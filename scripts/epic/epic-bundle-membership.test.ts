@@ -19,9 +19,7 @@ import { epic_bundle_gaps } from './epic-bundle-gaps'
 // forbids (joshuafolkken/kit#943).
 
 const REPO = 'joshuafolkken/kit'
-// Read through a variable key, as the command itself does. A literal one used to be rewritten to dot
-// notation by `dot-notation` and then rejected by `noPropertyAccessFromIndexSignature`;
-// joshuafolkken/kit#1783 switched that fix off, so matching the command is the whole reason now.
+// A variable key matches the command's access to the indexed property (joshuafolkken/kit#1783).
 const CREATE_EPIC: BundleAction = 'create_epic'
 const ADD_TO_EPIC: BundleAction = 'add_to_epic'
 const CREATE_EPIC_LINE = epic_bundle_cli.ACTION_LINES[CREATE_EPIC] ?? ''
@@ -153,11 +151,8 @@ async function report_with_capped_epics(): Promise<string> {
 		.spyOn(git_gh_command, 'issue_list_by_label')
 		.mockResolvedValue(capped_listing_outcome(EPIC_LISTING))
 	const backlog = vi
-		.spyOn(git_gh_command, 'issue_list_open_bodies')
+		.spyOn(git_gh_command, 'issue_list_open_relations')
 		.mockResolvedValue(listing_outcome(BACKLOG_LISTING))
-	const relations = vi
-		.spyOn(git_gh_command, 'issue_get_state_and_relations')
-		.mockResolvedValue(undefined)
 	const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
 
@@ -166,7 +161,7 @@ async function report_with_capped_epics(): Promise<string> {
 
 		return info.mock.calls.map((call) => String(call[0])).join('\n')
 	} finally {
-		for (const spy of [epics, backlog, relations, info, error]) spy.mockRestore()
+		for (const spy of [epics, backlog, info, error]) spy.mockRestore()
 	}
 }
 

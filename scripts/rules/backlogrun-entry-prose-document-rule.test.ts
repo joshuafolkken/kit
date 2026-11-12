@@ -37,11 +37,11 @@ const RELOCATED_BODIES: ReadonlyArray<SingleSourceRule> = [
 		canonical: `${SKILL_DIR}/backlogrun-steps.md`,
 	},
 	{
-		marker: 'Read only the one section the row names',
+		marker: 'The supervisor already holds the carry record',
 		canonical: `${SKILL_DIR}/backlogrun-steps.md`,
 	},
 	{
-		marker: 'There is no epic to audit',
+		marker: 'is not run on the opted-in backlog',
 		canonical: `${SKILL_DIR}/backlogrun-steps.md`,
 	},
 ]

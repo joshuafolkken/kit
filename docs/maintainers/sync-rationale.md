@@ -258,6 +258,19 @@ mean denying `git` and its read-only inspection with it. The deny stops the habi
 `CLAUDE.md` stays the authority, and a command being let through is not permission. An explicit
 staging request is blocked for the agent too — deliberately; the user runs it in their own terminal.
 
+## Human review before merging workflow changes
+
+Agents may edit `.github/workflows/**` and open a pull request (joshuafolkken/kit#6223).
+A `pull_request` run executes the branch's own workflow files, so a rewritten workflow can turn a
+required check green.
+
+`followup` therefore refuses to merge a pull request that changes a workflow,
+even when CI is green. A person reads the diff on GitHub and merges it; this merge-side check
+addresses the concern in joshuafolkken/kit#6067.
+
+The former file-tool denies and lane-child write guard are removed. `josh sync` also removes the
+retired deny entries from existing consumer settings, so the next sync opens workflow editing there.
+
 ## The Bash output cap
 
 **The same file caps what one command's output contributes to the context.** Its `env` block sets

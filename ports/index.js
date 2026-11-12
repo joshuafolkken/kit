@@ -209,22 +209,15 @@ function discard_loaded_keys(snapshot) {
 /**
  * Apply the project settings kit's own Playwright config reads from `.env`, and nothing else.
  *
- * Every reader comes through here. `playwright.config.ts` is loaded by Playwright itself — from
- * `pnpm exec playwright test`, the VS Code extension and `josh test:e2e` alike — with nothing on
- * the way in that reads `.env`, and `josh port` calls this rather than the
- * `--env-file-if-exists=.env` tsx flag it used to carry, because that flag resolved the file
- * against the working directory while this resolves it at the project root (#826). Two readers on
- * two rules is how `josh port preview` printed 4176 while Playwright waited on 4173, costing a
- * consumer its whole E2E suite to a webServer timeout (#820).
+ * Every reader comes through here so Playwright and `josh port` resolve `.env` at the same project
+ * root, including calls made from a subdirectory. Agreement prevents a webServer timeout caused
+ * by the command and Playwright choosing different ports (#820, #826).
  *
- * The file is parsed by `loadEnvFile`, so `.env` is read exactly as the flag reads it, and then
- * every key outside `PROJECT_ENVIRONMENT_KEYS` is taken back out. #826: the `webServer` child
- * inherits this process's environment wholesale, so keeping the rest handed a consumer's `.env`
- * secrets to the dev or preview server for the sake of two settings. A `CLOUDFLARE_API_TOKEN`
- * sitting there is not inert: `wrangler` prefers it over the OAuth session it would otherwise use,
- * so a token short of the needed scopes turned a working preview into a 403. A server that wants
- * `.env` still loads it in its own start script, which is where that decision was made before this
- * loader existed.
+ * `loadEnvFile` parses `.env`, and every key outside `PROJECT_ENVIRONMENT_KEYS` is taken back out.
+ * The `webServer` child inherits this process's environment wholesale, so retaining other keys
+ * would pass consumer secrets to
+ * the server. A `CLOUDFLARE_API_TOKEN` can override wrangler's OAuth session with insufficient
+ * scopes. Servers that need `.env` load it in their own start script (#826).
  *
  * A missing file is the documented default and does nothing, and a variable already present in the
  * environment wins over the file, so an explicit `PORT_SEED=2 pnpm josh test:e2e` still overrides

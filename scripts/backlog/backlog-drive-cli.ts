@@ -4,16 +4,13 @@ import { fileURLToPath } from 'node:url'
 import { auto_ok_judge_read, type JudgedCache } from '#scripts/auto-ok/auto-ok-judge-read'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { hook_decision } from '#scripts/josh/hook-decision'
-import { josh_command } from '#scripts/josh/josh-run'
 import { lane_await, type AwaitState } from '#scripts/lane/lane-await'
+import { lane_launch_cli } from '#scripts/lane/lane-launch-cli'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_sampler } from '#scripts/lane/lane-sampler'
 import { error_text } from '#scripts/lib/error-message'
 import { json_value } from '#scripts/lib/json-value'
-import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
-import type { MergeResult } from '#scripts/run/merge/run-merge-cli'
-import { run_merge_driver } from '#scripts/run/merge/run-merge-driver'
 import { run_merge_usage_limit } from '#scripts/run/merge/run-merge-usage-limit'
 import { z } from 'zod'
 import { backlog_budget } from './backlog-budget'
@@ -28,19 +25,26 @@ import {
 import { backlog_drive_adopt } from './backlog-drive-adopt'
 import { backlog_drive_args, type DriveContext } from './backlog-drive-args'
 import { backlog_drive_carried } from './backlog-drive-carried'
+import { backlog_drive_collect } from './backlog-drive-collect'
 import { backlog_drive_finish } from './backlog-drive-finish'
 import { backlog_drive_hold, type HoldRecorder } from './backlog-drive-hold'
 import { backlog_drive_idle } from './backlog-drive-idle'
 import { backlog_drive_launch } from './backlog-drive-launch'
+import { backlog_drive_listing } from './backlog-drive-listing'
 import { backlog_drive_memory } from './backlog-drive-memory'
 import { backlog_drive_named } from './backlog-drive-named'
 import { backlog_drive_named_offer } from './backlog-drive-named-offer'
 import { backlog_drive_offer_argv } from './backlog-drive-offer-argv'
 import { backlog_drive_owner } from './backlog-drive-owner'
 import { backlog_drive_paused } from './backlog-drive-paused'
-import { backlog_drive_restore } from './backlog-drive-restore'
+import { backlog_drive_rate } from './backlog-drive-rate'
+import { backlog_drive_rate_limit } from './backlog-drive-rate-limit'
+import { backlog_drive_record } from './backlog-drive-record'
+import { backlog_drive_restore, type LeftOut } from './backlog-drive-restore'
 import { backlog_drive_retrospective } from './backlog-drive-retrospective'
+import { backlog_drive_retrospective_unit } from './backlog-drive-retrospective-unit'
 import { backlog_drive_seats } from './backlog-drive-seats'
+import { backlog_drive_tick, type RunningCheck } from './backlog-drive-tick'
 import { backlog_offer_cli } from './backlog-offer-cli'
 import { backlog_ready } from './backlog-ready'
 
@@ -56,7 +60,6 @@ import { backlog_ready } from './backlog-ready'
 const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const should_forward_stderr = true
 const POLL_MS = 5000
 const FIRST_LINE = 0
 
@@ -68,6 +71,9 @@ const offer_read_schema = z.object({
 	answer: z.string().optional(),
 	cause: z.string().optional(),
 	waiting: z.array(z.number()).optional(),
+	not_before_ms: z.number().optional(),
+	idle_until_ms: z.number().optional(),
+	is_judgment_owed: z.boolean().optional(),
 	reason: z.string().optional(),
 	is_finish: z.boolean().optional(),
 })
@@ -77,26 +83,18 @@ function to_offer(out: string): OfferRead | undefined {
 	return json_value.parse_with(out, offer_schema)?.[backlog_offer_cli.JSON_KEY]
 }
 
-async function read_record(): Promise<RunCarry | undefined> {
-	const target = await run_carry.repository_directory()
-
-	if (target === undefined) return undefined
-
-	const read = run_carry.read_carry(run_carry.carry_path(target))
-
-	return read.kind === 'carried' ? read.carry : undefined
-}
-
 async function read_offer(
 	state: DriveState,
 	context: DriveContext,
 ): Promise<OfferRead | undefined> {
 	const carry = await backlog_drive_owner.assert_current(context.owner)
-	const named = await backlog_drive_named_offer.read(carry, state, context)
-	if (named !== undefined) return named
+	const { offer: named, pool } = await backlog_drive_named_offer.read(carry, state, context)
+	// joshuafolkken/kit#6563: the open offer's read waits out a dry core allowance.
+	const answered = named ?? (await backlog_drive_rate_limit.held(state))
+	if (answered !== undefined) return answered
 
-	const argv = backlog_drive_offer_argv.offer_argv(state, carry, context.forwarded)
-	const result = await josh_command.josh_run(argv, should_forward_stderr)
+	const argv = backlog_drive_offer_argv.offer_argv(pool, carry, context.forwarded)
+	const result = await backlog_drive_rate.offer_run(argv)
 
 	const offer = result.code === SUCCESS_EXIT_CODE ? to_offer(result.out) : undefined
 
@@ -115,35 +113,18 @@ function merge_token(out: string, code: number): string {
 	return ''
 }
 
-// A `run:merge` that printed no result — a crash before its verdict — answers no token, which the loop
-// never reads as a collection.
-function unprinted(code: number): MergeResult {
-	return { token: '', code, is_offer: true, outcome: 'unresolved' }
-}
-
-// The child's transcript, where its lane recorded one, so `run:merge` can tell an API outage from a
-// failure exactly as it does for the parent that passes `--output` by hand. Run as its own process
-// (`run-merge-driver.ts`), so a fix merged since this loop started is the code that decides the child.
-async function merge(issue: string, owner: string): Promise<MergeResult> {
-	await backlog_drive_owner.assert_current(owner)
-	const lane = await lane_registry.find_open_lane(issue)
-	const argv = run_merge_driver.argv_of({ child: issue, owner, output: lane?.output })
-	const ran = await josh_command.josh_run(argv, should_forward_stderr)
-	const result = run_merge_driver.read(ran.out) ?? unprinted(ran.code)
-
-	await backlog_drive_named.mark_done(issue, result, owner)
-
-	return result
-}
-
 // `lane:await`'s re-confirmed check, one state per child. A child already gone when the loop starts —
 // a restart after it ended — is read as having appeared, so it is collected after the re-confirm window
 // rather than waited on until the never-appeared timeout. One that never appeared is collected too:
 // `run:merge` reads its state rather than this loop guessing.
-function finished_checker(seeded: ReadonlySet<string>): (issue: string) => boolean {
+// `is_running` answers from the tick's process snapshot (`backlog_drive_tick`).
+function finished_checker(
+	seeded: ReadonlySet<string>,
+	is_running: RunningCheck,
+): (issue: string) => boolean {
 	const states = new Map<string, AwaitState>()
 	const config = {
-		is_running: lane_await.is_process_running_default,
+		is_running,
 		is_shipped: lane_await.is_shipped_default,
 		reconfirm_ms: lane_await.RECONFIRM_MS,
 		never_appeared_timeout_ms: lane_await.NEVER_APPEARED_TIMEOUT_MS,
@@ -174,7 +155,7 @@ async function open_lanes(): Promise<ReadonlyArray<LaneInfo>> {
 
 function end_line(end: DriveEnd): string {
 	const token = end.token === undefined || end.token === end.reason ? [] : [end.token]
-	const issue = end.issue === undefined ? [] : [issue_cite.plain(end.issue)]
+	const issue = end.issue === undefined ? [] : [issue_cite.plain_for('program', end.issue)]
 	const base = [end.reason, ...token, ...issue].join(' ')
 
 	return end.detail === undefined ? base : `${base} ${end.detail}`
@@ -197,19 +178,19 @@ function reporters(holds: HoldRecorder): Pick<LoopPorts, 'hold' | 'idle' | 'paus
 	return {
 		hold: holds.hold,
 		idle: backlog_drive_idle.notify,
-		paused: async () => {
-			await backlog_drive_paused.notify()
-		},
+		paused: backlog_drive_paused.notify,
 	}
 }
 
-// What a launch is weighed against: the free lanes, a kept lane, and the memory for one more.
+// What a launch is weighed against: the free lanes, a kept lane, and the memory for one more — and
+// whether a free lane has a new `auto-ok` issue to ask about.
 function room_ports(): Pick<
 	LoopPorts,
-	'free_lanes' | 'has_lane' | 'limit_room' | 'memory_held' | 'usage_limited'
+	'free_lanes' | 'has_lane' | 'limit_room' | 'memory_held' | 'usage_limited' | 'listing_changed'
 > {
 	return {
 		free_lanes: backlog_ready.drive_free_lane_count,
+		listing_changed: backlog_drive_listing.watcher(),
 		limit_room: backlog_ready.drive_limit_room,
 		has_lane: backlog_drive_seats.has_kept_lane,
 		memory_held: backlog_drive_memory.gauge(),
@@ -222,12 +203,13 @@ function room_ports(): Pick<
 function child_ports(
 	seeded: ReadonlyArray<string>,
 	owner: string,
+	is_running: RunningCheck,
 ): Pick<LoopPorts, 'adoptable' | 'is_finished' | 'merge'> {
 	const known = new Set(seeded)
 
 	return {
-		is_finished: finished_checker(known),
-		merge: async (issue) => await merge(issue, owner),
+		is_finished: finished_checker(known, is_running),
+		merge: async (issue) => await backlog_drive_collect.merge(issue, owner),
 		adoptable: async (in_flight) => {
 			const adopting = await backlog_drive_adopt.adoptable(in_flight)
 
@@ -238,24 +220,35 @@ function child_ports(
 	}
 }
 
+async function offer_for(state: DriveState, context: DriveContext): Promise<OfferRead | undefined> {
+	const read = await read_offer(state, context)
+
+	lane_launch_cli.keep_pending(read?.verdict === 'run' ? read.issues : [])
+
+	return read
+}
+
 function ports_of(
 	context: DriveContext,
 	seeded: ReadonlyArray<string>,
 	last: { state: DriveState },
 	holds: HoldRecorder,
 ): LoopPorts {
+	const tick = backlog_drive_tick.tick_share()
+
 	return {
-		...child_ports(seeded, context.owner),
-		offer: async (state) => await read_offer(state, context),
+		...child_ports(seeded, context.owner, tick.is_running),
+		begin_tick: tick.begin_tick,
+		offer: async (state) => await offer_for(state, context),
 		launch: async (issue) => await backlog_drive_launch.launch(issue, context.owner),
 		...room_ports(),
 		judgement_owed: judgement_reader(),
 		...reporters(holds),
 		now: () => new Date(),
-		sleep: async (milliseconds) => {
-			await sleep(milliseconds)
-		},
+		sleep,
+		...backlog_drive_record.record_ports(tick.read),
 		finish: backlog_drive_finish.finish,
+		retrospective: async () => await backlog_drive_retrospective_unit.run(context.owner),
 		on_state: (state) => {
 			last.state = state
 		},
@@ -264,14 +257,14 @@ function ports_of(
 
 // The lanes still in flight, and the children this run withdrew: a withdrawal while the drive was
 // handed back is never collected by this invocation, so its exclusion is read from the stream
-// (joshuafolkken/kit#4365).
+// (joshuafolkken/kit#4365). The sample waits are read back the same way (joshuafolkken/kit#6503).
 interface Seeded {
 	lanes: ReadonlyArray<string>
-	withdrawn: ReadonlyArray<string>
+	left_out: LeftOut
 }
 
 async function seeded_lanes(context: DriveContext): Promise<Seeded | undefined> {
-	const carry = await read_record()
+	const carry = await backlog_drive_record.read_record()
 
 	if (carry === undefined) return undefined
 
@@ -286,13 +279,19 @@ async function seeded_lanes(context: DriveContext): Promise<Seeded | undefined> 
 
 	return {
 		lanes: backlog_drive_restore.restore(lanes, events, carry.merged_issues ?? [], dispatched),
-		withdrawn: backlog_drive_restore.withdrawn_issues(events),
+		left_out: backlog_drive_restore.left_out(events, context.exclude),
 	}
 }
 
 // The interval between two asks is `backlog:budget`'s own, so the driver keeps the one its reason prints.
 function loop_config(window_ms: number | undefined): LoopConfig {
-	return { poll_ms: POLL_MS, offer_ms: backlog_budget.OFFER_INTERVAL_MS, window_ms }
+	return {
+		poll_ms: POLL_MS,
+		offer_ms: backlog_budget.OFFER_INTERVAL_MS,
+		idle_offer_ms: backlog_budget.IDLE_OFFER_INTERVAL_MS,
+		check_ms: backlog_budget.LISTING_CHECK_INTERVAL_MS,
+		window_ms,
+	}
 }
 
 // The hand-back, the ledger's hold included — the lanes now wait on a session — and the resume line.
@@ -315,7 +314,11 @@ function seeded_state(seeded: Seeded, context: DriveContext): DriveState {
 	const initial =
 		context.stopped === undefined ? fresh : backlog_drive.merge_stopped(context.stopped, fresh)
 
-	return { ...initial, exclude: [...new Set([...context.exclude, ...seeded.withdrawn])] }
+	initial.is_triage_owed = context.is_triage_owed
+	initial.triage_pid = context.triage_pid
+	initial.triage_start = context.triage_start
+
+	return { ...initial, ...seeded.left_out }
 }
 
 async function drive(context: DriveContext): Promise<number> {
@@ -344,6 +347,7 @@ async function run_safe(context: DriveContext): Promise<number> {
 
 		return FAILURE_EXIT_CODE
 	} finally {
+		lane_launch_cli.keep_pending([])
 		stop_sampling()
 	}
 }
@@ -367,13 +371,14 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 }
 
 const backlog_drive_cli = {
+	child_ports,
 	end_line,
-	finish: backlog_drive_finish.finish,
 	loop_config,
-	merge,
+	merge: backlog_drive_collect.merge,
 	merge_token,
 	offer_argv: backlog_drive_offer_argv.offer_argv,
 	parse: backlog_drive_args.parse,
+	ports_of,
 	read_offer,
 	resume_line: backlog_drive_args.resume_line,
 	run,

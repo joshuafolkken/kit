@@ -111,12 +111,12 @@ function record(invocation: string): RunCarry {
 	return { invocation, started_at: EARLY, merged: 0, filed: 0, cuts: 0, failures: 0, outages: 0 }
 }
 
-function lane_of(issue: string): LaneInfo {
+function lane_of(issue: string, seat = 1): LaneInfo {
 	return {
 		issue,
 		branch: `${issue}-lane`,
 		directory: `/lanes/${issue}`,
-		seat: undefined,
+		seat,
 		development_port: undefined,
 		preview_port: undefined,
 		output: undefined,
@@ -126,7 +126,9 @@ function lane_of(issue: string): LaneInfo {
 
 const LIMIT = 6
 // Five lanes open under a limit of six: one is free.
-const OPEN = ['3865', '3867', '3868', '3871', '3881'].map((issue) => lane_of(issue))
+const OPEN = ['3865', '3867', '3868', '3871', '3881'].map((issue, index) =>
+	lane_of(issue, index + 1),
+)
 
 // joshuafolkken/kit#3893: the board said "no free lane" beside a `lane:limit` that printed free 1.
 describe('backlog_ready.free_lanes_beside', () => {

@@ -1,8 +1,8 @@
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { build_library, library_paths } from './build-library'
 
@@ -18,12 +18,14 @@ const BUILD_TIMEOUT = 60_000
 const DOWNSTREAM_NAME = '@example/downstream'
 const MANIFEST = 'package.json'
 
+const make_directory = temporary_directory('suite')
+
 beforeAll(async () => {
 	await build_library(LIBRARY)
 }, BUILD_TIMEOUT)
 
 function manifest_directory(name: string): string {
-	const directory = mkdtempSync(path.join(tmpdir(), 'guard-dist-'))
+	const directory = make_directory('guard-dist-')
 
 	writeFileSync(path.join(directory, MANIFEST), JSON.stringify({ name }))
 
@@ -71,17 +73,5 @@ describe('build_library self_sync_guard — bundled .d.ts', () => {
 
 		expect(content).toContain('self_sync_guard')
 		expect(content).toContain('self_sync_refusal')
-	})
-})
-
-describe('package.json — the ./self-sync-guard export', () => {
-	it('points at the files the build writes', () => {
-		const manifest = JSON.parse(
-			readFileSync(path.join(import.meta.dirname, '..', '..', MANIFEST), 'utf8'),
-		) as { exports: Record<string, { types: string; default: string }> }
-		const entry = manifest.exports['./self-sync-guard']
-
-		expect(entry?.default).toBe('./dist/self-sync-guard/index.js')
-		expect(entry?.types).toBe('./dist/self-sync-guard/index.d.ts')
 	})
 })

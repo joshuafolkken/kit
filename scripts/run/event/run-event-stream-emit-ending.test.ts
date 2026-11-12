@@ -1,7 +1,8 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { rmSync } from 'node:fs'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#4481: every writer of an ending emits through `emit`, which records the child's lane
 // time on the event once, from the stream's launch or the lane record's.
@@ -19,10 +20,11 @@ const { run_event_stream_emit } = await import('./run-event-stream-emit')
 const { run_event_stream } = await import('./run-event-stream')
 
 const KIND = run_event_stream.EVENT_KIND
-const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-run-event-ending-'))
+const TEMPORARY = make_directory('josh-run-event-ending-')
 const LAUNCHED_AT = new Date('2026-10-22T07:09:38.000Z')
 const ENDED_AT = new Date('2026-10-22T07:17:30.000Z')
 const MERGED_TEXT = '#4430 merged'
+const PARKED_TEXT = '#4430 parked'
 const IN_LANE_MS = ENDED_AT.getTime() - LAUNCHED_AT.getTime()
 const RECORD = {
 	issue: '4430',
@@ -36,10 +38,6 @@ beforeEach(() => {
 	git_directories_mock.mockReset()
 	read_state_mock.mockReset()
 	git_directories_mock.mockResolvedValue(['/repo/.git/worktrees/lane', TEMPORARY])
-})
-
-afterAll(() => {
-	rmSync(TEMPORARY, { force: true, recursive: true })
 })
 
 // The newest event on the stream, removing the stream afterwards.
@@ -101,8 +99,18 @@ describe('run_event_stream_emit -- an ending with no time, or appended by hand',
 
 	it('records nothing for a child with no lane record', async () => {
 		read_state_mock.mockResolvedValue(undefined)
-		await run_event_stream_emit.emit(KIND.PARK, '#4430 parked', ENDED_AT)
+		await run_event_stream_emit.emit(KIND.PARK, PARKED_TEXT, ENDED_AT)
 
 		expect(await newest_event()).not.toHaveProperty('elapsed_ms')
+	})
+
+	// joshuafolkken/kit#6864: a park's ship stop rides on the event `emit` writes.
+	it('writes the fields it is given beside the text', async () => {
+		read_state_mock.mockResolvedValue(undefined)
+		const stop = { stage: 'followup', cause: 'check' }
+
+		await run_event_stream_emit.emit(KIND.PARK, PARKED_TEXT, ENDED_AT, { stop })
+
+		expect(await newest_event()).toMatchObject({ kind: KIND.PARK, text: PARKED_TEXT, stop })
 	})
 })

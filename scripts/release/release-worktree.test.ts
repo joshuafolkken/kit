@@ -49,7 +49,6 @@ const ADD_REFUSAL = 'already exists'
 const AHEAD = 2
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.mocked(git_command.get_default_branch).mockResolvedValue(DEFAULT_BRANCH)
 	vi.mocked(git_worktree.worktree_add).mockResolvedValue('')
 	vi.mocked(git_worktree.worktree_remove).mockResolvedValue('')
@@ -107,8 +106,8 @@ describe('release_worktree.create', () => {
 	})
 })
 
-// `git worktree add -b` creates the branch before it checks the path, so a refused add used to leave
-// `release/v<version>` behind for the next run's branch guard to trip on (joshuafolkken/kit#3058).
+// `git worktree add -b` creates the branch before checking the path, so a failed add needs cleanup
+// to keep the next run's branch guard clear (joshuafolkken/kit#3058).
 describe('release_worktree.create when the add fails', () => {
 	it('deletes the branch the failed add created and rethrows', async () => {
 		vi.mocked(git_worktree.worktree_add).mockRejectedValue(new Error(ADD_REFUSAL))

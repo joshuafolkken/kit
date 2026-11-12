@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { busy_average, type BusySample } from './busy-average'
 import type { MachineReading } from './machine-capacity'
 
-// joshuafolkken/kit#4238: one 250 ms reading of a CPU near saturation swings across the admission
+// joshuafolkken/kit#4238: one reading of a CPU near saturation swings across the admission
 // threshold, so a claim judged on each reading alone is admitted on a momentary dip. A waiting claim
 // judges on the mean of its last few seconds instead.
 
@@ -65,6 +65,25 @@ describe('busy_average — the busy cores a waiting claim admits against', () =>
 
 // joshuafolkken/kit#4982: on a saturated machine a claim waited out the two-minute cap though the load
 // never fell. A wait now tracks when the load last eased, a whole core at a time.
+// joshuafolkken/kit#5391: the raw mean is not floored at the ledger's declared cores, so a ledger that
+// reserves more than it runs leaves the machine room to show.
+describe('busy_average.mean_busy — the raw busy cores a wait has read', () => {
+	it('averages the raw readings below the ledger the samples were taken against', () => {
+		const samples = busy_average.with_reading(
+			busy_average.with_reading([], reading(DIPPED), RESERVED, 0),
+			reading(DIPPED + 2),
+			RESERVED,
+			STEP_MS,
+		)
+
+		expect(busy_average.mean_busy(samples)).toBe(DIPPED + 1)
+	})
+
+	it('answers undefined before any reading', () => {
+		expect(busy_average.mean_busy([])).toBeUndefined()
+	})
+})
+
 const WINDOW_MS = 1000
 
 describe('busy_average.with_ease — when the load a wait reads last eased', () => {

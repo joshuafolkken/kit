@@ -2,6 +2,7 @@ import os from 'node:os'
 import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
 import { command_memory, type ToolCall } from '#scripts/gate/command-memory'
 import { core_weights } from '#scripts/gate/core-weights'
+import type { HookContext } from '#scripts/hooks/hook-context'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { json_value } from '#scripts/lib/json-value'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
@@ -22,8 +23,7 @@ import { timed_rerun } from './timed-rerun'
 // `pnpm josh reserved-run <weight> -- <command>` wraps is read as reserved.
 //
 // **A multi-worker eslint is refused even when reserved** (joshuafolkken/kit#4582): typed eslint holds a
-// TypeScript program per worker, so `--concurrency 4` or `auto` held 12 GB in one lane and swapped the
-// machine. `--concurrency off`, `1` and no flag pass.
+// TypeScript program per worker, so `--concurrency 4` or `auto` in one lane swapped the machine. `--concurrency off`, `1` and no flag pass.
 //
 // **Lane children only.** An interactive session outside a lane keeps its direct runs; the overlap this
 // prevents is between concurrently dispatched lanes.
@@ -112,13 +112,19 @@ function reserved_command(
 	return `${RESERVED_RUN} ${String(weight)} -- ${line}`
 }
 
-function is_lane_bash(call: GuardedCall): boolean {
-	return call.name === cost_blocks.BASH_TOOL && lane_child_marker.is_child_of(process.cwd())
+function is_lane_bash(call: GuardedCall, context: HookContext): boolean {
+	if (call.name !== cost_blocks.BASH_TOOL) return false
+
+	return lane_child_marker.is_child_of(context.cwd, context.env)
 }
 
 // The call's input with its line wrapped, for a lane child alone; `undefined` where nothing is rewritten.
-function reserved_input(call: GuardedCall): Record<string, unknown> | undefined {
-	if (!is_lane_bash(call) || !json_value.is_record(call.input)) return undefined
+function reserved_input(
+	call: GuardedCall,
+	_tail: () => string,
+	context: HookContext,
+): Record<string, unknown> | undefined {
+	if (!is_lane_bash(call, context) || !json_value.is_record(call.input)) return undefined
 
 	const command = reserved_command(time_shell.bash_command(call.input))
 
@@ -127,13 +133,14 @@ function reserved_input(call: GuardedCall): Record<string, unknown> | undefined 
 
 // True when this session is a dispatched lane child launching a heavy tool directly, or eslint with
 // more than one worker by any path.
-function is_lane_direct_tool(
-	command: string,
-	is_lane_child: boolean = lane_child_marker.is_child_of(process.cwd()),
-): boolean {
+function is_lane_direct_tool(command: string, is_lane_child: boolean): boolean {
 	if (!is_lane_child) return false
 
 	return runs_heavy_tool(command) || command_memory.runs_multi_worker_eslint(command)
+}
+
+function is_lane_direct_tool_in(command: string, context: HookContext): boolean {
+	return is_lane_direct_tool(command, lane_child_marker.is_child_of(context.cwd, context.env))
 }
 
 const LANE_DIRECT_TOOL_REASON =
@@ -145,7 +152,7 @@ const LANE_DIRECT_TOOL_REASON =
 // The row itself, so `delivered-rules.ts` spreads one entry; the shape is `lane-switch-main.ts`'s.
 const ROW = {
 	id: 'lane-direct-tool',
-	is_trigger: bash_triggers.on_bash_command(is_lane_direct_tool),
+	is_trigger: bash_triggers.on_bash_command(is_lane_direct_tool_in),
 	reason: LANE_DIRECT_TOOL_REASON,
 	decide: (): boolean => true,
 	rewrite: reserved_input,

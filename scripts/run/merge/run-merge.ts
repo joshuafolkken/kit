@@ -2,6 +2,7 @@ import {
 	EPIC_LABEL,
 	has_label_name,
 	has_parked_label,
+	NEEDS_HUMAN_MERGE_LABEL,
 	RUN_STALLED_LABEL,
 } from '#scripts/issue/issue-labels'
 import type { IssueState } from '#scripts/issue/issue-state'
@@ -20,17 +21,21 @@ import type { ChildOutcome } from './run-merge-outcome'
 // unit-tested without a network — `merged`, `parked`, `failed`, `human-review`, `unresolved`.
 
 const CLOSED_STATE = 'CLOSED'
-// Three failures in a row stop the run — the figure `backlogrun-progress.md` states in prose. A merge
-// resets the streak (`run-carry.ts` → `next_failures`), so the guard trips only on an environment
-// failing every child it is handed rather than on failures scattered across a long run.
+// Every third failure in a row asks whether `main` itself is broken (`run-merge-health.ts`) — the
+// figure `backlogrun-progress.md` states in prose. Nothing stops the run: each failed child is already
+// parked on its own (joshuafolkken/kit#7078). A merge resets the streak (`run-carry.ts` →
+// `next_failures`), so the check runs only on an environment failing every child it is handed.
 const CONSECUTIVE_FAILURE_LIMIT = 3
-// Three outages in a row stop the run too — the same shape as the failure
-// guard, over its own streak. An outage is a child its environment ended — it could not reach the API
-// or its session was killed inside a turn — so a run of them is the environment being down; stopping is
-// what keeps the run from re-dispatching into a dead API forever. A ship that stopped with no relaunch
-// is re-dispatched too but not counted: its child reached the API (joshuafolkken/kit#3974). A merge or
-// a genuine child failure resets it (`run-carry.ts` → `next_outages`).
+// Three outages in a row hold launches — the same shape as the failure guard, over its own streak. An
+// outage is a child its environment ended — it could not reach the API or its session was killed inside
+// a turn — so a run of them is the environment being down; the hold keeps the run from re-dispatching
+// into a dead API, and every further outage doubles it up to `OUTAGE_WAIT_CAP_MS` (`outage_wait_ms`).
+// A ship that stopped with no relaunch is re-dispatched too but not counted: its child reached the API
+// (joshuafolkken/kit#3974). A merge or a genuine child failure resets it (`run-carry.ts` → `next_outages`).
 const CONSECUTIVE_OUTAGE_LIMIT = 3
+const OUTAGE_WAIT_BASE_MS = 300_000
+const OUTAGE_WAIT_CAP_MS = 3_600_000
+const DOUBLING = 2
 const ONE = 1
 
 // What a returned child turned out to be, decided from its GitHub state and — for the failed case
@@ -38,7 +43,7 @@ const ONE = 1
 // - `merged`      — CLOSED by a merge; the child finished and its pull request merged. Also an OPEN, unparked
 //                   child a merged pull request's `closes #N` names — GitHub merged it without closing
 //                   the issue.
-// - `human-review` — OPEN and carrying `needs-human-review`; the run's own ending (needs-human-review.md).
+// - `human-review` — OPEN and carrying `needs-human-review`; only this child stops (needs-human-review.md).
 // - `parked`      — OPEN and carrying a park label (`PARKED_LABELS`); a person still owns it.
 // - `split`       — OPEN and carrying `epic`; its work was divided into new children.
 // - `outage`      — OPEN and carrying neither, but the exit record shows it could not reach the API, a
@@ -48,8 +53,8 @@ const ONE = 1
 //                   the child ended its session on purpose, so it is resumed rather than parked and
 //                   counts nothing.
 // - `unauthenticated` — OPEN and carrying neither, but the exit record shows the session could not
-//                   authenticate; no child can run until a person runs `/login`, so the run stops with
-//                   the child left `in-progress` and nothing counted (joshuafolkken/kit#4216).
+//                   authenticate; no child can run until a person runs `/login`, so launches are held
+//                   with the child released and nothing counted (joshuafolkken/kit#4216, #7078).
 // - `usage-limit` — OPEN and carrying neither, but the exit record shows a Claude usage limit stopped
 //                   it; nothing is counted or parked, and the run dispatches again once the limit
 //                   resets (joshuafolkken/kit#4745).
@@ -127,7 +132,9 @@ function unfinished_outcome(signals: EndingSignals): ChildOutcome {
 }
 
 function open_outcome(state: IssueState, signals: EndingSignals): ChildOutcome {
-	if (state.is_human_review) return 'human-review'
+	if (state.is_human_review || has_label_name(state.labels, NEEDS_HUMAN_MERGE_LABEL)) {
+		return 'human-review'
+	}
 
 	if (has_label_name(state.labels, EPIC_LABEL)) return 'split'
 
@@ -171,14 +178,24 @@ function change_of(outcome: ChildOutcome): CarryChange | undefined {
 	return undefined
 }
 
+// Every `CONSECUTIVE_FAILURE_LIMIT`-th failure in a row, so a streak `main`'s check found green asks
+// again only after as many more failures.
 function is_guard_tripped(failures: number): boolean {
-	return failures >= CONSECUTIVE_FAILURE_LIMIT
+	return failures > 0 && failures % CONSECUTIVE_FAILURE_LIMIT === 0
 }
 
-// The outage guard, over its own streak. Same shape as the failure guard: a
-// run of consecutive outages is the environment being down, so the run stops rather than re-dispatching.
+// The outage guard, over its own streak: a run of consecutive outages is the environment being down,
+// so launches are held rather than re-dispatched.
 function is_outage_guard_tripped(outages: number): boolean {
 	return outages >= CONSECUTIVE_OUTAGE_LIMIT
+}
+
+// How long a tripped outage guard holds launches: `OUTAGE_WAIT_BASE_MS` at the limit, doubled for every
+// outage past it, never past `OUTAGE_WAIT_CAP_MS`.
+function outage_wait_ms(outages: number): number {
+	const doublings = Math.max(0, outages - CONSECUTIVE_OUTAGE_LIMIT)
+
+	return Math.min(OUTAGE_WAIT_BASE_MS * DOUBLING ** doublings, OUTAGE_WAIT_CAP_MS)
 }
 
 // The progress comment, generated from the single-source carry record so the counters live in one
@@ -210,7 +227,7 @@ interface ParkReason {
 function streak_line(carry: RunCarry | undefined): string {
 	if (carry === undefined) return '- Consecutive failures: not recorded (no carry record).'
 
-	return `- Consecutive failures: ${String(carry.failures)} of ${String(CONSECUTIVE_FAILURE_LIMIT)} (the run stops at ${String(CONSECUTIVE_FAILURE_LIMIT)}).`
+	return `- Consecutive failures: ${String(carry.failures)} of ${String(CONSECUTIVE_FAILURE_LIMIT)} (every ${String(CONSECUTIVE_FAILURE_LIMIT)} in a row checks \`main\`).`
 }
 
 function park_comment(reason: ParkReason): string {
@@ -221,7 +238,7 @@ function park_comment(reason: ParkReason): string {
 		`- Why: ${reason.cause}`,
 		'- Read: the issue is OPEN, carries no park label, `needs-human-review` or `epic`, no merged pull request’s `closes #N` names it, and it declares no open blocker, start date still ahead or sample condition not yet met.',
 		streak_line(reason.carry),
-		`- Next: read the child’s transcript${transcript}, ${run_stalled.next_step(reason.child)}.`,
+		`- Next: read the child’s transcript${transcript}, ${run_stalled.next_step(reason.child, reason.cause)}.`,
 	].join('\n')
 }
 
@@ -246,6 +263,7 @@ const run_merge = {
 	waiting_comment,
 	is_guard_tripped,
 	is_outage_guard_tripped,
+	outage_wait_ms,
 }
 
 export type { EndingSignals, ParkReason }

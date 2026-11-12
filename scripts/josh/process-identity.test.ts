@@ -1,9 +1,10 @@
 import { spawnSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { writeFileSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { process_identity } from './process-identity'
 import { process_identity_fixture } from './process-identity-fixture'
@@ -27,6 +28,7 @@ const {
 	has_start_probe,
 	sandbox_probes,
 } = process_identity_fixture
+const make_directory = temporary_directory()
 
 const SOCKET_SCHEME = 'socket:'
 const UNUSED_TARGET = 'unused.sock'
@@ -52,13 +54,7 @@ function missing_socket(): string {
 }
 
 function in_scratch_directory(work: (directory: string) => void): void {
-	const directory = mkdtempSync(path.join(tmpdir(), 'process-identity-test-'))
-
-	try {
-		work(directory)
-	} finally {
-		rmSync(directory, { force: true, recursive: true })
-	}
+	work(make_directory('process-identity-test-'))
 }
 
 function fail_binding(): never {
@@ -230,6 +226,7 @@ describe('process_identity.is_live_beacon — an unanswered probe is unknown, no
 		const target = token.slice(SOCKET_SCHEME.length)
 
 		try {
+			expect(probe_socket(target)).toBe(0)
 			expect(process_identity.is_live_beacon(target, probe_socket)).toBe(true)
 		} finally {
 			process_identity.close_beacon(token)

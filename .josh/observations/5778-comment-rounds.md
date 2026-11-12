@@ -1,0 +1,1 @@
+- rf:bug-risks | low | scripts/followup/git-pr-followup-checks.ts:152 | 2026-11-01 | #5778

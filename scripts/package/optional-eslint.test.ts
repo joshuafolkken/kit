@@ -1,17 +1,17 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import os from 'node:os'
 import path from 'node:path'
 import {
 	production_dependency_graph,
 	type Lockfile,
 } from '#tools/package/production-dependency-graph'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { execaSync } from 'execa'
 import { loadAll } from 'js-yaml'
-import { afterAll, beforeAll, expect, it, vi } from 'vitest'
+import { beforeAll, expect, it, vi } from 'vitest'
 
 const ROOT = process.cwd()
-const SCRATCH = mkdtempSync(path.join(os.tmpdir(), 'kit-optional-eslint-'))
+const SCRATCH = temporary_directory('suite')('kit-optional-eslint-')
 const PNPM = 'pnpm'
 const IGNORE_SCRIPTS_FLAG = '--ignore-scripts'
 const PACKAGE_NAME = '@joshuafolkken/kit'
@@ -87,10 +87,6 @@ beforeAll(() => {
 	expect(path.resolve(SCRATCH, filename)).toBe(TARBALL)
 })
 
-afterAll(() => {
-	rmSync(SCRATCH, { recursive: true, force: true })
-})
-
 vi.setConfig({ testTimeout: 60_000 })
 
 it('keeps ESLint and Svelte out of a minimal installation', () => {
@@ -160,6 +156,7 @@ it('resolves the public config against an opted-in consumer and runs ESLint', ()
 	const directory = path.join(SCRATCH, 'eslint')
 
 	extract_kit(directory)
+	for (const name of Object.keys(MANIFEST.dependencies)) link_package(directory, name)
 	for (const name of ESLINT_PACKAGES) link_package(directory, name)
 	writeFileSync(path.join(directory, '.gitignore'), '')
 	const config_path = path.join(directory, 'lint-probe.mjs')

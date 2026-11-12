@@ -1,7 +1,7 @@
-import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
+import { issue_cite } from '#scripts/issue/issue-cite'
 import { SPLIT_ROUTE_LABEL } from '#scripts/issue/issue-labels'
-import { issue_read } from '#scripts/issue/issue-read'
 import { session_cite } from '#scripts/issue/session-cite'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import {
 	lane_ledger,
 	type LedgerEntry,
@@ -9,20 +9,34 @@ import {
 	type SplitNoticeEntry,
 } from '#scripts/lane/lane-ledger'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
+import { error_text } from '#scripts/lib/error-message'
 import { split_assess } from './split-assess'
 
-// **What answers a split notice** (joshuafolkken/kit#4695). Of the lanes the notice reached, none split
-// and none recorded why it stayed one Issue (joshuafolkken/kit#4676): the notice asked, and nothing
-// checked. The pre-gate `josh run:cut` now does. A noticed Issue passes once it has either answer:
-//
-// - **a split child** — a `josh issue:file --route split` filed from its lane, recorded in the lane
-//   ledger as the filing lands;
-// - **a reason** — a trusted Issue comment carrying the filing's own reason line
-//   (`split_assess.REASON_PREFIX`), so one declaration reads the same at filing and before the gate.
+// A split child answers a notice; the child is recorded as the filing lands (joshuafolkken/kit#6212).
+// A started lane is never split (joshuafolkken/kit#7183): its own `--route split --found-during` is
+// refused, and an overrun is recorded at its merge as a pre-split miss (`lane-size-record.ts`).
 
-const { REASON_PREFIX } = split_assess
 const NOTICE_SECTION = `split-assessment.md → "${split_assess.NOTICE_SECTION}"`
-const UNREAD_NOTE = 'Its comments could not be read, so no recorded reason was found. '
+
+interface SplitArguments {
+	route: string | undefined
+	found_during: string | undefined
+}
+
+// Whether the filing is not a split of the dispatched lane it is filed from; a refusal is printed. An
+// independent new requirement found in the lane is filed as an observation instead. An omitted
+// `--found-during` is the lane's own, as `issue_file_fold.finder` reads it.
+function is_split_clear({ route, found_during }: SplitArguments): boolean {
+	const marked = lane_child_marker.marked_issue()
+	const finder = found_during ?? marked
+
+	if (route !== SPLIT_ROUTE_LABEL || finder === undefined || finder !== marked) return true
+	console.error(
+		`refused: ${session_cite.issue(finder)} is a dispatched lane, which is never split — finish it; file an independent new requirement without \`--route split\` (${NOTICE_SECTION}).`,
+	)
+
+	return false
+}
 
 function is_notice(entry: LedgerEntry): entry is SplitNoticeEntry {
 	return entry.kind === lane_ledger.KIND.SPLIT_NOTICE
@@ -42,53 +56,6 @@ function split_issues(entries: ReadonlyArray<LedgerEntry>): ReadonlySet<number> 
 	return new Set(entries.filter((entry) => is_split_child(entry)).map((entry) => entry.issue))
 }
 
-function is_reason_line(line: string): boolean {
-	const text = line.trim()
-
-	return text.startsWith(REASON_PREFIX) && text !== REASON_PREFIX
-}
-
-function has_reason(bodies: ReadonlyArray<string>): boolean {
-	return bodies.some((body) => body.split('\n').some((line) => is_reason_line(line)))
-}
-
-// The trusted comments' bodies, or `undefined` when the listing could not be read.
-async function trusted_comments(issue: number): Promise<ReadonlyArray<string> | undefined> {
-	const json = await git_gh_issue_read.issue_list_comments(String(issue))
-	const comments = await issue_read.parse_comments(json)
-
-	return comments === undefined ? undefined : issue_read.trusted_bodies(comments)
-}
-
-function refusal_text(notice: SplitNoticeEntry, bodies: ReadonlyArray<string> | undefined): string {
-	const counted = `${String(notice.files)} file(s), ${String(notice.lines)} line(s), tests excluded`
-	const unread = bodies === undefined ? UNREAD_NOTE : ''
-	const answers = `post an Issue comment with the line \`${REASON_PREFIX} <理由>\`, or file the rest with \`pnpm josh issue:file --route split\``
-
-	return `${session_cite.issue(notice.issue)} got the split notice (${counted}) and has neither a recorded reason nor a split child. ${unread}Either ${answers}, then run \`pnpm josh run:cut ${String(notice.issue)}\` again — ${NOTICE_SECTION}`
-}
-
-// The refusal for a noticed Issue that has no answer yet, else `undefined`. The ledger is read first,
-// so an Issue the notice never reached costs no GitHub read.
-async function refusal(
-	issue: number,
-	entries: ReadonlyArray<LedgerEntry>,
-): Promise<string | undefined> {
-	const notice = notices(entries).findLast((entry) => entry.issue === issue)
-
-	if (notice === undefined || split_issues(entries).has(issue)) return undefined
-	const bodies = await trusted_comments(issue)
-
-	return bodies !== undefined && has_reason(bodies) ? undefined : refusal_text(notice, bodies)
-}
-
-// The refusal against this repository's lane ledger; outside a repository there is none to read.
-async function ledger_refusal(issue: number): Promise<string | undefined> {
-	const ledger = await lane_ledger.target()
-
-	return ledger === undefined ? undefined : await refusal(issue, lane_ledger.read_entries(ledger))
-}
-
 interface Filing {
 	route: string | undefined
 	found_during: string | undefined
@@ -99,9 +66,44 @@ interface Filing {
 // other route, and a filing found in no lane, record nothing.
 async function record_child({ route, found_during, child }: Filing): Promise<void> {
 	if (route !== SPLIT_ROUTE_LABEL || found_during === undefined) return
-	await lane_ledger_write.record_split_filed({ issue: Number(found_during), child })
+
+	try {
+		await lane_ledger_write.record_split_filed({ issue: Number(found_during), child })
+	} catch (error) {
+		throw new Error(
+			`Created ${child}, but split-child evidence could not be recorded. Do not create another child. Recover with \`pnpm josh split:recover ${found_during} ${child}\`.`,
+			{ cause: error },
+		)
+	}
 }
 
-const split_resolution = { ledger_refusal, notices, record_child, refusal, split_issues }
+interface Fold {
+	origin: string
+	target: string
+}
+
+// joshuafolkken/kit#6630: the split part folded into existing Issue `target`
+// (`josh issue:fold-existing --apply <target> --found-during <origin>`) answers the notice as its child.
+async function record_fold({ origin, target }: Fold): Promise<void> {
+	try {
+		await lane_ledger_write.record_split_filed({
+			issue: Number(origin),
+			child: issue_cite.plain_for('program', target),
+		})
+	} catch (error) {
+		throw new Error(
+			`Folded into ${session_cite.issue(target)}, but split-child evidence for ${session_cite.issue(origin)} could not be recorded: ${error_text.message_of(error)}`,
+			{ cause: error },
+		)
+	}
+}
+
+const split_resolution = {
+	is_split_clear,
+	notices,
+	record_child,
+	record_fold,
+	split_issues,
+}
 
 export { split_resolution }

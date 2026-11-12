@@ -25,24 +25,58 @@ function live_carry(target: string): RunCarry | undefined {
 	return read.kind === 'carried' ? read.carry : undefined
 }
 
-// The override, or `undefined` where no live run set one — the environment's limit then stands.
-async function read_override(): Promise<number | undefined> {
+async function current_carry(): Promise<RunCarry | undefined> {
 	const target = await carry_target()
 
-	return target === undefined ? undefined : live_carry(target)?.lane_limit
+	return target === undefined ? undefined : live_carry(target)
 }
 
-// `undefined` clears the override. Answers whether a live run took it: with no run there is no record
-// to write to, and the next run reads `JOSH_LANE_LIMIT` as it starts.
-async function write_override(limit: number | undefined): Promise<boolean> {
+// The override, or `undefined` where no live run set one — the run's start limit, else the
+// environment's, then stands.
+async function read_override(): Promise<number | undefined> {
+	const carry = await current_carry()
+
+	return carry?.lane_limit
+}
+
+// A record a crashed run left must not pin its start limit over an edited `.env`: the start limit
+// counts while its owner lives, or while a cut hands the record to a successor.
+function is_run_live(carry: RunCarry): boolean {
+	return carry.is_handed_off === true || run_carry.is_owner_live(carry)
+}
+
+// The limit a live run holds: its override, else the limit it started with — so a `--reset` returns
+// to the run's own `JOSH_LANE_LIMIT`, not the one a shell's `.env` reads now (joshuafolkken/kit#6166).
+async function read_carried(): Promise<number | undefined> {
+	const carry = await current_carry()
+
+	if (carry?.lane_limit !== undefined) return carry.lane_limit
+
+	return carry !== undefined && is_run_live(carry) ? carry.launch_limit : undefined
+}
+
+// Answers whether a live run took the fields: with no run there is no record to write to, and the
+// next run reads `JOSH_LANE_LIMIT` as it starts.
+async function update_carry(
+	fields: Pick<RunCarry, 'lane_limit'> | Pick<RunCarry, 'launch_limit'>,
+): Promise<boolean> {
 	const target = await carry_target()
 	const carry = target === undefined ? undefined : live_carry(target)
 
 	if (target === undefined || carry === undefined) return false
 
-	stamp_file.write_stamp(target, { ...carry, lane_limit: limit })
+	stamp_file.write_stamp(target, { ...carry, ...fields })
 
 	return true
+}
+
+// `undefined` clears the override.
+async function write_override(limit: number | undefined): Promise<boolean> {
+	return await update_carry({ lane_limit: limit })
+}
+
+async function write_launch(limit: number): Promise<boolean> {
+	return await update_carry({ launch_limit: limit })
 }
 
 async function emit_raise(text: string): Promise<void> {
@@ -69,6 +103,13 @@ async function watch_raise(): Promise<() => boolean> {
 	}
 }
 
-const lane_limit_override = { emit_raise, read_override, watch_raise, write_override }
+const lane_limit_override = {
+	emit_raise,
+	read_carried,
+	read_override,
+	watch_raise,
+	write_launch,
+	write_override,
+}
 
 export { lane_limit_override }

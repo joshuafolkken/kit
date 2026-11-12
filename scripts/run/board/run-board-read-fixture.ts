@@ -2,13 +2,15 @@ import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
 import { lane_capacity } from '#scripts/lane/lane-capacity'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_spent } from '#scripts/lane/lane-spent'
-import { lane_state } from '#scripts/lane/lane-state'
+import { lane_state, type LaneStateRecord } from '#scripts/lane/lane-state'
 import { lane_vacant } from '#scripts/lane/lane-vacant'
 import { run_carry, type CarryRead, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_carry_ended, type EndedRun } from '#scripts/run/carry/run-carry-ended'
-import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
+import type { RunEvent } from '#scripts/run/event/run-event-stream'
+import { run_event_tail } from '#scripts/run/event/run-event-tail'
+import { run_hold } from '#scripts/run/hold/run-hold'
 import { run_wake } from '#scripts/run/wake/run-wake'
-import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
+import { transcript_tail } from '#scripts/time-runtime/transcript-tail'
 import { vi } from 'vitest'
 
 const REPOSITORY = '/repo/.git'
@@ -38,7 +40,7 @@ function lane(issue: string): LaneInfo {
 		issue,
 		branch: `${issue}-lane`,
 		directory: `/lanes/${issue}`,
-		seat: undefined,
+		seat: 1,
 		development_port: undefined,
 		preview_port: undefined,
 		output: undefined,
@@ -51,6 +53,9 @@ function arrange_records(read: CarryRead, ended: EndedRun | undefined): void {
 	vi.spyOn(run_carry, 'read_carry').mockReturnValue(read)
 	vi.spyOn(run_carry_ended, 'read_ended').mockReturnValue(ended)
 	vi.spyOn(backlogrun_launch, 'pending_launch').mockReturnValue(undefined)
+	// This checkout's hold, read for a single run with no carry record: none held unless a test holds one.
+	vi.spyOn(run_hold, 'worktree_directory').mockResolvedValue(REPOSITORY)
+	vi.spyOn(run_hold, 'read_hold').mockReturnValue({ kind: 'free' })
 	vi.spyOn(run_wake, 'read_wake').mockReturnValue(undefined)
 	vi.spyOn(lane_state, 'read_states').mockResolvedValue(new Map())
 	vi.spyOn(lane_state, 'read_records').mockResolvedValue([])
@@ -59,17 +64,25 @@ function arrange_records(read: CarryRead, ended: EndedRun | undefined): void {
 function arrange(read: CarryRead, ended: EndedRun | undefined): void {
 	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(REPOSITORY)
 	arrange_records(read, ended)
-	vi.spyOn(run_event_stream, 'read_events').mockReturnValue([INSIDE, AFTER])
+	vi.spyOn(run_event_tail, 'read_events').mockReturnValue([INSIDE, AFTER])
 	vi.spyOn(lane_registry, 'list_lanes').mockResolvedValue([lane('3432')])
 	vi.spyOn(lane_registry, 'main_repository_root').mockResolvedValue(MAIN_ROOT)
 	// The limit is read off the environment and a live run's override: never a real one from a test.
 	vi.spyOn(lane_capacity, 'lane_limit').mockResolvedValue({ kind: 'limit', limit: LANE_LIMIT })
 	// Every log is read off the machine: never a real one from a test.
-	vi.spyOn(time_density_hook, 'read_tail').mockReturnValue('')
+	vi.spyOn(transcript_tail, 'read_tail').mockReturnValue('')
 	// Each lane's child is probed with `pgrep`: never a real process from a test.
 	vi.spyOn(lane_spent, 'idle_lanes').mockReturnValue([])
 	// Each lane's branch and tree are read with git: never a real lane from a test.
 	vi.spyOn(lane_vacant, 'vacant_issues').mockResolvedValue([])
+}
+
+// The open lanes' records feed the lane room; every record, the board's lane states.
+function arrange_states(records: ReadonlyArray<LaneStateRecord>): void {
+	vi.mocked(lane_state.read_states).mockResolvedValue(
+		new Map(records.map((one) => [one.issue, one])),
+	)
+	vi.mocked(lane_state.read_records).mockResolvedValue([...records])
 }
 
 const run_board_read_fixture = {
@@ -81,6 +94,7 @@ const run_board_read_fixture = {
 	MAIN_ROOT,
 	REPOSITORY,
 	arrange,
+	arrange_states,
 	lane,
 }
 

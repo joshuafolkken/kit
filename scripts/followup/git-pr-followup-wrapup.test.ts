@@ -56,7 +56,7 @@ const BASE_INPUT: WrapupInput = {
 	notify_config: NOTIFY_CONFIG,
 	pr_url: 'https://github.com/owner/repo/pull/7',
 	should_merge: true,
-	managed_notes: [],
+	report_notes: [],
 	checked: CHECKED,
 	wait_for_green: vi.fn(),
 	send_completion: vi.fn().mockResolvedValue(undefined),
@@ -86,7 +86,6 @@ function warned_text(): string {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 	mocked_get_body.mockResolvedValue('{"body":"existing content"}')
 	mocked_comment.mockResolvedValue('')
@@ -106,6 +105,18 @@ describe('run_wrapup — the merge', () => {
 			CHECKED_HEAD_SHA,
 		)
 	})
+})
+
+it('stops a workflow PR before sending completion, merging or cleaning up', async () => {
+	const refusal = new Error('Read the diff on GitHub and merge there')
+	const before_merge = vi.fn().mockRejectedValue(refusal)
+
+	await expect(run_wrapup({ before_merge })).rejects.toBe(refusal)
+	expect(before_merge).toHaveBeenCalledExactlyOnceWith(CHECKED_HEAD_SHA)
+	expect(BASE_INPUT.send_completion).not.toHaveBeenCalled()
+	expect(git_gh_command.pr_merge).not.toHaveBeenCalled()
+	expect(mocked_ensure_closed).not.toHaveBeenCalled()
+	expect(mocked_strip_label).not.toHaveBeenCalled()
 })
 
 // joshuafolkken/kit#2770: GitHub stopped applying `closes #N` on some merges, so a merged run confirms
@@ -343,13 +354,13 @@ function notes_passed(): ReadonlyArray<string> | undefined {
 
 describe('run_wrapup — the managed config-file report', () => {
 	it('hands the report to the completion comment body', async () => {
-		await run_wrapup({ managed_notes: [REPORT_LINE] })
+		await run_wrapup({ report_notes: [REPORT_LINE] })
 
 		expect(notes_passed()).toEqual([REPORT_LINE])
 	})
 
 	it('hands over an empty report unchanged, so the comment gains no section', async () => {
-		await run_wrapup({ managed_notes: [] })
+		await run_wrapup({ report_notes: [] })
 
 		expect(notes_passed()).toEqual([])
 	})

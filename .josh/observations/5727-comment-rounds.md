@@ -1,0 +1,3 @@
+- rf:project-conventions | low | .claude/skills/workflow-commands/split-assessment.md:85 | 2026-11-01 | #5727 | fixed
+- rf:project-conventions | low | .claude/skills/workflow-commands/split-assessment.md:85 | 2026-11-01 | #5727
+- k:followup-unrelated-test-rerun | d1 | 2026-11-01 | scripts/run/event/run-event-stream.test.ts | followup reran Unit Tests (3/6); failed outside the change: isolated scripts/run/event/run-event-stream.test.ts > run_event_stream.append — the one enumeration > appends every enumerated kind

@@ -1,6 +1,6 @@
 ---
 name: dependency-update
-description: Checks after `pnpm update`, `josh latest`, `josh adopt`, `pnpm josh overrides` or any dependency update — the `overrides` survived, the one expected `devEngines` change. Read it before reporting the pins intact or pinning a bump back.
+description: Checks after `pnpm update`, `josh latest`, `josh adopt`, `pnpm josh overrides` or any dependency update — `overrides` kept, one expected `devEngines` change. Read it before reporting the pins or pinning a bump back.
 ---
 
 # After a dependency-update command
@@ -17,25 +17,22 @@ versions. Overrides exist on purpose (e.g. `"esbuild@<=0.24.2": ">=0.25.0"` for 
 **`package.json` is ignored** (verified with pnpm 12.6.0). Inspect both to preserve existing
 declarations, but an absent package field says nothing about workspace overrides.
 
-## 2. The check is a command you run, not a conclusion you reach
+## 2. Quote the printed overrides verdict
 
-```bash
-git diff -- pnpm-workspace.yaml package.json
-```
+`josh latest`, `josh adopt` and `josh latest:if-required` print it after §3's line and a
+`✖ <file> overrides changed` heading per moved block. `overrides: keep` — keep. `overrides: restore (…)`
+(non-zero exit) — restore the moved entries, investigate, report. `overrides: not judged (…)` — run
+the check below.
 
-(after `josh adopt`, which has already committed and returned to the default branch:
-`git diff <default>...<branch> -- pnpm-workspace.yaml package.json`). Confirm both overrides blocks
-are untouched **and** `devDependencies` still respect the effective overrides. A removed, modified or
-over-bumped entry: restore it immediately, investigate, and report — never keep it without approval.
+**No verdict printed** (`pnpm update`, a Dependabot merge) — run `pnpm josh overrides --diff HEAD`
+(`<default>...<branch>` once committed) and quote its `✔` / `✖` lines the same way.
 
-`josh latest` prints its verdict as its last overrides line (`✔ overrides unchanged (<n> from
-<file>)` or `⚠ overrides changed`); `pnpm josh overrides` compares against a saved snapshot —
-**quote what one printed.**
+It covers the overrides blocks only: confirm overridden packages' `devDependencies` still respect them.
 
 ## 3. `devEngines` — the one expected change
 
-**Read the verdict line, never compare by eye.** `pnpm josh overrides` prints it first, and
-`josh latest` prints it after its pnpm bump — `HEAD`'s `package.json` against the working tree
+**Read the verdict line, never compare by eye.** `pnpm josh overrides` prints it first — against
+`HEAD`, or the `--diff` range's base — and `josh latest` prints it after its pnpm bump
 (`scripts/version/development-engines-verdict.ts`). Quote it:
 
 - `devEngines: unchanged` / `devEngines: kept` — keep. `kept` is the lockstep pnpm bump (the version

@@ -1,4 +1,6 @@
+import { agent_provider, type AgentProvider } from '#scripts/agent/agent-provider'
 import { git_command } from '#scripts/git/git-command'
+import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { durable_state } from '#scripts/josh/durable-state'
 import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
@@ -41,8 +43,8 @@ const REPOSITORY_DIRECTORY_INDEX = 1
 const NO_INCREMENT = 0
 
 // The most session cuts one invocation may take. This bounds `cuts`, which
-// only `run:carry --cut` increments — a `backlogrun`'s session hand-off at a child's merge (~one per
-// 50 minutes of work), not the `run:cut` phase cuts a lane child takes. Each
+// only `run:carry --cut` increments — a `backlogrun`'s session hand-off at a child's merge,
+// not the `run:cut` phase cuts a lane child takes. Each
 // cut drops the context it accumulated but pays a cold preamble to resume, so past a point the
 // re-establishment costs more than the accumulation it sheds; six sits well under the ~10 a night of
 // work could otherwise take and refuses a run that has begun to churn. `is_at_cut_cap` reads it, and the
@@ -53,11 +55,9 @@ const MAX_CUTS = 6
 const END_COMMAND = 'pnpm josh run:carry --end'
 const RESUME_COMMAND = 'pnpm josh run:carry --resume'
 const READ_COMMAND = 'pnpm josh run:carry --json'
-// The shell variable that names the parent loop's own long-lived process, quoted so the reader can
-// paste the printed command as it stands.
-const OWNER_ARGUMENT = '--owner "$PPID"'
 
 interface RunCarry {
+	scheduler_provider?: AgentProvider | undefined
 	// The invocation the person typed — a `backlogrun` one in `run_invocation.rebuild`'s spelling — so
 	// a resumed session runs the same command rather than one it inferred. `CLAUDE.md` → "Explicit invocation required" forbids inferring; naming the
 	// invocation is what leaves nothing to infer. **It is not the ownership test** — that is
@@ -79,7 +79,7 @@ interface RunCarry {
 	// The consecutive-API-outage streak. It is kept apart from `failures`
 	// because a child that could not reach the API is not a child that failed: an outage is not counted
 	// against the consecutive-failure guard, and this streak is its own environment-broken guard — a run
-	// of outages stops the run rather than re-dispatching into a dead API forever. **A merge or a genuine
+	// of outages holds launches rather than re-dispatching into a dead API. **A merge or a genuine
 	// child failure resets it**, because both prove the API was reachable; only a further outage adds to
 	// it.
 	outages: number
@@ -133,12 +133,16 @@ interface RunCarry {
 	// with, and the record is the one place both it and a person's shell read. Carried across a hand-off
 	// like `done`; optional and `| undefined` for the same disk round-trip reason.
 	lane_limit?: number | undefined
+	// The limit the run started with, read after `lane_limit` so `lane:limit --reset` restores it rather
+	// than the `JOSH_LANE_LIMIT` a shell's `.env` reads now (joshuafolkken/kit#6166).
+	launch_limit?: number | undefined
 }
 
 // The identity of a process, as `process-identity.ts` keeps it: the pid plus an opaque start-time
 // token, so a reissued pid is never mistaken for the process that wrote the record — and the
 // transcript of the conversation that process runs, which outlives it (`run-carry-conversation.ts`).
 interface CarryOwner {
+	provider?: AgentProvider | undefined
 	pid?: number | undefined
 	start?: string | undefined
 	transcript?: string | undefined
@@ -189,6 +193,7 @@ const NO_OWNER: CarryOwner = {}
 const carry_addition_schema = z.object({ issue: z.number(), is_priority: z.boolean() })
 
 const run_carry_schema = z.object({
+	scheduler_provider: agent_provider.PROVIDER_SCHEMA.optional(),
 	invocation: z.string(),
 	started_at: z.string(),
 	merged: z.number(),
@@ -210,6 +215,7 @@ const run_carry_schema = z.object({
 	retrospective: z.boolean().optional(),
 	added: z.array(carry_addition_schema).optional(),
 	lane_limit: z.number().int().positive().optional(),
+	launch_limit: z.number().int().positive().optional(),
 })
 
 function carry_path(git_directory: string): string {
@@ -250,7 +256,7 @@ function read_carry(target: string): CarryRead {
 // The identity to record for a pid the caller declared. `read_start` is what makes the pair an
 // identity rather than a number; injected in tests so the sandbox branch is exercised without
 // changing the machine's process capabilities. The transcript is the calling session's own — the
-// declared pid is that session's process (`--owner "$PPID"`).
+// declared pid is that session's process.
 function owner_of(
 	pid: number,
 	read: (owner_pid: number) => string | undefined = process_identity.read_start,
@@ -259,8 +265,17 @@ function owner_of(
 	return { pid, start: read(pid), transcript }
 }
 
+// The calling session as owner — the pid the session exports, so no caller spells `$PPID`; with
+// none exported, no owner is declared.
+function session_owner(): CarryOwner {
+	const pid = agent_session_environment.own_session_pid()
+
+	return pid === undefined ? NO_OWNER : owner_of(pid)
+}
+
 function fresh_carry(invocation: string, owner: CarryOwner, now: Date): RunCarry {
 	return {
+		...(owner.provider && { scheduler_provider: owner.provider }),
 		invocation,
 		started_at: now.toISOString(),
 		merged: NO_INCREMENT,
@@ -309,6 +324,7 @@ function adopt_carry(
 	// writes `undefined`, so the previous owner cannot survive — and the declared hand-off is spent.
 	const next: RunCarry = {
 		...carry,
+		scheduler_provider: owner.provider,
 		owner_pid: owner.pid,
 		owner_start: owner.start,
 		owner_transcript: owner.transcript,
@@ -420,21 +436,26 @@ function retrospective_done_of(read: CarryRead): boolean {
 	return read.kind === 'carried' && read.carry.retrospective === true
 }
 
+function left_of(carry: RunCarry, declared: ReadonlyArray<number>): ReadonlyArray<number> {
+	const done = carry.done ?? []
+
+	return run_carry_added.ordered(declared, carry.added).filter((issue) => !done.includes(issue))
+}
+
 // **What the resumed session has to be told, computed rather than stored.** A stored remainder would
 // be a second copy of a subtraction the record already determines, free to disagree with it; computed
 // here, `--json` answers the successor's one question — which issues are left, in the order they were
-// declared — so nothing downstream has to subtract two lists by hand. An invocation that named no
-// issues answers `undefined`, which `JSON.stringify` drops. The issues `run:add` put in are folded in by `run_carry_added.ordered`.
+// declared — so nothing downstream has to subtract two lists by hand. The issues `run:add` put in are
+// folded in by `run_carry_added.ordered`. An invocation that named no issues answers `undefined`, which
+// `JSON.stringify` drops, once no issue `run:add` gave it is left: what is left of it then is the pool,
+// not an empty list a reader would take for a finished run.
 function remaining_of(carry: RunCarry | undefined): ReadonlyArray<number> | undefined {
 	if (carry === undefined) return undefined
 
 	const declared = run_invocation.issue_numbers(carry.invocation)
+	const left = left_of(carry, declared ?? [])
 
-	if (declared === undefined) return undefined
-
-	const done = carry.done ?? []
-
-	return run_carry_added.ordered(declared, carry.added).filter((issue) => !done.includes(issue))
+	return declared === undefined && left.length === 0 ? undefined : left
 }
 
 // The finished issues are named rather than counted, because the reader of a `busy` or `standing`
@@ -463,13 +484,11 @@ function busy_message(carry: RunCarry): string {
 	return `A live run holds this budget — ${describe_carry(carry)}, owner pid ${String(carry.owner_pid)} still running. Nothing was established. Wait for that run, or end its record with \`${END_COMMAND}\` once you know it is over.`
 }
 
-// The adoption command, shared by the standing refusal and the judgment wake's hand-off.
-// **`--owner "$PPID"` is part of the command, not an optional extra.** An adoption made without it
-// leaves the record declaring no owner, and from then on every second parent reads it as not provably
-// live and is answered `standing` rather than `busy` — the ownership defense degrading silently
-// through the very message that recommends the command.
+// The adoption command the standing refusal names.
+// It names no `--owner`: the command takes the session's own pid from its environment, so the
+// adoption still declares an owner without a `$PPID` expansion a shell guard refuses.
 function claim_command(invocation: string): string {
-	return `${RESUME_COMMAND} "${invocation}" ${OWNER_ARGUMENT}`
+	return `${RESUME_COMMAND} "${invocation}"`
 }
 
 // The record's owner is gone and no cut handed it off — the crashed run, and the same command
@@ -542,6 +561,7 @@ const run_carry = {
 	remaining_of,
 	repository_directory,
 	retrospective_done_of,
+	session_owner,
 	standing_message,
 	unknown_message,
 	unreadable_message,

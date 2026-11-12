@@ -1,11 +1,13 @@
 import { randomUUID } from 'node:crypto'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { run_board_phase } from '#scripts/run/board/run-board-phase'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { run_event_stream, type RunEvent } from './run-event-stream'
 import { run_event_stream_fixture } from './run-event-stream-fixture'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#2205: the append-only, ordered event stream. The pure module takes an explicit
 // target, so the tests write to a temp file rather than resolving a run identity — the emit side is
@@ -22,15 +24,11 @@ const REVIEW_STAGE = '#3521 review start'
 const GATE_STAGE = '#3521 gate start'
 const OTHER_ISSUE_STAGE = '#3522 gate start'
 const SEED_PHASE = '#3520 implement'
-const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-run-event-stream-'))
+const TEMPORARY = make_directory('josh-run-event-stream-')
 
 function fresh_target(): string {
 	return path.join(TEMPORARY, `${randomUUID()}.jsonl`)
 }
-
-afterAll(() => {
-	rmSync(TEMPORARY, { force: true, recursive: true })
-})
 
 describe('run_event_stream.append — positions', () => {
 	it('assigns a monotonically increasing position to each event', () => {
@@ -48,6 +46,18 @@ describe('run_event_stream.append — positions', () => {
 		run_event_stream.append(target, KIND.CUT, 'cut', AT)
 
 		expect(run_event_stream.append(target, KIND.STOP, 'stopped', AT).position).toBe(3)
+	})
+})
+
+// joshuafolkken/kit#6864: a park's ship stop is written beside its text and read back whole.
+describe('run_event_stream.append_event — a park stop', () => {
+	it('reads back the stop a park event was appended with', () => {
+		const target = fresh_target()
+		const stop = { stage: 'followup', cause: 'check' }
+
+		run_event_stream.append_event(target, { at: AT, kind: KIND.PARK, text: '#7 parked', stop })
+
+		expect(run_event_stream.read_events(target)[0]?.stop).toStrictEqual(stop)
 	})
 })
 

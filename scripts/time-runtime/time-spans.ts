@@ -2,6 +2,7 @@ import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
 import type { FollowupStage } from '#scripts/followup/git-followup-stages'
 import { time_background } from './time-background'
 import { time_followup_stage } from './time-followup-stage'
+import { time_josh_names } from './time-josh-names'
 import { time_reported_failure } from './time-reported-failure'
 import { time_shell } from './time-shell'
 import { time_tool_call, type ToolCall } from './time-tool-call'
@@ -28,8 +29,8 @@ const { NO_CALL, UNKNOWN_CALL, UNKNOWN_TOOL, to_tool_call } = time_tool_call
 // ending at a tool result is that tool's execution, one ending at a user prompt is human wait.
 // Classifying by pairs instead would double-count parallel tool calls and leave the three shares
 // summing to something other than the elapsed time — the property that makes two runs comparable.
-// Measured against three sessions restored by hand: 49.6 / 73.3 / 54.6 minutes, every share within
-// 0.4 points of the hand figure.
+// Measured against three sessions restored by hand, every share within 0.4 points of the hand
+// figure.
 
 const ASSISTANT_TYPE = 'assistant'
 const USER_TYPE = 'user'
@@ -372,10 +373,9 @@ function parse_timeline(text: string): Timeline {
 }
 
 // **"No span was read" is the one criterion every scope withholds a transcript figure on**.
-// A run whose transcript could not be attributed, a child of an epic in
-// that state, and a batch no child contributed to are the same fact asked at three scales, and each
-// used to spell it out for itself — which is how the run scope came to print three `0.0 min` rows
-// beside the epic scope's `not measured` for the very same child.
+// A run without an attributed transcript, an epic child in that state, and a batch without child
+// contributions are the same missing measurement at three scales. Sharing the criterion keeps
+// every scope from presenting missing data as a zero duration.
 //
 // It takes the count rather than the array so the three callers can pass what they hold: the spans
 // themselves before a report exists, and `TimeReport.span_count` afterwards.
@@ -399,8 +399,8 @@ const time_spans = {
 	// Re-exported so the suites that measure how a command is read keep asking one namespace, and so
 	// `time-shell.ts` moving out of this file changed no call site.
 	bash_label: time_shell.bash_label,
-	josh_command_of: time_shell.josh_command_of,
-	josh_commands_of: time_shell.josh_commands_of,
+	josh_command_of: time_josh_names.josh_command_of,
+	josh_commands_of: time_josh_names.josh_commands_of,
 	to_tool_call,
 	parse_line,
 	parse_timeline,

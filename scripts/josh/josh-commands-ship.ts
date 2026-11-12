@@ -8,7 +8,6 @@ const ISSUE_WITH_OPTIONS = '<issue> [options]'
 // command's usage moved onto its entry (#4185). `AI_COMMANDS` spreads this in at the same place, so the
 // map keeps its order.
 
-/* eslint-disable @typescript-eslint/naming-convention */
 const SHIP_COMMANDS: Record<string, CommandEntry> = {
 	'run:merge': {
 		script: 'scripts/run/merge/run-merge-main.ts',
@@ -20,10 +19,10 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 		usage: {
 			examples: [
 				{
-					arguments: '<N> --epic <E> --repo <owner/repo> --owner "$PPID" --output <path>',
+					arguments: '<N> --epic <E> --repo <owner/repo> --output <path>',
 					note: 'prints the next child number, or a verdict',
 				},
-				{ arguments: '<N> --owner "$PPID"', note: 'backlog offer (no epic)' },
+				{ arguments: '<N>', note: 'backlog offer (no epic)' },
 			],
 			flags: [
 				{
@@ -32,7 +31,8 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 				},
 				{
 					names: [OWNER],
-					description: "the parent's process, so the carry count respects the ownership guard.",
+					description:
+						"the parent's process, so the carry count respects the ownership guard; omitted, the calling session.",
 				},
 				{
 					names: [OUTPUT],
@@ -44,13 +44,18 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 					description:
 						'the caller is `backlog:drive`, which has no context to cut and asks `backlog:offer` itself, so the merge is never handed back `over` and answers `deferred` in place of the next offer.',
 				},
+				{
+					names: ['--stash'],
+					description:
+						"before classifying, stash the lane's uncommitted work and comment the `stash:pop` line on the Issue — the stopped-unit recovery.",
+				},
 			],
 		},
 	},
 	'run:review': {
 		script: 'scripts/run/review/run-review-cli.ts',
 		description:
-			'Start test:pinned and the gate in the background and write the /code-review brief to a file, printing its path, in one call so they overlap (--join to join them; it stops on an unpinned change)',
+			'Start test:pinned in the background, run the gate and, once it is green, write the /code-review brief to a file, printing its path (--join to join them; it stops on an unpinned change)',
 		category: 'AI tools',
 		reference: [
 			'[--code-only] [--unpinned-ok "<reason>"] | --join [--fixing] | --pinned | --push',
@@ -61,7 +66,7 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 			examples: [
 				{
 					arguments: '',
-					note: 'detach test:pinned and the gate, write the brief (the interaction brief after it where due) to a file and print its path, then launch a reviewer per brief',
+					note: 'detach test:pinned, wait for a green gate, write the brief (the interaction brief after it where due) to a file and print its path, then launch a reviewer per brief',
 				},
 				{
 					arguments: '--code-only',
@@ -86,6 +91,47 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 				{
 					arguments: '--push',
 					note: 'launched by a lane open: push and open the PR at a green gate',
+				},
+			],
+		},
+	},
+	// The main line's chain up to the review, folded into one call: `main:merge`, `review:selfcheck`,
+	// `check:related` and `run:review` were four round trips re-billing the run's full context each.
+	'run:chain': {
+		script: 'scripts/run/review/run-chain-cli.ts',
+		description:
+			'Open the review, or --join to join, attest and record it; --ship starts ship --detach --review after a clean record. Stops at the first refusal with its next action',
+		category: 'AI tools',
+		reference: [
+			'<issue> [--from <stage>] [--unpinned-ok "<reason>"] | <issue> --join [--fixing] [--from <stage>] [--ship "<title> #<N>"]',
+			'automation',
+			['processes', 'files', 'git', 'network'],
+		],
+		usage: {
+			examples: [
+				{
+					arguments: '<N>',
+					note: 'after `run:cut <N>` alone: merge main (not in a lane child), answer the self-check, run the scoped pair, open the review',
+				},
+				{
+					arguments: '<N> --from check:related',
+					note: 'resume at the stage a stop named, once the run settled it',
+				},
+				{
+					arguments: '<N> --unpinned-ok "only logs"',
+					note: 'forwarded to run:review as given',
+				},
+				{
+					arguments: '<N> --join',
+					note: 'join the gate, attest and record; every finding holds for disposition',
+				},
+				{
+					arguments: '<N> --join --fixing',
+					note: 'the same, when round 1 has fixes to make',
+				},
+				{
+					arguments: '<N> --join --ship "<title> #<N>"',
+					note: 'ship a clean round; title must match the issue. Record interaction review first.',
 				},
 			],
 		},
@@ -123,24 +169,29 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 			'automation',
 			['git', 'network'],
 		],
+		// `--log <N>` stands alone and prints a detached ship's log (`run-ship-args.ts`).
+		read_only_flags: ['--log'],
 		usage: {
 			examples: [
-				{ arguments: '"<title> #<N>" --body-file <evidence.md>' },
+				{ arguments: '"<title> #<N>" --body-file .josh/tmp/evidence.md' },
 				{ arguments: '"<title> #<N>" --review', note: 'both review rounds inside the ship' },
-				{ arguments: '--detach "<title> #<N>"', note: 'hand the ship to a supervisor' },
+				{
+					arguments: '--detach "<title> #<N>"',
+					note: 'hand the ship to a supervisor; on `launched` and `cost --cut` `under`, wait one `ship:wait` chunk',
+				},
 				{ arguments: '--log <N>', note: "a detached ship's log" },
 			],
 			flags: [
 				{
 					names: ['--body-file <path>'],
 					description:
-						'the PR body carrying the live-execution evidence `followup` gates on; forwarded to `git -y` alone.',
+						'the PR body carrying the live-execution evidence `followup` gates on, written under `.josh/tmp/`; forwarded to `git -y` alone.',
 				},
 				{ names: ['--notify-message <text>'], description: 'forwarded to `followup` alone.' },
 				{
 					names: ['--review'],
 					description:
-						'runs review round 1 beside the gate, and round 2 after the commit when `review:round2` requires it; a High or an unfixed Medium stops the ship. A pre-detach `test:pinned` stop at the first unpinned hunk probes the rest in the background, for the next pre-detach.',
+						'runs round 1 beside the gate; after sync and round 1, an owed round 2 runs beside the gate and joins before the PR opens. A High or unfixed Medium stops the ship. A pre-detach `test:pinned` stop probes remaining hunks in the background for the next pre-detach.',
 				},
 				{
 					names: ['--unpinned-ok <reason>'],
@@ -156,7 +207,7 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 	'ship:wait': {
-		script: 'scripts/run/ship/run-ship-wait-cli.ts',
+		script: 'scripts/run/ship/run-ship-wait-main.ts',
 		description:
 			'Wait on a detached ship through its gate and review round 1, so a stop there returns to this session (returned | passed | ended | pending)',
 		category: 'AI tools',
@@ -166,6 +217,25 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 				{
 					arguments: '<N>',
 					note: 're-issue it on `pending` while `cost --cut` is `under`; `returned` prints the stop to fix',
+				},
+			],
+		},
+	},
+	'ship:evidence': {
+		script: 'scripts/run/ship/run-ship-evidence-cli.ts',
+		description:
+			'Run a command and append its invocation and output tail to the ship body draft’s live-evidence section (exits with the command’s code)',
+		category: 'AI tools',
+		reference: ['<N> [--fresh] -- <command...>', 'automation', ['files', 'processes']],
+		usage: {
+			examples: [
+				{
+					arguments: '<N> -- pnpm josh <command>',
+					note: 'the run picks which command is the evidence; the format is written for it',
+				},
+				{
+					arguments: '<N> --fresh -- pnpm josh <command>',
+					note: 'runs it even when this tree already holds a recorded run of it',
 				},
 			],
 		},
@@ -200,7 +270,12 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			'Generate the session-facing report for this invocation from the run’s event stream (merges, parks, cuts) with the release tail — the same text josh notify sends',
 		category: 'AI tools',
-		reference: ['[--handoff]', 'automation', ['files', 'network']],
+		// `--end` stops the `run:wake` supervisor process.
+		reference: [
+			'[--handoff | --end [--stopped "<reason>"]]',
+			'automation',
+			['files', 'network', 'processes'],
+		],
 		usage: {
 			examples: [
 				{ arguments: '', note: 'print the report; the same text josh notify sends' },
@@ -208,10 +283,17 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 					arguments: '--handoff',
 					note: 'print the backlogrun hand-off report and send it as the confirmation',
 				},
+				{
+					arguments: '--end',
+					note: 'end the run: the report, run:carry --end, run:wake --stop — stops at a failed stage',
+				},
+				{
+					arguments: '--end --stopped "<reason>"',
+					note: 'end a run that stopped: run:carry --end --stopped sends the confirmation',
+				},
 			],
 		},
 	},
 }
-/* eslint-enable @typescript-eslint/naming-convention */
 
 export { SHIP_COMMANDS }

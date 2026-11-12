@@ -1,8 +1,8 @@
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { process_identity } from '#scripts/josh/process-identity'
 import { process_identity_fixture } from '#scripts/josh/process-identity-fixture'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it } from 'vitest'
 import { unit_run_marker } from './unit-run-marker'
 
@@ -30,8 +30,10 @@ const DEAD_MARKER = `${unit_run_marker.RUN_PREFIX}dead.json`
 const ALIVE_MARKER = `${unit_run_marker.RUN_PREFIX}alive.json`
 const RECYCLED_MARKER = `${unit_run_marker.RUN_PREFIX}recycled.json`
 
+const make_directory = temporary_directory()
+
 function probe_directory(): string {
-	return mkdtempSync(path.join(tmpdir(), PROBE_PREFIX))
+	return make_directory(PROBE_PREFIX)
 }
 
 // The count for a path under a directory this run just created, so it cannot exist. A fixed name
@@ -40,11 +42,7 @@ function probe_directory(): string {
 function count_under_absent_child(): number {
 	const directory = probe_directory()
 
-	try {
-		return unit_run_marker.live_run_count(path.join(directory, 'absent'))
-	} finally {
-		rmSync(directory, { recursive: true, force: true })
-	}
+	return unit_run_marker.live_run_count(path.join(directory, 'absent'))
 }
 
 function write_marker(directory: string, name: string, payload: unknown): void {
@@ -95,13 +93,9 @@ describe('unit_run_marker.live_run_count — who counts as running', () => {
 	])('counts a marker that %s', (_label: string, payload: unknown) => {
 		const directory = probe_directory()
 
-		try {
-			write_marker(directory, ALIVE_MARKER, payload)
+		write_marker(directory, ALIVE_MARKER, payload)
 
-			expect(unit_run_marker.live_run_count(directory)).toBe(1)
-		} finally {
-			rmSync(directory, { recursive: true, force: true })
-		}
+		expect(unit_run_marker.live_run_count(directory)).toBe(1)
 	})
 })
 
@@ -117,13 +111,9 @@ describe('unit_run_marker.live_run_count — who does not', () => {
 		(pid: number) => {
 			const directory = probe_directory()
 
-			try {
-				write_marker(directory, DEAD_MARKER, { pid })
+			write_marker(directory, DEAD_MARKER, { pid })
 
-				expect(unit_run_marker.live_run_count(directory)).toBe(0)
-			} finally {
-				rmSync(directory, { recursive: true, force: true })
-			}
+			expect(unit_run_marker.live_run_count(directory)).toBe(0)
 		},
 	)
 })
@@ -135,14 +125,10 @@ describe('unit_run_marker.live_run_count — sweeping what it counted out', () =
 	it('removes the marker of a process that is gone', () => {
 		const directory = probe_directory()
 
-		try {
-			write_marker(directory, DEAD_MARKER, { pid: DEAD_PID })
-			unit_run_marker.live_run_count(directory)
+		write_marker(directory, DEAD_MARKER, { pid: DEAD_PID })
+		unit_run_marker.live_run_count(directory)
 
-			expect(existsSync(path.join(directory, DEAD_MARKER))).toBe(false)
-		} finally {
-			rmSync(directory, { recursive: true, force: true })
-		}
+		expect(existsSync(path.join(directory, DEAD_MARKER))).toBe(false)
 	})
 
 	// **Sweeping only ever collected the phantoms whose pid had not yet been reissued**, which is the
@@ -159,17 +145,13 @@ describe('unit_run_marker.live_run_count — sweeping what it counted out', () =
 		() => {
 			const directory = probe_directory()
 
-			try {
-				write_marker(directory, RECYCLED_MARKER, {
-					pid: process.pid,
-					process_start: FOREIGN_START,
-				})
+			write_marker(directory, RECYCLED_MARKER, {
+				pid: process.pid,
+				process_start: FOREIGN_START,
+			})
 
-				expect(unit_run_marker.live_run_count(directory)).toBe(0)
-				expect(existsSync(path.join(directory, RECYCLED_MARKER))).toBe(false)
-			} finally {
-				rmSync(directory, { recursive: true, force: true })
-			}
+			expect(unit_run_marker.live_run_count(directory)).toBe(0)
+			expect(existsSync(path.join(directory, RECYCLED_MARKER))).toBe(false)
 		},
 	)
 })
@@ -182,31 +164,37 @@ describe('unit_run_marker.live_run_count — what it leaves alone', () => {
 	it('leaves a marker it could not read rather than deleting it', () => {
 		const directory = probe_directory()
 
-		try {
-			writeFileSync(path.join(directory, DEAD_MARKER), 'not json')
+		writeFileSync(path.join(directory, DEAD_MARKER), 'not json')
 
-			expect(unit_run_marker.live_run_count(directory)).toBe(0)
-			expect(existsSync(path.join(directory, DEAD_MARKER))).toBe(true)
-		} finally {
-			rmSync(directory, { recursive: true, force: true })
-		}
+		expect(unit_run_marker.live_run_count(directory)).toBe(0)
+		expect(existsSync(path.join(directory, DEAD_MARKER))).toBe(true)
 	})
 
 	it('ignores a file that is not a marker at all', () => {
 		const directory = probe_directory()
 
-		try {
-			write_marker(directory, 'something-else.json', { pid: process.pid })
+		write_marker(directory, 'something-else.json', { pid: process.pid })
 
-			expect(unit_run_marker.live_run_count(directory)).toBe(0)
-		} finally {
-			rmSync(directory, { recursive: true, force: true })
-		}
+		expect(unit_run_marker.live_run_count(directory)).toBe(0)
 	})
 
 	// A temp directory that cannot be read answers "no other run", which leaves behavior as it was.
 	// Being wrong in this direction costs wall time; being wrong in the other throttles a solo run.
 	it('answers no other run when the directory cannot be read', () => {
 		expect(count_under_absent_child()).toBe(0)
+	})
+})
+
+describe('unit_run_marker.sharing_runs', () => {
+	it('divides by the runs while no more lanes are live than runs', () => {
+		expect(unit_run_marker.sharing_runs(2, 1)).toBe(2)
+	})
+
+	it('divides by the live lanes when more lanes are live than runs in flight', () => {
+		expect(unit_run_marker.sharing_runs(1, LANE_COUNT)).toBe(LANE_COUNT)
+	})
+
+	it('divides by the runs when the lanes could not be read', () => {
+		expect(unit_run_marker.sharing_runs(2, 0)).toBe(2)
 	})
 })

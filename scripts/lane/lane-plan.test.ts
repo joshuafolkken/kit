@@ -1,15 +1,16 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { Declared } from '#scripts/backlog/backlog-overlap'
 import { git_common_directory } from '#scripts/git/git-common-directory'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_plan, type LanePlan } from './lane-plan'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#4864: a lane's recorded plan is read as its declaration in place of its body, and a lane
 // waits only on a holder that planned before it.
 
-const ROOT = mkdtempSync(path.join(tmpdir(), 'lane-plan-'))
+const ROOT = make_directory('lane-plan-')
 const DIRECTORY = path.join(ROOT, 'lane')
 const EARLIER = 4858
 const LATER = 4859
@@ -26,12 +27,8 @@ const LATER_PLAN = plan(LATER, '2026-10-25T03:20:00.000Z')
 
 beforeEach(() => {
 	vi.spyOn(git_common_directory, 'repository').mockReturnValue(
-		mkdtempSync(path.join(ROOT, 'repository-')),
+		make_directory(path.join(ROOT, 'repository-')),
 	)
-})
-
-afterAll(() => {
-	rmSync(ROOT, { recursive: true, force: true })
 })
 
 describe('lane_plan.with_plans', () => {
@@ -48,6 +45,40 @@ describe('lane_plan.with_plans', () => {
 		const joined = lane_plan.with_plans(new Map([[UNPLANNED, new Set([RANK])]]), DIRECTORY)
 
 		expect([...(joined.get(UNPLANNED) ?? [])]).toEqual([RANK])
+	})
+})
+
+const HOUR_MS = 3_600_000
+
+// The paths read for the earlier issue, yielded on its recorded plan, whose plan comment declaring
+// `RANK` was posted `at`.
+function commented_at(at: string): Array<string> {
+	lane_plan.record({ ...EARLIER_PLAN, yielded: true }, DIRECTORY)
+
+	const declared = lane_plan.with_plans(
+		new Map([[EARLIER, new Set([RANK])]]),
+		DIRECTORY,
+		new Map([[EARLIER, at]]),
+	)
+
+	return [...(declared.get(EARLIER) ?? [])]
+}
+
+// joshuafolkken/kit#6798: joshuafolkken/kit#6796 fixed its plan comment after yielding, and every
+// redispatch yielded again on the kept plan.
+describe('lane_plan.with_plans with plan comment times', () => {
+	it('reads a plan comment posted after the recorded plan in place of it', () => {
+		const later = new Date(Date.now() + HOUR_MS).toISOString()
+
+		expect(commented_at(later)).toEqual([RANK])
+	})
+
+	it('keeps the recorded plan over a plan comment posted before it', () => {
+		expect(commented_at('2000-01-01T00:00:00Z')).toEqual([OVERRUN])
+	})
+
+	it('keeps the recorded plan over an undated plan comment', () => {
+		expect(commented_at('(undated)')).toEqual([OVERRUN])
 	})
 })
 
@@ -93,6 +124,24 @@ describe('lane_plan.earlier_holders', () => {
 		lane_plan.remove(LATER, DIRECTORY)
 
 		expect(lane_plan.read(LATER, DIRECTORY)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#5672: a narrowing re-plan keeps the files an earlier clear held, for the hunks axis.
+describe('lane_plan.record on a re-plan', () => {
+	it('keeps every path an earlier cleared plan held when a re-plan narrows it', () => {
+		lane_plan.record({ ...LATER_PLAN, paths: [OVERRUN, RANK], cleared: true }, DIRECTORY)
+		lane_plan.record(LATER_PLAN, DIRECTORY)
+		lane_plan.record({ ...LATER_PLAN, cleared: true }, DIRECTORY)
+
+		expect(lane_plan.read(LATER, DIRECTORY)?.cleared_paths).toEqual([OVERRUN, RANK])
+	})
+
+	it('records no history before any plan of the issue cleared', () => {
+		lane_plan.record(LATER_PLAN, DIRECTORY)
+		lane_plan.record(LATER_PLAN, DIRECTORY)
+
+		expect(lane_plan.read(LATER, DIRECTORY)?.cleared_paths).toBeUndefined()
 	})
 })
 
@@ -142,6 +191,14 @@ describe('lane_plan.is_yield_held', () => {
 		lane_plan.record({ ...LATER_PLAN, yielded: true }, DIRECTORY)
 
 		expect(lane_plan.is_yield_held(LATER, in_flight(OVERRUN), DIRECTORY)).toBe(false)
+	})
+
+	// joshuafolkken/kit#6798: a plan comment fixed since the yield is the scope held, not the kept paths.
+	it('holds a yielded issue on the scope it is handed in place of its kept paths', () => {
+		lane_plan.record(EARLIER_PLAN, DIRECTORY)
+		lane_plan.record({ ...LATER_PLAN, yielded: true }, DIRECTORY)
+
+		expect(lane_plan.is_yield_held(LATER, in_flight(), DIRECTORY, new Set([RANK]))).toBe(false)
 	})
 
 	it('holds no plan its lane did not yield on', () => {

@@ -1,8 +1,10 @@
 import { api_auth } from '#scripts/agent/api-auth'
+import { core_priority } from '#scripts/gate/core-priority'
 import { deferred_answer } from '#scripts/git/deferred-answer-fixture'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { run_ship_stop_cause } from '#scripts/run/ship/run-ship-stop-cause'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { lane_child_marker } from './lane-child-marker'
 import type { LaneInfo } from './lane-registry'
 import { lane_relaunch } from './lane-relaunch'
 import { lane_session_action, type BrokerAnswer } from './lane-session-action'
@@ -79,6 +81,20 @@ describe('lane_session_action.answer — a review round', () => {
 	})
 })
 
+// joshuafolkken/kit#5819: the brokered reviewer claims cores with the priority mark, beside the lane's own.
+describe('lane_session_action.answer — the reviewer environment', () => {
+	it('launches the reviewer with the lane child mark and the core-budget priority mark', async () => {
+		vi.spyOn(console, 'error').mockImplementation(vi.fn())
+
+		await lane_session_action.answer(LANE, ROUND_ONE)
+
+		expect(launch_mock.mock.calls[0]?.[0]).toHaveProperty('env', {
+			...lane_child_marker.env_for(LANE.issue),
+			...core_priority.PRIORITY_ENVIRONMENT,
+		})
+	})
+})
+
 // joshuafolkken/kit#4216: a reviewer whose session expired is named so, not left a bare exit code.
 describe('lane_session_action.answer — a reviewer that could not authenticate', () => {
 	it('names an authentication failure the reviewer log ends on', async () => {
@@ -115,7 +131,7 @@ describe('lane_session_action.answer', () => {
 	})
 
 	it('names the note of a rejected relaunch', async () => {
-		vi.spyOn(lane_relaunch, 'relaunch').mockReturnValue({ kind: 'rejected', note: 'no profile' })
+		vi.spyOn(lane_relaunch, 'relaunch').mockResolvedValue({ kind: 'rejected', note: 'no profile' })
 
 		const answer = await lane_session_action.answer(LANE, RELAUNCH)
 
@@ -123,7 +139,7 @@ describe('lane_session_action.answer', () => {
 	})
 
 	it('answers a thrown action as a failure naming its error', async () => {
-		vi.spyOn(lane_relaunch, 'relaunch').mockImplementation(() => {
+		vi.spyOn(lane_relaunch, 'relaunch').mockImplementation(async () => {
 			throw new Error('spawn EACCES')
 		})
 

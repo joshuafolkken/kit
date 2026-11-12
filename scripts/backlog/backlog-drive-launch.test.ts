@@ -2,9 +2,11 @@ import { git_stash, type StashEntry } from '#scripts/git/stash/git-stash'
 import { lane_launch_cli } from '#scripts/lane/lane-launch-cli'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
+import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_drive_launch } from './backlog-drive-launch'
 import { backlog_drive_owner } from './backlog-drive-owner'
+import { backlog_drive_split_unit } from './backlog-drive-split-unit'
 import { backlog_measure_close } from './backlog-measure-close'
 
 const OWNER = '4242'
@@ -18,25 +20,73 @@ const OTHER: StashEntry = { selector: 'stash@{1}', subject: 'On 3200-lane: 3200:
 const DUPLICATE: StashEntry = { selector: 'stash@{2}', subject: `On main: ${MESSAGE}` }
 
 function launched_with(): ReadonlyArray<string | undefined> {
-	return vi.mocked(lane_launch_cli.launch_lane).mock.calls.map(([context]) => context.stash)
+	return vi.mocked(lane_launch_cli.launch_ready_lane).mock.calls.map(([context]) => context.stash)
 }
 
 beforeEach(() => {
 	vi.spyOn(backlog_drive_owner, 'assert_current').mockResolvedValue(CARRY)
-	vi.spyOn(lane_launch_cli, 'launch_lane').mockResolvedValue({ kind: 'launched', pid: '1' })
+	vi.spyOn(lane_launch_cli, 'launch_ready_lane').mockResolvedValue({ kind: 'launched', pid: '1' })
 	// The stage a launch writes goes to the checkout's own stream, which is a live run's: never from a test.
 	vi.spyOn(run_event_setup, 'emit').mockResolvedValue()
-	vi.spyOn(backlog_measure_close, 'closed').mockResolvedValue(false)
+	vi.spyOn(run_event_stream_emit, 'emit').mockResolvedValue()
+	vi.spyOn(backlog_measure_close, 'outcome').mockResolvedValue('launch')
+	vi.spyOn(backlog_drive_split_unit, 'run').mockResolvedValue('launch')
+})
+
+// joshuafolkken/kit#7182: an issue over the size bar goes to its split-only unit before any lane.
+describe('backlog_drive_launch.launch — the split-only unit', () => {
+	it('answers split without opening a lane or a stage when the unit split the issue', async () => {
+		vi.mocked(backlog_drive_split_unit.run).mockResolvedValue('split')
+
+		await expect(backlog_drive_launch.launch(FIRST, OWNER)).resolves.toBe('split')
+		expect(backlog_drive_split_unit.run).toHaveBeenCalledWith(FIRST)
+		expect(lane_launch_cli.launch_ready_lane).not.toHaveBeenCalled()
+		expect(run_event_setup.emit).not.toHaveBeenCalled()
+	})
+
+	it('opens the lane when the unit answers launch', async () => {
+		await expect(backlog_drive_launch.launch(FIRST, OWNER)).resolves.toBe('launched')
+		expect(lane_launch_cli.launch_ready_lane).toHaveBeenCalledOnce()
+	})
+
+	it('opens no lane when the driver lost its owner while the unit ran', async () => {
+		vi.mocked(backlog_drive_owner.assert_current)
+			.mockResolvedValueOnce(CARRY)
+			.mockRejectedValueOnce(new Error(LOST_OWNER))
+
+		await expect(backlog_drive_launch.launch(FIRST, OWNER)).rejects.toThrow(LOST_OWNER)
+		expect(backlog_drive_split_unit.run).toHaveBeenCalledWith(FIRST)
+		expect(lane_launch_cli.launch_ready_lane).not.toHaveBeenCalled()
+		expect(run_event_setup.emit).not.toHaveBeenCalled()
+	})
+
+	it('runs no unit for a measured close', async () => {
+		vi.mocked(backlog_measure_close.outcome).mockResolvedValue('closed')
+
+		await backlog_drive_launch.launch(FIRST, OWNER)
+		expect(backlog_drive_split_unit.run).not.toHaveBeenCalled()
+	})
 })
 
 // joshuafolkken/kit#4621: an issue its measurement declaration closed takes no lane.
 describe('backlog_drive_launch.launch — a measured close', () => {
 	it('answers measured without opening a lane or a stage', async () => {
-		vi.mocked(backlog_measure_close.closed).mockResolvedValue(true)
+		vi.mocked(backlog_measure_close.outcome).mockResolvedValue('closed')
 
 		await expect(backlog_drive_launch.launch(FIRST, OWNER)).resolves.toBe('measured')
-		expect(backlog_measure_close.closed).toHaveBeenCalledWith(FIRST)
-		expect(lane_launch_cli.launch_lane).not.toHaveBeenCalled()
+		expect(backlog_measure_close.outcome).toHaveBeenCalledWith(FIRST)
+		expect(lane_launch_cli.launch_ready_lane).not.toHaveBeenCalled()
+		expect(run_event_setup.emit).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#6503: an issue whose declaration has no sample yet waits without a lane.
+describe('backlog_drive_launch.launch — no sample yet', () => {
+	it('answers unsampled without opening a lane or a stage', async () => {
+		vi.mocked(backlog_measure_close.outcome).mockResolvedValue('wait')
+
+		await expect(backlog_drive_launch.launch(FIRST, OWNER)).resolves.toBe('unsampled')
+		expect(lane_launch_cli.launch_ready_lane).not.toHaveBeenCalled()
 		expect(run_event_setup.emit).not.toHaveBeenCalled()
 	})
 })
@@ -50,7 +100,7 @@ describe('backlog_drive_launch.launch', () => {
 		vi.spyOn(git_stash, 'list').mockResolvedValue([OTHER, LATEST])
 
 		await expect(backlog_drive_launch.launch(FIRST, OWNER)).resolves.toBe('launched')
-		expect(lane_launch_cli.launch_lane).toHaveBeenCalledWith({ issue: FIRST, stash: MESSAGE })
+		expect(lane_launch_cli.launch_ready_lane).toHaveBeenCalledWith({ issue: FIRST, stash: MESSAGE })
 	})
 
 	it('launches without a stash when none was pushed', async () => {
@@ -70,6 +120,18 @@ describe('backlog_drive_launch.launch', () => {
 		expect(launched_with()).toStrictEqual([MESSAGE, undefined])
 	})
 
+	// joshuafolkken/kit#5519: a pass launches side by side, before either lane has popped the stash.
+	it('gives the stash to one of two lanes launched at once', async () => {
+		vi.spyOn(git_stash, 'list').mockResolvedValue([LATEST])
+
+		await Promise.all([
+			backlog_drive_launch.launch(FIRST, OWNER),
+			backlog_drive_launch.launch(SECOND, OWNER),
+		])
+
+		expect(launched_with().filter((stash) => stash === MESSAGE)).toHaveLength(1)
+	})
+
 	it('refuses before reading the stash when the driver lost its owner', async () => {
 		const list = vi.spyOn(git_stash, 'list').mockResolvedValue([LATEST])
 
@@ -77,7 +139,7 @@ describe('backlog_drive_launch.launch', () => {
 
 		await expect(backlog_drive_launch.launch(FIRST, OWNER)).rejects.toThrow(LOST_OWNER)
 		expect(list).not.toHaveBeenCalled()
-		expect(lane_launch_cli.launch_lane).not.toHaveBeenCalled()
+		expect(lane_launch_cli.launch_ready_lane).not.toHaveBeenCalled()
 	})
 })
 
@@ -92,16 +154,16 @@ describe('backlog_drive_launch.launch setup stage', () => {
 
 		expect(emit.mock.calls).toStrictEqual([[`opening lane #${FIRST}`], [`opening lane #${SECOND}`]])
 		expect(emit.mock.invocationCallOrder[0]).toBeLessThan(
-			vi.mocked(lane_launch_cli.launch_lane).mock.invocationCallOrder[0] ?? 0,
+			vi.mocked(lane_launch_cli.launch_ready_lane).mock.invocationCallOrder[0] ?? 0,
 		)
 	})
 
 	it.each(['unopened', 'failed'] as const)('ends an %s launch with a stage', async (kind) => {
 		vi.spyOn(git_stash, 'list').mockResolvedValue([])
-		vi.mocked(lane_launch_cli.launch_lane).mockResolvedValue({ kind })
+		vi.mocked(lane_launch_cli.launch_ready_lane).mockResolvedValue({ kind })
 
 		await expect(backlog_drive_launch.launch(FIRST, OWNER)).resolves.toBe(kind)
-		expect(run_event_setup.emit).toHaveBeenLastCalledWith(run_event_setup.STAGE.NO_CHILD)
+		expect(run_event_setup.emit).toHaveBeenLastCalledWith(`no child launched #${FIRST}`)
 	})
 
 	it('says nothing once the driver lost its owner', async () => {
@@ -110,6 +172,49 @@ describe('backlog_drive_launch.launch setup stage', () => {
 		await expect(backlog_drive_launch.launch(FIRST, OWNER)).rejects.toThrow(LOST_OWNER)
 		expect(run_event_setup.emit).not.toHaveBeenCalled()
 	})
+})
+
+// joshuafolkken/kit#6551: the refusal's stage keeps why, on the event's one line.
+describe('backlog_drive_launch.launch refusal detail', () => {
+	it.each(['unopened', 'failed'] as const)('records an %s launch’s detail', async (kind) => {
+		vi.spyOn(git_stash, 'list').mockResolvedValue([])
+		const detail = 'lane:open refused:\n  pool  is full'
+
+		vi.mocked(lane_launch_cli.launch_ready_lane).mockResolvedValue({ kind, detail })
+
+		await expect(backlog_drive_launch.launch(FIRST, OWNER)).resolves.toBe(kind)
+		expect(run_event_setup.emit).toHaveBeenLastCalledWith(
+			`no child launched #${FIRST}: lane:open refused: pool is full`,
+		)
+	})
+
+	it('caps a long detail so the board header stays one short line', async () => {
+		vi.spyOn(git_stash, 'list').mockResolvedValue([])
+		const limit = 200
+
+		vi.mocked(lane_launch_cli.launch_ready_lane).mockResolvedValue({
+			kind: 'failed',
+			detail: 'x'.repeat(limit + 1),
+		})
+
+		await backlog_drive_launch.launch(FIRST, OWNER)
+
+		expect(run_event_setup.emit).toHaveBeenLastCalledWith(
+			`no child launched #${FIRST}: ${'x'.repeat(limit)}…`,
+		)
+	})
+
+	it.each([{ kind: 'launched', pid: '1' }, { kind: 'waiting' }] as const)(
+		'records no refusal for a $kind launch',
+		async (outcome) => {
+			vi.spyOn(git_stash, 'list').mockResolvedValue([])
+			vi.mocked(lane_launch_cli.launch_ready_lane).mockResolvedValue(outcome)
+
+			await backlog_drive_launch.launch(FIRST, OWNER)
+
+			expect(run_event_setup.emit).toHaveBeenLastCalledWith(`opening lane #${FIRST}`)
+		},
+	)
 })
 
 describe('backlog_drive_launch.launch with two stashes under the message', () => {

@@ -1,3 +1,5 @@
+import { writeFile } from 'node:fs/promises'
+import path from 'node:path'
 import { git_fixture_workspace, type FixtureWorkspace } from '#scripts/git/git-fixture-workspace'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_pinned } from './test-pinned'
@@ -129,7 +131,10 @@ describe('test_pinned.run over an import graph after an edit no hunk rests on', 
 			await write(EXTRA_TEST, extra_test('runs'))
 			const runs = vi.spyOn(test_red, 'probe_in')
 
-			expect(await run_report()).toEqual(first)
+			const report = await run_report()
+
+			expect(report.tree_hash).not.toBe(first.tree_hash)
+			expect(report).toEqual({ ...first, tree_hash: report.tree_hash })
 			expect(runs).not.toHaveBeenCalled()
 		},
 		RUN_TIMEOUT,
@@ -144,7 +149,10 @@ describe('test_pinned.run over an import graph after an edit no hunk rests on', 
 			await write_outside(1)
 			const runs = vi.spyOn(test_red, 'probe_in')
 
-			expect(await run_report()).toEqual(first)
+			const report = await run_report()
+
+			expect(report.tree_hash).not.toBe(first.tree_hash)
+			expect(report).toEqual({ ...first, tree_hash: report.tree_hash })
 			expect(runs).not.toHaveBeenCalled()
 		},
 		RUN_TIMEOUT,
@@ -278,7 +286,10 @@ describe('test_pinned.run over an import graph after an edit no failed test can 
 			await write_outside(1)
 			const runs = vi.spyOn(test_red, 'probe_in')
 
-			expect(await run_report()).toEqual(first)
+			const report = await run_report()
+
+			expect(report.tree_hash).not.toBe(first.tree_hash)
+			expect(report).toEqual({ ...first, tree_hash: report.tree_hash })
 			expect(runs).not.toHaveBeenCalled()
 		},
 		RUN_TIMEOUT,
@@ -291,9 +302,10 @@ describe('test_pinned.run over an import graph after an edit made while it ran',
 		async () => {
 			await build_with_app()
 			const probe_in = test_red.probe_in.bind(test_red)
+			const original_app = path.resolve(APP_FILE)
 
 			vi.spyOn(test_red, 'probe_in').mockImplementationOnce(async (...parameters) => {
-				await write(APP_FILE, `${APP_THROUGH_DRIVER}// edited\n`)
+				await writeFile(original_app, `${APP_THROUGH_DRIVER}// edited\n`)
 
 				return await probe_in(...parameters)
 			})

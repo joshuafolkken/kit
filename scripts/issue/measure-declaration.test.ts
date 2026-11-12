@@ -5,6 +5,7 @@ import { measure_declaration } from './measure-declaration'
 
 const BACKGROUND = '## 背景\n\n'
 const DECLARED = `${BACKGROUND}- 計測宣言: \`pnpm josh count\` <= 5\n`
+const PLACEHOLDER = `${BACKGROUND}- 計測宣言: \`pnpm josh count --since <merge instant>\` <= 5\n`
 
 describe('measure_declaration.parse', () => {
 	it('reads the command, the operator and the bound', () => {
@@ -33,6 +34,7 @@ describe('measure_declaration.parse', () => {
 			`${BACKGROUND}\`\`\`md\n- 計測宣言: \`echo 1\` <= 5\n\`\`\`\n`,
 		],
 		['a malformed declaration', `${BACKGROUND}- 計測宣言: echo 1 under 5\n`],
+		['a declaration with a placeholder left in its command', PLACEHOLDER],
 	])('reads nothing from %s', (_case, body) => {
 		expect(measure_declaration.parse(body)).toBeUndefined()
 	})
@@ -58,8 +60,50 @@ describe('measure_declaration.problems', () => {
 		expect(measure_declaration.parse(`${BACKGROUND}${example}\n`)).toBeDefined()
 	})
 
-	it.each([DECLARED, `${BACKGROUND}- 種別: 非不具合\n`])('finds no problem in %j', (body) => {
+	// joshuafolkken/kit#6016: a placeholder left in the command is a shell syntax error when the drive runs it.
+	it('names a placeholder left in the command and ends in an example that parses', () => {
+		const [found = ''] = measure_declaration.problems(PLACEHOLDER)
+		const example = found.split('\n').at(-1) ?? ''
+
+		expect(found).toContain('`<merge instant>`')
+		expect(measure_declaration.parse(`${BACKGROUND}${example}\n`)).toBeDefined()
+	})
+
+	it.each([
+		DECLARED,
+		`${BACKGROUND}- 種別: 非不具合\n`,
+		`${BACKGROUND}- 計測宣言: \`pnpm josh count 2>&1 < input.txt\` < 5\n`,
+		`${BACKGROUND}- 計測宣言: \`wc -l <in.txt >out.txt\` < 5\n`,
+	])('finds no problem in %j', (body) => {
 		expect(measure_declaration.problems(body)).toStrictEqual([])
+	})
+})
+
+// joshuafolkken/kit#7021: a premise line is read as the declaration is, every one of them.
+describe('measure_declaration.problems on premise lines', () => {
+	it('refuses every malformed premise line with a premise example', () => {
+		const body = `${BACKGROUND}- 前提: \`echo 1\` <= 5\n- 前提: about 35\n- 前提: \`echo <n>\` < 2\n`
+		const found = measure_declaration.problems(body)
+
+		expect(found).toStrictEqual([
+			expect.stringContaining(`\`${measure_declaration.PREMISE_PREFIX}\` must be written`),
+			expect.stringContaining('`<n>`'),
+		])
+		expect(found.every((problem) => problem.split('\n').at(-1)?.startsWith('- 前提: `'))).toBe(true)
+	})
+
+	// joshuafolkken/kit#7022: `lane:plan` re-runs every premise that parses.
+	it('reads every premise line that parses, in body order', () => {
+		const body = `${BACKGROUND}- 前提: \`echo 1\` <= 5\n- 前提: about 35\n- 前提: \`echo 2\` > 1\n`
+
+		expect(measure_declaration.premises(body)).toStrictEqual([
+			{ command: 'echo 1', operator: '<=', threshold: 5 },
+			{ command: 'echo 2', operator: '>', threshold: 1 },
+		])
+	})
+
+	it('reads no premise line as the measurement declaration', () => {
+		expect(measure_declaration.parse(`${BACKGROUND}- 前提: \`echo 1\` <= 5\n`)).toBeUndefined()
 	})
 })
 

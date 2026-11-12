@@ -33,8 +33,9 @@ josh run:release --force` is the one spelling that removes a record this run did
 `busy` message names it.
 
 **Release what the claim recorded.** A `#N` entry releases `<N>`. A **`new` entry claimed before its
-Issue existed**, so once it files `<N>` it runs `pnpm josh run:hold --adopt <N>`, which re-keys the
-record to `<N>` and applies `in-progress`; from then on every stop releases with `run:release <N>`.
+Issue existed**, so once it files `<N>` it runs `pnpm josh run:entry <N> --adopt`, whose
+`run:hold --adopt <N>` re-keys the record to `<N>` and applies `in-progress`; from then on every stop
+releases with `run:release <N>`.
 A `new` stop before filing releases with the **bare** form.
 
 **Releasing is the run's, not a person's memory.** `pnpm josh followup` releases on a merged run; an

@@ -1,22 +1,17 @@
-import { gh_author_association } from '#scripts/gh/gh-author-association'
-import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { SPLIT_ROUTE_LABEL } from '#scripts/issue/issue-labels'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_ledger, type LedgerEntry } from '#scripts/lane/lane-ledger'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { split_assess } from './split-assess'
 import { split_resolution } from './split-resolution'
 
-const { REASON_PREFIX } = split_assess
-
-// joshuafolkken/kit#4695: a lane the split notice reached is refused before the gate until it either
-// filed a split child or recorded, in a trusted Issue comment, why it stays one Issue.
+// joshuafolkken/kit#6212: only a filed split child answers the notice, never a reason comment.
 
 const ISSUE = 4695
 const OTHER_ISSUE = 4696
 const AT = '2026-10-23T00:00:00.000Z'
-const OWNER = 'OWNER'
-const REASON = `${REASON_PREFIX} the rest shares one schema change`
+const APPEND_FAILED = 'append failed'
+const FOLD_TARGET = '4701'
 
 const NOTICE: LedgerEntry = {
 	kind: lane_ledger.KIND.SPLIT_NOTICE,
@@ -32,85 +27,73 @@ const SPLIT_CHILD: LedgerEntry = {
 	child: '#4700',
 }
 
-const list_comments = vi.spyOn(git_gh_issue_read, 'issue_list_comments')
-const is_trusted = vi.spyOn(gh_author_association, 'is_trusted')
 const record_split_filed = vi.spyOn(lane_ledger_write, 'record_split_filed')
-
-function comments_json(body: string, association = OWNER): string {
-	return JSON.stringify([{ user: { login: 'someone' }, body, author_association: association }])
-}
+const error = vi.spyOn(console, 'error')
 
 beforeEach(() => {
-	vi.clearAllMocks()
-	is_trusted.mockImplementation(async (author) => author.association === OWNER)
-	list_comments.mockResolvedValue('[]')
 	record_split_filed.mockResolvedValue()
+	error.mockImplementation(vi.fn())
+	vi.stubEnv(lane_child_marker.KEY, String(OTHER_ISSUE))
 })
 
-describe('split_resolution.refusal for a noticed issue with no answer', () => {
-	it('names the counts, the reason line, the split route and the command to rerun', async () => {
-		const note = await split_resolution.refusal(ISSUE, [NOTICE])
-
-		expect(note).toContain('11 file(s), 550 line(s)')
-		expect(note).toContain(REASON_PREFIX)
-		expect(note).toContain('pnpm josh issue:file --route split')
-		expect(note).toContain(`pnpm josh run:cut ${String(ISSUE)}`)
-	})
-
-	it('refuses a reason from an untrusted author', async () => {
-		list_comments.mockResolvedValue(comments_json(REASON, 'NONE'))
-
-		expect(await split_resolution.refusal(ISSUE, [NOTICE])).toBeDefined()
-	})
-
-	it('refuses a reason line with no reason after it', async () => {
-		list_comments.mockResolvedValue(comments_json(`${REASON_PREFIX}   `))
-
-		expect(await split_resolution.refusal(ISSUE, [NOTICE])).toBeDefined()
-	})
-
-	it('refuses, saying so, when the comments cannot be read', async () => {
-		list_comments.mockResolvedValue(undefined)
-
-		expect(await split_resolution.refusal(ISSUE, [NOTICE])).toContain('could not be read')
+describe('split_resolution.notices and split_issues', () => {
+	it('reads the notices and the Issues whose lane filed a split child', () => {
+		expect(split_resolution.notices([NOTICE, SPLIT_CHILD])).toStrictEqual([NOTICE])
+		expect(split_resolution.split_issues([NOTICE, SPLIT_CHILD])).toStrictEqual(new Set([ISSUE]))
 	})
 })
 
-describe('split_resolution.refusal for an answered or unnoticed issue', () => {
-	it('passes an issue the notice never reached without reading its comments', async () => {
-		const notice_elsewhere = { ...NOTICE, issue: OTHER_ISSUE }
+// joshuafolkken/kit#7183: a dispatched lane is never split, so its own split filing is refused.
+describe('split_resolution.is_split_clear', () => {
+	it('refuses a split filed from the dispatched lane it would split', () => {
+		const filing = { route: SPLIT_ROUTE_LABEL, found_during: String(OTHER_ISSUE) }
 
-		expect(await split_resolution.refusal(ISSUE, [notice_elsewhere])).toBeUndefined()
-		expect(list_comments).not.toHaveBeenCalled()
+		expect(split_resolution.is_split_clear(filing)).toBe(false)
+		expect(String(error.mock.calls.at(-1)?.[0])).toContain('never split')
 	})
 
-	it('passes an issue whose lane filed a split child', async () => {
-		expect(await split_resolution.refusal(ISSUE, [NOTICE, SPLIT_CHILD])).toBeUndefined()
+	it('refuses a split that omits --found-during in the dispatched lane', () => {
+		expect(
+			split_resolution.is_split_clear({ route: SPLIT_ROUTE_LABEL, found_during: undefined }),
+		).toBe(false)
+		expect(String(error.mock.calls.at(-1)?.[0])).toContain(`#${String(OTHER_ISSUE)}`)
 	})
 
-	it('passes an issue with a trusted comment carrying the reason line', async () => {
-		list_comments.mockResolvedValue(comments_json(`Stays one Issue.\n${REASON}`))
+	it('passes another route and another lane', () => {
+		const filings = [
+			{ route: 'route:bug', found_during: String(OTHER_ISSUE) },
+			{ route: SPLIT_ROUTE_LABEL, found_during: String(ISSUE) },
+		]
 
-		expect(await split_resolution.refusal(ISSUE, [NOTICE])).toBeUndefined()
-	})
-})
-
-describe('split_resolution.ledger_refusal', () => {
-	it('reads the repository ledger', async () => {
-		vi.spyOn(lane_ledger, 'target').mockResolvedValueOnce('/ledger.jsonl')
-		vi.spyOn(lane_ledger, 'read_entries').mockReturnValueOnce([NOTICE])
-
-		expect(await split_resolution.ledger_refusal(ISSUE)).toBeDefined()
+		expect(filings.every((filing) => split_resolution.is_split_clear(filing))).toBe(true)
+		expect(error).not.toHaveBeenCalled()
 	})
 
-	it('refuses nothing outside a repository', async () => {
-		vi.spyOn(lane_ledger, 'target').mockResolvedValueOnce(undefined)
+	it('passes a split filed outside any dispatched lane', () => {
+		vi.stubEnv(lane_child_marker.KEY, '')
 
-		expect(await split_resolution.ledger_refusal(ISSUE)).toBeUndefined()
+		expect(
+			split_resolution.is_split_clear({ route: SPLIT_ROUTE_LABEL, found_during: undefined }),
+		).toBe(true)
+		expect(error).not.toHaveBeenCalled()
 	})
 })
 
 describe('split_resolution.record_child', () => {
+	it('reports the existing child URL and a recovery command when recording fails', async () => {
+		const child = 'https://github.com/joshuafolkken/kit/issues/4700'
+
+		record_split_filed.mockRejectedValueOnce(new Error(APPEND_FAILED))
+
+		await expect(
+			split_resolution.record_child({
+				route: SPLIT_ROUTE_LABEL,
+				found_during: String(ISSUE),
+				child,
+			}),
+		).rejects.toThrow(`pnpm josh split:recover ${String(ISSUE)} ${child}`)
+	})
+
 	it('records a split child against the lane it was found in', async () => {
 		const filing = { route: SPLIT_ROUTE_LABEL, found_during: String(ISSUE), child: '#4700' }
 
@@ -128,5 +111,35 @@ describe('split_resolution.record_child', () => {
 		})
 
 		expect(record_split_filed).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#6630: a split part folded into an existing Issue answers the notice.
+describe('split_resolution.record_fold', () => {
+	const fold = { origin: String(ISSUE), target: FOLD_TARGET }
+
+	it('records the fold target as the origin lane split child', async () => {
+		await split_resolution.record_fold(fold)
+
+		expect(record_split_filed).toHaveBeenCalledExactlyOnceWith({
+			issue: ISSUE,
+			child: `#${FOLD_TARGET}`,
+		})
+	})
+
+	it('lets the recorded fold answer the notice as a split child', async () => {
+		await split_resolution.record_fold(fold)
+		const recorded = record_split_filed.mock.calls[0]?.[0] ?? { issue: OTHER_ISSUE, child: '' }
+		const entry: LedgerEntry = { kind: lane_ledger.KIND.SPLIT_FILED, at: AT, ...recorded }
+
+		expect(split_resolution.split_issues([NOTICE, entry]).has(ISSUE)).toBe(true)
+	})
+
+	it('names the folded issue and the cause when recording fails', async () => {
+		record_split_filed.mockRejectedValueOnce(new Error(APPEND_FAILED))
+
+		await expect(split_resolution.record_fold(fold)).rejects.toThrow(
+			new RegExp(`Folded into .*${FOLD_TARGET}.*${APPEND_FAILED}`, 'u'),
+		)
 	})
 })

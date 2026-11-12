@@ -28,6 +28,7 @@ import {
 // The author fields (`AuthorFields`) are read only by `backlog:next`, which offers a child only when
 // its author has write access (joshuafolkken/kit#4633); absent on rows built without a read.
 interface EpicChild extends AuthorFields {
+	is_resumable?: boolean | undefined
 	number: number
 	repo: string
 	state: 'OPEN' | 'CLOSED'

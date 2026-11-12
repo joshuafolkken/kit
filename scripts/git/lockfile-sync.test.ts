@@ -1,8 +1,8 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { lane_install } from '#scripts/lane/lane-install'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { LOCKFILE_NAME, lockfile_sync, RECORD_PATH } from './lockfile-sync'
 
 // joshuafolkken/kit#3463: a pull that changed the lock left the primary checkout's `node_modules`
@@ -21,6 +21,7 @@ const INSTALL_OUTPUT = 'Done in 3.4s'
 const INSTALL_FAILURE = { is_installed: false, output: 'ERR_PNPM_FETCH_404' }
 
 const checkout = { directory: '' }
+const make_directory = temporary_directory()
 
 function write_lock(content: string): void {
 	writeFileSync(path.join(checkout.directory, LOCKFILE_NAME), content)
@@ -38,13 +39,8 @@ async function installed(content: string): Promise<void> {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
-	checkout.directory = mkdtempSync(path.join(tmpdir(), 'lockfile-sync-'))
+	checkout.directory = make_directory('lockfile-sync-')
 	install.mockResolvedValue({ is_installed: true, output: INSTALL_OUTPUT })
-})
-
-afterEach(() => {
-	rmSync(checkout.directory, { recursive: true, force: true })
 })
 
 describe('reinstalling a stale checkout', () => {

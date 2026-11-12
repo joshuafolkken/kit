@@ -1,13 +1,14 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // joshuafolkken/kit#4634: the sonar file goes through `write_contained` like every other sync write,
 // so a `sonar-project.properties` linked outside the project is refused rather than written through.
 // The project root is pinned to a scratch tree, as `file-content.test.ts` does.
 
-const SANDBOX = mkdtempSync(path.join(tmpdir(), 'sonar-contained-'))
+const make_directory = temporary_directory('suite')
+const SANDBOX = make_directory('sonar-contained-')
 const ROOT = path.join(SANDBOX, 'project')
 const OUTSIDE_FILE = path.join(SANDBOX, 'outside.properties')
 const TEMPLATE = path.join(SANDBOX, 'template.properties')
@@ -28,10 +29,6 @@ beforeEach(() => {
 	writeFileSync(TEMPLATE, 'sonar.projectKey={{PROJECT_KEY}}\nsonar.organization={{ORGANIZATION}}\n')
 	writeFileSync(OUTSIDE_FILE, OUTSIDE_CONTENT)
 	symlinkSync(OUTSIDE_FILE, DESTINATION)
-})
-
-afterAll(() => {
-	rmSync(SANDBOX, { recursive: true, force: true })
 })
 
 describe('sonar_file — a destination linked outside the project', () => {

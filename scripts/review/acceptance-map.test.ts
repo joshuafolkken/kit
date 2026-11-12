@@ -173,6 +173,29 @@ describe('acceptance_map.compare — row shapes', () => {
 	})
 })
 
+describe('acceptance_map.rows_of — code fences', () => {
+	const deferred = `- \`${id(SECOND)}\` 見送り: ${SPLIT_OFF} split off`
+
+	it.each(['```', '~~~'])(
+		'ignores met and deferral rows inside a %s fence, keeping rows outside it (ac-556065d1)',
+		(fence) => {
+			const rows = acceptance_map.rows_of(
+				pr_with([met(FIRST), fence, met(SECOND), deferred, fence]),
+			)
+
+			expect(rows.ids).toEqual(new Set([id(FIRST)]))
+			expect(rows.deferrals).toEqual([])
+		},
+	)
+
+	it('keeps a deferral row after a closed fence (ac-556065d1)', () => {
+		const rows = acceptance_map.rows_of(pr_with(['~~~md', met(FIRST), '~~~', deferred]))
+
+		expect(rows.met.size).toBe(0)
+		expect(rows.deferrals).toEqual([{ id: id(SECOND), issue: SPLIT_OFF }])
+	})
+})
+
 describe('acceptance_map.compare — deferrals', () => {
 	it('maps a criterion deferred to a named issue and returns the issue to check', () => {
 		const row = `- \`${id(SECOND)}\` 見送り: ${SPLIT_OFF} split off`
@@ -201,6 +224,27 @@ describe('acceptance_map.skeleton', () => {
 
 	it('writes nothing for an issue with no criteria', () => {
 		expect(acceptance_map.skeleton('## 背景')).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#5541: a test the change added that names a criterion's identifier meets its row.
+describe('acceptance_map.with_test_rows', () => {
+	const skeleton = acceptance_map.skeleton(issue_with([FIRST, SECOND])) ?? ''
+	const naming = `acceptance_map > refuses an unmapped criterion (${id(FIRST)})`
+
+	it('meets a pending row a test title names, leaving the unnamed row pending (ac-6863b4b8)', () => {
+		const filled = acceptance_map.with_test_rows(skeleton, [naming, 'an unrelated test'])
+
+		expect(filled).toContain(`- \`${id(FIRST)}\` ${FIRST} — 満たした: \`${naming}\``)
+		expect(filled).toContain(`- \`${id(SECOND)}\` ${SECOND} — 未記入`)
+		expect([...acceptance_map.rows_of(filled).met]).toStrictEqual([id(FIRST)])
+	})
+
+	it('never rewrites a row the run already filled in (ac-05552640)', () => {
+		const written = `- \`${id(FIRST)}\` ${FIRST} — 見送り: ${SPLIT_OFF} later`
+		const body = [acceptance_map.MAP_HEADING, '', written].join('\n')
+
+		expect(acceptance_map.with_test_rows(body, [naming])).toBe(body)
 	})
 })
 

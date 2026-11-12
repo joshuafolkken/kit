@@ -6,7 +6,7 @@ import { openai_lane_supervisor_decision as decision } from './openai-lane-super
 // owner had no test. The first decision recorded for a nonce is the one that holds; a later,
 // different one is refused rather than overwriting it.
 
-// Polling gives up after 200 reads 50ms apart; the clock is advanced past that in one step.
+// Advancing past the polling window makes an unanswered supervisor fail without a real wait.
 const POLL_WINDOW_MS = 10_050
 
 // A lane directory no real lane uses, so the stamp keyed to it is this test's alone.

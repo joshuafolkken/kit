@@ -1,6 +1,7 @@
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { delivered_rules } from './delivered-rules'
@@ -33,8 +34,10 @@ function comments_tail(): string {
 	return COMMENTS_TAIL
 }
 
+const make_directory = temporary_directory()
+
 function transcript(lines: ReadonlyArray<string>): string {
-	const directory = mkdtempSync(path.join(tmpdir(), 'rule-rewrite-'))
+	const directory = make_directory('rule-rewrite-')
 	const transcript_path = path.join(directory, TRANSCRIPT_FILE)
 
 	writeFileSync(transcript_path, `${['{"type":"user"}', ...lines].join('\n')}\n`)

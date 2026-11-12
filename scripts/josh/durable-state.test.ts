@@ -1,6 +1,7 @@
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
+import { git_common_directory } from '#scripts/git/git-common-directory'
 import { lane_dispatch_log } from '#scripts/lane/lane-dispatch-log'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { lane_state } from '#scripts/lane/lane-state'
@@ -9,7 +10,8 @@ import { run_carry_ended } from '#scripts/run/carry/run-carry-ended'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
 import { run_wake } from '#scripts/run/wake/run-wake'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterAll, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { durable_state } from './durable-state'
 import { PLATFORM_TEMP_ROOT, platform_temporary } from './platform-temporary'
 import { stamp_file } from './stamp-file'
@@ -25,11 +27,11 @@ const RECORD = { kept: 'across a reboot' }
 const ISSUE = '4743'
 const OVERRIDE_STATE_DIRECTORY = 'josh-state'
 
-const scratch = mkdtempSync(path.join(PLATFORM_TEMP_ROOT, TEST_PREFIX))
+const make_directory = temporary_directory('suite')
+const scratch = make_directory(TEST_PREFIX)
 const written: Array<string> = []
 
 afterAll(() => {
-	rmSync(scratch, { recursive: true, force: true })
 	for (const target of written) rmSync(target, { force: true })
 })
 
@@ -60,21 +62,37 @@ function dispatch_log_path(directory: string): string {
 	})
 }
 
+function common_git_directory(): string {
+	return COMMON_GIT_DIRECTORY
+}
+
+function outside_repository(): undefined {
+	return undefined
+}
+
 describe('durable_state.state_root', () => {
 	it('keeps run state in the josh directory of the common git directory', () => {
-		expect(durable_state.state_root(undefined, COMMON_GIT_DIRECTORY)).toBe(
+		expect(durable_state.state_root(undefined, common_git_directory)).toBe(
 			path.join(COMMON_GIT_DIRECTORY, 'josh', 'run-state'),
 		)
 	})
 
 	it('moves beneath an explicit temp root, as the unit suite and live evidence set one', () => {
-		expect(durable_state.state_root(OVERRIDE_ROOT, COMMON_GIT_DIRECTORY)).toBe(
+		expect(durable_state.state_root(OVERRIDE_ROOT, common_git_directory)).toBe(
 			path.join(OVERRIDE_ROOT, OVERRIDE_STATE_DIRECTORY),
 		)
 	})
 
+	it('never asks git for the common directory beneath an explicit temp root', () => {
+		const read_common = vi.fn(common_git_directory)
+
+		durable_state.state_root(OVERRIDE_ROOT, read_common)
+
+		expect(read_common).not.toHaveBeenCalled()
+	})
+
 	it('falls back to the temp root outside a repository', () => {
-		expect(durable_state.state_root('', undefined)).toBe(PLATFORM_TEMP_ROOT)
+		expect(durable_state.state_root('', outside_repository)).toBe(PLATFORM_TEMP_ROOT)
 	})
 })
 
@@ -82,8 +100,14 @@ describe('durable_state.root', () => {
 	// The network guard sets `JOSH_TEMP_ROOT` for the whole unit run, so no test writes into the
 	// real `.git/josh/run-state` of the checkout it runs in.
 	it('resolves inside the test run temp root, never the real common git directory', () => {
+		const repository = vi.spyOn(git_common_directory, 'repository')
+
+		onTestFinished(() => {
+			repository.mockRestore()
+		})
 		expect(process.env[platform_temporary.TEMP_ROOT_KEY]).toBe(PLATFORM_TEMP_ROOT)
 		expect(durable_state.root()).toBe(path.join(PLATFORM_TEMP_ROOT, OVERRIDE_STATE_DIRECTORY))
+		expect(repository).not.toHaveBeenCalled()
 	})
 })
 
@@ -146,6 +170,15 @@ describe('durable_state.PREFIX — the lane plan', () => {
 
 		expect(durable_state.PREFIX.LANE_PLAN).toBe('josh-lane-plan-')
 		expect(prefixes.filter((prefix) => prefix === durable_state.PREFIX.LANE_PLAN)).toHaveLength(1)
+	})
+
+	// joshuafolkken/kit#6153: the investigator's conclusion outlives a yielded lane's work tree.
+	it('names the investigation record with a prefix no other record starts with', () => {
+		const { INVESTIGATION } = durable_state.PREFIX
+		const others = Object.values(durable_state.PREFIX).filter((prefix) => prefix !== INVESTIGATION)
+
+		expect(INVESTIGATION).toBe('josh-investigation-record-')
+		expect(others.filter((prefix) => INVESTIGATION.startsWith(prefix))).toStrictEqual([])
 	})
 })
 

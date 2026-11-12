@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { reconcile_script_fixture } from './dependabot-reconcile-script-fixture'
 
 const {
@@ -17,12 +17,9 @@ const {
 	call_count,
 	notice_marker,
 	posted_body,
-	remove_workspace,
 	run_reconcile,
 	withdraw_attempts,
 } = reconcile_script_fixture
-
-afterAll(remove_workspace)
 
 // The arm-versus-withdraw choice and the retry policy both live in the reconciling step's shell, not
 // in an expression, so these guards run the script rather than matching substrings in it: the step
@@ -160,8 +157,8 @@ describe.skipIf(process.platform === 'win32')(
 describe.skipIf(process.platform === 'win32')(
 	'dependabot-auto-merge.yml reconcile script — a gh call that keeps failing',
 	() => {
-		// The hole joshuafolkken/kit#846 names: the read used to abort the step, so `--disable-auto` was
-		// never reached and an armed auto-merge survived on a diff nobody re-approved.
+		// A failed read must still reach `--disable-auto`, so an unapproved diff cannot retain armed
+		// auto-merge (joshuafolkken/kit#846).
 		it('still tries to withdraw when the state stayed unreadable', () => {
 			const outcome = run_reconcile({
 				should_be_armed: FALSE,

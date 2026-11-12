@@ -1,0 +1,3 @@
+- rf:project-conventions | low | docs/josh-commands-board.md:56 | 2026-11-09 | #6598
+- rf:project-conventions | low | docs/maintainers/josh-commands-run-rationale.md:166 | 2026-11-09 | #6598
+- rf:performance | low | scripts/run/event/run-event-step.ts:70 | 2026-11-09 | #6598

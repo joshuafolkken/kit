@@ -80,7 +80,6 @@ function written_body(): string {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	mocked_edit_body.mockResolvedValue('')
 	mocked_comment.mockResolvedValue(true)
 	mocked_apply_relations.mockResolvedValue(0)

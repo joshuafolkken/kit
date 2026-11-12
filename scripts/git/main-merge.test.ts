@@ -16,7 +16,6 @@ vi.mock('./git-command', () => ({
 		merge_fast_forward: vi.fn(),
 		repository_root: vi.fn(),
 		status: vi.fn(),
-		untracked_names: vi.fn(),
 	},
 }))
 
@@ -36,11 +35,10 @@ const { main_merge } = await import('./main-merge')
 const { main_merge_guard } = await import('./main-merge-guard')
 const { main_merge_regenerate } = await import('./main-merge-regenerate')
 const { git_spawn } = await import('./git-spawn')
-const { split_early_notice } = await import('#scripts/split/split-early-notice')
 const { lane_install } = await import('#scripts/lane/lane-install')
+const { lane_ledger_write } = await import('#scripts/lane/lane-ledger-write')
 
-// The notice's ledger record; its marker and ledger writes are `split-early-notice.test.ts`'s.
-const record_notice = vi.spyOn(split_early_notice, 'record').mockResolvedValue()
+const record_split_notice = vi.spyOn(lane_ledger_write, 'record_split_notice').mockResolvedValue()
 
 const CHANGED_FILE = 'scripts/a.ts'
 const MODIFIED_STATUS = ` M ${CHANGED_FILE}`
@@ -70,7 +68,6 @@ const LOCKFILE_INCOMING = `${CHANGED_FILE}\n${LOCKFILE}`
 const INSTALL_OUTPUT = 'ERR_PNPM_OUTDATED_LOCKFILE'
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	vi.mocked(git_command.get_default_branch).mockResolvedValue('main')
@@ -87,11 +84,8 @@ beforeEach(() => {
 	install_dependencies.mockResolvedValue({ is_installed: true, output: '' })
 })
 
-// The split notice's diff read, empty by default so no merge below prints one.
 beforeEach(() => {
 	vi.spyOn(console, 'warn').mockImplementation(() => undefined)
-	vi.mocked(git_command.diff_numstat_since).mockResolvedValue('')
-	vi.mocked(git_command.untracked_names).mockResolvedValue('')
 })
 
 describe('merging the default branch into the current branch', () => {
@@ -287,49 +281,15 @@ describe('refusing extra arguments', () => {
 	})
 })
 
-// joshuafolkken/kit#4302: the merge that precedes the gate tells the run when its diff has outgrown the
-// split guide, and stays silent — and successful — otherwise.
-const OVER_GUIDE_FILES = 11
-const LINES_PER_FILE = 50
-const UNDER_GUIDE_NUMSTAT = `${String(LINES_PER_FILE)}\t0\t${CHANGED_FILE}`
-
-function over_guide_numstat(): string {
-	return Array.from(
-		{ length: OVER_GUIDE_FILES },
-		(_unused, index) => `${String(LINES_PER_FILE)}\t0\tscripts/thing-${String(index)}.ts`,
-	).join('\n')
-}
-
-describe('the split notice before the gate', () => {
-	it('warns when the diff clearly exceeds the split guide', async () => {
-		vi.mocked(git_command.diff_numstat_since).mockResolvedValue(over_guide_numstat())
+// joshuafolkken/kit#7009: size is judged before implementation, so a merge mid-implementation neither
+// prints nor records a split notice, however far the diff has outgrown its declaration.
+describe('no split notice after the merge', () => {
+	it('stays silent and records nothing for a diff past the guide (ac-0b7dc4c3)', async () => {
+		vi.mocked(git_command.diff_numstat_since).mockResolvedValue(`900\t0\t${CHANGED_FILE}`)
 
 		expect(await main_merge.run(NO_ARGUMENTS)).toBe(SUCCESS_EXIT_CODE)
-		expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('split notice'))
-	})
-
-	// joshuafolkken/kit#4695: the notice it prints is the one the lane ledger records.
-	it('records the notice it prints', async () => {
-		vi.mocked(git_command.diff_numstat_since).mockResolvedValue(over_guide_numstat())
-
-		await main_merge.run(NO_ARGUMENTS)
-
-		expect(record_notice).toHaveBeenCalledWith(expect.objectContaining({ files: OVER_GUIDE_FILES }))
-	})
-
-	it('prints nothing for a diff under the guide', async () => {
-		vi.mocked(git_command.diff_numstat_since).mockResolvedValue(UNDER_GUIDE_NUMSTAT)
-
-		await main_merge.run(NO_ARGUMENTS)
-
 		expect(console.warn).not.toHaveBeenCalled()
-		expect(record_notice).not.toHaveBeenCalled()
-	})
-
-	it('keeps a finished merge successful and says the diff was unmeasured when it cannot be read', async () => {
-		vi.mocked(git_command.diff_numstat_since).mockRejectedValue(MERGE_FAILURE)
-
-		expect(await main_merge.run(NO_ARGUMENTS)).toBe(SUCCESS_EXIT_CODE)
-		expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('could not be measured'))
+		expect(git_command.diff_numstat_since).not.toHaveBeenCalled()
+		expect(record_split_notice).not.toHaveBeenCalled()
 	})
 })

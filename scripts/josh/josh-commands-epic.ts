@@ -1,4 +1,4 @@
-import type { CommandEntry } from './josh-command-types'
+import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types'
 
 const REPO = '--repo <owner/repo>'
 const EXCLUDE = '--exclude <N>'
@@ -7,10 +7,11 @@ const JUST_MERGED = 'skip the issue just merged'
 // The epic and auto-ok commands, split out of `josh-commands-ai.ts` when each command's usage moved onto
 // its entry (#4185). `AI_COMMANDS` spreads this in at the same place, so the map keeps its order.
 
-/* eslint-disable @typescript-eslint/naming-convention */
 const EPIC_COMMANDS: Record<string, CommandEntry> = {
 	epic: {
-		script: 'scripts/epic/epic.ts',
+		script: 'scripts/epic/epic-main.ts',
+		// `--notify` sends the `planning` Telegram (epic-notify.ts), which reads `.env`.
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		description: 'Create an epic issue from its child issue numbers',
 		category: 'AI tools',
 		reference: ['<title> <issue...> [--ordered]', 'automation', ['network']],
@@ -18,17 +19,21 @@ const EPIC_COMMANDS: Record<string, CommandEntry> = {
 			examples: [
 				{ arguments: '"Epic: split the parser work" 101 102 103' },
 				{ arguments: '"Epic: staged rollout" 101 102 --ordered' },
-				{ arguments: '"Epic: ..." 101 102 --rationale-file rationale.md' },
+				{ arguments: '"Epic: ..." 101 102 --rationale-file .josh/tmp/rationale.md' },
 				{ arguments: '--promote 858 101 102 103', note: 'turn an existing issue into an epic' },
 				{ arguments: '--add 893 894', note: 'track #894, declaring no order for it' },
 				{ arguments: '--add 893 894 --before 891', note: '#894 must finish before #891' },
 				{ arguments: '--add 893 894 --after 890', note: '#894 starts once #890 is done' },
-				{ arguments: '--add 893 894 --decision-file why.md', note: '…and record why, in one call' },
+				{
+					arguments: '--add 893 894 --decision-file .josh/tmp/why.md',
+					note: '…and record why, in one call',
+				},
 				{
 					arguments: '--reconcile 2184',
 					note: 'rewrite the body to match the recorded blocked-by, and record any order the body declared',
 				},
-				{ arguments: '--decide 893 894 --decision-file why.md' },
+				{ arguments: '--decide 893 894 --decision-file .josh/tmp/why.md' },
+				{ arguments: '--untrack 893 894', note: 'remove a child row and its connected orders' },
 			],
 			flags: [
 				{
@@ -38,11 +43,20 @@ const EPIC_COMMANDS: Record<string, CommandEntry> = {
 				},
 				{
 					names: ['--rationale-file <path|->'],
-					description: 'split rationale prose (`-` reads stdin).',
+					description: 'split rationale prose, written under `.josh/tmp/` (`-` reads stdin).',
 				},
 				{
 					names: ['--origin <owner/repo#N>'],
 					description: 'backlink when the split originated in another repository.',
+				},
+				{
+					names: ['--notify'],
+					description:
+						"on create or `--promote`: send the split path's `planning` Telegram (the epic URL, child URLs and `Next: pnpm josh backlogrun <E> --only`), as `issue:plan --planned` sends; a failed send only warns.",
+				},
+				{
+					names: ['--title <title>'],
+					description: 'with `--promote`: rename the issue first.',
 				},
 				{
 					names: ['--before <M>'],
@@ -60,12 +74,18 @@ const EPIC_COMMANDS: Record<string, CommandEntry> = {
 				},
 				{
 					names: ['--decision-file <path|->'],
-					description: 'with `--add`: record why the child was placed.',
+					description:
+						'with `--add`: record why the child was placed, written under `.josh/tmp/` (`-` reads stdin).',
 				},
 				{
 					names: ['--remove <E> <M> <N> [<N2> …]'],
 					description:
 						'delete a declared order from the body and the relations; each consecutive pair is one link.',
+				},
+				{
+					names: ['--untrack <E> <N...>'],
+					description:
+						'remove child rows and connected orders without reconnecting survivors; relation failures preserve the body for retry; absent rows are safe to repeat.',
 				},
 			],
 		},
@@ -111,7 +131,7 @@ const EPIC_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 	'epic:audit': {
-		script: 'scripts/epic/epic-audit-cli.ts',
+		script: 'scripts/epic/epic-audit-main.ts',
 		description: "Audit an epic's children against each other for contradictions",
 		category: 'AI tools',
 		reference: ['<epic>', 'automation', ['network']],
@@ -145,7 +165,7 @@ const EPIC_COMMANDS: Record<string, CommandEntry> = {
 			'List the open issues backlogrun owes an auto-ok judgement, or record one (--apply / --decline)',
 		category: 'AI tools',
 		reference: [
-			'[--apply <n> (--lane | --solo) | --decline <n> --reason <text>]',
+			'[--apply <n> (--lane | --solo --defect yes --verification yes --every-run yes) | --decline <n> --reason <text>]',
 			'automation',
 			['network'],
 		],
@@ -166,6 +186,5 @@ const EPIC_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 }
-/* eslint-enable @typescript-eslint/naming-convention */
 
 export { EPIC_COMMANDS }

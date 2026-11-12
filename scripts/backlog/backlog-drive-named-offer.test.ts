@@ -1,22 +1,21 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
-import { auto_ok_cli } from '#scripts/auto-ok/auto-ok-cli'
-import type { OpenIssueData } from '#scripts/git/git-schemas'
-import { cutoff_of } from '#scripts/git/listing-cutoff'
-import { NEEDS_DECISION_LABEL, RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
+import { gh_core_rate_limit } from '#scripts/gh/gh-core-rate-limit'
+import {
+	NEEDS_DECISION_LABEL,
+	NEEDS_HUMAN_MERGE_LABEL,
+	RUN_STALLED_LABEL,
+} from '#scripts/issue/issue-labels'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
-import { lane_plan } from '#scripts/lane/lane-plan'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
-import { expect, test, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { backlog_drive, type LoopPorts } from './backlog-drive'
 import { backlog_drive_epic } from './backlog-drive-epic'
 import { backlog_drive_fixture, type Harness } from './backlog-drive-fixture'
 import { backlog_drive_named_offer } from './backlog-drive-named-offer'
 import { backlog_offer } from './backlog-offer'
-import { backlog_plan_comment } from './backlog-plan-comment'
 
 const ACTIVE = new Date().toISOString()
+const make_directory = temporary_directory()
 const CARRY = {
 	invocation: 'backlogrun #1 #2 --max 1',
 	started_at: ACTIVE,
@@ -27,11 +26,39 @@ const CARRY = {
 	outages: 0,
 }
 const CONTEXT = { is_only: false, forwarded: ['--max', '1'], owner: String(process.pid) }
+const CORE_LIMIT = 5000
+const RESET_MS = Date.parse('2026-11-08T12:00:00Z')
+
+// A launch reads the GitHub core allowance: unread here, so no case calls `gh api`.
+beforeEach(() => {
+	vi.spyOn(gh_core_rate_limit, 'read_core').mockResolvedValue(undefined)
+})
+
+afterEach(() => {
+	vi.restoreAllMocks()
+})
+
+// joshuafolkken/kit#6729: a named launch below the core floor waits for the reset unread.
+test('holds a named launch until the reset while the core allowance is below the floor', async () => {
+	vi.spyOn(gh_core_rate_limit, 'read_core').mockResolvedValue({
+		remaining: 0,
+		limit: CORE_LIMIT,
+		reset_ms: RESET_MS,
+	})
+	const read = vi.spyOn(issue_state_cli, 'read_issue')
+	const state = backlog_drive.initial_state([], ACTIVE)
+	const context = { ...CONTEXT, forwarded: ['--max', '2'] }
+
+	const { offer } = await backlog_drive_named_offer.read(CARRY, state, context)
+
+	expect(offer).toMatchObject({ verdict: 'wait', issues: [], not_before_ms: RESET_MS })
+	expect(read).not.toHaveBeenCalled()
+})
 
 test('honors the merged maximum before the second named issue', async () => {
 	const carry = { ...CARRY, done: [1], merged: 1 }
 	const state = backlog_drive.initial_state([], ACTIVE)
-	const offer = await backlog_drive_named_offer.read(carry, state, CONTEXT)
+	const { offer } = await backlog_drive_named_offer.read(carry, state, CONTEXT)
 
 	expect(offer?.verdict).toBe('stop')
 })
@@ -48,7 +75,7 @@ test('offers a named epic child from the epic instead of launching the root', as
 		.spyOn(backlog_drive_epic, 'offer')
 		.mockResolvedValue({ verdict: 'run', issues: ['7'], retries: 0 })
 
-	const offer = await backlog_drive_named_offer.read(CARRY, state, CONTEXT)
+	const { offer } = await backlog_drive_named_offer.read(CARRY, state, CONTEXT)
 
 	expect(offer).toMatchObject({ verdict: 'run', issues: ['7'] })
 	expect(epic).toHaveBeenCalledWith('1', state, CONTEXT.owner)
@@ -56,55 +83,30 @@ test('offers a named epic child from the epic instead of launching the root', as
 	epic.mockRestore()
 })
 
-const RUNNING: OpenIssueData = {
-	number: 3,
-	title: 'running',
-	createdAt: '2026-10-25T03:07:44Z',
-	blockedBy: undefined,
-	labels: [{ name: 'in-progress' }],
-	body: '`scripts/lane/lane-overrun.ts`',
-}
-const LISTING_LIMIT = 100
-const DECLARED = new Map([[3, new Set(['scripts/lane/lane-overrun.ts'])]])
+// joshuafolkken/kit#6839: a pool run names no issue, yet the epic `run:add` made its root is offered
+// from the epic, and once it is done nothing is named, so `read_offer` asks the pool.
+test('offers a pool run its added epic from the epic, then names nothing once it is done', async () => {
+	const carry = {
+		...CARRY,
+		invocation: 'backlogrun --max 1',
+		added: [{ issue: 5, is_priority: false }],
+	}
+	const state = backlog_drive.initial_state([], ACTIVE)
 
-// joshuafolkken/kit#4926: a declared issue that gave its lane back waits on its kept plan while the
-// lane it yielded to runs, rather than relaunching into the same yield. The running lane's body is read
-// with its plan — the scope `lane:plan` yielded on.
-test('waits on a declared issue whose yielded plan a lane in flight still holds', async () => {
-	vi.spyOn(lane_plan, 'is_yielded').mockImplementation((issue) => issue === 1)
-	vi.spyOn(auto_ok_cli, 'fetch_opted_in').mockResolvedValue({
-		kind: 'read',
-		issues: [RUNNING],
-		cutoff: cutoff_of(1, LISTING_LIMIT, false),
-	})
-	const declared = vi.spyOn(backlog_plan_comment, 'declared_of').mockResolvedValue(DECLARED)
-	const held = vi.spyOn(lane_plan, 'is_yield_held').mockImplementation((issue) => issue === 1)
-
-	const offer = await backlog_drive_named_offer.read(
-		CARRY,
-		backlog_drive.initial_state(['3'], ACTIVE),
-		CONTEXT,
-	)
-
-	expect(offer?.verdict).toBe('wait')
-	expect(declared).toHaveBeenCalledWith([RUNNING], process.cwd())
-	expect(held).toHaveBeenCalledWith(1, DECLARED, process.cwd())
-	vi.restoreAllMocks()
-})
-
-test('reads no listing while no declared issue yielded', async () => {
-	vi.spyOn(lane_plan, 'is_yielded').mockReturnValue(false)
 	vi.spyOn(issue_state_cli, 'read_issue').mockResolvedValue({
 		kind: 'state',
-		state: { state: 'OPEN', labels: [], is_human_review: false },
+		state: { state: 'OPEN', labels: ['epic'], is_human_review: false },
 	})
-	const fetch = vi.spyOn(auto_ok_cli, 'fetch_opted_in')
-	const state = backlog_drive.initial_state(['3'], ACTIVE)
-	const context = { ...CONTEXT, forwarded: ['--max', '2'] }
+	const epic = vi
+		.spyOn(backlog_drive_epic, 'offer')
+		.mockResolvedValue({ verdict: 'run', issues: ['7'], retries: 0 })
 
-	await backlog_drive_named_offer.read(CARRY, state, context)
+	const { offer } = await backlog_drive_named_offer.read(carry, state, CONTEXT)
+	const drained = await backlog_drive_named_offer.read({ ...carry, done: [5] }, state, CONTEXT)
 
-	expect(fetch).not.toHaveBeenCalled()
+	expect(offer).toMatchObject({ verdict: 'run', issues: ['7'] })
+	expect(epic).toHaveBeenCalledWith('5', state, CONTEXT.owner)
+	expect(drained.offer).toBeUndefined()
 	vi.restoreAllMocks()
 })
 
@@ -123,7 +125,7 @@ function begin_named(target: string, directory: string): RunCarry | undefined {
 async function offer_labelled(
 	labels: ReadonlyArray<string>,
 ): Promise<{ offer: unknown; done: unknown }> {
-	const directory = mkdtempSync(path.join(tmpdir(), 'josh-drive-settled-'))
+	const directory = make_directory('josh-drive-settled-')
 	const target = run_carry.carry_path(directory)
 	const carry = begin_named(target, directory)
 
@@ -132,11 +134,10 @@ async function offer_labelled(
 		state: { state: 'OPEN', labels, is_human_review: false },
 	})
 	const state = backlog_drive.initial_state([], ACTIVE)
-	const offer = await backlog_drive_named_offer.read({ ...CARRY, ...carry }, state, CONTEXT)
+	const { offer } = await backlog_drive_named_offer.read({ ...CARRY, ...carry }, state, CONTEXT)
 	const read = run_carry.read_carry(target)
 
 	vi.restoreAllMocks()
-	rmSync(directory, { recursive: true, force: true })
 
 	return { offer, done: read.kind === 'carried' ? read.carry.done : undefined }
 }
@@ -144,7 +145,7 @@ async function offer_labelled(
 // joshuafolkken/kit#4102: a mechanical park (`run:stalled`) is booked the same as a decision park.
 // joshuafolkken/kit#4746: and only it — the named issues after it were never started, so an `--only`
 // run that booked them done ended over issues still queued for a lane.
-test.each([NEEDS_DECISION_LABEL, RUN_STALLED_LABEL])(
+test.each([NEEDS_DECISION_LABEL, RUN_STALLED_LABEL, NEEDS_HUMAN_MERGE_LABEL])(
 	'never dispatches a named issue parked with %s, and books it done alone',
 	async (label) => {
 		const { offer, done } = await offer_labelled([label])
@@ -162,7 +163,7 @@ test('offers the next named issue after the epic root is recorded done', async (
 	})
 	const carry = { ...CARRY, done: [1] }
 	const context = { ...CONTEXT, forwarded: ['--max', '2'] }
-	const offer = await backlog_drive_named_offer.read(carry, state, context)
+	const { offer } = await backlog_drive_named_offer.read(carry, state, context)
 
 	expect(offer).toMatchObject({ verdict: 'run', issues: ['2'] })
 	read.mockRestore()
@@ -179,7 +180,11 @@ const OPEN_STATE = {
 function named_ports(harness: Harness): LoopPorts {
 	return {
 		...harness.ports,
-		offer: async (state) => await backlog_drive_named_offer.read(CARRY, state, CONTEXT),
+		offer: async (state) => {
+			const { offer } = await backlog_drive_named_offer.read(CARRY, state, CONTEXT)
+
+			return offer
+		},
 	}
 }
 
@@ -243,7 +248,7 @@ test('stops an --only run naming the park an issue sits on', async () => {
 	read_issue_as('OPEN', [RUN_STALLED_LABEL])
 	const state = backlog_drive.initial_state([], ACTIVE)
 
-	const offer = await backlog_drive_named_offer.read(DONE_CARRY, state, ONLY_CONTEXT)
+	const { offer } = await backlog_drive_named_offer.read(DONE_CARRY, state, ONLY_CONTEXT)
 
 	expect(offer).toMatchObject({
 		verdict: 'stop',
@@ -257,7 +262,7 @@ test('stops an --only run naming an issue whose state is unreadable', async () =
 	vi.spyOn(issue_state_cli, 'read_issue').mockResolvedValue(UNREACHABLE)
 	const state = backlog_drive.initial_state([], ACTIVE)
 
-	const offer = await backlog_drive_named_offer.read(DONE_CARRY, state, ONLY_CONTEXT)
+	const { offer } = await backlog_drive_named_offer.read(DONE_CARRY, state, ONLY_CONTEXT)
 
 	expect(offer).toMatchObject({ reason: 'only: #2 (state unreadable) ended without a merge' })
 	vi.restoreAllMocks()
@@ -267,7 +272,7 @@ test('stops an --only run naming the issue that parked instead of finishing it',
 	read_issue_as('OPEN')
 	const state = backlog_drive.initial_state([], ACTIVE)
 
-	const offer = await backlog_drive_named_offer.read(DONE_CARRY, state, ONLY_CONTEXT)
+	const { offer } = await backlog_drive_named_offer.read(DONE_CARRY, state, ONLY_CONTEXT)
 
 	expect(offer).toMatchObject({
 		verdict: 'stop',
@@ -288,7 +293,7 @@ test('stops an --only run naming an added issue that parked', async () => {
 		added: [{ issue: 3, is_priority: true }],
 	}
 
-	const offer = await backlog_drive_named_offer.read(carry, state, ONLY_CONTEXT)
+	const { offer } = await backlog_drive_named_offer.read(carry, state, ONLY_CONTEXT)
 
 	expect(offer).toMatchObject({
 		verdict: 'stop',
@@ -302,8 +307,9 @@ test('finishes an --only run whose named issues all merged', async () => {
 	read_issue_as('CLOSED')
 	const state = backlog_drive.initial_state([], ACTIVE)
 
-	const offer = await backlog_drive_named_offer.read(DONE_CARRY, state, ONLY_CONTEXT)
+	const { offer } = await backlog_drive_named_offer.read(DONE_CARRY, state, ONLY_CONTEXT)
 
 	expect(offer).toMatchObject({ verdict: 'stop', is_finish: true, reason: 'only' })
+	expect(gh_core_rate_limit.read_core).not.toHaveBeenCalled()
 	vi.restoreAllMocks()
 })

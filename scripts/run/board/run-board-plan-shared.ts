@@ -83,6 +83,9 @@ const context_schema = z.object({
 })
 
 const board_plan_schema = z.object({
+	decision_questions: map_of(z.string()).optional(),
+	decision_waits: map_of(z.string()).optional(),
+	human_merge_prs: map_of(z.number()).optional(),
 	waves: waves_schema,
 	tracked: map_of(z.number()),
 	context: context_schema,

@@ -1,6 +1,7 @@
 import { pre_push_related_switch } from '#scripts/hooks/pre-push-related-switch'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_ship_overlap } from './run-ship-overlap'
+import { run_ship_scoped } from './run-ship-scoped'
 
 const merge_mock = vi.hoisted(() => vi.fn())
 const josh_run_mock = vi.hoisted(() => vi.fn())
@@ -11,6 +12,7 @@ vi.mock('#scripts/git/git-command', () => ({ git_command: { branch: async () => 
 vi.mock('#scripts/git/main-merge', () => ({ main_merge: { merge: merge_mock } }))
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 vi.spyOn(run_ship_overlap, 'await_overlap').mockResolvedValue(undefined)
+const pair_mock = vi.spyOn(run_ship_scoped, 'scoped_pair')
 const { run_ship_sync } = await import('./run-ship-sync')
 
 // joshuafolkken/kit#5067: a merge the sync stage made is pushed before the gate, so CI and SonarQube
@@ -34,6 +36,7 @@ beforeEach(() => {
 	merge_mock.mockReset().mockResolvedValue({ kind: 'merged', branch: 'main' })
 	josh_run_mock.mockReset().mockResolvedValue({ code: OK, out: '' })
 	pr_number_mock.mockReset().mockResolvedValue(PULL_NUMBER)
+	pair_mock.mockReset().mockResolvedValue({ code: OK, out: '' })
 })
 
 describe('run_ship_sync.sync_stage — a merge is pushed ahead of the gate', () => {
@@ -58,6 +61,33 @@ describe('run_ship_sync.sync_stage — a merge is pushed ahead of the gate', () 
 			code: OK,
 			out: `merged main\n${run_ship_sync.PUSH_FAILED_NOTE}\npush rejected`,
 		})
+	})
+})
+
+// joshuafolkken/kit#6121: the merge moved the base under the pair's records, so the hook re-ran the
+// related tests the pair had passed; settled first, the hook reuses its `test:related` record.
+describe('run_ship_sync.sync_stage — the scoped pair settles before the push', () => {
+	it('settles the scoped pair on the merged tree before it pushes', async () => {
+		pair_mock.mockImplementation(async () => {
+			expect(commands()).toStrictEqual([])
+
+			return { code: OK, out: '' }
+		})
+
+		await run_ship_sync.sync_stage(ISSUE, TITLE, is_dirty)
+
+		expect(pair_mock).toHaveBeenCalledTimes(1)
+		expect(commands()).toStrictEqual([PUSH])
+	})
+
+	it('pushes nothing ahead of the gate when the scoped pair is red, and says so', async () => {
+		pair_mock.mockResolvedValue({ code: FAILED, out: 'lint failed' })
+
+		expect(await run_ship_sync.sync_stage(ISSUE, TITLE, is_dirty)).toStrictEqual({
+			code: OK,
+			out: `merged main\n${run_ship_sync.PAIR_RED_NOTE}`,
+		})
+		expect(commands()).toStrictEqual([])
 	})
 })
 

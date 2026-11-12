@@ -22,7 +22,7 @@ import { issue_cite } from './issue-cite'
 // would cost the `gh` call this module exists to avoid.
 //
 // **A line assembled elsewhere is linked where it is printed.** A summary, a report or a list built by
-// a helper that also feeds GitHub or a parser holds `issue_cite.plain`; `text` links every bare `#N` in
+// a helper that also feeds GitHub or a parser holds `issue_cite.plain_for`; `text` links every bare `#N` in
 // it at the print boundary, the same `issue_citation.linkify` pass the listings already print through.
 
 // `owner/repo` of the repository the command runs in, or `undefined` without a GitHub `origin`.

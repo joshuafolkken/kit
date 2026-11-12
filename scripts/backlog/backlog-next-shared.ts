@@ -4,13 +4,14 @@ import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { z } from 'zod'
 import { backlog_next } from './backlog-next'
+import { backlog_wait_cause } from './backlog-wait-cause'
 
 // One `josh backlog:next` answer shared by every reader that asks it within a minute
 // (joshuafolkken/kit#4550).
 //
-// **The drive's assignment and the arrival probe each ask every minute, and since a lane waiting on its
-// merge frees its slot (joshuafolkken/kit#4483) a free slot is the usual state** — so both read the
-// whole pool from GitHub every minute, for the same answer.
+// **The drive's assignment asks every offer interval and the arrival probe every minute, and since a
+// lane waiting on its merge frees its slot (joshuafolkken/kit#4483) a free slot is the usual state** —
+// so both read the whole pool from GitHub, for the same answer.
 //
 // **The key carries the newest event on the run's stream**, so a launch, a merge or a park — anything
 // that can change what may start — is never answered from before it: the first ask after it reads
@@ -50,6 +51,23 @@ function replay(result: JoshResult, should_forward_stderr: boolean): JoshResult 
 	return result
 }
 
+function wait_deadline(kept: JoshResult | undefined): number | undefined {
+	if (kept?.out.trim() !== backlog_next.VERDICT_TOKENS.wait) return undefined
+
+	return backlog_wait_cause.parse(kept.err ?? '').not_before_ms
+}
+
+// A deadline can shorten the ordinary TTL. The minute bound still discovers GitHub changes that
+// have no event on this machine's stream.
+function kept_until(key: string, now_ms: number): JoshResult | undefined {
+	const kept = shared_cache.read(NEXT_CACHE, key, result_schema, now_ms)
+	const deadline = wait_deadline(kept)
+
+	if (deadline !== undefined) return deadline > now_ms ? kept : undefined
+
+	return kept
+}
+
 async function read(
 	argv: ReadonlyArray<string>,
 	should_forward_stderr = false,
@@ -57,7 +75,7 @@ async function read(
 ): Promise<JoshResult> {
 	const key = await stream_key(argv)
 	const now_ms = Date.now()
-	const kept = shared_cache.read(NEXT_CACHE, key, result_schema, now_ms)
+	const kept = kept_until(key, now_ms)
 
 	if (kept !== undefined) return replay(kept, should_forward_stderr)
 

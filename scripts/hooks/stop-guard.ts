@@ -4,6 +4,7 @@ import { agent_headless } from '#scripts/agent/agent-headless'
 import { backlog_ready } from '#scripts/backlog/backlog-ready'
 import { backlog_stalled_detect } from '#scripts/backlog/backlog-stalled-detect'
 import { repo_party } from '#scripts/discovery/repo-party'
+import { hook_ledger } from '#scripts/hooks/hook-ledger'
 import { stop_actions } from '#scripts/hooks/stop-actions'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { session_language } from '#scripts/josh/session-language'
@@ -26,8 +27,8 @@ import { run_hold_session } from '#scripts/run/hold/run-hold-session'
 import { run_halfrun_resume } from '#scripts/run/run-halfrun-resume'
 import { run_headless } from '#scripts/run/run-headless'
 import { run_stranded_detect } from '#scripts/run/run-stranded-detect'
-import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { time_hook_transcript } from '#scripts/time-runtime/time-hook-transcript'
+import { transcript_tail } from '#scripts/time-runtime/transcript-tail'
 
 // The `Stop` hook entry: one process that delivers the stop-time rules, running the fixed ones itself
 // (`stop-actions.ts`).
@@ -39,6 +40,9 @@ import { time_hook_transcript } from '#scripts/time-runtime/time-hook-transcript
 // a hook that failed closed would wedge a run over its own plumbing. The hook runs the fixed
 // operations itself (send the notify, release the hold) and `stop_hook_active` is the backstop, so failing
 // open here costs at most a missed nudge, never a stuck run.
+
+// The name a refusal is recorded under in the hook ledger (`hook-ledger.ts`).
+const HOOK_NAME = 'stop-guard'
 
 // The hold record for this working tree. `unreadable` reads as absent: the safe direction for a stop
 // guard is not to act, and an unreadable record is not proof a run is holding.
@@ -76,10 +80,10 @@ async function hold_facts(
 
 // A `confirmation` notify sits on this run's transcript tail. The tail is derived exactly as the
 // PreToolUse guards derive it, and the judgement is `lane-park`'s, reused rather than re-spelled.
-function transcript_tail(transcript_path: string): string {
+function session_tail(transcript_path: string): string {
 	const transcript = time_hook_transcript.transcript_of(transcript_path, undefined)
 
-	return time_density_hook.read_tail(transcript)
+	return transcript_tail.read_tail(transcript)
 }
 
 // An Issue was filed on this turn — the tail from the last prompt on. The count is `turn_filings`', so
@@ -109,21 +113,22 @@ function session_lang(): string {
 // Which session this is — a headless parent, a lane child, a kit-launched agent, the `backlogrun`
 // parent — the facts that say whether a person is there to answer.
 async function session_role_facts(): Promise<
-	Pick<StopContext, 'backlog_parent' | 'headless_agent' | 'headless_waiting' | 'lane_child'>
+	Pick<StopContext, 'backlog_parent' | 'headless_agent' | 'lane_child'>
 > {
 	return {
-		headless_waiting: await run_headless.must_keep_waiting(),
 		lane_child: lane_child_marker.is_child_of(process.cwd()),
 		headless_agent: agent_headless.is_headless(),
 		backlog_parent: await run_headless.is_backlog_parent(),
 	}
 }
 
+type PassContext = Omit<StopContext, 'headless_waiting'>
+
 async function build_context(
 	transcript_path: string,
 	payload_tail: { stop_hook_active: boolean; message: string },
-): Promise<StopContext> {
-	const tail = transcript_tail(transcript_path)
+): Promise<PassContext> {
+	const tail = session_tail(transcript_path)
 
 	return {
 		...(await hold_facts(tail)),
@@ -145,6 +150,20 @@ async function build_context(
 	}
 }
 
+// **A headless parent's cut is written only once no other rule refuses the stop**
+// (joshuafolkken/kit#5739). Its turn-end is its process's end, so the stop is where
+// `run_headless.hand_back_at_turn_end` hands the loop back; a cut written before another refusal would
+// hand off a record the continued session still counts on. The headless wait is asked only after the
+// write, where it means the write lost.
+async function hand_back_outcome(context: PassContext): Promise<StopOutcome> {
+	const released = stop_rules.stop_outcome({ ...context, headless_waiting: false })
+	if (released.reason !== undefined) return released
+
+	const is_waiting = await run_headless.hand_back_at_turn_end()
+
+	return is_waiting ? stop_rules.stop_outcome({ ...context, headless_waiting: true }) : released
+}
+
 async function stop_outcome_for_payload(raw_payload: string): Promise<StopOutcome> {
 	const payload = stop_rules.parse_stop_payload(raw_payload)
 
@@ -155,7 +174,7 @@ async function stop_outcome_for_payload(raw_payload: string): Promise<StopOutcom
 		message: payload.last_assistant_message ?? '',
 	})
 
-	return stop_rules.stop_outcome(context)
+	return await hand_back_outcome(context)
 }
 
 async function outcome_of(raw_payload: string): Promise<StopOutcome> {
@@ -225,6 +244,8 @@ async function write_stop_decision(raw_payload: string): Promise<void> {
 	if (envelope === undefined) return
 
 	process.stdout.write(`${envelope}\n`)
+	// Read off the written envelope, so a stop held by a failed action is counted beside a bare reason.
+	await hook_ledger.record_reason(HOOK_NAME, hook_ledger.blocked_reason(envelope), raw_payload)
 }
 
 const stop_guard = { outcome_of, stop_outcome_for_payload }

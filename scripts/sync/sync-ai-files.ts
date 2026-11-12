@@ -46,7 +46,7 @@ function should_skip_hook_file(filename: string): boolean {
 }
 
 // The project's own hooks, permissions and keys survive: only kit's entries are replaced
-// (`claude-settings-merge.ts`). `--force` is the replacement sync used to make, as it is for
+// (`claude-settings-merge.ts`). `--force` requests replacement, as it does for
 // `pnpm-workspace.yaml`.
 function sync_claude_settings(
 	source_path: string,
@@ -201,7 +201,7 @@ function sync_ai_copy_all(is_force: boolean, shape?: ProjectShape): void {
 
 	sync_claude_md(path.join(PROJECT_ROOT, CLAUDE_MD_FILENAME), shape)
 
-	for (const filename of init_ai_copy.ai_files(shape)) {
+	for (const filename of init_ai_copy.copied_files(shape)) {
 		sync_ai_copy_file(filename, is_force, shape)
 	}
 

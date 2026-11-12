@@ -4,16 +4,18 @@ import { describe, expect, it } from 'vitest'
 
 // joshuafolkken/kit#4477: measurement follow-up Issues picked K as 5, 10, 25 or 30 with no tie to
 // what they measured. The section now names one basis per kind of value, so a filer reads K off it.
+// joshuafolkken/kit#6007: each basis carries its cap, and K defaults to 10.
 
 const MEASUREMENT = 'prompts/collaboration-workflow/measurement.md'
 const HEADING = '効果を測る後続 Issue'
 const BASES = [
+	'迷ったら 10',
 	'事象の回数の率',
-	'K ≥ 10 ÷ 変更前の率',
+	'K ≥ 10 ÷ 変更前の率、30 まで',
 	'連続値の平均・差',
 	'5〜10',
-	'最大値・裾',
-	'変更前の標本数と同程度',
+	'最大値・裾: 20 まで',
+	'起票から 7 日以内',
 ]
 
 describe('the sample count K of a measurement follow-up Issue', () => {

@@ -1,96 +1,44 @@
 // cspell:words coderabbit coderabbitai
 import { git_gh_command } from '#scripts/gh/git-gh-command'
-import {
-	parse_pr_state_snapshot,
-	type PrStateSnapshot,
-	type RollupCheck,
-} from '#scripts/gh/git-pr-checks-parse'
+import { parse_pr_state_snapshot } from '#scripts/gh/git-pr-checks-parse'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { poll } from '#scripts/lib/poll'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { followup_coderabbit_retrigger, type PullComment } from './followup-coderabbit-retrigger'
-import { followup_coderabbit_wait, type CodeRabbitWait } from './followup-coderabbit-wait'
+import { describe, expect, it, vi } from 'vitest'
+import { followup_coderabbit_retrigger } from './followup-coderabbit-retrigger'
+import { retrigger_fixture } from './followup-coderabbit-retrigger-fixture'
 
-// joshuafolkken/kit#5289: followup reads CodeRabbit's rate-limit window, waits it out, posts one
-// `@coderabbitai review` and waits for the check again; a second rate limit is left to the person.
+// joshuafolkken/kit#5289: followup reads CodeRabbit's rate-limit window, waits it out, posts
+// `@coderabbitai review` and waits for the check again. The retriggers past the first and the cap:
+// `followup-coderabbit-retrigger-cap.test.ts`.
 
 vi.mock('#scripts/gh/git-pr-checks-parse', async (import_original) => ({
 	...(await import_original<Record<string, unknown>>()),
 	parse_pr_state_snapshot: vi.fn(),
 }))
 
-const SECONDS = 1000
-const MINUTES = 60 * SECONDS
-const MARGIN = 15 * SECONDS
-const NOTICE_AT = '2026-10-28T01:00:00Z'
-const NOTICE_AT_MS = Date.parse(NOTICE_AT)
-const BRANCH = '5289-lane'
-const ONE_MINUTE = '**1 minute**'
-const TWO_MINUTES = '**2 minutes**'
+const {
+	BRANCH,
+	DONE,
+	MARGIN,
+	MINUTES,
+	NOTICE_AT_MS,
+	ONE_MINUTE,
+	RATE_LIMITED,
+	RUNNING,
+	SECONDS,
+	TWO_MINUTES,
+	checks_read,
+	coderabbit,
+	comments_are,
+	notice,
+	retrigger_at,
+	snapshot,
+	use_run_spies,
+	wait_seeing,
+} = retrigger_fixture
+const RETRIGGERED_AT = '2026-10-28T01:01:00Z'
 const NOT_A_NOTICE = 'Actionable comments posted: 0'
-const RATE_LIMITED: RollupCheck = {
-	name: 'CodeRabbit',
-	status: 'pass',
-	description: 'Rate limited',
-}
-const RUNNING: RollupCheck = { name: 'CodeRabbit', status: 'pending', description: 'In progress' }
-const DONE: RollupCheck = { name: 'CodeRabbit', status: 'pass', description: 'Review completed' }
-const STOP_AGAIN = { kind: 'stop', note: followup_coderabbit_retrigger.AGAIN_NOTE }
 const STOP_UNREADABLE = { kind: 'stop', note: followup_coderabbit_retrigger.UNREADABLE_NOTE }
-
-function notice(wait: string): string {
-	return `> [!WARNING]\n> ## Rate limit exceeded\n>\n> Please wait ${wait} before requesting another review.`
-}
-
-function coderabbit(body: string, updated_at = NOTICE_AT): PullComment {
-	return { body, author: { login: 'coderabbitai[bot]' }, updatedAt: updated_at }
-}
-
-function retrigger_at(updated_at: string): PullComment {
-	return { body: followup_coderabbit_retrigger.RETRIGGER_BODY, updatedAt: updated_at }
-}
-
-function snapshot(check: RollupCheck): PrStateSnapshot {
-	return { rollup: [check], merge_state_status: undefined, review_decision: undefined }
-}
-
-function wait_seeing(check: RollupCheck): CodeRabbitWait {
-	const wait = followup_coderabbit_wait.new_wait()
-
-	followup_coderabbit_wait.observe(wait, snapshot(check), 0)
-
-	return wait
-}
-
-function comments_are(...comments: Array<PullComment>): void {
-	vi.mocked(git_gh_command.pr_get_comments).mockResolvedValue(JSON.stringify(comments))
-}
-
-function checks_read(...checks: Array<RollupCheck>): void {
-	for (const check of checks) {
-		vi.mocked(parse_pr_state_snapshot).mockReturnValueOnce(snapshot(check))
-	}
-}
-
-function use_run_spies(): void {
-	beforeEach(() => {
-		vi.spyOn(git_gh_command, 'pr_get_comments')
-		vi.spyOn(git_gh_command, 'pr_comment').mockResolvedValue('')
-		vi.spyOn(git_gh_command, 'pr_get_checks_snapshot').mockResolvedValue({
-			pr_number: 1,
-			snapshot_json: '{}',
-		})
-		vi.spyOn(poll, 'sleep').mockResolvedValue()
-		vi.spyOn(lane_ledger_write, 'record_stage').mockResolvedValue()
-		vi.spyOn(Date, 'now').mockReturnValue(NOTICE_AT_MS)
-		vi.spyOn(console, 'info').mockImplementation(vi.fn())
-	})
-
-	afterEach(() => {
-		vi.restoreAllMocks()
-		vi.mocked(parse_pr_state_snapshot).mockReset()
-	})
-}
 
 describe('followup_coderabbit_retrigger.parse_wait_ms', () => {
 	it.each([
@@ -132,18 +80,17 @@ describe('followup_coderabbit_retrigger.decide — a retrigger', () => {
 			followup_coderabbit_retrigger.decide(comments, NOTICE_AT_MS + 9 * MINUTES),
 		).toStrictEqual({ kind: 'retrigger', wait_ms: MARGIN })
 	})
+
+	it('waits for the review a retrigger newer than the notice asked for, whoever posted it', () => {
+		const comments = [coderabbit(notice(ONE_MINUTE)), retrigger_at('2026-10-28T01:05:00Z')]
+
+		expect(followup_coderabbit_retrigger.decide(comments, NOTICE_AT_MS)).toStrictEqual({
+			kind: 'await',
+		})
+	})
 })
 
 describe('followup_coderabbit_retrigger.decide — a stop', () => {
-	it('stops on a pull request already retriggered', () => {
-		const comments = [
-			coderabbit(notice(ONE_MINUTE)),
-			{ body: followup_coderabbit_retrigger.RETRIGGER_BODY, author: { login: 'joshuafolkken' } },
-		]
-
-		expect(followup_coderabbit_retrigger.decide(comments, NOTICE_AT_MS)).toStrictEqual(STOP_AGAIN)
-	})
-
 	it.each([
 		['a notice from someone else', { ...coderabbit(notice(ONE_MINUTE)), author: { login: 'me' } }],
 		[
@@ -169,24 +116,6 @@ describe('followup_coderabbit_retrigger.decide — a stop', () => {
 	})
 })
 
-describe('followup_coderabbit_retrigger.decide — a retrigger already on the pull request', () => {
-	const LATER = '2026-10-28T01:05:00Z'
-
-	it('waits for the review a retrigger newer than the notice asked for, whoever posted it', () => {
-		const comments = [coderabbit(notice(ONE_MINUTE)), retrigger_at(LATER)]
-
-		expect(followup_coderabbit_retrigger.decide(comments, NOTICE_AT_MS)).toStrictEqual({
-			kind: 'await',
-		})
-	})
-
-	it('reads a notice newer than the retrigger as the second rate limit', () => {
-		const comments = [coderabbit(notice(ONE_MINUTE), LATER), retrigger_at(NOTICE_AT)]
-
-		expect(followup_coderabbit_retrigger.decide(comments, NOTICE_AT_MS)).toStrictEqual(STOP_AGAIN)
-	})
-})
-
 describe('followup_coderabbit_retrigger.run — a retrigger', () => {
 	use_run_spies()
 
@@ -207,18 +136,6 @@ describe('followup_coderabbit_retrigger.run — a retrigger', () => {
 		})
 	})
 
-	it('hands a rate limit after the retriggered review started to the person', async () => {
-		comments_are(coderabbit(notice(TWO_MINUTES)))
-		checks_read(RUNNING, RATE_LIMITED)
-
-		const result = await followup_coderabbit_retrigger.run(BRANCH, wait_seeing(RATE_LIMITED))
-
-		expect(result).toStrictEqual({
-			is_retriggered: true,
-			notes: [followup_coderabbit_retrigger.AGAIN_NOTE],
-		})
-	})
-
 	it('lets the merge go ahead when the retriggered review is still running', async () => {
 		comments_are(coderabbit(notice(TWO_MINUTES)))
 		vi.mocked(parse_pr_state_snapshot).mockReturnValue(snapshot(RUNNING))
@@ -236,7 +153,7 @@ describe('followup_coderabbit_retrigger.run — the review it waits for', () => 
 	use_run_spies()
 
 	it('waits for a retrigger already posted without posting another', async () => {
-		comments_are(coderabbit(notice(TWO_MINUTES)), retrigger_at('2026-10-28T01:01:00Z'))
+		comments_are(coderabbit(notice(TWO_MINUTES)), retrigger_at(RETRIGGERED_AT))
 		checks_read(RUNNING, DONE)
 
 		const result = await followup_coderabbit_retrigger.run(BRANCH, wait_seeing(RATE_LIMITED))
@@ -259,6 +176,26 @@ describe('followup_coderabbit_retrigger.run — the review it waits for', () => 
 	})
 })
 
+// #6868: the review wait reads on the PR completion schedule, not a fixed thirty seconds.
+describe('followup_coderabbit_retrigger.run — the review wait’s cadence', () => {
+	use_run_spies()
+
+	it('reads every 30 seconds four times, then every 20 seconds', async () => {
+		comments_are(coderabbit(notice(TWO_MINUTES)), retrigger_at(RETRIGGERED_AT))
+		checks_read(RUNNING, RUNNING, RUNNING, RUNNING, RUNNING, RUNNING, DONE)
+		await followup_coderabbit_retrigger.run(BRANCH, wait_seeing(RATE_LIMITED))
+
+		expect(vi.mocked(poll.sleep).mock.calls.flat()).toStrictEqual([
+			30 * SECONDS,
+			30 * SECONDS,
+			30 * SECONDS,
+			30 * SECONDS,
+			20 * SECONDS,
+			20 * SECONDS,
+		])
+	})
+})
+
 describe('followup_coderabbit_retrigger.settle', () => {
 	use_run_spies()
 
@@ -278,7 +215,7 @@ describe('followup_coderabbit_retrigger.settle', () => {
 
 	it('reads the checks again after a retriggered review', async () => {
 		comments_are(coderabbit(notice(TWO_MINUTES)))
-		checks_read(RUNNING, RATE_LIMITED)
+		checks_read(RUNNING, DONE)
 
 		const settled = await followup_coderabbit_retrigger.settle(
 			'first',
@@ -287,11 +224,7 @@ describe('followup_coderabbit_retrigger.settle', () => {
 			wait_seeing(RATE_LIMITED),
 		)
 
-		expect(settled).toStrictEqual({
-			snapshot: 'second',
-			is_retriggered: true,
-			notes: [STOP_AGAIN.note],
-		})
+		expect(settled).toStrictEqual({ snapshot: 'second', is_retriggered: true, notes: [] })
 	})
 })
 
@@ -303,18 +236,6 @@ describe('followup_coderabbit_retrigger.run — no retrigger', () => {
 
 		expect(result).toStrictEqual({ is_retriggered: false, notes: [] })
 		expect(git_gh_command.pr_get_comments).not.toHaveBeenCalled()
-	})
-
-	it('posts nothing a second time on the same pull request', async () => {
-		comments_are(coderabbit(notice(TWO_MINUTES)), {
-			body: followup_coderabbit_retrigger.RETRIGGER_BODY,
-		})
-
-		const result = await followup_coderabbit_retrigger.run(BRANCH, wait_seeing(RATE_LIMITED))
-
-		expect(result).toStrictEqual({ is_retriggered: false, notes: [STOP_AGAIN.note] })
-		expect(git_gh_command.pr_comment).not.toHaveBeenCalled()
-		expect(lane_ledger_write.record_stage).not.toHaveBeenCalled()
 	})
 
 	it('posts nothing when no window can be read', async () => {

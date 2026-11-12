@@ -6,7 +6,8 @@ import { lane_stats, type StatsWindow } from './lane-stats'
 // The followup's critical path (joshuafolkken/kit#5295): over the period's `ci-wait` rows, which check
 // settled last — how often, and the median and maximum of when it settled into the wait — printed by
 // `josh lane:stats`. A row from before the field, or a wait no check was seen to settle in, names none
-// and is left out.
+// and is left out. So is a row marked `has_rerun` (joshuafolkken/kit#7202): its time spans a failed
+// attempt and the rerun's queue, not a check's own run.
 
 const COLUMNS = ['followup critical path', 'runs', 'median (s)', 'max (s)'] as const
 
@@ -46,6 +47,7 @@ function name_row(name: string, lasts: ReadonlyArray<LastCheck>): string {
 function table(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): string {
 	const lasts = lane_stats
 		.in_window(entries, window)
+		.filter((entry) => entry.kind !== lane_ledger.KIND.STAGE || entry.has_rerun !== true)
 		.map((entry) => last_check_of(entry))
 		.filter((last) => last !== undefined)
 	const names = [...new Set(lasts.map((last) => last.name))]
@@ -57,17 +59,26 @@ function table(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): string
 
 // `issue`'s followup line detail for `lane:breakdown`: the last check its latest `ci-wait` row names,
 // `''` where none does.
-function last_check_text(entries: ReadonlyArray<LedgerEntry>, issue: number): string {
-	const last = entries
+function latest_check(entries: ReadonlyArray<LedgerEntry>, issue: number): LastCheck | undefined {
+	return entries
 		.filter((entry) => entry.kind === lane_ledger.KIND.STAGE && entry.issue === issue)
 		.map((entry) => last_check_of(entry))
 		.findLast((found) => found !== undefined)
+}
+
+// The check `issue`'s latest `ci-wait` row settled last on — its longest — `undefined` where none names one.
+function last_check_name(entries: ReadonlyArray<LedgerEntry>, issue: number): string | undefined {
+	return latest_check(entries, issue)?.name
+}
+
+function last_check_text(entries: ReadonlyArray<LedgerEntry>, issue: number): string {
+	const last = latest_check(entries, issue)
 
 	return last === undefined
 		? ''
 		: ` (last check: ${last.name} ${lane_check_stats.cell(last.elapsed_ms)}s)`
 }
 
-const lane_ci_path_stats = { last_check_text, table }
+const lane_ci_path_stats = { last_check_name, last_check_text, table }
 
 export { lane_ci_path_stats }

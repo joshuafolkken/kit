@@ -16,8 +16,8 @@ import { backlog_fixture, type BacklogInput, type ChildInput } from './backlog-f
 import { backlog_next } from './backlog-next'
 import { backlog_plan_cli } from './backlog-plan-cli'
 
-// joshuafolkken/kit#2455: while the defect rate is above its baseline, `backlog:next` offers defects
-// and hardening first and defers new mechanisms; at or below it, the order is the graph's own.
+// joshuafolkken/kit#6410: defects always lead ranking ties; only mechanism deferral needs a rate
+// above the baseline. Other kinds keep their relative graph order below that threshold.
 
 const { console_streams, issue, opted_in_epic } = auto_ok_fixture
 
@@ -47,11 +47,11 @@ const GRAPH_ORDER = [MECHANISM, CODE_ONLY, DEFECT, INTERRUPTED_MECHANISM, UNDECL
 // interrupted issue heads the offer whatever the rate; the rest keep the order this file pins.
 const RANKED_GRAPH_ORDER = [
 	INTERRUPTED_MECHANISM,
+	DEFECT,
+	BUGFIX_ONLY,
 	MECHANISM,
 	CODE_ONLY,
-	DEFECT,
 	UNDECLARED,
-	BUGFIX_ONLY,
 ]
 
 const ABOVE_BASELINE: DefectRate = {
@@ -100,7 +100,7 @@ beforeEach(() => {
 })
 
 describe('backlog:next while the defect rate is above its baseline', () => {
-	it('offers defects first, keeps the rest in place and defers new mechanisms', async () => {
+	it('offers defects first and defers new mechanisms (ac-97b89544)', async () => {
 		stub({ defect_rate: ABOVE_BASELINE })
 
 		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
@@ -171,19 +171,30 @@ describe('backlog:plan while the defect rate is above its baseline', () => {
 })
 
 describe('backlog:next at or below the baseline', () => {
-	it('keeps the graph order when the rate equals the baseline', async () => {
-		stub({ defect_rate: backlog_fixture.AT_BASELINE })
+	it.each([
+		{ name: 'equals', rate: backlog_fixture.AT_BASELINE },
+		{
+			name: 'is below',
+			rate: { ...backlog_fixture.AT_BASELINE, defects: backlog_fixture.AT_BASELINE.defects - 1 },
+		},
+		{ name: 'has no denominator for', rate: { ...backlog_fixture.AT_BASELINE, enhancements: 0 } },
+	])(
+		'offers defects first without deferring mechanisms when the rate $name the baseline (ac-bb03cbe3) (ac-6d52c6b5)',
+		async ({ rate }) => {
+			stub({ defect_rate: rate })
 
-		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
-		expect(offered()).toBe(joined(RANKED_GRAPH_ORDER))
-		expect(stderr()).not.toContain(ABOVE_NOTE)
-	})
+			expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
+			expect(offered()).toBe(joined(RANKED_GRAPH_ORDER))
+			expect(stderr()).not.toContain(ABOVE_NOTE)
+		},
+	)
 
-	it('keeps the graph order when the rate cannot be read', async () => {
+	it('offers defects first without deferring mechanisms when the rate cannot be read', async () => {
 		stub({ is_rate_unreadable: true })
 
 		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
 		expect(offered()).toBe(joined(RANKED_GRAPH_ORDER))
 		expect(stderr()).toContain(backlog_defect_priority.UNMEASURED_MESSAGE)
+		expect(stderr()).toContain('defects are offered first without deferring new mechanisms')
 	})
 })

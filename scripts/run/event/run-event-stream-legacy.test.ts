@@ -1,10 +1,12 @@
 import { randomUUID } from 'node:crypto'
-import { appendFileSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { appendFileSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { run_board_status } from '#scripts/run/board/run-board-status'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { run_event_stream } from './run-event-stream'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#3689: the `idle` kind is retired, and a stream a previous version wrote may still
 // hold its lines. Such a line reads as no event — not a position, not the run's newest activity — and
@@ -17,11 +19,7 @@ const POLLED_AT = '2026-10-12T11:00:00.000Z'
 const LEGACY_KIND = 'idle'
 const LEGACY_POSITION = 2
 const LAUNCH = '#3689 launched'
-const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-run-event-stream-legacy-'))
-
-afterAll(() => {
-	rmSync(TEMPORARY, { force: true, recursive: true })
-})
+const TEMPORARY = make_directory('josh-run-event-stream-legacy-')
 
 // A stream of one launch, then a line of the retired kind appended as a previous version left it.
 function legacy_stream(): string {
@@ -58,6 +56,7 @@ describe('run_event_stream — a line of the retired idle kind', () => {
 			is_stopped: false,
 			lane_events: new Map(),
 			pr_checks: new Map(),
+			first_lane_ms: undefined,
 		})
 	})
 

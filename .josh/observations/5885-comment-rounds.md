@@ -1,0 +1,3 @@
+- rf:bug-risks | medium | .claude/skills/workflow-commands/observation-filing.md:40 | 2026-11-02 | #5885
+- rf:assumptions | low | .claude/skills/workflow-commands/observation-filing.md:36 | 2026-11-02 | #5885
+- rf:none | none | - | 2026-11-02 | #5885

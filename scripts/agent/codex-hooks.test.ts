@@ -9,6 +9,7 @@ const TOOL_MATCHER = 'Bash|Edit'
 const PROMPT_TIMEOUT = 10
 const COMMAND_TYPE = 'command'
 const STOP_GUARD = 'pnpm josh stop:guard'
+const STOP_GUARD_HOOK = 'stop-guard'
 
 function claude_settings(): HookConfig {
 	return {
@@ -45,9 +46,13 @@ describe('codex_hook_config', () => {
 		expect(derived_command('PostToolUse')).toBe(codex_hooks.adapter_command('posttool'))
 	})
 
-	it('adds apply_patch to the tool-event matchers only', () => {
-		expect(derived_group('PreToolUse').matcher).toBe(`${TOOL_MATCHER}|apply_patch`)
-		expect(derived_group('PostToolUse').matcher).toBe('Edit|apply_patch')
+	it('adds apply_patch and the shell tools to the tool-event matchers only', () => {
+		expect(derived_group('PreToolUse').matcher).toBe(
+			`${TOOL_MATCHER}|apply_patch|functions.apply_patch|exec_command|functions.exec_command|exec|functions.exec`,
+		)
+		expect(derived_group('PostToolUse').matcher).toBe(
+			'Edit|apply_patch|functions.apply_patch|exec_command|functions.exec_command|exec|functions.exec',
+		)
 		expect(derived_group('Stop').matcher).toBe('')
 	})
 
@@ -66,6 +71,25 @@ describe('codex_hook_config', () => {
 		const events = Object.keys(codex_hooks.codex_hook_config(settings).hooks)
 
 		expect(events).toStrictEqual(Object.keys(settings.hooks))
+	})
+})
+
+// Codex names no project root, so every launcher it runs is named under the root git resolves.
+describe('codex_hook_config launcher root', () => {
+	it('names the root git resolves for a launcher the adapter does not replace', () => {
+		const launched = hook_launch.hook_launch_command(STOP_GUARD_HOOK)
+		const settings = {
+			hooks: { Stop: [{ matcher: '', hooks: [{ type: COMMAND_TYPE, command: launched }] }] },
+		}
+		const { hooks } = codex_hooks.codex_hook_config(settings)
+
+		expect(hooks['Stop']?.[0]?.hooks[0]?.command).toBe(
+			hook_launch.hook_launch_command(STOP_GUARD_HOOK, hook_launch.CODEX_ROOT),
+		)
+	})
+
+	it('names the root git resolves for the adapter', () => {
+		expect(codex_hooks.adapter_command('pretool')).toContain(`"${hook_launch.CODEX_ROOT}/`)
 	})
 })
 

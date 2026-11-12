@@ -5,7 +5,6 @@ import type { CommandEntry } from './josh-command-types'
 // `josh-commands-development.ts` when it reached its line cap (joshuafolkken/kit#5153). `DEV_COMMANDS`
 // spreads this in at the same place, so the map keeps its order.
 
-/* eslint-disable @typescript-eslint/naming-convention */
 const TEST_CHECK_COMMANDS: Record<string, CommandEntry> = {
 	'test:declared': {
 		script: 'scripts/test/test-declared.ts',
@@ -75,6 +74,5 @@ const TEST_CHECK_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 }
-/* eslint-enable @typescript-eslint/naming-convention */
 
 export { TEST_CHECK_COMMANDS }

@@ -1,7 +1,9 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const make_directory = temporary_directory('suite')
 
 const run_mock = vi.hoisted(() => vi.fn())
 
@@ -18,18 +20,13 @@ const { run_ship_lock } = await import('./run-ship-lock')
 // joshuafolkken/kit#3307: a drifted lock file was rewritten by the pre-push hook's install, leaving the
 // tree dirty so the hook re-ran the whole unit suite and timed the push out. The ship asks first.
 
-const WITH_LOCK = mkdtempSync(path.join(tmpdir(), 'josh-ship-lock-'))
-const WITHOUT_LOCK = mkdtempSync(path.join(tmpdir(), 'josh-ship-no-lock-'))
+const WITH_LOCK = make_directory('josh-ship-lock-')
+const WITHOUT_LOCK = make_directory('josh-ship-no-lock-')
 
 writeFileSync(path.join(WITH_LOCK, 'pnpm-lock.yaml'), "lockfileVersion: '9.0'\n")
 
 beforeEach(() => {
 	run_mock.mockReset().mockResolvedValue({ output: '', exit_code: 0, elapsed_ms: 1 })
-})
-
-afterAll(() => {
-	rmSync(WITH_LOCK, { force: true, recursive: true })
-	rmSync(WITHOUT_LOCK, { force: true, recursive: true })
 })
 
 describe('run_ship_lock.lock_problems', () => {

@@ -32,7 +32,6 @@ vi.spyOn(console, 'info').mockImplementation(streams.info)
 vi.spyOn(console, 'error').mockImplementation(streams.error)
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	// The default answer for a call the case did not queue one for. Every wrapper answers
 	// `{ json, is_capped }` since joshuafolkken/kit#1067, so a bare `vi.fn()` returning `undefined`
 	// is a shape no caller can be handed — and the failed-read path is what an unqueued call means.
@@ -42,7 +41,7 @@ beforeEach(() => {
 })
 
 describe('josh auto-ok:next — the token on standard output', () => {
-	it('answers the newest opted-in issue, matching the next-issues display order', async () => {
+	it('answers the oldest opted-in issue, matching the next-issues display order', async () => {
 		issue_list.mockResolvedValueOnce(
 			listing_of([
 				issue(OLD_ISSUE_NUMBER, CREATED_EARLIER),
@@ -51,7 +50,7 @@ describe('josh auto-ok:next — the token on standard output', () => {
 		)
 
 		expect(await auto_ok_cli.run([])).toBe(SUCCESS_EXIT_CODE)
-		expect(stdout()).toBe(String(NEW_ISSUE_NUMBER))
+		expect(stdout()).toBe(String(OLD_ISSUE_NUMBER))
 	})
 
 	// Opting in is the default absence: a repository that has never used the label answers this on
@@ -101,6 +100,23 @@ describe('josh auto-ok:next — what it refuses to run', () => {
 	it('refuses an argument rather than answering about it', async () => {
 		expect(await auto_ok_cli.run(['--help'])).toBe(FAILURE_EXIT_CODE)
 		expect(stdout()).toBe('')
+	})
+})
+
+// joshuafolkken/kit#7074: the size cap holds nothing — the lane's `lane:plan` splits or keeps it.
+describe('josh auto-ok:next — an estimate over the size cap', () => {
+	it('offers an issue declared over the size cap', async () => {
+		const body = '## 背景\n\n- 規模見積もり: 約 25 ファイル / 300 行（テスト除く）\n'
+
+		issue_list.mockResolvedValueOnce(
+			listing_of([
+				{ ...issue(NEW_ISSUE_NUMBER, CREATED_LATER), body },
+				issue(OLD_ISSUE_NUMBER, CREATED_EARLIER),
+			]),
+		)
+
+		expect(await auto_ok_cli.run([])).toBe(SUCCESS_EXIT_CODE)
+		expect(stdout()).toBe(String(NEW_ISSUE_NUMBER))
 	})
 })
 

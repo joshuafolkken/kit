@@ -89,10 +89,10 @@ describe('behavior_change_lint.problems', () => {
 
 describe('behavior_change_lint.problems — firing point', () => {
 	it('flags a firing point that no hook can deliver', () => {
-		const undeliverable = TARGET_BODY.replace(FIRING_POINT, '`WebFetch`')
+		const undeliverable = TARGET_BODY.replace(FIRING_POINT, '`WebSearch`')
 
 		expect(behavior_change_lint.problems(undeliverable)).toContain(
-			'firing point `WebFetch` is a real tool call, but no hook can deliver a rule on it',
+			'firing point `WebSearch` is a real tool call, but no hook can deliver a rule on it',
 		)
 	})
 

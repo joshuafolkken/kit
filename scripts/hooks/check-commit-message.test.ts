@@ -1,5 +1,5 @@
 import os from 'node:os'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('#scripts/git/git-command', () => ({
 	git_command: { branch: vi.fn(), git_directories: vi.fn() },
@@ -19,11 +19,22 @@ const mocked_read = vi.mocked(read_file_sync)
 mocked_branch.mockResolvedValue('main')
 mocked_git_directories.mockResolvedValue([])
 
+// The spies watch the module's first import, so a side effect at load time is caught; their counts are
+// read before `beforeEach` clears them.
+const console_spy = vi.spyOn(console, 'info').mockImplementation(vi.fn())
+const exit_spy = vi.spyOn(process, 'exit').mockImplementation(vi.fn() as never)
 const { check_commit_message, extract_issue_number, is_safe_commit_message_path } =
 	await import('./check-commit-message')
+const import_calls = { info: console_spy.mock.calls.length, exit: exit_spy.mock.calls.length }
 
-beforeEach(() => {
-	vi.clearAllMocks()
+console_spy.mockRestore()
+exit_spy.mockRestore()
+
+describe('check-commit-message — side-effect-free import', () => {
+	it('does not call console.info or process.exit on import', () => {
+		expect(import_calls.info).toBe(0)
+		expect(import_calls.exit).toBe(0)
+	})
 })
 
 // What `git rev-parse` answers in a linked work tree: the work tree's own git directory first, then
@@ -44,9 +55,8 @@ describe('is_safe_commit_message_path', () => {
 		expect(is_safe_commit_message_path(temporary_path, GIT_DIRECTORIES)).toBe(true)
 	})
 
-	// joshuafolkken/kit#1106: the shape a linked work tree produces. It is absolute and shares no
-	// prefix with `.git/`, so the prefix test this guard used to be refused it — before the real
-	// check ran, which made every commit inside a work tree impossible.
+	// Linked work trees supply absolute paths without a `.git/` prefix; those paths must reach the
+	// message check (joshuafolkken/kit#1106).
 	it('accepts the absolute path a linked work tree passes', () => {
 		const worktree_path = `${WORKTREE_GIT_DIRECTORY}/COMMIT_EDITMSG`
 
@@ -125,10 +135,8 @@ describe('check_commit_message — branch with issue number', () => {
 		expect(result.message).toContain('#42')
 	})
 
-	// joshuafolkken/kit#1106: with no path passed, the file is read from the work tree's own git
-	// directory. The relative `.git/COMMIT_EDITMSG` this used to hardcode names a *file* in a linked
-	// work tree, so reading through it ends at ENOTDIR — the same defect as the guard's, on the
-	// branch the guard never reaches because there is no argument to check.
+	// Without an argument, resolve the work tree's git directory: its `.git` is a file and cannot
+	// serve as the parent of COMMIT_EDITMSG (joshuafolkken/kit#1106).
 	it('reads from the git directory git reports, not a literal .git', async () => {
 		mocked_branch.mockResolvedValue(ISSUE_BRANCH)
 		mocked_git_directories.mockResolvedValue([WORKTREE_GIT_DIRECTORY, MAIN_GIT_DIRECTORY])

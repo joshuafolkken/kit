@@ -70,14 +70,7 @@ describe('lane_overrun_prompt.handling — the breakdown', () => {
 
 describe('lane_overrun_prompt.handling — no share of merges', () => {
 	it('names no share, no 2–3% line, no period average and no cross-lane sum', () => {
-		for (const part of [
-			'%',
-			'share of',
-			'median lane',
-			'per merge',
-			'7 day',
-			'overrun:mechanisms',
-		]) {
+		for (const part of ['%', 'share of', 'median lane', 'per merge', '7 day']) {
 			expect(handling()).not.toContain(part)
 		}
 	})

@@ -89,6 +89,27 @@ describe('lane_breakdown_pinned.detail_text', () => {
 		)
 	})
 
+	// joshuafolkken/kit#5503
+	it('counts the hunks over the test-file cap the run did not probe', () => {
+		expect(lane_breakdown_pinned.detail_text([{ ...row(INSIDE), rewired: 1, over_cap: 3 }])).toBe(
+			' (test:pinned 8 hunks, 2 cached, 2 probed, 1 rewired, 3 over cap, scripts/b.ts 2.0 min, scripts/a.ts 3 test files 1.0 min)',
+		)
+	})
+
+	// joshuafolkken/kit#5385
+	it('marks a probe the type check pinned', () => {
+		const typed: TestPinnedEntry = {
+			...row(INSIDE),
+			held: 0,
+			probes: [{ file: 'scripts/c.ts', elapsed_ms: 60_000, pinned_by: 'type-check' }],
+			elapsed_ms: 60_000,
+		}
+
+		expect(lane_breakdown_pinned.detail_text([typed])).toBe(
+			' (test:pinned 1 hunks, 0 cached, 1 probed, scripts/c.ts 1.0 min (type check))',
+		)
+	})
+
 	it('is empty when no probe ran inside the stage', () => {
 		expect(lane_breakdown_pinned.detail_text([])).toBe('')
 	})

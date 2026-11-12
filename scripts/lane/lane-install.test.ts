@@ -1,12 +1,14 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { core_budget } from '#scripts/gate/core-budget'
 import { buffered_process, type BufferedProcessResult } from '#scripts/lib/buffered-process'
 import { PACKAGE_JSON } from '#scripts/lib/package-manifest'
 import { INSTALL_TIMEOUT_MS } from '#scripts/lib/timeouts'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { INSTALL_ARGUMENTS, lane_install, NO_MANIFEST_OUTPUT } from './lane-install'
+
+const make_directory = temporary_directory()
 
 // joshuafolkken/kit#1554: opening a lane has to leave dependencies in it, so what is asserted here is
 // what this module asks for and how it reads the answer — never pnpm itself, nor the spawning that
@@ -55,13 +57,8 @@ function remove_manifest(): void {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
-	lane.directory = mkdtempSync(path.join(tmpdir(), 'lane-install-test-'))
+	lane.directory = make_directory('lane-install-test-')
 	write_manifest()
-})
-
-afterEach(() => {
-	rmSync(lane.directory, { force: true, recursive: true })
 })
 
 describe('install_dependencies — what it asks for', () => {

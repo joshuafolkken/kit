@@ -1,3 +1,4 @@
+import { review_prompt_level } from '#scripts/review/review-prompt-level'
 import { agent_diagnostics } from './agent-diagnostics'
 import {
 	agent_role_profile,
@@ -102,9 +103,9 @@ function profiled_in(invocation: string, resolved: ProfileResult, cwd: string): 
 }
 
 // **A cut relaunch's profile, resolved for the phase the resumed child is entering**.
-// A stored lane profile keeps its model unless the phase's own model key is set, and takes the phase's
-// effort; a lane without one resolves the worker for the phase. An env override wins over the phase in
-// either path.
+// A stored lane profile takes the phase's model where the phase has one (pre-gate: Sonnet, or
+// `JOSH_WORKER_SHIP_MODEL`) and the phase's effort; a lane without one resolves the worker for the
+// phase. An env override wins over the phase in either path.
 function resume_argv(
 	invocation: string,
 	profile: AgentProfile | undefined,
@@ -135,7 +136,13 @@ function review_in(
 	cwd: string,
 	environment: AgentEnvironment = process.env,
 ): AgentArgvResult {
-	return profiled_in(invocation, agent_role_profile.resolve_review(round, environment), cwd)
+	const is_reduced = review_prompt_level.level_of(invocation) === 'low'
+
+	return profiled_in(
+		invocation,
+		agent_role_profile.resolve_review(round, environment, is_reduced),
+		cwd,
+	)
 }
 
 const agent_argv = {

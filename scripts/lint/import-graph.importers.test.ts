@@ -1,7 +1,7 @@
-import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { realpathSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { import_graph, type ImportGraph } from './import-graph'
 
 // joshuafolkken/kit#5368: `runtime_importers` walks the test runner's graph, which a type-only
@@ -16,13 +16,11 @@ const TYPE_IMPORT = "import type { Leaf } from './leaf'\n"
 const BOTH = [LEAF, READER]
 const RUNTIME: 'importers' | 'runtime_importers' = 'runtime_importers'
 
-const roots: Array<string> = []
+const make_directory = temporary_directory()
 
 async function graph_with(reader: string): Promise<{ root: string; graph: ImportGraph }> {
-	const created = mkdtempSync(path.join(tmpdir(), 'kit-import-graph-importers-'))
-	const root = realpathSync(created)
+	const root = realpathSync(make_directory('kit-import-graph-importers-'))
 
-	roots.push(root)
 	writeFileSync(path.join(root, LEAF), 'export type Leaf = 1\nexport const x = 1\n')
 	writeFileSync(path.join(root, READER), reader)
 	writeFileSync(path.join(root, 'tsconfig.json'), TSCONFIG)
@@ -41,10 +39,6 @@ async function importers_of(reader: string, kind = RUNTIME): Promise<Array<strin
 		.map((file) => path.relative(root, file))
 		.toSorted((left, right) => left.localeCompare(right))
 }
-
-afterEach(() => {
-	for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
-})
 
 describe('import_graph.runtime_importers', () => {
 	it('follows a value import', async () => {

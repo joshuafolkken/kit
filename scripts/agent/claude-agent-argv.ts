@@ -36,8 +36,8 @@ const SESSION_ID_FLAG = '--session-id'
 // **A launched child carries only the tools a lane has ever used**. Every
 // tool definition and every user-side claude.ai connector rides on each request's cached preamble, and
 // across the lanes measured none of Artifact, Workflow or a connector was ever called, while
-// AskUserQuestion has nobody to answer it in an unattended lane. Narrowing them cut the preamble by
-// about 16,000 tokens per request. **No web tool is launched**: no role runs with a person at the keyboard, and a
+// AskUserQuestion has nobody to answer it in an unattended lane, so narrowing them shrinks every
+// request's preamble. **No web tool is launched**: no role runs with a person at the keyboard, and a
 // fetched page enters the context with no trust label, past the Issue trust filter (#4664). This list
 // is the one place the set is kept.
 const LAUNCHED_TOOLS: ReadonlyArray<string> = [
@@ -55,8 +55,14 @@ const LAUNCHED_TOOLS: ReadonlyArray<string> = [
 ]
 // **A reviewer is the review, not a launcher of one** (joshuafolkken/kit#4715): with `Skill` it ran
 // `/code-review`, which forked a second agent that read the same diff and brief again. Without the two
-// tools that open a nested agent, the review stays in the one session.
-const NESTING_TOOLS: ReadonlySet<string> = new Set(['Agent', 'Skill'])
+// tools that open a nested agent, the review stays in the one session. **A worker has no `Skill` call
+// path** (#7104): it reads its procedures with `josh doc:read` and starts reviews through `Agent`, so
+// dropping `Skill` takes the skill listing off every request's preamble. The scheduler keeps both.
+const DROPPED_TOOLS: Readonly<Record<AgentRole, ReadonlySet<string>>> = {
+	scheduler: new Set(),
+	worker: new Set(['Skill']),
+	reviewer: new Set(['Agent', 'Skill']),
+}
 const TOOLS_FLAG = '--tools'
 // **Only the project's own MCP servers load** — the user's connectors are what the strict flag drops.
 // A project with no `.mcp.json` gets the strict flag alone, which loads no server at all: that is
@@ -82,9 +88,9 @@ function session_id_flags(session_id: string | undefined): ReadonlyArray<string>
 }
 
 function launched_tools(role: AgentRole): ReadonlyArray<string> {
-	if (role !== agent_role_profile.REVIEWER) return LAUNCHED_TOOLS
+	const dropped = DROPPED_TOOLS[role]
 
-	return LAUNCHED_TOOLS.filter((tool) => !NESTING_TOOLS.has(tool))
+	return LAUNCHED_TOOLS.filter((tool) => !dropped.has(tool))
 }
 
 // The config is named by absolute path, resolved against the directory the child is launched in, so

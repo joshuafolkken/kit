@@ -6,8 +6,8 @@ import { lane_stats, type StatsWindow } from './lane-stats'
 // What widened a `josh test:related` run (joshuafolkken/kit#4465): one row per scope it settled on —
 // `related`, `none` or the full-suite fallback kind — with the medians of its input (the change
 // itself, what a main sync brought in, what the change since the test-read map's tree joined, the
-// readers the map added), of the test files vitest
-// ran and of its duration. A `related` row whose test files far outrun its input is vitest widening the
+// readers the map added), of the test files vitest ran, of its test selection (joshuafolkken/kit#7248)
+// and of its duration. A `related` row whose test files far outrun its input is vitest widening the
 // run on its own.
 
 const DECIMALS = 1
@@ -21,6 +21,7 @@ const COLUMNS = [
 	'since map',
 	'readers',
 	'test files',
+	'select (s)',
 	SECONDS_COLUMN,
 ] as const
 const TRIGGER_COLUMNS = ['test:related whole-suite trigger', RUNS_COLUMN, SECONDS_COLUMN] as const
@@ -52,6 +53,7 @@ function median_of(runs: ReadonlyArray<TestRelatedEntry>, field: CountField): st
 function scope_row(scope: string, entries: ReadonlyArray<TestRelatedEntry>): string {
 	const runs = entries.filter((entry) => entry.scope === scope)
 	const test_files = runs.map((run) => run.test_files).filter((files) => files !== undefined)
+	const selects = runs.map((run) => run.select_elapsed_ms).filter((ms) => ms !== undefined)
 
 	return lane_stats.to_row([
 		scope,
@@ -61,6 +63,7 @@ function scope_row(scope: string, entries: ReadonlyArray<TestRelatedEntry>): str
 		median_of(runs, 'since_map'),
 		median_of(runs, 'readers'),
 		count_cell(test_files),
+		seconds_cell(selects),
 		seconds_cell(runs.map((run) => run.elapsed_ms)),
 	])
 }

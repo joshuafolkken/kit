@@ -1,9 +1,10 @@
+import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import type { TestPinnedRecord } from '#scripts/lane/lane-ledger'
-import { lane_ledger_schema } from '#scripts/lane/lane-ledger-schema'
+import { lane_ledger_pinned_origin } from '#scripts/lane/lane-ledger-pinned-origin'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { lane_paths } from '#scripts/lane/lane-paths'
 import type { Hunk } from './test-pinned-logic'
-import type { RedProbe } from './test-red-logic'
+import type { PinnedBy, RedProbe } from './test-red-logic'
 
 // One `test-pinned` ledger row per `josh test:pinned` run that probed (joshuafolkken/kit#5078): how
 // many hunks the verdict cache answered, and each probed hunk's test files and wall time, so
@@ -13,10 +14,13 @@ interface ProbeTime {
 	file: string
 	tests?: number | undefined
 	elapsed_ms: number
+	pinned_by?: PinnedBy | undefined
 }
 
 function time_of(hunk: Hunk, verdict: RedProbe, elapsed_ms: number): ProbeTime {
-	return { file: hunk.file, tests: verdict.ran, elapsed_ms }
+	const time: ProbeTime = { file: hunk.file, tests: verdict.ran, elapsed_ms }
+
+	return verdict.pinned_by === undefined ? time : { ...time, pinned_by: verdict.pinned_by }
 }
 
 // What started a run (joshuafolkken/kit#5262): `run:review`'s background check, the ship's pre-detach,
@@ -29,16 +33,17 @@ const BACKGROUND_ORIGIN: PinnedOrigin = 'run-review'
 // A `--origin` value: none is `manual`, one not named above `undefined`.
 function origin_of(raw: string | undefined): PinnedOrigin | undefined {
 	if (raw === undefined) return MANUAL_ORIGIN
-	const parsed = lane_ledger_schema.pinned_origin_schema.safeParse(raw)
+	const parsed = lane_ledger_pinned_origin.pinned_origin_schema.safeParse(raw)
 
 	return parsed.success ? parsed.data : undefined
 }
 
-// The hunks a run did not probe: `held` the cache answered, `rewired` left out as a rewire; and what
-// started it, `manual` when unnamed.
+// The hunks a run did not probe: `held` the cache answered, `rewired` left out as a rewire, `over_cap`
+// over the test-file cap; and what started it, `manual` when unnamed.
 interface Skipped {
 	held: number
 	rewired: number
+	over_cap?: number
 	origin?: PinnedOrigin | undefined
 }
 
@@ -48,9 +53,10 @@ async function record(
 	elapsed_ms: number,
 ): Promise<void> {
 	await lane_ledger_write.record_test_pinned({
-		issue: lane_paths.issue_here(),
+		issue: lane_paths.issue_here(PROJECT_ROOT),
 		held: skipped.held,
 		rewired: skipped.rewired,
+		over_cap: skipped.over_cap ?? 0,
 		probes: [...probes],
 		elapsed_ms,
 		origin: skipped.origin ?? MANUAL_ORIGIN,
@@ -65,7 +71,7 @@ async function record_discarded(
 	origin: PinnedOrigin = BACKGROUND_ORIGIN,
 ): Promise<void> {
 	await lane_ledger_write.record_test_pinned({
-		issue: lane_paths.issue_here(),
+		issue: lane_paths.issue_here(PROJECT_ROOT),
 		held: 0,
 		probes: [],
 		elapsed_ms,
@@ -76,5 +82,5 @@ async function record_discarded(
 
 const test_pinned_ledger = { BACKGROUND_ORIGIN, origin_of, record, record_discarded, time_of }
 
-export type { PinnedOrigin, ProbeTime }
+export type { PinnedOrigin, ProbeTime, Skipped }
 export { test_pinned_ledger }

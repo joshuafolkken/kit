@@ -14,6 +14,7 @@ const PROGRESS_DOC = 'backlogrun-progress.md'
 const HAND_OFF = 'The hand-off'
 const BACKLOGRUN = 'backlogrun'
 const LANE_CHILD = 'lane-child'
+const FULLRUN = 'fullrun'
 const NO_SUCH_DOC = 'no-such-doc.md'
 const FAILURE = 1
 const MISTYPED = 'not-an-entry'
@@ -81,8 +82,7 @@ describe('josh doc:section', () => {
 	})
 })
 
-// An unrecognized keyword used to produce a complete report with a saving of zero and exit 0, so a
-// typo answered "nothing to save" rather than "no such entry".
+// An unrecognized keyword must fail so a typo cannot look like a valid report with no savings.
 describe('josh read:set — what it refuses', () => {
 	it('refuses an entry the table does not carry, and lists the ones it does', () => {
 		const { code, err } = captured(() => read_set_cli.run([MISTYPED], ROOT))
@@ -90,6 +90,7 @@ describe('josh read:set — what it refuses', () => {
 		expect(code).toBe(FAILURE)
 		expect(err).toContain('Known entries:')
 		expect(err).toContain(BACKLOGRUN)
+		expect(err).toContain(read_set_cli.BYTES_FLAG)
 	})
 })
 
@@ -136,6 +137,29 @@ describe('josh read:set', () => {
 	})
 })
 
+// joshuafolkken/kit#5952: a measurement Issue declares the total, so it has to be a bare number.
+// joshuafolkken/kit#7139: the parent's note names what its trim drops, never "every point-of-use".
+describe('josh read:set — the backlogrun parent note', () => {
+	it('notes that the parent skips its children stages documents', () => {
+		const { out } = captured(() => read_set_cli.run([BACKLOGRUN], ROOT))
+
+		expect(out).toContain('skips the documents of a child’s stages')
+		expect(out).not.toContain('keeps every point-of-use document')
+	})
+})
+
+describe('josh read:set — the total as one number', () => {
+	it('prints only the total read bytes under --bytes, the figure of the total-read row', () => {
+		const { code, out } = captured(() => read_set_cli.run([FULLRUN, read_set_cli.BYTES_FLAG], ROOT))
+		const report = captured(() => read_set_cli.run([FULLRUN], ROOT)).out
+		const total = report.split('\n').find((line) => line.includes(read_set_cli.TOTAL_READ_LABEL))
+
+		expect(code).toBe(SUCCESS)
+		expect(out).toMatch(/^\d+$/u)
+		expect(total).toContain(Number(out).toLocaleString('en-US'))
+	})
+})
+
 // joshuafolkken/kit#2289: every file row, section row and total row carries a per-run dollar figure,
 // and the report states the run size it assumes so the reader checks the premise rather than doing the
 // arithmetic in their head.
@@ -166,6 +190,9 @@ describe('josh read:set — the lane-child entry', () => {
 		expect(out).toContain(`entry: ${LANE_CHILD}`)
 		expect(out).toContain(read_set_cli.TOTAL_READ_LABEL)
 		expect(out).toContain('JOSH_LANE_CHILD')
+		expect(out).toContain(
+			'reads fullrun-lane.md instead of SKILL.md, fullrun.md and entry-sequence.md',
+		)
 		expect(out).toMatch(/resident: lane instructions [\d,]+ tok in place of CLAUDE\.md/u)
 	})
 

@@ -13,9 +13,9 @@ import { describe, expect, it } from 'vitest'
 // joshuafolkken/kit#2996: a rule number written in several documents drifts the moment one of them
 // changes. Each number has one source in code, one document that states it, and every other document
 // points at that document instead of restating it — so this suite pins both halves: the stating
-// document agrees with the code, and the documents that used to restate it no longer do.
+// document agrees with the code, and every other document points there without restating it.
 
-const WIP_CAP = String(issue_wip.WIP_CAP)
+const WIP_CAP = String(issue_wip.DEFAULT_WIP_CAP)
 const FILE_GUIDE = String(split_assess.FILE_GUIDE)
 const LINE_GUIDE = String(split_assess.LINE_GUIDE)
 
@@ -26,7 +26,7 @@ const OPERATING_RULES = 'prompts/collaboration-workflow/operating-rules.md'
 const OVERVIEW = 'prompts/collaboration-workflow/overview.md'
 const RESIDENCY = 'prompts/collaboration-workflow/residency.md'
 // The review round cap's number is stated in `review.md`; every other document points at its heading.
-// Each phrasing below is one a document has used to restate the cap as a limit, not merely to name
+// Each phrasing below restates the cap as a limit, rather than merely naming
 // "the two rounds" of a review that the cap allows.
 const TWO_REVIEWS = 'two reviews'
 const ROUND_CAP_RESTATEMENTS: ReadonlyArray<string> = [
@@ -49,7 +49,7 @@ const RESTATEMENTS: ReadonlyArray<string> = [
 	`above ${WIP_CAP} open`,
 	`cap of ${WIP_CAP}`,
 	`${WIP_CAP} 件`,
-	`about ${FILE_GUIDE} changed files`,
+	`than ${FILE_GUIDE} changed files`,
 	`${LINE_GUIDE} changed lines`,
 	...ROUND_CAP_RESTATEMENTS,
 ]
@@ -66,13 +66,13 @@ function standalone_count(content: string, value: string): number {
 }
 
 describe('each rule number agrees with its source in code', () => {
-	it('states the WIP cap in wip-cap.md as WIP_CAP', () => {
-		expect(read_unwrapped(WIP_TOPIC)).toContain(`**上限は ${WIP_CAP}。**`)
+	it('states the default WIP cap in wip-cap.md as DEFAULT_WIP_CAP', () => {
+		expect(read_unwrapped(WIP_TOPIC)).toContain(`**上限は既定 ${WIP_CAP}。**`)
 	})
 
 	it('states the split guide in split-assessment.md as FILE_GUIDE and LINE_GUIDE', () => {
 		expect(read_unwrapped(SPLIT_SKILL)).toContain(
-			`about ${FILE_GUIDE} changed files and about ${LINE_GUIDE} changed lines`,
+			`more than ${FILE_GUIDE} changed files or more than ${LINE_GUIDE} changed lines`,
 		)
 	})
 
@@ -83,7 +83,7 @@ describe('each rule number agrees with its source in code', () => {
 })
 
 describe('each source document states its number once', () => {
-	it('writes the WIP cap once in wip-cap.md', () => {
+	it('writes the default WIP cap once in wip-cap.md', () => {
 		expect(standalone_count(read_repo_file(WIP_TOPIC), WIP_CAP)).toBe(1)
 	})
 
@@ -133,6 +133,6 @@ describe.each(RETIRED_POINTERS)('%s — the pointer-only file is retired', (reti
 	})
 
 	it('is not linked from the index', () => {
-		expect(read_index()).not.toContain(retired.replace('prompts/', './'))
+		expect(read_index()).not.toContain(`../${retired}`)
 	})
 })

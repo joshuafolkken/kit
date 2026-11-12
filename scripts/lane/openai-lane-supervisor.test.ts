@@ -1,36 +1,36 @@
-import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs'
-import os from 'node:os'
 import path from 'node:path'
 import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
-import { OBSERVATION_LEDGER_DIRECTORY } from '#scripts/observations/observation-ledger'
 import { run_cut } from '#scripts/run/cut/run-cut'
 import { detached_launch, type LaunchRequest } from '#scripts/run/detached-launch'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, beforeEach, describe, expect, it, test, vi } from 'vitest'
+import { lane_child_invocation } from './lane-child-invocation'
 import type { LaneInfo } from './lane-registry'
 import { lane_session_broker } from './lane-session-broker'
 import { openai_lane_ship } from './openai-lane-ship'
 import { openai_lane_supervisor } from './openai-lane-supervisor'
 
+const make_directory = temporary_directory('suite')
+
 const ISSUE = '2084'
 const BRANCH = '2084-lane'
-const scratch = mkdtempSync(path.join(os.tmpdir(), 'openai-supervisor-test-'))
+const scratch = make_directory('openai-supervisor-test-')
 const repository = path.join(scratch, 'repository.git')
 const lane_directory = path.join(scratch, 'lane')
 const target = run_cut.cut_path(repository)
 const profile = agent_role_profile.OPENAI_PROFILES.worker
-const RESUME_PROMPT = 'run:cut --resume 2084'
+const RESUME_PROMPT = 'run:entry 2084'
 const SHIP_SUCCESS = 'ship-success'
 const EPHEMERAL_FLAG = '--ephemeral'
 
 const launch = vi.spyOn(detached_launch, 'launch_attached')
 const worktree = vi.spyOn(run_cut, 'worktree_directory')
 const diagnostic = vi.spyOn(agent_diagnostics, 'check')
-const resolve_common_directory = vi.spyOn(git_common_directory, 'resolve')
-const common_directory = path.join(scratch, 'repository with spaces', '.git')
+const repository_directory = vi.spyOn(git_common_directory, 'repository')
 const ship_current = vi.spyOn(openai_lane_ship, 'current')
 const ship_wait = vi.spyOn(openai_lane_ship, 'wait_for_ship')
 const with_server = vi.spyOn(lane_session_broker, 'with_server')
@@ -61,6 +61,14 @@ function launched_request(index = 0): LaunchRequest {
 	return request
 }
 
+function expect_trusted_launch(index = 0): void {
+	const { args } = launched_request(index).argv
+
+	expect(args).toContain('default_permissions=":danger-full-access"')
+	expect(args).toContain('approval_policy="never"')
+	expect(args.some((value) => value.startsWith('permissions.'))).toBe(false)
+}
+
 async function supervise(nonce: string): Promise<number> {
 	openai_lane_supervisor.approve(lane_directory, nonce)
 
@@ -74,20 +82,18 @@ function reset_ship(): void {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	run_cut.end_cut(target)
 	stamp_file.remove_stamp(openai_lane_supervisor.marker_path(lane_directory))
 	stamp_file.remove_stamp(openai_lane_supervisor.state_path(lane_directory))
 	worktree.mockResolvedValue(repository)
 	diagnostic.mockReturnValue({ kind: 'ready' })
-	resolve_common_directory.mockReturnValue(undefined)
+	repository_directory.mockReturnValue(undefined)
 	launch.mockResolvedValue({ kind: 'completed', pid: 9001, exit_code: 0 })
 	reset_ship()
 })
 
 afterAll(() => {
 	vi.restoreAllMocks()
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 test('starts the review broker around the supervised lane', async () => {
@@ -95,6 +101,30 @@ test('starts the review broker around the supervised lane', async () => {
 	expect(with_server).toHaveBeenCalledWith(lane(), expect.any(Function))
 })
 
+it('logs a late claim cancelled by the dispatcher before exiting', async () => {
+	const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+	openai_lane_supervisor.cancel(lane_directory, 'late')
+
+	expect(await openai_lane_supervisor.supervise(lane(), profile, 'late')).toBe(0)
+	expect(error).toHaveBeenCalledWith(expect.stringContaining('late claim — dispatcher cancelled'))
+	expect(launch).not.toHaveBeenCalled()
+	error.mockRestore()
+})
+
+it('logs an approval timeout separately from cancellation', async () => {
+	vi.useFakeTimers()
+	const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+	const pending = openai_lane_supervisor.supervise(lane(), profile, 'timeout')
+
+	await vi.runAllTimersAsync()
+
+	expect(await pending).toBe(0)
+	expect(error).toHaveBeenCalledWith(expect.stringContaining('approval timed out'))
+	expect(launch).not.toHaveBeenCalled()
+	error.mockRestore()
+	vi.useRealTimers()
+})
 describe('OpenAI lane supervisor generations', () => {
 	it('launches an ordinary initial generation through the lane-local adapter', async () => {
 		expect(await supervise('initial')).toBe(0)
@@ -134,26 +164,16 @@ describe('OpenAI lane supervisor generations', () => {
 		expect(launched_request(1).argv.args).not.toContain(EPHEMERAL_FLAG)
 		expect(launched_request(1).profile).toStrictEqual(profile)
 		expect(launched_request(2).argv.args.at(-1)).toContain(RESUME_PROMPT)
+
+		for (const index of [0, 1, 2]) expect_trusted_launch(index)
 	})
 })
 
 describe('OpenAI lane supervisor Git access', () => {
-	it('grants the common Git directory and the ledger in the launched generation', async () => {
-		mkdirSync(common_directory, { recursive: true })
-		resolve_common_directory.mockReturnValue(common_directory)
-
+	it('uses the trusted local policy without generating Git or ledger grants', async () => {
 		await supervise('git-common-directory')
 
-		const filesystem = launched_request().argv.args.join(' ')
-		const ledger = path.join(
-			path.dirname(common_directory),
-			path.dirname(OBSERVATION_LEDGER_DIRECTORY),
-		)
-
-		expect(resolve_common_directory).toHaveBeenCalledWith(lane_directory)
-		expect(filesystem).toContain(`${JSON.stringify(realpathSync(common_directory))}="write"`)
-		expect(filesystem).toContain(`${JSON.stringify(realpathSync(ledger))}="write"`)
-		expect(filesystem).not.toContain('--add-dir')
+		expect_trusted_launch()
 	})
 })
 
@@ -200,6 +220,23 @@ describe('OpenAI lane supervisor detached ship completion', () => {
 		ship_wait.mockResolvedValue('abnormal')
 		expect(await supervise('ship-abnormal')).toBe(1)
 		expect(launch).toHaveBeenCalledTimes(1)
+	})
+
+	it('relaunches with the stopped ship title, body, citations and review options', async () => {
+		const invocation = lane_child_invocation.ship_stop_invocation(ISSUE, {
+			stage: 'preflight',
+			title: `Resume shipping #${ISSUE}`,
+			is_review: true,
+			flags: ['--body-file', path.join(scratch, 'body.md'), '--cite', '5473'],
+			unpinned_ok: ['--unpinned-ok', 'reason'],
+		})
+
+		ship_current
+			.mockResolvedValueOnce(undefined)
+			.mockResolvedValue({ launch_id: 'stopped', result: 'failed', stop_invocation: invocation })
+		ship_wait.mockResolvedValueOnce('failed').mockResolvedValueOnce('none')
+		expect(await supervise('ship-resume-options')).toBe(0)
+		expect(launched_request(1).argv.args.at(-1)).toBe(invocation)
 	})
 })
 

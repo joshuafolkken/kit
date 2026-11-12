@@ -1,23 +1,19 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { latest_stamp, type LatestStamp } from './latest-stamp'
 
-// joshuafolkken/kit#1215: `josh latest` ran at the head of every run and cost 60–120 seconds of
-// network time to answer the same thing several times a day. The record here is what turns "should I
-// update?" from a judgement into an elapsed-time reading.
+// joshuafolkken/kit#1215: `josh latest` ran at the head of every run and spent network time to
+// answer the same thing several times a day. The record here is what turns "should I update?" from
+// a judgement into an elapsed-time reading.
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'josh-latest-stamp-test-'))
+const scratch = temporary_directory('suite')('josh-latest-stamp-test-')
 const NOW = new Date('2026-09-02T12:00:00.000Z')
 const HOURS_AGO_2 = { ran_at: '2026-09-02T10:00:00.000Z' } satisfies LatestStamp
 const HOURS_AGO_20 = { ran_at: '2026-09-01T16:00:00.000Z' } satisfies LatestStamp
 const SLIGHTLY_AHEAD = { ran_at: '2026-09-02T13:00:00.000Z' } satisfies LatestStamp
 const FAR_AHEAD = { ran_at: '2026-09-03T12:00:00.000Z' } satisfies LatestStamp
-
-afterAll(() => {
-	rmSync(scratch, { recursive: true, force: true })
-})
 
 describe('latest_stamp.hours_since', () => {
 	it('measures the age of a record in hours', () => {

@@ -47,3 +47,12 @@ describe('run_carry.is_held_by_another', () => {
 		expect(run_carry.is_held_by_another(gone(), () => true)).toBe(true)
 	})
 })
+
+// joshuafolkken/kit#5743: no wake prints the adoption command any more, so the refusal is its one reader.
+describe('run_carry.standing_message', () => {
+	it('names the adoption command for a record whose owner is gone', () => {
+		const message = run_carry.standing_message(gone())
+
+		expect(message).toContain('`pnpm josh run:carry --resume "backlogrun --max 5"`')
+	})
+})

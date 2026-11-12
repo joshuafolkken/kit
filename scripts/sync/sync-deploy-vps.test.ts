@@ -1,11 +1,13 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { pnpm_installer } from '#scripts/lib/pnpm-installer'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { sync } from './sync'
 
-// Unique per run, guarded by `shared-temporary-path.test.ts` (joshuafolkken/kit#1517).
-const TEST_DIR = mkdtempSync(path.join(tmpdir(), 'sync-deploy-vps-test-'))
+// Unique per run, guarded by `shared-temporary-path.test.ts` (joshuafolkken/kit#1517). Each test
+// empties it, and `beforeEach` lays it out again.
+const TEST_DIR = temporary_directory('suite')('sync-deploy-vps-test-')
 const DEPLOY_VPS_DEST = path.join(TEST_DIR, 'dest', 'deploy-vps.yml')
 
 const OLD_DEPLOY_VPS_CONTENT = `    script: |
@@ -15,6 +17,15 @@ const OLD_DEPLOY_VPS_CONTENT = `    script: |
 `
 const PNPM12_INSTALL = 'npm install -g pnpm@12.6.0'
 const VERSION_CHECK_MARKER = '[ "$PNPM_MINOR" -lt 1 ]'
+const OLD_FALLBACK = 'curl -fsSL https://get.pnpm.io/install.sh | sh -'
+
+function version_checked_content(): string {
+	return OLD_DEPLOY_VPS_CONTENT.replaceAll(
+		'if ! command -v pnpm &> /dev/null; then',
+		() =>
+			`PNPM_VERSION=$(pnpm --version 2>/dev/null || echo "0.0.0")\n      PNPM_MAJOR=$(echo "$PNPM_VERSION" | cut -d. -f1)\n      PNPM_MINOR=$(echo "$PNPM_VERSION" | cut -d. -f2)\n      if [ "$PNPM_MAJOR" -lt 12 ] || { [ "$PNPM_MAJOR" -eq 12 ] && ${VERSION_CHECK_MARKER}; }; then`,
+	).replaceAll('pnpm@10.24.0', () => 'pnpm@12.6.0')
+}
 
 beforeEach(() => {
 	mkdirSync(path.join(TEST_DIR, 'dest'), { recursive: true })
@@ -43,11 +54,9 @@ describe('sync_deploy_vps', () => {
 	})
 
 	it('logs unchanged when file already uses pnpm@12 with version check', () => {
-		const already_patched = OLD_DEPLOY_VPS_CONTENT.replaceAll(
-			'if ! command -v pnpm &> /dev/null; then',
-			() =>
-				`PNPM_VERSION=$(pnpm --version 2>/dev/null || echo "0.0.0")\n      PNPM_MAJOR=$(echo "$PNPM_VERSION" | cut -d. -f1)\n      PNPM_MINOR=$(echo "$PNPM_VERSION" | cut -d. -f2)\n      if [ "$PNPM_MAJOR" -lt 12 ] || { [ "$PNPM_MAJOR" -eq 12 ] && ${VERSION_CHECK_MARKER}; }; then`,
-		).replaceAll('pnpm@10.24.0', () => 'pnpm@12.6.0')
+		const already_patched = version_checked_content().replaceAll(OLD_FALLBACK, () =>
+			pnpm_installer.command(),
+		)
 		const info_spy = vi.spyOn(console, 'info').mockImplementation(() => {
 			/* suppress */
 		})
@@ -57,5 +66,17 @@ describe('sync_deploy_vps', () => {
 
 		expect(info_spy).toHaveBeenCalledWith(expect.stringContaining('unchanged'))
 		expect(readFileSync(DEPLOY_VPS_DEST, 'utf8')).toBe(already_patched)
+	})
+
+	it('migrates an unverified fallback under an existing version check, then leaves it unchanged', () => {
+		writeFileSync(DEPLOY_VPS_DEST, version_checked_content())
+		sync.sync_deploy_vps(DEPLOY_VPS_DEST)
+
+		const result = readFileSync(DEPLOY_VPS_DEST, 'utf8')
+
+		expect(result).toContain(pnpm_installer.command())
+		expect(result).not.toContain(OLD_FALLBACK)
+		sync.sync_deploy_vps(DEPLOY_VPS_DEST)
+		expect(readFileSync(DEPLOY_VPS_DEST, 'utf8')).toBe(result)
 	})
 })

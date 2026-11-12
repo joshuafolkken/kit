@@ -1,16 +1,17 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { process_identity_fixture } from '#scripts/josh/process-identity-fixture'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { run_carry, type RunCarry } from './run-carry'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#2328: the end-of-run retrospective runs once per invocation, so the fact that it
 // has run lives on the record that survives every session cut. `--retrospective` sets a sticky flag,
 // and the adoption that carries a budget across a cut carries the flag with it. Colocated apart from
 // `run-carry.test.ts` to keep that file under its line ceiling.
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-carry-retro-'))
+const scratch = make_directory('run-carry-retro-')
 const TARGET = run_carry.carry_path(path.join(scratch, 'repository.git'))
 const INVOCATION = 'backlogrun --max 5'
 const START = new Date('2026-09-10T00:00:00.000Z')
@@ -28,10 +29,6 @@ function begun(): RunCarry {
 function dead_owner(): ReturnType<typeof run_carry.owner_of> {
 	return run_carry.owner_of(process_identity_fixture.DEAD_PID)
 }
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
 
 describe('the retrospective flag', () => {
 	it('sets a sticky flag that survives a later count and a hand-off', () => {

@@ -50,7 +50,6 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.unstubAllEnvs()
-	vi.clearAllMocks()
 })
 
 describe('issue_file_cap.is_cap_clear — ten filings per originating work item', () => {

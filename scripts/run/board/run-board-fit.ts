@@ -7,7 +7,7 @@ import { run_board_labels } from './run-board-labels'
 // how far it is — is what scrolls off. So the parts below it give way instead, least wanted first and
 // in the order the frame draws them from the bottom (joshuafolkken/kit#4099): the footer, the legend,
 // the rows under the notes — the finished, the 🔗 waiting, the not yet started — the notes from the
-// oldest, the reviewers thanked above the legend, the parked rows and, last, the rows waiting on a person's decision
+// oldest, the reviewers thanked above the legend, the 📈 throughput rows, the ⛽ usage gauges, the parked rows and, last, the rows waiting on a person's decision
 // and the running rows — what a person keeps the board open to see. Each stage stops once the
 // frame fits, a cut row is counted on the plan's `more N` line — or on its folding section's own last
 // line while that section keeps a row (joshuafolkken/kit#4042) — and the order a row is drawn in
@@ -35,10 +35,13 @@ interface RowYield {
 interface PlanLine {
 	text: string
 	row: RowYield | undefined
+	// An empty lane seat's reason: it gives way as a row does but is no issue, so no count names it.
+	is_seat?: boolean | undefined
 }
 
 // A section a person folds and unfolds with one key on a live board (`run-board-fold.ts`).
-type SectionKey = 'lanes' | 'processes' | 'findings' | 'queued' | 'waiting' | 'done'
+type SectionKey =
+	'throughput' | 'usage' | 'lanes' | 'processes' | 'findings' | 'queued' | 'waiting' | 'done'
 
 // What a foldable part's rule is labeled, and whether a person folded it to its heading alone.
 interface Foldable {
@@ -72,9 +75,13 @@ interface DetailPart extends Foldable {
 }
 
 // A frame in its parts, top to bottom: the header above stays. The plan's sections are drawn around
-// the notes: `plan` above them, `below` under them; `processes` between the plan and the notes.
+// the notes: `plan` above them, `below` under them; `processes` between the plan and the notes. The
+// closes per active hour (`throughput`), then the usage-limit gauges (`usage`), stand right under the
+// header.
 interface FrameParts {
 	above: ReadonlyArray<string>
+	throughput?: DetailPart | undefined
+	usage?: DetailPart | undefined
 	plan: ReadonlyArray<PlanSection>
 	processes?: DetailPart | undefined
 	notes: NotesPart
@@ -83,14 +90,19 @@ interface FrameParts {
 	thanks?: ReadonlyArray<string> | undefined
 	legend: ReadonlyArray<string>
 	footer: ReadonlyArray<string>
+	// The column every rule runs on to: where the lane rows' titles end; none where no lane row is drawn.
+	rule_width?: number | undefined
 }
 
 // One thing that gives way: a part as a whole, the processes' details, one note (the oldest shown),
 // or one issue row.
-type Yielder = 'thanks' | 'footer' | 'legend' | 'details' | 'note' | PlanLine
+type Yielder =
+	'thanks' | 'throughput' | 'usage' | 'footer' | 'legend' | 'details' | 'note' | PlanLine
 
 interface Cut {
 	thanks: boolean
+	throughput: boolean
+	usage: boolean
 	footer: boolean
 	legend: boolean
 	details: boolean
@@ -100,6 +112,8 @@ interface Cut {
 
 const NO_CUT: Cut = {
 	thanks: false,
+	throughput: false,
+	usage: false,
 	footer: false,
 	legend: false,
 	details: false,
@@ -175,17 +189,24 @@ function section_lines(section: PlanSection, cut: ReadonlySet<PlanLine>): Array<
 
 	const kept = kept_lines(section, cut)
 
-	if (kept.length === 0) return []
+	// A section with every line cut goes; one drawn with none keeps its head (joshuafolkken/kit#7281).
+	if (kept.length === 0 && section.lines.length > 0) return []
 
 	return [...section.head, ...kept, ...fold_lines(section, cut)]
 }
 
-// The cut rows no folding section counts.
+// Whether a section draws any of its rows, open or folded; a head kept with none draws no row, so the
+// plan's `more N` never reads as its hidden rows (joshuafolkken/kit#7281).
+function draws_row(section: PlanSection, cut: ReadonlySet<PlanLine>): boolean {
+	return section.lines.length > 0 && section_lines(section, cut).length > 0
+}
+
+// The cut rows no folding section counts; a seat line is no row.
 function unfolded(plan: ReadonlyArray<PlanSection>, cut: ReadonlySet<PlanLine>): number {
 	const folding = plan.filter((section) => is_folding(section, cut))
 	const folded = new Set(folding.flatMap((section) => section.lines))
 
-	return [...cut].filter((line) => !folded.has(line)).length
+	return [...cut].filter((line) => !folded.has(line) && line.is_seat !== true).length
 }
 
 // The notes give way from the oldest shown; with none left the section goes, heading and all.
@@ -216,7 +237,7 @@ function detail_lines(part: DetailPart | undefined, is_cut: boolean): Array<stri
 }
 
 // The plan's sections around the notes, its cut rows counted on one line after its last drawn section —
-// under `below` while any of it is drawn, else above the processes and the notes, never under the
+// under `below` while any of its rows is drawn, else above the processes and the notes, never under the
 // notes' own `more` — and under a blank when no section is left above it.
 function body_lines(parts: FrameParts, cut: Cut): Array<string> {
 	const below = parts.below ?? []
@@ -227,16 +248,26 @@ function body_lines(parts: FrameParts, cut: Cut): Array<string> {
 	]
 	const more = more_lines(unfolded([...parts.plan, ...below], cut.rows))
 
-	if (under.length > 0) return [...plan, ...notes, ...under, ...more]
+	if (below.some((section) => draws_row(section, cut.rows))) {
+		return [...plan, ...notes, ...under, ...more]
+	}
 
 	const lead = plan.length === 0 && more.length > 0 ? [''] : []
 
-	return [...lead, ...plan, ...more, ...notes]
+	return [...lead, ...plan, ...more, ...notes, ...under]
+}
+
+// The throughput rows and the usage gauges give way whole: their rows are no details to drop.
+function gauge_lines(parts: FrameParts, cut: Cut): Array<string> {
+	const kept = [cut.throughput ? undefined : parts.throughput, cut.usage ? undefined : parts.usage]
+
+	return kept.flatMap((part) => detail_lines(part, false))
 }
 
 function compose(parts: FrameParts, cut: Cut): Array<string> {
 	return [
 		...parts.above,
+		...gauge_lines(parts, cut),
 		...body_lines(parts, cut),
 		...(cut.thanks ? [] : (parts.thanks ?? [])),
 		...(cut.legend ? [] : parts.legend),
@@ -290,7 +321,8 @@ function rows_yielding(sections: ReadonlyArray<PlanSection>): Array<PlanLine> {
 }
 
 // Everything that gives way, in the order it does: the rows drawn under the notes before them, the
-// processes' details before the notes, the rows above them after the thanks.
+// processes' details before the notes, the throughput rows and then the usage gauges after the thanks,
+// the rows above them last.
 function order_of(parts: FrameParts): Array<Yielder> {
 	const notes = parts.notes.lines.map((): Yielder => 'note')
 
@@ -301,6 +333,8 @@ function order_of(parts: FrameParts): Array<Yielder> {
 		'details',
 		...notes,
 		'thanks',
+		'throughput',
+		'usage',
 		...rows_yielding(parts.plan),
 	]
 }
@@ -315,6 +349,8 @@ function cut_of(order: ReadonlyArray<Yielder>, count: number): Cut {
 
 	return {
 		thanks: gone.includes('thanks'),
+		throughput: gone.includes('throughput'),
+		usage: gone.includes('usage'),
 		footer: gone.includes('footer'),
 		legend: gone.includes('legend'),
 		details: gone.includes('details'),

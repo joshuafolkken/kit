@@ -52,8 +52,7 @@ describe('backlog_drive.run_pass — a merge that answers stop', () => {
 	})
 })
 
-// The guard's stop of 2026-10-22: no offer followed it, so the hold stayed open until the next
-// driver's dispatch 22 minutes later (joshuafolkken/kit#4571).
+// A guard stop must release the hold even when no offer follows it (joshuafolkken/kit#4571).
 describe('backlog_drive.run_pass — the hold a merge stop releases', () => {
 	it('releases the hold once when the collection turns the run to stopping', async () => {
 		const { ports, holds } = harness({

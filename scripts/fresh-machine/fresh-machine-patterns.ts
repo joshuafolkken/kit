@@ -1,11 +1,13 @@
 import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
+import { fresh_machine_registry } from './fresh-machine-registry'
 import { fresh_machine_spec, type Scenario } from './fresh-machine-spec'
 
-// kit's own six patterns: three projects (one Lua file, one `index.html`, a minimal TypeScript
+// kit's own seven patterns: three projects (one Lua file, one `index.html`, a minimal TypeScript
 // SvelteKit app from `sv`) by two commands (`josh init`, `josh start`), each from the starting state
-// joshuafolkken/kit#2848 gave it. `josh init` installs the packed checkout, so a fix is retested
-// without a release; `josh start` installs a published version, because its setup pull request
-// would carry a tarball path CI cannot resolve.
+// joshuafolkken/kit#2848 gave it, and the Lua file through `pnpm dlx` against a local registry.
+// `josh init` installs the packed checkout, so a fix is retested without a release; `josh start`
+// installs a published version, because its setup pull request would carry a tarball path CI cannot
+// resolve.
 
 const KIT = KIT_PACKAGE_NAME
 const ALLOW_BUILDS = '--allow-build=esbuild --allow-build=unrs-resolver'
@@ -140,6 +142,24 @@ function start_pattern(
 	})
 }
 
+// The documented first command, `pnpm dlx` handing off to the kit it installs, against the local
+// registry where one of kit's dependencies is inside the release-age wait; the install a later person
+// runs must accept the lockfile it left (#7200). The project starts with a first commit because
+// `josh init` reads the tree's state through git, which only the GitHub image has.
+const DLX_INIT = `pnpm --allow-build=esbuild dlx ${KIT} init`
+const FROZEN_INSTALL = 'pnpm install --frozen-lockfile'
+const LOCKED_FRESH_DEPENDENCY = `grep -n -A2 '${fresh_machine_registry.FRESH_DEPENDENCY}@' pnpm-lock.yaml`
+
+function dlx_pattern(project: string, files: Record<string, string>): Scenario {
+	return fresh_machine_spec.define({
+		name: `kit-test-${project}-dlx`,
+		requires_github: true,
+		files,
+		commands: [...fresh_machine_registry.COMMANDS, ...FIRST_COMMIT, DLX_INIT, FROZEN_INSTALL],
+		probes: [LOCKED_FRESH_DEPENDENCY, ...fresh_machine_registry.PROBES],
+	})
+}
+
 const PATTERNS: ReadonlyArray<Scenario> = [
 	init_pattern('lua', LUA_FILES, [BARE_MANIFEST]),
 	// No Git: `josh start` creates the repository, the first commit and the GitHub repository.
@@ -160,6 +180,7 @@ const PATTERNS: ReadonlyArray<Scenario> = [
 			probes: [SETUP_CI],
 		},
 	),
+	dlx_pattern('lua', LUA_FILES),
 ]
 
 function names(): Array<string> {

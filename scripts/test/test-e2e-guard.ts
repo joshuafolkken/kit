@@ -73,11 +73,12 @@ async function run_playwright(extra_arguments: ReadonlyArray<string>): Promise<n
 }
 
 // Only a run reserves: a skip starts nothing, and a claim there could wait out a full ledger for it.
+// A whole suite, so a ship's push never runs it ahead of other lanes (`core-priority.ts`).
 async function run_reserved_playwright(extra_arguments: ReadonlyArray<string>): Promise<number> {
 	return await core_budget.with_command_reservation(
 		core_budget.CORE_WEIGHTS.e2e,
 		async () => await run_playwright(extra_arguments),
-		{ command: 'test:e2e' },
+		{ command: 'test:e2e', memory_mb: core_budget.MEMORY_MB.e2e, is_suite: true },
 	)
 }
 

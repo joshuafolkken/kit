@@ -1,3 +1,9 @@
+// テストファイルだけ関数の最大行数を引き上げる。eslint/base.js の tests ブロックが使い、
+// CLAUDE.md の Quality limits は tools/document/generate-lint-prose.ts がここから生成する
+export const code_quality_test_rules = {
+	'max-lines-per-function': ['error', { max: 35, skipBlankLines: true, skipComments: true }],
+}
+
 export const code_quality_rules = {
 	// ===== 一般的なコード品質 =====
 	// console の使用を警告（開発時は許可、本番ではエラーにするべき）

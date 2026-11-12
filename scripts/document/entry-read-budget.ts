@@ -48,11 +48,19 @@ interface EntryBudget {
 // entry with no row, so the definition cannot rot as entries are added or removed.
 const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	{ entry: 'kickoff', bytes: 36_864 },
-	{ entry: 'fullrun', bytes: 53_248 },
+	// joshuafolkken/kit#6094 trimmed restated prose from SKILL.md and entry-sequence.md, lowering
+	// `fullrun`, `halfrun`, `prrun` and `backlogrun` by a block each.
+	{ entry: 'fullrun', bytes: 49_152 },
 	{ entry: 'halfrun', bytes: 45_056 },
-	{ entry: 'prrun', bytes: 57_344 },
-	{ entry: 'backlogrun', bytes: 81_920 },
-	{ entry: LANE_CHILD, bytes: 45_056 },
+	{ entry: 'prrun', bytes: 49_152 },
+	// joshuafolkken/kit#5843 removed the duplicated backlogrun procedures, lowering the read by a block;
+	// joshuafolkken/kit#5920 moved the loop's section pointers into the driver hand-off, by another;
+	// joshuafolkken/kit#5946 moved the lane child's step 0 out of the chain section, by another
+	// (and lowered `prrun` and the lane child by one block each).
+	{ entry: 'backlogrun', bytes: 69_632 },
+	// joshuafolkken/kit#5953 charged pre-gate-cut.md at the two sections run:cut prints, not whole;
+	// joshuafolkken/kit#5958 dropped the seam's pointer to the cut, lowering it by a block.
+	{ entry: LANE_CHILD, bytes: 24_576 },
 ]
 
 function byte_size(root: string, relative_path: string): number {

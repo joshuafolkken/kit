@@ -2,6 +2,8 @@ import { lane_spent, type LaneUse } from '#scripts/lane/lane-spent'
 import { run_carry, type CarryRead, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
+import { run_stranded, type SupervisorLiveness } from '#scripts/run/run-stranded'
+import { run_wake } from '#scripts/run/wake/run-wake'
 import { backlog_drive_retrospective } from './backlog-drive-retrospective'
 import { backlogrun_launch } from './backlogrun-launch'
 
@@ -40,6 +42,11 @@ const UNREAD_LANE = 'whether a child is working could not be read in the lane fo
 const LANE_WAY_OUT = '(`pnpm josh lane:close <N>` discards a lane)'
 const RETROSPECTIVE_REASON = 'the run still owes its retrospective'
 const WORKING_REASON = 'the run is not watching: it is still starting or has a child at work'
+const HANDED_OFF_REASON =
+	'a session cut handed the run to a successor (`pnpm josh backlogrun --restart` continues it)'
+const SUPERVISED_REASON =
+	'its `run:wake` supervisor may still recover the run (`pnpm josh backlogrun --stop` ends both)'
+const SUPERVISOR_GONE: SupervisorLiveness = 'gone'
 
 // `same` is the board reopened, which is kept without a word; `keep` is a refusal, and says why.
 type ReplaceVerdict = { kind: 'replace' } | { kind: 'same' } | { kind: 'keep'; reason: string }
@@ -55,6 +62,8 @@ interface ReplacePorts {
 	pending_invocation: (git_directory: string) => string | undefined
 	// The lanes in use: a child working in one, or a probe that did not answer.
 	lanes: () => Promise<LaneUse>
+	// Whether the run's `run:wake` supervisor is alive to wake a successor.
+	supervisor: (git_directory: string) => SupervisorLiveness
 }
 
 const LIVE_PORTS: ReplacePorts = {
@@ -65,6 +74,8 @@ const LIVE_PORTS: ReplacePorts = {
 	pending_invocation: (git_directory) =>
 		backlogrun_launch.pending_launch(git_directory)?.invocation,
 	lanes: async () => await lane_spent.lanes_in_use(),
+	supervisor: (git_directory) =>
+		run_stranded.supervisor_liveness(run_wake.read_wake(run_wake.wake_path(git_directory))),
 }
 
 function keep(reason: string): ReplaceVerdict {
@@ -130,6 +141,14 @@ function is_free(use: LaneUse): boolean {
 	return use.working.length === 0 && use.unread.length === 0
 }
 
+async function lane_verdict(settled: ReplaceVerdict, ports: ReplacePorts): Promise<ReplaceVerdict> {
+	if (settled.kind !== 'replace') return settled
+
+	const use = await ports.lanes()
+
+	return is_free(use) ? REPLACE : keep(lane_reason(use))
+}
+
 async function claimed_verdict(
 	invocation: string,
 	git_directory: string,
@@ -139,11 +158,32 @@ async function claimed_verdict(
 	const settled =
 		record_verdict(invocation, read, ports) ?? watch_verdict(git_directory, read, ports)
 
-	if (settled.kind !== 'replace') return settled
+	return await lane_verdict(settled, ports)
+}
 
-	const use = await ports.lanes()
+// What the stranded record alone settles.
+function stranded_record_verdict(read: CarryRead, ports: ReplacePorts): ReplaceVerdict {
+	if (read.kind !== 'carried') return keep(UNREADABLE_REASON)
+	if (read.carry.is_handed_off === true) return keep(HANDED_OFF_REASON)
 
-	return is_free(use) ? REPLACE : keep(lane_reason(use))
+	return ports.is_retrospective_owed(read.carry) ? keep(RETROSPECTIVE_REASON) : REPLACE
+}
+
+// A record no process is running under, left by a launch that died (joshuafolkken/kit#5401). The typed
+// invocation replaces it whether or not it is the record's own — retyping it carries no budget, which
+// `--restart` is for — unless a supervisor not proven gone may still wake a successor for it
+// (`run-wake.ts` → `decide_not_handed_off`), a cut handed it to a successor, it owes its retrospective,
+// or a lane is in use. No watch is asked: a dead parent never drains. `undefined` is no record standing.
+async function stranded(
+	git_directory: string,
+	ports: ReplacePorts = LIVE_PORTS,
+): Promise<ReplaceVerdict | undefined> {
+	const read = ports.read_carry(git_directory)
+
+	if (read.kind === 'none') return undefined
+	if (ports.supervisor(git_directory) !== SUPERVISOR_GONE) return keep(SUPERVISED_REASON)
+
+	return await lane_verdict(stranded_record_verdict(read, ports), ports)
 }
 
 async function decide(
@@ -160,7 +200,7 @@ async function decide(
 	return await claimed_verdict(invocation, git_directory, read, ports)
 }
 
-const backlogrun_replace = { decide }
+const backlogrun_replace = { decide, stranded }
 
 export type { ReplacePorts, ReplaceVerdict }
 export { backlogrun_replace }

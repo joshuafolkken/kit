@@ -1,0 +1,1 @@
+- rf:project-conventions | low | .claude/skills/workflow-commands/chain-rule.md:9 | 2026-11-01 | #5764

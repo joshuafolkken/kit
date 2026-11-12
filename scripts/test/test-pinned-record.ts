@@ -5,6 +5,7 @@ import { stamp_file } from '#scripts/josh/stamp-file'
 import { test_pinned_cache_logic } from './test-pinned-cache-logic'
 import type { PinnedOrigin } from './test-pinned-ledger'
 import { test_pinned_logic, type PinnedReport, type ReportParts } from './test-pinned-logic'
+import { test_pinned_snapshot } from './test-pinned-snapshot'
 
 // The answer `josh test:pinned --record` leaves for `josh run:review --join` (joshuafolkken/kit#4770):
 // the printed report and its unpinned count, keyed to the checkout. `run:review` starts the check in
@@ -23,6 +24,8 @@ const FIRST_UNPINNED_FLAG = '--first-unpinned'
 const LIST_PREFIX = 'josh-test-pinned-list-'
 const LIST_SUFFIX = '.log'
 const LIST_HEADER = 'josh test:pinned — every unpinned and unchecked place'
+const UNCHECKED_NOTE =
+	'Unchecked places are not verified: map each listed place to its related regression test before ship; reuse the pending probe or cached verdicts, and fix unresolved places with the round-1 findings.\n'
 
 type UnpinnedHunk = PinnedReport['unpinned'][number]
 
@@ -31,6 +34,7 @@ type UnpinnedHunk = PinnedReport['unpinned'][number]
 // `text`, `counts` and `log` are the printed report's parts (`test_pinned_logic.report_text`).
 interface PinnedSummary extends ReportParts {
 	unpinned: ReadonlyArray<string>
+	is_unchecked?: boolean
 	// What a check still running reached so far; it is shown, never judged or remembered as the answer.
 	is_partial?: boolean
 	// A `--first-unpinned` check that stopped before some hunks (joshuafolkken/kit#5153): its unpinned
@@ -45,6 +49,12 @@ interface PinnedSummary extends ReportParts {
 // key (joshuafolkken/kit#4775): the file, the function, and a digest of the lines the change replaced
 // and the lines it put in their place.
 function site_of(hunk: UnpinnedHunk): string {
+	if (hunk.parts !== undefined) {
+		return stamp_file.digest(
+			JSON.stringify(hunk.parts.map((part) => site_of({ ...part, is_green: hunk.is_green }))),
+		)
+	}
+
 	const body = JSON.stringify([hunk.new_count, hunk.old_lines, hunk.new_lines ?? []])
 	const key = stamp_file.digest(body).slice(0, SITE_KEY_LENGTH)
 	const place = hunk.function_name === undefined ? hunk.file : `${hunk.file} ${hunk.function_name}`
@@ -65,6 +75,7 @@ function kept_log(report: PinnedReport, root: string): KeptLog | undefined {
 function summary_with(report: PinnedReport, log: KeptLog | undefined): PinnedSummary {
 	const summary = {
 		...test_pinned_logic.report_parts(report),
+		...(test_pinned_logic.has_unchecked(report) && { is_unchecked: true }),
 		log,
 		unpinned: test_pinned_cache_logic.distinct(report.unpinned.map((hunk) => site_of(hunk))),
 	}
@@ -83,14 +94,17 @@ function summary_of(report: PinnedReport, root: string = PROJECT_ROOT): PinnedSu
 function partial_summary(report: PinnedReport, note: string): PinnedSummary {
 	const summary = summary_with(report, undefined)
 
-	return { ...summary, text: `${note}\n${summary.text}`, is_partial: true }
+	const places = test_pinned_logic.format(report)
+	const next = summary.is_unchecked === true ? UNCHECKED_NOTE : ''
+
+	return { ...summary, text: `${note}\n${places}\n${next}`, is_partial: true }
 }
 
 // A check that could not run checked nothing, so it names no unpinned place and the run fails open.
 function not_run_summary(error: unknown): PinnedSummary {
 	const message = error instanceof Error ? error.message : String(error)
 
-	return { text: `${NOT_RUN_NOTE}${message}\n`, unpinned: [] }
+	return { text: `${NOT_RUN_NOTE}${message}\n`, unpinned: [], is_unchecked: true }
 }
 
 function record_path(token: string, root: string = PROJECT_ROOT): string {
@@ -129,11 +143,16 @@ function remaining_of(record: Record<string, unknown>): Pick<PinnedSummary, 'rem
 	return typeof remaining === 'number' ? { remaining } : {}
 }
 
+function snapshot_of(record: Record<string, unknown>): Pick<PinnedSummary, 'tree_hash'> {
+	return typeof record['tree_hash'] === 'string' ? { tree_hash: record['tree_hash'] } : {}
+}
+
 function to_summary(record: Record<string, unknown>): PinnedSummary | undefined {
 	const { text, unpinned, is_cut } = record
 
 	if (typeof text !== 'string' || !is_text_list(unpinned)) return undefined
-	const summary = { text, unpinned, ...tail_of(record) }
+	const unchecked = record['is_unchecked'] === true ? { is_unchecked: true } : {}
+	const summary = { text, unpinned, ...tail_of(record), ...unchecked, ...snapshot_of(record) }
 
 	return is_cut === true ? { ...summary, is_cut, ...remaining_of(record) } : summary
 }
@@ -150,13 +169,25 @@ function parsed(raw: string): Record<string, unknown> | undefined {
 	}
 }
 
-function read(token: string, root: string = PROJECT_ROOT): PinnedSummary | undefined {
+function read_summary(token: string, root: string): PinnedSummary | undefined {
 	const raw = stamp_file.read_stamp_text(record_path(token, root))
 	const record = raw === undefined ? undefined : parsed(raw)
 
 	if (record?.['token'] !== token) return undefined
 
 	return to_summary(record)
+}
+
+function fresh_summary(summary: PinnedSummary, root: string): PinnedSummary {
+	if (summary.tree_hash === undefined) return summary
+
+	return { ...summary, is_stale: test_pinned_snapshot.current_hash(root) !== summary.tree_hash }
+}
+
+function read(token: string, root: string = PROJECT_ROOT): PinnedSummary | undefined {
+	const summary = read_summary(token, root)
+
+	return summary === undefined ? undefined : fresh_summary(summary, root)
 }
 
 function clear(token: string, root: string = PROJECT_ROOT): void {
@@ -180,6 +211,7 @@ function launch_argv(
 }
 
 const test_pinned_record = {
+	UNCHECKED_NOTE,
 	clear,
 	launch_argv,
 	is_text_list,

@@ -1,6 +1,5 @@
 import { fileURLToPath } from 'node:url'
 import type { AgentProfile, AgentProvider } from '#scripts/agent/agent-role-profile'
-import { backlog_budget } from '#scripts/backlog/backlog-budget'
 import { lane_session_broker } from '#scripts/lane/lane-session-broker'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
@@ -18,6 +17,7 @@ import { run_wake_session, type LaunchResult } from './run-wake-session'
 import { run_wake_stop } from './run-wake-stop'
 import { run_wake_supervise } from './run-wake-supervise'
 import { run_wake_takeover, type TakeoverResult } from './run-wake-takeover'
+import { run_wake_window } from './run-wake-window'
 
 // `josh run:wake --start | --list | --stop | --loop` — the supervisor that continues a cut
 // `backlogrun` or `queue` without a person retyping the keyword. **Which invocations it may continue
@@ -37,7 +37,7 @@ const ONE_GROUP = 1
 // The interval is whole and positive (`cli_flags.to_positive`): a zero interval is a busy loop against
 // the temp directory, not a faster supervisor.
 // **Bounded above as well as below, and for the same reason.** `setTimeout` clamps any delay past
-// 2^31−1 ms to *one millisecond*, so a number large enough to look like "poll rarely" produces exactly
+// its maximum to the minimum delay, so a number large enough to look like "poll rarely" produces exactly
 // the busy loop the lower bound exists to prevent. An hour is far past any useful polling interval and
 // nowhere near the clamp.
 const MAX_INTERVAL_SECONDS = 3600
@@ -93,7 +93,7 @@ function usage(): number {
 const { note_to_stderr } = run_wake_ports
 
 function to_interval_ms(value: string | boolean | undefined): number | undefined {
-	if (typeof value !== 'string') return backlog_budget.OFFER_INTERVAL_MS
+	if (typeof value !== 'string') return run_wake_window.PASS_INTERVAL_MS
 	const seconds = cli_flags.to_positive(value)
 
 	return seconds === undefined || seconds > MAX_INTERVAL_SECONDS

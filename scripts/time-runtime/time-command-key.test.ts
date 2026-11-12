@@ -1,7 +1,6 @@
 import { time_span_fixture } from '#tools/time/time-span-fixture'
 import { describe, expect, it } from 'vitest'
 import { time_command_key } from './time-command-key'
-import { time_shell } from './time-shell'
 import { time_spans } from './time-spans'
 
 // What counts as *the same command* across a run's spans (joshuafolkken/kit#1311 for the rule,
@@ -15,8 +14,10 @@ const PNPM_LABEL = 'Bash: pnpm'
 const END_MINUTE = 1
 const ALIASED_GATE = 'pnpm josh ga'
 
+// Named through the tool-call reader the run's spans are built from, so the alias is expanded where
+// the aggregation reads it, not where this suite would (joshuafolkken/kit#6159).
 function key_of(command: string): string {
-	const josh_command = time_shell.josh_command_of(command)
+	const { josh_command } = time_spans.to_tool_call('Bash', { command }, time_spans.NO_MESSAGE_ID)
 
 	return time_command_key.command_key(
 		time_span_fixture.outcome_span(END_MINUTE, time_spans.OK_OUTCOME, PNPM_LABEL, josh_command),

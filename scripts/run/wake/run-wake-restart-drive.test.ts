@@ -1,16 +1,17 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { josh_command } from '#scripts/josh/josh-run'
 import { run_carry, type CarryOwner } from '#scripts/run/carry/run-carry'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { run_wake } from './run-wake'
 import type { WakeContext } from './run-wake-describe'
 import { run_wake_loop, type LoopPorts, type LoopStop } from './run-wake-loop'
 import { run_wake_ports } from './run-wake-ports'
 import { run_wake_restart } from './run-wake-restart'
+
+const make_directory = temporary_directory()
 
 // joshuafolkken/kit#3701: a driver that exited non-zero left the carry record adopted for the
 // supervisor's own process, so every restarted pass read that owner as a session at work and waited
@@ -65,7 +66,7 @@ async function supervise(): Promise<LoopStop> {
 }
 
 beforeEach(() => {
-	scratch.directory = mkdtempSync(path.join(tmpdir(), 'josh-wake-restart-drive-'))
+	scratch.directory = make_directory('josh-wake-restart-drive-')
 	// The stage a claim writes goes to the checkout's own stream, which is a live run's: never from a test.
 	vi.spyOn(run_event_setup, 'emit').mockResolvedValue()
 	vi.spyOn(josh_command, 'josh_run').mockResolvedValue(DRIVER_FAILURE)
@@ -73,7 +74,6 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.restoreAllMocks()
-	rmSync(scratch.directory, { recursive: true, force: true })
 })
 
 test('re-drives a failed driver on every restart and stops as failed at the bound', async () => {

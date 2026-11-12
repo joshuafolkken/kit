@@ -1,0 +1,3 @@
+- rf:tests | low | docs/why.md:264 | 2026-11-01 | #5644
+- rf:tests | low | scripts/document/why-command-counts.test.ts:19 | 2026-11-01 | #5644
+- rf:tests | low | docs/why.md:264 | 2026-11-01 | #5644

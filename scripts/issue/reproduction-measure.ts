@@ -1,3 +1,4 @@
+import { issue_body_keys } from './issue-body-keys'
 import { markdown_section } from './markdown-section'
 
 // A defect-claiming (behavior-change) Issue's reproduction section is written as `command + actual
@@ -6,7 +7,7 @@ import { markdown_section } from './markdown-section'
 // distilled `command -> value`, the reproduction is the raw command *and* the output block it printed
 // — a prose "I checked it" is refused for the same reason a prose baseline is, it cannot be re-run.
 
-const REPRODUCTION_HEADING = '## 再現'
+const REPRODUCTION_HEADING = issue_body_keys.heading('reproduction')
 // A backticked command span on a line that is not inside a fenced block. `- `grep …`` and a bare
 // `` `grep …` `` both match; prose with no backticked command does not.
 const COMMAND_SPAN = /`[^`]+`/u

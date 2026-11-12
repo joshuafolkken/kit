@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LedgerEntry } from './lane-ledger'
 import { lane_overrun } from './lane-overrun'
 
-// joshuafolkken/kit#4930: #4916's 70-minute overrun was refused its launch, and a refused launch was
+// joshuafolkken/kit#4930: #4916's overrun was refused its launch, and a refused launch was
 // final, so the lane went without an investigation.
 
 const mocks = vi.hoisted(() => ({
@@ -46,6 +46,7 @@ vi.mock('#scripts/cost-runtime/cost-transcript', () => ({
 	cost_transcript: {
 		home_directory: () => '/home',
 		lane_transcript_directories: mocks.transcripts,
+		list_sessions_across: () => [],
 		session_cwd: (cwd: string) => cwd,
 	},
 }))
@@ -93,7 +94,6 @@ function launched_lanes(): ReadonlyArray<string | undefined> {
 afterEach(() => vi.unstubAllEnvs())
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.stubEnv('JOSH_LANE_INVESTIGATION', 'on')
 	mocks.all_events.mockResolvedValue([])
 	mocks.read_entries.mockReturnValue(lane(70))

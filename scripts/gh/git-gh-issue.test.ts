@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { git_gh_issue } from './git-gh-issue'
 import { git_gh_issue_list } from './git-gh-issue-list'
 
@@ -36,10 +36,6 @@ const WRAPPERS: ReadonlyArray<[string, () => Promise<unknown>]> = [
 	],
 	['issue_list_recently_closed', async () => await git_gh_issue.issue_list_recently_closed(LIMIT)],
 ]
-
-beforeEach(() => {
-	vi.clearAllMocks()
-})
 
 // joshuafolkken/kit#4564: the epic auto-close's sweep reads `reopened` off the label listing.
 describe('issue_list_by_label', () => {

@@ -1,19 +1,15 @@
 import type { CommandEntry } from './josh-command-types'
 
-// The document-reading and -editing command registry, split out of `josh-commands-ai.ts` so that file
-// stays under its 300-code-line limit, exactly as `SPLIT_COMMANDS` was for the same reason.
-// It is spread into
-// `AI_COMMANDS` so the commands stay grouped under the 'AI tools' category. `read:files` and
+// The document-reading and -editing command registry. It is spread into `AI_COMMANDS` so the
+// commands stay grouped under the 'AI tools' category. `read:files` and
 // `edit:files` are the read/write halves of the round-trip fold.
 
-/* eslint-disable @typescript-eslint/naming-convention */
 const DOCUMENT_COMMANDS: Record<string, CommandEntry> = {
 	'doc:section': {
 		script: 'scripts/document/document-section-main.ts',
 		description: 'Print one section of a markdown document, for a `file.md` → "Heading" reference',
 		category: 'AI tools',
 		reference: ['<file> <heading>', 'automation', ['none']],
-		is_bundled: true,
 		usage: {
 			examples: [
 				{ arguments: '<file.md> "<heading>"' },
@@ -21,17 +17,35 @@ const DOCUMENT_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
+	'code:symbol': {
+		script: 'scripts/code/code-symbol-cli.ts',
+		description:
+			'Print one TypeScript declaration by name, numbered, or list where a name is declared',
+		category: 'AI tools',
+		reference: ['<file> <name> | <name>', 'automation', ['none']],
+		// Parses the repository's sources and prints, so a consultation session can run it.
+		is_read_only: true,
+		usage: {
+			examples: [
+				{ arguments: '<file> <name>', note: 'the declaration, its comment block included' },
+				{ arguments: '<name>', note: 'every file:line that declares it' },
+				{ arguments: 'scripts/code/code-symbol.ts declarations' },
+			],
+		},
+	},
 	'read:set': {
 		script: 'scripts/document/read-set-cli.ts',
 		description: 'Print what an entry point reads before it starts, and what that read costs',
 		category: 'AI tools',
-		reference: ['[<entry>] [--json]', 'automation', ['none']],
-		is_bundled: true,
+		reference: ['[<entry>] [--json | --bytes]', 'automation', ['none']],
+		// Reads the repository's documents and prints, so a consultation session can run it.
+		is_read_only: true,
 		usage: {
 			examples: [
 				{ arguments: '', note: 'every entry point' },
 				{ arguments: 'backlogrun', note: 'one of them' },
 				{ arguments: 'backlogrun --json' },
+				{ arguments: 'fullrun --bytes', note: 'its total read bytes alone, as the last line' },
 			],
 		},
 	},
@@ -41,7 +55,6 @@ const DOCUMENT_COMMANDS: Record<string, CommandEntry> = {
 			'Read a whole document safely: print it, or point at the Read tool when over the Bash cap',
 		category: 'AI tools',
 		reference: ['<file>', 'automation', ['none']],
-		is_bundled: true,
 		usage: {
 			examples: [
 				{ arguments: 'CLAUDE.md', note: 'under the cap: prints the document' },
@@ -83,6 +96,5 @@ const DOCUMENT_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 }
-/* eslint-enable @typescript-eslint/naming-convention */
 
 export { DOCUMENT_COMMANDS }

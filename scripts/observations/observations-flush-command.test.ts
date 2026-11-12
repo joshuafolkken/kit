@@ -153,7 +153,6 @@ async function rejected_flush(): Promise<string> {
 // The push -> PR -> merge path that had never run under a test before joshuafolkken/kit#1795.
 describe('observations_flush — the success path command sequence', () => {
 	beforeEach(() => {
-		vi.clearAllMocks()
 		on_default_branch()
 	})
 
@@ -199,7 +198,6 @@ describe('observations_flush — the success path command sequence', () => {
 // joshuafolkken/kit#5326: a lane child leaves the closed issues' comment rounds to this flush.
 describe('observations_flush — the comment-round carry', () => {
 	beforeEach(() => {
-		vi.clearAllMocks()
 		on_default_branch()
 	})
 
@@ -229,7 +227,6 @@ describe('observations_flush — the comment-round carry', () => {
 
 describe('observations_flush — a merged flush', () => {
 	beforeEach(() => {
-		vi.clearAllMocks()
 		on_default_branch()
 	})
 
@@ -268,15 +265,12 @@ describe('observations_flush — a merged flush', () => {
 	})
 })
 
-// joshuafolkken/kit#1785: a commit rejected by the pre-commit hook used to leave the flush branch
-// behind with no commit on it, and the refusal the next run printed named two exits — finish that
-// branch, or delete it — that the distributed `.claude/settings.json` denies outright. What is pinned
-// here is the rollback, which is the half the messages cannot pin: the side that created the branch
-// removes it, the checkout goes back, and the appended lines stay in the working tree.
+// A rejected flush commit must roll back its own branch and restore the checkout while preserving
+// appended ledger lines; a caller cannot repair it through the denied branch operations
+// (joshuafolkken/kit#1785).
 
 describe('observations_flush — a commit the pre-commit hook rejects', () => {
 	beforeEach(() => {
-		vi.clearAllMocks()
 		on_default_branch()
 	})
 
@@ -310,8 +304,7 @@ describe('observations_flush — a commit the pre-commit hook rejects', () => {
 		expect(message).not.toContain(ONLY_COPY)
 	})
 
-	// The acceptance criterion the refusal used to break: with the branch gone and the checkout back
-	// on the default branch, the very next flush is a fresh branch rather than a refusal.
+	// Restoring the default branch must let the next flush start fresh without a refusal.
 	it('leaves the same command runnable immediately afterwards', async () => {
 		await rejected_flush()
 		vi.mocked(git_command.commit).mockResolvedValue(undefined)
@@ -324,7 +317,6 @@ describe('observations_flush — a commit the pre-commit hook rejects', () => {
 
 describe('observations_flush — a rollback that cannot finish', () => {
 	beforeEach(() => {
-		vi.clearAllMocks()
 		on_default_branch()
 		vi.mocked(git_command.checkout).mockRejectedValue(new Error(CHECKOUT_FAILURE))
 	})
@@ -345,7 +337,6 @@ describe('observations_flush — a default branch behind origin', () => {
 	const LEDGER_CONFLICT = 'Your local changes to the following files would be overwritten by merge'
 
 	beforeEach(() => {
-		vi.clearAllMocks()
 		on_default_branch()
 		vi.mocked(git_command.commit_count_beyond).mockResolvedValue(COMMITS_BEHIND)
 	})
@@ -391,7 +382,6 @@ describe('observations_flush — a default branch behind origin', () => {
 
 describe('observations_flush — a flush branch that is still in the checkout', () => {
 	beforeEach(() => {
-		vi.clearAllMocks()
 		on_default_branch()
 		vi.mocked(git_command.branch).mockResolvedValue(FLUSH_BRANCH)
 	})

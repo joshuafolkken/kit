@@ -159,6 +159,20 @@ describe('run_review_pinned_join.wait_for_join with round-1 fixes to make', () =
 
 // joshuafolkken/kit#4936: the verdicts a running check already reached answer for the unmoved hunks.
 describe('run_review_pinned_join.wait_for_join with round-1 fixes to make and a check still running', () => {
+	it('shows unchecked-only cached places in the first fixing answer without another probe', async () => {
+		run_review_pinned_steps.launch(ROOT, REASON, FIXED_TREE)
+		vi.mocked(test_pinned.cached).mockResolvedValue({ ...EMPTY_REPORT, unchecked: [UNPINNED] })
+
+		const answer = await run_review_pinned_join.wait_for_join(ROOT, undefined, true)
+
+		expect(answer).toMatchObject({ is_partial: true, is_unchecked: true, unpinned: [] })
+		expect(answer?.text).toContain('unchecked driver.js:6')
+		expect(answer?.text).toContain('related regression test before ship')
+		expect(test_pinned.cached).toHaveBeenCalledOnce()
+		expect(run_review_steps.launch_josh).toHaveBeenCalledOnce()
+		expect(process.kill).not.toHaveBeenCalled()
+	})
+
 	it('shows the unpinned hunks the cache already holds while the check still runs', async () => {
 		run_review_pinned_steps.launch(ROOT, REASON, FIXED_TREE)
 		vi.mocked(test_pinned.cached).mockResolvedValue({ ...EMPTY_REPORT, unpinned: [UNPINNED] })

@@ -1,13 +1,17 @@
 import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { git_gh_api_path } from './git-gh-api-path'
-import { git_gh_exec } from './git-gh-exec'
+import { git_gh_blocked_by_graphql } from './git-gh-blocked-by-graphql'
+import { git_gh_etag_read } from './git-gh-etag-read'
+import { git_gh_issue_list_graphql } from './git-gh-issue-list-graphql'
 import { read_blocked_by } from './git-gh-issue-read'
 import {
+	BLOCKED_BY_COUNT_FIELD,
 	BLOCKED_BY_FIELD,
 	git_gh_issue_rest,
 	type BlockedBy,
 	type RestIssue,
 } from './git-gh-issue-rest'
+import { GH_SPAWN_CONCURRENCY } from './git-gh-spawn-width'
 
 // Listing issues through REST, in the JSON shape `gh issue list --json <fields>` answered with.
 //
@@ -15,6 +19,9 @@ import {
 // is served normally. The callers differ only in filter and fields, so
 // the request, the paging and the mapping are decided once here and every caller downstream keeps
 // reading the field names it already reads.
+//
+// Where the transport allows GraphQL, the open listing newest first is asked in one query first
+// (`read_graphql`, joshuafolkken/kit#6785); REST answers whatever that query cannot.
 //
 // `state` is a parameter because the duplicate scan needs the issue that closed an hour ago, and the
 // name describes that behavior rather than the open-only listing most callers ask for.
@@ -62,14 +69,18 @@ interface IssueListRequest {
 	sort?: ListingSort
 }
 
-function listing_query(request: IssueListRequest): string {
+// What a listing's path is built from: a caller reading a page on its own — the `auto-ok` probe,
+// joshuafolkken/kit#7226 — builds the same path the listing reads without a whole request.
+type ListingFilter = Pick<IssueListRequest, 'label' | 'repo' | 'sort' | 'state'>
+
+function listing_query(request: ListingFilter): string {
 	const state = request.state ?? DEFAULT_STATE
 	const sort = request.sort ?? DEFAULT_SORT
 
 	return `state=${state}&sort=${sort}&${LISTING_DIRECTION}`
 }
 
-function listing_path(request: IssueListRequest, page: number): string {
+function listing_path(request: ListingFilter, page: number): string {
 	const label = request.label === undefined ? '' : `&labels=${encodeURIComponent(request.label)}`
 	const paging = `&per_page=${String(PER_PAGE)}&page=${String(page)}`
 
@@ -108,18 +119,21 @@ function is_selected(rest: RestIssue, request: IssueListRequest): boolean {
 	return !git_gh_issue_rest.is_pull_request(rest) && matches_body(rest, request.body_term)
 }
 
-// One page, already filtered. `is_full` rides along because the page's *unfiltered* size is what
+// One page, already filtered, sent with the ETag of the previous process's read of the same page
+// (joshuafolkken/kit#6560). `is_full` rides along because the page's *unfiltered* size is what
 // says whether there is another page — a page emptied by the filter is still a full page.
+// `is_unchanged` is whether GitHub answered the page 304 (joshuafolkken/kit#7306).
 async function fetch_page(
 	request: IssueListRequest,
 	page: number,
-): Promise<{ selected: Array<RestIssue>; is_full: boolean }> {
-	const path = listing_path(request, page)
-	const rows = git_gh_issue_rest.parse_rest_issues(await git_gh_exec.exec_gh_api({ path }))
+): Promise<{ selected: Array<RestIssue>; is_full: boolean; is_unchanged: boolean }> {
+	const detail = await git_gh_etag_read.read_detail(listing_path(request, page))
+	const rows = git_gh_issue_rest.parse_rest_issues(detail.body)
 
 	return {
 		selected: rows.filter((row) => is_selected(row, request)),
 		is_full: rows.length >= PER_PAGE,
+		is_unchanged: detail.is_unchanged,
 	}
 }
 
@@ -157,9 +171,11 @@ function wants_more(has_more: boolean, selected_count: number, limit: number): b
 // and the empty page that would have proved the listing ended is the one the ceiling refuses to
 // fetch. Left as it is: erring toward "I may not have seen everything" is the safe direction here,
 // and the alternative spends a request on every capped run to rule out one boundary.
+// `is_unchanged` is whether every page read answered 304.
 interface SelectedRows {
 	rows: Array<RestIssue>
 	is_capped: boolean
+	is_unchanged: boolean
 }
 
 // Paged with `page` rather than `gh api --paginate`, which reads the whole backlog whatever the
@@ -171,44 +187,48 @@ interface SelectedRows {
 // than `limit` matches; the page ceiling is what terminates any listing that has not reached either.
 async function fetch_selected(request: IssueListRequest): Promise<SelectedRows> {
 	const selected: Array<RestIssue> = []
-	let page = FIRST_PAGE
+	// One entry per page read, in order — its length is the pages read so far.
+	const unchanged: Array<boolean> = []
 	let has_more = true
 
-	while (page <= MAX_PAGES && wants_more(has_more, selected.length, request.limit)) {
+	while (unchanged.length < MAX_PAGES && wants_more(has_more, selected.length, request.limit)) {
 		// eslint-disable-next-line no-await-in-loop -- paging stops as soon as enough rows are selected
-		const result = await fetch_page(request, page)
+		const result = await fetch_page(request, FIRST_PAGE + unchanged.length)
 
 		selected.push(...result.selected)
 		has_more = result.is_full
-		page += 1
+		unchanged.push(result.is_unchanged)
 	}
 
 	return {
 		rows: selected.slice(0, request.limit),
 		is_capped: wants_more(has_more, selected.length, request.limit),
+		is_unchanged: unchanged.length > 0 && unchanged.every(Boolean),
 	}
 }
 
-// `blockedBy` is not in a listing response — GraphQL selected it as a connection, REST serves it from
-// each issue's own dependencies endpoint. `read_blocked_by` is the single-issue read's, unchanged:
-// it consults the row's `issue_dependencies_summary` first, and every listing row carries one, so an
-// issue GitHub itself reports as unblocked costs no request. A backlog with no declared blockers
-// therefore costs exactly what `gh` cost — one listing — rather than one request per row.
+// `blockedBy` is not in a listing response. The rows declaring blockers are read in one GraphQL query
+// per hundred (`git-gh-blocked-by-graphql.ts`), so the scan's request count does not grow with them.
+// A row that query did not answer goes to `read_blocked_by`, the single-issue read's, unchanged: it
+// consults the row's `issue_dependencies_summary` first, so an issue GitHub itself reports as
+// unblocked costs no request.
 //
-// Bounded rather than sequential: the pass was paced one request at a time,
-// which made every `backlog:plan` wait about 0.7 s per opted-in issue declaring a blocker. The width
-// is the one `epic:bundle` already reads the same endpoint at, so the burst stays bounded while a
-// rate-limited read still fails the whole listing rather than a row (`bounded-pool.ts`).
-const RELATION_CONCURRENCY = 8
-
+// The REST reads are bounded rather than sequential: the pass was paced one request at a time,
+// which made every `backlog:plan` wait about 0.7 s per opted-in issue declaring a blocker. The `gh`
+// layer's shared spawn limit already bounds the burst; the pool stays because `read_blocked_by`
+// throws, and a rate-limited read fails the whole listing — `bounded_map` then starts no further
+// read (`bounded-pool.ts`), where a `Promise.all` would have queued every row's read into the same
+// rate limit for an answer nobody reads. Its width is the layer's, so the pool adds no bound of its own.
 async function read_relations(
 	rows: ReadonlyArray<RestIssue>,
 	repo?: string,
 ): Promise<Array<BlockedBy>> {
+	const answered = await git_gh_blocked_by_graphql.read_answered(rows)
+
 	return await bounded_pool.bounded_map(
 		rows,
-		RELATION_CONCURRENCY,
-		async (row) => await read_blocked_by(String(row.number), row, repo),
+		GH_SPAWN_CONCURRENCY,
+		async (row) => answered.get(row) ?? (await read_blocked_by(String(row.number), row, repo)),
 	)
 }
 
@@ -219,24 +239,95 @@ async function read_relations(
 // `is_capped` is `false` on that failure path, and says nothing there: an unreadable listing is
 // already fully described by `json`, and a caller reading a truncation flag off it would be reading
 // a field about pages that were never fetched.
+//
+// `is_unchanged` is `true` only where every REST page answered 304 (joshuafolkken/kit#7306), so
+// `backlog:next` can record whether its listing was the previous scan's. A GraphQL read carries no
+// ETag and answers `false`; it is absent on the failure path.
 interface IssueListOutcome {
 	json: string | undefined
 	is_capped: boolean
+	is_unchanged?: boolean
+}
+
+interface MappedListing {
+	rows: Array<Record<string, unknown>>
+	is_capped: boolean
+	is_unchanged: boolean
+}
+
+// The fields a GraphQL listing row carries (`git_gh_issue_graphql.to_rest_issue`). A request naming
+// any other — `stateReason`, `updatedAt`, `state` — stays on REST, which answers every field.
+const GRAPHQL_FIELDS = new Set([
+	'number',
+	'title',
+	'body',
+	'labels',
+	'createdAt',
+	'url',
+	'author_association',
+	'user',
+	BLOCKED_BY_FIELD,
+	BLOCKED_BY_COUNT_FIELD,
+])
+
+function is_open_newest_first(request: IssueListRequest): boolean {
+	return (
+		(request.state ?? DEFAULT_STATE) === DEFAULT_STATE &&
+		(request.sort ?? DEFAULT_SORT) === DEFAULT_SORT
+	)
+}
+
+// One GraphQL page answers only the open listing newest first. A limit past one page still asks it:
+// a pool that fits the page answers whole, and one that does not reads REST (`read_graphql`).
+function is_graphql_listing(request: IssueListRequest, fields: ReadonlyArray<string>): boolean {
+	return is_open_newest_first(request) && fields.every((field) => GRAPHQL_FIELDS.has(field))
+}
+
+// The listing in one GraphQL query (joshuafolkken/kit#6785), so a `backlog:next` cold scan spends
+// no REST core request. `undefined` — a REST session, a failed query, or a page that does not answer
+// the caller — hands the listing to REST, whose answer this one matches row for row.
+async function read_graphql(
+	request: IssueListRequest,
+	fields: ReadonlyArray<string>,
+): Promise<MappedListing | undefined> {
+	if (!is_graphql_listing(request, fields)) return undefined
+
+	const page = await git_gh_issue_list_graphql.read_open_page(request.label, request.repo)
+	if (page === undefined) return undefined
+
+	const selected = page.issues.filter((issue) => is_selected(issue.rest, request))
+	if (wants_more(page.has_next_page, selected.length, request.limit)) return undefined
+
+	const rows = selected
+		.slice(0, request.limit)
+		.map((issue) => git_gh_issue_rest.to_gh_issue(issue.rest, fields, issue.blocked_by))
+
+	return { rows, is_capped: false, is_unchanged: false }
+}
+
+async function read_rest(
+	request: IssueListRequest,
+	fields: ReadonlyArray<string>,
+): Promise<MappedListing> {
+	const { rows, is_capped, is_unchanged } = await fetch_selected(request)
+	const relations = fields.includes(BLOCKED_BY_FIELD)
+		? await read_relations(rows, request.repo)
+		: undefined
+	const mapped = rows.map((row, index) =>
+		git_gh_issue_rest.to_gh_issue(row, fields, relations?.[index]),
+	)
+
+	return { rows: mapped, is_capped, is_unchanged }
 }
 
 // One invocation shape for every issue listing.
 async function issue_list(request: IssueListRequest): Promise<IssueListOutcome> {
 	try {
-		const { rows, is_capped } = await fetch_selected(request)
 		const fields = git_gh_issue_rest.split_fields(request.json_fields)
-		const relations = fields.includes(BLOCKED_BY_FIELD)
-			? await read_relations(rows, request.repo)
-			: undefined
-		const mapped = rows.map((row, index) =>
-			git_gh_issue_rest.to_gh_issue(row, fields, relations?.[index]),
-		)
+		const { rows, is_capped, is_unchanged } =
+			(await read_graphql(request, fields)) ?? (await read_rest(request, fields))
 
-		return { json: JSON.stringify(mapped), is_capped }
+		return { json: JSON.stringify(rows), is_capped, is_unchanged }
 	} catch {
 		return { json: undefined, is_capped: false }
 	}
@@ -250,7 +341,8 @@ async function issue_list(request: IssueListRequest): Promise<IssueListOutcome> 
 // it — `git-gh-issue.ts` records that decision, caller by caller.
 const git_gh_issue_list = {
 	issue_list,
+	listing_path,
 }
 
 export type { IssueListOutcome, IssueListRequest }
-export { git_gh_issue_list, MAX_PAGES, MAX_SCANNED, PER_PAGE }
+export { FIRST_PAGE, git_gh_issue_list, MAX_PAGES, MAX_SCANNED, PER_PAGE }

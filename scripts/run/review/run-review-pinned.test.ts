@@ -22,8 +22,20 @@ const { BRIEF_PATH, pinned_run, launch_gate, brief_run, launch_pinned, clear_pin
 		mark_due: vi.fn(),
 	}))
 
+vi.mock('#scripts/gate/metrics-totals', () => ({
+	metrics_totals: { totals_refusal: async () => undefined },
+}))
+vi.mock('./run-review-unplanned', () => ({
+	run_review_unplanned: { refusal: async () => undefined },
+}))
 vi.mock('#scripts/test/test-pinned', () => ({ test_pinned: { run: pinned_run } }))
-vi.mock('#scripts/josh/stamp-file', () => ({ stamp_file: { write_text_stamp: vi.fn() } }))
+vi.mock('#scripts/josh/stamp-file', () => ({
+	stamp_file: {
+		remove_stamp: vi.fn(),
+		stamp_path: (prefix: string) => `/stamps/${prefix}`,
+		write_text_stamp: vi.fn(),
+	},
+}))
 vi.mock('#scripts/lane/lane-session-broker', () => ({
 	lane_session_broker: { review_paths: () => ({ brief: BRIEF_PATH }) },
 }))
@@ -38,7 +50,12 @@ vi.mock('#scripts/review/review-brief-cli', () => ({
 vi.mock('#scripts/review/review-interaction', async (import_original) => {
 	const { review_interaction } = await import_original<Record<'review_interaction', object>>()
 
-	return { review_interaction: { ...review_interaction, status: async () => 'not-required' } }
+	return {
+		review_interaction: {
+			...review_interaction,
+			reading: async () => ({ status: 'not-required' }),
+		},
+	}
 })
 vi.mock('./run-review-steps', () => ({
 	run_review_steps: {
@@ -47,6 +64,7 @@ vi.mock('./run-review-steps', () => ({
 			await Promise.resolve()
 		}),
 		write_timing_start: vi.fn(),
+		wait_for_gate_finish: async () => 'green',
 	},
 }))
 

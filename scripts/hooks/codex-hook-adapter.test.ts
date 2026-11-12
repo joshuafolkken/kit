@@ -1,32 +1,39 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { hook_decision, type GuardOutcome } from '#scripts/josh/hook-decision'
+import { json_value } from '#scripts/lib/json-value'
 import { issue_comments } from '#scripts/rules/issue-comments'
 import { time_batch_guard, type GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { time_bundle_call } from '#scripts/time-runtime/time-bundle-call'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { codex_hook_adapter } from './codex-hook-adapter'
 import { format_edited_file, parse_edited_path, type CommandRunner } from './format-edited-file'
+import { hook_context } from './hook-context'
 import { pretool_guard } from './pretool-guard'
 
-const TEST_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'codex-hook-adapter-'))
+const make_directory = temporary_directory('suite')
+const TEST_DIRECTORY = make_directory('codex-hook-adapter-')
 const TYPESCRIPT_FILE = path.join(TEST_DIRECTORY, 'app.ts')
 const MARKDOWN_FILE = path.join(TEST_DIRECTORY, 'notes.md')
 const THIRD_FILE = path.join(TEST_DIRECTORY, 'third.json')
 const ALLOW: GuardOutcome = { reason: undefined, notice: undefined, fault: undefined }
+const UNKNOWN_INPUT = 'Cannot verify'
+const HANDOFF = 'lane:dispatch'
+const SOURCE_WRITE = 'echo changed > scripts/example.ts'
+const NO_TRANSCRIPT = json_value.parse_or_undefined('null')
+const MIXED_PATHS = ['notes.md', 'scripts/example.ts']
+const PATCH_TOOLS = ['apply_patch', 'functions.apply_patch']
 const { open_turn_lines, target_turn_lines } = time_transcript_fixture
 
 writeFileSync(TYPESCRIPT_FILE, 'export const value = 1\n')
 writeFileSync(MARKDOWN_FILE, '# Notes\n')
 
-afterAll(() => {
-	rmSync(TEST_DIRECTORY, { recursive: true, force: true })
-})
-
 afterEach(() => {
 	vi.restoreAllMocks()
+	vi.unstubAllEnvs()
 })
 
 function patch_command(paths: ReadonlyArray<string>): string {
@@ -35,18 +42,107 @@ function patch_command(paths: ReadonlyArray<string>): string {
 	return `*** Begin Patch\n${changes}\n*** End Patch`
 }
 
-function codex_payload(paths: ReadonlyArray<string>): string {
+function codex_payload(paths: ReadonlyArray<string>, tool_name = 'apply_patch'): string {
 	return JSON.stringify({
 		session_id: 'session-1',
 		transcript_path: path.join(TEST_DIRECTORY, 'transcript.jsonl'),
 		cwd: TEST_DIRECTORY,
 		hook_event_name: 'PreToolUse',
 		turn_id: 'turn-1',
-		tool_name: 'apply_patch',
+		tool_name,
 		tool_use_id: 'call-1',
 		tool_input: { command: patch_command(paths) },
 	})
 }
+
+describe('Codex implementation scope', () => {
+	it.each(PATCH_TOOLS)('refuses a source patch from %s', (tool_name) => {
+		vi.stubEnv(agent_session_role.KEY, 'scheduler')
+		const raw_payload = JSON.stringify({
+			tool_name,
+			tool_input: patch_command(MIXED_PATHS),
+			transcript_path: path.join(TEST_DIRECTORY, 'scope.jsonl'),
+		})
+
+		const { reason } = codex_hook_adapter.pretool_outcome(raw_payload)
+
+		expect(reason).toContain(HANDOFF)
+		expect(reason).not.toContain(UNKNOWN_INPUT)
+	})
+
+	it.each(['exec_command', 'functions.exec_command'])(
+		'refuses a shell write from %s',
+		(tool_name) => {
+			vi.stubEnv(agent_session_role.KEY, undefined)
+			const raw_payload = JSON.stringify({
+				tool_name,
+				tool_input: { cmd: SOURCE_WRITE },
+				transcript_path: path.join(TEST_DIRECTORY, 'shell-scope.jsonl'),
+			})
+
+			expect(codex_hook_adapter.pretool_outcome(raw_payload).reason).toContain(UNKNOWN_INPUT)
+		},
+	)
+})
+
+describe('Codex unverified input scope', () => {
+	it.each(PATCH_TOOLS)(
+		'refuses an unrecognized %s input instead of silently passing it through',
+		(tool_name) => {
+			vi.stubEnv(agent_session_role.KEY, 'reviewer')
+
+			expect(codex_hook_adapter.pretool_outcome(codex_payload([], tool_name)).reason).toContain(
+				UNKNOWN_INPUT,
+			)
+		},
+	)
+})
+
+describe('Codex reviewer without transcript history', () => {
+	it.each([NO_TRANSCRIPT, '', undefined])(
+		'allows reads with transcript path %s (ac-5495bec9)',
+		(transcript_path) => {
+			vi.stubEnv(agent_session_role.KEY, 'reviewer')
+			const raw_payload = JSON.stringify({
+				session_id: 'session-1',
+				cwd: process.cwd(),
+				hook_event_name: 'PreToolUse',
+				tool_use_id: 'call-1',
+				tool_name: 'Bash',
+				tool_input: { command: 'cat CLAUDE.md' },
+				transcript_path,
+			})
+
+			expect(codex_hook_adapter.pretool_outcome(raw_payload).reason).toBeUndefined()
+			expect(hook_decision.parse_hook_payload(raw_payload)).toBeUndefined()
+		},
+	)
+
+	it.each([
+		['Bash', { command: SOURCE_WRITE }],
+		['exec_command', { cmd: SOURCE_WRITE }],
+		['apply_patch', patch_command(MIXED_PATHS)],
+		['apply_patch', 'unrecognized patch'],
+	])('refuses writes through %s without history (ac-297ecc9c)', (tool_name, tool_input) => {
+		vi.stubEnv(agent_session_role.KEY, 'reviewer')
+		const raw_payload = JSON.stringify({ tool_name, tool_input, transcript_path: NO_TRANSCRIPT })
+
+		expect(codex_hook_adapter.pretool_outcome(raw_payload).reason).toContain(HANDOFF)
+	})
+})
+
+describe('Codex orchestration scope', () => {
+	it('refuses namespaced opaque orchestration through the canonical guard', () => {
+		vi.stubEnv(agent_session_role.KEY, 'scheduler')
+		const raw_payload = JSON.stringify({
+			tool_name: 'functions.exec',
+			tool_input: { code: 'opaque orchestration' },
+			transcript_path: path.join(TEST_DIRECTORY, 'exec-scope.jsonl'),
+		})
+
+		expect(codex_hook_adapter.pretool_outcome(raw_payload).reason).toContain(UNKNOWN_INPUT)
+	})
+})
 
 function adapted_call(paths: ReadonlyArray<string>): GuardedCall {
 	const payload = hook_decision.parse_hook_payload(
@@ -106,7 +202,32 @@ describe('Codex pre-tool adaptation', () => {
 		await codex_hook_adapter.write_pretool_outcome(codex_payload([TYPESCRIPT_FILE]))
 
 		expect(emit).toHaveBeenCalledWith(outcome)
-		expect(mark).toHaveBeenCalledWith(outcome)
+		const judged = codex_hook_adapter.pretool_payload(codex_payload([TYPESCRIPT_FILE]))
+
+		expect(mark).toHaveBeenCalledWith(outcome, judged, hook_context.from_process())
+	})
+})
+
+// joshuafolkken/kit#6587: a Codex refusal reaches the hook ledger like a Claude one.
+describe('Codex pre-tool hook ledger', () => {
+	// joshuafolkken/kit#6976: the ledger and the direct gh count read the call's own context.
+	it('hands the ledger the outcome and context, judged as the adapted Edit call', async () => {
+		const outcome: GuardOutcome = { ...ALLOW, reason: '⛔ batching: reissue' }
+
+		vi.spyOn(pretool_guard, 'pretool_outcome').mockReturnValue(outcome)
+		vi.spyOn(hook_decision, 'load_environment_file').mockReturnValue(undefined)
+		vi.spyOn(hook_decision, 'emit_outcome').mockReturnValue(undefined)
+		vi.spyOn(pretool_guard, 'mark_phase').mockResolvedValue(undefined)
+		const record = vi.spyOn(pretool_guard, 'record_refusal').mockResolvedValue(undefined)
+		const raw_payload = codex_payload([TYPESCRIPT_FILE])
+
+		await codex_hook_adapter.write_pretool_outcome(raw_payload)
+
+		expect(record).toHaveBeenCalledWith(
+			codex_hook_adapter.pretool_payload(raw_payload),
+			outcome,
+			hook_context.from_process(),
+		)
 	})
 })
 

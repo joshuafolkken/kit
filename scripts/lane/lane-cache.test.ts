@@ -1,5 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { hook_launch } from '#scripts/init/hook-launch'
 import {
@@ -8,14 +7,17 @@ import {
 	GATE_CACHE_FILES,
 	TS_BUILD_INFO_FILE,
 } from '#scripts/josh/josh-command-types'
-import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { lane_cache } from './lane-cache'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#1849: a fresh lane copies the gate's content-addressed caches from the main
 // checkout so its first `josh gate` is warm. A tool runs against its per-lane file, then atomically
 // publishes the whole cache to main; overlapping publications intentionally use last-writer-wins.
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'lane-cache-test-'))
+const scratch = make_directory('lane-cache-test-')
 const SOURCE = path.join(scratch, 'main')
 const DESTINATION = path.join(scratch, 'lane')
 const SECOND_DESTINATION = path.join(scratch, 'second-lane')
@@ -41,10 +43,6 @@ function source_cache(cache_file: string, content: string): void {
 function is_in_destination(cache_file: string): boolean {
 	return existsSync(path.join(DESTINATION, cache_file))
 }
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
 
 beforeEach(() => {
 	rmSync(SOURCE, { force: true, recursive: true })

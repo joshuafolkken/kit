@@ -3,7 +3,8 @@ import { fileURLToPath } from 'node:url'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { baseline_measure, type Baseline } from './baseline-measure'
-import { trusted_measure } from './trusted-measure'
+import { issue_body_keys } from './issue-body-keys'
+import { trusted_measure, type TrustedBody } from './trusted-measure'
 
 // `josh measure:rerun <N>` — read a behavior-change Issue body after merge, re-run each baseline
 // command, and print the before/after pair. A value that did not move means
@@ -16,7 +17,7 @@ import { trusted_measure } from './trusted-measure'
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
 const USAGE = 'Usage: josh measure:rerun <issue-number>'
-const NO_BASELINE = 'no `command → value` baseline found in ## ベースライン — nothing to re-run'
+const NO_BASELINE = `no \`command → value\` baseline found in ${issue_body_keys.heading('baseline')} — nothing to re-run`
 const DATE_END = 10
 
 interface Outcome {
@@ -26,8 +27,8 @@ interface Outcome {
 
 // A failing or timed-out command yields its message so the pair still prints and the remaining
 // baselines still run, rather than aborting the whole re-measurement.
-function rerun_one(baseline: Baseline, date: string): Outcome {
-	const after = trusted_measure.text_of(trusted_measure.run_command(baseline.command))
+function rerun_one(baseline: Baseline, date: string, source: TrustedBody): Outcome {
+	const after = trusted_measure.text_of(trusted_measure.run_command(baseline.command, source))
 	const is_unchanged = baseline_measure.is_no_change(baseline.value, after)
 
 	return {
@@ -51,8 +52,8 @@ function today(now: Date): string {
 	return now.toISOString().slice(0, DATE_END)
 }
 
-async function rerun(body: string, now: Date): Promise<number> {
-	const baselines = baseline_measure.parse_baselines(body)
+async function rerun(source: TrustedBody, now: Date): Promise<number> {
+	const baselines = baseline_measure.parse_baselines(source.body)
 
 	if (baselines.length === 0) {
 		console.error(NO_BASELINE)
@@ -60,7 +61,7 @@ async function rerun(body: string, now: Date): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	const outcomes = baselines.map((baseline) => rerun_one(baseline, today(now)))
+	const outcomes = baselines.map((baseline) => rerun_one(baseline, today(now), source))
 	const ledger_lines = outcomes
 		.map((outcome) => outcome.ledger_line)
 		.filter((line): line is string => line !== undefined)
@@ -86,7 +87,7 @@ async function run(issue_number: string | undefined, now: Date): Promise<number>
 		return FAILURE_EXIT_CODE
 	}
 
-	return await rerun(read.body, now)
+	return await rerun(read, now)
 }
 
 async function main(argv: ReadonlyArray<string>): Promise<void> {

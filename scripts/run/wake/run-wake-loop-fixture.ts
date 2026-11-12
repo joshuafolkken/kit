@@ -10,6 +10,7 @@ const LAUNCHED: LaunchResult = { kind: 'launched', pid: 4242 }
 const HANDOFF_MATERIAL = 'merge over #2500'
 const HAND_OFF_CALL = 'hand_off'
 const WAKE_CALL = 'wake'
+const BESIDE_CALL = 'wake_beside'
 
 function carry(overrides: Partial<RunCarry> = {}): RunCarry {
 	return {
@@ -37,6 +38,9 @@ interface Calls {
 	// Every hand-off and launch in call order, so a test can pin that the hand-off lands first
 	// (joshuafolkken/kit#2437).
 	order: Array<string>
+	// The session ids the record was handed to, so a test can pin it goes to the session then woken
+	// (joshuafolkken/kit#5743).
+	handed: Array<string>
 }
 
 interface Recorder extends Calls {
@@ -58,6 +62,18 @@ function wake_port(calls: Calls, launch: LaunchResult): LoopPorts['wake'] {
 	}
 }
 
+// A triage session woken beside the driver: recorded in `order` and `materials`, never in `wakes`,
+// which lists only the sessions a hand-off woke (joshuafolkken/kit#7120).
+function beside_port(calls: Calls, launch: LaunchResult): LoopPorts['wake_beside'] {
+	return function wake_beside(_invocation: string, session_id: string, material: string) {
+		calls.order.push(BESIDE_CALL)
+		calls.materials.push(material)
+		calls.session_ids.push(session_id)
+
+		return launch
+	}
+}
+
 function ports_of(remaining: Array<CarryRead>, calls: Calls, launch: LaunchResult): LoopPorts {
 	return {
 		read_carry: () => remaining.shift() ?? ENDED,
@@ -70,11 +86,13 @@ function ports_of(remaining: Array<CarryRead>, calls: Calls, launch: LaunchResul
 		// the record-only decision; the idle tests override this port.
 		has_work: async () => true,
 		new_session_id: () => `sid-${String(calls.session_ids.length + 1)}`,
-		hand_off: () => {
+		hand_off: (session_id) => {
 			calls.order.push(HAND_OFF_CALL)
+			calls.handed.push(session_id)
 		},
 		drive: async () => ({ kind: 'judgment', material: HANDOFF_MATERIAL }),
 		wake: wake_port(calls, launch),
+		wake_beside: beside_port(calls, launch),
 		sleep: settled,
 		now: () => NOW,
 		retry_closes: settled,
@@ -85,12 +103,13 @@ function ports_of(remaining: Array<CarryRead>, calls: Calls, launch: LaunchResul
 // A scripted sequence of carry reads, one per pass, so a whole run of the supervisor is expressed as
 // what the record said over time. Running past the end reads as the run having ended.
 function recorder(reads: ReadonlyArray<CarryRead>, launch: LaunchResult = LAUNCHED): Recorder {
-	const calls: Calls = { wakes: [], materials: [], session_ids: [], order: [] }
+	const calls: Calls = { wakes: [], materials: [], session_ids: [], order: [], handed: [] }
 
 	return { ...calls, ports: ports_of([...reads], calls, launch) }
 }
 
 const run_wake_loop_fixture = {
+	BESIDE_CALL,
 	ENDED,
 	HAND_OFF_CALL,
 	HANDED_OFF,

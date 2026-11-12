@@ -1,3 +1,4 @@
+import { poll } from '#scripts/lib/poll'
 import { git_gh_command } from './git-gh-command'
 import { git_pr_checks, type PrStateSnapshot } from './git-pr-checks'
 
@@ -24,6 +25,7 @@ interface CheckedMerge {
 	wait_for_green: WaitForGreen
 	// The snapshot the gate already passed. Absent, the merge waits for one first.
 	checked?: PrStateSnapshot | undefined
+	before_merge?: ((head?: string) => Promise<void>) | undefined
 }
 
 function checked_head(snapshot: PrStateSnapshot): string {
@@ -33,11 +35,13 @@ function checked_head(snapshot: PrStateSnapshot): string {
 }
 
 // `false` is "the head moved"; every other failure is the caller's to see.
-async function try_merge(branch_name: string, snapshot: PrStateSnapshot): Promise<boolean> {
+async function try_merge(input: CheckedMerge, snapshot: PrStateSnapshot): Promise<boolean> {
 	const head_sha = checked_head(snapshot)
 
+	await input.before_merge?.(head_sha)
+
 	try {
-		await git_gh_command.pr_merge(branch_name, head_sha)
+		await git_gh_command.pr_merge(input.branch_name, head_sha)
 
 		return true
 	} catch (error) {
@@ -48,16 +52,26 @@ async function try_merge(branch_name: string, snapshot: PrStateSnapshot): Promis
 }
 
 async function merge_checked(input: CheckedMerge): Promise<void> {
-	let snapshot = input.checked ?? (await input.wait_for_green())
+	const progress = { snapshot: input.checked ?? (await input.wait_for_green()) }
 
-	for (let move = 0; move < MAX_HEAD_MOVES; move += 1) {
-		// eslint-disable-next-line no-await-in-loop -- each merge names the head the wait before it passed
-		if (await try_merge(input.branch_name, snapshot)) return
+	const is_merged = await poll.poll_until(
+		async () => {
+			if (await try_merge(input, progress.snapshot)) return true
 
-		console.info(HEAD_MOVED_NOTE)
-		// eslint-disable-next-line no-await-in-loop -- the new head has to pass before it is merged
-		snapshot = await input.wait_for_green()
-	}
+			console.info(HEAD_MOVED_NOTE)
+			Object.assign(progress, { snapshot: await input.wait_for_green() })
+
+			return false
+		},
+		{
+			attempts: MAX_HEAD_MOVES,
+			interval_ms: 0,
+			sleeper: async () => {
+				await Promise.resolve()
+			},
+		},
+	)
+	if (is_merged) return
 
 	throw new Error(HEAD_KEPT_MOVING_MESSAGE)
 }

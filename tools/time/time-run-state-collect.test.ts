@@ -1,11 +1,12 @@
-import { mkdtempSync } from 'node:fs'
-import os from 'node:os'
 import path from 'node:path'
 import { cost_transcript, type SessionFile } from '#scripts/cost-runtime/cost-transcript'
 import type { RunWake } from '#scripts/run/wake/run-wake'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it } from 'vitest'
 import { time_run_state_collect } from './time-run-state-collect'
 import { time_transcript_fixture } from './time-transcript-fixture'
+
+const make_directory = temporary_directory()
 
 const { span, issue_lines, project_directory, write_session } = time_transcript_fixture
 const AT_ISO = '2026-09-13T10:18:00.000Z'
@@ -89,7 +90,7 @@ describe('time_run_state_collect.collect_whiffs', () => {
 	// The positive half of the boundary: two read-only transcripts on disk, both genuine whiffs, and
 	// only the one whose id the supervisor forced is priced. An always-empty or inverted filter fails.
 	it('prices the whiff of a session the supervisor started, and only that one', () => {
-		const home = mkdtempSync(path.join(os.tmpdir(), 'collect-whiffs-'))
+		const home = make_directory('collect-whiffs-')
 		const spawned = on_disk(home, SPAWNED_ID, AT_MS)
 		const unrelated = on_disk(home, UNRELATED_ID, UNRELATED_MS)
 

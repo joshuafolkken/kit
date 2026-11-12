@@ -1,13 +1,15 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync } from 'node:fs'
 import path from 'node:path'
 import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_carry } from './run-carry'
 import { run_carry_cli } from './run-carry-cli'
 import { run_carry_cli_fixture } from './run-carry-cli-fixture'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#3696: `--begin` starts the run's clock where `josh backlogrun` launched its owner,
 // so the board's `⏰` does not restart at the claim, and says the run is planning. A run with no launch
@@ -20,7 +22,7 @@ vi.mock('./run-carry-stash', () => ({ run_carry_stash: { report_orphans: vi.fn()
 
 const { git_command } = await import('#scripts/git/git-command')
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-carry-cli-launch-test-'))
+const scratch = make_directory('run-carry-cli-launch-test-')
 const WORKTREE = path.join(scratch, 'worktree.git')
 const REPOSITORY = path.join(scratch, 'repository.git')
 const INVOCATION = 'backlogrun --max 5'
@@ -67,10 +69,6 @@ afterEach(() => {
 	clear()
 })
 
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
-
 describe('run:carry --begin under a launch', () => {
 	it('starts the run when its owner was launched, asking for this repository and owner', async () => {
 		const started_for = vi.spyOn(backlogrun_launch, 'started_for').mockReturnValue(LAUNCHED)
@@ -95,6 +93,33 @@ describe('run:carry --begin under a launch', () => {
 		await run_carry_cli.run(['--begin', INVOCATION])
 
 		expect(Date.parse(started_at() ?? '')).toBeGreaterThanOrEqual(before)
+	})
+})
+
+// joshuafolkken/kit#5516: the launch already handed the record to the supervisor.
+function handed_off(): void {
+	run_carry.apply_change(target(), run_carry.fresh_carry(INVOCATION, { pid: 1 }, LAUNCHED), {
+		cuts: 1,
+	})
+}
+
+describe('run:carry --begin from the launched parent', () => {
+	it('answers driving and leaves the record handed off', async () => {
+		handed_off()
+		vi.spyOn(backlogrun_launch, 'running_parent').mockReturnValue(process.pid)
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		expect(await run_carry_cli.run(BEGIN)).toBe(0)
+		expect(info).toHaveBeenCalledWith('driving')
+		expect(run_carry.read_carry(target())).toMatchObject({ carry: { is_handed_off: true } })
+	})
+
+	it('still resumes the record for a session the launch did not start', async () => {
+		handed_off()
+		vi.spyOn(backlogrun_launch, 'running_parent').mockReturnValue(undefined)
+
+		expect(await run_carry_cli.run(BEGIN)).toBe(0)
+		expect(run_carry.read_carry(target())).toMatchObject({ carry: { is_handed_off: false } })
 	})
 })
 

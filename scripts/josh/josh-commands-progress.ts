@@ -1,10 +1,9 @@
 import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types'
 
-// The run's progress and board commands, split out of `josh-commands-run.ts` when each command's
-// usage moved onto its entry (#4185). `RUN_COMMANDS` spreads this in at the same place, so the map
-// keeps its order.
+// The run's progress, board and hand-off commands, split out of `josh-commands-run.ts` when each
+// command's usage moved onto its entry (#4185). `RUN_COMMANDS` spreads this in at the same place, so
+// the map keeps its order.
 
-/* eslint-disable @typescript-eslint/naming-convention */
 const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 	'run:progress': {
 		script: 'scripts/run/progress/run-progress-main.ts',
@@ -40,7 +39,7 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: ['--wait'],
 					description:
-						'start once in the background: each report goes to the event stream and ambient log, never stdout; exits only on an arrival, `josh followup` ending the run, or `--hours`.',
+						'start once in the background: as it starts it prints `progress-watcher.md` → "Progress while the run is quiet" once per session (a repeat names it in one line — `run:entry` has printed it first outside a lane child); each report then goes to the event stream and ambient log, never stdout; exits only on an arrival, `josh followup` ending the run, or `--hours`.',
 				},
 				{
 					names: ['--hours <n>'],
@@ -71,7 +70,7 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: ['--chat'],
 					description:
-						'answers a `backlogrun` progress question: the frame `--once` draws, with only `🧠` on the machine line and no escapes; it records the report as `run:progress --mark` does.',
+						'answers a `backlogrun`, `fullrun` or `halfrun` progress question: the frame `--once` draws, with only `🧠` on the machine line and no escapes; it records the report as `run:progress --mark` does.',
 				},
 				{
 					names: ['--every <minutes>'],
@@ -81,7 +80,60 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
+	'run:pickup': {
+		script: 'scripts/run/run-pickup-cli.ts',
+		description:
+			'Pick the lanes up after a manual cut: launch what the epics offer, then each liveness and the watcher line',
+		category: 'AI tools',
+		reference: ['[<epic>...]', 'automation', ['processes']],
+		usage: {
+			examples: [
+				{ arguments: '', note: 'one line per lane, then the watcher line' },
+				{
+					arguments: '5800',
+					note: 'first one line per child the epic offers: launched, refused or its verdict',
+				},
+			],
+		},
+	},
+	'run:handoff-lanes': {
+		script: 'scripts/run/handoff-lanes/run-handoff-lanes-cli.ts',
+		description:
+			'Chain a backlogrun hand-off: cost --cut, the lane reading, run:carry --cut, run:board --chat and run:report --handoff, answering under, cut, blocked or capped',
+		category: 'AI tools',
+		reference: ['', 'automation', ['processes', 'files', 'network']],
+		usage: {
+			examples: [
+				{
+					arguments: '',
+					note: 'after each child’s merge; prints the verdict line, then its next action',
+				},
+			],
+		},
+	},
+	'run:handoff': {
+		script: 'scripts/run/handoff/run-handoff-cli.ts',
+		description:
+			'Hand a workflow keyword typed in a consultation session to a child on the role profile model',
+		category: 'AI tools',
+		reference: ['<keyword> [N|new ...] --brief-file <path>', 'automation', ['processes', 'files']],
+		usage: {
+			examples: [
+				{
+					arguments: 'kickoff new --brief-file .josh/tmp/brief.md',
+					note: 'waits; prints its final message and URLs',
+				},
+				{
+					arguments: 'fullrun <N> --brief-file .josh/tmp/brief.md',
+					note: 'detached; a bare N is #N; check it with run:progress --once',
+				},
+				{
+					arguments: 'backlogrun <E> --only',
+					note: 'josh backlogrun with this session’s --agent',
+				},
+			],
+		},
+	},
 }
-/* eslint-enable @typescript-eslint/naming-convention */
 
 export { PROGRESS_COMMANDS }

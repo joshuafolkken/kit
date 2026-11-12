@@ -1,0 +1,1 @@
+- rf:bug-risks | medium | scripts/init/init-logic.ts:90 | 2026-11-11 | #7205

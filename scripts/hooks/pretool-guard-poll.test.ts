@@ -1,6 +1,6 @@
-import { mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 // The poll guard is the third asynchronous rule, after the watcher and the parent hand-off and before
@@ -15,7 +15,10 @@ vi.mock('#scripts/run/run-watcher-hook', () => ({
 }))
 
 vi.mock('#scripts/run/run-parent-cut-hook', () => ({
-	run_parent_cut_hook: { parent_cut_reason: vi.fn().mockResolvedValue(undefined) },
+	run_parent_cut_hook: {
+		current_state: vi.fn(),
+		parent_cut_reason: vi.fn().mockResolvedValue(undefined),
+	},
 }))
 
 vi.mock('#scripts/run/run-poll-hook', () => ({
@@ -39,12 +42,13 @@ const parent_cut_reason = vi.mocked(run_parent_cut_hook.parent_cut_reason)
 const safe_poll_reason = vi.mocked(run_poll_hook.safe_poll_reason)
 const watch_reason = vi.mocked(issue_watch_hook.watch_reason)
 
+const make_directory = temporary_directory()
 const BOARD = 'pnpm josh run:board'
 const POLL_REASON = 'poll'
 const PARENT_CUT_REASON = 'parent hand-off'
 
 function payload(command: string): string {
-	const directory = mkdtempSync(path.join(tmpdir(), 'pretool-guard-poll-'))
+	const directory = make_directory('pretool-guard-poll-')
 	const transcript_path = path.join(directory, 'transcript.jsonl')
 
 	writeFileSync(transcript_path, '{"type":"user"}\n')

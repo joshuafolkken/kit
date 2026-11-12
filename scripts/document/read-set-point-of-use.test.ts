@@ -103,7 +103,7 @@ describe('a role reaches documents its base entry path does not name (#3078)', (
 	)
 })
 
-// The heartbeat left `backlogrun-progress.md` (#3172): a single-issue run reads its ~3 KB of rules
+// The heartbeat left `backlogrun-progress.md` (#3172): a single-issue run reads its rules
 // without the batch's hand-off, waiting and summary procedure, which is charged to the batch alone.
 describe('single-issue runs read progress-watcher.md, not backlogrun-progress.md (#3172)', () => {
 	const PROGRESS_WATCHER = 'progress-watcher.md'

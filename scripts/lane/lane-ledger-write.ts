@@ -2,38 +2,43 @@ import { closeSync, constants, openSync, writeSync } from 'node:fs'
 import { durable_state } from '#scripts/josh/durable-state'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { run_carry } from '#scripts/run/carry/run-carry'
-import {
-	lane_ledger_schema,
-	type CoreWaitRecord,
-	type GateRecord,
-	type HeldRecord,
-	type LaneStateChangeRecord,
-	type LedgerEntry,
-	type OverlapRecord,
-	type PushMissRecord,
-	type RoundOneRecord,
-	type RoundTwoRecord,
-	type ShipLapRecord,
-	type SplitFiledRecord,
-	type SplitNoticeRecord,
-	type StageRecord,
-	type StopRecord,
-	type TestPinnedRecord,
-	type TestRelatedRecord,
-	type UnitFileRecord,
-	type UnplannedNoticeRecord,
+import { lane_ledger_kind } from './lane-ledger-kind'
+import type {
+	CoreWaitRecord,
+	GateRecord,
+	HeldRecord,
+	LaneStateChangeRecord,
+	LedgerEntry,
+	OverlapRecord,
+	PushMissRecord,
+	RoundOneRecord,
+	RoundTwoRecord,
+	ShipLapRecord,
+	SizeRecord,
+	SplitFiledRecord,
+	SplitNoticeRecord,
+	StageRecord,
+	StopRecord,
+	TestPinnedRecord,
+	TestRelatedRecord,
+	UnitFileRecord,
+	UnplannedNoticeRecord,
 } from './lane-ledger-schema'
+import type { OfferRecord } from './lane-ledger-schema-offer'
+import type { ChainRecord } from './lane-ledger-schema-ship'
 
 // The measurement ledger the lane limit is tuned against: one JSON line per
 // lane merge, per finished `josh gate`, per machine-load sample, per lane dispatch, per finished
-// `josh ship` stage, per stopped `josh ship`, per round-2 decision, per core-budget wait and per
-// `josh test:related` run, read back by `josh lane:stats` through `lane-ledger.ts`. Each line's shape
-// is `lane-ledger-schema.ts`.
+// `josh ship` stage, per stopped `josh ship`, per `josh run:chain`, per round-2 decision, per core-budget wait, per
+// `josh test:related` run and per lane-limit start or change (`limit`), read back by
+// `josh lane:stats` through `lane-ledger.ts`. Each line's shape is `lane-ledger-schema.ts`.
 //
 // **The writers' leaf, apart from the reader** (joshuafolkken/kit#5202). The gate, `followup`, `josh
 // ship`, the dispatch and the backlog driver write here, and dozens of suites import them; the reading
 // and the measurement modules built on it import `lane-ledger.ts`, so a change there no longer reaches
 // every suite a writer sits under.
+//
+// This writer still reaches the suites of its importing hubs — dispatch, gate and followup — until those hubs are cut (joshuafolkken/kit#5177).
 //
 // **Its own file rather than the run's event stream.** The stream is capped at 500 events and is
 // rewritten whole on every append, which is right for "where is the run" and wrong for a measurement
@@ -67,7 +72,7 @@ const { O_APPEND, O_CREAT, O_NOFOLLOW, O_WRONLY } = constants
 // eslint-disable-next-line no-bitwise -- POSIX open flags are a bit field; `||` here would be a bug
 const APPEND_FLAGS = O_WRONLY | O_APPEND | O_CREAT | O_NOFOLLOW
 
-const { KIND } = lane_ledger_schema
+const { KIND } = lane_ledger_kind
 
 function target_of(repository: string): string {
 	return durable_state.path(LEDGER_PREFIX, repository, LEDGER_SUFFIX)
@@ -99,9 +104,11 @@ function append(path: string, entry: object): void {
 	const descriptor = openSync(path, APPEND_FLAGS, LEDGER_FILE_MODE)
 
 	try {
-		if (stamp_file.is_own_regular_file(path)) {
-			writeSync(descriptor, `${JSON.stringify(entry)}${LINE_SEPARATOR}`)
+		if (!stamp_file.is_own_regular_file(path)) {
+			throw new Error('Ledger is not an owned regular file')
 		}
+
+		writeSync(descriptor, `${JSON.stringify(entry)}${LINE_SEPARATOR}`)
 	} finally {
 		closeSync(descriptor)
 	}
@@ -144,6 +151,10 @@ async function record_stop(stop: StopRecord, path?: string): Promise<void> {
 	await record({ kind: KIND.STOP, at: now_iso(), ...stop }, path)
 }
 
+async function record_chain(chain: ChainRecord, path?: string): Promise<void> {
+	await record({ kind: KIND.CHAIN, at: now_iso(), ...chain }, path)
+}
+
 async function record_overlap(overlap: OverlapRecord, path?: string): Promise<void> {
 	await record({ kind: KIND.OVERLAP, at: now_iso(), ...overlap }, path)
 }
@@ -166,6 +177,10 @@ async function record_lane_state(change: LaneStateChangeRecord, path?: string): 
 
 async function record_offerable(is_offerable: boolean, path?: string): Promise<void> {
 	await record({ kind: KIND.OFFERABLE, at: now_iso(), is_offerable }, path)
+}
+
+async function record_offer(offer: OfferRecord, path?: string): Promise<void> {
+	await record({ kind: KIND.OFFER, at: now_iso(), ...offer }, path)
 }
 
 async function record_round_one(round_one: RoundOneRecord, path?: string): Promise<void> {
@@ -200,15 +215,29 @@ async function record_split_notice(notice: SplitNoticeRecord, path?: string): Pr
 }
 
 async function record_split_filed(filed: SplitFiledRecord, path?: string): Promise<void> {
-	await record({ kind: KIND.SPLIT_FILED, at: now_iso(), ...filed }, path)
+	const destination = path ?? (await target())
+
+	if (destination === undefined) throw new Error('Could not resolve the split-child ledger')
+	append(destination, { kind: KIND.SPLIT_FILED, at: now_iso(), ...filed })
 }
 
 async function record_push_miss(miss: PushMissRecord, path?: string): Promise<void> {
 	await record({ kind: KIND.PUSH_MISS, at: now_iso(), ...miss }, path)
 }
 
+async function record_early_push(
+	push: Omit<Extract<LedgerEntry, { kind: 'early-push' }>, 'kind' | 'at'>,
+	path?: string,
+): Promise<void> {
+	await record({ kind: KIND.EARLY_PUSH, at: now_iso(), ...push }, path)
+}
+
 async function record_ship_lap(lap: ShipLapRecord, path?: string): Promise<void> {
 	await record({ kind: KIND.SHIP_LAP, at: now_iso(), ...lap }, path)
+}
+
+async function record_size(size: SizeRecord, path?: string): Promise<void> {
+	await record({ kind: KIND.SIZE, at: now_iso(), ...size }, path)
 }
 
 async function record_unplanned_notice(
@@ -229,6 +258,7 @@ const lane_ledger_write = {
 	ROUND_ONE_REUSED,
 	append,
 	record,
+	record_chain,
 	record_core_wait,
 	record_dispatch,
 	record_gate,
@@ -237,11 +267,14 @@ const lane_ledger_write = {
 	record_released,
 	record_merge,
 	record_overlap,
+	record_offer,
 	record_offerable,
 	record_push_miss,
+	record_early_push,
 	record_round_one,
 	record_round_two,
 	record_ship_lap,
+	record_size,
 	record_split_filed,
 	record_split_notice,
 	record_stage,

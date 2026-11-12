@@ -12,8 +12,26 @@ const LAP = {
 }
 
 describe('lane_ledger_schema_ship — the lines josh ship writes, read through the entry union', () => {
+	it('reads a size measurement back through the ledger union', () => {
+		const size = {
+			kind: 'size',
+			at: AT,
+			issue: 5384,
+			declared: { files: 7, lines: 160 },
+			actual: { files: 12, lines: 300 },
+		}
+
+		expect(lane_ledger_schema.entry_schema.parse(size)).toEqual(size)
+	})
+
 	it('reads a ship lap back as written', () => {
 		expect(lane_ledger_schema.entry_schema.parse(LAP)).toEqual(LAP)
+	})
+
+	it('keeps a scoped test replay when reading the ledger', () => {
+		const reused = { ...LAP, step: 'test:related', is_reused: true }
+
+		expect(lane_ledger_schema.entry_schema.parse(reused)).toEqual(reused)
 	})
 
 	it('refuses a ship lap with no step', () => {
@@ -24,6 +42,12 @@ describe('lane_ledger_schema_ship — the lines josh ship writes, read through t
 
 	it('reads a ship stop back as written', () => {
 		const stop = { kind: 'stop', at: AT, issue: 5294, reason: 'gate', cause: 'check' }
+
+		expect(lane_ledger_schema.entry_schema.parse(stop)).toEqual(stop)
+	})
+
+	it('keeps the base a review failure stopped on', () => {
+		const stop = { kind: 'stop', at: AT, issue: 6141, reason: 'review', base: 'a'.repeat(40) }
 
 		expect(lane_ledger_schema.entry_schema.parse(stop)).toEqual(stop)
 	})

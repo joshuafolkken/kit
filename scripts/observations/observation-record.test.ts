@@ -1,10 +1,10 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { followup_failed_tests } from '#scripts/followup/followup-failed-tests'
 import { git_spawn } from '#scripts/git/git-spawn'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import prettier from 'prettier'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { OBSERVATION_LEDGER_DIRECTORY } from './observation-ledger'
 import {
 	FILE_VERDICT,
@@ -22,7 +22,8 @@ import {
 vi.mock('#scripts/git/git-spawn', () => ({ git_spawn: { read: vi.fn() } }))
 vi.mocked(git_spawn.read).mockRejectedValue(new Error('not a git repository'))
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'observation-record-test-'))
+const make_directory = temporary_directory('suite')
+const scratch = make_directory('observation-record-test-')
 const FIRST_DAY = new Date('2026-10-01T09:00:00Z')
 const SECOND_DAY = new Date('2026-10-02T09:00:00Z')
 const THIRD_DAY = new Date('2026-10-03T09:00:00Z')
@@ -34,10 +35,6 @@ const ENTRY: ObservationEntry = {
 	where: 'pnpm josh run:liveness',
 	what: 'The probe answered none while the ship ran',
 }
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
 
 function fresh_checkout(name: string): string {
 	return path.join(scratch, name)

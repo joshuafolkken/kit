@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process'
 import path from 'node:path'
 import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { lane_paths } from './lane-paths'
+import { process_linux } from './process-linux'
 
 // Each process's working directory, read with `lsof` — the one place its output is parsed.
 //
@@ -11,7 +12,7 @@ import { lane_paths } from './lane-paths'
 // `run:board` draws such a process as a lane's or a leftover, and `lane:close` ends it
 // (joshuafolkken/kit#4304); the board falls back to the ancestry where the directory names no lane
 // (`run-board-usage-lanes.ts`).
-// **macOS alone**, as the board reads it: elsewhere nothing is listed.
+// macOS uses lsof; Linux reads the current account's process metadata from procfs.
 
 const LSOF_COMMAND = 'lsof'
 // `-a` joins the conditions: the `cwd` descriptor only, in `-F` fields. The board appends `-p <pids>`.
@@ -41,6 +42,7 @@ function parse(output: string): Map<number, string> {
  * rest, so its output is read whatever the exit status.
  */
 function list_all(platform: NodeJS.Platform = process.platform): Map<number, string> | undefined {
+	if (platform === 'linux') return process_linux.directories()
 	if (!LISTING_PLATFORMS.has(platform)) return new Map()
 
 	const result = spawnSync(LSOF_COMMAND, CWD_ARGUMENTS, {

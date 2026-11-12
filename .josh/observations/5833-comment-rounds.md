@@ -1,0 +1,1 @@
+- rf:bug-risks | low | scripts/issue/issue-file-cli.ts:138 | 2026-11-02 | #5833

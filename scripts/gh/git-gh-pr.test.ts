@@ -107,7 +107,6 @@ function lookup_calls(): number {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	forget_pr_numbers()
 	mocked_api.mockImplementation(gh_api_routes(write_routes()))
 	mocked_command.mockResolvedValue('')

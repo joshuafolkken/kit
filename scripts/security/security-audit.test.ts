@@ -1,11 +1,14 @@
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { COMMAND_MAP } from '#scripts/josh/josh-logic'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { execaSync } from 'execa'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { security_audit } from './security-audit'
 import { security_audit_logic } from './security-audit-logic'
+
+const make_directory = temporary_directory()
+const make_suite_directory = temporary_directory('suite')
 
 vi.mock('execa', () => ({ execaSync: vi.fn() }))
 
@@ -21,10 +24,6 @@ function fake_sync_result(exit_code: number | undefined, stdout = ''): ExecaSync
 
 const FLOOR_VERSION_OUTPUT = 'osv-scanner version: 2.6.0'
 const BELOW_FLOOR_VERSION_OUTPUT = 'osv-scanner version: 2.3.5'
-
-beforeEach(() => {
-	vi.clearAllMocks()
-})
 
 const OSV_SCANNER = 'osv-scanner'
 const MISSING_BINARY = 'missing-bin'
@@ -103,7 +102,7 @@ describe('security_audit.run_scanner', () => {
 })
 
 function fresh_scratch(): string {
-	return mkdtempSync(path.join(tmpdir(), 'kit-audit-resolve-'))
+	return make_directory('kit-audit-resolve-')
 }
 
 function write_managed(scratch: string): string {
@@ -208,11 +207,7 @@ describe('security_audit.meets_floor', () => {
 // a restrictive mount leaves a non-executable one. Spawning either fails with EACCES or ENOEXEC —
 // an error naming neither the scanner nor how to get one — so neither counts as a provisioned copy.
 describe('security_audit.is_executable_file', () => {
-	const scratch = mkdtempSync(path.join(tmpdir(), 'kit-audit-exec-'))
-
-	afterAll(() => {
-		rmSync(scratch, { recursive: true, force: true })
-	})
+	const scratch = make_suite_directory('kit-audit-exec-')
 
 	function write_candidate(name: string, content: string, mode: number): string {
 		const candidate_path = path.join(scratch, name)

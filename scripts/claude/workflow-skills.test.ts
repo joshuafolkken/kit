@@ -1,11 +1,6 @@
 import { readdirSync } from 'node:fs'
 import { cost_tokens } from '#scripts/cost-runtime/cost-tokens'
-import {
-	AI_DOCS,
-	read_repo_file,
-	read_unwrapped,
-	WORKFLOW_PROMPT,
-} from '#scripts/document/ai-document-fixture'
+import { AI_DOCS, read_repo_file } from '#scripts/document/ai-document-fixture'
 import { resident_budget } from '#scripts/document/resident-budget'
 import { init_logic } from '#scripts/init/init-logic'
 import { skill_meta } from '#tools/claude/skill-meta'
@@ -18,15 +13,6 @@ import { package_file, read_skill_file, SKILL_ROOT } from './skill-fixture'
 // documents route to them, and the prohibitions that have to fire *before* a skill is loaded stay
 // resident — so all three are asserted here rather than left to the section that moved.
 const WORKFLOW_SKILL = '.claude/skills/workflow-commands'
-const DEPENDENCY_SKILL = '.claude/skills/dependency-update'
-// The canonical topic file for the residency criterion. Named directly rather than reached through
-// `WORKFLOW_PROMPT`, which answers with the whole concatenated corpus: an assertion about where the
-// ceiling policy is argued has to fail when it is argued somewhere else.
-const RESIDENCY_TOPIC = 'prompts/collaboration-workflow/residency.md'
-// joshuafolkken/kit#3177 cut the topic file down to its four questions; the resident-rule list, the
-// budget and its raise conditions moved here, so their markers are asserted at this file.
-const RESIDENCY_RATIONALE = 'docs/maintainers/residency-rationale.md'
-const NOT_ASPIRATIONAL_MARKER = '**This criterion is not aspirational.**'
 
 // Long enough that it says when to read the skill rather than merely naming it — the description is
 // what an agent matches the situation against, so a one-liner ships a skill nothing ever opens.
@@ -65,23 +51,11 @@ const FULLRUN_STEPS_FILE = 'fullrun-steps.md'
 const HALFRUN_FILE = 'halfrun.md'
 const CHAIN_RULE_FILE = 'chain-rule.md'
 const FOLLOWUP_FILE = 'followup.md'
-const ANTI_PATTERN_MARKER = '**Anti-pattern catalog**'
 
-// The headings of the two sections that stayed resident. `ROUTING_END_HEADING` doubles as the
-// marker for the rule that cannot move — it is the first thing after the routing table.
-//
-// All three were asserted by a suite that compared these sections byte-for-byte across the three
-// paired documents. joshuafolkken/kit#963 single-sourced the rules, so there is nothing left to
-// compare a document against and that suite is gone. What it was really protecting is that these
-// sections exist and are resident, which is asserted directly below instead — the substance of each
-// one is already pinned marker by marker, and without the headings a rename would go unnoticed.
+// The headings of the sections that stayed resident. `ROUTING_END_HEADING` doubles as the marker for
+// the rule that cannot move — it is the first thing after the routing table.
 const ROUTING_HEADING = '### Shorthand Commands'
 const ROUTING_END_HEADING = '#### Explicit invocation required (MANDATORY)'
-// joshuafolkken/kit#3395 retired the overrides section: its two prohibitions are one Tier C entry in
-// "Decision autonomy", and the procedure is the `dependency-update` skill.
-const OVERRIDES_HEADING = '### Dependency overrides (`pnpm-workspace.yaml` / `package.json`)'
-// Pinned in its own right: it was only ever asserted as the end of the overrides slice, so deleting
-// the slice comparison took the one assertion that `## Package-First Development` still exists.
 const PACKAGE_FIRST_HEADING = '## Package-First Development'
 
 const SUPPORTING_FILES: ReadonlyArray<string> = [
@@ -137,166 +111,24 @@ describe(`${WORKFLOW_SKILL} — carries the procedures that left the documents`,
 
 	// Every shipped file being reachable from the entry is pinned in `workflow-skill-reach.test.ts`.
 
-	// What the entry file owes the reader is the pointer, since `kickoff` and `halfrun` are routed away
-	// from `followup.md`; joshuafolkken/kit#5165 moved the rule's body to `rule-delivery.md`.
-	it('points at the mid-workflow stop rule', () => {
-		expect(entry).toContain('`rule-delivery.md` → "stop-notify"')
-	})
-
-	// joshuafolkken/kit#2296: `chain-rule.md` is how the gate itself starts, overlapped with the review,
-	// so a run that read it before the `/code-review` step had already run the gate bare. Its point-of-use
-	// trigger names the first gate launch instead.
-	it('reads chain-rule.md before the first gate launch, not before the review', () => {
-		expect(entry).toContain('Before the first `pnpm josh gate` launch')
-	})
-
 	// A command that stashes the working tree and never pops it leaves the user's changes buried in
-	// the stash list with the run reporting success. The pop is `pnpm josh stash:pop`, targeted by
-	// message, because the stash is a repository-wide stack every lane shares — a positional
-	// `git stash pop` takes whichever lane last pushed (joshuafolkken/kit#2050).
-	it.each([FULLRUN_STEPS_FILE, HALFRUN_FILE])('%s restores everything it stashes', (filename) => {
+	// the stash list with the run reporting success (joshuafolkken/kit#2050). joshuafolkken/kit#5747
+	// moved a `new` entry's stash, sync and pop into `run:entry <N> --adopt`, whose pop by message is
+	// pinned in `run-entry-sync.test.ts`, so the step lists hand it over rather than stash by hand.
+	it.each([FULLRUN_STEPS_FILE, HALFRUN_FILE])('%s hands its stash to run:entry', (filename) => {
 		const content = read_skill_file(WORKFLOW_SKILL, filename)
 
-		expect(content).toContain('pnpm josh stash:push')
-		expect(content).toContain('pnpm josh stash:pop')
-	})
-
-	// The comment-reading step every `#N` entry point owes is pinned by its own suite, beside the two
-	// other delivered rules: `scripts/rules/issue-comments-rule.test.ts` (joshuafolkken/kit#1319).
-	it.each([
-		[FULLRUN_FILE, 'pnpm josh followup'],
-		[HALFRUN_FILE, '**Invoking `halfrun` is _not_ authorization to commit, push, or merge**'],
-		[KICKOFF_FILE, 'pnpm josh epic'],
-		[CHAIN_RULE_FILE, 'Run the review-to-merge chain'],
-		[FOLLOWUP_FILE, '`auto-merge` — Default `fullrun` behavior'],
-	])('%s states %j', (filename, marker) => {
-		expect(read_skill_file(WORKFLOW_SKILL, filename)).toContain(marker)
-	})
-})
-
-describe(`${DEPENDENCY_SKILL} — carries the post-update verification`, () => {
-	const content = read_skill_file(DEPENDENCY_SKILL)
-
-	it.each([
-		'git diff -- pnpm-workspace.yaml package.json',
-		'**pnpm 11 and 12 read effective overrides only from `pnpm-workspace.yaml`.**',
-		'**quote what one printed.**',
-		'`devEngines: restore (<reason>)` — restore + ask',
-		'never touch `overrides`',
-		'never touch `devEngines`',
-	])('states %j', (marker) => {
-		expect(content).toContain(marker)
-	})
-})
-
-// joshuafolkken/kit#951: what may stay resident had never been written down, so each new rule was
-// placed by whoever wrote it. The criterion has one input — does the rule bind before a command has
-// started — and every rule that passes it is named, because a criterion with no worked examples is
-// re-derived differently every time it is applied.
-describe('the residency criterion — which rules may stay in the always-loaded documents', () => {
-	// §3's heading stays in the entry file as a pointer (pinned in `document-markers.test.ts`), but its
-	// whole body — the residency questions included — left it (joshuafolkken/kit#1797,
-	// joshuafolkken/kit#2161), and joshuafolkken/kit#2891 merged the skill-side copy into the canonical
-	// topic file, so the criterion is asserted at its one home.
-	it('states the residency criterion at its single source', () => {
-		expect(read_unwrapped(RESIDENCY_TOPIC)).toContain(
-			'**`CLAUDE.md` に残るのは、skill がロードされていないターンでも効く必要がある規則だけである。**',
-		)
-	})
-})
-
-// joshuafolkken/kit#955: written without a scope, the exhaustiveness claim read as governing every
-// resident rule — naming conventions and quality limits included — which would either grow the list
-// without end or mark them as unchecked candidates for a skill. Counting by skill instead drew the
-// line in two wrong places at once: `verify-ui` is routed to just as this skill is, and one entry
-// routes to a prompt rather than to a skill at all. The axis is whether the rule has a counterpart.
-describe('the residency list says what it covers', () => {
-	// joshuafolkken/kit#2891 merged the English skill-side copy of this list into the canonical topic
-	// file, and joshuafolkken/kit#3177 moved it on to the rationale, in English again.
-	it.each([
-		'Within that scope the list is exhaustive',
-		// The pointer has to name where each entry is actually guarded; two of them are asserted by their
-		// own suites, and a maintainer who looks only in this one concludes they are unguarded.
-		'the UI verification gate in `scripts/claude/verify-ui-skill.test.ts`',
-		'Absence from the list is not an omission',
-		// The worked examples §3 used to carry (joshuafolkken/kit#1797); joshuafolkken/kit#3395 moved the
-		// `epic:*` rules off residency, and the list records where they went.
-		'**Explicit invocation required**',
-		'**The `confirmation` notification on a stop**',
-		'**`overrides` protection**',
-		'**Moved off residency by joshuafolkken/kit#3395.**',
-		NOT_ASPIRATIONAL_MARKER,
-	])('scopes the claim at the single source: %j', (marker) => {
-		expect(read_unwrapped(RESIDENCY_RATIONALE)).toContain(marker)
-	})
-
-	// Asserted absent, not merely replaced: the unscoped sentence beside the scoped one leaves two
-	// claims about the same list, and a reader applying the first one still grows it without end.
-	it('no longer claims the list covers every resident rule', () => {
-		expect(read_unwrapped(WORKFLOW_PROMPT)).not.toContain('**この一覧は網羅的である**')
-	})
-
-	// The skill is the operational copy; the canonical reference is where the rule is argued, and the
-	// two have to agree. A criterion stated only in the skill is invisible to a Gemini or Cursor run,
-	// which reads the prompt and never loads a Claude Code skill.
-	it.each([
-		'## 常駐ドキュメントと skill の分担（何を常駐に残すか）',
-		'**その規則は、skill がロードされていないターンでも効く必要があるか。**',
-	])('is argued in the canonical prompt: %j', (marker) => {
-		expect(read_unwrapped(WORKFLOW_PROMPT)).toContain(marker)
-	})
-
-	it.each([
-		'**This list covers the resident rules that have a procedure on the on-demand side**',
-		'**Drawing the line by counting skills is wrong**',
-		'**The UI verification gate**',
-		'**A resident rule outside that scope is correctly absent from this list.**',
-	])('keeps the list argued in the rationale: %j', (marker) => {
-		expect(read_unwrapped(RESIDENCY_RATIONALE)).toContain(marker)
-	})
-})
-
-// joshuafolkken/kit#1275: "do not raise the ceiling" was written as a flat prohibition, so on the
-// day recovery genuinely runs out there is no procedure for moving it and the cheapest move left is
-// deleting an unpinned sentence — the failure this whole criterion exists to prevent. The conditions
-// that would justify a raise are now written down, and pinned so they survive the
-// joshuafolkken/kit#1193 consistency sweep.
-describe('the ceiling can be raised, but only against written conditions', () => {
-	it.each([
-		'**引き上げは Tier C として扱う**',
-		// The Tier C half protects the budget by naming its constants, so a rename made here and not
-		// there leaves the rule guarding a name nothing uses. All three are named because whichever
-		// one is actually binding is the one somebody will want to loosen.
-		'RESIDENT_CEILING_BYTES',
-		'RESIDENT_HEADROOM_BYTES',
-		'RE_INLINE_GUARD_HEADROOM_BYTES',
-	])('states the rule for raising the ceiling: %j', (marker) => {
-		expect(read_unwrapped(RESIDENCY_TOPIC)).toContain(marker)
-	})
-
-	// The conditions themselves moved to the rationale in joshuafolkken/kit#3177; the topic file keeps
-	// the Tier C line and points at them.
-	it.each([
-		'## When the ceiling may be raised',
-		'**"Do not raise" is a falsifiable default, not an absolute prohibition.**',
-		'**Exhaustion is shown by measurement, not asserted**',
-		'**The risk is asymmetric, so when in doubt, recover.**',
-		'**A raise is Tier C.**',
-		'RE_INLINE_GUARD_HEADROOM_BYTES',
-	])('records the raise conditions in the rationale: %j', (marker) => {
-		expect(read_unwrapped(RESIDENCY_RATIONALE)).toContain(marker)
+		expect(content).toContain('--adopt`')
+		expect(content).not.toContain('pnpm josh stash:')
 	})
 })
 
 describe.each(AI_DOCS)('%s — stays inside the resident budget', (document_path) => {
 	const content = read_repo_file(document_path)
 
-	// joshuafolkken/kit#1275: this used to assert only `< EFFECTIVE_CEILING_BYTES`, and it passed at
-	// 30 bytes of headroom — the state the reserve exists to prevent rather than the state it
-	// permits, since the next resident rule then pays for itself out of whichever neighboring
-	// sentence no marker pinned. The guard floor is asserted in its place rather than beside it:
-	// being over the ceiling is being under the floor as well, so a second assertion could never
-	// fail on its own, and two tests for one condition report the same defect twice.
+	// The guard floor preserves enough room for the next resident rule. A ceiling-only assertion
+	// cannot guarantee that reserve; asserting both would duplicate the same failure condition
+	// (joshuafolkken/kit#1275).
 	it('stays under the resident ceiling, with room left to write the next rule', () => {
 		const headroom = EFFECTIVE_CEILING_BYTES - Buffer.byteLength(content, 'utf8')
 
@@ -321,114 +153,25 @@ describe.each(AI_DOCS)('%s — stays inside the resident budget', (document_path
 	})
 })
 
-describe.each(AI_DOCS)('%s — routes to the skills instead of inlining them', (document_path) => {
-	const content = read_repo_file(document_path)
-
-	// The skills now ship as the `kit` plugin (joshuafolkken/kit#1879), so the document routes to them
-	// by skill name rather than by a `.claude/skills/…` path that would not resolve at a consumer.
-	it.each(['workflow-commands', 'dependency-update'])('names the %s skill', (skill_name) => {
-		expect(content).toContain(`\`${skill_name}\` skill`)
-	})
-
-	// Asserted absent, not merely "not required": a document that both routes to the skill and keeps
-	// the procedure has not been split, and the two copies drift from the next edit onward.
-	it.each([
-		'#### `kickoff` — Planning phase only',
-		'#### `fullrun` — Full execution',
-		'#### `halfrun` — Implement + verify',
-		'#### `/review` → `followup` chain rule (MANDATORY)',
-		ANTI_PATTERN_MARKER,
-		// joshuafolkken/kit#951: three rules that bind only after a command has started, restated
-		// resident until the documents reached the ceiling. Their opening sentences are pinned absent
-		// so a re-inlining is caught by name rather than only by the byte count it would push past.
-		'**The split assessment runs at every entry point, from one definition.**',
-		'**A prerequisite discovered mid-run is a dependency, not a park.**',
-		'**`epicrun` also accepts an Issue that is not an epic.**',
-		'**`epicrun` parks instead of stopping.**',
-		// joshuafolkken/kit#3077: the routing paragraph for the same three rules went too — the table's
-		// "Read first" column already names `split-assessment.md` for every entry.
-		'**Three rules decide what a run does when the work turns out not to be one Issue**',
-	])('no longer inlines %j', (marker) => {
-		expect(content).not.toContain(marker)
-	})
-
-	// Removing a procedure is only half of it. Without the routing the rule reaches no run at all,
-	// which reads exactly like the rule having been deleted. joshuafolkken/kit#3171 dropped the per-command
-	// "Read first" table — the skill's own §1 is that table — so the routing is the one sentence that
-	// sends every command to the skill before its first call.
-	it.each([
-		'procedures in the `workflow-commands` skill',
-		'read it before any part of a command, including the first `gh` call',
-	])('routes to the moved procedures with %j', (marker) => {
-		expect(content).toContain(marker)
-	})
-
-	// joshuafolkken/kit#1985 removed `epicrun` and kept a resident redirect for a typed old keyword.
-	// joshuafolkken/kit#3395 retired the redirect with the rest of the per-task prose; the history keeps
-	// it in docs/maintainers/claude-md-history.md.
-	it('no longer carries the retired-keyword redirect', () => {
-		expect(content).not.toContain('**`queue` and `epicrun` were removed**')
-	})
-})
-
-// The rules that pass the residency criterion: each one binds on a turn where the workflow skill was
-// never loaded — the first decides whether a workflow starts at all, and the pauses that need the
-// second mostly happen with no workflow keyword typed (an upstream-Issue interrupt, a Tier C stop).
-describe.each(AI_DOCS)('%s — keeps what cannot move', (document_path) => {
+// The rules that pass the residency criterion bind on a turn where no skill was loaded, so each
+// document keeps its routing and the pointers to the moved bodies. One contract: a rename of any of
+// these leaves the resident text routing nowhere.
+describe.each(AI_DOCS)('%s — keeps the routing and pointers resident', (document_path) => {
 	const content = read_repo_file(document_path)
 
 	it.each([
 		ROUTING_HEADING,
 		ROUTING_END_HEADING,
 		PACKAGE_FIRST_HEADING,
-		'Please run \\`<command>\\` to start this task.',
-		// joshuafolkken/kit#3395: both prohibitions of the retired overrides section, as one Tier C
-		// entry. The sanctioned `josh latest` bump is named by the `dependency-update` skill, and the
-		// `epic:*` rules by the `epic-commands` skill, whose description carries their trigger.
-		'`devEngines` / overrides edits): explicit user instruction only',
-		// Clearing `needs-decision` moved into that skill, so recording a decision has to load it, or
-		// the label stays and the child is parked out of the backlog pool.
-		'when recording a decision on a `needs-decision` child',
-	])('keeps %j resident', (marker) => {
-		expect(content).toContain(marker)
-	})
-
-	it('no longer carries the overrides section', () => {
-		expect(content).not.toContain(OVERRIDES_HEADING)
-	})
-
-	// joshuafolkken/kit#5165: the Git Rules body and the stop-notify command moved to the sources their
-	// hook rows cite; the resident text keeps the trigger and the pointer to each.
-	it.each([
+		// The skills ship as the `kit` plugin (joshuafolkken/kit#1879), so the document routes to them
+		// by skill name rather than by a `.claude/skills/…` path that would not resolve at a consumer.
+		'`workflow-commands` skill',
+		'`dependency-update` skill',
 		'`prompts/collaboration-workflow/operating-rules.md` → "git-rules"',
 		'`prompts/collaboration-workflow/rule-delivery.md` → "stop-notify"',
-	])('points at the moved body with %j', (marker) => {
-		expect(content).toContain(marker)
-	})
-
-	// The residency criterion itself is not restated here: it lives in `residency.md` (question 2) and
-	// is read only when a rule is placed (joshuafolkken/kit#3256). The markers above pin its outcome.
-})
-
-// joshuafolkken/kit#3077: the merge exception names `fullrun` and `backlogrun`, and a `prrun` stops
-// before the merge. joshuafolkken/kit#5165 moved it, with the stop-notify command, out of the resident
-// document into the sources the `pr-merge` and `stop-notify` rows cite.
-describe.each([
-	[
-		'prompts/collaboration-workflow/operating-rules.md',
-		[
-			'`fullrun` / `backlogrun` の起動で、`pnpm josh followup` 経由のマージを認める',
-			'`prrun` は認めない',
-		],
-	],
-	[
-		'prompts/collaboration-workflow/rule-delivery.md',
-		['pnpm josh notify --task-type confirmation'],
-	],
-])('%s — carries the moved body', (document_path, markers) => {
-	const content = read_repo_file(document_path)
-
-	it.each(markers)('states %j', (marker) => {
+		// The `overrides` protection entry of the resident-rule list in `residency-rationale.md`.
+		'`devEngines` / overrides edits): explicit user instruction only',
+	])('keeps %j resident', (marker) => {
 		expect(content).toContain(marker)
 	})
 })
@@ -436,8 +179,8 @@ describe.each([
 // joshuafolkken/kit#964: the residency criterion decides *whether* a rule stays; this is the guard
 // on *how much* of it stays. A rule that cites a canonical section has its procedure there, so the
 // resident text is a trigger and a pointer — and a trigger that grew past this cap has had its
-// procedure pasted back beside the pointer, which is how `CLAUDE.md` reached 585 bytes of headroom
-// with the procedures already moved out.
+// procedure pasted back beside the pointer, which is how `CLAUDE.md` ran out of headroom with the
+// procedures already moved out.
 //
 // The cap is not a style preference. It is set just above the largest rule that legitimately needs
 // most of its text resident — the cross-package interrupt, whose every sentence changes what an
@@ -459,9 +202,7 @@ interface ResidentRule {
 // the rules in `## Git Rules` and `## Collaboration Workflow` free to grow a second copy of their
 // procedure beside the pointer — which is the regression the cap exists to stop, so the cap has to
 // see them. Each rule is a single line: prettier runs with `proseWrap: preserve` here, so the line
-// is the rule. Matching line by line also avoided materializing a match iterator, which
-// `prefer-spread` and `prefer-iterator-to-array` used to disagree about how to spell —
-// joshuafolkken/kit#1783 settled that, so only the first reason is load-bearing now.
+// is the rule. Line-by-line matching also avoids materializing an iterator (joshuafolkken/kit#1783).
 function resident_rules(content: string): ReadonlyArray<ResidentRule> {
 	return content
 		.split('\n')
@@ -518,19 +259,5 @@ describe('the resident budget reads the same in both units', () => {
 
 		expect(short_by).toBeLessThan(THREE_BYTE_CHAR_BYTES)
 		expect(cost_tokens.estimate(japanese)).toBe(EFFECTIVE_CEILING_TOKENS)
-	})
-})
-
-describe('the residency criterion defines how much of a resident rule is resident', () => {
-	const criterion = read_unwrapped(RESIDENCY_TOPIC)
-
-	it.each([
-		'**常駐規則は、トリガと導線の 2 つで書く。**',
-		'**判定は、導線を一度も開かないターンでも常駐の記述だけで正しく振る舞えるかである。**',
-		// Re-pointed by joshuafolkken/kit#1525: trimming is still moving, but a narrow retirement
-		// route now exists beside it, so the sentence that used to close the door names the exception.
-		'**削ることは移すことであり、削除は理由を示して初めて許される例外である。**',
-	])('states %j', (marker) => {
-		expect(criterion).toContain(marker)
 	})
 })

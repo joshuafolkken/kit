@@ -86,26 +86,30 @@ warning and returning success, and a send from inside `pnpm josh followup` print
 saying nobody was notified while the merge carries on. See
 [Notification behavior](./environment-variables.md#notification-behavior).
 
-## `gh` — REST only, and it has to be installed
+## `gh` — `gh api` only, and it has to be installed
 
-**Every GitHub call this package makes is `gh api` (REST).** A cloud session's egress is answered
-`403` for GitHub's GraphQL endpoint, so the subcommand forms — `gh issue view`, `gh pr list`,
-`gh repo view --json` and the rest — do not work there. `tools/gh/gh-subcommand-guard.ts` and
-`scripts/gh/gh-document-guard.test.ts` hold the code and the shipped documents to that rule, and
-`prompts/collaboration-workflow/gh-rest.md` is the rule itself.
+**Every GitHub call this package makes is `gh api`.** A cloud session's egress is answered `403` for
+GitHub's GraphQL endpoint, so the issue, blocker and merge-state reads fall back to REST for that
+session through the transport switch (`JOSH_GH_TRANSPORT`, default `auto` —
+[Environment variables](./environment-variables.md)), and the subcommand forms — `gh issue view`,
+`gh pr list`, `gh repo view --json` and the rest — are not used. `tools/gh/gh-subcommand-guard.ts`
+and `scripts/gh/gh-document-guard.test.ts` hold the code and the shipped documents to that rule, and
+`prompts/collaboration-workflow/gh-rest.md` is the rule itself, with how GitHub calls are kept few.
 
 Two exceptions, and only two:
 
 - **`gh auth token`** reads the credential the local CLI already holds. It contacts no endpoint, so
-  there is no REST call it could be written as.
+  there is no REST call it could be written as. Only a script reading it in its own process may run
+  it; an agent's `Bash` call to it is refused by the `egress` guard row
+  (`scripts/rules/egress-guard.ts`).
 - **GitHub Actions workflows.** They run on a runner where `gh` works normally, and
   `gh pr merge --auto` uses an API that exists only in GraphQL.
 
 ### REST does not make `gh` optional
 
 **Every REST call is still `execa('gh', ['api', …])`.** Migrating away from the subcommands removed
-the GraphQL dependency, not the binary dependency — and a container without `gh` was measured, so
-this is not hypothetical:
+the need for GraphQL to be reachable, not the binary dependency — and a container without `gh` was
+measured, so this is not hypothetical:
 
 - `pnpm josh doctor` reports that Dependabot security updates could not be read because `gh` is
   missing.

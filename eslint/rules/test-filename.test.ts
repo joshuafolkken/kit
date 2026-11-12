@@ -99,9 +99,8 @@ describe('test-filename — forbids a top-level tests/ directory', () => {
 	})
 })
 
-// joshuafolkken/kit#1414: the globs used to list `.ts` and `.js` only, so `Foo.spec.tsx`,
-// `tests/foo.mts` and every other extension in this ecosystem walked past both bans while the
-// documents claimed the top-level directory itself was forbidden.
+// Both bans must cover every JS/TS extension so the forbidden directory and suffix cannot be
+// bypassed by choosing another parser-supported extension (joshuafolkken/kit#1414).
 const BANNED_SPEC_FILES = [
 	'src/lib/Foo.spec.tsx',
 	'src/lib/foo.spec.mts',

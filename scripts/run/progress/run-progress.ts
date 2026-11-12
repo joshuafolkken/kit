@@ -4,16 +4,15 @@ import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 // `josh run:progress` — the one line an unattended run prints when it has gone quiet, and the clock
 // that decides when that is.
 //
-// **The trigger is silence, not a timer.** An `epicrun` reports when a child merges or is parked, and
-// a child is 20–46 minutes of wall clock; between those two events it says nothing at all, so the
-// person watching has to type "how is it going" to find out — the polling this command exists to
+// **The trigger is silence, not a timer.** An `epicrun` reports when a child merges or is parked.
+// Between those events it says nothing, so the person watching has to type "how is it going"
+// to find out — the polling this command exists to
 // remove. What it deliberately does **not** do is print on a fixed clock: the interval is measured
 // from the last report of *any* kind, so a heartbeat never lands immediately behind a real one, where
 // it would be noise rather than news. `--mark` is how the run tells this clock a real report happened.
 //
-// **A line that could say "still running" is a line not worth printing.** The default is twenty
-// minutes: a child measures 20–46 minutes, and twenty gives one to two reports per child rather than a
-// run of lines saying what the last one said. Every field below is
+// **A line that could say "still running" is a line not worth printing.** The interval avoids a
+// run of lines saying what the last one said (joshuafolkken/kit#5367). Every field below is
 // re-read on each tick rather than remembered — a child's labels, whether a pull request exists yet,
 // which lanes are open, the load average, and how long the whole set has been identical.
 //
@@ -47,6 +46,15 @@ const DEFAULT_INTERVAL_MINUTES = 20
 // spellings of it.
 const INTERVAL_KEY = 'JOSH_PROGRESS_INTERVAL_MINUTES'
 const DEFAULT_INTERVAL_MS = DEFAULT_INTERVAL_MINUTES * MS_PER_MINUTE
+// **A decline deliberately does not move the report clock** — the first child to appear is reported at
+// once rather than waiting out an interval the repository spent idle. Without a cooldown, though, that
+// same property re-reads GitHub on every poll for the watcher's whole life, and a batch stacks one
+// fresh watcher per child, so the listings accumulate into secondary-rate-limit territory and would
+// themselves start producing the unreadable listings the watcher's decline (`run-progress-cli.ts`) exists to handle. Two minutes keeps
+// "reported at once" true to within a fraction of the twenty-minute interval and takes the call count
+// down with it. Kept here, not in `run-progress-cli.ts`, so `run:board` reads it without the watcher's
+// imports (joshuafolkken/kit#5987).
+const DECLINE_RETRY_SECONDS = 120
 // The switch that silences every progress report — the watcher's and `run:board --every`'s alike.
 const DISABLED_KEY = 'JOSH_PROGRESS'
 const DISABLED_VALUE = '0'
@@ -247,7 +255,7 @@ interface LineTiming {
  * that already holds the inputs, as for `run:hold`, `delegate`, `review:level` and `latest:scope`.
  *
  * **It is a schedule rather than an observation, and the two conditions on it are said in prose**
- * (`docs/josh-commands-run.md` → `josh run:progress`): it holds only while the silence continues, and a
+ * (`docs/josh-commands-board.md` → `josh run:progress`): it holds only while the silence continues, and a
  * real report arriving first restarts the clock through `--mark` and supersedes it. The line printing
  * it is itself a report, so the clock starts at this observation.
  */
@@ -345,6 +353,7 @@ function is_disabled(): boolean {
 }
 
 const run_progress = {
+	DECLINE_RETRY_SECONDS,
 	DEFAULT_INTERVAL_MINUTES,
 	DEFAULT_INTERVAL_MS,
 	DISABLED_KEY,

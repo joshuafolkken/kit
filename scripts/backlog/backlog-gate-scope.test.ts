@@ -1,23 +1,29 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
+import type { BusyRead } from '#scripts/epic/epic-busy'
 import { epic_graph } from '#scripts/epic/epic-graph'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import { lane_plan } from '#scripts/lane/lane-plan'
 import { lane_state } from '#scripts/lane/lane-state'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_gate_scope, type PoolContext } from './backlog-gate-scope'
 
 // joshuafolkken/kit#4864: a candidate waits on the files a running lane plans to edit as it waits on its
 // body's. joshuafolkken/kit#5107: an issue that yielded its lane is named, so the offer puts it first.
 
-const ROOT = mkdtempSync(path.join(tmpdir(), 'backlog-gate-scope-'))
+const make_directory = temporary_directory('suite')
+const ROOT = make_directory('backlog-gate-scope-')
 const REPO = 'joshuafolkken/kit'
 const RUNNING = 4858
 const YIELDED = 5083
 const BODY_FILE = 'scripts/backlog/backlog-rank.ts'
 const PLANNED_FILE = 'scripts/lane/lane-overrun.ts'
 const PLANNED_AT = '2026-10-25T03:10:00.000Z'
+const UNLISTED = 7121
+
+const BUSY: BusyRead = {
+	kind: 'busy',
+	issues: [{ number: UNLISTED, title: 'running', createdAt: PLANNED_AT, blockedBy: undefined }],
+}
 
 function issue(number: number): PoolContext['opted_in']['issues'][number] {
 	return {
@@ -34,16 +40,13 @@ const CONTEXT: PoolContext = {
 	tracking: { kind: 'read', index: new Map(), cutoff: 'none' },
 	repo: REPO,
 	exclude: [],
+	implement_rate: undefined,
 }
 
 beforeEach(() => {
 	vi.spyOn(git_common_directory, 'repository').mockReturnValue(ROOT)
 	vi.spyOn(lane_state, 'read_states').mockResolvedValue(new Map())
 	lane_plan.record({ issue: RUNNING, paths: [PLANNED_FILE], planned_at: PLANNED_AT }, process.cwd())
-})
-
-afterAll(() => {
-	rmSync(ROOT, { recursive: true, force: true })
 })
 
 describe('backlog_gate_scope.gate_scope', () => {
@@ -64,5 +67,28 @@ describe('backlog_gate_scope.gate_scope', () => {
 		expect([...(scope.yielded ?? [])]).toStrictEqual([
 			epic_graph.key_of({ number: YIELDED, repo: REPO }),
 		])
+	})
+
+	// joshuafolkken/kit#7185: a running lane the opted-in listing misses declares its recorded plan.
+	it('declares the recorded plan of a running lane outside the listing', async () => {
+		lane_plan.record(
+			{ issue: UNLISTED, paths: [PLANNED_FILE], planned_at: PLANNED_AT },
+			process.cwd(),
+		)
+
+		const scope = await backlog_gate_scope.gate_scope(CONTEXT, BUSY)
+
+		expect([...(scope.declared.get(UNLISTED) ?? [])]).toStrictEqual([PLANNED_FILE])
+	})
+
+	it('leaves a running lane outside the listing undeclared without the busy read', async () => {
+		lane_plan.record(
+			{ issue: UNLISTED, paths: [PLANNED_FILE], planned_at: PLANNED_AT },
+			process.cwd(),
+		)
+
+		const scope = await backlog_gate_scope.gate_scope(CONTEXT)
+
+		expect(scope.declared.has(UNLISTED)).toBe(false)
 	})
 })

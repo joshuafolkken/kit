@@ -257,6 +257,28 @@ describe('issue_priority.lost_minutes', () => {
 const SECURITY_LINE = '- セキュリティ: Issue 本文がガードを通らずに読める\n'
 const PARK_LINE = '- 原因の park: #4703\n'
 
+describe('issue_priority.parked_issues', () => {
+	it('reads repeated single-number declarations once each', () => {
+		const filed = body('', `${PARK_LINE}- 原因の park: #4704\n${PARK_LINE}`)
+
+		expect(issue_priority.parked_issues(filed)).toStrictEqual(['4703', '4704'])
+		expect(issue_priority.problem(filed, [])).toBeUndefined()
+	})
+
+	it('ignores fenced examples and declarations outside the background', () => {
+		const filed = body('', `\`\`\`md\n${PARK_LINE}\`\`\`\n`) + PARK_LINE
+
+		expect(issue_priority.parked_issues(filed)).toStrictEqual([])
+	})
+
+	it.each(['other/repo#4703', '#4703, #4704', '#0', '#9007199254740992'])(
+		'never resolves %s as a local issue number',
+		(value) => {
+			expect(issue_priority.parked_issues(body('', `${PARK_PREFIX} ${value}\n`))).toStrictEqual([])
+		},
+	)
+})
+
 describe.each([
 	['security finding (H)', SECURITY_LINE, '- セキュリティ:'],
 	['caused park (I)', PARK_LINE, PARK_PREFIX],

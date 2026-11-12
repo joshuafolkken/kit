@@ -5,7 +5,6 @@ import { gate_labels } from '#scripts/gate/gate-labels'
 import type { GateStepResult } from '#scripts/gate/gate-report'
 import { gate_tree } from '#scripts/gate/gate-tree'
 import { metrics_totals } from '#scripts/gate/metrics-totals'
-import { project_checks } from '#scripts/gate/project-checks'
 import { structural_checks } from '#scripts/gate/structural-checks'
 import { type_check_step } from '#scripts/gate/type-check-step'
 import type { JoshResult } from '#scripts/josh/josh-run'
@@ -38,11 +37,11 @@ import { buffered_process, type BufferedProcessResult } from '#scripts/lib/buffe
 //
 // In kit the metrics ratchet's totals join them: a feature grows a total almost every time, and here
 // the session that grew the total writes the reason itself rather than a relaunched one —
-// `josh lint:related` has already reported the growth in the loop (`metrics-totals.ts`), so this is
-// the stop for a growth that notice did not settle. A total the branch's approval already names is
-// re-recorded at its growth here rather than stopped (`--rerecord`, joshuafolkken/kit#4716). The
-// durations are left out: they read the gate ledger, stale before the detach, so they stay with the
-// supervised gate.
+// `josh lint:related` has already reported the growth in the loop and `josh run:review`'s open has
+// stopped on it (`metrics-totals.ts`), so this is the backstop for a growth neither settled. A total
+// the branch's approval already names is re-recorded at its growth here rather than stopped
+// (`--rerecord`, joshuafolkken/kit#4716). The durations are left out: they read the gate ledger,
+// stale before the detach, so they stay with the supervised gate.
 
 interface PreDetachCheck {
 	list: ReadonlyArray<string>
@@ -86,9 +85,17 @@ function guard_tests(directory: string): Array<PreDetachCheck> {
 	return targets.length === 0 ? [] : [{ list: [...GUARD_TEST_COMMAND, ...targets] }]
 }
 
-// The same kit-only rule as the gate's `is_kit_only` step: a consumer's kit has no `josh metrics`.
-function kit_only(directory: string): Array<PreDetachCheck> {
-	return project_checks.is_kit_repository(directory) ? [{ list: METRICS_RERECORD_COMMAND }] : []
+// The totals' judgment `josh run:review`'s open stops on (`metrics_totals.totals_check`), run again
+// here as the backstop; none outside kit.
+async function metrics_runs(directory: string): Promise<Array<PreDetachRun>> {
+	const started = performance.now()
+	const result = await metrics_totals.totals_check(directory)
+
+	if (result === undefined) return []
+
+	return [
+		{ check: { list: METRICS_RERECORD_COMMAND }, result, elapsed_ms: performance.now() - started },
+	]
 }
 
 async function command_lists(directory: string): Promise<Array<PreDetachCheck>> {
@@ -183,9 +190,7 @@ async function checks(
 	records: CheckRecords = check_reuse.DEFAULT_RECORDS,
 	pinned: PinnedCheck = not_asked,
 ): Promise<PreDetachResult> {
-	const metrics = await Promise.all(
-		kit_only(directory).map(async (check) => await run_in(directory, check)),
-	)
+	const metrics = await metrics_runs(directory)
 	const [lists, tree] = await Promise.all([command_lists(directory), gate_tree.read_gate_tree()])
 	const [runs, pinned_result] = await Promise.all([
 		Promise.all(lists.map(async (check) => await run_in(directory, check))),
@@ -205,6 +210,7 @@ const run_ship_pre_detach = {
 	UNPINNED,
 	checks,
 	failure_prefix,
+	with_pinned,
 }
 
 export type { PinnedCheck, PreDetachCheck, PreDetachResult }

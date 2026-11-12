@@ -8,6 +8,26 @@ import { destructive_command } from './destructive-command'
 // `repo-admin`'s since joshuafolkken/kit#4650.
 
 const LABEL_REMOVAL = 'gh api -X DELETE repos/joshuafolkken/kit/issues/5/labels/in-progress'
+const BLOCKED_BY_REMOVAL =
+	'gh api -X DELETE repos/o/r/issues/5767/dependencies/blocked_by/6136548813'
+const UNBLOCK_COMMAND = 'pnpm josh backlog:triage --apply 5767 --unblock 5562 --reason x'
+
+// joshuafolkken/kit#5820: the raw blocked-by removal stays refused, and its reason names the josh path.
+describe('destructive_command — a blocked-by removal', () => {
+	it('refuses the raw gh api DELETE', () => {
+		expect(destructive_command.is_destructive_command(BLOCKED_BY_REMOVAL)).toBe(true)
+	})
+
+	it('is silent on backlog:triage --unblock', () => {
+		expect(destructive_command.is_destructive_command(UNBLOCK_COMMAND)).toBe(false)
+	})
+
+	it('names backlog:triage --unblock in the reason', () => {
+		expect(destructive_command.DESTRUCTIVE_COMMAND_REASON).toContain(
+			'pnpm josh backlog:triage --apply <N> --unblock <M>',
+		)
+	})
+})
 
 describe('destructive_command.is_destructive_command — refuses', () => {
 	it.each([

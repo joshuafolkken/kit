@@ -26,6 +26,16 @@ describe('backlog_offer.answer_of — issue numbers become candidates', () => {
 			answer: 'candidates',
 			issues: ['12', '13'],
 			retries: NO_RETRIES,
+			is_judgment_owed: false,
+		})
+	})
+
+	it('maps issue numbers then a trailing triage to candidates that owe the judgment', () => {
+		expect(offer_of(['12', TOKENS.triage], SOME_RUNNING, ONE_RETRY)).toStrictEqual({
+			answer: 'candidates',
+			issues: ['12'],
+			retries: NO_RETRIES,
+			is_judgment_owed: true,
 		})
 	})
 
@@ -104,6 +114,13 @@ const CHAIN_LINE = 'Waiting on a dependency chain: [#4496](https://github.com/o/
 const GATE_LINE = 'Waiting on a start condition: #4487'
 
 describe('backlog_offer.answer_of — the chain and gate causes', () => {
+	it('carries the deadline of a dated gate wait', () => {
+		const not_before_ms = Date.parse('2999-01-01T00:00Z')
+		const read = wait_with(`${GATE_LINE}\nNext start time: ${String(not_before_ms)}`, NO_RUNNING)
+
+		expect(read.not_before_ms).toBe(not_before_ms)
+	})
+
 	it('marks a blocked wait with its cause and the issues it waited on', () => {
 		expect(wait_with(`${CHAIN_LINE}\n${GATE_LINE}`, SOME_RUNNING)).toStrictEqual({
 			answer: 'blocked',
@@ -112,6 +129,13 @@ describe('backlog_offer.answer_of — the chain and gate causes', () => {
 			cause: 'chain+gate',
 			waiting: [4496, 4487],
 		})
+	})
+
+	// joshuafolkken/kit#7307: an overlap-withheld candidate beside a dated one is held on both.
+	it('marks a wait on a running lane beside a start condition with both and their issues', () => {
+		const read = wait_with(`${GATE_LINE}\nWaiting on a running lane: #7303`, SOME_RUNNING)
+
+		expect(read).toMatchObject({ cause: 'gate+lane', waiting: [4487, 7303] })
 	})
 
 	it('lets the run:solo notice win over a cause line', () => {

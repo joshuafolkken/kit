@@ -13,6 +13,10 @@
 			"Read(!.env.example)",
 			"Read(!.env.test)",
 			"Read(./.dev.vars)",
+			"Read(~/.config/gh/**)",
+			"Read(~/.codex/auth.json)",
+			"Read(~/.netrc)",
+			"Read(~/.ssh/**)",
 			"Bash(git push --force*)",
 			"Bash(git push -f*)",
 			"Bash(git push *--force*)",
@@ -39,13 +43,22 @@
 			"Bash(gh pr merge*)",
 			"Bash(gh api *pulls/*/merge*)",
 			"Bash(gh api graphql*mergePullRequest*)",
-			"Bash(sudo *)"
+			"Bash(sudo *)",
+			"Bash(curl *)",
+			"Bash(wget *)",
+			"Bash(nc *)",
+			"Bash(gh auth token*)",
+			"Bash(printenv)"
 		]
 	},
 	"env": {
 		"BASH_MAX_OUTPUT_LENGTH": "8000"
 	},
 	"enableArtifact": false,
+	"statusLine": {
+		"type": "command",
+		"command": "pnpm josh usage:tee"
+	},
 	"hooks": {
 		"SessionStart": [
 			{
@@ -53,8 +66,18 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "export JOSH_HOOK_CWD=\"$PWD\" && project_root=\"${CLAUDE_PROJECT_DIR:-$( (unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; git rev-parse --show-toplevel 2>/dev/null) || git rev-parse --show-toplevel)}\" && cd \"$project_root\" && sh scripts/hooks/run-hook.sh audit-provision --session-start",
-						"timeout": 180
+						"command": "sh \"$CLAUDE_PROJECT_DIR/scripts/hooks/run-hook.sh\" audit-provision --session-start",
+						"timeout": 90
+					}
+				]
+			},
+			{
+				"matcher": "clear",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/scripts/hooks/run-hook.sh\" audit-provision --session-model",
+						"timeout": 10
 					}
 				]
 			}
@@ -65,7 +88,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "export JOSH_HOOK_CWD=\"$PWD\" && project_root=\"${CLAUDE_PROJECT_DIR:-$( (unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; git rev-parse --show-toplevel 2>/dev/null) || git rev-parse --show-toplevel)}\" && cd \"$project_root\" && sh scripts/hooks/run-hook.sh session-lang",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/scripts/hooks/run-hook.sh\" session-lang",
 						"timeout": 10
 					}
 				]
@@ -73,11 +96,11 @@
 		],
 		"PreToolUse": [
 			{
-				"matcher": "Bash|Edit|Read|Write|AskUserQuestion|Agent|Task",
+				"matcher": "Bash|Edit|Read|Write|AskUserQuestion|Agent|Task|Glob|Grep|WebFetch",
 				"hooks": [
 					{
 						"type": "command",
-						"command": "export JOSH_HOOK_CWD=\"$PWD\" && project_root=\"${CLAUDE_PROJECT_DIR:-$( (unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; git rev-parse --show-toplevel 2>/dev/null) || git rev-parse --show-toplevel)}\" && cd \"$project_root\" && sh scripts/hooks/run-hook.sh pretool-guard",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/scripts/hooks/run-hook.sh\" pretool-guard",
 						"timeout": 20
 					}
 				]
@@ -85,11 +108,11 @@
 		],
 		"PostToolUse": [
 			{
-				"matcher": "Edit|Write",
+				"matcher": "Edit|Write|Bash",
 				"hooks": [
 					{
 						"type": "command",
-						"command": "export JOSH_HOOK_CWD=\"$PWD\" && project_root=\"${CLAUDE_PROJECT_DIR:-$( (unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; git rev-parse --show-toplevel 2>/dev/null) || git rev-parse --show-toplevel)}\" && cd \"$project_root\" && sh scripts/hooks/run-hook.sh format-edited",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/scripts/hooks/run-hook.sh\" format-edited",
 						"timeout": 90
 					}
 				]
@@ -101,7 +124,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "export JOSH_HOOK_CWD=\"$PWD\" && project_root=\"${CLAUDE_PROJECT_DIR:-$( (unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; git rev-parse --show-toplevel 2>/dev/null) || git rev-parse --show-toplevel)}\" && cd \"$project_root\" && sh scripts/hooks/run-hook.sh stop-guard",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/scripts/hooks/run-hook.sh\" stop-guard",
 						"timeout": 20
 					}
 				]

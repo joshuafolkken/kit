@@ -104,6 +104,15 @@ describe('test_pinned_probe.selection_of — a counted reach', () => {
 
 		expect(argv?.slice(0, 2)).toEqual(['related', HUB_MODULE])
 	})
+
+	it('keeps an explicitly reached native test even when it is heavy', async () => {
+		const root = held.fixture?.workspace ?? ''
+		const probe = { ...probe_of(HUB_MODULE, test_pinned_stage.WIDE_REACH), spawned: [HEAVY_TEST] }
+		const argv = await test_pinned_probe.selection_of(root, probe, WORKERS)
+
+		expect(argv?.slice(0, 3)).toEqual(['related', HUB_TEST, HEAVY_TEST])
+		expect(argv).not.toContain(EXCLUDE_FLAG)
+	})
 })
 
 // `vitest related` runs the whole suite when handed a config dependency such as `unit-projects.ts`, so

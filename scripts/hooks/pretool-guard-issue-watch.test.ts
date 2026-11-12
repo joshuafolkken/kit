@@ -1,6 +1,6 @@
-import { closeSync, mkdtempSync, openSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { closeSync, openSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 // joshuafolkken/kit#3773: the issue watch is the third asynchronous rule, after the watcher and the
@@ -16,7 +16,10 @@ vi.mock('#scripts/run/run-watcher-hook', () => ({
 }))
 
 vi.mock('#scripts/run/run-parent-cut-hook', () => ({
-	run_parent_cut_hook: { parent_cut_reason: vi.fn().mockResolvedValue(undefined) },
+	run_parent_cut_hook: {
+		current_state: vi.fn(),
+		parent_cut_reason: vi.fn().mockResolvedValue(undefined),
+	},
 }))
 
 vi.mock('#scripts/issue/issue-watch-hook', () => ({
@@ -34,12 +37,13 @@ const { pretool_outcome_async } = await import('./pretool-guard')
 const parent_cut_reason = vi.mocked(run_parent_cut_hook.parent_cut_reason)
 const watch_reason = vi.mocked(issue_watch_hook.watch_reason)
 
+const make_directory = temporary_directory()
 const BENIGN_COMMAND = 'ls'
 const UPDATE_REASON = 'A person updated issue #3773'
 const PARENT_CUT_REASON = 'parent hand-off'
 
 function payload(command: string): string {
-	const directory = mkdtempSync(path.join(tmpdir(), 'pretool-guard-watch-'))
+	const directory = make_directory('pretool-guard-watch-')
 	const transcript_path = path.join(directory, 'transcript.jsonl')
 
 	writeFileSync(transcript_path, '{"type":"user"}\n')

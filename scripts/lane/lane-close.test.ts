@@ -1,9 +1,11 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_paths } from './lane-paths'
 import type { LaneInfo } from './lane-registry'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#1490: a lane is closed after a park, a failure or an interruption as readily as
 // after a success, so what is asserted here is that **nothing is left** in each of those states —
@@ -64,7 +66,7 @@ const { git_worktree } = await import('#scripts/git/git-worktree')
 const { lane_registry } = await import('./lane-registry')
 const { lane_close } = await import('./lane-close')
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'lane-close-test-'))
+const scratch = make_directory('lane-close-test-')
 const LANE_ROOT = path.join(scratch, 'lanes')
 const ISSUE = '1490'
 const OTHER_ISSUE = '1491'
@@ -101,7 +103,6 @@ function lanes_are(lanes: ReadonlyArray<LaneInfo>): void {
 }
 
 afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
 	Reflect.deleteProperty(process.env, lane_paths.LANE_ROOT_KEY)
 })
 

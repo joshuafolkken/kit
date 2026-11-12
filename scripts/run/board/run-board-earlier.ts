@@ -21,9 +21,25 @@ const NO_EARLIER: EarlierLanes = { lanes: [] }
 // What an unknown lane's row says after its title: it has no record, and keeps its place.
 const UNKNOWN_TAIL = lane_state.NO_STATE_HINT
 
-// The mark an earlier run's running lane leads with in place of its phase (joshuafolkken/kit#4269),
-// two columns wide as every row icon is (`run-board-labels.ts`, kept out of it by its size).
+// The mark an earlier run's lane draws after its title, its phase keeping its place
+// (joshuafolkken/kit#4269, #7098), two columns wide as every row icon is (`run-board-labels.ts`, kept
+// out of it by its size).
 const EARLIER_ICON = '🧳'
+
+// An earlier run's row's tail led by 🧳, one blank before what it draws, or 🧳 alone where it draws
+// nothing; any other row's tail as it is.
+function earlier_marked(row: BoardRow, tail: ReadonlyArray<string>): Array<string> {
+	if (row.is_earlier !== true) return [...tail]
+
+	const [first = '', ...rest] = tail
+
+	return [first === '' ? EARLIER_ICON : `${EARLIER_ICON} ${first}`, ...rest]
+}
+
+// The marks the legend names beside the row leads: 🧳 where an earlier run's lane is drawn.
+function marks_of(rows: ReadonlyArray<BoardRow>): Array<string> {
+	return rows.some((row) => row.is_earlier === true) ? [EARLIER_ICON] : []
+}
 
 // A child working now — this run's, or an earlier run's lane holding a place.
 function is_live(row: BoardRow): boolean {
@@ -88,7 +104,15 @@ function rows_of(
 	]
 }
 
-const run_board_earlier = { EARLIER_ICON, NO_EARLIER, UNKNOWN_TAIL, is_live, rows_of }
+const run_board_earlier = {
+	EARLIER_ICON,
+	NO_EARLIER,
+	UNKNOWN_TAIL,
+	earlier_marked,
+	is_live,
+	marks_of,
+	rows_of,
+}
 
 export { run_board_earlier }
 export type { EarlierLanes }

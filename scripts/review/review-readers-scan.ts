@@ -7,7 +7,7 @@
 // namespace object (`export { issue_merged }`) as `issue_merged.read_merged`. The namespace object
 // itself is skipped — a member added to it changes none of its readers.
 //
-// `declarations` and `exported_names` are also read by `prose-stale-scan.ts` over a diff's removed lines.
+// `declarations`, `exported_names` and `reachable_names` are also read by `prose-stale-scan.ts` over a diff's removed lines.
 
 const HUNK_HEADER = /^@@ -\d+(?:,\d+)? \+(?<start>\d+)(?:,(?<count>\d+))? @@/u
 const DECLARATION =
@@ -87,7 +87,10 @@ function exported_names(source: string): Set<string> {
 // The members of `const <name> = { … }`, or `undefined` where `name` is not an object literal. `name`
 // is a `\w+` match, so it carries no pattern syntax.
 function namespace_members(source: string, name: string): Array<string> | undefined {
-	const literal = new RegExp(String.raw`^const\s+${name}\s*=\s*\{(?<body>[^}]*)\}`, 'mu')
+	const literal = new RegExp(
+		String.raw`^(?:export\s+)?const\s+${name}\s*=\s*\{(?<body>[^}]*)\}`,
+		'mu',
+	)
 	const body = literal.exec(source)?.groups?.['body']
 
 	return body === undefined ? undefined : list_names(body)
@@ -159,7 +162,26 @@ function edited(source: string, diff: string): Array<Edited> {
 	return found_targets.filter((entry): entry is Edited => entry.target !== undefined)
 }
 
-const review_readers_scan = { changed_lines, declarations, edited, exported_names }
+// The declared names another module can reach: a direct export, an `export { … }` entry, or a member of
+// an exported namespace object — what a deleted file can still be named by (joshuafolkken/kit#6130).
+// A namespace object exported in place (`export const ns = { … }`) counts as one listed in `export { ns }`.
+function reachable_names(source: string): Array<string> {
+	const found = declarations(source)
+	const direct = found.filter((declaration) => declaration.is_exported).map((entry) => entry.name)
+	const exported = new Set([...exported_names(source), ...direct])
+	const members = [...namespaces(source, exported).values()].flat()
+	const reachable = new Set([...exported, ...members])
+
+	return found.map((entry) => entry.name).filter((name) => reachable.has(name))
+}
+
+const review_readers_scan = {
+	changed_lines,
+	declarations,
+	edited,
+	exported_names,
+	reachable_names,
+}
 
 export type { Declaration, Edited }
 export { review_readers_scan }

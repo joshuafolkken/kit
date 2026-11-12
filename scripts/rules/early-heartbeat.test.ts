@@ -1,9 +1,10 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { hook_context } from '#scripts/hooks/hook-context'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { run_progress } from '#scripts/run/progress/run-progress'
 import { run_progress_clock } from '#scripts/run/progress/run-progress-clock'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { early_heartbeat } from './early-heartbeat'
@@ -31,7 +32,8 @@ const FULL_INTERVAL_SLEEP = 'sleep 1200'
 // Five minutes, which lands well inside the interval whatever the last report was.
 const EARLY_SLEEP = 'sleep 300'
 
-const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'early-heartbeat-'))
+const make_directory = temporary_directory('suite')
+const WORK_DIRECTORY = make_directory('early-heartbeat-')
 const RULE_ID = 'early-heartbeat'
 
 // A real, empty transcript: the decision reads the call and the clock, never the history, so an empty
@@ -55,7 +57,7 @@ function with_last_report(elapsed_ms: number | undefined): void {
 function arm(name: string, command: string, now_ms = NOW_MS, can_record = true): boolean {
 	return early_heartbeat.decide(
 		{ name: 'Bash', input: { command } },
-		{ transcript: transcript_named(name), now_ms },
+		{ transcript: transcript_named(name), now_ms, context: hook_context.from_process() },
 		can_record,
 	)
 }
@@ -89,8 +91,6 @@ afterAll(() => {
 		rmSync(stamp_file.stamp_path(early_heartbeat.ARM_PREFIX, transcript), { force: true })
 		rmSync(delivered_rules.delivery_path(RULE_ID, transcript), { force: true })
 	}
-
-	rmSync(WORK_DIRECTORY, { recursive: true, force: true })
 })
 
 // **The compliance side of the same rule** (joshuafolkken/kit#1643). The trigger fires only on the

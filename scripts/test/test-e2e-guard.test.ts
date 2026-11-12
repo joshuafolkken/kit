@@ -1,7 +1,8 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { core_budget } from '#scripts/gate/core-budget'
+import { fake_result } from '#tools/test/execa-result'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { execa } from 'execa'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_e2e_guard } from './test-e2e-guard'
@@ -10,25 +11,15 @@ vi.mock('execa', () => ({ execa: vi.fn() }))
 
 const mocked_execa = vi.mocked(execa)
 
-type ExecaResult = Awaited<ReturnType<typeof execa>>
-
 const E2E_BASENAME = 'home.e2e.ts'
 const E2E_FILE = path.join('tests', E2E_BASENAME)
 const LOCAL_WORKERS = `--workers=${String(core_budget.CORE_WEIGHTS.e2e)}`
 
-function fake_result(exit_code: number | undefined): ExecaResult {
-	return { exitCode: exit_code } as unknown as ExecaResult
-}
-
 const ctx = { project_directory: '' }
+const make_directory = temporary_directory()
 
 beforeEach(() => {
-	vi.clearAllMocks()
-	ctx.project_directory = mkdtempSync(path.join(tmpdir(), 'e2e-guard-'))
-})
-
-afterEach(() => {
-	rmSync(ctx.project_directory, { recursive: true, force: true })
+	ctx.project_directory = make_directory('e2e-guard-')
 })
 
 function add_playwright_package(): void {
@@ -191,20 +182,20 @@ describe('test_e2e_guard.run_guarded_e2e — the core budget it claims', () => {
 	beforeEach(prepare_reserved_run)
 	afterEach(release_reserved_run)
 
-	it('claims the e2e weight before Playwright runs', async () => {
+	it('claims the e2e cores and measured memory before Playwright runs', async () => {
 		const reservation = vi.spyOn(core_budget, 'with_command_reservation')
 
 		await test_e2e_guard.run_guarded_e2e(ctx.project_directory, [])
 
-		expect(reservation).toHaveBeenCalledWith(
-			core_budget.CORE_WEIGHTS.e2e,
-			expect.any(Function),
-			expect.anything(),
-		)
+		expect(reservation).toHaveBeenCalledWith(core_budget.CORE_WEIGHTS.e2e, expect.any(Function), {
+			command: 'test:e2e',
+			is_suite: true,
+			memory_mb: core_budget.MEMORY_MB.e2e,
+		})
 	})
 
-	it('claims nothing when it skips', async () => {
-		rmSync(path.join(ctx.project_directory, 'tests'), { recursive: true, force: true })
+	it.each(['tests', 'node_modules'])('claims nothing when %s is missing', async (directory) => {
+		rmSync(path.join(ctx.project_directory, directory), { recursive: true, force: true })
 		vi.spyOn(console, 'info').mockImplementation(() => undefined)
 		const reservation = vi.spyOn(core_budget, 'with_command_reservation')
 

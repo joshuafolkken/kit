@@ -14,6 +14,7 @@ import { test_pinned } from '#scripts/test/test-pinned'
 import { test_pinned_logic } from '#scripts/test/test-pinned-logic'
 import { test_pinned_record, type PinnedSummary } from '#scripts/test/test-pinned-record'
 import { run_ship_pre_detach, type PreDetachResult } from './run-ship-pre-detach'
+import { run_ship_pre_detach_timed } from './run-ship-pre-detach-timed'
 import type { ShipArguments } from './run-ship-steps'
 
 // `josh test:pinned` among the pre-detach checks of a `josh ship --review` (joshuafolkken/kit#4785). The
@@ -177,6 +178,11 @@ function checks_for(options: PinnedOptions): () => Promise<PreDetachResult> {
 		})
 }
 
+// The ship's pre-detach checks, timed into the ledger.
+async function timed_checks(args: ShipArguments): Promise<PreDetachResult> {
+	return await run_ship_pre_detach_timed.checks(args.number, checks_for(args))
+}
+
 // **A reason an earlier run on this branch accepted is this ship's `--unpinned-ok`** when it gives
 // none (joshuafolkken/kit#4974): the pre-detach check skips its probe under it, and the supervisor's
 // round 1 and its relaunch carry it, so a place the record lacks is listed and recorded after the
@@ -192,6 +198,6 @@ async function with_recorded_reason(args: ShipArguments): Promise<ShipArguments>
 	return { ...args, unpinned_ok: [run_review_pinned.UNPINNED_OK_FLAG, reason] }
 }
 
-const run_ship_pre_detach_pinned = { checks_for, pinned_check, with_recorded_reason }
+const run_ship_pre_detach_pinned = { checks_for, pinned_check, timed_checks, with_recorded_reason }
 
 export { run_ship_pre_detach_pinned }

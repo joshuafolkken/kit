@@ -9,20 +9,11 @@ import { review_round_one_blobs } from './review-round-one-blobs'
 import { review_round2 } from './review-round2'
 import { review_stamps } from './review-stamps'
 
-// joshuafolkken/kit#1441: `record_round_one` used to overwrite the round-1 snapshot on every round-1
-// invocation. A bare `josh review:brief` run after round 1's fixes were in therefore retook it
-// against the **fixed** tree, the fix delta read empty, and `josh review:round2` on a closed round 1
-// fired arm A — skipping the second round over fix code nobody had read. The mitigation in place was
-// the record's timestamp in the reason line, which nothing compared.
-//
-// **Every case below asserts the direction, not just the digest.** A record that cannot be trusted
-// has to make the round wider; there is no state here whose answer is `skip` on unreviewed code.
-//
-// **The records are written to an explicit temp path, never the real one.** `josh review:brief` and
-// `josh review:round2` share one path per checkout by design, so a suite writing to it would be a
-// second writer nobody declared — and it would hand the surrounding run's own round 2 a snapshot
-// taken by a test. joshuafolkken/kit#1437 fixed exactly that trap one directory over, where the gate
-// suites were writing the real green-gate record.
+// The round-1 snapshot must retain the reviewed tree across later brief invocations, so fix code
+// cannot disappear from round 2's delta (joshuafolkken/kit#1441). Assert the decision direction as
+// well as the digest: an untrustworthy record must widen review rather than skip unreviewed code.
+// Explicit temporary paths isolate these records from the surrounding run's per-checkout snapshot
+// (joshuafolkken/kit#1437).
 const RECORD_PATH = path.join(tmpdir(), `josh-review-round1-suite-${String(process.pid)}.json`)
 const CODE_RECORD_PATH = path.join(
 	tmpdir(),

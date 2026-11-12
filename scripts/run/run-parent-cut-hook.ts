@@ -1,5 +1,6 @@
 import { cost_cli, type CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
+import { hook_context, type HookContext } from '#scripts/hooks/hook-context'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { error_text } from '#scripts/lib/error-message'
 import { implementation_cut_verdict } from '#scripts/rules/implementation-cut-verdict'
@@ -27,9 +28,9 @@ import { run_watcher_hook } from './run-watcher-hook'
 const SWITCH_ENV_KEY = 'JOSH_PARENT_CUT_GUARD'
 const STAMP_PREFIX = 'josh-parent-cut-guard-'
 
-// **One refusal, then a quiet window long enough to finish the hand-off in.** The hand-off is several
-// calls — `lane:list`, `lane:output`, `run:carry --cut`, `run:wake`, the progress comment — and a guard
-// refusing each of them would wedge the very procedure it asks for. A parent that could not cut (a lane
+// **One refusal, then a quiet window long enough to finish the hand-off in.** The hand-off is
+// `run:handoff-lanes` and the `lane:output` fix a `blocked` verdict names — and a guard refusing each
+// of them would wedge the very procedure it asks for. A parent that could not cut (a lane
 // nobody can poll) is asked again once the window has passed.
 const QUIET_WINDOW_MS = 600_000
 
@@ -40,11 +41,17 @@ interface ParentCutState {
 	verdict: () => CostVerdict
 }
 
-function current_state(): ParentCutState {
+// The world as the call in hand sees it: the carry record and session verdict under its own cwd, env
+// and process ancestry.
+function current_state(context: HookContext = hook_context.from_process()): ParentCutState {
 	return {
-		carry: async (): Promise<RunCarry | undefined> => await run_headless.driving_carry(),
+		carry: async (): Promise<RunCarry | undefined> =>
+			await run_headless.driving_carry(context.env, context.ancestry),
 		verdict: (): CostVerdict =>
-			implementation_cut_verdict.reused_verdict(() => cost_cli.session_verdict()),
+			implementation_cut_verdict.reused_verdict(
+				() => cost_cli.session_verdict(context.cwd, context.env),
+				context.cwd,
+			),
 	}
 }
 
@@ -54,9 +61,9 @@ const THRESHOLD_TEXT = '`pnpm josh cost --cut`'
 const PARENT_CUT_REASON =
 	'⛔ backlogrun parent hand-off: this session drives a `backlogrun` and its recent context ' +
 	`crossed the ${THRESHOLD_TEXT} threshold between merges. Take the hand-off now: open no new lane, ` +
-	'follow `backlogrun-progress.md` → "The hand-off" (`pnpm josh run:carry --cut --owner "$PPID"`, then ' +
-	'`pnpm josh run:wake` unless `capped`) and end the turn. Reissue this call once done or if it ' +
-	'cannot be taken.'
+	'follow `backlogrun-progress.md` → "The hand-off" (`pnpm josh run:handoff-lanes`, then the ' +
+	'`next:` line its `cut` / `blocked` / `capped` verdict prints). Reissue this call once done or ' +
+	'if it cannot be taken.'
 
 // Neither an uncapped parent's own record nor a measured `over` is optional: a capped record has no cut
 // left to take (`run:carry --cut` answers `capped`), and an unmeasurable session is left alone here —
@@ -131,6 +138,7 @@ const run_parent_cut_hook = {
 	PARENT_CUT_REASON,
 	QUIET_WINDOW_MS,
 	SWITCH_ENV_KEY,
+	current_state,
 	parent_cut_reason,
 }
 

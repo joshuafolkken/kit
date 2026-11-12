@@ -19,10 +19,8 @@ const ABOVE_MAX_LANE = String(MAX_LANE + 1)
 // exists to remove, so every malformed shape has to raise instead of defaulting.
 const REJECTED_SEEDS: ReadonlyArray<string> = ['abc', '-1', '1.5', '1e3', '+1']
 
-// #820: `.env.example` ships `PORT_SEED=` with no value, so a blank one is how a developer says "I
-// have not set this" — both by copying the sample and by clearing a seed they no longer want. It
-// used to raise, which turned copying the sample into an error from `josh port` and, once
-// `playwright.config.ts` started reading `.env`, would have cost that developer the whole E2E suite.
+// #820: `.env.example` ships `PORT_SEED=` with no value, so a blank seed means unset. Copying the
+// sample or clearing a seed must preserve the default for both `josh port` and Playwright.
 const BLANK_SEEDS: ReadonlyArray<string> = ['', ' ', '\t']
 
 const TEMP_DIRECTORY_PREFIX = 'kit-ports-'
@@ -187,10 +185,9 @@ describe('ports.load_environment_file', () => {
 	})
 })
 
-// #826: `playwright.config.ts` reads one variable, but the `webServer` child inherits this whole
-// process, so every other key the file carried used to reach the dev or preview server too. These
-// two suites are the boundary: the seed crosses, nothing else does, and the file is found from a
-// subdirectory the way `pnpm run` finds it.
+// #826: the `webServer` child inherits this process, so loading Playwright's seed must not expose
+// other file keys to the server. These suites pin that boundary and resolve the file from a
+// subdirectory the way `pnpm run` does.
 describe('ports.load_environment_file — what crosses from .env', () => {
 	it('keeps the seed the file sets', () => {
 		load_seed_from(`${PORT_SEED_KEY}=${FILE_SEED_TEXT}\n${SECRET_KEY}=${SECRET_VALUE}\n`)
@@ -292,8 +289,8 @@ describe('ports.load_environment_file — where the search stops', () => {
 		environment_file_fixture.remove_project_directory(marked)
 	})
 
-	// `path.dirname('.')` is `'.'`, so a relative directory used to end the ascent on its first step
-	// and read nothing — the #826 mismatch again, for any caller that passes one.
+	// Resolve relative directories before ascending: `path.dirname('.')` is `'.'`, which otherwise
+	// ends the search before it reaches the project root (#826).
 	it('ascends from a relative directory the same way', () => {
 		environment_file_fixture.write_environment_file(marked, `${PORT_SEED_KEY}=${FILE_SEED_TEXT}\n`)
 		environment_file_fixture.make_subdirectory(marked, NESTED_DIRECTORY_NAME)

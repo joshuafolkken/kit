@@ -1,0 +1,1 @@
+- rf:bug-risks | low | scripts/split/split-resolution.ts:64 | 2026-10-31 | #5568

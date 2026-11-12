@@ -1,10 +1,57 @@
 import { describe, expect, it } from 'vitest'
+import { lane_ledger_kind } from './lane-ledger-kind'
 import { lane_ledger_schema } from './lane-ledger-schema'
 
 // The ledger's line shapes: a known kind parses, anything else is a line `read_entries` skips.
 
-const { KIND, entry_schema } = lane_ledger_schema
+const { KIND } = lane_ledger_kind
+const { entry_schema } = lane_ledger_schema
 const AT = '2026-10-22T00:00:00.000Z'
+const PROBED = 'scripts/a.ts'
+
+describe('lane_ledger_schema.entry_schema — test reuse', () => {
+	it('preserves reuse counts, reason and comparison time on a related run', () => {
+		const run = {
+			kind: KIND.TEST_RELATED,
+			at: AT,
+			scope: 'related',
+			changed: 1,
+			synced: 1,
+			since_map: 0,
+			readers: 1,
+			elapsed_ms: 5,
+			reused: 1,
+			reuse_missed: 1,
+			reuse_reason: 'matched-inputs',
+			reuse_elapsed_ms: 1,
+		}
+
+		expect(entry_schema.safeParse(run).data).toStrictEqual(run)
+	})
+
+	// joshuafolkken/kit#7248
+	it('preserves the test selection time on a related run', () => {
+		const run = {
+			kind: KIND.TEST_RELATED,
+			at: AT,
+			scope: 'related',
+			changed: 1,
+			synced: 0,
+			since_map: 0,
+			readers: 0,
+			elapsed_ms: 5,
+			select_elapsed_ms: 2,
+		}
+
+		expect(entry_schema.safeParse(run).data).toStrictEqual(run)
+	})
+})
+
+describe('lane_ledger_schema runtime boundary', () => {
+	it('exposes only the entry parser so callers take constants from their leaves', () => {
+		expect(Object.keys(lane_ledger_schema)).toStrictEqual(['entry_schema'])
+	})
+})
 
 // joshuafolkken/kit#5078
 describe('lane_ledger_schema.entry_schema on a test-pinned run', () => {
@@ -14,7 +61,7 @@ describe('lane_ledger_schema.entry_schema on a test-pinned run', () => {
 			at: AT,
 			issue: 5078,
 			held: 2,
-			probes: [{ file: 'scripts/a.ts', elapsed_ms: 5 }],
+			probes: [{ file: PROBED, elapsed_ms: 5 }],
 			elapsed_ms: 9,
 		}
 
@@ -42,6 +89,18 @@ describe('lane_ledger_schema.entry_schema on a test-pinned run', () => {
 
 		expect(entry_schema.safeParse(run).data).toStrictEqual(run)
 		expect(entry_schema.safeParse({ ...run, origin: 'ship' }).success).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#5385
+describe('lane_ledger_schema.entry_schema on a test-pinned probe', () => {
+	it('keeps a probe the type check pinned, and rejects an unknown pinner', () => {
+		const probe = { file: PROBED, elapsed_ms: 5, pinned_by: 'type-check' }
+		const run = { kind: KIND.TEST_PINNED, at: AT, held: 0, probes: [probe], elapsed_ms: 9 }
+		const unknown = { ...run, probes: [{ ...probe, pinned_by: 'lint' }] }
+
+		expect(entry_schema.safeParse(run).data).toStrictEqual(run)
+		expect(entry_schema.safeParse(unknown).success).toBe(false)
 	})
 })
 
@@ -115,6 +174,21 @@ describe('lane_ledger_schema.entry_schema — the ci-wait critical path', () => 
 			issue: 5295,
 			last_check: 'e2e',
 			check_ms: { lint: 3, e2e: 8 },
+		}
+
+		expect(entry_schema.safeParse(row).data).toStrictEqual(row)
+	})
+
+	// joshuafolkken/kit#7202: a wait with a rerun is marked so lane:stats can leave it out.
+	it('keeps the rerun mark on a stage row', () => {
+		const row = {
+			kind: KIND.STAGE,
+			at: AT,
+			stage: 'ci-wait',
+			elapsed_ms: 9,
+			last_check: 'test',
+			check_ms: { test: 8 },
+			has_rerun: true,
 		}
 
 		expect(entry_schema.safeParse(row).data).toStrictEqual(row)

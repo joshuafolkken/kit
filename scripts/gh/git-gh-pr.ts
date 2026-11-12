@@ -15,6 +15,7 @@ import {
 } from './git-gh-pr-read'
 import { git_gh_pr_rest } from './git-gh-pr-rest'
 import { git_gh_pr_snapshot } from './git-gh-pr-snapshot'
+import { gh_retry } from './git-gh-retry'
 
 // The pull-request writes, through REST.
 //
@@ -55,6 +56,11 @@ const MERGE_UNCONFIRMED_MESSAGE =
 	'gh api could not read the pull request back after the merge request failed'
 const MERGE_READ_BACK_ATTEMPTS = 3
 const MERGE_READ_BACK_INTERVAL_MS = 1000
+// GitHub's 405 body for a merge it is still carrying out — typically the earlier request of a pair
+// whose first answer was a 504. The read-back then waits for it to land, about a minute at most.
+const MERGE_IN_PROGRESS_MESSAGE = 'Merge already in progress'
+const MERGE_IN_PROGRESS_ATTEMPTS = 30
+const MERGE_IN_PROGRESS_INTERVAL_MS = 2000
 // `PUT pulls/{N}/merge` with a `sha` that is no longer the branch head.
 const HEAD_MOVED_STATUS = 409
 const PR_NUMBER_PATTERN = /\/pull\/([1-9]\d*)$/u
@@ -185,6 +191,7 @@ async function put_merge(pr_number: number, head_sha: string): Promise<void> {
 		method: PUT_METHOD,
 		body: JSON.stringify({ merge_method: MERGE_COMMIT_METHOD, sha: head_sha }),
 		timeout_ms: MERGE_REQUEST_TIMEOUT_MS,
+		should_retry: false,
 	})
 }
 
@@ -212,11 +219,21 @@ async function read_merge_state(
 	}
 }
 
-// The wait goes **between** attempts and never after the last one — the convention `poll.wait_between`
-// and `git-pr-checks.ts`'s own `sleep_before_next_attempt` both hold to. Without the guard a merge
-// whose read-back never succeeds delays its own failure report by a whole interval.
-async function sleep_between_read_backs(attempt: number): Promise<void> {
-	if (attempt < MERGE_READ_BACK_ATTEMPTS - 1) await poll.sleep(MERGE_READ_BACK_INTERVAL_MS)
+function is_merge_in_progress(error: unknown): boolean {
+	return error instanceof Error && error.message.includes(MERGE_IN_PROGRESS_MESSAGE)
+}
+
+// **"Not merged" is not a verdict while GitHub says the merge is still running** (#7171), so only an
+// answer of merged ends the wait early. Out of attempts it answers false, and the caller rethrows the
+// 405 itself.
+async function has_in_progress_merge_landed(
+	branch_name: string,
+	pr_number: number,
+): Promise<boolean> {
+	return await poll.poll_until(
+		async () => (await read_merge_state(branch_name, pr_number)) === true,
+		{ attempts: MERGE_IN_PROGRESS_ATTEMPTS, interval_ms: MERGE_IN_PROGRESS_INTERVAL_MS },
+	)
 }
 
 // Whether the merge is actually there, asked only after the request failed.
@@ -235,14 +252,15 @@ async function has_merge_landed(
 	pr_number: number,
 	merge_error: unknown,
 ): Promise<boolean> {
-	for (let attempt = 0; attempt < MERGE_READ_BACK_ATTEMPTS; attempt += 1) {
-		// eslint-disable-next-line no-await-in-loop -- a retry runs only after the previous attempt has answered
-		const is_merged = await read_merge_state(branch_name, pr_number)
-		if (is_merged !== undefined) return is_merged
-
-		// eslint-disable-next-line no-await-in-loop -- a retry runs only after the previous attempt has answered
-		await sleep_between_read_backs(attempt)
+	if (is_merge_in_progress(merge_error)) {
+		return await has_in_progress_merge_landed(branch_name, pr_number)
 	}
+
+	const is_merged = await poll.poll_for(
+		async () => await read_merge_state(branch_name, pr_number),
+		{ attempts: MERGE_READ_BACK_ATTEMPTS, interval_ms: MERGE_READ_BACK_INTERVAL_MS },
+	)
+	if (is_merged !== undefined) return is_merged
 
 	throw new Error(MERGE_UNCONFIRMED_MESSAGE, { cause: merge_error })
 }
@@ -258,21 +276,31 @@ async function has_merge_landed(
 // **A failed merge request is not proof the merge did not happen**, so the pull request's own state
 // settles it: merged, and this returns as if the request had succeeded, which is what lets
 // `followup` carry on to the notification and the epic close, and what makes re-running it recover
-// instead of failing on the 405. Not merged, and the original failure is rethrown unchanged.
+// instead of failing on the 405. Not merged, and the original failure reaches the bounded retry.
 //
 // **The question is "is this pull request merged", not "did my request merge it"**, and that is
 // deliberate: the state the recovery has to act on is whether the branch is in, and a merge someone
 // made by hand between the failure and the read leaves `followup` with exactly the same work to
 // finish. REST offers nothing that would tell the two apart without keeping the merge commit's SHA
 // across a request that never answered.
-async function pr_merge(branch_name: string, head_sha: string): Promise<void> {
-	const pr_number = await require_pr_number(branch_name)
-
+async function merge_with_confirmation(
+	branch_name: string,
+	pr_number: number,
+	head_sha: string,
+): Promise<void> {
 	try {
 		await put_merge(pr_number, head_sha)
 	} catch (error) {
 		if (!(await has_merge_landed(branch_name, pr_number, error))) throw error
 	}
+}
+
+async function pr_merge(branch_name: string, head_sha: string): Promise<void> {
+	const pr_number = await require_pr_number(branch_name)
+
+	await gh_retry.with_retry(async () => {
+		await merge_with_confirmation(branch_name, pr_number, head_sha)
+	})
 }
 
 const git_gh_pr = {
@@ -287,4 +315,10 @@ const git_gh_pr = {
 	is_head_moved,
 }
 
-export { git_gh_pr, MERGE_COMMIT_METHOD, MERGE_REQUEST_TIMEOUT_MS, MERGE_UNCONFIRMED_MESSAGE }
+export {
+	git_gh_pr,
+	MERGE_COMMIT_METHOD,
+	MERGE_IN_PROGRESS_ATTEMPTS,
+	MERGE_REQUEST_TIMEOUT_MS,
+	MERGE_UNCONFIRMED_MESSAGE,
+}

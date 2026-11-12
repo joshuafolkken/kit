@@ -1,12 +1,15 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { agent_argv } from '#scripts/agent/agent-argv'
-import { agent_role_profile, type AgentProvider } from '#scripts/agent/agent-role-profile'
+import { agent_profile_schema } from '#scripts/agent/agent-profile-schema'
+import type { AgentProvider } from '#scripts/agent/agent-provider'
 import { api_auth } from '#scripts/agent/api-auth'
+import { core_priority } from '#scripts/gate/core-priority'
 import { distributed_paths } from '#scripts/init/distributed-paths'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { error_text } from '#scripts/lib/error-message'
 import { review_attest, type ReviewSlot } from '#scripts/review/review-attest'
+import { review_pair_session, type LaunchEnvironment } from '#scripts/review/review-pair-session'
 import { detached_launch, type AttachedLaunchResult } from '#scripts/run/detached-launch'
 import { run_ship_review } from '#scripts/run/ship/run-ship-review'
 import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
@@ -149,6 +152,10 @@ function reviewer_answer(result: AttachedLaunchResult, log_path: string): Broker
 	return result.exit_code === 0 ? SUCCESS : exited_answer(result.exit_code, log_path)
 }
 
+function reviewer_environment(lane: LaneInfo): LaunchEnvironment {
+	return { ...lane_child_marker.env_for(lane.issue), ...core_priority.PRIORITY_ENVIRONMENT }
+}
+
 async function launch_review(
 	lane: LaneInfo,
 	action: ReviewAction,
@@ -163,14 +170,14 @@ async function launch_review(
 		return failure(`the reviewer resolved to ${built.profile.provider}, not the lane's provider`)
 	}
 
-	console.error(agent_role_profile.describe_review(Number(action.round), built.profile))
+	console.error(agent_profile_schema.describe_review(Number(action.round), built.profile))
 	const result = await detached_launch.launch_attached(
 		{
 			argv: built.argv,
 			cwd: lane.directory,
 			log_path: target.log,
 			profile: built.profile,
-			env: lane_child_marker.env_for(lane.issue),
+			env: reviewer_environment(lane),
 		},
 		console.error,
 	)
@@ -178,25 +185,34 @@ async function launch_review(
 	return reviewer_answer(result, target.log)
 }
 
+// The paired comparison reviewer runs beside round 1's code reviewer while the ship paired its brief
+// (joshuafolkken/kit#7020); it never changes the answer.
+async function launch_pair(lane: LaneInfo, action: ReviewAction): Promise<void> {
+	if (action.round !== '1' || !action_slots(action).includes(review_attest.REVIEW_SLOT.CODE)) return
+
+	await review_pair_session.launch(lane.directory, reviewer_environment(lane))
+}
+
 // **The slots' reviewers run side by side**, and the answer is the first failure among them — each
 // slot's findings file then says which review finished (`run-ship-reviewer.ts`).
 async function launch_reviews(lane: LaneInfo, action: ReviewAction): Promise<BrokerAnswer> {
-	const answers = await Promise.all(
-		action_slots(action).map(async (slot) => await launch_review(lane, action, slot)),
-	)
+	const [answers] = await Promise.all([
+		Promise.all(action_slots(action).map(async (slot) => await launch_review(lane, action, slot))),
+		launch_pair(lane, action),
+	])
 
 	return answers.find((reply) => !reply.is_success) ?? SUCCESS
 }
 
 // An OpenAI lane's successor is its supervisor's to start, never a relaunch's.
-function relaunch(lane: LaneInfo, stop: ShipStop): BrokerAnswer {
+async function relaunch(lane: LaneInfo, stop: ShipStop): Promise<BrokerAnswer> {
 	if (lane_relaunch.is_openai_lane(lane)) {
 		return failure('an OpenAI lane is relaunched by its own supervisor')
 	}
 
 	const invocation = lane_child_invocation.ship_stop_invocation(lane.issue, stop)
-	const phase = agent_role_profile.IMPLEMENTATION_PHASE
-	const result = lane_relaunch.relaunch(lane, invocation, phase, console.error)
+	const phase = agent_profile_schema.IMPLEMENTATION_PHASE
+	const result = await lane_relaunch.relaunch(lane, invocation, phase, console.error)
 
 	return result.kind === 'launched'
 		? SUCCESS
@@ -208,7 +224,7 @@ function relaunch(lane: LaneInfo, stop: ShipStop): BrokerAnswer {
 async function perform(lane: LaneInfo, action: BrokerAction): Promise<BrokerAnswer> {
 	if (await lane_parked.is_parked(lane.issue)) return failure('the issue is parked')
 
-	if (action.kind === 'relaunch') return relaunch(lane, action.stop)
+	if (action.kind === 'relaunch') return await relaunch(lane, action.stop)
 
 	return await launch_reviews(lane, action)
 }

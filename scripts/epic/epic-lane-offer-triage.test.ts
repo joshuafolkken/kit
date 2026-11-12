@@ -43,7 +43,6 @@ function request(is_all_lanes = true): LaneRequest {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	issue_list.mockResolvedValue(listing_outcome('[]'))
 })
 

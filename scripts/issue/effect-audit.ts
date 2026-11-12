@@ -1,4 +1,5 @@
 import { expected_effect_lint } from './expected-effect-lint'
+import { issue_body_keys } from './issue-body-keys'
 import { issue_cite } from './issue-cite'
 import { has_label_name, MEASURED_LABEL, MEASURED_UNMET_LABEL } from './issue-labels'
 import { issue_sample_gate } from './issue-sample-gate'
@@ -37,7 +38,7 @@ const RESULT_WORDS: Readonly<Record<EffectResult, string>> = {
 
 // Plain: the rows feed an issue body as well as the session, which links them where it prints them.
 function cite(issue: SearchIssue): string {
-	return issue_cite.plain(issue.number)
+	return issue_cite.plain_for('linked', issue.number)
 }
 
 // The closed time-shortening issues of the window. The search narrows by the declaration's words; the
@@ -131,14 +132,14 @@ function draft_title(row: AuditRow): string {
 
 function background_lines(origin: string, measurements: string): ReadonlyArray<string> {
 	return [
-		'## 背景',
+		issue_body_keys.heading('background'),
 		'',
-		'- 種別: 非不具合',
-		'- 目的: 機能改善',
-		'- 人の判断: 不要',
-		'- 優先度: 通常',
-		'- 規模見積もり: 約 <N> ファイル / <M> 行（テスト除く）',
-		`- 出どころ: ${measurements} の計測（\`measured:unmet\`）`,
+		issue_body_keys.line('kind', 'non_bug'),
+		issue_body_keys.line('purpose', 'improvement'),
+		issue_body_keys.line('judgement', 'not_needed'),
+		issue_body_keys.line('priority', 'normal'),
+		`${issue_body_keys.prefix('size')} 約 <N> ファイル / <M> 行（テスト除く）`,
+		`${issue_body_keys.prefix('source')} ${measurements} の計測（\`measured:unmet\`）`,
 		'',
 		`${origin} で足した機構は、後続計測 ${measurements} で期待効果に届かなかった。効かない機構は利用者の実行時間・読む量・保守の負担を増やすので、撤去するか、効く範囲に縮小する。`,
 	]
@@ -153,16 +154,16 @@ function draft_body(row: AuditRow): string {
 	return [
 		...background_lines(origin, measurements),
 		'',
-		'## 現象',
+		issue_body_keys.heading('symptom'),
 		'',
 		`- ${origin} の期待効果: ${effect_text(row.origin.body)}`,
 		`- 計測 ${measurements} の結果: 届かなかった`,
 		'',
-		'## 期待結果',
+		issue_body_keys.heading('expected'),
 		'',
 		`- ${origin} で足した機構が撤去されているか、効く範囲に縮小されている`,
 		'',
-		'## 受け入れ条件',
+		issue_body_keys.heading('criteria'),
 		'',
 		`- [ ] ${origin} で足した機構を撤去するか縮小し、どちらを選んだかとその理由を記録する`,
 		'',

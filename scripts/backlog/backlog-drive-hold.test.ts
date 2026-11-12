@@ -3,11 +3,34 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 // joshuafolkken/kit#3995: the driver dispatches the moment a lane frees, and a free lane it leaves
 // empty is recorded with why — the offer that started nothing, or the hand-back to a session.
 
-const record_held = vi.hoisted(() => vi.fn(async () => undefined))
-const record_released = vi.hoisted(() => vi.fn(async () => undefined))
+const writes = vi.hoisted((): Array<string> => [])
+const record_held = vi.hoisted(() =>
+	vi.fn(async () => {
+		writes.push('held')
+	}),
+)
+const record_released = vi.hoisted(() =>
+	vi.fn(async () => {
+		writes.push('released')
+	}),
+)
+const mark = vi.hoisted(() =>
+	vi.fn(async (reason: string) => {
+		writes.push(`mark ${reason}`)
+	}),
+)
+const clear = vi.hoisted(() =>
+	vi.fn(async () => {
+		writes.push('clear')
+	}),
+)
 
 vi.mock('#scripts/lane/lane-ledger-write', () => ({
 	lane_ledger_write: { record_held, record_released },
+}))
+
+vi.mock('#scripts/lane/lane-hand-back-hold', () => ({
+	lane_hand_back_hold: { clear, mark },
 }))
 
 const { backlog_drive } = await import('./backlog-drive')
@@ -21,6 +44,8 @@ const WAIT_REASON = 'offer:wait'
 const CHAIN_REASON = 'offer:watch:chain'
 const WAITED_ISSUE = 4496
 const WINDOW_END = { reason: 'window', token: undefined, issue: undefined }
+// A full pool's hand-back: one release of the open hold, then the mark.
+const FULL_HAND_BACK = ['released', 'clear', 'mark hand-back:window']
 
 async function free(): Promise<number> {
 	return 1
@@ -31,8 +56,7 @@ async function full(): Promise<number> {
 }
 
 beforeEach(() => {
-	record_held.mockClear()
-	record_released.mockClear()
+	writes.length = 0
 })
 
 describe('backlog_drive.run_loop — a freed lane', () => {
@@ -196,5 +220,38 @@ describe('backlog_drive_hold.recorder — end', () => {
 		await holds.hold(undefined)
 
 		expect(record_released).toHaveBeenCalledTimes(2)
+	})
+})
+
+// joshuafolkken/kit#7159: a full pool's hand-back leaves a mark for whoever records the lanes it frees.
+describe('backlog_drive_hold.recorder — hand-back mark', () => {
+	it('writes the release and then the mark when a full pool hands back', async () => {
+		await backlog_drive_hold.recorder(full).end(WINDOW_END)
+
+		expect(writes).toStrictEqual(FULL_HAND_BACK)
+	})
+
+	it('marks without a second release when the full pool already released', async () => {
+		const holds = backlog_drive_hold.recorder(full)
+
+		await holds.hold(WAIT_REASON)
+		await holds.end(WINDOW_END)
+
+		expect(writes).toStrictEqual(FULL_HAND_BACK)
+	})
+
+	it('clears the mark on every ledger line the driver writes', async () => {
+		const holds = backlog_drive_hold.recorder(free)
+
+		await holds.hold(WAIT_REASON)
+		await holds.end({ reason: 'stop', token: 'stop', issue: undefined })
+
+		expect(writes).toStrictEqual(['held', 'clear', 'released', 'clear'])
+	})
+
+	it('leaves no mark when a lane is free at the hand-back', async () => {
+		await backlog_drive_hold.recorder(free).end(WINDOW_END)
+
+		expect(mark).not.toHaveBeenCalled()
 	})
 })

@@ -47,7 +47,6 @@ function read_tree_file(path: string): string {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	tree.package_json = PACKAGE_JSON
 	tree.workspace_yaml = WORKSPACE_WITH_CAP
 	read_mock.mockImplementation(read_tree_file)

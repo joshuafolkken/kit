@@ -6,7 +6,7 @@ import type { GitState } from './start-plan'
 import { start_steps } from './start-steps'
 import { working_tree_fixture } from './working-tree-fixture'
 
-const { MANIFEST, committed_repository, git, remove_all, repository, write } = working_tree_fixture
+const { MANIFEST, committed_repository, git, repository, write } = working_tree_fixture
 const DIRTY_REFUSAL = 'josh start refuses to run'
 const STATUS = ['status', '--porcelain']
 const EDITED_MANIFEST = '{ "name": "fixture", "private": true }\n'
@@ -44,7 +44,6 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.restoreAllMocks()
-	remove_all()
 })
 
 describe('josh start — a working tree with uncommitted changes (#3835)', () => {

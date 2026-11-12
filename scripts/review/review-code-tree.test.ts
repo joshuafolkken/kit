@@ -1,8 +1,9 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { git_command } from '#scripts/git/git-command'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import ts from 'typescript'
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { review_code_tree } from './review-code-tree'
 import { review_stamps } from './review-stamps'
 
@@ -10,7 +11,8 @@ import { review_stamps } from './review-stamps'
 // them through. Real files in a temp root; TypeScript is passed in, because the temp root has none to
 // resolve — which is itself the case of a consumer without it.
 
-const ROOT = mkdtempSync(path.join(tmpdir(), 'josh-review-code-tree-'))
+const make_directory = temporary_directory('suite')
+const ROOT = make_directory('josh-review-code-tree-')
 const RECORD_PATH = path.join(ROOT, 'round1-code.json')
 const SOURCE = 'src/thing.ts'
 const OTHER_SOURCE = 'src/other.ts'
@@ -20,6 +22,7 @@ const HOOK = '.claude/hooks/guard.js'
 const DELETED = 'src/gone.ts'
 const BASE = '0123456789abcdef0123456789abcdef01234567'
 const CODE = 'const value = 1\n'
+const CHANGED_CODE = 'const value = 2\n'
 
 function write(relative: string, text: string): void {
 	mkdirSync(path.dirname(path.join(ROOT, relative)), { recursive: true })
@@ -34,13 +37,20 @@ function stamp_of(files: Record<string, string>): {
 	return { taken_at: '', files, base: BASE }
 }
 
+// `git show <base>:<path>` answering from `files` with the final newline stripped, as `git_spawn.read`
+// returns it, and failing for a path the base does not hold.
+function base_holds(files: Record<string, string>): void {
+	vi.spyOn(git_command, 'show_file').mockImplementation(async (spec) => {
+		const text = files[spec.slice(BASE.length + 1)]
+		if (text === undefined) throw new Error(`fatal: path not in ${spec}`)
+
+		return text.replace(/\n$/u, '')
+	})
+}
+
 afterEach(() => {
 	vi.restoreAllMocks()
 	rmSync(RECORD_PATH, { force: true })
-})
-
-afterAll(() => {
-	rmSync(ROOT, { recursive: true, force: true })
 })
 
 describe('review_code_tree.tree_of — which paths get a code digest', () => {
@@ -69,7 +79,7 @@ describe('review_code_tree.comment_only — the paths whose code the fixes left 
 		const before = review_code_tree.tree_of(ROOT, [SOURCE, OTHER_SOURCE], ts)
 
 		write(SOURCE, `// Explained.\n${CODE}`)
-		write(OTHER_SOURCE, 'const value = 2\n')
+		write(OTHER_SOURCE, CHANGED_CODE)
 		const after = review_code_tree.tree_of(ROOT, [SOURCE, OTHER_SOURCE], ts)
 
 		expect(review_code_tree.comment_only(stamp_of(before), after, BASE)).toStrictEqual([SOURCE])
@@ -95,6 +105,78 @@ describe('review_code_tree.comment_only — the paths whose code the fixes left 
 		expect(review_code_tree.comment_only(stamp_of({ [SOURCE]: 'digest' }), {}, BASE)).toStrictEqual(
 			[],
 		)
+	})
+})
+
+// joshuafolkken/kit#5656: before round 1 has recorded anything, the base's blobs stand in for the
+// snapshot.
+describe('review_code_tree.inert_since — the paths whose code the base already had', () => {
+	it('names a file whose change is only a comment, and not one whose code changed', async () => {
+		base_holds({ [SOURCE]: CODE, [OTHER_SOURCE]: CODE })
+		write(SOURCE, `// Explained.\n${CODE}`)
+		write(OTHER_SOURCE, CHANGED_CODE)
+
+		expect(
+			await review_code_tree.inert_since(BASE, [SOURCE, OTHER_SOURCE], ROOT, ts),
+		).toStrictEqual([SOURCE])
+	})
+
+	it('names neither a file new since the base nor a documentation path', async () => {
+		base_holds({ [DOCUMENT]: '# Guide\n' })
+		write(SOURCE, CODE)
+		write(DOCUMENT, '# Guide\n')
+
+		expect(await review_code_tree.inert_since(BASE, [SOURCE, DOCUMENT], ROOT, ts)).toStrictEqual([])
+	})
+
+	it('names nothing where TypeScript cannot be resolved from the project', async () => {
+		base_holds({ [SOURCE]: CODE })
+		write(SOURCE, CODE)
+
+		expect(await review_code_tree.inert_since(BASE, [SOURCE], ROOT)).toStrictEqual([])
+	})
+})
+
+// joshuafolkken/kit#5789: an import whose bindings stay and whose module path alone moved.
+describe('review_code_tree.inert_since — a change to import specifiers only', () => {
+	const OLD_IMPORT = "import { profile } from '#scripts/agent/agent-role-profile'\n"
+	const NEW_IMPORT = "import { profile } from '#scripts/agent/agent-profile-schema'\n"
+
+	it('names a file whose only change is the module specifier of a binding import', async () => {
+		base_holds({ [SOURCE]: `${OLD_IMPORT}${CODE}` })
+		write(SOURCE, `${NEW_IMPORT}${CODE}`)
+
+		expect(await review_code_tree.inert_since(BASE, [SOURCE], ROOT, ts)).toStrictEqual([SOURCE])
+	})
+
+	it('does not name a file whose body changed beside the import', async () => {
+		base_holds({ [SOURCE]: `${OLD_IMPORT}${CODE}` })
+		write(SOURCE, `${NEW_IMPORT}${CHANGED_CODE}`)
+
+		expect(await review_code_tree.inert_since(BASE, [SOURCE], ROOT, ts)).toStrictEqual([])
+	})
+
+	it('does not name a file whose import changed a binding name', async () => {
+		base_holds({ [SOURCE]: `${OLD_IMPORT}${CODE}` })
+		write(SOURCE, `import { schema } from '#scripts/agent/agent-profile-schema'\n${CODE}`)
+
+		expect(await review_code_tree.inert_since(BASE, [SOURCE], ROOT, ts)).toStrictEqual([])
+	})
+
+	it('does not name a file whose side-effect import moved, since that path alone decides what runs', async () => {
+		base_holds({ [SOURCE]: `import './setup-old'\n${CODE}` })
+		write(SOURCE, `import './setup-new'\n${CODE}`)
+
+		expect(await review_code_tree.inert_since(BASE, [SOURCE], ROOT, ts)).toStrictEqual([])
+	})
+
+	it('keeps the round-1 digest sensitive to a moved import', () => {
+		write(SOURCE, `${OLD_IMPORT}${CODE}`)
+		const before = review_code_tree.tree_of(ROOT, [SOURCE], ts)
+
+		write(SOURCE, `${NEW_IMPORT}${CODE}`)
+
+		expect(review_code_tree.tree_of(ROOT, [SOURCE], ts)).not.toStrictEqual(before)
 	})
 })
 

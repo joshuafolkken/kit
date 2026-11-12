@@ -1,7 +1,7 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { execaSync } from 'execa'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { init } from './init'
@@ -18,7 +18,7 @@ function fake_lefthook_result(exit_code: number | undefined): ReturnType<typeof 
 }
 
 // Unique per run, guarded by `shared-temporary-path.test.ts` (joshuafolkken/kit#1517).
-const TEST_DIR = mkdtempSync(path.join(tmpdir(), 'init-test-'))
+const TEST_DIR = temporary_directory('suite')('init-test-')
 const TEMPLATE_PATH = path.join(TEST_DIR, 'template.properties')
 const DEST_PATH = path.join(TEST_DIR, 'sonar-project.properties')
 
@@ -187,8 +187,8 @@ describe('apply_package_json_merges — generated config dependencies', () => {
 const PUBLISHED_PIN = '12.6.0+sha512.abc'
 const PACKAGE_MANAGER_FIELD = 'pnpm@12.7.0'
 
-// pnpm strips `packageManager` when it publishes, so the installed kit carries its pin only in
-// `devEngines`; the consumer used to get the bare `>=12.1.0` range instead (#2710).
+// pnpm strips `packageManager` when publishing, so the installed kit's `devEngines` pin must supply
+// the consumer's package-manager version (#2710).
 describe('resolve_kit_package_manager', () => {
 	it('prefers the packageManager field', () => {
 		const manifest = { packageManager: PACKAGE_MANAGER_FIELD }

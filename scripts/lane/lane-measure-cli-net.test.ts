@@ -1,22 +1,19 @@
 import { randomUUID } from 'node:crypto'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_ledger_write } from './lane-ledger-write'
 import { lane_measure_cli } from './lane-measure-cli'
 
-// joshuafolkken/kit#4749: `josh lane:net <issue>` prints a lane's net minutes, the waits its parks and
-// outages stood taken out and rounded up (34.33 → 35, so a lane over 40 minutes never prints 40), as the one number a causing-lane declaration copies.
+const make_directory = temporary_directory('suite')
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'lane-measure-cli-net-test-'))
+// joshuafolkken/kit#4749: `josh lane:net <issue>` prints a lane's net minutes, the waits its parks and
+// outages stood taken out and rounded up, so a lane above the overrun threshold cannot print the threshold itself.
+
+const scratch = make_directory('lane-measure-cli-net-test-')
 const ISSUE = 4695
 const FAILURE = 1
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
 
 beforeEach(() => {
 	vi.spyOn(console, 'error').mockReturnValue(undefined)

@@ -1,0 +1,1 @@
+- rf:assumptions | low | templates/AGENTS.basic.md:3 | 2026-11-03 | #6036

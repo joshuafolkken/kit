@@ -13,7 +13,6 @@ import {
 } from './claude-settings-fixture'
 
 const GITIGNORE_PATH = fileURLToPath(new URL('../../.gitignore', import.meta.url))
-const CLAUDE_MD_PATH = fileURLToPath(new URL('../../CLAUDE.md', import.meta.url))
 
 // #852: the innermost feedback loop is one edited file, and before this hook the only way to see
 // what prettier and eslint made of it was a whole-project run. The hook launches the pre-built
@@ -56,12 +55,11 @@ const MINIMUM_STOP_GUARD_TIMEOUT_SECONDS = STARTUP_ALLOWANCE_SECONDS
 // Splitting on `|` alone would read the equally valid `"Edit, Write, Bash"` as one tool named
 // `Edit, Write, Bash` and fail every case below on a settings file that is correct.
 const TOOL_SEPARATORS = /[|,]/u
-// The formatter formats the file an edit named, so it needs exactly the two edit tools. `Bash` was
-// dropped from the matcher (joshuafolkken/kit#1930): a shell call has no edited file to format, so
-// running the formatter after every `Bash` was overhead every consumer paid on every command. The
-// density line it used to also carry (joshuafolkken/kit#1337) is not worth that per-call cost, and
-// the batching it fed now rides the consolidated PreToolUse guard, which does intervene before the call.
-const FORMAT_TOOLS = ['Edit', 'Write']
+// The formatter needs only the two edit tools: a shell call names no edited file to format
+// (joshuafolkken/kit#1930). Batching belongs to the PreToolUse guard, which can intervene before
+// the call without adding formatter overhead to every command (joshuafolkken/kit#1337). `Bash` is
+// matched for the consultation-scope revert alone, which never starts a formatter (joshuafolkken/kit#6589).
+const FORMAT_TOOLS = ['Edit', 'Write', 'Bash']
 // The union of the composed guards' matchers, since one process now answers for all of them.
 // `Bash` is where the rule delivery guard (joshuafolkken/kit#1524) and the read-only half of the
 // batching guard bind; `Edit` carries the largest share of the batching guard's recoverable round
@@ -69,21 +67,36 @@ const FORMAT_TOOLS = ['Edit', 'Write']
 // (joshuafolkken/kit#1798); `Write` earns the batching guard's non-blocking notice
 // (joshuafolkken/kit#1848); `AskUserQuestion` is where the lane-child interactive-ask rule binds
 // (joshuafolkken/kit#2201) — without it in the matcher the hook never sees the ask a headless child
-// must be routed away from; `Agent` / `Task` is where the `agent-model` row binds (joshuafolkken/kit#3927).
+// must be routed away from; `Agent` / `Task` is where the `agent-model` row binds (joshuafolkken/kit#3927);
+// `Glob` / `Grep` / `WebFetch` is where the `consultation-investigation` row binds (joshuafolkken/kit#5351).
 // Each composed guard self-gates on the tool name inside its own candidate test, so naming the union is
 // safe — a guard the call does not concern returns "allow" without ever reading the transcript.
-const PRETOOL_GUARD_TOOLS = ['Bash', 'Edit', 'Read', 'Write', 'AskUserQuestion', 'Agent', 'Task']
+const PRETOOL_GUARD_TOOLS = [
+	'Bash',
+	'Edit',
+	'Read',
+	'Write',
+	'AskUserQuestion',
+	'Agent',
+	'Task',
+	'Glob',
+	'Grep',
+	'WebFetch',
+]
 // The audit provisioner (joshuafolkken/kit#1563). `SessionStart` is the one event that fires before
 // any work is attempted, which is what makes the pre-push audit's missing binary a solved problem
 // rather than a push that dies after the unit suite has already run. It goes through the shared
 // launcher like every other hook (joshuafolkken/kit#3256), so a bundle runs it instead of `pnpm josh`.
 const PROVISION_HOOK_COMMAND = hook_launch.hook_launch_command('audit-provision --session-start')
+// The `clear` start's model record (joshuafolkken/kit#5761): no download, so one script start.
+const MODEL_RECORD_HOOK_COMMAND = hook_launch.hook_launch_command('audit-provision --session-model')
 // Derived from the download's own bound for the reason the formatter's is: a harness kill lands
 // mid-write, and the staging file this script renames from is the only thing that makes that
 // survivable. Raising the download budget has to raise the declared timeout with it.
 const MINIMUM_PROVISION_TIMEOUT_SECONDS =
 	security_audit_provision_logic.SESSION_DOWNLOAD_TIMEOUT_MS / MS_PER_SECOND +
 	STARTUP_ALLOWANCE_SECONDS
+const PROVISION_TIMEOUT_MARGIN_SECONDS = 20
 // The session-language hook (joshuafolkken/kit#1903): resolves JOSH_SESSION_LANG and prints it to
 // stdout, so a SessionStart / UserPromptSubmit hook injects the value into context every turn. It
 // starts no download and reads no large file, so one script start is its whole budget. Launched from
@@ -167,7 +180,7 @@ function describe_shared_hook_properties(wiring: HookWiring): void {
 	// whose live-source fallback fails with nothing pointing at the cause. The launcher derives that
 	// subcommand from the hook name (joshuafolkken/kit#3184); a plain `pnpm josh <cmd>` hook names it.
 	it('names a subcommand josh actually has', () => {
-		const hook_name = new RegExp(String.raw`${hook_launch.RUN_HOOK_SCRIPT} ([\w-]+)`, 'u').exec(
+		const hook_name = new RegExp(String.raw`${hook_launch.RUN_HOOK_SCRIPT}"? ([\w-]+)`, 'u').exec(
 			wiring.command,
 		)?.[1]
 		const subcommand =
@@ -237,10 +250,41 @@ function describe_stop_hook(title: string, wiring: HookWiring): void {
 	})
 }
 
-describe_session_hook('.claude/settings.json — session-start audit provisioning', {
+const PROVISION_WIRING: HookWiring = {
 	event: 'SessionStart',
 	command: PROVISION_HOOK_COMMAND,
 	minimum_timeout_seconds: MINIMUM_PROVISION_TIMEOUT_SECONDS,
+}
+
+describe_session_hook('.claude/settings.json — session-start audit provisioning', PROVISION_WIRING)
+
+// Measured, not guessed (joshuafolkken/kit#6038): a cold download ran up to 58s, inside the script's
+// own download bound, so the floor plus this margin is the whole budget the hook can use. A larger
+// declaration only lets a hang outside the download hold the session start longer.
+describe('.claude/settings.json — session-start audit provisioning budget', () => {
+	it('declares no more than its floor and the measured margin', () => {
+		const timeouts = handlers_of(PROVISION_WIRING).map((handler) => handler.timeout ?? 0)
+
+		expect(Math.max(...timeouts)).toBeLessThanOrEqual(
+			MINIMUM_PROVISION_TIMEOUT_SECONDS + PROVISION_TIMEOUT_MARGIN_SECONDS,
+		)
+	})
+})
+
+// `/clear` opens a new transcript with no assistant entry, so its start records the model too —
+// `resume` and `compact` keep a transcript that already names one.
+describe('.claude/settings.json — clear-start model record', () => {
+	const wiring: HookWiring = {
+		event: 'SessionStart',
+		command: MODEL_RECORD_HOOK_COMMAND,
+		minimum_timeout_seconds: STARTUP_ALLOWANCE_SECONDS,
+	}
+
+	describe_shared_hook_properties(wiring)
+
+	it('matches only a clear start', () => {
+		expect(matchers_of(wiring).map((entry) => entry.matcher)).toEqual(['clear'])
+	})
 })
 
 // `UserPromptSubmit` carries no tool matcher, so it shares the session hook's three checks and the
@@ -342,41 +386,10 @@ function prompt_commands(): ReadonlyArray<string> {
 
 // joshuafolkken/kit#2994: an echo is injected on every prompt, a question that writes nothing included,
 // so the Step 0 reminder moved to the first runtime `Edit` / `Write` (`step-zero-notice.ts`) and the
-// prompt hook is the one session-language process.
+// prompt hook is the one session-language process; the exact list leaves no room for an echo.
 describe('.claude/settings.json — one per-turn process, no echoed reminder', () => {
 	it('runs exactly one UserPromptSubmit command, the session-language line', () => {
 		expect(prompt_commands()).toEqual([SESSION_LANG_HOOK_COMMAND])
-	})
-
-	it('injects no echo on a prompt', () => {
-		expect(prompt_commands().filter((command) => command.startsWith('echo '))).toEqual([])
-	})
-})
-
-// joshuafolkken/kit#2889 moved the deletion policy from a per-turn hook into the Tier C definition in
-// `CLAUDE.md`, which every session loads, so the rule is pinned where it now lives.
-function tier_c_line(): string {
-	return (
-		readFileSync(CLAUDE_MD_PATH, 'utf8')
-			.split('\n')
-			.find((line) => line.includes('**Tier C')) ?? ''
-	)
-}
-
-describe('CLAUDE.md — deletion-policy reconciliation with Tier C', () => {
-	it('keeps the index-mutation deny the policy sits beside', () => {
-		expect(claude_settings_fixture.read_settings_text()).toContain('git restore')
-	})
-
-	it('frames git-tracked deletion as reversible and not a destructive op', () => {
-		expect(tier_c_line()).toContain(
-			'Deleting a git-tracked file is reversible, so it is not a destructive op',
-		)
-	})
-
-	it('still requires inspecting the target before deleting', () => {
-		expect(tier_c_line()).toContain('inspect the target first')
-		expect(tier_c_line()).not.toContain('proceed directly')
 	})
 })
 

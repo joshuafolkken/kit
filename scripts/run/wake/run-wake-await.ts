@@ -15,7 +15,8 @@ import type { WakeContext } from './run-wake-describe'
 // while the launch that will write it is alive, and gives up once that launch is gone.
 //
 // **While a launch is pending, only a live owner's record is its parent's**: a dead owner's record is one
-// an earlier run left, and supervising it would wake that run beside the parent just launched.
+// an earlier run left, and supervising it would wake that run beside the parent just launched — except
+// the record the launcher itself began for that launch (`is_launched_record`).
 
 interface AwaitPorts {
 	read_carry: () => CarryRead
@@ -23,6 +24,8 @@ interface AwaitPorts {
 	// no such launch is alive.
 	pending_invocation: () => string | undefined
 	is_owner_live: (carry: RunCarry) => boolean
+	// Whether the record is the one `josh backlogrun` began and handed off for the pending launch.
+	is_launched_record: (carry: RunCarry) => boolean
 	sleep: (milliseconds: number) => Promise<void>
 }
 
@@ -31,8 +34,24 @@ type ClaimResult =
 	| { kind: 'running' }
 	| { kind: 'refused'; carry_kind: CarryRead['kind'] }
 
+// **The record the launcher handed off is the pending launch's, whether or not the launcher still
+// lives** (joshuafolkken/kit#5516): `josh backlogrun` owns it only until this supervisor adopts it, and a
+// launcher without a terminal draws one board frame and exits before the first read here.
 function is_live_carry(read: CarryRead, ports: AwaitPorts): boolean {
-	return read.kind === 'carried' && ports.is_owner_live(read.carry)
+	if (read.kind !== 'carried') return false
+
+	return ports.is_owner_live(read.carry) || ports.is_launched_record(read.carry)
+}
+
+// Handed off, for the pending launch's invocation, started at that launch — what preflight begins.
+function is_launched_record(carry: RunCarry, git_directory: string): boolean {
+	const launch = backlogrun_launch.pending_launch(git_directory)
+	if (launch === undefined || carry.is_handed_off !== true) return false
+
+	return (
+		carry.invocation === launch.invocation &&
+		Date.parse(carry.started_at) === Date.parse(launch.started_at)
+	)
 }
 
 // What the supervisor claims its record for: the live carried run, else the launch about to carry one,
@@ -64,6 +83,7 @@ function ports_of(context: WakeContext): AwaitPorts {
 		read_carry: () => run_carry.read_carry(context.carry_target),
 		pending_invocation: () => backlogrun_launch.pending_launch(context.git_directory)?.invocation,
 		is_owner_live: (carry) => run_carry.is_owner_live(carry),
+		is_launched_record: (carry) => is_launched_record(carry, context.git_directory),
 		sleep: poll.sleep,
 	}
 }

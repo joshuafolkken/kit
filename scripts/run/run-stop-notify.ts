@@ -5,7 +5,7 @@ import type { CarryRead } from '#scripts/run/carry/run-carry'
 // remaining child blocked behind a parked one, the backlog drained of anything runnable, the failure
 // streak tripped — each ends the run, and while the session is the person's the stop is there in the
 // conversation. After a cut the parent is a headless `claude -p backlogrun`, so the stop would reach
-// its own transcript and nowhere else. The 15-minute heartbeat stays a pull; a *stop* is a state
+// its own transcript and nowhere else. The heartbeat stays a pull; a *stop* is a state
 // change, and a state change is what `confirmation` exists to push.
 //
 // **This is the decision, kept apart from the send so the dedup can be pinned without a Telegram.**

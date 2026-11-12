@@ -11,11 +11,25 @@ const mocked_get_default_branch = vi.mocked(git_command.get_default_branch)
 mocked_branch.mockResolvedValue('feature-branch')
 mocked_get_default_branch.mockResolvedValue('main')
 
+// The spies watch the module's first import, so a side effect at load time is caught; their counts are
+// read before `beforeEach` clears them.
+const console_spy = vi.spyOn(console, 'info').mockImplementation(vi.fn())
+const exit_spy = vi.spyOn(process, 'exit').mockImplementation(vi.fn() as never)
 const { check_main_branch } = await import('./prevent-main-commit')
+const import_calls = { info: console_spy.mock.calls.length, exit: exit_spy.mock.calls.length }
+
+console_spy.mockRestore()
+exit_spy.mockRestore()
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	mocked_get_default_branch.mockResolvedValue('main')
+})
+
+describe('prevent-main-commit — side-effect-free import', () => {
+	it('does not call console.info or process.exit on import', () => {
+		expect(import_calls.info).toBe(0)
+		expect(import_calls.exit).toBe(0)
+	})
 })
 
 describe('check_main_branch', () => {

@@ -102,13 +102,15 @@ function status_pages(...pages: ReadonlyArray<ReadonlyArray<Record<string, unkno
 	)
 }
 
-// The page a one-page read of a commit listing gets: a slurped answer of exactly one page is that
-// page, and anything else is answered as routed.
+// The page a one-page read of a commit listing gets: a slurped answer of exactly one page — a record
+// carrying the listing's `total_count` — is that page, and anything else, a bare-array listing such as
+// the reviews one included, is answered as routed.
 function one_page(body: string): string {
-	const pages = json_value.parse_array(body)
-	const [page] = pages ?? []
+	const pages = json_value.parse_array(body) ?? []
+	const [page] = pages
+	const is_slurped_page = pages.length === 1 && json_value.is_record(page) && 'total_count' in page
 
-	return pages?.length === 1 && json_value.is_record(page) ? JSON.stringify(page) : body
+	return is_slurped_page ? JSON.stringify(page) : body
 }
 
 // `git_gh_conditional.read_conditional` the way GitHub answers it, over the `exec_gh_api` router: the

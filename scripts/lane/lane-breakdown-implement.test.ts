@@ -4,7 +4,7 @@ import { lane_breakdown_implement } from './lane-breakdown-implement'
 import type { ToolCall } from './lane-transcript-calls'
 import { lane_transcript_stats } from './lane-transcript-stats'
 
-// joshuafolkken/kit#4995: #4970's 51-minute implementation was one span, so which command took its
+// joshuafolkken/kit#4995: #4970's implementation was one span, so which command took its
 // time was unknown. Its tool calls split it by kind; what no call spent is the edits and the thinking.
 
 const MINUTE_MS = 60_000
@@ -16,6 +16,9 @@ const GIT_STATUS = 'git status'
 const OTHER_BASH = 'other bash'
 const GENERAL_PURPOSE = 'subagent: general-purpose'
 const REVIEWER = 'subagent: reviewer'
+const RUN_REVIEW = 'run:review'
+const CHAIN_OPEN = 'run:chain open'
+const OPEN_COMMAND = 'pnpm josh run:chain 1'
 
 const BREAKDOWN: Breakdown = {
 	stages: [{ name: 'implement', ms: IMPLEMENT_TO - IMPLEMENT_FROM }],
@@ -67,7 +70,7 @@ function kinds_of(calls: ReadonlyArray<ToolCall>): Array<readonly [string, numbe
 	return detail.kinds.map((kind) => [kind.name, kind.ms / MINUTE_MS] as const)
 }
 
-// joshuafolkken/kit#5293: #5197's 13.5 minutes of other bash were run:review waits no kind named.
+// joshuafolkken/kit#5293: run:review waits need their own kind so they do not hide in other bash.
 describe('lane_breakdown_implement.of — run:review and ship', () => {
 	it('counts run:review and ship / ship:wait apart from other bash', () => {
 		const calls = [
@@ -80,9 +83,61 @@ describe('lane_breakdown_implement.of — run:review and ship', () => {
 
 		expect(kinds_of(calls)).toStrictEqual([
 			[REMAINDER, 29],
-			['run:review', 12],
+			[RUN_REVIEW, 12],
 			['ship / ship:wait', 9],
 			[OTHER_BASH, 1],
+		])
+	})
+
+	// joshuafolkken/kit#5585: `ship:evidence` runs the command it wraps, so it is not ship time.
+	it('counts ship:evidence by the command it wraps, not as ship', () => {
+		const calls = [bash(11, 10, 'pnpm josh ship:evidence 1 -- pnpm josh test:pinned')]
+
+		expect(kinds_of(calls)).toStrictEqual([
+			[REMAINDER, 41],
+			['test', 10],
+		])
+	})
+})
+
+// joshuafolkken/kit#6152: one compound call counts once, under one kind, and run:chain is review time.
+describe('lane_breakdown_implement.of — run:chain', () => {
+	it('counts a chained call once, under run:chain open when it runs run:chain', () => {
+		const calls = [
+			bash(11, 5, OPEN_COMMAND),
+			bash(
+				20,
+				5,
+				'pnpm josh issue:comment 1 --body-file b.md && pnpm josh test:unit a.test.ts && pnpm josh run:chain 1',
+			),
+		]
+
+		expect(kinds_of(calls)).toStrictEqual([
+			[REMAINDER, 41],
+			[CHAIN_OPEN, 10],
+		])
+	})
+
+	it('separates open and join, including fixing and resumed joins', () => {
+		const calls = [
+			bash(11, 5, OPEN_COMMAND),
+			bash(20, 2, 'pnpm josh run:chain 1 --join --fixing'),
+			bash(25, 1, 'pnpm josh run:chain 1 --from review:attest --join'),
+		]
+
+		expect(kinds_of(calls)).toStrictEqual([
+			[REMAINDER, 43],
+			[CHAIN_OPEN, 5],
+			['run:chain join', 3],
+		])
+	})
+
+	it('keeps a join flag on a separate command out of the chain arguments', () => {
+		const calls = [bash(11, 5, 'pnpm josh run:chain 1 && pnpm josh run:review --join')]
+
+		expect(kinds_of(calls)).toStrictEqual([
+			[REMAINDER, 46],
+			[CHAIN_OPEN, 5],
 		])
 	})
 })
@@ -213,5 +268,27 @@ describe('lane_breakdown_implement.read — window', () => {
 			until_ms: 80 * MINUTE_MS,
 		})
 		spy.mockRestore()
+	})
+})
+
+function edit(minute: number, tool: string): ToolCall {
+	return call({ minute, minutes: undefined, tool })
+}
+
+// joshuafolkken/kit#5835: a docs-only lane writes no `plan` event, so its first edit opens the
+// implementation.
+describe('lane_breakdown_implement.first_edit_ms', () => {
+	const span = { from_ms: IMPLEMENT_FROM, to_ms: IMPLEMENT_TO }
+
+	it('answers the earliest Edit or Write started inside the span', () => {
+		const calls = [edit(5, 'Edit'), edit(12, 'Read'), edit(20, 'Edit'), edit(15, 'Write')]
+
+		expect(lane_breakdown_implement.first_edit_ms(calls, span)).toBe(15 * MINUTE_MS)
+	})
+
+	it('answers undefined when no edit started inside the span', () => {
+		const calls = [edit(12, 'Read'), edit(30, 'Bash'), edit(90, 'Edit')]
+
+		expect(lane_breakdown_implement.first_edit_ms(calls, span)).toBeUndefined()
 	})
 })

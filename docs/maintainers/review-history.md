@@ -116,7 +116,7 @@ rule that enforces it:
   and explicit param and return types** — `eslint/rules/typescript.js` and `eslint/rules/promise.js`.
 - **Identical functions and repeated string literals** — `eslint/rules/sonarjs.js`.
 - **The quality limits** — `eslint/rules/code-quality.js` and `eslint/rules/sonarjs.js`, stated once
-  in `CLAUDE.md` and pinned against the rule objects by `eslint/quality-limits-document.test.ts`.
+  in `CLAUDE.md` and generated from the rule objects by `tools/document/generate-lint-prose.ts`.
 - **`function` syntax rather than an arrow const** — `func-style: declaration` in
   `eslint/rules/code-quality.js`; `eslint/base.js` allows the typed-const idiom only in the SvelteKit
   route, hook and param-matcher files (joshuafolkken/kit#3294).

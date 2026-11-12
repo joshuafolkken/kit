@@ -11,6 +11,7 @@ const UNDECLARED_BODY = '## 背景\n\n- 種別: 非不具合\n'
 const BOTH_BODY = '## 背景\n\n- 人の判断: 不要\n- 人の判断: 要\n'
 const FENCED_BODY = '## 背景\n\n```md\n- 人の判断: 不要\n```\n'
 const OUTSIDE_BACKGROUND_BODY = '## 背景\n\n- 種別: 非不具合\n\n## 期待結果\n\n- 人の判断: 不要\n'
+const DECISION_RULE = '- 判定規則: A で足りるなら A、そうでなければ B（#6403）'
 
 function filing_of(overrides: Partial<AutoOkFiling>): AutoOkFiling {
 	return {
@@ -100,4 +101,26 @@ describe('issue_auto_ok.declaration_problem', () => {
 			expect(problem).toContain('`- 人の判断: 要（<which one>）`')
 		},
 	)
+})
+
+describe('issue_auto_ok.decision_problem', () => {
+	it.each([
+		`${NEEDED_BODY}${DECISION_RULE}`,
+		`${NEEDED_BODY}${DECISION_RULE}`.replaceAll('\n', '\r\n'),
+	])('refuses human judgement beside a decision rule citing a measurement Issue', (body) => {
+		expect(issue_auto_ok.decision_problem(body)).toContain('- 人の判断: 不要')
+	})
+
+	it.each([
+		`${NOT_NEEDED_BODY}${DECISION_RULE}`,
+		NEEDED_BODY,
+		`${NEEDED_BODY}- 判定規則: A で足りるなら A、そうでなければ B`,
+		`${NEEDED_BODY}- 計測参照: #6403\n- 判定規則: A で足りるなら A`,
+		`${NEEDED_BODY}\`\`\`md\n${DECISION_RULE}\n\`\`\``,
+		`${NEEDED_BODY}~~~md\n${DECISION_RULE}\n~~~`,
+		`${NEEDED_BODY}    ${DECISION_RULE}`,
+		`${NEEDED_BODY}## 期待結果\n${DECISION_RULE}`,
+	])('accepts a body without a conflicting background declaration: %s', (body) => {
+		expect(issue_auto_ok.decision_problem(body)).toBeUndefined()
+	})
 })

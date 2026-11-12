@@ -1,21 +1,26 @@
 # The split assessment — one definition, every entry point
 
-Before any entry point starts work on an Issue, decide whether the request is **one** deliverable or
-several. Every command applies it identically.
+Before work on an Issue starts, decide whether it is **one** deliverable or several; every entry
+point applies this.
 
 ## The question
 
 **The default is not to split.** Two questions have to answer yes **together**:
 
-1. **Does the request contain two or more deliverables that could each be merged separately?**
-2. **Does the whole of it clearly exceed what one verification gate can confirm in one pass?** The
-   guide is **about 10 changed files and about 400 changed lines** (test files excluded).
-   Under that, it is one Issue however many separable pieces a reader can name inside it.
+1. Mergeable parts (separability)?
+2. Over guide? (test files excluded) Docs/snapshots/listings count.
 
-A change that must land in one commit to be correct is one deliverable however big it is; **separability
-alone no longer splits anything**. **"Clearly" is the operative word** — a run that has to argue past
-the numbers has answered no. They are read against the whole request's estimate, and 11 files is not
-thereby a split.
+The same trailing 3-day period as the implement budget;
+median implement minutes per 100 actual changed lines;
+implement budget ÷ measured minutes per 100 lines × 100 → line guide;
+line guide × (fallback file guide / fallback line guide) → file guide.
+Floor (also the unmeasured fallback):
+**more than 8 changed files or more than 200 changed lines**.
+
+Past **the cap (1.5 × guide)** or the bar (2 × budget): split or say why.
+Merged lanes' median actual / declared ratios per axis, apart from speed; unmeasured: 2.
+First `lane:plan` answers `split` past declared files × files ratio (files, hunks), bar (lines);
+`--single`, a re-plan or a dispatched lane → `size warning` (`lane-plan-size.ts`).
 
 ## The same two questions decide the filing-time fold
 
@@ -39,17 +44,20 @@ a judgement, so its `split` is the size condition met, not a decision to divide.
 
 ## Over the guide before the gate
 
-**Trigger: `pnpm josh main:merge` prints a `split notice`** — the branch's diff, untracked files
-included, answers `split` on `split:assess`; the first `pnpm josh lint:related` or `pnpm josh
-test:related` past the guide prints it earlier, once per Issue. Take one action on it, before `pnpm josh run:cut <N>`
-(`chain-rule.md` step 1) — the cut ends the turn, and the resumed run does not see the notice:
+**Size is judged before dispatch: at filing (`issue:file`) and at `lane:plan` only.
+A dispatched lane is never split: it is finished to the end, and never splits, spills or stops for size.**
 
-- Keep it one Issue — it must land together: one Issue comment with the line
-  `- 分割しない理由: <理由>`, citing the counts.
-- Carve the rest out — the unimplemented part merges separately: `pnpm josh issue:file --route split --found-during <N>`
-  it, narrow this Issue's acceptance criteria to this branch, then gate.
+**Trigger: a dispatched lane's first `lane:plan` is past its bar.** It answers `clear` with one
+`size warning` and nothing on the ledger; a re-plan, `run:cut` and `run:chain` print none. Go on implementing.
 
-Neither on record: the pre-gate `run:cut` answers `split-unresolved`. The notice never creates an epic.
+- An independent new requirement found in the lane → file it as an observation, without `--route split`.
+  `issue:file --route split --found-during <N>` from lane `#N` is refused.
+- At the merge, a diff past the Issue's declared size × the growth factor, capped at the guide
+  (no declaration: the guide), on either axis, is recorded as a pre-split miss with its declared and
+  actual size (`scripts/lane/lane-size-record.ts`). `pnpm josh lane:stats --period <days>` counts and lists the misses;
+  use them to tune the pre-dispatch assessment.
+
+The quality gates, the clash and unread checks, and the review stay stops. The warning never creates an epic.
 
 ## What each entry point does with the answer
 
@@ -73,8 +81,10 @@ condition to evaluate.** **An entry point that applies a different condition is 
 is the non-closing home for the split rationale.
 
 **Each split child is filed with the `route:split` label** —
-`pnpm josh issue:file "<sub-title>" --body-file <body-file> --route split` — and judged for
-`auto-ok` like any filing (`kickoff.md` → "Words typed after `new`").
+`pnpm josh issue:file "<sub-title>" --body-file .josh/tmp/body.md --route split` — and judged like any
+filing (`kickoff.md` → "Words typed after `new`").
+
+Over the bar before dispatch → a split-only unit answers question 1 (`scripts/backlog/backlog-drive-split-unit.ts`).
 
 ## Promote, or create a new epic
 
@@ -96,7 +106,7 @@ Issue, where the split creates the epic (`backlogrun-child.md` → "When `#N` is
 `fullrun` and `halfrun` **stop** after filing the children and the epic — typing `fullrun` approved
 **one** Issue. Report what was filed and end with:
 
-> Please run `backlogrun #<E> --only` to execute this epic.
+> Please run `pnpm josh backlogrun <E> --only` to execute this epic.
 
 ## There is no `kickoff epic`
 

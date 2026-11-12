@@ -1,14 +1,15 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { PACKAGE_JSON } from '#scripts/lib/package-manifest'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { execaSync } from 'execa'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { version_targets } from './version-targets'
 
 vi.mock('execa', () => ({ execaSync: vi.fn() }))
 
 const mocked_execa_sync = vi.mocked(execaSync)
+const make_directory = temporary_directory()
 
 type ExecaSyncResult = ReturnType<typeof execaSync>
 
@@ -33,12 +34,7 @@ function write_manifest(content: string): void {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
-	ctx.work_directory = mkdtempSync(path.join(tmpdir(), 'kit-workspace-'))
-})
-
-afterEach(() => {
-	rmSync(ctx.work_directory, { recursive: true, force: true })
+	ctx.work_directory = make_directory('kit-workspace-')
 })
 
 describe('version_targets.parse_global_version', () => {

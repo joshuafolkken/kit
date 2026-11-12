@@ -50,7 +50,7 @@ function arrange(window_minutes: number): void {
 
 beforeEach(() => {
 	vi.restoreAllMocks()
-	vi.clearAllMocks()
+
 	mocked_fetch_times.mockReturnValue(RELEASE_TIMES)
 })
 

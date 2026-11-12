@@ -7,8 +7,15 @@ import { git_push_transport } from './git-push-transport'
 import { git_spawn } from './git-spawn'
 import { git_spawn_sync } from './git-spawn-sync'
 
+const BRANCH_ARGUMENTS = ['rev-parse', '--abbrev-ref', 'HEAD'] as const
+
 async function branch(): Promise<string> {
-	return await git_spawn.read(['rev-parse', '--abbrev-ref', 'HEAD'])
+	return await git_spawn.read([...BRANCH_ARGUMENTS])
+}
+
+// The branch of another work tree of the repository — the primary checkout, read from a lane.
+async function branch_at(directory: string): Promise<string> {
+	return await git_spawn.read(['-C', directory, ...BRANCH_ARGUMENTS])
 }
 
 // **The untracked-files mode is passed rather than inherited**. Every
@@ -392,6 +399,7 @@ async function count_merges(range: string): Promise<number> {
 const git_command = {
 	GIT_DIRECTORY_ARGUMENTS,
 	branch,
+	branch_at,
 	status,
 	repository_root,
 	head_commit,

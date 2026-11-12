@@ -7,7 +7,7 @@
 - no → その呼び出しは、依存していない他の呼び出しと同じターンに載せる
 - yes → 結果を待つ。別のターンになるのが正しい
 
-ファイル 3 つを 3 ターンで読む、`git status` と `pnpm josh issue:state` を別ターンに分ける — いずれも禁止。**費用は仕事の量ではなく往復の回数にある。**
+ファイル 3 つを 3 ターンで読む、`pnpm josh tree:status` と `pnpm josh issue:state` を別ターンに分ける — いずれも禁止。**費用は仕事の量ではなく往復の回数にある。**
 
 ## 判断基準は「依存の有無」であって、呼び出しの種類ではない
 
@@ -27,4 +27,4 @@ round trip は 1 ターンがまとめて出した呼び出しのかたまり 1 
 
 ## 実装中の独立編集に効く合成コマンド（joshuafolkken/kit#2202）
 
-**Step 0 が対象ファイルを列挙したら、`pnpm josh read:files <path> …` で読み取りを 1 回に畳み、続く独立した編集は `pnpm josh edit:files` の 1 呼び出しで送る**（`old` が 1 箇所に一致しなければ拒否される）。ガードが `read:files` / `edit:files` を手渡したら、その 1 呼び出しで出し直す。形式は `docs/josh-commands-run.md` →「`josh read:files`」と「`josh edit:files`」。
+**Step 0 が対象ファイルを列挙したら、`pnpm josh read:files <path> …` で読み取りを 1 回に畳み、続く独立した編集は `pnpm josh edit:files` の 1 呼び出しで送る**（`old` が 1 箇所に一致しなければ拒否される）。ガードが `read:files` / `edit:files` を手渡したら、その 1 呼び出しで出し直す。形式は `docs/josh-commands-session.md` →「`josh read:files`」と「`josh edit:files`」。

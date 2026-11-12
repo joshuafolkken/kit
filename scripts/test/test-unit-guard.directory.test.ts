@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { changed_file_scope } from '#scripts/git/changed-file-scope'
+import { DIRECT_LAUNCH_FILE } from '#tools/test/local-bin-mock'
 import { execa } from 'execa'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_read_recording } from './test-read-recording'
@@ -8,6 +9,8 @@ import { unit_share_fixture } from './unit-share-fixture'
 import { vitest_failure_summary } from './vitest-failure-summary'
 
 vi.mock('execa', () => ({ execa: vi.fn() }))
+// The `pnpm exec` list is asserted here; where vitest resolves to is `local-bin.test.ts`.
+vi.mock('#scripts/build/local-bin', async () => await import('#tools/test/local-bin-mock'))
 vi.mock('#scripts/git/changed-file-scope', () => ({
 	changed_file_scope: { repository_root_or_cwd: vi.fn() },
 }))
@@ -24,9 +27,9 @@ const ROOT = path.resolve('/repo')
 const CHECKOUT = path.resolve('/checkout')
 const RELATED = ['related', 'scripts/git/change-base.ts', '--run']
 const VITEST_OUTPUT = ' FAIL  scripts/git/change-base.test.ts > fails'
+const ISOLATED = test_unit_guard.isolated_unit_environment()
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	unit_share_fixture.stub_share(undefined)
 	unit_share_fixture.stub_free(undefined)
 	unit_share_fixture.stub_claim(undefined)
@@ -42,12 +45,14 @@ afterEach(() => {
 })
 
 describe('test_unit_guard.run_vitest_in', () => {
+	// joshuafolkken/kit#7259: launched without pnpm's wrapper, vitest still gets exactly the isolated
+	// environment it got through `pnpm exec`.
 	it('starts vitest in the given checkout rather than in this process’s directory', async () => {
 		await expect(test_unit_guard.run_vitest_in(CHECKOUT, RELATED)).resolves.toBe(0)
 		expect(mocked_execa).toHaveBeenCalledWith(
-			'pnpm',
+			DIRECT_LAUNCH_FILE,
 			['exec', 'vitest', ...RELATED],
-			expect.objectContaining({ cwd: CHECKOUT, extendEnv: false }),
+			expect.objectContaining({ cwd: CHECKOUT, env: ISOLATED, extendEnv: false }),
 		)
 	})
 
@@ -58,7 +63,7 @@ describe('test_unit_guard.run_vitest_in', () => {
 
 		await expect(test_unit_guard.run_vitest_in(CHECKOUT, RELATED)).resolves.toBe(1)
 		expect(mocked_execa).toHaveBeenCalledWith(
-			'pnpm',
+			DIRECT_LAUNCH_FILE,
 			['exec', 'vitest', ...RELATED],
 			expect.objectContaining({
 				stdout: ['inherit', 'pipe'],
@@ -73,7 +78,7 @@ describe('test_unit_guard.run_vitest_in', () => {
 		await test_unit_guard.run_guarded_vitest(process.cwd(), RELATED)
 
 		expect(mocked_execa).toHaveBeenCalledWith(
-			'pnpm',
+			DIRECT_LAUNCH_FILE,
 			['exec', 'vitest', ...RELATED],
 			expect.objectContaining({ cwd: process.cwd() }),
 		)

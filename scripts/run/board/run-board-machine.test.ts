@@ -39,7 +39,7 @@ function plain(gauges: Parameters<typeof line_of>[0]): string | undefined {
 	return line === undefined ? undefined : stripVTControlCharacters(line)
 }
 
-// The swap rate a second after a sample that had swapped 50 MB.
+// A nonzero baseline ensures only newly swapped memory contributes to the rate.
 function swap_after(swapped_mb: number | undefined): number | undefined {
 	const before = mark(0, sample(0, 1000, 50))
 

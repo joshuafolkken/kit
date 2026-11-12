@@ -1,10 +1,13 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
+import { ts_entry_loader } from '#scripts/run/ts-entry-loader'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_wake_session, type LaunchResult } from './run-wake-session'
+
+const make_directory = temporary_directory()
 
 // joshuafolkken/kit#1719. What the supervisor spawns is the one place it could widen what may be run,
 // so the argument vector is pinned rather than left to reading.
@@ -12,6 +15,7 @@ import { run_wake_session, type LaunchResult } from './run-wake-session'
 const INVOCATION = 'backlogrun --max 5 --idle 30'
 const SCRIPT = '/somewhere/run-wake-cli.ts'
 const LOOPBACK_PROXY = 'http://localhost:52554'
+const PLAIN_NODE_FLAG = '--disable-warning=ExperimentalWarning'
 
 // Nothing here is exploitable as the code stands — `spawn` is given an argument vector and never a
 // shell — but "it cannot be exploited the way this is written today" is an argument rather than a
@@ -71,6 +75,27 @@ describe('run_wake_session.supervisor_argv — the detached self', () => {
 		expect(argv.args.slice(0, process.execArgv.length)).toStrictEqual(process.execArgv)
 	})
 
+	// joshuafolkken/kit#6401: the dist launcher runs under plain node, so the parent has no loader flag.
+	it('adds the tsx loader when the parent runner carries none', () => {
+		const inherited = process.execArgv
+
+		process.execArgv = [PLAIN_NODE_FLAG]
+
+		try {
+			const argv = run_wake_session.supervisor_argv(SCRIPT)
+
+			expect(argv.args).toStrictEqual([
+				PLAIN_NODE_FLAG,
+				ts_entry_loader.IMPORT_FLAG,
+				ts_entry_loader.loader_url(),
+				SCRIPT,
+				run_wake_session.LOOP_FLAG,
+			])
+		} finally {
+			process.execArgv = inherited
+		}
+	})
+
 	it('runs the loop body and names the script it was given', () => {
 		const argv = run_wake_session.supervisor_argv(SCRIPT)
 
@@ -100,10 +125,8 @@ describe('the launched session does not inherit what the launcher must not pass 
 	})
 })
 
-// joshuafolkken/kit#1746. A woken session that exits without claiming the carry record used to leave
-// nothing at all behind, because `stdio: 'ignore'` rode along with `detached` — and the two are
-// separate requirements. These pin the half that changed: the child is still detached, and its output
-// now survives it.
+// A detached wake child still needs durable output so a session that exits without claiming the
+// carry record leaves diagnostic evidence (joshuafolkken/kit#1746).
 
 const MARKER = 'wake-log-marker'
 const POLL_LIMIT = 60
@@ -112,12 +135,8 @@ const POLL_INTERVAL_MS = 50
 const log_scratch = { directory: '', target: '' }
 
 beforeEach(() => {
-	log_scratch.directory = mkdtempSync(path.join(tmpdir(), 'josh-run-wake-log-test-'))
+	log_scratch.directory = make_directory('josh-run-wake-log-test-')
 	log_scratch.target = path.join(log_scratch.directory, 'wake.log')
-})
-
-afterEach(() => {
-	rmSync(log_scratch.directory, { force: true, recursive: true })
 })
 
 async function settle(): Promise<void> {

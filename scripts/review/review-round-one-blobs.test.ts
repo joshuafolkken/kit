@@ -179,6 +179,52 @@ describe('review_round_one_blobs.carried_delta — a carry that cannot be made',
 	})
 })
 
+// joshuafolkken/kit#5791: one path git cannot carry answers for itself, never for the paths beside it.
+async function carry_each(
+	round_one: RoundOne,
+	paths: ReadonlyArray<string>,
+): Promise<Record<string, boolean | undefined> | undefined> {
+	const to = await git(fixture.root, ['rev-parse', MAIN])
+
+	return review_round_one_blobs.carried_each({ ...round_one, to, paths })
+}
+
+describe('review_round_one_blobs.carried_each — each path on its own', () => {
+	it('answers undefined for the conflicting path alone', async () => {
+		const round_one = await read_round_one()
+
+		await land_on_main_and_merge({ [THING]: with_line(BASE_LINES, 0, 'main'), ...FOREIGN_ON_MAIN })
+		write_file(THING, with_line(BASE_LINES, 0, 'resolved'))
+		await commit_all('resolve')
+
+		expect(await carry_each(round_one, [THING, FOREIGN])).toStrictEqual({
+			[THING]: undefined,
+			[FOREIGN]: true,
+		})
+	})
+
+	it('answers false for a path fixed after the merge', async () => {
+		const round_one = await read_round_one()
+
+		await land_on_main_and_merge(FOREIGN_ON_MAIN)
+		write_file(THING, with_line(ROUND_ONE_LINES, 1, 'fixed'))
+
+		expect(await carry_each(round_one, [THING, FOREIGN])).toStrictEqual({
+			[THING]: false,
+			[FOREIGN]: true,
+		})
+	})
+
+	it('answers nothing to carry over no paths, and undefined with no recorded blobs', async () => {
+		const round_one = await read_round_one()
+
+		await land_on_main_and_merge(FOREIGN_ON_MAIN)
+
+		expect(await carry_each(round_one, [])).toStrictEqual({})
+		expect(await carry_each({ ...round_one, blobs: undefined }, [THING])).toBeUndefined()
+	})
+})
+
 describe('review_round_one_blobs.unmoved — the paths a base move left alone', () => {
 	it('names the file main left alone and not the one main changed', async () => {
 		const { from } = await read_round_one()

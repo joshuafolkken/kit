@@ -28,6 +28,7 @@ import { lane_stats, type StatsWindow } from './lane-stats'
 const DECIMALS = 1
 const NOT_MEASURED = 'not measured'
 const IMPLEMENT = 'implement'
+const DRIVER_NOTE = '(driver, outside lane net)'
 const COLUMNS = ['stage', 'median (min)', 'max (min)', 'runs'] as const
 const { STAGE } = run_ship_stage
 const STAGES = [
@@ -46,6 +47,20 @@ const STAGES = [
 	lane_ledger.CODERABBIT_RETRIGGER_STAGE,
 	STAGE.REPORT,
 ] as const
+
+interface Implement {
+	issue: number
+	ms: number
+}
+
+// A dispatch's implementation interval: it ends at the first ship stage that followed, else — still
+// open — at the issue's next dispatch, `Infinity` for none.
+interface ImplementSpan {
+	issue: number
+	from_ms: number
+	to_ms: number
+	is_open: boolean
+}
 
 interface Measured {
 	implement: ReadonlyArray<number>
@@ -72,37 +87,82 @@ function started_ms(stage: StageEntry): number {
 	return Date.parse(stage.at) - stage.elapsed_ms
 }
 
-// When the same issue was dispatched again, or never: a child that died before its ship must not have
-// its implementation stretched to the ship of the child that replaced it.
-function next_dispatch_ms(sorted: ReadonlyArray<DispatchEntry>, index: number): number {
-	const next = sorted.slice(index + 1).find((entry) => entry.issue === sorted[index]?.issue)
+// Each issue's stage starts, indexed once so a dispatch reads only its own issue's stages.
+function starts_by_issue(stages: ReadonlyArray<StageEntry>): ReadonlyMap<number, Array<number>> {
+	const index = new Map<number, Array<number>>()
 
-	return next === undefined ? Infinity : Date.parse(next.at)
+	for (const stage of stages) {
+		if (stage.issue === undefined) continue
+		const starts = index.get(stage.issue) ?? []
+
+		starts.push(started_ms(stage))
+		index.set(stage.issue, starts)
+	}
+
+	return index
+}
+
+// Each dispatch's next dispatch of the same issue, `Infinity` for none, in one backward pass: a child
+// that died before its ship must not have its implementation stretched to the ship of the child that
+// replaced it.
+function next_dispatches_ms(sorted: ReadonlyArray<DispatchEntry>): Array<number> {
+	const later = new Map<number, number>()
+
+	return sorted
+		.toReversed()
+		.map((dispatch) => {
+			const next_ms = later.get(dispatch.issue) ?? Infinity
+
+			later.set(dispatch.issue, Date.parse(dispatch.at))
+
+			return next_ms
+		})
+		.toReversed()
 }
 
 function implement_ms(
-	dispatch: DispatchEntry,
+	from_ms: number,
 	until_ms: number,
-	stages: ReadonlyArray<StageEntry>,
+	starts: ReadonlyArray<number>,
 ): number | undefined {
-	const from_ms = Date.parse(dispatch.at)
-	const starts = stages
-		.filter((stage) => stage.issue === dispatch.issue)
-		.map((stage) => started_ms(stage))
-		.filter((start) => start >= from_ms && start < until_ms)
+	const inside = starts.filter((start) => start >= from_ms && start < until_ms)
 
-	return starts.length === 0 ? undefined : Math.min(...starts) - from_ms
+	return inside.length === 0 ? undefined : Math.min(...inside) - from_ms
 }
 
-function implement_durations(
-	dispatches: ReadonlyArray<DispatchEntry>,
-	stages: ReadonlyArray<StageEntry>,
-): Array<number> {
-	const sorted = dispatches.toSorted((left, right) => Date.parse(left.at) - Date.parse(right.at))
+// Each dispatch's implementation interval in dispatch order.
+function implement_spans(entries: ReadonlyArray<LedgerEntry>): Array<ImplementSpan> {
+	const starts = starts_by_issue(entries.filter(is_stage))
+	const sorted = entries
+		.filter(is_dispatch)
+		.toSorted((left, right) => Date.parse(left.at) - Date.parse(right.at))
+	const next_ms = next_dispatches_ms(sorted)
 
-	return sorted
-		.map((dispatch, index) => implement_ms(dispatch, next_dispatch_ms(sorted, index), stages))
-		.filter(is_number)
+	return sorted.map((dispatch, index) => {
+		const from_ms = Date.parse(dispatch.at)
+		const until_ms = next_ms[index] ?? Infinity
+		const ms = implement_ms(from_ms, until_ms, starts.get(dispatch.issue) ?? [])
+
+		return {
+			issue: dispatch.issue,
+			from_ms,
+			to_ms: ms === undefined ? until_ms : from_ms + ms,
+			is_open: ms === undefined,
+		}
+	})
+}
+
+// Each dispatch's implementation in dispatch order, a dispatch no ship stage followed left out.
+function implements_of(entries: ReadonlyArray<LedgerEntry>): Array<Implement> {
+	return implement_spans(entries)
+		.filter((span) => !span.is_open)
+		.map(({ issue, from_ms, to_ms }) => ({ issue, ms: to_ms - from_ms }))
+}
+
+// Each issue's implementation over every entry given — the latest dispatch's, so a reissued lane
+// reads as the run that shipped (joshuafolkken/kit#6021).
+function implement_by_issue(entries: ReadonlyArray<LedgerEntry>): ReadonlyMap<number, number> {
+	return new Map(implements_of(entries).map(({ issue, ms }) => [issue, ms] as const))
 }
 
 function durations_of(stage: string, measured: Measured): ReadonlyArray<number> {
@@ -117,11 +177,17 @@ function cell(milliseconds: number | undefined): string {
 		: (milliseconds / MS_PER_MINUTE).toFixed(DECIMALS)
 }
 
+// The row's name: the followup is the driver's wait, outside the lane's net time
+// (joshuafolkken/kit#6541).
+function label_of(stage: string): string {
+	return stage === STAGE.FOLLOWUP ? `${stage} ${DRIVER_NOTE}` : stage
+}
+
 function stage_row(stage: string, measured: Measured): string {
 	const durations = durations_of(stage, measured)
 
 	return lane_stats.to_row([
-		stage,
+		label_of(stage),
 		cell(lane_stats.median(durations)),
 		cell(lane_stats.peak(durations)),
 		String(durations.length),
@@ -129,9 +195,10 @@ function stage_row(stage: string, measured: Measured): string {
 }
 
 function measured_of(entries: ReadonlyArray<LedgerEntry>): Measured {
-	const stages = entries.filter(is_stage)
-
-	return { implement: implement_durations(entries.filter(is_dispatch), stages), stages }
+	return {
+		implement: implements_of(entries).map(({ ms }) => ms),
+		stages: entries.filter(is_stage),
+	}
 }
 
 // The period's table: `entries` is the whole ledger, filtered here to `window`.
@@ -164,6 +231,8 @@ const lane_stage_stats = {
 	NOT_MEASURED,
 	STAGES,
 	cell,
+	implement_by_issue,
+	implement_spans,
 	is_dispatch,
 	is_merge,
 	is_number,

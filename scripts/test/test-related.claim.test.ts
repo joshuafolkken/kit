@@ -15,6 +15,9 @@ vi.mock('#scripts/git/changed-paths', () => ({
 		read_held_at: vi.fn(),
 	},
 }))
+vi.mock('./related-heavy-tests', () => ({ related_heavy_tests: { exclude_flags: () => [] } }))
+// The reach cap walks no import graph here; what it caps is `test-related-cap.test.ts`.
+vi.mock('./test-pinned-reach')
 vi.mock('./test-unit-guard', () => ({
 	test_unit_guard: { is_running: vi.fn(), run_guarded_vitest: vi.fn() },
 }))
@@ -22,7 +25,12 @@ vi.mock('./test-unit-guard', () => ({
 vi.mock('#scripts/gate/scoped-green', () => ({
 	scoped_green: { read_before: vi.fn(), record_if_green: vi.fn() },
 }))
-vi.mock('#scripts/gate/since-green', () => ({ since_green: { read_moved_parts: vi.fn() } }))
+vi.mock(import('#scripts/gate/since-green'), async (import_original) => {
+	const { since_green: real } = await import_original()
+	const no_record = { fallback: real.FALLBACK.NO_RECORD }
+
+	return { since_green: { ...real, read_verdict: vi.fn(async () => no_record) } }
+})
 // What a claim weighs for the files it is handed is `test-related-claim.test.ts`.
 vi.mock('./test-related-claim', () => ({ test_related_claim: { with_unit_claim: vi.fn() } }))
 
@@ -33,7 +41,6 @@ const ABSOLUTE_SOURCE = path.join(REPOSITORY_ROOT, CHANGED_SOURCE)
 const mocked_claim = vi.mocked(test_related_claim.with_unit_claim)
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
 	vi.mocked(git_command.repository_root).mockResolvedValue(REPOSITORY_ROOT)
 	vi.mocked(changed_paths.read_changed_paths).mockResolvedValue([CHANGED_SOURCE])

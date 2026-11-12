@@ -13,7 +13,14 @@
 // every entry point would otherwise pay for.
 
 import { document_section } from './document-section'
-import { entry_read_set, type Cost, type FileCost, type ReadSetCost } from './entry-read-set'
+import {
+	entry_read_set,
+	type Cost,
+	type FileCost,
+	type ReadSetCost,
+	type SectionCost,
+	type SectionReference,
+} from './entry-read-set'
 
 interface TrimSpec {
 	// The table entry whose read set is trimmed — `fullrun` for the worker, `backlogrun` for the parent.
@@ -26,6 +33,8 @@ interface TrimSpec {
 	skipped_point_of_use: ReadonlySet<string>
 	// The point-of-use documents this role reaches that its base entry's path does not name.
 	reached_point_of_use: ReadonlySet<string>
+	// The point-of-use sections a command prints for this role, charged at those sections, not whole.
+	printed_sections?: ReadonlyArray<SectionReference>
 }
 
 function subtract(left: Cost, right: Cost): Cost {
@@ -58,6 +67,37 @@ function reduce_skill(file: FileCost, saving: Cost): FileCost {
 	return { file: file.file, cost: subtract(file.cost, saving) }
 }
 
+const HEADING_JOINER = '" + "'
+
+// **A document a command prints the sections of is charged at those sections** (joshuafolkken/kit#5953):
+// a row no manifest pointer sections (charged whole by the base) is read only as the printed sections,
+// and a row a manifest already sections is read as both (joshuafolkken/kit#7139).
+function printed_cost(
+	root: string,
+	row: SectionCost,
+	printed: ReadonlyArray<SectionReference>,
+): SectionCost {
+	const printed_headings = printed.filter((one) => one.file === row.file).map((one) => one.heading)
+
+	if (printed_headings.length === 0) return row
+	const named = row.heading === '' ? [] : row.heading.split(HEADING_JOINER)
+	const headings = [...new Set([...named, ...printed_headings])]
+	const text = document_section.read_optional(entry_read_set.document_path(root, row.file)) ?? ''
+
+	return {
+		file: row.file,
+		heading: headings.join(HEADING_JOINER),
+		cost: entry_read_set.total(headings.map((heading) => section_cost(text, heading))),
+		is_resolved: headings.every((heading) => document_section.section(text, heading) !== undefined),
+	}
+}
+
+function point_of_use_rows(root: string, base: ReadSetCost, spec: TrimSpec): Array<SectionCost> {
+	return base.point_of_use
+		.filter((one) => !spec.skipped_point_of_use.has(one.file))
+		.map((one) => printed_cost(root, one, spec.printed_sections ?? []))
+}
+
 // **`whole` and `scoped` both carry the own-files cost identically**, so the `SKILL.md` saving lands
 // on each by the same amount — there is no need to re-derive the referenced-section split.
 function costed(root: string, spec: TrimSpec): ReadSetCost {
@@ -68,7 +108,7 @@ function costed(root: string, spec: TrimSpec): ReadSetCost {
 		...base,
 		entry: spec.label,
 		files: base.files.map((file) => reduce_skill(file, saving)),
-		point_of_use: base.point_of_use.filter((one) => !spec.skipped_point_of_use.has(one.file)),
+		point_of_use: point_of_use_rows(root, base, spec),
 		whole: subtract(base.whole, saving),
 		scoped: subtract(base.scoped, saving),
 	}

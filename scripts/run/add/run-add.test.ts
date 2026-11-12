@@ -1,4 +1,10 @@
-import { AUTO_OK_LABEL, PRIORITY_HIGH_LABEL, RUN_LANE_LABEL } from '#scripts/issue/issue-labels'
+import {
+	AUTO_OK_LABEL,
+	EPIC_LABEL,
+	PRIORITY_CRITICAL_LABEL,
+	PRIORITY_HIGH_LABEL,
+	RUN_LANE_LABEL,
+} from '#scripts/issue/issue-labels'
 import { describe, expect, it } from 'vitest'
 import { run_add, type AddPorts, type IssueView } from './run-add'
 
@@ -10,11 +16,15 @@ const CLOSED_ISSUE = 3434
 const UNREADABLE_ISSUE = 3435
 const BLOCKED_ISSUE = 3436
 const BLOCKER = 3400
+const EPIC_ISSUE = 6358
+const CLOSED_EPIC = 6359
 
 const VIEWS = new Map<number, IssueView>([
+	[CLOSED_EPIC, { is_open: false, labels: [EPIC_LABEL], blockers: [] }],
 	[OPEN_ISSUE, { is_open: true, blockers: [] }],
 	[CLOSED_ISSUE, { is_open: false, blockers: [] }],
 	[BLOCKED_ISSUE, { is_open: true, blockers: [BLOCKER] }],
+	[EPIC_ISSUE, { is_open: true, labels: [EPIC_LABEL], blockers: [] }],
 ])
 
 function fake_ports(refused_label?: string): AddPorts & { applied: Array<string> } {
@@ -23,6 +33,7 @@ function fake_ports(refused_label?: string): AddPorts & { applied: Array<string>
 	return {
 		applied,
 		read_issue: async (issue) => VIEWS.get(issue),
+		clear_label: async () => true,
 		apply_label: async (issue, label) => {
 			if (label === refused_label) return false
 
@@ -45,6 +56,17 @@ describe('labels_for', () => {
 	it('leaves the priority label off with --no-priority', () => {
 		expect(run_add.labels_for(false)).toStrictEqual([AUTO_OK_LABEL, RUN_LANE_LABEL])
 	})
+
+	it('adds priority:high to an issue with no priority label', () => {
+		expect(run_add.labels_for(true, [AUTO_OK_LABEL])).toContain(PRIORITY_HIGH_LABEL)
+	})
+
+	it.each([PRIORITY_HIGH_LABEL, PRIORITY_CRITICAL_LABEL])(
+		'keeps the priority label already on the issue (%s)',
+		(label) => {
+			expect(run_add.labels_for(true, [label])).toStrictEqual([AUTO_OK_LABEL, RUN_LANE_LABEL])
+		},
+	)
 })
 
 describe('add_all', () => {
@@ -84,6 +106,54 @@ describe('add_all', () => {
 		const outcomes = await run_add.add_all([CLOSED_ISSUE, OPEN_ISSUE], true, fake_ports())
 
 		expect(outcomes.map((outcome) => outcome.issue)).toStrictEqual([CLOSED_ISSUE, OPEN_ISSUE])
+	})
+})
+
+// joshuafolkken/kit#6840: an epic is tracked as a root, never labelled — kit#6535's labelled epic
+// was warned about on every board redraw.
+describe('add_all with an epic', () => {
+	it('tracks an open epic without labelling it', async () => {
+		const ports = fake_ports()
+
+		expect(await run_add.add_all([EPIC_ISSUE], true, ports)).toStrictEqual([
+			{ kind: 'tracked', issue: EPIC_ISSUE, is_new: true },
+		])
+		expect(ports.applied).toStrictEqual([])
+	})
+
+	it('refuses a closed epic as closed', async () => {
+		const ports = fake_ports()
+
+		expect(await run_add.add_all([CLOSED_EPIC], true, ports)).toStrictEqual([
+			{ kind: 'closed', issue: CLOSED_EPIC },
+		])
+		expect(ports.applied).toStrictEqual([])
+	})
+
+	it('does not add an epic the run already tracks again', async () => {
+		const context = {
+			is_retry: false,
+			done: [],
+			active: new Set<string>(),
+			tracked: new Set([EPIC_ISSUE]),
+		}
+		const outcomes = await run_add.add_all([EPIC_ISSUE], true, fake_ports(), context)
+
+		expect(outcomes).toStrictEqual([{ kind: 'tracked', issue: EPIC_ISSUE, is_new: false }])
+		expect(run_add.additions_of(outcomes, true)).toStrictEqual([])
+		expect(run_add.is_all_added(outcomes)).toBe(true)
+	})
+})
+
+describe('roots_of', () => {
+	it('names only the epic roots this call added', async () => {
+		const outcomes = await run_add.add_all([OPEN_ISSUE, EPIC_ISSUE], false, fake_ports())
+
+		expect(run_add.roots_of(outcomes)).toStrictEqual(new Set([EPIC_ISSUE]))
+		expect(run_add.additions_of(outcomes, false)).toStrictEqual([
+			{ issue: OPEN_ISSUE, is_priority: false },
+			{ issue: EPIC_ISSUE, is_priority: false },
+		])
 	})
 })
 
@@ -127,12 +197,18 @@ describe('describe', () => {
 			run_add.describe({ kind: 'unlabeled', issue: OPEN_ISSUE, label: RUN_LANE_LABEL }, true),
 		).toBe(`refused #3433 · could not apply \`${RUN_LANE_LABEL}\``)
 	})
+
+	it('says an epic is tracked as a root', () => {
+		expect(run_add.describe({ kind: 'tracked', issue: EPIC_ISSUE, is_new: true }, false)).toBe(
+			'tracking #6358 · epic root, end of the queue',
+		)
+	})
 })
 
-describe('is_all_queued', () => {
+describe('is_all_added', () => {
 	it('is false once any issue was refused', async () => {
 		const outcomes = await run_add.add_all([OPEN_ISSUE, CLOSED_ISSUE], true, fake_ports())
 
-		expect(run_add.is_all_queued(outcomes)).toBe(false)
+		expect(run_add.is_all_added(outcomes)).toBe(false)
 	})
 })

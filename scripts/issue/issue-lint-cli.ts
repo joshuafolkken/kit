@@ -1,7 +1,10 @@
-import { readFile } from 'node:fs/promises'
+import { cli_body } from '#scripts/josh/cli-body'
 import { aggregation_split } from './aggregation-split'
 import { behavior_change_lint } from './behavior-change-lint'
+import { enforcement_lint } from './enforcement-lint'
 import { expected_effect_lint } from './expected-effect-lint'
+import { figure_source_lint } from './figure-source-lint'
+import { issue_auto_ok } from './issue-auto-ok'
 import { issue_classification } from './issue-classification'
 import { issue_lint } from './issue-lint'
 import { issue_not_before } from './issue-not-before'
@@ -35,8 +38,9 @@ function with_template(problem: string): string {
 }
 
 // Every problem a body has: the four base template headings it lacks, then the behavior-change and
-// expected-effect problems (each empty for an Issue that does not declare itself one).
-function problems(body: string): ReadonlyArray<string> {
+// expected-effect problems (each empty for an Issue that does not declare itself one). `labels` are
+// the ones `issue:file` files it with; left out, the body's own.
+function problems(body: string, labels?: ReadonlyArray<string>): ReadonlyArray<string> {
 	const missing = issue_lint
 		.missing_headings(body)
 		.map((heading) => `${MISSING_HEADING_PREFIX}${heading}`)
@@ -44,19 +48,29 @@ function problems(body: string): ReadonlyArray<string> {
 	return [
 		...missing,
 		...behavior_change_lint.problems(body),
+		...enforcement_lint.problems(body),
 		...expected_effect_lint.problems(body),
-		...issue_classification.problems(body),
+		...issue_classification.problems(body, labels),
 		...issue_not_before.problems(body),
 		...measure_declaration.problems(body),
 		...size_estimate.problems(body),
 		...aggregation_split.problems(body),
+		issue_auto_ok.decision_problem(body),
 		issue_priority.order_problem(body),
 	]
 		.filter((problem) => problem !== undefined)
 		.map((problem) => with_template(problem))
 }
 
+// The body's warnings, printed by every command that lints a body whichever way its verdict goes; they
+// never change an exit code.
+function warn(body: string): void {
+	for (const warning of figure_source_lint.warnings(body)) console.warn(`⚠ ${warning}`)
+}
+
 function report(found: ReadonlyArray<string>, body: string): number {
+	warn(body)
+
 	if (found.length === 0) {
 		console.info(OK_MESSAGE)
 		console.info(`labels: ${issue_classification.required_labels(body).join(', ') || NO_LABELS}`)
@@ -76,11 +90,11 @@ async function run(body_path: string | undefined): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	const body = await readFile(body_path, 'utf8')
+	const body = cli_body.read_file_or_stdin(body_path)
 
 	return report(problems(body), body)
 }
 
-const issue_lint_cli = { problems, run }
+const issue_lint_cli = { problems, run, warn }
 
 export { issue_lint_cli }

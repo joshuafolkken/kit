@@ -34,8 +34,7 @@ describe('merge_json_extends', () => {
 		expect(result).toBe(content)
 	})
 
-	// The comment used to be read tolerantly and then thrown away by the write-back (#798). It now
-	// survives, so the result is JSONC rather than JSON and has to be read as such.
+	// Preserved comments make the result JSONC, so the assertion must parse it as JSONC (#798).
 	it('keeps a tsconfig.json JSONC line comment while merging', () => {
 		const comment = '// compiler options'
 		const content = `{\n\t${comment}\n\t"extends": ["existing"]\n}`

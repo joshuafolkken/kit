@@ -38,6 +38,7 @@ function ports_of(run: FakeRun): LimitPorts {
 			return run.is_live
 		}),
 		emit_raise: vi.fn(async () => undefined),
+		record_limit: vi.fn(async () => undefined),
 		lane_use: vi.fn(async () => ({ occupied: IN_USE, seated: IN_USE, unknown: run.unknown ?? [] })),
 	}
 }
@@ -80,7 +81,32 @@ describe('lane_limit_cli.run — changing the limit', () => {
 		expect(ports.write_override).toHaveBeenCalledWith(LOWERED_LIMIT)
 		expect(ports.emit_raise).not.toHaveBeenCalled()
 	})
+})
 
+// joshuafolkken/kit#6139: `lane:stats` labels a period with every limit it held.
+describe('lane_limit_cli.run — recording the limit', () => {
+	it.each([[RAISED_LIMIT], [LOWERED_LIMIT]])(
+		'records %i in the ledger after writing it, raise or lower',
+		async (limit) => {
+			const ports = ports_of(live_run())
+
+			await run_capturing('info', [String(limit)], ports)
+
+			expect(ports.write_override).toHaveBeenCalledBefore(vi.mocked(ports.record_limit))
+			expect(ports.record_limit).toHaveBeenCalledOnce()
+		},
+	)
+
+	it('records nothing with no run in progress', async () => {
+		const ports = ports_of({ ...live_run(), is_live: false })
+
+		await run_capturing('error', [String(LOWERED_LIMIT)], ports)
+
+		expect(ports.record_limit).not.toHaveBeenCalled()
+	})
+})
+
+describe('lane_limit_cli.run — waking the watcher', () => {
 	it('wakes nobody for a raise past the seats that frees no lane', async () => {
 		const ports = ports_of(live_run(LIMIT_ABOVE_SEATS))
 

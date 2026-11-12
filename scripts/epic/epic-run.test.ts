@@ -35,7 +35,6 @@ function create_input(is_ordered: boolean): {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(console, 'info').mockImplementation(() => {
 		/* suppress */
 	})
@@ -78,7 +77,7 @@ describe('epic_run.create_epic', () => {
 		await epic_run.create_epic(create_input(false))
 
 		expect(vi.mocked(console.info)).toHaveBeenCalledWith(
-			expect.stringContaining('backlogrun #700 --only'),
+			expect.stringContaining('pnpm josh backlogrun 700 --only'),
 		)
 	})
 })

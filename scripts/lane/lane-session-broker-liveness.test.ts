@@ -1,12 +1,14 @@
 import { randomUUID } from 'node:crypto'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { process_identity_fixture } from '#scripts/josh/process-identity-fixture'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_broker_server } from './lane-broker-server'
 import type { LaneInfo } from './lane-registry'
 import { lane_session_broker, type BrokerAnswer } from './lane-session-broker'
+
+const make_directory = temporary_directory()
 
 // Whether a ship reads the server as live: the server record, the legacy heartbeat beside it, and a
 // review the server is still running however long it writes nothing (joshuafolkken/kit#3840).
@@ -62,7 +64,7 @@ vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
 const state = { directory: '' }
 
 beforeEach(() => {
-	state.directory = mkdtempSync(path.join(tmpdir(), 'review-broker-liveness-'))
+	state.directory = make_directory('review-broker-liveness-')
 	LANE.directory = path.join(state.directory, 'lane')
 	resolve_mock.mockReturnValue(path.join(state.directory, '.git'))
 	launch_mock.mockReset().mockResolvedValue({ kind: 'completed', pid: 1, exit_code: 0 })
@@ -70,7 +72,6 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.useRealTimers()
-	rmSync(state.directory, { recursive: true, force: true })
 })
 
 function response_target(): string {
@@ -229,7 +230,7 @@ describe('lane_session_broker — waiting on a review the server is still runnin
 	})
 })
 
-// joshuafolkken/kit#4344: a relaunch waited out the review's 30 minutes on a broker that never answered.
+// joshuafolkken/kit#4344: an unanswered broker must not consume the review's wait window.
 describe('lane_session_broker — a relaunch the server never answers', () => {
 	const RELAUNCH = {
 		kind: 'relaunch',

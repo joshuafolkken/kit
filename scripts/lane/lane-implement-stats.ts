@@ -11,7 +11,7 @@ import { lane_transcript_stats } from './lane-transcript-stats'
 // earlier calls to its own, the model's turn before it included — is put to one sub-stage, and `lane:stats` prints each one's
 // median over the period's lanes.
 //
-// **A lane's implement ends at its first `josh ship` call**, so a lane that never shipped in the period
+// **A lane's implement ends at its first `ship` or `run:chain --join --ship` call**, so a lane that never shipped in the period
 // has no implement here. **`review-fix` runs from `run:review` on** — the round's fixes and their scoped
 // checks; before it, an edit is `edit`, a scoped check or gate is `check`, and any other call is `plan`
 // before the first edit, `read` after it. **A session's first call spans its own duration**, so the gap
@@ -23,19 +23,24 @@ const SUB_STAGES = ['plan', 'read', 'edit', 'check', 'review-fix'] as const
 type SubStage = (typeof SUB_STAGES)[number]
 const [PLAN, READ, EDIT, CHECK, REVIEW_FIX] = SUB_STAGES
 type Totals = ReadonlyMap<SubStage, number>
+const LINT_RELATED = 'lint:related'
 
 const EDIT_TOOLS: ReadonlySet<string> = new Set(['Edit', 'MultiEdit', 'NotebookEdit', 'Write'])
 const CHECK_COMMANDS: ReadonlySet<string> = new Set([
 	'check:related',
 	'cspell:dot',
 	'gate',
-	'lint:related',
+	LINT_RELATED,
 	'metrics',
 	'test:pinned',
 	'test:related',
 ])
 const REVIEW_COMMANDS: ReadonlySet<string> = new Set(['review:brief', 'run:review'])
 const SHIP_COMMANDS: ReadonlySet<string> = new Set(['ship'])
+const JOIN_FLAG = /\s--join(?:\s|$)/u
+const SHIP_FLAG = /\s--ship(?:\s|=|$)/u
+const CHAIN_REACHED_SHIP = /^run:chain \d+ — (?:ran (?:[^\s]+ → )*ship$|stopped at ship \()/mu
+const FIRST_LINT_ROW = `lane first ${LINT_RELATED}`
 // `backgrounded` counts a subagent row's untimed calls (`lane-implement-subagents.ts`); a sub-stage has none.
 const COLUMNS = [
 	'implement sub-stage',
@@ -106,26 +111,65 @@ function active_ms(call: ToolCall, reach: Reach, paused: ReadonlyArray<PausedSpa
 	return span - lane_paused_spans.overlap_ms(paused, end - span, end)
 }
 
-// Each sub-stage's summed span over one lane's implement calls, oldest first.
-function lane_totals(calls: ReadonlyArray<ToolCall>, paused: ReadonlyArray<PausedSpan>): Totals {
-	const totals = new Map<SubStage, number>(SUB_STAGES.map((stage) => [stage, 0]))
+// One implement call with the sub-stage its span went to and that span less its paused overlap.
+interface StagedCall {
+	call: ToolCall
+	stage: SubStage
+	active_ms: number
+}
+
+// One lane's implement calls, oldest first, each put to its sub-stage.
+function staged(
+	calls: ReadonlyArray<ToolCall>,
+	paused: ReadonlyArray<PausedSpan>,
+): Array<StagedCall> {
+	const result: Array<StagedCall> = []
 	let phase: Phase = { edited: false, reviewing: false }
 	let reach = NO_REACH
 
 	for (const call of calls) {
 		phase = next_phase(call, phase)
-		const stage = sub_stage_of(call, phase)
-
-		totals.set(stage, (totals.get(stage) ?? 0) + active_ms(call, reach, paused))
+		result.push({
+			call,
+			stage: sub_stage_of(call, phase),
+			active_ms: active_ms(call, reach, paused),
+		})
 		reach = next_reach(call, reach)
+	}
+
+	return result
+}
+
+// Each sub-stage's summed span over one lane's implement calls, oldest first.
+function lane_totals(calls: ReadonlyArray<ToolCall>, paused: ReadonlyArray<PausedSpan>): Totals {
+	const totals = new Map<SubStage, number>(SUB_STAGES.map((stage) => [stage, 0]))
+
+	for (const entry of staged(calls, paused)) {
+		totals.set(entry.stage, (totals.get(entry.stage) ?? 0) + entry.active_ms)
 	}
 
 	return totals
 }
 
-// One lane's calls before its first ship, or `undefined` when it never shipped.
+function chain_ships(segment: string): boolean {
+	return (
+		lane_transcript_stats.josh_commands(segment).includes('run:chain') &&
+		JOIN_FLAG.test(segment) &&
+		SHIP_FLAG.test(segment)
+	)
+}
+
+function starts_ship(call: ToolCall): boolean {
+	return (
+		runs_any(call, SHIP_COMMANDS) ||
+		(CHAIN_REACHED_SHIP.test(call.output) &&
+			lane_transcript_stats.command_segments(call.command).some((segment) => chain_ships(segment)))
+	)
+}
+
+// One lane's calls before its first ship, including the clean join's ship option.
 function implement_calls(calls: ReadonlyArray<ToolCall>): ReadonlyArray<ToolCall> | undefined {
-	const ship = calls.findIndex((call) => runs_any(call, SHIP_COMMANDS))
+	const ship = calls.findIndex((call) => starts_ship(call))
 
 	return ship === -1 ? undefined : calls.slice(0, ship)
 }
@@ -171,11 +215,9 @@ function lane_totals_in(
 	return implement_lanes(calls, window, paused).map((lane) => lane_totals(lane.calls, lane.paused))
 }
 
-function stage_row(stage: SubStage, totals: ReadonlyArray<Totals>): Array<string> {
-	const values = totals.map((lane) => lane.get(stage) ?? 0)
-
+function minutes_row(label: string, values: ReadonlyArray<number>): Array<string> {
 	return [
-		stage,
+		label,
 		String(values.length),
 		lane_stage_stats.cell(lane_stats.median(values)),
 		lane_stage_stats.cell(lane_stats.peak(values)),
@@ -183,14 +225,40 @@ function stage_row(stage: SubStage, totals: ReadonlyArray<Totals>): Array<string
 	]
 }
 
+function stage_row(stage: SubStage, totals: ReadonlyArray<Totals>): Array<string> {
+	return minutes_row(
+		stage,
+		totals.map((lane) => lane.get(stage) ?? 0),
+	)
+}
+
+// One lane's first timed solo `lint:related` less its paused overlap, or `undefined` when it ran none; a
+// backgrounded call, or one whose session ended before its result, has no duration to count, and a
+// chained call's duration holds its other commands too (joshuafolkken/kit#5785).
+function first_lint_ms(lane: ImplementLane): number | undefined {
+	const first = lane_transcript_stats
+		.solo_calls(lane.calls, LINT_RELATED)
+		.find((call) => call.duration_ms !== undefined)
+
+	return first === undefined ? undefined : active_ms(first, NO_REACH, lane.paused)
+}
+
+// How many lanes a cold first `lint:related` held up (joshuafolkken/kit#5714); no row when none ran one.
+function first_lint_rows(lanes: ReadonlyArray<ImplementLane>): Array<Array<string>> {
+	const values = lanes.flatMap((lane) => first_lint_ms(lane) ?? [])
+
+	return values.length === 0 ? [] : [minutes_row(FIRST_LINT_ROW, values)]
+}
+
 // The period's table: `calls` is every lane session's calls, filtered here to `window`; `paused` is
-// each lane's paused spans (`lane-paused-spans.ts`). The sub-stages, then the subagents by agent type
-// (`lane-implement-subagents.ts`).
+// each lane's paused spans (`lane-paused-spans.ts`). The sub-stages, the lane first `lint:related` row,
+// then the subagents by agent type (`lane-implement-subagents.ts`).
 function table(calls: ReadonlyArray<ToolCall>, window: StatsWindow, paused: PausedSpans): string {
 	const lanes = implement_lanes(calls, window, paused)
 	const totals = lanes.map((lane) => lane_totals(lane.calls, lane.paused))
 	const rows = [
 		...SUB_STAGES.map((stage) => stage_row(stage, totals)),
+		...first_lint_rows(lanes),
 		...lane_implement_subagents.rows(lanes),
 	]
 
@@ -201,7 +269,14 @@ function table(calls: ReadonlyArray<ToolCall>, window: StatsWindow, paused: Paus
 	].join('\n')
 }
 
-const lane_implement_stats = { SUB_STAGES, lane_totals_in, table }
+const lane_implement_stats = {
+	EDIT_TOOLS,
+	SUB_STAGES,
+	implement_lanes,
+	lane_totals_in,
+	staged,
+	table,
+}
 
-export type { SubStage }
+export type { StagedCall, SubStage }
 export { lane_implement_stats }

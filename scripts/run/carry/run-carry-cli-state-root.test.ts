@@ -1,12 +1,14 @@
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { platform_temporary } from '#scripts/josh/platform-temporary'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_carry } from './run-carry'
 import { run_carry_cli } from './run-carry-cli'
 import { run_carry_cli_fixture } from './run-carry-cli-fixture'
 import { run_carry_ended } from './run-carry-ended'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#3458: live evidence for `run:carry` once rewrote and then ended the record of the
 // run that was actually going. `JOSH_TEMP_ROOT` moves every record the run keeps — they are all
@@ -33,7 +35,7 @@ vi.mock('#scripts/run/merge/run-merge-collect', () => ({
 const { git_command } = await import('#scripts/git/git-command')
 const git_directories = vi.mocked(git_command.git_directories)
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-carry-state-root-test-'))
+const scratch = make_directory('run-carry-state-root-test-')
 const evidence_root = path.join(scratch, 'evidence')
 const REPOSITORY = path.join(scratch, 'repository.git')
 const LIVE_INVOCATION = 'backlogrun #3431 --only'
@@ -69,10 +71,6 @@ afterEach(() => {
 	vi.unstubAllEnvs()
 	run_carry.end_carry(run_carry.carry_path(REPOSITORY))
 	rmSync(evidence_root, { recursive: true, force: true })
-})
-
-afterAll(() => {
-	rmSync(scratch, { recursive: true, force: true })
 })
 
 describe('run:carry under JOSH_TEMP_ROOT — the live run is out of reach', () => {

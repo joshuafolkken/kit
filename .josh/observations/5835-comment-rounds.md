@@ -1,0 +1,5 @@
+- rf:bug-risks | low | scripts/issue/issue-watch-diff.ts:216 | 2026-11-03 | #5835
+- rf:bug-risks | low | scripts/lane/lane-overrun.ts:107 | 2026-11-03 | #5835
+- rf:performance | low | scripts/lane/lane-breakdown-implement.ts:259 | 2026-11-03 | #5835
+- rf:project-conventions | low | scripts/lane/lane-breakdown.ts:12 | 2026-11-03 | #5835
+- rf:tests | low | scripts/issue/issue-watch.test.ts:46 | 2026-11-03 | #5835

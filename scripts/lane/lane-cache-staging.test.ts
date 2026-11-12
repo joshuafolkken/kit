@@ -1,17 +1,18 @@
 import {
 	existsSync,
 	mkdirSync,
-	mkdtempSync,
 	readdirSync,
 	readFileSync,
 	rmSync,
 	writeFileSync,
 	type PathLike,
 } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { CSPELL_CACHE_FILE, ESLINT_CACHE_FILE } from '#scripts/josh/josh-command-types'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#3763: prettier walks the checkout while the cache copy is in flight, so the
 // copy's temporary file must never be listed in a directory a tree scan reads. The rename is the one
@@ -32,7 +33,7 @@ vi.mock(import('node:fs'), async (import_original) => {
 
 const { lane_cache } = await import('./lane-cache')
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'lane-cache-staging-test-'))
+const scratch = make_directory('lane-cache-staging-test-')
 const MAIN = path.join(scratch, 'main')
 const LANE = path.join(scratch, 'lane')
 const STAGING_ROOT = 'node_modules'
@@ -51,10 +52,6 @@ function listed_during_copy(root: string): Array<Array<string>> {
 
 	return listings
 }
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
 
 beforeEach(() => {
 	before_rename.mockReset()

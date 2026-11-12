@@ -3,7 +3,7 @@ import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_list } from '#scripts/gh/git-gh-issue-list'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { repository_labels } from '#scripts/repo/repository-labels'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_release_cli } from './issue-release-cli'
 
 // joshuafolkken/kit#3360: `josh issue:release <N>` links Issue N to the repository's open release
@@ -41,10 +41,6 @@ beforeEach(() => {
 	exec_gh_api.mockResolvedValue(FILED_URL)
 	add_blocked_by.mockResolvedValue(true)
 	ensure_labels.mockReturnValue([])
-})
-
-afterEach(() => {
-	vi.clearAllMocks()
 })
 
 afterAll(() => {

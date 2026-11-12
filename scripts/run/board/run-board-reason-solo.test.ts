@@ -174,7 +174,7 @@ describe('run_board_reason.reader while a run:solo issue runs', () => {
 		])
 
 		expect(blocked).toStrictEqual({ icon: WAIT_ICONS.blocker, issues: [String(BLOCKER)] })
-		expect(untriaged?.icon).toBe(WAIT_ICONS.untriaged)
+		expect(untriaged?.icon).toBe(WAIT_ICONS.held)
 		expect(later?.icon).toBe(WAIT_ICONS.not_before)
 	})
 })

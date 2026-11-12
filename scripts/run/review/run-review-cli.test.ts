@@ -36,6 +36,12 @@ describe('JOIN_HINT', () => {
 		expect(run_review_cli.JOIN_HINT).toContain('as the `reviewer` agent type')
 	})
 
+	// joshuafolkken/kit#5938: the brief now follows a green gate, so the hint no longer says it runs on.
+	it('opens on the green gate the brief followed, not a gate still running', () => {
+		expect(run_review_cli.JOIN_HINT).toMatch(/^Gate green\. /u)
+		expect(run_review_cli.JOIN_HINT).not.toContain('running in the background')
+	})
+
 	// joshuafolkken/kit#4863: the briefs are written to files, so the hints point the reviewer at them.
 	it('hands the reviewer the brief file, as the interaction hint hands one per brief', () => {
 		expect(run_review_cli.JOIN_HINT).toContain('brief file')

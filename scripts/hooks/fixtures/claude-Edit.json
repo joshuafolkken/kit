@@ -1,0 +1,17 @@
+{
+	"session_id": "b1ed6070-5d65-4c9e-a280-4d33bff03475",
+	"transcript_path": "__HOME__/.claude/projects/__PROJECT__/b1ed6070-5d65-4c9e-a280-4d33bff03475.jsonl",
+	"cwd": "__ROOT__",
+	"prompt_id": "0cf4b433-7c1a-4dde-a7d0-9937a78e533e",
+	"permission_mode": "bypassPermissions",
+	"effort": { "level": "medium" },
+	"hook_event_name": "PreToolUse",
+	"tool_name": "Edit",
+	"tool_input": {
+		"file_path": "__ROOT__/scripts/lib/json-value.ts",
+		"old_string": "export { json_value }",
+		"new_string": "export { json_value } // probe",
+		"replace_all": false
+	},
+	"tool_use_id": "toolu_01HUtL9KhEJj9u98Hme1YLcY"
+}

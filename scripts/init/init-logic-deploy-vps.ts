@@ -1,3 +1,4 @@
+import { pnpm_installer } from '#scripts/lib/pnpm-installer'
 import semver from 'semver'
 
 const PNPM_INSTALL_PATTERN = /npm install -g pnpm@\d[\d.]{0,19}/gu
@@ -8,6 +9,7 @@ const OLD_PNPM_CHECK_PATTERN =
 const OLD_MAJOR_LINE_PATTERN =
 	/^[ \t]*PNPM_MAJOR=\$\(pnpm --version 2>\/dev\/null \| cut -d\. -f1 \|\| echo "0"\)\n/mu
 const VERSION_CHECK_MARKER = '[ "$PNPM_MINOR" -lt 1 ]'
+const UNVERIFIED_INSTALLER = /curl -fsSL https:\/\/get\.pnpm\.io\/install\.sh \| sh -/gu
 
 function replace_outdated_install(command: string): string {
 	const version = command.slice('npm install -g pnpm@'.length)
@@ -27,9 +29,9 @@ function build_version_check(indent: string): string {
 }
 
 function patch_deploy_vps_pnpm(content: string): string {
-	const with_pnpm12 = content.replaceAll(PNPM_INSTALL_PATTERN, (command) =>
-		replace_outdated_install(command),
-	)
+	const with_pnpm12 = content
+		.replaceAll(UNVERIFIED_INSTALLER, () => pnpm_installer.command())
+		.replaceAll(PNPM_INSTALL_PATTERN, (command) => replace_outdated_install(command))
 
 	if (with_pnpm12.includes(VERSION_CHECK_MARKER) || !OLD_PNPM_CHECK_PATTERN.test(with_pnpm12)) {
 		return with_pnpm12

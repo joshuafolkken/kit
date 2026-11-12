@@ -1,7 +1,8 @@
 #!/usr/bin/env tsx
-import { readFileSync, writeFileSync } from 'node:fs'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { stdin_text } from '#scripts/lib/stdin-text'
 import { document_section } from './document-section'
 
 // `josh edit:files <plan-path>` — apply several content-addressed edits in one call.
@@ -40,7 +41,6 @@ const NONE = 0
 const SINGLE = 1
 const USAGE = 'Usage: josh edit:files <plan-path | ->'
 const STDIN_PATH = '-'
-const STDIN_DESCRIPTOR = 0
 
 // The plan format, chosen for a model to author without escaping code into JSON: a `=====`-fenced path
 // header — the same rule `read:files` prints between files — then a git-conflict-marker pair. Every
@@ -207,10 +207,6 @@ function report(results: ReadonlyArray<EditResult>): number {
 	return has_failure ? FAILURE_EXIT_CODE : SUCCESS_EXIT_CODE
 }
 
-function read_stdin(): string {
-	return readFileSync(STDIN_DESCRIPTOR, 'utf8')
-}
-
 // The plan text: standard input for `-`, otherwise the named file (`undefined` when it cannot be read).
 function read_plan(root: string, plan_path: string, read_input: () => string): string | undefined {
 	if (plan_path === STDIN_PATH) return read_input()
@@ -247,7 +243,7 @@ function load_specs(
 function run(
 	argv: ReadonlyArray<string>,
 	root: string = process.cwd(),
-	read_input: () => string = read_stdin,
+	read_input: () => string = stdin_text.read_all,
 ): number {
 	const [plan_path] = argv
 

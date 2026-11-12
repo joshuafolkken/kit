@@ -1,12 +1,14 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync } from 'node:fs'
 import path from 'node:path'
 import { git_command } from '#scripts/git/git-command'
 import { run_label } from '#scripts/run/run-label'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_hold, type RunHold } from './run-hold'
 import { run_hold_adopt } from './run-hold-adopt'
 import { run_hold_cli } from './run-hold-cli'
+
+const make_directory = temporary_directory('suite')
 
 vi.mock('#scripts/git/git-command', () => ({
 	git_command: { git_directories: vi.fn(), status: vi.fn() },
@@ -15,7 +17,7 @@ vi.mock('#scripts/git/git-command', () => ({
 // The label calls reach GitHub; `run-label.ts` owns them, so here only which one each command makes.
 vi.mock('#scripts/run/run-label', () => ({ run_label: { mark: vi.fn(), unmark: vi.fn() } }))
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-hold-adopt-test-'))
+const scratch = make_directory('run-hold-adopt-test-')
 const WORKTREE = path.join(scratch, '.git')
 const TARGET = run_hold.hold_path(WORKTREE)
 const ISSUE = '4156'
@@ -42,13 +44,8 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-	vi.clearAllMocks()
 	vi.restoreAllMocks()
 	rmSync(TARGET, { force: true })
-})
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 describe('adopting a new run’s unnumbered hold', () => {

@@ -7,8 +7,8 @@
 
 `pnpm josh followup` は Required チェックだけを待つが、Workers Builds（Cloudflare デプロイ）など**非 Required チェックの失敗もユーザーに報告する**。
 
-- `pnpm josh followup` が印字するチェック一覧から失敗をすべて列挙する。手で読み直すときは `gh api repos/{owner}/{repo}/commits/<head-sha>/check-runs --jq '.check_runs[] | {name, conclusion}'`（`gh pr checks` は GraphQL を通るためクラウドセッションで 403）
-- 修正できたら修正内容を、できなかったら失敗チェック名・原因・未解決である旨を `--notify-message` に書く。**完了コメントに失敗を隠してはならない**
+- 緑の `pnpm josh followup` → 一覧は `followup` が完了通知に書く（`docs/josh-commands-automation.md` → "`josh followup`"）。修正内容・原因は `--notify-message`
+- 赤の run・マージ済み PR の再実行 → 印字された失敗を全件、修正内容か「名前・原因・未解決」で `--notify-message` に書く。読み直しは `pnpm josh checks:failed [<PR|sha>]`（非 Required を含む失敗を check runs と commit statuses から一覧。`gh pr checks` はクラウドで 403）。**完了コメントに失敗を隠してはならない**
 - ユーザーへの報告でも失敗を「成功」として扱わない
 
 ### git-rules — コミット・共有状態・index・PR
@@ -17,8 +17,8 @@
 
 - **コミットは指示されたときだけ。** マージ・ブランチ削除・force push などの共有状態の変更は、そのターンで指示されたときだけ。例外は `fullrun` / `backlogrun` の起動で、`pnpm josh followup` 経由のマージを認める（`prrun` は認めない）。deny は規則より狭い — ツールが通したことを許可と読まない
 - **git index は自分の判断で変えない** — 明示の指示か `pnpm josh git` 経由だけ（下記 "no-self-staging"）
-- **コミットは `pnpm josh git`、PR は `pnpm josh pr`** — `gh pr create` の直接実行は `direct-pr-create` 行が拒否する。GitHub 操作は `gh api`（REST） — [`gh-rest.md`](./gh-rest.md)
-- **作業ツリーの前提で動く前に `git status`（と `git stash list`）をその場で実行する**
+- **コミットは `pnpm josh git`、PR は `pnpm josh pr`** — `gh pr create` の直接実行は `direct-pr-create` 行が拒否する。GitHub 操作は `gh api` — [`gh-rest.md`](./gh-rest.md)
+- **作業ツリーの前提で動く前に `pnpm josh tree:status` をその場で実行する** — branch・status・stash list・hold を 1 回で読む
 
 ### 指示されていない行動は取らない
 
@@ -34,7 +34,7 @@
 
 上記 "git-rules" の細則。index には履歴がなく、上書きされたステージ状態は復元できない。
 
-- **調査目的の staging はしない。** 読み取り専用コマンドを使う: `git status --short`、`git diff` / `git diff --stat` / `git diff HEAD`、`git diff --staged`、未追跡ファイルは `git diff --no-index /dev/null <new-file>` か直接読む
+- **調査目的の staging はしない。** 読み取り専用コマンドを使う: `pnpm josh tree:status`、`git diff` / `git diff --stat` / `git diff HEAD`、`git diff --staged`、未追跡ファイルは `git diff --no-index /dev/null <new-file>` か直接読む
 - staging してよいのは次の 2 ケースだけ。それ以外は実行せずに確認する:
   1. ユーザーがそのターンで明示的にステージを指示した
   2. 承認済みのコミットフロー（`pnpm josh git`、`fullrun` / `backlogrun` のコミット手順。`halfrun` は含まない）
@@ -48,7 +48,7 @@
 
   1〜3 は直後に `pnpm josh stash:pop "<メッセージ>"` で復元する（位置指定の pop は `worktree-mutation` 行が拒否する）。4 は復元しない — 代わりに stash を子の Issue にコメントで記録する（`prerequisite.md` の stash と同じく、記録だけが後で pop させる手がかり）
 
-- **会話で作った実装をランへ渡す「引き渡し用の stash」も `pnpm josh stash:pop "<メッセージ>"` で復元する。当てたあと stash は消える**
+- **既存の実装をランへ渡す「引き渡し用の stash」も `pnpm josh stash:pop "<メッセージ>"` で復元する。当てたあと stash は消える**。担当範囲は `principles.md` → "consult-vs-execute" に従う
   - 計画には復元手順としてこの 1 行だけを書く。`git stash apply` / `git stash pop` も「drop しない」という条件も書かない
   - 計画がガードの拒否する復元形を指していたら、実行側は `stash:pop` に読み替えて続行し、Issue コメントに残す（Tier A）。`needs-decision` では止まらない
   - stash を残すのは持ち主の判断だけ。持ち主が計画に理由を書き、ランはそこで止まって確認する
@@ -59,8 +59,11 @@
 `CLAUDE.md` → "Decision autonomy" の境界の細則。
 
 - **A と B の判定**: 確認するのは「差が僅差 かつ 後戻りしにくい／アーキテクチャに長く影響する」ときだけ。明確に優位な選択肢は自動で選び、僅差でも安価に巻き戻せる選択は決めて記録して進む
+- **判定規則のある Issue**: 子ランは背景の `- 判定規則:` が参照する計測 Issue の本文・コメントを読み、条件を適用し、選択・計測値・理由を Issue コメントに記録する。自然言語の条件はこの自律判断で評価する。参照を読めない、または必要な値が無い場合は未判定として停止理由を記録する
 - 起票した Issue の所属先は、候補が複数の epic に散っていても Tier A（`.claude/skills/epic-commands/epic-bundle.md`）
 - 自己修正（自分が公開した成果物の事実誤りの訂正、同じセッションで自分が特定した自分の作業の抜けの穴埋め）は Tier A。承認済みの作業の完了・修復に限り、目標の表明や問いで動いてよい意味ではない（→ `principles.md` → "consult-vs-execute"）
 - **Tier C との境界**: マージ・ブランチ削除・force push・スコープ外の変更は、自分が招いた問題でも Tier C。確認を外しても監査証跡は外さない
+- 既に merge 済みの Issue の close、CodeRabbit の rate limit の retrigger → コマンドが決める（`issue-comments.md` → "When the work turns out to be already merged"、`followup.md`）
+- blocked-by 関係の削除 → `pnpm josh backlog:triage --apply <N> --unblock <M> --reason <text>`。`--blocked-by` で戻せるので取り消し可能。生の `gh api -X DELETE …/dependencies/blocked_by/…` は `destructive-command` 行が拒否する（`scripts/rules/destructive-command.ts`）
 - **major のバージョン bump は Tier C**: `pnpm josh bump major` は自分の判断で実行も提案もしない。既定は minor / patch で、major はユーザーがそのターンで明示したときだけ（0.x の major は 1.0.0 になり戻せない）。`josh bump` が版を変えたら、変わった挙動の `docs/` をコミット前に更新する
-- 自動判断を記録する Issue コメントは `pnpm josh issue:comment <N> --body-file <path>` で投稿する
+- 自動判断を記録する Issue コメントは `pnpm josh issue:comment <N> --body-file .josh/tmp/comment.md` で投稿する

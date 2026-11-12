@@ -111,6 +111,8 @@ interface StageLog {
 	last_ms: number
 	coderabbit: CodeRabbitWait
 	ci_path: CiPath
+	// The CI jobs the check wait reran as flaky, read into the completion notification (#5545).
+	reran: Array<string>
 	issue?: number
 }
 
@@ -120,6 +122,7 @@ function new_log(): StageLog {
 		last_ms: performance.now(),
 		coderabbit: followup_coderabbit_wait.new_wait(),
 		ci_path: followup_ci_path.new_path(),
+		reran: [],
 	}
 }
 

@@ -2,18 +2,23 @@ import { styleText } from 'node:util'
 import type { BudgetWait } from '#scripts/gate/core-wait'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_board_estimate } from './run-board-estimate'
+import { run_board_first_lane } from './run-board-first-lane'
 import { run_board_fit } from './run-board-fit'
 import type { FoundOf } from './run-board-found'
 import { run_board_fresh } from './run-board-fresh'
+import { run_board_issue_count, type IssueCount } from './run-board-issue-count'
 import { run_board_labels } from './run-board-labels'
 import { run_board_layout, type BoardLayout, type BoardRow } from './run-board-layout'
+import type { BoardLinks } from './run-board-link'
 import { run_board_machine, type MachineGauges } from './run-board-machine'
 import { run_board_now, type NowLine } from './run-board-now'
 import type { SessionOperations } from './run-board-operation-read'
 import { run_board_priority } from './run-board-priority'
 import type { ProcessGroups } from './run-board-process-groups'
+import type { QuotaHold, QuotaView } from './run-board-render-quota'
 import { run_board_render_slot } from './run-board-render-slot'
 import { run_board_render_title } from './run-board-render-title'
+import type { SeatRead } from './run-board-seat'
 import type { RunActivity } from './run-board-status'
 import type { LaneUsages, UsageScale } from './run-board-usage'
 import type { UsualTimes } from './run-board-usual'
@@ -64,8 +69,13 @@ interface BoardUsage {
 	scale: UsageScale
 }
 
-interface BoardHeader {
+// Claude's and Codex's usage-limit windows and GitHub's core rate limit are the usage row's
+// (`run-board-render-quota.ts`). Its links are made where the terminal opens one (`run-board-link.ts`).
+interface BoardHeader
+	extends Pick<QuotaView, 'quotas' | 'scheduler_provider' | 'rate_limit'>, BoardLinks {
 	now_ms: number
+	// A single run's name (`run-board-single.ts`); `undefined` draws `backlogrun`.
+	run_name?: string | undefined
 	started_ms: number
 	// Set once the run has ended: the title then says when, and how long it took.
 	ended_ms: number | undefined
@@ -89,10 +99,16 @@ interface BoardHeader {
 	usages?: BoardUsage | undefined
 	// The claims waiting in the machine-wide core budget (`run-board-render-waits.ts`).
 	budget_waits?: ReadonlyArray<BudgetWait> | undefined
+	// The usage limit holding the run's launches; `undefined` where none holds.
+	quota_hold?: QuotaHold | undefined
 	// How long each phase usually takes; a running row's phase time is colored against it.
 	usual?: UsualTimes | undefined
 	// How many lanes the run may hold at once, which the estimated finish stacks the waiting children on.
 	lane_limit?: number | undefined
+	// The slots occupied according to the same capacity read that supplies the limit.
+	occupied_count?: number | undefined
+	// What explains the seats no lane holds (`run-board-seat.ts`).
+	seats?: SeatRead | undefined
 	// What each done row says after its time (`run-board-found.ts`); none where nothing was read.
 	found?: FoundOf | undefined
 	// Whether `JOSH_LANE_INVESTIGATION` is on; off, a merged row hides its minutes and investigation
@@ -104,11 +120,8 @@ interface BoardHeader {
 	form: BoardForm
 	// The repository the plan was read for, as `owner/repo`; `undefined` before a plan is read.
 	repo: string | undefined
-	// An issue reference as the board draws it — `3450` or `owner/repo#12` — made a link where the
-	// terminal opens one.
-	link: (reference: string) => string
-	// A pull request's number, made a link to it where the terminal opens one (joshuafolkken/kit#4625).
-	pull_link: (number: number) => string
+	// The repository's open and closed issues, `undefined` where none was read.
+	issue_count?: IssueCount | undefined
 }
 
 interface BoardCounts {
@@ -169,10 +182,10 @@ function mark_of(header: BoardHeader, running: number): RunMark {
 }
 
 // The mark stands still in every state: the spinner turns on the third line.
-function run_part(mark: RunMark): string {
+function run_part(mark: RunMark, name = RUN_NAME): string {
 	const { glyph, color } = RUN_MARKS[mark]
 
-	return styleText(color, `${glyph} ${RUN_NAME}`)
+	return styleText(color, `${glyph} ${name}`)
 }
 
 // The repository's own name — `kit` of `owner/kit` — under the run's, past the mark's columns, so a
@@ -181,7 +194,7 @@ function repo_part(header: BoardHeader, mark: RunMark): string {
 	const name = header.repo?.split(REPO_SEPARATOR).at(-1) ?? ''
 	const indent = run_board_fit.width_of(RUN_MARKS[mark].glyph) + BLANK.length
 
-	return `${BLANK.repeat(indent)}${name}`
+	return `${BLANK.repeat(indent)}${header.repo_link(name, 'home')}`
 }
 
 // A part aged as the `💓` is: yellow once stale, red once alarming — a row's newest activity too
@@ -224,10 +237,9 @@ function beat_part(header: BoardHeader, mark: RunMark, width: number): string {
 	return WORKING_MARKS.has(mark) ? aged(part, age) : part
 }
 
-// How long ago what the third line says happened, blank where no event gave it a time.
-function now_age(now: NowLine | undefined): string {
-	const age = now?.age_ms
-
+// An age in the `⏰`'s format, blank where there is none to draw — no event gave it a time, or the
+// `💓` draws none.
+function span_or_blank(age: number | undefined): string {
 	return age === undefined ? '' : span_of(age)
 }
 
@@ -237,13 +249,6 @@ function fresh_age(now: NowLine | undefined, header: BoardHeader): number | unde
 	const age = now?.age_ms
 
 	return age === undefined ? undefined : age + header.now_ms - (header.ended_ms ?? header.now_ms)
-}
-
-// The `💓`'s digits, blank where it draws none.
-function beat_span(header: BoardHeader): string {
-	const age = age_of(header)
-
-	return age === undefined ? '' : span_of(age)
 }
 
 // The third line's time: the spinner in the `⏰`'s and `💓`'s column — turning only while the run
@@ -257,7 +262,7 @@ function now_time(
 ): string {
 	const spinner = WORKING_MARKS.has(mark) ? header.spinner : undefined
 	const icon = cell_of(spinner, run_board_fit.width_of(HEADER_ICONS.heartbeat))
-	const age = now_age(now)
+	const age = span_or_blank(now?.age_ms)
 
 	return `${icon} ${padded(age, width, aged_fresh(age, fresh_age(now, header), header))}`
 }
@@ -272,8 +277,10 @@ function now_text(now: NowLine, header: BoardHeader): string {
 // passed ten hours.
 function time_parts(header: BoardHeader, mark: RunMark, now: NowLine | undefined): Array<string> {
 	const elapsed = span_of((header.ended_ms ?? header.now_ms) - header.started_ms)
-	const age = now_age(now)
-	const width = Math.max(...[elapsed, beat_span(header), age].map((span) => span.length))
+	const age = span_or_blank(now?.age_ms)
+	const width = Math.max(
+		...[elapsed, span_or_blank(age_of(header)), age].map((span) => span.length),
+	)
 
 	return [
 		`${HEADER_ICONS.elapsed} ${elapsed.padStart(width)}`,
@@ -368,9 +375,11 @@ function progress_parts(counts: BoardCounts, header: BoardHeader): Array<string 
 function progress_part(counts: BoardCounts, header: BoardHeader): string {
 	const parts = [
 		...progress_parts(counts, header),
+		run_board_first_lane.part(header.activity),
 		loading_part(header),
 		warning_of(WORDS.plan, header.plan_failed_ms),
 		warning_of(WORDS.read, header.read_failed_ms, header.read_error),
+		run_board_issue_count.part_of(header.repo, header.issue_count, header.repo_link),
 	]
 
 	return parts.filter((part) => part !== undefined).join(GAP)
@@ -432,7 +441,7 @@ function header_lines(header: BoardHeader): Array<string> {
 	const counts = counts_of(layout_of(header))
 	const mark = mark_of(header, counts.running)
 	const now = now_line(counts, header)
-	const names = column_of([run_part(mark), repo_part(header, mark), ''])
+	const names = column_of([run_part(mark, header.run_name), repo_part(header, mark), ''])
 	const times = column_of(time_parts(header, mark, now))
 	const lasts = [progress_part(counts, header), machine_part(counts, header)]
 	const third =

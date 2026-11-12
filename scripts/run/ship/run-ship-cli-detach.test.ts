@@ -15,6 +15,9 @@ const mark_result_mock = vi.hoisted(() => vi.fn())
 const preflight_mock = vi.hoisted(() => vi.fn())
 const pre_detach_mock = vi.hoisted(() => vi.fn())
 const merge_mock = vi.hoisted(() => vi.fn())
+const wait_mock = vi.hoisted(() => vi.fn().mockResolvedValue(0))
+
+vi.mock('./run-ship-detach-wait', () => ({ run_ship_detach_wait: { after_launch: wait_mock } }))
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 vi.mock('./run-ship-probe', () => ({
@@ -35,7 +38,7 @@ vi.mock('./run-ship-preflight', () => ({ run_ship_preflight: { stage: preflight_
 // The pre-detach checks' own branches are pinned in `run-ship-pre-detach.test.ts`; here they pass.
 vi.mock('./run-ship-pre-detach', () => ({ run_ship_pre_detach: { checks: pre_detach_mock } }))
 // The conflict probe (`run-ship-cli-conflict.test.ts`) finds none, so no test fetches the default branch.
-vi.mock('./run-ship-conflict-probe', () => ({ run_ship_conflict_probe: { probe: vi.fn() } }))
+vi.mock('./run-ship-conflict-probe')
 vi.mock('./run-ship-scoped', async (import_original) => {
 	const actual = await import_original<{ run_ship_scoped: typeof real_scoped }>()
 	const scoped_pair = vi
@@ -162,14 +165,17 @@ describe('run_ship_cli.run — --detach hands the region to a supervisor', () =>
 		)
 		expect(josh_run_mock).not.toHaveBeenCalled()
 		expect(info_lines).toEqual(['launched'])
+		expect(wait_mock).toHaveBeenCalledWith(NUMBER)
 		// joshuafolkken/kit#4785: a `--review` ship hands the pre-detach checks its `test:pinned` check.
 		expect(pre_detach_mock.mock.calls[0]?.[2]).toBeTypeOf('function')
 	})
 
 	it('exits non-zero on a refused launch', async () => {
 		detach_mock.mockResolvedValue({ verdict: 'busy', note: 'already running' })
+		wait_mock.mockClear()
 
 		expect(await run_ship_cli.run([TITLE, '--detach'])).toBe(FAILED)
+		expect(wait_mock).not.toHaveBeenCalled()
 	})
 })
 

@@ -23,7 +23,7 @@ function section<K>(
 }
 
 function pr_label(pr: number): string {
-	return issue_cite.plain(pr)
+	return issue_cite.plain_for('linked', pr)
 }
 
 function summary(report: DefectReport): string {

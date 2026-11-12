@@ -5,6 +5,7 @@ import {
 	type GateEntry,
 	type LedgerEntry,
 	type PushMissEntry,
+	type ShipLapEntry,
 } from './lane-ledger'
 import { lane_stage_stats } from './lane-stage-stats'
 import { lane_stats, type StatsWindow } from './lane-stats'
@@ -28,6 +29,11 @@ const DECIMALS = 1
 const WHOLE_GATE_LABEL = 'gate (whole)'
 const COLUMNS = ['check', 'median (s)', 'max (s)', 'runs', 'reused', 'no-op', 'fallback'] as const
 const FALLBACK_COLUMNS = ['fallback reason', 'runs'] as const
+const RELATED_LABEL = 'test:related'
+type CheckTiming = Pick<
+	GateCheckRecord,
+	'label' | 'elapsed_ms' | 'is_reused' | 'is_unmoved' | 'fallback'
+>
 
 function is_gate(entry: LedgerEntry): entry is GateEntry {
 	return entry.kind === lane_ledger.KIND.GATE
@@ -44,13 +50,13 @@ function header(columns: ReadonlyArray<string>): Array<string> {
 }
 
 function count(
-	runs: ReadonlyArray<GateCheckRecord>,
-	is_counted: (check: GateCheckRecord) => boolean,
+	runs: ReadonlyArray<CheckTiming>,
+	is_counted: (check: CheckTiming) => boolean,
 ): string {
 	return String(runs.filter((check) => is_counted(check)).length)
 }
 
-function check_row(label: string, checks: ReadonlyArray<GateCheckRecord>): string {
+function check_row(label: string, checks: ReadonlyArray<CheckTiming>): string {
 	const runs = checks.filter((check) => check.label === label)
 	const timed = runs.filter((check) => check.is_reused !== true && check.is_unmoved !== true)
 	const elapsed = timed.map((check) => check.elapsed_ms)
@@ -80,13 +86,27 @@ function is_push_miss(entry: LedgerEntry): entry is PushMissEntry {
 	return entry.kind === lane_ledger.KIND.PUSH_MISS
 }
 
+function is_related_lap(entry: LedgerEntry): entry is ShipLapEntry {
+	return (
+		entry.kind === lane_ledger.KIND.SHIP_LAP && entry.step.split(' › ').at(-1) === RELATED_LABEL
+	)
+}
+
+function related_checks(entries: ReadonlyArray<LedgerEntry>): Array<CheckTiming> {
+	return entries.filter(is_related_lap).map((entry) => ({
+		label: RELATED_LABEL,
+		elapsed_ms: entry.elapsed_ms,
+		is_reused: entry.is_reused,
+	}))
+}
+
 // A pre-push hook's miss, told apart from the gate's own fallbacks by its scope (joshuafolkken/kit#5234).
 function push_reason(miss: PushMissEntry): string {
 	return `pre-push ${miss.scope}: ${miss.reason}`
 }
 
 function fallback_table(
-	checks: ReadonlyArray<GateCheckRecord>,
+	checks: ReadonlyArray<CheckTiming>,
 	misses: ReadonlyArray<PushMissEntry>,
 ): string {
 	const fallbacks = checks.map((check) => check.fallback).filter((reason) => reason !== undefined)
@@ -103,7 +123,7 @@ function fallback_table(
 function table(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): string {
 	const windowed = lane_stats.in_window(entries, window)
 	const gates = windowed.filter(is_gate)
-	const checks = gates.flatMap((gate) => gate.checks ?? [])
+	const checks = [...gates.flatMap((gate) => gate.checks ?? []), ...related_checks(windowed)]
 	const rows = [...gates.map((gate) => whole_gate(gate)), ...checks]
 	const labels = [...new Set(rows.map((row) => row.label))]
 

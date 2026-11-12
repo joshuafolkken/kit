@@ -1,8 +1,8 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { resolve_local_bin } from '#scripts/build/local-bin'
 import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { afterAll, describe, expect, it } from 'vitest'
 import { z } from 'zod'
@@ -31,9 +31,10 @@ import {
 
 // Under the OS temp directory for the reason yaml-config-fixture.test.ts gives: several suites here
 // assert on the repository's own file listing, so a fixture left at the package root would break
-// them rather than merely leave litter. mkdtempSync rather than a fixed name so a watch-mode run
-// and a lefthook-triggered run cannot delete each other's directory.
-const TEST_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'format-edited-'))
+// them rather than merely leave litter. A unique directory rather than a fixed name so a watch-mode
+// run and a lefthook-triggered run cannot delete each other's directory.
+const make_directory = temporary_directory('suite')
+const TEST_DIRECTORY = make_directory('format-edited-')
 const { write_fixture, plan_commands_in } = make_directory_helpers(TEST_DIRECTORY)
 
 // The density hook's throttle records, which live in the shared temp directory rather than under
@@ -44,8 +45,6 @@ afterAll(() => {
 	for (const transcript of DENSITY_TRANSCRIPTS) {
 		rmSync(time_density_hook.notice_path(transcript), { force: true })
 	}
-
-	rmSync(TEST_DIRECTORY, { recursive: true, force: true })
 })
 
 describe('parse_edited_path', () => {
@@ -150,35 +149,27 @@ describe('relative_to_root', () => {
 
 // The startup route is where this hook's time went: one cold `eslint --fix` on a single TypeScript
 // file measured 1.70s of a 2.50s hook, against 0.08s through the warm daemon. These assert the
-// choice itself — which of the three routes is taken, and that the two slower ones still answer for
-// a project that has no daemon installed (joshuafolkken/kit#1259).
+// choice itself — which of the two routes is taken, and that the direct launch still answers for a
+// project that has no daemon installed (joshuafolkken/kit#1259, joshuafolkken/kit#7259).
 describe('select_invocation — the startup route', () => {
 	const eslint_command = { bin: ESLINT, command_arguments: ['--fix', 'app.ts'] }
 	const daemon_cli = path.join(path.sep, 'pkg', 'eslint_d', 'bin', 'eslint_d.js')
 	const shim = path.join(path.sep, 'repo', 'node_modules', '.bin', ESLINT)
+	const launch = { file: shim, args: ['--fix', 'app.ts'] }
 
 	// Run with this process's own node rather than the CLI file directly: the daemon entry is a
 	// plain `.js` with no execute bit of its own.
 	it('runs the daemon CLI with the current node binary when one is installed', () => {
-		expect(select_invocation(eslint_command, { daemon_cli, shim })).toStrictEqual({
+		expect(select_invocation(eslint_command, { daemon_cli, launch })).toStrictEqual({
 			bin: process.execPath,
 			command_arguments: [daemon_cli, '--fix', 'app.ts'],
 		})
 	})
 
-	it('falls back to the local shim when no daemon is installed', () => {
-		expect(select_invocation(eslint_command, { daemon_cli: undefined, shim })).toStrictEqual({
+	it('falls back to the direct launch when no daemon is installed', () => {
+		expect(select_invocation(eslint_command, { daemon_cli: undefined, launch })).toStrictEqual({
 			bin: shim,
 			command_arguments: ['--fix', 'app.ts'],
-		})
-	})
-
-	it('falls back to pnpm exec when neither route resolves', () => {
-		const routes = { daemon_cli: undefined, shim: undefined }
-
-		expect(select_invocation(eslint_command, routes)).toStrictEqual({
-			bin: 'pnpm',
-			command_arguments: ['exec', ESLINT, '--fix', 'app.ts'],
 		})
 	})
 })
@@ -230,11 +221,21 @@ describe('resolve_invocations', () => {
 	})
 
 	// Output is ignored, so a missing shim would make the hook a silent no-op rather than a slow one.
+	// A root of its own: the lookup walks up, and `TEST_DIRECTORY` gains a shim in the case above.
 	it('falls back to pnpm exec when the shim is missing', () => {
-		const [invocation] = resolve_invocations(command, path.join(TEST_DIRECTORY, 'no-bins'))
+		const [invocation] = resolve_invocations(command, make_directory('format-edited-no-bins-'))
 
 		expect(invocation?.bin).toBe('pnpm')
 		expect(invocation?.command_arguments).toStrictEqual(['exec', PRETTIER, '--write', 'app.ts'])
+	})
+
+	// joshuafolkken/kit#7259: an installed package runs its CLI entry under this node, with the same
+	// arguments the shim and `pnpm exec` were given.
+	it('runs the installed package entry under this node', () => {
+		const [invocation] = resolve_invocations(command, process.cwd())
+
+		expect(invocation?.bin).toBe(process.execPath)
+		expect(invocation?.command_arguments.slice(1)).toStrictEqual(['--write', 'app.ts'])
 	})
 })
 
@@ -319,7 +320,7 @@ const EMPTY_JSON = '{}'
 
 // A project with an installed eslint and no daemon running yet.
 function daemon_project(): { root: string; eslint_directory: string } {
-	const root = mkdtempSync(path.join(tmpdir(), 'format-edited-daemon-'))
+	const root = make_directory('format-edited-daemon-')
 	const eslint_directory = path.join(root, 'node_modules', 'eslint')
 
 	mkdirSync(eslint_directory, { recursive: true })
@@ -350,7 +351,6 @@ describe('format_edited_file — a daemon its commands started', () => {
 		)
 
 		expect(existsSync(path.join(eslint_directory, '.eslint_d-toolchain'))).toBe(true)
-		rmSync(root, { recursive: true, force: true })
 	})
 })
 

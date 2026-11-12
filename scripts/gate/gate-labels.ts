@@ -4,6 +4,8 @@
 // checks from these; a reader that needs only a name imports this leaf.
 
 const LINT_LABEL = 'lint'
+// The `josh` command `check:related` lints with, whose green also writes the gate's `lint` record.
+const LINT_TARGET = 'lint:related'
 const TYPE_CHECK_LABEL = 'check'
 // The `josh` command the gate's type check runs, shared with `check:related` so the scoped check runs the same one.
 const TYPE_CHECK_TARGET = 'check'
@@ -13,6 +15,7 @@ const UNIT_LABEL = 'test:unit'
 const UNIT_TARGET = 'test:related'
 // **The gate's unit leg runs the whole suite for a changed file every test imports**
 // (joshuafolkken/kit#5122), which every other `josh test:related` narrows to its direct importers.
+// Outside a lane only: a lane leaves the whole suite to CI (`test-related-whole.ts`, joshuafolkken/kit#7014).
 const KEEP_WHOLE_SUITE_FLAG = '--keep-whole-suite'
 const BEHAVIOR_LABEL = 'behavior'
 const METRICS_LABEL = 'metrics'
@@ -32,6 +35,7 @@ const gate_labels = {
 	EXPORTS_LABEL,
 	KEEP_WHOLE_SUITE_FLAG,
 	LINT_LABEL,
+	LINT_TARGET,
 	LOCKFILE_LABEL,
 	METRICS_LABEL,
 	SPELL_CHECK_LABEL,

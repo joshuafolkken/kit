@@ -1,7 +1,9 @@
 #!/usr/bin/env tsx
 import { parseArgs } from 'node:util'
 import { git_pr } from '#scripts/gh/git-pr'
+import { hook_lap } from '#scripts/hooks/hook-lap'
 import { cli_body } from '#scripts/josh/cli-body'
+import { run_ship_lap } from '#scripts/run/ship/run-ship-lap'
 import { test_red_commit } from '#scripts/test/test-red-commit'
 import { git_branch } from './git-branch'
 import { git_commit } from './git-commit'
@@ -11,6 +13,9 @@ import { git_preflight } from './git-preflight'
 import { git_prompt, type WorkflowConfirmations } from './git-prompt'
 import { git_push } from './git-push'
 import { git_staging } from './git-staging'
+
+// Each step is a lap under the ship's commit when the ship spawned this run (joshuafolkken/kit#5831).
+const { GIT_STEP } = hook_lap
 
 const SKIP_MESSAGES = {
 	commit: '💡 Commit skipped.',
@@ -53,7 +58,9 @@ async function execute_commit_step(
 	confirmations: WorkflowConfirmations,
 ): Promise<void> {
 	if (confirmations.commit) {
-		await git_commit.commit(commit_message)
+		await run_ship_lap.timed(GIT_STEP.COMMIT, async () => {
+			await git_commit.commit(commit_message)
+		})
 	} else {
 		console.info(SKIP_MESSAGES.commit)
 	}
@@ -61,7 +68,9 @@ async function execute_commit_step(
 
 async function execute_push_step(confirmations: WorkflowConfirmations): Promise<void> {
 	if (confirmations.push) {
-		await git_push.push()
+		await run_ship_lap.timed(GIT_STEP.PUSH, async () => {
+			await git_push.push()
+		})
 	} else {
 		console.info(SKIP_MESSAGES.push)
 	}
@@ -73,7 +82,9 @@ async function execute_pr_step(
 	extra_body?: string,
 ): Promise<void> {
 	if (confirmations.pr) {
-		await git_pr.create_with_issue_info(issue_info, extra_body)
+		await run_ship_lap.timed(GIT_STEP.PR, async () => {
+			await git_pr.create_with_issue_info(issue_info, extra_body)
+		})
 	} else {
 		console.info(SKIP_MESSAGES.pr)
 	}
@@ -87,7 +98,12 @@ async function run_workflow_steps(
 ): Promise<void> {
 	const commit_message = commit_message_override ?? issue_info.commit_message
 
-	if (confirmations.commit) await test_red_commit.assert_reproduces(issue_info.number)
+	if (confirmations.commit) {
+		await run_ship_lap.timed(GIT_STEP.TEST_RED, async () => {
+			await test_red_commit.assert_reproduces(issue_info.number)
+		})
+	}
+
 	await execute_commit_step(commit_message, confirmations)
 	await execute_push_step(confirmations)
 	await execute_pr_step(issue_info, confirmations, extra_body)
@@ -209,15 +225,22 @@ async function execute_workflow(
 
 	// Unattended, nobody can fix a precondition between stages — so all are asked before staging.
 	if (is_non_interactive) {
-		await git_preflight.check({
-			cli_input: cli_issue_input,
-			will_open_pr: values['skip-pr'] !== true,
+		await run_ship_lap.timed(GIT_STEP.PREFLIGHT, async () => {
+			await git_preflight.check({
+				cli_input: cli_issue_input,
+				will_open_pr: values['skip-pr'] !== true,
+			})
 		})
 	}
 
-	await git_staging.check_and_confirm_staging(values.yes === true)
+	await run_ship_lap.timed(GIT_STEP.STAGING, async () => {
+		await git_staging.check_and_confirm_staging(values.yes === true)
+	})
 
-	const issue_info = await prepare_issue_info(cli_issue_input, is_non_interactive)
+	const issue_info = await run_ship_lap.timed(
+		GIT_STEP.ISSUE,
+		async () => await prepare_issue_info(cli_issue_input, is_non_interactive),
+	)
 	const confirmations = await get_workflow_confirmations(is_non_interactive, values)
 	const commit_message = build_commit_message(issue_info, commit_suffix)
 

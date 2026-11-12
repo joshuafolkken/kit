@@ -25,11 +25,13 @@ import { whole_suite_files } from './whole-suite-files'
 
 // `left` are the synced modules no longer handed to vitest, `shared` the tests where they meet the change,
 // `meeting` every file whose imports reach both — `shared` and the code between, which `josh ship`'s
-// lint settle reads (joshuafolkken/kit#4985) — all repository-root-relative.
+// lint settle reads (joshuafolkken/kit#4985) — all repository-root-relative. `failure` says why the
+// graph left nothing out, which `josh ship` logs and names nothing over (joshuafolkken/kit#6185).
 interface SyncedSplit {
 	left: ReadonlyArray<string>
 	shared: ReadonlyArray<string>
 	meeting: ReadonlyArray<string>
+	failure?: string
 }
 
 // What the split is read from: the synced modules this branch did not change, the code of its own
@@ -43,6 +45,21 @@ interface SplitInputs {
 
 const NOTHING_LEFT: SyncedSplit = { left: [], shared: [], meeting: [] }
 const UNRESOLVED_EXTENSION = '.svelte'
+const FAILURE = {
+	OWN_UNREAD: "the branch's change is not one the graph can vouch for",
+	NOTHING_VOUCHED: 'no synced module is one the graph can vouch for',
+	NO_GRAPH: 'no import graph could be built',
+	UNRESOLVED: 'the work tree holds a file TypeScript does not resolve',
+	THREW: 'building or walking the graph failed',
+} as const
+
+function failed(failure: string): SyncedSplit {
+	return { ...NOTHING_LEFT, failure }
+}
+
+function threw(error: unknown): SyncedSplit {
+	return failed(`${FAILURE.THREW}: ${error instanceof Error ? error.message : String(error)}`)
+}
 
 function is_unresolved(file: string): boolean {
 	return path.extname(file) === UNRESOLVED_EXTENSION
@@ -95,11 +112,14 @@ async function split_by_graph(
 ): Promise<SyncedSplit> {
 	const graph = await import_graph.create(root)
 
-	if (graph === undefined) return NOTHING_LEFT
+	if (graph === undefined) return failed(FAILURE.NO_GRAPH)
 
 	const universe = await test_pinned_reach.code_universe()
+	const unresolved = universe.find((file) => is_unresolved(file))
 
-	if (universe.some((file) => is_unresolved(file))) return NOTHING_LEFT
+	if (unresolved !== undefined) {
+		return failed(`${FAILURE.UNRESOLVED}: ${path.relative(root, unresolved)}`)
+	}
 
 	return split_with(graph, {
 		root,
@@ -118,18 +138,21 @@ async function split(
 	map: ReadMap | undefined,
 ): Promise<SyncedSplit> {
 	const own = own_of(branch, map)
-	const main_only = synced.filter((file) => !own?.includes(file) && is_vouched(root, file))
 
-	if (own === undefined || main_only.length === 0) return NOTHING_LEFT
+	if (own === undefined) return failed(FAILURE.OWN_UNREAD)
+
+	const main_only = synced.filter((file) => !own.includes(file) && is_vouched(root, file))
+
+	if (main_only.length === 0) return failed(FAILURE.NOTHING_VOUCHED)
 
 	try {
 		return await split_by_graph(root, main_only, own)
-	} catch {
-		return NOTHING_LEFT
+	} catch (error) {
+		return threw(error)
 	}
 }
 
-const test_related_synced = { own_of, split, split_with }
+const test_related_synced = { FAILURE, own_of, split, split_with }
 
 export type { SyncedSplit }
 export { test_related_synced }

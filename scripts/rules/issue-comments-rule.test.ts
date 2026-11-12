@@ -27,11 +27,11 @@ const ISSUE_ROUTE = '…/issues/<N>'
 const GUARD_DOC = 'docs/josh-commands-automation.md'
 
 const ENTRY_POINTS = [ENTRY_SEQUENCE_SKILL, KICKOFF_SKILL]
-// The portable spelling. `gh issue view <N> --comments` is GraphQL-backed and a cloud session is
-// answered 403, which `scripts/gh/gh-document-guard.test.ts` enforces for runnable blocks — so the REST
-// call is what the procedure has to name. It is the read itself, so a trim keeps it.
-// Cross-repository only: the `{owner}` spelling of this repository's read is refused by `direct-issue-read`.
-const REST_READ = 'gh api repos/<owner>/<repo>/issues/<N>/comments'
+// The portable cross-repository spelling. `gh issue view <N> --comments` is GraphQL-backed and a cloud
+// session is answered 403, which `scripts/gh/gh-document-guard.test.ts` enforces for runnable blocks —
+// `issue:read` reads over REST, and its `--repo` replaced the raw `gh api` comments read
+// (joshuafolkken/kit#5879). It is the read itself, so a trim keeps it.
+const CROSS_REPO_READ = 'pnpm josh issue:read <N> [<N> ...] --repo <owner/repo>'
 // The stop answer that is not the run's to make. Stated once, in `issue-comments.md`, so an entry point that restated
 // it would be the clone `CLAUDE.md` prohibits.
 const STOP_ANSWER = 'no longer has a reason to exist'
@@ -45,7 +45,7 @@ const ISSUE_COMMENTS_DOC = '.claude/skills/workflow-commands/issue-comments.md'
 
 describe('`issue-comments.md` — the procedure every `#N` entry point owes', () => {
 	it('names the portable comment read in its single source', () => {
-		expect(read_unwrapped(ISSUE_COMMENTS_DOC)).toContain(REST_READ)
+		expect(read_unwrapped(ISSUE_COMMENTS_DOC)).toContain(CROSS_REPO_READ)
 	})
 
 	it('leaves the SKILL.md stub pointing at the companion', () => {

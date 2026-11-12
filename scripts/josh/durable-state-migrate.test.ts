@@ -1,16 +1,8 @@
-import {
-	existsSync,
-	mkdirSync,
-	mkdtempSync,
-	readFileSync,
-	rmSync,
-	utimesSync,
-	writeFileSync,
-} from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { durable_state_migrate } from './durable-state-migrate'
-import { PLATFORM_TEMP_ROOT } from './platform-temporary'
 
 // joshuafolkken/kit#4743: the records a run left in `/tmp` are copied into the durable directory once,
 // and a log the durable directory keeps forever is pruned once it has not been written for two weeks.
@@ -18,6 +10,7 @@ import { PLATFORM_TEMP_ROOT } from './platform-temporary'
 const TEST_PREFIX = 'josh-durable-state-migrate-test-'
 const LANE_STATE_PREFIX = 'josh-lane-state-'
 const PREFIXES = [LANE_STATE_PREFIX, 'josh-run-wake-log-']
+const INVESTIGATION_PREFIX = 'josh-investigation-record-'
 const LEGACY_TEXT = '{"state":"running"}'
 const DURABLE_TEXT = '{"state":"ended"}'
 const LANE_STATE_NAME = `${LANE_STATE_PREFIX}0123456789abcdef-4743.json`
@@ -26,11 +19,8 @@ const DAY_MS = 86_400_000
 const NOW_MS = Date.parse('2026-10-25T00:00:00Z')
 const STALE_DAYS = durable_state_migrate.LOG_RETENTION_DAYS + 1
 
-const scratch = mkdtempSync(path.join(PLATFORM_TEMP_ROOT, TEST_PREFIX))
-
-afterAll(() => {
-	rmSync(scratch, { recursive: true, force: true })
-})
+const make_directory = temporary_directory('suite')
+const scratch = make_directory(TEST_PREFIX)
 
 function directory_of(name: string): string {
 	const directory = path.join(scratch, name)
@@ -126,5 +116,18 @@ describe('durable_state_migrate.prune_stale_logs', () => {
 		expect(existsSync(stale_log)).toBe(false)
 		expect(existsSync(fresh_log)).toBe(true)
 		expect(existsSync(stale_record)).toBe(true)
+	})
+
+	// joshuafolkken/kit#6153: an investigation record its issue's ship never removed does not live on.
+	it('removes an investigation note older than the retention and keeps a fresh one', () => {
+		const directory = directory_of('prune-note')
+		const prefixes = [...PREFIXES, INVESTIGATION_PREFIX]
+		const stale_note = write_aged(path.join(directory, `${INVESTIGATION_PREFIX}a-1.md`), STALE_DAYS)
+		const fresh_note = write_aged(path.join(directory, `${INVESTIGATION_PREFIX}a-2.md`), 1)
+
+		durable_state_migrate.prune_stale_logs(directory, prefixes, NOW_MS)
+
+		expect(existsSync(stale_note)).toBe(false)
+		expect(existsSync(fresh_note)).toBe(true)
 	})
 })

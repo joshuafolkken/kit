@@ -51,12 +51,12 @@ describe('backlog_drive.run_pass — the lane limit', () => {
 		expect(result.kind === 'continue' && result.state.in_flight).toStrictEqual([OFFERED])
 	})
 
-	it('launches nothing when no lane is free', async () => {
+	it('does not ask the offer when no lane is free', async () => {
 		const offered = offer('run', [OFFERED])
 		const { ports, calls } = harness({ offers: [offered], free_lanes: [NO_FREE_LANES] })
 		const result = await backlog_drive.run_pass(state(), true, ports)
 
-		expect(calls).toStrictEqual(['offer'])
+		expect(calls).toStrictEqual([])
 		expect(result.kind).toBe('continue')
 	})
 
@@ -75,7 +75,7 @@ describe('backlog_drive.run_pass — the lane limit', () => {
 describe('backlog_drive.run_pass — a refused launch at the lane limit', () => {
 	it('waits rather than handing back a lane:open refused because every lane is taken', async () => {
 		const offered = offer('run', [OFFERED])
-		const script = { offers: [offered], unopened_launches: [OFFERED], free_lanes: [1, 0] }
+		const script = { offers: [offered], unopened_launches: [OFFERED], free_lanes: [1, 1, 0] }
 		const { ports } = harness(script)
 		const result = await backlog_drive.run_pass(state(), true, ports)
 
@@ -84,7 +84,7 @@ describe('backlog_drive.run_pass — a refused launch at the lane limit', () => 
 
 	it('hands back a launch that failed after its lane took the last seat', async () => {
 		const offered = offer('run', [OFFERED])
-		const script = { offers: [offered], failed_launches: [OFFERED], free_lanes: [1, 0] }
+		const script = { offers: [offered], failed_launches: [OFFERED], free_lanes: [1, 1, 0] }
 		const { ports } = harness(script)
 		const result = await backlog_drive.run_pass(state(), true, ports)
 
@@ -111,7 +111,7 @@ describe('backlog_drive.run_pass — a kept lane', () => {
 
 		await backlog_drive.run_pass(state(), true, ports)
 
-		expect(calls).toStrictEqual(['offer'])
+		expect(calls).toStrictEqual([])
 	})
 })
 
@@ -257,6 +257,25 @@ describe('backlog_drive.run_pass — triage', () => {
 		})
 		expect(result.state.in_flight).toStrictEqual([FIRST_CHILD])
 	})
+
+	// joshuafolkken/kit#5518: the triaged candidates start while the judgment runs.
+	it('launches the offered lanes, then hands triage back in the same pass', async () => {
+		const owed = { ...offer('run', [OFFERED]), is_judgment_owed: true }
+		const { ports, calls } = harness({ offers: [owed] })
+		const result = await backlog_drive.run_pass(state(), true, ports)
+
+		expect(calls).toStrictEqual(['offer', `launch ${OFFERED}`])
+		expect(result.kind === 'end' && result.end.token).toBe('triage')
+		expect(result.state.in_flight).toStrictEqual([OFFERED])
+	})
+
+	it('keeps a refused launch as the end of a pass that owes the judgment', async () => {
+		const owed = { ...offer('run', [OFFERED]), is_judgment_owed: true }
+		const { ports } = harness({ offers: [owed], failed_launches: [OFFERED] })
+		const result = await backlog_drive.run_pass(state(), true, ports)
+
+		expect(result.kind === 'end' && result.end.reason).toBe('launch')
+	})
 })
 
 describe('backlog_drive.run_loop', () => {
@@ -288,6 +307,21 @@ describe('backlog_drive.run_loop', () => {
 		expect(calls).toStrictEqual([`merge ${FIRST_CHILD}`, 'offer', 'offer', 'finish'])
 		expect(end.reason).toBe('stop')
 	})
+})
+
+// joshuafolkken/kit#7016: the tick's shared snapshot is taken once, before the tick asks anything.
+it('begins each tick once with the lanes then in flight', async () => {
+	const { ports, states } = harness({ finished: [FIRST_CHILD], offers: [offer('stop')] })
+	const ticks: Array<ReadonlyArray<string>> = []
+
+	async function begin_tick(in_flight: ReadonlyArray<string>): Promise<void> {
+		ticks.push(in_flight)
+	}
+
+	await backlog_drive.run_loop(state([FIRST_CHILD]), CONFIG, { ...ports, begin_tick })
+
+	expect(ticks[0]).toStrictEqual([FIRST_CHILD])
+	expect(ticks).toHaveLength(states.length)
 })
 
 it('returns window once the bounded wait is spent', async () => {
@@ -327,24 +361,6 @@ it('keeps the budget reason on the first stop verdict', async () => {
 	const end = await backlog_drive.run_loop(state(), CONFIG, ports)
 
 	expect(end.detail).toBe(reason)
-})
-
-it('returns the drained stop for a retrospective before ending the carry', async () => {
-	const { ports, calls } = harness({
-		offers: [{ ...offer('stop'), answer: 'exhausted', is_retrospective_owed: true }],
-	})
-	const end = await backlog_drive.run_loop(state(), CONFIG, ports)
-
-	expect(end.reason).toBe('retrospective')
-	expect(calls).not.toContain('finish')
-})
-
-it('ends a drained stop that owes no retrospective without handing it back', async () => {
-	const { ports, calls } = harness({ offers: [{ ...offer('stop'), answer: 'exhausted' }] })
-	const end = await backlog_drive.run_loop(state(), CONFIG, ports)
-
-	expect(end.reason).toBe('stop')
-	expect(calls).toContain('finish')
 })
 
 describe('backlog_drive.run_loop — hand-back state', () => {

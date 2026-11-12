@@ -48,8 +48,13 @@ function add_issues(
 	target: string,
 	carry: RunCarry,
 	additions: ReadonlyArray<CarryAddition>,
+	retries: ReadonlyArray<number> = [],
 ): RunCarry {
-	const next: RunCarry = { ...carry, added: next_added(carry, additions) }
+	const next: RunCarry = {
+		...carry,
+		added: additions.length === 0 ? carry.added : next_added(carry, additions),
+		done: carry.done?.filter((issue) => !retries.includes(issue)),
+	}
 
 	stamp_file.replace_stamp(target, next)
 

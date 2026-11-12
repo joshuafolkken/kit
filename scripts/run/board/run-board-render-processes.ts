@@ -16,7 +16,7 @@ import { run_board_usage_text } from './run-board-usage-text'
 // cut to fit before them.
 
 const { LANES_LABEL, column_cells, label_columns } = run_board_render_lanes
-const { USAGE_START } = run_board_render_lead
+const { USAGE_START, column_offset } = run_board_render_lead
 const { columns_rule, heading_lines } = run_board_render_section
 const { title_of } = run_board_render_title
 const { plain_of } = run_board_usage_text
@@ -120,17 +120,17 @@ function padded(text: string, width: number): string {
 	return `${text}${' '.repeat(Math.max(0, width - run_board_fit.width_of(text)))}`
 }
 
-function screen_part(usage: BoardUsage): DetailPart {
+function screen_part(usage: BoardUsage, offset: number): DetailPart {
 	const lines = labeled_of(usage).map((entry) => {
 		const cells = column_cells(entry.figure, usage.scale, GAUGE)
 
 		return {
-			text: `${INDENT}${padded(label_text(entry), LABEL_WIDTH)}${CELL_GAP}${cells}`,
+			text: `${INDENT}${padded(label_text(entry), LABEL_WIDTH + offset)}${CELL_GAP}${cells}`,
 			is_detail: entry.is_detail,
 		}
 	})
 
-	return { head: ['', columns_rule(LABEL, label_columns(USAGE_START, GAUGE))], lines }
+	return { head: ['', columns_rule(LABEL, label_columns(USAGE_START + offset, GAUGE))], lines }
 }
 
 function plain_group(
@@ -186,7 +186,8 @@ function processes_part(header: BoardHeader): DetailPart | undefined {
 
 	if (usages === undefined) return undefined
 
-	const part = header.spinner === undefined ? plain_part(usages) : screen_part(usages)
+	const part =
+		header.spinner === undefined ? plain_part(usages) : screen_part(usages, column_offset(header))
 
 	return { ...part, label: LABEL, summary: summary_of(usages) }
 }

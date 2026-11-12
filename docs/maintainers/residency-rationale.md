@@ -200,7 +200,7 @@ worse still** — the pointer has no body, so the section is no longer there.
 
 **A topic file reduced to a pointer is not kept.** Once its body has moved to a skill and it holds only
 a one-paragraph redirect, it is deleted along with its row in the index
-(`prompts/collaboration-workflow.md`) (joshuafolkken/kit#1925, joshuafolkken/kit#2996). A pointer that
+(`docs/collaboration-workflow.md`) (joshuafolkken/kit#1925, joshuafolkken/kit#2996). A pointer that
 survives until then is a record of where the body went, reached from the index, not from other
 documents' citations. The exception is the skill that is the single source itself: naming its own
 pointer is a reverse reference and causes no double read.
@@ -362,11 +362,13 @@ reading all of it. Whatever a session reads is billed again as accumulated prefi
 turn, so the cost of one check grew with the length of the conversation (joshuafolkken/kit#965). Each
 topic now has its own file, and the index exists only to pick one.
 
+No session reads the index, so it lives in `docs/collaboration-workflow.md` for a person browsing.
+
 The index records no byte counts: a hand-maintained number goes stale before the prose does, and a
 stale number is worse than none. `ls -l prompts/collaboration-workflow/` answers the real sizes.
 
 A citation names the file that holds the body because routing through the index
-(`prompts/collaboration-workflow.md` followed by a section name) forces a second read and dead-ends
+(`docs/collaboration-workflow.md` followed by a section name) forces a second read and dead-ends
 silently when the section is renamed. `scripts/claude/collaboration-prompt-split.test.ts` checks that
 every cited file exists, that every cited section resolves, and that the index lists every topic file.
 These notes moved out of the index in joshuafolkken/kit#3179.

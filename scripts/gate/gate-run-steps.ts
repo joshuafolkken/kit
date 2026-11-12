@@ -10,6 +10,7 @@ import { gate_plan, type GatePlan } from './gate-plan'
 import type { CheckClaim, GateStep, GateStepResult } from './gate-report'
 import { build_gate_step, with_granted_workers } from './gate-steps'
 import { project_checks } from './project-checks'
+import { type_program_serial, type SerialRun } from './type-program-serial'
 
 // Running the gate's checks: each one under its place in the machine-wide budget, a reused one
 // (`check-reuse.ts`) without starting it. `verification-gate.ts` decides what runs and records the
@@ -113,6 +114,17 @@ function claim_of(requested: number, admission: Admission): CheckClaim {
 	}
 }
 
+// The fields a step run under a claim adds to its result: an overflow note and its ledger row.
+function claimed_fields(
+	requested: number,
+	admission: Admission,
+): Pick<GateStepResult, 'budget_note' | 'claim'> {
+	return {
+		budget_note: core_budget.describe_overflow(admission),
+		claim: claim_of(requested, admission),
+	}
+}
+
 // **The unit step's width is bounded by the free memory too** (joshuafolkken/kit#4528). The plan's cap
 // and the granted width are sized from the cores alone, and the `--maxWorkers` they become skips the
 // guard's own reading (`test-unit-guard.ts`), so the memory is read here, once the claim is admitted
@@ -137,12 +149,11 @@ async function admitted_step(
 // own gate tests; each of those is a gate inside the outer gate's unit reservation, and a place it
 // claimed would wait for cores the outer gate cannot free until the suite — this test included —
 // finishes.
-async function run_reserved_step(
+async function run_claimed_step(
 	reserved: ReservedStep,
 	budget: BudgetContext,
 	cpu: CheckCpu,
 ): Promise<GateStepResult> {
-	if (reserved.reused_at !== undefined) return reused_result(reserved.step, reserved.reused_at)
 	if (!budget.is_reserved) return await run_gate_step(reserved.step, cpu)
 
 	return await core_budget.with_core_reservation(
@@ -152,8 +163,7 @@ async function run_reserved_step(
 				await admitted_step(reserved, admission, budget.available_cores),
 				cpu,
 			)),
-			budget_note: core_budget.describe_overflow(admission),
-			claim: claim_of(reserved.weight, admission),
+			...claimed_fields(reserved.weight, admission),
 		}),
 		{
 			budget: budget.available_cores,
@@ -161,6 +171,21 @@ async function run_reserved_step(
 			command: `gate ${reserved.step.label}`,
 			is_unit: reserved.step.label === gate_labels.UNIT_LABEL,
 		},
+	)
+}
+
+// A reused check starts nothing, so it does not wait for a type-program check's turn.
+async function run_reserved_step(
+	reserved: ReservedStep,
+	budget: BudgetContext,
+	cpu: CheckCpu,
+	serial: SerialRun,
+): Promise<GateStepResult> {
+	if (reserved.reused_at !== undefined) return reused_result(reserved.step, reserved.reused_at)
+
+	return await serial(
+		reserved.step.label,
+		async () => await run_claimed_step(reserved, budget, cpu),
 	)
 }
 
@@ -197,6 +222,7 @@ async function run_gate_steps(
 ): Promise<ReadonlyArray<GateStepResult>> {
 	const reserved = await build_reserved_steps(plan, budget.available_cores, reused)
 	const cpu = check_cpu.check_cpu_reader()
+	const serial = type_program_serial.serial_runner()
 
 	// **The checks run under the held mark, so a check's own dispatch claims nothing**.
 	// Each check is a `pnpm josh <target>` child, and a target that declares
@@ -207,12 +233,18 @@ async function run_gate_steps(
 			await run_lightest_first(
 				reserved,
 				plan.concurrency,
-				async (entry) => await run_reserved_step(entry, budget, cpu),
+				async (entry) => await run_reserved_step(entry, budget, cpu, serial),
 			),
 	)
 }
 
-const gate_run_steps = { default_budget, run_gate_step, run_gate_steps }
+const gate_run_steps = {
+	claimed_fields,
+	default_budget,
+	reused_result,
+	run_gate_step,
+	run_gate_steps,
+}
 
 export type { BudgetContext, ReusedChecks }
 export { gate_run_steps }

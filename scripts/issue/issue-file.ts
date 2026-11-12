@@ -1,4 +1,5 @@
 import type { parseArgs } from 'node:util'
+import { backlog_triage_decision } from '#scripts/backlog/backlog-triage-decision'
 import { epic_issue } from '#scripts/epic/epic-issue'
 import { epic_triage } from '#scripts/epic/epic-triage'
 import { github_issue_url } from '#scripts/gh/github-issue-url'
@@ -14,6 +15,7 @@ import {
 } from './issue-labels'
 import { issue_not_before_label } from './issue-not-before-label'
 import { issue_priority } from './issue-priority'
+import { issue_run_verdict } from './issue-run-verdict'
 import { markdown_section } from './markdown-section'
 
 // The decisions behind `josh issue:file`, kept apart from the command that
@@ -30,6 +32,7 @@ const LEADING_NON_WORD = /^[^\w]+/u
 const DIGIT = /\d/u
 
 interface FileArguments {
+	answers?: Parameters<typeof issue_run_verdict.run_label_of>[0]
 	title: string
 	body_file: string
 	route: string | undefined
@@ -40,7 +43,8 @@ interface FileArguments {
 	// long lane the parent investigated, the Issue a prerequisite or an observation came out of. The
 	// filing cap counts per origin (`issue-file-cap.ts`); absent, the finder is read (`issue-file-fold.ts`).
 	found_during: string | undefined
-	// `--over-cap`: the run is blocked by this filing, so the WIP cap does not hold it (`issue-wip.ts`).
+	// `--over-cap`: the run is blocked by this filing, or a user typed `new`, so the WIP cap does not
+	// hold it (`issue-wip.ts`, `wip-cap.md`).
 	is_over_cap: boolean
 	// `--no-auto-ok`: the Issue needs a person's judgement, so `auto-ok` is not applied (`issue-auto-ok.ts`).
 	is_auto_ok_opted_out: boolean
@@ -50,9 +54,12 @@ interface FileArguments {
 	// `--blocks-finder`: an interrupt the finder cannot go on without, so the finder is recorded as
 	// blocked by it (`issue-file-interrupt.ts`). An interrupt that blocks nobody omits it (`wip-cap.md`).
 	is_blocking_finder: boolean
+	// `--check`: every filing step runs and prints its verdict, and nothing is created on GitHub.
+	is_check: boolean
 }
 
 const OPTIONS = {
+	...backlog_triage_decision.OPTIONS,
 	'body-file': { type: 'string' },
 	route: { type: 'string' },
 	label: { type: 'string', multiple: true },
@@ -63,6 +70,7 @@ const OPTIONS = {
 	'no-auto-ok': { type: 'boolean' },
 	release: { type: 'boolean' },
 	'blocks-finder': { type: 'boolean' },
+	check: { type: 'boolean' },
 } as const
 
 // The label a `--route` value names, or `undefined` when it names none — read against the route
@@ -136,6 +144,11 @@ function arguments_of(values: ParsedValues, title: string | undefined): FileArgu
 	return {
 		title,
 		body_file,
+		answers: {
+			defect: values.defect,
+			verification: values.verification,
+			'every-run': values['every-run'],
+		},
 		...labelled,
 		labels: values.label ?? [],
 		repo: values.repo,
@@ -143,14 +156,20 @@ function arguments_of(values: ParsedValues, title: string | undefined): FileArgu
 		is_auto_ok_opted_out: values['no-auto-ok'] === true,
 		is_release: values.release === true,
 		is_blocking_finder: values['blocks-finder'] === true,
+		is_check: values.check === true,
 	}
 }
 
 // An unknown flag is `undefined` rather than a throw, so the answer is the usage line, not a stack trace.
 function parse(argv: ReadonlyArray<string>): FileArguments | undefined {
 	const parsed = cli_flags.arguments_of(argv, OPTIONS)
+	const args = parsed === undefined ? undefined : arguments_of(parsed.values, parsed.positionals[0])
 
-	return parsed === undefined ? undefined : arguments_of(parsed.values, parsed.positionals[0])
+	if (args === undefined || !has_label_name(args.labels, RUN_SOLO_LABEL)) return args
+
+	return issue_run_verdict.run_label_of({ ...args.answers, solo: true }) === RUN_SOLO_LABEL
+		? args
+		: undefined
 }
 
 // A classification label is the body's to declare, so an extra `--label` naming one the body does not
@@ -181,8 +200,8 @@ function labels_of(args: FileArguments, body: string, is_auto_ok = false): Reado
 }
 
 // Why an `auto-ok` filing with neither `run:lane` nor `run:solo` is refused, or `undefined` when it is
-// not. The offer paths withhold every candidate while one opted-in Issue is
-// untriaged, so a run's own filing without the judgement stopped every lane. No default is applied:
+// not. The offer paths hold an untriaged opted-in Issue back until it is judged — `epic:next --lanes`
+// every candidate with it — so a run's own filing without the judgement stalls. No default is applied:
 // `run:solo` is the answer that keeps a verification defect from running beside others, and only a
 // reading of the Issue gives it (`backlogrun-lanes.md`).
 function triage_problem(labels: ReadonlyArray<string>): string | undefined {
@@ -235,7 +254,7 @@ function origin_problem(body: string, target: string, current: string): string |
 
 // The duplicate candidates the caller has not declared separate. The scan cannot tell a duplicate from
 // a neighbor — that is a reading of each candidate (`issue-fold-existing.md`) — so the command holds
-// the filing until every candidate it printed is named back with `--distinct`.
+// the filing until every title match it printed is named back with `--distinct`.
 function unacknowledged(
 	candidates: ReadonlyArray<number>,
 	distinct: ReadonlyArray<number>,

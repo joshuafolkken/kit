@@ -29,8 +29,8 @@ interface DelegatableStep {
 // the investigation starts, so nothing here rests on guessing how large it will be. It is where the
 // guard refuses, not a budget: a run that knows its subject needs reading delegates before the first
 // read (`run:prep`, #4345). Two stray files the run will not edit are tolerated, because delegating costs two extra main-line turns — one to
-// write the brief, one to read the result, about 18 seconds at roughly 8.8 s of model
-// wait per turn — and below the threshold that round trip costs more than carrying the text.
+// write the brief, one to read the result, each paying a model wait — and below the threshold that
+// round trip costs more than carrying the text.
 const INVESTIGATION_FILE_THRESHOLD = 3
 
 // The same boundary for searches, counted in turns. A `grep` carries no file

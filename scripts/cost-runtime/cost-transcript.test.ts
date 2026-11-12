@@ -1,7 +1,7 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { cost_transcript } from './cost-transcript'
 import { cost_transcript_fixture } from './cost-transcript-fixture'
 
@@ -13,21 +13,18 @@ const { CWD, ASSISTANT, usage_line } = cost_transcript_fixture
 // A path that is guaranteed not to exist, named under a directory this run created. A fixed name
 // under `os.tmpdir()` would be shared with every other unit suite on the machine, so whether it is
 // absent would depend on what those suites happen to be doing (joshuafolkken/kit#1517).
-const ABSENT_ROOT = mkdtempSync(path.join(tmpdir(), 'cost-absent-'))
+const make_directory = temporary_directory('suite')
+const ABSENT_ROOT = make_directory('cost-absent-')
 
 function absent_path(name: string): string {
 	return path.join(ABSENT_ROOT, name)
 }
 
-afterAll(() => {
-	rmSync(ABSENT_ROOT, { recursive: true, force: true })
-})
-
 // A home directory holding one project's transcripts, so the reader is exercised against real files
 // rather than a mocked `fs` — the failure this command must not have is reading nothing and calling
 // it zero, and only a real path can produce that.
 function make_home(content: string): string {
-	const home = mkdtempSync(path.join(tmpdir(), 'cost-'))
+	const home = make_directory('cost-')
 	const directory = cost_transcript.transcript_directory(CWD, home)
 
 	mkdirSync(directory, { recursive: true })

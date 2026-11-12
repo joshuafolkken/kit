@@ -1,16 +1,10 @@
-import {
-	lstatSync,
-	mkdirSync,
-	mkdtempSync,
-	readFileSync,
-	rmSync,
-	symlinkSync,
-	writeFileSync,
-} from 'node:fs'
-import { tmpdir } from 'node:os'
+import { lstatSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it } from 'vitest'
 import { lane_instructions } from './lane-instructions'
+
+const make_directory = temporary_directory()
 
 const ROOT_CAUSE_ITEM = '- **Fix root causes.** Never a symptom.'
 const RULES_FILE = 'CLAUDE.md'
@@ -41,12 +35,23 @@ const AGENTS_FILE = 'AGENTS.md'
 const PLANTED_TEXT = 'Planted instructions.'
 
 function checkout_with(rules: string): string {
-	const directory = mkdtempSync(path.join(tmpdir(), 'lane-instructions-'))
+	const directory = make_directory('lane-instructions-')
 
 	writeFileSync(path.join(directory, RULES_FILE), rules)
 
 	return directory
 }
+
+describe('lane workflow entry', () => {
+	it('routes fresh fullrun children to the dedicated entry and preserves resume and review scope', () => {
+		const composed = lane_instructions.composed_in(REPO_ROOT, REPO_ROOT) ?? ''
+
+		expect(composed).toContain(lane_instructions.WORKFLOW_ENTRY)
+		expect(composed).toContain('instead of workflow-commands/SKILL.md')
+		expect(composed).toContain('A resumed child follows its resume prompt first')
+		expect(composed).toContain('Review sessions do not start a fullrun')
+	})
+})
 
 describe('lane instruction composition', () => {
 	it('expands each include from CLAUDE.md and drops the rules it does not name', () => {
@@ -121,6 +126,12 @@ describe('lane instruction launch flags', () => {
 		expect(excludes_of(lane_instructions.flags(cwd))).toEqual({
 			claudeMdExcludes: [package_copy, path.join(cwd, AGENTS_FILE)],
 		})
+		const prompt_file = value_after(
+			lane_instructions.flags(cwd),
+			lane_instructions.PROMPT_FILE_FLAG,
+		)
+
+		expect(readFileSync(prompt_file, 'utf8')).toContain('pnpm josh doc:read fullrun-lane.md')
 	})
 
 	it('passes nothing, leaving CLAUDE.md loaded, when the set cannot be composed', () => {

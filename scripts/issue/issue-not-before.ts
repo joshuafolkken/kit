@@ -1,5 +1,7 @@
+import { issue_body_keys } from './issue-body-keys'
 import { issue_sample_gate } from './issue-sample-gate'
 import { markdown_section } from './markdown-section'
+import { measure_declaration } from './measure-declaration'
 
 // joshuafolkken/kit#4007: a follow-up measurement filed with `auto-ok` ("measure three days after #N
 // merges") was offered by `backlog:next` the day it was filed, and its lane could only hand the hold
@@ -8,8 +10,8 @@ import { markdown_section } from './markdown-section'
 // A body may instead wait on samples recorded after a pull request merged (`issue-sample-gate.ts`);
 // this module answers for both, so every reader holds an issue back the same way.
 
-const BACKGROUND_HEADING = '## 背景'
-const PREFIX = '- 実施可能日:'
+const BACKGROUND_HEADING = issue_body_keys.heading('background')
+const PREFIX = issue_body_keys.prefix('not_before')
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z$/u
 // What `toISOString` writes after the minutes the declaration spells.
 const ISO_TAIL = ':00.000Z'
@@ -17,6 +19,15 @@ const ISO_TAIL = ':00.000Z'
 // example never reads as already due.
 const EXAMPLE = `${PREFIX} 2099-01-01T09:00Z`
 const MALFORMED = `\`${PREFIX}\` must be a UTC time written YYYY-MM-DDTHH:MMZ\n${EXAMPLE}`
+// joshuafolkken/kit#6007: a measurement follow-up waits on samples; a calendar wait on one is capped
+// at a week from filing, and declaring both makes a wait no reader can tell the end of.
+const MAX_WAIT_DAYS = 7
+const DAY_MS = 86_400_000
+const MAX_WAIT_MS = MAX_WAIT_DAYS * DAY_MS
+// `YYYY-MM-DDTHH:MM` — the part of `toISOString` the declaration spells.
+const MINUTES_LENGTH = 16
+const TOO_LATE = `\`${PREFIX}\` of a measurement follow-up must be at most ${String(MAX_WAIT_DAYS)} days after filing — wait on samples with \`${issue_sample_gate.DECLARATION}\` instead`
+const BOTH = `a measurement follow-up declares one of \`${PREFIX}\` and \`${issue_body_keys.prefix('sample_gate')}\`, not both — keep the condition`
 const HEADING_MARKS = /^#{1,6}\s+/u
 // joshuafolkken/kit#4438: a start condition written as its own heading is never read — every reader
 // sees only the declaration line under the background heading — so the issue is offered at once.
@@ -102,11 +113,30 @@ function stray_heading_problems(body: string): ReadonlyArray<string> {
 	)
 }
 
-function problems(body: string): ReadonlyArray<string> {
+function latest_date(now: number): string {
+	return `${new Date(now + MAX_WAIT_MS).toISOString().slice(0, MINUTES_LENGTH)}Z`
+}
+
+// The calendar-wait refusals of a body with a measure declaration; `now` stands for the filing time.
+function measurement_wait_problems(body: string, now: number): ReadonlyArray<string> {
+	const date = date_of(body)
+
+	if (date === undefined || !measure_declaration.is_stated(body)) return []
+	if (issue_sample_gate.cited_number(body) !== undefined) return [BOTH]
+
+	return Date.parse(date) > now + MAX_WAIT_MS ? [`${TOO_LATE}\n${PREFIX} ${latest_date(now)}`] : []
+}
+
+function problems(body: string, now: number = Date.now()): ReadonlyArray<string> {
 	const value = declared_value(body)
 	const date_problems = value === undefined || is_valid(value) ? [] : [MALFORMED]
 
-	return [...stray_heading_problems(body), ...date_problems, ...issue_sample_gate.problems(body)]
+	return [
+		...stray_heading_problems(body),
+		...date_problems,
+		...measurement_wait_problems(body, now),
+		...issue_sample_gate.problems(body),
+	]
 }
 
 const issue_not_before = { is_due, problems, waiting_date, waiting_ms, waiting_reason }

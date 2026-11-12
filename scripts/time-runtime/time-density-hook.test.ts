@@ -1,21 +1,19 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { afterAll, describe, expect, it } from 'vitest'
 import { time_density } from './time-density'
 import { time_density_hook } from './time-density-hook'
 import { time_hook_transcript } from './time-hook-transcript'
 
-const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'density-hook-'))
+const make_directory = temporary_directory('suite')
+const WORK_DIRECTORY = make_directory('density-hook-')
 const ENOUGH_TURNS = time_transcript_fixture.DENSITY_TURNS
 const ONE_CALL = 1
 const THREE_CALLS = 3
 const NOW_MS = 1_700_000_000_000
 const RECENTLY_MS = 1000
-const TAIL_SAMPLE_BYTES = 16
-// Longer than the window above, so a read that ignored the window would return something else.
-const LONG_TEXT = '0123456789'.repeat(3)
 const ABSENT_PATH = path.join(WORK_DIRECTORY, 'no-such-session.jsonl')
 // The id Claude Code puts in a forked agent's payload, beside the *parent* session's transcript path.
 const AGENT_ID = 'a313eea340918b8a1'
@@ -51,23 +49,6 @@ afterAll(() => {
 	for (const transcript of WRITTEN_TRANSCRIPTS) {
 		rmSync(time_density_hook.notice_path(transcript), { force: true })
 	}
-
-	rmSync(WORK_DIRECTORY, { recursive: true, force: true })
-})
-
-describe('time_density_hook.read_tail', () => {
-	it('reads only the end of the file', () => {
-		const target = write_transcript('tail', LONG_TEXT)
-		const tail = time_density_hook.read_tail(target, TAIL_SAMPLE_BYTES)
-
-		expect(tail).toBe(LONG_TEXT.slice(-TAIL_SAMPLE_BYTES))
-	})
-
-	it('reads a file shorter than the window whole', () => {
-		const target = write_transcript('short', 'abc')
-
-		expect(time_density_hook.read_tail(target, TAIL_SAMPLE_BYTES)).toBe('abc')
-	})
 })
 
 describe('time_density_hook.density_notice', () => {

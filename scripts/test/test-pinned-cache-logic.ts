@@ -108,6 +108,10 @@ function digest_of(text: string): string {
 
 // The hunk's file, its old lines, the lines it holds now in `content` and the probed function's name.
 function hunk_key(hunk: Hunk, content: string): string {
+	if (hunk.parts !== undefined) {
+		return digest_of(JSON.stringify(hunk.parts.map((part) => hunk_key(part, content))))
+	}
+
 	const start = hunk.new_start - 1
 	const lines = content.split(LINE_BREAK).slice(start, start + hunk.new_count)
 

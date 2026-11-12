@@ -42,7 +42,7 @@ async function read(
 
 // The budget for a git call that talks to the remote — `fetch` and `pull`.
 // `read` and `with_output` once waited without end, and a `git fetch --prune` under `josh main:sync`
-// sat on a dead ssh connection for 37 minutes, stalling the unattended backlog driver whose merge step
+// sat on a dead ssh connection without end, stalling the unattended backlog driver whose merge step
 // runs it. Their default now is a local command's, far too short for a transfer, so a remote call
 // still takes this one. The push's budget is reused rather than a second number chosen: both transfer
 // objects over the same transport, and that one is already read off what a healthy transfer costs here.

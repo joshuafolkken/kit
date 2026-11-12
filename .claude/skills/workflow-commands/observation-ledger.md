@@ -47,6 +47,9 @@ Choose it from the phenomenon, not the run, and record with one command:
 pnpm josh observation:record <slug> d<n> '<where>' '<what>' [--checkout <that repository's checkout>]
 ```
 
+`d<n>` → the token `pnpm josh observation:depth <path>` prints for the subject's path, a command's
+being its script (`observation-filing.md` → "The depth test").
+
 Standard output is one token: `file` (second sighting — file it, below) or `ledger` (nothing to file);
 standard error lists earlier sightings and the file appended to. A broken line, or `k:example`, exits
 1 with nothing appended. **Every file of the directory is counted**, in the named checkout. A
@@ -69,7 +72,7 @@ blocked depth-0 work is filed as before.
   passing round 2), so CI does not restart; so does any code round on a pushed, clean tree, a
   blocking round 2 included.
   Once the Issue closes, the next ledger round outside a lane carries the comment's lines into
-  `<N>-comment-rounds.md` (`review-comment-round.ts`); a lane child leaves that to
+  `<N>-comment-rounds.md` (`review-comment-round.ts`); a lane, including one without a child marker, leaves that to
   `pnpm josh observations:flush`.
 - **`pnpm josh followup` commits any other line appended after the run's commit onto the pull request,
   before the merge** — only when the ledger holds a pending append; a broken line refuses the merge.

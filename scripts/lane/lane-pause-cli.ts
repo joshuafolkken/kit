@@ -68,7 +68,9 @@ const UNREAD_NOTE =
 function report(verb: Verb, issue: string, result: LaneSignalled): void {
 	const note = result.is_unread ? UNREAD_NOTE : ''
 
-	console.info(`lane:${verb} ${issue_cite.plain(issue)}: ${outcome_of(verb, result)}${note}`)
+	console.info(
+		`lane:${verb} ${issue_cite.plain_for('terminal', issue)}: ${outcome_of(verb, result)}${note}`,
+	)
 }
 
 async function record(verb: Verb, issue: string): Promise<void> {
@@ -78,7 +80,7 @@ async function record(verb: Verb, issue: string): Promise<void> {
 	await lane_ledger_write.record_lane_state({ issue: Number(issue), state: VERBS[verb].state })
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.LANE_STATE,
-		`${issue_cite.plain(issue)} ${VERBS[verb].done} by ${command}`,
+		`${issue_cite.plain_for('program', issue)} ${VERBS[verb].done} by ${command}`,
 	)
 }
 

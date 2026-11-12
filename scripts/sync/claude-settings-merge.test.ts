@@ -175,6 +175,23 @@ describe('merge_claude_settings — permissions', () => {
 	})
 })
 
+describe('merge_claude_settings — retired workflow edit denies', () => {
+	it.each(['Edit(./.github/workflows/**)', 'Write(./.github/workflows/**)'])(
+		'removes %s from existing settings without restoring it on another sync',
+		(workflow_deny) => {
+			const existing = existing_with((settings) => {
+				settings.permissions[DENY] = [workflow_deny, OWN_DENY]
+			})
+			const once = merge_claude_settings(existing, DISTRIBUTED)
+
+			expect(parse(DISTRIBUTED).permissions[DENY]).not.toContain(workflow_deny)
+			expect(parse(once).permissions[DENY]).not.toContain(workflow_deny)
+			expect(parse(once).permissions[DENY]).toContain(OWN_DENY)
+			expect(merge_claude_settings(once, DISTRIBUTED)).toBe(once)
+		},
+	)
+})
+
 describe('merge_claude_settings — permissions kit withdrew', () => {
 	it("removes a withdrawn kit entry and keeps the project's own beside it", () => {
 		const merged = merged_with((settings) => {
@@ -206,12 +223,27 @@ describe('merge_claude_settings — permissions kit withdrew', () => {
 describe('merge_claude_settings — other keys', () => {
 	it('keeps a top-level key kit does not ship', () => {
 		const merged = merged_with((settings) => {
+			settings['spinnerTipsEnabled'] = false
+		})
+
+		expect(merged['spinnerTipsEnabled']).toBe(false)
+	})
+
+	it("keeps the project's own statusLine over kit's", () => {
+		const merged = merged_with((settings) => {
 			settings[STATUS_LINE_KEY] = STATUS_LINE
-			settings['enableArtifact'] = false
 		})
 
 		expect(merged[STATUS_LINE_KEY]).toEqual(STATUS_LINE)
-		expect(merged['enableArtifact']).toBe(false)
+	})
+
+	it("writes kit's statusLine where the project has none", () => {
+		const without = Object.entries(parse(DISTRIBUTED)).filter(([key]) => key !== STATUS_LINE_KEY)
+		const existing = json_format.format_json(Object.fromEntries(without))
+		const merged = parse(merge_claude_settings(existing, DISTRIBUTED))
+
+		expect(merged[STATUS_LINE_KEY]).toEqual(parse(DISTRIBUTED)[STATUS_LINE_KEY])
+		expect(merged[STATUS_LINE_KEY]).toMatchObject({ type: 'command' })
 	})
 
 	it("keeps a project's own entry inside an object kit ships, with kit's entries winning", () => {

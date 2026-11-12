@@ -65,7 +65,7 @@ function end_carried_cut(lane: LaneInfo): void {
 async function record_restart(issue: string): Promise<void> {
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.RESTART,
-		`${issue_cite.plain(issue)} restarted in a fresh session by a person`,
+		`${issue_cite.plain_for('program', issue)} restarted in a fresh session by a person`,
 	)
 }
 

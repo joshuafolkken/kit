@@ -1,0 +1,5 @@
+- rf:project-conventions | medium | .claude/skills/workflow-commands/kickoff.md:26 | 2026-11-01 | #5637
+- rf:project-conventions | low | scripts/josh/josh-commands-epic.ts:35 | 2026-11-01 | #5637
+- rf:project-conventions | low | scripts/epic/epic-run.ts:87 | 2026-11-01 | #5637
+- rf:bug-risks | low | scripts/epic/epic.ts:199 | 2026-11-01 | #5637
+- rf:tests | low | scripts/epic/epic.ts:51 | 2026-11-01 | #5637

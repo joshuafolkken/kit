@@ -1,8 +1,10 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { describe, expect, it, onTestFinished } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { run_board_snapshot, type Snapshot } from './run-board-snapshot'
+
+const make_directory = temporary_directory()
 
 const { file_store } = run_board_snapshot
 const FILE_NAME = 'snapshot.json'
@@ -23,17 +25,12 @@ const SNAPSHOT: Snapshot = {
 			},
 		],
 	]),
+	issue_count: { open: 87, closed: 6912 },
 }
 
 // A directory of the test's own, removed once it finishes.
 function scratch(): string {
-	const directory = mkdtempSync(path.join(tmpdir(), 'run-board-snapshot-'))
-
-	onTestFinished(() => {
-		rmSync(directory, { recursive: true, force: true })
-	})
-
-	return directory
+	return make_directory('run-board-snapshot-')
 }
 
 describe('run_board_snapshot.file_store — what it keeps', () => {
@@ -58,6 +55,15 @@ describe('run_board_snapshot.file_store — what it keeps', () => {
 		store.save({ ...SNAPSHOT, closed: new Map([[1, withdrawn]]) })
 
 		expect(store.load()?.closed.get(1)).toStrictEqual(withdrawn)
+	})
+
+	// joshuafolkken/kit#7088: a snapshot written before the count was kept reads as no count.
+	it('reads a snapshot with no issue count as having none', () => {
+		const store = file_store(path.join(scratch(), FILE_NAME))
+
+		store.save({ ...SNAPSHOT, issue_count: undefined })
+
+		expect(store.load()?.issue_count).toBeUndefined()
 	})
 
 	it('rewrites the snapshot whole', () => {

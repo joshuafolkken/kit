@@ -4,8 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { read_script } from '#tools/josh/josh-script-reader'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { COMMAND_MAP } from './josh-command-map'
-import type { CommandEntry } from './josh-command-types'
-import { FAILURE_EXIT_CODE, josh_in_process } from './josh-in-process'
+import { FAILURE_EXIT_CODE, josh_in_process, type InProcessTarget } from './josh-in-process'
 
 const PACKAGE_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
 const JOSH_DIR = path.join(PACKAGE_DIR, 'scripts', 'josh')
@@ -18,13 +17,8 @@ const TYPESCRIPT_DISPATCHER_URL = 'file:///repo/scripts/josh/josh-logic.ts'
 const BUNDLED_DISPATCHER_URL = 'file:///repo/dist/josh.js'
 
 const FIXTURE_EXIT_CODE = 3
-const SCRIPT_ENTRY: CommandEntry = {
-	script: 'scripts/lint/lint-related.ts',
-	description: 'Lint the changed files',
-	category: 'Development',
-	reference: ['', 'developer', ['processes']],
-	usage: { examples: [] },
-}
+const SCRIPT = 'scripts/lint/lint-related.ts'
+const SCRIPT_PATH = path.join(PACKAGE_DIR, SCRIPT)
 
 const ORIGINAL_ARGV = process.argv
 const ORIGINAL_EXIT_CODE = process.exitCode
@@ -35,59 +29,32 @@ afterEach(() => {
 	vi.restoreAllMocks()
 })
 
-function target_of(entry: CommandEntry, dispatcher_url: string): string | undefined {
-	return josh_in_process.in_process_target(entry, PACKAGE_DIR, dispatcher_url)
+function target_of(dispatcher_url: string): InProcessTarget {
+	return josh_in_process.in_process_target(SCRIPT, PACKAGE_DIR, dispatcher_url)
+}
+
+function source_target(script_path: string): InProcessTarget {
+	return { module_path: script_path, script_path }
 }
 
 describe('josh_in_process.in_process_target', () => {
 	it('imports the source script when the dispatcher itself was loaded as TypeScript', () => {
-		expect(target_of(SCRIPT_ENTRY, TYPESCRIPT_DISPATCHER_URL)).toBe(
-			path.join(PACKAGE_DIR, SCRIPT_ENTRY.script ?? ''),
-		)
+		expect(target_of(TYPESCRIPT_DISPATCHER_URL)).toEqual(source_target(SCRIPT_PATH))
 	})
 
-	// A consumer runs the bundle under plain node, which cannot evaluate `scripts/*.ts` at all, so a
-	// command that is not pre-built has to keep spawning tsx exactly as it did.
-	it('spawns a command that is not pre-built when the dispatcher is the bundled dist/josh.js', () => {
-		expect(target_of(SCRIPT_ENTRY, BUNDLED_DISPATCHER_URL)).toBeUndefined()
-	})
-
-	it('imports the pre-built bundle of an is_bundled command under the bundled dist/josh.js', () => {
-		const entry: CommandEntry = { ...SCRIPT_ENTRY, is_bundled: true }
-
-		expect(target_of(entry, BUNDLED_DISPATCHER_URL)).toBe(
-			path.join(PACKAGE_DIR, 'dist', 'commands', 'lint-related.js'),
-		)
-	})
-
-	// `--env-file` is a node flag that has to be in force before the script's first line runs.
-	it('refuses a command carrying tsx_arguments, even when it is marked is_bundled', () => {
-		const entry: CommandEntry = {
-			...SCRIPT_ENTRY,
-			is_bundled: true,
-			tsx_arguments: ['--env-file=.env'],
-		}
-
-		expect(target_of(entry, TYPESCRIPT_DISPATCHER_URL)).toBeUndefined()
-		expect(target_of(entry, BUNDLED_DISPATCHER_URL)).toBeUndefined()
-	})
-
-	it('refuses a shell command, which has no script to import', () => {
-		const entry: CommandEntry = {
-			shell: ['pnpm', 'exec', 'prettier', '--check', '.'],
-			description: 'Check formatting',
-			category: 'Development',
-			reference: ['', 'developer', ['processes']],
-			usage: { examples: [] },
-		}
-
-		expect(target_of(entry, TYPESCRIPT_DISPATCHER_URL)).toBeUndefined()
+	// A consumer runs the bundle under plain node, which cannot evaluate `scripts/*.ts` at all, so it
+	// imports the pre-built command while the script it runs as stays the source.
+	it('imports the pre-built command under the bundled dist/josh.js', () => {
+		expect(target_of(BUNDLED_DISPATCHER_URL)).toEqual({
+			module_path: path.join(PACKAGE_DIR, 'dist', 'commands', 'lint-related.js'),
+			script_path: SCRIPT_PATH,
+		})
 	})
 })
 
 describe('josh_in_process.run_in_process', () => {
 	it('runs the script in this process and answers with the exit code it set', async () => {
-		const exit_code = await josh_in_process.run_in_process(FIXTURE_PATH, [
+		const exit_code = await josh_in_process.run_in_process(source_target(FIXTURE_PATH), [
 			String(FIXTURE_EXIT_CODE),
 		])
 
@@ -96,21 +63,31 @@ describe('josh_in_process.run_in_process', () => {
 		expect(process.argv[1]).toBe(realpathSync(FIXTURE_PATH))
 	})
 
+	// The pre-built command's guard compares against its source location, so argv[1] names the
+	// script, never the module actually imported.
+	it('sets argv[1] to the script path when the imported module differs', async () => {
+		const target: InProcessTarget = { module_path: FIXTURE_PATH, script_path: SCRIPT_PATH }
+
+		await josh_in_process.run_in_process(target, [String(FIXTURE_EXIT_CODE)])
+
+		expect(process.argv[1]).toBe(realpathSync(SCRIPT_PATH))
+	})
+
 	// A spawned tsx reported a broken script on stderr and exited 1; the in-process path may not
 	// turn that into a silent success.
 	it('answers 1 and reports the failure when the script cannot be loaded', async () => {
 		vi.spyOn(console, 'error').mockImplementation(vi.fn())
 
-		const exit_code = await josh_in_process.run_in_process(MISSING_SCRIPT_PATH, [])
+		const exit_code = await josh_in_process.run_in_process(source_target(MISSING_SCRIPT_PATH), [])
 
 		expect(exit_code).toBe(FAILURE_EXIT_CODE)
 		expect(vi.mocked(console.error)).toHaveBeenCalled()
 	})
 })
 
-const IN_PROCESS_SCRIPTS: ReadonlyArray<string> = Object.values(COMMAND_MAP)
-	.filter((entry) => target_of(entry, TYPESCRIPT_DISPATCHER_URL) !== undefined)
-	.map((entry) => entry.script ?? '')
+const IN_PROCESS_SCRIPTS: ReadonlyArray<string> = [
+	...new Set(Object.values(COMMAND_MAP).flatMap((entry) => entry.script ?? [])),
+]
 
 // The dispatcher sets `process.argv[1]` to the script's own path, so a script whose main guard is
 // written any other way imports cleanly, does nothing, and answers 0 — a `josh gate` that passes
@@ -127,7 +104,7 @@ const ENTRY_DETECTION_MARKERS: ReadonlyArray<string> = [
 ]
 const UNCONDITIONAL_SCRIPTS: ReadonlyArray<string> = [
 	'scripts/epic/epic-check.ts',
-	'scripts/epic/epic.ts',
+	'scripts/followup/git-followup-workflow.ts',
 	'scripts/git/git-workflow.ts',
 	'scripts/version/version-check.ts',
 ]

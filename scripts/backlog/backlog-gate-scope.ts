@@ -1,8 +1,12 @@
 import type { OptedInRead, TrackingRead } from '#scripts/auto-ok/auto-ok-cli'
+import type { BusyRead } from '#scripts/epic/epic-busy'
 import { epic_graph } from '#scripts/epic/epic-graph'
 import { epic_index } from '#scripts/epic/epic-index'
+import type { ImplementRate } from '#scripts/lane/lane-implement-rate'
 import { lane_plan } from '#scripts/lane/lane-plan'
+import type { SizeRatios } from '#scripts/lane/lane-size-stats'
 import { lane_state } from '#scripts/lane/lane-state'
+import { backlog_overlap } from './backlog-overlap'
 import { backlog_plan_comment } from './backlog-plan-comment'
 import { backlog_pool } from './backlog-pool'
 import type { GateScope } from './backlog-rank'
@@ -10,12 +14,17 @@ import type { GateScope } from './backlog-rank'
 type OptedIn = Extract<OptedInRead, { kind: 'read' }>
 type Tracking = Extract<TrackingRead, { kind: 'read' }>
 
+const IDLE: BusyRead = { kind: 'idle' }
+
 // Everything the answer is assembled from, read once and passed down rather than re-fetched.
+// `implement_rate` is the rate `issue:file` projects a declared size by (joshuafolkken/kit#6066).
 interface PoolContext {
 	opted_in: OptedIn
 	tracking: Tracking
 	repo: string
 	exclude: ReadonlyArray<number>
+	implement_rate: ImplementRate | undefined
+	growth?: SizeRatios | undefined
 }
 
 // The rows the offer's cap bounds — the standalone half.
@@ -42,14 +51,17 @@ function yielded_keys(context: PoolContext, directory: string): ReadonlySet<stri
 // `backlog:plan --waves` reads the same scope, so its first wave is this offer. Their lane state
 // records name a paused holder in the wait it causes (joshuafolkken/kit#4270); they are local files.
 // A lane's recorded plan (joshuafolkken/kit#4864), else a plan comment (joshuafolkken/kit#4923), is
-// read in place of the body (joshuafolkken/kit#4937).
-async function gate_scope(context: PoolContext): Promise<GateScope> {
+// read in place of the body (joshuafolkken/kit#4937). A running lane in `read` the listing misses
+// declares its recorded plan (joshuafolkken/kit#7185).
+async function gate_scope(context: PoolContext, read: BusyRead = IDLE): Promise<GateScope> {
 	const { issues } = context.opted_in
 	const directory = process.cwd()
+	const declared = await backlog_plan_comment.declared_of(issues, directory)
+	const holders = backlog_overlap.running_numbers(read)
 
 	return {
 		standalone: standalone_keys(context),
-		declared: await backlog_plan_comment.declared_of(issues, directory),
+		declared: lane_plan.with_holder_plans(declared, holders, directory),
 		lanes: await lane_state.read_states(issues.map((issue) => String(issue.number))),
 		yielded: yielded_keys(context, directory),
 	}

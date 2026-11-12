@@ -1,7 +1,9 @@
 import { git_followup_label } from '#scripts/followup/git-followup-label'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
-import { IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
+import type { LabelWrite } from '#scripts/gh/git-gh-issue-write'
+import { IN_PROGRESS_LABEL, NEEDS_HUMAN_MERGE_LABEL } from '#scripts/issue/issue-labels'
 import { session_cite } from '#scripts/issue/session-cite'
+import { run_maintenance } from './run-maintenance'
 
 // **The `in-progress` marker belongs to the commands that open and release a run**, so no manifest
 // spells the label's calls and none can forget it: `run:entry` applies it the moment the tree is held
@@ -13,17 +15,18 @@ import { session_cite } from '#scripts/issue/session-cite'
 
 const MARK_RECOVERY = "gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=in-progress'"
 const UNMARK_RECOVERY = 'gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress'
+const PARK_RECOVERY = 'gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/needs-human-merge'
 
-function warn(action: string, issue: string, recovery: string): void {
+function warn(action: string, issue: string, recovery: string, label = IN_PROGRESS_LABEL): void {
 	console.warn(
-		`⚠ could not ${action} \`in-progress\` on ${session_cite.issue(issue)} — run by hand: ${recovery}`,
+		`⚠ could not ${action} \`${label}\` on ${session_cite.issue(issue)} — run by hand: ${recovery}`,
 	)
 }
 
 // `issue_add_label` creates the label when the repository lacks it (`lane-dispatch.ts`), so no
 // separate provisioning call is made here.
 async function mark(issue: string): Promise<boolean> {
-	const is_marked = await git_gh_command.issue_add_label(issue, IN_PROGRESS_LABEL)
+	const is_marked = await run_maintenance.label(issue)
 
 	if (!is_marked) warn('apply', issue, MARK_RECOVERY)
 
@@ -44,7 +47,20 @@ async function unmark(issue: string): Promise<boolean> {
 	}
 }
 
+// **A dispatch is the word that the issue runs again** (joshuafolkken/kit#7313): a pull request
+// returned for a fix still carries the `needs-human-merge` park, which refuses the lane's review
+// (`lane-parked.ts`), so the park comes off before `in-progress` goes on. The removal answers `true`
+// for a label already off, and a refused one is warned about without holding the launch.
+async function claim(issue: string): Promise<LabelWrite> {
+	const is_cleared = await git_gh_command.issue_clear_label(issue, NEEDS_HUMAN_MERGE_LABEL)
+
+	if (!is_cleared) warn('remove', issue, PARK_RECOVERY, NEEDS_HUMAN_MERGE_LABEL)
+
+	return await git_gh_command.issue_apply_label(issue, IN_PROGRESS_LABEL)
+}
+
 const run_label = {
+	claim,
 	mark,
 	unmark,
 }

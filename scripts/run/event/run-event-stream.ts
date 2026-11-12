@@ -31,9 +31,8 @@ const EVENT_PREFIX = durable_state.PREFIX.EVENTS
 // distinction the ambient `.log` draws.
 const EVENT_SUFFIX = '.jsonl'
 // A week of a busy run's events, so `josh lane:stats --period 7` reads the parks that end a stop's wait
-// and `run:board` keeps every ship stage (joshuafolkken/kit#3997). A four-lane `backlogrun` wrote about
-// 75 events an hour (1,877 in 25 hours), so fifteen thousand holds about eight days at that rate and
-// still bounds the file to a few megabytes — past it the oldest events roll off.
+// and `run:board` keeps every ship stage (joshuafolkken/kit#3997). The cap retains enough history
+// to inspect a long run while preventing unbounded growth; past it the oldest events roll off.
 const EVENT_CAP = 15_000
 const FIRST_POSITION = 0
 const POSITION_INCREMENT = 1
@@ -55,6 +54,7 @@ const EVENT_KIND = {
 	CHILD_LAUNCH: 'child-launch',
 	MERGE: 'merge',
 	PARK: 'park',
+	HUMAN_REVIEW: 'human-review',
 	SPLIT: 'split',
 	OUTAGE: 'outage',
 	// A Claude usage limit stopped a lane child (joshuafolkken/kit#4745). Its text names the reset time,
@@ -133,9 +133,15 @@ const EVENT_KIND = {
 	// same section.
 	NOTE: 'note',
 	// A lane child reached a phase no other event marks — its first implementation edit, written by the
-	// PreToolUse hook — so `run:board` draws how far the child has got. A trace,
-	// like `SHIP_STAGE`: it says where the child's work is, not where the run is.
+	// PreToolUse hook — so `run:board` draws how far the child has got. The backlog driver writes its own
+	// `collect` / `launch` steps on a child as this kind too, which no reader draws as a phase
+	// (`backlog-drive-trace.ts`). A trace, like `SHIP_STAGE`: it says where the child's work is, not where
+	// the run is.
 	LANE_PHASE: 'lane-phase',
+	// The fullrun step `run:step` or `run:entry` computed for an issue: `#<N> step <n>/<total> <name>`,
+	// written once per change of step (`run-event-step.ts`), so `run:board` draws it (joshuafolkken/kit#6598).
+	// A trace: it says which step the issue's run reached, not where the run is.
+	STEP: 'step',
 	// An issue `run:add` put into the live run. The parent's `--wait` watcher
 	// ends on it, so the issue takes the next free lane without waiting out the arrival probe's minute. A
 	// trace: it says what the run was handed, not where the run is.
@@ -171,10 +177,22 @@ const EVENT_KIND = {
 	// closed the issue through `issue:measured` — no lane was launched for it (joshuafolkken/kit#4621).
 	// `run:board` draws it merged. A trace: the parent's position is the drive's, not this close.
 	MEASURED: 'measured',
+	// `backlog:drive` ran a due issue's measurement declaration and found no sample to read yet, so the
+	// issue waits without a lane (joshuafolkken/kit#6503). A trace: `offer_exclude` keeps it out of the
+	// run's offers, the way the drive's own `waiting` list does.
+	SAMPLE_WAIT: 'sample-wait',
 	// The host slept while `backlog:drive` sampled its load (joshuafolkken/kit#5032): the sampler's timer
 	// ran late by more than a few intervals. `at` is the wake and `elapsed_ms` how long the sleep
 	// lasted; every lane's net time takes it out (`lane-sleep.ts`). A trace.
 	SLEEP: 'sleep',
+	// A lane's `lane:plan` blocking on a holder of its files (joshuafolkken/kit#6140): `#<N> start #<M>`
+	// as one ask begins to wait, `#<N> end #<M>` as it ends, so `lane:breakdown` counts
+	// the wait under its own row rather than the stage it fell in (`lane-plan-wait-event.ts`). A trace.
+	PLAN_WAIT: 'plan-wait',
+	// GitHub's REST core rate limit read around one `backlog:drive` offer cycle (joshuafolkken/kit#6558):
+	// JSON text with the cycle's `used_delta`, `remaining` and `reset`, or `is_missing` when a read failed
+	// (`backlog-drive-rate.ts`). A trace written every cycle, so the bound rolls it off with the heartbeats.
+	RATE_LIMIT: 'rate-limit',
 } as const
 
 type EventKind = (typeof EVENT_KIND)[keyof typeof EVENT_KIND]
@@ -190,6 +208,7 @@ const TRACE_KINDS: ReadonlySet<string> = new Set([
 	EVENT_KIND.FILED,
 	EVENT_KIND.NOTE,
 	EVENT_KIND.LANE_PHASE,
+	EVENT_KIND.STEP,
 	EVENT_KIND.ADD,
 	EVENT_KIND.LANE_LIMIT,
 	EVENT_KIND.SETUP,
@@ -198,13 +217,17 @@ const TRACE_KINDS: ReadonlySet<string> = new Set([
 	EVENT_KIND.LANE_STATE,
 	EVENT_KIND.PAUSED_NOTICE,
 	EVENT_KIND.MEASURED,
+	EVENT_KIND.SAMPLE_WAIT,
 	EVENT_KIND.RELAUNCH_FAILED,
 	EVENT_KIND.SLEEP,
+	EVENT_KIND.PLAN_WAIT,
+	EVENT_KIND.RATE_LIMIT,
 ])
 
 // The trace kinds that say only that the run was alive, so the bound rolls them off first. A `filed` or
 // `note` line is a trace to the position readers but is the board's record of what the run found, so
-// it rolls off only with the positions. A ship-stage `start` is disposable but goes last of them:
+// it rolls off only with the positions; so does a `lane-phase` line, the driver's `collect` / `launch`
+// steps included. A ship-stage `start` is disposable but goes last of them:
 // `run:board` draws from that line. Only the newest `setup` line is the stage the run stands at,
 // so every one but the newest goes; likewise only each child's newest `pr-checks` is drawn.
 const DISPOSABLE_KINDS: ReadonlySet<string> = new Set([
@@ -212,6 +235,7 @@ const DISPOSABLE_KINDS: ReadonlySet<string> = new Set([
 	EVENT_KIND.HEARTBEAT,
 	EVENT_KIND.SETUP,
 	EVENT_KIND.PR_CHECKS,
+	EVENT_KIND.RATE_LIMIT,
 ])
 
 const event_schema = z.object({
@@ -223,6 +247,11 @@ const event_schema = z.object({
 	// reader never has to find its launch again. An event written before it has none. A `sleep` event
 	// carries the sleep's length here.
 	elapsed_ms: z.number().optional(),
+	// The ship stop a park was taken at — its stage and `Cause` class (joshuafolkken/kit#6864) — so a
+	// reader re-dispatching the park reads them without parsing text. Free strings: an event a later
+	// version wrote with a new class still parses. A park written before it, or no ship's, has none —
+	// as does one a lane on older code rewrote, since its schema drops the key, so none is a normal read.
+	stop: z.object({ stage: z.string(), cause: z.string() }).optional(),
 })
 
 type RunEvent = z.infer<typeof event_schema>
@@ -259,14 +288,8 @@ function parse_line(line: string): RunEvent | undefined {
 	return event_schema.safeParse(json_value.parse_or_undefined(line)).data
 }
 
-// Every line on the stream that parses, oldest first, whatever its kind. An absent or unreadable file
-// is an empty stream, the same fail-quiet direction `stamp_file.read_stamp_text` takes for a planted or
-// unowned file.
-function read_lines(target: string): ReadonlyArray<RunEvent> {
-	const raw = stamp_file.read_stamp_text(target)
-
-	if (raw === undefined) return []
-
+// Every line of `raw` that parses, oldest first, whatever its kind.
+function lines_of(raw: string): ReadonlyArray<RunEvent> {
 	return raw
 		.split(LINE_SEPARATOR)
 		.map((line) => line.trim())
@@ -275,11 +298,29 @@ function read_lines(target: string): ReadonlyArray<RunEvent> {
 		.filter(is_present)
 }
 
-// Every event on the stream, oldest first. A line whose kind the enumeration no longer names — one a
+// The events of `raw`, oldest first. A line whose kind the enumeration no longer names — one a
 // previous version wrote — reads as no event, so no reader takes it for a position or for the run's
-// newest activity.
-function read_events(target: string): ReadonlyArray<RunEvent> {
-	return read_lines(target).filter((event) => is_event_kind(event.kind))
+// newest activity. Pure per line, so the incremental reader (`run-event-tail.ts`) parses only the
+// appended text with it and still agrees with a whole read.
+function events_of_text(raw: string): ReadonlyArray<RunEvent> {
+	return lines_of(raw).filter((event) => is_event_kind(event.kind))
+}
+
+// Every line on the stream that parses, oldest first, whatever its kind. An absent or unreadable file
+// is an empty stream, the same fail-quiet direction `stamp_file.read_stamp_text` takes for a planted or
+// unowned file. A required read refuses that unknown history instead of treating it as empty.
+function read_lines(target: string, is_required = false): ReadonlyArray<RunEvent> {
+	const raw = stamp_file.read_stamp_text(target)
+
+	if (raw === undefined && is_required) throw new Error('Could not read the run event stream.')
+	if (raw === undefined) return []
+
+	return lines_of(raw)
+}
+
+// Every event on the stream, oldest first.
+function read_events(target: string, is_required = false): ReadonlyArray<RunEvent> {
+	return read_lines(target, is_required).filter((event) => is_event_kind(event.kind))
 }
 
 function last_position(events: ReadonlyArray<RunEvent>): number {
@@ -436,14 +477,19 @@ function read_last(target: string): RunEvent | undefined {
 	return read_events(target).findLast((event) => !TRACE_KINDS.has(event.kind))
 }
 
+// The events after the newest `reset_kind` — all of them, before the first one.
+function since(events: ReadonlyArray<RunEvent>, reset_kind: string): ReadonlyArray<RunEvent> {
+	const reset_at = events.findLastIndex((event) => event.kind === reset_kind)
+
+	return events.slice(reset_at + POSITION_INCREMENT)
+}
+
 // Whether `kind` is already on the stream after the newest `reset_kind` — or anywhere, before the first
 // one. The episode test for a marker whose episode ends only when something specific happens rather than
 // when any other event lands: a stall ends at a dispatch, and the merges, parks
 // and heartbeats every parallel lane appends in between must not read as a fresh stall.
 function has_since(events: ReadonlyArray<RunEvent>, kind: string, reset_kind: string): boolean {
-	const reset_at = events.findLastIndex((event) => event.kind === reset_kind)
-
-	return events.slice(reset_at + POSITION_INCREMENT).some((event) => event.kind === kind)
+	return since(events, reset_kind).some((event) => event.kind === kind)
 }
 
 // One event as the line a reader relays. The follow reader and the degenerate
@@ -463,12 +509,14 @@ const run_event_stream = {
 	TRACE_KINDS,
 	append,
 	append_event,
+	events_of_text,
 	format_event,
 	has_since,
 	is_stage_start,
 	read_events,
 	read_from,
 	read_last,
+	since,
 	target_of,
 }
 

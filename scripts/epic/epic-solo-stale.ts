@@ -78,7 +78,7 @@ async function find_stale(
 }
 
 function stale_message(stale: ReadonlyArray<OpenIssueData>, repo: string): string {
-	const named = stale.map((issue) => issue_cite.plain(issue.number)).join(', ')
+	const named = stale.map((issue) => issue_cite.plain_for('linked', issue.number)).join(', ')
 
 	return issue_citation.linkify(
 		`${named} carries \`${RUN_SOLO_LABEL}\` and \`${IN_PROGRESS_LABEL}\`, but no process of it is running in ${repo} — the \`${IN_PROGRESS_LABEL}\` label is stale, so it does not hold the backlog. Remove the label once you have confirmed nothing is running it.`,

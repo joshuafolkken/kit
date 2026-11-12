@@ -1,10 +1,12 @@
 import { spawn, type SpawnOptions } from 'node:child_process'
 import { closeSync, constants, openSync, writeSync } from 'node:fs'
 import { agent_launch_environment } from '#scripts/agent/agent-launch-environment'
-import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
+import { agent_profile_schema, type AgentProfile } from '#scripts/agent/agent-profile-schema'
+import { agent_safe_text } from '#scripts/agent/agent-safe-text'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { launch_priority } from '#scripts/run/launch-priority'
+import { attached_log } from './attached-log'
 
 // Starting a process that outlives this one, and keeping what it writes.
 //
@@ -71,7 +73,7 @@ interface LaunchRequest {
 	profile?: AgentProfile | undefined
 }
 
-const { is_safe_prompt, is_safe_value } = agent_role_profile
+const { is_safe_prompt, is_safe_value } = agent_safe_text
 const LAST = -1
 
 // An agent vector's prompt, the last element, may break lines; every other element is a value.
@@ -113,7 +115,7 @@ const LOG_FLAGS = constants.O_WRONLY | constants.O_APPEND | constants.O_CREAT | 
 const LOG_MODE = 0o600
 
 function profile_suffix(profile: AgentProfile | undefined): string {
-	return profile === undefined ? '' : ` · ${agent_role_profile.describe(profile)}`
+	return profile === undefined ? '' : ` · ${agent_profile_schema.describe(profile)}`
 }
 
 // One line in front of each launch, so the sessions started into one file can be told apart. The
@@ -225,10 +227,12 @@ function spawn_options(
 	environment: Readonly<Record<string, string | undefined>> = {},
 	is_detached = true,
 ): SpawnOptions {
+	const output = log ?? 'ignore'
+
 	return {
 		cwd,
 		detached: is_detached,
-		stdio: log === undefined ? 'ignore' : ['ignore', log, log],
+		stdio: ['ignore', is_detached ? output : 'pipe', output],
 		env: { ...process.env, ...agent_session_environment.removed_environment(), ...environment },
 	}
 }
@@ -254,7 +258,7 @@ async function attached_spawn(
 	on_spawn: (pid: number) => void,
 ): Promise<AttachedLaunchResult> {
 	return await new Promise((resolve) => {
-		const environment = agent_launch_environment.build(request.cwd, request.profile, request.env)
+		const environment = agent_launch_environment.build(request.profile, request.env)
 		const child = spawn(
 			request.argv.command,
 			[...request.argv.args],
@@ -265,7 +269,8 @@ async function attached_spawn(
 			on_error(note_of(error))
 			resolve({ kind: 'failed', note: note_of(error) })
 		})
-		child.once('exit', (exit_code) => {
+		attached_log.record(child, log, on_error)
+		child.once('close', (exit_code) => {
 			resolve({ kind: 'completed', pid: child.pid ?? 0, exit_code })
 		})
 		launch_priority.lower(child.pid)
@@ -298,7 +303,7 @@ function spawned(
 	on_error: (note: string) => void,
 ): LaunchResult {
 	const { command, args } = request.argv
-	const environment = agent_launch_environment.build(request.cwd, request.profile, request.env)
+	const environment = agent_launch_environment.build(request.profile, request.env)
 	const child = spawn(command, [...args], spawn_options(request.cwd, log, environment)) // NOSONAR — see above
 
 	child.on('error', (error) => {

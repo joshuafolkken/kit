@@ -49,6 +49,17 @@ beforeEach(() => {
 	vi.spyOn(run_ending, 'read_transcript').mockReturnValue(undefined)
 })
 
+describe('run_merge_restart.is_host_restart — unavailable host uptime', () => {
+	it('does not infer a restart when host uptime is denied', async () => {
+		dispatched(BEFORE_BOOT_MS)
+		uptime_mock.mockImplementation(() => {
+			throw Object.assign(new Error('uv_uptime returned EPERM'), { code: 'EPERM' })
+		})
+
+		await expect(run_merge_restart.is_host_restart(CHILD, OUTPUT)).resolves.toBe(false)
+	})
+})
+
 describe('run_merge_restart.is_host_restart — a child the host restart killed', () => {
 	it('reads a child dispatched before the host booted, with no exit record, as killed', async () => {
 		dispatched(BEFORE_BOOT_MS)

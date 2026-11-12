@@ -2,10 +2,20 @@ import type { OptedIn } from '#scripts/backlog/backlog-gate-scope'
 import type { Plan } from '#scripts/backlog/backlog-plan-read'
 import { backlog_waves } from '#scripts/backlog/backlog-waves'
 import type { EpicChild } from '#scripts/epic/epic-graph'
+import { git_gh_conditional } from '#scripts/gh/git-gh-conditional'
+import { git_gh_etag_read } from '#scripts/gh/git-gh-etag-read'
+import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
+import { TRANSPORT_ENV_VAR } from '#scripts/gh/git-gh-transport'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
-import { IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
+import {
+	IN_PROGRESS_LABEL,
+	NEEDS_DECISION_LABEL,
+	NEEDS_HUMAN_MERGE_LABEL,
+} from '#scripts/issue/issue-labels'
+import { issue_read } from '#scripts/issue/issue-read'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_board_plan, type PlanPorts } from './run-board-plan'
+import { run_board_scope } from './run-board-scope'
 
 // joshuafolkken/kit#3442: the board drew the whole opted-in backlog whatever the run was asked to do. The
 // classification and the wave play-forward are `backlog:next`'s and `backlog_waves`'s own, tested there;
@@ -15,7 +25,8 @@ const REPO = 'joshuafolkken/kit'
 const SINGLE = 3441
 const EPIC = 3406
 const EPIC_CHILDREN = [3407, 3408]
-const POOL = [3412, 3407]
+const POOL_ONLY = 3412
+const POOL = [POOL_ONLY, 3407]
 
 function row(number: number): OpenIssueData {
 	return { number, title: `issue ${String(number)}`, createdAt: '2026-10-08T00:00:00Z' }
@@ -77,6 +88,10 @@ beforeEach(() => {
 		waves: [result.waiting],
 		unreached: [],
 	}))
+	// The decision read's ETag requests (joshuafolkken/kit#6700) stay offline, answering nothing, and
+	// its GraphQL read (joshuafolkken/kit#6819) is not sent.
+	vi.stubEnv(TRANSPORT_ENV_VAR, 'rest')
+	vi.spyOn(git_gh_conditional, 'read_conditional').mockResolvedValue({ kind: 'unreadable' })
 })
 
 describe('run_board_plan.read_plan', () => {
@@ -130,6 +145,28 @@ describe('run_board_plan.read_plan', () => {
 	})
 })
 
+// joshuafolkken/kit#6836: an `--only` run drew none of the issues `run:add` handed it.
+describe('run_board_plan.read_plan added issues', () => {
+	// The rows keep the classification's order, as the declared ones do; `run_board_scope` pins the scope's.
+	it('draws the issues run:add handed an --only run, an epic as its children', async () => {
+		const scope = run_board_scope.scope_of(`backlogrun #${String(SINGLE)} --only`, [
+			{ issue: EPIC, is_priority: true },
+		])
+		const plan = await run_board_plan.read_plan(scope, ports())
+
+		expect(wave_numbers(plan?.waves.waves)).toStrictEqual([[SINGLE, ...EPIC_CHILDREN]])
+	})
+
+	it('draws an added issue of a run without --only once, among the named ones', async () => {
+		const scope = run_board_scope.scope_of(`backlogrun #${String(SINGLE)}`, [
+			{ issue: POOL_ONLY, is_priority: false },
+		])
+		const plan = await run_board_plan.read_plan(scope, ports())
+
+		expect(wave_numbers(plan?.waves.waves)).toStrictEqual([[SINGLE, POOL_ONLY], [3407]])
+	})
+})
+
 // joshuafolkken/kit#4222: a running issue sits in no wave, yet the joined plan still holds it once.
 describe('run_board_plan.read_plan running issues', () => {
 	it('joins the running issues of the named plan and the pool, never holding one twice', async () => {
@@ -143,6 +180,47 @@ describe('run_board_plan.read_plan running issues', () => {
 		const plan = await run_board_plan.read_plan({ issues: [EPIC], only: false }, ports())
 
 		expect(plan?.waves.running).toStrictEqual([running])
+	})
+})
+
+describe('run_board_plan.read_plan human merge pull requests', () => {
+	it.each([true, false])('carries PR numbers from REST for only=%s', async (only) => {
+		const labelled = { ...row(SINGLE), labels: [{ name: NEEDS_HUMAN_MERGE_LABEL }] }
+		const read = {
+			...ports(),
+			fetch_open: vi.fn(async () => ({ rows: [labelled], is_capped: false })),
+		}
+
+		vi.spyOn(git_gh_etag_read, 'read_listing').mockResolvedValue(
+			JSON.stringify([{ number: EPIC, body: `closes #${String(SINGLE)}` }]),
+		)
+		const plan = await run_board_plan.read_plan({ issues: only ? [SINGLE] : [], only }, read)
+
+		expect(plan?.human_merge_prs).toEqual(new Map([[SINGLE, EPIC]]))
+	})
+})
+
+describe('run_board_plan.read_plan decision questions', () => {
+	it('carries the trusted question from the issue comments into the live plan', async () => {
+		const labelled = { ...row(SINGLE), labels: [{ name: NEEDS_DECISION_LABEL }] }
+		const read = {
+			...ports(),
+			fetch_open: vi.fn(async () => ({ rows: [labelled], is_capped: false })),
+		}
+
+		vi.spyOn(git_gh_issue_read, 'issue_list_comments').mockResolvedValue('[]')
+		vi.spyOn(issue_read, 'parse_comments').mockResolvedValue([
+			{ body: '## Choose an account', author: 'owner', created_at: '', is_trusted: true },
+		])
+		const plan = await run_board_plan.read_plan({ issues: [SINGLE], only: true }, read)
+
+		expect(plan?.decision_questions).toEqual(new Map([[SINGLE, 'Choose an account']]))
+		expect(git_gh_issue_read.issue_list_comments).toHaveBeenCalledWith(
+			String(SINGLE),
+			undefined,
+			REPO,
+			git_gh_issue_read.read_comments_conditionally,
+		)
 	})
 })
 

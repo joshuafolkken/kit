@@ -1,6 +1,7 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { fake_result } from '#tools/test/execa-result'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { execa } from 'execa'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { project_test_script } from './project-test-script'
@@ -13,8 +14,6 @@ vi.mock('execa', () => ({ execa: vi.fn() }))
 
 const mocked_execa = vi.mocked(execa)
 
-type ExecaResult = Awaited<ReturnType<typeof execa>>
-
 const PACKAGE_JSON = 'package.json'
 const NODE_TEST = 'node --test'
 const BASIC = { profile: 'basic' }
@@ -24,10 +23,7 @@ const MISSING_PACKAGE = 'skip-missing-package'
 const VITEST_SUBJECT = 'skipping vitest unit tests'
 
 const ctx = { project_directory: '' }
-
-function fake_result(exit_code: number): ExecaResult {
-	return { exitCode: exit_code } as unknown as ExecaResult
-}
+const make_directory = temporary_directory()
 
 function write_manifest(manifest: unknown): void {
 	writeFileSync(path.join(ctx.project_directory, PACKAGE_JSON), JSON.stringify(manifest))
@@ -48,16 +44,14 @@ function info_lines(): string {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.stubEnv(project_test_script.REENTRY_KEY, '')
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
-	ctx.project_directory = mkdtempSync(path.join(tmpdir(), 'unit-guard-script-'))
+	ctx.project_directory = make_directory('unit-guard-script-')
 })
 
 afterEach(() => {
 	vi.unstubAllEnvs()
 	vi.restoreAllMocks()
-	rmSync(ctx.project_directory, { recursive: true, force: true })
 })
 
 describe('test_unit_guard.resolve_guard_action — a basic project without vitest', () => {

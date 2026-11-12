@@ -29,3 +29,14 @@ describe('run_merge_cli.parse — --driver', () => {
 		expect(run_merge_cli.parse([CHILD])?.over).toBeDefined()
 	})
 })
+
+// joshuafolkken/kit#5841: `--stash` asks for the stopped unit's work to be stashed before classifying.
+describe('run_merge_cli.parse — --stash', () => {
+	it('carries --stash onto the context', () => {
+		expect(run_merge_cli.parse([CHILD, '--stash'])?.stash).toBe(true)
+	})
+
+	it('leaves the stash off without --stash', () => {
+		expect(run_merge_cli.parse([CHILD])?.stash).toBeUndefined()
+	})
+})

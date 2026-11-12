@@ -1,14 +1,11 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { find_package_directory } from './package-directory'
 
-const root = mkdtempSync(path.join(tmpdir(), 'package-directory-'))
-
-afterAll(() => {
-	rmSync(root, { recursive: true, force: true })
-})
+const make_directory = temporary_directory('suite')
+const root = make_directory('package-directory-')
 
 describe('find_package_directory', () => {
 	it('ascends to the nearest directory holding a package.json', () => {

@@ -1,17 +1,18 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { SWITCH_ENV_KEY as INVESTIGATION_SWITCH } from '#scripts/delegation/investigation-guard'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
-import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { batch_refusal } from './batch-guard'
 
 // kit#5342: in a dispatched lane child the general batching rule is off, and only a chain of
 // single-call searches is refused — standing aside where the investigation guard refuses the same call.
 // A separate suite from `batch-guard.test.ts`, which is at its length limit.
 
-const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'batch-guard-search-'))
+const make_directory = temporary_directory('suite')
+const WORK_DIRECTORY = make_directory('batch-guard-search-')
 const ENTRY_DIRECTORY = process.cwd()
 const LANE_ISSUE = '5342'
 const LANE_DIRECTORY = path.join(WORK_DIRECTORY, '.kit-lanes', LANE_ISSUE)
@@ -49,10 +50,6 @@ afterEach(() => {
 	process.chdir(ENTRY_DIRECTORY)
 	Reflect.deleteProperty(process.env, lane_child_marker.KEY)
 	Reflect.deleteProperty(process.env, INVESTIGATION_SWITCH)
-})
-
-afterAll(() => {
-	rmSync(WORK_DIRECTORY, { recursive: true, force: true })
 })
 
 describe('batch_refusal — the search chain a lane child is still refused for', () => {

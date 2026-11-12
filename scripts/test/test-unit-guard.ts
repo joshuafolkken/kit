@@ -2,6 +2,7 @@ import { existsSync, globSync } from 'node:fs'
 import { availableParallelism } from 'node:os'
 import path from 'node:path'
 import { PROJECT_ENVIRONMENT_KEYS } from '#ports'
+import { direct_launch } from '#scripts/build/local-bin'
 import { core_budget } from '#scripts/gate/core-budget'
 import { free_cores } from '#scripts/gate/free-cores'
 import { project_checks } from '#scripts/gate/project-checks'
@@ -10,10 +11,10 @@ import { execa } from 'execa'
 import { project_test_script, type ProjectScriptState } from './project-test-script'
 import { SKIP_MARKER } from './skip-marker'
 import { test_read_recording, type RecordingEnvironment } from './test-read-recording'
+import { unit_update_arguments } from './unit-update-arguments'
 import { unit_worker_share } from './unit-worker-share'
 import { vitest_failure_summary } from './vitest-failure-summary'
 
-const PNPM = 'pnpm'
 const FAIL_EXIT_CODE = 1
 const VITEST_PACKAGE = path.join('node_modules', 'vitest')
 const UNIT_GLOB = '**/*.{test,spec}.{ts,js}'
@@ -196,6 +197,7 @@ async function vitest_share(vitest_arguments: ReadonlyArray<string>): Promise<nu
 		available_cores,
 		unit_worker_share.live_run_count(),
 		free,
+		unit_worker_share.live_lane_count(),
 	)
 
 	return unit_worker_share.cap_to_claim(share, core_budget.held_unit_claim())
@@ -207,7 +209,8 @@ async function execute_vitest(
 	directory: string,
 ): Promise<number> {
 	// Shown as it runs and kept as well, so a failed run can end with its summary (joshuafolkken/kit#4869).
-	const result = await execa(PNPM, ['exec', 'vitest', ...vitest_arguments], {
+	const launch = direct_launch(directory, ['exec', 'vitest', ...vitest_arguments])
+	const result = await execa(launch.file, [...launch.args], {
 		cwd: directory,
 		env: { ...isolated_unit_environment(), ...recording },
 		extendEnv: false,
@@ -305,7 +308,13 @@ async function run_guarded_unit(
 	project_directory: string,
 	extra_arguments: ReadonlyArray<string>,
 ): Promise<number> {
-	return await run_guarded_vitest(project_directory, ['run', ...extra_arguments])
+	const { arguments: ordered, filter } = unit_update_arguments.reorder(extra_arguments)
+
+	if (filter !== undefined) {
+		console.info(`josh ${UNIT_COMMAND_LABEL}: ${unit_update_arguments.notice(filter)}`)
+	}
+
+	return await run_guarded_vitest(project_directory, ['run', ...ordered])
 }
 
 const test_unit_guard = {

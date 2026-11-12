@@ -27,7 +27,9 @@ function body_of(answer: RoundTwoAnswer): string {
 }
 
 function is_recorded(comment: IssueComment, body: string): boolean {
-	return comment.is_trusted === true && comment.body.trimStart().startsWith(body)
+	const recorded = comment.body.trimStart()
+
+	return comment.is_trusted === true && (recorded === body || recorded.startsWith(`${body}\n`))
 }
 
 async function read_comments(issue: number): Promise<ReadonlyArray<IssueComment> | undefined> {

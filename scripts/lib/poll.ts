@@ -7,9 +7,9 @@
 // it, so the definition moved here and those three import it.
 //
 // **The loop is here for the same reason the sleep is.** A caller that only needs "ask again until
-// this is true, then give up" would otherwise write its own `for` with its own off-by-one; the one
-// existing loop that is *not* folded in is `wait_for_pr_success`, whose body carries the merge
-// gate's stable-read counting and failure classification and is therefore not this shape at all.
+// this is true, then give up" would otherwise write its own `for` with its own off-by-one. Callers
+// carry domain state in their read, including the merge gate's stable-read counters and
+// failure classification; the wait itself stays here.
 
 async function sleep(duration_ms: number): Promise<void> {
 	await new Promise<void>((resolve) => {
@@ -17,26 +17,136 @@ async function sleep(duration_ms: number): Promise<void> {
 	})
 }
 
+interface BackoffLead {
+	count: number
+	interval_ms: number
+}
+
+interface BackoffSchedule {
+	// The first `count` waits, counted from the poll's start and never restarted by a changed tick.
+	lead?: BackoffLead
+	initial_ms: number
+	factor: number
+	max_ms: number
+}
+
+// The schedule for a caller that names none, such as a rerun's wait: most fixed-cadence reads of a
+// run only confirm that nothing moved, and each one spends REST core (joshuafolkken/kit#6719), so the
+// wait lengthens while nothing changes. PR completion waits use `PR_POLL_SCHEDULES` instead.
+const POLL_BACKOFF: BackoffSchedule = { initial_ms: 30_000, factor: 1.5, max_ms: 120_000 }
+
+// **PR completion waits poll finer as the end nears** (joshuafolkken/kit#6868).
+const PR_POLL_SCHEDULES = {
+	// CI does not finish right after it starts, so the lead reads coarsely; after it a fixed interval
+	// bounds the detection delay that a lengthening wait would stretch toward its cap.
+	checks: {
+		lead: { count: 4, interval_ms: 30_000 },
+		initial_ms: 20_000,
+		factor: 1,
+		max_ms: 20_000,
+	},
+	// The CI completion wait and its watch: a poll where the head's checks did not move costs only
+	// two conditional reads (`git-pr-checks-gate.ts`), so after the same lead it polls twice as often
+	// (joshuafolkken/kit#7238). `checks` stays the CodeRabbit retrigger wait's, which has no gate.
+	checks_gated: {
+		lead: { count: 4, interval_ms: 30_000 },
+		initial_ms: 10_000,
+		factor: 1,
+		max_ms: 10_000,
+	},
+	// A merge lands soon after the checks pass, so its wait starts fine and keeps a low cap that
+	// bounds the delay between the merge landing and its detection (joshuafolkken/kit#7237).
+	merge: { initial_ms: 10_000, factor: 1.5, max_ms: 15_000 },
+} satisfies Record<string, BackoffSchedule>
+
+interface PollBackoff {
+	// What the last read saw. A tick whose answer differs from the one before resets the interval;
+	// absent, every tick reads as unchanged.
+	seen?: () => string
+	schedule?: BackoffSchedule
+}
+
 interface PollOptions {
 	attempts: number
 	interval_ms: number
-	// Injected by the tests so a poll costs no wall clock. Production callers leave it out.
+	// A caller's existing wait, or an injected sleeper so tests cost no wall clock.
 	sleeper?: (duration_ms: number) => Promise<void>
+	// Lengthens the waits within the same budget the fixed cadence spends: `(attempts - 1) × interval_ms`.
+	backoff?: PollBackoff
 }
 
+// How long to wait after `attempt`, or `undefined` once the poll is over.
+type Cadence = (attempt: number) => number | undefined
+
 // **The wait goes between attempts, never after the last one**, so the budget a caller computes from
-// `attempts × interval_ms` is the budget it actually spends. The pre-existing merge-gate loop in
-// `git-pr-checks.ts` guards its sleep the same way; extracted here so the loop keeps one branch.
-async function wait_between(
-	wait: (duration_ms: number) => Promise<void>,
-	interval_ms: number,
-	attempt: number,
-	attempts: number,
-): Promise<void> {
-	if (attempt < attempts - 1) await wait(interval_ms)
+// `attempts × interval_ms` bounds the wait. The merge gate uses this same loop to keep its
+// stable-read and read-failure counters while sharing the wait between attempts.
+function fixed_cadence(options: PollOptions): Cadence {
+	return function next_wait(attempt: number): number | undefined {
+		return attempt < options.attempts - 1 ? options.interval_ms : undefined
+	}
+}
+
+interface BackoffStep {
+	interval_ms: number
+	seen: string | undefined
+}
+
+function next_backoff_interval(
+	schedule: BackoffSchedule,
+	previous: BackoffStep,
+	seen: string,
+): number {
+	if (seen !== previous.seen) return schedule.initial_ms
+
+	return Math.min(previous.interval_ms * schedule.factor, schedule.max_ms)
+}
+
+// A lead step leaves `seen` unset, so the schedule after the lead starts at `initial_ms`.
+function next_backoff_step(
+	schedule: BackoffSchedule,
+	previous: BackoffStep,
+	tick: number,
+	seen: string,
+): BackoffStep {
+	const { lead } = schedule
+
+	if (lead !== undefined && tick < lead.count) {
+		return { interval_ms: lead.interval_ms, seen: undefined }
+	}
+
+	return { interval_ms: next_backoff_interval(schedule, previous, seen), seen }
+}
+
+// The last wait is cut to what the budget has left, so the total wait stays the fixed cadence's.
+function backoff_cadence(options: PollOptions, backoff: PollBackoff): Cadence {
+	const schedule = backoff.schedule ?? POLL_BACKOFF
+	const budget_ms = (options.attempts - 1) * options.interval_ms
+	const state = { waited_ms: 0, step: { interval_ms: 0, seen: undefined } satisfies BackoffStep }
+
+	return function next_wait(tick: number): number | undefined {
+		if (state.waited_ms >= budget_ms) return undefined
+		const step = next_backoff_step(schedule, state.step, tick, backoff.seen?.() ?? '')
+		const wait_ms = Math.min(step.interval_ms, budget_ms - state.waited_ms)
+
+		Object.assign(state, { waited_ms: state.waited_ms + wait_ms, step })
+
+		return wait_ms
+	}
+}
+
+function to_cadence(options: PollOptions): Cadence {
+	return options.backoff === undefined
+		? fixed_cadence(options)
+		: backoff_cadence(options, options.backoff)
 }
 
 type WaitOptions = Omit<PollOptions, 'attempts'>
+
+// A read that answered ends the poll, so there is nothing to wait for after it.
+function wait_after(value: unknown, next_wait: Cadence, attempt: number): number | undefined {
+	return value === undefined ? next_wait(attempt) : undefined
+}
 
 // **The first value `read` answers, `undefined` when the attempts run out.** `undefined` is "not yet",
 // so a read that reaches a verdict — success or failure — answers it and the loop ends there.
@@ -45,17 +155,17 @@ async function poll_for<T>(
 	options: PollOptions,
 ): Promise<T | undefined> {
 	const wait = options.sleeper ?? sleep
+	const next_wait = to_cadence(options)
 
-	for (let attempt = 0; attempt < options.attempts; attempt += 1) {
+	for (let attempt = 0; ; attempt += 1) {
 		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		const value = await read()
-		if (value !== undefined) return value
+		const wait_ms = wait_after(value, next_wait, attempt)
+		if (wait_ms === undefined) return value
 
 		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		await wait_between(wait, options.interval_ms, attempt, options.attempts)
+		await wait(wait_ms)
 	}
-
-	return undefined
 }
 
 // **True as soon as `is_done` answers true, false when the attempts run out.** The first attempt runs
@@ -84,5 +194,5 @@ async function wait_for<T>(
 
 const poll = { poll_for, poll_until, sleep, wait_for }
 
-export { poll }
-export type { PollOptions, WaitOptions }
+export { poll, POLL_BACKOFF, PR_POLL_SCHEDULES }
+export type { BackoffLead, BackoffSchedule, PollBackoff, PollOptions, WaitOptions }

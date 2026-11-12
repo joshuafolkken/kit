@@ -3,7 +3,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { execa, execaSync } from 'execa'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { git_gh_exec } from './git-gh-exec'
 
 vi.mock('execa', () => ({
@@ -49,10 +49,6 @@ const GLOBAL_AGENT_KEY = 'GLOBAL_AGENT_HTTP_PROXY'
 
 // Each case declares exactly the proxy it is about; every other spelling starts blank because the
 // unit projects blank them (`unit-projects.ts`), whatever wrapper launched the suite.
-beforeEach(() => {
-	vi.clearAllMocks()
-})
-
 afterEach(() => {
 	vi.unstubAllEnvs()
 })
@@ -73,7 +69,7 @@ const SCANNER_REMOVED = {
 	[agent_session_environment.PROXY_CERTIFICATE_KEY]: undefined,
 }
 
-// joshuafolkken/kit#2436: under a supply-chain scanner's loopback proxy, one 30-second stall made the
+// joshuafolkken/kit#2436: under a supply-chain scanner's loopback proxy, one stalled request made the
 // proxy refuse every later api.github.com connection of that `followup` run, so the merge gate's
 // retries could only fail. GitHub requests now bypass a proxy this machine stood up on loopback.
 describe('git_gh_exec — a loopback proxy is not handed to gh', () => {

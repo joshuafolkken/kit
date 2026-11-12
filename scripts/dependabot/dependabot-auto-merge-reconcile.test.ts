@@ -156,9 +156,8 @@ describe('dependabot-auto-merge.yml reconcile — reachability', () => {
 		expect(step_condition(reconcile, RECONCILE_LABEL)).toBe(NOT_CANCELLED)
 	})
 
-	// `dependabot/fetch-metadata` fails outright on a branch whose first commit is no longer
-	// Dependabot's. Containing that failure is what removed both the gate this step used to repeat
-	// and the ordering constraint that put the withdrawal ahead of it (joshuafolkken/kit#838).
+	// `dependabot/fetch-metadata` can fail when the first commit is not Dependabot's, so withdrawal
+	// must tolerate that failure regardless of step ordering (joshuafolkken/kit#838).
 	it('contains the metadata action’s failure instead of gating around it', () => {
 		const metadata = find_step(template_job(), METADATA_STEP_ID)
 

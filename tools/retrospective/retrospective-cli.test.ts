@@ -1,14 +1,15 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { observation_ledger } from '#scripts/observations/observation-ledger'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it, vi } from 'vitest'
 
 // joshuafolkken/kit#2919: the ledger is a directory of one file per issue, and the retrospective
 // counts every file in it from the work tree on disk — a line one lane's pull request has not merged
 // yet is still a line the retrospective sees.
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'retrospective-cli-test-'))
+const make_directory = temporary_directory('suite')
+const scratch = make_directory('retrospective-cli-test-')
 const LEDGER = path.join(scratch, observation_ledger.ledger_file(1))
 const OTHER_LEDGER = path.join(scratch, observation_ledger.ledger_file(2))
 const LINE =
@@ -25,10 +26,6 @@ vi.mock('#tools/cost-audit/cost-audit-cli', () => ({
 }))
 
 const { retrospective_cli } = await import('./retrospective-cli')
-
-afterAll(() => {
-	rmSync(scratch, { recursive: true, force: true })
-})
 
 describe('retrospective_cli.gather — the ledger is read from the files on disk', () => {
 	it('counts the lines of every issue file in the directory', async () => {

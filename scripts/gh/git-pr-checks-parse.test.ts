@@ -40,7 +40,6 @@ describe('read_string', () => {
 
 function check_run_item(name: string): Record<string, string> {
 	return {
-		// eslint-disable-next-line @typescript-eslint/naming-convention -- GitHub API field name
 		__typename: 'CheckRun',
 		name,
 		status: 'COMPLETED',
@@ -50,7 +49,6 @@ function check_run_item(name: string): Record<string, string> {
 
 function status_context_item(context: string, state: string): Record<string, string> {
 	return {
-		// eslint-disable-next-line @typescript-eslint/naming-convention -- GitHub API field name
 		__typename: 'StatusContext',
 		context,
 		state,

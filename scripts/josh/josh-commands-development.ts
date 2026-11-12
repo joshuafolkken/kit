@@ -14,7 +14,6 @@ const REQUIRED_FILE_ARGUMENTS = '<files...>'
 const FILTER_ARGUMENTS = '[filters...]'
 const PATH_ARGUMENTS = '<path...>'
 
-/* eslint-disable @typescript-eslint/naming-convention */
 const DEV_COMMANDS: Record<string, CommandEntry> = {
 	'pr:classification': {
 		script: 'scripts/ci/pr-classification-main.ts',
@@ -30,7 +29,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Run lint, type check, spell check and unit tests concurrently',
 		category: 'Development',
 		reference: [
-			'[--verbose|--force|--no-unit|--static-group=<group>]',
+			'[--verbose|--force|--no-unit|--whole-tree|--static-group=<group>]',
 			'developer',
 			['files', 'processes'],
 		],
@@ -40,6 +39,10 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 				{ arguments: '--verbose', note: "every check's output, passing ones included" },
 				{ arguments: '--force', note: 're-run even on a tree already recorded green' },
 				{ arguments: '--no-unit', note: 'the static checks only (CI only)' },
+				{
+					arguments: '--whole-tree',
+					note: "add the whole-tree checks (the ship's gate on the final tree)",
+				},
 			],
 		},
 	},
@@ -126,7 +129,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			"Print each delivered rule's unaided compliance — runs reached, kept rate, refusals",
 		category: 'AI tools',
-		reference: ['[--fresh | --refresh]', 'developer', ['files']],
+		reference: ['[--fresh | --refresh | --prose]', 'developer', ['files']],
 		usage: {
 			examples: [
 				{ arguments: '', note: 'a reading cached under 15 minutes ago, else measure' },
@@ -135,6 +138,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 					arguments: '--refresh',
 					note: 'write the reading to the loop-head cache instead of stdout',
 				},
+				{ arguments: '--prose', note: 'class each prose rule: enforced, measured or prose only' },
 			],
 		},
 	},
@@ -186,11 +190,16 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 	},
 	'check:related': {
 		script: 'scripts/gate/check-related.ts',
-		description: 'Run related lint, unit, type and dotfile spelling checks in parallel',
+		description:
+			'Run related lint, type and dotfile spelling checks in parallel, and the unit tests once lint passes',
 		category: 'Development',
 		reference: ['', 'developer', ['processes']],
 		usage: {
-			examples: [{ arguments: '' }, { arguments: '--full', note: 'whole outputs' }],
+			examples: [
+				{ arguments: '' },
+				{ arguments: '--full', note: 'whole outputs' },
+				{ arguments: '--touched', note: 'mid-run: test:related --touched, no green record' },
+			],
 		},
 	},
 	behavior: {
@@ -207,6 +216,10 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 			'Report exported namespace members nothing reads (kit only; a consumer project skips it)',
 		category: 'Development',
 		reference: ['', 'developer', ['none']],
+		// One TypeScript program, as the type check builds (joshuafolkken/kit#7030).
+		core_weight: core_weights.CORE_WEIGHTS.type_check,
+		// Reads source files and prints only, so a consultation session can run it.
+		is_read_only: true,
 		usage: { examples: [{ arguments: '' }] },
 	},
 	'test:unit': {
@@ -238,8 +251,13 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			'Say whether a review finding reaches a runtime path (runtime) or is inert (non-runtime)',
 		category: 'AI tools',
-		reference: [PATH_ARGUMENTS, 'automation', ['none']],
-		usage: { examples: [{ arguments: '<path...>', note: '→ runtime | non-runtime' }] },
+		reference: [`${PATH_ARGUMENTS} | --batch <findings-file>`, 'automation', ['none']],
+		usage: {
+			examples: [
+				{ arguments: '<path...>', note: '→ runtime | non-runtime' },
+				{ arguments: '--batch <findings-file>', note: '→ branch table + drop notes' },
+			],
+		},
 	},
 	'e2e:retry-check': {
 		script: 'scripts/test/e2e-retry-check.ts',
@@ -291,6 +309,5 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 }
-/* eslint-enable @typescript-eslint/naming-convention */
 
 export { DEV_COMMANDS }

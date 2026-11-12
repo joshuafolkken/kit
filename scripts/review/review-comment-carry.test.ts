@@ -1,7 +1,7 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it, vi } from 'vitest'
 import { review_comment_carry } from './review-comment-carry'
 import { review_comment_round } from './review-comment-round'
 
@@ -12,13 +12,10 @@ vi.mock('./review-comment-round', async (original) => {
 })
 
 const ROOT = '/nonexistent/review-comment-carry'
-const TEST_DIR = mkdtempSync(path.join(tmpdir(), 'review-comment-carry-'))
+const make_directory = temporary_directory('suite')
+const TEST_DIR = make_directory('review-comment-carry-')
 const CARRIED = '.josh/observations/5267-comment-rounds.md'
 const LEDGER = '.josh/observations/5267.md'
-
-afterAll(() => {
-	rmSync(TEST_DIR, { recursive: true, force: true })
-})
 
 async function printed_by_carry(): Promise<{ info: string; warn: string }> {
 	const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)

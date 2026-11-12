@@ -54,7 +54,6 @@ async function run_gate(exit_code: number): Promise<number> {
 // The tree is stubbed to one stable map for the reason `gate-record-warning.test.ts` gives: git cannot
 // answer from inside a worker, and a green record is written only on a tree that did not move.
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(unit_worker_share, 'live_run_count').mockReturnValue(0)
 	vi.spyOn(gate_tree, 'read_gate_tree').mockResolvedValue({ files: STABLE_TREE, base: undefined })
 	vi.spyOn(review_tree, 'read_changed_tree').mockResolvedValue(STABLE_TREE)

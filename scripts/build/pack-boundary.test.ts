@@ -1,13 +1,25 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import {
+	copyFileSync,
+	existsSync,
+	lstatSync,
+	mkdirSync,
+	readFileSync,
+	readlinkSync,
+	symlinkSync,
+	writeFileSync,
+} from 'node:fs'
 import path from 'node:path'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
-import { describe, expect, it, onTestFinished } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { HOOK_BUNDLES, STAGING_PREFIX } from './build-hooks'
 import { COMMANDS_TEST_PREFIX, DISPATCH_TEST_PREFIX } from './distribution-scratch-fixture'
 import { hook_bundle_stamp } from './hook-bundle-stamp'
 import { import_closure, SCRIPTS_DIR } from './import-closure-fixture'
+
+const make_directory = temporary_directory()
+const make_suite_directory = temporary_directory('suite')
 
 // The pack boundary (joshuafolkken/kit#1997): the published npm package and the `kit` plugin must
 // carry what a consumer runs — every distributed command's entry script and its static import
@@ -43,26 +55,29 @@ interface PackageManifest {
 // `lane:open` its eslint warm-up by URL. The hook sources (the Codex adapter's fallback included) are
 // seeded from `HOOK_BUNDLES`.
 const PATH_LAUNCHED_ENTRIES = [
+	'scripts/gate/change-scope-action.ts',
 	'scripts/gh/fix-gh-packages.ts',
 	'scripts/lane/lane-session-reread-main.ts',
-	'scripts/lane/openai-lane-supervisor-cli.ts',
+	'scripts/lane/openai-lane-supervisor-entry.ts',
+	'scripts/lint/eslint-memory.js',
 	'scripts/lint/eslint-warm-cli.ts',
 	'scripts/run/board/run-board-gather-worker.ts',
+	'scripts/run/run-label-main.ts',
 ]
 
 // Shipped although no consumer entry reaches them: kit's own build and release entries, which run
-// from kit's checkout (`pnpm build`, CI workflows). Every other unreachable module is kit-internal
-// and belongs in `tools/`, so a kit-only file placed under `scripts/` fails the reachability test.
+// from kit's checkout (`pnpm build`, CI workflows), and the explicitly staged shared reader below.
+// Every other unreachable module is kit-internal and belongs in `tools/`.
 const SHIPPED_UNREACHABLE = new Set([
 	'scripts/build/build-bin.ts',
 	'scripts/build/build-claude-md.ts',
 	'scripts/build/build-codex-hooks.ts',
 	'scripts/build/build-commands.ts',
-	'scripts/agent/codex-hooks.ts',
 	'scripts/build/build-hooks.ts',
 	'scripts/build/build-library.ts',
 	'scripts/build/hook-bundle-stamp.ts',
 	'scripts/build/build.ts',
+	'scripts/build/source-location.ts',
 	'scripts/managed-marker/index.ts',
 	'scripts/self-sync-guard/index.ts',
 	'scripts/version/index.ts',
@@ -70,8 +85,15 @@ const SHIPPED_UNREACHABLE = new Set([
 	'scripts/package/verify-optional-eslint-install.ts',
 	'scripts/release/github-release.ts',
 	'scripts/release/github-release-cli.ts',
-	'scripts/release/publish-tag.ts',
-	'scripts/release/publish-tag-cli.ts',
+	// #6514 stages the child removal plan; remove this entry when #6517 adds its consumer command.
+	'scripts/epic/epic-untrack-plan.ts',
+	// #6299 stages the shared reader without callers; remove this entry when #6243 or #6048 uses it.
+	'scripts/review/review-gate-mode.ts',
+	// #6564 stages the rate-limit classifier; remove this entry when #6614 or #6502 uses it.
+	'scripts/gh/git-gh-rate-limit.ts',
+	// #6528 stages the judgment launch and the trusted sources; remove these entries when #6531 uses them.
+	'scripts/agent/judgment-agent-argv.ts',
+	'scripts/issue/issue-sources.ts',
 ])
 
 interface PackedEntry {
@@ -112,9 +134,52 @@ function packed_paths(raw: string): Set<string> {
 	return new Set((report?.files ?? []).map((entry) => entry.path))
 }
 
-function packed_files(): Set<string> {
-	return packed_paths(run_pack(REPO_ROOT))
+// A tracked file deleted from the tree is not copied, nor an untracked nested repository, which the
+// listing names as a directory.
+function is_copyable(file: string): boolean {
+	const stats = lstatSync(path.join(REPO_ROOT, file), { throwIfNoEntry: false })
+
+	return stats !== undefined && !stats.isDirectory()
 }
+
+// A hook launch or a build in this checkout prunes the previous `dist/hooks` chunks, so a pack of
+// the checkout itself fails to read a chunk it listed (joshuafolkken/kit#6168). The boundary concerns
+// the sources, so it packs a copy of the tracked and unignored files, which the ignored `dist/` never
+// joins.
+function listed_sources(): Array<string> {
+	const listing = execFileSync(
+		'git',
+		['ls-files', '-z', '--cached', '--others', '--exclude-standard'],
+		{ cwd: REPO_ROOT, encoding: 'utf8' },
+	)
+
+	return listing.split('\0').filter((file) => file !== '' && is_copyable(file))
+}
+
+// A tracked symlink is copied as a link, which pack skips here as it does in the checkout.
+function copy_source(source: string, target: string): void {
+	if (lstatSync(source).isSymbolicLink()) symlinkSync(readlinkSync(source), target)
+	else copyFileSync(source, target)
+}
+
+function copy_sources(directory: string): void {
+	for (const file of listed_sources()) {
+		const target = path.join(directory, file)
+
+		mkdirSync(path.dirname(target), { recursive: true })
+		copy_source(path.join(REPO_ROOT, file), target)
+	}
+}
+
+function packed_files(): Set<string> {
+	const directory = make_suite_directory('pack-boundary-sources-')
+
+	copy_sources(directory)
+
+	return packed_paths(run_pack(directory))
+}
+
+const PACKED = packed_files()
 
 function read_manifest(): PackageManifest {
 	return JSON.parse(readFileSync(path.join(REPO_ROOT, MANIFEST_NAME), 'utf8')) as PackageManifest
@@ -150,7 +215,11 @@ function reachable_files(): Set<string> {
 }
 
 describe('the published package boundary', () => {
-	const packed = packed_files()
+	const packed = PACKED
+
+	it('packs a copy of the sources, never the dist/ a concurrent rebuild in this checkout rewrites', () => {
+		expect([...packed].filter((file) => file.startsWith('dist/'))).toEqual([])
+	})
 
 	it('ships no kit-only measurement report or eval module', () => {
 		const leaked = [...packed].filter(
@@ -183,11 +252,7 @@ describe('the published package boundary', () => {
 
 describe('a failed pnpm pack', () => {
 	it('reports what pnpm printed rather than only that the command failed', () => {
-		const directory = mkdtempSync(path.join(tmpdir(), 'pack-boundary-'))
-
-		onTestFinished(() => {
-			rmSync(directory, { recursive: true, force: true })
-		})
+		const directory = make_directory('pack-boundary-')
 
 		expect(() => run_pack(directory)).toThrow(/stdout:\n\S[\s\S]*ERR_PNPM/u)
 	})
@@ -215,12 +280,9 @@ function write_hook_scratch(directory: string): void {
 }
 
 function pack_with_hook_scratch(): Set<string> {
-	const directory = mkdtempSync(path.join(tmpdir(), 'pack-boundary-scratch-'))
+	const directory = make_directory('pack-boundary-scratch-')
 	const package_json = { name: 'scratch', version: '0.0.0', files: read_manifest().files }
 
-	onTestFinished(() => {
-		rmSync(directory, { recursive: true, force: true })
-	})
 	writeFileSync(path.join(directory, MANIFEST_NAME), JSON.stringify(package_json))
 	write_hook_scratch(directory)
 
@@ -241,7 +303,7 @@ describe('the published package carries no per-machine hook scratch', () => {
 })
 
 describe('the published package carries nothing kit-internal', () => {
-	const packed = packed_files()
+	const packed = PACKED
 
 	it('ships no scripts module that no consumer entry reaches', () => {
 		const reachable = reachable_files()

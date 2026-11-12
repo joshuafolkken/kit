@@ -12,7 +12,7 @@ import type { UsualTimes } from './run-board-usual'
 const MINUTE = 60_000
 const NOW = Date.parse('2026-10-18T09:00:00.000Z')
 const EMPTY_LAYOUT: BoardLayout = { active: [], queued: [], people: [], unreached: [] }
-// One child usually takes 30 minutes: 20 implementing, 6 in the gate, 4 in the followup.
+// Distinct phase estimates expose whether the remaining phases are summed correctly.
 const USUAL: UsualTimes = new Map<Phase, number>([
 	['implement', 20 * MINUTE],
 	['gate', 6 * MINUTE],

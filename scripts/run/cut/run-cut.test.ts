@@ -1,10 +1,12 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { git_command } from '#scripts/git/git-command'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, describe, expect, it } from 'vitest'
 import { run_cut, type CutResumeRequest, type RunCut } from './run-cut'
 import type { Handoff } from './run-cut-handoff'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#1839: the record exists so a lane child can end its process before the gate and a
 // fresh one resume from it. What these tests pin is what a rewrite would lose first — that only a
@@ -14,7 +16,7 @@ import type { Handoff } from './run-cut-handoff'
 // second resume cannot take the same cut.
 
 const TEST_PREFIX = 'run-cut-test-'
-const scratch = mkdtempSync(path.join(tmpdir(), TEST_PREFIX))
+const scratch = make_directory(TEST_PREFIX)
 const REPOSITORY = path.join(scratch, 'repository.git')
 const OTHER_REPOSITORY = path.join(scratch, 'other.git')
 
@@ -81,7 +83,6 @@ function resume_request(overrides: Partial<CutResumeRequest> = {}): CutResumeReq
 afterAll(() => {
 	rmSync(run_cut.cut_path(REPOSITORY), { force: true })
 	rmSync(run_cut.cut_path(OTHER_REPOSITORY), { force: true })
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 describe('a working tree with no cut in flight', () => {

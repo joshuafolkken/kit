@@ -5,6 +5,7 @@ import { rule_value_cache } from '#scripts/rules/rule-value-cache'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { z } from 'zod'
+import { backlog_drain_flush } from './backlog-drain-flush'
 import { backlog_next_shared } from './backlog-next-shared'
 import { backlog_offer, type OfferAnswer } from './backlog-offer'
 
@@ -114,9 +115,11 @@ const budget_read_schema = z.object({
 	[BUDGET_JSON_KEY]: z.string(),
 	reason: z.string(),
 	is_finish: z.boolean(),
+	idle_until_ms: z.number().optional(),
 })
 
 interface BudgetRead {
+	idle_until_ms?: number | undefined
 	verdict: string
 	reason: string
 	is_finish: boolean
@@ -126,7 +129,7 @@ function budget_of(out: string): BudgetRead | undefined {
 	const read = json_value.parse_with(out, budget_read_schema)
 	if (read === undefined) return undefined
 
-	return { verdict: read[BUDGET_JSON_KEY], reason: read.reason, is_finish: read.is_finish }
+	return { ...read, verdict: read[BUDGET_JSON_KEY] }
 }
 
 function to_tokens(out: string): ReadonlyArray<string> {
@@ -150,6 +153,9 @@ function emit(decision: BudgetRead, offer: OfferAnswer, is_json: boolean): numbe
 			answer: offer.answer,
 			cause: offer.cause,
 			waiting: offer.waiting,
+			not_before_ms: offer.not_before_ms,
+			idle_until_ms: decision.idle_until_ms,
+			is_judgment_owed: offer.is_judgment_owed,
 			retries: offer.retries,
 			reason,
 			is_finish,
@@ -185,7 +191,12 @@ async function mark_drain(verdict: string, answer: string, running: number): Pro
 	if (answer !== EXHAUSTED_ANSWER || running !== NO_RUNNING) return false
 	if (verdict !== WATCH_VERDICT && verdict !== STOP_VERDICT) return false
 
-	return await run_event_stream_emit.emit_once(run_event_stream.EVENT_KIND.DRAIN, DRAIN_TEXT)
+	// The flush finishes before the marker is visible: `backlogrun-replace` reads a drain as replaceable.
+	return await run_event_stream_emit.emit_once(
+		run_event_stream.EVENT_KIND.DRAIN,
+		DRAIN_TEXT,
+		backlog_drain_flush.flush,
+	)
 }
 
 async function decide(values: ParsedValues, counts: OfferCounts): Promise<number> {

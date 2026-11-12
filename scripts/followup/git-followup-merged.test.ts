@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { git_followup_merged } from './git-followup-merged'
 
 vi.mock('#scripts/gh/git-gh-command', () => ({
@@ -34,10 +34,6 @@ function record(comments_json: string | undefined): {
 } {
 	return { comments_json, pr_url: PR_URL, merged_at: MERGED_AT }
 }
-
-beforeEach(() => {
-	vi.clearAllMocks()
-})
 
 describe('git_followup_merged.to_merge_plan — what a run does about the merge', () => {
 	it('runs the tail as merged for a pull request a person already merged', () => {

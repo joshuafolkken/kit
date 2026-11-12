@@ -1,3 +1,4 @@
+import { issue_body_keys } from './issue-body-keys'
 import { issue_bug_label } from './issue-bug-label'
 import { markdown_section } from './markdown-section'
 import { reproduction_measure } from './reproduction-measure'
@@ -6,20 +7,20 @@ import { reproduction_measure } from './reproduction-measure'
 // introduced the defect, or "unknown" with the reason it could not be traced. `defect:report` groups
 // defects by it, so a bug filed without one is a defect nobody can attribute.
 
-const ORIGIN_PREFIX = '- 原因:'
-const PR_LINE = /^- 原因: #(?<pr>\d+)$/u
-const UNKNOWN_LINE = /^- 原因: 不明（(?<reason>[^）]*)）$/u
-const MISSING_ORIGIN =
-	'missing origin line: a `- 種別: 不具合` body declares `- 原因: #<PR>` or `- 原因: 不明（<reason>）` under ## 背景 (`pnpm josh defect:origin <N>` lists candidates)'
-const MALFORMED_ORIGIN =
-	'malformed origin line: write `- 原因: #<PR>` or `- 原因: 不明（<reason>）` with a non-empty reason'
-const MISSING_REPRODUCTION =
-	'missing reproduction: a `- 原因: 不明（<reason>）` bug carries ## 再現 with a backticked command and its actual output in a fenced block'
+const BACKGROUND_HEADING = issue_body_keys.heading('background')
+const ORIGIN_PREFIX = issue_body_keys.prefix('origin')
+const UNKNOWN_PREFIX = issue_body_keys.line('origin', 'unknown')
+const PR_LINE = new RegExp(String.raw`^${ORIGIN_PREFIX} #(?<pr>\d+)$`, 'u')
+const UNKNOWN_LINE = new RegExp(`^${UNKNOWN_PREFIX}（(?<reason>[^）]*)）$`, 'u')
+const ORIGIN_FORMS = `\`${ORIGIN_PREFIX} #<PR>\` or \`${UNKNOWN_PREFIX}（<reason>）\``
+const MISSING_ORIGIN = `missing origin line: a \`${issue_bug_label.BUG_DECLARATION_LINE}\` body declares ${ORIGIN_FORMS} under ${BACKGROUND_HEADING} (\`pnpm josh defect:origin <N>\` lists candidates)`
+const MALFORMED_ORIGIN = `malformed origin line: write ${ORIGIN_FORMS} with a non-empty reason`
+const MISSING_REPRODUCTION = `missing reproduction: a \`${UNKNOWN_PREFIX}（<reason>）\` bug carries ${issue_body_keys.heading('reproduction')} with a backticked command and its actual output in a fenced block`
 
 type DefectOrigin = { kind: 'pr'; pr: number } | { kind: 'unknown'; reason: string }
 
 function origin_lines(body: string): ReadonlyArray<string> {
-	const background = markdown_section.section_lines(body, '## 背景').join('\n')
+	const background = markdown_section.section_lines(body, BACKGROUND_HEADING).join('\n')
 
 	return markdown_section
 		.unfenced_lines(background)

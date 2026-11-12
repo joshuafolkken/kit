@@ -1,9 +1,10 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { process_identity } from '#scripts/josh/process-identity'
+import { unit_lane_count } from '#scripts/test/unit-lane-count'
 import { unit_run_marker } from '#scripts/test/unit-run-marker'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { vitest_config_workers } from './vitest-config-workers'
 
@@ -14,6 +15,7 @@ import { vitest_config_workers } from './vitest-config-workers'
 const MEASURED_CORES = 11
 const PROBE_PREFIX = 'josh-config-workers-test-'
 
+const { lane_count_probe } = vitest_config_workers
 const outer_flag = process.env[unit_worker_share.NESTED_KEY]
 const probe = { directory: '' }
 
@@ -24,18 +26,20 @@ function record_other_run(): void {
 	writeFileSync(marker, JSON.stringify(process_identity.own_fields()))
 }
 
-function workers(): number | undefined {
-	return vitest_config_workers.config_workers(MEASURED_CORES, probe.directory)
+// One live lane — this one — so the machine's own lanes do not move the answers below.
+function workers(lanes = 1): number | undefined {
+	return vitest_config_workers.config_workers(MEASURED_CORES, probe.directory, lanes)
 }
 
+const make_directory = temporary_directory()
+
 beforeEach(() => {
-	probe.directory = mkdtempSync(path.join(tmpdir(), PROBE_PREFIX))
+	probe.directory = make_directory(PROBE_PREFIX)
 	process.env[unit_worker_share.NESTED_KEY] = ''
 })
 
 afterEach(() => {
 	process.env[unit_worker_share.NESTED_KEY] = outer_flag ?? ''
-	rmSync(probe.directory, { recursive: true, force: true })
 	vi.restoreAllMocks()
 })
 
@@ -67,6 +71,23 @@ describe('vitest_config_workers.config_workers', () => {
 		expect(workers()).toBeUndefined()
 	})
 
+	// joshuafolkken/kit#6682: a direct run beside idle lanes takes only its lane's share.
+	it('takes its lane share when other lanes are live', () => {
+		const lanes = 3
+
+		expect(workers(lanes)).toBe(3)
+	})
+
+	it('reads the live lanes when no count is passed', () => {
+		const lanes = 3
+
+		vi.spyOn(lane_count_probe, 'spawned_lane_count').mockReturnValue(lanes)
+
+		expect(vitest_config_workers.config_workers(MEASURED_CORES, probe.directory)).toBe(
+			workers(lanes),
+		)
+	})
+
 	// The `josh` guard sizes a nested run itself; a second answer here would make two deciders.
 	it('leaves a josh-driven run to the flag josh passed', () => {
 		record_other_run()
@@ -81,5 +102,47 @@ describe('vitest_config_workers.config_workers', () => {
 		})
 
 		expect(workers()).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#7254: the config counts the lanes in a child process, so the lane reading stays out
+// of its imports — and the child has to answer what the in-process reading answers.
+describe('vitest_config_workers.lane_count_probe.spawned_lane_count', () => {
+	const LANES = ['6682', '6905']
+
+	// A repository checkout beside a lanes root holding two lanes, read with no environment.
+	function checkout_beside_lanes(): string {
+		const parent = probe.directory
+
+		for (const name of LANES) mkdirSync(path.join(parent, '.repo-lanes', name), { recursive: true })
+
+		return path.join(parent, 'repo')
+	}
+
+	it('counts the lanes the in-process reading counts', () => {
+		const checkout = checkout_beside_lanes()
+
+		expect(lane_count_probe.spawned_lane_count(checkout, {})).toBe(LANES.length)
+		expect(lane_count_probe.spawned_lane_count(checkout, {})).toBe(
+			unit_lane_count.live_lane_count(checkout, {}),
+		)
+	})
+
+	it.each([
+		['fails to start', '--no-such-node-flag'],
+		['prints more than a number', '--import=data:text/javascript,process.stdout.write("x")'],
+	])('counts no lane when the child %s', (_case, node_options) => {
+		const environment = { NODE_OPTIONS: node_options }
+
+		expect(lane_count_probe.spawned_lane_count(checkout_beside_lanes(), environment)).toBe(0)
+	})
+
+	it('spawns no lane count for a josh-driven run', () => {
+		const spawned = vi.spyOn(lane_count_probe, 'spawned_lane_count')
+
+		process.env[unit_worker_share.NESTED_KEY] = unit_worker_share.NESTED_VALUE
+		vitest_config_workers.config_workers(MEASURED_CORES, probe.directory)
+
+		expect(spawned).not.toHaveBeenCalled()
 	})
 })

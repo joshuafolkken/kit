@@ -65,7 +65,7 @@ function timing_of(over: Partial<ReviewTiming> = {}): ReviewTiming {
 
 describe('overlap_seconds', () => {
 	it('measures from the later start to the earlier end', () => {
-		// review starts at +2s, gate ends at +30s: the two ran together for 28 seconds.
+		// Staggered endpoints ensure only the shared interval counts as overlap.
 		expect(run_review.overlap_seconds(timing_of())).toBe(28)
 	})
 

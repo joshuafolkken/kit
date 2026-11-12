@@ -21,6 +21,7 @@ import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 const YIELD_REASON = 'it gave its lane back to an earlier lane holding one of its planned files'
 
 const YIELD_MARK = ' yielded its lane: '
+const NAMED_ISSUE = /#([1-9]\d*)\b/gu
 
 const YIELD_TEXT = {
 	name: 'its own lane:plan',
@@ -43,7 +44,7 @@ const YIELD_AT_MARK = ' · at: '
 async function record_yield(issue: number, reason: string, at: YieldAt): Promise<void> {
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.NOTE,
-		`${issue_cite.plain(String(issue))}${YIELD_MARK}${reason}${YIELD_AT_MARK}${at}`,
+		`${issue_cite.plain_for('program', String(issue))}${YIELD_MARK}${reason}${YIELD_AT_MARK}${at}`,
 	)
 }
 
@@ -73,13 +74,46 @@ function is_deciding(event: RunEvent, issue: string): boolean {
 }
 
 // Whether the issue's newest launch gave its lane back, and no one withdrew it since.
-function is_yielded(events: ReadonlyArray<RunEvent>, issue: string): boolean {
+function latest_yield(events: ReadonlyArray<RunEvent>, issue: string): RunEvent | undefined {
 	const newest = events.findLast((event) => is_deciding(event, issue))
 
-	return newest !== undefined && is_yield_note(newest)
+	return newest !== undefined && is_yield_note(newest) ? newest : undefined
 }
 
-const lane_yield = { YIELD_REASON, YIELD_TEXT, is_yield, is_yielded, record_yield }
+function is_yielded(events: ReadonlyArray<RunEvent>, issue: string): boolean {
+	return latest_yield(events, issue) !== undefined
+}
+
+// The overlap text names the holder last, after the yielding issue's own citations.
+function holder_of(note: RunEvent): number | undefined {
+	const yielder = Number(run_event_scope.issue_named(note))
+
+	return [...note.text.matchAll(NAMED_ISSUE)]
+		.map((match) => Number(match[1]))
+		.findLast((issue) => issue !== yielder)
+}
+
+function withdraw_reason(events: ReadonlyArray<RunEvent>, issue: string): string {
+	const note = latest_yield(events, issue)
+	const holder = note === undefined ? undefined : holder_of(note)
+	// Stored in the withdrawal event; its renderer supplies session citations.
+	const holding_issue = issue_cite.plain_for('program', holder ?? '')
+
+	return holder === undefined
+		? YIELD_REASON
+		: `yielded to ${holding_issue}, which held one of its planned files; re-queues after ${holding_issue} merges`
+}
+
+const lane_yield = {
+	YIELD_REASON,
+	YIELD_TEXT,
+	holder_of,
+	is_yield,
+	is_yield_note,
+	is_yielded,
+	record_yield,
+	withdraw_reason,
+}
 
 export { lane_yield }
 export type { YieldAt }

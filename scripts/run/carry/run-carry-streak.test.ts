@@ -14,7 +14,7 @@ import {
 const T0 = new Date('2026-09-22T00:00:00.000Z')
 // +60s: inside the 120s fold window, so the same network event.
 const WITHIN = new Date('2026-09-22T00:01:00.000Z')
-// +3min and +6min: outside it, so distinct outages — the spacing a re-dispatched dead API produces.
+// Spaced beyond the window to represent distinct outages from a re-dispatched dead API.
 const BEYOND = new Date('2026-09-22T00:03:00.000Z')
 const BEYOND_AGAIN = new Date('2026-09-22T00:06:00.000Z')
 const OUTAGE = { outages: 1 }

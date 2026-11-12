@@ -1,4 +1,5 @@
 import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
+import { hook_context } from '#scripts/hooks/hook-context'
 import {
 	time_transcript_line,
 	type TranscriptLine,
@@ -129,7 +130,7 @@ function keeps_the_rule(rule: MeasuredRule, call: IssuedCall, context: CallConte
 }
 
 function is_the_trigger(rule: MeasuredRule, call: IssuedCall): boolean {
-	return rule.is_trigger?.(call) === true
+	return rule.is_trigger?.(call, hook_context.from_process()) === true
 }
 
 function observe_before_trigger(
@@ -227,12 +228,9 @@ function turn_key(entry: DatedLine, index: number): string {
 	return entry.message_id
 }
 
-// **The turn a call belongs to, gathered by id but never moved**. A folded
-// turn used to be *placed* where it opened, which both grouped a message's calls and reordered them:
-// a background unit's call landing between two blocks of a parent message was read after the whole
-// parent turn instead of at its own instant. This gathers each message's calls without touching the
-// timeline order — the reading walks the lines in the order `dated_lines_of` sorted them and asks
-// this map only for a call's siblings. A line with no id keys a turn of its own, so its context is
+// Gather each call's turn by id without moving it: a background call between two parent-message
+// blocks must retain its own timeline position. The reading walks lines in `dated_lines_of` order
+// and asks this map only for a call's siblings. A line with no id keys a turn of its own, so its context is
 // its own calls.
 function turns_by_key(entries: ReadonlyArray<DatedLine>): Map<string, Array<IssuedCall>> {
 	const turns = new Map<string, Array<IssuedCall>>()
@@ -396,15 +394,23 @@ function credit(reading: RuleReading, state: RuleState): void {
 	reading.rewrites += state.is_rewritten ? 1 : 0
 }
 
+// A state the reading counts. Any other adds nothing, so a kept run may drop it.
+function is_credited(state: RuleState): boolean {
+	return state.is_triggered || state.is_reached
+}
+
 function reading_to_credit(
 	readings: Map<string, RuleReading>,
 	id: string,
 	state: RuleState,
 ): RuleReading | undefined {
-	return state.is_triggered || state.is_reached ? readings.get(id) : undefined
+	return is_credited(state) ? readings.get(id) : undefined
 }
 
-function apply_run(readings: Map<string, RuleReading>, states: Map<string, RuleState>): void {
+function apply_run(
+	readings: Map<string, RuleReading>,
+	states: ReadonlyMap<string, RuleState>,
+): void {
 	for (const [id, state] of states) {
 		const reading = reading_to_credit(readings, id, state)
 
@@ -438,10 +444,18 @@ function unaided_rate(reading: RuleReading): number | undefined {
 
 // **Runs, not files.** Each element is every transcript belonging to one run, so a caller may read
 // one run at a time and never hold the corpus.
-function measure(runs: Iterable<ReadonlyArray<string>>): ReadonlyArray<RuleReading> {
+function* states_of(runs: Iterable<ReadonlyArray<string>>): Generator<Map<string, RuleState>> {
+	for (const texts of runs) yield read_run(texts)
+}
+
+// The reading from each run's states, however they were obtained — read now by `read_run` or kept
+// from an earlier reading (`rule-value-runs.ts`), since a run adds to the reading on its own.
+function measure_states(
+	runs: Iterable<ReadonlyMap<string, RuleState>>,
+): ReadonlyArray<RuleReading> {
 	const readings = blank_readings()
 
-	for (const texts of runs) apply_run(readings, read_run(texts))
+	for (const states of runs) apply_run(readings, states)
 
 	// Enumeration order, so a caller's table matches the registry rather than insertion order.
 	return delivered_rules.MEASURED_RULES.map((rule) => readings.get(rule.id)).filter(
@@ -449,7 +463,18 @@ function measure(runs: Iterable<ReadonlyArray<string>>): ReadonlyArray<RuleReadi
 	)
 }
 
-const rule_value = { REASON_SIGNATURE_LENGTH, measure, unaided_rate }
+function measure(runs: Iterable<ReadonlyArray<string>>): ReadonlyArray<RuleReading> {
+	return measure_states(states_of(runs))
+}
 
-export type { RuleReading }
+const rule_value = {
+	REASON_SIGNATURE_LENGTH,
+	is_credited,
+	measure,
+	measure_states,
+	read_run,
+	unaided_rate,
+}
+
+export type { RuleReading, RuleState }
 export { rule_value }

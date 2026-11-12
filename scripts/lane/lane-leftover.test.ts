@@ -1,8 +1,11 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, mkdirSync, symlinkSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { write_file } from '#tools/test/write-file'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#2857: a lane directory git no longer registers is removed only when removing it
 // loses nothing. `git_spawn` is mocked so the object listing is the fixture's; the files themselves are
@@ -13,7 +16,7 @@ vi.mock('#scripts/git/git-spawn', () => ({ git_spawn: { read: vi.fn() } }))
 const { git_spawn } = await import('#scripts/git/git-spawn')
 const { lane_leftover } = await import('./lane-leftover')
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'lane-leftover-test-'))
+const scratch = make_directory('lane-leftover-test-')
 const CONFIG_PATH = '.codex/config.toml'
 const CONFIG_CONTENT = 'model = "x"\n'
 const SKILLS_PATH = '.agents/skills'
@@ -33,17 +36,10 @@ function hash_object(file: string): string {
 	return execFileSync('git', ['hash-object', '--no-filters', file], { encoding: 'utf8' }).trim()
 }
 
-function write_file(relative: string, content: string): void {
-	const file = path.join(cases.directory, relative)
-
-	mkdirSync(path.dirname(file), { recursive: true })
-	writeFileSync(file, content)
-}
-
 // The leftover #2842 found: the `.git` pointer, the skills symlink and the Codex configuration.
 function write_leftover(): void {
-	write_file('.git', POINTER_CONTENT)
-	write_file(CONFIG_PATH, CONFIG_CONTENT)
+	write_file(cases.directory, '.git', POINTER_CONTENT)
+	write_file(cases.directory, CONFIG_PATH, CONFIG_CONTENT)
 	mkdirSync(path.join(cases.directory, '.agents'), { recursive: true })
 	symlinkSync(SKILLS_TARGET, path.join(cases.directory, SKILLS_PATH))
 }
@@ -74,13 +70,9 @@ beforeEach(() => {
 	vi.mocked(git_spawn.read).mockReset()
 })
 
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
-
 describe('lane_leftover.blob_id', () => {
 	it('matches git for a regular file', () => {
-		write_file(CONFIG_PATH, CONFIG_CONTENT)
+		write_file(cases.directory, CONFIG_PATH, CONFIG_CONTENT)
 		const file = path.join(cases.directory, CONFIG_PATH)
 
 		expect(lane_leftover.blob_id(file)).toBe(hash_object(file))
@@ -107,8 +99,8 @@ describe('lane_leftover.foreign_paths', () => {
 		write_leftover()
 		const listing = tracked()
 
-		write_file(NOTES_PATH, NOTES_CONTENT)
-		write_file(CONFIG_PATH, 'model = "edited"\n')
+		write_file(cases.directory, NOTES_PATH, NOTES_CONTENT)
+		write_file(cases.directory, CONFIG_PATH, 'model = "edited"\n')
 
 		expect(lane_leftover.foreign_paths(cases.directory, listing)).toStrictEqual(
 			expect.arrayContaining([CONFIG_PATH, NOTES_PATH]),
@@ -126,7 +118,7 @@ describe('lane_leftover.foreign_paths', () => {
 // from any commit is restorable, and what the install, the build and the gate write is regenerated.
 describe('lane_leftover.foreign_paths on an older checkout', () => {
 	it('finds nothing foreign in content the history holds under another path', () => {
-		write_file(NOTES_PATH, CONFIG_CONTENT)
+		write_file(cases.directory, NOTES_PATH, CONFIG_CONTENT)
 		const objects = new Set([lane_leftover.blob_id(path.join(cases.directory, NOTES_PATH))])
 
 		expect(lane_leftover.foreign_paths(cases.directory, objects)).toStrictEqual([])
@@ -139,7 +131,7 @@ describe('lane_leftover.foreign_paths on an older checkout', () => {
 			'.env',
 			'.eslintcache',
 		]) {
-			write_file(regenerated, NOTES_CONTENT)
+			write_file(cases.directory, regenerated, NOTES_CONTENT)
 		}
 
 		expect(lane_leftover.foreign_paths(cases.directory, new Set())).toStrictEqual([])
@@ -148,7 +140,7 @@ describe('lane_leftover.foreign_paths on an older checkout', () => {
 	it('still names a regenerated name below the top level', () => {
 		const nested = 'scripts/.env'
 
-		write_file(nested, NOTES_CONTENT)
+		write_file(cases.directory, nested, NOTES_CONTENT)
 
 		expect(lane_leftover.foreign_paths(cases.directory, new Set())).toStrictEqual([nested])
 	})
@@ -160,7 +152,7 @@ describe('lane_leftover.foreign_paths on a live or linked tree', () => {
 		const registration = path.join(cases.directory, 'registration')
 
 		mkdirSync(registration)
-		write_file('.git', `gitdir: ${registration}\n`)
+		write_file(cases.directory, '.git', `gitdir: ${registration}\n`)
 
 		expect(lane_leftover.foreign_paths(cases.directory, tracked())).toStrictEqual(
 			expect.arrayContaining(['.git']),
@@ -169,7 +161,7 @@ describe('lane_leftover.foreign_paths on a live or linked tree', () => {
 
 	it('does not walk into a symbolic link to a directory the repository also holds', () => {
 		write_leftover()
-		write_file(SKILL_PATH, SKILL_CONTENT)
+		write_file(cases.directory, SKILL_PATH, SKILL_CONTENT)
 		const listing = new Set([
 			...tracked(),
 			lane_leftover.blob_id(path.join(cases.directory, SKILL_PATH)),
@@ -199,7 +191,7 @@ describe('lane_leftover.reclaim', () => {
 	it('keeps a leftover holding other files and names them in the refusal', async () => {
 		write_leftover()
 		vi.mocked(git_spawn.read).mockResolvedValue(object_listing())
-		write_file(NOTES_PATH, NOTES_CONTENT)
+		write_file(cases.directory, NOTES_PATH, NOTES_CONTENT)
 
 		await expect(lane_leftover.reclaim(cases.directory)).rejects.toThrow(/notes\.md/u)
 		expect(existsSync(path.join(cases.directory, NOTES_PATH))).toBe(true)

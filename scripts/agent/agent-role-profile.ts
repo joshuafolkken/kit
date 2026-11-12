@@ -1,4 +1,11 @@
-import { z } from 'zod'
+import { agent_consultation_model } from './agent-consultation-model'
+import {
+	agent_profile_schema,
+	type AgentEffort,
+	type AgentPhase,
+	type AgentProfile,
+	type AgentRole,
+} from './agent-profile-schema'
 import {
 	agent_provider,
 	type AgentEnvironment,
@@ -8,11 +15,9 @@ import {
 import { agent_safe_text } from './agent-safe-text'
 
 const {
-	ANTHROPIC_PROVIDER,
 	CODEX_SESSION_KEY,
 	HANDED_PROVIDER_KEY,
 	OPENAI_PROVIDER,
-	PROVIDER_SCHEMA,
 	default_notice,
 	handoff_environment,
 	has_completion_callback,
@@ -21,25 +26,23 @@ const {
 	trimmed,
 	warn_of_default,
 } = agent_provider
+const { consultation_provider } = agent_consultation_model
 
-const ROLE_SCHEMA = z.enum(['scheduler', 'worker', 'reviewer'])
-const EFFORT_SCHEMA = z.enum(['low', 'medium', 'high', 'xhigh', 'max'])
-// The run phases effort may vary by. They are the cut boundaries a lane child
-// resumes across — `run-cut.ts` imports these names for its own cut record, so the phase a run passes
-// and the phase this table is keyed on cannot drift. A phase-less call resolves the role default, which
-// is what keeps every existing caller unchanged.
-const PHASE_SCHEMA = z.enum(['implementation', 'pre-gate'])
-const PROFILE_SCHEMA = z.object({
-	provider: PROVIDER_SCHEMA.default('anthropic'),
-	role: ROLE_SCHEMA,
-	model: z.string(),
-	effort: EFFORT_SCHEMA,
-})
+const {
+	DEFAULT_PROFILES,
+	EFFORT_SCHEMA,
+	IMPLEMENTATION_PHASE,
+	OPENAI_MODEL,
+	OPENAI_PROFILES,
+	PHASE_SCHEMA,
+	PRE_GATE_PHASE,
+	REVIEWER,
+	SCHEDULER,
+	WORKER,
+	describe,
+	describe_review,
+} = agent_profile_schema
 
-type AgentRole = z.infer<typeof ROLE_SCHEMA>
-type AgentEffort = z.infer<typeof EFFORT_SCHEMA>
-type AgentPhase = z.infer<typeof PHASE_SCHEMA>
-type AgentProfile = z.infer<typeof PROFILE_SCHEMA>
 type ProfileResult = Rejected | { kind: 'profile'; profile: AgentProfile }
 type EffortResult = Rejected | { kind: 'effort'; effort: AgentEffort }
 type OverrideField = 'model' | 'effort'
@@ -62,37 +65,7 @@ interface AgentStage {
 	round?: number
 }
 
-const SCHEDULER: AgentRole = 'scheduler'
-const WORKER: AgentRole = 'worker'
-const REVIEWER: AgentRole = 'reviewer'
-const IMPLEMENTATION_PHASE: AgentPhase = 'implementation'
-const PRE_GATE_PHASE: AgentPhase = 'pre-gate'
-// **Pinned model ids, never a floating alias**. An alias such as `opus` moves
-// whenever the CLI moves it, so a run log could not say which model produced it and a model migration
-// could not be measured apart from everything else. A new lane records the id it resolved; a lane
-// created before a migration keeps the model it recorded (`with_phase` moves it only by a phase key).
-const OPENAI_MODEL = 'gpt-6.1-sol'
-const ANTHROPIC_MODEL = 'claude-opus-5-5'
-
-// **Round 1 reviews at `medium`** (joshuafolkken/kit#5106): it ended clean on 88% of diffs while its
-// `high` run sat on the lane's critical path; the verification pass below keeps `high`.
-const REVIEW_EFFORT: AgentEffort = 'medium'
 const VERIFICATION_EFFORT: AgentEffort = 'high'
-
-// Every provider runs each role at the same effort; only the model differs.
-function role_profiles(
-	provider: AgentProvider,
-	model: string,
-): Readonly<Record<AgentRole, AgentProfile>> {
-	return {
-		scheduler: { provider, role: SCHEDULER, model, effort: 'medium' },
-		worker: { provider, role: WORKER, model, effort: 'medium' },
-		reviewer: { provider, role: REVIEWER, model, effort: REVIEW_EFFORT },
-	}
-}
-
-const DEFAULT_PROFILES = role_profiles(ANTHROPIC_PROVIDER, ANTHROPIC_MODEL)
-const OPENAI_PROFILES = role_profiles(OPENAI_PROVIDER, OPENAI_MODEL)
 
 const PROVIDER_PROFILES = { anthropic: DEFAULT_PROFILES, openai: OPENAI_PROFILES }
 
@@ -100,13 +73,13 @@ const PROVIDER_PROFILES = { anthropic: DEFAULT_PROFILES, openai: OPENAI_PROFILES
 // first only checks that the first round's findings were fixed, so its model and effort are set apart:
 // its own keys win, then the reviewer's, then its own default.
 const FIRST_REVIEW_ROUND = 1
-// Sonnet holds the verification pass by the eval criterion: on every `verification-fix-*` scenario its
-// pass/fail equals Opus's (100% agreement), and Opus passes all 4.
-const VERIFICATION_MODEL = 'claude-sonnet-5-5'
+const SONNET_MODEL = 'claude-sonnet-5-5'
 const VERIFICATION_PROFILES: Readonly<Record<AgentProvider, AgentProfile>> = {
 	anthropic: {
 		...DEFAULT_PROFILES.reviewer,
-		model: VERIFICATION_MODEL,
+		// Sonnet holds the verification pass by the eval criterion: on every `verification-fix-*`
+		// scenario its pass/fail equals Opus's (100% agreement), and Opus passes all 4.
+		model: SONNET_MODEL,
 		effort: VERIFICATION_EFFORT,
 	},
 	openai: { ...OPENAI_PROFILES.reviewer, effort: VERIFICATION_EFFORT },
@@ -115,6 +88,16 @@ const VERIFICATION_KEYS = {
 	model: 'JOSH_REVIEWER_VERIFICATION_MODEL',
 	effort: 'JOSH_REVIEWER_VERIFICATION_EFFORT',
 }
+
+// The model a consultation main line hands its investigation to (joshuafolkken/kit#5351); the
+// consultation models themselves are `agent-consultation-model.ts`'s. The Claude one is the pinned id
+// of `.claude/agents/investigator.md`'s `model:` alias, which the Agent tool dispatches on — a test
+// holds the two together (joshuafolkken/kit#5944).
+const INVESTIGATION_MODELS: Readonly<Record<AgentProvider, string>> = {
+	anthropic: SONNET_MODEL,
+	openai: OPENAI_MODEL,
+}
+const INVESTIGATION_MODEL_KEY = 'JOSH_INVESTIGATION_MODEL'
 
 // **Effort as a function of the run phase, not the role alone**. For the first
 // merge only the mechanical ship/bookkeeping region is lowered: the pre-gate resume drives the gate,
@@ -129,10 +112,10 @@ const PHASE_EFFORT: PhaseTable<AgentEffort> = {
 }
 
 // **The ship phase may run on a model of its own** (joshuafolkken/kit#5343), read from its key ahead of
-// the role's and applied on the same cut relaunch as `SHIP_EFFORT`. Unset, the phase keeps the role's
-// model, so the default is unchanged.
-const PHASE_MODEL_KEYS: PhaseTable<string> = {
-	worker: { [PRE_GATE_PHASE]: 'JOSH_WORKER_SHIP_MODEL' },
+// the role's and applied on the same cut relaunch as `SHIP_EFFORT`. Unset, the phase runs on its default:
+// Sonnet held the ship phase's duration and stop rates against Opus across a lane trial (joshuafolkken/kit#5346).
+const PHASE_MODELS: PhaseTable<PhaseModel> = {
+	worker: { [PRE_GATE_PHASE]: { key: 'JOSH_WORKER_SHIP_MODEL', value: SONNET_MODEL } },
 }
 
 const ENV_KEYS: Readonly<Record<AgentRole, { model: string; effort: string }>> = {
@@ -143,7 +126,23 @@ const ENV_KEYS: Readonly<Record<AgentRole, { model: string; effort: string }>> =
 
 const LEGACY_WORKER_KEYS = { model: 'JOSH_LANE_MODEL', effort: 'JOSH_LANE_EFFORT' }
 
-const { MAX_VALUE_LENGTH, is_safe_prompt, is_safe_value, printable } = agent_safe_text
+function phase_model_keys(): ReadonlyArray<string> {
+	return Object.values(PHASE_MODELS).flatMap((phases) =>
+		Object.values(phases).map(({ key }) => key),
+	)
+}
+
+// Every env key a profile is read from. The unit suite blanks them so a lane's model and effort never
+// reach its fixtures (joshuafolkken/kit#5863); its test pins each to the pattern its config blanks.
+const PROFILE_KEYS: ReadonlyArray<string> = [
+	...Object.values(ENV_KEYS).flatMap((keys) => [keys.model, keys.effort]),
+	...Object.values(LEGACY_WORKER_KEYS),
+	...Object.values(VERIFICATION_KEYS),
+	...phase_model_keys(),
+	INVESTIGATION_MODEL_KEY,
+]
+
+const { MAX_VALUE_LENGTH, is_safe_prompt, is_safe_value } = agent_safe_text
 
 function is_verification(role: AgentRole, round: number | undefined): boolean {
 	return role === REVIEWER && round !== undefined && round > FIRST_REVIEW_ROUND
@@ -187,19 +186,18 @@ function phase_entry<Value>(
 	return parsed.success ? table[role]?.[parsed.data] : undefined
 }
 
-// The phase's own model key when it is set; `undefined` for a phase with no key, an unset key, or an
-// OpenAI session, whose model is never read from env.
+// The phase's own model — its key when set, else its default; `undefined` for a phase with no entry or
+// an OpenAI session, whose model is never read from env.
 function phase_model(
 	role: AgentRole,
 	provider: AgentProvider,
 	phase: string | undefined,
 	environment: AgentEnvironment,
 ): PhaseModel | undefined {
-	const key = provider === OPENAI_PROVIDER ? undefined : phase_entry(PHASE_MODEL_KEYS, role, phase)
-	if (key === undefined) return undefined
-	const value = trimmed(environment[key])
+	const entry = provider === OPENAI_PROVIDER ? undefined : phase_entry(PHASE_MODELS, role, phase)
+	if (entry === undefined) return undefined
 
-	return value === undefined ? undefined : { key, value }
+	return { key: entry.key, value: trimmed(environment[entry.key]) ?? entry.value }
 }
 
 function model_override(
@@ -224,9 +222,16 @@ function resolved_effort(override: Override, fallback: AgentEffort): EffortResul
 		: rejection(override.key, override.value ?? '', 'is not an allowed effort')
 }
 
+// **A launched main line never runs on a consultation model** (joshuafolkken/kit#5616): a scheduler or
+// worker on one is itself a consultation main line, which `consultation-handoff` refuses its
+// `run:entry` / `run:hold`, so every launcher refuses the profile here instead. A reviewer runs neither.
 function validate(profile: AgentProfile, model_key: string): ProfileResult {
 	if (!is_safe_value(profile.model)) {
 		return rejection(model_key, profile.model, 'is not a safe model')
+	}
+
+	if (profile.role !== REVIEWER && consultation_provider(profile.model) !== undefined) {
+		return rejection(model_key, profile.model, 'is a consultation model')
 	}
 
 	return { kind: 'profile', profile }
@@ -257,7 +262,7 @@ function overridden_effort(
 }
 
 // A stored profile resolved for the phase the run is entering: its effort, and its model only where the
-// phase's own model key is set — the role's model key never moves a lane off the model it recorded.
+// phase has a model of its own — the role's model key never moves a lane off the model it recorded.
 function with_phase(
 	profile: AgentProfile,
 	phase: string,
@@ -314,23 +319,34 @@ function resolve(
 
 // The reviewer for one review round: round 1 as `resolve(REVIEWER)` does, any later round the
 // verification pass's own profile.
-function resolve_review(round: number, environment: AgentEnvironment = process.env): ProfileResult {
-	return resolve_stage(REVIEWER, environment, { round })
+function reduced_review(result: ProfileResult, environment: AgentEnvironment): ProfileResult {
+	if (result.kind === 'rejected') return result
+	const { profile } = result
+	if (profile.provider !== 'anthropic' || trimmed(environment['JOSH_REVIEWER_MODEL'])) return result
+
+	return { kind: 'profile', profile: { ...profile, model: SONNET_MODEL } }
 }
 
-function describe(profile: AgentProfile): string {
-	return `provider=${profile.provider} role=${profile.role} model=${profile.model} effort=${profile.effort}`
+function resolve_review(
+	round: number,
+	environment: AgentEnvironment = process.env,
+	is_reduced = false,
+): ProfileResult {
+	const result = resolve_stage(REVIEWER, environment, { round })
+
+	return is_reduced && round === FIRST_REVIEW_ROUND ? reduced_review(result, environment) : result
 }
 
-// The run-log line a review launch writes, so each round's model is on record beside its round.
-function describe_review(round: number, profile: AgentProfile): string {
-	return `review round ${String(round)} · ${describe(profile)}`
-}
+// The model a consultation main line hands its investigation to. Its key moves the Claude model alone,
+// as every model key here does: an OpenAI session's model is never read from env.
+function investigation_model(
+	provider: AgentProvider,
+	environment: AgentEnvironment = process.env,
+): string {
+	const override =
+		provider === OPENAI_PROVIDER ? undefined : trimmed(environment[INVESTIGATION_MODEL_KEY])
 
-function parse(value: unknown): AgentProfile | undefined {
-	const parsed = PROFILE_SCHEMA.safeParse(value)
-
-	return parsed.success && is_safe_value(parsed.data.model) ? parsed.data : undefined
+	return override ?? INVESTIGATION_MODELS[provider]
 }
 
 const agent_role_profile = {
@@ -338,10 +354,11 @@ const agent_role_profile = {
 	DEFAULT_PROFILES,
 	HANDED_PROVIDER_KEY,
 	IMPLEMENTATION_PHASE,
+	INVESTIGATION_MODEL_KEY,
 	MAX_VALUE_LENGTH,
 	OPENAI_PROFILES,
 	PRE_GATE_PHASE,
-	PROFILE_SCHEMA,
+	PROFILE_KEYS,
 	REVIEWER,
 	SCHEDULER,
 	VERIFICATION_PROFILES,
@@ -351,10 +368,9 @@ const agent_role_profile = {
 	describe_review,
 	handoff_environment,
 	has_completion_callback,
+	investigation_model,
 	is_safe_prompt,
 	is_safe_value,
-	parse,
-	printable,
 	resolve,
 	resolve_provider,
 	resolve_review,
@@ -362,7 +378,14 @@ const agent_role_profile = {
 	with_phase,
 }
 
-export type { AgentEffort, AgentPhase, AgentProfile, AgentRole, ProfileResult }
+export type { ProfileResult }
 export { agent_role_profile }
 
 export { type AgentEnvironment, type AgentProvider } from './agent-provider'
+
+export {
+	type AgentEffort,
+	type AgentPhase,
+	type AgentProfile,
+	type AgentRole,
+} from './agent-profile-schema'

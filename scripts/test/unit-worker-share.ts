@@ -1,5 +1,6 @@
 import { availableParallelism } from 'node:os'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { unit_lane_count } from './unit-lane-count'
 import { unit_run_marker } from './unit-run-marker'
 
 // How wide one vitest run may fan out when it is not the only one on the machine.
@@ -8,13 +9,9 @@ import { unit_run_marker } from './unit-run-marker'
 // `josh gate` at once each concluded "11 cores, take 7 workers" and put 42 workers on 11 cores. The
 // pre-push hook once passed no cap at all; it now runs the suite through `test_unit_guard.run_guarded_unit`,
 // the same guard `josh test:unit` uses, so the share below applies there too.
-// Measured on the machine this was found on — load average 14.97 in the field, and 209 in a deliberate
-// reproduction of six concurrent suites, against 22 once the share below was applied.
 //
-// **What it fixes, and what it does not.** Six concurrent copies of the full suite produced ten
-// `Test timed out in 10000ms` failures across six runs; at the share this module hands out, the same
-// six runs produced **none**. It is the *second* multiplicand of those timeouts — the first
-// was a live `git fetch` inside two test files, which is fixed in `test-network-guard.ts` and its
+// **Concurrent suites need a share to avoid oversubscription** (joshuafolkken/kit#1515, which records
+// the load averages). Oversubscription compounds timeouts; the other cause of those timeouts was a live `git fetch` inside two test files, which is fixed in `test-network-guard.ts` and its
 // callers, and which no worker count would have repaired: that one failed on an idle machine at one
 // worker.
 //
@@ -26,8 +23,14 @@ import { unit_run_marker } from './unit-run-marker'
 // **The run markers and their division of the machine are `unit-run-marker.ts`**, the part the vitest
 // config imports (joshuafolkken/kit#4572); the capacity and claim bounds and the flag handling are here.
 const { MIN_WORKERS, NESTED_KEY, NESTED_VALUE, SOLO_RUNS } = unit_run_marker
-const { is_nested_run, live_run_count, mark_run_started, marker_path, resolve_unit_workers } =
-	unit_run_marker
+const {
+	is_nested_run,
+	live_run_count,
+	mark_run_started,
+	marker_path,
+	resolve_unit_workers,
+	sharing_runs,
+} = unit_run_marker
 
 // Vitest's own flag, in both spellings its CLI accepts — it normalizes `--max-workers` to the same
 // option, so a run that recognized only one of them would replace a number the caller typed with the
@@ -98,20 +101,31 @@ function cap_to_claim(share: number | undefined, claim: UnitClaim | undefined): 
 	return Math.min(share ?? bound, bound)
 }
 
-// The share this run may take, read from the machine. Separate from `resolve_unit_workers` so that
-// one stays a pure function of two numbers and every test of it can pass them.
-//
 // **A nested run is already counted, and adding one for it would be wrong rather than cautious.**
 // Inside `josh gate` the marker was written by the parent before this process started, so `+ 1` here
 // would count one run twice — and on a machine the gate leaves uncapped, a four-core CI runner among
 // them, that alone would halve a solo run nothing was sharing.
+function own_run(): number {
+	return is_nested_run() ? 0 : SOLO_RUNS
+}
+
+// The share this run may take, read from the machine. Separate from `resolve_unit_workers` so that
+// one stays a pure function of two numbers and every test of it can pass them.
+//
+// **`live_lanes` defaults to this lane alone rather than to a reading** (joshuafolkken/kit#6682), so a
+// caller that does not pass the lanes keeps dividing by the runs only. The share `test-unit-guard.ts`
+// opens and the claim `gate-plan.ts` declares both pass `live_lane_count()`, so the ledger holds what
+// the run uses.
 function current_share(
 	available_cores: number = availableParallelism(),
 	live_runs: number = live_run_count(),
 	free: FreeCapacity = UNREAD_CAPACITY,
+	live_lanes: number = SOLO_RUNS,
 ): number | undefined {
-	const own_run = is_nested_run() ? 0 : SOLO_RUNS
-	const share = resolve_unit_workers(available_cores, live_runs + own_run)
+	const share = resolve_unit_workers(
+		available_cores,
+		sharing_runs(live_runs + own_run(), live_lanes),
+	)
 
 	return cap_to_capacity(share, free, available_cores)
 }
@@ -164,6 +178,7 @@ async function with_run_marker<T>(run: () => Promise<T>): Promise<T> {
 
 const unit_worker_share = {
 	...unit_run_marker,
+	...unit_lane_count,
 	MAIN_PROCESS_CORES,
 	cap_to_capacity,
 	cap_to_claim,

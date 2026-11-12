@@ -1,13 +1,18 @@
 import path from 'node:path'
+import { project_checks } from '#scripts/gate/project-checks'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
+import { ESLINT_CACHE_FLAGS } from '#scripts/josh/josh-command-types'
+import { fake_result } from '#tools/test/execa-result'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ESLINT_HEAP_MIB } from './eslint-heap'
 import { lint_parallel } from './lint-parallel'
 
 // joshuafolkken/kit#4085: `josh lint --changed` is the gate's lint. Narrowed, it must still hand the
 // changed files to both linters and fail on what they report; it must never narrow in CI.
 
 vi.mock('execa', () => ({ execa: vi.fn() }))
+vi.mock('#scripts/build/local-bin', async () => await import('#tools/test/local-bin-mock'))
 vi.mock('#scripts/git/git-command', () => ({ git_command: { repository_root: vi.fn() } }))
 vi.mock('#scripts/git/changed-paths', () => ({ changed_paths: { read_changed_paths: vi.fn() } }))
 vi.mock('#scripts/lane/lane-cache-run', () => ({
@@ -17,14 +22,14 @@ vi.mock('#scripts/lane/lane-cache-run', () => ({
 }))
 vi.mock('./eslint-cache-dependencies', () => ({
 	eslint_cache_dependencies: {
-		guard: vi.fn(async (_cache_file: string, work: () => Promise<unknown>) => await work()),
+		guard_counted: vi.fn(async (_cache_file: string, work: () => Promise<unknown>) => ({
+			result: await work(),
+		})),
 	},
 }))
 
 const execa_module = await import('execa')
 const mocked_execa = vi.mocked(execa_module.execa)
-
-type ExecaResult = Awaited<ReturnType<typeof execa_module.execa>>
 
 const ROOT = process.cwd()
 const CHANGED = path.join('scripts', 'lint', 'lint-parallel.ts')
@@ -33,14 +38,10 @@ const WHOLE_TREE = '.'
 const FAILED = 1
 const CHANGED_ARGUMENTS = ['--changed']
 const PRETTIER_PASS = 'All matched files use Prettier code style!'
-const TIMING_LINE = /^lint timing — prettier \d+\.\d s · eslint \d+\.\d s\n$/u
-
-// The lint check reads only `all` and `exitCode` of execa's large result interface.
-function fake_result(exit_code: number, all = ''): ExecaResult {
-	const result = { all, exitCode: exit_code }
-
-	return result as unknown as ExecaResult
-}
+const TIMING_LINE =
+	/^lint timing — prettier \d+\.\d s · eslint \d+\.\d s · cache (?:present|absent)/u
+const ESLINT_HEAP = `--max-old-space-size=${String(ESLINT_HEAP_MIB)}`
+const COLD_OPTIONS = `${ESLINT_HEAP} --import=${new URL('eslint-memory.js', import.meta.url).href}`
 
 function mock_exit_codes(prettier_code: number, eslint_code: number): void {
 	mocked_execa
@@ -53,7 +54,6 @@ function linter_arguments(): ReadonlyArray<ReadonlyArray<string>> {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
 	vi.stubEnv('CI', '')
 	vi.mocked(git_command.repository_root).mockResolvedValue(ROOT)
@@ -115,6 +115,56 @@ describe('lint_parallel.run_lint_command --changed', () => {
 	})
 })
 
+// joshuafolkken/kit#6997: CI's sharded gate lint reaches eslint with the shard's targets, and its
+// scope line names the shard.
+describe('lint_parallel.run_lint_command --changed --shard in CI', () => {
+	it('lints shard 1 directories and the whole tree’s formatting', async () => {
+		vi.stubEnv('CI', 'true')
+		mock_exit_codes(0, 0)
+
+		await lint_parallel.run_lint_command([...CHANGED_ARGUMENTS, '--shard=1'])
+
+		expect(linter_arguments()[1]).toContain('scripts/run')
+		expect(linter_arguments()[1]).not.toContain(WHOLE_TREE)
+		expect(process.stdout.write).toHaveBeenCalledWith(expect.stringContaining(' · shard 1 of 2\n'))
+	})
+
+	it('lints shard 2 with eslint alone, ignoring shard 1 directories', async () => {
+		vi.stubEnv('CI', 'true')
+		mocked_execa.mockResolvedValueOnce(fake_result(0))
+
+		await expect(lint_parallel.run_lint_command([...CHANGED_ARGUMENTS, '--shard=2'])).resolves.toBe(
+			0,
+		)
+
+		expect(mocked_execa).toHaveBeenCalledOnce()
+		expect(linter_arguments()[0]).toEqual(expect.arrayContaining([WHOLE_TREE, 'scripts/run/']))
+	})
+})
+
+describe('CI whole-tree resource settings', () => {
+	it('preserves CI whole-tree violations and gives eslint its heap (ac-2027cb4a)', async () => {
+		vi.stubEnv('CI', 'true')
+		vi.stubEnv('NODE_OPTIONS', '')
+		mock_exit_codes(0, FAILED)
+
+		await expect(lint_parallel.run_lint_command(CHANGED_ARGUMENTS)).resolves.toBe(FAILED)
+		expect(mocked_execa.mock.calls.at(-1)?.[1]).toEqual([
+			'exec',
+			'eslint',
+			WHOLE_TREE,
+			...ESLINT_CACHE_FLAGS,
+		])
+		expect(mocked_execa).toHaveBeenLastCalledWith(
+			expect.any(String),
+			expect.any(Array),
+			expect.objectContaining<Record<string, unknown>>({
+				env: expect.objectContaining({ NODE_OPTIONS: COLD_OPTIONS }),
+			}),
+		)
+	})
+})
+
 // joshuafolkken/kit#5116: the gate times `lint` as one step, so only this line says which of the two
 // side-by-side tools is the long pole.
 describe('lint_parallel.run_lint_command timing', () => {
@@ -158,5 +208,21 @@ describe('lint_parallel.run_lint_command timing', () => {
 		await lint_parallel.run_lint_command([])
 
 		expect(process.stdout.write).not.toHaveBeenCalledWith(expect.stringMatching(TIMING_LINE))
+	})
+})
+
+// joshuafolkken/kit#7204: the gate's whole-tree lint checks what `josh.format` leaves to Prettier.
+describe('lint_parallel.run_lint_parallel_checks prettier targets', () => {
+	it('checks the targets the project formats rather than the whole tree', async () => {
+		const targets = vi
+			.spyOn(project_checks, 'prettier_targets')
+			.mockReturnValue([project_checks.WEB_FILES])
+
+		mock_exit_codes(0, 0)
+		await lint_parallel.run_lint_parallel_checks()
+		targets.mockRestore()
+
+		expect(linter_arguments()[0]).toContain(project_checks.WEB_FILES)
+		expect(linter_arguments()[0]).not.toContain(WHOLE_TREE)
 	})
 })

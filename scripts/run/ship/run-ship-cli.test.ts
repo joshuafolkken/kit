@@ -103,7 +103,7 @@ beforeEach(() => {
 	repository_mock.mockReset().mockResolvedValue(process.cwd())
 	josh_run_mock.mockReset().mockResolvedValue({ code: OK, out: '' })
 	review_mock.mockReset().mockResolvedValue({ code: OK, out: 'review clean' })
-	round_two_mock.mockReset().mockResolvedValue({ code: OK, out: 'round 2 not due' })
+	round_two_mock.mockReset().mockResolvedValue({ code: OK, out: 'not due', is_skipped: true })
 	preflight_mock.mockReset().mockResolvedValue({ code: OK, out: 'ready' })
 	scoped_mock.mockReset().mockResolvedValue({ code: OK, out: '' })
 	info_lines.length = 0
@@ -359,20 +359,20 @@ function order(): ReadonlyArray<string> {
 
 // joshuafolkken/kit#2489: round 1 fixed its local Mediums in place, so the supervisor carries the ship
 // through the gate, the commit, a round-2 pass and the followup without handing it back.
-describe('run_ship_cli.run — --review carries round 2 between the commit and the followup', () => {
-	it('runs review → gate → commit → round 2 → followup → report without stopping', async () => {
+describe('run_ship_cli.run — --review joins round 2 before the PR opens', () => {
+	it('runs round 2 beside the gate before commit, followup and report', async () => {
 		const events = order()
 
 		expect(await run_ship_cli.run(REVIEWED)).toBe(OK)
-		expect(events).toStrictEqual(['review', 'gate', 'git', 'round-2', 'followup', 'run:tail'])
+		expect(events).toStrictEqual(['review', 'round-2', 'gate', 'git', 'followup', 'run:tail'])
 		expect(round_two_mock).toHaveBeenCalledWith(NUMBER)
 	})
 
-	it('stops at a blocking round 2, never reaching the followup', async () => {
+	it('stops at a blocking round 2, never opening the PR', async () => {
 		round_two_mock.mockResolvedValue({ code: FAILED, out: 'round 2 is final' })
 
 		expect(await run_ship_cli.run(REVIEWED)).toBe(FAILED)
-		expect(argv_calls()).toStrictEqual([GATE, COMMIT])
+		expect(argv_calls()).toStrictEqual([GATE])
 		expect(info_lines[0]).toContain('stopped at: === round-2 review ===')
 	})
 })

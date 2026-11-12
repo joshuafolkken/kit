@@ -15,10 +15,8 @@ function read_published_files(): Array<string> {
 	return manifest_schema.parse(manifest).files
 }
 
-// josh init / josh sync resolve consumer workflow pins by reading .github/workflows out of the
-// INSTALLED package. That directory used to matter only to kit's own CI, so nothing stopped it
-// from being dropped from the published `files` list — which would break pin resolution for every
-// consumer while kit's own tests stayed green. These two assertions are that missing guard.
+// Init and sync resolve consumer workflow pins from .github/workflows in the installed package.
+// The published files list must include that directory even when source-checkout tests can read it.
 describe('workflow pin resolution packaging', () => {
 	it('publishes .github so the canonical pins ship with the package', () => {
 		expect(read_published_files()).toContain(GITHUB_DIRECTORY)

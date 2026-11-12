@@ -15,11 +15,17 @@ import { lane_seed_policy } from './lane-seed'
 // says a fifth will not start. What actually runs is bounded by what is runnable, by the port
 // seats `lane-seed.ts` can allocate, and by the machine.
 
-// Four rather than the nine seats `lane_seed_policy` can allocate: the seats are the hard structural
-// bound, this is the one a person tunes, and leaving headroom between them means raising the limit
-// never lands on "the ports ran out" as its first symptom. joshuafolkken/kit#3788 lowered it from
-// six: a week of `lane:stats` showed 1.5 effective lanes, while the hours at five or six lanes held
-// the swap peak, the slowest gates and most of the gate and commit failures.
+// Below the nine seats `lane_seed_policy` can allocate: the seats are the hard structural bound,
+// this is the one a person tunes, and leaving headroom between them means raising the limit never
+// lands on "the ports ran out" as its first symptom. joshuafolkken/kit#3788 lowered it from six: a
+// week of `lane:stats` showed 1.5 effective lanes, while the hours at five or six lanes held the
+// swap peak, the slowest gates and most of the gate and commit failures. joshuafolkken/kit#5409
+// raised it to eight with launch memory admission in the same core budget ledger as the gates:
+// memory bounds starts while gate reservations bound overlapping heavy work.
+// joshuafolkken/kit#7234 lowers it to four: the default fits a consumer's development machine, not
+// kit's own. A consumer reported eight cold builds of about six minutes each running at once on an
+// eight-core M1 Pro (joshuafolkken/kit#7212). A larger machine, kit's own included, raises it with
+// `JOSH_LANE_LIMIT`.
 const DEFAULT_LANE_LIMIT = 4
 const LANE_LIMIT_KEY = 'JOSH_LANE_LIMIT'
 const NO_LANES = 0
@@ -34,18 +40,24 @@ function read_limit(raw: string | undefined, name: string): LimitChoice {
 	return cli_flags.read_positive_setting(raw, name, DEFAULT_LANE_LIMIT)
 }
 
-// **A live run's `lane:limit` override outranks the environment**: a running
-// parent keeps the environment it started with, so the override is the only way its limit moves. This
-// stays the one place the limit is read; the override reader is injected so a test reads none.
+// `JOSH_LANE_LIMIT` as this process's environment holds it.
+function environment_limit(environment: LaneEnvironment = process.env): LimitChoice {
+	return read_limit(environment[LANE_LIMIT_KEY], LANE_LIMIT_KEY)
+}
+
+// **A live run's limit outranks the environment** — its `lane:limit` override, else the limit it
+// started with: a running parent keeps the environment it started with, so a shell whose `.env` moved
+// since must not read another limit than the parent does. This stays the one place the limit is read;
+// the carry reader is injected so a test reads none.
 async function lane_limit(
 	environment: LaneEnvironment = process.env,
-	read_override: () => Promise<number | undefined> = lane_limit_override.read_override,
+	read_carried: () => Promise<number | undefined> = lane_limit_override.read_carried,
 ): Promise<LimitChoice> {
-	const override = await read_override()
+	const carried = await read_carried()
 
-	if (override !== undefined) return { kind: 'limit', limit: override }
+	if (carried !== undefined) return { kind: 'limit', limit: carried }
 
-	return read_limit(environment[LANE_LIMIT_KEY], LANE_LIMIT_KEY)
+	return environment_limit(environment)
 }
 
 // **A limit above the seat count is capped at the seats**. `lane:open` refuses
@@ -59,10 +71,8 @@ function seated_limit(limit: number): number {
 // was lowered, or a stale label outlived its run — has no free lane, and a negative count read as
 // "how many to offer" would be a slice nobody meant.
 //
-// **A lane that holds no place under the limit still holds its port seat** (joshuafolkken/kit#3967):
-// `seated` counts every open lane, so the free count never offers more launches than seats are left.
-// The places left under the limit, port seats aside: what resuming a lane that keeps its seat is
-// weighed against (joshuafolkken/kit#4107).
+// `seated` counts current port ownership independently of execution places. A saved tree alone
+// holds no seat; a suspended process can still hold one while taking no execution place.
 function limit_room(limit: number, occupied: number): number {
 	return Math.max(NO_LANES, seated_limit(limit) - occupied)
 }
@@ -75,6 +85,7 @@ function free_lanes(limit: number, occupied: number, seated = occupied): number 
 
 const lane_capacity = {
 	LANE_LIMIT_KEY,
+	environment_limit,
 	free_lanes,
 	lane_limit,
 	limit_room,

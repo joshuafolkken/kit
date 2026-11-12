@@ -1,9 +1,13 @@
-import { mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { hook_context_fixture } from '#tools/hooks/hook-context-fixture'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { run_headless } from './run-headless'
 import { run_poll_hook } from './run-poll-hook'
+
+const make_directory = temporary_directory('suite')
 
 const { josh_call_line, prompt_line, result_line, error_result_line } = time_transcript_fixture
 
@@ -11,7 +15,7 @@ const BRANCH = '3925-lane'
 const BOARD = 'pnpm josh run:board --chat'
 const AWAIT = 'pnpm josh lane:await 1'
 const CARRY_JSON = 'pnpm josh run:carry --json'
-const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'run-poll-hook-'))
+const TEMPORARY = make_directory('run-poll-hook-')
 const sequence = { value: 0 }
 
 function write_transcript(lines: ReadonlyArray<string>): string {
@@ -53,6 +57,7 @@ async function not_parent(): Promise<boolean> {
 
 afterEach(() => {
 	vi.unstubAllEnvs()
+	vi.restoreAllMocks()
 })
 
 describe('run_poll_hook.poll_reason — a repeated state read', () => {
@@ -86,6 +91,11 @@ describe('run_poll_hook.poll_reason — a repeated state read', () => {
 	it('names the blocking waits in its reason', () => {
 		expect(run_poll_hook.POLL_REASON).toContain('backlog:drive')
 		expect(run_poll_hook.POLL_REASON).toContain('lane:await')
+	})
+
+	// joshuafolkken/kit#5504: the consultation guard refuses `$PPID`, so the wait it names omits `--owner`.
+	it('names a wait the consultation guard lets through', () => {
+		expect(run_poll_hook.POLL_REASON).not.toContain('$PPID')
 	})
 })
 
@@ -148,6 +158,17 @@ describe('run_poll_hook.safe_poll_reason', () => {
 		})
 
 		expect(await run_poll_hook.safe_poll_reason(raw)).toBeUndefined()
+	})
+
+	// joshuafolkken/kit#6683: a daemon answers calls from many launchers, so the parent is judged under
+	// the call's own environment and process ancestry, never the answering process's.
+	it("judges the parent under the call's environment and ancestry", async () => {
+		const is_backlog_parent = vi.spyOn(run_headless, 'is_backlog_parent').mockResolvedValue(true)
+		const context = hook_context_fixture.of(TEMPORARY, { CALL_ONLY: '1' })
+		const raw = payload(after(BOARD), { command: BOARD })
+
+		expect(await run_poll_hook.safe_poll_reason(raw, context)).toBe(run_poll_hook.POLL_REASON)
+		expect(is_backlog_parent).toHaveBeenCalledWith(context.env, context.ancestry)
 	})
 })
 

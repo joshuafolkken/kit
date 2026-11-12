@@ -8,8 +8,8 @@ const EMPTY_LENGTH = 0
 const MAX_VALUE_LENGTH = 4096
 // A prompt is prose that grows with its instructions, so it gets a cap of its own rather than a
 // value's: an overrun investigation's prompt grew past 4096 and its launch was refused
-// (joshuafolkken/kit#4930). 64 Ki UTF-16 units of mostly ASCII text stay under Linux's 128 KiB
-// `MAX_ARG_STRLEN` per element; a launch the system still refuses fails as a noted launch failure.
+// (joshuafolkken/kit#4930). The cap keeps mostly ASCII text under Linux's per-element
+// `MAX_ARG_STRLEN`; a launch the system still refuses fails as a noted launch failure.
 const MAX_PROMPT_LENGTH = 65_536
 const LINE_FEED = '\n'
 const SPACE = ' '

@@ -1,6 +1,8 @@
+import path from 'node:path'
 import { release_scope_cli } from '#scripts/release/release-scope-cli'
 import { run_event_scope, type EventScope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it } from 'vitest'
 import { run_report } from './run-report'
 
@@ -18,6 +20,8 @@ const KIND = run_event_stream.EVENT_KIND
 const AT = '2026-09-21T00:00:00.000Z'
 const PARK_TEXT = '#8 parked (needs-decision)'
 const NOT_A_TIME = 'not-a-time'
+
+const make_directory = temporary_directory()
 
 function since(started_at: string): EventScope {
 	return { kind: 'since', started_at }
@@ -59,6 +63,32 @@ describe('run_report.build_report — enumeration', () => {
 
 		for (const one of EVENTS) expect(report).toContain(run_event_stream.format_event(one))
 		expect(report).toContain(PARK_TEXT)
+	})
+
+	it('leaves out the per-offer rate-limit lines, so a long run keeps its merges readable', () => {
+		const rate_text = '{"used_delta":3,"remaining":4997,"reset":"2026-09-21T01:00:00.000Z"}'
+		const events = [...EVENTS, event(4, KIND.RATE_LIMIT, rate_text)]
+
+		const report = run_report.build_report({ events, release: SKIP, scope: SCOPE })
+
+		expect(report).not.toContain(rate_text)
+		expect(report).toContain('#7 merged')
+	})
+
+	// joshuafolkken/kit#6707: the per-process gh-usage lines go to their own log, never the stream.
+	it('never shows a gh-usage line, which the stream refuses as no event kind', () => {
+		const target = path.join(make_directory('josh-run-report-'), 'events.jsonl')
+		const usage_text = '{"command":"run:step","issue":7,"calls":4,"not_modified":1}'
+
+		run_event_stream.append(target, KIND.MERGE, '#7 merged', AT)
+
+		expect(run_event_stream.append(target, 'gh-usage', usage_text, AT).appended).toBe(false)
+
+		const events = run_event_stream.read_events(target)
+		const report = run_report.build_report({ events, release: SKIP, scope: SCOPE })
+
+		expect(report).not.toContain(usage_text)
+		expect(report).toContain('#7 merged')
 	})
 })
 
@@ -175,8 +205,8 @@ describe('run_report.build_report — an undetermined scope', () => {
 // `run-event-scope.test.ts`, its single-source home (joshuafolkken/kit#2395); this file pins how the report
 // renders a scope, not how the scope is derived.
 
-// The harm the scope removes: the observed body was 138 events and 11,689 bytes, and Telegram rejected it for
-// length. The fixture is that stream — 138 events of which 40 are this invocation's — so the byte count
+// The scope prevents Telegram from rejecting a report that includes other invocations' events.
+// The fixture mixes this invocation with others, so the byte count
 // measures the scope rather than `format_event`'s line length: unscoped, the same input is over the limit.
 const TELEGRAM_BODY_LIMIT_BYTES = 4096
 const OBSERVED_STREAM_EVENTS = 138

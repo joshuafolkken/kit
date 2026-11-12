@@ -1,0 +1,2 @@
+- rf:bug-risks | low | scripts/issue/issue-human-stops.ts:143 | 2026-11-10 | #7080
+- rf:project-conventions | low | CLAUDE.md:19 | 2026-11-10 | #7080

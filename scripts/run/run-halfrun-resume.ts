@@ -1,3 +1,4 @@
+import { lane_state } from '#scripts/lane/lane-state'
 import {
 	run_hold,
 	type HoldRead,
@@ -100,7 +101,14 @@ async function adopt(issue: string): Promise<boolean> {
 
 	if (target === undefined) return false
 
-	return adopt_at(target, issue, await run_hold.is_tree_dirty())
+	const is_adopted = adopt_at(target, issue, await run_hold.is_tree_dirty())
+	const lane = is_adopted ? await lane_state.read_state(issue) : undefined
+
+	if (lane?.state === 'human-review') {
+		await lane_state.record_change({ issue, state: 'running', command: 'run:entry' })
+	}
+
+	return is_adopted
 }
 
 const run_halfrun_resume = {

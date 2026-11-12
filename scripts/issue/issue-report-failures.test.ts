@@ -56,6 +56,20 @@ describe('issue_report_failures.report_failures', () => {
 	})
 })
 
+// joshuafolkken/kit#6614: a classified cause replaces the list of every cause it could have been.
+describe('issue_report_failures.report_failures — a classified cause', () => {
+	it('names the classified cause of an unreadable number in place of the guess', () => {
+		const hint = 'GitHub rate limit exhausted, resets at then'
+		const reports = [{ issue_number: '7', result: { kind: 'unreadable' as const, hint } }]
+
+		issue_report_failures.report_failures(reports, TERMS)
+
+		expect(error_spy).toHaveBeenCalledWith(
+			`✖ could not read issue ${session_cite.issue('7')} — ${hint}. This is not "${TERMS.misreading}"`,
+		)
+	})
+})
+
 describe('issue_report_failures.print_blocks', () => {
 	it('joins the blocks with the separator in one print', () => {
 		issue_report_failures.print_blocks(['a', 'b'], '\n---\n', 'label')

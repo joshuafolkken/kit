@@ -1,8 +1,7 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
-import { describe, expect, it, onTestFinished } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { review_prior_findings } from './review-prior-findings'
 import { review_stop_log } from './review-stop-log'
 
@@ -33,12 +32,10 @@ const CURRENT = {
 const EPERM_ENTRY =
 	'tick.ts:187 — is_live_pid reads EPERM as dead. (bug-risks:medium, stopped in the review stage)'
 
-function fresh_log(): string {
-	const directory = mkdtempSync(path.join(tmpdir(), 'review-prior-findings-'))
+const make_directory = temporary_directory()
 
-	onTestFinished(() => {
-		rmSync(directory, { recursive: true, force: true })
-	})
+function fresh_log(): string {
+	const directory = make_directory('review-prior-findings-')
 
 	return path.join(directory, 'review-stops.jsonl')
 }

@@ -6,6 +6,7 @@ import {
 	type BundleAction,
 	type BundleDecision,
 } from './epic-bundle'
+import { epic_bundle_recommend } from './epic-bundle-recommend'
 import { epic_reconcile } from './epic-reconcile'
 import { epic_run } from './epic-run'
 
@@ -16,10 +17,12 @@ import { epic_run } from './epic-run'
 // **An order the candidates already record is carried into the epic body** by `epic --reconcile`,
 // which declares exactly the recorded relations — an order nobody recorded is never invented.
 //
-// `ask` stays the caller's: which epic to choose is a judgement, recorded with its reasoning.
+// `ask` is placed in the epic the decision recommends, with the reasoning written through `epic --add`'s
+// decision record on both the epic and the children. A cyclic spread recommends none and writes nothing.
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
+const ISO_DATE_LENGTH = 10
 
 interface ApplyInput {
 	decision: BundleDecision
@@ -30,7 +33,7 @@ interface ApplyInput {
 }
 
 const UNAPPLIED_LINES: Readonly<Partial<Record<BundleAction, string>>> = {
-	ask: '↷ `--apply` wrote nothing: the related issues sit in more than one epic. Choose one and place it with `pnpm josh epic --add <E> <N> --decision-file <path>`.',
+	ask: '↷ `--apply` wrote nothing: the related epics declare a cycle, so none is recommended. Choose one and place it with `pnpm josh epic --add <E> <N> --decision-file <path>`.',
 	none: '↷ `--apply` wrote nothing: there is nothing to place.',
 }
 const WITHHELD_LINE =
@@ -73,18 +76,47 @@ function placeable(epic_number: number, input: ApplyInput): ApplyInput {
 	return { ...input, members }
 }
 
-async function add_to_epic(epic_number: number, input: ApplyInput): Promise<number> {
+async function add_to_epic(
+	epic_number: number,
+	input: ApplyInput,
+	decision: string | undefined,
+): Promise<number> {
 	const placed = placeable(epic_number, input)
-	const added = await epic_add.add_children({ epic_number, children: children_of(placed) })
+	const added = await epic_add.add_children({
+		epic_number,
+		children: children_of(placed),
+		...(decision !== undefined && { decision }),
+	})
 	if (added !== SUCCESS_EXIT_CODE) return added
 
 	return await reconcile_order(epic_number, placed)
 }
 
+// The epic a placing answer names: `add_to_epic`'s own, or the one `ask` recommends.
+function target_of(decision: BundleDecision): number | undefined {
+	if (decision.action === 'add_to_epic') return decision.epic
+
+	return decision.action === 'ask' ? decision.recommended : undefined
+}
+
+// `ask`'s placement was a choice between epics, so it carries its record; `add_to_epic`'s was not.
+function record_of(input: ApplyInput, epic_number: number): string | undefined {
+	if (input.decision.action !== 'ask') return undefined
+	const date = new Date().toISOString().slice(0, ISO_DATE_LENGTH)
+	const placement = {
+		subject: input.subject.number,
+		epic: epic_number,
+		epics: input.decision.epics,
+		members: input.members,
+	}
+
+	return epic_bundle_recommend.placement_record(placement, date)
+}
+
 // The title is the subject's, since the subject is what the bundle was asked about; the rationale is
 // the verdict's own reason, which already names the signal that grouped them.
 function title_of(subject: BacklogIssue): string {
-	const title = subject.title ?? `bundle with ${issue_cite.plain(subject.number)}`
+	const title = subject.title ?? `bundle with ${issue_cite.plain_for('github', subject.number)}`
 
 	return `Epic: ${title}`
 }
@@ -116,13 +148,12 @@ async function apply_decision(input: ApplyInput): Promise<number> {
 		return SUCCESS_EXIT_CODE
 	}
 
-	if (decision.action === 'add_to_epic' && decision.epic !== undefined) {
-		return await add_to_epic(decision.epic, input)
-	}
-
 	if (decision.action === 'create_epic') return await create_epic(input)
 
-	return report_unapplied(decision.action)
+	const epic_number = target_of(decision)
+	if (epic_number === undefined) return report_unapplied(decision.action)
+
+	return await add_to_epic(epic_number, input, record_of(input, epic_number))
 }
 
 const epic_bundle_apply = {

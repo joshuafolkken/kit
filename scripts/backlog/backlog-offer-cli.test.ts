@@ -4,6 +4,9 @@ const josh_run_mock = vi.hoisted(() => vi.fn())
 const rule_value_emit_mock = vi.hoisted(() => vi.fn())
 const emit_once_mock = vi.hoisted(() => vi.fn())
 const emit_mock = vi.hoisted(() => vi.fn())
+const flush_mock = vi.hoisted(() => vi.fn())
+
+vi.mock('./backlog-drain-flush', () => ({ backlog_drain_flush: { flush: flush_mock } }))
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 vi.mock('#scripts/rules/rule-value-cache', () => ({
@@ -21,6 +24,7 @@ const { shared_cache } = await import('#scripts/josh/shared-cache')
 const { shared_cache_fixture } = await import('#scripts/josh/shared-cache-fixture')
 const { backlog_next_shared } = await import('./backlog-next-shared')
 const { backlog_offer_cli } = await import('./backlog-offer-cli')
+const { backlog_drive_cli } = await import('./backlog-drive-cli')
 
 const OK = 0
 const FAILED = 1
@@ -33,6 +37,7 @@ const EXCLUDE_FLAG = '--exclude'
 const EXCLUDED = '1630'
 const MERGED = ['--merged', '3']
 const CANDIDATES = 'candidates'
+const FUTURE_START = '2999-01-01T00:00Z'
 
 interface JoshResult {
 	code: number
@@ -47,6 +52,7 @@ beforeEach(() => {
 	rule_value_emit_mock.mockReset()
 	emit_once_mock.mockReset()
 	emit_mock.mockReset()
+	flush_mock.mockReset()
 	info_lines.length = 0
 	vi.spyOn(console, 'info').mockImplementation((line: string) => {
 		info_lines.push(line)
@@ -79,6 +85,46 @@ async function answer_for(
 
 	return budget_args[budget_args.indexOf(ANSWER_FLAG) + 1] ?? ''
 }
+
+describe('backlog_offer_cli.run — dated waits', () => {
+	it('transports an earlier idle deadline alongside the start date', async () => {
+		const not_before_ms = Date.parse(FUTURE_START)
+		const idle_until_ms = not_before_ms - 1
+
+		josh_run_mock.mockResolvedValueOnce({
+			code: OK,
+			out: 'wait',
+			err: `Waiting on a start condition: #12\nNext start time: ${String(not_before_ms)}`,
+		})
+		josh_run_mock.mockResolvedValueOnce({
+			code: OK,
+			out: JSON.stringify({ budget: 'watch', reason: 'idle', is_finish: false, idle_until_ms }),
+		})
+
+		await backlog_offer_cli.run([...BASE, '--json'])
+
+		expect(backlog_drive_cli.to_offer(info_lines[0] ?? '')).toMatchObject({
+			not_before_ms,
+			idle_until_ms,
+		})
+	})
+
+	it('passes a dated wait through the offer JSON into the driver', async () => {
+		const not_before_ms = Date.parse(FUTURE_START)
+
+		await answer_for(
+			{
+				code: OK,
+				out: 'wait',
+				err: `Waiting on a start condition: #12\nNext start time: ${String(not_before_ms)}`,
+			},
+			'watch',
+			['--json'],
+		)
+
+		expect(backlog_drive_cli.to_offer(info_lines[0] ?? '')?.not_before_ms).toBe(not_before_ms)
+	})
+})
 
 describe('backlog_offer_cli.run — the loop table maps each backlog:next answer to a budget word', () => {
 	it('maps issue numbers to candidates', async () => {
@@ -169,23 +215,54 @@ describe('backlog_offer_cli.run — a watching poll leaves the stream alone', ()
 // stream untouched.
 const DRAIN_KIND = 'drain'
 
+describe('backlog_offer_cli.run — flush before the retrospective', () => {
+	it.each(['watch', 'stop'])('flushes a fresh drain before returning %s', async (verdict) => {
+		emit_once_mock.mockImplementation(
+			async (_kind: string, _text: string, before_append: () => Promise<void>) => {
+				await before_append()
+
+				return true
+			},
+		)
+		flush_mock.mockImplementation(async () => {
+			expect(info_lines).toHaveLength(0)
+		})
+
+		expect(await answer_for({ code: OK, out: 'none' }, verdict)).toBe('exhausted')
+		expect(flush_mock).toHaveBeenCalledExactlyOnceWith()
+		expect(info_lines.length).toBeGreaterThan(0)
+	})
+
+	it('hands the flush to the marker as the step before it is appended', async () => {
+		await answer_for({ code: OK, out: 'none' }, 'watch')
+
+		expect(emit_once_mock).toHaveBeenCalledExactlyOnceWith(
+			DRAIN_KIND,
+			expect.any(String),
+			flush_mock,
+		)
+		expect(flush_mock).not.toHaveBeenCalled()
+	})
+})
+
 describe('backlog_offer_cli.run — the drain marks the stream before the idle watch', () => {
 	it('marks the stream once when the backlog drains with nothing in flight', async () => {
 		await answer_for({ code: OK, out: 'none' }, 'watch')
 
-		expect(emit_once_mock).toHaveBeenCalledWith(DRAIN_KIND, expect.any(String))
+		expect(emit_once_mock).toHaveBeenCalledWith(DRAIN_KIND, expect.any(String), flush_mock)
 	})
 
 	it('marks a drain when idle zero stops on an empty backlog', async () => {
 		await answer_for({ code: OK, out: 'none' }, 'stop')
 
-		expect(emit_once_mock).toHaveBeenCalledWith(DRAIN_KIND, expect.any(String))
+		expect(emit_once_mock).toHaveBeenCalledWith(DRAIN_KIND, expect.any(String), flush_mock)
 	})
 
 	it('does not mark the stream on a watch that opened while children were still merging', async () => {
 		await answer_for({ code: OK, out: 'none' }, 'watch', RUNNING)
 
 		expect(emit_once_mock).not.toHaveBeenCalled()
+		expect(flush_mock).not.toHaveBeenCalled()
 	})
 
 	it('does not mark the stream on a blocked watch', async () => {
@@ -254,5 +331,12 @@ describe('backlog_offer_cli.run --json — the cause', () => {
 		await answer_for({ code: OK, out: 'wait', err: error }, 'watch', [...RUNNING, '--json'])
 
 		expect(info_lines.at(-1)).toContain('"cause":"chain","waiting":[4496,4497]')
+	})
+
+	// joshuafolkken/kit#5518: a trailing `triage` reaches the driver as the judgment it owes.
+	it('prints the judgment owed by candidates offered beside a held one', async () => {
+		await answer_for({ code: OK, out: '12\ntriage' }, 'run', [...RUNNING, '--json'])
+
+		expect(info_lines.at(-1)).toContain('"is_judgment_owed":true')
 	})
 })

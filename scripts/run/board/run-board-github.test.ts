@@ -1,19 +1,20 @@
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_github, type Gather } from './run-board-github'
 import type { BoardLanes } from './run-board-lane-state'
 import type { BoardPlan } from './run-board-layout'
 import type { LocalRead } from './run-board-read'
+import type { GithubRateLimit } from './run-board-render-quota-github'
 import { run_board_state, type Pace } from './run-board-state'
 import type { ItemStatus } from './run-board-status'
 
 const { LOCAL, START, harness, plan_titled } = run_board_fixture
-const { gather_github } = run_board_github
+const { PLAN_RETRY_MS, gather_github } = run_board_github
 const { FRESH_STATE } = run_board_state
 
 // A read that never answers.
-async function never(): Promise<BoardPlan | undefined> {
+async function never(): Promise<undefined> {
 	return await new Promise(() => undefined)
 }
 
@@ -157,5 +158,85 @@ describe('run_board_github.statuses_for with a lane an earlier run left', () => 
 
 	it('draws this run’s lane as its record says though the stream never saw it launched', () => {
 		expect(statuses_with([]).get(RESUMED)).toStrictEqual(RESUMED_STATUS)
+	})
+})
+
+// joshuafolkken/kit#6559: GitHub's core rate limit is read beside the plan, as often as the plan, and a
+// failed read clears the allowance rather than keeping a stale one on the usage row.
+const CORE: GithubRateLimit = {
+	core: { remaining: 4321, limit: 5000, reset_ms: START + 1 },
+	graphql: undefined,
+}
+
+function rate_gather(
+	read_rate_limit: () => Promise<GithubRateLimit | undefined>,
+	pace: Pace,
+	now_ms = START,
+): Gather {
+	const gather = gather_of([plan_titled('a'), plan_titled('a')], pace)
+
+	return { ...gather, ports: { ...gather.ports, read_rate_limit }, now_ms }
+}
+
+describe('run_board_github.gather_github rate limit', () => {
+	it('waits for the rate limit and folds it in at the settled pace', async () => {
+		const state = await gather_github(
+			FRESH_STATE,
+			rate_gather(async () => CORE, 'settled'),
+		)
+
+		expect(state.rate_limit).toStrictEqual(CORE)
+		expect(state.rate_limit_fetch).toBeUndefined()
+	})
+
+	it('waits at the settled pace for a rate limit that lands after the plan', async () => {
+		async function later(): Promise<GithubRateLimit> {
+			return await new Promise((resolve) => {
+				setTimeout(() => {
+					resolve(CORE)
+				}, 0)
+			})
+		}
+
+		const state = await gather_github(FRESH_STATE, rate_gather(later, 'settled'))
+
+		expect(state.rate_limit).toStrictEqual(CORE)
+	})
+
+	it('launches the read and returns without it in the background', async () => {
+		const state = await gather_github(FRESH_STATE, rate_gather(never, 'background'))
+
+		expect(state.rate_limit).toBeUndefined()
+		expect(state.rate_limit_fetch?.answer()).toBeUndefined()
+		expect(state.rate_limit_attempted_ms).toBe(START)
+	})
+})
+
+describe('run_board_github.gather_github rate limit throttle', () => {
+	it('does not launch a second read while one is in flight', async () => {
+		const read = vi.fn(never)
+		const first = await gather_github(FRESH_STATE, rate_gather(read, 'background'))
+		const second = await gather_github(
+			first,
+			rate_gather(read, 'background', START + PLAN_RETRY_MS),
+		)
+
+		expect(second.rate_limit_fetch).toBe(first.rate_limit_fetch)
+		expect(read).toHaveBeenCalledTimes(1)
+	})
+
+	it('reads again only after the plan interval, clearing the allowance when that read fails', async () => {
+		const read = vi
+			.fn<() => Promise<GithubRateLimit | undefined>>()
+			.mockResolvedValueOnce(CORE)
+			.mockRejectedValueOnce(new Error('offline'))
+		const first = await gather_github(FRESH_STATE, rate_gather(read, 'settled'))
+		const early = START + PLAN_RETRY_MS - 1
+		const second = await gather_github(first, rate_gather(read, 'settled', early))
+		const third = await gather_github(second, rate_gather(read, 'settled', early + 1))
+
+		expect(second.rate_limit).toStrictEqual(CORE)
+		expect(third.rate_limit).toBeUndefined()
+		expect(read).toHaveBeenCalledTimes(2)
 	})
 })

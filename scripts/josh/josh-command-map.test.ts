@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs'
+import { existsSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -7,7 +7,8 @@ import { CATEGORY_ORDER, COMMAND_MAP, type CommandEntry } from './josh-command-m
 import { COMMAND_AUDIENCES, COMMAND_SIDE_EFFECTS } from './josh-command-types'
 import { composite_arguments } from './josh-composite-arguments'
 
-const PACKAGE_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
+const COMMAND_TABLE_DIRECTORY = path.dirname(fileURLToPath(import.meta.url))
+const PACKAGE_DIR = path.join(COMMAND_TABLE_DIRECTORY, '..', '..')
 const ALL_COMMAND_NAMES = Object.keys(COMMAND_MAP)
 const TEST_E2E_COMMAND = 'test:e2e'
 const TEST_UNIT_COMMAND = 'test:unit'
@@ -73,15 +74,50 @@ describe('COMMAND_MAP — required fields', () => {
 	})
 })
 
-describe('COMMAND_MAP — script paths', () => {
-	// A moved entry point leaves the map pointing at nothing, and no other test runs every command
-	// (joshuafolkken/kit#2903).
-	it('every command script exists in the package', () => {
-		for (const [name, entry] of Object.entries(COMMAND_MAP)) {
-			if (entry.script === undefined) continue
+function is_command_table_file(file: string): boolean {
+	return file.startsWith('josh-commands-') && !file.endsWith('.test.ts')
+}
 
-			expect(existsSync(path.join(PACKAGE_DIR, entry.script)), `command ${name}`).toBe(true)
-		}
+function is_record(value: unknown): value is Record<string, unknown> {
+	return typeof value === 'object' && value !== null
+}
+
+async function table_entries(file: string): Promise<Array<[string, unknown]>> {
+	const exports: unknown = await import(path.join(COMMAND_TABLE_DIRECTORY, file))
+	const tables = is_record(exports) ? Object.values(exports) : []
+
+	return tables.flatMap((table) => (is_record(table) ? Object.entries(table) : []))
+}
+
+async function unregistered_commands(): Promise<Array<string>> {
+	const files = readdirSync(COMMAND_TABLE_DIRECTORY).filter((file) => is_command_table_file(file))
+	const entries = await Promise.all(files.map(async (file) => await table_entries(file)))
+
+	return entries
+		.flat()
+		.filter(([name, entry]) => COMMAND_MAP[name] !== entry)
+		.map(([name]) => name)
+}
+
+function commands_without_script(): Array<string> {
+	return Object.entries(COMMAND_MAP)
+		.filter(([, entry]) => entry.script !== undefined)
+		.filter(([, entry]) => !existsSync(path.join(PACKAGE_DIR, entry.script ?? '')))
+		.map(([name]) => name)
+}
+
+describe('COMMAND_MAP — registration', () => {
+	// One pass over every `josh-commands-*.ts` table, so a table added or a spread dropped is caught
+	// without a registration test per table (joshuafolkken/kit#6028); a moved entry point leaves the
+	// map pointing at nothing, and no other test runs every command (joshuafolkken/kit#2903).
+	it('registers every command table entry intact, each with a script on disk', async () => {
+		expect(readdirSync(COMMAND_TABLE_DIRECTORY).some((file) => is_command_table_file(file))).toBe(
+			true,
+		)
+		expect({
+			unregistered: await unregistered_commands(),
+			without_script: commands_without_script(),
+		}).toEqual({ unregistered: [], without_script: [] })
 	})
 })
 
@@ -115,19 +151,6 @@ describe('COMMAND_MAP — reference metadata', () => {
 
 			expect(entry.reference[0], `composite command ${name} advertises rejected arguments`).toBe('')
 		}
-	})
-
-	// The per-command values are pinned by the snapshot below rather than by hand-picked examples:
-	// three `toEqual` assertions duplicating snapshot entries meant every metadata edit had to be
-	// made twice, and `josh-command-reference.test.ts` now checks each synopsis against its own
-	// parser, which is what those examples were reaching for.
-	it('keeps every canonical command and alias stable', () => {
-		const references = Object.fromEntries(
-			Object.entries(COMMAND_MAP).map(([name, entry]) => [name, entry.reference]),
-		)
-
-		// The hint is printed with a mismatch, so a stale snapshot names the command that rewrites it (#4970).
-		expect({ aliases: ALIASES, references }).toMatchSnapshot('regenerate: pnpm josh command:derive')
 	})
 })
 

@@ -1,5 +1,3 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_carry_change } from '#scripts/run/carry/run-carry-change'
@@ -7,7 +5,8 @@ import { run_headless } from '#scripts/run/run-headless'
 import { run_step } from '#scripts/run/run-step'
 import { run_wake, type WakeDecision } from '#scripts/run/wake/run-wake'
 import { run_wake_driver } from '#scripts/run/wake/run-wake-driver'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { backlog_budget, type BudgetInput } from './backlog-budget'
 import { backlog_budget_cli } from './backlog-budget-cli'
 import { backlog_drive } from './backlog-drive'
@@ -31,14 +30,11 @@ const NO_RETRIES = 0
 // budget flags follow.
 const DRIVER_FLAG_OFFSET = 5
 const scratch = { directory: '', target: '' }
+const make_directory = temporary_directory()
 
 beforeEach(() => {
-	scratch.directory = mkdtempSync(path.join(tmpdir(), 'josh-empty-start-'))
+	scratch.directory = make_directory('josh-empty-start-')
 	scratch.target = path.join(scratch.directory, 'carry.json')
-})
-
-afterEach(() => {
-	rmSync(scratch.directory, { recursive: true, force: true })
 })
 
 function begin(invocation: string): RunCarry {

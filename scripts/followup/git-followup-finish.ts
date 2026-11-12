@@ -1,5 +1,8 @@
+import { git_command } from '#scripts/git/git-command'
 import { git_next_issues } from '#scripts/issue/git-next-issues'
 import { issue_watch } from '#scripts/issue/issue-watch'
+import { josh_command } from '#scripts/josh/josh-run'
+import { lane_registry } from '#scripts/lane/lane-registry'
 import { review_attest } from '#scripts/review/review-attest'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { run_hold } from '#scripts/run/hold/run-hold'
@@ -8,6 +11,8 @@ import { parse_completed_issue_number } from './followup-issue-number'
 import { git_followup_cleanup, type CleanupStep } from './git-followup-cleanup'
 import { git_followup_pending } from './git-followup-pending'
 import { git_followup_stages } from './git-followup-stages'
+
+const MAIN_SYNC = 'main:sync'
 
 // **The count of unreleased merges, not the project version**. The local `package.json` version
 // reads as "the version this run just shipped", but children do not bump, so that number names the
@@ -224,11 +229,56 @@ function build_record_steps(should_merge: boolean): ReadonlyArray<CleanupStep> {
 	]
 }
 
+// **Only a main checkout already on the default branch is synced.** `main:sync` checks the default
+// branch out, so on any other branch it would move another session's work out from under it.
+async function is_on_default_branch(root: string): Promise<boolean> {
+	const [current, default_branch] = await Promise.all([
+		git_command.branch_at(root),
+		git_command.get_default_branch(),
+	])
+
+	return current === default_branch
+}
+
+// The default branch the merge advanced is pulled into the main checkout here, so no caller runs
+// `main:sync` as a step of its own after `followup` (#5941). **Run at the main repository root**:
+// `main:sync` refuses inside a linked work tree, and a lane is where `followup` usually runs.
+async function sync_main_checkout(should_merge: boolean): Promise<void> {
+	if (!should_merge) return
+
+	const root = await lane_registry.main_repository_root()
+
+	if (!(await is_on_default_branch(root))) {
+		console.info(`${MAIN_SYNC} skipped: ${root} is not on the default branch`)
+
+		return
+	}
+
+	josh_command.require_success(await josh_command.josh_run_at([MAIN_SYNC], root), MAIN_SYNC)
+}
+
+// Last, after the hold release: a sync that fails or takes long must not keep the working tree held.
+function build_sync_steps(should_merge: boolean): ReadonlyArray<CleanupStep> {
+	return [
+		{
+			label: 'The main checkout sync',
+			recovery: 'pnpm josh main:sync (in the primary checkout)',
+			run: async () => {
+				await sync_main_checkout(should_merge)
+			},
+		},
+	]
+}
+
 function build_finish_steps(
 	issue_number: string | undefined,
 	should_merge: boolean,
 ): ReadonlyArray<CleanupStep> {
-	return [...build_report_steps(issue_number, should_merge), ...build_record_steps(should_merge)]
+	return [
+		...build_report_steps(issue_number, should_merge),
+		...build_record_steps(should_merge),
+		...build_sync_steps(should_merge),
+	]
 }
 
 // The tail every invocation shares. Answers whether all of it completed, so a caller could report a
@@ -254,6 +304,7 @@ const git_followup_finish = {
 	clear_review_records,
 	release_worktree_hold,
 	end_progress_watcher,
+	sync_main_checkout,
 }
 
 export { git_followup_finish }

@@ -80,7 +80,6 @@ function numbers_of(children: ReadonlyArray<EpicChild>): Array<number> {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	// Every holder these cases list is running; a stale one is `epic-solo-stale.test.ts`'s case.
 	vi.spyOn(lane_await, 'is_process_running_default').mockReturnValue(true)
 	vi.spyOn(epic_label_age, 'read_ages').mockResolvedValue(new Map())

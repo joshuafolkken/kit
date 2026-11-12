@@ -15,7 +15,7 @@ import { format_dependency_links } from './epic-reference'
 const ACTION_LINES: Readonly<Record<string, string>> = {
 	add_to_epic: 'Add it to the epic that already tracks a related issue (Tier A — do it).',
 	create_epic: 'Create an epic for these (Tier A — do it).',
-	ask: 'Related issues sit in more than one epic: choose the one you recommend, add it, and record why (Tier A — do it).',
+	ask: 'Related issues sit in more than one epic: place it in the recommended one and record why — `epic:bundle --apply` does both (Tier A — do it).',
 	none: 'Nothing to bundle.',
 }
 
@@ -31,7 +31,7 @@ function headline(decision: BundleDecision): string {
 }
 
 function format_numbers(numbers: ReadonlyArray<number>): string {
-	return numbers.map((issue_number) => issue_cite.plain(issue_number)).join(', ')
+	return numbers.map((issue_number) => issue_cite.plain_for('linked', issue_number)).join(', ')
 }
 
 // The backlog rows of the verdict's candidates — what the printed order and `--apply` both read.
@@ -79,6 +79,20 @@ const PLACING_ACTIONS: ReadonlySet<BundleAction> = new Set<BundleAction>([
 	'ask',
 ])
 
+// A cycle recommends nothing, so `--apply` places nothing there and the headline's "recommended one"
+// has to be named as absent rather than left for the reader to look for.
+const NO_RECOMMENDATION_LINE =
+	'  Recommended: none — the epics declare a cycle; place it with `pnpm josh epic --add <E> <N> --decision-file <path>`'
+
+// The spread and the epic `ask` recommends — what `--apply` places the issue in.
+function format_epics(decision: BundleDecision): Array<string> {
+	if (decision.epics.length <= 1) return []
+	const involved = `  Epics involved: ${format_numbers(decision.epics)}`
+	if (decision.recommended === undefined) return [involved, NO_RECOMMENDATION_LINE]
+
+	return [involved, `  Recommended: ${issue_cite.plain_for('linked', decision.recommended)}`]
+}
+
 // `is_membership_established` is what separates "no epic tracks these" from "their epics were never
 // read".
 function format_decision(
@@ -97,17 +111,17 @@ function format_decision(
 		lines.push(`  Related: ${format_numbers(decision.candidates)}`)
 	}
 
-	if (decision.epics.length > 1) {
-		lines.push(`  Epics involved: ${format_numbers(decision.epics)}`)
-	}
-
-	return [...lines, ...format_order(decision, subject, backlog)].join('\n')
+	return [...lines, ...format_epics(decision), ...format_order(decision, subject, backlog)].join(
+		'\n',
+	)
 }
 
 const epic_bundle_format = {
 	ACTION_LINES,
 	ALREADY_TRACKED_LINE,
+	NO_RECOMMENDATION_LINE,
 	format_numbers,
+	format_epics,
 	format_order,
 	format_decision,
 	members_of,

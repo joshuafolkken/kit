@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { PinnedReport } from './test-pinned-logic'
+import { test_pinned_logic, type PinnedReport } from './test-pinned-logic'
 import { test_pinned_main } from './test-pinned-main'
 
 const { run } = vi.hoisted(() => ({
@@ -29,7 +29,8 @@ const FILE = 'a.ts'
 const MANUAL = 'manual'
 const PRE_DETACH = 'pre-detach'
 const HUNK = { file: FILE, new_start: 4, new_count: 1, old_lines: [], is_green: true }
-const GREEN_LINE = 'unpinned a.ts:4 — reverting it left every related test green\n'
+const GREEN_LINE =
+	'unpinned a.ts:4 — reverting it left every related test green; related tests unavailable; add or strengthen a regression test that fails when this change is reverted\n'
 const output: { stdout: Array<string>; stderr: Array<string> } = { stdout: [], stderr: [] }
 
 function capture(sink: Array<string>): (chunk: string | Uint8Array) => boolean {
@@ -99,10 +100,15 @@ describe('test_pinned_main.main', () => {
 			expect(output.stderr.join('')).toContain('Usage: josh test:pinned')
 		},
 	)
+})
 
-	it('prints the usage clean on --help', async () => {
+describe('test_pinned_main.main --help', () => {
+	it('prints the usage clean, naming the test-file cap as its own reason', async () => {
 		expect(await test_pinned_main.main(['--help'])).toBe(0)
 		expect(run).not.toHaveBeenCalled()
+		expect(output.stderr.join('')).toContain(
+			`\n  over the ${String(test_pinned_logic.MAX_TEST_FILES)}-test-file cap,\n`,
+		)
 	})
 })
 
@@ -135,6 +141,7 @@ describe('test_pinned_main.main --record', () => {
 			token: TOKEN,
 			text: `\`josh test:pinned\` could not run, so nothing was checked: ${reason}\n`,
 			unpinned: [],
+			is_unchecked: true,
 		})
 	})
 
@@ -152,19 +159,32 @@ describe('test_pinned_main.main --record', () => {
 	})
 })
 
-describe('test_pinned_main.main --record on a moving tree', () => {
-	it('checks again when the tree moved under the check, and records the settled answer', async () => {
-		read_changed_tree
-			.mockResolvedValueOnce({ [FILE]: 'one' })
-			.mockResolvedValueOnce({ [FILE]: 'two' })
-		run.mockResolvedValueOnce({ ...CLEAN_REPORT, unpinned: [HUNK] }).mockResolvedValue(CLEAN_REPORT)
+function mock_moved_snapshot(): void {
+	read_changed_tree
+		.mockResolvedValueOnce({ [FILE]: 'before' })
+		.mockResolvedValue({ [FILE]: 'after' })
+	run.mockResolvedValue({
+		...CLEAN_REPORT,
+		unpinned: [HUNK],
+		tree_hash: 'snapshot',
+		is_stale: true,
+	})
+}
 
-		expect(await test_pinned_main.main(['--record', TOKEN])).toBe(0)
-		expect(run).toHaveBeenCalledTimes(2)
-		expect(write_stamp).toHaveBeenCalledWith(RECORD, expect.objectContaining({ unpinned: [] }))
+describe('test_pinned_main.main --record on a moving tree', () => {
+	it('records the snapshot answer once even when the original tree moved', async () => {
+		mock_moved_snapshot()
+
+		expect(await test_pinned_main.main(['--record', TOKEN])).toBe(1)
+		expect(run).toHaveBeenCalledTimes(1)
+		expect(write_stamp).toHaveBeenCalledWith(
+			RECORD,
+			expect.objectContaining({ tree_hash: 'snapshot', is_stale: true }),
+		)
+		expect(output.stdout.join('')).toContain('snapshot snapshot · stale\n')
 	})
 
-	it('records nothing checked when the tree keeps moving', async () => {
+	it('returns its snapshot verdict without retrying while the original keeps moving', async () => {
 		let reads = 0
 
 		read_changed_tree.mockImplementation(async () => {
@@ -174,9 +194,12 @@ describe('test_pinned_main.main --record on a moving tree', () => {
 		})
 		run.mockResolvedValue({ ...CLEAN_REPORT, unpinned: [HUNK] })
 
-		await expect(test_pinned_main.main(['--record', TOKEN])).rejects.toThrow('kept moving')
-		expect(run).toHaveBeenCalledTimes(3)
-		expect(write_stamp).toHaveBeenCalledWith(RECORD, expect.objectContaining({ unpinned: [] }))
+		expect(await test_pinned_main.main(['--record', TOKEN])).toBe(1)
+		expect(run).toHaveBeenCalledTimes(1)
+		expect(write_stamp).toHaveBeenCalledWith(
+			RECORD,
+			expect.objectContaining({ unpinned: [expect.any(String)] }),
+		)
 	})
 
 	it('checks the tree once without --record', async () => {

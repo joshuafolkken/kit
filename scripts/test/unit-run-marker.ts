@@ -11,7 +11,8 @@ import { json_value } from '#scripts/lib/json-value'
 //
 // **Kept apart from `unit-worker-share.ts` because the config imports it** (joshuafolkken/kit#4572).
 // Every module the vitest config imports is a whole-suite file (`whole-suite-files.ts`), and the
-// capacity and claim bounds of the share change often; held here, only this stable part is one.
+// capacity and claim bounds of the share change often; held here, only this stable part is one. The
+// lane count is apart for the same reason (`unit-lane-count.ts`, joshuafolkken/kit#7254).
 
 // A record that means something only while it exists, in the shape `stamp-file.ts` already keeps for
 // the in-flight gate marker. Keyed by pid rather than by checkout: `josh gate`'s unit step and a
@@ -134,6 +135,14 @@ function resolve_unit_workers(available_cores: number, runs: number): number | u
 	return Math.max(MIN_WORKERS, Math.floor(available_cores / runs))
 }
 
+// **Each live lane is held a share before its suite starts** (joshuafolkken/kit#6682). The run count
+// sees a lane only once its suite is in flight, so the first of several lanes took the whole machine
+// and the next ones divided what it left; dividing by the lanes as well keeps every lane's workers —
+// and their memory — to its share from the start. The wider of the two counts divides.
+function sharing_runs(runs: number, lanes: number): number {
+	return Math.max(runs, lanes)
+}
+
 // **The write failing is not a reason to fail the run.** A marker that could not be written costs the
 // next run a wider share than it should have — the behavior that was there before — while a thrown
 // error here would fail a unit suite over bookkeeping.
@@ -157,6 +166,7 @@ const unit_run_marker = {
 	marker_path,
 	read_marker,
 	resolve_unit_workers,
+	sharing_runs,
 }
 
 export { unit_run_marker }

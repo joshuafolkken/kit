@@ -1,4 +1,5 @@
 import { styleText } from 'node:util'
+import { lane_stage_budget, type BudgetStage } from '#scripts/lane/lane-stage-budget'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import type { PrChecks } from '#scripts/run/event/run-event-checks'
 import { run_board_earlier } from './run-board-earlier'
@@ -27,6 +28,7 @@ const ALARM_FACTOR = 3
 // report) is near zero, and scaled as it is it would draw a healthy few-second stage as alarming.
 const USUAL_FLOOR_MINUTES = 2
 const USUAL_FLOOR_MS = USUAL_FLOOR_MINUTES * MS_PER_MINUTE
+const OVER_WORDS = 'over budget'
 
 interface TimedActivity {
 	icon: string
@@ -67,14 +69,23 @@ function column_width(header: BoardHeader, age_of: (row: BoardRow) => number | u
 	return Math.max(span_of(0).length, ...spans)
 }
 
+// What a phase is timed up to: now for a running row, the stop for a stopped lane's — so its phase time
+// freezes there (joshuafolkken/kit#6577); `undefined` for any other row.
+function phase_end(row: BoardRow, header: BoardHeader): number | undefined {
+	if (is_live(row)) return header.now_ms
+
+	return row.state === 'stopped' ? row.status?.ended_ms : undefined
+}
+
 // How long the child has stood at its phase, right-aligned to `width` and colored against the phase's
 // usual time; blanks where no event said when it got there, so what follows still starts in its column.
 function phase_time(row: BoardRow, header: BoardHeader, width: number): string {
-	const current = is_live(row) ? current_of(row) : undefined
+	const current = current_of(row)
+	const end = phase_end(row, header)
 
-	if (current === undefined) return ' '.repeat(width)
+	if (current === undefined || end === undefined) return ' '.repeat(width)
 
-	const elapsed = header.now_ms - current.since_ms
+	const elapsed = end - current.since_ms
 	const text = span_of(elapsed).padStart(width)
 
 	return tinted(text, phase_color(elapsed, header.usual?.get(current.phase)))
@@ -162,11 +173,41 @@ function is_tailed(row: BoardRow): boolean {
 	return is_live(row)
 }
 
-// A running row's end — the check its held lane waits to run, its pull request's checks in followup,
-// or its newest activity — and nothing for any other row.
-function tail_of(row: BoardRow, header: BoardHeader): Array<string> {
-	if (!is_tailed(row)) return []
+// The lane budget each phase counts against (`lane-stage-budget.ts`); the report and a failure none.
+const PHASE_BUDGETS: Partial<Record<Phase, BudgetStage>> = {
+	investigate: 'plan',
+	plan: 'plan',
+	implement: 'implement',
+	ship: 'ship',
+	sync: 'ship',
+	review: 'ship',
+	gate: 'ship',
+	commit: 'ship',
+	round_two: 'ship',
+	followup: 'followup',
+}
 
+function over_of(phase: Phase, elapsed_ms: number): number | undefined {
+	const budget = PHASE_BUDGETS[phase]
+
+	return budget === undefined ? undefined : lane_stage_budget.over_minutes(budget, elapsed_ms)
+}
+
+// What the running phase has run past its share of the lane budget, as `over budget +N′`
+// (joshuafolkken/kit#5563) — words, not a glyph, since 🔺 is the priority cell's; none within it. The
+// phase's own time is a lower bound of its stage's, and counts host sleep as the phase time beside it
+// does, which `lane:breakdown` takes out.
+function over_part(row: BoardRow, header: BoardHeader): Array<string> {
+	const current = is_live(row) ? current_of(row) : undefined
+	const over =
+		current === undefined ? undefined : over_of(current.phase, header.now_ms - current.since_ms)
+
+	return over === undefined ? [] : [`${OVER_WORDS} +${String(over)}′`]
+}
+
+// A running row's end before its budget part — the check its held lane waits to run, its pull
+// request's checks in followup, or its newest activity.
+function end_of(row: BoardRow, header: BoardHeader): Array<string> {
 	const held = held_of(row, header)
 
 	if (held !== undefined) return [check_of(held)]
@@ -176,6 +217,11 @@ function tail_of(row: BoardRow, header: BoardHeader): Array<string> {
 	if (checks !== undefined) return [run_board_render_checks.checks_part(checks, header.pull_link)]
 
 	return [activity_part(row, header)]
+}
+
+// A running row's end, then what its phase ran past its budget; nothing for any other row.
+function tail_of(row: BoardRow, header: BoardHeader): Array<string> {
+	return is_tailed(row) ? [...end_of(row, header), ...over_part(row, header)] : []
 }
 
 // The icon a row's end draws for its newest activity, so the legend names it — none where the row

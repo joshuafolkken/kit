@@ -1,5 +1,12 @@
 import { readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
+import { git_location_environment } from '#scripts/git/git-location-environment'
+import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
+import { error_text } from '#scripts/lib/error-message'
+import { JOSH_TMP_DIRECTORY } from '#scripts/lib/josh-temporary-directory'
+import { stdin_text } from '#scripts/lib/stdin-text'
+
+type BodyRead = { text: string } | { problem: string }
 
 // A body — an Issue comment, a PR comment, a notification message — handed to a command as an inline
 // double-quoted shell argument is **evaluated by the shell before the command ever sees it**.
@@ -16,7 +23,8 @@ import path from 'node:path'
 // than spelled out per flag, so the stdin form cannot come to mean one thing under one and something
 // else under another.
 const STDIN_PATH = '-'
-const STDIN_FD = 0
+// `git check-ignore -q` exits 1 for a path inside the repository that no rule ignores.
+const NOT_IGNORED_EXIT_CODE = 1
 
 // The escape a caller writes when the body has to stay one shell token. It is expanded for the
 // **inline** form only: a file already holds real newlines, and expanding there would rewrite a
@@ -35,6 +43,22 @@ const ESCAPED_NEWLINE = String.raw`\n`
 // pipe, and a `<(…)` process substitution arrives as the FIFO `/dev/fd/63`. An `isFile()` test rejects
 // both with `Not a readable file`, which is a regression dressed as a guard — so the test is
 // `isDirectory()`, and anything else readable is opened exactly as it was before.
+//
+// **A regular file inside a work tree that git does not ignore is refused** (joshuafolkken/kit#6055).
+// Sessions kept writing bodies into an untracked `scratchpad/` beside the code, where `git status`
+// carries them and a commit can sweep them up. The refusal sits in this reader rather than in a rule
+// per writer, and every `*-file` flag reads through it (joshuafolkken/kit#6056). git answers whether the path is
+// ignored, so no second ignore table exists: exit 1 alone refuses — 0 is ignored, 128 is no
+// repository, and a timeout is no answer. Devices and FIFOs are never asked about.
+function is_unignored_in_tree(resolved: string): boolean {
+	const result = git_spawn_sync.run(
+		['-C', path.dirname(resolved), 'check-ignore', '-q', resolved],
+		{ env: git_location_environment.location_free_environment() },
+	)
+
+	return result.exit_code === NOT_IGNORED_EXIT_CODE
+}
+
 function read_body_file(raw_path: string): string {
 	const resolved = path.resolve(raw_path)
 	const stats = statSync(resolved, { throwIfNoEntry: false })
@@ -43,11 +67,28 @@ function read_body_file(raw_path: string): string {
 		throw new Error(`Not a readable file: ${resolved}`)
 	}
 
+	if (stats.isFile() && is_unignored_in_tree(resolved)) {
+		throw new Error(
+			`Body file in the work tree and not git-ignored: ${resolved} — write it to ${JOSH_TMP_DIRECTORY}/${path.basename(resolved)} instead.`,
+		)
+	}
+
 	return readFileSync(resolved, 'utf8')
 }
 
 function read_file_or_stdin(raw_path: string): string {
-	return raw_path === STDIN_PATH ? readFileSync(STDIN_FD, 'utf8') : read_body_file(raw_path)
+	return raw_path === STDIN_PATH ? stdin_text.read_all() : read_body_file(raw_path)
+}
+
+// The non-throwing read, for a caller that turns an unreadable or refused body into its own exit:
+// the refusal's sentence is carried out, so `issue:file` and the rest do not replace it with a
+// vaguer one of their own.
+function read_result(raw_path: string): BodyRead {
+	try {
+		return { text: read_file_or_stdin(raw_path) }
+	} catch (error) {
+		return { problem: error_text.message_of(error) }
+	}
 }
 
 function expand_escaped_newlines(raw: string): string {
@@ -61,12 +102,8 @@ function has_value(raw: string | undefined): boolean {
 
 // The inline half, kept apart so `resolve` reads as the one decision it makes: file or not.
 //
-// **Trim first, expand second — the order the inline form has always had.** `git_notify` used to run
-// `raw.trim().replaceAll(…)` in one expression; moving only the expansion up here would leave a trim
-// downstream of it, and a body written `--notify-message "…\n"` would have its own trailing newline
-// eaten as surrounding whitespace. Trimming the raw argument removes quoting slack, which is the only
-// whitespace a shell token picks up by accident; the newlines the escape produces are the author's
-// text and survive it.
+// Trim the raw argument before expanding escapes so quoting slack disappears while the author's
+// escaped newlines survive, including a trailing newline in `--notify-message "…\n"`.
 function resolve_inline(inline: string | undefined): string | undefined {
 	return inline === undefined ? undefined : expand_escaped_newlines(inline.trim())
 }
@@ -91,6 +128,6 @@ function resolve(input: {
 	return read_file_or_stdin(file_path)
 }
 
-const cli_body = { read_file_or_stdin, has_value, resolve }
+const cli_body = { STDIN_PATH, read_file_or_stdin, read_result, has_value, resolve }
 
 export { cli_body }

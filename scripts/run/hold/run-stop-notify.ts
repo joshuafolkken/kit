@@ -38,7 +38,7 @@ interface Composed {
 
 // Plain, not linked: every line is a command a person copies out of the Telegram.
 function reference_of(facts: StopFacts): string {
-	return issue_cite.plain(facts.issue)
+	return issue_cite.plain_for('telegram', facts.issue)
 }
 
 function commit_title(facts: StopFacts): string {

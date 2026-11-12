@@ -65,7 +65,7 @@ const LANE_GUARD_POLICY: ReadonlyArray<LaneGuardEntry> = [
 		id: 'duplicate-read',
 		mode_in_lane_child: 'notice',
 		because:
-			'a refusal ends a child turn, yet unchanged re-reads are measured in lane children above all, so the child is nudged to scroll up to the earlier read by a notice rather than killed',
+			'a refusal ends a child turn, yet unchanged re-reads and whole reads of large files are measured in lane children above all, so the child is nudged — to scroll up to the earlier read, or to read a slice — by a notice rather than killed; the large-read guard shares this row',
 	},
 	{
 		id: 'rule',

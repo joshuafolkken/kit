@@ -144,6 +144,58 @@ describe('review_round_reuse.answer_here — the cause', () => {
 	})
 })
 
+// joshuafolkken/kit#5662: the moves no round reads ride on the reuse to the ship's reason line.
+describe('review_round_reuse.answer_here — the note', () => {
+	const NOTE = 'passed over documentation, a prompt or an inert path no round executes: docs/a.md'
+
+	beforeEach(() => {
+		check_mock.mockReset().mockResolvedValue({ status: 'ok' })
+		stopped_on_mock.mockReset().mockReturnValue(false)
+		refusal_mock.mockReset().mockResolvedValue(undefined)
+	})
+
+	it.each([
+		['held', REUSE.HELD],
+		['delta', REUSE.DELTA],
+	])('carries the standing note on a %s reuse', async (movement, reuse) => {
+		movement_mock.mockResolvedValue({ movement, note: NOTE })
+
+		expect(await review_round_reuse.answer_here(ISSUE)).toStrictEqual({ reuse, note: NOTE })
+	})
+})
+
+// joshuafolkken/kit#5791: a synced document git could not carry is passed over, a synced runtime file
+// still reviews round 1 again.
+describe('review_round_reuse.answer_here — a covered path the default branch changed', () => {
+	const DOC_NOTE =
+		'passed over documentation, a prompt or an inert path no round executes: docs/josh-commands.md'
+	const SYNCED_CAUSE = 'the default branch changed a file the round covers: a.ts'
+
+	beforeEach(() => {
+		check_mock.mockReset().mockResolvedValue({ status: 'ok' })
+		stopped_on_mock.mockReset().mockReturnValue(false)
+		refusal_mock.mockReset().mockResolvedValue(undefined)
+	})
+
+	it('reuses round 1 with the passed-over document as its reason', async () => {
+		movement_mock.mockResolvedValue({ movement: 'held', note: DOC_NOTE })
+
+		expect(await review_round_reuse.answer_here(ISSUE)).toStrictEqual({
+			reuse: REUSE.HELD,
+			note: DOC_NOTE,
+		})
+	})
+
+	it('reviews round 1 again on a synced runtime file', async () => {
+		movement_mock.mockResolvedValue({ movement: 'unsettled', cause: SYNCED_CAUSE })
+
+		expect(await review_round_reuse.answer_here(ISSUE)).toStrictEqual({
+			reuse: REUSE.AGAIN,
+			cause: SYNCED_CAUSE,
+		})
+	})
+})
+
 describe('review_round_reuse.is_stale_here', () => {
 	it('is stale when josh followup would refuse the review', async () => {
 		refusal_mock.mockResolvedValue(REFUSAL)

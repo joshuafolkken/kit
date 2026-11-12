@@ -1,11 +1,13 @@
-import { mkdtempSync, rmdirSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it } from 'vitest'
 import { release_window } from './release-window'
 
 const THREE_DAY_MINUTES = 4320
 const ROOT_PREFIX = 'release-window-'
+
+const make_directory = temporary_directory()
 
 describe('release_window.parse_release_window', () => {
 	it('reads the minutes and the exclusions together', () => {
@@ -29,28 +31,18 @@ describe('release_window.parse_release_window', () => {
 
 describe('release_window.read_release_window', () => {
 	it('reads a missing workspace file as no window and no exclusions', () => {
-		const root = mkdtempSync(path.join(tmpdir(), ROOT_PREFIX))
+		const root = make_directory(ROOT_PREFIX)
 
-		try {
-			expect(release_window.read_release_window(root)).toStrictEqual({
-				minutes: undefined,
-				exclusions: [],
-			})
-		} finally {
-			rmdirSync(root)
-		}
+		expect(release_window.read_release_window(root)).toStrictEqual({
+			minutes: undefined,
+			exclusions: [],
+		})
 	})
 
 	it('reads the workspace file at the root', () => {
-		const root = mkdtempSync(path.join(tmpdir(), ROOT_PREFIX))
-		const workspace_path = path.join(root, 'pnpm-workspace.yaml')
+		const root = make_directory(ROOT_PREFIX)
 
-		try {
-			writeFileSync(workspace_path, 'minimumReleaseAge: 4320\n')
-			expect(release_window.read_release_window(root).minutes).toBe(THREE_DAY_MINUTES)
-		} finally {
-			rmSync(workspace_path)
-			rmdirSync(root)
-		}
+		writeFileSync(path.join(root, 'pnpm-workspace.yaml'), 'minimumReleaseAge: 4320\n')
+		expect(release_window.read_release_window(root).minutes).toBe(THREE_DAY_MINUTES)
 	})
 })

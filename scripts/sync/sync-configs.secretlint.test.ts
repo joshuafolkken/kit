@@ -1,21 +1,21 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { init_logic } from '#scripts/init/init-logic'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { sync_configs } from './sync-configs'
 
+const make_directory = temporary_directory()
 const UNCHANGED_LABEL = 'unchanged'
 
 const ctx = { work_directory: '', destination: '' }
 
 beforeEach(() => {
-	ctx.work_directory = mkdtempSync(path.join(tmpdir(), 'sync-configs-secretlint-'))
+	ctx.work_directory = make_directory('sync-configs-secretlint-')
 	ctx.destination = path.join(ctx.work_directory, '.secretlintrc.json')
 })
 
 afterEach(() => {
-	rmSync(ctx.work_directory, { recursive: true, force: true })
 	vi.restoreAllMocks()
 })
 

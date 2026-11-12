@@ -12,11 +12,18 @@ const FIRST_HEADER_CELLS = [
 	'ship step',
 	'followup critical path',
 	'implement sub-stage',
+	'implement read',
+	'stage turns',
 	'stop',
+	'stopped at',
 	'gap',
+	'cuts',
 	'round 1',
 	'round 2',
-	'noticed lanes',
+	'early push',
+	'reason',
+	'measured lanes',
+	'implement-rate lanes',
 	'held by',
 	'lane',
 	'process',
@@ -25,6 +32,7 @@ const FIRST_HEADER_CELLS = [
 	'test:related scope',
 	'test:related whole-suite trigger',
 	'transcript metric',
+	'concurrent lanes',
 ]
 
 function first_header_cell(table: string): string {

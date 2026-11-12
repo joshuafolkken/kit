@@ -20,10 +20,14 @@ const FOUND_DURING_FLAG = '--found-during'
 const EPIC = 'epic'
 const TIER_A = 'route:tier-a'
 const FILED = [TITLE, BODY_FLAG, BODY_FILE]
+const DEFECT_FLAG = '--defect'
+const VERIFICATION_FLAG = '--verification'
+const EVERY_RUN_FLAG = '--every-run'
 const REFUSES = 'refuses %s'
 
 function args_of(overrides: Partial<FileArguments> = {}): FileArguments {
 	return {
+		answers: { defect: undefined, verification: undefined, 'every-run': undefined },
 		title: TITLE,
 		body_file: BODY_FILE,
 		route: undefined,
@@ -35,6 +39,7 @@ function args_of(overrides: Partial<FileArguments> = {}): FileArguments {
 		is_auto_ok_opted_out: false,
 		is_release: false,
 		is_blocking_finder: false,
+		is_check: false,
 		...overrides,
 	}
 }
@@ -53,24 +58,14 @@ describe('issue_file.parse — the arguments a filing owes', () => {
 		expect(parsed).toStrictEqual(args_of({ ...expected, distinct: [DUPLICATE_A, DUPLICATE_B] }))
 	})
 
-	it('reads --over-cap', () => {
-		expect(issue_file.parse([...FILED, '--over-cap'])).toStrictEqual(args_of({ is_over_cap: true }))
-	})
-
-	it('reads --no-auto-ok', () => {
-		const parsed = issue_file.parse([...FILED, '--no-auto-ok'])
-
-		expect(parsed).toStrictEqual(args_of({ is_auto_ok_opted_out: true }))
-	})
-
-	it('reads --release', () => {
-		expect(issue_file.parse([...FILED, '--release'])).toStrictEqual(args_of({ is_release: true }))
-	})
-
-	it('reads --blocks-finder', () => {
-		const parsed = issue_file.parse([...FILED, '--blocks-finder'])
-
-		expect(parsed).toStrictEqual(args_of({ is_blocking_finder: true }))
+	it.each<[string, Partial<FileArguments>]>([
+		['--over-cap', { is_over_cap: true }],
+		['--no-auto-ok', { is_auto_ok_opted_out: true }],
+		['--release', { is_release: true }],
+		['--blocks-finder', { is_blocking_finder: true }],
+		['--check', { is_check: true }],
+	])('reads %s', (flag, expected) => {
+		expect(issue_file.parse([...FILED, flag])).toStrictEqual(args_of(expected))
 	})
 
 	it.each([
@@ -81,6 +76,36 @@ describe('issue_file.parse — the arguments a filing owes', () => {
 		['an unknown flag', [...FILED, '--nope']],
 	])(REFUSES, (_label, argv) => {
 		expect(issue_file.parse(argv)).toBeUndefined()
+	})
+})
+
+describe('issue_file.parse — solo evidence', () => {
+	it('reads the three solo answers', () => {
+		const parsed = issue_file.parse([
+			...FILED,
+			DEFECT_FLAG,
+			'yes',
+			VERIFICATION_FLAG,
+			'yes',
+			EVERY_RUN_FLAG,
+			'yes',
+		])
+
+		expect(parsed?.answers).toStrictEqual({
+			defect: 'yes',
+			verification: 'yes',
+			'every-run': 'yes',
+		})
+	})
+	it.each([
+		[],
+		[DEFECT_FLAG, 'yes', VERIFICATION_FLAG, 'yes'],
+		[DEFECT_FLAG, 'no', VERIFICATION_FLAG, 'yes', EVERY_RUN_FLAG, 'yes'],
+		[DEFECT_FLAG, 'yes', VERIFICATION_FLAG, 'unknown', EVERY_RUN_FLAG, 'yes'],
+		[DEFECT_FLAG, 'yes', VERIFICATION_FLAG, 'yes', EVERY_RUN_FLAG, 'no'],
+		[DEFECT_FLAG, 'invalid', VERIFICATION_FLAG, 'yes', EVERY_RUN_FLAG, 'yes'],
+	])('refuses %j', (...answers) => {
+		expect(issue_file.parse([...FILED, '--label', 'run:solo', ...answers])).toBeUndefined()
 	})
 })
 

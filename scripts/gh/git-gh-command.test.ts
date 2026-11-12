@@ -1,5 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { repo_discovery } from '#scripts/discovery/repo-discovery'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_gh_command, parse_pr_state_string } from './git-gh-command'
+import { git_gh_etag_read } from './git-gh-etag-read'
 import { find_request, request_body } from './git-gh-pr-fixture'
 import { PR_CHECKS_WATCH_TIMEOUT_MS } from './git-pr-checks-watch'
 
@@ -42,9 +44,9 @@ const GITHUB_PR_URL = 'https://github.com/owner/repo/pull/1'
 const PULLS_PATH = 'repos/{owner}/{repo}/pulls'
 const HEAD_BRANCH = 'feature-branch'
 const REPO_NAME = 'joshuafolkken/kit'
+const REPO_API_PATH = 'repos/{owner}/{repo}'
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	mocked_get_default_branch.mockResolvedValue(DEFAULT_BRANCH)
 	mocked_git.branch.mockResolvedValue(HEAD_BRANCH)
 })
@@ -169,21 +171,29 @@ describe('git_gh_command.pr_create — the REST request', () => {
 	})
 })
 
-// joshuafolkken/kit#993 removed the unquoting from the parser the repository-name read shares with
-// the issue-title read. It never received a quoted answer, so it must be unchanged by the removal —
-// which is what the Issue asked to be confirmed rather than assumed. The PR-url reader shares the
-// same parser and is asserted in `git-gh-pr-read.test.ts`, where it now lives.
-describe('the other callers of the shared parser are unaffected', () => {
-	// joshuafolkken/kit#1023 moved this read to `gh api`; the parser it shares is unchanged.
-	it('reads a repository name unchanged', async () => {
-		mocked_api.mockResolvedValue(REPO_NAME)
+describe('git_gh_command.repo_get_name_with_owner — API fallback', () => {
+	beforeEach(() => {
+		vi.stubEnv('GH_REPO', '')
+		vi.spyOn(repo_discovery, 'read_remote_urls').mockReturnValue([])
+		vi.spyOn(git_gh_etag_read, 'read').mockResolvedValue(JSON.stringify({ full_name: REPO_NAME }))
+	})
 
+	afterEach(() => {
+		vi.unstubAllEnvs()
+		vi.restoreAllMocks()
+	})
+
+	it('reads a repository name unchanged', async () => {
 		await expect(git_gh_command.repo_get_name_with_owner()).resolves.toBe(REPO_NAME)
+		expect(git_gh_etag_read.read).toHaveBeenCalledWith(REPO_API_PATH)
 	})
 
 	it('still trims whitespace off a repository name', async () => {
-		mocked_api.mockResolvedValue(`${REPO_NAME}\n`)
+		vi.mocked(git_gh_etag_read.read).mockResolvedValueOnce(
+			JSON.stringify({ full_name: `  ${REPO_NAME}\n` }),
+		)
 
 		await expect(git_gh_command.repo_get_name_with_owner()).resolves.toBe(REPO_NAME)
+		expect(git_gh_etag_read.read).toHaveBeenCalledWith(REPO_API_PATH)
 	})
 })

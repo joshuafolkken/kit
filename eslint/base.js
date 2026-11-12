@@ -13,12 +13,11 @@ import globals from 'globals'
 import ts from 'typescript-eslint'
 import { checkout_rooted_parser } from './checkout-rooted-parser.js'
 import { config_fingerprint } from './config-fingerprint.js'
-import { code_quality_rules } from './rules/code-quality.js'
+import { code_quality_rules, code_quality_test_rules } from './rules/code-quality.js'
 import { early_return_one_liner_rule } from './rules/early-return-one-liner.js'
 import { formatting_rules } from './rules/formatting.js'
 import { import_rules } from './rules/import.js'
 import { namespace_object_export_rule } from './rules/namespace-object-export.js'
-import { naming_convention_rules } from './rules/naming-convention.js'
 import { promise_rules } from './rules/promise.js'
 import { sonarjs_rules } from './rules/sonarjs.js'
 import {
@@ -30,6 +29,7 @@ import {
 } from './rules/test-filename.js'
 import { typescript_rules } from './rules/typescript.js'
 import { unicorn_rules, unicorn_test_rules } from './rules/unicorn.js'
+import { untyped_lint } from './untyped.js'
 
 const FILE_PATTERNS = {
 	d_ts: ['**/*.d.ts'],
@@ -42,6 +42,9 @@ const FILE_PATTERNS = {
 	// file that was failing anyway.
 	tests: ['**/*.test.ts', '**/*.e2e.ts'],
 	eslint_rules: ['eslint/**/*.ts', 'eslint/rules/**/*.js'],
+	// joshuafolkken/kit#6028: the josh command tables — one object per command, no control flow.
+	command_tables: ['scripts/josh/josh-commands-*.ts'],
+	fixtures: ['scripts/**/*-fixture.ts'],
 	// joshuafolkken/kit#3294: the SvelteKit convention files, whose named exports — route handlers,
 	// `load`, `handle`, `match` — are typed through a const annotation (`export const GET:
 	// RequestHandler = …`). That idiom is the one place `func-style` allows an arrow const.
@@ -118,14 +121,14 @@ export function create_base_config({ gitignore_path, tsconfig_root_dir }) {
 			// them. It is the spelling git's own exclude uses, for the same reason.
 			ignores: ['node_modules/**', '**/.claude/worktrees/**', '*.config.{ts,js,cjs,mjs}'],
 		},
-		// joshuafolkken/kit#1347: a content fingerprint of this directory's rule modules, carried in
+		// joshuafolkken/kit#1347: a content fingerprint of the rule modules the config imports, carried in
 		// `settings` so that ESLint's own cache key changes when one of them is edited. Serializing the
 		// config drops every `create` function, so without this an edit to a rule left every cached
 		// entry valid and the gate reported the pre-edit verdict for every unchanged file. It sits in
 		// the shared config rather than beside either cache file because both the gate's cache and the
 		// edit hook's are invalidated by the same value — `config-fingerprint.js` carries the reasoning
 		// and what the fingerprint deliberately does not cover.
-		config_fingerprint.create_config_fingerprint_block(),
+		config_fingerprint.create_config_fingerprint_block(tsconfig_root_dir),
 		js.configs.recommended,
 		...ts.configs.strictTypeChecked,
 		...ts.configs.stylisticTypeChecked,
@@ -138,10 +141,8 @@ export function create_base_config({ gitignore_path, tsconfig_root_dir }) {
 			plugins: { import: importPlugin },
 			settings: {
 				// joshuafolkken/kit#3599: `import-x/resolver-next` is the key eslint-plugin-import-x
-				// reads. The resolvers used to sit under `import/resolver`, which the plugin ignores —
-				// the rules are only *named* `import/` here, the settings namespace stays the plugin's
-				// own — so every import fell back to the default node resolver, which does not follow
-				// an extensionless `.ts` specifier, and `no-cycle` was green over cycles it never saw.
+				// reads. The settings namespace must match the plugin even though the rules are named
+				// `import/`, so extensionless TypeScript imports resolve and cycle checks can follow them.
 				'import-x/resolver-next': [
 					// `project` roots the resolver's tsconfig where the parser's is. Left out, the
 					// resolver reads the one in `process.cwd()`, so a run started anywhere else resolves
@@ -177,7 +178,7 @@ export function create_base_config({ gitignore_path, tsconfig_root_dir }) {
 				'no-undef': 'off',
 				'local/namespace-object-export': 'error',
 				'local/early-return-one-liner': 'error',
-				...naming_convention_rules,
+				...untyped_lint.naming_convention(process.env),
 				...typescript_rules,
 				...code_quality_rules,
 				...import_rules,
@@ -197,7 +198,7 @@ export function create_base_config({ gitignore_path, tsconfig_root_dir }) {
 			ignores: ['**/*.svelte.ts'],
 			languageOptions: {
 				parser: checkout_rooted_parser.create(tsconfig_root_dir),
-				parserOptions: { project: './tsconfig.json' },
+				parserOptions: { project: false, projectService: true },
 			},
 		},
 		{
@@ -220,8 +221,15 @@ export function create_base_config({ gitignore_path, tsconfig_root_dir }) {
 		{
 			files: FILE_PATTERNS.tests,
 			rules: {
+				...ts.configs.disableTypeChecked.rules,
+				// Missing awaits can make tests finish before their assertions; void callbacks can
+				// silently discard rejected promises. Keep both checks with real project types.
+				'@typescript-eslint/no-floating-promises':
+					typescript_rules['@typescript-eslint/no-floating-promises'],
+				'@typescript-eslint/no-misused-promises':
+					typescript_rules['@typescript-eslint/no-misused-promises'],
 				'@typescript-eslint/no-magic-numbers': 'off',
-				'max-lines-per-function': ['error', { max: 35, skipBlankLines: true, skipComments: true }],
+				...code_quality_test_rules,
 				'no-console': ['error', { allow: ['warn', 'error', 'info'] }],
 				// vi mock/stub patterns require explicit undefined (mockResolvedValue/stubGlobal)
 				'unicorn/no-useless-undefined': 'off',
@@ -243,6 +251,21 @@ export function create_base_config({ gitignore_path, tsconfig_root_dir }) {
 				'@typescript-eslint/naming-convention': 'off',
 				'@typescript-eslint/no-magic-numbers': 'off',
 			},
+		},
+		{
+			// `max-lines` bounds the reading load of functions and branches, which a data table has
+			// none of; splitting one only to stay under it scattered a table across files. The
+			// function, complexity and nesting limits still apply.
+			files: FILE_PATTERNS.command_tables,
+			ignores: FILE_PATTERNS.tests,
+			rules: { 'max-lines': 'off' },
+		},
+		{
+			// A command table keys by command name (`'exports:unused'`) and a fixture may mirror an
+			// external shape (`'timeout-minutes'`), so either kind breaks the naming convention by design.
+			files: [...FILE_PATTERNS.command_tables, ...FILE_PATTERNS.fixtures],
+			ignores: FILE_PATTERNS.tests,
+			rules: { '@typescript-eslint/naming-convention': 'off' },
 		},
 		{
 			// `.mjs` / `.cjs` too (joshuafolkken/kit#2693): the typed parser options above reach only
@@ -284,5 +307,7 @@ export function create_base_config({ gitignore_path, tsconfig_root_dir }) {
 			CENTRALIZED_TESTS_DIRECTORY_PATTERNS,
 			CENTRALIZED_TESTS_DIRECTORY_ENTRY,
 		),
+		// joshuafolkken/kit#6768: nothing unless the process was started for edit-time lint.
+		untyped_lint.blocks(process.env),
 	)
 }

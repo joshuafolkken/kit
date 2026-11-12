@@ -2,11 +2,8 @@ import { environment_file_fixture } from '#ports/environment-file-fixture'
 import { josh_cli_fixture } from '#scripts/josh/josh-cli-fixture'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-// #826: `josh port` used to receive `.env` from a `--env-file-if-exists=.env` tsx flag, which
-// resolves against the working directory, while `playwright.config.ts` resolves the file at the
-// project root. From a subdirectory the two answered a consumer's `preview` script and its
-// webServer with different numbers — the #820 failure again. Only running the real command proves
-// the two now name one file, because the flag lived on the command entry rather than in the code.
+// The real command must resolve `.env` at the project root even from a subdirectory, so a consumer's
+// preview script and Playwright webServer choose the same port (#820, #826).
 const TEMP_DIRECTORY_PREFIX = 'kit-port-cli-'
 const NESTED_DIRECTORY_NAME = 'e2e'
 const DEFAULT_DEV_PORT = 5173

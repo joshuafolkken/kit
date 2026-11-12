@@ -1,9 +1,9 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { ALIASES } from '#scripts/josh/josh-aliases'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { propagate_run } from '#scripts/propagate/propagate-run'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { adopt } from './adopt'
 import { adopt_logic } from './adopt-logic'
@@ -22,25 +22,29 @@ const JOSH = 'josh'
 const RANGE = '^1.0.0'
 
 const state = { workspace: '' }
+const make_directory = temporary_directory()
 
 function write_json(file_path: string, content: Record<string, unknown>): void {
 	mkdirSync(path.dirname(file_path), { recursive: true })
 	writeFileSync(file_path, JSON.stringify(content))
 }
 
+function workspace_directory(): string {
+	return make_directory(path.join(state.workspace, 'repo-'))
+}
+
 function make_repository(name?: string): string {
-	const repository_path = mkdtempSync(path.join(state.workspace, 'repo-'))
+	const repository_path = workspace_directory()
 
 	if (name !== undefined) write_json(path.join(repository_path, MANIFEST), { name })
 
 	return repository_path
 }
 
-// A consumer declaring two toolkits with only one of them runnable. This is the partial install that
-// used to leave the run syncing kit alone, writing app-kit's overlay paths back to kit's originals
-// (joshuafolkken/kit#1540).
+// A partial install must not sync kit alone: doing so overwrites app-kit's overlay paths with kit's
+// originals when the second declared toolkit has no runnable CLI (joshuafolkken/kit#1540).
 function make_partial_install(): string {
-	const repository_path = mkdtempSync(path.join(state.workspace, 'repo-'))
+	const repository_path = workspace_directory()
 	const modules = path.join(repository_path, NODE_MODULES)
 
 	write_json(path.join(repository_path, MANIFEST), {
@@ -55,14 +59,13 @@ function make_partial_install(): string {
 }
 
 beforeEach(() => {
-	state.workspace = mkdtempSync(path.join(tmpdir(), 'adopt-'))
+	state.workspace = make_directory('adopt-')
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
 })
 
 afterEach(() => {
 	vi.restoreAllMocks()
-	rmSync(state.workspace, { recursive: true, force: true })
 })
 
 // The same boundary `josh sync` draws (joshuafolkken/kit#868): the sync step would overwrite the
@@ -127,7 +130,7 @@ describe('adopt_logic.refuse_incomplete_plan', () => {
 		expect(refusal).toContain('docs/maintainers/sync-rationale.md')
 	})
 
-	// The path that used to say nothing at all: a declared toolkit with no runnable CLI here.
+	// A declared toolkit without a runnable CLI needs an explicit diagnostic.
 	it('refuses and names a toolkit whose CLI could not be resolved', () => {
 		const refusal = adopt_logic.refuse_incomplete_plan([], [APP_KIT])
 

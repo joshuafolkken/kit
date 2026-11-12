@@ -1,0 +1,2 @@
+- rf:security | medium | scripts/rules/egress-guard.ts:123 | 2026-11-03 | #5999
+- rf:bug-risks | medium | scripts/rules/egress-guard.ts:65 | 2026-11-03 | #5999

@@ -1,28 +1,50 @@
+import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { lane_paths } from '#scripts/lane/lane-paths'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { test_pinned_ledger } from './test-pinned-ledger'
+import type { Hunk } from './test-pinned-logic'
+import type { PinnedBy, RedProbe } from './test-red-logic'
 
 const FILE = 'scripts/a.ts'
 const PROBE = { file: FILE, tests: 2, elapsed_ms: 1500 }
 const BACKGROUND = 'run-review'
 const PRE_DETACH = 'pre-detach'
+const TYPE_CHECK: PinnedBy = 'type-check'
 
 afterEach(() => {
 	vi.restoreAllMocks()
 })
 
+describe('test_pinned_ledger.record snapshot context', () => {
+	it('keeps the initial checkout lane when a probe runs from a snapshot', async () => {
+		vi.spyOn(lane_paths, 'issue_here').mockImplementation((directory) =>
+			directory === PROJECT_ROOT ? 5078 : undefined,
+		)
+		const write = vi.spyOn(lane_ledger_write, 'record_test_pinned').mockResolvedValue()
+
+		await test_pinned_ledger.record({ held: 0, rewired: 0 }, [PROBE], 10)
+
+		expect(write).toHaveBeenCalledWith(expect.objectContaining({ issue: 5078 }))
+	})
+})
+
 describe('test_pinned_ledger.record', () => {
-	it('writes one test-pinned row with the lane, the held and rewired counts and each probe', async () => {
+	it('writes one test-pinned row with the lane, the skipped counts and each probe', async () => {
 		vi.spyOn(lane_paths, 'issue_here').mockReturnValue(5078)
 		const write = vi.spyOn(lane_ledger_write, 'record_test_pinned').mockResolvedValue()
 
-		await test_pinned_ledger.record({ held: 3, rewired: 2, origin: PRE_DETACH }, [PROBE], 2000)
+		await test_pinned_ledger.record(
+			{ held: 3, rewired: 2, over_cap: 4, origin: PRE_DETACH },
+			[PROBE],
+			2000,
+		)
 
 		expect(write).toHaveBeenCalledWith({
 			issue: 5078,
 			held: 3,
 			rewired: 2,
+			over_cap: 4,
 			probes: [PROBE],
 			elapsed_ms: 2000,
 			origin: PRE_DETACH,
@@ -39,6 +61,7 @@ describe('test_pinned_ledger.record', () => {
 			issue: undefined,
 			held: 0,
 			rewired: 0,
+			over_cap: 0,
 			probes: [],
 			elapsed_ms: 10,
 			origin: 'manual',
@@ -90,5 +113,18 @@ describe('test_pinned_ledger.time_of', () => {
 		expect(test_pinned_ledger.time_of(hunk, { verdict: 'red', failed: [], ran: 2 }, 1500)).toEqual(
 			PROBE,
 		)
+	})
+
+	// joshuafolkken/kit#5385
+	it('records a red the type check reached as pinned by it', () => {
+		const hunk: Hunk = { file: FILE, new_start: 1, new_count: 1, old_lines: [] }
+		const verdict: RedProbe = { verdict: 'red', failed: [], pinned_by: TYPE_CHECK }
+
+		expect(test_pinned_ledger.time_of(hunk, verdict, 1500)).toStrictEqual({
+			file: FILE,
+			tests: undefined,
+			elapsed_ms: 1500,
+			pinned_by: TYPE_CHECK,
+		})
 	})
 })

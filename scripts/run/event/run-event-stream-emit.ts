@@ -63,35 +63,55 @@ async function ending_fields(
  * of an ending — `emit` and `run:event --append` — appends through here, so the time is computed once,
  * as the ending is written, with the board's own count.
  */
-async function append_at(
+async function append_with(
 	target: string,
-	kind: string,
-	text: string,
-	at: Date,
+	event: Omit<RunEvent, 'pos' | 'elapsed_ms'>,
 ): Promise<AppendResult> {
-	const event = { kind, text, at: at.toISOString() }
-
 	return run_event_stream.append_event(target, {
 		...event,
 		...(await ending_fields(target, event)),
 	})
 }
 
+async function append_at(
+	target: string,
+	kind: string,
+	text: string,
+	at: Date,
+): Promise<AppendResult> {
+	return await append_with(target, { kind, text, at: at.toISOString() })
+}
+
 /**
  * Append one session-facing event, best-effort. A kind outside the enumeration is refused by `append`;
  * every error is swallowed, because the reporting path must never fail the work it reports on.
- * `at` is the caller's instant where another record must carry the same one.
+ * `at` is the caller's instant where another record must carry the same one; `fields` the event's
+ * structured fields beside its text — a park's ship stop.
  */
-async function emit(kind: string, text: string, at: Date = new Date()): Promise<void> {
+async function emit(
+	kind: string,
+	text: string,
+	at: Date = new Date(),
+	fields: Pick<RunEvent, 'stop'> = {},
+): Promise<void> {
 	try {
 		const target = await stream_target()
 
 		if (target === undefined) return
 
-		await append_at(target, kind, text, at)
+		await append_with(target, { ...fields, kind, text, at: at.toISOString() })
 	} catch {
 		// Reporting is best-effort: a failed append is dropped rather than raised into the caller's work.
 	}
+}
+
+// The stream `emit_once` appends to, or undefined when there is none or its newest event is already `kind`.
+async function fresh_target(kind: string): Promise<string | undefined> {
+	const target = await stream_target()
+
+	if (target === undefined || run_event_stream.read_last(target)?.kind === kind) return undefined
+
+	return target
 }
 
 /**
@@ -105,12 +125,21 @@ async function emit(kind: string, text: string, at: Date = new Date()): Promise<
  * effect — the stall detector sends one notification per stall — fires that
  * effect exactly when the marker was fresh. A skipped duplicate and a swallowed failure both read
  * `false`: neither is a fresh episode.
+ *
+ * `before_append` runs only on a fresh episode and is awaited before the marker becomes visible, for an
+ * effect a reader of the marker must see finished — the drain flush (joshuafolkken/kit#5329).
  */
-async function emit_once(kind: string, text: string): Promise<boolean> {
+async function emit_once(
+	kind: string,
+	text: string,
+	before_append?: () => Promise<void>,
+): Promise<boolean> {
 	try {
-		const target = await stream_target()
+		const target = await fresh_target(kind)
 
-		if (target === undefined || run_event_stream.read_last(target)?.kind === kind) return false
+		if (target === undefined) return false
+
+		await before_append?.()
 
 		return run_event_stream.append(target, kind, text, now_iso()).appended
 	} catch (error) {
@@ -180,19 +209,30 @@ async function emit_heartbeat(line: string): Promise<void> {
 
 // The events of the invocation now running, for a reader restoring the run from its stream
 // (`backlog:drive`). Fail-quiet like the writers: no repository, an unreadable stream or an
-// undetermined scope is an empty invocation.
-async function current_events(): Promise<ReadonlyArray<RunEvent>> {
+// undetermined scope is an empty invocation. Required reads propagate failures so a retry cannot
+// mistake unknown history for permission to queue an issue.
+function read_current_events(
+	repository: string | undefined,
+	is_required: boolean,
+): ReadonlyArray<RunEvent> {
+	if (repository === undefined) throw new Error('Could not resolve the run event stream.')
+
+	const read = run_carry.read_carry(run_carry.carry_path(repository))
+	const scope = run_event_scope.scope_of(read)
+	const events = run_event_stream.read_events(run_event_stream.target_of(repository), is_required)
+	const scoped = run_event_scope.scoped_events(events, scope)
+
+	if (scoped === undefined) throw new Error('Could not determine the run event scope.')
+
+	return scoped
+}
+
+async function current_events(is_required = false): Promise<ReadonlyArray<RunEvent>> {
 	try {
-		const repository = await run_carry.repository_directory()
+		return read_current_events(await run_carry.repository_directory(), is_required)
+	} catch (error) {
+		if (is_required) throw error
 
-		if (repository === undefined) return []
-
-		const read = run_carry.read_carry(run_carry.carry_path(repository))
-		const scope = run_event_scope.scope_of(read)
-		const events = run_event_stream.read_events(run_event_stream.target_of(repository))
-
-		return run_event_scope.scoped_events(events, scope) ?? []
-	} catch {
 		return []
 	}
 }

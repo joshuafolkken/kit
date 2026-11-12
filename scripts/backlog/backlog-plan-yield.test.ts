@@ -1,6 +1,7 @@
 import { auto_ok_fixture, CREATED_EARLIER } from '#scripts/auto-ok/auto-ok-fixture'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { AUTO_OK_LABEL, RUN_LANE_LABEL } from '#scripts/issue/issue-labels'
+import { lane_capacity } from '#scripts/lane/lane-capacity'
 import { lane_plan } from '#scripts/lane/lane-plan'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_fixture } from './backlog-fixture'
@@ -13,10 +14,10 @@ import { backlog_plan_cli } from './backlog-plan-cli'
 
 const { console_streams } = auto_ok_fixture
 
-// One timestamp, so the rank is the number order, highest first; the yielded one ranks last.
-const RANKED_FIRST = 807
+// One timestamp, so the rank is the number order, lowest first; the yielded one ranks last.
+const RANKED_FIRST = 805
 const RANKED_SECOND = 806
-const YIELDED = 805
+const YIELDED = 807
 
 const streams = console_streams()
 const { stdout } = streams
@@ -28,6 +29,8 @@ function stub_pool(): void {
 	)
 
 	backlog_fixture.stub_backlog({ opted_in: rows, in_progress: [] })
+	// The wave is cut at the lane limit; a live run's carried limit must not cut the pool.
+	vi.spyOn(lane_capacity, 'lane_limit').mockResolvedValue({ kind: 'limit', limit: rows.length })
 	vi.spyOn(git_gh_command, 'issue_list_recent').mockResolvedValue({
 		json: JSON.stringify(rows),
 		is_capped: false,
@@ -44,6 +47,8 @@ function ready_numbers(): Array<number> {
 
 beforeEach(() => {
 	vi.restoreAllMocks()
+	// The sections' headings are the English table's (`backlog-plan-words.ts`).
+	vi.stubEnv('JOSH_SESSION_LANG', 'en')
 	vi.spyOn(console, 'info').mockImplementation(streams.info)
 	vi.spyOn(console, 'error').mockImplementation(streams.error)
 	vi.spyOn(console, 'warn').mockImplementation(streams.error)

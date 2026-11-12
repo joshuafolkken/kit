@@ -1,5 +1,7 @@
+import { lane_registry } from '#scripts/lane/lane-registry'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_merge, type ChildOutcome } from './run-merge'
+import type { run_merge_restart as RunMergeRestart } from './run-merge-restart'
 
 // joshuafolkken/kit#3908: the readings `run:merge` takes beside a returned child's GitHub state — a
 // person's withdrawal among them — and the outcome they decide.
@@ -8,6 +10,12 @@ const events_mock = vi.hoisted(() => vi.fn())
 const closing_pr_mock = vi.hoisted(() => vi.fn())
 const merged_mock = vi.hoisted(() => vi.fn())
 const restart_mock = vi.hoisted(() => vi.fn())
+const uptime_mock = vi.hoisted(() => vi.fn())
+const record_mock = vi.hoisted(() => vi.fn())
+const mid_turn_mock = vi.hoisted(() => vi.fn())
+const RESTART_MODULE = vi.hoisted(() => './run-merge-restart')
+
+vi.mock(import('node:os'), async (original) => ({ ...(await original()), uptime: uptime_mock }))
 
 vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
 	run_event_stream_emit: { current_events: events_mock },
@@ -22,14 +30,28 @@ vi.mock('#scripts/issue/issue-merged', () => ({
 }))
 
 vi.mock('./run-merge-steps', () => ({
-	run_merge_steps: { has_resumable_cut: vi.fn().mockResolvedValue(false) },
+	run_merge_steps: {
+		has_resumable_cut: vi.fn().mockResolvedValue(false),
+		read_record: record_mock,
+	},
 }))
 
 vi.mock('./run-merge-ship', () => ({
 	run_merge_ship: { is_unanswered: vi.fn().mockResolvedValue(false) },
 }))
 
-vi.mock('./run-merge-restart', () => ({
+vi.mock('#scripts/run/run-ending', () => ({
+	run_ending: {
+		ended_mid_turn: mid_turn_mock,
+		read_exit: vi.fn(),
+		read_transcript: vi.fn().mockReturnValue(''),
+		written_at: vi.fn(),
+	},
+}))
+
+vi.mock('./run-merge-github-limit', () => ({ run_merge_github_limit: { read_stop: vi.fn() } }))
+
+vi.mock(RESTART_MODULE, () => ({
 	run_merge_restart: { is_host_restart: restart_mock },
 }))
 
@@ -66,6 +88,8 @@ beforeEach(() => {
 	closing_pr_mock.mockReset().mockResolvedValue(undefined)
 	merged_mock.mockReset().mockResolvedValue(false)
 	restart_mock.mockReset().mockResolvedValue(false)
+	record_mock.mockReset().mockResolvedValue(undefined)
+	mid_turn_mock.mockReset().mockReturnValue(false)
 })
 
 // joshuafolkken/kit#4540: six children a host restart killed were each counted a failure, and the
@@ -87,16 +111,41 @@ async function failures_of(children: ReadonlyArray<string>): Promise<number> {
 }
 
 describe('run_merge_signals — children a host restart killed', () => {
+	it('continues ordinary failure classification when host uptime is denied', async () => {
+		const { run_merge_restart } = await vi.importActual<{
+			run_merge_restart: typeof RunMergeRestart
+		}>(RESTART_MODULE)
+
+		restart_mock.mockImplementation(run_merge_restart.is_host_restart)
+		uptime_mock.mockImplementation(() => {
+			throw Object.assign(new Error('uv_uptime returned EPERM'), { code: 'EPERM' })
+		})
+		vi.spyOn(lane_registry, 'find_open_lane').mockResolvedValueOnce({
+			issue: CHILD,
+			branch: `${CHILD}-lane`,
+			directory: `/Users/runner/.kit-lanes/${CHILD}`,
+			seat: undefined,
+			development_port: undefined,
+			preview_port: undefined,
+			output: undefined,
+			dispatched_ms: 1,
+			is_stranded: false,
+		})
+
+		expect(await outcome_of_child(CHILD)).toBe('failed')
+		expect(uptime_mock).toHaveBeenCalledOnce()
+	})
+
 	it('reads a killed child as an outage left out of the run-wide streak', async () => {
 		restart_mock.mockResolvedValue(true)
 
 		expect(await signals_of(OPEN_READ)).toMatchObject({ is_outage: true, is_streak_exempt: true })
 	})
 
-	it('does not trip the failure guard however many the restart killed', async () => {
+	it('counts no failure however many the restart killed', async () => {
 		restart_mock.mockResolvedValue(true)
 
-		expect(run_merge.is_guard_tripped(await failures_of(RESTARTED))).toBe(false)
+		expect(await failures_of(RESTARTED)).toBe(0)
 	})
 
 	it('still counts a child that ended itself a failure', async () => {
@@ -133,6 +182,39 @@ describe('run_merge_signals — a child the re-dispatch cap stopped', () => {
 
 		expect(signals).toMatchObject({ is_outage: true })
 		expect(signals).not.toHaveProperty('capped_note')
+	})
+})
+
+// joshuafolkken/kit#7078: a capped child's API outage while the outage hold is on stays an outage, so
+// the hold keeps growing instead of a park resetting the streak.
+describe('run_merge_signals — an API outage past the cap while the outage hold is on', () => {
+	const OUTAGES = Array.from({ length: run_merge.CONSECUTIVE_OUTAGE_LIMIT }, (_, index) =>
+		event(index, 'outage'),
+	)
+	const API_OUTPUT = { child: CHILD, output: 'child.jsonl' }
+	const API_CONTEXT = API_OUTPUT as Context
+
+	beforeEach(() => {
+		mid_turn_mock.mockReturnValue(true)
+		events_mock.mockResolvedValue(OUTAGES)
+	})
+
+	it('stays an outage while the run-wide streak holds launches', async () => {
+		const outages = run_merge.CONSECUTIVE_OUTAGE_LIMIT
+
+		record_mock.mockResolvedValue({ carry: { outages } })
+
+		const signals = await run_merge_signals.read_signals(API_CONTEXT, OPEN_READ)
+
+		expect(signals).toMatchObject({ is_outage: true })
+		expect(signals).not.toHaveProperty('capped_note')
+	})
+
+	it('is capped once the run-wide streak no longer holds', async () => {
+		const signals = await run_merge_signals.read_signals(API_CONTEXT, OPEN_READ)
+
+		expect(signals).toMatchObject({ is_outage: false })
+		expect(signals).toHaveProperty('capped_note')
 	})
 })
 

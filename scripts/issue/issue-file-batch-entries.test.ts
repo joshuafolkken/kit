@@ -1,0 +1,109 @@
+import { writeFileSync } from 'node:fs'
+import path from 'node:path'
+import { cli_body_repository } from '#scripts/josh/cli-body-repository-fixture'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
+import { issue_file_batch_entries } from './issue-file-batch-entries'
+
+// joshuafolkken/kit#5660: `josh issue:file --batch <dir>` reads each body file's title from its front
+// matter or its first line, and its `--distinct` from the front matter.
+
+const SOURCE = 'one.md'
+const TITLE = 'Add a batch filing'
+const BODY = '## 背景\n\nx\n'
+
+const make_directory = temporary_directory('suite')
+const work = make_directory('issue-file-batch-entries-')
+
+describe('issue_file_batch_entries.entry_of — the title, body and distinct of one body file', () => {
+	it('reads the title and distinct from the front matter', () => {
+		const text = `---\ntitle: ${TITLE}\ndistinct: 12,34\n---\n\n${BODY}`
+
+		expect(issue_file_batch_entries.entry_of(text, SOURCE)).toStrictEqual({
+			source: SOURCE,
+			title: TITLE,
+			body: BODY,
+			distinct: '12,34',
+		})
+	})
+
+	it('reads the title from the first line, dropping a heading marker', () => {
+		expect(issue_file_batch_entries.entry_of(`# ${TITLE}\n\n${BODY}`, SOURCE)).toStrictEqual({
+			source: SOURCE,
+			title: TITLE,
+			body: BODY,
+			distinct: undefined,
+		})
+	})
+})
+
+describe('issue_file_batch_entries.entry_of — front matter written other ways', () => {
+	it('reads the title from the first body line when the front matter has no title', () => {
+		const text = `---\ndistinct: 12\n---\n\n# ${TITLE}\n\n${BODY}`
+
+		expect(issue_file_batch_entries.entry_of(text, SOURCE)).toStrictEqual({
+			source: SOURCE,
+			title: TITLE,
+			body: BODY,
+			distinct: '12',
+		})
+	})
+
+	it('reads the front matter of a CRLF body file', () => {
+		const text = `---\r\ntitle: ${TITLE}\r\n---\r\n${BODY}`
+
+		expect(issue_file_batch_entries.entry_of(text, SOURCE).title).toBe(TITLE)
+	})
+
+	it('drops one pair of quotes around a front matter value', () => {
+		const text = `---\ntitle: "${TITLE}"\n---\n${BODY}`
+
+		expect(issue_file_batch_entries.entry_of(text, SOURCE).title).toBe(TITLE)
+	})
+})
+
+describe('issue_file_batch_entries.entries_of — the body files of a directory', () => {
+	it('reads every .md file in name order and skips other files', async () => {
+		writeFileSync(path.join(work, 'b.md'), 'Second\nbody b\n')
+		writeFileSync(path.join(work, 'a.md'), 'First\nbody a\n')
+		writeFileSync(path.join(work, 'notes.txt'), 'Ignored\n')
+
+		const entries = await issue_file_batch_entries.entries_of(work)
+
+		expect(entries.map((entry) => entry.title)).toStrictEqual(['First', 'Second'])
+		expect(entries[0]?.source).toBe(path.join(work, 'a.md'))
+	})
+})
+
+// joshuafolkken/kit#5675: one file split at `%%%` lines is the same batch as a directory.
+describe('issue_file_batch_entries.entries_of — one file split at %%% lines', () => {
+	it('reads each part as one filing, front matter or first-line title alike', async () => {
+		const file = path.join(work, 'batch.txt')
+
+		writeFileSync(
+			file,
+			`---\ntitle: ${TITLE}\ndistinct: 7\n---\n${BODY}%%%\r\n# Second\nb\n%%%  \nThird\nc\n%%%\n`,
+		)
+		const entries = await issue_file_batch_entries.entries_of(file)
+
+		expect(entries.map((entry) => entry.title)).toStrictEqual([TITLE, 'Second', 'Third'])
+		expect(entries[0]).toStrictEqual({
+			source: `${file}[1]`,
+			title: TITLE,
+			body: BODY,
+			distinct: '7',
+		})
+		expect(entries[2]?.source).toBe(`${file}[3]`)
+	})
+})
+
+// joshuafolkken/kit#6056: the batch's body files are read through `cli_body`, so a batch kept in the
+// work tree is refused as one `--body-file` would be.
+describe('issue_file_batch_entries.entries_of — where the batch sits', () => {
+	it('refuses a batch file in the work tree that git does not ignore', async () => {
+		const repository = cli_body_repository.create(make_directory('issue-file-batch-repository-'))
+		const file = repository.write(cli_body_repository.UNIGNORED_DIRECTORY, `${TITLE}\n${BODY}`)
+
+		await expect(issue_file_batch_entries.entries_of(file)).rejects.toThrow('not git-ignored')
+	})
+})

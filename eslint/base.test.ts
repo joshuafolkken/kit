@@ -114,6 +114,32 @@ describe('create_base_config — scripts block', () => {
 	})
 })
 
+// joshuafolkken/kit#6028: a command table is data, so the file cap is the one limit lifted from it.
+describe('create_base_config — command tables block', () => {
+	const command_tables_block = build_config().find((block) =>
+		has_file_pattern(block, 'josh-commands-'),
+	)
+
+	it('turns off max-lines and no other rule', () => {
+		expect(rules_of(command_tables_block)).toStrictEqual({ 'max-lines': 'off' })
+	})
+
+	it('leaves the command table tests under the cap', () => {
+		expect(command_tables_block?.ignores).toContain('**/*.test.ts')
+	})
+})
+
+// joshuafolkken/kit#6030: a command table, or a fixture mirroring an external shape, breaks the
+// naming rule by design.
+describe('create_base_config — naming-convention by file kind block', () => {
+	const naming_block = build_config().find((block) => has_file_pattern(block, '-fixture.ts'))
+
+	it('turns off naming-convention for the command tables and the fixtures', () => {
+		expect(naming_block?.files).toContain('scripts/josh/josh-commands-*.ts')
+		expect(rules_of(naming_block)).toStrictEqual({ '@typescript-eslint/naming-convention': 'off' })
+	})
+})
+
 // joshuafolkken/kit#3047: the local gate reports what Sonar's S9382 reports.
 describe('create_base_config — global block', () => {
 	it('reports an await inside a loop as an error', () => {

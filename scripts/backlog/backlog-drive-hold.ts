@@ -1,5 +1,7 @@
+import { lane_hand_back_hold } from '#scripts/lane/lane-hand-back-hold'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import type { DriveEnd, DrivePorts, DriveState, OfferRead, PassResult } from './backlog-drive'
+import { backlog_hold_codes } from './backlog-hold-codes'
 import { backlog_ready } from './backlog-ready'
 
 // Why a free lane stayed empty, written where `josh lane:stats` reads it (joshuafolkken/kit#3995).
@@ -14,12 +16,11 @@ import { backlog_ready } from './backlog-ready'
 // finished run — a `stop`, the drain's `watch` or `retrospective` — owes no lane a child. Either writes
 // a `released` entry instead, which ends the hold before it: a lane opened outside this driver can
 // fill the pool, and no dispatch of this driver's would end that hold. A full pool's release is written
-// once per hold, so it does not add a line on every pass; the finished run's is written every time.
+// once per hold, so it does not add a line on every pass, and so is a full pool's hand-back, which
+// leaves `lane-hand-back-hold.ts`'s mark beside it; the finished run's is written every time.
 
 const NO_FREE_LANES = 0
-const OFFER_PREFIX = 'offer'
-const HAND_BACK_PREFIX = 'hand-back'
-const REASON_SEPARATOR = ':'
+const { OFFER_PREFIX, HAND_BACK_PREFIX, REASON_SEPARATOR } = backlog_hold_codes
 // The verdict that starts nothing more: the run is finishing, so the lanes it frees are no hold.
 const STOP_VERDICT = 'stop'
 // The ends that finished the run: nothing is owed a lane after them.
@@ -47,8 +48,8 @@ interface HoldLedger {
 
 // The reason an offer that started nothing holds a free lane, or `undefined` for the run's stop. The
 // offer's cause stands in for its answer, so a `run:solo` wait is `offer:watch:solo` rather than one
-// more `offer:watch:blocked` (joshuafolkken/kit#4396), and a dependency-chain or start-condition wait is
-// `offer:watch:chain`, `offer:watch:gate` or `offer:watch:chain+gate` (joshuafolkken/kit#4513).
+// more `offer:watch:blocked` (joshuafolkken/kit#4396), and a dependency-chain, start-condition or
+// running-lane wait is `offer:watch:chain`, `offer:watch:gate+lane` and the like (joshuafolkken/kit#4513).
 function offer_reason(read: OfferRead): string | undefined {
 	if (read.verdict === STOP_VERDICT) return undefined
 
@@ -69,7 +70,7 @@ async function held(
 	return result
 }
 
-// A collection whose `run:merge` answered `stop` — the consecutive-failure guard — finishes the run as
+// A collection whose `run:merge` answered `stop` — a failed child left unparked — finishes the run as
 // an offer's `stop` does, but no offer follows it to release the hold, so it is released here. Left
 // open, the lanes it freed read as held until the next driver's first offer (joshuafolkken/kit#4571).
 async function stopped(
@@ -102,9 +103,11 @@ async function free_count(
 	}
 }
 
+// Every ledger line clears a hand-back mark: a driver writing again is the one recording the lanes.
 async function release(ledger: HoldLedger): Promise<void> {
 	ledger.is_open = false
 	await lane_ledger_write.record_released()
+	await lane_hand_back_hold.clear()
 }
 
 async function release_open(ledger: HoldLedger): Promise<void> {
@@ -135,6 +138,25 @@ async function record(
 
 	ledger.is_open = true
 	await lane_ledger_write.record_held({ reason: draft.reason, waiting: draft.waiting })
+	await lane_hand_back_hold.clear()
+}
+
+// A hand-back on a full pool releases an open hold, then marks the lanes as waiting on a session: a
+// lane freed after this driver ends has no driver to record it (joshuafolkken/kit#7159). A closed hold
+// is not released again — a `released` line reads as an offer's answer in `lane-gap-stats.ts`.
+async function hand_back(
+	ledger: HoldLedger,
+	reason: string | undefined,
+	count: number | undefined,
+): Promise<void> {
+	if (reason === undefined || count !== NO_FREE_LANES) {
+		await record(ledger, { reason }, count)
+
+		return
+	}
+
+	await release_open(ledger)
+	await lane_hand_back_hold.mark(reason)
 }
 
 // The production `hold` port and the driver's end, sharing whether a hold is open. Best-effort like
@@ -151,7 +173,9 @@ function recorder(
 	return {
 		hold: write,
 		end: async (end) => {
-			await write(hand_back_reason(end))
+			const reason = hand_back_reason(end)
+
+			await hand_back(ledger, reason, await free_count(free_lanes, reason))
 		},
 	}
 }

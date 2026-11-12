@@ -2,7 +2,8 @@ import { auto_ok_author } from '#scripts/auto-ok/auto-ok-author'
 import { auto_ok_cli } from '#scripts/auto-ok/auto-ok-cli'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { issue_cite } from '#scripts/issue/issue-cite'
-import { has_any_label, NEEDS_DECISION_LABEL, RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
+import { issue_human_stops, type HumanStop } from '#scripts/issue/issue-human-stops'
+import { has_any_label, RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
 import { issue_not_before } from '#scripts/issue/issue-not-before'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
@@ -14,18 +15,16 @@ import type { DrivePorts, DriveState, OfferRead, PassResult } from './backlog-dr
 // to start. A stall was notified instead and reached nobody with anything to do, since the next dispatch
 // resolved it; this fires only once nothing is left for the loop itself to do.
 //
-// **Once per idle episode**: the loop asks once a minute while it watches, so the marker on the stream
+// **Once per idle episode**: the loop asks every offer interval while it watches, so the marker on the stream
 // (`emit_once_since_with`, reset by a `child-launch`) holds every repeat back, and the pool is read only
 // for an episode that is new.
 
 const WATCH_VERDICT = 'watch'
 const BLOCKED_ANSWER = 'blocked'
-const DECISION_HEADING = `Waiting on a decision (${NEEDS_DECISION_LABEL}):`
 const STALLED_HEADING = `Stalled mechanically (${RUN_STALLED_LABEL}):`
-const UNTRUSTED_HEADING = 'Waiting on a person to vouch for the body (author without write access):'
 const IDLE_HEAD = 'No child running and nothing left to dispatch.'
 const IDLE_RECOVERY =
-	'Decide the parked issues, fix and release the stalled ones, or start the next run with `backlogrun`.'
+	'Act on each issue under its heading, fix and release the stalled ones, or start the next run with `backlogrun`.'
 
 interface IdlePorts {
 	read_issues: () => Promise<ReadonlyArray<OpenIssueData> | undefined>
@@ -61,11 +60,11 @@ async function noticed(
 }
 
 function cited(issue: OpenIssueData, suffix = ''): string {
-	return `- ${issue_cite.plain(issue.number)} ${issue.title}${suffix}`
+	return `- ${issue_cite.plain_for('telegram', issue.number)} ${issue.title}${suffix}`
 }
 
-// The cited issues carrying one park label. `needs-decision` and `run:stalled` are listed apart: one asks
-// a person for a judgement, the other for a mechanical fix (`issue-labels.ts`).
+// The cited issues carrying one label. A person's stops and `run:stalled` are listed apart: one asks
+// a person, the other for a mechanical fix (`issue-labels.ts`).
 function labelled_lines(issues: ReadonlyArray<OpenIssueData>, label: string): Array<string> {
 	return issues
 		.filter((issue) => has_any_label(issue.labels, new Set([label])))
@@ -95,13 +94,25 @@ function section(heading: string, lines: ReadonlyArray<string>): Array<string> {
 	return lines.length === 0 ? [] : [heading, ...lines]
 }
 
+function waiting_lines(issues: ReadonlyArray<OpenIssueData>, stop: HumanStop): Array<string> {
+	if (stop.label !== undefined) return labelled_lines(issues, stop.label)
+
+	return stop.key === issue_human_stops.UNTRUSTED_AUTHOR_KEY ? untrusted_lines(issues) : []
+}
+
+// The person's stops come from their single list (`issue-human-stops.ts`), so a new one is listed here too.
+function person_lines(issues: ReadonlyArray<OpenIssueData>): Array<string> {
+	return issue_human_stops
+		.idle_stops()
+		.flatMap((stop) => section(stop.idle_heading ?? stop.key, waiting_lines(issues, stop)))
+}
+
 function remaining_lines(reading: IdleReading): Array<string> {
 	if (reading.issues === undefined) return ['Remaining issues: unreadable']
 
 	const lines = [
-		...section(DECISION_HEADING, labelled_lines(reading.issues, NEEDS_DECISION_LABEL)),
+		...person_lines(reading.issues),
 		...section(STALLED_HEADING, labelled_lines(reading.issues, RUN_STALLED_LABEL)),
-		...section(UNTRUSTED_HEADING, untrusted_lines(reading.issues)),
 		...section('Waiting on a date:', dated_lines(reading.issues, reading.now_ms)),
 	]
 

@@ -18,6 +18,7 @@ const FIELD_COUNT = 5
 const DISPOSED_FIELD_COUNT = FIELD_COUNT + 1
 const ISSUE_FIELD_INDEX = FIELD_COUNT - 1
 const SEVERITY_FIELD_INDEX = 1
+const DATE_FIELD_INDEX = 3
 // **A code round written to the issue's file opens with a boundary line** (joshuafolkken/kit#5359):
 // the ledger is append-only, so a stopped round's unfixed lines stay, and `josh review:round2` reads
 // only the lines after the issue's last boundary. Its own prefix keeps it out of every `- rf:` reader.
@@ -72,6 +73,8 @@ interface CategoryCount {
 	count: number
 }
 
+type SeverityCount = { category: string } & Record<Severity, number>
+
 function is_category(value: string): value is Category {
 	return (CATEGORIES as ReadonlyArray<string>).includes(value)
 }
@@ -107,7 +110,7 @@ function split_disposition(positional: string): DisposedSpec {
 }
 
 function issue_field(issue: number): string {
-	return issue_cite.plain(issue)
+	return issue_cite.plain_for('github', issue)
 }
 
 function line_of(fields: ReadonlyArray<string>, kind: LineKind): string {
@@ -194,11 +197,65 @@ function category_counts(content: string): ReadonlyArray<CategoryCount> {
 		)
 }
 
-// The number of rounds that recorded zero findings — the denominator half that a bare category count
-// cannot show.
-function zero_round_count(content: string): number {
-	return content.split('\n').filter((line) => is_finding_line(line) && category_of(line) === NONE)
-		.length
+// A well-formed `- rf:` line's fields when it is dated on or after `since` — a `YYYY-MM-DD`, which
+// sorts as text — or `undefined`. An empty `since` admits every date.
+function dated_fields(line: string, since: string): ReadonlyArray<string> | undefined {
+	if (!is_finding_line(line)) return undefined
+
+	const fields = well_formed_fields(line)
+
+	return fields !== undefined && (fields[DATE_FIELD_INDEX] ?? '') >= since ? fields : undefined
+}
+
+// A real finding's category and severity; `undefined` for the `none` sentinel or an unknown severity.
+function graded(fields: ReadonlyArray<string>): [string, Severity] | undefined {
+	const [category = NONE, severity = NONE] = fields
+
+	return category !== NONE && is_severity(severity) ? [category, severity] : undefined
+}
+
+function add_severity(counts: Map<string, SeverityCount>, fields: ReadonlyArray<string>): void {
+	const pair = graded(fields)
+
+	if (pair === undefined) return
+
+	const [category, severity] = pair
+	const entry = counts.get(category) ?? { category, high: 0, medium: 0, low: 0 }
+
+	entry[severity] += 1
+	counts.set(category, entry)
+}
+
+function medium_up(entry: SeverityCount): number {
+	return entry.high + entry.medium
+}
+
+function by_weight(left: SeverityCount, right: SeverityCount): number {
+	return (
+		medium_up(right) - medium_up(left) ||
+		right.low - left.low ||
+		left.category.localeCompare(right.category)
+	)
+}
+
+// Each category's findings dated on or after `since`, split by severity — the medium-and-up total
+// first, since that is what starts a fix round — then low, ties broken by name.
+function severity_counts(content: string, since: string): ReadonlyArray<SeverityCount> {
+	const counts = new Map<string, SeverityCount>()
+
+	for (const line of content.split('\n')) {
+		const fields = dated_fields(line, since)
+
+		if (fields !== undefined) add_severity(counts, fields)
+	}
+
+	return [...counts.values()].toSorted(by_weight)
+}
+
+// The number of rounds that recorded zero findings on or after `since` — the denominator half that a
+// bare category count cannot show.
+function zero_round_count(content: string, since = ''): number {
+	return content.split('\n').filter((line) => dated_fields(line, since)?.[0] === NONE).length
 }
 
 // The issue a finding line is keyed to — its fifth field, the `#<N>` token — or `undefined` for a
@@ -215,13 +272,17 @@ interface DisposedLine {
 
 // One issue's `- rf:` lines, each with its severity and disposition — `undefined` disposition for a
 // line written without one. `josh review:round2` reads round 1's closure from this.
-function issue_dispositions(content: string, issue: number): ReadonlyArray<DisposedLine> {
+function issue_dispositions(
+	content: string,
+	issue: number,
+	kind: LineKind = 'code',
+): ReadonlyArray<DisposedLine> {
 	const target = issue_field(issue)
 
 	return content
 		.split('\n')
-		.filter((line) => is_finding_line(line) && issue_of(line, 'code') === target)
-		.map((line) => well_formed_fields(line) ?? [])
+		.filter((line) => is_finding_line(line, kind) && issue_of(line, kind) === target)
+		.map((line) => well_formed_fields(line, kind) ?? [])
 		.map((fields) => ({
 			severity: fields[SEVERITY_FIELD_INDEX] ?? NONE,
 			disposition: fields[FIELD_COUNT],
@@ -277,10 +338,11 @@ const review_finding_ledger = {
 	latest_round,
 	round_line,
 	SEVERITIES,
+	severity_counts,
 	split_disposition,
 	zero_round_count,
 	zero_round_line,
 }
 
-export type { CategoryCount, DisposedLine, Finding, LineKind }
+export type { CategoryCount, DisposedLine, Finding, LineKind, SeverityCount }
 export { review_finding_ledger }

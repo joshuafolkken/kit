@@ -1,17 +1,11 @@
-import {
-	copyFileSync,
-	mkdirSync,
-	mkdtempSync,
-	readFileSync,
-	rmSync,
-	symlinkSync,
-	writeFileSync,
-} from 'node:fs'
-import os from 'node:os'
+import { copyFileSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { package_path } from '#scripts/init/init-paths'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import ts from 'typescript'
-import { afterAll, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
+
+const make_directory = temporary_directory('suite')
 
 // `tsconfig.sonar.json` is byte-copied into a consumer's root, where no `tsconfig/` directory
 // exists, so the base is named by the package specifier — which also self-resolves inside kit.
@@ -44,7 +38,7 @@ function collect_config_diagnostics(config_path: string): Array<string> {
 // A consumer root as `josh init` leaves it: the copied config, one source file for `include`, and
 // kit installed under node_modules (linked to this checkout), with a package name of its own.
 function create_consumer_root(): string {
-	const root = mkdtempSync(path.join(os.tmpdir(), 'kit-sonar-tsconfig-'))
+	const root = make_directory('kit-sonar-tsconfig-')
 	const scope_directory = path.join(root, 'node_modules', '@joshuafolkken')
 
 	mkdirSync(scope_directory, { recursive: true })
@@ -78,10 +72,6 @@ describe('tsconfig.sonar.json in kit', () => {
 describe('tsconfig.sonar.json copied into a consumer', () => {
 	const consumer_root = create_consumer_root()
 	const consumer_config = path.join(consumer_root, SONAR_TSCONFIG_NAME)
-
-	afterAll(() => {
-		rmSync(consumer_root, { recursive: true, force: true })
-	})
 
 	it('resolves the kit base from node_modules with no diagnostics', () => {
 		expect(collect_config_diagnostics(consumer_config)).toStrictEqual([])

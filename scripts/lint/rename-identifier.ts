@@ -186,7 +186,7 @@ function rewrite(
 	}
 }
 
-const rename_identifier = { rewrite }
+const rename_identifier = { apply, rewrite }
 
-export type { RenameRequest, RenameResult, TypeScriptApi }
+export type { RenameRequest, RenameResult, Replacement, TypeScriptApi }
 export { rename_identifier }

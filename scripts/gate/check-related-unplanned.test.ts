@@ -47,3 +47,31 @@ describe('check_related_unplanned.notice', () => {
 		expect(lane_ledger_write.record_unplanned_notice).not.toHaveBeenCalled()
 	})
 })
+
+// joshuafolkken/kit#5388: the join prints the notice `check:related` prints.
+describe('check_related_unplanned.show', () => {
+	beforeEach(() => {
+		vi.spyOn(lane_ledger_write, 'record_unplanned_notice').mockResolvedValue()
+		vi.spyOn(console, 'info').mockReturnValue(undefined)
+	})
+
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it("prints the preflight's answer, its lane:plan command included", async () => {
+		vi.spyOn(run_ship_planned, 'unplanned').mockResolvedValue(FOUND)
+
+		await check_related_unplanned.show()
+
+		expect(console.info).toHaveBeenCalledExactlyOnceWith(FOUND.text)
+	})
+
+	it('prints nothing where the preflight finds nothing unplanned', async () => {
+		vi.spyOn(run_ship_planned, 'unplanned').mockResolvedValue(undefined)
+
+		await check_related_unplanned.show()
+
+		expect(console.info).not.toHaveBeenCalled()
+	})
+})

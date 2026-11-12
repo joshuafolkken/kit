@@ -24,7 +24,7 @@ function running(number: number): BoardRow {
 		state: 'running' as const,
 		started_ms: NOW - 15 * MINUTE,
 		track: ['implement' as const],
-		phase_ms: NOW - 11 * MINUTE,
+		phase_ms: NOW - 8 * MINUTE,
 	}
 	const title = `Issue ${String(number)} narrows a long title down to fit the pane`
 

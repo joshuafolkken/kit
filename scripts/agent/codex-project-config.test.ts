@@ -2,6 +2,7 @@ import { lstatSync, readFileSync, readlinkSync, realpathSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { codex_hooks, type HookConfig } from '#scripts/agent/codex-hooks'
+import { hook_launch } from '#scripts/init/hook-launch'
 import { init_logic } from '#scripts/init/init-logic'
 import { prompt_hooks } from '#tools/hooks/prompt-hooks'
 import { describe, expect, it } from 'vitest'
@@ -69,17 +70,42 @@ describe('Codex hook wiring', () => {
 	it('runs the Codex adapter and the provider-independent kit hooks', () => {
 		const hooks = read(CODEX_HOOKS)
 
-		expect(hooks).toContain('run-hook.sh codex-hook-adapter pretool')
-		expect(hooks).toContain('run-hook.sh codex-hook-adapter posttool')
-		expect(hooks).toContain('run-hook.sh audit-provision')
-		expect(hooks).toContain('run-hook.sh session-lang')
+		for (const hook of [
+			'codex-hook-adapter pretool',
+			'codex-hook-adapter posttool',
+			'audit-provision',
+			'session-lang',
+		]) {
+			expect(hooks).toContain(String.raw`run-hook.sh\" ${hook}`)
+		}
 	})
 
+	// Codex names its hooks' root through git rather than `CLAUDE_PROJECT_DIR`; the rest is the same.
 	it('keeps prompt-time rules aligned with the Claude workflow', () => {
 		const codex_commands = prompt_hooks.user_prompt_hook_commands(read(CODEX_HOOKS))
-		const claude_commands = prompt_hooks.user_prompt_hook_commands(read(CLAUDE_SETTINGS))
+		const claude_commands = prompt_hooks
+			.user_prompt_hook_commands(read(CLAUDE_SETTINGS))
+			.map((command) => hook_launch.codex_command(command))
 
 		expect(codex_commands).toStrictEqual(claude_commands)
+	})
+})
+
+// A lane runs the main checkout's trusted hooks.json (joshuafolkken/kit#6658), so every command
+// must find its scripts through the running work tree rather than a fixed path.
+describe('Codex hooks in a lane', () => {
+	it('resolves every hook command from the running work tree', () => {
+		const handlers = Object.values(load_hooks(CODEX_HOOKS).hooks)
+			.flat()
+			.flatMap((group) => group?.hooks ?? [])
+
+		expect(handlers.length).toBeGreaterThan(0)
+
+		for (const handler of handlers) {
+			expect(handler.command).toMatch(
+				/^sh "\$\( \(unset GIT_DIR GIT_WORK_TREE; git rev-parse --show-toplevel/u,
+			)
+		}
 	})
 })
 

@@ -20,8 +20,8 @@
  * release, exactly as the filtered view behaves.
  *
  * The resolved version is floored at the current `packageManager` pin: a filtered registry
- * view legitimately answers below a freshly adopted pin for the first 24 hours after every
- * pnpm release, and writing that answer would downgrade the protected toolchain pin.
+ * view legitimately answers below a freshly adopted pin for the minimum-release-age window
+ * after every pnpm release, and writing that answer would downgrade the protected toolchain pin.
  * Not-newer answers skip the bump non-fatally instead.
  *
  * `devEngines.packageManager.version` is realigned with the `packageManager` pin on every
@@ -108,7 +108,7 @@ function extract_pinned_version(package_json_content: string): string | undefine
 }
 
 // Never move the pin backwards. A filtered registry view (safe-chain's minimum-release-age
-// proxy) answers below a freshly adopted pin for 24 hours after every pnpm release, and an
+// proxy) answers below a freshly adopted pin for that window after every pnpm release, and an
 // equal answer would only rewrite the same value — both skip instead.
 function is_target_not_newer_than_pin(target: string, pinned_version: string | undefined): boolean {
 	if (pinned_version === undefined) return false

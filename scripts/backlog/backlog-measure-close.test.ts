@@ -23,9 +23,17 @@ vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
 const ISSUE = '4599'
 const DECLARED = '## 背景\n\n- 計測宣言: `pnpm josh count` <= 5\n'
 const UNREADABLE = 'Value: unreadable'
+const UNSAMPLED = 'sample condition not met'
+const SINCE = 'since 2026-11-01T00:00:00.000Z'
 
 function given(body: string, run: CommandRun): void {
-	vi.mocked(trusted_measure.read_trusted_body).mockResolvedValue({ kind: 'trusted', body })
+	vi.mocked(trusted_measure.read_trusted_body).mockResolvedValue({
+		kind: 'trusted',
+		body,
+		issue: ISSUE,
+		author: 'author',
+		editor: 'editor',
+	})
 	vi.mocked(trusted_measure.run_command).mockReturnValue(run)
 }
 
@@ -36,11 +44,11 @@ beforeEach(() => {
 	vi.mocked(run_event_stream_emit.emit).mockReset().mockResolvedValue()
 })
 
-describe('backlog_measure_close.closed — a value within the bound', () => {
+describe('backlog_measure_close.outcome — a value within the bound', () => {
 	it('closes the issue and puts a measured event on the stream', async () => {
 		given(DECLARED, { kind: 'ok', output: '3' })
 
-		await expect(backlog_measure_close.closed(ISSUE)).resolves.toBe(true)
+		await expect(backlog_measure_close.outcome(ISSUE)).resolves.toBe('closed')
 		expect(issue_measured_close.close).toHaveBeenCalledWith(
 			ISSUE,
 			expect.stringContaining('Value: 3'),
@@ -55,12 +63,12 @@ describe('backlog_measure_close.closed — a value within the bound', () => {
 		given(DECLARED, { kind: 'ok', output: '3' })
 		vi.mocked(issue_measured_close.close).mockResolvedValue(false)
 
-		await expect(backlog_measure_close.closed(ISSUE)).resolves.toBe(false)
+		await expect(backlog_measure_close.outcome(ISSUE)).resolves.toBe('launch')
 		expect(run_event_stream_emit.emit).not.toHaveBeenCalled()
 	})
 })
 
-describe('backlog_measure_close.closed — handed to the lane with the result', () => {
+describe('backlog_measure_close.outcome — handed to the lane with the result', () => {
 	it.each([
 		['a value out of bound', { kind: 'ok', output: '9' }, 'Value: 9'],
 		['output that is not one number', { kind: 'ok', output: 'nine' }, UNREADABLE],
@@ -68,7 +76,7 @@ describe('backlog_measure_close.closed — handed to the lane with the result', 
 	] as const)('comments %s and launches', async (_case, run, value) => {
 		given(DECLARED, run)
 
-		await expect(backlog_measure_close.closed(ISSUE)).resolves.toBe(false)
+		await expect(backlog_measure_close.outcome(ISSUE)).resolves.toBe('launch')
 		expect(git_gh_command.issue_comment).toHaveBeenCalledWith(ISSUE, expect.stringContaining(value))
 		expect(issue_measured_close.close).not.toHaveBeenCalled()
 	})
@@ -78,15 +86,36 @@ describe('backlog_measure_close.closed — handed to the lane with the result', 
 		vi.mocked(git_gh_command.issue_comment).mockRejectedValue(new Error('HTTP 502'))
 		vi.spyOn(console, 'error').mockImplementation(() => undefined)
 
-		await expect(backlog_measure_close.closed(ISSUE)).resolves.toBe(false)
+		await expect(backlog_measure_close.outcome(ISSUE)).resolves.toBe('launch')
 	})
 })
 
-describe('backlog_measure_close.closed — nothing to run', () => {
+// joshuafolkken/kit#6503: a `lane:value` with no sample in its period is a wait, not a lane.
+describe('backlog_measure_close.outcome — no sample yet', () => {
+	it.each([
+		['a cell', `josh lane:value cell: no numeric cell ${SINCE}`],
+		['a metric', `josh lane:value merges: no sample ${SINCE}`],
+	])('comments the unmet sample condition of %s and waits on the stream', async (_case, stderr) => {
+		given(DECLARED, { kind: 'failed', message: `Command failed: pnpm josh lane:value\n${stderr}` })
+
+		await expect(backlog_measure_close.outcome(ISSUE)).resolves.toBe('wait')
+		expect(git_gh_command.issue_comment).toHaveBeenCalledWith(
+			ISSUE,
+			expect.stringContaining(UNSAMPLED),
+		)
+		expect(issue_measured_close.close).not.toHaveBeenCalled()
+		expect(run_event_stream_emit.emit).toHaveBeenCalledExactlyOnceWith(
+			run_event_stream.EVENT_KIND.SAMPLE_WAIT,
+			`#${ISSUE} waiting: ${UNSAMPLED}`,
+		)
+	})
+})
+
+describe('backlog_measure_close.outcome — nothing to run', () => {
 	it('launches without a comment when the body declares nothing', async () => {
 		given('## 背景\n\n- 種別: 非不具合\n', { kind: 'ok', output: '3' })
 
-		await expect(backlog_measure_close.closed(ISSUE)).resolves.toBe(false)
+		await expect(backlog_measure_close.outcome(ISSUE)).resolves.toBe('launch')
 		expect(trusted_measure.run_command).not.toHaveBeenCalled()
 		expect(git_gh_command.issue_comment).not.toHaveBeenCalled()
 	})
@@ -95,7 +124,7 @@ describe('backlog_measure_close.closed — nothing to run', () => {
 		vi.mocked(trusted_measure.read_trusted_body).mockResolvedValue({ kind: 'refused', reason: 'x' })
 		vi.mocked(trusted_measure.run_command).mockClear()
 
-		await expect(backlog_measure_close.closed(ISSUE)).resolves.toBe(false)
+		await expect(backlog_measure_close.outcome(ISSUE)).resolves.toBe('launch')
 		expect(trusted_measure.run_command).not.toHaveBeenCalled()
 		expect(git_gh_command.issue_comment).not.toHaveBeenCalled()
 	})

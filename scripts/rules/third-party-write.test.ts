@@ -1,6 +1,8 @@
+import { hook_context } from '#scripts/hooks/hook-context'
 import { delivered_rules_harness } from '#tools/rules/delivered-rules-harness'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
+import { egress_guard } from './egress-guard'
 import { third_party_write } from './third-party-write'
 
 // The `gh api` write to a repository we do not own, refused before the backlog count speaks
@@ -175,7 +177,7 @@ afterAll(() => {
 
 function claiming_ids(command: string): Array<string> {
 	return delivered_rules.DELIVERED_RULES.filter((rule) =>
-		rule.is_trigger({ name: 'Bash', input: { command } }),
+		rule.is_trigger({ name: 'Bash', input: { command } }, hook_context.from_process()),
 	).map((rule) => rule.id)
 }
 
@@ -192,17 +194,19 @@ describe('third-party-write — delivered through the guard', () => {
 		expect(delivered_rules.delivery(payload_of('3p-read', command), NOW_MS)).toBeUndefined()
 	})
 
-	it('is silent on a first-party comment write', () => {
+	it('leaves a first-party comment write to egress', () => {
 		// Not the checkout's own repository, which `direct-issue-comment` claims.
 		const command = `gh api repos/${SESSION}/other/issues/5/comments -f body=x`
 
-		expect(delivered_rules.delivery(payload_of('fp-comment', command), NOW_MS)).toBeUndefined()
+		expect(delivered_rules.delivery(payload_of('fp-comment', command), NOW_MS)).toBe(
+			egress_guard.EGRESS_REASON,
+		)
 	})
 
-	it('is silent on a placeholder label write', () => {
-		expect(
-			delivered_rules.delivery(payload_of('fp-placeholder', PLACEHOLDER_LABEL), NOW_MS),
-		).toBeUndefined()
+	it('leaves a placeholder label write to egress', () => {
+		expect(delivered_rules.delivery(payload_of('fp-placeholder', PLACEHOLDER_LABEL), NOW_MS)).toBe(
+			egress_guard.EGRESS_REASON,
+		)
 	})
 
 	it('is refused before wip-cap on a third-party filing', () => {
@@ -218,10 +222,9 @@ describe('third-party-write — delivered through the guard', () => {
 })
 
 describe('third-party-write — which rows claim a command', () => {
-	// One refusal can leave a PreToolUse hook, so a non-filing third-party write must be claimed by
-	// this row alone — the filing overlap with the filing rows is the intended one.
-	it('claims a non-filing third-party write alone', () => {
-		expect(claiming_ids(THIRD_PARTY_COMMENT)).toStrictEqual([ROW_ID])
+	// Specific third-party guidance wins delivery; egress remains the recurring broad backstop.
+	it('claims a non-filing third-party write with the egress backstop', () => {
+		expect(claiming_ids(THIRD_PARTY_COMMENT)).toStrictEqual([ROW_ID, 'egress'])
 	})
 
 	it('does not claim a first-party filing', () => {

@@ -1,12 +1,13 @@
-import { closeSync, mkdtempSync, openSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { closeSync, openSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { agent_session_role } from '#scripts/agent/agent-session-role'
 import type { GuardOutcome } from '#scripts/josh/hook-decision'
 import { delivered_rules } from '#scripts/rules/delivered-rules'
 import { issue_comments } from '#scripts/rules/issue-comments'
 import { piped_verification } from '#scripts/rules/piped-verification'
 import { rule_rewrite } from '#scripts/rules/rule-rewrite'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { pretool_guard, pretool_outcome, pretool_outcome_async } from './pretool-guard'
 import { shell_rules_notice } from './shell-rules-notice'
 import { step_zero_notice } from './step-zero-notice'
@@ -23,7 +24,10 @@ vi.mock('#scripts/run/run-watcher-hook', () => ({
 }))
 
 vi.mock('#scripts/run/run-parent-cut-hook', () => ({
-	run_parent_cut_hook: { parent_cut_reason: vi.fn().mockResolvedValue(undefined) },
+	run_parent_cut_hook: {
+		current_state: vi.fn(),
+		parent_cut_reason: vi.fn().mockResolvedValue(undefined),
+	},
 }))
 
 // The issue watch polls GitHub; its composition is pinned in `pretool-guard-issue-watch.test.ts`.
@@ -46,6 +50,14 @@ const lane_plan_reason = vi.mocked(lane_plan_guard.reason)
 
 const { combine_outcomes } = pretool_guard
 
+beforeEach(() => {
+	vi.stubEnv(agent_session_role.KEY, 'worker')
+})
+
+afterEach(() => {
+	vi.unstubAllEnvs()
+})
+
 const BENIGN_COMMAND = 'ls'
 const SHELL_BODY_COMMAND = 'pnpm josh notify --body="hi `date`"'
 const SHELL_BODY_REASON = 'shell-evaluated body'
@@ -62,11 +74,12 @@ function outcome(
 }
 
 const CLEAR = outcome(undefined, undefined, undefined)
+const make_directory = temporary_directory()
 
 // A real transcript file so the composed guards run their normal disk path rather than failing open,
 // and a fresh one per case so the once-per-run stamp never dedupes one case against another.
 function fresh_transcript(): string {
-	const directory = mkdtempSync(path.join(tmpdir(), 'pretool-guard-'))
+	const directory = make_directory('pretool-guard-')
 	const transcript_path = path.join(directory, 'transcript.jsonl')
 
 	writeFileSync(transcript_path, '{"type":"user"}\n')
@@ -120,7 +133,7 @@ describe('combine_outcomes', () => {
 		expect(combine_outcomes([batch_fault, CLEAR], undefined)).toEqual(batch_fault)
 	})
 
-	// joshuafolkken/kit#3877: a later guard's notice or fault used to be dropped on the floor.
+	// Every guard's notice or fault must remain visible (joshuafolkken/kit#3877).
 	it("passes a later guard's notice and fault through when nothing earlier spoke", () => {
 		expect(combine_outcomes([CLEAR, later_notice], undefined)).toEqual(later_notice)
 		expect(combine_outcomes([CLEAR, later_fault], undefined)).toEqual(later_fault)
@@ -132,6 +145,18 @@ describe('combine_outcomes', () => {
 })
 
 describe('pretool_outcome', () => {
+	it.each(['scheduler', 'reviewer', undefined, 'unknown'])(
+		'refuses runtime edits without worker authority: %s',
+		async (role) => {
+			vi.stubEnv(agent_session_role.KEY, role)
+			const payload = edit_payload_with_transcript()
+			const asynchronous = await pretool_outcome_async(payload)
+
+			expect(pretool_outcome(payload).reason).toContain(agent_session_role.scope_line())
+			expect(asynchronous.reason).toBe(pretool_outcome(payload).reason)
+		},
+	)
+
 	it('allows a benign call that trips none of the three guards', () => {
 		expect(pretool_outcome(payload_with_transcript(BENIGN_COMMAND)).reason).toBeUndefined()
 	})
@@ -202,7 +227,7 @@ describe('pretool_outcome — the Step 0 reminder at Edit time', () => {
 	})
 
 	// joshuafolkken/kit#3444: the reminder's edit is the lane child's move from plan to code.
-	it('marks the implement phase beside the reminder, and only then', async () => {
+	it('marks each allowed runtime edit even after the reminder was spent', async () => {
 		mark_implement.mockClear()
 		const payload = edit_payload_with_transcript()
 
@@ -210,7 +235,7 @@ describe('pretool_outcome — the Step 0 reminder at Edit time', () => {
 		await pretool_outcome_async(payload)
 		await pretool_outcome_async(payload_with_transcript(BENIGN_COMMAND))
 
-		expect(mark_implement).toHaveBeenCalledOnce()
+		expect(mark_implement).toHaveBeenCalledTimes(2)
 	})
 
 	it('lets an asynchronous refusal win over the reminder', async () => {
@@ -238,13 +263,16 @@ describe('pretool_outcome — the shell rules at the first Bash call', () => {
 
 // joshuafolkken/kit#3444: the Codex adapter marks the phase through the same helper.
 describe('pretool_guard.mark_phase', () => {
-	it('marks the implement phase from the reminder alone', async () => {
+	it('marks allowed runtime edits independently of the reminder', async () => {
 		mark_implement.mockClear()
+		const payload = edit_payload_with_transcript()
 
-		await pretool_guard.mark_phase(outcome(undefined, 'another notice', undefined))
-		await pretool_guard.mark_phase(outcome(undefined, step_zero_notice.NOTICE, undefined))
+		await pretool_guard.mark_phase(CLEAR, payload)
+		await pretool_guard.mark_phase(outcome(undefined, 'another notice', undefined), payload)
+		await pretool_guard.mark_phase(outcome('refused', undefined, undefined), payload)
+		await pretool_guard.mark_phase(CLEAR, payload_with_transcript(BENIGN_COMMAND))
 
-		expect(mark_implement).toHaveBeenCalledOnce()
+		expect(mark_implement).toHaveBeenCalledTimes(2)
 	})
 })
 

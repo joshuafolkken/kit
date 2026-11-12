@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LedgerEntry } from './lane-ledger'
 import { lane_overrun } from './lane-overrun'
 
-// joshuafolkken/kit#4751: a merged lane over 40 minutes of net time is investigated in a detached
+// joshuafolkken/kit#4751: a merged lane over the net-time threshold is investigated in a detached
 // session that files its unfiled causes against the lane; one at or under it stops before its records.
 
 const mocks = vi.hoisted(() => ({
@@ -21,7 +21,12 @@ const mocks = vi.hoisted(() => ({
 vi.mock(import('./lane-ledger'), async (import_original) => {
 	const { lane_ledger } = await import_original()
 
-	return { lane_ledger: { ...lane_ledger, read_entries: mocks.read_entries, target: mocks.target } }
+	// The archive beside the ledger (`lane-ledger-archive.ts`) holds nothing here.
+	function read_entries(file: string): ReadonlyArray<LedgerEntry> {
+		return file.endsWith('-archive.jsonl') ? [] : mocks.read_entries(file)
+	}
+
+	return { lane_ledger: { ...lane_ledger, read_entries, target: mocks.target } }
 })
 vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
 	run_event_stream_emit: { all_events: mocks.all_events, emit: mocks.emit },
@@ -40,6 +45,7 @@ vi.mock('#scripts/cost-runtime/cost-transcript', () => ({
 	cost_transcript: {
 		home_directory: () => '/home',
 		lane_transcript_directories: mocks.transcripts,
+		list_sessions_across: () => [],
 		session_cwd: (cwd: string) => cwd,
 	},
 }))
@@ -69,6 +75,11 @@ function park(minute: number): RunEvent {
 	return { pos: minute, at: at(minute), kind: 'park', text: `#${String(ISSUE)} parked` }
 }
 
+// A note an earlier pass left on the stream once the lane merged.
+function note(text: string): RunEvent {
+	return { pos: 1, at: at(41), kind: 'note', text }
+}
+
 function launched_prompt(): string {
 	return mocks.resolve_in.mock.calls.map(([invocation]) => invocation).join('\n')
 }
@@ -88,7 +99,6 @@ function notes(): ReadonlyArray<string> {
 afterEach(() => vi.unstubAllEnvs())
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.stubEnv('JOSH_LANE_INVESTIGATION', 'on')
 	mocks.target.mockResolvedValue('/ledger.jsonl')
 	mocks.all_events.mockResolvedValue([])
@@ -336,12 +346,7 @@ describe('lane_overrun.investigate — a lane whose earlier pass threw', () => {
 	it('is investigated again', async () => {
 		mocks.read_entries.mockReturnValue(lane(41))
 		mocks.all_events.mockResolvedValue([
-			{
-				pos: 1,
-				at: at(41),
-				kind: 'note',
-				text: `#${String(ISSUE)} overrun investigation failed: no profile`,
-			},
+			note(`#${String(ISSUE)} overrun investigation failed: no profile`),
 		])
 
 		await lane_overrun.investigate(ISSUE)
@@ -356,14 +361,9 @@ describe('lane_overrun.investigate — a lane already investigated or refused a 
 	})
 
 	it('launches once for a lane already on the stream', async () => {
-		const note: RunEvent = {
-			pos: 1,
-			at: at(41),
-			kind: 'note',
-			text: `#${String(ISSUE)} overran: 41 min net — investigating in pid 1`,
-		}
-
-		mocks.all_events.mockResolvedValue([note])
+		mocks.all_events.mockResolvedValue([
+			note(`#${String(ISSUE)} overran: 41 min net — investigating in pid 1`),
+		])
 
 		await lane_overrun.investigate(ISSUE)
 
@@ -372,14 +372,7 @@ describe('lane_overrun.investigate — a lane already investigated or refused a 
 	})
 
 	it('records once for a lane whose net minutes are on the stream', async () => {
-		const note: RunEvent = {
-			pos: 1,
-			at: at(41),
-			kind: 'note',
-			text: `#${String(ISSUE)} net: 9 min`,
-		}
-
-		mocks.all_events.mockResolvedValue([note])
+		mocks.all_events.mockResolvedValue([note(`#${String(ISSUE)} net: 9 min`)])
 
 		await lane_overrun.investigate(ISSUE)
 

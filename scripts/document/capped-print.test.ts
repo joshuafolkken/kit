@@ -1,6 +1,6 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import os from 'node:os'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { capped_output } from './capped-print'
 import { capped_print_fixture } from './capped-print-fixture'
@@ -14,7 +14,8 @@ const LINE = `${'word '.repeat(9)}\n`
 const LONG_REPEAT = 30
 const LONG = LINE.repeat(LONG_REPEAT)
 const SHORT = 'a short output'
-const ROOT = mkdtempSync(path.join(os.tmpdir(), 'capped-print-test-'))
+const make_directory = temporary_directory('suite')
+const ROOT = make_directory('capped-print-test-')
 
 mkdirSync(path.join(ROOT, '.claude'))
 writeFileSync(
@@ -43,7 +44,6 @@ beforeEach(() => {
 
 afterAll(() => {
 	vi.restoreAllMocks()
-	rmSync(ROOT, { recursive: true, force: true })
 })
 
 describe('capped_output.capped_print', () => {

@@ -2,6 +2,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { NEEDS_HUMAN_MERGE_LABEL } from '#scripts/issue/issue-labels'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { detached_launch } from '#scripts/run/detached-launch'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
@@ -9,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_dispatch } from './lane-dispatch'
 import { lane_output } from './lane-output'
 import { lane_registry, type LaneInfo } from './lane-registry'
+import { lane_seat_fixture } from './lane-seat-fixture'
 
 // joshuafolkken/kit#3591: a launch that never started took `in-progress` back off by the canonical
 // spelling and swallowed the failure, so a label stored as `In-Progress` answered 404 and stayed on an
@@ -22,6 +24,7 @@ const CREATED_CASING = 'In-Progress'
 
 const read_labels = vi.spyOn(git_gh_command, 'issue_get_labels_and_body')
 const remove_label = vi.spyOn(git_gh_command, 'issue_remove_label')
+const clear_label = vi.spyOn(git_gh_command, 'issue_clear_label')
 
 const LANE: LaneInfo = {
 	issue: ISSUE,
@@ -44,14 +47,16 @@ function mock_lane(): void {
 	})
 }
 
+beforeEach(lane_seat_fixture.mock_start)
+
 beforeEach(() => {
-	vi.clearAllMocks()
 	for (const key of agent_session_environment.PARENT_SESSION_KEYS) vi.stubEnv(key, '')
 	vi.stubEnv('CLAUDE_CODE_SESSION_ID', 'session')
 	vi.stubEnv('CODEX_THREAD_ID', '')
 	mock_lane()
 	vi.spyOn(run_event_stream_emit, 'emit').mockResolvedValue(undefined)
 	vi.spyOn(git_gh_command, 'issue_apply_label').mockResolvedValue({ is_applied: true })
+	clear_label.mockResolvedValue(true)
 	vi.spyOn(detached_launch, 'launch').mockReturnValue({ kind: 'failed', note: 'spawn ENOENT' })
 	read_labels.mockResolvedValue(JSON.stringify({ labels: [{ name: CREATED_CASING }] }))
 	remove_label.mockResolvedValue(undefined)
@@ -77,5 +82,17 @@ describe('lane_dispatch.dispatch_child — the marker a failed launch takes back
 
 		expect(outcome.kind).toBe('failed')
 		expect(warn).toHaveBeenCalledWith(expect.stringContaining('labels/in-progress'))
+	})
+})
+
+// joshuafolkken/kit#7313: the park left on a dispatched-back issue refused its lane's review.
+describe('lane_dispatch.dispatch_child — the park a dispatch takes off', () => {
+	it('takes needs-human-merge off before it starts the child', async () => {
+		await lane_dispatch.dispatch_child(ISSUE)
+
+		expect(clear_label).toHaveBeenCalledWith(ISSUE, NEEDS_HUMAN_MERGE_LABEL)
+		expect(clear_label.mock.invocationCallOrder[0] ?? 0).toBeLessThan(
+			vi.mocked(detached_launch.launch).mock.invocationCallOrder[0] ?? 0,
+		)
 	})
 })

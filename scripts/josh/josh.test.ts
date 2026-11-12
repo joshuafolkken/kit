@@ -6,8 +6,19 @@ const josh_mock = vi.hoisted(() => {
 		format_help_return: '',
 	}
 
-	return { state, UNKNOWN_PREFIX: 'Unknown command: ', UNKNOWN_COMMAND_EXIT_CODE: -1 }
+	return {
+		state,
+		UNKNOWN_PREFIX: 'Unknown command: ',
+		UNKNOWN_COMMAND_EXIT_CODE: -1,
+		usage_write: vi.fn(async (): Promise<void> => await undefined),
+	}
 })
+
+// The entry's gh usage record (joshuafolkken/kit#6707): only whether the entry hands its command to the
+// writer is asserted here; what the writer writes is `gh-usage-event.test.ts`'s.
+vi.mock('#scripts/gh/gh-usage-event', () => ({
+	gh_usage_event: { write: josh_mock.usage_write },
+}))
 
 vi.mock('./josh-logic', () => ({
 	josh_logic: {
@@ -69,9 +80,7 @@ describe('josh.ts — no command', () => {
 })
 
 describe('josh.ts — help command', () => {
-	// The flag spellings are here because #825 moved the unknown-command path to stderr, and they
-	// used to reach the listing only by falling into it: `josh --help | less` printed the listing
-	// before that move and nothing after it.
+	// Help flags must print the listing on stdout so `josh --help | less` works (#825).
 	it.each(['help', '--help', '-h'])('prints help to stdout for %s', async (help_command) => {
 		process.argv = [...ARGV_BASE, help_command]
 
@@ -171,5 +180,19 @@ describe('josh.ts — command with zero exit code', () => {
 
 		expect(process.exitCode).toBe(ORIGINAL_EXIT_CODE)
 		expect(vi.mocked(console.error)).not.toHaveBeenCalled()
+	})
+})
+
+describe('josh.ts — gh usage record', () => {
+	it('hands the command and its issue to the gh usage writer as the command ends', async () => {
+		josh_mock.usage_write.mockClear()
+		process.argv = [...ARGV_BASE, 'run:step', '6707']
+
+		await import('./josh')
+
+		expect(josh_mock.usage_write).toHaveBeenCalledOnce()
+		expect(josh_mock.usage_write).toHaveBeenCalledWith(
+			expect.objectContaining({ command: 'run:step', issue: 6707 }),
+		)
 	})
 })

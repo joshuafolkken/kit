@@ -5,6 +5,7 @@ import { josh_command } from '#scripts/josh/josh-run'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { review_attest, type ReviewSlot } from '#scripts/review/review-attest'
+import { early_push_record } from '#scripts/run/early-push-record'
 import { run_hold } from '#scripts/run/hold/run-hold'
 import { run_ship_body_draft } from '#scripts/run/ship/run-ship-body-draft'
 import { run_review } from './run-review'
@@ -33,6 +34,7 @@ const COMMIT_REFUSED_NOTE =
 const SKIPPED_NOTE = 'No early push: '
 const RED_NOTE = 'the gate did not come back green on this tree.'
 const DIRTY_NOTE = 'the tree moved after the gate (a round-1 fix in place).'
+const DIRTY_REASON = 'dirty-tree'
 
 interface EarlyPushPlan {
 	is_code_only: boolean
@@ -67,28 +69,54 @@ async function commit_locally(): Promise<boolean> {
 	return false
 }
 
+function preparation_skip(
+	plan: EarlyPushPlan,
+	environment: Environment,
+	directory: string,
+): string | undefined {
+	if (!lane_child_marker.is_child_of(directory, environment)) return 'not-lane-child'
+	if (plan.is_code_only) return 'code-only'
+
+	return is_code_alone(plan) ? undefined : 'multiple-slots'
+}
+
 // Whether this open pushes early: due here, and the tree committed for the brief to attest.
 async function prepare(
 	plan: EarlyPushPlan,
 	environment?: Environment,
 	directory?: string,
 ): Promise<boolean> {
-	return is_due(plan, environment, directory) && (await commit_locally())
+	const reason = preparation_skip(plan, environment ?? process.env, directory ?? PROJECT_ROOT)
+
+	if (reason !== undefined) {
+		await early_push_record.record('review', reason)
+
+		return false
+	}
+
+	const is_committed = await commit_locally()
+
+	if (!is_committed) await early_push_record.record('review', 'commit-refused')
+
+	return is_committed
 }
 
 function launch(): void {
 	const log_path = stamp_file.stamp_path(PUSH_LOG_PREFIX, PROJECT_ROOT)
 	const result = run_review_steps.launch_josh([RUN_REVIEW_COMMAND, PUSH_FLAG], log_path)
 
-	if (result.kind === 'failed') {
-		process.stderr.write(`${SKIPPED_NOTE}the push could not be started: ${result.note}\n`)
-	}
+	if (result.kind !== 'failed') return
+
+	process.stderr.write(`${SKIPPED_NOTE}the push could not be started: ${result.note}\n`)
+	void early_push_record.record('review', 'launch-failed')
 }
 
 async function skip_reason(): Promise<string | undefined> {
-	if ((await run_review_steps.wait_for_gate_finish()) !== run_review.GATE_GREEN) return RED_NOTE
+	const gate = await run_review_steps.wait_for_gate_finish()
 
-	return (await run_hold.is_tree_dirty()) ? DIRTY_NOTE : undefined
+	if (gate !== run_review.GATE_GREEN) return gate
+
+	return (await run_hold.is_tree_dirty()) ? DIRTY_REASON : undefined
 }
 
 // The ship's body draft goes with the pull request it opens; the ship's commit stage replaces it.
@@ -104,12 +132,18 @@ async function push(): Promise<number> {
 	const reason = await skip_reason()
 
 	if (reason !== undefined) {
-		process.stdout.write(`${SKIPPED_NOTE}${reason}\n`)
+		process.stdout.write(`${SKIPPED_NOTE}${reason === DIRTY_REASON ? DIRTY_NOTE : RED_NOTE}\n`)
+		await early_push_record.record('review', reason)
 
 		return SUCCESS_EXIT_CODE
 	}
 
 	const result = await josh_command.josh_run([...PUSH_ARGS, ...(await body_arguments())], true)
+
+	await early_push_record.record(
+		'review',
+		result.code === SUCCESS_EXIT_CODE ? 'pushed' : 'push-failed',
+	)
 
 	process.stdout.write(`${result.out}\n`)
 

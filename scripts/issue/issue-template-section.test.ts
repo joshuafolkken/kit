@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { issue_template_section } from './issue-template-section'
 
 vi.mock(import('node:fs'), async (load_original) => {
@@ -61,5 +61,31 @@ describe('issue_template_section.section (issue-template.md)', () => {
 		vi.mocked(existsSync).mockReturnValueOnce(false)
 
 		expect(issue_template_section.section('## 現象')).toBeUndefined()
+	})
+})
+
+const LANG_KEY = 'JOSH_SESSION_LANG'
+const ENGLISH_BACKGROUND = '## Background'
+
+describe('issue_template_section.section (issue-template.en.md)', () => {
+	afterEach(() => {
+		vi.unstubAllEnvs()
+	})
+
+	it.each([ENGLISH_BACKGROUND, '## Symptom', '## Expected result', '## Acceptance criteria'])(
+		'reads %s from the English template when the session language is en',
+		(heading) => {
+			vi.stubEnv(LANG_KEY, 'en')
+
+			expect(issue_template_section.section(heading)).toMatch(
+				new RegExp(String.raw`^${heading}\n\n\S`, 'u'),
+			)
+		},
+	)
+
+	it('does not read the English template when the session language is ja', () => {
+		vi.stubEnv(LANG_KEY, 'ja')
+
+		expect(issue_template_section.section(ENGLISH_BACKGROUND)).toBeUndefined()
 	})
 })

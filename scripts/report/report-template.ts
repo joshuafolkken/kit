@@ -1,20 +1,21 @@
 import type { ReportLabels } from './report-labels'
 import { report_lint } from './report-lint'
 
-// The skeletons `report:template` prints — the work summary and the completion report — built from
+// The skeletons `report:template` prints — the work summary, the completion report and a lane
+// child's summary — built from
 // the one label table `report:lint` checks against, so a printed skeleton always passes the lint in
 // the session's language. What a command can answer is filled in: each changed path gets its own
 // change block, and the abnormal cases `josh cases` owes for that path open its "if it breaks" tier.
 // The rest is a `<…>` placeholder, the sentences only the writer can supply.
 
-type TemplateKind = 'summary' | 'done'
+type TemplateKind = 'summary' | 'done' | 'child'
 
 interface ChangeInput {
 	path: string
 	abnormal_cases: ReadonlyArray<string>
 }
 
-const KINDS: ReadonlyArray<TemplateKind> = ['summary', 'done']
+const KINDS: ReadonlyArray<TemplateKind> = ['summary', 'done', 'child']
 const KIND_NAMES: ReadonlySet<string> = new Set(KINDS)
 const PLACEHOLDER = '<…>'
 // The test line after the changed path: what changes, the test kind, the test file, the behavior.
@@ -98,15 +99,27 @@ function done_template(changes: ReadonlyArray<ChangeInput>, labels: ReportLabels
 	].join('\n')
 }
 
+// A lane child's final message (`report:lint --child-summary`): the three labels and nothing GitHub
+// already holds, so no changed-file line — the paths are ignored.
+function child_template(labels: ReportLabels, result = PLACEHOLDER): string {
+	return [
+		item(labels.cause, PLACEHOLDER),
+		item(labels.fix, PLACEHOLDER),
+		item(labels.result, result),
+	].join('\n')
+}
+
 function build(
 	kind: TemplateKind,
 	changes: ReadonlyArray<ChangeInput>,
 	labels: ReportLabels,
 ): string {
+	if (kind === 'child') return child_template(labels)
+
 	return kind === 'summary' ? summary_template(changes, labels) : done_template(changes, labels)
 }
 
-const report_template = { KINDS, build, is_kind }
+const report_template = { KINDS, build, child_template, is_kind }
 
 export type { ChangeInput, TemplateKind }
 export { report_template }

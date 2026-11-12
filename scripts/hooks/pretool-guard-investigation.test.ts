@@ -1,11 +1,11 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { delegation_policy } from '#scripts/delegation/delegation-policy'
 import { refusal_path, SWITCH_ENV_KEY } from '#scripts/delegation/investigation-guard'
 import { investigation_reads } from '#scripts/delegation/investigation-reads'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { json_value } from '#scripts/lib/json-value'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
@@ -23,7 +23,10 @@ vi.mock('#scripts/run/run-watcher-hook', () => ({
 }))
 
 vi.mock('#scripts/run/run-parent-cut-hook', () => ({
-	run_parent_cut_hook: { parent_cut_reason: vi.fn().mockResolvedValue(undefined) },
+	run_parent_cut_hook: {
+		current_state: vi.fn(),
+		parent_cut_reason: vi.fn().mockResolvedValue(undefined),
+	},
 }))
 
 vi.mock('#scripts/issue/issue-watch-hook', () => ({
@@ -32,7 +35,8 @@ vi.mock('#scripts/issue/issue-watch-hook', () => ({
 
 const { pretool_guard } = await import('./pretool-guard')
 
-const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'pretool-guard-investigation-'))
+const make_directory = temporary_directory('suite')
+const WORK_DIRECTORY = make_directory('pretool-guard-investigation-')
 const ENTRY_DIRECTORY = process.cwd()
 const LANE_ISSUE = '3927'
 const LANE_DIRECTORY = path.join(WORK_DIRECTORY, '.kit-lanes', LANE_ISSUE)
@@ -105,8 +109,6 @@ afterAll(() => {
 	for (const transcript of WRITTEN_TRANSCRIPTS) {
 		rmSync(refusal_path(transcript), { force: true })
 	}
-
-	rmSync(WORK_DIRECTORY, { force: true, recursive: true })
 })
 
 describe('pretool:guard — the investigation guard in a lane child', () => {

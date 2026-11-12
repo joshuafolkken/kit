@@ -1,11 +1,12 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_guard_policy } from '#scripts/lane/lane-guard-policy'
 import { time_hook_transcript } from '#scripts/time-runtime/time-hook-transcript'
+import { hook_context_fixture } from '#tools/hooks/hook-context-fixture'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { delegation_policy } from './delegation-policy'
@@ -24,7 +25,8 @@ import { investigation_reads } from './investigation-reads'
 // all, that it happens once per accumulation, and that a delegation re-arms it — the three properties
 // that make the threshold fire more than once in a run.
 
-const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'investigation-guard-'))
+const make_directory = temporary_directory('suite')
+const WORK_DIRECTORY = make_directory('investigation-guard-')
 // The directory vitest was launched from, restored in teardown. `should_block` now reads the live
 // process.cwd() and `JOSH_LANE_CHILD` to decide whether the session is a dispatched lane child
 // (joshuafolkken/kit#2138), so the lane case chdirs into a lane checkout and this puts it back.
@@ -38,6 +40,7 @@ const { BRANCH, call_line, edit_call_line, error_result_line, result_line, ms, t
 
 const BELOW_THRESHOLD = delegation_policy.INVESTIGATION_FILE_THRESHOLD - 1
 const NOW_MS = ms(59)
+const context_of = hook_context_fixture.of
 const EARLIER_REFUSAL_MS = ms(9)
 const DELEGATION_MINUTE = 20
 const DELEGATION_END_MINUTE = 23
@@ -135,8 +138,6 @@ afterAll(() => {
 	for (const transcript of WRITTEN_TRANSCRIPTS) {
 		rmSync(refusal_path(transcript), { force: true })
 	}
-
-	rmSync(WORK_DIRECTORY, { force: true, recursive: true })
 })
 
 describe('investigation_refusal — the threshold, and its second firing', () => {
@@ -335,6 +336,60 @@ describe('investigation — a dispatched lane child is refused like the main lin
 		} finally {
 			Reflect.deleteProperty(process.env, agent_session_role.KEY)
 		}
+	})
+})
+
+function at_threshold_payload(name: string): string {
+	return payload_of(write_transcript(name, at_threshold_lines()))
+}
+
+describe('investigation_outcome — the per-call context, not the process (kit#6967)', () => {
+	it('stands down for a reviewer role the context names under a worker process', () => {
+		const reviewer = context_of(process.cwd(), {
+			[agent_session_role.KEY]: agent_role_profile.REVIEWER,
+		})
+
+		expect(
+			investigation_outcome(at_threshold_payload('ctx-reviewer'), NOW_MS, reviewer).reason,
+		).toBeUndefined()
+	})
+
+	it('reads its switch from the context environment', () => {
+		const off = context_of(process.cwd(), { [SWITCH_ENV_KEY]: 'off' })
+
+		expect(
+			investigation_outcome(at_threshold_payload('ctx-off'), NOW_MS, off).reason,
+		).toBeUndefined()
+	})
+
+	it('refuses when only the process environment switches it off', () => {
+		process.env[SWITCH_ENV_KEY] = 'off'
+		const on = context_of(process.cwd(), {})
+
+		expect(investigation_outcome(at_threshold_payload('ctx-on'), NOW_MS, on).reason).toBe(
+			investigation_reads.REASON,
+		)
+	})
+})
+
+// A read of the lane checkout's `prompts/review.md` at the threshold, judged in `cwd`.
+function lane_instruction_reason(name: string, cwd: string): string | undefined {
+	const tool_input = { file_path: path.join(LANE_DIRECTORY, 'prompts', 'review.md') }
+	const payload = payload_of(write_transcript(name, at_threshold_lines()), { tool_input })
+
+	return investigation_outcome(payload, NOW_MS, context_of(cwd, {})).reason
+}
+
+// The instruction exemption is anchored at the call's checkout, not the process's (kit#6967).
+describe('investigation_outcome — the context directory', () => {
+	it('exempts an instruction file of the checkout the context names', () => {
+		expect(lane_instruction_reason('ctx-root', LANE_DIRECTORY)).toBeUndefined()
+	})
+
+	it('counts the same file as subject code read from another checkout', () => {
+		expect(lane_instruction_reason('ctx-other-root', process.cwd())).toBe(
+			investigation_reads.REASON,
+		)
 	})
 })
 

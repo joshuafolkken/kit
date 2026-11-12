@@ -4,6 +4,7 @@ import {
 	type RankedTable,
 	type TierVerdict,
 } from './package-scout'
+import type { ReuseOutcome } from './package-scout-reuse'
 
 // The printed shape of `josh pkg:scout` — one line per candidate with each metric labelled, then a
 // verdict line that names whether the choice is a Tier A pick or a Tier B question.
@@ -111,30 +112,43 @@ function lead_line(table: RankedTable): string {
 	return `${names} by ${format_percent(table.gap ?? 0)}`
 }
 
-function format_pair(table: RankedTable, verdict: TierVerdict): string {
+// joshuafolkken/kit#6510: a close pair is Tier A only once the Issue's reuse decision is recorded;
+// every other outcome keeps the question and prints its note, so a stopped check never reads as made.
+function format_close(lead: string, reuse: ReuseOutcome | undefined): string {
+	if (reuse?.kind === 'recorded') {
+		return `Tier: close — ${lead}; ${reuse.note} — no dependency added (Tier A). Auto-decided: ${reuse.url}`
+	}
+
+	const line = `Tier: close — ${lead}; ask the user (Tier B).`
+
+	return reuse === undefined ? line : `${line}\n${reuse.note}`
+}
+
+function format_pair(table: RankedTable, verdict: TierVerdict, reuse?: ReuseOutcome): string {
 	const threshold = format_percent(package_scout.NEAR_TIE_THRESHOLD)
 	const lead = lead_line(table)
 
 	if (verdict === 'clear') return `Tier: clear — ${lead} (≥ ${threshold}); select it (Tier A).`
 
-	return `Tier: close — ${lead} (< ${threshold}); ask the user (Tier B).`
+	return format_close(`${lead} (< ${threshold})`, reuse)
 }
 
-function format_verdict(table: RankedTable): string {
+// `reuse` is read only on a close pair: a clear pick or a lone candidate is Tier A already.
+function format_verdict(table: RankedTable, reuse?: ReuseOutcome): string {
 	const [first] = table.ranked
 
 	if (first === undefined) return NO_CANDIDATES_LINE
 	if (table.verdict === undefined) return format_single(first)
 
-	return format_pair(table, table.verdict)
+	return format_pair(table, table.verdict, reuse)
 }
 
-function format_table(table: RankedTable): string {
+function format_table(table: RankedTable, reuse?: ReuseOutcome): string {
 	if (table.ranked.length === 0) return NO_CANDIDATES_LINE
 
 	const rows = table.ranked.map((metrics, index) => format_row(index, metrics))
 
-	return [...rows, '', format_verdict(table)].join('\n')
+	return [...rows, '', format_verdict(table, reuse)].join('\n')
 }
 
 const package_scout_format = {

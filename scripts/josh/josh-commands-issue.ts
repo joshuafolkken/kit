@@ -5,21 +5,18 @@ const REPO = '--repo <owner/repo>'
 const CONCURRENT = 'several numbers, read concurrently'
 const REPO_FLAG = {
 	names: [REPO],
-	description: 'read a child in another repository; applies to every number.',
+	description: 'read an issue in another repository; applies to every number.',
 }
 const BODY_FILE = '--body-file <path>'
 const JSON_FLAG = { names: ['--json'], description: 'print the verdict and reason as JSON.' }
 
-// The issue-reading and issue-citation commands, split out of `josh-commands-ai.ts` when the mandated
-// `issue:cite` section pushed that file past its 300-line ceiling — the same
-// group-per-file shape `LANE_COMMANDS` and `SPLIT_COMMANDS` already take. `COMMAND_MAP` spreads this
-// in, so nothing downstream sees where an entry lives.
+// The issue-reading and issue-citation commands. `COMMAND_MAP` spreads this in, so nothing
+// downstream sees where an entry lives.
 
-// The synopsis `issue:state` and `issue:cite` share: a list of numbers with an optional cross-repo
-// flag. One constant, so the two cannot drift and the literal is not duplicated.
+// The synopsis `issue:read`, `issue:state` and `issue:cite` share: a list of numbers with an optional
+// cross-repo flag. One constant, so they cannot drift and the literal is not duplicated.
 const ISSUES_WITH_REPO = '<issue...> [--repo <owner/repo>]'
 
-/* eslint-disable @typescript-eslint/naming-convention */
 const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 	'issue:ack': {
 		script: 'scripts/issue/issue-ack-cli.ts',
@@ -31,18 +28,36 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 	},
 	'issue:priority': {
 		script: 'scripts/issue/issue-priority-cli.ts',
-		description: 'Apply priority:high to an issue whose body reached the high floor after filing',
+		description:
+			'Raise an issue to the priority its body declares or reaches, or set the one a person instructs',
 		category: 'AI tools',
-		reference: ['<issue>', 'automation', ['network']],
-		usage: { examples: [{ arguments: '4960' }] },
+		reference: ['<issue> [--critical|--high|--normal --reason <text>]', 'automation', ['network']],
+		usage: {
+			examples: [
+				{ arguments: '4960' },
+				{
+					arguments: '6707 --critical --reason "asked in this turn"',
+					note: "on a person's instruction only",
+				},
+				{
+					arguments: '6683 --normal --reason "asked in this turn"',
+					note: 'lowers it the same way',
+				},
+			],
+		},
 	},
 	'issue:read': {
 		script: 'scripts/issue/issue-read-main.ts',
 		description: "Print each issue's title, body and every comment on it, in one call",
 		category: 'AI tools',
-		reference: ['<issue...>', 'automation', ['network']],
+		reference: [ISSUES_WITH_REPO, 'automation', ['network']],
 		usage: {
-			examples: [{ arguments: '1715' }, { arguments: '1715 1567 1605', note: CONCURRENT }],
+			examples: [
+				{ arguments: '1715' },
+				{ arguments: '1715 1567 1605', note: CONCURRENT },
+				{ arguments: '42 --repo joshuafolkken/app-kit', note: 'an issue in another repo' },
+			],
+			flags: [REPO_FLAG],
 		},
 	},
 	'issue:state': {
@@ -70,7 +85,7 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 			examples: [
 				{ arguments: '"Stop the gate re-running after every edit"' },
 				{ arguments: '"<title>" --body "parent: #1246"' },
-				{ arguments: '"<title>" --body-file draft.md' },
+				{ arguments: '"<title>" --body-file .josh/tmp/draft.md' },
 			],
 			flags: [
 				{
@@ -106,6 +121,8 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 	},
 	'effect:audit': {
 		script: 'scripts/issue/effect-audit-cli.ts',
+		is_read_only: true,
+		write_flags: ['--draft'],
 		description:
 			'List closed run-time-shortening issues with their expected effect, follow-up measurement and result',
 		category: 'AI tools',
@@ -158,8 +175,32 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/issue/issue-fold-existing-cli.ts',
 		description: 'Assess whether a complete draft can join an unstarted issue',
 		category: 'AI tools',
-		reference: ['<assessment.json> [--json]', 'automation', ['none']],
-		usage: { examples: [{ arguments: 'assessment.json --json' }] },
+		reference: [
+			'<assessment.json> [--json | --apply <N> [--blocked <M> | --found-during <M>]] | --fingerprint <N>',
+			'automation',
+			['network'],
+		],
+		usage: {
+			examples: [
+				{
+					arguments: '--fingerprint 5848',
+					note: 'read the comment fingerprint before assessment.',
+				},
+				{ arguments: 'assessment.json --json' },
+				{
+					arguments: 'assessment.json --apply 5848',
+					note: 'apply and verify the assessed fold and priority floor.',
+				},
+				{
+					arguments: 'assessment.json --apply 5848 --blocked 5849',
+					note: 'record a confirmed duplicate dependency and reconcile its epic.',
+				},
+				{
+					arguments: 'assessment.json --apply 5848 --found-during 5849',
+					note: "record a split fold as lane 5849's split child.",
+				},
+			],
+		},
 	},
 	'issue:cite': {
 		script: 'scripts/issue/issue-cite-main.ts',
@@ -220,6 +261,5 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 }
-/* eslint-enable @typescript-eslint/naming-convention */
 
 export { ISSUE_COMMANDS }

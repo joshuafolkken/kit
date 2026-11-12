@@ -1,0 +1,5 @@
+- rf:project-conventions | low | scripts/gh/git-pr-checks-observe.test.ts:1 | 2026-11-03 | #6047 | fixed
+- rf:project-conventions | low | tools/test/unit-durations.json:523 | 2026-11-03 | #6047 | fixed
+- rf:project-conventions | low | scripts/gh/git-pr-checks-observe.test.ts:1 | 2026-11-03 | #6047 | false-positive
+- rf:project-conventions | low | tools/test/unit-durations.json:523 | 2026-11-03 | #6047 | false-positive
+- rf:project-conventions | low | tools/test/unit-durations.json:523 | 2026-11-03 | #6047

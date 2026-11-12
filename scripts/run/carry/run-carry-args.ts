@@ -1,3 +1,4 @@
+import { agent_provider } from '#scripts/agent/agent-provider'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_headless } from '#scripts/run/run-headless'
@@ -178,22 +179,35 @@ function group_count(values: ParsedValues): number {
 	return groups.filter(Boolean).length
 }
 
-// The mark rides the environment the run launched its session with; the record keeps it beside the
-// owner, so `josh backlogrun --stop` knows that owner for the run's own. An attached owner is left as
-// it is, so its record is the one it always was.
+// The parent's provider and headless mark come from its own launch environment and are kept beside
+// its identity; an unknown provider stays absent rather than guessing the default.
 function marked(owner: CarryOwner): CarryOwner {
-	return run_headless.is_headless_parent(process.env) ? { ...owner, is_headless: true } : owner
+	const selected = agent_provider.resolve_provider()
+	const provider =
+		selected.kind === 'provider' && selected.is_default !== true ? selected.provider : undefined
+	const marked_owner = provider === undefined ? owner : { ...owner, provider }
+
+	return run_headless.is_headless_parent(process.env)
+		? { ...marked_owner, is_headless: true }
+		: marked_owner
+}
+
+function session_owner(): CarryOwner {
+	const owner = run_carry.session_owner()
+
+	return owner.pid === undefined ? owner : marked(owner)
 }
 
 // **`--owner` is what makes liveness answerable at all.** The process that runs this command is a
 // short-lived `tsx`, so its own pid says nothing about whether the run is still going; the caller
-// names the process that is — its own session — and a `backlogrun` passes `--owner "$PPID"`. Absent,
-// the record simply declares no owner and every standing record reads as not provably live, which
-// refuses rather than resumes.
+// names the process that is — its own session. Omitted, it is the pid the session exports
+// (`agent_session_environment.own_session_pid`), so the documented spelling carries no `$` expansion a
+// shell guard refuses; with neither, the record declares no owner and every standing record reads as
+// not provably live, which refuses rather than resumes.
 function to_owner(value: OptionValue): CarryOwner | undefined {
 	const text = cli_flags.string_of(value)
 
-	if (text === undefined) return run_carry.NO_OWNER
+	if (text === undefined) return session_owner()
 
 	const pid = cli_flags.to_count(text)
 

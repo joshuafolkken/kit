@@ -1,14 +1,15 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it, vi } from 'vitest'
 import { cases_cli } from './cases-cli'
 
 // joshuafolkken/kit#2246: the CLI prints the boundary tokens on stdout and the required cases on
 // stderr, and answers `none` with a clean exit when no boundary is crossed. joshuafolkken/kit#4491: the
 // interaction tokens join the stdout line, and their lines lead stderr.
 
-const directory = mkdtempSync(path.join(tmpdir(), 'cases-cli-'))
+const make_directory = temporary_directory('suite')
+const directory = make_directory('cases-cli-')
 const NETWORK_PATH = path.join(directory, 'net.ts')
 const ENVIRONMENT_PATH = path.join(directory, 'env.ts')
 const INERT_PATH = path.join(directory, 'pure.ts')
@@ -16,10 +17,6 @@ const INERT_PATH = path.join(directory, 'pure.ts')
 writeFileSync(NETWORK_PATH, 'await fetch(url)\n', 'utf8')
 writeFileSync(ENVIRONMENT_PATH, "await fetch(process.env['API_URL'])\n", 'utf8')
 writeFileSync(INERT_PATH, 'export const x = 1\n', 'utf8')
-
-afterAll(() => {
-	rmSync(directory, { recursive: true, force: true })
-})
 
 async function capture(
 	argv: ReadonlyArray<string>,

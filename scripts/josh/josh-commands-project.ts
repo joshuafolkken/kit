@@ -8,10 +8,6 @@ const PR_NUMBER = '42'
 const DRY_RUN = '--dry-run'
 const SKIP_PUBLISH_WAIT = '--skip-publish-wait'
 
-// Command names are the CLI's, not TypeScript's: a scoped one carries a colon (`sync:scope`), which
-// no identifier format allows. The same disable sits at the top of `josh-commands-maintenance.ts`
-// for the same reason.
-/* eslint-disable @typescript-eslint/naming-convention */
 const PROFILE_ARGUMENTS = '[--profile basic|full]'
 const PROJECT_COMMANDS: Record<string, CommandEntry> = {
 	profile: {
@@ -76,7 +72,7 @@ const PROJECT_COMMANDS: Record<string, CommandEntry> = {
 		],
 		usage: {
 			examples: [
-				{ arguments: '--list', note: "kit's six patterns" },
+				{ arguments: '--list', note: "kit's seven patterns" },
 				{ arguments: 'kit-test-html-init', note: 'one pattern, the packed checkout' },
 				{
 					arguments: 'kit-test-html-start',
@@ -197,6 +193,13 @@ const PROJECT_COMMANDS: Record<string, CommandEntry> = {
 				{ arguments: STAGED, note: STAGED_DIFF },
 			],
 		},
+	},
+	'ui:shot': {
+		script: 'scripts/ui/ui-shot-cli.ts',
+		description: "Capture routes with this project's own screenshot command",
+		category: 'Project',
+		reference: ['<route> [route...]', 'automation', ['processes']],
+		usage: { examples: [{ arguments: '/ /blog' }] },
 	},
 	propagate: {
 		script: 'scripts/propagate/propagate.ts',

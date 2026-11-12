@@ -11,7 +11,7 @@ const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url))
 
 // `josh bytes` — the byte counterpart of `josh lines`. A mandated
 // documentation update that grows an agent-read document past its byte ceiling is invisible until
-// `pnpm josh gate` reports it 80–90 seconds in, and the raise that follows is rework. This answers
+// `pnpm josh gate` reports it well into its run, and the raise that follows is rework. This answers
 // the same question before that: how many bytes each budgeted document already has, its ceiling, and
 // how many are left — the number to check right after an edit.
 //

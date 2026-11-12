@@ -7,7 +7,7 @@ const SESSION = 'session-abc'
 const EVERY = 'every-line'
 const { bash_line, GIT_STATUS } = behavior_test_fixture
 
-// A rule that flags every line, used to exercise the engine independent of the real assertions: the
+// A rule that flags every line exercises the engine independent of the real assertions: the
 // engine's job is the walk and the stamping, not what any one rule decides.
 function every_line_rule(): Assertion {
 	return {

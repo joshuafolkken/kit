@@ -88,8 +88,8 @@ describe('files distributed by josh init / josh sync', () => {
 	//
 	// **The budget is its own, not the suite's** (joshuafolkken/kit#1246). This one test spawns a
 	// whole cspell process over every distributed file and skill directory, and that set grows with
-	// the distribution: at the 10-second default it took 10.09s inside `pnpm josh gate`, where three
-	// other CPU-heavy checks run beside it, while passing on its own. Timing out there reports a
+	// the distribution. It exceeded the suite default inside `pnpm josh gate`, where other
+	// CPU-heavy checks run beside it, while passing on its own. Timing out there reports a
 	// spelling failure that is not one — and it fails on whichever change happens to add the next
 	// distributed paragraph, which is the least informative moment possible. Nothing about the
 	// assertion is relaxed; only the wall-clock it is allowed to take.

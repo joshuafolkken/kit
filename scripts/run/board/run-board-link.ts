@@ -38,7 +38,47 @@ function pull_linker(repo: string | undefined, link: Link): (number: number) => 
 	return (number) => link(String(number), pull_url(number, repo))
 }
 
-const run_board_link = { issue_url, linker, pull_linker, pull_url }
+// The page of the repository itself a header part opens: its top, or its open or closed issues
+// (joshuafolkken/kit#7089).
+type RepoPage = 'home' | 'open' | 'closed'
+
+type RepoLink = (text: string, page: RepoPage) => string
+
+// The links a board draws, each plain before a plan names the repository.
+interface BoardLinks {
+	// An issue reference as the board draws it — `3450` or `owner/repo#12`.
+	link: (reference: string) => string
+	// A pull request's number (joshuafolkken/kit#4625).
+	pull_link: (number: number) => string
+	// A header part — the repository's name, an issue count — to a page of the repository.
+	repo_link: RepoLink
+}
+
+// The repository's top, or its open or closed issues as GitHub's own search spells them.
+function repo_url(repo: string, page: RepoPage): string {
+	if (page === 'home') return `${GITHUB_URL_PREFIX}${repo}`
+
+	const query = new URLSearchParams({ q: `is:issue is:${page}` })
+
+	return `${GITHUB_URL_PREFIX}${repo}/issues?${query.toString()}`
+}
+
+// A header part linked to a page of the repository, plain text on the same rule as `linker`.
+function repo_linker(repo: string | undefined, link: Link): RepoLink {
+	if (repo === undefined) return (text) => text
+
+	return (text, page) => link(text, repo_url(repo, page))
+}
+
+function links_of(repo: string | undefined, link: Link): BoardLinks {
+	return {
+		link: linker(repo, link),
+		pull_link: pull_linker(repo, link),
+		repo_link: repo_linker(repo, link),
+	}
+}
+
+const run_board_link = { issue_url, linker, links_of, pull_linker, pull_url, repo_linker, repo_url }
 
 export { run_board_link }
-export type { Link }
+export type { BoardLinks, Link, RepoLink, RepoPage }

@@ -5,8 +5,9 @@
 - **The clean path folds the region into one backgrounded `pnpm josh ship`** (preflight → gate → `git -y` →
   foreground `followup` → `run:tail`). The calls below serve a due second round.
 - Background `pnpm josh gate` beside the review; join it before commit. Also `lint:related` /
-  `test:related` / `check:related` / `metrics` with work to overlap: a wait past the 5-min cache TTL
+  `test:related` / `check:related` / read-only `metrics` with work to overlap: a wait past the 5-min cache TTL
   rewrites the context.
+- `metrics --accept` writes must finish before verification starts; use the existing `josh ship` pre-detach sequence (`run-ship-pre-detach.ts`) for approval re-recording before checks.
 - Issue `pnpm josh git -y` in the background; its completion resumes the run, so the turn never ends
   at the push.
 - `pnpm josh followup` stays in the foreground (`followup.md`).
@@ -47,8 +48,10 @@ merge result?**
   `pnpm josh epic:next`, `pnpm josh backlog:next --exclude <N>`, `pnpm josh lane:close` /
   `pnpm josh lane:list`. **De-duplicating a step is not removing it** — none is dropped or answered
   from memory.
-- **It does not — it is composed in the turn that issues `followup`**: the epic progress counter
-  *values* and the completion report body. **Only the write follows the merge.**
+- **Epic progress counters → `pnpm josh run:merge <N> --epic <E> --repo <owner/repo>` posts them**
+  after the merge (`docs/josh-commands-run.md` → "josh run:merge").
+- **It does not — it is composed in the turn that issues `followup`**: the completion report body.
+  **Only the write follows the merge.**
 - **`pnpm josh cost --cut` stays after the merge**, though it reads nothing from it (`backlogrun-progress.md`
   → "The check is asked at every merge").
 
@@ -59,7 +62,7 @@ merge result?**
 | `pnpm josh gate` | a subagent running `/code-review` with the brief `pnpm josh review:brief` prints |
 | `pnpm josh git -y` | Write the completion notification body to a file for `--notify-message-file`, and settle the three-way disposition of any remaining non-High finding |
 | CI, after the push | The second review round where one is due, the branch-2 filing through `pnpm josh issue:file`, which runs `epic:bundle` itself (`prompts/review.md` → "Review round cap") |
-| `pnpm josh followup` | Nothing — it is foreground. **The post-merge tail is taken before the call**: compose the epic progress counters first, and leave after the merge only the steps that read its result, plus `pnpm josh cost --cut` |
+| `pnpm josh followup` | Nothing — it is foreground. **The post-merge tail is taken before the call**: leave after the merge only the steps that read its result, plus `pnpm josh cost --cut` |
 
 **The turn never ends at the push.** The `pnpm josh git -y` completion resumes the run, and that turn
 goes straight through any branch-2 filing and `pnpm josh epic:bundle` to `pnpm josh followup`. the

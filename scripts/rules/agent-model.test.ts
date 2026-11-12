@@ -1,3 +1,4 @@
+import { hook_context } from '#scripts/hooks/hook-context'
 import { describe, expect, it } from 'vitest'
 import { agent_model } from './agent-model'
 import { delivered_rules } from './delivered-rules'
@@ -61,12 +62,20 @@ describe('agent_model.ROW — delivered by the rule guard', () => {
 		expect(agent_model.ROW.reaches(missed)).toBe(true)
 	})
 
-	// The only row that claims a subagent call, so no other row's reason is delivered in its place.
-	it('is the one delivered row whose trigger fires on an unnamed-model dispatch', () => {
+	// The consultation rows also claim it, but they stand down off the consultation model and sit
+	// after `agent-model`, so its reason is the one delivered first.
+	it('is the first delivered row whose trigger fires on an unnamed-model dispatch', () => {
 		const call = agent_call({ subagent_type: GENERAL_PURPOSE })
-		const claiming = delivered_rules.DELIVERED_RULES.filter((rule) => rule.is_trigger(call))
+		const context = hook_context.from_process()
+		const claiming = delivered_rules.DELIVERED_RULES.filter((rule) =>
+			rule.is_trigger(call, context),
+		)
 
-		expect(claiming.map((rule) => rule.id)).toEqual(['agent-model'])
+		expect(claiming.map((rule) => rule.id)).toEqual([
+			'agent-model',
+			'consultation-investigation',
+			'consultation-investigation-codex',
+		])
 	})
 
 	it('names the remedy and the document it points at', () => {

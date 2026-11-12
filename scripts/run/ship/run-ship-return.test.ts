@@ -7,7 +7,6 @@ const relaunch_mock = vi.hoisted(() => vi.fn())
 const serving_mock = vi.hoisted(() => vi.fn())
 const request_mock = vi.hoisted(() => vi.fn())
 const is_over_mock = vi.hoisted(() => vi.fn())
-const park_mock = vi.hoisted(() => vi.fn())
 const stale_mock = vi.hoisted(() => vi.fn())
 const CHANGED_FILE = vi.hoisted(() => 'scripts/changed.ts')
 
@@ -43,7 +42,7 @@ vi.mock('./run-ship-probe', () => ({
 	run_ship_probe: { read_review_stale: stale_mock, repository_directory: vi.fn() },
 }))
 vi.mock('./run-ship-relaunch-cap', () => ({
-	run_ship_relaunch_cap: { is_over: is_over_mock, park: park_mock },
+	run_ship_relaunch_cap: { is_over: is_over_mock },
 }))
 
 const { run_ship_return } = await import('./run-ship-return')
@@ -53,7 +52,7 @@ const { run_ship_return } = await import('./run-ship-return')
 
 const ISSUE = '2428'
 const TITLE = `Hand a stopped ship back #${ISSUE}`
-const BODY_PATH = 'scratchpad/evidence.md'
+const BODY_PATH = '.josh/tmp/evidence.md'
 const RESUME = { title: TITLE, flags: ['--body-file', BODY_PATH], is_review: true }
 const LANE = { issue: ISSUE, directory: '/lanes/2428', profile: undefined }
 const OUTPUT = 'FAIL scripts/run/ship/run-ship.test.ts'
@@ -77,11 +76,10 @@ beforeEach(() => {
 	emit_mock.mockReset()
 	is_child_mock.mockReset().mockReturnValue(true)
 	find_lane_mock.mockReset().mockResolvedValue(LANE)
-	relaunch_mock.mockReset().mockReturnValue({ kind: 'launched', pid: 1 })
+	relaunch_mock.mockReset().mockResolvedValue({ kind: 'launched', pid: 1 })
 	serving_mock.mockReset().mockReturnValue(undefined)
 	request_mock.mockReset().mockResolvedValue({ is_success: true })
 	is_over_mock.mockReset().mockResolvedValue(false)
-	park_mock.mockReset().mockResolvedValue(true)
 	stale_mock.mockReset().mockResolvedValue(false)
 	vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
 })
@@ -129,7 +127,7 @@ describe('run_ship_return.return_control when no relaunch started', () => {
 	const RELAUNCH_FAILED = 'relaunch-failed'
 
 	it('records the stop and the failed relaunch when the relaunch could not start', async () => {
-		relaunch_mock.mockReturnValue({ kind: 'failed', note: 'no claude' })
+		relaunch_mock.mockResolvedValue({ kind: 'failed', note: 'no claude' })
 
 		expect(await run_ship_return.return_control(ISSUE, 'commit', RESUME, OUTPUT)).toBe('recorded')
 		expect(emit_mock).toHaveBeenCalledTimes(2)
@@ -263,33 +261,7 @@ describe('run_ship_return.return_control after the broker stopped serving', () =
 	})
 })
 
-// joshuafolkken/kit#3999: a child that keeps stopping is parked past the cap rather than relaunched forever.
-describe('run_ship_return.return_control past the ship-stop cap', () => {
-	it('parks the issue for the stopped stage and relaunches nothing', async () => {
-		is_over_mock.mockResolvedValue(true)
-
-		expect(await run_ship_return.return_control(ISSUE, 'round-2', RESUME, OUTPUT)).toBe('parked')
-		expect(is_over_mock).toHaveBeenCalledWith(ISSUE, 'round-2')
-		expect(park_mock).toHaveBeenCalledWith(ISSUE, 'round-2')
-		expect(relaunch_mock).not.toHaveBeenCalled()
-		expect(request_mock).not.toHaveBeenCalled()
-	})
-
-	it('records the stop when the park label was refused', async () => {
-		is_over_mock.mockResolvedValue(true)
-		park_mock.mockResolvedValue(false)
-
-		expect(await run_ship_return.return_control(ISSUE, 'gate', RESUME, OUTPUT)).toBe('recorded')
-		expect(relaunch_mock).not.toHaveBeenCalled()
-	})
-
-	it('asks the cap only inside a dispatched lane child', async () => {
-		is_child_mock.mockReturnValue(false)
-		await run_ship_return.return_control(ISSUE, 'gate', RESUME, OUTPUT)
-
-		expect(is_over_mock).not.toHaveBeenCalled()
-	})
-})
+// The ship-stop cap and the merge-wait timeout's park are covered in `run-ship-return-park.test.ts`.
 
 // joshuafolkken/kit#3221: a stop on a merge git could not finish reads as `conflict`, not as the stage.
 describe('run_ship_return.return_control on a merge conflict', () => {

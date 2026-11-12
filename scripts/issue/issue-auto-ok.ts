@@ -1,3 +1,4 @@
+import { issue_body_keys } from './issue-body-keys'
 import {
 	BREAKING_CHANGE_LABEL,
 	DEFERRED_LABEL,
@@ -32,10 +33,12 @@ interface AutoOkDecision {
 	reason: string
 }
 
-const BACKGROUND_HEADING = '## 背景'
-const JUDGEMENT_NOT_NEEDED = '- 人の判断: 不要'
-const JUDGEMENT_NEEDED = '- 人の判断: 要'
+const BACKGROUND_HEADING = issue_body_keys.heading('background')
+const JUDGEMENT_NOT_NEEDED = issue_body_keys.line('judgement', 'not_needed')
+const JUDGEMENT_NEEDED = issue_body_keys.line('judgement', 'needed')
 const DECLARATION_PROBLEM = `declare under \`${BACKGROUND_HEADING}\` whether a person's judgement (a policy decision, an external account, a human visual check) is needed: \`${JUDGEMENT_NOT_NEEDED}\` or \`${JUDGEMENT_NEEDED}（<which one>）\` — exactly one (\`issue-template.md\`)`
+const DECISION_RULE_PREFIX = issue_body_keys.prefix('decision_rule')
+const DECISION_PROBLEM = `a decision rule citing a measurement Issue determines the choice; declare \`${JUDGEMENT_NOT_NEEDED}\` and record the applied result and reason in an Issue comment`
 
 const OPTED_OUT: AutoOkDecision = { is_applied: false, reason: '--no-auto-ok declared' }
 const CROSS_REPOSITORY: AutoOkDecision = {
@@ -70,10 +73,15 @@ function exclusion_of(labels: ReadonlyArray<string>): AutoOkDecision | undefined
 	return { is_applied: false, reason: `a \`${found[0]}\` Issue — ${found[1]}` }
 }
 
+function background_lines(body: string): ReadonlyArray<string> {
+	const background = markdown_section.section_lines(body, BACKGROUND_HEADING).join('\n')
+
+	return markdown_section.unfenced_lines(background).map((line) => line.trim())
+}
+
 // `true` / `false` for a declared need, `undefined` when the background declares neither or both.
 function judgement_of(body: string): boolean | undefined {
-	const background = markdown_section.section_lines(body, BACKGROUND_HEADING).join('\n')
-	const lines = markdown_section.unfenced_lines(background).map((line) => line.trim())
+	const lines = background_lines(body)
 	const is_not_needed = lines.some((line) => line.startsWith(JUDGEMENT_NOT_NEEDED))
 	const is_needed = lines.some((line) => line.startsWith(JUDGEMENT_NEEDED))
 
@@ -83,6 +91,15 @@ function judgement_of(body: string): boolean | undefined {
 // Why the filing is refused for its declaration, or `undefined` when it declares exactly one answer.
 function declaration_problem(body: string): string | undefined {
 	return judgement_of(body) === undefined ? DECLARATION_PROBLEM : undefined
+}
+
+function decision_problem(body: string): string | undefined {
+	if (judgement_of(body) !== true) return undefined
+	const has_rule = background_lines(body).some(
+		(line) => line.startsWith(DECISION_RULE_PREFIX) && /#[1-9]\d*\b/u.test(line),
+	)
+
+	return has_rule ? DECISION_PROBLEM : undefined
 }
 
 function decide(filing: AutoOkFiling): AutoOkDecision {
@@ -96,7 +113,7 @@ function line_of(decision: AutoOkDecision): string {
 	return `auto-ok: ${decision.is_applied ? 'applied' : 'not applied'} — ${decision.reason}`
 }
 
-const issue_auto_ok = { declaration_problem, decide, exclusion_of, line_of }
+const issue_auto_ok = { declaration_problem, decide, decision_problem, exclusion_of, line_of }
 
 export type { AutoOkDecision, AutoOkFiling }
 export { issue_auto_ok }

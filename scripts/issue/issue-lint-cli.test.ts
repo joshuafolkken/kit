@@ -1,23 +1,18 @@
-import { mkdtempSync } from 'node:fs'
-import { rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { cli_body_repository } from '#scripts/josh/cli-body-repository-fixture'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { issue_lint_cli } from './issue-lint-cli'
 import { issue_template_section } from './issue-template-section'
 
-const TEMP_PATHS: Array<string> = []
+const make_directory = temporary_directory()
 const VALID_BODY = '## 背景\n\n- 規模見積もり: 約 1 ファイル / 10 行（テスト除く）\n'
 const REQUIRED_SECTIONS = '## 現象\n\n## 期待結果\n\n## 受け入れ条件\n'
 const ENHANCEMENT_OUTPUT = 'labels: enhancement'
 
-afterEach(async () => {
+afterEach(() => {
 	vi.restoreAllMocks()
-	await Promise.all(
-		TEMP_PATHS.splice(0).map(async (directory) => {
-			await rm(directory, { recursive: true })
-		}),
-	)
 })
 
 describe('issue:lint label output', () => {
@@ -35,9 +30,7 @@ describe('issue:lint label output', () => {
 		},
 		{ body: `${VALID_BODY}- 種別: 非不具合\n`, expected: 'labels: none' },
 	])('prints $expected for the issue body', async ({ body, expected }) => {
-		const directory = mkdtempSync(path.join(tmpdir(), 'issue-lint-label-'))
-
-		TEMP_PATHS.push(directory)
+		const directory = make_directory('issue-lint-label-')
 		const body_path = path.join(directory, 'issue.md')
 
 		await writeFile(body_path, `${body}${REQUIRED_SECTIONS}`)
@@ -45,6 +38,16 @@ describe('issue:lint label output', () => {
 
 		expect(await issue_lint_cli.run(body_path)).toBe(0)
 		expect(report).toHaveBeenCalledWith(expected)
+	})
+})
+
+// joshuafolkken/kit#6056: the body is read through `cli_body`, so one left in the work tree is refused.
+describe('issue_lint_cli.run — where the body sits', () => {
+	it('refuses a body in the work tree that git does not ignore', async () => {
+		const repository = cli_body_repository.create(make_directory('issue-lint-repository-'))
+		const body_path = repository.write(cli_body_repository.UNIGNORED_DIRECTORY, VALID_BODY)
+
+		await expect(issue_lint_cli.run(body_path)).rejects.toThrow('not git-ignored')
 	})
 })
 
@@ -63,11 +66,18 @@ describe('issue:lint run-last declaration', () => {
 	})
 })
 
+// joshuafolkken/kit#6029: a behavior-change body names what stops a violation and what measures it.
+describe('issue:lint enforcement declaration', () => {
+	it('refuses a behavior-change body with no enforcement line', () => {
+		const body = `${VALID_BODY}- 種別: 振る舞い変更\n- 計測: \`pnpm josh lane:stats\`\n${REQUIRED_SECTIONS}`
+
+		expect(issue_lint_cli.problems(body).join('\n')).toContain('- 強制:')
+	})
+})
+
 describe('issue:lint fenced headings', () => {
 	it('rejects required headings that appear only inside a fenced example', async () => {
-		const directory = mkdtempSync(path.join(tmpdir(), 'issue-lint-fenced-heading-'))
-
-		TEMP_PATHS.push(directory)
+		const directory = make_directory('issue-lint-fenced-heading-')
 		const body_path = path.join(directory, 'issue.md')
 
 		await writeFile(body_path, `\`\`\`md\n## 背景\n- 種別: 不具合\n\`\`\`\n${REQUIRED_SECTIONS}`)
@@ -84,9 +94,7 @@ describe('issue:lint fenced headings', () => {
 
 describe('issue:lint classification failures', () => {
 	it('rejects an unclassified failure report', async () => {
-		const directory = mkdtempSync(path.join(tmpdir(), 'issue-lint-unclassified-'))
-
-		TEMP_PATHS.push(directory)
+		const directory = make_directory('issue-lint-unclassified-')
 		const body_path = path.join(directory, 'issue.md')
 
 		await writeFile(
@@ -100,9 +108,7 @@ describe('issue:lint classification failures', () => {
 	})
 
 	it('rejects conflicting bug and enhancement declarations', async () => {
-		const directory = mkdtempSync(path.join(tmpdir(), 'issue-lint-conflict-'))
-
-		TEMP_PATHS.push(directory)
+		const directory = make_directory('issue-lint-conflict-')
 		const body_path = path.join(directory, 'issue.md')
 
 		await writeFile(
@@ -121,9 +127,7 @@ const EXPECTED_EFFECT_SECTION =
 	'## 期待効果\n\n- 効く率: 19%\n- 1 回あたりの得: 2.0 分\n- 外れたときの損: CI 1 回\n- 出典: `pnpm josh lane:stats` → 2.0\n'
 
 async function lint_body(body: string): Promise<number> {
-	const directory = mkdtempSync(path.join(tmpdir(), 'issue-lint-expected-effect-'))
-
-	TEMP_PATHS.push(directory)
+	const directory = make_directory('issue-lint-expected-effect-')
 	const body_path = path.join(directory, 'issue.md')
 
 	await writeFile(body_path, body)
@@ -175,6 +179,45 @@ describe('issue:lint measurement declaration (joshuafolkken/kit#4621)', () => {
 
 		expect(await lint_body(declaring('- 計測宣言: `echo 3` <= 5'))).toBe(0)
 	})
+})
+
+describe('issue:lint figure sources (joshuafolkken/kit#7021)', () => {
+	it('warns about a figure with no source and still passes', async () => {
+		vi.spyOn(console, 'info').mockImplementation(() => undefined)
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+		expect(await lint_body(declaring('概算は約 35 分 / 100 行'))).toBe(0)
+		expect(warn).toHaveBeenCalledWith(expect.stringMatching(/^⚠ number with no source .*約 35 分/u))
+	})
+
+	it('does not warn about a figure with its command', async () => {
+		vi.spyOn(console, 'info').mockImplementation(() => undefined)
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+		await lint_body(declaring('中央値 16.9 分（`pnpm josh lane:stats --period 3`）'))
+
+		expect(warn).not.toHaveBeenCalled()
+	})
+})
+
+describe('issue:lint decision rule (joshuafolkken/kit#6501)', () => {
+	const RULE = '- 判定規則: 検出範囲を保てるなら A、そうでなければ B（#6403）'
+
+	it('rejects human judgement when a decision rule cites a measurement Issue', async () => {
+		const report = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		expect(await lint_body(declaring(`- 人の判断: 要（方針の判断）\n${RULE}`))).toBe(1)
+		expect(report).toHaveBeenCalledWith(expect.stringContaining('- 人の判断: 不要'))
+	})
+
+	it.each([`- 人の判断: 不要\n${RULE}`, '- 人の判断: 要（方針の判断）'])(
+		'accepts a consistent declaration: %s',
+		async (line) => {
+			vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+			expect(await lint_body(declaring(line))).toBe(0)
+		},
+	)
 })
 
 const AGGREGATION_BODY = `${VALID_BODY.replace('1 ファイル', '6 ファイル')}- 種別: 非不具合\n${REQUIRED_SECTIONS}\n- [ ] 形を集計し Issue にコメントで記録する\n`

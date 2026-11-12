@@ -1,9 +1,9 @@
-import { readFile } from 'node:fs/promises'
 import { epic_audit_logic } from '#scripts/epic/epic-audit'
 import { epic_bundle, type BacklogIssue, type BundleDecision } from '#scripts/epic/epic-bundle'
 import { epic_bundle_cli } from '#scripts/epic/epic-bundle-cli'
 import { epic_bundle_gaps } from '#scripts/epic/epic-bundle-gaps'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { cli_body } from '#scripts/josh/cli-body'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { issue_citation } from '#scripts/rules/issue-citation'
 import {
@@ -13,6 +13,7 @@ import {
 	type ScoutIssue,
 } from './issue-scout'
 import { issue_scout_closed, type ClosedScan } from './issue-scout-closed'
+import { measure_twin } from './measure-twin'
 import { session_cite } from './session-cite'
 
 const { CLOSED_CEILING_LINE, CLOSED_UNREADABLE_LINE, read_recently_closed, warn_about_closed } =
@@ -22,10 +23,10 @@ const { CLOSED_CEILING_LINE, CLOSED_UNREADABLE_LINE, read_recently_closed, warn_
 // questions every `new` entry point asks first: has this already been filed, and which epic does it
 // belong to.
 //
-// Both were assembled by hand every time, differently every time: a measured `fullrun new` spent
-// 7 minutes 32 seconds — 22% of the run — listing epics, reading their children and searching for
+// Both were assembled by hand every time, differently every time: a measured `fullrun new` spent a
+// large share of the run listing epics, reading their children and searching for
 // duplicates before implementation began, and the session that measured it went on to file work that
-// two open issues already covered, one of them filed three minutes earlier by another session.
+// two open issues already covered, one of them filed shortly before by another session.
 //
 // The epic half is `epic:bundle`'s decision, called rather than restated. The duplicate half is a
 // signal that command deliberately does not have, and it lives in `issue-scout.ts`.
@@ -77,14 +78,14 @@ function read_arguments(argv: ReadonlyArray<string>): ScoutArguments | undefined
 	return { title, body: values.body ?? '', body_file: values['body-file'] }
 }
 
-async function with_draft_body(args: ScoutArguments): Promise<ScoutArguments | undefined> {
+function with_draft_body(args: ScoutArguments): ScoutArguments | undefined {
 	if (args.body_file === undefined) return args
+	const read = cli_body.read_result(args.body_file)
 
-	try {
-		return { ...args, body: await readFile(args.body_file, 'utf8') }
-	} catch {
-		return undefined
-	}
+	if ('text' in read) return { ...args, body: read.text }
+	console.error(read.problem)
+
+	return undefined
 }
 
 // The issue as it would be filed. The summary is carried as the body because that is what the epic
@@ -101,8 +102,18 @@ function draft_of(args: ScoutArguments, repo: string): BacklogIssue {
 
 // The epic beside a candidate is the placement answer for a draft that cites nothing: the epic half
 // below decides from signal references, and a title-only draft has none to give it.
+// A cited title match keeps its score beside `ref`, so the rows that hold a filing read apart from
+// the ones the body only cites.
+function score_label(candidate: DuplicateCandidate): string {
+	const score = candidate.score.toFixed(SCORE_DIGITS)
+
+	if (candidate.is_referenced !== true) return score
+
+	return candidate.score > 0 ? `ref ${score}` : 'ref'
+}
+
 function format_duplicate(candidate: DuplicateCandidate): string {
-	const score = candidate.is_referenced === true ? 'ref' : candidate.score.toFixed(SCORE_DIGITS)
+	const score = score_label(candidate)
 	const epic = candidate.epic === undefined ? '' : ` (epic ${session_cite.issue(candidate.epic)})`
 	// The reader does two different things with the two states, so the row has to say which it is: an
 	// open candidate means somebody is already tracking this, a closed one means it may already be
@@ -152,11 +163,7 @@ function format_epic(decision: BundleDecision): Array<string> {
 		lines.push(`  Related: ${epic_bundle_cli.format_numbers(decision.candidates)}`)
 	}
 
-	if (decision.epics.length > 1) {
-		lines.push(`  Epics involved: ${epic_bundle_cli.format_numbers(decision.epics)}`)
-	}
-
-	return lines
+	return [...lines, ...epic_bundle_cli.format_epics(decision)]
 }
 
 // A draft cites nothing where a citation counts, so the epic half has nothing to decide from: its two
@@ -322,6 +329,9 @@ function linkified_report(
 interface ScoutOutcome {
 	report: string
 	candidates: ReadonlyArray<number>
+	// The open issues declaring the draft's measurement (`measure-twin.ts`), read off the open listing
+	// alone so a closed issue never holds a filing.
+	measure_twins?: ReadonlyArray<number>
 }
 
 // The backlog is read without its `blocked-by` relations: a draft has no number, so no recorded
@@ -351,9 +361,14 @@ async function scout(args: ScoutArguments, repo: string): Promise<ScoutOutcome |
 
 	// The same cut `warn_about_gaps` reports on standard error, read once more so standard output is
 	// held to it too — a ⚠ beside an executable instruction is not what stops a run acting on it.
+	// A cited issue whose title does not match (score 0) is shown as `ref` but holds nothing: a body
+	// cites its evidence and unrelated issues alike, and only a title match marks the same work.
 	return {
 		report: linkified_report(draft, widened, closed, repo),
-		candidates: duplicates.candidates.map((candidate) => candidate.number),
+		candidates: duplicates.candidates
+			.filter((candidate) => candidate.score > 0)
+			.map((candidate) => candidate.number),
+		measure_twins: measure_twin.twins_of(args.body, backlog.issues),
 	}
 }
 
@@ -369,7 +384,7 @@ async function report(args: ScoutArguments, repo: string): Promise<number> {
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const parsed = read_arguments(argv)
-	const args = parsed === undefined ? undefined : await with_draft_body(parsed)
+	const args = parsed === undefined ? undefined : with_draft_body(parsed)
 
 	if (args === undefined) {
 		console.error(USAGE)
@@ -400,6 +415,7 @@ const issue_scout_cli = {
 	NO_REFERENCE_LINE,
 	CLOSED_UNREADABLE_LINE,
 	CLOSED_CEILING_LINE,
+	format_epic,
 	read_arguments,
 	with_draft_body,
 	scout,

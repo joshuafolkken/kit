@@ -1,13 +1,14 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { status_icons } from '#scripts/lib/status-icons'
 import { lint_related_scope } from '#scripts/lint/lint-related-scope'
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { check_related, type CheckResult } from './check-related'
 import { metrics_totals } from './metrics-totals'
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'check-related-tail-test-'))
+const make_directory = temporary_directory('suite')
+const scratch = make_directory('check-related-tail-test-')
 const LOG_TARGET = path.join(scratch, 'check-related.log')
 const [LINT_COMMAND, TEST_COMMAND] = check_related.CHECKS
 const LINT_OUTPUT = 'lint output'
@@ -41,10 +42,6 @@ afterEach(() => {
 	vi.restoreAllMocks()
 })
 
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
-
 // joshuafolkken/kit#4939: the notice sat inside the lint section, cut off by a tail of the output.
 describe('check_related.report_results metrics growth notice', () => {
 	it('repeats the lint section notice just above the log notice and the verdict line', () => {
@@ -66,9 +63,11 @@ describe('check_related.report_results metrics growth notice', () => {
 	})
 
 	// joshuafolkken/kit#4987: a tail of the last lines read `passed` alone, and the ship stopped on it.
-	it('names the ship stop and the accept form on the verdict line itself', () => {
+	// joshuafolkken/kit#6023: run:review's open is now the stop, the pre-detach its backstop.
+	it('names the run:review stop and the accept form on the verdict line itself', () => {
 		const verdict = report_with_lint_output(GROWTH_NOTICE).at(-1) ?? ''
 
+		expect(verdict).toContain('`josh run:review`')
 		expect(verdict).toContain('pre-detach')
 		expect(verdict).toContain('pnpm josh metrics --accept')
 	})

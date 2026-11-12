@@ -5,12 +5,27 @@ import { COMMAND_MAP } from './josh-command-map'
 const GATE_USAGE = [
 	'```bash',
 	'pnpm josh gate',
-	"pnpm josh gate --verbose   # every check's output, passing ones included",
-	'pnpm josh gate --force     # re-run even on a tree already recorded green',
-	'pnpm josh gate --no-unit   # the static checks only (CI only)',
+	"pnpm josh gate --verbose      # every check's output, passing ones included",
+	'pnpm josh gate --force        # re-run even on a tree already recorded green',
+	'pnpm josh gate --no-unit      # the static checks only (CI only)',
+	"pnpm josh gate --whole-tree   # add the whole-tree checks (the ship's gate on the final tree)",
 	'```',
 ].join('\n')
 const UNKNOWN_NAME = 'not-a-command'
+const FILE_FLAG_SUFFIX = '-file'
+const STDIN = '-'
+const JOSH_TMP = '.josh/tmp/'
+
+// The value after each `--<name>-file` token of one example's arguments.
+function file_flag_values(arguments_text: string): Array<string> {
+	const tokens = arguments_text.split(' ')
+
+	return tokens
+		.map((token, index) =>
+			token.endsWith(FILE_FLAG_SUFFIX) ? (tokens[index + 1] ?? '') : undefined,
+		)
+		.filter((value) => value !== undefined)
+}
 
 describe('command usage', () => {
 	it('aligns every example comment in one column', () => {
@@ -62,9 +77,29 @@ describe('command entry usage', () => {
 
 		expect(empty).toEqual([])
 	})
+
+	it('writes every example body file under .josh/tmp/', () => {
+		const misplaced = Object.values(COMMAND_MAP)
+			.flatMap((entry) => entry.usage.examples)
+			.flatMap((example) => file_flag_values(example.arguments))
+			.filter((path) => path !== STDIN && !path.startsWith(JOSH_TMP))
+
+		expect(misplaced).toEqual([])
+	})
 })
 
 describe('command help', () => {
+	it('includes all solo evidence in the triage synopsis and example (ac-71557ea7)', () => {
+		const help = command_usage.format_command_help('backlog:triage') ?? ''
+
+		expect(help.split('\n', 1)[0]).toContain(
+			'[--lane | --solo --defect yes --verification yes --every-run yes]',
+		)
+		expect(help).toContain(
+			'pnpm josh backlog:triage --apply 913 --solo --defect yes --verification yes --every-run yes --reason "<why>" --clear',
+		)
+	})
+
 	it('resolves an alias and prints the synopsis, description and usage', () => {
 		const help = command_usage.format_command_help('ga') ?? ''
 		const { gate } = COMMAND_MAP

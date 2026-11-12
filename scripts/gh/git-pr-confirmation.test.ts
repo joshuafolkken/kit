@@ -25,7 +25,6 @@ const INPUT = {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.stubEnv('JOSH_SESSION_LANG', 'en')
 	mocked_send_or_report.mockResolvedValue(true)
 })

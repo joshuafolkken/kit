@@ -175,7 +175,7 @@ describe('the decision is written where the next conversion will read it', () =>
 	it('is what the index tells a citation to do', () => {
 		const content = read_index().replaceAll(/\s+/gu, ' ')
 
-		expect(content).toContain('**本文があるファイルを直接指す**')
+		expect(content).toContain('cites the file that holds the body, never this index')
 		expect(content).toContain('residency.md')
 	})
 })

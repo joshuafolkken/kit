@@ -156,8 +156,9 @@ const KIND = run_event_stream.EVENT_KIND
 const OFFER_BACKLOG = 'pnpm josh backlog:next'
 const EVENT_ACTIONS: Record<string, (issue_number: string) => StepAction> = {
 	[KIND.PR_OPENED]: () => command('pnpm josh followup'),
-	[KIND.REVIEW_ROUND]: (issue_number) =>
-		command(`pnpm josh review:round2 --record ${issue_number}`),
+	// `ship --review` asks `review:round2 --record` itself and reuses a recorded round 1, so a run past
+	// round 1 hands the rest of the region to it rather than to the hand-run round-2 steps.
+	[KIND.REVIEW_ROUND]: () => command('pnpm josh ship --review'),
 	[KIND.MERGE]: merge_command,
 	[KIND.OUTAGE]: merge_command,
 	[KIND.PARK]: () => command(OFFER_BACKLOG),
@@ -201,7 +202,7 @@ function drain_action(input: StepInput): StepAction {
 // It is the existing merge-time cut, so the ownership check and the cut cap
 // apply unchanged, and the supervisor's driver adopts the in-flight lanes from their `child-launch`
 // events.
-const HAND_OFF_COMMAND = 'pnpm josh run:carry --cut --owner "$PPID"'
+const HAND_OFF_COMMAND = 'pnpm josh run:carry --cut'
 
 // After a dispatch the parent waits for its child — where waiting is free. A session the completion
 // does not re-invoke could only wait by polling, each poll a model call over its whole context, so a

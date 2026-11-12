@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { metrics_totals } from '#scripts/gate/metrics-totals'
 import { git_branch } from '#scripts/git/git-branch'
 import { git_command } from '#scripts/git/git-command'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
@@ -10,22 +11,26 @@ import { review_attest, type ReviewSlot } from '#scripts/review/review-attest'
 import { review_brief_cli } from '#scripts/review/review-brief-cli'
 import { review_interaction } from '#scripts/review/review-interaction'
 import { review_lane_handover } from '#scripts/review/review-lane-handover'
+import { review_pair } from '#scripts/review/review-pair'
+import { review_round } from '#scripts/review/review-round'
 import { review_stamps } from '#scripts/review/review-stamps'
+import { run_step_section } from '#scripts/run/run-step-section'
 import { run_ship_review } from '#scripts/run/ship/run-ship-review'
 import { test_pinned_record, type PinnedSummary } from '#scripts/test/test-pinned-record'
 import { run_review, type GateState, type ReviewTiming } from './run-review'
 import { run_review_early_push } from './run-review-early-push'
 import { run_review_join_read, type JoinVerdict } from './run-review-join-read'
+import { run_review_join_ready } from './run-review-join-ready'
 import { run_review_pinned } from './run-review-pinned'
 import { run_review_pinned_accepted } from './run-review-pinned-accepted'
 import { run_review_pinned_join } from './run-review-pinned-join'
 import { run_review_pinned_steps } from './run-review-pinned-steps'
 import { run_review_pinned_tree } from './run-review-pinned-tree'
 import { run_review_steps } from './run-review-steps'
+import { run_review_unplanned } from './run-review-unplanned'
 
-// `josh run:review` — one call that leaves `josh gate` running in the background and writes the
-// `/code-review` brief to a file, printing its path, so a lane child launches the two together and they
-// overlap.
+// `josh run:review` — one call that runs `josh gate` and, once it is green, writes the `/code-review`
+// brief to a file, printing its path, so round 1 reads the tree the gate passed (joshuafolkken/kit#5938).
 // It composes `josh gate` and `josh review:brief` and changes neither: the gate is the same command
 // spawned detached, and the brief is `review:brief` run unchanged, so the nonce/checkout contract
 // `review:attest --check` enforces is minted exactly as a standalone brief mints it.
@@ -84,10 +89,10 @@ function join_exit_code(state: GateState): number {
 }
 
 const JOIN_HINT =
-	'Gate is running in the background. Launch the /code-review subagent as the `reviewer` agent type (`kit:reviewer` in a consumer), with the prompt printed under its brief file, verbatim; when it returns, run `pnpm josh run:review --join` to join the gate and test:pinned and check their verdicts before committing.'
+	'Gate green. Launch the /code-review subagent as the `reviewer` agent type (`kit:reviewer` in a consumer), with the prompt printed under its brief file, verbatim; when it returns, run `pnpm josh run:review --join` to join the gate and test:pinned and check their verdicts before committing.'
 
 const INTERACTION_HINT =
-	'Two brief files above: launch one `reviewer` per brief side by side, each with its own printed prompt, and once both are attested record the interaction pass with `pnpm josh review:record --interaction --issue <N> [<finding> ...]` beside round 1.'
+	'Two brief files above: launch one `reviewer` per brief side by side, each with its own printed prompt, and once both are attested record the interaction pass the reviewer wrote with `pnpm josh review:submit --interaction` by `pnpm josh review:record --from-slot --interaction --issue <N>` beside round 1.'
 
 // The briefs an open writes: the slots this branch's issue owes round 1, and whether this is the ship's
 // own `--code-only` open, which prints code's brief instead.
@@ -107,18 +112,20 @@ async function brief_slots(is_code_only: boolean): Promise<ReadonlyArray<ReviewS
 	if (is_code_only) return [CODE]
 	const issue = git_branch.issue_from_branch(await git_command.branch())
 	if (issue === undefined) return [CODE]
+	const answer = await review_interaction.reading(issue)
+	if (answer.inert_line !== undefined) process.stderr.write(`${answer.inert_line}\n`)
 
-	return review_interaction.round_one_slots(await review_interaction.status(issue))
+	return review_interaction.round_one_slots(answer.status)
 }
 
-// A lane child's reopen after a round 1 the ship reuses is refused before anything is launched
-// (`review-lane-handover.ts`); the ship's own `--code-only` open is never refused.
+// A lane child's reopen after an attested round 1 is refused before anything is launched, a widened
+// plan included (`review-lane-handover.ts`); the ship's own `--code-only` open is never refused.
 async function handover_refusal(is_code_only: boolean): Promise<string | undefined> {
 	if (is_code_only) return undefined
 	const issue = git_branch.issue_from_branch(await git_command.branch())
 	if (issue === undefined) return undefined
 
-	return (await review_lane_handover.is_handed_over(issue))
+	return (await review_lane_handover.is_reopen_refused(issue))
 		? review_lane_handover.refusal(issue)
 		: undefined
 }
@@ -128,13 +135,21 @@ async function handover_refusal(is_code_only: boolean): Promise<string | undefin
 // to `review:brief`, whose new code nonce dropped the interaction slot (joshuafolkken/kit#4863). Its
 // launch prompt follows, the one `josh ship` opens a reviewer with: the brief no longer travels in the
 // prompt, and `/code-review` beside `review:attest` is how the time and cost readers tell a review.
+// The slot's findings go with the old brief, read for a resume by then: a reviewer that ends without
+// `review:submit` leaves `review:record --from-slot` nothing to record, not the last round's findings.
 function save_brief(slot: ReviewSlot, text: string): void {
-	const { brief } = lane_session_broker.review_paths(PROJECT_ROOT, slot)
+	const { brief, findings } = lane_session_broker.review_paths(PROJECT_ROOT, slot)
 
 	stamp_file.write_text_stamp(brief, `${text}\n`)
-	process.stdout.write(
-		`${slot} brief: ${brief}\n${slot} prompt: ${run_ship_review.round_one_opening(brief)}\n`,
-	)
+	stamp_file.remove_stamp(findings)
+	const opening =
+		review_round.from_brief(text) === '2'
+			? run_ship_review.final_opening(brief)
+			: run_ship_review.round_one_opening(brief)
+
+	process.stdout.write(`${slot} brief: ${brief}\n${slot} prompt: ${opening}\n`)
+	const paired = slot === CODE ? review_pair.offer(text) : undefined
+	if (paired !== undefined) process.stdout.write(`${paired}\n`)
 }
 
 async function write_brief(slot: ReviewSlot): Promise<number> {
@@ -169,17 +184,71 @@ function follow_brief(slots: ReadonlyArray<ReviewSlot>, is_early_push: boolean):
 	if (is_early_push) run_review_early_push.launch()
 }
 
-async function start_pair(plan: BriefPlan, is_early_push: boolean): Promise<number> {
+const GREEN_NOTE = 'Gate green — the review verdict may be adopted.'
+const RED_NOTE =
+	'Gate RED — the review verdict is blocked; fix the gate and re-run it before committing.'
+const MOVED_NOTE =
+	'Gate passed on an earlier tree — the tree moved after it (a review fix in place); re-run the gate on this tree before committing.'
+const STILL_RUNNING_NOTE =
+	'Gate still running at the open’s wait cap — no brief written; re-run `pnpm josh run:review` (in a chain, `pnpm josh run:chain <N> --from run:review`), which waits on the same gate.'
+
+// A moved tree's gate passed, so its log is no failure to show.
+function settled_note(state: GateState): string | undefined {
+	if (state === run_review.GATE_GREEN) return GREEN_NOTE
+	if (state === run_review.GATE_MOVED) return MOVED_NOTE
+
+	return undefined
+}
+
+function report_gate(state: GateState): void {
+	const settled = settled_note(state)
+
+	if (settled !== undefined) {
+		process.stdout.write(`${settled}\n`)
+
+		return
+	}
+
+	const log = run_review_steps.read_gate_log()
+
+	if (log !== undefined) process.stdout.write(`${log}\n`)
+	process.stdout.write(`${RED_NOTE}\n`)
+}
+
+// **Round 1 reads the tree the gate passed** (joshuafolkken/kit#5938): the brief, and the round-1
+// snapshot `josh review:round2` measures its fix delta from, follow a green gate, so a gate fix never
+// moves the diff round 1 read into round 2. A red gate writes no brief; its log and note are the stop.
+// A gate still running at the open's cap is no red one, so it stops with its own note.
+async function is_gate_green(): Promise<boolean> {
+	const state = await run_review_steps.wait_for_gate_finish(run_review_steps.MAX_OPEN_WAIT_MS)
+
+	if (state === run_review.GATE_GREEN) return true
+	if (state === run_review.GATE_RUNNING) process.stdout.write(`${STILL_RUNNING_NOTE}\n`)
+	else report_gate(state)
+
+	return false
+}
+
+// The moment the gate started, once it is green; `undefined` where it could not start or was not.
+async function passed_gate_start(): Promise<string | undefined> {
 	const gate_started_at = now_iso()
 	const launch = run_review_steps.launch_gate()
 
 	if (launch.kind === 'failed') {
 		process.stderr.write(`the background gate could not be started: ${launch.note}\n`)
 
-		return FAILURE_EXIT_CODE
+		return undefined
 	}
 
 	await run_review_steps.mark_gate_starting()
+
+	return (await is_gate_green()) ? gate_started_at : undefined
+}
+
+async function start_pair(plan: BriefPlan, is_early_push: boolean): Promise<number> {
+	const gate_started_at = await passed_gate_start()
+
+	if (gate_started_at === undefined) return FAILURE_EXIT_CODE
 	run_review_steps.write_timing_start({ gate_started_at, review_started_at: now_iso() })
 	const code = await open_briefs(plan)
 
@@ -191,7 +260,8 @@ async function start_pair(plan: BriefPlan, is_early_push: boolean): Promise<numb
 	return code
 }
 
-// A fresh `josh test:pinned` on this tree in place of the last one.
+// A fresh `josh test:pinned` on this tree in place of the last one; its reason is recorded for the
+// branch, so the ship carries it (`run-review-pinned-accepted.ts` → `keep_reason`).
 async function launch_pinned(reason: string | undefined): Promise<void> {
 	const tree = await run_review_pinned_tree.key()
 
@@ -201,6 +271,8 @@ async function launch_pinned(reason: string | undefined): Promise<void> {
 	if (launched.kind === 'failed') {
 		process.stderr.write(test_pinned_record.not_run_summary(new Error(launched.note)).text)
 	}
+
+	if (reason !== undefined) await run_review_pinned_accepted.keep_reason(reason)
 }
 
 // `josh test:pinned` runs in the background beside the pair, `--unpinned-ok` or not, so the pair never
@@ -239,35 +311,6 @@ function gate_ended_at(is_green: boolean): string {
 	return review_stamps.gate_stamp.read()?.taken_at ?? now_iso()
 }
 
-const GREEN_NOTE = 'Gate green — the review verdict may be adopted.'
-const RED_NOTE =
-	'Gate RED — the review verdict is blocked; fix the gate and re-run it before committing.'
-const MOVED_NOTE =
-	'Gate passed on an earlier tree — the tree moved after it (a review fix in place); re-run the gate on this tree before committing.'
-
-// A moved tree's gate passed, so its log is no failure to show.
-function settled_note(state: GateState): string | undefined {
-	if (state === run_review.GATE_GREEN) return GREEN_NOTE
-	if (state === run_review.GATE_MOVED) return MOVED_NOTE
-
-	return undefined
-}
-
-function report_gate(state: GateState): void {
-	const settled = settled_note(state)
-
-	if (settled !== undefined) {
-		process.stdout.write(`${settled}\n`)
-
-		return
-	}
-
-	const log = run_review_steps.read_gate_log()
-
-	if (log !== undefined) process.stdout.write(`${log}\n`)
-	process.stdout.write(`${RED_NOTE}\n`)
-}
-
 function report_timing(timing: ReviewTiming | undefined): void {
 	if (timing === undefined) return
 
@@ -275,7 +318,8 @@ function report_timing(timing: ReviewTiming | undefined): void {
 }
 
 async function run_join(is_fixing = false): Promise<number> {
-	const state = await run_review_steps.wait_for_gate_finish()
+	const ready = await run_review_join_ready.read(is_fixing)
+	const state = await run_review_join_ready.gate_state(ready)
 	const timing = run_review_steps.complete_timing({
 		gate_ended_at: gate_ended_at(settled_note(state) !== undefined),
 		review_ended_at: now_iso(),
@@ -285,7 +329,9 @@ async function run_join(is_fixing = false): Promise<number> {
 	report_timing(timing)
 
 	// An unpinned change stops the round whatever the gate answered; a tree a fix moved is checked again.
-	const is_unpinned = await show_pinned(run_review_join_read.read(PROJECT_ROOT, is_fixing))
+	const is_unpinned = await show_pinned(run_review_join_ready.verdict(ready, is_fixing))
+
+	await run_review_join_ready.show_unplanned(ready)
 
 	return is_unpinned ? run_review.UNPINNED_EXIT_CODE : join_exit_code(state)
 }
@@ -351,19 +397,47 @@ function refuse(text: string): number {
 	return FAILURE_EXIT_CODE
 }
 
-// The open's arguments after `--code-only`: none, or `--unpinned-ok "<reason>"`.
+// A metrics total grown past every approval stops the open, right after the implementation and before
+// anything is launched, rather than the ship's pre-detach after the review (joshuafolkken/kit#6023).
+// The ship's own `--code-only` open has just passed that pre-detach.
+async function metrics_refusal(is_code_only: boolean): Promise<string | undefined> {
+	if (is_code_only) return undefined
+
+	return await metrics_totals.totals_refusal(PROJECT_ROOT)
+}
+
+// An unplanned file's overlap stops the open while the file can still be dropped (joshuafolkken/kit#6142);
+// the ship's own open has just passed the `unplanned` preflight.
+async function unplanned_refusal(is_code_only: boolean): Promise<string | undefined> {
+	if (is_code_only) return undefined
+
+	return await run_review_unplanned.refusal()
+}
+
+async function open_accepted(is_code_only: boolean, reason: string | undefined): Promise<number> {
+	const accepted = await accept_finished(is_code_only, reason)
+
+	if (accepted !== undefined) return accepted
+	const stop =
+		(await handover_refusal(is_code_only)) ??
+		(await metrics_refusal(is_code_only)) ??
+		(await unplanned_refusal(is_code_only))
+
+	if (stop !== undefined) return refuse(stop)
+
+	return await run_start({ is_code_only, slots: await brief_slots(is_code_only) }, reason)
+}
+
+// The open's arguments after `--code-only`: none, or `--unpinned-ok "<reason>"`. The governing section
+// prints once they are accepted, so a refused argv prints its usage line alone; the ship's own
+// `--code-only` open prints nothing, since the ship printed the section it runs under.
 async function run_open(is_code_only: boolean, argv: ReadonlyArray<string>): Promise<number> {
 	const reason = run_review_pinned.ok_reason_of(argv)
 
 	if (reason === undefined && argv.length > 0) return refuse(USAGE)
-	const accepted = await accept_finished(is_code_only, reason)
+	const printed = is_code_only ? SUCCESS_EXIT_CODE : run_step_section.print_once('run:review')
 
-	if (accepted !== undefined) return accepted
-	const handover = await handover_refusal(is_code_only)
-
-	if (handover !== undefined) return refuse(handover)
-
-	return await run_start({ is_code_only, slots: await brief_slots(is_code_only) }, reason)
+	return printed === SUCCESS_EXIT_CODE ? await open_accepted(is_code_only, reason) : printed
 }
 
 async function run_pinned(): Promise<number> {

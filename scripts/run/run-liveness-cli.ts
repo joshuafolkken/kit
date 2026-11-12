@@ -64,7 +64,7 @@ function to_ms(raw: string | undefined, unit_ms: number): number | undefined {
 }
 
 // A malformed duration is refused rather than silently replaced by the default: a caller that meant
-// to widen the window and mistyped it would otherwise be answered against the 30-minute one. Whole and
+// to widen the window and mistyped it would otherwise be answered against the default. Whole and
 // positive, both of them: a zero window would call any unit not writing at that instant frozen, and a
 // zero gap would take both samples back-to-back — together they book a live unit as stopped, which is
 // the one error direction this command is built to avoid.

@@ -1,5 +1,6 @@
 import { isDeepStrictEqual } from 'node:util'
-import { Worker } from 'node:worker_threads'
+import { Worker, type WorkerOptions } from 'node:worker_threads'
+import { ts_entry_loader } from '#scripts/run/ts-entry-loader'
 import {
 	run_board_gather,
 	type Gatherer,
@@ -168,8 +169,12 @@ async function latest_of(thread: Thread): Promise<GatherRead> {
 	})
 }
 
+function worker_options(exec_argv: ReadonlyArray<string>): WorkerOptions {
+	return { execArgv: ts_entry_loader.loader_argv(exec_argv) }
+}
+
 function spawn_worker(): GatherWorker {
-	return new Worker(WORKER_URL)
+	return new Worker(WORKER_URL, worker_options(process.execArgv))
 }
 
 // The first redraw waits for the worker's first round; every later one draws the last round handed.
@@ -183,7 +188,13 @@ function worker_gatherer(spawn: Spawn = spawn_worker, now: () => number = Date.n
 	}
 }
 
-const run_board_gather_thread = { WORKER_URL, gather_round, post_of, worker_gatherer }
+const run_board_gather_thread = {
+	WORKER_URL,
+	gather_round,
+	post_of,
+	worker_gatherer,
+	worker_options,
+}
 
 export { run_board_gather_thread }
 export type { FailedPost, GatherPost, GatherWorker }

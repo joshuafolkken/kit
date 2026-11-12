@@ -1,6 +1,6 @@
 ---
 name: epic-commands
-description: Procedures for `josh epic:audit`, `epic:next` and `epic:bundle`. Read it before running one, before an epic tracks a child in another repository, when `epic:bundle` places a filed issue, and when recording a decision on a `needs-decision` child.
+description: Procedures for `josh epic:audit`, `epic:next`, `epic:bundle`, an epic child in another repository and a `needs-decision` decision. Read it before any of them and when `epic:bundle` places a filed issue.
 ---
 
 # The `josh epic:*` commands
@@ -15,8 +15,8 @@ epic:audit → find contradictions across the children, and fix what it finds (T
 backlogrun → which calls epic:next each round
 ```
 
-Front-loading every `needs-decision` is `backlogrun`'s job: `backlogrun-steps.md` → "Resolve what
-the plan can resolve, before starting". A `backlogrun #E --only`'s pre-check is `epic:audit`.
+Settling every `needs-decision` is `backlogrun`'s job: `backlogrun-steps.md` → "Resolve what
+the plan can resolve"; a `推奨なし` park → `backlogrun-park.md` → "A park the driver decides". A `pnpm josh backlogrun <E> --only`'s pre-check is `epic:audit`.
 
 Read `execution-waves.md` only when children need an order between groups (a wave boundary, or a child
 that must run alone), and `epic-bundle.md` only when a filing's `epic:bundle` answer places the issue.
@@ -31,6 +31,8 @@ Recording a decision removes that child's `needs-decision` label (Tier A; `backl
   (`epic-bundle.md`).
 - **About a child the epic already tracks**: `pnpm josh epic --decide <E> <N...> --decision-file
   <path|->` writes the entry, the comments and the label removal; a rerun writes nothing twice.
+- A decision that changes one child's scope → state the new `- 規模見積もり:` line in a record naming
+  that child alone; `scripts/epic/epic-decide.ts`.
 
 ```md
 ## Decisions
@@ -120,15 +122,15 @@ learn their state** — only to implement.
 ## `josh epic:bundle <N>` — does this new issue belong with one already filed?
 
 Runs right after any filing; **`pnpm josh issue:file` runs it as its last step** — run it by hand only
-when that step printed `⚠`. **It recommends and writes nothing; `--apply` writes an `add_to_epic` /
-`create_epic` answer.**
+when that step printed `⚠`. **It recommends and writes nothing; `--apply` writes every placing answer
+— `ask` into its `Recommended:` epic, with the decision recorded.**
 
 | Candidates | Do | Tier |
 | --- | --- | --- |
 | **The new issue itself already has an epic** | Nothing — an issue belongs to at most one | — |
 | Already a child of an epic | Add to **that** epic; do not create a second | A |
 | Spread across an epic and its **own parent** | Add to the inner epic — the parent already contains it | A |
-| Spread across **different** epics | **Choose the one you recommend** (`epic-bundle.md`) | **A** |
+| Spread across **different** epics | **The `Recommended:` epic** — most related issues, older on a tie; none on a cycle (`epic-bundle.md`) | **A** |
 | In no epic, two or more counting the new issue | Create an epic | A |
 | No strong signal | Nothing | — |
 | **The epic listing was cut short** | **Nothing** — every placing row above is withheld | — |

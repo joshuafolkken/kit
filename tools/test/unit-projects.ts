@@ -1,5 +1,7 @@
+import { agent_headless } from '#scripts/agent/agent-headless'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { lane_child_mark_keys } from '#scripts/lane/lane-child-mark-keys'
+import { run_headless_keys } from '#scripts/run/run-headless-keys'
 import { unit_setup_files } from '#scripts/test/unit-setup-files'
 import { vitest_cli_excludes } from '#scripts/test/vitest-cli-excludes'
 import { PURE_FILES } from '#tools/test/pure-files'
@@ -50,11 +52,31 @@ const MAIN_EXCLUDE: ReadonlyArray<string> = ['scripts/build/packed-consumer.test
 // delivery fixture that sets the lane mark and expects the refusal. A suite about the reviewer passes
 // the role itself.
 //
+// **The paired review switch is blanked** (joshuafolkken/kit#7035): a session exporting
+// `JOSH_REVIEWER_PAIRED=1` made the run:review suites write a paired brief through a stamp-file mock
+// that has no `stamp_path`. A suite about the paired review passes the environment itself.
+//
+// **Every inherited agent model and effort key is blanked by its suffix** (joshuafolkken/kit#5863): a
+// lane that sets `JOSH_WORKER_SHIP_MODEL` would otherwise move every fixture that resolves a profile off
+// its default model. The keys `agent-role-profile.ts` reads are its `PROFILE_KEYS`, which the suite pins
+// to this pattern; importing them here would pull the profile resolution into the config's import graph.
+// The pattern also blanks the eval runner's `JOSH_EVAL_MODEL` and the lane agent's
+// `JOSH_LANE_AGENT_*`, which no unit fixture reads from `process.env`.
+//
 // **Every inherited ship mark and every lane mark is blanked without a list here**
 // (joshuafolkken/kit#5029): the supervisor sets `JOSH_SHIP_RETRY_PENDING` around a retried attempt,
 // and a hand-kept list let it reach the gate's run alone. Any `JOSH_SHIP_*` key the config process
 // inherits is blanked by its prefix, and the lane marks are read from where the launcher composes them.
+//
+// **The paired review switch is blanked as well** (joshuafolkken/kit#6902): a lane run with
+// `JOSH_REVIEWER_PAIRED=1` would make every `run:review` fixture write a paired brief its stubs never
+// planned. A suite about the paired review passes the environment itself.
+//
+// **The headless agent and run marks are blanked as well** (joshuafolkken/kit#7309): a lane carries
+// them, so every rule that reads "unattended" from them passed the gate there and failed in CI, which
+// runs unmarked. A suite about an unattended run sets the mark itself.
 const SHIP_MARK = /^JOSH_SHIP_[A-Z0-9_]+$/u
+const PROFILE_KEY = /^JOSH_[A-Z0-9_]+_(?:MODEL|EFFORT)$/u
 
 type EnvironmentSource = Readonly<Record<string, string | undefined>>
 
@@ -62,8 +84,8 @@ function blank(keys: ReadonlyArray<string>): Record<string, string> {
 	return Object.fromEntries(keys.map((key) => [key, '']))
 }
 
-function inherited_ship_marks(source: EnvironmentSource): ReadonlyArray<string> {
-	return Object.keys(source).filter((key) => SHIP_MARK.test(key))
+function inherited_marks(source: EnvironmentSource): ReadonlyArray<string> {
+	return Object.keys(source).filter((key) => SHIP_MARK.test(key) || PROFILE_KEY.test(key))
 }
 
 function unit_environment(source: EnvironmentSource): Record<string, string> {
@@ -72,13 +94,18 @@ function unit_environment(source: EnvironmentSource): Record<string, string> {
 			...agent_session_environment.PROXY_KEYS,
 			agent_session_environment.PROXY_CERTIFICATE_KEY,
 		]),
-		...blank(inherited_ship_marks(source)),
+		...blank(inherited_marks(source)),
 		...blank(lane_child_mark_keys.MARK_KEYS),
+		...blank([agent_headless.KEY, ...run_headless_keys.MARK_KEYS]),
 		[agent_session_environment.AGENT_PID_KEY]: '',
 		CLAUDE_CODE_SESSION_ID: 'vitest-session',
 		CODEX_THREAD_ID: '',
 		JOSH_AGENT_PROVIDER: '',
 		JOSH_AGENT_ROLE: '',
+		// `auto` would probe GitHub and keep its answer in the repository's shared cache, which the
+		// developer's own sessions read; a test that exercises `auto` sets it and isolates that cache.
+		JOSH_GH_TRANSPORT: 'graphql',
+		JOSH_REVIEWER_PAIRED: '',
 		JOSH_SHIP_SUPERVISED: '',
 	}
 }
@@ -87,9 +114,7 @@ const ENV: Record<string, string> = unit_environment(process.env)
 
 // **The packages most test files load are pre-bundled into one file each** (joshuafolkken/kit#4301).
 // An isolated file starts a fresh module graph, so each of them re-imports these from their many
-// source files: measured with `--experimental.importDurations`, execa and zod alone cost about 70ms
-// and 50ms per file across 700 and 900 isolated files — the top two import costs of the suite.
-// A bundled copy loads several times faster (execa 35ms → 9ms, zod 27ms → 10ms natively).
+// source files. Bundling reduces the repeated module-loading cost across the suite.
 const OPTIMIZED_DEPENDENCIES: ReadonlyArray<string> = [
 	'execa',
 	'zod',
@@ -117,6 +142,8 @@ const { STATE_GUARD, WORKER_GUARDS, READ_RECORDER } = unit_setup_files
 
 interface UnitProjectTest {
 	name: string
+	clearMocks: boolean
+	restoreMocks: boolean
 	env: Record<string, string>
 	include: ReadonlyArray<string>
 	exclude: ReadonlyArray<string>
@@ -142,6 +169,8 @@ function unit_project(spec: UnitProjectSpec): UnitProject {
 	return {
 		test: {
 			name: spec.name,
+			clearMocks: true,
+			restoreMocks: false,
 			env: ENV,
 			include: [...spec.include],
 			exclude: [...(spec.exclude ?? [])],

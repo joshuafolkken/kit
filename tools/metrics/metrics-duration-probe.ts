@@ -24,8 +24,9 @@ const SAMPLES = 5
 const BASELINE_FILE = 'metrics-durations.json'
 const LEGACY_BASELINE_FILE = 'josh-metrics-durations.json'
 const JOSH_COMMAND: ReadonlyArray<string> = [
-	'node_modules/.bin/tsx',
-	'scripts/josh/josh.ts',
+	'node',
+	'--disable-warning=ExperimentalWarning',
+	'tools/josh/josh-ready.ts',
 	'--help',
 ]
 const GUARD_COMMAND: ReadonlyArray<string> = ['sh', 'scripts/hooks/run-hook.sh', 'pretool-guard']

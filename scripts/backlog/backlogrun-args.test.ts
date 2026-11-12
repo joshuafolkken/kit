@@ -49,6 +49,9 @@ describe('backlogrun_args.parse flags', () => {
 	it.each([
 		{ argv: ['--agent', 'gemini'] },
 		{ argv: ['--agent'] },
+		{ argv: ['--agent', 'constructor'] },
+		{ argv: ['--agent', 'openai'] },
+		{ argv: ['--agent', 'anthropic'] },
 		{ argv: ['--bogus'] },
 		{ argv: ['--agent', 'claude', '--agent', 'codex'] },
 		// joshuafolkken/kit#3597: issue `0` and a leading zero are not issue numbers, bare or prefixed.
@@ -58,6 +61,58 @@ describe('backlogrun_args.parse flags', () => {
 		{ argv: ['3437', '0'] },
 	])('refuses $argv with the usage', ({ argv }) => {
 		expect(parse(argv)).toStrictEqual({ kind: 'refused' })
+	})
+})
+
+describe('backlogrun_args.parse configured provider', () => {
+	it.each([
+		{ value: undefined, provider: 'anthropic' },
+		{ value: '', provider: 'anthropic' },
+		{ value: '  ', provider: 'anthropic' },
+		{ value: 'anthropic', provider: 'anthropic' },
+		{ value: 'openai', provider: 'openai' },
+		{ value: ' openai ', provider: 'openai' },
+	])('selects $provider for $value and keeps the invocation', ({ value, provider }) => {
+		expect(parse(['5403', '--only'], { JOSH_AGENT_PROVIDER: value })).toStrictEqual({
+			kind: 'args',
+			args: { provider, invocation: 'backlogrun #5403 --only', issues: [5403] },
+		})
+	})
+})
+
+describe('backlogrun_args.parse provider overrides and refusals', () => {
+	it.each(['codex', 'claude', 'constructor', 'OPENAI'])(
+		'refuses invalid provider %s with a reason',
+		(value) => {
+			expect(parse([], { JOSH_AGENT_PROVIDER: value })).toStrictEqual({
+				kind: 'refused',
+				note: `JOSH_AGENT_PROVIDER=${value} is not an allowed provider, so the agent was not started`,
+			})
+		},
+	)
+
+	it.each([
+		{ agent: 'claude', value: 'openai', provider: 'anthropic' },
+		{ agent: 'codex', value: 'anthropic', provider: 'openai' },
+		{ agent: 'codex', value: 'invalid', provider: 'openai' },
+	])('lets explicit $agent override $value', ({ agent, value, provider }) => {
+		expect(parse(['--agent', agent], { JOSH_AGENT_PROVIDER: value })).toMatchObject({
+			kind: 'args',
+			args: { provider },
+		})
+	})
+
+	it.each(['stop', 'restart'])('keeps --%s independent of an invalid default', (kind) => {
+		expect(parse([`--${kind}`], { JOSH_AGENT_PROVIDER: 'invalid' })).toStrictEqual({ kind })
+	})
+
+	it('does not use the invoking session to select the new run', () => {
+		expect(
+			parse([], { CODEX_THREAD_ID: 'session', JOSH_AGENT_PROVIDER: 'anthropic' }),
+		).toMatchObject({
+			kind: 'args',
+			args: { provider: 'anthropic' },
+		})
 	})
 })
 

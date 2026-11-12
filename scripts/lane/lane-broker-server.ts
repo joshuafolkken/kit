@@ -51,7 +51,7 @@ function read(response: string, session: string): BrokerServer | undefined {
 
 // **The identity is checked when a ship first finds the server, the pid while it waits.** A response
 // a killed supervisor left behind is met on that first look, where a reissued pid must not read as
-// it; the wait polls every 100 ms, where a start-time probe would spawn `ps` on each. Both read
+// it; the wait polls repeatedly, where a start-time probe would spawn `ps` on each. Both read
 // through `is_present_*`, because a Codex lane's ship probes from inside its sandbox, where the kernel
 // answers `EPERM` for a supervisor it has found. A start time that cannot be read is no proof of a
 // dead server, so it does not fail the review.

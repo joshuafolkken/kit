@@ -1,7 +1,9 @@
 import type { CarryRead, RunCarry } from '#scripts/run/carry/run-carry'
 import type { LaunchResult } from '#scripts/run/detached-launch'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
+import type { SupervisorLiveness } from '#scripts/run/run-stranded'
 import { describe, expect, it, vi } from 'vitest'
+import type { PreflightResult } from './backlog-preflight'
 import { backlogrun_cli, type BacklogrunPorts } from './backlogrun-cli'
 import type { StartResult } from './backlogrun-launch'
 import { backlogrun_replace, type ReplaceVerdict } from './backlogrun-replace'
@@ -54,7 +56,10 @@ function harness(
 		repository_directory: vi.fn(async () => GIT_DIRECTORY),
 		is_running: vi.fn(() => is_running),
 		replacement: vi.fn(async () => SAME),
+		stranded: vi.fn(async (): Promise<ReplaceVerdict | undefined> => undefined),
 		start: vi.fn(() => started),
+		preflight: vi.fn((): PreflightResult => ({ kind: 'standing' })),
+		record_limit: vi.fn(async () => undefined),
 		start_supervisor: vi.fn((): LaunchResult => SUPERVISED),
 		stop: vi.fn(async () => STOPPED),
 		restart: vi.fn(async () => 0),
@@ -102,6 +107,24 @@ describe('backlogrun_cli.run starting the supervisor', () => {
 		expect(lines).toStrictEqual([STARTED_LINE, SUPERVISED_LINE])
 	})
 
+	// joshuafolkken/kit#5516: the supervisor's first pass meets a record already handed off.
+	it('hands the record off after the launch and before the supervisor starts', async () => {
+		const { ports } = harness(false)
+
+		await backlogrun_cli.run(['5516'], ports)
+		expect(ports.preflight).toHaveBeenCalledExactlyOnceWith(expect.anything(), GIT_DIRECTORY)
+		expect(ports.start).toHaveBeenCalledBefore(vi.mocked(ports.preflight))
+		expect(ports.preflight).toHaveBeenCalledBefore(vi.mocked(ports.start_supervisor))
+	})
+
+	// joshuafolkken/kit#6139: `lane:stats` reads the limit each run started under off the ledger.
+	it('records the lane limit the launched run starts under', async () => {
+		const { ports } = harness(false)
+
+		await backlogrun_cli.run(['6139'], ports)
+		expect(ports.record_limit).toHaveBeenCalledOnce()
+	})
+
 	it('says a supervisor that did not start and still shows the board', async () => {
 		const { ports, lines } = harness(false)
 		const failed: LaunchResult = { kind: 'failed', note: 'claude is not on PATH' }
@@ -144,6 +167,7 @@ describe('backlogrun_cli.run beside a leftover lane', () => {
 		read_carry: (): CarryRead => ({ kind: 'carried', carry: CARRY }),
 		events: (): Array<RunEvent> => [{ pos: 1, at: DRAINED_AT, kind: 'drain', text: 'drained' }],
 		is_retrospective_owed: (): boolean => false,
+		supervisor: (): SupervisorLiveness => 'gone',
 	}
 
 	function beside(in_use: ReadonlyArray<string>): BacklogrunPorts['replacement'] {
@@ -236,6 +260,32 @@ describe('backlogrun_cli.run replacing nothing', () => {
 		await expect(backlogrun_cli.run(['3724'], ports)).resolves.toBe(0)
 		expect(ports.replacement).not.toHaveBeenCalled()
 		expect(ports.stop).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#5401: a launch that died left its record, and retyping it, `--only` added or not, was refused.
+describe('backlogrun_cli.run over a stopped run', () => {
+	it.each([['5400'], ['5400', '--only']])(
+		'ends the record and starts `backlogrun %s`',
+		async (...argv: Array<string>) => {
+			const { ports, lines } = harness(false)
+			const stranded = { ...ports, stranded: async () => REPLACE }
+
+			await expect(backlogrun_cli.run(argv, stranded)).resolves.toBe(0)
+			expect(lines[0]).toMatch(/^backlogrun: replacing the stopped run with `backlogrun #5400/u)
+			expect(ports.stop).toHaveBeenCalledBefore(vi.mocked(ports.start))
+			expect(ports.replacement).not.toHaveBeenCalled()
+		},
+	)
+
+	it('starts nothing over a record it keeps, and says why', async () => {
+		const { ports, lines } = harness(false)
+		const kept = { ...ports, stranded: async () => ({ kind: 'keep', reason: 'lane' }) as const }
+
+		await expect(backlogrun_cli.run(['5400'], kept)).resolves.toBe(1)
+		expect(lines).toStrictEqual(['backlogrun: not starting — lane'])
+		expect(ports.stop).not.toHaveBeenCalled()
+		expect(ports.start).not.toHaveBeenCalled()
 	})
 })
 

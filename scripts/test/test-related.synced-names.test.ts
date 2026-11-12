@@ -21,6 +21,8 @@ vi.mock('#scripts/git/changed-paths', () => ({
 	},
 }))
 vi.mock('./related-heavy-tests', () => ({ related_heavy_tests: { exclude_flags: () => [] } }))
+// The reach cap walks no import graph here; what it caps is `test-related-cap.test.ts`.
+vi.mock('./test-pinned-reach')
 vi.mock('./test-unit-guard', () => ({
 	test_unit_guard: { is_running: vi.fn(), run_guarded_vitest: vi.fn() },
 }))
@@ -28,9 +30,17 @@ vi.mock('./test-unit-guard', () => ({
 vi.mock('#scripts/gate/scoped-green', () => ({
 	scoped_green: { read_before: vi.fn(), record_if_green: vi.fn() },
 }))
-vi.mock('#scripts/gate/since-green', () => ({
-	since_green: { describe: vi.fn(() => 'since its last green run'), read_moved_parts: vi.fn() },
-}))
+vi.mock(import('#scripts/gate/since-green'), async (import_original) => {
+	const original = await import_original()
+
+	return {
+		since_green: {
+			...original.since_green,
+			describe: vi.fn(() => 'since its last green run'),
+			read_verdict: vi.fn(),
+		},
+	}
+})
 
 const mocked_run = vi.mocked(test_unit_guard.run_guarded_vitest)
 
@@ -69,16 +79,14 @@ function with_map(): void {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	with_map()
 	vi.mocked(git_command.repository_root).mockResolvedValue(REPOSITORY_ROOT)
 	vi.mocked(changed_paths.read_changed_paths).mockResolvedValue([OWN_SOURCE, OWN_TEST])
 	vi.mocked(changed_paths.read_changed_since).mockResolvedValue([MAIN_SOURCE])
 	vi.mocked(changed_paths.read_held_at).mockResolvedValue([])
 	vi.mocked(test_unit_guard.is_running).mockReturnValue(true)
-	vi.mocked(since_green.read_moved_parts).mockResolvedValue({
-		changed: [OWN_SOURCE, OWN_TEST],
-		synced: [DELETED_BY_MAIN, SHARED_TEST],
+	vi.mocked(since_green.read_verdict).mockResolvedValue({
+		parts: { changed: [OWN_SOURCE, OWN_TEST], synced: [DELETED_BY_MAIN, SHARED_TEST] },
 	})
 	mocked_run.mockResolvedValue(0)
 })

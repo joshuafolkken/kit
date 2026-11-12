@@ -18,6 +18,7 @@ const MULTILINE_FIELD: ShellShapeId = 'multiline-quoted-field'
 const FILING_RULES: Record<string, ReadonlyArray<ShellShapeId>> = {
 	'third-party-write': [MULTILINE_FIELD, HEREDOC],
 	'direct-filing': [HEREDOC],
+	'unasked-filing': [],
 	'direct-issue-comment': [HEREDOC],
 	'direct-issue-read': [HEREDOC],
 	'issue-comments': [],
@@ -45,9 +46,12 @@ const GUARD_RULES: Record<string, ReadonlyArray<ShellShapeId>> = {
 	'destructive-command': [SUBSHELL, HEREDOC],
 	'repo-admin': [],
 	'protected-file': [HEREDOC],
+	egress: ['curl-data-file', MULTILINE_FIELD, SEMICOLON, HEREDOC, 'name-prefix'],
 	'direct-pr-create': [SEMICOLON, HEREDOC],
 	'pr-merge': [SEMICOLON, HEREDOC],
 	'poll-loop': [],
+	'direct-git-status': [SEMICOLON],
+	'direct-vitest-run': [],
 }
 
 // The lane-scoped rules — read in the dispatched lane child the test pins, so each rule reaches its
@@ -68,9 +72,13 @@ const LANE_RULES: Record<string, ReadonlyArray<ShellShapeId>> = {
 	'agent-model': [],
 	'investigator-foreground': [],
 	'reviewer-foreground': [],
+	'consultation-investigation': [],
+	'consultation-investigation-codex': [],
+	'consultation-handoff': [],
 	'lane-carry-conflict': [HEREDOC],
 	'lane-switch-main': [SUBSHELL, HEREDOC],
 	'round-one-check-related': [],
+	'repeat-check-related': [],
 	// The corpus heredoc is `cat`'s, which runs nothing; a shell's heredoc is pinned in its own test.
 	'lane-direct-tool': [],
 	'lane-spilled-read': [],

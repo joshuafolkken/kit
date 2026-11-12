@@ -39,12 +39,16 @@ interface OfferAnswer {
 	issues: ReadonlyArray<string>
 	// The consecutive-retry count after this ask — reset to zero by any answer that is not `retry`.
 	retries: number
+	not_before_ms?: number
 	// Why a `wait` answer started nothing, where `backlog:next` said: `solo` for the `run:solo` gate,
 	// so `lane:stats` rows that wait apart from every other one (joshuafolkken/kit#4396); `chain`,
-	// `gate` or `chain+gate` for the waits `backlog-wait-cause.ts` names (joshuafolkken/kit#4513).
+	// `gate`, `lane` or their `+` joins for the waits `backlog-wait-cause.ts` names (joshuafolkken/kit#4513).
 	cause?: string
-	// The issues a `chain` / `gate` cause waited on, recorded with the hold.
+	// The issues a `chain` / `gate` / `lane` cause waited on, recorded with the hold.
 	waiting?: ReadonlyArray<number> | undefined
+	// Whether `backlog:next` held an untriaged candidate back while offering the triaged ones — its
+	// trailing `triage` line — so the judgment session is started beside the lanes.
+	is_judgment_owed?: boolean
 }
 
 // The verdict words that map to one answer regardless of context. `wait` and `retry` are the two that
@@ -86,15 +90,27 @@ function is_numbers(tokens: ReadonlyArray<string>): boolean {
 	return tokens.length > 0 && tokens.every((token) => issue_number_shape.is_issue_number(token))
 }
 
+// The tokens before a trailing `triage` line: `backlog:next` names the triaged candidates it offers and
+// then the judgment it still owes for the untriaged one it held back.
+function without_triage(tokens: ReadonlyArray<string>): ReadonlyArray<string> {
+	return tokens.at(-1) === TOKENS.triage ? tokens.slice(0, -1) : tokens
+}
+
 // What `backlog:next`'s stderr says a blocked wait was for: the `run:solo` gate's notice first, then
 // the waiting issues' causes, or nothing when it names neither.
-function blocked_cause(error: string): Pick<OfferAnswer, 'cause' | 'waiting'> {
+function blocked_cause(error: string): Pick<OfferAnswer, 'cause' | 'waiting' | 'not_before_ms'> {
 	if (epic_solo.is_solo_wait(error)) return { cause: SOLO_CAUSE }
 
 	const causes = backlog_wait_cause.parse(error)
 	const tag = backlog_wait_cause.tag_of(causes)
 
-	return tag === undefined ? {} : { cause: tag, waiting: backlog_wait_cause.numbers_of(causes) }
+	return tag === undefined
+		? {}
+		: {
+				cause: tag,
+				waiting: backlog_wait_cause.numbers_of(causes),
+				...(causes.not_before_ms !== undefined && { not_before_ms: causes.not_before_ms }),
+			}
 }
 
 // A `wait` answer marked with its cause. An `exhausted` wait is marked too: the idle watch it opens
@@ -112,8 +128,12 @@ function answer_of(read: NextRead, running: number, retries: number): OfferAnswe
 		return { answer: 'unreadable', issues: [], retries: NO_RETRIES }
 	}
 
-	if (is_numbers(read.tokens)) {
-		return { answer: 'candidates', issues: read.tokens, retries: NO_RETRIES }
+	const numbers = without_triage(read.tokens)
+
+	if (is_numbers(numbers)) {
+		const is_judgment_owed = numbers.length < read.tokens.length
+
+		return { answer: 'candidates', issues: numbers, retries: NO_RETRIES, is_judgment_owed }
 	}
 
 	const token = read.tokens[0] ?? ''

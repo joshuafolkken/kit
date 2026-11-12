@@ -1,9 +1,11 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import type { CarryRead, RunCarry } from '#scripts/run/carry/run-carry'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { run_wake, type WakeDecisionInput } from './run-wake'
+
+const make_directory = temporary_directory()
 
 // joshuafolkken/kit#1719. The decision is the whole safety property: a supervisor that woke on the
 // wrong answer would spend a budget the record calls finished, and one that woke twice for a single
@@ -150,12 +152,8 @@ describe('run_wake.decide — the session that cut is still running', () => {
 const scratch = { directory: '', target: '' }
 
 beforeEach(() => {
-	scratch.directory = mkdtempSync(path.join(tmpdir(), 'josh-run-wake-test-'))
+	scratch.directory = make_directory('josh-run-wake-test-')
 	scratch.target = path.join(scratch.directory, 'wake.json')
-})
-
-afterEach(() => {
-	rmSync(scratch.directory, { force: true, recursive: true })
 })
 
 describe('run_wake — the supervisor record', () => {

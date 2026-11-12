@@ -21,7 +21,7 @@ report. Drop an observation nobody would act on.
 
 **Below the filing bar, a line that could still change a person's judgement is a board note**:
 `pnpm josh run:event --append note "#<N> <text>"`, shown by `pnpm josh run:board`
-(`docs/josh-commands-run.md` → "`josh run:board`").
+(`docs/josh-commands-board.md` → "`josh run:board`").
 
 **The filing ceilings still apply.** It counts toward the per-origin cap of ten (`prerequisite.md`); above the target
 repository's WIP cap, close one first or do not file (`prompts/collaboration-workflow/wip-cap.md`).
@@ -33,13 +33,12 @@ A bug filing's origin line: `prompts/collaboration-workflow/issue-template.md` (
 
 ### The depth test — a discretionary filing cites the product work it blocked
 
-**Depth is read off the subject rather than judged:**
+**Depth is read off the subject's path, never judged — `pnpm josh observation:depth <path>`.**
 
-| Depth | The subject | Where it lives |
-| --- | --- | --- |
-| **0** | What a consumer of this package touches | A `josh` command's behavior, a distributed document or config, the published package |
-| **1** | The run orchestration that executes an Issue | `fullrun` / `backlogrun`, lanes, the `epic:*` commands, the filing routes themselves |
-| **2** | What measures a run | `josh cost` and the run-timing report |
+The rows' single source is `scripts/observations/observation-depth.ts`.
+
+A command subject → pass its script's path (`script:` in `scripts/josh/josh-commands*.ts`), never the
+command line.
 
 **The depth is read, not recorded** — no label carries it.
 
@@ -65,6 +64,9 @@ to decide something, or the path of the rule that reads it. **A measurement with
 added.** `route:tier-a` and `route:interrupt` carry over unchanged.
 
 ### A delegated child does not take this route
+
+A `backlogrun` child's parent is a driver with no person, so it files an interrupt itself —
+`pnpm josh issue:file --route interrupt --found-during <N>`, then `pnpm josh run:add <M>`.
 
 **A delegated child files `route:tier-a` and `route:interrupt` only.** Its discretionary observations
 go in the summary's "Observations that could bite later" line (`backlogrun-child.md` → "What the

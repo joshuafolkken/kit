@@ -4,14 +4,16 @@ import { git_stash } from '#scripts/git/stash/git-stash'
 import { stash_pop_cli } from '#scripts/git/stash/stash-pop-cli'
 import { stash_push_cli } from '#scripts/git/stash/stash-push-cli'
 import { resolve_spawn_exit } from '#scripts/lib/spawn-exit'
+import { overrides_diff_report } from '#scripts/overrides/overrides-diff-report'
 import { execaSync } from 'execa'
 import { latest_scope_cli } from './latest-scope-cli'
 
 // `josh latest:if-required` — the dependency update a run owes, in one call.
 //
 // `latest:scope` decides; on `required` the tree is set aside, `josh latest` runs, and the stash is
-// popped by its message. Four procedures used to spell that sequence out, and each copy was one more
-// place to drift from the others. `josh latest` itself stays a fixed `sh -c` chain that takes no
+// popped by its message, the dependency-update check printed in between. Sharing that sequence keeps
+// the entry procedures in agreement.
+// `josh latest` itself stays a fixed `sh -c` chain that takes no
 // arguments, so the conditional form is its own command rather than a flag on it.
 //
 // **Every failure leaves the stash where it is.** A failed update can leave `package.json` half
@@ -28,6 +30,11 @@ const FAILURE_EXIT_CODE = 1
 const KEPT_STASH_HINT = `the stash is kept — pop it with \`pnpm josh stash:pop "${STASH_MESSAGE}"\``
 // A conflicted pop has already applied the stash, so popping it again would apply it twice.
 const CONFLICTED_STASH_HINT = `the stash "${STASH_MESSAGE}" is applied and still kept — resolve the conflicts, then drop it`
+const PIN_CHECK_RANGE = 'HEAD'
+const SKILL = '`.claude/skills/dependency-update`'
+const PIN_MOVED = `a protected pin moved — restore it and ask (${SKILL} §2–§3)`
+// The one item of the check no command answers.
+const PIN_JUDGEMENT = `judge: the devDependencies of overridden packages still respect the overrides (${SKILL} §2)`
 
 function run_latest(): number {
 	const result = execaSync(PNPM, LATEST_COMMAND, { stdio: 'inherit', reject: false })
@@ -56,16 +63,37 @@ async function restore(): Promise<number> {
 	return SUCCESS_EXIT_CODE
 }
 
+// The dependency-update check (`.claude/skills/dependency-update` §2–§3) runs before the pop, while
+// HEAD is the only baseline the update moved away from. A range that resolves to nothing is a check
+// that did not run, so it reads as moved rather than as intact.
+function is_pin_moved(): boolean {
+	const verdict = overrides_diff_report.report(PIN_CHECK_RANGE)
+	if (verdict === undefined) return true
+
+	return verdict.is_overrides_moved || verdict.is_engines_moved
+}
+
+async function finish(is_stashed: boolean, is_moved: boolean): Promise<number> {
+	const code = is_stashed ? await restore() : SUCCESS_EXIT_CODE
+
+	if (code !== SUCCESS_EXIT_CODE) return code
+	if (is_moved) return stop(PIN_MOVED)
+	console.info(PIN_JUDGEMENT)
+
+	return SUCCESS_EXIT_CODE
+}
+
 async function update(): Promise<number> {
 	const verdict = await stash_push_cli.set_aside({ message: STASH_MESSAGE, dir: undefined })
 	const is_stashed = verdict === stash_push_cli.STASHED_VERDICT
 	const code = run_latest()
 
-	if (code !== SUCCESS_EXIT_CODE) {
+	// A moved overrides block is a full update the check below stops on, after the pop.
+	if (code !== SUCCESS_EXIT_CODE && code !== latest_scope_cli.OVERRIDES_MOVED_EXIT_CODE) {
 		return stop(is_stashed ? `josh latest failed — ${KEPT_STASH_HINT}` : 'josh latest failed')
 	}
 
-	return is_stashed ? await restore() : SUCCESS_EXIT_CODE
+	return await finish(is_stashed, is_pin_moved())
 }
 
 // The scope on stdout and its reason on stderr, the split `latest:scope` prints in, so the log

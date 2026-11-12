@@ -1,9 +1,10 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { sync } from './sync'
 
+const make_directory = temporary_directory()
 const LEFTHOOK = 'lefthook'
 const CSPELL = 'cspell'
 const OLDER_RANGE = '^1.0.0'
@@ -30,14 +31,13 @@ function printed_lines(): Array<string> {
 }
 
 beforeEach(() => {
-	ctx.work_directory = mkdtempSync(path.join(tmpdir(), 'sync-toolchain-'))
+	ctx.work_directory = make_directory('sync-toolchain-')
 	ctx.package_json_path = path.join(ctx.work_directory, 'package.json')
 	mkdirSync(path.join(ctx.work_directory, '.git'))
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 })
 
 afterEach(() => {
-	rmSync(ctx.work_directory, { recursive: true, force: true })
 	vi.restoreAllMocks()
 })
 

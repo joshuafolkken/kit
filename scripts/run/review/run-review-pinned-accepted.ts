@@ -75,6 +75,20 @@ async function remember(reason: string, unpinned: ReadonlyArray<string>): Promis
 	}
 }
 
+// **A reason `run:review` is opened with is recorded at its launch** (joshuafolkken/kit#6207): a round-1
+// fix moves the tree, so `--join` waits on no check and `judge` records nothing; the ship's carry then
+// found no reason and stopped on the places the lane had already accepted. The branch's recorded places
+// are kept, so `judge` without a reason accepts no place it did not accept before.
+async function keep_reason(reason: string): Promise<void> {
+	try {
+		const accepted = await recorded()
+
+		await write(reason, accepted?.unpinned ?? [])
+	} catch (error) {
+		error_text.trace_swallowed('run_review_pinned_accepted.keep_reason', error)
+	}
+}
+
 async function earlier_reason(unpinned: ReadonlyArray<string>): Promise<string | undefined> {
 	try {
 		return covering_reason(await recorded(), unpinned)
@@ -121,6 +135,6 @@ async function judge(summary: PinnedSummary, reason: string | undefined): Promis
 	return { kind: 'accepted', text: test_pinned_logic.report_text(summary, note) }
 }
 
-const run_review_pinned_accepted = { RECORD_NAME, judge, recorded_reason }
+const run_review_pinned_accepted = { RECORD_NAME, judge, keep_reason, recorded_reason }
 
 export { run_review_pinned_accepted }

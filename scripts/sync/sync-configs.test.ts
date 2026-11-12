@@ -1,12 +1,13 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { init_logic } from '#scripts/init/init-logic'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { sync_configs } from './sync-configs'
 
-// Unique per run, guarded by `shared-temporary-path.test.ts` (joshuafolkken/kit#1517).
-const TEST_DIR = mkdtempSync(path.join(tmpdir(), 'sync-configs-test-'))
+// Unique per run, guarded by `shared-temporary-path.test.ts` (joshuafolkken/kit#1517). Each test
+// empties it, and `beforeEach` lays it out again.
+const TEST_DIR = temporary_directory('suite')('sync-configs-test-')
 const VSCODE_DIR = path.join(TEST_DIR, '.vscode')
 const UNCHANGED_LABEL = 'unchanged'
 

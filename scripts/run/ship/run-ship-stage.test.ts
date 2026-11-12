@@ -1,15 +1,17 @@
 import { randomUUID } from 'node:crypto'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { run_ship_stage, type ShipState } from './run-ship-stage'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#2426: which stage a resumed ship may pass over, decided from the record and the
 // repository's actual state, and the record's own read/write round trip.
 
 const { STAGE } = run_ship_stage
-const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-ship-stage-'))
+const TEMPORARY = make_directory('josh-ship-stage-')
 const NOTHING: ShipState = { is_committed: false, is_pushed: false, is_merged: false }
 const COMMITTED: ShipState = { ...NOTHING, is_committed: true }
 const SHIPPED: ShipState = { ...COMMITTED, is_pushed: true }
@@ -22,10 +24,6 @@ const SKIP_COMMIT = '--skip-commit'
 function fresh_target(): string {
 	return path.join(TEMPORARY, `${randomUUID()}.json`)
 }
-
-afterAll(() => {
-	rmSync(TEMPORARY, { force: true, recursive: true })
-})
 
 describe('run_ship_stage.is_done — the gate', () => {
 	it('runs on a fresh tree even when the record says it completed', () => {
@@ -117,15 +115,14 @@ describe('run_ship_stage.is_done — followup and report', () => {
 	})
 })
 
-// joshuafolkken/kit#2489: the round-2 pass reads the pushed fix delta, so a resumed ship repeats it
-// unless its record still stands on that push.
+// The final review's exact tree stamp decides reuse, including before the push.
 describe('run_ship_stage.is_done — the round-2 pass', () => {
 	it('runs with no record on a shipped tree', () => {
 		expect(run_ship_stage.is_done(STAGE.ROUND_TWO, NONE, SHIPPED)).toBe(false)
 	})
 
-	it('passes over a recorded pass while the push still stands', () => {
-		expect(run_ship_stage.is_done(STAGE.ROUND_TWO, new Set([STAGE.ROUND_TWO]), SHIPPED)).toBe(true)
+	it('consults the reviewed tree even when a pass and push are recorded', () => {
+		expect(run_ship_stage.is_done(STAGE.ROUND_TWO, new Set([STAGE.ROUND_TWO]), SHIPPED)).toBe(false)
 	})
 
 	it('reruns a recorded pass once the state no longer corroborates it', () => {

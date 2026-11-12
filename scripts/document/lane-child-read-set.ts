@@ -1,32 +1,10 @@
-// What a dispatched lane child reads, and what that costs.
-//
-// **A lane child is the largest fixed cost a `backlogrun` has.** Measured on the batch of
-// 2026-09-13, the lane child sessions were 72% of the run's whole input,
-// and each `claude -p fullrun #N` child read the `fullrun` entry set in full — around 227KB. Most of
-// that is spent on procedure a leaf child never carries out: it dispatches no child of its own, opens
-// no lane, runs no progress watcher and performs no hand-off, so the point-of-use documents that
-// carry those steps are read by the parent and never by the child.
-//
-// **This models the child as a trimmed `fullrun`, derived rather than transcribed.** The set is the
-// `fullrun` entry read with two subtractions — the `SKILL.md` sections a child never uses read at the
-// section level, and the point-of-use documents a leaf never reaches dropped — applied by the shared
-// `read-set-trim`, which the `backlogrun` parent trim uses too.
+// The lane child's dedicated entry and the point-of-use sections its commands print.
 
-import type { ReadSetCost } from './entry-read-set'
+import { run_step_section_table } from '#scripts/run/run-step-section-table'
+import type { ReadSetCost, SectionReference } from './entry-read-set'
 import { read_set_trim } from './read-set-trim'
 
 const LANE_CHILD = 'lane-child'
-const FULLRUN = 'fullrun'
-
-// **The `SKILL.md` sections a dispatched lane child never uses**, read at the section level rather
-// than in full. A child never edits these documents (§3), and its dispatch is already an explicit
-// workflow invocation, so §0 cannot decide anything for it either. The other rules it never uses — the
-// `into` target, delegation, the repository prefix, the scout, observation filing, the retrospective —
-// are single rows of §2's table, so no section of them is left to trim.
-const UNUSED_SKILL_SECTIONS: ReadonlyArray<string> = [
-	'0. The rule that fires before any of them — explicit invocation',
-	'3. What stays resident, and what is read from here',
-]
 
 // **The point-of-use documents a leaf child never reaches**: child dispatch, lane opening and the
 // progress watcher / hand-off are the parent's, so their single-source documents are dropped from
@@ -43,7 +21,7 @@ const UNUSED_SKILL_SECTIONS: ReadonlyArray<string> = [
 // once-per-session tail — none of which a leaf child performs. Every reference to it lives in a
 // document the child never reads (`backlogrun.md`, `backlogrun-progress.md`, `retrospective.md`) or in a
 // `SKILL.md` section the child trims (§0's session-cut note), so the child has no path
-// that opens it. It was the child's single largest read — ~16,000 tokens read whole — charged for a
+// that opens it. It was the child's single largest read, read whole and charged for a
 // document it never reaches, so dropping it is a correction of an over-count, not a loss of any rule the
 // child needs. The parent still reads it in full.
 // **`progress-watcher.md` is the parent's too**: a dispatched child is refused
@@ -67,13 +45,28 @@ const SKIPPED_POINT_OF_USE: ReadonlySet<string> = new Set([
 // child's reach carries it instead.
 const REACHED_POINT_OF_USE: ReadonlySet<string> = new Set(['backlogrun-park.md', 'pre-gate-cut.md'])
 
+// **The child reads `pre-gate-cut.md` only as the sections `run:cut` prints** (joshuafolkken/kit#5953),
+// read off the command's own rows so the two never drift.
+function printed_sections(): Array<SectionReference> {
+	const rows = [
+		run_step_section_table.CUT,
+		run_step_section_table.RESUME,
+		run_step_section_table.ENTRY,
+	].map((key) => run_step_section_table.GOVERNING_SECTIONS.get(key))
+
+	return rows
+		.filter((found) => found !== undefined)
+		.map((found) => ({ file: found.document, heading: found.heading }))
+}
+
 function costed(root: string): ReadSetCost {
 	return read_set_trim.costed(root, {
-		base_entry: FULLRUN,
+		base_entry: LANE_CHILD,
 		label: LANE_CHILD,
-		unused_skill_sections: UNUSED_SKILL_SECTIONS,
+		unused_skill_sections: [],
 		skipped_point_of_use: SKIPPED_POINT_OF_USE,
 		reached_point_of_use: REACHED_POINT_OF_USE,
+		printed_sections: printed_sections(),
 	})
 }
 
@@ -81,7 +74,6 @@ const lane_child_read_set = {
 	LANE_CHILD,
 	REACHED_POINT_OF_USE,
 	SKIPPED_POINT_OF_USE,
-	UNUSED_SKILL_SECTIONS,
 	costed,
 }
 

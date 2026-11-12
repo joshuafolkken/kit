@@ -1,11 +1,12 @@
 import { execa } from 'execa'
+import { run_board_held } from './run-board-held'
 
 // Each process's memory and compressed memory as `top`'s MEM and CMPRS count them — the columns
 // Activity Monitor's "Memory" and "Compressed Memory" show. Compressed pages are what a resident set
-// leaves out: `eslint_d` holds about 28 MB resident against 1 GB in `top`'s MEM (joshuafolkken/kit#4171).
+// leaves out, so resident memory alone understates the footprint (joshuafolkken/kit#4171).
 // **CMPRS has no cheaper reader**: `proc_pid_rusage` carries the footprint (MEM) but no compressed
-// count, and `top -l 1` costs about 1.1 s of system CPU against `ps`'s 30 ms. So `top` runs at most once
-// every 30 s, in the background, and the board draws the last reading; only the very first read waits.
+// count. Its sampling cost warrants a cached background reading: the board draws the last reading,
+// and only the very first read waits.
 
 const TOP_ARGUMENTS = ['-l', '1', '-F', '-R', '-stats', 'pid,mem,cmprs']
 const TOP_INTERVAL_MS = 30_000
@@ -54,40 +55,16 @@ function parse_top(output: string): Map<number, TopReading> {
 	return new Map(lines.filter((line) => line !== undefined))
 }
 
-interface TopHeld {
-	readings: TopReadings | undefined
-	read_ms: number
-	pending: Promise<TopReadings> | undefined
-}
-
-// A read that fails keeps the earlier readings, and an empty map where there were none.
-async function refreshed(held: TopHeld, ports: TopPorts): Promise<TopReadings> {
-	try {
-		held.readings = parse_top(await ports.list())
-	} catch {
-		held.readings ??= new Map()
-	} finally {
-		held.pending = undefined
-	}
-
-	return held.readings
-}
-
 // The last reading, with a fresh `top` started in the background once it is `TOP_INTERVAL_MS` old;
-// only the first read, which has none to draw, waits for it.
+// only the first read, which has none to draw, waits for it. A read that fails keeps the earlier
+// readings, and an empty map where there were none.
 function top_reader(ports: TopPorts): () => Promise<TopReadings> {
-	const held: TopHeld = { readings: undefined, read_ms: -Infinity, pending: undefined }
-
-	async function read(): Promise<TopReadings> {
-		if (held.pending === undefined && ports.now() - held.read_ms >= TOP_INTERVAL_MS) {
-			held.read_ms = ports.now()
-			held.pending = refreshed(held, ports)
-		}
-
-		return held.readings ?? (await (held.pending ?? Promise.resolve(new Map())))
-	}
-
-	return read
+	return run_board_held.held_reader<TopReadings>({
+		read: async () => parse_top(await ports.list()),
+		now: ports.now,
+		interval_ms: TOP_INTERVAL_MS,
+		fallback: new Map(),
+	})
 }
 
 async function list_top(): Promise<string> {

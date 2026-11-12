@@ -1,15 +1,17 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { lane_state } from '#scripts/lane/lane-state'
 import { run_hold } from '#scripts/run/hold/run-hold'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { run_halfrun_resume } from './run-halfrun-resume'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#2796: `fullrun #N` after a `halfrun` stop adopts the hold that stop marked, and adopts
 // nothing else — a `halfrun` still running, a `backlogrun` child, another issue's hold, a clean tree and
 // a free tree all fall through to the ordinary claim unchanged.
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-halfrun-resume-test-'))
+const scratch = make_directory('run-halfrun-resume-test-')
 const TARGET = run_hold.hold_path(path.join(scratch, '.git'))
 const ISSUE = '2796'
 const OTHER_ISSUE = '2795'
@@ -19,10 +21,10 @@ const ADOPTED_RECORD = { issue: ISSUE, is_fullrun: true, is_halfrun_stop: undefi
 
 afterEach(() => {
 	run_hold.release_hold(TARGET)
+	vi.restoreAllMocks()
 })
 
 afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
 	run_hold.release_hold(TARGET)
 })
 
@@ -68,6 +70,24 @@ describe('run_halfrun_resume.mark_stop_at — the halfrun stop marks its own rec
 })
 
 describe('run_halfrun_resume.adopt_at — a marked halfrun stop is adopted as this fullrun', () => {
+	it('returns a human-review lane to running when its verified work is adopted', async () => {
+		run_hold.create_halfrun_stop_hold(TARGET, ISSUE)
+		vi.spyOn(run_hold, 'worktree_directory').mockResolvedValue(path.join(scratch, '.git'))
+		vi.spyOn(run_hold, 'is_tree_dirty').mockResolvedValue(true)
+		vi.spyOn(lane_state, 'read_state').mockResolvedValue({
+			issue: ISSUE,
+			state: 'human-review',
+			changed_at: '',
+			changed_by: '',
+		})
+		const record = vi
+			.spyOn(lane_state, 'record_change')
+			.mockResolvedValue({ kind: 'skipped', reason: 'test' })
+
+		expect(await run_halfrun_resume.adopt(ISSUE)).toBe(true)
+		expect(record).toHaveBeenCalledWith({ issue: ISSUE, state: 'running', command: 'run:entry' })
+	})
+
 	it('re-writes the marked hold over a dirty tree with the fullrun mark', () => {
 		run_hold.create_halfrun_stop_hold(TARGET, ISSUE)
 

@@ -61,7 +61,6 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.unstubAllEnvs()
-	vi.clearAllMocks()
 })
 
 describe('issue_file_fold.prior_filings — the run’s earlier filings by the same finder', () => {

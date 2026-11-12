@@ -1,4 +1,5 @@
 import { run_board_fit } from './run-board-fit'
+import { run_board_labels } from './run-board-labels'
 import type { BoardRow } from './run-board-layout'
 
 // A row's title and the reason it makes room for — pure. A title is cut to the title column; a row
@@ -19,6 +20,11 @@ interface RowCut {
 }
 
 const WHOLE: RowCut = { title_limit: TITLE_LIMIT, reason_cut: 0 }
+const WHOLE_TAIL_STATES: ReadonlySet<string> = new Set(['stopped', 'parked', 'human'])
+
+function keeps_tail(row: BoardRow): boolean {
+	return WHOLE_TAIL_STATES.has(row.state) || row.reason?.icon === run_board_labels.STATE_ICONS.human
+}
 
 // A title cut to the title column, so every time after it starts in one column.
 function title_of(title = '', limit = TITLE_LIMIT): string {
@@ -100,6 +106,9 @@ function reason_fitted(
 	draw: (cut: RowCut) => string,
 ): string {
 	const text = draw({ title_limit, reason_cut: 0 })
+
+	if (keeps_tail(row)) return text
+
 	const reason_cut = overrun_of(text, row.reason !== undefined, columns)
 
 	return reason_cut === 0 ? text : draw({ title_limit, reason_cut })
@@ -122,19 +131,31 @@ function row_overrun(
 	return Math.max(line, head_overrun(fit, columns))
 }
 
+// The columns `fitted` cuts the row's title to, none where it draws the row whole.
+function fitted_limit(
+	row: BoardRow,
+	columns: number | undefined,
+	draw: (cut: RowCut) => string,
+	fit: RowFit = {},
+): number | undefined {
+	const overrun = Math.max(row_overrun(row, columns, draw, fit), fit.shared ?? 0)
+
+	return overrun === 0 ? undefined : narrowed_limit(row, overrun, fit.lead ?? 0)
+}
+
 // A row's line as `draw` draws it: whole, or — where it or its section runs past the pane — with its
-// title narrowed first and its reason cut after.
+// title narrowed first and its reason cut after; parked and stopped rows keep their whole tail.
 function fitted(
 	row: BoardRow,
 	columns: number | undefined,
 	draw: (cut: RowCut) => string,
 	fit: RowFit = {},
 ): string {
-	const overrun = Math.max(row_overrun(row, columns, draw, fit), fit.shared ?? 0)
+	const title_limit = fitted_limit(row, columns, draw, fit)
 
-	if (overrun === 0) return draw(WHOLE)
+	if (title_limit === undefined) return draw(WHOLE)
 
-	return reason_fitted(row, columns, narrowed_limit(row, overrun, fit.lead ?? 0), draw)
+	return reason_fitted(row, columns, title_limit, draw)
 }
 
 const run_board_render_title = {
@@ -143,6 +164,7 @@ const run_board_render_title = {
 	WHOLE,
 	columns_cut,
 	fitted,
+	fitted_limit,
 	reason_text,
 	row_overrun,
 	title_of,

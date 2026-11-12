@@ -2,9 +2,8 @@ import { session_cite } from '#scripts/issue/session-cite'
 import { describe, expect, it } from 'vitest'
 import { epic_relations } from './epic-relations'
 
-// joshuafolkken/kit#1080 — the report used to be a bare count, and a count cannot be checked: an
-// insertion that recorded an order nobody declared printed the same line as a correct one, so the
-// invented chains were caught only by whoever opened the epic body afterwards.
+// The report must show the declared relations as well as their count, so an invented dependency
+// is visible without reopening the epic body (joshuafolkken/kit#1080).
 
 const LINKS = [
 	{ blocker: 1228, blocked: 1248 },

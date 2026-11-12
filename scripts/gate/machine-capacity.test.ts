@@ -27,7 +27,8 @@ const AVAILABLE_MB = 4000
 const LEDGER_MEMORY_MB = 2400
 const LEDGER_CORES = 4
 const PAGE_BYTES = 4096
-// 256 + 512 pages of 4 KB: 3 MB swapped since boot; 5 MB compressed since boot.
+// Counters since boot, swap in pages of hw.pagesize and the compressor in bytes, so the parser must
+// turn both into whole MB.
 const DARWIN_LEVEL = 'kern.memorystatus_level: 58'
 const DARWIN_SYSCTL = [
 	DARWIN_LEVEL,
@@ -204,8 +205,8 @@ describe('machine_capacity.swapped_between', () => {
 	})
 })
 
-// joshuafolkken/kit#3943: the level counted compressible pages as free, so 5.2 GB of reservations
-// were admitted while the compressor held 5.9 GB and churned 3.3 GB every three seconds.
+// joshuafolkken/kit#3943: compressible pages must not count as free while the compressor churns,
+// or reservations admit more work into memory pressure.
 const NORMAL = 1
 const WARNING = 2
 const SWAPPED_MB = 100
@@ -232,9 +233,8 @@ function admits_second_claim(after: MemoryReading): boolean {
 	return core_admission.is_admitted('second', [claim('first', 0, 0), claim('second', 1)], budget)
 }
 
-// joshuafolkken/kit#4313: a machine that swaps and compresses all day held a third of every wait with
-// memory to spare, so the traffic alone no longer answers no free memory.
-describe('machine_capacity.pressured_available — swap and compressor traffic alone set no limit', () => {
+// Cumulative swap and compression counters alone do not establish current pressure (#4313).
+describe('machine_capacity.pressured_available — counters without a rate set no limit', () => {
 	it('answers the available memory when nothing is under pressure', () => {
 		expect(machine_capacity.pressured_available(CALM)).toBe(AVAILABLE_MB)
 	})
@@ -265,6 +265,17 @@ describe('machine_capacity.pressured_available — swap and compressor traffic a
 		const unread = { available_mb: undefined, swapped_mb: undefined, pressure_level: undefined }
 
 		expect(machine_capacity.pressured_available(unread)).toBeUndefined()
+	})
+})
+
+describe('machine_capacity.pressured_available — measured swap traffic', () => {
+	it('holds only above the threshold and resumes when the counter stops advancing', () => {
+		const at_limit = { ...CALM, swapped_mb: SWAPPED_MB + machine_capacity.SWAP_PRESSURE_MB }
+		const over_limit = { ...at_limit, swapped_mb: at_limit.swapped_mb + 1 }
+
+		expect(machine_capacity.pressured_available(at_limit, CALM)).toBe(AVAILABLE_MB)
+		expect(machine_capacity.pressured_available(over_limit, CALM)).toBe(0)
+		expect(machine_capacity.pressured_available(over_limit, over_limit)).toBe(AVAILABLE_MB)
 	})
 })
 
@@ -314,11 +325,11 @@ async function read_swapping_machine(): Promise<MachineReading> {
 }
 
 describe('machine_capacity.read_machine — memory read at both ends of the window', () => {
-	it('names the pressure but keeps the free memory when the swap counter advanced during the window', async () => {
+	it('holds new memory claims when swap passes the threshold despite free memory', async () => {
 		const reading = await read_swapping_machine()
 
 		expect(reading.memory_pressured).toBe(true)
-		expect(reading.available_mb).toBeGreaterThan(0)
+		expect(reading.available_mb).toBe(0)
 	})
 
 	// joshuafolkken/kit#4361: the run queue is read on the host, and never under a CPU quota.

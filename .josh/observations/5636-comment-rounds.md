@@ -1,0 +1,3 @@
+- rf:bug-risks | low | scripts/backlog/backlog-triage-cli.ts:107 | 2026-11-01 | #5636
+- rf:project-conventions | low | scripts/backlog/backlog-budget.ts:93 | 2026-11-01 | #5636
+- rf:comments | low | scripts/epic/epic-triage.ts:26 | 2026-11-01 | #5636

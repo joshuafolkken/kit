@@ -6,33 +6,28 @@
 
 ## 記録の読み方
 
-- CI のジョブとステップ: Actions の記録を読む。
+- CI のジョブとステップ: `pnpm josh ci:timing <pr|branch|run-id>`（最新コミットの各 run の job・step ごとの秒と結論、`--json` も可、`docs/josh-commands.md`）。
 
-  ```bash
-  gh api --method GET "repos/<owner>/<repo>/actions/runs?branch=<branch>&per_page=5" --jq '.workflow_runs[] | [.id, .name, .conclusion, .run_started_at, .updated_at] | @tsv'
-  gh api --method GET "repos/<owner>/<repo>/actions/runs/<run_id>/jobs?per_page=100" --jq '.jobs[] | [.name, .started_at, .completed_at] | @tsv'
-  gh api --method GET "repos/<owner>/<repo>/actions/runs/<run_id>/jobs?per_page=100" --jq '.jobs[] | select(.name == "<job>") | .steps[] | [.name, .started_at, .completed_at] | @tsv'
-  ```
-
-- 手元の gate とチェックごとの所要時間: `pnpm josh lane:stats --period <days>`（gate の記録、`docs/josh-commands-run.md`）。
+- 手元の gate とチェックごとの所要時間: `pnpm josh lane:stats --period <days>`（gate の記録、`docs/josh-commands-lane.md`）。
 
 ## 効果を測る後続 Issue
 
-PR の効果を測る後続 Issue を起票するとき:
+PR の効果を測る後続 Issue の起票:
 
-- 開始条件は日数でなく標本数で書く: `## 背景` に `- 実施可能条件: #<PR> のマージ後 <K> マージ`（`issue-template.md`）。`#<PR>` は元の PR の番号で、Issue の番号は `issue:file` が refuse する。元の PR がまだ無い（レーンが `josh ship` の前に起票する）→ `- 実施可能条件: #<Issue> を閉じる PR のマージ後 <K> マージ` と書く。`#<Issue>` を閉じたマージ済み PR から数える。`- 計測宣言:` のある Issue と、見積もりが 0 ファイルで受け入れ条件が `#<N>` の後・以降か記録（`lane:stats` 等）を読む Issue に条件が無いときも、`issue:file` が refuse する。
-- 判定は既定で `## 背景` の `- 計測宣言:` に書く（`issue-template.md`）。`lane:stats` の表の 1 セル → `pnpm josh lane:value cell`（`docs/josh-commands-run.md` → "`josh lane:value`"）。1 コマンドで出せない値 → `- 計測宣言なし: <理由>`。どちらも無ければ `issue:file` が refuse する。
-- K は測る値の種類で決める:
-  - 事象の回数の率（停止・再利用など）: 変更前の率で 10 件以上見込める最小のマージ数（K ≥ 10 ÷ 変更前の率）。変更前の標本数を上限の目安にする。
+- 開始条件は日数でなく標本数で書く: `## 背景` に `- 実施可能条件: #<PR> のマージ後 <K> マージ`（`issue-template.md`）。`#<PR>` は元の PR の番号で、Issue の番号は `issue:file` が refuse する。元の PR がまだ無い → `- 実施可能条件: #<Issue> を閉じる PR のマージ後 <K> マージ` と書く。`#<Issue>` を閉じたマージ済み PR から数える。`- 計測宣言:` のある Issue と、見積もりが 0 ファイルで受け入れ条件が `#<N>` の後・以降か記録（`lane:stats` 等）を読む Issue に条件が無いときも、`issue:file` が refuse する。
+- 判定は既定で `## 背景` の `- 計測宣言:` に書く（`issue-template.md`）。`lane:stats` の表の 1 セル → `pnpm josh lane:value cell`（`docs/josh-commands-lane.md` → "`josh lane:value`"）。1 コマンドで出せない値 → `- 計測宣言なし: <理由>`。どちらも無いか同じ宣言の open Issue があれば `issue:file` が refuse する（後者は `issue:comment <N>` で合流）。
+- K は値の種類で決め、迷ったら 10（30 超は `issue:file` が refuse）:
+  - 事象の回数の率（停止・再利用など）: K ≥ 10 ÷ 変更前の率、30 まで。超える見込み → 率でなく件数を宣言するか `- 計測宣言なし: <理由>`。
   - 連続値の平均・差（所要時間など）: 5〜10。
-  - 最大値・裾: 変更前の標本数と同程度。
-- 受け入れ条件の集計は固定日数でなく `pnpm josh lane:stats --period <days>` とし、`<days>` は元 PR のマージからの経過日数（小数可）にする。
+  - 最大値・裾: 20 まで。
+- 計測宣言のある本文の `- 実施可能日:` → 起票から 7 日以内、`- 実施可能条件:` と併記しない（`issue:file` が refuse）。
+- 受け入れ条件の集計は固定日数でなく `pnpm josh lane:stats --period <days>`、`<days>` は元 PR のマージからの経過日数（小数可）。
 
-計測を記録し終えた → `pnpm josh issue:measured <N> --evidence-file <path>`。`.claude/skills/workflow-commands/issue-comments.md` →「A measurement-only Issue」。
+計測を記録し終えた → `pnpm josh issue:measured <N> --evidence-file .josh/tmp/measured.md`。`.claude/skills/workflow-commands/issue-comments.md` →「A measurement-only Issue」。
 
 ## 期待効果に届かなかったとき
 
-- 計測が期待効果に届かなかった → `pnpm josh issue:measured <N> --unmet --evidence-file <path>`。
+- 計測が期待効果に届かなかった → 同じ `issue:measured` に `--unmet` を足す。
 - 届かなかった機構の撤去候補を起票する → `pnpm josh effect:audit --draft <元 Issue>`（元 Issue が 30 日より前に閉じたときは `--days <N>` を足す）、表示された `issue:file` の行で起票する（重複は scout が止める）。
 - 時間短縮 Issue の効果を一覧する → `pnpm josh effect:audit [--days <N>]`。
 
@@ -41,4 +36,5 @@ PR の効果を測る後続 Issue を起票するとき:
 記録で答えられない問い（記録の無い変更前後の比較など）に限る。
 
 - 1 回だけ実行する。lane 子は `pnpm josh reserved-run <weight> -- <command>` で包み、コア予算に数えさせる。ESLint は `--concurrency off` で走らせ、並列度の計測はレーン外で行う（`lane-direct-tool`）。
+- 1 ルールをリポジトリ全体に当てる → `pnpm josh lint:rule <rule>`（コアを自ら予約するので `reserved-run` で包まない）、違反は出力ファイルを読み直す（`docs/josh-commands.md` → "`josh lint:rule`"）。ルールや設定を直しながらの確認は `--paths <path>...` で数ファイルに絞り、全体実行は最後に 1 回。
 - 結果を Issue のコメントに残し、以後はそれを使い回す。

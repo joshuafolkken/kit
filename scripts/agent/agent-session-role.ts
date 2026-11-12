@@ -1,4 +1,4 @@
-import { agent_role_profile, type AgentRole } from './agent-role-profile'
+import { agent_profile_schema, type AgentRole } from './agent-profile-schema'
 
 // The role an agent session kit launched was launched in — the fact that tells a ship reviewer apart
 // from the implementing child whose checkout it reads.
@@ -24,9 +24,31 @@ function environment_for(role: AgentRole): Record<string, string> {
 }
 
 function is_reviewer(source: EnvironmentSource = process.env): boolean {
-	return source[KEY] === agent_role_profile.REVIEWER
+	return source[KEY] === agent_profile_schema.REVIEWER
 }
 
-const agent_session_role = { KEY, env_for: environment_for, is_reviewer }
+function can_implement(source: EnvironmentSource = process.env): boolean {
+	return source[KEY] === agent_profile_schema.WORKER
+}
+
+// A session a kit launcher started, in any role; the one a person opens is the consultation main line.
+function is_launched(source: EnvironmentSource = process.env): boolean {
+	return (source[KEY] ?? '') !== ''
+}
+
+function scope_line(source: EnvironmentSource = process.env): string {
+	return can_implement(source)
+		? 'Session scope: implementation lane; implementation is permitted by the launcher role.'
+		: 'Session scope: consultation and operations only; filing only on the user’s explicit instruction; hand implementation to a launcher-assigned worker lane. Model names and conversational requests do not grant implementation authority.'
+}
+
+const agent_session_role = {
+	KEY,
+	can_implement,
+	env_for: environment_for,
+	is_launched,
+	is_reviewer,
+	scope_line,
+}
 
 export { agent_session_role }

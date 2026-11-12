@@ -51,7 +51,7 @@ const COUNT_WORDS: ReadonlyArray<string> = [
 // run by, which the pointer has to precede.
 const STEP_MARKERS: ReadonlyArray<[string, string]> = [
 	['0. **A lane child**', '`pnpm josh check:related`'],
-	['1. Run `pnpm josh main:merge`', 'run the final scoped lint/test pair'],
+	['1. **Issue `pnpm josh run:cut <N>` alone first**', 'the scoped lint/test pair'],
 ]
 
 // Unwrapped, since a stem or a pointer wraps at whatever column the prose wraps at.
@@ -123,16 +123,16 @@ describe('the self-check question 1 and josh test:pinned', () => {
 		)
 	})
 
-	it('the chain rule says run:review runs test:pinned beside the gate and how it carries on past it', () => {
+	// joshuafolkken/kit#5966: how run:review carries test:pinned past the gate, and the join's
+	// `--unpinned-ok` note (kit#4920), are what the commands print, so step 1–2 point at their sources.
+	it('the chain rule points at what run:review and its join print about test:pinned', () => {
 		const step = read_unwrapped(CHAIN_RULE)
 
-		expect(step).toContain("its `--join`'s `test:pinned` lines answer the self-check")
+		expect(step).toContain('self-check"; 1: `--join`\'s `test:pinned`')
 		expect(step).toContain(
-			'it starts `pnpm josh test:pinned` and `pnpm josh gate` in the background',
+			"`run:review`'s brief paths and prompts (`scripts/run/review/run-review-cli.ts`)",
 		)
-		expect(step).toContain('on a red gate, `3` on an `unpinned` line')
-		// joshuafolkken/kit#4920: the stop note names the call that passes the reason without a re-run.
-		expect(step).toContain('`3` on an `unpinned` line (its note names the `--unpinned-ok` call)')
+		expect(step).toContain('follow what it prints (`scripts/run/review/run-chain-join.ts`)')
 	})
 })
 

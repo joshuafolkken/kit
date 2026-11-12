@@ -44,14 +44,14 @@ const { run_ship_return } = await import('./run-ship-return')
 // fresh session re-reads the run; a session that ended is relaunched as before.
 
 const TITLE = `Return a stopped review #${ISSUE}`
-const BODY_PATH = 'scratchpad/evidence.md'
+const BODY_PATH = '.josh/tmp/evidence.md'
 const RESUME = { title: TITLE, flags: ['--body-file', BODY_PATH], is_review: true }
 const OUTPUT = 'High: scripts/run/ship/run-ship-return.ts'
 const STAGE = 'review'
 
 beforeEach(() => {
 	offer_mock.mockReset().mockResolvedValue(false)
-	relaunch_mock.mockReset().mockReturnValue({ kind: 'launched', pid: 1 })
+	relaunch_mock.mockReset().mockResolvedValue({ kind: 'launched', pid: 1 })
 	request_mock.mockReset()
 	place_mock.mockReset().mockResolvedValue(undefined)
 	is_over_mock.mockReset().mockResolvedValue(false)

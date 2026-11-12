@@ -91,7 +91,8 @@ function is_destructive_command(command: string): boolean {
 const DESTRUCTIVE_COMMAND_REASON =
 	'⛔ destructive command: a recursive forced `rm`, a `gh repo delete` / `archive`, ' +
 	'`gh pr close` or a `gh api -X DELETE` cannot be undone, which is Tier C. Remove one path at a ' +
-	'time without `-f`, or ask the user to run it. It fires on every occurrence ' +
+	'time without `-f`, or ask the user to run it. A blocked-by removal: ' +
+	'`pnpm josh backlog:triage --apply <N> --unblock <M> --reason <text>`. It fires on every occurrence ' +
 	'(`prompts/collaboration-workflow/operating-rules.md`).'
 
 const ROW = {

@@ -2,6 +2,7 @@ import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { time_shell } from '#scripts/time-runtime/time-shell'
 import { git_argv } from './git-argv'
+import { interpreter_options } from './interpreter-options'
 import { shell_segments } from './shell-segments'
 
 // The trigger helpers the enumeration in `delivered-rules.ts` is built from, held here so a rule
@@ -14,11 +15,14 @@ import { shell_segments } from './shell-segments'
 // not. Every rule delivered by the enumeration is therefore one whose binding moment is a shell call —
 // so the tool-name guard belongs here rather than to each row, and a row states only what it looks for
 // in the command.
-function on_bash_command(is_match: (command: string) => boolean): (call: GuardedCall) => boolean {
-	return function is_trigger(call: GuardedCall): boolean {
+// The arguments after the call (the hook call's context) are handed on to the command test.
+function on_bash_command<Rest extends ReadonlyArray<unknown>>(
+	is_match: (command: string, ...rest: Rest) => boolean,
+): (call: GuardedCall, ...rest: Rest) => boolean {
+	return function is_trigger(call: GuardedCall, ...rest: Rest): boolean {
 		if (call.name !== cost_blocks.BASH_TOOL) return false
 
-		return is_match(time_shell.bash_command(call.input))
+		return is_match(time_shell.bash_command(call.input), ...rest)
 	}
 }
 
@@ -57,7 +61,6 @@ function spoken_line(command: string): string {
 }
 
 const LEADING_SHELL_SCRIPT_RUNNER = new RegExp(`^${SHELL_SCRIPT_RUNNER.source}`, 'u')
-const QUOTE_MARK = /["']/gu
 
 // The quoted script a segment's shell runs, as a line of its own: `sh -c 'pnpm exec eslint .'` reads
 // as `pnpm exec eslint .`, so a caller cutting it into commands reads the programs the script
@@ -65,15 +68,14 @@ const QUOTE_MARK = /["']/gu
 // `undefined` when the segment runs no shell script.
 function shell_script_of(segment: string): string | undefined {
 	const call = git_argv.program_of(segment)
-
 	if (call === undefined) return undefined
-
 	const spoken = [call.name, ...call.args].join(' ')
-	const runner = LEADING_SHELL_SCRIPT_RUNNER.exec(spoken)
+	if (!LEADING_SHELL_SCRIPT_RUNNER.test(spoken)) return undefined
 
-	if (runner === null) return undefined
+	const index = interpreter_options.shell_script_index(call)
+	const script = call.name === 'eval' ? call.args.join(' ') : (call.args[index + 1] ?? '')
 
-	return spoken.slice(runner[0].length).replaceAll(QUOTE_MARK, '').trim()
+	return script.replace(/^(["'])([\s\S]*)\1$/u, '$2')
 }
 
 function is_direct_filing(command: string): boolean {
@@ -89,12 +91,21 @@ function is_direct_filing(command: string): boolean {
 // spelling quoted inside another command's body is not read as a filing.
 const FILING_NAMES: ReadonlySet<string> = new Set(['issue:file'])
 
-function is_issue_filing(command: string): boolean {
-	return shell_segments
-		.segments_of(command)
-		.some((segment) => shell_segments.is_josh_command(segment, FILING_NAMES))
+// One segment of a command line, for a reader that also judges the segment's own flags.
+function is_issue_filing_segment(segment: string): boolean {
+	return shell_segments.is_josh_command(segment, FILING_NAMES)
 }
 
-const bash_triggers = { is_direct_filing, is_issue_filing, on_bash_command, shell_script_of }
+function is_issue_filing(command: string): boolean {
+	return shell_segments.segments_of(command).some((segment) => is_issue_filing_segment(segment))
+}
+
+const bash_triggers = {
+	is_direct_filing,
+	is_issue_filing,
+	is_issue_filing_segment,
+	on_bash_command,
+	shell_script_of,
+}
 
 export { bash_triggers }

@@ -1,32 +1,13 @@
 #!/bin/sh
-# Launch one kit hook by name: `sh scripts/hooks/run-hook.sh <name> [arguments...]`
-# (joshuafolkken/kit#3184).
-#
-# A hook command in `.claude/settings.json` / `.codex/hooks.json` only moves to the project root
-# (`scripts/init/hook-launch.ts`) and calls this script, so everything every hook shares lives here once:
-#
-# - The git location variables a git hook exports are cleared when the checkout resolves without
-#   them, so the hook's own git calls act on the checkout it stands in, and kept when the git metadata
-#   lives outside the work tree. `git` starts only when one of them is set — a hook runs on every tool
-#   call (joshuafolkken/kit#3946, joshuafolkken/kit#4187). The list is `GIT_LOCATION_VARIABLES`
-#   (`scripts/git/git-location-environment.ts`), held to it by `run-hook.test.ts`.
-# - The pre-built bundle `dist/hooks/<name>.js` runs once its gate passes; otherwise the live source
-#   runs through josh, whose command is the name with its first `-` turned into `:`
-#   (`pretool-guard` → `pretool:guard`).
-# - In kit's own checkout the gate is the kit-only `tools/hooks/hook-bundle-ready.ts`, which rebuilds stale bundles
-#   (joshuafolkken/kit#2984) and then runs the bundle — or the josh fallback — itself, so a hook call
-#   starts node once (joshuafolkken/kit#3327). In an installed package it is a presence check: the
-#   published bundles cannot be stale against a source the consumer never edits, and Node strips no
-#   types under `node_modules`.
-# - Nothing is spawned that the shell can do itself: the directory is a parameter expansion rather than
-#   `dirname`, and `node` replaces this shell through `exec` rather than running beside it.
-# - An `if`/`else`, never `&&`/`||`: a guard's refusal is a non-zero exit, and a chain would read it as
-#   a missing bundle and run the hook twice.
-# - A hook launched inside one of Claude Code's own worktrees (`EnterWorktree`, an
-#   `isolation: "worktree"` subagent) runs in that worktree. Claude Code keeps `CLAUDE_PROJECT_DIR` on
-#   the main checkout there, so the prefix lands on it and hands over where the hook was launched in
-#   `JOSH_HOOK_CWD` (joshuafolkken/kit#4617). The code still comes from the project root — a fresh
-#   worktree has no install and no bundles — so only the working directory moves.
+# Launch one kit hook: `sh <root>/scripts/hooks/run-hook.sh <name> [arguments...]` is the whole hook
+# command (`scripts/init/hook-launch.ts`). Move to the project root this script sits under — into the
+# Claude Code worktree the hook was launched in, if any, with the launch directory in `JOSH_HOOK_CWD` —
+# clear the git location variables (`GIT_LOCATION_VARIABLES`) when the checkout resolves without them,
+# then run `dist/hooks/<name>.js`, or josh with `<name>`'s first `-` as `:`. kit's checkout gates the
+# bundles with the built `dist/hooks/ready.js`, or `tools/hooks/hook-bundle-ready.ts` before a first
+# build; a built checkout or package first hands `pretool-guard` to its resident daemon (`daemon_answer`). No
+# process the shell can do itself, and `if`/`else`
+# rather than `&&`/`||`: a guard's refusal is a non-zero exit that must not run the hook twice.
 
 hook_name=$1
 shift
@@ -35,10 +16,16 @@ case $0 in
 */*) hooks_dir=$PWD/${0%/*} ;;
 *) hooks_dir=$PWD ;;
 esac
-package_dir="$hooks_dir/../.."
+package_dir=${hooks_dir%/scripts/hooks}
 bundle="$package_dir/dist/hooks/$hook_name.js"
 josh_command="${hook_name%%-*}:${hook_name#*-}"
 
+launch_directory=$PWD
+cd "${package_dir%/node_modules/*/*}" || exit
+# The project's own cache: an installed package's directory may be a read-only store link.
+cache_dir=$PWD/node_modules/.cache
+# A command from before joshuafolkken/kit#6033 exports the launch directory itself, then moves to the root.
+if [ "$launch_directory" != "$PWD" ] || [ -z "$JOSH_HOOK_CWD" ]; then export JOSH_HOOK_CWD="$launch_directory"; fi
 worktrees_dir=$PWD/.claude/worktrees/
 case $JOSH_HOOK_CWD in
 "$worktrees_dir"?*)
@@ -54,11 +41,78 @@ if [ -n "$GIT_ALTERNATE_OBJECT_DIRECTORIES$GIT_COMMON_DIR$GIT_DIR$GIT_INDEX_FILE
 	unset $location_variables
 fi
 
+compile_cache="$cache_dir/kit-hook-compile"
+
+# Hand the call to the resident pretool-guard of this checkout (`tools/hooks/hook-daemon.ts`) and exit
+# with its answer. Returns, with the payload back on stdin, when there is none — starting one for the
+# next call — or it answers `stale` or nothing in time. Each call directory sits beside the daemon's, so
+# a daemon that goes never takes a payload with it. The call carries this environment in `env`, one
+# `name=value` line per variable with `%` and line breaks escaped, for the daemon to answer under.
+daemon_answer() {
+	daemon_script=$1
+	daemon_key=$(printf '%s\n' "$PWD" | cksum)
+	daemons_dir="$cache_dir/kit-hook-daemon"
+	daemon_dir="$daemons_dir/${daemon_key%% *}"
+	daemon_pid=
+	if [ -f "$daemon_dir/pid" ]; then read -r daemon_pid <"$daemon_dir/pid"; fi
+	# Trusted only while the pid's command line is this daemon's, so a pid reused after an unclean
+	# daemon exit is neither waited on nor stopped.
+	case $(ps -ww -o command= -p "${daemon_pid:-0}" 2>/dev/null) in
+	*"/daemon.js $daemon_dir") ;;
+	*)
+		rm -rf "$daemon_dir"
+		NODE_COMPILE_CACHE="$compile_cache" node --disable-warning=ExperimentalWarning "$daemon_script" --detach "$daemon_dir" </dev/null >/dev/null 2>&1 &
+		return
+		;;
+	esac
+	request=$(mktemp -d "$daemons_dir/call.XXXXXX") || return
+	# Written before stdin is read, so a call whose environment cannot be written runs itself untouched.
+	if ! awk 'BEGIN { for (name in ENVIRON) { value = ENVIRON[name]; gsub(/%/, "%25", value); gsub(/\n/, "%0A", value); print name "=" value } }' >"$request/env"; then
+		rm -rf "$request"
+		return
+	fi
+	cat >"$request/payload"
+	printf '%s' "$JOSH_HOOK_CWD" >"$request/cwd"
+	printf '%s' "$$" >"$request/launcher"
+	mkfifo "$request/reply"
+	exec 4<>"$request/reply"
+	daemon_reply=timeout
+	if printf '%s\n' "$request" 2>/dev/null 1<>"$daemon_dir/requests"; then
+		(
+			trap 'kill $! 2>/dev/null; exit' TERM
+			sleep "${JOSH_HOOK_DAEMON_WAIT:-10}" &
+			wait $!
+			printf 'timeout\n' 1<>"$request/reply"
+		) </dev/null >/dev/null 2>&1 4<&- &
+		watchdog=$!
+		read -r daemon_reply <&4
+		kill "$watchdog" 2>/dev/null
+	fi
+	exec 4<&-
+	case $daemon_reply in
+	'' | *[!0-9]*) ;;
+	*)
+		if [ -s "$request/out" ]; then cat "$request/out"; fi
+		if [ -s "$request/err" ]; then cat "$request/err" >&2; fi
+		rm -rf "$request"
+		exit "$daemon_reply"
+		;;
+	esac
+	if [ "$daemon_reply" = timeout ]; then kill "$daemon_pid" 2>/dev/null; fi
+	exec 0<"$request/payload"
+	rm -rf "$request"
+}
+
+daemon="$package_dir/dist/hooks/daemon.js"
+if [ "$hook_name" = pretool-guard ] && [ -f "$daemon" ]; then daemon_answer "$daemon"; fi
+
 case $0 in
 *node_modules/*)
 	if [ -d "$package_dir/dist/hooks" ]; then exec node "$bundle" "$@"; else exec node "$package_dir/dist/josh.js" "$josh_command" "$@"; fi
 	;;
 *)
-	exec node --disable-warning=ExperimentalWarning "$package_dir/tools/hooks/hook-bundle-ready.ts" "$hook_name" "$josh_command" "$@"
+	gate="$package_dir/dist/hooks/ready.js"
+	if [ ! -f "$gate" ]; then gate="$package_dir/tools/hooks/hook-bundle-ready.ts"; fi
+	NODE_COMPILE_CACHE="$compile_cache" exec node --disable-warning=ExperimentalWarning "$gate" "$hook_name" "$josh_command" "$@"
 	;;
 esac

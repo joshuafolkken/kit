@@ -82,3 +82,35 @@ describe('review_round2_skip_comment.record', () => {
 		expect(await review_round2_skip_comment.record(ISSUE, SKIP)).toBe('failed')
 	})
 })
+
+describe('review_round2_skip_comment.record — reason line boundaries', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it.each(['', '\n', '\n\nAdditional context'])(
+		'posts nothing twice with suffix %j after the reason line',
+		async (suffix) => {
+			const post = plant([comment(`\n${BODY}${suffix}`)])
+
+			expect(await review_round2_skip_comment.record(ISSUE, SKIP)).toBe('present')
+			expect(post).not.toHaveBeenCalled()
+		},
+	)
+
+	it.each(['.bak', ', docs/other.md', ' extra text'])(
+		'posts a low skip when the recorded reason has suffix %j on the same line',
+		async (suffix) => {
+			const answer: RoundTwoAnswer = {
+				verdict: review_round2.SKIPPED_VERDICT,
+				code: review_round2.CODE.LOW,
+				reason: 'low review level has one round: docs/guide.md',
+			}
+			const body = review_round2_skip_comment.body_of(answer)
+			const post = plant([comment(`${body}${suffix}`)])
+
+			expect(await review_round2_skip_comment.record(ISSUE, answer)).toBe('posted')
+			expect(post).toHaveBeenCalledWith(String(ISSUE), body)
+		},
+	)
+})

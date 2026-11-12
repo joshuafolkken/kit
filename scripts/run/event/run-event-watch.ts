@@ -1,3 +1,4 @@
+import { poll } from '#scripts/lib/poll'
 import type { StreamRead } from './run-event-stream'
 
 // The loop behind `josh run:event --watch` — the ambient surface a person keeps open in a pane of their
@@ -19,13 +20,17 @@ interface WatchPorts {
 async function watch(ports: WatchPorts, position: number): Promise<number> {
 	let next = position
 
-	while (ports.should_continue()) {
-		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		const read = await ports.pass(next)
+	await poll.poll_until(() => !ports.should_continue(), {
+		attempts: Infinity,
+		interval_ms: 0,
+		sleeper: async () => {
+			const read = await ports.pass(next)
 
-		for (const event of read.events) ports.write(ports.render(event))
-		next = read.next_position
-	}
+			for (const event of read.events) ports.write(ports.render(event))
+			// eslint-disable-next-line require-atomic-updates -- poll awaits each callback before starting the next pass
+			next = read.next_position
+		},
+	})
 
 	return next
 }

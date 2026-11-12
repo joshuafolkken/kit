@@ -1,0 +1,379 @@
+import type { OpenIssueData } from '#scripts/git/git-schemas'
+import { size_estimate } from '#scripts/issue/size-estimate'
+import { describe, expect, it } from 'vitest'
+import type { LanePlan } from './lane-plan'
+import { lane_plan_size, type Oversize, type PlanSignals } from './lane-plan-size'
+
+// joshuafolkken/kit#5533: two lanes declared at 4 files planned 9 and shipped 16 and 18. A plan past twice
+// its declaration is refused with the split it should take; an Issue with no declaration never is.
+// joshuafolkken/kit#5568: the probed hunks and the projected lines answer `split` too, with their reason.
+
+const ISSUE = 5533
+const DECLARED_BODY = '## 背景\n\n- 規模見積もり: 約 4 ファイル / 70 行（テスト除く）\n'
+const PLANNED_AT = '2026-10-31T00:00:00.000Z'
+const TEST_FILE = 'scripts/lane/lane-plan-size.test.ts'
+const UNPLANNED = 'scripts/lane/unplanned.ts'
+const LANE_DIRECTORY = 'scripts/lane/'
+const QUIET: PlanSignals = {
+	hunk_files: [],
+	committed_files: [],
+	lines_ratio: undefined,
+	implement_rate: undefined,
+	split_filed: false,
+}
+
+// `count` probed hunks, all in `file`.
+function hunks(count: number, file = UNPLANNED): Pick<PlanSignals, 'hunk_files'> {
+	return { hunk_files: Array.from({ length: count }, () => file) }
+}
+
+function issue_with(body: string): Array<OpenIssueData> {
+	return [{ number: ISSUE, title: 'lane', createdAt: PLANNED_AT, labels: [], body }]
+}
+
+function declared(file_count: number, line_count: number): Array<OpenIssueData> {
+	return issue_with(
+		`## 背景\n\n- 規模見積もり: 約 ${String(file_count)} ファイル / ${String(line_count)} 行（テスト除く）\n`,
+	)
+}
+
+function files(count: number): Array<string> {
+	return Array.from({ length: count }, (_, index) => `scripts/lane/file-${String(index + 1)}.ts`)
+}
+
+function plan_of(paths: ReadonlyArray<string>): LanePlan {
+	return { issue: ISSUE, paths: [...paths], planned_at: PLANNED_AT }
+}
+
+function oversize_of(
+	paths: ReadonlyArray<string>,
+	issues: ReadonlyArray<OpenIssueData> = issue_with(DECLARED_BODY),
+	recorded?: ReadonlyArray<string>,
+): Oversize | undefined {
+	const held = recorded === undefined ? undefined : plan_of(recorded)
+
+	return lane_plan_size.oversize(plan_of(paths), issues, held, QUIET)
+}
+
+function signalled(
+	issues: ReadonlyArray<OpenIssueData>,
+	signals: Partial<PlanSignals>,
+): Oversize | undefined {
+	return lane_plan_size.oversize(plan_of(files(1)), issues, undefined, { ...QUIET, ...signals })
+}
+
+function replanned(
+	issues: ReadonlyArray<OpenIssueData>,
+	signals: Partial<PlanSignals>,
+	is_cleared = true,
+): Oversize | undefined {
+	const recorded = { ...plan_of(files(1)), cleared: is_cleared }
+
+	return lane_plan_size.oversize(plan_of(files(2)), issues, recorded, { ...QUIET, ...signals })
+}
+
+function text_of(over: Oversize | undefined): string {
+	return over === undefined ? '' : lane_plan_size.refusal_text(ISSUE, over)
+}
+
+describe('lane_plan_size.oversize', () => {
+	it('passes an eighth file against a declaration of 4 files', () => {
+		expect(oversize_of(files(8))).toBeUndefined()
+	})
+
+	it('refuses a ninth file against a declaration of 4 files', () => {
+		expect(oversize_of(files(9))).toMatchObject({
+			reason: 'files',
+			declared: 4,
+			limit: 8,
+			split_off: ['scripts/lane/file-9.ts'],
+		})
+	})
+
+	it('does not count test files toward the bar', () => {
+		expect(oversize_of([...files(8), TEST_FILE])).toBeUndefined()
+	})
+
+	it.each([
+		['an Issue with no declaration (an epic)', issue_with('## 背景\n\n- 種別: 非不具合\n')],
+		['an Issue missing from the listing', []],
+		['an Issue declaring 0 files', declared(0, 0)],
+	])('never refuses %s', (_label, issues) => {
+		expect(oversize_of(files(20), issues)).toBeUndefined()
+	})
+
+	it('keeps the files the recorded plan held and splits off the ones added since', () => {
+		const added = 'scripts/lane/added.ts'
+		const over = oversize_of([added, ...files(8)], issue_with(DECLARED_BODY), files(8))
+
+		expect(over).toMatchObject({ kept: files(8), split_off: [added] })
+	})
+})
+
+// joshuafolkken/kit#7074: the lines axis is the filing's size bar, twice the implement budget.
+describe('lane_plan_size size bar', () => {
+	it.each([
+		[50, undefined],
+		[60, 54],
+	])('judges %s declared lines at 20.6 min / 100 lines and growth 1.59375', (lines, limit) => {
+		const signals = { implement_rate: { median: 20.6, lanes: 372 }, lines_ratio: 1.59375 }
+
+		expect(signalled(declared(1, lines), signals)?.limit).toBe(limit)
+	})
+})
+
+describe('lane_plan_size measured guide', () => {
+	it.each([
+		[12, 75, false],
+		[12, 76, true],
+		[3, 300, false],
+		[3, 301, true],
+	])(
+		'matches the backlog size bar at rate %s and %s lines (ac-881063cd)',
+		(median, lines, split) => {
+			const implement_rate = { median, lanes: 1 }
+			const issues = declared(1, lines)
+			const body = issues[0]?.body ?? ''
+
+			const over = signalled(issues, { implement_rate })
+
+			expect(over).toEqual(split ? expect.objectContaining({ reason: 'lines' }) : undefined)
+			expect(size_estimate.over_budget(body, implement_rate) !== undefined).toBe(split)
+		},
+	)
+
+	it('keeps the measured declaration correction and split and replan exemptions', () => {
+		const signals = { implement_rate: { median: 12, lanes: 1 }, lines_ratio: 1.5 }
+		const issues = declared(1, 140)
+
+		expect(signalled(issues, signals)).toMatchObject({ reason: 'lines', measured: 210, limit: 100 })
+		expect(signalled(issues, { ...signals, split_filed: true })).toBeUndefined()
+		expect(replanned(issues, signals)).toBeUndefined()
+		expect(replanned(issues, signals, false)).toMatchObject({ reason: 'lines' })
+		const recorded = { ...plan_of(files(1)), sized: true }
+
+		const over = lane_plan_size.oversize(plan_of(files(1)), issues, recorded, {
+			...QUIET,
+			...signals,
+		})
+
+		expect(over).toBeUndefined()
+	})
+})
+
+describe('lane_plan_size.oversize on the hunks and lines axes', () => {
+	it('answers hunks for 17 probed hunks against a declaration of 8 files', () => {
+		expect(signalled(declared(8, 100), hunks(17))).toMatchObject({
+			reason: 'hunks',
+			limit: 16,
+			measured: 17,
+		})
+	})
+
+	it('passes 16 probed hunks against a declaration of 8 files', () => {
+		expect(signalled(declared(8, 100), hunks(16))).toBeUndefined()
+	})
+
+	it('answers lines for 200 declared lines at a ratio of 1.8', () => {
+		expect(signalled(declared(4, 200), { lines_ratio: 1.8 })).toMatchObject({
+			reason: 'lines',
+			measured: 360,
+		})
+	})
+
+	it('does not answer for 100 declared lines at a ratio of 1.8', () => {
+		expect(signalled(declared(4, 100), { lines_ratio: 1.8 })).toBeUndefined()
+	})
+
+	it('projects with the declared growth factor when the period has none', () => {
+		expect(signalled(declared(4, 120), {})).toMatchObject({ reason: 'lines', measured: 240 })
+	})
+
+	// joshuafolkken/kit#5945: the fallback is the filing guide's factor, so the two bars meet at 100 lines.
+	it('passes 100 declared lines and answers lines at 101 when the period has none', () => {
+		expect(signalled(declared(4, 100), {})).toBeUndefined()
+		expect(signalled(declared(4, 101), {})).toMatchObject({ reason: 'lines', measured: 202 })
+	})
+
+	it('stands the lines axis down once the lane filed a split child', () => {
+		expect(signalled(declared(4, 200), { split_filed: true })).toBeUndefined()
+	})
+
+	it('stands the hunks axis down once the lane filed a split child', () => {
+		expect(signalled(declared(8, 100), { ...hunks(17), split_filed: true })).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#5600: a cleared plan's declaration was judged when it cleared, so its re-plan skips the lines axis.
+describe('lane_plan_size.oversize on a re-plan of a recorded plan', () => {
+	it('skips the lines axis for a cleared plan', () => {
+		expect(replanned(declared(4, 200), { lines_ratio: 1.8 })).toBeUndefined()
+	})
+
+	it('still answers lines for a yielded plan that never cleared', () => {
+		expect(replanned(declared(4, 200), { lines_ratio: 1.8 }, false)).toMatchObject({
+			reason: 'lines',
+		})
+	})
+
+	// joshuafolkken/kit#5605: a plan recorded `sized` before an unread listing or a yield met the bar too.
+	it('skips the lines axis for a sized plan that never cleared', () => {
+		const recorded = { ...plan_of(files(1)), sized: true }
+		const signals = { ...QUIET, lines_ratio: 1.8 }
+		const plan = plan_of(files(2))
+
+		expect(lane_plan_size.oversize(plan, declared(4, 200), recorded, signals)).toBeUndefined()
+	})
+
+	it('still answers hunks for a cleared plan', () => {
+		expect(replanned(declared(8, 100), hunks(17))).toMatchObject({ reason: 'hunks' })
+	})
+})
+
+// joshuafolkken/kit#5601: the recorded plan's files passed the files axis, so their hunks do not count again.
+describe('lane_plan_size.oversize on the hunks of a re-plan', () => {
+	const planned = files(1)[0] ?? ''
+
+	it('passes 3 hunks inside the one planned file of a 1-file declaration', () => {
+		expect(replanned(declared(1, 15), hunks(3, planned))).toBeUndefined()
+	})
+
+	it('still answers hunks for 3 hunks in a code file outside the plan', () => {
+		expect(
+			replanned(declared(1, 15), { hunk_files: [planned, UNPLANNED, UNPLANNED, UNPLANNED] }),
+		).toMatchObject({ reason: 'hunks', limit: 2, measured: 3 })
+	})
+
+	it('passes 3 hunks under a directory the recorded plan claims', () => {
+		const recorded = plan_of([LANE_DIRECTORY])
+		const signals = { ...QUIET, ...hunks(3) }
+		const plan = plan_of([LANE_DIRECTORY, 'docs/x.md'])
+
+		expect(lane_plan_size.oversize(plan, declared(1, 15), recorded, signals)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#5672: a narrowing re-plan dropped a cleared, edited file; the plan that restores it
+// counts that file's hunks as planned, while a file no plan ever held still counts.
+describe('lane_plan_size.oversize on the hunks of a re-plan that restores a cleared file', () => {
+	const [restored = '', kept = ''] = files(2)
+	const recorded = { ...plan_of([kept]), cleared: true, cleared_paths: [restored, kept] }
+	const plan = plan_of([restored, kept])
+
+	it('passes 3 hunks in a file an earlier clear held', () => {
+		const signals = { ...QUIET, ...hunks(3, restored) }
+
+		expect(lane_plan_size.oversize(plan, declared(1, 15), recorded, signals)).toBeUndefined()
+	})
+
+	it('still answers hunks for 3 hunks in a file no plan ever held', () => {
+		const signals = { ...QUIET, hunk_files: [restored, UNPLANNED, UNPLANNED, UNPLANNED] }
+
+		expect(lane_plan_size.oversize(plan, declared(1, 15), recorded, signals)).toMatchObject({
+			reason: 'hunks',
+			limit: 2,
+			measured: 3,
+		})
+	})
+})
+
+// joshuafolkken/kit#5684: a record narrowed before #5672 is cleared with no `cleared_paths`; the files the
+// branch committed stand in for that history, while a file neither committed nor planned still counts.
+describe('lane_plan_size.oversize on the hunks of a re-plan of a cleared record with no history', () => {
+	const [committed = '', kept = ''] = files(2)
+	const recorded = { ...plan_of([kept, TEST_FILE]), cleared: true }
+	const plan = plan_of([kept, TEST_FILE])
+
+	it('passes 3 hunks in a code file the branch committed', () => {
+		const signals = { ...QUIET, ...hunks(3, committed), committed_files: [committed, kept] }
+
+		expect(lane_plan_size.oversize(plan, declared(1, 15), recorded, signals)).toBeUndefined()
+	})
+
+	it('still answers hunks for 3 hunks in a file the branch never committed', () => {
+		const signals = { ...QUIET, ...hunks(3), committed_files: [committed, kept] }
+
+		expect(lane_plan_size.oversize(plan, declared(1, 15), recorded, signals)).toMatchObject({
+			reason: 'hunks',
+			limit: 2,
+			measured: 3,
+		})
+	})
+
+	it('still answers hunks in a committed file when the record never cleared', () => {
+		const signals = { ...QUIET, ...hunks(3, committed), committed_files: [committed, kept] }
+		const uncleared = plan_of([kept, TEST_FILE])
+
+		expect(lane_plan_size.oversize(plan, declared(1, 15), uncleared, signals)).toMatchObject({
+			reason: 'hunks',
+		})
+	})
+
+	it('reads the recorded history, not the commits, once the record has one', () => {
+		const signals = { ...QUIET, ...hunks(3, committed), committed_files: [committed] }
+		const narrowed = { ...recorded, cleared_paths: [kept] }
+
+		expect(lane_plan_size.oversize(plan, declared(1, 15), narrowed, signals)).toMatchObject({
+			reason: 'hunks',
+		})
+	})
+})
+
+// joshuafolkken/kit#5679: a plan recorded too narrow; the re-plan the ship's `unplanned` stop asks for adds
+// files no plan ever held, and passes while it stays within the files axis.
+describe('lane_plan_size.oversize on a re-plan that adds files to a narrow recorded plan', () => {
+	const [held = '', added = '', other = ''] = files(3)
+	const recorded = { ...plan_of([held, TEST_FILE]), cleared: true }
+	const signals = {
+		...QUIET,
+		hunk_files: [...hunks(5, added).hunk_files, ...hunks(4, other).hunk_files],
+	}
+
+	it('passes 9 hunks in the files the re-plan adds against a declaration of 3 files', () => {
+		const plan = plan_of([held, TEST_FILE, added, other])
+
+		expect(lane_plan_size.oversize(plan, declared(3, 40), recorded, signals)).toBeUndefined()
+	})
+
+	it('still answers files for a re-plan past twice the declared files', () => {
+		const plan = plan_of([...files(7), TEST_FILE])
+
+		expect(lane_plan_size.oversize(plan, declared(3, 40), recorded, signals)).toMatchObject({
+			reason: 'files',
+			limit: 6,
+		})
+	})
+
+	it('still answers hunks for a re-plan that claims their directory', () => {
+		const plan = plan_of([held, TEST_FILE, LANE_DIRECTORY])
+
+		expect(lane_plan_size.oversize(plan, declared(3, 40), recorded, signals)).toMatchObject({
+			reason: 'hunks',
+			measured: 9,
+		})
+	})
+})
+
+describe('lane_plan_size.refusal_text', () => {
+	it.each([
+		['hunks', hunks(17), "17 hunks outside the plan's files (tests excluded), over 16"],
+		['lines', { lines_ratio: 1.8 }, 'about 360'],
+	])('names the %s axis and its measure', (reason, signals, measure) => {
+		const text = text_of(signalled(declared(8, 200), signals))
+
+		expect(text).toContain(`split (${reason})`)
+		expect(text).toContain(measure)
+		expect(text).toContain('--route split')
+	})
+
+	it('names the split-off files, the `--route split` filing and the replan on the kept files', () => {
+		const text = text_of(oversize_of([...files(9), TEST_FILE]))
+
+		expect(text).toContain('Split off: scripts/lane/file-9.ts')
+		expect(text).toContain('pnpm josh issue:file "<title>" --body-file <body.md> --route split')
+		expect(text).toContain(
+			`pnpm josh lane:plan ${String(ISSUE)} ${files(8).join(' ')} ${TEST_FILE}`,
+		)
+		expect(text).toContain('split-assessment.md → "The question"')
+	})
+})

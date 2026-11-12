@@ -1,4 +1,5 @@
 import { session_cite } from '#scripts/issue/session-cite'
+import type { ChildSource } from './epic-child-source'
 import { epic_cross_repo } from './epic-cross-repo'
 import { epic_fetch, type EpicSnapshot } from './epic-fetch'
 import { epic_graph } from './epic-graph'
@@ -90,10 +91,14 @@ function is_childless(snapshot: EpicSnapshot): boolean {
 // epic whose task list has not been filled in is the ordinary case — and refusing the
 // whole command for it would stop every *other* named epic's children being offered, on every
 // polling round, until a person noticed.
-async function read_one(reference: EpicReference, current_repo: string): Promise<ReadOutcome> {
+async function read_one(
+	reference: EpicReference,
+	current_repo: string,
+	source?: ChildSource,
+): Promise<ReadOutcome> {
 	const epic_repo = epic_repo_of(reference, current_repo)
 	if (epic_repo === undefined) return { refusal: FOREIGN_EPIC }
-	const snapshot = await epic_fetch.fetch_epic(reference.number, epic_repo, current_repo)
+	const snapshot = await epic_fetch.fetch_epic(reference.number, epic_repo, current_repo, source)
 
 	if (is_childless(snapshot)) return { notice: childless(reference) }
 
@@ -110,16 +115,20 @@ function collect(outcome: ReadOutcome, reads: Array<EpicRead>, notices: Array<st
 // the first refusal was seen — the very read the refusal exists to prevent. The latency is the
 // price of that guarantee, and `unique_references` above is what keeps it from being paid twice for
 // one epic.
+//
+// `source` is the children the caller already knows (`epic-child-source.ts`); without it every child
+// is read.
 async function read_snapshots(
 	references: ReadonlyArray<EpicReference>,
 	current_repo: string,
+	source?: ChildSource,
 ): Promise<SnapshotReads> {
 	const reads: Array<EpicRead> = []
 	const notices: Array<string> = []
 
 	for (const reference of unique_references(references, current_repo)) {
 		// eslint-disable-next-line no-await-in-loop -- the first refusal ends the read, so later reads are not spent
-		const outcome = await read_one(reference, current_repo)
+		const outcome = await read_one(reference, current_repo, source)
 
 		if (outcome.refusal !== undefined) return { reads, notices, refusal: outcome.refusal }
 		collect(outcome, reads, notices)

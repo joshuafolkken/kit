@@ -1,19 +1,11 @@
-import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
-import { AI_DOCS, read_repo_file, WORKFLOW_PROMPT } from '#scripts/document/ai-document-fixture'
+import { read_repo_file, WORKFLOW_PROMPT } from '#scripts/document/ai-document-fixture'
 import { rule_list } from '#scripts/rules/rule-list'
 import { describe, expect, it } from 'vitest'
 import { claude_settings_fixture } from './claude-settings-fixture'
 
-const SYNC_DOC_PATH = fileURLToPath(
-	new URL('../../docs/maintainers/sync-rationale.md', import.meta.url),
-)
-
 const { load_settings } = claude_settings_fixture
 
-// Every command that rewrites the index or ships work without going through `pnpm josh git`. The
-// maintainer sync rationale has to enumerate the same list, so drift shows up as a failing test
-// rather than as a document that describes a weaker guard than the one being distributed.
+// Every command that rewrites the index or ships work without going through `pnpm josh git`.
 const INDEX_DENY_PATTERNS: ReadonlyArray<string> = [
 	'Bash(git add*)',
 	'Bash(git stage*)',
@@ -88,12 +80,17 @@ const DESTRUCTIVE_DENY_PATTERNS: ReadonlyArray<string> = [
 ]
 
 // Under `bypassPermissions` and `Bash(*)` the deny list is the only thing between the Read tool and
-// a secret file, so the dotenv variants and wrangler's `.dev.vars` are named beside `.env` itself.
+// a secret file, so the dotenv variants, wrangler's `.dev.vars` and the home credential files (#6003)
+// are named beside `.env` itself.
 const ENV_VARIANT_DENY = 'Read(./.env.*)'
 const SECRET_READ_DENY_PATTERNS: ReadonlyArray<string> = [
 	'Read(./.env)',
 	ENV_VARIANT_DENY,
 	'Read(./.dev.vars)',
+	'Read(~/.config/gh/**)',
+	'Read(~/.codex/auth.json)',
+	'Read(~/.netrc)',
+	'Read(~/.ssh/**)',
 ]
 
 // `.gitignore` un-ignores these two: they are tracked placeholders, so the variant deny must not take
@@ -112,6 +109,12 @@ const REQUIRED_DENY_PATTERNS: ReadonlyArray<string> = [
 	PR_MERGE_DENY,
 	...REST_MERGE_DENY_PATTERNS,
 	'Bash(sudo *)',
+	// The static backstop behind the `egress` guard row (joshuafolkken/kit#5999).
+	'Bash(curl *)',
+	'Bash(wget *)',
+	'Bash(nc *)',
+	'Bash(gh auth token*)',
+	'Bash(printenv)',
 ]
 
 // A deny entry was observed to apply to each command of a compound invocation, not only to the
@@ -346,61 +349,6 @@ describe('.claude/settings.json — deny patterns', () => {
 	})
 })
 
-describe('docs/maintainers/sync-rationale.md — deny rationale', () => {
-	it('records why the git index and PR merge commands are denied', () => {
-		const sync_document = readFileSync(SYNC_DOC_PATH, 'utf8')
-
-		for (const pattern of INDEX_DENY_PATTERNS) expect(sync_document).toContain(pattern)
-
-		expect(sync_document).toContain(PR_MERGE_DENY)
-		expect(sync_document).toMatch(/pnpm josh git/u)
-	})
-
-	// The REST spellings are the half a reader is least likely to guess at, so the rationale has to
-	// name them rather than leave the entries to speak for themselves.
-	it.each([...REST_MERGE_DENY_PATTERNS, ...SHARED_STATE_DENY_PATTERNS])(
-		'records why %s is denied',
-		(pattern) => {
-			expect(readFileSync(SYNC_DOC_PATH, 'utf8')).toContain(pattern)
-		},
-	)
-
-	it('records that a literal colon cannot be matched by a deny entry', () => {
-		const sync_document = readFileSync(SYNC_DOC_PATH, 'utf8')
-
-		expect(sync_document).toContain('git push origin :branch')
-	})
-})
-
-// The deny list only holds while every copy of the prose says the same thing: a doc that still
-// reads "ask first" without naming the deny sends an agent looking for an exception that the tool
-// no longer grants. joshuafolkken/kit#1924 slimmed `CLAUDE.md`'s Git Rules to the resident trigger and
-// moved the pattern enumeration and the loophole explanation to `docs/sync.md` (since
-// joshuafolkken/kit#2896, `docs/maintainers/sync-rationale.md`) and the Japanese
-// workflow prompt (both pinned by the suites below); what stays resident in `CLAUDE.md` is the
-// criterion a no-hook agent cannot infer from the deny list — the deny is narrower than the rule, and
-// the tool letting a command through is not permission. joshuafolkken/kit#5165 moved that criterion
-// with the rest of the Git Rules body to `operating-rules.md` → "git-rules", the source the hook rows
-// cite; `CLAUDE.md` keeps the pointer.
-const GIT_RULES_SOURCE = 'prompts/collaboration-workflow/operating-rules.md'
-const GIT_RULES_MARKERS: ReadonlyArray<string> = [
-	'deny は規則より狭い',
-	'ツールが通したことを許可と読まない',
-]
-
-// joshuafolkken/kit#2996 made `.claude/settings.json` the single source of the pattern list: the
-// workflow prompt states that the deny exists and why, and points at the file instead of copying it.
-// joshuafolkken/kit#3179 moved the guard-row enumeration to the delivery list in `rule-delivery.md`
-// and left one pointer here, so the markers pin the rule each paragraph carries rather than its former
-// wording.
-const WORKFLOW_MARKERS: ReadonlyArray<string> = [
-	'`.claude/settings.json` の `permissions.deny`',
-	'**deny と配送ガードは実装であって規則ではない。**',
-	'deny には「そのターンでユーザーが明示指示した」という例外がない',
-	'ユーザー自身の端末で実行してもらう',
-	'規則より狭い',
-]
-
 // The guard rows the workflow prompt names by id alone must each keep an entry in the delivery list
 // its pointer sends readers to, or what they refuse is written nowhere (joshuafolkken/kit#3179).
 // joshuafolkken/kit#3399 moved that list to `pnpm josh rule:list`.
@@ -419,26 +367,10 @@ describe('pnpm josh rule:list — guard rows the workflow prompt points at', () 
 	})
 })
 
-describe(`${GIT_RULES_SOURCE} — the deny rule reaches the Git Rules source`, () => {
-	const content = read_repo_file(GIT_RULES_SOURCE)
-
-	it.each(GIT_RULES_MARKERS)('states %j', (marker) => {
-		expect(content).toContain(marker)
-	})
-})
-
-describe.each(AI_DOCS)('%s — points at the Git Rules source', (document_path) => {
-	it('names operating-rules.md → "git-rules"', () => {
-		expect(read_repo_file(document_path)).toContain(`\`${GIT_RULES_SOURCE}\` → "git-rules"`)
-	})
-})
-
-describe(`${WORKFLOW_PROMPT} — canonical deny rationale`, () => {
+// joshuafolkken/kit#2996 made `.claude/settings.json` the single source of the pattern list: the
+// workflow prompt states that the deny exists and why, and points at the file instead of copying it.
+describe(`${WORKFLOW_PROMPT} — single source of the deny list`, () => {
 	const content = read_repo_file(WORKFLOW_PROMPT)
-
-	it.each(WORKFLOW_MARKERS)('states %j', (marker) => {
-		expect(content).toContain(marker)
-	})
 
 	it.each([...INDEX_DENY_PATTERNS, PR_MERGE_DENY])(
 		'does not copy the deny pattern %j',

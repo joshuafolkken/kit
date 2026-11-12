@@ -7,6 +7,7 @@
  * Usage:
  *   tsx scripts/overrides/overrides-check.ts --save      # save current overrides as snapshot
  *   tsx scripts/overrides/overrides-check.ts              # compare current overrides against snapshot
+ *   tsx scripts/overrides/overrides-check.ts --diff HEAD  # compare against a git revision (or <base>...<head>)
  */
 import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -14,12 +15,13 @@ import { cli_flags } from '#scripts/lib/cli-flags'
 import { file_reader } from '#scripts/lib/read-file'
 import { overrides_snapshot_schema } from '#scripts/lib/schemas'
 import { development_engines_verdict } from '#scripts/version/development-engines-verdict'
+import { overrides_diff_report } from './overrides-diff-report'
 import { overrides_files } from './overrides-files'
 import { overrides_check, type OverridesDiff } from './overrides-logic'
 
 const ARGV_OFFSET = 2
-const OPTIONS = { save: { type: 'boolean', default: false } } as const
-const USAGE = cli_flags.usage_line(['--save'], 'overrides')
+const OPTIONS = { save: { type: 'boolean', default: false }, diff: { type: 'string' } } as const
+const USAGE = cli_flags.usage_line(['--save', '--diff <base>[...<head>]'], 'overrides')
 
 function load_snapshot(): Record<string, string> {
 	try {
@@ -38,12 +40,8 @@ function load_snapshot(): Record<string, string> {
 	}
 }
 
-function print_diff(diff: OverridesDiff, sources_summary: string): never {
-	console.error(`✖ overrides changed unexpectedly (${sources_summary}):`)
-
-	for (const line of overrides_check.format_diff_lines(diff)) {
-		console.error(line)
-	}
+function print_diff(diff: OverridesDiff, heading: string): never {
+	overrides_diff_report.print_diff_lines(diff, heading)
 
 	return process.exit(1)
 }
@@ -67,7 +65,7 @@ function run_overrides_check(should_save: boolean): void {
 	const snapshot = load_snapshot()
 	const diff = overrides_check.compare(snapshot, current)
 
-	if (diff.is_changed) print_diff(diff, summary)
+	if (diff.is_changed) print_diff(diff, `✖ overrides changed unexpectedly (${summary}):`)
 
 	console.info(`✔ overrides unchanged (${summary}).`)
 }
@@ -77,6 +75,21 @@ function run_overrides_check(should_save: boolean): void {
 function run_check(should_save: boolean): void {
 	development_engines_verdict.report()
 	run_overrides_check(should_save)
+}
+
+function refuse_range(range: string): never {
+	console.error(`✖ cannot resolve ${range} to a commit (or a merge-base) to compare against.`)
+
+	return process.exit(1)
+}
+
+// The same two verdict lines as the snapshot check, read against a git revision instead, so the
+// dependency-update check after `josh adopt` is a command's answer rather than a diff read by eye.
+function run_diff(range: string): void {
+	const verdict = overrides_diff_report.report(range)
+
+	if (verdict === undefined) refuse_range(range)
+	if (verdict.is_overrides_moved) process.exit(1)
 }
 
 // A line nobody can read is refused before the snapshot is read or written: a misspelled `--save` that
@@ -91,7 +104,17 @@ function main(argv: ReadonlyArray<string>): void {
 	const values = cli_flags.values_of(argv, OPTIONS)
 
 	if (values === undefined) refuse_usage()
-	run_check(values.save)
+	const range = cli_flags.string_of(values.diff)
+
+	if (range === undefined) {
+		run_check(values.save)
+
+		return
+	}
+
+	// `--save` writes the snapshot `--diff` never reads, so the pair is a line nobody can read.
+	if (values.save) refuse_usage()
+	run_diff(range)
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main(process.argv.slice(ARGV_OFFSET))

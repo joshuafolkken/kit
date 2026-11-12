@@ -1,0 +1,3 @@
+- rf:tests | low | scripts/security/security-audit-provision-main.test.ts:35 | 2026-11-01 | #5761 | fixed
+- rf:bug-risks | medium | .claude/settings.json:52 | 2026-11-01 | #5761
+- rf:tests | low | scripts/security/security-audit-provision-main.test.ts:35 | 2026-11-01 | #5761

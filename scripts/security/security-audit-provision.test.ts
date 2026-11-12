@@ -4,16 +4,15 @@ import {
 	constants,
 	existsSync,
 	mkdirSync,
-	mkdtempSync,
 	readdirSync,
 	rmSync,
 	writeFileSync,
 } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { execaSync } from 'execa'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { security_audit_logic } from './security-audit-logic'
 import { security_audit_provision } from './security-audit-provision'
 import type { ScannerAsset } from './security-audit-provision-logic'
@@ -35,7 +34,8 @@ const EXECUTABLE_MODE = 0o755
 const TEST_TIMEOUT_MS = 5000
 const FLOOR_VERSION_OUTPUT = 'osv-scanner version: 2.6.0'
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'kit-audit-provision-'))
+const make_directory = temporary_directory('suite')
+const scratch = make_directory('kit-audit-provision-')
 
 function fake_sync_result(exit_code: number | undefined, stdout = ''): ExecaSyncResult {
 	const result = { exitCode: exit_code, stdout }
@@ -131,16 +131,8 @@ async function fail_then_succeed(target_path: string): Promise<void> {
 	await security_audit_provision.attempt(target_path, asset, TEST_TIMEOUT_MS)
 }
 
-beforeEach(() => {
-	vi.clearAllMocks()
-})
-
 afterEach(() => {
 	vi.unstubAllGlobals()
-})
-
-afterAll(() => {
-	rmSync(scratch, { recursive: true, force: true })
 })
 
 describe('security_audit_provision.provision — a download that verifies', () => {

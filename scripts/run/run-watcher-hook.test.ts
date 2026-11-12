@@ -1,10 +1,13 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync } from 'node:fs'
 import path from 'node:path'
 import { run_progress_clock } from '#scripts/run/progress/run-progress-clock'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { hook_context_fixture } from '#tools/hooks/hook-context-fixture'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_watcher_guard } from './run-watcher-guard'
 import { run_watcher_hook } from './run-watcher-hook'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#2353. The adapter turns `run_watcher_guard`'s verdict into a deny reason and fires
 // once per run, so a stale watcher refuses the first call but not the restart that fixes it. The
@@ -29,7 +32,7 @@ const { run_progress_read } = await import('#scripts/run/progress/run-progress-r
 const lanes_in_flight = vi.mocked(lane_registry.has_lanes_in_flight)
 const live_target = vi.mocked(run_progress_read.live_target)
 
-const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-run-watcher-hook-'))
+const TEMPORARY = make_directory('josh-run-watcher-hook-')
 const LIFE_TARGET = path.join(TEMPORARY, 'life.json')
 
 const sequence = { value: 0 }
@@ -44,10 +47,6 @@ function fresh_payload(): string {
 	})
 }
 
-afterAll(() => {
-	rmSync(TEMPORARY, { force: true, recursive: true })
-})
-
 beforeEach(() => {
 	vi.mocked(run_headless.is_backlog_parent).mockResolvedValue(true)
 	lanes_in_flight.mockResolvedValue(true)
@@ -57,8 +56,6 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-	vi.clearAllMocks()
-
 	try {
 		rmSync(LIFE_TARGET, { force: true })
 	} catch {
@@ -80,6 +77,18 @@ describe('watcher_hook_reason — lanes in-flight, watcher stale', () => {
 		const second = await run_watcher_hook.watcher_hook_reason(payload)
 
 		expect(second).toBeUndefined()
+	})
+
+	// joshuafolkken/kit#6683: a daemon answers calls from many launchers, so the watcher is judged under
+	// the call's own process ancestry, never the answering process's.
+	it("judges the watcher under the call's ancestry", async () => {
+		const check = vi.spyOn(run_watcher_guard, 'check')
+		const context = hook_context_fixture.of(TEMPORARY, {})
+
+		await run_watcher_hook.watcher_hook_reason(fresh_payload(), context)
+
+		expect(check).toHaveBeenCalledWith(LIFE_TARGET, context.ancestry)
+		check.mockRestore()
 	})
 })
 

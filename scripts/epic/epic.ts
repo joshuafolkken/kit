@@ -1,36 +1,43 @@
-#!/usr/bin/env tsx
 /**
  * Create an epic Issue that satisfies every requirement the auto-close and the order warning read.
- *
- * Usage: tsx scripts/epic/epic.ts "<title>" <N1> <N2> ... [--ordered] [--rationale-file <path|->]
- *                                                       [--origin <owner/repo#N>]
- *        tsx scripts/epic/epic.ts --promote <N> <N1> <N2> ... [same flags]
- *        tsx scripts/epic/epic.ts --add <E> <N1> <N2> ... [--before <M> | --after <M>]
- *                                                      [--decision-file <path|->]
- *        tsx scripts/epic/epic.ts --remove <E> <M> <N> ... [--decision-file <path|->]
- *        tsx scripts/epic/epic.ts --decide <E> <N1> <N2> ... --decision-file <path|->
+ * `USAGE` below lists the `josh epic` forms; the entry is `epic-main.ts`, so `run:split` can import
+ * this module in the same process.
  */
 import { git_gh_command } from '#scripts/gh/git-gh-command'
-import { error_text } from '#scripts/lib/error-message'
 import { epic_add, type AddChildrenInput } from './epic-add'
-import { epic_cli, type AddArguments, type CrossRepoAddTarget } from './epic-cli'
+import { epic_cli, epic_cli_untrack, type AddArguments, type CrossRepoAddTarget } from './epic-cli'
 import { epic_decide } from './epic-decide'
+import { epic_notify } from './epic-notify'
 import { epic_reconcile } from './epic-reconcile'
 import { epic_remove } from './epic-remove'
 import { epic_run } from './epic-run'
+import { epic_split_reach } from './epic-split-reach'
+import { epic_untrack } from './epic-untrack'
 
-const ARGV_OFFSET = 2
-const FLAGS = '[--ordered] [--rationale-file <path|->] [--origin <owner/repo#N>]'
+const FLAGS = '[--ordered] [--rationale-file <path|->] [--origin <owner/repo#N>] [--notify]'
 const USAGE = [
 	`Usage: josh epic "<title>" <N1> <N2> ... ${FLAGS}`,
-	`       josh epic --promote <N> <N1> <N2> ... ${FLAGS}`,
+	`       josh epic --promote <N> <N1> <N2> ... ${FLAGS} [--title <title>]`,
 	'       josh epic --add <E> <N1> <N2> ... [--before <M> | --after <M>] [--decision-file <path|->]',
 	'       josh epic --add <E> <N1> <N2> ... [--order-before <M> | --order-after <M>] [--decision-file <path|->]',
 	'       josh epic --remove <E> <M> <N> ... [--decision-file <path|->]',
+	'       josh epic --untrack <E> <N1> <N2> ...',
 	'       josh epic --reconcile <E>',
 	'       josh epic --decide <E> <N1> <N2> ... --decision-file <path|->',
 ].join('\n')
 const FAILURE_EXIT_CODE = 1
+const SUCCESS_EXIT_CODE = 0
+
+// Whether a split's child could not merge alone, its refusal printed — read before creation and
+// promotion write anything, the two forms a split files its epic through. `--add` places an issue
+// filed on its own and `epic:bundle` groups related ones, so neither is a split.
+async function is_split_stranded(children: ReadonlyArray<number>): Promise<boolean> {
+	const refusal = await epic_split_reach.refusal_of(children)
+
+	if (refusal !== undefined) console.error(refusal)
+
+	return refusal !== undefined
+}
 
 async function run_promotion(argv: ReadonlyArray<string>): Promise<number> {
 	const parsed = epic_cli.parse_promote_arguments(argv)
@@ -41,13 +48,20 @@ async function run_promotion(argv: ReadonlyArray<string>): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	return await epic_run.promote_epic({
+	if (await is_split_stranded(parsed.children)) return FAILURE_EXIT_CODE
+
+	const exit_code = await epic_run.promote_epic({
 		epic_number: parsed.epic_number,
 		children: parsed.children,
 		rationale: epic_cli.read_rationale(parsed.rationale_path),
 		is_ordered: parsed.is_ordered,
 		origin: parsed.origin,
+		title: parsed.title,
 	})
+
+	await epic_notify.announce(parsed, epic_notify.promoted_number(exit_code, parsed.epic_number))
+
+	return exit_code
 }
 
 // The parsed insertion as the writer's input: the decision file becomes the decision itself, read here
@@ -171,22 +185,51 @@ async function run_reconciliation(argv: ReadonlyArray<string>): Promise<number> 
 	return await epic_reconcile.reconcile_epic(parsed.epic_number)
 }
 
-async function run_creation(argv: ReadonlyArray<string>): Promise<number> {
+// `epic: undefined` is a created epic whose URL could not be read — still a success here.
+type Creation = { kind: 'refused' } | { kind: 'created'; epic: number | undefined }
+
+async function create(argv: ReadonlyArray<string>): Promise<Creation> {
 	const parsed = epic_cli.parse_create_arguments(argv)
 
 	if (parsed === undefined) {
 		console.error(`✖ A title and at least one child issue number are required.\n${USAGE}`)
 
-		return FAILURE_EXIT_CODE
+		return { kind: 'refused' }
 	}
 
-	return await epic_run.create_epic({
+	if (await is_split_stranded(parsed.children)) return { kind: 'refused' }
+
+	const epic_number = await epic_run.create_epic_number({
 		title: parsed.title,
 		children: parsed.children,
 		rationale: epic_cli.read_rationale(parsed.rationale_path),
 		is_ordered: parsed.is_ordered,
 		origin: parsed.origin,
 	})
+
+	await epic_notify.announce(parsed, epic_number)
+
+	return { kind: 'created', epic: epic_number }
+}
+
+async function run_creation(argv: ReadonlyArray<string>): Promise<number> {
+	const creation = await create(argv)
+
+	return creation.kind === 'refused' ? FAILURE_EXIT_CODE : SUCCESS_EXIT_CODE
+}
+
+async function run_untrack(argv: ReadonlyArray<string>): Promise<number> {
+	const parsed = epic_cli_untrack.parse_arguments(argv)
+
+	if (parsed === undefined) {
+		console.error(
+			`✖ An epic number and at least one distinct child issue number are required.\n${USAGE}`,
+		)
+
+		return FAILURE_EXIT_CODE
+	}
+
+	return await epic_untrack.untrack(parsed.epic_number, parsed.children)
 }
 
 type EpicForm = readonly [
@@ -197,6 +240,7 @@ type EpicForm = readonly [
 // Checked in this order. `--add` comes before `--promote`: both name an existing issue first, and only
 // the flag distinguishes "insert into this epic" from "turn this issue into one".
 const FLAGGED_FORMS: ReadonlyArray<EpicForm> = [
+	[epic_cli_untrack.is_untrack, run_untrack],
 	[epic_cli.is_reconciliation, run_reconciliation],
 	[epic_cli.is_removal, run_removal],
 	[epic_cli.is_decision_entry, run_decision],
@@ -211,17 +255,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	return await run_form(argv)
 }
 
-async function main(): Promise<void> {
-	const exit_code = await run(process.argv.slice(ARGV_OFFSET))
+const epic_command = { run, create }
 
-	if (exit_code !== 0) process.exit(exit_code)
-}
-
-// A `gh` failure carries its stderr as the message, which is the useful part; printing it alone
-// keeps a routine "not authenticated" or "label not found" from arriving as a stack trace.
-try {
-	await main()
-} catch (error) {
-	console.error(`✖ ${error_text.message_of(error)}`)
-	process.exit(FAILURE_EXIT_CODE)
-}
+export type { Creation }
+export { epic_command }

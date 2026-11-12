@@ -7,7 +7,7 @@ import { entry_read_budget } from './entry-read-budget'
 // The byte-ceiling check the gate's `document-byte-budget.test.ts` runs, made reachable on the fast
 // between-edits path — `josh lint:related` calls it over the files it already resolved so a mandated
 // documentation update that grows a document past its ceiling is caught in seconds rather than after
-// the 80–90-second gate. The ceiling and its message are
+// the whole gate. The ceiling and its message are
 // `document-byte-budget.ts`'s alone: this adds no budget of its own, so the fast path can never hold
 // a different line from the gate, and widening one can never loosen the other.
 //

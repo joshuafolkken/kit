@@ -1,0 +1,1 @@
+- rf:bug-risks | low | scripts/review/diff-summary.ts:15 | 2026-10-31 | #5547

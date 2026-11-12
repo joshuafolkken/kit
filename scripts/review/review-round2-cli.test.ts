@@ -7,6 +7,7 @@ import { review_round_one_closure, type Closure } from './review-round-one-closu
 import { review_round2 } from './review-round2'
 import { review_round2_cli } from './review-round2-cli'
 import { review_round2_skip_comment } from './review-round2-skip-comment'
+import { review_size } from './review-size'
 import { review_stamps } from './review-stamps'
 import { review_tree } from './review-tree'
 
@@ -104,6 +105,7 @@ describe('review_round2_cli.read_comment_only', () => {
 
 const OPEN: Closure = { is_closed: false, reason: 'round 1 left a Medium open' }
 const BRANCH_ISSUE = 77
+const LOW_SKIP_JSON = '"round2":"skip","code":"low"'
 
 interface PlantedDecision {
 	decide: MockInstance<typeof review_round2.decide>
@@ -112,6 +114,7 @@ interface PlantedDecision {
 
 // Every input `decide_here` reads, planted so the run decides from the closure given alone.
 function plant_decision(closure: Closure): PlantedDecision {
+	vi.spyOn(review_size, 'read').mockResolvedValue(undefined)
 	vi.spyOn(change_base, 'resolved_through_merge').mockResolvedValue(BASE)
 	vi.spyOn(review_tree, 'read_changed_tree').mockResolvedValue({})
 	vi.spyOn(review_stamps.round_one_stamp, 'read').mockReturnValue(undefined)
@@ -150,6 +153,39 @@ describe('review_round2_cli.run', () => {
 		await review_round2_cli.run([])
 
 		expect(decide).toHaveBeenCalledWith(expect.objectContaining({ base: BASE }))
+	})
+
+	it('skips the second round for a documentation fix on a closed low review', async () => {
+		plant_decision({ is_closed: true, reason: '' })
+		const document = 'docs/guide.md'
+
+		vi.mocked(review_tree.read_changed_tree).mockResolvedValue({ [document]: 'after' })
+		vi.mocked(review_stamps.round_one_stamp.read).mockReturnValue({
+			base: BASE,
+			taken_at: '',
+			files: { [document]: 'before' },
+		})
+		await review_round2_cli.run(['--json'])
+
+		expect(console.info).toHaveBeenCalledWith(expect.stringContaining(LOW_SKIP_JSON))
+	})
+})
+
+describe('review_round2_cli tiny changes', () => {
+	afterEach(() => vi.restoreAllMocks())
+	it('skips the second round for a tiny executable change (ac-267e5f8b)', async () => {
+		plant_decision({ is_closed: true, reason: '' })
+		vi.mocked(review_tree.read_changed_tree).mockResolvedValue({ [SOURCE]: 'after' })
+		vi.mocked(review_size.read).mockResolvedValue(20)
+		vi.mocked(review_stamps.round_one_stamp.read).mockReturnValue({
+			base: BASE,
+			taken_at: '',
+			files: { [SOURCE]: 'before' },
+		})
+
+		await review_round2_cli.run(['--json'])
+
+		expect(console.info).toHaveBeenCalledWith(expect.stringContaining(LOW_SKIP_JSON))
 	})
 })
 

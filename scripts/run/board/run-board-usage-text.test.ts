@@ -107,7 +107,7 @@ describe('run_board_usage_text.lane_share', () => {
 
 // joshuafolkken/kit#4570: a lane row and a processes row turn yellow past half of the full gauge and
 // red past nine tenths, in each of the CPU, MEM and CMPRS cells. Seven lanes make a lane's share of
-// `SCALE` one core and 2 GB; a processes row's full is 10 cores and 20 GB.
+// `SCALE` smaller than a processes row's full, so the two must use different denominators.
 const SEVEN = lane_limits(7)
 
 type Shade = keyof typeof GAUGE_SHADES

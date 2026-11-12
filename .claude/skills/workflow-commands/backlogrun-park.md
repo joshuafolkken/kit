@@ -3,22 +3,6 @@
 **Read this file in full when a child cannot finish** — before parking it, before a
 `needs-human-review` stop, or before recording a mid-run prerequisite or split.
 
-## What happens to a child that cannot finish
-
-A `backlogrun` child is a `fullrun` under a batch authorization:
-
-- **A stop that would end the run parks one issue and the run continues** — → "park and continue".
-- **A prerequisite discovered mid-run is recorded as a dependency rather than parked** — → "A
-  prerequisite discovered mid-run"; `prerequisite.md` separates prerequisite, split and upstream
-  defect. With no epic, the `blocked-by` is written on the issue itself.
-- **A split found mid-run** files the children and the epic and does not stop the batch —
-  `split-assessment.md`, → "Splitting a child mid-run". Not a park, not a failure.
-- **`in-progress` left behind by an interrupted run** — → "`in-progress` is removed by whoever finds
-  it stale".
-- **A child released from `needs-decision` is re-dispatched to a lane, never implemented by the
-  parent** — `backlogrun.md` → "Claim nothing at the entry — this parent orchestrates and never
-  implements".
-
 ## The parent does not investigate a lane failure itself
 
 **A lane failure whose reason is not on its Issue is read by a unit** — `pnpm josh delegate
@@ -27,35 +11,36 @@ parks, re-dispatches or files.
 
 ## `needs-human-review` — the one stop that is not a park
 
-A child carrying **`needs-human-review`** stops `halfrun`-shaped and **the whole run ends there**:
+A child carrying **`needs-human-review`** stops `halfrun`-shaped in **its own lane**:
 implementation and the gate run, nothing is committed, the tree is left dirty and unstashed,
 `pnpm josh run:hold <N> --human-review-stop` sends the `confirmation` Telegram with the resume command
-and the lane directory, and the remaining children are not started.
+and the lane directory. The parent collects that dispatch and offers the next children.
 
-**The child goes on holding its repository**, and **its lane is left open and untouched**. **Name the
-lane directory in the stop report.** Lanes in flight finish; no new lane opens.
+**The child goes on holding its repository**, and **its lane is left open and untouched** — never
+park or release it. **Name the lane directory in the stop report.** The parent keeps launching
+children while free lanes remain.
 
 **Never apply or remove the label** — a person's alone (`needs-human-review.md`, the single source).
 
 ## park and continue
 
 When a child hits something only a person can decide (→ "Only a person's judgement carries
-`needs-decision`"), **park the child and keep going**:
+`needs-decision`"; every stop left to a person: `scripts/issue/issue-human-stops.ts`), **park the
+child and keep going**:
 
 ```bash
-pnpm josh run:park <N> --body-file <path>   # what needs deciding, and the options; applies needs-decision
+pnpm josh run:park <N> --body-file .josh/tmp/park.md   # body schema: docs/josh-commands-run.md → "josh run:park"; applies needs-decision, then releases
 ```
 
-`in-progress` stays; the parked child does **not** hold the repository (`needs-decision` takes
-precedence in `epic:next`). Return to step 1.
+Return to step 1.
 
-**A parked child's lane is kept, whether or not it had committed**, and every parked ending owes
-`pnpm josh run:release <N>` — `backlogrun-lanes.md` → "What happens to a lane". A lost merge race
-resolves in its lane instead (`backlogrun-recovery.md` → "Conflicts are not predicted").
+A finding that meets the body's declared `- 中止条件:` is not a park —
+`issue-comments.md` → "When a declared close condition holds".
 
-**Parking replaces stopping the session, not the rule that produced the stop** — an upstream defect is
-still filed at once, and a workaround is still forbidden. `epic:bundle`'s `ask` is Tier A, not a park:
-`pnpm josh epic --add <E> <N> --after <M>` and record it on both Issues' `## Decisions`.
+**What happens to a parked child's lane** — `backlogrun-lanes.md` → "What happens to a lane".
+
+**Parking keeps the stop's rule** — file upstream defects; never work around them.
+`epic:bundle`'s `ask` is Tier A (`epic-commands` skill).
 
 **Removing the label is Tier A — do it without asking**, once the decision is recorded:
 
@@ -66,19 +51,25 @@ pnpm josh run:park <N> --clear   # succeeds when the label is already off
 **The released child goes back to a lane, never into the parent's own context** — `pnpm josh
 lane:launch <N>`.
 
+An interrupt filed for a parked child turns the park into a wait — `issue:file --route interrupt
+--found-during <N>` (`scripts/issue/issue-file-interrupt.ts`); its merge relaunches #N
+(`backlog_drive_retry.after_merge`).
+
 ## Only a person's judgement carries `needs-decision`
 
 **`needs-decision` means "a person has to choose", and nothing else.** It carries only:
 
-- a design choice nobody has made;
-- a Tier B toss-up, or a Tier C action (`CLAUDE.md` → "Decision autonomy");
+- a Tier B toss-up with no recommendation, or a Tier C action (decision-autonomy below) — the
+  driver decides the first only once (`A park the driver decides`);
 - an upstream defect in another package, whose wait-or-defer is the person's (`upstream-interrupt.md`);
 - information only the web holds — no lane launches a web tool (`scripts/agent/claude-agent-argv.ts`),
   so a person fetches it.
 
 It never carries:
 
-- a choice with a clearly better default — that is Tier A: decide it and record it as an Issue comment;
+- a recommended, reversible choice — Tier A: adopt it with
+  `pnpm josh backlog:triage --apply <N> --adopt <k> --reason <text>`, and continue
+  (`prompts/collaboration-workflow/operating-rules.md` → "decision-autonomy", the single source);
 - whether to run something already planned and opted in with `auto-ok` — the opt-in is that decision;
 - a wait for the next published release — a dependency, `pnpm josh issue:release <N> --wait`
   (`prerequisite.md`);
@@ -86,51 +77,61 @@ It never carries:
   (`prompts/collaboration-workflow/upstream-interrupt.md` → "実行中のリポジトリ自身のラン機構の不具合"),
   its filing carrying the `- 原因の park:` line when it parked or stopped an Issue (`issue-template.md` → I);
 - a wait on an open blocker or a start date — `run:merge` releases it (`run-merge-steps.ts`);
-- a mechanical failure — the driver applies `run:stalled` (`RUN_STALLED_LABEL` in `issue-labels.ts`).
+- a mechanical failure — the driver applies `run:stalled` (`RUN_STALLED_LABEL` in `issue-labels.ts`)
+  and re-offers the causes it can itself up to its auto-retry cap; any other or capped row →
+  `run:add <N> --retry`
+  (`backlog-drive-stalled-retry.ts`, `docs/labels-and-run-states.md`).
 
 **When in doubt, it is Tier A**: decide, comment the decision, and continue. **A label a mechanical step
 applied** (a failed or abandoned child, a lost merge race) is read against this list once its reason is
 known, and removed when the reason is not on it.
 
+### A park the parent session resolves
+
+A recommendation the child lacked the permission to take → the parent runs
+`pnpm josh backlog:triage --apply <N> --adopt <k> --reason <text>` (tiers: `operating-rules.md` →
+"decision-autonomy"): a scoped size approval, a premise the body constrains, a run-tooling defect to
+file. An option whose `必要な権限` starts with `親` → carry it out first, then adopt it with
+`--done <what was done>`. A dependency → `--apply <N> --blocked-by <M>` / `--unblock <M>`. No tracking epic → comment the
+decision, `run:park <N> --clear`, `run:add <N> --retry`.
+
+### A park the driver decides
+
+A `parked` child whose park recommends a tier A option needing no permission, or says `推奨なし` over a
+reversible option needing none and no size approval → `backlog:drive` decides it once per issue, records `Auto-decided: …`
+and notifies afterwards (`backlog-drive-after-merge.ts`, `run_park_body.default_pick`). A person
+overrides it with a later decision comment (`issue-comments.md`).
+
+### A park left for a person
+
+`推奨なし` with no option the driver may take, a second park after its decision, a trust or security
+setting, an upstream defect, a third-party write, a destructive operation, or web-only information.
+
 ## `in-progress` is removed by whoever finds it stale
 
-An interrupted run leaves `in-progress` behind, which excludes the child from `epic:next` permanently
-and occupies a lane. **A session that detects a stale child removes the label itself** (Tier A) and
-reports it, before continuing. **The rule therefore applies to any open issue in the repository, not
-only to this epic's children** (`epic:next` names the holders on standard error).
-
-**Age alone is not the test.** Past the 90-minute window, check what holds it: a `halfrun` stopped for
-manual verification, a run paused mid-child, and a `needs-human-review` child hold it legitimately.
-**All three leave uncommitted work in the checkout**, so `git status` there decides: a dirty tree means
-the hold is real — leave the label and report.
-
-**A closed issue's labels are neither a finding nor something to clean up** (no lane, never offered).
-**Do not report it, and do not strip it.**
-
-```bash
-gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress 2>/dev/null || true
-```
+**A session that detects a stale `in-progress` on any open issue in the repository — not only this
+epic's children (`epic:next` names the holders on standard error) — runs `pnpm josh run:stale`**
+(Tier A) before continuing, and reports each `kept` / `removed` line (`docs/josh-commands-run.md` →
+"`josh run:stale`").
 
 ## A prerequisite discovered mid-run
 
-Something else in **this** repository has to land first: not a split, not an upstream defect.
-`prerequisite.md` is the single source of the distinction, the `route:tier-a` filing and the ceiling.
-`<M>` is the child in hand; `<N>` the new Issue.
+Something else in **this** repository has to land first: not a split, not an upstream defect. File it
+(`route:tier-a`) and set the child in hand `<M>` aside with `run:pause` — `prerequisite.md`, the
+single source of the distinction, the filing, the pause and the ceiling. Then:
 
-1. File the prerequisite `<N>` with `route:tier-a` (Tier A, first-party, no confirmation) — **first**,
-   because the next step names it.
-2. **`pnpm josh run:pause <M> --for <N>`** — the stash, the comment naming its `stash:pop`, `<M>`
-   blocked by `<N>` (the epic's row and declaration too) and `run:release <M>` in one call
-   (`prerequisite.md`). Pop the stash the comment names when `epic:next` offers `<M>` again, after its
-   `pnpm josh ms`; expect conflicts.
-3. **Do not park.** Back to step 1 of the loop; `epic:next` hands back the prerequisite first.
-
-**A stop a dependency can express is never parked**, including a defect in this repository's own gate
-or run tooling — `prerequisite.md`.
+1. **Do not park.** Back to step 1 of the loop; `epic:next` hands back the prerequisite first.
+2. Resume as the pause comment names when `epic:next` offers `<M>` again: on its lane branch the
+   WIP commit is already there — `pnpm josh main:merge` and continue; a stash is popped after
+   `pnpm josh ms`.
 
 ## Splitting a child mid-run
 
-Not a reason to stop. File the new children with `route:split` (Tier A, first-party), then
+**A dispatched child is never split** (`split-assessment.md` → "Over the guide before the gate"):
+finish it, and file an independent new requirement found in it as an observation, without
+`--route split`.
+
+A split is decided before dispatch: file the new children (Tier A, first-party; `split-assessment.md`
+→ "Two or more always means an epic"), then
 `pnpm josh epic --add <E> <N...> [--before <M> | --after <M>]` — never a hand edit. Same criteria as
-`kickoff`. If what remains needs a person, park **that** child and move on. Splitting alone never adds
-`needs-decision` to the promoted epic.
+`kickoff`. Splitting alone never adds `needs-decision` to the promoted epic.

@@ -12,6 +12,50 @@ function event(pos: number, kind: string, text: string): RunEvent {
 	return { pos, kind, text, at: '2026-09-24T00:00:00.000Z' }
 }
 
+it('restores only parks after the newest retry, leaving other issues settled', () => {
+	const events = [
+		event(1, 'park', CHILD_DISPATCHED),
+		event(2, 'park', PARKED_2509),
+		event(3, 'add', 'retry #2508'),
+	]
+
+	expect(backlog_drive_restore.settled_issues(events)).toStrictEqual(new Set([2509]))
+	expect(backlog_drive_restore.parked_issues(events)).toStrictEqual(new Set([2509]))
+	const stopped_again = [
+		...events,
+		event(4, CHILD_LAUNCH, CHILD_DISPATCHED),
+		event(5, 'park', CHILD_DISPATCHED),
+	]
+
+	expect(backlog_drive_restore.settled_issues(stopped_again)).toStrictEqual(
+		new Set([2509, Number(CHILD)]),
+	)
+	expect(backlog_drive_restore.parked_issues(stopped_again)).toStrictEqual(
+		new Set([2509, Number(CHILD)]),
+	)
+})
+
+it('does not reset parks on an ordinary add', () => {
+	const events = [event(1, 'park', CHILD_DISPATCHED), event(2, 'add', 'added #2508')]
+
+	expect(backlog_drive_restore.settled_issues(events)).toStrictEqual(new Set([Number(CHILD)]))
+})
+
+it('settles a human-review dispatch without retiring the issue from the run', () => {
+	const events = [
+		event(1, CHILD_LAUNCH, CHILD_DISPATCHED),
+		event(2, 'human-review', '#2508 waiting for human review'),
+	]
+
+	expect([...backlog_drive_restore.active_issues(events)]).toStrictEqual([])
+	expect(backlog_drive_restore.restore([CHILD], events, [], [CHILD])).toStrictEqual([])
+	expect([...backlog_drive_restore.settled_issues(events)]).toStrictEqual([Number(CHILD)])
+	expect(backlog_drive_restore.offer_exclude(events)).toStrictEqual([])
+	const resumed = [...events, event(3, CHILD_LAUNCH, CHILD_DISPATCHED)]
+
+	expect(backlog_drive_restore.restore([CHILD], resumed, [])).toStrictEqual([CHILD])
+})
+
 it('excludes from the offer the merged children and the ones still in flight', () => {
 	const events = [
 		event(1, CHILD_LAUNCH, CHILD_DISPATCHED),
@@ -22,6 +66,15 @@ it('excludes from the offer the merged children and the ones still in flight', (
 	]
 
 	expect(backlog_drive_restore.offer_exclude(events)).toStrictEqual(['2509', CHILD])
+})
+
+// joshuafolkken/kit#6503: a child waiting for its measurement sample is no ready work to a stream reader.
+const SAMPLE_WAITED = event(1, 'sample-wait', '#2509 waiting: sample condition not met')
+
+it('excludes from the offer a child waiting for its measurement sample', () => {
+	const events = [SAMPLE_WAITED]
+
+	expect(backlog_drive_restore.offer_exclude(events)).toStrictEqual(['2509'])
 })
 
 it('restores only live lanes launched by this invocation', () => {
@@ -136,4 +189,15 @@ it('excludes a child a person withdrew after a yield of an earlier launch', () =
 
 it('offers a child withdrawn in another run', () => {
 	expect(backlog_drive_restore.offer_exclude([])).toStrictEqual([])
+})
+
+// joshuafolkken/kit#6503: a drive resumed after a hand-back reads its sample waits back apart from the
+// resume line and withdrawal exclusion, which it unites without repeats.
+it('seeds the sample waits apart from the resume line and withdrawal exclusion', () => {
+	const events = [...WITHDRAWN, SAMPLE_WAITED, SAMPLE_WAITED]
+
+	expect(backlog_drive_restore.left_out(events, ['2400', CHILD])).toStrictEqual({
+		exclude: ['2400', CHILD],
+		waiting: ['2509'],
+	})
 })

@@ -1,8 +1,10 @@
 import { readFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { capped_print_part } from '#scripts/document/capped-print-part'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { run_prep, type PrepParts } from '#scripts/run/run-prep'
-import { afterEach, describe, expect, it } from 'vitest'
+import { run_step_section_once } from '#scripts/run/run-step-section-once'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_entry_spill } from './run-entry-spill'
 
 // The cap `.claude/settings.json` declares for this checkout — the figure the issue measured against.
@@ -49,8 +51,36 @@ function spill_file(report: string): string {
 	return file
 }
 
+// The bundle's own cases run as a lane child, where no watcher section shares the result.
+beforeEach(() => {
+	vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(true)
+	vi.spyOn(run_step_section_once, 'is_recorded').mockReturnValue(false)
+	vi.spyOn(run_step_section_once, 'record_text').mockReturnValue()
+})
+
 afterEach(() => {
 	for (const directory of written.splice(0)) rmSync(directory, { recursive: true, force: true })
+	vi.restoreAllMocks()
+})
+
+// joshuafolkken/kit#5696: outside a lane child `run:entry` also prints the progress watcher's section.
+describe('run_entry_spill.report_budget — the sections printed after the bundle', () => {
+	it('leaves less outside a lane child than inside one', () => {
+		const inside = run_entry_spill.report_budget(root)
+
+		vi.mocked(lane_child_marker.is_child_of).mockReturnValue(false)
+
+		expect(run_entry_spill.report_budget(root)).toBeLessThan(inside)
+	})
+
+	it('counts no watcher section once this session printed it', () => {
+		const inside = run_entry_spill.report_budget(root)
+
+		vi.mocked(lane_child_marker.is_child_of).mockReturnValue(false)
+		vi.mocked(run_step_section_once.is_recorded).mockReturnValue(true)
+
+		expect(run_entry_spill.report_budget(root)).toBe(inside)
+	})
 })
 
 describe('run_entry_spill.fit — a bundle under the budget', () => {
@@ -75,11 +105,13 @@ describe('run_entry_spill.fit — a large issue bundle', () => {
 		expect(report).not.toContain(LARGE_BODY)
 	})
 
-	it('writes the whole bundle, the issue body included, to the named file', () => {
+	it('writes only the issue section to the named file, no section kept inline', () => {
 		const parts = parts_with({ content_body: LARGE_BODY })
 		const file = spill_file(run_entry_spill.fit(parts, compose, root))
+		const written_text = readFileSync(file, 'utf8')
 
-		expect(readFileSync(file, 'utf8')).toBe(run_prep.format_report(parts))
+		expect(written_text).toBe(LARGE_BODY)
+		expect(written_text).not.toContain(run_prep.SHIP_HEADER)
 	})
 
 	// The investigation guard exempts this shape, so reading the bundle costs no subject read.
@@ -99,5 +131,23 @@ describe('run_entry_spill.fit — a large issue bundle', () => {
 		expect(report.startsWith(run_prep.summary(parts))).toBe(true)
 		expect(report).not.toContain(run_prep.SHIP_HEADER)
 		expect(spill_file(report)).not.toBe('')
+	})
+})
+
+describe('run_entry_spill.fit — the fallback file and the ship record', () => {
+	it('writes the whole bundle when only the summary stays inline', () => {
+		const parts = parts_with({ content_body: LARGE_BODY, ship_problems: LARGE_PROBLEMS })
+		const file = spill_file(run_entry_spill.fit(parts, compose, root))
+
+		expect(readFileSync(file, 'utf8')).toBe(run_prep.format_report(parts))
+	})
+
+	it('records the ship preconditions it carries, so run:step does not print them again', () => {
+		const record = vi.mocked(run_step_section_once.record_text)
+		const parts = parts_with({ ship_problems: ['criterion pending'] })
+
+		run_entry_spill.fit(parts, compose, root)
+
+		expect(record).toHaveBeenCalledWith(run_prep.ship_body(parts.ship_problems))
 	})
 })

@@ -1,42 +1,30 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { fake_result } from '#tools/test/execa-result'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { project_checks } from './project-checks'
 
 vi.mock('execa', () => ({ execa: vi.fn() }))
 
-const { TSC_ARGS, type_check_command } = await import('./type-check-command')
+const { type_check_command } = await import('./type-check-command')
+const { TSC_ARGS } = await import('./tsc-arguments')
 const execa_module = await import('execa')
 const mocked_execa = vi.mocked(execa_module.execa)
 
-type ExecaResult = Awaited<ReturnType<typeof execa_module.execa>>
-
-const roots: Array<string> = []
+const make_directory = temporary_directory()
 const NODE_MANIFEST = '{"name":"app"}'
 
 function fixture(manifest: string): string {
-	const root = mkdtempSync(path.join(tmpdir(), 'josh-type-check-'))
+	const root = make_directory('josh-type-check-')
 
-	roots.push(root)
 	writeFileSync(path.join(root, 'package.json'), manifest)
 
 	return root
 }
 
-function fake_result(exit_code: number): ExecaResult {
-	const result: unknown = { exitCode: exit_code }
-
-	return result as ExecaResult
-}
-
-beforeEach(() => {
-	vi.clearAllMocks()
-})
-
 afterEach(() => {
 	vi.restoreAllMocks()
-	for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
 
 describe('josh check on a basic project', () => {

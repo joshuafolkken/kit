@@ -10,6 +10,7 @@ import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_ending } from '#scripts/run/run-ending'
 import { run_merge, type ChildOutcome, type EndingSignals } from './run-merge'
 import { run_merge_cap } from './run-merge-cap'
+import { run_merge_github_limit } from './run-merge-github-limit'
 import { run_merge_restart } from './run-merge-restart'
 import { run_merge_ship } from './run-merge-ship'
 import { run_merge_steps, type MergeContext } from './run-merge-steps'
@@ -21,12 +22,23 @@ import { run_merge_steps, type MergeContext } from './run-merge-steps'
 type IssueRead = Awaited<ReturnType<typeof issue_state_cli.read_issue>>
 
 // Whether the child's session ended through its environment — read only when `--output` named the
-// transcript, off otherwise: its exit record shows it could not reach the API, or the session was
-// killed inside a turn. The path is validated inside `run_ending`, so a missing output is "no".
+// transcript, off otherwise: its exit record shows it could not reach the API, the session was
+// killed inside a turn, or `gh` lost its login (`run-merge-github-limit.ts`). The path is validated
+// inside `run_ending`, so a missing output is "no".
 function read_is_outage(output: string | undefined): boolean {
 	if (output === undefined) return false
 
-	return api_outage.is_outage(run_ending.read_exit(output)) || run_ending.ended_mid_turn(output)
+	if (api_outage.is_outage(run_ending.read_exit(output))) return true
+
+	return run_ending.ended_mid_turn(output) || run_merge_github_limit.read_stop(output) === 'auth'
+}
+
+// A ship stop no relaunch answered, a host restart, or a GitHub rate limit — whose wait for its reset is
+// held apart from the streak, as a usage limit's is (`run-merge-usage-limit.ts`).
+async function is_exempt_stop(child: string, output: string | undefined): Promise<boolean> {
+	if (await run_merge_restart.is_host_restart(child, output)) return true
+
+	return run_merge_github_limit.read_stop(output) === 'rate-limit'
 }
 
 // Whether the child's session ended because it could not authenticate — off without `--output`, as the
@@ -40,12 +52,13 @@ function read_is_auth_failure(output: string | undefined): boolean {
 
 // Why an unfinished child is re-dispatchable, or `undefined` when it is not. **Only an API outage adds
 // to the run-wide streak**: a host restart is over by the time the child is read (joshuafolkken/kit#4540),
-// and an unanswered ship stop reached the API (joshuafolkken/kit#3974).
+// an unanswered ship stop reached the API (joshuafolkken/kit#3974), and a GitHub rate limit holds
+// launches until it resets (joshuafolkken/kit#6502).
 async function retry_cause(
 	child: string,
 	output: string | undefined,
 ): Promise<'api' | 'exempt' | undefined> {
-	if (await run_merge_restart.is_host_restart(child, output)) return 'exempt'
+	if (await is_exempt_stop(child, output)) return 'exempt'
 
 	if (read_is_outage(output)) return 'api'
 
@@ -54,7 +67,19 @@ async function retry_cause(
 
 // An outage child is re-dispatched only so many times: one that ends the same way on every dispatch is
 // parked, since merges in other lanes reset the run-wide outage streak and would never stop it. Its park
-// says so (`run-merge-cap.ts`).
+// says so (`run-merge-cap.ts`). While that streak holds launches, an API outage is the environment's,
+// not the child's: the cap waits, so the hold keeps growing rather than a park resetting it (#7078).
+async function is_capped(child: string, cause: 'api' | 'exempt'): Promise<boolean> {
+	const events = await run_event_stream_emit.current_events()
+
+	if (run_merge_cap.outages(events, child) < run_merge.CONSECUTIVE_OUTAGE_LIMIT) return false
+
+	if (cause !== 'api') return true
+	const record = await run_merge_steps.read_record()
+
+	return !run_merge.is_outage_guard_tripped(record?.carry.outages ?? 0)
+}
+
 async function read_retryable(
 	child: string,
 	output: string | undefined,
@@ -63,10 +88,10 @@ async function read_retryable(
 
 	if (cause === undefined) return { is_outage: false, is_streak_exempt: false }
 
-	const events = await run_event_stream_emit.current_events()
-	const limit = run_merge.CONSECUTIVE_OUTAGE_LIMIT
+	if (await is_capped(child, cause)) {
+		const events = await run_event_stream_emit.current_events()
+		const limit = run_merge.CONSECUTIVE_OUTAGE_LIMIT
 
-	if (run_merge_cap.outages(events, child) >= limit) {
 		return { is_outage: false, capped_note: run_merge_cap.note_of(events, child, limit) }
 	}
 

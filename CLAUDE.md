@@ -9,7 +9,7 @@
 - **No clones — single-source, even across package boundaries.** Duplicate non-trivial logic only after presenting the alternative and getting explicit approval. `prompts/collaboration-workflow/principles.md` → "no-clones".
 - **Design for elegance and simplicity first.** Before adding a hook, guard, rule or abstraction, ask whether fixing the cause makes it unnecessary. `prompts/collaboration-workflow/principles.md` → "elegant-design"; conflicting quality goals, or a remedy for defects → "quality-priority".
 - **Write concise prose: conditions and actions only.** `prompts/collaboration-workflow/principles.md` → "concise-prose".
-- **Distinguish consultation from execution.** A question or goal statement asks for analysis only — act on an explicit imperative or a workflow keyword. `prompts/collaboration-workflow/principles.md` → "consult-vs-execute".
+- **Distinguish consultation from execution.** Main-session scope and implementation handoff: `prompts/collaboration-workflow/principles.md` → "consult-vs-execute".
 - **Route distributed-doc / config changes upstream to kit.** In a consumer repo never edit kit-distributed docs/config; in kit you are the source. `prompts/collaboration-workflow/principles.md` → "upstream-to-kit".
 - **Latest-first, fix forward — pin back only as a last resort.** `prompts/collaboration-workflow/principles.md` → "latest-first".
 - **Output language follows `JOSH_SESSION_LANG`** (default `ja`) for session output and artifact prose; English for Issue/PR titles, code comments, test titles, commit messages and script strings. `prompts/collaboration-workflow/overview.md`.
@@ -18,11 +18,11 @@
 
 ### Decision autonomy
 
-Classify each decision point and act; stop **only** where the user's judgment is genuinely needed. `prompts/collaboration-workflow/operating-rules.md` → "decision-autonomy".
+Classify each decision point and act; stop **only** where the user's judgment is genuinely needed. `prompts/collaboration-workflow/operating-rules.md` → "decision-autonomy". The stops left to a person, each with why: `scripts/issue/issue-human-stops.ts`.
 
 - **Tier A — reversible implementation / design choices** (library, naming, layout, tests, refactor shape; placing a filed Issue into an epic; self-correction). Pick the clearly-better option, proceed, log it. Unasked filing: unattended only (`observation-filing.md`).
 - **Tier B — genuine toss-up.** The only tier that stops — ask with the candidates and trade-offs.
-- **Tier C — irreversible / shared-state / out-of-scope actions** (merge, branch delete, force push, destructive ops, repo settings, out-of-scope work, `devEngines` / overrides edits): explicit user instruction only, never auto-decided. Deleting a git-tracked file is reversible, so it is not a destructive op — inspect the target first and surface any contradiction. After a dependency-update command, load the `dependency-update` skill before reporting on the pins.
+- **Tier C — irreversible / shared-state / out-of-scope actions** (merge, branch delete, force push, destructive ops, repo settings, out-of-scope work, bypassing a check, `devEngines` / overrides edits): explicit user instruction only, never auto-decided. Deleting a git-tracked file is reversible, so it is not a destructive op — inspect the target first and surface any contradiction. After a dependency-update command, load the `dependency-update` skill before reporting on the pins.
 
 Log auto-decisions: an Issue comment in an Issue workflow, else a one-line "Auto-decided: `<choice>` over `<alt>` because `<reason>`" in the reply.
 
@@ -32,12 +32,12 @@ Naming, exports, file names and content rules are enforced by `eslint/rules/`; t
 
 ### Quality limits
 
-- Function complexity ≤5 · nesting ≤2 · function ≤25 lines · file ≤300 lines · params ≤4 · statements per function ≤10 · cognitive complexity ≤4 — line counts are code lines, not physical lines; test functions allow 35 code lines.
+- <!-- lint: quality-limits -->Function complexity ≤5 · nesting ≤2 · function ≤25 lines · file ≤300 lines · params ≤4 · statements per function ≤10 · cognitive complexity ≤4 — line counts are code lines, not physical lines; test functions allow 35 code lines<!-- /lint -->.
 - No magic numbers beyond `0`, `1`, `-1` · no `any` · restricted `as` · explicit param and return types · single short early return → one-liner `if (x) return y`.
 
 ## Package-First Development
 
-Before building a feature, run `pnpm josh pkg:scout <keywords>`: `clear` → use it (Tier A), `close` → ask (Tier B).
+Before building a feature, run `pnpm josh pkg:scout <keywords>` and act on its `Tier:` line (A: use it, B: ask).
 
 ## Code Change Rules
 
@@ -57,15 +57,15 @@ Before every `git commit`, a subagent runs `/code-review` per `prompts/review.md
 
 ## Git Rules
 
-Commits, the index and shared state (merge, branch delete, force push) only on explicit instruction, through `pnpm josh git` / `pnpm josh pr`; run `git status` live before any tree assumption: `prompts/collaboration-workflow/operating-rules.md` → "git-rules".
+Commits, the index and shared state (merge, branch delete, force push) only on explicit instruction, through `pnpm josh git` / `pnpm josh pr`; run `pnpm josh tree:status` live before any tree assumption: `prompts/collaboration-workflow/operating-rules.md` → "git-rules".
 
 ## Collaboration Workflow
 
-The issue-driven flow: `prompts/collaboration-workflow.md`.
+The issue-driven flow: `prompts/collaboration-workflow/`.
 
 ### Shorthand Commands
 
-`kickoff`, `fullrun`, `prrun`, `halfrun`, `backlogrun` (with `#N` / `new`) are procedures in the `workflow-commands` skill — read it before any part of a command, including the first `gh` call. Read the `epic-commands` skill before any `josh epic:*` command, before writing an epic that tracks a child in another repository, when `epic:bundle` places a filed issue, and when recording a decision on a `needs-decision` child.
+`kickoff`, `fullrun`, `prrun`, `halfrun`, `backlogrun` (with `#N` / `new`) are procedures in the `workflow-commands` skill — read it before any part of a command, including the first `gh` call. The `epic-commands` skill: before `josh epic:*`, a cross-repository epic child or a `needs-decision` decision, and when `epic:bundle` places a filed issue.
 
 #### Explicit invocation required (MANDATORY)
 

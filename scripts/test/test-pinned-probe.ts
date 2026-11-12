@@ -4,10 +4,16 @@ import { base_tree, type BaseTree } from '#scripts/git/base-tree'
 import { direct_importers } from './direct-importers'
 import { related_heavy_tests } from './related-heavy-tests'
 import { test_pinned_cache_logic, type Recheck } from './test-pinned-cache-logic'
-import { test_pinned_ledger, type PinnedOrigin, type ProbeTime } from './test-pinned-ledger'
+import {
+	test_pinned_ledger,
+	type PinnedOrigin,
+	type ProbeTime,
+	type Skipped,
+} from './test-pinned-ledger'
 import { test_pinned_logic, type Hunk } from './test-pinned-logic'
 import { test_pinned_pool } from './test-pinned-pool'
 import { test_pinned_stage, type Staged, type StagePlan } from './test-pinned-stage'
+import { test_pinned_type_check } from './test-pinned-type-check'
 import { test_red } from './test-red'
 import type { RedProbe } from './test-red-logic'
 import { related_scope, type RelatedScope } from './test-related-scope'
@@ -21,7 +27,7 @@ import { unit_worker_share } from './unit-worker-share'
 // A hunk with a `recheck` runs only those tests — the ones added or edited since its stored `green` or
 // `no-test` verdict, or the ones its stored `red` failed in (`test-pinned-cache-logic.ts`); a `red`
 // recheck they no longer fail falls back to a fresh probe, which runs in stages where the file's reach
-// is wide (`test-pinned-stage.ts`).
+// is wide (`test-pinned-stage.ts`), type-checked between the stages (`test-pinned-type-check.ts`).
 
 const TREE_PREFIX = 'josh-test-pinned-'
 const HEAD = 'HEAD'
@@ -34,6 +40,7 @@ interface Probe {
 	index: number
 	recheck?: Recheck | undefined
 	reach?: number | undefined
+	spawned?: ReadonlyArray<string> | undefined
 }
 
 type OnVerdict = (index: number, verdict: RedProbe) => Promise<void>
@@ -47,7 +54,7 @@ async function direct_of(root: string, file: string): Promise<Array<string>> {
 // What a fresh probe of the hunk runs in the tree at `root` (`test-pinned-stage.ts`). A file every
 // test imports stays the special case of joshuafolkken/kit#5122: its direct importers alone, never
 // escalated, since its reach is the whole suite — and `vitest related` handed it runs the whole suite.
-async function plan_of(root: string, probe: Probe): Promise<StagePlan> {
+async function import_plan(root: string, probe: Probe): Promise<StagePlan> {
 	const { file } = probe.hunk
 
 	if (direct_importers.every_test_imports_of([file]).length > 0) {
@@ -57,6 +64,17 @@ async function plan_of(root: string, probe: Probe): Promise<StagePlan> {
 	if (probe.reach === undefined) return { reach: [file] }
 
 	return test_pinned_stage.plan_over(file, await direct_of(root, file), probe.reach)
+}
+
+async function plan_of(root: string, probe: Probe): Promise<StagePlan> {
+	const plan = await import_plan(root, probe)
+	const spawned = probe.spawned ?? []
+
+	return {
+		...plan,
+		direct: plan.direct?.concat(spawned),
+		reach: [...new Set([...plan.reach, ...spawned])],
+	}
 }
 
 // The tests `files` reach in the tree at `root`, the heavy files reached only indirectly left out
@@ -95,8 +113,21 @@ async function selection_of(
 	return selection_over(root, plan.direct ?? plan.reach, workers)
 }
 
-// The run with this one hunk reverted. The file is put back before the next hunk runs, or that hunk's
+// `action` with this one hunk reverted. The file is put back before the next hunk runs, or that hunk's
 // tests would also see this revert.
+async function with_revert<T>(tree: BaseTree, hunk: Hunk, action: () => Promise<T>): Promise<T> {
+	const target = path.join(tree.tree, hunk.file)
+	const content = await readFile(target, 'utf8')
+
+	await writeFile(target, test_pinned_logic.revert(content, hunk))
+
+	try {
+		return await action()
+	} finally {
+		await writeFile(target, content)
+	}
+}
+
 async function reverted_run(
 	tree: BaseTree,
 	hunk: Hunk,
@@ -104,16 +135,16 @@ async function reverted_run(
 ): Promise<RedProbe> {
 	if (selection === undefined) return NO_TEST
 
-	const target = path.join(tree.tree, hunk.file)
-	const content = await readFile(target, 'utf8')
+	return await with_revert(tree, hunk, async () => await test_red.probe_in(tree, selection))
+}
 
-	await writeFile(target, test_pinned_logic.revert(content, hunk))
+// Whether the type check over the hunk's file and its direct importers reads red with it reverted and
+// green without: a scope already red before the revert answers nothing.
+async function is_reverted_type_red(tree: BaseTree, hunk: Hunk): Promise<boolean> {
+	const scope = await test_pinned_type_check.scope_of(hunk.file)
+	if (scope.length === 0 || (await test_pinned_type_check.is_red(tree, scope))) return false
 
-	try {
-		return await test_red.probe_in(tree, selection)
-	} finally {
-		await writeFile(target, content)
-	}
+	return await with_revert(tree, hunk, async () => await test_pinned_type_check.is_red(tree, scope))
 }
 
 // Set once a probe is unpinned in a `--first-unpinned` run (joshuafolkken/kit#5153): no lane starts
@@ -140,7 +171,11 @@ async function fresh_verdict(tree: BaseTree, probe: Probe, lane: Lane): Promise<
 		return await reverted_run(tree, probe.hunk, selection_over(tree.tree, files, lane.workers))
 	}
 
-	return await test_pinned_stage.staged_verdict(plan, run, lane.staged)
+	async function is_type_red(): Promise<boolean> {
+		return await is_reverted_type_red(tree, probe.hunk)
+	}
+
+	return await test_pinned_stage.staged_verdict(plan, run, is_type_red, lane.staged)
 }
 
 // The hunk's verdict: its recheck's answer, or a fresh probe where it answers none.
@@ -212,10 +247,12 @@ async function pooled(
 }
 
 // `held` counts the hunks the cache answered, `rewired` the ones left out as a rewire
-// (`test-pinned-rewire.ts`); `is_first_unpinned` starts no probe once one is unpinned.
+// (`test-pinned-rewire.ts`), `over_cap` the ones over the test-file cap; `is_first_unpinned` starts
+// no probe once one is unpinned.
 interface CheckOptions {
 	held?: number
 	rewired?: number
+	over_cap?: number
 	is_first_unpinned?: boolean
 	origin?: PinnedOrigin | undefined
 }
@@ -224,6 +261,15 @@ interface CheckOptions {
 interface Checked {
 	verdicts: Array<RedProbe>
 	staged: Staged
+}
+
+function skipped_of(options: CheckOptions): Skipped {
+	return {
+		held: options.held ?? 0,
+		rewired: options.rewired ?? 0,
+		over_cap: options.over_cap ?? 0,
+		origin: options.origin,
+	}
 }
 
 // The probes, checked over as many trees as the worker budget allows; `paths` are copied into each.
@@ -241,9 +287,7 @@ async function checked_on(
 	const halt = options.is_first_unpinned === true ? { is_set: false } : undefined
 	const verdicts = await pooled(paths, probes, { on_verdict, times, staged, halt })
 
-	const skipped = { held: options.held ?? 0, rewired: options.rewired ?? 0, origin: options.origin }
-
-	await test_pinned_ledger.record(skipped, times, Date.now() - started)
+	await test_pinned_ledger.record(skipped_of(options), times, Date.now() - started)
 
 	return { verdicts, staged }
 }

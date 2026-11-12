@@ -179,8 +179,8 @@ function is_unreachable_session(session: SessionOutcome): boolean {
 }
 
 // Whether the session got far enough to announce itself, which is what separates "never started"
-// from "started and then died". The two used to print the same sentence, so a run could not tell an
-// expired login from an API drop mid-scenario.
+// from "started and then died", so a run can distinguish an expired login from an API drop
+// mid-scenario.
 function reached_note(session: SessionOutcome, calls: ReadonlyArray<ToolCall>): string {
 	if (calls.length > 0) return 'part way'
 
@@ -191,7 +191,7 @@ function reached_note(session: SessionOutcome, calls: ReadonlyArray<ToolCall>): 
 
 // How the session ended, in its own terms. The exit code cannot carry this: execa reports none at all
 // for a signal-terminated process, so a timeout, an OOM kill and a `claude` that never started all
-// arrive alike and used to print the same sentence.
+// arrive alike at the exit-code interface and need the session's own outcome to distinguish them.
 function ended_note(session: SessionOutcome): string {
 	if (session.is_timed_out === true) return 'session timed out'
 	if (session.signal !== undefined) return `session was killed by ${session.signal}`

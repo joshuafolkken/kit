@@ -12,12 +12,14 @@ import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 const KIND = run_event_stream.EVENT_KIND.USAGE_LIMIT
 const RESUMES_AT = /resumes at (\S+)$/u
 
-function stop_text(child: string, reset_ms: number): string {
-	return `${issue_cite.plain(child)} usage limit — resumes at ${new Date(reset_ms).toISOString()}`
+function stop_text(child: string, reset_ms: number, limit: string): string {
+	return `${issue_cite.plain_for('program', child)} ${limit} — resumes at ${new Date(reset_ms).toISOString()}`
 }
 
-async function record(child: string, reset_ms: number): Promise<void> {
-	await run_event_stream_emit.emit(KIND, stop_text(child, reset_ms))
+// `limit` names what stopped the child — a GitHub rate limit holds launches the same way
+// (`run-merge-github-limit.ts`).
+async function record(child: string, reset_ms: number, limit = 'usage limit'): Promise<void> {
+	await run_event_stream_emit.emit(KIND, stop_text(child, reset_ms, limit))
 }
 
 // The time a stop's text names, or `undefined` when it does not parse.
@@ -28,7 +30,7 @@ function time_of(text: string): number | undefined {
 }
 
 // The reset the newest usage-limit stop names, in epoch milliseconds, or `undefined` when the stream
-// holds none — every lane shares the one account, so the newest stop is the limit in force.
+// holds none. A hold reads `held_until`, which also weighs a GitHub rate limit's stops.
 function resume_ms(events: ReadonlyArray<RunEvent>): number | undefined {
 	const newest = events.findLast((event) => event.kind === KIND)
 
@@ -36,11 +38,22 @@ function resume_ms(events: ReadonlyArray<RunEvent>): number | undefined {
 }
 
 // The reset a usage limit still holds launches until at `now_ms`, or `undefined` once it has passed —
-// what `run:board` names a waiting row's hold by (joshuafolkken/kit#4796).
+// what `run:board` names a waiting row's hold by (joshuafolkken/kit#4796). The latest reset still ahead
+// wins, not the newest stop: a GitHub rate limit's reset is another account's, and an earlier one
+// recorded after a Claude limit must not end that limit's hold (joshuafolkken/kit#6502).
 function held_until(events: ReadonlyArray<RunEvent>, now_ms: number): number | undefined {
-	const reset_ms = resume_ms(events)
+	const ahead = events
+		.filter((event) => event.kind === KIND)
+		.map((event) => time_of(event.text) ?? 0)
+		.filter((reset_ms) => reset_ms > now_ms)
 
-	return reset_ms !== undefined && reset_ms > now_ms ? reset_ms : undefined
+	return ahead.length === 0 ? undefined : Math.max(...ahead)
+}
+
+// How many children a usage limit stopped whose reset is still ahead at `now_ms` — the children the
+// `⛽ usage` section counts as parked behind it (joshuafolkken/kit#5395).
+function held_count(events: ReadonlyArray<RunEvent>, now_ms: number): number {
+	return events.filter((event) => event.kind === KIND && (time_of(event.text) ?? 0) > now_ms).length
 }
 
 // Whether a usage limit still holds launches at `now_ms` — the production `usage_limited` port.
@@ -48,6 +61,6 @@ async function is_held(now_ms: number): Promise<boolean> {
 	return held_until(await run_event_stream_emit.current_events(), now_ms) !== undefined
 }
 
-const run_merge_usage_limit = { held_until, is_held, record, resume_ms }
+const run_merge_usage_limit = { held_count, held_until, is_held, record, resume_ms }
 
 export { run_merge_usage_limit }

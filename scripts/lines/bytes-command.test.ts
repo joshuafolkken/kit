@@ -1,9 +1,9 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import os from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { document_byte_budget } from '#scripts/document/document-byte-budget'
 import { entry_read_budget } from '#scripts/document/entry-read-budget'
 import { resident_budget } from '#scripts/document/resident-budget'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it } from 'vitest'
 import { bytes_command } from './bytes-command'
 
@@ -16,6 +16,7 @@ const NOTHING = 0
 const JOSH_COMMANDS = 'docs/josh-commands.md'
 const CLAUDE_MD = 'CLAUDE.md'
 const TEMP_PREFIX = 'kit-bytes-'
+const make_directory = temporary_directory()
 
 describe('status_row — one budgeted document', () => {
 	it('names the headroom left when within the ceiling', () => {
@@ -58,13 +59,9 @@ describe('argument_row — a path handed on the command line', () => {
 	})
 
 	it('says no-file for a budgeted path the tree does not hold', () => {
-		const package_root = mkdtempSync(path.join(os.tmpdir(), TEMP_PREFIX))
+		const package_root = make_directory(TEMP_PREFIX)
 
-		try {
-			expect(argument_row(JOSH_COMMANDS, package_root)).toContain(NOT_A_FILE)
-		} finally {
-			rmSync(package_root, { recursive: true, force: true })
-		}
+		expect(argument_row(JOSH_COMMANDS, package_root)).toContain(NOT_A_FILE)
 	})
 })
 
@@ -80,40 +77,32 @@ describe('argument_row — the resident CLAUDE.md', () => {
 	})
 
 	it('names the overage of the resident document without a value to raise it to', () => {
-		const package_root = mkdtempSync(path.join(os.tmpdir(), TEMP_PREFIX))
+		const package_root = make_directory(TEMP_PREFIX)
 		const overage = 7
 
-		try {
-			writeFileSync(
-				path.join(package_root, CLAUDE_MD),
-				'a'.repeat(resident_budget.RESIDENT_LIMIT_BYTES + overage),
-			)
-			const row = argument_row(CLAUDE_MD, package_root)
+		writeFileSync(
+			path.join(package_root, CLAUDE_MD),
+			'a'.repeat(resident_budget.RESIDENT_LIMIT_BYTES + overage),
+		)
+		const row = argument_row(CLAUDE_MD, package_root)
 
-			expect(row).toContain(`over by ${overage.toString()}`)
-			expect(row).not.toContain('raise recorded')
-		} finally {
-			rmSync(package_root, { recursive: true, force: true })
-		}
+		expect(row).toContain(`over by ${overage.toString()}`)
+		expect(row).not.toContain('raise recorded')
 	})
 })
 
 describe('near_ceiling_statuses — the no-argument scan', () => {
 	it('skips documents absent from a published package without losing present ones', () => {
-		const package_root = mkdtempSync(path.join(os.tmpdir(), TEMP_PREFIX))
+		const package_root = make_directory(TEMP_PREFIX)
 		const document = path.join(package_root, JOSH_COMMANDS)
 		const recorded = document_byte_budget.recorded_bytes_for(JOSH_COMMANDS)
 
-		try {
-			expect(near_ceiling_statuses(package_root)).toStrictEqual([])
-			mkdirSync(path.dirname(document), { recursive: true })
-			writeFileSync(document, 'x'.repeat(recorded ?? 0))
-			expect(near_ceiling_statuses(package_root).map((status) => status.path)).toStrictEqual([
-				JOSH_COMMANDS,
-			])
-		} finally {
-			rmSync(package_root, { recursive: true, force: true })
-		}
+		expect(near_ceiling_statuses(package_root)).toStrictEqual([])
+		mkdirSync(path.dirname(document), { recursive: true })
+		writeFileSync(document, 'x'.repeat(recorded ?? 0))
+		expect(near_ceiling_statuses(package_root).map((status) => status.path)).toStrictEqual([
+			JOSH_COMMANDS,
+		])
 	})
 
 	it('reports only documents near their ceiling, least headroom first', () => {

@@ -10,6 +10,7 @@ import { lane_limit_override } from './lane-limit-override'
 // it writes are never the live run's.
 
 const OVERRIDE_LIMIT = 8
+const LAUNCH_LIMIT = 3
 const RAISE_TEXT = 'lane limit 6 → 8'
 
 const scratch = { repository: '' }
@@ -36,6 +37,7 @@ describe('lane_limit_override — with no run in progress', () => {
 
 	it('refuses to write one', async () => {
 		await expect(lane_limit_override.write_override(OVERRIDE_LIMIT)).resolves.toBe(false)
+		await expect(lane_limit_override.write_launch(LAUNCH_LIMIT)).resolves.toBe(false)
 	})
 })
 
@@ -55,6 +57,41 @@ describe('lane_limit_override — on a live run', () => {
 
 		await expect(lane_limit_override.read_override()).resolves.toBeUndefined()
 		expect(run_carry.read_carry(carry_target()).kind).toBe('carried')
+	})
+})
+
+// joshuafolkken/kit#6166: `--reset` returns to the limit the run started with, not a shell's `.env`.
+describe('lane_limit_override.read_carried', () => {
+	beforeEach(() => {
+		run_carry.begin_carry(carry_target(), 'backlogrun')
+		vi.spyOn(run_carry, 'is_owner_live').mockReturnValue(true)
+	})
+
+	it('ignores the start limit a crashed run left behind', async () => {
+		vi.spyOn(run_carry, 'is_owner_live').mockReturnValue(false)
+		await lane_limit_override.write_launch(LAUNCH_LIMIT)
+
+		await expect(lane_limit_override.read_carried()).resolves.toBeUndefined()
+	})
+
+	it('reads nothing on a run that recorded no limit', async () => {
+		await expect(lane_limit_override.read_carried()).resolves.toBeUndefined()
+	})
+
+	it('reads the override over the start limit', async () => {
+		await lane_limit_override.write_launch(LAUNCH_LIMIT)
+		await lane_limit_override.write_override(OVERRIDE_LIMIT)
+
+		await expect(lane_limit_override.read_carried()).resolves.toBe(OVERRIDE_LIMIT)
+	})
+
+	it('reads the start limit again once the override is cleared', async () => {
+		await lane_limit_override.write_launch(LAUNCH_LIMIT)
+		await lane_limit_override.write_override(OVERRIDE_LIMIT)
+		await lane_limit_override.write_override(undefined)
+
+		await expect(lane_limit_override.read_carried()).resolves.toBe(LAUNCH_LIMIT)
+		await expect(lane_limit_override.read_override()).resolves.toBeUndefined()
 	})
 })
 

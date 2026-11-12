@@ -8,7 +8,8 @@ import { issue_state, type IssueState } from '#scripts/issue/issue-state'
 // **It is read-only, and that is the whole point** — the merge event has its own composite
 // (`run:merge`), and the pre-edit reads have theirs (`run:prep`); this is the passive glance a resumed
 // session or a non-merge decision takes, which must not write. `run:hold`'s claim and
-// `run:progress`'s clock mark are excluded for exactly that reason.
+// `run:progress`'s clock mark are excluded for exactly that reason; the hold record itself is *read*
+// by `tree:status`, which never claims it.
 //
 // The leading summary line carries the three facts on one line — the state, the cost verdict and the
 // carry summary — so the glance is read off the first line without parsing the sections below it.

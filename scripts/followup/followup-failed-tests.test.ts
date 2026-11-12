@@ -96,6 +96,14 @@ describe('followup_failed_tests.verdict_of', () => {
 		expect(followup_failed_tests.verdict_of(tests, new Set([moved]))).toBe(KEPT_VERDICT)
 	})
 
+	// joshuafolkken/kit#5642: a command-table change pins the registry tests, so their failure is its own.
+	it('keeps an ALIASES failure when the change touched the command table', () => {
+		const tests = tests_of('scripts/josh/josh-logic.test.ts')
+		const changed = new Set(['scripts/josh/josh-commands-development.ts'])
+
+		expect(followup_failed_tests.verdict_of(tests, changed)).toBe(KEPT_VERDICT)
+	})
+
 	it('answers unnamed when the log named no failed test', () => {
 		expect(followup_failed_tests.verdict_of(tests_of(), new Set())).toBe(UNNAMED_VERDICT)
 	})

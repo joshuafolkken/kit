@@ -1,3 +1,4 @@
+import { poll } from '#scripts/lib/poll'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { run_board_fit, type TerminalSize } from './run-board-fit'
 import { run_board_labels } from './run-board-labels'
@@ -84,13 +85,18 @@ async function turn_until(
 	ports: SpinPorts,
 	until_ms: number,
 ): Promise<void> {
-	for (let now = ports.now(); now < until_ms; now = ports.now()) {
-		// eslint-disable-next-line no-await-in-loop -- polling: each turn waits for the spinner's next frame
-		await ports.sleep(next_turn(now, until_ms) - now)
-		const at_ms = ports.now()
+	await poll.poll_until(() => ports.now() >= until_ms, {
+		attempts: Infinity,
+		interval_ms: 0,
+		sleeper: async () => {
+			const now_ms = ports.now()
 
-		if (at_ms < until_ms) ports.write(spin_bytes(spots, spinner_of(at_ms)))
-	}
+			await ports.sleep(next_turn(now_ms, until_ms) - now_ms)
+			const at_ms = ports.now()
+
+			if (at_ms < until_ms) ports.write(spin_bytes(spots, spinner_of(at_ms)))
+		},
+	})
 }
 
 // Waits for the next second, turning the spinners until then; a frame with none just waits.

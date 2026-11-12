@@ -1,0 +1,3 @@
+- rf:tests | low | scripts/document/backlogrun-progress-relaunch.test.ts:15 | 2026-11-02 | #5939 | false-positive
+- rf:comments | low | scripts/document/backlogrun-progress-relaunch.test.ts:11 | 2026-11-02 | #5939 | fixed
+- rf:tests | low | scripts/document/backlogrun-progress-relaunch.test.ts:15 | 2026-11-02 | #5939

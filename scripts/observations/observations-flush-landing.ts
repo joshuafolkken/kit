@@ -52,7 +52,7 @@ async function wait_for_landing(branch_name: string, is_auto_merge: boolean): Pr
 }
 
 function describe_pull(pull: OpenPull): string {
-	return `${issue_cite.plain(pull.number)} (\`${pull.head_ref}\`)`
+	return `${issue_cite.plain_for('github', pull.number)} (\`${pull.head_ref}\`)`
 }
 
 // **Landing means GitHub will merge it with nobody watching**: auto-merge is on and the merge gate has

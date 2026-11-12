@@ -1,7 +1,7 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { gate_labels } from './gate-labels'
 import { verification_inputs } from './verification-inputs'
 
@@ -9,11 +9,18 @@ import { verification_inputs } from './verification-inputs'
 // the declaration — the configurations it cannot narrow past, and the fingerprint of its tools and
 // environment.
 
+const make_directory = temporary_directory()
 const PACKAGE_JSON = 'package.json'
 const SOURCE_FILE = 'scripts/thing.ts'
 const NODE_ENV = 'NODE_ENV'
 const TEST_ENV = 'test'
 const BEHAVIOR_LABEL = 'behavior'
+const ESLINT_CONFIG = 'eslint.config.js'
+const ESLINT_BASE = 'eslint/base.js'
+const WIRED_MODULE = 'eslint/rules/wired.js'
+const WIRED_SPECIFIER = './eslint/rules/wired.js'
+const PACKAGE_IMPORT = '#rule'
+const PACKAGE_EXPORT = './rule'
 
 describe('verification_inputs.configures', () => {
 	it.each([
@@ -37,7 +44,7 @@ describe('verification_inputs.configures', () => {
 		}
 	})
 
-	it.each(['eslint/rules/thing.ts', 'eslint.config.js', 'prettier.config.js', 'tsconfig.json'])(
+	it.each([ESLINT_BASE, ESLINT_CONFIG, 'prettier.config.js', 'tsconfig.json'])(
 		'reads %j as a lint configuration',
 		(relative) => {
 			expect(verification_inputs.configures(gate_labels.LINT_LABEL, [relative])).toBe(true)
@@ -53,6 +60,66 @@ describe('verification_inputs.configures', () => {
 
 	it('answers true for an undeclared check, which no narrowing reads past', () => {
 		expect(verification_inputs.configures(BEHAVIOR_LABEL, [SOURCE_FILE])).toBe(true)
+	})
+})
+
+// joshuafolkken/kit#5380: a rule module the eslint config does not import yet changes no lint result,
+// so a change to it alone must not switch `lint --changed` to the whole tree.
+function write_project(config_source = "import './eslint/base.js'\n"): string {
+	const root = make_directory('kit-lint-config-reach-')
+
+	mkdirSync(path.join(root, 'eslint', 'rules'), { recursive: true })
+	writeFileSync(path.join(root, ESLINT_CONFIG), config_source)
+	writeFileSync(path.join(root, 'eslint', 'base.js'), "export * from './rules/wired.js'\n")
+	writeFileSync(path.join(root, 'eslint', 'rules', 'wired.js'), '')
+	writeFileSync(path.join(root, 'eslint', 'rules', PACKAGE_JSON), '{"main":"wired.js"}')
+	writeFileSync(path.join(root, 'eslint', 'rules', 'pending.js'), '')
+
+	return root
+}
+
+describe('verification_inputs.configures for the eslint config modules', () => {
+	it('leaves the tests beside the eslint rules out of the lint configuration', () => {
+		const relatives = ['eslint/config-fingerprint.test.ts']
+
+		expect(verification_inputs.configures(gate_labels.LINT_LABEL, relatives)).toBe(false)
+	})
+
+	it.each([ESLINT_BASE, WIRED_MODULE])(
+		'reads %j, which the config imports, as a lint configuration',
+		(relative) => {
+			const root = write_project()
+
+			expect(verification_inputs.configures(gate_labels.LINT_LABEL, [relative], root)).toBe(true)
+		},
+	)
+
+	it('leaves a rule module the config does not import yet out', () => {
+		const root = write_project()
+		const relatives = ['eslint/rules/pending.js']
+
+		expect(verification_inputs.configures(gate_labels.LINT_LABEL, relatives, root)).toBe(false)
+	})
+})
+
+describe('verification_inputs.configures for local import forms', () => {
+	it.each([
+		'await import(`./eslint/rules/wired.js`)\n',
+		"require('./eslint/rules')\n",
+		"import '#rule'\n",
+		"import 'lint-fixture/rule'\n",
+	])('reads the rule loaded through %j as configuration', (entry) => {
+		const root = write_project(entry)
+
+		writeFileSync(
+			path.join(root, PACKAGE_JSON),
+			JSON.stringify({
+				name: 'lint-fixture',
+				imports: { [PACKAGE_IMPORT]: { import: WIRED_SPECIFIER } },
+				exports: { [PACKAGE_EXPORT]: { import: WIRED_SPECIFIER } },
+			}),
+		)
+		expect(verification_inputs.configures(gate_labels.LINT_LABEL, [WIRED_MODULE], root)).toBe(true)
 	})
 })
 
@@ -81,12 +148,8 @@ describe('verification_inputs.fingerprint', () => {
 	let root = ''
 
 	beforeEach(() => {
-		root = mkdtempSync(path.join(tmpdir(), 'verification-inputs-'))
+		root = make_directory('verification-inputs-')
 		install(root, 'typescript', '5.0.0')
-	})
-
-	afterEach(() => {
-		rmSync(root, { recursive: true, force: true })
 	})
 
 	function of(label: string, environment: Record<string, string> = {}): string {

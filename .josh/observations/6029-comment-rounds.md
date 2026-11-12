@@ -1,0 +1,5 @@
+- rf:bug-risks | medium | scripts/issue/enforcement-lint.ts:22 | 2026-11-03 | #6029
+- rf:bug-risks | medium | scripts/issue/enforcement-lint.ts:38 | 2026-11-03 | #6029
+- rf:project-conventions | low | scripts/issue/enforcement-lint.ts:22 | 2026-11-03 | #6029
+- rf:tests | low | scripts/issue/enforcement-lint.test.ts:30 | 2026-11-03 | #6029
+- rf:none | none | - | 2026-11-03 | #6029

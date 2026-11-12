@@ -288,8 +288,7 @@ interface IssueOutcome {
 
 const ISSUE_NUMBER_PATTERN = /\/(?<number>\d+)\s*$/u
 
-// The creation answers the new issue's browser URL — `.html_url`, which is the value `gh issue
-// create` used to print — and its last path segment is the number `josh git` needs.
+// The creation returns the issue's browser URL; its last path segment supplies the number `josh git` needs.
 function parse_issue_number(issue_url: string): string | undefined {
 	const { groups } = ISSUE_NUMBER_PATTERN.exec(issue_url.trim()) ?? {}
 	const { number: issue_number } = groups ?? {}
@@ -341,7 +340,7 @@ function pull_request_step(
 ): StepResult {
 	const number = issue_numbers.get(target.repo)
 	if (number === undefined) return { step, is_ok: false, detail: 'no issue number' }
-	const argument = `${plan_title(plan.releases)} ${issue_cite.plain(number)}`
+	const argument = `${plan_title(plan.releases)} ${issue_cite.plain_for('github', number)}`
 	const outcome = spawn_captured(target, step, ['pnpm', 'josh', 'git', '-y', argument])
 	if (outcome.result.is_ok) return outcome.result
 

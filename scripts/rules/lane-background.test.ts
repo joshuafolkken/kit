@@ -1,3 +1,4 @@
+import { hook_context } from '#scripts/hooks/hook-context'
 import { describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { lane_background } from './lane-background'
@@ -259,7 +260,9 @@ describe('lane_background.ROW — delivery', () => {
 		const row = delivered_rules.DELIVERED_RULES.find((rule) => rule.id === ROW_ID)
 
 		expect(row?.reason).toBe(lane_background.LANE_BACKGROUND_REASON)
-		expect(row?.decide?.(background_call('ls'), { transcript: '', now_ms: 0 }, false, 0)).toBe(true)
+		const run = { transcript: '', now_ms: 0, context: hook_context.from_process() }
+
+		expect(row?.decide?.(background_call('ls'), run, false, 0)).toBe(true)
 	})
 
 	it('is listed before run-tail, whose foreground push it claims in a lane child', () => {
@@ -276,12 +279,13 @@ describe('lane_background.ROW — delivery', () => {
 		expect(lane_background.LANE_BACKGROUND_REASON).toContain('issued in the foreground')
 	})
 
-	// A launched ship is waited on, so a stop returns to this session (joshuafolkken/kit#4711).
+	// A launched ship is waited on, so a stop returns to this session (joshuafolkken/kit#4711); `ship
+	// --detach` runs the first wait chunk itself and only a `pending` is re-issued (joshuafolkken/kit#5625).
 	it.each([
-		['refusal', lane_background.LANE_BACKGROUND_REASON],
-		['foreground note', lane_background.FOREGROUND_NOTE],
-	])('the %s sends a launched ship to josh ship:wait', (_name, text) => {
-		expect(text).toContain('josh ship:wait')
+		['refusal', lane_background.LANE_BACKGROUND_REASON, 'runs `josh ship:wait` itself'],
+		['foreground note', lane_background.FOREGROUND_NOTE, '`josh ship:wait` on its `pending`'],
+	])('the %s leaves the first wait to the launched ship', (_name, text, wording) => {
+		expect(text).toContain(wording)
 	})
 })
 

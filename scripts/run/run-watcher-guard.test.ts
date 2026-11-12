@@ -1,9 +1,11 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { run_progress_clock } from '#scripts/run/progress/run-progress-clock'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_watcher_guard } from './run-watcher-guard'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#2113. The guard detects "in-flight lanes, stale watcher" and refuses — the
 // same contract `pretool:guard` holds. Behavior is pinned here so a refactor that
@@ -23,13 +25,9 @@ const lanes_in_flight = vi.mocked(lane_registry.has_lanes_in_flight)
 const backlog_parent = vi.mocked(run_headless.is_backlog_parent)
 const headless = vi.mocked(run_headless.is_headless)
 
-const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-run-watcher-guard-'))
+const TEMPORARY = make_directory('josh-run-watcher-guard-')
 const LIFE_TARGET = path.join(TEMPORARY, 'life.json')
 const THRESHOLD_MS = run_watcher_guard.STALE_THRESHOLD_MS
-
-afterAll(() => {
-	rmSync(TEMPORARY, { force: true, recursive: true })
-})
 
 beforeEach(() => {
 	backlog_parent.mockResolvedValue(true)
@@ -38,8 +36,6 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-	vi.clearAllMocks()
-
 	try {
 		rmSync(LIFE_TARGET, { force: true })
 	} catch {

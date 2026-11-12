@@ -1,14 +1,15 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import os from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { claude_token } from '#scripts/auth/claude-token'
 import { gh_cli_token } from '#scripts/gh/gh-cli-token'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fresh_machine_cli } from './fresh-machine-cli'
 import { fresh_machine_run, type RunRequest } from './fresh-machine-run'
 
 const paths_mock = vi.hoisted(() => ({ root: '' }))
+const make_directory = temporary_directory()
 
 vi.mock('#scripts/init/init-paths', () => ({
 	get PROJECT_ROOT(): string {
@@ -56,7 +57,7 @@ function write_manifest(name: string): void {
 }
 
 beforeEach(() => {
-	paths_mock.root = mkdtempSync(path.join(os.tmpdir(), 'fresh-machine-cli-test-'))
+	paths_mock.root = make_directory('fresh-machine-cli-test-')
 	write_manifest(KIT)
 	vi.mocked(fresh_machine_run.run).mockResolvedValue(0)
 	vi.mocked(gh_cli_token.get).mockReturnValue(TOKEN)
@@ -67,13 +68,12 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-	rmSync(paths_mock.root, { force: true, recursive: true })
 	vi.resetAllMocks()
 	vi.restoreAllMocks()
 })
 
 describe('fresh_machine_cli.run — choosing the scenario', () => {
-	it('lists the six patterns of kit and runs nothing', async () => {
+	it('lists the seven patterns of kit and runs nothing', async () => {
 		await expect(fresh_machine_cli.run(['--list'])).resolves.toBe(0)
 
 		expect(printed(console.info).split('\n')).toStrictEqual([
@@ -83,6 +83,7 @@ describe('fresh_machine_cli.run — choosing the scenario', () => {
 			START_PATTERN,
 			'kit-test-svelte-init',
 			'kit-test-svelte-start',
+			'kit-test-lua-dlx',
 		])
 		expect(fresh_machine_run.run).not.toHaveBeenCalled()
 	})

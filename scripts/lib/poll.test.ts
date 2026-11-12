@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { poll } from './poll'
+import { poll, POLL_BACKOFF, PR_POLL_SCHEDULES, type BackoffSchedule } from './poll'
 
 const ATTEMPTS = 5
 const INTERVAL_MS = 10
@@ -158,6 +158,127 @@ describe('poll.wait_for', () => {
 		)
 
 		expect(waits).toEqual([INTERVAL_MS, INTERVAL_MS])
+	})
+})
+
+// #6719: a CI wait reads mostly unchanged state, so the interval lengthens until something moves.
+describe('poll.poll_for backoff', () => {
+	const BACKOFF_ATTEMPTS = 20
+	const FIXED_INTERVAL_MS = 30_000
+	const BUDGET_MS = (BACKOFF_ATTEMPTS - 1) * FIXED_INTERVAL_MS
+
+	async function waits_over(seen_per_tick: ReadonlyArray<string>): Promise<Array<number>> {
+		const waits: Array<number> = []
+		let tick = 0
+
+		await poll.poll_for(never_answers, {
+			attempts: BACKOFF_ATTEMPTS,
+			interval_ms: FIXED_INTERVAL_MS,
+			sleeper: async (duration_ms) => {
+				waits.push(duration_ms)
+				tick += 1
+				await no_wait()
+			},
+			backoff: { seen: () => seen_per_tick[tick] ?? 'same' },
+		})
+
+		return waits
+	}
+
+	it('lengthens the wait by 1.5 per unchanged tick and stops at 120 seconds', async () => {
+		const waits = await waits_over([])
+
+		expect(POLL_BACKOFF).toEqual({ initial_ms: 30_000, factor: 1.5, max_ms: 120_000 })
+		expect(waits.slice(0, 6)).toEqual([30_000, 45_000, 67_500, 101_250, 120_000, 120_000])
+	})
+
+	it('goes back to the first interval after a tick that changed', async () => {
+		const waits = await waits_over(['a', 'a', 'a', 'b', 'b'])
+
+		expect(waits.slice(0, 5)).toEqual([30_000, 45_000, 67_500, 30_000, 45_000])
+	})
+
+	it('spends the same total wait as the fixed cadence, the last wait cut to what is left', async () => {
+		const waits = await waits_over([])
+		const total_ms = waits.reduce((sum, wait_ms) => sum + wait_ms, 0)
+
+		expect(total_ms).toBe(BUDGET_MS)
+		expect(waits.at(-1)).toBeLessThanOrEqual(POLL_BACKOFF.max_ms)
+	})
+})
+
+async function first_waits_of(
+	schedule: BackoffSchedule,
+	seen_per_tick: ReadonlyArray<string> = [],
+): Promise<Array<number>> {
+	const waits: Array<number> = []
+
+	await poll.poll_for(never_answers, {
+		attempts: 10,
+		interval_ms: 60_000,
+		sleeper: async (duration_ms) => {
+			waits.push(duration_ms)
+			await no_wait()
+		},
+		backoff: { seen: () => seen_per_tick[waits.length] ?? 'same', schedule },
+	})
+
+	return waits.slice(0, 6)
+}
+
+// #6868: the PR completion waits — checks and CodeRabbit, then the merge.
+describe('PR_POLL_SCHEDULES', () => {
+	it.each([
+		['changed', ['a', 'b']],
+		['unchanged', []],
+	])('holds the lead through %s ticks, then starts the schedule', async (_label, seen_per_tick) => {
+		const schedule = {
+			lead: { count: 2, interval_ms: 5000 },
+			initial_ms: 1000,
+			factor: 2,
+			max_ms: 3000,
+		}
+
+		await expect(first_waits_of(schedule, seen_per_tick)).resolves.toEqual([
+			5000, 5000, 1000, 2000, 3000, 3000,
+		])
+	})
+
+	it('reads the checks every 30 seconds four times, then every 20 seconds', async () => {
+		await expect(first_waits_of(PR_POLL_SCHEDULES.checks)).resolves.toEqual([
+			30_000, 30_000, 30_000, 30_000, 20_000, 20_000,
+		])
+	})
+
+	// #7237: the low cap bounds how late a landed merge is detected.
+	it('reads the merge from 10 seconds, then every 15 seconds at most', async () => {
+		await expect(first_waits_of(PR_POLL_SCHEDULES.merge)).resolves.toEqual([
+			10_000, 15_000, 15_000, 15_000, 15_000, 15_000,
+		])
+	})
+
+	// #7238
+	it('reads the gated checks every 30 seconds four times, then every 10 seconds', async () => {
+		await expect(first_waits_of(PR_POLL_SCHEDULES.checks_gated)).resolves.toEqual([
+			30_000, 30_000, 30_000, 30_000, 10_000, 10_000,
+		])
+	})
+})
+
+describe('PR_POLL_SCHEDULES.checks_gated budget', () => {
+	it('spends the same total wait as the fixed cadence', async () => {
+		const waits: Array<number> = []
+
+		await poll.poll_for(() => undefined, {
+			attempts: 10,
+			interval_ms: 60_000,
+			sleeper: async (duration_ms: number) => {
+				waits.push(duration_ms)
+			},
+			backoff: { schedule: PR_POLL_SCHEDULES.checks_gated },
+		})
+
+		expect(waits.reduce((total, wait_ms) => total + wait_ms, 0)).toBe(9 * 60_000)
 	})
 })
 

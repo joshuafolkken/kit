@@ -37,7 +37,6 @@ const TRIPWIRE_PAIR: TemplateSourcePair = {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	mocked.read_recorded_manifest.mockReturnValue(RECORDED_MANIFEST)
 	mocked.format_drift_message.mockReturnValue(DRIFT_MESSAGE)
 	vi.spyOn(process, 'exit').mockImplementation(() => {

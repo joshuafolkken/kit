@@ -1,30 +1,28 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { process_identity } from '#scripts/josh/process-identity'
 import { process_identity_fixture } from '#scripts/josh/process-identity-fixture'
 import { stamp_file } from '#scripts/josh/stamp-file'
-import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { run_carry, type CarryOwner, type RunCarry } from './run-carry'
 import { run_carry_conversation } from './run-carry-conversation'
 import { run_carry_reclaim } from './run-carry-reclaim'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#3137 review: a resumed parent waiting on a lane child counts nothing, so the
 // record has to be taken back by the wait itself — otherwise it names the dead process once the
 // transcript falls quiet, and `run:wake` recovers it as a crash ten minutes later.
 
 const { DEAD_PID } = process_identity_fixture
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-carry-reclaim-test-'))
+const scratch = make_directory('run-carry-reclaim-test-')
 const TARGET = path.join(scratch, 'carry.json')
 const TRANSCRIPT = path.join(scratch, 'conversation-3137.jsonl')
 const OTHER_TRANSCRIPT = path.join(scratch, 'other.jsonl')
 const LONG_QUIET_MS = run_carry_conversation.CONVERSATION_QUIET_MS + 1
 
 writeFileSync(TRANSCRIPT, '{}\n')
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
 
 beforeEach(() => {
 	stamp_file.remove_stamp(TARGET)

@@ -1,0 +1,67 @@
+import { agent_profile_schema } from '#scripts/agent/agent-profile-schema'
+import { agent_provider } from '#scripts/agent/agent-provider'
+import { own_session } from '#scripts/cost-runtime/own-session'
+import { stamp_file } from '#scripts/josh/stamp-file'
+import { lane_child_invocation } from '#scripts/lane/lane-child-invocation'
+import type { RunCut } from './run-cut'
+
+// A session id survives separate CLI calls; the CLI's own pid does not.
+function session(): string | undefined {
+	const selected = agent_provider.resolve_provider()
+	if (selected.kind !== 'provider') return undefined
+	const id = agent_provider.trimmed(
+		selected.provider === agent_provider.OPENAI_PROVIDER
+			? process.env[agent_provider.CODEX_SESSION_KEY]
+			: own_session.session_id_of(process.env),
+	)
+
+	return id === undefined ? undefined : `${selected.provider}:${id}`
+}
+
+function is_own_adoption(cut: RunCut): boolean {
+	return (
+		cut.is_handed_off === false &&
+		cut.adopted_session !== undefined &&
+		cut.adopted_session === session()
+	)
+}
+
+function matches_run(previous: RunCut, next: RunCut): boolean {
+	return (
+		previous.issue === next.issue &&
+		previous.branch === next.branch &&
+		previous.invocation === next.invocation
+	)
+}
+
+function can_replace(previous: RunCut, next: RunCut): boolean {
+	return (
+		previous.phase === agent_profile_schema.PRE_GATE_PHASE &&
+		next.phase === agent_profile_schema.IMPLEMENTATION_PHASE &&
+		is_own_adoption(previous) &&
+		matches_run(previous, next)
+	)
+}
+
+// Called only after the lane's workers have stopped. Keep the saved resume point, but let the
+// next worker adopt it again; a waiting or parked worker no longer owns the handoff.
+function release(target: string, cut: RunCut, issue: string): void {
+	if (
+		cut.is_handed_off !== false ||
+		cut.invocation !== lane_child_invocation.child_invocation(issue) ||
+		cut.issue !== issue
+	) {
+		return
+	}
+
+	stamp_file.replace_stamp(target, {
+		...cut,
+		is_handed_off: true,
+		adopted_session: undefined,
+		is_merge_relaunched: undefined,
+	})
+}
+
+const run_cut_adoption = { can_replace, release, session }
+
+export { run_cut_adoption }

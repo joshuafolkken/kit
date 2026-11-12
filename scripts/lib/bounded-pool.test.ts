@@ -60,8 +60,9 @@ describe('bounded_pool.bounded_map', () => {
 		expect(peak).toBe(LIMIT)
 	})
 
-	// A wave implementation idles the whole batch behind its slowest member: with these durations it
-	// would start the third task at 30ms rather than at 10ms, when the second one's slot came free.
+	// A wave implementation idles the whole batch behind its slowest member: with these test inputs it
+	// would start the third task when the first wave ended rather than when the second one's slot came
+	// free.
 	it('refills a slot as soon as one task ends, rather than waiting for the wave', async () => {
 		const started: Array<number> = []
 		const durations = [SLOW_MS, QUICK_MS, BRIEF_MS]
@@ -178,5 +179,58 @@ describe('bounded_pool.pool_width guards', () => {
 		await vi.advanceTimersByTimeAsync(SLOW_MS)
 
 		await expect(run).resolves.toStrictEqual([BRIEF_MS, BRIEF_MS])
+	})
+})
+
+interface Flight {
+	now: number
+	peak: number
+}
+
+async function tracked_sleep(flight: Flight, duration: number): Promise<number> {
+	flight.now += 1
+	flight.peak = Math.max(flight.peak, flight.now)
+	await sleep(duration)
+	flight.now -= 1
+
+	return duration
+}
+
+describe('bounded_pool.limiter', () => {
+	it('never runs more than its width across independent callers', async () => {
+		const limiter = bounded_pool.limiter(LIMIT)
+		const flight = { now: 0, peak: 0 }
+		const durations = [QUICK_MS, SLOW_MS, BRIEF_MS, QUICK_MS, BRIEF_MS]
+		const runs = durations.map(
+			async (duration) => await limiter.run(async () => await tracked_sleep(flight, duration)),
+		)
+
+		await vi.advanceTimersByTimeAsync(SLOW_MS * LIMIT)
+
+		await expect(Promise.all(runs)).resolves.toStrictEqual(durations)
+		expect(flight.peak).toBe(LIMIT)
+	})
+
+	// A failure that kept its slot would shrink the width by one per failed request until every
+	// later caller waited forever.
+	it('hands a failed task its rejection and frees the slot for the next one', async () => {
+		const limiter = bounded_pool.limiter(1)
+		const failed = limiter.run(async () => {
+			await sleep(BRIEF_MS)
+			throw new Error(WORKER_FAILED)
+		})
+		const after = limiter.run(async () => await QUICK_MS)
+		const settled = expect(failed).rejects.toThrow(WORKER_FAILED)
+
+		await vi.advanceTimersByTimeAsync(BRIEF_MS)
+
+		await settled
+		await expect(after).resolves.toBe(QUICK_MS)
+	})
+
+	it('runs one task at a time when its width is below one, rather than none', async () => {
+		const limiter = bounded_pool.limiter(0)
+
+		await expect(limiter.run(async () => await BRIEF_MS)).resolves.toBe(BRIEF_MS)
 	})
 })

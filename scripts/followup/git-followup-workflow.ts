@@ -4,12 +4,15 @@ import { git_branch } from '#scripts/git/git-branch'
 import { git_error } from '#scripts/git/git-error'
 import { cli_body } from '#scripts/josh/cli-body'
 import { josh_environment_file } from '#scripts/josh/josh-environment-file'
+import { lane_size_record } from '#scripts/lane/lane-size-record'
 import { git_notify, type GitNotifyConfig } from '#scripts/notify/git-notify'
 import { acceptance_map_check } from '#scripts/review/acceptance-map-check'
 import { live_evidence } from '#scripts/review/live-evidence'
 import { removed_tests_check } from '#scripts/review/removed-tests-check'
+import { followup_human_merge, HumanMergeRequiredError } from './followup-human-merge'
 import { parse_issue_number_from_text } from './followup-issue-number'
 import { followup_review_gates } from './followup-review-gates'
+import { followup_section } from './followup-section'
 import { git_followup_finish } from './git-followup-finish'
 import { git_followup_flush } from './git-followup-flush'
 import { git_followup_merged, type MergePlan } from './git-followup-merged'
@@ -176,10 +179,12 @@ async function assert_merge_gates(
 	await assert_removed_tests_disposed(should_merge, branch_name)
 }
 
-// After the gates, before the CI wait: a line appended since the run's commit rides the pull request
+// After the gates, before the CI wait: the lane's size line is written while the branch is still
+// checked out, then a line appended since the run's commit rides the pull request
 // itself, so it merges with it — a lane's included. **A pull request that has
 // already merged skips both**: the gates guard a merge this run no longer
-// makes, and a ledger commit would land on a branch that has already gone in.
+// makes, and a ledger commit would land on a branch that has already gone in. The human-merge stop
+// is not here: it waits for green CI in `before_merge`, so a red workflow PR fails as red.
 async function prepare_merge(
 	plan: MergePlan,
 	issue_number: string | undefined,
@@ -188,18 +193,28 @@ async function prepare_merge(
 	if (plan.is_merged) return
 
 	await assert_merge_gates(plan.should_merge, issue_number, branch_name)
+	if (is_valid_issue(issue_number)) await lane_size_record.record(plan.should_merge, issue_number)
 	await git_followup_flush.commit_ledger_step(plan.should_merge, issue_number)
+}
+
+// `--help` answers alone; every other invocation opens on the section that governs it. `true` when the
+// help was the whole answer.
+function answer_help_or_open(values: CliArguments['values']): boolean {
+	if (values.help !== true) {
+		followup_section.print_section()
+
+		return false
+	}
+
+	display_help()
+
+	return true
 }
 
 async function main(): Promise<void> {
 	const cli = parse_cli_arguments()
 
-	if (cli.values.help === true) {
-		display_help()
-
-		return
-	}
-
+	if (answer_help_or_open(cli.values)) return
 	const issue_number =
 		cli.values['issue-number'] ?? parse_issue_number_from_text(cli.positionals[0] ?? undefined)
 	const branch_name = await resolve_branch_name(cli.values.branch)
@@ -219,6 +234,9 @@ async function main(): Promise<void> {
 		should_merge: plan.should_merge,
 		is_merged: plan.is_merged,
 		merged_at: plan.merged_at,
+		before_merge: async (head) => {
+			await followup_human_merge.assert_allowed(branch_name, issue_number, head)
+		},
 	})
 
 	await git_followup_finish.finish(used_issue_number ?? issue_number, plan.should_merge)
@@ -228,10 +246,12 @@ try {
 	await main()
 	console.info('')
 } catch (error) {
-	git_error.handle(error)
+	if (error instanceof HumanMergeRequiredError) console.info(error.message)
+	else git_error.handle(error)
 }
 
 const git_followup_workflow = {
+	answer_help_or_open,
 	assert_acceptance_mapped,
 	assert_live_evidence,
 	assert_removed_tests_disposed,

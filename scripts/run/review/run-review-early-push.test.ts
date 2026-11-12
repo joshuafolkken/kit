@@ -1,3 +1,4 @@
+import { early_push_record } from '#scripts/run/early-push-record'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_review } from './run-review'
 import { run_review_early_push } from './run-review-early-push'
@@ -9,7 +10,7 @@ type JoshRun = (
 	args: ReadonlyArray<string>,
 	forward?: boolean,
 ) => Promise<{ code: number; out: string }>
-type LaunchJosh = (args: ReadonlyArray<string>, log_path: string) => { kind: string }
+type LaunchJosh = (args: ReadonlyArray<string>, log_path: string) => { kind: string; note?: string }
 
 const { is_tree_dirty, josh_run, launch_josh, wait_for_gate_finish, existing } = vi.hoisted(() => ({
 	is_tree_dirty: vi.fn<() => Promise<boolean>>(),
@@ -39,6 +40,7 @@ const COMMIT = ['git', '-y', '--skip-push', '--skip-pr']
 const PUSH = ['git', '-y', '--skip-commit']
 
 beforeEach(() => {
+	vi.spyOn(early_push_record, 'record').mockResolvedValue()
 	is_tree_dirty.mockReset().mockResolvedValue(false)
 	josh_run.mockReset().mockResolvedValue({ code: 0, out: '' })
 	launch_josh.mockReset().mockReturnValue({ kind: 'launched' })
@@ -85,15 +87,29 @@ describe('run_review_early_push.prepare', () => {
 		josh_run.mockResolvedValue({ code: 1, out: 'refused' })
 
 		expect(await run_review_early_push.prepare(CODE_PLAN, LANE, LANE_DIRECTORY)).toBe(false)
+		expect(early_push_record.record).toHaveBeenCalledWith('review', 'commit-refused')
 	})
 
-	it('touches nothing when not due', async () => {
-		expect(await run_review_early_push.prepare(CODE_PLAN, {}, LANE_DIRECTORY)).toBe(false)
+	it.each([
+		[CODE_PLAN, {}, 'not-lane-child'],
+		[{ is_code_only: true, slots: ['code'] as const }, LANE, 'code-only'],
+		[{ is_code_only: false, slots: ['code', 'interaction'] as const }, LANE, 'multiple-slots'],
+	])('records why preparation skips %j', async (plan, environment, reason) => {
+		expect(await run_review_early_push.prepare(plan, environment, LANE_DIRECTORY)).toBe(false)
 		expect(is_tree_dirty).not.toHaveBeenCalled()
+		expect(early_push_record.record).toHaveBeenCalledWith('review', reason)
 	})
 })
 
 describe('run_review_early_push.launch', () => {
+	it('records a failed background launch', () => {
+		launch_josh.mockReturnValue({ kind: 'failed', note: 'spawn refused' })
+
+		run_review_early_push.launch()
+
+		expect(early_push_record.record).toHaveBeenCalledWith('review', 'launch-failed')
+	})
+
 	it('leaves `josh run:review --push` running in the background', () => {
 		run_review_early_push.launch()
 
@@ -111,6 +127,7 @@ describe('run_review_early_push.push', () => {
 		expect(await run_review_early_push.push()).toBe(0)
 		expect(existing).toHaveBeenCalledWith('4907')
 		expect(josh_run).toHaveBeenCalledExactlyOnceWith([...PUSH, '--body-file', DRAFT], true)
+		expect(early_push_record.record).toHaveBeenCalledWith('review', 'pushed')
 	})
 
 	it('pushes without a body file when no draft exists', async () => {
@@ -123,6 +140,7 @@ describe('run_review_early_push.push', () => {
 		josh_run.mockResolvedValue({ code: 1, out: 'push refused' })
 
 		expect(await run_review_early_push.push()).toBe(1)
+		expect(early_push_record.record).toHaveBeenCalledWith('review', 'push-failed')
 	})
 
 	it.each([run_review.GATE_RED, run_review.GATE_MOVED])(
@@ -132,6 +150,7 @@ describe('run_review_early_push.push', () => {
 
 			expect(await run_review_early_push.push()).toBe(0)
 			expect(josh_run).not.toHaveBeenCalled()
+			expect(early_push_record.record).toHaveBeenCalledWith('review', state)
 		},
 	)
 
@@ -140,5 +159,6 @@ describe('run_review_early_push.push', () => {
 
 		expect(await run_review_early_push.push()).toBe(0)
 		expect(josh_run).not.toHaveBeenCalled()
+		expect(early_push_record.record).toHaveBeenCalledWith('review', 'dirty-tree')
 	})
 })

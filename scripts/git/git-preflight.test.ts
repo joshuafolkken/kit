@@ -42,7 +42,6 @@ function arrange(branch: string, issue_json: string, changed_paths = 'README.md'
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.mocked(git_command.get_default_branch).mockResolvedValue('main')
 	vi.mocked(git_gh_command.pr_exists).mockResolvedValue(false)
 	vi.mocked(git_gh_command.pr_get_body).mockResolvedValue(undefined)

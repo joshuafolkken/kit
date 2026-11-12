@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url'
-import { RUN_LANE_LABEL, RUN_SOLO_LABEL } from '#scripts/issue/issue-labels'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
+import { issue_run_verdict } from '#scripts/issue/issue-run-verdict'
 import { session_cite } from '#scripts/issue/session-cite'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { auto_ok_judge_read } from './auto-ok-judge-read'
@@ -19,13 +19,12 @@ const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const NONE_TOKEN = 'none'
 const USAGE =
-	'Usage: josh auto-ok:judge [--apply <N> (--lane | --solo) | --decline <N> --reason <text>]'
+	'Usage: josh auto-ok:judge [--apply <N> (--lane | --solo --defect yes --verification yes --every-run yes) | --decline <N> --reason <text>]'
 
 const OPTIONS = {
 	apply: { type: 'string' },
 	decline: { type: 'string' },
-	lane: { type: 'boolean' },
-	solo: { type: 'boolean' },
+	...issue_run_verdict.RUN_LABEL_OPTIONS,
 	reason: { type: 'string' },
 } as const
 
@@ -33,19 +32,13 @@ type Values = NonNullable<ReturnType<typeof cli_flags.values_of<typeof OPTIONS>>
 
 type JudgeRequest =
 	| { kind: 'list' }
-	| { kind: 'apply'; issue: string; run_label: string }
+	| { kind: 'apply'; issue: string; run_label: string; answers: Values }
 	| { kind: 'decline'; issue: string; reason: string }
 
-function run_label_of(values: Values): string | undefined {
-	if (values.lane === values.solo) return undefined
-
-	return values.lane === true ? RUN_LANE_LABEL : RUN_SOLO_LABEL
-}
-
 function apply_request(issue: string, values: Values): JudgeRequest | undefined {
-	const run_label = run_label_of(values)
+	const run_label = issue_run_verdict.run_label_of(values)
 
-	return run_label === undefined ? undefined : { kind: 'apply', issue, run_label }
+	return run_label === undefined ? undefined : { kind: 'apply', issue, run_label, answers: values }
 }
 
 function decline_request(issue: string, values: Values): JudgeRequest | undefined {
@@ -98,7 +91,7 @@ async function dispatch(request: JudgeRequest): Promise<number> {
 	if (request.kind === 'list') return await list()
 	if (request.kind === 'decline') return await decline(request.issue, request.reason)
 
-	return await apply(request.issue, request.run_label)
+	return await apply(request.issue, request.run_label, request.answers)
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {

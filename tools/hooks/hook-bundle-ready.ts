@@ -1,44 +1,66 @@
-import { spawnSync } from 'node:child_process'
-import { realpathSync } from 'node:fs'
+import { spawn, spawnSync } from 'node:child_process'
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { fileURLToPath } from 'node:url'
 import { hook_bundle_stamp } from '#scripts/build/hook-bundle-stamp'
 import { error_text } from '#scripts/lib/error-message'
+import { bundle_rebuild_lock } from '#tools/hooks/bundle-rebuild-lock'
+import { hook_bundle_load } from '#tools/hooks/hook-bundle-load'
 
-// The launch of each of kit's own hook commands in kit's checkout (`scripts/hooks/run-hook.sh`):
-//`node hook-bundle-ready.ts <name> <josh command> [arguments...]` checks
-// that the bundles match the source beside them — already, or after rebuilding them here — and runs
-// `dist/hooks/<name>.js` in this same process; a checkout that cannot build runs its `pnpm josh`
-// fallback, which runs the live source.
+// The launch of each of kit's own hook commands in kit's checkout (`scripts/hooks/run-hook.sh`) when
+// the built fast path (`dist/hooks/ready.js`, `hook-bundle-fast.ts`) is absent or finds the bundles
+// stale: `node hook-bundle-ready.ts <name> <josh command> [arguments...]` checks
+// that the bundles match the source beside them and runs `dist/hooks/<name>.js` in this same process;
+// a checkout that has no bundle to run and cannot build one runs its `pnpm josh` fallback, which runs
+// the live source.
 //
-// **One node launch per hook call**. The gate and the bundle used to be two
-// `node` processes, so every tool call paid the node start-up twice. The bundle is imported here
-// instead, with `process.argv` set to what `node dist/hooks/<name>.js [arguments...]` would have given
-// it, because every hook runs its main from `process.argv[1] === fileURLToPath(import.meta.url)`.
+// One node launch per hook call avoids paying startup twice: the bundle is imported here
+// (`hook-bundle-load.ts`).
 //
-// **Stale bundles are rebuilt rather than skipped.** The fallback pays a pnpm launch and a cold tsx
-// compile of the whole hook graph, and a hook that outruns its timeout fails open — every guard off,
-// with nothing said. A rebuild takes a fraction of a second, so the slow path is left only for a
-// checkout that cannot build at all (no installed dependencies, or a source that does not compile),
-// and that case is announced on stderr instead of passing silently.
+// **Stale bundles are rebuilt out of the hook call (joshuafolkken/kit#5628).** Every source edit makes
+// the bundles stale, and the next hook call — the edit's own `format-edited` — would otherwise wait on
+// esbuild. A stale build that is still whole runs as it is while a detached `node hook-bundle-ready.ts
+// --rebuild <out directory>` rebuilds it, and the call after that build lands runs the new bundles.
+// The window is the build's own fraction of a second, and what runs in it is the last build, which
+// guarded every call before the edit; a guard edit takes effect one call later than the edit, and the
+// rebuild is announced on stderr. A lock beside the bundles keeps the launches that find them stale
+// at once to one build. Two builds side by side — a lock taken over in the same instant — are safe:
+// each places its files through its own staging directory (`build-hooks.ts`).
+//
+// **With nothing whole to run, the rebuild stays in the call.** The fallback pays a pnpm launch and a
+// cold tsx compile of the whole hook graph, and a hook that outruns its timeout fails open — every
+// guard off, with nothing said. So the slow path is left only for a checkout that cannot build at all
+// (no installed dependencies, or a source that does not compile), and that case is announced on stderr.
 //
 // Run by plain `node` (type stripping), so every import resolves without `tsx`: `node:` built-ins and
-// `#scripts/*` subpaths only. The build is imported on the stale path alone — esbuild is the one
-// expensive load, and a fresh launch never pays it. Nothing is written to stdout and stdin is never
+// `#scripts/*` / `#tools/*` subpaths only. The build is imported on the rebuild path alone — esbuild is the one
+// expensive load, and a launch never pays it. Nothing is written to stdout and stdin is never
 // read: both belong to the hook.
 
-const PACKAGE_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
+const LAUNCH_SCRIPT = fileURLToPath(import.meta.url)
+const PACKAGE_DIR = path.join(path.dirname(LAUNCH_SCRIPT), '..', '..')
 const OUT_DIR = path.join(PACKAGE_DIR, 'dist', 'hooks')
 const TSX_BIN = path.join(PACKAGE_DIR, 'node_modules', '.bin', 'tsx')
 const JOSH_ENTRY = path.join(PACKAGE_DIR, 'scripts', 'josh', 'josh.ts')
 const FALLBACK_FAILED_EXIT = 1
 // `process.argv` is node, this script, then the hook name, its josh command and its arguments.
 const LAUNCH_ARGUMENTS_START = 2
+const REBUILD_FLAG = '--rebuild'
 const REBUILT_NOTICE = 'kit hooks: dist/hooks was stale against the source and has been rebuilt'
+const STALE_NOTICE =
+	'kit hooks: dist/hooks is stale against the source, so this call runs the previous build while it is rebuilt in the background'
+const FAILING_NOTICE =
+	'kit hooks: dist/hooks is stale and its last background rebuild failed, so this call runs the previous build — an edited guard does not take effect until the source builds again (pnpm build shows the error)'
 const FAILED_NOTICE =
 	'kit hooks: dist/hooks is stale and could not be rebuilt, so this hook runs from source through pnpm — slow, and a hook that exceeds its timeout lets the call through unguarded. Fix the build (pnpm build) to restore the bundles'
 
 type Rebuild = (out_directory: string) => Promise<void>
+type StartRebuild = (out_directory: string) => void
+
+interface BundleBuilds {
+	rebuild: Rebuild
+	start_rebuild: StartRebuild
+}
 
 interface HookLaunch {
 	hook_name: string
@@ -52,13 +74,55 @@ async function rebuild_from_source(out_directory: string): Promise<void> {
 	await build_hooks(out_directory)
 }
 
-// True when the bundles in `out_directory` can be launched as the current source.
-async function ensure_bundles(
-	out_directory: string = OUT_DIR,
-	rebuild: Rebuild = rebuild_from_source,
-): Promise<boolean> {
-	if (hook_bundle_stamp.is_fresh(out_directory, PACKAGE_DIR)) return true
+const rebuild_lock = bundle_rebuild_lock.lock_path
 
+// Written by a background build that failed and removed by one that succeeds, so a source esbuild
+// rejects is reported on every call instead of passing as a rebuild in progress.
+function rebuild_failure(out_directory: string): string {
+	return bundle_rebuild_lock.beside_bundles(out_directory, 'rebuild.failed')
+}
+
+function start_background_rebuild(out_directory: string): void {
+	const lock = rebuild_lock(out_directory)
+	if (!bundle_rebuild_lock.claim(lock)) return
+	const child = spawn(
+		process.execPath,
+		[...process.execArgv, LAUNCH_SCRIPT, REBUILD_FLAG, out_directory],
+		{ detached: true, stdio: 'ignore' },
+	)
+
+	child.on('error', () => {
+		rmSync(lock, { force: true })
+	})
+	child.unref()
+}
+
+// The detached build's own run. A failed build records why and releases the lock too, so the next
+// launch reports it and tries again — the edit that fixes the source is picked up at once.
+async function rebuild_detached(
+	out_directory: string,
+	rebuild: Rebuild = rebuild_from_source,
+): Promise<void> {
+	try {
+		await rebuild(out_directory)
+		rmSync(rebuild_failure(out_directory), { force: true })
+	} catch (error) {
+		writeFileSync(rebuild_failure(out_directory), error_text.message_of(error))
+		throw error
+	} finally {
+		rmSync(rebuild_lock(out_directory), { force: true })
+	}
+}
+
+function announce_stale(out_directory: string): void {
+	const failure = rebuild_failure(out_directory)
+
+	console.error(
+		existsSync(failure) ? `${FAILING_NOTICE} (${readFileSync(failure, 'utf8')})` : STALE_NOTICE,
+	)
+}
+
+async function rebuild_now(out_directory: string, rebuild: Rebuild): Promise<boolean> {
 	try {
 		await rebuild(out_directory)
 		console.error(REBUILT_NOTICE)
@@ -71,12 +135,28 @@ async function ensure_bundles(
 	}
 }
 
-// The real path, because Node resolves an imported module's `import.meta.url` through symlinks.
-async function run_bundle(bundle: string, hook_arguments: ReadonlyArray<string>): Promise<void> {
-	const bundle_path = realpathSync(bundle)
+const DEFAULT_BUILDS: BundleBuilds = {
+	rebuild: rebuild_from_source,
+	start_rebuild: start_background_rebuild,
+}
 
-	process.argv.splice(1, process.argv.length, bundle_path, ...hook_arguments)
-	await import(pathToFileURL(bundle_path).href)
+// True when `bundle` can be launched now: fresh, stale but whole (rebuilt in the background), or
+// rebuilt here because there was nothing whole to run.
+async function ensure_bundle(
+	bundle: string,
+	builds: BundleBuilds = DEFAULT_BUILDS,
+): Promise<boolean> {
+	const out_directory = path.dirname(bundle)
+	if (hook_bundle_stamp.is_fresh(out_directory, PACKAGE_DIR)) return true
+
+	if (!hook_bundle_stamp.has_outputs(out_directory) || !existsSync(bundle)) {
+		return await rebuild_now(out_directory, builds.rebuild)
+	}
+
+	announce_stale(out_directory)
+	builds.start_rebuild(out_directory)
+
+	return true
 }
 
 // This checkout's own `tsx` and josh entry, run in the hook's working directory: a hook launched in
@@ -93,27 +173,46 @@ function run_from_source(josh_command: string, hook_arguments: ReadonlyArray<str
 async function launch(
 	request: HookLaunch,
 	out_directory: string = OUT_DIR,
-	rebuild: Rebuild = rebuild_from_source,
+	builds: BundleBuilds = DEFAULT_BUILDS,
 ): Promise<void> {
-	if (!(await ensure_bundles(out_directory, rebuild))) {
+	const bundle = path.join(out_directory, `${request.hook_name}.js`)
+
+	if (!(await ensure_bundle(bundle, builds))) {
 		run_from_source(request.josh_command, request.hook_arguments)
 
 		return
 	}
 
-	await run_bundle(path.join(out_directory, `${request.hook_name}.js`), request.hook_arguments)
+	await hook_bundle_load.run_bundle(bundle, request.hook_arguments)
 }
 
 async function main(): Promise<void> {
-	const [hook_name = '', josh_command = '', ...hook_arguments] =
-		process.argv.slice(LAUNCH_ARGUMENTS_START)
+	const [first = '', second = '', ...rest] = process.argv.slice(LAUNCH_ARGUMENTS_START)
 
-	await launch({ hook_name, josh_command, hook_arguments })
+	if (first === REBUILD_FLAG) {
+		if (second !== '') await rebuild_detached(second)
+
+		return
+	}
+
+	await launch({ hook_name: first, josh_command: second, hook_arguments: rest })
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main()
+if (process.argv[1] === LAUNCH_SCRIPT) await main()
 
-const hook_bundle_ready = { ensure_bundles, FAILED_NOTICE, launch, REBUILT_NOTICE }
+const hook_bundle_ready = {
+	ensure_bundle,
+	FAILED_NOTICE,
+	FAILING_NOTICE,
+	launch,
+	REBUILD_FLAG,
+	rebuild_detached,
+	rebuild_failure,
+	rebuild_lock,
+	REBUILT_NOTICE,
+	STALE_NOTICE,
+	start_background_rebuild,
+}
 
-export type { HookLaunch }
+export type { BundleBuilds, HookLaunch }
 export { hook_bundle_ready }

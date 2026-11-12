@@ -35,7 +35,7 @@ backlogrun joshuafolkken/kit#<N> --only
   finding to record and no draft to prepare.
 - **No prefix leaves the behavior exactly as it was** — the target is the session's repository.
 - **`kickoff` needs no checkout**: name the target repository with `--repo <owner/repo>` on every
-  `pnpm josh issue:file` call and in the path of every `gh api` call, and never clone. The one exception
+  `pnpm josh issue:file` and `pnpm josh issue:read` call, and never clone. The one exception
   is the split path's epic, since `pnpm josh epic` only writes the repository it runs in — run it in
   that repository's checkout. With no checkout there, file the children, report that the epic could
   not be created, and stop — a hand-built `gh api …/issues` filing of the epic is refused by the
@@ -48,7 +48,7 @@ backlogrun joshuafolkken/kit#<N> --only
   `confirmation` Telegram — never clone, never stash. Otherwise the commands that act on the target
   execute in that checkout.
 - **A named epic is exempt from the whole bullet above**: `owner/repo#E` names where the *epic* lives,
-  not where its children are implemented. Its state is read against that repository through `gh api`,
+  not where its children are implemented. Its state is read through `josh issue:read <E> --repo`,
   so that repository needs no checkout. The checkout rules bind each child at implementation time,
   against **that child's** repository ("Concurrency" in `backlogrun.md`).
 - **Independent of `into <target>`**: this says which repository the run acts on, `into` says which

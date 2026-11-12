@@ -1,7 +1,7 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Findings } from './cases-interaction-scan'
 
 // joshuafolkken/kit#4491: the scan searches the repository for every other source that names the same
@@ -20,7 +20,8 @@ const LEDGER = '.josh/ledger'
 const LEDGER_CONSTANT = 'LEDGER_DIRECTORY'
 const SITE_A = 'scripts/a.ts:4'
 const LOCK = 'p.lock'
-const directory = mkdtempSync(path.join(tmpdir(), 'cases-scan-'))
+const make_directory = temporary_directory('suite')
+const directory = make_directory('cases-scan-')
 
 function fixture(name: string, content: string): string {
 	const target = path.join(directory, name)
@@ -61,10 +62,6 @@ const OWN_PATH = path.relative(process.cwd(), STATE_PATH)
 const ENV_PATH = fixture('env.ts', "const v = process.env['GIT_DIR']\n")
 const INERT_PATH = fixture('pure.ts', 'export const x = 1\n')
 const DOC_PATH = fixture('doc.md', `'${LEDGER}' and process.env['CI']\n`)
-
-afterAll(() => {
-	rmSync(directory, { recursive: true, force: true })
-})
 
 beforeEach(() => {
 	read_mock.mockReset()

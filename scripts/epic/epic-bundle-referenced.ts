@@ -1,5 +1,7 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
-import { bounded_pool } from '#scripts/lib/bounded-pool'
+import { git_gh_issue_batch_graphql } from '#scripts/gh/git-gh-issue-batch-graphql'
+import { git_gh_issue_batch_read } from '#scripts/gh/git-gh-issue-batch-read'
+import { PLAN_FIELDS, type IssueRead } from '#scripts/gh/git-gh-issue-read'
 import { epic_audit_logic } from './epic-audit'
 import { epic_bundle, type BacklogIssue } from './epic-bundle'
 import { epic_issue, type EpicIssue } from './epic-issue'
@@ -144,30 +146,35 @@ function collect_referenced(
 	}
 }
 
-// One `gh api` read per reference, a few at a time. Bounded for the same reason the relation reads
-// are: spawning every request at once is what turns a rate limit into a wrong answer, because a
-// refused read arrives as an absence rather than as an error.
-const LOOKUP_CONCURRENCY = 8
-
 // A read that came back shaped wrong counts as unreadable, not as missing: the number resolved to
 // something, so the gap is in what arrived rather than in whether there was anything to arrive.
-async function read_one(number: number): Promise<ReferencedRead> {
-	const read = await git_gh_command.issue_get_plan_fields_classified(String(number))
-
+function to_referenced(number: number, read: IssueRead): ReferencedRead {
 	if (read.kind !== 'read') return { number, result: read.kind }
 
 	return { number, result: epic_issue.parse_epic_issue(read.json) ?? 'unreadable' }
 }
 
-// The pool is shared with the eval suite rather than spelled out again here: this was written as
-// waves — slice, `Promise.all`, next slice — which holds every finished read's slot until the whole
-// slice returns.
+async function read_plan_fields(number: number): Promise<IssueRead> {
+	return await git_gh_command.issue_get_plan_fields_classified(String(number))
+}
+
+async function read_one(number: number): Promise<ReferencedRead> {
+	return to_referenced(number, await read_plan_fields(number))
+}
+
+// The references read the batched way (`git-gh-issue-batch-read.ts`), in the plan fields — the title
+// and URL included, which is what tells a pull request apart. A pull request is left to REST rather
+// than failing the batch. Every reference the batch left unanswered is a `gh api` read, all requested
+// at once: the `gh` layer's shared spawn limit (`GH_SPAWN_CONCURRENCY`, `git-gh-exec.ts`) bounds how
+// many run, so the burst never turns a rate limit into a refused read that arrives as an absence.
 async function fetch_referenced(numbers: ReadonlyArray<number>): Promise<Array<ReferencedRead>> {
-	return await bounded_pool.bounded_map(
-		numbers,
-		LOOKUP_CONCURRENCY,
-		async (number) => await read_one(number),
-	)
+	const reads = await git_gh_issue_batch_read.read_each(numbers, {
+		fields: PLAN_FIELDS,
+		from_json: git_gh_issue_batch_graphql.answered,
+		read_rest: read_plan_fields,
+	})
+
+	return reads.map(([number, read]) => to_referenced(number, read))
 }
 
 // What the subject's body names, read and filtered. `undefined` when there was nothing new to read,
@@ -184,8 +191,26 @@ async function referenced_candidates(
 	return { ...found, unreadable: [...found.unreadable, ...dropped] }
 }
 
+function is_open_issue(read: EpicIssue): boolean {
+	return !epic_issue.is_pull_request(read) && epic_issue.is_open(read.state)
+}
+
+// The subject itself, read on its own when the open listing does not show it yet — a just-filed
+// issue trails the listing. `undefined` unless it is an open issue: a closed one or a pull request
+// has nothing to bundle, and a failed read is reported by the caller as "not an open issue".
+async function read_subject(
+	number: number,
+	context: ReferencedContext,
+): Promise<BacklogIssue | undefined> {
+	const { result } = await read_one(number)
+	if (is_failed_read(result) || !is_open_issue(result)) return undefined
+
+	return { ...to_backlog_issue(result, context), title: result.title }
+}
+
 const epic_bundle_referenced = {
 	REFERENCED_LOOKUP_LIMIT,
+	read_subject,
 	referenced_lookups,
 	collect_referenced,
 	fetch_referenced,

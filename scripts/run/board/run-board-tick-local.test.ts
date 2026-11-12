@@ -3,6 +3,7 @@ import type { EpicChild } from '#scripts/epic/epic-graph'
 import { describe, expect, it } from 'vitest'
 import { run_board_fit } from './run-board-fit'
 import { run_board_fixture } from './run-board-fixture'
+import { run_board_gather } from './run-board-gather'
 import type { BoardPlan } from './run-board-layout'
 import { run_board_tick } from './run-board-tick'
 
@@ -12,6 +13,7 @@ import { run_board_tick } from './run-board-tick'
 
 const { LOCAL, harness } = run_board_fixture
 const { FRESH_STATE, tick } = run_board_tick
+const { LOCAL_READ_MS } = run_board_gather
 const CHILD = 3421
 const LAUNCH = {
 	pos: 1,
@@ -58,6 +60,65 @@ async function loading(events: ReadonlyArray<typeof LAUNCH>): Promise<Array<stri
 
 	return lines_of(frames[0])
 }
+
+describe('run_board_tick.tick capacity', () => {
+	it('refreshes occupied slots and the live limit independently of visible running rows', async () => {
+		const local = { ...LOCAL, events: [LAUNCH], occupied_count: 2, lane_limit: 6 }
+		const { ports, frames, read_local, clock } = harness(local, [])
+		const state = await tick(FRESH_STATE, ports)
+
+		read_local.mockResolvedValue({ ...local, occupied_count: 0, lane_limit: 12 })
+		clock.now_ms += LOCAL_READ_MS
+		await tick(state, ports)
+
+		expect(frames[0]).toContain('🧵 lanes 2/6')
+		expect(frames.at(-1)).toContain('🧵 lanes 0/12')
+	})
+})
+
+// joshuafolkken/kit#6538: an empty seat's reason follows the local read — a later launch drops the
+// refusal and the ledger's open hold is named.
+const REFUSAL = {
+	pos: 1,
+	at: LAUNCH.at,
+	kind: 'setup',
+	text: 'no child launched #6242: lane:open refused',
+}
+const HOLD = 'offer:wait:blocked'
+const SEATED = { ...LOCAL, events: [REFUSAL], occupied_count: 0, lane_limit: 2 }
+
+describe('run_board_tick.tick empty lane seats', () => {
+	it('redraws each seat’s reason from the next local read', async () => {
+		const local = SEATED
+		const { ports, frames, read_local, clock } = harness(local, [long_plan(0)])
+		const state = await tick(FRESH_STATE, ports)
+
+		read_local.mockResolvedValue({
+			...local,
+			events: [REFUSAL, { ...LAUNCH, pos: 2 }],
+			occupied_count: 1,
+			launch_hold: HOLD,
+		})
+		clock.now_ms += LOCAL_READ_MS
+		await tick(state, ports)
+
+		expect(frames[0]).toContain('💺 blocked: #6242: lane:open refused')
+		expect(frames.at(-1)).not.toContain('blocked: #6242')
+		expect(frames.at(-1)).toContain('💺 no issue ready to start — every queued issue is blocked')
+	})
+
+	it.each([
+		{ name: 'before the plan is read', local: SEATED, plan: never },
+		{ name: 'once the run stopped', local: { ...SEATED, is_stranded: true }, plan: undefined },
+	])('draws no seat line $name', async ({ local, plan }) => {
+		const { ports, frames } = harness(local, [long_plan(0)])
+
+		if (plan === undefined) await tick(FRESH_STATE, ports)
+		else await tick(FRESH_STATE, { ...ports, read_plan: plan }, 'background')
+
+		expect(frames.at(-1)).not.toContain('💺')
+	})
+})
 
 describe('run_board_tick.tick before the plan is read', () => {
 	it('draws three header lines and a blank, the run’s own child, and - for what it does not know', async () => {

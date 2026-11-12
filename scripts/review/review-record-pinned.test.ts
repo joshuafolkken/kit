@@ -1,10 +1,12 @@
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { run_review_join_read, type JoinVerdict } from '#scripts/run/review/run-review-join-read'
 import { run_review_pinned_join } from '#scripts/run/review/run-review-pinned-join'
 import { run_review_pinned_steps } from '#scripts/run/review/run-review-pinned-steps'
 import { run_review_pinned_tree } from '#scripts/run/review/run-review-pinned-tree'
 import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
+import { run_ship_planned, type Unplanned } from '#scripts/run/ship/run-ship-planned'
 import { test_pinned_logic } from '#scripts/test/test-pinned-logic'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { review_record_pinned } from './review-record-pinned'
@@ -24,6 +26,7 @@ beforeEach(() => {
 	vi.spyOn(run_review_pinned_steps, 'launch').mockReturnValue({ kind: 'launched', pid: 1 })
 	vi.spyOn(run_review_pinned_tree, 'key').mockResolvedValue(FIXED_TREE)
 	vi.spyOn(console, 'info').mockReturnValue(undefined)
+	vi.spyOn(run_ship_planned, 'unplanned').mockResolvedValue(undefined)
 })
 
 afterEach(() => {
@@ -131,6 +134,12 @@ const STOPPED: JoinVerdict = {
 	text: UNPINNED_LINE,
 }
 
+const UNPLANNED: Unplanned = {
+	issue: 5388,
+	files: ['scripts/run/run-step.ts'],
+	text: 'unplanned: scripts/run/run-step.ts — run `pnpm josh lane:plan 5388 scripts/run/run-step.ts`',
+}
+
 function spy_join(is_due: boolean, joined: JoinVerdict | undefined): void {
 	vi.spyOn(run_review_join_read, 'is_due').mockReturnValue(is_due)
 	vi.spyOn(run_review_join_read, 'read_finished').mockResolvedValue(joined)
@@ -167,6 +176,20 @@ describe('review_record_pinned.read_skipped_join', () => {
 		await review_record_pinned.read_skipped_join(ROOT)
 
 		expect(console.info).not.toHaveBeenCalled()
+	})
+
+	// joshuafolkken/kit#5388: a file a round-1 fix added surfaced only at the ship's preflight.
+	it.each([
+		['still due', true],
+		['already read before the fixes', false],
+	])("prints the ship preflight's unplanned answer when the join was %s", async (_case, is_due) => {
+		spy_join(is_due, { ...STOPPED, is_stop: false })
+		vi.spyOn(lane_ledger_write, 'record_unplanned_notice').mockResolvedValue()
+		vi.mocked(run_ship_planned.unplanned).mockResolvedValue(UNPLANNED)
+
+		await review_record_pinned.read_skipped_join(ROOT)
+
+		expect(console.info).toHaveBeenCalledExactlyOnceWith(UNPLANNED.text)
 	})
 })
 

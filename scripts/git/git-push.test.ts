@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 const PUSH_ERROR = 'push failed'
 
@@ -25,10 +25,6 @@ const { git_command } = await import('./git-command')
 const { animation_helpers } = await import('#scripts/lib/animation-helpers')
 const mocked_push = vi.mocked(git_command.push)
 const mocked_execute = vi.mocked(animation_helpers.execute_with_animation)
-
-beforeEach(() => {
-	vi.clearAllMocks()
-})
 
 describe('git_push.push', () => {
 	it('calls git_command.push via animation wrapper', async () => {

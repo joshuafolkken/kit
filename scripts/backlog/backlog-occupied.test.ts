@@ -44,6 +44,13 @@ function occupied(
 const LANES = [...RUNNING, BLOCKED].map((issue) => lane(issue))
 
 describe('backlog_occupied.occupied_lanes', () => {
+	it('releases a human-review lane after its child exits (ac-b80338cc)', () => {
+		const records = new Map([...records_of(RUNNING), ...records_of([BLOCKED], 'human-review')])
+
+		expect(occupied(LANES, () => [BLOCKED], records)).toStrictEqual(RUNNING)
+		expect(occupied([lane(BLOCKED, true)], () => [], records)).toStrictEqual([])
+	})
+
 	it('drops a lane read with no child in it, whatever it waits on', () => {
 		expect(occupied(LANES, () => [BLOCKED])).toStrictEqual(RUNNING)
 	})

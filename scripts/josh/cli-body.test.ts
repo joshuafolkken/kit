@@ -1,46 +1,41 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { devNull, tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
+import { devNull } from 'node:os'
 import path from 'node:path'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it, vi } from 'vitest'
 import { cli_body } from './cli-body'
-
-// The one export this file replaces, in the shape `cli_body` calls it. The rest of `node:fs` is
-// spread through untouched at run time — only the type is narrowed to what is being wrapped.
-interface FsReader {
-	readFileSync: (target: number | string, encoding: BufferEncoding) => string
-}
+import { cli_body_repository } from './cli-body-repository-fixture'
 
 // **The stdin form cannot be exercised through the runner's own descriptor 0.** A vitest worker
-// inherits it, so reading it would block on a terminal or an open pipe and hang the suite. The read
-// is wrapped instead: descriptor 0 answers with a known body and every path-shaped read still reaches
-// the real file system, so what is pinned is the one thing `-` decides — file or descriptor.
-const STDIN = vi.hoisted(() => ({ BODY: 'a body piped in\n', FD: 0 }))
+// inherits it, so reading it would block on a terminal or an open pipe and hang the suite. The stdin
+// reader is replaced instead and every path-shaped read still reaches the real file system, so what
+// is pinned is the one thing `-` decides — file or descriptor. The read itself, a late writer on a
+// real pipe included, is `stdin-text.test.ts`'s.
+const STDIN = vi.hoisted(() => ({ BODY: 'a body piped in\n' }))
 
-vi.mock('node:fs', async (import_original) => {
-	const actual = await import_original<FsReader>()
-
-	function read_file_sync(target: number | string, encoding: BufferEncoding): string {
-		return target === STDIN.FD ? STDIN.BODY : actual.readFileSync(target, encoding)
-	}
-
-	return { ...actual, readFileSync: read_file_sync }
-})
+vi.mock('#scripts/lib/stdin-text', () => ({
+	stdin_text: {
+		read_all(): string {
+			return STDIN.BODY
+		},
+	},
+}))
 
 // joshuafolkken/kit#1198: an Issue or PR body handed to a command inside shell double quotes is
 // evaluated before the command runs — a backtick runs as command substitution, and the substituted
 // text is what reaches GitHub. A PR comment posted that way had part of its own words run as git
 // commands. The file route exists so the shell never sees the body at all, and these cases pin that
 // a body full of exactly those characters survives it byte for byte.
-const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'cli-body-'))
+const make_directory = temporary_directory('suite')
+const WORK_DIRECTORY = make_directory('cli-body-')
 // The flag pair every case resolves under. Named so a case cannot silently test a different pairing
 // from the one the error message is asserted against.
 const INLINE_FLAG = '--body'
 const FILE_FLAG = '--body-file'
 // The shortest body a case can carry when what it pins is the route rather than the text.
 const DONE = 'done'
-// What `\nline1\nline2\n` expands to — assembled from its lines rather than written as a literal, so
-// the expected value cannot be read as the same token as the escaped input beside it. The newlines at
-// either end are the ones a downstream `trim` used to eat.
+// Assemble the expansion from lines so the expected value differs visibly from the escaped input.
+// Leading and trailing escaped newlines must survive normalization.
 const EDGE_NEWLINES = ['', 'line1', 'line2', ''].join('\n')
 
 // Every character the measurement in `prompts/collaboration-workflow/shell-body.md` found dangerous,
@@ -58,10 +53,6 @@ function write_body(name: string, text: string): string {
 
 	return target
 }
-
-afterAll(() => {
-	rmSync(WORK_DIRECTORY, { recursive: true, force: true })
-})
 
 describe('cli_body.resolve — the file route', () => {
 	it('carries a body of backticks and dollars through unchanged', () => {
@@ -115,10 +106,8 @@ describe('cli_body.resolve — the file route', () => {
 	})
 })
 
-// **Trim first, expand second.** `git_notify` used to run `raw.trim().replaceAll(…)` in one
-// expression; moving only the expansion here left a trim downstream of it, and a body written
-// `--notify-message "…\n"` had the newline its own escape had just produced eaten as surrounding
-// whitespace. These two cases are the pair: the quoting slack goes, the escape's newlines stay.
+// Trim before expansion so quoting slack is removed while newlines explicitly requested with an
+// escape survive.
 describe('cli_body.resolve — the order the inline route reads in', () => {
 	it('trims the surrounding whitespace a shell token picks up', () => {
 		expect(
@@ -213,6 +202,39 @@ describe('cli_body.resolve — a path that names no file', () => {
 			).toThrow('Not a readable file')
 		},
 	)
+})
+
+// joshuafolkken/kit#6055: bodies kept landing in an untracked `scratchpad/` beside the code.
+// `WORK_DIRECTORY` above is the tree-outside case, since it sits in no repository.
+const repository = cli_body_repository.create(make_directory('cli-body-repository-'))
+const { IGNORED_DIRECTORY, UNIGNORED_DIRECTORY } = cli_body_repository
+
+describe('cli_body.read_file_or_stdin — where a body file may sit', () => {
+	it('opens a body under the ignored `.josh/tmp/`', () => {
+		expect(cli_body.read_file_or_stdin(repository.write(IGNORED_DIRECTORY, DONE))).toBe(DONE)
+	})
+
+	it('opens a body outside any work tree', () => {
+		expect(cli_body.read_file_or_stdin(write_body('outside.md', DONE))).toBe(DONE)
+	})
+
+	it('refuses a body in the work tree that git does not ignore, naming `.josh/tmp/`', () => {
+		expect(() => cli_body.read_file_or_stdin(repository.write(UNIGNORED_DIRECTORY, DONE))).toThrow(
+			'write it to .josh/tmp/body.md instead',
+		)
+	})
+})
+
+describe('cli_body.read_result — the read that does not throw', () => {
+	it('carries the text of a readable body', () => {
+		expect(cli_body.read_result(write_body('result.md', DONE))).toStrictEqual({ text: DONE })
+	})
+
+	it('carries the refusal sentence of a body in the work tree', () => {
+		expect(cli_body.read_result(repository.write(UNIGNORED_DIRECTORY, DONE))).toStrictEqual({
+			problem: expect.stringContaining('not git-ignored') as string,
+		})
+	})
 })
 
 describe('cli_body.has_value', () => {

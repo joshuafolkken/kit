@@ -1,4 +1,4 @@
-import { mkdtempSync, realpathSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
+import { realpathSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { AgentEventState } from '#scripts/agent/agent-event'
@@ -7,6 +7,7 @@ import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { lane_state } from '#scripts/lane/lane-state'
 import { MS_PER_MINUTE, MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { run_hold } from '#scripts/run/hold/run-hold'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
 	ALIVE_VERDICT,
@@ -20,6 +21,8 @@ import {
 	type LivenessRequest,
 	type Traces,
 } from './run-liveness'
+
+const make_directory = temporary_directory()
 
 // joshuafolkken/kit#1485. The four-trace conjunction joshuafolkken/kit#1212 wrote could not fire for
 // a unit that stopped before implementing, because it required a dirty checkout. These are the cases
@@ -108,12 +111,12 @@ describe('a stopped child is classified through run:merge, not parked outright',
 		expect(advice).toContain('re-dispatches')
 	})
 
-	it('asks for a stash before classifying only when the checkout is dirty', () => {
+	it('asks run:merge to stash in the same call only when the checkout is dirty', () => {
 		expect(run_liveness.decide(arrange_traces({ is_tree_dirty: true })).advice).toContain(
-			'pnpm josh stash:push',
+			'run:merge <N> --output <path> --stash',
 		)
 		expect(run_liveness.decide(arrange_traces({ is_tree_dirty: false })).advice).not.toContain(
-			'stash:push',
+			'--stash',
 		)
 	})
 })
@@ -132,7 +135,7 @@ describe('a live unit is never booked as stopped', () => {
 		expect(advice).not.toContain('poll')
 	})
 
-	// A `pnpm josh followup` waits on CI for up to 32 minutes and writes nothing while it
+	// A `pnpm josh followup` waits on CI and writes nothing while it
 	// does, which is longer than the silent window. The process trace is what keeps that from reading
 	// as a stop.
 	it('answers alive while a process of the child is running a long check', () => {
@@ -187,20 +190,15 @@ describe('a child that no longer needs recovering', () => {
 	})
 })
 
-const directories: Array<string> = []
 const DIRECTORY_PREFIX = 'run-liveness-'
 const FIRST_LINE = 'first\n'
 
-// One temp directory per case, registered for the teardown that removes them all. The root is a
+// One temp directory per case, removed by the shared helper. The root is a
 // parameter because the cases below deliberately sit under different ones: `os.tmpdir()` for the
 // reads that only need somewhere to write, and the platform temp root for the two that exist to
 // assert it is reachable at all (joshuafolkken/kit#1501).
 function arrange_directory(root: string): string {
-	const directory = mkdtempSync(path.join(root, DIRECTORY_PREFIX))
-
-	directories.push(directory)
-
-	return directory
+	return make_directory(path.join(root, DIRECTORY_PREFIX))
 }
 
 function arrange_transcript(age_ms: number): { link: string; target: string } {
@@ -226,12 +224,6 @@ async function is_frozen(output_path: string, gap_ms: number): Promise<boolean |
 		silent_window_ms: MS_PER_MINUTE,
 	})
 }
-
-afterEach(() => {
-	for (const directory of directories.splice(0)) {
-		rmSync(directory, { force: true, recursive: true })
-	}
-})
 
 describe('the output read follows the symlink', () => {
 	// The link's own modification time never moves after it is created, so a read that does not follow

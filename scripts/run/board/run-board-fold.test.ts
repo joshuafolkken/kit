@@ -23,6 +23,8 @@ const WIDE = 80
 const RULE_WIDTH = 50
 const NONE: ReadonlySet<SectionKey> = new Set()
 const ALL: ReadonlyArray<SectionKey> = [
+	'throughput',
+	'usage',
 	'lanes',
 	'processes',
 	'findings',
@@ -37,6 +39,10 @@ const WAITING = '🔗 waiting'
 const FINDINGS = '📌 findings'
 const PROCESSES = '💻 processes'
 const GROUPS = '▶ 1.0 ── 🌐 2.0'
+const USAGE = '⛽ usage'
+const USAGE_SUMMARY = 'Claude 42/68 · Codex 45'
+const THROUGHPUT = '📈 throughput'
+const THROUGHPUT_SUMMARY = '24h 4.0/h · 7d 2.9/h'
 
 function rows(count: number, stage: YieldStage): Array<PlanLine> {
 	return Array.from({ length: count }, (_, index) => ({
@@ -74,6 +80,8 @@ function opened(plan: PlanSection): string {
 
 describe('run_board_fold.toggled', () => {
 	it.each([
+		{ key: 't', section: 'throughput' },
+		{ key: 'u', section: 'usage' },
 		{ key: 'l', section: 'lanes' },
 		{ key: 'p', section: 'processes' },
 		{ key: 'f', section: 'findings' },
@@ -168,6 +176,45 @@ describe('run_board_fold.fold_parts folded', () => {
 	})
 })
 
+describe('run_board_fold.fold_parts usage', () => {
+	it('folds the usage gauges to their percents', () => {
+		const usage: DetailPart = {
+			head: heading_lines(USAGE),
+			lines: [{ text: '  claude  42%', is_detail: false }],
+			label: USAGE,
+			summary: USAGE_SUMMARY,
+		}
+		const folded = fold_parts(parts_of({ usage }), new Set(['usage'])).usage
+
+		expect(folded?.head).toStrictEqual(['', shut(USAGE, USAGE_SUMMARY)])
+		expect(folded?.lines).toStrictEqual([])
+	})
+})
+
+// joshuafolkken/kit#5710: the 📈 throughput section folds, opens and widens like the usage gauges.
+describe('run_board_fold throughput', () => {
+	const throughput: DetailPart = {
+		head: heading_lines(THROUGHPUT),
+		lines: [{ text: '  24h  ▁▂▃', is_detail: false }],
+		label: THROUGHPUT,
+		summary: THROUGHPUT_SUMMARY,
+	}
+
+	it('folds the throughput to each row’s closes per hour, and opens it led by ▾', () => {
+		const folded = fold_parts(parts_of({ throughput }), new Set(['throughput'])).throughput
+		const open = fold_parts(parts_of({ throughput }), NONE).throughput
+
+		expect(folded?.head).toStrictEqual(['', shut(THROUGHPUT, THROUGHPUT_SUMMARY)])
+		expect(open?.head.at(-1)?.startsWith(`▾ ${THROUGHPUT}`)).toBe(true)
+	})
+
+	it('runs the throughput rule on to the frame’s rule width', () => {
+		const lines = bounded(parts_of({ throughput, rule_width: WIDE }), { folded: NONE })
+
+		expect(width_of(lines.find((line) => line.includes(THROUGHPUT)) ?? '')).toBe(WIDE)
+	})
+})
+
 describe('run_board_fold.fold_parts long summary', () => {
 	it('ends a folded line on a rule even where its summary runs past the rule width', () => {
 		const summary = GROUPS.repeat(RULE_WIDTH)
@@ -214,10 +261,45 @@ describe('run_board_render_section.keyed', () => {
 
 		expect(done?.key).toBe('done')
 	})
+
+	// joshuafolkken/kit#5520: an open section's rule counts its rows, an epic's own line not among them.
+	it('counts the rows a labeled section holds on its rule', () => {
+		const epic = { text: '    📁 10', row: undefined }
+		const [queued] = keyed('queued', [section(QUEUED, 'queued', [epic, ...rows(3, 'pending')])])
+
+		expect(queued?.head).toStrictEqual(heading_lines(`${QUEUED} 3`))
+	})
+})
+
+describe('run_board_fold.fold_parts open counted', () => {
+	it('keeps the count after the label on an open rule, as wide as the rule it leads', () => {
+		const head = heading_lines(`${QUEUED} 3`)
+		const marked = opened({ head, lines: rows(3, 'pending'), label: QUEUED, key: 'queued' })
+
+		expect(marked.startsWith(`▾ ${QUEUED} 3 ─`)).toBe(true)
+		expect(width_of(marked)).toBe(width_of(head.at(-1) ?? ''))
+	})
+})
+
+describe('run_board_fold.bounded rule width', () => {
+	it('runs every rule, open or folded, on to the frame’s rule width', () => {
+		const lines = bounded({ ...below_parts(), rule_width: WIDE }, { folded: new Set(['queued']) })
+
+		expect(lines.filter((line) => line.includes('─')).map((line) => width_of(line))).toStrictEqual([
+			WIDE,
+			WIDE,
+		])
+	})
+
+	it('leaves a rule already past the rule width as it is', () => {
+		const lines = bounded({ ...below_parts(), rule_width: 1 }, {})
+
+		expect(lines).toStrictEqual(run_board_fit.whole(below_parts()))
+	})
 })
 
 describe('run_board_fold.KEYS_LINE', () => {
 	it('names every key once', () => {
-		expect(KEYS_LINE).toBe(' l p f q w d: fold · a: all · Ctrl-C: quit')
+		expect(KEYS_LINE).toBe(' t u l p f q w d: fold · a: all · Ctrl-C: quit')
 	})
 })

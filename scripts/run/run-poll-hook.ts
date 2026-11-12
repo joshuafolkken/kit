@@ -1,8 +1,9 @@
+import { hook_context, type HookContext } from '#scripts/hooks/hook-context'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { error_text } from '#scripts/lib/error-message'
-import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
-import { time_shell } from '#scripts/time-runtime/time-shell'
+import { time_josh_names } from '#scripts/time-runtime/time-josh-names'
 import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
+import { transcript_tail } from '#scripts/time-runtime/transcript-tail'
 import { run_headless } from './run-headless'
 import { run_watcher_hook } from './run-watcher-hook'
 
@@ -34,7 +35,7 @@ const STATE_READS: ReadonlySet<string> = new Set([
 
 const POLL_REASON =
 	'⛔ poll: this `backlogrun` session repeats a state read with nothing decided in between, on every ' +
-	'occurrence. Wait on `pnpm josh backlog:drive`, or `pnpm josh lane:await <N...> --owner "$PPID"` in ' +
+	'occurrence. Wait on `pnpm josh backlog:drive`, or `pnpm josh lane:await <N...>` in ' +
 	'the background, and end the turn; its exit is the wake.'
 
 // The flags that make a state-read command write: `run:carry --filed` twice is two filings, and
@@ -77,7 +78,7 @@ function read_keys(signatures: ReadonlyArray<string>): Array<string> {
 }
 
 function state_reads_of(command: string): ReadonlyArray<string> {
-	return read_keys(time_shell.josh_signatures_of(command))
+	return read_keys(time_josh_names.josh_signatures_of(command))
 }
 
 function command_of(input: unknown): string {
@@ -120,7 +121,7 @@ function is_repeat(raw_payload: string): boolean {
 
 	if (transcript === undefined) return false
 
-	return repeats_last_call(time_density_hook.read_tail(transcript), reads)
+	return repeats_last_call(transcript_tail.read_tail(transcript), reads)
 }
 
 /**
@@ -137,9 +138,15 @@ async function poll_reason(
 }
 
 // It fails open: an unreadable transcript or carry record allows the call rather than wedging the run.
-async function safe_poll_reason(raw_payload: string): Promise<string | undefined> {
+async function safe_poll_reason(
+	raw_payload: string,
+	context: HookContext = hook_context.from_process(),
+): Promise<string | undefined> {
 	try {
-		return await poll_reason(raw_payload)
+		return await poll_reason(
+			raw_payload,
+			async () => await run_headless.is_backlog_parent(context.env, context.ancestry),
+		)
 	} catch (error) {
 		error_text.trace_swallowed('run_poll_hook.poll_reason', error)
 

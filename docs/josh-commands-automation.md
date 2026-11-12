@@ -8,6 +8,30 @@ A `<!-- usage: … -->` span is generated — its summary line from the command'
 
 These replace the corresponding `package.json` scripts; consumers need not add them.
 
+### `josh completion`
+
+<!-- usage: completion -->
+
+Print command names and aliases, or a shell completion script.
+
+```bash
+pnpm josh completion --names
+pnpm josh completion zsh
+pnpm josh completion bash
+pnpm josh completion fish
+```
+
+<!-- /usage -->
+
+`josh completion <zsh|bash|fish>` prints a script that completes the name after `josh` and `pnpm josh` from `--names`. Enable it after pnpm's own completion, which keeps the rest:
+
+```bash
+eval "$(josh completion zsh)"  # or bash
+josh completion fish | source
+```
+
+Flags are not completed: `CommandEntry` defines none.
+
 ### `josh refactor:scan`
 
 <!-- usage: refactor:scan -->
@@ -20,7 +44,7 @@ pnpm josh refactor:scan
 
 <!-- /usage -->
 
-The candidates are those of `prompts/refactoring.md` §4.1–§4.3, as `verdict: clear` / `verdict: candidates`. Never fails.
+The candidates are those of `prompts/refactoring.md` §4.1–§4.3, as `verdict: clear` / `verdict: candidates`. Completed scans exit zero; execution failures print a diagnostic and `verdict: error`, then exit non-zero.
 
 Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh refactor:scan` in detail".
 
@@ -39,6 +63,13 @@ pnpm josh rename lane_ledger lane_ledger_write --import '#scripts/lane/lane-ledg
 
 Only bindings and module specifiers change; strings, comments, `obj.old` and property keys stay. Each file's count is printed, then the files are formatted as the edit hook would.
 A file with no replacement, missing, or not TypeScript or JavaScript is named, nothing is written, exit 1.
+
+**The same name on both sides moves its named import** (`pnpm josh rename A A --import <from> <to> <file...>`).
+
+Only that name leaves the declaration, which keeps its other names and gains an `import` from `<to>` below it; a name alone in its declaration takes the new specifier. A type-only name stays type-only.
+Comments in the braces stay. A file importing the name twice from `<from>` is refused as having no replacement.
+
+A file that already imports names from `<to>` gets the name in that declaration instead, and a declaration left empty is removed; `import type { … }` takes only a type-only name.
 
 ### `josh format:edited`
 
@@ -81,7 +112,10 @@ pnpm josh pretool:guard   # run by the PreToolUse hook, the pending tool call as
 
 <!-- /usage -->
 
-It also runs the duplicate-read guard. A refusal leaves through `hookSpecificOutput.permissionDecision`; a call no guard claims writes nothing.
+It also runs the duplicate-read and large-read guards. A refusal leaves through `hookSpecificOutput.permissionDecision`; a call no guard claims writes nothing.
+
+Only a launcher-assigned `worker` may edit source. Other roles retain explicit record writes and
+recognized reads/operations; unverified shell or patch inputs are refused on every attempt.
 
 **How each guard behaves in a dispatched lane child is an enumeration** in `scripts/lane/lane-guard-policy.ts` — `refuse`, `notice` or `off` per guard; `lane-guard-policy.test.ts` pins it to the guards' live behavior.
 
@@ -90,11 +124,11 @@ Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh pret
 ```json
 "PreToolUse": [
 	{
-		"matcher": "Bash|Edit|Read|Write|AskUserQuestion|Agent|Task",
+		"matcher": "Bash|Edit|Read|Write|AskUserQuestion|Agent|Task|Glob|Grep|WebFetch",
 		"hooks": [
 			{
 				"type": "command",
-				"command": "<project-root prefix> sh scripts/hooks/run-hook.sh pretool-guard",
+				"command": "sh \"$CLAUDE_PROJECT_DIR/scripts/hooks/run-hook.sh\" pretool-guard",
 				"timeout": 20
 			}
 		]
@@ -104,14 +138,14 @@ Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh pret
 
 Every kit hook command, Claude Code and Codex alike, has this shape (`scripts/init/hook-launch.ts`):
 
-- **`<project-root prefix>`** — `cd`s to `CLAUDE_PROJECT_DIR`, else (Codex) `git rev-parse --show-toplevel`, so a hook run in a subdirectory finds its paths. It exports the launch directory as `JOSH_HOOK_CWD`, from which the launcher moves into a Claude Code worktree (`.claude/worktrees/<name>`).
-- **The launcher** (`scripts/hooks/run-hook.sh <name>`) clears a git hook's location variables when git resolves without them, then runs the ready gate, falling back to `pnpm josh <command>`.
-- **The ready gate** (`tools/hooks/hook-bundle-ready.ts`) runs the bundle when its digest matches the source, and rebuilds it in-process when stale.
+- **The root** — `CLAUDE_PROJECT_DIR`; Codex names none, so `.codex/hooks.json` asks `git rev-parse --show-toplevel`.
+- **The launcher** (`scripts/hooks/run-hook.sh <name>`) exports the launch directory as `JOSH_HOOK_CWD`, moves to the root it sits under (or into the Claude Code worktree `.claude/worktrees/<name>` the hook was launched in), clears a git hook's location variables when git resolves without them, then runs the ready gate, falling back to `pnpm josh <command>`.
+- **The ready gate** (`tools/hooks/hook-bundle-ready.ts`) runs the bundle when its digest matches the source, and when stale runs the old build once while a background rebuild replaces it (in-process only when no whole build exists).
 - A consumer's command is rewritten to the installed launcher (`node_modules/@joshuafolkken/kit/scripts/hooks/run-hook.sh`), whose gate is a presence check on `dist/hooks/` (published bundles have no source to be stale against) and whose fallback is the `dist/josh.js` dispatcher.
 
 #### The batching guard
 
-- The batch guard reaches `Bash`, `Edit`, `Read`, `Write`; the trailing `AskUserQuestion` in the matcher is the rule guard's. `Bash`, `Edit`, `Read` are refusable; `Write` earns only a non-blocking notice. Refused only when two single-call turns are closed behind it, the call is bundleable, and it touches nothing the sequence already touched.
+- The batch guard reaches `Bash`, `Edit`, `Read`, `Write`, `Glob`, `Grep`, `WebFetch`; `AskUserQuestion`, `Agent` and `Task` in the matcher are the rule guard's. All but `Write` (a notice only) are refusable. Refused only when two single-call turns are closed behind it, the call is bundleable, and it touches nothing the sequence already touched.
 - **In a dispatched lane child** (`JOSH_LANE_CHILD`): off, except a chain of single-call `grep` / `rg` / `find` / `fd` / read-only `sed` searches, which the `search-batching` row refuses unless the investigation guard refuses the same call (`scripts/lane/lane-guard-policy.ts`). Why: `docs/maintainers/josh-commands-automation-rationale.md` → "The batching guard is off in a lane child".
 - **Fires more than once per run**: again every `REFIRE_EVERY` further single-call turns (the notice every `NOTICE_REFIRE_EVERY`); a batched turn starts a fresh sequence.
 - Set `JOSH_BATCH_GUARD` to `off` / `0` / `false` / `no` to disable.
@@ -167,6 +201,15 @@ Refuses a second whole-file read of a path whose content has not changed since t
 - **In a dispatched lane child it is a `notice`, not a refusal** (`JOSH_LANE_CHILD`). See the `pretool:guard` lane-child enumeration above.
 - Set `JOSH_DUPLICATE_READ_GUARD` to `off` / `0` / `false` / `no` to disable.
 
+#### The large-read guard
+
+Refuses a whole-file read (no `offset` or `limit`) of a file over 32 KB: its result stays in context and is re-billed on every later call. Grep for the part needed and read it with `offset` / `limit`.
+
+- The repeat goes through: a whole read of a file whose latest read in the transcript was refused — by this guard or the duplicate-read guard — is allowed, so a run that needs the whole file issues the call again. A read of another file in between does not change that.
+- A failed stat (missing file, glob) allows the call.
+- **In a dispatched lane child it is a `notice`, not a refusal**, sharing the duplicate-read row of the lane-child enumeration.
+- Set `JOSH_LARGE_READ_GUARD` to `off` / `0` / `false` / `no` to disable.
+
 #### The rule guard
 
 Delivers a trigger-delivered rule at the call that binds it, in place of a rule resident in `CLAUDE.md` (`pnpm josh rule:list` prints every row).
@@ -212,7 +255,22 @@ pnpm josh codex:hook-adapter posttool   # a Codex PostToolUse payload on stdin
 
 <!-- /usage -->
 
-It answers in Codex's hook format. `.codex/hooks.json` launches it as `sh scripts/hooks/run-hook.sh codex-hook-adapter <pretool|posttool>`; this command is the fallback when the bundle cannot run.
+It answers in Codex's hook format. `.codex/hooks.json` launches it as `sh <git root>/scripts/hooks/run-hook.sh codex-hook-adapter <pretool|posttool>`; this command is the fallback when the bundle cannot run.
+
+The adapter normalizes patch and shell calls into the same authority check. Opaque orchestration is
+refused for non-workers. Hosts that skip PreToolUse, including nested tool calls, have no verified
+enforcement; generated settings alone do not establish host coverage.
+
+A consultation scope's shell runs unless it is irreversible: a git, GitHub, dependency or josh
+shared-state write, a visible write to a runtime path, or a command that runs what an expansion or
+standard input spells, or a `case` arm or function body it cannot read. The refusal names that
+operation. The check reads nested commands too:
+substitutions, compound bodies, `xargs`, `timeout`, `find -exec`, `sh -c` and `eval`
+(`scripts/hooks/implementation-shell-nested.ts`); the deny-list is
+`scripts/hooks/implementation-shell-deny.ts`. A runtime file any other call changes in the session's
+own checkout is restored after the call (`scripts/hooks/bash-revert.ts`); a file-writing program
+(`cp`, `mv`, `rsync`, `tar`, `dd`, `sed -i`, …) aimed at a runtime path outside it is refused, as the
+restore does not reach another checkout.
 
 ### `josh stop:guard`
 
@@ -232,11 +290,34 @@ A failed step of its own blocks too. The rows are in `prompts/collaboration-work
 
 Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh stop:guard` in detail".
 
+### `josh hook:ledger`
+
+<!-- usage: hook:ledger -->
+
+Print Claude Code hook refusals per hook and rule over a period: refusals, the same call passing later, and route:interrupt issues naming the rule; list, demote or restore rules that mostly refuse allowed work.
+
+```bash
+pnpm josh hook:ledger --period 7                    # a 7-day period's refusals per rule
+pnpm josh hook:ledger --period 7 --demote           # rules to demote from blocking to notice
+pnpm josh hook:ledger --period 7 --demote --apply   # record them in .josh/hook-demoted.json
+pnpm josh hook:ledger --restore batching            # make a demoted rule block again
+```
+
+<!-- /usage -->
+
+Reads the hook ledger, `<git common dir>/josh/hook-ledger/<date>.jsonl`. The ledger keeps no tool-use id, so `passed later` matches a refused call by its tool and command head. It counts a later call in the same transcript that came back without `is_error`. `interrupts` prints `unknown` when the Issue listing cannot be read.
+
+`--demote` lists a rule with at least 10 refusals over the period, half or more of them passing later.
+`--apply` adds those rules to the tracked `.josh/hook-demoted.json`; `--restore <rule>` takes one back out.
+
+The PreToolUse guard returns a demoted rule's refusal as an `additionalContext` notice under a header saying the call ran,
+and lets the call run; the ledger still records the refusal. A rule not demoted still blocks.
+
 ### `josh session:lang`
 
 <!-- usage: session:lang -->
 
-Claude Code hook: print a non-default JOSH_SESSION_LANG for the session context, and the run:board reply rule while a backlogrun is live (otherwise nothing).
+Claude Code hook: print a non-default JOSH_SESSION_LANG for the session context, the run:board reply rule while a backlogrun is live, and the run:handoff line for a workflow keyword on a consultation model (otherwise nothing).
 
 ```bash
 pnpm josh session:lang   # run by the UserPromptSubmit hook; `ja` prints nothing
@@ -246,6 +327,8 @@ pnpm josh session:lang   # run by the UserPromptSubmit hook; `ja` prints nothing
 
 - Timeout 10. Read via `process.loadEnvFile` (environment wins). Unset / empty / no-`.env` resolve to `ja`; `JOSH_SESSION_LANG=en` opts into English.
 - While a `backlogrun` is live in the repository, it prints one line telling the session to answer a progress question with `pnpm josh run:board --chat`, even a session not driving the run.
+- On a consultation model (Fable, Codex Astra), a prompt carrying a `run:handoff` keyword gets one line pointing at [`josh run:handoff`](./josh-commands-board.md#josh-runhandoff). It reads the stdin payload (`prompt`, `transcript_path`, `model`); Codex wires the same hook in `.codex/hooks.json`.
+- Claude Code's payload names no model, so the transcript's last assistant turn does: a session's first prompt gets no line, and only the `run:entry` refusal catches it.
 
 ### `josh e2e:retry-check`
 
@@ -278,6 +361,20 @@ pnpm josh test:reach scripts/lane/lane-ledger.ts   # a reach count to measure be
 Run by a lane filing an overrun investigation, for the reach count its `## ベースライン` measures before and after a change.
 
 - A path is read from the repository root (where `pnpm josh` runs) or as an absolute path; one that names no file is refused rather than printed as `0`.
+
+### `josh usage:tee`
+
+<!-- usage: usage:tee -->
+
+Record account-wide Claude statusLine rate limits without printing output.
+
+```bash
+pnpm josh usage:tee   # Claude statusLine JSON on stdin; stdout stays empty
+```
+
+<!-- /usage -->
+
+Stores `{five_hour, seven_day, at}` in `~/.claude/josh/usage.json`; `CLAUDE_CONFIG_DIR` overrides `~/.claude`. An absent window is stored as `null`; absent `rate_limits` or invalid input leaves the file unchanged.
 
 ## Project
 
@@ -333,7 +430,7 @@ It refuses, changing nothing and exiting `1`, unless the directory:
 Run an install scenario in a Docker container of a machine with nothing installed, and keep the log.
 
 ```bash
-pnpm josh fresh:run --list                        # kit's six patterns
+pnpm josh fresh:run --list                        # kit's seven patterns
 pnpm josh fresh:run kit-test-html-init            # one pattern, the packed checkout
 pnpm josh fresh:run kit-test-html-start           # a GitHub pattern, the latest published version
 pnpm josh fresh:run --spec fresh/html-init.json   # a scenario another toolkit wrote
@@ -419,6 +516,20 @@ pnpm josh ui:routes --staged   # the staged diff instead
 
 A changed `+page` / `+layout` gives its own route, a changed shared component the routes that import it (a one-level `src/routes` scan). Empty output prints "no route derived"; `verify-ui` §1 narrows the list.
 
+### `josh ui:shot`
+
+<!-- usage: ui:shot -->
+
+Capture routes with this project's own screenshot command.
+
+```bash
+pnpm josh ui:shot / /blog
+```
+
+<!-- /usage -->
+
+It runs the first of `josh-app shot`, `josh-game shot` (listed in the toolkit's usage line) and a `shot` / `screenshot` / `verify:ui` script with the routes; that command prints the image paths and its exit status is the result. Nothing resolved prints the candidates tried and exits `1`.
+
 ### `josh propagate`
 
 <!-- usage: propagate -->
@@ -452,6 +563,38 @@ The opposite direction — one consumer catching itself up from its own checkout
 
 AI-assisted git and notification helpers used in the day-to-day development loop.
 
+### `josh issue:tick`
+
+<!-- usage: issue:tick -->
+
+Tick selected acceptance checkboxes by their plan identifiers.
+
+```bash
+pnpm josh issue:tick 6233 ac-a1f32a2f ac-8647b0dd
+```
+
+<!-- /usage -->
+
+Use the `ac-…` identifiers printed in the plan's acceptance map. Unknown identifiers refuse the whole update. Repeating a checked criterion is a no-op. Other sections, formatting and line endings are preserved.
+
+### `josh issue:consolidate`
+
+<!-- usage: issue:consolidate -->
+
+Fold duplicates into a target: untrack, close as not planned; a failed write lists the writes done.
+
+```bash
+pnpm josh issue:consolidate 6559 6567 6568 --body-file .josh/tmp/body.md --demote
+```
+
+**Options:**
+
+- `--title <title>` — replace the target's title.
+- `--body-file <path>` — replace the target's body, from a file or stdin (`-`). Target author needs write access.
+- `--demote` — remove the `epic` label and the `## Split into children` sections from the body.
+
+<!-- /usage -->
+
 ### `josh pr:classification`
 
 <!-- usage: pr:classification -->
@@ -475,7 +618,7 @@ Follow-up git workflow.
 ```bash
 pnpm josh followup "PR title #N"                                                 # merges (default)
 pnpm josh followup "PR title #N" --notify-message "Implemented X:\n- change 1"
-pnpm josh followup "PR title #N" --notify-message-file completion.md
+pnpm josh followup "PR title #N" --notify-message-file .josh/tmp/completion.md
 pnpm josh followup "PR title #N" --ai-review-ignore-reason "false positive"
 pnpm josh followup "PR title #N" --no-merge                                      # do the work, leave the PR open
 ```
@@ -484,7 +627,7 @@ pnpm josh followup "PR title #N" --no-merge                                     
 
 - `--no-merge` — do the follow-up work but do not merge; leaves the PR open (the only flag that stops the merge). `--merge` is a deprecated no-op. A PR already merged by hand skips the CI wait, the AI-review scan and the merge and runs only the post-merge tail; a completion report already on the Issue is not posted again.
 - `--notify-message` — inline completion body; `\n` expands to newlines.
-- `--notify-message-file` — read the completion body from a file (`-` reads stdin); use this whenever the body carries a backtick or `$`. Passing both forms is refused.
+- `--notify-message-file` — read the completion body from a file written under `.josh/tmp/` (`-` reads stdin); use this whenever the body carries a backtick or `$`. Passing both forms is refused.
 - `--ai-review-ignore-reason` — reason to dismiss an AI-review finding.
 
 <!-- /usage -->
@@ -497,9 +640,11 @@ Rows match by an identifier built from the criterion's text, so a reworded crite
 
 **Behavior:** waits for CI (every 10 s, a 32-minute budget, `JOSH_CI_TIMEOUT_SECONDS`), merges, then closes completed epics and the Issue, removes `in-progress` and flushes the ledger. A person's unacknowledged update stops it unmerged ([`josh issue:ack`](josh-commands-backlog.md#josh-issueack)). Give the call its longest timeout.
 
+**Check report:** a green run's completion notification lists under `Checks:` each failed check left in the green snapshot (`required` / `not required`), each job re-run as flaky and each retriggered rate-limited CodeRabbit review. A red run or a merged-PR re-run writes no list; `--notify-message` names its failures.
+
 **Output / exit codes:** exits non-zero naming the failing check on a red run; prints a per-stage timing block (`followup stage: <name> <n> s`) on both success and failure.
 
-Related: [`josh git`](josh-commands.md#josh-git), [`josh observations:flush`](#josh-observationsflush), [`josh time`](josh-commands-run.md#josh-time).
+Related: [`josh git`](josh-commands.md#josh-git), [`josh observations:flush`](#josh-observationsflush), [`josh time`](josh-commands-session.md#josh-time).
 
 Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh followup` in detail".
 
@@ -511,14 +656,14 @@ Send Telegram notification.
 
 ```bash
 pnpm josh notify --task-type planning --issue-url "https://..." --body="- bullet 1\n- bullet 2"
-pnpm josh notify --task-type confirmation --issue-url "https://..." --body-file r.md --recommended "Go" --alternative "Wait"
+pnpm josh notify --task-type confirmation --issue-url "https://..." --body-file .josh/tmp/r.md --recommended "Go" --alternative "Wait"
 ```
 
 **Options:**
 
 - `--task-type` — one of `planning` 📋, `completion` ✅, `failure` ❌, `warning` ⚠️, `kickoff_retry` 🔄, `confirmation` ⏸️. Do not send `completion` or `warning` by hand — `josh followup` sends them.
 - `--body` / `--body=$'…'` — inline body; use `--body=$'…'` when it starts with `-`.
-- `--body-file` — read the body from a file (`-` reads stdin); use this whenever the body carries a backtick or `$`. Passing both forms is refused.
+- `--body-file` — read the body from a file written under `.josh/tmp/` (`-` reads stdin); use this whenever the body carries a backtick or `$`. Passing both forms is refused.
 - `--repo-name` / `--issue-url` / `--pr-url` — header repository, resolved in that order, then the working directory. The issue title is read from `--issue-url`.
 - `--recommended` / `--alternative` — the choices appended under `JOSH_SESSION_LANG` headings; `--recommended` is required for `confirmation`, `--alternative` is repeatable.
 
@@ -572,6 +717,22 @@ Related: [`josh observations:flush`](#josh-observationsflush), [`josh issue:lint
 
 Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh measure:rerun` in detail".
 
+### `josh observation:depth`
+
+<!-- usage: observation:depth -->
+
+Print the depth test's depth for a subject path.
+
+```bash
+pnpm josh observation:depth scripts/lane/lane-plan.ts
+```
+
+<!-- /usage -->
+
+It prints `d0`, `d1` or `d2` alone on stdout, and the row it applied, with the prefix it matched, on stderr. `d1` and deeper are the `<depth>` [`josh observation:record`](#josh-observationrecord) takes; `d0` is filed, never recorded.
+
+The path may be absolute or relative to the caller's directory; one outside the repository is refused with exit 1. The deepest row whose prefix the path starts with wins; a path no row claims is `d0`. The rows: `scripts/observations/observation-depth.ts`.
+
 ### `josh observation:record`
 
 <!-- usage: observation:record -->
@@ -603,11 +764,14 @@ pnpm josh review:record --issue 2325                                            
 pnpm josh review:record --issue 2325 --comment                                            # a round that passed after the PR opened — an Issue comment, no append
 pnpm josh review:record --check --issue 2325                                              # the merge gate: was it recorded?
 pnpm josh review:record --issue 2325 --interaction                                        # the interaction review’s pass — a `- ri:` line
+pnpm josh review:record --from-slot --issue 2325 2=filed:#7                               # the findings the reviewer wrote with review:submit — each `fixed` unless its line is given another
 ```
 
 <!-- /usage -->
 
 The findings are a `/code-review` round's, written as `- rf:` lines in the issue's ledger file (`.josh/observations/<N>.md`) — the one write path for findings. Each code round opens with a `- rb:<date> | #<N>` boundary line, so [`josh review:round2`](josh-commands-backlog.md#josh-reviewround2) reads only the latest round's lines.
+
+`--from-slot` records the findings written with [`josh review:submit`](josh-commands-run.md#josh-reviewsubmit) (`--interaction`: that slot's), each `fixed` unless a positional `<n>=<disposition>` names another for its 1-based line. An unwritten slot or an `<n>` past the last line is refused.
 
 **Behavior:** each positional is `'<category>:<severity>:<file>[ — <reason>]'` (quoted).
 
@@ -618,6 +782,24 @@ A ledger round carries the closed issues' comment rounds into its commit, except
 Related: [`josh review:findings`](josh-commands.md#josh-reviewfindings), [`josh observations:flush`](#josh-observationsflush).
 
 Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh review:record` in detail".
+
+### `josh review:pair`
+
+<!-- usage: review:pair -->
+
+Record a paired comparison under JOSH_REVIEWER_PAIRED=1: the Opus and Sonnet round-1 findings with severity and each agent cost; never gates.
+
+```bash
+pnpm josh review:pair --issue 6902 --opus-agent a1b2 --sonnet-agent c3d4   # after both round-1 reviewers return, before review:record
+```
+
+**Options:**
+
+- `--opus-agent <id>` / `--sonnet-agent <id>` — each reviewer's agentId, whose transcript prices its cost.
+
+<!-- /usage -->
+
+Appends one line to `review-pairs.jsonl` in the git common directory. Neither `review:attest` nor the merge gate reads it.
 
 ## Versioning
 
@@ -668,13 +850,24 @@ It raises the version by one minor per merge, opens and merges a `release/v<vers
 🎉 Release vX.Y.Z complete
 ```
 
-A `private: true` package skips the npm stage.
+A repository whose `@joshuafolkken/` package public npm does not carry skips the npm stage; the registry decides, not `private` in `package.json`.
+
+In a consumer repository the release runs through workflows kit syncs:
+
+1. The `release/v<version>` pull request merges into main.
+2. `auto-tag.yml` tags `vX.Y.Z` once main's CI passes.
+3. `production.yml` merges the tag into the `production` branch.
+4. `github-release.yml` creates the GitHub Release; its notes are grouped by the labels in `.github/release.yml` (breaking changes, features, bug fixes, other).
+
+All three workflows ship with kit v1.1093.0 or later (see [What gets synced](sync.md#ai-files-overwritten)); on an older install, run `pnpm josh sync` first.
 
 **Runs in its own work tree, never the root checkout**, so it can run beside a [`backlogrun`](how-to/run-issues.md) on a dirty root.
 
+After printing the plan, a live run and `--dry-run` alike check `origin/<default>` for a GitHub Release workflow: `github-release.yml` or `publish.yml` that runs `josh release:github`. They print the one found. With none, they exit non-zero before any branch, pull request or tag. Fix: kit v1.1093.0 or later, then `pnpm josh sync`.
+
 Watch budgets (default 30 minutes each): `JOSH_RELEASE_TAG_TIMEOUT_SECONDS` (tag), `JOSH_RELEASE_NPM_TIMEOUT_SECONDS` (npm publish), `JOSH_RELEASE_GITHUB_RELEASE_TIMEOUT_SECONDS` (GitHub Release).
 
-**Output / exit codes:** exits 0 and writes nothing when the pending count is zero; exits non-zero if `origin/<default>` cannot be read, no version base can be found, the `release/v<version>` branch is already taken (locally or on origin), or a watched stage (tag, npm version, GitHub Release) never appears, which prints that stage with ❌.
+**Output / exit codes:** exits 0 and writes nothing when the pending count is zero; exits non-zero if `origin/<default>` cannot be read, no version base is found, no GitHub Release workflow is found (above), `release/v<version>` already exists (locally or on origin), or a watched stage never appears (printed with ❌).
 
 The npm watch stops early when the tag's `Publish` run fails; its ❌ line names the run ID.
 
@@ -693,9 +886,9 @@ pnpm josh release:scope --json   # {"scope":"…","reason":"…"} on one line
 
 <!-- /usage -->
 
-Same fetch-then-count as `josh followup`: `required` when main has taken at least one merge since the version last changed, `skip` when the count is zero, `unknown` when it could not be read.
+Same fetch-then-count as `josh followup`: `required` when main has taken at least one merge since the version last changed, `skip` when the count is zero, `unknown` when it could not be read. On `required` it also prints `release_issue: [#N](url)|none|unknown` — the open release Issue, found by the search `issue:release` uses — and the `request:` line that closes a completion report.
 
-**Output / exit codes:** the verdict goes to stdout, the reason to stderr. Exit code is 0 for every verdict and 1 only for an unknown flag; `unknown` is never read as `skip`.
+**Output / exit codes:** the verdict goes to stdout, the reason (and on `required` the two lines above) to stderr; `--json` carries them as `release_issue` and `request`. Exit code is 0 for every verdict and 1 only for an unknown flag; `unknown` is never read as `skip`.
 
 ### `josh release:github`
 
@@ -709,7 +902,7 @@ pnpm josh release:github   # run by CI with GH_TOKEN, RELEASE_TAG and GITHUB_REP
 
 <!-- /usage -->
 
-The notes come from `.github/release.yml`. Run by CI — kit's `publish.yml`, and the `github-release.yml` every consumer receives.
+The notes come from `.github/release.yml`. Run by CI — kit's `publish.yml`, and the `github-release.yml` every consumer receives. `josh sync` also distributes kit's `publish.yml` to repositories public npm carries; there it skips the GitHub Release steps when `github-release.yml` exists.
 
 It takes no arguments: `--help` / `-h` prints the usage line and exits 0 without reading the environment; any other argument is refused with the usage line and a non-zero exit, before anything is released.
 
@@ -729,6 +922,18 @@ Releases are created in version order: a later tag waits for the nearest lower o
 **Output / exit codes:** prints `published <tag> from <baseline>` or `already-published`; exits non-zero on an API error, an invalid tag or repository, a latest release that is not older than the tag, or a lower tag that never gets a release within the wait budget.
 
 Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh release:github` in detail".
+
+### `josh release:tag`
+
+<!-- usage: release:tag -->
+
+Print the npm dist-tag a version publishes under, given the current latest.
+
+```bash
+pnpm josh release:tag 1.2.0 1.1.0   # → latest
+```
+
+<!-- /usage -->
 
 ## Maintenance
 
@@ -866,11 +1071,23 @@ pnpm josh latest:guard   # refuses inside a lane
 
 It fronts the `josh latest` chain.
 
+### `josh split:recover`
+
+<!-- usage: split:recover -->
+
+Recover split-child evidence after verifying an existing child URL, split route and parent.
+
+```bash
+pnpm josh split:recover 6212 https://github.com/joshuafolkken/kit/issues/6326
+```
+
+<!-- /usage -->
+
 ### `josh command:derive`
 
 <!-- usage: command:derive -->
 
-Write every artifact the command map derives — usage spans, catalog, snapshot, docs/why.md counts — and print page bytes against their ceilings.
+Write every artifact the command map derives — usage spans and catalog — and print page bytes against their ceilings.
 
 ```bash
 pnpm josh command:derive   # after adding, renaming or describing a command
@@ -964,7 +1181,7 @@ The result is reused when [`josh gate`](josh-commands.md#josh-gate) recorded tha
 JOSH_PRE_PUSH_FORCE=1 git push   # run the suite even on a tree recorded green
 ```
 
-With `JOSH_PRE_PUSH_RELATED=1`, a push the record does not cover runs `josh test:related` instead of the whole suite — `josh ship` sets it when it pushes its sync merge onto an open pull request ahead of the gate.
+With `JOSH_PRE_PUSH_RELATED=1`, a push the record does not cover runs `josh test:related` instead of the whole suite — `josh ship` sets it when it pushes its sync merge onto an open pull request ahead of the gate. That push reuses the `test:related` green record when it covers the same clean tree and base.
 
 **Output:** on reuse, prints that the tree is already green.
 
@@ -978,7 +1195,6 @@ Git hook: run a command while holding a place in the machine-wide core budget.
 
 ```bash
 pnpm josh reserved-run 2 -- pnpm install              # hold 2 cores while installing
-pnpm josh reserved-run 1 -- pnpm josh audit           # hold 1 core while scanning
 pnpm josh reserved-run 1 --memory 3000 -- <command>   # hold 3,000 MB beside the core
 ```
 
@@ -1021,6 +1237,20 @@ Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh pre-
 ## AI tools
 
 Helpers for AI-assisted development workflows.
+
+### `josh pin:verify`
+
+<!-- usage: pin:verify -->
+
+Check that a tag resolves to the commit a SHA pin names, printing a line a bypass reason cites.
+
+```bash
+pnpm josh pin:verify actions/checkout v4.2.2 11bd71901bbe5b1630ceea73d27597364c9af683   # → match / mismatch / unreadable
+```
+
+<!-- /usage -->
+
+Resolves the tag through `repos/<owner>/<repo>/commits/refs/tags/<tag>` (fully qualified, so a branch never answers; an annotated tag peeled to its commit) and compares it with the SHA. Prints one line on stdout: `match` / `mismatch` with the resolved SHA, or `unreadable` with the `gh` failure reason — the `match` line is what a `--coderabbit-ignore-reason` cites. Only `match` exits zero.
 
 ### `josh repo:party`
 

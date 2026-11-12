@@ -1,3 +1,4 @@
+import { issue_body_keys } from '#scripts/issue/issue-body-keys'
 import { markdown_section } from '#scripts/issue/markdown-section'
 import { issue_citation } from '#scripts/rules/issue-citation'
 import { epic_graph, type EpicChild, type IssueReference } from './epic-graph'
@@ -41,7 +42,7 @@ const NO_KNOWN_REPOS: ReadonlySet<string> = new Set()
 // Where a child states what it must deliver. Both spellings, because the bodies are written in
 // whichever language the session was in.
 const ACCEPTANCE_HEADINGS: ReadonlySet<string> = new Set([
-	'## 受け入れ条件',
+	issue_body_keys.heading('criteria'),
 	'## Acceptance criteria',
 ])
 
@@ -206,8 +207,8 @@ function has_parent_marker(line: string): boolean {
 const PARENT_REFERENCE = /(?:親|Parent|parent)\**[:：]\**\s*(?:[\w.-]+\/[\w.-]+)?#\d+/gu
 
 function parent_references(body: string): string {
-	return markdown_section
-		.unfenced_lines(body)
+	return issue_citation
+		.prose_lines(body)
 		.flatMap((line) => [...line.matchAll(PARENT_REFERENCE)].map((match) => match[0]))
 		.join('\n')
 }
@@ -271,7 +272,9 @@ const epic_audit_logic = {
 	known_repos,
 	parse_issue_references,
 	parse_references,
+	parent_references,
 	acceptance_section,
+	is_acceptance_heading,
 	signal_references,
 	has_parent_marker,
 	depends_on,

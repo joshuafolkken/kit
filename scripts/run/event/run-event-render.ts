@@ -23,6 +23,7 @@ const KIND_LABELS: Readonly<Record<EventKind, KindLabel>> = {
 	'child-launch': { ja: '着手', en: 'launched' },
 	merge: { ja: 'マージ', en: 'merged' },
 	park: { ja: '保留', en: 'parked' },
+	'human-review': { ja: '人のレビュー待ち', en: 'human review' },
 	split: { ja: '分割', en: 'split' },
 	outage: { ja: '障害', en: 'outage' },
 	'usage-limit': { ja: '利用上限', en: 'usage limit' },
@@ -45,6 +46,7 @@ const KIND_LABELS: Readonly<Record<EventKind, KindLabel>> = {
 	filed: { ja: '起票', en: 'filed' },
 	note: { ja: '意見', en: 'note' },
 	'lane-phase': { ja: 'レーンの段階', en: 'lane phase' },
+	step: { ja: 'ステップ', en: 'step' },
 	add: { ja: '割り込み', en: 'added' },
 	'lane-limit': { ja: 'レーン上限', en: 'lane limit' },
 	setup: { ja: '準備', en: 'setup' },
@@ -53,7 +55,10 @@ const KIND_LABELS: Readonly<Record<EventKind, KindLabel>> = {
 	'lane-state': { ja: 'レーンの状態', en: 'lane state' },
 	'paused-notice': { ja: '一時停止の通知', en: 'paused notice' },
 	measured: { ja: '計測で完了', en: 'measured' },
+	'sample-wait': { ja: '標本条件未達', en: 'sample condition not met' },
 	sleep: { ja: 'ホストのスリープ', en: 'host sleep' },
+	'plan-wait': { ja: '計画の重なり待ち', en: 'plan wait' },
+	'rate-limit': { ja: 'GitHub API の消費', en: 'GitHub rate limit' },
 }
 
 const LABELS_BY_KIND: ReadonlyMap<string, KindLabel> = new Map(Object.entries(KIND_LABELS))

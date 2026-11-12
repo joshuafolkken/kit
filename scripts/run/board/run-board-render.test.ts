@@ -170,7 +170,7 @@ describe('run_board_render.render sections', () => {
 		const epic = { kind: 'epic' as const, epic: 10, title: 'Epic ten', rows: children }
 		const layout = { ...EMPTY_LAYOUT, queued: [epic, { kind: 'row' as const, row: long }] }
 		const lines = lines_of(header({ layout }))
-		const queued_rule = rule('⏳ queued')
+		const queued_rule = rule('⏳ queued 3')
 
 		expect(lines.slice(lines.indexOf(queued_rule), -2)).toStrictEqual([
 			queued_rule,
@@ -198,7 +198,7 @@ describe('run_board_render.render sections', () => {
 		const start = lines.indexOf(decision_rule)
 
 		expect(lines.slice(start, start + 2)).toStrictEqual([decision_rule, decision_row])
-		expect(lines.at(-1)).toBe(decision_row)
+		expect(lines.slice(-3)).toStrictEqual([decision_row, '', rule('⏳ queued 0')])
 	})
 })
 

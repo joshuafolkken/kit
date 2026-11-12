@@ -1,7 +1,6 @@
-#!/usr/bin/env tsx
 import { setTimeout as sleep } from 'node:timers/promises'
-import { fileURLToPath } from 'node:url'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
+import { poll } from '#scripts/lib/poll'
 import { run_ship_detach } from './run-ship-detach'
 import { run_ship_probe } from './run-ship-probe'
 import { run_ship_stage } from './run-ship-stage'
@@ -17,9 +16,8 @@ import { run_ship_waiter } from './run-ship-waiter'
 // - `pending` — the chunk ran out with the ship still before its commit: issue the wait again.
 //
 // **A chunk ends below the five-minute prompt-cache TTL a lane child runs on** (`lane-child-marker.ts`),
-// so re-issuing it is the keep-alive: the next request reads the cached context back (66k tokens on
-// Opus 5.5, about $0.013) instead of writing it whole again after the wait (about $0.33) —
-// joshuafolkken/kit#5344. The heartbeat outlives the chunk by the session gap.
+// so re-issuing it keeps the next request on cached context instead of rewriting the whole context
+// (joshuafolkken/kit#5344). The heartbeat outlives the chunk by the session gap.
 
 const VERDICT = {
 	RETURNED: 'returned',
@@ -37,14 +35,13 @@ interface Waited {
 
 const CHUNK_MS = 270_000
 const POLL_MS = 2000
-const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const USAGE = 'Usage: josh ship:wait <N>'
 const NO_REPOSITORY_NOTE = 'not inside a git repository'
 
-const { COMMIT, ROUND_TWO, FOLLOWUP, REPORT } = run_ship_stage.STAGE
-const PAST_COMMIT: ReadonlySet<string> = new Set([ROUND_TWO, FOLLOWUP, REPORT])
+const { COMMIT, FOLLOWUP, REPORT } = run_ship_stage.STAGE
+const PAST_COMMIT: ReadonlySet<string> = new Set([FOLLOWUP, REPORT])
 
 // Past the commit in the current attempt: the record's `done` outlives a stop after the commit, so a
 // re-ship after a followup stop would read as committed before its own gate and review ran. `started`
@@ -76,27 +73,32 @@ function settled(repository: string, issue: string): Waited | undefined {
 	return ended(repository, issue)
 }
 
-async function poll(repository: string, issue: string, deadline: number): Promise<Waited> {
-	while (Date.now() < deadline) {
-		run_ship_waiter.beat(repository, issue)
-		const waited = settled(repository, issue)
+async function wait_within(repository: string, issue: string, deadline: number): Promise<Waited> {
+	return await poll.wait_for(
+		() => {
+			if (Date.now() >= deadline) return { verdict: VERDICT.PENDING }
+			run_ship_waiter.beat(repository, issue)
 
-		if (waited !== undefined) return waited
-
-		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the supervisor's progress
-		await sleep(POLL_MS)
-	}
-
-	return { verdict: VERDICT.PENDING }
+			return settled(repository, issue)
+		},
+		{ interval_ms: POLL_MS, sleeper: sleep },
+	)
 }
 
 // A `pending` chunk keeps the heartbeat for the next one; any other verdict ends the wait for good.
 async function wait_for(repository: string, issue: string, chunk_ms = CHUNK_MS): Promise<Waited> {
-	const waited = await poll(repository, issue, Date.now() + chunk_ms)
+	const waited = await wait_within(repository, issue, Date.now() + chunk_ms)
 
 	if (waited.verdict !== VERDICT.PENDING) run_ship_waiter.leave(repository, issue)
 
 	return waited
+}
+
+// The chunk counts from the process start, not the wait's: both clocks it is sized against start at the
+// session's call, and a `ship --detach` reaches the wait only after its preflight (joshuafolkken/kit#5625).
+// None left reads `pending` at once, so the re-issue gets fresh clocks.
+function chunk_left(): number {
+	return CHUNK_MS - performance.now()
 }
 
 // Each verdict carries what the session does next, so the instruction lives with the command.
@@ -131,15 +133,11 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	report(issue, await wait_for(repository, issue))
+	report(issue, await wait_for(repository, issue, chunk_left()))
 
 	return SUCCESS_EXIT_CODE
 }
 
 const run_ship_wait_cli = { CHUNK_MS, VERDICT, run, wait_for }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-	process.exitCode = await run(process.argv.slice(ARGV_OFFSET))
-}
 
 export { run_ship_wait_cli }

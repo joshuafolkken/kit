@@ -42,9 +42,12 @@ describe('run_merge_driver.printed', () => {
 })
 
 describe('run_merge_driver.read', () => {
-	it.each([OFFER, CONTROL])('reads back what print wrote: %j', (result) => {
-		expect(run_merge_driver.read(run_merge_driver.print(result))).toStrictEqual(result)
-	})
+	it.each([OFFER, CONTROL, { ...OFFER, outcome: 'failed', is_parked: true } as const])(
+		'reads back what print wrote: %j',
+		(result) => {
+			expect(run_merge_driver.read(run_merge_driver.print(result))).toStrictEqual(result)
+		},
+	)
 
 	it('reads only the last line, past the progress printed before it', () => {
 		expect(run_merge_driver.read(`progress\n${run_merge_driver.print(OFFER)}\n`)).toStrictEqual(

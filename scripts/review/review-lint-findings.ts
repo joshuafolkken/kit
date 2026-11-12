@@ -1,8 +1,8 @@
 import { review_lint_sections, type ReviewSection } from './review-lint-sections'
 
-// The finding-line checks of `review:lint` (`prompts/review-rubric.md` → "Review output format"): every
-// finding cites `file_path:line_number` and a severity, and a `low` carries its
-// `no failure scenario — <what you tried>` line. A round-2 first-round line cites the severity it
+// The finding-line checks of the review lint `review:submit --review` runs
+// (`prompts/review-rubric.md` → "Review output format"): every finding cites `file_path:line_number`
+// and a severity, and a `low` carries its `no failure scenario — <what you tried>` line. A round-2 first-round line cites the severity it
 // had (`(was high)`) and its resolution instead.
 
 interface ItemRule {

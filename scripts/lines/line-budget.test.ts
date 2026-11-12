@@ -1,7 +1,7 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 
 // joshuafolkken/kit#1425. Two claims are pinned here, and they are the two a headroom report can
@@ -53,7 +53,7 @@ const message_schema = z.object({ ruleId: z.string().nullish(), message: z.strin
 const result_schema = z.object({ filePath: z.string(), messages: z.array(message_schema) })
 const results_schema = z.array(result_schema)
 
-const ROOTS: Array<string> = []
+const make_directory = temporary_directory()
 
 function cache_location_of(key: string, root: string): string {
 	const probe_args = line_budget.probe_arguments({ key, options: OPTIONS, paths: [] }, root)
@@ -71,11 +71,7 @@ function resolve_to(options: Record<string, unknown>): void {
 }
 
 function make_root(): string {
-	const root = mkdtempSync(path.join(tmpdir(), PROJECT_ROOT_PREFIX))
-
-	ROOTS.push(root)
-
-	return root
+	return make_directory(PROJECT_ROOT_PREFIX)
 }
 
 // A file whose *physical* size is nothing like the number eslint will be made to report, so a test
@@ -109,10 +105,6 @@ function eslint_reply(entries: ReadonlyArray<[string, number]>): { stdout: strin
 		),
 	}
 }
-
-afterAll(() => {
-	for (const root of ROOTS) rmSync(root, { recursive: true, force: true })
-})
 
 beforeEach(() => {
 	execa_mock.mockReset()

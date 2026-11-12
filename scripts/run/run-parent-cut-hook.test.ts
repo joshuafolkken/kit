@@ -1,13 +1,15 @@
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { context_cut_payback } from '#scripts/cost-runtime/context-cut-payback'
 import type { CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
+import { hook_context_fixture } from '#tools/hooks/hook-context-fixture'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_headless } from './run-headless'
 import { run_parent_cut_hook, type ParentCutState } from './run-parent-cut-hook'
+
+const make_directory = temporary_directory()
 
 // joshuafolkken/kit#2947: a `backlogrun` parent past the shared threshold is steered to the hand-off at
 // its next call, not only at a merge.
@@ -47,7 +49,7 @@ function priced_on(billed: ReadonlyArray<number>): ParentCutState {
 
 // A payload naming a transcript in a fresh directory, so each test starts with no refusal recorded.
 function fresh_payload(): string {
-	const directory = mkdtempSync(path.join(tmpdir(), 'parent-cut-'))
+	const directory = make_directory('parent-cut-')
 
 	return JSON.stringify({ transcript_path: path.join(directory, 'session.jsonl') })
 }
@@ -71,6 +73,20 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.unstubAllEnvs()
+	vi.restoreAllMocks()
+})
+
+// joshuafolkken/kit#6683: a daemon answers calls from many launchers, so the carry record is read under
+// the call's own environment and process ancestry, never the answering process's.
+describe('run_parent_cut_hook.current_state', () => {
+	it("reads the carry record under the call's environment and ancestry", async () => {
+		const driving_carry = vi.spyOn(run_headless, 'driving_carry').mockResolvedValue(undefined)
+		const context = hook_context_fixture.of('/call', { CALL_ONLY: '1' })
+
+		await run_parent_cut_hook.current_state(context).carry()
+
+		expect(driving_carry).toHaveBeenCalledWith(context.env, context.ancestry)
+	})
 })
 
 describe('run_parent_cut_hook.parent_cut_reason — who is refused', () => {
@@ -188,7 +204,8 @@ describe('run_parent_cut_hook.parent_cut_reason — priced on the newest request
 
 describe('run_parent_cut_hook.PARENT_CUT_REASON', () => {
 	it('names the hand-off command and the procedure', () => {
-		expect(run_parent_cut_hook.PARENT_CUT_REASON).toContain('pnpm josh run:carry --cut')
+		expect(run_parent_cut_hook.PARENT_CUT_REASON).toContain('(`pnpm josh run:handoff-lanes`,')
+		expect(run_parent_cut_hook.PARENT_CUT_REASON).not.toContain('run:carry --cut')
 		expect(run_parent_cut_hook.PARENT_CUT_REASON).toContain('backlogrun-progress.md')
 	})
 

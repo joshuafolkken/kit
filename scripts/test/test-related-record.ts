@@ -1,8 +1,12 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import type { ChangedParts } from '#scripts/git/changed-paths'
 import type { TestRelatedRecord } from '#scripts/lane/lane-ledger-schema'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
+import { lane_paths } from '#scripts/lane/lane-paths'
+import { test_related_cap } from './test-related-cap'
+import type { TestReuse } from './test-related-reuse'
 import { related_scope, type RelatedScope } from './test-related-scope'
 import { unit_count_file } from './unit-count-file'
 
@@ -15,6 +19,8 @@ const COUNT_FILE_NAME = 'count'
 
 // The facts the run knew before vitest started: the scope, and the change it was resolved from.
 interface RunInput {
+	passed?: ReadonlyArray<string>
+	reuse?: TestReuse
 	scope: RelatedScope
 	root: string
 	// Repository-root-relative, as the change was read; `undefined` when it could not be.
@@ -29,6 +35,13 @@ interface RunInput {
 	branch?: ReadonlyArray<string> | undefined
 	// The name the run is recorded under when it is not the scope's own — `touched` for a `--touched` run.
 	kind?: string
+	// The changed files past the reach cap, narrowed to their direct importers, widest reach first
+	// (`test-related-cap.ts`).
+	over_cap?: ReadonlyArray<string>
+	// The branch change by half and base, read beside the run; `undefined` where git could not answer.
+	branch_parts?: ChangedParts | undefined
+	// How long selecting the tests took — the import graph and the importer index (joshuafolkken/kit#7248).
+	select_elapsed_ms?: number
 }
 
 interface RunResult {
@@ -56,7 +69,7 @@ function count_directory(): string | undefined {
 // A run that started no vitest writes none, which is an absent count rather than zero.
 async function with_test_count(
 	run: () => Promise<number>,
-): Promise<{ exit_code: number; test_files: number | undefined }> {
+): Promise<{ exit_code: number; test_files: number | undefined; passed?: ReadonlyArray<string> }> {
 	const directory = count_directory()
 
 	if (directory === undefined) return { exit_code: await run(), test_files: undefined }
@@ -67,7 +80,13 @@ async function with_test_count(
 	set_count_target(file)
 
 	try {
-		return { exit_code: await run(), test_files: unit_count_file.read_count(file) }
+		const exit_code = await run()
+
+		return {
+			exit_code,
+			test_files: unit_count_file.read_count(file),
+			passed: unit_count_file.read_files(file),
+		}
 	} finally {
 		set_count_target(previous)
 		rmSync(directory, { recursive: true, force: true })
@@ -91,9 +110,11 @@ function triggers_of(input: RunInput): Partial<TestRelatedRecord> {
 // **The run's own change is the branch's, where it was read** (joshuafolkken/kit#5041): a synced file
 // the split cannot vouch for is in `changed` without being this branch's change. Unread, it is what
 // neither a main sync nor the map's tree joined.
-function own_of(input: RunInput): ReadonlyArray<string> {
-	const { changed = [], branch } = input
-	const joined = new Set([...input.synced, ...input.since_map])
+function own_of(
+	input: Pick<RunInput, 'changed' | 'branch'> & Partial<Pick<RunInput, 'synced' | 'since_map'>>,
+): ReadonlyArray<string> {
+	const { changed = [], branch, synced = [], since_map = [] } = input
+	const joined = new Set([...synced, ...since_map])
 
 	return changed.filter((file) => branch?.includes(file) ?? !joined.has(file))
 }
@@ -113,27 +134,82 @@ function parts_of(input: RunInput): Record<'own' | 'synced' | 'since_map', Reado
 	}
 }
 
+function reuse_record(reuse: TestReuse | undefined): Partial<TestRelatedRecord> {
+	if (reuse === undefined) return {}
+
+	return {
+		reused: reuse.reused,
+		reuse_missed: reuse.missed,
+		reuse_reason: reuse.reason,
+		reuse_elapsed_ms: Math.round(reuse.elapsed_ms),
+	}
+}
+
+function select_record(select_elapsed_ms: number | undefined): Partial<TestRelatedRecord> {
+	return select_elapsed_ms === undefined ? {} : { select_elapsed_ms: Math.round(select_elapsed_ms) }
+}
+
+// How many files the cap narrowed, and the hub of them (joshuafolkken/kit#5699) — the one the run's
+// summary line names (`test_related_cap.hub_of`).
+function over_cap_record(
+	over_cap: ReadonlyArray<string> | undefined,
+	own: ReadonlyArray<string>,
+): Pick<TestRelatedRecord, 'over_cap' | 'over_cap_hub'> {
+	if (over_cap === undefined) return {}
+	const hub = test_related_cap.hub_of(over_cap, own)
+	const count = { over_cap: over_cap.length }
+
+	return hub === undefined ? count : { ...count, over_cap_hub: hub }
+}
+
+// joshuafolkken/kit#6982: a run whose `changed` swelled to ~1,500 left nothing that told an untracked
+// flood from a base that fell back to the default branch — nor (joshuafolkken/kit#7066) the branch
+// change from named files or moves since the last green.
+function branch_parts_record(
+	parts: ChangedParts | undefined,
+	own: ReadonlyArray<string>,
+): Partial<TestRelatedRecord> {
+	if (parts === undefined) return {}
+	const branch = new Set([...parts.tracked, ...parts.untracked])
+	const in_branch = own.filter((file) => branch.has(file)).length
+
+	return {
+		branch_tracked: parts.tracked.length,
+		branch_untracked: parts.untracked.length,
+		branch_base: parts.base,
+		changed_in_branch: in_branch,
+		changed_off_branch: own.length - in_branch,
+	}
+}
+
 function record_of(input: RunInput, result: RunResult): TestRelatedRecord {
 	const { own, synced, since_map } = parts_of(input)
 	const record = {
+		...reuse_record(input.reuse),
+		...branch_parts_record(input.branch_parts, own),
 		scope: input.kind ?? related_scope.scope_kind(input.scope),
 		changed: own.length,
 		synced: synced.length,
 		since_map: since_map.length,
 		readers: readers_of(input, new Set([...own, ...synced, ...since_map])),
 		...triggers_of(input),
+		...over_cap_record(input.over_cap, own),
+		...select_record(input.select_elapsed_ms),
 		elapsed_ms: Math.round(result.elapsed_ms),
 	}
 
 	return result.test_files === undefined ? record : { ...record, test_files: result.test_files }
 }
 
-// Best-effort, as every ledger write is.
+// Best-effort, as every ledger write is. `issue` is the lane it ran in, which `josh lane:breakdown`
+// reads its rows by (joshuafolkken/kit#5532).
 async function record_run(input: RunInput, result: RunResult, ledger?: string): Promise<void> {
-	await lane_ledger_write.record_test_related(record_of(input, result), ledger)
+	const issue = lane_paths.issue_here()
+
+	await lane_ledger_write.record_test_related({ ...record_of(input, result), issue }, ledger)
 }
 
-const test_related_record = { record_of, record_run, with_test_count }
+const test_related_record = { own_of, record_of, record_run, with_test_count }
 
 export type { RunInput, RunResult }
 export { test_related_record }

@@ -5,12 +5,17 @@ import { session_cite } from '#scripts/issue/session-cite'
 import { durable_state } from '#scripts/josh/durable-state'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { figure_format } from '#scripts/lib/figure-format'
-import { json_value } from '#scripts/lib/json-value'
 import { run_carry } from '#scripts/run/carry/run-carry'
-import { z } from 'zod'
+import {
+	lane_state_record,
+	type LaneRun,
+	type LaneState,
+	type LaneStateRecord,
+	type StuckProcess,
+} from './lane-state-record'
 
 // One record per lane of where it is in its life — opened, running, paused, ended — written only by
-// the lane commands (joshuafolkken/kit#4268), so a reader asks the record rather than guessing from
+// the lane commands and human-review stops, so a reader asks the record rather than guessing from
 // the `.env` mtime, the event stream or the `ps` state.
 //
 // **It is a `durable_state` path keyed on the common git directory**, in
@@ -27,44 +32,24 @@ import { z } from 'zod'
 // warned about and the command carries on, as it does when the record cannot be written at all — the
 // record never fails the command that keeps it.
 
-const STATE_PREFIX = durable_state.PREFIX.LANE_STATE
-const STATE_SUFFIX = '.json'
+// **The record's shape, name and read are `lane-state-record.ts`'s**, which the vitest config reads too.
 const LOCK_SUFFIX = '.lock'
 // A change holds the lock for one read and one rename; a wait this long means a holder is stuck.
 const LOCK_WAIT_MS = 5000
-const LANE_STATES = ['open', 'running', 'paused', 'ended'] as const
+const { HUMAN_REVIEW, LANE_STATES, STATE_SUFFIX } = lane_state_record
 // What a lane with no record is answered with: its state is unknown, so it keeps its place.
 const NO_STATE_HINT = 'no lane state — counted in use'
 
-type LaneState = (typeof LANE_STATES)[number]
-
-const lane_run_schema = z.object({ started_at: z.string(), owner_pid: z.number().optional() })
-
-// A process the last `lane:close` could not end even with a SIGKILL, and why (`lane-reap-settle.ts`).
-const stuck_schema = z.object({ pid: z.number(), reason: z.string() })
-
-const lane_state_schema = z.object({
-	issue: z.string(),
-	run: lane_run_schema.optional(),
-	state: z.enum(LANE_STATES),
-	launched_at: z.string().optional(),
-	changed_at: z.string(),
-	changed_by: z.string(),
-	stuck: z.array(stuck_schema).optional(),
-})
-
-type LaneRun = z.infer<typeof lane_run_schema>
-type LaneStateRecord = z.infer<typeof lane_state_schema>
-type StuckProcess = z.infer<typeof stuck_schema>
 // Each lane's record, by issue; a lane with none is left out (`read_states`).
 type LaneRecords = ReadonlyMap<string, LaneStateRecord>
 
 // The states each one moves to. A lane with no record yet (opened before the record existed) moves to
 // any of them.
 const TRANSITIONS: Record<LaneState, ReadonlyArray<LaneState>> = {
-	open: ['open', 'running', 'ended'],
-	running: ['running', 'paused', 'ended'],
+	open: ['open', 'running', HUMAN_REVIEW, 'ended'],
+	running: ['running', 'paused', HUMAN_REVIEW, 'ended'],
 	paused: ['paused', 'running', 'ended'],
+	[HUMAN_REVIEW]: [HUMAN_REVIEW, 'running', 'ended'],
 	ended: ['ended', 'open'],
 }
 
@@ -86,7 +71,10 @@ type RecordOutcome =
 	{ kind: 'written'; record: LaneStateRecord } | { kind: 'skipped'; reason: string }
 
 function state_path(directory: string, issue: string): string {
-	return durable_state.path(STATE_PREFIX, directory, `-${issue}${STATE_SUFFIX}`)
+	return path.join(
+		durable_state.ensure(durable_state.root()),
+		lane_state_record.record_name(directory, issue),
+	)
 }
 
 function is_allowed(from: LaneState | undefined, to: LaneState): boolean {
@@ -94,9 +82,7 @@ function is_allowed(from: LaneState | undefined, to: LaneState): boolean {
 }
 
 function read_record(directory: string, issue: string): LaneStateRecord | undefined {
-	const raw = stamp_file.read_stamp_text(state_path(directory, issue))
-
-	return raw === undefined ? undefined : json_value.parse_with(raw, lane_state_schema)
+	return lane_state_record.read_record_file(state_path(directory, issue))
 }
 
 function write_record(directory: string, record: LaneStateRecord): void {
@@ -331,4 +317,6 @@ const lane_state = {
 }
 
 export { lane_state }
-export type { LaneChange, LaneRecords, LaneState, LaneStateRecord, RecordOutcome, StuckProcess }
+export type { LaneChange, LaneRecords, RecordOutcome }
+
+export { type LaneState, type LaneStateRecord, type StuckProcess } from './lane-state-record'

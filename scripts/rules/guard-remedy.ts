@@ -30,6 +30,7 @@ const STOP_NOTIFY = 'the hook sends the notify itself; it blocks only when the s
 const HOLD_RELEASE = 'the hook releases the hold itself; it blocks only when that release fails'
 const FILING_OFFER = 'the filing needs a title and a body only the model can write'
 const CONCISE_REPLY = 'the shorter reply is prose only the model can write'
+const NARROW_ENOUGH = 'which reading is narrow enough to keep is the author’s call'
 
 function rewrite(): GuardRemedy {
 	return { remedy: 'rewrite', why: REWRITTEN }
@@ -57,8 +58,11 @@ const GUARD_REMEDIES: Readonly<Record<string, GuardRemedy>> = {
 	),
 	'rule-body': judgment('a trigger-plus-pointer line is written, not derived'),
 	'direct-filing': judgment(ANOTHER_COMMAND),
+	'unasked-filing': judgment(NO_RUN),
 	'direct-issue-comment': judgment(ANOTHER_COMMAND),
 	'direct-issue-read': judgment(ANOTHER_COMMAND),
+	'direct-git-status': judgment(ANOTHER_COMMAND),
+	'direct-vitest-run': judgment(ANOTHER_COMMAND),
 	'direct-pr-create': judgment(ANOTHER_COMMAND),
 	'pr-merge': judgment(ANOTHER_COMMAND),
 	'josh-git-bare': judgment(ANOTHER_COMMAND),
@@ -66,6 +70,7 @@ const GUARD_REMEDIES: Readonly<Record<string, GuardRemedy>> = {
 	'pre-gate-cut': judgment(ANOTHER_COMMAND),
 	'implementation-cut': judgment(ANOTHER_COMMAND),
 	'round-one-check-related': judgment(ANOTHER_COMMAND),
+	'repeat-check-related': judgment(ANOTHER_COMMAND),
 	'early-heartbeat': judgment(ANOTHER_COMMAND),
 	'poll-loop': judgment(ANOTHER_COMMAND),
 	'lane-park': judgment(ANOTHER_COMMAND),
@@ -73,6 +78,9 @@ const GUARD_REMEDIES: Readonly<Record<string, GuardRemedy>> = {
 	'lane-interactive-ask': judgment(ANOTHER_COMMAND),
 	'agent-model': judgment("which model fits the unit is the author's call"),
 	'investigator-foreground': judgment('which reads go beside the dispatch is the author’s call'),
+	'consultation-investigation': judgment(NARROW_ENOUGH),
+	'consultation-investigation-codex': judgment(NARROW_ENOUGH),
+	'consultation-handoff': judgment(ANOTHER_COMMAND),
 	'lane-carry-conflict': judgment(ANOTHER_COMMAND),
 	'lane-switch-main': judgment(ANOTHER_COMMAND),
 	'lane-direct-tool': rewrite(), // a one-command line behind `pnpm josh reserved-run <weight> --`
@@ -93,6 +101,7 @@ const GUARD_REMEDIES: Readonly<Record<string, GuardRemedy>> = {
 	'destructive-command': judgment(NO_RUN),
 	'repo-admin': judgment(NO_RUN),
 	'protected-file': judgment(NO_RUN),
+	egress: judgment(NO_RUN),
 	// The `Stop` rows: the hook judges a finished reply, so it has no call to rewrite.
 	'stop-notify': judgment(STOP_NOTIFY),
 	'filing-offer': judgment(FILING_OFFER),

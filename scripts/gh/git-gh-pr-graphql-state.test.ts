@@ -1,7 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { forget_branch_rules } from './git-gh-branch-rules'
 import { git_gh_conditional } from './git-gh-conditional'
-import { git_gh_exec } from './git-gh-exec'
+import { git_gh_exec, type GhApiRequest } from './git-gh-exec'
 import { git_gh_poll_read } from './git-gh-poll-read'
 import {
 	check_runs_pages,
@@ -24,6 +24,7 @@ import {
 import { GRAPHQL_PATH, MERGE_STATE_QUERY, NO_MERGE_STATE_MESSAGE } from './git-gh-pr-graphql-state'
 import { forget_pr_numbers } from './git-gh-pr-read'
 import { pr_get_state_snapshot } from './git-gh-pr-snapshot'
+import { TRANSPORT_ENV_VAR } from './git-gh-transport'
 import { evaluate_pr_state } from './git-pr-checks-eval'
 import { parse_pr_state_snapshot } from './git-pr-checks-parse'
 
@@ -78,12 +79,26 @@ function asked_graphql(): boolean {
 	return mocked_api.mock.calls.some(([request]) => request.path === GRAPHQL_PATH)
 }
 
+// The snapshot query (joshuafolkken/kit#6786) goes first on a GraphQL-capable session, so the
+// merge-state request is picked out by its query rather than by the path they share.
+function merge_state_requests(): Array<GhApiRequest> {
+	return mocked_api.mock.calls
+		.map(([request]) => request)
+		.filter(
+			(request) =>
+				request.path === GRAPHQL_PATH && request_body(request)['query'] === MERGE_STATE_QUERY,
+		)
+}
+
 beforeEach(() => {
-	vi.clearAllMocks()
 	mocked_conditional.mockImplementation(conditional_read_over(mocked_api))
 	forget_pr_numbers()
 	forget_branch_rules()
 	git_gh_poll_read.forget_poll_reads()
+})
+
+afterEach(() => {
+	vi.unstubAllEnvs()
 })
 
 describe('pr_get_state_snapshot — a detail refused as too many files changed', () => {
@@ -99,10 +114,10 @@ describe('pr_get_state_snapshot — a detail refused as too many files changed',
 	it('asks GraphQL for the listing row node', async () => {
 		stub_too_large({ graphql: CLEAN_ANSWER })
 		await pr_get_state_snapshot(PR_BRANCH)
-		const requests = mocked_api.mock.calls.map(([request]) => request)
-		const graphql_request = find_request(requests, GRAPHQL_PATH)
+		const requests = merge_state_requests()
 
-		expect(request_body(graphql_request)).toStrictEqual({
+		expect(requests).toHaveLength(1)
+		expect(request_body(find_request(requests, GRAPHQL_PATH))).toStrictEqual({
 			query: MERGE_STATE_QUERY,
 			variables: { id: NODE_ID },
 		})
@@ -120,12 +135,20 @@ describe('pr_get_state_snapshot — no merge state to judge from', () => {
 		await expect(pr_get_state_snapshot(PR_BRANCH)).rejects.toThrow(NO_MERGE_STATE_MESSAGE)
 	})
 
+	it('throws with the reason on a REST session, which sends no GraphQL', async () => {
+		stub_too_large({ graphql: CLEAN_ANSWER })
+		vi.stubEnv(TRANSPORT_ENV_VAR, 'rest')
+
+		await expect(pr_get_state_snapshot(PR_BRANCH)).rejects.toThrow(NO_MERGE_STATE_MESSAGE)
+		expect(asked_graphql()).toBe(false)
+	})
+
 	it('keeps any other detail failure as it was, without asking GraphQL', async () => {
 		const failure = gh_failure()
 
 		stub_too_large({ graphql: CLEAN_ANSWER, detail_failure: failure })
 
 		await expect(pr_get_state_snapshot(PR_BRANCH)).rejects.toBe(failure)
-		expect(asked_graphql()).toBe(false)
+		expect(merge_state_requests()).toEqual([])
 	})
 })

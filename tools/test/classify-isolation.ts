@@ -40,6 +40,8 @@ const SUBPROCESS_TOKENS: ReadonlyArray<string> = [
 const FS_WRITE_TOKENS: ReadonlyArray<string> = [
 	'writeFileSync',
 	'writeFile',
+	// `#tools/test/write-file` — the shared helper hides its `writeFileSync` from the caller's text.
+	'write_file',
 	'appendFileSync',
 	'mkdirSync',
 	'mkdtempSync',

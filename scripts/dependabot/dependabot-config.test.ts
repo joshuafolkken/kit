@@ -10,16 +10,13 @@ import { describe, expect, it } from 'vitest'
 // disabled on the line, as in ci-yml-fixture — rather than reached through an index signature,
 // which would turn a misspelled key into `undefined` and make an assertion pass without testing.
 interface DependabotGroup {
-	// eslint-disable-next-line @typescript-eslint/naming-convention -- Dependabot config key
 	'update-types'?: ReadonlyArray<string>
 	patterns?: ReadonlyArray<string>
 }
 
 interface DependabotUpdate {
-	// eslint-disable-next-line @typescript-eslint/naming-convention -- Dependabot config key
 	'package-ecosystem'?: string
 	schedule?: { interval?: string }
-	// eslint-disable-next-line @typescript-eslint/naming-convention -- Dependabot config key
 	'open-pull-requests-limit'?: number
 	groups?: Record<string, DependabotGroup>
 }
@@ -48,6 +45,7 @@ const LOCAL_ACTION_PREFIX = './'
 const ACTION_FILE = 'action.yml'
 // An action only a local composite action runs, so the resolver is shown to follow them.
 const COMPOSITE_ONLY_ACTION = 'pnpm/setup'
+const ACTION_REPOSITORY_SEGMENTS = 2
 
 function by_name(left: string, right: string): number {
 	return left.localeCompare(right)
@@ -57,6 +55,11 @@ function local_action(step: WorkflowStep): string | undefined {
 	if (step.uses?.startsWith(LOCAL_ACTION_PREFIX) !== true) return undefined
 
 	return path.join(step.uses, ACTION_FILE)
+}
+
+// Dependabot names an action by its repository, so `actions/cache/restore` is `actions/cache`.
+function action_repository(name: string): string {
+	return name.split('/').slice(0, ACTION_REPOSITORY_SEGMENTS).join('/')
 }
 
 // A local composite action is replaced by the steps it runs, so an action it adds is counted too.
@@ -76,7 +79,7 @@ function publish_actions(): ReadonlyArray<string> {
 	)
 	const names = resolve_steps(job_steps)
 		.filter((step) => step.uses !== undefined)
-		.map((step) => ci_yml_fixture.action_name(step))
+		.map((step) => action_repository(ci_yml_fixture.action_name(step)))
 
 	return [...new Set(names)].toSorted(by_name)
 }

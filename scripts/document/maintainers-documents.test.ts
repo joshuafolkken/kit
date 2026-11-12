@@ -2,7 +2,13 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { package_file } from '#scripts/claude/skill-fixture'
 import { safe_chain_preinstall } from '#scripts/safe-chain/preinstall-command'
 import { describe, expect, it } from 'vitest'
-import { linked_paths, read_document, read_unwrapped } from './ai-document-fixture'
+import {
+	CONTRIBUTING_DOC,
+	has_japanese_prose,
+	linked_paths,
+	read_document,
+	read_unwrapped,
+} from './ai-document-fixture'
 
 // Maintainer content sits apart from the user documentation (joshuafolkken/kit#2993): one index
 // reaches every maintainer page, the user lists reach that index instead of the pages, and the
@@ -14,7 +20,9 @@ const README = 'README.md'
 const OVERVIEW = 'docs/overview.md'
 const HOW_TO_INDEX = 'docs/how-to.md'
 const TROUBLESHOOTING = 'docs/troubleshooting.md'
-const ENTRY_DOCUMENTS: ReadonlyArray<string> = [README, OVERVIEW, HOW_TO_INDEX]
+// The README reaches the maintainer index through the contributing guide its "Contributing" link
+// opens (joshuafolkken/kit#7241).
+const ENTRY_DOCUMENTS: ReadonlyArray<string> = [CONTRIBUTING_DOC, OVERVIEW, HOW_TO_INDEX]
 const USER_DOCS_DIRECTORY = 'docs'
 // Maintainer pages announce their audience with one of these phrases: the index-level pages say "For
 // kit maintainers", the rationale pages open with "Rationale behind" (joshuafolkken/kit#4188), and the
@@ -51,16 +59,24 @@ const INSTALLER_PIN_KEYS: ReadonlyArray<string> = [
 	'SAFE_CHAIN_INSTALLER_VERSION',
 	'SAFE_CHAIN_INSTALLER_SHA256',
 ]
-// A verbatim quote of a Japanese prompt heading or literal sits in a code span, a fence or double
-// quotes (`docs/maintainers/README.md` → "Language"); everything else is English.
-const QUOTED_SPANS = /```[\s\S]*?```|`[^`\n]*`|"[^"\n]*"/gu
-const JAPANESE = /[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}]/u
+const SECRETS_SECTION = /^## Secrets$([\s\S]*?)^## /mu
+const GH_WRITE_ROUTES: ReadonlyArray<string> = [
+	'issue:file',
+	'issue:comment',
+	'issue:priority',
+	'git',
+	'pr',
+]
 
 // GitHub's anchor for a plain-text heading: lower case, spaces as hyphens.
 function heading_anchors(text: string): Array<string> {
 	return [...text.matchAll(HEADING_LINE)].map((match) =>
 		(match[1] ?? '').toLowerCase().replaceAll(' ', '-'),
 	)
+}
+
+function secrets_section(): string {
+	return SECRETS_SECTION.exec(read_document(SECURITY))?.[1] ?? ''
 }
 
 interface Manifest {
@@ -94,14 +110,12 @@ function published_entries(): Array<string> {
 
 describe('the maintainer documentation language', () => {
 	it.each(markdown_under(MAINTAINERS_DIRECTORY))('%s carries no Japanese prose', (path) => {
-		expect(read_document(path).replaceAll(QUOTED_SPANS, '')).not.toMatch(JAPANESE)
+		expect(has_japanese_prose(read_document(path))).toBe(false)
 	})
 
 	it('reads a quoted Japanese heading as a quote, not as prose', () => {
-		const quoted = 'See `wip-cap.md` → "規則" and `## 背景`.'
-
-		expect(quoted.replaceAll(QUOTED_SPANS, '')).not.toMatch(JAPANESE)
-		expect('The 規則 section.'.replaceAll(QUOTED_SPANS, '')).toMatch(JAPANESE)
+		expect(has_japanese_prose('See `wip-cap.md` → "規則" and `## 背景`.')).toBe(false)
+		expect(has_japanese_prose('The 規則 section.')).toBe(true)
 	})
 })
 
@@ -174,6 +188,19 @@ describe('the security policy', () => {
 
 	it.each(INSTALLER_PIN_KEYS)('verifies the installer against the pinned %s', (key) => {
 		expect(read_document(SECURITY)).toContain(`\`${key}\``)
+	})
+
+	// joshuafolkken/kit#6759: the egress refusal points here, so the section says what it refuses.
+	it('refuses a direct gh write in the Secrets section', () => {
+		const section = secrets_section()
+
+		expect(section).toContain('refuses a direct `gh` write')
+		expect(section).toContain('`is_gh_write`')
+		expect(section).not.toContain('`gh` against github.com, `git` and `pnpm` stay allowed')
+	})
+
+	it.each(GH_WRITE_ROUTES)('names the josh write route %s in the Secrets section', (route) => {
+		expect(secrets_section()).toContain(`\`${route}\``)
 	})
 })
 

@@ -1,10 +1,10 @@
 // The pure decisions `josh run:review` makes, kept apart from the side effects the same way
 // `run-merge.ts` is kept apart from `run-merge-steps.ts`.
 //
-// `run:review` starts the gate in the background and writes the `/code-review` brief in one call, so a
-// lane child launches both from a single command and the two overlap rather than running one after the
-// other. Two facts have to be decided from what the stamps say, and both are decided here so a test can
-// pin them without a gate ever running:
+// `run:review` starts the gate and, once it is green, writes the `/code-review` brief in one call
+// (joshuafolkken/kit#5938), so round 1 reads the tree the gate passed. Two facts have to be decided
+// from what the stamps say, and both are decided here so a test can pin them without a gate ever
+// running:
 //
 // - **whether the review verdict may be adopted** — only over a green gate. Started together, the two
 //   no longer guarantee that by their order, so it has to be a decision (`adopt_verdict`).

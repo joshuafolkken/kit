@@ -1,9 +1,9 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { ALIASES } from '#scripts/josh/josh-aliases'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { propagate } from './propagate'
 
 const KIT = '@joshuafolkken/kit'
@@ -16,9 +16,10 @@ const MISSING_NAME = 'needs a repository'
 const KIT_BIN = { josh: 'dist/josh.js' }
 
 const state = { workspace: '' }
+const make_directory = temporary_directory()
 
 function write_repository(manifest: Record<string, unknown>): string {
-	const repository_path = mkdtempSync(path.join(state.workspace, 'repo-'))
+	const repository_path = make_directory(path.join(state.workspace, 'repo-'))
 
 	writeFileSync(path.join(repository_path, MANIFEST), JSON.stringify(manifest))
 
@@ -39,11 +40,7 @@ function make_library(name: string): string {
 }
 
 beforeEach(() => {
-	state.workspace = mkdtempSync(path.join(tmpdir(), 'propagate-guard-'))
-})
-
-afterEach(() => {
-	rmSync(state.workspace, { recursive: true, force: true })
+	state.workspace = make_directory('propagate-guard-')
 })
 
 // The guard is also the concurrency answer: in the per-repository session model exactly one session

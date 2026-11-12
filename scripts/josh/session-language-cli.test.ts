@@ -1,3 +1,5 @@
+import { agent_session_role } from '#scripts/agent/agent-session-role'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { session_language_cli, type LivePorts } from './session-language-cli'
 
@@ -9,11 +11,13 @@ const {
 	format_line,
 	is_run_live,
 	prompt_lines,
+	print_prompt_lines,
 } = session_language_cli
 
 const DEFAULT_RESULT = { lang: DEFAULT_SESSION_LANG, is_default: true }
 const ENGLISH_RESULT = { lang: 'en', is_default: false }
 const ENGLISH_LINE = `Session language (${ENV_KEY}): en`
+const SCOPE_LINE = agent_session_role.scope_line()
 const GIT_DIRECTORY = '/repository/.git'
 // Characters, a little above the line as written: it is injected on every prompt while a run is live.
 const BOARD_LINE_LIMIT = 130
@@ -72,21 +76,56 @@ describe('format_line', () => {
 // session asked about a run it was not driving never saw it.
 describe('prompt_lines', () => {
 	it('adds the run:board line while a backlogrun is live', () => {
-		expect(prompt_lines(ENGLISH_RESULT, true)).toStrictEqual([ENGLISH_LINE, BOARD_LINE])
+		expect(prompt_lines(ENGLISH_RESULT, true)).toStrictEqual([SCOPE_LINE, ENGLISH_LINE, BOARD_LINE])
 	})
 
 	it('names the command to answer a progress question with', () => {
 		expect(BOARD_LINE).toContain('pnpm josh run:board --chat')
 	})
 
-	it('prints the language line alone when no backlogrun is live', () => {
-		expect(prompt_lines(ENGLISH_RESULT, false)).toStrictEqual([ENGLISH_LINE])
+	it('prints the scope and language when no backlogrun is live', () => {
+		expect(prompt_lines(ENGLISH_RESULT, false)).toStrictEqual([SCOPE_LINE, ENGLISH_LINE])
 	})
 
-	it('prints nothing for the ja default when no backlogrun is live', () => {
-		expect(prompt_lines(DEFAULT_RESULT, false)).toStrictEqual([])
+	it('still prints the session scope for the ja default', () => {
+		expect(prompt_lines(DEFAULT_RESULT, false)).toStrictEqual([SCOPE_LINE])
 	})
 
+	it('appends the run:handoff line when the payload asked for one', () => {
+		expect(prompt_lines(DEFAULT_RESULT, false, 'handoff')).toStrictEqual([SCOPE_LINE, 'handoff'])
+	})
+
+	it('prints the run:handoff line the hook payload asks for', async () => {
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+		const payload = '{"prompt":"fullrun #1","model":"claude-fable-5-1"}'
+
+		await print_prompt_lines(async () => payload)
+
+		expect(info.mock.calls.flat().join('\n')).toContain('pnpm josh run:handoff fullrun')
+		info.mockRestore()
+	})
+})
+
+describe('lane child prompt guidance', () => {
+	it.each(['claude-fable-5-1', 'gpt-6.1-astra'])(
+		'omits consultation handoff guidance for a lane child on %s',
+		async (model) => {
+			const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+			const child = vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(true)
+
+			try {
+				await print_prompt_lines(async () => JSON.stringify({ prompt: 'fullrun #1', model }))
+
+				expect(info.mock.calls.flat().join('\n')).not.toContain('Consultation model:')
+			} finally {
+				child.mockRestore()
+				info.mockRestore()
+			}
+		},
+	)
+})
+
+describe('board line bound', () => {
 	it('keeps the board line within its bound', () => {
 		expect(BOARD_LINE.length).toBeLessThanOrEqual(BOARD_LINE_LIMIT)
 	})
@@ -114,6 +153,9 @@ describe('is_run_live', () => {
 			throw new Error('unreadable stamp')
 		})
 
-		expect(prompt_lines(ENGLISH_RESULT, await is_run_live(ports))).toStrictEqual([ENGLISH_LINE])
+		expect(prompt_lines(ENGLISH_RESULT, await is_run_live(ports))).toStrictEqual([
+			SCOPE_LINE,
+			ENGLISH_LINE,
+		])
 	})
 })

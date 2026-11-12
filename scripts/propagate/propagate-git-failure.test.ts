@@ -302,7 +302,7 @@ describe('propagate_git_failure.attribute', () => {
 		expect(attributed.detail).toContain(AUDIT_LINE)
 	})
 
-	// The report used to say the upgrade and the sync were left uncommitted. They had been committed.
+	// The report must distinguish committed upgrade/sync changes from the failed git step.
 	it('records what the failure really left rather than the standing note', () => {
 		stub_committed_unpushed()
 		vi.mocked(propagate_git.is_clean).mockReturnValue(true)

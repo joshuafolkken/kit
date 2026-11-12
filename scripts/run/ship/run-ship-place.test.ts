@@ -6,6 +6,7 @@ const lane_use_mock = vi.hoisted(() => vi.fn())
 const list_lanes_mock = vi.hoisted(() => vi.fn())
 const place_waiting_mock = vi.hoisted(() => vi.fn())
 const mark_mock = vi.hoisted(() => vi.fn())
+const sleep_mock = vi.hoisted(() => vi.fn<() => Promise<void>>())
 const REPOSITORY = vi.hoisted(() => '/repo/.git')
 
 vi.mock('#scripts/lane/lane-capacity', () => ({
@@ -21,7 +22,7 @@ vi.mock('#scripts/lane/lane-handoff', () => ({
 vi.mock('#scripts/git/git-common-directory', () => ({
 	git_common_directory: { repository: (): string => REPOSITORY },
 }))
-vi.mock('node:timers/promises', () => ({ setTimeout: async (): Promise<void> => undefined }))
+vi.mock('node:timers/promises', () => ({ setTimeout: sleep_mock }))
 
 const { run_ship_place } = await import('./run-ship-place')
 const { run_ship_stage } = await import('./run-ship-stage')
@@ -53,6 +54,7 @@ beforeEach(() => {
 	place_waiting_mock.mockReset().mockReturnValue(false)
 	vi.spyOn(run_ship_stage, 'mark_place_waiting').mockImplementation(mark_mock)
 	mark_mock.mockReset()
+	sleep_mock.mockReset().mockResolvedValue(undefined)
 })
 
 // joshuafolkken/kit#4466: the freed place may have gone to the next launch, so a followup stop waits for a
@@ -73,6 +75,7 @@ describe('run_ship_place.await_place on a followup stop', () => {
 		await run_ship_place.await_place(LANE, 'followup')
 
 		expect(lane_use_mock).toHaveBeenCalledTimes(PLACE_POLLS)
+		expect(sleep_mock).toHaveBeenCalledTimes(PLACE_POLLS)
 	})
 
 	it('waits on nothing when the lane limit cannot be read', async () => {

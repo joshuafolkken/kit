@@ -10,7 +10,12 @@ const withdraw_mock = vi.hoisted(() => vi.fn())
 const CHILD = vi.hoisted(() => '4926')
 const EVENTS = vi.hoisted(() => [
 	{ pos: 1, at: '2026-10-26T00:00:00.000Z', kind: 'child-launch', text: `#${CHILD} dispatched` },
-	{ pos: 2, at: '2026-10-26T00:01:00.000Z', kind: 'note', text: `#${CHILD} yielded its lane: x` },
+	{
+		pos: 2,
+		at: '2026-10-26T00:01:00.000Z',
+		kind: 'note',
+		text: `#${CHILD} yielded its lane: overlaps #6207`,
+	},
 ])
 
 vi.mock('#scripts/issue/issue-state-cli', () => ({
@@ -43,7 +48,6 @@ vi.mock('./run-merge-steps', () => ({
 }))
 vi.mock('#scripts/run/run-label', () => ({ run_label: { unmark: vi.fn() } }))
 
-const { lane_yield } = await import('#scripts/lane/lane-yield')
 const { run_merge_cli } = await import('./run-merge-cli')
 
 function context(): NonNullable<ReturnType<typeof run_merge_cli.parse>> {
@@ -72,6 +76,10 @@ describe('run_merge_cli.merge_child — a child that yielded its lane', () => {
 	it('closes its lane named as the yield', async () => {
 		await run_merge_cli.merge_child(context())
 
-		expect(withdraw_mock).toHaveBeenCalledWith({ issue: CHILD }, lane_yield.YIELD_REASON, 'yield')
+		expect(withdraw_mock).toHaveBeenCalledWith(
+			{ issue: CHILD },
+			'yielded to #6207, which held one of its planned files; re-queues after #6207 merges',
+			'yield',
+		)
 	})
 })

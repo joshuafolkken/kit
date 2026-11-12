@@ -1,9 +1,11 @@
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { hook_context } from '#scripts/hooks/hook-context'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_handoff } from '#scripts/lane/lane-handoff'
 import { run_park } from '#scripts/run/park/run-park'
+import { hook_context_fixture } from '#tools/hooks/hook-context-fixture'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { lane_park } from './lane-park'
@@ -27,7 +29,8 @@ const APPLY_PARK_EDIT = `gh issue edit ${ISSUE} --add-label needs-decision`
 const RUN_PARK = `pnpm josh run:park ${ISSUE} --body-file /tmp/b.md`
 const NOW_MS = 1_700_000_000_000
 const SAYS_NOTHING = 'says nothing about %j'
-const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'lane-park-'))
+const make_directory = temporary_directory('suite')
+const WORK_DIRECTORY = make_directory('lane-park-')
 // The directory vitest was launched from, restored before WORK_DIRECTORY is removed. The suite pins its
 // working directory to the non-lane WORK_DIRECTORY per test to stay hermetic: the trigger reads the
 // live process.cwd() to decide whether a checkout is a lane, so a run started inside a lane worktree
@@ -39,7 +42,7 @@ const WRITTEN_TRANSCRIPTS = new Set<string>()
 
 function rules_claiming(command: string): number {
 	return delivered_rules.DELIVERED_RULES.filter((rule) =>
-		rule.is_trigger({ name: BASH, input: { command } }),
+		rule.is_trigger({ name: BASH, input: { command } }, hook_context.from_process()),
 	).length
 }
 
@@ -70,8 +73,6 @@ afterAll(() => {
 	for (const transcript of WRITTEN_TRANSCRIPTS) {
 		rmSync(delivered_rules.delivery_path(RULE_ID, transcript), { force: true })
 	}
-
-	rmSync(WORK_DIRECTORY, { recursive: true, force: true })
 })
 
 describe('cwd isolation', () => {
@@ -155,7 +156,7 @@ describe('is_parking_child', () => {
 		const handed_off = vi.spyOn(lane_handoff, 'is_handed_off').mockReturnValue(true)
 
 		expect(lane_park.is_parking_child(WORK_DIRECTORY)).toBe(false)
-		expect(handed_off).toHaveBeenCalledWith(WORK_DIRECTORY)
+		expect(handed_off).toHaveBeenCalledWith(WORK_DIRECTORY, process.env)
 	})
 
 	it('reads a session with no dispatch mark as not parking, without probing the ship', () => {
@@ -198,6 +199,28 @@ describe('is_unparked_child', () => {
 
 		expect(lane_park.is_unparked_child(WORK_DIRECTORY)).toBe(false)
 		expect(parked).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#6973: the row reads the lane child from the hook call's context, not the process.
+describe('lane_park.ROW — the call context', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('reads the dispatch mark and the park record under the context cwd and env', () => {
+		const environment = { [lane_child_marker.KEY]: ISSUE }
+		const is_child = vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(true)
+
+		vi.spyOn(lane_handoff, 'is_handed_off').mockReturnValue(false)
+		const parked = vi.spyOn(run_park, 'is_parked_sync').mockReturnValue(false)
+		const call = { name: BASH, input: { command: CONFIRMATION_NOTIFY } }
+
+		expect(
+			lane_park.ROW.is_trigger(call, hook_context_fixture.of(LANE_DIRECTORY, environment)),
+		).toBe(true)
+		expect(is_child).toHaveBeenCalledWith(LANE_DIRECTORY, environment)
+		expect(parked).toHaveBeenCalledWith(ISSUE, LANE_DIRECTORY)
 	})
 })
 

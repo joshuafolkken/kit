@@ -1,10 +1,8 @@
 import path from 'node:path'
 import { file_reader } from '#scripts/lib/read-file'
 
-// The scope expansion `prompts/refactoring.md` §4.3 used to describe in prose:
-// from the seed files, follow imports both ways — the files a seed imports and the files that import a
-// seed — for up to three stages, stopping as soon as a stage finds nothing new. Walking the import
-// graph is exactly computable, so it is computed here rather than read and traced by hand.
+// Bidirectional import traversal makes refactor scope reproducible: follow imports and importers
+// from the seeds for up to three stages, stopping when a stage finds nothing new.
 
 // `import ... from '<spec>'` and `export ... from '<spec>'` both re-export from a specifier; the group
 // captures it. `from` is matched as a word so an identifier ending in `from` is not mistaken for the

@@ -1,3 +1,4 @@
+import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { git_stash } from '#scripts/git/stash/git-stash'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { issue_read_cli, type BlockRead } from '#scripts/issue/issue-read-cli'
@@ -7,8 +8,10 @@ import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { error_text } from '#scripts/lib/error-message'
 import { run_ship_preflight } from '#scripts/run/ship/run-ship-preflight'
 import { latest_scope_cli } from '#scripts/version/latest-scope-cli'
+import { run_investigation_record, type InvestigationRecord } from './run-investigation-record'
 import { run_prep, type PrepParts } from './run-prep'
 import { run_prep_locate } from './run-prep-locate'
+import { run_prep_summary } from './run-prep-summary'
 
 // `josh run:prep <N>` — one call for the reads a `fullrun` makes before its first edit:
 // the issue body and comments (`issue:read`), the state, labels and
@@ -24,7 +27,8 @@ import { run_prep_locate } from './run-prep-locate'
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const USAGE = 'Usage: josh run:prep <issue-number>'
+const USAGE = 'Usage: josh run:prep <issue-number> [--summary]'
+const SUMMARY_FLAG = '--summary'
 const LANE_SKIP_SCOPE = 'not asked'
 const LANE_SKIP_REASON =
 	'a dispatched lane child does not run josh latest — the parent does, once per session'
@@ -41,6 +45,12 @@ interface PrepReads {
 	has_changes: boolean
 	locations: string
 	ship_problems: ReadonlyArray<string>
+	investigation: InvestigationRecord | undefined
+}
+
+interface SummaryRead {
+	body: string
+	text: string
 }
 
 // Exactly one issue number, or the call is refused: `run:prep` prepares one run, and a second number
@@ -74,7 +84,7 @@ function latest_decision(): LatestDecision {
 		return { scope: LANE_SKIP_SCOPE, reason: LANE_SKIP_REASON }
 	}
 
-	return latest_scope_cli.decide()
+	return latest_scope_cli.scope_decision()
 }
 
 // Whether a dispatched lane child's tree holds uncommitted work. A lane child that popped
@@ -94,16 +104,18 @@ async function lane_has_changes(): Promise<boolean> {
 }
 
 async function gather(issue_number: string): Promise<PrepReads> {
-	const [content, state, has_changes, ship_problems] = await Promise.all([
+	const [content, state, has_changes, ship_problems, investigation] = await Promise.all([
 		issue_read_cli.read_block(issue_number),
 		issue_state_cli.read_issue(issue_number),
 		lane_has_changes(),
 		run_ship_preflight.ahead(issue_number),
+		run_investigation_record.load(issue_number),
 	])
 	// Located from the body just read, so it waits for that read rather than joining the batch above.
 	const locations = await run_prep_locate.locate(content.kind === 'ok' ? content.block : '')
+	const latest = latest_decision()
 
-	return { content, state, latest: latest_decision(), has_changes, locations, ship_problems }
+	return { content, state, latest, has_changes, locations, ship_problems, investigation }
 }
 
 function content_body(issue_number: string, content: BlockRead): string {
@@ -124,6 +136,7 @@ function to_parts(issue_number: string, reads: PrepReads): PrepParts {
 		has_changes: reads.has_changes,
 		locations: reads.locations,
 		ship_problems: reads.ship_problems,
+		investigation: reads.investigation,
 	}
 }
 
@@ -135,14 +148,46 @@ function exit_code(reads: PrepReads): number {
 	return is_complete ? SUCCESS_EXIT_CODE : FAILURE_EXIT_CODE
 }
 
+// `--summary` prints the work summary's skeleton alone: it is read at the plan step, after the
+// bundle, so it reads the body and the author trust `issue:read` would mark it with. A trust read
+// that failed leaves the body unmarked as trusted, never trusted. `plan:scaffold` reads the same pair.
+async function read_summary(issue_number: string): Promise<SummaryRead | undefined> {
+	const [body, block] = await Promise.all([
+		git_gh_issue_read.issue_get_body(issue_number),
+		issue_read_cli.read_block(issue_number),
+	])
+
+	if (body === undefined) return undefined
+
+	const is_trusted = block.kind === 'ok' ? block.trust.is_body_trusted : undefined
+
+	return { body, text: session_cite.text(run_prep_summary.format_summary(body, is_trusted)) }
+}
+
+async function print_summary(issue_number: string): Promise<number> {
+	const summary = await read_summary(issue_number)
+
+	if (summary === undefined) {
+		console.error(failure_note(issue_number, 'unreadable'))
+
+		return FAILURE_EXIT_CODE
+	}
+
+	console.info(summary.text)
+
+	return SUCCESS_EXIT_CODE
+}
+
 async function run(argv: ReadonlyArray<string>): Promise<number> {
-	const issue_number = parse_number(argv)
+	const issue_number = parse_number(argv.filter((argument) => argument !== SUMMARY_FLAG))
 
 	if (issue_number === undefined) {
 		console.error(USAGE)
 
 		return FAILURE_EXIT_CODE
 	}
+
+	if (argv.includes(SUMMARY_FLAG)) return await print_summary(issue_number)
 
 	const reads = await gather(issue_number)
 	const report = run_prep.format_report(to_parts(issue_number, reads))
@@ -153,7 +198,9 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 }
 
 // `gather` and `to_parts` are exported so `run:next` reads the same state from the same three reads
-// rather than growing a second copy of the gather.
-const run_prep_cli = { gather, parse_number, run, to_parts }
+// rather than growing a second copy of the gather; `read_summary` and `failure_note` so `plan:scaffold`
+// reads the skeleton and reports an unreadable body the same way.
+const run_prep_cli = { failure_note, gather, parse_number, read_summary, run, to_parts }
 
+export type { SummaryRead }
 export { run_prep_cli }

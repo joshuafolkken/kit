@@ -2,7 +2,8 @@
 import { fileURLToPath } from 'node:url'
 import { delivered_rules } from './delivered-rules'
 import { guard_remedy } from './guard-remedy'
-import { stop_rule_rows, type StopRule } from './stop-rule-rows'
+import { guard_rule_rows } from './guard-rule-rows'
+import type { StopRule } from './stop-rule-rows'
 
 // `josh rule:list` — the list of trigger-delivered rules, rendered from the guard rows themselves.
 // One item per `MEASURED_RULES` row in delivery order, then the `Stop`
@@ -23,9 +24,7 @@ function item({ id, about }: StopRule): string {
 }
 
 function render(): string {
-	const rows = [...delivered_rules.MEASURED_RULES, ...stop_rule_rows.ROWS].map((rule) => item(rule))
-
-	return [HEADER, '', ...rows].join('\n')
+	return [HEADER, '', ...guard_rule_rows.rows().map((rule) => item(rule))].join('\n')
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) process.stdout.write(`${render()}\n`)

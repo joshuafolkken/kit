@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 const read_mock = vi.hoisted(() => vi.fn())
 
@@ -21,10 +21,6 @@ function fail_with(code: string): void {
 		throw Object.assign(new Error(code), { code })
 	})
 }
-
-beforeEach(() => {
-	vi.clearAllMocks()
-})
 
 describe('file_reader.is_absent', () => {
 	it.each([

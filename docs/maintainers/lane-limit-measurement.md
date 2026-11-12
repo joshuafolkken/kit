@@ -55,21 +55,21 @@ still there for a reading outside a run.
 
 ## The columns
 
-| Column                          | Source                                                           |
-| ------------------------------- | ---------------------------------------------------------------- |
-| `JOSH_LANE_LIMIT`               | `--limit`, else the limit `lane:stats` reads                     |
-| `period (days)`                 | `--period`                                                       |
-| `merges`                        | `merge` entries in the period                                    |
-| `merges / hour`                 | merges per active hour — time `load` samples saw a lane working  |
-| `effective lanes`               | mean of the working `load` samples' `lanes` (child running)      |
-| `lane median (min)`             | median per merge of the time since its issue's latest `dispatch` |
-| `lanes over 40 min`             | merges whose lane time is over the overrun threshold             |
-| `lane p90 (min)`                | nearest-rank 90th percentile of the same lane times              |
-| `gate median (min)` / `max`     | `gate` entries' `elapsed_ms`                                     |
-| `load peak` / `mean`            | `load` samples' one-minute load average                          |
-| `swapped peak` / `mean (GB/h)`  | the `swapped_mb` difference between consecutive `load` samples   |
-| `free memory min` / `mean (GB)` | `load` samples' `available_mb`                                   |
-| `load samples`                  | how many `load` samples the period holds                         |
+| Column                          | Source                                                                                  |
+| ------------------------------- | --------------------------------------------------------------------------------------- |
+| `JOSH_LANE_LIMIT`               | `--limit`, else the period's `limit` entries (`3→4`), else the limit `lane:stats` reads |
+| `period (days)`                 | `--period`                                                                              |
+| `merges`                        | `merge` entries in the period                                                           |
+| `merges / hour`                 | merges per active hour — time `load` samples saw a lane working                         |
+| `effective lanes`               | mean of the working `load` samples' `lanes` (child running)                             |
+| `lane median (min)`             | median per merge of the time since its issue's latest `dispatch`                        |
+| `lanes over 40 min`             | merges whose lane time is over the overrun threshold                                    |
+| `lane p90 (min)`                | nearest-rank 90th percentile of the same lane times                                     |
+| `gate median (min)` / `max`     | `gate` entries' `elapsed_ms`                                                            |
+| `load peak` / `mean`            | `load` samples' one-minute load average                                                 |
+| `swapped peak` / `mean (GB/h)`  | the `swapped_mb` difference between consecutive `load` samples                          |
+| `free memory min` / `mean (GB)` | `load` samples' `available_mb`                                                          |
+| `load samples`                  | how many `load` samples the period holds                                                |
 
 **A column with no samples prints `—`, never `0`** — a period no `backlogrun` ran in has no load,
 which is not an idle machine. **The swap columns need two samples between half a minute and an hour apart** — a
@@ -225,6 +225,22 @@ lane whose open pull request changes a path its own change does (`run-ship-overl
 The entry names the lanes, the shared paths, `waited_ms` and whether the wait cleared. Read it against
 the `conflict` row of the same period.
 
+## Why `run:chain` stopped
+
+Under the ship-stop table, `lane:stats` prints one row per cause a `josh run:chain` stopped on: the
+stage and why, `check:related (exit)` for a non-zero exit, `review:attest --join (hold)` for a hold
+notice after exit 0.
+
+- `stops` — how many runs stopped on the cause
+- `to re-run (min)`, `median (min)` — the minutes from each stop to the next `run:chain` on its issue
+- `not re-run` — the stops no run followed
+
+Every run writes one `chain` entry: its end, its length, and on a stop the stage and the reason, so
+the re-run's start is its end less its length (joshuafolkken/kit#7024).
+
+**The decision the table is for**: which `run:chain` stop to remove next — the cause with the largest
+`to re-run (min)` leads.
+
 ## Why round 2 ran or was skipped
 
 Under the stop table, `lane:stats` prints one row per round-2 verdict and reason code, most frequent
@@ -240,12 +256,16 @@ is not giving the decision what it needs.
 
 ## Whether the split notice led to a split
 
-Under the round-2 table, `lane:stats` prints one row: how many lanes got the split notice in the period
+Under the round-2 table, `lane:stats` prints how many lanes got a split notice in the period
 (`noticed lanes`), and how many of those filed a split child (`split`), whenever it was filed.
 
-The first showing of the notice writes a `split-notice` entry with the Issue and the measured files and
-lines (`split-early-notice.ts`); `josh issue:file --route split` from a lane writes a `split-filed`
-entry (`split-resolution.ts`).
+The `all` row counts each lane once. The rows below it count by `reason`: `files`, `hunks` and
+`lines` for the axis `josh lane:plan` answered `split` on (`lane-plan-size.ts`). `diff` and `budget`
+count only older entries, from the notices scoped checks and `main:merge` printed before
+joshuafolkken/kit#7009.
+
+Each `split` from `lane:plan` writes a `split-notice` entry that carries its `reason`. `josh issue:file --route split` from a lane writes a `split-filed` entry
+(`split-resolution.ts`).
 
 ## Why a free lane stayed empty
 
@@ -253,32 +273,55 @@ Under the stop table, `lane:stats` prints one row per reason `backlog:drive` lef
 row shows the total, median and maximum minutes, how many holds were recorded (`holds`), and how many
 had no end (`not ended`). A period with no hold prints a `none` row.
 
-The driver records the hold only while a lane is free. A pass that collects a child asks for the
-next offer in that same pass, so a freed lane is offered at once. Two passes record a `held` entry:
+A running driver records the hold only while a lane is free. A pass that collects a child asks for
+the next offer in that same pass, so a freed lane is offered at once. Two passes record a `held` entry:
 
 - An offered pass that started nothing. The entry is `offer:<verdict>[:<answer>]`, for example
   `offer:wait:blocked`. A `stop` verdict is not a hold, because the run is finishing. A wait the
   `run:solo` gate caused names its cause in place of the answer, `offer:watch:solo`, so the lanes a
   solo run left empty show apart from every other `blocked` offer.
-- A `blocked` offer whose issues wait on another issue or on a start condition (`実施可能日` /
-  `実施可能条件`) names the cause: `offer:<verdict>:chain`, `:gate` or `:chain+gate`, and `waiting`
-  lists those issues. Other waits stay `blocked` (`scripts/backlog/backlog-wait-cause.ts`).
+- A `blocked` offer whose issues wait on another issue, on a start condition (`実施可能日` /
+  `実施可能条件`) or on a running lane (a path overlap or the `run:solo` gate) names the cause:
+  `offer:<verdict>:chain`, `:gate`, `:lane` or a `+` join such as `:gate+lane`, and `waiting` lists
+  those issues. Other waits stay `blocked` (`scripts/backlog/backlog-wait-cause.ts`).
 - A driver end that hands control back to a session. The entry is `hand-back:<reason>`, for example
   `hand-back:merge` or `hand-back:window`. A finished run (`stop`, or the drain's `watch` or
   `retrospective`) is not a hold.
+
+A driver that hands back with every lane taken writes `released` and leaves a mark with its
+`hand-back:<reason>` beside the ledger; its next ledger line clears it. A lane that frees while the
+mark stands writes `held` with `driverless:hand-back:<reason>` (`scripts/lane/lane-hand-back-held.ts`).
+
+The lane frees when its ship reaches the merge wait. The next driver's first line ends the hold. No
+offer was made, so `lane:stats`'s park → offer gap does not end at it.
 
 Every lane taken is the limit, not idle capacity, and a finished run owes no lane a child. Either one
 records a `released` entry instead, once per hold. This ends a hold that a lane opened outside the
 driver filled, such as an epic run or a person's `lane:open`.
 
 The time is derived, not recorded. A hold runs until the next `held`, `released` or `dispatch` entry.
-The driver offers once a minute while it waits, so consecutive entries cover the wait and the last one
+The driver offers every offer interval (180 s) while it waits, so consecutive entries cover the wait and the last one
 ends at the dispatch or the release. A hold past an hour is a driver nobody restarted, and it reads as
 ended at the hour.
 
 **The decision the table is for**: what the `Stop` hook's stall report's "ready, free lane, no dispatch" time is
 made of. `hand-back:*` rows are time spent waiting on a session, and `offer:*` rows are the backlog's
 own answer. Compare the rows from one period to the next to show the idle time shrinking.
+
+## How often a lane cut
+
+Under the gap table, `lane:stats` prints the period's `run:cut`s (`scripts/lane/lane-cut-stats.ts`). The
+`all` row shows the per-lane median and maximum cut count and the total, a lane dispatched in the
+period that never cut counting as zero. One row per phase follows.
+
+`lane:breakdown <N>` ends with one lane's count, `run:cut ×3 (implementation ×2, pre-gate ×1)`. A lane
+that never cut gets no line.
+
+The phase is the only attribution a `cut` event records (`#<N> cut (<phase>)`). A pause is a `park`,
+not a cut, so it counts in the stop table.
+
+**The decision the table is for**: which phase's cuts to reduce. Each resume reruns the self-check,
+lint and `run:review`, so the loss grows with the cut count.
 
 ## How long a lane waited for the core budget
 
@@ -360,7 +403,7 @@ own Issue, which cites this table as its evidence.
 
 ## What the lane sessions' transcripts show
 
-The last table is read from the lane sessions' transcripts (`~/.claude/projects/<lane-slug>/*.jsonl`),
+The transcript table is read from the lane sessions' transcripts (`~/.claude/projects/<lane-slug>/*.jsonl`),
 not the ledger ([#4418](https://github.com/joshuafolkken/kit/issues/4418)).
 
 It prints tool time per session, the verification calls (`lint:related` / `test:related` /
@@ -373,3 +416,18 @@ It prints tool time per session, the verification calls (`lint:related` / `test:
 - A call is timed from its `tool_use` line to its `tool_result` line, in the foreground only.
 - One Bash call naming two verification commands is counted as chained; the medians take solo calls.
 - The period is cut at each call's timestamp. A delegated unit's transcript is not a session.
+
+## How long verification took at each lane count
+
+The last table splits the solo `lint:related` / `test:related` calls by the lanes running when each
+started: runs and median seconds per count
+([#7025](https://github.com/joshuafolkken/kit/issues/7025)).
+
+- A call's count is the `lanes` of the latest load sample at or before it, and that count includes the
+  calling lane: 1 means it ran alone.
+- A call with no sample in the 5 minutes before it is left out. A period without `backlog:drive`'s
+  sampler gives an empty table.
+- A call that runs while more lanes start is filed under the lower count.
+
+Read it as: medians that rise with the count show the verification calls competing for CPU. A
+`JOSH_LANE_LIMIT` or verification-parallelism change is filed in its own Issue, which cites this table.

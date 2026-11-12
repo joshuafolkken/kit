@@ -1,10 +1,11 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { ESLint, type Linter } from 'eslint'
 import ts from 'typescript-eslint'
-import { describe, expect, it, onTestFinished, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { create_base_config } from './base.js'
 import { checkout_rooted_parser } from './checkout-rooted-parser.js'
 import { config_fingerprint } from './config-fingerprint.js'
@@ -18,6 +19,7 @@ vi.setConfig({ testTimeout: LINT_PROBE_TIMEOUT_MS })
 
 const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url))
 const GITIGNORE = '.gitignore'
+const ESLINT_CONFIG = 'eslint.config.js'
 // A second checkout location. Nothing exists there, which is the point of the cache-hit probe: a run
 // that re-linted under it could not load the project and would report a fatal parse error.
 const OTHER_CHECKOUT = path.join(tmpdir(), 'kit-other-checkout', 'kit')
@@ -25,7 +27,7 @@ const PROBE_FILE = 'eslint/checkout-rooted-parser.test.ts'
 const SOURCE = 'const x = 1\n'
 const HASH_OF_CONFIG = /"hashOfConfig":"(?<hash>[^"]+)"/u
 
-// The cache probe lints for real, and `parserOptions.project` would make that a typed lint over this
+// The cache probe lints for real, and the typed parser would make that a lint over this
 // repository's whole program. A checkout holding one file under a one-file `tsconfig.json` asks the
 // same question — does the hash of the config move with the checkout path — at a fraction of the cost.
 const PROBE_TSCONFIG = {
@@ -33,13 +35,27 @@ const PROBE_TSCONFIG = {
 	include: [PROBE_FILE],
 }
 
+const make_directory = temporary_directory()
+
 function create_probe_checkout(): string {
-	const checkout = mkdtempSync(path.join(tmpdir(), 'kit-probe-checkout-'))
+	const checkout = make_directory('kit-probe-checkout-')
 
 	mkdirSync(path.join(checkout, path.dirname(PROBE_FILE)))
 	writeFileSync(path.join(checkout, PROBE_FILE), SOURCE)
 	writeFileSync(path.join(checkout, 'tsconfig.json'), JSON.stringify(PROBE_TSCONFIG))
 	writeFileSync(path.join(checkout, GITIGNORE), 'node_modules\n')
+
+	return checkout
+}
+
+function create_matching_checkout(): string {
+	const checkout = create_probe_checkout()
+	const config_entry = path.relative(checkout, path.join(REPO_ROOT, ESLINT_CONFIG))
+
+	writeFileSync(
+		path.join(checkout, ESLINT_CONFIG),
+		`import '${config_entry.split(path.sep).join('/')}'\n`,
+	)
 
 	return checkout
 }
@@ -106,24 +122,21 @@ describe('checkout_rooted_parser.create', () => {
 
 describe('create_base_config — the serialized config across checkouts', () => {
 	it('serializes the same config for two checkouts at different paths', async () => {
+		const checkout = create_matching_checkout()
 		const [here, there] = await Promise.all([
 			serialized_config(REPO_ROOT),
-			serialized_config(OTHER_CHECKOUT),
+			serialized_config(checkout),
 		])
 
 		expect(here).not.toContain(REPO_ROOT)
+		expect(there).not.toContain(checkout)
 		expect(there).toBe(here)
 	})
 
 	it('hits a cache warmed in one checkout from another without re-linting', async () => {
-		const cache_directory = mkdtempSync(path.join(tmpdir(), 'kit-lane-cache-'))
+		const cache_directory = make_directory('kit-lane-cache-')
 		const cache_location = path.join(cache_directory, '.eslintcache')
 		const checkout = create_probe_checkout()
-
-		onTestFinished(() => {
-			rmSync(cache_directory, { recursive: true, force: true })
-			rmSync(checkout, { recursive: true, force: true })
-		})
 		const warmed = await cached_hash(checkout, checkout, cache_location)
 		const reused = await cached_hash(OTHER_CHECKOUT, checkout, cache_location)
 
@@ -151,7 +164,8 @@ describe('create_base_config — a consumer block after it', () => {
 		const config = await resolved_config(REPO_ROOT, [consumer])
 
 		expect(config.languageOptions?.['parserOptions']).toMatchObject({
-			project: './tsconfig.json',
+			project: false,
+			projectService: true,
 			extraFileExtensions: ['.svelte'],
 		})
 	})

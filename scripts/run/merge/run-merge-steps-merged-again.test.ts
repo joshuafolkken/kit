@@ -1,10 +1,12 @@
-import { mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_close } from '#scripts/lane/lane-close'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#3442: a parent that counted a closed child by hand (`run:carry --merged`) and then
 // ran `run:merge` for it must not count the merge twice — the run is owed only the merge event, which
@@ -48,11 +50,11 @@ function counted_carry(): RunCarry {
 	}
 }
 
-const LANE_PARENT = mkdtempSync(path.join(tmpdir(), 'merged-again-lane-'))
+const LANE_PARENT = make_directory('merged-again-lane-')
 const MISSING_LANE = path.join(LANE_PARENT, 'no-such-lane')
 
 function write_carry(): string {
-	const directory = mkdtempSync(path.join(tmpdir(), 'merged-again-'))
+	const directory = make_directory('merged-again-')
 
 	writeFileSync(run_carry.carry_path(directory), JSON.stringify(counted_carry()))
 	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(directory)

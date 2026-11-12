@@ -1,0 +1,1 @@
+- rf:bug-risks | low | scripts/run/board/run-board-setup.ts:69 | 2026-10-31 | #5519

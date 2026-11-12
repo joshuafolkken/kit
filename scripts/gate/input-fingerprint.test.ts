@@ -1,20 +1,17 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { stamp_file } from '#scripts/josh/stamp-file'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { input_fingerprint } from './input-fingerprint'
 
-const root = mkdtempSync(path.join(tmpdir(), 'kit-input-fingerprint-'))
+const make_directory = temporary_directory('suite')
+const root = make_directory('kit-input-fingerprint-')
 const PRESENT = 'present.txt'
 const MISSING = 'missing.txt'
 const CONTENT = 'content\n'
 
 writeFileSync(path.join(root, PRESENT), CONTENT)
-
-afterAll(() => {
-	rmSync(root, { recursive: true, force: true })
-})
 
 describe('input_fingerprint.of_entries', () => {
 	it('answers the same digest whatever the order', () => {

@@ -12,6 +12,11 @@ import type { ItemState } from './run-board-status'
 const { EMPTY_LAYOUT, MINUTE, NOW, STARTED, header, lines_of, note, rule } =
 	run_board_render_fixture
 
+// A rule's start, whatever column the lane rows' titles run it on to.
+function lead(label: string): string {
+	return `── ${label} ─`
+}
+
 function row(number: number, state: ItemState, started_minute?: number): BoardRow {
 	const started_ms = started_minute === undefined ? undefined : STARTED + started_minute * MINUTE
 	const ended_ms = started_ms === undefined || state === 'running' ? undefined : started_ms + MINUTE
@@ -43,15 +48,15 @@ describe('run_board_render.render sections', () => {
 	const order = [
 		'Issue 1',
 		'Issue 2',
-		rule('🙋 decision'),
+		lead('🙋 decision'),
 		'Issue 6',
-		rule('📌 findings'),
+		lead('📌 findings 1'),
 		'finding',
-		rule('⏳ queued'),
+		lead('⏳ queued 1'),
 		'Issue 8',
-		rule('🔗 waiting'),
+		lead('🔗 waiting 1'),
 		'Issue 7',
-		rule('✅ done'),
+		lead('✅ done 3'),
 		'Issue 3',
 		'Issue 4',
 		'Issue 5',

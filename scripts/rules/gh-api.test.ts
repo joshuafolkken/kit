@@ -25,11 +25,14 @@ describe('gh_api read vs write', () => {
 		['no flags', 'gh api repos/o/r/issues/5'],
 		['explicit GET', 'gh api repos/o/r/issues/5 -X GET'],
 		['jq projection', "gh api repos/o/r/issues/5 --jq '.state'"],
+		['include with GET', 'gh api -iX GET repos/o/r/issues/5'],
 	])('reads: %s', (_name, command) => {
 		expect(gh_api.is_read(command)).toBe(true)
 		expect(gh_api.is_write(command)).toBe(false)
 	})
+})
 
+describe('gh_api writes', () => {
 	it.each([
 		['short field', 'gh api repos/o/r/issues -f title=x'],
 		['capital field', 'gh api repos/o/r/issues -F title=x'],
@@ -40,6 +43,9 @@ describe('gh_api read vs write', () => {
 		['DELETE method', 'gh api -X DELETE repos/o/r/issues/5/labels/x'],
 		['attached method', 'gh api -XPUT repos/o/r/collaborators/x'],
 		['method with equals', 'gh api --method=PATCH repos/o/r'],
+		['include clustered with the method', 'gh api repos/o/r/issues/5 -iX DELETE'],
+		['include clustered with an attached method', 'gh api -iXPUT repos/o/r/collaborators/x'],
+		['include clustered with a field', 'gh api repos/o/r/issues -if title=x'],
 		['attached short field', 'gh api repos/o/r/rulesets -fname=x'],
 		['attached capital field', 'gh api repos/o/r/rulesets -Fname=x'],
 		[
@@ -47,6 +53,8 @@ describe('gh_api read vs write', () => {
 			"gh api repos/o/r/rulesets -f name=x -f 'note=a -X GET'",
 		],
 		['the last method winning', 'gh api repos/o/r/rulesets -X GET -X POST'],
+		['a flag-shaped jq value before a field', 'gh api user -q -X -f name=x'],
+		['a flag-shaped jq value before a method', 'gh api user -q --method -X PATCH'],
 	])('writes: %s', (_name, command) => {
 		expect(gh_api.is_write(command)).toBe(true)
 		expect(gh_api.is_read(command)).toBe(false)

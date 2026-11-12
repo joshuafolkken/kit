@@ -13,17 +13,22 @@ import { stamp_file } from '#scripts/josh/stamp-file'
 // A copy rather than a rename because `/tmp` is often another filesystem. A record an old-code
 // process writes to `/tmp` after the copy is not picked up.
 //
-// **A log not written for two weeks is removed.** `/tmp` used to clear them on every boot; the common
-// git directory never does, and a log is the only record here that grows without an owner ending it.
+// A log not written for two weeks is removed because the common git directory persists across
+// reboots, and a log is the only record here that grows without an owner ending it. A note — the
+// investigator's saved conclusion — goes the same way: every path that ends its issue without the
+// ship's removal would otherwise hand a reopened run stale citations (joshuafolkken/kit#6153).
 
 const COPIED_MARKER = '.legacy-copied'
 const MARKER_MODE = 0o600
 const LOG_RETENTION_DAYS = 14
 const DAY_MS = 86_400_000
 const LOG_SUFFIX = '.log'
+const NOTE_SUFFIX = '.md'
 // What a record is. A lock or a staged write beside a record carries its prefix but means nothing
 // past the process that made it.
-const RECORD_SUFFIXES = ['.json', '.jsonl', LOG_SUFFIX] as const
+const RECORD_SUFFIXES = ['.json', '.jsonl', LOG_SUFFIX, NOTE_SUFFIX] as const
+// The records pruned once they have not been written for the retention.
+const PRUNED_SUFFIXES = [LOG_SUFFIX, NOTE_SUFFIX] as const
 
 function is_record_name(name: string, prefixes: ReadonlyArray<string>): boolean {
 	const has_prefix = prefixes.some((prefix) => name.startsWith(prefix))
@@ -94,7 +99,9 @@ function prune_stale_logs(
 	now_ms: number,
 ): void {
 	for (const name of list_names(directory)) {
-		if (name.endsWith(LOG_SUFFIX) && is_record_name(name, prefixes)) {
+		const is_pruned = PRUNED_SUFFIXES.some((suffix) => name.endsWith(suffix))
+
+		if (is_pruned && is_record_name(name, prefixes)) {
 			prune_log(path.join(directory, name), now_ms)
 		}
 	}

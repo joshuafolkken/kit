@@ -37,9 +37,8 @@ function capture_git_environment(): Record<string, string | undefined> {
 	return Object.fromEntries(GIT_ENV_KEYS.map((key) => [key, process.env[key]]))
 }
 
-// `vitest --update` rewrites snapshot files by design — `josh command:derive` runs one to refresh the
-// command-map snapshot (#4970) — so an update run leaves them out of the comparison. Any other run,
-// and any other path, still counts.
+// `vitest --update` rewrites snapshot files by design, so an update run leaves them out of the
+// comparison. Any other run, and any other path, still counts.
 function tracked_status(status: string, is_snapshot_update: boolean): string {
 	if (!is_snapshot_update) return status
 

@@ -1,7 +1,7 @@
 import type { IssueState } from '#scripts/issue/issue-state'
 import { session_cite } from '#scripts/issue/session-cite'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { run_prep } from './run-prep'
+import { run_prep, type PrepParts } from './run-prep'
 
 const read_block_mock = vi.hoisted(() => vi.fn())
 const read_state_mock = vi.hoisted(() => vi.fn())
@@ -20,7 +20,7 @@ vi.mock('#scripts/issue/issue-state-cli', () => ({
 }))
 
 vi.mock('#scripts/version/latest-scope-cli', () => ({
-	latest_scope_cli: { decide: decide_mock },
+	latest_scope_cli: { scope_decision: decide_mock },
 }))
 
 vi.mock('./run-prep-locate', () => ({
@@ -43,6 +43,12 @@ vi.mock('#scripts/run/ship/run-ship-preflight', () => ({
 	run_ship_preflight: { ahead: ahead_mock },
 }))
 
+const load_mock = vi.hoisted(() => vi.fn())
+
+vi.mock('./run-investigation-record', () => ({
+	run_investigation_record: { load: load_mock },
+}))
+
 const { run_prep_cli } = await import('./run-prep-cli')
 
 const SUCCESS = 0
@@ -53,7 +59,10 @@ const BLOCK = 'issue: 1978\nThe body\n\ncomment by alice: agreed'
 const OPEN_STATE: IssueState = { state: 'OPEN', labels: ['auto-ok'], is_human_review: false }
 const SKIP_DECISION = { scope: 'skip', reason: 'ran 2 hours ago; window is 12h' }
 const LOCATIONS = 'run:prep\n  scripts/josh/josh-commands-ai.ts:42  run:prep'
-const CLASSIFICATION_PROBLEM = 'Add "- リリース分類: <label>" to the Issue body.'
+const DELEGATE_STEP = 'Delegate before the first read'
+const RECORD_PATH = '/repo/.git/josh/run-state/josh-investigation-record-1978.md'
+const FINDINGS = '- `run:prep` builds its report in scripts/run/run-prep.ts:97'
+const CLASSIFICATION_PROBLEM = 'on a filed Issue, `pnpm josh issue:release-class <issue> <label>`'
 const REVIEW_STATE: IssueState = {
 	state: 'OPEN',
 	labels: ['needs-human-review'],
@@ -90,6 +99,7 @@ beforeEach(() => {
 	locate_mock.mockReset()
 	locate_mock.mockResolvedValue(LOCATIONS)
 	ahead_mock.mockReset().mockResolvedValue([])
+	load_mock.mockReset().mockResolvedValue(undefined)
 })
 
 afterEach(() => {
@@ -236,22 +246,87 @@ describe('run_prep_cli.gather — uncommitted work', () => {
 	})
 })
 
+const PARTS: PrepParts = {
+	issue_number: ISSUE,
+	content_body: BLOCK,
+	state: REVIEW_STATE,
+	state_failure: '',
+	latest_scope: 'required',
+	latest_reason: 'last update 20h ago',
+	has_changes: false,
+	locations: '',
+	ship_problems: [],
+}
+
 describe('run_prep.format_report', () => {
 	it('surfaces a human-review issue on the summary line', () => {
-		const report = run_prep.format_report({
-			issue_number: ISSUE,
-			content_body: BLOCK,
-			state: REVIEW_STATE,
-			state_failure: '',
-			latest_scope: 'required',
-			latest_reason: 'last update 20h ago',
-			has_changes: false,
-			locations: '',
-			ship_problems: [],
-		})
+		const report = run_prep.format_report(PARTS)
 
 		expect(report.split('\n', 1)[0]).toContain('human_review: yes')
 		expect(report).toContain('latest: required')
+	})
+
+	// joshuafolkken/kit#5700: a recorded plan is the investigation, so the investigator is skipped.
+	it('names the investigator skip and its reason when the entry read the issue as planned', () => {
+		const report = run_prep.format_report({ ...PARTS, is_planned: true })
+
+		expect(report).toContain(
+			`${run_prep.INVESTIGATION_HEADER}\n${run_prep.INVESTIGATION_PLANNED_BODY}`,
+		)
+		expect(run_prep.INVESTIGATION_PLANNED_BODY).toContain('`run:planned`')
+		expect(report).not.toContain(DELEGATE_STEP)
+	})
+
+	it('keeps the delegation step when the issue is not planned', () => {
+		const report = run_prep.format_report({ ...PARTS, is_planned: false })
+
+		expect(report).toContain(`${run_prep.INVESTIGATION_HEADER}\n${DELEGATE_STEP}`)
+		expect(report).not.toContain(run_prep.INVESTIGATION_PLANNED_BODY)
+	})
+
+	// joshuafolkken/kit#5765: the saved conclusion is printed, so the implement phase does not re-delegate.
+	it('prints the saved investigator findings in place of the delegation step (ac-7d856df0)', () => {
+		const investigation = { path: RECORD_PATH, findings: FINDINGS }
+		const report = run_prep.format_report({ ...PARTS, is_planned: true, investigation })
+
+		expect(report).toContain(
+			`${run_prep.INVESTIGATION_HEADER}\n${run_prep.INVESTIGATION_SAVED_LEAD}\n${FINDINGS}`,
+		)
+		expect(report).not.toContain(DELEGATE_STEP)
+		expect(report).not.toContain(run_prep.INVESTIGATION_PLANNED_BODY)
+	})
+
+	it('names where to save the conclusion when none is saved yet', () => {
+		const investigation = { path: RECORD_PATH, findings: undefined }
+		const report = run_prep.format_report({ ...PARTS, investigation })
+
+		expect(report).toContain(DELEGATE_STEP)
+		expect(report).toContain(`${run_prep.INVESTIGATION_SAVE_STEP} \`${RECORD_PATH}\`.`)
+	})
+})
+
+describe('run_prep_cli.run saved investigation', () => {
+	it('prints the findings the investigation record holds (ac-7d856df0)', async () => {
+		stub_ok()
+		load_mock.mockResolvedValue({ path: RECORD_PATH, findings: FINDINGS })
+
+		await run_prep_cli.run([ISSUE])
+
+		expect(printed()).toContain(`${run_prep.INVESTIGATION_SAVED_LEAD}\n${FINDINGS}`)
+		expect(load_mock).toHaveBeenCalledWith(ISSUE)
+	})
+
+	// joshuafolkken/kit#6153 (ac-a6f8fbf5): a lane dispatched again after a yield reads the saved
+	// conclusion, so its entry names no investigator dispatch and only the diff to re-read.
+	it('names no investigator dispatch for a re-dispatched lane with a saved conclusion', async () => {
+		stub_ok()
+		load_mock.mockResolvedValue({ path: RECORD_PATH, findings: FINDINGS })
+
+		await run_prep_cli.run([ISSUE])
+
+		expect(printed()).not.toContain(DELEGATE_STEP)
+		expect(printed()).not.toContain(run_prep.INVESTIGATION_SAVE_STEP)
+		expect(printed()).toContain('where main moved since re-read only the cited files')
 	})
 })
 

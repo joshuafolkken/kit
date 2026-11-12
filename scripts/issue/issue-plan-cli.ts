@@ -4,8 +4,11 @@ import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { issue_body_or_comment } from '#scripts/issue/issue-body-or-comment'
 import { PLANNED_LABEL } from '#scripts/issue/issue-labels'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
+import { issue_plan_notify } from '#scripts/issue/issue-plan-notify'
 import { plan_consumers_section } from '#scripts/issue/plan-consumers-section'
 import { cli_body } from '#scripts/josh/cli-body'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { lane_plan_auto } from '#scripts/lane/lane-plan-auto'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { error_text } from '#scripts/lib/error-message'
 
@@ -22,13 +25,14 @@ const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
 const USAGE =
-	'Usage: josh issue:plan <issue-number> --body-file <path> [--title <title>] [--planned] [--repo <owner/name>]'
+	'Usage: josh issue:plan <issue-number> --body-file <path> [--title <title>] [--planned] [--no-notify] [--repo <owner/name>]'
 
 interface PlanRequest {
 	issue_number: string
 	plan: string
 	title: string | undefined
 	is_planned: boolean
+	is_notified: boolean
 	repo: string | undefined
 }
 
@@ -36,6 +40,7 @@ const OPTIONS = {
 	'body-file': { type: 'string' },
 	title: { type: 'string' },
 	planned: { type: 'boolean' },
+	'no-notify': { type: 'boolean' },
 	repo: { type: 'string' },
 } as const
 
@@ -73,8 +78,10 @@ function parse_request(argv: ReadonlyArray<string>): PlanRequest | undefined {
 
 	if (issue_number === undefined || [title, repo].includes('')) return undefined
 	const is_planned = parsed.values.planned === true
+	const is_notified = is_planned && parsed.values['no-notify'] !== true
+	const flags = { issue_number, title, is_planned, is_notified, repo }
 
-	return with_plan({ issue_number, title, is_planned, repo }, parsed.values['body-file'])
+	return with_plan(flags, parsed.values['body-file'])
 }
 
 // A file-read failure surfaces as an `Error` naming the resolved path, printed as-is; `undefined` is
@@ -117,8 +124,12 @@ async function record_plan(request: PlanRequest): Promise<boolean> {
 	const posted = await issue_body_or_comment.post(issue_number, request.plan, repo)
 
 	console.info(`${posted.destination}: ${posted.url}`)
+	if (!request.is_planned) return true
+	const is_applied = await apply_planned_label(issue_number, repo)
 
-	return request.is_planned ? await apply_planned_label(issue_number, repo) : true
+	if (is_applied && request.is_notified) await issue_plan_notify.send(request)
+
+	return is_applied
 }
 
 // A refused write prints as one line, like a file-read failure, rather than escaping as a stack trace.
@@ -132,12 +143,29 @@ async function try_record_plan(request: PlanRequest): Promise<boolean> {
 	}
 }
 
+// True when the plan is the running lane's own: a lane child planning its own issue in this repository.
+// Any other plan has no lane to plan — one recorded at `kickoff`, or on another issue, would hold its
+// files (or yield them) long before its own lane runs.
+function is_own_lane(request: PlanRequest): boolean {
+	const is_lane_issue = lane_child_marker.marked_issue() === request.issue_number
+
+	return is_lane_issue && request.repo === undefined && lane_child_marker.is_child_of(process.cwd())
+}
+
+// **A lane child's plan runs `lane:plan` on its own paths** (joshuafolkken/kit#5738), its exit code the
+// command's, so the child spends no second call copying the paths.
+async function lane_plan_code(request: PlanRequest): Promise<number> {
+	if (!is_own_lane(request)) return SUCCESS_EXIT_CODE
+
+	return await lane_plan_auto.run_from_plan(request.issue_number, request.plan)
+}
+
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const request = resolve_request(argv)
 
-	if (request === undefined) return FAILURE_EXIT_CODE
+	if (request === undefined || !(await try_record_plan(request))) return FAILURE_EXIT_CODE
 
-	return (await try_record_plan(request)) ? SUCCESS_EXIT_CODE : FAILURE_EXIT_CODE
+	return await lane_plan_code(request)
 }
 
 async function main(argv: ReadonlyArray<string>): Promise<void> {

@@ -23,7 +23,7 @@ const CHECKS_PATTERN =
 function text_of(issue: string, checks: PrChecks): string {
 	const { pr, pass, pending, fail, coderabbit } = checks
 
-	return `${issue_cite.plain(issue)} PR ${String(pr)} pass ${String(pass)} pending ${String(pending)} fail ${String(fail)} coderabbit ${coderabbit}`
+	return `${issue_cite.plain_for('program', issue)} PR ${String(pr)} pass ${String(pass)} pending ${String(pending)} fail ${String(fail)} coderabbit ${coderabbit}`
 }
 
 const STATE_NAMES: ReadonlySet<string> = new Set(CODERABBIT_STATES)

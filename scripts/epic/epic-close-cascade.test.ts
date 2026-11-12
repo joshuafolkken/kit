@@ -1,3 +1,4 @@
+import { stub_unanswered_batch } from '#scripts/gh/git-gh-issue-batch-graphql-fixture'
 import type { IssueListOutcome } from '#scripts/gh/git-gh-issue-list'
 import { listing_outcome } from '#scripts/gh/git-gh-issue-list-fixture'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -63,7 +64,7 @@ function linear_chain(depth: number): Array<{ number: number; children: Array<nu
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
+	stub_unanswered_batch()
 	mocked_close.mockResolvedValue(true)
 	mocked_comments.mockResolvedValue('[]')
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)

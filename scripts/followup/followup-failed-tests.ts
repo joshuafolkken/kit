@@ -7,6 +7,7 @@ import {
 	type ObservationEntry,
 } from '#scripts/observations/observation-record'
 import { review_comment_round } from '#scripts/review/review-comment-round'
+import { test_related_pins } from '#scripts/test/test-related-pins'
 import { vitest_failure_summary } from '#scripts/test/vitest-failure-summary'
 
 // A CI job that ended `failure` because a unit test went red can still owe nothing to the change: a test
@@ -71,7 +72,10 @@ function subjects_of(test_file: string): ReadonlyArray<string> {
 	return [test_file, ...modules]
 }
 
+// A test the change pins (`test-related-pins.ts`) belongs to it, as a subject's test does.
 function is_in_change(test_file: string, changed: ReadonlySet<string>): boolean {
+	if (test_related_pins.pinned_tests(changed).includes(test_file)) return true
+
 	return subjects_of(test_file).some((subject) => changed.has(subject))
 }
 

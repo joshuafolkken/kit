@@ -2,11 +2,20 @@ import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { beforeAll, describe, expect, it } from 'vitest'
+import { z } from 'zod'
 import { build_library, library_paths } from './build-library'
 
 const LIBRARY = 'version'
 const { outfile: VERSION_OUTFILE, dts_file: VERSION_DTS_FILE } = library_paths(LIBRARY)
 const BUILD_TIMEOUT = 60_000
+const RUNTIME_EXPORTS: ReadonlyArray<string> = [
+	'KIT_PACKAGE_NAME',
+	'create_version_command_config',
+	'derive_versions_endpoint',
+	'kit_package_descriptor',
+	'resolve_effective_upstream_version',
+	'version_commands',
+]
 
 beforeAll(async () => {
 	await build_library(LIBRARY)
@@ -30,14 +39,17 @@ describe('build_library version — compiled .js', () => {
 		expect(content).toContain('from "zod"')
 	})
 
-	it('loads under plain node and exposes the public API', () => {
+	// The built file is what a consumer loads, so a name dropped from the barrel fails here even when
+	// nothing inside kit imports it — app-kit's `upstreams: [kit_package_descriptor]` would not.
+	it('loads under plain node and exports every runtime name of the barrel', () => {
 		const module_url = pathToFileURL(VERSION_OUTFILE).href
-		const script = `import('${module_url}').then((m) => { if (typeof m.create_version_command_config !== 'function' || typeof m.version_commands !== 'object') process.exit(1) })`
+		const script = `import('${module_url}').then((m) => console.log(JSON.stringify(Object.keys(m))))`
 		const result = spawnSync('node', ['--input-type=module', '-e', script], {
 			encoding: 'utf8',
 		})
+		const names = z.array(z.string()).parse(JSON.parse(result.stdout))
 
-		expect(result.status).toBe(0)
+		expect(new Set(names)).toEqual(new Set(RUNTIME_EXPORTS))
 	})
 })
 

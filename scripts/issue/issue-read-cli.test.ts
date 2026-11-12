@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs'
 import { bash_output_cap_reader } from '#scripts/document/bash-output-cap'
 import { capped_print_fixture } from '#scripts/document/capped-print-fixture'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { git_gh_exec } from '#scripts/gh/git-gh-exec'
+import { gh_rate_limit } from '#scripts/gh/git-gh-rate-limit'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_read } from './issue-read'
 
 const classified_mock = vi.hoisted(() => vi.fn())
@@ -9,10 +11,19 @@ const comments_mock = vi.hoisted(() => vi.fn())
 const info_mock = vi.hoisted(() => vi.fn())
 const error_mock = vi.hoisted(() => vi.fn())
 
+// The combined read answers what its REST fallback's two reads would, so the cases keep stubbing those.
 vi.mock('#scripts/gh/git-gh-command', () => ({
 	git_gh_command: {
-		issue_view_json_classified: classified_mock,
-		issue_list_comments: comments_mock,
+		async issue_read_with_comments(
+			issue_number: string,
+			fields: string,
+			repo?: string,
+		): Promise<{ read: unknown; comments_json: unknown }> {
+			return {
+				read: await classified_mock(issue_number, fields, repo),
+				comments_json: await comments_mock(issue_number, undefined, repo),
+			}
+		},
 	},
 }))
 
@@ -31,6 +42,7 @@ const FAILURE = 1
 const LINE_FRACTION = 10
 const ISSUE = '1715'
 const OTHER_ISSUE = '1567'
+const REPO = 'joshuafolkken/app-kit'
 const FIELDS_JSON = JSON.stringify({ title: 'A title', state: 'open', body: 'The body' })
 const READ = { kind: 'read', json: FIELDS_JSON }
 // An author with write access, whose comment body `issue:read` prints whole.
@@ -75,6 +87,64 @@ describe('issue_read_cli.parse_numbers', () => {
 	it('refuses the whole call when a token is not an issue number', () => {
 		expect(issue_read_cli.parse_numbers([`#${ISSUE}`])).toBeUndefined()
 		expect(issue_read_cli.parse_numbers([])).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#5851: the flag follows `issue:state`'s rules — an empty, repeated or misspelled
+// `--repo` refuses rather than falling back to the session's repository.
+describe('issue_read_cli.parse_request', () => {
+	it('reads --repo beside the numbers, in either spelling', () => {
+		const expected = { issue_numbers: [ISSUE], repo: REPO }
+
+		expect(issue_read_cli.parse_request([ISSUE, '--repo', REPO])).toEqual(expected)
+		expect(issue_read_cli.parse_request([`--repo=${REPO}`, ISSUE])).toEqual(expected)
+	})
+
+	it('names no repository when --repo is absent', () => {
+		expect(issue_read_cli.parse_request([ISSUE])).toEqual({ issue_numbers: [ISSUE] })
+	})
+
+	it('refuses an empty, repeated or misspelled --repo', () => {
+		expect(issue_read_cli.parse_request([ISSUE, '--repo='])).toBeUndefined()
+		expect(issue_read_cli.parse_request([ISSUE, '--repo', REPO, '--repo', REPO])).toBeUndefined()
+		expect(issue_read_cli.parse_request([ISSUE, `--rep=${REPO}`])).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#5851: a body from one repository beside the comments of another is a block about
+// two different issues of the same number.
+describe('issue_read_cli.run — the repository it reads', () => {
+	it('reads the body and the comments from the repository --repo names', async () => {
+		classified_mock.mockResolvedValue(READ)
+		comments_mock.mockResolvedValue(COMMENTS_JSON)
+
+		expect(await issue_read_cli.run([ISSUE, '--repo', REPO])).toBe(SUCCESS)
+		expect(classified_mock).toHaveBeenCalledWith(ISSUE, expect.any(String), REPO)
+		expect(comments_mock).toHaveBeenCalledWith(ISSUE, undefined, REPO)
+	})
+
+	// The trust lookup follows the read: an author's write access is asked of the repository named.
+	it('judges the authors against the repository --repo names', async () => {
+		const parse_fields = vi.spyOn(issue_read, 'parse_issue_fields')
+		const parse_comments = vi.spyOn(issue_read, 'parse_comments')
+
+		classified_mock.mockResolvedValue(READ)
+		comments_mock.mockResolvedValue(COMMENTS_JSON)
+
+		await issue_read_cli.run([ISSUE, '--repo', REPO])
+
+		expect(parse_fields).toHaveBeenCalledWith(FIELDS_JSON, REPO)
+		expect(parse_comments).toHaveBeenCalledWith(COMMENTS_JSON, REPO)
+	})
+
+	it('reads the session repository when no --repo is given', async () => {
+		classified_mock.mockResolvedValue(READ)
+		comments_mock.mockResolvedValue(COMMENTS_JSON)
+
+		await issue_read_cli.run([ISSUE])
+
+		expect(classified_mock).toHaveBeenCalledWith(ISSUE, expect.any(String), undefined)
+		expect(comments_mock).toHaveBeenCalledWith(ISSUE, undefined, undefined)
 	})
 })
 
@@ -169,10 +239,51 @@ describe('issue_read_cli.run — a number that produced nothing', () => {
 		expect(await issue_read_cli.run([])).toBe(FAILURE)
 		expect(reported()).toContain(issue_read_cli.USAGE)
 	})
+
+	it('names --repo in the usage it prints', async () => {
+		expect(await issue_read_cli.run([ISSUE, '--rep=x'])).toBe(FAILURE)
+		expect(reported()).toContain('[--repo <owner/repo>]')
+	})
 })
 
-// A long thread used to overflow the Bash output cap into a saved file read a second time
-// (joshuafolkken/kit#3143); past the cap the output is now part files, each one read.
+// joshuafolkken/kit#6614: a rate-limited read was reported with the same guess as expired auth, and a
+// lane child stopped on an authentication failure while its token was fine.
+const RESET_EPOCH = '1762400400'
+const RESET_ISO = '2025-11-06T03:40:00.000Z'
+const FORBIDDEN_STATUS = 403
+const UNAUTHORIZED_STATUS = 401
+const RATE_LIMIT_DETAIL = `gh: API rate limit exceeded for user ID 1. (HTTP 403)\n{"message":"API rate limit exceeded for user ID 1.","status":"403"}`
+const AUTH_DETAIL = `gh: Bad credentials (HTTP 401)\n{"message":"Bad credentials","status":"401"}`
+
+function fail_read(detail: string, status: number): void {
+	classified_mock.mockResolvedValue({ kind: 'unreadable', reason: 'rejected', status, detail })
+	comments_mock.mockResolvedValue(undefined)
+}
+
+describe('issue_read_cli.run — the cause of a failed read', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('reports an exhausted rate limit with its reset time', async () => {
+		vi.spyOn(git_gh_exec, 'exec_gh_api').mockResolvedValue(RESET_EPOCH)
+		fail_read(RATE_LIMIT_DETAIL, FORBIDDEN_STATUS)
+
+		expect(await issue_read_cli.run([ISSUE])).toBe(FAILURE)
+		expect(reported()).toContain(gh_rate_limit.exhausted_message(new Date(RESET_ISO)))
+	})
+
+	it('reports a 401 with the authentication hint', async () => {
+		fail_read(AUTH_DETAIL, UNAUTHORIZED_STATUS)
+
+		expect(await issue_read_cli.run([ISSUE])).toBe(FAILURE)
+		expect(reported()).toContain(gh_rate_limit.AUTH_HINT)
+		expect(reported()).not.toContain('rate limit')
+	})
+})
+
+// Long threads need individually readable parts so the shell output cap cannot hide comments
+// (joshuafolkken/kit#3143).
 describe('issue_read_cli.run — a thread past the Bash output cap', () => {
 	const cap = bash_output_cap_reader.bash_output_cap(process.cwd())
 	const long_body = 'a line of a long issue thread\n'.repeat(cap / LINE_FRACTION)

@@ -1,15 +1,16 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import ts from 'typescript'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { rename_cli } from './rename-cli'
 
 const TOUCHED = "import { old } from './old'\n\nold()\n"
 const UNTOUCHED = 'const other = 1\n'
 const FAILURE_EXIT_CODE = 1
 
-const directory = mkdtempSync(path.join(tmpdir(), 'rename-cli-'))
+const make_directory = temporary_directory('suite')
+const directory = make_directory('rename-cli-')
 
 function file_with(name: string, text: string): string {
 	const file = path.join(directory, name)
@@ -30,10 +31,6 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.restoreAllMocks()
-})
-
-afterAll(() => {
-	rmSync(directory, { recursive: true, force: true })
 })
 
 describe('rename_cli.run — writes', () => {
@@ -75,6 +72,19 @@ describe('rename_cli.run — writes', () => {
 	})
 })
 
+describe('rename_cli.run — moves', () => {
+	it('moves the named import to the new module when both names are the same', async () => {
+		const file = file_with('a.ts', "import { old, other } from './old'\n\nold()\n")
+		const argv = ['old', 'old', '--import', './old', './renamed', file]
+
+		expect(await rename_cli.run(argv, ts, no_format)).toBe(0)
+		expect(readFileSync(file, 'utf8')).toBe(
+			"import { other } from './old'\nimport { old } from './renamed'\n\nold()\n",
+		)
+		expect(console.info).toHaveBeenCalledWith(`${file}: 1`)
+	})
+})
+
 describe('rename_cli.run — refuses', () => {
 	it('names a file with no replacement, exits 1 and writes nothing', async () => {
 		const touched = file_with('a.ts', TOUCHED)
@@ -83,6 +93,16 @@ describe('rename_cli.run — refuses', () => {
 		expect(await rename_cli.run(['old', 'renamed', touched, untouched], ts, no_format)).toBe(
 			FAILURE_EXIT_CODE,
 		)
+		expect(readFileSync(touched, 'utf8')).toBe(TOUCHED)
+		expect(console.error).toHaveBeenCalledWith(expect.stringContaining(untouched))
+	})
+
+	it('names a file a move would not touch, exits 1 and writes nothing', async () => {
+		const touched = file_with('a.ts', TOUCHED)
+		const untouched = file_with('b.ts', "import { old } from './other'\n")
+		const argv = ['old', 'old', '--import', './old', './renamed', touched, untouched]
+
+		expect(await rename_cli.run(argv, ts, no_format)).toBe(FAILURE_EXIT_CODE)
 		expect(readFileSync(touched, 'utf8')).toBe(TOUCHED)
 		expect(console.error).toHaveBeenCalledWith(expect.stringContaining(untouched))
 	})
@@ -116,6 +136,8 @@ describe('rename_cli.run — refuses a file', () => {
 		['no file', ['old', 'renamed']],
 		['an identifier that is not one', ['old', 'not-a-name', 'a.ts']],
 		['an --import with one specifier', ['old', 'renamed', 'a.ts', '--import', './old']],
+		['the same name with no --import', ['old', 'old', 'a.ts']],
+		['the same name and the same module', ['old', 'old', '--import', './old', './old', 'a.ts']],
 	])('prints the usage on %s', async (_label, argv) => {
 		expect(await rename_cli.run(argv, ts, no_format)).toBe(FAILURE_EXIT_CODE)
 		expect(console.error).toHaveBeenCalledWith(rename_cli.USAGE)

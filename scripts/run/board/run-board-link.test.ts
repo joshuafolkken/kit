@@ -4,7 +4,7 @@ import { run_board_link } from './run-board-link'
 // joshuafolkken/kit#3450: an issue number on the board opens its GitHub issue — this repository's for a
 // bare number, the named repository's for `owner/repo#N` — and stays plain before the plan names one.
 
-const { issue_url, linker, pull_linker, pull_url } = run_board_link
+const { issue_url, linker, pull_linker, pull_url, repo_linker, repo_url } = run_board_link
 const REPO = 'joshuafolkken/kit'
 
 function bracketed(text: string, url: string): string {
@@ -45,5 +45,30 @@ describe('run_board_link.pull_linker', () => {
 
 	it('leaves the number plain while no repository is known', () => {
 		expect(pull_linker(undefined, bracketed)(4618)).toBe('4618')
+	})
+})
+
+// joshuafolkken/kit#7089: the header's repository name opens the repository, its issue counts the lists.
+describe('run_board_link.repo_linker', () => {
+	it('points each page at the repository’s top or its open or closed issues', () => {
+		expect([
+			repo_url(REPO, 'home'),
+			repo_url(REPO, 'open'),
+			repo_url(REPO, 'closed'),
+		]).toStrictEqual([
+			'https://github.com/joshuafolkken/kit',
+			'https://github.com/joshuafolkken/kit/issues?q=is%3Aissue+is%3Aopen',
+			'https://github.com/joshuafolkken/kit/issues?q=is%3Aissue+is%3Aclosed',
+		])
+	})
+
+	it('links the text to the page', () => {
+		expect(repo_linker(REPO, bracketed)('kit', 'home')).toBe(
+			'[kit](https://github.com/joshuafolkken/kit)',
+		)
+	})
+
+	it('leaves the text plain while no repository is known', () => {
+		expect(repo_linker(undefined, bracketed)('87', 'open')).toBe('87')
 	})
 })

@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { lane_seat_fixture } from './lane-seat-fixture'
 
 const launch_mock = vi.hoisted(() => vi.fn())
 const resume_argv_mock = vi.hoisted(() =>
@@ -21,14 +22,16 @@ const { run_ship_detach } = await import('#scripts/run/ship/run-ship-detach')
 const ISSUE = '2428'
 const LANE = { issue: ISSUE, directory: '/lanes/2428', profile: undefined }
 
+beforeEach(lane_seat_fixture.mock_start)
+
 // joshuafolkken/kit#2428: the detached supervisor relaunches the lane child, and the child inherits the
 // supervisor's environment — its supervised mark must not survive, or the child's own in-turn ship
 // failure would relaunch a second child beside it.
 describe('lane_relaunch.relaunch', () => {
-	it('keeps the lane child mark and drops the ship supervisor mark', () => {
+	it('keeps the lane child mark and drops the ship supervisor mark', async () => {
 		launch_mock.mockReturnValue({ kind: 'launched', pid: 1 })
 
-		lane_relaunch.relaunch(LANE as never, 'fullrun #2428', 'implementation', vi.fn())
+		await lane_relaunch.relaunch(LANE as never, 'fullrun #2428', 'implementation', vi.fn())
 
 		const [request] = (launch_mock.mock.calls[0] ?? []) as ReadonlyArray<{
 			env: Record<string, string | undefined>
@@ -42,10 +45,10 @@ describe('lane_relaunch.relaunch', () => {
 // joshuafolkken/kit#2484: `run:cut` and the `run:merge` cut fallback share one resume relaunch and one
 // OpenAI-lane predicate rather than each spelling its own.
 describe('lane_relaunch.resume and is_openai_lane', () => {
-	it('relaunches with the resume prompt, still ending with the bare fullrun invocation', () => {
+	it('relaunches with the resume prompt, still ending with the bare fullrun invocation', async () => {
 		launch_mock.mockReset().mockReturnValue({ kind: 'launched', pid: 1 })
 
-		expect(lane_relaunch.resume(LANE as never, 'pre-gate', vi.fn())).toMatchObject({
+		await expect(lane_relaunch.resume(LANE as never, 'pre-gate', vi.fn())).resolves.toMatchObject({
 			kind: 'launched',
 		})
 		expect(resume_argv_mock.mock.calls.at(-1)?.[0]).toMatch(/fullrun #2428$/u)

@@ -47,7 +47,6 @@ async function is_merged(issue: string): Promise<boolean> {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.mocked(lane_registry.list_lanes).mockResolvedValue([lane(MERGED_ISSUE), lane(OPEN_ISSUE)])
 	vi.mocked(git_stash.has_changes).mockResolvedValue(false)
 	vi.mocked(run_hold.hold_path).mockReturnValue(HOLD_PATH)

@@ -12,10 +12,9 @@ const GATE_FAILED_BODY = ['', LINT_STEP_FAILED, '✗ verification gate failed: l
 const GATE_PASSED_BODY = '\n✔ verification gate passed (4 checks) in 15.1s.'
 const JOSH_GATE = 'josh gate'
 
-// joshuafolkken/kit#1374: a green gate forwards the body of a step that skipped or passed with
-// warnings, and that body is written by eslint, svelte-check, vitest or cspell — formats this
-// repository does not own. One of them opening a line with the failure icon used to make the whole
-// call a failure, which charged the next gate run as rework.
+// A green gate can forward third-party warnings or skip output containing a failure icon. Those
+// bodies must not turn the gate into reported failure or charge a later run as rework
+// (joshuafolkken/kit#1374).
 const THIRD_PARTY_WARNING = ['', '✗ src/app.svelte:12:3', '  1 warning found', ''].join('\n')
 // The gate's opening line, printed before any check body exists — what joshuafolkken/kit#1379 reads to
 // tell where the run a verdict summarizes began.
@@ -175,9 +174,8 @@ describe("a gate body carrying another tool's output", () => {
 // joshuafolkken/kit#1379: the verdict is bounded on both sides. It summarizes the gate run in front of
 // it, which begins at that run's opening line — not everything the call printed before it.
 describe('a body where a green gate ran after a command that states no verdict', () => {
-	// The first acceptance criterion: `pnpm josh propagate; pnpm josh gate 2>&1 | tail -40` is labelled
-	// `josh propagate` by its first segment, and propagate's rows used to be discarded by the verdict
-	// the *next* command printed.
+	// The first segment labels this chain as propagate, so the next command's gate verdict must
+	// not discard propagate's own rows.
 	it('still reads the failure rows printed before the gate started', () => {
 		const chained = [PROPAGATE_FAILED_BODY, GREEN_GATE_FORWARDING_WARNING].join('\n')
 

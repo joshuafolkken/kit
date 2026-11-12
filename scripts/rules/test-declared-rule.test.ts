@@ -1,7 +1,8 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { git_fixture_workspace, type FixtureWorkspace } from '#scripts/git/git-fixture-workspace'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { write_file } from '#tools/test/write-file'
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { test_declared_commit } from './test-declared-commit'
@@ -20,19 +21,13 @@ const A_RUNTIME_LINE = 'export const x = 1\n'
 const A_CHANGED_LINE = 'export const x = 2\n'
 const DECLARED = 'test-declared'
 const RUN_TAIL = 'run-tail'
-const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'test-declared-rule-'))
+const make_directory = temporary_directory('suite')
+const WORK_DIRECTORY = make_directory('test-declared-rule-')
 const ENTRY_DIRECTORY = process.cwd()
 const WRITTEN_TRANSCRIPTS = new Set<string>()
 
 const state: { fixture: FixtureWorkspace } = {
 	fixture: { workspace: '', previous_cwd: '', restore_environment: undefined },
-}
-
-function write_file(relative_path: string, body: string): void {
-	const target = path.join(state.fixture.workspace, relative_path)
-
-	mkdirSync(path.dirname(target), { recursive: true })
-	writeFileSync(target, body)
 }
 
 // `scripts/thing.ts` is committed so its directory is tracked: a new file beside it then lists as its
@@ -42,8 +37,8 @@ async function build_repository(): Promise<void> {
 	const { workspace } = state.fixture
 
 	await git(workspace, ['init', git_fixture_workspace.MAIN_BRANCH])
-	write_file(README, 'first\n')
-	write_file(RUNTIME_FILE, A_RUNTIME_LINE)
+	write_file(state.fixture.workspace, README, 'first\n')
+	write_file(state.fixture.workspace, RUNTIME_FILE, A_RUNTIME_LINE)
 	await git(workspace, ['add', '-A'])
 	await git(workspace, ['commit', '-m', 'initial'])
 }
@@ -85,13 +80,11 @@ afterAll(() => {
 		rmSync(delivered_rules.delivery_path(DECLARED, target), { force: true })
 		rmSync(delivered_rules.delivery_path(RUN_TAIL, target), { force: true })
 	}
-
-	rmSync(WORK_DIRECTORY, { recursive: true, force: true })
 })
 
 describe('delivered_rules.delivery — the test-declared rule at the commit stage', () => {
 	it('delivers on a foreground commit that changes a runtime file with no test', () => {
-		write_file(RUNTIME_FILE, A_CHANGED_LINE)
+		write_file(state.fixture.workspace, RUNTIME_FILE, A_CHANGED_LINE)
 
 		expect(delivered_rules.delivery(push_payload('required', false), NOW_MS)).toBe(
 			test_declared_commit.REASON,
@@ -99,13 +92,13 @@ describe('delivered_rules.delivery — the test-declared rule at the commit stag
 	})
 
 	it('says nothing when a test file changed', () => {
-		write_file('scripts/thing.test.ts', A_RUNTIME_LINE)
+		write_file(state.fixture.workspace, 'scripts/thing.test.ts', A_RUNTIME_LINE)
 
 		expect(delivered_rules.delivery(push_payload('satisfied', true), NOW_MS)).toBeUndefined()
 	})
 
 	it('says nothing when only documentation changed', () => {
-		write_file(README, 'second\n')
+		write_file(state.fixture.workspace, README, 'second\n')
 
 		expect(delivered_rules.delivery(push_payload('exempt', true), NOW_MS)).toBeUndefined()
 	})
@@ -114,7 +107,7 @@ describe('delivered_rules.delivery — the test-declared rule at the commit stag
 	// whether the commit should happen at all, so it is delivered first; run-tail is delivered on the
 	// reissue, its per-id stamp untouched by the first refusal.
 	it('delivers test-declared first and run-tail on the reissue for an untested foreground push', () => {
-		write_file(RUNTIME_FILE, A_CHANGED_LINE)
+		write_file(state.fixture.workspace, RUNTIME_FILE, A_CHANGED_LINE)
 		const payload = push_payload('overlap', false)
 
 		expect(delivered_rules.delivery(payload, NOW_MS)).toBe(test_declared_commit.REASON)

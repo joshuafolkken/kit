@@ -1,5 +1,6 @@
 import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types'
 import { PAUSE_COMMANDS } from './josh-commands-pause'
+import { PRIME_COMMANDS } from './josh-commands-prime'
 import { PROGRESS_COMMANDS } from './josh-commands-progress'
 
 const OWNER = '--owner <pid>'
@@ -7,15 +8,12 @@ const OUTPUT = '--output <path>'
 const REPO_FLAG = { names: ['--repo <owner/name>'], description: 'a child in another repository.' }
 const ISSUE = { arguments: '<N>' }
 
-// The run-lifecycle registry (`run:hold` through `run:step`), split out of `josh-commands-ai.ts` so
-// that file stays under its 300-code-line limit, as `BACKLOG_COMMANDS` and `LANE_COMMANDS` are. It
-// is spread into `AI_COMMANDS` at the place the entries belong, so the generated catalog keeps their
-// order.
+// The run-lifecycle registry (`run:hold` through `run:step`). It is spread into `AI_COMMANDS` at the
+// place the entries belong, so the generated catalog keeps their order.
 
 // One script answers both `run:hold` and `run:release`; the flag below is what tells them apart.
 const RUN_HOLD_SCRIPT = 'scripts/run/hold/run-hold-main.ts'
 
-/* eslint-disable @typescript-eslint/naming-convention */
 const RUN_COMMANDS: Record<string, CommandEntry> = {
 	'run:hold': {
 		script: RUN_HOLD_SCRIPT,
@@ -49,7 +47,7 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: ['--human-review-stop'],
 					description:
-						'marks a `needs-human-review` stop as a `halfrun` stop, and sends its `confirmation` Telegram naming the lane; answers `e2e-owed` (exit 1) until `test:e2e` answered green on this tree.',
+						"marks a `halfrun` stop and a `human-review` lane, retaining its tree and hold. Sends `confirmation`; its worker's exit frees the execution place. Answers `e2e-owed` (exit 1) until `test:e2e` is green on this tree.",
 				},
 				{
 					names: ['--prrun-stop'],
@@ -81,13 +79,7 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 	...PAUSE_COMMANDS,
-	'run:tidy': {
-		script: 'scripts/run/tidy/run-tidy-main.ts',
-		description: 'Close merged lanes and drop stashes whose issues are all merged',
-		category: 'AI tools',
-		reference: ['', 'automation', ['git', 'network', 'files']],
-		usage: { examples: [{ arguments: '' }] },
-	},
+	...PRIME_COMMANDS,
 	'run:carry': {
 		script: 'scripts/run/carry/run-carry-cli.ts',
 		// `--stopped` sends the stop confirmation, so the Telegram credentials come from `.env` as for
@@ -98,18 +90,14 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['<operation> [arguments...]', 'automation', ['files']],
 		usage: {
 			examples: [
-				{ arguments: '--begin "backlogrun --max 5" --owner "$PPID"' },
+				{ arguments: '--begin "backlogrun --max 5"' },
 				{ arguments: '--json', note: 'read the record back in a resumed session' },
-				{ arguments: '--cut --owner "$PPID"', note: 'hand the record off before a cut' },
+				{ arguments: '--cut', note: 'hand the record off before a cut' },
 				{
-					arguments:
-						'--retrospective --summary "0 filed; dropped #2240 already merged" --owner "$PPID"',
+					arguments: '--retrospective --summary "0 filed; dropped #2240 already merged"',
 					note: 'close the end-of-run retrospective',
 				},
-				{
-					arguments: '--resume "backlogrun --max 5" --owner "$PPID"',
-					note: 'adopt a record no cut handed off',
-				},
+				{ arguments: '--resume "backlogrun --max 5"', note: 'adopt a record no cut handed off' },
 				{
 					arguments: '--end --stopped "epic #2126: everything is blocked behind parked #2118"',
 					note: 'end + push',
@@ -119,7 +107,7 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: [OWNER],
 					description:
-						'the long-lived process spending the budget (`$PPID` under a loop); required by counts and `--begin` / `--resume`. A live PID stays `busy` if probes fail.',
+						'the long-lived process spending the budget; omitted, the `CLAUDE_PID` of the calling Claude session (none elsewhere, e.g. Codex). Read by counts and `--begin` / `--resume`. A live PID stays `busy` if probes fail.',
 				},
 				{ names: ['--done <issue>'], description: "shrinks a named-issue run's `remaining` list." },
 				{
@@ -148,13 +136,15 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 	},
 	'run:add': {
 		script: 'scripts/run/add/run-add-cli.ts',
-		description: 'Add issues to a live backlogrun, ahead of the queue unless --no-priority',
+		description:
+			'Add issues to a live backlogrun, ahead of the queue unless --no-priority; epics become roots',
 		category: 'AI tools',
-		reference: ['<issue...> [--no-priority]', 'automation', ['network', 'files']],
+		reference: ['<issue...> [--no-priority] [--retry]', 'automation', ['network', 'files']],
 		usage: {
 			examples: [
 				{ arguments: '101 102', note: 'ahead of the rest of the queue (`#N` works too)' },
 				{ arguments: '101 --no-priority', note: 'at the end of the queue' },
+				{ arguments: '101 --retry', note: 'retry a mechanically stopped issue in this run' },
 			],
 		},
 	},
@@ -197,12 +187,13 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/run/park/run-park-cli.ts',
 		description: 'Park a lane child for a decision, or clear the park',
 		category: 'AI tools',
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		reference: ['<issue> --body-file <path> | <issue> --clear', 'automation', ['files', 'network']],
 		usage: {
 			examples: [
 				{
 					arguments: '1839 --body-file .josh/tmp/park-1839.md',
-					note: 'comment, needs-decision and the local record',
+					note: 'options, tiers and a recommendation; then needs-decision, the record, run:release',
 				},
 				{ arguments: '1839 --clear', note: 'remove needs-decision and the record' },
 			],
@@ -263,9 +254,8 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/run/run-prep-main.ts',
 		description: 'Bundle a run’s pre-edit reads: body, comments, state, dependency scope',
 		category: 'AI tools',
-		reference: ['<issue>', 'automation', ['network']],
-		is_bundled: true,
-		usage: { examples: [ISSUE] },
+		reference: ['<issue> [--summary]', 'automation', ['network']],
+		usage: { examples: [ISSUE, { arguments: '<N> --summary', note: 'the work summary skeleton' }] },
 	},
 	// The entry sequence a lane opened on, folded into one call: claim the tree,
 	// read the budget, gather the issue reads and decide the pre-implementation step. `run:hold`,
@@ -277,11 +267,12 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			'Open a run in one call: claim the tree, read the budget, bundle the reads, decide the pre-implementation step',
 		category: 'AI tools',
-		reference: ['<issue> [--to <command>]', 'automation', ['git', 'network', 'files']],
+		reference: ['<issue> [--to <command>] [--adopt]', 'automation', ['git', 'network', 'files']],
 		usage: {
 			examples: [
 				{ arguments: '<N>', note: 'a `fullrun`' },
 				{ arguments: '<N> --to halfrun', note: 'a run that goes as far as `halfrun`' },
+				{ arguments: '<N> --adopt', note: "a `new` run's entry once <N> is filed" },
 			],
 		},
 	},
@@ -307,7 +298,6 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 			'Print the run’s next single action, computed from the event stream, carry record and issue state',
 		category: 'AI tools',
 		reference: ['[<issue>]', 'automation', ['network', 'files']],
-		is_bundled: true,
 		usage: {
 			examples: [
 				{ arguments: '<N>', note: "the run's next action for issue <N>" },
@@ -316,6 +306,5 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 }
-/* eslint-enable @typescript-eslint/naming-convention */
 
 export { RUN_COMMANDS }

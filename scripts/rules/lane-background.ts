@@ -1,7 +1,9 @@
 import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
+import type { HookContext } from '#scripts/hooks/hook-context'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { json_value } from '#scripts/lib/json-value'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
+import { time_josh_names } from '#scripts/time-runtime/time-josh-names'
 import { time_shell } from '#scripts/time-runtime/time-shell'
 import {
 	time_transcript_line,
@@ -23,8 +25,9 @@ import { run_tail_rule } from './run-tail-rule'
 //
 // **`ship` is in the set too, `--detach` or not**. It detaches in a child, but only after its
 // preflight — the scoped checks — has passed in the calling process, so a backgrounded `ship` is
-// killed at the turn's end before any supervisor exists. Issued in the foreground it returns at
-// `launched` within the tool timeout, and the supervisor carries the rest. A backgrounded `ship` alone
+// killed at the turn's end before any supervisor exists. Issued in the foreground it returns after
+// `launched` and, on `cost --cut` `under`, one `ship:wait` chunk timed from its own start, within the
+// tool timeout; the supervisor carries the rest. A backgrounded `ship` alone
 // is not refused but rewritten into that foreground call (`foreground_input`); one chained after
 // another long command is refused. A foreground `ship` without the cap is given it the same way.
 //
@@ -33,7 +36,7 @@ import { run_tail_rule } from './run-tail-rule'
 // so the `Stop` hook sends the child back to wait or detach rather than asking for a notify
 // (`stop-rules.ts`). The launch and finish ids are `time_transcript_line`'s, never re-parsed here.
 
-// The josh subcommands that run long enough to be backgrounded, as `time_shell` names them — canonical,
+// The josh subcommands that run long enough to be backgrounded, as `time_josh_names` names them — canonical,
 // so the `ga` / `g` / `fu` aliases are covered by the one spelling.
 // `ship`, `ship:wait` and `lane:plan` are run in the foreground at the cap rather than refused: a
 // `ship:wait` left at the two-minute default is moved aside mid-chunk and dies with the turn, its verdict
@@ -59,7 +62,7 @@ function is_backgrounded(input: unknown): boolean {
 }
 
 function long_commands_of(command: string): Array<string> {
-	return time_shell.josh_commands_of(command).filter((name) => LONG_RUNNING_COMMANDS.has(name))
+	return time_josh_names.josh_commands_of(command).filter((name) => LONG_RUNNING_COMMANDS.has(name))
 }
 
 // A call whose long-running work is `ship` or `ship:wait` alone. In a child a foreground `ship` already
@@ -87,7 +90,7 @@ function is_backgrounded_ship(call: GuardedCall): boolean {
 // in either spelling. A child's foreground push is claimed too, because `run-tail` would otherwise answer
 // it with "reissue it backgrounded" — the one reissue this row then refuses — so the child is handed the
 // detached route on its first refusal rather than two contradictory ones. A backgrounded `ship` alone is
-// not refused: `foreground_input` turns it into the foreground call the refusal used to ask for.
+// accepted through `foreground_input` so a detached ship runs with the foreground contract.
 function is_candidate(call: GuardedCall): boolean {
 	if (run_tail_rule.is_push_step_call(call)) return true
 
@@ -100,10 +103,7 @@ function is_candidate(call: GuardedCall): boolean {
 
 // True when this session is a dispatched lane child backgrounding a long-running josh command. The call's
 // own fields are tested first, so the dispatch mark is read only on the handful of calls that match.
-function is_background_long_run(
-	call: GuardedCall,
-	is_lane_child: () => boolean = () => lane_child_marker.is_child_of(process.cwd()),
-): boolean {
+function is_background_long_run(call: GuardedCall, is_lane_child: () => boolean): boolean {
 	return is_candidate(call) && is_lane_child()
 }
 
@@ -130,7 +130,7 @@ function is_capped_foreground(input: Record<string, unknown>): boolean {
 // `undefined` for every call this does not apply to.
 function foreground_input(
 	call: GuardedCall,
-	is_lane_child: () => boolean = () => lane_child_marker.is_child_of(process.cwd()),
+	is_lane_child: () => boolean,
 ): Record<string, unknown> | undefined {
 	const input = ship_alone_input(call)
 
@@ -143,7 +143,7 @@ const FOREGROUND_NOTE =
 	"lane background: a lane child's `josh ship`, `josh ship:wait` or `josh lane:plan` backgrounded, by its flag or by " +
 	'outrunning the Bash timeout, dies with the headless turn — so it was run in the foreground at the ' +
 	'600000 ms cap, where `ship` detaches itself after the preflight. Then follow ' +
-	'`chain-rule.md` step 0 (`josh ship:wait` on `launched`).'
+	'`chain-rule.md` step 0 (`josh ship:wait` on its `pending`).'
 
 type LaunchedIds = (block: TranscriptBlock) => ReadonlyArray<string>
 
@@ -196,8 +196,8 @@ function pending_command_ids(tail: string): ReadonlyArray<string> {
 const LANE_BACKGROUND_REASON =
 	'⛔ lane background: this session is a dispatched lane child (`JOSH_LANE_CHILD`), a headless ' +
 	'process whose background tasks die when the turn ends. Hand over to ' +
-	'`pnpm josh ship --detach --review "<title> #<N>"`, issued in the foreground, then `josh ship:wait <N>` on ' +
-	'`launched` or end the turn. It fires on every occurrence ' +
+	'`pnpm josh ship --detach --review "<title> #<N>"`, issued in the foreground; on `launched` it ' +
+	'runs `josh ship:wait` itself on `cost --cut` `under`. It fires on every occurrence ' +
 	'(`.claude/skills/workflow-commands/chain-rule.md` step 0).'
 
 const LANE_BACKGROUND_STOP_REASON =
@@ -219,7 +219,8 @@ const LANE_AGENT_STOP_REASON =
 // a reissue. It declares no `keeps`: the detached ship is a different command, not this call made right.
 const ROW = {
 	id: 'lane-background',
-	is_trigger: (call: GuardedCall): boolean => is_background_long_run(call),
+	is_trigger: (call: GuardedCall, context: HookContext): boolean =>
+		is_background_long_run(call, () => lane_child_marker.is_child_of(context.cwd, context.env)),
 	reason: LANE_BACKGROUND_REASON,
 	decide: (): boolean => true,
 	// `pretool-guard.ts` rewrites a lone `josh ship` to the foreground rather than refusing it; this is

@@ -1,11 +1,13 @@
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
-import { josh_command } from '#scripts/josh/josh-run'
+import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_vacant } from '#scripts/lane/lane-vacant'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { INSTALL_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { execa } from 'execa'
+import { lane_launch_admission } from './lane-launch-admission'
+import { lane_launch_pending } from './lane-launch-pending'
 
 // `josh lane:launch <issue> [--stash <message>]` — one composite command for a `backlogrun` lane-start
 // event. Opening one lane was four to six turns of the parent: `lane:open`,
@@ -27,6 +29,8 @@ const PNPM = 'pnpm'
 const USAGE = 'Usage: josh lane:launch <issue-number> [--stash <message>]'
 
 const OPTIONS = { stash: { type: 'string' } } as const
+
+const PREPARED: JoshResult = { code: SUCCESS_EXIT_CODE, out: '' }
 
 // The stash message is present only for the first lane — the caller passes `--stash` there and nowhere
 // else, so "only the first lane pops and re-installs" is preserved by which invocation carries it.
@@ -53,49 +57,65 @@ function read_context(argv: ReadonlyArray<string>): LaunchContext | undefined {
 	return { issue, stash: parsed.values.stash }
 }
 
+// Where the chain ended. `unopened` is a `lane:open` refusal — no lane was taken; `failed` is a step
+// after it, which leaves the opened lane holding a seat, so a caller cannot read the two alike. Either
+// carries the failing step's own explanation as `detail`, when it said one.
+type Refusal = { kind: 'unopened'; detail?: string } | { kind: 'failed'; detail?: string }
+
+type LaunchOutcome = Refusal | { kind: 'launched'; pid: string } | { kind: 'waiting' }
+
+// The step's stderr, or its stdout when stderr is empty; nothing when it said neither.
+function failure_detail(result: JoshResult): string | undefined {
+	const detail = (result.err ?? '').trim() || result.out.trim()
+
+	return detail === '' ? undefined : detail
+}
+
+function refused(kind: Refusal['kind'], result: JoshResult): Refusal {
+	const detail = failure_detail(result)
+
+	return detail === undefined ? { kind } : { kind, detail }
+}
+
 // The pop brought in the `pnpm-lock.yaml` `josh latest` rewrote, so this one lane installs a second
 // time against it. Output is captured and surfaced only on failure, so the composite's stdout stays
 // the child's pid alone.
-async function install(directory: string): Promise<boolean> {
+async function install(directory: string): Promise<JoshResult> {
 	const result = await execa(PNPM, ['--dir', directory, 'install', '--frozen-lockfile'], {
 		reject: false,
 		timeout: INSTALL_TIMEOUT_MS,
 	})
+	const installed = {
+		code: result.exitCode ?? FAILURE_EXIT_CODE,
+		out: result.stdout,
+		err: result.stderr,
+	}
 
-	if ((result.exitCode ?? FAILURE_EXIT_CODE) === SUCCESS_EXIT_CODE) return true
+	if (installed.code !== SUCCESS_EXIT_CODE) console.error(failure_detail(installed) ?? '')
 
-	console.error(result.stderr === '' ? result.stdout : result.stderr)
-
-	return false
+	return installed
 }
 
 // The first lane pops the shared stash and re-installs against the lock it brought in; a pop that
 // refused (`no-match` / `ambiguous`) stops the lane rather than dispatching onto an unprepared tree.
 // A caller without `--stash` skips both, which is every lane after the first. The re-install is a
 // stage of its own on the run's stream, as the install `lane:open` ran was.
-async function prepare(context: LaunchContext, directory: string): Promise<boolean> {
+async function prepare(context: LaunchContext, directory: string): Promise<JoshResult> {
 	const { issue, stash } = context
 
-	if (stash === undefined) return true
+	if (stash === undefined) return PREPARED
 
 	const popped = await josh_command.josh_run(
 		['stash:pop', stash, '--dir', directory],
 		should_forward_stderr,
 	)
 
-	if (popped.code !== SUCCESS_EXIT_CODE) return false
+	if (popped.code !== SUCCESS_EXIT_CODE) return popped
 
 	await run_event_setup.emit(run_event_setup.installing(issue))
 
 	return await install(directory)
 }
-
-// Where the chain ended. `unopened` is a `lane:open` refusal — no lane was taken; `failed` is a step
-// after it, which leaves the opened lane holding a seat, so a caller cannot read the two alike.
-type LaunchOutcome = { kind: 'launched'; pid: string } | { kind: 'unopened' } | { kind: 'failed' }
-
-const UNOPENED: LaunchOutcome = { kind: 'unopened' }
-const FAILED: LaunchOutcome = { kind: 'failed' }
 
 async function close_if_vacant(lane: LaneInfo | undefined): Promise<void> {
 	if (lane === undefined || !(await lane_vacant.is_vacant(lane))) return
@@ -114,27 +134,27 @@ async function close_if_vacant(lane: LaneInfo | undefined): Promise<void> {
 // — a run cut between the open and the dispatch leaves one. It is reopened
 // rather than reused because nothing recorded whether its install finished. A lane with work or a live
 // process in it still meets `lane:open`'s refusal.
-async function lane_directory(issue: string): Promise<string | undefined> {
+async function lane_directory(issue: string): Promise<JoshResult> {
 	const kept = await lane_registry.find_open_lane(issue)
 
-	if (kept?.output !== undefined) return kept.directory
+	if (kept?.output !== undefined) return { code: SUCCESS_EXIT_CODE, out: kept.directory }
 
 	await close_if_vacant(kept)
 
-	const opened = await josh_command.josh_run(['lane:open', issue], should_forward_stderr)
-
-	return opened.code === SUCCESS_EXIT_CODE ? opened.out : undefined
+	return await josh_command.josh_run(['lane:open', issue], should_forward_stderr)
 }
 
 // The launch chain in-process. The CLI prints the pid; `backlog:drive` launches through this same
 // chain. The dispatch is said on the run's stream before it starts, so the board draws a lane that is
 // ready apart from one still being filled.
-async function launch_lane(context: LaunchContext): Promise<LaunchOutcome> {
-	const directory = await lane_directory(context.issue)
+async function launch_admitted(context: LaunchContext): Promise<LaunchOutcome> {
+	const opened = await lane_directory(context.issue)
 
-	if (directory === undefined) return UNOPENED
+	if (opened.code !== SUCCESS_EXIT_CODE) return refused('unopened', opened)
 
-	if (!(await prepare(context, directory))) return FAILED
+	const prepared = await prepare(context, opened.out)
+
+	if (prepared.code !== SUCCESS_EXIT_CODE) return refused('failed', prepared)
 
 	await run_event_setup.emit(run_event_setup.dispatching(context.issue))
 
@@ -143,7 +163,17 @@ async function launch_lane(context: LaunchContext): Promise<LaunchOutcome> {
 		should_forward_stderr,
 	)
 
-	return dispatched.code === SUCCESS_EXIT_CODE ? { kind: 'launched', pid: dispatched.out } : FAILED
+	if (dispatched.code !== SUCCESS_EXIT_CODE) return refused('failed', dispatched)
+
+	return { kind: 'launched', pid: dispatched.out }
+}
+
+async function launch_lane(context: LaunchContext): Promise<LaunchOutcome> {
+	return await lane_launch_admission.launch(context, launch_admitted)
+}
+
+async function launch_ready_lane(context: LaunchContext): Promise<LaunchOutcome> {
+	return await lane_launch_pending.launch(context, launch_admitted)
 }
 
 async function launch(context: LaunchContext): Promise<number> {
@@ -168,7 +198,13 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	return await launch(context)
 }
 
-const lane_launch_cli = { launch_lane, read_context, run }
+const lane_launch_cli = {
+	keep_pending: lane_launch_pending.keep,
+	launch_lane,
+	launch_ready_lane,
+	read_context,
+	run,
+}
 
 export type { LaunchContext, LaunchOutcome }
 export { lane_launch_cli }

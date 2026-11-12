@@ -1,5 +1,8 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { cli_body } from '#scripts/josh/cli-body'
+import { disposition_batch } from './disposition-batch'
+import { disposition_batch_filing } from './disposition-batch-filing'
 import { disposition } from './disposition-logic'
 
 // `josh disposition <path...>` — the machine half of the three-way review disposition.
@@ -7,9 +10,11 @@ import { disposition } from './disposition-logic'
 // runtime code path, a distributed artifact a consumer reads, or the verification guarding either —
 // and `non-runtime` when every path is inert. `prompts/review.md` → "Three-way disposition after the
 // cap" leaves the run one judgement after this: whether the finding is a confirmed defect.
+// `--batch <findings-file>` routes every remaining finding at once (`disposition-batch.ts`).
 
 const ARGV_OFFSET = 2
-const USAGE = 'Usage: josh disposition <path...>'
+const BATCH_FLAG = '--batch'
+const USAGE = 'Usage: josh disposition <path...> | --batch <findings-file>'
 const FAILURE_EXIT_CODE = 1
 
 function reason_line(paths: ReadonlyArray<string>): string {
@@ -20,7 +25,36 @@ function reason_line(paths: ReadonlyArray<string>): string {
 		: `reaches through: ${reaching.join(', ')}`
 }
 
+function refuse(message: string): number {
+	console.error(message)
+
+	return FAILURE_EXIT_CODE
+}
+
+// `<findings-file> [--found-during <N>]`; the issue is needed once a finding routes to `file`.
+function run_batch(argv: ReadonlyArray<string>): number {
+	const [path] = argv
+
+	if (path === undefined) return refuse(USAGE)
+
+	const result = disposition_batch.parse(cli_body.read_file_or_stdin(path))
+
+	if ('invalid' in result) {
+		return refuse(`not in the review:record grammar:\n${result.invalid.join('\n')}`)
+	}
+
+	const filing = disposition_batch_filing.filing_lines(result.findings, argv)
+
+	if (filing === undefined) return refuse(disposition_batch_filing.MISSING_FOUND_DURING)
+
+	process.stdout.write(`${[disposition_batch.render(result.findings), ...filing].join('\n')}\n`)
+
+	return 0
+}
+
 function run(argv: ReadonlyArray<string>): number {
+	if (argv[0] === BATCH_FLAG) return run_batch(argv.slice(1))
+
 	if (argv.length === 0) {
 		console.error(USAGE)
 

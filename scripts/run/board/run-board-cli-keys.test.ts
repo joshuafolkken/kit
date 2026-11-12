@@ -10,7 +10,7 @@ import type { KeyInput } from './run-board-keys'
 const { STOPPED, harness } = run_board_fixture
 const ESCAPE = '\u{1B}'
 const LEAVE = `${ESCAPE}[?25h${ESCAPE}[?1049l`
-const KEYS_LINE = ' l p f q w d: fold · a: all · Ctrl-C: quit'
+const KEYS_LINE = ' u l p f q w d: fold · a: all · Ctrl-C: quit'
 
 function keyboard(calls: Array<string>): KeyInput {
 	return {
@@ -52,5 +52,11 @@ describe('run_board_cli.run keys', () => {
 		await expect(run_board_cli.run([], live.ports)).rejects.toBe(STOPPED)
 		expect(calls).toStrictEqual([])
 		expect([...once.frames, ...live.frames].join('')).not.toContain(KEYS_LINE)
+	})
+
+	// joshuafolkken/kit#7213: the live keyboard keeps its folds across launches.
+	it('gives the live keyboard a store for its folds', () => {
+		expect(run_board_cli.LIVE_PORTS.keys?.store?.load).toBeTypeOf('function')
+		expect(run_board_cli.LIVE_PORTS.keys?.store?.save).toBeTypeOf('function')
 	})
 })

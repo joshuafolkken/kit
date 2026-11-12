@@ -1,7 +1,8 @@
+import { hook_context, type HookContext } from '#scripts/hooks/hook-context'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { json_value } from '#scripts/lib/json-value'
-import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { time_hook_transcript } from '#scripts/time-runtime/time-hook-transcript'
+import { transcript_tail } from '#scripts/time-runtime/transcript-tail'
 import { delivered_rules, type DeliveredRule } from './delivered-rules'
 import { guard_remedy } from './guard-remedy'
 
@@ -36,7 +37,7 @@ function read_payload_tail(raw_payload: string): string {
 		const payload = hook_decision.parse_hook_payload(raw_payload)
 
 		return payload
-			? time_density_hook.read_tail(
+			? transcript_tail.read_tail(
 					time_hook_transcript.transcript_of(payload.transcript_path, payload.agent_id),
 				)
 			: ''
@@ -55,11 +56,16 @@ function tail_reader(raw_payload: string): () => string {
 	}
 }
 
-function fold(name: string, typed: Record<string, unknown>, tail: () => string): Folded {
+function fold(
+	name: string,
+	typed: Record<string, unknown>,
+	tail: () => string,
+	context: HookContext,
+): Folded {
 	const folded: Folded = { input: typed, notes: [] }
 
 	for (const rule of REWRITING_RULES) {
-		const input = rule.rewrite?.({ name, input: folded.input }, tail)
+		const input = rule.rewrite?.({ name, input: folded.input }, tail, context)
 
 		if (input === undefined) {
 			continue
@@ -91,12 +97,16 @@ function typed_payload(raw_payload: string): TypedPayload | undefined {
 		: undefined
 }
 
-function rewrite(raw_payload: string): RuleRewrite | undefined {
+// The rows read the cwd and environment from `context`, never off the process.
+function rewrite(
+	raw_payload: string,
+	context: HookContext = hook_context.from_process(),
+): RuleRewrite | undefined {
 	const typed = delivered_rules.is_enabled() ? typed_payload(raw_payload) : undefined
 
 	if (typed === undefined) return undefined
 
-	const { input, notes } = fold(typed.name, typed.input, tail_reader(raw_payload))
+	const { input, notes } = fold(typed.name, typed.input, tail_reader(raw_payload), context)
 
 	if (notes.length === 0) return undefined
 

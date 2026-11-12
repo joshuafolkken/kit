@@ -16,16 +16,19 @@ function since_of(before: IdleSince, idle: ReadonlyArray<string>, now_ms: number
 	return new Map(idle.map((lane) => [lane, before.get(lane) ?? now_ms]))
 }
 
-// The lanes idle for the whole window as of the read at `read_ms`; none before any read.
-function stopped_of(since: IdleSince, read_ms: number | undefined): Array<string> {
-	if (read_ms === undefined) return []
+// The lanes idle for the whole window as of the read at `read_ms`, each with when it was first read
+// idle — when its child stopped (joshuafolkken/kit#6577); none before any read.
+function stopped_since(since: IdleSince, read_ms: number | undefined): IdleSince {
+	if (read_ms === undefined) return NO_IDLE
 
-	const lasted = [...since].filter(([, at]) => read_ms - at >= lane_await.RECONFIRM_MS)
-
-	return lasted.map(([lane]) => lane)
+	return new Map([...since].filter(([, at]) => read_ms - at >= lane_await.RECONFIRM_MS))
 }
 
-const run_board_idle = { NO_IDLE, since_of, stopped_of }
+function stopped_of(since: IdleSince, read_ms: number | undefined): Array<string> {
+	return [...stopped_since(since, read_ms).keys()]
+}
+
+const run_board_idle = { NO_IDLE, since_of, stopped_of, stopped_since }
 
 export type { IdleSince }
 export { run_board_idle }

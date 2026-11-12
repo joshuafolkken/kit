@@ -1,16 +1,17 @@
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { resolve_local_bin } from '#scripts/build/local-bin'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { execa } from 'execa'
-import { afterAll, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { edited_cspell, type CspellRequest } from './edited-cspell'
 
 // joshuafolkken/kit#2296: the edit hook reports the edited file's cspell unknown words as
 // additionalContext, and reports nothing when there are none — and never fails the edit, however the
 // spell check behaves.
 
-const DIRECTORY = mkdtempSync(path.join(tmpdir(), 'edited-cspell-'))
+const make_directory = temporary_directory('suite')
+const DIRECTORY = make_directory('edited-cspell-')
 const TEXT = 'content'
 // A real cspell start takes about a second, two of them more under a loaded machine.
 const LIVE_TIMEOUT_MS = 60_000
@@ -26,10 +27,6 @@ function file_of(name: string): string {
 async function never_called(): Promise<string> {
 	throw new Error('runner should not have been called')
 }
-
-afterAll(() => {
-	rmSync(DIRECTORY, { recursive: true, force: true })
-})
 
 describe('format_unknown_words', () => {
 	it('names each unknown word under a header', () => {
@@ -112,7 +109,7 @@ describe('spelling_diagnostics — the text it checks', () => {
 
 // joshuafolkken/kit#4596: the live runner reads the text from stdin under the file's own name. A
 // project of its own, with this checkout's `node_modules` linked in, pins that the project config —
-// its word list and its ignore list — answers exactly as it does for the path the hook used to pass.
+// its word list and its ignore list — agrees between the stdin and file-path routes.
 // The real path: macOS hands out a temporary directory under a symlink, and cspell's path route
 // reads a file reached through one as outside its working directory.
 const PROJECT = path.join(realpathSync(DIRECTORY), 'live')
@@ -153,15 +150,20 @@ async function both_routes(name: string): Promise<ReadonlyArray<string>> {
 	])
 }
 
+// joshuafolkken/kit#7259: cspell's `exports` map hides its manifest, so the shim is its direct route.
 describe('cspell_command', () => {
 	it('spawns the project shim directly when it is installed', () => {
-		expect(edited_cspell.cspell_command(PROJECT)).toStrictEqual([
-			resolve_local_bin(PROJECT, 'cspell'),
-		])
+		expect(edited_cspell.cspell_command(PROJECT)).toStrictEqual({
+			file: resolve_local_bin(PROJECT, 'cspell'),
+			args: [],
+		})
 	})
 
-	it('falls back to pnpm exec where the root carries no shim', () => {
-		expect(edited_cspell.cspell_command(DIRECTORY)).toStrictEqual(['pnpm', 'exec', 'cspell'])
+	it('falls back to pnpm exec where no shim is installed at or above the root', () => {
+		expect(edited_cspell.cspell_command(DIRECTORY)).toStrictEqual({
+			file: 'pnpm',
+			args: ['exec', 'cspell'],
+		})
 	})
 })
 

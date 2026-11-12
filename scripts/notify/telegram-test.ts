@@ -50,13 +50,18 @@ function refuse_usage(): void {
 // lose the header's repository name there. The same fact is already read over REST by
 // `git_gh_repo`, whose failure contract is the `undefined` this caller handles, so it is read from
 // there rather than from a second
-// spawn (`CLAUDE.md` → "No clones").
+// spawn (`CLAUDE.md` → "No clones"). An exhausted rate limit is thrown there, not answered
+// `undefined`; the header name is optional, so it is warned and the notification goes without it.
 async function fetch_repo_name(): Promise<string | undefined> {
-	const name_with_owner = await git_gh_repo.repo_get_name_with_owner()
+	try {
+		const name_with_owner = await git_gh_repo.repo_get_name_with_owner()
 
-	if (name_with_owner === undefined) return undefined
+		return name_with_owner?.split(REPO_NAME_SEPARATOR).at(-1)
+	} catch (error) {
+		console.warn(`⚠️  Could not read the repository name, sending without it: ${String(error)}`)
 
-	return name_with_owner.split(REPO_NAME_SEPARATOR).at(-1)
+		return undefined
+	}
 }
 
 // The title is read from the repository the URL names, through the same reader every other

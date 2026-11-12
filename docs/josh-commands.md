@@ -24,24 +24,35 @@ Run lint, type check, spell check and unit tests concurrently.
 
 ```bash
 pnpm josh gate
-pnpm josh gate --verbose   # every check's output, passing ones included
-pnpm josh gate --force     # re-run even on a tree already recorded green
-pnpm josh gate --no-unit   # the static checks only (CI only)
+pnpm josh gate --verbose      # every check's output, passing ones included
+pnpm josh gate --force        # re-run even on a tree already recorded green
+pnpm josh gate --no-unit      # the static checks only (CI only)
+pnpm josh gate --whole-tree   # add the whole-tree checks (the ship's gate on the final tree)
 ```
 
 <!-- /usage -->
 
-Also runs [behavior](#josh-behavior), [unused namespace members](#josh-exportsunused), the [metrics ratchet](#josh-metrics) and the [lockfile policy](josh-commands-automation.md#josh-lockfilepolicy) (kit only).
+Also runs [behavior](#josh-behavior) and the [lockfile policy](josh-commands-automation.md#josh-lockfilepolicy) (kit only).
+
+- The whole-tree checks — [unused namespace members](#josh-exportsunused) and the [metrics ratchet](#josh-metrics) (kit only) — run only with `--whole-tree` or `--no-unit`: the ship's gate and CI run them; a lane's own gate does not.
+- A `--whole-tree` gate reuses a green record only while both checks' own records are reusable (`scripts/gate/whole-tree-reuse.ts`).
 
 - Static checks: `pnpm josh lint`, `cspell:dot`, `behavior`, `exports:unused`, `metrics` (kit only); the unit leg is `pnpm josh test:related`; the type check resolves to a toolkit `check:ci` / `check` when installed, else `pnpm josh check`.
 - A tree recorded green is reused unless `--force` or the changed-file map moved; otherwise `lint`, `check`, `exports` and `metrics` are each reused while none of their inputs moved since they last passed silently (`scripts/gate/check-inputs.ts`), and `test:unit` while `josh test:related` would run no test for what moved (no test-read map, or one git can no longer diff against, runs it); the header reads `reused — inputs unchanged since it passed at <time>`.
 - The other checks always run; `--force` reuses nothing.
 - **Refuses to start when the scoped pair has not been green on this tree**: a unit-included local gate reads the record `josh review:brief` does and names `pnpm josh lint:related && pnpm josh test:related`. Not for `--no-unit` or `--force`; `JOSH_SCOPED_GREEN=0` turns it off.
-- `--static-group=<lint|types|rest>` implies `--no-unit`: one part of the static set per CI matrix leg (`scripts/gate/gate-static-group.ts`).
+- `--static-group=<lint-1|lint-2|types|rest>` implies `--no-unit`: one part of the static set per CI matrix leg (`scripts/gate/gate-static-group.ts`). `lint-<n>` runs the lint check alone on that `josh lint --shard`.
 - **On failure, a line per failed check with the command to re-run is printed just above the verdict**, so a `tail` keeps every failure.
 - **The last line is the verdict, counting ran apart from skipped**: `✔ verification gate passed (6 checks) in 41.2s.`, or `⚠ verification gate not verified (0 ran, 6 skipped) in 0.2s.` — which exits `0` but writes no green record.
-- Exit `1` if any check failed. Refuses any argument other than the three flags and `--static-group=<group>`.
+- Exit `1` if any check failed. Refuses any argument other than the four flags and `--static-group=<group>`.
 - [`josh test:related`](#josh-testrelated) narrows the unit leg; CI runs the whole sharded suite regardless.
+- Project steps (`josh.gate.steps` in `package.json`: `{ name, command, paths?, cores? }`) run after the fixed checks, in order, as `pnpm exec --shell-mode <command>`.
+  - `cores`: the places the step claims in the core budget below before it starts; unset → the whole budget, so two lanes' heavy steps run one at a time. A light step sets a smaller count.
+  - `paths`: repo-relative globs or directories (`src/**/*.rs`, `crates/core`). The step is `reused` until a path moved since its green record matches one (`check-reuse.ts`); no `paths` → always runs. It runs on a changed `command`/`paths`, no record, `--force` or `--no-unit`. One step per crate narrows per crate.
+  - A failed step makes the gate red under its `name`; later steps still run.
+  - An invalid definition (a fixed check's label as `name` included) runs none and fails as one `josh.gate.steps` check naming the error.
+  - With `--static-group`, only `rest` runs them.
+
 - **Each check waits for a place in a machine-wide core budget** (`scripts/gate/core-budget.ts`). Weighting: `docs/maintainers/josh-commands-rationale.md` → "`josh gate`'s core budget".
 
 Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh gate` in detail".
@@ -78,9 +89,28 @@ Keeps caches of its own, apart from the gate's.
 
 - Changed set = branch diff plus untracked files (cache `.eslintcache.related`); flags are named rather than forwarded (`--fix` is reported ignored).
 - A bare run after a green one lints only what moved since, main syncs included (`scripts/gate/since-green.ts`); nothing moved lints nothing and exits green; the branch diff when there is no comparable record (none, or one written under other tool versions or `NODE_ENV`), nothing lintable moved, or a toolchain or lint config moved (`scripts/gate/verification-inputs.ts`).
+- A bare run on a tree it already answered (same file contents and base) runs nothing and prints `reused: tree <hash> <green|red> at <time>` with the kept verdict; a red one names its record to remove (`tree-verdict.ts`).
+- A bare run whose green record cannot narrow, here and in `josh test:related`, first prints `whole branch — since-green fell back: <reason>`.
 - Falls back to the whole tree (naming the case) when no changed file is lintable.
 - In kit, a green bare run also reports a metrics total grown past the merge-base (`josh metrics --totals-only`) as a notice; it changes no exit code and writes no approval file.
 - Also runs the fast byte-ceiling check on any changed agent-read document, sharing `document-byte-budget.ts`: a documentation update over its ceiling fails here in seconds, and the green record is withheld until both lint and the byte check pass.
+
+### `josh lint:rule`
+
+<!-- usage: lint:rule -->
+
+Run one eslint rule over the whole repository, or with --paths a subset, on a cache of its own and write the rule's violations to a file.
+
+```bash
+pnpm josh lint:rule kit/no-measurement-comment
+pnpm josh lint:rule kit/no-measurement-comment --config eslint.tmp.config.js       # a temporary config
+pnpm josh lint:rule kit/no-measurement-comment --output .josh/tmp/violations.txt
+pnpm josh lint:rule kit/no-measurement-comment --paths scripts/lint/*.ts           # only these paths, on a subset cache and report
+```
+
+<!-- /usage -->
+
+- Check a rule while changing it with `--paths <path>...` on a few files, then run the whole repository once. A whole run takes minutes, and each change to the rule or its config misses the cache for every file. A `--paths` run uses its own cache, JSON report and default output (`<rule>.paths.txt`), so the whole run's files stay as they were.
 
 ### `josh lines`
 
@@ -182,28 +212,31 @@ pnpm josh cspell:dot   # includes dotfiles
 
 <!-- usage: check:related -->
 
-Run related lint, unit, type and dotfile spelling checks in parallel.
+Run related lint, type and dotfile spelling checks in parallel, and the unit tests once lint passes.
 
 ```bash
 pnpm josh check:related
-pnpm josh check:related --full   # whole outputs
+pnpm josh check:related --full      # whole outputs
+pnpm josh check:related --touched   # mid-run: test:related --touched, no green record
 ```
 
 <!-- /usage -->
 
-Each check runs through its own `pnpm josh` command, preserving its core-budget reservation, green record or cache. The command waits for every check it started, ends with one verdict line naming every check that failed, and exits non-zero if any fails.
+Each check runs through its own `pnpm josh` command, preserving its core-budget reservation, green record or cache. The command waits for every check it started, ends with one verdict line naming each failed check, and exits non-zero if any fails.
+
+`test:related` starts once `lint:related` passes (at once on a reused one); after a failed one its section reads `=== test:related: not run ===` and the verdict line adds `(not run: test:related)`.
 
 A section prints its check's last 5 lines, 40 on a failure; the log keeps the whole output.
 
-A check whose green record still describes the tree is not run: its section reads `=== <check>: reused ===` and the verdict line lists it as `(reused: …)`. A check that failed last time left no record and runs again.
+A tree it already answered runs no check, as in `josh lint:related`. A check whose green record still describes the tree is not run: its section reads `=== <check>: reused ===` and the verdict lists it `(reused: …)`.
 
-`lint:related` and `test:related` read their own scoped records; the type check and `cspell:dot` read the gate's per-check records, which `check:related` also writes when they pass.
+`lint:related` and `test:related` read their own scoped records, the type check and `cspell:dot` the gate's per-check records (written here on a pass). A record holds only for the same changed files (`.josh/` records included), merge base, and tool and environment fingerprint; any moved file reruns `cspell:dot`.
 
-A record holds only for the same changed files (a `.josh/` record included), merge base, and tool and environment fingerprint; any moved file reruns `cspell:dot`. In kit, a metrics growth notice from `lint:related` is printed again above that verdict line, which then says the ship's pre-detach stops on it and names `josh metrics --accept`.
+In kit, `lint:related`'s metrics growth notice prints again above the verdict line, which then says `josh run:review`'s open stops on it (the ship's pre-detach as the backstop) and names `josh metrics --accept`.
 
-When a `josh test:pinned` launched on the current tree has already answered with unpinned places the ship's pre-detach would stop on, they are printed there too, with the `josh ship --review … --unpinned-ok "<reason>"` form, so the first ship can carry the reason; a check this run did not start, if still running, prints nothing and is not waited on.
+Unpinned places a `josh test:pinned` already answered on the current tree, which the ship's pre-detach would stop on, print there too, with the `josh ship --review … --unpinned-ok "<reason>"` form for the first ship; one still running prints nothing and is not waited on.
 
-In a lane child, a tree a round-1 fix moved first restarts the background `josh test:pinned`. That check is waited for after the four, until it answers, ends, the tree moves again, or 240 seconds pass; only an answer on the current tree is printed.
+In a lane child, a tree a round-1 fix moved first restarts the background `josh test:pinned`. It is waited for after the four until it answers, ends, the tree moves again, or 240 s pass; only an answer on the current tree is printed.
 
 ### `josh behavior`
 
@@ -288,10 +321,15 @@ pnpm josh test:related --silent           # flags are forwarded to vitest
 
 `josh gate` runs it as its unit leg.
 
-- `--touched` is the implementation loop's re-check: the diff's test files (or the given files') plus each changed module's colocated `foo.test.ts` / `foo.*.test.ts`, with no test-read map and no import graph (`scripts/test/test-related-touched.ts`). It leaves no green record, so `josh review:brief` and the gate's reuse count only a full-reach run; the lane ledger records it as `touched`.
+- `--touched` rechecks the diff's test files (or the given files') and each changed module's colocated `foo.test.ts` / `foo.*.test.ts`, without the test-read map or import graph (`scripts/test/test-related-touched.ts`). The lane ledger records it as `touched`.
+  With no other arguments, its separate green record admits review round 2; round 1 and the gate's reuse require a full-reach run.
 
 - Changed set handed to `vitest related`; value-taking flags must be `--flag=value`. Falls back to the whole suite (naming which case) when a changed non-code file has no map or no recorded reader and is new since the map's tree, or a changed file is one every test depends on (counting only files this change moved); a narrowed run matching nothing prints `No test files found` and exits 0.
 - A changed module the vitest config or a setup file imports (`IMPORTED_BY_EVERY_TEST` in `scripts/test/whole-suite-files.ts`) runs only the test files importing it directly, and none when no test does; `josh gate`'s `test:unit` passes `--keep-whole-suite` to run the whole suite for it, as CI does. `josh test:pinned`'s probe narrows by the same rule and leaves out the same heavy files.
+- A changed file whose imports reach more test files than `test_pinned_logic.MAX_TEST_FILES` (150) narrows the same way, to the test files importing it directly, and prints `<N> over cap`, the hub, the count of test files run in place of the reach, and the files (`scripts/test/test-related-cap.ts`).
+- `--keep-whole-suite` does nothing in a lane: its gate leaves the whole suite to CI's required `Checks` (`scripts/test/test-related-whole.ts`).
+- The hub is the capped file of the widest reach in the branch's own change, left off where a main merge or the map's tree brought every capped file.
+- The lane ledger row records `<N>` as `over_cap` and the hub as `over_cap_hub`; `josh lane:breakdown` prints the widest run's count, the one its summary line printed. `--keep-whole-suite` lifts the cap outside a lane; `josh gate` there and CI run the rest.
 - An entries-only edit of `tools/test/pure-files.ts` runs the moved entries and the list's own tests; a `.josh/` run record reaches only a test that read it by name.
 - A changed non-code file narrows to the tests that read it, per the test-read map a whole-suite `josh test:unit` records (`<git-common-dir>/josh/test-read-map.v<version>.json`, one file per map version so lanes on different kits keep their own; a write removes another version's file unwritten for a week); with no map the changed set is the branch diff.
 - A change of only non-code files the map's tree held and no test read runs no test: it says why and exits 0.
@@ -369,6 +407,9 @@ pnpm josh test:e2e
 
 <!-- /usage -->
 
+Runs reserve CPU cores and measured memory for Playwright, Chromium and the web server through
+the shared admission budget. Skipped runs reserve nothing.
+
 ### `josh test`
 
 <!-- usage: test -->
@@ -386,6 +427,7 @@ pnpm josh test
 ```bash
 pnpm josh test:e2e --workers=1   # ✅ reaches Playwright
 pnpm josh test:unit -u           # ✅ reaches Vitest
+pnpm josh test:unit -u <filter>  # ✅ the filter moves in front of -u, which takes an optional type
 pnpm josh test --workers=1       # ❌ exits 1, naming test:unit and test:e2e
 ```
 
@@ -652,6 +694,7 @@ Count review findings by category from the observation ledger.
 
 ```bash
 pnpm josh review:findings
+pnpm josh review:findings --period 7   # the last 7 days, by category and severity
 ```
 
 <!-- /usage -->
@@ -659,6 +702,8 @@ pnpm josh review:findings
 The reader over what `josh review:record` wrote.
 
 **Behavior:** counts only `- rf:` lines, ignoring `- k:` observation lines. `none` sentinel lines are reported as the zero-finding round count, not tallied. A ledger with no finding lines prints `no review findings recorded yet`.
+
+`--period <days>` counts only lines dated from `<days>` days ago on, by category and severity, medium-and-up first. A value that is not a positive whole number prints the usage and exits non-zero.
 
 Related: [`josh review:record`](josh-commands-automation.md#josh-reviewrecord).
 
@@ -709,6 +754,24 @@ pnpm josh main:merge
 ---
 
 Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh main:merge` in detail".
+
+### `josh checks:failed`
+
+<!-- usage: checks:failed -->
+
+List the failing CI checks of a pull request or commit, required or not (check runs and commit statuses).
+
+```bash
+pnpm josh checks:failed           # the current branch's pull request
+pnpm josh checks:failed 7147      # a pull request by number
+pnpm josh checks:failed c0ffee1   # a commit by sha
+```
+
+<!-- /usage -->
+
+`#N` or a number of up to 6 digits names a pull request; 7 to 40 hex characters name a commit.
+
+**Output / exit codes:** one `- <name> — <conclusion> — <URL>` line per failing check run (`failure`, `timed_out`, `cancelled`, `action_required`, `startup_failure`; the newest run per name) or commit status (`failure`, `error`); `No failing checks on <sha>.` when none. Exits 0 either way, 1 when the checks cannot be read.
 
 ## Versioning
 
@@ -827,6 +890,10 @@ pnpm josh audit
 
 The scanner is looked up on `PATH`, then in the `josh audit:provision` cache (`node_modules/.cache/josh-tools/`) — in a linked work tree, the primary checkout's cache, so every work tree shares one binary and one failed-download record. With neither the audit exits non-zero and prints how to get one — never skipped.
 
+- A clean scan is recorded against the lockfile's digest in the common git directory, so every work tree shares it.
+- While that record is under 24 hours old, the audit prints one `✔ audit skipped` line and exits 0 without scanning. A changed lockfile or an expired record is scanned as before.
+- The scan claims one core in the machine-wide budget itself, so the pre-push hook calls `pnpm josh audit` directly.
+
 ### `josh overrides`
 
 <!-- usage: overrides -->
@@ -834,13 +901,16 @@ The scanner is looked up on `PATH`, then in the `josh audit:provision` cache (`n
 Check pnpm overrides for drift.
 
 ```bash
-pnpm josh overrides          # verify overrides unchanged
-pnpm josh overrides --save   # snapshot current merged overrides
+pnpm josh overrides                          # verify overrides unchanged
+pnpm josh overrides --save                   # snapshot current merged overrides
+pnpm josh overrides --diff HEAD              # after an update not yet committed
+pnpm josh overrides --diff main...<branch>   # after `josh adopt` committed its branch
 ```
 
 **Options:**
 
 - `--save` — write the current merged overrides to `.overrides-snapshot.json` (gitignored); later runs compare against it and exit non-zero on any add, removal, or change.
+- `--diff <base>[...<head>]` — compare against git instead of the snapshot — `<base>` against the working tree, `<base>...<head>` the head against its merge-base with `<base>` — printing the `devEngines` verdict and `✔ overrides unchanged since <range>`, or exiting non-zero on any add, removal, or change. Refused beside `--save`.
 
 <!-- /usage -->
 
@@ -898,6 +968,42 @@ When the update moved `@playwright/test`, it installs the browsers (`JOSH_PLAYWR
 
 Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh latest:update` in detail".
 
+### `josh ci:timing`
+
+<!-- usage: ci:timing -->
+
+Print the job and step durations and conclusions of a run id's GitHub Actions run, or of every run on a pull request's or a branch's latest commit.
+
+```bash
+pnpm josh ci:timing 5544                 # a pull request, or a branch name
+pnpm josh ci:timing 18912345678 --json   # a run id, machine-readable
+```
+
+<!-- /usage -->
+
+A number from 100,000,000 up is a run id, a smaller one a pull request; unfinished prints `—`; no run exits 1.
+
+### `josh gh:usage`
+
+<!-- usage: gh:usage -->
+
+Tally the josh processes' logged GitHub API usage per command — runs, calls, 304 answers and core used — most calls first, under the period the lines cover.
+
+```bash
+pnpm josh gh:usage                             # every line the log holds
+pnpm josh gh:usage --since 2026-11-08T00:00Z   # the lines at or after an instant
+```
+
+<!-- /usage -->
+
+- Reads the one file each josh process appends to (`scripts/gh/gh-usage-log.ts`, newest 2000 lines); the heading names the period and line count.
+- A hook-recorded direct `gh` call is its own `direct:<subcommand>` row.
+- `core Δ` sums the lines that carry a reading; `—` means none did.
+- Below the command table, the calls and 304s per endpoint, most calls first (`scripts/gh/gh-call-kind.ts`): REST as method and normalized path (`GET repos/{o}/{r}/issues/{n}`), GraphQL as one `graphql` row, other subcommands by name (`gh issue view`).
+- Its totals line splits REST, GraphQL and `gh`. The free `GET rate_limit` keeps its own row, counted as `rate_limit (free)`, not REST. `unrecorded` is the calls on lines written before endpoints were recorded.
+- A line that does not parse is counted in the heading, not tallied.
+- An unreadable `--since` or an unknown flag prints the usage and exits 1.
+
 ## AI tools
 
 Helpers for AI-assisted development workflows.
@@ -909,7 +1015,7 @@ Helpers for AI-assisted development workflows.
 Start a backlogrun in the background and show its board; with one already running, only show the board, or replace it when it is idle and the invocation differs; --stop stops it; --restart replaces its processes and keeps its record.
 
 ```bash
-pnpm josh backlogrun                 # start in Claude, then show the board
+pnpm josh backlogrun                 # start with the configured provider, then show the board
 pnpm josh backlogrun 3437 --only     # the arguments go to backlogrun as typed
 pnpm josh backlogrun --agent codex   # start in Codex
 pnpm josh backlogrun --stop          # stop the run in this repository
@@ -918,10 +1024,20 @@ pnpm josh backlogrun --restart       # replace the run's processes, keeping its 
 
 <!-- /usage -->
 
-The board is [`josh run:board`](./josh-commands-run.md#josh-runboard). The agent runs in the main checkout, its output going to a log file.
+The board is [`josh run:board`](./josh-commands-board.md#josh-runboard). The agent runs in the main checkout, its output going to a log file.
+
+The launch begins the run's carry record and hands it to the supervisor before the agent plans, so the first lane opens without waiting for the plan; the agent's own `run:carry --begin` answers `driving`, and it reports the plan and settles `needs-decision` beside the lanes.
+
+To default to Codex, add `JOSH_AGENT_PROVIDER=openai` to the project's `.env`. Provider selection is `--agent claude|codex` first, then the exported `JOSH_AGENT_PROVIDER`, then `.env`, then Claude Code (`anthropic`).
+
+The environment accepts `anthropic|openai`; an unset or blank value selects Claude, and other values are refused with a reason unless `--agent` overrides them. Codex uses the existing OpenAI role profiles. Changing this setting only affects a new launch: showing an existing run or `--restart` keeps its recorded provider.
 
 - The arguments are the `backlogrun` keyword's own: named Issues, `--only`, `--max <n>`, `--idle <minutes>`. A bare number is read as `#<n>`, since an unquoted `#` starts a shell comment.
 - A run already going here is never joined by a second: the board is shown, and each named Issue is printed as a `run:add` line to add it by hand.
+- A record left with no process running it — a launch that died before ending it — is ended as `--stop` ends it and the typed invocation is started, the same one or a different one. It is kept, with the reason in one line and exit code 1, when:
+  - its `run:wake` supervisor is not proven gone, since it may still wake a successor (`--stop` ends both);
+  - a session cut handed it to a successor (`--restart` continues it);
+  - it owes its retrospective, a child is working in a lane, or it cannot be read.
 - An idle run is replaced by a different invocation. The run going is stopped as `--stop` stops it and the typed one is started when all of these hold:
   - the typed invocation differs from the one the run was started with — the same invocation, a bare one over a bare one included, only shows the board;
   - the run is watching: its backlog drained, it has launched no child since, and it owes no end-of-run retrospective (`JOSH_RETROSPECTIVE`);
@@ -949,21 +1065,25 @@ Change a live backlogrun’s lane limit without stopping it, or print the limit,
 ```bash
 pnpm josh lane:limit 8         # raise or lower the live run's limit to 8
 pnpm josh lane:limit           # print the limit, the lanes in use and the free lanes
-pnpm josh lane:limit --reset   # clear the override; JOSH_LANE_LIMIT applies again
+pnpm josh lane:limit --reset   # clear the override; the run’s start limit applies again
 ```
 
 <!-- /usage -->
 
-The run keeps the environment it started with, so this writes an override onto the run's record, which every lane-limit read takes over `JOSH_LANE_LIMIT`.
+The run keeps the environment it started with, so this writes an override onto the run's record, read before `JOSH_LANE_LIMIT`.
 
-- The next lane allocation uses the new limit. Raising it writes a `lane-limit` event, and the parent's `run:progress --wait` watcher wakes within a minute to fill the freed lanes.
+- The next lane allocation uses the new limit. Raising it writes a `lane-limit` event: a running `backlog:drive` asks for work on its next tick, seconds later, to fill the freed lanes, and the parent's `run:progress --wait` watcher wakes within ten seconds.
 - Lowering it stops no running child; a lane that finishes is not refilled.
-- The lanes in use are the open lane work trees whose child is working, or whose process probe did not answer. A lane with no child in it is not counted — its tree, branch and port seat stay, and when its issue is picked up again the driver starts it ahead of a fresh launch, inside the free lanes.
+- The lanes in use are the open lane work trees whose child is working, or whose process probe did not answer. A stopped lane keeps its tree and changes; its port seat becomes free once its owned processes and listeners are gone.
+- Every dispatch atomically acquires a seat and updates `.env` and the child's environment before starting. Kept trees are prioritized within the same free-seat limit as fresh launches.
+- A live or suspended lane child or listener keeps its seat; idle shells and portless helpers do not. Unreadable process ownership or ports block allocation with a reason. A saved `.env` seat alone is no reservation, so older stopped trees need no manual cleanup.
 - A lane whose child and every process under it are stopped (`lane:pause`, `kill -STOP`) is not counted either; `lane:resume` continues it in place, and it is counted again.
-- `run:board` leads the waiting row with `🧵 <used>/<limit>`; it counts the lanes in use and does not name them — some may be no board row, such as a lane an earlier run left.
+- `run:board` leads the waiting row with `🧵 <used>/<limit>`; it counts the lanes in use, some of which (an earlier run's) may have no board row.
 - The limit counts lanes, not memory or usage: the driver opens no lane under memory pressure or a Claude usage limit, and `run:board` leads the waiting row with `🧠` or `🪫 <reset>`.
 - A limit above the nine port seats is counted at the seats, as `JOSH_LANE_LIMIT` is; a value that is not a positive integer is refused.
-- The override lives and ends with the run (`run:carry --end` removes it). With no run in progress, the command refuses and points at `JOSH_LANE_LIMIT`.
+- With no run in progress, the command refuses and points at `JOSH_LANE_LIMIT`.
+- `--reset` returns to the run's start `JOSH_LANE_LIMIT`, even if `.env` changed. A crashed run's start limit is ignored.
+- A run's start limit and each change are ledger `limit` lines; `lane:stats` labels a period with each limit it held (`3→4`).
 
 **Output / exit codes:** prints `lane limit <n> (<source>) · in use <n> · free <n>` and exits 0. Bad arguments, an invalid limit or no run in progress exit 1.
 
@@ -998,11 +1118,32 @@ pnpm josh lane:withdraw 3769 --reason "folded into a broader issue"
 
 - In order: records a `withdraw` event, stops the child's process tree, stashes the lane's uncommitted work as `<N>: uncommitted work at lane withdraw`, comments on the Issue that it stays open with a `- Why: <reason>` line, comments the `stash:pop` line, removes the `in-progress` marker and closes the lane. A child that had already ended is still withdrawn.
 - A closed issue's lane is withdrawn by `run:wake`, or by `run:merge` when it closed without a merge.
-- `run:merge` also closes the lane of a child whose `lane:plan` yielded (`josh lane:plan` in `docs/josh-commands-run.md`), booked `yielded`, not `withdrawn`; that issue stays in the run and is offered again once the holding lane ends.
+- `run:merge` also closes the lane of a child whose `lane:plan` yielded (`josh lane:plan` in `docs/josh-commands-lane.md`), booked `yielded`, not `withdrawn`; that issue stays in the run and is offered again once the holding lane ends.
 - The Issue stays open, its state reason unchanged: the withdrawal ends this run's attempt, not the work. This run's `backlog:next` / `backlog:offer` exclude it (read off the `withdraw` event); a later run offers it again.
 - The event comes first: `run:merge` and `run:board` book the child `withdrawn` from the stream before reading GitHub, so it is never resumed as an outage, parked `needs-decision` or counted as a failure, and the run moves on.
 
 **Output / exit codes:** every explanation on stderr; exit 0 once the withdrawal finished. No open lane or an unreadable state: nothing written, exit 1. Work that cannot be stashed leaves the lane in place, exit 1.
+
+### `josh lane:resolve`
+
+<!-- usage: lane:resolve -->
+
+Merge the default branch into a lane's branch and print one verdict — resolved, conflict <paths>, or step-back 2 (overlapping hunks, merge aborted) / 3 (a resolution already recorded on the issue); --record posts that resolution comment once the lane is pushed.
+
+```bash
+pnpm josh lane:resolve 3769                      # prints `conflict docs/a.md` on a hand-resolvable conflict
+pnpm josh lane:resolve 3769 --record docs/a.md   # posts the `## Lane conflict resolved` comment once the lane is pushed
+```
+
+<!-- /usage -->
+
+- The merge-conflict path of `backlogrun-recovery.md`, judged by a command. It runs only on `<issue>-lane`; on any other branch it refuses before reading a comment or merging. Step-back condition 3 is read next, before any merge: a trusted Issue comment starting `## Lane conflict resolved` means this child already spent its one resolution.
+- The merge is `josh main:merge`'s (`main_merge.merge`), so the files it regenerates resolve themselves and its refusals hold.
+- Condition 2 is read per conflicted path off `git diff --unified=0` from the merge base to each side: both sides rewriting one base line overlaps; adjacent rewrites, pure insertions and a hunk both sides made identically do not. An overlap aborts the merge, so the park finds a clean tree.
+- Conditions 1 and 4 stay the run's: a specification question, and the gate and review after a resolution.
+- `--record [<path>...]` posts the resolution comment condition 3 counts — `## Lane conflict resolved` and one bullet per path — and merges nothing. It refuses on another branch, while a merge is unconcluded, and while HEAD differs from origin's `<issue>-lane`, so a resolution that never left the checkout is never counted.
+
+**Output / exit codes:** one line on stdout, exit 0 — `resolved`, `conflict <paths>`, `step-back 2 <paths>` or `step-back 3`; under `--record`, `recorded <comment url>`. A refused merge or record, an unreadable comment thread or a git failure: stderr, exit 1.
 
 ### `josh lane:pause` / `josh lane:resume`
 
@@ -1059,7 +1200,7 @@ pnpm josh lane:adopt --all   # every open lane with no record
 - A lane is recorded `open` only when every fact reads: its process probe answers that no child is there, and its work tree status, unpushed commits, pull request and issue all read. Any one unread leaves it unknown, counted in use as before. A lane with a record is left as it is.
 - The pull request is the branch's open one, else its newest, printed with its state — a reopened lane's branch can still carry the merged one.
 - `open`, not `paused`: nobody suspended it. The next launch moves it to `running`, and the next `backlogrun` takes the lane back while its issue still carries `in-progress`.
-- It still holds its port seat, as every open lane does.
+- It holds its port seat while its child or listeners remain; a stopped tree alone holds no seat.
 - An adoption adds one `note` line to the run's event stream (`#<N> adopted by lane:adopt`) — not a `lane-state` line, which would re-send the paused-lanes notice though no paused lane changed.
 
 **Output / exit codes:** one line per lane — `recorded open — branch <b> · uncommitted changes · <n> unpushed commit(s) · PR #<n> <OPEN|MERGED|CLOSED> · issue OPEN (<labels>)`, `already recorded <state>`, or `left unknown — <reason>`. Exit 0, also for a lane already recorded. A named lane left unknown, no open lane for it, or bad arguments, exit 1; under `--all` a lane left unknown is no failure.
@@ -1074,6 +1215,7 @@ Print each delivered rule's unaided compliance — runs reached, kept rate, refu
 pnpm josh rule:value             # a reading cached under 15 minutes ago, else measure
 pnpm josh rule:value --fresh     # measure now, whatever the cache holds
 pnpm josh rule:value --refresh   # write the reading to the loop-head cache instead of stdout
+pnpm josh rule:value --prose     # class each prose rule: enforced, measured or prose only
 ```
 
 <!-- /usage -->
@@ -1085,5 +1227,6 @@ The kept rate is the share kept before the rule's trigger fired (`scripts/rules/
 - Printed from a cache at the `backlogrun` loop head (`josh backlog:offer`), refreshed at most every 15 minutes.
 - Bare, it prints that cache while under 15 minutes old, then `cached reading taken at <ISO time>`. A lane reads its parent's cache.
 - On stdout only, a `candidates:` section follows the table: `retire` lists measurable rules no run reached once the reading covers `MIN_RUNS_FOR_RETIREMENT` runs, and `condense` lists rules a hook refuses on every occurrence that it has refused (`scripts/rules/rule-value-candidates.ts`). The cache keeps the table alone, so `--fresh` prints them.
+- `--prose` reads the documents instead: each prose rule's class and `file:line`.
 
 Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh rule:value` in detail".

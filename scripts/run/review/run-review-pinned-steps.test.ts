@@ -210,6 +210,7 @@ describe('run_review_pinned_steps.wait_for_answer — failing open', () => {
 		expect(await run_review_pinned_steps.wait_for_answer(ROOT)).toStrictEqual({
 			text: '`josh test:pinned` could not run, so nothing was checked: its process ended without an answer\n',
 			unpinned: [],
+			is_unchecked: true,
 		})
 	})
 
@@ -298,6 +299,7 @@ describe('run_review_pinned_steps.wait_for_answer — stopping a queued check no
 		expect(answer).toStrictEqual({
 			text: '`josh test:pinned` could not run, so nothing was checked: it was still waiting for cores when the gate and the review ended\n',
 			unpinned: [],
+			is_unchecked: true,
 		})
 	})
 
@@ -386,6 +388,7 @@ describe('run_review_pinned_steps.wait_for_answer — a check still queued for c
 		expect(answer).toStrictEqual({
 			text: `\`josh test:pinned\` could not run, so nothing was checked: it was still waiting for cores when the gate and the review ended — ${STILL_RUNNING_NOTE}\n`,
 			unpinned: [],
+			is_unchecked: true,
 		})
 	})
 

@@ -1,3 +1,4 @@
+import type { HookContext } from '#scripts/hooks/hook-context'
 import { platform_temporary } from '#scripts/josh/platform-temporary'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { bash_triggers } from './bash-triggers'
@@ -31,7 +32,14 @@ import { shell_segments } from './shell-segments'
 // The parent backlogrun budget/ownership commands. A child never runs either: `run:carry` begins and
 // advances the run budget the parent owns, and `run:merge` counts a returned child into it. Named in
 // canonical form only — `shell_segments.is_josh_command` canonicalizes an alias before the match.
-const RUN_BUDGET_COMMANDS: ReadonlySet<string> = new Set(['run:merge', 'run:carry'])
+// `run:handoff-lanes` runs `run:carry --cut` as a subprocess this guard never sees, so it is named too.
+const MERGE_COMMAND = 'run:merge'
+const HANDOFF_COMMAND = 'run:handoff-lanes'
+const RUN_BUDGET_COMMANDS: ReadonlySet<string> = new Set([
+	MERGE_COMMAND,
+	'run:carry',
+	HANDOFF_COMMAND,
+])
 
 // **A `run:carry` call prefixed with a non-empty `JOSH_TEMP_ROOT` cannot reach the parent's record**,
 // because every record it keeps is a `stamp_path` under that root. It is how
@@ -55,7 +63,8 @@ const REDIRECTED_PREFIX = new RegExp(
 )
 
 // The budget commands with an effect outside the temp root, so a redirected root does not isolate them.
-const SHARED_STATE_COMMANDS: ReadonlySet<string> = new Set(['run:merge'])
+// `run:handoff-lanes` reads the shared lane registry and sends the hand-off Telegram.
+const SHARED_STATE_COMMANDS: ReadonlySet<string> = new Set([MERGE_COMMAND, HANDOFF_COMMAND])
 
 // The leading assignments, stripped before the command is read. The shared command reader unwraps
 // `$(…)` into the command position — the subshell is the real work in a cost row — so without this
@@ -79,13 +88,10 @@ function invokes_budget_command(command: string): boolean {
 // dispatch mark against this checkout's own issue — runs only on the handful of calls that invoke a
 // budget command, not on every `Bash` call in the run. A person working in a lane carries no mark and
 // sees no refusal, exactly as `lane-park.ts` and `lane-interactive-ask.ts` gate their own reads.
-function is_carry_conflict(
-	command: string,
-	is_lane_child: boolean = lane_child_marker.is_child_of(process.cwd()),
-): boolean {
+function is_carry_conflict(command: string, context: HookContext): boolean {
 	if (!invokes_budget_command(command)) return false
 
-	return is_lane_child
+	return lane_child_marker.is_child_of(context.cwd, context.env)
 }
 
 // The instruction in the shape a refusal can carry: what the child cannot do, why the record is not a
@@ -112,7 +118,8 @@ const ROW = {
 	about: {
 		title: 'Lane child carry commands',
 		topic: '`.claude/skills/workflow-commands/backlogrun-lanes.md`',
-		fires: 'a dispatched lane child running `pnpm josh run:merge` / `run:carry`. Every occurrence',
+		fires:
+			'a dispatched lane child running `pnpm josh run:merge` / `run:carry` / `run:handoff-lanes`. Every occurrence',
 		quiet: 'not a lane child — the parent owns the run budget',
 	},
 }

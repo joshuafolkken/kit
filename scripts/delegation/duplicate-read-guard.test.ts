@@ -1,8 +1,9 @@
-import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
+import { hook_context_fixture } from '#tools/hooks/hook-context-fixture'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
@@ -22,7 +23,8 @@ import {
 // failed stat allows the call, that the guard fires once per accumulation and re-arms on a later read,
 // and that a dispatched lane child is nudged with a notice rather than killed with a refusal.
 
-const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'duplicate-read-guard-'))
+const make_directory = temporary_directory('suite')
+const WORK_DIRECTORY = make_directory('duplicate-read-guard-')
 // The directory vitest was launched from — a lane checkout carrying `JOSH_LANE_CHILD` — restored in
 // teardown. The main-line cases delete the mark so the guard reads as `refuse`; the lane case chdirs
 // into a lane checkout and sets it back, exactly as `investigation-guard.test.ts` does.
@@ -43,6 +45,7 @@ const SECOND_READ_MS = ms(SECOND_READ_MINUTE * 2 + 2)
 const BEFORE_READ_MS = ms(1)
 const AFTER_READ_MS = ms(3)
 const NOW_MS = ms(59)
+const context_of = hook_context_fixture.of
 const EARLIER_REFUSAL_MS = ms(5)
 const READ_TOOL = 'Read'
 const UNSET = ''
@@ -101,8 +104,6 @@ afterAll(() => {
 		rmSync(refusal_path(transcript), { force: true })
 		rmSync(notice_refusal_path(transcript), { force: true })
 	}
-
-	rmSync(WORK_DIRECTORY, { force: true, recursive: true })
 })
 
 describe('duplicate_read_refusal — the unchanged re-read', () => {
@@ -224,6 +225,58 @@ describe('duplicate_read_outcome — a dispatched lane child is nudged, not kill
 
 		expect(result.reason).toBeUndefined()
 		expect(result.notice).toBe(duplicate_reads.NOTICE)
+	})
+})
+
+function unchanged_reread(name: string): string {
+	const target = subject_file(BEFORE_READ_MS)
+
+	return payload_of(read_once(name, target), target)
+}
+
+describe('duplicate_read_outcome — the per-call context, not the process', () => {
+	// joshuafolkken/kit#6967: the process stays on the main line; only the context names the lane.
+	const LANE_CONTEXT = context_of(LANE_DIRECTORY, { [lane_child_marker.KEY]: LANE_ISSUE })
+
+	it('nudges a lane child the context names under a main-line process', () => {
+		const result = duplicate_read_outcome(unchanged_reread('context-lane'), NOW_MS, LANE_CONTEXT)
+
+		expect(result.reason).toBeUndefined()
+		expect(result.notice).toBe(duplicate_reads.NOTICE)
+	})
+
+	it('reads its switch from the context environment', () => {
+		const off = context_of(process.cwd(), { [SWITCH_ENV_KEY]: 'off' })
+
+		expect(
+			duplicate_read_outcome(unchanged_reread('context-off'), NOW_MS, off).reason,
+		).toBeUndefined()
+	})
+
+	it('refuses when only the process environment switches it off', () => {
+		process.env[SWITCH_ENV_KEY] = 'off'
+		const on = context_of(process.cwd(), {})
+
+		expect(duplicate_read_outcome(unchanged_reread('context-on'), NOW_MS, on).reason).toBe(
+			duplicate_reads.REASON,
+		)
+	})
+
+	// A relative path names a file of the call's checkout; the process's checkout holds no such file.
+	it('resolves a relative read against the context directory', () => {
+		const target = subject_file(BEFORE_READ_MS)
+		const payload = payload_of(read_once('context-root', target), path.basename(target))
+		const work = context_of(WORK_DIRECTORY, {})
+
+		expect(duplicate_read_outcome(payload, NOW_MS, work).reason).toBe(duplicate_reads.REASON)
+	})
+
+	it('does not resolve a relative read against the process directory', () => {
+		const target = subject_file(BEFORE_READ_MS)
+		const payload = payload_of(read_once('process-root', target), path.basename(target))
+		const here = context_of(process.cwd(), {})
+
+		expect(duplicate_read_outcome(payload, NOW_MS, here).reason).toBeUndefined()
 	})
 })
 

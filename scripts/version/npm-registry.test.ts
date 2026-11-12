@@ -1,5 +1,8 @@
+import { writeFileSync } from 'node:fs'
+import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import type { execaSync } from 'execa'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { npm_registry } from './npm-registry'
 
 const execa_outcomes = vi.hoisted(() => vi.fn())
@@ -47,10 +50,6 @@ function packument_requests(): ReadonlyArray<ReadonlyArray<string>> {
 
 	return calls.filter(([command]) => command === process.execPath).map(([, argv]) => argv)
 }
-
-beforeEach(() => {
-	vi.clearAllMocks()
-})
 
 describe('npm_registry.packument_url', () => {
 	it('encodes the scope separator of a scoped package', () => {
@@ -183,6 +182,66 @@ describe('npm_registry.has_public_version', () => {
 		respond_with(fake_result('', 1))
 
 		expect(npm_registry.has_public_version(KIT_PACKAGE, LATEST)).toBe(false)
+	})
+})
+
+const make_directory = temporary_directory()
+
+// The answer for a project whose package.json is `manifest`.
+function published_for(manifest: object): string | undefined {
+	const directory = make_directory('npm-registry-')
+
+	writeFileSync(path.join(directory, 'package.json'), JSON.stringify(manifest))
+
+	return npm_registry.published_package_name(directory)
+}
+
+describe('npm_registry.published_package_name — a published package', () => {
+	it('answers the name when npm already carries the package under kit scope', () => {
+		respond_with(fake_result(LATEST_BODY))
+		execa_outcomes.mockClear()
+
+		expect(published_for({ name: KIT_PACKAGE })).toBe(KIT_PACKAGE)
+		expect(packument_requests()[0]).toContain(KIT_URL)
+	})
+
+	// A forgotten `private: true` must not turn publishing on, and a set one does not turn it off.
+	it('does not read private', () => {
+		respond_with(fake_result(LATEST_BODY))
+
+		expect(published_for({ name: KIT_PACKAGE, private: true })).toBe(KIT_PACKAGE)
+	})
+})
+
+describe('npm_registry.published_package_name — a repository that does not publish', () => {
+	it('answers nothing for a package npm does not carry or cannot answer for', () => {
+		respond_with(fake_result('', 1))
+
+		expect(published_for({ name: KIT_PACKAGE })).toBeUndefined()
+	})
+
+	it('answers nothing when the packument carries no latest version', () => {
+		respond_with(fake_result('{}'))
+
+		expect(published_for({ name: KIT_PACKAGE })).toBeUndefined()
+	})
+
+	// A consumer whose name collides with someone else's npm package must not read as published.
+	it.each(['consumer-app', '@someone-else/kit'])(
+		'never asks npm for %s, outside kit scope',
+		(name) => {
+			respond_with(fake_result(LATEST_BODY))
+			execa_outcomes.mockClear()
+
+			expect(published_for({ name })).toBeUndefined()
+			expect(packument_requests()).toHaveLength(0)
+		},
+	)
+
+	it('answers nothing for a manifest without a name', () => {
+		respond_with(fake_result(LATEST_BODY))
+
+		expect(published_for({ private: true })).toBeUndefined()
 	})
 })
 

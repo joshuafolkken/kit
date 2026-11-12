@@ -5,6 +5,10 @@ import { SUITE_TIMEOUT_MS } from './timeouts'
 vi.mock('execa', () => ({
 	execa: vi.fn(),
 }))
+vi.mock('#scripts/build/local-bin', () => ({ direct_launch: vi.fn() }))
+
+const { direct_launch } = await import('#scripts/build/local-bin')
+const mocked_direct_launch = vi.mocked(direct_launch)
 
 const { buffered_process } = await import('./buffered-process')
 const execa_module = await import('execa')
@@ -66,7 +70,6 @@ function mock_unfinished(outcome: UnfinishedOutcome): void {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	spawn_options.length = 0
 })
 
@@ -137,6 +140,41 @@ describe('run_buffered_process', () => {
 	})
 })
 
+const PRETTIER_EXEC = ['exec', 'prettier', '--check', '.']
+const PRETTIER_LAUNCH = { file: '/usr/bin/node', args: ['/prettier/bin.cjs', '--check', '.'] }
+
+// joshuafolkken/kit#7256: a lint tool runs without pnpm's wrapper process, under the same
+// environment and options the pnpm route had.
+describe('run_buffered_direct', () => {
+	it('spawns the launch resolved from the working directory with the same options', async () => {
+		mock_execa()
+		mocked_direct_launch.mockReturnValue(PRETTIER_LAUNCH)
+		const environment = { NODE_OPTIONS: '--max-old-space-size=4096' }
+
+		await buffered_process.run_buffered_direct(PRETTIER_EXEC, { cwd: LANE_DIRECTORY, environment })
+
+		expect(mocked_direct_launch).toHaveBeenCalledWith(LANE_DIRECTORY, PRETTIER_EXEC)
+		expect(mocked_execa).toHaveBeenCalledWith(PRETTIER_LAUNCH.file, PRETTIER_LAUNCH.args, {
+			env: environment,
+			extendEnv: false,
+			all: true,
+			reject: false,
+			cwd: LANE_DIRECTORY,
+			timeout: SUITE_TIMEOUT_MS,
+		})
+	})
+
+	it('resolves the launch from the process directory when no caller named one', async () => {
+		mock_execa()
+		mocked_direct_launch.mockReturnValue(PRETTIER_LAUNCH)
+
+		await buffered_process.run_buffered_direct(PRETTIER_EXEC)
+
+		expect(mocked_direct_launch).toHaveBeenCalledWith(process.cwd(), PRETTIER_EXEC)
+		expect(spawn_options[0]?.env).toEqual(buffered_process.child_environment())
+	})
+})
+
 // joshuafolkken/kit#3712: a child with no exit code never said why, so `josh gate` printed a bare ✗
 // and an empty log for every check when `pnpm` was missing from the PATH the gate ran with.
 describe('run_buffered_process — a child that produced no exit code', () => {
@@ -204,6 +242,17 @@ describe('color environment', () => {
 
 		expect(spawn_options[0]?.env?.['NO_COLOR']).toBe('1')
 		expect(spawn_options[0]?.env).not.toHaveProperty('FORCE_COLOR')
+		expect(spawn_options[0]?.extendEnv).toBe(false)
+	})
+
+	it('hands the child a caller-supplied environment in place of its own', async () => {
+		const environment = { NODE_OPTIONS: '--max-old-space-size=1' }
+
+		mock_execa()
+
+		await buffered_process.run_buffered_process(['josh', 'lint'], { environment })
+
+		expect(spawn_options[0]?.env).toBe(environment)
 		expect(spawn_options[0]?.extendEnv).toBe(false)
 	})
 })

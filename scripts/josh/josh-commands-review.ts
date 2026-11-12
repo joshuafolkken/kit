@@ -5,12 +5,12 @@ const CHECK = '--check'
 const MACHINE_READABLE = 'the verdict and the reason, machine-readable'
 const JSON_FLAG = '--json'
 const RECORD = '--record'
+const FULL_CHANGE = '--full-change'
 
 // The review and delegation commands, split out of `josh-commands-ai.ts` when each command's usage
 // moved onto its entry (#4185). `AI_COMMANDS` spreads this in at the same place, so the map keeps its
 // order.
 
-/* eslint-disable @typescript-eslint/naming-convention */
 const REVIEW_COMMANDS: Record<string, CommandEntry> = {
 	'review:brief': {
 		script: 'scripts/review/review-brief-main.ts',
@@ -18,7 +18,7 @@ const REVIEW_COMMANDS: Record<string, CommandEntry> = {
 			'Print the whole /code-review invocation: level, what the gate already proved, target (--level-only for the level alone)',
 		category: 'AI tools',
 		reference: [
-			'[--round <1|2>] | --interaction | --level-only [--staged] [--json]',
+			'[--round <1|2> | --full-change] | --interaction | --level-only [--staged] [--json]',
 			'automation',
 			['files'],
 		],
@@ -26,11 +26,16 @@ const REVIEW_COMMANDS: Record<string, CommandEntry> = {
 			examples: [
 				{ arguments: '', note: 'round 1' },
 				{ arguments: '--round 2', note: 'verification pass, scoped to the fix delta' },
+				{ arguments: FULL_CHANGE, note: 'final round 2 over the whole change' },
 				{ arguments: '--interaction', note: 'the interaction review of a run-tooling change' },
 				{ arguments: LEVEL_ONLY, note: 'the level alone (pre-commit review)' },
 				{ arguments: '--level-only --json', note: 'level and reason, machine-readable' },
 			],
 			flags: [
+				{
+					names: [FULL_CHANGE],
+					description: 'final round 2 over the whole change (no `--round` or `--interaction`).',
+				},
 				{
 					names: ['--round 2'],
 					description:
@@ -69,19 +74,58 @@ const REVIEW_COMMANDS: Record<string, CommandEntry> = {
 	},
 	'review:submit': {
 		script: 'scripts/review/review-submit-cli.ts',
-		description: "Write a ship reviewer's findings, read from stdin, where the ship reads them",
+		description:
+			"Write a reviewer's findings, read from stdin, where the ship or review:record --from-slot reads them; --review lints the review in the same call",
 		category: 'AI tools',
-		reference: ['[--interaction] < findings | [--interaction] --none', 'automation', ['files']],
+		reference: [
+			'[--interaction] [--review <absolute-path> [--round <1|2>]] < findings | … --none',
+			'automation',
+			['files'],
+		],
 		usage: {
 			examples: [
 				{ arguments: '< findings.txt', note: 'the /code-review slot' },
 				{ arguments: '--interaction < findings.txt', note: 'the interaction review slot' },
 				{ arguments: '--none', note: 'a review with no findings' },
+				{
+					arguments: '--review "$PWD/review.md" < findings.txt',
+					note: 'lint the review and submit the findings in one call',
+				},
 			],
 			flags: [
 				{
 					names: ['--none'],
 					description: 'a review with no findings; empty stdin without it is refused.',
+				},
+				{
+					names: ['--review <absolute-path>'],
+					description:
+						"the reviewer's markdown review, by absolute path (josh runs from the package root, so a relative path is refused), linted against the rubric's output format in the same call; a violation and a grammar refusal are reported together, and nothing is written while either stands.",
+				},
+				{
+					names: ['--round <1|2>'],
+					description: 'the rubric shape `--review` is linted against; round 1 by default.',
+				},
+			],
+		},
+	},
+	'review:pair': {
+		script: 'scripts/review/review-pair-cli.ts',
+		description:
+			'Record a paired comparison under JOSH_REVIEWER_PAIRED=1: the Opus and Sonnet round-1 findings with severity and each agent cost; never gates',
+		category: 'AI tools',
+		reference: ['--issue <N> --opus-agent <id> --sonnet-agent <id>', 'automation', ['files']],
+		usage: {
+			examples: [
+				{
+					arguments: '--issue 6902 --opus-agent a1b2 --sonnet-agent c3d4',
+					note: 'after both round-1 reviewers return, before review:record',
+				},
+			],
+			flags: [
+				{
+					names: ['--opus-agent <id>', '--sonnet-agent <id>'],
+					description: "each reviewer's agentId, whose transcript prices its cost.",
 				},
 			],
 		},
@@ -99,6 +143,41 @@ const REVIEW_COMMANDS: Record<string, CommandEntry> = {
 					arguments: '',
 					note: '→ `file:line kind word` per reference, or `ok` (exit 1 / 0; 2 on a failure)',
 				},
+			],
+		},
+	},
+	'review:selfcheck': {
+		script: 'scripts/review/selfcheck-cli.ts',
+		description:
+			'Answer the pre-commit self-check questions 2, 4 and 10 — stale prose, untouched readers, new command examples run — in one command',
+		category: 'AI tools',
+		reference: ['[--interaction-answered]', 'automation', ['files', 'processes']],
+		usage: {
+			examples: [
+				{
+					arguments: '',
+					note: '→ `file:line` per finding, then one `selfcheck: pass|fail` line (exit 0 / 1; 2 on a failure)',
+				},
+				{
+					arguments: '--interaction-answered',
+					note: "→ a passing, due run also records the issue's interaction round",
+				},
+			],
+		},
+	},
+	'diff:summary': {
+		script: 'scripts/review/diff-summary-cli.ts',
+		description:
+			'Print the diff from the change base as one table — lines, hunks, ranges and declarations per file — and save it whole',
+		category: 'AI tools',
+		reference: ['[<base>]', 'automation', ['files']],
+		usage: {
+			examples: [
+				{
+					arguments: '',
+					note: '→ one row per file, then `full output: <path>` (the diff, in the git directory)',
+				},
+				{ arguments: 'HEAD', note: '→ the same, against a named base' },
 			],
 		},
 	},
@@ -154,6 +233,5 @@ const REVIEW_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 }
-/* eslint-enable @typescript-eslint/naming-convention */
 
 export { REVIEW_COMMANDS }

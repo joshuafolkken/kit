@@ -1,19 +1,20 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
 import { git_spawn } from '#scripts/git/git-spawn'
+import type { FileMapStampAccess } from '#scripts/josh/file-map-stamp'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { review_tree } from '#scripts/review/review-tree'
 import { test_read_map, type ReadMap } from '#scripts/test/test-read-map'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import fc from 'fast-check'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { check_reuse } from './check-reuse'
 import { gate_labels } from './gate-labels'
 import type { GateStepResult } from './gate-report'
 import { gate_skip } from './gate-skip'
 import { gate_tree } from './gate-tree'
+import { moved_paths } from './moved-paths'
 import { RECORD, reuse_operations } from './reuse-operations-fixture'
 import { BASE_PREFIX, reuse_world, type Kind, type World } from './reuse-world-fixture'
 import { since_green } from './since-green'
@@ -26,7 +27,8 @@ import { since_green } from './since-green'
 
 const MAX_STEPS = 30
 const NUM_RUNS = 60
-const scratch = mkdtempSync(path.join(tmpdir(), 'reuse-verdicts-'))
+const make_directory = temporary_directory('suite')
+const scratch = make_directory('reuse-verdicts-')
 const gate_record = path.join(scratch, 'gate.json')
 const lint_record = path.join(scratch, 'lint-related.json')
 const unit_record = path.join(scratch, 'test-related.json')
@@ -104,10 +106,6 @@ vi.spyOn(changed_paths, 'read_changed_since').mockResolvedValue([])
 vi.spyOn(changed_paths, 'read_held_at').mockImplementation(async (_commit, files) => [...files])
 const read_changed_tree = vi.spyOn(review_tree, 'read_changed_tree')
 
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
-
 function passed(label: string): GateStepResult {
 	return { label, command: `josh ${label}`, exit_code: 0, output: '', elapsed_ms: 1 }
 }
@@ -125,19 +123,29 @@ async function record_green(world: World): Promise<void> {
 	await check_reuse.record_green_checks(results, tree, check_record)
 }
 
+async function read_narrowed(
+	stamp: FileMapStampAccess,
+	label: string,
+	record: string,
+): Promise<ReadonlyArray<string> | undefined> {
+	const parts = await since_green.read_moved_parts(stamp, label, record)
+
+	return parts === undefined ? undefined : moved_paths.union_of(parts).toSorted(reuse_world.by_name)
+}
+
 async function actual_verdicts(world: World): Promise<Verdicts> {
 	const tree = current_tree(world)
 	const gate = gate_skip.gate_reuse(tree.files, tree.base, gate_record)
 	const checks = await check_reuse.reusable_checks(SCOPED_LABELS, tree, check_record)
 	const { lint_related_stamp, test_related_stamp } = review_stamps
-	const lint = await since_green.read_moved(lint_related_stamp, gate_labels.LINT_LABEL, lint_record)
-	const unit = await since_green.read_moved(test_related_stamp, gate_labels.UNIT_LABEL, unit_record)
+	const lint = await read_narrowed(lint_related_stamp, gate_labels.LINT_LABEL, lint_record)
+	const unit = await read_narrowed(test_related_stamp, gate_labels.UNIT_LABEL, unit_record)
 
 	return {
 		gate_reused: 'stamp' in gate,
 		checks_reused: [...checks.keys()].toSorted(reuse_world.by_name),
-		lint_narrowed_to: lint?.toSorted(reuse_world.by_name),
-		unit_narrowed_to: unit?.toSorted(reuse_world.by_name),
+		lint_narrowed_to: lint,
+		unit_narrowed_to: unit,
 	}
 }
 

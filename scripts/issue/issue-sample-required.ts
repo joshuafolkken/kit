@@ -1,4 +1,5 @@
 import { acceptance_map } from '#scripts/review/acceptance-map'
+import { issue_body_keys } from './issue-body-keys'
 import { issue_sample_gate } from './issue-sample-gate'
 import { measure_declaration } from './measure-declaration'
 import { size_estimate } from './size-estimate'
@@ -20,11 +21,19 @@ const AFTER_CITED_CHANGE: ReadonlyArray<RegExp> = [
 	/#[1-9]\d*[^#\n]{0,16}?(?:以降|以後)/u,
 ]
 const RECORD_READERS: ReadonlyArray<string> = ['lane:stats', 'actions/runs', 'ship --log']
+// joshuafolkken/kit#5886: `lane:breakdown` prints the ledger of lanes already run, so a criterion read
+// through it (the command, then the particle "by") waits on later lanes whether or not it cites the
+// change and whatever the body's estimate (#5860); one naming the command as its object, or one whose
+// closing note names a test that verifies it inside the lane (a change to the output, #5216), reads none.
+const LEDGER_READ = /lane:breakdown(?:[^`\n]*`)?\s*(?:の(?:出力|結果|表))?で(?![きすは])/u
+const CLOSING_NOTE = /（[^（）]*）\s*$/u
+const TEST_VERIFIED = 'テスト'
 const CITATION_PATTERN = /#[1-9]\d*/u
-const MISSING = `measurement follow-up without its start condition: declare \`${issue_sample_gate.DECLARATION}\`, or \`${issue_sample_gate.CLOSING_FORMAT}\` before that pull request exists, under ## 背景 — prompts/collaboration-workflow/measurement.md → "効果を測る後続 Issue"`
+const BACKGROUND_HEADING = issue_body_keys.heading('background')
+const MISSING = `measurement follow-up without its start condition: declare \`${issue_sample_gate.DECLARATION}\`, or \`${issue_sample_gate.CLOSING_FORMAT}\` before that pull request exists, under ${BACKGROUND_HEADING} — prompts/collaboration-workflow/measurement.md → "効果を測る後続 Issue"`
 // joshuafolkken/kit#5144: one waiting K merges reads one value against a bound, which `backlog:drive`
 // does without a lane once it is declared; the declaration is the default, a stated reason the exception.
-const UNDECLARED = `measurement follow-up without a measure declaration: declare \`${measure_declaration.DECLARATION}\` (any \`lane:stats\` cell: \`pnpm josh lane:value cell\`), or \`${measure_declaration.ABSENT}\` when no one command prints the value, under ## 背景 — prompts/collaboration-workflow/measurement.md → "効果を測る後続 Issue"\n${measure_declaration.EXAMPLE}`
+const UNDECLARED = `measurement follow-up without a measure declaration: declare \`${measure_declaration.DECLARATION}\` (any \`lane:stats\` cell: \`pnpm josh lane:value cell\`), or \`${measure_declaration.ABSENT}\` when no one command prints the value, under ${BACKGROUND_HEADING} — prompts/collaboration-workflow/measurement.md → "効果を測る後続 Issue"\n${measure_declaration.EXAMPLE}`
 
 function measures_a_change(criterion: string): boolean {
 	if (AFTER_CITED_CHANGE.some((pattern) => pattern.test(criterion))) return true
@@ -34,11 +43,19 @@ function measures_a_change(criterion: string): boolean {
 	)
 }
 
+function reads_the_ledger(criterion: string): boolean {
+	const note = CLOSING_NOTE.exec(criterion)?.[0] ?? ''
+
+	return LEDGER_READ.test(criterion) && !note.includes(TEST_VERIFIED)
+}
+
 function is_measurement(body: string): boolean {
 	if (measure_declaration.parse(body) !== undefined) return true
+	const criteria = acceptance_map.criteria_of(body)
+	if (criteria.some((criterion) => reads_the_ledger(criterion.text))) return true
 	if (size_estimate.declared_files(body) !== 0) return false
 
-	return acceptance_map.criteria_of(body).some((criterion) => measures_a_change(criterion.text))
+	return criteria.some((criterion) => measures_a_change(criterion.text))
 }
 
 // The refusal for a measurement follow-up whose start condition does not parse — missing, or

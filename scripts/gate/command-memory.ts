@@ -9,7 +9,7 @@ import { core_weights } from './core-weights'
 //
 // **`reserved-run` counted a wrapped command's cores and no memory**: a lane ran
 // `reserved-run 4 -- sh -c '… eslint . --concurrency 4 …'`, typed eslint held a TypeScript program per
-// worker, and the 12 GB process was admitted beside four other lanes until the machine swapped. The
+// worker, and the process was admitted beside other lanes until the machine swapped. The
 // estimate here is what the wrapper now reserves, and the same reading is what `lane-direct-tool`
 // refuses a multi-worker eslint on.
 //
@@ -20,8 +20,8 @@ import { core_weights } from './core-weights'
 // (`bash <<'EOF'`), when it is read as a line of its own, the `sh -c` escape spelled another way.
 //
 // **The estimate is the largest tool's, not the sum**: the commands of one line run one after another,
-// so only one of them is resident at a time. A line with no known tool is `undefined`, the 0 MB it
-// counted before — `reserved-run 1 -- pnpm josh audit` reserves its own, and is not counted twice.
+// so only one of them is resident at a time. A line with no known tool is `undefined`:
+// `reserved-run 2 -- pnpm install` reserves no memory beside its cores.
 
 interface ToolCall extends ProgramCall {
 	// Inside a `pnpm josh reserved-run … --`, the budgeted path.
@@ -186,7 +186,13 @@ function runs_multi_worker_eslint(
 	)
 }
 
-const command_memory = { estimated_memory_mb, runs_multi_worker_eslint, tool_calls_of, workers_of }
+const command_memory = {
+	estimated_memory_mb,
+	runs_multi_worker_eslint,
+	tool_calls_of,
+	workers_of,
+	wrapped_command_of,
+}
 
 export { command_memory }
 export type { ToolCall }

@@ -16,10 +16,48 @@ describe('run_ship_review.recorded_specs', () => {
 	})
 
 	it('drops the fixed marks of a stopped round, so the fix is recorded as unfixed', () => {
-		const verdict = { kind: VERDICT.FIXED, specs: [LOW_COMMENT, FIXED_MEDIUM], report: [] }
+		const verdict = {
+			kind: VERDICT.FIXED,
+			specs: [LOW_COMMENT, FIXED_MEDIUM],
+			report: [LOW_COMMENT, FIXED_MEDIUM],
+		}
 
 		expect(
 			run_ship_review.recorded_specs(verdict, run_ship_review.UNVERIFIED_OUTCOME),
 		).toStrictEqual([LOW_COMMENT, 'bug-risks:medium:b.ts:9'])
 	})
+})
+
+describe('run_ship_review.recorded_specs — real verdicts', () => {
+	it.each([
+		['passing', `${FIXED_MEDIUM} — Keep this reason.`, true, `${FIXED_MEDIUM} — Keep this reason.`],
+		[
+			'blocking',
+			`${FIXED_MEDIUM} — Keep this reason.\nbug-risks:high:a.ts — Blocking reason.`,
+			true,
+			'bug-risks:medium:b.ts:9 — Keep this reason.\nbug-risks:high:a.ts — Blocking reason.',
+		],
+		[
+			'scoped failure',
+			`${FIXED_MEDIUM} — Keep this reason.`,
+			false,
+			'bug-risks:medium:b.ts:9 — Keep this reason.',
+		],
+		['no description', LOW_COMMENT, true, LOW_COMMENT],
+		['clean', '', true, ''],
+	])(
+		'preserves descriptions and only removes stopped fixed marks: %s (ac-71ade449) (ac-76503f90)',
+		(_name, text, is_verified, expected) => {
+			const verdict = run_ship_review.read_verdict(text)
+
+			expect(verdict.kind).not.toBe(VERDICT.INVALID)
+			if (verdict.kind === VERDICT.INVALID) return
+
+			const outcome = is_verified
+				? run_ship_review.round_one_outcome(verdict)
+				: run_ship_review.UNVERIFIED_OUTCOME
+
+			expect(run_ship_review.recorded_specs(verdict, outcome).join('\n')).toBe(expected)
+		},
+	)
 })

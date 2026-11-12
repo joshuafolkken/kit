@@ -1,3 +1,4 @@
+import { PR_POLL_SCHEDULES } from '#scripts/lib/poll'
 import {
 	CHECK_WAIT_INTERVAL_MS,
 	compute_max_attempts,
@@ -10,7 +11,12 @@ import {
 	type PrStateEvaluator,
 	type SnapshotObserver,
 } from './git-pr-checks'
-import { is_coderabbit_check, is_required_check, type PrEvaluation } from './git-pr-checks-eval'
+import {
+	collect_blocking_failures,
+	is_coderabbit_check,
+	is_required_check,
+	type PrEvaluation,
+} from './git-pr-checks-eval'
 import {
 	CHECK_STATUS_FAIL,
 	CHECK_STATUS_PENDING,
@@ -32,7 +38,7 @@ import {
 // soon as the pull request is open.
 //
 // **What is lost is the live table.** `gh` printed each check's name and state as it changed; the
-// poll prints `Checking PR status… (n/N)` instead. The trade is accepted because the display was
+// poll prints `Checking PR status… (read n)` instead. The trade is accepted because the display was
 // never load-bearing — no caller parsed it — and because keeping it would have left the merge gate's
 // last GraphQL call in place, which is a 403 in a cloud session.
 
@@ -91,10 +97,9 @@ function is_awaited_check(check: RollupCheck): boolean {
 // CodeRabbit posts `Review queued` before any workflow has attached a check run, and a flat
 // `pending` sits out the whole budget on a lone CodeRabbit that has already reported.
 //
-// **The order of the questions is the old order**, and it has to be: asking "is anything still
-// pending" before "did anything fail" is what keeps a pull request whose E2E is still running from
-// being called failed by a check that has already gone red.
-function evaluate_checks_settled(snapshot: PrStateSnapshot): PrEvaluation {
+// **Every red that is not blocking keeps the old order**: "is anything still pending" before "did
+// anything fail", so a non-blocking CodeRabbit failure does not end the watch while E2E is running.
+function evaluate_awaited_settled(snapshot: PrStateSnapshot): PrEvaluation {
 	const awaited = snapshot.rollup.filter((check) => is_awaited_check(check))
 	const considered = awaited.length === 0 ? snapshot.rollup : awaited
 
@@ -106,6 +111,16 @@ function evaluate_checks_settled(snapshot: PrStateSnapshot): PrEvaluation {
 	}
 
 	return snapshot.rollup.some((check) => check.status === CHECK_STATUS_FAIL) ? 'failure' : 'success'
+}
+
+// **A blocking failure is asked first** (joshuafolkken/kit#5389): a red check the merge gate refuses
+// on — `collect_blocking_failures`, the gate's own predicate — already makes the pull request
+// unmergeable, so waiting for a pending E2E cannot change the verdict and only delays it. The cost is
+// that the E2E's own red is learned one push later.
+function evaluate_checks_settled(snapshot: PrStateSnapshot): PrEvaluation {
+	if (collect_blocking_failures(snapshot).length > 0) return 'failure'
+
+	return evaluate_awaited_settled(snapshot)
 }
 
 function describe_checks_failure(snapshot: PrStateSnapshot): string {
@@ -138,6 +153,7 @@ async function watch_until_settled(branch_name: string, observe?: SnapshotObserv
 			PR_CHECKS_WATCH_TIMEOUT_MS / SECONDS_TO_MS,
 			CHECK_WAIT_INTERVAL_MS,
 		),
+		backoff: PR_POLL_SCHEDULES.checks_gated,
 		required_stable_reads: DEFAULT_STABLE_READS,
 		evaluator: CHECKS_SETTLED_EVALUATOR,
 	})

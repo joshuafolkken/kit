@@ -1,3 +1,4 @@
+import { followup_section } from '#scripts/followup/followup-section'
 import { pre_commit_lint_switch } from '#scripts/hooks/pre-commit-lint-switch'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_ship_overlap } from './run-ship-overlap'
@@ -9,10 +10,18 @@ const overlap_mock = vi.spyOn(run_ship_overlap, 'await_overlap')
 
 // An open pull request, so a merge the sync made is pushed ahead of the gate.
 vi.mock('#scripts/gh/git-gh-pr-read', () => ({ git_gh_pr_read: { pr_get_number: async () => 1 } }))
+vi.mock('#scripts/gh/git-gh-code-scanning', () => ({
+	git_gh_code_scanning: { own_alerts_note: async () => undefined },
+}))
 vi.mock('#scripts/git/git-command', () => ({ git_command: { branch: async () => '3221-lane' } }))
 vi.mock('#scripts/git/main-merge', () => ({ main_merge: { merge: merge_mock } }))
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
-vi.mock('./run-ship-scoped', () => ({ run_ship_scoped: { scoped_gate: scoped_mock } }))
+vi.mock('./run-ship-scoped', () => ({
+	run_ship_scoped: {
+		scoped_gate: scoped_mock,
+		scoped_pair: async (): Promise<{ code: number; out: string }> => ({ code: 0, out: '' }),
+	},
+}))
 const { run_ship_sync } = await import('./run-ship-sync')
 
 // joshuafolkken/kit#3221: `josh ship` merges the default branch again before the gate and on a
@@ -255,6 +264,16 @@ describe('run_ship_sync.followup_stage — a default branch that moved since the
 		expect(result.conflicts).toStrictEqual(CONFLICTED)
 		expect(result.out).toContain(FOLLOWUP_FAILED.out)
 		expect(commands()).toStrictEqual([FOLLOWUP])
+	})
+})
+
+// joshuafolkken/kit#5696: the ship's followup carries the marker, so it prints no section.
+describe('run_ship_sync.followup_stage — the ship marker', () => {
+	it('runs the followup with the ship marker in its environment', async () => {
+		await run_ship_sync.followup_stage(TITLE, NOTIFY)
+
+		expect(josh_run_mock.mock.calls[0]?.[0]).toStrictEqual(FOLLOWUP)
+		expect(josh_run_mock.mock.calls[0]?.[3]).toStrictEqual(followup_section.SHIPPED_ENVIRONMENT)
 	})
 })
 

@@ -1,11 +1,12 @@
 import { IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
+import type { LaneStateRecord } from '#scripts/lane/lane-state'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { describe, expect, it } from 'vitest'
 import { run_board_lane_state, type BoardLanes } from './run-board-lane-state'
 import { run_board_status, type ItemStatus, type OpenRead } from './run-board-status'
 
-// joshuafolkken/kit#3893: a lane whose child had died stood at 🔄 running, its 🔧 past 80 minutes,
-// because nothing on the stream says a child died.
+// joshuafolkken/kit#3893: a lane whose child died must not stay at 🔄 running just because the
+// stream has no child-death event.
 
 const KIND = run_event_stream.EVENT_KIND
 const T0 = '2026-10-08T09:00:00.000Z'
@@ -16,6 +17,8 @@ const NONE: ReadonlySet<number> = new Set()
 const LAUNCH: RunEvent = { pos: 1, at: T0, kind: KIND.CHILD_LAUNCH, text: '#3409 launched' }
 const HELD = { lane: 'lane 3409' }
 const BARE: ItemStatus = { state: 'running' }
+const IDLE_MS = Date.parse(T1)
+const IDLE = new Map([[LANE, IDLE_MS]])
 
 // This run's lane as its record draws it: what the stream folds of its launch, with its lane.
 function own_lane(status: ItemStatus = BARE): BoardLanes {
@@ -33,8 +36,8 @@ const OPEN: OpenRead = {
 }
 
 describe('run_board_status.statuses_of a lane no child is working in', () => {
-	it('draws the child stopped with its lane, its phase no longer timed', () => {
-		const statuses = run_board_status.statuses_of([LAUNCH], LAUNCHED, [LANE])
+	it('draws the child stopped with its lane, its phase frozen when first read idle', () => {
+		const statuses = run_board_status.statuses_of([LAUNCH], LAUNCHED, IDLE)
 
 		expect(statuses.get(ISSUE)).toStrictEqual({
 			state: 'stopped',
@@ -42,35 +45,62 @@ describe('run_board_status.statuses_of a lane no child is working in', () => {
 			spans: [{ from_ms: Date.parse(T0), end_ms: undefined }],
 			track: ['investigate'],
 			lane: 'lane 3409',
+			phase_ms: Date.parse(T0),
+			ended_ms: IDLE_MS,
 		})
 	})
 
 	it('draws a lane the stream never saw launched stopped too', () => {
-		const statuses = run_board_status.statuses_of([], own_lane(), [LANE])
+		const statuses = run_board_status.statuses_of([], own_lane(), IDLE)
 
 		expect(statuses.get(ISSUE)).toStrictEqual({
 			state: 'stopped',
 			started_ms: undefined,
 			lane: 'lane 3409',
+			ended_ms: IDLE_MS,
 		})
 	})
 
 	it('keeps a lane a child is working in running', () => {
-		const statuses = run_board_status.statuses_of([LAUNCH], LAUNCHED, ['3415'])
+		const statuses = run_board_status.statuses_of([LAUNCH], LAUNCHED, new Map([['3415', IDLE_MS]]))
 
 		expect(statuses.get(ISSUE)?.state).toBe('running')
 	})
 })
 
+describe('run_board_status.statuses_of a lane its record ended', () => {
+	const changed_at = '2026-10-08T09:03:00.000Z'
+	const closer = 'lane:close'
+	const record: LaneStateRecord = {
+		issue: LANE,
+		state: 'ended',
+		launched_at: T0,
+		changed_at,
+		changed_by: closer,
+	}
+
+	it('draws the closed lane stopped by the command, at the record time', () => {
+		const records = new Map([[LANE, record]])
+		const read = { events: [LAUNCH], lanes: [], records, started_ms: Date.parse(T0) }
+		const lanes = run_board_lane_state.lanes_of(read)
+
+		expect(run_board_status.statuses_of([LAUNCH], lanes).get(ISSUE)).toMatchObject({
+			state: 'stopped',
+			ended_ms: Date.parse(changed_at),
+			stop_reason: closer,
+		})
+	})
+})
+
 describe('run_board_status.settle_closed a stopped lane', () => {
 	it('leaves it stopped while its issue is open and in progress', () => {
-		const statuses = run_board_status.statuses_of([LAUNCH], LAUNCHED, [LANE])
+		const statuses = run_board_status.statuses_of([LAUNCH], LAUNCHED, IDLE)
 
 		expect(run_board_status.settle_closed(statuses, OPEN).get(ISSUE)?.state).toBe('stopped')
 	})
 
 	it('draws it merged once GitHub says its issue merged after the launch', () => {
-		const statuses = run_board_status.statuses_of([LAUNCH], LAUNCHED, [LANE])
+		const statuses = run_board_status.statuses_of([LAUNCH], LAUNCHED, IDLE)
 		const merged = {
 			title: '',
 			labels: [],

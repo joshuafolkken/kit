@@ -178,7 +178,6 @@ describe('evaluate_pr_state — pending', () => {
 })
 
 function skipped_job(name: string): Record<string, string> {
-	// eslint-disable-next-line @typescript-eslint/naming-convention -- GitHub API field name
 	return { __typename: 'CheckRun', name, status: 'COMPLETED', conclusion: 'SKIPPED' }
 }
 
@@ -195,9 +194,7 @@ describe('evaluate_pr_state — parsed payload with skipped jobs (#793)', () => 
 			skipped_job('auto-merge'),
 			skipped_job('E2E'),
 			skipped_job('Notify Auto Tag'),
-			// eslint-disable-next-line @typescript-eslint/naming-convention -- GitHub API field name
 			{ __typename: 'CheckRun', name: SONAR_QUBE, status: 'COMPLETED', conclusion: 'SUCCESS' },
-			// eslint-disable-next-line @typescript-eslint/naming-convention -- GitHub API field name
 			{ __typename: 'StatusContext', context: CODE_RABBIT, state: 'PENDING' },
 		],
 	})

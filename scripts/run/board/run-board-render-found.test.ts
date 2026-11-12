@@ -244,9 +244,9 @@ describe('run_board_render — a merged row’s finished investigation', () => {
 // a mechanism's minutes.
 describe('run_board_render — a merged row’s keyed result from before #4929', () => {
 	it('says `∅` and the reason, not the largest mechanism', () => {
-		const line = done_line(ended('none: all small — under 2%: test:pinned 7.2 min: restarted'))
+		const line = done_line(ended('none: all small — test:pinned 7.2 min: restarted'))
 
-		expect(line).toMatch(/52′ {2}🔍 ∅ all small — und…$/u)
+		expect(line).toMatch(/52′ {2}🔍 ∅ all small — tes…$/u)
 		expect(line).not.toContain('7′')
 	})
 })
@@ -335,8 +335,9 @@ describe('run_board_render — a done row’s filings', () => {
 		expect(line).toMatch(/18′ {2}<4768>, <4769>, <4770>$/u)
 	})
 
-	it('draws only them on a 🏁 done row', () => {
-		const status: ItemStatus = { ...MERGED, state: 'done' }
+	// joshuafolkken/kit#7095 (ac-932de729): a ⏩ already-done row counts what it found as 🏁 done does.
+	it.each(['done', 'already_done'] as const)('draws only them on a %s row', (state) => {
+		const status: ItemStatus = { ...MERGED, state }
 		const line = row_line(board(found_of(undefined, { filed: FILED }), {}, status))
 
 		expect(line).toMatch(/″ +4768, 4769, 4770$/u)

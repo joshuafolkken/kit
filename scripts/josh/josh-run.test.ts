@@ -88,3 +88,18 @@ describe('josh_command.josh_run — the environment', () => {
 		})
 	})
 })
+
+describe('josh_command.josh_run_at', () => {
+	it('runs a command in the requested checkout and captures a failure there', async () => {
+		const cwd = '/primary/checkout'
+
+		stub(FALLBACK_EXIT, ' output ', ' reason ')
+
+		await expect(josh_command.josh_run_at([BUDGET], cwd)).resolves.toStrictEqual({
+			code: FALLBACK_EXIT,
+			out: 'output',
+			err: 'reason',
+		})
+		expect(mocked_execa).toHaveBeenCalledWith(PNPM, [JOSH, BUDGET], { ...PIPED, cwd })
+	})
+})

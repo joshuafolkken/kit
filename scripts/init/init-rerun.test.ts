@@ -1,9 +1,11 @@
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import os from 'node:os'
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { PACK_HOOK_FILE } from '#scripts/safe-chain/pack-hook'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+const make_directory = temporary_directory()
 
 // Same import-time paths as the other `init` integration tests, so the same getter mock
 // (joshuafolkken/kit#879).
@@ -65,7 +67,7 @@ async function snapshot_two_runs(): Promise<{
 beforeEach(() => {
 	vi.resetModules()
 	paths_mock.package_dir = fileURLToPath(new URL('../../', import.meta.url))
-	paths_mock.root = mkdtempSync(path.join(os.tmpdir(), 'josh-init-rerun-'))
+	paths_mock.root = make_directory('josh-init-rerun-')
 	// A published manifest is what makes `init` write its pack hook, the `.mjs` file of kit's own.
 	write_project_file(PACKAGE_JSON, '{"name":"example"}\n')
 	write_project_file('main.lua', 'print("hello")\n')
@@ -73,7 +75,6 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-	rmSync(paths_mock.root, { recursive: true, force: true })
 	vi.restoreAllMocks()
 })
 

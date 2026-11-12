@@ -8,7 +8,7 @@ import { shell_segments } from './shell-segments'
 // **A bare `pnpm josh git` cannot succeed from an agent, and it wastes the time it takes to fail.** The
 // command prompts to confirm the staging, and with no TTY the prompt falls to its cancel branch —
 // `Checking unstaged files... Found` → `Operation cancelled.` — so the run throws the time away and then
-// reissues with `-y` (about 31 seconds in one measured lane). The confirmation flag is what makes it the
+// reissues with `-y`. The confirmation flag is what makes it the
 // run's own unattended commit-push-PR step rather than a person's interactive invocation.
 //
 // **It is not `run-tail`.** That row governs a `pnpm josh git -y` push already carrying the flag, issued

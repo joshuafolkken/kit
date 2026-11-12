@@ -5,6 +5,7 @@ import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { gate_test_fixture, type ExecaResult } from './gate-test-fixture'
 import { project_checks } from './project-checks'
+import { project_gate_steps } from './project-gate-steps'
 
 vi.mock('execa', () => ({
 	execa: vi.fn(),
@@ -16,9 +17,8 @@ vi.mock('./type-check-step', () => ({
 	},
 }))
 
-// The last line of `josh gate`, at the granularity a `basic` project's user reads it at: every check
-// exits 0, and what tells a gate that checked something from one that checked nothing is the body each
-// check printed. The verdict used to be the planned number of checks whichever it was.
+// For a `basic` project, zero exit codes alone cannot distinguish checked work from skips. The
+// verdict must count the work reported by each check rather than the number of planned commands.
 
 const { verification_gate } = await import('./verification-gate')
 const GATE_STEPS = await verification_gate.build_gate_steps('/project')
@@ -76,10 +76,11 @@ function with_first(body: string, count: number): ReadonlyArray<string> {
 }
 
 const live_runs = vi.spyOn(unit_worker_share, 'live_run_count')
+const live_lanes = vi.spyOn(unit_worker_share, 'live_lane_count')
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	live_runs.mockReturnValue(0)
+	live_lanes.mockReturnValue(0)
 	RECORDS.clear()
 })
 
@@ -185,5 +186,31 @@ describe('josh gate — the verdict of a gate that ran some of its checks', () =
 		const [, verdict] = await run_gate(NONE_SKIPPED)
 
 		expect(verdict).toMatch(/^✔ verification gate passed \(\d+ checks\) in \d+\.\ds\.$/u)
+	})
+})
+
+describe('josh gate — the project steps after the fixed checks', () => {
+	const project_step = { label: 'cargo', command: 'exec --shell-mode cargo test', elapsed_ms: 0 }
+
+	it('counts a passing project step among the checks', async () => {
+		vi.spyOn(project_gate_steps, 'run_for').mockResolvedValueOnce([
+			{ ...project_step, output: RAN_BODY, exit_code: 0 },
+		])
+
+		const [code, verdict] = await run_gate(NONE_SKIPPED)
+
+		expect(code).toBe(0)
+		expect(verdict).toContain(`passed (${String(STEP_TOTAL + 1)} checks)`)
+	})
+
+	it('fails the gate under the failing project step name', async () => {
+		vi.spyOn(project_gate_steps, 'run_for').mockResolvedValueOnce([
+			{ ...project_step, output: 'error[E0308]', exit_code: 1 },
+		])
+
+		const [code, verdict] = await run_gate(NONE_SKIPPED)
+
+		expect(code).toBe(1)
+		expect(verdict).toContain(project_step.label)
 	})
 })

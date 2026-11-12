@@ -1,8 +1,9 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, readFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { observation_ledger } from '#scripts/observations/observation-ledger'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { run_ship_review } from '#scripts/run/ship/run-ship-review'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it, vi } from 'vitest'
 import { review_prior_findings } from './review-prior-findings'
 import { review_record_cli } from './review-record-cli'
 import type { review_stop_log } from './review-stop-log'
@@ -26,7 +27,8 @@ vi.mock('./review-stop-log', async (original) => {
 	}
 })
 
-const TEST_DIR = mkdtempSync(path.join(tmpdir(), 'review-record-reasons-'))
+const make_directory = temporary_directory('suite')
+const TEST_DIR = make_directory('review-record-reasons-')
 const LOG = path.join(TEST_DIR, 'review-stops.jsonl')
 
 log_target.path = LOG
@@ -61,10 +63,6 @@ const EPERM_REASON = 'is_live_pid reads EPERM as dead. A second sentence is not 
 const EPERM_ENTRY =
 	'tick.ts:187 — is_live_pid reads EPERM as dead. (bug-risks:medium, fixed in place in the review:record stage)'
 
-afterAll(() => {
-	rmSync(TEST_DIR, { recursive: true, force: true })
-})
-
 async function quietly(run: () => Promise<number>): Promise<number> {
 	const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
@@ -91,6 +89,24 @@ async function record(name: string, positionals: ReadonlyArray<string>): Promise
 }
 
 describe('review_record_cli.run with a reason', () => {
+	it.each(['passing', 'blocking'])(
+		'saves a ship %s finding description (ac-e202c7b5)',
+		async (route) => {
+			rmSync(LOG, { force: true })
+			const prefix = route === 'passing' ? run_ship_review.FIXED_PREFIX : ''
+			const verdict = run_ship_review.read_verdict(`${prefix}${EPERM_SPEC} — ${EPERM_REASON}`)
+
+			expect(verdict.kind).not.toBe(run_ship_review.VERDICT.INVALID)
+			if (verdict.kind === run_ship_review.VERDICT.INVALID) return
+
+			const outcome = run_ship_review.round_one_outcome(verdict)
+			const specs = run_ship_review.recorded_specs(verdict, outcome)
+
+			await record(`ship-${route}`, specs)
+			expect(readFileSync(LOG, 'utf8')).toContain('is_live_pid reads EPERM as dead.')
+		},
+	)
+
 	it('carries the location and reason into the next stop fix and the next review prompt', async () => {
 		await record('with-reason', [`${EPERM_SPEC} — ${EPERM_REASON}`])
 

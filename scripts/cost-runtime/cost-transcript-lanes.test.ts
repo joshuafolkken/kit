@@ -1,18 +1,19 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { lane_paths } from '#scripts/lane/lane-paths'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { cost_transcript } from './cost-transcript'
 import { cost_transcript_fixture } from './cost-transcript-fixture'
 
 const { CWD, usage_line } = cost_transcript_fixture
 const MAIN = CWD
+const make_directory = temporary_directory()
 
 // A linked work tree as git leaves one: its `.git` is a *file* naming the main checkout's worktree
 // registration, which is what says where the session's transcripts are actually filed.
 function make_worktree(gitdir: string): string {
-	const root = mkdtempSync(path.join(tmpdir(), 'cost-worktree-'))
+	const root = make_directory('cost-worktree-')
 
 	writeFileSync(path.join(root, '.git'), `gitdir: ${gitdir}\n`)
 
@@ -33,7 +34,7 @@ function write_transcript(home: string, cwd: string, session_id: string, content
 
 // A lane work tree whose `.git` file resolves to the main checkout `MAIN`, paired with a fresh home.
 function lane_home(): { home: string; lane: string } {
-	const home = mkdtempSync(path.join(tmpdir(), 'cost-for-'))
+	const home = make_directory('cost-for-')
 
 	return { home, lane: make_worktree(`${MAIN}/.git/worktrees/1825`) }
 }
@@ -122,7 +123,7 @@ describe('cost_transcript.searched_directories', () => {
 	})
 
 	it('distinguishes an existing directory from an absent one', () => {
-		const present = mkdtempSync(path.join(tmpdir(), 'cost-present-'))
+		const present = make_directory('cost-present-')
 		const absent = path.join(present, 'gone')
 
 		const searched = cost_transcript.searched_directories([present, absent])
@@ -171,7 +172,7 @@ const LANE = lane_paths.lane_directory(lane_paths.default_lane_root(MAIN), '1832
 
 // A fresh, empty home a from-main test writes lane transcripts into.
 function empty_home(): string {
-	return mkdtempSync(path.join(tmpdir(), 'cost-main-'))
+	return make_directory('cost-main-')
 }
 
 // `lane_paths.lane_root` honors `JOSH_LANE_ROOT`; a blank value pins the default derivation these

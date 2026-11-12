@@ -4,20 +4,21 @@ Point-of-use, read one section at a time from `backlogrun.md` → "The manifest 
 
 ## Running a named epic's children
 
+An epic `pnpm josh run:add <E>` tracked as a root is a named epic too, in a pool run as well.
+
 **`backlog:drive` walks this loop on its own; a session runs it when the driver hands back `epic #N`.**
 Each child runs as `fullrun #<N>` in a lane —
 `pnpm josh lane:launch <N>` (`backlogrun-lanes.md` → "Opening one lane and dispatching its child"),
-then `pnpm josh lane:await <N...> --owner "$PPID"` in the background — and every ending is read by one
+then `pnpm josh lane:await <N...>` in the background — and every ending is read by one
 command:
 
 ```bash
-next=$(pnpm josh run:merge <N> --epic <E> --repo <owner/repo> --owner "$PPID" --output <path>)
+next=$(pnpm josh run:merge <N> --epic <E> --repo <owner/repo> --output <path>)
 ```
 
 **`pnpm josh run:merge <N>` is the only reading of how a child ended** — never
 classify `issue:state` by hand or ask `epic:next` in its place. **Pass `--output <path>`, the child's
-transcript**; the named-epic flags are dropped for the opted-in backlog. It classifies, counts, closes
-the lane and comments itself; act on the token.
+transcript**; the named-epic flags are dropped for the opted-in backlog. It closes the lane itself; act on the token.
 
 | It prints | What the run does |
 | --- | --- |
@@ -25,8 +26,8 @@ the lane and comments itself; act on the token.
 | `wait` | Wait for the next wake |
 | `complete` | Record the root done (`backlogrun-steps.md` → "The session cut is inside the invocation") and post the epic summary |
 | `over` | Hand the lanes over and take the cut — "The hand-off" below |
-| `human-review` | Stop, leave `in-progress` on; send a `confirmation` only where the child ran in this session's own context (`needs-human-review.md`) |
-| `stop` / `environment` | Report the parked children (or the outage, or the `/login` an authentication failure needs) and stop |
+| human-review child | Keep its lane and `in-progress`; `run:merge` offers the next children and the stopped lane holds no execution place once its worker exits |
+| `stop` / `environment` | Report the parked children and stop. Failure streaks, outages and authentication failures hold launches instead (`scripts/run/merge/run-merge-health.ts`, `run-merge-auth.ts`) |
 | `resumed` | `lane:await <N>` it again |
 | `retry` / `busy` | Re-read the child |
 
@@ -41,49 +42,36 @@ summary, and who propagates" below.
 
 ## The hand-off — one session does not have to run the whole batch
 
-**The check is asked at every merge, and delegation does not excuse it** — `pnpm josh cost --cut`
-after every child's merge and `pnpm josh ms`, never wired to `pnpm josh delegate epic-child`. Crossing it **hands the session off to a fresh one,
-carrying the budget** (`backlogrun-steps.md` → "The session cut is inside the invocation"); it is not a
-stop. The threshold is the one `pnpm josh cost --cut` prints, priced at the session's model and
-shared by the scheduler entry, hand-off and the lane worker cut (`pre-gate-cut.md` → "The threshold").
+**The check is asked at every merge, and delegation does not excuse it** — `pnpm josh run:handoff-lanes`
+after every child's merge, never wired to `pnpm josh delegate epic-child`. It chains
+`pnpm josh cost --cut` (its threshold priced at the session's model), the lane reading, `run:carry --cut`,
+`run:board --chat` and `pnpm josh run:report --handoff` (`backlogrun-handoff-report.md`). A cut
+**hands the session off to a fresh one, carrying the budget** (`backlogrun-steps.md` → "The session cut
+is inside the invocation").
 
 | It answers | What the run does |
 | --- | --- |
 | `under` | Back to the loop |
-| `over` | Open no new lane, take no new child, and read the lanes below in the same turn |
-| exit 1, empty output | Report that the check could not answer, and take `over`'s branch |
+| `cut` | Open no new lane, take no new child, and end the turn; the `run:wake` driver polls the lanes |
+| `blocked <lanes>` | No cut, never assume idle: fix each named lane as printed, name it in the progress comment, re-ask at the next merge |
+| `capped` | No `run:wake`, no hand-off: carry this session on and re-ask at the next merge |
+| a step's exit code | Settle what it refused, then rerun the command |
 
 **A parent without a completion callback (Codex) dispatches the wave and ends the turn** — `run:step`
-prints the `--cut`.
-
-**On `over`, read the lanes rather than judging them** — `pnpm josh lane:list` prints each lane's state
-and output path; fill a missing path with `pnpm josh lane:output <N> <path>`:
-
-- **A lane nobody can poll** (`unreadable`, or `open` with no path) — **the cut does not happen**: name
-  it in the progress comment and re-ask at the next merge. **Never assume idle.** A `stranded` lane is
-  closed by `pnpm josh lane:prune`.
-- **Every in-flight lane records a path** — count everything, run `pnpm josh run:carry --cut --owner
-  "$PPID"`, post the progress comment naming every lane and its path with `pnpm josh run:board`, and end
-  the turn; the `run:wake` driver polls the lanes.
-- **`--cut` answers `capped`** (`MAX_CUTS`) — **do not `run:wake` or hand off**;
-  carry this session on and re-ask at the next merge.
-
-The hand-off report is `pnpm josh run:report --handoff` (`backlogrun-handoff-report.md`). **This is not a failure and not a
-park** — nothing is labelled, stashed or filed.
+prints the `--cut`. **A cut is not a failure and not a park** — nothing is labelled, stashed or filed.
 
 ## Resuming after a cut
 
-**A session woken by the driver** — `Driver result:` in its prompt — acts on its branch and cuts as its
-`Next:` line says. A session resumed by hand reads the subsections below.
+**A session woken by the driver** — `Driver result:` in its prompt — acts on its branch and ends its turn
+as its `Next:` line says. A session resumed by hand reads the subsections below.
 
 ### Picking the lanes up in the fresh session
 
-**Start no child again and open no lane already open.** In one turn: `pnpm josh lane:list` (a line
-with a path is a handed-over child, waited on per `backlogrun-recovery.md` → "A delegated unit that stopped
-without reporting"), `pnpm josh run:progress --wait --output <handed-over paths>` in the background
-(`run:watcher:guard`), `pnpm josh run:liveness`, and `epic:next --lanes`, a lane per child it offers.
+**Start no child again and open no lane already open.** Run `pnpm josh run:pickup <E>...` and start
+the watcher line it prints in the background. A lane with a path is a handed-over child, waited on per
+`backlogrun-recovery.md` → "A delegated unit that stopped without reporting".
 **A carried-over child finishes in its own unit — never run its `followup` yourself**; one lost in the
-cut is re-dispatched with `pnpm josh lane:open <N>` then `pnpm josh lane:dispatch <N>`.
+cut is re-dispatched with `pnpm josh lane:launch <N>`.
 
 ### What carries over
 
@@ -95,20 +83,18 @@ the epic body; what merged the epic's task list.
 
 | Setting | Value | Meaning |
 | --- | --- | --- |
-| Re-ask floor | 60 s | **In flight, never a clock — the wait is `backlog:drive` or `lane:await`**, and the wake is their exit or the watcher's arrival exit, never a report; a state read repeated with nothing decided in between is refused. **With nothing in flight no wake comes: it is the parent's own clock.** A `backlogrun` idle watch re-asks at this same floor. |
-| Silent delegated unit | 30 min | Not the child's duration — the time its output has gone **unchanged**. Past it, ask `run:liveness` and book a stopped unit as a failure. |
+| Re-ask floor | 60 s | **In flight, never a clock — the wait is `backlog:drive` or `lane:await`**, and the wake is their exit or the watcher's arrival exit, never a report. **With nothing in flight no wake comes: it is the parent's own clock.** A `backlogrun` idle watch re-asks every 180 s, every 30 s while a named issue is left to dispatch, at the next poll after `run:add`, and when the `auto-ok` listing a free lane checks every 10 s holds a new issue number. |
+| Silent delegated unit | 30 min | The time its output has gone **unchanged**. Past it, ask `run:liveness` and book a stopped unit as a failure. |
 | Stale `in-progress` | 90 min | Past it, the other session is gone. |
-| Publish wait | 10 min | `josh propagate`'s own budget. A failed publish never appears. |
-| `backlogrun` idle watch | 8 h | Counted from when the run's hands became free, never from its start; `pnpm josh backlog:budget` decides it. |
+| `backlogrun` idle watch | 8 h | Counted from when the run's hands became free; `pnpm josh backlog:budget` decides it. |
 
 Each timeout **ends the wait and reports** — none is retried indefinitely. A stale child's label is
-removed first, so the next ask can offer it. **A graph that has
-deadlocked on a cycle is not this loop's to untangle**: `epic:next` detects it and exits with an error.
+removed first, so the next ask can offer it.
 
 ## Who sends the summary, and who propagates
 
 **Exactly one session does the end-of-epic work: the one standing in the repository that owns the
 epic** — the start and completion notifications, `josh propagate`, and `pnpm josh release:scope` once
 after the last merge (`followup.md` → "When `pnpm josh release` runs"). **Never compose the summary by
-hand — `pnpm josh run:report` generates it**; pass it to `pnpm josh notify
---body-file`.
+hand — `pnpm josh run:report` generates it**; write its output to `.josh/tmp/report.md` for
+`pnpm josh notify --body-file .josh/tmp/report.md`.

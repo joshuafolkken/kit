@@ -1,4 +1,5 @@
 import { error_text } from '#scripts/lib/error-message'
+import { poll } from '#scripts/lib/poll'
 import type { CarryRead } from '#scripts/run/carry/run-carry'
 import {
 	run_wake,
@@ -43,11 +44,15 @@ interface LoopPorts {
 	// fresh UUID. The same id is recorded on the wake record, which is how `josh time --run` later knows
 	// the session was one this supervisor started.
 	new_session_id: () => string
-	// Hands the carry record from the supervisor-owned driver to a judgment session.
-	hand_off: () => void
+	// Hands the carry record from the supervisor-owned driver to the judgment session `session_id`
+	// names, adopting it for that session (`run-wake-handoff.ts`).
+	hand_off: (session_id: string) => void
 	// Runs the deterministic backlog driver. A normal completion never calls `wake`.
 	drive: () => Promise<DriveResult>
 	wake: (invocation: string, session_id: string, material: string) => LaunchResult
+	// Wakes the triage session beside the driver: the record stays this supervisor's, and the session's
+	// process is named on the driver's kept resume line (joshuafolkken/kit#7120).
+	wake_beside: (invocation: string, session_id: string, material: string) => LaunchResult
 	sleep: (milliseconds: number) => Promise<void>
 	now: () => Date
 	// Closes again a lane a process outlived, once the process is gone (`lane_close.retry_closes`), and
@@ -63,7 +68,7 @@ interface LoopPorts {
 type DriveResult =
 	| { kind: 'finished' }
 	| { kind: 'released' }
-	| { kind: 'judgment'; material: string }
+	| { kind: 'judgment' | 'triage'; material: string }
 	| { kind: 'failed'; note: string }
 
 interface LoopStop {
@@ -90,26 +95,41 @@ function wake_failure_note(wake: RunWake): string {
 	return `woke a session for "${wake.invocation}" ${attempts} time(s) and none of them claimed the carry record; the last one was ${last}, which may still be running`
 }
 
-// The hand-off is written before the launch, never after: a successor that boots fast enough to run
-// `--begin` before a post-launch write would read the record un-handed-off and be answered `standing`.
-async function wake_step(wake: RunWake, ports: LoopPorts): Promise<StepOutcome> {
-	const driven = await ports.drive()
-	if (driven.kind === 'finished') return stopped('ended')
-	if (driven.kind === 'failed') return stopped(FAILED_REASON, driven.note)
-	if (driven.kind === 'released') return { kind: 'continue', wake }
+// **Triage is no hand-off** (joshuafolkken/kit#7120): the record stays this supervisor's, so the next
+// pass drives again at once — collecting and filling lanes while the session judges — and no wake is
+// counted, which would hold that pass in the grace window a hand-off waits through.
+function beside_step(wake: RunWake, material: string, ports: LoopPorts): StepOutcome {
+	const result = ports.wake_beside(wake.invocation, ports.new_session_id(), material)
 
+	return result.kind === 'failed' ? stopped(FAILED_REASON, result.note) : { kind: 'continue', wake }
+}
+
+// The hand-off is written before the launch, never after: a session that boots fast enough to count
+// before a post-launch write would meet a record still the supervisor's.
+function handoff_step(wake: RunWake, material: string, ports: LoopPorts): StepOutcome {
 	const session_id = ports.new_session_id()
 
-	ports.hand_off()
+	ports.hand_off(session_id)
 
-	const result = ports.wake(wake.invocation, session_id, driven.material)
+	const result = ports.wake(wake.invocation, session_id, material)
 
 	if (result.kind === 'failed') return stopped(FAILED_REASON, result.note)
 
 	return { kind: 'continue', wake: run_wake.count_wake(wake, ports.now(), result.pid, session_id) }
 }
 
-// A `wait` means the woken session has claimed the carry record, so the wake mark is cleared and the
+async function wake_step(wake: RunWake, ports: LoopPorts): Promise<StepOutcome> {
+	const driven = await ports.drive()
+	if (driven.kind === 'finished') return stopped('ended')
+	if (driven.kind === 'failed') return stopped(FAILED_REASON, driven.note)
+	if (driven.kind === 'released') return { kind: 'continue', wake }
+
+	return driven.kind === 'triage'
+		? beside_step(wake, driven.material, ports)
+		: handoff_step(wake, driven.material, ports)
+}
+
+// A `wait` means the woken session is at work on the carry record, so the wake mark is cleared and the
 // next cut starts the grace window afresh — **and it is the only pass on which `woke` may grow**,
 // because arriving here is the supervisor observing that a record it was
 // waiting on has been taken over. A `pending` keeps what is there, because the window it is measured
@@ -210,21 +230,41 @@ async function run_pass(
 // supervisor is already serving, and only then finding the write-back refused. Read as owned or not
 // at all, the replaced loop ends here, quietly and before it does anything: the run is not
 // unattended, because the supervisor that took the record over is watching it.
-async function run_loop(target: string, ports: LoopPorts, interval_ms: number): Promise<LoopStop> {
-	let wake = run_wake.read_own_wake(target)
+// A driver window already waited. Recheck ownership and reload code immediately before the next
+// driver, so the supervisor's interval cannot hide a not_before deadline between windows. A triage
+// woken beside the driver re-drives at once too, so no lane waits out the interval while it judges.
+function without_release_gap(ports: LoopPorts): LoopPorts {
+	let is_released = false
 
-	while (wake !== undefined) {
-		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		const stop = await run_pass(target, wake, ports)
+	return {
+		...ports,
+		drive: async () => {
+			const result = await ports.drive()
 
-		if (stop !== undefined) return stop
+			is_released = result.kind === 'released' || result.kind === 'triage'
 
-		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		await ports.sleep(interval_ms)
-		wake = run_wake.read_own_wake(target)
+			return result
+		},
+		sleep: async (milliseconds) => {
+			const duration = is_released ? 0 : milliseconds
+
+			is_released = false
+			await ports.sleep(duration)
+		},
 	}
+}
 
-	return STOPPED_BY_PERSON
+async function run_loop(target: string, ports: LoopPorts, interval_ms: number): Promise<LoopStop> {
+	const continuous = without_release_gap(ports)
+
+	return await poll.wait_for(
+		async () => {
+			const wake = run_wake.read_own_wake(target)
+
+			return wake === undefined ? STOPPED_BY_PERSON : await run_pass(target, wake, continuous)
+		},
+		{ interval_ms, sleeper: continuous.sleep },
+	)
 }
 
 const run_wake_loop = {

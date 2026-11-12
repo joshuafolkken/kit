@@ -1,7 +1,7 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { test_network_guard } from '#tools/test/test-network-guard'
 import { test_telegram_guard } from '#tools/test/test-telegram-guard'
 import { GUARD_LOG_KEY } from '#tools/test/unit-guard-environment'
@@ -19,20 +19,17 @@ const TELEGRAM_URL = `https://api.telegram.org/bot${FAKE_TOKEN}/sendMessage`
 const OTHER_URL = 'https://example.invalid/'
 const STOP_BODY = 'backlog drained'
 
-const directories: Array<string> = []
+const make_directory = temporary_directory()
 
 afterEach(() => {
 	vi.unstubAllEnvs()
-	for (const directory of directories) rmSync(directory, { recursive: true, force: true })
-	directories.length = 0
 })
 
 // A scratch record the guard writes to instead of the run's own.
 function scratch_log(): string {
-	const directory = mkdtempSync(path.join(tmpdir(), TEMP_PREFIX))
+	const directory = make_directory(TEMP_PREFIX)
 	const log_file = path.join(directory, LOG_NAME)
 
-	directories.push(directory)
 	writeFileSync(log_file, '')
 	vi.stubEnv(GUARD_LOG_KEY, log_file)
 

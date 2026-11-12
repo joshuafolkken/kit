@@ -1,5 +1,5 @@
 import { execa } from 'execa'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { check_gh_installed, GH_NOT_INSTALLED_MSG } from './git-gh-check'
 import {
 	BODY_FROM_STDIN,
@@ -33,10 +33,6 @@ function fake_stdout_result(stdout: string): ExecaResult {
 }
 
 const TIMEOUT_OPTION = { timeout: GH_REQUEST_TIMEOUT_MS }
-
-beforeEach(() => {
-	vi.clearAllMocks()
-})
 
 describe('git_gh_exec', () => {
 	it('exposes exec_gh_command as a callable function', () => {

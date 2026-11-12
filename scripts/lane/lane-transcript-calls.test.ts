@@ -23,6 +23,25 @@ function result_line(id: string, content: unknown, at = END): string {
 	return JSON.stringify({ type: 'user', timestamp: at, message: { content: [block] } })
 }
 
+// joshuafolkken/kit#6664: `josh hook:ledger` tells a refused call from one that later went through.
+describe('lane_transcript_calls.parse — error flag', () => {
+	it('keeps the error flag a refused call result carries', () => {
+		const block = { type: 'tool_result', tool_use_id: 'e', content: 'refused', is_error: true }
+		const refused = JSON.stringify({ type: 'user', timestamp: END, message: { content: [block] } })
+		const [call] = lane_transcript_calls.parse(SOURCE, [use_line('e', {}), refused].join('\n'))
+
+		expect(call?.is_error).toBe(true)
+	})
+})
+
+describe('lane_transcript_calls.parse — head', () => {
+	it('keeps the head the hook ledger writes, from whichever field the tool carries', () => {
+		const raw = [use_line('a', { pattern: 'needle' }), result_line('a', 'ok')]
+
+		expect(lane_transcript_calls.parse(SOURCE, raw.join('\n'))[0]?.head).toBe('needle')
+	})
+})
+
 describe('lane_transcript_calls.parse — timing', () => {
 	it('times a foreground call as the gap from its use line to its result line', () => {
 		const command = 'pnpm josh lint:related'
@@ -39,6 +58,9 @@ describe('lane_transcript_calls.parse — timing', () => {
 				command,
 				subagent: undefined,
 				output: 'ok',
+				file_path: undefined,
+				head: command,
+				is_error: false,
 			},
 		])
 	})
@@ -70,6 +92,16 @@ describe('lane_transcript_calls.parse — tool name', () => {
 		expect(call?.tool).toBe('Edit')
 		expect(call?.duration_ms).toBe(SEVEN_AND_A_HALF_SECONDS)
 	})
+
+	// joshuafolkken/kit#6188: the implement's read counts the files it read.
+	it('keeps the file path a call names', () => {
+		const file_path = '/repo/a.ts'
+		const block = { type: 'tool_use', id: 'r', name: 'Read', input: { file_path } }
+		const use = JSON.stringify({ timestamp: START, message: { content: [block] } })
+		const [call] = lane_transcript_calls.parse(SOURCE, use)
+
+		expect(call?.file_path).toBe(file_path)
+	})
 })
 
 function agent_call(name: string, input: Record<string, unknown>): string {
@@ -78,6 +110,9 @@ function agent_call(name: string, input: Record<string, unknown>): string {
 	return JSON.stringify({ timestamp: START, message: { content: [block] } })
 }
 
+// A prompt that is not a review brief: no level, not the interaction review (joshuafolkken/kit#5539).
+const NO_BRIEF = { level: undefined, pass: undefined }
+
 // joshuafolkken/kit#5297: the implement's subagent time splits by the agent each call dispatched.
 describe('lane_transcript_calls.parse — subagent', () => {
 	it('keeps the agent type and model an Agent or Task call names', () => {
@@ -85,14 +120,16 @@ describe('lane_transcript_calls.parse — subagent', () => {
 		const [agent] = lane_transcript_calls.parse(SOURCE, agent_call('Agent', input))
 		const [task] = lane_transcript_calls.parse(SOURCE, agent_call('Task', input))
 
-		expect(agent?.subagent).toStrictEqual({ type: 'investigator', model: 'sonnet' })
-		expect(task?.subagent).toStrictEqual({ type: 'investigator', model: 'sonnet' })
+		const expected = { type: 'investigator', model: 'sonnet', ...NO_BRIEF }
+
+		expect(agent?.subagent).toStrictEqual(expected)
+		expect(task?.subagent).toStrictEqual(expected)
 	})
 
 	it('reads an Agent call naming no type as general-purpose, its model unnamed', () => {
 		const [call] = lane_transcript_calls.parse(SOURCE, agent_call('Agent', { model: '' }))
 
-		expect(call?.subagent).toStrictEqual({ type: 'general-purpose', model: undefined })
+		expect(call?.subagent).toStrictEqual({ type: 'general-purpose', model: undefined, ...NO_BRIEF })
 	})
 
 	it('gives a call of any other tool no subagent', () => {

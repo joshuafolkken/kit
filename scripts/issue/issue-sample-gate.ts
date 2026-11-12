@@ -1,3 +1,4 @@
+import { issue_body_keys } from './issue-body-keys'
 import { issue_cite } from './issue-cite'
 import { markdown_section } from './markdown-section'
 
@@ -21,16 +22,19 @@ import { markdown_section } from './markdown-section'
 // and `prime` resolves the merged pull request that closes it; until one exists the body waits as
 // unmerged.
 
-const BACKGROUND_HEADING = '## 背景'
-const PREFIX = '- 実施可能条件:'
+const BACKGROUND_HEADING = issue_body_keys.heading('background')
+const PREFIX = issue_body_keys.prefix('sample_gate')
 const CONDITION_PATTERN =
 	/^#(?<cited>[1-9]\d*) (?<closing>を閉じる PR )?のマージ後 (?<count>[1-9]\d*) マージ$/u
 const VALUE_FORMAT = '#<PR> のマージ後 <K> マージ'
 const CLOSING_FORMAT = '#<issue> を閉じる PR のマージ後 <K> マージ'
 const DECLARATION = `${PREFIX} ${VALUE_FORMAT}`
-// The refusal ends in a line ready to paste (joshuafolkken/kit#5225).
-const EXAMPLE = `${PREFIX} #5198 のマージ後 30 マージ`
-const MALFORMED = `\`${PREFIX}\` must read \`${VALUE_FORMAT}\` or \`${CLOSING_FORMAT}\` with K at least 1\n${EXAMPLE}`
+// joshuafolkken/kit#6007: past 30 merges a follow-up waits most of a working day before it can start,
+// so a larger sample is refused (`measurement.md`, the follow-up measurement section).
+const MAX_COUNT = 30
+// The refusal ends in a line ready to paste (joshuafolkken/kit#5225), at the default K.
+const EXAMPLE = `${PREFIX} #5198 のマージ後 10 マージ`
+const MALFORMED = `\`${PREFIX}\` must read \`${VALUE_FORMAT}\` or \`${CLOSING_FORMAT}\` with K from 1 to ${String(MAX_COUNT)}\n${EXAMPLE}`
 
 // `pull` cites the pull request itself, `issue` the issue whose closing pull request it waits on.
 type Via = 'pull' | 'issue'
@@ -114,10 +118,17 @@ function key_of({ cited, via }: Pick<Condition, 'cited' | 'via'>): string {
 	return `${via}:${String(cited)}`
 }
 
+// A count over the cap still parses (`condition_of`): an issue filed before the cap keeps waiting on it.
+function is_well_formed(value: string): boolean {
+	const count = CONDITION_PATTERN.exec(value)?.groups?.['count']
+
+	return count !== undefined && Number(count) <= MAX_COUNT
+}
+
 function problems(body: string): ReadonlyArray<string> {
 	const value = declared_value(body)
 
-	return value === undefined || CONDITION_PATTERN.test(value) ? [] : [MALFORMED]
+	return value === undefined || is_well_formed(value) ? [] : [MALFORMED]
 }
 
 // Keeps what a prime read for the condition; `undefined` — a failed read — leaves it unread.
@@ -175,7 +186,7 @@ function wait_of(body?: string): SampleWait | undefined {
 }
 
 function subject_of({ cited, via }: SampleWait): string {
-	const plain = issue_cite.plain(cited)
+	const plain = issue_cite.plain_for('linked', cited)
 
 	return via === 'pull' ? plain : `the pull request closing ${plain}`
 }

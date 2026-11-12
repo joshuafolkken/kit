@@ -1,8 +1,8 @@
 import { spawnSync } from 'node:child_process'
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import type { WorkflowStep } from '#scripts/ci/ci-yml-fixture'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { expect } from 'vitest'
 import { dependabot_workflow_fixture } from './dependabot-workflow-fixture'
 
@@ -37,7 +37,7 @@ const UNKNOWN_OUTCOME = 'unknown'
 const LASTING_OUTAGE = 99
 const ONE_DIRECTION = 2
 
-const workspace = mkdtempSync(path.join(tmpdir(), 'reconcile-'))
+const workspace = temporary_directory('suite')('reconcile-')
 
 interface Case {
 	should_be_armed: string
@@ -64,10 +64,6 @@ interface Case {
 interface Outcome {
 	direction: string
 	stderr: string
-}
-
-function remove_workspace(): void {
-	rmSync(workspace, { recursive: true, force: true })
 }
 
 // A step's own `env` — the reconciling step's unless another is named — minus the entries GitHub
@@ -307,7 +303,6 @@ const reconcile_script_fixture = {
 	call_count,
 	notice_marker,
 	posted_body,
-	remove_workspace,
 	run_reconcile,
 	run_step,
 	withdraw_attempts,

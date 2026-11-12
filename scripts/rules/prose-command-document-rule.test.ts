@@ -5,26 +5,31 @@ import { describe, expect, it } from 'vitest'
 
 // joshuafolkken/kit#2188. The two commands that lay the foundation epic #2166 trims the entry read on
 // — `run:next` (the next step, computed from run state) and `doc:read` (a Bash-cap-safe whole-document
-// read) — guarded off the command registration and `docs/josh-commands-run.md`, the command's own
-// reference. It also exercises the single-source framework this issue ships (`single-source.ts`)
-// against the real corpus, so the framework a later child pins each prose move with is proven to run
-// on the documents rather than only on synthetic inputs.
+// read) — guarded off the command registration and each command's own reference (`run:next` in
+// `docs/josh-commands-run.md`, `doc:read` in `docs/josh-commands-session.md`). It also exercises
+// the single-source framework this issue ships (`single-source.ts`) against the real corpus, so the
+// framework a later child pins each prose move with is proven to run on the documents rather than
+// only on synthetic inputs.
 
-const DOCS = 'docs/josh-commands-run.md'
+const RUN_DOCS = 'docs/josh-commands-run.md'
+const SESSION_DOCS = 'docs/josh-commands-session.md'
 
 const NEXT_COMMAND = 'run:next'
 const NEXT_SCRIPT = 'scripts/run/run-next-cli.ts'
 const READ_COMMAND = 'doc:read'
 const READ_SCRIPT = 'scripts/document/document-read-cli.ts'
 
-const DOC_MARKERS: ReadonlyArray<string> = ['### `josh run:next`', '### `josh doc:read`']
+const DOC_MARKERS: ReadonlyArray<[string, string]> = [
+	[RUN_DOCS, '### `josh run:next`'],
+	[SESSION_DOCS, '### `josh doc:read`'],
+]
 
 // A phrase unique to the `doc:read` reference — the framework asserts it lives in the one document and
 // is not pasted into any other routing document, which is exactly the check a later child of #2166
 // will run over the prose it moves into a command's help.
 const DOC_READ_RULE: SingleSourceRule = {
 	marker: 'this never emits the over-cap document through the shell',
-	canonical: DOCS,
+	canonical: SESSION_DOCS,
 }
 
 describe.each([
@@ -36,9 +41,9 @@ describe.each([
 	})
 })
 
-describe(`${DOCS} documents both commands`, () => {
-	it.each(DOC_MARKERS)('mentions: %j', (marker) => {
-		expect(read_repo_file(DOCS)).toContain(marker)
+describe('the command references document both commands', () => {
+	it.each(DOC_MARKERS)('%s mentions: %j', (document, marker) => {
+		expect(read_repo_file(document)).toContain(marker)
 	})
 })
 

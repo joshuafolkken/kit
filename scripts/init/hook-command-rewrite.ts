@@ -14,26 +14,35 @@ import { hook_launch } from './hook-launch'
 // transformed in place.
 
 const PNPM_JOSH_PREFIX = 'pnpm josh '
-// Relative to the consumer's project root, which hook commands select before using this path.
-// The path is the plugin marketplace's `node_modules` location plus the built entry `bin.josh` names.
-const BUNDLE_INVOCATION = `node ${claude_plugin_config.MARKETPLACE_PATH}/dist/josh.js `
-// Anchored on the `sh ` that launches it: the installed path still ends in the source path, so only the
-// anchor keeps a second pass from rebasing an already-rebased launcher onto itself.
-const RUN_HOOK_INVOCATION = `sh ${hook_launch.RUN_HOOK_SCRIPT} `
-const CONSUMER_RUN_HOOK_INVOCATION = `sh ${claude_plugin_config.MARKETPLACE_PATH}/${hook_launch.RUN_HOOK_SCRIPT} `
-const CONSUMER_PACKAGE_MANIFEST = `${claude_plugin_config.MARKETPLACE_PATH}/package.json`
+const { MARKETPLACE_PATH } = claude_plugin_config
+// The installed package below the project root, as a rooted path names it.
+const PACKAGE_PATH = MARKETPLACE_PATH.replace(/^\.\//u, '')
+const INSTALLED_LAUNCHER = `${PACKAGE_PATH}/${hook_launch.RUN_HOOK_SCRIPT}`
+const INSTALLED_DISPATCHER = `${PACKAGE_PATH}/dist/josh.js`
+const INSTALLED_MANIFEST = `${PACKAGE_PATH}/package.json`
 const MISSING_INSTALL_NOTICE = 'kit hooks inactive: run pnpm install, then reread CLAUDE.md'
-const MISSING_INSTALL_GUARD = `if [ ! -f ${CONSUMER_PACKAGE_MANIFEST} ]; then echo '${MISSING_INSTALL_NOTICE}' >&2; exit 0; fi; `
 const CODEX_HOOKS_DESTINATION = '.codex/hooks.json'
-// Every shape a hook command kit wrote can carry: the launcher as kit's own file names it, the
-// launcher rebased onto the installed package, and the installed dispatcher the releases from
-// 2026-09-13 (joshuafolkken/kit#1930) to the launcher rebased `pnpm josh` onto. The settings merge
-// tells kit's hooks from a project's own by these and the list below, so the shapes stay beside the
-// rewrite that produces them.
-const KIT_COMMAND_MARKERS: ReadonlyArray<string> = [
-	RUN_HOOK_INVOCATION,
-	CONSUMER_RUN_HOOK_INVOCATION,
-	BUNDLE_INVOCATION,
+
+// Each shape a hook command took while it moved to the project root first and named every path
+// relative to it, before joshuafolkken/kit#6033 named the launcher by its absolute path. The settings
+// merge still tells a consumer's not-yet-synced kit hooks by these. History, never edited; removable
+// from kit 2.0.0.
+const RELATIVE_RUN_HOOK_INVOCATION = `sh ${hook_launch.RUN_HOOK_SCRIPT} `
+const RELATIVE_CONSUMER_RUN_HOOK_INVOCATION = `sh ${MARKETPLACE_PATH}/${hook_launch.RUN_HOOK_SCRIPT} `
+// The installed dispatcher the releases from 2026-09-13 (joshuafolkken/kit#1930) rebased `pnpm josh`
+// onto.
+const RELATIVE_BUNDLE_INVOCATION = `node ${MARKETPLACE_PATH}/dist/josh.js `
+const RELATIVE_INSTALL_GUARD = `if [ ! -f ${MARKETPLACE_PATH}/package.json ]; then echo '${MISSING_INSTALL_NOTICE}' >&2; exit 0; fi; `
+const LOCATION_VARIABLES =
+	'GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE'
+const ROOT_LOOKUP = 'git rev-parse --show-toplevel'
+const LOCATION_FREE_ROOT = `$( (unset ${LOCATION_VARIABLES}; ${ROOT_LOOKUP} 2>/dev/null) || ${ROOT_LOOKUP})`
+// The root prefixes, newest first: until joshuafolkken/kit#6033, until #4617 (no launch directory)
+// and until #4187 (the git location variables cleared here rather than in the launcher).
+const ROOT_PREFIXES: ReadonlyArray<string> = [
+	`export JOSH_HOOK_CWD="$PWD" && project_root="\${CLAUDE_PROJECT_DIR:-${LOCATION_FREE_ROOT}}" && cd "$project_root" && `,
+	`project_root="\${CLAUDE_PROJECT_DIR:-${LOCATION_FREE_ROOT}}" && cd "$project_root" && `,
+	`if project_root="$(unset ${LOCATION_VARIABLES}; ${ROOT_LOOKUP} 2>/dev/null)"; then unset ${LOCATION_VARIABLES}; else project_root="$(${ROOT_LOOKUP})"; fi && cd "$project_root" && `,
 ]
 // Before joshuafolkken/kit#1930 nothing was rebased: a consumer received these six as the whole hook
 // command. A plain `pnpm josh <command>` is also how a project writes a hook of its own, so only the
@@ -49,65 +58,81 @@ const PLAIN_KIT_COMMANDS: ReadonlySet<string> = new Set(
 		'session:lang',
 	].map((command) => `${PNPM_JOSH_PREFIX}${command}`),
 )
-// The root prefix kit wrote until joshuafolkken/kit#4187 moved the git location variables into the
-// launcher. A consumer's file still carries it until its next sync, which replaces it with the current
-// one. History, never edited; removable from kit 2.0.0.
-const LOCATION_VARIABLES =
-	'GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE'
-const ROOT_LOOKUP = 'git rev-parse --show-toplevel'
-const LEGACY_ROOT_PREFIX = `if project_root="$(unset ${LOCATION_VARIABLES}; ${ROOT_LOOKUP} 2>/dev/null)"; then unset ${LOCATION_VARIABLES}; else project_root="$(${ROOT_LOOKUP})"; fi && cd "$project_root" && `
-// The root prefix kit wrote until joshuafolkken/kit#4617 exported the launch directory for a worktree.
-// History, never edited; removable from kit 2.0.0.
-const PRE_WORKTREE_ROOT_PREFIX = `project_root="\${CLAUDE_PROJECT_DIR:-$( (unset ${LOCATION_VARIABLES}; ${ROOT_LOOKUP} 2>/dev/null) || ${ROOT_LOOKUP})}" && cd "$project_root" && `
-// The values below are matched inside raw JSON text, so each root prefix is taken in its escaped form.
-const ROOT_PREFIXES: ReadonlyArray<string> = [
-	hook_launch.PROJECT_ROOT_PREFIX,
-	PRE_WORKTREE_ROOT_PREFIX,
-	LEGACY_ROOT_PREFIX,
-].map((prefix) => JSON.stringify(prefix).slice(1, -1))
-const [PROJECT_ROOT_PREFIX = ''] = ROOT_PREFIXES
+// Every shape a hook command kit wrote can carry: the launcher under any root, kit's or the installed
+// package's, the installed dispatcher under any root, and the relative shapes above. The settings merge
+// tells kit's hooks from a project's own by these and the list above, so the shapes stay beside the
+// rewrite that produces them.
+const KIT_COMMAND_MARKERS: ReadonlyArray<string> = [
+	`/${hook_launch.RUN_HOOK_SCRIPT}" `,
+	`/${INSTALLED_DISPATCHER}" `,
+	RELATIVE_RUN_HOOK_INVOCATION,
+	RELATIVE_CONSUMER_RUN_HOOK_INVOCATION,
+	RELATIVE_BUNDLE_INVOCATION,
+]
 // Capture the value of every `"command"` field, escapes and all, so the rewrites below touch command
 // values alone — never an echo reminder's prose or a `"description"` that merely mentions the string.
 const COMMAND_FIELD = /("command":\s*")((?:[^"\\]|\\.)*)(")/gu
 
-// Rebase both paths a hook command can carry: the launcher, then a plain `pnpm josh`. Neither
-// replacement contains the other's anchor, so the two are independent whichever order they run, and
-// the whole rewrite is safe to run more than once.
-function rewrite_command_value(value: string): string {
-	const rewritten = value
-		.split(RUN_HOOK_INVOCATION)
-		.join(CONSUMER_RUN_HOOK_INVOCATION)
-		.split(PNPM_JOSH_PREFIX)
-		.join(BUNDLE_INVOCATION)
+function install_guard(root: string): string {
+	const manifest = hook_launch.rooted_path(root, INSTALLED_MANIFEST)
 
-	if (
-		!rewritten.includes(claude_plugin_config.MARKETPLACE_PATH) ||
-		rewritten.includes(MISSING_INSTALL_GUARD)
-	) {
-		return rewritten
-	}
-
-	return `${MISSING_INSTALL_GUARD}${rewritten}`
+	return `if [ ! -f ${manifest} ]; then echo '${MISSING_INSTALL_NOTICE}' >&2; exit 0; fi; `
 }
 
-// kit's own commands already start from the root (`hook-launch.ts`), and so does an already-rewritten
-// value. The prefix — the current one or an earlier one — is taken off before the rewrite and the
-// current one put back after it, so the install guard sits behind the `cd` it depends on and a second
-// pass never doubles the prefix.
-function without_root_prefix(value: string): string {
-	const prefix = ROOT_PREFIXES.find((candidate) => value.startsWith(candidate)) ?? ''
+// What a command starts with ahead of its launch — a root prefix, an install guard — is taken off
+// before the rewrite, and the current guard put back after it, so a second pass never doubles either.
+function launch_part(command: string, root: string): string {
+	const prefix = ROOT_PREFIXES.find((candidate) => command.startsWith(candidate)) ?? ''
+	const launch = command.slice(prefix.length)
+	const guard = [RELATIVE_INSTALL_GUARD, install_guard(root)].find((candidate) =>
+		launch.startsWith(candidate),
+	)
 
-	return value.slice(prefix.length)
+	return launch.slice(guard?.length ?? 0)
+}
+
+// Every launch shape becomes the installed launcher or dispatcher under `root`. No replacement contains
+// another's anchor, so the order does not matter and the whole rewrite is safe to run more than once.
+function rebased(launch: string, root: string): string {
+	const consumer_launch = `sh ${hook_launch.rooted_path(root, INSTALLED_LAUNCHER)} `
+	const bundle_launch = `node ${hook_launch.rooted_path(root, INSTALLED_DISPATCHER)} `
+	const replacements: ReadonlyArray<readonly [string, string]> = [
+		[`sh ${hook_launch.rooted_path(root, hook_launch.RUN_HOOK_SCRIPT)} `, consumer_launch],
+		[RELATIVE_CONSUMER_RUN_HOOK_INVOCATION, consumer_launch],
+		[RELATIVE_RUN_HOOK_INVOCATION, consumer_launch],
+		[RELATIVE_BUNDLE_INVOCATION, bundle_launch],
+		[PNPM_JOSH_PREFIX, bundle_launch],
+	]
+	let text = launch
+
+	for (const [from, to] of replacements) text = text.split(from).join(to)
+
+	return text
+}
+
+function rewrite_command(command: string, root: string): string {
+	const rewritten = rebased(launch_part(command, root), root)
+
+	return rewritten.includes(PACKAGE_PATH) ? `${install_guard(root)}${rewritten}` : rewritten
+}
+
+// The field holds the command JSON-escaped; it is rewritten as the shell reads it and escaped back,
+// and a command the rewrite leaves alone keeps its original text.
+function rewrite_command_value(value: string, root: string): string {
+	const command = JSON.parse(`"${value}"`) as string
+	const rewritten = rewrite_command(command, root)
+
+	return rewritten === command ? value : JSON.stringify(rewritten).slice(1, -1)
 }
 
 function rewrite_hook_commands(content: string, is_codex = false): string {
-	return content.replaceAll(COMMAND_FIELD, (_match, open: string, value: string, close: string) => {
-		const rewritten = rewrite_command_value(without_root_prefix(value))
-		const should_select_root = is_codex || rewritten.includes(claude_plugin_config.MARKETPLACE_PATH)
-		const prefix = should_select_root ? PROJECT_ROOT_PREFIX : ''
+	const root = is_codex ? hook_launch.CODEX_ROOT : hook_launch.CLAUDE_ROOT
 
-		return `${open}${prefix}${rewritten}${close}`
-	})
+	return content.replaceAll(
+		COMMAND_FIELD,
+		(_match, open: string, value: string, close: string) =>
+			`${open}${rewrite_command_value(value, root)}${close}`,
+	)
 }
 
 // Rewrite copied Claude and Codex hook files only; kit's source files keep their live-source fallback.

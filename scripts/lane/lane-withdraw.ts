@@ -5,6 +5,7 @@ import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { session_cite } from '#scripts/issue/session-cite'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { run_investigation_record } from '#scripts/run/run-investigation-record'
 import { run_label } from '#scripts/run/run-label'
 import { lane_close, type CloseKind } from './lane-close'
 import { lane_preserve, type KeptWork } from './lane-preserve'
@@ -120,7 +121,7 @@ function withdraw_comment({ reason, by, is_closed }: Withdrawal): string {
 async function record_withdraw(issue: string, { reason, by }: Withdrawal): Promise<void> {
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.WITHDRAW,
-		`${issue_cite.plain(issue)} withdrawn by ${WITHDRAWER_TEXT[by].name}: ${reason}`,
+		`${issue_cite.plain_for('program', issue)} withdrawn by ${WITHDRAWER_TEXT[by].name}: ${reason}`,
 	)
 }
 
@@ -131,6 +132,15 @@ async function read_is_closed(issue: string): Promise<boolean | undefined> {
 	if (read.kind !== 'state') return undefined
 
 	return read.state.state.toUpperCase() === CLOSED_STATE
+}
+
+// A closed issue's saved investigation goes with its lane, so a reopened run reads the code again
+// rather than stale `file:line` citations; an open issue's — a yield's — waits for its next dispatch
+// (joshuafolkken/kit#6153).
+async function forget_investigation(issue: string, is_closed: boolean): Promise<void> {
+	if (!is_closed) return
+
+	await run_investigation_record.remove(issue)
 }
 
 async function note_issue(
@@ -145,6 +155,7 @@ async function note_issue(
 	}
 
 	await run_label.unmark(issue)
+	await forget_investigation(issue, withdrawal.is_closed)
 
 	return is_noted
 }

@@ -4,15 +4,19 @@ import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { lint_related_scope } from '#scripts/lint/lint-related-scope'
 import { review_record_pinned } from '#scripts/review/review-record-pinned'
+import { test_related_touched } from '#scripts/test/test-related-touched'
 import { execa } from 'execa'
 import run_parallel from 'run-parallel'
+import { check_related_order } from './check-related-order'
 import { check_related_pinned } from './check-related-pinned'
 import { check_related_reuse } from './check-related-reuse'
 import { check_related_section, type CheckResult } from './check-related-section'
 import { check_related_unplanned } from './check-related-unplanned'
 import { gate_labels } from './gate-labels'
 import { gate_log } from './gate-log'
+import type { GateTree } from './gate-tree'
 import { metrics_totals } from './metrics-totals'
+import { tree_verdict } from './tree-verdict'
 import { verification_tail } from './verification-tail'
 
 const COMMAND = 'check:related'
@@ -22,18 +26,23 @@ const LOG_PATH = stamp_file.stamp_path(
 	PROJECT_ROOT,
 	gate_log.GATE_LOG_SUFFIX,
 )
-const LINT_RELATED = 'lint:related'
+const LINT_RELATED = gate_labels.LINT_TARGET
+const TEST_RELATED = 'test:related'
 // The verdict `lint:related` itself prints last, under its own label.
 const LINT_PASSED = verification_tail.format_verdict(lint_related_scope.COMMAND_LABEL, [])
 const CHECKS: ReadonlyArray<string> = [
 	LINT_RELATED,
-	'test:related',
+	TEST_RELATED,
 	gate_labels.TYPE_CHECK_TARGET,
 	'cspell:dot',
 ]
+const TOUCHED_CHECKS: ReadonlyArray<string> = CHECKS.map((command) =>
+	command === TEST_RELATED ? `${TEST_RELATED} ${test_related_touched.TOUCHED_FLAG}` : command,
+)
 const REUSED = 'reused'
+const VERDICT_RECORD = tree_verdict.record_path('check-related')
 const METRICS_STOP =
-	'`josh ship`\'s pre-detach stops on the metrics notice above unless the branch approval already names the total; settle it first (`pnpm josh metrics --accept --reason "<why>"`); the accept needs no `check:related` re-run, as the notice changed no exit code'
+	'`josh run:review`\'s open (and the ship\'s pre-detach behind it) stops on the metrics notice above unless the branch approval already names the total; settle it first (`pnpm josh metrics --accept --reason "<why>"`); the accept needs no `check:related` re-run, as the notice changed no exit code'
 
 type CheckExecutor = (command: string) => Promise<CheckResult>
 type ProcessRunner = (
@@ -63,7 +72,7 @@ async function execute_check(
 	run: ProcessRunner = run_execa,
 ): Promise<CheckResult> {
 	try {
-		const result = await run('pnpm', ['josh', command], { all: true, reject: false })
+		const result = await run('pnpm', ['josh', ...command.split(' ')], { all: true, reject: false })
 
 		return { command, exit_code: result.exitCode ?? 1, output: result.all ?? '' }
 	} catch (error) {
@@ -91,9 +100,10 @@ async function run_checks(
 	execute: CheckExecutor = execute_check,
 	commands: ReadonlyArray<string> = CHECKS,
 ): Promise<Array<CheckResult>> {
+	const ordered = check_related_order.lint_first(execute, commands)
 	const tasks = commands.map((command): run_parallel.Task<CheckResult> => {
 		return (complete): void => {
-			void start_check(command, execute, complete)
+			void start_check(command, ordered, complete)
 		}
 	})
 
@@ -104,8 +114,19 @@ async function run_checks(
 	})
 }
 
+// A check that was not run did not fail; the one it waited on is the failure to fix.
 function failed_commands(results: ReadonlyArray<CheckResult>): ReadonlyArray<string> {
-	return results.filter((result) => result.exit_code !== 0).map((result) => result.command)
+	return results
+		.filter((result) => result.exit_code !== 0 && result.is_skipped !== true)
+		.map((result) => result.command)
+}
+
+function not_run_suffix(results: ReadonlyArray<CheckResult>): string {
+	const skipped = results.filter((result) => result.is_skipped === true)
+
+	if (skipped.length === 0) return ''
+
+	return ` (${check_related_section.NOT_RUN}: ${skipped.map((result) => result.command).join(', ')})`
 }
 
 // The verdict is the last line, as every josh check prints it, so a reader of the tail sees every
@@ -141,20 +162,21 @@ function reused_suffix(reused: ReadonlySet<string>): string {
 }
 
 // A notice is never a failure, so a passing verdict line alone hid it from a reader of the last lines,
-// and the ship's pre-detach stopped on it (joshuafolkken/kit#4987).
+// and `josh run:review`'s open (the ship's pre-detach as the backstop) stops on it
+// (joshuafolkken/kit#4987, joshuafolkken/kit#6023).
 function verdict_line(
 	results: ReadonlyArray<CheckResult>,
 	has_metrics_notice: boolean,
 	reused: ReadonlySet<string>,
 ): string {
-	const line = `${checks_line(results)}${reused_suffix(reused)}`
+	const line = `${checks_line(results)}${not_run_suffix(results)}${reused_suffix(reused)}`
 
 	return has_metrics_notice ? `${line} — ${METRICS_STOP}` : line
 }
 
 // `josh lint:related` ends its section with the metrics growth notice, which the sections after it
-// bury; it is repeated above the verdict so the tail still carries what stops `josh ship`
-// (joshuafolkken/kit#4939).
+// bury; it is repeated above the verdict so the tail still carries what `josh run:review`'s open
+// stops on, the ship's pre-detach as the backstop (joshuafolkken/kit#4939, joshuafolkken/kit#6023).
 function metrics_notice(results: ReadonlyArray<CheckResult>): string | undefined {
 	const output = results.find((result) => result.command === LINT_RELATED)?.output ?? ''
 	const start = output.indexOf(metrics_totals.NOTICE_HEADING)
@@ -179,14 +201,23 @@ interface ReportOptions {
 	is_full?: boolean
 }
 
-function report_notices(notices: ReadonlyArray<string | undefined>): void {
-	for (const notice of notices) {
-		if (notice !== undefined) process.stdout.write(`\n${notice}\n`)
-	}
+function format_notices(notices: ReadonlyArray<string | undefined>): string {
+	return notices.map((notice) => (notice === undefined ? '' : `\n${notice}\n`)).join('')
 }
 
-function report_results(results: ReadonlyArray<CheckResult>, options: ReportOptions = {}): void {
-	const { is_full, log_target = LOG_PATH, pinned_notice, reused = new Set<string>() } = options
+function verdict_tail(
+	results: ReadonlyArray<CheckResult>,
+	log: { path: string | undefined },
+	verdict: string,
+): string {
+	return `\n${verification_tail.format_tail({ failures: failure_lines(results), log, verdict })}`
+}
+
+// Returns what `tree-verdict.ts` keeps for a re-run on the same tree: the metrics notice and the tail.
+// The `test:pinned` and unplanned notices, printed first, read state outside the tree key, so a replay
+// asks them again above the kept text.
+function report_results(results: ReadonlyArray<CheckResult>, options: ReportOptions = {}): string {
+	const { is_full, log_target = LOG_PATH, reused = new Set<string>() } = options
 
 	report_reused(reused)
 
@@ -195,15 +226,16 @@ function report_results(results: ReadonlyArray<CheckResult>, options: ReportOpti
 	}
 
 	const metrics = metrics_notice(results)
-
-	report_notices([metrics, pinned_notice, options.unplanned_notice])
-
 	const log = { path: write_log(results, log_target) }
-	const verdict = verdict_line(results, metrics !== undefined, reused)
+	const tail = verdict_tail(results, log, verdict_line(results, metrics !== undefined, reused))
+
+	const kept = `${format_notices([metrics])}${tail}`
 
 	process.stdout.write(
-		`\n${verification_tail.format_tail({ failures: failure_lines(results), log, verdict })}`,
+		`${format_notices([options.pinned_notice, options.unplanned_notice])}${kept}`,
 	)
+
+	return kept
 }
 
 function exit_code(results: ReadonlyArray<CheckResult>): number {
@@ -216,13 +248,10 @@ function exit_code(results: ReadonlyArray<CheckResult>): number {
 // not move, or a run outside a lane child, starts nothing. A verdict that check already reached on this
 // tree is printed above the verdict line, waited for when this run started it (`check-related-pinned.ts`).
 // A check whose green record still holds is not run (`check-related-reuse.ts`).
-async function run_all(
-	root?: string,
-	execute: CheckExecutor = execute_check,
-	is_full = false,
-): Promise<number> {
-	const is_started = await review_record_pinned.restart_in_lane(root)
-	const tree = await check_related_reuse.read_tree()
+async function results_not_reused(
+	tree: GateTree,
+	execute: CheckExecutor,
+): Promise<{ results: Array<CheckResult>; reused: ReadonlySet<string> }> {
 	const reused = await check_related_reuse.reusable(CHECKS, tree)
 	const results = await run_checks(
 		execute,
@@ -230,33 +259,92 @@ async function run_all(
 	)
 
 	await check_related_reuse.record(results, tree)
-	report_results(results, {
+
+	return { results, reused }
+}
+
+async function run_fresh(
+	tree: GateTree,
+	root: string | undefined,
+	execute: CheckExecutor,
+	is_full: boolean,
+): Promise<number> {
+	const is_started = await review_record_pinned.restart_in_lane(root)
+	const { results, reused } = await results_not_reused(tree, execute)
+	const tail = report_results(results, {
 		is_full,
 		pinned_notice: await check_related_pinned.notice(root, is_started),
 		unplanned_notice: await check_related_unplanned.notice(),
 		reused,
 	})
+	const code = exit_code(results)
+
+	await tree_verdict.record(
+		{ before: tree, exit_code: code, tail },
+		check_related_reuse.read_tree,
+		VERDICT_RECORD,
+	)
+
+	return code
+}
+
+// A tree this run already answered for, green or red, is answered again with no check run
+// (`tree-verdict.ts`) — unless `--full` asks for the whole output the kept tail does not hold.
+async function run_all(
+	root?: string,
+	execute: CheckExecutor = execute_check,
+	is_full = false,
+): Promise<number> {
+	const tree = await check_related_reuse.read_tree()
+	const kept = is_full ? undefined : tree_verdict.read(tree, VERDICT_RECORD)
+
+	if (kept === undefined) return await run_fresh(tree, root, execute, is_full)
+
+	return tree_verdict.replay(kept, VERDICT_RECORD, [
+		await check_related_pinned.notice(root, false),
+		await check_related_unplanned.notice(),
+	])
+}
+
+// **`--touched` is the mid-run check** (joshuafolkken/kit#5784): its unit stage is `test:related
+// --touched`, so like that run it keeps nothing a brief or the ship reuses — no per-check green, no kept
+// verdict, no `test:pinned` restart. The full-reach run before the brief stays the one that vouches.
+async function run_touched(
+	execute: CheckExecutor = execute_check,
+	is_full = false,
+): Promise<number> {
+	const results = await run_checks(execute, TOUCHED_CHECKS)
+
+	report_results(results, { is_full })
 
 	return exit_code(results)
+}
+
+async function run_cli(argv: ReadonlyArray<string>): Promise<number> {
+	const is_full = check_related_section.is_full_requested(argv)
+
+	if (argv.includes(test_related_touched.TOUCHED_FLAG)) {
+		return await run_touched(execute_check, is_full)
+	}
+
+	return await run_all(undefined, execute_check, is_full)
 }
 
 const check_related = {
 	CHECKS,
 	METRICS_STOP,
 	REUSED,
+	TOUCHED_CHECKS,
 	execute_check,
 	exit_code,
 	report_results,
 	run_all,
 	run_checks,
+	run_touched,
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-	process.exitCode = await check_related.run_all(
-		undefined,
-		execute_check,
-		check_related_section.is_full_requested(process.argv),
-	)
+	process.exitCode = await run_cli(process.argv)
 }
 
 export type { CheckExecutor }

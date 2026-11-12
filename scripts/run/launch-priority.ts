@@ -1,12 +1,9 @@
 import { setPriority } from 'node:os'
 
-// **A launched session runs below the interactive one, so a saturated machine still answers the
-// user.** Every headless session and everything it starts — gates, tests, builds — used to share the
-// interactive session's priority, and at a load of ~30 the lanes took the terminal's responsiveness
-// with them (#3947). The niceness is set on the child right after `spawn` returns: a process inherits
-// its parent's niceness at fork, and an agent CLI boots for far longer than this takes before it forks
-// anything, so every descendant inherits it. Efficiency-core confinement (`taskpolicy -b`) is not
-// used — it throttles a lane far beyond yielding to the user.
+// Lowering the launched session's priority preserves interactive responsiveness under saturation
+// (#3947). Set niceness immediately after spawn, before the agent CLI forks descendants, so its
+// gates, tests and builds inherit it. Efficiency-core confinement would throttle the lane beyond
+// the intended yielding to interactive work.
 const LANE_NICENESS = 10
 
 type SetPriority = (pid: number, priority: number) => void

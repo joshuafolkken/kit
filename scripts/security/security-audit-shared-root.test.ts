@@ -88,7 +88,7 @@ beforeEach(async () => {
 	await git(fixture.workspace, ['init', MAIN_BRANCH, 'primary'])
 	await git(fixture.primary_root, ['commit', '--allow-empty', '-m', 'base'])
 	await git(fixture.primary_root, ['worktree', 'add', '-b', 'lane', fixture.lane_root])
-	vi.clearAllMocks()
+
 	mock_managed_scanner_only()
 }, TIMEOUT_MS)
 

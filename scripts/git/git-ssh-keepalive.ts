@@ -6,10 +6,10 @@ import { has_timed_out } from './git-execa-error'
 // The ssh environment every git network call runs under. It began inside
 // `git-push-transport.ts` as the push's own, and moved here when the fetch
 // and pull of `josh main:sync` turned out to need the same thing: a dead connection under a `git
-// fetch` was waited on for 37 minutes, stalling the unattended backlog driver behind it.
+// fetch` was waited on without end, stalling the unattended backlog driver behind it.
 //
-// SSH's own liveness probe: three unanswered checks 15 seconds apart, so a connection that dies
-// mid-transfer is noticed in about 45 seconds instead of waiting on the TCP default. The caller's
+// SSH's own liveness probe: a few unanswered checks, so a connection that dies mid-transfer is
+// noticed quickly instead of waiting on the TCP default. The caller's
 // timeout bounds the damage either way; this is what makes the common case fail in seconds rather
 // than sit out the whole budget — and, because ssh exits on its own, it is also what leaves no ssh
 // behind: git does not kill its transport child when it is itself killed on a timeout.

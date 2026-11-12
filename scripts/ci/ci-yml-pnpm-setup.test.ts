@@ -1,8 +1,8 @@
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { package_path } from '#scripts/init/init-paths'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import semver from 'semver'
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
@@ -10,6 +10,7 @@ import { ci_yml_fixture, type WorkflowStep } from './ci-yml-fixture'
 
 // The step is found by the action name, never by its pin, so a Dependabot bump of the SHA alone
 // keeps the suite green and auto-merges (joshuafolkken/kit#4147).
+const make_directory = temporary_directory()
 const ACTION = 'pnpm/setup@'
 const SHA_PINNED_ACTION = /^pnpm\/setup@[\da-f]{40}$/u
 const VERSION_INPUT = '${{ steps.pnpm-version.outputs.version }}'
@@ -31,6 +32,7 @@ const CREDENTIALED_JOBS = ['publish-github', 'publish-npm']
 const INSTALL_COMMAND = 'pnpm install --frozen-lockfile --ignore-scripts'
 const SAFE_CHAIN_STEP = 'Setup safe-chain'
 const WHEN_INSTALLING = "inputs.install == 'true'"
+const WHEN_CACHING = `${WHEN_INSTALLING} && inputs.cache == 'true'`
 const COREPACK_SYMPTOM_HEADING = 'pnpm does not start — `bin/pnpm.cjs` not found'
 const COREPACK_SYMPTOM_ANCHOR = 'pnpm-does-not-start--binpnpmcjs-not-found'
 const DISABLE_COREPACK = 'corepack disable pnpm'
@@ -39,6 +41,9 @@ const COREPACK_PREPARE = 'corepack prepare'
 const TROUBLESHOOTING_MD = 'docs/troubleshooting.md'
 const ACTION_STEPS = ci_yml_fixture.load_action(ci_yml_fixture.SETUP_PNPM_ACTION).runs.steps
 const CACHE_ACTION = 'actions/cache'
+const SAFE_CHAIN_CACHE_STEP = 'Restore safe-chain'
+const SAFE_CHAIN_SAVE_STEP = 'Save safe-chain'
+const SAFE_CHAIN_FETCH_STEP = 'Fetch safe-chain'
 // The jobs that prepare pnpm, all through the composite action: kit's own workflows, and the
 // distributed template, which calls the action `josh sync` writes beside it (joshuafolkken/kit#3095).
 const ACTION_CALLERS = [
@@ -77,24 +82,20 @@ function action_call(workflow_path: string, job_name: string): WorkflowStep | un
 }
 
 function run_resolver(steps: Steps, manifest: unknown): string {
-	const directory = mkdtempSync(path.join(tmpdir(), 'kit-pnpm-version-'))
+	const directory = make_directory('kit-pnpm-version-')
 	const output_path = path.join(directory, 'github-output')
 	const script = steps.find((step) => step.id === RESOLVER_ID)?.run ?? ''
 
-	try {
-		writeFileSync(path.join(directory, PACKAGE_JSON), JSON.stringify(manifest))
-		const result = spawnSync('bash', ['-e', '-c', script], {
-			cwd: directory,
-			encoding: 'utf8',
-			env: { ...process.env, GITHUB_OUTPUT: output_path },
-		})
+	writeFileSync(path.join(directory, PACKAGE_JSON), JSON.stringify(manifest))
+	const result = spawnSync('bash', ['-e', '-c', script], {
+		cwd: directory,
+		encoding: 'utf8',
+		env: { ...process.env, GITHUB_OUTPUT: output_path },
+	})
 
-		expect(result.status, result.stderr).toBe(0)
+	expect(result.status, result.stderr).toBe(0)
 
-		return readFileSync(output_path, 'utf8')
-	} finally {
-		rmSync(directory, { recursive: true, force: true })
-	}
+	return readFileSync(output_path, 'utf8')
 }
 
 function expect_pnpm_before_use(steps: Steps): void {
@@ -140,7 +141,53 @@ describe('the setup-pnpm composite action', () => {
 	it('leaves the store cache to pnpm/setup, which restores it before the runtime', () => {
 		const cache_steps = ACTION_STEPS.filter((step) => step.uses?.startsWith(CACHE_ACTION))
 
-		expect(cache_steps).toEqual([])
+		expect(cache_steps.map((step) => step.name)).toEqual([
+			SAFE_CHAIN_CACHE_STEP,
+			SAFE_CHAIN_SAVE_STEP,
+		])
+	})
+})
+
+// joshuafolkken/kit#6833: a GitHub Releases outage turned every job red before its tests.
+describe('the setup-pnpm safe-chain cache', () => {
+	it('restores the safe-chain download keyed on the pin, only when asked to', () => {
+		expect(action_step(SAFE_CHAIN_CACHE_STEP)).toMatchObject({
+			uses: expect.stringMatching(/^actions\/cache\/restore@[\da-f]{40}$/u),
+			if: WHEN_CACHING,
+			with: {
+				path: expect.not.stringContaining('pnpm'),
+				key: expect.stringMatching(
+					/steps\.safe-chain-pin\.outputs\.version.*steps\.safe-chain-pin\.outputs\.sha256/u,
+				),
+			},
+		})
+	})
+
+	// joshuafolkken/kit#6849: what the cache restores goes through the setup's hash checks too.
+	it('fetches only on a cache miss, before the setup that verifies either', () => {
+		const names = ACTION_STEPS.map((step) => step.name)
+
+		expect(names.indexOf(SAFE_CHAIN_CACHE_STEP)).toBe(names.indexOf(SAFE_CHAIN_FETCH_STEP) - 1)
+		expect(names.indexOf(SAFE_CHAIN_FETCH_STEP)).toBe(names.indexOf(SAFE_CHAIN_STEP) - 1)
+		expect(action_step(SAFE_CHAIN_FETCH_STEP)?.if).toBe(
+			`${WHEN_INSTALLING} && steps.safe-chain-cache.outputs.cache-hit != 'true'`,
+		)
+		expect(action_step(SAFE_CHAIN_STEP)?.if).toBe(WHEN_INSTALLING)
+	})
+
+	// Saved in the post-job step, the binary could carry what a later step's code wrote over it.
+	it('saves a fresh download straight after the setup, before any project code runs', () => {
+		const names = ACTION_STEPS.map((step) => step.name)
+
+		expect(names.indexOf(SAFE_CHAIN_SAVE_STEP)).toBe(names.indexOf(SAFE_CHAIN_STEP) + 1)
+		expect(action_step(SAFE_CHAIN_SAVE_STEP)).toMatchObject({
+			uses: expect.stringMatching(/^actions\/cache\/save@[\da-f]{40}$/u),
+			if: `${WHEN_CACHING} && steps.safe-chain-cache.outputs.cache-hit != 'true'`,
+			with: {
+				path: action_step(SAFE_CHAIN_CACHE_STEP)?.with?.['path'],
+				key: '${{ steps.safe-chain-cache.outputs.cache-primary-key }}',
+			},
+		})
 	})
 })
 
@@ -165,7 +212,7 @@ describe.each(ACTION_CALLERS)('pnpm setup in $path', ({ path: workflow_path, job
 
 describe('the publish workflow', () => {
 	it.each(PUBLISH_JOBS)('installs behind safe-chain without the store cache in %s', (job_name) => {
-		expect(action_call(PUBLISH_YML, job_name)?.with).toEqual({ cache: 'false' })
+		expect(action_call(PUBLISH_YML, job_name)?.with).toMatchObject({ cache: 'false' })
 	})
 
 	it.each(CREDENTIALED_JOBS)('sets up no pnpm and runs no pnpm or tsx in %s', (job_name) => {

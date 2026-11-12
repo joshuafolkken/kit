@@ -1,0 +1,1 @@
+- rf:project-conventions | low | scripts/run/run-investigation-record.ts:22 | 2026-11-01 | #5765

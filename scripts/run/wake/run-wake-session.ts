@@ -5,10 +5,12 @@ import {
 	type AgentProvider,
 	type ProfileResult,
 } from '#scripts/agent/agent-role-profile'
+import { agent_safe_text } from '#scripts/agent/agent-safe-text'
 import { claude_agent_argv } from '#scripts/agent/claude-agent-argv'
 import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
 import { detached_launch, type LaunchArgv } from '#scripts/run/detached-launch'
 import { run_invocation } from '#scripts/run/run-invocation'
+import { ts_entry_loader } from '#scripts/run/ts-entry-loader'
 import { run_wake_caffeinate } from './run-wake-caffeinate'
 
 // How the supervisor starts things: the next agent session, and — at `--start` — its own detached
@@ -39,8 +41,6 @@ const WAKE_FLAGS = claude_agent_argv.AGENT_FLAGS
 const LOOP_FLAG = '--loop'
 const INTERVAL_FLAG = '--interval'
 const SUPERVISOR_SESSION = 'run-wake-supervisor'
-// eslint-disable-next-line no-control-regex -- matching control characters is the point
-const CONTROL_CHARACTERS = /[\u{0}-\u{1F}\u{7F}]/gu
 
 function scheduler_profile(): AgentProfile | undefined {
 	const resolved = agent_role_profile.resolve(agent_role_profile.SCHEDULER)
@@ -112,15 +112,17 @@ function resolved_argv(invocation: string, cwd?: string): AgentArgvResult {
 		: agent_argv.resolve_in(invocation, agent_role_profile.SCHEDULER, cwd)
 }
 
-// **Handoff material is made safe to launch rather than refused.** It is the
-// driver's own output, not the record, so it is flattened — a newline becomes a separator, any other
-// control character a space — and the prompt is cut at the cap `is_safe_value` enforces. The driver puts
-// its verdict and resume line first, so the cut only ever shortens the details. The check itself is
-// untouched: the argv still passes `is_safe_argv` before anything is spawned.
+// **Handoff material is made safe to launch rather than refused.** It is the driver's own output, not
+// the record, so every control character but a newline becomes a space (`printable`) — the sections it
+// carries keep their lines (joshuafolkken/kit#5920) — and the prompt is cut at the cap `is_safe_prompt`
+// enforces. The driver puts its verdict, resume line and sections first, so the cut only ever shortens
+// the details. The check itself is untouched: the argv still passes `is_safe_argv` before anything is
+// spawned.
 function handoff_prompt(matched: string, material: string): string {
-	const flattened = material.replaceAll('\n', ' | ').replaceAll(CONTROL_CHARACTERS, ' ')
-
-	return `${matched} | Driver handoff: ${flattened}`.slice(0, agent_role_profile.MAX_VALUE_LENGTH)
+	return `${matched}\nDriver handoff: ${agent_safe_text.printable(material)}`.slice(
+		0,
+		agent_safe_text.MAX_PROMPT_LENGTH,
+	)
 }
 
 function wake_argv(
@@ -140,9 +142,9 @@ function wake_argv(
 }
 
 // Re-invoking this very script under the same runner, which is what makes the supervisor outlive the
-// session that started it. `execArgv` is carried across rather than dropped, because the loader flags
-// are what let the runner execute a TypeScript entry point at all — without them the detached process
-// starts and immediately fails on the syntax.
+// session that started it. `execArgv` is carried across, and the tsx loader is added when it is missing
+// (`ts-entry-loader.ts`, joshuafolkken/kit#6401) — the dist launcher leaves none, and without one the
+// detached process fails on the entry's extensionless imports.
 //
 // **The interval is forwarded rather than dropped.** `--start --interval 15` accepts the flag, so a
 // supervisor that then polled at the default would be silently ignoring what it was told.
@@ -151,7 +153,7 @@ function supervisor_argv(script_path: string, interval?: string): LaunchArgv {
 
 	return {
 		command: process.execPath,
-		args: [...process.execArgv, script_path, LOOP_FLAG, ...chosen],
+		args: [...ts_entry_loader.loader_argv(process.execArgv), script_path, LOOP_FLAG, ...chosen],
 	}
 }
 

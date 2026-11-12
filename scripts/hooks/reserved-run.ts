@@ -7,21 +7,21 @@ import { execa } from 'execa'
 
 // Runs a command while holding a place in the machine-wide core budget.
 //
-// **The pre-push hook's `pnpm install` and `pnpm josh audit` are heavy and were outside the ledger.**
-// The gate's checks reserve their cores, but a lefthook `pre-push` fires `pnpm install` on every push
-// (`josh bump` rewrites `package.json` right before it) and runs `josh audit` beside it — and eight
-// lanes reach that push around the same time, so the two spiked a machine the gate thought it had to
-// itself. Wrapping each command here counts it: it claims a place before it starts and waits while the
-// budget is full, exactly as a gate check does, so a concurrent gate on another lane backs off for it.
+// **The pre-push hook's `pnpm install` is heavy and was outside the ledger.** The gate's checks
+// reserve their cores, but a lefthook `pre-push` fires `pnpm install` on every push (`josh bump`
+// rewrites `package.json` right before it) — and eight lanes reach that push around the same time, so
+// it spiked a machine the gate thought it had to itself. Wrapping a command here counts it: it claims a
+// place before it starts and waits while the budget is full, exactly as a gate check does, so a
+// concurrent gate on another lane backs off for it.
 //
-// **It is one wrapper for both rather than a reservation written into each command.** The audit scans
-// synchronously and the install is pnpm's, so neither can hold an async reservation itself without
-// being rewritten around it — and a second copy of the claim-run-release dance is the clone
-// `CLAUDE.md` prohibits. The weight is the caller's, passed on the command line beside the command, so
-// the reservation these two conservative numbers stand for lives at the one place a person reads them.
+// **It is a wrapper rather than a reservation written into the command.** The install is pnpm's, so it
+// cannot hold an async reservation itself; `josh audit` is kit's own and reserves its place itself
+// (`security-audit-cache.ts`). The weight is the caller's, passed on the command line beside the
+// command, so the reservation that conservative number stands for lives at the one place a person
+// reads it.
 //
 // **The memory is read off the command, not left at zero** (joshuafolkken/kit#4582): a lane wrapped a
-// four-worker typed eslint here and the 12 GB it held was admitted beside four other lanes. The
+// four-worker typed eslint here and the memory it held was admitted beside four other lanes. The
 // wrapped command's tool and worker count give its `MEMORY_MB` (`command-memory.ts`); `--memory <MB>`
 // overrides that estimate.
 
@@ -96,7 +96,7 @@ function shell_word(argument: string): string {
 
 // What the claim carries to the ledger: the command named on the waiting line, and the memory it
 // holds — the explicit `--memory`, else the estimate read off the command (`command-memory.ts`), else
-// none, the 0 MB a command the table does not know counted before.
+// none, which is what a command the table does not know counts.
 function reservation_options(parsed: ReservedCommand): {
 	command: string
 	memory_mb: number | undefined

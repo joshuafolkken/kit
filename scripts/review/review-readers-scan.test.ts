@@ -83,6 +83,25 @@ describe('review_readers_scan.edited', () => {
 	})
 })
 
+describe('review_readers_scan.reachable_names', () => {
+	it('keeps a direct export, an export-list entry and a namespace member, and drops the locals', () => {
+		expect(review_readers_scan.reachable_names(SOURCE)).toEqual([
+			'read_merged',
+			'direct',
+			'Shape',
+			'issue_merged',
+		])
+	})
+
+	it('reads the members of a namespace object exported in place', () => {
+		const source = ['function finish(): void {}', 'export const drive = {', '\tfinish,', '}'].join(
+			'\n',
+		)
+
+		expect(review_readers_scan.reachable_names(source)).toEqual(['finish', 'drive'])
+	})
+})
+
 const COMMENTED = [
 	'export function first(): void {}',
 	'',

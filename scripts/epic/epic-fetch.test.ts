@@ -1,4 +1,5 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { git_gh_issue_batch_graphql } from '#scripts/gh/git-gh-issue-batch-graphql'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { epic_fetch } from './epic-fetch'
 
@@ -66,6 +67,11 @@ function children_reading(by_row: ReadonlyArray<unknown>): void {
 
 beforeEach(() => {
 	vi.restoreAllMocks()
+	// The children's batched GraphQL read answers nothing, so every child comes from the REST stub
+	// (the GraphQL path: `epic-fetch-graphql.test.ts`).
+	vi.spyOn(git_gh_issue_batch_graphql, 'read_many').mockResolvedValue(
+		git_gh_issue_batch_graphql.empty_batch(),
+	)
 })
 
 describe('epic_fetch.fetch_child', () => {

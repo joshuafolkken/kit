@@ -1,8 +1,8 @@
-import { appendFileSync, mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { appendFileSync } from 'node:fs'
 import path from 'node:path'
 import { session_cite } from '#scripts/issue/session-cite'
-import { describe, expect, it, onTestFinished, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it, vi } from 'vitest'
 import { review_stop_log, type StopLine } from './review-stop-log'
 import { review_stops_cli } from './review-stops-cli'
 
@@ -19,12 +19,10 @@ function stop(kind: string, location: string, at: string = RECENT_AT): StopLine 
 	return { at, issue: 7, stage: 'review', kind, location, sentence: `${location} is wrong.` }
 }
 
-function fresh_log(): string {
-	const directory = mkdtempSync(path.join(tmpdir(), 'review-stops-cli-'))
+const make_directory = temporary_directory()
 
-	onTestFinished(() => {
-		rmSync(directory, { recursive: true, force: true })
-	})
+function fresh_log(): string {
+	const directory = make_directory('review-stops-cli-')
 
 	return path.join(directory, 'review-stops.jsonl')
 }

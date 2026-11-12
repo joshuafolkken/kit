@@ -53,28 +53,36 @@ const CORE_WEIGHTS = {
 	e2e: 2,
 } as const
 
-// **The memory each heavy tool holds, declared beside its cores**: peak
-// resident size in MB, rounded up. Measured with `/usr/bin/time -l` on the 11-core / 18 GB machine on
-// 2026-10-07: the type check 1,244 MB, the spell check 330 MB, and one unit worker 319 MB over 54 test
-// files. Typed eslint was 1,207 MB over one directory and was observed at 1.6–2.4 GB per whole-tree
-// `eslint .` with three lanes running the same day, so lint and the whole-tree scan take that peak.
-// On 2026-10-17: prettier 260 MB, the retrospective 862 MB and a lane install 65 MB. On 2026-10-22
-// (joshuafolkken/kit#4528) the whole suite, 1,830 files at `--maxWorkers=3` beside four lanes, sampled
-// each worker's resident size once a second: the largest peaked at 381 MB, so the 54-file
-// measurement had read a worker short of the files it lives through. On 2026-10-23
-// (joshuafolkken/kit#4595) `josh metrics`, its process tree sampled four times a second, peaked at
-// 1,176 MB on a merge-base cache hit and 1,851 MB on a miss, where its own untyped `max-lines`-only
-// eslint pass still holds its heap beside the `--json` child measuring the merge-base. It takes the miss.
+// joshuafolkken/kit#6331: whole-tree typed lint holds the root TypeScript program and every
+// module's import/export metadata, and ran out of V8's default heap — in CI and locally alike.
+// `eslint-heap.ts` launches eslint under this heap; the lint reservations below are read off it too
+// (joshuafolkken/kit#6684), so the ledger cannot reserve less than the heap eslint may grow to.
+const ESLINT_HEAP_MIB = 8192
+const BYTES_PER_MIB = 1_048_576
+const BYTES_PER_MB = 1_000_000
+
+// The heap cap in the ledger's megabytes, rounded up — the eslint peak `josh lane:stats` recorded
+// (joshuafolkken/kit#6684) sits under it.
+const ESLINT_PEAK_MB = Math.ceil((ESLINT_HEAP_MIB * BYTES_PER_MIB) / BYTES_PER_MB)
+
+// **Memory reservations cover peak resident size, rounded up.** Lint and the whole-tree scan share
+// the whole-tree peak, the eslint heap cap. Unit workers use a whole-suite reading because a small subset misses their
+// later growth (joshuafolkken/kit#4528). Metrics uses the cache-miss peak because its parent retains
+// its heap beside the merge-base child (joshuafolkken/kit#4595). E2E reserves the full Playwright
+// process tree, including the dev server, once per run rather than per worker (joshuafolkken/kit#5413).
+// Type check uses the cold incremental peak — no `.tsbuildinfo` — because the warm peak is less than
+// half of it and a fresh lane starts cold (joshuafolkken/kit#7131).
 const MEMORY_MB = {
-	lint: 2400,
+	lint: ESLINT_PEAK_MB,
 	metrics: 1900,
-	type_check: 1300,
+	type_check: 2900,
 	spell_check: 350,
-	eslint_scan: 2400,
+	eslint_scan: ESLINT_PEAK_MB,
 	unit_worker: 400,
 	format: 300,
 	retrospective: 900,
 	install: 100,
+	e2e: 1800,
 } as const
 
 // **The program a command launches, mapped to the `MEMORY_MB` row it holds** — the one table
@@ -87,8 +95,9 @@ const TOOL_MEMORY: Readonly<Partial<Record<string, keyof typeof MEMORY_MB>>> = {
 	vitest: 'unit_worker',
 	prettier: 'format',
 	install: 'install',
+	playwright: 'e2e',
 }
 
-const core_weights = { CORE_WEIGHTS, MEASURED, MEMORY_MB, TOOL_MEMORY }
+const core_weights = { CORE_WEIGHTS, ESLINT_HEAP_MIB, MEASURED, MEMORY_MB, TOOL_MEMORY }
 
 export { core_weights }

@@ -1,14 +1,16 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync } from 'node:fs'
 import path from 'node:path'
 import { git_command } from '#scripts/git/git-command'
 import { process_identity } from '#scripts/josh/process-identity'
 import { process_identity_fixture } from '#scripts/josh/process-identity-fixture'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { run_preflight } from '#scripts/run/run-preflight'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_hold, type RunHold } from './run-hold'
 import { run_hold_cli } from './run-hold-cli'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#3419: a lane child's second `run:entry` answered `busy` to the hold it had taken
 // itself. The claim now recognizes its own run by the issue, and a record whose session has ended as
@@ -22,9 +24,9 @@ vi.mock('#scripts/run/run-preflight', () => ({
 	run_preflight: { CLEAN_VERDICT: 'clean', check: vi.fn() },
 }))
 
-vi.mock('#scripts/run/tidy/run-tidy-cli', () => ({ run_tidy_cli: { sweep: vi.fn() } }))
+vi.mock('#scripts/run/run-maintenance', () => ({ run_maintenance: { sweep: vi.fn() } }))
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-hold-cli-owner-test-'))
+const scratch = make_directory('run-hold-cli-owner-test-')
 const WORKTREE = path.join(scratch, '.git')
 const TARGET = run_hold.hold_path(WORKTREE)
 const ISSUE = '3419'
@@ -59,10 +61,6 @@ afterEach(() => {
 	vi.restoreAllMocks()
 	vi.unstubAllEnvs()
 	rmSync(TARGET, { force: true })
-})
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 describe('the same run claiming again', () => {

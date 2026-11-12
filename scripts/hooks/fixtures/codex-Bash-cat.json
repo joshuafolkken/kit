@@ -1,0 +1,12 @@
+{
+	"session_id": "01a1b634-d6d3-7fb0-bbcd-783266e851e7",
+	"turn_id": "01a1b634-da3c-7222-902d-c1f6e4ac8c08",
+	"transcript_path": "__HOME__/.codex/sessions/2026/11/07/rollout-2026-11-07T20-31-19-01a1b634-d6d3-7fb0-bbcd-783266e851e7.jsonl",
+	"cwd": "__ROOT__",
+	"hook_event_name": "PreToolUse",
+	"model": "gpt-6-astra",
+	"permission_mode": "bypassPermissions",
+	"tool_name": "Bash",
+	"tool_input": { "command": "cat CLAUDE.md" },
+	"tool_use_id": "exec-670e2ef2-c7de-4900-9c3c-cc6a0ea94dfb"
+}

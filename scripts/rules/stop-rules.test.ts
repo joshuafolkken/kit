@@ -162,7 +162,7 @@ describe('stop_rules.stop_outcome — headless parent', () => {
 		const { reason } = stop_rules.stop_outcome(context({ headless_waiting: true }))
 
 		expect(reason).toBe(stop_rules.HEADLESS_WAIT_REASON)
-		expect(reason).toContain('pnpm josh run:carry --cut --owner "$PPID"')
+		expect(reason).toContain('pnpm josh run:carry --cut`')
 	})
 
 	it('is not stood down by the loop-breaker or a pending cut', () => {

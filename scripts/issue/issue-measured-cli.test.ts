@@ -1,8 +1,8 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { MEASURED_LABEL, MEASURED_UNMET_LABEL } from '#scripts/issue/issue-labels'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_measured_cli } from './issue-measured-cli'
 
 // joshuafolkken/kit#4475: a measurement-only issue completes by one command. The GitHub writes and
@@ -34,7 +34,8 @@ vi.mock('#scripts/epic/epic-close', () => ({ epic_close: { close_completed_epics
 const ISSUE = '4452'
 const FLAG = '--evidence-file'
 const EVIDENCE = '- criterion 1: CI run 123 — 4m12s\n'
-const work = mkdtempSync(path.join(tmpdir(), 'issue-measured-cli-'))
+const make_directory = temporary_directory('suite')
+const work = make_directory('issue-measured-cli-')
 const EVIDENCE_FILE = path.join(work, 'evidence.md')
 const EMPTY_FILE = path.join(work, 'empty.md')
 
@@ -74,10 +75,6 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.restoreAllMocks()
-})
-
-afterAll(() => {
-	rmSync(work, { recursive: true, force: true })
 })
 
 describe('issue_measured_cli.run — the completion in order', () => {

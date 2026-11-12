@@ -1,3 +1,4 @@
+import { file_reader } from '#scripts/lib/read-file'
 import type ts from 'typescript'
 
 // The module specifiers a file names only for their types: an `import type` or an
@@ -53,6 +54,24 @@ function runtime_specifiers(typescript: TypeScript, file: string, content: strin
 		.map((reference) => reference.fileName)
 }
 
-const type_only_imports = { runtime_specifiers }
+function strings(typescript: TypeScript, file: string): Array<string> {
+	const content = file_reader.read_if_readable(file) ?? ''
+	const source = typescript.createSourceFile(file, content, typescript.ScriptTarget.Latest)
+	const found: Array<string> = []
+
+	function visit(node: ts.Node): void {
+		if (typescript.isStringLiteralLike(node) || typescript.isTemplateLiteralToken(node)) {
+			found.push(node.text)
+		}
+
+		typescript.forEachChild(node, visit)
+	}
+
+	visit(source)
+
+	return found
+}
+
+const type_only_imports = { runtime_specifiers, strings }
 
 export { type_only_imports }

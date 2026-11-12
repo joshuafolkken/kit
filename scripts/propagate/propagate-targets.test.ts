@@ -1,8 +1,10 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { propagate_targets } from './propagate-targets'
+
+const make_directory = temporary_directory()
 
 const KIT = '@joshuafolkken/kit'
 const TARGET_VERSION = '1.111.0'
@@ -56,11 +58,7 @@ function classify(repository_path: string): string {
 }
 
 beforeEach(() => {
-	state.workspace = mkdtempSync(path.join(tmpdir(), 'propagate-targets-'))
-})
-
-afterEach(() => {
-	rmSync(state.workspace, { recursive: true, force: true })
+	state.workspace = make_directory('propagate-targets-')
 })
 
 describe('propagate_targets.classify_target', () => {

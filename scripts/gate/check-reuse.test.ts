@@ -1,9 +1,8 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { git_spawn } from '#scripts/git/git-spawn'
 import { review_tree } from '#scripts/review/review-tree'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { check_reuse, type CheckRecords } from './check-reuse'
 import { gate_labels } from './gate-labels'
 import type { GateStepResult } from './gate-report'
@@ -13,7 +12,7 @@ import type { GateTree } from './gate-tree'
 // check over sources neither had a reason to read again. Each scoped check now keeps its own record and
 // is reused while none of its inputs moved — across a base move included.
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'check-reuse-test-'))
+const make_directory = temporary_directory('suite')
 const read_git = vi.spyOn(git_spawn, 'read')
 const read_tree = vi.spyOn(review_tree, 'read_changed_tree')
 const { LINT_LABEL, TYPE_CHECK_LABEL } = gate_labels
@@ -27,7 +26,7 @@ const SKILL_DOC = '.claude/skills/x/SKILL.md'
 const FAIL = 1
 
 function records_in(prefix: string): CheckRecords {
-	const directory = mkdtempSync(path.join(scratch, prefix))
+	const directory = make_directory(`check-reuse-test-${prefix}`)
 
 	return function record_of(label: string): string {
 		return path.join(directory, `${label}.json`)
@@ -64,10 +63,6 @@ async function recorded(): Promise<CheckRecords> {
 beforeEach(() => {
 	read_git.mockReset()
 	read_tree.mockResolvedValue(FILES)
-})
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 describe('check_reuse — across a main sync', () => {
@@ -127,6 +122,17 @@ describe('check_reuse.record_green_checks', () => {
 		await check_reuse.record_green_checks(results, RECORDED, records)
 
 		await expect(reused(records, RECORDED)).resolves.toStrictEqual([TYPE_CHECK_LABEL])
+	})
+
+	// joshuafolkken/kit#7053: the fix after a red check reruns that check, not the green ones it left alone.
+	it('reuses a red gate green check over a fix that moved none of its inputs', async () => {
+		const records = records_in('fixed-')
+		const results = [passed(LINT_LABEL), { ...passed(TYPE_CHECK_LABEL), exit_code: FAIL }]
+		const fixed = { files: { ...FILES, [SKILL_DOC]: 'digest-fix' }, base: RECORDED.base }
+
+		await check_reuse.record_green_checks(results, RECORDED, records)
+
+		await expect(reused(records, fixed)).resolves.toStrictEqual([LINT_LABEL])
 	})
 
 	it('records nothing when the tree moved while the checks ran', async () => {

@@ -21,8 +21,6 @@ const CHECKS = [
 ]
 
 beforeEach(() => {
-	vi.clearAllMocks()
-
 	for (const { check } of CHECKS) {
 		vi.mocked(check.check_all).mockReturnValue(0)
 		vi.mocked(check.check_files).mockReturnValue(0)

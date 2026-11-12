@@ -126,12 +126,12 @@ const SETTLED_ADVICE =
 // park an API-outage child that should be re-dispatched, so the recovery is
 // routed through `run:merge --output`, the same composite a returned child takes: it reads the exit
 // record without waiting for the unit to return, re-dispatches an outage child (counting the outage,
-// and stopping the run on the environment guard once a run of them trips it), and parks an abandoned
+// and holding launches once a run of them trips the environment guard), and parks an abandoned
 // child with `run:stalled` against the consecutive-failure guard.
 const STOPPED_CLEAN_ADVICE =
-	'The unit ended — classify how before booking it. Run `pnpm josh run:merge <N> --output <path>` (add `--epic <E> --repo <owner/repo> --owner "$PPID"` for a named epic): it reads the child\'s exit record without waiting for the unit to return, re-dispatches a child that could not reach the API (counting the outage; a run of them trips the environment guard and stops the run), and parks an abandoned child with `run:stalled` against the consecutive-failure guard. The checkout is clean, so there is nothing to stash.'
+	"The unit ended — classify how before booking it. Run `pnpm josh run:merge <N> --output <path>` (add `--epic <E> --repo <owner/repo>` for a named epic): it reads the child's exit record without waiting for the unit to return, re-dispatches a child that could not reach the API (counting the outage; a run of them trips the environment guard, which holds launches), and parks an abandoned child with `run:stalled` against the consecutive-failure guard. The checkout is clean, so there is nothing to stash."
 const STOPPED_DIRTY_ADVICE =
-	'Stash the half-finished work with `pnpm josh stash:push "backlogrun: stopped unit for #<N>"` and record it on the Issue, then classify how the unit ended with `pnpm josh run:merge <N> --output <path>` (add `--epic <E> --repo <owner/repo> --owner "$PPID"` for a named epic): it re-dispatches an API-outage child (counting the outage; a run of them trips the environment guard) and parks an abandoned child with `run:stalled` against the consecutive-failure guard, without waiting for the unit to return.'
+	'Classify how the unit ended with `pnpm josh run:merge <N> --output <path> --stash` (add `--epic <E> --repo <owner/repo>` for a named epic): `--stash` first stashes the half-finished work and records its `stash:pop` line on the Issue, then it re-dispatches an API-outage child (counting the outage; a run of them trips the environment guard, which holds launches) and parks an abandoned child with `run:stalled` against the consecutive-failure guard, without waiting for the unit to return.'
 const UNDETERMINED_ADVICE =
 	'Read the trace that failed and ask again. Where the process trace was given as `unknown`, leave `--process` out so the command reads it. Two of these in a row is a fault in the check itself rather than a slow unit: stop polling and report it.'
 
@@ -169,7 +169,7 @@ function definitive_verdict(traces: Traces): LivenessVerdict | undefined {
 }
 
 // A live process is a unit inside a long check — a `pnpm josh followup` waiting on CI writes
-// nothing for up to 32 minutes, which is longer than the silent window and is exactly the false
+// nothing for longer than the silent window, which is exactly the false
 // positive this trace exists to stop. **It is asked after the unreadable check rather than before it**:
 // a `pgrep` scoped a shade too wide answers `alive` on a
 // machine running several kit projects at once, and read ahead of an output path that resolves to
@@ -323,7 +323,7 @@ interface FreshnessRequest {
 
 // Frozen means both: nothing was written inside the silent window, and nothing was written between
 // two samples taken a few seconds apart. The window alone would call a unit stopped the moment its
-// clock crossed 30 minutes, and the two samples alone would call a slow turn a stop.
+// clock crossed the window, and the two samples alone would call a slow turn a stop.
 async function read_output_frozen(request: FreshnessRequest): Promise<boolean | undefined> {
 	const first = sample_output(request.output_path)
 
@@ -421,6 +421,7 @@ const run_liveness = {
 	check,
 	decide,
 	describe_agent_state,
+	read_agent_state,
 	read_child_settled,
 	read_output_frozen,
 	sample_output,

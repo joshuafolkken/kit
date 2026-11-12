@@ -1,5 +1,6 @@
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
+import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
 import type { LedgerEntry } from './lane-ledger'
 import { lane_sleep } from './lane-sleep'
 import { lane_spans, type IssueAt, type Span } from './lane-spans'
@@ -12,11 +13,15 @@ import { lane_yield } from './lane-yield'
 // usage-limit stop (joshuafolkken/kit#4745), each until the issue's next ship stage, re-dispatch or
 // another of the two, the wait `josh lane:stats` derives for a stop (`lane-stop-stats.ts`) — and the
 // host's sleeps (joshuafolkken/kit#5032), whatever the issue (`lane-sleep.ts`), and a yield's wait for
-// the issue's next dispatch (joshuafolkken/kit#5216), no lane seat held while the holder runs. A ship
-// stop is not taken out: a relaunched child works through its wait. `josh lane:net` prints it, and a
-// causing-lane line declares it (`issue-priority.ts`).
+// the issue's next dispatch (joshuafolkken/kit#5216), no lane seat held while the holder runs, and a
+// run that ended in a split until the next dispatch (joshuafolkken/kit#6678), the parts' cost. The
+// ship's followup — CI, CodeRabbit and the merge, waited on by the driver with no lane seat held — is
+// taken out too, counted apart as a driver stage (joshuafolkken/kit#6541). A ship stop is not taken
+// out: a relaunched child works through its wait. `josh lane:net` prints it, and a causing-lane line
+// declares it (`issue-priority.ts`).
 
 const { EVENT_KIND } = run_event_stream
+const { PHASE, STAGE } = run_ship_stage
 
 interface LaneSpan {
 	from_ms: number
@@ -105,14 +110,16 @@ function slept(events: ReadonlyArray<RunEvent>, span: LaneSpan): Array<LaneSpan>
 }
 
 // Each yield (`lane:plan` gave the seat back) until its issue's next dispatch, every issue's — the
-// `yield → redispatch` gap `josh lane:stats` prints (`lane-gap-stats.ts`).
+// `yield → redispatch` gap `josh lane:stats` prints (`lane-gap-stats.ts`). The wait starts at the
+// child's yield note, not at the withdrawal `run:merge` may close the lane with later, or never
+// (joshuafolkken/kit#5755).
 function yield_spans(
 	entries: ReadonlyArray<LedgerEntry>,
 	events: ReadonlyArray<RunEvent>,
 ): Array<Span> {
 	const yields = lane_stop_stats.events_of(
-		events.filter((event) => lane_yield.is_yield(event)),
-		EVENT_KIND.WITHDRAW,
+		events.filter((event) => lane_yield.is_yield_note(event)),
+		EVENT_KIND.NOTE,
 	)
 
 	return lane_spans.issue_spans({
@@ -122,17 +129,37 @@ function yield_spans(
 	})
 }
 
-// `issue`'s yields inside `span`, each until its redispatch, cut at the merge.
-function yielded(
+// The dispatch that started the run `split` ended: the issue's last dispatch at or before it.
+function run_start_ms(dispatches: ReadonlyArray<IssueAt>, split: IssueAt): number {
+	const start = dispatches.findLast(
+		(entry) => entry.issue === split.issue && entry.at_ms <= split.at_ms,
+	)
+
+	return start?.at_ms ?? split.at_ms
+}
+
+// Each run that ended with its issue split (`run:merge` closing the lane), from its dispatch until the
+// issue's next one: the split run filed the parts, the next run is the lane (joshuafolkken/kit#6678).
+// A split no later dispatch followed is no wait.
+function split_spans(
 	entries: ReadonlyArray<LedgerEntry>,
 	events: ReadonlyArray<RunEvent>,
-	issue: number,
-	span: LaneSpan,
-): Array<LaneSpan> {
-	const of_issue = events.filter((event) => lane_stop_stats.issue_of(event) === issue)
-	const inside = yield_spans(entries, of_issue).filter(
-		(wait) => wait.from_ms >= span.from_ms && wait.from_ms < span.to_ms,
-	)
+): Array<Span> {
+	const splits = lane_stop_stats.events_of(events, EVENT_KIND.SPLIT)
+	const dispatches = lane_stop_stats.dispatches_of(entries)
+	const spans = lane_spans.issue_spans({ starts: splits, bounds: splits, ends: dispatches })
+
+	return splits
+		.map((split, index) => ({
+			from_ms: run_start_ms(dispatches, split),
+			end_ms: spans[index]?.end_ms,
+		}))
+		.filter((wait) => wait.end_ms !== undefined)
+}
+
+// The waits of `spans` that began inside `span`, each cut at the merge.
+function cut_inside(spans: ReadonlyArray<Span>, span: LaneSpan): Array<LaneSpan> {
+	const inside = spans.filter((wait) => wait.from_ms >= span.from_ms && wait.from_ms < span.to_ms)
 
 	return inside.map((wait) => ({
 		from_ms: wait.from_ms,
@@ -140,9 +167,33 @@ function yielded(
 	}))
 }
 
+function events_of_issue(events: ReadonlyArray<RunEvent>, issue: number): Array<RunEvent> {
+	return events.filter((event) => lane_stop_stats.issue_of(event) === issue)
+}
+
+// `issue`'s yields inside `span`, each until its redispatch, cut at the merge.
+function yielded(
+	entries: ReadonlyArray<LedgerEntry>,
+	events: ReadonlyArray<RunEvent>,
+	issue: number,
+	span: LaneSpan,
+): Array<LaneSpan> {
+	return cut_inside(yield_spans(entries, events_of_issue(events, issue)), span)
+}
+
+// `issue`'s split runs inside `span`, each until its redispatch, cut at the merge.
+function split_waits(
+	entries: ReadonlyArray<LedgerEntry>,
+	events: ReadonlyArray<RunEvent>,
+	issue: number,
+	span: LaneSpan,
+): Array<LaneSpan> {
+	return cut_inside(split_spans(entries, events_of_issue(events, issue)), span)
+}
+
 // The waits `net_ms` takes out of `span` — each hold from itself to its end, cut at the merge, each
-// yield until its redispatch, and each sleep of the host — the intervals `josh lane:breakdown` counts
-// as excluded (`lane-breakdown.ts`).
+// yield and split run until its redispatch, and each sleep of the host — the intervals `josh
+// lane:breakdown` counts as excluded (`lane-breakdown.ts`).
 function waits(
 	entries: ReadonlyArray<LedgerEntry>,
 	events: ReadonlyArray<RunEvent>,
@@ -152,13 +203,46 @@ function waits(
 	return joined([
 		...hold_waits(entries, events, issue, span),
 		...yielded(entries, events, issue, span),
+		...split_waits(entries, events, issue, span),
 		...slept(events, span),
 	])
 }
 
+function is_followup_start(event: RunEvent): boolean {
+	const { stage, phase } = run_ship_stage.words_of(event.text)
+
+	return stage === STAGE.FOLLOWUP && phase === PHASE.START
+}
+
+// `issue`'s ship followups inside `span`, each from its start to the issue's next ship stage line, or
+// else the merge — the driver's wait on CI, CodeRabbit and the merge (joshuafolkken/kit#6541).
+function followed(events: ReadonlyArray<RunEvent>, issue: number, span: LaneSpan): Array<LaneSpan> {
+	const lines = events
+		.filter((event) => event.kind === EVENT_KIND.SHIP_STAGE)
+		.filter((event) => lane_stop_stats.issue_of(event) === issue)
+		.map((event) => ({ event, at_ms: Date.parse(event.at) }))
+		.filter((line) => line.at_ms >= span.from_ms && line.at_ms < span.to_ms)
+		.toSorted((left, right) => left.at_ms - right.at_ms)
+
+	return lines
+		.map((line, index) => ({ line, to_ms: lines[index + 1]?.at_ms ?? span.to_ms }))
+		.filter(({ line }) => is_followup_start(line.event))
+		.map(({ line, to_ms }) => ({ from_ms: line.at_ms, to_ms }))
+}
+
+// Every interval `net_ms` leaves out of `span`: the waits and the driver's followups, joined.
+function outside(
+	entries: ReadonlyArray<LedgerEntry>,
+	events: ReadonlyArray<RunEvent>,
+	issue: number,
+	span: LaneSpan,
+): Array<LaneSpan> {
+	return joined([...waits(entries, events, issue, span), ...followed(events, issue, span)])
+}
+
 /**
  * The net milliseconds of `issue`'s lane, or `undefined` when the ledger holds no dispatch and merge of
- * it. `events` is the run's event stream, read for the parks and outages.
+ * it. `events` is the run's event stream, read for the parks, outages and followups.
  */
 function net_ms(
 	entries: ReadonlyArray<LedgerEntry>,
@@ -169,7 +253,7 @@ function net_ms(
 
 	if (span === undefined) return undefined
 
-	return waits(entries, events, issue, span).reduce(
+	return outside(entries, events, issue, span).reduce(
 		(left, wait) => left - (wait.to_ms - wait.from_ms),
 		span.to_ms - span.from_ms,
 	)
@@ -201,6 +285,7 @@ const lane_net_time = {
 	missing_reason,
 	net_minutes,
 	net_ms,
+	outside,
 	slept,
 	span_of,
 	waits,

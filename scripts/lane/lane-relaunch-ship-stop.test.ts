@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { lane_seat_fixture } from './lane-seat-fixture'
 
 const spawn_mock = vi.hoisted(() => vi.fn(() => ({ pid: 4242, on: vi.fn(), unref: vi.fn() })))
 
@@ -27,6 +28,8 @@ const STOP = { stage: 'gate', flags: [], is_review: true, title: `Some work #${I
 const EXCERPT_LINES = 40
 const LINE_PADDING = 200
 
+beforeEach(lane_seat_fixture.mock_start)
+
 function long_excerpt(): Array<string> {
 	return Array.from(
 		{ length: EXCERPT_LINES },
@@ -37,11 +40,11 @@ function long_excerpt(): Array<string> {
 // joshuafolkken/kit#3964: the ship-stop prompt joins its lines with line breaks and carries the failed
 // output's tail, and the launcher's argv check refused it — every lane whose ship stopped went 🛑.
 describe('the ship-stop relaunch through the argv check', () => {
-	it('launches a child whose prompt carries a long excerpt and the changed files', () => {
+	it('launches a child whose prompt carries a long excerpt and the changed files', async () => {
 		const context = { excerpt: long_excerpt(), changed: ['scripts/a.ts'], more_changed: 0 }
 		const prompt = lane_child_invocation.ship_stop_invocation(ISSUE, { ...STOP, context })
 
-		const result = lane_relaunch.relaunch(LANE as never, prompt, 'pre-gate', vi.fn())
+		const result = await lane_relaunch.relaunch(LANE as never, prompt, 'pre-gate', vi.fn())
 
 		expect(result).toStrictEqual({ kind: 'launched', pid: 4242 })
 		expect(prompt.length).toBeLessThanOrEqual(agent_role_profile.MAX_VALUE_LENGTH)

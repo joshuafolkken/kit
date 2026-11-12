@@ -163,7 +163,7 @@ describe('detached ship supervisor identity', () => {
 			process_start: 'stale-start',
 			launch_id: 'stopped',
 		})
-		vi.spyOn(process_identity, 'is_same_process').mockReturnValue(false)
+		vi.spyOn(process_identity, 'is_present_process').mockReturnValue(false)
 
 		expect(run_ship_detach.read_result(target.repository, NUMBER)?.result).toBe('abnormal')
 	})
@@ -250,7 +250,7 @@ describe('detached ship identity that cannot be verified', () => {
 			process_start: 'proc:1',
 			launch_id: 'live',
 		})
-		vi.spyOn(process_identity, 'is_same_process').mockReturnValue(undefined)
+		vi.spyOn(process_identity, 'is_present_process').mockReturnValue(undefined)
 
 		expect(run_ship_detach.read_result(target.repository, NUMBER)?.result).toBe('running')
 		const detached = await run_ship_detach.detach(target)

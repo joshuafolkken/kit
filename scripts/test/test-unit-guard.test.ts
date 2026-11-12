@@ -1,8 +1,10 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { LANE_SEAT_KEY, PORT_SEED_KEY } from '#ports'
 import { changed_file_scope } from '#scripts/git/changed-file-scope'
+import { fake_result } from '#tools/test/execa-result'
+import { DIRECT_LAUNCH_FILE } from '#tools/test/local-bin-mock'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { execa } from 'execa'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_read_recording } from './test-read-recording'
@@ -11,6 +13,7 @@ import { unit_share_fixture } from './unit-share-fixture'
 import { unit_worker_share } from './unit-worker-share'
 
 vi.mock('execa', () => ({ execa: vi.fn() }))
+vi.mock('#scripts/build/local-bin', async () => await import('#tools/test/local-bin-mock'))
 vi.mock('#scripts/git/changed-file-scope', () => ({
 	changed_file_scope: { repository_root_or_cwd: vi.fn() },
 }))
@@ -30,8 +33,6 @@ beforeEach(() => {
 	mocked_recording.mockImplementation(async (_root, _arguments, run) => await run(RECORDING))
 })
 
-type ExecaResult = Awaited<ReturnType<typeof execa>>
-
 const UNIT_TEST_BASENAME = 'sample.test.ts'
 const PACKAGE_JSON = 'package.json'
 const COVERAGE_FLAG = '--coverage'
@@ -41,10 +42,6 @@ const OUTER_SEAT = '3'
 const SPAWN_OPTIONS_POSITION = 2
 const FREE_CORES = 3
 const CALLER_WORKERS = '--maxWorkers=4'
-
-function fake_result(exit_code: number | undefined): ExecaResult {
-	return { exitCode: exit_code } as unknown as ExecaResult
-}
 
 function is_record(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null
@@ -76,21 +73,20 @@ function expect_isolated_environment(options: Record<string, unknown>): void {
 }
 
 const ctx = { project_directory: '' }
+const make_directory = temporary_directory()
 
 const { stub_claim, stub_free, stub_share } = unit_share_fixture
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	stub_share(undefined)
 	stub_free(undefined)
 	stub_claim(undefined)
-	ctx.project_directory = mkdtempSync(path.join(tmpdir(), 'unit-guard-'))
+	ctx.project_directory = make_directory('unit-guard-')
 })
 
 afterEach(() => {
 	vi.unstubAllEnvs()
 	vi.restoreAllMocks()
-	rmSync(ctx.project_directory, { recursive: true, force: true })
 })
 
 function add_vitest_package(): void {
@@ -293,7 +289,7 @@ describe('test_unit_guard.run_guarded_unit — run path', () => {
 
 		expect(exit_code).toBe(0)
 		expect(mocked_execa).toHaveBeenCalledWith(
-			'pnpm',
+			DIRECT_LAUNCH_FILE,
 			['exec', 'vitest', 'run', COVERAGE_FLAG],
 			expect.objectContaining({ extendEnv: false, reject: false }),
 		)
@@ -316,7 +312,7 @@ describe('test_unit_guard.run_guarded_unit — run path', () => {
 		await test_unit_guard.run_guarded_unit(ctx.project_directory, [])
 
 		expect(mocked_execa).toHaveBeenCalledWith(
-			'pnpm',
+			DIRECT_LAUNCH_FILE,
 			['exec', 'vitest', 'run', '--maxWorkers=2'],
 			expect.objectContaining({ reject: false }),
 		)
@@ -330,7 +326,11 @@ describe('test_unit_guard.run_guarded_unit — the free cores', () => {
 	})
 
 	// joshuafolkken/kit#3945: the share is bounded by the cores free of load outside the ledger.
-	it('hands the free cores to the share', async () => {
+	// joshuafolkken/kit#6682: and the live lanes, read rather than assumed.
+	it('hands the free cores and the live lanes to the share', async () => {
+		const lanes = 3
+
+		vi.spyOn(unit_worker_share, 'live_lane_count').mockReturnValue(lanes)
 		stub_free(FREE_CORES)
 		mocked_execa.mockResolvedValue(fake_result(0))
 
@@ -340,6 +340,7 @@ describe('test_unit_guard.run_guarded_unit — the free cores', () => {
 			expect.any(Number),
 			expect.any(Number),
 			{ cores: FREE_CORES, memory_workers: undefined },
+			lanes,
 		)
 	})
 
@@ -354,7 +355,7 @@ describe('test_unit_guard.run_guarded_unit — the free cores', () => {
 
 		expect(read).not.toHaveBeenCalled()
 		expect(mocked_execa).toHaveBeenCalledWith(
-			'pnpm',
+			DIRECT_LAUNCH_FILE,
 			['exec', 'vitest', 'run', CALLER_WORKERS],
 			expect.objectContaining({ reject: false }),
 		)

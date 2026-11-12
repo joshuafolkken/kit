@@ -1,9 +1,17 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { main_entry_fixture } from '#scripts/josh/main-entry-fixture'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const josh_run_mock = vi.hoisted(() => vi.fn())
 const is_child_of_mock = vi.hoisted(() => vi.fn())
+const is_linked_mock = vi.hoisted(() => vi.fn())
+const load_environment_file_mock = vi.hoisted(() => vi.fn())
+
+vi.mock('#scripts/git/git-worktree', () => ({ git_worktree: { is_linked: is_linked_mock } }))
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
+vi.mock('#scripts/josh/josh-environment-file', () => ({
+	josh_environment_file: { load_environment_file: load_environment_file_mock },
+}))
 vi.mock('#scripts/lane/lane-child-marker', () => ({
 	lane_child_marker: { is_child_of: is_child_of_mock },
 }))
@@ -30,11 +38,17 @@ function argv_calls(): ReadonlyArray<ReadonlyArray<string>> {
 beforeEach(() => {
 	josh_run_mock.mockReset().mockResolvedValue({ code: OK, out: '' })
 	is_child_of_mock.mockReset().mockReturnValue(false)
+	is_linked_mock.mockReset().mockResolvedValue(false)
+	load_environment_file_mock.mockReset()
 	info_lines.length = 0
 	vi.spyOn(console, 'info').mockImplementation((line: string) => {
 		info_lines.push(line)
 	})
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
+})
+
+afterEach(() => {
+	vi.unstubAllEnvs()
 })
 
 describe('run_tail_cli.run — folds the three post-merge steps into one call', () => {
@@ -60,7 +74,7 @@ describe('run_tail_cli.run — folds the three post-merge steps into one call', 
 
 		await run_tail_cli.run([ISSUE])
 
-		expect(info_lines[0]).toBe(
+		expect(info_lines[0]).toContain(
 			`=== sync ===\nsynced\n\n=== observations ===\nflushed\n\n=== citations ===\ncited ${ISSUE}\n\n=== release ===\nskip`,
 		)
 	})
@@ -85,13 +99,20 @@ describe('run_tail_cli.run — a dispatched lane child leaves the ledger to the 
 
 		await run_tail_cli.run([ISSUE])
 
-		expect(info_lines[0]).toBe(`=== citations ===\ncited ${ISSUE}\n\n=== release ===\nskip`)
+		expect(info_lines[0]).toContain(`=== citations ===\ncited ${ISSUE}\n\n=== release ===\nskip`)
 	})
 })
 
 // joshuafolkken/kit#2979: `josh ship` reaches the report still on the feature branch it merged, and the
 // flush refuses anywhere but the default branch, so a merged run was reported as failed.
 describe('run_tail_cli.run — returns to the default branch before the flush', () => {
+	it('keeps a linked checkout even when a person started the run without a child marker', async () => {
+		is_linked_mock.mockResolvedValue(true)
+
+		expect(await run_tail_cli.run([ISSUE])).toBe(OK)
+		expect(argv_calls()).toStrictEqual([CITE, SCOPE])
+	})
+
 	it('runs main:sync before observations:flush, so the flush never starts on the merged branch', async () => {
 		await run_tail_cli.run([ISSUE])
 
@@ -138,7 +159,7 @@ describe('run_tail_cli.run — a failed step fails the whole close', () => {
 
 		await run_tail_cli.run([ISSUE])
 
-		expect(info_lines[0]).toBe(
+		expect(info_lines[0]).toContain(
 			`=== sync ===\nsynced\n\n=== observations ===\n[ELIFECYCLE] failed\n${reason}\n\n=== citations ===\ncited\n\n=== release ===\nskip`,
 		)
 	})
@@ -147,4 +168,27 @@ describe('run_tail_cli.run — a failed step fails the whole close', () => {
 		expect(await run_tail_cli.run(['--force'])).toBe(FAILED)
 		expect(josh_run_mock).not.toHaveBeenCalled()
 	})
+})
+
+describe('run_tail_cli.run — closes with reusable report templates', () => {
+	it('loads the file language before printing templates on the command entry path', async () => {
+		vi.stubEnv('JOSH_SESSION_LANG', 'ja')
+		load_environment_file_mock.mockImplementation(() => {
+			vi.stubEnv('JOSH_SESSION_LANG', 'en')
+		})
+
+		expect(await main_entry_fixture.run_entry('scripts/run/run-tail-cli.ts', [ISSUE])).toBe(OK)
+		expect(info_lines[0]).toContain('- **Cause**: <…>')
+		expect(info_lines[0]).not.toContain('- **原因**:')
+	})
+
+	it.each([{ issues: [] }, { issues: [ISSUE] }])(
+		'prints both skeleton sections for $issues',
+		async ({ issues }) => {
+			await run_tail_cli.run(issues)
+
+			expect(info_lines[0]).toContain('=== child summary template ===')
+			expect(info_lines[0]).toContain('=== notify-message template ===')
+		},
+	)
 })

@@ -11,7 +11,7 @@ import { run_board_render_fixture } from './run-board-render-fixture'
 // person has to act on.
 
 const { minute_of } = run_board_labels
-const { EMPTY_LAYOUT, MINUTE, NOW, header, lines_of, note, rule } = run_board_render_fixture
+const { EMPTY_LAYOUT, MINUTE, NOW, header, lines_of, note } = run_board_render_fixture
 const KIND = run_event_stream.EVENT_KIND
 const REPO = 'joshuafolkken/kit'
 const GUARD = 'Stop the guard'
@@ -70,7 +70,7 @@ describe('run_board_render.render a full findings section', () => {
 	)
 	const lines = lines_of(listing([4100]), [listed, ...seen, park, filed])
 	const drawn = lines
-		.slice(lines.indexOf(rule(NOTES_HEADING)) + 1)
+		.slice(lines.findIndex((line) => line.startsWith(`── ${NOTES_HEADING} `)) + 1)
 		.filter((line) => line.startsWith(' '.repeat(4)))
 
 	it('keeps 💤, then a filed Issue with no row, then notes, and draws no line for a filed row', () => {

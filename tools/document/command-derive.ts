@@ -1,21 +1,18 @@
+#!/usr/bin/env tsx
 import { readFileSync, statSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
-import { execa } from 'execa'
 import { derived_artifacts } from './derived-artifacts'
 import { CATALOG_FILE, generate_catalog } from './generate-catalog'
 import { generate_command_usage } from './generate-command-usage'
+import { generate_lint_prose } from './generate-lint-prose'
 import { usage_span_placement } from './usage-span-placement'
 
-// `josh command:derive` — write every artifact derived from the command map in one run, then print
-// each written page's bytes beside its ceiling (#4970). The snapshot goes through vitest, its only
-// writer. The test file comes before `--update`: vitest's `--update` takes an optional value, so a
-// path after it is read as the update mode and the whole suite runs.
+// `josh command:derive` — write every artifact derived from the command map, and the lint prose spans
+// derived from the lint config, in one run, then print each command page's bytes beside its ceiling.
 
 const { page_path, USAGE_PAGES } = generate_command_usage
 const CATALOG_PAGE = 'docs/josh-command-catalog.md'
-const WHY_PAGE = 'docs/why.md'
-const SNAPSHOT_TEST = 'scripts/josh/josh-command-map.test.ts'
 
 function read_usage_pages(): ReadonlyMap<string, string> {
 	return new Map(USAGE_PAGES.map((page) => [page, readFileSync(page_path(page), 'utf8')]))
@@ -29,22 +26,23 @@ function write_usage_pages(pages: ReadonlyMap<string, string>): void {
 	}
 }
 
-function write_why_counts(): void {
-	const file = page_path(WHY_PAGE)
-
-	writeFileSync(file, derived_artifacts.rewrite_why_counts(readFileSync(file, 'utf8')))
+// Filled before anything is written: a span the lint config cannot render throws here, not midway.
+function filled_lint_prose_pages(): ReadonlyMap<string, string> {
+	return new Map(
+		generate_lint_prose.LINT_PROSE_PAGES.map((page) => [
+			page,
+			generate_lint_prose.fill_lint_spans(readFileSync(page_path(page), 'utf8')),
+		]),
+	)
 }
 
-async function update_snapshot(): Promise<void> {
-	await execa('pnpm', ['exec', 'vitest', 'run', SNAPSHOT_TEST, '--update'], {
-		cwd: page_path('.'),
-		stdio: 'inherit',
-	})
+function write_pages(pages: ReadonlyMap<string, string>): void {
+	for (const [page, text] of pages) writeFileSync(page_path(page), text)
 }
 
 // Non-zero when a written page is over its ceiling, so the run names the page to shrink.
 function report_bytes(): number {
-	const sizes = [...USAGE_PAGES, CATALOG_PAGE, WHY_PAGE].map((path) => ({
+	const sizes = [...USAGE_PAGES, CATALOG_PAGE].map((path) => ({
 		path,
 		bytes: statSync(page_path(path)).size,
 	}))
@@ -55,7 +53,7 @@ function report_bytes(): number {
 }
 
 // A span naming no command stops the run before anything is written: filling it would throw midway.
-async function main(): Promise<number> {
+function main(): number {
 	const pages = read_usage_pages()
 	const stale = usage_span_placement.stale_spans(pages, COMMAND_MAP)
 
@@ -67,12 +65,17 @@ async function main(): Promise<number> {
 		return 1
 	}
 
+	const lint_prose_pages = filled_lint_prose_pages()
+
 	write_usage_pages(pages)
 	writeFileSync(CATALOG_FILE, generate_catalog())
-	write_why_counts()
-	await update_snapshot()
+	write_pages(lint_prose_pages)
 
 	return report_bytes()
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) process.exitCode = await main()
+if (process.argv[1] === fileURLToPath(import.meta.url)) process.exitCode = main()
+
+const command_derive = { main }
+
+export { command_derive }

@@ -119,6 +119,12 @@ function report(): void {
 	console.info(describe(head, readFileSync(PACKAGE_JSON, 'utf8')))
 }
 
-const development_engines_verdict = { judge, describe, report }
+// Whether a verdict line keeps the pin. `not judged` keeps nothing it could vouch for, so a caller
+// that stops on a moved pin stops on it too.
+function is_intact(verdict: string): boolean {
+	return verdict === UNCHANGED || verdict === KEPT
+}
+
+const development_engines_verdict = { judge, describe, report, is_intact }
 
 export { development_engines_verdict }

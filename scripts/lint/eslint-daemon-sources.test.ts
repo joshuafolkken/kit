@@ -1,6 +1,6 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
+import { mkdirSync, rmSync } from 'node:fs'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { write_file } from '#tools/test/write-file'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('execa', () => ({ execa: vi.fn() }))
@@ -29,14 +29,8 @@ const EXPORTS_BEFORE = 'export const a = 1\n'
 const EXPORTS_AFTER = 'export const a = 1\nexport const b = 2\n'
 const HEAD = 'aaaa'
 
-const project_root = mkdtempSync(path.join(tmpdir(), 'eslint-daemon-sources-'))
-
-function write_file(relative: string, content: string = JSON_BODY): void {
-	const file = path.join(project_root, relative)
-
-	mkdirSync(path.dirname(file), { recursive: true })
-	writeFileSync(file, content)
-}
+const make_directory = temporary_directory('suite')
+const project_root = make_directory('eslint-daemon-sources-')
 
 // git under one commit, answering `changed` as the files that differ from it.
 function answer_changed(changed: string): void {
@@ -59,10 +53,15 @@ function is_stale(): boolean {
 // already changed from HEAD.
 function current_checkout(changed: string = IMPORTED): void {
 	answer_changed(changed)
-	for (const input of ['package.json', `${ESLINT_DIRECTORY}/package.json`]) write_file(input)
-	write_file(IMPORTED, EXPORTS_BEFORE)
-	write_file(`${ESLINT_DIRECTORY}/.eslint_d`, DAEMON)
+
+	for (const input of ['package.json', `${ESLINT_DIRECTORY}/package.json`]) {
+		write_file(project_root, input, JSON_BODY)
+	}
+
+	write_file(project_root, IMPORTED, EXPORTS_BEFORE)
+	write_file(project_root, `${ESLINT_DIRECTORY}/.eslint_d`, DAEMON)
 	write_file(
+		project_root,
 		`${ESLINT_DIRECTORY}/.eslint_d-toolchain`,
 		eslint_daemon.record_text(DAEMON, current()),
 	)
@@ -73,7 +72,6 @@ function remember_edit_of(relative: string): void {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	mkdirSync(project_root, { recursive: true })
 	vi.mocked(resolve_package_bin).mockReturnValue(CLI)
 })
@@ -87,7 +85,7 @@ describe('eslint_daemon — a source edited under a running daemon', () => {
 		current_checkout()
 		const before = current()
 
-		write_file(IMPORTED, EXPORTS_AFTER)
+		write_file(project_root, IMPORTED, EXPORTS_AFTER)
 
 		expect(current()).not.toBe(before)
 	})
@@ -99,10 +97,10 @@ describe('eslint_daemon — a non-ASCII source edited under a running daemon', (
 		const non_ascii = 'src/日本語.ts'
 
 		current_checkout(non_ascii)
-		write_file(non_ascii, EXPORTS_BEFORE)
+		write_file(project_root, non_ascii, EXPORTS_BEFORE)
 		const before = current()
 
-		write_file(non_ascii, EXPORTS_AFTER)
+		write_file(project_root, non_ascii, EXPORTS_AFTER)
 
 		expect(current()).not.toBe(before)
 		expect(mocked_git_read.mock.calls.map(([git_arguments]) => git_arguments)).toContainEqual(
@@ -114,7 +112,7 @@ describe('eslint_daemon — a non-ASCII source edited under a running daemon', (
 describe('eslint_daemon — the edit hook refreshing the fingerprint', () => {
 	it('keeps the daemon current when the edit hook linted the edited file', () => {
 		current_checkout()
-		write_file(IMPORTED, EXPORTS_AFTER)
+		write_file(project_root, IMPORTED, EXPORTS_AFTER)
 
 		remember_edit_of(IMPORTED)
 
@@ -123,7 +121,7 @@ describe('eslint_daemon — the edit hook refreshing the fingerprint', () => {
 
 	it('keeps the daemon stale when the edit hook linted another file', () => {
 		current_checkout(`${IMPORTED}\0${IMPORTER}`)
-		write_file(IMPORTED, EXPORTS_AFTER)
+		write_file(project_root, IMPORTED, EXPORTS_AFTER)
 
 		remember_edit_of(IMPORTER)
 
@@ -134,7 +132,7 @@ describe('eslint_daemon — the edit hook refreshing the fingerprint', () => {
 		type ExecaResult = Awaited<ReturnType<typeof execa_module.execa>>
 
 		current_checkout()
-		write_file(IMPORTED, EXPORTS_AFTER)
+		write_file(project_root, IMPORTED, EXPORTS_AFTER)
 		mocked_execa.mockResolvedValue({ exitCode: 0, stdout: '', all: '' } as unknown as ExecaResult)
 
 		await eslint_daemon.run(PNPM_ESLINT, { project_root })

@@ -21,7 +21,7 @@ function mark(at: string, is_offerable: boolean): LedgerEntry {
 	return { kind: lane_ledger.KIND.OFFERABLE, at, is_offerable }
 }
 
-// Work and a free lane first observed together 15 minutes ago, after the 12:00 launch.
+// Work and a free lane become observable together after the launch, so their age starts there.
 const OPEN_EPISODE: ReadonlyArray<LedgerEntry> = [mark(OPENED_ISO, true)]
 
 function ports(overrides: Partial<DetectPorts>): DetectPorts {
@@ -62,7 +62,9 @@ describe('backlog_stalled_detect.detect_and_report hold reason', () => {
 			THRESHOLD_MS,
 		)
 
-		expect(emit_stall).toHaveBeenCalledWith(expect.stringContaining('(held: memory)'))
+		expect(emit_stall).toHaveBeenCalledWith(
+			expect.stringContaining('(memory pressure is high; lanes resume when it eases)'),
+		)
 	})
 
 	// joshuafolkken/kit#4015: a stall resolves at the next dispatch, so it reaches nobody off-screen.

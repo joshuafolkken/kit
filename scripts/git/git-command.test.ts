@@ -68,6 +68,20 @@ describe('the status reading targets another work tree when given its directory'
 
 		expect(execa_mock.state.last_arguments.slice(0, 3)).toEqual(['-C', lane_directory, 'status'])
 	})
+
+	// joshuafolkken/kit#5941: a lane's followup reads the primary checkout's branch before syncing it.
+	it('reads the branch inside the named directory', async () => {
+		const { git_command } = await import('./git-command')
+		const primary_directory = '/repo'
+
+		await git_command.branch_at(primary_directory)
+
+		expect(execa_mock.state.last_arguments.slice(0, 3)).toEqual([
+			'-C',
+			primary_directory,
+			'rev-parse',
+		])
+	})
 })
 
 // joshuafolkken/kit#3733: a lane is discarded only when deleting its branch loses nothing, so the
@@ -351,7 +365,7 @@ describe('git_command.pull_fast_forward', () => {
 	})
 
 	// joshuafolkken/kit#2942: `josh main:sync` pulls through this, and an unbounded network call there
-	// waited 37 minutes on a dead connection while the backlog driver stood behind it.
+	// waited on a dead connection while the backlog driver stood behind it.
 	it('bounds the pull with the remote budget', async () => {
 		const { git_command } = await import('./git-command')
 		const { PUSH_TIMEOUT_MS } = await import('./git-push-transport')

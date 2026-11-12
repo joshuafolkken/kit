@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_report } from './run-report'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#2249: `josh run:report`. The stream target and the pending-merge count are both
 // mocked, so the CLI is exercised end to end — it renders the appended events through the generator and
@@ -34,9 +35,18 @@ vi.mock('#scripts/run/carry/run-carry', () => ({
 	},
 }))
 
+// joshuafolkken/kit#5639: `--end`'s later stages are `pnpm josh` subprocesses, and the lane-child mark
+// is read off this process's environment, so both are mocked to keep the CLI path hermetic.
+const josh_run_mock = vi.hoisted(() => vi.fn())
+
+vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
+vi.mock('#scripts/lane/lane-child-marker', () => ({
+	lane_child_marker: { is_child_of: () => false },
+}))
+
 const { run_report_cli } = await import('./run-report-cli')
 
-const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-run-report-cli-'))
+const TEMPORARY = make_directory('josh-run-report-cli-')
 const AT = '2026-09-21T00:00:00.000Z'
 const EARLIER_AT = '2026-09-19T18:00:14.732Z'
 const EARLIER_TEXT = '#2216 merged'
@@ -74,10 +84,6 @@ beforeEach(() => {
 	})
 })
 
-afterAll(() => {
-	rmSync(TEMPORARY, { force: true, recursive: true })
-})
-
 describe('run_report_cli.run', () => {
 	it('renders the stream and closes with the release command when one is owed', async () => {
 		seeded_target()
@@ -94,6 +100,18 @@ describe('run_report_cli.run', () => {
 
 		expect(await run_report_cli.run()).toBe(SUCCESS)
 		expect(stdout.join('')).toBe('\n')
+	})
+
+	it('prints the report, then ends the record and stops the supervisor on --end', async () => {
+		seeded_target()
+		read_pending_mock.mockResolvedValue(0)
+		josh_run_mock.mockReset()
+		josh_run_mock.mockResolvedValue({ code: SUCCESS, out: '' })
+
+		expect(await run_report_cli.run(['--end'])).toBe(SUCCESS)
+		expect(stdout.join('')).toContain('#7 merged')
+		expect(josh_run_mock).toHaveBeenNthCalledWith(1, ['run:carry', '--end'], true)
+		expect(josh_run_mock).toHaveBeenNthCalledWith(2, ['run:wake', '--stop'], true)
 	})
 })
 

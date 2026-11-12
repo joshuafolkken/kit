@@ -3,6 +3,7 @@ import { review_attest, type ReviewSlot } from '#scripts/review/review-attest'
 import { review_finding_ledger } from '#scripts/review/review-finding-ledger'
 import { review_finding_text } from '#scripts/review/review-finding-text'
 import { review_prior_findings } from '#scripts/review/review-prior-findings'
+import { review_prompt_level } from '#scripts/review/review-prompt-level'
 import { review_record_cli } from '#scripts/review/review-record-cli'
 
 // The pure half of `josh ship --review`: the one-line prompts the supervised reviewers are launched
@@ -148,7 +149,7 @@ function findings_instruction(
 // (joshuafolkken/kit#3875).
 function issue_read_instruction(issue: string): string {
 	return [
-		`Read Issue ${issue_cite.plain(issue)} with \`pnpm josh issue:read ${issue}\`, which prints the body and every`,
+		`Read Issue ${issue_cite.plain_for('program', issue)} with \`pnpm josh issue:read ${issue}\`, which prints the body and every`,
 		`comment together — never a body-only \`gh api …/issues/${issue}\` read.`,
 	].join(' ')
 }
@@ -159,9 +160,10 @@ function issue_read_instruction(issue: string): string {
 const IN_SESSION_CLAUSE =
 	'Review it yourself in this session — you carry no Skill or Agent tool, so never launch a second reviewer.'
 
+// Each opening leads with the brief's level, so a transcript tells the review's level (joshuafolkken/kit#5555).
 function round_one_opening(brief_path: string): string {
 	return [
-		`Review this checkout as a /code-review: read the review brief at ${brief_path} and follow it exactly —`,
+		`${review_prompt_level.opening(brief_path)}Review this checkout as a /code-review: read the review brief at ${brief_path} and follow it exactly —`,
 		'the level on its first line, the rubric it names, the checkout it pins and its review:attest step.',
 		IN_SESSION_CLAUSE,
 	].join(' ')
@@ -221,6 +223,10 @@ function slot_prompt(
 }
 
 // The round-2 verification pass: a fresh session over the round-1 fix delta, reading only.
+function final_opening(brief_path: string): string {
+	return `${round_one_opening(brief_path)} This is the final round-2 verification pass; read the scope the brief names. Do not edit any file.`
+}
+
 function verification_prompt(
 	brief_path: string,
 	slot: ReviewSlot,
@@ -228,10 +234,7 @@ function verification_prompt(
 	findings_path?: string,
 ): string {
 	return [
-		`Review this checkout as a /code-review — the round-2 verification pass over the round-1 fixes: read the`,
-		`review brief at ${brief_path} and follow it exactly — the level on its first line, the rubric it`,
-		'names, the checkout it pins and its review:attest step. Do not edit any file.',
-		IN_SESSION_CLAUSE,
+		final_opening(brief_path),
 		issue_read_instruction(issue),
 		...review_prior_findings.prompt_clauses(issue),
 		findings_instruction(slot, '', findings_path),
@@ -347,12 +350,12 @@ function read_verdict(text: string | undefined): ReviewVerdict {
 	}
 }
 
-// The specs `review:record` is given: a stopped round's `fixed` marks are dropped, since a fix the scoped
+// The whole findings `review:record` is given: a stopped round's `fixed` marks are dropped, since a fix the scoped
 // pair turned down, or one beside a finding still blocking, has not closed what it marks.
 function recorded_specs(verdict: ScoredVerdict, outcome: RoundOutcome): ReadonlyArray<string> {
-	if (outcome.is_passing) return verdict.specs
+	if (outcome.is_passing) return verdict.report
 
-	return verdict.specs.map((spec) =>
+	return verdict.report.map((spec) =>
 		spec.startsWith(FIXED_PREFIX) ? spec.slice(FIXED_PREFIX.length) : spec,
 	)
 }
@@ -390,6 +393,7 @@ function round_two_outcome(verdict: ScoredVerdict): RoundOutcome {
 }
 
 const run_ship_review = {
+	final_opening,
 	FIXED_PREFIX,
 	OTHER_SITES_CLAUSE,
 	SWEEP_INSTRUCTION,

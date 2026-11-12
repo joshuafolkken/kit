@@ -2,11 +2,17 @@ import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { beforeAll, describe, expect, it } from 'vitest'
+import { z } from 'zod'
 import { build_library, library_paths } from './build-library'
 
 const LIBRARY = 'config-merge'
 const { outfile: CONFIG_MERGE_OUTFILE, dts_file: CONFIG_MERGE_DTS_FILE } = library_paths(LIBRARY)
 const BUILD_TIMEOUT = 60_000
+const CONFIG_MERGE_FUNCTIONS: ReadonlyArray<string> = [
+	'patch_json_list_field',
+	'patch_yaml_list_field',
+	'read_yaml_list_field',
+]
 
 beforeAll(async () => {
 	await build_library(LIBRARY)
@@ -30,12 +36,15 @@ describe('build_library config_merge — compiled .js', () => {
 		expect(content).toContain('from "zod"')
 	})
 
-	it('loads under plain node and exposes the public API', () => {
+	// The built file is what a consumer loads, so a function dropped from `config_merge` fails here
+	// even when nothing inside kit calls it through the barrel.
+	it('loads under plain node and exposes every config_merge function', () => {
 		const module_url = pathToFileURL(CONFIG_MERGE_OUTFILE).href
-		const script = `import('${module_url}').then((m) => { if (typeof m.config_merge !== 'object' || typeof m.config_merge.patch_yaml_list_field !== 'function') process.exit(1) })`
+		const script = `import('${module_url}').then((m) => console.log(JSON.stringify(Object.keys(m.config_merge))))`
 		const result = spawnSync('node', ['--input-type=module', '-e', script], { encoding: 'utf8' })
+		const names = z.array(z.string()).parse(JSON.parse(result.stdout))
 
-		expect(result.status).toBe(0)
+		expect(new Set(names)).toEqual(new Set(CONFIG_MERGE_FUNCTIONS))
 	})
 })
 

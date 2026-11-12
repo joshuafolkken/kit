@@ -1,5 +1,8 @@
 import { setTimeout as sleep } from 'node:timers/promises'
 import { styleText } from 'node:util'
+import { gh_core_rate_limit } from '#scripts/gh/gh-core-rate-limit'
+import { git_gh_transport } from '#scripts/gh/git-gh-transport'
+import { poll } from '#scripts/lib/poll'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { run_progress } from '#scripts/run/progress/run-progress'
@@ -8,12 +11,15 @@ import terminalLink from 'terminal-link'
 import { run_board_closed } from './run-board-closed'
 import { run_board_every } from './run-board-every'
 import { run_board_fold } from './run-board-fold'
+import { run_board_fold_store } from './run-board-fold-store'
 import { run_board_gather } from './run-board-gather'
 import { run_board_gather_live } from './run-board-gather-live'
 import { run_board_gather_thread } from './run-board-gather-thread'
+import { run_board_issue_count } from './run-board-issue-count'
 import { run_board_keys, type KeyReading } from './run-board-keys'
 import { run_board_labels } from './run-board-labels'
 import { run_board_plan_shared } from './run-board-plan-shared'
+import type { GithubRateLimit } from './run-board-render-quota-github'
 import { run_board_screen, type Screen } from './run-board-screen'
 import { run_board_snapshot } from './run-board-snapshot'
 import { run_board_spin } from './run-board-spin'
@@ -48,11 +54,23 @@ function on_exit(leave: () => void): void {
 	process.once('SIGTERM', () => process.exit(SIGTERM_EXIT_CODE))
 }
 
+// The allowances with the session's transport, which the github row marks with ▶. The transport is
+// read without a probe, so the board spends none of the GraphQL allowance it draws; one not known
+// yet (or an invalid setting) leaves the allowances unmarked.
+async function read_rate_limit_with_transport(): Promise<GithubRateLimit | undefined> {
+	const resources = await gh_core_rate_limit.read_resources()
+	if (resources === undefined) return undefined
+
+	return { ...resources, transport: await git_gh_transport.known() }
+}
+
 const LIVE_PORTS: Omit<BoardPorts, 'gather'> = {
 	read_plan: async (scope) => await run_board_plan_shared.read(scope),
 	read_closed: async (issues) => await run_board_closed.read_all(issues),
 	snapshot: run_board_snapshot.file_store(),
 	read_thanks: async () => await run_board_thanks_read.read_thanks(),
+	read_rate_limit: read_rate_limit_with_transport,
+	read_issue_count: async (repo) => await run_board_issue_count.read_issue_count(repo),
 	now: () => Date.now(),
 	write: (frame) => process.stdout.write(frame),
 	// No fallback: a terminal that opens no link, or a pipe, gets the bare number rather than a URL.
@@ -74,6 +92,7 @@ const LIVE_PORTS: Omit<BoardPorts, 'gather'> = {
 			process.stdin.pause()
 		},
 		interrupt: () => process.exit(SIGINT_EXIT_CODE),
+		store: run_board_fold_store.file_store(),
 	},
 	mark: async () => {
 		run_progress_read.mark(await run_progress_read.stamp_target(), Date.now())
@@ -133,14 +152,20 @@ function leaver(ports: BoardPorts, screen: Screen, keys: KeyReading): () => void
 async function redraw_forever(ports: BoardPorts, screen: Screen): Promise<void> {
 	const drawn = framed(ports, screen)
 	// The plan is read in the background, so the first frame is drawn without waiting on GitHub.
-	let state = await tick(FRESH_STATE, drawn, 'background')
+	let state = FRESH_STATE
 
-	for (;;) {
-		// eslint-disable-next-line no-await-in-loop -- polling: each redraw waits for the next second
-		await run_board_spin.spin_to_second(state.spots, ports)
-		// eslint-disable-next-line no-await-in-loop -- polling: each redraw folds the state the last one left
-		state = await tick(state, drawn, 'background')
-	}
+	await poll.wait_for(
+		async () => {
+			// eslint-disable-next-line require-atomic-updates -- poll awaits each callback before starting the next tick
+			state = await tick(state, drawn, 'background')
+		},
+		{
+			interval_ms: run_board_spin.REDRAW_MS,
+			sleeper: async () => {
+				await run_board_spin.spin_to_second(state.spots, ports)
+			},
+		},
+	)
 }
 
 // A signal leaves through `on_exit`; a failed redraw leaves before its error is printed, so the error
@@ -160,7 +185,7 @@ async function watch(ports: BoardPorts): Promise<void> {
 	}
 }
 
-// The answer to a progress question asked during a `backlogrun`: one frame in the chat's form,
+// The answer to a progress question asked during a `backlogrun`, `fullrun` or `halfrun`: one frame in the chat's form,
 // recorded as the report it is, so the next scheduled one waits a full interval — as
 // `run:progress --once` does.
 async function answer(ports: BoardPorts): Promise<void> {
@@ -239,6 +264,6 @@ async function run(argv: ReadonlyArray<string>, ports?: BoardPorts): Promise<num
 	return SUCCESS_EXIT_CODE
 }
 
-const run_board_cli = { DISABLED_NOTICE, USAGE, run }
+const run_board_cli = { DISABLED_NOTICE, LIVE_PORTS, USAGE, run }
 
 export { run_board_cli }

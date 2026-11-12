@@ -1,3 +1,4 @@
+import { issue_watch_diff } from '#scripts/issue/issue-watch-diff'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // joshuafolkken/kit#3773: `review:attest --check` refuses an attested review when a person updated the
@@ -24,13 +25,29 @@ const FAILURE_EXIT = 1
 const WATCH_REFUSAL = 'Issue #3773 was updated after the review was briefed'
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
 	check_mock.mockResolvedValue({ status: 'ok' })
 })
 
 describe('review_attest_cli.run --check — the issue watch', () => {
+	it.each([
+		['- [x] Keep the wording', OK_EXIT],
+		['- [X] Keep the wording', OK_EXIT],
+		['- [x] Changed requirement', FAILURE_EXIT],
+		['- [ ] Keep the wording\nNew requirement', FAILURE_EXIT],
+	])('checks the real body diff for %s', async (body, exit) => {
+		const baseline = { body: '- [ ] Keep the wording', last_comment_id: 0 }
+		const snapshot = { body, is_body_trusted: true, comments: [] }
+		const diff = issue_watch_diff.unread_diff(baseline, snapshot)
+
+		watch_refusal_mock.mockResolvedValueOnce(diff)
+
+		await expect(review_attest_cli.run([CHECK_FLAG])).resolves.toBe(exit)
+		if (exit === OK_EXIT) expect(console.error).not.toHaveBeenCalled()
+		else expect(console.error).toHaveBeenCalledWith(diff)
+	})
+
 	it('passes an attested review of the current issue', async () => {
 		await expect(review_attest_cli.run([CHECK_FLAG])).resolves.toBe(OK_EXIT)
 	})

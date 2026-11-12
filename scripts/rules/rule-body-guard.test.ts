@@ -1,9 +1,10 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { read_repo_file, RULE_DELIVERY_RATIONALE } from '#scripts/document/ai-document-fixture'
+import { hook_context } from '#scripts/hooks/hook-context'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
@@ -48,7 +49,8 @@ const LINK_NEW = 'See [docs](https://example.com/b) for the rule and its rationa
 const TYPO_OLD = 'The agent must alwyas read the comments before it implements the Issue.'
 const TYPO_NEW = TYPO_OLD.replace('alwyas', 'always')
 
-const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'rule-body-guard-'))
+const make_directory = temporary_directory('suite')
+const WORK_DIRECTORY = make_directory('rule-body-guard-')
 const ENTRY_DIRECTORY = process.cwd()
 const WRITTEN_TRANSCRIPTS = new Set<string>()
 
@@ -94,8 +96,6 @@ afterAll(() => {
 	for (const transcript of WRITTEN_TRANSCRIPTS) {
 		rmSync(delivered_rules.delivery_path(RULE_ID, transcript), { force: true })
 	}
-
-	rmSync(WORK_DIRECTORY, { recursive: true, force: true })
 })
 
 describe('is_rule_document', () => {
@@ -201,7 +201,10 @@ describe('delivered_rules.delivery — end to end through the enumeration', () =
 	// Exactly one enumeration row claims the edit, so no delivery is silently dropped.
 	it('is claimed by exactly one rule in the enumeration', () => {
 		const call = edit_call(CLAUDE_PATH, '', RULE_SENTENCE)
-		const claiming = delivered_rules.DELIVERED_RULES.filter((rule) => rule.is_trigger(call))
+		const context = hook_context.from_process()
+		const claiming = delivered_rules.DELIVERED_RULES.filter((rule) =>
+			rule.is_trigger(call, context),
+		)
 
 		expect(claiming).toHaveLength(1)
 	})
@@ -270,6 +273,17 @@ describe(`pnpm josh rule:list — the enumeration names this rule`, () => {
 
 	it('leaves the firing suite to the rationale', () => {
 		expect(read_repo_file(RULE_DELIVERY_RATIONALE)).toContain(FIRING_SUITE)
+	})
+})
+
+// joshuafolkken/kit#6973: the row is asked with the call alone, so the hook context never lands on
+// the trigger's own `read` seam.
+describe('the delivered rule-body row', () => {
+	it('reads a new rule document through its own seam under a hook context', () => {
+		const row = delivered_rules.DELIVERED_RULES.find((rule) => rule.id === RULE_ID)
+		const call = { name: WRITE, input: { file_path: NEW_PROMPT_PATH, content: RULE_SENTENCE } }
+
+		expect(row?.is_trigger(call, hook_context.from_process())).toBe(true)
 	})
 })
 

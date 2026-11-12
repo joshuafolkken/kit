@@ -43,8 +43,10 @@ const MARKER_CLOSE = ' -->'
 // child issues are closed ()".
 function child_references(epic: EpicChildren): Array<string> {
 	return [
-		...epic.children.map((child) => issue_cite.plain(child)),
-		...epic.external_children.map((child) => issue_cite.plain(child.number, child.repo)),
+		...epic.children.map((child) => issue_cite.plain_for('github', child)),
+		...epic.external_children.map((child) =>
+			issue_cite.plain_for('github', child.number, child.repo),
+		),
 	]
 }
 

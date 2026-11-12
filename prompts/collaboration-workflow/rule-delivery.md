@@ -2,33 +2,25 @@
 
 規則の届け方は**常駐**（`CLAUDE.md` に書き毎ターン読み込ませる）と**引き金つき配送**（効く瞬間にフックが本文を突きつける）の 2 つ。
 
-## 判定基準 — 引き金を特定できるか
-
-どの規則を配送へ移すかは [`residency.md`](./residency.md) →「第 1 問」に従う。
-
 ## 機構 — 1 本だけ、新規に作らない
 
 入口は `PreToolUse` の `pnpm josh pretool:guard`（バッチング ／ 調査 ／ 規則の 3 ガード）と Stop フックの `pnpm josh stop:guard` の 2 つ。**2 本目の配送経路を作るのは `CLAUDE.md` →「No clones」が禁じるクローン**である。配送は呼び出しの書き換え（`updatedInput`）でもよい — 規則の結果そのものを機械的に作れる形に限る。書き換えは `pnpm josh rule:value` が `rewritten` として数える。どのガードが書き換えるかは `scripts/rules/guard-remedy.ts` の分類表が単一ソース。
 
 ## 配送されている規則
 
-一覧は `pnpm josh rule:list` が `scripts/rules/delivered-rules.ts` から生成する（joshuafolkken/kit#3399）。各項目は規則の単一ソース・発火点・発火しないときを持ち、フックが走らないエージェントはその出力を自己適用のチェックリストにする（`principles.md`）。
+一覧は `pnpm josh rule:list`（`scripts/rules/delivered-rules.ts`）。フックが走らないエージェントはその出力を自己適用のチェックリストにする。
 
-**引き金はシェルのコマンド文字列しか見えない**（node 内の REST は掛からず、`gh api --input <file>` のファイルの中身を読むのは `credential-body` だけ）ので、常駐側にトリガ 1 行を残す。
+**引き金はシェルのコマンド文字列しか見えない**ので、node 内の REST のように引き金が掛からない経路を持つ規則は、常駐側にトリガ 1 行を残す。各項目の発火しない状態は「規則が守られている状態」と一致させ、一致が取れない規則は常駐に残す。
 
-引き金が発火しないターンでは何も起きないのが仕様で、各項目の発火しない状態は「規則が守られている状態」と一致させる。一致が取れない規則は常駐に残す。
+- 相談スコープのシェルが拒否される → `scripts/hooks/implementation-shell.ts`（拒否リストは `implementation-shell-deny.ts`）。それ以外の runtime 書き込みは `scripts/hooks/bash-revert.ts` が戻す。
 
 ## stop-notify — 途中停止の通知（`confirmation`）
 
-`CLAUDE.md` → "Mid-workflow stop notification" の本文（`pnpm josh rule:list` の `stop-notify` 行）。保持中のランが判断待ちで止まるとき、Stop フックの `pnpm josh stop:guard` が `confirmation` を送る — 理由を先頭に、末尾は `Recommended: <choice>`。フックが停止を拒否したときだけ自分で送る:
+保持中のランが判断待ちで止まるとき、Stop フックの `pnpm josh stop:guard` が `confirmation` を送る — 理由を先頭に、末尾は `Recommended: <choice>`。フックが停止を拒否したときだけ自分で送る:
 
 ```bash
 pnpm josh notify --task-type confirmation --issue-url "<url>" --body=$'<reason>' --recommended "<choice>" --alternative "<other>"
 ```
-
-## concise-reply — 回答の長さ
-
-`principles.md` → "concise-reply"（`pnpm josh rule:list` の `concise-reply` 行）。散文が上限を超えた回答の Stop で、`pnpm josh stop:guard` が節の本文付きで 1 度だけ書き直させる。
 
 ## 配送は 1 ラン 1 回
 

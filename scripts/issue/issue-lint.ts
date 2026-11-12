@@ -1,15 +1,13 @@
+import { issue_body_keys } from './issue-body-keys'
 import { markdown_section } from './markdown-section'
 
 // The Issue body template's four headings (`prompts/collaboration-workflow/issue-template.md`) are a
 // fixed shape, but unlike an epic — which `josh epic:check` verifies — nothing checks that a filed
 // Issue carries them. This reports the ones a body is missing. The headings
 // are the single source's, and the document test pins that these match it.
-const REQUIRED_HEADINGS: ReadonlyArray<string> = [
-	'## 背景',
-	'## 現象',
-	'## 期待結果',
-	'## 受け入れ条件',
-]
+const REQUIRED_HEADINGS: ReadonlyArray<string> = (
+	['background', 'symptom', 'expected', 'criteria'] as const
+).map((name) => issue_body_keys.heading(name))
 
 // The required headings a body lacks, in template order; an empty array is a conforming body. A heading
 // is present when a line is exactly it (`markdown_section.has_line`) — one mentioned inside a sentence

@@ -4,6 +4,7 @@ import { backlog_ready, type LaneUse } from '#scripts/backlog/backlog-ready'
 import { session_cite } from '#scripts/issue/session-cite'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { lane_capacity, type LimitChoice } from './lane-capacity'
+import { lane_limit_history } from './lane-limit-history'
 import { lane_limit_override } from './lane-limit-override'
 import { lane_state } from './lane-state'
 
@@ -15,6 +16,9 @@ import { lane_state } from './lane-state'
 // **Only a raise wakes anyone.** Lowering stops no child — a finished lane is simply not refilled — so
 // there is nothing for the parent to do; a raise frees lanes, and its `lane-limit` event is what the
 // `--wait` watcher's arrival probe wakes the parent for.
+//
+// **Every change is measured.** A raise, a lower or a reset writes the limit it leaves to the lane
+// ledger, so `lane:stats` labels a period the limit moved in with its history (joshuafolkken/kit#6139).
 
 const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
@@ -28,7 +32,7 @@ const NO_RUN_MESSAGE = `No run is in progress: lane:limit changes a live run's l
 
 const OPTIONS = { reset: { type: 'boolean' } } as const
 
-// `set` with no limit is `--reset`: the override is cleared and the environment's limit stands.
+// `set` with no limit is `--reset`: the override is cleared and the run's start limit stands.
 type LimitRequest =
 	| { kind: 'show' }
 	| { kind: 'set'; limit: number | undefined }
@@ -39,6 +43,7 @@ interface LimitPorts {
 	read_override: () => Promise<number | undefined>
 	write_override: (limit: number | undefined) => Promise<boolean>
 	emit_raise: (text: string) => Promise<void>
+	record_limit: () => Promise<void>
 	lane_use: () => Promise<LaneUse>
 }
 
@@ -57,6 +62,9 @@ const DEFAULT_PORTS: LimitPorts = {
 	read_override: lane_limit_override.read_override,
 	write_override: lane_limit_override.write_override,
 	emit_raise: lane_limit_override.emit_raise,
+	record_limit: async () => {
+		await lane_limit_history.record_current()
+	},
 	lane_use: backlog_ready.lane_use,
 }
 
@@ -141,6 +149,8 @@ async function change(limit: number | undefined, ports: LimitPorts): Promise<num
 	if (!(await ports.write_override(limit))) return refuse(NO_RUN_MESSAGE)
 
 	const after = await seated_now(ports)
+
+	await ports.record_limit()
 
 	if (after > before) await ports.emit_raise(`lane limit ${String(before)} → ${String(after)}`)
 

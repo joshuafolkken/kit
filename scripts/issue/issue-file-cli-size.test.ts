@@ -1,10 +1,10 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { repo_party } from '#scripts/discovery/repo-party'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_issue_list } from '#scripts/gh/git-gh-issue-list'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_file_cli } from './issue-file-cli'
 import { issue_file_fold } from './issue-file-fold'
 import { issue_scout_cli } from './issue-scout-cli'
@@ -15,12 +15,17 @@ import { issue_scout_cli } from './issue-scout-cli'
 
 const HERE = 'joshuafolkken/kit'
 const FAILURE_EXIT_CODE = 1
-const OVER_GUIDE = '- 規模見積もり: 約 30 ファイル / 900 行（テスト除く）'
+const OVER_GUIDE = '- 規模見積もり: 約 6 ファイル / 150 行（テスト除く）'
+const OVER_CAP = '- 規模見積もり: 約 25 ファイル / 300 行（テスト除く）'
 const REASON = '- 分割しない理由: 1 コミットで入れないと壊れる'
 
-const work = mkdtempSync(path.join(tmpdir(), 'issue-file-cli-size-'))
+const make_directory = temporary_directory('suite')
+const work = make_directory('issue-file-cli-size-')
 const over_path = path.join(work, 'over.md')
 const reasoned_path = path.join(work, 'reasoned.md')
+const capped_path = path.join(work, 'capped.md')
+const unreasoned_cap_path = path.join(work, 'capped-unreasoned.md')
+const CAP_TEXT = 'exceeds the cap'
 
 function body_of(...declarations: ReadonlyArray<string>): string {
 	const sections = '## 現象\n\nx\n\n## 期待結果\n\ny\n\n## 受け入れ条件\n\n- [ ] z\n'
@@ -38,6 +43,8 @@ function body_of(...declarations: ReadonlyArray<string>): string {
 
 writeFileSync(over_path, body_of(OVER_GUIDE))
 writeFileSync(reasoned_path, body_of(OVER_GUIDE, REASON))
+writeFileSync(capped_path, body_of(OVER_CAP, REASON))
+writeFileSync(unreasoned_cap_path, body_of(OVER_CAP))
 
 function argv_of(body_file: string, ...extra: ReadonlyArray<string>): Array<string> {
 	return ['A title', '--body-file', body_file, ...extra]
@@ -56,13 +63,8 @@ beforeEach(() => {
 	scout.mockResolvedValue(undefined)
 })
 
-afterEach(() => {
-	vi.clearAllMocks()
-})
-
 afterAll(() => {
 	vi.restoreAllMocks()
-	rmSync(work, { recursive: true, force: true })
 })
 
 function refusals(): string {
@@ -72,7 +74,7 @@ function refusals(): string {
 describe('issue_file_cli.run — a size estimate over the split guide', () => {
 	it('refuses the filing, naming the guide and the question', async () => {
 		expect(await issue_file_cli.run(argv_of(over_path))).toBe(FAILURE_EXIT_CODE)
-		expect(refusals()).toContain('exceeds the guide (10 files / 400 lines)')
+		expect(refusals()).toContain('exceeds the guide (more than 8 files or 200 lines)')
 		expect(refusals()).toContain('split-assessment.md → "The question"')
 	})
 
@@ -83,6 +85,29 @@ describe('issue_file_cli.run — a size estimate over the split guide', () => {
 		await issue_file_cli.run(argv)
 
 		expect(refusals()).not.toContain('exceeds the guide')
+		expect(scout).toHaveBeenCalledTimes(1)
+	})
+})
+
+// joshuafolkken/kit#5502: over the cap a filing with no reason is refused; a split or a declared
+// reason — the pre-start single-deliverable decision (joshuafolkken/kit#6602) — lets it through.
+describe('issue_file_cli.run — a size estimate over the cap', () => {
+	it('refuses the filing with no reason declared', async () => {
+		expect(await issue_file_cli.run(argv_of(unreasoned_cap_path))).toBe(FAILURE_EXIT_CODE)
+		expect(refusals()).toContain('exceeds the cap (more than 12 files or 300 lines)')
+	})
+
+	it('lets it through with a reason declared', async () => {
+		await issue_file_cli.run(argv_of(capped_path))
+
+		expect(refusals()).not.toContain(CAP_TEXT)
+		expect(scout).toHaveBeenCalledTimes(1)
+	})
+
+	it('lets it through filed as a split', async () => {
+		await issue_file_cli.run(argv_of(unreasoned_cap_path, '--route', 'split'))
+
+		expect(refusals()).not.toContain(CAP_TEXT)
 		expect(scout).toHaveBeenCalledTimes(1)
 	})
 })

@@ -14,6 +14,7 @@ import { lane_dispatch } from './lane-dispatch'
 import { lane_ledger_write } from './lane-ledger-write'
 import { lane_output } from './lane-output'
 import { lane_registry, type LaneInfo } from './lane-registry'
+import { lane_seat_fixture } from './lane-seat-fixture'
 import { lane_state, type RecordOutcome } from './lane-state'
 
 // joshuafolkken/kit#2464: the stall detector ages the last dispatch from the stream's `child-launch`, and
@@ -41,8 +42,9 @@ const LANE: LaneInfo = {
 	is_stranded: false,
 }
 
+beforeEach(lane_seat_fixture.mock_start)
+
 beforeEach(() => {
-	vi.clearAllMocks()
 	for (const key of agent_session_environment.PARENT_SESSION_KEYS) vi.stubEnv(key, '')
 	vi.stubEnv('CLAUDE_CODE_SESSION_ID', 'session')
 	vi.stubEnv('CODEX_THREAD_ID', '')
@@ -54,6 +56,7 @@ beforeEach(() => {
 		output: LOG_PATH,
 	})
 	vi.spyOn(git_gh_command, 'issue_apply_label').mockResolvedValue({ is_applied: true })
+	vi.spyOn(git_gh_command, 'issue_clear_label').mockResolvedValue(true)
 	vi.spyOn(run_label, 'unmark').mockResolvedValue(true)
 	emit.mockResolvedValue(undefined)
 })
@@ -208,7 +211,7 @@ describe('lane_dispatch.describe — the wait it hands the parent', () => {
 
 		const message = lane_dispatch.describe(await lane_dispatch.dispatch_child(ISSUE), ISSUE)
 
-		expect(message).toContain(`lane:await ${ISSUE} --owner "$PPID"\` in the background`)
+		expect(message).toContain(`lane:await ${ISSUE}\` in the background`)
 		expect(message).not.toContain('poll')
 	})
 })

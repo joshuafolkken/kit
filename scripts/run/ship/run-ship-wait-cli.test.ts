@@ -38,7 +38,6 @@ const { VERDICT } = run_ship_wait_cli
 const SHORT_CHUNK_MS = 20
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	take_mock.mockReturnValue(undefined)
 	result_mock.mockReturnValue({ result: 'running' })
 	done_mock.mockReturnValue(new Set())
@@ -47,6 +46,16 @@ beforeEach(() => {
 })
 
 describe('run_ship_wait_cli.wait_for', () => {
+	it('does not beat or consume a note when the chunk has no time left', async () => {
+		take_mock.mockReturnValue(NOTE)
+
+		await expect(run_ship_wait_cli.wait_for(ROOT, ISSUE, 0)).resolves.toStrictEqual({
+			verdict: VERDICT.PENDING,
+		})
+		expect(beat_mock).not.toHaveBeenCalled()
+		expect(take_mock).not.toHaveBeenCalled()
+	})
+
 	it('returns the stop the supervisor handed back, and stops waiting', async () => {
 		take_mock.mockReturnValueOnce(undefined).mockReturnValueOnce(NOTE)
 
@@ -81,7 +90,7 @@ describe('run_ship_wait_cli.wait_for — the current attempt', () => {
 	})
 
 	it('passes once the attempt is past a commit it skipped as already shipped', async () => {
-		started_mock.mockReturnValue(['round-2'])
+		started_mock.mockReturnValue(['followup'])
 
 		await expect(run_ship_wait_cli.wait_for(ROOT, ISSUE)).resolves.toStrictEqual({
 			verdict: VERDICT.PASSED,
@@ -114,6 +123,17 @@ describe('run_ship_wait_cli.CHUNK_MS — the wait is the keep-alive (#5344)', ()
 })
 
 describe('run_ship_wait_cli.wait_for — a commit in progress', () => {
+	it('keeps the heartbeat while gate and round 2 run before a new commit', async () => {
+		done_mock.mockReturnValue(new Set(['commit']))
+		started_mock.mockReturnValue(['gate', 'round-2'])
+
+		await expect(run_ship_wait_cli.wait_for(ROOT, ISSUE, SHORT_CHUNK_MS)).resolves.toStrictEqual({
+			verdict: VERDICT.PENDING,
+		})
+		expect(beat_mock).toHaveBeenCalledWith(ROOT, ISSUE)
+		expect(leave_mock).not.toHaveBeenCalled()
+	})
+
 	it('keeps waiting while the attempt has started its commit but not finished it', async () => {
 		done_mock.mockReturnValue(new Set(['review', 'gate']))
 		started_mock.mockReturnValue(['review', 'gate', 'commit'])
@@ -145,6 +165,15 @@ describe('run_ship_wait_cli.run', () => {
 		expect(String(info.mock.calls[0]?.[0])).toMatch(
 			/^pending — .*`pnpm josh cost --cut` `under`.*; else end the turn$/u,
 		)
+	})
+
+	it('counts the chunk from the process start, so a long preflight leaves it no wait', async () => {
+		vi.spyOn(performance, 'now').mockReturnValue(run_ship_wait_cli.CHUNK_MS)
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		await expect(run_ship_wait_cli.run([ISSUE])).resolves.toBe(0)
+		expect(beat_mock).not.toHaveBeenCalled()
+		expect(String(info.mock.calls[0]?.[0])).toMatch(/^pending — /u)
 	})
 
 	it('refuses anything but one issue number', async () => {

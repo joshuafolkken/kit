@@ -211,6 +211,22 @@ describe('stop_actions.envelope_of — an action fails', () => {
 	})
 })
 
+describe('stop_actions.envelope_of — the Issue URL cannot be resolved', () => {
+	const RATE_LIMIT = 'API rate limit exceeded'
+
+	it('sends the confirmation without an Issue URL when the repository lookup hits a rate limit', async () => {
+		vi.mocked(git_gh_repo.repo_get_name_with_owner).mockRejectedValue(new Error(RATE_LIMIT))
+		const warn = vi.spyOn(console, 'warn').mockReturnValue(undefined)
+
+		const written = await envelope([NOTIFY])
+
+		expect(sent_values()).not.toHaveProperty('issue-url')
+		expect(warn).toHaveBeenCalledWith(expect.stringContaining(RATE_LIMIT))
+		expect(written).not.toHaveProperty('decision')
+		expect(String(written[NOTICE_KEY])).toContain(NOTIFY_NOTICE)
+	})
+})
+
 describe('stop_actions.envelope_of — stdout stays the envelope', () => {
 	it('sends what a reused call prints to stderr', async () => {
 		vi.mocked(run_hold_cli.run).mockImplementation(async () => {

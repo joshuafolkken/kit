@@ -1,5 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { release_age } from '#scripts/version/release-age'
 import {
@@ -7,8 +6,11 @@ import {
 	release_window,
 	type ReleaseWindow,
 } from '#scripts/version/release-window'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it } from 'vitest'
 import { dependabot_cooldown } from './dependabot-cooldown'
+
+const make_directory = temporary_directory()
 
 const DAY_MINUTES = 1440
 const THREE_DAYS = 3
@@ -64,14 +66,10 @@ function read_kit_file(name: string): string {
 }
 
 function with_root(run: (root: string) => void): void {
-	const root = mkdtempSync(path.join(tmpdir(), 'dependabot-cooldown-'))
+	const root = make_directory('dependabot-cooldown-')
 
-	try {
-		mkdirSync(path.join(root, '.github'))
-		run(root)
-	} finally {
-		rmSync(root, { recursive: true, force: true })
-	}
+	mkdirSync(path.join(root, '.github'))
+	run(root)
 }
 
 describe('dependabot_cooldown.cooldown_days', () => {

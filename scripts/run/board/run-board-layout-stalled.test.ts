@@ -10,7 +10,9 @@ import type { ItemStatus } from './run-board-status'
 const REPO = 'joshuafolkken/kit'
 const STALLED = 33
 const NO_STATUSES: ReadonlyMap<number, ItemStatus> = new Map()
-const RESUME = { tail: 'fullrun #33' }
+const RESUME = { tail: '→ resume: fullrun #33' }
+const RETRY = { tail: '→ resume: pnpm josh run:add 33 --retry' }
+const REVIEW_FAILED = 'run:stalled: review failed'
 
 function stalled_child(): EpicChild {
 	return { number: STALLED, repo: REPO, state: 'OPEN', labels: [RUN_STALLED_LABEL], blocked_by: [] }
@@ -53,17 +55,29 @@ describe('run_board_layout.layout_of — a stalled row’s resume action', () =>
 		expect(row?.reason).toStrictEqual(RESUME)
 	})
 
-	it('draws a parked row’s recorded cause before the resume action', () => {
-		const reason = 'review failed → fullrun #33'
+	it('draws a parked row’s cause with the current resume action', () => {
+		const reason = REVIEW_FAILED
 		const statuses = new Map<number, ItemStatus>([
 			[STALLED, { state: 'parked', started_ms: 1, reason }],
 		])
 		const [row] = run_board_layout.layout_of(plan_of([]), statuses).active
 
-		expect(row?.reason).toStrictEqual({ tail: reason })
+		expect(row?.reason).toStrictEqual({ tail: '→ resume: fullrun #33 (review failed)' })
+	})
+})
+
+describe('run_board_layout stop and decision reasons', () => {
+	it('passes the shared comment question to a park without its own question', () => {
+		const plan = { ...plan_of([]), decision_questions: new Map([[1, 'Choose the account']]) }
+		const parked = new Map<number, ItemStatus>([
+			[1, { state: 'parked', reason: NEEDS_DECISION_LABEL }],
+		])
+		const [park] = run_board_layout.layout_of(plan, parked).active
+
+		expect(park?.reason?.tail).toBe('→ decide: Choose the account')
 	})
 
-	it('draws no reason on a stopped row that is not stalled, nor on a decision park', () => {
+	it('keeps a non-stalled stop bare and names a decision park question', () => {
 		const reason = `${NEEDS_DECISION_LABEL}: pick one`
 		const statuses = new Map<number, ItemStatus>([
 			[1, { state: 'stopped', started_ms: 1 }],
@@ -71,6 +85,43 @@ describe('run_board_layout.layout_of — a stalled row’s resume action', () =>
 		])
 		const layout = run_board_layout.layout_of(plan_of([]), statuses)
 
-		expect(layout.active.map((row) => row.reason)).toStrictEqual([undefined, undefined])
+		expect(layout.active.map((row) => row.reason)).toStrictEqual([
+			undefined,
+			{ tail: '→ decide: pick one' },
+		])
+	})
+})
+
+describe('run_board_layout live backlog retry', () => {
+	it('draws live retry on plan and unexplained touched rows (ac-26bb1f1e)', () => {
+		const labels = new Map([[STALLED, [RUN_STALLED_LABEL]]])
+		const plan = { ...plan_of([stalled_child()], labels), is_backlog_live: true }
+		const statuses = new Map<number, ItemStatus>([[STALLED, { state: 'parked' }]])
+
+		expect(run_board_layout.layout_of(plan, NO_STATUSES).unreached[0]?.reason).toStrictEqual(RETRY)
+		expect(run_board_layout.layout_of(plan, statuses).active[0]?.reason).toStrictEqual(RETRY)
+	})
+
+	it('changes a recorded park’s action without changing its cached status', () => {
+		const statuses = new Map<number, ItemStatus>([
+			[STALLED, { state: 'parked', reason: REVIEW_FAILED }],
+		])
+		const plan = plan_of([])
+		const live = run_board_layout.layout_of({ ...plan, is_backlog_live: true }, statuses)
+		const ended = run_board_layout.layout_of(plan, statuses)
+
+		expect(live.active[0]?.reason?.tail).toBe(`${RETRY.tail} (review failed)`)
+		expect(ended.active[0]?.reason?.tail).toBe(`${RESUME.tail} (review failed)`)
+	})
+
+	it('uses the live state before the plan has loaded', () => {
+		const statuses = new Map<number, ItemStatus>([
+			[STALLED, { state: 'parked', reason: 'run:stalled' }],
+		])
+		const read = { titles: new Map(), labels: new Map(), is_backlog_live: true }
+
+		expect(
+			run_board_layout.local_layout_of(statuses, undefined, read).active[0]?.reason,
+		).toStrictEqual(RETRY)
 	})
 })

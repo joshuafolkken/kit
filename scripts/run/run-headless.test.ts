@@ -14,6 +14,7 @@ vi.mock('#scripts/run/carry/run-carry', () => ({
 		repository_directory: vi.fn(),
 		carry_path: vi.fn(() => '/carry.json'),
 		read_carry: vi.fn(),
+		apply_change: vi.fn(),
 		is_at_cut_cap: vi.fn(() => true),
 	},
 }))
@@ -25,6 +26,7 @@ const { run_headless } = await import('./run-headless')
 const lanes_in_flight = vi.mocked(lane_registry.has_lanes_in_flight)
 const repository_directory = vi.mocked(run_carry.repository_directory)
 const read_carry = vi.mocked(run_carry.read_carry)
+const apply_change = vi.mocked(run_carry.apply_change)
 
 const HEADLESS = { [run_headless.HEADLESS_ENV_KEY]: '1' }
 const HEADLESS_CHILD = { ...HEADLESS, JOSH_LANE_CHILD: '2437' }
@@ -57,7 +59,6 @@ function own_ancestry(): ReadonlySet<number> {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	lanes_in_flight.mockResolvedValue(true)
 	repository_directory.mockResolvedValue('/repo/.git')
 	read_carry.mockReturnValue(DRIVING)
@@ -84,43 +85,57 @@ describe('run_headless.is_cut_capped', () => {
 })
 
 describe('run_headless.must_keep_waiting', () => {
-	it('holds a headless parent with lanes in flight and a live record', async () => {
-		expect(await run_headless.must_keep_waiting(HEADLESS)).toBe(true)
+	beforeEach(() => {
+		read_carry.mockReturnValue(OWNED)
+	})
+
+	it('holds a headless parent with lanes in flight and a live record it owns', async () => {
+		expect(await run_headless.must_keep_waiting(HEADLESS, own_ancestry)).toBe(true)
 	})
 
 	it('holds a named epic session while its child lane is in flight', async () => {
 		read_carry.mockReturnValue({
 			kind: 'carried',
-			carry: carry({ invocation: 'backlogrun #2501 --only' }),
+			carry: carry({ invocation: 'backlogrun #2501 --only', owner_pid: SESSION_PID }),
 		})
 
-		expect(await run_headless.must_keep_waiting(HEADLESS)).toBe(true)
+		expect(await run_headless.must_keep_waiting(HEADLESS, own_ancestry)).toBe(true)
 	})
 
 	it('lets a headless parent with no lanes in flight stop', async () => {
 		lanes_in_flight.mockResolvedValue(false)
 
-		expect(await run_headless.must_keep_waiting(HEADLESS)).toBe(false)
+		expect(await run_headless.must_keep_waiting(HEADLESS, own_ancestry)).toBe(false)
 	})
 
 	it('never holds an attached session', async () => {
-		expect(await run_headless.must_keep_waiting(ATTACHED)).toBe(false)
+		expect(await run_headless.must_keep_waiting(ATTACHED, own_ancestry)).toBe(false)
 	})
 
 	it('never holds a lane child that inherited the mark', async () => {
-		expect(await run_headless.must_keep_waiting(HEADLESS_CHILD)).toBe(false)
+		expect(await run_headless.must_keep_waiting(HEADLESS_CHILD, own_ancestry)).toBe(false)
 	})
 
 	it('lets a parent whose cut handed the record off stop', async () => {
 		read_carry.mockReturnValue(HANDED_OFF)
 
-		expect(await run_headless.must_keep_waiting(HEADLESS)).toBe(false)
+		expect(await run_headless.must_keep_waiting(HEADLESS, own_ancestry)).toBe(false)
 	})
 
 	it('lets a parent whose run ended stop', async () => {
 		read_carry.mockReturnValue({ kind: 'none' })
 
-		expect(await run_headless.must_keep_waiting(HEADLESS)).toBe(false)
+		expect(await run_headless.must_keep_waiting(HEADLESS, own_ancestry)).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#5516: the supervisor adopts the record the launcher handed off and opens lanes
+// while the launched parent plans, so that parent's turn-end strands nothing.
+describe('run_headless.must_keep_waiting — beside the supervisor', () => {
+	it('lets the launched parent stop while the supervisor drives its record', async () => {
+		read_carry.mockReturnValue({ kind: 'carried', carry: carry({ owner_pid: SUCCESSOR_PID }) })
+
+		expect(await run_headless.must_keep_waiting(HEADLESS, own_ancestry)).toBe(false)
 	})
 })
 
@@ -165,6 +180,16 @@ describe('run_headless.driving_carry', () => {
 		read_carry.mockReturnValue({ kind: 'carried', carry: carry({ owner_pid: SUCCESSOR_PID }) })
 		expect(await run_headless.driving_carry(ATTACHED, own_ancestry)).toBeUndefined()
 	})
+
+	// joshuafolkken/kit#6743: the retrospective unit runs under the parent that owns the carry, so the
+	// owner is in its ancestry; its launch environment must still keep it from driving or cutting it.
+	it('returns nothing for a run:handoff child of a headless parent, whose owner is its ancestor', async () => {
+		read_carry.mockReturnValue(OWNED)
+		const unit = { ...HEADLESS, ...run_headless.handoff_child_environment() }
+
+		expect(await run_headless.driving_carry(unit, own_ancestry)).toBeUndefined()
+		expect(await run_headless.hand_back_at_turn_end(unit, own_ancestry)).toBe(false)
+	})
 })
 
 // joshuafolkken/kit#2472: after a cut the successor owns the record, and the session that cut —
@@ -180,6 +205,52 @@ describe('run_headless.is_backlog_parent — ownership', () => {
 		read_carry.mockReturnValue(DRIVING)
 
 		expect(await run_headless.is_backlog_parent(ATTACHED, own_ancestry)).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#5739: a headless judgment session's turn-end writes the hand-back cut itself.
+describe('run_headless.hand_back_at_turn_end', () => {
+	beforeEach(() => {
+		read_carry.mockReturnValue(OWNED)
+		apply_change.mockImplementation((_target, written) => {
+			read_carry.mockReturnValue(HANDED_OFF)
+
+			return written
+		})
+	})
+
+	it('cuts the record a headless parent drives and lets it stop, lanes in flight or not', async () => {
+		expect(await run_headless.hand_back_at_turn_end(HEADLESS, own_ancestry)).toBe(false)
+		expect(apply_change).toHaveBeenCalledWith(expect.any(String), OWNED.carry, { cuts: 1 })
+
+		read_carry.mockReturnValue(OWNED)
+		lanes_in_flight.mockResolvedValue(false)
+		expect(await run_headless.hand_back_at_turn_end(HEADLESS, own_ancestry)).toBe(false)
+		expect(apply_change).toHaveBeenCalledTimes(2)
+	})
+
+	it('writes no cut for an attached session, a lane child or a handed-off record', async () => {
+		expect(await run_headless.hand_back_at_turn_end(ATTACHED, own_ancestry)).toBe(false)
+		expect(await run_headless.hand_back_at_turn_end(HEADLESS_CHILD, own_ancestry)).toBe(false)
+
+		read_carry.mockReturnValue(HANDED_OFF)
+		expect(await run_headless.hand_back_at_turn_end(HEADLESS, own_ancestry)).toBe(false)
+		expect(apply_change).not.toHaveBeenCalled()
+	})
+
+	it('keeps a parent with lanes in flight waiting when the write left the record un-handed-off', async () => {
+		apply_change.mockImplementation((_target, written) => written)
+
+		expect(await run_headless.hand_back_at_turn_end(HEADLESS, own_ancestry)).toBe(true)
+	})
+
+	// joshuafolkken/kit#7120: the triage session beside the driver runs under the supervisor that owns
+	// the record, so only its mark keeps its turn-end from cutting the record the driver still holds.
+	it('writes no cut for a triage session started beside the driver', async () => {
+		const beside = run_headless.beside_environment()
+
+		expect(await run_headless.hand_back_at_turn_end(beside, own_ancestry)).toBe(false)
+		expect(apply_change).not.toHaveBeenCalled()
 	})
 })
 

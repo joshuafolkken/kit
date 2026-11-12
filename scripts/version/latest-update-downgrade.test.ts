@@ -61,7 +61,6 @@ function rewrite_package_json(content: string): void {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	tree.package_json = INSTALLED
 	tree.lockfile = ORIGINAL_LOCK
 	read_mock.mockImplementation((path: string) =>

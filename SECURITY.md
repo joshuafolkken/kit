@@ -25,7 +25,7 @@ The `files` field of `package.json` decides what the published `@joshuafolkken/k
 **Code that runs on your machine and in CI**
 
 - `dist/`, `scripts/` — the `josh` command and the scripts behind it. They read and write files in your repository, run `git`, `gh` and `pnpm`, and call the GitHub API and, when configured, the Telegram API.
-- `.claude/settings.json` — Claude Code hooks that run `pnpm josh …` commands on session start, on each prompt, before and after tool calls and on stop, plus a deny list for staging, committing, merging, force pushes, branch deletions and reads of `.env`, `.env.*` (except the tracked `.env.example` and `.env.test`) and `.dev.vars`. The deny list and the `pretool-guard` hook are a guardrail, not a sandbox: another spelling of the same action (a git command inside `bash -c '…'`, a script that opens the file itself) gets through, and an instruction planted in text the agent reads can run with your permissions; the section linked below describes these limits and what keeps them small. It allows `Bash(*)` and ships no `permissions.defaultMode`, which Claude Code v2.1.257 and later ignore in a project settings file; the distributed `.vscode/settings.json` turns the VS Code extension's prompts off — an opt-out default, described in [`docs/init.md` → "Claude Code permission mode"](https://github.com/joshuafolkken/kit/blob/main/docs/init.md#claude-code-permission-mode).
+- `.claude/settings.json` — Claude Code hooks that run `pnpm josh …` commands on session start, on each prompt, before and after tool calls and on stop, plus a deny list for staging, committing, merging, force pushes, branch deletions and reads of `.env`, `.env.*` (except the tracked `.env.example` and `.env.test`), `.dev.vars` and the credential files `~/.config/gh/**`, `~/.codex/auth.json`, `~/.netrc` and `~/.ssh/**`; the `pretool-guard` hook refuses the same reads through a shell reader, and of `~/.curlrc` and `~/.npmrc` too. The deny list and the `pretool-guard` hook are a guardrail, not a sandbox: another spelling of the same action (a git command inside `bash -c '…'`, a script that opens the file itself) gets through, and an instruction planted in text the agent reads can run with your permissions; the section linked below describes these limits and what keeps them small. It allows `Bash(*)` and ships no `permissions.defaultMode`, which Claude Code v2.1.257 and later ignore in a project settings file; the distributed `.vscode/settings.json` turns the VS Code extension's prompts off — an opt-out default, described in [`docs/init.md` → "Claude Code permission mode"](https://github.com/joshuafolkken/kit/blob/main/docs/init.md#claude-code-permission-mode).
 - `.codex/` — the same hooks for Codex (`hooks.json`) and its project settings (`config.toml`).
 - `.github/` — GitHub Actions workflows (CI, tagging, pull request classification, Dependabot auto-merge, SonarQube and production), composite actions, `dependabot.yml`, the pull request template and the release-notes config. `josh sync` overwrites the distributed workflows; their action references are pinned to commit SHAs. kit's own `publish.yml` ships in the package but is never copied into a project.
 - `lefthook/` — Git hook presets: lint before commit, checks before push.
@@ -61,6 +61,14 @@ sh install-safe-chain.sh
 
 Stop if `shasum` does not print `install-safe-chain.sh: OK`. Then restart your terminal; if the warning still appears, run `safe-chain setup` and restart it again.
 
+The shell integration wraps every `pnpm` call, `pnpm josh …` included, which costs about 0.25 s per call and adds up across an agent's many josh runs. `pnpm josh` installs nothing, and the `pnpm` calls josh makes itself are child processes that never pass through a shell function, so exempting it loses no protection. In `~/.zshrc`, after the line safe-chain added:
+
+```sh
+pnpm() { [ "$1" = josh ] && { command pnpm "$@"; return; }; wrapSafeChainCommand pnpm "$@"; }
+```
+
+`pnpm install`, `pnpm add` and every other subcommand still go through safe-chain.
+
 ## Secrets
 
 kit never stores a secret in a file it ships or commits. The ones it uses:
@@ -70,6 +78,8 @@ kit never stores a secret in a file it ships or commits. The ones it uses:
 - `GITHUB_TOKEN` — supplied by GitHub Actions to the distributed workflows; nothing to configure.
 - `GH_TOKEN` — authenticates `gh` in CI and cloud sessions, where `gh auth login` is not available.
 - `NODE_AUTH_TOKEN` — the GitHub Packages credential, only for projects that still install kit from there ([authentication.md](https://github.com/joshuafolkken/kit/blob/main/docs/authentication.md)). The `prepare` script above reads it.
+
+An unattended agent runs with `Bash(*)`, so an instruction planted in text it reads could send one of these off the machine. The `egress` guard row (`scripts/rules/egress-guard.ts`) refuses an agent's `Bash` call that reaches another host (`curl`, `wget`, `nc`, `ssh`, `scp`, a remote `rsync`, a network call in an inline `node -e` / `python -c` script, `gh` sent to a host other than github.com) or prints a credential (`gh auth token`, `printenv`, a bare `env`, a `*TOKEN*` / `*SECRET*` / `*KEY*` variable, a keychain secret through `security find-generic-password` / `find-internet-password` / `dump-keychain` / `export` or `security -i`), nested in `bash -c`, `eval` or `$(…)` as well. The same row refuses a direct `gh` write against github.com: a subcommand other than `browse`, `search`, `status` or a read action (`view`, `list`, `diff`, `checks`, …), a `gh api graphql` call that merges a pull request or writes to another owner's repository, and any other `gh api` call with a non-`GET` method or a field flag (`-f`, `-F`, `--input`) (`scripts/rules/shell-permissions.ts` → `is_gh_write`). Writes go through the `pnpm josh` routes instead — `issue:file`, `issue:comment`, `issue:priority`, `git`, `pr` — or the user runs them. `gh` reads against github.com, `git` and `pnpm` stay allowed. `.claude/settings.json` denies `curl`, `wget`, `nc`, `gh auth token` and `printenv` as a static backstop for when the hook does not run, so a plain `curl` / `wget` is refused even to localhost; the hook's localhost / GitHub allowance covers only the spellings that deny list does not reach (a nested or wrapped call).
 
 ## MCP External Endpoints
 

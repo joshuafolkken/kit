@@ -25,12 +25,15 @@ vi.mock('./lint-parallel', () => ({
 // gate records. What belongs to this suite is that the recorder is reached with this run's verdict
 // and its arguments; what the recorder then does with them is `scoped-green.test.ts`.
 vi.mock('#scripts/gate/scoped-green', () => ({
-	scoped_green: { read_before: vi.fn(), record_if_green: vi.fn() },
+	scoped_green: { is_unmoved: vi.fn(), read_before: vi.fn(), record_if_green: vi.fn() },
 }))
 // Mocked so no case reads this checkout's real green record; unset, it answers "read the whole branch".
-vi.mock('#scripts/gate/since-green', () => ({
-	since_green: { UNMOVED_REASON: 'nothing moved', describe: vi.fn(), read_moved: vi.fn() },
-}))
+vi.mock(import('#scripts/gate/since-green'), async (import_original) => {
+	const { since_green: real } = await import_original()
+	const no_record = { fallback: real.FALLBACK.NO_RECORD }
+
+	return { since_green: { ...real, describe: vi.fn(), read_verdict: vi.fn(async () => no_record) } }
+})
 // Mocked so the verdict is the mocked lint's alone, never this checkout's real document sizes — an
 // unrelated document over its ceiling mid-work failed the whole-tree fallback case here
 // (joshuafolkken/kit#3208). The ceilings are the suites of the checks `document-checks.ts` runs.
@@ -109,7 +112,6 @@ function green_checks_after_lint(): void {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
 	mocked_root.mockResolvedValue(REPOSITORY_ROOT)
 	mocked_changed.mockResolvedValue([CHANGED_SOURCE])
@@ -204,7 +206,7 @@ describe('lint_related.run_related_lint', () => {
 	it('asks for the warm eslint daemon on the narrowed run', async () => {
 		await lint_related.run_related_lint([])
 
-		expect(mocked_scoped.mock.calls[0]?.[3]).toEqual({ warm_daemon: true })
+		expect(mocked_scoped.mock.calls[0]?.[3]).toMatchObject({ warm_daemon: true })
 	})
 
 	it('reports the narrowing it applied before either linter starts', async () => {
@@ -354,11 +356,13 @@ describe('lint_related.run_related_lint — since the last green run', () => {
 	// joshuafolkken/kit#4655: the tree read for the record is the one handed over, so a bare run reads
 	// it once — `since-green.test.ts` pins that a handed tree is not read again.
 	it('lints only the files moved since its own green record, read on the record’s tree', async () => {
-		vi.mocked(since_green.read_moved).mockResolvedValue([CHANGED_SOURCE])
+		vi.mocked(since_green.read_verdict).mockResolvedValue({
+			parts: { changed: [CHANGED_SOURCE], synced: [] },
+		})
 
 		await lint_related.run_related_lint([])
 
-		expect(since_green.read_moved).toHaveBeenCalledWith(
+		expect(since_green.read_verdict).toHaveBeenCalledWith(
 			review_stamps.lint_related_stamp,
 			gate_labels.LINT_LABEL,
 			undefined,
@@ -369,7 +373,9 @@ describe('lint_related.run_related_lint — since the last green run', () => {
 	})
 
 	it('lints the whole branch change when nothing moved is lintable', async () => {
-		vi.mocked(since_green.read_moved).mockResolvedValue(['assets/logo.png'])
+		vi.mocked(since_green.read_verdict).mockResolvedValue({
+			parts: { changed: ['assets/logo.png'], synced: [] },
+		})
 
 		await lint_related.run_related_lint([])
 
@@ -379,14 +385,14 @@ describe('lint_related.run_related_lint — since the last green run', () => {
 	it('never consults the record for explicit file arguments', async () => {
 		await lint_related.run_related_lint([CHANGED_SOURCE])
 
-		expect(since_green.read_moved).not.toHaveBeenCalled()
+		expect(since_green.read_verdict).not.toHaveBeenCalled()
 	})
 })
 
 // joshuafolkken/kit#4593: a re-run with no edit since its green run re-linted the whole branch diff.
 describe('lint_related.run_related_lint — nothing moved since the last green run', () => {
 	it('returns green without starting a linter or the byte check', async () => {
-		vi.mocked(since_green.read_moved).mockResolvedValue([])
+		vi.mocked(since_green.read_verdict).mockResolvedValue({ parts: { changed: [], synced: [] } })
 
 		await expect(lint_related.run_related_lint([])).resolves.toBe(0)
 		expect(mocked_scoped).not.toHaveBeenCalled()
@@ -397,7 +403,7 @@ describe('lint_related.run_related_lint — nothing moved since the last green r
 
 	// A main sync can move the base while moving no path; a record left on the old base refuses the gate.
 	it('still hands the recorder its green verdict, so the record follows a moved base', async () => {
-		vi.mocked(since_green.read_moved).mockResolvedValue([])
+		vi.mocked(since_green.read_verdict).mockResolvedValue({ parts: { changed: [], synced: [] } })
 
 		await lint_related.run_related_lint([])
 
@@ -407,7 +413,9 @@ describe('lint_related.run_related_lint — nothing moved since the last green r
 	// No record (a red run writes none, `scoped-green.test.ts`), other inputs, or a moved configuration
 	// all answer `undefined` (`since-green.test.ts`).
 	it('lints the branch change when the record cannot vouch for this tree', async () => {
-		vi.mocked(since_green.read_moved).mockResolvedValue(undefined)
+		vi.mocked(since_green.read_verdict).mockResolvedValue({
+			fallback: since_green.FALLBACK.NO_RECORD,
+		})
 
 		await lint_related.run_related_lint([])
 

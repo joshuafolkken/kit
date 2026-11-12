@@ -4,6 +4,7 @@ import type { Classification } from '#scripts/epic/epic-classify'
 import { epic_graph, type EpicChild, type GraphAnomaly } from '#scripts/epic/epic-graph'
 import { epic_index } from '#scripts/epic/epic-index'
 import { epic_issue } from '#scripts/epic/epic-issue'
+import { epic_next_read, type SnapshotReads } from '#scripts/epic/epic-next-read'
 import type { EpicView } from '#scripts/epic/epic-next-views'
 import { epic_outside_blocker } from '#scripts/epic/epic-outside-blocker'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
@@ -40,10 +41,13 @@ type TrackingIndex = ReadonlyMap<number, ReadonlyArray<number>>
 // The part of the context that decides which rows the standalone half considers at all.
 type ConsideredContext = Pick<StandaloneContext, 'tracked' | 'exclude' | 'repo'>
 
-interface StandaloneContext {
+interface RepoContext {
+	repo: string
+}
+
+interface StandaloneContext extends RepoContext {
 	tracked: ReadonlyMap<number, number>
 	exclude: ReadonlyArray<number>
-	repo: string
 	// Every issue this backlog may run. A row whose open blocker is outside it
 	// waits on a person rather than on time, exactly as an epic child's does.
 	running: ReadonlySet<string>
@@ -63,16 +67,21 @@ function waits_outside(issue: OpenIssueData, running: ReadonlySet<string>, repo:
 }
 
 // An issue whose author lacks write access waits on a person too: only they can vouch for its body.
-function is_stuck(issue: OpenIssueData, running: ReadonlySet<string>, repo: string): boolean {
+// Its size never does: the lane splits it or keeps it one Issue (joshuafolkken/kit#7074).
+function is_stuck(
+	issue: OpenIssueData,
+	running: ReadonlySet<string>,
+	context: RepoContext,
+): boolean {
 	return (
 		!auto_ok_author.is_author_trusted(issue) ||
 		has_any_label(issue.labels, DECISION_LABELS) ||
-		waits_outside(issue, running, repo)
+		waits_outside(issue, running, context.repo)
 	)
 }
 
 function needs_person(issue: OpenIssueData, context: StandaloneContext): boolean {
-	return is_stuck(issue, context.running, context.repo)
+	return is_stuck(issue, context.running, context)
 }
 
 // Each open epic's key, read off the tracking index — child number to the epics listing it.
@@ -114,21 +123,21 @@ function rooted(
 function settle_standalone(
 	running: ReadonlySet<string>,
 	issues: ReadonlyArray<OpenIssueData>,
-	repo: string,
+	context: RepoContext,
 	tracking: TrackingIndex,
 ): ReadonlySet<string> {
 	const settled = new Set(running)
 
 	// An epic row is never a standalone row, so deleting its key here never happens; `rooted` decides it.
 	for (const issue of issues) {
-		if (is_stuck(issue, running, repo)) {
-			settled.delete(epic_graph.key_of({ repo, number: issue.number }))
+		if (is_stuck(issue, running, context)) {
+			settled.delete(epic_graph.key_of({ repo: context.repo, number: issue.number }))
 		}
 	}
 
-	const next = rooted(settled, tracking, repo)
+	const next = rooted(settled, tracking, context.repo)
 
-	return next.size === running.size ? next : settle_standalone(next, issues, repo, tracking)
+	return next.size === running.size ? next : settle_standalone(next, issues, context, tracking)
 }
 
 // An opted-in row as the graph's node type. Both halves of the pool are then the same shape, so one
@@ -142,6 +151,7 @@ function settle_standalone(
 //
 // The body rides along as an epic child's does, so a declared start time (`issue-not-before.ts`)
 // reaches the classification and the board's waiting row for a standalone row too (#4014).
+// The author rides along too, so an epic child taken from this row (`read_epics`) is judged as read.
 function to_child(issue: OpenIssueData, repo: string): EpicChild {
 	return {
 		number: issue.number,
@@ -150,6 +160,8 @@ function to_child(issue: OpenIssueData, repo: string): EpicChild {
 		labels: (issue.labels ?? []).map((label) => label.name),
 		blocked_by: epic_issue.blocker_references_of(issue, repo),
 		body: issue.body,
+		author_association: issue.author_association,
+		user: issue.user,
 	}
 }
 
@@ -170,6 +182,22 @@ function opted_in_epics(
 	tracking: ReadonlyMap<number, ReadonlyArray<number>>,
 ): ReadonlyArray<number> {
 	return [...epic_index.reachable_epic_numbers(tracking, issues)]
+}
+
+interface ListedPool {
+	opted_in: { issues: ReadonlyArray<OpenIssueData> }
+	tracking: { index: TrackingIndex }
+	repo: string
+}
+
+// The opted-in epics, each child the listing returned taken from its row rather than read again — the
+// listing asks the child read's fields (joshuafolkken/kit#6611).
+async function read_epics(pool: ListedPool): Promise<SnapshotReads> {
+	const { issues } = pool.opted_in
+	const references = opted_in_epics(issues, pool.tracking.index).map((number) => ({ number }))
+	const listed = new Map(to_children(issues, pool.repo).map((child) => [child.number, child]))
+
+	return await epic_next_read.read_snapshots(references, pool.repo, { repo: pool.repo, listed })
 }
 
 // The rows that stand for themselves. An epic root is a container rather than work, so it is never a
@@ -233,15 +261,15 @@ function classify_standalone(
 function running_set(
 	graphs: ReadonlyArray<ReadonlyArray<EpicChild>>,
 	issues: ReadonlyArray<OpenIssueData>,
-	repo: string,
+	context: RepoContext,
 	tracking: TrackingIndex,
 ): ReadonlySet<string> {
 	const running = epic_outside_blocker.running_keys([
 		...graphs.flat().filter((child) => child.state === 'OPEN'),
-		...to_children(standalone_rows(issues), repo),
+		...to_children(standalone_rows(issues), context.repo),
 	])
 
-	return settle_standalone(rooted(running, tracking, repo), issues, repo, tracking)
+	return settle_standalone(rooted(running, tracking, context.repo), issues, context, tracking)
 }
 
 // A cycle no single epic can see, because its links cross from one graph into another. Each epic's own
@@ -412,6 +440,7 @@ const backlog_pool = {
 	epic_classification,
 	merge_classifications,
 	opted_in_epics,
+	read_epics,
 	standalone_rows,
 	to_child,
 	to_children,

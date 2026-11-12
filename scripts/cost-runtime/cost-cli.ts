@@ -1,4 +1,4 @@
-import { agent_role_profile, type AgentProvider } from '#scripts/agent/agent-role-profile'
+import { agent_provider, type AgentProvider } from '#scripts/agent/agent-provider'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { codex_usage } from './codex-usage'
 import { context_cut_payback } from './context-cut-payback'
@@ -12,11 +12,8 @@ import { transcript_cwd } from './transcript-cwd'
 // `josh cost` — what the next turn of a run will cost, read from the active provider's own session
 // usage.
 //
-// Since #2016 this is the `--over` hand-off verdict alone. The readerless report scopes
-// (`--session` / `--issue` / `--all` / `--run` / `--json`) and the `--cap` counterfactual were
-// retired because no rule or decision read them — leaving only the entry judgment `fullrun` /
-// `backlogrun` / `halfrun` / `pre-gate-cut` ask, and the `josh time` run-timing report keeps the
-// hand-off aggregates used to compare the `--cut` break-even.
+// Only the entry judgment requested by workflow and cut commands belongs here (#2016).
+// `josh time` owns the hand-off aggregates for comparing the `--cut` break-even.
 
 const FAILURE_EXIT_CODE = 1
 const USAGE = 'Usage: josh cost (--cut | --over <tokens-per-request>) [--path <dir>]'
@@ -141,7 +138,7 @@ function report_empty(cwd: string, session_id: string | undefined): number {
 // The provider of this process's own session. A defaulted provider is no session at all: a launch may
 // default to Claude Code, but pricing here would measure the newest transcript of some other session.
 function provider_of(environment: Environment): AgentProvider | undefined {
-	const resolved = agent_role_profile.resolve_provider(environment)
+	const resolved = agent_provider.resolve_provider(environment)
 	if (resolved.kind !== 'provider' || resolved.is_default === true) return undefined
 
 	return resolved.provider

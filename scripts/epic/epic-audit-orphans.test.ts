@@ -108,8 +108,7 @@ describe('epic_audit_orphans.locally_tracked', () => {
 	})
 })
 
-// joshuafolkken/kit#1033: a rate limit used to arrive here as `[]`, which is what "no issue claims
-// this epic" looks like — so `epic:audit` reported zero orphans without having read anything.
+// A rate limit is unread data, not an empty orphan listing (joshuafolkken/kit#1033).
 describe('epic_audit_orphans.find_claiming_issues', () => {
 	beforeEach(() => {
 		vi.restoreAllMocks()

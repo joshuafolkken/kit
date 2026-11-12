@@ -2,6 +2,34 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # The POSIX named-pipe command the resident hook daemon and its launcher create FIFOs with (#6683).
+  - mkfifo
+  # The POSIX checksum command and shell-depth variable that key the hook daemon by its environment (#6683).
+  - cksum
+  - SHLVL
+  # The `git diff` summary flag an issue reproduction runs (#6586).
+  - shortstat
+  # A subshell written without a space after the parenthesis, as a review finding names it (#6586).
+  - unspaced
+  # Codex session files grouped into one lane task (#6376).
+  - rollouts
+  # Claude's update opt-out and an unsupported CPU used by bootstrap tests (#6295).
+  - AUTOUPDATER
+  - riscv
+  - pushurl
+  # One of the network programs `egress-guard.ts` refuses (#5999).
+  - ncat
+  # The Xcode launcher `launched-call.ts` looks past, so `xcrun security` reaches the keychain check (#7198).
+  - xcrun
+  # The option-parsing convention the #7198 review cites for `security -qi` flag clusters.
+  - getopt
+  # `security -pstop`, an attached-prompt spelling the #7198 round-2 review quotes in its record.
+  - pstop
+  # `josh review:selfcheck`, the self-check's questions 2, 4 and 10 run as one command (#5540).
+  - selfcheck
+  - uncomputable
+  - textconv
+  - fsmonitor
   # awk's `getline` and `nextfile`, which reach outside the pipe or leave it early, so an `awk` filter using one is not rewritten (#5266).
   - getline
   - nextfile
@@ -19,9 +47,6 @@ words:
   - CMPRS
   - cmprs
   - BKMGT
-  # macOS's process-policy command, named where lanes deliberately avoid efficiency-core confinement
-  # (#3947).
-  - taskpolicy
   # macOS's process-start scanners, named where hook launches cut their process count (#3946).
   - Xprotect
   - syspolicyd
@@ -53,9 +78,18 @@ words:
   - numer
   # The macOS `sysctl` memory-pressure key the core budget reads available memory from (#3371).
   - memorystatus
+  # The macOS `sysctl` timebase and wake-clock keys a load sample reads the host's sleep from (#7026).
+  - tbfrequency
+  - machdep
+  - abstime
+  - boottime
+  - waketime
+  - usec
+  - conttime
+  # British spellings review findings record verbatim (#6577).
+  - memoising
+  - behaviour
   - purgeable
-  # The macOS `sysctl` key the lane-limit measurement reads swap from (#3355).
-  - swapusage
   # The swap counters `run:board`'s machine line reads: macOS `sysctl` and Linux `/proc/vmstat` (#3450).
   - swapins
   - swapouts
@@ -68,8 +102,6 @@ words:
   - prrun
   # A rationale section no procedure document cites (#2762).
   - uncited
-  # GitHub Release API field used to select the commit for generated notes.
-  - commitish
   # package.json lifecycle hook names the webServer command library chains (#2392).
   - postdev
   - predev
@@ -80,45 +112,42 @@ words:
   - buildpack
   - pyproject
   # Names and technical terms quoted in the fourth historical release audit.
-  - SQSCANGHA
   - undici
-  - Zenn
   - unfiled
-  - thomasleplus
   # Terms quoted from PR and Issue evidence in the third historical release audit.
   - redispatch
   - dedupe
-  - unscored
-  - hardlink
-  - pageouts
+  # find(1) actions named by the consultation shell guard.
+  - execdir
+  - okdir
+  - fprint
   # Names and established technical terms quoted in the historical release audit.
   - execa
-  - Threlte
+  # npm_execpath / npm_node_execpath, set by pnpm for the command it launches.
+  - execpath
   - sveltejs
-  - toggleable
-  - webapps
   - lockfiles
   - iwasakishinya
   - rescanning
-  - codegen
   # VS Code extension publisher and extension identifiers in the static profile.
   - pkief
   - usernamehw
   - errorlens
+  - errexit
+  - autoselection
+  - rcfile
+  - rfixture
+  - Wonce
+  - Iexample
+  - rrexml
   # Python virtual-environment directory names excluded from project file discovery.
   - venv
-  # Standard shell command used to create a temporary publication directory.
-  - mktemp
   # npm's CLI option for selecting the registry-auth configuration file.
   - userconfig
-  # `josh issue:fold-existing` short command alias (joshuafolkken/kit#2553).
-  - isfe
   # git's `for-each-ref` modifier that removes leading path components (joshuafolkken/kit#2504).
   - lstrip
   # git's `for-each-ref` atom naming the work tree a branch is checked out in (joshuafolkken/kit#2504).
   - worktreepath
-  # An observation-ledger line appended but not yet committed by a flush (joshuafolkken/kit#2492).
-  - unflushed
   # ISO 15924 script codes `Intl.Locale#maximize` returns and Unicode regex scripts name — the
   # session-language check judges a reply by script (joshuafolkken/kit#2470).
   - Jpan
@@ -134,6 +163,8 @@ words:
   # A Claude Code built-in agent type, `statusline-setup` — enumerated in the known-agent-types set the
   # review-subagent document rule checks against (joshuafolkken/kit#2297).
   - statusline
+  # The `📈 throughput` section's bar of cells on `run:board` (joshuafolkken/kit#5705).
+  - sparkline
   # `git_stash.has_stashable_changes` — what `josh stash:push` would set aside (joshuafolkken/kit#4131).
   - stashable
   # `josh fanout` — the command that says whether implementation units are file-disjoint, so their
@@ -163,13 +194,6 @@ words:
   # "The section intro cites the same words unbolded" — the prompt-sync test comment contrasts the
   # bold header it matches against the plain (unbolded) mention nearby (joshuafolkken/kit#2255).
   - unbolded
-  # "A safety net not firing is not a miscalibration" — the pre-gate-cut decision heading for
-  # joshuafolkken/kit#2282 names the threshold-tuning question it declines to treat as an error.
-  - miscalibration
-  # "halving it moves the unsimulated parent hand-off too" — the pre-gate-cut decision for
-  # joshuafolkken/kit#2366 names the three shared uses of the context-cut threshold the lane simulation
-  # did not price.
-  - unsimulated
   # Wrapped in backticks, as a past participle. `josh epic --add` writes the relation it replaced into
   # the decision record with the chain in a code span, because a line that is nothing but `#A -> #B` is
   # read as a dependency declaration anywhere in an epic body (joshuafolkken/kit#1711) — the code and
@@ -234,14 +258,8 @@ words:
   # The shell tokens `time-shell.ts` drops before keying a check by its arguments
   # (joshuafolkken/kit#1383). The plural is what cspell's dictionaries do not derive.
   - redirections
-  # What the gate's caches exist to stop it doing (joshuafolkken/kit#1256). Both forms are needed:
-  # cspell's dictionaries do not derive one from the other.
+  # What the gate's caches exist to stop it doing (joshuafolkken/kit#1256).
   - rescan
-  - rescanned
-  # What `time-phases.ts` calls a span belonging to no phase at all (joshuafolkken/kit#1299). It
-  # stays in this local list because it reaches no distributed file; the `wrapup` beside it in the
-  # same change does, so that one is in `cspell/index.yaml` instead.
-  - unphased
   # What `time-batch.ts` calls a batch row with no duration to print — a run the batch never reached,
   # and one whose report could not be built at all (joshuafolkken/kit#1352). `unstarted` is the word
   # its counterpart uses for the first of those alone. Neither reaches a distributed file.
@@ -251,12 +269,6 @@ words:
   # state a consumer's pre-push hook leaves behind (joshuafolkken/kit#1417). It reaches no
   # distributed file: the word appears only in that module's own unit suite.
   - unpushed
-  # What `time-ci.ts` does with a CI cycle the merge command sat waiting for: it moves from the
-  # `merge` phase to `ci` (joshuafolkken/kit#1384). All three forms are needed — cspell's
-  # dictionaries derive none of them from another — and none reaches a distributed file.
-  - reattribute
-  - reattributed
-  - reattribution
   # The shell builtins `josh time` walks past when it names the command a Bash call actually ran
   # (joshuafolkken/kit#1267). They reach no distributed file, so they stay in this local list.
   - pushd
@@ -300,7 +312,6 @@ words:
   - desync
   - desynced
   - dotless
-  - testuser
   - myorg
   - myrepo
   # The `tsc --noEmit` flag, folded to lower case: a lowercased command line is matched against
@@ -308,7 +319,7 @@ words:
   # split it (joshuafolkken/kit#1313).
   - noemit
   - unstub
-  - appleboy
+  - unstubbed
   - vercel
   - winget
   - packument
@@ -316,11 +327,12 @@ words:
   - sonarlint
   - inlines
   - extensionless
-  - triaging
   - untriaged
   - mnemecha
   - waneccha
   - ENOENT
+  - EACCES
+  - EMFILE
   # The errno a `--stop` gets when it may not signal the supervisor it just unrecorded
   - EPERM
   - ELIFECYCLE
@@ -350,11 +362,6 @@ words:
   # carries it, so `docs/josh-commands.md` has used it for some time; the workflow is YAML, where
   # that dictionary is off, so the word has to be declared here to be spelled the same in both.
   - rollup
-  # What `scripts/time-runtime/time-history.ts` calls `tools/time/`: the report directory that is
-  # deliberately left out of the package, so the recorder must not statically pull it into a
-  # distributed command's closure (joshuafolkken/kit#2003). cspell derives "distributable" but not
-  # the "un-" compound.
-  - undistributable
   # What `scripts/rules/lane-park.ts` calls a lane child's decision-stop that has not yet recorded its
   # park on the Issue (joshuafolkken/kit#2034) — the state the delivered rule refuses. It reaches no
   # distributed file: the word appears only in that module, its two suites and the enumeration.

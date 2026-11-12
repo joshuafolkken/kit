@@ -13,8 +13,7 @@ const WATCHER_EXCLUDE_KEY = 'files.watcherExclude'
 const CONSUMER_EXCLUDE_GLOB = '**/tmp/**'
 const JOSH_EXCLUDE_GLOB = '**/.git/josh/**'
 
-// #691: a key the consumer already owns used to freeze out every later kit addition inside it.
-// Object-valued settings are registries of independent entries, so kit's missing entries are merged
+// #691: object-valued settings are registries of independent entries, so kit's missing entries merge
 // in while the consumer's own entries win. Arrays and scalars stay create-only — the real
 // `eslint.validate` case, where a consumer appends 'svelte' that must survive every sync.
 describe('init_logic_json_merge.merge_json_object — owned object keys', () => {

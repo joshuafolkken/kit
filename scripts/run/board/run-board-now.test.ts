@@ -53,6 +53,13 @@ describe('run_board_now.line_of at a stage', () => {
 		expect(line_of({ activity, waiting: 2 })).toBe('1′12″ 💭 judgment session running — 2 waiting')
 	})
 
+	// joshuafolkken/kit#6745: the driver's retrospective unit reads as the investigate icon.
+	it('draws the retrospective unit the driver waits on as `🔍 retrospective`', () => {
+		const activity = standing(STAGE.RETROSPECTIVE, 72 * SECOND)
+
+		expect(line_of({ activity, waiting: 0 })).toContain('🔍 retrospective')
+	})
+
 	it('writes the running children as the reason while any run', () => {
 		const activity = standing(STAGE.JUDGING, SECOND)
 

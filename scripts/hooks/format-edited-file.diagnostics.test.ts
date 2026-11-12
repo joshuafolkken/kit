@@ -1,7 +1,5 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { compose_context, format_edited_file, MAX_DIAGNOSTIC_CHARS } from './format-edited-file'
 import {
 	eslint_reporting_runner,
@@ -12,12 +10,9 @@ import {
 
 // Its own temp directory and teardown: vitest isolates test files, so this does not share the
 // sibling suite's `mkdtemp` (see format-edited-file.test.ts for why it lives under the OS temp dir).
-const TEST_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'format-edited-diagnostics-'))
+const make_directory = temporary_directory('suite')
+const TEST_DIRECTORY = make_directory('format-edited-diagnostics-')
 const { write_fixture } = make_directory_helpers(TEST_DIRECTORY)
-
-afterAll(() => {
-	rmSync(TEST_DIRECTORY, { recursive: true, force: true })
-})
 
 async function returned_for(name: string, stdout: string): Promise<string | undefined> {
 	return await format_edited_file(

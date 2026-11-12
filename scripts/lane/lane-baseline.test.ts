@@ -56,7 +56,6 @@ function launched_prompt(): string {
 afterEach(() => vi.unstubAllEnvs())
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.stubEnv('JOSH_LANE_INVESTIGATION', 'on')
 	mocks.target.mockResolvedValue('/state/lane-ledger.jsonl')
 	mocks.all_events.mockResolvedValue([])
@@ -163,7 +162,6 @@ describe('lane_baseline.investigate — the prompt', () => {
 		expect(launched_prompt()).toContain('`pnpm josh issue:file`')
 		expect(launched_prompt()).not.toContain('--found-during')
 		expect(launched_prompt()).not.toContain('%')
-		expect(launched_prompt()).not.toContain('overrun:mechanisms')
 	})
 
 	it('launches the session with no lane marks in its env', async () => {

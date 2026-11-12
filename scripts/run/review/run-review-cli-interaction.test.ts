@@ -1,6 +1,6 @@
 import type { ReviewSlot } from '#scripts/review/review-attest'
 import type { Emit } from '#scripts/review/review-brief-cli'
-import type { InteractionStatus } from '#scripts/review/review-interaction'
+import type { InteractionReading, InteractionStatus } from '#scripts/review/review-interaction'
 import { run_ship_review } from '#scripts/run/ship/run-ship-review'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_review } from './run-review'
@@ -19,21 +19,33 @@ const { early_launch, early_prepare, early_push } = vi.hoisted(() => ({
 	early_push: vi.fn<() => Promise<number>>(),
 }))
 
-const { branch, brief_run, brief_run_to, interaction_status, launch_pinned, write_text_stamp } =
-	vi.hoisted(() => ({
-		branch: vi.fn<() => Promise<string>>(),
-		brief_run: vi.fn<(argv: ReadonlyArray<string>) => Promise<number>>(),
-		brief_run_to: vi.fn<(argv: ReadonlyArray<string>, emit: Emit) => Promise<number>>(),
-		interaction_status: vi.fn<(issue: number) => Promise<InteractionStatus>>(),
-		launch_pinned: vi.fn<(root: string, reason?: string) => { kind: string }>(),
-		write_text_stamp: vi.fn<(target: string, text: string) => string>(),
-	}))
+const { branch, brief_run, brief_run_to, interaction_reading, launch_pinned } = vi.hoisted(() => ({
+	branch: vi.fn<() => Promise<string>>(),
+	brief_run: vi.fn<(argv: ReadonlyArray<string>) => Promise<number>>(),
+	brief_run_to: vi.fn<(argv: ReadonlyArray<string>, emit: Emit) => Promise<number>>(),
+	interaction_reading: vi.fn<(issue: number) => Promise<InteractionReading>>(),
+	launch_pinned: vi.fn<(root: string, reason?: string) => { kind: string }>(),
+}))
+
+const { remove_stamp, write_text_stamp } = vi.hoisted(() => ({
+	remove_stamp: vi.fn<(target: string) => void>(),
+	write_text_stamp: vi.fn<(target: string, text: string) => string>(),
+}))
 
 vi.mock('#scripts/git/git-command', () => ({ git_command: { branch } }))
-vi.mock('#scripts/josh/stamp-file', () => ({ stamp_file: { write_text_stamp } }))
+vi.mock('#scripts/josh/stamp-file', () => ({
+	stamp_file: {
+		remove_stamp,
+		stamp_path: (prefix: string) => `/stamps/${prefix}`,
+		write_text_stamp,
+	},
+}))
 vi.mock('#scripts/lane/lane-session-broker', () => ({
 	lane_session_broker: {
-		review_paths: (_root: string, slot: ReviewSlot) => ({ brief: `/briefs/brief-${slot}.md` }),
+		review_paths: (_root: string, slot: ReviewSlot) => ({
+			brief: `/briefs/brief-${slot}.md`,
+			findings: `/briefs/findings-${slot}.txt`,
+		}),
 	},
 }))
 vi.mock('#scripts/review/review-brief-cli', () => ({
@@ -42,7 +54,7 @@ vi.mock('#scripts/review/review-brief-cli', () => ({
 vi.mock('#scripts/review/review-interaction', async (import_original) => {
 	const { review_interaction } = await import_original<Record<'review_interaction', object>>()
 
-	return { review_interaction: { ...review_interaction, status: interaction_status } }
+	return { review_interaction: { ...review_interaction, reading: interaction_reading } }
 })
 // joshuafolkken/kit#4907: `run-review-early-push.test.ts` owns the commit and the push themselves.
 vi.mock('./run-review-early-push', () => ({
@@ -52,6 +64,12 @@ vi.mock('./run-review-early-push', () => ({
 		prepare: early_prepare,
 		push: early_push,
 	},
+}))
+vi.mock('#scripts/gate/metrics-totals', () => ({
+	metrics_totals: { totals_refusal: async () => undefined },
+}))
+vi.mock('./run-review-unplanned', () => ({
+	run_review_unplanned: { refusal: async () => undefined },
 }))
 vi.mock('./run-review-join-read', () => ({ run_review_join_read: { mark_due: vi.fn() } }))
 vi.mock('./run-review-pinned-steps', () => ({
@@ -64,6 +82,7 @@ vi.mock('./run-review-steps', () => ({
 			await Promise.resolve()
 		}),
 		write_timing_start: vi.fn(),
+		wait_for_gate_finish: async () => 'green',
 	},
 }))
 
@@ -85,6 +104,9 @@ const PATH_LINES = `${brief_lines(CODE, CODE_PATH)}${brief_lines(INTERACTION, IN
 const FAILURE_EXIT_CODE = 1
 const UNPINNED_OK = '--unpinned-ok'
 const REASON = 'a doc-only change'
+const NOT_REQUIRED: InteractionStatus = 'not-required'
+const INERT_LINE =
+	'Interaction review not due: every run-tooling path … unchanged: scripts/run/x.ts'
 
 const output = { stdout: [] as Array<string>, stderr: [] as Array<string> }
 
@@ -104,7 +126,7 @@ beforeEach(() => {
 	output.stdout = []
 	output.stderr = []
 	branch.mockResolvedValue(LANE_BRANCH)
-	interaction_status.mockReset().mockResolvedValue('missing')
+	interaction_reading.mockReset().mockResolvedValue({ status: 'missing' })
 	launch_pinned.mockReset().mockReturnValue({ kind: 'launched' })
 	write_text_stamp.mockReset()
 	brief_run.mockReset().mockImplementation(async (argv) => {
@@ -124,16 +146,30 @@ beforeEach(() => {
 beforeEach(() => {
 	early_launch.mockReset()
 	early_prepare.mockReset().mockResolvedValue(false)
+	remove_stamp.mockReset()
 })
 
 afterEach(() => {
 	vi.restoreAllMocks()
 })
 
+describe('run:review with a full-change final brief', () => {
+	it('hands a full-change final brief a read-only final opening', async () => {
+		brief_run_to.mockImplementationOnce(async (_argv, emit) => {
+			emit('medium\nReview round: 2 — final, whole change, read only.')
+
+			return 0
+		})
+
+		expect(await run_review_cli.run([])).toBe(0)
+		expect(output.stdout.join('')).toContain(run_ship_review.final_opening(CODE_PATH))
+	})
+})
+
 describe('run:review where the interaction review is due', () => {
 	it('writes code’s brief, then the interaction brief, to their files, and the two-reviewer hint', async () => {
 		expect(await run_review_cli.run([])).toBe(0)
-		expect(interaction_status).toHaveBeenCalledWith(ISSUE)
+		expect(interaction_reading).toHaveBeenCalledWith(ISSUE)
 		expect(brief_run_to.mock.calls.map(([argv]) => argv)).toStrictEqual([[], [INTERACTION_FLAG]])
 		expect(write_text_stamp.mock.calls).toStrictEqual([
 			[CODE_PATH, `${CODE_BRIEF}\n`],
@@ -166,6 +202,18 @@ describe('run:review where the interaction review is due', () => {
 	})
 })
 
+// joshuafolkken/kit#5549: a reviewer that ends without `review:submit` must leave
+// `review:record --from-slot` nothing to record, not the previous round's findings.
+describe('run:review and the review:submit slots', () => {
+	it('clears each briefed slot’s findings so --from-slot never records a stale round', async () => {
+		expect(await run_review_cli.run([])).toBe(0)
+		expect(remove_stamp.mock.calls.filter(([file]) => file.startsWith('/briefs/'))).toStrictEqual([
+			['/briefs/findings-code.txt'],
+			['/briefs/findings-interaction.txt'],
+		])
+	})
+})
+
 describe('run:review stdout', () => {
 	it('carries only the two paths, however long the briefs are', async () => {
 		const long_brief = 'x'.repeat(run_review.CODE_ONLY_FLAG.length * ISSUE)
@@ -185,11 +233,29 @@ describe('run:review stdout', () => {
 	})
 })
 
+// joshuafolkken/kit#5656: a due change whose every due path is inert opens no interaction brief.
+describe('run:review over an inert due change', () => {
+	it('writes only code’s brief, printing why the interaction review is not due', async () => {
+		interaction_reading.mockResolvedValue({ status: NOT_REQUIRED, inert_line: INERT_LINE })
+
+		expect(await run_review_cli.run([])).toBe(0)
+		expect(brief_run_to.mock.calls.map(([argv]) => argv)).toStrictEqual([[]])
+		expect(output.stderr.join('')).toContain(`${INERT_LINE}\n`)
+		expect(output.stderr.join('')).not.toContain(run_review_cli.INTERACTION_HINT)
+	})
+
+	it('prints no inert line where the interaction review is due', async () => {
+		expect(await run_review_cli.run([])).toBe(0)
+		expect(brief_run_to.mock.calls.map(([argv]) => argv)).toStrictEqual([[], [INTERACTION_FLAG]])
+		expect(output.stderr.join('')).not.toContain('Interaction review not due')
+	})
+})
+
 describe('run:review that briefs code alone', () => {
-	it.each<InteractionStatus>(['not-required', 'ok'])(
+	it.each<InteractionStatus>([NOT_REQUIRED, 'ok'])(
 		'writes only code’s brief when the interaction review is %s',
 		async (status) => {
-			interaction_status.mockResolvedValue(status)
+			interaction_reading.mockResolvedValue({ status })
 
 			expect(await run_review_cli.run([])).toBe(0)
 			expect(brief_run_to.mock.calls.map(([argv]) => argv)).toStrictEqual([[]])
@@ -202,7 +268,7 @@ describe('run:review that briefs code alone', () => {
 		branch.mockResolvedValue('main')
 
 		expect(await run_review_cli.run([])).toBe(0)
-		expect(interaction_status).not.toHaveBeenCalled()
+		expect(interaction_reading).not.toHaveBeenCalled()
 		expect(brief_run_to.mock.calls.map(([argv]) => argv)).toStrictEqual([[]])
 	})
 
@@ -230,7 +296,7 @@ describe('run:review that briefs code alone', () => {
 // joshuafolkken/kit#4907: the push waits on the gate this pair launched, so it follows a written brief.
 describe('run:review early push', () => {
 	it('launches the early push after a written brief, when the open prepared one', async () => {
-		interaction_status.mockResolvedValue('ok')
+		interaction_reading.mockResolvedValue({ status: 'ok' })
 		early_prepare.mockResolvedValue(true)
 
 		expect(await run_review_cli.run([])).toBe(0)

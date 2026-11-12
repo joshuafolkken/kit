@@ -1,5 +1,5 @@
 import type { execaSync } from 'execa'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { npm_registry } from './npm-registry'
 import { fetch_latest_version, fetch_release_times, with_page_size } from './version-remote'
 
@@ -52,10 +52,6 @@ function expect_gh_call(endpoint: string): void {
 		expect.anything(),
 	)
 }
-
-beforeEach(() => {
-	vi.clearAllMocks()
-})
 
 const KIT_ENDPOINT = '/users/joshuafolkken/packages/npm/kit/versions?per_page=1'
 const KIT_PACKAGE = '@joshuafolkken/kit'

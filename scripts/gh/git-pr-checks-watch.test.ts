@@ -1,9 +1,9 @@
+import { PR_POLL_SCHEDULES } from '#scripts/lib/poll'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_gh_pr_snapshot } from './git-gh-pr-snapshot'
 import {
 	CHECK_WAIT_INTERVAL_MS,
 	compute_max_attempts,
-	default_fetch_pr_state,
 	DEFAULT_STABLE_READS,
 	PR_CHECKS_TIMEOUT_MESSAGE,
 	SECONDS_TO_MS,
@@ -34,7 +34,7 @@ import {
 vi.mock('./git-gh-pr-snapshot', () => ({
 	git_gh_pr_snapshot: {
 		pr_get_checks_snapshot: vi.fn(),
-		pr_get_review_decision: vi.fn(),
+		pr_read_review_decision: vi.fn(),
 	},
 }))
 
@@ -48,7 +48,7 @@ vi.mock('./git-pr-checks', async (import_original) => {
 
 const wait = vi.mocked(wait_for_pr_success)
 const fetch_checks = vi.mocked(git_gh_pr_snapshot.pr_get_checks_snapshot)
-const fetch_review = vi.mocked(git_gh_pr_snapshot.pr_get_review_decision)
+const fetch_review = vi.mocked(git_gh_pr_snapshot.pr_read_review_decision)
 
 const PR_NUMBER = 972
 
@@ -103,9 +103,16 @@ const CODERABBIT_FAILING = settled([
 	{ name: SONAR_QUBE, status: 'pass' },
 	{ name: CODE_RABBIT, status: 'fail' },
 ])
+const BLOCKING_FAILURE_WITH_PENDING = settled([
+	{ name: 'CodeQL', status: 'fail' },
+	{ name: E2E, status: 'pending' },
+])
+const CODERABBIT_FAILING_WITH_PENDING = settled([
+	{ name: CODE_RABBIT, status: 'fail' },
+	{ name: E2E, status: 'pending' },
+])
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	wait.mockResolvedValue(EMPTY_SNAPSHOT)
 })
@@ -131,6 +138,12 @@ describe('evaluate_checks_settled — the weaker question the watch asks', () =>
 
 	it('fails on a check that failed, as the watch process did', () => {
 		expect(evaluate_checks_settled(ONE_FAILING)).toBe('failure')
+	})
+
+	// joshuafolkken/kit#5389: the merge gate already refuses on this red, so waiting out the pending
+	// E2E only delays the same verdict.
+	it('fails on a blocking failure in one poll while another check is pending', () => {
+		expect(evaluate_checks_settled(BLOCKING_FAILURE_WITH_PENDING)).toBe('failure')
 	})
 
 	// **An empty rollup keeps waiting rather than failing.** `followup` starts the watch right after
@@ -163,6 +176,11 @@ describe('evaluate_checks_settled — CodeRabbit is not waited on', () => {
 	// `failure`, which is what `git-pr-followup.ts` swallows and falls through on.
 	it('still fails on a CodeRabbit check that failed', () => {
 		expect(evaluate_checks_settled(CODERABBIT_FAILING)).toBe('failure')
+	})
+
+	// A non-blocking red keeps the old order: it does not end the watch while E2E is still running.
+	it('keeps waiting on a failed CodeRabbit while another check is pending', () => {
+		expect(evaluate_checks_settled(CODERABBIT_FAILING_WITH_PENDING)).toBe('pending')
 	})
 
 	// A rollup holding nothing but CodeRabbit falls back to the whole rollup, so a lone CodeRabbit
@@ -204,6 +222,12 @@ describe('evaluate_checks_settled — CodeRabbit put back on the required list',
 
 		expect(reloaded.evaluate_checks_settled(CODERABBIT_PENDING)).toBe('pending')
 	})
+
+	it('fails on a failed CodeRabbit in one poll while another check is pending', async () => {
+		const reloaded = await import('./git-pr-checks-watch')
+
+		expect(reloaded.evaluate_checks_settled(CODERABBIT_FAILING_WITH_PENDING)).toBe('failure')
+	})
 })
 
 describe('describe_checks_failure', () => {
@@ -225,12 +249,14 @@ describe('pr_checks_watch — what it asks the poll loop for', () => {
 
 		expect(wait.mock.calls[0]?.[0]).toMatchObject({
 			branch_name: BRANCH,
-			fetcher: default_fetch_pr_state,
+			// Gated per wait (#7238), so a fresh fetcher rather than the shared default.
+			fetcher: expect.any(Function),
 			interval_ms: CHECK_WAIT_INTERVAL_MS,
 			max_attempts: compute_max_attempts(
 				PR_CHECKS_WATCH_TIMEOUT_MS / SECONDS_TO_MS,
 				CHECK_WAIT_INTERVAL_MS,
 			),
+			backoff: PR_POLL_SCHEDULES.checks_gated,
 			required_stable_reads: DEFAULT_STABLE_READS,
 			evaluator: CHECKS_SETTLED_EVALUATOR,
 		})

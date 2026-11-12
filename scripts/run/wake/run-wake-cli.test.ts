@@ -1,5 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, readFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { issue_cite } from '#scripts/issue/issue-cite'
@@ -7,10 +6,13 @@ import { stamp_file } from '#scripts/josh/stamp-file'
 import { issue_citation } from '#scripts/rules/issue-citation'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, beforeEach, describe, expect, it, test, vi } from 'vitest'
 import { run_wake } from './run-wake'
 import { run_wake_cli } from './run-wake-cli'
 import { run_wake_session } from './run-wake-session'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#1719. Two things are pinned here: standard output is one verdict token on every
 // path, and a person can find the supervisor and stop it — the last acceptance criterion, and the one
@@ -32,7 +34,7 @@ const { git_command } = await import('#scripts/git/git-command')
 const git_directories = vi.mocked(git_command.git_directories)
 
 const TEST_PREFIX = 'run-wake-cli-test-'
-const scratch = mkdtempSync(path.join(tmpdir(), TEST_PREFIX))
+const scratch = make_directory(TEST_PREFIX)
 const WORKTREE = path.join(scratch, 'worktree.git')
 const REPOSITORY = path.join(scratch, 'repository.git')
 const INVOCATION = 'backlogrun --max 5 --idle 30'
@@ -100,7 +102,6 @@ beforeEach(() => {
 })
 
 afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
 	rmSync(log_target(), { force: true })
 	rmSync(event_target(), { force: true })
 })
@@ -125,7 +126,7 @@ describe('josh run:wake — the stdout contract', () => {
 		expect(await run_wake_cli.run([LOOP_FLAG, INTERVAL_FLAG, '0'])).toBe(FAILURE)
 	})
 
-	// `setTimeout` clamps a delay past 2^31−1 ms to one millisecond, so an interval large enough to
+	// `setTimeout` clamps an overflowing delay to its minimum, so an interval large enough to
 	// look like "poll rarely" produces the busy loop the lower bound exists to prevent.
 	it('refuses an interval large enough to wrap round to a busy loop', async () => {
 		expect(await run_wake_cli.run([LOOP_FLAG, INTERVAL_FLAG, '3000000'])).toBe(FAILURE)
@@ -388,8 +389,8 @@ describe('josh run:wake — the log exists at the path it names', () => {
 		expect(existsSync(log_target())).toBe(true)
 	})
 
-	// The already-running branch of `--start` prints the same listing and launches nothing, so it is
-	// the path on which the file used to be named without anything ever creating it.
+	// The already-running branch of `--start` must create the file its listing names even though it
+	// launches nothing.
 	it('leaves the log in place for a `--start` that found a supervisor already running', async () => {
 		write_carry(true)
 		run_wake.write_wake(wake_target(), run_wake.fresh_wake(INVOCATION, new Date()))

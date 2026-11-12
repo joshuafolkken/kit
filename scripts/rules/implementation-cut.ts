@@ -1,7 +1,10 @@
 import path from 'node:path'
+import { agent_provider, type AgentEnvironment } from '#scripts/agent/agent-provider'
 import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { cost_cli, type CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
+import type { HookContext } from '#scripts/hooks/hook-context'
+import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import type { GuardRun } from '#scripts/josh/hook-decision'
 import { lane_child_marker, type MarkerSource } from '#scripts/lane/lane-child-marker'
 import { lane_paths } from '#scripts/lane/lane-paths'
@@ -75,23 +78,70 @@ interface LaneCostState {
 // **The guard asks for a cut only where `run:cut --impl` could take one** (joshuafolkken/kit#3881).
 // A run held on the default branch, or one whose cut was already answered `not-a-lane` / `unready`
 // under this hold, can only be refused again, so each refusal was a round trip that cut nothing. The
-// decline record is a file read and comes first; the tree read spawns git and comes second.
-function can_cut_sync(issue: string): boolean {
-	return !run_cut_decline.is_declined_sync(issue) && run_cut_ready.is_ready_sync()
+// decline record is a file read and comes first; the tree read spawns git and comes second. Both are
+// read under the call's cwd.
+function can_cut_sync(issue: string, cwd: string): boolean {
+	const directory = run_cut.worktree_git_directory_sync(cwd)
+
+	if (run_cut_decline.is_declined_sync(issue, directory)) return false
+
+	return run_cut_ready.is_ready_sync(() => run_cut_ready.read_tree_sync(cwd))
 }
 
-function current_state(): LaneCostState {
+function is_named(value: string | undefined): boolean {
+	return value !== undefined && value !== ''
+}
+
+// A relaunched Claude hook names its transcript even when no session id is exported. An exported id
+// (a unit prices its parent's session) and an OpenAI thread id already identify the session;
+// conflicting providers remain unmeasurable.
+function environment_for(transcript: string, source: AgentEnvironment): AgentEnvironment {
+	if (
+		agent_provider.resolve_provider(source).kind === 'rejected' ||
+		is_named(source[agent_provider.CODEX_SESSION_KEY]) ||
+		is_named(source[agent_session_environment.SESSION_ID_KEY])
+	) {
+		return source
+	}
+
 	return {
-		directory: process.cwd(),
-		source: process.env,
-		carried: run_cut.carried_cut_sync,
-		held_issue: run_cut.held_issue_sync,
+		...source,
+		[agent_session_environment.SESSION_ID_KEY]: path.basename(transcript, '.jsonl'),
+	}
+}
+
+// The verdict of the hook's own transcript, cached per transcript so a resumed session never reads
+// the verdict its predecessor left.
+function session_verdict(
+	transcript: string,
+	directory: string,
+	source: AgentEnvironment,
+): CostVerdict {
+	return implementation_cut_verdict.reused_verdict(
+		() => cost_cli.session_verdict(directory, environment_for(transcript, source)),
+		transcript,
+	)
+}
+
+function current_state(context: HookContext, transcript?: string): LaneCostState {
+	const { cwd, env } = context
+
+	return {
+		directory: cwd,
+		source: env,
+		// The cut record and the run hold of the call's own work tree.
+		carried: (now?: Date): RunCut | undefined =>
+			run_cut.carried_cut_sync(now, run_cut.worktree_git_directory_sync(cwd)),
+		held_issue: (): string | undefined =>
+			run_cut.held_issue_sync(run_cut.worktree_git_directory_sync(cwd)),
 		// **Read through the short reuse window**. The row now fires per
 		// threshold crossing rather than once per run, so this predicate is a candidate on every edit;
 		// the window collapses one turn's burst of edits to a single whole-transcript price.
 		verdict: (): CostVerdict =>
-			implementation_cut_verdict.reused_verdict(() => cost_cli.session_verdict()),
-		can_cut: can_cut_sync,
+			transcript === undefined
+				? implementation_cut_verdict.reused_verdict(() => cost_cli.session_verdict(cwd, env), cwd)
+				: session_verdict(transcript, cwd, env),
+		can_cut: (issue: string): boolean => can_cut_sync(issue, cwd),
 	}
 }
 
@@ -163,15 +213,10 @@ function refusable_issue(call: GuardedCall, state: LaneCostState): string | unde
 	return is_handoff_write(call, state.directory, issue) ? undefined : issue
 }
 
-// **An unmeasurable session is cut in a lane and left alone outside one.** A lane child's safety net is
-// the pre-gate direction below; a held run outside a lane is a person's own session, so only a measured
-// `over` interrupts it — a provider with no transcript would otherwise refuse every edit it makes.
+// Only a measured `over` warrants a cut, inside or outside a lane (joshuafolkken/kit#6575).
+// An unmeasurable verdict is undetermined: relaunching cannot supply a provider's missing transcript.
 function warrants_the_cut(state: LaneCostState): boolean {
-	const verdict = state.verdict()
-
-	if (lane_child_issue(state) === undefined) return verdict === cost_verdict.OVER_VERDICT
-
-	return verdict !== cost_verdict.UNDER_VERDICT
+	return state.verdict() === cost_verdict.OVER_VERDICT
 }
 
 // **The tool-name test comes first and the world is consulted second, the cost measurement last.** This
@@ -180,15 +225,9 @@ function warrants_the_cut(state: LaneCostState): boolean {
 // a dispatched child makes in an uncut lane — where crossing the threshold is exactly the event this
 // guard exists to catch.
 //
-// **The unmeasurable direction matches the pre-gate cut**. A session that
-// cannot be priced reads as warranting the cut, the same safety-net direction `pre-gate-cut.ts`'s
-// `warrants_the_cut` takes (`verdict !== UNDER_VERDICT`): the two rules read one statistic against one
-// threshold, so they must not disagree about whether an unmeasurable session is due a cut. Whether the
-// cut could be taken is asked only once it is warranted, so an under-threshold edit spawns no git.
-function is_over_threshold_edit(
-	call: GuardedCall,
-	state: LaneCostState = current_state(),
-): boolean {
+// Whether the cut could be taken is asked only once a measured `over` warrants it, so an
+// under-threshold or unmeasurable edit spawns no git.
+function is_over_threshold_edit(call: GuardedCall, state: LaneCostState): boolean {
 	if (!is_edit_tool(call.name)) return false
 
 	const issue = refusable_issue(call, state)
@@ -225,8 +264,8 @@ function is_reissued_refusal(now_ms: number, delivered_at_ms: number): boolean {
 
 // **Fires on every threshold crossing rather than once per run**. Once per run
 // silenced the row for the rest of a process the moment its first refusal landed — and a `busy` /
-// `failed` / `unready` verdict, or an edit reissued unchanged, left the context to grow unwatched to
-// 282,747 tokens with the cut never taken. `decide` re-asks on every over-threshold edit; the reissue
+// `failed` / `unready` verdict, or an edit reissued unchanged, left the context to grow unwatched far
+// past the threshold with the cut never taken. `decide` re-asks on every over-threshold edit; the reissue
 // window keeps that from wedging a run whose cut came back `busy` / `failed`, and a run that cannot
 // cut at all never reaches here — `can_cut_sync` keeps the trigger silent for it. `delivered_at_ms` is this
 // row's own last refusal, written by `fire_once` only when a refusal actually fired, so a passed
@@ -240,6 +279,29 @@ function decide(
 	return !is_reissued_refusal(run.now_ms, delivered_at_ms)
 }
 
+// Delivery has the calling transcript; candidate selection has only the tool call.
+function decide_for_session(
+	call: GuardedCall,
+	run: GuardRun,
+	can_record: boolean,
+	delivered_at_ms: number,
+): boolean {
+	return (
+		decide(call, run, can_record, delivered_at_ms) &&
+		is_over_threshold_edit(call, current_state(run.context, run.transcript))
+	)
+}
+
+// The candidate half, priced on nothing: an edit an uncut run could be refused for. Outside a run no
+// edit is a candidate, so the row claims nothing another rule delivers.
+function is_refusable_edit(call: GuardedCall, state: LaneCostState): boolean {
+	return is_edit_tool(call.name) && refusable_issue(call, state) !== undefined
+}
+
+function is_refusable_edit_in(call: GuardedCall, context: HookContext): boolean {
+	return is_refusable_edit(call, current_state(context))
+}
+
 // The row itself, so `delivered-rules.ts` spreads one entry. `decide` fires it per threshold crossing
 // in a run that can cut. It declares no `keeps`: the trigger is a budget threshold the child cannot
 // observe, so no run takes `run:cut --impl` before crossing it unaided, and the row is reported
@@ -247,9 +309,9 @@ function decide(
 // `keeps` predicate is reported as unmeasured").
 const ROW = {
 	id: 'implementation-cut',
-	is_trigger: is_over_threshold_edit,
+	is_trigger: is_refusable_edit_in,
 	reason: IMPLEMENTATION_CUT_REASON,
-	decide,
+	decide: decide_for_session,
 	// The opening the reason carried before it was cut to the action and the next command.
 	former_reasons: [
 		'⛔ implementation-phase cut: this checkout is a lane dispatched',
@@ -274,6 +336,7 @@ const implementation_cut = {
 	is_over_threshold_edit,
 	is_reissued_refusal,
 	resumes_a_cut,
+	session_verdict,
 	takes_the_impl_cut,
 	uncut_run_issue,
 }

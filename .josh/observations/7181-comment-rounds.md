@@ -1,0 +1,3 @@
+- rf:assumptions | low | scripts/run/board/run-board-render-condition.ts:44 | 2026-11-11 | #7181
+- rf:project-conventions | low | scripts/run/board/run-board-render-condition.ts:58 | 2026-11-11 | #7181
+- rf:project-conventions | low | scripts/run/board/run-board-render-condition.ts:8 | 2026-11-11 | #7181

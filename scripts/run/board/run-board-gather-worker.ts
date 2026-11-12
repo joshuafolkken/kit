@@ -1,5 +1,6 @@
 import { setTimeout as sleep } from 'node:timers/promises'
 import { parentPort, type MessagePort } from 'node:worker_threads'
+import { poll } from '#scripts/lib/poll'
 import { run_board_gather } from './run-board-gather'
 import { run_board_gather_live } from './run-board-gather-live'
 import { run_board_gather_thread } from './run-board-gather-thread'
@@ -16,14 +17,15 @@ async function gather_forever(port: MessagePort): Promise<void> {
 	const ports = run_board_gather_live.ports_of(true)
 	let state = FRESH_GATHER
 
-	for (;;) {
-		// eslint-disable-next-line no-await-in-loop -- polling: each round folds the state the last one left
-		state = await gather_round(state, ports, (value) => {
-			port.postMessage(value)
-		})
-		// eslint-disable-next-line no-await-in-loop -- polling: each round waits a redraw
-		await sleep(run_board_spin.REDRAW_MS)
-	}
+	await poll.wait_for(
+		async () => {
+			// eslint-disable-next-line require-atomic-updates -- poll awaits each callback before starting the next gather
+			state = await gather_round(state, ports, (value) => {
+				port.postMessage(value)
+			})
+		},
+		{ interval_ms: run_board_spin.REDRAW_MS, sleeper: sleep },
+	)
 }
 
 if (parentPort !== null) await gather_forever(parentPort)

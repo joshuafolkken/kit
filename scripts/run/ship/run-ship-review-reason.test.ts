@@ -13,6 +13,15 @@ describe('run_ship_review_reason', () => {
 		expect(run_ship_review_reason.reused({ reuse: 'delta' })).toContain("round 2's delta")
 	})
 
+	// joshuafolkken/kit#5662: a reuse past a moved doc says which moves no round reads.
+	it('appends the moves a reused round 1 passed over', () => {
+		const note = 'passed over documentation, a prompt or an inert path no round executes: docs/a.md'
+
+		expect(run_ship_review_reason.reused({ reuse: 'held', note })).toBe(
+			`reused: round 1 attested on this branch, its tree held — ${note}`,
+		)
+	})
+
 	it('names the cause a round 1 was reviewed again for', () => {
 		expect(run_ship_review_reason.ran({ reuse: 'again', cause: 'the issue changed' })).toBe(
 			'ran: --review with no reusable round 1 — the issue changed',

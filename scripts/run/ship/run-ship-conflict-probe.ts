@@ -22,22 +22,20 @@ function fix_note(): string {
 	return `The pre-detach checks did not run. Commit the work with ${main_merge_guard.commit_command()}, run \`pnpm josh main:merge\`, resolve the conflict in those files, then run the ship again.`
 }
 
-async function conflicting_paths(): Promise<ReadonlyArray<string>> {
-	const default_branch = await git_command.get_default_branch()
-
-	await git_command.fetch_branch(default_branch)
-
-	const paths = await changed_paths.read_changed_paths(false)
-	const root = await git_command.repository_root()
-
-	return git_merge_conflicts.working_tree_conflicts(`origin/${default_branch}`, paths, root) ?? []
-}
-
-async function answered_paths(): Promise<ReadonlyArray<string>> {
+// The paths merging origin/main would leave unmerged, `[]` for a clean merge; `undefined` when the
+// probe could not tell — a fetch that failed, a merge base it cannot read.
+async function read_conflicts(): Promise<ReadonlyArray<string> | undefined> {
 	try {
-		return await conflicting_paths()
+		const default_branch = await git_command.get_default_branch()
+
+		await git_command.fetch_branch(default_branch)
+
+		const paths = await changed_paths.read_changed_paths(false)
+		const root = await git_command.repository_root()
+
+		return git_merge_conflicts.working_tree_conflicts(`origin/${default_branch}`, paths, root)
 	} catch {
-		return []
+		return undefined
 	}
 }
 
@@ -45,7 +43,7 @@ async function answered_paths(): Promise<ReadonlyArray<string>> {
 // `conflict`; `undefined` when the merge would go through, the sync's merge would resolve every
 // conflict itself (`main-merge-regenerate.ts`), or the probe could not tell.
 async function probe(): Promise<StepResult | undefined> {
-	const conflicts = await answered_paths()
+	const conflicts = (await read_conflicts()) ?? []
 
 	if (conflicts.length === 0 || main_merge_regenerate.is_resolvable(conflicts)) return undefined
 
@@ -54,6 +52,6 @@ async function probe(): Promise<StepResult | undefined> {
 	return { code: FAILURE_EXIT_CODE, out, conflicts }
 }
 
-const run_ship_conflict_probe = { CONFLICT_NOTE, probe }
+const run_ship_conflict_probe = { CONFLICT_NOTE, probe, read_conflicts }
 
 export { run_ship_conflict_probe }

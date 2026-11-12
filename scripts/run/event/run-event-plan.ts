@@ -14,7 +14,7 @@ const KIND = run_event_stream.EVENT_KIND.PLAN
 const PLAN_VERB = 'planned'
 
 function plan_text(issue: string): string {
-	return `${PLAN_VERB} ${issue_cite.plain(issue)}`
+	return `${PLAN_VERB} ${issue_cite.plain_for('program', issue)}`
 }
 
 function has_plan(events: ReadonlyArray<RunEvent>, issue: string): boolean {

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
 	CHAINED_CONFIG,
 	CHAINED_CONFIG_WITH_EFFECTIVE,
@@ -30,10 +30,6 @@ vi.mock('./version-targets', () => ({
 
 const { arrange_chain_versions, config_with_context_hooks, fake_sync_result } =
 	version_chain_fixture
-
-beforeEach(() => {
-	vi.clearAllMocks()
-})
 
 describe('version_commands.run_check threads the fetched latest without re-fetching', () => {
 	it('feeds read_snapshot latest into the hook and fetches latest only once per package', () => {

@@ -9,7 +9,6 @@ const PROMPT_ROOTS = ['.claude/skills', 'prompts']
 const LABEL_CREATION = 'labels -f name='
 const POST_MERGE_SYNC = /after the merge, run `pnpm josh ms`|run `pnpm josh ms` after/iu
 const EPIC_FALLBACK = "'labels[]=epic'"
-const ISSUE_TEMPLATE = 'prompts/collaboration-workflow/issue-template.md'
 const MARKDOWN = '.md'
 
 function markdown_under(root: string): ReadonlyArray<string> {
@@ -38,9 +37,9 @@ describe('skill and prompt prose defers to the josh commands', () => {
 		},
 	)
 
-	it('keeps the epic fallback without josh in issue-template.md alone', () => {
+	it('never restates epic creation, which josh epic owns', () => {
 		const holders = PROSE_FILES.filter((path) => read(path).includes(EPIC_FALLBACK))
 
-		expect(holders).toStrictEqual([ISSUE_TEMPLATE])
+		expect(holders).toStrictEqual([])
 	})
 })

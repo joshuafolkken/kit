@@ -115,6 +115,9 @@ pnpm --allow-build=esbuild dlx @joshuafolkken/kit init
 **Only the kit the project itself installed sets the project up.** A `josh init` run from anywhere else — `pnpm dlx`, a global install — compares its own directory with the project's `node_modules/@joshuafolkken/kit`. When they differ:
 
 1. **It installs the project's kit.** A directory with no `package.json` first gets `{ "private": true }`, so pnpm does not install into an ancestor project. A project that does not list `@joshuafolkken/kit` gets `pnpm add -D` with the esbuild and unrs-resolver build approvals; one that lists it gets `pnpm install`, keeping its version.
+
+   Before installing, `pnpm-workspace.yaml` gets the template's `minimumReleaseAge` (or the `.npmrc` value) unless it sets one, so a kit published inside the wait leaves the previous one installed.
+
 2. **It hands the run to that kit** — `pnpm exec josh init` with the same arguments, in the project root.
 
 `--no-install` installs nothing, so the kit that is running does the setup itself. Why: `docs/maintainers/init-rationale.md` → "Running from outside the project".
@@ -156,8 +159,9 @@ kit ships with permission prompts off, so the unattended commands (`fullrun`, `b
 - `.vscode/settings.json` sets `claudeCode.initialPermissionMode` to `bypassPermissions` and `claudeCode.allowDangerouslySkipPermissions` to `true`.
 - `.claude/settings.json` allows `Bash(*)`. It ships no `permissions.defaultMode`, so `josh sync` leaves your own mode as it is. A file synced before kit stopped shipping it keeps the `bypassPermissions` line; that line is now yours, and deleting it survives a sync.
 - `backlogrun` starts its sessions with `--permission-mode bypassPermissions`.
+- The `egress` guard row refuses an agent's `Bash` call that sends data off the machine (`curl` / `wget` / `nc` / `ssh` to another host, a network call in `node -e`) or prints a credential (`gh auth token`, `printenv`), nested spellings included; `.claude/settings.json` denies the plain forms as a backstop. See [SECURITY.md](../SECURITY.md#secrets).
 
-The `permissions.deny` list and the `pretool-guard` hook are a guardrail, not a sandbox. They refuse destructive commands and reads of `.env`, `.env.*` and `.dev.vars` (`.env.example` and `.env.test` stay readable).
+The `permissions.deny` list and the `pretool-guard` hook are a guardrail, not a sandbox. They refuse destructive commands and reads of `.env`, `.env.*` and `.dev.vars` (`.env.example` and `.env.test` stay readable) and of the credential files: gh's `hosts.yml`, Codex's `auth.json`, `~/.netrc`, `~/.curlrc`, `~/.npmrc` and `~/.ssh/**`.
 
 The deny list matches the start of a command, so `git -C . …` or `command git …` passes it. The hook reads git's own arguments past those, but a git command inside `bash -c '…'`, a `python -c` one-liner or a script that opens the file itself still gets through. A command they let through is not thereby permitted.
 
@@ -311,7 +315,7 @@ Why the AI files take this shape: `docs/maintainers/init-rationale.md` → "The 
 After all files are processed, `josh init` runs:
 
 1. **`pnpm install`** — installs the development dependencies it added. The `prepare` script it runs installs the git hooks defined in `lefthook.yml` (pre-commit, commit-msg, pre-push).
-2. **`josh format`** — formats every file, including the ones `josh init` just wrote.
+2. **`josh format`** — formats every file, including the ones `josh init` just wrote; a basic project formats only its HTML, CSS and JavaScript files unless `josh.format` is `"all"` ([Package settings](./environment-variables.md#package-settings)).
 
 A failed install skips the format, and `josh init` exits non-zero with the commands to re-run by hand; `josh start` then stops before its commit. A failed format is only a warning. `josh gate` is not run, since in an existing project it can fail on the project's own code.
 

@@ -4,18 +4,33 @@ import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { defect_rate, type DefectRate, type IssueKind } from '#scripts/issue/defect-rate'
 import { defect_rate_cli } from '#scripts/issue/defect-rate-cli'
 
-// While the defect rate is above its baseline, `backlog:next` offers defects and hardening first and
-// defers new mechanisms. The re-ordering stays inside the runnable set — every
+// `backlog:next` always offers defects first among ranking ties and defers new mechanisms only
+// while the defect rate is above its baseline. The re-ordering stays inside the runnable set — every
 // candidate is already ready to start — so no dependency the graph recorded is crossed.
 
 const UNMEASURED_MESSAGE =
-	'The defect rate could not be read from GitHub, so the backlog is offered in its usual order.'
+	'The defect rate could not be read from GitHub, so defects are offered first without deferring new mechanisms.'
 
 // Lower goes first. The sort is stable, so each kind keeps the order the graph gave it.
-const KIND_RANK: Readonly<Record<IssueKind, number>> = { defect: 0, other: 1, mechanism: 2 }
+const KIND_RANK: Readonly<Record<IssueKind, number>> = { defect: 0, other: 1, mechanism: 1 }
+const DEFERRED_KIND_RANK: Readonly<Record<IssueKind, number>> = { ...KIND_RANK, mechanism: 2 }
 
 function above_message(measured: DefectRate): string {
 	return `The defect rate ${defect_rate.rate_text(measured)} is above its baseline ${String(defect_rate.BASELINE_RATE)}, so among issues the ranking keys tie, defects are offered first and new mechanisms last.`
+}
+
+function should_defer_mechanisms(measured: DefectRate | undefined): boolean {
+	if (measured === undefined) {
+		console.error(UNMEASURED_MESSAGE)
+
+		return false
+	}
+
+	if (!defect_rate.is_above_baseline(measured)) return false
+
+	console.error(above_message(measured))
+
+	return true
 }
 
 // The body the listing already carried, else one read for it (joshuafolkken/kit#4550). An unreadable
@@ -27,21 +42,29 @@ async function kind_of_child(child: EpicChild): Promise<IssueKind> {
 	return defect_rate.kind_of({ body: body ?? '', labels: child.labels })
 }
 
-async function reorder_bundle(bundle: RepoCandidates): Promise<RepoCandidates> {
+async function reorder_bundle(
+	bundle: RepoCandidates,
+	is_above_baseline: boolean,
+): Promise<RepoCandidates> {
 	const kinds = await Promise.all(bundle.children.map(async (child) => await kind_of_child(child)))
+	const ranks = is_above_baseline ? DEFERRED_KIND_RANK : KIND_RANK
 	const ranked = bundle.children.map((child, index) => ({
 		child,
-		rank: KIND_RANK[kinds[index] ?? 'other'],
+		rank: ranks[kinds[index] ?? 'other'],
 	}))
 	const children = ranked.toSorted((left, right) => left.rank - right.rank).map((row) => row.child)
 
 	return { ...bundle, children }
 }
 
-async function reorder(result: EpicNextResult, repo: string): Promise<EpicNextResult> {
+async function reorder(
+	result: EpicNextResult,
+	repo: string,
+	is_above_baseline: boolean,
+): Promise<EpicNextResult> {
 	const candidates = await Promise.all(
 		result.candidates.map(async (bundle) =>
-			bundle.repo === repo ? await reorder_bundle(bundle) : bundle,
+			bundle.repo === repo ? await reorder_bundle(bundle, is_above_baseline) : bundle,
 		),
 	)
 
@@ -60,17 +83,7 @@ async function prioritize(
 	const days = defect_rate.DEFAULT_WINDOW_DAYS
 	const measured = await defect_rate_cli.measure_window(repo, days, now_ms)
 
-	if (measured === undefined) {
-		console.error(UNMEASURED_MESSAGE)
-
-		return result
-	}
-
-	if (!defect_rate.is_above_baseline(measured)) return result
-
-	console.error(above_message(measured))
-
-	return await reorder(result, repo)
+	return await reorder(result, repo, should_defer_mechanisms(measured))
 }
 
 const backlog_defect_priority = { UNMEASURED_MESSAGE, prioritize }

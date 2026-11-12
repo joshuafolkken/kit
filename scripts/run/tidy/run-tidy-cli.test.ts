@@ -1,6 +1,9 @@
 import { issue_merged } from '#scripts/issue/issue-merged'
+import { lane_ledger_archive } from '#scripts/lane/lane-ledger-archive'
+import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { run_ship_lap } from '#scripts/run/ship/run-ship-lap'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_tidy_cli } from './run-tidy-cli'
 import { run_tidy_lanes } from './run-tidy-lanes'
@@ -12,6 +15,12 @@ vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
 }))
 vi.mock('./run-tidy-lanes', () => ({ run_tidy_lanes: { tidy_lanes: vi.fn() } }))
 vi.mock('./run-tidy-stashes', () => ({ run_tidy_stashes: { tidy_stashes: vi.fn() } }))
+vi.mock('#scripts/lane/lane-ledger-archive', () => ({
+	lane_ledger_archive: { rotate_target: vi.fn() },
+}))
+vi.mock('#scripts/lane/lane-ledger-write', () => ({
+	lane_ledger_write: { record_ship_lap: vi.fn() },
+}))
 
 const errors: Array<string> = []
 const LANE_TARGET = 'lane #2583'
@@ -20,7 +29,6 @@ const AT = '2026-10-08T08:00:00.000Z'
 const KIND = run_event_stream.EVENT_KIND
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	errors.length = 0
 	vi.spyOn(console, 'error').mockImplementation((...parts: Array<unknown>) => {
 		errors.push(parts.map(String).join(' '))
@@ -29,9 +37,24 @@ beforeEach(() => {
 	vi.mocked(run_event_stream_emit.current_events).mockResolvedValue([])
 	vi.mocked(run_tidy_lanes.tidy_lanes).mockResolvedValue([])
 	vi.mocked(run_tidy_stashes.tidy_stashes).mockResolvedValue([])
+	vi.mocked(lane_ledger_archive.rotate_target).mockResolvedValue(0)
 })
 
-// joshuafolkken/kit#2701: the sweep runs inside `run:hold`, so it reports on stderr and never throws.
+describe('run_tidy_cli.sweep timing', () => {
+	it('records the entire sweep under its inherited hold scope', async () => {
+		await run_ship_lap.within('6255', 'run:entry', run_tidy_cli.sweep, 'run:entry › run:hold')
+
+		expect(lane_ledger_write.record_ship_lap).toHaveBeenCalledWith(
+			expect.objectContaining({
+				issue: 6255,
+				stage: 'run:entry',
+				step: 'run:entry › run:hold › sweep',
+			}),
+		)
+	})
+})
+
+// The detached sweep reports on stderr and never throws.
 describe('run_tidy_cli.sweep', () => {
 	it('reports cleaned lanes and stashes together on standard error', async () => {
 		vi.mocked(run_tidy_lanes.tidy_lanes).mockResolvedValue([
@@ -76,6 +99,22 @@ describe('run_tidy_cli.sweep', () => {
 
 		await expect(run_tidy_cli.sweep()).resolves.toBeUndefined()
 		expect(errors.join('\n')).toContain('run:tidy could not finish')
+	})
+})
+
+// joshuafolkken/kit#7038: the sweep rotates the lane ledger, and a failed rotation is a note.
+describe('run_tidy_cli.sweep — the lane ledger', () => {
+	it('rotates the lane ledger after the residue', async () => {
+		await run_tidy_cli.sweep()
+
+		expect(lane_ledger_archive.rotate_target).toHaveBeenCalledOnce()
+	})
+
+	it('notes a failed rotation instead of throwing', async () => {
+		vi.mocked(lane_ledger_archive.rotate_target).mockRejectedValue(new Error('disk full'))
+
+		await expect(run_tidy_cli.sweep()).resolves.toBeUndefined()
+		expect(errors.join('\n')).toContain('could not rotate the lane ledger')
 	})
 })
 

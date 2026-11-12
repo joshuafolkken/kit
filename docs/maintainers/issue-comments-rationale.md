@@ -12,7 +12,7 @@ says it has been superseded, so the mistake is silent.
 
 `pnpm josh issue:read` says when a comment listing could not be read rather than showing no comments
 because the conflict rule is that the later text wins, and a comment nobody read cannot win anything.
-`gh issue view <N> --comments` is GraphQL-backed, so a cloud session is answered `403`;
+`gh issue view <N> --comments` is a `gh` subcommand (`prompts/collaboration-workflow/gh-rest.md`);
 `scripts/gh/gh-document-guard.test.ts` refuses it in a runnable block.
 
 A `backlogrun` named issue and epic child inherit the read rather than restate it: each runs in a

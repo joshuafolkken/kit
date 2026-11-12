@@ -8,6 +8,7 @@ import {
 } from '#scripts/gate/reuse-operations-fixture'
 import { CONFIG_FILES, reuse_world, TSCONFIG, type World } from '#scripts/gate/reuse-world-fixture'
 import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import fc from 'fast-check'
 import { parse, stringify } from 'flatted'
 import { describe, expect, it, vi } from 'vitest'
@@ -15,6 +16,8 @@ import { eslint_cache_dependencies } from './eslint-cache-dependencies'
 import { eslint_daemon } from './eslint-daemon'
 import { eslint_daemon_sources } from './eslint-daemon-sources'
 import { reuse_disk, type Disk } from './reuse-disk-fixture'
+
+const make_directory = temporary_directory()
 
 // joshuafolkken/kit#4494: the ESLint side of reusing a verdict — a cached entry answers for a file
 // whose imports changed underneath it (#4407, #4415), and a warm daemon keeps the types a merge
@@ -263,7 +266,7 @@ async function take(
 
 async function start_walk(): Promise<Walk> {
 	const world = reuse_world.create_world()
-	const disk = reuse_disk.create_disk()
+	const disk = reuse_disk.create_disk(make_directory('reuse-disk-'))
 
 	sync(disk, world)
 	const walk: Walk = {

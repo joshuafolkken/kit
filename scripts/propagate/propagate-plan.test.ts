@@ -1,6 +1,6 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { propagate_plan } from './propagate-plan'
 import { propagate_run } from './propagate-run'
@@ -29,6 +29,7 @@ const KIT_ONLY: ReleasePlan = {
 }
 
 const state = { workspace: '' }
+const make_temporary_directory = temporary_directory()
 
 function write_manifest(directory: string, content: Record<string, unknown>): void {
 	mkdirSync(directory, { recursive: true })
@@ -36,7 +37,7 @@ function write_manifest(directory: string, content: Record<string, unknown>): vo
 }
 
 function make_directory(prefix: string): string {
-	return mkdtempSync(path.join(state.workspace, prefix))
+	return make_temporary_directory(path.join(state.workspace, prefix))
 }
 
 // An installed toolkit with its CLI shim, the way pnpm leaves a direct dev dependency.
@@ -89,11 +90,10 @@ function plan_of(root: string, version: string): ReleasePlan {
 }
 
 beforeEach(() => {
-	state.workspace = mkdtempSync(path.join(tmpdir(), 'propagate-plan-'))
+	state.workspace = make_temporary_directory('propagate-plan-')
 })
 
 afterEach(() => {
-	rmSync(state.workspace, { recursive: true, force: true })
 	vi.restoreAllMocks()
 })
 

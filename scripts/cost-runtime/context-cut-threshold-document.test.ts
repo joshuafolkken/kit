@@ -29,8 +29,8 @@ const CONTEXT_CUT_DOCS = [
 	'docs/josh-commands-run.md',
 ]
 
-// joshuafolkken/kit#4155: `retrospective.md` stated a 150,000-token session budget beside the
-// threshold everywhere else — the Bash output cap's figure, not the threshold's.
+// joshuafolkken/kit#4155: `retrospective.md` stated the Bash output cap's figure as a session
+// budget beside the threshold everywhere else.
 const STALE_SESSION_BUDGET = '150,000-token'
 
 describe.each(CONTEXT_CUT_DOCS)('%s names the context-cut threshold', (path) => {

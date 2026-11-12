@@ -1,9 +1,11 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { init_logic } from '#scripts/init/init-logic'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { sync } from './sync'
+
+const make_directory = temporary_directory()
 
 // The `preinstall` an earlier `josh init` wrote: an unverified safe-chain fetched on every install.
 const LEGACY_PREINSTALL = 'pnpm dlx @aikidosec/safe-chain@1.5.20 setup-ci'
@@ -31,13 +33,12 @@ function sync_preinstall(preinstall: string): string {
 }
 
 beforeEach(() => {
-	ctx.work_directory = mkdtempSync(path.join(tmpdir(), 'sync-safe-chain-preinstall-'))
+	ctx.work_directory = make_directory('sync-safe-chain-preinstall-')
 	ctx.package_json_path = path.join(ctx.work_directory, 'package.json')
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 })
 
 afterEach(() => {
-	rmSync(ctx.work_directory, { recursive: true, force: true })
 	vi.restoreAllMocks()
 })
 

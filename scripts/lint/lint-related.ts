@@ -5,16 +5,18 @@ import { fileURLToPath } from 'node:url'
 import { document_checks } from '#scripts/document/document-checks'
 import { unused_members_check } from '#scripts/exports/unused-members-check'
 import { gate_labels } from '#scripts/gate/gate-labels'
-import type { GateTree } from '#scripts/gate/gate-tree'
+import { gate_tree, type GateTree } from '#scripts/gate/gate-tree'
 import { metrics_totals } from '#scripts/gate/metrics-totals'
+import { moved_paths } from '#scripts/gate/moved-paths'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { since_green } from '#scripts/gate/since-green'
 import { structural_checks } from '#scripts/gate/structural-checks'
+import { tree_verdict } from '#scripts/gate/tree-verdict'
 import { verification_tail } from '#scripts/gate/verification-tail'
 import { changed_file_scope, type ChangedFileScope } from '#scripts/git/changed-file-scope'
 import { review_stamps } from '#scripts/review/review-stamps'
-import { split_early_notice } from '#scripts/split/split-early-notice'
-import { lint_parallel } from './lint-parallel'
+import { eslint_daemon_calls } from './eslint-daemon-calls'
+import { lint_parallel, type LintRunTiming } from './lint-parallel'
 import { lint_related_scope } from './lint-related-scope'
 
 // `josh lint:related` — the lint check an implementation loop runs between edits.
@@ -37,16 +39,34 @@ function report_ignored_flags(command_arguments: ReadonlyArray<string>): void {
 	)
 }
 
+// The timing line names what the run read, so a slow first run is told apart from a wide one
+// (joshuafolkken/kit#5712).
+function timing_of(targets: string): LintRunTiming {
+	return { label: lint_related_scope.COMMAND_LABEL, targets }
+}
+
 // A fallback to the whole project is a superset of the changed files, so it vouches for them too —
 // which is why the record below is written from either arm rather than only from the narrow one.
 async function lint_exit_code(scope: ChangedFileScope): Promise<number> {
-	if (scope.mode === 'all') return await lint_parallel.run_lint_parallel_checks()
+	if (scope.mode === 'all') {
+		return await lint_parallel.run_lint_parallel_checks({
+			warm_daemon: false,
+			timing: timing_of('whole tree'),
+		})
+	}
 
 	return await lint_parallel.run_lint_checks(
 		lint_related_scope.prettier_arguments(scope.files),
 		lint_related_scope.eslint_arguments(scope.files),
 		lint_related_scope.RELATED_CACHES.eslint_file,
-		{ warm_daemon: true },
+		{
+			warm_daemon: true,
+			timing: timing_of(`${String(scope.files.length)} file(s)`),
+			call: {
+				caller: eslint_daemon_calls.DAEMON_CALLER.LINT_RELATED,
+				files: scope.files.length,
+			},
+		},
 	)
 }
 
@@ -63,9 +83,11 @@ function document_check_exit_code(scope: ChangedFileScope, root: string): number
 interface LintOutcome {
 	stage: string
 	exit_code: number
+	notice?: string | undefined
 }
 
 const UNMOVED: LintOutcome = { stage: 'unmoved', exit_code: 0 }
+const VERDICT_RECORD = tree_verdict.record_path('lint-related')
 
 function is_failed(outcome: LintOutcome): boolean {
 	return outcome.exit_code !== 0
@@ -110,18 +132,27 @@ async function scoped_outcome(scope: ChangedFileScope, root: string): Promise<Li
 
 // **A bare run reads only what moved since its last green run** (`since-green.ts`), against the tree
 // its green record is read from, so one run reads the gate tree once (joshuafolkken/kit#4655).
-// Explicit file arguments read no tree, so they never consult the record.
+// Explicit file arguments read no tree, so they never consult the record. A record that cannot narrow
+// says why on the summary line (`since-green.ts`).
 async function read_since_green(
 	before: GateTree | undefined,
 ): Promise<ReadonlyArray<string> | undefined> {
 	if (before === undefined) return undefined
 
-	return await since_green.read_moved(
+	const verdict = await since_green.read_verdict(
 		review_stamps.lint_related_stamp,
 		gate_labels.LINT_LABEL,
 		undefined,
 		before,
 	)
+
+	if ('parts' in verdict) return moved_paths.union_of(verdict.parts)
+
+	process.stdout.write(
+		`${since_green.fallback_line(lint_related_scope.COMMAND_LABEL, verdict.fallback)}\n`,
+	)
+
+	return undefined
 }
 
 // Narrowed to what moved while a lintable file is among it; otherwise the whole branch change, as before.
@@ -168,12 +199,7 @@ async function outcome_with_notice(
 	const outcome = await scoped_outcome(scope, root)
 	if (is_failed(outcome) || command_arguments.length > 0) return outcome
 
-	const notice = await metrics_totals.growth_notice(root)
-
-	// On a line of its own: a linter's buffered output need not end with a newline.
-	if (notice !== undefined) process.stdout.write(`\n${notice}\n`)
-
-	return outcome
+	return { ...outcome, notice: await metrics_totals.growth_notice(root) }
 }
 
 // The narrowing line is printed before either child starts, so a scoped run is never read as a
@@ -218,12 +244,15 @@ async function checked_outcome(
 }
 
 // The run's last line names the stage that failed, or says it passed; the console is the only copy of
-// the output, so there is no log notice (`verification-tail.ts`).
-function report_verdict(outcome: LintOutcome): void {
+// the output, so there is no log notice (`verification-tail.ts`). The metrics notice, on a line of its
+// own as a linter's buffered output need not end with a newline, rides above it, so a reused verdict
+// (`tree-verdict.ts`) still carries what `josh check:related` repeats.
+function verdict_tail(outcome: LintOutcome): string {
 	const failed = is_failed(outcome) ? [outcome.stage] : []
 	const verdict = verification_tail.format_verdict(lint_related_scope.COMMAND_LABEL, failed)
+	const notice = outcome.notice === undefined ? '' : `\n${outcome.notice}\n`
 
-	process.stdout.write(`\n${verification_tail.format_tail({ failures: '', verdict })}`)
+	return `${notice}\n${verification_tail.format_tail({ failures: '', verdict })}`
 }
 
 // **A green run leaves a record of the tree it was green on**, so
@@ -231,24 +260,36 @@ function report_verdict(outcome: LintOutcome): void {
 // and the three states in which it is withheld, are `scoped-green.ts`. An unmoved run records too, as
 // `josh test:related`'s does: a main sync can move the base while moving no path, and a record left on
 // the old base would refuse `josh gate` while every re-run kept linting nothing.
+async function fresh_exit_code(
+	command_arguments: ReadonlyArray<string>,
+	root: string,
+	before: GateTree | undefined,
+): Promise<number> {
+	const moved = await read_since_green(before)
+	const outcome = await checked_outcome(command_arguments, root, moved)
+	const { exit_code } = outcome
+	const tail = verdict_tail(outcome)
+
+	process.stdout.write(tail)
+	await scoped_green.record_if_green(review_stamps.lint_related_stamp, { before, exit_code })
+	await tree_verdict.record({ before, exit_code, tail }, gate_tree.read_gate_tree, VERDICT_RECORD)
+
+	return exit_code
+}
+
+// A bare run on a tree this check already answered for prints that answer and runs nothing.
 async function run_related_lint(command_arguments: ReadonlyArray<string>): Promise<number> {
 	const root = await changed_file_scope.repository_root_or_cwd()
 	const before = await scoped_green.read_before(command_arguments)
-	const moved = await read_since_green(before)
-	const outcome = await checked_outcome(command_arguments, root, moved)
+	const kept = tree_verdict.read(before, VERDICT_RECORD)
 
-	report_verdict(outcome)
-	await scoped_green.record_if_green(review_stamps.lint_related_stamp, {
-		before,
-		exit_code: outcome.exit_code,
-	})
+	if (kept !== undefined) return tree_verdict.replay(kept, VERDICT_RECORD)
 
-	return outcome.exit_code
+	return await fresh_exit_code(command_arguments, root, before)
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	process.exitCode = await run_related_lint(process.argv.slice(changed_file_scope.ARGV_START))
-	await split_early_notice.surface()
 }
 
 const lint_related = { run_related_lint }

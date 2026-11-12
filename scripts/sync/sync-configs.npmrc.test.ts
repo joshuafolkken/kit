@@ -1,9 +1,10 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { sync_configs } from './sync-configs'
 
+const make_directory = temporary_directory()
 const UNCHANGED_LABEL = 'unchanged'
 const SYNCED_LABEL = 'synced'
 const HOME_NPMRC = '~/.npmrc'
@@ -18,12 +19,11 @@ const NPMRC_WITH_AUTH_LINE = `${REGISTRY_LINE}${AUTH_LINE}`
 const ctx = { work_directory: '', destination: '' }
 
 beforeEach(() => {
-	ctx.work_directory = mkdtempSync(path.join(tmpdir(), 'sync-configs-npmrc-'))
+	ctx.work_directory = make_directory('sync-configs-npmrc-')
 	ctx.destination = path.join(ctx.work_directory, '.npmrc')
 })
 
 afterEach(() => {
-	rmSync(ctx.work_directory, { recursive: true, force: true })
 	vi.restoreAllMocks()
 })
 

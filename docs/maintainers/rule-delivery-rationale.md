@@ -40,7 +40,7 @@ was delivered.
   `scripts/hooks/pretool-guard.ts`), run as `pnpm josh pretool:guard`. It folds the three
   `PreToolUse` guards — batching, investigation and rule — into one process, wired as a **single
   entry** in `.claude/settings.json`'s `PreToolUse` with the matcher
-  `Bash|Edit|Read|Write|AskUserQuestion|Agent|Task`. A
+  `Bash|Edit|Read|Write|AskUserQuestion|Agent|Task|Glob|Grep|WebFetch`. A
   batching refusal wins over an investigation refusal, which wins over a rule refusal, and each guard
   still honors its own environment switch.
 - **The switch**: `JOSH_RULE_GUARD` for the rule guard — on by default, off with `off` / `0` /
@@ -103,8 +103,8 @@ The implementation reuse and verdict details taken out of the procedure's list.
   beside nothing but `echo` / `:` / `date`
 - **The idle run tail** — a call carrying `run_in_background` is not the trigger
 - **The implementation-phase cut** — the cost is measured with the same statistics and the same
-  model-priced threshold as `pnpm josh cost --cut`, and an unmeasurable cost fires on the safe side
-  through `!== UNDER`. It fires every time the threshold is crossed (`decide`,
+  model-priced threshold as `pnpm josh cost --cut`, and an unmeasurable cost does not fire
+  (`=== OVER`, #6575). It fires every time the threshold is crossed (`decide`,
   joshuafolkken/kit#2385), and it lets the
   immediate reissue of the same edit through, so `busy` / `failed` do not spin
 - **The test declaration** — reuses `run_tail_rule`'s commit-stage match rather than a new delivery
@@ -237,8 +237,8 @@ measured not to fire in non-interactive zsh. The rule body and the trigger's bli
 
 A refusal or notice is read by the model and stays in its context for the rest of the session, so
 each one says what is wrong and the next command, in at most 400 characters, and never carries its
-history: no Issue number, no "Before this". `scripts/hooks/hook-refusal-brevity.test.ts` pins that
-bound over every `PreToolUse` and `Stop` text, extending `hook-notice-brevity.test.ts`. A reworded
+history: no Issue number, no "Before this". `scripts/hooks/hook-brevity.test.ts` pins that bound
+over every `PreToolUse` and `Stop` text, the batching notices under tighter bounds of their own. A reworded
 reason keeps its first 48 characters (`rule-value.ts` matches a delivered refusal by its opening) or
 lists the old opening in its row's `former_reasons`. The history the texts used to carry lives here:
 

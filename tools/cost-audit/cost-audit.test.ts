@@ -3,6 +3,7 @@ import { guard_friction_fixture } from '#tools/retrospective/guard-friction-fixt
 import { describe, expect, it } from 'vitest'
 import { cost_audit, type Audit, type AuditRow, type MergeCounts } from './cost-audit'
 import { cost_audit_fixture } from './cost-audit-fixture'
+import { cost_audit_spend } from './cost-audit-spend'
 
 const { ms, day, record, session } = cost_audit_fixture
 
@@ -61,12 +62,60 @@ describe('cost_audit.audit — the period set against the one before it', () => 
 	})
 })
 
+// joshuafolkken/kit#6913: each kind's current-period spend by model and token type, priced by #6899's
+// breakdown, so the kinds' model terms sum to the period's total.
+const OPUS = 'claude-opus-4-6'
+
+function spent(row: AuditRow): number {
+	return (row.models ?? []).reduce((sum, spend) => sum + cost_audit_spend.total_of(spend), 0)
+}
+
+describe('cost_audit.audit — the session kinds by model and token type', () => {
+	const opus = { ...record('o', CURRENT, 3), model: OPUS }
+	const sessions = [...SESSIONS, session('fullrun', [opus, record('p', PREVIOUS, 7)])]
+	const result = cost_audit.audit({ sessions, days: DAYS, now_ms: NOW_MS, merges: undefined })
+
+	it('sums each kind model terms to the kind current figure alone', () => {
+		for (const kind of result.kinds) expect(spent(kind)).toBeCloseTo(kind.current)
+	})
+
+	it('sums every kind model terms to the current period total', () => {
+		const sum = result.kinds.reduce((total, kind) => total + spent(kind), 0)
+
+		expect(sum).toBeCloseTo(result.total.current)
+	})
+
+	it('lists each billed model of a kind, the costliest first', () => {
+		const models = key_of(result.kinds, 'fullrun')?.models?.map((spend) => spend.model)
+
+		expect(models).toStrictEqual([OPUS, 'claude-haiku-4-5'])
+	})
+})
+
 describe('cost_audit.audit — the floor keeps cent-sized growth out of the regressions', () => {
 	it('does not flag a row under the floor however much it grew', () => {
 		const sessions = [session('fullrun', [record('a', PREVIOUS, 0.1), record('b', CURRENT, 0.5)])]
 		const result = cost_audit.audit({ sessions, days: DAYS, now_ms: NOW_MS, merges: undefined })
 
 		expect(result.total.is_regression).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#5971: the agent type table reads the current period alone.
+describe('cost_audit.audit — the lane subagents by agent type', () => {
+	it('sums only the requests inside the current period', () => {
+		const records = [record('a', PREVIOUS, 5), record('b', CURRENT, 2)]
+		const unit = { ...session('review', records), issue: 7, agent_type: 'reviewer' }
+		const result = cost_audit.audit({
+			sessions: [unit],
+			days: DAYS,
+			now_ms: NOW_MS,
+			merges: undefined,
+		})
+
+		expect(result.agents.map((row) => [row.key, row.usd])).toStrictEqual([
+			['subagent: reviewer', 2],
+		])
 	})
 })
 

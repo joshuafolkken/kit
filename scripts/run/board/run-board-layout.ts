@@ -1,19 +1,21 @@
 import type { Declared } from '#scripts/backlog/backlog-overlap'
-import { backlog_plan, type PlanContext } from '#scripts/backlog/backlog-plan'
+import type { PlanContext } from '#scripts/backlog/backlog-plan'
 import type { WavePlan } from '#scripts/backlog/backlog-waves'
 import type { EpicChild } from '#scripts/epic/epic-graph'
-import type { IssueReference } from '#scripts/epic/epic-reference'
-import { issue_cite } from '#scripts/issue/issue-cite'
 import {
 	has_label_name,
-	NEEDS_DECISION_LABEL,
+	NEEDS_HUMAN_MERGE_LABEL,
 	RUN_SOLO_LABEL,
 	RUN_STALLED_LABEL,
 } from '#scripts/issue/issue-labels'
 import type { FiledKind } from '#scripts/run/event/run-event-filed'
-import { run_stalled } from '#scripts/run/park/run-stalled'
+import { run_board_decision } from './run-board-decision'
 import { run_board_earlier, type EarlierLanes } from './run-board-earlier'
+import { run_board_ending_reason } from './run-board-ending-reason'
+import { run_board_human } from './run-board-human'
+import { run_board_human_merge } from './run-board-human-merge'
 import { run_board_kind, type BoardPriority } from './run-board-kind'
+import { run_board_standing_waits } from './run-board-standing-waits'
 import type { ItemState, ItemStatus } from './run-board-status'
 
 // The plan with each issue's status laid over it — pure, so the order the board
@@ -28,6 +30,12 @@ import type { ItemState, ItemStatus } from './run-board-status'
 // tracks is drawn under its epic; a `blocked_by` edge is a DAG, so it stays a waiting-on note at the end of the row.
 
 interface BoardPlan {
+	decision_questions?: ReadonlyMap<number, string> | undefined
+	decision_waits?: ReadonlyMap<number, string> | undefined
+	is_backlog_live?: boolean | undefined
+	human_merge_prs?: ReadonlyMap<number, number> | undefined
+	// The same snapshot's worker identities that the header counts as occupied seats.
+	occupied_lanes?: ReadonlyArray<string> | undefined
 	waves: WavePlan
 	// Which opted-in epic tracks which child (`Plan.tracked`).
 	tracked: ReadonlyMap<number, number>
@@ -54,6 +62,9 @@ interface RowReason {
 	// `+<rest>` where the rest follow its title.
 	issues?: ReadonlyArray<string> | undefined
 	tail?: string | undefined
+	// The pull request the value and tail end on, which the board links where it draws the number
+	// whole (joshuafolkken/kit#7181).
+	pr?: number | undefined
 	// When the row entered a stage, where the reason is one — the condition column counts how long it
 	// has stood there from it.
 	since_ms?: number | undefined
@@ -78,7 +89,7 @@ interface BoardRow {
 	// Why the row waits beyond its blockers (`run-board-reason.ts`), or why a parked or withdrawn row
 	// ended; any other row the run has touched has none.
 	reason?: RowReason | undefined
-	// An earlier run's lane (`run-board-earlier.ts`): drawn as its status says, marked 🧳.
+	// An earlier run's lane (`run-board-earlier.ts`): drawn as its status says, marked 🧳 after its title.
 	is_earlier?: boolean | undefined
 	// A touched child carrying `run:solo`, which nothing else starts beside while it runs.
 	is_solo?: boolean | undefined
@@ -100,8 +111,12 @@ interface BoardLayout {
 
 // What an active row is named and classified by — each issue's title and labels.
 interface RowRead {
+	decision_questions?: ReadonlyMap<number, string> | undefined
+	is_backlog_live?: boolean | undefined
 	titles: ReadonlyMap<number, string>
 	labels: ReadonlyMap<number, ReadonlyArray<string>>
+	// Each planned child's standing blockers, which a touched stalled row waits on in place of its retry.
+	waits?: ReadonlyMap<number, ReadonlyArray<string>> | undefined
 }
 
 const NO_READ: RowRead = { titles: new Map(), labels: new Map() }
@@ -116,35 +131,23 @@ interface Drawn extends Overlay {
 	reason_of: ReasonOf | undefined
 }
 
-const SETTLED_STATES: ReadonlySet<ItemState> = new Set(['merged', 'parked', 'done', 'withdrawn'])
+// A child that has ended for good — drawn in the done section rather than the leading one.
+const FINISHED_STATES: ReadonlySet<ItemState> = new Set([
+	'merged',
+	'done',
+	'already_done',
+	'withdrawn',
+])
+// The finished ones and a parked one: what has stopped moving.
+const SETTLED_STATES: ReadonlySet<ItemState> = new Set([...FINISHED_STATES, 'parked'])
 
 function is_settled(state: ItemState): boolean {
 	return SETTLED_STATES.has(state)
 }
 
-// A blocker the plan still names, unless the stream has already seen it merge — the plan was read up
-// to two minutes ago, and a merge since then is no longer worth waiting on.
-function is_waiting_on(edge: IssueReference, overlay: Overlay): boolean {
-	const { context } = overlay.plan
-	const is_merged =
-		edge.repo === context.repo && overlay.statuses.get(edge.number)?.state === 'merged'
-
-	return !is_merged && backlog_plan.is_standing(edge, context)
-}
-
-function reference_of(edge: IssueReference, repo: string): string {
-	return edge.repo === repo ? String(edge.number) : issue_cite.plain(edge.number, edge.repo)
-}
-
 // Whether a blocker the plan names still stands for `child` — the wait its row draws as 🔗.
 function is_blocked(child: EpicChild, overlay: Overlay): boolean {
-	return child.blocked_by.some((edge) => is_waiting_on(edge, overlay))
-}
-
-// A stalled row's right end names the action that resumes it (`run-stalled.ts`), with no event to
-// name its cause.
-function stalled_reason(number: number): RowReason {
-	return { tail: run_stalled.row_text(number) }
+	return child.blocked_by.some((edge) => run_board_standing_waits.is_waiting_on(edge, overlay))
 }
 
 // Why a waiting row waits, or what resumes a stalled one.
@@ -154,16 +157,18 @@ function plan_reason(
 	overlay: Drawn,
 	waits: ReadonlyArray<string>,
 ): RowReason | undefined {
-	if (state === 'stopped') return stalled_reason(child.number)
+	if (state === 'human') return run_board_decision.plan_reason(child.number, overlay.plan)
+
+	if (state === 'stopped') {
+		return run_board_ending_reason.stalled_reason(child.number, overlay.plan, waits)
+	}
 
 	return state === 'waiting' ? overlay.reason_of?.(child, waits) : undefined
 }
 
 function plan_row(child: EpicChild, state: ItemState, overlay: Drawn): BoardRow {
 	const { context } = overlay.plan
-	const waits = child.blocked_by
-		.filter((edge) => is_waiting_on(edge, overlay))
-		.map((edge) => reference_of(edge, context.repo))
+	const waits = run_board_standing_waits.waits_of(child, overlay)
 	const reason = plan_reason(child, state, overlay, waits)
 
 	return {
@@ -177,9 +182,6 @@ function plan_row(child: EpicChild, state: ItemState, overlay: Drawn): BoardRow 
 		waits,
 	}
 }
-
-// A child that has ended for good — drawn in the done section rather than the leading one.
-const FINISHED_STATES: ReadonlySet<ItemState> = new Set(['merged', 'done', 'withdrawn'])
 
 function is_finished(state: ItemState): boolean {
 	return FINISHED_STATES.has(state)
@@ -210,45 +212,20 @@ function active_order(left: BoardRow, right: BoardRow): number {
 	return compared(rank_of(left), rank_of(right)) || compared(key_of(left), key_of(right))
 }
 
-// The states a row its labels say stalled can be drawn in: 🛑, and 💤 where its last park event was
-// bare — `run:merge`'s park of a child already labelled (`on_parked`) after the ship-stop cap's.
-const STALLED_STATES: ReadonlySet<ItemState> = new Set(['stopped', 'parked'])
-
-// A row its labels say stalled, which no ending event explains.
-function is_stalled(status: ItemStatus, labels: ReadonlyArray<string> = []): boolean {
-	return STALLED_STATES.has(status.state) && has_label_name(labels, RUN_STALLED_LABEL)
-}
-
-// The reason a parked or withdrawn row draws where ⏳ draws why it waits — its ending event's own —
-// and a stalled row the action that resumes it.
-function ending_reason(
-	number: number,
-	status: ItemStatus,
-	labels: ReadonlyArray<string> | undefined,
-): Pick<BoardRow, 'reason'> {
-	if (status.reason !== undefined) return { reason: { tail: status.reason } }
-
-	return is_stalled(status, labels) ? { reason: stalled_reason(number) } : {}
-}
-
-// A park waiting on a person's decision (joshuafolkken/kit#4099) — the one answer the 🙋 decision
-// section and the findings section read a park reason by.
-function is_decision(reason: string | undefined): boolean {
-	return reason?.includes(NEEDS_DECISION_LABEL) === true
-}
-
 function solo_flag(labels: ReadonlyArray<string> = []): Pick<BoardRow, 'is_solo'> {
 	return has_label_name(labels, RUN_SOLO_LABEL) ? { is_solo: true } : {}
 }
 
 // A child parked on a decision is a 🙋 row: it waits on a person, as an untouched `needs-decision`
-// child does, and the section it is drawn in already says why, so its row draws no reason.
+// child does; its tail names the decision that resumes it.
 function touched_row(number: number, status: ItemStatus, read: RowRead): BoardRow {
-	const is_asked = status.state === 'parked' && is_decision(status.reason)
+	const is_asked = status.state === 'parked' && run_board_human.is_decision(status.reason)
 	const labels = read.labels.get(number)
 
 	return {
-		...(!is_asked && ending_reason(number, status, labels)),
+		...(is_asked
+			? { reason: run_board_decision.reason_of(number, status.reason, read) }
+			: run_board_ending_reason.row_reason(number, status, read)),
 		...solo_flag(labels),
 		number,
 		title: read.titles.get(number),
@@ -290,7 +267,8 @@ function is_untouched(child: EpicChild, overlay: Overlay): boolean {
 // A plan row waits, unless it waits on a person's decision — the one wait the board marks — or the run
 // stalled on it mechanically (`run:stalled`), which is drawn as the stop it is, never as a decision.
 function plan_state(child: EpicChild): ItemState {
-	if (has_label_name(child.labels, NEEDS_DECISION_LABEL)) return 'human'
+	if (has_label_name(child.labels, NEEDS_HUMAN_MERGE_LABEL)) return 'waiting'
+	if (run_board_human.is_human(child.labels)) return 'human'
 
 	return has_label_name(child.labels, RUN_STALLED_LABEL) ? 'stopped' : 'waiting'
 }
@@ -342,21 +320,29 @@ function waiting_children(overlay: Overlay): Array<EpicChild> {
 }
 
 function layout_of(
-	plan: BoardPlan,
-	statuses: ReadonlyMap<number, ItemStatus>,
+	input_plan: BoardPlan,
+	input_statuses: ReadonlyMap<number, ItemStatus>,
 	reason_of?: ReasonOf,
 	earlier: EarlierLanes = run_board_earlier.NO_EARLIER,
 ): BoardLayout {
+	const current = run_board_human_merge.overlay_of(input_plan, input_statuses)
+	const { plan, statuses } = current
 	const overlay = { plan, statuses, reason_of }
 	const queue = plan.waves.waves.flat().filter((child) => is_untouched(child, overlay))
-	const read = { titles: plan.context.titles, labels: plan.labels }
+	const read = {
+		...plan,
+		titles: plan.context.titles,
+		waits: run_board_standing_waits.by_number(children_of(plan), overlay),
+	}
 
 	return {
 		active: active_rows(statuses, read),
 		queued: queued_entries(queue, overlay),
 		people: unreached_rows(overlay, true),
 		unreached: unreached_rows(overlay, false),
-		earlier: run_board_earlier.rows_of(earlier, statuses, read),
+		earlier: run_board_earlier
+			.rows_of(earlier, statuses, read)
+			.filter((row) => !current.waiting_numbers.has(row.number)),
 	}
 }
 
@@ -384,11 +370,14 @@ function numbers_of(plan: BoardPlan): ReadonlySet<number> {
 	return new Set([...children_of(plan), ...running].map((child) => child.number))
 }
 
+// The queued rows, an epic's children among them.
+function queued_rows(layout: BoardLayout): Array<BoardRow> {
+	return layout.queued.flatMap((entry) => (entry.kind === 'row' ? [entry.row] : entry.rows))
+}
+
 // Every row the layout draws, an epic's children among them — what the header counts and the legend reads.
 function rows_of(layout: BoardLayout): Array<BoardRow> {
-	const queued = layout.queued.flatMap((entry) => (entry.kind === 'row' ? [entry.row] : entry.rows))
-
-	return [...layout.active, ...queued, ...layout.people, ...layout.unreached]
+	return [...layout.active, ...queued_rows(layout), ...layout.people, ...layout.unreached]
 }
 
 // Every row the frame draws — the counted ones and the earlier run's lanes — what the legend reads.
@@ -431,7 +420,7 @@ const run_board_layout = {
 	EMPTY_LAYOUT,
 	drawn_rows,
 	is_blocked,
-	is_decision,
+	is_decision: run_board_human.is_decision,
 	is_finished,
 	is_settled,
 	lane_rows,
@@ -441,6 +430,7 @@ const run_board_layout = {
 	local_layout_of,
 	people_of,
 	numbers_of,
+	queued_rows,
 	rows_of,
 	waiting_children,
 }

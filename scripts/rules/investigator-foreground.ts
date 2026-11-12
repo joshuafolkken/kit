@@ -15,12 +15,15 @@ import { implementation_cut } from './implementation-cut'
 //
 // **The background launch is the cost, not the dispatch.** The subagent tool launches in the
 // background by default, so a main line with nothing else to do ends its turn on "waiting for the
-// reply", and the finished result sits in the queue until a later turn — measured at 4 of 33 such
-// dispatches over 7 days, 658 seconds idle, up to 287 in one plan. A foreground dispatch returns the
+// reply", and the finished result sits idle in the queue until a later turn. A foreground dispatch returns the
 // result in the same turn; the edit-target reads that keep the main line busy go in the same message,
 // where they run beside it.
 //
 // **It fires on every occurrence**: the remedy is one field on the same call.
+//
+// **VS Code has no background field at the first dispatch** (joshuafolkken/kit#6240). Its launcher
+// identifies itself through CLAUDE_CODE_ENTRYPOINT before any transcript exists. Other entrypoints
+// still need the tells below; an explicit background request always remains refused.
 //
 // **A build whose subagent tool has no such field stands it down** (joshuafolkken/kit#4889). Claude
 // Code 2.1.306 in VS Code declares no `run_in_background`: every dispatch there launched in the
@@ -31,7 +34,7 @@ import { implementation_cut } from './implementation-cut'
 // reissue it was refused into passes on the refused call's body instead (joshuafolkken/kit#4903).
 //
 // **The build is a fact of the session, not of the tail** (joshuafolkken/kit#4966). Each tell is
-// recorded once against the transcript, so a stand-down outlives the 256 KiB window the tells are read
+// recorded once against the transcript, so a stand-down outlives the tail window the tells are read
 // from. A boolean `false` the parsed input dropped is a tell too: the transcript keeps what the model
 // wrote, so a dispatch this row refused that wrote it there is one the field never reached.
 //
@@ -183,8 +186,11 @@ function remember_no_field(run: GuardRun): boolean {
 	return true
 }
 
-function is_remembered(run: GuardRun): boolean {
-	return NO_FIELD_STAMP.last_ms(NO_FIELD_STAMP.path(run.transcript)) !== hook_decision.NEVER_MS
+function is_known_no_field(run: GuardRun): boolean {
+	return (
+		run.context.env['CLAUDE_CODE_ENTRYPOINT'] === 'claude-vscode' ||
+		NO_FIELD_STAMP.last_ms(NO_FIELD_STAMP.path(run.transcript)) !== hook_decision.NEVER_MS
+	)
 }
 
 // True when this session's subagent tool declares no `run_in_background`, so no dispatch in it can run
@@ -194,7 +200,7 @@ function is_remembered(run: GuardRun): boolean {
 // call that names the background explicitly came through a build that declares the field.
 function lacks_background_field(tail: string, call: GuardedCall, run: GuardRun): boolean {
 	if (field_of(call.input, BACKGROUND_FIELD) === true) return false
-	if (is_remembered(run)) return true
+	if (is_known_no_field(run)) return true
 
 	const has_tell =
 		is_untyped_field(call.name, call.input) || tail_shows_no_field(tail, call, run.now_ms)
@@ -217,7 +223,7 @@ const ROW = {
 		fires:
 			'an `Agent` / `Task` call of the `investigator` type without `run_in_background: false`. Every occurrence',
 		quiet:
-			'another agent type, `run_in_background: false` set, or a session whose subagent tool declares no `run_in_background` (the field written as a string, the tail holding the same description and prompt, a refused dispatch that wrote it `false`, or a reissue still without the field just after this row refused a lone dispatch) — remembered for the session',
+			'another agent type, `run_in_background: false` set, VS Code identified by `CLAUDE_CODE_ENTRYPOINT=claude-vscode`, or a session whose subagent tool declares no `run_in_background` (the field written as a string, the tail holding the same description and prompt, a refused dispatch that wrote it `false`, or a reissue still without the field just after this row refused a lone dispatch) — remembered for the session',
 	},
 }
 

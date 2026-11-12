@@ -85,3 +85,43 @@ describe('lane_yield.is_yielded', () => {
 		)
 	})
 })
+
+describe('lane_yield.withdraw_reason', () => {
+	it('reads the holder from a linked note with repeated yielder citations', () => {
+		const text = `#${ISSUE} yielded its lane: [#${ISSUE}](https://github.com/x/y/issues/${ISSUE}) overlaps a file, which [#4925](https://github.com/x/y/issues/4925) declares or plans · at: entry`
+
+		expect(lane_yield.withdraw_reason([LAUNCH, event(2, 'note', text)], ISSUE)).toBe(
+			'yielded to #4925, which held one of its planned files; re-queues after #4925 merges',
+		)
+	})
+
+	it('keeps the original reason when the note only names the yielder', () => {
+		expect(
+			lane_yield.withdraw_reason(
+				[event(1, 'note', `#${ISSUE} yielded its lane: #${ISSUE} overlaps`)],
+				ISSUE,
+			),
+		).toBe(lane_yield.YIELD_REASON)
+	})
+
+	it('ignores another issue and a yield before the newest launch', () => {
+		const events = [
+			YIELD_NOTE,
+			{ ...LAUNCH, pos: 3 },
+			event(4, 'note', '#5000 yielded its lane: overlaps #5001'),
+		]
+
+		expect(lane_yield.withdraw_reason(events, ISSUE)).toBe(lane_yield.YIELD_REASON)
+	})
+
+	it('uses the newest yield and retains it after its own withdrawal', () => {
+		const newest = event(3, 'note', `#${ISSUE} yielded its lane: overlaps #5001`)
+
+		expect(
+			lane_yield.withdraw_reason(
+				[YIELD_NOTE, newest, event(4, 'withdraw', YIELD_EVENT_TEXT)],
+				ISSUE,
+			),
+		).toBe('yielded to #5001, which held one of its planned files; re-queues after #5001 merges')
+	})
+})

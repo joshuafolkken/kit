@@ -1,0 +1,3 @@
+- rf:bug-risks | medium | .claude/skills/workflow-commands/backlogrun-child.md:74 | 2026-11-02 | #5925
+- rf:tests | low | scripts/rules/latest-gate-document-rule.test.ts:35 | 2026-11-02 | #5925
+- rf:none | none | - | 2026-11-02 | #5925

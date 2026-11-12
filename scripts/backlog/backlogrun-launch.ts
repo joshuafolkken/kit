@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { agent_argv, type AgentArgvResult } from '#scripts/agent/agent-argv'
+import { agent_provider } from '#scripts/agent/agent-provider'
 import {
 	agent_role_profile,
 	type AgentEnvironment,
@@ -40,6 +41,7 @@ const launch_schema = z.object({
 	// before the parent claims the carry record. Absent on a record an earlier version wrote.
 	invocation: z.string().optional(),
 	started_at: z.string().optional(),
+	scheduler_provider: agent_provider.PROVIDER_SCHEMA.optional(),
 })
 
 type LaunchRecord = z.infer<typeof launch_schema>
@@ -48,6 +50,7 @@ type LaunchRecord = z.infer<typeof launch_schema>
 interface PendingLaunch {
 	invocation: string
 	started_at: string
+	scheduler_provider?: AgentProvider | undefined
 }
 
 interface LaunchTarget {
@@ -133,7 +136,7 @@ function note_to_stderr(note: string): void {
 // dated before the start the board measures from.
 function record_launch(
 	git_directory: string,
-	launch: Pick<LaunchRecord, 'pid' | 'session' | 'invocation'>,
+	launch: Pick<LaunchRecord, 'pid' | 'session' | 'invocation' | 'scheduler_provider'>,
 ): void {
 	const now = new Date()
 	const identity = process_identity.read_start(launch.pid)
@@ -153,11 +156,11 @@ function live_launch(git_directory: string): LaunchRecord | undefined {
 // The launch `run:board` draws while no carry record stands: one whose record says what it runs and
 // since when.
 function pending_launch(git_directory: string): PendingLaunch | undefined {
-	const { invocation, started_at } = live_launch(git_directory) ?? {}
+	const { invocation, started_at, scheduler_provider } = live_launch(git_directory) ?? {}
 
 	if (invocation === undefined || started_at === undefined) return undefined
 
-	return { invocation, started_at }
+	return { invocation, started_at, ...(scheduler_provider && { scheduler_provider }) }
 }
 
 // When the launch that started `owner_pid` began, for `run:carry --begin` to start the run's clock
@@ -238,7 +241,12 @@ function start(invocation: string, provider: AgentProvider, target: LaunchTarget
 
 	if (result.kind === 'failed') return result
 
-	record_launch(target.git_directory, { pid: result.pid, session, invocation })
+	record_launch(target.git_directory, {
+		pid: result.pid,
+		session,
+		invocation,
+		scheduler_provider: built.profile.provider,
+	})
 
 	const launched = { pid: result.pid, session, log_path: log_path(target.git_directory) }
 

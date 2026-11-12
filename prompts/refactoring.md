@@ -15,10 +15,11 @@ pnpm josh refactor:scan
 
 - 対象ファイル: 作業ツリーの変更＋main との差分＋未追跡ファイル。いずれも無ければ `scripts/` 配下。`demo`・`src/routes/stories`・先頭に `/* @refactor-ignore */` を持つファイルは除外。
 - スコープ拡張: import グラフを双方向に最大3段階たどり、新規0件で止める。拡張後の集合を印字する。
-- **候補の集計**: eslint の件数と file:line — 行数・複雑度（`max-lines` / `max-lines-per-function` / `complexity` / `sonarjs/cognitive-complexity`）、型の安全性（`@typescript-eslint/no-explicit-any`）、名前空間エクスポート（`local/namespace-object-export`）、重複コード（`sonarjs/no-identical-functions`）、変数名の書式（`@typescript-eslint/naming-convention`）、重複文字列（`sonarjs/no-duplicate-string`）、マジックナンバー（`@typescript-eslint/no-magic-numbers`）、未使用コード（低優先度: `@typescript-eslint/no-unused-vars`）。件数は `pnpm josh gate` の eslint と同一。
+- **候補の集計**: eslint の件数と file:line — <!-- lint: refactor-scan-rules -->lines & complexity（`max-lines` / `max-lines-per-function` / `complexity` / `sonarjs/cognitive-complexity`）、type safety（`@typescript-eslint/no-explicit-any`）、namespace-object export（`local/namespace-object-export`）、duplicate code（`sonarjs/no-identical-functions`）、duplicate string（`sonarjs/no-duplicate-string`）、magic number（`@typescript-eslint/no-magic-numbers`）、variable naming（`@typescript-eslint/naming-convention`）、unused code（低優先度: `@typescript-eslint/no-unused-vars`）<!-- /lint -->。件数は `pnpm josh gate` の eslint と同一。
+- inline config: gate と同じ設定を使い、外部形式のキーなどに付けた有効な例外は候補に数えない。抑制されていない規約違反は引き続き報告する。
 - 収束判定: 高・中優先度の候補が0件なら `verdict: clear`、残れば `verdict: candidates`。低優先度は報告のみで数えない。
 
-行数はコード行数（`max-lines` / `max-lines-per-function` は `skipBlankLines` と `skipComments` 有効）。`wc -l` ではなくこのコマンドの報告で判断する。
+行数はコード行数（<!-- lint: line-counting -->`max-lines` / `max-lines-per-function`<!-- /lint --> は `skipBlankLines` と `skipComments` 有効）。`wc -l` ではなくこのコマンドの報告で判断する。
 
 ---
 
@@ -90,4 +91,4 @@ lint が一部の面しか見ない項目だけを挙げる。コーディング
 
 ## 実装後の品質保証（絶対遵守）
 
-実装後は `pnpm josh lint:related` → `pnpm josh gate` の順で全関与ファイルを確認し、エラー0件になるまで修正する。エラーが残ったまま完了報告しない。レーン子の gate は `josh ship` が回す（`.claude/skills/workflow-commands/chain-rule.md` → "Run the review-to-merge chain" step 0）。
+実装後は `pnpm josh lint:related` → `pnpm josh gate` の順で全関与ファイルを確認し、エラー0件になるまで修正する。エラーが残ったまま完了報告しない。レーン子の gate は `josh ship` が回す（`.claude/skills/workflow-commands/chain-rule.md` → "A lane child"）。

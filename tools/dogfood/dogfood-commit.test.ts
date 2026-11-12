@@ -1,15 +1,8 @@
-import {
-	existsSync,
-	mkdirSync,
-	mkdtempSync,
-	realpathSync,
-	rmSync,
-	symlinkSync,
-	writeFileSync,
-} from 'node:fs'
+import { existsSync, mkdirSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { git_location_environment } from '#scripts/git/git-location-environment'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { execaSync } from 'execa'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { dogfood_commit_cli } from './dogfood-commit-cli'
@@ -19,6 +12,7 @@ import { dogfood_commit_cli } from './dogfood-commit-cli'
 // checkout, a repository with history, a directory inside another repository and any other name.
 
 const TEST_PROJECT = 'kit-test-sample'
+const make_directory = temporary_directory()
 const MAIN = 'main'
 const INITIAL_COMMIT = 'Initial commit'
 const LOG_SUBJECTS = ['log', '--format=%s']
@@ -52,7 +46,7 @@ function run(target: string): number {
 }
 
 beforeEach(() => {
-	const sandbox = mkdtempSync(path.join(os.tmpdir(), 'dogfood-commit-'))
+	const sandbox = make_directory('dogfood-commit-')
 
 	fixture.sandbox = realpathSync(sandbox)
 	fixture.kit_root = path.join(fixture.sandbox, 'kit')
@@ -69,7 +63,6 @@ beforeEach(() => {
 afterEach(() => {
 	vi.unstubAllEnvs()
 	vi.restoreAllMocks()
-	rmSync(fixture.sandbox, { recursive: true, force: true })
 })
 
 describe('dogfood_commit_cli.run — commits', () => {

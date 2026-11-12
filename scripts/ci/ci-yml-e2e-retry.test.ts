@@ -248,10 +248,8 @@ describe('ci.yml e2e retry job shape (templates/workflows/ci.yml)', () => {
 	})
 })
 
-// #872. A pull request used to leave the chain before it started: its first attempt failed, the
-// job went red, and a human pressed re-run — over and over, because the preview server process
-// dying is a property of the CI substrate rather than of the diff under review. These guards are
-// what keep the narrower gate that replaced it honest in both directions.
+// #872: preview-server process failures can come from the CI substrate, so retries must distinguish
+// those failures from a defect in the diff. These guards check both sides of that boundary.
 describe('ci.yml e2e crash check (templates/workflows/ci.yml)', () => {
 	const check_step = steps.find((step) => step.id === CHECK_ID)
 	const check_index = step_index((step) => step.id === CHECK_ID)

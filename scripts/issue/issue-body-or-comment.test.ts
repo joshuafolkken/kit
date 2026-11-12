@@ -20,6 +20,10 @@ vi.mock('#scripts/gh/git-gh-command', () => ({
 }))
 
 vi.mock('#scripts/gh/git-gh-exec', () => ({ git_gh_exec: { exec_gh_api } }))
+// The permission lookup goes through the ETag layer (joshuafolkken/kit#6754); here it reaches the mock.
+vi.mock('#scripts/gh/git-gh-etag-read', () => ({
+	git_gh_etag_read: { read: async (api_path: string) => await exec_gh_api({ path: api_path }) },
+}))
 
 const ISSUE_NUMBER = '42'
 const TEXT = '## Plan\n- step'
@@ -39,7 +43,6 @@ function serve(body: string, association = TRUSTED, login = 'someone'): void {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	issue_edit_body.mockResolvedValue(BODY_URL)
 	issue_comment.mockResolvedValue(COMMENT_URL)
 })

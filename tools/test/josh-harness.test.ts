@@ -1,9 +1,9 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { process_identity } from '#scripts/josh/process-identity'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { josh_harness, type CommandOptions, type JoshEnvironment } from './josh-harness'
 
@@ -21,15 +21,15 @@ const PID_FILE = 'grandchild.pid'
 const SPAWNS_GRANDCHILD = ['-c', `sleep 30 & echo $! > ${PID_FILE}; wait`]
 
 const scratch = { directory: '' }
+const make_directory = temporary_directory()
 
 beforeEach(() => {
-	scratch.directory = mkdtempSync(path.join(tmpdir(), 'josh-harness-unit-'))
+	scratch.directory = make_directory('josh-harness-unit-')
 })
 
 afterEach(() => {
 	josh_harness.stop_all()
 	vi.unstubAllEnvs()
-	rmSync(scratch.directory, { recursive: true, force: true })
 })
 
 function options(timeout_ms: number): CommandOptions {

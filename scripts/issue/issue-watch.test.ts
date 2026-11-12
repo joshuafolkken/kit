@@ -1,11 +1,9 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
 import { gh_author_association } from '#scripts/gh/gh-author-association'
 import { git_gh_conditional, type ConditionalRead } from '#scripts/gh/git-gh-conditional'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { review_attest } from '#scripts/review/review-attest'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { issue_watch, type WatchRecord } from './issue-watch'
 import { issue_watch_diff } from './issue-watch-diff'
@@ -29,6 +27,8 @@ const INTERVAL_MS = 180_000
 const BASE_TIME = '2026-10-14T00:00:00.000Z'
 const LATER_TIME = '2026-10-14T01:00:00.000Z'
 const BRIEFED_AT = '2026-10-14T00:30:00.000Z'
+const EARLIER_TIME = '2026-10-13T23:00:00.000Z'
+const FUTURE_TIME = '2026-10-14T02:00:00.000Z'
 const OTHER_ISSUE = '4703'
 const COMMENTS = JSON.stringify([{ id: COMMENT_ID, user: { login: 'person' }, body: 'hi' }])
 
@@ -38,16 +38,16 @@ const OPEN_STATE = 'open'
 // A fresh root per case, and its record removed with it. A getter rather than the path: `beforeEach`
 // assigns a new one per case, and a value captured at definition would be the previous case's.
 function use_temporary_root(): () => string {
+	const make_directory = temporary_directory()
 	let directory = ''
 
 	beforeEach(() => {
-		directory = mkdtempSync(path.join(tmpdir(), 'issue-watch-'))
+		directory = make_directory('issue-watch-')
 		vi.spyOn(git_gh_issue_read, 'issue_list_comments').mockResolvedValue(COMMENTS)
 	})
 
 	afterEach(() => {
 		issue_watch.clear(directory)
-		rmSync(directory, { recursive: true, force: true })
 		vi.restoreAllMocks()
 	})
 
@@ -57,8 +57,13 @@ function use_temporary_root(): () => string {
 const root = use_temporary_root()
 
 // Filed by the owner unless a case names another author, so the trust check asks no network.
-function changed(body: string, state = OPEN_STATE, author_association = 'OWNER'): ConditionalRead {
-	const issue = { state, body, author_association, user: { login: 'author' } }
+function changed(
+	body: string,
+	state = OPEN_STATE,
+	author_association = 'OWNER',
+	updated_at?: string,
+): ConditionalRead {
+	const issue = { state, body, author_association, user: { login: 'author' }, updated_at }
 
 	return { kind: 'changed', etag: NEW_ETAG, body: JSON.stringify(issue) }
 }
@@ -168,6 +173,50 @@ describe('issue_watch.record_baseline — the review brief across a re-run', () 
 
 	it('refuses a review briefed before a re-run that took an update in', async () => {
 		await expect(refusal_after_rerun(EDITED_BODY)).resolves.toContain(`briefed at ${BRIEFED_AT}`)
+	})
+})
+
+// joshuafolkken/kit#5835: a run's own body edit, landed before its review was briefed and acknowledged
+// after it, keeps that round 1 — the brief already read the edited issue.
+async function refusal_after_ack(updated_at: string): Promise<string | undefined> {
+	vi.spyOn(review_attest, 'read_pointer').mockReturnValue({ nonce: 'n', taken_at: BRIEFED_AT })
+	seed()
+	stub_issue(changed(EDITED_BODY, OPEN_STATE, 'OWNER', updated_at), { kind: 'unchanged' })
+	await issue_watch.acknowledge(root(), new Date(LATER_TIME))
+
+	return await issue_watch_gate.review_refusal(root())
+}
+
+describe('issue_watch.acknowledge — when the update landed', () => {
+	it('stamps acknowledged_at with when the update landed, never later than now', async () => {
+		stub_issue(changed(EDITED_BODY, OPEN_STATE, 'OWNER', BASE_TIME))
+		seed({ acknowledged_at: EARLIER_TIME })
+		await issue_watch.acknowledge(root(), new Date(LATER_TIME))
+
+		expect(issue_watch.read_record(root())?.acknowledged_at).toBe(BASE_TIME)
+
+		stub_issue(changed(BODY, OPEN_STATE, 'OWNER', FUTURE_TIME))
+		await issue_watch.acknowledge(root(), new Date(LATER_TIME))
+
+		expect(issue_watch.read_record(root())?.acknowledged_at).toBe(LATER_TIME)
+	})
+
+	it('never moves acknowledged_at earlier than the stamp it replaces', async () => {
+		stub_issue(changed(EDITED_BODY, OPEN_STATE, 'OWNER', BASE_TIME))
+		seed({ acknowledged_at: LATER_TIME })
+		await issue_watch.acknowledge(root(), new Date(FUTURE_TIME))
+
+		expect(issue_watch.read_record(root())?.acknowledged_at).toBe(LATER_TIME)
+	})
+})
+
+describe('issue_watch.acknowledge — the review brief across an acknowledgement', () => {
+	it('keeps a review briefed after the acknowledged update landed', async () => {
+		await expect(refusal_after_ack(BASE_TIME)).resolves.toBeUndefined()
+	})
+
+	it('refuses a review briefed before the acknowledged update landed', async () => {
+		await expect(refusal_after_ack(LATER_TIME)).resolves.toContain(`briefed at ${BRIEFED_AT}`)
 	})
 })
 

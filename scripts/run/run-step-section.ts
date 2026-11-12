@@ -1,10 +1,13 @@
 import { document_section_cli } from '#scripts/document/document-section-cli'
-import { run_step, type StepAction } from './run-step'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import type { StepAction } from './run-step'
+import { run_step_section_once } from './run-step-section-once'
+import { run_step_section_table, type SectionReference } from './run-step-section-table'
 
 // The section that governs each action `run:step` and `run:entry` print — the one table the action →
-// rule mapping lives in, so the manifests no longer carry a route table the reader walks to find it.
-// The command prints the section after its action line, which saves the `doc:section` turn the reader
-// would otherwise spend fetching a section the action already determined.
+// rule mapping lives in (`run-step-section-table.ts`), so the manifests no longer carry a route table
+// the reader walks to find it. The command prints the section after its action line, which saves the
+// `doc:section` turn the reader would otherwise spend fetching a section the action already determined.
 //
 // **A heading that does not resolve fails the command**, exactly as `doc:section` refuses it: a pointer
 // renamed away would otherwise print the action without its rule, and the reader would act unread.
@@ -12,52 +15,7 @@ import { run_step, type StepAction } from './run-step'
 const JOSH_PREFIX = 'pnpm josh '
 const COMMAND_SEPARATOR = ' '
 const SUCCESS_EXIT_CODE = 0
-
-// The key `run:entry` prints under — not a `run:step` action, but the entry's own read, kept in the
-// same table so every mechanically-chosen section has one home.
-const ENTRY = 'entry'
-
-interface SectionReference {
-	document: string
-	heading: string
-}
-
-function reference(document: string, heading: string): SectionReference {
-	return { document, heading }
-}
-
-// The gate's chain governs both the implementation it follows and a stopped ship's report.
-const CHAIN_RULE = 'chain-rule.md'
-const CHAIN = reference(CHAIN_RULE, 'Run the review-to-merge chain')
-const PROGRESS = 'backlogrun-progress.md'
-
-// Keyed on a verdict token, or on the josh subcommand a command action runs. An action with no row —
-// `wait`, `stop`, a `decide:` line — has no rule to read beyond its own line.
-const GOVERNING_SECTIONS: ReadonlyMap<string, SectionReference> = new Map([
-	[ENTRY, reference('split-assessment.md', 'The question')],
-	[run_step.IMPLEMENT, CHAIN],
-	[run_step.HUMAN_REVIEW, reference('needs-human-review.md', '`needs-human-review`')],
-	[run_step.UPDATE_DEPS, reference('latest-gate.md', 'The dependency update')],
-	['followup', reference('followup.md', 'Run `pnpm josh followup`')],
-	['review:round2', reference('prompts/review.md', 'Review round cap')],
-	['run:merge', reference(PROGRESS, "Running a named epic's children")],
-	['backlog:next', reference('backlogrun-steps.md', 'The loop')],
-	['run:cut', reference('pre-gate-cut.md', 'Resuming')],
-	['ship', CHAIN],
-	['retrospective', reference('retrospective.md', 'The end-of-run retrospective')],
-	['run:carry', reference(PROGRESS, 'The hand-off')],
-])
-
-// **A lane child reads its own step of the chain, never the whole of it** (joshuafolkken/kit#5016):
-// the chain's step 1 opens with `josh main:merge`, which a lane child leaves to ship's sync, and a
-// child handed the whole section ran it, moving the tree its scoped pair was green on. The step is
-// the chain's labelled step 0, cited where it stands, so it is written once; it ends at the sibling
-// item `1.`, so a blank line inside it would cut it short. A stopped ship's report reads it too.
-const LANE_CHILD_STEP = reference(CHAIN_RULE, 'A lane child')
-const LANE_CHILD_SECTIONS: ReadonlyMap<string, SectionReference> = new Map([
-	[run_step.IMPLEMENT, LANE_CHILD_STEP],
-	['ship', LANE_CHILD_STEP],
-])
+const { GOVERNING_SECTIONS, LANE_CHILD_SECTIONS } = run_step_section_table
 
 function key_of(action: StepAction): string {
 	if (action.kind !== 'command') return action.line
@@ -74,13 +32,33 @@ function section_for(key: string, is_lane_child: boolean): SectionReference | un
 }
 
 // Printed through `doc:section` itself, so the extent, the Bash-cap split and the refusal of an
-// unresolved heading are that command's, never a second copy of them.
+// unresolved heading are that command's, never a second copy of them. Each print is recorded for the
+// session, so a command printing its own row after it prints one line (`print_once`).
 function print_section(key: string, root: string = process.cwd(), is_lane_child = false): number {
 	const found = section_for(key, is_lane_child)
 
 	if (found === undefined) return SUCCESS_EXIT_CODE
+	const exit_code = document_section_cli.run([found.document, found.heading], root)
 
-	return document_section_cli.run([found.document, found.heading], root)
+	if (exit_code === SUCCESS_EXIT_CODE) run_step_section_once.record(found)
+
+	return exit_code
+}
+
+// **A command's own row prints once per session** (joshuafolkken/kit#5626): `run:review` and `ship`
+// print the section that governs them, so the reader spends no `doc:section` turn on it, and a
+// section this session already printed — by `run:step`, or by the other command — is one line.
+function print_once(key: string, root: string = process.cwd()): number {
+	const is_lane_child = lane_child_marker.is_child_of(root)
+	const found = section_for(key, is_lane_child)
+
+	if (found === undefined || !run_step_section_once.is_recorded(found)) {
+		return print_section(key, root, is_lane_child)
+	}
+
+	console.info(run_step_section_once.repeat_line(found))
+
+	return SUCCESS_EXIT_CODE
 }
 
 function print_for(
@@ -91,14 +69,22 @@ function print_for(
 	return print_section(key_of(action), root, is_lane_child)
 }
 
+const { CUT, ENTRY, PARK, PAUSE, PROGRESS, RESUME, RETROSPECTIVE } = run_step_section_table
+
 const run_step_section = {
+	CUT,
 	ENTRY,
 	GOVERNING_SECTIONS,
+	PARK,
+	PAUSE,
+	PROGRESS,
+	RESUME,
+	RETROSPECTIVE,
 	LANE_CHILD_SECTIONS,
 	key_of,
 	print_for,
+	print_once,
 	print_section,
 }
 
-export type { SectionReference }
 export { run_step_section }

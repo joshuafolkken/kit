@@ -23,6 +23,7 @@ const ARGV_OFFSET = 2
 const FAILURE_EXIT_CODE = 1
 const FLAG_PREFIX = '-'
 const JSON_FLAG = '--json'
+const BYTES_FLAG = '--bytes'
 const JSON_INDENT = 2
 const NOTHING = 0
 const PERCENT = 100
@@ -34,28 +35,27 @@ const DOLLAR_DECIMALS = 2
 // size*, because an entry-read token rides every request as cached context. Printed rather than
 // assumed, so a reader checks the assumption instead of guessing it.
 const PREMISE = `  $ = cost per run, assuming a ${String(read_set_pricing.ASSUMED_REQUESTS)}-request run (each entry-read token re-read from cache per request)`
-const USAGE = 'Usage: josh read:set [<entry>] [--json]'
+const USAGE = 'Usage: josh read:set [<entry>] [--json | --bytes]'
 const WHOLE_LABEL = 'whole — every referenced file read in full'
 const SCOPED_LABEL = 'scoped — referenced sections only'
 const TOTAL_READ_LABEL = 'total read — scoped entry plus point-of-use reached'
 const SECTION_LABEL = '-- sections referenced out of the set --'
 const POINT_OF_USE_LABEL = '-- read at the point of use, not at the entry --'
-// **The dispatched lane child reads a trimmed `fullrun` set** — the point-of-use documents the parent
-// owns are dropped and the entry-only `SKILL.md` sections are read section by section, so `total read`
-// falls well below a normal `fullrun`'s.
+// The lane child reads its own entry; the scheduler's procedures stay with the parent.
 const LANE_CHILD_NOTE: ReadonlyArray<string> = [
 	'  a dispatched lane child (`JOSH_LANE_CHILD`) reads this trimmed set:',
 	'  - skips the point-of-use documents the parent owns — child dispatch, lane opening, the progress watcher and the hand-off',
-	'  - omits SKILL.md §0/§3 — dispatch already authorized the run and a leaf child edits no rule',
+	'  - reads fullrun-lane.md instead of SKILL.md, fullrun.md and entry-sequence.md',
 ]
 // **The `backlogrun` parent reads a trimmed set of its own** — a scheduler that never implements, so
 // the implementer-only `SKILL.md` sections are read section by section rather than whole.
 // A *different* trim from the lane child's: the parent keeps §0, which is the
-// scheduler's own, and drops no point-of-use document.
+// scheduler's own, and drops only the documents of its children's stages.
 const BACKLOGRUN_PARENT_NOTE: ReadonlyArray<string> = [
 	'  the backlogrun parent (scheduler) reads this trimmed set:',
 	'  - omits SKILL.md §3 — the parent edits no rule mid-run',
-	'  - keeps every point-of-use document — the parent is the one dispatching children and running lanes',
+	'  - skips the documents of a child’s stages — the gate, the ship and fullrun.md',
+	'  - reads the sections run:step prints at its own stages beside the ones its manifest names',
 ]
 const FETCH_RULE =
 	'fetch: one `Read` call per file — never `cat`, and never two files in one command.'
@@ -249,8 +249,14 @@ function costed_entry(root: string, entry: string): ReadSetCost {
 	return entry_read_set.costed(root, entry)
 }
 
-function printed(reports: ReadonlyArray<ReadSetCost>, is_json: boolean): string {
-	if (is_json) return JSON.stringify(reports, undefined, JSON_INDENT)
+// `--bytes` prints each entry's total read bytes alone, unformatted, so one named entry's figure is
+// the output's last line — the number a measurement Issue declares (`measure-declaration.ts`).
+function printed(reports: ReadonlyArray<ReadSetCost>, argv: ReadonlyArray<string>): string {
+	if (argv.includes(JSON_FLAG)) return JSON.stringify(reports, undefined, JSON_INDENT)
+
+	if (argv.includes(BYTES_FLAG)) {
+		return reports.map((report) => String(total_read(report).bytes)).join('\n')
+	}
 
 	return reports.flatMap((report) => report_lines(report)).join('\n')
 }
@@ -267,7 +273,7 @@ function run(argv: ReadonlyArray<string>, root: string = process.cwd()): number 
 
 	const reports = wanted.map((entry) => costed_entry(root, entry))
 
-	console.info(printed(reports, argv.includes(JSON_FLAG)))
+	console.info(printed(reports, argv))
 
 	return 0
 }
@@ -277,6 +283,7 @@ function main(argv: ReadonlyArray<string>): void {
 }
 
 const read_set_cli = {
+	BYTES_FLAG,
 	FETCH_RULE,
 	JSON_FLAG,
 	POINT_OF_USE_LABEL,

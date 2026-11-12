@@ -1,4 +1,5 @@
 import { agent_session_role } from '#scripts/agent/agent-session-role'
+import type { HookContext } from '#scripts/hooks/hook-context'
 import { hook_decision, type GuardRun } from '#scripts/josh/hook-decision'
 import { lane_guard_policy } from '#scripts/lane/lane-guard-policy'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
@@ -33,11 +34,13 @@ function should_block(
 	tail: string,
 	call: GuardedCall,
 	refused_at_ms: number,
-	run?: GuardRun,
+	run: GuardRun,
 ): boolean {
+	const { cwd, env } = run.context
+
 	if (
-		agent_session_role.is_reviewer() ||
-		lane_guard_policy.mode_here('investigation') !== 'refuse'
+		agent_session_role.is_reviewer(env) ||
+		lane_guard_policy.mode_here('investigation', cwd, env) !== 'refuse'
 	) {
 		return false
 	}
@@ -45,10 +48,15 @@ function should_block(
 	return investigation_reads.should_block(tail, call, refused_at_ms, run)
 }
 
+// The call's paths resolve against its own checkout, never the process's.
+function is_candidate(call: GuardedCall, context: HookContext): boolean {
+	return investigation_reads.is_refusable_call(call, context.cwd)
+}
+
 const GUARD = hook_decision.create_transcript_guard({
 	prefix: STAMP_PREFIX,
 	switch_key: SWITCH_ENV_KEY,
-	is_candidate: investigation_reads.is_refusable_call,
+	is_candidate,
 	should_block,
 	reason: investigation_reads.REASON,
 })
@@ -63,7 +71,7 @@ const STAMP = hook_decision.create_refusal_stamp(STAMP_PREFIX)
 // lane-child search refusal can stand aside for it: only one reason surfaces per call, and delegating
 // the reading supersedes batching it.
 function will_refuse(tail: string, call: GuardedCall, run: GuardRun): boolean {
-	if (!is_enabled() || !investigation_reads.is_refusable_call(call)) return false
+	if (!is_enabled(run.context.env) || !is_candidate(call, run.context)) return false
 
 	return should_block(tail, call, STAMP.last_ms(STAMP.path(run.transcript)), run)
 }

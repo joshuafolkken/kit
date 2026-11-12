@@ -24,6 +24,7 @@ const pr_raw_schema = z.object({
 	mergeStateStatus: z.string().optional(),
 	reviewDecision: z.string().optional(),
 	headRefOid: z.string().optional(),
+	merged: z.boolean().optional(),
 })
 
 const pull_comment_schema = z.object({

@@ -1,8 +1,9 @@
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { SessionFile } from '#scripts/cost-runtime/cost-transcript'
 import { NOTHING_TO_CHECK_MARKER, SKIP_MARKER } from '#scripts/test/skip-marker'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { behavior_cli } from './behavior-cli'
 import { behavior_test_fixture } from './behavior-test-fixture'
@@ -11,6 +12,7 @@ const SESSION = 'run-xyz'
 const PASS_EXIT_CODE = 0
 const FAIL_EXIT_CODE = 1
 const TMP_PREFIX = 'behavior-cli-'
+const make_directory = temporary_directory()
 const { bash_line, GIT_STATUS, GIT_COMMIT, JOSH_GIT } = behavior_test_fixture
 
 function session_file(file_path: string): SessionFile {
@@ -18,7 +20,7 @@ function session_file(file_path: string): SessionFile {
 }
 
 function transcript_file(...commands: ReadonlyArray<string>): SessionFile {
-	const directory = mkdtempSync(path.join(tmpdir(), TMP_PREFIX))
+	const directory = make_directory(TMP_PREFIX)
 	const file_path = path.join(directory, `${SESSION}.jsonl`)
 
 	writeFileSync(file_path, commands.map((command) => bash_line(command)).join('\n'))

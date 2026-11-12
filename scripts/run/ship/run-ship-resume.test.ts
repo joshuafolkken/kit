@@ -1,14 +1,16 @@
 import { randomUUID } from 'node:crypto'
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { gate_tree } from '#scripts/gate/gate-tree'
 import type { josh_command } from '#scripts/josh/josh-run'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_ship_overlap } from './run-ship-overlap'
 import { run_ship_recorded_fixture } from './run-ship-recorded-fixture'
 import type { run_ship_scoped as real_scoped } from './run-ship-scoped'
 import type { ShipState } from './run-ship-stage'
+
+const make_directory = temporary_directory('suite')
 
 const josh_run_mock = vi.hoisted(() => vi.fn<typeof josh_command.josh_run>())
 const probe = vi.hoisted(() => ({
@@ -84,7 +86,7 @@ const OK = 0
 const FAILED = 1
 const TITLE = 'Make ship resumable #2426'
 const REPORT = 'run:tail 2426'
-const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-ship-resume-'))
+const TEMPORARY = make_directory('josh-ship-resume-')
 const NOTHING: ShipState = { is_committed: false, is_pushed: false, is_merged: false }
 const COMMITTED: ShipState = { ...NOTHING, is_committed: true }
 const SHIPPED: ShipState = { ...COMMITTED, is_pushed: true }
@@ -131,12 +133,8 @@ afterEach(() => {
 	vi.unstubAllEnvs()
 })
 
-afterAll(() => {
-	rmSync(TEMPORARY, { force: true, recursive: true })
-})
-
-// joshuafolkken/kit#4221: a followup refused because the issue changed after the review's brief used to
-// resume past the review, so the relaunched followup was refused again.
+// An issue change after the brief requires resuming at review so the next followup has current
+// review evidence (joshuafolkken/kit#4221).
 describe('josh ship — a restart after a stale review', () => {
 	// joshuafolkken/kit#5003: with an `--unpinned-ok` recorded for this branch where ship reads it.
 	it('reviews a pushed ship again, then follows up', async () => {

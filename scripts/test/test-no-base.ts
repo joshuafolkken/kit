@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
-import path from 'node:path'
 import { project_checks } from '#scripts/gate/project-checks'
 import { no_base_checkout } from '#scripts/git/no-base-checkout'
+import { direct_importers, type ImportMap, type SourceReader } from './direct-importers'
 import { test_related_claim } from './test-related-claim'
 import { related_scope } from './test-related-scope'
 import { test_unit_guard } from './test-unit-guard'
@@ -15,17 +15,25 @@ import { test_unit_guard } from './test-unit-guard'
 // no longer for it. **Nor does a consumer project**: the checkout holds only what git tracks, and a
 // consumer's vitest config can read a generated, ignored file (`.svelte-kit/tsconfig.json`) it lacks.
 
-// The names a file that resolves the base, or reads a diff against it, carries — the modules'
-// own, and the bare default-branch name a caller could hand git.
-const BASE_NAMES: ReadonlyArray<string> = [
-	'change_base',
-	'default_branch',
-	'diff_main',
-	"'main'",
-	'"main"',
-]
+// The modules that resolve the base, or read a diff against it (joshuafolkken/kit#6186). A file is
+// touching when it is one of them or imports one of the two roots at run time — a file merely naming
+// `'main'` is not. A caller of the wrappers gets paths already resolved, and `git_command`, which
+// re-exports the diff reads, is imported too widely to count.
+const BASE_ROOTS: ReadonlySet<string> = new Set([
+	'scripts/git/change-base',
+	'scripts/git/git-diff-reads',
+])
+const BASE_MODULES: ReadonlySet<string> = new Set([
+	...BASE_ROOTS,
+	'scripts/git/changed-file-scope',
+	'scripts/git/changed-paths',
+	'scripts/git/changed-paths-sync',
+])
 
-// Shared with `test-related.ts`'s own reading of which files name another: a file it cannot read
+// A type-only import erases at run time, so it resolves nothing.
+const TYPE_ONLY_IMPORT = /^import type (?!from )[^"']*["'][^"']*["']/gmu
+
+// Kept for `test-related.ts`'s own reading of which files name another: a file it cannot read
 // names nothing.
 function text_of(file_path: string): string {
 	try {
@@ -39,14 +47,25 @@ function names_any(text: string, names: ReadonlyArray<string>): boolean {
 	return names.some((name) => text.includes(name))
 }
 
-function touches_base(root: string, file: string): boolean {
-	if (!related_scope.is_relatable(file)) return false
+function imports_base(source: string, file: string, imports: ImportMap): boolean {
+	const runtime = source.replaceAll(TYPE_ONLY_IMPORT, '')
 
-	return names_any(text_of(path.join(root, file)), BASE_NAMES)
+	return direct_importers.names_any(runtime, file, BASE_ROOTS, imports)
+}
+
+function touches_base(file: string, reader: SourceReader): boolean {
+	if (!related_scope.is_relatable(file)) return false
+	if (BASE_MODULES.has(direct_importers.module_key(file))) return true
+
+	const source = reader.read_source(file)
+
+	return source !== undefined && imports_base(source, file, reader.imports)
 }
 
 function touching(root: string, changed: ReadonlyArray<string>): Array<string> {
-	return changed.filter((file) => touches_base(root, file))
+	const reader = direct_importers.source_reader(root)
+
+	return changed.filter((file) => touches_base(file, reader))
 }
 
 async function run_in_checkout(
@@ -83,6 +102,6 @@ async function run_if_touched(
 	)
 }
 
-const test_no_base = { names_any, run_if_touched, text_of, touching }
+const test_no_base = { imports_base, names_any, run_if_touched, text_of, touching }
 
 export { test_no_base }

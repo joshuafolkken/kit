@@ -6,7 +6,8 @@ import { lane_spent } from '#scripts/lane/lane-spent'
 import { lane_state, type LaneStateRecord } from '#scripts/lane/lane-state'
 import { run_carry, type CarryRead } from '#scripts/run/carry/run-carry'
 import type { EndedRun } from '#scripts/run/carry/run-carry-ended'
-import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
+import type { RunEvent } from '#scripts/run/event/run-event-stream'
+import { run_event_tail } from '#scripts/run/event/run-event-tail'
 import { run_stranded_detect } from '#scripts/run/run-stranded-detect'
 import { run_wake } from '#scripts/run/wake/run-wake'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -19,7 +20,7 @@ const MINUTE_MS = 60_000
 // joshuafolkken/kit#3439: the board reads the running run, else the one that last ended, and keeps the
 // next run's events off an ended run's board.
 
-const { AFTER, CARRY, ENDED_AT, INSIDE, LANE_LIMIT, REPOSITORY, arrange, lane } =
+const { AFTER, CARRY, ENDED_AT, INSIDE, REPOSITORY, arrange, arrange_states, lane } =
 	run_board_read_fixture
 const STARTED_AT = '2026-10-08T09:00:00.000Z'
 const NONE: CarryRead = { kind: 'none' }
@@ -37,15 +38,14 @@ const LANE_LOG = '/logs/josh-lane-dispatch-3432.log'
 // Three lanes allowed and one open: two more may open.
 const FREE_LANES = 2
 
-afterEach(() => {
-	vi.restoreAllMocks()
-})
+afterEach(() => vi.restoreAllMocks())
 
 // The one lane against the limit, as `lane:limit` counts it — this run's, no earlier run's among them.
 const LANE_ROOM = {
 	free_lanes: FREE_LANES,
-	lane_limit: LANE_LIMIT,
+	lane_limit: run_board_read_fixture.LANE_LIMIT,
 	occupied_count: 1,
+	occupied_lanes: ['3432'],
 	earlier_occupied: [],
 }
 // An ended run with no record to resume from and no wake stamp: no session and no process named.
@@ -105,7 +105,7 @@ describe('run_board_read.read_local — an overrun note after the run ended', ()
 		arrange(NONE, { invocation: EPIC_RUN, started_at: STARTED_AT, ended_at: ENDED_AT })
 		const result = { ...AFTER, kind: 'note', text: '#3432 overrun: none: CI wait' }
 
-		vi.spyOn(run_event_stream, 'read_events').mockReturnValue([INSIDE, result])
+		vi.spyOn(run_event_tail, 'read_events').mockReturnValue([INSIDE, result])
 
 		const read = await run_board_read.read_local()
 
@@ -127,17 +127,19 @@ describe('run_board_read.read_local', () => {
 			ended_ms: Date.parse(ENDED_AT),
 			scope: { issues: [3431], only: true },
 			events: [INSIDE],
+			throughput: expect.any(Array) as Array<unknown>,
 			found: new Map(),
 			lanes: ['3432'],
 			...UNRECORDED,
 			is_stranded: false,
 			operations: { lanes: [], owner: undefined, judgment: undefined },
 			// joshuafolkken/kit#4269: the open lane has no record, so it is unknown.
-			lane_states: { own: new Map(), earlier: new Map(), unknown: ['3432'] },
+			lane_states: { own: new Map(), earlier: new Map(), unknown: ['3432'], ended: new Map() },
 			idle_lanes: [],
 			...LANE_ROOM,
 			usual: new Map(),
 			is_memory_held: false,
+			launch_hold: undefined,
 			usage_reset_ms: undefined,
 		})
 	})
@@ -269,14 +271,16 @@ describe('run_board_read.read_local free lanes', () => {
 		arrange(NONE, STOPPED)
 		vi.mocked(lane_registry.list_lanes).mockResolvedValue([lane('3432'), stranded])
 
-		await expect(run_board_read.read_local()).resolves.toMatchObject({ free_lanes: FREE_LANES })
+		await expect(run_board_read.read_local()).resolves.toMatchObject(LANE_ROOM)
 	})
 
 	it('reads no count where the limit is not a number anyone set', async () => {
 		arrange(NONE, STOPPED)
 		vi.mocked(lane_capacity.lane_limit).mockResolvedValue({ kind: 'problem', problem: 'bad' })
 
-		await expect(run_board_read.read_local()).resolves.toMatchObject({ free_lanes: undefined })
+		const expected = { free_lanes: undefined, lane_limit: undefined, occupied_count: 1 }
+
+		await expect(run_board_read.read_local()).resolves.toMatchObject(expected)
 	})
 })
 
@@ -304,12 +308,6 @@ function record_of(issue: string, run_started_at: string): LaneStateRecord {
 		changed_at: run_started_at,
 		changed_by: 'lane:dispatch',
 	}
-}
-
-function arrange_states(records: ReadonlyArray<LaneStateRecord>): void {
-	const by_issue = new Map(records.map((record) => [record.issue, record]))
-
-	vi.mocked(lane_state.read_states).mockResolvedValue(by_issue)
 }
 
 // joshuafolkken/kit#3969, #4269: a lane an earlier run left behind was drawn as this run's child.
@@ -340,7 +338,7 @@ describe('run_board_read.read_local lane states', () => {
 		}
 
 		arrange(NONE, { invocation: EPIC_RUN, started_at: STARTED_AT, ended_at: ENDED_AT })
-		vi.mocked(run_event_stream.read_events).mockReturnValue([launch])
+		vi.mocked(run_event_tail.read_events).mockReturnValue([launch])
 		vi.mocked(lane_registry.list_lanes).mockResolvedValue([lane('3431')])
 		arrange_states([record_of('3431', EARLIER_AT)])
 

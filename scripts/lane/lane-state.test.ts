@@ -1,14 +1,16 @@
 import { spawn } from 'node:child_process'
-import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { repository_lock } from '#scripts/git/repository-lock'
 import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { figure_format } from '#scripts/lib/figure-format'
 import { run_carry } from '#scripts/run/carry/run-carry'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_state, type LaneChange } from './lane-state'
+
+const make_directory = temporary_directory()
 
 const ISSUE = '4268'
 const OTHER_ISSUE = '4300'
@@ -24,6 +26,7 @@ const OPEN = 'lane:open'
 const DISPATCH = 'lane:dispatch'
 const PAUSE = 'lane:pause'
 const CLOSE = 'lane:close'
+const HUMAN_REVIEW = 'human-review'
 
 const state = { directory: '' }
 
@@ -40,7 +43,7 @@ async function record_at(change: LaneChange, now: Date): Promise<void> {
 }
 
 beforeEach(() => {
-	state.directory = mkdtempSync(path.join(tmpdir(), 'lane-state-'))
+	state.directory = make_directory('lane-state-')
 	vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 })
 
@@ -48,7 +51,6 @@ afterEach(() => {
 	stamp_file.remove_stamp(run_carry.carry_path(state.directory))
 	stamp_file.remove_stamp(lane_state.state_path(state.directory, ISSUE))
 	stamp_file.remove_stamp(lane_state.state_path(state.directory, OTHER_ISSUE))
-	rmSync(state.directory, { recursive: true, force: true })
 	vi.restoreAllMocks()
 })
 
@@ -132,6 +134,17 @@ describe('lane_state.read_states and paused_note', () => {
 })
 
 describe('lane_state.record_change — transitions', () => {
+	it('keeps a human-review lane until a fresh dispatch resumes it', async () => {
+		await record_at(change_of('running', DISPATCH, { is_launch: true }), LAUNCHED_AT)
+		await record_at(change_of(HUMAN_REVIEW, 'run:hold --human-review-stop'), PAUSED_AT)
+		expect(await lane_state.read_state(ISSUE, state.directory)).toMatchObject({
+			state: HUMAN_REVIEW,
+			launched_at: LAUNCHED_AT.toISOString(),
+		})
+		await record_at(change_of('running', DISPATCH, { is_launch: true }), PAUSED_AT)
+		expect(await lane_state.read_state(ISSUE, state.directory)).toMatchObject({ state: 'running' })
+	})
+
 	it('writes no transition the lifecycle lacks, and warns instead', async () => {
 		await record_at(change_of('ended', CLOSE), OPENED_AT)
 		const outcome = await lane_state.record_change(change_of('paused', PAUSE), {

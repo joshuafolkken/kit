@@ -1,6 +1,5 @@
-#!/usr/bin/env tsx
-import { fileURLToPath } from 'node:url'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { git_gh_issue_batch_read, type BatchReader } from '#scripts/gh/git-gh-issue-batch-read'
 import { issue_read } from '#scripts/issue/issue-read'
 import { session_cite } from '#scripts/issue/session-cite'
 import { issue_citation } from '#scripts/rules/issue-citation'
@@ -21,7 +20,6 @@ import { epic_parse, type DependencyLink } from './epic-parse'
 // what.
 
 const FAILURE_EXIT_CODE = 1
-const ARGV_OFFSET = 2
 const USAGE = 'Usage: josh epic:audit <epic-number>'
 // Check 3 filters the issues the children cite down to this owner's repositories, so a repository
 // name it could not read silently dropped every qualified reference and reported nothing. A check
@@ -37,18 +35,28 @@ const UNREADABLE_REPO =
 // follow, rather than a second spelling here. Without it a cross-repository child's body was read
 // from *this* repository's issue of that number, and all four body-reading checks then ran against
 // the wrong text.
+//
+// They are read one repository at a time, the batched way (`git-gh-issue-batch-read.ts`): the body
+// is in the batch's answer, and only a child it left unanswered costs a REST read.
+function body_reader(scope: string | undefined): BatchReader<string | undefined> {
+	return {
+		repo: scope,
+		from_json: (json) => epic_issue.parse_epic_issue(json)?.body,
+		read_rest: async (issue_number) =>
+			await git_gh_command.issue_get_body(String(issue_number), scope),
+	}
+}
+
 async function attach_bodies(
 	children: ReadonlyArray<AuditChild>,
 	repo: string,
 ): Promise<Array<AuditChild>> {
-	const bodies = await Promise.all(
-		children.map(
-			async (child) =>
-				await git_gh_command.issue_get_body(
-					String(child.number),
-					epic_fetch.scope_for(child.repo, repo),
-				),
-		),
+	const bodies = await git_gh_issue_batch_read.read_across(
+		children.map((child) => ({
+			number: child.number,
+			repo: epic_fetch.scope_for(child.repo, repo),
+		})),
+		body_reader,
 	)
 
 	return children.map((child, index) => ({ ...child, body: bodies[index] }))
@@ -351,14 +359,6 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	return await report_audit(epic_number, repo)
 }
 
-// `process.exitCode` rather than `process.exit()`: the answer goes to standard output and a write to
-// a pipe is asynchronous on macOS, so exiting can tear the process down before it drains. This
-// command's answer is what a workflow reads and acts on, which is exactly that pipe. The same shape
-// is in `scripts/cost-runtime/cost-main.ts`, which met the truncation first.
-async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(argv)
-}
-
 const epic_audit_cli = {
 	UNREADABLE_REPO,
 	parse_epic_number: epic_issue.parse_epic_number,
@@ -369,8 +369,6 @@ const epic_audit_cli = {
 	audit,
 	run,
 }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export type { AuditInput }
 export { epic_audit_cli }

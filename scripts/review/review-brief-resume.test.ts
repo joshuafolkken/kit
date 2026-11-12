@@ -1,10 +1,10 @@
 import { randomBytes } from 'node:crypto'
-import { mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { utimesSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import type { FileMapStamp } from '#scripts/josh/file-map-stamp'
-import { afterAll, afterEach, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, describe, expect, it } from 'vitest'
 import { review_attest } from './review-attest'
 import { review_brief } from './review-brief'
 import type { ReviewCheckout } from './review-checkout'
@@ -100,7 +100,8 @@ describe('review_brief.compose — a resumed round 1 reads the delta since the a
 })
 
 const roots: Array<string> = []
-const SCRATCH = mkdtempSync(path.join(tmpdir(), 'josh-review-resume-'))
+const make_directory = temporary_directory('suite')
+const SCRATCH = make_directory('josh-review-resume-')
 
 function fresh_root(): string {
 	const root = `/josh-review-resume-test/${randomBytes(8).toString('hex')}`
@@ -138,10 +139,6 @@ function attested_root(): string {
 
 afterEach(() => {
 	for (const root of roots.splice(0)) review_attest.clear(root)
-})
-
-afterAll(() => {
-	rmSync(SCRATCH, { recursive: true, force: true })
 })
 
 describe('review_attest.is_reviewed_on — the resume needs a review that finished', () => {

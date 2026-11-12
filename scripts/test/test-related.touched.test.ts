@@ -2,10 +2,12 @@ import path from 'node:path'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
+import { review_stamps } from '#scripts/review/review-stamps'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_related } from './test-related'
 import { test_related_claim } from './test-related-claim'
 import { test_related_record } from './test-related-record'
+import { test_related_verdict } from './test-related-verdict'
 import { test_unit_guard } from './test-unit-guard'
 
 vi.mock('#scripts/git/git-command', () => ({ git_command: { repository_root: vi.fn() } }))
@@ -23,7 +25,13 @@ vi.mock('./test-unit-guard', () => ({
 vi.mock('#scripts/gate/scoped-green', () => ({
 	scoped_green: { read_before: vi.fn(), record_if_green: vi.fn() },
 }))
-vi.mock('#scripts/gate/since-green', () => ({ since_green: { read_moved_parts: vi.fn() } }))
+// No green record, so every case reads the whole branch change.
+vi.mock(import('#scripts/gate/since-green'), async (import_original) => {
+	const { since_green } = await import_original()
+	const no_record = { fallback: since_green.FALLBACK.NO_RECORD }
+
+	return { since_green: { ...since_green, read_verdict: vi.fn(async () => no_record) } }
+})
 vi.mock('./test-related-claim', () => ({ test_related_claim: { with_unit_claim: vi.fn() } }))
 
 const REPOSITORY_ROOT = process.cwd()
@@ -40,7 +48,6 @@ const TOUCHED = '--touched'
 const mocked_record = vi.spyOn(test_related_record, 'record_run')
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
 	vi.mocked(git_command.repository_root).mockResolvedValue(REPOSITORY_ROOT)
 	vi.mocked(changed_paths.read_changed_paths).mockResolvedValue([CHANGED_SOURCE])
@@ -63,11 +70,15 @@ describe('test_related.run_related_tests — a --touched run', () => {
 		expect(vitest_arguments).not.toContain(TOUCHED)
 	})
 
-	it('leaves no green record, so review:brief and the gate count only a full-reach run', async () => {
+	it('reads the tree for its separate review-fix record', async () => {
 		await test_related.run_related_tests([TOUCHED])
 
-		expect(scoped_green.read_before).not.toHaveBeenCalled()
-		expect(scoped_green.record_if_green).not.toHaveBeenCalled()
+		expect(scoped_green.read_before).toHaveBeenCalledWith([])
+		expect(scoped_green.record_if_green).toHaveBeenCalledWith(review_stamps.test_related_stamp, {
+			before: undefined,
+			exit_code: 0,
+			target: test_related_verdict.touched_target(),
+		})
 	})
 
 	it('records the run in the lane ledger as touched', async () => {

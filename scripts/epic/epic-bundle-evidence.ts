@@ -141,8 +141,8 @@ const EVIDENCE_INDENT = ' '.repeat(EVIDENCE_INDENT_WIDTH)
 
 function format_one(item: OrderingEvidence): string {
 	const { verb, order_prefix, order_suffix } = EVIDENCE_WORDING[item.kind]
-	const first = issue_cite.plain(item.first)
-	const second = issue_cite.plain(item.second)
+	const first = issue_cite.plain_for('linked', item.first)
+	const second = issue_cite.plain_for('linked', item.second)
 	const order = `${order_prefix}${first}${order_suffix}`
 
 	return `${EVIDENCE_INDENT}${second} ${verb} ${first}${section_phrase(item)} — ${order}`

@@ -43,7 +43,6 @@ function capture_child_marks(): Array<string | undefined> {
 // cores the gate already reserved for that check.
 describe('run_gate_steps — the checks never reserve their cores twice', () => {
 	beforeEach(() => {
-		vi.clearAllMocks()
 		vi.stubEnv(core_budget.HELD_KEY, '')
 	})
 

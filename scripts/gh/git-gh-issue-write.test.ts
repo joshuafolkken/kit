@@ -71,7 +71,6 @@ function serve_id(id = String(BLOCKER_ID)): void {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	mocked_api.mockResolvedValue(ISSUE_URL)
 })
 

@@ -10,11 +10,8 @@ import { json_format } from './json-format'
 
 // Set or remove one top-level key while leaving every other byte of the document alone.
 //
-// The merges kit runs against a consumer's `tsconfig.json` / `.vscode/*.json` used to read with a
-// tolerant JSONC parse and write the whole file back from the parsed object, which silently deleted
-// the consumer's comments — including the `// Path aliases are handled by ...` block `sv create`
-// ships. Editing text in place instead keeps comments, trailing commas, key order and any
-// hand-formatting outside the one value being changed.
+// Editing text in place keeps the consumer's comments, trailing commas, key order and hand-formatting
+// outside the one value being changed in `tsconfig.json` / `.vscode/*.json`.
 //
 // jsonc-parser is used ONLY to locate text, never to produce it. Two independent reasons:
 //
@@ -23,8 +20,8 @@ import { json_format } from './json-format'
 //     here, where the `json` printer keeps a short array inline. Letting it render would fail
 //     `prettier --check` on the rewritten file.
 //  2. `modify` with `formattingOptions` reformats a region around its edit, not just the edit —
-//     removing `compilerOptions` from a document also expanded the untouched `extends` array above
-//     it. Dropping `formattingOptions` avoids that but then places inserted keys with no newline or
+//     removing `compilerOptions` can also expand the untouched `extends` array above it.
+//     Dropping `formattingOptions` avoids that but then places inserted keys with no newline or
 //     indent at all. Neither setting does what is wanted, so placement is computed here from node
 //     offsets, which is exact and touches nothing else.
 

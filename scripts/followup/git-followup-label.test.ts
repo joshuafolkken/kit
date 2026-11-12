@@ -25,7 +25,6 @@ function serve_labels(...names: ReadonlyArray<string>): void {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	serve_labels(IN_PROGRESS, OTHER_LABEL)
 	mocked_remove.mockResolvedValue()
 })

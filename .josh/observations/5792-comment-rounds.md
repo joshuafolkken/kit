@@ -1,0 +1,2 @@
+- rf:bug-risks | medium | scripts/lint/import-move.ts:147 | 2026-11-01 | #5792
+- rf:project-conventions | low | scripts/lint/rename-cli.ts:39 | 2026-11-01 | #5792

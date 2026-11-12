@@ -40,9 +40,7 @@ function render(decision: BundleDecision, subject: BacklogIssue): string {
 	return epic_bundle_cli.format_decision(decision, subject, [], true)
 }
 
-// Looked up through a variable key, as the command itself does. A literal key used to be rewritten
-// to dot notation by `dot-notation` and then rejected by `noPropertyAccessFromIndexSignature`;
-// joshuafolkken/kit#1783 switched that fix off, so matching the command is the whole reason now.
+// A variable key mirrors the command's own lookup (joshuafolkken/kit#1783).
 function action_line(action: BundleDecision['action']): string {
 	return epic_bundle_cli.ACTION_LINES[action] ?? ''
 }
@@ -85,11 +83,8 @@ describe('epic_bundle_cli.format_decision — the headline', () => {
 	})
 })
 
-// joshuafolkken/kit#1339: `ask` used to print "not a call to make without confirmation (Tier B)",
-// which told a run to stop over a placement one `epic --add` reverses. **Both lines are asserted,
-// because the reason prints directly under the headline**: the first version of this change left the
-// reason saying "merging epics is not a call to make without asking" beneath a headline that now says
-// Tier A, so the command contradicted itself in its own two lines of output.
+// Placement is reversible with `epic --add`, so both the headline and its adjacent reason must
+// describe Tier A consistently (joshuafolkken/kit#1339).
 // joshuafolkken/kit#2329: the command runs its human report through `issue_citation.linkify` before
 // printing, so the `Related: #N` / `Epics involved: #N` listings a run copies into its reply carry
 // clickable references — never a bare `#N` the stop guard would fire on.
@@ -123,6 +118,18 @@ describe('epic_bundle_cli — the `ask` verdict', () => {
 		expect(spread.action).toBe('ask')
 		expect(spread.reason).not.toContain('without asking')
 		expect(spread.reason).toContain('record why')
+	})
+
+	it('recommends the epic tracking the most related issues and prints it', () => {
+		const body = epic_bundle_fixture.in_acceptance('refers to #2, #3 and #4')
+		const spread = epic_bundle.decide_bundle(issue(1, { body }), [
+			issue(2, { epic: 10 }),
+			issue(3, { epic: 20 }),
+			issue(4, { epic: 20 }),
+		])
+
+		expect(spread.recommended).toBe(20)
+		expect(render(spread, issue(1))).toContain('Recommended: #20')
 	})
 })
 
@@ -314,31 +321,27 @@ describe('epic_bundle_cli.fetch_epics — a listing the paging cut short', () =>
 })
 
 // The backlog listing carries titles since joshuafolkken/kit#1252, and a caller may ask for it without
-// the per-issue relation reads. Nothing in this command's own answer changes — which is what makes the
-// option safe, and what makes it worth pinning here rather than only where the new caller lives.
-// What one `fetched()` call hands back: the answer, and the relation-read spy the cases assert on.
+// the relations. Nothing in this command's own answer changes — which is what makes the option safe,
+// and what makes it worth pinning here rather than only where the new caller lives.
+// What one `fetched()` call hands back: the answer, and the relations-listing spy the cases assert on.
 interface Fetched {
 	backlog: unknown
-	relations: MockInstance<typeof git_gh_command.issue_get_state_and_relations>
+	relations: MockInstance<typeof git_gh_command.issue_list_open_relations>
 }
 
 describe('epic_bundle_cli.fetch_backlog — the title and the relations', () => {
 	const TITLE = 'Stop the gate re-running after every edit'
 
-	// Both reads are mocked here, and the relation spy is handed back rather than made per case
-	// (joshuafolkken/kit#1353). The relation read is on by default, so the case that mocked only the
-	// listing called through to a live `gh api` against real issues — 768ms where its siblings took
-	// 0–1ms, and a 10-second timeout in CI that had nothing to do with the change under test. Handing
-	// the spy back rather than leaving each case to make its own is what keeps that from coming back:
-	// a case cannot forget a mock it is given, and no case ends up spying a second time on a property
-	// this helper has already spied.
+	// Both listings are mocked here, and the relations spy is handed back rather than made per case
+	// (joshuafolkken/kit#1353): a case cannot forget a mock it is given, so none calls through to a
+	// live `gh` read.
 	async function fetched(options?: { include_relations?: boolean }): Promise<Fetched> {
-		vi.spyOn(git_gh_command, 'issue_list_open_bodies').mockResolvedValue(
-			listing_of([{ number: 1, title: TITLE, body: '' }]),
-		)
+		const listing = listing_of([{ number: 1, title: TITLE, body: '' }])
+
+		vi.spyOn(git_gh_command, 'issue_list_open_bodies').mockResolvedValue(listing)
 		const relations = vi
-			.spyOn(git_gh_command, 'issue_get_state_and_relations')
-			.mockResolvedValue(undefined)
+			.spyOn(git_gh_command, 'issue_list_open_relations')
+			.mockResolvedValue(listing)
 
 		return {
 			backlog: await epic_bundle_cli.fetch_backlog(REPO, new Map(), new Set(), options),
@@ -347,7 +350,7 @@ describe('epic_bundle_cli.fetch_backlog — the title and the relations', () => 
 	}
 
 	it('carries each row title into the backlog issue', async () => {
-		const { backlog } = await fetched()
+		const { backlog } = await fetched({ include_relations: false })
 
 		expect(backlog).toMatchObject({ issues: [{ number: 1, title: TITLE }] })
 	})

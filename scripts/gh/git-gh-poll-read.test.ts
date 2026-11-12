@@ -1,20 +1,25 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { FULL_PAGE_QUERY } from './git-gh-api-path'
+import { FULL_PAGE_QUERY, git_gh_api_path } from './git-gh-api-path'
 import { git_gh_conditional, type ConditionalRead } from './git-gh-conditional'
 import { git_gh_exec } from './git-gh-exec'
 import { git_gh_poll_read } from './git-gh-poll-read'
 import { check_runs_pages, PR_HEAD_SHA, REPO_NAME_PATH } from './git-gh-pr-fixture'
 import { git_gh_pr_rollup } from './git-gh-pr-rollup'
 
-// joshuafolkken/kit#4550: every lane waiting on its merge read its pull request every 10 seconds, each
+// joshuafolkken/kit#4550: every lane waiting on its merge repeatedly read its pull request, and each
 // read counted against the rate limit whether or not anything had changed.
 
 const PATH = `${REPO_NAME_PATH}/pulls/972`
 const LISTING_PATH = `${REPO_NAME_PATH}/commits/${PR_HEAD_SHA}/check-runs`
+const REVIEWS_PATH = `${PATH}/reviews`
+const REVIEWS = JSON.stringify([{ state: 'APPROVED' }, { state: 'COMMENTED' }])
 const ETAG = 'W/"abc"'
 const RUNNING = { name: 'SonarQube', status: 'in_progress' }
 const PAGE = JSON.stringify({ total_count: 1, check_runs: [RUNNING] })
 const LONG_PAGE = JSON.stringify({ total_count: 101, check_runs: [RUNNING] })
+const FULL_REVIEWS_PAGE = JSON.stringify(
+	Array.from({ length: git_gh_api_path.FULL_PAGE_SIZE }, () => ({ state: 'COMMENTED' })),
+)
 const UNCHANGED: ConditionalRead = { kind: 'unchanged' }
 
 function changed(body: string): ConditionalRead {
@@ -110,5 +115,40 @@ describe('git_gh_poll_read.read_object_pages', () => {
 		const second = await git_gh_poll_read.read_object_pages(LISTING_PATH)
 
 		expect(rollup(second)).toStrictEqual(rollup(first))
+	})
+})
+
+describe('git_gh_poll_read.read_array_pages', () => {
+	it('answers a bare-array listing that fits one page from its conditional read', async () => {
+		answer(changed(REVIEWS))
+
+		expect(await git_gh_poll_read.read_array_pages(REVIEWS_PATH)).toBe(REVIEWS)
+		expect(git_gh_conditional.read_conditional).toHaveBeenCalledExactlyOnceWith(
+			`${REVIEWS_PATH}${FULL_PAGE_QUERY}`,
+			undefined,
+		)
+		expect(git_gh_exec.exec_gh_api).not.toHaveBeenCalled()
+	})
+
+	it('reuses the previous listing on a 304', async () => {
+		answer(changed(REVIEWS), UNCHANGED)
+		await git_gh_poll_read.read_array_pages(REVIEWS_PATH)
+
+		expect(await git_gh_poll_read.read_array_pages(REVIEWS_PATH)).toBe(REVIEWS)
+		expect(git_gh_conditional.read_conditional).toHaveBeenLastCalledWith(
+			`${REVIEWS_PATH}${FULL_PAGE_QUERY}`,
+			ETAG,
+		)
+	})
+
+	it('pages through a full first page without slurping it', async () => {
+		answer(changed(FULL_REVIEWS_PAGE))
+		vi.mocked(git_gh_exec.exec_gh_api).mockResolvedValue(REVIEWS)
+
+		expect(await git_gh_poll_read.read_array_pages(REVIEWS_PATH)).toBe(REVIEWS)
+		expect(git_gh_exec.exec_gh_api).toHaveBeenCalledExactlyOnceWith({
+			path: `${REVIEWS_PATH}${FULL_PAGE_QUERY}`,
+			should_paginate: true,
+		})
 	})
 })

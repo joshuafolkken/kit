@@ -1,15 +1,18 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { auto_ok_cli } from '#scripts/auto-ok/auto-ok-cli'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { cutoff_of } from '#scripts/git/listing-cutoff'
+import { trusted_measure } from '#scripts/issue/trusted-measure'
 import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_plan } from './lane-plan'
 import { lane_plan_cli } from './lane-plan-cli'
 import { lane_yield } from './lane-yield'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#4864: joshuafolkken/kit#4858 and joshuafolkken/kit#4859 declared disjoint paths
 // and both edited `scripts/lane/lane-overrun.ts`. The later plan is held back before implementing and
@@ -18,7 +21,7 @@ import { lane_yield } from './lane-yield'
 // joshuafolkken/kit#4926: the held-back lane polled up to nine minutes a call, two to four calls, with its
 // seat taken. It now gives its lane back on the first answer, and a docs-only overlap holds nothing.
 
-const ROOT = mkdtempSync(path.join(tmpdir(), 'lane-plan-cli-'))
+const ROOT = make_directory('lane-plan-cli-')
 const DIRECTORY = path.join(ROOT, 'lane')
 const HOLDER = 4858
 const LATER = 4859
@@ -61,22 +64,17 @@ const HOLDING = listing([running(HOLDER, '`scripts/lane/lane-phase.ts:82-94`'), 
 const HOLDER_LEFT = listing([running(LATER, '')])
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	error.mockImplementation(vi.fn())
 	info.mockImplementation(vi.fn())
 	record_yield.mockResolvedValue(undefined)
 	release.mockResolvedValue(SUCCESS)
 	vi.spyOn(git_common_directory, 'repository').mockReturnValue(
-		mkdtempSync(path.join(ROOT, 'repository-')),
+		make_directory(path.join(ROOT, 'repository-')),
 	)
 	lane_plan.record(
 		{ issue: HOLDER, paths: [OVERRUN, PRIORITY, RUN_DOC], planned_at: '2000-01-01T00:00:00.000Z' },
 		DIRECTORY,
 	)
-})
-
-afterAll(() => {
-	rmSync(ROOT, { recursive: true, force: true })
 })
 
 describe('lane:plan — a plan that edits a file an earlier plan holds', () => {
@@ -180,8 +178,7 @@ describe('lane:plan — a plan that overlaps nothing', () => {
 		expect(error).not.toHaveBeenCalled()
 	})
 
-	// joshuafolkken/kit#4926: joshuafolkken/kit#4916 waited 27 minutes on joshuafolkken/kit#4910 for
-	// this file alone.
+	// joshuafolkken/kit#4926: a shared document alone must not block independent implementation.
 	it('runs on at once when only a document under docs/ overlaps the holder’s plan', async () => {
 		fetch_opted_in.mockResolvedValue(HOLDING)
 
@@ -190,6 +187,32 @@ describe('lane:plan — a plan that overlaps nothing', () => {
 		expect(code).toBe(SUCCESS)
 		expect(info).toHaveBeenCalledWith('clear')
 		expect(record_yield).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#5928: `--imports` names the modules the new code imports; they are probed, never held.
+describe('lane:plan — the modules a plan imports', () => {
+	it('names an imported module with a main guard, holding only the planned paths', async () => {
+		fetch_opted_in.mockResolvedValue(HOLDER_LEFT)
+
+		const entry = fileURLToPath(new URL('lane-plan-cli.ts', import.meta.url))
+
+		const argv = [String(LATER), FREE_FILE, '--imports', entry, PRIORITY]
+
+		expect(await lane_plan_cli.run(argv, DIRECTORY)).toBe(SUCCESS)
+		expect(lane_plan.read(LATER, DIRECTORY)?.paths).toEqual([FREE_FILE])
+		expect(error).toHaveBeenCalledWith(`import blocked: ${entry} — main guard`)
+	})
+
+	it('prints only the verdict when no imported module is blocked', async () => {
+		fetch_opted_in.mockResolvedValue(HOLDER_LEFT)
+
+		const importable = fileURLToPath(new URL('lane-plan-check.ts', import.meta.url))
+
+		await lane_plan_cli.run([String(LATER), FREE_FILE, '--imports', importable], DIRECTORY)
+
+		expect(error).not.toHaveBeenCalled()
+		expect(info.mock.calls).toEqual([['clear']])
 	})
 })
 
@@ -202,6 +225,13 @@ describe('lane:plan — what it refuses', () => {
 		expect(error).toHaveBeenCalledWith(lane_plan_cli.USAGE)
 	})
 
+	it('prints the usage naming `--imports` for a call that imports but plans no path', async () => {
+		expect(await lane_plan_cli.run([String(LATER), '--imports', FREE_FILE], DIRECTORY)).toBe(
+			FAILURE,
+		)
+		expect(error).toHaveBeenCalledWith(expect.stringContaining('[--imports <path> ...]'))
+	})
+
 	it('prints the usage naming `--probe` for a probe with no path, never holding the flag as a path', async () => {
 		expect(await lane_plan_cli.run([String(LATER), '--probe'], DIRECTORY)).toBe(FAILURE)
 		expect(error).toHaveBeenCalledWith(expect.stringContaining('[--probe]'))
@@ -210,6 +240,14 @@ describe('lane:plan — what it refuses', () => {
 
 	it('waits rather than starting on a listing it could not read', async () => {
 		fetch_opted_in.mockResolvedValue({ kind: 'unreadable' })
+		// joshuafolkken/kit#7022: an unlisted issue's premises are read from its own body.
+		vi.spyOn(trusted_measure, 'read_trusted_body').mockResolvedValue({
+			kind: 'trusted',
+			body: '',
+			issue: String(LATER),
+			author: 'author',
+			editor: 'author',
+		})
 
 		expect(await lane_plan_cli.run([String(LATER), OVERRUN], DIRECTORY)).toBe(FAILURE)
 		expect(info).toHaveBeenCalledWith('wait')

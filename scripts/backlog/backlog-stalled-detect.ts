@@ -164,9 +164,10 @@ async function gather(ports: DetectPorts, threshold_ms: number): Promise<StallRe
 	return await probe_reading(ports, clock)
 }
 
-// The watcher's once-a-minute arrival probe records the same observation from the reading it already
-// made, so an episode opens within a probe interval of work meeting a lane — not at the first stop past
-// the dispatch-age gate, which would hide up to one threshold of the wait. Best-effort, like the check.
+// The watcher's arrival probe records the same observation from each backlog reading it makes — one
+// made only once the `auto-ok` listing changed (joshuafolkken/kit#7229) — so an episode opens at that
+// reading rather than at the first stop past the dispatch-age gate, which would hide up to one
+// threshold of the wait. Best-effort, like the check.
 async function observe_offerable(
 	is_offerable: boolean,
 	ports: DetectPorts = DEFAULT_PORTS,

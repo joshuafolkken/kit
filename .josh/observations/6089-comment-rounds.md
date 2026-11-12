@@ -1,0 +1,1 @@
+- rf:tests | low | scripts/agent/agent-role-profile-documents.test.ts:8 | 2026-11-03 | #6089

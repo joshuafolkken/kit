@@ -16,7 +16,7 @@ The agent-facing version of steps 3 and 4 is the [`dependency-update` skill](../
 
 ## Check it worked
 
-- The last overrides line of `josh latest` reads unchanged, and `git diff -- pnpm-workspace.yaml package.json` shows no override edits.
+- `josh latest` ends on `overrides: keep` (it exits 3 on `overrides: restore (…)` or `overrides: not judged (…)`), and `josh overrides --diff HEAD` (after `josh adopt`, `--diff main...<branch>`) prints `✔ overrides unchanged since …` beside a `devEngines` line that is `unchanged` or `kept`.
 - `josh overrides` exits zero against the snapshot from step 1.
 
 ## Common failures

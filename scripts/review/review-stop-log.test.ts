@@ -1,7 +1,7 @@
-import { appendFileSync, mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { appendFileSync } from 'node:fs'
 import path from 'node:path'
-import { describe, expect, it, onTestFinished } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { review_stop_log } from './review-stop-log'
 
 // joshuafolkken/kit#4519: every finding that stopped a review is kept, one line each, in a log a reboot
@@ -11,13 +11,11 @@ const FINDING = { kind: 'bug-risks:medium', location: 'a.ts:3', sentence: 'the g
 const OTHER = { kind: 'tests:high', location: 'b.test.ts', sentence: '' }
 const REVIEW = 'review'
 
+const make_directory = temporary_directory()
+
 // A log path whose directory does not exist yet, removed when the test ends.
 function fresh_log(): string {
-	const directory = mkdtempSync(path.join(tmpdir(), 'review-stop-log-'))
-
-	onTestFinished(() => {
-		rmSync(directory, { recursive: true, force: true })
-	})
+	const directory = make_directory('review-stop-log-')
 
 	return path.join(directory, 'josh', 'review-stops.jsonl')
 }

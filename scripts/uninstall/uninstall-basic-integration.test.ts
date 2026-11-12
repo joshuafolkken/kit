@@ -1,11 +1,12 @@
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import os from 'node:os'
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { execaSync } from 'execa'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const paths_mock = vi.hoisted(() => ({ root: '', package_dir: '' }))
+const make_directory = temporary_directory()
 
 vi.mock('#scripts/init/init-paths', () => ({
 	get PROJECT_ROOT(): string {
@@ -89,13 +90,12 @@ beforeEach(() => {
 	vi.resetModules()
 	mocked_execa.mockReset()
 	paths_mock.package_dir = fileURLToPath(new URL('../../', import.meta.url))
-	paths_mock.root = mkdtempSync(path.join(os.tmpdir(), 'josh-basic-uninstall-'))
+	paths_mock.root = make_directory('josh-basic-uninstall-')
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	writeFileSync(project_path(INDEX_HTML), '<h1>Hello</h1>')
 })
 
 afterEach(() => {
-	rmSync(paths_mock.root, { recursive: true, force: true })
 	vi.restoreAllMocks()
 })
 

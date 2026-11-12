@@ -61,7 +61,7 @@ async function emit_resume_event(issue: string, verdict: string): Promise<void> 
 
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.RESUME,
-		`${issue_cite.plain(issue)} resumed`,
+		`${issue_cite.plain_for('program', issue)} resumed`,
 	)
 }
 

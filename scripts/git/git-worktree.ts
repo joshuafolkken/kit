@@ -1,5 +1,6 @@
 import { INSTALL_TIMEOUT_MS, SUITE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { PORCELAIN_FLAG } from './constants'
+import { git_command } from './git-command'
 import { ls_remote_branch_arguments } from './git-ls-remote'
 import { git_spawn } from './git-spawn'
 import { repository_lock } from './repository-lock'
@@ -14,10 +15,10 @@ import { repository_lock } from './repository-lock'
 // asynchronous `git ls-remote` spawn, and a second spawn helper beside it would be that same clone.
 // **It is not the only one in this package** — `propagate_git.has_remote_branch` runs the same query
 // synchronously against a consumer's path, and the two share their arguments through
-// `git-ls-remote.ts` rather than the spawn. Its sole caller is `git-remote-branch.ts`, which turns
-// the raw output into the three-way answer (`absent` / `present` / `unreachable`) that
-// `lane-start-point.ts` and `release-publish.ts` both act on — so this module stops at "what git
-// printed" and the meaning of it is decided there.
+// `git-ls-remote.ts` rather than the spawn. `git-remote-branch.ts` turns the raw output into the
+// three-way answer (`absent` / `present` / `unreachable`) that `lane-start-point.ts` and
+// `release-publish.ts` both act on, and `lane-resolve-record.ts` reads the commit off it, which that
+// answer drops — so this module stops at "what git printed" and the meaning of it is decided there.
 const WORKTREE = 'worktree'
 const ORIGIN = 'origin'
 
@@ -148,7 +149,14 @@ async function branch_delete(branch_name: string): Promise<string> {
 	return await git_spawn.read(['branch', '-D', branch_name])
 }
 
+async function is_linked(): Promise<boolean> {
+	const [own, common] = await git_command.git_directories()
+
+	return own !== common
+}
+
 const git_worktree = {
+	is_linked,
 	branch_delete,
 	ls_remote_branch,
 	set_upstream,

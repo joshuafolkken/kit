@@ -1,12 +1,12 @@
 import { spawnSync } from 'node:child_process'
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { init_basic } from '#scripts/init/init-basic'
 import type { ProjectShape } from '#scripts/init/project-profile'
 import { canonical_command } from '#scripts/josh/josh-aliases'
 import { COMMAND_MAP, type CommandEntry } from '#scripts/josh/josh-command-map'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { ci_yml_fixture, type WorkflowStep } from './ci-yml-fixture'
 import { workflow_expression_fixture } from './workflow-expression-fixture'
 
@@ -49,11 +49,8 @@ const BASIC_SHAPE: ProjectShape = {
 const VERSIONS = { kit: '1.0.0', prettier: '^3.0.0' }
 const { TEMPLATE_CI_YML, find_job, find_step_by_id, step_run } = ci_yml_fixture
 
-const workspace = mkdtempSync(path.join(tmpdir(), 'checks-profile-'))
-
-afterAll(() => {
-	rmSync(workspace, { recursive: true, force: true })
-})
+const make_directory = temporary_directory('suite')
+const workspace = make_directory('checks-profile-')
 
 function basic_manifest(): string {
 	return init_basic.merge_basic_manifest(init_basic.initial_manifest(), BASIC_SHAPE, VERSIONS)

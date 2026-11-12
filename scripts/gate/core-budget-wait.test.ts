@@ -1,13 +1,13 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { process_identity } from '#scripts/josh/process-identity'
 import { lane_paths } from '#scripts/lane/lane-paths'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { core_admission } from './core-admission'
 import { core_budget } from './core-budget'
 import type { WaitSink } from './core-wait-record'
-import type { MachineReading } from './machine-capacity'
+import { machine_capacity, type MachineReading, type MemoryReading } from './machine-capacity'
 
 // joshuafolkken/kit#3943: a claim held back by the budget waited in silence. A waiting claim now
 // records its command, checkout and reason on its marker for `run:board`, and says it once on its
@@ -21,12 +21,10 @@ const PRESSURED: MachineReading = { busy_cores: 0, available_mb: 0, memory_press
 
 const probe = { directory: '' }
 
-beforeEach(() => {
-	probe.directory = mkdtempSync(path.join(tmpdir(), 'josh-core-budget-wait-test-'))
-})
+const make_directory = temporary_directory()
 
-afterEach(() => {
-	rmSync(probe.directory, { recursive: true, force: true })
+beforeEach(() => {
+	probe.directory = make_directory('josh-core-budget-wait-test-')
 })
 
 function write_blocker(fields: object): void {
@@ -100,6 +98,37 @@ async function names_pressure(): Promise<void> {
 // never eases either, and that does not release it before the stall passes (joshuafolkken/kit#4982).
 const STALL_POLLS = 3
 const WAIT_CAP_MS = 10
+
+async function waits_for_swap_recovery(): Promise<void> {
+	const before: MemoryReading = { available_mb: TOOL_MEMORY_MB, swapped_mb: 0, pressure_level: 1 }
+	const after = { ...before, swapped_mb: machine_capacity.SWAP_PRESSURE_MB + 1 }
+	const clock = { now: 1, polls: 0 }
+	const handle = await core_budget.reserve(1, {
+		directory: probe.directory,
+		memory_mb: TOOL_MEMORY_MB,
+		command: 'lint',
+		report: vi.fn(),
+		wait_cap_ms: WAIT_CAP_MS,
+		now: () => clock.now,
+		read_machine: async () => ({
+			busy_cores: 0,
+			memory_pressured: clock.polls < STALL_POLLS,
+			available_mb: machine_capacity.pressured_available(
+				after,
+				clock.polls < STALL_POLLS ? before : after,
+			),
+		}),
+		sleep: async () => {
+			expect(core_budget.budget_waits(probe.directory, clock.now)[0]?.reason).toBe('pressure')
+			clock.now += WAIT_CAP_MS
+			clock.polls += 1
+		},
+	})
+
+	core_budget.release(handle)
+	expect(clock.polls).toBe(STALL_POLLS)
+	expect(handle.admission.overflow).toBeUndefined()
+}
 
 async function waits_out_a_stall_past_the_cap(): Promise<void> {
 	const clock = { now: 1, polls: 0 }
@@ -199,4 +228,8 @@ describe('core_budget.reserve — a claim that waits says why', () => {
 	it('names memory pressure when the reading saw compression or swap', names_pressure)
 	it('prints nothing for a claim admitted at once', prints_nothing_solo)
 	it('keeps a lone claim a swap stall holds waiting past the cap', waits_out_a_stall_past_the_cap)
+	it(
+		'holds a running lane check past the cap until swap stops despite free memory',
+		waits_for_swap_recovery,
+	)
 })

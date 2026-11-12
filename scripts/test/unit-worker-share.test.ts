@@ -49,6 +49,39 @@ describe('unit_worker_share.current_share — counting this run once', () => {
 	})
 })
 
+// joshuafolkken/kit#6682: lanes whose suites overlapped each took their widest share first, so the
+// workers' memory grew with the lane count. The live lanes divide the machine before the suites start.
+describe('unit_worker_share.current_share — dividing by the live lanes', () => {
+	const outer_flag = process.env[unit_worker_share.NESTED_KEY]
+	const UNREAD = { cores: undefined, memory_workers: undefined }
+	const LANES = 3
+
+	beforeEach(() => {
+		process.env[unit_worker_share.NESTED_KEY] = ''
+	})
+
+	afterEach(() => {
+		process.env[unit_worker_share.NESTED_KEY] = outer_flag ?? ''
+	})
+
+	it('leaves a solo run as it was when this lane is the only one', () => {
+		expect(unit_worker_share.current_share(MEASURED_CORES, 0, UNREAD, 1)).toBeUndefined()
+	})
+
+	it('takes its lane share when several lanes are live and no other suite runs yet', () => {
+		expect(unit_worker_share.current_share(MEASURED_CORES, 0, UNREAD, LANES)).toBe(3)
+	})
+
+	it('divides by the runs, as before, when the lanes could not be read', () => {
+		expect(unit_worker_share.current_share(MEASURED_CORES, 0, UNREAD, 0)).toBeUndefined()
+		expect(unit_worker_share.current_share(MEASURED_CORES, 1, UNREAD, 0)).toBe(5)
+	})
+
+	it('never goes below one worker however many lanes are live', () => {
+		expect(unit_worker_share.current_share(MEASURED_CORES, 0, UNREAD, MEASURED_CORES * 2)).toBe(1)
+	})
+})
+
 describe('unit_worker_share.worker_arguments — what reaches vitest', () => {
 	it('passes the share as the flag vitest reads', () => {
 		expect(unit_worker_share.worker_arguments(RUN_ARGUMENTS, 3)).toEqual(['--maxWorkers=3'])

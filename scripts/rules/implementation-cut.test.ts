@@ -1,13 +1,14 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { agent_session_role } from '#scripts/agent/agent-session-role'
 import type { CostVerdict } from '#scripts/cost-runtime/cost-cli'
+import { hook_context } from '#scripts/hooks/hook-context'
+import type { GuardRun } from '#scripts/josh/hook-decision'
 import { lane_child_marker, type MarkerSource } from '#scripts/lane/lane-child-marker'
 import type { RunCut } from '#scripts/run/cut/run-cut'
 import { run_cut_handoff } from '#scripts/run/cut/run-cut-handoff'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { implementation_cut, type LaneCostState } from './implementation-cut'
 
@@ -20,7 +21,8 @@ import { implementation_cut, type LaneCostState } from './implementation-cut'
 
 const ISSUE = '2310'
 const EDIT = 'Edit'
-const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'implementation-cut-'))
+const make_directory = temporary_directory('suite')
+const WORK_DIRECTORY = make_directory('implementation-cut-')
 const LANE_ROOT = path.join(WORK_DIRECTORY, '.kit-lanes')
 const LANE_DIRECTORY = path.join(LANE_ROOT, ISSUE)
 const OVER: CostVerdict = 'over'
@@ -87,11 +89,13 @@ function edit_call(name = EDIT): { name: string; input: unknown } {
 	return { name, input: { file_path: 'scripts/x.ts', old_string: 'a', new_string: 'b' } }
 }
 
-function run_at(now_ms: number): { transcript: string; now_ms: number } {
-	return { transcript: path.join(WORK_DIRECTORY, 'transcript.jsonl'), now_ms }
+function run_at(now_ms: number): GuardRun {
+	const transcript = path.join(WORK_DIRECTORY, 'transcript.jsonl')
+
+	return { transcript, now_ms, context: hook_context.from_process() }
 }
 
-// A verdict thunk that fails the test if it is ever read — used to prove the cost measurement is gated
+// A verdict thunk fails the test if read, proving the cost measurement is gated
 // behind the cheap tool-name and lane reads, never run on a call this guard does not own.
 function unread_verdict(): CostVerdict {
 	throw new Error('the cost verdict was read for a call the guard does not own')
@@ -178,9 +182,12 @@ describe('uncut_run_issue', () => {
 describe('is_over_threshold_edit', () => {
 	// **The firing case, and the acceptance condition #2310 pins**: an edit in a marked lane child whose
 	// recent-context cost is over threshold.
-	it.each([[EDIT], ['Write']])('fires on a %j in an over-threshold uncut lane child', (name) => {
-		expect(implementation_cut.is_over_threshold_edit(edit_call(name), state_of())).toBe(true)
-	})
+	it.each([[EDIT], ['Write']])(
+		'fires on a %j in an over-threshold uncut lane child (ac-e8e1364b)',
+		(name) => {
+			expect(implementation_cut.is_over_threshold_edit(edit_call(name), state_of())).toBe(true)
+		},
+	)
 
 	// **Below the threshold it does not fire** — the other half of the acceptance condition.
 	it('says nothing when the recent-context cost is under threshold', () => {
@@ -189,14 +196,11 @@ describe('is_over_threshold_edit', () => {
 		expect(implementation_cut.is_over_threshold_edit(edit_call(), state)).toBe(false)
 	})
 
-	// **The unmeasurable direction matches the pre-gate cut** (joshuafolkken/kit#2385): a session that
-	// cannot be priced warrants the cut as a safety net, the `verdict !== UNDER_VERDICT` reading
-	// `pre-gate-cut.ts`'s `warrants_the_cut` takes, so the two rules never disagree about whether an
-	// unmeasurable session is due a cut.
-	it('fires when the session cannot be measured, the pre-gate-cut safety-net direction', () => {
+	// joshuafolkken/kit#6575: relaunching cannot make a provider's missing transcript measurable.
+	it('allows an edit when the lane child cannot be measured (ac-d67534a4)', () => {
 		const state = state_of({ verdict: (): CostVerdict => UNMEASURABLE })
 
-		expect(implementation_cut.is_over_threshold_edit(edit_call(), state)).toBe(true)
+		expect(implementation_cut.is_over_threshold_edit(edit_call(), state)).toBe(false)
 	})
 
 	// **The cost read is gated behind the cheap checks.** A non-edit call and a call outside an uncut
@@ -355,11 +359,12 @@ describe('the row in the enumeration', () => {
 	})
 
 	// **The cut this rule asks for must itself pass every row in the enumeration** — a refusal on the
-	// remedy would leave a run with nothing it is allowed to do. Read from the non-lane suite checkout,
-	// where every world-consulting row is silent.
+	// remedy would leave a run with nothing it is allowed to do. Read from the non-lane suite checkout.
 	it('leaves the implementation cut command unclaimed by every rule', () => {
 		const call = { name: 'Bash', input: { command: TAKE_THE_IMPL_CUT } }
-		const claiming = delivered_rules.DELIVERED_RULES.filter((rule) => rule.is_trigger(call))
+		const claiming = delivered_rules.DELIVERED_RULES.filter((row) =>
+			row.is_trigger(call, hook_context.from_process()),
+		)
 
 		expect(claiming).toStrictEqual([])
 	})
@@ -445,8 +450,4 @@ describe('decide — fires per crossing, lets a reissue through', () => {
 	])('reads an age of %j ms as reissued=%j', (age, reissued) => {
 		expect(implementation_cut.is_reissued_refusal(NOW_MS, NOW_MS - age)).toBe(reissued)
 	})
-})
-
-afterAll(() => {
-	rmSync(WORK_DIRECTORY, { recursive: true, force: true })
 })

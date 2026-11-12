@@ -89,8 +89,8 @@ function is_release_age_hold(
 }
 
 // Render the window in whole hours when it divides evenly, otherwise in minutes. The policy is
-// written in minutes but read by humans in hours (1440 → 24 h), and printing "1440 minutes" buries
-// the one number the reader needs to judge how long the hold lasts.
+// written in minutes but read by humans in hours, and printing a day as a four-digit minute count
+// buries the one number the reader needs to judge how long the hold lasts.
 function format_window(minimum_age_minutes: number): string {
 	if (minimum_age_minutes % MINUTES_PER_HOUR !== 0) return `${String(minimum_age_minutes)} min`
 

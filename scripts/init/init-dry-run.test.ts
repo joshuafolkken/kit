@@ -1,23 +1,22 @@
 import {
 	existsSync,
 	mkdirSync,
-	mkdtempSync,
 	readdirSync,
 	readFileSync,
-	rmSync,
 	symlinkSync,
 	writeFileSync,
 } from 'node:fs'
-import os from 'node:os'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { execaSync } from 'execa'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import { init_dry_run, type DryRunRequest } from './init-dry-run'
 
 vi.mock('execa', () => ({ execaSync: vi.fn() }))
 
 const mocked_execa_sync = vi.mocked(execaSync)
+const make_directory = temporary_directory()
 const PACKAGE_JSON = 'package.json'
 const ORIGINAL_MANIFEST = '{"name":"example"}\n'
 const GENERATED_FILE = 'AGENTS.md'
@@ -82,15 +81,11 @@ function request(overrides: Partial<DryRunRequest> = {}): DryRunRequest {
 }
 
 beforeEach(() => {
-	state.root = mkdtempSync(path.join(os.tmpdir(), 'init-dry-run-test-'))
+	state.root = make_directory('init-dry-run-test-')
 	writeFileSync(path.join(state.root, PACKAGE_JSON), ORIGINAL_MANIFEST)
 	mkdirSync(path.join(state.root, NODE_MODULES))
 	writeFileSync(path.join(state.root, NODE_MODULES, 'big.js'), 'module.exports = 1\n')
 	mocked_execa_sync.mockReset()
-})
-
-afterEach(() => {
-	rmSync(state.root, { recursive: true, force: true })
 })
 
 describe('init_dry_run.split_dry_run_flag', () => {

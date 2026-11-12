@@ -10,9 +10,9 @@ import { auto_ok_judge, type JudgeIssue } from './auto-ok-judge'
 // The reading half of `josh auto-ok:judge`: the open issues that still owe a judgement, shared by the
 // command's listing and the backlog driver's check for a free lane with nothing opted in.
 //
-// **The driver asks once a minute while it watches**, so it hands in a cache it keeps for its process:
-// an issue seen judged is remembered with its `updatedAt`, and its comments are read again only once
-// that moves — a body edit, a comment or a label change. Without it every watch minute would read the
+// **The driver asks every offer interval while it watches**, so it hands in a cache it keeps for its
+// process: an issue seen judged is remembered with its `updatedAt`, and its comments are read again only
+// once that moves — a body edit, a comment or a label change. Without it every watch ask would read the
 // comments of every candidate in the repository.
 
 // The listing cap `auto-ok:next` reads the opted-in pool under; the open backlog is read under the same.

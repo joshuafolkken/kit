@@ -1,7 +1,9 @@
 import { api_auth } from '#scripts/agent/api-auth'
+import { RERUNS_SPENT_MESSAGE } from '#scripts/followup/followup-job-rerun'
 import { UNREADABLE_COMMENTS_STOP } from '#scripts/gh/git-gh-comments-unreadable'
 import { MERGE_UNCONFIRMED_MESSAGE } from '#scripts/gh/git-gh-pr'
 import { gh_retry } from '#scripts/gh/git-gh-retry'
+import { PR_CHECKS_TIMEOUT_MESSAGE } from '#scripts/gh/git-pr-checks'
 import { NO_CHECKS_MESSAGE } from '#scripts/gh/git-pr-checks-watch'
 import { git_error } from '#scripts/git/git-error'
 import { describe, expect, it } from 'vitest'
@@ -249,5 +251,62 @@ describe('run_ship_stop_cause.details_of — the findings of a review stop, whol
 
 	it('names no finding for a stop with no output', () => {
 		expect(run_ship_stop_cause.details_of('review')).toStrictEqual([])
+	})
+})
+
+// joshuafolkken/kit#5780: a timed-out merge wait logs what it was blocked on under its failure.
+describe('run_ship_stop_cause.blocked_cause_of — the block a timed-out wait named', () => {
+	const TIMEOUT = `${git_error.FAILURE_PREFIX} Timed out while waiting for PR checks to complete.`
+
+	it('reads the cause logged under the failure the stage ended on', () => {
+		const body = `${TIMEOUT}\n\n${git_error.DETAILS_PREFIX} BLOCKED: Checks missing\n`
+
+		expect(run_ship_stop_cause.blocked_cause_of(body)).toBe('BLOCKED: Checks missing')
+	})
+
+	it('reads none from a failure with no blocked cause', () => {
+		expect(run_ship_stop_cause.blocked_cause_of(`${TIMEOUT}\n`)).toBeUndefined()
+		expect(run_ship_stop_cause.blocked_cause_of(RED_CHECK)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#5775: a timed-out merge wait read as `check`, so a relaunch waited the same timeout
+// on the same blocked merge until the stop cap parked it.
+describe('run_ship_stop_cause.cause_of — a merge wait that timed out', () => {
+	const TIMED_OUT = `${git_error.FAILURE_PREFIX} ${PR_CHECKS_TIMEOUT_MESSAGE}\n${git_error.DETAILS_PREFIX} BLOCKED: Checks missing\n`
+
+	it.each(['followup', 'report'] as const)('reads a %s stop on it as a timeout', (stage) => {
+		expect(cause_of(stage, { body: TIMED_OUT })).toBe(CAUSE.TIMEOUT)
+		expect(run_ship_stop_cause.parks_at_once(stage, { body: TIMED_OUT })).toBe(true)
+	})
+
+	it('reads the text in a gate or a review, or above a later failure, as no timeout', () => {
+		const later = `${TIMED_OUT}${git_error.FAILURE_PREFIX} ${RED_CHECK}\n`
+
+		expect(cause_of('gate', { body: TIMED_OUT })).toBe(CAUSE.CHECK)
+		expect(cause_of('followup', { body: later })).toBe(CAUSE.CHECK)
+		expect(run_ship_stop_cause.parks_at_once('review', { body: TIMED_OUT })).toBe(false)
+	})
+
+	it('keeps the timeout out of the infrastructure an in-place retry reruns', () => {
+		expect(cause_of('followup', { body: `${RATE_LIMITED}\n${TIMED_OUT}` })).toBe(CAUSE.TIMEOUT)
+	})
+})
+
+// joshuafolkken/kit#6848: a followup whose CI-infrastructure reruns ran out read as `check`, so each
+// relaunch met the same outage until the stop cap parked it.
+describe('run_ship_stop_cause.cause_of — CI-infrastructure reruns spent', () => {
+	const SPENT = `${git_error.FAILURE_PREFIX} ${RERUNS_SPENT_MESSAGE} (3 reruns; still failing: Detect E2E). Rerun the failed jobs once CI recovers, then run followup again.\n`
+
+	it('reads a followup stop on it as a CI-infrastructure stop that parks at once', () => {
+		expect(cause_of('followup', { body: SPENT })).toBe(CAUSE.CI_INFRA)
+		expect(run_ship_stop_cause.parks_at_once('followup', { body: SPENT })).toBe(true)
+	})
+
+	it('reads the text in a gate, or above a later failure, as a check', () => {
+		expect(cause_of('gate', { body: SPENT })).toBe(CAUSE.CHECK)
+		expect(
+			cause_of('followup', { body: `${SPENT}${git_error.FAILURE_PREFIX} ${RED_CHECK}\n` }),
+		).toBe(CAUSE.CHECK)
 	})
 })

@@ -1,4 +1,4 @@
-import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { agent_safe_text } from '#scripts/agent/agent-safe-text'
 import type { StopFinding } from '#scripts/run/ship/run-ship-review'
 import { review_stop_log, type StopLine } from './review-stop-log'
 
@@ -33,9 +33,7 @@ function entry_text(line: StopLine): string {
 	const disposition = line.fixed === true ? 'fixed in place' : 'stopped'
 	const text = `${key_of(line)} (${line.kind}, ${disposition} in the ${line.stage} stage)`
 
-	return agent_role_profile
-		.printable(text.replaceAll(LINE_BREAKS, ' '))
-		.slice(0, ENTRY_LENGTH_LIMIT)
+	return agent_safe_text.printable(text.replaceAll(LINE_BREAKS, ' ')).slice(0, ENTRY_LENGTH_LIMIT)
 }
 
 // The latest findings of the lane's issue that `is_kept` admits, oldest first.

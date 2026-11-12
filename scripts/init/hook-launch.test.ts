@@ -1,27 +1,28 @@
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { claude_settings_fixture } from '#scripts/claude/claude-settings-fixture'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it } from 'vitest'
 import { hook_command_bootstrap } from './hook-command-bootstrap-fixture'
 import { hook_launch } from './hook-launch'
 
-const { hook_launch_command, PROJECT_ROOT_PREFIX, RUN_HOOK_SCRIPT } = hook_launch
+const { CLAUDE_ROOT, codex_command, CODEX_ROOT, hook_launch_command, RUN_HOOK_SCRIPT } = hook_launch
 
-// Run from the root, the probe prints that the prefix landed there.
+// Run from the root, the probe prints that the root expression named it.
 const AT_ROOT = 'at root'
 const ROOT_PROBE = `test -f .git/HEAD || test -d metadata && echo ${AT_ROOT}`
 const PRETOOL_GUARD = 'pretool-guard'
 const LEAKED_GIT_DIRECTORIES = ['.git', '/elsewhere'] as const
-// Whether each agent names the project root for a hook command.
-const AGENTS: ReadonlyArray<readonly [string, boolean]> = [
-	['Claude Code', true],
-	['Codex', false],
+// The root each agent's hook command names, and whether the agent names it in `CLAUDE_PROJECT_DIR`.
+const AGENTS: ReadonlyArray<readonly [string, string, boolean]> = [
+	['Claude Code', CLAUDE_ROOT, true],
+	['Codex', CODEX_ROOT, false],
 ]
 
 // The four settings.json hooks, each named by its bundle under `dist/hooks`.
 const HOOKS = [PRETOOL_GUARD, 'format-edited', 'session-lang', 'stop-guard'] as const
+
+const make_directory = temporary_directory()
 
 function command_containing(fragment: string): string {
 	const { hooks } = claude_settings_fixture.load_settings()
@@ -35,79 +36,76 @@ function command_containing(fragment: string): string {
 	return found
 }
 
-describe('hook_launch_command', () => {
-	it('starts from the project root and hands the hook name to the launcher', () => {
-		expect(hook_launch_command(PRETOOL_GUARD)).toBe(
-			`${PROJECT_ROOT_PREFIX}sh ${RUN_HOOK_SCRIPT} ${PRETOOL_GUARD}`,
-		)
-	})
-})
+type CheckoutOptions = Parameters<typeof hook_command_bootstrap.run_in_temporary_checkout>[3]
 
-function probe_from_subdirectory(
-	is_project_directory_named: boolean,
-	is_external_git = false,
-): string {
+function probe_from_subdirectory(root: string, options: CheckoutOptions): string {
 	const result = hook_command_bootstrap.run_in_temporary_checkout(
-		`${PROJECT_ROOT_PREFIX}${ROOT_PROBE}`,
+		`cd "${root}" && ${ROOT_PROBE}`,
 		false,
 		true,
-		{ is_external_git, is_project_directory_named },
+		options,
 	)
 
 	return result.stdout.trim()
 }
 
-// joshuafolkken/kit#2984: every path after the prefix is relative, so a hook fired from a subdirectory
-// has to reach the root rather than stay where the session stands — the root Claude Code names, or
-// git's where Codex names none (joshuafolkken/kit#4187).
-describe('the project-root prefix', () => {
-	it.each(AGENTS)('moves to the root from a project subdirectory under %s', (_agent, is_named) => {
-		expect(probe_from_subdirectory(is_named)).toBe(AT_ROOT)
+describe('hook_launch_command', () => {
+	it('names the launcher under the root Claude Code names and hands it the hook name', () => {
+		expect(hook_launch_command(PRETOOL_GUARD)).toBe(
+			`sh "$CLAUDE_PROJECT_DIR/${RUN_HOOK_SCRIPT}" ${PRETOOL_GUARD}`,
+		)
+	})
+
+	it('names the launcher under the root git resolves for Codex', () => {
+		expect(codex_command(hook_launch_command(PRETOOL_GUARD))).toBe(
+			hook_launch_command(PRETOOL_GUARD, CODEX_ROOT),
+		)
+	})
+})
+
+// joshuafolkken/kit#2984: a hook fired from a subdirectory has to reach the root rather than stay where
+// the session stands — the root Claude Code names, or git's where Codex names none (joshuafolkken/kit#4187).
+describe('the root a hook command names', () => {
+	it.each(AGENTS)('is the root from a project subdirectory under %s', (_agent, root, is_named) => {
+		expect(probe_from_subdirectory(root, { is_project_directory_named: is_named })).toBe(AT_ROOT)
 	})
 
 	it.each(AGENTS)(
-		'moves to the work tree when Git metadata is outside it under %s',
-		(_agent, is_named) => {
-			expect(probe_from_subdirectory(is_named, true)).toBe(AT_ROOT)
+		'is the work tree when Git metadata is outside it under %s',
+		(_agent, root, is_named) => {
+			const options = { is_external_git: true, is_project_directory_named: is_named }
+
+			expect(probe_from_subdirectory(root, options)).toBe(AT_ROOT)
 		},
 	)
 
 	// A git hook in a subdirectory leaks a `GIT_DIR` that names no repository from there: the checkout's
 	// own `.git`, relative, or another checkout's.
 	it.each(LEAKED_GIT_DIRECTORIES)(
-		'moves to the root under Codex despite a leaked GIT_DIR of %s',
+		'is the root under Codex despite a leaked GIT_DIR of %s',
 		(git_directory) => {
-			const result = hook_command_bootstrap.run_in_temporary_checkout(
-				`${PROJECT_ROOT_PREFIX}${ROOT_PROBE}`,
-				false,
-				true,
-				{ git_overrides: { GIT_DIR: git_directory } },
-			)
+			const options = { git_overrides: { GIT_DIR: git_directory } }
 
-			expect(result.stdout.trim()).toBe(AT_ROOT)
+			expect(probe_from_subdirectory(CODEX_ROOT, options)).toBe(AT_ROOT)
 		},
 	)
 })
 
-describe('a hook fired outside any checkout', () => {
-	it('stops before the launcher when no root resolves', () => {
-		const outside = mkdtempSync(path.join(tmpdir(), 'kit-hook-outside-'))
+describe('a Codex hook fired outside any checkout', () => {
+	it('fails without launching a hook when no root resolves', () => {
+		const outside = make_directory('kit-hook-outside-')
+		const command = codex_command(hook_launch_command(PRETOOL_GUARD))
+		const result = spawnSync('sh', ['-c', command], {
+			cwd: outside,
+			encoding: 'utf8',
+			env: {
+				...hook_command_bootstrap.fresh_git_environment(),
+				GIT_CEILING_DIRECTORIES: path.dirname(outside),
+			},
+		})
 
-		try {
-			const result = spawnSync('sh', ['-c', `${PROJECT_ROOT_PREFIX}echo launched`], {
-				cwd: outside,
-				encoding: 'utf8',
-				env: {
-					...hook_command_bootstrap.fresh_git_environment(),
-					GIT_CEILING_DIRECTORIES: tmpdir(),
-				},
-			})
-
-			expect(result.status).not.toBe(0)
-			expect(result.stdout).toBe('')
-		} finally {
-			rmSync(outside, { recursive: true, force: true })
-		}
+		expect(result.status).not.toBe(0)
+		expect(result.stdout).toBe('')
 	})
 })
 

@@ -40,6 +40,8 @@ describe('run_board_status.activity_of during setup', () => {
 			is_stopped: false,
 			lane_events: new Map(),
 			pr_checks: new Map(),
+			// No lane has opened since the start.
+			first_lane_ms: undefined,
 		})
 	})
 

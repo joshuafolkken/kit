@@ -1,6 +1,7 @@
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_ending } from '#scripts/run/run-ending'
 import { beforeEach, expect, it, vi } from 'vitest'
+import { run_merge } from './run-merge'
 import { run_merge_driver } from './run-merge-driver'
 import { run_merge_restart } from './run-merge-restart'
 import { run_merge_ship } from './run-merge-ship'
@@ -11,6 +12,7 @@ import { run_merge_ship } from './run-merge-ship'
 
 const do_failed_mock = vi.hoisted(() => vi.fn())
 const do_outage_mock = vi.hoisted(() => vi.fn())
+const read_record_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/issue/issue-state-cli', () => ({
 	issue_state_cli: {
@@ -42,6 +44,7 @@ vi.mock('./run-merge-steps', () => ({
 		do_outage: do_outage_mock,
 		has_resumable_cut: vi.fn().mockResolvedValue(false),
 		is_over_budget: vi.fn().mockResolvedValue(false),
+		read_record: read_record_mock,
 	},
 }))
 
@@ -69,6 +72,7 @@ beforeEach(() => {
 	vi.mocked(run_event_stream_emit.current_events).mockResolvedValue([])
 	do_outage_mock.mockReset().mockResolvedValue({ carry: { outages: 1 }, is_refused: false })
 	do_failed_mock.mockReset().mockResolvedValue(FAILED)
+	read_record_mock.mockReset().mockResolvedValue(undefined)
 })
 
 it('re-dispatches a child killed inside a turn instead of parking it', async () => {
@@ -113,6 +117,29 @@ it('parks a child once it has been re-dispatched as an outage three times', asyn
 
 	expect(do_failed_mock).toHaveBeenCalledOnce()
 	expect(do_outage_mock).not.toHaveBeenCalled()
+})
+
+function held_until(now: number, outages: number): string {
+	return new Date(now + run_merge.outage_wait_ms(outages)).toISOString()
+}
+
+// joshuafolkken/kit#7078: while the outage hold is on, the cap would park the child and reset the streak.
+it('holds longer on the same child fourth outage while the outage hold is on', async () => {
+	const held = run_merge.CONSECUTIVE_OUTAGE_LIMIT
+	const now = Date.now()
+
+	vi.spyOn(Date, 'now').mockReturnValue(now)
+	vi.mocked(run_ending.ended_mid_turn).mockReturnValue(true)
+	vi.mocked(run_event_stream_emit.current_events).mockResolvedValue([OUTAGE, OUTAGE, OUTAGE])
+	read_record_mock.mockResolvedValue({ carry: { outages: held } })
+	do_outage_mock.mockResolvedValue({ carry: { outages: held + 1 }, is_refused: false })
+	await merge_child()
+
+	expect(do_failed_mock).not.toHaveBeenCalled()
+	expect(run_event_stream_emit.emit).toHaveBeenCalledWith(
+		'usage-limit',
+		expect.stringContaining(held_until(now, held + 1)),
+	)
 })
 
 it('parks a child that ended on its own', async () => {

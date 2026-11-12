@@ -1,0 +1,1 @@
+- rf:assumptions | low | tools/test/pure-files.ts | 2026-11-09 | #6905

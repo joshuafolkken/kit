@@ -12,6 +12,12 @@ import { run_review_steps } from './run-review-steps'
 // joshuafolkken/kit#4793: its check runs in the background beside the pair, so the gate and the
 // reviewer start without waiting on it, and the reason rides on the launch for the join to judge by.
 
+vi.mock('#scripts/gate/metrics-totals', () => ({
+	metrics_totals: { totals_refusal: async () => undefined },
+}))
+vi.mock('./run-review-unplanned', () => ({
+	run_review_unplanned: { refusal: async () => undefined },
+}))
 // Code's brief alone: the interaction brief beside it is `run-review-cli-interaction.test.ts`'s.
 vi.mock('#scripts/review/review-interaction', async (import_original) => {
 	const { review_interaction } = await import_original<Record<'review_interaction', object>>()

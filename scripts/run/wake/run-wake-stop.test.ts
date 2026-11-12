@@ -1,13 +1,14 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_wake } from './run-wake'
 import { run_wake_stop } from './run-wake-stop'
 
+const make_directory = temporary_directory('suite')
+
 // joshuafolkken/kit#3708: the supervisor's stop, shared by `run:wake --stop` and `josh backlogrun --stop`.
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-wake-stop-test-'))
+const scratch = make_directory('run-wake-stop-test-')
 const TARGET = path.join(scratch, 'wake.json')
 const INVOCATION = 'backlogrun --max 5'
 const NOW = new Date('2026-10-12T09:00:00.000Z')
@@ -16,10 +17,6 @@ const SUPERVISOR_PID = 4242
 afterEach(() => {
 	vi.restoreAllMocks()
 	run_wake.remove_wake(TARGET)
-})
-
-afterAll(() => {
-	rmSync(scratch, { recursive: true, force: true })
 })
 
 function write_wake(): void {

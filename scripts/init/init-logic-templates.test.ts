@@ -1,20 +1,18 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { init_logic_templates } from './init-logic-templates'
 import { PACKAGE_DIR } from './init-paths'
+
+const make_directory = temporary_directory()
 
 // A holder rather than a bare `let`: `beforeEach` writes a property here rather than reassigning a
 // module binding, which `unicorn/no-top-level-assignment-in-function` forbids.
 const context = { project: '' }
 
 beforeEach(() => {
-	context.project = mkdtempSync(path.join(tmpdir(), 'init-templates-test-'))
-})
-
-afterEach(() => {
-	rmSync(context.project, { recursive: true, force: true })
+	context.project = make_directory('init-templates-test-')
 })
 
 const SPREAD_ONLY = `import { config } from '@joshuafolkken/kit/prettier'\n\nexport default {\n\t...config,\n}\n`

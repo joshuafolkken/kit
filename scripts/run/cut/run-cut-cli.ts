@@ -1,8 +1,9 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { agent_session_role } from '#scripts/agent/agent-session-role'
-import { cost_cli } from '#scripts/cost-runtime/cost-cli'
+import { cost_cli, type CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
+import { repository_lock } from '#scripts/git/repository-lock'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_relaunch } from '#scripts/lane/lane-relaunch'
@@ -10,12 +11,13 @@ import { openai_lane_supervisor } from '#scripts/lane/openai-lane-supervisor'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_cli_fault } from '#scripts/run/run-cli-fault'
-import { split_resolution } from '#scripts/split/split-resolution'
+import { run_step_section } from '#scripts/run/run-step-section'
 import { run_cut } from './run-cut'
 import { run_cut_args, type Request } from './run-cut-args'
 import { run_cut_decline } from './run-cut-decline'
 import { run_cut_digest } from './run-cut-digest'
 import { run_cut_handoff } from './run-cut-handoff'
+import { run_cut_next } from './run-cut-next'
 import { run_cut_ready } from './run-cut-ready'
 import { run_cut_report } from './run-cut-report'
 import { run_cut_resume } from './run-cut-resume'
@@ -27,10 +29,11 @@ import { run_cut_review } from './run-cut-review'
 // against the record and hands the run on to the gate. **Turning `argv` into a request is
 // `run-cut-args.ts`'s**; what is here acts on the record and relaunches.
 //
-// The contract is `run:hold`'s and `run:carry`'s: **standard output carries exactly one token** and
-// every explanation goes to standard error, so a loop can branch on `answer=$(pnpm josh run:cut 12)`.
-// `--json` is the one exception, and it is still one line: the whole record has to reach a resuming
-// session.
+// The contract is `run:hold`'s and `run:carry`'s: **the first line of standard output is one token** and
+// every explanation goes to standard error, so a loop can branch on the first line of
+// `answer=$(pnpm josh run:cut 12)`. A non-trivial verdict is followed by the `pre-gate-cut.md` section
+// it acts on (joshuafolkken/kit#5953), so the reader never opens the whole document. `--json` is still
+// one line: the whole record has to reach a resuming session.
 
 const ARGV_OFFSET = 2
 const COMMAND = 'run:cut'
@@ -44,12 +47,12 @@ const {
 	FAILURE_EXIT_CODE,
 	FRESH_VERDICT,
 	HANDOFF_MISSING_NOTE,
+	last_verdict,
 	HANDOFF_OVERFLOW_NOTE,
 	NOT_A_LANE_VERDICT,
 	OVER_VERDICT,
 	RESUME_IMPL_VERDICT,
 	RESUME_VERDICT,
-	SPLIT_UNRESOLVED_VERDICT,
 	SUCCESS_EXIT_CODE,
 	UNDER_THRESHOLD_VERDICT,
 	UNREADY_VERDICT,
@@ -62,29 +65,41 @@ const {
 	report_missing_supervisor,
 	report_relaunched_cut,
 	report_reviewer,
-	report_split_unresolved,
 	report_under_threshold,
 	report_unknown,
 } = run_cut_report
 
+// An unmeasurable session was never priced, so it is not told it is under the threshold; it reaches the
+// gate under the same verdict, since a relaunch could not price it either (joshuafolkken/kit#6576).
+function report_unmeasurable(): number {
+	console.error(
+		'The current context cannot be measured, so nothing was cut; a resume could not measure it either. Continue to the gate.',
+	)
+
+	return report(UNDER_THRESHOLD_VERDICT, SUCCESS_EXIT_CODE)
+}
+
+// Only a measured `over` takes the cut; `under` and an unmeasurable session both continue uncut.
+function verdict_answer(verdict: CostVerdict): number | undefined {
+	if (verdict === cost_verdict.OVER_VERDICT) return undefined
+
+	return verdict === cost_verdict.UNDER_VERDICT ? report_under_threshold() : report_unmeasurable()
+}
+
 // **The pre-gate cut is conditional on the same statistic the implementation-phase cut reads**.
 // `cost_cli.session_verdict` prices the newest request against the `--cut` break-even, so no second
-// threshold is introduced — an `under` session skips the cut, and an unmeasurable one still cuts as
-// the safety net. Only the pre-gate phase is checked here; the implementation-phase caller gates its own
+// threshold is introduced — only an `over` session is cut, an unmeasurable one skips it (joshuafolkken/kit#6576).
+// Only the pre-gate phase is checked here; the implementation-phase caller gates its own
 // `--impl` cut on `pnpm josh cost --cut` before it is ever issued.
 //
-// **A noticed Issue answers the split notice first** (joshuafolkken/kit#4695): the pre-gate cut is the
-// boundary the notice names, so a lane that neither split nor recorded why is refused whether or not
-// the cut itself would be taken. Returns the answer given without cutting, or `undefined`.
-async function pre_gate_answer(issue: string, phase: string): Promise<number | undefined> {
+// **Size never reaches the cut** (joshuafolkken/kit#7183): `lane:plan` warned once, and an overrun is
+// recorded at the merge as a pre-split miss. **Nor does an implementation past its budget**
+// (joshuafolkken/kit#7010): the overrun stays in `lane:stats` / `lane:breakdown` only, and a started
+// Issue is implemented to the end. Returns the answer given without cutting, or `undefined`.
+function pre_gate_answer(phase: string): number | undefined {
 	if (phase !== run_cut.PRE_GATE_PHASE) return undefined
-	const split_note = await split_resolution.ledger_refusal(Number(issue))
 
-	if (split_note !== undefined) return report_split_unresolved(split_note)
-
-	return cost_cli.session_verdict() === cost_verdict.UNDER_VERDICT
-		? report_under_threshold()
-		: undefined
+	return verdict_answer(cost_cli.session_verdict())
 }
 
 // The exclusive create lost, so a cut is already in flight for this tree — the double-cut guard. The
@@ -114,10 +129,10 @@ function report_relaunch_failure(target: string, note: string): number {
 // A pre-gate resume drives the gate, commit, PR and merge — the mechanical
 // ship/bookkeeping region, lowered — while an implementation resume keeps the role default. The
 // phase-aware profile is `agent_argv.resume_argv`'s; a person's `JOSH_WORKER_EFFORT` still wins over it,
-// and a pre-gate resume moves to `JOSH_WORKER_SHIP_MODEL` when that is set.
-function relaunch(target: string, lane: LaneInfo, phase: string): number {
+// and a pre-gate resume moves to the ship model — Sonnet, or `JOSH_WORKER_SHIP_MODEL` when that is set.
+async function relaunch(target: string, lane: LaneInfo, phase: string): Promise<number> {
 	const notes: Array<string> = []
-	const result = lane_relaunch.resume(lane, phase, (note) => {
+	const result = await lane_relaunch.resume(lane, phase, (note) => {
 		notes.push(note)
 	})
 
@@ -131,10 +146,11 @@ function relaunch(target: string, lane: LaneInfo, phase: string): number {
 const { is_lane_branch } = run_cut_ready
 const { declined } = run_cut_decline
 
-// An expired record is a fresh process that never started; it is cleared so the next cut can begin
-// rather than being wedged behind a stale file the exclusive create would refuse forever.
+// An unadopted expired cut may be cleared. An adopted record can still belong to a live session;
+// its age alone never permits another session to delete it.
 function clear_expired(target: string): void {
-	if (run_cut.read_cut(target).kind === 'expired') run_cut.end_cut(target)
+	const read = run_cut.read_cut(target)
+	if (read.kind === 'expired' && read.cut.is_handed_off !== false) run_cut.end_cut(target)
 }
 
 function has_matching_supervisor(lane: LaneInfo, issue: string): boolean {
@@ -159,7 +175,7 @@ interface CutRequest {
 async function emit_cut_event(request: CutRequest): Promise<void> {
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.CUT,
-		`${issue_cite.plain(request.issue)} cut (${request.phase})`,
+		`${issue_cite.plain_for('program', request.issue)} cut (${request.phase})`,
 	)
 }
 
@@ -205,7 +221,7 @@ async function finish_cut(target: string, lane: LaneInfo, request: CutRequest): 
 
 	return lane_relaunch.is_openai_lane(lane)
 		? report_relaunched_cut()
-		: relaunch(target, lane, request.phase)
+		: await relaunch(target, lane, request.phase)
 }
 
 // **A `fullrun` held in its own checkout takes the implementation cut too**, so a run a person started
@@ -251,7 +267,7 @@ async function cut(
 		return await declined({ issue, phase }, state, refuse_unready(state))
 	}
 
-	const answered = await pre_gate_answer(issue, phase)
+	const answered = pre_gate_answer(phase)
 
 	if (answered !== undefined) return answered
 
@@ -293,12 +309,31 @@ async function take_cut(target: string, request: CutCommand): Promise<number> {
 	return await cut(target, request.issue, cut_phase(request), request.handoff_path)
 }
 
+// The verdicts that leave nothing to act on beyond carrying on, so no section follows them.
+const TRIVIAL_VERDICTS: ReadonlySet<string> = new Set([
+	NOT_A_LANE_VERDICT,
+	UNDER_THRESHOLD_VERDICT,
+	FRESH_VERDICT,
+])
+
+// The section is printed after the token, never instead of it, and the token's exit code stands.
+function with_section(key: string, code: number): number {
+	if (!TRIVIAL_VERDICTS.has(last_verdict())) run_step_section.print_once(key)
+
+	return code
+}
+
 async function act(target: string, request: Request): Promise<number> {
-	if (request.kind === 'cut') return await take_cut(target, request)
+	// "Taking the cut" is the pre-gate boundary's; an `--impl` cut's caller carries its own instruction.
+	if (request.kind === 'cut' && request.is_implementation) return await take_cut(target, request)
 
-	if (request.kind === 'resume') return await run_cut_resume.resume(target, request.issue)
+	if (request.kind === 'cut') {
+		return with_section(run_step_section.CUT, await take_cut(target, request))
+	}
 
-	if (request.kind === 'read') return read_json(target)
+	if (request.kind === 'resume') {
+		return with_section(run_step_section.RESUME, await run_cut_resume.resume(target, request.issue))
+	}
 
 	return end(target)
 }
@@ -308,13 +343,31 @@ async function answer(request: Request): Promise<number> {
 
 	if (directory === undefined) return report_unknown()
 
-	return await act(run_cut.cut_path(directory), request)
+	const target = run_cut.cut_path(directory)
+	// Atomic record replacement lets diagnostics read a complete snapshot without the mutation lock.
+	if (request.kind === 'read') return read_json(target)
+
+	const result = await repository_lock.with_lock(
+		async () => await act(target, request),
+		`${target}.lock`,
+		0,
+	)
+
+	return result ?? report_cut_exists(target)
 }
 
 function refuse(): number {
 	console.error(run_cut_args.USAGE)
 
 	return FAILURE_EXIT_CODE
+}
+
+function print_next(request: Request): void {
+	if (request.kind !== 'cut' || request.is_implementation || agent_session_role.is_reviewer()) {
+		return
+	}
+
+	run_cut_next.print_next(last_verdict(), request.issue)
 }
 
 // Every path out prints exactly one token, including the ones nobody planned: an empty standard
@@ -334,6 +387,8 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 		return await answer(request)
 	} catch (error) {
 		return report_fault(run_cli_fault.message(COMMAND, error))
+	} finally {
+		print_next(request)
 	}
 }
 
@@ -352,7 +407,6 @@ const run_cut_cli = {
 	OVER_VERDICT,
 	RESUME_IMPL_VERDICT,
 	RESUME_VERDICT,
-	SPLIT_UNRESOLVED_VERDICT,
 	UNDER_THRESHOLD_VERDICT,
 	UNREADY_VERDICT,
 	run,

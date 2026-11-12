@@ -2,9 +2,8 @@ import type { FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { describe, expect, it } from 'vitest'
 import { review_round2 } from './review-round2'
 
-// joshuafolkken/kit#4165: a moved base used to answer `required` outright. Round 1's tree carried onto
-// the new base now names the fix delta, and the same empty / inert / live rules decide from it; only a
-// carry that cannot be made keeps the old refusal.
+// Carrying round 1's tree onto a moved base isolates the fix delta for the same empty/inert/live
+// decision. An uncomputable carry still requires review (joshuafolkken/kit#4165).
 
 const TAKEN_AT = '2026-10-20T00:00:00.000Z'
 const ROUND_ONE_BASE = '0123456789abcdef0123456789abcdef01234567'

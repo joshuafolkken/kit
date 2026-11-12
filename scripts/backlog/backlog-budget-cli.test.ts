@@ -117,6 +117,7 @@ it('prints the finish classification beside a JSON budget verdict', () => {
 // joshuafolkken/kit#3689: no verdict carries the wait's window — nothing reads it, so a watching poll
 // has nothing to record.
 const WATCH_JSON = '"budget":"watch"'
+const IDLE_DEADLINE_JSON = '"idle_until_ms"'
 
 function json_for(answer: string, extra: ReadonlyArray<string> = []): string {
 	const info = vi.spyOn(console, 'info').mockImplementation(vi.fn())
@@ -131,6 +132,18 @@ function json_for(answer: string, extra: ReadonlyArray<string> = []): string {
 }
 
 describe('backlog_budget_cli.run — a JSON verdict names no idle window', () => {
+	it.each(['exhausted', 'parked', 'unreadable'])('carries the idle deadline for %s', (answer) => {
+		const deadline = Date.parse(ACTIVE) + IDLE_MINUTES * MS_PER_MINUTE
+
+		expect(json_for(answer, ['--idle', String(IDLE_MINUTES)])).toContain(
+			`"idle_until_ms":${String(deadline)}`,
+		)
+	})
+
+	it.each(['blocked', 'untriaged', 'candidates'])('has no idle deadline for %s', (answer) => {
+		expect(json_for(answer)).not.toContain(IDLE_DEADLINE_JSON)
+	})
+
 	it.each(['exhausted', 'parked', 'unreadable'])('names none on a watch over %s', (answer) => {
 		const watching = json_for(answer)
 
@@ -146,6 +159,7 @@ describe('backlog_budget_cli.run — a JSON verdict names no idle window', () =>
 			expect(stopped).toContain('"budget":"stop"')
 			expect(stopped).toContain('"is_finish":false')
 			expect(stopped).not.toContain('"idle"')
+			expect(stopped).not.toContain(IDLE_DEADLINE_JSON)
 		},
 	)
 })

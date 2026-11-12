@@ -3,7 +3,13 @@ import { parse_json_object_or_undefined } from '#scripts/git/parse-json-array'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_gh_exec } from './git-gh-exec'
 import { gh_failure } from './git-gh-failure'
-import { git_gh_issue_read as git_gh_issue, NOT_FOUND_STATUS } from './git-gh-issue-read'
+import { git_gh_issue_memo } from './git-gh-issue-memo'
+import {
+	git_gh_issue_read as git_gh_issue,
+	NOT_FOUND_STATUS,
+	type IssueRead,
+	type IssueReadReason,
+} from './git-gh-issue-read'
 import {
 	BLOCKED_BY_SEGMENT,
 	BLOCKER_NUMBER,
@@ -22,8 +28,17 @@ vi.mock('./git-gh-exec', () => ({
 	git_gh_exec: { exec_gh_api: vi.fn(), exec_gh_api_status: vi.fn() },
 }))
 
+// The relations reads go through `exec_gh_api` here; the ETag is pinned in `git-gh-issue-read-etag.test.ts`.
+vi.mock('./git-gh-etag-read', () => ({
+	git_gh_etag_read: { read: async (path: string) => await git_gh_exec.exec_gh_api({ path }) },
+}))
+
 const mocked_api = vi.mocked(git_gh_exec.exec_gh_api)
 const mocked_status = vi.mocked(git_gh_exec.exec_gh_api_status)
+
+beforeEach(() => {
+	git_gh_issue_memo.forget()
+})
 
 const OTHER_REPO = 'joshuafolkken/app-kit'
 const ISSUE_PATH = `${CURRENT_REPO_ISSUES}/${String(ISSUE_NUMBER)}`
@@ -56,15 +71,18 @@ function api_paths(): Array<string> {
 }
 
 // The error `to_gh_error` throws, carrying the classification it takes off the failed request's own
-// response body. The message is deliberately the same in every case: nothing here may read it
-// (joshuafolkken/kit#1690).
+// response body. The message is deliberately the same in every case: the classification may not
+// read it (joshuafolkken/kit#1690); it is only carried to the report as `detail` (#6614).
+const GH_WORDING = 'gh: some wording or other'
+
 function gh_error(status: number | undefined): Error {
-	return gh_failure.attach(new Error('gh: some wording or other'), { status })
+	return gh_failure.attach(new Error(GH_WORDING), { status })
 }
 
-beforeEach(() => {
-	vi.clearAllMocks()
-})
+// A failed gh request as `issue_view_json_classified` reports it, its error text kept as `detail`.
+function gh_unreadable(reason: IssueReadReason, status: number | undefined): IssueRead {
+	return { kind: 'unreadable', reason, status, detail: GH_WORDING }
+}
 
 // joshuafolkken/kit#1024: `gh issue view` goes through GraphQL, which a cloud session is answered
 // 403 for. The failure arrived as `catch { return undefined }`, so an epic whose children could not
@@ -230,33 +248,27 @@ describe('issue_view_json_classified — telling the failures apart', () => {
 	it('reports a rate-limited read as unreachable', async () => {
 		mocked_api.mockRejectedValueOnce(gh_error(RATE_LIMITED_STATUS))
 
-		await expect(git_gh_issue.issue_view_json_classified(READ_NUMBER, 'state')).resolves.toEqual({
-			kind: 'unreadable',
-			reason: 'unreachable',
-			status: RATE_LIMITED_STATUS,
-		})
+		await expect(git_gh_issue.issue_view_json_classified(READ_NUMBER, 'state')).resolves.toEqual(
+			gh_unreadable('unreachable', RATE_LIMITED_STATUS),
+		)
 	})
 
 	// No status at all is the transport case: the request wrote no response body, so nothing answered.
 	it('reports a read that reached no status at all as unreachable', async () => {
 		mocked_api.mockRejectedValueOnce(gh_error(undefined))
 
-		await expect(git_gh_issue.issue_view_json_classified(READ_NUMBER, 'state')).resolves.toEqual({
-			kind: 'unreadable',
-			reason: 'unreachable',
-			status: undefined,
-		})
+		await expect(git_gh_issue.issue_view_json_classified(READ_NUMBER, 'state')).resolves.toEqual(
+			gh_unreadable('unreachable', undefined),
+		)
 	})
 
 	// A refusal answers the same however often it is asked, so it must not be read as a connection.
 	it('reports a refused read as rejected rather than unreachable', async () => {
 		mocked_api.mockRejectedValueOnce(gh_error(FORBIDDEN_STATUS))
 
-		await expect(git_gh_issue.issue_view_json_classified(READ_NUMBER, 'state')).resolves.toEqual({
-			kind: 'unreadable',
-			reason: 'rejected',
-			status: FORBIDDEN_STATUS,
-		})
+		await expect(git_gh_issue.issue_view_json_classified(READ_NUMBER, 'state')).resolves.toEqual(
+			gh_unreadable('rejected', FORBIDDEN_STATUS),
+		)
 	})
 })
 

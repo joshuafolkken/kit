@@ -1,11 +1,11 @@
 import { stripVTControlCharacters } from 'node:util'
-import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { agent_safe_text } from '#scripts/agent/agent-safe-text'
 import { changed_paths } from '#scripts/git/changed-paths'
+import { git_common_directory } from '#scripts/git/git-common-directory'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { review_prior_findings } from '#scripts/review/review-prior-findings'
 import { z } from 'zod'
 import { run_ship_next } from './run-ship-next'
-import { run_ship_probe } from './run-ship-probe'
 import type { StopFinding } from './run-ship-review'
 
 // What a relaunched lane child needs in front of it to fix a stopped ship: the tail of the failed
@@ -55,13 +55,13 @@ function output_lines(output: string): Array<string> {
 	return stripVTControlCharacters(output)
 		.trimEnd()
 		.split(LINE_BREAK)
-		.map((line) => agent_role_profile.printable(shown_frame(line)))
+		.map((line) => agent_safe_text.printable(shown_frame(line)))
 }
 
 // The full output is kept beside the ship log, keyed the same way, so the prompt's line range points at
 // text that reads exactly as the excerpt was cut from.
 async function keep_full_output(issue: string, output: string): Promise<string | undefined> {
-	const repository = await run_ship_probe.repository_directory()
+	const repository = await git_common_directory.read_repository()
 
 	if (repository === undefined) return undefined
 
@@ -217,7 +217,7 @@ function has_prior(context: StopContext): boolean {
 function describe(
 	issue: string,
 	context: StopContext,
-	budget: number = agent_role_profile.MAX_VALUE_LENGTH,
+	budget: number = agent_safe_text.MAX_VALUE_LENGTH,
 ): string {
 	let fitted = context
 	let block = fitted_block(issue, fitted, budget)

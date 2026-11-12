@@ -150,7 +150,7 @@ describe('run_step.next_action — no cut at the setup→implementation boundary
 describe('run_step.next_action — event-driven position', () => {
 	it.each([
 		[KIND.PR_OPENED, FOLLOWUP_COMMAND],
-		[KIND.REVIEW_ROUND, `pnpm josh review:round2 --record ${ISSUE}`],
+		[KIND.REVIEW_ROUND, 'pnpm josh ship --review'],
 		[KIND.MERGE, MERGE_COMMAND],
 		[KIND.OUTAGE, MERGE_COMMAND],
 		[KIND.PARK, OFFER_COMMAND],
@@ -178,6 +178,7 @@ describe('run_step.next_action — the hand-off at a child launch', () => {
 		)
 
 		expect(action).toEqual({ kind: 'command', line: run_step.HAND_OFF_COMMAND })
+		expect(run_step.HAND_OFF_COMMAND).toBe('pnpm josh run:carry --cut')
 	})
 
 	it.each<Partial<StepInput>>([

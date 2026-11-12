@@ -11,6 +11,7 @@ const ISSUE = 4695
 const OTHER = 4696
 const MINUTE_MS = 60_000
 const OTHER_REDISPATCH = 20
+const FOLLOWUP_START = 'followup start'
 const START = Date.parse('2026-10-24T03:00:00.000Z')
 
 function at(minute: number): string {
@@ -36,6 +37,10 @@ function stage(minute: number): LedgerEntry {
 
 function event(minute: number, kind: string, text: string): RunEvent {
 	return { pos: minute, at: at(minute), kind, text }
+}
+
+function ship(minute: number, words: string, issue = ISSUE): RunEvent {
+	return event(minute, 'ship-stage', `#${String(issue)} ${words}`)
 }
 
 function net_minutes(
@@ -78,7 +83,7 @@ describe('lane_net_time.net_ms', () => {
 	})
 })
 
-function yielded(minute: number, by: string = lane_yield.YIELD_TEXT.name): RunEvent {
+function withdrawn(minute: number, by: string): RunEvent {
 	return event(
 		minute,
 		'withdraw',
@@ -86,7 +91,16 @@ function yielded(minute: number, by: string = lane_yield.YIELD_TEXT.name): RunEv
 	)
 }
 
-// joshuafolkken/kit#5216: #5171 yielded its seat at 7 minutes and waited 43 for its redispatch.
+// The note a yielding child writes (`lane-yield.ts`); `run:merge` may close the lane later, or never.
+function yielded(minute: number): RunEvent {
+	return event(
+		minute,
+		'note',
+		`#${String(ISSUE)} yielded its lane: overlaps #${String(OTHER)} · at: summary`,
+	)
+}
+
+// joshuafolkken/kit#5216: a yielded lane's redispatch wait must not count as work.
 describe('lane_net_time.net_ms -- a yield', () => {
 	it('is the two seats together, the wait for the redispatch taken out', () => {
 		const entries = [dispatch(0), dispatch(50), merge(104)]
@@ -94,14 +108,46 @@ describe('lane_net_time.net_ms -- a yield', () => {
 		expect(net_minutes(entries, [yielded(7)])).toBe(61)
 	})
 
+	// joshuafolkken/kit#5755: #5635's yield had no closing withdrawal; one that has it waits from the note.
+	it('takes the wait out from the note, the closing withdrawal counted with it', () => {
+		const entries = [dispatch(0), dispatch(50), merge(104)]
+		const events = [yielded(7), withdrawn(9, lane_yield.YIELD_TEXT.name)]
+
+		expect(net_minutes(entries, events)).toBe(61)
+	})
+
 	it('keeps the time after a withdrawal that is not a yield', () => {
 		const entries = [dispatch(0), dispatch(50), merge(104)]
 
-		expect(net_minutes(entries, [yielded(7, 'a person')])).toBe(104)
+		expect(net_minutes(entries, [withdrawn(7, 'a person')])).toBe(104)
 	})
 
 	it('cuts a yield no redispatch ended at the merge', () => {
 		expect(net_minutes([dispatch(0), merge(30)], [yielded(20)])).toBe(20)
+	})
+})
+
+// The event `run:merge` writes when a child's run ends with its issue split.
+function split(minute: number, issue = ISSUE): RunEvent {
+	return event(minute, 'split', `#${String(issue)} split`)
+}
+
+// joshuafolkken/kit#6678: an issue split, then dispatched again, counts only the run after the split.
+describe('lane_net_time.net_ms — a split', () => {
+	it('takes out the split run and the wait for the redispatch', () => {
+		const entries = [dispatch(0), dispatch(1900), merge(1950)]
+
+		expect(net_minutes(entries, [split(14)])).toBe(50)
+	})
+
+	it('takes out nothing for a split no later dispatch followed', () => {
+		expect(net_minutes([dispatch(0), merge(30)], [split(14)])).toBe(30)
+	})
+
+	it("ignores another issue's split", () => {
+		const entries = [dispatch(0), dispatch(OTHER_REDISPATCH, OTHER), merge(30)]
+
+		expect(net_minutes(entries, [split(10, OTHER)])).toBe(30)
 	})
 })
 
@@ -164,6 +210,27 @@ describe('lane_net_time.net_ms — where a wait ends', () => {
 
 		expect(net_minutes(entries)).toBeUndefined()
 		expect(lane_net_time.span_of(entries, ISSUE)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#6541: the followup is the driver's wait on CI, CodeRabbit and the merge.
+describe('lane_net_time.net_ms — the followup', () => {
+	const lane = [dispatch(0), merge(30)]
+
+	it('takes out the followup from its start to the next ship stage line', () => {
+		expect(net_minutes(lane, [ship(20, FOLLOWUP_START), ship(28, 'followup done')])).toBe(22)
+	})
+
+	it('takes out a followup no line ended until the merge', () => {
+		expect(net_minutes(lane, [ship(20, FOLLOWUP_START)])).toBe(20)
+	})
+
+	it("keeps another issue's followup and the lane's other ship stages", () => {
+		expect(net_minutes(lane, [ship(10, FOLLOWUP_START, OTHER), ship(12, 'gate start')])).toBe(30)
+	})
+
+	it('takes out a host sleep inside the followup once', () => {
+		expect(net_minutes(lane, [ship(20, FOLLOWUP_START), sleep(22, 3)])).toBe(20)
 	})
 })
 

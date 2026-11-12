@@ -1,0 +1,1 @@
+- rf:bug-risks | low | scripts/hooks/run-hook.sh:68 | 2026-11-01 | #5663

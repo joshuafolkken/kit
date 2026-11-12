@@ -12,6 +12,7 @@ import { lane_child_invocation } from './lane-child-invocation'
 import { lane_dispatch, type DispatchOutcome } from './lane-dispatch'
 import { lane_output } from './lane-output'
 import { lane_registry, type LaneInfo } from './lane-registry'
+import { lane_seat_fixture } from './lane-seat-fixture'
 
 // joshuafolkken/kit#1934: a backlogrun/epicrun parent must re-dispatch a child released from
 // `needs-decision` to a lane rather than implement it in its own context. The path is already covered
@@ -54,12 +55,14 @@ function lane(): LaneInfo {
 
 const DERIVED_LOG = lane_dispatch.default_log_path(lane())
 
+beforeEach(lane_seat_fixture.mock_start)
+
 beforeEach(() => {
-	vi.clearAllMocks()
 	launch.mockReturnValue({ kind: 'launched', pid: PID })
 	find_open_lane.mockResolvedValue(lane())
 	record_output.mockResolvedValue({ kind: 'recorded', lane: lane(), output: DERIVED_LOG })
 	apply_label.mockResolvedValue({ is_applied: true })
+	vi.spyOn(git_gh_command, 'issue_clear_label').mockResolvedValue(true)
 })
 
 describe('re-dispatching a released child to a lane (joshuafolkken/kit#1934)', () => {

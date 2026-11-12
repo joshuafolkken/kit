@@ -51,6 +51,30 @@ const STREAM = [
 	event(3, '2026-10-08T11:30:00.000Z'),
 ]
 
+describe('run_board_span scheduler', () => {
+	it.each(['anthropic', 'openai'] as const)(
+		'keeps %s scoped to the selected run across launch, carry and end',
+		(scheduler_provider) => {
+			const pending = { ...launch(SECOND_START), scheduler_provider }
+			const current = { ...carry(SECOND_START), scheduler_provider }
+			const finished = { ...ended(SECOND_START, SECOND_END), scheduler_provider }
+			const old = ended(FIRST_START, FIRST_END)
+
+			expect(run_board_span.span_of(NONE, old, pending)?.scheduler_provider).toBe(
+				scheduler_provider,
+			)
+			expect(
+				run_board_span.span_of({ kind: 'carried', carry: current }, old)?.scheduler_provider,
+			).toBe(scheduler_provider)
+			expect(run_board_span.span_of(NONE, finished)?.scheduler_provider).toBe(scheduler_provider)
+			expect(
+				run_board_span.span_of({ kind: 'carried', carry: carry(SECOND_START) }, finished, pending)
+					?.scheduler_provider,
+			).toBeUndefined()
+		},
+	)
+})
+
 describe('run_board_span.span_of', () => {
 	it('draws the run that ended once, from its start to its end', () => {
 		const span = run_board_span.span_of(NONE, ended(FIRST_START, FIRST_END))

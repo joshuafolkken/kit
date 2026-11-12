@@ -6,9 +6,9 @@ import { ESLint } from 'eslint'
 
 // The code-line count `josh metrics` totals, asked of eslint's own `max-lines` exactly as
 // `line_budget` asks it, but **in process and with every other rule filtered out**.
-// The CLI probe `josh lines` spawns runs the project's whole rule set over
-// the files — about 37 seconds across `scripts/` — because the CLI has no way to run one rule; the
-// API's `ruleFilter` brings the same count to a few seconds, which is what lets the gate run it.
+// The CLI probe `josh lines` spawns runs the project's whole rule set over the files, because the
+// CLI has no way to run one rule; the API's `ruleFilter` makes the same count cheap enough for the
+// gate to run it.
 //
 // **It reads one line lower than `josh lines` on a file that starts with `#!`.** `line-budget.ts`
 // records why the API counts a hashbang as a comment where the CLI counts it as code, and why a
@@ -22,7 +22,9 @@ import { ESLint } from 'eslint'
 // code and saw `scripts.code_lines` 150 above the baseline a local run had just written. That
 // inference is also the CLI/API difference above. `max-lines` reads no type information, so parsing
 // without a program gives one answer everywhere, and in a fraction of the time.
-const UNTYPED_PARSE = { languageOptions: { parserOptions: { project: false } } }
+const UNTYPED_PARSE = {
+	languageOptions: { parserOptions: { project: false, projectService: false } },
+}
 
 const MAX_LINES_RULE = 'max-lines'
 // The API deletes whatever `cacheLocation` names whenever `cache` is off, and its default is the

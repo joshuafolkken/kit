@@ -1,8 +1,7 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 // joshuafolkken/kit#1520. The command's surface: the interval is configurable and disable-able, a
 // real report is recorded with `--mark`, and a repository with nothing in flight is told apart from
 // one whose listing could not be read. The watch loop is driven a tick at a time through `step`,
@@ -11,6 +10,8 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vites
 
 import type { WatchLoop, WatchOptions } from './run-progress-cli'
 import type { ObservationRead } from './run-progress-read'
+
+const make_directory = temporary_directory('suite')
 
 vi.mock('#scripts/gh/gh-spawn', () => ({
 	gh_spawn: { get_repo_name_with_owner: vi.fn(), get_repo_name_with_owner_within: vi.fn() },
@@ -64,7 +65,7 @@ const is_child_of = vi.mocked(lane_child_marker.is_child_of)
 const REPO = 'joshuafolkken/kit'
 // A directory of this suite's own. A fixed name under the temp directory is shared by every suite
 // running at once, which `scripts/lib/shared-temporary-path.test.ts` refuses for exactly that reason.
-const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-run-progress-cli-'))
+const TEMPORARY = make_directory('josh-run-progress-cli-')
 const STAMP = path.join(TEMPORARY, 'stamp.json')
 const LIFE_STAMP = path.join(TEMPORARY, 'life.json')
 const TRANSCRIPT = path.join(TEMPORARY, 'unit.jsonl')
@@ -114,11 +115,6 @@ beforeEach(() => {
 afterEach(() => {
 	vi.unstubAllEnvs()
 	vi.restoreAllMocks()
-	vi.clearAllMocks()
-})
-
-afterAll(() => {
-	rmSync(TEMPORARY, { force: true, recursive: true })
 })
 
 describe('the interval is configurable and disable-able', () => {

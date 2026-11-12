@@ -5,10 +5,7 @@ import { GRAPHQL_PATH } from './git-gh-pr-graphql-state'
 import { read_pull, read_pull_or_listed, require_pr_number } from './git-gh-pr-read'
 import { git_gh_pr_rest, type RestPull } from './git-gh-pr-rest'
 
-// Auto-merge for a pull request a josh command opens and would otherwise have to stay alive to land.
-// `pnpm josh observations:flush` used to merge its pull request only from
-// inside its own wait, so a wait that ended early — a session cut, a killed process — left a green
-// pull request open with nobody to merge it.
+// Auto-merge lets a josh-owned pull request land even if its waiting process ends early.
 //
 // **This is a GraphQL request because REST has no equivalent** — the pull-request layer's only other
 // one is `git-gh-pr-graphql-state.ts`. Enabling auto-merge is `enablePullRequestAutoMerge` and

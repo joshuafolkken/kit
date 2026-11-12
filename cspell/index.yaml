@@ -47,6 +47,11 @@ ignorePaths:
   #   - '**/*.min.js'
   #   - '**/*.svg'
 words:
+  - curlrc
+  - mktemp
+  # safe-chain's release asset name for its static Linux binary, which the distributed
+  # `setup-pnpm` action fetches (joshuafolkken/kit#6849).
+  - linuxstatic
   # pnpm's `.pnpmfile.mjs` hook file that strips the safe-chain preinstall at pack time
   # (joshuafolkken/kit#2693). Distributed, because `josh init` / `josh sync` copy that file, which
   # names itself, into a published consumer (joshuafolkken/kit#3110).
@@ -61,6 +66,9 @@ words:
   # The process-listing command `epicrun.md` names among the traces a stopped delegated unit leaves
   # (joshuafolkken/kit#1212). Distributed, because the skill that names it is copied by `josh sync`.
   - pgrep
+  # The home credential file the `protected-file` guard refuses a read of (joshuafolkken/kit#6003).
+  # Distributed, because the package ships `scripts/rules/`, whose guard reason names it.
+  - netrc
   # The shell variable naming the parent process, which `josh run:carry --owner "$PPID"` passes so the
   # record can name the long-lived session spending the budget (joshuafolkken/kit#1722). Distributed,
   # because `backlogrun.md` types that command and `josh sync` copies that skill.
@@ -132,6 +140,9 @@ words:
   - newbot
   - userinfobot
   - lefthook
+  # In kit's distributed `pnpm-workspace.yaml`, inside a region `josh sync` drops before writing it
+  # (joshuafolkken/kit#5500); the cspell guard reads the file as kit ships it.
+  - minimatch
   - mischeck
   - multicriteria
   - narratively

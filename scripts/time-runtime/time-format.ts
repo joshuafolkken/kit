@@ -19,8 +19,8 @@ import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 
 const SECOND_DECIMALS = 1
 const LABEL_WIDTH = 24
-// Wide enough for a three-digit run (`335.4 min`), so a long session's rows stay in column with a
-// short one's rather than pushing the share out by a character.
+// Wide enough for a three-digit minute count with its decimal and unit, so a long session's rows
+// stay in column with a short one's rather than pushing the share out by a character.
 const MINUTES_WIDTH = 9
 // The answer a table gives where the half it sums was never read at all, kept apart from the phase
 // table's `not detected` because the two ask different questions: a phase is about a marker, this is
@@ -52,8 +52,8 @@ function overflow_line(row_count: number): Array<string> {
 	]
 }
 
-// Seconds rather than minutes for a per-turn figure: one turn is tens of seconds, and `0.1 min` is
-// too coarse to show the rise across a batch that this scale exists to make visible.
+// Seconds rather than minutes for a per-turn figure: one turn is tens of seconds, and a tenth of a
+// minute is too coarse to show the rise across a batch that this scale exists to make visible.
 function format_seconds(duration_ms: number): string {
 	return `${(duration_ms / MS_PER_SECOND).toFixed(SECOND_DECIMALS)} s`
 }

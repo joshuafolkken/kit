@@ -73,7 +73,6 @@ async function collected(): Promise<Array<unknown>> {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
 	carried()
 	vi.mocked(run_event_stream_emit.current_events).mockResolvedValue([

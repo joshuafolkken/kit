@@ -53,7 +53,6 @@ const JOSH_COMMAND = 'pnpm josh '
 const CONTRACT_PHRASES: ReadonlyArray<string> = [
 	'All rules for this repository live in',
 	READ_IN_FULL,
-	'This file exists only to point at it',
 	DO_NOT_COPY,
 	'Every change to how agents work',
 ]

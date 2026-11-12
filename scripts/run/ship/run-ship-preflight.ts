@@ -5,6 +5,7 @@ import { changed_paths } from '#scripts/git/changed-paths'
 import { git_branch } from '#scripts/git/git-branch'
 import { git_issue } from '#scripts/git/git-issue'
 import { git_preflight, type Unmet } from '#scripts/git/git-preflight'
+import { cli_body } from '#scripts/josh/cli-body'
 import type { JoshResult } from '#scripts/josh/josh-run'
 import { error_text } from '#scripts/lib/error-message'
 import { report_format_reference } from '#scripts/report/report-format-reference'
@@ -16,6 +17,7 @@ import { run_ship_body_draft } from './run-ship-body-draft'
 import { run_ship_lap } from './run-ship-lap'
 import { run_ship_lock } from './run-ship-lock'
 import { run_ship_planned } from './run-ship-planned'
+import { run_ship_preflight_reuse, type PreflightKey } from './run-ship-preflight-reuse'
 import { run_ship_scoped } from './run-ship-scoped'
 
 // `josh ship`'s first stage. The commit stage (`git -y`'s preflight) and the merge (`followup`'s
@@ -65,7 +67,7 @@ interface PreflightResult extends JoshResult {
 
 // The body the next ship delivers: `--body-file`, else the run's ship body draft, else the open PR's.
 async function body_text(body_path: string | undefined): Promise<string | undefined> {
-	if (body_path !== undefined) return await readFile(body_path, 'utf8')
+	if (body_path !== undefined) return cli_body.read_file_or_stdin(body_path)
 	const branch = await git_branch.current()
 	const issue = git_issue.branch_number(branch)
 	const draft = issue === undefined ? undefined : await run_ship_body_draft.existing(issue)
@@ -172,7 +174,7 @@ async function asked_problems(request: PreflightRequest): Promise<Array<Unmet>> 
 	return [...preflight, ...evidence, ...acceptance, ...removed, ...lock, ...planned]
 }
 
-async function stage(request: PreflightRequest): Promise<PreflightResult> {
+async function asked_stage(request: PreflightRequest): Promise<PreflightResult> {
 	const problems = await run_ship_lap.timed(
 		run_ship_lap.STEP.PRECONDITIONS,
 		async () => await asked_problems(request),
@@ -185,6 +187,22 @@ async function stage(request: PreflightRequest): Promise<PreflightResult> {
 	if (scoped.code === SUCCESS_EXIT_CODE) return { code: SUCCESS_EXIT_CODE, out: 'ready' }
 
 	return { ...scoped, preconditions: [PRECONDITION.SCOPED] }
+}
+
+// The title and the body this ship delivers key the reuse; an unreadable body is asked every time.
+async function reuse_key(request: PreflightRequest): Promise<PreflightKey | undefined> {
+	const [branch, body] = await Promise.all([git_branch.current(), readable_body(request.body_path)])
+	const issue = git_issue.branch_number(branch)
+
+	if (issue === undefined || body === UNREADABLE) return undefined
+
+	return { issue, inputs: `${request.title}\n${body ?? ''}` }
+}
+
+async function stage(request: PreflightRequest): Promise<PreflightResult> {
+	const key = await reuse_key(request)
+
+	return await run_ship_preflight_reuse.run(key, async () => await asked_stage(request))
 }
 
 async function classification_problems(issue_number: string): Promise<Array<Unmet>> {
@@ -253,6 +271,7 @@ async function ahead(issue_number: string): Promise<Array<string>> {
 }
 
 const run_ship_preflight = {
+	SCOPED_PRECONDITION: PRECONDITION.SCOPED,
 	EVIDENCE_PENDING,
 	EVIDENCE_PROBLEM,
 	acceptance_pending_text,

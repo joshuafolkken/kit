@@ -16,11 +16,11 @@ import { time_spans, type Span } from './time-spans'
 // than a second copy of that arithmetic living here. The two series then fold in identically, which is
 // what keeps `unattributed_round_trips` at zero.
 //
-// **What the shape costs.** Run #1839 launched three investigation subagents at 1.7 / 7.3 / 11.4
-// minutes, in three separate turns, whose three questions — the lane machinery, the API signatures,
-// the registry and log paths — needed nothing from one another and could have gone out at once. The
-// consecutive detector counted none of them. The three review finders it launched at 36.7 minutes, by
-// contrast, went out *in one turn* and cost nothing, which is the shape this series must not charge.
+// **What the shape costs.** Run #1839 launched three investigation subagents in three separate
+// turns, whose three questions — the lane machinery, the API signatures, the registry and log
+// paths — needed nothing from one another and could have gone out at once. The consecutive detector
+// counted none of them. The three review finders it launched later, by contrast, went out *in one
+// turn* and cost nothing, which is the shape this series must not charge.
 //
 // ## When two launches could have been one
 //

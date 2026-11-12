@@ -118,11 +118,11 @@ describe('the documented inert set is the one the command uses', () => {
 	})
 })
 
-describe('documentation is stated as not inert', () => {
+describe('documentation gets a reduced review', () => {
 	// `CLAUDE.md` no longer restates "documentation is not inert" — that consequence lives at
 	// `prompts/review.md` with its measurement (joshuafolkken/kit#1924).
-	it.each([REVIEW_PROMPT])('%s says documentation stays at the default level', (document_path) => {
-		expect(read_unwrapped(document_path)).toContain('documentation')
+	it.each([REVIEW_PROMPT])('%s says documentation gets low review', (document_path) => {
+		expect(read_unwrapped(document_path)).toContain('get `low`')
 	})
 
 	// The evidence, not just the claim: a maintainer who disagrees needs to be able to check it. The

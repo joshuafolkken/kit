@@ -1,18 +1,15 @@
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { unit_count_file } from './unit-count-file'
 
 // joshuafolkken/kit#4465: `josh test:related` reads the run's test-file count from a file it names.
 
 const COUNT = 25
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'unit-count-file-test-'))
-
-afterAll(() => {
-	rmSync(scratch, { recursive: true, force: true })
-})
+const make_directory = temporary_directory('suite')
+const scratch = make_directory('unit-count-file-test-')
 
 describe('unit_count_file.write_count — the reporter side', () => {
 	it('writes the count to the named file', async () => {
@@ -60,5 +57,21 @@ describe('unit_count_file.read_count — the caller side', () => {
 		writeFileSync(target, content)
 
 		expect(unit_count_file.read_count(target)).toBeUndefined()
+	})
+})
+
+describe('unit_count_file — individual success evidence', () => {
+	it('hands reported file paths to the caller beside its count', async () => {
+		const target = path.join(scratch, 'passed')
+		const files = ['unit.test.ts']
+
+		await unit_count_file.write_files(files, target)
+		expect(unit_count_file.read_files(target)).toEqual(files)
+	})
+	it.each(['{}', '[1]', 'broken'])('refuses malformed evidence: %s', (content) => {
+		const target = path.join(scratch, 'malformed')
+
+		writeFileSync(`${target}.files`, content)
+		expect(unit_count_file.read_files(target)).toEqual([])
 	})
 })

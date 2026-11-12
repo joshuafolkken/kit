@@ -1,11 +1,15 @@
 import { has_timed_out } from '#scripts/git/git-execa-error'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
+import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { error_text } from '#scripts/lib/error-message'
 import { token_shape } from '#scripts/lib/token-shape'
 import { execa, execaSync } from 'execa'
+import { gh_call_kind } from './gh-call-kind'
+import { gh_request_tally } from './gh-request-tally'
 import { check_gh_installed } from './git-gh-check'
-import { gh_failure } from './git-gh-failure'
+import { gh_failure, has_stdout_field } from './git-gh-failure'
 import { gh_retry } from './git-gh-retry'
+import { GH_SPAWN_CONCURRENCY } from './git-gh-spawn-width'
 
 const BODY_FROM_STDIN = '-'
 
@@ -14,23 +18,23 @@ const BODY_FROM_STDIN = '-'
 // `gh` would hold the caller open with no upper bound — most visibly in `josh propagate`, whose
 // runner is single-threaded and would process no further consumer at all.
 //
-// **It is a request's budget, not a step's.** `STEP_TIMEOUT_MS` (30 minutes, `propagate-steps.ts`)
-// covers a consumer's whole unit suite and a `pnpm add`; one REST call has no business borrowing
-// that number. The value is read off what the callers actually do instead:
+// **It is a request's budget, not a step's.** `STEP_TIMEOUT_MS` in `propagate-steps.ts` covers a
+// consumer's whole unit suite and a `pnpm add`; one REST call must not borrow that budget.
+// The value is read off what the callers actually do instead:
 //
-// - `CHECK_WAIT_INTERVAL_MS` is 10 seconds — the merge gate's poll cadence. A request still in
-//   flight six polls later is not slow, it is stuck.
-// - `PR_CHECKS_WATCH_TIMEOUT_MS` is 120 seconds: `followup`'s look-ahead, which bounds its own
+// - `CHECK_WAIT_INTERVAL_MS` defines the merge gate's poll cadence. A request still in
+//   flight across repeated polls must not block the loop indefinitely.
+// - `PR_CHECKS_WATCH_TIMEOUT_MS` bounds `followup`'s look-ahead and its own
 //   *sleeps* rather than the wall clock, so each poll's requests sit on top of it. A request allowed
 //   to outlast that whole window would make the budget meaningless; half of it keeps one request
 //   from dominating the look-ahead.
-// - the readers that override it ask for 5 seconds (`repo-setting.ts`) and 20
-//   (`propagate-publish.ts`, `epic-cross-repo.ts`). Sixty is deliberately the most generous of them,
+// - the readers that override it (`repo-setting.ts`, `propagate-publish.ts`, `epic-cross-repo.ts`)
+//   use tighter budgets. This default is deliberately more generous,
 //   because this entry also serves `--paginate` requests — several HTTP round trips inside one
-//   spawn — which a 5-second budget would break.
+//   spawn — which the tightest override would break.
 //
-// The aggregate is not what this bounds and must not be read as one: `followup` makes roughly 573
-// requests across a 32-minute wait, and what caps that wait is its own attempt count. All this
+// The aggregate is not what this bounds and must not be read as one: `followup` makes repeated
+// requests while waiting, and what caps that wait is its own attempt count. All this
 // guarantees is that no single request holds it forever.
 //
 // **What a timed-out read costs its caller is decided by that caller, and two are worth naming.**
@@ -64,7 +68,7 @@ function to_timeout_option(timeout_ms?: number): { timeout: number } {
 // **`gh` dials GitHub directly, never through a proxy this machine stood up on loopback**.
 // A package-manager wrapper writes one into the environment of everything
 // its invocation spawns, and it exists to inspect package downloads — api.github.com crosses it
-// without inspection, so the hop buys nothing and can fail on its own: one 30-second stall makes the
+// without inspection, so the hop buys nothing and can fail on its own: one stalled request makes the
 // wrapper refuse every later GitHub connection of that `followup`, and the retries in the poll loop
 // can then only ever fail. The loopback test and
 // the list of spellings are the agent-session launcher's, shared rather than
@@ -115,12 +119,6 @@ function has_stderr_field(error: unknown): error is Error & { stderr: string } {
 	return error instanceof Error && 'stderr' in error && typeof error.stderr === 'string'
 }
 
-// execa attaches the captured output to the error it throws, which is where the status line lands
-// when `gh api` exits non-zero — the case the whole probe exists for.
-function has_stdout_field(error: unknown): error is Error & { stdout: string } {
-	return error instanceof Error && 'stdout' in error && typeof error.stdout === 'string'
-}
-
 // `has_timed_out` is shared with the push transport rather than restated here: execa marks a spawn
 // it killed the same way whichever binary was spawned, and `git push` has a budget of its own.
 function to_timeout_prefix(error: unknown): string {
@@ -152,13 +150,18 @@ function to_gh_error(error: unknown): Error {
 	)
 }
 
-async function exec_gh_command(
+// Held around the spawn only: `with_retry`'s backoff waits outside a slot.
+const gh_slots = bounded_pool.limiter(GH_SPAWN_CONCURRENCY)
+
+async function spawn_gh_command(
 	arguments_: Array<string>,
 	timeout_ms?: number,
 	cwd?: string,
 ): Promise<string> {
 	await check_gh_installed()
 	const options = to_spawn_options(timeout_ms, cwd)
+
+	gh_request_tally.count_call(gh_call_kind.of(arguments_))
 
 	try {
 		const { stdout } = await execa('gh', arguments_, options) // NOSONAR S8705: execa array args (no shell), trusted dev CLI tooling
@@ -169,19 +172,31 @@ async function exec_gh_command(
 	}
 }
 
-async function exec_gh_command_with_stdin(input: {
+async function exec_gh_command(
+	arguments_: Array<string>,
+	timeout_ms?: number,
+	cwd?: string,
+): Promise<string> {
+	return await gh_slots.run(async () => await spawn_gh_command(arguments_, timeout_ms, cwd))
+}
+
+interface StdinCommand {
 	args: Array<string>
 	stdin_body: string
 	// `number | undefined` rather than plain optional: `exec_gh_api` forwards its own optional field,
 	// which `exactOptionalPropertyTypes` will not narrow for it.
 	timeout_ms?: number | undefined
 	cwd?: string | undefined
-}): Promise<string> {
+}
+
+async function spawn_gh_command_with_stdin(input: StdinCommand): Promise<string> {
 	await check_gh_installed()
 
 	// Built ahead of the call so the spawn itself stays on one line: `// NOSONAR` suppresses the rule
 	// only on the line it sits on, and a wrapped call moves that line away from the reported one.
 	const options = { input: input.stdin_body, ...to_spawn_options(input.timeout_ms, input.cwd) }
+
+	gh_request_tally.count_call(gh_call_kind.of(input.args))
 
 	try {
 		const { stdout } = await execa('gh', input.args, options) // NOSONAR S8705: execa array args (no shell), trusted dev CLI tooling
@@ -190,6 +205,10 @@ async function exec_gh_command_with_stdin(input: {
 	} catch (error) {
 		throw to_gh_error(error)
 	}
+}
+
+async function exec_gh_command_with_stdin(input: StdinCommand): Promise<string> {
+	return await gh_slots.run(async () => await spawn_gh_command_with_stdin(input))
 }
 
 // The status line `gh api --include` prints before the headers, e.g. `HTTP/2.0 404 Not Found`.
@@ -220,7 +239,7 @@ function status_of_failure(error: unknown): number | undefined {
 // spawn beside four bounded ones would be an inconsistency in the same file. A timeout reaches the
 // `catch` and answers `undefined`, which already means "no status was reached", which its one
 // caller already reads as a failed read rather than as a 404.
-async function exec_gh_api_status(path: string, timeout_ms?: number): Promise<number | undefined> {
+async function spawn_gh_api_status(path: string, timeout_ms?: number): Promise<number | undefined> {
 	// Hoisted so the spawn below fits on one line, which `// NOSONAR` requires — it suppresses only
 	// the line it sits on. The **argument list** stays an inline literal for the opposite reason:
 	// `gh-subcommand-guard.ts` resolves the subcommand from it, and hoisting that into a `const`
@@ -230,12 +249,17 @@ async function exec_gh_api_status(path: string, timeout_ms?: number): Promise<nu
 
 	try {
 		await check_gh_installed()
+		gh_request_tally.count_call(gh_call_kind.of_api(path))
 		const { stdout } = await execa('gh', ['api', '--include', '--silent', path], options) // NOSONAR S8705: execa array args (no shell), trusted dev CLI tooling
 
 		return parse_status_line(stdout)
 	} catch (error) {
 		return status_of_failure(error)
 	}
+}
+
+async function exec_gh_api_status(path: string, timeout_ms?: number): Promise<number | undefined> {
+	return await gh_slots.run(async () => await spawn_gh_api_status(path, timeout_ms))
 }
 
 // The synchronous twin of `exec_gh_api_status`, for `epic-cross-repo.ts`, whose resolver is
@@ -245,6 +269,8 @@ async function exec_gh_api_status(path: string, timeout_ms?: number): Promise<nu
 // answers `undefined`, which is what that check would have led to anyway.
 function exec_gh_api_status_sync(path: string, timeout_ms?: number): number | undefined {
 	const options = to_spawn_options(timeout_ms)
+
+	gh_request_tally.count_call(gh_call_kind.of_api(path))
 
 	try {
 		const { stdout } = execaSync('gh', ['api', '--include', '--silent', path], options) // NOSONAR S8705: execa array args (no shell), trusted dev CLI tooling
@@ -365,6 +391,21 @@ async function exec_gh_api(request: GhApiRequest): Promise<string> {
 	return await gh_retry.with_retry(async () => await send_gh_api(request))
 }
 
+// `exec_gh_api` without the count, for the request tally's own core allowance reading
+// (`gh-request-tally.ts`): `GET /rate_limit` costs no quota and is the measurement, not a measured
+// call. It takes no slot and no retry, so the reading never waits behind the calls it measures.
+async function exec_gh_api_uncounted(request: GhApiRequest): Promise<string> {
+	const options = to_spawn_options(request.timeout_ms, request.cwd)
+
+	try {
+		const { stdout } = await execa('gh', to_gh_api_args(request), options) // NOSONAR S8705: execa array args (no shell), trusted dev CLI tooling
+
+		return stdout.trimEnd()
+	} catch (error) {
+		throw to_gh_error(error)
+	}
+}
+
 // The synchronous twin of `exec_gh_api`, for a caller that cannot await. `josh propagate` runs each
 // consumer's steps as a sequential chain of `execaSync` spawns with inherited stdio, and that shape
 // reaches from `open_issue` up through `RunStep`, `run_target` and `run_targets` — so the issue it
@@ -389,9 +430,12 @@ function exec_gh_api_sync(request: GhApiRequest): string {
 	refuse_credential_body(request)
 	const body_option = request.body === undefined ? {} : { input: request.body }
 	const options = { ...body_option, ...to_spawn_options(request.timeout_ms, request.cwd) }
+	const gh_arguments = to_gh_api_args(request)
+
+	gh_request_tally.count_call(gh_call_kind.of(gh_arguments))
 
 	try {
-		const { stdout } = execaSync('gh', to_gh_api_args(request), options) // NOSONAR S8705: execa array args (no shell), trusted dev CLI tooling
+		const { stdout } = execaSync('gh', gh_arguments, options) // NOSONAR S8705: execa array args (no shell), trusted dev CLI tooling
 
 		return stdout.trimEnd()
 	} catch (error) {
@@ -416,6 +460,7 @@ const git_gh_exec = {
 	exec_gh_command,
 	exec_gh_command_with_stdin,
 	exec_gh_api,
+	exec_gh_api_uncounted,
 	exec_gh_api_sync,
 	read_gh_api_sync,
 	exec_gh_api_status,
@@ -424,5 +469,9 @@ const git_gh_exec = {
 }
 
 export type { GhApiRequest }
-export { git_gh_exec, has_stderr_field, has_stdout_field }
+export { git_gh_exec, has_stderr_field }
 export { BODY_FROM_STDIN, GH_REQUEST_TIMEOUT_MESSAGE, GH_REQUEST_TIMEOUT_MS }
+
+export { GH_SPAWN_CONCURRENCY } from './git-gh-spawn-width'
+
+export { has_stdout_field } from './git-gh-failure'

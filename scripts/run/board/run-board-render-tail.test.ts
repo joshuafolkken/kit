@@ -15,7 +15,7 @@ import type { UsualTimes } from './run-board-usual'
 // phase is not drawn twice.
 
 const { EMPTY_LAYOUT, MINUTE, NOW, header, lines_of } = run_board_render_fixture
-const PHASE_TIME = '10′00″'
+const PHASE_TIME = '8′00″'
 // The width the lead gives a time.
 const TIME_WIDTH = 8
 const PHASE_PART = PHASE_TIME.padStart(TIME_WIDTH)
@@ -23,8 +23,13 @@ const ACTIVITY = '👀 3′00″'
 const SECOND = MINUTE / 60
 const SECONDS_40 = 40 * SECOND
 const MINUTES_61_SECONDS_5 = 61 * MINUTE + 5 * SECOND
-// A phase three digits of minutes long, as a run past 100 minutes reaches.
+// A long phase exercises the wider duration field.
 const LONG_PHASE = 125 * MINUTE
+const LONG_TIME = '2°05′00″'
+// The columns the past-an-hour phase time takes beyond the usual one.
+const WIDER = LONG_TIME.length - PHASE_TIME.length
+// The long phase's row ends on its activity, then what it ran past the ship budget.
+const LONG_END = /Long {2,}👀 3′00″ {2}over budget \+117′$/u
 const EVENT: LaneEvent = { phase: 'review', words: 'ship review', at_ms: NOW - 3 * MINUTE }
 
 function running(number: number, title = `Issue ${String(number)}`): BoardRow {
@@ -32,7 +37,7 @@ function running(number: number, title = `Issue ${String(number)}`): BoardRow {
 		state: 'running' as const,
 		started_ms: NOW - number * MINUTE,
 		track: ['implement' as const, 'review' as const],
-		phase_ms: NOW - 10 * MINUTE,
+		phase_ms: NOW - 8 * MINUTE,
 	}
 
 	return { number, title, kind: undefined, state: 'running', status, waits: [] }
@@ -101,9 +106,9 @@ describe('run_board_render_tail.tail_of phase time', () => {
 	it('draws the time plain up to twice the usual time, yellow past it and red past three times', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 
-		expect(time_of(running(2), { usual: usual(5) })).toBe(PHASE_PART)
-		expect(time_of(running(2), { usual: usual(4) })).toBe(styleText('yellow', PHASE_PART))
-		expect(time_of(running(2), { usual: usual(3) })).toBe(styleText('red', PHASE_PART))
+		expect(time_of(running(2), { usual: usual(4) })).toBe(PHASE_PART)
+		expect(time_of(running(2), { usual: usual(3) })).toBe(styleText('yellow', PHASE_PART))
+		expect(time_of(running(2), { usual: usual(2) })).toBe(styleText('red', PHASE_PART))
 	})
 
 	it('counts a near-zero usual time as two minutes, so a stage of seconds is not drawn as alarming', () => {
@@ -125,6 +130,19 @@ describe('run_board_render_tail.tail_of phase time', () => {
 	it('draws seconds alone and carries the minutes into hours', () => {
 		expect(phase_time(SECONDS_40)).toBe('40″'.padStart(TIME_WIDTH))
 		expect(phase_time(MINUTES_61_SECONDS_5)).toBe('1°01′05″')
+	})
+})
+
+// joshuafolkken/kit#6577: a stopped row's phase time stops where its lane stopped.
+describe('run_board_render_tail.phase_time of a stopped row', () => {
+	it('freezes a stopped row at its stop, however far now has moved', () => {
+		const row = running(2)
+		const status = { ...row.status, state: 'stopped' as const, ended_ms: NOW - 5 * MINUTE }
+		const stopped: BoardRow = { ...row, state: 'stopped', status }
+		const frozen = '3′00″'.padStart(TIME_WIDTH)
+
+		expect(time_of(stopped)).toBe(frozen)
+		expect(time_of(stopped, { now_ms: NOW + 60 * MINUTE })).toBe(frozen)
 	})
 })
 
@@ -248,8 +266,8 @@ describe('run_board_render.render tail column', () => {
 		const lines = lines_of(board({ layout, activity: { ...board().activity, lane_events } }))
 
 		expect(column_of(lines, 'Long', '👀 3′00″')).toBe(column_of(lines, 'Short', '👀 3′00″'))
-		expect(lines.find((line) => line.includes('Long'))).toMatch(/Long {2,}👀 3′00″$/u)
-		expect(column_of(lines, 'Long', '2°05′00″')).toBe(column_of(lines, 'Short', PHASE_TIME) - 2)
+		expect(lines.find((line) => line.includes('Long'))).toMatch(LONG_END)
+		expect(column_of(lines, 'Long', LONG_TIME)).toBe(column_of(lines, 'Short', PHASE_TIME) - WIDER)
 	})
 
 	it('ends every running row’s activity age in one column where one runs past an hour', () => {

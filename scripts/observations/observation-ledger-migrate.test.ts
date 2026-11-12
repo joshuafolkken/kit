@@ -1,15 +1,7 @@
-import {
-	existsSync,
-	mkdirSync,
-	mkdtempSync,
-	readdirSync,
-	readFileSync,
-	rmSync,
-	writeFileSync,
-} from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import {
 	LEGACY_LEDGER_FILE,
 	LEGACY_OBSERVATION_LEDGER_DIRECTORY,
@@ -22,19 +14,15 @@ const [SINGLE_FILE_LEDGER_PATH = '', LEGACY_OBSERVATION_LEDGER_PATH = ''] =
 	LEGACY_OBSERVATION_LEDGER_PATHS
 const OBSERVATION_LEDGER_PATH = `${OBSERVATION_LEDGER_DIRECTORY}/${LEGACY_LEDGER_FILE}`
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'observation-ledger-migrate-test-'))
+const make_directory = temporary_directory('suite')
 const OLD_LINE = '- k:a | d1 | 2026-09-29 | x | appended at the old path'
 const NEW_LINE = '- k:b | d1 | 2026-09-29 | x | appended at the new path'
 const STRANDED_LINE = '- k:c | d1 | 2026-09-29 | x | left in a claim by a killed process'
 // No process runs under this id, so a claim carrying it belongs to a process that is gone.
 const DEAD_PID = 2_147_483_646
 
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
-
 function fresh_root(): string {
-	return mkdtempSync(path.join(scratch, 'root-'))
+	return make_directory('observation-ledger-migrate-test-')
 }
 
 function write(root: string, relative: string, content: string): void {

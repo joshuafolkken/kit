@@ -10,7 +10,13 @@ const ACTIVE = '2026-09-24T00:00:00.000Z'
 const START_MS = Date.parse(ACTIVE)
 const POLL_MS = 5000
 const OFFER_MS = backlog_budget.OFFER_INTERVAL_MS
-const CONFIG = { poll_ms: POLL_MS, offer_ms: OFFER_MS, window_ms: undefined }
+const CONFIG = {
+	poll_ms: POLL_MS,
+	offer_ms: OFFER_MS,
+	idle_offer_ms: backlog_budget.IDLE_OFFER_INTERVAL_MS,
+	check_ms: backlog_budget.LISTING_CHECK_INTERVAL_MS,
+	window_ms: undefined,
+}
 const FIRST_CHILD = '2400'
 const SECOND_CHILD = '2401'
 const OFFERED = '2500'
@@ -41,6 +47,7 @@ interface Script {
 	// Children `run:merge` handled as parked, withdrawn, yielded or failed rather than merged; every other
 	// reads as merged.
 	parked?: ReadonlyArray<string>
+	human_review?: ReadonlyArray<string>
 	withdrawn?: ReadonlyArray<string>
 	yielded?: ReadonlyArray<string>
 	unmerged?: ReadonlyArray<string>
@@ -50,6 +57,10 @@ interface Script {
 	unopened_launches?: ReadonlyArray<string>
 	// Issues their measurement declaration closed, so the launch took no lane.
 	measured_launches?: ReadonlyArray<string>
+	// Issues whose measurement declaration had no sample yet, so the launch waited without a lane.
+	unsampled_launches?: ReadonlyArray<string>
+	// Issues over the size bar their split-only unit split, so the launch took no lane.
+	split_launches?: ReadonlyArray<string>
 	// The free-lane answers in order, the last repeating; unset reads as a pool with room to spare.
 	free_lanes?: ReadonlyArray<number>
 	// The limit-room answers in order, the last repeating; unset reads as the free-lane answers.
@@ -62,6 +73,16 @@ interface Script {
 	memory_held?: ReadonlyArray<boolean>
 	// The usage-limit answers in order, the last repeating; unset reads as no limit in force.
 	usage_limited?: ReadonlyArray<boolean>
+	// Whether the retrospective unit exited 0; unset reads as a unit that did.
+	retrospective?: boolean
+	// When `run:add` handed the run an issue, in ms from the start; unset reads as never.
+	added_at_ms?: number
+	// When `lane:limit` raised the limit, in ms from the start; unset reads as never.
+	raised_at_ms?: number
+	// Whether a named issue is left to dispatch; unset reads as none.
+	is_named_left?: boolean
+	// When the `auto-ok` listing changed, in ms from the start; unset reads as never.
+	listed_at_ms?: number
 }
 
 function offer(verdict: string, issues: ReadonlyArray<string> = []): OfferRead {
@@ -81,6 +102,7 @@ type MergeOutcome = Awaited<ReturnType<LoopPorts['merge']>>['outcome']
 function merge_outcome(script: Script, issue: string): MergeOutcome {
 	const scripted: ReadonlyArray<[ReadonlyArray<string> | undefined, MergeOutcome]> = [
 		[script.parked, 'parked'],
+		[script.human_review, 'human-review'],
 		[script.withdrawn, 'withdrawn'],
 		[script.yielded, 'yielded'],
 		[script.unmerged, 'failed'],
@@ -89,16 +111,40 @@ function merge_outcome(script: Script, issue: string): MergeOutcome {
 	return scripted.find(([issues]) => issues?.includes(issue) === true)?.[1] ?? 'merged'
 }
 
-// The child-facing ports: a finished child is merged once and then reads as gone.
+// The yield notes on the stream: each `yielded` merge notes one at the clock's time, as the child's own
+// `lane:plan` does, and a park — a trip's or a refused launch's `run:stalled` — is recorded in `calls`.
+function yield_ports(
+	calls: Array<string>,
+	now: () => Date,
+): Pick<LoopPorts, 'yields' | 'park' | 'stall'> & { note: (issue: string) => void } {
+	const notes = new Map<string, Array<string>>()
+
+	return {
+		note: (issue) => {
+			notes.set(issue, [...(notes.get(issue) ?? []), now().toISOString()])
+		},
+		yields: async (issue) => notes.get(issue) ?? [],
+		park: async (issue) => {
+			calls.push(`park ${issue}`)
+		},
+		stall: async (issue, outcome) => {
+			calls.push(`stall ${issue} ${outcome}`)
+		},
+	}
+}
+
+// The child-facing ports: a finished child is merged once and then reads as gone. A yielding child
+// gives its lane back as soon as it starts, so one launched again reads as finished at once.
 function child_ports(
 	script: Script,
 	calls: Array<string>,
+	note: (issue: string) => void,
 ): Pick<LoopPorts, 'adoptable' | 'is_finished' | 'merge'> {
 	const finished = new Set(script.finished)
 	const adoptable = new Set(script.adoptable)
 
 	return {
-		is_finished: (issue) => finished.has(issue),
+		is_finished: (issue) => finished.has(issue) || script.yielded?.includes(issue) === true,
 		adoptable: async (in_flight) => {
 			const adopting = [...adoptable].filter((issue) => !in_flight.includes(issue))
 
@@ -109,8 +155,11 @@ function child_ports(
 		merge: async (issue) => {
 			calls.push(`merge ${issue}`)
 			finished.delete(issue)
+			const outcome = merge_outcome(script, issue)
 
-			return { ...merge_token(script, issue), outcome: merge_outcome(script, issue) }
+			if (outcome === 'yielded') note(issue)
+
+			return { ...merge_token(script, issue), outcome }
 		},
 	}
 }
@@ -118,6 +167,8 @@ function child_ports(
 function launch_outcome(script: Script, issue: string): DriveLaunch {
 	const scripted: ReadonlyArray<[DriveLaunch, ReadonlyArray<string> | undefined]> = [
 		['measured', script.measured_launches],
+		['unsampled', script.unsampled_launches],
+		['split', script.split_launches],
 		['failed', script.failed_launches],
 		['unopened', script.unopened_launches],
 	]
@@ -178,15 +229,72 @@ function memory_port(script: Script): Pick<LoopPorts, 'memory_held' | 'usage_lim
 	return { memory_held: queued(script.memory_held), usage_limited: queued(script.usage_limited) }
 }
 
+// The retrospective unit, its start recorded in `calls`.
+function retrospective_port(script: Script, calls: Array<string>): LoopPorts['retrospective'] {
+	return async () => {
+		calls.push('retrospective unit')
+
+		return script.retrospective ?? true
+	}
+}
+
+function is_seen_since(at_ms: number | undefined, since_ms: number, now: () => Date): boolean {
+	if (at_ms === undefined) return false
+	const event_ms = START_MS + at_ms
+
+	return event_ms >= since_ms && event_ms <= now().getTime()
+}
+
+type RecordPorts = Pick<
+	LoopPorts,
+	'added_since' | 'raised_since' | 'named_left' | 'listing_changed'
+>
+
+// The `auto-ok` listing's ETag check: the change reads once, at the first check the clock has reached it.
+function listing_port(script: Script, now: () => Date): LoopPorts['listing_changed'] {
+	const read = { since_ms: -Infinity }
+
+	return async () => {
+		const is_changed = is_seen_since(script.listed_at_ms, read.since_ms, now)
+
+		read.since_ms = now().getTime() + 1
+
+		return is_changed
+	}
+}
+
+// The run's own records: a `run:add`, a `lane:limit` raise or a listing change reads as written once
+// the clock reaches it.
+function record_ports(script: Script, now: () => Date): RecordPorts {
+	return {
+		added_since: async (since_ms) => is_seen_since(script.added_at_ms, since_ms, now),
+		raised_since: async (since_ms) => is_seen_since(script.raised_at_ms, since_ms, now),
+		named_left: async () => script.is_named_left === true,
+		listing_changed: listing_port(script, now),
+	}
+}
+
+// The scripted ports read no process table or stream, so a tick has no snapshot to take.
+async function no_snapshot(): Promise<void> {
+	await Promise.resolve()
+}
+
 // The loop-facing ports: a clock the sleeps advance, and the finish and state records.
 function loop_ports(
+	script: Script,
 	calls: Array<string>,
 	states: Array<DriveState>,
-): Pick<LoopPorts, 'now' | 'sleep' | 'finish' | 'on_state'> {
+): Pick<LoopPorts, 'now' | 'begin_tick' | 'sleep' | 'finish' | 'on_state'> & RecordPorts {
 	let now_ms = START_MS
 
+	function now(): Date {
+		return new Date(now_ms)
+	}
+
 	return {
-		now: () => new Date(now_ms),
+		now,
+		begin_tick: no_snapshot,
+		...record_ports(script, now),
 		sleep: async (milliseconds) => {
 			now_ms += milliseconds
 		},
@@ -218,6 +326,22 @@ function report_ports(
 	}
 }
 
+type ClockedPorts = ReturnType<typeof loop_ports> &
+	ReturnType<typeof child_ports> &
+	Pick<LoopPorts, 'yields' | 'park' | 'stall'>
+
+// The clock and the ports that read it: a yield note is stamped with the clock's time.
+function clocked_ports(
+	script: Script,
+	calls: Array<string>,
+	states: Array<DriveState>,
+): ClockedPorts {
+	const loop = loop_ports(script, calls, states)
+	const { note, ...yielding } = yield_ports(calls, loop.now)
+
+	return { ...loop, ...yielding, ...child_ports(script, calls, note) }
+}
+
 function harness(script: Script): Harness {
 	const calls: Array<string> = []
 	const offers: Array<DriveState> = []
@@ -234,12 +358,12 @@ function harness(script: Script): Harness {
 		idles,
 		pauses,
 		ports: {
-			...child_ports(script, calls),
+			...clocked_ports(script, calls, states),
 			...dispatch_ports(script, calls, offers),
 			...room_ports(script),
 			...memory_port(script),
-			...loop_ports(calls, states),
 			...report_ports(holds, idles, pauses),
+			retrospective: retrospective_port(script, calls),
 		},
 	}
 }

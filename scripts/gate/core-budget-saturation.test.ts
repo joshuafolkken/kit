@@ -1,8 +1,8 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { process_identity } from '#scripts/josh/process-identity'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { core_admission } from './core-admission'
 import { core_budget } from './core-budget'
 import type { MachineReading } from './machine-capacity'
@@ -28,20 +28,19 @@ const CPU_SATURATED_LINE = '⏳ a step waits for the core budget — CPU saturat
 
 const probe = { directory: '' }
 
-beforeEach(() => {
-	probe.directory = mkdtempSync(path.join(tmpdir(), 'josh-core-budget-saturation-test-'))
-})
+const make_directory = temporary_directory()
 
-afterEach(() => {
-	rmSync(probe.directory, { recursive: true, force: true })
+beforeEach(() => {
+	probe.directory = make_directory('josh-core-budget-saturation-test-')
 })
 
 function busy(busy_cores: number): () => Promise<MachineReading> {
 	return async () => ({ busy_cores, available_mb: undefined })
 }
 
+// Admitted long enough ago that the machine reading already shows its load.
 function write_reserved(weight: number): void {
-	const payload = { ...process_identity.own_fields(), weight, claimed_at: 0, admitted_at: 0 }
+	const payload = { ...process_identity.own_fields(), weight, claimed_at: 0, admitted_at: LONG_AGO }
 
 	writeFileSync(path.join(probe.directory, BLOCKER), JSON.stringify(payload))
 }
@@ -236,6 +235,11 @@ async function waited_ms(
 	return { waited: clock.value, is_overflow: handle.admission.overflow !== undefined }
 }
 
+// Busy cores well under a full ledger's, behind a run queue past twice the cores beyond it.
+async function overloaded_with_room(): Promise<MachineReading> {
+	return { busy_cores: RESERVED - 2, available_mb: undefined, run_queue: CORES * 3 + 1 }
+}
+
 describe('core_budget.reserve — a wait that does not ease the load ends early', () => {
 	it('admits at minimum width before the cap while the load holds steady', async () => {
 		const run = await waited_ms(busy(CORES + 2))
@@ -261,6 +265,21 @@ describe('core_budget.reserve — a wait that does not ease the load ends early'
 		const run = await waited_ms(busy(CORES), CORES)
 
 		expect(run.is_overflow).toBe(true)
+		expect(run.waited).toBe(STEP_MS * STEPS_TO_CAP)
+	})
+
+	// joshuafolkken/kit#5391: other lanes' claims reserve the whole machine but run below it, so a small
+	// claim they hold starts at minimum width rather than waiting out the cap.
+	it('admits a small claim the ledger holds before the cap while the machine has room', async () => {
+		const run = await waited_ms(busy(RESERVED - 2), CORES)
+
+		expect(run.is_overflow).toBe(true)
+		expect(run.waited).toBe(STEP_MS * EASE_STEPS)
+	})
+
+	it('keeps a small claim the ledger holds waiting to the cap on an overloaded machine', async () => {
+		const run = await waited_ms(overloaded_with_room, CORES)
+
 		expect(run.waited).toBe(STEP_MS * STEPS_TO_CAP)
 	})
 })
@@ -310,7 +329,7 @@ describe('core_budget.reserve — an overloaded machine holds the first waiter',
 		expect(run.is_overflow).toBe(false)
 	})
 
-	// The oldest claim with nothing running used to start before the overload was consulted.
+	// An empty running set must still respect overload before admitting the oldest claim.
 	it('keeps the oldest claim waiting on an empty ledger while the run queue stays past the cap', async () => {
 		const run = await claim_one(queue_in_turn([OVERLOADED]))
 

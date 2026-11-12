@@ -1,4 +1,4 @@
-// A package-name → currently-installed-version lookup, used to decide whether an upgrade command can
+// A package-name → currently-installed-version lookup determines whether an upgrade command can
 // still change anything. `undefined` means the package is not installed at the scope being checked.
 type InstalledVersions = ReadonlyMap<string, string | undefined>
 

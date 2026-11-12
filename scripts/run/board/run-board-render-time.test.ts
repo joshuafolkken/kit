@@ -36,6 +36,14 @@ describe('run_board_render_time.time_of', () => {
 		expect(time_of(paused, NOW)).toBe('1′00″')
 	})
 
+	// joshuafolkken/kit#6577: a stopped lane's time stops where it stopped, as now moves on.
+	it('times a stopped row up to its stop, whatever now is', () => {
+		const stopped = row('stopped', { started_ms: NOW - HOUR, ended_ms: NOW - HOUR + MINUTE })
+
+		expect(time_of(stopped, NOW)).toBe('1′00″')
+		expect(time_of(stopped, NOW + HOUR)).toBe('1′00″')
+	})
+
 	it('has no time for a row with no start, or a settled one with no end', () => {
 		expect(time_of(row('waiting'), NOW)).toBeUndefined()
 		expect(time_of(row('merged', { started_ms: STARTED }), NOW)).toBeUndefined()

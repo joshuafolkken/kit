@@ -1,0 +1,2 @@
+- rf:project-conventions | low | scripts/lane/lane-net-read.ts:52 | 2026-11-10 | #7038
+- rf:tests | low | tools/cost-audit/cost-audit-cli.test.ts:16 | 2026-11-10 | #7038

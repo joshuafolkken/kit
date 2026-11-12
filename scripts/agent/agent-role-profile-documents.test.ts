@@ -10,7 +10,9 @@ import { agent_role_profile } from './agent-role-profile'
 // read against a model the run never used (joshuafolkken/kit#2161). Derived from `DEFAULT_PROFILES` so
 // a later profile change fails here until the prose is updated with it. joshuafolkken/kit#3175 moved
 // the provider table out of `backlogrun-steps.md` into `docs/josh-commands-run.md` →
-// "`josh run:wake`", read only when the supervisor is asked about.
+// "`josh run:wake`", read only when the supervisor is asked about. joshuafolkken/kit#6089 replaced
+// `backlogrun-child.md`'s quoted worker default with a pointer to `docs/josh-commands-lane.md` →
+// "`josh lane:dispatch`", so that document now quotes no model to drift.
 
 const ROOT = process.cwd()
 const PROFILES = agent_role_profile.DEFAULT_PROFILES
@@ -41,10 +43,9 @@ describe('the workflow documents quote the default agent profiles', () => {
 		expect(run_reference).toContain('| Provider | scheduler | worker | reviewer |')
 	})
 
-	it('states the worker default that backlogrun-child.md quotes', () => {
-		expect(child).toContain(
-			`Anthropic \`${PROFILES.worker.model}\` / \`${PROFILES.worker.effort}\``,
-		)
+	it('points backlogrun-child.md at the lane:dispatch reference instead of quoting the worker model', () => {
+		expect(child).toContain('docs/josh-commands-lane.md` → "`josh lane:dispatch`"')
+		expect(child).not.toContain(PROFILES.worker.model)
 	})
 
 	it('brings back no pre-#2095 sonnet worker', () => {

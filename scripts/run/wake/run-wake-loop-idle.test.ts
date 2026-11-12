@@ -1,11 +1,12 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { CarryRead, RunCarry } from '#scripts/run/carry/run-carry'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { run_wake } from './run-wake'
 import { run_wake_loop, type LoopPorts } from './run-wake-loop'
 import type { LaunchResult } from './run-wake-session'
+
+const make_directory = temporary_directory()
 
 // joshuafolkken/kit#2417. The loop is where "no work, no launch" either holds or does not: what
 // matters is what it launches and how long it sleeps between passes.
@@ -70,6 +71,7 @@ function recorder(reads: ReadonlyArray<CarryRead>, work: ReadonlyArray<boolean>)
 
 			return LAUNCHED
 		},
+		wake_beside: () => LAUNCHED,
 		sleep: async (milliseconds) => {
 			sleeps.push(milliseconds)
 			clock.now += milliseconds
@@ -86,13 +88,9 @@ function recorder(reads: ReadonlyArray<CarryRead>, work: ReadonlyArray<boolean>)
 const scratch = { directory: '', target: '' }
 
 beforeEach(() => {
-	scratch.directory = mkdtempSync(path.join(tmpdir(), 'josh-run-wake-loop-idle-test-'))
+	scratch.directory = make_directory('josh-run-wake-loop-idle-test-')
 	scratch.target = path.join(scratch.directory, 'wake.json')
 	run_wake.write_wake(scratch.target, run_wake.fresh_wake(INVOCATION, NOW))
-})
-
-afterEach(() => {
-	rmSync(scratch.directory, { force: true, recursive: true })
 })
 
 describe('run_wake_loop.run_loop — no work, no launch', () => {

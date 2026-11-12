@@ -1,23 +1,20 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { session_cite } from '#scripts/issue/session-cite'
 import { observation_ledger } from '#scripts/observations/observation-ledger'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { review_record } from './review-record'
 
-const TEST_DIR = mkdtempSync(path.join(tmpdir(), 'review-record-check-'))
+const make_directory = temporary_directory('suite')
+const TEST_DIR = make_directory('review-record-check-')
 const ISSUE = 2343
 const NONE_LINE = '- rf:none | none | - | 2026-09-22 | #2343\n'
 const OTHER_ISSUE_LINE = '- rf:tests | low | a.ts | 2026-09-22 | #1\n'
 
 afterEach(() => {
 	vi.restoreAllMocks()
-})
-
-afterAll(() => {
-	rmSync(TEST_DIR, { recursive: true, force: true })
 })
 
 async function no_comment_lines(): Promise<ReadonlyArray<string>> {

@@ -151,8 +151,8 @@ describe('epic_next.parse_options — refusals', () => {
 		expect(epic_next.parse_options(['858', '--lanes']).usage).toContain('Usage:')
 	})
 
-	// A value that is itself a flag is no value at all: this used to narrow to a repository literally
-	// named `--lanes` and report `No runnable child in --lanes` with exit 0.
+	// A flag cannot supply a repository value; accepting it would turn malformed input into an
+	// apparently successful empty selection.
 	it('refuses a --repo whose value is the next flag', () => {
 		expect(epic_next.parse_options(['858', '--repo', '--lanes']).usage).toContain('Usage:')
 	})
@@ -343,9 +343,8 @@ describe('epic_next.decide — how an unread child is named', () => {
 })
 
 describe('epic_next.is_order_declared', () => {
-	// The unanchored existence check and the line-anchored link parser used to disagree: a body whose
-	// arrows are all prose counted as a declaration with zero links, so every correct relation was
-	// reported as undeclared.
+	// The existence check and link parser must agree on line anchoring so prose arrows cannot create
+	// an empty declaration that marks correct relations as undeclared.
 	it('does not count a body whose arrows are only prose', () => {
 		expect(epic_next.is_order_declared('推奨実行順: #1 -> #2', [])).toBe(false)
 	})

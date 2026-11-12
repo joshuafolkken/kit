@@ -36,10 +36,10 @@ interface WrapupInput {
 	notify_config: GitNotifyConfig | undefined
 	pr_url: string | undefined
 	should_merge: boolean
-	// The managed config-file report, which reaches the completion report on the Issue as well as the
-	// completion notification. Empty on a run that changed nothing `josh sync`
-	// distributes, and an empty one adds no line.
-	managed_notes: ReadonlyArray<string>
+	// The managed config-file report and the check report (`followup-check-report.ts`), which reach
+	// the completion report on the Issue as well as the completion notification, after the
+	// `--notify-message` text. Empty on a run with nothing to report, and an empty one adds no line.
+	report_notes: ReadonlyArray<string>
 	// A pull request merged before this run is not merged again, and a tail whose completion report is
 	// already on the issue does not post it twice (`git-followup-merged.ts`).
 	is_merged?: boolean | undefined
@@ -48,6 +48,7 @@ interface WrapupInput {
 	// that head moved before the merge (`git-pr-merge-checked.ts`, #4036).
 	checked?: PrStateSnapshot | undefined
 	wait_for_green: WaitForGreen
+	before_merge?: ((head?: string) => Promise<void>) | undefined
 	// The completion Telegram, its body already read, sent beside the merge.
 	send_completion: () => Promise<void>
 }
@@ -56,14 +57,14 @@ function build_notify_body(input: {
 	notify_config: GitNotifyConfig
 	issue_number: string | undefined
 	pr_url: string | undefined
-	managed_notes: ReadonlyArray<string>
+	report_notes: ReadonlyArray<string>
 }): string {
 	return git_notify.build_completion_comment_body({
 		message: input.notify_config.message,
 		issue_number: input.issue_number,
 		pr_url: input.pr_url,
 		mentions: input.notify_config.mentions,
-		notes: input.managed_notes,
+		notes: input.report_notes,
 	})
 }
 
@@ -91,7 +92,7 @@ async function post_completion_notification(input: {
 	issue_number: string | undefined
 	notify_config: GitNotifyConfig | undefined
 	pr_url: string | undefined
-	managed_notes: ReadonlyArray<string>
+	report_notes: ReadonlyArray<string>
 }): Promise<void> {
 	if (input.notify_config === undefined) return
 
@@ -99,7 +100,7 @@ async function post_completion_notification(input: {
 		notify_config: input.notify_config,
 		issue_number: input.issue_number,
 		pr_url: input.pr_url,
-		managed_notes: input.managed_notes,
+		report_notes: input.report_notes,
 	})
 	const { target } = input.notify_config
 
@@ -128,7 +129,7 @@ async function notify_step(input: WrapupInput): Promise<void> {
 				issue_number: input.issue_number,
 				notify_config: input.notify_config,
 				pr_url: input.pr_url,
-				managed_notes: input.managed_notes,
+				report_notes: input.report_notes,
 			})
 		},
 	})
@@ -251,6 +252,7 @@ async function send_beside_merge(input: WrapupInput): Promise<string> {
 		return STAGE.telegram
 	}
 
+	await input.before_merge?.(input.checked?.head_sha)
 	await settled_together(input.send_completion(), merge_step(input))
 
 	return STAGE.telegram_and_merge

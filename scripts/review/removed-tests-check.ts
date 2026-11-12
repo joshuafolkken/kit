@@ -28,6 +28,11 @@ import { test_titles } from './test-titles'
 const UNREADABLE_MESSAGE =
 	'Merge refused: the change base could not be resolved, so the tests this change removes could not be listed; re-run once `git merge-base` answers.'
 
+interface TitleChanges {
+	removed: ReadonlyArray<string>
+	added: ReadonlyArray<string>
+}
+
 function titles_in(api: TypeScriptApi, texts: ReadonlyArray<string>): ReadonlyArray<string> {
 	return texts.flatMap((text) => test_titles.titles_of(api, text))
 }
@@ -51,19 +56,37 @@ function tree_texts(root: string, paths: ReadonlyArray<string>): ReadonlyArray<s
 		.map((absolute) => readFileSync(absolute, 'utf8'))
 }
 
-async function read(): Promise<ReadonlyArray<string> | undefined> {
+// The titles the change added, so a draft row can be met by the test that names its criterion
+// (joshuafolkken/kit#5541).
+function added_titles(
+	before: ReadonlyArray<string>,
+	after: ReadonlyArray<string>,
+): ReadonlyArray<string> {
+	const held = new Set(before)
+
+	return after.filter((title) => !held.has(title))
+}
+
+async function changes(): Promise<TitleChanges | undefined> {
 	const base = await change_base.resolved_through_merge()
 
 	if (base === undefined) return undefined
 	const root = await git_command.repository_root()
 	const api = review_code_tree.load_typescript(root)
 
-	if (api === undefined) return []
+	if (api === undefined) return { removed: [], added: [] }
 	const changed = await changed_paths.read_changed_since(base)
 	const paths = changed.filter((relative) => test_declared_logic.is_test_file(relative))
 	const before = titles_in(api, await base_texts(base, paths))
+	const after = titles_in(api, tree_texts(root, paths))
 
-	return removed_tests.removed(before, titles_in(api, tree_texts(root, paths)))
+	return { removed: removed_tests.removed(before, after), added: added_titles(before, after) }
+}
+
+async function read(): Promise<ReadonlyArray<string> | undefined> {
+	const found = await changes()
+
+	return found?.removed
 }
 
 // `josh ship`'s preflight asks the body it is about to deliver, so a missing disposition stops it
@@ -81,6 +104,7 @@ async function refusal(branch_name: string): Promise<string | undefined> {
 	return await body_refusal(await git_gh_command.pr_get_body(branch_name))
 }
 
-const removed_tests_check = { body_refusal, read, refusal, UNREADABLE_MESSAGE }
+const removed_tests_check = { body_refusal, changes, read, refusal, UNREADABLE_MESSAGE }
 
+export type { TitleChanges }
 export { removed_tests_check }

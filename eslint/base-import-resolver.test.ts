@@ -1,9 +1,9 @@
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, realpathSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { ESLint } from 'eslint'
 import ts from 'typescript-eslint'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { create_base_config } from './base.js'
 
 // joshuafolkken/kit#3599: the TypeScript resolver sat under `import/resolver`, a key
@@ -46,6 +46,8 @@ const RELATIVE_ENTRY = 'a.ts'
 const ALIAS_ENTRY = 'lib/c.ts'
 const ACYCLIC_ENTRY = 'lib/e.ts'
 const PATHS_ENTRY = 'lib/g.ts'
+const DEEP_ENTRY = 'deep-a.ts'
+const DEEP_ENTRY_SOURCE = "import { b } from './deep-b'\n\nexport const a = b\n"
 const RELATIVE_ENTRY_SOURCE = "import { b } from './b'\n\nexport const a = b\n"
 const ALIAS_ENTRY_SOURCE = "import { d } from '#lib/d'\n\nexport const c = d\n"
 const ACYCLIC_ENTRY_SOURCE = "import { f } from '#lib/f'\n\nexport const e = f\n"
@@ -66,6 +68,10 @@ const FIXTURE_FILES: Record<string, string> = {
 	'lib/h.ts': "import { g } from '$lib/g'\n\nexport const h = g\n",
 	[JAVASCRIPT_ENTRY]: JAVASCRIPT_ENTRY_SOURCE,
 	'k.js': 'export const k = 1\n',
+	[DEEP_ENTRY]: DEEP_ENTRY_SOURCE,
+	'deep-b.ts': "import { c } from './deep-c'\n\nexport const b = c\n",
+	'deep-c.ts': "import { d } from './deep-d'\n\nexport const c = d\n",
+	'deep-d.ts': "import { a } from './deep-a'\n\nexport const d = a\n",
 }
 
 function write_fixture(root: string): void {
@@ -94,7 +100,8 @@ function create_linter(root: string): ESLint {
 
 // `realpathSync`: macOS hands back `/var/…`, a symlink to `/private/var/…`, and the resolver
 // answers with the real path — the two have to agree for a cycle to close.
-const created_root = mkdtempSync(path.join(tmpdir(), 'kit-import-resolver-'))
+const make_directory = temporary_directory('suite')
+const created_root = make_directory('kit-import-resolver-')
 const root = realpathSync(created_root)
 
 // Written before the linter exists: the resolver reads the fixture's tsconfig when it is created.
@@ -121,10 +128,6 @@ async function rule_config(entry: string): Promise<unknown> {
 	return config
 }
 
-afterAll(() => {
-	rmSync(root, { recursive: true, force: true })
-})
-
 describe('create_base_config — the import resolver follows TypeScript (issue #3599)', () => {
 	it('reports a cycle through an extensionless .ts import', async () => {
 		await expect(cycle_messages(RELATIVE_ENTRY, RELATIVE_ENTRY_SOURCE)).resolves.toHaveLength(1)
@@ -140,6 +143,18 @@ describe('create_base_config — the import resolver follows TypeScript (issue #
 
 	it('stays quiet on an alias import that closes no cycle', async () => {
 		await expect(cycle_messages(ACYCLIC_ENTRY, ACYCLIC_ENTRY_SOURCE)).resolves.toEqual([])
+	})
+
+	it('keeps internal cycle detection beyond direct imports (ac-f1d67bc1)', async () => {
+		await expect(cycle_messages(DEEP_ENTRY, DEEP_ENTRY_SOURCE)).resolves.toHaveLength(1)
+	})
+
+	it('skips external traversal without limiting cycle depth (ac-ecf45c29)', async () => {
+		const config = await rule_config(RELATIVE_ENTRY)
+
+		expect(config).toHaveProperty(['rules', NO_CYCLE_RULE, 0], RULE_SEVERITY_ERROR)
+		expect(config).toHaveProperty(['rules', NO_CYCLE_RULE, 1, 'ignoreExternal'], true)
+		expect(config).not.toHaveProperty(['rules', NO_CYCLE_RULE, 1, 'maxDepth'])
 	})
 
 	// The compiler does not check a hand-authored module, so the lint is the only thing between a

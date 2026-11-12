@@ -50,7 +50,7 @@ function problem_text(
 ): string {
 	const replan = ['pnpm josh lane:plan', issue, ...claims, ...files].join(' ')
 
-	return `unplanned: ${files.join(', ')} — the lane's lane:plan record does not list these code files. In scope: run \`${replan}\` and comment the reason on the Issue in one line, then re-detach; if it answers \`yield\`, another lane holds the file — follow what it prints instead. Out of scope: revert the change and file it with \`pnpm josh issue:file\`.`
+	return `unplanned: ${files.join(', ')} — the lane's lane:plan record does not list these code files. In scope: run \`${replan}\` and comment the reason on the Issue in one line, then re-detach; if it answers \`yield\` or \`split\`, follow what it prints instead. Out of scope: revert the change and file it with \`pnpm josh issue:file\`.`
 }
 
 // A yielded plan outlives its lane on purpose (`lane-plan.ts`) and cleared no edit, so it reads as none.

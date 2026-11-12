@@ -1,7 +1,9 @@
 import path from 'node:path'
+import { json_value } from '#scripts/lib/json-value'
 import { token_shape } from '#scripts/lib/token-shape'
 import { transcript_record, type TranscriptRecord } from '#scripts/lib/transcript-record'
 import { z } from 'zod'
+import { run_board_operation_codex } from './run-board-operation-codex'
 
 // The newest thing a session did, read off the end of its log — a lane child's dispatch log, the
 // parent's transcript or the watcher's log, all one JSON object a line with the tool calls of an
@@ -20,9 +22,8 @@ interface Operation {
 // A command is cut here, so a long argument — or a value passed in one — is not drawn.
 const TARGET_LIMIT = 40
 const CUT_MARK = '…'
-const TOOL_USE = 'tool_use'
 // A line that holds no call is never parsed: one can be tens of thousands of characters long.
-const TOOL_USE_MARK = `"${TOOL_USE}"`
+const OPERATION_MARK = /"(?:tool_use|command_execution|file_change)"/u
 const NEWLINE = '\n'
 // One variable set ahead of the command, with what parts it from the command: it carries a value,
 // never what the command does. The value is read as the shell reads one word — a quoted stretch with
@@ -72,7 +73,8 @@ function command_target(command: string): string {
 
 // The path from `root` down; a file outside it is drawn by its name alone, never by where it is.
 function path_target(file_path: string, root: string | undefined): string {
-	const relative = root === undefined ? undefined : path.relative(root, file_path)
+	const relative =
+		root === undefined ? undefined : path.relative(root, path.resolve(root, file_path))
 	const is_inside = relative !== undefined && !relative.startsWith('..') && relative !== ''
 
 	return ascii_head(is_inside ? relative : path.basename(file_path))
@@ -104,7 +106,8 @@ function record_operation(
 
 // The same, `undefined` too for a line that is cut or is not JSON.
 function line_operation(line: string, root: string | undefined): Operation | undefined {
-	const record = transcript_record.parse(line)
+	const value = json_value.parse_or_undefined(line)
+	const record = run_board_operation_codex.record_of(value) ?? transcript_record.read(value)
 
 	return record === undefined ? undefined : record_operation(record, root)
 }
@@ -112,7 +115,7 @@ function line_operation(line: string, root: string | undefined): Operation | und
 // The newest operation in `tail` — the end of a log, whose first line is usually cut mid-way and so
 // reads as no call. `root` is the checkout the session works in, which its paths are drawn from.
 function latest_of(tail: string, root?: string): Operation | undefined {
-	const lines = tail.split(NEWLINE).filter((line) => line.includes(TOOL_USE_MARK))
+	const lines = tail.split(NEWLINE).filter((line) => OPERATION_MARK.test(line))
 
 	for (const line of lines.toReversed()) {
 		const operation = line_operation(line, root)

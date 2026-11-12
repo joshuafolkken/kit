@@ -10,6 +10,7 @@ import { lane_state } from '#scripts/lane/lane-state'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
+import { run_board_human_merge } from './run-board-human-merge'
 import { run_board_labels } from './run-board-labels'
 import { run_board_layout, type Overlay, type ReasonOf, type RowReason } from './run-board-layout'
 import { run_board_machine, type MachineGauges } from './run-board-machine'
@@ -67,8 +68,6 @@ interface ReasonRead extends Overlay {
 
 // What every row of one layout is weighed against, read once.
 interface Pool {
-	// The untriaged issue nothing blocks that withholds every candidate (`epic-triage.ts`), if any.
-	held_by: number | undefined
 	running: ReadonlyArray<number>
 	// The issues the classifier withholds for a person (`epic-outside-blocker.ts`'s `human`).
 	withheld: ReadonlySet<number>
@@ -96,7 +95,11 @@ function stage_of(child: EpicChild, read: ReasonRead): RowReason | undefined {
 }
 
 function is_untriaged_candidate(child: EpicChild, read: ReasonRead): boolean {
-	return !epic_triage.is_triaged(child) && !run_board_layout.is_blocked(child, read)
+	return (
+		!epic_triage.is_triaged(child) &&
+		issue_not_before.is_due(child.body, read.now_ms) &&
+		!run_board_layout.is_blocked(child, read)
+	)
 }
 
 // A child whose lane stands with no one in it still holds the paths it declared, as its open lane does.
@@ -132,7 +135,6 @@ function pool_of(read: ReasonRead): Pool {
 	const candidates = waiting.filter((child) => is_candidate(child, read))
 
 	return {
-		held_by: waiting.find((child) => is_untriaged_candidate(child, read))?.number,
 		running,
 		withheld: read.plan.withheld ?? new Set(),
 		planning: run_board_planning.planning_of(read, running),
@@ -218,13 +220,6 @@ function named_of(child: EpicChild, read: ReasonRead, pool: Pool): RowReason | u
 	return holder === undefined ? undefined : { icon: WAIT_ICONS.named, issues: [String(holder)] }
 }
 
-// `✋ 4301`: the untriaged issue the pool is held for a judgment of.
-function held_of(pool: Pool): RowReason | undefined {
-	if (pool.held_by === undefined) return undefined
-
-	return { icon: WAIT_ICONS.held, issues: [String(pool.held_by)] }
-}
-
 // `🔒 4374`: the running `run:solo` issue nothing new starts beside until it merges or is parked.
 function held_solo_of(pool: Pool): RowReason | undefined {
 	if (pool.solo_holder === undefined) return undefined
@@ -256,13 +251,11 @@ function solo_wait(child: EpicChild, pool: Pool): RowReason | undefined {
 }
 
 // A candidate nothing blocks, in the order the driver answers: the declared order, then what
-// `backlog:next` answers — the pool held for a judgment, then a running `run:solo` issue, then a
-// waiting `run:solo` issue's wait, then a path a running issue declares, then a pool with no lane
+// `backlog:next` answers — a running `run:solo` issue, then a waiting `run:solo` issue's wait, then a path a running issue declares, then a pool with no lane
 // left, then a usage limit not yet reset, then a machine with no memory.
 function offer_wait(child: EpicChild, read: ReasonRead, pool: Pool): RowReason | undefined {
 	return (
 		named_of(child, read, pool) ??
-		held_of(pool) ??
 		solo_wait(child, pool) ??
 		overlap_of(child, read, pool) ??
 		room_wait(read)
@@ -301,8 +294,27 @@ function blocker_icon(child: EpicChild, pool: Pool): string {
 	return pool.withheld.has(child.number) ? STATE_ICONS.human : WAIT_ICONS.blocker
 }
 
-// `❓ 4183`: an issue nobody has judged, naming its first standing blocker where it has one.
-function untriaged_of(waits: ReadonlyArray<string>): RowReason {
+// The decision a withheld row waits on, followed through its blockers as the plan was read — kept even
+// where no blocker still stands at this frame, so the row itself says what a person decides.
+function decision_tail(child: EpicChild, read: ReasonRead, pool: Pool): string | undefined {
+	return pool.withheld.has(child.number) ? read.plan.decision_waits?.get(child.number) : undefined
+}
+
+function blocker_reason(
+	child: EpicChild,
+	waits: ReadonlyArray<string>,
+	tail: string | undefined,
+	pool: Pool,
+): RowReason {
+	return { icon: blocker_icon(child, pool), issues: waits, ...(tail !== undefined && { tail }) }
+}
+
+// `✋`: an issue nobody has judged, due and unblocked, held alone for its judgment while `backlog:next`
+// offers the triaged candidates (`epic-triage.ts`); `❓ 4183` where a blocker still stands, naming the
+// first, or `❓` alone where its start time is ahead.
+function untriaged_of(child: EpicChild, waits: ReadonlyArray<string>, read: ReasonRead): RowReason {
+	if (is_untriaged_candidate(child, read)) return { icon: WAIT_ICONS.held }
+
 	return { icon: WAIT_ICONS.untriaged, issues: waits.slice(0, FIRST_ONLY) }
 }
 
@@ -312,18 +324,26 @@ function wait_of(
 	read: ReasonRead,
 	pool: Pool,
 ): RowReason | undefined {
-	if (!epic_triage.is_triaged(child)) return untriaged_of(waits)
-	if (waits.length > 0) return { icon: blocker_icon(child, pool), issues: waits }
+	if (!epic_triage.is_triaged(child)) return untriaged_of(child, waits, read)
+	const tail = decision_tail(child, read, pool)
+
+	if (tail !== undefined || waits.length > 0) return blocker_reason(child, waits, tail, pool)
 
 	return not_before_of(child, read.now_ms) ?? offer_wait(child, read, pool)
 }
 
 // What each waiting row of one layout says, the pool-wide facts read once for all of them.
 function reader(read: ReasonRead): ReasonOf {
-	const pool = pool_of(read)
+	const current = { ...read, ...run_board_human_merge.overlay_of(read.plan, read.statuses) }
+	const pool = pool_of(current)
 
 	return function reason_of(child, waits) {
-		return stage_of(child, read) ?? planned_of(child, pool) ?? wait_of(child, waits, read, pool)
+		return (
+			run_board_human_merge.reason_of(child, current.plan) ??
+			stage_of(child, current) ??
+			planned_of(child, pool) ??
+			wait_of(child, waits, current, pool)
+		)
 	}
 }
 

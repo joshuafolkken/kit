@@ -3,18 +3,17 @@ import {
 	chmodSync,
 	existsSync,
 	mkdirSync,
-	mkdtempSync,
 	readFileSync,
 	renameSync,
 	rmSync,
 	writeFileSync,
 } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { run_carry } from '#scripts/run/carry/run-carry'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { metrics_duration_probe, type Measurement } from './metrics-duration-probe'
 import type { Durations } from './metrics-durations'
 
@@ -29,7 +28,8 @@ vi.mock('node:fs', async (original) => {
 	return { ...actual, renameSync: vi.fn(actual.renameSync) }
 })
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'metrics-duration-probe-test-'))
+const make_directory = temporary_directory('suite')
+const scratch = make_directory('metrics-duration-probe-test-')
 const baseline_file = path.join(scratch, 'durations.json')
 const FAIL = 1
 const WARNING = 'josh metrics: warning'
@@ -51,10 +51,6 @@ function baseline_on_disk(): unknown {
 beforeEach(() => {
 	rmSync(baseline_file, { force: true })
 	vi.spyOn(process.stderr, 'write').mockReturnValue(true)
-})
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 // joshuafolkken/kit#3409: the gate fails past the +10% tolerance and passes within it.
@@ -138,7 +134,7 @@ describe('metrics_duration_probe.baseline_path', () => {
 	})
 
 	it('moves the baseline kept at the common directory root into the josh state directory', async () => {
-		const repository = mkdtempSync(path.join(scratch, 'legacy-'))
+		const repository = make_directory(path.join(scratch, 'legacy-'))
 
 		writeFileSync(path.join(repository, LEGACY_BASELINE_NAME), GATE_BASELINE)
 		vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(repository)
@@ -150,7 +146,7 @@ describe('metrics_duration_probe.baseline_path', () => {
 	})
 
 	it('copies the root baseline when the root is read-only', async () => {
-		const repository = mkdtempSync(path.join(scratch, 'sandboxed-'))
+		const repository = make_directory(path.join(scratch, 'sandboxed-'))
 
 		writeFileSync(path.join(repository, LEGACY_BASELINE_NAME), GATE_BASELINE)
 		mkdirSync(path.join(repository, 'josh'))
@@ -168,7 +164,7 @@ describe('metrics_duration_probe.baseline_path', () => {
 describe('metrics_duration_probe.baseline_path under a concurrent move', () => {
 	// The move fails and the other lane's move lands before the copy, so the copy finds nothing.
 	it('takes the baseline another lane moved first rather than failing to copy it', async () => {
-		const repository = mkdtempSync(path.join(scratch, 'raced-'))
+		const repository = make_directory(path.join(scratch, 'raced-'))
 
 		writeFileSync(path.join(repository, LEGACY_BASELINE_NAME), GATE_BASELINE)
 		vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(repository)
@@ -185,6 +181,19 @@ describe('metrics_duration_probe.baseline_path under a concurrent move', () => {
 })
 
 describe('metrics_duration_probe.measure', () => {
+	it('times the same launcher used by pnpm josh (ac-cbdaa1f2)', async () => {
+		vi.spyOn(lane_ledger, 'target').mockResolvedValue(undefined)
+		vi.mocked(spawnSync).mockReturnValue(spawnSync(process.execPath, ['--version']))
+
+		await metrics_duration_probe.measure(scratch, true)
+
+		expect(spawnSync).toHaveBeenCalledWith(
+			'node',
+			['--disable-warning=ExperimentalWarning', 'tools/josh/josh-ready.ts', '--help'],
+			expect.objectContaining({ cwd: scratch }),
+		)
+		vi.mocked(spawnSync).mockReset()
+	})
 	it('holds a startup that ran past the timeout at the timeout instead of leaving it unmeasured', async () => {
 		vi.spyOn(lane_ledger, 'target').mockResolvedValue(undefined)
 		// A real run killed at a 1 ms timeout, handed back for every startup the probe times.

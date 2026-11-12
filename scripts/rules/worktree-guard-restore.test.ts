@@ -1,14 +1,15 @@
 import { execFileSync, execSync, spawnSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { worktree_guard } from './worktree-guard'
 
 // joshuafolkken/kit#4988: the named restore, run as written, puts HEAD's bytes back on the one file and
 // leaves every other tracked edit where it was — from the repository root or a subdirectory — and an
 // untracked path is left untouched. This row does not refuse it.
-const scratch = mkdtempSync(path.join(tmpdir(), 'worktree-guard-restore-'))
+const make_directory = temporary_directory('suite')
+const scratch = make_directory('worktree-guard-restore-')
 const TARGET = 'src/app.ts'
 const OTHER = 'other.md'
 const UNTRACKED = 'src/new.ts'
@@ -50,10 +51,6 @@ describe('worktree_guard.SINGLE_FILE_RESTORE', () => {
 	// The target as a hand revert that dropped a line would leave it.
 	beforeEach(() => {
 		writeFileSync(path.join(scratch, TARGET), HAND_REVERT)
-	})
-
-	afterAll(() => {
-		rmSync(scratch, { recursive: true, force: true })
 	})
 
 	it('is not refused by this row', () => {

@@ -1,11 +1,12 @@
 import { randomUUID } from 'node:crypto'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { delegation_policy } from '#scripts/delegation/delegation-policy'
+import { hook_context } from '#scripts/hooks/hook-context'
 import type { GuardRun } from '#scripts/josh/hook-decision'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { implementation_cut } from './implementation-cut'
 import { investigator_foreground } from './investigator-foreground'
@@ -22,6 +23,14 @@ const GENERAL_PURPOSE = 'general-purpose'
 const FOREGROUND_FIELD = '`run_in_background: false`'
 const ROW_REASON = investigator_foreground.ROW.reason
 const { REISSUE_WINDOW_MS } = implementation_cut
+
+beforeEach(() => {
+	vi.stubEnv('CLAUDE_CODE_ENTRYPOINT', '')
+})
+
+afterEach(() => {
+	vi.unstubAllEnvs()
+})
 
 function agent_call(
 	input: Record<string, unknown>,
@@ -65,18 +74,17 @@ describe('investigator_foreground.is_background_investigator — the refusal', (
 // from the parsed input, and the model writes it as a string there. The stand-down reads that string off
 // the call or the tail; a boolean spelling that ran is a build that declares it, so the refusal holds.
 const TIMESTAMP = '2026-10-25T08:50:55.976Z'
-const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'investigator-foreground-'))
-
-afterAll(() => {
-	rmSync(WORK_DIRECTORY, { recursive: true, force: true })
-})
+const make_directory = temporary_directory('suite')
+const WORK_DIRECTORY = make_directory('investigator-foreground-')
 
 const TIMESTAMP_MS = Date.parse(TIMESTAMP)
 
 // A transcript of its own per call, so one test's remembered build never reaches another's. Past the
 // reissue window of the tail's results unless a test says otherwise.
 function fresh_run(now_ms = TIMESTAMP_MS + REISSUE_WINDOW_MS): GuardRun {
-	return { transcript: path.join(WORK_DIRECTORY, `${randomUUID()}.jsonl`), now_ms }
+	const transcript = path.join(WORK_DIRECTORY, `${randomUUID()}.jsonl`)
+
+	return { transcript, now_ms, context: hook_context.from_process() }
 }
 
 function lacks(tail: string, call: GuardedCall, run: GuardRun = fresh_run()): boolean {
@@ -359,7 +367,10 @@ describe('investigator_foreground.ROW — delivered by the rule guard', () => {
 
 	it('is the one delivered row whose trigger fires on a background investigator', () => {
 		const call = agent_call({ subagent_type: INVESTIGATOR })
-		const claiming = delivered_rules.DELIVERED_RULES.filter((rule) => rule.is_trigger(call))
+		const context = hook_context.from_process()
+		const claiming = delivered_rules.DELIVERED_RULES.filter((rule) =>
+			rule.is_trigger(call, context),
+		)
 
 		expect(claiming.map((rule) => rule.id)).toEqual(['investigator-foreground'])
 	})

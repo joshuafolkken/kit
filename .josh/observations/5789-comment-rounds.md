@@ -1,0 +1,2 @@
+- rf:bug-risks | low | scripts/review/import-specifiers.ts:23 | 2026-11-01 | #5789 | fixed
+- rf:bug-risks | low | scripts/review/import-specifiers.ts:28 | 2026-11-01 | #5789

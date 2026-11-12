@@ -1,9 +1,10 @@
-import { closeSync, mkdtempSync, openSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { closeSync, openSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { agent_session_role } from '#scripts/agent/agent-session-role'
 import type { GuardOutcome } from '#scripts/josh/hook-decision'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { piped_verification } from '#scripts/rules/piped-verification'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 // joshuafolkken/kit#3154: a lane child's backgrounded `josh ship` is run in the foreground instead of
@@ -19,7 +20,10 @@ vi.mock('#scripts/run/run-watcher-hook', () => ({
 }))
 
 vi.mock('#scripts/run/run-parent-cut-hook', () => ({
-	run_parent_cut_hook: { parent_cut_reason: vi.fn().mockResolvedValue(undefined) },
+	run_parent_cut_hook: {
+		current_state: vi.fn(),
+		parent_cut_reason: vi.fn().mockResolvedValue(undefined),
+	},
 }))
 
 vi.mock('#scripts/issue/issue-watch-hook', () => ({
@@ -32,6 +36,7 @@ vi.mock('#scripts/lane/lane-phase', () => ({
 
 const { pretool_guard } = await import('./pretool-guard')
 
+const make_directory = temporary_directory()
 const LANE_SHIP = 'pnpm josh ship --detach "Title #1"'
 const PIPED_LINT = 'pnpm josh lint:related 2>&1 | tail -5'
 const CLEAR: GuardOutcome = { reason: undefined, notice: undefined, fault: undefined }
@@ -43,6 +48,7 @@ const REFUSED: GuardOutcome = {
 
 afterEach(() => {
 	vi.restoreAllMocks()
+	vi.unstubAllEnvs()
 })
 
 function in_lane(): boolean {
@@ -55,7 +61,7 @@ function outside_lane(): boolean {
 
 // A real transcript file so the composed guards run their normal disk path rather than failing open.
 function fresh_transcript(): string {
-	const directory = mkdtempSync(path.join(tmpdir(), 'pretool-guard-foreground-'))
+	const directory = make_directory('pretool-guard-foreground-')
 	const transcript_path = path.join(directory, 'transcript.jsonl')
 
 	writeFileSync(transcript_path, '{"type":"user"}\n')
@@ -109,10 +115,11 @@ describe('pretool_guard.foreground_rewrite', () => {
 	})
 })
 
-// joshuafolkken/kit#4101: the row's rewrite used to replace the foreground one, so a ship chained after
-// a piped check ran at the two-minute default and was moved aside.
+// A row rewrite must retain the foreground rewrite, so a ship chained after a piped check keeps
+// its required execution mode and timeout (joshuafolkken/kit#4101).
 describe('pretool_guard.respond — the foreground cap on top of a row rewrite', () => {
 	it("caps a lane child's ship on top of the pipefail rewrite, deciding nothing", async () => {
+		vi.stubEnv(agent_session_role.KEY, 'worker')
 		vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(true)
 		const envelope = await written(ship_input(false, `${PIPED_LINT} && ${LANE_SHIP}`))
 

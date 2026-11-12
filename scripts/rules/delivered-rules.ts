@@ -1,14 +1,19 @@
 import { investigation_reads } from '#scripts/delegation/investigation-reads'
-import { will_refuse as will_batch_refuse } from '#scripts/hooks/batch-guard'
-import { hook_decision, type GuardRun, type TranscriptGuardSpec } from '#scripts/josh/hook-decision'
+import { hook_context, type HookContext } from '#scripts/hooks/hook-context'
+import { hook_decision, type GuardRun } from '#scripts/josh/hook-decision'
 import { time_batch_guard, type GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { agent_model } from './agent-model'
 import { bash_triggers } from './bash-triggers'
 import { concise_reply } from './concise-reply'
+import { consultation_handoff } from './consultation-handoff'
+import { consultation_investigation } from './consultation-investigation'
 import { credential_body } from './credential-body'
+import { delivered_rules_guard } from './delivered-rules-guard'
 import { direct_filing } from './direct-filing'
+import { direct_git_status } from './direct-git-status'
 import { direct_issue_comment } from './direct-issue-comment'
 import { direct_issue_read } from './direct-issue-read'
+import { direct_vitest_run } from './direct-vitest-run'
 import { early_heartbeat } from './early-heartbeat'
 import { file_edit_rows } from './file-edit-rows'
 import { git_force } from './git-force'
@@ -30,6 +35,7 @@ import { piped_verification } from './piped-verification'
 import { poll_loop } from './poll-loop'
 import { pre_gate_cut } from './pre-gate-cut'
 import { raw_field_body } from './raw-field-body'
+import { repeat_check_related } from './repeat-check-related'
 import { reviewer_foreground } from './reviewer-foreground'
 import { round_one_check_related } from './round-one-check-related'
 import { rule_body_guard } from './rule-body-guard'
@@ -38,15 +44,13 @@ import { shell_body_trigger } from './shell-body-trigger'
 import { test_declared_commit } from './test-declared-commit'
 import { third_party_write } from './third-party-write'
 import { timed_rerun } from './timed-rerun'
+import { unasked_filing } from './unasked-filing'
 import { worktree_guard } from './worktree-guard'
 
 // The rules delivered by a `PreToolUse` refusal at the moment they bind, rather than carried resident
 // in `CLAUDE.md` — a nameable trigger is cheaper and stronger delivered than carried. Every entry is a
 // `hook_decision.create_transcript_guard` spec; each reason is a trigger plus a pointer to its topic
 // file (`prompts/collaboration-workflow/residency.md`).
-
-// The escape hatch, on by default like the other two guards.
-const SWITCH_ENV_KEY = 'JOSH_RULE_GUARD'
 
 // A compliance test sees the call, its turn and its run: batching needs the turn, the pre-gate cut
 // needs the run; every other row reads the call alone.
@@ -57,7 +61,11 @@ type CallTest = (
 ) => boolean
 
 // The tail is read lazily: most calls no rewrite applies to never need it.
-type CallRewrite = (call: GuardedCall, tail: () => string) => Record<string, unknown> | undefined
+type CallRewrite = (
+	call: GuardedCall,
+	tail: () => string,
+	context: HookContext,
+) => Record<string, unknown> | undefined
 
 // The human-readable side `pnpm josh rule:list` renders, carried on the row so a rule is one entry.
 interface RuleAbout {
@@ -78,7 +86,7 @@ const PRETOOL_GUARD = 'pnpm josh pretool:guard'
 // `id` keys the rule's own refusal record, so one rule firing never spends another's budget.
 interface DeliveredRule {
 	id: string
-	is_trigger: (call: GuardedCall) => boolean
+	is_trigger: (call: GuardedCall, context: HookContext) => boolean
 	// The only text that reaches the model: the instruction and the pointer.
 	reason: string
 	about: RuleAbout
@@ -113,8 +121,6 @@ type MeasuredRule = Omit<DeliveredRule, 'is_trigger'> & {
 	is_trigger?: DeliveredRule['is_trigger']
 }
 
-const STAMP_PREFIX = 'josh-rule-guard-'
-
 const { is_issue_filing, on_bash_command } = bash_triggers
 
 const { SHELL_BODY_REASON, carries_a_body, is_shell_evaluated_body, keeps_body_safe } =
@@ -130,6 +136,8 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	// The direct call only. The filing cap, the WIP cap and the fold question are `issue:file`'s own
 	// steps, so no row gates them.
 	direct_filing.ROW,
+	// An interactive session's `issue:file` the person did not ask for; unattended runs never fire it.
+	unasked_filing.ROW,
 	// Before the body rows: a comment posted by hand is refused whatever its body, and the command it
 	// points at takes the body by path, so the body rows have nothing left to say.
 	direct_issue_comment.ROW,
@@ -153,6 +161,7 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	raw_field_body.ROW,
 	// Before `piped-verification`, whose rewrite would run under `pipefail` a check that must not run.
 	round_one_check_related.ROW,
+	repeat_check_related.ROW,
 	{
 		id: 'piped-verification',
 		is_trigger: on_bash_command(piped_verification.is_masked_verification),
@@ -190,29 +199,14 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	test_declared_commit.ROW,
 	// Before `run-tail`, so a lane child goes straight to `ship --detach` instead of through both.
 	lane_background.ROW,
-	// Reads `run_in_background` beside the command; `decide`, since a push recurs.
-	{
-		id: 'run-tail',
-		is_trigger: run_tail_rule.is_foreground_push_step,
-		reason: run_tail_rule.RUN_TAIL_REASON,
-		decide: run_tail_rule.decide,
-		keeps: run_tail_rule.is_backgrounded_push_step,
-		reaches: run_tail_rule.is_push_step_call,
-		about: {
-			title: 'Idle run tail',
-			topic: '`.claude/skills/workflow-commands/background-commands.md`',
-			fires:
-				'`pnpm josh git -y` (`josh g`, `--yes` alike) issued in the **foreground**. Every occurrence',
-			quiet: 'issued in the background — its completion resumes the run',
-		},
-	},
+	run_tail_rule.ROW,
 	// Reads the lane name and the cut record. Once per run, not `decide`: taking the cut ends the
 	// process, and the verdicts that leave a run at the gate all need the reissue through. `reaches`
 	// tells the cutting run from the resumed one by the run's calls. Overlaps `piped-verification`
 	// safely: that row speaks first and this one delivers on the reissue.
 	{
 		id: 'pre-gate-cut',
-		is_trigger: on_bash_command(pre_gate_cut.is_uncut_gate),
+		is_trigger: on_bash_command(pre_gate_cut.is_uncut_gate_in),
 		reason: pre_gate_cut.PRE_GATE_CUT_REASON,
 		keeps: on_bash_command(pre_gate_cut.takes_the_cut),
 		reaches: pre_gate_cut.reaches_the_pre_gate_boundary,
@@ -231,8 +225,17 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	agent_model.ROW,
 	investigator_foreground.ROW,
 	reviewer_foreground.ROW,
+	// After `agent-model`, its one overlap (an unnamed `general-purpose` on Fable): `model` fixes both.
+	consultation_investigation.ROW,
+	consultation_investigation.CODEX_ROW,
+	consultation_handoff.ROW,
 	lane_carry_conflict.ROW,
 	lane_switch_main.ROW,
+	// Before `timed-rerun` and `lane-direct-tool`, its overlaps (a timed or lane `vitest run`):
+	// `test:related` replaces the direct run, so neither the record nor the reservation comes first. A lane
+	// child's plain `vitest run` never reaches this order: `lane-direct-tool`'s rewrite runs before
+	// judgment (`rule-rewrite.ts`), and this row is silent on the `reserved-run` it produces.
+	direct_vitest_run.ROW,
 	// Before `lane-direct-tool`, its one overlap (a timed tool in a lane): the record is the right first
 	// act, and `lane-direct-tool` delivers on the reissue of a `time`-prefixed tool.
 	timed_rerun.ROW,
@@ -247,13 +250,15 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	...file_edit_rows.SHELL_ROWS,
 	...permission_guards.ROWS,
 	poll_loop.ROW,
+	// After the safety rows: a harmless read is steered only once nothing on the line is refused.
+	direct_git_status.ROW,
 	// Before `rule-body`, its one overlap: the cut is the right first act, and `rule-body` delivers on
 	// the reissue in the fresh process.
 	implementation_cut.ROW,
 	// Before `rule-body`, its one overlap (a whole-file `Write` of a rule document): the right tool is
 	// chosen before the placement questions are asked of its text.
 	file_edit_rows.REWRITE_ROW,
-	rule_body_guard.ROW,
+	delivered_rules_guard.call_only(rule_body_guard.ROW),
 	...oracle_consulted.ROWS,
 ]
 
@@ -279,12 +284,18 @@ const BATCHING_RULE: MeasuredRule = {
 	},
 }
 
+// A row reads the call alone, so its paths resolve against this process's checkout until the rows take
+// the per-call context (joshuafolkken/kit#6973).
+function is_investigation_read(call: GuardedCall): boolean {
+	return investigation_reads.is_refusable_call(call)
+}
+
 // No `is_trigger`, as for batching. No `keeps`: any dispatch would read as compliance, so it is left
 // unmeasured — `pnpm josh time`'s `Investigation reads:` block is the compliance reading.
 const INVESTIGATION_RULE: MeasuredRule = {
 	id: 'investigation',
 	reason: investigation_reads.REASON,
-	reaches: investigation_reads.is_refusable_call,
+	reaches: is_investigation_read,
 	about: {
 		title: 'Investigation delegation threshold',
 		topic: '`delegation.md`',
@@ -302,63 +313,7 @@ const MEASURED_RULES: ReadonlyArray<MeasuredRule> = [
 	concise_reply.ROW,
 ]
 
-// Once per run, so a run that obeyed is never wedged. A call the batching guard may refuse is stepped
-// aside from: only one hook's reason surfaces per call, and a stamp written for a lost reason would
-// silence the rule for the run. The rule delivers on the reissue instead.
-const BATCH_STAMP = hook_decision.create_refusal_stamp(time_batch_guard.STAMP_PREFIX)
-
-// The two hooks race on one event and the stamp is written before the reason, so a record this young
-// is the batching guard speaking about the call in hand.
-const BATCH_REFUSAL_WINDOW_MS = 10_000
-
-// Asked with its real record, not `NEVER_MS`: that guard never refuses one sequence twice.
-function will_batch_guard_refuse(tail: string, call: GuardedCall, run: GuardRun): boolean {
-	const refused_at_ms = BATCH_STAMP.last_ms(BATCH_STAMP.path(run.transcript))
-
-	if (run.now_ms - refused_at_ms < BATCH_REFUSAL_WINDOW_MS) return true
-
-	return will_batch_refuse(tail, call, run)
-}
-
-function is_first_delivery(
-	tail: string,
-	call: GuardedCall,
-	delivered_at_ms: number,
-	run: GuardRun,
-): boolean {
-	return delivered_at_ms === hook_decision.NEVER_MS && !will_batch_guard_refuse(tail, call, run)
-}
-
-// `decide` and `already_satisfied` each replace `is_first_delivery`. A recurring row is always asked;
-// the stand-aside reaches it as `can_record`, since what must not happen is recording a refused act.
-// An `already_satisfied` row refuses every call until the satisfying act is on the tail.
-function delivery_decision(rule: DeliveredRule): TranscriptGuardSpec['should_block'] {
-	const { decide, already_satisfied } = rule
-
-	if (decide === undefined && already_satisfied === undefined) return is_first_delivery
-
-	return function should_block(
-		tail: string,
-		call: GuardedCall,
-		delivered_at_ms: number,
-		run: GuardRun,
-	): boolean {
-		if (already_satisfied?.(tail, call, run) === true) return false
-		if (decide === undefined) return true
-
-		return decide(call, run, !will_batch_guard_refuse(tail, call, run), delivered_at_ms)
-	}
-}
-
-function guard_of(rule: DeliveredRule): ReturnType<typeof hook_decision.create_transcript_guard> {
-	return hook_decision.create_transcript_guard({
-		prefix: `${STAMP_PREFIX}${rule.id}-`,
-		switch_key: SWITCH_ENV_KEY,
-		is_candidate: rule.is_trigger,
-		should_block: delivery_decision(rule),
-		reason: rule.reason,
-	})
-}
+const { SWITCH_ENV_KEY, guard_of } = delivered_rules_guard
 
 const GUARDS = new Map(DELIVERED_RULES.map((rule) => [rule.id, guard_of(rule)]))
 
@@ -369,9 +324,13 @@ function delivery_path(rule_id: string, transcript_path: string): string {
 
 // The first entry whose delivery fires wins. An overlap is admissible only when the losing rule is
 // still right one reissue later; stamps are keyed per id, so it is delivered then.
-function delivery(raw_payload: string, now_ms: number = Date.now()): string | undefined {
+function delivery(
+	raw_payload: string,
+	now_ms: number = Date.now(),
+	context: HookContext = hook_context.from_process(),
+): string | undefined {
 	for (const guard of GUARDS.values()) {
-		const reason = guard.refusal(raw_payload, now_ms)
+		const reason = guard.refusal(raw_payload, now_ms, context)
 
 		if (reason !== undefined) return reason
 	}

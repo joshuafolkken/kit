@@ -1,13 +1,15 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync } from 'node:fs'
 import path from 'node:path'
 import { process_identity } from '#scripts/josh/process-identity'
 import { process_identity_fixture } from '#scripts/josh/process-identity-fixture'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_carry } from './run-carry'
 import { run_carry_cli } from './run-carry-cli'
 import { run_carry_cli_fixture } from './run-carry-cli-fixture'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#1714. Two things are pinned here that prose alone would let a rewrite lose:
 // standard output is one token on every path, and `--begin` never starts a second budget over a
@@ -30,14 +32,14 @@ const git_directories = vi.mocked(git_command.git_directories)
 const { DEAD_PID, has_native_start_probe: has_owner_probe } = process_identity_fixture
 
 const TEST_PREFIX = 'run-carry-cli-test-'
-const scratch = mkdtempSync(path.join(tmpdir(), TEST_PREFIX))
+const scratch = make_directory(TEST_PREFIX)
 const WORKTREE = path.join(scratch, 'worktree.git')
 const REPOSITORY = path.join(scratch, 'repository.git')
 const INVOCATION = 'backlogrun --max 5'
 const OTHER_INVOCATION = 'backlogrun --max 10 --idle 30'
 const RETROSPECTIVE = '--retrospective'
 const SUMMARY = '--summary'
-// A start far more than eight hours ago: the age that used to expire a record (joshuafolkken/kit#3687).
+// An old start exercises the absence of age-based expiry (joshuafolkken/kit#3687).
 const LONG_AGO = new Date('2026-09-01T00:00:00.000Z')
 const START = new Date('2026-09-11T00:00:00.000Z')
 // The opening list, pinned: it is what a named-issue `backlogrun` writes to `--begin` at every cut,
@@ -78,10 +80,6 @@ afterEach(() => {
 	rmSync(event_target(), { force: true })
 })
 
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
-
 describe('the record is keyed to the repository rather than the work tree', () => {
 	it('reads none before anything has begun', async () => {
 		expect(await run_carry_cli.run([])).toBe(0)
@@ -103,8 +101,8 @@ describe('beginning a run', () => {
 })
 
 describe('who a standing record belongs to', () => {
-	// The headline defect of joshuafolkken/kit#1722: the string matched, so the fresh session used to
-	// inherit the dead run's counters and a `started_at` hours old.
+	// A matching string must not make a fresh session inherit a dead run's counters or start time
+	// (joshuafolkken/kit#1722).
 	it('answers standing when the same invocation is typed again, leaving the record alone', async () => {
 		await run_carry_cli.run(['--begin', INVOCATION])
 		const first = run_carry.read_carry(target())
@@ -148,9 +146,8 @@ describe('who a standing record belongs to', () => {
 })
 
 describe('beginning a run over a record that is already there', () => {
-	// joshuafolkken/kit#3687: a record older than eight hours used to be replaced by `--begin`. It has no
-	// expiry now, so an old record no cut handed off stands exactly as a young one does — a person
-	// resumes or ends it, and `--begin` never deletes a run on its age.
+	// Age alone cannot expire a record: without a cut handoff, a person must resume or end it.
+	// `--begin` must preserve an old record just as it preserves a young one (joshuafolkken/kit#3687).
 	it('never replaces a standing record on its age', async () => {
 		run_carry.begin_carry(target(), INVOCATION, run_carry.NO_OWNER, LONG_AGO)
 

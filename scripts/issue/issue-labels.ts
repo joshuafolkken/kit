@@ -41,7 +41,8 @@ const RUN_LANE_LABEL = 'run:lane'
 // Read by `issue-rank.ts`, the one place the ranking keys are decided.
 const PRIORITY_HIGH_LABEL = 'priority:high'
 // Ranks above `priority:high` — an urgent defect (one of the interrupt-filing conditions) or a lane
-// speed-up worth at least a tenth of a merge's median lane time. Applied from the urgent declaration;
+// speed-up worth at least a tenth of a merge's median lane time. Applied from the urgent declaration,
+// or on a person's instruction by `josh issue:priority --critical` (never an agent's own judgment);
 // it never interrupts a running lane, only takes the next free one. Only a person removes it.
 const PRIORITY_CRITICAL_LABEL = 'priority:critical'
 // Opts one issue outside any epic into unattended execution. **Only a
@@ -66,6 +67,8 @@ const AUTO_OK_LABEL = 'auto-ok'
 // checkout and must go on holding the repository. Read as parked in either place, the next child
 // would start on top of that work.
 const NEEDS_HUMAN_REVIEW_LABEL = 'needs-human-review'
+// The PR is ready for a person to inspect and merge on GitHub.
+const NEEDS_HUMAN_MERGE_LABEL = 'needs-human-merge'
 // Marks an issue whose work a run verified is **already merged**. Closing
 // an Issue is Tier C, so a run that reaches that conclusion may not act on it — this label is its
 // exit that is not Tier C.
@@ -103,13 +106,14 @@ const NOT_BEFORE_LABEL = 'not-before'
 
 // The labels that park an open issue: a run never starts or restarts it, and only a person lifts
 // them — `needs-decision` waits for an answer, `run:stalled` for a mechanical cause to be fixed, and
-// `already-done` for the close. The run that applied any of them committed nothing, so the checkout
-// is clean. Held once because the merge, the board, the pool, the classification and the liveness
+// `already-done` for the close, and `needs-human-merge` for a person to merge its ready PR. Each
+// leaves a clean checkout. Held once because the merge, the board, the pool, the classification and the liveness
 // read all ask "is this child parked", and a copy that missed a label would answer differently.
 const PARKED_LABELS: ReadonlySet<string> = new Set([
 	NEEDS_DECISION_LABEL,
 	RUN_STALLED_LABEL,
 	ALREADY_DONE_LABEL,
+	NEEDS_HUMAN_MERGE_LABEL,
 ])
 
 // The labels that mean an open issue must not be handed to a run as it stands: an `epic`
@@ -249,6 +253,11 @@ const WORKFLOW_LABELS: ReadonlyArray<LabelDefinition> = [
 		description: 'Implement and verify, but stop before committing so a person can look',
 	},
 	{
+		name: NEEDS_HUMAN_MERGE_LABEL,
+		color: 'd93f0b',
+		description: 'Pull request open: a person must inspect the diff and merge on GitHub',
+	},
+	{
 		name: ALREADY_DONE_LABEL,
 		color: '6f42c1',
 		description: 'Verified already merged — a person closes it',
@@ -380,6 +389,7 @@ const ALL_LABELS: ReadonlySet<string> = new Set([
 	RUN_STALLED_LABEL,
 	AUTO_OK_LABEL,
 	NEEDS_HUMAN_REVIEW_LABEL,
+	NEEDS_HUMAN_MERGE_LABEL,
 	ALREADY_DONE_LABEL,
 	MEASURED_LABEL,
 	MEASURED_UNMET_LABEL,
@@ -428,6 +438,7 @@ export {
 	MEASURED_UNMET_LABEL,
 	NEEDS_DECISION_LABEL,
 	NEEDS_HUMAN_REVIEW_LABEL,
+	NEEDS_HUMAN_MERGE_LABEL,
 	NOT_BEFORE_LABEL,
 	NOT_DIRECTLY_RUNNABLE_LABELS,
 	OTHER_CHANGE_LABEL,

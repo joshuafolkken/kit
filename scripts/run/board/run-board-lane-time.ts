@@ -14,6 +14,7 @@ const LAUNCH_KINDS: ReadonlySet<string> = new Set([KIND.CHILD_LAUNCH, KIND.RESTA
 const OFF_LANE_KINDS: ReadonlySet<string> = new Set([
 	KIND.MERGE,
 	KIND.PARK,
+	KIND.HUMAN_REVIEW,
 	KIND.WITHDRAW,
 	KIND.OUTAGE,
 	KIND.USAGE_LIMIT,

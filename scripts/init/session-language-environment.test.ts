@@ -1,7 +1,7 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it } from 'vitest'
 import type { FileAction } from './init-actions'
 import { session_language_environment } from './session-language-environment'
 
@@ -39,13 +39,10 @@ describe('session_language_environment.lang_from_locale', () => {
 })
 
 const fixture = { root: '' }
+const make_directory = temporary_directory()
 
 beforeEach(() => {
-	fixture.root = mkdtempSync(path.join(tmpdir(), 'session-lang-'))
-})
-
-afterEach(() => {
-	rmSync(fixture.root, { recursive: true, force: true })
+	fixture.root = make_directory('session-lang-')
 })
 
 function only_action(environment: Record<string, string>): FileAction {

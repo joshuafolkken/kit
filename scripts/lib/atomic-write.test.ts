@@ -1,15 +1,7 @@
-import {
-	mkdirSync,
-	mkdtempSync,
-	readdirSync,
-	readFileSync,
-	rmSync,
-	statSync,
-	type PathLike,
-} from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, readdirSync, readFileSync, statSync, type PathLike } from 'node:fs'
 import path from 'node:path'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // The rename is the one instant both writers' staging files exist at once, so a second write to the
 // same target is started from inside the first one's rename.
@@ -29,7 +21,8 @@ vi.mock(import('node:fs'), async (import_original) => {
 
 const { atomic_write } = await import('./atomic-write')
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'atomic-write-test-'))
+const make_directory = temporary_directory('suite')
+const scratch = make_directory('atomic-write-test-')
 const FIRST = 'first'
 const SECOND = 'second'
 const PRIVATE_MODE = 0o600
@@ -46,10 +39,6 @@ function directory_for(name: string): string {
 
 	return directory
 }
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
 
 beforeEach(() => {
 	before_rename.mockReset()

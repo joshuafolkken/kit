@@ -11,7 +11,7 @@ import { review_tree } from '#scripts/review/review-tree'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { check_reuse, type CheckRecords } from './check-reuse'
 import { gate_ledger, type GateLedgerStart } from './gate-ledger'
-import { gate_plan, type GatePlan } from './gate-plan'
+import { gate_plan, type CheckSelection, type GatePlan } from './gate-plan'
 import { gate_report, type GateStepResult } from './gate-report'
 import { gate_run_steps, type ReusedChecks } from './gate-run-steps'
 import { gate_skip } from './gate-skip'
@@ -19,7 +19,9 @@ import { gate_static_group } from './gate-static-group'
 import { build_gate_step, build_gate_steps, UNIT_WORKER_FLAG } from './gate-steps'
 import { gate_tree, type GateTree } from './gate-tree'
 import { project_checks } from './project-checks'
+import { project_gate_steps } from './project-gate-steps'
 import { scoped_green, type ScopedSources } from './scoped-green'
+import { whole_tree_reuse } from './whole-tree-reuse'
 
 // The completion gate's four checks are independent and share no mutable state, so they run
 // together. Beyond the seconds: a serial gate reports one failure at a time, so a tree with a lint
@@ -174,18 +176,20 @@ async function run_marked_gate<T>(
 // A `--static-group` narrows the resolved plan's checks and keeps its concurrency, which the full static
 // set sized: a cap above the narrowed count never binds.
 function announce_gate_plan(
-	is_unit_included: boolean,
+	selection: CheckSelection,
 	available_cores: number,
 	static_group?: string,
 ): GatePlan {
-	const concurrent_runs = unit_worker_share.live_run_count() + unit_worker_share.SOLO_RUNS
-	const is_kit_repository = project_checks.is_kit_repository(process.cwd())
-	const resolved = gate_plan.resolve_gate_plan(
-		available_cores,
-		concurrent_runs,
-		is_unit_included,
-		is_kit_repository,
+	// The live lanes divide as well as the runs in flight (joshuafolkken/kit#6682).
+	const concurrent_runs = unit_worker_share.sharing_runs(
+		unit_worker_share.live_run_count() + unit_worker_share.SOLO_RUNS,
+		unit_worker_share.live_lane_count(),
 	)
+	const is_kit_repository = project_checks.is_kit_repository(process.cwd())
+	const resolved = gate_plan.resolve_gate_plan(available_cores, concurrent_runs, {
+		...selection,
+		is_kit_repository,
+	})
 	const plan = {
 		...resolved,
 		checks: gate_static_group.narrow_checks(resolved.checks, static_group),
@@ -210,6 +214,10 @@ interface GateOptions {
 	is_unit_included?: boolean
 	// The one static group a CI matrix leg runs (`gate-static-group.ts`); set only with the unit suite off.
 	static_group?: string | undefined
+	// Whether the whole-tree checks run (`gate_plan.select_gate_checks`): `--whole-tree` for the ship's
+	// gate, and always where the unit suite is off. A whole-tree run reuses a green record only with
+	// those checks' own records (`whole-tree-reuse.ts`).
+	is_whole_tree_included?: boolean
 	stamp_path?: string
 	marker_path?: string
 	// The gate log's destination, a parameter for the same reason the two above are: this suite runs
@@ -232,7 +240,7 @@ interface GateOptions {
 }
 
 // **Per-check records belong to the full local gate alone**: CI's `--no-unit` gate is the safety net
-// under the local reuse and stays as it was, so it neither reads nor writes one.
+// under the local reuse and stays as it was, so it never writes one.
 function check_records_of(plan: GatePlan, options: GateOptions): CheckRecords | undefined {
 	return gate_plan.has_unit_check(plan.checks) ? options.check_records : undefined
 }
@@ -329,14 +337,17 @@ async function run_checked_gate(
 	options: GateOptions,
 	started_at: number,
 ): Promise<number> {
-	const is_unit_included = options.is_unit_included ?? true
+	const selection = {
+		is_unit_included: options.is_unit_included ?? true,
+		is_whole_tree_included: options.is_whole_tree_included,
+	}
 	// Read before the concurrent-run count, never between it and the marker below: the reading waits out
 	// a sample window, and a lane counting inside that window would miss this gate.
 	const ledger = await gate_ledger.start(options.ledger_path)
 	// Resolved at the gate's entry, before this gate sets `JOSH_UNIT_RUN_MARKED`, so a gate nested in the
 	// unit suite reads the flag as set and reserves nothing.
 	const budget = gate_run_steps.default_budget()
-	const plan = announce_gate_plan(is_unit_included, budget.available_cores, options.static_group)
+	const plan = announce_gate_plan(selection, budget.available_cores, options.static_group)
 	const reused = await checks_to_reuse(plan, tree, options)
 
 	// **The gate holds the unit-run marker for its whole run, not just its unit step.** The step that
@@ -346,7 +357,10 @@ async function run_checked_gate(
 	// the next lane asks; the guard inside the spawned `josh test:unit` sees the handoff and adds no
 	// second marker for the same run.
 	async function run_and_settle(): Promise<number> {
-		const results = await gate_run_steps.run_gate_steps(plan, budget, reused)
+		const fixed = await gate_run_steps.run_gate_steps(plan, budget, reused)
+		const records = check_records_of(plan, options)
+		const project = await project_gate_steps.run_for(options, { tree, records }, budget)
+		const results = [...fixed, ...project]
 
 		return await settle_gate(plan, results, tree, { ...options, started_at, ledger })
 	}
@@ -356,10 +370,17 @@ async function run_checked_gate(
 
 // `--force` is answered here rather than inside `gate_skip`, so the module stays about what the
 // record can prove and this one stays about what the caller asked for.
-function reusable_stamp(tree: GateTree, options: GateOptions): FileMapStamp | undefined {
+async function reusable_stamp(
+	tree: GateTree,
+	options: GateOptions,
+): Promise<FileMapStamp | undefined> {
 	if (options.is_forced === true) return undefined
 
-	return gate_skip.reusable_green_gate(tree.files, tree.base, options.stamp_path)
+	const stamp = gate_skip.reusable_green_gate(tree.files, tree.base, options.stamp_path)
+
+	if (stamp === undefined || options.is_whole_tree_included !== true) return stamp
+
+	return (await whole_tree_reuse.is_reused(tree, options.check_records)) ? stamp : undefined
 }
 
 // The reuse leaves its line in the ledger too, so `josh lane:stats` counts the gates it saved
@@ -383,7 +404,7 @@ async function short_circuit_gate(
 	options: GateOptions,
 	started_at: number,
 ): Promise<number | undefined> {
-	const reusable = reusable_stamp(tree, options)
+	const reusable = await reusable_stamp(tree, options)
 
 	if (reusable !== undefined) return await reuse_gate(reusable, options, started_at)
 
@@ -420,7 +441,13 @@ const VERBOSE_FLAG = '--verbose'
 // Read here and never forwarded, exactly as the two above are: it selects which sub-commands the
 // gate fans out to rather than being passed to one of them.
 const NO_UNIT_FLAG = '--no-unit'
-const ACCEPTED_FLAGS: ReadonlyArray<string> = [VERBOSE_FLAG, gate_skip.FORCE_FLAG, NO_UNIT_FLAG]
+const { WHOLE_TREE_FLAG } = whole_tree_reuse
+const ACCEPTED_FLAGS: ReadonlyArray<string> = [
+	VERBOSE_FLAG,
+	gate_skip.FORCE_FLAG,
+	NO_UNIT_FLAG,
+	WHOLE_TREE_FLAG,
+]
 
 // The flags are the caller's, the destinations are the run's, so the two are merged here rather than
 // letting an option override a flag the user typed.
@@ -458,13 +485,15 @@ async function run_gate_command(
 
 	// A static group is a part of the static set, so it implies `--no-unit` and every withholding that flag carries.
 	const static_group = gate_static_group.find_group(extra_arguments)
+	const is_unit_included = !extra_arguments.includes(NO_UNIT_FLAG) && static_group === undefined
 
 	return await run_verification_gate({
 		is_scoped_enforced: true,
 		...options,
 		is_verbose: extra_arguments.includes(VERBOSE_FLAG),
 		is_forced: extra_arguments.includes(gate_skip.FORCE_FLAG),
-		is_unit_included: !extra_arguments.includes(NO_UNIT_FLAG) && static_group === undefined,
+		is_unit_included,
+		is_whole_tree_included: !is_unit_included || extra_arguments.includes(WHOLE_TREE_FLAG),
 		static_group,
 	})
 }
@@ -485,6 +514,7 @@ const verification_gate = {
 	NO_UNIT_FLAG,
 	UNIT_WORKER_FLAG,
 	VERBOSE_FLAG,
+	WHOLE_TREE_FLAG,
 	build_gate_step,
 	build_gate_steps,
 	clear_gate_running,

@@ -7,13 +7,12 @@ Read before implementing a `#N` Issue.
 turn as whatever else the run needs:
 
 ```bash
-pnpm josh issue:read <N> [<N> ...]     # body and comments, one call per batch
-gh api repos/<owner>/<repo>/issues/<N>/comments --jq '.[] | {user: .user.login, created_at, body}'
+pnpm josh issue:read <N> [<N> ...]                       # body and comments, one call per batch
+pnpm josh issue:read <N> [<N> ...] --repo <owner/repo>   # an Issue in another repository
 ```
 
-**Type the first line**; it **says when a comment listing could not be read rather than showing no
-comments**. The `gh api` form is **cross-repository only** (the command takes no `--repo`); a read
-of this repository's Issue, its comments or its timeline — `repos/{owner}/…` or the repository
+The command **says when a comment listing could not be read rather than showing no comments**. A raw
+read of this repository's Issue, its comments or its timeline — `repos/{owner}/…` or the repository
 spelled out, and `gh issue view` — is refused (`pnpm josh rule:list` → `direct-issue-read`).
 
 An Issue whose author has no write access stops at `run:entry` until a person with write access
@@ -37,7 +36,7 @@ what.
   the body's criteria say; name the Issue it went to in the completion report.
 - **A comment saying the Issue no longer has a reason to exist** — the defect does not reproduce, or it
   was fixed elsewhere — takes the exit in "When the work turns out to be already merged". Closing an
-  Issue is Tier C.
+  Issue any other way is Tier C.
 
 Everything else, **a widened scope included**, is ordinary work; a widening into several
 separately-mergeable deliverables is the split assessment's business (`split-assessment.md`).
@@ -48,31 +47,46 @@ separately-mergeable deliverables is the split assessment's business (`split-ass
 satisfied in merged code — one procedure either way. **Parking it is not the place**: `needs-decision`
 means "waiting for an answer", and here the answer exists.
 
-**The exit is the `already-done` label.** `epic:next`, `backlog:next` and `auto-ok:next` stop offering
-the Issue (`scripts/issue/issue-labels.ts` → `NOT_DIRECTLY_RUNNABLE_LABELS`, `epic-classify.ts` →
-`human`), and `epic:busy` stops counting it. **Only a person removes it, by closing the Issue.**
+**The exit applies the `already-done` label, then closes the Issue as `completed` when a cited pull
+request reads back as merged or `origin/main` contains a cited commit SHA**
+(`scripts/issue/already-done-citation.ts`); the label stays, and a
+reopen undoes the close. **Anything else leaves it OPEN with the label**, the reason printed:
+`epic:next`, `backlog:next` and `auto-ok:next` stop offering the Issue
+(`scripts/issue/issue-labels.ts` → `NOT_DIRECTLY_RUNNABLE_LABELS`, `epic-classify.ts` → `human`),
+`epic:busy` stops counting it, and a person closes it.
 
 **Commit nothing, push nothing, open no pull request** — run one command; it posts the evidence,
-applies `already-done` and releases the hold, in that order, stopping at the first failure:
+applies `already-done` and closes the Issue when the citation checks, and releases the hold, in that
+order, stopping at a failed comment or label; a failed close leaves the labelled Issue OPEN and
+still releases the hold:
 
 ```bash
-pnpm josh issue:already-done <N> --evidence-file <path>
+pnpm josh issue:already-done <N> --evidence-file .josh/tmp/evidence.md
 ```
 
 **The evidence file names the merging pull request or commit and, per acceptance criterion, the
 `file:line` that satisfies it.** **A claim with no citations is not the finding this exit is for.**
 
-Then behave as the entry point does for a parked child: a typed `fullrun` / `halfrun` sends a
-`confirmation` Telegram naming the Issue and the covering merge, and stops; a `backlogrun` child is
-park-and-continue (`backlogrun-park.md` → "park and continue"). **Never close the Issue** — Tier C.
+A closed Issue ends the run. A labelled one is handled like a parked child: a typed `fullrun` /
+`halfrun` sends a `confirmation` Telegram naming the Issue and the covering merge, and stops; a
+`backlogrun` child is park-and-continue (`backlogrun-park.md` → "park and continue"). **Never close
+it by any other path** — Tier C.
 
 **Looking familiar is no license to skip the work**: a criterion you cannot point at merged code for is
 one this run still owes.
 
+## When a declared close condition holds
+
+The body's `## 背景` declares `- 中止条件:` and the run's finding meets it → before any commit, run
+`pnpm josh issue:premise-unmet <N> --evidence-file .josh/tmp/premise-unmet.md` with the measured
+values and the reason (refusals: `scripts/issue/issue-premise-unmet-cli.ts`).
+
+With no declared line, a judgement that the work is not worth doing still parks.
+
 ## A measurement-only Issue
 
 **Every criterion is a measurement, so no pull request closes it** → `pnpm josh issue:measured <N>
---evidence-file <path>` (per criterion, the result and its run), never a bare comment: an OPEN child is
+--evidence-file .josh/tmp/evidence.md` (per criterion, the result and its run), never a bare comment: an OPEN child is
 parked `run:stalled`. Invoking `fullrun` / `backlogrun` authorizes this close. `docs/josh-commands-backlog.md` → "`josh issue:measured`".
 
 ## A long thread

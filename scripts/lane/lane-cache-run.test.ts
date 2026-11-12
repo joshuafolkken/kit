@@ -12,7 +12,6 @@ const sync_cache = vi.spyOn(lane_cache, 'sync_cache')
 const main_repository_root = vi.spyOn(lane_registry, 'main_repository_root')
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	main_repository_root.mockResolvedValue(MAIN_ROOT)
 })
 

@@ -1,5 +1,5 @@
 import { agent_argv } from '#scripts/agent/agent-argv'
-import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { agent_profile_schema } from '#scripts/agent/agent-profile-schema'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { issue_cite } from '#scripts/issue/issue-cite'
@@ -15,6 +15,7 @@ import { lane_breakdown_text, type Report } from './lane-breakdown-text'
 import { lane_child_marker } from './lane-child-marker'
 import { lane_investigation_switch } from './lane-investigation-switch'
 import { lane_ledger, type LedgerEntry } from './lane-ledger'
+import { lane_ledger_archive } from './lane-ledger-archive'
 import { lane_net_time } from './lane-net-time'
 import { lane_overrun_prompt } from './lane-overrun-prompt'
 import { lane_tail_stats } from './lane-tail-stats'
@@ -39,13 +40,15 @@ const NO_LEDGER = 'no ledger'
 
 // A lane's net minutes and their breakdown by stage, or why there are none (joshuafolkken/kit#4818).
 // `is_commented` says an earlier pass of the lane commented the breakdown on its Issue already;
-// `entries` are the ledger rows the breakdown's details are read off (joshuafolkken/kit#5078).
+// `entries` are the ledger rows the breakdown's details are read off (joshuafolkken/kit#5078), and
+// `events` the stream an overrun's breakdown is read again from, its first edit included.
 type LaneNet =
 	| {
 			kind: 'minutes'
 			minutes: number
 			breakdown: Breakdown
 			entries: ReadonlyArray<LedgerEntry>
+			events: ReadonlyArray<RunEvent>
 			is_commented: boolean
 	  }
 	| { kind: 'missing'; reason: string }
@@ -102,7 +105,7 @@ function is_commented(events: ReadonlyArray<RunEvent>, issue: number): boolean {
 }
 
 function net_in(path: string, events: ReadonlyArray<RunEvent>, issue: number): LaneNet {
-	const entries = lane_ledger.read_entries(path)
+	const entries = lane_ledger_archive.history_at(path)
 	const minutes = lane_net_time.net_minutes(entries, events, issue)
 	const breakdown = lane_breakdown.of(entries, events, issue)
 
@@ -110,7 +113,14 @@ function net_in(path: string, events: ReadonlyArray<RunEvent>, issue: number): L
 		return { kind: 'missing', reason: lane_net_time.missing_reason(entries, issue) }
 	}
 
-	return { kind: 'minutes', minutes, breakdown, entries, is_commented: is_commented(events, issue) }
+	return {
+		kind: 'minutes',
+		minutes,
+		breakdown,
+		entries,
+		events,
+		is_commented: is_commented(events, issue),
+	}
 }
 
 // The net time of a lane not yet noted, or `undefined` when its note is on the stream already.
@@ -144,7 +154,7 @@ function reading(issue: number, cite: string, minutes: number): string {
 // One line: `detached_launch` lets a prompt break lines, but a single line keeps the log header whole.
 // The breakdown leads, so the search starts from the longest stage (joshuafolkken/kit#4995).
 function prompt(issue: number, minutes: number, report: Report): string {
-	const reads = reading(issue, issue_cite.plain(issue), minutes)
+	const reads = reading(issue, issue_cite.plain_for('program', issue), minutes)
 	const stages = lane_breakdown_text.line(report)
 
 	return `${stages} ${reads} ${lane_overrun_prompt.handling(issue, minutes)}`
@@ -170,7 +180,7 @@ interface Investigation {
 // investigation's (`lane-baseline.ts`) alike.
 function launch(investigation: Investigation): string {
 	const cwd = process.cwd()
-	const built = agent_argv.resolve_in(investigation.prompt, agent_role_profile.WORKER, cwd)
+	const built = agent_argv.resolve_in(investigation.prompt, agent_profile_schema.WORKER, cwd)
 
 	if (built.kind === 'rejected') return `not investigated: ${built.note}`
 
@@ -200,15 +210,18 @@ function launched(issue: number, minutes: number, report: Report): string {
 type OverranNet = Extract<LaneNet, { kind: 'minutes' }>
 
 // The breakdown goes on the lane's Issue before the session starts, once across the lane's passes; a
-// refused comment costs the comment, not the investigation.
+// refused comment costs the comment, not the investigation. Only an overrun reads the lane's
+// transcripts, for the first edit that opens a lane with no `plan` event (joshuafolkken/kit#5994).
 async function overran_text(issue: number, net: OverranNet): Promise<string> {
-	const report = lane_breakdown_text.report_of(issue, net.breakdown, net.entries)
+	const breakdown =
+		lane_breakdown_implement.breakdown_of(net.entries, net.events, issue) ?? net.breakdown
+	const report = lane_breakdown_text.report_of(issue, breakdown, net.entries)
 	const comment = lane_breakdown_text.comment(issue, net.minutes, report)
 
 	if (!net.is_commented) await git_gh_issue_write.issue_try_comment(String(issue), comment)
 
 	const outcome = launched(issue, net.minutes, report)
-	const longest = lane_breakdown.longest_of(net.breakdown)
+	const longest = lane_breakdown.longest_of(breakdown)
 
 	return run_event_overrun.started_text(issue, net.minutes, outcome, longest)
 }

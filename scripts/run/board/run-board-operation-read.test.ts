@@ -1,8 +1,11 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it, vi } from 'vitest'
 import { run_board_operation_read, type OperationSources } from './run-board-operation-read'
+
+const make_directory = temporary_directory()
 
 // joshuafolkken/kit#3757: the end of each session's log, read in a fixed amount — and no operation
 // from a log that is missing or cannot be read.
@@ -21,7 +24,6 @@ const LONG_LINE = JSON.stringify({ type: 'user', text: 'x'.repeat(LONG_LINE_LENG
 const NONE = { log: undefined, root: undefined }
 const OWNER = { log: OWNER_LOG, root: ROOT }
 const LANES = [{ issue: '7', log: LANE_LOG, root: '/lanes/7' }]
-const directories: Array<string> = []
 
 function call_line(command: string): string {
 	const content = [{ type: 'tool_use', name: 'Bash', input: { command } }]
@@ -41,18 +43,13 @@ function sources(extra: Partial<OperationSources> = {}): OperationSources {
 
 // A real log holding `text`, and the read of it as the parent's.
 function owner_of(text: string): ReturnType<typeof run_board_operation_read.read>['owner'] {
-	const directory = mkdtempSync(path.join(tmpdir(), 'run-board-operation-'))
+	const directory = make_directory('run-board-operation-')
 	const log = path.join(directory, 'session.log')
 
-	directories.push(directory)
 	writeFileSync(log, text)
 
 	return run_board_operation_read.read(sources({ owner: { log, root: undefined } })).owner
 }
-
-afterEach(() => {
-	for (const directory of directories.splice(0)) rmSync(directory, { recursive: true })
-})
 
 describe('run_board_operation_read.read', () => {
 	it('reads each session’s newest operation from its own log, a lane’s under its issue', () => {

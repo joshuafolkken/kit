@@ -1,3 +1,4 @@
+import { review_round } from '#scripts/review/review-round'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const josh_run_mock = vi.hoisted(() => vi.fn())
@@ -29,18 +30,27 @@ vi.mock('#scripts/agent/agent-argv', () => ({
 	},
 }))
 vi.mock('#scripts/run/detached-launch', () => ({ detached_launch: { launch_attached: launch } }))
+vi.mock('#scripts/review/review-pair', () => ({ review_pair: { offer: vi.fn() } }))
+vi.mock('#scripts/review/review-pair-session', () => ({
+	review_pair_session: { launch: vi.fn(), pair_argv: vi.fn() },
+}))
 vi.mock('#scripts/lane/lane-child-marker', () => ({
 	lane_child_marker: { is_child_of: () => false },
 }))
 
 const { run_ship_reviewer } = await import('./run-ship-reviewer')
 const { run_ship_stop_cause } = await import('./run-ship-stop-cause')
+const { core_priority } = await import('#scripts/gate/core-priority')
+const { agent_argv } = await import('#scripts/agent/agent-argv')
 
 const OK = 0
 const FAILED = 1
 const ISSUE = '4276'
-const OPEN = ['review:brief', '--interaction']
+const FINAL_ROUND = 2
+const REVIEW_BRIEF_COMMAND = 'review:brief'
+const OPEN = [REVIEW_BRIEF_COMMAND, '--interaction']
 const { CAUSE } = run_ship_stop_cause
+const { PRIORITY_ENVIRONMENT } = core_priority
 
 function prompt_of(brief_path: string): string {
 	return `read ${brief_path}`
@@ -90,10 +100,63 @@ describe('run_ship_reviewer.reviewed', () => {
 
 		expect(await open?.()).toHaveProperty('code', OK)
 		expect(await review?.()).toHaveProperty('code', OK)
-		expect(josh_run_mock).toHaveBeenCalledWith(OPEN, true)
+		expect(josh_run_mock).toHaveBeenCalledWith(OPEN, true, undefined, PRIORITY_ENVIRONMENT)
 		expect(write_text_stamp).toHaveBeenCalledWith(expect.any(String), 'the brief')
 	})
+})
 
+describe('run_ship_reviewer.reviewed with a full-change final brief', () => {
+	it('uses the final profile and read-only prompt for a direct launch', async () => {
+		const profile = vi.spyOn(agent_argv, 'review_in')
+		const brief = `medium\n${review_round.FINAL_LINE}`
+		const [open, review] = run_ship_reviewer.reviewed(
+			[REVIEW_BRIEF_COMMAND, review_round.FULL_CHANGE_FLAG],
+			prompt_of,
+			ISSUE,
+			run_ship_reviewer.ROUND_ONE,
+		)
+
+		josh_run_mock.mockResolvedValue({ code: OK, out: brief })
+		await open?.()
+		await review?.()
+		expect(profile).toHaveBeenCalledWith(
+			expect.stringMatching(/read the scope the brief names.*Do not edit any file/u),
+			FINAL_ROUND,
+			expect.any(String),
+		)
+		expect(launch).toHaveBeenCalledOnce()
+		profile.mockRestore()
+	})
+})
+
+// joshuafolkken/kit#5819: the review stage's children and reviewer claim cores with the priority mark.
+describe('run_ship_reviewer — the core-budget priority mark', () => {
+	it('launches the reviewer under the core-budget priority mark', async () => {
+		const [, review] = run_ship_reviewer.reviewed(
+			OPEN,
+			prompt_of,
+			ISSUE,
+			run_ship_reviewer.ROUND_ONE,
+		)
+
+		await review?.()
+
+		expect(launch.mock.calls[0]?.[0]).toHaveProperty('env', PRIORITY_ENVIRONMENT)
+	})
+
+	it('attests under the core-budget priority mark', async () => {
+		await run_ship_reviewer.attest_phase()
+
+		expect(josh_run_mock).toHaveBeenCalledWith(
+			['review:attest', '--check'],
+			true,
+			undefined,
+			PRIORITY_ENVIRONMENT,
+		)
+	})
+})
+
+describe('run_ship_reviewer.reviewed — a failed reviewer', () => {
 	it('books a reviewer that exited non-zero as infrastructure, not a finding', async () => {
 		launch.mockResolvedValue({ kind: 'completed', pid: 1, exit_code: FAILED })
 		read_stamp_text.mockReturnValue(undefined)

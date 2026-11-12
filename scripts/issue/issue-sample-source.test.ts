@@ -1,6 +1,6 @@
 import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { issue_closing_pr } from './issue-closing-pr'
 import { issue_sample_gate } from './issue-sample-gate'
 import { issue_sample_source } from './issue-sample-source'
@@ -25,10 +25,6 @@ const GATED_BODY = body_with(`- 実施可能条件: #${String(CITED)} のマー�
 function cited_as(rest: object): void {
 	exec_gh_api.mockResolvedValue(JSON.stringify(rest))
 }
-
-afterEach(() => {
-	vi.clearAllMocks()
-})
 
 describe('issue_sample_source.problem — an issue number', () => {
 	it('refuses it and cites the pull request that closed it', async () => {

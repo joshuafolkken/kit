@@ -1,4 +1,5 @@
 import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
+import { run_stage, type StageState } from '#scripts/run/run-stage'
 import { run_step } from '#scripts/run/run-step'
 
 // `josh run:entry <N>` — the one call a `fullrun` makes to open a run. It folds the fixed entry
@@ -29,6 +30,8 @@ const COST_SKIPPED = 'skipped'
 // The placeholder verdict for a summary printed before the pre-implementation step was reached — a
 // short-circuit on a `busy` hold or an `over` budget prints the summary without a `run:step` answer.
 const NO_VERDICT = '-'
+// The verdict of an issue whose pull request is already open: the run starts at the gate.
+const GATE_VERDICT = 'gate'
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
@@ -78,15 +81,21 @@ function exit_code(parts: EntryParts): number {
 	return is_ok ? SUCCESS_EXIT_CODE : FAILURE_EXIT_CODE
 }
 
+function stage_verdict(state: StageState, verdict: string): string {
+	return state === run_stage.PR_OPEN && verdict === run_step.IMPLEMENT ? GATE_VERDICT : verdict
+}
+
 const run_entry = {
 	COST_OVER,
 	COST_SKIPPED,
 	COST_UNDER,
+	GATE_VERDICT,
 	NO_VERDICT,
 	exit_code,
 	format_report,
 	can_proceed,
 	summary,
+	stage_verdict,
 }
 
 export type { EntryParts }

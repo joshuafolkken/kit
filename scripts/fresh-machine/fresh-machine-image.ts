@@ -4,6 +4,8 @@
 // package and a consumer toolkit builds the same machine; `fresh-machine-image.test.ts` holds the
 // commands below to the guide's own lines.
 
+import { pnpm_installer } from '#scripts/lib/pnpm-installer'
+
 const BASE_IMAGE = 'buildpack-deps:bookworm-curl'
 const MACHINE_USER = 'dev'
 const HOME_DIRECTORY = `/home/${MACHINE_USER}`
@@ -11,7 +13,7 @@ const TAG_PREFIX = 'josh-fresh-machine'
 
 // `docs/setup/prerequisites.md` → "Linux and macOS". The first line runs in the shell a new machine
 // starts with; the guide then says to open a new terminal, which is what `NEW_TERMINAL` does.
-const INSTALL_PNPM = 'curl -fsSL https://get.pnpm.io/install.sh | sh -'
+const INSTALL_PNPM = pnpm_installer.command()
 const NEW_TERMINAL_COMMANDS = ['pnpm runtime set node 22 -g', 'node --version']
 
 // The guide sends a Linux reader to the gh installation page; these are that page's Debian steps,

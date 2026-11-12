@@ -1,5 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { repo_party } from '#scripts/discovery/repo-party'
 import { epic_bundle_cli } from '#scripts/epic/epic-bundle-cli'
@@ -8,6 +7,7 @@ import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_list } from '#scripts/gh/git-gh-issue-list'
 import { repository_labels } from '#scripts/repo/repository-labels'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_file_cap } from './issue-file-cap'
 import { issue_file_cli } from './issue-file-cli'
@@ -19,7 +19,7 @@ import { issue_wip } from './issue-wip'
 
 // joshuafolkken/kit#2808: `josh issue:file` runs every filing step, and any refusal stops the filing
 // before anything is sent; joshuafolkken/kit#5191: the refusals the caller answers from the body and
-// the arguments are printed in one pass, each tier at once (#5333). The network reads are stubbed at the namespaces the command
+// the arguments are printed in one pass, every step at once (#5833). The network reads are stubbed at the namespaces the command
 // calls, so what is asserted is the order and the request — never a real filing.
 
 const HERE = 'joshuafolkken/kit'
@@ -35,6 +35,7 @@ const DISTINCT_HINT = `--distinct ${String(DUPLICATE)}`
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const JUDGEMENT_NOT_NEEDED = '- 人の判断: 不要'
+const SOLO_ANSWERS = ['--defect', 'yes', '--verification', 'yes', '--every-run', 'yes']
 
 const SECTIONS = '## 現象\n\nx\n\n## 期待結果\n\ny\n\n## 受け入れ条件\n\n- [ ] z\n'
 const ESTIMATE = '- 規模見積もり: 約 1 ファイル / 10 行（テスト除く）'
@@ -48,7 +49,7 @@ function body_of(...declarations: ReadonlyArray<string>): string {
 const JUDGEMENT_NEEDED = '- 人の判断: 要（目視確認）'
 const VALID_BODY = body_of(JUDGEMENT_NEEDED)
 
-const work = mkdtempSync(path.join(tmpdir(), 'issue-file-cli-'))
+const work = temporary_directory('suite')('issue-file-cli-')
 const valid_path = path.join(work, 'valid.md')
 const invalid_path = path.join(work, 'invalid.md')
 const origin_path = path.join(work, 'origin.md')
@@ -88,7 +89,7 @@ function listing_of(count: number): { json: string; is_capped: boolean } {
 	return { json: JSON.stringify(rows), is_capped: false }
 }
 
-const OVER_CAP_LISTING = listing_of(issue_wip.WIP_CAP + 1)
+const OVER_CAP_LISTING = listing_of(issue_wip.DEFAULT_WIP_CAP + 1)
 const OVER_CAP_FLAG = '--over-cap'
 
 function argv_of(body_path: string, ...extra: ReadonlyArray<string>): Array<string> {
@@ -109,16 +110,16 @@ beforeEach(() => {
 	report_for.mockResolvedValue(SUCCESS_EXIT_CODE)
 	ensure_labels.mockReturnValue([])
 	issue_list.mockResolvedValue(listing_of(1))
+	vi.stubEnv(issue_wip.WIP_CAP_KEY, '')
 })
 
 afterEach(() => {
-	vi.clearAllMocks()
 	Reflect.deleteProperty(process.env, 'GH_REPO')
+	vi.unstubAllEnvs()
 })
 
 afterAll(() => {
 	vi.restoreAllMocks()
-	rmSync(work, { recursive: true, force: true })
 })
 
 describe('issue_file_cli.run — a filing that clears every step', () => {
@@ -132,13 +133,8 @@ describe('issue_file_cli.run — a filing that clears every step', () => {
 			labels: ['route:interrupt', 'bug'],
 			body: VALID_BODY,
 		})
-		expect(report_for).toHaveBeenCalledWith(ISSUE_NUMBER, HERE, issue_file_cli.FRESH_ISSUE_POLL)
-	})
-
-	// joshuafolkken/kit#3332: the open listing trails the create call, so the just-filed Issue is
-	// looked for more than once rather than declared "not an open issue" on the first read.
-	it('asks epic:bundle to wait for the new Issue to reach the open listing', () => {
-		expect(issue_file_cli.FRESH_ISSUE_POLL.attempts).toBeGreaterThan(1)
+		// joshuafolkken/kit#6796: no poll — `report_for` reads a subject the listing trails on its own.
+		expect(report_for).toHaveBeenCalledWith(ISSUE_NUMBER, HERE)
 	})
 
 	// joshuafolkken/kit#3423: the one `--distinct` declaration answers both the scout and the fold
@@ -202,28 +198,31 @@ describe('issue_file_cli.run — the auto-ok decision', () => {
 		)
 	})
 
-	it('refuses a body with no judgement declaration before the scout and the create', async () => {
+	it('refuses a body with no judgement declaration before the create', async () => {
 		expect(await issue_file_cli.run(argv_of(undeclared_path))).toBe(FAILURE_EXIT_CODE)
 		expect(vi.mocked(console.error).mock.calls.join('\n')).toContain('`- 人の判断: 不要`')
-		expect(scout).not.toHaveBeenCalled()
 		expect(exec_gh_api).not.toHaveBeenCalled()
 	})
 })
 
 // joshuafolkken/kit#3313: an untriaged opted-in Issue withholds every lane's candidate.
 describe('issue_file_cli.run — the run label an auto-ok filing owes', () => {
-	it('refuses an auto-ok filing with no run label before counting, scouting or creating', async () => {
-		expect(await issue_file_cli.run(argv_of(judged_in_path))).toBe(FAILURE_EXIT_CODE)
-		expect(vi.mocked(console.error).mock.calls.join('\n')).toContain('--label run:solo')
-		for (const step of [issue_list, scout]) expect(step).not.toHaveBeenCalled()
-		expect(exec_gh_api).not.toHaveBeenCalled()
-	})
+	it.each([[], ['--label', 'run:solo'], ['--label', 'run:solo', '--defect', 'no']])(
+		'refuses unverified run labels %j before creating',
+		async (...extra) => {
+			expect(await issue_file_cli.run(argv_of(judged_in_path, ...extra))).toBe(FAILURE_EXIT_CODE)
+			expect(exec_gh_api).not.toHaveBeenCalled()
+		},
+	)
 
 	it('files an auto-ok filing judged run:solo', async () => {
-		expect(await issue_file_cli.run(argv_of(judged_in_path, '--label', 'run:solo'))).toBe(
-			SUCCESS_EXIT_CODE,
-		)
+		expect(
+			await issue_file_cli.run(argv_of(judged_in_path, '--label', 'run:solo', ...SOLO_ANSWERS)),
+		).toBe(SUCCESS_EXIT_CODE)
 		expect(create_body()).toMatchObject({ labels: ['run:solo', 'bug', 'auto-ok'] })
+		const comment = exec_gh_api.mock.calls[1]?.[0].body
+
+		expect(comment).toContain('solo-run answers: defect yes · verification yes · every-run yes')
 	})
 
 	it('files without a run label when auto-ok is not applied, as before', async () => {
@@ -281,12 +280,11 @@ describe('issue_file_cli.run — the WIP cap count', () => {
 		expect(issue_list).toHaveBeenCalledWith(expect.objectContaining({ repo: THERE }))
 	})
 
-	it('holds a filing past the cap with no exemption before the scout and the create', async () => {
+	it('holds a filing past the cap with no exemption before the create', async () => {
 		issue_list.mockResolvedValue(OVER_CAP_LISTING)
 
 		expect(await issue_file_cli.run(argv_of(valid_path))).toBe(FAILURE_EXIT_CODE)
 		expect(vi.mocked(console.error).mock.calls.join('\n')).toContain(OVER_CAP_FLAG)
-		expect(scout).not.toHaveBeenCalled()
 		expect(exec_gh_api).not.toHaveBeenCalled()
 	})
 

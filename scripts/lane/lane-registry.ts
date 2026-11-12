@@ -9,16 +9,12 @@ import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { file_reader } from '#scripts/lib/read-file'
 import { lane_environment } from './lane-environment'
 import { lane_paths } from './lane-paths'
+import { lane_seat_ownership } from './lane-seat-ownership'
 
 // The open lanes, read from git and from each lane's own `.env`.
 //
-// **There is no ledger file, and that is the design rather than an omission.** A lane's seat has to
-// live in its `.env` anyway — that file is what `josh port` and `playwright.config.ts` read inside
-// the work tree — so keeping a second copy of it anywhere else buys nothing and can disagree with
-// the first. Reading the seats back out of the live lanes means `git worktree remove` erases the
-// record of a seat along with the tree that held it: there is nothing to keep in step and nothing
-// that can go stale. A counter, or a ledger beside the trees, would let a lane that was closed and
-// reopened take a seat a running lane is still using.
+// `.env` records the last assigned ports. Live process ownership decides whether that seat is held;
+// preserving a stopped tree and its changes does not reserve its old ports.
 
 const OWNER_ONLY_MODE = 0o600
 
@@ -28,8 +24,11 @@ interface LaneInfo {
 	directory: string
 	// The lane's seat (`JOSH_LANE_SEAT`, 1..9), and the dev/preview ports it resolves to through
 	// `ports/index.js` — all `undefined` when the lane's `.env` cannot be read. The seat is what a new
-	// lane's allocation has to avoid; the ports are what the report shows.
+	// lane's allocation avoids only while seat_held is true; the ports are what the report shows.
 	seat: number | undefined
+	seat_held?: boolean
+	seat_owned?: boolean
+	seat_problem?: string
 	development_port: number | undefined
 	preview_port: number | undefined
 	// Where the delegated unit running this lane's child writes, or
@@ -93,7 +92,7 @@ const EMPTY_SEAT: SeatPorts = {
 	preview_port: undefined,
 }
 
-// A stranded or unreadable lane holds no seat and binds no ports, so all three fields read undefined.
+// Missing metadata reads undefined; ownership failures are reported separately and block allocation.
 function held_seat(content: string | undefined): SeatPorts {
 	if (content === undefined) return EMPTY_SEAT
 
@@ -153,8 +152,7 @@ function build_lane(
 	directory: string,
 	is_stranded: boolean,
 ): LaneInfo {
-	// A stranded lane binds no ports and runs nothing, so its seat is free and there is nothing to
-	// read — its work tree is gone from disk along with the `.env` that held both records.
+	// A stranded tree has no environment to read. Allocation also probes each candidate's ports.
 	const content = is_stranded ? undefined : read_environment(directory)
 	const held = held_seat(content)
 	const output = content === undefined ? undefined : lane_environment.read_lane_output(content)
@@ -258,7 +256,10 @@ async function list_lanes(main_root?: string): Promise<Array<LaneInfo>> {
 	const blocks = await worktree_blocks()
 	const lanes = blocks.map((block) => parse_block(block, root)).filter(is_lane)
 
-	return lanes.toSorted((left, right) => Number(left.issue) - Number(right.issue))
+	const reading = await lane_seat_ownership.snapshot(lanes.map((lane) => lane.issue))
+	const measured = lane_seat_ownership.measure(lanes, reading)
+
+	return measured.toSorted((left, right) => Number(left.issue) - Number(right.issue))
 }
 
 /**
@@ -281,12 +282,16 @@ async function has_lanes_in_flight(): Promise<boolean> {
 
 /** The seats live lanes hold — what a new lane's seat has to avoid. */
 function used_seats(lanes: ReadonlyArray<LaneInfo>): Array<number> {
-	return lanes.map((lane) => lane.seat).filter((seat): seat is number => seat !== undefined)
+	return [
+		...new Set(lanes.filter((lane) => lane.seat_held !== false).flatMap((lane) => lane.seat ?? [])),
+	]
 }
 
 /** The live lanes whose seat could not be read, which is what stops an allocation. */
 function unreadable_lanes(lanes: ReadonlyArray<LaneInfo>): Array<LaneInfo> {
-	return lanes.filter((lane) => !lane.is_stranded && lane.seat === undefined)
+	return lanes.filter(
+		(lane) => !lane.is_stranded && (lane.seat === undefined || lane.seat_problem !== undefined),
+	)
 }
 
 function find_lane(lanes: ReadonlyArray<LaneInfo>, issue: string): LaneInfo | undefined {

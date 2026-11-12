@@ -150,8 +150,9 @@ function build_input(values: ParsedValues, now_ms: number): BudgetInput | undefi
 function print_json(input: BudgetInput, decision: BudgetDecision): void {
 	const { verdict, reason } = decision
 	const is_finish = backlog_budget.is_finish(input)
+	const idle_until_ms = backlog_budget.idle_until_ms(input)
 
-	console.info(JSON.stringify({ [JSON_KEY]: verdict, reason, is_finish }))
+	console.info(JSON.stringify({ [JSON_KEY]: verdict, reason, is_finish, idle_until_ms }))
 }
 
 function refuse(): number {

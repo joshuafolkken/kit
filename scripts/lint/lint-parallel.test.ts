@@ -5,25 +5,33 @@ import {
 	PRETTIER_CACHE_FLAGS,
 } from '#scripts/josh/josh-command-types'
 import { lane_cache_run } from '#scripts/lane/lane-cache-run'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { fake_result } from '#tools/test/execa-result'
+import { DIRECT_LAUNCH_FILE } from '#tools/test/local-bin-mock'
+import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
+import type { DaemonState } from './eslint-daemon'
+import type { LintRunTiming } from './lint-parallel'
+import { lint_shard } from './lint-shard'
 
-vi.mock('execa', () => ({
-	execa: vi.fn(),
-}))
+vi.mock('execa', () => ({ execa: vi.fn() }))
+vi.mock('#scripts/build/local-bin', async () => await import('#tools/test/local-bin-mock'))
 vi.mock('#scripts/lane/lane-cache-run', () => ({
 	lane_cache_run: {
 		run: vi.fn(async (_cache_file: string, work: () => Promise<unknown>) => await work()),
 	},
 }))
-vi.mock('./eslint-daemon', () => ({ eslint_daemon: { run_or_cold: vi.fn() } }))
+vi.mock('./eslint-daemon', () => ({
+	eslint_daemon: { run_or_cold: vi.fn() },
+}))
 vi.mock('./eslint-cache-dependencies', () => ({
 	eslint_cache_dependencies: {
-		guard: vi.fn(async (_cache_file: string, work: () => Promise<unknown>) => await work()),
+		guard_counted: vi.fn(async (_cache_file: string, work: () => Promise<unknown>) => ({
+			result: await work(),
+		})),
 	},
 }))
 
 const { eslint_cache_dependencies } = await import('./eslint-cache-dependencies')
-const mocked_guard = vi.mocked(eslint_cache_dependencies.guard)
+const mocked_guard = vi.mocked(eslint_cache_dependencies.guard_counted)
 const { eslint_daemon } = await import('./eslint-daemon')
 const mocked_run_or_cold = vi.mocked(eslint_daemon.run_or_cold)
 const { ESLINT_ARGS, lint_parallel, PRETTIER_ARGS } = await import('./lint-parallel')
@@ -32,15 +40,7 @@ const execa_module = await import('execa')
 const mocked_execa = vi.mocked(execa_module.execa)
 const mocked_cache_run = vi.mocked(lane_cache_run.run)
 
-type ExecaResult = Awaited<ReturnType<typeof execa_module.execa>>
-
-// execa's resolved Result is a large interface; the lint check only reads
-// `all` and `exitCode`, so a minimal stub is bridged through `unknown`.
-function fake_result(exit_code: number): ExecaResult {
-	const result = { all: '', exitCode: exit_code }
-
-	return result as unknown as ExecaResult
-}
+type Write = typeof process.stdout.write
 
 function mock_exit_codes(prettier_code: number, eslint_code: number): void {
 	mocked_execa
@@ -50,7 +50,6 @@ function mock_exit_codes(prettier_code: number, eslint_code: number): void {
 
 beforeEach(() => {
 	vi.restoreAllMocks()
-	vi.clearAllMocks()
 })
 
 const WHOLE_TREE = '.'
@@ -90,7 +89,7 @@ describe('run_lint_parallel_checks', () => {
 
 		await run_lint_parallel_checks()
 
-		expect(mocked_execa.mock.calls[0]?.[1]).toEqual(PRETTIER_ARGS)
+		expect(mocked_execa.mock.calls[0]?.slice(0, 2)).toEqual([DIRECT_LAUNCH_FILE, PRETTIER_ARGS])
 		expect(PRETTIER_ARGS.join(' ')).toContain(PRETTIER_CACHE_FLAGS.join(' '))
 		expect(mocked_cache_run).not.toHaveBeenCalledWith(PRETTIER_CACHE_FILE, expect.any(Function))
 	})
@@ -122,8 +121,43 @@ describe('whole-tree eslint in CI', () => {
 	})
 })
 
+// joshuafolkken/kit#6997: a `--shard` run hands eslint the shard's targets on the same cache file,
+// and only shard 1 checks formatting.
+describe('josh lint --shard', () => {
+	it('lints shard 1 with prettier over the whole tree', async () => {
+		mock_exit_codes(0, 0)
+
+		expect(await lint_parallel.run_lint_command(['--shard=1'])).toBe(0)
+		expect(mocked_execa.mock.calls[0]?.[1]).toEqual(PRETTIER_ARGS)
+		expect(mocked_execa.mock.calls[1]?.[1]).toEqual(
+			expect.arrayContaining([...lint_shard.FIRST_SHARD_DIRECTORIES]),
+		)
+		expect(mocked_cache_run).toHaveBeenCalledWith(ESLINT_CACHE_FILE, expect.any(Function))
+	})
+
+	it('lints shard 1 with the prettier targets the project formats (josh.format)', async () => {
+		vi.spyOn(project_checks, 'prettier_targets').mockReturnValue([project_checks.WEB_FILES])
+		mock_exit_codes(0, 0)
+		await lint_parallel.run_lint_command(['--shard=1'])
+		expect(mocked_execa.mock.calls[0]?.[1]).toContain(project_checks.WEB_FILES)
+	})
+
+	it('lints shard 2 alone, saying prettier is left to shard 1', async () => {
+		mocked_execa.mockResolvedValueOnce(fake_result(0))
+		const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+
+		expect(await lint_parallel.run_lint_command(['--shard=2'])).toBe(0)
+		expect(mocked_execa).toHaveBeenCalledOnce()
+		expect(mocked_execa.mock.calls[0]?.[1]).toContain('--ignore-pattern')
+		expect(stdout).toHaveBeenCalledWith(expect.stringContaining(lint_shard.FORMATTING_SHARD_REASON))
+	})
+})
+
 const TARGET = 'scripts/thing.ts'
 const RELATED_CACHE_FILE = '.eslintcache.related'
+// Read from the test's working directory, the repository root: one file always there, one never.
+const PRESENT_CACHE_FILE = 'package.json'
+const NO_CACHE_FILE = '.eslintcache.never-written'
 
 describe('run_lint_checks', () => {
 	it('runs the targets it was given instead of the whole tree', async () => {
@@ -155,20 +189,27 @@ describe('run_lint_checks', () => {
 	})
 })
 
+const ESLINT = ['exec', 'eslint', TARGET]
+const PRETTIER = ['exec', 'prettier', TARGET]
+const WARM = { warm_daemon: true, call: { caller: 'lint:related', files: 1 } } as const
+const LINT_RELATED_LABEL = 'josh lint:related'
+const DAEMON_REUSED: DaemonState = 'daemon reused'
+
 // joshuafolkken/kit#4358: only a run that asks for it reaches the warm daemon; the fallback to the
 // cold process is `eslint_daemon.run_or_cold`'s own.
 describe('run_lint_checks — the warm eslint daemon', () => {
-	const ESLINT = ['exec', 'eslint', TARGET]
-	const PRETTIER = ['exec', 'prettier', TARGET]
-	const WARM = { warm_daemon: true }
-
 	it('lints through the daemon when asked, spawning only prettier', async () => {
 		mocked_execa.mockResolvedValueOnce(fake_result(0))
-		mocked_run_or_cold.mockResolvedValueOnce({ exit_code: 1, output: 'x', elapsed_ms: 0 })
+		mocked_run_or_cold.mockResolvedValueOnce({
+			exit_code: 1,
+			output: 'x',
+			elapsed_ms: 0,
+			daemon: DAEMON_REUSED,
+		})
 		vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
 
 		expect(await run_lint_checks(PRETTIER, ESLINT, RELATED_CACHE_FILE, WARM)).toBe(1)
-		expect(mocked_run_or_cold).toHaveBeenCalledWith(ESLINT)
+		expect(mocked_run_or_cold).toHaveBeenCalledWith(ESLINT, WARM.call)
 		expect(mocked_execa).toHaveBeenCalledOnce()
 	})
 
@@ -179,6 +220,84 @@ describe('run_lint_checks — the warm eslint daemon', () => {
 		await run_lint_parallel_checks()
 
 		expect(mocked_run_or_cold).not.toHaveBeenCalled()
+	})
+})
+
+// A clean warm run whose eslint took `eslint_ms` with the daemon as `daemon`, its stdout captured.
+function mock_warm_run(eslint_ms: number, daemon: DaemonState): MockInstance<Write> {
+	mocked_execa.mockResolvedValueOnce(fake_result(0))
+	mocked_run_or_cold.mockResolvedValueOnce({
+		exit_code: 0,
+		output: '',
+		elapsed_ms: eslint_ms,
+		daemon,
+	})
+
+	return vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+}
+
+function timing_of(targets: string): LintRunTiming {
+	return { label: LINT_RELATED_LABEL, targets }
+}
+
+// joshuafolkken/kit#5712: the line a lane's slow first `lint:related` is diagnosed by, naming what the
+// run did with the daemon — a stale one restarted is not one reused.
+describe('run_lint_checks — the timing line', () => {
+	it('prints the timing line with the targets, daemon and cache it names', async () => {
+		const write = mock_warm_run(2000, 'daemon restarted')
+		const timing = timing_of('3 file(s)')
+
+		await run_lint_checks(PRETTIER, ESLINT, NO_CACHE_FILE, { ...WARM, timing })
+
+		expect(write).toHaveBeenCalledWith(
+			expect.stringMatching(
+				/^josh lint:related timing — prettier \d+\.\d s · eslint 2\.0 s · 3 file\(s\) · daemon restarted · cache absent\n$/u,
+			),
+		)
+	})
+
+	it('reads a daemon started and a present cache on the timing line', async () => {
+		const write = mock_warm_run(0, 'daemon started')
+
+		await run_lint_checks(PRETTIER, ESLINT, PRESENT_CACHE_FILE, { ...WARM, timing: timing_of('1') })
+
+		expect(write).toHaveBeenCalledWith(
+			expect.stringContaining('· 1 · daemon started · cache present\n'),
+		)
+	})
+
+	it('prints no timing line for a run that names none', async () => {
+		const write = mock_warm_run(0, DAEMON_REUSED)
+
+		await run_lint_checks(PRETTIER, ESLINT, RELATED_CACHE_FILE, WARM)
+
+		expect(write).not.toHaveBeenCalledWith(expect.stringContaining('timing —'))
+	})
+
+	it('forwards the whole-tree run’s timing, naming its cold process', async () => {
+		mocked_execa.mockResolvedValue(fake_result(0))
+		const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+
+		await run_lint_parallel_checks({ warm_daemon: false, timing: timing_of('whole tree') })
+
+		expect(write).toHaveBeenCalledWith(expect.stringContaining('· whole tree · cold process · '))
+	})
+})
+
+// joshuafolkken/kit#6984: a slow lint is read against how many entries the dependency guard dropped.
+describe('run_lint_checks — the cache entries the dependency guard dropped', () => {
+	it('names the dropped entries beside a present cache', async () => {
+		const write = mock_warm_run(0, DAEMON_REUSED)
+
+		mocked_guard.mockImplementationOnce(async (_cache_file, work) => ({
+			result: await work(),
+			drop: { dropped: 3, total: 40 },
+		}))
+		await run_lint_checks(PRETTIER, ESLINT, PRESENT_CACHE_FILE, { ...WARM, timing: timing_of('1') })
+
+		expect(write).toHaveBeenCalledWith(
+			expect.stringContaining('· cache present · 3 of 40 cache entries dropped\n'),
+		)
 	})
 })
 

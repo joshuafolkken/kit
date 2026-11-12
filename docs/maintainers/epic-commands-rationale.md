@@ -128,7 +128,7 @@ rejected because it also fires when a batch fails midway.
 
 ## Execution
 
-backlogrun #<E> --only
+pnpm josh backlogrun <E> --only
 
 ## Progress
 
@@ -167,8 +167,9 @@ failure loses only those, and `epic:next` and auto-close read the name alone.
 
 **Native relations, and why sub-issues were not adopted.** `gh issue edit --add-blocked-by` /
 `--parent` and `gh issue view --json blockedBy,subIssues` exist from `gh` 2.94.0 (confirmed on 2.97.0),
-but they go through GraphQL and fail with 403 in cloud sessions (joshuafolkken/kit#1022), so no
-procedure uses them — everything goes through the REST endpoint via `gh api`. Dependencies are adopted:
+but they are `gh` subcommands, which bypass the `scripts/gh/` exec layer
+(`prompts/collaboration-workflow/gh-rest.md`), so no procedure uses them — everything goes through
+`gh api`. Dependencies are adopted:
 a child shows what it waits for in the UI and API, though they only display and never block, so order
 is still enforced by `--ordered` and `backlogrun`. Sub-issues are not: they express containment, not
 order, and are limited to one repository owner — neither reason depends on CLI support.

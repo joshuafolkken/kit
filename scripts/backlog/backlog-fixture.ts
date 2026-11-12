@@ -1,19 +1,33 @@
 import { auto_ok_fixture } from '#scripts/auto-ok/auto-ok-fixture'
 import { repo_discovery } from '#scripts/discovery/repo-discovery'
+import { epic_child_source } from '#scripts/epic/epic-child-source'
 import { epic_schema } from '#scripts/epic/epic-index'
 import { epic_solo_stale } from '#scripts/epic/epic-solo-stale'
+import { gh_permission_cache } from '#scripts/gh/gh-permission-cache'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
+import { git_gh_issue_batch_graphql } from '#scripts/gh/git-gh-issue-batch-graphql'
 import { listing_outcome } from '#scripts/gh/git-gh-issue-list-fixture'
 import type { IssueRead } from '#scripts/gh/git-gh-issue-read'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
+import { git_stash } from '#scripts/git/stash/git-stash'
 import { defect_rate, type DefectRate } from '#scripts/issue/defect-rate'
 import { defect_rate_cli } from '#scripts/issue/defect-rate-cli'
 import { issue_cite } from '#scripts/issue/issue-cite'
-import { NOT_BEFORE_LABEL, RUN_LANE_LABEL, RUN_SOLO_LABEL } from '#scripts/issue/issue-labels'
+import {
+	BUG_LABEL,
+	NOT_BEFORE_LABEL,
+	RUN_LANE_LABEL,
+	RUN_SOLO_LABEL,
+} from '#scripts/issue/issue-labels'
+import { shared_cache_fixture } from '#scripts/josh/shared-cache-fixture'
 import { lane_await } from '#scripts/lane/lane-await'
-import { vi } from 'vitest'
+import type { ImplementRate } from '#scripts/lane/lane-implement-rate'
+import { lane_net_read } from '#scripts/lane/lane-net-read'
+import type { SizeRatios } from '#scripts/lane/lane-size-stats'
+import { onTestFinished, vi } from 'vitest'
+import { backlog_resume_reads } from './backlog-resume-reads'
 
 // One description of a backlog, stubbed across every read `josh backlog:next` makes.
 //
@@ -53,6 +67,9 @@ interface EpicInput {
 }
 
 interface BacklogInput {
+	stashed?: ReadonlyArray<number>
+	paused?: ReadonlyArray<number>
+	open_pr?: ReadonlyArray<number>
 	// The rows the `auto-ok` listing answers with — an epic root among them is what opts its children in.
 	opted_in?: ReadonlyArray<OpenIssueData>
 	// The open epics, whatever their labels: this is the listing that says which issues an epic tracks.
@@ -63,6 +80,9 @@ interface BacklogInput {
 	defect_rate?: DefectRate
 	// A measurement that could not be read at all.
 	is_rate_unreadable?: boolean
+	// The measured implement rate `issue:file` projects a size by. Left out, none is measured.
+	implement_rate?: ImplementRate
+	growth?: SizeRatios
 	// The repository's open `in-progress` issues, which the `run:solo` gate reads on a `run` answer.
 	// Left out, nothing is running.
 	in_progress?: ReadonlyArray<OpenIssueData>
@@ -85,15 +105,28 @@ const AT_BASELINE: DefectRate = {
 	is_capped: false,
 }
 
+// An untriaged issue is a `bug` naming a verification-gate path, the one kind
+// `backlog_auto_triage` leaves for the judgment rather than labelling `run:lane` itself.
+const UNTRIAGED_BODY = 'Breaks `scripts/gate/`.'
+
 // The labels an issue is read with: `run:lane` added where the case left it judged.
 function triaged_labels(
 	number: number,
 	labels: ReadonlyArray<string>,
 	untriaged: ReadonlyArray<number>,
 ): ReadonlyArray<string> {
-	if (untriaged.includes(number) || labels.includes(RUN_SOLO_LABEL)) return labels
+	if (untriaged.includes(number)) return [...labels, BUG_LABEL]
+	if (labels.includes(RUN_SOLO_LABEL)) return labels
 
 	return [...labels, RUN_LANE_LABEL]
+}
+
+function triaged_body(
+	number: number,
+	body: string | undefined,
+	untriaged: ReadonlyArray<number>,
+): string | undefined {
+	return untriaged.includes(number) ? (body ?? UNTRIAGED_BODY) : body
 }
 
 function triaged_row(row: OpenIssueData, untriaged: ReadonlyArray<number>): OpenIssueData {
@@ -102,9 +135,11 @@ function triaged_row(row: OpenIssueData, untriaged: ReadonlyArray<number>): Open
 		(row.labels ?? []).map((label) => label.name),
 		untriaged,
 	)
+	const labels = names.map((name) => ({ name }))
+	const body = triaged_body(row.number, row.body, untriaged)
 
 	// Filed by the owner unless the case says otherwise, so the pickup's trust check asks no network.
-	return { author_association: OWNER_ASSOCIATION, ...row, labels: names.map((name) => ({ name })) }
+	return { author_association: OWNER_ASSOCIATION, ...row, labels, body }
 }
 
 // The shape a `number,state,labels,blockedBy,body` read answers with — `blockedBy` is a connection
@@ -130,7 +165,7 @@ function gh_child(input: ChildInput, untriaged: ReadonlyArray<number> = []): str
 		number: input.number,
 		state: input.state ?? 'OPEN',
 		labels: child_labels(input, untriaged),
-		body: input.body,
+		body: triaged_body(input.number, input.body, untriaged),
 		author_association: input.author_association ?? OWNER_ASSOCIATION,
 		blockedBy: blocked_by_of(input),
 	})
@@ -180,15 +215,32 @@ function stub_environment(): void {
 	)
 	vi.spyOn(git_gh_command, 'repo_get_name_with_owner').mockResolvedValue(REPO)
 	vi.spyOn(git_gh_exec, 'exec_gh_api_status').mockResolvedValue(REACHABLE_STATUS)
+	// The children's batched GraphQL read answers nothing, so every child comes from the REST stub.
+	vi.spyOn(git_gh_issue_batch_graphql, 'read_many').mockResolvedValue(
+		git_gh_issue_batch_graphql.empty_batch(),
+	)
+	// The closed children and the write roles a scan keeps for the next one, held per test so no case
+	// answers from another's record or the machine's own.
+	onTestFinished(
+		shared_cache_fixture.isolate_shared_cache(
+			epic_child_source.CLOSED_CACHE,
+			gh_permission_cache.WRITERS_CACHE,
+		),
+	)
 }
 
-// The two reads the defect priority adds: the rate, and each candidate's body.
+// The two reads the defect priority adds: the rate, and each candidate's body — beside the implement
+// rate the size note projects by.
 function stub_defect_priority(input: BacklogInput): void {
 	const bodies = new Map((input.children ?? []).map((child) => [String(child.number), child.body]))
 	const measured =
 		input.is_rate_unreadable === true ? undefined : (input.defect_rate ?? AT_BASELINE)
 
 	vi.spyOn(defect_rate_cli, 'measure_window').mockResolvedValue(measured)
+	vi.spyOn(lane_net_read, 'measurements').mockResolvedValue({
+		implement_rate: input.implement_rate,
+		growth: input.growth ?? {},
+	})
 	vi.spyOn(git_gh_command, 'issue_get_body').mockImplementation(async (number) =>
 		bodies.get(number),
 	)
@@ -223,12 +275,30 @@ function stub_listings(input: BacklogInput, epics: ReadonlyArray<EpicInput>): vo
 	vi.spyOn(epic_solo_stale.io, 'settle').mockResolvedValue()
 }
 
+function stub_resumable(input: BacklogInput): void {
+	const paused = new Set((input.paused ?? []).map(String))
+
+	vi.spyOn(backlog_resume_reads, 'paused_issues').mockImplementation(
+		async (issues) => new Set(issues.filter((issue) => paused.has(issue))),
+	)
+	vi.spyOn(backlog_resume_reads, 'open_pr_issues').mockResolvedValue(
+		new Set((input.open_pr ?? []).map(String)),
+	)
+	vi.spyOn(git_stash, 'list').mockResolvedValue(
+		(input.stashed ?? []).map((number) => ({
+			selector: 'stash@{0}',
+			subject: `On ${String(number)}-lane: ${String(number)}: paused work`,
+		})),
+	)
+}
+
 function stub_backlog(input: BacklogInput): void {
 	const epics = input.epics ?? []
 	const bodies = epic_bodies(epics)
 	const children = child_texts(input.children ?? [], input.untriaged ?? [])
 
 	stub_environment()
+	stub_resumable(input)
 	stub_listings(input, epics)
 	// The classified reads. An epic the fixture has no body for is a body that
 	// is simply absent, which is what it always meant here; a child it has no text for is a read that

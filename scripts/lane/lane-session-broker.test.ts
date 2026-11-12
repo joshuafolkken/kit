@@ -1,11 +1,13 @@
 import { randomUUID } from 'node:crypto'
-import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LaneInfo } from './lane-registry'
 import { lane_relaunch } from './lane-relaunch'
 import { lane_session_broker, type BrokerAction, type BrokerAnswer } from './lane-session-broker'
+
+const make_directory = temporary_directory()
 
 const resolve_mock = vi.hoisted(() => vi.fn())
 const argv_mock = vi.hoisted(() => vi.fn())
@@ -62,7 +64,7 @@ vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
 const state = { directory: '' }
 
 beforeEach(() => {
-	state.directory = mkdtempSync(path.join(tmpdir(), 'review-broker-'))
+	state.directory = make_directory('review-broker-')
 	LANE.directory = path.join(state.directory, 'lane')
 	CLAUDE_LANE.directory = LANE.directory
 	resolve_mock.mockReturnValue(path.join(state.directory, '.git'))
@@ -78,7 +80,6 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.restoreAllMocks()
-	rmSync(state.directory, { recursive: true, force: true })
 })
 
 async function invalid_request(): Promise<void> {
@@ -208,9 +209,9 @@ it("marks the reviewer as the lane's child rather than inheriting the server's e
 
 describe('lane_session_broker — the relaunch action', () => {
 	it('relaunches a Claude lane child with the ship-stop invocation', async () => {
-		const relaunch = vi
-			.spyOn(lane_relaunch, 'relaunch')
-			.mockReturnValue({ kind: 'launched', pid: 1 })
+		const relaunch = vi.spyOn(lane_relaunch, 'relaunch')
+
+		relaunch.mockResolvedValue({ kind: 'launched', pid: 1 })
 
 		expect(await request_relaunch(CLAUDE_LANE)).toStrictEqual(SUCCESS)
 		expect(relaunch).toHaveBeenCalledWith(
@@ -230,7 +231,7 @@ describe('lane_session_broker — the relaunch action', () => {
 	})
 
 	it('answers a failure when the relaunch is rejected', async () => {
-		vi.spyOn(lane_relaunch, 'relaunch').mockReturnValue(REJECTED)
+		vi.spyOn(lane_relaunch, 'relaunch').mockResolvedValue(REJECTED)
 
 		expect(await request_relaunch(CLAUDE_LANE)).toMatchObject({ is_success: false })
 	})
@@ -240,7 +241,7 @@ describe('lane_session_broker — the relaunch action', () => {
 // supervisor refusing a multi-line prompt could not be told from a dead broker.
 describe('lane_session_broker — a failed action names its reason', () => {
 	it('names the rejected relaunch', async () => {
-		vi.spyOn(lane_relaunch, 'relaunch').mockReturnValue(REJECTED)
+		vi.spyOn(lane_relaunch, 'relaunch').mockResolvedValue(REJECTED)
 
 		expect(await request_relaunch(CLAUDE_LANE)).toStrictEqual({
 			is_success: false,
@@ -249,7 +250,7 @@ describe('lane_session_broker — a failed action names its reason', () => {
 	})
 
 	it('answers an action that threw as a failure rather than a dead server', async () => {
-		vi.spyOn(lane_relaunch, 'relaunch').mockImplementation(() => {
+		vi.spyOn(lane_relaunch, 'relaunch').mockImplementation(async () => {
 			throw new Error('spawn EACCES')
 		})
 
@@ -264,7 +265,7 @@ describe('lane_session_broker.is_answering', () => {
 	it('reads true only while a request is being answered', async () => {
 		const seen: Array<boolean> = []
 
-		vi.spyOn(lane_relaunch, 'relaunch').mockImplementation(() => {
+		vi.spyOn(lane_relaunch, 'relaunch').mockImplementation(async () => {
 			seen.push(lane_session_broker.is_answering())
 
 			return REJECTED
@@ -320,7 +321,7 @@ describe('lane_session_broker — the relaunch carries the stop context', () => 
 	it('carries the stop context through to the relaunched prompt', async () => {
 		const relaunch = vi
 			.spyOn(lane_relaunch, 'relaunch')
-			.mockReturnValue({ kind: 'launched', pid: 1 })
+			.mockResolvedValue({ kind: 'launched', pid: 1 })
 		const excerpt = ['FAIL gate', 'expected 1 to be 2']
 		const context = { excerpt, changed: ['scripts/a.ts'], more_changed: 0 }
 		const action = { kind: 'relaunch', stop: { ...RELAUNCH.stop, context } } as const
@@ -359,7 +360,7 @@ describe('lane_session_broker — a parked issue and a finished request', () => 
 	})
 
 	it('withdraws its request once answered, so no server acts on it later', async () => {
-		vi.spyOn(lane_relaunch, 'relaunch').mockReturnValue(REJECTED)
+		vi.spyOn(lane_relaunch, 'relaunch').mockResolvedValue(REJECTED)
 
 		expect(await request_relaunch(CLAUDE_LANE)).toMatchObject({ is_success: false })
 		expect(existsSync(lane_session_broker.request_path(LANE.directory, ISSUE))).toBe(false)

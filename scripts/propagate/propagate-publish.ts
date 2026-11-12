@@ -151,15 +151,16 @@ async function wait_for_publish(
 	const deadline = resolved.now() + resolved.timeout_ms
 	const progress: WaitProgress = { attempts: 0, failures: 0 }
 
-	while (should_keep_waiting(resolved.now(), deadline)) {
-		const { state } = probe_once(resolved, versions_endpoint, target_version, progress)
+	const state = await poll.wait_for(
+		() => {
+			if (!should_keep_waiting(resolved.now(), deadline)) return 'timed_out'
 
-		if (state !== undefined) return finish(state, target_version, progress.attempts)
-		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		await resolved.sleep(resolved.interval_ms)
-	}
+			return probe_once(resolved, versions_endpoint, target_version, progress).state
+		},
+		{ interval_ms: resolved.interval_ms, sleeper: resolved.sleep },
+	)
 
-	return finish('timed_out', target_version, progress.attempts)
+	return finish(state, target_version, progress.attempts)
 }
 
 const propagate_publish = {

@@ -2,6 +2,7 @@ import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_reap } from '#scripts/lane/lane-reap'
 import { lane_registry } from '#scripts/lane/lane-registry'
 import { run_carry, type CarryRead, type RunCarry } from '#scripts/run/carry/run-carry'
+import { run_headless_keys } from '#scripts/run/run-headless-keys'
 
 // The headless `backlogrun` parent. `run:wake` starts a cut's successor as
 // `claude -p`, and there a turn that ends is the process that ends: its background `lane:await` and
@@ -14,14 +15,36 @@ import { run_carry, type CarryRead, type RunCarry } from '#scripts/run/carry/run
 // the headless parent dispatches inherits it but is exempted by its own mark — a child ends its turn at
 // its own boundaries, never on the parent's lanes.
 
-const HEADLESS_ENV_KEY = 'JOSH_RUN_HEADLESS'
+const { HEADLESS_ENV_KEY, HANDOFF_CHILD_KEY, BESIDE_CHILD_KEY } = run_headless_keys
 const HEADLESS_VALUE = '1'
+const SESSION_CUT = { cuts: 1 }
 
 type EnvironmentSource = Readonly<Record<string, string | undefined>>
 
 // The environment fragment the supervisor launches a successor with.
 function environment(): Record<string, string> {
 	return { [HEADLESS_ENV_KEY]: HEADLESS_VALUE }
+}
+
+// The fragment a `run:handoff` child starts with: never the headless parent its launcher may be, and
+// marked as the hand-off it is.
+function handoff_child_environment(): Record<string, string | undefined> {
+	return { [HEADLESS_ENV_KEY]: undefined, [HANDOFF_CHILD_KEY]: HEADLESS_VALUE }
+}
+
+// The fragment a triage session beside the driver starts with: headless, and marked as beside it.
+function beside_environment(): Record<string, string> {
+	return { ...environment(), [BESIDE_CHILD_KEY]: HEADLESS_VALUE }
+}
+
+// A lane child, a hand-off child or a triage session beside the driver: a session started under the
+// parent that is never the parent.
+function is_started_child(source: EnvironmentSource): boolean {
+	return (
+		lane_child_marker.marked_issue(source) !== undefined ||
+		source[HANDOFF_CHILD_KEY] === HEADLESS_VALUE ||
+		source[BESIDE_CHILD_KEY] === HEADLESS_VALUE
+	)
 }
 
 function is_headless(source: EnvironmentSource = process.env): boolean {
@@ -51,22 +74,16 @@ function is_driving(read: CarryRead | undefined): boolean {
 	return read?.kind === 'carried' && read.carry.is_handed_off !== true
 }
 
-async function read_carry_here(): Promise<CarryRead | undefined> {
+async function carry_target_here(): Promise<string | undefined> {
 	const repository = await run_carry.repository_directory()
 
-	return repository === undefined
-		? undefined
-		: run_carry.read_carry(run_carry.carry_path(repository))
+	return repository === undefined ? undefined : run_carry.carry_path(repository)
 }
 
-/**
- * Whether this session is a headless parent that would end its run by ending the turn: marked, not a
- * lane child, with lanes still in flight and no cut handed the record off.
- */
-async function must_keep_waiting(source: EnvironmentSource = process.env): Promise<boolean> {
-	if (!is_headless_parent(source) || !(await lane_registry.has_lanes_in_flight())) return false
+async function read_carry_here(): Promise<CarryRead | undefined> {
+	const target = await carry_target_here()
 
-	return is_driving(await read_carry_here())
+	return target === undefined ? undefined : run_carry.read_carry(target)
 }
 
 // The live record itself, whoever owns it — the run's scope (`--only`, the named list) is the run's,
@@ -104,7 +121,7 @@ async function driving_carry(
 	source: EnvironmentSource = process.env,
 	ancestry: () => ReadonlySet<number> = lane_reap.own_ancestry,
 ): Promise<RunCarry | undefined> {
-	if (lane_child_marker.marked_issue(source) !== undefined) return undefined
+	if (is_started_child(source)) return undefined
 
 	return driven_here(await read_carry_here(), ancestry)
 }
@@ -120,12 +137,59 @@ async function is_backlog_parent(
 	return (await driving_carry(source, ancestry)) !== undefined
 }
 
+/**
+ * Whether this session is a headless parent that would end its run by ending the turn: marked, not a
+ * lane child, with lanes still in flight and a record it drives itself. **The launched parent beside
+ * the supervisor that drives its record holds none** (joshuafolkken/kit#5516): its turn-end strands
+ * nothing, and its `--cut` would be refused against the supervisor's live ownership.
+ */
+async function must_keep_waiting(
+	source: EnvironmentSource = process.env,
+	ancestry: () => ReadonlySet<number> = lane_reap.own_ancestry,
+): Promise<boolean> {
+	if (!is_headless_parent(source) || !(await lane_registry.has_lanes_in_flight())) return false
+
+	return await is_backlog_parent(source, ancestry)
+}
+
+// **A headless parent's turn-end hands the loop back itself** (joshuafolkken/kit#5739). Its turn-end is
+// its process's end, and the `run:wake` driver holds the lanes between wakes, so the `run:carry --cut`
+// a woken session closed its branch with is written here — through `run_carry.apply_change`, the
+// writer `--cut` uses — on a record the session still drives; one it cut or ended by hand is left as
+// it is. Answers `must_keep_waiting` after the write: only a record that changed before the write
+// keeps the session waiting, and the stop rule then asks for the cut by hand as before.
+async function write_cut(
+	source: EnvironmentSource,
+	ancestry: () => ReadonlySet<number>,
+): Promise<void> {
+	const target = await carry_target_here()
+	const carry = await driving_carry(source, ancestry)
+
+	if (target !== undefined && carry !== undefined) {
+		run_carry.apply_change(target, carry, SESSION_CUT)
+	}
+}
+
+async function hand_back_at_turn_end(
+	source: EnvironmentSource = process.env,
+	ancestry: () => ReadonlySet<number> = lane_reap.own_ancestry,
+): Promise<boolean> {
+	if (!is_headless_parent(source)) return false
+
+	await write_cut(source, ancestry)
+
+	return await must_keep_waiting(source, ancestry)
+}
+
 const run_headless = {
 	HEADLESS_ENV_KEY,
+	beside_environment,
 	current_carry,
+	hand_back_at_turn_end,
 	driven_here,
 	driving_carry,
 	environment,
+	handoff_child_environment,
 	is_backlog_parent,
 	is_cut_capped,
 	is_headless,

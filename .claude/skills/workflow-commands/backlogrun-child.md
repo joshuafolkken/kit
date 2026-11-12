@@ -13,52 +13,32 @@ children until every one is processed, then the run advances to the next named i
 `backlogrun #<N>` on an Issue with no task list runs `#<N>` as a `fullrun` and finishes. A prerequisite
 or a split found mid-run does **not** stop it:
 
-1. File the new Issue(s) — `route:split` for a split, `route:tier-a` for a prerequisite — no
-   confirmation.
-2. **Stash and remove `in-progress`**: for a prerequisite `<P>`, `pnpm josh run:pause <N> --for <P>`
-   (`prerequisite.md`), which also records the dependency step 3 would; for a split,
-   `pnpm josh stash:push "..."`, `pnpm josh issue:comment <N> --body-file <path>` recording the
-   stash, and `pnpm josh run:release <N>`.
-3. **Ask `pnpm josh epic:bundle <N>` whether an epic already tracks `#<N>` before creating one.**
+**A split** → file the children with `route:split` (no confirmation) by `split-assessment.md` → "Two
+or more always means an epic", then
+`pnpm josh run:split <N> --children <N1,N2,...> [--ordered] [--title "<title>"]` (`docs/josh-commands-run.md`
+→ "`josh run:split`"). `epic #<E>` → continue into the loop against `#<E>`; `needs-decision` → report.
 
-   | Answer | What to do |
-   | --- | --- |
-   | An epic `#<E>` already tracks `#<N>` | `pnpm josh epic --add <E> <P> --before <N>` (prerequisite) or `--add <E> <N1> ...` (split). **Do not create a second epic**; continue against `#<E>` |
-   | No epic tracks it | Create one (table below) |
-   | **The command could not answer** | Park `#<N>` with `needs-decision` and report — "could not tell" is not "no epic" |
+**A prerequisite** `<P>` → file it with `route:tier-a` (no confirmation), then
+`pnpm josh run:split <N> --prerequisite <P> [--title "<title>"]` (`docs/josh-commands-run.md` →
+"`josh run:split`"), which pauses `#<N>` as `run:pause` does (`prerequisite.md`). `epic #<E>` →
+**do not stop**, continue into the loop against `#<E>`; `needs-decision` → report.
 
-   "Could not answer" is a non-zero exit, `Could not confirm which epic already tracks these — do not
-   place this issue in one.`, or a `⚠ The epic listing …` truncation warning (`hit its …-epic cap` /
-   `stopped at the …-issue page ceiling`) above `Nothing to bundle.`. `⚠ Could not read #N.` voids
-   nothing, and a definitive answer stands beside a warning.
-
-   `#<N>` is itself one of the deliverables (the keep-as-a-child arm of `split-assessment.md`).
-   `--ordered` makes the argument order the dependency chain:
-
-   | Found | Command |
-   | --- | --- |
-   | A prerequisite `<P>` | `pnpm josh epic "<title>" <P> <N> --ordered` — the prerequisite **first** |
-   | A split into independent children | `pnpm josh epic "<title>" <N> <N1> ...` — **no `--ordered`** |
-   | A split whose children do have an order | `pnpm josh epic "<title>" ... --ordered`, in that order |
-
-4. **Run `pnpm josh epic:audit <E>` now** — there is no epic to audit before step 3.
-5. **Do not stop.** Continue into the loop against `#<E>`.
+Over the size bar before dispatch → a split-only unit, not a lane (`scripts/backlog/backlog-drive-split-unit.ts`).
 
 - **Nothing found means no epic** — the run finishes at `#<N>`'s merge.
 - **Every guard applies unchanged** (`backlogrun.md` → "Guards").
 - **`fullrun` does not promote itself** — it files and **stops** (`split-assessment.md` → "Finding a
-  split mid-run stops the run"). `josh epic:next` still refuses an Issue with no task list.
-- **A bare Issue named beside an epic is a mistyped command.** Named alone, the refusal is the answer;
-  among several, it is **skipped** — `backlogrun #<E> --only #<N>` exits 0, notes the skip on stderr
-  and **never runs `#<N>`**. To do both, type `backlogrun #<N>` after the epic.
+  split mid-run stops the run").
+- **A bare Issue named beside an epic is a mistyped command.** Named alone, `epic:next`'s refusal is the answer;
+  among several, it is **skipped** — `pnpm josh backlogrun <E> <N> --only` exits 0, notes the skip on stderr
+  and **never runs `#<N>`**. To do both, run `pnpm josh backlogrun <N>` after the epic.
 
 ## Each child runs in a delegated unit
 
 **Whatever offers a child — the loop, or a person clearing a label — the child is handed to a lane,
 never run in the parent's context.** `pnpm josh delegate epic-child` answers `delegate`; the unit is a
 detached process from `pnpm josh lane:launch` (`backlogrun-lanes.md` → "Opening one lane and
-dispatching its child") with the CLI's `worker` profile — Claude Code defaults to Anthropic
-`claude-opus-5-5` / `medium` (`docs/josh-commands-run.md` → "`josh lane:dispatch`"). With no isolated
+dispatching its child"; its profile and model: `docs/josh-commands-lane.md` → "`josh lane:dispatch`"). With no isolated
 unit, run the child in the parent's context and still ask the hand-off at every merge.
 
 - **The parent reads GitHub, never the summary** — `pnpm josh issue:state <N>` (or `run:merge`)
@@ -73,23 +53,18 @@ unit, run the child in the parent's context and still ask the hand-off at every 
 
 **Only what GitHub does not, in at most 25 lines; the brief states the bound.**
 
-- **Kept**: `Cause` / `Fix` / `Result`; every verification not closed the ordinary way, named as such;
+- **Kept**: the cause / fix / result lines from `run:tail`'s `child summary template`; every verification not closed the ordinary way, named as such;
   observations that could bite later — **a child's only route for one** (`observation-filing.md` → "A
   delegated child does not take this route"); decisions not yet logged; what was left undone, on whose
   authority.
 - **Cut**: the changed-file list, per-round review detail, restated rules.
-- Before the final message → `pnpm josh report:lint --child-summary < summary.md` (labels in the
-  session language).
+- Before the final message → `pnpm josh report:lint --child-summary < summary.md`.
 
-The person-facing report (`prompts/collaboration-workflow/report-format.md` → 「完了報告（セッション向け）」)
-is unchanged.
+Fill the `<…>` narrative fields from `pnpm josh run:tail <N>`, keeping its cited targets.
+`report:template child` supplies a standalone skeleton.
 
-## A delegated unit that stopped without reporting
-
-**Hand the child off without blocking, and wait on `pnpm josh lane:await <N>`** — a stopped unit
-leaves no notification, so the await's exit is the wake. Once its
-output is unchanged for the silent-unit window, read `backlogrun-recovery.md` → "A delegated unit that
-stopped without reporting" and ask `pnpm josh run:liveness`.
+The `notify-message template` section supplies the three lines for `followup --notify-message`
+(or `--notify-message-file`) when preparing a notification.
 
 ## Audit before the first child
 
@@ -98,23 +73,15 @@ creates the epic. Errors stop the run; warnings are read and passed. Fixing a fi
 
 ## `josh latest` runs once per session, not once per child
 
-Run once, the first time the loop hands back a child number, before implementing it:
-
-```bash
-pnpm josh stash:push "backlogrun: ms #<N>"   # `clean` when nothing changed
-pnpm josh ms
-pnpm josh stash:pop "backlogrun: ms #<N>"    # only after `stashed` above
-pnpm josh latest:if-required                 # stash → josh latest → pop; nothing on `skip`
-```
-
-On `required`, load the `dependency-update` skill; `latest-gate.md` is the single source. A resumed
-`backlogrun` asks again. **The lock file lands with the first child's `pnpm josh git -y`**; fix a
-failing bump forward. **Never inside a lane** (`pnpm josh latest:guard` refuses) — the parent runs it
-in the primary checkout (`backlogrun-lanes.md` → "Once per repository, before the first lane opens").
+It is a step of `pnpm josh run:prime` (`backlogrun-lanes.md` → "Once per repository, before the first
+lane opens"), run before the first child. On `latest required`, load the `dependency-update` skill;
+`latest-gate.md` is the single source. **A first child outside a lane** (a named issue) and a `stash`
+line other than `clean` → `pnpm josh stash:pop "<message>"` with that message before it, in the
+primary checkout; the lock file lands with its `pnpm josh git -y`. A resumed `backlogrun` asks again; fix a failing bump forward.
+**Never inside a lane** (`pnpm josh latest:guard` refuses).
 
 ## Preflight — the child's claim asks it
 
-`pnpm josh run:hold <N>`, the child's first call, checks for an interrupted run's leftovers before
-claiming the tree and prints the step for each answer (`reclaim` / `resume` / `park`) on stderr —
-follow it, and report a reclaim or resume with its stash reference (`docs/josh-commands-run.md` →
-"`josh run:hold`").
+`pnpm josh run:hold <N>`, the child's first call, prints the step for an interrupted run's leftovers
+on stderr — follow it, and report a reclaim or resume with its stash reference
+(`docs/josh-commands-run.md` → "`josh run:hold`").

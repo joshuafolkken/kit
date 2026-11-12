@@ -1,18 +1,14 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
-import { afterEach, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { sync_hook_safety } from './sync-hook-safety'
 
 const WRITING_VERSION = '1.340.0'
 const HOOK_FILES = ['.claude/settings.json', '.codex/hooks.json']
-const PROJECT_ROOTS = new Set<string>()
 
-afterEach(() => {
-	for (const project_root of PROJECT_ROOTS) rmSync(project_root, { recursive: true, force: true })
-	PROJECT_ROOTS.clear()
-})
+const make_directory = temporary_directory()
 
 function write_installed_version(project_root: string, version: string): void {
 	const install_directory = path.join(project_root, 'node_modules', KIT_PACKAGE_NAME)
@@ -22,9 +18,8 @@ function write_installed_version(project_root: string, version: string): void {
 }
 
 function project_with_installed_version(version: string | undefined): string {
-	const project_root = mkdtempSync(path.join(tmpdir(), 'sync-hook-safety-'))
+	const project_root = make_directory('sync-hook-safety-')
 
-	PROJECT_ROOTS.add(project_root)
 	if (version !== undefined) write_installed_version(project_root, version)
 
 	return project_root

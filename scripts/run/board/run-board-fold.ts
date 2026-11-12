@@ -10,12 +10,15 @@ import {
 import { run_board_render_section } from './run-board-render-section'
 
 // A live `run:board`'s sections folded and unfolded by one key each (joshuafolkken/kit#4172): every
-// section starts unfolded, and what a person folds holds until the board closes — it is never saved.
+// section starts as the last board left it, and what a person folds is saved to `~/.claude/josh/board.json`
+// (`$CLAUDE_CONFIG_DIR` in its place) on every fold (`run-board-fold-store.ts`, joshuafolkken/kit#7213).
 // A folded section is its heading alone, led by ▸ and saying what it holds, and the rows it gave up go
 // to the other sections before `run-board-fit.ts` cuts anything; an unfolded one's heading is led by ▾.
 
-const { folded_head, open_head } = run_board_render_section
+const { folded_head, open_head, row_count, widened } = run_board_render_section
 const SECTION_KEYS: ReadonlyMap<string, SectionKey> = new Map([
+	['t', 'throughput'],
+	['u', 'usage'],
 	['l', 'lanes'],
 	['p', 'processes'],
 	['f', 'findings'],
@@ -70,7 +73,7 @@ function fold_section(section: PlanSection, folded: ReadonlySet<SectionKey>): Pl
 	if (key === undefined || label === undefined) return section
 	if (!folded.has(key)) return headed(section, label, undefined)
 
-	const count = section.lines.filter((line) => line.row !== undefined).length
+	const count = row_count(section.lines)
 
 	return { ...headed(section, label, String(count)), lines: [] }
 }
@@ -88,13 +91,15 @@ function fold_notes(notes: NotesPart, folded: ReadonlySet<SectionKey>): NotesPar
 	return { ...headed(notes, label, count), lines: [], hidden: 0 }
 }
 
-// The processes say each group's totals.
-function fold_processes(
+// A folded detail part says its summary: the processes each group's totals, the usage gauges each
+// provider's percents, the throughput each row's closes per hour.
+function fold_detail(
 	part: DetailPart | undefined,
 	folded: ReadonlySet<SectionKey>,
+	key: SectionKey,
 ): DetailPart | undefined {
 	if (part?.label === undefined) return part
-	if (!folded.has('processes')) return headed(part, part.label, undefined)
+	if (!folded.has(key)) return headed(part, part.label, undefined)
 
 	return { ...headed(part, part.label, part.summary ?? ''), lines: [] }
 }
@@ -102,22 +107,49 @@ function fold_processes(
 function fold_parts(parts: FrameParts, folded: ReadonlySet<SectionKey>): FrameParts {
 	return {
 		...parts,
+		throughput: fold_detail(parts.throughput, folded, 'throughput'),
+		usage: fold_detail(parts.usage, folded, 'usage'),
 		plan: parts.plan.map((section) => fold_section(section, folded)),
 		below: parts.below?.map((section) => fold_section(section, folded)),
-		processes: fold_processes(parts.processes, folded),
+		processes: fold_detail(parts.processes, folded, 'processes'),
 		notes: fold_notes(parts.notes, folded),
+	}
+}
+
+function widened_part<Part extends Headed>(part: Part, width: number): Part {
+	return { ...part, head: widened(part.head, width) }
+}
+
+function widened_detail(part: DetailPart | undefined, width: number): DetailPart | undefined {
+	return part === undefined ? undefined : widened_part(part, width)
+}
+
+// Every rule run on to the lane rows' title column, folded or open (joshuafolkken/kit#5520).
+function widened_parts(parts: FrameParts): FrameParts {
+	const { rule_width: width } = parts
+
+	if (width === undefined) return parts
+
+	return {
+		...parts,
+		throughput: widened_detail(parts.throughput, width),
+		usage: widened_detail(parts.usage, width),
+		plan: parts.plan.map((section) => widened_part(section, width)),
+		below: parts.below?.map((section) => widened_part(section, width)),
+		processes: widened_detail(parts.processes, width),
+		notes: widened_part(parts.notes, width),
 	}
 }
 
 // A live frame is kept within its terminal, folded as a person folded it; any other is drawn whole.
 function bounded(parts: FrameParts, bounds: FrameBounds): Array<string> {
 	const { size, folded } = bounds
-	const shown = folded === undefined ? parts : fold_parts(parts, folded)
+	const shown = widened_parts(folded === undefined ? parts : fold_parts(parts, folded))
 
 	return size === undefined ? run_board_fit.whole(shown) : run_board_fit.fit(shown, size)
 }
 
-const run_board_fold = { KEYS_LINE, bounded, fold_parts, toggled }
+const run_board_fold = { KEYS_LINE, SECTIONS, bounded, fold_parts, toggled }
 
 export { run_board_fold }
 export type { FrameBounds }

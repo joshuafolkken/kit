@@ -1,11 +1,11 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { file_map_stamp, type FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { process_identity } from '#scripts/josh/process-identity'
 import { process_identity_fixture } from '#scripts/josh/process-identity-fixture'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { review_brief } from './review-brief'
 import { review_brief_cli } from './review-brief-cli'
 import type { ReviewCheckout } from './review-checkout'
@@ -416,8 +416,10 @@ describe('review_brief_cli.format_reason', () => {
 	const CODE = 'scripts/x.ts'
 	const INERT = '.editorconfig'
 
-	it('says a reduced change is inert', () => {
-		expect(review_brief_cli.format_reason([INERT], review_level.REDUCED_LEVEL)).toContain('inert')
+	it('says a reduced change is inert, documentation, prompts or tests', () => {
+		expect(review_brief_cli.format_reason([INERT], review_level.REDUCED_LEVEL)).toContain(
+			'documentation',
+		)
 	})
 
 	it('names the path that forced the default level', () => {
@@ -431,15 +433,13 @@ describe('review_brief_cli.format_reason', () => {
 	})
 })
 
+const make_directory = temporary_directory()
+
 describe('review_tree.tree_of', () => {
 	let root = ''
 
 	beforeEach(() => {
-		root = mkdtempSync(path.join(tmpdir(), 'josh-review-tree-'))
-	})
-
-	afterEach(() => {
-		rmSync(root, { recursive: true, force: true })
+		root = make_directory('josh-review-tree-')
 	})
 
 	it('digests each file and sorts the entries', () => {

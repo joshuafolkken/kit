@@ -1,10 +1,9 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { core_budget } from './core-budget'
 import { gate_ledger } from './gate-ledger'
 import { gate_skip } from './gate-skip'
@@ -26,7 +25,8 @@ const execa_module = await import('execa')
 const mocked_execa = vi.mocked(execa_module.execa)
 
 const RECORDS = gate_test_fixture.suite_records('ledger')
-const scratch = mkdtempSync(path.join(tmpdir(), 'verification-gate-ledger-test-'))
+const make_directory = temporary_directory('suite')
+const scratch = make_directory('verification-gate-ledger-test-')
 const PASS = 0
 const FAIL = 1
 const EXTERNAL_CORES = 3
@@ -56,7 +56,6 @@ async function run_into(ledger_path: string | undefined, exit_code: number): Pro
 // so its checks never claim the real machine-wide budget — a mocked busy machine would otherwise
 // leave the unit claim waiting out `WAIT_CAP_MS`. No other lane's reservation reaches the sampler.
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.stubEnv(core_budget.HELD_KEY, core_budget.HELD_VALUE)
 	vi.spyOn(core_budget, 'live_reservations').mockReturnValue([])
 	live_runs.mockReturnValue(0)
@@ -66,10 +65,6 @@ beforeEach(() => {
 afterEach(() => {
 	vi.unstubAllEnvs()
 	RECORDS.clear()
-})
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 // joshuafolkken/kit#3355: a finished gate appends its duration and verdict to the lane ledger —

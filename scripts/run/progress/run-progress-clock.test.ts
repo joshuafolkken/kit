@@ -1,18 +1,16 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { run_progress_clock } from './run-progress-clock'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#1821: the watcher's own liveness record, kept apart from the report clock. The
 // watcher writes it, reads it every tick, and stops when it is gone; `josh followup` removes it at the
 // merge. The read/write is `stamp_file` and the record is presence-only, so these drive it through a
 // real temp file rather than a mock.
-const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-life-record-'))
-
-afterAll(() => {
-	rmSync(TEMPORARY, { force: true, recursive: true })
-})
+const TEMPORARY = make_directory('josh-life-record-')
 
 describe('the watcher liveness record', () => {
 	it('reads as ended before the watcher has begun', () => {
@@ -80,7 +78,7 @@ describe('ping_life and is_life_fresh — staleness detection (joshuafolkken/kit
 
 		run_progress_clock.ping_life(target)
 
-		// is_life_fresh with a threshold of 0 ms always returns false
+		// A zero threshold leaves no interval in which the life record can be fresh.
 		expect(run_progress_clock.is_life_fresh(target, 0)).toBe(false)
 	})
 

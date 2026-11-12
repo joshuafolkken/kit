@@ -2,6 +2,7 @@ import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
+import { lane_seat_fixture } from '#scripts/lane/lane-seat-fixture'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -75,6 +76,8 @@ beforeEach(() => {
 	vi.spyOn(git_gh_command, 'issue_get_body').mockResolvedValue(undefined)
 	vi.spyOn(issue_state_cli, 'read_issue').mockResolvedValue({ kind: 'missing' })
 })
+
+beforeEach(lane_seat_fixture.mock_stop)
 
 describe('run_merge_steps — a child that ended without a merge', () => {
 	it.each(ENDINGS)('closes the vacant lane of a %s child', async (_ending, end) => {

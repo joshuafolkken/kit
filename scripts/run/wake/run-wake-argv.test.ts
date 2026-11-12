@@ -1,7 +1,8 @@
 import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
-import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { agent_safe_text } from '#scripts/agent/agent-safe-text'
 import { claude_agent_argv } from '#scripts/agent/claude-agent-argv'
 import { detached_launch } from '#scripts/run/detached-launch'
+import { run_step_section_driver } from '#scripts/run/run-step-section-driver'
 import { describe, expect, it, vi } from 'vitest'
 import { run_wake_driver } from './run-wake-driver'
 import { run_wake_session } from './run-wake-session'
@@ -164,7 +165,6 @@ describe('run_wake_session.wake_argv — a judgment handoff', () => {
 		const result = run_wake_driver.driver_result(
 			`epic #2663\n${EPIC_RESUME}`,
 			{ kind: 'none' },
-			NAMED_EPIC,
 			REMAINING_CHILD,
 		)
 
@@ -207,7 +207,6 @@ describe('run_wake_session.wake_argv — handoff material the launch check would
 		const result = run_wake_driver.driver_result(
 			'blocked over #2931\nresume: --owner 2608 --max 5',
 			{ kind: 'none' },
-			NAMED_EPIC,
 			stderr.join('\n'),
 		)
 
@@ -221,12 +220,36 @@ describe('run_wake_session.wake_argv — handoff material the launch check would
 		expect(prompt).toContain(`candidate #${String(LONG_STDERR_LINES - 1)}`)
 	})
 
-	it('caps the prompt even when the material alone is past the argv cap', () => {
+	it('caps the prompt even when the material alone is past the prompt cap', () => {
 		const prompt = handoff_prompt_of(
-			`resume: --owner 1 | ${'x'.repeat(agent_role_profile.MAX_VALUE_LENGTH)}`,
+			`resume: --owner 1 | ${'x'.repeat(agent_safe_text.MAX_PROMPT_LENGTH)}`,
 		)
 
-		expect(prompt?.length).toBe(agent_role_profile.MAX_VALUE_LENGTH)
+		expect(prompt?.length).toBe(agent_safe_text.MAX_PROMPT_LENGTH)
 		expect(prompt).toContain('resume: --owner 1')
 	})
+})
+
+describe('run_wake_session.wake_argv — a hand-off carrying its governing sections', () => {
+	// joshuafolkken/kit#5920: the sections the hand-off carries come before the details, and the cap is
+	// the prompt's own, so the stderr's last line and its line breaks survive the largest of them.
+	it.each(['merge over #5920', 'epic #5920', 'blocked over #5920'])(
+		'keeps the stderr tail beside the sections a %s hand-off carries',
+		(verdict) => {
+			const stderr = Array.from(
+				{ length: LONG_STDERR_LINES },
+				(_, index) => `line #${String(index)}`,
+			)
+			const result = run_wake_driver.driver_result(
+				`${verdict}\nresume: --owner 1`,
+				{ kind: 'none' },
+				stderr.join('\n'),
+			)
+			const material = result.kind === 'judgment' ? result.material : ''
+			const prompt = handoff_prompt_of(material)
+
+			expect(prompt).toContain(run_step_section_driver.driver_sections(verdict))
+			expect(prompt).toContain(`\nline #${String(LONG_STDERR_LINES - 1)}`)
+		},
+	)
 })

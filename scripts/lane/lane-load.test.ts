@@ -16,7 +16,7 @@ vi.mock('execa', async () => {
 })
 
 const AT = '2026-10-10T00:00:00.000Z'
-// Half the memory available, and 256 + 512 pages of 4 KB: 3 MB swapped since boot.
+// Mixed swap counters ensure the available-memory and swap readings stay independent.
 const SYSCTL_OUTPUT = [
 	'kern.memorystatus_level: 50',
 	'vm.compressor.swapper.swapins_total: 256',
@@ -24,6 +24,14 @@ const SYSCTL_OUTPUT = [
 	'hw.pagesize: 4096',
 ].join('\n')
 const SWAPPED_MB = 3
+// joshuafolkken/kit#7026: the host's sleep since boot, the continuous wake clock past the absolute one.
+const TIMEBASE_NAME = 'hw.tbfrequency'
+const SLEEP_OUTPUT = [
+	`${TIMEBASE_NAME}: 24000000`,
+	'machdep.wake_abstime: 24000000',
+	'machdep.wake_conttime: 72000000',
+].join('\n')
+const SLEPT_MS = 2000
 
 function stub_platform(platform: NodeJS.Platform): void {
 	vi.spyOn(process, 'platform', 'get').mockReturnValue(platform)
@@ -43,11 +51,15 @@ async function read_admission(): Promise<number | undefined> {
 }
 
 const PROCESSES = [{ kind: 'vitest', cpu_percent: 300, rss_mb: 1024, count: 4 }]
+const RESIDENT_MB = 7680
 
 beforeEach(() => {
 	hanging_execa.reset()
 	vi.spyOn(lane_registry, 'list_lanes').mockResolvedValue([])
-	vi.spyOn(lane_process_load, 'read').mockResolvedValue(PROCESSES)
+	vi.spyOn(lane_process_load, 'read').mockResolvedValue({
+		processes: PROCESSES,
+		resident_mb: RESIDENT_MB,
+	})
 })
 
 afterEach(() => {
@@ -62,7 +74,9 @@ describe('lane_load.sample', () => {
 		const sample = await lane_load.sample(AT)
 		const available_mb = await read_admission()
 		// The admission reads the memory at both ends of its window, to see swapping across it.
-		const [sampled, ...admitted] = hanging_execa.calls()
+		const [sampled, ...admitted] = hanging_execa
+			.calls()
+			.filter((call) => !call.arguments_list.includes(TIMEBASE_NAME))
 
 		expect(available_mb).toBeGreaterThan(0)
 		expect(sample.available_mb).toBe(Math.round(available_mb ?? 0))
@@ -91,6 +105,24 @@ describe('lane_load.sample', () => {
 	})
 })
 
+// joshuafolkken/kit#5658: the resident apps' size rides on the same sample as the load.
+describe('lane_load.sample resident apps', () => {
+	it('carries the resident apps size beside the load', async () => {
+		stub_platform('win32')
+
+		await expect(lane_load.sample(AT)).resolves.toMatchObject({ resident_mb: RESIDENT_MB })
+	})
+
+	it('records neither breakdown when ps does not answer', async () => {
+		stub_platform('win32')
+		vi.mocked(lane_process_load.read).mockResolvedValue(undefined)
+
+		const entry = await lane_load.sample(AT)
+
+		expect([entry.processes, entry.resident_mb]).toStrictEqual([undefined, undefined])
+	})
+})
+
 function lane(issue: string, is_stranded: boolean): LaneInfo {
 	return {
 		issue,
@@ -103,6 +135,40 @@ function lane(issue: string, is_stranded: boolean): LaneInfo {
 		is_stranded,
 	}
 }
+
+describe('lane_load.parse_slept_ms', () => {
+	it('reads the wake clocks apart in milliseconds', () => {
+		expect(lane_load.parse_slept_ms(SLEEP_OUTPUT)).toBe(SLEPT_MS)
+	})
+
+	it('reads the boot and last-wake instants in epoch milliseconds', () => {
+		const output =
+			'kern.boottime: { sec = 100, usec = 5 } x\nkern.waketime: { sec = 200, usec = 9 } y'
+
+		expect(lane_load.parse_times(output)).toStrictEqual({ booted_ms: 100_000, woke_ms: 200_000 })
+	})
+
+	it('reads none when a clock is missing', () => {
+		expect(lane_load.parse_slept_ms(`${TIMEBASE_NAME}: 24000000`)).toBeUndefined()
+	})
+})
+
+describe('lane_load.sample host sleep', () => {
+	it('carries the host sleep counter on macOS', async () => {
+		stub_platform('darwin')
+		hanging_execa.answer_with('sysctl', `${SYSCTL_OUTPUT}\n${SLEEP_OUTPUT}`)
+
+		await expect(lane_load.sample(AT)).resolves.toMatchObject({ slept_ms: SLEPT_MS })
+	})
+
+	it('records no sleep counter on another platform', async () => {
+		stub_platform('win32')
+
+		const entry = await lane_load.sample(AT)
+
+		expect(entry.slept_ms).toBeUndefined()
+	})
+})
 
 describe('lane_load.count_working', () => {
 	it('counts only open lanes whose child process is running', () => {

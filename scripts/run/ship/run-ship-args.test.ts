@@ -4,7 +4,8 @@ import { run_ship_args } from './run-ship-args'
 const TITLE = 'Fix the thing #42'
 const BODY_PATH = 'body.md'
 const NOTIFY = ['--notify-message', 'done']
-const BODY = ['--body-file', BODY_PATH]
+const BODY_FLAG = '--body-file'
+const BODY = [BODY_FLAG, BODY_PATH]
 const UNPINNED_OK = '--unpinned-ok'
 const REASON = 'removes dead code'
 
@@ -47,6 +48,10 @@ describe('run_ship_args.parse — the log and the refusals', () => {
 		['a --log with a positional', ['--log', '42', TITLE]],
 		['--unpinned-ok without --review', [TITLE, UNPINNED_OK, REASON]],
 		['--unpinned-ok with a blank reason', [TITLE, '--review', UNPINNED_OK, ' ']],
+		[
+			'--body-file - (stdin), which the preflight would read more than once',
+			[TITLE, BODY_FLAG, '-'],
+		],
 		['no positional at all', []],
 	])('refuses %s', (_label, argv) => {
 		expect(run_ship_args.parse(argv)).toBeUndefined()

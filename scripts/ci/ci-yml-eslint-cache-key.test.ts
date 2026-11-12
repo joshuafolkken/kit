@@ -23,6 +23,7 @@ import { ci_yml_fixture } from './ci-yml-fixture'
 // the empty string, and pass the `not.toContain` half while asserting nothing at all.
 const RUNTIME_LINT_JOB = 'static-checks'
 const TEMPLATE_LINT_JOB = 'checks'
+const WARM_LINT_JOB = 'warm-eslint-lineage'
 const CACHE_STEP_ID = 'eslint-cache'
 const KEY_INPUT = 'key'
 const RESTORE_KEYS_INPUT = 'restore-keys'
@@ -34,6 +35,10 @@ const SETUP_NODE_STEP_ID = 'setup-node'
 const NODE_VERSION_OUTPUT = 'node-version'
 const NODE_VERSION_EXPRESSION = `\${{ steps.${SETUP_NODE_STEP_ID}.outputs.${NODE_VERSION_OUTPUT} }}`
 const SETUP_NODE_ACTION = '.github/actions/setup-node/action.yml'
+// joshuafolkken/kit#7126: this repository's lint jobs are matrices, and each group keeps its own
+// lineage; the template's single `checks` job has no matrix, so its cache name carries no group.
+const UNGROUPED_CACHE = CACHE_STEP_ID
+const GROUPED_CACHE = `${UNGROUPED_CACHE}-\${{ matrix.group }}`
 
 function eslint_cache_input(relative_path: string, job_name: string, input: string): string {
 	const job = ci_yml_fixture.find_job(relative_path, job_name)
@@ -72,9 +77,10 @@ describe('setup-node composite action', () => {
 })
 
 describe.each([
-	[ci_yml_fixture.RUNTIME_CI_YML, RUNTIME_LINT_JOB],
-	[ci_yml_fixture.TEMPLATE_CI_YML, TEMPLATE_LINT_JOB],
-])('eslint cache key (%s)', (relative_path, job_name) => {
+	[ci_yml_fixture.RUNTIME_CI_YML, RUNTIME_LINT_JOB, GROUPED_CACHE],
+	[ci_yml_fixture.RUNTIME_CI_YML, WARM_LINT_JOB, GROUPED_CACHE],
+	[ci_yml_fixture.TEMPLATE_CI_YML, TEMPLATE_LINT_JOB, UNGROUPED_CACHE],
+])('eslint cache key (%s %s)', (relative_path, job_name, cache_name) => {
 	// The lookup above returns the empty string for a job or step that is not there, which would let
 	// both assertions below pass on a workflow that had lost the cache entirely.
 	it('finds the cache step on the job that runs eslint', () => {
@@ -83,6 +89,15 @@ describe.each([
 
 	it('keys the cache on the config sources the fingerprint reads', () => {
 		expect(eslint_cache_key(relative_path, job_name)).toContain(CONFIG_SOURCE_GLOB)
+	})
+
+	it('keeps the config lineage in every restore-key while allowing another lockfile', () => {
+		const keys = eslint_cache_keys(relative_path, job_name)
+
+		for (const key of keys) expect(key).toContain(CONFIG_SOURCE_GLOB)
+		expect(keys.at(-1)).toBe(
+			`\${{ runner.os }}-${cache_name}-${NODE_VERSION_EXPRESSION}-\${{ ${CONFIG_SOURCE_GLOB} }}-`,
+		)
 	})
 
 	it('does not key it on the tests beside them, which no cache entry depends on', () => {
@@ -94,6 +109,6 @@ describe.each([
 
 		expect(setup_node_uses(relative_path, job_name)).toBe('./.github/actions/setup-node')
 		expect(keys.length).toBeGreaterThan(1)
-		for (const key of keys) expect(key).toContain(`-eslint-cache-${NODE_VERSION_EXPRESSION}-`)
+		for (const key of keys) expect(key).toContain(`-${cache_name}-${NODE_VERSION_EXPRESSION}-`)
 	})
 })

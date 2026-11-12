@@ -1,3 +1,5 @@
+import { cost_cli } from '#scripts/cost-runtime/cost-cli'
+import { git_command } from '#scripts/git/git-command'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -10,6 +12,7 @@ import { run_ship_pre_detach_timed } from './run-ship-pre-detach-timed'
 import { run_ship_preflight } from './run-ship-preflight'
 import { run_ship_probe } from './run-ship-probe'
 import { run_ship_recorded_fixture } from './run-ship-recorded-fixture'
+import { run_ship_wait_cli } from './run-ship-wait-cli'
 
 // joshuafolkken/kit#5228: a passed preflight left the red pre-detach checks unrecorded, so `lane:stats`
 // never counted the stop a red `test:pinned` made. The kinds themselves are pinned in
@@ -53,6 +56,25 @@ afterEach(() => {
 })
 
 describe('josh ship --detach — red pre-detach checks behind a passed preflight', () => {
+	it('returns a scoped failure before conflict and pinned probes or a detached push', async () => {
+		const failure = 'scripts/review-fix.test.ts:9: too many statements'
+
+		vi.spyOn(run_ship_preflight, 'stage').mockResolvedValue({
+			code: FAILED,
+			out: failure,
+			preconditions: [run_ship_preflight.SCOPED_PRECONDITION],
+		})
+
+		expect(await run_ship_cli.run([TITLE, '--detach', '--review'])).toBe(FAILED)
+		expect(run_ship_conflict_probe.probe).not.toHaveBeenCalled()
+		expect(run_ship_pre_detach_timed.checks).not.toHaveBeenCalled()
+		expect(run_ship_detach.detach).not.toHaveBeenCalled()
+		expect(console.info).toHaveBeenCalledWith(expect.stringContaining(failure))
+		expect(lane_ledger_write.record_stop).toHaveBeenCalledWith(
+			expect.objectContaining({ preconditions: ['scoped'] }),
+		)
+	})
+
 	it('records the stop under the preflight as unpinned', async () => {
 		vi.spyOn(run_ship_pre_detach_timed, 'checks').mockResolvedValue({
 			code: FAILED,
@@ -70,6 +92,20 @@ describe('josh ship --detach — red pre-detach checks behind a passed preflight
 	it('records no stop when the checks passed too', async () => {
 		expect(await run_ship_cli.run([TITLE, '--detach'])).toBe(OK)
 		expect(lane_ledger_write.record_stop).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#5815: on a branch origin does not have, the launched detach waited live on it.
+describe('josh ship --detach — a branch origin does not have', () => {
+	it('detaches without a live wait from a session measured under the cut', async () => {
+		vi.spyOn(git_command, 'branch').mockResolvedValue('observations/no-such-branch-5815')
+		vi.spyOn(cost_cli, 'session_verdict').mockReturnValue('under')
+		run_ship_recorded_fixture.isolate()
+		const wait = vi.spyOn(run_ship_wait_cli, 'run').mockResolvedValue(OK)
+
+		expect(await run_ship_cli.run([TITLE, '--detach'])).toBe(OK)
+		expect(wait).not.toHaveBeenCalled()
+		expect(console.info).toHaveBeenCalledWith('cost --cut: unmeasurable')
 	})
 })
 

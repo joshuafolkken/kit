@@ -1,6 +1,6 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it } from 'vitest'
 import { document_section } from './document-section'
 import { entry_read_set } from './entry-read-set'
@@ -9,6 +9,7 @@ const ROOT = process.cwd()
 const STEPS = 'backlogrun-steps.md'
 const LATEST_GATE = 'latest-gate.md'
 const HEADING_JOINER = '" + "'
+const make_directory = temporary_directory()
 
 function backlogrun_point_of_use(
 	file: string,
@@ -19,7 +20,7 @@ function backlogrun_point_of_use(
 // A fixture without `package.json` keeps its own skill tree, so its route can name a heading the
 // document no longer carries.
 function fixture_with_missing_heading(): string {
-	const root = mkdtempSync(path.join(tmpdir(), 'entry-read-set-union-'))
+	const root = make_directory('entry-read-set-union-')
 	const directory = path.join(root, entry_read_set.SKILL_DIRECTORY)
 	const row = '| `backlogrun` | `backlogrun.md`, `backlogrun-steps.md` → "Renamed away" |'
 	const table = ['## 1. Which file to read', '', '| Entry | Files |', '| --- | --- |', row, '']
@@ -61,16 +62,11 @@ describe('entry_read_set — a point-of-use document is charged at the union of 
 
 	it('marks the union unresolved when a named heading is missing from the document', () => {
 		const root = fixture_with_missing_heading()
+		const steps = entry_read_set
+			.costed(root, 'backlogrun')
+			.point_of_use.find((one) => one.file === STEPS)
 
-		try {
-			const steps = entry_read_set
-				.costed(root, 'backlogrun')
-				.point_of_use.find((one) => one.file === STEPS)
-
-			expect(steps?.heading).toBe('Renamed away')
-			expect(steps?.is_resolved).toBe(false)
-		} finally {
-			rmSync(root, { recursive: true, force: true })
-		}
+		expect(steps?.heading).toBe('Renamed away')
+		expect(steps?.is_resolved).toBe(false)
 	})
 })

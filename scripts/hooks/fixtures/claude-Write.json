@@ -1,0 +1,12 @@
+{
+	"session_id": "d037fd1e-4ac5-478d-a07a-7c57ace1b800",
+	"transcript_path": "__HOME__/.claude/projects/__PROJECT__/d037fd1e-4ac5-478d-a07a-7c57ace1b800.jsonl",
+	"cwd": "__ROOT__",
+	"prompt_id": "127d271b-85c1-43ba-a358-d0f194609d3b",
+	"permission_mode": "bypassPermissions",
+	"effort": { "level": "medium" },
+	"hook_event_name": "PreToolUse",
+	"tool_name": "Write",
+	"tool_input": { "file_path": "__ROOT__/scripts/hook-capture-probe.ts", "content": "export {}\n" },
+	"tool_use_id": "toolu_01Qqe6CuzVuAGtaYw9iZqV78"
+}

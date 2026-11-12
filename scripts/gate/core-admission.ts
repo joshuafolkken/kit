@@ -38,6 +38,9 @@ interface LedgerReservation {
 	admitted_at?: number | undefined
 	granted?: number | undefined
 	is_unit?: boolean | undefined
+	is_strict_admission?: boolean | undefined
+	is_memory_pending?: boolean | undefined
+	is_priority?: boolean | undefined
 }
 
 interface LedgerEntry {
@@ -64,9 +67,19 @@ interface Admission {
 	waited_ms?: number | undefined
 }
 
+function priority_rank(reservation: LedgerReservation): number {
+	return reservation.is_priority === true ? 0 : 1
+}
+
 // Claim order, with the filename as the tiebreak so every reader agrees on the same ledger order
-// however the wall clock rounded two near-simultaneous claims.
+// however the wall clock rounded two near-simultaneous claims. **A priority claim
+// (`core-priority.ts`) is ordered before every claim without the mark**, so it waits only for the room
+// running claims hold and the priority claims before it (joshuafolkken/kit#5767).
 function compare_claim(left: LedgerEntry, right: LedgerEntry): number {
+	const by_priority = priority_rank(left.reservation) - priority_rank(right.reservation)
+
+	if (by_priority !== 0) return by_priority
+
 	const by_time = left.reservation.claimed_at - right.reservation.claimed_at
 
 	return by_time === 0 ? left.key.localeCompare(right.key) : by_time
@@ -136,10 +149,12 @@ function first_waiter_limit(budget: MachineBudget): LedgerLoad {
 
 // Whether `own` may pass one waiter ahead: any waiter claimed within the window before it, and a heavier
 // one within the longer window (joshuafolkken/kit#4595) — a two-core `lint:related` queued for most of the
-// cap behind a unit claim of five cores that the running claims had no room for.
+// cap behind a unit claim of five cores that the running claims had no room for. A claim never passes a
+// priority waiter ahead of it, which would take the room that waiter was put first for.
 function may_pass_waiter(own: LedgerReservation, waiter: LedgerReservation): boolean {
 	const since_ms = own.claimed_at - waiter.claimed_at
 
+	if (priority_rank(waiter) < priority_rank(own)) return false
 	if (since_ms < BYPASS_WINDOW_MS) return true
 
 	return waiter.weight > own.weight && since_ms < HEAVIER_BYPASS_WINDOW_MS
@@ -163,8 +178,8 @@ function fits_in_order({ own, ahead, running }: Placement, budget: MachineBudget
 }
 
 // **A host-wide swap stall holds the oldest claim too** (joshuafolkken/kit#4451). Running alone skipped
-// the memory test, so a lone gate started a 2.4 GB lint into a stall with 1.7 GB free and swapped it
-// for 830 s. Only both together hold: traffic alone is this machine's daily norm (#4313), and a claim
+// the memory test, so a lone gate started lint into a stall and prolonged it.
+// Only both together hold: traffic alone is this machine's daily norm (#4313), and a claim
 // heavier than free memory on a calm machine would wait for room that never comes.
 function is_swap_stalled({ own, running }: Placement, budget: MachineBudget): boolean {
 	const needed_mb = sum_load([...running, own]).memory_mb
@@ -174,8 +189,8 @@ function is_swap_stalled({ own, running }: Placement, budget: MachineBudget): bo
 
 // **The wait cap does not release a swap-stall hold, for any claim** (joshuafolkken/kit#4451): the cap
 // exists so a wedged sibling cannot stall the machine for good, but a stall ends when its traffic stops
-// or its memory is free, so the hold cannot outlive it. Released at the cap, a 2.4 GB lint started into
-// the stall it waited on and swapped for the same 830 s — and holding only a lone claim let a gate's
+// or its memory is free, so the hold cannot outlive it. Released at the cap, lint started into
+// the stall it waited on and prolonged it — and holding only a lone claim let a gate's
 // later claims start into the stall at their own caps, after which the lint was no longer alone.
 function is_swap_held(
 	key: string,
@@ -191,7 +206,13 @@ function is_swap_held(
 // like the first waiter (`first_waiter_limit`) until a poll reads the load back under the cap, or stalled
 // on swap (`is_swap_stalled`), where it waits until the traffic stops or its memory is free.
 function runs_alone(placement: Placement, budget: MachineBudget): boolean {
-	if (!placement.is_oldest || placement.running.length > 0) return false
+	if (
+		!placement.is_oldest ||
+		placement.running.length > 0 ||
+		placement.own.reservation.is_strict_admission === true
+	) {
+		return false
+	}
 
 	return budget.is_overloaded !== true && !is_swap_stalled(placement, budget)
 }
@@ -252,7 +273,11 @@ function admitted_keys(
 function is_ramped(reservation: LedgerReservation, now: number): boolean {
 	const { admitted_at } = reservation
 
-	return admitted_at !== undefined && now - admitted_at >= RAMP_UP_MS
+	return (
+		reservation.is_memory_pending !== true &&
+		admitted_at !== undefined &&
+		now - admitted_at >= RAMP_UP_MS
+	)
 }
 
 // **The load the ledger already accounts for.** CPU use shows in the reading the moment a tool starts,
@@ -356,6 +381,7 @@ const core_admission = {
 	RAMP_UP_MS,
 	admitted_keys,
 	admitted_load,
+	compare_claim,
 	describe_overflow,
 	is_admitted,
 	is_swap_held,

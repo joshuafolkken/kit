@@ -3,9 +3,6 @@ import { issue_cite } from '#scripts/issue/issue-cite'
 import { composite_arguments, USAGE_ERROR_EXIT_CODE } from '#scripts/josh/josh-composite-arguments'
 import { lane_install } from '#scripts/lane/lane-install'
 import { error_text } from '#scripts/lib/error-message'
-import { split_assess } from '#scripts/split/split-assess'
-import { split_early_notice } from '#scripts/split/split-early-notice'
-import { split_measure } from '#scripts/split/split-measure'
 import { git_command } from './git-command'
 import { main_merge_guard } from './main-merge-guard'
 import { main_merge_regenerate } from './main-merge-regenerate'
@@ -33,8 +30,6 @@ import { main_merge_regenerate } from './main-merge-regenerate'
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const COMMAND_NAME = 'main:merge'
-const SPLIT_UNMEASURED =
-	'split notice: the diff could not be measured — run `pnpm josh split:assess`'
 const LOCKFILE = 'pnpm-lock.yaml'
 const INSTALL_OWED =
 	'the merge brought in a lockfile change, but installing it failed — run `pnpm install --frozen-lockfile`'
@@ -48,7 +43,7 @@ function merge_message(default_branch: string, current_branch: string): string |
 
 	if (issue_number === undefined) return undefined
 
-	return `Merge ${default_branch} into ${current_branch} ${issue_cite.plain(issue_number)}`
+	return `Merge ${default_branch} into ${current_branch} ${issue_cite.plain_for('github', issue_number)}`
 }
 
 // What one merge of the default branch came to. `josh ship` merges it again
@@ -155,34 +150,8 @@ function failure_text(outcome: MergeOutcome): string | undefined {
 	return undefined
 }
 
-// joshuafolkken/kit#4302: every implementing run merges the default branch immediately before the
-// gate, so this is where a diff that outgrew the entry's split estimate is told so. The notice is
-// advisory: a finished merge never fails on it, and an unreadable diff says so rather than reading as
-// under the guide. It sits on the command, not on `merge()`, because `josh ship` merges again past the
-// point a run can act on it.
-async function measured_notice(): Promise<string | undefined> {
-	const measurement = await split_measure.read_branch()
-	const notice = split_assess.notice(measurement)
-
-	if (notice !== undefined) await split_early_notice.record(measurement)
-
-	return notice
-}
-
-async function split_notice(): Promise<string | undefined> {
-	try {
-		return await measured_notice()
-	} catch (error) {
-		return `${SPLIT_UNMEASURED}: ${error_text.message_of(error)}`
-	}
-}
-
-async function warn_over_split_guide(): Promise<void> {
-	const notice = await split_notice()
-
-	if (notice !== undefined) console.warn(notice)
-}
-
+// A finished merge prints no split notice: size is judged before implementation (`lane:plan`), and a
+// started Issue is implemented to the end (joshuafolkken/kit#7009).
 async function merge_default_branch(): Promise<number> {
 	const outcome = await merge()
 	const failure = failure_text(outcome)
@@ -194,8 +163,6 @@ async function merge_default_branch(): Promise<number> {
 	}
 
 	if ('branch' in outcome) console.info(outcome.branch)
-
-	await warn_over_split_guide()
 
 	return SUCCESS_EXIT_CODE
 }

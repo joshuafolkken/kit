@@ -1,27 +1,29 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it } from 'vitest'
 import { step_zero_notice } from './step-zero-notice'
 
 const ROOT = '/repo'
 const RUNTIME_FILE = '/repo/scripts/hooks/example.ts'
 const DOC_FILE = '/repo/docs/guide.md'
+const PROMPT_FILE = '/repo/prompts/review.txt'
+const EXTERNAL_FILE = '/elsewhere/memory/note.ts'
 // Below `prompt-hook-brevity.test.ts`'s per-turn ceiling: the notice is still injected text.
 const NOTICE_CEILING_BYTES = 256
 
+const make_directory = temporary_directory()
 const created: Array<string> = []
 
 afterEach(() => {
 	for (const transcript of created.splice(0)) {
 		rmSync(step_zero_notice.stamp_path(transcript), { force: true })
-		rmSync(path.dirname(transcript), { recursive: true, force: true })
 	}
 })
 
 // A fresh transcript per case, so the once-per-session stamp never dedupes one case against another.
 function fresh_transcript(): string {
-	const directory = mkdtempSync(path.join(tmpdir(), 'step-zero-'))
+	const directory = make_directory('step-zero-')
 	const transcript = path.join(directory, 'transcript.jsonl')
 
 	created.push(transcript)
@@ -65,7 +67,7 @@ describe('step_zero_notice — when it speaks', () => {
 		).toBeUndefined()
 	})
 
-	it.each([DOC_FILE, '/repo/prompts/review.txt', '/elsewhere/memory/note.ts'])(
+	it.each([DOC_FILE, PROMPT_FILE, EXTERNAL_FILE])(
 		'stays silent, without spending its stamp, on a non-runtime path %s',
 		(file_path) => {
 			const transcript = fresh_transcript()
@@ -81,12 +83,68 @@ describe('step_zero_notice — when it speaks', () => {
 })
 
 describe('step_zero_notice — a translated Codex patch', () => {
+	it.each(['Edit', 'Write'])('classifies %s without recording a history notice', (tool_name) => {
+		const raw_payload = JSON.stringify({ tool_name, tool_input: { file_path: RUNTIME_FILE } })
+		const documentation_payload = JSON.stringify({ tool_name, tool_input: { file_path: DOC_FILE } })
+
+		expect(step_zero_notice.is_runtime_edit(raw_payload, ROOT)).toBe(true)
+		expect(step_zero_notice.is_runtime_edit(documentation_payload, ROOT)).toBe(false)
+		expect(step_zero_notice.notice(raw_payload, ROOT)).toBeUndefined()
+	})
+
 	it('reminds when the runtime file is not the first one the patch lists', () => {
 		const tool_input = { file_path: DOC_FILE, file_paths: [DOC_FILE, RUNTIME_FILE] }
 		const raw_payload = payload('Edit', tool_input, fresh_transcript())
 
 		expect(step_zero_notice.notice(raw_payload, ROOT)).toBe(step_zero_notice.NOTICE)
 	})
+})
+
+describe('step_zero_notice — default root', () => {
+	it('uses the current directory when no root is provided', () => {
+		const file_path = path.join(process.cwd(), 'scripts/hooks/example.ts')
+		const raw = JSON.stringify({ tool_name: 'Edit', tool_input: { file_path } })
+
+		expect(step_zero_notice.is_runtime_edit(raw)).toBe(true)
+	})
+})
+
+describe('step_zero_notice — edits without history', () => {
+	it.each(['null', '""', undefined])(
+		'classifies edits with unavailable history %j',
+		(transcript) => {
+			for (const tool_name of ['Edit', 'Write']) {
+				const history = transcript === undefined ? '' : `,"transcript_path":${transcript}`
+				const raw = `{"tool_name":"${tool_name}","tool_input":{"file_path":"${RUNTIME_FILE}"}${history}}`
+
+				expect(step_zero_notice.is_runtime_edit(raw, ROOT)).toBe(true)
+				expect(step_zero_notice.notice(raw, ROOT)).toBeUndefined()
+			}
+		},
+	)
+
+	it.each([DOC_FILE, PROMPT_FILE, EXTERNAL_FILE])(
+		'excludes a non-runtime edit of %s without history',
+		(file_path) => {
+			const raw = JSON.stringify({ tool_name: 'Edit', tool_input: { file_path } })
+
+			expect(step_zero_notice.is_runtime_edit(raw, ROOT)).toBe(false)
+		},
+	)
+
+	it('classifies every translated patch path without history', () => {
+		const tool_input = { file_path: DOC_FILE, file_paths: [DOC_FILE, RUNTIME_FILE] }
+		const raw = JSON.stringify({ tool_name: 'Edit', tool_input })
+
+		expect(step_zero_notice.is_runtime_edit(raw, ROOT)).toBe(true)
+	})
+
+	it.each(['{}', 'invalid', '{"tool_name":"Read","tool_input":{"file_path":"app.ts"}}'])(
+		'excludes an invalid or non-edit call %s',
+		(raw) => {
+			expect(step_zero_notice.is_runtime_edit(raw, ROOT)).toBe(false)
+		},
+	)
 })
 
 describe('step_zero_notice — what it says', () => {

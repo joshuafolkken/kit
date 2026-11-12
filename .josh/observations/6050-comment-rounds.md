@@ -1,0 +1,3 @@
+- rf:bug-risks | medium | scripts/rules/workflow-edit.ts:50 | 2026-11-03 | #6050
+- rf:bug-risks | low | scripts/rules/workflow-edit.ts:53 | 2026-11-03 | #6050
+- rf:tests | low | scripts/rules/workflow-edit.test.ts:26 | 2026-11-03 | #6050

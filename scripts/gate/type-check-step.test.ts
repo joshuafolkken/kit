@@ -56,7 +56,6 @@ function mock_installed(bin_names: ReadonlyArray<string>, usage: string): void {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	spawn_options.length = 0
 })
 

@@ -15,7 +15,7 @@ Every requirement gets a test (`CLAUDE.md` → "Code Change Rules" Step 0); the 
 
 ### Verification checklist (add to the completion gate)
 
-- [ ] Requirement count equals the count of tests added/updated (each gap documented as infeasible).
+- [ ] Every requirement has a declared test (each gap documented as infeasible); `pnpm josh test:declared --match` checks each declaration against the change set (`docs/josh-commands.md` → "josh test:declared").
 - [ ] UI changes: a screenshot of the affected screen was checked (`CLAUDE.md` → UI verification); if impossible here, say so and ask the user to check.
 
 ---
@@ -71,7 +71,7 @@ When tests leave persistent state behind:
 
 1. Add or extend a guard and confirm it fails (e.g. `dash_leak_guard.scrub_then_assert_clean` in `src/routes/dash/dash-leak-check.e2e.ts` scrubs `E2E_`-prefixed tasks, then asserts none remain).
 2. Fix production code or teardown — prefer `data-testid` over locale-specific `aria-label`; do not swallow cleanup errors unless intended.
-3. Confirm green with full `pnpm test:e2e` (or a targeted Playwright run).
+3. Confirm green with full `pnpm josh test:e2e` (or a targeted Playwright run).
 4. Document any new invariant here or in the E2E helper module.
 
 ### Error Messages
@@ -83,6 +83,19 @@ When tests leave persistent state behind:
 - **A unit test must not reach the network** — mock every read leaving the process (`gh` call, HTTP request, CLI subprocess that makes one).
 - **Mock the whole read**: a stub of one call leaving a second on its default still passes, slowly and against the remote (joshuafolkken/kit#1353: a 10-second CI timeout).
 - kit's `vitest.config.ts` fails such a run, listing the `gh` invocations (`docs/josh-commands.md` → `josh test:unit`); elsewhere the rule holds unguarded.
+
+### What not to test (テストしないもの)
+
+Writing an assertion → it must check behavior the code computes. Skip it when it only restates:
+
+- a re-export existing (barrel, `index.ts`)
+- raw text of a document or config — test the code that reads it
+- a mock's echo — a stub returning what the test set, or called with what the test passed through
+- a source literal re-typed into the test — import it, or assert what it drives
+
+### Use the shared test helpers (kit only)
+
+Creating a temp directory, a fixture file or an execa stub in a test → `#tools/test/temporary-directory`, `#tools/test/write-file`, `#tools/test/execa-result`. `mkdtempSync` and `vi.clearAllMocks()` in `beforeEach` are lint errors (`eslint/rules/test-helper-bans.js`).
 
 ### A josh command that writes state runs through the integration harness (kit only)
 

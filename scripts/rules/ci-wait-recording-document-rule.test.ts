@@ -1,10 +1,8 @@
 import { read_repo_file } from '#scripts/document/ai-document-fixture'
 import { describe, expect, it } from 'vitest'
 
-// joshuafolkken/kit#2763. The records a run makes that need no CI result used to wait for the merge:
-// the observation ledger was flushed as a pull request of its own after it, and the rest waited out
-// the CI wait. This pins the procedure — the ledger rides the run's commit, and the records are made
-// while CI runs — so the guidance cannot drift back behind `pnpm josh followup`.
+// Records independent of CI belong before `followup`: the ledger rides the run's commit and other
+// records can be made while CI runs, avoiding a separate flush PR (joshuafolkken/kit#2763).
 
 const SKILL_DIR = '.claude/skills/workflow-commands'
 const BACKGROUND = read_repo_file(`${SKILL_DIR}/background-commands.md`)

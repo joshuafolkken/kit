@@ -1,8 +1,8 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import type { HistoryReader } from '#scripts/release/release-history'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it, vi } from 'vitest'
 
 const DEFAULT_BRANCH = 'main'
 const fetched = vi.hoisted(() => ({ branches: [] as Array<string> }))
@@ -23,13 +23,9 @@ vi.mock('#scripts/git/git-command', () => ({
 
 const { git_followup_pending } = await import('./git-followup-pending')
 
-// joshuafolkken/kit#1486: the completion notification used to read the local `package.json` and
-// report it as the shipping version. Children no longer bump, so that read now names the *previous*
-// release — the unconfirmed value presented as fact this suite exists to keep out.
-//
-// What the assertions are really about is the two directions in which the replacement can be wrong:
-// a count that is silently understated by this run's own merge, and a count nobody could measure
-// being reported as zero.
+// The local package version does not confirm a release. Completion must count pending changes
+// without understating this run's merge or treating an unreadable count as zero
+// (joshuafolkken/kit#1486).
 
 const BASE_SHA = 'a1b2c3d4e5f6a7b8'
 const CURRENT_VERSION = '1.340.0'
@@ -41,12 +37,10 @@ const NO_MERGES = 0
 // range the reader is handed.
 const TIP = 'origin/main'
 
-const work_directories: Array<string> = []
+const make_directory = temporary_directory()
 
 function project_at(version: string | undefined): string {
-	const directory = mkdtempSync(path.join(tmpdir(), 'josh-followup-pending-'))
-
-	work_directories.push(directory)
+	const directory = make_directory('josh-followup-pending-')
 
 	if (version !== undefined) {
 		writeFileSync(
@@ -95,10 +89,6 @@ function failing_reader(): HistoryReader {
 		count_merges: async (): Promise<number> => NO_MERGES,
 	}
 }
-
-afterAll(() => {
-	for (const directory of work_directories) rmSync(directory, { force: true, recursive: true })
-})
 
 describe('git_followup_pending.pending_release_line', () => {
 	it('reports the unreleased merge count rather than a project version', async () => {

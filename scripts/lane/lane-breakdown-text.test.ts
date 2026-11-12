@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
+import { lane_breakdown } from './lane-breakdown'
 import { lane_breakdown_implement } from './lane-breakdown-implement'
 import { lane_breakdown_text, type Report } from './lane-breakdown-text'
-import type { ShipLapEntry, StageEntry, TestPinnedEntry } from './lane-ledger'
+import type { ShipLapEntry, StageEntry, TestPinnedEntry, TestRelatedEntry } from './lane-ledger'
 
 // joshuafolkken/kit#4995: the breakdown reads as one bullet per stage on the lane's Issue and as one
 // line at the head of the investigation's prompt, the implementation's kinds beside it.
@@ -35,9 +36,10 @@ const REPORT: Report = {
 }
 
 const IMPLEMENT_TEXT =
-	'implement 51.0 min (editing & thinking 41.0 min, gate 10.0 min, 2 backgrounded calls, their waits in editing & thinking)'
+	'implement 51.0 min, over budget +42 min (editing & thinking 41.0 min, gate 10.0 min, 2 backgrounded calls, their waits in editing & thinking)'
+const PLAN_TEXT = 'start to plan 10.0 min, over budget +7 min'
 const EXCLUDED_TEXT =
-	'waits taken out (park, outage, usage limit, yield, host sleep) 3.0 min, of which yield wait 1.0 min, of which host sleep 1.0 min'
+	'waits taken out (park, outage, usage limit, yield, split run, host sleep) 3.0 min, of which yield wait 1.0 min, of which host sleep 1.0 min'
 
 describe('lane_breakdown_text.comment', () => {
 	it('heads the stages with the net minutes and the command that prints them', () => {
@@ -45,8 +47,37 @@ describe('lane_breakdown_text.comment', () => {
 			'Net time by stage, longest first, 62 min of net time (`pnpm josh lane:breakdown 4970`):',
 			'',
 			`- ${IMPLEMENT_TEXT}`,
-			'- start to plan 10.0 min',
+			`- ${PLAN_TEXT}`,
 			`- ${EXCLUDED_TEXT}`,
+		])
+	})
+})
+
+// joshuafolkken/kit#6006: the yield wait split into the holder's remaining time and the gap.
+describe('lane_breakdown_text.comment — the yield split', () => {
+	it('writes the yield split under the waits taken out, and none without a yield wait', () => {
+		const yield_split = { holder_ms: 0, gap_ms: MINUTE_MS, unsplit_ms: 0 }
+		const breakdown = { ...REPORT.breakdown, yield_split }
+		const report = { ...REPORT, breakdown }
+		const lines = lane_breakdown_text.comment(ISSUE, 62, report).split('\n')
+
+		expect(lines.slice(-2)).toStrictEqual([
+			'  - yield wait: holder remaining 0.0 min',
+			'  - yield wait: redispatch gap (offer + launch) 1.0 min',
+		])
+		expect(lane_breakdown_text.line({ ...report, breakdown: { ...breakdown, yield_ms: 0 } })).toBe(
+			lane_breakdown_text.line({ ...REPORT, breakdown: { ...REPORT.breakdown, yield_ms: 0 } }),
+		)
+	})
+
+	it('writes a wait no holder splits as its own line, and no zero split beside it', () => {
+		const yield_split = { holder_ms: 0, gap_ms: 0, unsplit_ms: MINUTE_MS }
+		const report = { ...REPORT, breakdown: { ...REPORT.breakdown, yield_split } }
+		const lines = lane_breakdown_text.comment(ISSUE, 62, report).split('\n')
+
+		expect(lines.slice(-2)).toStrictEqual([
+			`- ${EXCLUDED_TEXT}`,
+			'  - yield wait: no holder named, unsplit 1.0 min',
 		])
 	})
 })
@@ -54,7 +85,7 @@ describe('lane_breakdown_text.comment', () => {
 describe('lane_breakdown_text.line', () => {
 	it('writes the stages on one line', () => {
 		expect(lane_breakdown_text.line(REPORT)).toBe(
-			`Net time by stage, longest first: ${IMPLEMENT_TEXT}; start to plan 10.0 min; ${EXCLUDED_TEXT}.`,
+			`Net time by stage, longest first: ${IMPLEMENT_TEXT}; ${PLAN_TEXT}; ${EXCLUDED_TEXT}.`,
 		)
 	})
 
@@ -139,6 +170,22 @@ describe('lane_breakdown_text — ship stage laps', () => {
 	})
 })
 
+// joshuafolkken/kit#6541: the driver followup, outside the net time, keeps the followup's laps.
+describe('lane_breakdown_text — driver followup laps', () => {
+	const driver = [{ name: lane_breakdown.DRIVER_FOLLOWUP_STAGE, ms: 4 * MINUTE_MS }]
+	const laps = new Map([
+		[lane_breakdown.FOLLOWUP_STAGE, [{ name: 'followup CI', ms: 3 * MINUTE_MS }]],
+	])
+	const report = { ...REPORT, breakdown: { ...REPORT.breakdown, driver }, laps }
+
+	it('prints the followup laps under the driver followup line', () => {
+		expect(lane_breakdown_text.comment(ISSUE, 6, report).split('\n').slice(-2)).toStrictEqual([
+			'- driver followup 4.0 min (outside lane net)',
+			'  - followup CI 3.0 min',
+		])
+	})
+})
+
 // joshuafolkken/kit#5297: a backgrounded subagent call is counted beside its type, at no time.
 describe('lane_breakdown_text.line — subagent types', () => {
 	it('counts the backgrounded subagent calls beside their type', () => {
@@ -175,6 +222,31 @@ describe('lane_breakdown_text.report_of', () => {
 	})
 })
 
+// joshuafolkken/kit#5532: the lane's test:related files past the reach cap have a line of their own.
+describe('lane_breakdown_text — test:related over cap', () => {
+	it('reads the over cap files off the ledger and writes them before the waits taken out', () => {
+		const read = vi.spyOn(lane_breakdown_implement, 'read').mockReturnValue([])
+		const entry: TestRelatedEntry = {
+			kind: 'test-related',
+			at: AT,
+			issue: ISSUE,
+			scope: 'related',
+			changed: 1,
+			synced: 0,
+			since_map: 0,
+			readers: 0,
+			over_cap: 2,
+			elapsed_ms: MINUTE_MS,
+		}
+		const report = lane_breakdown_text.report_of(ISSUE, REPORT.breakdown, [entry])
+
+		expect(lane_breakdown_text.line(report)).toContain(
+			'; test:related 2 over cap, in 1 of 1 runs; waits taken out',
+		)
+		read.mockRestore()
+	})
+})
+
 // joshuafolkken/kit#5295: the followup line names the check its CI wait waited on last.
 describe('lane_breakdown_text — the followup critical path', () => {
 	it('writes the last check to settle on the ship followup line', () => {
@@ -190,13 +262,13 @@ describe('lane_breakdown_text — the followup critical path', () => {
 		}
 		const breakdown = {
 			...REPORT.breakdown,
-			stages: [{ name: 'ship followup', ms: 4 * MINUTE_MS }],
+			driver: [{ name: lane_breakdown.DRIVER_FOLLOWUP_STAGE, ms: 4 * MINUTE_MS }],
 		}
 
 		const report = lane_breakdown_text.report_of(ISSUE, breakdown, [ci_wait])
 
 		expect(lane_breakdown_text.line(report)).toContain(
-			'ship followup 4.0 min (last check: e2e 150.0s)',
+			'driver followup 4.0 min (outside lane net) (last check: e2e 150.0s)',
 		)
 		read.mockRestore()
 	})
@@ -225,5 +297,45 @@ describe('lane_breakdown_text.report_of — ship laps', () => {
 
 		expect(lane_breakdown_text.line(report)).toContain('ship gate 3.0 min [josh gate 2.0 min]')
 		read.mockRestore()
+	})
+})
+
+// joshuafolkken/kit#5563, joshuafolkken/kit#6540: a stage past its share of a lane's 25-minute budget
+// says by how much; one within it carries nothing.
+function report_with(stages: Report['breakdown']['stages']): Report {
+	return { ...REPORT, breakdown: { ...REPORT.breakdown, stages } }
+}
+
+describe('lane_breakdown_text — stage budget', () => {
+	it('writes the minutes an implement of 20 min ran past its budget', () => {
+		const report = report_with([{ name: 'implement', ms: 20 * MINUTE_MS }])
+
+		expect(lane_breakdown_text.line(report)).toContain(
+			': implement 20.0 min, over budget +11 min (',
+		)
+	})
+
+	it('writes nothing beside a stage within its budget', () => {
+		const report = report_with([
+			{ name: lane_breakdown.PLAN_STAGE, ms: 3 * MINUTE_MS },
+			{ name: 'ship gate', ms: 8 * MINUTE_MS },
+		])
+
+		expect(lane_breakdown_text.line(report)).not.toContain('over budget')
+	})
+
+	it('checks the driver followup against its own budget, not the ship one', () => {
+		const driver = [{ name: lane_breakdown.DRIVER_FOLLOWUP_STAGE, ms: 6 * MINUTE_MS }]
+		const report = { ...REPORT, breakdown: { ...REPORT.breakdown, driver } }
+
+		expect(lane_breakdown_text.line(report)).toContain(
+			'driver followup 6.0 min (outside lane net), over budget +1 min',
+		)
+	})
+
+	it('checks a ship stage against the whole ship budget', () => {
+		const report = report_with([{ name: 'ship gate', ms: 9 * MINUTE_MS }])
+
+		expect(lane_breakdown_text.line(report)).toContain(': ship gate 9.0 min, over budget +1 min;')
 	})
 })

@@ -6,7 +6,7 @@ import { step_zero_notice } from './step-zero-notice'
 
 // The `UserPromptSubmit` hooks are injected into the conversation on **every user turn**, and what
 // is injected is then re-read as accumulated context on every turn after it. joshuafolkken/kit#967
-// cut them from 1,471 bytes to 1,010 by applying the same rule a resident document follows since
+// cut them by applying the same rule a resident document follows since
 // kit#964: state the trigger and point at the body, which is in `CLAUDE.md` and is already loaded.
 // joshuafolkken/kit#2889 cut them again, to a trigger and a pointer.
 //

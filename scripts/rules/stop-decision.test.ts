@@ -59,3 +59,24 @@ describe('stop_decision.is_question', () => {
 		expect(stop_decision.is_question(prompt)).toBe(false)
 	})
 })
+
+describe('stop_decision.contains_question', () => {
+	it.each([
+		'終了しますか？ それとも変更しますか？ 推奨は終了です。',
+		'Proceed? Recommended: proceed.',
+		'終了しますか？推奨は終了です。',
+		'進めてよいですか。推奨は続行です。',
+		'選択してください。\n進めてよいですか',
+	])('reads a question before a recommendation: %s', (message) => {
+		expect(stop_decision.contains_question(message)).toBe(true)
+	})
+
+	it.each([
+		'Implementation ended before completion.',
+		'See https://ci.example/build?job=42 for the failure log.',
+		'処理が失敗しました。',
+		'',
+	])('keeps a mechanical ending without a question: %s', (message) => {
+		expect(stop_decision.contains_question(message)).toBe(false)
+	})
+})

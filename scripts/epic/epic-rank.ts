@@ -1,6 +1,7 @@
 import { expected_effect_lint } from '#scripts/issue/expected-effect-lint'
 import { issue_priority } from '#scripts/issue/issue-priority'
 import { issue_rank } from '#scripts/issue/issue-rank'
+import { size_estimate } from '#scripts/issue/size-estimate'
 import { epic_graph, type EpicChild } from './epic-graph'
 
 // `issue-rank.ts`'s keys over graph children, for both offer paths that hand
@@ -9,8 +10,9 @@ import { epic_graph, type EpicChild } from './epic-graph'
 
 const CLOSED = 'CLOSED'
 
-// How many open issues of the pool wait on each child. Only the pool is counted: it is every issue the
-// caller may run, and an issue outside it is not one this ranking can start sooner.
+// How many open issues of the pool wait on each child, directly or down a chain. Only the pool is
+// counted: it is every issue the caller may run, and an issue outside it is not one this ranking can
+// start sooner.
 function dependents_of(pool: ReadonlyArray<EpicChild>): ReadonlyMap<string, number> {
 	return issue_rank.count_dependents(
 		pool
@@ -29,11 +31,13 @@ function rank(
 	const dependents = dependents_of(pool)
 
 	return issue_rank.rank(children, (child) => ({
+		is_resumable: child.is_resumable,
 		is_last: issue_priority.is_last(child.body),
 		labels: child.labels,
 		lost_minutes: issue_priority.lost_minutes(child.body),
 		gain_minutes: expected_effect_lint.weekly_minutes(child.body),
 		dependents: dependents.get(epic_graph.key_of(child)) ?? 0,
+		estimated_lines: size_estimate.declared_size(child.body ?? '')?.lines,
 	}))
 }
 

@@ -9,8 +9,7 @@ import { refactor_targets } from './refactor-targets'
 // scope along the import graph, asks the project's own eslint which refactoring candidates the scope
 // holds, and answers whether any high- or medium-priority candidate remains.
 //
-// **It reports and never fails**, like `josh lines`: a candidate is work to do, not a gate to break,
-// so the exit code stays 0 and the answer is the printed verdict token. Convergence counts the high-
+// Candidates are work to do, so valid scans exit 0; execution failures exit non-zero. Convergence counts the high-
 // and medium-priority categories only; the one low-priority category (unused code) is reported but
 // never counted, so `clear` means the scope is empty of high/medium candidates.
 
@@ -27,6 +26,7 @@ interface ScanResult {
 	scope_count: number
 	categories: ReadonlyArray<CategoryResult>
 	verdict: string
+	diagnostic?: string
 }
 
 // Convergence counts high- and medium-priority candidates only: a low-priority finding (unused code)
@@ -75,12 +75,16 @@ function render(
 
 // The failure report: the scope line and an `error` verdict, so a scan that could not run says so
 // rather than printing empty categories that would read as `clear`.
-function error_output(seed_count: number, scope_count: number): string {
-	return [scope_line(seed_count, scope_count), `verdict: ${ERROR} (scan could not run)`].join('\n')
+function error_output(seed_count: number, scope_count: number, diagnostic?: string): string {
+	return [scope_line(seed_count, scope_count), diagnostic, `verdict: ${ERROR} (scan could not run)`]
+		.filter(Boolean)
+		.join('\n')
 }
 
 function render_result(result: ScanResult): string {
-	if (result.verdict === ERROR) return error_output(result.seed_count, result.scope_count)
+	if (result.verdict === ERROR) {
+		return error_output(result.seed_count, result.scope_count, result.diagnostic)
+	}
 
 	return render(result.categories, result.seed_count, result.scope_count)
 }
@@ -89,12 +93,15 @@ async function scan(root: string): Promise<ScanResult> {
 	const seed = await refactor_targets.collect_targets(root)
 	const universe = await line_targets.lint_target_files(root)
 	const scope = [...import_graph.expand_scope(seed, universe, root)]
-	const categories = await refactor_lint.scan_categories(scope, root)
 	const counts = { seed_count: seed.length, scope_count: scope.length }
 
-	if (categories === undefined) return { ...counts, categories: [], verdict: ERROR }
+	try {
+		const categories = await refactor_lint.scan_categories(scope, root)
 
-	return { ...counts, categories, verdict: verdict_token(categories) }
+		return { ...counts, categories, verdict: verdict_token(categories) }
+	} catch (error) {
+		return { ...counts, categories: [], verdict: ERROR, diagnostic: String(error) }
+	}
 }
 
 async function run_scan(): Promise<number> {
@@ -103,7 +110,7 @@ async function run_scan(): Promise<number> {
 
 	process.stdout.write(`${render_result(result)}\n`)
 
-	return 0
+	return result.verdict === ERROR ? 1 : 0
 }
 
 const refactor_scan = {

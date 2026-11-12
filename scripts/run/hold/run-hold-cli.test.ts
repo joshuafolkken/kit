@@ -1,11 +1,13 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync } from 'node:fs'
 import path from 'node:path'
 import { git_command } from '#scripts/git/git-command'
 import { run_preflight } from '#scripts/run/run-preflight'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_hold } from './run-hold'
 import { run_hold_cli } from './run-hold-cli'
+
+const make_directory = temporary_directory('suite')
 
 vi.mock('#scripts/git/git-command', () => ({
 	git_command: { git_directories: vi.fn(), status: vi.fn() },
@@ -18,7 +20,7 @@ vi.mock('#scripts/run/run-preflight', () => ({
 }))
 
 // The sweep a successful claim runs reads git and GitHub; `run-hold-cli-tidy.test.ts` pins the call.
-vi.mock('#scripts/run/tidy/run-tidy-cli', () => ({ run_tidy_cli: { sweep: vi.fn() } }))
+vi.mock('#scripts/run/run-maintenance', () => ({ run_maintenance: { sweep: vi.fn() } }))
 
 // A numbered release strips the issue's `in-progress` on GitHub; `run-hold-cli-release.test.ts` pins it.
 vi.mock('#scripts/run/run-label', () => ({ run_label: { unmark: vi.fn() } }))
@@ -41,7 +43,7 @@ const CLEAN_TREE = ''
 const DIRTY_TREE = ' M scripts/run/hold/run-hold.ts'
 
 const TEST_PREFIX = 'run-hold-cli-test-'
-const scratch = mkdtempSync(path.join(tmpdir(), TEST_PREFIX))
+const scratch = make_directory(TEST_PREFIX)
 const WORKTREE = path.join(scratch, '.git')
 const OTHER_WORKTREE = path.join(scratch, '.git', 'worktrees', 'second')
 const COMMON = path.join(scratch, '.git')
@@ -79,10 +81,6 @@ afterEach(() => {
 	vi.restoreAllMocks()
 	rmSync(run_hold.hold_path(WORKTREE), { force: true })
 	rmSync(run_hold.hold_path(OTHER_WORKTREE), { force: true })
-})
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 describe('parse_request', () => {

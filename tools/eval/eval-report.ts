@@ -113,12 +113,8 @@ function report_summary(verdicts: ReadonlyArray<Verdict>): boolean {
 // nothing about the rules, so blocking on it would park work for a problem in the harness or its
 // surroundings.
 //
-// **It does not say *why*, and it used to.** The sentence asserted the shared budget was exhausted —
-// a cause nobody had established, and the first run that printed a reason contradicted it outright:
-// `API Error: Unable to connect to API (ConnectionRefused)` on every inconclusive scenario.
-// Naming one cause in a fixed string sends every reader to check the one
-// thing that may not be wrong; the per-scenario `?` line carries the reason that was actually
-// observed, so the verdict points there instead of guessing.
+// A fixed verdict cannot establish the cause of an inconclusive run. Point to the per-scenario
+// observed reason rather than directing readers toward an unconfirmed explanation.
 const VERDICT_BLOCKED = 'blocked'
 const VERDICT_HELD = 'held'
 const VERDICT_UNMEASURED = 'unmeasured'

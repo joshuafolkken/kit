@@ -4,6 +4,7 @@ import { core_budget } from '#scripts/gate/core-budget'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { poll } from '#scripts/lib/poll'
 import type { LaunchResult } from '#scripts/run/detached-launch'
 import { test_pinned_ledger, type PinnedOrigin } from '#scripts/test/test-pinned-ledger'
 import { test_pinned_record, type PinnedSummary } from '#scripts/test/test-pinned-record'
@@ -172,8 +173,9 @@ function read_answer(root: string, { pid, token, start }: Launch): PinnedSummary
 	)
 }
 
-// The launch is detached, so its pid leads a process group holding the `josh` process and its Vitest
-// workers; signalling the group stops them all, and `base-tree.ts` removes the trees they held.
+// The launch is detached, so its pid leads a process group holding the `josh` process; signalling the
+// group stops it, `base-tree.ts` removes the trees it held, and its exit kills the Vitest probes, which
+// run in groups of their own (`test-red.ts`).
 function signal_group(pid: number): void {
 	try {
 		process.kill(-pid, STOP_SIGNAL)
@@ -249,11 +251,14 @@ async function poll_within_grace(
 	const started = now()
 	let summary = read_answer(root, launched)
 
-	while (summary === undefined && now() - started < grace_ms) {
-		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		await sleep(run_review_steps.POLL_INTERVAL_MS)
-		summary = read_answer(root, launched)
-	}
+	await poll.poll_until(() => summary !== undefined || now() - started >= grace_ms, {
+		attempts: Infinity,
+		interval_ms: run_review_steps.POLL_INTERVAL_MS,
+		sleeper: async (milliseconds) => {
+			await sleep(milliseconds)
+			summary = read_answer(root, launched)
+		},
+	})
 
 	return summary
 }

@@ -4,18 +4,20 @@ import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
 import { resolve_tsx_runner } from '#scripts/josh/josh-logic'
 import { LINT_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { eslint_daemon } from './eslint-daemon'
+import { eslint_daemon_calls } from './eslint-daemon-calls'
 
 // Warms a fresh checkout's eslint daemon before its first edit (joshuafolkken/kit#4720). A cold
 // daemon took 5–8 s on the first edit hook's lint and 0.1–1.3 s once warm; `eslint_d start` alone
 // warms nothing — its first lint still took 8 s — because the cost is eslint loading the config, the
-// plugins and the type program, which only a lint of a typed source pays.
+// plugins and the TypeScript parser, which only a lint of a TypeScript source pays. The daemon holds
+// no type program (joshuafolkken/kit#6768), so that is all the warm-up loads.
 //
 // **The lint goes through `eslint_daemon.run` rather than the bare daemon**, so the daemon it starts
 // is recorded with its fingerprint: an unrecorded one is stale to `josh lint:related` and the
 // pre-commit hook, which would stop and cold-start it on their first run.
 
 const WARM_CLI = fileURLToPath(new URL('eslint-warm-cli.ts', import.meta.url))
-// One typed source the type program covers; a declaration file can be ignored by the flat config.
+// One TypeScript source; a declaration file can be ignored by the flat config.
 const TYPED_SOURCES: ReadonlyArray<string> = ['ls-files', '--', '*.ts', ':!*.d.ts']
 // A project with no TypeScript still loads its config and plugins through this.
 const FALLBACK_TARGET = 'eslint.config.js'
@@ -34,6 +36,7 @@ async function warm(project_root: string): Promise<void> {
 	await eslint_daemon.run(['exec', 'eslint', warm_target(project_root)], {
 		project_root,
 		timeout_ms: LINT_TIMEOUT_MS,
+		call: { caller: eslint_daemon_calls.DAEMON_CALLER.WARM, files: 1 },
 	})
 }
 

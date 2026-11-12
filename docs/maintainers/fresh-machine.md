@@ -20,7 +20,7 @@ which a normal user (`dev`) runs the Linux route of
 [setup/prerequisites.md](../setup/prerequisites.md) and nothing else:
 
 ```bash
-curl -fsSL https://get.pnpm.io/install.sh | sh -
+(installer=$(mktemp) && trap 'rm -f "$installer"' EXIT && curl --proto '=https' -fsSL https://raw.githubusercontent.com/pnpm/get.pnpm.io/7c26e549143daf5cf072a38c428170ad8eccaf2d/install.sh -o "$installer" && (echo "53d3ad6ef67d49d6951f3326bd3180e5c504c8f695bcdf73bb61ec7a4d4c9407  $installer" | (if command -v sha256sum >/dev/null 2>&1; then sha256sum -c -; else shasum -a 256 -c -; fi)) && PNPM_VERSION=12.6.0 sh "$installer")
 # a new terminal
 pnpm runtime set node 22 -g
 node --version
@@ -40,18 +40,20 @@ node --version
   `fresh-machine-image.test.ts` holds its commands to the lines of the guide. `--rebuild` drops the
   layer cache — use it after pnpm or the guide changed.
 
-## kit's six patterns
+## kit's seven patterns
 
-Three projects by two commands, each from the state its row names:
+Three projects by two commands, and the documented `pnpm dlx` first command, each from the state its
+row names:
 
-| Pattern                 | Project before the install                | Git and GitHub before the install      | kit installed from    |
-| ----------------------- | ----------------------------------------- | -------------------------------------- | --------------------- |
-| `kit-test-lua-init`     | `main.lua`                                | no Git on the machine                  | the packed checkout   |
-| `kit-test-html-init`    | `index.html`                              | no Git on the machine                  | the packed checkout   |
-| `kit-test-svelte-init`  | `sv create --template minimal --types ts` | no Git on the machine                  | the packed checkout   |
-| `kit-test-lua-start`    | `main.lua`                                | no repository                          | the published version |
-| `kit-test-html-start`   | `index.html`                              | a first commit on `main`, no GitHub    | the published version |
-| `kit-test-svelte-start` | `sv create --template minimal --types ts` | a GitHub repository with `main` pushed | the published version |
+| Pattern                 | Project before the install                | Git and GitHub before the install      | kit installed from                       |
+| ----------------------- | ----------------------------------------- | -------------------------------------- | ---------------------------------------- |
+| `kit-test-lua-init`     | `main.lua`                                | no Git on the machine                  | the packed checkout                      |
+| `kit-test-html-init`    | `index.html`                              | no Git on the machine                  | the packed checkout                      |
+| `kit-test-svelte-init`  | `sv create --template minimal --types ts` | no Git on the machine                  | the packed checkout                      |
+| `kit-test-lua-start`    | `main.lua`                                | no repository                          | the published version                    |
+| `kit-test-html-start`   | `index.html`                              | a first commit on `main`, no GitHub    | the published version                    |
+| `kit-test-svelte-start` | `sv create --template minimal --types ts` | a GitHub repository with `main` pushed | the published version                    |
+| `kit-test-lua-dlx`      | `main.lua`                                | a first commit on `main`, no GitHub    | the packed checkout, on a local registry |
 
 - **The patterns run from a kit checkout only.** They install `@joshuafolkken/kit` by name, while the
   tarball and the published version are those of the checkout the command is run from; anywhere else
@@ -77,9 +79,17 @@ Three projects by two commands, each from the state its row names:
   had a commit gets kit's files through a setup Issue and pull request in place of a commit to `main`,
   and these show the pull request was opened, left unmerged, and touched nothing else.
   `kit-test-svelte-start` then waits for the setup pull request's CI (`gh pr checks --watch`).
-- **Every pattern ends with two probes**, recorded whatever they exit with: `pnpm josh gate` from
-  `bash --noprofile --norc` with an environment of `HOME` and the system `PATH` only, and `josh gate`
-  from a `PATH` that has `node` on it and no `pnpm`.
+- **`dlx` runs the first command against a local registry** (#7218). The machine starts verdaccio,
+  publishes the packed checkout to it dated ten days back, and publishes a next patch version of kit's
+  dependency `run-parallel` dated two days back — inside `josh init`'s three-day `minimumReleaseAge`,
+  past the one day pnpm waits by default. `pnpm dlx @joshuafolkken/kit init` then installs kit into the
+  project and hands off to its `josh init`, and `pnpm install --frozen-lockfile` must accept the
+  lockfile that left. A first install that resolves before the wait is written locks the new version
+  and the later install refuses it (#7200). Every other package comes from npm through the registry.
+  The pattern runs on the GitHub machine for its git, and creates no repository.
+- **Every `init` and `start` pattern ends with two probes**, recorded whatever they exit with:
+  `pnpm josh gate` from `bash --noprofile --norc` with an environment of `HOME` and the system `PATH`
+  only, and `josh gate` from a `PATH` that has `node` on it and no `pnpm`.
 
 ## What the first runs found
 

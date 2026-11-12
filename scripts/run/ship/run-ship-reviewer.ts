@@ -1,12 +1,16 @@
 import { agent_argv, type AgentArgv, type AgentArgvResult } from '#scripts/agent/agent-argv'
 import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
 import { api_auth } from '#scripts/agent/api-auth'
+import { core_priority } from '#scripts/gate/core-priority'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_session_broker } from '#scripts/lane/lane-session-broker'
 import { review_attest, type ReviewSlot } from '#scripts/review/review-attest'
+import { review_pair } from '#scripts/review/review-pair'
+import { review_pair_session } from '#scripts/review/review-pair-session'
+import { review_round } from '#scripts/review/review-round'
 import { detached_launch } from '#scripts/run/detached-launch'
 import { run_ship_brokered_review } from './run-ship-brokered-review'
 import { run_ship_review, type PromptOf } from './run-ship-review'
@@ -42,6 +46,7 @@ interface Briefed {
 
 const { CAUSE } = run_ship_stop_cause
 const { CODE } = review_attest.REVIEW_SLOT
+const { PRIORITY_ENVIRONMENT } = core_priority
 
 // **Every stop is tagged with the step's own cause**, so a round that stopped on a red join, a reviewer
 // that did not finish or a refused attestation is not booked as a finding (joshuafolkken/kit#4431).
@@ -61,8 +66,11 @@ function paths(slot?: ReviewSlot): { brief: string; findings: string; log: strin
 	return lane_session_broker.review_paths(PROJECT_ROOT, slot)
 }
 
+// The review stage's children claim cores with priority (`core-priority.ts`), as the commit's do: a
+// round's short checks need not queue behind other lanes' heavy ones (joshuafolkken/kit#5819). The gate
+// a round opens runs in the background and drops the mark at its launch (`run-review-steps.ts`).
 async function josh(argv: ReadonlyArray<string>): Promise<JoshResult> {
-	return await josh_command.josh_run(argv, should_forward_stderr)
+	return await josh_command.josh_run(argv, should_forward_stderr, undefined, PRIORITY_ENVIRONMENT)
 }
 
 function note(text: string): void {
@@ -130,7 +138,7 @@ async function run_direct_session(
 	round: Round,
 ): Promise<JoshResult> {
 	const log_path = paths(slot).log
-	const request = { argv, cwd: PROJECT_ROOT, log_path, profile }
+	const request = { argv, cwd: PROJECT_ROOT, log_path, profile, env: PRIORITY_ENVIRONMENT }
 
 	note(agent_role_profile.describe_review(Number(round), profile))
 	const result = await detached_launch.launch_attached(request, note)
@@ -193,6 +201,25 @@ async function run_brokered(
 		: ended_session(`isolated reviewer failed: ${answer.reason}`, slots)
 }
 
+// The paired comparison reviewer runs beside the code reviewer alone, and only while the code brief was
+// paired (joshuafolkken/kit#7020); a lane's broker starts it beside the reviewers it starts.
+async function launch_pair(slots: ReadonlyArray<ReviewSlot>): Promise<void> {
+	if (slots.includes(CODE)) await review_pair_session.launch(PROJECT_ROOT, PRIORITY_ENVIRONMENT)
+}
+
+async function run_slots(
+	sessions: ReadonlyArray<SlotSession>,
+	round: Round,
+	slots: ReadonlyArray<ReviewSlot>,
+): Promise<ReadonlyArray<JoshResult>> {
+	const [results] = await Promise.all([
+		Promise.all(sessions.map(async (session) => await run_slot(session, round))),
+		launch_pair(slots),
+	])
+
+	return results
+}
+
 // **The slots' reviewers run side by side** (joshuafolkken/kit#4672), and the first failure among
 // them is the result — each slot is launched through the same path a single review takes.
 async function run_sessions(
@@ -208,7 +235,7 @@ async function run_sessions(
 		return await run_brokered(issue, round, slots)
 	}
 
-	const results = await Promise.all(sessions.map(async (session) => await run_slot(session, round)))
+	const results = await run_slots(sessions, round, slots)
 
 	return (
 		results.find((result) => result.code !== SUCCESS_EXIT_CODE) ?? {
@@ -218,14 +245,34 @@ async function run_sessions(
 	)
 }
 
+function offer_pair(code: Briefed | undefined): void {
+	if (code !== undefined) review_pair.offer(code.brief)
+}
+
+// The paired round's comparison, recorded and never gating: a refused record is only noted. Only a
+// launch that briefed the code slot records, so an interaction pass alone never re-records the last
+// round 1's pair its paired brief still names.
+async function record_pair(issue: string, code: Briefed | undefined): Promise<void> {
+	if (code === undefined) return
+	const argv = review_pair_session.pair_argv(issue, paths(CODE).log, PROJECT_ROOT)
+	if (argv === undefined) return
+	const result = await josh(argv)
+
+	if (result.code !== SUCCESS_EXIT_CODE) note(`paired reviewer: review:pair recorded nothing`)
+}
+
 // The brief goes to a file and the previous round's findings are removed, so a reviewer that writes
-// nothing reads as unfinished rather than as the last round's verdict.
+// nothing reads as unfinished rather than as the last round's verdict. The code brief is paired, or its
+// last pairing removed, before any reviewer starts (`review-pair.ts`).
 async function launch_reviewers(
 	briefs: ReadonlyArray<Briefed>,
 	prompt_of: PromptOf,
 	issue: string,
 	round: Round,
 ): Promise<JoshResult> {
+	const code = briefs.find(({ slot }) => slot === CODE)
+	const effective_round = review_round.from_brief(code?.brief ?? '', round)
+
 	for (const { brief, slot } of briefs) {
 		const target = paths(slot)
 
@@ -233,12 +280,17 @@ async function launch_reviewers(
 		stamp_file.remove_stamp(target.findings)
 	}
 
-	return await run_sessions(
-		prompt_of,
+	offer_pair(code)
+	const result = await run_sessions(
+		effective_round === ROUND_TWO ? run_ship_review.verification_prompt : prompt_of,
 		issue,
-		round,
+		effective_round,
 		briefs.map(({ slot }) => slot),
 	)
+
+	await record_pair(issue, code)
+
+	return result
 }
 
 // A refused attestation — the issue changed after the brief, an update left unread, no attestation —

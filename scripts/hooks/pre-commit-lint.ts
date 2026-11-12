@@ -13,6 +13,7 @@ import { FAIL_EXIT_CODE } from '#scripts/lib/buffered-process'
 import { resolve_spawn_exit } from '#scripts/lib/spawn-exit'
 import { eslint_cache_dependencies } from '#scripts/lint/eslint-cache-dependencies'
 import { eslint_daemon } from '#scripts/lint/eslint-daemon'
+import { eslint_daemon_calls } from '#scripts/lint/eslint-daemon-calls'
 import { execa } from 'execa'
 
 // The pre-commit hook's cspell, prettier and eslint runs over the staged files. They go through here
@@ -44,8 +45,8 @@ const TOOL_ARGUMENTS: Readonly<Record<string, ReadonlyArray<string>>> = {
 
 // **Each tool claims its place in the core budget** (joshuafolkken/kit#3944): lefthook starts the three
 // in parallel, and off the ledger every other lane's admission saw them only as foreign load. Each is
-// one process over the staged files — eslint over 40 of them took 16.9s of CPU over 14.0s of wall at
-// 1,225 MB, the one-process shape the whole-tree scan's weight already names.
+// one process over the staged files — the one-process shape the whole-tree scan's weight already
+// names.
 // The key is the one `CORE_WEIGHTS` and `MEMORY_MB` both declare the tool under.
 const TOOL_BUDGETS: Readonly<Record<string, 'spell_check' | 'format' | 'eslint_scan'>> = {
 	cspell: 'spell_check',
@@ -76,10 +77,14 @@ function build_arguments(
 //
 // A merge or checkout can change only the files a staged file imports, and the content cache keeps
 // the staged file's verdict: its entry is dropped first when they changed (joshuafolkken/kit#4415).
-async function run_eslint(command_arguments: ReadonlyArray<string>): Promise<number> {
+async function run_eslint(
+	command_arguments: ReadonlyArray<string>,
+	staged_count: number,
+): Promise<number> {
+	const call = { caller: eslint_daemon_calls.DAEMON_CALLER.PRE_COMMIT, files: staged_count }
 	const result = await eslint_cache_dependencies.guard(
 		ESLINT_COMMIT_CACHE_FILE,
-		async () => await eslint_daemon.run_or_cold(command_arguments),
+		async () => await eslint_daemon.run_or_cold(command_arguments, call),
 	)
 	if (result.output !== '') process.stdout.write(result.output)
 
@@ -94,7 +99,7 @@ async function run_tool(command_arguments: ReadonlyArray<string>): Promise<numbe
 
 async function run_reserved(tool: string, staged_files: ReadonlyArray<string>): Promise<number> {
 	const command_arguments = build_arguments(tool, staged_files) ?? []
-	if (tool === ESLINT) return await run_eslint(command_arguments)
+	if (tool === ESLINT) return await run_eslint(command_arguments, staged_files.length)
 
 	return await run_tool(command_arguments)
 }

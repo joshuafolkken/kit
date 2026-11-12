@@ -26,7 +26,6 @@ function restarted(dispatch: DispatchOutcome): RestartOutcome {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	warn_of_problem.mockResolvedValue()
 	info.mockImplementation(vi.fn())
 })

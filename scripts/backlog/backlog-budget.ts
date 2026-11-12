@@ -29,13 +29,30 @@ const IDLE_WAIT_HOURS = 8
 const DEFAULT_IDLE_MINUTES = IDLE_WAIT_HOURS * MINUTES_PER_HOUR
 const DEFAULT_IDLE_MS = DEFAULT_IDLE_MINUTES * MS_PER_MINUTE
 
-// **The one interval between two asks for work, whether lanes are running or nothing is.** The driver
-// and the wake supervisor both read it from here. The loop is a process, so an ask spends no AI turn,
-// and a watch is polled as often as a running batch; a child collected in between is asked about at
+// **The interval between two asks for work, whether lanes are running or a watch has nothing named
+// left.** The loop is a process, so an ask spends no AI turn, and a watch is polled as often as a
+// running batch; a child collected in between, or an issue `run:add` hands the run, is asked about at
 // once, without waiting it out. `backlogrun-progress.md` → "Waiting, and never waiting forever" holds
-// the row; the figure is here because `idle_watch_reason` below has to say it.
-const OFFER_INTERVAL_SECONDS = 60
+// the row; the figure is here because `idle_watch_reason` below has to say it. Three minutes keeps the
+// asks within the REST core budget while lanes run (joshuafolkken/kit#6718); the wake supervisor's
+// pause is its own (`run-wake-window.ts`).
+const OFFER_INTERVAL_SECONDS = 180
 const OFFER_INTERVAL_MS = OFFER_INTERVAL_SECONDS * MS_PER_SECOND
+
+// **The interval while no lane runs and an issue the run names is still left to dispatch**
+// (joshuafolkken/kit#6788). That stretch ends at the named issue's dispatch, and no lane spends the
+// REST core allowance beside it. At the empty-seat ask's measured cost (joshuafolkken/kit#6718) a
+// half-minute keeps the warm asks of an hour under half the hourly core allowance, and only the first
+// ask after a gap is cold. A dry allowance is waited out by `backlog-drive-rate-limit.ts` either way.
+const IDLE_OFFER_INTERVAL_SECONDS = 30
+const IDLE_OFFER_INTERVAL_MS = IDLE_OFFER_INTERVAL_SECONDS * MS_PER_SECOND
+
+// **How often a free seat checks the `auto-ok` listing between two asks** (joshuafolkken/kit#7227).
+// The check reads the listing's first page by its ETag, and a 304 spends no REST core, so the floor is
+// the drive's own poll (`backlog-drive-cli.ts` → `POLL_MS`); a changed listing asks at once, an unchanged one waits out the intervals
+// above.
+const LISTING_CHECK_INTERVAL_SECONDS = 10
+const LISTING_CHECK_INTERVAL_MS = LISTING_CHECK_INTERVAL_SECONDS * MS_PER_SECOND
 
 const RUN_VERDICT = 'run'
 const WATCH_VERDICT = 'watch'
@@ -221,6 +238,12 @@ function answer_decision(input: BudgetInput): BudgetDecision {
 	return FIXED_DECISIONS[input.answer] ?? idle_decision(input)
 }
 
+function idle_until_ms(input: BudgetInput): number | undefined {
+	if (FIXED_DECISIONS[input.answer] !== undefined || input.answer === 'candidates') return undefined
+
+	return input.idle_budget_ms === undefined ? undefined : input.active_at_ms + input.idle_budget_ms
+}
+
 function decide(input: BudgetInput): BudgetDecision {
 	return max_decision(input) ?? answer_decision(input)
 }
@@ -230,7 +253,9 @@ const backlog_budget = {
 	BLOCKED_REASON,
 	DEFAULT_IDLE_MINUTES,
 	DEFAULT_IDLE_MS,
+	IDLE_OFFER_INTERVAL_MS,
 	IDLE_WAIT_HOURS,
+	LISTING_CHECK_INTERVAL_MS,
 	OFFER_INTERVAL_MS,
 	RUN_VERDICT,
 	STOP_VERDICT,
@@ -241,6 +266,7 @@ const backlog_budget = {
 	decide,
 	draining_reason,
 	idle_expired_reason,
+	idle_until_ms,
 	idle_watch_reason,
 	is_finish,
 	max_reached_reason,

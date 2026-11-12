@@ -1,7 +1,12 @@
+import { followup_section } from '#scripts/followup/followup-section'
+import { core_priority } from '#scripts/gate/core-priority'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
+import { run_investigation_record } from '#scripts/run/run-investigation-record'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_ship } from './run-ship'
 import { run_ship_body_draft } from './run-ship-body-draft'
+import { run_ship_early_push } from './run-ship-early-push'
+import { run_ship_lap } from './run-ship-lap'
 import { run_ship_preflight } from './run-ship-preflight'
 import { run_ship_review_steps } from './run-ship-review-steps'
 import { run_ship_scoped } from './run-ship-scoped'
@@ -40,10 +45,13 @@ const sync_spy = vi.spyOn(run_ship_sync, 'sync_stage')
 const followup_spy = vi.spyOn(run_ship_sync, 'followup_stage')
 const catch_up_spy = vi.spyOn(run_ship_sync, 'catch_up')
 const remove_draft_spy = vi.spyOn(run_ship_body_draft, 'remove')
+const remove_record_spy = vi.spyOn(run_investigation_record, 'remove')
 
 beforeEach(() => {
+	vi.spyOn(run_ship_early_push, 'push').mockResolvedValue()
 	catch_up_spy.mockReset().mockResolvedValue(undefined)
 	remove_draft_spy.mockReset().mockResolvedValue(undefined)
+	remove_record_spy.mockReset().mockResolvedValue(undefined)
 	josh_spy.mockReset().mockResolvedValue(OK)
 	preflight_spy.mockReset().mockResolvedValue(OK)
 	scoped_gate_spy.mockReset().mockResolvedValue(OK)
@@ -55,6 +63,7 @@ beforeEach(() => {
 function step_for(stage: string, args: ShipArguments = ARGS): Step {
 	const found = run_ship_steps
 		.steps({ ...args, is_review: true })
+		.flatMap((step) => (step.beside === undefined ? [step] : [step, step.beside]))
 		.find((step) => step.stage === stage)
 
 	if (found === undefined) throw new Error(`no step for ${stage}`)
@@ -83,10 +92,10 @@ describe('run_ship_steps.steps — the order a change ships in', () => {
 			STAGE.REVIEW,
 			STAGE.GATE,
 			STAGE.COMMIT,
-			STAGE.ROUND_TWO,
 			STAGE.FOLLOWUP,
 			STAGE.REPORT,
 		])
+		expect(step_for(STAGE.GATE).beside?.stage).toBe(STAGE.ROUND_TWO)
 	})
 
 	// joshuafolkken/kit#5067: the sync pushes its merge ahead of the gate, so the merge still waits on
@@ -127,6 +136,17 @@ describe('run_ship_steps — preflight and review stages delegate', () => {
 })
 
 describe('run_ship_steps — the gate stage', () => {
+	it('pushes immediately on green for a reviewed ship and never on red', async () => {
+		const args = { ...ARGS, is_review: true }
+
+		await step_for(STAGE.GATE).run(args, FRESH)
+		expect(run_ship_early_push.push).toHaveBeenCalledExactlyOnceWith(args)
+		vi.mocked(run_ship_early_push.push).mockClear()
+		scoped_gate_spy.mockResolvedValue(FAILED)
+		await step_for(STAGE.GATE).run(args, FRESH)
+		expect(run_ship_early_push.push).not.toHaveBeenCalled()
+	})
+
 	it('delegates to the scoped gate and returns its result', async () => {
 		scoped_gate_spy.mockResolvedValue(FAILED)
 
@@ -146,11 +166,17 @@ describe('run_ship_steps — the gate stage', () => {
 	})
 })
 
-describe('run_ship_steps — the commit, followup and report stages', () => {
-	it('commits with no skip flags on a fresh state', async () => {
+// The commit's hooks claim cores with the priority mark (joshuafolkken/kit#5767).
+describe('run_ship_steps — the commit stage', () => {
+	it('commits with no skip flags on a fresh state, under the core-budget priority mark', async () => {
 		await step_for(STAGE.COMMIT).run(ARGS, FRESH)
 
-		expect(josh_spy).toHaveBeenCalledWith(['git', '-y', '--body', 'text', TITLE], true)
+		expect(josh_spy).toHaveBeenCalledWith(
+			['git', '-y', '--body', 'text', TITLE],
+			true,
+			undefined,
+			core_priority.PRIORITY_ENVIRONMENT,
+		)
 	})
 
 	it('carries the skip flags a resumed ship needs', async () => {
@@ -161,15 +187,40 @@ describe('run_ship_steps — the commit, followup and report stages', () => {
 		expect(josh_spy).toHaveBeenCalledWith(
 			['git', '-y', '--skip-commit', '--skip-push', '--body', 'text', TITLE],
 			true,
+			undefined,
+			core_priority.PRIORITY_ENVIRONMENT,
 		)
 	})
 
+	// joshuafolkken/kit#5831: `josh git` times its steps and hooks under the ship's commit stage.
+	it('hands its lap scope to josh git under the commit step', async () => {
+		await run_ship_lap.within('5831', 'commit', async () => {
+			await step_for(STAGE.COMMIT).run(ARGS, FRESH)
+		})
+
+		expect(josh_spy).toHaveBeenCalledWith(expect.any(Array), true, undefined, {
+			...core_priority.PRIORITY_ENVIRONMENT,
+			[run_ship_lap.ENVIRONMENT_KEY]: JSON.stringify({
+				issue: 5831,
+				stage: 'commit',
+				parent: run_ship_lap.STEP.COMMIT,
+			}),
+		})
+	})
+})
+
+describe('run_ship_steps — the followup and report stages', () => {
 	it('followup passes the title and notify flags; report passes the number and cites', async () => {
 		await step_for(STAGE.FOLLOWUP).run(ARGS, FRESH)
 		await step_for(STAGE.REPORT).run(ARGS, FRESH)
 
 		expect(josh_spy.mock.calls).toStrictEqual([
-			[['followup', TITLE, '--notify', 'done'], true],
+			[
+				['followup', TITLE, '--notify', 'done'],
+				true,
+				undefined,
+				followup_section.SHIPPED_ENVIRONMENT,
+			],
 			[['run:tail', ISSUE, '--cite', '#1'], true],
 		])
 	})
@@ -241,10 +292,20 @@ describe('run_ship_steps — the ship body draft after the merge', () => {
 		expect(remove_draft_spy).toHaveBeenCalledWith(ISSUE)
 	})
 
-	it('keeps the ship body draft when the merge stopped', async () => {
+	// joshuafolkken/kit#5765: a record left behind would hand a reopened issue's run the old findings.
+	it('removes the investigation record once the merge succeeded', async () => {
+		followup_spy.mockResolvedValue(OK)
+
+		await step_for(STAGE.FOLLOWUP).run(ARGS, FRESH)
+
+		expect(remove_record_spy).toHaveBeenCalledWith(ISSUE)
+	})
+
+	it('keeps the ship body draft and the investigation record when the merge stopped', async () => {
 		followup_spy.mockResolvedValue(FAILED)
 
 		expect(await step_for(STAGE.FOLLOWUP).run(ARGS, FRESH)).toBe(FAILED)
 		expect(remove_draft_spy).not.toHaveBeenCalled()
+		expect(remove_record_spy).not.toHaveBeenCalled()
 	})
 })

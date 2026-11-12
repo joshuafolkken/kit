@@ -1,4 +1,5 @@
 import type { ConfirmInput } from '#scripts/notify/telegram-notify'
+import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // joshuafolkken/kit#4663: a named issue from an author without write access runs only on a trusted
@@ -12,6 +13,9 @@ const read_issue_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 vi.mock('#scripts/notify/telegram-notify', () => ({ telegram_notify: { confirm: confirm_mock } }))
+vi.mock('#scripts/backlog/backlog-plan-comment', () => ({
+	backlog_plan_comment: { read_plan: async () => undefined },
+}))
 vi.mock('#scripts/issue/issue-state-cli', () => ({
 	issue_state_cli: { read_issue: read_issue_mock },
 }))
@@ -27,7 +31,9 @@ vi.mock('#scripts/run/run-prep-cli', () => ({
 vi.mock('./run-entry-spill', () => ({ run_entry_spill: { fit: () => '' } }))
 vi.mock('#scripts/run/run-label', () => ({ run_label: { mark: async () => true } }))
 vi.mock('#scripts/run/event/run-event-plan', () => ({ run_event_plan: { emit_plan: vi.fn() } }))
-vi.mock('#scripts/run/run-step-section', () => ({ run_step_section: { print_section: () => 0 } }))
+vi.mock('#scripts/run/run-step-section', () => ({
+	run_step_section: { print_section: () => 0, print_once: () => 0 },
+}))
 vi.mock('#scripts/run/run-halfrun-resume', () => ({
 	run_halfrun_resume: { is_pending: async () => false },
 }))
@@ -40,7 +46,7 @@ const { run_entry_trust } = await import('./run-entry-trust')
 
 const OK = 0
 const ISSUE = '4663'
-const RELEASE = ['run:release', ISSUE]
+const RELEASE = ['--release', ISSUE]
 const PLANNED = 'run:planned'
 
 const STOP_CASES: ReadonlyArray<[string, boolean, Array<string>]> = [
@@ -70,6 +76,7 @@ beforeEach(() => {
 		.mockResolvedValueOnce({ code: OK, out: 'hold' })
 		.mockResolvedValue({ code: OK, out: 'under' })
 	confirm_mock.mockReset().mockResolvedValue(true)
+	vi.spyOn(run_hold_cli, 'run').mockResolvedValue(OK)
 	record_baseline_mock.mockReset().mockResolvedValue(true)
 	read_issue_mock.mockReset().mockResolvedValue(state_read([]))
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
@@ -82,7 +89,7 @@ describe('run_entry_cli.run — an untrusted author stops the run until a truste
 			gather_mock.mockResolvedValue(gathered(false, has_comment, labels))
 
 			expect(await run_entry_cli.run([ISSUE])).not.toBe(OK)
-			expect(josh_run_mock).toHaveBeenLastCalledWith(RELEASE, true)
+			expect(run_hold_cli.run).toHaveBeenCalledExactlyOnceWith(RELEASE)
 			expect(record_baseline_mock).not.toHaveBeenCalled()
 
 			const [input] = confirm_mock.mock.calls[0] as [ConfirmInput]
@@ -115,7 +122,7 @@ describe('run_entry_cli.run — a trust read that failed stops as the failed rea
 			gather_mock.mockResolvedValue(gathered(is_trusted, has_comment, labels))
 
 			expect(await run_entry_cli.run([ISSUE])).not.toBe(OK)
-			expect(josh_run_mock).toHaveBeenLastCalledWith(RELEASE, true)
+			expect(run_hold_cli.run).toHaveBeenCalledExactlyOnceWith(RELEASE)
 
 			const [input] = confirm_mock.mock.calls[0] as [ConfirmInput]
 

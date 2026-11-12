@@ -1,6 +1,5 @@
 import {
 	existsSync,
-	mkdtempSync,
 	readdirSync,
 	readFileSync,
 	realpathSync,
@@ -8,11 +7,11 @@ import {
 	symlinkSync,
 	writeFileSync,
 } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { step_zero_notice } from '#scripts/hooks/step-zero-notice'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { execa } from 'execa'
-import { afterAll, beforeAll, describe, expect, it, onTestFinished } from 'vitest'
+import { beforeAll, describe, expect, it, onTestFinished } from 'vitest'
 import { build_hooks, HOOK_BUNDLES, outfile_for } from './build-hooks'
 import { hook_bundle_stamp } from './hook-bundle-stamp'
 import { lane_cut_fixture } from './lane-cut-fixture'
@@ -26,10 +25,14 @@ const CODEX_ADAPTER_SOURCE = 'scripts/hooks/codex-hook-adapter.ts'
 const CODEX_ADAPTER_BUNDLE = 'dist/hooks/codex-hook-adapter.js'
 const PRETOOL_BUNDLE = 'dist/hooks/pretool-guard.js'
 const FORMAT_BUNDLE = 'dist/hooks/format-edited.js'
+const OUT_PREFIX = 'build-hooks-out-'
 
 // Linked into the format fixture so the hook, run from there, finds this project's prettier binary
 // and config exactly as it does from the repository root.
 const FORMAT_LINKS = ['node_modules', 'prettier.config.js']
+
+const make_directory = temporary_directory()
+const make_suite_directory = temporary_directory('suite')
 
 // The format fixture lives outside the repository: `pnpm pack` walks every directory under the root —
 // ignore files included — so a fixture removed there between its readdir and stat failed the
@@ -37,8 +40,7 @@ const FORMAT_LINKS = ['node_modules', 'prettier.config.js']
 // directory, so its runs use the fixture as that directory. The path is resolved because the hook's
 // working directory is: a symlinked tmpdir (macOS `/var` → `/private/var`) would read as outside it.
 function create_format_directory(): string {
-	const created = mkdtempSync(path.join(tmpdir(), 'codex-hook-'))
-	const format_root = realpathSync(created)
+	const format_root = realpathSync(make_suite_directory('codex-hook-'))
 
 	for (const name of FORMAT_LINKS) {
 		symlinkSync(path.join(REPO_ROOT, name), path.join(format_root, name))
@@ -47,7 +49,7 @@ function create_format_directory(): string {
 	return format_root
 }
 
-const directory = mkdtempSync(path.join(tmpdir(), 'build-hooks-'))
+const directory = make_suite_directory('build-hooks-')
 const format_directory = create_format_directory()
 const TRANSCRIPT_PATH = path.join(directory, 't.jsonl')
 const UNREADABLE_TRANSCRIPT_PAYLOAD = JSON.stringify({
@@ -88,7 +90,10 @@ type PayloadOf = (transcript_path: string) => string
 // on one transcript would have the first spend it and the second run silently. Each side reads a
 // transcript of its own, so neither reads the other's stamp and the two start together.
 function new_transcript(): string {
-	const transcript_path = path.join(mkdtempSync(path.join(directory, 'transcript-')), 't.jsonl')
+	const transcript_path = path.join(
+		make_suite_directory(path.join(directory, 'transcript-')),
+		't.jsonl',
+	)
 
 	writeFileSync(transcript_path, TRANSCRIPT_LINE)
 	onTestFinished(() => {
@@ -121,11 +126,6 @@ writeFileSync(TRANSCRIPT_PATH, TRANSCRIPT_LINE)
 beforeAll(async () => {
 	await build_hooks()
 }, BUILD_TIMEOUT_MS)
-
-afterAll(() => {
-	rmSync(directory, { recursive: true, force: true })
-	rmSync(format_directory, { recursive: true, force: true })
-})
 
 function payload(
 	tool_name: string,
@@ -223,25 +223,11 @@ describe('launched hook bundles run their main', () => {
 
 	it('refuses an over-threshold edit in an uncut lane child', async () => {
 		const lane = lane_cut_fixture.create_over_threshold_lane()
-
-		onTestFinished(() => {
-			lane_cut_fixture.remove(lane)
-		})
 		const result = await lane_cut_fixture.run_edit(lane)
 
 		expect(result).toContain('⛔ implementation-phase cut:')
 	})
 })
-
-function create_out_directory(): string {
-	const out_directory = mkdtempSync(path.join(tmpdir(), 'build-hooks-out-'))
-
-	onTestFinished(() => {
-		rmSync(out_directory, { recursive: true, force: true })
-	})
-
-	return out_directory
-}
 
 // joshuafolkken/kit#2885: split builds emit freshly hashed chunks each time, so a chunk left from an
 // earlier build has to be gone after the next one rather than shipping beside the live chunks.
@@ -249,7 +235,7 @@ describe('build_hooks output directory', () => {
 	it(
 		'removes a stale chunk left from an earlier build',
 		async () => {
-			const out_directory = create_out_directory()
+			const out_directory = make_directory(OUT_PREFIX)
 			const stale_chunk = path.join(out_directory, 'chunk-STALE.js')
 
 			writeFileSync(stale_chunk, 'export {}\n')
@@ -270,11 +256,12 @@ describe('build_hooks output directory', () => {
 	it(
 		'places the build and its stamp without leaving the staging directory behind',
 		async () => {
-			const out_directory = create_out_directory()
+			const out_directory = make_directory(OUT_PREFIX)
 
 			await build_hooks(out_directory)
 
 			expect(existsSync(path.join(out_directory, hook_bundle_stamp.STAMP_NAME))).toBe(true)
+			expect(existsSync(path.join(out_directory, 'daemon.js'))).toBe(true)
 			expect(hook_bundle_stamp.is_fresh(out_directory, process.cwd())).toBe(true)
 			expect(readdirSync(path.dirname(out_directory))).not.toContainEqual(
 				expect.stringMatching(/^\.hooks-staging-/u),

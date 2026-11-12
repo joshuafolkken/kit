@@ -5,7 +5,7 @@ import { lane_stats, type StatsWindow } from './lane-stats'
 // verdict, with each reviewed verdict's share of the rounds the ship ran. The `clean` share is the rate
 // a ship-time round 1 passed with no fix — the number the "CI beside the review" break-even of
 // `docs/maintainers/lane-limit-measurement.md` is read against (joshuafolkken/kit#4620). A `reused`
-// round never ran, so it has a count and no share.
+// or skipped round never ran, so it has a count and no share.
 
 const COLUMNS = ['round 1', 'rounds', 'share'] as const
 const VERDICTS = ['clean', 'fixed', 'blocking'] as const
@@ -43,6 +43,7 @@ function table(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): string
 		lane_stats.to_row(COLUMNS.map(() => '---')),
 		...rows,
 		lane_stats.to_row([REUSED, String(count_of(rounds, REUSED)), NO_SHARE]),
+		lane_stats.to_row(['skipped', String(count_of(rounds, 'skipped')), NO_SHARE]),
 	].join('\n')
 }
 

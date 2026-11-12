@@ -1,4 +1,5 @@
 import { behavior_change_lint } from './behavior-change-lint'
+import { issue_body_keys } from './issue-body-keys'
 import {
 	BUG_LABEL,
 	BUGFIX_LABEL,
@@ -16,7 +17,7 @@ import { markdown_section } from './markdown-section'
 // Older bodies rarely wrote it, so the labels a maintainer re-applied after review count as well — the
 // name changed over time (`bugfix` earlier, `bug` from `issue:file`), and the labels read both periods
 // by one standard where the declaration alone moved the rate with the filing habit.
-const DEFECT_DECLARATION_LINE = '- 種別: 不具合'
+const DEFECT_DECLARATION_LINE = issue_body_keys.line('kind', 'bug')
 const DEFECT_LABELS: ReadonlyArray<string> = [BUG_LABEL, BUGFIX_LABEL, INTERRUPT_ROUTE_LABEL]
 const DEFAULT_WINDOW_DAYS = 14
 // The rate over 2026-09-09 to 2026-09-23 measured by the label definition — 150 / 206, rounded.

@@ -1,30 +1,33 @@
 # Labels and run states
 
-The labels you put on an Issue to steer the agent, the labels a run puts on it for you, and the states a run reads off an Issue to decide where it starts. The procedures behind them are in the [`workflow-commands` skill](../.claude/skills/workflow-commands/SKILL.md); this page is for the person running the agent.
+Issue labels and entry states. Procedures: [`workflow-commands`](../.claude/skills/workflow-commands/SKILL.md).
 
 ## Labels you apply
 
-| Label                | What it does                                                                                                                                             |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `auto-ok`            | Opts the Issue in to unattended work. On an epic's root it opts in every descendant. See [Run the backlog](./how-to/run-backlog.md).                     |
-| `needs-human-review` | Implement and verify, then stop before the commit — [below](#needs-human-review--the-opposite-label).                                                    |
-| `priority:critical`  | Puts the Issue first in the backlog's order. Applied at filing from the body's `- 優先度:` declaration; only you remove it.                              |
-| `priority:high`      | Puts the Issue next, after `priority:critical`. Applied at filing the same way; only you remove it.                                                      |
-| `deferred`           | Sets the Issue aside for now: it never gets `auto-ok` at filing or from the agent's judgement.                                                           |
-| `run:solo`           | Runs the Issue alone, with nothing else started beside it. The agent applies it to a defect in kit's own verification that answers wrongly on every run. |
-| `run:lane`           | Lets the Issue run in a parallel lane beside others. The agent applies it to every other opted-in Issue.                                                 |
+| Label                | What it does                                                                                                                                                                                                               |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `auto-ok`            | Opts the Issue in to unattended work. On an epic's root it opts in every descendant. See [Run the backlog](./how-to/run-backlog.md).                                                                                       |
+| `needs-human-review` | Implement and verify, then stop before the commit — [below](#needs-human-review--the-opposite-label).                                                                                                                      |
+| `needs-human-merge`  | PR open: workflow changes require a person to read the diff and merge on GitHub. `backlogrun` treats an OPEN child as human waiting, with no failure or stalled count; after merge closes the Issue, it advances normally. |
+| `priority:critical`  | Puts the Issue first in the backlog's order. Applied at filing from the body's `- 優先度:` declaration; only you remove it.                                                                                                |
+| `priority:high`      | Puts the Issue next, after `priority:critical`. Applied at filing the same way; only you remove it.                                                                                                                        |
+| `deferred`           | Sets the Issue aside for now: it never gets `auto-ok` at filing or from the agent's judgement.                                                                                                                             |
+| `run:solo`           | Runs the Issue alone, with nothing else started beside it. The agent applies it to a defect in kit's own verification that answers wrongly on every run.                                                                   |
+| `run:lane`           | Lets the Issue run in a parallel lane beside others. The agent applies it to every other opted-in Issue.                                                                                                                   |
 
 ## Labels a run applies
 
-| Label            | What it means                                                                                                                                           |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `in-progress`    | A run holds a working tree for this Issue. Remove a stale one only once the tree is clean ([Recover a stopped run](./how-to/recover-a-run.md)).         |
-| `needs-decision` | The run parked the Issue: it waits for your answer and the backlog skips it until you give one.                                                         |
-| `run:stalled`    | The run parked the Issue on a mechanical failure: fix the cause, then resume it with `fullrun #N` or remove the label; the backlog skips it until then. |
-| `already-done`   | The work is already merged — [below](#already-done--the-exit-for-work-that-is-already-merged).                                                          |
-| `measured`       | A measurement-only Issue a run closed itself with `josh issue:measured`: the result is commented on it, and no pull request was needed.                 |
-| `measured:unmet` | Set with `measured` by `josh issue:measured --unmet`: the measurement fell short of the expected effect it checked. `josh effect:audit` reads it.       |
-| `epic`           | The Issue tracks child Issues and the order they land in.                                                                                               |
+| Label            | What it means                                                                                                                                                                                                                 |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `in-progress`    | A run holds a working tree for this Issue. Remove a stale one only once the tree is clean ([Recover a stopped run](./how-to/recover-a-run.md)).                                                                               |
+| `needs-decision` | The run parked the Issue for your answer, including a child ending with a question or confirmation notification. The backlog skips it; the wait does not increase consecutive failures.                                       |
+| `run:stalled`    | A mechanical failure parked it (`session unfinished`: no question or confirmation found). Fix the cause, then `pnpm josh run:add N --retry` in a live backlogrun, else `fullrun #N`. An open blocker shows `waiting on #<B>`. |
+| `already-done`   | The work is already merged — [below](#already-done--the-exit-for-work-that-is-already-merged).                                                                                                                                |
+| `measured`       | A measurement-only Issue a run closed itself with `josh issue:measured`: the result is commented on it, and no pull request was needed.                                                                                       |
+| `measured:unmet` | Set with `measured` by `josh issue:measured --unmet`: the measurement fell short of the expected effect it checked. `josh effect:audit` reads it.                                                                             |
+| `epic`           | The Issue tracks child Issues and the order they land in.                                                                                                                                                                     |
+
+A live backlogrun retries a `run:stalled` park itself — a `followup` stop once its PR is mergeable and green, `yield cap` after its 15-minute window, `session unfinished`, `cut not relaunched` and `stale hand-off` on the next sweep — 2 times per Issue across driver restarts; then its row shows `auto-retry cap 2 reached — <cause>`. Any other park, or one at the cap, waits for `run:add N --retry`.
 
 ### `needs-human-review` — the opposite label
 
@@ -38,7 +41,9 @@ Single source: [`.claude/skills/workflow-commands/needs-human-review.md`](../.cl
 
 ### `already-done` — the exit for work that is already merged
 
-The exit for a run that verifies its issue's work is already in `main`: nothing to implement, and it cannot close the issue (Tier C). Not `needs-decision` — that waits for an answer; this one has its answer and only the close is outstanding. A run applies it with `josh issue:already-done`; only a person removes it, by closing the issue.
+The exit for a run that verifies its issue's work is already in `main`. `josh issue:already-done` applies it, then closes the issue as `completed` when a cited pull request reads back as merged or `origin/main` contains a cited commit SHA; the label stays on the closed issue.
+
+Any other evidence leaves it OPEN with the label and prints why. Not `needs-decision` — it has its answer; a person closes it.
 
 ```bash
 gh api repos/{owner}/{repo}/labels -f name=already-done -f color=6f42c1 -f description="Verified already merged — a person closes it"
@@ -48,7 +53,11 @@ Procedure: [`.claude/skills/workflow-commands/issue-comments.md`](../.claude/ski
 
 ## Run states
 
-A run reads one of these states off the Issue to decide where it starts, so nothing already done is redone. Which keyword starts where from each state is the table in [Run Issues with the workflow keywords](./how-to/run-issues.md#going-up-the-ladder-a-stage-at-a-time).
+| Board icon | Meaning                                                                                                                                                                |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🔏         | An OPEN Issue carrying `needs-human-merge` awaits a human merge. The row ends `→ merge PR #<P>`, `→ find its PR for #<N>` when no open PR pairs, or nothing if unread. |
+
+A run starts from the Issue's state. Keyword entry points: [Run Issues](./how-to/run-issues.md#going-up-the-ladder-a-stage-at-a-time).
 
 | State             | What it means                                                                    |
 | ----------------- | -------------------------------------------------------------------------------- |
@@ -59,3 +68,7 @@ A run reads one of these states off the Issue to decide where it starts, so noth
 | `merged`          | The Issue is closed; the work is in the default branch.                          |
 
 How each state is read is in [`josh run:entry`](./josh-commands-run.md#josh-runentry).
+
+A cut's `handed-off` verdict stops a second resume. After stopping and releasing the adopter to
+wait or park, `run:merge` makes the cut resumable again, with the usual tree verification.
+A failed stop leaves the adoption protected.

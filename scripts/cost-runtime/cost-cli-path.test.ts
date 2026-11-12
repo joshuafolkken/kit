@@ -1,6 +1,6 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
-import os from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it, vi } from 'vitest'
 import { codex_usage } from './codex-usage'
 import { cost_cli } from './cost-cli'
@@ -21,6 +21,7 @@ const PER_REQUEST = 'per request'
 const WORKTREE_GIT_PATH = '.git/worktrees/2089'
 const ISSUE = '2089'
 const THREAD_ID = 'active-thread'
+const make_directory = temporary_directory()
 
 cost_cli_fixture.capture_console()
 
@@ -47,10 +48,10 @@ function write_active_rollout(codex_home: string, lane: string): void {
 }
 
 function linked_rollout(): { main: string; lane: string; environment: Record<string, string> } {
-	const main = mkdtempSync(path.join(os.tmpdir(), 'cost-openai-main-'))
-	const lane_root = mkdtempSync(path.join(os.tmpdir(), 'cost-openai-lanes-'))
+	const main = make_directory('cost-openai-main-')
+	const lane_root = make_directory('cost-openai-lanes-')
 	const lane = path.join(lane_root, ISSUE)
-	const codex_home = mkdtempSync(path.join(os.tmpdir(), 'cost-openai-home-'))
+	const codex_home = make_directory('cost-openai-home-')
 
 	mkdirSync(path.join(main, WORKTREE_GIT_PATH), { recursive: true })
 	mkdirSync(lane, { recursive: true })

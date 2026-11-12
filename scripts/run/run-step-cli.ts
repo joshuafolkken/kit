@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { agent_provider } from '#scripts/agent/agent-provider'
 import { doctor_consumer } from '#scripts/doctor/doctor-consumer'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { find_package_directory } from '#scripts/josh/josh-logic'
@@ -15,7 +15,9 @@ import { run_prep_cli } from './run-prep-cli'
 import { run_retrospective } from './run-retrospective'
 import { run_step, type ParentInput, type StepInput } from './run-step'
 import { run_step_lane_plan } from './run-step-lane-plan'
+import { run_step_progress } from './run-step-progress'
 import { run_step_section } from './run-step-section'
+import { run_step_section_once } from './run-step-section-once'
 
 // `josh run:step [<N>]` — print the run's next single action, followed by the section that governs it
 // (`run-step-section.ts`), computed from the event stream, the carry
@@ -27,6 +29,8 @@ import { run_step_section } from './run-step-section'
 
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
+const SHIP_REPEAT =
+	'ship preconditions: unchanged — printed earlier this session; after a compaction: pnpm josh run:prep '
 const USAGE =
 	'Usage: josh run:step [<issue-number>] — without a number it answers for the `backlogrun` carry record this session drives'
 
@@ -58,6 +62,15 @@ const UNREADABLE_RUN: RunReads = {
 	last_event: undefined,
 }
 
+// A repository's carry belongs to its parent and dispatched children. An interactive numbered
+// fullrun beside another owner uses the existing no-carry path, without changing that owner's record.
+function invocation_carry(carry: CarryRead, is_lane_child: boolean): CarryRead {
+	if (carry.kind !== 'carried') return carry
+	if (is_lane_child || run_headless.is_owned_here(carry.carry, lane_reap.own_ancestry)) return carry
+
+	return { kind: 'none' }
+}
+
 // The run-level reads, keyed on the common git directory both the carry and the event stream share. A
 // directory that cannot be read leaves the position unknowable, which `next_action` answers `unknown`.
 function read_run(
@@ -67,7 +80,10 @@ function read_run(
 ): RunReads {
 	if (directory === undefined) return UNREADABLE_RUN
 
-	const carry = run_carry.read_carry(run_carry.carry_path(directory))
+	const carry = invocation_carry(
+		run_carry.read_carry(run_carry.carry_path(directory)),
+		is_lane_child,
+	)
 	const events = run_event_stream.read_events(run_event_stream.target_of(directory))
 	// The last event *within this invocation's scope*, not the raw newest one: a stale event a previous
 	// invocation left on the stream — an old `child-launch`, say — must not be read as this run's
@@ -108,7 +124,7 @@ function step_input(parts: PrepParts, run_reads: RunReads, is_lane_child: boolea
 		// Read here rather than in `run-step.ts` so the position logic stays a pure function of its input.
 		is_retrospective_enabled: run_retrospective.is_enabled(),
 		has_changes: parts.has_changes,
-		has_completion_callback: agent_role_profile.has_completion_callback(),
+		has_completion_callback: agent_provider.has_completion_callback(),
 	}
 }
 
@@ -166,24 +182,36 @@ async function run_parent(): Promise<number> {
 	return FAILURE_EXIT_CODE
 }
 
-// The action line, then — under `implement` — the `lane:plan` a lane child runs before its first edit.
-// Only `implement` reads it, so no other step pays for the plan comment's request.
+// The action line, then — under `implement` — the `lane:plan` a lane child runs before its first edit
+// and its `--imports` hint. Only `implement` reads it, so no other step pays for the plan comment's request.
 async function action_lines(input: StepInput, line: string): Promise<ReadonlyArray<string>> {
 	if (line !== run_step.IMPLEMENT) return [line]
-	const next = await run_step_lane_plan.line_for(input.issue_number, input.is_lane_child)
 
-	return next === undefined ? [line] : [line, next]
+	return [line, ...(await run_step_lane_plan.lines_for(input.issue_number, input.is_lane_child))]
+}
+
+// The ship preconditions, once per session while they read the same (`run-step-section-once.ts`):
+// `run:entry` printed them in its bundle, so an unchanged list is one line naming where to re-read it.
+function ship_text(issue_number: string, problems: ReadonlyArray<string>): string {
+	const body = run_prep.ship_body(problems)
+
+	if (run_step_section_once.is_text_recorded(body)) return `${SHIP_REPEAT}${issue_number}`
+	run_step_section_once.record_text(body)
+
+	return body
 }
 
 async function report({ input, ship_problems }: Gathered): Promise<number> {
 	const action = run_step.next_action(input)
 
+	await run_step_progress.record(input.issue_number, action.line, input.last_event)
+
 	const lines = await action_lines(input, action.line)
 
 	for (const line of lines) console.info(line)
 	// On stderr, so stdout stays the action lines and their rule: what `josh ship` would
-	// refuse on is said at every step, while it is still cheap to meet.
-	if (ship_problems.length > 0) console.error(run_prep.ship_body(ship_problems))
+	// refuse on is said at every step — in full once per session, then as one line — while it is still cheap to meet.
+	if (ship_problems.length > 0) console.error(ship_text(input.issue_number, ship_problems))
 
 	// A state that could not be read exits non-zero, exactly as `run:prep` and `run:next` exit on the
 	// same failure, so a position missing its issue state is never read as a confident next step.
@@ -213,7 +241,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }
 
-const run_step_cli = { run }
+const run_step_cli = { run, ship_text }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 

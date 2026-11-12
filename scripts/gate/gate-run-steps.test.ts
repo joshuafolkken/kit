@@ -45,12 +45,11 @@ function unit_step_args(): string | undefined {
 // so a zero-weight check never queues behind one waiting for cores.
 describe('run_gate_steps — the start order', () => {
 	beforeEach(() => {
-		vi.clearAllMocks()
 		mocked_execa.mockImplementation(gate_test_fixture.as_execa_implementation(fake_execa))
 	})
 
 	it('starts the zero-weight checks first and reports in declaration order', async () => {
-		const plan = gate_plan.plan_of(1, undefined, gate_plan.select_gate_checks(false, true))
+		const plan = gate_plan.plan_of(1, undefined, gate_plan.select_gate_checks(false, true, false))
 
 		const results = await gate_run_steps.run_gate_steps(plan, UNRESERVED_BUDGET)
 		const started = mocked_execa.mock.calls.map((call) => JSON.stringify(call[1]))
@@ -62,10 +61,46 @@ describe('run_gate_steps — the start order', () => {
 	})
 })
 
+// The type-program check a spawned step runs, read from its `josh <target>` arguments.
+function program_of(args: unknown): string | undefined {
+	const targets = Array.isArray(args) ? args : []
+
+	return [gate_labels.LINT_LABEL, gate_labels.TYPE_CHECK_LABEL].find((label) =>
+		targets.includes(label),
+	)
+}
+
+// joshuafolkken/kit#7031: a lane's gate held the tsc and the type-aware ESLint programs at once.
+describe('run_gate_steps — the type-program checks', () => {
+	it('starts the type check only after the lint has ended, however wide the pool', async () => {
+		const events: Array<string> = []
+
+		mocked_execa.mockImplementation(
+			gate_test_fixture.as_execa_implementation(async (_command, args) => {
+				const program = program_of(args)
+
+				if (program !== undefined) events.push(`start:${program}`)
+				await new Promise((resolve) => setTimeout(resolve, 0))
+				if (program !== undefined) events.push(`end:${program}`)
+
+				return gate_test_fixture.fake_result(0, '')
+			}),
+		)
+
+		await gate_run_steps.run_gate_steps(gate_plan.plan_of(MEASURED_CORES), UNRESERVED_BUDGET)
+
+		expect(events).toStrictEqual([
+			`start:${gate_labels.LINT_LABEL}`,
+			`end:${gate_labels.LINT_LABEL}`,
+			`start:${gate_labels.TYPE_CHECK_LABEL}`,
+			`end:${gate_labels.TYPE_CHECK_LABEL}`,
+		])
+	})
+})
+
 // joshuafolkken/kit#3903: a check whose inputs did not move since its record is reused, not run.
 describe('run_gate_steps — a reused check', () => {
 	beforeEach(() => {
-		vi.clearAllMocks()
 		mocked_execa.mockImplementation(gate_test_fixture.as_execa_implementation(fake_execa))
 	})
 

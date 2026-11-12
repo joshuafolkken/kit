@@ -8,6 +8,7 @@ import {
 } from './epic-candidate-confirm'
 import { epic_graph, type EpicChild } from './epic-graph'
 import { epic_label_age } from './epic-label-age'
+import { epic_lane_occupancy, type OccupancyRead } from './epic-lane-occupancy'
 import { epic_rank } from './epic-rank'
 import type { EpicVerdict } from './epic-report'
 import { epic_solo } from './epic-solo'
@@ -17,7 +18,7 @@ import { epic_triage, type TriageVerdict } from './epic-triage'
 // Which children a repository has room to start right now.
 //
 // A lane is its own checkout, so the question is how many are free — the repository's occupancy
-// counted from GitHub, compared against `lane_capacity`'s limit.
+// read from GitHub and reconciled with the local snapshot against `lane_capacity`'s limit.
 //
 // **The pool takes several sources, and none of them is an epic.** `RepoPool` is a candidate list
 // with the context needed to confirm it. `epic:next` builds one per named epic and passes them all;
@@ -85,6 +86,18 @@ async function merge_waiting_holders(read: BusyRead, request: LaneRequest): Prom
 
 	return await lane_snapshot_trace.count_merge_waiting(
 		read.issues.map((issue) => String(issue.number)),
+	)
+}
+
+async function room_in(occupancy: OccupancyRead, request: LaneRequest): Promise<number> {
+	if (occupancy.use !== undefined) {
+		return lane_capacity.free_lanes(request.limit, occupancy.use.occupied, occupancy.use.seated)
+	}
+
+	return free_lanes(
+		occupancy.read,
+		request.limit,
+		await merge_waiting_holders(occupancy.read, request),
 	)
 }
 
@@ -216,11 +229,17 @@ async function collect(
 // `run:solo` child never opens a lane beside another one on either path.
 function solo_offer(
 	answer: { children: ReadonlyArray<EpicChild>; verdict: EpicVerdict },
-	read: BusyRead,
+	occupancy: OccupancyRead,
 	request: LaneRequest,
 	ages: ReadonlyMap<number, string>,
 ): LaneOffer {
-	const { offered, notice = '' } = epic_solo.select(answer.children, read, request.repo)
+	const { read, use } = occupancy
+	const { offered, notice = '' } = epic_solo.select(
+		answer.children,
+		read,
+		request.repo,
+		use?.occupied,
+	)
 
 	if (offered.length === NO_LANES && answer.children.length > NO_LANES) {
 		return { children: [], verdict: WAIT_VERDICT, notice }
@@ -254,35 +273,52 @@ function triage_offer(pools: ReadonlyArray<RepoPool>, request: LaneRequest): Lan
 	}
 }
 
-async function offer_for_repo(
+function full_notice(
+	occupancy: OccupancyRead,
+	request: LaneRequest,
+	ages: ReadonlyMap<number, string>,
+): string {
+	if (occupancy.use === undefined) {
+		return epic_busy.busy_reason(occupancy.read, request.repo, request.limit, ages)
+	}
+
+	return `${String(occupancy.use.occupied)} of ${String(request.limit)} lanes in use in ${request.repo}; ${String(occupancy.use.seated)} port seats held. No lane is free, so nothing is offered here.`
+}
+
+async function offer_after_triage(
 	pools: ReadonlyArray<RepoPool>,
 	request: LaneRequest,
 ): Promise<LaneOffer> {
-	const triage = triage_offer(pools, request)
-
-	if (triage !== undefined) return triage
-
-	const { read, notice } = await epic_solo_stale.release(
+	const released = await epic_solo_stale.release(
 		await epic_busy.read_repository(request.repo),
 		request.repo,
 	)
 
-	if (notice !== undefined) console.error(notice)
+	if (released.notice !== undefined) console.error(released.notice)
 
-	const free = free_lanes(read, request.limit, await merge_waiting_holders(read, request))
+	const occupancy = await epic_lane_occupancy.read(released.read, request.is_this_checkout)
+	const { read } = occupancy
+	const free = await room_in(occupancy, request)
 	const ages = await holder_ages(read, request.repo)
 
 	if (free === NO_LANES) {
 		return {
 			children: [],
 			verdict: WAIT_VERDICT,
-			notice: epic_busy.busy_reason(read, request.repo, request.limit, ages),
+			notice: full_notice(occupancy, request, ages),
 		}
 	}
 
 	const for_repo = dedupe_pools(pools.map((pool) => ranked_in(pool, request.repo)))
 
-	return solo_offer(await collect(for_repo, wanted_of(request, free)), read, request, ages)
+	return solo_offer(await collect(for_repo, wanted_of(request, free)), occupancy, request, ages)
+}
+
+async function offer_for_repo(
+	pools: ReadonlyArray<RepoPool>,
+	request: LaneRequest,
+): Promise<LaneOffer> {
+	return triage_offer(pools, request) ?? (await offer_after_triage(pools, request))
 }
 
 // A `--repo` compared against the repository this command runs in, case-insensitively as GitHub

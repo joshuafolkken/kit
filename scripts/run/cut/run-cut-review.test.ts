@@ -25,7 +25,6 @@ const latest = vi.spyOn(review_prior_findings, 'latest')
 const errors = vi.spyOn(console, 'error').mockReturnValue()
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(git_command, 'repository_root').mockResolvedValue(ROOT)
 	is_attested_on.mockReturnValue(true)
 	record_check.mockResolvedValue({ status: 'missing', issue: Number(ISSUE) })

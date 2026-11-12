@@ -4,6 +4,8 @@ import { lane_limit_override } from '#scripts/lane/lane-limit-override'
 import { COMMAND_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { run_headless } from '#scripts/run/run-headless'
 import { backlog_arrival_added } from './backlog-arrival-added'
+import { backlog_budget } from './backlog-budget'
+import { backlog_drive_listing, type ListingCheck } from './backlog-drive-listing'
 import { backlog_next } from './backlog-next'
 import { backlog_ready, type ReadyPorts, type ReadyReading } from './backlog-ready'
 import { backlog_stalled } from './backlog-stalled'
@@ -14,19 +16,26 @@ import { backlog_stalled_detect } from './backlog-stalled-detect'
 // next wakes — a child's merge, or the progress interval — so in practice the ten-minute stall detector
 // becomes the pick-up, ten minutes late.
 //
-// **The watcher's exit is the only thing that wakes a live parent**, so the probe rides it: once a
-// minute it reads the backlog the pick-up line reads (`backlog_ready.read_ready`, cheap first — a full
-// pool answers without the network read), and an issue runnable now that was not runnable when the
-// watcher started ends the wait. The exit prints the `ready #N` line as every exit does, and that line
-// is what sends the parent to `backlog:offer`. The stall detector stays the safety net.
+// **The watcher's exit is the only thing that wakes a live parent**, so the probe rides it: every
+// `PROBE_INTERVAL_MS` it reads the backlog the pick-up line reads (`backlog_ready.read_ready`, cheap
+// first — a full pool answers without the network read), and an issue runnable now that was not
+// runnable when the watcher started ends the wait. The exit prints the `ready #N` line as every exit
+// does, and that line is what sends the parent to `backlog:offer`. The stall detector stays the safety
+// net.
+//
+// **The `auto-ok` listing gates the read** (joshuafolkken/kit#7229): each probe first asks the listing
+// check `backlog:drive` asks (`backlog_drive_listing.watcher`), whose 304 spends no REST core, and reads
+// the backlog only once the listing holds a new issue — so the probe shares that check's ten-second
+// interval. A raised lane limit changes no listing, so it reads regardless, and a listing change whose
+// reading failed is read again at the next probe.
 //
 // **"New" is measured against the watcher's own start**, so one issue wakes the parent once: the next
 // `--wait` the parent starts takes the pool as it stands then — the woken issue included, dispatched or
 // not — as its baseline. A reading that fails is not an arrival; the probe says nothing and reads again
-// a minute later. A baseline that cannot be read is never read as empty — an empty one would wake the
+// at the next probe. A baseline that cannot be read is never read as empty — an empty one would wake the
 // parent for the whole pool — but it is not given up on either: the scheduled report no longer ends the
 // wait, so an inert probe would leave the parent without a wake until `--hours`. The
-// probe reads the baseline again each minute until one answers.
+// probe reads the baseline again at each probe until one answers.
 //
 // **Every read is bounded.** The probe is awaited inside the watcher's tick loop, so a `gh` call that
 // hangs would otherwise freeze the loop — its `--hours` bound, its liveness ping and the exit that is
@@ -36,7 +45,7 @@ import { backlog_stalled_detect } from './backlog-stalled-detect'
 // the lenient pick-up read takes as an empty pool — here that empty baseline is the whole-pool wake the
 // paragraph above rules out, so either verdict, like a non-zero exit, is a read that did not answer.
 
-const PROBE_INTERVAL_MS = 60_000
+const PROBE_INTERVAL_MS = backlog_budget.LISTING_CHECK_INTERVAL_MS
 const SUCCESS_EXIT_CODE = 0
 const NO_FREE = 0
 const NONE = 0
@@ -67,11 +76,13 @@ async function bounded_ready_issues(): Promise<ReadonlyArray<string>> {
 	return answered_issues(await backlog_ready.read_backlog_next(COMMAND_TIMEOUT_MS))
 }
 
-// The backlog reads, whether `run:add` handed the run an issue since a given instant, and the stall
-// detector's record of whether work and a free lane coexist (joshuafolkken/kit#4349).
+// The backlog reads, whether `run:add` handed the run an issue since a given instant, the stall
+// detector's record of whether work and a free lane coexist (joshuafolkken/kit#4349), and a fresh
+// `auto-ok` listing check per watcher, since each check keeps the numbers it has seen.
 interface ArrivalPorts extends ReadyPorts {
 	is_added_since: (since_ms: number) => Promise<boolean>
 	observe_offerable: (is_offerable: boolean) => Promise<void>
+	listing_watcher: () => ListingCheck
 }
 
 const ARRIVAL_PORTS: ArrivalPorts = {
@@ -79,10 +90,44 @@ const ARRIVAL_PORTS: ArrivalPorts = {
 	ready_issues: bounded_ready_issues,
 	is_added_since: backlog_arrival_added.is_added_since,
 	observe_offerable: backlog_stalled_detect.observe_offerable,
+	listing_watcher: backlog_drive_listing.watcher,
 }
 
 interface ArrivalProbe {
 	has_arrived: (now_ms: number) => Promise<boolean>
+}
+
+// What may have changed since the start: the lane limit, and whether the backlog is worth reading.
+interface PoolWatch {
+	is_raised: () => boolean
+	is_due: () => Promise<boolean>
+	settle: () => void
+}
+
+// A listing change stays due until a reading answers, so a failed reading is read again at the next
+// probe rather than waiting for yet another new issue.
+function pool_watch_of(is_changed: ListingCheck, is_raised: () => boolean): PoolWatch {
+	const memory = { is_pending: false }
+
+	function mark(is_pending: boolean): void {
+		memory.is_pending = is_pending
+	}
+
+	async function is_due(): Promise<boolean> {
+		if (is_raised() || memory.is_pending) return true
+
+		const is_new = await is_changed()
+
+		mark(is_new)
+
+		return is_new
+	}
+
+	function settle(): void {
+		mark(false)
+	}
+
+	return { is_raised, is_due, settle }
 }
 
 // Runnable now, not runnable at the start, and a lane free to take it. **A raised lane limit makes the
@@ -106,8 +151,8 @@ function is_offerable(reading: ReadyReading): boolean {
 // The baseline is the whole runnable pool, free lane or not: an issue that was waiting for a lane is not
 // new when one frees, and the child's merge that freed it already wakes the parent.
 //
-// A baseline read during a `triage` answer names none of the issues it withheld, so every one of them
-// would arrive once they were judged — the whole-pool wake. It is read as a baseline that did not answer.
+// A baseline read during a `triage` answer — alone, or trailing the triaged candidates — leaves out the
+// held issue, so it would arrive once judged. It is read as a baseline that did not answer.
 async function read_baseline(ports: ReadyPorts): Promise<ReadonlySet<string> | undefined> {
 	try {
 		const issues = await ports.ready_issues()
@@ -155,11 +200,30 @@ async function retry_baseline(
 // The next-probe instant is set before any read is awaited. A baseline that did not answer is read again
 // at the next probe instead of the reading, and the first one that answers is the baseline from then on
 // — never an arrival itself, since it is the pool as it stands.
+// A reading is made only on a probe the watch finds due, and only a reading that answered records the
+// stall detector's observation or settles the watch.
+async function has_reading_arrival(
+	baseline: ReadonlySet<string>,
+	ports: ArrivalPorts,
+	watch: PoolWatch,
+): Promise<boolean> {
+	if (!(await watch.is_due())) return false
+
+	const reading = await read_reading(ports)
+
+	if (reading === undefined) return false
+
+	watch.settle()
+	await ports.observe_offerable(is_offerable(reading))
+
+	return arrivals(baseline, reading, watch.is_raised()).length > NONE
+}
+
 function pool_probe_of(
 	initial: ReadonlySet<string> | undefined,
 	first_ms: number,
 	ports: ArrivalPorts,
-	is_raised: () => boolean,
+	watch: PoolWatch,
 ): ArrivalProbe {
 	let next_ms = first_ms
 	// At most one entry, held in a list so the baseline that answers after an await is added rather than
@@ -175,25 +239,21 @@ function pool_probe_of(
 
 		if (baseline === undefined) return await retry_baseline(answered, ports)
 
-		const reading = await read_reading(ports)
-
-		if (reading !== undefined) await ports.observe_offerable(is_offerable(reading))
-
-		return reading !== undefined && arrivals(baseline, reading, is_raised()).length > NONE
+		return await has_reading_arrival(baseline, ports, watch)
 	}
 
 	return { has_arrived }
 }
 
 // An issue `run:add` handed the run since the watcher started wakes the parent at the next tick, ahead
-// of the pool probe's minute.
+// of the pool probe's interval.
 function probe_of(
 	initial: ReadonlySet<string> | undefined,
 	started_ms: number,
 	ports: ArrivalPorts,
-	is_raised: () => boolean,
+	watch: PoolWatch,
 ): ArrivalProbe {
-	const pool = pool_probe_of(initial, started_ms + PROBE_INTERVAL_MS, ports, is_raised)
+	const pool = pool_probe_of(initial, started_ms + PROBE_INTERVAL_MS, ports, watch)
 
 	async function has_arrived(now_ms: number): Promise<boolean> {
 		if (await ports.is_added_since(started_ms)) return true
@@ -205,7 +265,9 @@ function probe_of(
 }
 
 // Inert outside a driving `backlogrun` parent — a `fullrun` watcher has no pool to pick from — and there
-// it reads nothing at all. The raise watch starts with the probe, so only a raise after it wakes.
+// it reads nothing at all. The raise watch starts with the probe, so only a raise after it wakes, and
+// the listing check's first read — its own baseline — is made before the pool's, so an issue opted in
+// between the two is either in the pool's baseline or new to the listing.
 async function start(
 	now_ms: number,
 	ports: ArrivalPorts = ARRIVAL_PORTS,
@@ -215,8 +277,13 @@ async function start(
 	if (!(await is_parent_safely(is_parent))) return INERT
 
 	const is_raised = await watch_raise()
+	const is_changed = ports.listing_watcher()
 
-	return probe_of(await read_baseline(ports), now_ms, ports, is_raised)
+	await is_changed()
+
+	const watch = pool_watch_of(is_changed, is_raised)
+
+	return probe_of(await read_baseline(ports), now_ms, ports, watch)
 }
 
 const backlog_arrival = { PROBE_INTERVAL_MS, answered_issues, arrivals, start }

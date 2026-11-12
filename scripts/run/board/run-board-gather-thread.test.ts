@@ -1,4 +1,5 @@
 import { stripVTControlCharacters } from 'node:util'
+import { ts_entry_loader } from '#scripts/run/ts-entry-loader'
 import { describe, expect, it, vi } from 'vitest'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_gather, type GatherState } from './run-board-gather'
@@ -10,16 +11,35 @@ import { run_board_tick } from './run-board-tick'
 
 const { LOCAL, START, WORDS, harness, plan_titled } = run_board_fixture
 const { FRESH_GATHER, read_of } = run_board_gather
-const { post_of, worker_gatherer } = run_board_gather_thread
+const { post_of, worker_gatherer, worker_options } = run_board_gather_thread
 const { FRESH_STATE, tick } = run_board_tick
 const FAILED_MS = START + 1000
 const READ: GatherState = { ...FRESH_GATHER, local: LOCAL, read_ms: START }
 
 const FAILED_READ = new RegExp(String.raw`❗ ${WORDS.read} \d{2}:\d{2}`, 'u')
 
+const worker_spawn = vi.hoisted(() => vi.fn())
+
+vi.mock('node:worker_threads', () => ({ Worker: worker_spawn }))
+
 interface Fake extends GatherWorker {
 	emit: (event: string, value?: unknown) => void
 }
+
+describe('run_board_gather_thread.worker_options', () => {
+	it('adds the loader for a dist-launched parent with no loader flags', () => {
+		expect(worker_options([]).execArgv).toStrictEqual([
+			ts_entry_loader.IMPORT_FLAG,
+			ts_entry_loader.loader_url(),
+		])
+	})
+
+	it('keeps an existing parent loader without adding it twice', () => {
+		const exec_argv = [ts_entry_loader.IMPORT_FLAG, ts_entry_loader.loader_url()]
+
+		expect(worker_options(exec_argv).execArgv).toStrictEqual(exec_argv)
+	})
+})
 
 function fake_worker(): Fake {
 	type Listener = (value: unknown) => void
@@ -46,6 +66,23 @@ function faked(): { gather: ReturnType<typeof worker_gatherer>; spawned: Array<F
 
 	return { gather: worker_gatherer(spawn, () => FAILED_MS), spawned }
 }
+
+describe('run_board_gather_thread.worker_gatherer with its default spawn', () => {
+	it('passes the parent loader options to the default Worker constructor', async () => {
+		const worker = fake_worker()
+
+		worker_spawn.mockImplementationOnce(function create_worker() {
+			return worker
+		})
+		const first = worker_gatherer()('background')
+
+		worker.emit('message', post_of(FRESH_GATHER, READ))
+		await first
+		expect(worker_spawn).toHaveBeenCalledWith(run_board_gather_thread.WORKER_URL, {
+			execArgv: ts_entry_loader.loader_argv(process.execArgv),
+		})
+	})
+})
 
 describe('run_board_gather_thread.worker_gatherer', () => {
 	it('waits for the worker’s first round, then draws the last one handed over', async () => {

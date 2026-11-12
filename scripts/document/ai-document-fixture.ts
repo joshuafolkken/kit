@@ -24,17 +24,26 @@ const POINTER_DOCS: ReadonlyArray<string> = ['AGENTS.md', 'GEMINI.md', '.cursorr
 // commands, so the corpus-wide scans have to read it.
 const README_DOC = 'README.md'
 
+// The page an outside contributor is sent to from the README. It links into the repository, so the
+// corpus-wide scans read it too.
+const CONTRIBUTING_DOC = 'CONTRIBUTING.md'
+
+// A verbatim quote of a Japanese prompt heading or literal sits in a code span, a fence or double
+// quotes (`docs/maintainers/README.md` → "Language"); everything else is English.
+const QUOTED_SPANS = /```[\s\S]*?```|`[^`\n]*`|"[^"\n]*"/gu
+const JAPANESE = /[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}]/u
+
 // The document the pointers name. Written once so the pointer suite and the pointers agree.
 const CANONICAL_DOC = 'CLAUDE.md'
-// The canonical workflow document: a small index over one file per topic under
-// `prompts/collaboration-workflow/`, so an agent following a pointer reads one topic instead of the
-// whole document.
+// The workflow index: a human-browsed table over one file per topic under
+// `prompts/collaboration-workflow/`. It lives in `docs/` because no session reads it — a citation
+// names the topic file directly.
 //
 // The marker suites read the whole corpus, which is why `read_repo_file(WORKFLOW_PROMPT)` is not
 // what they call: a marker asserting a canonical rule exists does not care which topic file holds
 // it, and making fifteen suites each name a file would turn every future re-grouping into a
 // fifteen-file edit. Reading is cheap here — this is a test process, not a session.
-const WORKFLOW_PROMPT = 'prompts/collaboration-workflow.md'
+const WORKFLOW_PROMPT = 'docs/collaboration-workflow.md'
 const WORKFLOW_PROMPT_DIRECTORY = 'prompts/collaboration-workflow'
 // The delivery list names each rule; which suite pins a row is maintainer detail and lives here,
 // so every row's marker suite asserts its suite path against this file.
@@ -132,7 +141,12 @@ function read_index(): string {
 // per-phrase marker suites. The pointers are included because a broken link
 // or a stale command name in `AGENTS.md` / `GEMINI.md` is as wrong as one in the rules.
 function all_documents(): ReadonlyArray<string> {
-	return [...routing_documents(), ...POINTER_DOCS, README_DOC]
+	return [...routing_documents(), ...POINTER_DOCS, README_DOC, CONTRIBUTING_DOC]
+}
+
+// Whether a document written in English carries Japanese outside its quotes.
+function has_japanese_prose(text: string): boolean {
+	return JAPANESE.test(text.replaceAll(QUOTED_SPANS, ''))
 }
 
 // The file exactly as it sits on disk. `read_repo_file` answers the workflow index with the whole
@@ -206,7 +220,9 @@ export {
 	CANONICAL_DOC,
 	CLAUDE_SETTINGS,
 	COMMAND_REFERENCE_DOCS,
+	CONTRIBUTING_DOC,
 	ENV_EXAMPLE,
+	has_japanese_prose,
 	linked_paths,
 	PROMPT_ROOT,
 	read_document,

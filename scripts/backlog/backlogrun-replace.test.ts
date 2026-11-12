@@ -1,5 +1,6 @@
 import type { CarryRead, RunCarry } from '#scripts/run/carry/run-carry'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
+import type { SupervisorLiveness } from '#scripts/run/run-stranded'
 import { describe, expect, it } from 'vitest'
 import { backlogrun_replace, type ReplacePorts, type ReplaceVerdict } from './backlogrun-replace'
 
@@ -26,6 +27,7 @@ const DRAINED: ReadonlyArray<RunEvent> = [{ pos: 1, at: AFTER, kind: 'drain', te
 const REPLACE: ReplaceVerdict = { kind: 'replace' }
 const UNREADABLE = "the run's record could not be read"
 const STARTING = 'the run is still starting: it has not written its record yet'
+const RETROSPECTIVE = 'the run still owes its retrospective'
 const NOT_WATCHING = 'the run is not watching: it is still starting or has a child at work'
 
 interface Stage {
@@ -35,6 +37,7 @@ interface Stage {
 	lanes?: ReadonlyArray<string>
 	unread?: ReadonlyArray<string>
 	pending?: string
+	supervisor?: SupervisorLiveness
 }
 
 function ports_of(stage: Stage = {}): ReplacePorts {
@@ -44,6 +47,7 @@ function ports_of(stage: Stage = {}): ReplacePorts {
 		is_retrospective_owed: () => stage.is_retrospective_owed ?? false,
 		pending_invocation: () => stage.pending,
 		lanes: async () => ({ working: [...(stage.lanes ?? [])], unread: [...(stage.unread ?? [])] }),
+		supervisor: () => stage.supervisor ?? 'gone',
 	}
 }
 
@@ -146,7 +150,7 @@ describe('backlogrun_replace.decide watching', () => {
 
 	it('keeps a drained run that still owes its retrospective', async () => {
 		await expect(answer({ is_retrospective_owed: true })).resolves.toStrictEqual(
-			keep('the run still owes its retrospective'),
+			keep(RETROSPECTIVE),
 		)
 	})
 
@@ -155,4 +159,58 @@ describe('backlogrun_replace.decide watching', () => {
 
 		await expect(answer({ read })).resolves.toStrictEqual(keep(UNREADABLE))
 	})
+})
+
+async function stranded(stage: Stage = {}): Promise<ReplaceVerdict | undefined> {
+	return await backlogrun_replace.stranded(GIT_DIRECTORY, ports_of(stage))
+}
+
+// joshuafolkken/kit#5401: a launch that died before its plan left a record nothing runs under.
+describe('backlogrun_replace.stranded', () => {
+	it('answers nothing where no record stands', async () => {
+		await expect(stranded({ read: { kind: 'none' } })).resolves.toBeUndefined()
+	})
+
+	it('replaces a record that never drained, whatever invocation it carries', async () => {
+		await expect(stranded({ events: [] })).resolves.toStrictEqual(REPLACE)
+	})
+
+	it('keeps a record a session cut handed to a successor', async () => {
+		const read: CarryRead = { kind: 'carried', carry: { ...CARRY, is_handed_off: true } }
+
+		await expect(stranded({ read })).resolves.toStrictEqual(
+			keep(
+				'a session cut handed the run to a successor (`pnpm josh backlogrun --restart` continues it)',
+			),
+		)
+	})
+
+	it('keeps a record that owes its retrospective or cannot be read', async () => {
+		await expect(stranded({ is_retrospective_owed: true })).resolves.toStrictEqual(
+			keep(RETROSPECTIVE),
+		)
+		await expect(stranded({ read: { kind: 'unreadable' } })).resolves.toStrictEqual(
+			keep(UNREADABLE),
+		)
+	})
+
+	it('keeps a record while a child still works in a lane', async () => {
+		const verdict = await stranded({ lanes: ['3701'] })
+
+		expect(verdict?.kind).toBe('keep')
+	})
+})
+
+// An owner that died with no hand-off is what `run:wake` recovers; a supervisor not proven gone keeps it.
+describe('backlogrun_replace.stranded under a supervisor', () => {
+	it.each<SupervisorLiveness>(['live', 'unknown'])(
+		'keeps a record whose supervisor is %s, since it may still wake a successor',
+		async (supervisor) => {
+			await expect(stranded({ supervisor })).resolves.toStrictEqual(
+				keep(
+					'its `run:wake` supervisor may still recover the run (`pnpm josh backlogrun --stop` ends both)',
+				),
+			)
+		},
+	)
 })

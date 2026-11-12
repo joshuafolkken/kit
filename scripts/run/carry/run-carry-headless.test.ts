@@ -1,18 +1,20 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { agent_provider } from '#scripts/agent/agent-provider'
 import { process_identity_fixture } from '#scripts/josh/process-identity-fixture'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { run_headless } from '#scripts/run/run-headless'
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_carry, type CarryOwner } from './run-carry'
 import { run_carry_args } from './run-carry-args'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#3708: a record says when its owner is a session the run launched headless, so
 // `josh backlogrun --stop` knows that owner for the run's own after the supervisor's record is gone.
 // Colocated apart from `run-carry.test.ts` to keep that file under its line ceiling.
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-carry-headless-'))
+const scratch = make_directory('run-carry-headless-')
 const TARGET = run_carry.carry_path(path.join(scratch, 'repository.git'))
 const INVOCATION = 'backlogrun --max 5'
 const ISSUE = '3708'
@@ -34,12 +36,17 @@ function declared_owner(lane_child: string | undefined): CarryOwner | undefined 
 	return request?.kind === 'claim' ? request.claim.owner : undefined
 }
 
-afterEach(() => {
-	vi.unstubAllEnvs()
+beforeEach(() => {
+	vi.spyOn(agent_provider, 'resolve_provider').mockReturnValue({
+		kind: 'provider',
+		provider: 'anthropic',
+		is_default: true,
+	})
 })
 
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
+afterEach(() => {
+	vi.unstubAllEnvs()
+	vi.restoreAllMocks()
 })
 
 describe('the headless owner mark', () => {

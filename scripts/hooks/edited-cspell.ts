@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
-import { resolve_local_bin } from '#scripts/build/local-bin'
+import { direct_launch, type LocalLaunch } from '#scripts/build/local-bin'
 import { HOOK_PROCESS_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execa } from 'execa'
 
@@ -46,7 +46,6 @@ const CSPELL_ARGS: ReadonlyArray<string> = [
 	'--no-summary',
 ]
 const CSPELL_BIN = 'cspell'
-const PNPM = 'pnpm'
 // The text arrives on stdin under the edited file's own name, so the project config — its ignore
 // list, its language per extension, its overrides — applies exactly as it does to the path. Reading
 // stdin rather than the file is what lets the check run beside the formatters
@@ -80,21 +79,19 @@ function is_checkable(file_path: string, project_root: string): boolean {
 	return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative)
 }
 
-// The project's own shim, spawned directly: `pnpm exec` costs a second process start on every edit,
-// and this check was the largest step of the edit hook (joshuafolkken/kit#4596). `pnpm exec` stays as
-// the route for a project whose binaries live somewhere other than the root's `node_modules/.bin`.
-function cspell_command(project_root: string): ReadonlyArray<string> {
-	const shim = resolve_local_bin(project_root, CSPELL_BIN)
-
-	return existsSync(shim) ? [shim] : [PNPM, 'exec', CSPELL_BIN]
+// The project's own cspell, spawned without pnpm's wrapper: `pnpm exec` costs a second process start
+// on every edit, and this check was the largest step of the edit hook (joshuafolkken/kit#4596).
+// `direct_launch` keeps `pnpm exec` only for a project with no cspell installed at or above its root.
+function cspell_command(project_root: string): LocalLaunch {
+	return direct_launch(project_root, ['exec', CSPELL_BIN])
 }
 
 // The live runner. `reject: false` because a non-zero exit is the ordinary way cspell reports words,
 // and stderr is ignored so a config note never reaches the model as if it were an unknown word.
 async function run_cspell(request: CspellRequest): Promise<string> {
-	const [bin = PNPM, ...prefix] = cspell_command(request.project_root)
+	const launch = cspell_command(request.project_root)
 	const target = `${STDIN_SCHEME}${path.resolve(request.file_path)}`
-	const result = await execa(bin, [...prefix, ...CSPELL_ARGS, target], {
+	const result = await execa(launch.file, [...launch.args, ...CSPELL_ARGS, target], {
 		reject: false,
 		cwd: request.project_root,
 		input: request.text,

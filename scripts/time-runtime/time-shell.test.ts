@@ -42,6 +42,21 @@ describe('josh_arguments', () => {
 	})
 })
 
+// The name as typed: expanding an alias is `time-josh-names.ts`'s, so this file does not pull in the
+// alias table every reader of it would then reach (joshuafolkken/kit#6159).
+describe('josh_command_of — an alias', () => {
+	it('keeps the alias as typed', () => {
+		expect(time_shell.josh_command_of('pnpm josh ga')).toBe('josh ga')
+	})
+
+	it('keeps each alias of a chain as typed', () => {
+		expect(time_shell.josh_commands_of('pnpm josh lr a.ts && pnpm josh ga')).toEqual([
+			'josh lr',
+			'josh ga',
+		])
+	})
+})
+
 // The wrappers a run puts around a check, skipped with their flag values and operands, and named by
 // their basename (joshuafolkken/kit#4525).
 describe('josh_command_of — wrappers', () => {
@@ -248,5 +263,15 @@ describe('unquoted', () => {
 			'cat   > f && git add f\nls',
 		)
 		expect(time_shell.unquoted("x <<-'END'\n\tdon't\n\tEND")).toBe('x  ')
+	})
+})
+
+describe('literal_blanked', () => {
+	it('blanks single-quoted spans and escapes but keeps double-quoted spans', () => {
+		expect(time_shell.literal_blanked('echo \'`a` $b\' "`c`" \\$d')).toBe('echo          "`c`"   d')
+	})
+
+	it('reads a single quote inside double quotes as a character', () => {
+		expect(time_shell.literal_blanked(`echo "it's $(x)"`)).toBe(`echo "it's $(x)"`)
 	})
 })

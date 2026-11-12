@@ -19,10 +19,10 @@ const GIT_TIMEOUT_MS = 10_000
 // A hook's spawned formatter or spell check, which holds the edit's turn open while it runs. Read it
 // against the worst-case run, not one spawn: an edit to a config input plans eslint, prettier and
 // `eslint_d restart`, the first and last each with a second route behind the daemon — five spawns.
-// The hook entry in `.claude/settings.json` declares 90 seconds, so five of these must fit under it,
-// or the harness kill lands at a moment the hook did not choose — possibly inside `prettier --write`,
-// which rewrites in place and can leave the file truncated. 15s × 5 = 75s. It is still two orders of
-// magnitude beyond the 0.84s a warm run takes, so reaching it means something is already wrong.
+// The hook entry in `.claude/settings.json` declares a 90-second timeout, so five of these must fit
+// under it, or the harness kill lands at a moment the hook did not choose — possibly inside
+// `prettier --write`, which rewrites in place and can leave the file truncated. 15s × 5 = 75s. It is
+// still orders of magnitude beyond a warm run, so reaching it means something is already wrong.
 const HOOK_PROCESS_TIMEOUT_MS = 15_000
 // One `gh api` read whose answer only shapes a report or a classification.
 const GH_API_TIMEOUT_MS = 20_000

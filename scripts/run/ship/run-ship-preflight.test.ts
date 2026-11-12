@@ -1,12 +1,15 @@
 import { randomUUID } from 'node:crypto'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import type { Unmet } from '#scripts/git/git-preflight'
+import { cli_body_repository } from '#scripts/josh/cli-body-repository-fixture'
 import { report_format_reference } from '#scripts/report/report-format-reference'
 import { acceptance_map } from '#scripts/review/acceptance-map'
 import { live_evidence } from '#scripts/review/live-evidence'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const make_directory = temporary_directory('suite')
 
 const problems_mock = vi.hoisted(() => vi.fn<() => Promise<Array<Unmet>>>())
 const paths_mock = vi.hoisted(() => vi.fn<() => Promise<Array<string>>>())
@@ -24,6 +27,7 @@ const removed_mock = vi.hoisted(() =>
 )
 const draft_mock = vi.hoisted(() => vi.fn<(issue: string) => Promise<string | undefined>>())
 const prepare_mock = vi.hoisted(() => vi.fn<(issue: string, rows: string) => Promise<string>>())
+const reuse_mock = vi.hoisted(() => vi.fn(async (_k: unknown, ask: () => unknown) => await ask()))
 
 vi.mock('#scripts/git/git-preflight', () => ({
 	git_preflight: { problems_of: problems_mock },
@@ -47,6 +51,7 @@ vi.mock('#scripts/review/removed-tests-check', () => ({
 	removed_tests_check: { body_refusal: removed_mock },
 }))
 vi.mock('./run-ship-scoped', () => ({ run_ship_scoped: { scoped_pair: scoped_mock } }))
+vi.mock('./run-ship-preflight-reuse', () => ({ run_ship_preflight_reuse: { run: reuse_mock } }))
 vi.mock('./run-ship-lock', () => ({ run_ship_lock: { lock_problems: lock_mock } }))
 vi.mock('./run-ship-planned', () => ({
 	run_ship_planned: { PRECONDITION: 'unplanned', problems: planned_mock },
@@ -78,7 +83,7 @@ const UNPLANNED = 'unplanned: scripts/gate/gate-plan.ts'
 const ISSUE = '3154'
 const EVIDENCE_BODY =
 	'## 実機証跡\n\n`pnpm josh ship --log 2946`\n\n```\nstopped at: === preflight ===\n```\n'
-const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-ship-preflight-'))
+const TEMPORARY = make_directory('josh-ship-preflight-')
 const MISSING_BODY = path.join(TEMPORARY, 'missing.md')
 const TWO_PROBLEMS = '2 pull-request precondition(s)'
 const GIT_FAILURE = 'git status failed'
@@ -169,9 +174,10 @@ describe('run_ship_preflight.stage — the lane plan', () => {
 	})
 })
 
-afterAll(() => {
-	rmSync(TEMPORARY, { force: true, recursive: true })
-})
+// joshuafolkken/kit#6056: the --body-file is read through `cli_body`, so one in the work tree is refused.
+const TREE_BODY = cli_body_repository
+	.create(make_directory('josh-ship-preflight-repository-'))
+	.write(cli_body_repository.UNIGNORED_DIRECTORY, EVIDENCE_BODY)
 
 describe('run_ship_preflight.stage — every pull-request precondition at once', () => {
 	it('reports the classification and the missing evidence together, before the scoped pair', async () => {
@@ -228,14 +234,14 @@ describe('run_ship_preflight.stage — a precondition that cannot be read', () =
 		expect(scoped_mock).not.toHaveBeenCalled()
 	})
 
-	it('still reports the git preflight problems when the --body-file cannot be read', async () => {
+	it('still reports the git preflight problems when the --body-file is refused', async () => {
 		problems_mock.mockResolvedValue([CLASSIFICATION_UNMET])
-		const result = await run_ship_preflight.stage({ title: TITLE, body_path: MISSING_BODY })
+		const result = await run_ship_preflight.stage({ title: TITLE, body_path: TREE_BODY })
 
 		expect(result.code).toBe(FAILED)
 		expect(result.out).toContain(TWO_PROBLEMS)
 		expect(result.out).toContain(CLASSIFICATION)
-		expect(result.out).toContain(MISSING_BODY)
+		expect(result.out).toContain('not git-ignored')
 	})
 
 	it('still reports the evidence problem when the git preflight read throws', async () => {

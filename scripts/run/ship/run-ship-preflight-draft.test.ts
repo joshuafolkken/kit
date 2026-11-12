@@ -1,8 +1,10 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { acceptance_map } from '#scripts/review/acceptance-map'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const make_directory = temporary_directory('suite')
 
 const pr_body_mock = vi.hoisted(() => vi.fn<() => Promise<string | undefined>>())
 const issue_body_mock = vi.hoisted(() => vi.fn<() => Promise<string | undefined>>())
@@ -42,7 +44,7 @@ const UNMAPPED = '`ac-12345678` has no row'
 const OPEN_PR_BODY = '## Summary\n'
 const FILLED_BODY = '## 受け入れ条件の対応\n\n## 実機証跡\n'
 const ONE_CRITERION_BODY = '## 受け入れ条件\n\n- [ ] the first criterion\n'
-const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-ship-preflight-draft-'))
+const TEMPORARY = make_directory('josh-ship-preflight-draft-')
 const DRAFT_PATH = path.join(TEMPORARY, 'josh-ship-body-4168.md')
 
 beforeEach(() => {
@@ -52,10 +54,6 @@ beforeEach(() => {
 	draft_mock.mockReset().mockResolvedValue(undefined)
 	prepare_mock.mockReset().mockResolvedValue(DRAFT_PATH)
 	paths_mock.mockReset().mockResolvedValue(['docs/josh-commands.md'])
-})
-
-afterAll(() => {
-	rmSync(TEMPORARY, { force: true, recursive: true })
 })
 
 describe('run_ship_preflight.ahead — the ship body draft', () => {

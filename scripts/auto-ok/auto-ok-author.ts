@@ -1,14 +1,25 @@
 import { epic_graph, type EpicChild } from '#scripts/epic/epic-graph'
-import { gh_author_association } from '#scripts/gh/gh-author-association'
+import {
+	gh_author_association,
+	type Author,
+	type AuthorFields,
+} from '#scripts/gh/gh-author-association'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 
 // Whether an unattended run may act on an opted-in issue's body. The run takes that body as its
 // specification, and on a public repository anyone can file an issue — the `auto-ok` a person applied
 // says nothing about a body its author rewrote after the label. So only an issue whose author has
 // write access is runnable, and a lookup that failed is not trust; the rest wait on a person.
+//
+// The asks are shared across processes (joshuafolkken/kit#6613): every backlog scan reads the same
+// authors, and a write role read in the last hour stands for the next scan.
+
+function shared_author_of(row: AuthorFields): Author {
+	return { ...gh_author_association.author_of(row), is_shared: true }
+}
 
 async function with_trust(issue: OpenIssueData): Promise<OpenIssueData> {
-	const author = gh_author_association.author_of(issue)
+	const author = shared_author_of(issue)
 
 	return { ...issue, author_trusted: await gh_author_association.is_trusted(author) }
 }
@@ -27,7 +38,7 @@ function is_author_trusted(issue: OpenIssueData): boolean {
 // The write-access lookup asks *this* repository's collaborators, which says nothing about access to
 // another one — so a child elsewhere is asked with no login, which `trust_of` answers for `OWNER` alone.
 async function is_child_trusted(child: EpicChild, repo: string): Promise<boolean> {
-	const author = gh_author_association.author_of(child)
+	const author = shared_author_of(child)
 
 	return await gh_author_association.is_trusted(
 		child.repo === repo ? author : { ...author, login: undefined },

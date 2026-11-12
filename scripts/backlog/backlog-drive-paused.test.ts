@@ -1,6 +1,3 @@
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
@@ -8,6 +5,7 @@ import { lane_plan } from '#scripts/lane/lane-plan'
 import type { LaneStateRecord } from '#scripts/lane/lane-state'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { DEFAULT_SILENT_MINUTES } from '#scripts/run/run-liveness'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it, vi } from 'vitest'
 import { backlog_drive } from './backlog-drive'
 import { backlog_drive_fixture } from './backlog-drive-fixture'
@@ -18,6 +16,7 @@ import { backlog_drive_paused, type PausedPorts } from './backlog-drive-paused'
 
 const { FIRST_CHILD, harness, offer, state } = backlog_drive_fixture
 const NOW_MS = Date.parse('2026-10-20T09:00Z')
+const make_directory = temporary_directory()
 const PAUSED_ISSUE = '4211'
 const WINDOW_MS = DEFAULT_SILENT_MINUTES * MS_PER_MINUTE
 const WAITING_ISSUE = 4300
@@ -115,7 +114,7 @@ describe('backlog_drive_paused.notify', () => {
 // joshuafolkken/kit#4864: a paused lane holds the files its recorded plan names as it holds its body's.
 describe('backlog_drive_paused.notify — a paused lane that holds a planned file', () => {
 	it('sends the notice when only its plan overlaps the waiting candidate', async () => {
-		const repository = mkdtempSync(path.join(tmpdir(), 'drive-paused-'))
+		const repository = make_directory('drive-paused-')
 
 		vi.spyOn(git_common_directory, 'repository').mockReturnValue(repository)
 		lane_plan.record(

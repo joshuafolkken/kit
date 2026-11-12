@@ -2,9 +2,8 @@ import { MAX_SCANNED } from '#scripts/gh/git-gh-issue-list'
 import { describe, expect, it } from 'vitest'
 import { cutoff_of, PAGE_CEILING_CAUSE } from './listing-cutoff'
 
-// joshuafolkken/kit#1067: every caller of the open-issue listing asks "did I see everything", and
-// each one used to answer it in its own words. One definition means a caller cannot quietly disagree
-// with the others about what a complete listing is.
+// Every open-issue listing caller must share one completeness definition so callers cannot disagree
+// silently about whether they saw everything (joshuafolkken/kit#1067).
 
 const LIMIT = 50
 

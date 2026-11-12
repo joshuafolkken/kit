@@ -90,7 +90,7 @@ function owner_wait(wake: RunWake, carry: RunCarry): string {
 
 const WAIT_LINES: Partial<Record<WakeDecision['kind'], (wake: RunWake) => string>> = {
 	pending: (wake) =>
-		`waiting: the woken session has until ${deadline(wake.woke_at, run_wake.WAKE_GRACE_MS)} to claim the carry record`,
+		`waiting: the woken session has until ${deadline(wake.woke_at, run_wake.WAKE_GRACE_MS)} to begin work on the carry record`,
 	idle: (wake) =>
 		`waiting: no runnable work; the driver starts anyway at ${deadline(wake.idle_since, run_wake.IDLE_CEILING_MS)}`,
 }

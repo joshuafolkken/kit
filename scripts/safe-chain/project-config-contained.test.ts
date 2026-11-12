@@ -1,13 +1,14 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, mkdirSync, symlinkSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it, vi } from 'vitest'
 
 // joshuafolkken/kit#4666: `.aikido` goes through `write_contained` like every other sync write, so a
 // dangling link to outside the project (`.aikido` → `~/.zshenv`) is refused rather than written
 // through. The project root is pinned to a scratch tree, as `file-content.test.ts` does.
 
-const SANDBOX = mkdtempSync(path.join(tmpdir(), 'safe-chain-contained-'))
+const make_directory = temporary_directory('suite')
+const SANDBOX = make_directory('safe-chain-contained-')
 const ROOT = path.join(SANDBOX, 'project')
 const OUTSIDE_FILE = path.join(SANDBOX, 'outside.zshenv')
 const DESTINATION = path.join(ROOT, '.aikido')
@@ -19,10 +20,6 @@ vi.doMock('#scripts/init/init-paths', async (import_original) => ({
 }))
 
 const { project_config } = await import('./project-config')
-
-afterAll(() => {
-	rmSync(SANDBOX, { recursive: true, force: true })
-})
 
 describe('project_config.sync_project_config — a .aikido linked outside the project', () => {
 	it('refuses the write and creates nothing outside', () => {

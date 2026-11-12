@@ -9,6 +9,7 @@ import {
 	type IssueListOutcome,
 	type IssueListRequest,
 } from './git-gh-issue-list'
+import { git_gh_issue_memo } from './git-gh-issue-memo'
 import {
 	BLOCKER_NUMBER,
 	ISSUE_BODY,
@@ -21,16 +22,29 @@ import {
 	rest_issue_page,
 	rest_pull_request,
 } from './git-gh-issue-rest-fixture'
+import { TRANSPORT_ENV_VAR } from './git-gh-transport'
 
 vi.mock('./git-gh-exec', () => ({
 	git_gh_exec: { exec_gh_api: vi.fn() },
 }))
 
+// The page reads go through `exec_gh_api` here; the ETag is pinned in `git-gh-issue-list-etag.test.ts`.
+vi.mock('./git-gh-etag-read', async () => {
+	const { git_gh_etag_read_fixture } = await import('./git-gh-etag-read-fixture')
+
+	return { git_gh_etag_read: git_gh_etag_read_fixture.through_exec }
+})
+
 const mocked_api = vi.mocked(git_gh_exec.exec_gh_api)
 
 // joshuafolkken/kit#1025: `gh issue list` goes through GraphQL, which a cloud session is answered
 // 403 for, so every open-issue listing moves to `repos/{owner}/{repo}/issues`. The six callers keep
-// the JSON shape `gh issue list --json` answered with, which is what these tests pin.
+// the JSON shape `gh issue list --json` answered with, which is what these tests pin — on a REST
+// session, since one on GraphQL reads a listing one page holds in one query (joshuafolkken/kit#6785).
+beforeEach(() => {
+	vi.stubEnv(TRANSPORT_ENV_VAR, 'rest')
+	git_gh_issue_memo.forget()
+})
 
 const SUMMARY_FIELDS = 'number,title,labels,createdAt'
 const PICKUP_FIELDS = `${SUMMARY_FIELDS},blockedBy`
@@ -110,10 +124,6 @@ function full_page_of(page: number, is_filtered_out: boolean): string {
 function parse_listing(json: string | undefined): Array<OpenIssueData> | undefined {
 	return json === undefined ? undefined : parse_json_array_or_undefined(json, open_issue_schema)
 }
-
-beforeEach(() => {
-	vi.clearAllMocks()
-})
 
 describe('issue_list — the request', () => {
 	it('reads the REST listing rather than gh issue list', async () => {

@@ -1,10 +1,11 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { stash_sweep_lock } from './stash-sweep-lock'
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'stash-sweep-lock-test-'))
+const make_directory = temporary_directory('suite')
+const scratch = make_directory('stash-sweep-lock-test-')
 const LOCK = path.join(scratch, 'lock.json')
 const NO_WAIT_MS = 0
 // A pid far above any real process table, so it reads as a process that is certainly gone.
@@ -21,10 +22,6 @@ async function failing_work(): Promise<string> {
 
 beforeEach(() => {
 	rmSync(LOCK, { force: true })
-})
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 // joshuafolkken/kit#2701: two lane sweeps dropping by a resolved `stash@{n}` at once could drop the

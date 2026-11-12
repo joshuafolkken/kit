@@ -18,11 +18,12 @@ const { metrics_totals } = await import('./metrics-totals')
 const DIRECTORY = '/repository'
 const GROWN =
 	'josh metrics: 1 total(s) grew past the merge-base abc123:\nRecord the reason: pnpm josh metrics --accept --reason "<why>"'
+const PASSED = { exit_code: 0, output: 'josh metrics: no total grew' }
 
 beforeEach(() => {
 	run_mock.mockReset()
 	is_kit_mock.mockReturnValue(true)
-	run_mock.mockResolvedValue({ exit_code: 0, output: 'josh metrics: no total grew' })
+	run_mock.mockResolvedValue(PASSED)
 })
 
 describe('metrics_totals.growth_notice', () => {
@@ -51,6 +52,43 @@ describe('metrics_totals.growth_notice', () => {
 		await expect(metrics_totals.growth_notice(DIRECTORY)).resolves.toBe(
 			`${metrics_totals.NOTICE_HEADING}\n${GROWN}`,
 		)
+	})
+})
+
+// joshuafolkken/kit#6023: one judgment for run:review's open and the ship's pre-detach backstop.
+describe('metrics_totals.totals_check', () => {
+	it('answers no run outside kit', async () => {
+		is_kit_mock.mockReturnValue(false)
+
+		await expect(metrics_totals.totals_check(DIRECTORY)).resolves.toBeUndefined()
+		expect(run_mock).not.toHaveBeenCalled()
+	})
+
+	it('runs the re-record form, so a growth the approval names passes', async () => {
+		await expect(metrics_totals.totals_check(DIRECTORY)).resolves.toStrictEqual(PASSED)
+		expect(run_mock).toHaveBeenCalledWith(metrics_totals.METRICS_RERECORD_COMMAND, {
+			cwd: DIRECTORY,
+		})
+	})
+})
+
+describe('metrics_totals.totals_refusal', () => {
+	it('refuses with the accept command when a total grew past every approval', async () => {
+		run_mock.mockResolvedValue({ exit_code: 1, output: `${GROWN}\n` })
+
+		await expect(metrics_totals.totals_refusal(DIRECTORY)).resolves.toBe(
+			`${metrics_totals.REVIEW_REFUSAL_HEADING}\n${GROWN}`,
+		)
+	})
+
+	it('refuses nothing once the growth is accepted', async () => {
+		await expect(metrics_totals.totals_refusal(DIRECTORY)).resolves.toBeUndefined()
+	})
+
+	it('refuses nothing outside kit', async () => {
+		is_kit_mock.mockReturnValue(false)
+
+		await expect(metrics_totals.totals_refusal(DIRECTORY)).resolves.toBeUndefined()
 	})
 })
 

@@ -83,6 +83,18 @@ describe('run_ship_planned.problems', () => {
 		expect(read_mock).toHaveBeenCalledWith(ISSUE, process.cwd())
 	})
 
+	// joshuafolkken/kit#6807: a re-plan claims only the lane's own changed code files beside its plan.
+	it('re-plans with the planned paths and the lane changed code files only', async () => {
+		paths_mock.mockResolvedValue([UNPLANNED, ...NON_CODE])
+
+		const [problem = ''] = await run_ship_planned.problems()
+		const command = /`(pnpm josh lane:plan [^`]+)`/u.exec(problem)?.[1]
+
+		expect(command).toBe(
+			`pnpm josh lane:plan ${String(ISSUE)} ${[...PLANNED, UNPLANNED].join(' ')}`,
+		)
+	})
+
 	it('passes once lane:plan is re-run with the file added', async () => {
 		read_mock.mockReturnValue(plan(CHANGED))
 

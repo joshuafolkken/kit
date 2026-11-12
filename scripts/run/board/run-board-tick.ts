@@ -7,12 +7,13 @@ import { run_board_github } from './run-board-github'
 import { run_board_header, type BoardHeader } from './run-board-header'
 import { run_board_labels } from './run-board-labels'
 import { run_board_layout, type BoardLayout, type BoardPlan } from './run-board-layout'
-import { run_board_link, type Link } from './run-board-link'
+import { run_board_link } from './run-board-link'
 import { run_board_notes, type Titles } from './run-board-notes'
 import type { LocalRead } from './run-board-read'
 import { run_board_reason, type ReasonRead } from './run-board-reason'
 import { run_board_released } from './run-board-released'
 import { run_board_render } from './run-board-render'
+import { run_board_seat, type SeatRead } from './run-board-seat'
 import type { Known } from './run-board-snapshot'
 import { run_board_spin, type Spun } from './run-board-spin'
 import { run_board_state, type BoardPorts, type BoardState, type Pace } from './run-board-state'
@@ -33,12 +34,17 @@ const { gather_thanks } = run_board_thanks
 
 // What the last board on this run kept (`run-board-snapshot.ts`); one written on another run is
 // discarded.
-function saved_for(ports: BoardPorts, started_ms: number): Pick<BoardState, 'known' | 'closed'> {
+function saved_for(
+	ports: BoardPorts,
+	started_ms: number,
+): Pick<BoardState, 'known' | 'closed' | 'issue_count'> {
 	const snapshot = ports.snapshot?.load()
 
 	if (snapshot?.run_started_ms !== started_ms) return FRESH_STATE
 
-	return { known: { titles: snapshot.titles, labels: snapshot.labels }, closed: snapshot.closed }
+	const { titles, labels, closed, issue_count } = snapshot
+
+	return { known: { titles, labels }, closed, issue_count }
 }
 
 // The state of the run on screen, over the reads just taken; a different run starts its plan state
@@ -68,16 +74,6 @@ function closed_under(known: Known, closed: ReadonlyMap<number, ClosedIssue>): K
 	}
 }
 
-// The plan with a closed child's title and labels under the listing's own.
-function with_closed(plan: BoardPlan, closed: ReadonlyMap<number, ClosedIssue>): BoardPlan {
-	const { titles, labels } = closed_under(
-		{ titles: plan.context.titles, labels: plan.labels },
-		closed,
-	)
-
-	return { ...plan, context: { ...plan.context, titles }, labels }
-}
-
 // The titles the findings name a parked issue by — the rows' own; the snapshot's before the plan is
 // read.
 function titles_of(state: BoardState): Titles {
@@ -90,6 +86,32 @@ function activity_here(local: LocalRead): RunActivity {
 		local.events,
 		local.ended_ms !== undefined || local.is_stranded,
 	)
+}
+
+// The already-read supervisor or parent drives retries until the run stops or becomes stranded.
+function is_backlog_live(local: LocalRead): boolean {
+	const roots = local.roots ?? {}
+
+	return (
+		!activity_here(local).is_stopped &&
+		(roots.supervisor !== undefined || roots.parent !== undefined)
+	)
+}
+
+// The plan with closed titles underneath the listing and this tick's local worker snapshot.
+function plan_here(plan: BoardPlan, state: BoardState, local: LocalRead): BoardPlan {
+	const { titles, labels } = closed_under(
+		{ titles: plan.context.titles, labels: plan.labels },
+		state.closed,
+	)
+
+	return {
+		...plan,
+		context: { ...plan.context, titles },
+		labels,
+		is_backlog_live: is_backlog_live(local),
+		occupied_lanes: local.occupied_lanes,
+	}
 }
 
 type RoomRead = Pick<
@@ -136,10 +158,11 @@ function earlier_here(local: LocalRead): EarlierLanes {
 // The plan laid under its statuses, each waiting row saying why it waits.
 function planned_layout(
 	state: BoardState,
-	plan: BoardPlan,
+	input_plan: BoardPlan,
 	local: LocalRead,
 	now_ms: number,
 ): BoardLayout {
+	const plan = plan_here(input_plan, state, local)
 	const statuses = planned_statuses(state, plan, local)
 	const reason_of = run_board_reason.reader({
 		plan,
@@ -151,12 +174,7 @@ function planned_layout(
 		now_ms,
 	})
 
-	return run_board_layout.layout_of(
-		with_closed(plan, state.closed),
-		statuses,
-		reason_of,
-		earlier_here(local),
-	)
+	return run_board_layout.layout_of(plan, statuses, reason_of, earlier_here(local))
 }
 
 // The statuses scoped to the run's plan, a running child GitHub read closed settled.
@@ -168,7 +186,10 @@ function layout_for(state: BoardState, local: LocalRead, now_ms: number): BoardL
 	const statuses = run_board_status.settle_closed(statuses_for(state, local), read)
 	const known = closed_under(state.known, state.closed)
 
-	return run_board_layout.local_layout_of(statuses, earlier_here(local), known)
+	return run_board_layout.local_layout_of(statuses, earlier_here(local), {
+		...known,
+		is_backlog_live: is_backlog_live(local),
+	})
 }
 
 // What one redraw draws with.
@@ -181,37 +202,62 @@ interface Redraw {
 // environment, `.env` loaded as for `run:merge`.
 type LocalHeader = Pick<
 	BoardHeader,
+	| 'run_name'
 	| 'started_ms'
 	| 'ended_ms'
 	| 'activity'
 	| 'operations'
 	| 'usual'
 	| 'lane_limit'
+	| 'occupied_count'
 	| 'found'
+	| 'scheduler_provider'
 	| 'is_investigation_on'
 >
 
 function local_header(local: LocalRead): LocalHeader {
 	return {
+		run_name: local.run_name,
 		started_ms: local.started_ms,
 		ended_ms: local.ended_ms,
 		activity: activity_here(local),
 		operations: local.operations,
 		usual: local.usual,
 		lane_limit: local.lane_limit,
+		occupied_count: local.occupied_count,
 		found: local.found,
+		scheduler_provider: local.scheduler_provider,
 		is_investigation_on: lane_investigation_switch.is_on(),
 	}
 }
 
-// The issue references and pull request numbers linked into `repo`, plain before a plan is read.
-type Links = Pick<BoardHeader, 'link' | 'pull_link'>
+type Gauges = Pick<
+	BoardHeader,
+	'machine' | 'usages' | 'budget_waits' | 'quotas' | 'quota_hold' | 'rate_limit' | 'issue_count'
+>
 
-function links_of(repo: string | undefined, link: Link): Links {
+// The machine's gauges and the usage-limit windows, with the limit that holds the run's launches.
+function gauges_of(state: BoardState, local: LocalRead): Gauges {
+	const reset_ms = local.usage_reset_ms
+	const quota_hold =
+		reset_ms === undefined ? undefined : { reset_ms, parked: local.usage_parked ?? 0 }
+
 	return {
-		link: run_board_link.linker(repo, link),
-		pull_link: run_board_link.pull_linker(repo, link),
+		machine: state.gauges,
+		usages: state.usages,
+		budget_waits: state.budget_waits,
+		quotas: state.quotas,
+		quota_hold,
+		rate_limit: state.rate_limit,
+		issue_count: state.issue_count,
 	}
+}
+
+// The empty seats' read once the plan names the rows that could take them, and while the run drives.
+function seats_of(state: BoardState, local: LocalRead): SeatRead | undefined {
+	if (state.plan === undefined || activity_here(local).is_stopped) return undefined
+
+	return run_board_seat.read_of(local.events, local.launch_hold)
 }
 
 function header_of(
@@ -223,6 +269,7 @@ function header_of(
 	return {
 		now_ms: redraw.now_ms,
 		...local_header(local),
+		seats: seats_of(state, local),
 		layout,
 		baseline_total: state.baseline_total,
 		plan_fetched_ms: state.fetched_ms,
@@ -230,13 +277,11 @@ function header_of(
 		read_failed_ms: state.read_failed_ms,
 		read_error: state.read_error,
 		is_plan_loading: state.plan_fetch !== undefined,
-		machine: state.gauges,
-		usages: state.usages,
-		budget_waits: state.budget_waits,
+		...gauges_of(state, local),
 		form: redraw.ports.form,
 		repo: state.plan?.context.repo,
 		spinner: redraw.ports.is_tty ? SPOT : undefined,
-		...links_of(state.plan?.context.repo, redraw.ports.link),
+		...run_board_link.links_of(state.plan?.context.repo, redraw.ports.link),
 	}
 }
 
@@ -256,6 +301,7 @@ function frame_of(state: BoardState, local: LocalRead, layout: BoardLayout, redr
 			run_board_layout.listed_parks(layout),
 		),
 		resume: local.resume,
+		throughput: local.throughput,
 		thanks: state.thanks,
 		link: redraw.ports.link,
 		...bounds,

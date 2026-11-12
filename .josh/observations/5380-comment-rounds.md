@@ -1,0 +1,1 @@
+- rf:bug-risks | medium | eslint/config-fingerprint.js:122 | 2026-10-30 | #5380 | fixed

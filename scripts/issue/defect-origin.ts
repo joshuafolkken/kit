@@ -1,3 +1,4 @@
+import { issue_body_keys } from './issue-body-keys'
 import { issue_cite } from './issue-cite'
 
 // Candidate origins for a defect: the merged pull requests that last changed what its issue names.
@@ -15,7 +16,7 @@ const MERGE_RECORD = new RegExp(
 const LOG_LIMIT = '--max-count=5'
 const MAX_CANDIDATES = 5
 const DATE_LENGTH = 'YYYY-MM-DD'.length
-const ORIGIN_HINT = '`- 原因: #<PR>`'
+const ORIGIN_HINT = `\`${issue_body_keys.prefix('origin')} #<PR>\``
 const NO_CANDIDATES = '(no merged pull request changed what the issue names)'
 
 interface Merge {
@@ -95,11 +96,11 @@ function format_candidate(candidate: Candidate): string {
 	const date = candidate.merged_at.slice(0, DATE_LENGTH)
 	const changed = candidate.targets.join(', ')
 
-	return `${issue_cite.plain(candidate.pr)}  ${date}  ${candidate.title}\n  changed: ${changed}`
+	return `${issue_cite.plain_for('linked', candidate.pr)}  ${date}  ${candidate.title}\n  changed: ${changed}`
 }
 
 function format(issue_number: string, candidates: ReadonlyArray<Candidate>): string {
-	const header = `origin candidates for ${issue_cite.plain(issue_number)} (newest first; declare one as ${ORIGIN_HINT}):`
+	const header = `origin candidates for ${issue_cite.plain_for('linked', issue_number)} (newest first; declare one as ${ORIGIN_HINT}):`
 	const lines =
 		candidates.length === 0
 			? [NO_CANDIDATES]

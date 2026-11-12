@@ -1,16 +1,16 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { hook_bundle_stamp } from '#scripts/build/hook-bundle-stamp'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { eslint_daemon } from '#scripts/lint/eslint-daemon'
 import { metrics_base_cache } from '#tools/metrics/metrics-base-cache'
-import { afterAll, describe, expect, it, onTestFinished } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it, onTestFinished } from 'vitest'
 import { toolchain_inputs } from './toolchain-inputs'
 
 // joshuafolkken/kit#4496: one list of toolchain inputs, read by every result kept across runs.
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'toolchain-inputs-test-'))
+const make_directory = temporary_directory('suite')
 const MANIFEST = 'package.json'
 const CONFIG_ENTRY = 'eslint.config.js'
 const TSCONFIG = 'tsconfig.json'
@@ -35,7 +35,7 @@ function file(root: string, relative: string, text: string): void {
 }
 
 function project(): string {
-	const root = mkdtempSync(path.join(scratch, 'root-'))
+	const root = make_directory('toolchain-inputs-test-root-')
 
 	file(root, MANIFEST, JSON_BODY)
 	file(root, CONFIG_ENTRY, 'export default []\n')
@@ -44,10 +44,6 @@ function project(): string {
 
 	return root
 }
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
 
 describe('toolchain_inputs.is_input', () => {
 	it.each([MANIFEST, 'pnpm-lock.yaml', CONFIG_ENTRY, 'eslint.config.mts', RULE_MODULE])(

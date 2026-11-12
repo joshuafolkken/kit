@@ -1,8 +1,10 @@
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { hook_context, type HookContext } from '#scripts/hooks/hook-context'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
-import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import { hook_context_fixture } from '#tools/hooks/hook-context-fixture'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { lane_carry_conflict } from './lane-carry-conflict'
 
@@ -19,10 +21,12 @@ const ISSUE = '2267'
 const MERGE_COMMAND = 'pnpm josh run:merge 2258'
 const CARRY_COMMAND = 'pnpm josh run:carry --begin "backlogrun #2252" --owner 21461'
 const CUT_COMMAND = 'pnpm josh run:cut 2258'
+const HANDOFF_COMMAND = 'pnpm josh run:handoff-lanes'
 const NOW_MS = 1_700_000_000_000
 const A_LATER_CALL_MS = NOW_MS + 60_000
 const REASON = lane_carry_conflict.LANE_CARRY_CONFLICT_REASON
-const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'lane-carry-conflict-'))
+const make_directory = temporary_directory('suite')
+const WORK_DIRECTORY = make_directory('lane-carry-conflict-')
 // The directory vitest was launched from, restored before WORK_DIRECTORY is removed. The suite pins its
 // working directory to the non-lane WORK_DIRECTORY per test to stay hermetic: the trigger reads the
 // live process.cwd() to decide whether a checkout is a lane, so a run started inside a lane worktree
@@ -36,7 +40,7 @@ const WRITTEN_TRANSCRIPTS = new Set<string>()
 // row claims a `gh` / `git` / `notify` / `gate` call, never `run:merge` / `run:carry`.
 function rules_claiming(command: string): number {
 	return delivered_rules.DELIVERED_RULES.filter((rule) =>
-		rule.is_trigger({ name: BASH, input: { command } }),
+		rule.is_trigger({ name: BASH, input: { command } }, hook_context.from_process()),
 	).length
 }
 
@@ -67,8 +71,6 @@ afterAll(() => {
 	for (const transcript of WRITTEN_TRANSCRIPTS) {
 		rmSync(delivered_rules.delivery_path(RULE_ID, transcript), { force: true })
 	}
-
-	rmSync(WORK_DIRECTORY, { recursive: true, force: true })
 })
 
 describe('cwd isolation', () => {
@@ -85,6 +87,8 @@ describe('invokes_budget_command', () => {
 	it.each([
 		['run:merge', MERGE_COMMAND],
 		['run:carry', CARRY_COMMAND],
+		['run:handoff-lanes', HANDOFF_COMMAND],
+		['run:handoff-lanes under a fresh root', `JOSH_TEMP_ROOT="$(mktemp -d)" ${HANDOFF_COMMAND}`],
 		['a later segment', `git switch main && ${MERGE_COMMAND}`],
 	])('matches %s', (_name, command) => {
 		expect(lane_carry_conflict.invokes_budget_command(command)).toBe(true)
@@ -142,19 +146,33 @@ describe('invokes_budget_command — a redirected state root', () => {
 })
 
 describe('is_carry_conflict', () => {
+	// The marker read is stubbed to answer by directory, so each context reads as what it names.
+	const child: HookContext = hook_context_fixture.of('/lanes/child', {})
+	const person: HookContext = hook_context_fixture.of('/lanes/person', {})
+
+	beforeEach(() => {
+		vi.spyOn(lane_child_marker, 'is_child_of').mockImplementation(
+			(directory) => directory === child.cwd,
+		)
+	})
+
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
 	// The dispatched-child case the refusal exists for.
 	it('fires on a budget command from a dispatched lane child', () => {
-		expect(lane_carry_conflict.is_carry_conflict(MERGE_COMMAND, true)).toBe(true)
+		expect(lane_carry_conflict.is_carry_conflict(MERGE_COMMAND, child)).toBe(true)
 	})
 
 	// **A person working in the lane carries no dispatch mark, so the rule stays silent for them.**
 	it('says nothing about a budget command that is not a lane child', () => {
-		expect(lane_carry_conflict.is_carry_conflict(MERGE_COMMAND, false)).toBe(false)
+		expect(lane_carry_conflict.is_carry_conflict(MERGE_COMMAND, person)).toBe(false)
 	})
 
 	// A lane child running its own legitimate commands is not touching the parent's budget.
 	it('says nothing about a non-budget command even in a lane child', () => {
-		expect(lane_carry_conflict.is_carry_conflict(CUT_COMMAND, true)).toBe(false)
+		expect(lane_carry_conflict.is_carry_conflict(CUT_COMMAND, child)).toBe(false)
 	})
 })
 

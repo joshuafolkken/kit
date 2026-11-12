@@ -1,10 +1,10 @@
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_close } from '#scripts/lane/lane-close'
 import { run_carry } from '#scripts/run/carry/run-carry'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it, vi } from 'vitest'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#4300: a close a process outlived exits non-zero. The merge is already done, so the
 // run logs the incomplete close and carries on — the supervisor closes the lane again.
@@ -26,7 +26,7 @@ const CONTEXT = {
 	owner: run_carry.NO_OWNER,
 }
 // No `.git` in it, so the merged path closes it without a stash.
-const LANE_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'lane-close-'))
+const LANE_DIRECTORY = make_directory('lane-close-')
 const LANE_CLOSE_COMMAND = 'lane:close'
 const REASON = 'Closing the lane for #4300 left this behind: process 912 (owned by root).'
 

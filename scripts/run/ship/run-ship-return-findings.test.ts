@@ -36,7 +36,7 @@ vi.mock('#scripts/lane/lane-registry', () => ({
 	lane_registry: { find_open_lane: async (): Promise<object> => ({ issue: ISSUE }) },
 }))
 vi.mock('#scripts/lane/lane-relaunch', () => ({
-	lane_relaunch: { relaunch: (): object => ({ kind: 'launched', pid: 1 }) },
+	lane_relaunch: { relaunch: async (): Promise<object> => ({ kind: 'launched', pid: 1 }) },
 }))
 vi.mock('#scripts/lane/lane-session-broker', () => ({
 	lane_session_broker: { serving_session: (): undefined => undefined, request: vi.fn() },

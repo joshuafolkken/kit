@@ -11,7 +11,9 @@ const EMPTY_REPORT: PinnedReport = {
 	has_runner: true,
 }
 
-const GREEN_LINE = 'unpinned a.ts:3 — reverting it left every related test green\n'
+const HINT =
+	'; related tests unavailable; add or strengthen a regression test that fails when this change is reverted'
+const GREEN_LINE = `unpinned a.ts:3 — reverting it left every related test green${HINT}\n`
 
 function printed(report: PinnedReport): string {
 	return test_pinned_logic.report_text(test_pinned_logic.report_parts(report))
@@ -169,7 +171,7 @@ describe('test_pinned_logic.split and format', () => {
 		const report = { ...EMPTY_REPORT, unpinned: [{ ...first, is_green: false }] }
 
 		expect(test_pinned_logic.format(report)).toBe(
-			'unpinned a.ts:3 — no related test ran with it reverted',
+			`unpinned a.ts:3 — no related test ran with it reverted${HINT}`,
 		)
 	})
 })
@@ -224,8 +226,8 @@ describe('test_pinned_logic.format with nothing left, and on an added file funct
 		}
 
 		expect(test_pinned_logic.format(report)).toBe(
-			'unpinned a.ts:3 tree.discard — replacing its body with a throw left every related test green\n' +
-				'unpinned a.ts:3 tree.discard — no related test ran with its body replaced by a throw',
+			`unpinned a.ts:3 tree.discard — replacing its body with a throw left every related test green${HINT}\n` +
+				`unpinned a.ts:3 tree.discard — no related test ran with its body replaced by a throw${HINT}`,
 		)
 	})
 })
@@ -260,7 +262,7 @@ describe('test_pinned_logic.report_text', () => {
 
 	// joshuafolkken/kit#5292
 	it('prints how many probes the direct importers decided and how many escalated', () => {
-		const report = { ...EMPTY_REPORT, staged: { direct: 3, escalated: 1 } }
+		const report = { ...EMPTY_REPORT, staged: { direct: 3, escalated: 1, typed: 0 } }
 
 		expect(printed(report)).toBe('unpinned 0 · unchecked 0 · direct 3 · escalated 1\n')
 	})

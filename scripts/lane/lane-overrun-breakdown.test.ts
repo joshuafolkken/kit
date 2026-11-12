@@ -2,6 +2,8 @@ import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LedgerEntry } from './lane-ledger'
 import { lane_overrun } from './lane-overrun'
+import type { ToolCall } from './lane-transcript-calls'
+import { lane_transcript_stats } from './lane-transcript-stats'
 
 // joshuafolkken/kit#4995: the overrun investigation saw only a lane's total, so its breakdown goes on
 // the lane's Issue once, before the session starts, and leads the session's prompt.
@@ -19,10 +21,15 @@ const mocks = vi.hoisted(() => ({
 vi.mock(import('./lane-ledger'), async (import_original) => {
 	const { lane_ledger } = await import_original()
 
+	// The archive beside the ledger (`lane-ledger-archive.ts`) holds nothing here.
+	function read_entries(file: string): ReadonlyArray<LedgerEntry> {
+		return file.endsWith('-archive.jsonl') ? [] : mocks.read_entries(file)
+	}
+
 	return {
 		lane_ledger: {
 			...lane_ledger,
-			read_entries: mocks.read_entries,
+			read_entries,
 			target: async () => '/ledger.jsonl',
 		},
 	}
@@ -80,7 +87,6 @@ function notes(): ReadonlyArray<string> {
 afterEach(() => vi.unstubAllEnvs())
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.stubEnv('JOSH_LANE_INVESTIGATION', 'on')
 	mocks.all_events.mockResolvedValue([plan()])
 	mocks.read_entries.mockReturnValue(lane(61))
@@ -107,7 +113,7 @@ describe('lane_overrun.investigate — the breakdown of an overrun', () => {
 	it('leads the prompt with the breakdown', async () => {
 		await lane_overrun.investigate(ISSUE)
 
-		expect(launched_prompt()).toMatch(/^Net time by stage, longest first: implement 51\.0 min /u)
+		expect(launched_prompt()).toMatch(/^Net time by stage, longest first: implement 51\.0 min, /u)
 	})
 
 	it('carries the longest stage on the start note', async () => {
@@ -124,6 +130,47 @@ describe('lane_overrun.investigate — the breakdown of an overrun', () => {
 		await lane_overrun.investigate(ISSUE)
 
 		expect(mocks.launch).toHaveBeenCalledOnce()
+	})
+})
+
+// joshuafolkken/kit#5994: a lane with no `plan` event has its implementation opened at its first edit,
+// as `josh lane:breakdown` does (joshuafolkken/kit#5835).
+describe('lane_overrun.investigate — an overrun with no plan event', () => {
+	const edit: ToolCall = {
+		session_id: 'lane',
+		lane: LANE,
+		started_ms: START + 15 * MINUTE_MS,
+		duration_ms: 1,
+		tool: 'Edit',
+		background: false,
+		command: undefined,
+		subagent: undefined,
+		output: '',
+	}
+
+	beforeEach(() => {
+		mocks.all_events.mockResolvedValue([])
+		mocks.read_entries.mockReturnValue(lane(41))
+		vi.spyOn(lane_transcript_stats, 'read_calls').mockReturnValue([edit])
+	})
+
+	afterEach(() => vi.restoreAllMocks())
+
+	it('opens the implement stage of the comment at the first edit', async () => {
+		await lane_overrun.investigate(ISSUE)
+
+		const [[, body] = []] = mocks.comment.mock.calls
+
+		expect(body).toContain('\n- start to plan 15.0 min')
+		expect(body).toContain('\n- implement 26.0 min')
+	})
+
+	it('carries the implement stage on the start note', async () => {
+		await lane_overrun.investigate(ISSUE)
+
+		expect(notes()).toStrictEqual([
+			`${LANE} overran: 41 min net, longest implement 26 min — investigating in pid 1`,
+		])
 	})
 })
 

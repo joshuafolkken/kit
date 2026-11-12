@@ -1,7 +1,9 @@
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import type { AuthorFields } from '#scripts/gh/gh-author-association'
+import { gh_permission_cache } from '#scripts/gh/gh-permission-cache'
 import { listing_outcome } from '#scripts/gh/git-gh-issue-list-fixture'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
+import { shared_cache_fixture } from '#scripts/josh/shared-cache-fixture'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { auto_ok_author } from './auto-ok-author'
 import { auto_ok_cli } from './auto-ok-cli'
@@ -21,6 +23,10 @@ import {
 const api_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/gh/git-gh-exec', () => ({ git_gh_exec: { exec_gh_api: api_mock } }))
+// The permission lookup goes through the ETag layer (joshuafolkken/kit#6754); here it reaches the mock.
+vi.mock('#scripts/gh/git-gh-etag-read', () => ({
+	git_gh_etag_read: { read: async (api_path: string) => await api_mock({ path: api_path }) },
+}))
 vi.mock('#scripts/gh/git-gh-command', () => ({
 	git_gh_command: { issue_list_by_label_summary: vi.fn(), issue_list_by_label: vi.fn() },
 }))
@@ -48,9 +54,11 @@ vi.spyOn(console, 'info').mockImplementation(streams.info)
 vi.spyOn(console, 'error').mockImplementation(streams.error)
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	epic_list.mockResolvedValue(listing_outcome(epic_listing([])))
 	streams.reset()
+
+	// The asks are shared, so each test keeps its write roles in a record of its own.
+	return shared_cache_fixture.isolate_shared_cache(gh_permission_cache.WRITERS_CACHE)
 })
 
 describe('auto_ok_author.with_author_trust', () => {

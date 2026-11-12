@@ -1,9 +1,9 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import type { GhApiRequest } from '#scripts/gh/git-gh-exec'
 import { gh_failure } from '#scripts/gh/git-gh-failure'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RequiredChecksReport } from './required-checks-report'
 import { ruleset_check } from './ruleset-check'
 
@@ -34,13 +34,10 @@ function write_workflow(root: string, content: string): void {
 }
 
 // A checkout holding only the SonarQube workflow, so exactly one check is expected.
-const scratch = mkdtempSync(path.join(tmpdir(), 'ruleset-check-test-'))
+const make_directory = temporary_directory('suite')
+const scratch = make_directory('ruleset-check-test-')
 
 write_workflow(scratch, `jobs:\n  sonar:\n    name: ${SONAR_QUBE}\n`)
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
 
 function branch_rules(contexts: ReadonlyArray<string>): string {
 	return JSON.stringify([
@@ -165,12 +162,11 @@ describe('ruleset_check.expected_in', () => {
 	})
 
 	it('expects nothing from a same-named workflow that reports none of the checks', () => {
-		const own = mkdtempSync(path.join(tmpdir(), 'ruleset-check-own-'))
+		const own = make_directory('ruleset-check-own-')
 
 		write_workflow(own, 'jobs:\n  build:\n    name: build\n')
 
 		expect(ruleset_check.expected_in(own)).toEqual([])
-		rmSync(own, { force: true, recursive: true })
 	})
 })
 

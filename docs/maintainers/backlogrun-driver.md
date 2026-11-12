@@ -8,8 +8,8 @@ run — each command prints its own answer, and the route the parent follows is 
 
 ## The carry record across a cut
 
-**Count into the record rather than into your head** — `--merged <N> --owner "$PPID"` at every child's
-merge, `--filed 1 --owner "$PPID"` at every Issue the run files, and `--cut --owner "$PPID"`
+**Count into the record rather than into your head** — `--merged <N>` at every child's
+merge, `--filed 1` at every Issue the run files, and `--cut`
 immediately before the cut. `--merged` names the merged issue, never a count
 (`scripts/run/carry/run-carry-args.ts`): `run:merge` records the same issue, so a merge counted on both
 paths counts once. Every other counter is an increment. A count that does not name the record's owning
@@ -53,7 +53,7 @@ may take.** The idle watch is on by default while the maximum is not:
 **`--idle 0` is the only way to turn the watch off.** The default's single source is
 `scripts/backlog/backlog-budget.ts` → `IDLE_WAIT_HOURS` — the only 8 hours the run knows: nothing is
 counted from the run's start, so no run is ended by its own age. A watch is polled
-at the loop's one 60-second interval, the same as a running batch
+at the loop's one 180-second interval, as a running batch is
 (`scripts/backlog/backlog-budget.ts` → `OFFER_INTERVAL_SECONDS`).
 
 **`backlog:offer` asks `backlog:budget` on every iteration** and hands back one verdict:
@@ -69,11 +69,11 @@ when it last had work, so refreshing it restarts the idle watch. Both are ISO-86
 `--merged` and `--running` both count against the maximum. **No ending abandons a lane**: whatever would
 have ended the run answers `watch` while `--running` is above zero.
 
-| Verdict | What the loop does                                                                                                                                                |
-| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `run`   | Start what `backlog:next` offered, up to the free lanes and no more than the maximum still allows                                                                 |
-| `watch` | Ask again at the 60-second interval, whether or not anything of this run's is in flight; a collected child is asked about at once. Nothing is held while watching |
-| `stop`  | Report and finish. The reason it printed **is** the termination reason the completion report carries                                                              |
+| Verdict | What the loop does                                                                                                                                                 |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `run`   | Start what `backlog:next` offered, up to the free lanes and no more than the maximum still allows                                                                  |
+| `watch` | Ask again at the 180-second interval, whether or not anything of this run's is in flight; a collected child is asked about at once. Nothing is held while watching |
+| `stop`  | Report and finish. The reason it printed **is** the termination reason the completion report carries                                                               |
 
 **At the drain the retrospective fires before the watch** (joshuafolkken/kit#2335): `backlog:offer`
 marks the drain on the event stream and `run:step` fires the retrospective there, so the watch that
@@ -101,22 +101,23 @@ Termination is decided by what the loop is told, never by a judgement that enoug
   unreadable listing. With the watch on, all three wait instead — **right after a merge too**: the
   driver asks `run:merge --driver` for no offer (it answers `deferred`, joshuafolkken/kit#4406), so
   no `backlog:next` `stop` (only person-waiting issues left) reaches it; the next pass asks
-  `backlog:offer`, and `backlog:budget` decides (joshuafolkken/kit#3781). Only `run:merge`'s own control `stop` — the failure guard, or a failed
-  child left unparked — ends the run there (`run_merge_token.is_control_stop`).
+  `backlog:offer`, and `backlog:budget` decides (joshuafolkken/kit#3781). Only `run:merge`'s own control `stop` — a failed child left
+  unparked — ends the run there (`run_merge_token.is_control_stop`).
 - **The guards in `backlogrun.md` → "Guards"**, counted over the whole `backlogrun`; whichever binds
   first ends the run.
-- **A `needs-human-review` child stops the whole run** before its commit (`needs-human-review.md`).
-- **Parking is not stopping.** Only the consecutive-failure guard can turn repeated parks into a stop.
+- **A `needs-human-review` child stops only its lane** before its commit; the parent continues in free lanes (`needs-human-review.md`).
+- **Parking is not stopping.** Repeated parks never stop the run: every third failure in a row checks
+  `main` instead (`run-merge-health.ts`).
 - **A driver that cannot read the carry record asks again before it ends** (joshuafolkken/kit#3697).
   `backlog:drive` checks the record before every offer, merge and launch; a read that is not
-  `carried` is repeated up to 6 times at the 60-second offer interval, each failed read logged with
+  `carried` is repeated up to 6 times at the 180-second offer interval, each failed read logged with
   what it answered and whether the file was there
   (`scripts/backlog/backlog-drive-owner.ts` → `READ_ATTEMPTS`). One failed read therefore costs one
   interval of the idle watch, never the rest of it. Two records are not re-read: one `run:carry --end`
   ended stops at once with `The carry record is no longer active.`, and one another owner holds
   stops with `The driver no longer owns the carry record.`
 - **A named issue whose state does not read is read again before a session hears of it**
-  (joshuafolkken/kit#3739). The failure is a `wait`, so the next offer — 60 seconds on — reads it again
+  (joshuafolkken/kit#3739). The failure is a `wait`, so the next offer — 180 seconds on — reads it again
   while the children in flight are still collected. The third consecutive failure (`backlog:offer`'s
   retry limit) hands back `offer`, with the issue and why the read failed on stderr; a number that
   resolves to nothing is handed back at once (`scripts/backlog/backlog-drive-unread.ts`).
@@ -163,6 +164,30 @@ starts nothing and tells nobody. **It is handed back as `triage`, the pool path'
 which is not triage-gated, so a session woken on it would launch the untriaged child. On `triage` the
 session labels each child standard error names and cuts (`backlogrun-steps.md` → "The loop"), and the
 next pass offers them; a child already running is left running.
+
+A pass that collected a parked child fills its free lanes before it hands `triage` back
+(joshuafolkken/kit#6871). It asks `backlog:offer` and, on `run`, launches the triaged candidates
+through `run_then_judge`, the path of a `run` that held an untriaged candidate back; then it ends with
+`triage`.
+
+Any other answer, a failed offer, or no free lane ends it with `triage` at once, before the judge,
+the drain or the retrospective reads that answer. That offer counts the parked child as still running
+(`--running`), so a pool with nothing runnable reads as `blocked`, never as the drain that would owe
+the run's retrospective before the triage.
+
+The parked child is not relaunched in that pass: `run:merge` writes its park label before it returns,
+so `backlog:next` no longer offers it. A launch that fills the lanes records the ledger's
+release; a lane still free records `hand-back:triage` (`scripts/backlog/backlog-drive-hold.ts`).
+
+The judgment session runs beside the driver, never in its place (joshuafolkken/kit#7120). On
+`triage` `run:wake` launches the session without handing the carry record over, names its pid on the
+kept resume line (`--triage-pid`) and drives again at once — the carry and `--exclude` stay the
+driver's.
+
+While that pid lives the driver keeps collecting, offering and launching, holds every answer
+but `run` (judge, drain, retrospective) as a continued pass, and keeps a park collected meanwhile owed
+(`scripts/backlog/backlog-drive-park-triage.ts`). Once the pid has ended the driver drops it and hands
+the owed `triage` back.
 
 ## Waiting while something is in flight
 

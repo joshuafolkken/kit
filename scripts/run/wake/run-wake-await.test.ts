@@ -24,6 +24,7 @@ function ports_of(
 	reads: ReadonlyArray<CarryRead>,
 	launches: ReadonlyArray<boolean>,
 	is_owner_live = true,
+	is_launched_record = false,
 ): AwaitPorts {
 	const carry_reads = [...reads]
 	const launch_reads = [...launches]
@@ -32,6 +33,7 @@ function ports_of(
 		read_carry: () => carry_reads.shift() ?? NONE,
 		pending_invocation: () => (launch_reads.shift() === true ? LAUNCHED_INVOCATION : undefined),
 		is_owner_live: () => is_owner_live,
+		is_launched_record: () => is_launched_record,
 		sleep: vi.fn(async () => undefined),
 	}
 }
@@ -55,6 +57,17 @@ describe('run_wake_await beside a dead owner’s carry record', () => {
 
 		await expect(run_wake_await.await_carry(ports, INTERVAL_MS)).resolves.toStrictEqual(NONE)
 		expect(ports.sleep).toHaveBeenCalledOnce()
+	})
+})
+
+// joshuafolkken/kit#5516: `josh backlogrun` begins and hands off the record itself, and a launcher
+// without a terminal exits before the supervisor's first read.
+describe('run_wake_await beside the record the launcher handed off', () => {
+	it('takes the launcher’s record at once though the launcher is gone', async () => {
+		const ports = ports_of([CARRIED], [true], false, true)
+
+		await expect(run_wake_await.await_carry(ports, INTERVAL_MS)).resolves.toStrictEqual(CARRIED)
+		expect(ports.sleep).not.toHaveBeenCalled()
 	})
 })
 

@@ -1,8 +1,10 @@
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, rmSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LaneStateRecord } from './lane-state'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#4300: a process that outlives a close's SIGKILL leaves the close `incomplete`,
 // noted on the lane's record, and the supervisor closes the lane again once the process is gone.
@@ -50,7 +52,7 @@ const { lane_reap_settle } = await import('./lane-reap-settle')
 const { lane_registry } = await import('./lane-registry')
 const { lane_close } = await import('./lane-close')
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'lane-close-settle-'))
+const scratch = make_directory('lane-close-settle-')
 const LANE_ROOT = path.join(scratch, 'lanes')
 const ISSUE = '4300'
 const GONE_ISSUE = '4301'
@@ -63,12 +65,7 @@ function record_of(issue: string, state: LaneStateRecord['state']): LaneStateRec
 	return { issue, state, changed_by: 'lane:open', changed_at: '2026-10-20T00:00:00.000Z' }
 }
 
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
-
 beforeEach(() => {
-	vi.clearAllMocks()
 	mkdirSync(path.join(LANE_ROOT, ISSUE), { recursive: true })
 	vi.mocked(lane_registry.lane_root_directory).mockResolvedValue(LANE_ROOT)
 })

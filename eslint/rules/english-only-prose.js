@@ -5,7 +5,9 @@
 // is an AST-and-codepoint one: look at comment tokens and the title/message string literals of
 // `describe` / `it` / `test` / `expect`, and report when they carry a CJK codepoint. The single
 // exception is `eslint/rules/` itself, where the rule modules are allowed to explain their rationale in
-// Japanese — that exemption is wired in `eslint.config.js`, not here, so the rule stays a pure detector.
+// Japanese — that exemption is wired in `eslint.config.js`, not here, so the rule stays a pure detector;
+// only its directory lives here, read by both the config and the generated Content-rules prose.
+const JAPANESE_RATIONALE_DIRECTORY = 'eslint/rules/'
 
 // CJK codepoints: Han (Kanji), Hiragana, Katakana and Hangul. This is intentionally the "comment or
 // title" alphabet, not "any non-ASCII" — a comment may legitimately carry `≤`, `→` or an accented
@@ -129,7 +131,12 @@ const english_only_prose_rule = {
 }
 
 // The plugin wrapper `eslint.config.js` wires under the `kit` namespace, plus the bare rule and the CJK
-// pattern for the tests and the document-sync guard to read.
+// pattern for the tests to read.
 const english_only_prose_plugin = { rules: { 'english-only-prose': english_only_prose_rule } }
 
-export { CJK_PATTERN, english_only_prose_rule, english_only_prose_plugin }
+export {
+	CJK_PATTERN,
+	JAPANESE_RATIONALE_DIRECTORY,
+	english_only_prose_rule,
+	english_only_prose_plugin,
+}

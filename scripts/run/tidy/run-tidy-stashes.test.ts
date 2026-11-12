@@ -1,5 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { git_stash } from '#scripts/git/stash/git-stash'
 import { stash_sweep_lock } from '#scripts/git/stash/stash-sweep-lock'
@@ -10,8 +9,11 @@ import {
 	OBSERVATION_LEDGER_DIRECTORY,
 } from '#scripts/observations/observation-ledger'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_tidy_stashes } from './run-tidy-stashes'
+
+const make_directory = temporary_directory('suite')
 
 vi.mock('#scripts/git/stash/git-stash', () => ({
 	git_stash: {
@@ -28,7 +30,7 @@ vi.mock('#scripts/git/stash/stash-sweep-lock', () => ({
 	},
 }))
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-tidy-stashes-test-'))
+const scratch = make_directory('run-tidy-stashes-test-')
 // joshuafolkken/kit#2919: the carry lands in the running tree's own issue file, and the duplicate check
 // reads every file of the directory.
 const LEDGER_FILE = observation_ledger.ledger_file(2701)
@@ -57,7 +59,6 @@ async function is_merged(issue: string): Promise<boolean> {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	rmSync(path.join(scratch, OBSERVATION_LEDGER_DIRECTORY), { force: true, recursive: true })
 	mkdirSync(path.dirname(LEDGER), { recursive: true })
 	writeFileSync(OTHER_ISSUE_LEDGER, `${EXISTING_LINE}\n`)
@@ -71,10 +72,6 @@ beforeEach(() => {
 	])
 	vi.mocked(git_stash.changed_paths).mockResolvedValue(['scripts/a.ts'])
 	vi.mocked(git_stash.drop_by_hash).mockResolvedValue(true)
-})
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 // joshuafolkken/kit#2701: stashes of merged issues piled up until a person dropped them.
@@ -141,7 +138,7 @@ describe('run_tidy_stashes.tidy_stashes — the ledger carry and failures', () =
 })
 
 function primary_with_old_ledger(): string {
-	const root = mkdtempSync(path.join(scratch, 'primary-'))
+	const root = make_directory(path.join(scratch, 'primary-'))
 
 	mkdirSync(path.join(root, path.dirname(LEGACY_LEDGER_FILE)), { recursive: true })
 	writeFileSync(path.join(root, LEGACY_LEDGER_FILE), `${NEW_LINE}\n`)

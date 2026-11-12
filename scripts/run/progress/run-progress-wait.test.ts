@@ -1,9 +1,10 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WatchOptions } from './run-progress-cli'
 import type { ObservationRead } from './run-progress-read'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#3102. `--wait` once ended at its first line so the session would relay it, which
 // woke the orchestrating session once per heartbeat for a relay it could not change. What is pinned
@@ -62,7 +63,7 @@ const live_target = vi.mocked(run_progress_read.live_target)
 const is_life_ended = vi.mocked(run_progress_clock.is_life_ended)
 
 const REPO = 'joshuafolkken/kit'
-const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-run-progress-wait-'))
+const TEMPORARY = make_directory('josh-run-progress-wait-')
 const STAMP = path.join(TEMPORARY, 'stamp.json')
 const LIFE_STAMP = path.join(TEMPORARY, 'life.json')
 const MINUTE_MS = 60_000
@@ -123,11 +124,6 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.restoreAllMocks()
-	vi.clearAllMocks()
-})
-
-afterAll(() => {
-	rmSync(TEMPORARY, { force: true, recursive: true })
 })
 
 // One report due at the first tick and none after: the seed and the first tick read a silence of
@@ -147,7 +143,7 @@ function recorded_line(): string | undefined {
 }
 
 describe('--wait — a report reaches the stream without waking the caller', () => {
-	// The regression the Issue was filed on: a report used to end the wait, and the exit was the wake.
+	// A report must keep waiting; only a wake ends the wait.
 	it('reports to the event stream and keeps waiting rather than exiting', async () => {
 		report_once(INTERVAL_MS)
 

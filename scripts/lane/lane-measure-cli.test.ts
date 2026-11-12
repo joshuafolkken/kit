@@ -1,9 +1,11 @@
 import { randomUUID } from 'node:crypto'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LedgerEntry } from './lane-ledger'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#3355: `lane:sample` appends one load sample and `lane:stats` prints the period's
 // table row; a malformed verb or flag is refused rather than measured as a zero period.
@@ -18,17 +20,14 @@ const { lane_measure_cli } = await import('./lane-measure-cli')
 const { lane_stats } = await import('./lane-stats')
 const { run_event_stream } = await import('#scripts/run/event/run-event-stream')
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'lane-measure-cli-test-'))
+const scratch = make_directory('lane-measure-cli-test-')
 const NOW = Date.parse('2026-10-06T12:00:00.000Z')
 const AT = new Date(NOW).toISOString()
 const FAILURE = 1
 const SINCE = '2026-10-06T00:00Z'
+const BEFORE_SINCE = '2026-10-05T23:00:00.000Z'
 const SESSION_FILE = 'session.jsonl'
 const GATE_STOP: LedgerEntry = { kind: 'stop', at: AT, issue: 1, reason: 'gate' }
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
 
 interface TestContext {
 	ledger_path: string
@@ -66,6 +65,8 @@ describe('lane_measure_cli.run — refusals', () => {
 		[['sample', '--unknown']],
 		[['stats']],
 		[['stats', '--period', '-1']],
+		[['stats', '--period', '1', '30']],
+		[['stats', '--period', '1', '--sinks', '0']],
 		[['value']],
 		[['value', 'edit']],
 		[['value', 'nope', '--since', SINCE]],
@@ -81,6 +82,7 @@ describe('lane_measure_cli.run — refusals', () => {
 
 	it('names the net verb in the usage it prints', () => {
 		expect(lane_measure_cli.USAGE).toContain('josh lane:net <issue>')
+		expect(lane_measure_cli.USAGE).toContain('josh lane:stats --since <instant>')
 	})
 })
 
@@ -97,22 +99,27 @@ describe('lane_measure_cli.run — sample', () => {
 	})
 })
 
-describe('lane_measure_cli.run — stats', () => {
-	it('prints the header and the row of the ledger period under the given limit', async () => {
+// joshuafolkken/kit#7007: `--since` opens the window at its instant, dropping the merges before it.
+describe('lane_measure_cli.run — stats window', () => {
+	it.each([
+		[['--period', '1.25'], '| 6 | 1.25 | 2 |'],
+		[['--since', SINCE], '| 6 | 0.5 | 1 |'],
+	])('prints the header and the row of the %j window under the given limit', async (flags, row) => {
 		const context = fresh_context()
 
 		lane_ledger_write.append(context.ledger_path, { kind: 'merge', at: AT, issue: 1 })
-
-		await expect(
-			lane_measure_cli.run(['stats', '--period', '2', '--limit', '6'], context),
-		).resolves.toBe(0)
-
+		lane_ledger_write.append(context.ledger_path, { kind: 'merge', at: BEFORE_SINCE, issue: 2 })
+		const code = await lane_measure_cli.run(['stats', ...flags, '--limit', '6'], context)
 		const printed = String(vi.mocked(console.info).mock.calls[0]?.[0])
 
-		expect(printed.startsWith(lane_stats.header())).toBe(true)
-		expect(printed).toContain('| 6 | 2 | 1 |')
-	})
+		expect(code).toBe(0)
 
+		expect(printed.startsWith(lane_stats.header())).toBe(true)
+		expect(printed).toContain(row)
+	})
+})
+
+describe('lane_measure_cli.run — stats', () => {
 	// joshuafolkken/kit#3643: the same command prints where the period's lanes spent their time.
 	it('prints the per-stage table under the row, unmeasured stages named as such', async () => {
 		const context = fresh_context()
@@ -270,7 +277,7 @@ describe('lane_measure_cli.run — stats round 2', () => {
 describe('lane_measure_cli.run — stats transcripts', () => {
 	it('prints the transcript table over the directories the context names', async () => {
 		const context = fresh_context()
-		const directory = mkdtempSync(path.join(scratch, 'transcripts-'))
+		const directory = make_directory(path.join(scratch, 'transcripts-'))
 		const block = { type: 'tool_use', id: 't', input: { command: 'pnpm josh gate' } }
 		const line = { type: 'assistant', timestamp: AT, message: { content: [block] } }
 
@@ -307,10 +314,10 @@ function lane_state(state: string, minute: number): string {
 	return JSON.stringify({ kind: 'lane-state', at: at_minute(minute), issue: PAUSED_ISSUE, state })
 }
 
-// One lane session of `PAUSED_ISSUE`: a `Read` from 20 to 10 minutes before `NOW`, then its ship.
+// A read spans the pause so the test can distinguish active tool time from paused time.
 function paused_lane_transcript(): string {
 	const directory = path.join(
-		mkdtempSync(path.join(scratch, 'paused-')),
+		make_directory(path.join(scratch, 'paused-')),
 		`-kit-lanes-${String(PAUSED_ISSUE)}`,
 	)
 	const read = { type: 'tool_use', id: 'r', name: 'Read', input: {} }
@@ -353,9 +360,9 @@ describe('lane_measure_cli.run — stats paused lanes', () => {
 	})
 })
 
-// One lane session that made one `Edit` taking 1.5 seconds, at `NOW`.
+// An edit-only session isolates tool time from the rest of the lane's work.
 function edit_transcript(): string {
-	const directory = mkdtempSync(path.join(scratch, 'value-'))
+	const directory = make_directory(path.join(scratch, 'value-'))
 	const use = { type: 'tool_use', id: 'e', name: 'Edit', input: {} }
 	const result = { type: 'tool_result', tool_use_id: 'e', content: 'ok' }
 	const ended = new Date(NOW + 1500).toISOString()

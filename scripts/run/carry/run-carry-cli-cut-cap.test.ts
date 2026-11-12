@@ -1,11 +1,12 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { run_headless } from '#scripts/run/run-headless'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_carry } from './run-carry'
 import { run_carry_cli } from './run-carry-cli'
 import { run_carry_cli_fixture } from './run-carry-cli-fixture'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#2346: `run:carry --cut` past the cap is refused with `capped` and the run carries on
 // uncut, so a run that has begun to churn cannot keep paying a cold preamble the accumulation it sheds
@@ -19,7 +20,7 @@ vi.mock('#scripts/git/git-command', () => ({
 const { git_command } = await import('#scripts/git/git-command')
 const git_directories = vi.mocked(git_command.git_directories)
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-carry-cli-cap-'))
+const scratch = make_directory('run-carry-cli-cap-')
 const WORKTREE = path.join(scratch, 'worktree.git')
 const REPOSITORY = path.join(scratch, 'repository.git')
 const INVOCATION = 'backlogrun --max 5'
@@ -65,7 +66,6 @@ afterEach(() => {
 
 afterAll(() => {
 	vi.restoreAllMocks()
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 describe('the cut count has a ceiling', () => {

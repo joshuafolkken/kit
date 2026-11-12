@@ -12,6 +12,7 @@ const CHECK_STEP_NAME = 'Fail on new Sonar issues or duplicated blocks'
 const VERSION_STEP_ID = 'project-version'
 const SCAN_STEP_NAME = 'SonarQube Scan'
 const INSTALL_STEP_NAME = 'Setup pnpm and install dependencies'
+const CACHE_STEP_NAME = 'Cache SonarQube scanner'
 const SET_TOKEN = 'sqp_example'
 const PULL_REQUEST_EVENT = 'pull_request'
 const PUSH_EVENT = 'push'
@@ -25,7 +26,11 @@ function step_named(name: string): WorkflowStep | undefined {
 }
 
 function ran_step_names(token: string, event_name: string): ReadonlyArray<string> {
-	const context: ContextTree = { env: { SONAR_TOKEN: token }, github: { event_name } }
+	const context: ContextTree = {
+		env: { SONAR_TOKEN: token },
+		github: { event_name },
+		needs: { 'change-scope': { result: 'success' } },
+	}
 
 	return sonar_steps()
 		.filter(
@@ -67,6 +72,43 @@ describe('sonar-qube.yml dependency install', () => {
 
 		expect(names).toContain(INSTALL_STEP_NAME)
 		expect(names.indexOf(INSTALL_STEP_NAME)).toBeLessThan(names.indexOf(SCAN_STEP_NAME))
+	})
+})
+
+describe('sonar-qube.yml scanner cache', () => {
+	it('caches analyzer downloads with a workflow-scoped key (ac-29d96ee4)', () => {
+		const step = step_named(CACHE_STEP_NAME)
+
+		expect(step).toMatchObject({
+			with: {
+				path: '~/.sonar/cache',
+				key: "${{ runner.os }}-sonar-${{ hashFiles('.github/workflows/sonar-qube.yml') }}",
+			},
+		})
+	})
+
+	it('uses a SHA-pinned cache action (ac-a2c303ed)', () => {
+		expect(step_named(CACHE_STEP_NAME)?.uses).toMatch(/^actions\/cache@[a-f\d]{40}$/u)
+	})
+
+	it.each([PUSH_EVENT, PULL_REQUEST_EVENT])('restores before the scan on a %s', (event_name) => {
+		const names = ran_step_names(SET_TOKEN, event_name)
+
+		expect(names).toContain(CACHE_STEP_NAME)
+		expect(names.indexOf(CACHE_STEP_NAME)).toBeLessThan(names.indexOf(SCAN_STEP_NAME))
+	})
+
+	it('does not cache without SONAR_TOKEN', () => {
+		expect(ran_step_names('', PULL_REQUEST_EVENT)).not.toContain(CACHE_STEP_NAME)
+	})
+})
+
+describe('sonar-qube.yml analysis safeguards', () => {
+	it('keeps full history and the quality gate wait (ac-9839ceec)', () => {
+		const checkout = sonar_steps().find((step) => step.uses?.startsWith('actions/checkout@'))
+
+		expect(checkout?.with?.['fetch-depth']).toBe(0)
+		expect(step_named(SCAN_STEP_NAME)?.with?.['args']).toContain('-Dsonar.qualitygate.wait=true')
 	})
 })
 

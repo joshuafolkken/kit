@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
+import { time_josh_names } from '#scripts/time-runtime/time-josh-names'
 import { time_shell } from '#scripts/time-runtime/time-shell'
 import { lane_stage_stats } from './lane-stage-stats'
 import { lane_stats, type StatsWindow } from './lane-stats'
@@ -61,15 +62,18 @@ const { NOT_MEASURED } = lane_stage_stats
 function segment_command(segment: string): string {
 	const words = segment.trim().split(WORD_PATTERN)
 	const start = words.findIndex((word) => !KEYWORDS.has(word))
-	const named = time_shell.josh_command_of_segment(words.slice(start).join(' '))
+	const named = time_josh_names.josh_command_of_segment(words.slice(start).join(' '))
 
 	return named.slice(time_shell.JOSH_PREFIX.length)
 }
 
+function command_segments(command = ''): Array<string> {
+	return time_shell.unquoted(command).split(SEPARATOR_PATTERN)
+}
+
 // Every josh command a shell `command` runs, in order.
 function josh_commands(command = ''): Array<string> {
-	const spoken = time_shell.unquoted(command)
-	const named = spoken.split(SEPARATOR_PATTERN).map((segment) => segment_command(segment))
+	const named = command_segments(command).map((segment) => segment_command(segment))
 
 	return named.filter((name) => name !== '')
 }
@@ -188,6 +192,7 @@ function read_calls(directories: ReadonlyArray<string>, window: StatsWindow): Ar
 }
 
 const lane_transcript_stats = {
+	command_segments,
 	durations,
 	in_period,
 	josh_commands,

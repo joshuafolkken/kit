@@ -1,5 +1,3 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { check_reuse, type CheckRecords } from '#scripts/gate/check-reuse'
 import { gate_labels } from '#scripts/gate/gate-labels'
@@ -7,7 +5,10 @@ import type { GateTree } from '#scripts/gate/gate-tree'
 import { change_base } from '#scripts/git/change-base'
 import { git_spawn } from '#scripts/git/git-spawn'
 import { review_tree } from '#scripts/review/review-tree'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const make_directory = temporary_directory('suite')
 
 const run_mock = vi.hoisted(() => vi.fn())
 
@@ -29,7 +30,7 @@ const { run_ship_pre_detach } = await import('./run-ship-pre-detach')
 // joshuafolkken/kit#4505: a check the pre-detach step passed is not run again by the gate stage on the
 // same tree — the pre-detach step writes the gate's own per-check record and the gate reads it.
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'pre-detach-reuse-'))
+const scratch = make_directory('pre-detach-reuse-')
 const read_tree = vi.spyOn(review_tree, 'read_changed_tree')
 const read_base = vi.spyOn(change_base, 'resolved_through_merge')
 const read_git = vi.spyOn(git_spawn, 'read')
@@ -42,7 +43,7 @@ const SHIPPED: GateTree = { files: FILES, base: BASE }
 const FAILED = 1
 
 function records_in(prefix: string): CheckRecords {
-	const directory = mkdtempSync(path.join(scratch, prefix))
+	const directory = make_directory(path.join(scratch, prefix))
 
 	return function record_of(label: string): string {
 		return path.join(directory, `${label}.json`)
@@ -78,10 +79,6 @@ beforeEach(() => {
 	answer(new Map())
 	read_tree.mockResolvedValue(FILES)
 	read_base.mockResolvedValue(BASE)
-})
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 describe('run_ship_pre_detach.checks — the gate stage after it', () => {

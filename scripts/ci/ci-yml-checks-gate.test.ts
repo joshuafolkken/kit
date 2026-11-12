@@ -1,10 +1,11 @@
 import { gate_static_group } from '#scripts/gate/gate-static-group'
 import { GATE_TARGETS, verification_gate } from '#scripts/gate/verification-gate'
+import { lint_gate_scope } from '#scripts/lint/lint-gate-scope'
 import { describe, expect, it } from 'vitest'
 import { ci_yml_fixture, type WorkflowStep } from './ci-yml-fixture'
 
 // joshuafolkken/kit#1216: the `Checks` job ran cspell → prettier → eslint → tsc → vitest one after
-// another inside a single job, so 78–162 seconds of a run's wall clock was spent waiting on steps
+// another inside a single job, so the run waited on steps
 // that share no state — and it sat on the critical path between the pull request opening and the
 // merge. `josh gate` already runs exactly those checks concurrently and reports every failure in
 // one pass, so the job runs that instead of restating the five tool invocations.
@@ -17,9 +18,8 @@ import { ci_yml_fixture, type WorkflowStep } from './ci-yml-fixture'
 const RUNTIME_GATE_JOB = 'static-checks'
 const TEMPLATE_CHECKS_JOB = 'checks'
 const GATE_STEP = 'pnpm josh gate'
-// The five invocations the job used to spell out. Each one is now reached through the `josh`
-// sub-command that defines it, so finding any of them here again means the job has gone back to
-// verifying a set of its own rather than the one the local gate verifies.
+const MIN_STATIC_TIMEOUT_MINUTES = 12
+// These invocations belong to their `josh` subcommands so CI and the local gate verify the same set.
 const RESTATED_TOOL_TOKENS: ReadonlyArray<string> = [
 	'pnpm exec cspell',
 	'pnpm exec prettier',
@@ -37,6 +37,14 @@ function checks_scripts(): ReadonlyArray<string> {
 }
 
 describe('the static-checks job runs the verification gate', () => {
+	it('budgets time for cold linting, setup and cache uploads', () => {
+		const job = ci_yml_fixture.find_job(ci_yml_fixture.RUNTIME_CI_YML, RUNTIME_GATE_JOB)
+
+		expect(ci_yml_fixture.job_timeout_minutes(job)).toBeGreaterThanOrEqual(
+			MIN_STATIC_TIMEOUT_MINUTES,
+		)
+	})
+
 	it('runs the gate command', () => {
 		expect(checks_scripts().some((script) => script.startsWith(GATE_STEP))).toBe(true)
 	})
@@ -66,6 +74,16 @@ describe('the static-checks job runs the verification gate', () => {
 		expect(checks_scripts()).toContain(
 			`${GATE_STEP} ${verification_gate.VERBOSE_FLAG} ${verification_gate.NO_UNIT_FLAG} "${gate_static_group.STATIC_GROUP_FLAG_PREFIX}\${STATIC_GROUP}"`,
 		)
+	})
+
+	// joshuafolkken/kit#6684: a lane's gate lints only its changed files, so the whole-tree lint is
+	// the one GitHub's own `CI` variable selects on this job — overriding it would drop the last one.
+	it('leaves GitHub’s CI variable alone, so its lint legs lint their whole shards', () => {
+		const workflow = ci_yml_fixture.load_workflow(ci_yml_fixture.RUNTIME_CI_YML)
+		const scopes = [workflow, workflow.jobs[RUNTIME_GATE_JOB], ...checks_steps()]
+
+		expect(scopes.filter((scope) => scope?.env?.['CI'] !== undefined)).toStrictEqual([])
+		expect(lint_gate_scope.resolve_gate_scope([], process.cwd(), { CI: 'true' }).mode).toBe('all')
 	})
 })
 

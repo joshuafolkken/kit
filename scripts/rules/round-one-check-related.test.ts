@@ -1,7 +1,7 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
@@ -27,7 +27,8 @@ const DETACH_LINE = time_transcript_fixture.josh_call_line(
 )
 const OPEN_ROUND = [BRIEF_LINE, FIX_LINE].join('\n')
 
-const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'round-one-check-related-'))
+const make_directory = temporary_directory('suite')
+const WORK_DIRECTORY = make_directory('round-one-check-related-')
 const ENTRY_DIRECTORY = process.cwd()
 const LANE_DIRECTORY = path.join(WORK_DIRECTORY, '.kit-lanes', ISSUE)
 const WRITTEN_TRANSCRIPTS = new Set<string>()
@@ -59,8 +60,6 @@ afterAll(() => {
 	for (const transcript of WRITTEN_TRANSCRIPTS) {
 		rmSync(delivered_rules.delivery_path(RULE_ID, transcript), { force: true })
 	}
-
-	rmSync(WORK_DIRECTORY, { recursive: true, force: true })
 })
 
 describe('round_one_check_related.fixes_an_open_round', () => {
@@ -95,6 +94,24 @@ describe('round_one_check_related.fixes_an_open_round', () => {
 	})
 })
 
+describe('round_one_check_related.fixes_an_open_round — run:chain', () => {
+	it('reads run:chain as a brief', () => {
+		const chain = time_transcript_fixture.josh_call_line(1, BRANCH, 'pnpm josh run:chain 5205')
+
+		expect(round_one_check_related.fixes_an_open_round(`${chain}\n${FIX_LINE}`)).toBe(true)
+	})
+
+	it('answers false once run:chain --join closes the round', () => {
+		const chain_join = time_transcript_fixture.josh_call_line(
+			3,
+			BRANCH,
+			'pnpm josh run:chain 5205 --join',
+		)
+
+		expect(round_one_check_related.fixes_an_open_round(`${OPEN_ROUND}\n${chain_join}`)).toBe(false)
+	})
+})
+
 function enter_lane_child(): void {
 	mkdirSync(LANE_DIRECTORY, { recursive: true })
 	process.chdir(LANE_DIRECTORY)
@@ -106,6 +123,13 @@ describe('the round-one-check-related delivery in a lane child — refused', () 
 
 	it('refuses check:related on a fixed round before the join', () => {
 		expect(delivered_rules.delivery(payload_of('open', CHECK, OPEN_ROUND))).toBe(REASON)
+	})
+
+	// joshuafolkken/kit#5784: the touched run is exempt from repeat-check-related only.
+	it('refuses check:related --touched on a fixed round before the join', () => {
+		const payload = payload_of('touched', `${CHECK} --touched`, OPEN_ROUND)
+
+		expect(delivered_rules.delivery(payload)).toBe(REASON)
 	})
 
 	it('refuses the `cr` alias on every occurrence', () => {

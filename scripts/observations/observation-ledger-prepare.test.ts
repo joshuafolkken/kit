@@ -1,7 +1,7 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import {
 	LEGACY_LEDGER_FILE,
 	LEGACY_OBSERVATION_LEDGER_PATHS,
@@ -10,19 +10,15 @@ import {
 } from './observation-ledger'
 import { observation_ledger_prepare } from './observation-ledger-prepare'
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'observation-ledger-prepare-test-'))
+const make_directory = temporary_directory('suite')
 const GOOD_LINE = '- k:a | d1 | 2026-09-30 | scripts/x.ts | A well-formed sighting'
 const OBSERVATION_LEDGER_PATH = observation_ledger.ledger_file(1)
 const OTHER_ISSUE_PATH = observation_ledger.ledger_file(2)
 const LEGACY_OBSERVATION_LEDGER_PATH = LEGACY_OBSERVATION_LEDGER_PATHS[0] ?? ''
 const BROKEN_LINE = '- k:b | d1 | a line missing its fields'
 
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
-
 function root_with(relative: string, content: string): string {
-	const root = mkdtempSync(path.join(scratch, 'root-'))
+	const root = make_directory('observation-ledger-prepare-test-')
 
 	mkdirSync(path.dirname(path.join(root, relative)), { recursive: true })
 	writeFileSync(path.join(root, relative), content)
@@ -56,7 +52,7 @@ describe('observation_ledger_prepare.prepare', () => {
 	})
 
 	it('answers no broken line when there is no ledger at all', async () => {
-		const root = mkdtempSync(path.join(scratch, 'empty-'))
+		const root = make_directory('observation-ledger-prepare-empty-')
 
 		expect(await observation_ledger_prepare.prepare(root)).toEqual([])
 	})

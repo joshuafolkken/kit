@@ -1,5 +1,4 @@
 import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
-import { canonical_command } from '#scripts/josh/josh-aliases'
 import { json_value } from '#scripts/lib/json-value'
 
 // Reading a shell command well enough to name what it ran.
@@ -15,10 +14,9 @@ import { json_value } from '#scripts/lib/json-value'
 // session and says nothing: `git`, `gh` and `pnpm` are different work with different costs.
 //
 // **The first word is not always the command.** Most calls here open with `cd <path> &&`, and taking
-// the literal first word put `Bash: cd` at the top of every table — 82 calls and 12.1 minutes of one
-// measured session, naming the one part of the command that did no work. So the chain is split into
-// segments and each segment walked past its leading `VAR=…` assignments and its wrappers, to the
-// first word that is a command.
+// the literal first word put `Bash: cd` at the top of every table, naming the one part of the
+// command that did no work. So the chain is split into segments and each segment walked past its
+// leading `VAR=…` assignments and its wrappers, to the first word that is a command.
 //
 // **A prefix is skipped word by word, not segment by segment.** Reading only each segment's first
 // word left `FOO=1 pnpm test` reported as `Bash: FOO=1` and `time pnpm build` as `Bash: time` — the
@@ -122,7 +120,10 @@ const FLAG_AND_VALUE = 2
 // charged `git commit -m "ran pnpm josh gate"` to `josh gate`, and this repository's own commit
 // messages and issue comments name josh subcommands constantly. Only the first match counts: a
 // compound command naming two would otherwise charge its whole duration to each.
-const JOSH_PATTERN = /^(?:(?:pnpm|npx)\s+(?:exec\s+)?)?josh\s+([a-z][\w:-]*)/u
+const JOSH_LAUNCHER = String.raw`^(?:(?:pnpm|npx)\s+(?:exec\s+)?)?josh`
+const JOSH_PATTERN = new RegExp(String.raw`${JOSH_LAUNCHER}\s+([a-z][\w:-]*)`, 'u')
+// A josh call with or without a subcommand — `pnpm josh`, `josh --help` (joshuafolkken/kit#7137).
+const JOSH_LAUNCHER_PATTERN = new RegExp(String.raw`${JOSH_LAUNCHER}(?:\s|$)`, 'u')
 const JOSH_PREFIX = 'josh '
 const COMMAND_KEY = 'command'
 
@@ -283,6 +284,14 @@ function blanked(command: string): string | undefined {
 	return command.replaceAll(QUOTED_SPAN_PATTERN, (span) => ' '.repeat(span.length))
 }
 
+// Only the text the shell never expands is blanked — a single-quoted span and an escaped character —
+// so a `` ` `` or `$` left here is one the shell acts on, and a double-quoted span stays as written.
+function literal_blanked(command: string): string {
+	return command.replaceAll(QUOTED_SPAN_PATTERN, (span) =>
+		span.startsWith(DOUBLE_QUOTE) ? span : ' '.repeat(span.length),
+	)
+}
+
 function discarded_commands(command: string): Array<string> {
 	const plain = unquoted(command)
 
@@ -302,21 +311,20 @@ function bash_label(command: string): string {
 	return word === '' ? cost_blocks.BASH_TOOL : `${cost_blocks.BASH_TOOL}${BASH_SEPARATOR}${word}`
 }
 
-// **An alias is expanded here, so one command is one name**. Every reading
-// built on this field keyed `pnpm josh ga` and `pnpm josh gate` as two different commands: the
-// per-command table printed them as two rows, the per-invocation table dropped both for having one
-// call each, and — the one with real cost — the failure chain did not see the second as answering the
-// first, so the time a red gate made the run pay again went unreported.
+// The josh subcommand one segment runs, as typed, or `''` for a segment that runs none. Shared by the
+// two readers below so what counts as a segment's josh command is one rule, not two.
 //
-// **The expansion belongs at the name, not at each reader.** `time-gate-runs.ts` had already patched
-// its own copy of this reading, which left the gate count and the per-invocation table answering
-// differently about the same run; `canonical_command` is the one rule both now go through.
-// The josh subcommand one segment runs, alias-expanded, or `''` for a segment that runs none. Shared
-// by the two readers below so what counts as a segment's josh command is one rule, not two.
+// **An alias is not expanded here** (joshuafolkken/kit#6159): expanding pulled the alias table into
+// every reader of this file. A reader that keys or matches on the name goes through
+// `time-josh-names.ts`, the one layer that expands.
 function josh_command_of_segment(segment: string): string {
 	const name = JOSH_PATTERN.exec(command_words(segment).join(' '))?.[1]
 
-	return name === undefined ? '' : `${JOSH_PREFIX}${canonical_command(name)}`
+	return name === undefined ? '' : `${JOSH_PREFIX}${name}`
+}
+
+function runs_josh(segment: string): boolean {
+	return JOSH_LAUNCHER_PATTERN.test(command_words(segment).join(' '))
 }
 
 function josh_command_of(command: string): string {
@@ -427,14 +435,17 @@ const time_shell = {
 	bash_label,
 	blanked,
 	command_segment,
+	command_words,
 	discarded_commands,
 	has_heredoc,
 	josh_arguments,
+	runs_josh,
 	josh_command_of,
 	josh_command_of_segment,
 	josh_commands_of,
 	josh_signatures_of,
 	leading_word,
+	literal_blanked,
 	unquoted,
 	without_heredoc_bodies,
 }

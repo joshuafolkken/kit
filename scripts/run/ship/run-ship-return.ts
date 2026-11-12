@@ -1,20 +1,21 @@
 import { setTimeout as sleep } from 'node:timers/promises'
-import { agent_role_profile } from '#scripts/agent/agent-role-profile'
-import { backlog_budget } from '#scripts/backlog/backlog-budget'
+import { agent_profile_schema } from '#scripts/agent/agent-profile-schema'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { lane_child_invocation, type ShipStop } from '#scripts/lane/lane-child-invocation'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_relaunch } from '#scripts/lane/lane-relaunch'
 import { lane_session_broker } from '#scripts/lane/lane-session-broker'
+import { poll } from '#scripts/lib/poll'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
-import { run_wake_driver } from '#scripts/run/wake/run-wake-driver'
+import { run_wake_window } from '#scripts/run/wake/run-wake-window'
 import type { ShipSection } from './run-ship'
+import { run_ship_detach } from './run-ship-detach'
 import { run_ship_next, type ShipResume } from './run-ship-next'
 import { run_ship_place } from './run-ship-place'
 import { run_ship_probe } from './run-ship-probe'
-import { run_ship_relaunch_cap } from './run-ship-relaunch-cap'
+import { run_ship_relaunch_cap, type ParkedStop } from './run-ship-relaunch-cap'
 import { run_ship_stage, type Stage } from './run-ship-stage'
 import type { ShipArguments } from './run-ship-steps'
 import { run_ship_stop_cause } from './run-ship-stop-cause'
@@ -41,7 +42,7 @@ import { run_ship_waiter } from './run-ship-waiter'
 // front of the agent that ran it.
 
 const OPENAI_PROVIDER = 'openai'
-// A minute of polling, long enough for the supervisor's 5-second lane scan to reopen a server.
+// Polling spans the supervisor's lane scan so a reopened server can receive the return.
 const SERVING_POLL_MS = 1000
 const SERVING_POLLS = 60
 // The wait for a broker on older code to be replaced: its refusal makes its supervisor reload onto the
@@ -50,7 +51,7 @@ const SERVING_POLLS = 60
 // successor's first lane scan. A driver that reruns a busy merge holds the pass longer still, and a ship
 // past the wait is re-dispatched with the version mismatch named.
 const RELOAD_POLLS =
-	(run_wake_driver.WINDOW_MS + backlog_budget.OFFER_INTERVAL_MS) / SERVING_POLL_MS + SERVING_POLLS
+	(run_wake_window.WINDOW_MS + run_wake_window.PASS_INTERVAL_MS) / SERVING_POLL_MS + SERVING_POLLS
 const VERSION_MISMATCH_NOTE =
 	'the lane broker runs older code than this ship (a version mismatch), and no broker on the current code read the request within the wait'
 
@@ -99,14 +100,14 @@ async function record_failed_relaunch(issue: string, reason: string): Promise<vo
 	note(`the lane child could not be relaunched: ${reason}`)
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.RELAUNCH_FAILED,
-		`${issue_cite.plain(issue)} could not be relaunched: ${reason}`,
+		`${issue_cite.plain_for('program', issue)} could not be relaunched: ${reason}`,
 	)
 }
 
 async function relaunched(lane: LaneInfo, stop: ShipStop): Promise<ReturnOutcome> {
 	const invocation = lane_child_invocation.ship_stop_invocation(lane.issue, stop)
-	const phase = agent_role_profile.IMPLEMENTATION_PHASE
-	const result = lane_relaunch.relaunch(lane, invocation, phase, note)
+	const phase = agent_profile_schema.IMPLEMENTATION_PHASE
+	const result = await lane_relaunch.relaunch(lane, invocation, phase, note)
 
 	if (result.kind === 'launched') return 'relaunched'
 
@@ -140,15 +141,17 @@ async function await_server(
 	previous?: string,
 	polls = SERVING_POLLS,
 ): Promise<string | undefined> {
-	for (let polled = 0; polled < polls; polled += 1) {
-		const session = lane_session_broker.serving_session(lane.directory, lane.issue)
-		if (session !== undefined && session !== previous) return session
+	const found = await poll.poll_for(
+		() => {
+			const session = lane_session_broker.serving_session(lane.directory, lane.issue)
 
-		// eslint-disable-next-line no-await-in-loop -- polling: each check waits on the scan the previous one missed
-		await sleep(SERVING_POLL_MS)
-	}
+			return session === previous ? undefined : session
+		},
+		{ attempts: polls, interval_ms: SERVING_POLL_MS, sleeper: sleep },
+	)
+	if (found === undefined && polls > 0) await sleep(SERVING_POLL_MS)
 
-	return undefined
+	return found
 }
 
 function polls_after(reply: BrokerReply): number {
@@ -204,18 +207,60 @@ async function relaunched_or_brokered(lane: LaneInfo, stop: ShipStop): Promise<R
 	return server === undefined ? await relaunched(lane, stop) : await brokered(lane, stop, server)
 }
 
-// A child that stopped more often than the cap allows is parked instead of relaunched
+// A child past the cap, or on a stop no relaunch clears, is parked instead of relaunched
 // (`run-ship-relaunch-cap.ts`); a park the label refused leaves the stop recorded, as before.
-async function parked(issue: string, reason: string): Promise<ReturnOutcome> {
-	if (await run_ship_relaunch_cap.park(issue, reason)) return 'parked'
+// A timed-out merge wait's block, named in the stage output, becomes the park's cause.
+// The park records the stop's stage and cause class (joshuafolkken/kit#6864).
+async function parked(
+	issue: string,
+	parking: Omit<ParkedStop, 'blocked'>,
+	output: StageOutput,
+	is_at_once: boolean,
+): Promise<ReturnOutcome> {
+	const blocked = run_ship_stop_cause.blocked_cause_of(output.body)
+	const { park, park_at_once } = run_ship_relaunch_cap
+	const is_parked = await (is_at_once ? park_at_once : park)(issue, { ...parking, blocked })
 
-	note('the lane child was not relaunched past the ship-stop cap, and the park label was refused')
+	if (is_parked) return 'parked'
+
+	note('the lane child was not relaunched, and the park label was refused')
 
 	return 'recorded'
 }
 
+// A stop no relaunch clears parks at once (joshuafolkken/kit#5775); any other parks past the cap.
+async function park_outcome(
+	issue: string,
+	stage: Stage,
+	resume: ShipResume,
+	output: StageOutput,
+): Promise<ReturnOutcome | undefined> {
+	const reason = run_ship_stage.stop_reason(stage, resume.conflicts)
+	const failed = { ...resume, ...output }
+	const is_at_once = run_ship_stop_cause.parks_at_once(stage, failed)
+
+	if (is_at_once || (await run_ship_relaunch_cap.is_over(issue, reason))) {
+		const stop = { stage, cause: run_ship_stop_cause.cause_of(stage, failed) }
+
+		return await parked(issue, { reason, stop }, output, is_at_once)
+	}
+
+	return undefined
+}
+
 // `output` is the failed stage's own output: the relaunched child's prompt carries the body's tail, and
 // the stop is classified on its standard output (`run-ship-stop-cause.ts`).
+// The OpenAI supervisor owns its child relaunch and reads the generated invocation from this launch.
+async function keep_stop(issue: string, stop: ShipStop): Promise<void> {
+	const repository = await run_ship_probe.repository_directory()
+	if (repository === undefined) return
+	await run_ship_detach.mark_stop(
+		repository,
+		issue,
+		lane_child_invocation.ship_stop_invocation(issue, stop),
+	)
+}
+
 async function stopped(
 	issue: string,
 	stage: Stage,
@@ -226,14 +271,15 @@ async function stopped(
 		run_event_stream.EVENT_KIND.SHIP_STOP,
 		stop_text(issue, stage, resume, output),
 	)
+	await keep_stop(issue, { stage, ...resume })
 
 	const lane = await lane_to_relaunch(issue)
 
 	if (lane === undefined) return 'recorded'
 
-	const reason = run_ship_stage.stop_reason(stage, resume.conflicts)
+	const parked_outcome = await park_outcome(issue, stage, resume, output)
 
-	if (await run_ship_relaunch_cap.is_over(issue, reason)) return await parked(issue, reason)
+	if (parked_outcome !== undefined) return parked_outcome
 
 	const findings = run_ship_stop_cause.details_of(stage, { ...resume, ...output })
 	const context = await run_ship_stop_context.build(issue, output.body, findings)

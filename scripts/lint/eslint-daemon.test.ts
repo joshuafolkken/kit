@@ -1,23 +1,16 @@
-import {
-	mkdirSync,
-	mkdtempSync,
-	readFileSync,
-	rmSync,
-	symlinkSync,
-	utimesSync,
-	writeFileSync,
-} from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, readFileSync, rmSync, symlinkSync, utimesSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { write_file } from '#tools/test/write-file'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('execa', () => ({ execa: vi.fn() }))
-vi.mock('#scripts/build/local-bin', () => ({ resolve_package_bin: vi.fn() }))
+vi.mock('#scripts/build/local-bin', async () => await import('#tools/test/local-bin-mock'))
 vi.mock('#scripts/git/git-spawn-sync', () => ({ git_spawn_sync: { read: vi.fn() } }))
 
 const execa_module = await import('execa')
 const mocked_execa = vi.mocked(execa_module.execa)
-const { resolve_package_bin } = await import('#scripts/build/local-bin')
+const { DIRECT_LAUNCH_FILE, resolve_package_bin } = await import('#tools/test/local-bin-mock')
 const mocked_resolve = vi.mocked(resolve_package_bin)
 const { git_spawn_sync } = await import('#scripts/git/git-spawn-sync')
 const mocked_git_read = vi.mocked(git_spawn_sync.read)
@@ -48,26 +41,20 @@ const NEW_MODULE = 'src/new-module.ts'
 const FILES_BEFORE = TARGET
 const FILES_AFTER = `${TARGET}\n${NEW_MODULE}`
 
-const project_root = mkdtempSync(path.join(tmpdir(), 'eslint-daemon-'))
+const make_directory = temporary_directory('suite')
+const project_root = make_directory('eslint-daemon-')
 
 function answer(exit_code: number, stdout: string): ExecaResult {
 	return { exitCode: exit_code, stdout, all: stdout } as unknown as ExecaResult
 }
 
-function write_file(relative: string, content: string = JSON_BODY): void {
-	const file = path.join(project_root, relative)
-
-	mkdirSync(path.dirname(file), { recursive: true })
-	writeFileSync(file, content)
-}
-
 // A checkout with an installed eslint whose daemon runs, recorded under nothing yet.
 function checkout(): void {
 	for (const input of ['package.json', `${ESLINT_DIRECTORY}/package.json`, RULE_MODULE]) {
-		write_file(input)
+		write_file(project_root, input, JSON_BODY)
 	}
 
-	write_file(`${ESLINT_DIRECTORY}/.eslint_d`, DAEMON)
+	write_file(project_root, `${ESLINT_DIRECTORY}/.eslint_d`, DAEMON)
 }
 
 // git under one commit, listing `files` as the ones the type program can resolve.
@@ -85,13 +72,13 @@ function recorded_text(): string {
 function current_checkout(): void {
 	checkout()
 	write_file(
+		project_root,
 		`${ESLINT_DIRECTORY}/.eslint_d-toolchain`,
 		eslint_daemon.record_text(DAEMON, eslint_daemon.fingerprint(project_root)),
 	)
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	mkdirSync(project_root, { recursive: true })
 	mocked_resolve.mockReturnValue(CLI)
 	mocked_git_read.mockReturnValue(undefined)
@@ -132,7 +119,7 @@ describe('eslint_daemon.fingerprint', () => {
 			checkout()
 			const before = eslint_daemon.fingerprint(project_root)
 
-			write_file(input, CHANGED)
+			write_file(project_root, input, CHANGED)
 
 			expect(eslint_daemon.fingerprint(project_root)).not.toBe(before)
 		},
@@ -142,7 +129,7 @@ describe('eslint_daemon.fingerprint', () => {
 		checkout()
 		const before = eslint_daemon.fingerprint(project_root)
 
-		write_file(TARGET, CHANGED)
+		write_file(project_root, TARGET, CHANGED)
 		utimesSync(path.join(project_root, RULE_MODULE), NEWER_S, NEWER_S)
 
 		expect(eslint_daemon.fingerprint(project_root)).toBe(before)
@@ -235,7 +222,7 @@ describe('eslint_daemon.run', () => {
 		current_checkout()
 		mocked_execa.mockResolvedValueOnce(answer(1, 'report'))
 
-		expect(await eslint_daemon.run(PNPM_ESLINT, { project_root, timeout_ms: 5 })).toEqual({
+		expect(await eslint_daemon.run(PNPM_ESLINT, { project_root, timeout_ms: 5 })).toMatchObject({
 			exit_code: 1,
 			stdout: 'report',
 			output: 'report',
@@ -255,10 +242,31 @@ describe('eslint_daemon.run', () => {
 	})
 })
 
+describe('eslint_daemon.stop', () => {
+	// A stop that failed or timed out is not reported as stopped.
+	it.each([
+		[0, true],
+		[1, false],
+	])('stops through its own cli, bounded: exit %i → %s', async (code, stopped) => {
+		mocked_execa.mockResolvedValue(answer(code, ''))
+
+		expect(await eslint_daemon.stop(project_root)).toBe(stopped)
+		expect(mocked_execa.mock.lastCall?.[1]).toEqual([CLI, 'stop'])
+		expect(mocked_execa.mock.lastCall?.at(-1)).toMatchObject({ timeout: expect.any(Number) })
+	})
+
+	it('stops nothing where no daemon cli resolves', async () => {
+		mocked_resolve.mockReturnValue(undefined)
+
+		expect(await eslint_daemon.stop(project_root)).toBe(false)
+		expect(mocked_execa).not.toHaveBeenCalled()
+	})
+})
+
 describe('eslint_daemon.run — a stale daemon', () => {
 	it('stops a daemon whose config moved since it started before linting', async () => {
 		current_checkout()
-		write_file(RULE_MODULE, CHANGED)
+		write_file(project_root, RULE_MODULE, CHANGED)
 		mocked_execa.mockResolvedValue(answer(0, ''))
 
 		await eslint_daemon.run(PNPM_ESLINT, { project_root })
@@ -317,17 +325,13 @@ describe('eslint_daemon.run — nothing to reach', () => {
 	})
 
 	it('reaches no daemon for a project that borrows its node_modules through a symlink', async () => {
-		const lender = mkdtempSync(path.join(tmpdir(), 'eslint-daemon-lender-'))
+		const lender = make_directory('eslint-daemon-lender-')
 
-		try {
-			symlinkSync(lender, path.join(project_root, 'node_modules'), 'dir')
+		symlinkSync(lender, path.join(project_root, 'node_modules'), 'dir')
 
-			expect(eslint_daemon.resolve_daemon_cli(project_root)).toBeUndefined()
-			expect(await eslint_daemon.run(PNPM_ESLINT, { project_root })).toBeUndefined()
-			expect(mocked_execa).not.toHaveBeenCalled()
-		} finally {
-			rmSync(lender, { recursive: true, force: true })
-		}
+		expect(eslint_daemon.resolve_daemon_cli(project_root)).toBeUndefined()
+		expect(await eslint_daemon.run(PNPM_ESLINT, { project_root })).toBeUndefined()
+		expect(mocked_execa).not.toHaveBeenCalled()
 	})
 
 	it('reaches the daemon for a project with a node_modules of its own', () => {
@@ -379,11 +383,11 @@ describe('eslint_daemon.run_or_cold', () => {
 		])
 	})
 
-	it('runs the cold pnpm eslint when the daemon cannot answer', async () => {
+	it('launches the cold eslint directly when the daemon cannot answer', async () => {
 		mocked_resolve.mockReturnValue(undefined)
 		mocked_execa.mockResolvedValueOnce(answer(0, 'cold'))
 
 		expect(await eslint_daemon.run_or_cold(PNPM_ESLINT)).toMatchObject({ exit_code: 0 })
-		expect(mocked_execa).toHaveBeenCalledExactlyOnceWith('pnpm', PNPM_ESLINT, expect.anything())
+		expect(mocked_execa.mock.calls).toEqual([[DIRECT_LAUNCH_FILE, PNPM_ESLINT, expect.anything()]])
 	})
 })

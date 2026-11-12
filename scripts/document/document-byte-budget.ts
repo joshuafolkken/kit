@@ -74,30 +74,49 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/target-repository.md', bytes: 4096 },
 	{ path: '.claude/skills/workflow-commands/working-tree-hold.md', bytes: 8192 },
 	// `command:derive`'s usage section (joshuafolkken/kit#4970) crossed the 45056 block.
-	{ path: 'docs/josh-commands-automation.md', bytes: 49_152 },
-	// The carried `--unpinned-ok` record (joshuafolkken/kit#4775) crossed the 73728 block.
-	// `run:merge`'s withdrawn child (joshuafolkken/kit#4916) crossed the 77824 block.
-	// `lane:plan --probe` and the entry probe (joshuafolkken/kit#5211) crossed the 81920 block.
-	{ path: 'docs/josh-commands-run.md', bytes: 86_016 },
+	// `ui:shot`'s usage section (joshuafolkken/kit#5633) crossed the 49152 block.
+	// `usage:tee`'s usage section (joshuafolkken/kit#6316) crossed the 53248 block.
+	// `issue:consolidate`'s usage section (joshuafolkken/kit#6609) crossed the 57344 block.
+	{ path: 'docs/josh-commands-automation.md', bytes: 61_440 },
+	// The run reference crossed a block in eleven lanes (joshuafolkken/kit#4775 …
+	// joshuafolkken/kit#6540), so joshuafolkken/kit#6676 split its board, lane and session commands
+	// into pages of their own, each at its smallest block.
+	// The drive's own `run:stalled` retry under `run:add --retry` (joshuafolkken/kit#7076) crossed the 53248 block.
+	{ path: 'docs/josh-commands-run.md', bytes: 57_344 },
+	// The finished rows' icons, `⏩` already done among them (joshuafolkken/kit#7095), crossed the 20480 block.
+	{ path: 'docs/josh-commands-board.md', bytes: 24_576 },
+	// `lane:stats --since`'s usage example (joshuafolkken/kit#7007) crossed the 28672 block.
+	{ path: 'docs/josh-commands-lane.md', bytes: 32_768 },
+	// `cost:audit`'s dated period and usage breakdown (joshuafolkken/kit#7042) crossed the 16384 block.
+	{ path: 'docs/josh-commands-session.md', bytes: 20_480 },
 	// `josh effect:audit` (joshuafolkken/kit#4958) and `issue:priority`'s usage section (joshuafolkken/kit#4960) crossed the 57344 block;
-	// `josh prose:stale` (joshuafolkken/kit#5287) crossed the 61440 block.
-	{ path: 'docs/josh-commands-backlog.md', bytes: 65_536 },
+	// `josh prose:stale` (joshuafolkken/kit#5287) crossed the 61440 block; `josh diff:summary`
+	// (joshuafolkken/kit#5547) crossed the 65536 block; solo evidence in `backlog:triage`
+	// (joshuafolkken/kit#6463) crossed the 73728 block; the drive's sample wait (joshuafolkken/kit#6503)
+	// crossed the 77824 block; `issue:fold-existing --found-during` (joshuafolkken/kit#6641) crossed the 81920 block.
+	{ path: 'docs/josh-commands-backlog.md', bytes: 81_920 },
 	// `run:merge` withdrawing a lane closed without a merge (joshuafolkken/kit#4916) crossed the 53248 block;
-	// `gate --static-group` (joshuafolkken/kit#5215) crossed the 57344 block.
-	{ path: 'docs/josh-commands.md', bytes: 61_440 },
-	{ path: 'docs/labels-and-run-states.md', bytes: 8192 },
+	// `gate --static-group` (joshuafolkken/kit#5215) crossed the 57344 block; `lint:rule`'s usage span
+	// (joshuafolkken/kit#5664) crossed the 61440 block; `test:related`'s own-change hub
+	// (joshuafolkken/kit#6193) crossed the 65536 block; project gate steps narrowed by `paths`
+	// (joshuafolkken/kit#7205) crossed the 69632 block.
+	{ path: 'docs/josh-commands.md', bytes: 73_728 },
+	// The auto-retry of every `run:stalled` cause (joshuafolkken/kit#7076) crossed the 8192 block.
+	{ path: 'docs/labels-and-run-states.md', bytes: 12_288 },
 	{ path: 'prompts/coding-standards.md', bytes: 4096 },
-	{ path: 'prompts/collaboration-workflow.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/file-edits.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/gh-rest.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/glossary.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/issue-citation.md', bytes: 4096 },
 	// The priority declaration and its criteria (joshuafolkken/kit#4383) crossed the 8192 block; the
-	// causing-lane declaration and criteria F / G (joshuafolkken/kit#4749) crossed the 12288 one.
-	{ path: 'prompts/collaboration-workflow/issue-template.md', bytes: 16_384 },
+	// causing-lane declaration and criteria F / G (joshuafolkken/kit#4749) crossed the 12288 one; the
+	// premise row (joshuafolkken/kit#7021) crossed the 16384 one.
+	// The template's en column (joshuafolkken/kit#7211).
+	{ path: 'prompts/collaboration-workflow/issue-template.en.md', bytes: 8192 },
+	{ path: 'prompts/collaboration-workflow/issue-template.md', bytes: 20_480 },
 	{ path: 'prompts/collaboration-workflow/lane-instructions.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/measurement.md', bytes: 4096 },
-	{ path: 'prompts/collaboration-workflow/operating-rules.md', bytes: 8192 },
+	{ path: 'prompts/collaboration-workflow/operating-rules.md', bytes: 12_288 },
 	{ path: 'prompts/collaboration-workflow/output-bounds.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/overview.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/plan-comment.md', bytes: 4096 },
@@ -112,8 +131,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: 'prompts/collaboration-workflow/wip-cap.md', bytes: 8192 },
 	{ path: 'prompts/refactoring.md', bytes: 8192 },
 	{ path: 'prompts/review-rubric.md', bytes: 12_288 },
-	// Self-check 2's `josh prose:stale` pointer (joshuafolkken/kit#5287) crossed the 12288 block.
-	{ path: 'prompts/review.md', bytes: 16_384 },
+	{ path: 'prompts/review.md', bytes: 12_288 },
 	{ path: 'prompts/sonar-hotspot-handling.md', bytes: 8192 },
 	{ path: 'prompts/testing-guide.md', bytes: 12_288 },
 ]

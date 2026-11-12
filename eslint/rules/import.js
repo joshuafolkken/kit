@@ -5,8 +5,7 @@ export const import_rules = {
 	// joshuafolkken/kit#3599: off for the same reason, and for one more. These six read the exports of
 	// the imported file, so a per-file content cache keeps a stale "no problem" for an unchanged
 	// importer after the file it imports changes. The compiler runs the first four checks on every
-	// file it type-checks; the last two never ran on a `.ts` import before the resolver was wired, so
-	// nothing that used to be reported is lost. `base.js` switches all six back on for hand-authored
+	// file it type-checks. `base.js` switches all six back on for hand-authored
 	// JavaScript, which the compiler does not check.
 	'import-x/named': 'off',
 	'import-x/namespace': 'off',
@@ -27,14 +26,8 @@ export const import_rules = {
 	// 名前付きエクスポートを優先
 	'import/prefer-default-export': 'off',
 	'import/no-default-export': 'error',
-	// 循環依存を禁止
-	'import/no-cycle': 'error',
-	// 未使用のインポートを禁止
-	// ESLint 10 で FileEnumerator API が削除されたため no-op だが、将来の代替実装に備えて残す
-	'import/no-unused-modules': [
-		'error',
-		{ unusedExports: true, suppressMissingFileEnumeratorAPIWarning: true },
-	],
+	// Skip dependencies outside the project without limiting internal cycle depth (#6405).
+	'import/no-cycle': ['error', { ignoreExternal: true }],
 	// CommonJSを禁止
 	'import/no-commonjs': 'error',
 	// AMD形式を禁止
@@ -85,11 +78,4 @@ export const import_rules = {
 	'import/newline-after-import': 'error',
 	// グループ化されていないインポートを禁止
 	'import/no-unassigned-import': ['error', { allow: ['**/*.css', '**/*.scss'] }],
-
-	// // 循環参照チェックは重いため、ローカル開発時は off、CIでのみ実行などを検討
-	// // どうしても有効にしたい場合は maxDepth を指定して制限する
-	// 'import/no-cycle': 'off',
-
-	// // 未使用モジュールチェックも非常に重い
-	// 'import/no-unused-modules': 'off',
 }

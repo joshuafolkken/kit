@@ -1,3 +1,7 @@
+import { rmSync, writeFileSync } from 'node:fs'
+import path from 'node:path'
+import { cli_body_repository } from '#scripts/josh/cli-body-repository-fixture'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it, vi } from 'vitest'
 import { disposition_cli } from './disposition-cli'
 
@@ -26,6 +30,98 @@ describe('disposition_cli.run', () => {
 		expect(write).toHaveBeenCalledWith('runtime\n')
 
 		vi.restoreAllMocks()
+	})
+})
+
+// joshuafolkken/kit#5542: `--batch <findings-file>` prints the routing table; a bare path stays the
+// single-finding call it was.
+const BATCH_FLAG = '--batch'
+const UNPARSED_LINE = 'not a finding'
+// An issue number no review cites, so the git-ignored draft it writes collides with nothing.
+const FOUND_DURING = 999_999
+const FOUND_DURING_FLAG = '--found-during'
+const FILE_ROUTED_LINE = `confirmed bug-risks:medium:${CODE_FILE} — a null deref\n`
+const DRAFTED_BODY = `.josh/tmp/review-cap-${String(FOUND_DURING)}-1.md`
+
+const make_directory = temporary_directory()
+
+function findings_file(content: string): string {
+	const directory = make_directory('disposition-batch-')
+	const file = path.join(directory, 'findings.txt')
+
+	writeFileSync(file, content)
+
+	return file
+}
+
+describe('disposition_cli.run --batch', () => {
+	// joshuafolkken/kit#6056: the findings file is read through `cli_body`.
+	it('refuses a findings file in the work tree that git does not ignore', () => {
+		const repository = cli_body_repository.create(make_directory('disposition-repository-'))
+		const file = repository.write(cli_body_repository.UNIGNORED_DIRECTORY, FILE_ROUTED_LINE)
+
+		expect(() => disposition_cli.run([BATCH_FLAG, file])).toThrow('not git-ignored')
+	})
+
+	it('prints the routing table for a findings file', () => {
+		const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+		const file = findings_file(`comments:low:${INERT_FILE} — a stale comment\n`)
+
+		expect(disposition_cli.run([BATCH_FLAG, file])).toBe(0)
+		expect(String(write.mock.calls[0]?.[0])).toContain('| non-runtime | no | drop |')
+
+		vi.restoreAllMocks()
+	})
+
+	it('is a usage error with no findings file', () => {
+		vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		expect(disposition_cli.run([BATCH_FLAG])).toBe(1)
+
+		vi.restoreAllMocks()
+	})
+
+	it('refuses a line outside the review:record grammar', () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		expect(disposition_cli.run([BATCH_FLAG, findings_file(`${UNPARSED_LINE}\n`)])).toBe(1)
+		expect(String(error.mock.calls[0]?.[0])).toContain(UNPARSED_LINE)
+
+		vi.restoreAllMocks()
+	})
+
+	it('keeps a bare path the single-finding call', () => {
+		const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+
+		vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+
+		expect(disposition_cli.run([INERT_FILE])).toBe(0)
+		expect(write).toHaveBeenCalledWith('non-runtime\n')
+
+		vi.restoreAllMocks()
+	})
+})
+
+// joshuafolkken/kit#5583: a finding routed to `file` drafts a body that cites the review's issue.
+describe('disposition_cli.run --batch with a file-routed finding', () => {
+	it('refuses it without --found-during', () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		expect(disposition_cli.run([BATCH_FLAG, findings_file(FILE_ROUTED_LINE)])).toBe(1)
+		expect(String(error.mock.calls[0]?.[0])).toContain(FOUND_DURING_FLAG)
+
+		vi.restoreAllMocks()
+	})
+
+	it('prints the issue:file line with --found-during', () => {
+		const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+		const file = findings_file(FILE_ROUTED_LINE)
+
+		expect(disposition_cli.run([BATCH_FLAG, file, FOUND_DURING_FLAG, String(FOUND_DURING)])).toBe(0)
+		expect(String(write.mock.calls[0]?.[0])).toContain('pnpm josh issue:file')
+
+		vi.restoreAllMocks()
+		rmSync(DRAFTED_BODY, { force: true })
 	})
 })
 

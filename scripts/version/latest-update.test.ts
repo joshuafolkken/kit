@@ -180,8 +180,8 @@ describe('latest_update.main — exit code', () => {
 })
 
 // Regression for joshuafolkken/kit#2805: a metadata cache written through safe-chain before a
-// version aged in would hide that version for up to 24 hours, so every stage resolves against a
-// cache directory created for this run alone, removed once the update is done.
+// version aged in would hide that version until the cache expired, so every stage resolves against
+// a cache directory created for this run alone, removed once the update is done.
 describe('latest_update.main — fresh metadata cache', () => {
 	beforeEach(() => {
 		execa_sync_mock.mockReset()

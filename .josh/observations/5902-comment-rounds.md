@@ -1,0 +1,5 @@
+- rf:performance | low | tools/retrospective/retrospective.ts:69 | 2026-11-02 | #5902
+- rf:assumptions | low | tools/retrospective/retrospective-picks.ts:56 | 2026-11-02 | #5902
+- rf:comments | low | tools/retrospective/retrospective-picks.ts:28 | 2026-11-02 | #5902
+- rf:performance | low | tools/retrospective/retrospective.ts:69 | 2026-11-02 | #5902
+- rf:assumptions | low | tools/retrospective/retrospective-picks.ts:55 | 2026-11-02 | #5902

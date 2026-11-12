@@ -40,8 +40,15 @@ describe('review_record_interaction.report_due', () => {
 	it('records first and runs the pass only where none ran beside the round', () => {
 		const line = review_record_interaction.due_line(ISSUE)
 
-		expect(line).toContain('record it with `pnpm josh review:record --interaction --issue 4835')
+		expect(line).toContain(
+			'record it with `pnpm josh review:record --from-slot --interaction --issue 4835 [<n>=<disposition> ...]`',
+		)
 		expect(line).toContain('if no interaction reviewer ran beside this round, first open its brief')
+	})
+
+	// joshuafolkken/kit#5656: a run-tooling change that only edits comments is not due either.
+	it('names the comment-only change among the reasons no pass is due', () => {
+		expect(review_record_interaction.NOT_REQUIRED_LINE).toContain('changes only comments in it')
 	})
 
 	it.each<InteractionStatus>(['ok', 'not-required'])('prints nothing on %s', async (status) => {

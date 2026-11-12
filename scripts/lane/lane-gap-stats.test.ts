@@ -1,6 +1,7 @@
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { describe, expect, it } from 'vitest'
 import { lane_gap_stats } from './lane-gap-stats'
+import { lane_hand_back_held } from './lane-hand-back-held'
 import type { LedgerEntry } from './lane-ledger'
 import { lane_stats } from './lane-stats'
 import { lane_yield } from './lane-yield'
@@ -17,7 +18,15 @@ const RELAUNCH = 'cut → resume'
 const OUTAGE = 'outage → relaunch'
 const PARK = 'park → offer'
 const YIELD = 'yield → redispatch'
+const YIELD_HOLDER = 'yield: holder running'
+const YIELD_OFFER = 'yield: offer wait'
+const YIELD_LAUNCH = 'yield: launch'
+const YIELD_UNKNOWN = 'yield: holder unknown'
+const NAMES_NO_HOLDER = 4400
 const MERGE = 'followup → merge'
+const FIRST_LANE = 'start → first lane'
+const SETUP_KIND = 'setup'
+const STARTING_TEXT = 'starting session'
 const CUT_TEXT = `#${String(ISSUE)} cut (implementation)`
 const OUTAGE_TEXT = `#${String(ISSUE)} outage (re-dispatchable)`
 const OUTAGE_KIND = 'outage'
@@ -53,6 +62,10 @@ function merge(issue: number, seconds_before: number): LedgerEntry {
 
 function withdraw(issue: number, by: string, seconds_before: number): RunEvent {
 	return event('withdraw', `#${String(issue)} withdrawn by ${by}: overlaps`, seconds_before)
+}
+
+function yield_note(issue: number, seconds_before: number): RunEvent {
+	return event('note', `#${String(issue)} yielded its lane: overlaps · at: summary`, seconds_before)
 }
 
 function dispatch(issue: number, seconds_before: number): LedgerEntry {
@@ -157,15 +170,54 @@ describe('lane_gap_stats.table -- park → offer', () => {
 
 		expect(row_of(entries, events, PARK)).toBe(`| ${PARK} | 1 | 30 | 30 | 0 |`)
 	})
+
+	// joshuafolkken/kit#7121: a lane freed while no driver runs holds, but no driver offered anything.
+	it('runs a park past a driverless hand-back hold to the next offer answer', () => {
+		const events = [event('park', `#${String(ISSUE)} parked`, 60)]
+		const driverless = `${lane_hand_back_held.DRIVERLESS_PREFIX}hand-back:window`
+		const entries: Array<LedgerEntry> = [
+			{ kind: 'held', at: seconds_before_now(50), reason: driverless },
+			{ kind: 'dispatch', at: seconds_before_now(30), issue: OTHER },
+		]
+
+		expect(row_of(entries, events, PARK)).toBe(`| ${PARK} | 1 | 30 | 30 | 0 |`)
+	})
 })
 
 describe('lane_gap_stats.table -- yield → redispatch', () => {
 	// joshuafolkken/kit#5216: the #5171 yield waited for its holder's lane, no seat held.
 	it('times each yield until its own issue next dispatch', () => {
-		const events = [withdraw(ISSUE, lane_yield.YIELD_TEXT.name, 100)]
+		const events = [yield_note(ISSUE, 100)]
 		const entries = [dispatch(OTHER, 90), dispatch(ISSUE, 40)]
 
 		expect(row_of(entries, events, YIELD)).toBe(`| ${YIELD} | 1 | 60 | 60 | 0 |`)
+	})
+
+	// joshuafolkken/kit#5755: the wait starts at the yield note; the withdrawal closing it is no second yield.
+	it('times a yield closed by its withdrawal once, from its note', () => {
+		const events = [yield_note(ISSUE, 100), withdraw(ISSUE, lane_yield.YIELD_TEXT.name, 70)]
+
+		expect(row_of([dispatch(ISSUE, 40)], events, YIELD)).toBe(`| ${YIELD} | 1 | 60 | 60 | 0 |`)
+	})
+
+	// joshuafolkken/kit#5984: the split and the unknown counts add up to the yield row's.
+	it('splits a yield naming its holder and counts one naming none apart', () => {
+		const events = [
+			event(
+				'note',
+				`#${String(ISSUE)} yielded its lane: overlaps #${String(OTHER)} · at: summary`,
+				100,
+			),
+			yield_note(NAMES_NO_HOLDER, 100),
+			event(SETUP_KIND, `opening lane #${String(ISSUE)}`, 50),
+		]
+		const entries = [merge(OTHER, 70), dispatch(ISSUE, 40), dispatch(NAMES_NO_HOLDER, 40)]
+
+		expect(row_of(entries, events, YIELD)).toBe(`| ${YIELD} | 2 | 60 | 60 | 0 |`)
+		expect(row_of(entries, events, YIELD_HOLDER)).toBe(`| ${YIELD_HOLDER} | 1 | 30 | 30 | 0 |`)
+		expect(row_of(entries, events, YIELD_OFFER)).toBe(`| ${YIELD_OFFER} | 1 | 20 | 20 | 0 |`)
+		expect(row_of(entries, events, YIELD_LAUNCH)).toBe(`| ${YIELD_LAUNCH} | 1 | 10 | 10 | 0 |`)
+		expect(row_of(entries, events, YIELD_UNKNOWN)).toBe(`| ${YIELD_UNKNOWN} | 1 | 60 | 60 | 0 |`)
 	})
 
 	it('leaves out a withdrawal that is not a yield', () => {
@@ -194,12 +246,25 @@ describe('lane_gap_stats.table -- followup → merge', () => {
 	})
 })
 
+describe('lane_gap_stats.table -- start → first lane', () => {
+	it('times each session start until its first lane opening', () => {
+		const events = [
+			event(SETUP_KIND, STARTING_TEXT, 300),
+			event(SETUP_KIND, `opening lane #${String(ISSUE)}`, 258),
+			event(SETUP_KIND, `opening lane #${String(OTHER)}`, 200),
+			event(SETUP_KIND, STARTING_TEXT, 100),
+		]
+
+		expect(row_of([], events, FIRST_LANE)).toBe(`| ${FIRST_LANE} | 2 | 42 | 42 | 1 |`)
+	})
+})
+
 describe('lane_gap_stats.table -- the period', () => {
 	it('prints every gap with zero counts for an empty period', () => {
 		const lines = lane_gap_stats.table([], WINDOW).split('\n')
 
 		expect(lines[0]).toBe(HEADER)
-		expect(lines).toHaveLength(7)
+		expect(lines).toHaveLength(12)
 	})
 
 	it('leaves out a gap that started before the period', () => {

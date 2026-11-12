@@ -33,8 +33,8 @@ function label_flag(label: string): string {
 const SKILL_ROOT = '.claude/skills/workflow-commands'
 
 // Each filing route, the constant that names its label, and the document whose filing command must
-// carry it. Tier A files from two procedures — a prerequisite (same repo) and an upstream defect
-// (a first-party target) — so both are pinned. joshuafolkken/kit#2189 relocated `prerequisite.md`'s body out of
+// carry it. An upstream defect files through `josh upstream:interrupt`, whose code passes
+// `--route interrupt` itself (`issue/upstream-interrupt-cli.test.ts`). joshuafolkken/kit#2189 relocated `prerequisite.md`'s body out of
 // `SKILL.md` into `prerequisite.md`, so the prerequisite's `issue:file` filing command now lives
 // there and the `SKILL.md` stub carries only the trigger and the pointer.
 const FILING_ROUTE_COMMANDS: ReadonlyArray<{ route: string; label: string; doc: string }> = [
@@ -52,11 +52,6 @@ const FILING_ROUTE_COMMANDS: ReadonlyArray<{ route: string; label: string; doc: 
 		route: 'Tier A prerequisite',
 		label: TIER_A_ROUTE_LABEL,
 		doc: `${SKILL_ROOT}/prerequisite.md`,
-	},
-	{
-		route: 'Tier A upstream defect',
-		label: TIER_A_ROUTE_LABEL,
-		doc: 'prompts/collaboration-workflow/upstream-interrupt.md',
 	},
 	// joshuafolkken/kit#1518: the interrupt files from the WIP cap's own rule body, because the cap is
 	// what it is an exemption from. Pinned in the flag form for the same reason the other three are —

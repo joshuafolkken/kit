@@ -1,17 +1,14 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { TS_CACHE_FLAGS } from '#scripts/josh/josh-command-types'
 import { execa } from 'execa'
 import { project_checks } from './project-checks'
+import { TSC_ARGS } from './tsc-arguments'
 
-// `josh check` — the project-wide TypeScript check. It used to be a bare `tsc --noEmit` shell entry,
-// so on a basic project with nothing to type-check it failed with `Command "tsc" not found` while
-// the gate, which asks `type_check_skip_reason` first, skipped the same step.
-// Both now read that one decision.
+// `josh check` and the gate share `type_check_skip_reason` so a basic project with no TypeScript
+// skips the check rather than trying to launch a missing compiler.
 
 const ARGV_OFFSET = 2
 const FAIL_EXIT_CODE = 1
-const TSC_ARGS = ['exec', 'tsc', '--noEmit', ...TS_CACHE_FLAGS] as const
 
 async function run_type_check(
 	command_arguments: ReadonlyArray<string>,
@@ -40,4 +37,4 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 
 const type_check_command = { run_type_check }
 
-export { TSC_ARGS, type_check_command }
+export { type_check_command }

@@ -17,6 +17,7 @@ const EPIC_NUMBER = 893
 const NEW_EPIC_NUMBER = 900
 const SUBJECT_NUMBER = 894
 const CANDIDATE_NUMBER = 890
+const OTHER_CANDIDATE_NUMBER = 891
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const REASON = 'They reference each other.'
@@ -50,7 +51,6 @@ const BLOCKED_MEMBER = issue(CANDIDATE_NUMBER, {
 })
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	mocked_add.mockResolvedValue(SUCCESS_EXIT_CODE)
 	mocked_create.mockResolvedValue(NEW_EPIC_NUMBER)
@@ -146,6 +146,45 @@ describe('epic_bundle_apply.apply_decision — create_epic', () => {
 
 	it('falls back to the subject number when the subject has no title', () => {
 		expect(epic_bundle_apply.title_of(issue(SUBJECT_NUMBER))).toBe('Epic: bundle with #894')
+	})
+})
+
+describe('epic_bundle_apply.apply_decision — ask', () => {
+	const OTHER_EPIC = 880
+	const SPREAD_MEMBERS = [
+		issue(CANDIDATE_NUMBER, { epic: EPIC_NUMBER }),
+		issue(OTHER_CANDIDATE_NUMBER, { epic: OTHER_EPIC }),
+	]
+
+	it('places the subject in the recommended epic and records the choice', async () => {
+		const result = await epic_bundle_apply.apply_decision(
+			input(
+				{ action: 'ask', epics: [OTHER_EPIC, EPIC_NUMBER], recommended: EPIC_NUMBER },
+				SPREAD_MEMBERS,
+			),
+		)
+
+		const added = mocked_add.mock.calls[0]?.[0]
+
+		expect(result).toBe(SUCCESS_EXIT_CODE)
+		expect(added).toMatchObject({
+			epic_number: EPIC_NUMBER,
+			children: [CANDIDATE_NUMBER, SUBJECT_NUMBER],
+		})
+		expect(added?.decision).toMatch(
+			/^Auto-decided \(\d{4}-\d{2}-\d{2}, `epic:bundle --apply`\): placed #894 in #893 over #880 because/u,
+		)
+	})
+
+	it('writes nothing when no epic is recommended', async () => {
+		const result = await epic_bundle_apply.apply_decision(
+			input({ action: 'ask', epics: [OTHER_EPIC, EPIC_NUMBER] }, SPREAD_MEMBERS),
+		)
+
+		expect(result).toBe(SUCCESS_EXIT_CODE)
+		expect(console.info).toHaveBeenCalledWith(epic_bundle_apply.UNAPPLIED_LINES.ask)
+		expect(epic_bundle_apply.UNAPPLIED_LINES.ask).toContain('declare a cycle')
+		expect(mocked_add).not.toHaveBeenCalled()
 	})
 })
 

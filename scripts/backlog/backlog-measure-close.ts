@@ -6,7 +6,8 @@ import {
 	type MeasureDeclaration,
 	type MeasureVerdict,
 } from '#scripts/issue/measure-declaration'
-import { trusted_measure, type CommandRun } from '#scripts/issue/trusted-measure'
+import { trusted_measure, type CommandRun, type TrustedBody } from '#scripts/issue/trusted-measure'
+import { lane_value_missing } from '#scripts/lane/lane-value-missing'
 import { error_text } from '#scripts/lib/error-message'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
@@ -14,39 +15,60 @@ import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 // joshuafolkken/kit#4621: the drive runs a due issue's measurement declaration (`measure-declaration.ts`)
 // before it opens a lane. A value within the bound closes the issue the way `issue:measured` does — the
 // result comment, the `measured` label, the close and the epic's progress — and puts a `measured` event
-// on the stream, so no lane is spent. Anything else — no declaration, an untrusted body, a value out of
-// bound, a failed command, output that is not one number — launches the lane as before; where a
-// command ran, its result is commented first, so the child starts from the measurement, not a re-run.
+// on the stream, so no lane is spent. A `lane:value` that failed for want of a sample
+// (`lane-value-missing.ts`) is a sample condition not yet met (joshuafolkken/kit#6503): the result is
+// commented and the issue waits, since a lane can measure nothing either. Anything else — no
+// declaration, an untrusted body, a value out of bound, any other failed command, output that is not
+// one number — launches the lane as before; where a command ran, its result is commented first, so the
+// child starts from the measurement, not a re-run.
 
 const FENCE = '```'
-const VERDICT_WORDS: Readonly<Record<MeasureVerdict['kind'], string>> = {
+
+// A drive's verdict: the declaration's own, or no sample to judge yet.
+type DriveVerdict = MeasureVerdict | { kind: 'unsampled' }
+
+const VERDICT_WORDS: Readonly<Record<DriveVerdict['kind'], string>> = {
 	pass: 'within the bound, so the issue is closed without a lane.',
 	fail: 'out of the bound, so the issue goes to a lane.',
 	unreadable: 'no value could be read from the output, so the issue goes to a lane.',
+	unsampled: 'sample condition not met — no sample to read yet, so the issue waits without a lane.',
 }
+
+// What the drive does with the issue: closed by its declaration, waiting for a sample, or its lane.
+type MeasureOutcome = 'closed' | 'wait' | 'launch'
 
 interface Measurement {
 	declaration: MeasureDeclaration
 	run: CommandRun
-	verdict: MeasureVerdict
+	verdict: DriveVerdict
 }
 
-async function declared(issue: string): Promise<MeasureDeclaration | undefined> {
+function verdict_of(declaration: MeasureDeclaration, run: CommandRun): DriveVerdict {
+	if (run.kind === 'ok') return measure_declaration.judge(declaration, run.output)
+
+	return lane_value_missing.is_unsampled(run.message)
+		? { kind: 'unsampled' }
+		: { kind: 'unreadable' }
+}
+
+function measured(declaration: MeasureDeclaration, source: TrustedBody): Measurement {
+	const run = trusted_measure.run_command(declaration.command, source)
+
+	return { declaration, run, verdict: verdict_of(declaration, run) }
+}
+
+async function declared(issue: string): Promise<Measurement | undefined> {
 	const read = await trusted_measure.read_trusted_body(issue)
 
-	return read.kind === 'trusted' ? measure_declaration.parse(read.body) : undefined
+	if (read.kind === 'refused') return undefined
+
+	const declaration = measure_declaration.parse(read.body)
+
+	return declaration === undefined ? undefined : measured(declaration, read)
 }
 
-function measured(declaration: MeasureDeclaration): Measurement {
-	const run = trusted_measure.run_command(declaration.command)
-	const verdict: MeasureVerdict =
-		run.kind === 'ok' ? measure_declaration.judge(declaration, run.output) : { kind: 'unreadable' }
-
-	return { declaration, run, verdict }
-}
-
-function value_words(verdict: MeasureVerdict): string {
-	return verdict.kind === 'unreadable' ? 'unreadable' : String(verdict.value)
+function value_words(verdict: DriveVerdict): string {
+	return 'value' in verdict ? String(verdict.value) : verdict.kind
 }
 
 // The result comment: the declaration, the value read, what follows and the command's own output.
@@ -75,38 +97,46 @@ async function close_passed(issue: string, measurement: Measurement): Promise<bo
 	if (is_closed) {
 		await run_event_stream_emit.emit(
 			run_event_stream.EVENT_KIND.MEASURED,
-			`${issue_cite.plain(issue)} measured by backlog:drive: ${value} ${bound}`,
+			`${issue_cite.plain_for('program', issue)} measured by backlog:drive: ${value} ${bound}`,
 		)
 	}
 
 	return is_closed
 }
 
-// The result handed to the lane on the issue itself, which the child reads with its comments. A comment
-// that cannot be posted still launches the lane: the child re-runs the declaration.
-async function hand_over(issue: string, measurement: Measurement): Promise<false> {
+// A wait goes on the stream, so a reader with only the stream keeps the issue out of the offer too.
+async function waited(issue: string): Promise<MeasureOutcome> {
+	await run_event_stream_emit.emit(
+		run_event_stream.EVENT_KIND.SAMPLE_WAIT,
+		`${issue_cite.plain_for('program', issue)} waiting: sample condition not met`,
+	)
+
+	return 'wait'
+}
+
+// The result left on the issue itself, which the child reads with its comments. A comment that cannot
+// be posted changes nothing: a lane re-runs the declaration, and a wait re-measures on the next drive.
+async function hand_over(issue: string, measurement: Measurement): Promise<MeasureOutcome> {
 	try {
 		await git_gh_command.issue_comment(issue, report(measurement))
 	} catch (error) {
 		console.error(`Measurement result not posted: ${error_text.message_of(error)}`)
 	}
 
-	return false
+	return measurement.verdict.kind === 'unsampled' ? await waited(issue) : 'launch'
 }
 
-// Whether the drive closed the issue by its declaration; `false` launches its lane.
-async function closed(issue: string): Promise<boolean> {
-	const declaration = await declared(issue)
+// What the drive does with the issue by its declaration; `launch` opens its lane.
+async function outcome(issue: string): Promise<MeasureOutcome> {
+	const measurement = await declared(issue)
 
-	if (declaration === undefined) return false
+	if (measurement === undefined) return 'launch'
+	if (measurement.verdict.kind !== 'pass') return await hand_over(issue, measurement)
 
-	const measurement = measured(declaration)
-
-	return measurement.verdict.kind === 'pass'
-		? await close_passed(issue, measurement)
-		: await hand_over(issue, measurement)
+	return (await close_passed(issue, measurement)) ? 'closed' : 'launch'
 }
 
-const backlog_measure_close = { closed }
+const backlog_measure_close = { outcome }
 
+export type { MeasureOutcome }
 export { backlog_measure_close }

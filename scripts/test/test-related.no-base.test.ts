@@ -17,6 +17,9 @@ vi.mock('#scripts/git/changed-paths', () => ({
 		read_held_at: vi.fn(),
 	},
 }))
+vi.mock('./related-heavy-tests', () => ({ related_heavy_tests: { exclude_flags: () => [] } }))
+// The reach cap walks no import graph here; what it caps is `test-related-cap.test.ts`.
+vi.mock('./test-pinned-reach')
 vi.mock('./test-unit-guard', () => ({
 	test_unit_guard: { is_running: vi.fn(), run_guarded_vitest: vi.fn() },
 }))
@@ -24,7 +27,12 @@ vi.mock('./test-unit-guard', () => ({
 vi.mock('#scripts/gate/scoped-green', () => ({
 	scoped_green: { read_before: vi.fn(), record_if_green: vi.fn() },
 }))
-vi.mock('#scripts/gate/since-green', () => ({ since_green: { read_moved_parts: vi.fn() } }))
+vi.mock(import('#scripts/gate/since-green'), async (import_original) => {
+	const { since_green: real } = await import_original()
+	const no_record = { fallback: real.FALLBACK.NO_RECORD }
+
+	return { since_green: { ...real, read_verdict: vi.fn(async () => no_record) } }
+})
 
 const mocked_run = vi.mocked(test_unit_guard.run_guarded_vitest)
 const mocked_record = vi.mocked(scoped_green.record_if_green)
@@ -43,7 +51,6 @@ function mock_change(): void {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
 	vi.mocked(git_command.repository_root).mockResolvedValue(REPOSITORY_ROOT)
 	mock_change()

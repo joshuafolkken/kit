@@ -1,6 +1,6 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { TimedModule } from './test-module-elapsed'
 import { unit_duration_record } from './unit-duration-record'
@@ -15,12 +15,11 @@ const OLD_MS = 5
 const SETUP_MS = 1
 const SETUP_PHASES = 4
 
-const directories: Array<string> = []
+const make_directory = temporary_directory()
 
 function repository(): string {
-	const root = mkdtempSync(path.join(tmpdir(), 'unit-duration-record-'))
+	const root = make_directory('unit-duration-record-')
 
-	directories.push(root)
 	mkdirSync(path.join(root, 'tools/test'), { recursive: true })
 
 	return root
@@ -41,7 +40,6 @@ function timed(root: string, file: string, duration: number): TimedModule {
 
 afterEach(() => {
 	vi.restoreAllMocks()
-	for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
 })
 
 describe('unit_duration_record.merge — what a run leaves in the record', () => {

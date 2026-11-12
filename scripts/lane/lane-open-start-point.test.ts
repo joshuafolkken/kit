@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_install } from './lane-install'
 import { lane_open } from './lane-open'
 import { lane_paths } from './lane-paths'
+import { lane_seat_ownership } from './lane-seat-ownership'
 import { lane_state } from './lane-state'
 
 // The regression this suite exists for (joshuafolkken/kit#1535): a lane opened after a merge must
@@ -113,6 +114,10 @@ function stub_what_the_fixture_cannot_do(): void {
 }
 
 beforeEach(async () => {
+	vi.spyOn(lane_seat_ownership, 'snapshot').mockResolvedValue({
+		running: new Set(),
+		ports: new Set(),
+	})
 	const opened = git_fixture_workspace.open_workspace(WORKSPACE_PREFIX)
 
 	fixture.previous_cwd = opened.previous_cwd

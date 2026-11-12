@@ -168,13 +168,11 @@ function read_hold(target: string, now: Date = new Date()): HoldRead {
 type Environment = Readonly<Record<string, string | undefined>>
 type SessionOwner = Pick<RunHold, 'owner_pid' | 'owner_start'>
 
-// The agent session's own process, which Claude Code exports to every command it runs. Absent or
-// malformed is no owner at all, never a guess at an ancestor: a wrong owner read as gone frees a live
-// run's tree, which is the one failure this guard exists to prevent.
+// The agent session's own process (`agent_session_environment.session_pid`); none is no owner at all.
 function session_owner(environment: Environment = process.env): SessionOwner {
-	const pid = Number(environment[agent_session_environment.AGENT_PID_KEY])
+	const pid = agent_session_environment.session_pid(environment)
 
-	if (!Number.isSafeInteger(pid) || pid <= 0) return {}
+	if (pid === undefined) return {}
 
 	return { owner_pid: pid, owner_start: process_identity.read_start(pid) }
 }
@@ -295,12 +293,16 @@ function unreadable_message(): string {
 	return `This working tree's run record could not be read — ${NOT_IDLE}. Run \`${FORCE_RELEASE_COMMAND}\` in this working tree to clear it, then ask again.`
 }
 
-function stale_message(hold: RunHold): string {
-	const why = is_owner_gone(hold)
+// Why a record counts as stale — shared by the claim's replacement message and `tree:status`'s
+// read-only report, which replaces nothing.
+function stale_reason(hold: RunHold): string {
+	return is_owner_gone(hold)
 		? 'the session that wrote it has ended'
 		: `older than ${String(HOLD_MAX_AGE_HOURS)} hours`
+}
 
-	return `Replaced a stale run record held by ${describe_holder(hold)}: ${why}, so the run that wrote it has ended without releasing it.`
+function stale_message(hold: RunHold): string {
+	return `Replaced a stale run record held by ${describe_holder(hold)}: ${stale_reason(hold)}, so the run that wrote it has ended without releasing it.`
 }
 
 function uncommitted_message(hold: RunHold): string {
@@ -335,6 +337,7 @@ const run_hold = {
 	create_stop_hold,
 	HALFRUN_STOP_FIELDS,
 	create_hold,
+	describe_holder,
 	foreign_release_message,
 	forced_release_message,
 	held_message,
@@ -349,6 +352,7 @@ const run_hold = {
 	release_hold,
 	session_owner,
 	stale_message,
+	stale_reason,
 	uncommitted_message,
 	unknown_message,
 	unreadable_message,

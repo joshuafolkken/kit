@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process'
+import { durable_state_root } from '#scripts/josh/durable-state-root'
 import { git_utilities } from './constants'
 import { git_command } from './git-command'
 import { git_location_environment, GIT_LOCATION_VARIABLES } from './git-location-environment'
@@ -8,9 +9,8 @@ import { git_location_environment, GIT_LOCATION_VARIABLES } from './git-location
 // cannot name different directories. It had been run in three places with three timeouts and no
 // memory of the answer, though a `PreToolUse` hook may ask it several times in one call.
 
-// josh's own per-clone state inside the common git directory, in one entry of it so nothing josh writes
-// sits at its root beside git's own files.
-const STATE_DIRECTORY = 'josh'
+// josh's own per-clone state inside the common git directory (`durable-state-root.ts`).
+const { STATE_DIRECTORY } = durable_state_root
 const OWN_GIT_DIRECTORY = 0
 const COMMON_GIT_DIRECTORY = 1
 // The read runs inside `PreToolUse` hooks, which hold the tool call for as long as it takes;
@@ -87,6 +87,19 @@ function repository(cwd?: string): string | undefined {
 	return directories(cwd)[COMMON_GIT_DIRECTORY]
 }
 
+// The common git directory every lane of the repository shares, asked asynchronously and never
+// remembered — what a ship's stage record, its detached supervisor's log and its pid are keyed on — or
+// `undefined` outside one.
+async function read_repository(): Promise<string | undefined> {
+	try {
+		const found = await git_command.git_directories()
+
+		return found[COMMON_GIT_DIRECTORY]
+	} catch {
+		return undefined
+	}
+}
+
 function select_linked(found: ReadonlyArray<string>): string | undefined {
 	const own_directory = found[OWN_GIT_DIRECTORY]
 	const common = found[COMMON_GIT_DIRECTORY]
@@ -104,6 +117,7 @@ const git_common_directory = {
 	STATE_DIRECTORY,
 	directories,
 	own,
+	read_repository,
 	repository,
 	resolve,
 	select_linked,

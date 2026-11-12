@@ -9,6 +9,10 @@ import { related_scope } from './test-related-scope'
 // is `test-pinned.ts`; an added file's hunks are its functions (`test-pinned-functions.ts`).
 
 const DEFAULT_MAX_HUNKS = 20
+// The most test files one hunk's probe runs (joshuafolkken/kit#5503): past it a hub's one-line change
+// runs hundreds to prove it green, so the hunk is `unchecked`. 150 sits just over the ledger's p90
+// and above `WIDE_REACH`, so the staged range stays probed.
+const MAX_TEST_FILES = 150
 const HEADER = /^@@ -\d+(?:,\d+)? \+(?<start>\d+)(?:,(?<count>\d+))? @@/u
 const FILE_HEADER = '+++ b/'
 const SECTION_HEADER = 'diff --git '
@@ -26,11 +30,14 @@ const UNPARSED_REASON = 'an added file, and typescript is not installed to read 
 const NO_RUNNER_REASON = 'vitest is not installed to run its related tests'
 const STOPPED_REASON = 'vitest stopped before any test ran with it reverted'
 const CUT_REASON = 'not probed: the run stopped at the first unpinned hunk'
+const OVER_CAP_REASON = `over the ${String(MAX_TEST_FILES)}-test-file cap`
 const STOPPED_VERDICT: RedVerdict = 'stopped'
 const SETTLED_VERDICTS: ReadonlySet<RedVerdict> = new Set<RedVerdict>(['red', STOPPED_VERDICT])
 
 interface Hunk {
 	file: string
+	// A move's disjoint deletion/addition; intervening hunks stay independent.
+	parts?: ReadonlyArray<Hunk>
 	// The first changed line of the working file; for a pure deletion, the line the removed ones sat after.
 	new_start: number
 	new_count: number
@@ -53,6 +60,7 @@ interface HunkSplit {
 // vitest passed with no related test to run.
 interface UnpinnedHunk extends Hunk {
 	is_green: boolean
+	related_tests?: ReadonlyArray<string> | undefined
 }
 
 interface HunkOutcome {
@@ -63,6 +71,8 @@ interface HunkOutcome {
 	// Hunks a `--first-unpinned` run did not probe once one was unpinned (joshuafolkken/kit#5153): the
 	// run fails already, so the rest wait for the next run.
 	cut?: ReadonlyArray<Hunk>
+	// Hunks whose file reaches more than `MAX_TEST_FILES` test files, never probed (joshuafolkken/kit#5503).
+	over_cap?: ReadonlyArray<Hunk>
 	// Whether every checked hunk had a verdict — false when a cache-only read found one the cache no
 	// longer holds (joshuafolkken/kit#5078).
 	is_held?: boolean
@@ -71,6 +81,8 @@ interface HunkOutcome {
 }
 
 interface PinnedReport extends HunkOutcome {
+	tree_hash?: string
+	is_stale?: boolean
 	unchecked: ReadonlyArray<Hunk>
 	// Added files whose functions could not be read, so none of them was probed.
 	unparsed: ReadonlyArray<string>
@@ -88,6 +100,8 @@ interface UncheckedPlace {
 // A report as printed (joshuafolkken/kit#5188): `text` is its lines above the counts line, each ending in
 // a newline; `counts` is absent for a check that could not run, and `log` where no full list was kept.
 interface ReportParts {
+	tree_hash?: string
+	is_stale?: boolean
 	text: string
 	counts?: string | undefined
 	log?: KeptLog | undefined
@@ -178,14 +192,34 @@ function start_index(hunk: Hunk): number {
 // The working file's content with this one hunk put back to the base's lines.
 function revert(content: string, hunk: Hunk): string {
 	const lines = content.split(LINE_BREAK)
+	const parts = (hunk.parts ?? [hunk]).toSorted(
+		(left, right) => start_index(right) - start_index(left),
+	)
 
-	lines.splice(start_index(hunk), hunk.new_count, ...hunk.old_lines)
+	for (const part of parts) lines.splice(start_index(part), part.new_count, ...part.old_lines)
 
 	return lines.join(LINE_BREAK)
 }
 
 function split(hunks: ReadonlyArray<Hunk>, max_hunks: number): HunkSplit {
 	return { checked: hunks.slice(0, max_hunks), unchecked: hunks.slice(max_hunks) }
+}
+
+// The hunks split at the per-hunk test-file cap, each keeping its order; a file `reach` lacks counts as
+// 0, so it is checked.
+function capped(
+	hunks: ReadonlyArray<Hunk>,
+	reach: ReadonlyMap<string, number>,
+	max_tests = MAX_TEST_FILES,
+): HunkSplit {
+	function is_over(hunk: Hunk): boolean {
+		return (reach.get(hunk.file) ?? 0) > max_tests
+	}
+
+	return {
+		checked: hunks.filter((hunk) => !is_over(hunk)),
+		unchecked: hunks.filter((hunk) => is_over(hunk)),
+	}
 }
 
 // The probes, the ones whose file reaches the fewest tests first (joshuafolkken/kit#5153), so a run
@@ -246,8 +280,24 @@ function unchecked_reason(report: PinnedReport): string {
 	return report.has_runner ? `over the ${String(report.max_hunks)}-hunk cap` : NO_RUNNER_REASON
 }
 
+function hint(hunk: UnpinnedHunk): string {
+	const tests = hunk.related_tests
+
+	if (tests === undefined) {
+		return 'related tests unavailable; add or strengthen a regression test that fails when this change is reverted'
+	}
+
+	if (tests.length === 0) {
+		return 'no related tests; add a related regression test that fails when this change is reverted'
+	}
+
+	return `related tests: ${tests.join(', ')}; strengthen a regression assertion that fails when this change is reverted`
+}
+
 function unpinned_lines(report: PinnedReport): Array<string> {
-	return report.unpinned.map((hunk) => `unpinned ${location(hunk)} — ${reason(hunk)}`)
+	return report.unpinned.map(
+		(hunk) => `unpinned ${location(hunk)} — ${reason(hunk)}; ${hint(hunk)}`,
+	)
 }
 
 function place_of(hunk: Hunk, why: string): UncheckedPlace {
@@ -258,6 +308,7 @@ function place_of(hunk: Hunk, why: string): UncheckedPlace {
 function unchecked_places(report: PinnedReport): Array<UncheckedPlace> {
 	return [
 		...report.unchecked.map((hunk) => place_of(hunk, unchecked_reason(report))),
+		...(report.over_cap ?? []).map((hunk) => place_of(hunk, OVER_CAP_REASON)),
 		...report.stopped.map((hunk) => place_of(hunk, STOPPED_REASON)),
 		...(report.cut ?? []).map((hunk) => place_of(hunk, CUT_REASON)),
 		...report.unparsed.map((file) => ({ place: file, why: UNPARSED_REASON })),
@@ -298,7 +349,14 @@ function counts_line(report: PinnedReport): string {
 function report_parts(report: PinnedReport): ReportParts {
 	const lines = [...unpinned_lines(report), ...folded_unchecked(report)]
 
-	return { text: lines.map((line) => `${line}${LINE_BREAK}`).join(''), counts: counts_line(report) }
+	return {
+		text: lines.map((line) => `${line}${LINE_BREAK}`).join(''),
+		counts: counts_line(report),
+		...(report.tree_hash !== undefined && {
+			tree_hash: report.tree_hash,
+			is_stale: report.is_stale,
+		}),
+	}
 }
 
 // What `josh test:pinned`, `josh run:review` and the ship's pre-detach print, in the verification-tail
@@ -306,7 +364,9 @@ function report_parts(report: PinnedReport): ReportParts {
 // newline), then where the full list went, and the counts line last. Without a counts line — a check
 // that could not run — the text and the note alone.
 function report_text(parts: ReportParts, note = ''): string {
-	const failures = `${parts.text}${note}`
+	const stale = parts.is_stale === true ? ' · stale' : ''
+	const snapshot = parts.tree_hash === undefined ? '' : `snapshot ${parts.tree_hash}${stale}\n`
+	const failures = `${snapshot}${parts.text}${note}`
 	if (parts.counts === undefined) return failures
 
 	return verification_tail.format_tail({ failures, log: parts.log, verdict: parts.counts })
@@ -316,11 +376,13 @@ const test_pinned_logic = {
 	all_hunks,
 	DEFAULT_MAX_HUNKS,
 	by_reach,
+	capped,
 	format,
 	has_unchecked,
 	is_target,
 	is_unpinned,
 	location,
+	MAX_TEST_FILES,
 	outcome,
 	parse_hunks,
 	report_parts,

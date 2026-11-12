@@ -30,6 +30,10 @@ function stage(name: string, minutes: number, ended_before: number, issue = ISSU
 	}
 }
 
+function at(minutes_before: number): number {
+	return NOW - minutes_before * MS_PER_MINUTE
+}
+
 function dispatch(minutes_before: number, issue = ISSUE): LedgerEntry {
 	return { kind: 'dispatch', at: minutes_before_now(minutes_before), issue }
 }
@@ -52,7 +56,12 @@ describe('lane_stage_stats.table — the recorded stages', () => {
 			.slice(2)
 			.map((line) => line.slice(2, -2).split(' | ', 1)[0])
 
-		expect(names).toStrictEqual([...lane_stage_stats.STAGES])
+		// joshuafolkken/kit#6541: the followup row is named the driver's, outside the net time.
+		const expected = lane_stage_stats.STAGES.map((name) =>
+			name === 'followup' ? 'followup (driver, outside lane net)' : name,
+		)
+
+		expect(names).toStrictEqual(expected)
 	})
 
 	it('reduces a stage to its median, its maximum and its run count, in minutes', () => {
@@ -116,7 +125,7 @@ describe('lane_stage_stats.table — the implementation, from dispatch to the fi
 	const { IMPLEMENT } = lane_stage_stats
 
 	it('times it to the start of the first stage of the same issue', () => {
-		// Dispatched 30 minutes ago; the preflight ended 19 minutes ago after running one minute.
+		// A dispatch before preflight exposes whether the initial wait is included.
 		const entries = [dispatch(30), stage('preflight', 1, 19), stage('gate', 5, 10)]
 
 		expect(row_of(entries, IMPLEMENT)).toStrictEqual(['10.0', '10.0', '1'])
@@ -151,6 +160,40 @@ describe('lane_stage_stats.table — the implementation, from dispatch to the fi
 		const entries = [dispatch(30), stage('preflight', 1, 19), stage('preflight', 1, 5)]
 
 		expect(row_of(entries, IMPLEMENT)?.at(-1)).toBe('1')
+	})
+})
+
+// joshuafolkken/kit#7037: the spans indexed by issue once still read each dispatch as before.
+describe('lane_stage_stats.implement_spans', () => {
+	it('closes each dispatch at its own issue first stage, or at its next dispatch when open', () => {
+		const unowned: LedgerEntry = {
+			kind: 'stage',
+			at: minutes_before_now(1),
+			stage: CI_WAIT,
+			elapsed_ms: MS_PER_MINUTE,
+		}
+		const entries = [
+			stage('preflight', 1, 9, OTHER_ISSUE),
+			dispatch(40, OTHER_ISSUE),
+			dispatch(50),
+			stage('preflight', 1, 19),
+			dispatch(30),
+			unowned,
+			dispatch(20, OTHER_ISSUE),
+		]
+
+		expect(lane_stage_stats.implement_spans(entries)).toStrictEqual([
+			{ issue: ISSUE, from_ms: at(50), to_ms: at(30), is_open: true },
+			{ issue: OTHER_ISSUE, from_ms: at(40), to_ms: at(20), is_open: true },
+			{ issue: ISSUE, from_ms: at(30), to_ms: at(20), is_open: false },
+			{ issue: OTHER_ISSUE, from_ms: at(20), to_ms: at(10), is_open: false },
+		])
+	})
+
+	it('leaves the last dispatch with no ship stage open to the end', () => {
+		expect(lane_stage_stats.implement_spans([dispatch(30)])).toStrictEqual([
+			{ issue: ISSUE, from_ms: at(30), to_ms: Infinity, is_open: true },
+		])
 	})
 })
 

@@ -66,6 +66,18 @@ function refusal_line(minute: number, id: string, reason: string): string {
 	)
 }
 
+function bash_call_line(minute: number, id: string, command = 'ls'): string {
+	return time_transcript_fixture.tool_call_line(minute, BRANCH, {
+		name: 'Bash',
+		input: { command },
+		id,
+	})
+}
+
+function allowed_line(minute: number, id: string): string {
+	return time_transcript_fixture.result_line(minute, BRANCH, id)
+}
+
 function investigator_call_line(minute: number, id: string): string {
 	return time_transcript_fixture.tool_call_line(minute, BRANCH, {
 		name: 'Agent',
@@ -80,6 +92,8 @@ const guard_friction_fixture = {
 	session,
 	stop_line,
 	refusal_line,
+	bash_call_line,
+	allowed_line,
 	investigator_call_line,
 }
 

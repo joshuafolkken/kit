@@ -1,6 +1,7 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { fake_result } from '#tools/test/execa-result'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { execa } from 'execa'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { project_test_script } from './project-test-script'
@@ -9,31 +10,24 @@ vi.mock('execa', () => ({ execa: vi.fn() }))
 
 const mocked_execa = vi.mocked(execa)
 
-type ExecaResult = Awaited<ReturnType<typeof execa>>
-
 const NODE_TEST = 'node --test'
 const COMMAND_LABEL = 'test:unit'
 const REENTRANT_ENVIRONMENT = { [project_test_script.REENTRY_KEY]: '1' }
 
 const ctx = { project_directory: '' }
-
-function fake_result(exit_code: number | undefined): ExecaResult {
-	return { exitCode: exit_code } as unknown as ExecaResult
-}
+const make_directory = temporary_directory()
 
 function write_manifest(manifest: unknown): void {
 	writeFileSync(path.join(ctx.project_directory, 'package.json'), JSON.stringify(manifest))
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
-	ctx.project_directory = mkdtempSync(path.join(tmpdir(), 'project-test-script-'))
+	ctx.project_directory = make_directory('project-test-script-')
 })
 
 afterEach(() => {
 	vi.restoreAllMocks()
-	rmSync(ctx.project_directory, { recursive: true, force: true })
 })
 
 describe('project_test_script.declared_script', () => {

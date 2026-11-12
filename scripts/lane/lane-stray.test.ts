@@ -1,8 +1,11 @@
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { chmodSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { write_file } from '#tools/test/write-file'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { StrayVerdict } from './lane-stray'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#3370: what the lanes root holds that no registered work tree accounts for. The
 // registry, the in-flight count and the object listing are mocked; the directories are real, and the
@@ -21,7 +24,7 @@ const { lane_leftover } = await import('./lane-leftover')
 const { lane_paths } = await import('./lane-paths')
 const { lane_stray } = await import('./lane-stray')
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'lane-stray-test-'))
+const scratch = make_directory('lane-stray-test-')
 const root = path.join(scratch, '.kit-lanes')
 const REPOSITORY_FILE = 'scripts/a.ts'
 const REPOSITORY_CONTENT = 'export {}\n'
@@ -29,13 +32,6 @@ const DANGLING_POINTER = 'gitdir: /nowhere/.git/worktrees/2509\n'
 const READ_ONLY_MODE = 0o555
 const WRITABLE_MODE = 0o755
 const NOT_A_LANE: StrayVerdict = 'not-a-lane'
-
-function write_file(relative: string, content: string): void {
-	const file = path.join(root, relative)
-
-	mkdirSync(path.dirname(file), { recursive: true })
-	writeFileSync(file, content)
-}
 
 // The listing `git rev-list --objects --all` would print for a history holding the repository file.
 function history_holding_the_repository_file(): void {
@@ -61,15 +57,11 @@ beforeEach(() => {
 	history_holding_the_repository_file()
 })
 
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
-
 describe('lane_stray.sweep_strays — what it removes', () => {
 	it('removes a lane whose .git points at a registration git no longer has', async () => {
-		write_file('2509/.git', DANGLING_POINTER)
-		write_file(`2509/${REPOSITORY_FILE}`, REPOSITORY_CONTENT)
-		write_file('2509/node_modules/pkg/index.js', 'regenerated\n')
+		write_file(root, '2509/.git', DANGLING_POINTER)
+		write_file(root, `2509/${REPOSITORY_FILE}`, REPOSITORY_CONTENT)
+		write_file(root, '2509/node_modules/pkg/index.js', 'regenerated\n')
 
 		const strays = await lane_stray.sweep_strays()
 
@@ -78,7 +70,7 @@ describe('lane_stray.sweep_strays — what it removes', () => {
 	})
 
 	it('removes a numbered directory with no .git, the shape a half-finished removal leaves', async () => {
-		write_file(`3256/${REPOSITORY_FILE}`, REPOSITORY_CONTENT)
+		write_file(root, `3256/${REPOSITORY_FILE}`, REPOSITORY_CONTENT)
 
 		await lane_stray.sweep_strays()
 
@@ -107,8 +99,8 @@ describe('lane_stray.sweep_strays — what it keeps', () => {
 	it('keeps a leftover holding files git cannot restore, and names them', async () => {
 		const notes = '2851/notes.md'
 
-		write_file('2851/.git', DANGLING_POINTER)
-		write_file(notes, 'work in progress\n')
+		write_file(root, '2851/.git', DANGLING_POINTER)
+		write_file(root, notes, 'work in progress\n')
 
 		const [stray] = await lane_stray.sweep_strays()
 
@@ -120,7 +112,7 @@ describe('lane_stray.sweep_strays — what it keeps', () => {
 		const live = '3370/notes.md'
 		const seat_locks = lane_entry(lane_paths.SEAT_LOCK_DIR)
 
-		write_file(live, 'live work\n')
+		write_file(root, live, 'live work\n')
 		mkdirSync(seat_locks)
 		vi.mocked(lane_registry.registered_directories).mockResolvedValue([lane_entry('3370')])
 
@@ -132,7 +124,7 @@ describe('lane_stray.sweep_strays — what it keeps', () => {
 	it('reports a name the lane machinery never writes and leaves it in place', async () => {
 		const log = '2879-lint.txt'
 
-		write_file(log, 'lint output\n')
+		write_file(root, log, 'lint output\n')
 
 		const [stray] = await lane_stray.sweep_strays()
 
@@ -159,7 +151,7 @@ describe('lane_stray.sweep_strays — a removal that stopped part-way', () => {
 	it('reports it as stuck, then removes it on the next sweep', async () => {
 		const locked = lane_entry('3039/scripts')
 
-		write_file(`3039/${REPOSITORY_FILE}`, REPOSITORY_CONTENT)
+		write_file(root, `3039/${REPOSITORY_FILE}`, REPOSITORY_CONTENT)
 		chmodSync(locked, READ_ONLY_MODE)
 
 		const [first] = await lane_stray.sweep_strays()

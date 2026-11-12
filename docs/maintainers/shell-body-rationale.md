@@ -38,8 +38,8 @@ that refused on them would be exactly
 ## Why no `gh` subcommand is written in an executable block
 
 `gh issue comment` / `gh pr comment` have `--body-file` too, but this repository's distributed
-documents do not put GraphQL-backed `gh` subcommands in executable blocks — they answer 403 in a cloud
-session (`scripts/gh/gh-document-guard.test.ts`).
+documents do not put `gh` subcommands in executable blocks (`prompts/collaboration-workflow/gh-rest.md`,
+`scripts/gh/gh-document-guard.test.ts`).
 
 ## The comments lost to `-f body=@`
 

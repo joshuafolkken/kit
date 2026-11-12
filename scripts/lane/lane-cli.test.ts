@@ -101,7 +101,6 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.restoreAllMocks()
-	vi.clearAllMocks()
 })
 
 describe('lane:open', () => {

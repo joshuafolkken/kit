@@ -6,14 +6,11 @@ import {
 	type RollupCheck,
 } from './git-pr-checks-parse'
 
-// joshuafolkken/kit#902 removed the completion gate's human E2E run: nobody is asked to run
-// `pnpm josh test` and paste the output any more. That leaves the CI E2E job as the only E2E signal
-// a `fullrun` reads, so what used to be an implementation detail of the wait loop is now the
-// verification itself — these are the assertions that removing the human step did not open the
-// gate. The claim they pin is written out in `prompts/testing-guide.md` → "Closing the E2E gate
-// without a human run" → "The gate is not weakened".
+// The CI E2E job is the completion gate's E2E evidence, so the wait must block an unverified merge
+// (joshuafolkken/kit#902; `prompts/testing-guide.md` → "Closing the E2E gate without a human run"
+// → "The gate is not weakened").
 //
-// **Two separate mechanisms hold the gate closed, and each fixture below picks one.** `E2E` is
+// **Two separate mechanisms hold the gate closed, and each E2E fixture below picks one.** `E2E` is
 // deliberately not in `DEFAULT_REQUIRED_CHECKS`. A *failed* E2E job is caught by
 // `collect_blocking_failures` since joshuafolkken/kit#990, which short-circuits `evaluate_pr_state`
 // before the merge state is consulted at all. A *non-passing but not failed* one — still running, or
@@ -64,6 +61,83 @@ function use_required_checks(value: string): void {
 	})
 }
 
+// joshuafolkken/kit#4351: GitHub reports UNSTABLE while an optional check — default-setup `CodeQL`,
+// about thirty minutes beside a six-minute CI — is still running. The merge gate proceeds once
+// every check the base branch's rules require has passed, and stays strict where none are known.
+const REQUIRED_CONTEXTS = ['Checks', SONAR_QUBE]
+const CHECKS_PASSED: RollupCheck = { name: 'Checks', status: 'pass' }
+const SONAR_PASSED: RollupCheck = { name: SONAR_QUBE, status: 'pass' }
+const CODEQL_RUNNING: RollupCheck = { name: 'CodeQL', status: 'pending' }
+
+function unstable(
+	rollup: Array<RollupCheck>,
+	required_contexts: Array<string> = REQUIRED_CONTEXTS,
+): PrStateSnapshot {
+	return {
+		rollup,
+		merge_state_status: UNSTABLE,
+		review_decision: undefined,
+		required_contexts,
+	}
+}
+
+describe('evaluate_pr_state — an optional check still running', () => {
+	it('returns success when every required context passed and only an optional check runs', () => {
+		const snapshot = unstable([CHECKS_PASSED, SONAR_PASSED, CODEQL_RUNNING])
+
+		expect(evaluate_pr_state(snapshot)).toBe(SUCCESS)
+	})
+
+	it('returns success when the required context passed as a nested suite job', () => {
+		const snapshot = unstable([
+			{ name: 'Checks / lint', status: 'pass' },
+			SONAR_PASSED,
+			CODEQL_RUNNING,
+		])
+
+		expect(evaluate_pr_state(snapshot)).toBe(SUCCESS)
+	})
+
+	it('returns failure when an optional check has failed', () => {
+		const snapshot = unstable([CHECKS_PASSED, SONAR_PASSED, { name: 'CodeQL', status: 'fail' }])
+
+		expect(evaluate_pr_state(snapshot)).toBe('failure')
+	})
+})
+
+describe('evaluate_pr_state — the gate stays strict', () => {
+	it('returns pending while a required context is still running', () => {
+		const snapshot = unstable([{ name: 'Checks', status: 'pending' }, SONAR_PASSED, CODEQL_RUNNING])
+
+		expect(evaluate_pr_state(snapshot)).toBe('pending')
+	})
+
+	it('returns pending while a required context has not reported', () => {
+		const snapshot = unstable([SONAR_PASSED, CODEQL_RUNNING])
+
+		expect(evaluate_pr_state(snapshot)).toBe('pending')
+	})
+
+	it('returns pending when no required context is known', () => {
+		const snapshot: PrStateSnapshot = {
+			rollup: [CHECKS_PASSED, SONAR_PASSED, CODEQL_RUNNING],
+			merge_state_status: UNSTABLE,
+			review_decision: undefined,
+		}
+
+		expect(evaluate_pr_state(snapshot)).toBe('pending')
+	})
+
+	it('returns pending on BLOCKED however the rollup reads', () => {
+		const snapshot = {
+			...unstable([CHECKS_PASSED, SONAR_PASSED, CODEQL_RUNNING]),
+			merge_state_status: 'BLOCKED',
+		}
+
+		expect(evaluate_pr_state(snapshot)).toBe('pending')
+	})
+})
+
 describe('a non-passing E2E job keeps the merge closed', () => {
 	it.each([
 		{ e2e_status: 'fail', merge_state_status: UNSTABLE },
@@ -82,8 +156,7 @@ describe('a non-passing E2E job keeps the merge closed', () => {
 
 	// The one opening in the wall is the temporary kit#753 CodeRabbit skip, and it applies only when
 	// *every* non-passing check is CodeRabbit's. An E2E job that is not passing beside a pending
-	// review must not be swept through it — that would be the exact weakening the removed human step
-	// used to catch. Both statuses are asserted because they take different routes: `fail` is caught
+	// review must still block the merge. Both statuses are asserted because they take different routes: `fail` is caught
 	// by the kit#990 fast fail before the exemption is reached, while `pending` is what actually puts
 	// the exemption to the test.
 	it.each([{ e2e_status: 'fail' }, { e2e_status: 'pending' }])(
@@ -115,9 +188,7 @@ describe('a skipped E2E job is a defined pass, not a stalled gate', () => {
 		mergeStateStatus: 'CLEAN',
 		reviewDecision: 'APPROVED',
 		statusCheckRollup: [
-			// eslint-disable-next-line @typescript-eslint/naming-convention -- GitHub API field name
 			{ __typename: 'CheckRun', name: E2E_CHECK, status: 'COMPLETED', conclusion: 'SKIPPED' },
-			// eslint-disable-next-line @typescript-eslint/naming-convention -- GitHub API field name
 			{ __typename: 'CheckRun', name: SONAR_QUBE, status: 'COMPLETED', conclusion: 'SUCCESS' },
 		],
 	})
@@ -140,19 +211,17 @@ describe('a skipped E2E job is a defined pass, not a stalled gate', () => {
 // The joshuafolkken/kit#991 decision, pinned rather than left in prose: `E2E` stays off the default
 // required list. Three things decide it.
 //
-// It would not have caught the defect that raised the question. A required check is satisfied by a
-// *skipped* job — the parser maps SKIPPED to `pass`, asserted directly above — so a required `E2E`
-// would have passed on exactly the skipped job that let a merge through with the suite never run.
-// What guarantees the job actually runs is the detection rule, and that is where the fix went:
-// `scripts/ci/ci-yml-e2e-detect.test.ts` executes it against the layouts it used to miss.
+// A required check is satisfied by a skipped job, because the parser maps SKIPPED to `pass`.
+// The detection rule must therefore ensure the suite runs; `scripts/ci/ci-yml-e2e-detect.test.ts`
+// exercises that rule against the supported layouts.
 //
 // It would add nothing to the failure path either. A red E2E already ends the wait at once
-// (joshuafolkken/kit#990) and can never reach `success`, which is what the first two describes here
-// assert — and they assert it without `E2E` being required.
+// (joshuafolkken/kit#990) and can never reach `success`, which is what the first E2E describe here
+// asserts — and it asserts it without `E2E` being required.
 //
 // And it would cost a repository that does not use this workflow its whole merge budget. With no
 // `E2E` context reported at all the required entry resolves to `missing`, which is never `pass`, so
-// the evaluation stays `pending` until the 32-minute wait times out with nothing actually wrong.
+// the evaluation stays `pending` until the merge wait times out with nothing actually wrong.
 // A project that wants it required opts in through `JOSH_REQUIRED_CHECKS` instead.
 describe('E2E is deliberately not a required check', () => {
 	// Emptied rather than left alone, so the default is what is asserted.

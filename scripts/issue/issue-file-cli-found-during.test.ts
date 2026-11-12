@@ -1,14 +1,15 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { repo_party } from '#scripts/discovery/repo-party'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_list } from '#scripts/gh/git-gh-issue-list'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_net_read } from '#scripts/lane/lane-net-read'
 import { repository_labels } from '#scripts/repo/repository-labels'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_file_cap } from './issue-file-cap'
 import { issue_file_cli } from './issue-file-cli'
 import { issue_file_deferral } from './issue-file-deferral'
@@ -27,7 +28,8 @@ const BODY_FILE_FLAG = '--body-file'
 const ORIGIN = 4717
 const HELD_MESSAGE = 'duplicate candidate'
 
-const work = mkdtempSync(path.join(tmpdir(), 'issue-file-cli-found-during-'))
+const make_directory = temporary_directory('suite')
+const work = make_directory('issue-file-cli-found-during-')
 const body_path = path.join(work, 'body.md')
 
 writeFileSync(
@@ -55,6 +57,7 @@ const issue_list = vi.spyOn(git_gh_issue_list, 'issue_list')
 const exec_gh_api = vi.spyOn(git_gh_exec, 'exec_gh_api')
 
 beforeEach(() => {
+	vi.unstubAllEnvs()
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	vi.spyOn(git_gh_command, 'repo_get_name_with_owner').mockResolvedValue(HERE)
@@ -63,14 +66,6 @@ beforeEach(() => {
 	fold_clear.mockResolvedValue(true)
 	issue_list.mockResolvedValue({ json: undefined, is_capped: false })
 	scout.mockResolvedValue(undefined)
-})
-
-afterEach(() => {
-	vi.clearAllMocks()
-})
-
-afterAll(() => {
-	rmSync(work, { recursive: true, force: true })
 })
 
 describe('issue_file_cli.run — the filing cap', () => {
@@ -87,6 +82,15 @@ describe('issue_file_cli.run — the filing cap', () => {
 		expect(await issue_file_cli.run(argv_of())).toBe(FAILURE_EXIT_CODE)
 		expect(cap_clear).toHaveBeenCalledOnce()
 		for (const step of [fold_clear, issue_list, scout]) expect(step).not.toHaveBeenCalled()
+	})
+
+	// joshuafolkken/kit#7183: an omitted origin is the dispatched lane's own, so its split is refused.
+	it('refuses a split filed from the dispatched lane without --found-during, before any step', async () => {
+		vi.stubEnv(lane_child_marker.KEY, String(ORIGIN))
+
+		expect(await issue_file_cli.run(argv_of('--route', 'split'))).toBe(FAILURE_EXIT_CODE)
+		expect(vi.mocked(console.error).mock.calls.join('\n')).toContain('never split')
+		for (const step of [cap_clear, exec_gh_api]) expect(step).not.toHaveBeenCalled()
 	})
 
 	it('names --found-during in the usage a malformed call prints', async () => {

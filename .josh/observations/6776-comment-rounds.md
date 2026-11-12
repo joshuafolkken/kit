@@ -1,0 +1,1 @@
+- rf:bug-risks | low | scripts/backlog/backlog-triage-adopt.ts:198 | 2026-11-09 | #6776

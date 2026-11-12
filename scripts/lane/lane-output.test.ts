@@ -1,15 +1,9 @@
-import {
-	existsSync,
-	mkdirSync,
-	mkdtempSync,
-	readFileSync,
-	rmSync,
-	statSync,
-	writeFileSync,
-} from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#1713: where a lane's unit writes is recorded in the lane itself, so a session
 // that never dispatched the child can poll it. Only `worktree_list` is stubbed here — the `.env`
@@ -26,7 +20,7 @@ const { git_command } = await import('#scripts/git/git-command')
 const { lane_output } = await import('./lane-output')
 const { lane_registry } = await import('./lane-registry')
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'lane-output-test-'))
+const scratch = make_directory('lane-output-test-')
 const MAIN_TREE = path.join(scratch, 'kit')
 // What `lane_paths.default_lane_root(MAIN_TREE)` derives: a work tree counts as a lane only when it
 // sits at `<lane root>/<issue>`.
@@ -48,10 +42,6 @@ const SINGLE_RECORD = 1
 // The permission bits are the mode below the file-type bits, `0o777` at most.
 const PERMISSION_RANGE = 0o1000
 const BROAD_MODE = 0o644
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
 
 function block(directory: string, branch: string): string {
 	return [`worktree ${directory}`, HEAD_LINE, `branch refs/heads/${branch}`].join('\n')

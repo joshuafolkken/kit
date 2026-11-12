@@ -1,8 +1,8 @@
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import os from 'node:os'
+import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { pack_hook, PACK_HOOK_FILE } from './pack-hook'
 import { safe_chain_preinstall } from './preinstall-command'
@@ -16,21 +16,19 @@ const OWN_HOOK = 'export const hooks = {}\n'
 const OWN_POSTINSTALL = 'node download-binary.js'
 const WORKSPACE_FILE = 'pnpm-workspace.yaml'
 const LEGACY_HOOK_FILE = '.pnpmfile.cjs'
-const directories: Array<string> = []
+const make_directory = temporary_directory()
 
 interface Manifest {
 	scripts?: Record<string, string>
 }
 
 afterEach(() => {
-	for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
 	vi.restoreAllMocks()
 })
 
 function project(manifest: Record<string, unknown>): string {
-	const root = mkdtempSync(path.join(os.tmpdir(), 'josh-pack-hook-'))
+	const root = make_directory('josh-pack-hook-')
 
-	directories.push(root)
 	writeFileSync(path.join(root, 'package.json'), JSON.stringify(manifest))
 	vi.spyOn(console, 'info').mockImplementation(vi.fn())
 

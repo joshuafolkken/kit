@@ -56,10 +56,15 @@ function is_name(target: string): boolean {
 	return NAME_CHARACTERS.test(target) && NAME_SEPARATOR.test(target)
 }
 
-function extract_targets(text: string): Array<string> {
+// Every backticked name, uncapped — `issue:file` weighs each file a body names (joshuafolkken/kit#7184).
+function names_of(text: string): Array<string> {
 	const targets = [...text.matchAll(BACKTICKED)].map((match) => to_target(match[1] ?? ''))
 
-	return [...new Set(targets.filter((target) => is_name(target)))].slice(0, MAX_TARGETS)
+	return [...new Set(targets.filter((target) => is_name(target)))]
+}
+
+function extract_targets(text: string): Array<string> {
+	return names_of(text).slice(0, MAX_TARGETS)
 }
 
 function format_target(located: Located): string {
@@ -115,7 +120,7 @@ async function locate(text: string): Promise<string> {
 	return format_locations(located)
 }
 
-const run_prep_locate = { extract_targets, locate }
+const run_prep_locate = { extract_targets, locate, names_of }
 
 export type { Located }
 export { run_prep_locate }

@@ -175,7 +175,7 @@ const HEADLESS_WAIT_CALLS = ['"command":"pnpm josh lane:await']
 const HEADLESS_WAIT_BODY =
 	' this is a `claude -p` `backlogrun` parent with lanes in flight, and ending this turn kills the ' +
 	'process and its background waits. Hand the loop back with ' +
-	'`pnpm josh run:carry --cut --owner "$PPID"` (or `--end` when the run is over), then end the turn ' +
+	'`pnpm josh run:carry --cut` (or `--end` when the run is over), then end the turn ' +
 	'(`backlogrun-progress.md`).'
 
 const HEADLESS_WAIT_REASON = `${HEADLESS_WAIT_MARKER}${HEADLESS_WAIT_BODY}`

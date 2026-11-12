@@ -1,14 +1,16 @@
 import { randomUUID } from 'node:crypto'
 import { readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { afterEach, describe, expect, it } from 'vitest'
-import type { PinnedReport } from './test-pinned-logic'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { test_pinned_logic, type PinnedReport } from './test-pinned-logic'
 import { test_pinned_record } from './test-pinned-record'
+import { test_pinned_snapshot } from './test-pinned-snapshot'
 
 // joshuafolkken/kit#4770: the answer `josh test:pinned --record` leaves for `josh run:review --join`.
 
 const ROOT = `/nonexistent/test-pinned-record-${randomUUID()}`
 const TOKEN = 'launch-1'
 const EARLIER_TOKEN = 'launch-0'
+const SNAPSHOT_HASH = 'starting-tree'
 const HUNK = { file: 'a.ts', new_start: 4, new_count: 1, old_lines: [], is_green: true }
 const REPORT: PinnedReport = {
 	unpinned: [HUNK],
@@ -20,6 +22,7 @@ const REPORT: PinnedReport = {
 }
 
 afterEach(() => {
+	vi.restoreAllMocks()
 	test_pinned_record.clear(TOKEN, ROOT)
 	test_pinned_record.clear(EARLIER_TOKEN, ROOT)
 })
@@ -27,7 +30,7 @@ afterEach(() => {
 describe('test_pinned_record', () => {
 	it('reduces a report to its printed text and its unpinned places', () => {
 		expect(test_pinned_record.summary_of(REPORT)).toStrictEqual({
-			text: 'unpinned a.ts:4 — reverting it left every related test green\n',
+			text: 'unpinned a.ts:4 — reverting it left every related test green; related tests unavailable; add or strengthen a regression test that fails when this change is reverted\n',
 			counts: 'unpinned 1 · unchecked 0',
 			log: undefined,
 			unpinned: [expect.stringMatching(/^a\.ts [\da-f]{16}$/u)],
@@ -42,6 +45,7 @@ describe('test_pinned_record', () => {
 		test_pinned_record.write(TOKEN, summary, ROOT)
 
 		expect(summary.text).toContain('unchecked 2 — over the 20-hunk cap\n')
+		expect(summary.is_unchecked).toBe(true)
 		expect(readFileSync(path, 'utf8')).toContain('unchecked a.ts:4 — over the 20-hunk cap')
 		expect(test_pinned_record.read(TOKEN, ROOT)?.log).toStrictEqual({ path })
 		rmSync(path, { force: true })
@@ -88,6 +92,31 @@ describe('test_pinned_record — the key of an unpinned place', () => {
 
 		expect(first).toBe(site(inserted))
 		expect(second).not.toBe(first)
+	})
+})
+
+describe('test_pinned_record — snapshot identity', () => {
+	it('preserves the snapshot hash and reports a stale record only when the current tree differs', () => {
+		const summary = test_pinned_record.summary_of({
+			...REPORT,
+			tree_hash: SNAPSHOT_HASH,
+			is_stale: false,
+		})
+		const current = vi.spyOn(test_pinned_snapshot, 'current_hash').mockReturnValue(SNAPSHOT_HASH)
+
+		test_pinned_record.write(TOKEN, summary, ROOT)
+
+		expect(test_pinned_record.read(TOKEN, ROOT)).toEqual(summary)
+		current.mockReturnValue('later-tree')
+		const stale = test_pinned_record.read(TOKEN, ROOT)
+
+		expect(stale).toMatchObject({ tree_hash: SNAPSHOT_HASH, is_stale: true })
+		expect(test_pinned_logic.report_text(stale ?? summary)).toContain(
+			'snapshot starting-tree · stale\n',
+		)
+		expect(readFileSync(test_pinned_record.record_path(TOKEN, ROOT), 'utf8')).toContain(
+			SNAPSHOT_HASH,
+		)
 	})
 })
 

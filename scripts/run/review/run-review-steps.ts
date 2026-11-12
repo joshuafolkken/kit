@@ -1,4 +1,5 @@
 import { setTimeout as sleep } from 'node:timers/promises'
+import { core_priority } from '#scripts/gate/core-priority'
 import { gate_skip } from '#scripts/gate/gate-skip'
 import { gate_tree } from '#scripts/gate/gate-tree'
 import { git_location_environment } from '#scripts/git/git-location-environment'
@@ -6,6 +7,7 @@ import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { file_map_stamp, type FileMapStampAccess } from '#scripts/josh/file-map-stamp'
 import { GATE_COMMAND } from '#scripts/josh/josh-command-types'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { poll } from '#scripts/lib/poll'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { review_tree } from '#scripts/review/review-tree'
 import { detached_launch, type LaunchArgv, type LaunchResult } from '#scripts/run/detached-launch'
@@ -28,11 +30,14 @@ const START_TREE_PREFIX = 'josh-run-review-start-tree-'
 // The tree this pair's gate started on, which tells a moved tree from a red gate at the join.
 const start_tree_stamp: FileMapStampAccess = file_map_stamp.create(START_TREE_PREFIX, PROJECT_ROOT)
 
-// The gate is a local, no-network command that finishes in tens of seconds; the review it runs beside
-// is the longer pole, so by the time the child joins, the gate has almost always already settled. The
-// cap is generous rather than tight — a wait that ended early would read a still-running gate as red.
+// The gate is a local, no-network command that finishes in tens of seconds, so the open waits on it
+// before the brief and the join after the review finds it settled (joshuafolkken/kit#5938). The cap is
+// generous rather than tight — a wait that ended early would read a still-running gate as red. The
+// open's cap sits under `run:chain`'s 600 s Bash budget, so a slow gate stops the open with its own
+// note rather than the Bash call being killed with no next step.
 const POLL_INTERVAL_MS = 1000
 const MAX_JOIN_WAIT_MS = 600_000
+const MAX_OPEN_WAIT_MS = 420_000
 
 type Clock = () => number
 
@@ -55,7 +60,8 @@ function josh_argv(root: string, josh_args: ReadonlyArray<string>): LaunchArgv {
 }
 
 // A `josh` command left running in the background, its output kept at `log_path`: the gate, and the
-// `test:pinned` check beside it (`run-review-pinned-steps.ts`).
+// `test:pinned` check beside it (`run-review-pinned-steps.ts`). A long-running check never inherits the
+// review stage's core-budget priority mark (`core-priority.ts`, joshuafolkken/kit#5819).
 function launch_josh(
 	josh_args: ReadonlyArray<string>,
 	log_path: string,
@@ -66,7 +72,10 @@ function launch_josh(
 			argv: josh_argv(root, josh_args),
 			cwd: root,
 			log_path,
-			env: git_location_environment.location_free_environment(),
+			env: {
+				...git_location_environment.location_free_environment(),
+				...core_priority.UNMARKED_ENVIRONMENT,
+			},
 		},
 		(note) => process.stderr.write(`${note}\n`),
 	)
@@ -141,18 +150,23 @@ async function mark_gate_starting(): Promise<void> {
 	start_tree_stamp.write(tree)
 }
 
-// Waited on gate finish, for the join. The review is the longer pole, so this usually returns on its
-// first read; the cap only bounds a gate that hung, which reads as red rather than blocking for ever.
-async function wait_for_gate_finish(now: Clock = () => Date.now()): Promise<GateState> {
+// Waited on gate finish, for the open before its brief and for the join; the cap only bounds a gate
+// that hung, which reads as red rather than blocking for ever.
+async function wait_for_gate_finish(
+	max_wait_ms: number = MAX_JOIN_WAIT_MS,
+	now: Clock = () => Date.now(),
+): Promise<GateState> {
 	const started = now()
 	let state = await read_gate_state()
 
-	while (!run_review.is_gate_settled(state) && now() - started < MAX_JOIN_WAIT_MS) {
-		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		await sleep(POLL_INTERVAL_MS)
-		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		state = await read_gate_state()
-	}
+	await poll.poll_until(() => run_review.is_gate_settled(state) || now() - started >= max_wait_ms, {
+		attempts: Infinity,
+		interval_ms: POLL_INTERVAL_MS,
+		sleeper: async (milliseconds) => {
+			await sleep(milliseconds)
+			state = await read_gate_state()
+		},
+	})
 
 	return state
 }
@@ -180,6 +194,7 @@ function complete_timing(
 
 const run_review_steps = {
 	MAX_JOIN_WAIT_MS,
+	MAX_OPEN_WAIT_MS,
 	POLL_INTERVAL_MS,
 	complete_timing,
 	gate_log_path,

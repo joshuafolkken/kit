@@ -5,7 +5,7 @@ import type { LedgerEntry } from './lane-ledger'
 import type { ToolCall } from './lane-transcript-calls'
 
 // joshuafolkken/kit#5294: a ship stage of the breakdown splits into the laps the ship wrote inside it
-// and the core-budget waits that ended there; the time between ship stages by the child's Bash.
+// and the core-budget waits that ended there; the time between ship stages by the child's calls.
 
 const MINUTE_MS = 60_000
 const ISSUE = 5294
@@ -15,6 +15,7 @@ const BETWEEN = 'between ship stages'
 const JOSH_GATE = 'josh gate'
 const SCOPED_PAIR = 'scoped pair'
 const GATE_COMMAND = 'pnpm josh gate'
+const EDITING = 'editing & thinking'
 
 const BREAKDOWN: Breakdown = {
 	stages: [],
@@ -78,18 +79,23 @@ function gate(
 	}
 }
 
-function bash(minute: number, minutes: number, command: string): ToolCall {
+// A call of `tool` started at `minute` for `minutes`; an `Agent` call dispatches a `reviewer`.
+function tool_call(minute: number, minutes: number, tool: string): ToolCall {
 	return {
 		session_id: 's',
 		lane: String(ISSUE),
 		started_ms: minute * MINUTE_MS,
 		duration_ms: minutes * MINUTE_MS,
-		tool: 'Bash',
+		tool,
 		background: false,
-		command,
-		subagent: undefined,
+		command: undefined,
+		subagent: tool === 'Agent' ? { type: 'reviewer', model: undefined } : undefined,
 		output: '',
 	}
+}
+
+function bash(minute: number, minutes: number, command: string): ToolCall {
+	return { ...tool_call(minute, minutes, 'Bash'), command }
 }
 
 function minutes_of(
@@ -131,8 +137,60 @@ describe('lane_breakdown_laps.of — ship stages', () => {
 		])
 	})
 
+	// joshuafolkken/kit#5531: a minutes-long pair tells why it read the whole branch.
+	it('names why a lap read the whole branch', () => {
+		const entries = [{ ...lap(SCOPED_PAIR, 4, 12), fallback: 'no-record, hub' }]
+
+		expect(minutes_of(entries)).toStrictEqual([
+			[SHIP_GATE, [[`${SCOPED_PAIR} (whole branch: no-record, hub)`, 4]]],
+		])
+	})
+
 	it("leaves out another lane's laps and a lap ended between ship stages", () => {
-		expect(minutes_of([lap(JOSH_GATE, 3, 15, OTHER_ISSUE), lap('push', 1, 18)])).toStrictEqual([])
+		const entries = [lap(JOSH_GATE, 3, 15, OTHER_ISSUE), lap('push', 1, 18)]
+
+		expect(minutes_of(entries)).toStrictEqual([])
+	})
+})
+
+// joshuafolkken/kit#5567: a gate the ship reused is counted on one row, apart from a gate that ran.
+describe('lane_breakdown_laps.of — a reused josh gate', () => {
+	it('counts the stage reuses on one row beside the gate that ran', () => {
+		const entries = [
+			{ ...lap(JOSH_GATE, 0, 12), reused_tree: 'abc' },
+			{ ...lap(JOSH_GATE, 0, 13), reused_tree: 'def' },
+			{ ...lap(JOSH_GATE, 2, 14), rerun: 'merge' },
+		]
+
+		expect(minutes_of(entries)).toStrictEqual([
+			[
+				SHIP_GATE,
+				[
+					[`${JOSH_GATE} (merge)`, 2],
+					[`${JOSH_GATE} (reused ×2)`, 0],
+				],
+			],
+		])
+	})
+})
+
+// joshuafolkken/kit#5538: a scoped pair that ran again says which run it was and why.
+describe('lane_breakdown_laps.of — a scoped pair run again', () => {
+	it('names the run count and the rerun reason beside why it read the whole branch', () => {
+		const entries = [
+			{ ...lap(SCOPED_PAIR, 4, 12), runs: 2, rerun: 'moved', fallback: 'hub' },
+			{ ...lap(SCOPED_PAIR, 3, 14), runs: 1 },
+		]
+
+		expect(minutes_of(entries)).toStrictEqual([
+			[
+				SHIP_GATE,
+				[
+					[`${SCOPED_PAIR} (run 2: moved; whole branch: hub)`, 4],
+					[SCOPED_PAIR, 3],
+				],
+			],
+		])
 	})
 })
 
@@ -193,6 +251,103 @@ describe('lane_breakdown_laps.of — between ship stages', () => {
 	it('splits the time between ship stages by the Bash the child ran there', () => {
 		const calls = [bash(17, 2, GATE_COMMAND), bash(12, 1, GATE_COMMAND)]
 
-		expect(minutes_of([], calls)).toStrictEqual([[BETWEEN, [['gate', 2]]]])
+		expect(minutes_of([], calls)).toStrictEqual([
+			[
+				BETWEEN,
+				[
+					['gate', 2],
+					[EDITING, 2],
+				],
+			],
+		])
+	})
+
+	// joshuafolkken/kit#5646: a lane that never paused reads as before.
+	it('splits it by the Bash alone when the lane recorded no park', () => {
+		const breakdown = { ...BREAKDOWN, pauses: [] }
+		const laps = lane_breakdown_laps.of([], ISSUE, breakdown, [bash(17, 2, GATE_COMMAND)])
+
+		expect([...laps]).toStrictEqual([
+			[
+				BETWEEN,
+				[
+					{ name: 'gate', ms: 2 * MINUTE_MS },
+					{ name: EDITING, ms: 2 * MINUTE_MS },
+				],
+			],
+		])
+	})
+})
+
+// joshuafolkken/kit#5834: a subagent, a read and an edit each count under their own kind.
+describe('lane_breakdown_laps.of — the tools between ship stages', () => {
+	it('splits it by the subagents, reads and edits the child ran there', () => {
+		const calls = [
+			tool_call(16, 1.5, 'Agent'),
+			tool_call(17.5, 1, 'Edit'),
+			tool_call(18.5, 0.25, 'Read'),
+		]
+
+		expect(minutes_of([], calls)).toStrictEqual([
+			[
+				BETWEEN,
+				[
+					['subagent: reviewer', 1.5],
+					[EDITING, 1.25],
+					['edit', 1],
+					['read', 0.25],
+				],
+			],
+		])
+	})
+
+	it('counts a Write under the edit kind', () => {
+		expect(minutes_of([], [tool_call(16, 4, 'Write')])).toStrictEqual([[BETWEEN, [['edit', 4]]]])
+	})
+
+	it('leaves a backgrounded subagent, its time unknown, in the rest', () => {
+		const agent = { ...tool_call(16, 0, 'Agent'), duration_ms: undefined, background: true }
+
+		expect(minutes_of([], [agent])).toStrictEqual([[BETWEEN, [[EDITING, 4]]]])
+	})
+})
+
+// joshuafolkken/kit#5834: a `ship:wait` begun in the ship stage before counts for what it ran past
+// that stage's end.
+describe('lane_breakdown_laps.of — a call begun before the stretch', () => {
+	it('counts the part of a call begun before the stretch that ran inside it', () => {
+		const calls = [bash(15, 3, 'pnpm josh ship:wait 5294')]
+
+		expect(minutes_of([], calls)).toStrictEqual([
+			[
+				BETWEEN,
+				[
+					['ship / ship:wait', 2],
+					[EDITING, 2],
+				],
+			],
+		])
+	})
+})
+
+// joshuafolkken/kit#5755: what no Bash call covered between two ship stages is the child's own time.
+describe('lane_breakdown_laps.of — the rest between ship stages', () => {
+	it('names the time no Bash call covered editing and thinking, a wait taken out', () => {
+		const breakdown = { ...BREAKDOWN, waits: [{ from_ms: 19 * MINUTE_MS, to_ms: 20 * MINUTE_MS }] }
+		const laps = lane_breakdown_laps.of([], ISSUE, breakdown, [bash(16, 1, GATE_COMMAND)])
+
+		expect(laps.get(BETWEEN)).toStrictEqual([
+			{ name: EDITING, ms: 2 * MINUTE_MS },
+			{ name: 'gate', ms: MINUTE_MS },
+		])
+	})
+
+	it('adds no row when the Bash covered all of it', () => {
+		expect(minutes_of([], [bash(16, 4, GATE_COMMAND)])).toStrictEqual([[BETWEEN, [['gate', 4]]]])
+	})
+
+	// A reader with no transcript calls (`lane-sinks.ts`) does not know the time was editing.
+	it('leaves the time unsplit when no calls were read', () => {
+		expect(minutes_of([], [])).toStrictEqual([])
 	})
 })

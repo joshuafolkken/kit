@@ -52,6 +52,9 @@ interface PrStateSnapshot {
 	// The base branch's required status check contexts (joshuafolkken/kit#4351). Absent where the
 	// branch requires none or they could not be read, which keeps the merge gate waiting for `CLEAN`.
 	required_contexts?: Array<string>
+	// `true` once the pull request is merged, which the auto-merge wait reads off this snapshot rather
+	// than a second detail read (joshuafolkken/kit#6721). Absent otherwise.
+	is_merged?: boolean
 }
 
 function read_string(value: unknown): string | undefined {
@@ -152,6 +155,7 @@ function parse_pr_state_snapshot(raw_json: string): PrStateSnapshot {
 		rollup: parse_rollup_checks(raw_json),
 		merge_state_status: read_string(data.mergeStateStatus),
 		review_decision: read_string(data.reviewDecision),
+		...(data.merged === true && { is_merged: true }),
 	}
 
 	return with_required_contexts(

@@ -1,10 +1,10 @@
-import { closeSync, fstatSync, openSync, readSync } from 'node:fs'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
 import { time_batch_guard, type GuardedCall } from './time-batch-guard'
 import { time_density } from './time-density'
 import { time_hook_transcript } from './time-hook-transcript'
+import { transcript_tail } from './transcript-tail'
 
 // The disk half of the live density line: find the transcript, read enough
 // of it, and remember when the line was last emitted.
@@ -28,12 +28,6 @@ import { time_hook_transcript } from './time-hook-transcript'
 // there too: `time_density.last_turn_calls` withholds the count when the tail's final line does not
 // parse, because that line belongs to the turn the count is about.
 
-// How much of the transcript's end is read. The file grows to several megabytes over a long run —
-// 4.7 MB and 2,712 lines for the largest in this checkout — and reading all of it on every edit would
-// put the run's own history in front of every write. A quarter of a megabyte is far more than the ten
-// round trips the reading needs and is read in a couple of milliseconds.
-const TAIL_BYTES = 262_144
-const FILE_START = 0
 // **One record per session, keyed on the transcript the payload named**, rather than per checkout the
 // way `josh gate`'s stamp is. What is being throttled is a *run*, and a run is one session: keyed on
 // the checkout, a session started — or cleared — within the interval of the previous one's line would
@@ -84,28 +78,6 @@ function parse_call(raw_payload: string): GuardedCall | undefined {
 	return { name: call.tool_name, input: call.tool_input }
 }
 
-// The last `max_bytes` of a file, as text. The leading line is usually cut mid-way, which every
-// reader below already handles: an unparseable line is dropped rather than dated.
-//
-// **Only the bytes `readSync` reports are decoded.** `Buffer.alloc` zero-fills, and a short read — a
-// real possibility on the network- and FUSE-backed home directories these transcripts can live on —
-// would otherwise leave NUL padding on the end of the text, making the *last* line unparseable. That
-// is the one line the turn's call count is read from.
-function read_tail(file_path: string, max_bytes: number = TAIL_BYTES): string {
-	const descriptor = openSync(file_path, 'r')
-
-	try {
-		const { size } = fstatSync(descriptor)
-		const length = Math.min(size, max_bytes)
-		const buffer = Buffer.alloc(length)
-		const read = readSync(descriptor, buffer, FILE_START, length, size - length)
-
-		return buffer.subarray(FILE_START, read).toString('utf8')
-	} finally {
-		closeSync(descriptor)
-	}
-}
-
 function notice_path(transcript_path: string): string {
 	return stamp_file.stamp_path(NOTICE_PREFIX, transcript_path)
 }
@@ -145,7 +117,7 @@ function notice_for(raw_payload: string, now_ms: number): string | undefined {
 
 	if (transcript_path === undefined) return undefined
 
-	const tail = read_tail(transcript_path)
+	const tail = transcript_tail.read_tail(transcript_path)
 	const reading = time_density.read_window(tail)
 	const target = notice_path(transcript_path)
 
@@ -175,7 +147,6 @@ const time_density_hook = {
 	notice_path,
 	parse_call,
 	parse_transcript_path,
-	read_tail,
 }
 
 export { time_density_hook }

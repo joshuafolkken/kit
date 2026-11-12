@@ -39,7 +39,6 @@ describe('eval_sandbox.create_sandbox', () => {
 
 	it('writes the fixture files a scenario declares', () => {
 		const sandbox_path = sandbox_for({
-			/* eslint-disable-next-line @typescript-eslint/naming-convention -- a fixture key is a file path */
 			fixture_files: { 'src/deep/probe.ts': 'export {}\n' },
 		})
 

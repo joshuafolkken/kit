@@ -150,6 +150,16 @@ describe('run_board_fit.fit order', () => {
 	})
 })
 
+// joshuafolkken/kit#7281: an empty section's kept head draws no row, so `more N` stays with the plan.
+describe('run_board_fit.fit an empty section under the plan', () => {
+	it('counts the plan’s cut rows after its last row, not under an empty section’s head', () => {
+		const empty = section([], ['', 'Q 0'])
+		const lines = fit_wide(parts_of([issues(5)], { below: [empty] }), 8)
+
+		expect(lines).toStrictEqual([...HEADER, '', '  1', '  2', '  more 3', '', 'Q 0'])
+	})
+})
+
 describe('run_board_fit.fit order of the rows that stay longest', () => {
 	it.each([
 		['the oldest parked row', 7, ['', '  1', '  3', '  5', '  more 5']],
@@ -174,6 +184,41 @@ describe('run_board_fit.fit thanks', () => {
 		expect(fit_wide(parts, 10)).toStrictEqual([...shown, ...thanks, ...LEGEND])
 		expect(fit_wide(parts, 8)).toStrictEqual([...shown, ...thanks])
 		expect(fit_wide(parts, 6)).toStrictEqual(shown)
+	})
+})
+
+// joshuafolkken/kit#5395: the ⛽ usage gauges under the header give way whole, after the thanks and
+// before any plan row.
+describe('run_board_fit.fit usage', () => {
+	it('drops the thanks before the usage gauges, and the gauges before any plan row', () => {
+		const usage = { head: ['', '⛽'], lines: [{ text: '  claude', is_detail: false }] }
+		const parts = parts_of([issues(2)], { usage, thanks: THANKS })
+		const gauges = ['', '⛽', '  claude']
+		const rows = ['', '  1', '  2']
+
+		expect(fit_wide(parts, 10)).toStrictEqual([...HEADER, ...gauges, ...rows, ...THANKS])
+		expect(fit_wide(parts, 8)).toStrictEqual([...HEADER, ...gauges, ...rows])
+		expect(fit_wide(parts, 5)).toStrictEqual([...HEADER, ...rows])
+		expect(fit_wide(parts, 4)).toStrictEqual([...HEADER, '', '  more 2'])
+	})
+})
+
+// joshuafolkken/kit#5710: the 📈 throughput rows stand between the header and the ⛽ usage gauges, and
+// give way whole before them.
+describe('run_board_fit.fit throughput', () => {
+	it('draws the throughput above the usage gauges and drops it before them', () => {
+		const throughput = { head: ['', '📈'], lines: [{ text: '  24h', is_detail: false }] }
+		const usage = { head: ['', '⛽'], lines: [{ text: '  claude', is_detail: false }] }
+		const parts = parts_of([issues(2)], { throughput, usage })
+		const [rates, gauges] = [
+			['', '📈', '  24h'],
+			['', '⛽', '  claude'],
+		]
+		const rows = ['', '  1', '  2']
+
+		expect(fit_wide(parts, 11)).toStrictEqual([...HEADER, ...rates, ...gauges, ...rows])
+		expect(fit_wide(parts, 8)).toStrictEqual([...HEADER, ...gauges, ...rows])
+		expect(fit_wide(parts, 5)).toStrictEqual([...HEADER, ...rows])
 	})
 })
 

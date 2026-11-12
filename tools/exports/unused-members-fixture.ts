@@ -1,12 +1,13 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import type ts from 'typescript'
 
 // One file of a fixture project: its project-relative path and the source written there.
 type FixtureFile = readonly [relative: string, source: string]
 
 const TMP_PREFIX = 'unused-members-'
+const make_directory = temporary_directory()
 // One ES lib rather than TypeScript's default set: the default pulls in DOM, about 83 lib files to
 // parse and bind for every Program a case builds, and no fixture reads any of it.
 const LIB = 'es2022'
@@ -27,7 +28,7 @@ const TSCONFIG = {
 
 // A throwaway TypeScript project the detector reads over its own `tsconfig.json`.
 function create_project(files: ReadonlyArray<FixtureFile>): string {
-	const root = mkdtempSync(path.join(tmpdir(), TMP_PREFIX))
+	const root = make_directory(TMP_PREFIX)
 
 	writeFileSync(path.join(root, 'tsconfig.json'), JSON.stringify(TSCONFIG))
 

@@ -6,25 +6,29 @@ stops before the commit.
 
 ## Run `pnpm josh followup`
 
-Run it in the foreground after `pnpm josh git` and after every required review disposition:
+After `pnpm josh git` and required review dispositions, run:
 
 ```bash
-pnpm josh followup "<title> #<N>" --notify-message-file <report-file>
+pnpm josh followup "<title> #<N>" --notify-message-file .josh/tmp/report.md
 ```
 
-The report uses the session language: plain `Cause:`, `Fix:` and `Result:` lines, then `Details:`
-bullets. Use the file option whenever it contains a command or path.
+Write the report in the session language; use the shape and file option in "The options" below.
 
 It waits for required CI, checks CodeRabbit and top-level AI review comments, sends the completion
 Telegram, merges by default, posts the Issue report, closes completed epics, removes `in-progress`,
-and releases the hold. Only `--no-merge` stops the merge; `--merge` is a deprecated no-op. **A pull
+and releases the hold. `--no-merge` stops the merge; `--merge` is a deprecated no-op. **A pull
 request already merged by hand** (a `prrun` stop) runs only the post-merge tail; a report already on the
 Issue is not posted twice, so re-running is safe. Keep the default Issue target. Ignore a finding only
 after verifying it is inapplicable; rate-limit text is not a finding.
 
-**A red rate-limited CodeRabbit check is cleared by a retrigger, not a bypass.** `followup` waits
-out the window (≤30 min) and posts `@coderabbitai review` once per pull request. On its
-no-retrigger note, do that and rerun `followup`. Bypassing a second rate limit is Tier C.
+**A PR changing `.github/workflows/**` (adds, deletes, either side of a rename) waits for a human
+merge.** Once CI is green, `followup` leaves it open, labels its Issue `needs-human-merge`, prints the
+PR URL and exits 0 with no completion report; red CI fails as usual. Read the diff on GitHub and merge
+there; `--merge` cannot bypass this stop. Re-run `followup` after merging to finish the tail.
+
+**A rate-limited CodeRabbit check is cleared by a retrigger, never a bypass** (Tier C). `followup`
+waits out each window (≤30 min), posts `@coderabbitai review` ≤3 times per PR, then asks for
+`run:stalled`. On its no-retrigger note, do so and rerun it.
 
 A pre-merge failure stops the run; an unverifiable AI finding or CI failure needing input sends a
 `confirmation` Telegram. A post-merge cleanup failure is named and does not undo the merge; run the
@@ -34,7 +38,7 @@ A CI job red only on tests outside the change → `followup` reruns it once, aft
 when main moved a failed test (`scripts/followup/followup-main-move.ts`).
 
 After the merge `run:tail` returns to the default branch — `ship` runs it; after a bare `followup`, run
-`pnpm josh run:tail <N>`. In a lane the parent uses `pnpm josh lane:close <N>`. Never delete the branch unless requested. The sections below are read when the output needs reading.
+`pnpm josh run:tail <N>`. In a lane the parent uses `pnpm josh lane:close <N>`. Never delete the branch unless requested.
 
 ## The options
 
@@ -55,8 +59,8 @@ Invoking `fullrun` is itself the explicit authorization to merge.
   `confirmation` Telegram and exits non-zero — fix and re-run. SonarCloud is carried by the required
   `SonarQube` check.
 - **Verify a CodeRabbit finding before bypassing it.** Never pass `--coderabbit-ignore-reason`
-  reflexively: a SHA pin flagged "not matching the tag" is checked with `gh api
-  repos/<owner>/<repo>/commits/<tag> --jq '.sha'`, and the bypass cites that command.
+  reflexively: a SHA pin flagged "not matching the tag" is checked with `pnpm josh pin:verify
+  <owner/repo> <tag> <sha>`; bypass only on `match`, citing its printed line.
 - **The merge is `followup`'s, not yours** — `.claude/settings.json` refuses `gh pr merge` and its
   `gh api` spellings (`operating-rules.md` → "git-rules"). Do **not** pass `--delete-branch` unless asked.
 - **A failed merge** (branch protection, a conflict) is reported and stops the run — never retried with
@@ -84,7 +88,7 @@ josh release` runs" below.
 A `failure` Telegram is sent **by hand, exactly once**, and only when recovery is given up:
 
 ```bash
-pnpm josh notify --task-type failure --issue-url "<issue-url>" --body-file <reason-file>
+pnpm josh notify --task-type failure --issue-url "<issue-url>" --body-file .josh/tmp/failure.md
 ```
 
 ## What the output means
@@ -105,7 +109,7 @@ pnpm josh release:scope          # → required | skip | unknown
 
 | It answers | What it means                                                    | What the run does                                                                 |
 | ---------- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| `required` | main has taken at least one merge since the version last changed | Close the completion report with the release request, naming `pnpm josh release` |
+| `required` | main has taken at least one merge since the version last changed | Close the completion report with the `request:` line it prints                   |
 | `skip`     | the count is zero — nothing is waiting to ship                   | Say so in one line and finish                                                     |
 | `unknown`  | the count could not be read                                      | **Report it as `unknown`** — it is never read as `skip`                           |
 
@@ -113,7 +117,5 @@ pnpm josh release:scope          # → required | skip | unknown
 outward-facing and effectively irreversible, so Tier C. A person types it in the primary checkout, on
 the default branch, with a clean tree.
 
-**On `required`, the release request cites the open release Issue** — the one `issue:file --release` / `issue:release <N>` links blockers to — with a number-link
-(`prompts/collaboration-workflow/issue-citation.md`). List it with
-`gh api 'repos/{owner}/{repo}/issues?labels=release&state=open' --jq '.[].number'`; when none is
-open, the request names `pnpm josh release` alone.
+**On `required`, it prints `release_issue: [#N](url)|none|unknown` and the `request:` line** — citing the
+open release Issue `issue:release <N>` links blockers to, or naming `pnpm josh release` alone.

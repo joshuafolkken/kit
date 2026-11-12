@@ -6,8 +6,8 @@ import { backlog_fixture } from './backlog-fixture'
 import { backlog_overlap, type Declared } from './backlog-overlap'
 import { backlog_rank } from './backlog-rank'
 
-// joshuafolkken/kit#5107: joshuafolkken/kit#5083 was dispatched beside its holder joshuafolkken/kit#5084,
-// yielded at 02:57, and was relaunched 11 minutes after the holder merged at 03:00, behind the pool.
+// joshuafolkken/kit#5107: a yielded child must be offered again when its holder merges, ahead of
+// unrelated pool work.
 
 const { REPO } = backlog_fixture
 const HOLDER = 5084

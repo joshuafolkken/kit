@@ -3,6 +3,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolve_local_bin, resolve_package_bin } from '#scripts/build/local-bin'
 import { core_budget } from '#scripts/gate/core-budget'
+import { hook_lap } from '#scripts/hooks/hook-lap'
 import { package_manifest } from '#scripts/lib/package-manifest'
 import { package_version_schema } from '#scripts/lib/schemas'
 import { resolve_spawn_exit } from '#scripts/lib/spawn-exit'
@@ -150,29 +151,14 @@ function all_command_names(): Array<string> {
 	return [...Object.keys(COMMAND_MAP), ...Object.keys(ALIASES)]
 }
 
-// `josh <unknown>` answers on stderr with a short line rather than the whole listing. A shell
-// substituting `$(josh port dev)` captures stdout alone, so a name this kit cannot resolve — a typo,
-// a retired command — must leave that stream empty rather than dump the toolkit index there, how #825
-// surfaced. It used to print the full help here; #1928 cut that to one line plus a "did you mean"
-// when a close command exists, so the diagnosis is readable and the stdout contract is unchanged.
-// `josh` and `josh --help` still print the listing to stdout, because there it is the answer rather
-// than the diagnosis.
+// Unknown commands need a short stderr diagnosis and an empty stdout, so shell substitutions such
+// as `$(josh port dev)` cannot capture a help listing as a value (#825, #1928).
+// Bare `josh` and `josh --help` print the listing to stdout because it is their requested answer.
 function format_unknown_command(cmd: string): string {
 	const suggestion = command_suggest.closest_command(cmd, all_command_names())
 	const hint = suggestion === undefined ? '' : ` Did you mean '${suggestion}'?`
 
 	return `Unknown command: ${cmd}.${hint} Run 'josh --help' for common commands or 'josh --all' for the full list.`
-}
-
-// No `shell` option on purpose: execa runs a Windows `.cmd` shim itself and escapes the arguments
-// for cmd.exe, which the shell would receive unescaped.
-function spawn_script(tsx_executable: string, script_arguments: Array<string>): number {
-	const result = execaSync(tsx_executable, script_arguments, {
-		stdio: 'inherit',
-		reject: false,
-	})
-
-	return resolve_spawn_exit(tsx_executable, result)
 }
 
 function run_shell_command(shell: ReadonlyArray<string>, extra: Array<string>): number {
@@ -185,34 +171,21 @@ function run_shell_command(shell: ReadonlyArray<string>, extra: Array<string>): 
 	return resolve_spawn_exit(executable, result)
 }
 
-function spawn_script_entry(
-	entry: CommandEntry,
-	script_path: string,
-	script_arguments: ReadonlyArray<string>,
-): number {
-	const runner = resolve_tsx_runner()
-
-	return spawn_script(runner.executable, [
-		...runner.leading_arguments,
-		...josh_environment_file.apply_node_flags(entry.tsx_arguments ?? []),
-		script_path,
-		...script_arguments,
-	])
-}
-
-// Only the in-process branch is genuinely asynchronous; the spawning one answers the moment the
-// child exits. Both are reported as a promise so every caller has one shape to handle, and
-// `josh.ts` awaits it either way.
+// Every script command runs in this process (`josh-in-process.ts`). Its `tsx_arguments` — only ever
+// the optional `.env` flag, which a spawned node would have read before the script's own code —
+// are loaded into this process's environment before the import, through the same filter that
+// keeps launch-only switches out of the file's reach.
 async function run_script_entry(
 	entry: CommandEntry,
+	script: string,
 	subcommand_arguments: Array<string>,
 ): Promise<number> {
 	const script_arguments = [...(entry.default_script_arguments ?? []), ...subcommand_arguments]
-	const target = josh_in_process.in_process_target(entry, PACKAGE_DIR, import.meta.url)
+	const target = josh_in_process.in_process_target(script, PACKAGE_DIR, import.meta.url)
 
-	if (target !== undefined) return await josh_in_process.run_in_process(target, script_arguments)
+	josh_environment_file.apply_node_flags(entry.tsx_arguments ?? [])
 
-	return spawn_script_entry(entry, path.join(PACKAGE_DIR, entry.script ?? ''), script_arguments)
+	return await josh_in_process.run_in_process(target, script_arguments)
 }
 
 function github_prerequisite_exit(resolved: string, is_consumer: boolean): number | undefined {
@@ -258,17 +231,15 @@ async function run_entry(
 ): Promise<number> {
 	if (entry.shell) return run_shell_command(entry.shell, subcommand_arguments)
 
-	return await run_script_entry(entry, subcommand_arguments)
+	return await run_script_entry(entry, entry.script ?? '', subcommand_arguments)
 }
 
 function declared(value: number | (() => number) | undefined): number | undefined {
 	return typeof value === 'function' ? value() : value
 }
 
-// **Every command passes through here, so this is where a declared weight is reserved**.
-// A heavy command run directly, outside `josh gate`, used to start its tools
-// without claiming a place. A command under a parent that already holds its cores claims nothing:
-// `core_budget.with_command_reservation` reads the mark that parent set.
+// Every command passes here, so reserving declared weight covers direct calls as well as gates.
+// A parent's reservation mark prevents nested commands from claiming the same cores twice.
 async function dispatch_entry(
 	command: string,
 	entry: CommandEntry,
@@ -298,14 +269,19 @@ async function run_command(
 	const early_exit = pre_dispatch_exit(resolved, entry, subcommand_arguments, is_consumer)
 	if (early_exit !== undefined) return early_exit
 
-	return await dispatch_entry(resolved, entry, subcommand_arguments)
+	return await hook_lap.timed_command(
+		resolved,
+		entry.category,
+		subcommand_arguments,
+		async () => await dispatch_entry(resolved, entry, subcommand_arguments),
+	)
 }
 
 const josh_logic = {
+	all_command_names,
 	format_help,
 	format_unknown_command,
 	run_command,
-	spawn_script,
 	run_shell_command,
 }
 

@@ -124,7 +124,7 @@ describe('time_spans.bash_label — bundling by the leading command', () => {
 		expect(time_spans.bash_label('COUNT=3 ; git status')).toBe('Bash: git')
 	})
 
-	// A flag is never a command name. `F=$(ls -t *.jsonl | head -1)` used to be labelled `Bash: -t`.
+	// A flag inside command substitution must not become the command's label.
 	it('never labels a call after a flag', () => {
 		expect(time_spans.bash_label('F=$(ls -t x | head -1) && wc -l x')).toBe('Bash: ls')
 	})
@@ -189,8 +189,8 @@ describe('time_spans.josh_command_of', () => {
 		expect(time_spans.josh_command_of('pnpm josh lint && pnpm josh gate')).toBe('josh lint')
 	})
 
-	// One command typed two ways used to key as two (joshuafolkken/kit#1789): the per-command table
-	// printed a row each, and the failure chain did not see the alias as a re-run of the full name.
+	// Aliases need the same key as full spellings so row grouping and failure-chain repeat detection
+	// agree (joshuafolkken/kit#1789).
 	it('expands an alias to the command it stands for', () => {
 		expect(time_spans.josh_command_of('pnpm josh ga')).toBe('josh gate')
 	})

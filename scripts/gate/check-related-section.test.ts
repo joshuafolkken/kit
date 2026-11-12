@@ -1,8 +1,7 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { review_record_pinned } from '#scripts/review/review-record-pinned'
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { check_related, type CheckResult } from './check-related'
 import { check_related_pinned } from './check-related-pinned'
 import { check_related_section } from './check-related-section'
@@ -20,7 +19,8 @@ vi.mock('./check-related-reuse', () => ({
 	},
 }))
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'check-related-section-test-'))
+const make_directory = temporary_directory('suite')
+const scratch = make_directory('check-related-section-test-')
 const LOG_TARGET = path.join(scratch, 'check-related.log')
 const TEST_COMMAND = 'test:related'
 const LINE_COUNT = 60
@@ -28,7 +28,7 @@ const PASSED_DROPPED_LINE = '… 55 earlier line(s) in the log'
 const FIRST_LINE = '\nline 1\n'
 // The size past which Claude Code saves a tool result instead of showing it (`BASH_MAX_OUTPUT_LENGTH`).
 const TOOL_RESULT_BYTES = 8000
-// joshuafolkken/kit#5168: the `test:related` that printed 142.8 KB ran 877 files.
+// joshuafolkken/kit#5168: large related suites must leave a readable verdict in the tool result.
 const RELATED_FILE_COUNT = 877
 
 function numbered_output(count: number): string {
@@ -81,10 +81,6 @@ afterEach(() => {
 	vi.restoreAllMocks()
 })
 
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
-
 // joshuafolkken/kit#5204: a whole `test:related` output went past the tool result's size limit.
 describe('check_related_section.format_section', () => {
 	it('prints the last 5 lines of a passed check under the count left out', () => {
@@ -125,6 +121,14 @@ describe('check_related_section.format_section', () => {
 		expect(check_related_section.format_section(result_of(1, ''))).toBe(
 			'\n=== test:related: failed (1) ===\n',
 		)
+	})
+})
+
+describe('check_related_section.result_status', () => {
+	it('heads a check that was never started not run, not failed', () => {
+		const section = check_related_section.format_section({ ...result_of(1, 'x'), is_skipped: true })
+
+		expect(section).toBe('\n=== test:related: not run ===\nx\n')
 	})
 })
 

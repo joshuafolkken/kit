@@ -3,9 +3,8 @@ import { describe, expect, it } from 'vitest'
 import { all_documents, read_document } from './ai-document-fixture'
 import { document_scan } from './document-scan'
 
-// Every label a document applies, removes or creates has to be one this package actually manages.
-// A mistyped `labels[]=…` used to fail silently at run time; this scan catches it, across every
-// document at once, in place of the per-rule marker suites that pinned a few label names by hand
+// Every label a document applies, removes or creates must be managed by this package. Scanning the
+// whole document set catches mistyped `labels[]=…` before a silent run-time failure
 // (joshuafolkken/kit#1923).
 
 function unknown_labels(text: string): Array<string> {

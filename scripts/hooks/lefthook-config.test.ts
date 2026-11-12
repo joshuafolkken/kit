@@ -142,7 +142,7 @@ describe('lefthook/base.yml pre-push dependency barrier (kit#813)', () => {
 	})
 })
 
-// kit#1334: the hook ran the whole unit suite 40 seconds after `josh gate` had printed it green on
+// kit#1334: the hook ran the whole unit suite right after `josh gate` had printed it green on
 // the same tree. The wrapper is what can read that record; a bare `vitest run` has nothing to read
 // it with, which is the state this pair of assertions exists to keep the config out of.
 describe('lefthook/base.yml pre-push unit command (kit#1334)', () => {
@@ -184,6 +184,15 @@ describe('lefthook/base.yml pre-commit type-check command (kit#1381)', () => {
 
 	it('stays scoped to the file types a type check can be about', () => {
 		expect(type_check?.glob).toContain('ts')
+	})
+})
+
+// kit#7146: `reserved-run … -- pnpm josh audit` started pnpm twice; the audit reserves its own place.
+describe('lefthook/base.yml pre-push audit command (kit#7146)', () => {
+	const run = PRE_PUSH_HOOK?.commands?.['audit']?.run
+
+	it('calls josh audit with a single pnpm launch', () => {
+		expect(run).toBe('pnpm josh audit')
 	})
 })
 

@@ -10,6 +10,7 @@ import type { RunEvent, StreamRead } from './run-event-stream'
 
 const OPTIONS = { interval_ms: 100, tick_ms: 5 }
 const AT = '2026-09-21T00:00:00.000Z'
+const DEADLINE_TEXT = 'at the deadline'
 
 function event(pos: number, text: string): RunEvent {
 	return { pos, at: AT, kind: 'merge', text }
@@ -63,6 +64,17 @@ describe('run_event_follow.follow — arrival', () => {
 })
 
 describe('run_event_follow.follow — the quiet tick', () => {
+	it('reads once more after the tick crosses the deadline', async () => {
+		const source = ports([event(1, DEADLINE_TEXT)], 1)
+		const options = { interval_ms: 1, tick_ms: OPTIONS.tick_ms }
+
+		await expect(run_event_follow.follow(source, 0, options)).resolves.toStrictEqual({
+			events: [event(1, DEADLINE_TEXT)],
+			next_position: 1,
+		})
+		expect(source.now()).toBe(OPTIONS.tick_ms)
+	})
+
 	it('returns at the interval with no events when nothing has been appended', async () => {
 		const read = await run_event_follow.follow(ports([], 0), 0, OPTIONS)
 

@@ -1,7 +1,7 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_comment_cli } from './issue-comment-cli'
 
 // joshuafolkken/kit#2304: the write side that was missing. The `gh api` call is mocked so the body the
@@ -20,7 +20,8 @@ const COMMENT_URL = 'https://github.com/o/r/issues/5#issuecomment-1'
 const BODY_FILE_FLAG = '--body-file'
 const INLINE_BODY = 'a short note'
 const FILE_BODY = 'park: needs a decision\n'
-const work = mkdtempSync(path.join(tmpdir(), 'issue-comment-cli-'))
+const make_directory = temporary_directory('suite')
+const work = make_directory('issue-comment-cli-')
 const BODY_FILE = path.join(work, 'body.md')
 
 writeFileSync(BODY_FILE, FILE_BODY)
@@ -43,10 +44,6 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.restoreAllMocks()
-})
-
-afterAll(() => {
-	rmSync(work, { recursive: true, force: true })
 })
 
 describe('issue_comment_cli.run — posts one comment and prints its URL', () => {
@@ -98,7 +95,7 @@ describe('issue_comment_cli.run — refuses a call it cannot post', () => {
 		expect(errors).toContain(issue_comment_cli.USAGE)
 	})
 
-	// joshuafolkken/kit#3261: a misspelled flag used to be skipped, posting with whatever else was given.
+	// Reject misspelled flags before posting a comment with unintended arguments (joshuafolkken/kit#3261).
 	it('refuses an unknown flag', async () => {
 		const code = await issue_comment_cli.run(['5', '--body', 'note', '--bdy-file', BODY_FILE])
 

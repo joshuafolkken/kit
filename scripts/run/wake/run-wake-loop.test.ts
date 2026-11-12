@@ -1,11 +1,12 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_wake, type RunWake } from './run-wake'
 import { run_wake_loop, type DriveResult } from './run-wake-loop'
 import { run_wake_loop_fixture } from './run-wake-loop-fixture'
 import type { LaunchResult } from './run-wake-session'
+
+const make_directory = temporary_directory()
 
 // joshuafolkken/kit#1719. The loop is where "one wake per cut" either holds or does not, and no test
 // of the decision alone can see it: what matters is what the supervisor writes back between passes.
@@ -60,12 +61,14 @@ describe('run_wake_loop.run_loop — deterministic driver', () => {
 
 	it('leaves a record released during the driver pause to the next pass', async () => {
 		const scripted = recorder([HANDED_OFF, ENDED])
-		const ports = { ...scripted.ports, drive: async () => ({ kind: 'released' as const }) }
+		const sleep = vi.fn(async () => undefined)
+		const ports = { ...scripted.ports, sleep, drive: async () => ({ kind: 'released' as const }) }
 
-		const stop = await run_wake_loop.run_loop(scratch.target, ports, 0)
+		const stop = await run_wake_loop.run_loop(scratch.target, ports, run_wake.WAKE_GRACE_MS)
 
 		expect(stop.reason).toBe('ended')
 		expect(scripted.wakes).toStrictEqual([])
+		expect(sleep).toHaveBeenCalledExactlyOnceWith(0)
 	})
 })
 
@@ -86,13 +89,9 @@ describe('run_wake_loop.run_loop — closing again what a process outlived', () 
 })
 
 beforeEach(() => {
-	scratch.directory = mkdtempSync(path.join(tmpdir(), 'josh-run-wake-loop-test-'))
+	scratch.directory = make_directory('josh-run-wake-loop-test-')
 	scratch.target = path.join(scratch.directory, 'wake.json')
 	run_wake.write_wake(scratch.target, run_wake.fresh_wake(INVOCATION, NOW))
-})
-
-afterEach(() => {
-	rmSync(scratch.directory, { force: true, recursive: true })
 })
 
 describe('run_wake_loop.run_loop — one wake per cut', () => {
@@ -132,6 +131,15 @@ describe('run_wake_loop.run_loop — one wake per cut', () => {
 
 		expect(run_wake.read_wake(scratch.target)?.spawned).toStrictEqual(scripted.session_ids)
 		expect(scripted.session_ids).toStrictEqual(['sid-1', 'sid-2'])
+	})
+
+	// joshuafolkken/kit#5743. The record is adopted for the very session the supervisor then wakes.
+	it('hands the record to the session it wakes', async () => {
+		const scripted = recorder([HANDED_OFF, IN_FLIGHT, HANDED_OFF, IN_FLIGHT])
+
+		await run_wake_loop.run_loop(scratch.target, scripted.ports, 0)
+
+		expect(scripted.handed).toStrictEqual(scripted.session_ids)
 	})
 })
 

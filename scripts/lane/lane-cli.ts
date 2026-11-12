@@ -387,8 +387,8 @@ async function dispatch_command(rest: ReadonlyArray<string>): Promise<number> {
 }
 
 // The completed issue number goes to standard output so `N=$(pnpm josh lane:await ...)` captures
-// which child finished without parsing stderr. `--owner` reclaims the carry record for a resumed
-// conversation before the wait (`run-carry-reclaim.ts`).
+// which child finished without parsing stderr. The owner (`--owner`, or the session's pid) reclaims
+// the carry record for a resumed conversation before the wait (`run-carry-reclaim.ts`).
 async function await_command(rest: ReadonlyArray<string>): Promise<number> {
 	const parsed = lane_await.parse_arguments(rest)
 

@@ -3,7 +3,6 @@ import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types
 const CHECK = '--check'
 const JSON_FLAG = '--json'
 
-/* eslint-disable @typescript-eslint/naming-convention */
 const MAINTENANCE_COMMANDS: Record<string, CommandEntry> = {
 	doctor: {
 		script: 'scripts/doctor/doctor.ts',
@@ -52,17 +51,24 @@ const MAINTENANCE_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/overrides/overrides-check.ts',
 		description: 'Check pnpm overrides for drift',
 		category: 'Maintenance',
-		reference: ['[--save]', 'developer', ['files']],
+		reference: ['[--save] [--diff <base>[...<head>]]', 'developer', ['files']],
 		usage: {
 			examples: [
 				{ arguments: '', note: 'verify overrides unchanged' },
 				{ arguments: '--save', note: 'snapshot current merged overrides' },
+				{ arguments: '--diff HEAD', note: 'after an update not yet committed' },
+				{ arguments: '--diff main...<branch>', note: 'after `josh adopt` committed its branch' },
 			],
 			flags: [
 				{
 					names: ['--save'],
 					description:
 						'write the current merged overrides to `.overrides-snapshot.json` (gitignored); later runs compare against it and exit non-zero on any add, removal, or change.',
+				},
+				{
+					names: ['--diff <base>[...<head>]'],
+					description:
+						'compare against git instead of the snapshot — `<base>` against the working tree, `<base>...<head>` the head against its merge-base with `<base>` — printing the `devEngines` verdict and `✔ overrides unchanged since <range>`, or exiting non-zero on any add, removal, or change. Refused beside `--save`.',
 				},
 			],
 		},
@@ -85,10 +91,38 @@ const MAINTENANCE_COMMANDS: Record<string, CommandEntry> = {
 			examples: [{ arguments: '', note: 'verify when the lockfile or its policy moved' }],
 		},
 	},
+	'ci:timing': {
+		script: 'scripts/ci/ci-timing-cli.ts',
+		description:
+			"Print the job and step durations and conclusions of a run id's GitHub Actions run, or of every run on a pull request's or a branch's latest commit",
+		category: 'Maintenance',
+		reference: ['<pr|branch|run-id> [--json]', 'developer', ['network']],
+		usage: {
+			examples: [
+				{ arguments: '5544', note: 'a pull request, or a branch name' },
+				{ arguments: '18912345678 --json', note: 'a run id, machine-readable' },
+			],
+		},
+	},
+	// The reader of `gh-usage-log.ts`'s file (joshuafolkken/kit#6753).
+	'gh:usage': {
+		script: 'scripts/gh/gh-usage-cli.ts',
+		description:
+			"Tally the josh processes' logged GitHub API usage per command — runs, calls, 304 answers and core used — most calls first, under the period the lines cover",
+		category: 'Maintenance',
+		reference: ['[--since <instant>]', 'developer', ['none']],
+		is_read_only: true,
+		usage: {
+			examples: [
+				{ arguments: '', note: 'every line the log holds' },
+				{ arguments: '--since 2026-11-08T00:00Z', note: 'the lines at or after an instant' },
+			],
+		},
+	},
 	'command:derive': {
 		script: 'tools/document/command-derive.ts',
 		description:
-			'Write every artifact the command map derives — usage spans, catalog, snapshot, docs/why.md counts — and print page bytes against their ceilings',
+			'Write every artifact the command map derives — usage spans and catalog — and print page bytes against their ceilings',
 		category: 'Maintenance',
 		reference: ['', 'maintainer', ['files']],
 		// Kit-only: the pages it writes are kit's own documentation, and the script lives under the
@@ -208,6 +242,5 @@ const MAINTENANCE_COMMANDS: Record<string, CommandEntry> = {
 		usage: { examples: [{ arguments: '', note: 'update dependencies only' }] },
 	},
 }
-/* eslint-enable @typescript-eslint/naming-convention */
 
 export { MAINTENANCE_COMMANDS }

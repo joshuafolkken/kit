@@ -1,7 +1,6 @@
 // The test type a changed path calls for — `Unit` or `E2E` — decided from the path alone.
 //
-// **This mechanizes `prompts/testing-guide.md` §1's two-row table**, whose last line used to be "When
-// ambiguous, ask the user" — a Tier B stop on a question the path already answers. The table routes
+// This mechanizes `prompts/testing-guide.md` §1's two-row table, which routes
 // `src/routes/` pages and interactive UI to E2E and everything else (utilities, `src/lib/server/`,
 // display-only components) to Unit. The mechanically certain half of that is location: a change under
 // `src/routes/` is a page whose behavior is observed through the browser, so it takes E2E; every other

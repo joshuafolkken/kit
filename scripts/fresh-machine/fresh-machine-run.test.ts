@@ -1,14 +1,6 @@
-import {
-	chmodSync,
-	existsSync,
-	mkdirSync,
-	mkdtempSync,
-	readFileSync,
-	rmSync,
-	writeFileSync,
-} from 'node:fs'
-import os from 'node:os'
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fresh_machine_image } from './fresh-machine-image'
 import { fresh_machine_run, type RunRequest } from './fresh-machine-run'
@@ -18,6 +10,7 @@ import { fresh_machine_spec } from './fresh-machine-spec'
 // their own, so what is asserted is what the two programs were actually handed.
 
 const paths_mock = vi.hoisted(() => ({ root: '' }))
+const make_directory = temporary_directory()
 
 vi.mock('#scripts/init/init-paths', () => ({
 	get PROJECT_ROOT(): string {
@@ -156,7 +149,7 @@ async function run_with_private_umask(run_request: RunRequest): Promise<void> {
 }
 
 function write_checkout(): void {
-	paths_mock.root = mkdtempSync(path.join(os.tmpdir(), 'fresh-machine-run-test-'))
+	paths_mock.root = make_directory('fresh-machine-run-test-')
 	scratch.bin = path.join(paths_mock.root, 'bin')
 	scratch.log = path.join(paths_mock.root, 'run.log')
 	mkdirSync(scratch.bin)
@@ -176,7 +169,6 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-	rmSync(paths_mock.root, { force: true, recursive: true })
 	vi.unstubAllEnvs()
 	vi.restoreAllMocks()
 })

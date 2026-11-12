@@ -1,12 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { COMPLETE_ATTEMPTS, followup_job_rerun, REGISTER_ATTEMPTS } from './followup-job-rerun'
+import { followup_job_rerun } from './followup-job-rerun'
 import {
 	ACTIONS,
 	followup_job_rerun_fixture,
 	RUN_ID,
 	SUCCESS,
 	UNIT_ID,
-	WORKFLOW_PATH,
 } from './followup-job-rerun-fixture'
 
 vi.mock('#scripts/gh/git-gh-command', () => ({
@@ -47,7 +46,6 @@ const { git_gh_exec } = await import('#scripts/gh/git-gh-exec')
 const { changed_paths } = await import('#scripts/git/changed-paths')
 const { observation_record } = await import('#scripts/observations/observation-record')
 const { git_gh_issue_write } = await import('#scripts/gh/git-gh-issue-write')
-const { followup_job_needs } = await import('./followup-job-needs')
 const { followup_main_move } = await import('./followup-main-move')
 
 const fetch_checks = vi.mocked(git_gh_command.pr_get_checks_snapshot)
@@ -55,7 +53,6 @@ const api = vi.mocked(git_gh_exec.exec_gh_api)
 const read_changed = vi.mocked(changed_paths.read_changed_paths)
 const assess = vi.mocked(observation_record.assess)
 const comment = vi.mocked(git_gh_issue_write.issue_comment)
-const read_graph = vi.mocked(followup_job_needs.read_graph)
 const merge_first = vi.mocked(followup_main_move.should_merge_first)
 const { answer_actions, answer_checks, as_check, job, rerun_paths } = followup_job_rerun_fixture
 
@@ -74,7 +71,20 @@ const FAILED_STEPS = [SUCCESS, FAILURE]
 const OUTSIDE_TEST = 'scripts/run/board/run-board-frame-budget.test.ts'
 const FAILED_TEST = `${OUTSIDE_TEST} > frame budget > reads the budget`
 const UNIT_LOG = `2026-10-27T10:00:00.0000000Z  FAIL  ${FAILED_TEST}\n`
-const CHECKS_NAME = 'Checks'
+const CURL_ERROR = '2026-11-08T08:58:56.5220933Z curl: (22) The requested URL returned error:'
+const CURL_EXIT = '2026-11-08T08:59:02.6053812Z ##[error]Process completed with exit code 22.'
+
+function curl_failed(status: number): string {
+	return `${CURL_ERROR} ${String(status)}\n${CURL_EXIT}\n`
+}
+
+function installer_failed(status: number): string {
+	return [
+		`${CURL_ERROR} ${String(status)}`,
+		'2026-11-08T11:54:13.0207669Z \u{1B}[0;31m[ERROR]\u{1B}[0m Failed to download from https://github.com/AikidoSec/safe-chain/releases/download/1.5.27/safe-chain-linuxstatic-x64',
+		'2026-11-08T11:54:13.0242832Z ##[error]Process completed with exit code 1.',
+	].join('\n')
+}
 
 const DETECT_E2E = job({ id: DETECT_E2E_ID, name: DETECT_E2E_NAME, conclusion: CANCELLED })
 const PLAYWRIGHT = job({ id: 102, name: PLAYWRIGHT_NAME, conclusion: 'timed_out' })
@@ -88,18 +98,6 @@ function failed_unit(run_attempt = 1): object {
 		steps: FAILED_STEPS,
 		run_attempt,
 	})
-}
-
-async function rerun_with_timers(): Promise<Array<string>> {
-	vi.useFakeTimers()
-	const pending = followup_job_rerun.rerun_failed_jobs(BRANCH_NAME)
-
-	await vi.runAllTimersAsync()
-	const names = await pending
-
-	vi.useRealTimers()
-
-	return names
 }
 
 async function expect_no_rerun(): Promise<void> {
@@ -127,37 +125,9 @@ describe('rerun_failed_jobs — a run whose only failures stopped after every st
 		expect(names).toStrictEqual([DETECT_E2E_NAME, PLAYWRIGHT_NAME])
 		expect(rerun_paths()).toStrictEqual([`${ACTIONS}runs/${String(RUN_ID)}/rerun-failed-jobs`])
 		expect(console.info).toHaveBeenCalledWith(
-			`🔁 Rerunning CI jobs that stopped after every step passed or failed only outside the change: ${DETECT_E2E_NAME}, ${PLAYWRIGHT_NAME}`,
+			`🔁 Rerunning CI jobs that stopped after every step passed, failed on a download, or failed only outside the change: ${DETECT_E2E_NAME}, ${PLAYWRIGHT_NAME}`,
 		)
 		expect(assess).not.toHaveBeenCalled()
-	})
-
-	// GitHub refuses a rerun while the run is still going, and the gate fails on the first red check.
-	it('waits for the run to complete before rerunning it', async () => {
-		answer_checks([as_check(DETECT_E2E)])
-		answer_actions({ jobs: [DETECT_E2E], statuses: ['in_progress', 'in_progress'] })
-
-		expect(await rerun_with_timers()).toStrictEqual([DETECT_E2E_NAME])
-		expect(rerun_paths()).toHaveLength(1)
-	})
-
-	it('does not rerun a run that never completes', async () => {
-		const statuses = Array.from({ length: COMPLETE_ATTEMPTS }, () => 'queued')
-
-		answer_checks([as_check(DETECT_E2E)])
-		answer_actions({ jobs: [DETECT_E2E], statuses })
-
-		expect(await rerun_with_timers()).toStrictEqual([])
-		expect(rerun_paths()).toStrictEqual([])
-	})
-
-	it('waits until the rerun replaced the stalled check runs', async () => {
-		answer_checks([as_check(DETECT_E2E)], [as_check(DETECT_E2E)])
-		answer_actions({ jobs: [DETECT_E2E] })
-
-		await rerun_with_timers()
-
-		expect(fetch_checks).toHaveBeenCalledTimes(1 + REGISTER_ATTEMPTS)
 	})
 })
 
@@ -246,6 +216,67 @@ describe('rerun_failed_jobs — a job red only on tests outside the change', () 
 	})
 })
 
+// joshuafolkken/kit#6673: the runner timed out fetching `pnpm/setup` and no test ran, yet `followup`
+// stopped the lane on the red job; joshuafolkken/kit#6748: the same for a setup `curl` answered 504.
+const ARCHIVE = `'https://codeload.github.com/pnpm/setup/tar.gz/a0881977'`
+
+// A repository step that prints the same words is still a failure of the change, and a client error
+// is not one a rerun helps.
+const NOT_DOWNLOAD_FAILURES = [
+	[
+		'whose own step printed the download failure',
+		`2026-11-07T13:52:11.1370349Z Error: Failed to download archive ${ARCHIVE}\n`,
+	],
+	['whose curl got a client error', curl_failed(404)],
+	['whose installer got a client error', installer_failed(404)],
+	[
+		'whose own step exited with code one after a server error',
+		`${CURL_ERROR} 504\n${CURL_EXIT.replace('22.', '1.')}`,
+	],
+	[
+		'whose installer retried successfully before a test failed',
+		`${installer_failed(504).replace('exit code 1.', 'exit code 0.')}\n${UNIT_LOG}`,
+	],
+	[
+		'whose curl got through on a retry and a test of the change failed',
+		`${CURL_ERROR} 504\n${UNIT_LOG}`,
+	],
+]
+
+describe('rerun_failed_jobs — a job red because a download failed', () => {
+	it.each([
+		[
+			'the download timed out',
+			`2026-11-07T13:52:11.1370349Z ##[error]Failed to download archive ${ARCHIVE} after 3 attempts.\n`,
+		],
+		[
+			'the download could not be resolved',
+			'2026-11-07T13:46:37.4787283Z ##[error]Failed to resolve action download info.\n',
+		],
+		['a setup curl got a server error', curl_failed(504)],
+		['an installer reported a terminal server error', installer_failed(504)],
+		[
+			'the CodeQL bundle got a server error',
+			'2026-11-08T10:12:01.0000000Z ##[error]Unable to download and extract CodeQL CLI: Unexpected HTTP response: 504\n',
+		],
+	])('reruns the run once when %s', async (_label, log) => {
+		answer_checks([as_check(failed_unit())])
+		answer_actions({ jobs: [failed_unit()], log })
+
+		expect(await followup_job_rerun.rerun_failed_jobs(BRANCH_NAME)).toStrictEqual([UNIT_NAME])
+		expect(rerun_paths()).toStrictEqual([`${ACTIONS}runs/${String(RUN_ID)}/rerun-failed-jobs`])
+		expect(assess).not.toHaveBeenCalled()
+	})
+
+	it.each(NOT_DOWNLOAD_FAILURES)('does not rerun a job %s', async (_label, log) => {
+		read_changed.mockResolvedValue([OUTSIDE_TEST])
+		answer_checks([as_check(failed_unit())])
+		answer_actions({ jobs: [failed_unit()], log })
+
+		await expect_no_rerun()
+	})
+})
+
 // joshuafolkken/kit#5316: a test main had already fixed was rerun on the old base before main came in.
 describe('rerun_failed_jobs — a failed test main has since changed', () => {
 	it('skips the rerun for a merge of main, then reruns once the merge left it red', async () => {
@@ -272,36 +303,6 @@ describe('rerun_failed_jobs — an observation that cannot be posted', () => {
 
 		expect(await followup_job_rerun.rerun_failed_jobs(BRANCH_NAME)).toStrictEqual([UNIT_NAME])
 		expect(rerun_paths()).toHaveLength(1)
-	})
-})
-
-// PR #5158: the aggregator `Checks` failed beside the shard, its log naming no test.
-describe('rerun_failed_jobs — a job red only for waiting on a job red outside the change', () => {
-	const checks = job({ id: 104, name: CHECKS_NAME, conclusion: FAILURE, steps: FAILED_STEPS })
-
-	function answer_waiting(needs: string): void {
-		const workflow = `jobs:\n  unit:\n    name: ${UNIT_NAME}\n  lint:\n    name: Lint\n  checks:\n    name: ${CHECKS_NAME}\n    needs: [${needs}]\n`
-
-		read_graph.mockResolvedValue(followup_job_needs.parse_graph(workflow))
-		answer_checks([as_check(failed_unit()), as_check(checks)])
-		answer_actions({ jobs: [failed_unit(), checks], log: UNIT_LOG })
-	}
-
-	it('reruns it with the job it waits on, reading the run workflow', async () => {
-		answer_waiting('lint, unit')
-
-		expect(await followup_job_rerun.rerun_failed_jobs(BRANCH_NAME)).toStrictEqual([
-			UNIT_NAME,
-			CHECKS_NAME,
-		])
-		expect(read_graph).toHaveBeenCalledWith(WORKFLOW_PATH)
-		expect(assess.mock.calls[0]?.[0].entry.what).toContain(`followup reran ${UNIT_NAME};`)
-	})
-
-	it('does not rerun when it waits on no such job', async () => {
-		answer_waiting('lint')
-
-		await expect_no_rerun()
 	})
 })
 

@@ -15,7 +15,7 @@ const mocked_create = vi.mocked(no_base_checkout.create)
 const mocked_remove = vi.mocked(no_base_checkout.remove)
 const mocked_run = vi.mocked(test_unit_guard.run_vitest_in)
 
-// Real files of this repository: one resolves the base, one never names it.
+// Real files of this repository: one resolves the base, one never imports it.
 const ROOT = process.cwd()
 const BASE_FILE = path.join('scripts', 'git', 'change-base.ts')
 const OTHER_FILE = path.join('scripts', 'gate', 'busy-average.ts')
@@ -31,18 +31,56 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.restoreAllMocks()
-	vi.clearAllMocks()
 })
 
 describe('test_no_base.touching', () => {
-	it('keeps only the code files that name the base branch or its resolution', () => {
+	it('keeps only the code files that are or import the base branch resolution', () => {
 		expect(test_no_base.touching(ROOT, [BASE_FILE, OTHER_FILE, DOCUMENT])).toStrictEqual([
 			BASE_FILE,
 		])
 	})
 
+	it('keeps a base module that imports neither root itself', () => {
+		const wrapper = path.join('scripts', 'git', 'changed-file-scope.ts')
+
+		expect(test_no_base.touching(ROOT, [wrapper])).toStrictEqual([wrapper])
+	})
+
 	it('reads a file the tree no longer holds as touching nothing', () => {
 		expect(test_no_base.touching(ROOT, ['scripts/no-such-file.ts'])).toStrictEqual([])
+	})
+})
+
+// joshuafolkken/kit#6186: the import decides, not a string the text happens to hold.
+describe('test_no_base.imports_base', () => {
+	const IMPORTS = Object.fromEntries([['#scripts/*', './scripts/*.ts']])
+	const FILE = 'scripts/gate/fixture.ts'
+
+	it('keeps a file that imports a base-resolution module, by alias or relative path', () => {
+		const aliased = "import { change_base } from '#scripts/git/change-base'\n"
+		const relative = "import { git_diff_reads } from '../git/git-diff-reads'\n"
+		const named_type = "import type from '#scripts/git/change-base'\n"
+
+		expect(test_no_base.imports_base(aliased, FILE, IMPORTS)).toBe(true)
+		expect(test_no_base.imports_base(relative, FILE, IMPORTS)).toBe(true)
+		expect(test_no_base.imports_base(named_type, FILE, IMPORTS)).toBe(true)
+	})
+
+	it.each([
+		[
+			'only names the default branch as a string',
+			'const BRANCH = \'main\'\nconst OTHER = "main"\n',
+		],
+		[
+			'calls a wrapper, which hands it paths already resolved',
+			"import { changed_paths } from '#scripts/git/changed-paths'\n",
+		],
+		[
+			'imports a type alone, which resolves nothing at run time',
+			"import type { ChangeBase } from '#scripts/git/change-base'\n",
+		],
+	])('leaves out a file that %s', (_case, source) => {
+		expect(test_no_base.imports_base(source, FILE, IMPORTS)).toBe(false)
 	})
 })
 

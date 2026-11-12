@@ -1,10 +1,10 @@
 import { mkdirSync } from 'node:fs'
 import path from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { working_tree } from './working-tree'
 import { working_tree_fixture } from './working-tree-fixture'
 
-const { MANIFEST, committed_repository, git, remove_all, repository, temporary_directory, write } =
+const { MANIFEST, committed_repository, git, repository, scratch_directory, write } =
 	working_tree_fixture
 const PROJECT = 'app'
 const NOTE = 'notes.md'
@@ -12,13 +12,9 @@ const DRAFT = 'draft\n'
 const EDITED_MANIFEST = '{ "name": "edited" }\n'
 const COMMAND = 'josh init'
 
-afterEach(() => {
-	remove_all()
-})
-
 describe('working_tree.uncommitted_paths — nothing to tell apart', () => {
 	it('reads nothing in a directory without Git', () => {
-		const root = temporary_directory()
+		const root = scratch_directory()
 
 		write(root, NOTE, DRAFT)
 
@@ -101,7 +97,7 @@ describe('working_tree.uncommitted_paths — a project below its repository’s 
 
 describe('working_tree.uncommitted_paths — git that does not answer', () => {
 	it('throws rather than reading a clean tree', () => {
-		const root = temporary_directory()
+		const root = scratch_directory()
 
 		write(root, '.git', 'not a repository\n')
 

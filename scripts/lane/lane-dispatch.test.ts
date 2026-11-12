@@ -6,17 +6,17 @@ import { claude_agent_argv } from '#scripts/agent/claude-agent-argv'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
-import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { detached_launch, type LaunchRequest } from '#scripts/run/detached-launch'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_label } from '#scripts/run/run-label'
-import { run_liveness } from '#scripts/run/run-liveness'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_child_marker } from './lane-child-marker'
 import { lane_dispatch, type DispatchOutcome } from './lane-dispatch'
 import { lane_output } from './lane-output'
 import { lane_registry, type LaneInfo } from './lane-registry'
+import { lane_seat_fixture } from './lane-seat-fixture'
 import { openai_lane_supervisor } from './openai-lane-supervisor'
+import { openai_lane_supervisor_owner } from './openai-lane-supervisor-owner'
 
 // **The launch and the lane lookup are spied on, not reimplemented.** What this file pins is the
 // request the dispatch composes — which directory the child runs in, which file it writes to, and that
@@ -51,6 +51,7 @@ const cancel_supervisor = vi.spyOn(openai_lane_supervisor, 'cancel')
 
 // The launch record is `lane-dispatch-launch-event.test.ts`'s; here it stays off the real stream.
 vi.spyOn(run_event_stream_emit, 'emit').mockResolvedValue(undefined)
+vi.spyOn(git_gh_command, 'issue_clear_label').mockResolvedValue(true)
 
 function lane(output: string | undefined): LaneInfo {
 	return {
@@ -81,8 +82,9 @@ function mock_supervisor(): void {
 	cancel_supervisor.mockReturnValue(true)
 }
 
+beforeEach(lane_seat_fixture.mock_start)
+
 beforeEach(() => {
-	vi.clearAllMocks()
 	for (const key of agent_session_environment.PARENT_SESSION_KEYS) vi.stubEnv(key, '')
 	vi.stubEnv('CLAUDE_CODE_SESSION_ID', 'session')
 	vi.stubEnv('CODEX_THREAD_ID', '')
@@ -99,6 +101,8 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+	openai_lane_supervisor.release(LANE_DIRECTORY, 'delayed')
+	vi.useRealTimers()
 	vi.unstubAllEnvs()
 })
 
@@ -117,10 +121,11 @@ describe('lane_dispatch.child_invocation — what the child is asked to do', () 
 // workflow-commands entry documents to learn it is a resume. This pins that instruction — its resume
 // command, and that it still ends with `child_invocation` so the parent's liveness poll keeps matching.
 describe('lane_dispatch.resume_invocation — what a relaunched child is asked to do', () => {
-	it('tells the child to resume first and points it at the resume guide, not the entry docs', () => {
+	it('opens a resumed child with one entry command (ac-648deb2e)', () => {
 		const prompt = lane_dispatch.resume_invocation(ISSUE)
 
-		expect(prompt).toContain(`pnpm josh run:cut --resume ${ISSUE}`)
+		expect(prompt).toContain(`pnpm josh run:entry ${ISSUE}`)
+		expect(prompt).not.toContain('run:cut --resume')
 		expect(prompt).toContain('pre-gate-cut.md')
 		expect(prompt).toContain('do not re-read the workflow-commands entry documents')
 	})
@@ -133,39 +138,36 @@ describe('lane_dispatch.resume_invocation — what a relaunched child is asked t
 		).toBe(true)
 	})
 
-	it('is a safe single command-line argument, never one the launcher rejects', () => {
-		const argv = claude_agent_argv.build(
-			lane_dispatch.resume_invocation(ISSUE),
-			agent_role_profile.DEFAULT_PROFILES.worker,
-		)
-
-		expect(detached_launch.is_safe_argv(argv)).toBe(true)
-	})
-
 	it('refuses anything that is not an issue number', () => {
 		expect(() => lane_dispatch.resume_invocation(INJECTION)).toThrow()
 		expect(() => lane_dispatch.resume_invocation('')).toThrow()
 	})
 })
 
-describe('lane_dispatch.default_log_path — the log the dispatch owns', () => {
-	it('is a path `run:liveness` can read, so the record is never one it refuses', () => {
-		expect(run_liveness.to_safe_path(DERIVED_LOG)).toBeDefined()
-	})
+function prepare_delayed_claim(): void {
+	vi.useFakeTimers()
+	vi.stubEnv('CLAUDE_CODE_SESSION_ID', '')
+	vi.stubEnv('CODEX_THREAD_ID', 'thread')
+	check_diagnostics.mockReturnValue({ kind: 'ready' })
+	wait_for_supervisor.mockImplementation(
+		async (directory) => await openai_lane_supervisor_owner.wait_for_active(directory),
+	)
+}
 
-	it('is in the temp directory, so it survives `lane:close`', () => {
-		expect(DERIVED_LOG.startsWith(PLATFORM_TEMP_ROOT)).toBe(true)
-	})
+const CLAIM_DELAY_MS = 3000
 
-	it('names the issue, so a person can find the file by eye', () => {
-		expect(DERIVED_LOG).toContain(ISSUE)
-	})
+it('dispatches successfully after a claim later than the former two-second window', async () => {
+	prepare_delayed_claim()
+	const pending = lane_dispatch.dispatch_child(ISSUE)
 
-	it('differs between two lanes sharing an issue number across repositories', () => {
-		const elsewhere = { ...lane(undefined), directory: `${LANE_DIRECTORY}-other-repository` }
+	await vi.advanceTimersByTimeAsync(CLAIM_DELAY_MS)
+	openai_lane_supervisor.claim(ISSUE, LANE_DIRECTORY, 'delayed')
+	await vi.advanceTimersByTimeAsync(CLAIM_DELAY_MS)
+	const outcome = await pending
 
-		expect(lane_dispatch.default_log_path(elsewhere)).not.toBe(DERIVED_LOG)
-	})
+	expect(outcome.kind).toBe('dispatched')
+	expect(cancel_supervisor).not.toHaveBeenCalled()
+	expect(approve_supervisor).toHaveBeenCalledWith(LANE_DIRECTORY, 'delayed')
 })
 
 describe('lane_dispatch.dispatch_child — provider selection', () => {

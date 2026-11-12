@@ -1,6 +1,5 @@
 import { agent_argv, type AgentArgv, type AgentArgvResult } from '#scripts/agent/agent-argv'
 import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
-import { git_gh_command } from '#scripts/gh/git-gh-command'
 import type { LabelWrite } from '#scripts/gh/git-gh-issue-write'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
@@ -20,6 +19,7 @@ import { lane_ledger_write } from './lane-ledger-write'
 import { lane_output } from './lane-output'
 import { lane_registry, type LaneInfo } from './lane-registry'
 import { lane_resume, type ResumePlan } from './lane-resume'
+import { lane_seat_start } from './lane-seat-start'
 import { lane_state } from './lane-state'
 import { openai_lane_supervisor } from './openai-lane-supervisor'
 
@@ -45,7 +45,6 @@ import { openai_lane_supervisor } from './openai-lane-supervisor'
 // procedure a `run:cut` successor follows, so naming it lets the child read one section rather than the
 // workflow-commands entry documents it would otherwise read to learn it is a resume at all.
 const NOTE_SEPARATOR = '; '
-const WARNING_TITLE = 'lane child dispatch'
 const WARNING_RECOVERY =
 	'Check the lane with `pnpm josh lane:list`, then run `pnpm josh lane:dispatch <issue-number>` again.'
 // The discriminant for a dispatch refused because the `in-progress` marker could not be applied, named
@@ -53,7 +52,6 @@ const WARNING_RECOVERY =
 const LABEL_UNSET_KIND = 'label-unset'
 const RESTART_START = 'restart'
 // The role a lane child runs under, resolved once so the fresh and resume builders read the same one.
-const RESOLVED_ROLE = agent_role_profile.WORKER
 
 interface Dispatched {
 	kind: 'dispatched'
@@ -115,12 +113,12 @@ function child_invocation(issue: string): string {
  * the bare `child_invocation`. Given the plain `fullrun #<N>`, a relaunched child would read the
  * workflow-commands entry documents every resume before it could learn it was a resume at all — the
  * "do not re-read" exception lives inside the very skill it would have to open. This preamble tells
- * it up front, so it goes straight to `run:cut --resume` and the stage that answers.
+ * it up front, so it goes straight to `run:entry` and the stage that answers.
  *
  * **It ends with `child_invocation` on purpose, not as decoration.** The parent's liveness poll is
  * `lane_child_invocation.process_pattern` (read by `run:liveness` — see `log_sentence`), so a relaunched process
  * whose command line did not end with `fullrun #<N>` would be booked stopped while it ran. The trailing
- * invocation keeps that poll matching and is also the ordinary run a `fresh` verdict falls back to.
+ * invocation keeps that poll matching and identifies the run the composite entry continues on `fresh`.
  */
 function resume_invocation(issue: string): string {
 	return lane_child_invocation.resume_invocation(issue)
@@ -210,24 +208,24 @@ async function openai_dispatched_start(
 	request: StartRequest,
 	notes: ReadonlyArray<string>,
 	nonce: string | undefined,
+	pid: number,
 ): Promise<DispatchOutcome> {
-	const { lane } = request
-	const owner = await openai_lane_supervisor.wait_for_active(lane.directory)
+	const owner = await openai_lane_supervisor.wait_for_active(request.lane.directory, pid)
 
-	if (owner?.issue !== lane.issue) {
-		if (nonce !== undefined) openai_lane_supervisor.cancel(lane.directory, nonce)
+	if (owner?.issue !== request.lane.issue) {
+		if (nonce !== undefined) openai_lane_supervisor.cancel(request.lane.directory, nonce)
 
 		return failed_start(
 			request,
-			`the OpenAI supervisor did not claim lane ${session_cite.issue(lane.issue)}`,
+			`the OpenAI supervisor did not claim lane ${session_cite.issue(request.lane.issue)}`,
 			notes,
 		)
 	}
 
-	if (!openai_lane_supervisor.approve(lane.directory, owner.nonce)) {
+	if (!openai_lane_supervisor.approve(request.lane.directory, owner.nonce)) {
 		return failed_start(
 			request,
-			`the OpenAI supervisor for lane ${session_cite.issue(lane.issue)} was cancelled`,
+			`the OpenAI supervisor for lane ${session_cite.issue(request.lane.issue)} was cancelled`,
 			notes,
 		)
 	}
@@ -242,7 +240,7 @@ async function dispatched_start(
 	nonce: string | undefined,
 ): Promise<DispatchOutcome> {
 	return request.profile.provider === 'openai'
-		? await openai_dispatched_start(request, notes, nonce)
+		? await openai_dispatched_start(request, notes, nonce, pid)
 		: dispatched_of(request, pid, notes)
 }
 
@@ -263,7 +261,10 @@ async function started(request: StartRequest): Promise<DispatchOutcome> {
 			cwd: request.lane.directory,
 			log_path: request.log_path,
 			profile: request.profile,
-			env: lane_child_marker.env_for(request.lane.issue),
+			env: {
+				...lane_child_marker.env_for(request.lane.issue),
+				...lane_seat_start.environment(request.lane),
+			},
 		},
 		(note) => {
 			notes.push(note)
@@ -293,7 +294,7 @@ function built_for(plan: ResumePlan, profile: AgentProfile, lane: LaneInfo): Age
 // fresh dispatch never reads the record**: a person restarting a child (`lane:restart`) wants a new
 // session that reads the Issue from the start, whatever the previous one ended on.
 function prepared(lane: LaneInfo, is_fresh: boolean): Prepared {
-	const resolved = agent_role_profile.resolve(RESOLVED_ROLE)
+	const resolved = agent_role_profile.resolve(agent_role_profile.WORKER)
 
 	if (resolved.kind === 'rejected') return resolved
 
@@ -321,7 +322,7 @@ function prepared(lane: LaneInfo, is_fresh: boolean): Prepared {
 // its unapplied answer is a real refusal to launch rather than a note — confirmed by a read-back, so
 // a write that landed but answered with an error still launches.
 async function mark_in_progress(issue: string): Promise<LabelWrite> {
-	return await git_gh_command.issue_apply_label(issue, IN_PROGRESS_LABEL)
+	return await run_label.claim(issue)
 }
 
 // A started child is recorded on the run's stream, which is where the stall detector ages the last
@@ -342,7 +343,7 @@ async function record_started(issue: string, start: DispatchStart): Promise<void
 
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.CHILD_LAUNCH,
-		`${issue_cite.plain(issue)} dispatched`,
+		`${issue_cite.plain_for('program', issue)} dispatched`,
 		now,
 	)
 	await lane_ledger_write.record_dispatch(Number(issue))
@@ -408,7 +409,11 @@ async function dispatch_child(
 
 	if (log.kind !== 'ready') return log
 
-	return await finish_dispatch(issue, { lane, log_path: log.path, ...built }, start)
+	return await lane_seat_start.start(
+		lane,
+		async (seated) =>
+			await finish_dispatch(issue, { lane: seated, log_path: log.path, ...built }, start),
+	)
 }
 
 // **A launch whose log could not be opened is still a launch, and the reader has to hear both halves.**
@@ -425,7 +430,7 @@ function log_sentence(outcome: Dispatched, issue: string): string {
 		return ` Its output is NOT being kept — ${outcome.notes.join(NOTE_SEPARATOR)} — so ${outcome.log_path} will not grow and the process trace is the only answer: ${poll}.`
 	}
 
-	return ` It writes to ${outcome.log_path}. Wait on it with \`pnpm josh lane:await ${issue} --owner "$PPID"\` in the background and end the turn; once that output falls silent, ${poll}.`
+	return ` It writes to ${outcome.log_path}. Wait on it with \`pnpm josh lane:await ${issue}\` in the background and end the turn; once that output falls silent, ${poll}.`
 }
 
 // Whether this dispatch resumed the disconnected child's session or started fresh — the report the
@@ -476,7 +481,7 @@ function is_worth_warning(outcome: DispatchOutcome): boolean {
 // own failures to standard error and never throws, so this cannot turn a refusal into an exception.
 async function warn_of_problem(outcome: DispatchOutcome, issue: string): Promise<void> {
 	await telegram_notify.warn({
-		issue_title: `${WARNING_TITLE} ${issue_cite.plain(issue)}`,
+		issue_title: `lane child dispatch ${issue_cite.plain_for('telegram', issue)}`,
 		body: describe(outcome, issue),
 		recovery: WARNING_RECOVERY,
 	})

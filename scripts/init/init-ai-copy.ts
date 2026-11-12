@@ -15,6 +15,7 @@ import { transform_copied_content } from './init-copy-content'
 import { init_logic } from './init-logic'
 import { package_path, PROJECT_ROOT } from './init-paths'
 import { init_sonar } from './init-sonar'
+import { npm_publish_files } from './npm-publish-files'
 import type { ProjectShape } from './project-profile'
 import { security_policy } from './security-policy'
 
@@ -59,8 +60,8 @@ const BASIC_GITHUB_MAPPINGS = [
 	{ src: RELEASE_CONFIG, dest: RELEASE_CONFIG },
 ]
 
-// Whether the existing file is a workflow that carries no header. A read failure answers "no": the
-// point is to warn, and a warning is not worth failing a command that used to open nothing.
+// Whether the existing file is a workflow that carries no header. A read failure answers "no": a
+// diagnostic warning must not fail the command it accompanies.
 function did_read_unstamped(destination_path: string): boolean {
 	try {
 		return !managed_marker_logic.is_marked(readFileSync(destination_path, 'utf8'))
@@ -124,7 +125,9 @@ function did_skip_copy_if_absent(
 function read_workspace_template(source_path: string, destination_path: string): string {
 	const npmrc = file_reader.read_file_or_empty(path.join(path.dirname(destination_path), '.npmrc'))
 
-	return init_logic.carry_npmrc_settings(readFileSync(source_path, 'utf8'), npmrc)
+	const distributed = init_logic.drop_kit_only_regions(readFileSync(source_path, 'utf8'))
+
+	return init_logic.carry_npmrc_settings(distributed, npmrc)
 }
 
 function merge_existing_workspace_yaml(source_path: string, destination_path: string): void {
@@ -343,6 +346,12 @@ function ai_files(shape?: ProjectShape): ReadonlyArray<string> {
 	return files.filter((filename) => should_copy_ai_file(filename, shape))
 }
 
+// What `josh init` and `josh sync` copy: the static set and, for a repository that publishes to npm,
+// the publish workflow (`npm-publish-files.ts`).
+function copied_files(shape?: ProjectShape): ReadonlyArray<string> {
+	return [...ai_files(shape), ...npm_publish_files.files(shape)]
+}
+
 type FileMappings = ReturnType<typeof init_logic.get_ai_copy_file_mappings>
 
 function ai_file_mappings(shape?: ProjectShape): FileMappings {
@@ -372,7 +381,7 @@ function report_sync_hint(has_skips: boolean, shape?: ProjectShape): void {
 
 function run_ai_copies(shape?: ProjectShape): string | undefined {
 	const did_skip_claude_md = did_skip_claude_md_import(shape)
-	const file_skips = ai_files(shape).map((filename) => did_skip_ai_file_copy(filename, shape))
+	const file_skips = copied_files(shape).map((filename) => did_skip_ai_file_copy(filename, shape))
 	const mapping_skips = ai_mapping_skips(shape)
 	const directory_skips = init_logic
 		.get_ai_copy_directories()
@@ -396,6 +405,7 @@ const init_ai_copy = {
 	workspace_content,
 	run_ai_copies,
 	ai_files,
+	copied_files,
 	ai_file_source,
 	ai_file_mappings,
 	ensure_basic_claude_md,

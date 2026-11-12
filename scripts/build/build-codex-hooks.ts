@@ -5,8 +5,8 @@ import { fileURLToPath } from 'node:url'
 import { codex_hooks } from '#scripts/agent/codex-hooks'
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
-const CLAUDE_SETTINGS = path.join(REPO_ROOT, '.claude', 'settings.json')
-const CODEX_HOOKS = path.join(REPO_ROOT, '.codex', 'hooks.json')
+const CLAUDE_SETTINGS = path.join(REPO_ROOT, codex_hooks.CLAUDE_SETTINGS_FILE)
+const CODEX_HOOKS = path.join(REPO_ROOT, codex_hooks.CODEX_HOOKS_FILE)
 
 // Regenerate `.codex/hooks.json` from `.claude/settings.json`. The output is
 // committed rather than gitignored: Codex reads it straight from a fresh clone of kit, before any

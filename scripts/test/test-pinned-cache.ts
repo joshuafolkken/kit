@@ -147,8 +147,13 @@ async function read_all(
 }
 
 // `hunks` are the ones this run checks; `pruned` is read now against the `green` hunks the cache recorded.
-async function load(base: string, hunks: ReadonlyArray<Hunk>): Promise<LoadedCache> {
-	const file = path.resolve(await git_spawn.read(['rev-parse', '--git-path', CACHE_NAME]))
+async function load(
+	base: string,
+	hunks: ReadonlyArray<Hunk>,
+	cache_file?: string,
+): Promise<LoadedCache> {
+	const file =
+		cache_file ?? path.resolve(await git_spawn.read(['rev-parse', '--git-path', CACHE_NAME]))
 	const [text, tree, contents] = await read_all(file, base, hunks)
 	const { test_digests, code, test_contents, change } = tree
 	const greens = test_pinned_cache_logic.greens_of(text)
@@ -158,19 +163,7 @@ async function load(base: string, hunks: ReadonlyArray<Hunk>): Promise<LoadedCac
 	const reach = test_pinned_reach.create({ ...code, test_digests })
 	const entries = test_pinned_cache_logic.entries_of(text)
 
-	return {
-		file,
-		base,
-		test_contents,
-		change,
-		entries,
-		freshness,
-		test_digests,
-		reach,
-		code,
-		hunks,
-		contents,
-	}
+	return { file, base, ...tree, entries, freshness, reach, hunks, contents }
 }
 
 // What a verdict on a hunk of `file` rests on now: the failed tests' closures for a `red`, the tests

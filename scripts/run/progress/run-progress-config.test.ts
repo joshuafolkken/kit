@@ -1,11 +1,13 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_progress } from './run-progress'
 import { run_progress_config } from './run-progress-config'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#1576. The interval had exactly one home and it was `.env`, which is deliberately
 // never committed — so a cadence set on one machine was the default on every other machine and in
@@ -25,10 +27,10 @@ const NO_INTERVAL = '{"josh":{}}'
 // suite runs in.
 const OBSERVED_AT = 10 * 60 * MINUTE
 
-const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'josh-run-progress-config-'))
+const WORK_DIRECTORY = make_directory('josh-run-progress-config-')
 
 function bare_directory(prefix: string): string {
-	return mkdtempSync(path.join(WORK_DIRECTORY, prefix))
+	return make_directory(path.join(WORK_DIRECTORY, prefix))
 }
 
 function directory_with(contents: string): string {
@@ -47,10 +49,6 @@ const EMPTY = directory_with('{}')
 
 afterEach(() => {
 	vi.unstubAllEnvs()
-})
-
-afterAll(() => {
-	rmSync(WORK_DIRECTORY, { force: true, recursive: true })
 })
 
 describe('resolve_interval_ms — flag, environment, repository, default', () => {
@@ -121,14 +119,14 @@ describe('the printed next report time follows the interval this module resolved
 describe('read_package_minutes — the nearest declaring package.json, searched upward', () => {
 	it('finds the declaration a directory above the one it was given', () => {
 		const root = directory_declaring(COMMITTED)
-		const nested = mkdtempSync(path.join(root, NESTED))
+		const nested = make_directory(path.join(root, NESTED))
 
 		expect(run_progress_config.read_package_minutes(nested)).toBe(COMMITTED)
 	})
 
 	it('stops at the first package.json that declares one', () => {
 		const root = directory_declaring(COMMITTED)
-		const nested = mkdtempSync(path.join(root, NESTED))
+		const nested = make_directory(path.join(root, NESTED))
 
 		writeFileSync(path.join(nested, run_progress_config.PACKAGE_FILE), NO_INTERVAL)
 
@@ -137,6 +135,14 @@ describe('read_package_minutes — the nearest declaring package.json, searched 
 })
 
 describe('read_package_minutes — an unusable answer falls through rather than throwing', () => {
+	it('reads the interval independently of an invalid review mode', () => {
+		const directory = directory_with(
+			JSON.stringify({ josh: { progress_interval_minutes: COMMITTED, review_gate: 'other' } }),
+		)
+
+		expect(run_progress_config.read_package_minutes(directory)).toBe(COMMITTED)
+	})
+
 	it.each([['0'], ['-5'], ['"fifteen"'], ['null']])('ignores %s as an interval', (literal) => {
 		const directory = directory_with(`{"josh":{"progress_interval_minutes":${literal}}}`)
 

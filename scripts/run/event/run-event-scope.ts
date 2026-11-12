@@ -96,6 +96,7 @@ const BATCH_RECORD_KINDS: ReadonlySet<string> = new Set([
 	KIND.RESTART,
 	KIND.WITHDRAW,
 	KIND.PARK,
+	KIND.HUMAN_REVIEW,
 	KIND.SPLIT,
 	KIND.RETROSPECTIVE,
 	KIND.STRANDED,
@@ -105,7 +106,8 @@ const ISSUE_REFERENCE = /#(\d+)/u
 
 function is_foreign_ship_event(event: RunEvent, issue: string): boolean {
 	return (
-		SHIP_POSITION_KINDS.has(event.kind) && !event.text.startsWith(`${issue_cite.plain(issue)} `)
+		SHIP_POSITION_KINDS.has(event.kind) &&
+		!event.text.startsWith(`${issue_cite.plain_for('program', issue)} `)
 	)
 }
 
@@ -174,6 +176,7 @@ const LAUNCH_OR_SETTLE_KINDS: ReadonlySet<string> = new Set([
 	KIND.CHILD_LAUNCH,
 	KIND.MERGE,
 	KIND.PARK,
+	KIND.HUMAN_REVIEW,
 	KIND.SPLIT,
 	KIND.WITHDRAW,
 ])

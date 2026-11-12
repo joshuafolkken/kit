@@ -1,12 +1,14 @@
 import { lane_breakdown, type Breakdown, type Segment, type Stage } from './lane-breakdown'
 import { lane_breakdown_implement } from './lane-breakdown-implement'
-import { lane_ledger, type LedgerEntry } from './lane-ledger'
+import { lane_breakdown_pause } from './lane-breakdown-pause'
+import { lane_ledger, type LedgerEntry, type ShipLapEntry } from './lane-ledger'
 import type { ToolCall } from './lane-transcript-calls'
 
 // What each ship stage of a lane's breakdown spent its time on (joshuafolkken/kit#5294): the laps the
 // ship wrote for its inner steps (`run-ship-lap.ts`), the lane's core-budget waits and the checks of
 // the lane's gates, each under the stage it ended in, and the time between two ship stages split by
-// the Bash the lane child ran there, by the implementation's kinds (`lane-breakdown-implement.ts`).
+// the park it went to (`lane-breakdown-pause.ts`), else by the calls the lane child made there, by the
+// implementation's kinds, and the rest as its editing and thinking (`lane-breakdown-implement.ts`).
 // A lap and a wait or a check inside it overlap — the gate's wait for cores and its checks, run side
 // by side, are part of its `josh gate` lap — so a stage's laps can add up to more.
 
@@ -19,12 +21,41 @@ type Laps = ReadonlyMap<string, ReadonlyArray<Stage>>
 interface Placed {
 	at_ms: number
 	part: Stage
+	stage?: string | undefined
+}
+
+// A gate the ship reused rather than started (joshuafolkken/kit#5567), counted per stage (`counted`).
+const REUSED_NOTE = '(reused)'
+
+// A scoped pair's rerun names its run count; a gate's reason stands alone (joshuafolkken/kit#5567).
+function rerun_note(entry: ShipLapEntry): ReadonlyArray<string> {
+	if (entry.rerun === undefined) return []
+
+	return [entry.runs === undefined ? entry.rerun : `run ${String(entry.runs)}: ${entry.rerun}`]
+}
+
+// Which run of the ship's scoped pair a lap was and why it ran again (joshuafolkken/kit#5538), and why
+// a check read the whole branch (joshuafolkken/kit#5531), after the step's name.
+function lap_name(entry: ShipLapEntry): string {
+	if (entry.reused_tree !== undefined) return `${entry.step} ${REUSED_NOTE}`
+
+	const run = rerun_note(entry)
+	const whole = entry.fallback === undefined ? [] : [`whole branch: ${entry.fallback}`]
+	const notes = [...run, ...whole]
+
+	return notes.length === 0 ? entry.step : `${entry.step} (${notes.join('; ')})`
 }
 
 function lap_of(entry: LedgerEntry, issue: number): ReadonlyArray<Placed> {
 	if (entry.kind !== KIND.SHIP_LAP || entry.issue !== issue) return []
 
-	return [{ at_ms: Date.parse(entry.at), part: { name: entry.step, ms: entry.elapsed_ms } }]
+	return [
+		{
+			at_ms: Date.parse(entry.at),
+			part: { name: lap_name(entry), ms: entry.elapsed_ms },
+			stage: entry.stage === 'run:entry' ? lane_breakdown.PLAN_STAGE : undefined,
+		},
+	]
 }
 
 function wait_of(entry: LedgerEntry, issue: number): ReadonlyArray<Placed> {
@@ -52,56 +83,117 @@ function stage_at(segments: ReadonlyArray<Segment>, at_ms: number): string | und
 	return segment?.stage === lane_breakdown.BETWEEN_STAGE ? undefined : segment?.stage
 }
 
+// Entry maintenance may finish after plan: keep its scope instead of charging it to the ship.
+function stage_for(place: Placed, segments: ReadonlyArray<Segment>): string | undefined {
+	if (place.stage === undefined) return stage_at(segments, place.at_ms)
+
+	return segments.some((segment) => segment.stage === place.stage) ? place.stage : undefined
+}
+
 function grouped(
 	placed: ReadonlyArray<Placed>,
 	segments: ReadonlyArray<Segment>,
+	groups = new Map<string, Array<Stage>>(),
 ): Map<string, Array<Stage>> {
-	const groups = new Map<string, Array<Stage>>()
+	for (const place of placed) {
+		const stage = stage_for(place, segments)
 
-	for (const { at_ms, part } of placed) {
-		const stage = stage_at(segments, at_ms)
-
-		if (stage !== undefined) groups.set(stage, [...(groups.get(stage) ?? []), part])
+		if (stage !== undefined) groups.set(stage, [...(groups.get(stage) ?? []), place.part])
 	}
 
 	return groups
 }
 
-function between_of(
-	calls: ReadonlyArray<ToolCall>,
-	segments: ReadonlyArray<Segment>,
-): Array<Stage> {
-	const between = segments.filter((segment) => segment.stage === lane_breakdown.BETWEEN_STAGE)
+// A stage's reused laps under one row carrying their count, `josh gate (reused ×2)`, before
+// `lane_breakdown.ranked` sums each name's time into one row.
+function counted(parts: ReadonlyArray<Stage>): Array<Stage> {
+	const reuses = new Map<string, number>()
 
-	return lane_breakdown_implement.bash_kinds(calls, between)
+	for (const { name } of parts) {
+		if (name.endsWith(REUSED_NOTE)) reuses.set(name, (reuses.get(name) ?? 0) + 1)
+	}
+
+	return parts.map((part) => {
+		const count = reuses.get(part.name)
+
+		return count === undefined
+			? part
+			: { ...part, name: `${part.name.slice(0, -REUSED_NOTE.length)}(reused ×${String(count)})` }
+	})
 }
 
-/** `issue`'s ship stages split by their laps, and the time between them by the lane child's Bash. */
+// A stretch between ship stages a park fell in, under the park's row and net of the waits taken out
+// (joshuafolkken/kit#5646); a stretch with no park is left to the call kinds.
+function paused_of(segment: Segment, breakdown: Breakdown): ReadonlyArray<Stage> {
+	const mark = lane_breakdown_pause.in_segment(breakdown.pauses ?? [], segment)
+
+	if (mark === undefined) return []
+	const waited_ms = lane_breakdown.covered_ms(segment, breakdown.waits)
+
+	return [{ name: mark.name, ms: segment.to_ms - segment.from_ms - waited_ms }]
+}
+
+function between_of(calls: ReadonlyArray<ToolCall>, breakdown: Breakdown): Array<Stage> {
+	const between = breakdown.ship.filter((segment) => segment.stage === lane_breakdown.BETWEEN_STAGE)
+	const paused = between.map((segment) => paused_of(segment, breakdown))
+	const unpaused = between.filter((_segment, index) => paused[index]?.length === 0)
+
+	return lane_breakdown.ranked([
+		...paused.flat(),
+		...lane_breakdown_implement.between_kinds(calls, unpaused, breakdown.waits),
+	])
+}
+
+// The start to plan as segments, where `run:entry` times its children (joshuafolkken/kit#5831) — only
+// laps are placed there, so a lane without them prints its start to plan as before.
+function plan_segments(breakdown: Breakdown): Array<Segment> {
+	return (breakdown.plan ?? []).map((span) => ({ ...span, stage: lane_breakdown.PLAN_STAGE }))
+}
+
+/**
+ * `issue`'s start to plan and ship stages split by their laps, and the time between them by the park it
+ * went to, else by the lane child's calls (joshuafolkken/kit#5834).
+ */
 function of(
 	entries: ReadonlyArray<LedgerEntry>,
 	issue: number,
 	breakdown: Breakdown,
 	calls: ReadonlyArray<ToolCall>,
 ): Laps {
-	const placed = entries.flatMap((entry) => [
-		...lap_of(entry, issue),
-		...wait_of(entry, issue),
-		...checks_of(entry, issue),
-	])
+	const lapped = entries.flatMap((entry) => lap_of(entry, issue))
+	const placed = entries.flatMap((entry) => [...wait_of(entry, issue), ...checks_of(entry, issue)])
+	const planned = grouped(lapped, plan_segments(breakdown))
 	const laps = new Map(
-		[...grouped(placed, breakdown.ship)].map(([stage, parts]) => [
+		[...grouped([...lapped, ...placed], breakdown.ship, planned)].map(([stage, parts]) => [
 			stage,
-			lane_breakdown.ranked(parts),
+			lane_breakdown.ranked(counted(parts)),
 		]),
 	)
-	const between = between_of(calls, breakdown.ship)
+	const between = between_of(calls, breakdown)
 
 	if (between.length > 0) laps.set(lane_breakdown.BETWEEN_STAGE, between)
 
 	return laps
 }
 
-const lane_breakdown_laps = { CORE_WAIT_STEP, of }
+// `issue`'s laps and core-budget waits that ended in a ship stage, one per run and unmerged — what
+// `josh lane:why` sums over the whole ship (joshuafolkken/kit#6154).
+function ship_parts(
+	entries: ReadonlyArray<LedgerEntry>,
+	issue: number,
+	breakdown: Breakdown,
+): Array<Stage> {
+	const placed = entries.flatMap((entry) => [...lap_of(entry, issue), ...wait_of(entry, issue)])
+
+	return [...grouped(placed, breakdown.ship).values()].flat()
+}
+
+// Whether a row stamped `at` ended in a ship stage of `breakdown`, by the rule its laps are placed by.
+function is_in_ship(breakdown: Breakdown, at: string): boolean {
+	return stage_at(breakdown.ship, Date.parse(at)) !== undefined
+}
+
+const lane_breakdown_laps = { CORE_WAIT_STEP, is_in_ship, of, ship_parts }
 
 export { lane_breakdown_laps }
 export type { Laps }

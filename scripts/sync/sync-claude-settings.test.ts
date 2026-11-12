@@ -1,10 +1,11 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const paths_mock = vi.hoisted(() => ({ root: '' }))
+const make_directory = temporary_directory()
 const REPOSITORY_ROOT = fileURLToPath(new URL('../..', import.meta.url))
 
 vi.mock('#scripts/init/init-paths', () => ({
@@ -30,7 +31,9 @@ const SETTINGS_FILE = '.claude/settings.json'
 const OWN_COMMAND = 'sh scripts/notify-team.sh'
 const OWN_DENY = 'Bash(terraform destroy*)'
 const KIT_DENY = 'Bash(git commit*)'
+// The launcher as an earlier release wrote it, and the end of the one a sync writes now.
 const KIT_LAUNCHER = 'sh ./node_modules/@joshuafolkken/kit/scripts/hooks/run-hook.sh'
+const SYNCED_LAUNCHER_END = 'scripts/hooks/run-hook.sh"'
 const STATUS_LINE = { type: 'command', command: 'sh status.sh' }
 const OWN_SETTINGS = {
 	permissions: { deny: [OWN_DENY] },
@@ -73,13 +76,13 @@ async function distributed_settings_text(): Promise<string> {
 	return read_settings_text()
 }
 
-function write_own_settings(): void {
+function write_own_settings(settings: object = OWN_SETTINGS): void {
 	mkdirSync(path.dirname(settings_path()), { recursive: true })
-	writeFileSync(settings_path(), JSON.stringify(OWN_SETTINGS))
+	writeFileSync(settings_path(), JSON.stringify(settings))
 }
 
 beforeEach(() => {
-	paths_mock.root = mkdtempSync(path.join(tmpdir(), 'sync-claude-settings-'))
+	paths_mock.root = make_directory('sync-claude-settings-')
 	writeFileSync(
 		path.join(paths_mock.root, 'package.json'),
 		JSON.stringify({ private: true, josh: { profile: 'full' } }),
@@ -89,7 +92,6 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-	rmSync(paths_mock.root, { recursive: true, force: true })
 	vi.restoreAllMocks()
 })
 
@@ -107,7 +109,7 @@ describe('josh sync on a .claude/settings.json the project has added to', () => 
 		write_own_settings()
 		await run_sync()
 
-		expect(stop_commands().map((command) => command.split(KIT_LAUNCHER).at(-1))).toEqual([
+		expect(stop_commands().map((command) => command.split(SYNCED_LAUNCHER_END).at(-1))).toEqual([
 			' stop-guard',
 			OWN_COMMAND,
 		])
@@ -131,6 +133,18 @@ describe('josh sync on a .claude/settings.json the project has added to', () => 
 		await run_sync(true)
 
 		expect(read_settings_text()).toBe(distributed)
+	})
+})
+
+describe('josh sync on the statusLine of .claude/settings.json', () => {
+	it("writes kit's usage:tee statusLine where the project has none", async () => {
+		write_own_settings({ ...OWN_SETTINGS, statusLine: undefined })
+		await run_sync()
+
+		expect(read_settings().statusLine).toMatchObject({
+			type: 'command',
+			command: expect.stringMatching(/ usage:tee$/u) as unknown,
+		})
 	})
 })
 

@@ -92,6 +92,17 @@ describe('run_board_reason.reader — a row the declared order keeps waiting', (
 		])
 	})
 
+	// joshuafolkken/kit#6836: the board's scope now draws the added issues, still without the 📋 mark.
+	it('leaves a prioritized added row without the declared-order mark', () => {
+		const carry = { ...CARRY, added: [{ issue: ADDED, is_priority: true }] }
+
+		expect(reasons({ carry, statuses: new Map() })).toStrictEqual([
+			named(RUNNING),
+			named(THIRD),
+			undefined,
+		])
+	})
+
 	it('leaves a run that names no issues as it was', () => {
 		const carry = { ...CARRY, invocation: 'backlogrun' }
 

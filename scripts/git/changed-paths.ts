@@ -6,6 +6,13 @@ import { git_command } from './git-command'
 // `josh review:level` asks this same question of the same tree (which level to review at), and a
 // second copy would let a caller disagree about what "changed" means.
 
+interface ChangedParts {
+	tracked: Array<string>
+	untracked: Array<string>
+	// `fallback` when no base resolved and the tracked half was read against the default branch.
+	base: 'merge_base' | 'fallback'
+}
+
 function to_paths(raw: string): Array<string> {
 	return raw
 		.split('\n')
@@ -19,12 +26,24 @@ function to_paths(raw: string): Array<string> {
 // so the diff from `HEAD`'s merge-base read everything the merge brought in as this branch's own — and
 // the ship's `unplanned` precondition refused the re-detach it had itself told the lane to make. A
 // base that cannot be resolved reads as before.
-async function tracked_names(): Promise<string> {
+async function tracked_names(): Promise<Pick<ChangedParts, 'tracked' | 'base'>> {
 	const base = await change_base.resolved_through_merge()
 
-	if (base === undefined) return await git_command.diff_main_names()
+	if (base === undefined) {
+		return { tracked: to_paths(await git_command.diff_main_names()), base: 'fallback' }
+	}
 
-	return await git_command.diff_names_since(base)
+	return { tracked: to_paths(await git_command.diff_names_since(base)), base: 'merge_base' }
+}
+
+// The unstaged reading split into its halves, and whether the tracked half was measured from a
+// resolved base or fell back to the default branch — what `josh test:related` records so a run whose
+// change swelled can be told apart by its cause (joshuafolkken/kit#6982).
+async function read_changed_parts(): Promise<ChangedParts> {
+	const { tracked, base } = await tracked_names()
+	const untracked = to_paths(await git_command.untracked_names())
+
+	return { tracked, untracked, base }
 }
 
 // The branch diff **plus** the untracked files. `git diff` lists neither, so a change that adds a
@@ -33,8 +52,7 @@ async function tracked_names(): Promise<string> {
 async function read_changed_paths(is_staged: boolean): Promise<Array<string>> {
 	if (is_staged) return to_paths(await git_command.diff_cached_names())
 
-	const tracked = to_paths(await tracked_names())
-	const untracked = to_paths(await git_command.untracked_names())
+	const { tracked, untracked } = await read_changed_parts()
 
 	return [...tracked, ...untracked]
 }
@@ -56,6 +74,13 @@ async function read_held_at(commit: string, paths: ReadonlyArray<string>): Promi
 	return to_paths(await git_command.tree_names_at(commit, paths))
 }
 
-const changed_paths = { read_changed_paths, read_changed_since, read_held_at, to_paths }
+const changed_paths = {
+	read_changed_parts,
+	read_changed_paths,
+	read_changed_since,
+	read_held_at,
+	to_paths,
+}
 
+export type { ChangedParts }
 export { changed_paths }

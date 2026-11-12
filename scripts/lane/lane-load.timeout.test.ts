@@ -30,7 +30,7 @@ afterEach(() => {
 })
 
 describe('lane_load.sample against a sysctl that never answers', () => {
-	it('records the sample without memory or processes once the probe budget is spent', async () => {
+	it('records the sample without memory, processes or sleep once the probe budget is spent', async () => {
 		const pending = lane_load.sample(AT)
 
 		await vi.advanceTimersByTimeAsync(PROBE_TIMEOUT_MS)
@@ -39,7 +39,12 @@ describe('lane_load.sample against a sysctl that never answers', () => {
 			available_mb: undefined,
 			swapped_mb: undefined,
 			processes: undefined,
+			slept_ms: undefined,
 		})
-		expect(hanging_execa.timeouts()).toStrictEqual([PROBE_TIMEOUT_MS, PROBE_TIMEOUT_MS])
+		expect(hanging_execa.timeouts()).toStrictEqual([
+			PROBE_TIMEOUT_MS,
+			PROBE_TIMEOUT_MS,
+			PROBE_TIMEOUT_MS,
+		])
 	})
 })

@@ -1,9 +1,12 @@
 import type { IssueReference } from '#scripts/issue/issue-reference'
 import { gh_author_association } from './gh-author-association'
 import { git_gh_api_path } from './git-gh-api-path'
+import { git_gh_etag_read } from './git-gh-etag-read'
 import { git_gh_exec } from './git-gh-exec'
 import { gh_failure, type GhFailure } from './git-gh-failure'
 import { git_gh_helpers } from './git-gh-helpers'
+import { git_gh_issue_graphql } from './git-gh-issue-graphql'
+import { git_gh_issue_memo } from './git-gh-issue-memo'
 import {
 	BLOCKED_BY_FIELD,
 	git_gh_issue_rest,
@@ -30,14 +33,17 @@ import { gh_reachability } from './git-gh-reachability'
 // `issue_dependencies_summary` can read `total_blocked_by: 0` while this endpoint returns a real
 // relation. Trusting the counter there makes `epic:next` call a graph that agrees with itself
 // contradictory and exit 1, which stops an unattended run at its first step with nothing to fix.
+//
+// Sent with the previous process's ETag (joshuafolkken/kit#6701): `backlog:next` reads every open
+// blocked issue's relations each offer, and an unchanged set answers `304`, which costs no core.
 async function read_blocked_by_listing(
 	issue_number: string,
 	repo?: string,
 	exact_total?: number,
 ): Promise<BlockedBy> {
-	const json = await git_gh_exec.exec_gh_api({
-		path: `${git_gh_api_path.blocked_by_api_path(issue_number, repo)}${git_gh_api_path.FULL_PAGE_QUERY}`,
-	})
+	const json = await git_gh_issue_memo.read(
+		`${git_gh_api_path.blocked_by_api_path(issue_number, repo)}${git_gh_api_path.FULL_PAGE_QUERY}`,
+	)
 
 	return git_gh_issue_rest.to_blocked_by(json, exact_total)
 }
@@ -103,6 +109,13 @@ async function read_relations(
 	}
 }
 
+// The request itself, sent with the previous process's ETag (joshuafolkken/kit#6754): every one of
+// the five commands `josh gh:usage` counts most calls for reads issues one GET at a time, and an
+// unchanged issue answers `304`, which costs no core. A caller passes its own read where it has one.
+// The default is remembered for the process (`git-gh-issue-memo.ts`), so a second read of the same
+// issue makes no request at all; a caller's own read is never remembered.
+type PathRead = (path: string) => Promise<string>
+
 // One issue through REST, answered in the field names `gh issue view --json` used. Every read below
 // goes through it, so the request, the field mapping and the blocker relations are decided once.
 //
@@ -110,13 +123,15 @@ async function read_relations(
 // labels-and-body reads never name it — and, when it was, only when the issue itself reports a
 // blocker to fetch. Both guards are about the same cost: relations are read per issue across the
 // whole open backlog, so an unconditional second request would double that pass.
+
 async function read_issue_fields(
 	issue_number: string,
 	fields: string,
 	repo?: string,
+	read_path: PathRead = git_gh_issue_memo.read,
 ): Promise<Record<string, unknown>> {
 	const rest = git_gh_issue_rest.parse_rest_issue(
-		await git_gh_exec.exec_gh_api({ path: git_gh_api_path.issue_api_path(issue_number, repo) }),
+		await read_path(git_gh_api_path.issue_api_path(issue_number, repo)),
 	)
 	const requested = git_gh_issue_rest.split_fields(fields)
 	const blocked_by = requested.includes(BLOCKED_BY_FIELD)
@@ -140,8 +155,11 @@ async function read_issue_fields(
 // neither a transport problem nor a permission one. `kind` is unchanged so the callers that only
 // separate "there is nothing at that number" from "the read failed" need no edit.
 type IssueReadReason = 'unreachable' | 'rejected' | 'malformed'
+// `detail` is the failed request's error text (gh's stderr summary and the response body), kept so a
+// report can tell an exhausted rate limit from expired auth (#6614); a `malformed` read has none.
 type IssueReadFailure =
-	{ kind: 'missing' } | { kind: 'unreadable'; reason: IssueReadReason; status: number | undefined }
+	| { kind: 'missing' }
+	| { kind: 'unreadable'; reason: IssueReadReason; status: number | undefined; detail?: string }
 type IssueRead = IssueReadFailure | { kind: 'read'; json: string }
 type FieldRead = IssueReadFailure | { kind: 'read'; text: string | undefined }
 
@@ -190,6 +208,7 @@ function to_read_failure(error: unknown): IssueReadFailure {
 		kind: 'unreadable',
 		reason: to_unreadable_reason(failure.status),
 		status: failure.status,
+		detail: error instanceof Error ? error.message : String(error),
 	}
 }
 
@@ -198,9 +217,10 @@ async function issue_view_json_classified(
 	issue_number: string,
 	fields: string,
 	repo?: string,
+	read_path?: PathRead,
 ): Promise<IssueRead> {
 	try {
-		const issue = await read_issue_fields(issue_number, fields, repo)
+		const issue = await read_issue_fields(issue_number, fields, repo, read_path)
 
 		return { kind: 'read', json: JSON.stringify(issue) }
 	} catch (error) {
@@ -269,8 +289,9 @@ async function issue_view_json(
 	issue_number: string,
 	fields: string,
 	repo?: string,
+	read_path?: PathRead,
 ): Promise<string | undefined> {
-	const read = await issue_view_json_classified(issue_number, fields, repo)
+	const read = await issue_view_json_classified(issue_number, fields, repo, read_path)
 
 	return read.kind === 'read' ? read.json : undefined
 }
@@ -353,20 +374,64 @@ async function issue_get_labels_and_body(issue_number: string): Promise<string |
 // is already keyed by a number and wants the rows as served. What the two genuinely share — the path
 // and the page size — is single-sourced in `git-gh-api-path.ts` and read from there by both.
 //
-// No `repo` parameter, unlike the reads above: the auto-close lists its candidate epics from the
-// repository it runs in, so the epic whose comments are read is always a local one. The path builder
-// takes one when a caller that needs it appears.
+// `repo` names the repository like the reads above do — `issue:read --repo` reads another repository's
+// thread (joshuafolkken/kit#5851); absent, it is the repository the command runs in. `read_path`
+// replaces the paged request, as `read_comments_conditionally` does for the run board.
 async function issue_list_comments(
 	issue_number: string,
 	timeout_ms?: number,
+	repo?: string,
+	read_path?: PathRead,
 ): Promise<string | undefined> {
-	const path = `${git_gh_api_path.issue_comments_api_path(issue_number)}${git_gh_api_path.FULL_PAGE_QUERY}`
+	const path = `${git_gh_api_path.issue_comments_api_path(issue_number, repo)}${git_gh_api_path.FULL_PAGE_QUERY}`
 
 	try {
-		return await git_gh_exec.exec_gh_api({ path, should_paginate: true, timeout_ms })
+		return await (read_path?.(path) ??
+			git_gh_exec.exec_gh_api({ path, should_paginate: true, timeout_ms }))
 	} catch {
 		return undefined
 	}
+}
+
+// One issue's fields and its comment listing, in the shapes `issue_view_json_classified` and
+// `issue_list_comments` answer. One GraphQL query serves both when it can (joshuafolkken/kit#6722),
+// so a read costs no REST core; when it cannot, the two REST reads are made side by side as before,
+// and they are what tells a missing number from a failed read.
+interface IssueWithComments {
+	read: IssueRead
+	comments_json: string | undefined
+}
+
+async function issue_read_with_comments(
+	issue_number: string,
+	fields: string,
+	repo?: string,
+): Promise<IssueWithComments> {
+	const graphql = await git_gh_issue_graphql.read_issue(issue_number, repo)
+
+	if (graphql === undefined) {
+		const [read, comments_json] = await Promise.all([
+			issue_view_json_classified(issue_number, fields, repo),
+			issue_list_comments(issue_number, undefined, repo),
+		])
+
+		return { read, comments_json }
+	}
+
+	const requested = git_gh_issue_rest.split_fields(fields)
+	const issue = git_gh_issue_rest.to_gh_issue(graphql.rest, requested, graphql.blocked_by)
+
+	return {
+		read: { kind: 'read', json: JSON.stringify(issue) },
+		comments_json: graphql.comments_json,
+	}
+}
+
+// The comment listing sent with the previous process's ETag (joshuafolkken/kit#6700): the run board
+// re-reads a decision child's thread every two minutes, and an unchanged first page answers `304`.
+// A full first page is read paged instead, by `read_listing`.
+async function read_comments_conditionally(path: string): Promise<string> {
+	return await git_gh_etag_read.read_listing(path, git_gh_api_path.FULL_PAGE_SIZE)
 }
 
 // Whether the relations endpoint has nothing at that number at all. Probed for its status rather
@@ -443,7 +508,15 @@ const git_gh_issue_read = {
 	issue_get_plan_fields_classified,
 	issue_get_labels_and_body,
 	issue_list_comments,
+	issue_read_with_comments,
+	read_comments_conditionally,
 }
 
-export type { IssueRead, IssueReadFailure, IssueReadReason }
-export { git_gh_issue_read, read_blocked_by, NOT_FOUND_STATUS }
+export type { IssueRead, IssueReadFailure, IssueReadReason, IssueWithComments }
+export {
+	git_gh_issue_read,
+	read_blocked_by,
+	NOT_FOUND_STATUS,
+	PLAN_FIELDS,
+	STATE_AND_RELATIONS_FIELDS,
+}

@@ -1,8 +1,11 @@
+import { agent_headless } from '#scripts/agent/agent-headless'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { RETRY_PENDING_KEY, RETRY_PENDING_VALUE } from '#scripts/gh/git-gh-comments-unreadable'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { lane_child_mark_keys } from '#scripts/lane/lane-child-mark-keys'
+import { review_pair } from '#scripts/review/review-pair'
+import { run_headless_keys } from '#scripts/run/run-headless-keys'
 import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
 import { PURE_FILES } from '#tools/test/pure-files'
 import { unit_projects, type UnitProject } from '#tools/test/unit-projects'
@@ -90,6 +93,17 @@ describe('the two projects partition the suite without gaps or overlap', () => {
 // Both `globalSetup` entries and `coverage` are read once at the root, so the projects must carry the
 // per-run env and timeout themselves or a project would silently run with vitest's defaults.
 describe('each project carries the per-run environment and timeout', () => {
+	it.each([PURE_PROJECT, ISOLATED_PROJECT])('preserves file-level spies in %s', (name) => {
+		expect(project(name).restoreMocks).toBe(false)
+	})
+
+	it.each([PURE_PROJECT, ISOLATED_PROJECT])(
+		'clears mock history before each test in %s',
+		(name) => {
+			expect(project(name).clearMocks).toBe(true)
+		},
+	)
+
 	it.each([PURE_PROJECT, ISOLATED_PROJECT])('gives %s the session env and timeout', (name) => {
 		expect(project(name).env['CLAUDE_CODE_SESSION_ID']).toBe('vitest-session')
 		expect(project(name).testTimeout).toBeGreaterThan(0)
@@ -123,6 +137,12 @@ describe('each project carries the per-run environment and timeout', () => {
 	// cut-guard delivery fixture, which then stands down where the refusal is expected.
 	it.each([PURE_PROJECT, ISOLATED_PROJECT])('blanks the agent session role for %s', (name) => {
 		expect(project(name).env[agent_session_role.KEY]).toBe('')
+	})
+
+	// joshuafolkken/kit#6902: a lane run with the paired review on would otherwise make every run:review
+	// fixture write a paired brief its stubs never planned.
+	it.each([PURE_PROJECT, ISOLATED_PROJECT])('blanks the paired review switch for %s', (name) => {
+		expect(project(name).env[review_pair.PAIRED_ENV]).toBe('')
 	})
 })
 
@@ -159,6 +179,55 @@ describe('the unit environment blanks inherited ship and lane marks without a li
 		const environment = unit_environment({})
 
 		for (const key of lane_child_mark_keys.MARK_KEYS) expect(environment[key]).toBe('')
+	})
+})
+
+// joshuafolkken/kit#5863: a lane exporting `JOSH_WORKER_SHIP_MODEL` turned every fixture that resolves a
+// profile off its default model, so the gate went red there alone.
+describe('the unit environment blanks the agent profile keys', () => {
+	it('blanks every inherited key a profile is read from', () => {
+		const inherited = Object.fromEntries(
+			agent_role_profile.PROFILE_KEYS.map((key) => [key, 'claude-sonnet-5-5']),
+		)
+		const environment = unit_environment(inherited)
+
+		expect(agent_role_profile.PROFILE_KEYS).toContain('JOSH_WORKER_SHIP_MODEL')
+		for (const key of agent_role_profile.PROFILE_KEYS) expect(environment[key]).toBe('')
+	})
+
+	it('leaves a key that only resembles one alone', () => {
+		const environment = unit_environment({ JOSH_MODEL: 'opus', JOSH_WORKER_MODELS: 'opus' })
+
+		expect(Object.hasOwn(environment, 'JOSH_MODEL')).toBe(false)
+		expect(Object.hasOwn(environment, 'JOSH_WORKER_MODELS')).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#7035: a session exporting `JOSH_REVIEWER_PAIRED=1` turned the run:review suites red,
+// because the paired review reached a stamp-file mock without `stamp_path`.
+describe('the unit environment blanks the paired review switch', () => {
+	it('turns an inherited paired review off', () => {
+		const environment = unit_environment({ [review_pair.PAIRED_ENV]: '1' })
+
+		expect(environment[review_pair.PAIRED_ENV]).toBe('')
+		expect(review_pair.is_enabled(environment)).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#7309: a lane carries the headless marks, so the unattended-filing rule passed the
+// gate there and failed in CI, which runs unmarked.
+describe('the unit environment blanks the headless agent and run marks', () => {
+	const MARKS: ReadonlyArray<string> = [agent_headless.KEY, ...run_headless_keys.MARK_KEYS]
+
+	it('blanks every inherited headless mark', () => {
+		const environment = unit_environment(Object.fromEntries(MARKS.map((key) => [key, '1'])))
+
+		expect(MARKS.map((key) => environment[key])).toStrictEqual(MARKS.map(() => ''))
+		expect(agent_headless.is_headless(environment)).toBe(false)
+	})
+
+	it('leaves no launcher headless mark in a test process', () => {
+		expect(MARKS.filter((key) => (process.env[key] ?? '') !== '')).toStrictEqual([])
 	})
 })
 

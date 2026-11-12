@@ -6,8 +6,16 @@ const PRE_TOOL_USE = 'run by the PreToolUse hook, the pending tool call as JSON 
 // command's usage moved onto its entry (#4185). `DEV_COMMANDS` spreads this in at the same place, so
 // the map keeps its order.
 
-/* eslint-disable @typescript-eslint/naming-convention */
 const AGENT_HOOK_COMMANDS: Record<string, CommandEntry> = {
+	'usage:tee': {
+		script: 'scripts/usage/usage-tee-cli.ts',
+		description: 'Record account-wide Claude statusLine rate limits without printing output',
+		category: 'Development',
+		reference: ['', 'automation', ['files']],
+		usage: {
+			examples: [{ arguments: '', note: 'Claude statusLine JSON on stdin; stdout stays empty' }],
+		},
+	},
 	'format:edited': {
 		script: 'scripts/hooks/format-edited-cli.ts',
 		description: 'Claude Code hook: format the file just edited (reads the tool call on stdin)',
@@ -28,10 +36,35 @@ const AGENT_HOOK_COMMANDS: Record<string, CommandEntry> = {
 		usage: { examples: [{ arguments: '', note: PRE_TOOL_USE }] },
 		// **No `tsx_arguments`, deliberately.** The guards read `.env` for their other values, as other
 		// commands do through `OPTIONAL_ENV_FILE_FLAGS`; the guard switches themselves come from the
-		// launch environment alone (`josh-environment-file.ts`). But declaring any `tsx_arguments`
-		// disqualifies a command from in-process dispatch (`josh-in-process.ts`), and this is the one PreToolUse hook consumers run
-		// before every guarded call, where a second ~0.16 s tsx start is not affordable. Each guard it
-		// composes loads `.env` through the shared loader instead.
+		// launch environment alone (`josh-environment-file.ts`). Each guard it composes loads `.env`
+		// through the shared loader on its real hook path instead, so the unit tests never see a
+		// developer's `.env`.
+	},
+	// The hook ledger read per rule (joshuafolkken/kit#6664): which rules refuse, and how often wrongly.
+	// `--apply` / `--restore` write the demoted-rules file (joshuafolkken/kit#6591).
+	'hook:ledger': {
+		script: 'scripts/hooks/hook-ledger-cli.ts',
+		is_read_only: true,
+		write_flags: ['--apply', '--restore'],
+		description:
+			'Print Claude Code hook refusals per hook and rule over a period: refusals, the same call passing later, and route:interrupt issues naming the rule; list, demote or restore rules that mostly refuse allowed work',
+		category: 'Development',
+		reference: [
+			'--period <days> [--demote [--apply]] | --restore <rule>',
+			'maintainer',
+			['network', 'files'],
+		],
+		usage: {
+			examples: [
+				{ arguments: '--period 7', note: "a 7-day period's refusals per rule" },
+				{ arguments: '--period 7 --demote', note: 'rules to demote from blocking to notice' },
+				{
+					arguments: '--period 7 --demote --apply',
+					note: 'record them in .josh/hook-demoted.json',
+				},
+				{ arguments: '--restore batching', note: 'make a demoted rule block again' },
+			],
+		},
 	},
 	'stop:guard': {
 		script: 'scripts/hooks/stop-guard.ts',
@@ -51,7 +84,7 @@ const AGENT_HOOK_COMMANDS: Record<string, CommandEntry> = {
 	'session:lang': {
 		script: 'scripts/josh/session-language-main.ts',
 		description:
-			'Claude Code hook: print a non-default JOSH_SESSION_LANG for the session context, and the run:board reply rule while a backlogrun is live (otherwise nothing)',
+			'Claude Code hook: print a non-default JOSH_SESSION_LANG for the session context, the run:board reply rule while a backlogrun is live, and the run:handoff line for a workflow keyword on a consultation model (otherwise nothing)',
 		category: 'Development',
 		reference: ['', 'automation', ['none']],
 		usage: {
@@ -78,6 +111,5 @@ const AGENT_HOOK_COMMANDS: Record<string, CommandEntry> = {
 		// above: it runs before every guarded Codex call.
 	},
 }
-/* eslint-enable @typescript-eslint/naming-convention */
 
 export { AGENT_HOOK_COMMANDS }

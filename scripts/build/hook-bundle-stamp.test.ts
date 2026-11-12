@@ -1,11 +1,13 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, mkdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
-import { describe, expect, it, onTestFinished } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { hook_bundle_stamp, type HookSources } from './hook-bundle-stamp'
 
-const { is_fresh, STAMP_NAME, stamp_text, VERIFIED_NAME } = hook_bundle_stamp
+const { has_outputs, is_fresh, STAMP_NAME, stamp_text, VERIFIED_NAME } = hook_bundle_stamp
+
+const make_directory = temporary_directory()
 
 const FIRST_INPUT = 'scripts/a.ts'
 const SECOND_INPUT = 'scripts/b.ts'
@@ -35,12 +37,9 @@ function sources_of(content: string): HookSources {
 
 // A package with two inputs and one built output, stamped as built from them.
 function create_fixture(): Fixture {
-	const package_directory = mkdtempSync(path.join(tmpdir(), 'hook-bundle-stamp-'))
+	const package_directory = make_directory('hook-bundle-stamp-')
 	const out_directory = path.join(package_directory, 'dist', 'hooks')
 
-	onTestFinished(() => {
-		rmSync(package_directory, { recursive: true, force: true })
-	})
 	mkdirSync(path.join(package_directory, 'scripts'))
 	mkdirSync(out_directory, { recursive: true })
 	writeFileSync(path.join(package_directory, FIRST_INPUT), ORIGINAL_CONTENT)
@@ -90,6 +89,32 @@ describe('is_fresh', () => {
 		rmSync(path.join(fixture.out_directory, OUTPUT_NAME))
 
 		expect(is_fixture_fresh(fixture)).toBe(false)
+	})
+})
+
+describe('has_outputs', () => {
+	it('reads a finished build as runnable even once its source has been edited', () => {
+		const fixture = create_fixture()
+
+		writeFileSync(path.join(fixture.package_directory, FIRST_INPUT), EDITED_CONTENT)
+
+		expect(has_outputs(fixture.out_directory)).toBe(true)
+	})
+
+	it('reads a build with a missing output as not runnable', () => {
+		const { out_directory } = create_fixture()
+
+		rmSync(path.join(out_directory, OUTPUT_NAME))
+
+		expect(has_outputs(out_directory)).toBe(false)
+	})
+
+	it('reads a directory with no record as not runnable', () => {
+		const { out_directory } = create_fixture()
+
+		rmSync(path.join(out_directory, STAMP_NAME))
+
+		expect(has_outputs(out_directory)).toBe(false)
 	})
 })
 

@@ -1,11 +1,13 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync } from 'node:fs'
 import path from 'node:path'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_carry } from './run-carry'
 import { run_carry_end } from './run-carry-end'
 import { run_carry_ended } from './run-carry-ended'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#3708: the run's end, shared by `run:carry --end` and `josh backlogrun --stop` — and
 // the one difference between them, whether a stop is announced.
@@ -23,7 +25,7 @@ vi.mock('#scripts/run/merge/run-merge-collect', () => ({
 const { telegram_notify } = await import('#scripts/notify/telegram-notify')
 const confirm = vi.mocked(telegram_notify.confirm)
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-carry-end-test-'))
+const scratch = make_directory('run-carry-end-test-')
 const REPOSITORY = path.join(scratch, 'repository.git')
 const INVOCATION = 'backlogrun --max 5'
 const REASON = 'stopped by a person'
@@ -45,7 +47,6 @@ beforeEach(() => {
 afterAll(() => {
 	run_carry.end_carry(carry_target())
 	rmSync(run_carry_ended.ended_path(REPOSITORY), { force: true })
-	rmSync(scratch, { recursive: true, force: true })
 })
 
 describe('run_carry_end.end_run', () => {

@@ -1,3 +1,5 @@
+import { run_step } from '#scripts/run/run-step'
+import { run_step_section_table } from '#scripts/run/run-step-section-table'
 import { describe, expect, it } from 'vitest'
 import { backlogrun_parent_read_set } from './backlogrun-parent-read-set'
 import { document_section } from './document-section'
@@ -21,10 +23,6 @@ const PARENT_NEEDS: ReadonlyArray<string> = [
 	'0. The rule that fires before any of them — explicit invocation',
 	'2. What every one of them shares',
 ]
-
-function by_text(left: string, right: string): number {
-	return left.localeCompare(right)
-}
 
 function skill_bytes(report: ReturnType<typeof backlogrun_parent_read_set.costed>): number {
 	return report.files.find((one) => one.file === entry_read_set.SKILL_FILE)?.cost.bytes ?? NOTHING
@@ -53,12 +51,9 @@ describe('backlogrun_parent_read_set.costed — the SKILL.md section trim', () =
 		expect(backlogrun_parent_read_set.UNUSED_SKILL_SECTIONS).not.toContain(heading)
 	})
 
-	// A different trim from the worker's: the parent keeps §0, which the lane child drops. The two sets
-	// must genuinely differ, not converge to one.
-	it('drops a different set of sections than the lane child', () => {
-		expect([...backlogrun_parent_read_set.UNUSED_SKILL_SECTIONS].toSorted(by_text)).not.toEqual(
-			[...lane_child_read_set.UNUSED_SKILL_SECTIONS].toSorted(by_text),
-		)
+	it('keeps the interactive entry while the lane child uses its dedicated entry', () => {
+		expect(skill_bytes(backlogrun_parent_read_set.costed(ROOT))).toBeGreaterThan(NOTHING)
+		expect(skill_bytes(lane_child_read_set.costed(ROOT))).toBe(NOTHING)
 	})
 })
 
@@ -83,14 +78,41 @@ describe('backlogrun_parent_read_set.costed — the reduction', () => {
 		expect(report.scoped.tokens).toBeLessThanOrEqual(report.whole.tokens)
 	})
 
-	it('reports under the backlogrun label, and drops no point-of-use document', () => {
+	it('reports under the backlogrun label, and drops only the child stages documents', () => {
 		const report = backlogrun_parent_read_set.costed(ROOT)
 		const reached = backlogrun_parent_read_set.REACHED_POINT_OF_USE
+		const skipped = new Set(['background-commands.md', 'chain-rule.md', 'fullrun.md'])
 		const base = entry_read_set.costed(ROOT, BACKLOGRUN, reached)
 
 		expect(report.entry).toBe(BACKLOGRUN)
 		expect(report.point_of_use.map((one) => one.file)).toEqual(
-			base.point_of_use.map((one) => one.file),
+			base.point_of_use.map((one) => one.file).filter((file) => !skipped.has(file)),
 		)
+	})
+})
+
+// joshuafolkken/kit#7139: the sections `run:step` prints at the parent's stages are the ones
+// `read:set backlogrun` charges, and a child stage's document is the lane child's, not the parent's.
+describe('backlogrun_parent_read_set — the stages match run:step', () => {
+	const report = backlogrun_parent_read_set.costed(ROOT)
+	const child = lane_child_read_set.costed(ROOT)
+	const CHILD_STAGE_KEYS = [run_step.IMPLEMENT, 'ship', 'run:review']
+
+	it.each(backlogrun_parent_read_set.printed_sections())(
+		'charges the printed section $file → $heading',
+		({ file, heading }) => {
+			const row = report.point_of_use.find((one) => one.file === file)
+
+			expect(row?.heading.split('" + "')).toContain(heading)
+			expect(row?.is_resolved).toBe(true)
+		},
+	)
+
+	it.each(CHILD_STAGE_KEYS)('leaves the child stage %j to the lane child', (key) => {
+		const file = run_step_section_table.GOVERNING_SECTIONS.get(key)?.document ?? ''
+		const charged = [...child.files, ...child.point_of_use].map((one) => one.file)
+
+		expect(report.point_of_use.map((one) => one.file)).not.toContain(file)
+		expect(charged).toContain(file)
 	})
 })

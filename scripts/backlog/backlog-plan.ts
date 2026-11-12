@@ -10,6 +10,7 @@ import {
 	PARKED_LABELS,
 	RUN_SOLO_LABEL,
 } from '#scripts/issue/issue-labels'
+import { backlog_plan_words, type PlanWords } from './backlog-plan-words'
 import type { OutOfScopeRow } from './backlog-scope'
 
 // The plan a person reads before a `backlogrun` starts.
@@ -23,27 +24,11 @@ import type { OutOfScopeRow } from './backlog-scope'
 // Two spaces deeper than `epic_report`'s repository headings, so a child reads as sitting under one.
 const ROW_INDENT_WIDTH = 4
 const ROW_INDENT = ' '.repeat(ROW_INDENT_WIDTH)
-const NOTHING = `${ROW_INDENT}(none)`
-
-// The named-issue prefix of a `backlogrun #N1 #N2 …`: these run one at a
-// time, in the order they were typed, before anything in the pool below is picked up.
-const NAMED_HEADING = 'Named issues — run in order first, one at a time, then the backlog:'
-// `--only` runs the named list and stops, so its heading says the pool is not drained.
-// The plan then shows the named section alone.
-const ONLY_NAMED_HEADING =
-	'Named issues — run in order, one at a time, then stop (`--only`; the opted-in backlog is not run):'
-const READY_HEADING =
-	'Ready now — each takes a free lane in its repository, so these may run in parallel:'
-const WAITING_HEADING = 'Waiting — each names what it is waiting on:'
-// Every park label (`PARKED_LABELS`) puts a child here, so the heading names none and each row names
-// its own: a `run:stalled` row read as `needs-decision` sends a person to decide a mechanical failure.
-const HUMAN_HEADING = 'Waiting on a person — resolve these before the run starts:'
-const SCOPE_HEADING = 'Out of scope — open, but the backlog will not run these:'
+// The English words, the table a context without its own `words` renders in.
+const ENGLISH = backlog_plan_words.ENGLISH_PLAN_WORDS
+const NOTHING = `${ROW_INDENT}${ENGLISH.nothing}`
 // `epic_report`'s own words for the same condition, so the plan and the run name it identically.
 const UNUSABLE_HEADING = 'The dependency graph is unusable, so there is no plan:'
-
-const IN_PROGRESS_NOTE = 'a run already has it'
-const PAST_OFFER_NOTE = 'ready, but past the offer this ask could make'
 
 // The repository the plan is written from, and the titles the pool does not carry. Passed together
 // because every row needs both: a bare number is not a plan, and a child elsewhere has to be
@@ -60,6 +45,12 @@ interface PlanContext {
 	// symmetric: naming a closed blocker sends a person to an issue that turns out to be done, while
 	// dropping a standing one reports the child as merely next in line when the run will keep waiting.
 	open_numbers: ReadonlySet<number> | undefined
+	// The session language's words; absent renders English.
+	words?: PlanWords
+}
+
+function words_of(context: PlanContext): PlanWords {
+	return context.words ?? ENGLISH
 }
 
 // A child elsewhere is qualified, because a bare number would name *this* repository's issue of that
@@ -72,7 +63,7 @@ function cite_of(reference: IssueReference, repo: string, title: string | undefi
 
 	return reference.repo === repo
 		? issue_cite.reference(repo, number, title)
-		: issue_cite.plain(number, reference.repo)
+		: issue_cite.plain_for('terminal', number, reference.repo)
 }
 
 function reference_of(reference: IssueReference, repo: string): string {
@@ -92,8 +83,8 @@ function join_row(reference: string, note: string): string {
 // A `run:solo` child is marked beside its number, so a person reading the plan sees which issues
 // `backlog:next` will start alone before the run starts.
 const SOLO_MARK = `[${RUN_SOLO_LABEL}]`
-// A child with neither `run:solo` nor `run:lane` is one `backlog:next` withholds everything for until
-// it is judged, so the plan says which ones before the run asks.
+// A child with neither `run:solo` nor `run:lane` is one `backlog:next` holds back until it is judged,
+// so the plan says which ones before the run asks.
 const UNTRIAGED_MARK = '[untriaged]'
 
 function mark_of(child: EpicChild): string | undefined {
@@ -134,16 +125,18 @@ function open_blockers(child: EpicChild, context: PlanContext): Array<string> {
 // same question in: a child a run already holds is withheld for that reason whatever else it
 // declares, and saying it waits on an issue would send a person to the wrong place.
 function waiting_note(child: EpicChild, context: PlanContext): string {
-	if (has_label_name(child.labels, IN_PROGRESS_LABEL)) return IN_PROGRESS_NOTE
+	const words = words_of(context)
+
+	if (has_label_name(child.labels, IN_PROGRESS_LABEL)) return words.in_progress_note
 	const blockers = open_blockers(child, context)
 
-	if (blockers.length > 0) return `waiting on ${blockers.join(', ')}`
+	if (blockers.length > 0) return `${words.waiting_on} ${blockers.join(', ')}`
 
-	return PAST_OFFER_NOTE
+	return words.past_offer_note
 }
 
-function section(heading: string, lines: ReadonlyArray<string>): string {
-	return [heading, ...(lines.length === 0 ? [NOTHING] : lines)].join('\n')
+function section(heading: string, lines: ReadonlyArray<string>, nothing = ENGLISH.nothing): string {
+	return [heading, ...(lines.length === 0 ? [`${ROW_INDENT}${nothing}`] : lines)].join('\n')
 }
 
 // The three child sections differ only in the note each row carries, so one function renders all of
@@ -222,18 +215,48 @@ function named_lines(named: ReadonlyArray<number>, context: PlanContext): Array<
 // non-`--only` prefix; `--only` renders its own whole plan in `format_only`.
 function named_prefix(named: NamedPlan, context: PlanContext): Array<string> {
 	if (named.issues.length === 0) return []
+	const words = words_of(context)
 
-	return [section(NAMED_HEADING, named_lines(named.issues, context)), '']
+	return [section(words.named_heading, named_lines(named.issues, context), words.nothing), '']
+}
+
+function title_line(context: PlanContext): string {
+	return `${words_of(context).title} — ${context.repo}`
 }
 
 // `--only` runs the named list and stops, so its plan is the named section alone — the pool is not
 // run, and rendering it would promise work `--only` excludes. The header still names the repository.
 function format_only(named: NamedPlan, context: PlanContext): string {
+	const words = words_of(context)
+
 	return [
-		`Backlog plan — ${context.repo}`,
+		title_line(context),
 		'',
-		section(ONLY_NAMED_HEADING, named_lines(named.issues, context)),
+		section(words.only_named_heading, named_lines(named.issues, context), words.nothing),
 	].join('\n')
+}
+
+// The four sections of the pool, in the order the run takes them.
+function pool_sections(
+	result: EpicNextResult,
+	out_of_scope: ReadonlyArray<OutOfScopeRow>,
+	context: PlanContext,
+): Array<string> {
+	const words = words_of(context)
+
+	return [
+		section(words.ready_heading, ready_lines(result, context), words.nothing),
+		'',
+		section(words.waiting_heading, waiting_lines(result.waiting, context), words.nothing),
+		'',
+		section(
+			words.human_heading,
+			child_lines(result.blocked_on_people, context, park_note),
+			words.nothing,
+		),
+		'',
+		section(words.scope_heading, scope_lines(out_of_scope, context.repo), words.nothing),
+	]
 }
 
 function format_plan(
@@ -246,32 +269,26 @@ function format_plan(
 	if (named.only) return format_only(named, context)
 
 	return [
-		`Backlog plan — ${context.repo}`,
+		title_line(context),
 		'',
 		...named_prefix(named, context),
-		section(READY_HEADING, ready_lines(result, context)),
-		'',
-		section(WAITING_HEADING, waiting_lines(result.waiting, context)),
-		'',
-		section(HUMAN_HEADING, child_lines(result.blocked_on_people, context, park_note)),
-		'',
-		section(SCOPE_HEADING, scope_lines(out_of_scope, context.repo)),
+		...pool_sections(result, out_of_scope, context),
 	].join('\n')
 }
 
 const backlog_plan = {
-	HUMAN_HEADING,
-	IN_PROGRESS_NOTE,
-	NAMED_HEADING,
+	HUMAN_HEADING: ENGLISH.human_heading,
+	IN_PROGRESS_NOTE: ENGLISH.in_progress_note,
+	NAMED_HEADING: ENGLISH.named_heading,
 	NOTHING,
-	ONLY_NAMED_HEADING,
-	PAST_OFFER_NOTE,
-	READY_HEADING,
-	SCOPE_HEADING,
+	ONLY_NAMED_HEADING: ENGLISH.only_named_heading,
+	PAST_OFFER_NOTE: ENGLISH.past_offer_note,
+	READY_HEADING: ENGLISH.ready_heading,
+	SCOPE_HEADING: ENGLISH.scope_heading,
 	SOLO_MARK,
 	UNTRIAGED_MARK,
 	UNUSABLE_HEADING,
-	WAITING_HEADING,
+	WAITING_HEADING: ENGLISH.waiting_heading,
 	format_plan,
 	format_unusable,
 	is_standing,

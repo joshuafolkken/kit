@@ -1,15 +1,17 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, describe, expect, it } from 'vitest'
 import { run_hold } from './run-hold'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#1091: the guard's whole value is that it answers "this tree is taken" without a
 // person watching, so the three answers the issue names are pinned here — held stops, free proceeds,
 // and a second work tree of the same repository is never stopped by the first one's record.
 
 const TEST_PREFIX = 'run-hold-test-'
-const scratch = mkdtempSync(path.join(tmpdir(), TEST_PREFIX))
+const scratch = make_directory(TEST_PREFIX)
 const MAIN_WORKTREE = path.join(scratch, '.git')
 const LINKED_WORKTREE = path.join(scratch, '.git', 'worktrees', 'second')
 const ISSUE = '1091'
@@ -19,7 +21,6 @@ const RECORDED_AT = '2026-09-06T12:00:00.000Z'
 const WRITER_PID = 4242
 
 afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
 	rmSync(run_hold.hold_path(MAIN_WORKTREE), { force: true })
 	rmSync(run_hold.hold_path(LINKED_WORKTREE), { force: true })
 })

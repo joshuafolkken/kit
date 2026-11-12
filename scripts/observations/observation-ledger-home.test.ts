@@ -1,14 +1,15 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { git_spawn } from '#scripts/git/git-spawn'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it, vi } from 'vitest'
 import { observation_ledger, OBSERVATION_LEDGER_DIRECTORY } from './observation-ledger'
 import { observation_ledger_home } from './observation-ledger-home'
 
 vi.mock('#scripts/git/git-spawn', () => ({ git_spawn: { read: vi.fn() } }))
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'observation-ledger-home-test-'))
+const make_directory = temporary_directory('suite')
+const scratch = make_directory('observation-ledger-home-test-')
 const PRIMARY = path.join(scratch, 'kit')
 const LANE = path.join(scratch, '.kit-lanes', '2919')
 const NOW = new Date('2026-10-02T12:00:00Z')
@@ -16,14 +17,6 @@ const LINE_A = '- k:a | d1 | 2026-10-02 | x | from one lane'
 const LINE_B = '- k:b | d1 | 2026-10-02 | x | from another lane'
 
 const mocked_read = vi.mocked(git_spawn.read)
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
-
-beforeEach(() => {
-	vi.clearAllMocks()
-})
 
 describe('observation_ledger_home — where a writer appends', () => {
 	// joshuafolkken/kit#2919 regression: a lane's ledger resolved to the primary checkout, where another
@@ -63,7 +56,7 @@ describe('observation_ledger_home — where a writer appends', () => {
 describe('observation_ledger_home.read', () => {
 	// joshuafolkken/kit#2919: two lanes write two files, and a reader counts both.
 	it('reads every file in the directory as one ledger', async () => {
-		const root = mkdtempSync(path.join(scratch, 'read-'))
+		const root = make_directory('observation-ledger-home-read-')
 		const directory = path.join(root, OBSERVATION_LEDGER_DIRECTORY)
 
 		mkdirSync(directory, { recursive: true })
@@ -75,8 +68,23 @@ describe('observation_ledger_home.read', () => {
 	})
 
 	it('answers undefined for a checkout that keeps no ledger', async () => {
-		const root = mkdtempSync(path.join(scratch, 'none-'))
+		const root = make_directory('observation-ledger-home-none-')
 
 		expect(await observation_ledger_home.read(root)).toBeUndefined()
+	})
+
+	it('rejects an unreadable directory in strict mode', async () => {
+		const root = make_directory('observation-ledger-home-strict-directory-')
+
+		await expect(observation_ledger_home.read(root, true)).rejects.toThrow()
+	})
+
+	it('rejects an unreadable ledger file in strict mode instead of treating it as empty history', async () => {
+		const root = make_directory('observation-ledger-home-strict-file-')
+		const directory = path.join(root, OBSERVATION_LEDGER_DIRECTORY)
+
+		mkdirSync(path.join(directory, '1.md'), { recursive: true })
+		await expect(observation_ledger_home.read(root, true)).rejects.toThrow()
+		expect(await observation_ledger_home.read(root)).toBe('')
 	})
 })

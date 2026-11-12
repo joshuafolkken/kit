@@ -12,6 +12,10 @@
   - fires: `pnpm josh pretool:guard` — a `Bash` that creates an Issue outside `josh issue:file` (`gh issue create`, or a POST with `title` to `…/issues`); the refusal hands over the `pnpm josh issue:file` form. Every occurrence
   - silent: filing through `pnpm josh issue:file` — the duplicate scan, the body check and `epic:bundle` all run
   - not automated: the right act is another command, whose arguments the call does not carry
+- **Unasked filing** (`unasked-filing`, `.claude/skills/workflow-commands/observation-filing.md`)
+  - fires: `pnpm josh pretool:guard` — an interactive session’s `pnpm josh issue:file` when the person’s last prompt asks for no filing; it hands over propose-then-file. Every occurrence
+  - silent: an unattended run (a kit-launched or headless session, a lane child, the `backlogrun` parent), `--check`, or a prompt that asks for filing
+  - not automated: the call must not run at all, or only on a person's word — refusing is the remedy
 - **Direct issue comment** (`direct-issue-comment`, `shell-body.md`)
   - fires: `pnpm josh pretool:guard` — a comment to the checkout's own repository outside `josh issue:comment` (`gh issue comment` with no `--repo`, or a `gh api` write to `repos/<owner>/<r>/issues/<N>/comments` whose owner is the `{owner}` placeholder or the checkout's own `owner/repo` spelled out); it points at `pnpm josh issue:comment`. Every occurrence
   - silent: `pnpm josh issue:comment`, or reading the comments — the path that writes the run marker
@@ -33,8 +37,12 @@
   - silent: `-F` / `--field body=@`, a body without `@`, or `pnpm josh issue:comment`
   - not automated: the body moves to a file the call does not name
 - **No check:related on round 1's fixes** (`round-one-check-related`, `.claude/skills/workflow-commands/chain-rule.md` → "A lane child")
-  - fires: `pnpm josh pretool:guard` — `pnpm josh check:related` (`josh cr`) in a lane child after an `Edit` / `Write` that follows `run:review`'s brief, before `run:review --join` or `ship --detach`. Every occurrence
+  - fires: `pnpm josh pretool:guard` — `pnpm josh check:related` (`josh cr`) in a lane child after an `Edit` / `Write` that follows `run:review`'s (or `run:chain`'s) brief, before `run:review --join`, `run:chain --join` or `ship --detach`. Every occurrence
   - silent: no fix since the brief, already joined or detached, or not a lane child
+  - not automated: the right act is another command, whose arguments the call does not carry
+- **One check:related before the brief** (`repeat-check-related`, `.claude/skills/workflow-commands/chain-rule.md` → "A lane child")
+  - fires: `pnpm josh pretool:guard` — `pnpm josh check:related` (`josh cr`) in a lane child after an earlier one that ran, with no `run:review` (or `run:chain`) brief, join or `ship --detach` since. Every occurrence
+  - silent: the first since the last join or detach, a brief since, a `--touched` run, or not a lane child
   - not automated: the right act is another command, whose arguments the call does not carry
 - **Piped verification** (`piped-verification`, `output-bounds.md`)
   - fires: `pnpm josh pretool:guard` — a pass/fail josh check (`gate` / `check*` / `lint*` / `cspell*` / `test*` / `eval` / `overrides` / `ranges`) in front of a pipe — rewritten under `set -o pipefail` when every filter reads to the end (`tail`, a full-reading `grep`, `cut`, `sort`, `uniq`, `wc`, `tee`, an `awk` / `sed` that cannot exit early and carries no `<` / `>` / `&`), refused otherwise
@@ -78,19 +86,35 @@
   - not automated: which model fits the unit is the author's call
 - **Investigator dispatched in the foreground** (`investigator-foreground`, `.claude/skills/workflow-commands/delegation.md` → "The pre-implementation reading — what goes to a unit, and from which file")
   - fires: `pnpm josh pretool:guard` — an `Agent` / `Task` call of the `investigator` type without `run_in_background: false`. Every occurrence
-  - silent: another agent type, `run_in_background: false` set, or a session whose subagent tool declares no `run_in_background` (the field written as a string, the tail holding the same description and prompt, a refused dispatch that wrote it `false`, or a reissue still without the field just after this row refused a lone dispatch) — remembered for the session
+  - silent: another agent type, `run_in_background: false` set, VS Code identified by `CLAUDE_CODE_ENTRYPOINT=claude-vscode`, or a session whose subagent tool declares no `run_in_background` (the field written as a string, the tail holding the same description and prompt, a refused dispatch that wrote it `false`, or a reissue still without the field just after this row refused a lone dispatch) — remembered for the session
   - not automated: which reads go beside the dispatch is the author’s call
 - **Lane child reviewer dispatched in the foreground** (`reviewer-foreground`, `.claude/skills/workflow-commands/chain-rule.md` → "A lane child")
   - fires: `pnpm josh pretool:guard` — a dispatched lane child’s `Agent` / `Task` call of the `reviewer` or `reviewer-verification` type without `run_in_background: false` — rewritten with it, every occurrence
   - silent: not a lane child, another agent type, or `run_in_background: false` set
   - not automated: the hook makes the same call right itself; it refuses only a spelling it cannot rewrite
+- **Consultation main line delegates investigation (Claude)** (`consultation-investigation`, `.claude/skills/workflow-commands/delegation.md` → "A consultation main line hands its investigation to a unit")
+  - fires: `pnpm josh pretool:guard` — a broad investigation call — `Glob`, `WebFetch`, a `Read` past the line cap, a tree `Grep` or shell search, an investigation dispatch inheriting the model — on the consultation main line on Opus or Fable. Every occurrence
+  - silent: a launched session (lane, reviewer, scheduler), a delegated unit, a main line at or below the investigation rate (Sonnet, Haiku, Sol), on another provider's or an unnamed model, or a narrow check (`Read` of a file or an `offset` / `limit` range <= 200 lines, `grep -n <pattern> <one file>`)
+  - not automated: which reading is narrow enough to keep is the author’s call
+- **Consultation main line delegates investigation (Codex)** (`consultation-investigation-codex`, `.claude/skills/workflow-commands/delegation.md` → "A consultation main line hands its investigation to a unit")
+  - fires: `pnpm josh pretool:guard` — a broad shell investigation on the consultation main line on Codex Astra. Every occurrence
+  - silent: a launched session (lane, reviewer, scheduler), a delegated unit, a main line at or below the investigation rate (Sonnet, Haiku, Sol), on another provider's or an unnamed model, or a narrow check (`Read` of a file or an `offset` / `limit` range <= 200 lines, `grep -n <pattern> <one file>`)
+  - not automated: which reading is narrow enough to keep is the author’s call
+- **Consultation main line hands a run to run:handoff** (`consultation-handoff`, `docs/josh-commands-board.md` → "josh run:handoff")
+  - fires: `pnpm josh pretool:guard` — `pnpm josh run:entry` / `run:hold` on Fable or Codex Astra. Every occurrence
+  - silent: a lane child, a main line on any other model, an unnamed model, a delegated unit, or filing and operating (`issue:file`, `issue:plan`, `epic`)
+  - not automated: the right act is another command, whose arguments the call does not carry
 - **Lane child carry commands** (`lane-carry-conflict`, `.claude/skills/workflow-commands/backlogrun-lanes.md`)
-  - fires: `pnpm josh pretool:guard` — a dispatched lane child running `pnpm josh run:merge` / `run:carry`. Every occurrence
+  - fires: `pnpm josh pretool:guard` — a dispatched lane child running `pnpm josh run:merge` / `run:carry` / `run:handoff-lanes`. Every occurrence
   - silent: not a lane child — the parent owns the run budget
   - not automated: the right act is another command, whose arguments the call does not carry
 - **Lane child on `git switch main`** (`lane-switch-main`, `.claude/skills/workflow-commands/backlogrun-lanes.md`)
   - fires: `pnpm josh pretool:guard` — a dispatched lane child switching to the default branch or running `josh main:sync`. Every occurrence
   - silent: not a lane child — `pnpm josh main:merge` brings the default in at the gate
+  - not automated: the right act is another command, whose arguments the call does not carry
+- **Direct vitest run** (`direct-vitest-run`, `docs/josh-commands.md` → "`josh test:related`")
+  - fires: `pnpm josh pretool:guard` — `vitest run` or bare `vitest` (directly, through `pnpm` / `npx` / `pnpm exec`, or inside `sh -c`); it points at `pnpm josh test:related`. Every occurrence
+  - silent: `pnpm josh test:related`, `--project` / `--config` / `-c`, another subcommand (`bench`, `list`, …), `--help` / `--version`, or a run inside `pnpm josh reserved-run`
   - not automated: the right act is another command, whose arguments the call does not carry
 - **Timed re-run** (`timed-rerun`, `measurement.md`)
   - fires: `pnpm josh pretool:guard` — a command timed with `time` / `/usr/bin/time` / `hyperfine`
@@ -133,7 +157,7 @@
   - silent: `gh issue close` or removing an Issue label — the workflow's own steps
   - not automated: the call must not run at all, or only on a person's word — refusing is the remedy
 - **Protected file** (`protected-file`, `operating-rules.md`)
-  - fires: `pnpm josh pretool:guard` — a `Read`, `Edit` or `Write` of `.env` (or a shell read or write of it), or an `Edit` / `Write` of `.claude/settings.json` outside kit. Every occurrence
+  - fires: `pnpm josh pretool:guard` — a `Read`, `Grep`, `Edit` or `Write` of `.env` or a credential file such as gh `hosts.yml`, Codex `auth.json`, `~/.netrc` or `~/.ssh/**` (or a shell read or write of one), or an `Edit` / `Write` of `.claude/settings.json` outside kit. Every occurrence
   - silent: kit itself, or the user's `~/.claude/settings.json`
   - not automated: the call must not run at all, or only on a person's word — refusing is the remedy
 - **Direct PR creation** (`direct-pr-create`, `operating-rules.md` → "git-rules")
@@ -148,9 +172,17 @@
   - fires: `pnpm josh pretool:guard` — a `gh api` POST / PUT / PATCH (path or URL) to the rulesets, branch protection, collaborators, invitations, secrets, variables, hooks, keys, environments, actions permissions or transfer, a `PATCH` of the repository, the matching GraphQL mutations, `gh secret` / `gh variable` writes, `gh repo edit` / `deploy-key` writes. Every occurrence
   - silent: `gh secret list`, `gh variable get`, a `gh api` read — a `DELETE` is `destructive-command`
   - not automated: the call must not run at all, or only on a person's word — refusing is the remedy
+- **Network egress or credential print** (`egress`, `SECURITY.md` → "Secrets")
+  - fires: `pnpm josh pretool:guard` — network sends, inline interpreter execution, direct `gh` writes, `git push` without explicit `origin`, credential, keychain or environment prints — in each shell segment and nested command. Every occurrence
+  - silent: ordinary reads, `gh` reads against github.com, `git fetch`, `git push origin`, named scripts and `pnpm josh` routes. A plain `curl` / `wget` is still refused by the deny list; the hook allows local or GitHub destinations with known flags
+  - not automated: the call must not run at all, or only on a person's word — refusing is the remedy
 - **Output poll loop** (`poll-loop`, `.claude/skills/workflow-commands/background-commands.md`)
   - fires: `pnpm josh pretool:guard` — a hand-written `while` / `until` wait loop over a command's output, a marker file or a process, a counted `for` that sleeps, or a `sleep` chain of 10 s or more before a read of a file or process. Every occurrence
   - silent: the command started with `run_in_background` — its exit ends the wait
+  - not automated: the right act is another command, whose arguments the call does not carry
+- **Direct git status** (`direct-git-status`, `docs/josh-commands-backlog.md` → "`josh tree:status`")
+  - fires: `pnpm josh pretool:guard` — a `git status` with no flag or only `-s` / `--short` / `-b` / `--branch` / `--porcelain` (bare, wrapped or inside `sh -c`); it points at `pnpm josh tree:status`. Once per run
+  - silent: `pnpm josh tree:status`, a global flag before the subcommand (`git -C <dir> status`), or a pathspec or any other flag
   - not automated: the right act is another command, whose arguments the call does not carry
 - **The implementation-phase cut** (`implementation-cut`, `.claude/skills/workflow-commands/pre-gate-cut.md` → "It is a guard, fired at the edit that crosses the threshold")
   - fires: `pnpm josh pretool:guard` — an `Edit` / `Write` by an uncut lane child whose recent context is over the `pnpm josh cost --cut` threshold; it hands over `pnpm josh run:cut --impl <N> --handoff <path>`. At each threshold crossing

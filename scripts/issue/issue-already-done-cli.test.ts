@@ -1,11 +1,12 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_already_done_cli } from './issue-already-done-cli'
 
 // joshuafolkken/kit#4130: the already-merged exit as one command. The GitHub writes and the hold
 // release are mocked, so the order they run in — and where a failure stops it — is read back.
+// joshuafolkken/kit#7079: evidence citing the merge closes the issue; evidence citing none labels it.
 
 const { issue_comment, issue_apply_label, issue_close, issue_get_body, release } = vi.hoisted(
 	() => ({
@@ -18,7 +19,10 @@ const { issue_comment, issue_apply_label, issue_close, issue_get_body, release }
 					label: string,
 				) => Promise<{ is_applied: true } | { is_applied: false; reason: string }>
 			>(),
-		issue_close: vi.fn<() => Promise<boolean>>(),
+		issue_close:
+			vi.fn<
+				(issue_number: string, comment: string | undefined, reason?: string) => Promise<boolean>
+			>(),
 		release: vi.fn<(argv: ReadonlyArray<string>) => Promise<number>>(),
 	}),
 )
@@ -29,12 +33,26 @@ vi.mock('#scripts/gh/git-gh-command', () => ({
 
 vi.mock('#scripts/run/hold/run-hold-cli', () => ({ run_hold_cli: { run: release } }))
 
+// joshuafolkken/kit#7093: whether the evidence checks is `already-done-citation.ts`'s own question
+// (its suite reads GitHub's answers); here it answers a merged pull request unless a test refuses.
+const { close_refusal } = vi.hoisted(() => ({
+	close_refusal: vi.fn<(evidence: string) => Promise<string | undefined>>(),
+}))
+
+vi.mock('#scripts/issue/already-done-citation', () => ({
+	already_done_citation: { close_refusal },
+}))
+
 const ISSUE = '4130'
 const FLAG = '--evidence-file'
 const EVIDENCE = 'merged in #4000\n- criterion 1: scripts/a.ts:12\n'
-const work = mkdtempSync(path.join(tmpdir(), 'issue-already-done-cli-'))
+const make_directory = temporary_directory('suite')
+const work = make_directory('issue-already-done-cli-')
 const EVIDENCE_FILE = path.join(work, 'evidence.md')
+const UNCITED_FILE = path.join(work, 'uncited.md')
 const EMPTY_FILE = path.join(work, 'empty.md')
+const LABEL = 'already-done'
+const REFUSAL = '#4000 is not merged'
 
 // joshuafolkken/kit#4504: the body of #4446, the follow-up measurement a lane exited here instead
 // of with `issue:measured`.
@@ -54,6 +72,7 @@ const MEASUREMENT_BODY = [
 const WORK_BODY = '## 背景\n\n- 種別: 不具合\n- 優先度: 通常\n'
 
 writeFileSync(EVIDENCE_FILE, EVIDENCE)
+writeFileSync(UNCITED_FILE, '- criterion 1: scripts/a.ts:12\n')
 writeFileSync(EMPTY_FILE, '  \n\n')
 
 const calls: Array<string> = []
@@ -75,8 +94,13 @@ beforeEach(() => {
 
 		return 0
 	})
-	issue_close.mockReset()
+	issue_close.mockReset().mockImplementation(async () => {
+		calls.push('close')
+
+		return true
+	})
 	issue_get_body.mockReset().mockResolvedValue(WORK_BODY)
+	close_refusal.mockReset().mockResolvedValue(undefined)
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
 })
@@ -85,25 +109,33 @@ afterEach(() => {
 	vi.restoreAllMocks()
 })
 
-afterAll(() => {
-	rmSync(work, { recursive: true, force: true })
-})
-
 describe('issue_already_done_cli.run — the exit in order', () => {
-	it('posts the evidence, then applies already-done, then releases the hold', async () => {
+	it('posts the evidence, labels it, closes it as completed, then releases the hold', async () => {
 		const code = await issue_already_done_cli.run([ISSUE, FLAG, EVIDENCE_FILE])
 
 		expect(code).toBe(0)
-		expect(calls).toStrictEqual(['comment', 'label', 'release'])
+		expect(calls).toStrictEqual(['comment', 'label', 'close', 'release'])
 		expect(issue_comment).toHaveBeenCalledWith(ISSUE, EVIDENCE.trim())
-		expect(issue_apply_label).toHaveBeenCalledWith(ISSUE, 'already-done')
+		expect(close_refusal).toHaveBeenCalledWith(EVIDENCE.trim())
+		expect(issue_apply_label).toHaveBeenCalledWith(ISSUE, LABEL)
+		expect(issue_close).toHaveBeenCalledWith(ISSUE, undefined, 'completed')
 		expect(release).toHaveBeenCalledWith(['--release', ISSUE])
 	})
 
-	it('never closes the issue', async () => {
-		await issue_already_done_cli.run([ISSUE, FLAG, EVIDENCE_FILE])
+	it('labels an issue whose evidence does not check and leaves it open, saying why', async () => {
+		const infos: Array<string> = []
 
+		close_refusal.mockResolvedValue(REFUSAL)
+		vi.spyOn(console, 'info').mockImplementation((line: unknown) => {
+			infos.push(String(line))
+		})
+		const code = await issue_already_done_cli.run([ISSUE, FLAG, UNCITED_FILE])
+
+		expect(code).toBe(0)
+		expect(calls).toStrictEqual(['comment', 'label', 'release'])
+		expect(issue_apply_label).toHaveBeenCalledWith(ISSUE, LABEL)
 		expect(issue_close).not.toHaveBeenCalled()
+		expect(infos.join('\n')).toContain(REFUSAL)
 	})
 
 	it('answers the release exit code', async () => {
@@ -124,14 +156,29 @@ describe('issue_already_done_cli.run — a failure stops at its step', () => {
 		expect(release).not.toHaveBeenCalled()
 	})
 
-	it('releases nothing when the label is not applied', async () => {
+	it('neither closes nor releases when the label is not applied', async () => {
 		issue_apply_label.mockResolvedValue({ is_applied: false, reason: 'HTTP 403' })
 
 		const code = await issue_already_done_cli.run([ISSUE, FLAG, EVIDENCE_FILE])
 
 		expect(code).toBe(1)
 		expect(calls).toStrictEqual(['comment'])
+		expect(issue_close).not.toHaveBeenCalled()
 		expect(release).not.toHaveBeenCalled()
+	})
+
+	it('leaves the labelled issue open for a person and releases it when the close fails', async () => {
+		const errors: Array<string> = []
+
+		issue_close.mockResolvedValue(false)
+		vi.spyOn(console, 'error').mockImplementation((line: unknown) => {
+			errors.push(String(line))
+		})
+		const code = await issue_already_done_cli.run([ISSUE, FLAG, EVIDENCE_FILE])
+
+		expect(code).toBe(0)
+		expect(calls).toStrictEqual(['comment', 'label', 'release'])
+		expect(errors.join('\n')).toContain('the close failed')
 	})
 })
 

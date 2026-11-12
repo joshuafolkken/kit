@@ -1,10 +1,12 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync } from 'node:fs'
 import path from 'node:path'
 import { process_identity } from '#scripts/josh/process-identity'
 import { process_identity_fixture } from '#scripts/josh/process-identity-fixture'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, describe, expect, it } from 'vitest'
 import { run_carry, type CarryClaimRequest, type CarryOwner, type RunCarry } from './run-carry'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#1714: the record exists so a `backlogrun` keeps one budget across its own session
 // cuts. What these tests pin is the part a rewrite would lose first — that a resumed session reads
@@ -17,7 +19,7 @@ import { run_carry, type CarryClaimRequest, type CarryOwner, type RunCarry } fro
 const { DEAD_PID, has_start_probe } = process_identity_fixture
 
 const TEST_PREFIX = 'run-carry-test-'
-const scratch = mkdtempSync(path.join(tmpdir(), TEST_PREFIX))
+const scratch = make_directory(TEST_PREFIX)
 const REPOSITORY = path.join(scratch, 'repository.git')
 const OTHER_REPOSITORY = path.join(scratch, 'other.git')
 
@@ -73,7 +75,6 @@ function dead_owner(): CarryOwner {
 afterAll(() => {
 	rmSync(run_carry.carry_path(REPOSITORY), { force: true })
 	rmSync(run_carry.carry_path(OTHER_REPOSITORY), { force: true })
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 describe('a repository with no run in flight', () => {
@@ -308,12 +309,13 @@ describe('a cut declares the hand-off', () => {
 	it('is spent by the adoption that carries it', () => {
 		const cut = run_carry.apply_change(target(), begun(), { cuts: 1 })
 
-		// Adoption carries every field of the cut record and changes exactly three: it takes the new
-		// owner and spends the hand-off. A strict spread of `cut` with those overrides asserts the whole
+		// Adoption carries the run's fields, takes the new owner and its provider, and spends the
+		// hand-off. A strict spread of `cut` with those overrides asserts the whole
 		// object — nothing is narrowed away — while naming what adoption alone touches. `undefined` from
 		// `adopt_carry` is the exclusive create losing a race, impossible against this suite's own path.
 		expect(run_carry.adopt_carry(target(), cut, dead_owner())).toStrictEqual({
 			...cut,
+			scheduler_provider: undefined,
 			owner_pid: DEAD_PID,
 			owner_start: undefined,
 			is_handed_off: false,
@@ -407,6 +409,7 @@ describe('the issues a backlogrun has finished', () => {
 	// "This invocation named no issues" and "this run has no issues left" are different facts.
 	it('is not reported for an invocation that declared none', () => {
 		expect(run_carry.remaining_of(begun())).toBeUndefined()
+		expect(run_carry.remaining_of({ ...begun(), added: [] })).toBeUndefined()
 	})
 
 	it('is named in the description a refusal message carries', () => {

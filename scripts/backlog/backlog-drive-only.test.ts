@@ -75,15 +75,19 @@ describe('backlog_drive.run_loop — a --only run beside a foreign carried lane'
 		expect(calls).toStrictEqual([`merge ${NAMED}`, `merge ${NAMED_TOO}`, 'offer', 'finish'])
 	})
 
-	it('finishes when one named issue parks and the other merges', async () => {
+	it('triages before finishing when one named issue parks and the other merges', async () => {
 		const { ports, calls } = harness({
 			finished: [NAMED, NAMED_TOO],
 			parked: [NAMED],
-			offers: [only_finish()],
+			offers: [only_finish(), only_finish()],
 		})
 		const end = await backlog_drive.run_loop(state(seeded(ONLY_CARRY, true)), BOUNDED, ports)
 
-		expect(end.reason).toBe('stop')
+		expect(end.reason).toBe('triage')
+		expect(calls).toStrictEqual([`merge ${NAMED}`, `merge ${NAMED_TOO}`, 'offer'])
+		const resumed = await backlog_drive.run_loop(state(), BOUNDED, ports)
+
+		expect(resumed).toMatchObject({ reason: 'stop', is_finish: true })
 		expect(calls.at(-1)).toBe('finish')
 	})
 })

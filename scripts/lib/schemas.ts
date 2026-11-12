@@ -4,7 +4,7 @@ const overrides_snapshot_schema = z.record(z.string(), z.string())
 
 const package_version_schema = z.object({ version: z.string() })
 
-// A package.json identified by both its `name` and `version` — used to confirm a walk-up landed on
+// A package.json identified by both its `name` and `version` confirms a walk-up landed on
 // the intended package root (matching by name) before trusting its version.
 const package_named_version_schema = z.looseObject({ name: z.string(), version: z.string() })
 

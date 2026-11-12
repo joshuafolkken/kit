@@ -108,7 +108,6 @@ function setup_gh_mocks(): void {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 	setup_gh_mocks()
 	vi.mocked(telegram_notify.send_or_report).mockResolvedValue(true)

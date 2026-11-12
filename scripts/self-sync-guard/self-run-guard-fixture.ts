@@ -1,6 +1,6 @@
-import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { expect, vi } from 'vitest'
 
 // `sync` and `init` now refuse a self-run through the same helper, so their guard tests set up and
@@ -18,6 +18,8 @@ const PACKAGE_NAME = '@joshuafolkken/kit'
 const REFUSAL_PREFIX = 'Refusing to sync'
 const MANIFEST_NAME = 'package.json'
 
+const make_directory = temporary_directory('suite')
+
 // Named rather than an inline `() => undefined`, which reads as a value the mock returns; the
 // console output is simply discarded, and the spy is what the assertions read.
 function discard_output(): void {
@@ -25,7 +27,7 @@ function discard_output(): void {
 }
 
 function make_project(name: string): string {
-	const directory = mkdtempSync(path.join(tmpdir(), 'self-run-guard-'))
+	const directory = make_directory('self-run-guard-')
 
 	writeFileSync(path.join(directory, MANIFEST_NAME), JSON.stringify({ name }))
 

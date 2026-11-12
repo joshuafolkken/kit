@@ -9,14 +9,9 @@ import {
 import { epic_add_plan, type PlanInput, type PlanOutcome } from './epic-add-plan'
 import { epic_parse, UNORDERED_DEPENDENCIES } from './epic-parse'
 
-// Declaring an order between two children an epic **already tracks** (joshuafolkken/kit#1701).
-//
-// `--add` used to refuse the whole invocation as "nothing to add", and no other verb could write an
-// order — so a prerequisite discovered between two tracked children had nowhere to go, and the only
-// remaining route was the hand edit this command exists to prevent. A position now reads as a move:
-// the child is spliced out of every chain that named it and re-inserted through the ordinary
-// insertion path, so `--before` still re-points, `--after` still branches, and the vacated chain
-// still closes around it — by construction rather than by a second code path.
+// Positioning an already tracked child must update its order without a hand edit
+// (joshuafolkken/kit#1701). Removing it from every chain before ordinary insertion gives moves the
+// same before/after semantics as additions and closes the vacated chain.
 
 const { child, plan_of, error_of, rows, body_of, tracked_of, declared_of, links_of } =
 	epic_add_fixture

@@ -70,11 +70,81 @@ describe('run_board_lane_state.lanes_of — whose lane it is', () => {
 	})
 
 	it('draws a lane with no record unknown, not guessed at', () => {
-		expect(lanes_of([])).toStrictEqual({ own: new Map(), earlier: new Map(), unknown: [ISSUE] })
+		expect(lanes_of([])).toStrictEqual({
+			own: new Map(),
+			earlier: new Map(),
+			unknown: [ISSUE],
+			ended: new Map(),
+		})
 	})
 
 	it.each<LaneState>(['open', 'ended'])('draws no row of a lane whose record is %s', (state) => {
-		expect(lanes_of([record_of(state)])).toStrictEqual(run_board_lane_state.NO_LANES)
+		expect(lanes_of([record_of(state)])).toMatchObject(run_board_lane_state.NO_LANES)
+	})
+})
+
+// joshuafolkken/kit#6577: a lane this run's record ended keeps when, and by which command.
+describe('run_board_lane_state.lanes_of — an ended lane', () => {
+	it('reads when and by what a record ended this run’s lane', () => {
+		const record = record_of('ended')
+
+		expect(lanes_of([record]).ended).toStrictEqual(
+			new Map([[NUMBER, { ended_ms: Date.parse(record.changed_at), by: record.changed_by }]]),
+		)
+	})
+})
+
+// joshuafolkken/kit#6577: a running lane carries its transcript's result and last write.
+describe('run_board_lane_state.lanes_of — a lane’s transcript', () => {
+	const WRITTEN_MS = 7000
+	const read = { result: 'running', written_ms: WRITTEN_MS } as const
+
+	function with_results(state: LaneState): BoardLanes {
+		return run_board_lane_state.lanes_of({
+			events: [],
+			lanes: [ISSUE],
+			records: new Map([[ISSUE, record_of(state)]]),
+			started_ms: Date.parse(THIS_RUN),
+			results: new Map([[ISSUE, read]]),
+		})
+	}
+
+	it('sets a running lane’s result and last write', () => {
+		expect(with_results('running').own.get(NUMBER)).toMatchObject(read)
+	})
+
+	it('leaves a paused lane without them', () => {
+		const status = with_results('paused').own.get(NUMBER)
+
+		expect(status?.result).toBeUndefined()
+		expect(status?.written_ms).toBeUndefined()
+	})
+})
+
+describe('run_board_lane_state.lanes_of — human review', () => {
+	it.each([THIS_RUN, EARLIER_RUN])('keeps a human-review lane from %s with stopped time', (run) => {
+		const lanes = lanes_of([record_of('human-review', run)])
+		const status = (run === THIS_RUN ? lanes.own : lanes.earlier).get(NUMBER)
+
+		expect(status).toMatchObject({
+			state: 'human',
+			started_ms: Date.parse(LAUNCHED),
+			ended_ms: Date.parse(LATER),
+		})
+
+		if (run === EARLIER_RUN) {
+			expect(run_board_lane_state.earlier_occupied([ISSUE], lanes)).toStrictEqual([ISSUE])
+		}
+	})
+
+	it('ends a human-review child from the event stream without a record', () => {
+		const events = [event_of(1, LAUNCHED, KIND.CHILD_LAUNCH), event_of(2, LATER, KIND.HUMAN_REVIEW)]
+		const status = run_board_status.statuses_of(events, run_board_lane_state.NO_LANES).get(NUMBER)
+
+		expect(status).toMatchObject({ state: 'human', ended_ms: Date.parse(LATER) })
+		expect(status?.spans).toStrictEqual([
+			{ from_ms: Date.parse(LAUNCHED), end_ms: Date.parse(LATER) },
+		])
 	})
 })
 

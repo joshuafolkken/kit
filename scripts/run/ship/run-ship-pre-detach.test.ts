@@ -1,7 +1,9 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const make_directory = temporary_directory()
 
 const run_mock = vi.hoisted(() => vi.fn())
 
@@ -85,15 +87,11 @@ function create(target: string): void {
 }
 
 beforeEach(() => {
-	tree.directory = mkdtempSync(path.join(tmpdir(), 'pre-detach-'))
+	tree.directory = make_directory('pre-detach-')
 	run_mock.mockReset()
 	record_mock.mockClear()
 	is_kit_mock.mockReturnValue(false)
 	answer(new Map())
-})
-
-afterEach(() => {
-	rmSync(tree.directory, { recursive: true, force: true })
 })
 
 describe('run_ship_pre_detach.checks — what runs', () => {
@@ -305,6 +303,30 @@ describe('run_ship_pre_detach.checks — the metrics totals', () => {
 			out: `${heading(metrics)}\n${grown}`,
 			preconditions: STATIC_RED,
 		})
+	})
+})
+
+// joshuafolkken/kit#5442: starting the approval first is insufficient; its write must finish.
+describe('run_ship_pre_detach.checks — an approval write still in progress', () => {
+	it('waits for the approval write to finish before starting verification', async () => {
+		is_kit_mock.mockReturnValue(true)
+		read_tree_mock.mockClear()
+		const metrics = run_ship_pre_detach.METRICS_RERECORD_COMMAND.join(' ')
+		const pinned = vi.fn().mockResolvedValue({ code: OK, out: '' })
+
+		run_mock.mockImplementation(async (list: ReadonlyArray<string>) => {
+			if (list.join(' ') !== metrics) return { exit_code: OK, output: '' }
+
+			await Promise.resolve()
+			expect(commands()).toStrictEqual([metrics])
+			expect(read_tree_mock).not.toHaveBeenCalled()
+			expect(pinned).not.toHaveBeenCalled()
+
+			return { exit_code: OK, output: '' }
+		})
+		await run_ship_pre_detach.checks(tree.directory, undefined, pinned)
+		expect(commands()).toStrictEqual([metrics, ...STATIC])
+		expect(pinned).toHaveBeenCalledOnce()
 	})
 })
 

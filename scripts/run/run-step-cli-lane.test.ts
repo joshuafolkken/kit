@@ -9,10 +9,21 @@ import { run_step } from './run-step'
 
 const ISSUE = '4910'
 const RUN_START = '2026-10-25T14:42:26.000Z'
+const FOREIGN_PID = 5151
+const FOREIGN_CARRY = {
+	kind: 'carried',
+	carry: {
+		started_at: RUN_START,
+		owner_pid: FOREIGN_PID,
+		invocation: 'backlogrun #5381',
+		is_handed_off: false,
+	},
+}
 const lane_child_mock = vi.hoisted(() => vi.fn(() => true))
-const lane_plan_line_mock = vi.hoisted(() => vi.fn())
+const lane_plan_lines_mock = vi.hoisted(() => vi.fn())
 const to_parts_mock = vi.hoisted(() => vi.fn())
 const read_carry_mock = vi.hoisted(() => vi.fn())
+const record_step_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('./run-prep-cli', () => ({
 	run_prep_cli: { parse_number: () => ISSUE, gather: async () => ({}), to_parts: to_parts_mock },
@@ -33,8 +44,9 @@ vi.mock('#scripts/lane/lane-child-marker', () => ({
 	lane_child_marker: { is_child_of: lane_child_mock, marked_issue: () => undefined },
 }))
 vi.mock('./run-step-lane-plan', () => ({
-	run_step_lane_plan: { line_for: lane_plan_line_mock },
+	run_step_lane_plan: { lines_for: lane_plan_lines_mock },
 }))
+vi.mock('./run-step-progress', () => ({ run_step_progress: { record: record_step_mock } }))
 
 const { run_step_cli } = await import('./run-step-cli')
 
@@ -51,6 +63,7 @@ const PARTS: PrepParts = {
 	ship_problems: [],
 }
 const LANE_PLAN_LINE = `pnpm josh lane:plan ${ISSUE} scripts/lane/lane-overrun-mechanisms-cli.ts`
+const IMPORTS_HINT = 'Append `--imports <path>...`'
 const info_mock = vi.fn()
 
 function stream(events: ReadonlyArray<RunEvent>): void {
@@ -68,7 +81,7 @@ beforeEach(() => {
 	lane_child_mock.mockReturnValue(true)
 	to_parts_mock.mockReturnValue(PARTS)
 	read_carry_mock.mockReturnValue({ kind: 'carried', carry: { started_at: RUN_START } })
-	lane_plan_line_mock.mockResolvedValue(undefined)
+	lane_plan_lines_mock.mockResolvedValue([])
 	stream([])
 })
 
@@ -92,13 +105,17 @@ describe('run_step_cli.run — a lane child', () => {
 		expect(printed_lines()[0]).toBe(run_step.IMPLEMENT)
 	})
 
-	it('prints the lane:plan command right under implement', async () => {
-		lane_plan_line_mock.mockResolvedValue(LANE_PLAN_LINE)
+	it('prints the lane:plan command and its --imports hint right under implement', async () => {
+		lane_plan_lines_mock.mockResolvedValue([LANE_PLAN_LINE, IMPORTS_HINT])
 
 		await run_step_cli.run([ISSUE])
 
-		expect(printed_lines().slice(0, 2)).toStrictEqual([run_step.IMPLEMENT, LANE_PLAN_LINE])
-		expect(lane_plan_line_mock).toHaveBeenCalledWith(ISSUE, true)
+		expect(printed_lines().slice(0, 3)).toStrictEqual([
+			run_step.IMPLEMENT,
+			LANE_PLAN_LINE,
+			IMPORTS_HINT,
+		])
+		expect(lane_plan_lines_mock).toHaveBeenCalledWith(ISSUE, true)
 	})
 
 	// joshuafolkken/kit#5016: the whole chain under implement led a lane child into step 1's main:merge.
@@ -106,17 +123,68 @@ describe('run_step_cli.run — a lane child', () => {
 		await run_step_cli.run([ISSUE])
 
 		expect(printed_lines().join('\n')).toContain('0. **A lane child**')
-		expect(printed_lines().join('\n')).not.toContain('1. Run `pnpm josh main:merge`.')
+		expect(printed_lines().join('\n')).not.toContain('`pnpm josh run:chain <N>` in one Bash call')
 	})
 
 	it('prints no lane:plan command away from implement', async () => {
-		lane_plan_line_mock.mockResolvedValue(LANE_PLAN_LINE)
+		lane_plan_lines_mock.mockResolvedValue([LANE_PLAN_LINE])
 		stream([{ pos: 1, at: RUN_START, kind: 'ship-stop', text: `#${ISSUE} gate failed` }])
 
 		await run_step_cli.run([ISSUE])
 
 		expect(printed_lines()[0]).toBe(`pnpm josh ship --log ${ISSUE}`)
 		expect(printed_lines()).not.toContain(LANE_PLAN_LINE)
-		expect(lane_plan_line_mock).not.toHaveBeenCalled()
+		expect(lane_plan_lines_mock).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#6598: the computed position goes to the `step` event writer.
+describe('run_step_cli.run — the fullrun step', () => {
+	it('records the fullrun step of the action it computed', async () => {
+		stream([{ pos: 1, at: RUN_START, kind: 'ship-stop', text: `#${ISSUE} gate failed` }])
+
+		await run_step_cli.run([ISSUE])
+
+		expect(record_step_mock).toHaveBeenCalledWith(
+			ISSUE,
+			`pnpm josh ship --log ${ISSUE}`,
+			'ship-stop',
+		)
+	})
+})
+
+// joshuafolkken/kit#5430: a person running fullrun in a lane is not the batch's dispatched child.
+describe('run_step_cli.run — an interactive fullrun beside a backlog parent', () => {
+	beforeEach(() => {
+		lane_child_mock.mockReturnValue(false)
+		read_carry_mock.mockReturnValue(structuredClone(FOREIGN_CARRY))
+	})
+
+	it.each([run_event_stream.EVENT_KIND.CHILD_LAUNCH, 'merge', 'stop', 'drain'])(
+		'ignores another owner’s %s without changing its carry',
+		async (kind) => {
+			stream([{ pos: 1, at: RUN_START, kind, text: `#${ISSUE} dispatched` }])
+
+			await run_step_cli.run([ISSUE])
+
+			expect(printed_lines()[0]).toBe(run_step.IMPLEMENT)
+			expect(read_carry_mock.mock.results[0]?.value).toStrictEqual(FOREIGN_CARRY)
+		},
+	)
+
+	it('still reads its own ship position beside another owner’s backlog carry', async () => {
+		stream([
+			{ pos: 1, at: RUN_START, kind: 'ship-stop', text: `#${ISSUE} gate failed` },
+			{
+				pos: 2,
+				at: RUN_START,
+				kind: run_event_stream.EVENT_KIND.CHILD_LAUNCH,
+				text: '#99 dispatched',
+			},
+		])
+
+		await run_step_cli.run([ISSUE])
+
+		expect(printed_lines()[0]).toBe(`pnpm josh ship --log ${ISSUE}`)
 	})
 })

@@ -1,16 +1,20 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync } from 'node:fs'
 import path from 'node:path'
 import { git_command } from '#scripts/git/git-command'
+import { lane_state } from '#scripts/lane/lane-state'
 import { test_e2e_stamp } from '#scripts/test/test-e2e-stamp'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_hold } from './run-hold'
 import { run_hold_cli } from './run-hold-cli'
 import { run_stop_notify } from './run-stop-notify'
 
+const make_directory = temporary_directory('suite')
+
 vi.mock('#scripts/git/git-command', () => ({
 	git_command: { git_directories: vi.fn(), head_commit: vi.fn(), status: vi.fn() },
 }))
+vi.mock('#scripts/lane/lane-state', () => ({ lane_state: { record_change: vi.fn() } }))
 
 // The send itself is `run-stop-notify.test.ts`'s; here only which one a marked stop calls.
 vi.mock('./run-stop-notify', () => ({
@@ -22,7 +26,7 @@ vi.mock('#scripts/test/test-e2e-stamp', () => ({
 	test_e2e_stamp: { is_current_tree: vi.fn() },
 }))
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-hold-cli-stop-test-'))
+const scratch = make_directory('run-hold-cli-stop-test-')
 const WORKTREE = path.join(scratch, '.git')
 const TARGET = run_hold.hold_path(WORKTREE)
 const ISSUE = '4135'
@@ -52,13 +56,8 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-	vi.clearAllMocks()
 	vi.restoreAllMocks()
 	rmSync(TARGET, { force: true })
-})
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 describe('a marked stop sends its own confirmation', () => {
@@ -69,6 +68,7 @@ describe('a marked stop sends its own confirmation', () => {
 		expect(run_stop_notify.send_halfrun).toHaveBeenCalledWith(TARGET, ISSUE)
 		expect(run_stop_notify.send_prrun).not.toHaveBeenCalled()
 		expect(out).toEqual([run_hold_cli.HOLD_VERDICT])
+		expect(lane_state.record_change).not.toHaveBeenCalled()
 	})
 
 	it('sends the prrun confirmation on a prrun stop', async () => {
@@ -99,6 +99,11 @@ describe('a needs-human-review stop', () => {
 
 		expect(read.kind === 'held' ? read.hold.is_halfrun_stop : undefined).toBe(true)
 		expect(run_stop_notify.send_human_review).toHaveBeenCalledWith(TARGET, ISSUE)
+		expect(lane_state.record_change).toHaveBeenCalledExactlyOnceWith({
+			issue: ISSUE,
+			state: 'human-review',
+			command: 'run:hold --human-review-stop',
+		})
 		expect(run_stop_notify.send_halfrun).not.toHaveBeenCalled()
 		expect(out).toEqual([run_hold_cli.HOLD_VERDICT])
 	})
@@ -118,6 +123,7 @@ describe('a stop before commit on a tree test:e2e has not answered green on', ()
 			expect(read.kind === 'held' ? read.hold.is_halfrun_stop : 'gone').toBeUndefined()
 			expect(run_stop_notify.send_halfrun).not.toHaveBeenCalled()
 			expect(run_stop_notify.send_human_review).not.toHaveBeenCalled()
+			expect(lane_state.record_change).not.toHaveBeenCalled()
 			expect(out).toEqual([E2E_OWED_VERDICT])
 		},
 	)

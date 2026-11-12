@@ -15,7 +15,7 @@ const { FRESH_STATE, PLAN_RETRY_MS, tick } = run_board_tick
 const CHILDREN = [3439, 3444, 3446]
 const TIME_PATTERN = String.raw`\d\d-\d\d \d\d:\d\d`
 const LAUNCHED_AT = '2026-10-08T08:00:00.000Z'
-// 45 minutes 48 seconds after the launch.
+// A close after launch ensures the terminal row keeps its elapsed duration.
 const CLOSED_MS = Date.parse('2026-10-08T08:45:48.000Z')
 
 function launch(issue: number, pos: number): RunEvent {

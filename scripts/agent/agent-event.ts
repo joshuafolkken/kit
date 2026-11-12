@@ -34,6 +34,7 @@ interface AgentEventState {
 	provider: AgentProvider | undefined
 	launch: AgentLaunch
 	progress: string | undefined
+	last_message?: string | undefined
 	result: AgentResult
 	reason: string | undefined
 	usage: AgentUsage | undefined
@@ -84,7 +85,7 @@ function claude_assistant(value: unknown, state: AgentEventState): AgentEventSta
 	if (!is_claude_assistant(record)) return undefined
 	const progress = claude_progress(record) ?? state.progress
 
-	return { ...state, provider: 'anthropic', progress }
+	return { ...state, provider: 'anthropic', progress, last_message: progress }
 }
 
 function claude_terminal(value: unknown, state: AgentEventState): AgentEventState | undefined {
@@ -99,12 +100,20 @@ function claude_event(value: unknown, state: AgentEventState): AgentEventState |
 	return claude_assistant(value, state) ?? claude_terminal(value, state)
 }
 
+function codex_message(
+	item: z.infer<typeof CODEX_PROGRESS_SCHEMA>['item'],
+	previous: string | undefined,
+): string | undefined {
+	return item?.type === 'agent_message' ? (usable_text(item.text) ?? previous) : previous
+}
+
 function codex_progress(value: unknown, state: AgentEventState): AgentEventState | undefined {
 	const parsed = CODEX_PROGRESS_SCHEMA.safeParse(value)
 	if (!parsed.success) return undefined
 	const progress = usable_text(parsed.data.item?.text) ?? state.progress
+	const last_message = codex_message(parsed.data.item, state.last_message)
 
-	return { ...state, provider: 'openai', progress }
+	return { ...state, provider: 'openai', progress, last_message }
 }
 
 function codex_completed(value: unknown, state: AgentEventState): AgentEventState | undefined {

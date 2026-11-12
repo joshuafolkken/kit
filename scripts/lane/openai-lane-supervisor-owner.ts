@@ -16,7 +16,7 @@ import { openai_lane_supervisor_decision } from './openai-lane-supervisor-decisi
 const OWNER_PREFIX = 'josh-openai-lane-supervisor-'
 const STATE_PREFIX = 'josh-openai-lane-supervisor-state-'
 const CLAIM_POLL_MS = 50
-const CLAIM_POLL_LIMIT = 40
+const CLAIM_POLL_LIMIT = 600
 // The shared owner pair, with the pid narrowed: this record is written only by a live supervisor, so a
 // pid that is not a real one marks it as corrupt rather than as a dead owner.
 const owner_schema = process_owner_schema.extend({
@@ -66,11 +66,27 @@ function active(lane_directory: string): SupervisorOwner | undefined {
 	return owner !== undefined && is_live(owner) ? owner : undefined
 }
 
-async function wait_for_active(lane_directory: string): Promise<SupervisorOwner | undefined> {
-	return await poll.poll_for(() => active(lane_directory), {
+function claim_status(
+	lane_directory: string,
+	pid: number | undefined,
+): { owner: SupervisorOwner | undefined } | undefined {
+	const owner = active(lane_directory)
+	if (owner !== undefined) return { owner }
+	if (pid !== undefined && !process_identity.is_present_pid(pid)) return { owner: undefined }
+
+	return undefined
+}
+
+async function wait_for_active(
+	lane_directory: string,
+	pid?: number,
+): Promise<SupervisorOwner | undefined> {
+	const owner = await poll.poll_for(() => claim_status(lane_directory, pid), {
 		attempts: CLAIM_POLL_LIMIT,
 		interval_ms: CLAIM_POLL_MS,
 	})
+
+	return owner?.owner
 }
 
 // The hard link snapshots the exact owner inode. Several contenders may snapshot one stale owner,

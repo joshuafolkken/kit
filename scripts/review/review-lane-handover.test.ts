@@ -7,8 +7,19 @@ import { review_lane_handover } from './review-lane-handover'
 // the ship ran again. The handover is decided here, from the mark and the ship's own reuse predicate,
 // which already requires the recorded round.
 
-const { reusable_mock } = vi.hoisted(() => ({ reusable_mock: vi.fn() }))
+const { attested_mock, record_mock, reusable_mock } = vi.hoisted(() => ({
+	attested_mock: vi.fn<() => boolean>(),
+	record_mock: vi.fn<() => Promise<{ status: string }>>(),
+	reusable_mock: vi.fn(),
+}))
 
+vi.mock('./review-attest', () => ({ review_attest: { is_attested_on: attested_mock } }))
+vi.mock('./review-checkout', () => ({
+	review_checkout: {
+		read_checkout: async () => ({ root: '/lane', branch: '4850-lane', head: 'h' }),
+	},
+}))
+vi.mock('./review-record', () => ({ review_record: { check: record_mock } }))
 vi.mock('./review-round-reuse', () => ({
 	review_round_reuse: {
 		REUSE: { AGAIN: 'again', DELTA: 'delta', HELD: 'held' },
@@ -109,7 +120,48 @@ describe('review_lane_handover.is_handed_over — the lane mark', () => {
 	})
 })
 
+// joshuafolkken/kit#5655: a widened plan moved the tree off the reused round, and each widen opened
+// another round 1. An attested round refuses the reopen whatever the reuse answer.
+describe('review_lane_handover.is_reopen_refused — the attested round 1', () => {
+	beforeEach(() => {
+		mark(String(ISSUE), true)
+		record_mock.mockResolvedValue({ status: 'ok' })
+		attested_mock.mockReturnValue(true)
+	})
+
+	it('refuses a lane child whose recorded round 1 is attested, without asking the reuse question', async () => {
+		expect(await review_lane_handover.is_reopen_refused(ISSUE)).toBe(true)
+		expect(record_mock).toHaveBeenCalledWith(ISSUE)
+		expect(reusable_mock).not.toHaveBeenCalled()
+	})
+
+	it('keeps run:review open when round 1 was never attested (an interrupted review)', async () => {
+		attested_mock.mockReturnValue(false)
+
+		expect(await review_lane_handover.is_reopen_refused(ISSUE)).toBe(false)
+	})
+
+	it('keeps run:review open when no round is recorded', async () => {
+		record_mock.mockResolvedValue({ status: 'missing' })
+
+		expect(await review_lane_handover.is_reopen_refused(ISSUE)).toBe(false)
+		expect(attested_mock).not.toHaveBeenCalled()
+	})
+
+	it('never refuses outside a lane child', async () => {
+		mark(undefined, false)
+
+		expect(await review_lane_handover.is_reopen_refused(ISSUE)).toBe(false)
+		expect(record_mock).not.toHaveBeenCalled()
+	})
+})
+
 describe('review_lane_handover text', () => {
+	it("routes a widened plan's files to the ship", () => {
+		expect(review_lane_handover.refusal(ISSUE)).toContain(review_lane_handover.SHIP_REVIEWS_LINE)
+		expect(review_lane_handover.SHIP_REVIEWS_LINE).toContain('widened `lane:plan`')
+	})
+
 	it('points the refusal at the ship and names the issue', () => {
 		const text = review_lane_handover.refusal(ISSUE)
 

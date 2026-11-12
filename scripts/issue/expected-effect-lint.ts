@@ -1,3 +1,4 @@
+import { issue_body_keys } from './issue-body-keys'
 import { markdown_section } from './markdown-section'
 
 // joshuafolkken/kit#3909: a run-time-shortening proposal was filed and implemented on a criterion that
@@ -6,9 +7,9 @@ import { markdown_section } from './markdown-section'
 // per miss and where each number came from — before `issue:lint` and `issue:file` accept it. The
 // declaration, the heading and the item labels are the template's, pinned by the document test.
 
-const DECLARATION_LINE = '- 目的: 時間短縮'
-const BACKGROUND_HEADING = '## 背景'
-const HEADING = '## 期待効果'
+const DECLARATION_LINE = issue_body_keys.line('purpose', 'time_saving')
+const BACKGROUND_HEADING = issue_body_keys.heading('background')
+const HEADING = issue_body_keys.heading('expected_effect')
 const RATE_LABEL = '効く率'
 const GAIN_LABEL = '1 回あたりの得'
 const ITEM_LABELS: ReadonlyArray<string> = [RATE_LABEL, GAIN_LABEL, '外れたときの損', '出典']
@@ -22,7 +23,7 @@ const SECONDS_UNIT = '秒'
 const SECONDS_PER_MINUTE = 60
 const NONE = 0
 // A template placeholder value — the `<...>` guidance a filed Issue replaces. It is not an estimate, but a
-// value that only opens with `<` (an upper bound such as `<1 min`) is one, so the placeholder must close with `>` too.
+// value that only opens with `<` (an upper bound on a duration) is one, so the placeholder must close with `>` too.
 const PLACEHOLDER = /^<.*>$/u
 
 // Whether the body declares a run-time-shortening aim under its background heading.
@@ -76,7 +77,7 @@ function weekly_hits(rate: string | undefined): number {
 }
 
 // The minutes one hit saves: the first number the gain states in seconds or minutes — a range written
-// with one closing unit ("3-6 min") reads its upper bound. `0` when it states none.
+// with one closing unit after both numbers reads its upper bound. `0` when it states none.
 function minutes_per_hit(gain = ''): number {
 	const groups = DURATION.exec(gain)?.groups
 	if (groups === undefined) return NONE

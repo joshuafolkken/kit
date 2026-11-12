@@ -3,7 +3,7 @@ import { z } from 'zod'
 
 // A scenario is everything one `josh fresh:run` needs to know: the files that are in the project
 // before anything is installed, the commands a person would type, and the probes recorded after
-// them. kit's own six patterns and a consumer toolkit's spec file are the same shape, so the machine
+// them. kit's own seven patterns and a consumer toolkit's spec file are the same shape, so the machine
 // and the log are shared and nothing about them is kit's alone (joshuafolkken/kit#3714).
 //
 // Inside the container a command reads `$RUN_NAME` (the numbered project and repository name),
@@ -21,7 +21,7 @@ const SCENARIO_SCHEMA = z.strictObject({
 	name: z.string().regex(/^[a-z0-9][a-z0-9-]*$/u),
 	// A GitHub scenario runs on the image that also has git and gh, and receives the host's token.
 	requires_github: z.boolean().default(false),
-	// A Claude Code scenario receives the host's long-lived token as `CLAUDE_CODE_OAUTH_TOKEN`.
+	// A Claude Code scenario installs a pinned binary and receives `CLAUDE_CODE_OAUTH_TOKEN`.
 	requires_claude: z.boolean().default(false),
 	package_source: z.enum(['tarball', 'published']).default('tarball'),
 	files: z.record(z.string().refine(is_project_relative), z.string()).default({}),

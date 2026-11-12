@@ -1,8 +1,8 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it } from 'vitest'
 import { concise_reply } from './concise-reply'
+
+const make_directory = temporary_directory()
 
 const OVER = 'あ'.repeat(concise_reply.PROSE_LIMIT + 1)
 const AT_LIMIT = 'あ'.repeat(concise_reply.PROSE_LIMIT)
@@ -75,15 +75,9 @@ describe('concise_reply.build_reason', () => {
 	})
 
 	it('still names the section when principles.md cannot be read', () => {
-		const root = mkdtempSync(path.join(tmpdir(), 'concise-reply-'))
+		const reason = concise_reply.build_reason(OVER, make_directory('concise-reply-'))
 
-		try {
-			const reason = concise_reply.build_reason(OVER, root)
-
-			expect(reason).toContain(SECTION_CITATION)
-			expect(reason).not.toContain(SECTION_HEADING)
-		} finally {
-			rmSync(root, { recursive: true, force: true })
-		}
+		expect(reason).toContain(SECTION_CITATION)
+		expect(reason).not.toContain(SECTION_HEADING)
 	})
 })

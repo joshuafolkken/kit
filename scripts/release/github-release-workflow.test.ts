@@ -1,10 +1,10 @@
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { ci_yml_fixture } from '#scripts/ci/ci-yml-fixture'
 import { init_logic } from '#scripts/init/init-logic'
-import { afterEach, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 
 const TEMPLATE = 'templates/workflows/github-release.yml'
 const KIT_PUBLISH_WORKFLOW = 'publish.yml'
@@ -14,16 +14,10 @@ const SELECT_STEP = 'release'
 const TAG = 'v0.107.0'
 const RELEASE_COMMAND = 'pnpm josh release:github'
 
-const directories: Array<string> = []
-
-afterEach(() => {
-	for (const directory of directories.splice(0)) rmSync(directory, { recursive: true })
-})
+const make_directory = temporary_directory()
 
 function checkout(has_publish: boolean): string {
-	const directory = mkdtempSync(path.join(tmpdir(), 'github-release-'))
-
-	directories.push(directory)
+	const directory = make_directory('github-release-')
 
 	if (has_publish) {
 		mkdirSync(path.join(directory, '.github/workflows'), { recursive: true })

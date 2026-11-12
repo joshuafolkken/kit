@@ -55,7 +55,8 @@ authorization a person gave, exactly as a delegated child runs `fullrun` in a un
 the keyword. Because the boundary is the budget, the budget has to survive the cut — and the
 conversation is the one place it cannot live, hence the carry record.
 
-**Why `--owner "$PPID"` matters.** It names the parent loop's own long-lived process, which is what
+**Why the owner matters.** It names the parent loop's own long-lived process — the session pid the
+agent exports, so the spelling carries no `$PPID` a shell guard refuses (joshuafolkken/kit#5498) — which is what
 lets `run:carry` answer `busy` instead of letting a second parent count into a budget still being
 spent. Without it every standing record reads as not provably live — refused rather than resumed, so
 nothing is lost silently, but the useful half of the answer is gone. When the sandbox cannot read a
@@ -157,7 +158,7 @@ the `auto-ok` that arrived four minutes later, and a 30-minute watch was a secon
 the run's start**: a bound counted from the start would end a run whose children were still working,
 and would leave a late wait shorter than the one promised. So an empty backlog, a backlog whose every
 opted-in issue waits on a person, and a listing that could not be read all wait the same 8 hours, and
-a child that runs restarts them. **A watch is polled at the loop's one 60-second
+a child that runs restarts them. **A watch is polled at the loop's one 180-second
 interval, the same as a running batch** (joshuafolkken/kit#3691): the loop is a process, so an ask
 spends no AI turn, and a second, slower interval was only a number the documents and the code disagreed
 on; the reason `backlog:budget` prints names the interval so a reader sees it rather than remembering it.

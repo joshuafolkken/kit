@@ -146,9 +146,10 @@ function parse_options(argv: ReadonlyArray<string>, usage: string = USAGE): Next
 // empty listing: reading a failed read as "none" ends the run reporting a confident absence built on
 // a response nobody parsed. They stay apart from each other because the zod
 // rejection `parse_json_array_or_undefined` deliberately rethrows means the listing's *fields*
-// changed, not that the caller's authentication lapsed.
+// changed, not that the caller's authentication lapsed. `is_unchanged` is whether the listing answered
+// 304 throughout (`IssueListOutcome`), recorded by `backlog:next` (joshuafolkken/kit#7306).
 type OptedInRead =
-	| { kind: 'read'; issues: Array<OpenIssueData>; cutoff: ScanCutoff }
+	| { kind: 'read'; issues: Array<OpenIssueData>; cutoff: ScanCutoff; is_unchanged?: boolean }
 	| { kind: 'unreadable' }
 	| { kind: 'unexpected_shape' }
 	| { kind: 'blockers_unreadable' }
@@ -205,7 +206,7 @@ async function classify_failed_read(): Promise<OptedInRead> {
 }
 
 async function fetch_opted_in(): Promise<OptedInRead> {
-	const { json, is_capped } = await git_gh_command.issue_list_by_label_summary(
+	const { json, is_capped, is_unchanged } = await git_gh_command.issue_list_by_label_summary(
 		AUTO_OK_LABEL,
 		LISTING_LIMIT,
 	)
@@ -218,7 +219,7 @@ async function fetch_opted_in(): Promise<OptedInRead> {
 
 	await issue_sample_prime.prime(issues.map((issue) => issue.body))
 
-	return { ...read, issues }
+	return { ...read, issues, is_unchanged: is_unchanged === true }
 }
 
 // Whether every issue this one declares as a blocker has closed. `blockedBy` is the same native
@@ -336,12 +337,16 @@ async function fetch_tracking(count: number): Promise<TrackingRead> {
 // `tracked` is the narrowed set `epic_index.withheld_children` builds, not
 // every tracked child; this function only applies it.
 // What the issue itself must hold: an author with write access (`auto-ok-author.ts`), every blocker
-// closed, and its declared start date reached.
-function is_ready(issue: OpenIssueData, now: number): boolean {
+// closed and its declared start date reached. Its size is the lane's to settle (joshuafolkken/kit#7074).
+interface RunnableOptions {
+	now?: number
+}
+
+function is_ready(issue: OpenIssueData, options: RunnableOptions): boolean {
 	return (
 		auto_ok_author.is_author_trusted(issue) &&
 		is_unblocked(issue) &&
-		issue_not_before.is_due(issue.body, now)
+		issue_not_before.is_due(issue.body, options.now ?? Date.now())
 	)
 }
 
@@ -349,19 +354,22 @@ function is_runnable(
 	issue: OpenIssueData,
 	tracked: ReadonlyMap<number, number>,
 	exclude: ReadonlyArray<number>,
-	now: number = Date.now(),
+	options: RunnableOptions = {},
 ): boolean {
 	if (tracked.has(issue.number)) return false
 
-	return !exclude.includes(issue.number) && is_ready(issue, now)
+	return !exclude.includes(issue.number) && is_ready(issue, options)
 }
 
 function pick_next(
 	issues: ReadonlyArray<OpenIssueData>,
 	tracked: ReadonlyMap<number, number> = new Map(),
 	exclude: ReadonlyArray<number> = [],
+	options: RunnableOptions = {},
 ): OpenIssueData | undefined {
-	return git_next_issues.order(issues).find((issue) => is_runnable(issue, tracked, exclude))
+	return git_next_issues
+		.order(issues)
+		.find((issue) => is_runnable(issue, tracked, exclude, options))
 }
 
 // Why there is nothing to run. "No open issue carries the label" and "every opted-in issue is
@@ -398,7 +406,7 @@ function warn_gaps(context: PickupContext, has_answer: boolean): void {
 
 // Grouped rather than passed one by one: the pickup now answers from two listings, and the
 // parameter limit is four.
-interface PickupContext {
+interface PickupContext extends RunnableOptions {
 	issues: ReadonlyArray<OpenIssueData>
 	cutoff: ScanCutoff
 	tracked: ReadonlyMap<number, number>
@@ -408,7 +416,7 @@ interface PickupContext {
 
 function report(context: PickupContext): number {
 	const { issues } = context
-	const next = pick_next(issues, context.tracked, context.exclude)
+	const next = pick_next(issues, context.tracked, context.exclude, context)
 
 	warn_gaps(context, next !== undefined)
 

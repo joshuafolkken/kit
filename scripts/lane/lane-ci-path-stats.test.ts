@@ -67,6 +67,23 @@ describe('lane_ci_path_stats.table', () => {
 	})
 })
 
+describe('lane_ci_path_stats.table — reruns', () => {
+	it('keeps a ci-wait row with a rerun out of the median and maximum', () => {
+		const rerun: LedgerEntry = {
+			kind: 'stage',
+			at: AT,
+			stage: 'ci-wait',
+			elapsed_ms: 900_000,
+			last_check: 'test',
+			check_ms: { test: 900_000 },
+			has_rerun: true,
+		}
+		const entries = [ci_wait('test', { test: 100_000 }), ci_wait('test', { test: 300_000 }), rerun]
+
+		expect(rows_of(entries)).toStrictEqual(['| test | 2 | 200.0 | 300.0 |'])
+	})
+})
+
 describe('lane_ci_path_stats.last_check_text', () => {
 	it("names the last check of the lane's latest ci-wait row", () => {
 		const entries = [
@@ -80,5 +97,14 @@ describe('lane_ci_path_stats.last_check_text', () => {
 
 	it('is empty where the lane has no ci-wait row naming one', () => {
 		expect(lane_ci_path_stats.last_check_text([ci_wait('e2e', { e2e: 1 })], ISSUE)).toBe('')
+	})
+})
+
+describe('lane_ci_path_stats.last_check_name', () => {
+	it("names the last check of the lane's latest ci-wait row, undefined where none does", () => {
+		const entries = [ci_wait('lint', { lint: 10_000 }, ISSUE), ci_wait('e2e', { e2e: 1 }, ISSUE)]
+
+		expect(lane_ci_path_stats.last_check_name(entries, ISSUE)).toBe('e2e')
+		expect(lane_ci_path_stats.last_check_name(entries, ISSUE + 1)).toBeUndefined()
 	})
 })

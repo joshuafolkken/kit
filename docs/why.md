@@ -113,7 +113,7 @@ Ask for a big feature in one go and the direction drifts halfway, tests go missi
 
 - Plan before starting: `kickoff` writes what will change and how into the Issue, then stops. Implementation reads that first.
 - One Issue = one PR = one verification: every change passes the gate and the review, so a diff stays a size you can read.
-- Split when too big: when the work separates into independently shippable parts and exceeds one verification (roughly 10 files or 400 lines), kit creates child Issues under an epic and stops; `backlogrun` works through them later. The split decision uses the same criteria every time, and the default is not to split.
+- Split when too big: when the work separates into independently shippable parts and exceeds one verification (a file-count or line-count guide, tests excluded), kit creates child Issues under an epic and stops; `backlogrun` works through them later. The split decision uses the same criteria every time, and the default is not to split.
 
 ### I spend all day talking to the agent
 
@@ -185,7 +185,7 @@ You let the agent file what it notices along the way, and three Issues say the s
 
 **Every filing checks the existing Issues for a duplicate first.** A duplicate is folded into the existing Issue instead of filed, and a related epic takes it in. A filing that skips the check is stopped on the spot.
 
-When more than 30 Issues are open, nothing new is filed until one is closed. If nothing can honestly be closed, the filing is dropped. The only exceptions are a filing the work itself needs, and an interrupt such as a verification giving a wrong answer or data being lost.
+When more than 30 Issues are open (the default, which a repository can change or turn off), nothing new is filed until one is closed. If nothing can honestly be closed, the filing is dropped. The only exceptions are a filing the work itself needs, and an interrupt such as a verification giving a wrong answer or data being lost.
 
 ## Writing TypeScript
 
@@ -261,7 +261,7 @@ If you read this far thinking "I built something like this in my own repository"
 
 Update kit and the sync command brings the project along. The same keyword works the same way in every project. (Everything above reaches a `full`-profile project; a `basic` project gets only short rules and minimal formatting and Git settings.)
 
-For scale: there are 193 `josh` commands, and **127 of them are meant to be run by the agent**, not by a person. That is what it means to be built with the agent as the primary user, rather than having AI support bolted on later.
+For scale: **most of the `josh` commands are meant to be run by the agent**, not by a person — the [command catalog](josh-command-catalog.md) lists each one with its audience. That is what it means to be built with the agent as the primary user, rather than having AI support bolted on later.
 
 ## What to know up front
 

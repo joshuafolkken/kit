@@ -1,15 +1,16 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
+import { rmSync } from 'node:fs'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { git_gh_pr_read } from '#scripts/gh/git-gh-pr-read'
 import { git_gh_repo } from '#scripts/gh/git-gh-repo'
 import { git_command } from '#scripts/git/git-command'
 import { telegram_test } from '#scripts/notify/telegram-test'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_hold } from './run-hold'
 import { run_hold_session } from './run-hold-session'
 import { run_stop_notify } from './run-stop-notify'
+
+const make_directory = temporary_directory('suite')
 
 const ISSUE = '4135'
 const TITLE = 'Send the stop confirmation'
@@ -23,7 +24,7 @@ const FULLRUN = 'fullrun #4135'
 const NEXT_LINE = 'Next: prrun #4135 | fullrun #4135'
 const RECOMMENDATION_TITLE = 'keeps the recommendation and the alternative the skill text named'
 const FACTS = { issue: ISSUE, title: TITLE, issue_url: ISSUE_URL }
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-stop-notify-test-'))
+const scratch = make_directory('run-stop-notify-test-')
 const TARGET = run_hold.hold_path(scratch)
 
 function sent_values(): unknown {
@@ -48,10 +49,6 @@ beforeEach(() => {
 afterEach(() => {
 	vi.restoreAllMocks()
 	rmSync(TARGET, { force: true })
-})
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 describe('halfrun_values', () => {

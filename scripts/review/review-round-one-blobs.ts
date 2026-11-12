@@ -134,16 +134,24 @@ function sides_of(relative: string, readings: Readings): Sides {
 	}
 }
 
+// A path's carry: `true` where it reproduces the file now, `false` where it differs, `undefined` where
+// git cannot make it — a conflict, or a side that does not hold the path.
+function carried_answer(relative: string, readings: Readings, root: string): boolean | undefined {
+	const carried = carried_blob(sides_of(relative, readings), root)
+
+	return carried === undefined ? undefined : carried === readings.now[relative]
+}
+
 function differing(
 	paths: ReadonlyArray<string>,
 	readings: Readings,
 	root: string,
 ): ReadonlyArray<string> | undefined {
-	const carried = paths.map((relative) => carried_blob(sides_of(relative, readings), root))
+	const answers = paths.map((relative) => carried_answer(relative, readings, root))
 
-	if (carried.includes(undefined)) return undefined
+	if (answers.includes(undefined)) return undefined
 
-	return paths.filter((relative, index) => carried[index] !== readings.now[relative])
+	return paths.filter((_relative, index) => answers[index] === false)
 }
 
 function read_readings(
@@ -172,15 +180,41 @@ function delta_of(input: Carry, root: string): ReadonlyArray<string> | undefined
 	return readings === undefined ? undefined : differing(paths, readings, root)
 }
 
+function carry_of({ blobs, from, to, paths }: CarryInput): Carry | undefined {
+	if (blobs === undefined || from === undefined || to === undefined) return undefined
+
+	return { blobs, from, to, paths }
+}
+
 function carried_delta(input: CarryInput): ReadonlyArray<string> | undefined {
-	const { blobs, from, to } = input
+	const carry = carry_of(input)
 	const root = repository_root()
 
-	if (root === undefined || blobs === undefined || from === undefined || to === undefined) {
-		return undefined
-	}
+	return carry === undefined || root === undefined ? undefined : delta_of(carry, root)
+}
 
-	return delta_of({ blobs, from, to, paths: input.paths }, root)
+type CarryAnswers = Readonly<Record<string, boolean | undefined>>
+
+function answers_of(carry: Carry, root: string): CarryAnswers | undefined {
+	const { paths } = carry
+	const readings = paths.length === 0 ? undefined : read_readings(carry, paths, root)
+
+	if (paths.length === 0) return {}
+	if (readings === undefined) return undefined
+
+	return Object.fromEntries(
+		paths.map((relative) => [relative, carried_answer(relative, readings, root)]),
+	)
+}
+
+// **Each path's carry on its own** (joshuafolkken/kit#5791): a path git cannot carry answers
+// `undefined` for itself, never for the paths beside it, as `carried_delta` does over the whole record.
+// `undefined` overall only where there is nothing to carry from or git cannot read the sides.
+function carried_each(input: CarryInput): CarryAnswers | undefined {
+	const carry = carry_of(input)
+	const root = repository_root()
+
+	return carry === undefined || root === undefined ? undefined : answers_of(carry, root)
 }
 
 function unmoved_between(
@@ -216,6 +250,6 @@ function capture(paths: ReadonlyArray<string>): Record<string, string> | undefin
 	return root === undefined ? undefined : hash_paths(root, paths, WRITE_FLAGS)
 }
 
-const review_round_one_blobs = { capture, carried_delta, unmoved }
+const review_round_one_blobs = { capture, carried_delta, carried_each, unmoved }
 
 export { review_round_one_blobs }

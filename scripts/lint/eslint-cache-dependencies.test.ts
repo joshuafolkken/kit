@@ -1,19 +1,11 @@
-import {
-	existsSync,
-	mkdirSync,
-	mkdtempSync,
-	readFileSync,
-	realpathSync,
-	rmSync,
-	writeFileSync,
-} from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { ESLINT_CACHE_FILE, ESLINT_CACHE_FLAGS } from '#scripts/josh/josh-command-types'
 import type { BufferedProcessResult } from '#scripts/lib/buffered-process'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { execa } from 'execa'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { eslint_cache_dependencies } from './eslint-cache-dependencies'
 
 // joshuafolkken/kit#4415. Only the file the caller imports changes, and the value it hands over
@@ -42,9 +34,10 @@ const TSCONFIG = {
 	include: ['*.ts'],
 }
 
-const created_root = mkdtempSync(path.join(tmpdir(), 'kit-eslint-cache-dependencies-'))
-const project = path.join(realpathSync(created_root), 'project')
-const config_file = path.join(realpathSync(created_root), 'eslint.config.js')
+const make_directory = temporary_directory('suite')
+const created_root = realpathSync(make_directory('kit-eslint-cache-dependencies-'))
+const project = path.join(created_root, 'project')
+const config_file = path.join(created_root, 'eslint.config.js')
 const cache_file = path.join(project, ESLINT_CACHE_FILE)
 const UNCACHED_FLAGS = ['--cache-location', `${ESLINT_CACHE_FILE}.uncached`]
 
@@ -91,10 +84,6 @@ async function run_guarded(): Promise<BufferedProcessResult> {
 		project,
 	)
 }
-
-afterAll(() => {
-	rmSync(created_root, { recursive: true, force: true })
-})
 
 describe('eslint_cache_dependencies.guard — the imports unchanged', () => {
 	it('lints the caller green and caches it', async () => {
@@ -188,5 +177,31 @@ describe('eslint_cache_dependencies.guard — a project with no tsconfig.json', 
 		)
 
 		expect(answered).toBe('ran')
+	})
+})
+
+async function counted_drop(): Promise<unknown> {
+	const { drop } = await eslint_cache_dependencies.guard_counted(
+		ESLINT_CACHE_FILE,
+		async () => 'ran',
+		project,
+	)
+
+	return drop
+}
+
+// joshuafolkken/kit#6984: a slow CI lint is read against how many entries the drop sent back to eslint.
+describe('eslint_cache_dependencies.guard_counted — the drop it answers', () => {
+	it('answers no entry dropped while the imports hash as recorded', async () => {
+		writeFileSync(path.join(project, REFERENCED), TYPED_VALUE)
+		await run_guarded()
+
+		expect(await counted_drop()).toEqual({ dropped: 0, total: 1 })
+	})
+
+	it('answers the entry whose import changed as dropped', async () => {
+		writeFileSync(path.join(project, REFERENCED), ANY_VALUE)
+
+		expect(await counted_drop()).toEqual({ dropped: 1, total: 1 })
 	})
 })

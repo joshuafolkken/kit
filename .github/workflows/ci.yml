@@ -32,6 +32,21 @@ env:
 # pnpm version resolution, the store cache, the safe-chain installer pin and the install
 # (joshuafolkken/kit#2982).
 jobs:
+  change-scope:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+    outputs:
+      runtime: ${{ steps.scope.outputs.runtime }}
+      publish: ${{ steps.scope.outputs.publish }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/change-scope
+        id: scope
   # Every other job runs on the Node.js version `.github/actions/setup-node` names, while `engines`
   # and the esbuild target accept Node 22 and a consumer may already be on 26. This job builds the
   # package and starts the bundled CLI on both ends of that range, so a syntax or API the oldest
@@ -243,22 +258,24 @@ jobs:
   # unguarded. So the two halves run under new names and `Checks` stays exactly what the ruleset
   # already requires: a job that is green only when both halves are.
   #
-  # **The static half is a matrix of three legs** (joshuafolkken/kit#5215). On one runner its seven
+  # **The static half is a matrix of legs** (joshuafolkken/kit#5215). On one runner its seven
   # checks took 4.1 minutes while every unit shard was done in about two, so it was the critical path
   # to `Checks`. Each leg is still `josh gate`, narrowed by `--static-group` to the partition
   # `scripts/gate/gate-static-group.ts` defines, and restores only the caches its checks write — a leg
   # that restored a cache it never writes would save it back unchanged under the same sha-keyed name,
   # racing the leg that does write it. `needs.static-checks.result` is `success` only when every leg is.
+  # joshuafolkken/kit#7108: lint runs as two legs, `lint-1` and `lint-2`, one `josh lint --shard` each —
+  # one leg linted the whole tree in 156 s at the median and about 220 s after a core-module change.
   static-checks:
     name: Static Checks (${{ matrix.group }})
     needs: reuse-pr-checks
     if: ${{ !cancelled() && needs.reuse-pr-checks.outputs.reuse != 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 12
     strategy:
       fail-fast: false
       matrix:
-        group: [lint, types, rest]
+        group: [lint-1, lint-2, types, rest]
     permissions:
       contents: read
       packages: read
@@ -280,7 +297,7 @@ jobs:
           registry-url: 'https://npm.pkg.github.com'
 
       - name: Setup ESLint cache
-        if: matrix.group == 'lint'
+        if: startsWith(matrix.group, 'lint-')
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: eslint-cache
         with:
@@ -305,11 +322,14 @@ jobs:
           # list every local reuse reads — the cache is restored before the install, with no tsx to run
           # it. The lockfile and eslint config hashes move it with the two inputs ESLint's own
           # per-entry check does not cover.
-          key: ${{ runner.os }}-eslint-cache-${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}-${{ github.sha }}
+          # joshuafolkken/kit#6118: PR-local restore-keys are tried before main's entries.
+          # Keep the config hash in every prefix so an old PR cache cannot hide main's warm lineage.
+          # joshuafolkken/kit#7126: the matrix group follows `eslint-cache-`, so each lint leg keeps its
+          # own lineage, prefix and artifact — the seed and warm jobs below carry the same group.
+          key: ${{ runner.os }}-eslint-cache-${{ matrix.group }}-${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-eslint-cache-${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}-
-            ${{ runner.os }}-eslint-cache-${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('pnpm-lock.yaml') }}-
-            ${{ runner.os }}-eslint-cache-${{ steps.setup-node.outputs.node-version }}-
+            ${{ runner.os }}-eslint-cache-${{ matrix.group }}-${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}-${{ hashFiles('pnpm-lock.yaml') }}-
+            ${{ runner.os }}-eslint-cache-${{ matrix.group }}-${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}-
 
       # `.tsbuildinfo` and `.cspellcache` were not cached in CI at all, so the type check and spell
       # check ran cold on every run. Both are content-addressed — `tsc` records its compiler options
@@ -349,9 +369,10 @@ jobs:
       # the whole tree cold on every run. Prettier hashes each file's absolute path into its entry
       # (`scripts/josh/josh-command-types.ts` → `GATE_CACHE_SPECS`), which is why no lane shares it,
       # but the runner checks out to the same path on every run, so an earlier run's entries hit. The
-      # key is the eslint cache's shape: lockfile and prettier config hashes, then the sha.
+      # key is the eslint cache's shape: lockfile and prettier config hashes, then the sha. Only the
+      # `lint-1` leg checks formatting (`scripts/lint/lint-shard.ts`), so only it writes the file.
       - name: Setup prettier cache
-        if: matrix.group == 'lint'
+        if: matrix.group == 'lint-1'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: prettier-cache
         with:
@@ -424,17 +445,17 @@ jobs:
       # transient artifact-service error must not turn this required job red; it continues on error.
       - name: Write ESLint cache prefix
         id: eslint-cache-prefix
-        if: github.event_name == 'pull_request' && matrix.group == 'lint'
+        if: github.event_name == 'pull_request' && startsWith(matrix.group, 'lint-')
         env:
-          ESLINT_CACHE_PREFIX: ${{ runner.os }}-eslint-cache-${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}-
+          ESLINT_CACHE_PREFIX: ${{ runner.os }}-eslint-cache-${{ matrix.group }}-${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}-${{ hashFiles('pnpm-lock.yaml') }}-
         run: printf '%s\n' "${ESLINT_CACHE_PREFIX}" > eslint-cache-prefix
 
       - name: Upload ESLint cache
-        if: github.event_name == 'pull_request' && matrix.group == 'lint'
+        if: github.event_name == 'pull_request' && startsWith(matrix.group, 'lint-')
         continue-on-error: true
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: eslint-cache-${{ github.event.pull_request.number }}
+          name: eslint-cache-${{ github.event.pull_request.number }}-${{ matrix.group }}
           path: |
             .eslintcache
             eslint-cache-prefix
@@ -451,13 +472,18 @@ jobs:
   # an outside author's run can write any `.eslintcache` it likes, and main's scope would then let
   # later pull requests skip lint on that forged record (joshuafolkken/kit#5050).
   seed-eslint-cache:
-    name: Seed ESLint Cache
+    name: Seed ESLint Cache (${{ matrix.group }})
     needs: reuse-pr-checks
     if: ${{ needs.reuse-pr-checks.outputs.reuse == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
     permissions:
       actions: read
+    # joshuafolkken/kit#7126: one leg per `static-checks` lint group, each seeding its own artifact.
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [lint-1, lint-2]
     steps:
       - name: Download the reused run's ESLint cache
         id: download
@@ -467,6 +493,7 @@ jobs:
           RUN_ID: ${{ needs.reuse-pr-checks.outputs.run-id }}
           PULL_NUMBER: ${{ needs.reuse-pr-checks.outputs.pull-number }}
           AUTHOR_ASSOCIATION: ${{ needs.reuse-pr-checks.outputs.author-association }}
+          GROUP: ${{ matrix.group }}
         run: |
           case "${AUTHOR_ASSOCIATION}" in
             OWNER | MEMBER | COLLABORATOR) ;;
@@ -475,12 +502,12 @@ jobs:
               exit 0
               ;;
           esac
-          if ! gh run download "${RUN_ID}" --repo "${REPOSITORY}" --name "eslint-cache-${PULL_NUMBER}"; then
+          if ! gh run download "${RUN_ID}" --repo "${REPOSITORY}" --name "eslint-cache-${PULL_NUMBER}-${GROUP}"; then
             echo '::notice::The reused run left no ESLint cache; saving nothing.'
             exit 0
           fi
           prefix=$(cat eslint-cache-prefix)
-          if ! printf '%s' "${prefix}" | grep -Eq '^[A-Za-z]+-eslint-cache-v[0-9.]+-[0-9a-f]+-[0-9a-f]+-$'; then
+          if ! printf '%s' "${prefix}" | grep -Eq "^[A-Za-z]+-eslint-cache-${GROUP}-v[0-9.]+-[0-9a-f]+-[0-9a-f]+-\$"; then
             echo '::warning::The ESLint cache prefix is not a cache key; saving nothing.'
             exit 0
           fi
@@ -504,7 +531,7 @@ jobs:
   # result in its post step, so the cold lint is paid on main instead of on a pull request. The lint
   # only saves time, so its step continues on error: a red lint still saves, and leaves the job green.
   warm-eslint-lineage:
-    name: Warm ESLint Lineage
+    name: Warm ESLint Lineage (${{ matrix.group }})
     needs: [reuse-pr-checks, seed-eslint-cache]
     if: ${{ !cancelled() && needs.reuse-pr-checks.outputs.reuse == 'true' }}
     runs-on: ubuntu-latest
@@ -512,6 +539,10 @@ jobs:
     permissions:
       contents: read
       packages: read
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [lint-1, lint-2]
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -530,11 +561,10 @@ jobs:
         with:
           path: |
             .eslintcache
-          key: ${{ runner.os }}-eslint-cache-${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}-${{ github.sha }}
+          key: ${{ runner.os }}-eslint-cache-${{ matrix.group }}-${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-eslint-cache-${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}-
-            ${{ runner.os }}-eslint-cache-${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('pnpm-lock.yaml') }}-
-            ${{ runner.os }}-eslint-cache-${{ steps.setup-node.outputs.node-version }}-
+            ${{ runner.os }}-eslint-cache-${{ matrix.group }}-${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}-${{ hashFiles('pnpm-lock.yaml') }}-
+            ${{ runner.os }}-eslint-cache-${{ matrix.group }}-${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}-
 
       - name: Setup pnpm and install dependencies
         if: steps.eslint-cache.outputs.cache-hit != 'true'
@@ -542,11 +572,14 @@ jobs:
         with:
           node-auth-token: ${{ secrets.GITHUB_TOKEN }}
 
+      # joshuafolkken/kit#7108: each leg lints only its group's shard, the files its lineage holds.
       - name: Lint to write this release's lineage
         id: lint
         if: steps.eslint-cache.outputs.cache-hit != 'true'
         continue-on-error: true
-        run: pnpm josh lint
+        run: pnpm josh lint "--shard=${GROUP#lint-}"
+        env:
+          GROUP: ${{ matrix.group }}
 
   # The other half of the gate, on a runner of its own. A GitHub job is its own machine, so this job
   # sets Node up again; the pnpm preamble is the shared `.github/actions/setup-pnpm` action
@@ -571,8 +604,8 @@ jobs:
   # where a small consumer suite would pay the duplicated setup and could leave a shard with no file.
   unit:
     name: Unit Tests (${{ matrix.shard }}/6)
-    needs: reuse-pr-checks
-    if: ${{ !cancelled() && needs.reuse-pr-checks.outputs.reuse != 'true' }}
+    needs: [reuse-pr-checks, change-scope]
+    if: ${{ !cancelled() && needs.reuse-pr-checks.outputs.reuse != 'true' && needs.change-scope.outputs.runtime == 'true' }}
     strategy:
       fail-fast: false
       matrix:
@@ -635,7 +668,7 @@ jobs:
   # shell body is the pattern to keep out of a workflow regardless of the value's provenance.
   checks:
     name: Checks
-    needs: [reuse-pr-checks, static-checks, unit, node-compat]
+    needs: [reuse-pr-checks, static-checks, unit, node-compat, change-scope]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -650,16 +683,26 @@ jobs:
           STATIC_RESULT: ${{ needs.static-checks.result }}
           UNIT_RESULT: ${{ needs.unit.result }}
           NODE_RESULT: ${{ needs.node-compat.result }}
+          SCOPE_RESULT: ${{ needs.change-scope.result }}
+          RUNTIME_CHANGED: ${{ needs.change-scope.outputs.runtime }}
         run: |
+          readonly SUCCESS='success'
           echo "Reuse PR Checks: ${REUSE_RESULT}"
           echo "Static Checks: ${STATIC_RESULT}"
           echo "Unit Tests: ${UNIT_RESULT}"
           echo "Node builds: ${NODE_RESULT}"
-          if [ "${NODE_RESULT}" != 'success' ]; then
+          if [ "${SCOPE_RESULT}" != "${SUCCESS}" ]; then
+            echo "::error::change classification did not pass"
+            exit 1
+          fi
+          if [ "${NODE_RESULT}" != "${SUCCESS}" ]; then
             echo "::error::the Node build matrix did not pass"
             exit 1
           fi
-          if [ "${STATIC_RESULT}" = 'success' ] && [ "${UNIT_RESULT}" = 'success' ]; then
+          if [ "${STATIC_RESULT}" = "${SUCCESS}" ] && [ "${UNIT_RESULT}" = "${SUCCESS}" ]; then
+            exit 0
+          fi
+          if [ "${STATIC_RESULT}" = "${SUCCESS}" ] && [ "${UNIT_RESULT}" = 'skipped' ] && [ "${RUNTIME_CHANGED}" = 'false' ]; then
             exit 0
           fi
           if [ "${REUSE_RESULT}" = 'true' ] && [ "${STATIC_RESULT}" = 'skipped' ] && \
@@ -842,7 +885,7 @@ jobs:
         run: pnpm build
 
       - name: Run E2E tests
-        run: pnpm test:e2e
+        run: pnpm exec playwright test
 
       # continue-on-error because the step exists to collect evidence, and collecting evidence must
       # not be what decides the release: it runs on always(), so a transient artifact-service error
@@ -861,11 +904,12 @@ jobs:
 
   notify-auto-tag:
     name: Notify Auto Tag
-    needs: [checks, security, e2e-detect, e2e]
+    needs: [checks, security, e2e-detect, e2e, change-scope]
     if: |
       always() &&
       github.event_name == 'push' &&
       github.ref == 'refs/heads/main' &&
+      needs.change-scope.outputs.publish == 'true' &&
       needs.checks.result == 'success' &&
       needs.security.result == 'success' &&
       needs.e2e-detect.result == 'success' &&

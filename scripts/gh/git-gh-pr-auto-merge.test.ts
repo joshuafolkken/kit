@@ -64,7 +64,6 @@ function open_pull_routes(): Record<string, string> {
 
 describe('git_gh_pr_auto_merge.pr_enable_auto_merge', () => {
 	beforeEach(() => {
-		vi.clearAllMocks()
 		forget_pr_numbers()
 	})
 
@@ -99,7 +98,6 @@ describe('git_gh_pr_auto_merge.pr_enable_auto_merge', () => {
 
 describe('git_gh_pr_auto_merge.pr_is_merged', () => {
 	beforeEach(() => {
-		vi.clearAllMocks()
 		forget_pr_numbers()
 	})
 
@@ -149,7 +147,6 @@ function too_large_routes(row: Record<string, unknown>): Record<string, GhApiAns
 
 describe('git_gh_pr_auto_merge — a detail refused as too many files changed', () => {
 	beforeEach(() => {
-		vi.clearAllMocks()
 		forget_pr_numbers()
 	})
 
@@ -172,10 +169,6 @@ describe('git_gh_pr_auto_merge — a detail refused as too many files changed', 
 })
 
 describe('git_gh_pr_auto_merge.pr_list_open_with_head_prefix', () => {
-	beforeEach(() => {
-		vi.clearAllMocks()
-	})
-
 	it('keeps this repository’s flush branches and reads whether each has auto-merge on', async () => {
 		mocked_api.mockImplementation(gh_api_routes(open_pull_routes()))
 

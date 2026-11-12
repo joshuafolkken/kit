@@ -21,12 +21,23 @@ interface SetupRead {
 
 const NO_SETUP: SetupRead = { setup: undefined, setup_ms: undefined }
 
-// The stages of a hand-back to a session. Only the supervisor's next hand-off ends one, whatever the
-// session writes to the stream meanwhile.
-const JUDGMENT_STAGES: ReadonlySet<string> = new Set([STAGE.JUDGING, STAGE.SESSION])
+// The stages of a hand-back to a session, and of the retrospective unit the driver waits on at a drain
+// (joshuafolkken/kit#6745). Only the run's next stage ends one, whatever the session or the unit writes
+// to the stream meanwhile.
+const SESSION_STAGES: ReadonlySet<string> = new Set([
+	STAGE.JUDGING,
+	STAGE.SESSION,
+	STAGE.RETROSPECTIVE,
+])
 
 function is_setup(event: RunEvent): boolean {
 	return event.kind === KIND.SETUP
+}
+
+// A launch that returned without a child (`run_event_setup.no_child`): it ends its own lane's stage,
+// and prepares nothing a person waits on.
+function is_refusal(event: RunEvent): boolean {
+	return is_setup(event) && event.text.startsWith(STAGE.NO_CHILD)
 }
 
 function has_launched(events: ReadonlyArray<RunEvent>): boolean {
@@ -42,9 +53,9 @@ function has_started(events: ReadonlyArray<RunEvent>): boolean {
 
 // A lane is opening while the stage naming its issue is newer than the run's newest position: the
 // launch it leads to, or whatever the run did instead, ends it. A stage that names no issue — a
-// hand-off between two children — prepares nothing a person waits on.
+// hand-off between two children — or a refusal prepares nothing a person waits on.
 function is_opening(events: ReadonlyArray<RunEvent>, stage: RunEvent): boolean {
-	if (run_event_scope.issue_named(stage) === undefined) return false
+	if (run_event_scope.issue_named(stage) === undefined || is_refusal(stage)) return false
 
 	const position = events.findLast((event) => !run_event_stream.TRACE_KINDS.has(event.kind))
 
@@ -54,7 +65,7 @@ function is_opening(events: ReadonlyArray<RunEvent>, stage: RunEvent): boolean {
 // Whether the run is at `stage` now: at any stage while it is starting; after that only at one it is
 // itself working through.
 function is_standing(events: ReadonlyArray<RunEvent>, stage: RunEvent): boolean {
-	if (!has_started(events) || JUDGMENT_STAGES.has(stage.text)) return true
+	if (!has_started(events) || SESSION_STAGES.has(stage.text)) return true
 
 	return is_opening(events, stage)
 }
@@ -84,27 +95,31 @@ function is_step_for(event: RunEvent, issue: number): boolean {
 	return is_setup(event) || !run_event_stream.TRACE_KINDS.has(event.kind)
 }
 
-// A stage that names no issue: a hand-off to the driver, a hand-back to a session, or a launch that
-// returned without a child. A lane's launch runs inside one driver pass, so a newer one of these says
-// that launch has returned.
+// A stage that names no issue: a hand-off to the driver or a hand-back to a session. A pass's launches
+// all return before either, so a newer one of these says every launch has returned.
 function is_run_stage(event: RunEvent): boolean {
 	return is_setup(event) && run_event_scope.issue_named(event) === undefined
 }
 
+// A stage of `issue`'s lane itself, not the refusal that ended it.
+function is_lane_stage(event: RunEvent, issue: number): boolean {
+	return is_setup(event) && names(event, issue) && !is_refusal(event)
+}
+
 // The stage `issue`'s own lane is at: the newest stage naming it, until the run does anything else for
-// that issue — its launch, or whatever ended the attempt — or writes a stage naming none, which is all
-// a launch that left no child puts on the stream: the driver says so itself, since a refusal it waits
-// out is followed by no hand-off. Read per issue, so two lanes opened side by side each stand at their
-// own stage whatever the other has reached.
+// that issue — its launch, its refusal (the driver writes that itself, since a refusal it waits out is
+// followed by no hand-off), or whatever ended the attempt — or writes a stage naming none. Read per
+// issue, so two lanes opened side by side each stand at their own stage whatever the other has
+// reached, a refusal of the other included.
 function lane_stage(events: ReadonlyArray<RunEvent>, issue: number): LaneStage | undefined {
 	const step = events.findLast((event) => is_run_stage(event) || is_step_for(event, issue))
 
-	if (step === undefined || !is_setup(step) || !names(step, issue)) return undefined
+	if (step === undefined || !is_lane_stage(step, issue)) return undefined
 
 	return { text: step.text, at_ms: Date.parse(step.at) }
 }
 
-const run_board_setup = { lane_stage, read }
+const run_board_setup = { is_refusal, lane_stage, read }
 
 export { run_board_setup }
 export type { LaneStage, SetupRead }

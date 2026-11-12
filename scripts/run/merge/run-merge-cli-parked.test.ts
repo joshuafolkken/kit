@@ -14,6 +14,16 @@ const emit_mock = vi.hoisted(() => vi.fn())
 const events_mock = vi.hoisted(() => vi.fn())
 const restart_mock = vi.hoisted(() => vi.fn())
 const merge_state_mock = vi.hoisted(() => vi.fn())
+const transcript_mock = vi.hoisted(() => vi.fn())
+
+vi.mock('#scripts/run/run-ending', () => ({
+	run_ending: {
+		read_transcript: transcript_mock,
+		read_exit: vi.fn(),
+		ended_mid_turn: vi.fn(),
+		written_at: vi.fn(),
+	},
+}))
 
 vi.mock('./run-merge-restart', () => ({
 	run_merge_restart: { is_host_restart: restart_mock },
@@ -69,6 +79,7 @@ const CHILD = '2987'
 const IN_PROGRESS = 'in-progress'
 const NEEDS_DECISION = 'needs-decision'
 const CLOSED_STATE = { kind: 'state', state: { state: 'CLOSED', labels: [] } }
+const HUMAN_REVIEW = 'human-review'
 
 function context(): NonNullable<ReturnType<typeof run_merge_cli.parse>> {
 	const ctx = run_merge_cli.parse([CHILD])
@@ -82,6 +93,32 @@ function open_with(labels: ReadonlyArray<string>): unknown {
 	return { kind: 'state', state: { state: 'OPEN', labels } }
 }
 
+describe('run_merge_cli.merge_child — human review', () => {
+	it.each([
+		{ kind: 'written', code: 0, token: '2039', events: 1 },
+		{ kind: 'skipped', code: 1, token: 'retry', events: 0 },
+	])('offers only after retaining the lane: %j', async ({ kind, code, token, events }) => {
+		read_issue_mock.mockResolvedValue({
+			kind: 'state',
+			state: { state: 'OPEN', labels: ['epic', 'needs-human-review'], is_human_review: true },
+		})
+		record_change_mock.mockResolvedValue({ kind })
+
+		expect(await run_merge_cli.merge_child(context())).toMatchObject({ code, token })
+		expect(record_change_mock).toHaveBeenCalledWith({
+			issue: CHILD,
+			state: HUMAN_REVIEW,
+			command: 'run:merge',
+		})
+		expect(release_mock).not.toHaveBeenCalled()
+		expect(emit_mock).toHaveBeenCalledTimes(events)
+
+		if (events > 0) {
+			expect(emit_mock).toHaveBeenCalledWith(HUMAN_REVIEW, `#${CHILD} waiting for human review`)
+		}
+	})
+})
+
 beforeEach(() => {
 	read_issue_mock.mockReset()
 	release_mock.mockReset().mockResolvedValue(true)
@@ -94,6 +131,8 @@ beforeEach(() => {
 	restart_mock.mockReset().mockResolvedValue(false)
 	merge_state_mock.mockReset().mockResolvedValue(true)
 })
+
+beforeEach(() => transcript_mock.mockReset().mockReturnValue(undefined))
 
 // joshuafolkken/kit#3908: a child a person withdrew is settled by `lane:withdraw`, so `run:merge` offers
 // the next child and counts, parks and records nothing — whatever GitHub's state reads.
@@ -142,6 +181,20 @@ describe('run_merge_cli.merge_child — a child waiting on an open blocker', () 
 
 // joshuafolkken/kit#4215: the park event carries the cause, so the board row can name it.
 describe('run_merge_cli.merge_child — a park that gave no cause', () => {
+	it('records a question as needs-decision and ignores the existing failure guard', async () => {
+		read_issue_mock.mockResolvedValue(open_with([IN_PROGRESS]))
+		transcript_mock.mockReturnValue(
+			JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text: 'Proceed?' } }),
+		)
+		do_failed_mock.mockResolvedValue({ carry: { failures: 3 }, is_parked: true, waits: [] })
+
+		const result = await run_merge_cli.merge_child({ ...context(), output: '/stub/question.log' })
+
+		expect(result.token).toBe('2039')
+		expect(result.is_parked).toBe(true)
+		expect(emit_mock).toHaveBeenCalledWith('park', `#${CHILD} parked (needs-decision)`)
+	})
+
 	it('names a session that ended unfinished', async () => {
 		read_issue_mock.mockResolvedValue(open_with([IN_PROGRESS]))
 		do_failed_mock.mockResolvedValue({

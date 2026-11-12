@@ -3,9 +3,9 @@ import { command_memory } from './command-memory'
 import { core_weights } from './core-weights'
 
 // joshuafolkken/kit#4582: `reserved-run` reserved a wrapped command's cores and no memory, so a
-// four-worker typed eslint holding 12 GB was admitted beside four other lanes. Pinned here is the
+// multi-worker typed eslint was admitted beside other lanes until the machine swapped. Pinned here is the
 // reading the wrapper reserves from and the lane rule refuses on: the tool, its worker count, a shell's
-// quoted script, and the 0 MB a command the table does not know keeps.
+// quoted script, and the absence of a reservation for a command the table does not know.
 
 const { MEMORY_MB } = core_weights
 const CORES = 11
@@ -37,6 +37,7 @@ describe('command_memory.estimated_memory_mb', () => {
 		['pnpm vitest run', MEMORY_MB.unit_worker * VITEST_DEFAULT_WORKERS],
 		['pnpm tsc --noEmit', MEMORY_MB.type_check],
 		['pnpm install', MEMORY_MB.install],
+		['pnpm exec playwright test --workers=2', MEMORY_MB.e2e],
 		// A heredoc a shell reads is its script, the `sh -c` escape spelled another way.
 		[`bash <<'EOF'\ncd x\n${ESLINT_FOUR}\nEOF`, MEMORY_MB.lint * FOUR_WORKERS],
 		[`sh -s <<EOF\n${ESLINT_FOUR}\nEOF\necho done`, MEMORY_MB.lint * FOUR_WORKERS],

@@ -1,17 +1,11 @@
 import { doctor_consumer } from '#scripts/doctor/doctor-consumer'
 import { command_usage } from './command-usage'
+import { josh_gh_usage } from './josh-gh-usage'
 import { find_package_directory, josh_logic, UNKNOWN_COMMAND_EXIT_CODE } from './josh-logic'
+import { josh_read_only } from './josh-read-only'
 
 const ARGV_OFFSET = 2
-
-// `--help` and `-h` ask for the listing as plainly as the bare `help` does. They used to fall
-// through to `handle_unknown`, which reached stdout only because the listing was printed there;
-// routing that path to stderr for #825 would otherwise have left `josh --help` printing nothing a
-// pipe could read.
-const HELP_COMMANDS: ReadonlySet<string> = new Set(['help', '--help', '-h'])
-// `josh --all` (and `josh --help --all`) lists every command available in this checkout.
-// A bare `--all` in the command slot is a help request, not a command.
-const ALL_FLAG = '--all'
+const { ALL_FLAG } = josh_read_only
 
 // Both halves go to stderr. The help listing is a diagnosis here, not the answer, and a shell
 // wiring `--port $(josh port dev)` reads stdout alone, so a command name this kit cannot resolve
@@ -52,14 +46,18 @@ async function main(): Promise<void> {
 	const is_all = process.argv.includes(ALL_FLAG)
 	const is_consumer = doctor_consumer.is_kit_consumer(find_package_directory(process.cwd()))
 
-	if (!cmd || cmd === ALL_FLAG || HELP_COMMANDS.has(cmd)) {
+	if (!cmd || josh_read_only.is_help_request(cmd)) {
 		print_help(is_all, is_consumer, process.argv[ARGV_OFFSET + 1])
 
 		return
 	}
 
 	const subcommand_arguments = process.argv.slice(ARGV_OFFSET + 1)
-	const exit_code = await josh_logic.run_command(cmd, subcommand_arguments, is_consumer)
+	const exit_code = await josh_gh_usage.recorded(
+		cmd,
+		subcommand_arguments,
+		async () => await josh_logic.run_command(cmd, subcommand_arguments, is_consumer),
+	)
 
 	if (exit_code === UNKNOWN_COMMAND_EXIT_CODE) handle_unknown(cmd)
 

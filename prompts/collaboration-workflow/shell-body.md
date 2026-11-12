@@ -4,22 +4,22 @@
 
 ### 安全な書き方
 
-**本文をファイルに書いて、パスで渡す。** `--body-file` の本文や計画メモは `.josh/tmp/` に置く（ignore 済みなのでコミットに混ざらない）。
+**本文をファイルに書いて、パスで渡す。** `*-file` に渡す本文や計画メモは `.josh/tmp/` に書く（ignore 済みなのでコミットに混ざらない）。作業ツリー内で git-ignore されていない本文ファイル（`scratchpad/` など）は、`cli_body` で読む `*-file` が拒否する（`scripts/josh/cli-body.ts`）。
 
 ```bash
-pnpm josh issue:comment <N> --body-file <path>
-gh api -X PATCH repos/{owner}/{repo}/issues/<N> --field body=@<path>
-pnpm josh followup "<title> #<N>" --notify-message-file <path>
-pnpm josh notify --task-type confirmation --issue-url "<url>" --body-file <path> --recommended "<choice>"
+pnpm josh issue:comment <N> --body-file .josh/tmp/comment.md
+pnpm josh issue:body <N> --body-file .josh/tmp/body.md
+pnpm josh followup "<title> #<N>" --notify-message-file .josh/tmp/notify.md
+pnpm josh notify --task-type confirmation --issue-url "<url>" --body-file .josh/tmp/notify.md --recommended "<choice>"
 ```
 
-PR コメントも `pnpm josh issue:comment <N> --body-file <path>` で投稿する（REST では PR コメントは issue コメント）。`gh issue comment` / `gh pr comment` は使わない。
+PR コメントも `pnpm josh issue:comment <N> --body-file .josh/tmp/comment.md` で投稿する（REST では PR コメントは issue コメント）。`gh issue comment` / `gh pr comment` は使わない。
 
 ### コメント投稿は `pnpm josh issue:comment` の 1 綴りだけ（joshuafolkken/kit#2304）
 
 自リポジトリへの `gh issue comment` / `gh api` コメント投稿 → `direct-issue-comment` 行が拒否する（`scripts/rules/direct-issue-comment.ts`）。
 
-`-f body=@<path>` は `@<path>` というリテラルを投稿するので、`raw-field-body` 行が拒否する。Issue body 書き換えの `--field body=@<path>` は安全なのでそのまま使う。
+`-f body=@<path>` は `@<path>` というリテラルを投稿するので、`raw-field-body` 行が拒否する。Issue 本文の書き換えは `pnpm josh issue:body`（エピック以外は `issue:lint` を通った本文だけ書く）。コンサルセッションは GET 以外の `gh api` を拒否するので、`gh api -X PATCH` では書けない。
 
 `--body-file` / `--notify-message-file` は `-` で標準入力を読む（実装は `scripts/josh/cli-body.ts`）。`--body` と `--body-file` の同時指定は拒否される。
 

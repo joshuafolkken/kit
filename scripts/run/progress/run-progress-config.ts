@@ -1,7 +1,5 @@
-import { ancestor_directories } from '#scripts/lib/ancestor-directories'
 import { PACKAGE_JSON, package_manifest } from '#scripts/lib/package-manifest'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
-import { z } from 'zod'
 import { run_progress } from './run-progress'
 
 // Where the silence interval comes from, and in what order.
@@ -27,23 +25,14 @@ import { run_progress } from './run-progress'
 // Unknown keys are stripped rather than rejected: this reads a whole `package.json`, and every other
 // field in it is none of this module's business. A present-but-unusable interval fails the parse and
 // falls through, which is the same answer an unusable environment variable already gets.
-const package_schema = z.object({
-	josh: z.object({ progress_interval_minutes: z.number().positive() }).optional(),
-})
-
-function read_declared_minutes(directory: string): number | undefined {
-	return package_manifest.read_manifest_if_valid(directory, package_schema)?.josh
-		?.progress_interval_minutes
-}
-
 function read_package_minutes(start: string): number | undefined {
-	for (const directory of ancestor_directories.list(start)) {
-		const minutes = read_declared_minutes(directory)
-
-		if (minutes !== undefined) return minutes
-	}
-
-	return undefined
+	return package_manifest.read_nearest_value(
+		start,
+		package_manifest.josh_schemas.progress_interval_minutes,
+		function select_minutes(manifest) {
+			return manifest.josh?.progress_interval_minutes
+		},
+	)
 }
 
 function to_ms(minutes: number | undefined): number | undefined {

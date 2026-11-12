@@ -73,7 +73,7 @@ type ClaimingSearch =
 // "there is nothing". The answer is carried out and reported instead.
 async function find_claiming_issues(epic_number: number, repo: string): Promise<ClaimingSearch> {
 	const { json, is_capped } = await git_gh_command.issue_search_body(
-		issue_cite.plain(epic_number),
+		issue_cite.plain_for('github', epic_number),
 		SEARCH_LIMIT,
 	)
 	if (json === undefined) return { kind: 'unreadable' }

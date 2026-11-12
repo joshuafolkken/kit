@@ -1,19 +1,16 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { MAX_REWRITE_CHARS, rewrite_notice } from './format-rewrite-notice'
 
 // Its own temp directory and teardown: vitest isolates test files, so the read_text cases here do not
 // share the sibling suites' fixtures (see format-edited-file.test.ts for why it lives under the OS
 // temp dir).
-const TEST_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'format-rewrite-'))
+const make_directory = temporary_directory('suite')
+const TEST_DIRECTORY = make_directory('format-rewrite-')
 // The formatted single line, reused as the after-side of a build and as read_text's fixture content.
 const FORMATTED_LINE = 'const a = 1\n'
-
-afterAll(() => {
-	rmSync(TEST_DIRECTORY, { recursive: true, force: true })
-})
 
 // The format hook rewrites a file in place, so the model's copy goes stale and its next Edit misses.
 // build returns the fact plus the changed region so the model reissues against current text; an edit

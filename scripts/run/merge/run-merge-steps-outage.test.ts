@@ -1,4 +1,5 @@
 import { lane_registry } from '#scripts/lane/lane-registry'
+import { lane_seat_fixture } from '#scripts/lane/lane-seat-fixture'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 
@@ -50,6 +51,8 @@ beforeEach(() => {
 	vi.spyOn(lane_registry, 'lane_location').mockResolvedValue(CHILD_LANE)
 })
 
+beforeEach(lane_seat_fixture.mock_stop)
+
 describe('run_merge_steps.do_outage — an unanswered ship stop', () => {
 	it('re-dispatches the child without adding to the outage streak', async () => {
 		const apply = carried(OWNED_CARRY)
@@ -77,5 +80,17 @@ describe('run_merge_steps.do_outage — an unanswered ship stop', () => {
 		await run_merge_steps.do_outage(CONTEXT)
 
 		expect(apply).toHaveBeenCalledWith(TARGET, expect.anything(), { outages: 1 })
+	})
+})
+
+// joshuafolkken/kit#7078: the outage cap reads the run-wide streak through this record.
+describe('run_merge_steps.read_record', () => {
+	it('reads the carried outage streak', async () => {
+		carried(OWNED_CARRY)
+
+		expect(await run_merge_steps.read_record()).toStrictEqual({
+			target: TARGET,
+			carry: OWNED_CARRY,
+		})
 	})
 })

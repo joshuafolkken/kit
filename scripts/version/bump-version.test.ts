@@ -21,7 +21,6 @@ const MINOR_BUMPED = '"version": "1.3.0"'
 const MOCK_PKG = JSON.stringify({ name: 'kit', version: BASE_VERSION }, undefined, '\t')
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.mocked(read_file_sync).mockReturnValue(MOCK_PKG)
 })
 

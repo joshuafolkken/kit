@@ -1,4 +1,3 @@
-import { issue_cite } from '#scripts/issue/issue-cite'
 import { UNORDERED_DEPENDENCIES } from './epic-parse'
 import { DEPENDENCY_ARROW, to_issue_reference } from './epic-reference'
 
@@ -38,10 +37,11 @@ function format_dependencies(children: ReadonlyArray<number>, is_ordered: boolea
 	return children.map((child) => to_issue_reference(child)).join(DEPENDENCY_ARROW)
 }
 
-// The command that runs the batch. `backlogrun #E --only` takes the epic itself rather than a list of
-// children: it re-reads the state from GitHub each
-// round, so an interrupted run resumes without anyone retyping the remaining numbers, and a child that
-// needs a decision is parked rather than ending the run. `--only` runs exactly the epic's children and
+// The command that runs the batch, in the form a terminal runs as typed: a `#` would start a shell
+// comment, and `backlogrun-args.ts` reads a bare number as `#N`. `backlogrun E --only` takes the epic
+// itself rather than a list of children: it re-reads the state from GitHub each round, so an
+// interrupted run resumes without anyone retyping the remaining numbers, and a child that needs a
+// decision is parked rather than ending the run. `--only` runs exactly the epic's children and
 // stops, which is the scope the removed `epicrun #E` keyword had.
 //
 // The epic number is not known while its own body is being built, so the placeholder is filled in by
@@ -53,7 +53,7 @@ const EPIC_PLACEHOLDER = '<this epic>'
 function format_run_command(epic_number: number | undefined): string {
 	const epic = epic_number === undefined ? EPIC_PLACEHOLDER : String(epic_number)
 
-	return `backlogrun ${issue_cite.plain(epic)} --only`
+	return `pnpm josh backlogrun ${epic} --only`
 }
 
 // A backlink to the Issue this split came from, when the split originated in another repository.

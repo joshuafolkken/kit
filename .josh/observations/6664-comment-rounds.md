@@ -1,0 +1,2 @@
+- rf:bug-risks | medium | scripts/hooks/hook-ledger-issues.ts:46 | 2026-11-09 | #6664
+- rf:bug-risks | low | scripts/hooks/hook-ledger-cli.ts:65 | 2026-11-09 | #6664

@@ -1,9 +1,10 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { yaml_document } from '#scripts/lib/yaml-document'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { init_ai_copy } from './init-ai-copy'
+import { package_path } from './init-paths'
 
 // `josh init` and `josh sync` read the workspace template through this, so a project's own `.npmrc`
 // window and engine check reach `pnpm-workspace.yaml` instead of kit's defaults (kit#3267).
@@ -11,17 +12,14 @@ const WORKSPACE_YAML = 'pnpm-workspace.yaml'
 const TEMPLATE = 'allowBuilds:\n  esbuild: true\n\nminimumReleaseAge: 1440\nengineStrict: true\n'
 
 describe('init_ai_copy.read_workspace_template', () => {
+	const make_directory = temporary_directory()
 	let project = ''
 	let template_path = ''
 
 	beforeEach(() => {
-		project = mkdtempSync(path.join(tmpdir(), 'workspace-npmrc-'))
+		project = make_directory('workspace-npmrc-')
 		template_path = path.join(project, 'template.yaml')
 		writeFileSync(template_path, TEMPLATE)
-	})
-
-	afterEach(() => {
-		rmSync(project, { recursive: true, force: true })
 	})
 
 	it('carries the .npmrc beside the destination into the template', () => {
@@ -37,5 +35,17 @@ describe('init_ai_copy.read_workspace_template', () => {
 		const destination = path.join(project, WORKSPACE_YAML)
 
 		expect(init_ai_copy.read_workspace_template(template_path, destination)).toBe(TEMPLATE)
+	})
+
+	// kit's own file fences the minimatch override and the import-x patch it needs; the patch file
+	// is not published, so neither may reach a consumer (joshuafolkken/kit#5500).
+	it('drops the kit-only regions of kit’s own workspace file and keeps the rest valid', () => {
+		const destination = path.join(project, WORKSPACE_YAML)
+		const content = init_ai_copy.read_workspace_template(package_path(WORKSPACE_YAML), destination)
+		const parsed = yaml_document.parse_yaml(content) as Record<string, Record<string, string>>
+
+		expect(parsed['patchedDependencies']).toBeUndefined()
+		expect(parsed['overrides']).not.toHaveProperty('minimatch')
+		expect(parsed['overrides']).toHaveProperty('vite')
 	})
 })

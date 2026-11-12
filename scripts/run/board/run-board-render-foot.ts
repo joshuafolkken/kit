@@ -1,3 +1,4 @@
+import { run_board_earlier } from './run-board-earlier'
 import type { BoardHeader } from './run-board-header'
 import { run_board_labels } from './run-board-labels'
 import { run_board_layout } from './run-board-layout'
@@ -30,7 +31,10 @@ function legend_of(header: BoardHeader, notes: ReadonlyArray<BoardNote>): Array<
 	if (layout === undefined) return []
 
 	const rows = run_board_layout.drawn_rows(layout)
-	const leads = new Set(rows.map((row) => run_board_render_icon.state_icon(row)))
+	const leads = new Set([
+		...rows.map((row) => run_board_render_icon.state_icon(row)),
+		...run_board_earlier.marks_of(rows),
+	])
 	const drawn = run_board_render_drawn.drawn_of(header, rows, leads)
 
 	return run_board_render_legend.legend_of(rows, drawn, notes)

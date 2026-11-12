@@ -17,6 +17,16 @@ vi.mock('#scripts/git/git-command', () => ({
 vi.mock('#scripts/git/change-base', () => ({
 	change_base: { resolved_through_merge: vi.fn().mockResolvedValue('base') },
 }))
+vi.mock('#scripts/split/split-relocations', () => ({
+	split_relocations: {
+		without_relocations: vi.fn(
+			async (_root: string, _base: string, numstat: string, added: Array<string>) => ({
+				numstat,
+				added,
+			}),
+		),
+	},
+}))
 
 const FILE_COUNT = 11
 

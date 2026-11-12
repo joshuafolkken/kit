@@ -1,17 +1,15 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import os from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { project_profile } from './project-profile'
 import { workflow_mark } from './workflow-mark'
 
 const WORKFLOW_ENV = 'JOSH_WORKFLOW'
-const roots: Array<string> = []
+const make_directory = temporary_directory('suite')
 
 function fixture(manifest?: Record<string, unknown>): string {
-	const root = mkdtempSync(path.join(os.tmpdir(), 'josh-workflow-mark-'))
-
-	roots.push(root)
+	const root = make_directory('josh-workflow-mark-')
 
 	if (manifest !== undefined) {
 		writeFileSync(path.join(root, 'package.json'), JSON.stringify(manifest))
@@ -26,10 +24,6 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.unstubAllEnvs()
-})
-
-afterAll(() => {
-	for (const root of roots) rmSync(root, { recursive: true, force: true })
 })
 
 describe('the GitHub workflow mark (#3796)', () => {

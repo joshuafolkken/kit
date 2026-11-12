@@ -11,7 +11,7 @@ import type { UsualTimes } from './run-board-usual'
 const MINUTE = 60_000
 const NOW = Date.parse('2026-10-21T09:00:00.000Z')
 const EMPTY_LAYOUT: BoardLayout = { active: [], queued: [], people: [], unreached: [] }
-// One child usually takes 30 minutes.
+// A shared child estimate isolates scheduling from differences in phase duration.
 const USUAL: UsualTimes = new Map<Phase, number>([['implement', 30 * MINUTE]])
 const PER_CHILD = 30 * MINUTE
 // What the running child has left: 30′ usual, 5′ spent.

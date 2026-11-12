@@ -67,6 +67,28 @@ describe('run_board_cli.run --every', () => {
 	})
 })
 
+// joshuafolkken/kit#6597: once a single run's hold is released the board falls back to an older ended
+// run, whose end screen is never pushed as this run's last frame.
+describe('run_board_cli.run --every across runs', () => {
+	it('ends without pushing once the frame draws another run than the first', async () => {
+		const { ports, pushes, clock, read_local } = harness(LOCAL, PLANS)
+		const older: LocalRead = { ...LOCAL, started_ms: START - FIVE_MINUTES_MS }
+		const sleep = vi.fn(async (ms: number) => {
+			clock.now_ms += ms
+		})
+		let read = 0
+
+		read_local.mockImplementation(async () => {
+			read += 1
+
+			return read > 1 ? older : LOCAL
+		})
+		await expect(run_board_cli.run(['--every', '5'], { ...ports, sleep })).resolves.toBe(0)
+
+		expect(pushes).toHaveLength(1)
+	})
+})
+
 describe('run_board_cli.run --every arguments', () => {
 	it.each([[['--every']], [['--every', '0']], [['--every', 'x']], [['--every', '5', '--once']]])(
 		'refuses %j',

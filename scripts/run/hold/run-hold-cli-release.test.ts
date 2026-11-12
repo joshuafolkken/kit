@@ -1,12 +1,14 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync } from 'node:fs'
 import path from 'node:path'
 import { git_command } from '#scripts/git/git-command'
 import { run_label } from '#scripts/run/run-label'
 import { run_preflight } from '#scripts/run/run-preflight'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_hold } from './run-hold'
 import { run_hold_cli } from './run-hold-cli'
+
+const make_directory = temporary_directory('suite')
 
 // The release half of `run-hold-cli.test.ts`, split out when that file reached its 300-code-line
 // limit (joshuafolkken/kit#3182): the refusals, the forced release and the `in-progress` strip.
@@ -19,11 +21,11 @@ vi.mock('#scripts/run/run-preflight', () => ({
 	run_preflight: { CLEAN_VERDICT: 'clean', check: vi.fn() },
 }))
 
-vi.mock('#scripts/run/tidy/run-tidy-cli', () => ({ run_tidy_cli: { sweep: vi.fn() } }))
+vi.mock('#scripts/run/run-maintenance', () => ({ run_maintenance: { sweep: vi.fn() } }))
 vi.mock('#scripts/run/run-label', () => ({ run_label: { unmark: vi.fn() } }))
 
 const unmark = vi.mocked(run_label.unmark)
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-hold-cli-release-test-'))
+const scratch = make_directory('run-hold-cli-release-test-')
 const WORKTREE = path.join(scratch, '.git')
 const ISSUE = '1091'
 const OTHER_ISSUE = '1090'
@@ -53,13 +55,8 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-	vi.clearAllMocks()
 	vi.restoreAllMocks()
 	rmSync(run_hold.hold_path(WORKTREE), { force: true })
-})
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 // joshuafolkken/kit#3182: the manifests stripped the label by hand at every stop that released.

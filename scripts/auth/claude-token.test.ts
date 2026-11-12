@@ -1,8 +1,10 @@
-import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import os from 'node:os'
+import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { claude_token } from './claude-token'
+
+const make_directory = temporary_directory()
 
 const TOKEN = 'sk-ant-oat01-exampleTokenValue_1-2'
 const ENVIRONMENT_TOKEN = 'sk-ant-oat01-fromTheEnvironment'
@@ -36,7 +38,7 @@ function keep(password: string): void {
 }
 
 beforeEach(() => {
-	scratch.directory = mkdtempSync(path.join(os.tmpdir(), 'claude-token-test-'))
+	scratch.directory = make_directory('claude-token-test-')
 	writeFileSync(fake_file('security'), SECURITY)
 	chmodSync(fake_file('security'), EXECUTABLE_MODE)
 	vi.stubEnv('PATH', `${scratch.directory}:${SYSTEM_PATH}`)
@@ -46,7 +48,6 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.unstubAllEnvs()
-	rmSync(scratch.directory, { force: true, recursive: true })
 })
 
 describe('claude_token.read', () => {

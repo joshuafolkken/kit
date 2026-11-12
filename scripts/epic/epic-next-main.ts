@@ -7,10 +7,8 @@ import { epic_next } from './epic-next'
 // bundle is one file, so a main guard there would fire for every command that carries it
 // (joshuafolkken/kit#4186).
 //
-// `.env` is read here rather than through the dispatcher's `tsx_arguments`: declaring any would
-// disqualify this command from in-process dispatch, and an unattended `epicrun` asks it every sixty
-// seconds for the whole life of a run (`josh-environment-file.ts` records the measurement). Inside the
-// guard, so a developer's own `.env` cannot decide what the unit tests see.
+// `.env` is read here, inside the guard, so a developer's own `.env` cannot decide what the unit
+// tests see (`josh-environment-file.ts`).
 //
 // `process.exitCode` rather than `process.exit()`, for the reason `scripts/cost-runtime/cost-main.ts`
 // records: the answer goes to standard output and a write to a pipe is asynchronous on macOS, so

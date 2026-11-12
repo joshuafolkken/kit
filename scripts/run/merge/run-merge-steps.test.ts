@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync } from 'node:fs'
+import { mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
@@ -8,10 +8,14 @@ import { josh_command } from '#scripts/josh/josh-run'
 import { lane_close } from '#scripts/lane/lane-close'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_relaunch } from '#scripts/lane/lane-relaunch'
+import { lane_seat_fixture } from '#scripts/lane/lane-seat-fixture'
 import { poll } from '#scripts/lib/poll'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_cut } from '#scripts/run/cut/run-cut'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
+
+const make_directory = temporary_directory('suite')
 
 const add_label_mock = vi.hoisted(() => vi.fn())
 const unmark_mock = vi.hoisted(() => vi.fn())
@@ -33,6 +37,8 @@ vi.mock('#scripts/lane/lane-reap', () => ({
 vi.mock('#scripts/epic/epic-close', () => ({ epic_close: { close_completed_epics: vi.fn() } }))
 
 const { run_merge_steps } = await import('./run-merge-steps')
+
+beforeEach(lane_seat_fixture.mock_stop)
 
 const CONTEXT = {
 	child: '2070',
@@ -156,7 +162,7 @@ describe('run_merge_steps — carry owner check (joshuafolkken/kit#2114)', () =>
 // joshuafolkken/kit#2476: the merged path removed a lane by force while it still held work the child had
 // popped back from a park, so the close now stashes that work first.
 // A real directory with a `.git` entry, so the merged path reads it as a work tree.
-const LANE_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'lane-'))
+const LANE_DIRECTORY = make_directory('lane-')
 
 mkdirSync(path.join(LANE_DIRECTORY, '.git'))
 const LANE_CLOSE_MESSAGE = `${CONTEXT.child}: uncommitted work at lane close`
@@ -204,7 +210,7 @@ describe('run_merge_steps.do_merged — uncommitted work at lane close', () => {
 	})
 
 	it('stashes the work, records it on the issue, then closes the lane', async () => {
-		vi.spyOn(git_stash, 'has_changes').mockResolvedValue(true)
+		vi.spyOn(git_stash, 'has_work').mockResolvedValue(true)
 
 		await run_merge_steps.do_merged(CONTEXT, vi.fn())
 
@@ -214,7 +220,7 @@ describe('run_merge_steps.do_merged — uncommitted work at lane close', () => {
 	})
 
 	it('closes a clean lane as before, with nothing stashed', async () => {
-		vi.spyOn(git_stash, 'has_changes').mockResolvedValue(false)
+		vi.spyOn(git_stash, 'has_work').mockResolvedValue(false)
 
 		await run_merge_steps.do_merged(CONTEXT, vi.fn())
 
@@ -224,7 +230,7 @@ describe('run_merge_steps.do_merged — uncommitted work at lane close', () => {
 	})
 
 	it('leaves the lane on disk when the stash push fails', async () => {
-		vi.spyOn(git_stash, 'has_changes').mockResolvedValue(true)
+		vi.spyOn(git_stash, 'has_work').mockResolvedValue(true)
 		spies.push.mockRejectedValue(new Error('stash failed'))
 		vi.spyOn(console, 'error').mockReturnValue()
 
@@ -238,7 +244,7 @@ describe('run_merge_steps.do_merged — primary checkout sync', () => {
 	it('synchronizes the primary checkout before closing the merged lane', async () => {
 		const spies = stub_lane_close()
 
-		vi.spyOn(git_stash, 'has_changes').mockResolvedValue(false)
+		vi.spyOn(git_stash, 'has_work').mockResolvedValue(false)
 
 		await run_merge_steps.do_merged(CONTEXT, vi.fn())
 
@@ -263,7 +269,7 @@ describe('run_merge_steps.do_merged — a failed primary checkout sync (joshuafo
 	beforeEach(() => {
 		spies = stub_lane_close()
 		vi.spyOn(poll, 'sleep').mockResolvedValue()
-		vi.spyOn(git_stash, 'has_changes').mockResolvedValue(false)
+		vi.spyOn(git_stash, 'has_work').mockResolvedValue(false)
 	})
 
 	it('retries a transient sync failure and carries on with the merged lane', async () => {
@@ -296,7 +302,7 @@ describe('run_merge_steps.do_merged — a failed primary checkout sync (joshuafo
 describe('run_merge_steps.do_merged — a lane directory that is no work tree', () => {
 	it('closes the remnant of an interrupted close without reading its status', async () => {
 		const spies = stub_lane_close()
-		const status_read = vi.spyOn(git_stash, 'has_changes')
+		const status_read = vi.spyOn(git_stash, 'has_work')
 
 		vi.spyOn(lane_close, 'resolve_lane').mockResolvedValue({
 			existing: undefined,
@@ -345,7 +351,7 @@ describe('run_merge_steps.resume_cut — the fallback relaunch', () => {
 		vi.spyOn(lane_registry, 'find_open_lane').mockResolvedValue(CUT_LANE)
 		vi.spyOn(run_cut, 'lane_cut_sync').mockReturnValue({ target: CUT_TARGET, cut: LANE_CUT })
 		mark = vi.spyOn(run_cut, 'mark_merge_relaunched').mockReturnValue(true)
-		relaunch = vi.spyOn(lane_relaunch, 'resume').mockReturnValue({ kind: 'launched', pid: 1 })
+		relaunch = vi.spyOn(lane_relaunch, 'resume').mockResolvedValue({ kind: 'launched', pid: 1 })
 	})
 
 	it('reads an unadopted cut as resumable and relaunches it at its phase', async () => {
@@ -373,7 +379,7 @@ describe('run_merge_steps.resume_cut — the fallback relaunch', () => {
 	})
 
 	it('reports a relaunch that could not start', async () => {
-		relaunch.mockReturnValue({ kind: 'failed', note: 'no binary' })
+		relaunch.mockResolvedValue({ kind: 'failed', note: 'no binary' })
 
 		expect(await run_merge_steps.resume_cut(CONTEXT.child)).toBe(false)
 	})

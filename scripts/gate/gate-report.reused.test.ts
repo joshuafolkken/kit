@@ -1,18 +1,14 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it, vi } from 'vitest'
 import { gate_report } from './gate-report'
 
 // joshuafolkken/kit#3903: a reused check prints when it last passed, never a duration it did not run.
 // Kept apart from `gate-report.test.ts` because it writes a log file and captures stdout.
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'gate-report-reused-test-'))
+const make_directory = temporary_directory('suite')
+const scratch = make_directory('gate-report-reused-test-')
 const TAKEN_AT = '2026-10-16T01:02:03.000Z'
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
 
 describe('report_gate_steps — a reused check', () => {
 	it('says the check was reused and when its record was taken', () => {

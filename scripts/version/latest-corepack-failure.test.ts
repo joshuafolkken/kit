@@ -17,9 +17,8 @@ vi.mock('./development-engines-verdict', () => ({
 	development_engines_verdict: { report: vi.fn() },
 }))
 
-// #3361: a failed pnpm bump used to be swallowed as a skip (exit 0), so `josh latest` recorded
-// the run as fresh and the pin never moved. Every failure path now exits non-zero with the
-// manifest restored, while a not-newer registry answer stays a non-fatal skip.
+// A failed pnpm bump must restore the manifest and fail so `josh latest` cannot record it as fresh.
+// A registry answer that is not newer remains a successful skip (#3361).
 
 const mocked_execa_sync = vi.mocked(execaSync)
 const mocked_read_file_sync = vi.mocked(readFileSync)

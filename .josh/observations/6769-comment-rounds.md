@@ -1,0 +1,2 @@
+- rf:tests | low | tools/josh/josh-ready.test.ts:144 | 2026-11-09 | #6769
+- rf:bug-risks | low | tools/hooks/bundle-rebuild-lock.ts:30 | 2026-11-09 | #6769

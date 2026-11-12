@@ -6,7 +6,7 @@ import { issue_cite } from '#scripts/issue/issue-cite'
 const STOP_PATTERN = /^#\d+ (?<reason>\S+) failed(?: \((?<cause>\S+)\))? — /u
 
 function format(issue: string, reason: string, cause: string): string {
-	return `${issue_cite.plain(issue)} ${reason} failed (${cause}) — pnpm josh ship --log ${issue}`
+	return `${issue_cite.plain_for('program', issue)} ${reason} failed (${cause}) — pnpm josh ship --log ${issue}`
 }
 
 function reason_of(text: string): string | undefined {

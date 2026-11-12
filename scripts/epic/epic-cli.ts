@@ -14,6 +14,9 @@ const ORDERED_FLAG = '--ordered'
 const RATIONALE_FLAG = '--rationale-file'
 const ORIGIN_FLAG = '--origin'
 const PROMOTE_FLAG = '--promote'
+// `--promote`'s rename of the promoted issue — the split path's English title, applied in the same call
+// rather than by a separate `gh api` PATCH.
+const TITLE_FLAG = '--title'
 const ADD_FLAG = '--add'
 // `--reconcile <E>`: bring the epic's declaration and its recorded relations back into agreement.
 // It takes no value flags — the epic number is the whole subject.
@@ -30,13 +33,19 @@ const ORDER_AFTER_FLAG = '--order-after'
 // from a file, or from stdin as `-`. The text is a judgement, so the caller writes it; what the command
 // contributes is placing it in the epic's `## Decisions` and on each child.
 const DECISION_FLAG = '--decision-file'
+// The split path's `planning` Telegram — the epic, every child's URL and the run command — sent by the
+// command once the epic exists rather than composed by hand (`epic-notify.ts`).
+const NOTIFY_FLAG = '--notify'
 // Which flags each form knows, and which of them consume the argument after them — per form, for the
 // reason `epic-cli-argv.ts` gives.
 const CREATE_FORM: FormFlags = {
-	switches: [ORDERED_FLAG],
+	switches: [ORDERED_FLAG, NOTIFY_FLAG],
 	value_flags: [RATIONALE_FLAG, ORIGIN_FLAG],
 }
-const PROMOTE_FORM: FormFlags = { ...CREATE_FORM, switches: [PROMOTE_FLAG, ORDERED_FLAG] }
+const PROMOTE_FORM: FormFlags = {
+	switches: [PROMOTE_FLAG, ORDERED_FLAG, NOTIFY_FLAG],
+	value_flags: [RATIONALE_FLAG, ORIGIN_FLAG, TITLE_FLAG],
+}
 const RECONCILE_FORM: FormFlags = { switches: [RECONCILE_FLAG] }
 const CHECK_FORM: FormFlags = { switches: [] }
 const ADD_FORM: FormFlags = {
@@ -51,26 +60,30 @@ interface CreateArguments {
 	title: string
 	children: Array<number>
 	is_ordered: boolean
+	is_notified: boolean
 	rationale_path?: string | undefined
 	origin?: string | undefined
 }
 
-// `--promote <N> <N1> <N2> …`: the issue to promote, then its children. No title — the issue already
-// has one, and the discussion in it is usually the split rationale.
+// `--promote <N> <N1> <N2> …`: the issue to promote, then its children. The title is optional — the
+// issue already has one, and `--title` renames it; the discussion in it is usually the split rationale.
 interface PromoteArguments {
 	epic_number: number
 	children: Array<number>
 	is_ordered: boolean
+	is_notified: boolean
 	rationale_path?: string | undefined
 	origin?: string | undefined
+	title?: string | undefined
 }
 
 // The flags a creation and a promotion share, read the same way for both.
 function read_batch_flags(
 	parsed: EpicArgv,
-): Pick<CreateArguments, 'is_ordered' | 'rationale_path' | 'origin'> {
+): Pick<CreateArguments, 'is_ordered' | 'is_notified' | 'rationale_path' | 'origin'> {
 	return {
 		is_ordered: is_switch_set(parsed, ORDERED_FLAG),
+		is_notified: is_switch_set(parsed, NOTIFY_FLAG),
 		rationale_path: read_flag_value(parsed, RATIONALE_FLAG),
 		origin: read_flag_value(parsed, ORIGIN_FLAG),
 	}
@@ -122,11 +135,15 @@ function parse_reconcile_arguments(argv: ReadonlyArray<string>): ReconcileArgume
 
 // The promoted issue and its children. The number after `--promote` is the epic; everything else
 // positional is a child. Refused when the epic would also be listed as its own child, which would
-// have it block itself under `--ordered`.
+// have it block itself under `--ordered`. A blank `--title` is refused rather than dropped: the caller
+// meant to rename the issue.
 function to_promote_arguments(parsed: EpicArgv): PromoteArguments | undefined {
 	const subject = epic_cli_argv.read_epic_children(parsed)
+	const title = read_flag_value(parsed, TITLE_FLAG)?.trim()
 
-	return subject === undefined ? undefined : { ...subject, ...read_batch_flags(parsed) }
+	if (subject === undefined || title === '') return undefined
+
+	return { ...subject, ...read_batch_flags(parsed), title }
 }
 
 function parse_promote_arguments(argv: ReadonlyArray<string>): PromoteArguments | undefined {
@@ -381,6 +398,7 @@ export {
 	AFTER_FLAG,
 	BEFORE_FLAG,
 	DECISION_FLAG,
+	NOTIFY_FLAG,
 	ORDER_AFTER_FLAG,
 	ORDER_BEFORE_FLAG,
 	ORDERED_FLAG,
@@ -390,5 +408,6 @@ export {
 	RECONCILE_FLAG,
 }
 export { REMOVE_FLAG } from './epic-cli-remove'
+export { epic_cli_untrack } from './epic-cli-untrack'
 export type { AddArguments, CreateArguments, CrossRepoAddTarget, PromoteArguments }
 export type { RemoveArguments } from './epic-cli-remove'

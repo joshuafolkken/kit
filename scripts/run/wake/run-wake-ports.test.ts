@@ -1,16 +1,23 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
+import { process_identity } from '#scripts/josh/process-identity'
 import { lane_close } from '#scripts/lane/lane-close'
 import { lane_withdraw_closed } from '#scripts/lane/lane-withdraw-closed'
+import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
+import { run_headless } from '#scripts/run/run-headless'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WakeContext } from './run-wake-describe'
+import { run_wake_driver } from './run-wake-driver'
 import { run_wake_ports } from './run-wake-ports'
+import { run_wake_resume } from './run-wake-resume'
 import { run_wake_session, type LaunchResult } from './run-wake-session'
+
+const make_directory = temporary_directory()
 
 // joshuafolkken/kit#3738: the supervisor says on the run's stream that the judgment session it woke is
 // running, so the board tells a session at work from a driver still waiting for one. Only a session
@@ -54,12 +61,11 @@ function stages(): Array<string> {
 // here rather than spawned.
 beforeEach(() => {
 	vi.spyOn(agent_diagnostics, 'check').mockReturnValue({ kind: 'ready' })
-	scratch.directory = mkdtempSync(path.join(tmpdir(), 'josh-wake-ports-'))
+	scratch.directory = make_directory('josh-wake-ports-')
 })
 
 afterEach(() => {
 	vi.restoreAllMocks()
-	rmSync(scratch.directory, { recursive: true, force: true })
 })
 
 describe('the supervisor waking a judgment session', () => {
@@ -86,6 +92,79 @@ describe('the supervisor waking a judgment session', () => {
 	})
 })
 
+// joshuafolkken/kit#5743: the record is the woken session's from its first command, named by the
+// transcript its forced id writes before the launch and by the launched process after it.
+describe('the supervisor handing the record to a judgment session', () => {
+	it('adopts the record for the session before the launch and names its process after it', () => {
+		const ports = run_wake_ports.ports_for(context(), PROFILE)
+
+		run_carry.begin_carry(context().carry_target, INVOCATION, run_carry.NO_OWNER, new Date())
+		ports.hand_off(SID)
+		vi.spyOn(run_wake_session, 'launch').mockReturnValue({ kind: 'launched', pid: SESSION_PID })
+		ports.wake(INVOCATION, SID, MATERIAL)
+
+		const read = run_carry.read_carry(context().carry_target)
+
+		expect(read.kind === 'carried' ? read.carry.owner_pid : undefined).toBe(SESSION_PID)
+		expect(read.kind === 'carried' ? read.carry.owner_transcript : '').toMatch(`${SID}.jsonl`)
+	})
+
+	it('reads the launched session as not at work until its transcript is written', () => {
+		const ports = run_wake_ports.ports_for(context(), PROFILE)
+
+		run_carry.begin_carry(context().carry_target, INVOCATION, run_carry.NO_OWNER, new Date())
+		ports.hand_off(SID)
+		vi.spyOn(run_wake_session, 'launch').mockReturnValue({ kind: 'launched', pid: process.ppid })
+		ports.wake(INVOCATION, SID, MATERIAL)
+
+		expect(ports.is_owner_live(ports.read_carry())).toBe(false)
+	})
+})
+
+// Wake a triage session beside the driver through the real port, after a `triage` hand-back kept its
+// resume line.
+function wake_beside(): ReturnType<typeof vi.spyOn> {
+	const target = context().carry_target
+	const carry = run_carry.begin_carry(target, INVOCATION, run_carry.NO_OWNER, new Date())
+	if (carry === undefined) throw new Error('Missing carry record')
+
+	run_wake_resume.remember(target, carry, { code: 0, out: 'triage\nresume: --owner 1' })
+	vi.spyOn(process_identity, 'read_start').mockReturnValue(undefined)
+	const launch = vi
+		.spyOn(run_wake_session, 'launch')
+		.mockReturnValue({ kind: 'launched', pid: SESSION_PID })
+
+	run_wake_ports.ports_for(context(), PROFILE).wake_beside(INVOCATION, SID, MATERIAL)
+
+	return launch
+}
+
+// joshuafolkken/kit#7120: a triage session wakes beside the driver — named on the kept resume line,
+// marked as beside it, and never handed the record.
+describe('the supervisor waking a triage session beside the driver', () => {
+	it('names the launched session on the kept resume line', () => {
+		wake_beside()
+		const read = run_carry.read_carry(context().carry_target)
+		const line =
+			read.kind === 'carried' ? run_wake_resume.stored(context().carry_target, read.carry) : ''
+
+		expect(line).toBe(`resume: --owner 1 --triage-pid ${String(SESSION_PID)}`)
+	})
+
+	it('hands the record to no one', () => {
+		wake_beside()
+		const read = run_carry.read_carry(context().carry_target)
+
+		expect(read.kind === 'carried' ? read.carry.owner_pid : SESSION_PID).toBeUndefined()
+	})
+
+	it('launches the session marked as beside the driver', () => {
+		const launch = wake_beside()
+
+		expect(launch.mock.calls[0]?.[0]).toMatchObject({ env: run_headless.beside_environment() })
+	})
+})
+
 // joshuafolkken/kit#4509: only the supervisor's own `--loop` watches its code.
 describe('run_wake_ports.ports_for — code staleness', () => {
 	it('never reads the code as stale when no watch is given', async () => {
@@ -96,6 +175,20 @@ describe('run_wake_ports.ports_for — code staleness', () => {
 		const ports = run_wake_ports.ports_for(context(), PROFILE, async () => true)
 
 		expect(await ports.is_code_stale()).toBe(true)
+	})
+})
+
+// joshuafolkken/kit#5516: triage waits for the launched parent this repository's launch names.
+describe('run_wake_ports.ports_for — the launched parent planning', () => {
+	it('drives with the launched parent of this repository as the planning check', async () => {
+		const drive = vi.spyOn(run_wake_driver, 'drive').mockResolvedValue({ kind: 'released' })
+		const parent = vi.spyOn(backlogrun_launch, 'running_parent').mockReturnValue(SESSION_PID)
+
+		await run_wake_ports.ports_for(context(), PROFILE).drive()
+		const is_parent_planning = drive.mock.calls[0]?.[2]
+
+		expect(is_parent_planning?.()).toBe(true)
+		expect(parent).toHaveBeenCalledWith(context().git_directory)
 	})
 })
 

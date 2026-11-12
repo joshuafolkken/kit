@@ -13,7 +13,13 @@ const SECOND = '2'
 const THIRD = '3'
 const REPORT_END = 'report and end'
 const REPORT_STOP = 'report and stop'
-const NO_WINDOW = { poll_ms: POLL_MS, offer_ms: OFFER_MS, window_ms: undefined }
+const NO_WINDOW = {
+	poll_ms: POLL_MS,
+	offer_ms: OFFER_MS,
+	idle_offer_ms: backlog_budget.IDLE_OFFER_INTERVAL_MS,
+	check_ms: backlog_budget.LISTING_CHECK_INTERVAL_MS,
+	window_ms: undefined,
+}
 const FREE_LANES = 6
 
 interface World {
@@ -70,8 +76,31 @@ function merge(world_state: World, issue: string): Awaited<ReturnType<LoopPorts[
 	return { token: 'none', is_offer: true, outcome: is_parked ? 'parked' : 'merged' }
 }
 
+// The run's own records and parks: nothing added, raised, named, listed, yielded or parked.
+const NO_RECORD: Pick<
+	LoopPorts,
+	| 'begin_tick'
+	| 'added_since'
+	| 'raised_since'
+	| 'named_left'
+	| 'listing_changed'
+	| 'yields'
+	| 'park'
+	| 'stall'
+> = {
+	begin_tick: async () => undefined,
+	added_since: async () => false,
+	raised_since: async () => false,
+	named_left: async () => false,
+	listing_changed: async () => false,
+	yields: async () => [],
+	park: async () => undefined,
+	stall: async () => undefined,
+}
+
 function ports(world_state: World): LoopPorts {
 	return {
+		...NO_RECORD,
 		is_finished: () => true,
 		adoptable: async () => [],
 		merge: async (issue) => merge(world_state, issue),
@@ -90,6 +119,7 @@ function ports(world_state: World): LoopPorts {
 		hold: async () => undefined,
 		idle: async () => undefined,
 		paused: async () => undefined,
+		retrospective: async () => true,
 		now: () => new Date(world_state.clock),
 		sleep: async (milliseconds) => {
 			world_state.clock += milliseconds
@@ -123,13 +153,14 @@ it('dispatches and merges every child, then reports and ends', async () => {
 	])
 })
 
-it('records a parked child and continues to the next child', async () => {
+// joshuafolkken/kit#6871: the free lane is filled before the parent's triage, not left empty through it.
+it('starts the next child before handing a parked child back for parent triage', async () => {
 	const fixture = world([FIRST, SECOND], [FIRST])
 	const end = await backlog_drive.run_loop(initial(), NO_WINDOW, ports(fixture))
 
-	expect(end.reason).toBe('stop')
-	expect(fixture.calls).toContain(`launch ${SECOND}`)
-	expect(fixture.merged).toBe(1)
+	expect(end.reason).toBe('triage')
+	expect(fixture.calls).toStrictEqual([`launch ${FIRST}`, `merge ${FIRST}`, `launch ${SECOND}`])
+	expect(fixture.merged).toBe(0)
 })
 
 it('restores only this invocation’s active lane after a kill', async () => {

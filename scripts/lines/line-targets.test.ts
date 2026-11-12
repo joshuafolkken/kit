@@ -1,18 +1,15 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('#scripts/git/git-spawn', () => ({ git_spawn: { read: vi.fn() } }))
 
 const { git_spawn } = await import('#scripts/git/git-spawn')
 const { line_targets } = await import('./line-targets')
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'line-targets-test-'))
-
-afterAll(() => {
-	rmSync(scratch, { recursive: true, force: true })
-})
+const make_directory = temporary_directory('suite')
+const scratch = make_directory('line-targets-test-')
 
 describe('line_targets.is_lint_target', () => {
 	// The extension pre-filter keeps the eslint probe off non-source paths; every JS/TS variant and

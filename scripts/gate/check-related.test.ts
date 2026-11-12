@@ -57,36 +57,8 @@ async function type_error_check(command: string): Promise<CheckResult> {
 	return { command, exit_code: 0, output: '' }
 }
 
+// The order the checks start in is driven by `check-related-order.test.ts`.
 describe('check_related.run_checks', () => {
-	it('starts every check before awaiting any result', async () => {
-		const started: Array<string> = []
-		const pending = new Map<string, (result: CheckResult) => void>()
-
-		async function execute(command: string): Promise<CheckResult> {
-			started.push(command)
-
-			return await new Promise((resolve) => {
-				pending.set(command, resolve)
-			})
-		}
-
-		const results = check_related.run_checks(execute)
-
-		await vi.waitFor(() => {
-			expect(started).toEqual(CHECK_COMMANDS)
-		})
-
-		for (const command of CHECK_COMMANDS) {
-			const complete = pending.get(command)
-			if (complete === undefined) throw new Error(`Missing pending result for ${command}`)
-			complete({ command, exit_code: 0, output: `${command} output` })
-		}
-
-		await expect(results).resolves.toMatchObject(
-			CHECK_COMMANDS.map((command) => ({ command, exit_code: 0 })),
-		)
-	})
-
 	it('waits for every result and fails when one check rejects', async () => {
 		const results = await check_related.run_checks(rejecting_check)
 

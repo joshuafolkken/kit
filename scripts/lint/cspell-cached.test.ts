@@ -17,18 +17,17 @@ vi.mock('#scripts/lane/lane-cache-run', () => ({
 vi.mock('#scripts/lib/buffered-process', () => ({
 	buffered_process: {
 		is_process_failed: vi.fn(() => false),
-		run_buffered_process: vi.fn(async () => ({ output: '', exit_code: PASS, elapsed_ms: 1 })),
+		run_buffered_direct: vi.fn(async () => ({ output: '', exit_code: PASS, elapsed_ms: 1 })),
 	},
 	FAIL_EXIT_CODE: 1,
 }))
 
 const run_cache = vi.mocked(lane_cache_run.run)
-const run_process = vi.mocked(buffered_process.run_buffered_process)
+const run_process = vi.mocked(buffered_process.run_buffered_direct)
 const is_process_failed = vi.mocked(buffered_process.is_process_failed)
 
 beforeEach(() => {
 	vi.restoreAllMocks()
-	vi.clearAllMocks()
 })
 
 test('skips basic cspell without configuration and names the reason', async () => {

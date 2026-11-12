@@ -8,7 +8,7 @@ import {
 	ESLINT_COMMIT_CACHE_FLAGS,
 	PRETTIER_CACHE_FLAGS,
 } from '#scripts/josh/josh-command-types'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('execa', () => ({ execa: vi.fn() }))
 vi.mock('#scripts/lint/eslint-daemon', () => ({ eslint_daemon: { run_or_cold: vi.fn() } }))
@@ -35,10 +35,6 @@ function built(tool: string): ReadonlyArray<string> {
 function joined(tool: string): string {
 	return built(tool).join(' ')
 }
-
-beforeEach(() => {
-	vi.clearAllMocks()
-})
 
 // joshuafolkken/kit#3948: the pre-commit hook's cache locations come from the same constants the
 // ignore rules are asserted against, joined so a flag stays paired with its value. The gate's location
@@ -141,7 +137,12 @@ describe('pre_commit_lint.run — switched off', () => {
 	)
 })
 
-const STALE_RED = { output: 'stale', exit_code: 1, elapsed_ms: 0 }
+const STALE_RED: Awaited<ReturnType<typeof eslint_daemon.run_or_cold>> = {
+	output: 'stale',
+	exit_code: 1,
+	elapsed_ms: 0,
+	daemon: 'daemon reused',
+}
 
 // joshuafolkken/kit#4358: eslint runs warm or cold through `eslint_daemon.run_or_cold`, inside the
 // eslint reservation.
@@ -154,7 +155,10 @@ describe('pre_commit_lint.run — eslint', () => {
 		vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
 
 		expect(await pre_commit_lint.run(['eslint', ...STAGED])).toBe(1)
-		expect(mocked_run_or_cold).toHaveBeenCalledWith(built('eslint'))
+		expect(mocked_run_or_cold).toHaveBeenCalledWith(built('eslint'), {
+			caller: 'pre-commit',
+			files: STAGED.length,
+		})
 		expect(mocked_execa).not.toHaveBeenCalled()
 		expect(reservation).toHaveBeenCalledOnce()
 		reservation.mockRestore()

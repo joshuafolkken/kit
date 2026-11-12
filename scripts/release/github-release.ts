@@ -1,4 +1,5 @@
 import { setTimeout } from 'node:timers/promises'
+import { poll as shared_poll } from '#scripts/lib/poll'
 import semver from 'semver'
 import { z } from 'zod'
 import { github_release_runs, type PollState, type RunSource } from './github-release-runs'
@@ -144,17 +145,16 @@ async function poll(
 	budget: Budget,
 	subject: string,
 ): Promise<boolean> {
-	while (budget.remaining > 0) {
-		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		const state = await read()
-		if (state !== 'pending') return state === 'ready'
+	return await shared_poll.wait_for(
+		async () => {
+			if (budget.remaining <= 0) throw new Error(`Timed out waiting for ${subject}`)
+			const state = await read()
+			if (state === 'pending') budget.remaining -= 1
 
-		budget.remaining -= 1
-		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		await budget.wait()
-	}
-
-	throw new Error(`Timed out waiting for ${subject}`)
+			return state === 'pending' ? undefined : state === 'ready'
+		},
+		{ interval_ms: POLL_INTERVAL_MS, sleeper: budget.wait },
+	)
 }
 
 async function wait_for_release(client: Client, tag: string, budget: Budget): Promise<boolean> {

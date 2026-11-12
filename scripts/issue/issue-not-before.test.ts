@@ -97,6 +97,45 @@ describe('the start-time declaration in issue:lint', () => {
 	})
 })
 
+// joshuafolkken/kit#6007: a measurement follow-up's calendar wait is capped at a week from filing.
+describe('the start-time declaration of a measurement follow-up', () => {
+	const FILED = Date.parse('2026-11-03T00:00Z')
+	const ABSENT = '- 計測宣言なし: Actions の記録を読む'
+	const CONDITION = '- 実施可能条件: #4426 のマージ後 10 マージ'
+
+	function measured_with(date: string): string {
+		return body_with(`${ABSENT}\n- 実施可能日: ${date}`)
+	}
+
+	it.each(['2026-11-10T00:00Z', '2026-11-04T09:00Z'])('accepts %j, within a week', (date) => {
+		expect(issue_not_before.problems(measured_with(date), FILED)).toEqual([])
+	})
+
+	it('refuses a date past a week and ends in a date a week after filing', () => {
+		const [found = '', ...rest] = issue_not_before.problems(
+			measured_with('2026-11-10T00:01Z'),
+			FILED,
+		)
+		const example = found.split('\n').at(-1) ?? ''
+
+		expect(rest).toEqual([])
+		expect(example).toBe('- 実施可能日: 2026-11-10T00:00Z')
+		expect(issue_not_before.problems(body_with(`${ABSENT}\n${example}`), FILED)).toEqual([])
+	})
+
+	it('refuses the date beside a sample condition', () => {
+		const body = body_with(`${ABSENT}\n- 実施可能日: 2026-11-04T00:00Z\n${CONDITION}`)
+
+		expect(issue_lint_cli.problems(body)).toEqual([expect.stringContaining('not both')])
+	})
+
+	it('leaves a body without a measure declaration to the calendar', () => {
+		const body = body_with(`- 実施可能日: 2099-01-01T09:00Z\n${CONDITION}`)
+
+		expect(issue_not_before.problems(body, FILED)).toEqual([])
+	})
+})
+
 describe('a start condition written as its own heading in issue:lint', () => {
 	// The body #4430 was filed with: a free-text condition under its own heading, never read.
 	const ISSUE_4430_BODY = `${body_with('')}\n## 実施可能条件\n\n#4426 のマージ後に、マージが 30 件以上ある\n`

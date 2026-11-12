@@ -107,14 +107,15 @@ function instant_of(stop: StopEntry): IssueAt {
 	return { issue: stop.issue, at_ms: Date.parse(stop.at) }
 }
 
-// The `josh check:related` notices of the ship's `unplanned` answer (joshuafolkken/kit#5203).
+// The notices of the ship's `unplanned` answer — `josh check:related`'s (joshuafolkken/kit#5203), and
+// `josh run:review --join`'s and `josh review:record`'s (joshuafolkken/kit#5388).
 function notices_of(entries: ReadonlyArray<LedgerEntry>): Array<IssueAt> {
 	return entries
 		.filter((entry) => entry.kind === lane_ledger.KIND.UNPLANNED_NOTICE)
 		.map((entry) => ({ issue: entry.issue, at_ms: Date.parse(entry.at) }))
 }
 
-// An `unplanned` stop the same issue's `check:related` already printed counts as `unplanned (noticed)`,
+// An `unplanned` stop an earlier notice on the same issue printed counts as `unplanned (noticed)`,
 // so the stops the earlier notice did not prevent are a number of their own.
 function noticed(cause: string, stop: IssueAt, notices: ReadonlyArray<IssueAt>): string {
 	if (cause !== run_ship_planned.PRECONDITION) return cause

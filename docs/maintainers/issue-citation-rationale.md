@@ -24,11 +24,13 @@ A run copies josh's own output — a warning, a progress line, a refusal — int
 bare `#N` printed by josh became a bare `#N` in the reply (joshuafolkken/kit#3424). An Issue
 number therefore reaches a string only through `issue_cite`: `session_cite.issue` links it for what a
 session reads, using a title only when the caller already holds one and the repository from the work
-tree's `origin` rather than a `gh` call, and `issue_cite.plain` keeps `#N` for what GitHub renders or a
-program parses. A line built from `plain` by a helper that also feeds GitHub or a parser is linked
-where it is printed, through `session_cite.text`. `scripts/issue/session-cite-scan.test.ts` refuses a
-bare `#${…}` assembled anywhere else and counts every `plain` call against the reason its text is not
-printed to the session as it is, so a new one fails until it is linked or justified.
+tree's `origin` rather than a `gh` call, and `issue_cite.plain_for` keeps `#N` for what GitHub renders
+or a program parses. A line built from `plain_for` by a helper that also feeds GitHub or a parser is
+linked where it is printed, through `session_cite.text`. `scripts/issue/session-cite-scan.test.ts`
+refuses a bare `#${…}` assembled anywhere else. `plain_for` takes the reason its text is not printed
+to the session as it is — `github`, `telegram`, `program`, `terminal` or `linked` — as a required
+argument, and the reasonless form is not exported, so a call that does not state its justification
+does not compile ([#6810](https://github.com/joshuafolkken/kit/issues/6810)).
 
 Not every line josh prints is linked: a commit message, a PR body, a run event line or a Telegram body
 keeps the plain `#N` its reader needs. A session copying one of those into a reply still cites it.

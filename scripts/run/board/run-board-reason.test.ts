@@ -29,8 +29,8 @@ const ONE_LANE_LEFT = 1
 const { STAGE_ICONS, STATE_ICONS, WAIT_ICONS } = run_board_labels
 const { LANE_STAGE } = run_event_setup
 const UNTRIAGED_REASON: RowReason = { icon: WAIT_ICONS.untriaged, issues: [] }
-// joshuafolkken/kit#4288: ✋ names the untriaged issue the pool is held for.
-const HELD_REASON: RowReason = { icon: WAIT_ICONS.held, issues: [String(UNTRIAGED)] }
+// joshuafolkken/kit#5518: ✋ marks the untriaged row held alone for its judgment.
+const HELD_REASON: RowReason = { icon: WAIT_ICONS.held }
 // joshuafolkken/kit#4137: a queued row says what it starts after.
 const NO_LANE_REASON: RowReason = { icon: WAIT_ICONS.lane }
 const OVERLAP: RowReason = { icon: WAIT_ICONS.path, issues: [String(RUNNING)], tail: SHARED }
@@ -124,18 +124,24 @@ function stage_of(steps: Array<Step>, extra: Partial<ReasonRead> = {}): RowReaso
 }
 
 describe('run_board_reason.reader — a row nobody has judged', () => {
-	it('leads a row with neither run label with ❓', () => {
-		expect(reasons([untriaged(UNTRIAGED)])).toStrictEqual([UNTRIAGED_REASON])
+	it('marks a row with neither run label and no blocker ✋, held alone for its judgment', () => {
+		expect(reasons([untriaged(UNTRIAGED)])).toStrictEqual([HELD_REASON])
 	})
 
-	it('names the untriaged issue a judged row is held by while it withholds the pool', () => {
+	it('leads a blocked row with neither run label with ❓ and its blocker', () => {
+		const reason = { ...UNTRIAGED_REASON, issues: [String(BLOCKER)] }
+
+		expect(reasons([untriaged(UNTRIAGED, [BLOCKER])])).toStrictEqual([reason])
+	})
+
+	it('holds only the untriaged row, the judged row waiting on a free lane as before', () => {
 		const pool = [untriaged(UNTRIAGED), child(HELD)]
 
-		expect(reasons(pool)).toStrictEqual([UNTRIAGED_REASON, HELD_REASON])
+		expect(reasons(pool, { free_lanes: NO_LANE_LEFT })).toStrictEqual([HELD_REASON, NO_LANE_REASON])
 	})
 
-	it('holds nothing for an untriaged row a blocker keeps out of the pool', () => {
-		const pool = [untriaged(UNTRIAGED, [BLOCKER]), child(HELD)]
+	it('holds nothing for a judged row beside an untriaged one', () => {
+		const pool = [untriaged(UNTRIAGED), child(HELD)]
 
 		expect(reasons(pool)[1]).toBeUndefined()
 	})
@@ -182,7 +188,7 @@ describe('run_board_reason.reader — a row a blocker keeps waiting', () => {
 	})
 })
 
-// joshuafolkken/kit#4270: a paused lane held five rows back for 1 h 40 min with no word of why.
+// joshuafolkken/kit#4270: a paused holder must explain why the queued rows cannot start.
 describe('run_board_reason.reader — a paused holder', () => {
 	it('names when and by what the holder was paused after the path', () => {
 		const plan = plan_of([child(HELD)], DECLARED)
@@ -228,14 +234,12 @@ describe('run_board_reason.reader — a row the pool keeps waiting', () => {
 		expect(reasons([child(HELD)], { free_lanes: undefined })).toStrictEqual([undefined])
 	})
 
-	it('answers in the order the offer does: triage, then the overlap, then the lanes', () => {
+	it('answers in the order the offer does, an untriaged row holding only itself', () => {
 		const pool = [untriaged(UNTRIAGED), child(HELD)]
 		const full = { statuses: STATUSES, free_lanes: NO_LANE_LEFT }
 		const held = reasons(pool, { ...full, plan: plan_of(pool, DECLARED) })
-		const alone = reasons([child(HELD)], { ...full, plan: plan_of([child(HELD)], DECLARED) })
 
-		expect(held[1]).toStrictEqual(HELD_REASON)
-		expect(alone).toStrictEqual([OVERLAP])
+		expect(held).toStrictEqual([HELD_REASON, OVERLAP])
 	})
 })
 
@@ -327,6 +331,13 @@ describe('run_board_reason.reader — a row whose declared start time is ahead',
 		const pool = [not_before(PAST)]
 
 		expect(reasons(pool, { free_lanes: NO_LANE_LEFT })).toStrictEqual([NO_LANE_REASON])
+	})
+
+	// joshuafolkken/kit#5518: `backlog:next` names no such row as held, so it is not drawn ✋.
+	it('leads an untriaged row whose start time is ahead with ❓, not ✋', () => {
+		const row = { ...not_before(FUTURE), labels: [] }
+
+		expect(reasons([row])).toStrictEqual([UNTRIAGED_REASON])
 	})
 
 	it('leads a blocked row with 🔗 whatever start time it declares', () => {

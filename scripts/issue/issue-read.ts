@@ -1,4 +1,5 @@
 import { gh_author_association } from '#scripts/gh/gh-author-association'
+import { gh_comment_input } from '#scripts/gh/gh-comment-input'
 import { parse_json_object_or_undefined, read_json_listing } from '#scripts/git/parse-json-array'
 import { z } from 'zod'
 
@@ -49,6 +50,7 @@ const issue_fields_schema = z.looseObject({
 })
 
 const comment_schema = z.looseObject({
+	html_url: z.string().optional(),
 	user: z.looseObject({ login: z.string() }).optional(),
 	created_at: z.string().optional(),
 	body: z.string().optional(),
@@ -65,6 +67,7 @@ interface IssueFields {
 }
 
 interface IssueComment {
+	html_url?: string | undefined
 	author: string
 	created_at: string
 	body: string
@@ -87,7 +90,9 @@ function parse_raw_fields(json: string): z.infer<typeof issue_fields_schema> | u
 	}
 }
 
-async function parse_issue_fields(json: string): Promise<IssueFields | undefined> {
+// `repo` is the repository the issue was read from, so its authors' write access is asked of that one
+// (joshuafolkken/kit#5851); absent, the session's.
+async function parse_issue_fields(json: string, repo?: string): Promise<IssueFields | undefined> {
 	const parsed = parse_raw_fields(json)
 
 	if (parsed === undefined) return undefined
@@ -96,20 +101,28 @@ async function parse_issue_fields(json: string): Promise<IssueFields | undefined
 		title: parsed.title,
 		state: parsed.state,
 		body: parsed.body ?? '',
-		is_body_trusted: await gh_author_association.trust_of(gh_author_association.author_of(parsed)),
+		is_body_trusted: await gh_author_association.trust_of({
+			...gh_author_association.author_of(parsed),
+			repo,
+		}),
 	}
 }
 
-async function to_comment(raw: z.infer<typeof comment_schema>): Promise<IssueComment> {
+async function to_comment(
+	raw: z.infer<typeof comment_schema>,
+	repo: string | undefined,
+): Promise<IssueComment> {
 	const login = raw.user?.login
 
 	return {
+		html_url: raw.html_url,
 		author: login ?? UNKNOWN_AUTHOR,
 		created_at: raw.created_at ?? UNKNOWN_TIME,
 		body: raw.body ?? '',
 		is_trusted: await gh_author_association.trust_of({
 			login,
 			association: raw.author_association,
+			repo,
 		}),
 	}
 }
@@ -125,6 +138,7 @@ async function to_comment(raw: z.infer<typeof comment_schema>): Promise<IssueCom
 // to `undefined` here, because the block above draws only one distinction: read, or not read.
 async function parse_comments(
 	json: string | undefined,
+	repo?: string,
 ): Promise<ReadonlyArray<IssueComment> | undefined> {
 	if (json === undefined) return undefined
 
@@ -132,7 +146,7 @@ async function parse_comments(
 
 	if (listing.kind !== 'read') return undefined
 
-	return await Promise.all(listing.rows.map(async (row) => await to_comment(row)))
+	return await Promise.all(listing.rows.map(async (row) => await to_comment(row, repo)))
 }
 
 // The bodies a caller may act on — the comments of authors with write access, in order.
@@ -141,7 +155,8 @@ function trusted_bodies(comments: ReadonlyArray<IssueComment>): ReadonlyArray<st
 }
 
 function format_comment(comment: IssueComment): string {
-	const heading = `${COMMENT_HEADING}${comment.author}${AT}${comment.created_at}`
+	const trust = gh_comment_input.trust_of(comment.author, comment.is_trusted)
+	const heading = `${COMMENT_HEADING}${comment.author}${AT}${comment.created_at} [${trust}]`
 
 	return `${heading}\n${comment.is_trusted === true ? comment.body : UNTRUSTED_COMMENT}`
 }

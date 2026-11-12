@@ -20,8 +20,8 @@ describe('package_manager_pin.running_pnpm_version', () => {
 	})
 })
 
-// A project installed by a newer pnpm used to be pinned back to kit's older pnpm, which then failed
-// to resolve the lockfile the newer one had just written (joshuafolkken/kit#3367).
+// The pin must support the project's lockfile, including one written by a newer pnpm than kit's
+// own version (joshuafolkken/kit#3367).
 describe('package_manager_pin.choose', () => {
 	it('pins the running pnpm when it is newer than the kit pin', () => {
 		expect(package_manager_pin.choose(KIT_PIN, NEWER_AGENT)).toBe('pnpm@12.10.0')

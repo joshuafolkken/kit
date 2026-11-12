@@ -16,7 +16,7 @@ entry sequence and the stop branches are `entry-sequence.md`.
 ## The step list
 
 `halfrun #<N>`: read Issue #N and its comments → **record the agreed plan**, normalizing
-the title (`pnpm josh issue:plan`, same as `fullrun`) → `pnpm josh ms`, then on `run:prep`'s
+the title (`pnpm josh issue:plan`, same as `fullrun`; `run:entry` has merged main) → on `run:prep`'s
 `latest: required` `pnpm josh latest:if-required` (`latest-gate.md`; the `dependency-update` skill) → implement → run the **full verification gate** (refactor →
 start `pnpm josh gate` beside a subagent `/code-review` with the brief `pnpm josh review:brief` prints,
 join the gate before the stop, iterate to no high/medium findings, within the round cap (`prompts/review.md`) → `pnpm josh
@@ -31,12 +31,9 @@ back with fixes, treat each as a new round: implement, re-run `pnpm josh gate`, 
 (it sends the `confirmation`), stop again.
 
 `halfrun new` or `halfrun new "<title>"`: `kickoff new` + `halfrun #<N>` (no Issue exists yet). Steps
-mirror `fullrun new` (1)–(8): derive an English title (or use the provided one) → create the Issue
-(`pnpm josh issue:file "<title>" --body-file <body-file>`, with the labels
+mirror `fullrun new` (1)–(6): derive an English title (or use the provided one) → create the Issue
+(`pnpm josh issue:file "<title>" --body-file .josh/tmp/body.md --over-cap`, with the labels
 `kickoff.md` → "Words typed after `new`" maps, body per
-`prompts/collaboration-workflow/issue-template.md`; its duplicate scan is read per `issue-scout.md`) → `pnpm josh run:hold --adopt <N>` (as `fullrun new` (3)) → post the agreed plan → stash
-any pre-existing changes with `pnpm josh stash:push "halfrun new: pre-existing changes"`, popped
-after `stashed` with `pnpm josh stash:pop "halfrun new: pre-existing changes"` →
-`pnpm josh ms` → `pnpm josh run:prep <N>`, and on `latest: required` `pnpm josh latest:if-required` → implement → run the gate (as above, `pnpm
+`prompts/collaboration-workflow/issue-template.md`; its duplicate scan is read per `issue-scout.md`) → `pnpm josh run:entry <N> --to halfrun --adopt` (as `fullrun new` (3), the tree sync included) → post the agreed plan → on the entry's `latest: required`, `pnpm josh latest:if-required` → implement → run the gate (as above, `pnpm
 josh test:e2e` run by **you**) → `pnpm josh run:hold <N> --halfrun-stop` (it sends the `confirmation`)
 → **stop**.

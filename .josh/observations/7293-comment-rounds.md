@@ -1,0 +1,3 @@
+- rf:bug-risks | medium | scripts/rules/unasked-filing.ts:47 | 2026-11-11 | #7293
+- rf:bug-risks | medium | scripts/rules/unasked-filing.ts:80 | 2026-11-11 | #7293
+- rf:project-conventions | low | scripts/rules/unasked-filing.ts:57 | 2026-11-11 | #7293

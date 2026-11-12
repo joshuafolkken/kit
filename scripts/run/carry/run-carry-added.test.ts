@@ -1,29 +1,35 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { run_carry, type RunCarry } from './run-carry'
 import { run_carry_added } from './run-carry-added'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#3433: `run:add` puts an issue into a live `--only` run without touching the
 // invocation the ownership comparison reads, and `remaining_of` folds it into the named list.
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-carry-added-test-'))
+const scratch = make_directory('run-carry-added-test-')
 const NAMED_ONLY_INVOCATION = 'backlogrun #1762 #1749 --only'
+const POOL_INVOCATION = 'backlogrun --max 3'
 const START = new Date('2026-09-10T00:00:00.000Z')
 
 function target(): string {
 	return run_carry.carry_path(path.join(scratch, 'repository.git'))
 }
 
-function named_run(): RunCarry {
+function begun(invocation: string): RunCarry {
 	run_carry.end_carry(target())
 
-	const carry = run_carry.begin_carry(target(), NAMED_ONLY_INVOCATION, run_carry.NO_OWNER, START)
+	const carry = run_carry.begin_carry(target(), invocation, run_carry.NO_OWNER, START)
 
 	if (carry === undefined) throw new Error('the scratch record was not created')
 
 	return carry
+}
+
+function named_run(): RunCarry {
+	return begun(NAMED_ONLY_INVOCATION)
 }
 
 function added_run(): RunCarry {
@@ -34,8 +40,33 @@ function added_run(): RunCarry {
 	])
 }
 
-afterAll(() => {
-	rmSync(scratch, { recursive: true, force: true })
+describe('explicit retry', () => {
+	it('retries only the requested issue while preserving counts, ownership and other completions', () => {
+		const carry = {
+			...named_run(),
+			done: [1749, 1762],
+			merged: 1,
+			merged_issues: [1762],
+			filed: 1,
+			owner_pid: 123,
+			lane_limit: 1,
+		}
+		const retried = run_carry_added.add_issues(
+			target(),
+			carry,
+			[{ issue: 1749, is_priority: true }],
+			[1749],
+		)
+
+		expect(retried).toStrictEqual({
+			...carry,
+			done: [1762],
+			added: [{ issue: 1749, is_priority: true }],
+		})
+		const read = run_carry.read_carry(target())
+
+		expect(read.kind === 'carried' ? run_carry.remaining_of(read.carry) : []).toStrictEqual([1749])
+	})
 })
 
 describe('the issues run:add put into a --only run', () => {
@@ -76,5 +107,24 @@ describe('the issues run:add put into a --only run', () => {
 		])
 
 		expect(run_carry.remaining_of(carry)).toStrictEqual([1749, 1762])
+	})
+})
+
+// joshuafolkken/kit#6839: a pool run names no issue, so its remaining list is the roots `run:add` gave it.
+describe('the issues run:add put into a run that named none', () => {
+	it('make its remaining list, prioritized first and done ones left out', () => {
+		const carry = run_carry_added.add_issues(target(), begun(POOL_INVOCATION), [
+			{ issue: 3, is_priority: false },
+			{ issue: 2, is_priority: true },
+			{ issue: 1, is_priority: false },
+		])
+
+		expect(run_carry.remaining_of(carry)).toStrictEqual([2, 3, 1])
+		expect(run_carry.remaining_of({ ...carry, done: [1] })).toStrictEqual([2, 3])
+		expect(run_carry.remaining_of({ ...carry, done: [1, 2, 3] })).toBeUndefined()
+	})
+
+	it('leave a run with none added unlisted', () => {
+		expect(run_carry.remaining_of(begun(POOL_INVOCATION))).toBeUndefined()
 	})
 })

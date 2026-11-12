@@ -19,8 +19,10 @@ interface Group {
 	elapsed: ReadonlyArray<number>
 }
 
+// A gate the ship reused started nothing (joshuafolkken/kit#5567), so its zero is no time spent and is
+// left out of the step's median.
 function is_ship_lap(entry: LedgerEntry): entry is ShipLapEntry {
-	return entry.kind === lane_ledger.KIND.SHIP_LAP
+	return entry.kind === lane_ledger.KIND.SHIP_LAP && entry.reused_tree === undefined
 }
 
 function groups_of(laps: ReadonlyArray<ShipLapEntry>): Array<Group> {

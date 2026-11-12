@@ -14,26 +14,31 @@ import {
 // undeclared one, so a wide-reach upgrade queues behind the rest of its pool (joshuafolkken/kit#5310);
 // declared ones rank among themselves by the keys below.
 //
-// Then, in order: `priority:critical`, then `priority:high`, then a defect on the verification path (`bug` with `run:solo`, or
+// Then, in order: `priority:critical`, then `priority:high`, then resumable work (an owned
+// stash, a pause comment or a linked open PR), then a defect on the verification path (`bug` with `run:solo`, or
 // `route:interrupt`), then the minutes its cause lost (`issue_priority.lost_minutes`: the body's
 // cause-loss lines summed over its recurrences (joshuafolkken/kit#4928), else its causing-lane line,
 // so causes of one lane are told apart (joshuafolkken/kit#4861); `0` when neither is declared, so an
-// undeclared issue follows every declared one of its priority), then the minutes a week its declared
-// speed-up saves (`expected_effect_lint.weekly_minutes`, on the same minute scale; `0` when undeclared,
-// so a measured time-saver runs ahead of an unmeasured feature (joshuafolkken/kit#5302)), then how many
-// other open issues wait on it. Below those, the caller's own order stands — the sort is stable, so recency and the defect-rate
-// adjustment survive as the last key.
+// undeclared issue follows every declared one of its priority), then how many other open issues wait
+// on it, transitively (`count_dependents`: a chain's head runs ahead of an independent issue
+// (joshuafolkken/kit#5506)), then declared size-estimate lines, smallest first (undeclared last),
+// then the minutes a week its declared speed-up saves
+// (`expected_effect_lint.weekly_minutes`, on the same minute scale; `0` when undeclared, so a measured
+// time-saver runs ahead of an unmeasured feature (joshuafolkken/kit#5302)). Below those, the caller's
+// own order stands — the sort is stable, so oldest-first ties and the defect-rate adjustment survive.
 //
 // **`run:solo` alone is not a key.** It means "runs alone", not "runs first": tidying that only touches
 // the verification path carries it too, and a low-priority one is not owed a place ahead of the queue.
 // Only a defect on that path is, because `backlogrun-lanes.md` holds a batch until it has merged.
 
 interface RankRow {
+	is_resumable?: boolean | undefined
 	is_last: boolean
 	labels: ReadonlyArray<string>
 	lost_minutes: number
 	gain_minutes: number
 	dependents: number
+	estimated_lines?: number | undefined
 }
 
 // One open issue as its key and the keys of the issues it is blocked by. The caller names the key
@@ -63,17 +68,18 @@ function is_verification_defect(labels: ReadonlyArray<string>): boolean {
 	return has_label_name(labels, BUG_LABEL) && has_label_name(labels, RUN_SOLO_LABEL)
 }
 
-// Negated so that the larger value sorts first under an ascending comparison; `is_last` alone is not,
-// so a declared row sorts last.
+// Descending keys are negated for the ascending comparison; `is_last` and estimated lines are not.
 function keys_of(row: RankRow): ReadonlyArray<number> {
 	return [
 		flag(row.is_last),
 		-flag(is_critical(row.labels)),
 		-flag(is_priority(row.labels)),
+		-flag(row.is_resumable === true),
 		-flag(is_verification_defect(row.labels)),
 		-row.lost_minutes,
-		-row.gain_minutes,
 		-row.dependents,
+		row.estimated_lines ?? Number.MAX_SAFE_INTEGER,
+		-row.gain_minutes,
 	]
 }
 
@@ -84,15 +90,42 @@ function compare(first: RankRow, second: RankRow): number {
 	return differences.find((difference) => difference !== 0) ?? 0
 }
 
-// How many of the rows wait on each key. A blocker outside the rows counts nothing, because only an
-// open issue in the same pool can be held back by it.
+function blockers_by_key(rows: ReadonlyArray<DependencyRow>): ReadonlyMap<string, Array<string>> {
+	const blockers = new Map<string, Array<string>>()
+
+	for (const row of rows) blockers.set(row.key, [...(blockers.get(row.key) ?? []), ...row.blockers])
+
+	return blockers
+}
+
+// Every key the row waits on, directly or through another row, itself excluded. The visited set stops
+// a cycle.
+function upstream_of(key: string, blockers: ReadonlyMap<string, Array<string>>): Set<string> {
+	const seen = new Set<string>([key])
+	const pending = [...(blockers.get(key) ?? [])]
+
+	for (let next = pending.pop(); next !== undefined; next = pending.pop()) {
+		if (seen.has(next)) continue
+		seen.add(next)
+		pending.push(...(blockers.get(next) ?? []))
+	}
+
+	seen.delete(key)
+
+	return seen
+}
+
+// How many of the rows wait on each key, transitively: a chain's head counts every row behind it, so
+// the issue that unblocks the longest run of lanes is offered first (joshuafolkken/kit#5506). Only a
+// row of the pool counts, because only an open issue in the same pool can be held back by it.
 function count_dependents(rows: ReadonlyArray<DependencyRow>): ReadonlyMap<string, number> {
+	const blockers = blockers_by_key(rows)
 	const counts = new Map<string, number>()
 
-	for (const row of rows) {
-		const blockers = new Set(row.blockers)
-
-		for (const blocker of blockers) counts.set(blocker, (counts.get(blocker) ?? NO_DEPENDENTS) + 1)
+	for (const key of blockers.keys()) {
+		for (const upstream of upstream_of(key, blockers)) {
+			counts.set(upstream, (counts.get(upstream) ?? NO_DEPENDENTS) + 1)
+		}
 	}
 
 	return counts

@@ -1,6 +1,6 @@
 ---
 name: workflow-commands
-description: Procedures for `kickoff`, `fullrun`, `halfrun`, `prrun` and `backlogrun`. Read it the moment one is typed (with or without `#N` / `new`), before any command, and when asked what one does or a run must be resumed or repaired.
+description: Procedures for `kickoff`, `fullrun`, `halfrun`, `prrun`, `backlogrun` (with or without `#N` / `new`). Read it before running, explaining, resuming or repairing one.
 ---
 
 # Issue-driven workflow commands
@@ -13,12 +13,15 @@ Its single source is `CLAUDE.md` → "Explicit invocation required (MANDATORY)",
 holds when this skill is not loaded. **A session cut inside a declared budget is not a new invocation — for `backlogrun`
 alone**: `backlogrun-steps.md` → "The session cut is inside the invocation".
 
+**Consultation main-session scope and implementation handoff follow
+`prompts/collaboration-workflow/principles.md` → "consult-vs-execute".** A keyword selects the
+existing procedure below; it does not turn the consultation main session into an implementation lane.
+
 ## 1. Which file to read
 
 Read this file, then the files the typed command's row names. A command file is a **manifest** of
 terse triggers and pointers; `pnpm josh run:step <N>` prints the run's next single action and the
-section that governs it, computed from the event stream, the carry record and the issue state, never
-the conversation; a section it prints is not fetched again.
+section that governs it; a section it prints is not fetched again.
 
 | Typed keyword                            | Read                                        |
 | ---------------------------------------- | ------------------------------------------- |
@@ -34,8 +37,7 @@ each manifest carries only its difference. `split-assessment.md` → "The questi
 
 ### The fetch is one `Read` call per file
 
-**Fetch each file above with one `Read` call of its own — never `cat`, never two in one command.** A
-Bash result is capped at `BASH_MAX_OUTPUT_LENGTH` characters and truncates a longer document;
+**Fetch each file above with one `Read` call of its own — never `cat`, never two in one command.**
 `pnpm josh doc:read <file>` is the cap-safe whole-file read.
 
 ### Four documents are read at the point of use, not at the entry
@@ -46,14 +48,14 @@ Each is fetched at its named scope, in the same turn, by the named command that 
 | Document                | Read it when                                                                   |
 | ----------------------- | ------------------------------------------------------------------------------ |
 | `latest-gate.md`        | `run:prep` answers `latest: required` — before `josh latest:if-required` runs  |
-| `followup.md` → "Run `pnpm josh followup`" | Before issuing `pnpm josh followup`, in that same turn |
-| `chain-rule.md` → "Run the review-to-merge chain" | Before the first `pnpm josh gate` launch (`fullrun` / `prrun` / `backlogrun`; a lane child reads "A lane child" alone) — the gate overlaps the review |
+| `followup.md` → "Run `pnpm josh followup`" | Never fetched: `pnpm josh followup` prints it as it starts, once per session — none in a followup any `josh ship` runs, a repeat names the section in one line |
+| `chain-rule.md` → "Run the review-to-merge chain" | Before the first `pnpm josh gate` launch (`fullrun` / `prrun` / `backlogrun`), never fetched: `run:step` prints it at `implement`, `run:review` (which launches the gate) and `ship` once per session — a lane child gets "A lane child" alone, a repeat names the section in one line |
 | `background-commands.md` → "Background the gate and push" | Before backgrounding `pnpm josh gate` — the first long-running command a run detaches (`fullrun` / `halfrun` / `prrun` / `backlogrun`) |
 
 A `latest: skip` answer reads nothing. **A lane child that parks reads
-`backlogrun-park.md` → "park and continue" at that point of use**, and **every implementing run reads
-`progress-watcher.md` → "Progress while the run is quiet"** before starting `pnpm josh run:progress
---wait` once its hold is claimed.
+`backlogrun-park.md` → "park and continue" at that point of use**, and **every implementing run starts
+`pnpm josh run:progress --wait` once its hold is claimed** — `progress-watcher.md` → "Progress while
+the run is quiet" is never fetched: `run:entry` prints it.
 
 ### A section reference is read as a section
 
@@ -64,29 +66,28 @@ pnpm josh doc:section <file.md> "<heading>"   # the section, verbatim
 pnpm josh read:set [<keyword>]                # what an entry reads, and what it costs
 ```
 
-A heading that does not resolve is refused, with the file's own headings listed.
-
 ## 2. What every one of them shares
 
-Each shared rule is a **trigger, a one-line action, and the single source** the procedure is read
-from — read at that trigger, never restated here.
+Each shared rule is a **trigger, a one-line action, and the single source** read at that trigger.
 
 | Trigger | Action | Single source |
 | --- | --- | --- |
+| Consultation main (Fable / Astra), excluding lane and `run:handoff` children | `pnpm josh run:handoff <keyword> … --brief-file .josh/tmp/brief.md` | `docs/josh-commands-board.md` → "josh run:handoff" |
+| A file passed as a `*-file` argument (body, plan, brief, rationale, human-steps, review note) | Write it under `.josh/tmp/` | `prompts/collaboration-workflow/shell-body.md` → "安全な書き方" |
 | First call of any entry | `#N`: `pnpm josh run:entry <N> --to <command>` (claims the tree, except `kickoff`); `new` (not `kickoff`): `pnpm josh run:hold`; `busy` / `unknown` stop | `working-tree-hold.md` |
 | `run:entry` prints its stage line | The command sets how far a run goes, the Issue where it starts; **`start: reached` redoes nothing** — stop (at `merged`, the next line answers) | `docs/how-to/run-issues.md` |
-| Same turn as the hold (not a dispatched child, not `kickoff`) | `pnpm josh cost --cut`; `under` continues, `over` stops — `run:entry` notifies and runs `run:release` (by hand for `new`) | `backlogrun-progress.md` → "The hand-off" (model-priced threshold) |
+| Same turn as the hold (not a dispatched child, not `kickoff`) | `pnpm josh cost --cut`; `under` continues, `over` stops — `run:entry` notifies and runs `run:release` (`new`: `--adopt`) | `backlogrun-progress.md` → "The hand-off" (model-priced threshold) |
 | An entry typed with an `owner/repo#` prefix or a short `repo#` name | Resolve the target and its checkout; an explicit foreign owner stops the run | `target-repository.md` |
 | A `new` entry typed with an `into <target>` suffix | Insert the artifact into the named epic with `pnpm josh epic --add <E> <N>` | `into-target.md` |
-| Before any work starts (every entry) | The split assessment; the default is not to split — separability **and** a scope clearly over one gate must hold together; a `fullrun` / `halfrun` that finds a split files the epic and **stops** | `split-assessment.md` → "The question" |
+| Before any work starts (every entry) | The split assessment; the default is not to split — separability **and** a scope over the size guide must hold together; a `fullrun` / `halfrun` that finds a split files the epic and **stops** | `split-assessment.md` → "The question" |
 | Before implementing (every implementing entry) | `pnpm josh run:prep <N>` (`run:entry` bundles it; `kickoff` reads `pnpm josh issue:read <N>`) — the body and the comments; the later of a body and a comment wins | `issue-comments.md` |
 | `run:prep` answers `human_review: yes` | Implement and gate, run `pnpm josh test:e2e`, then stop before the commit with `pnpm josh run:hold <N> --human-review-stop`; the label is applied only by a person | `needs-human-review.md` |
-| `run:prep` answers `latest: required` | Read the doc and run `pnpm josh latest:if-required`, then load the `dependency-update` skill | `latest-gate.md` (read whole, only on `required`) |
+| `run:prep` answers `latest: required` | `pnpm josh latest:if-required` — it prints the `dependency-update` check | `latest-gate.md` (read whole, only on `required`) |
 | Before delegating any run step | `pnpm josh delegate <step>` decides eligibility, never you | `delegation.md` |
 | The pre-implementation reading reaches 3 unedited files | Delegate the unread investigation; a file this run will edit is read in the main line | `delegation.md` → "The pre-implementation reading" |
 | Immediately before implementation | Present the two-layer work summary (once per Issue); `kickoff` posts a plan instead | `prompts/collaboration-workflow/report-format.md` |
 | While implementing | Re-run one check by name, not the whole gate — `pnpm josh lint:related`, `pnpm josh cspell:dot`, `pnpm josh test:related --touched` (full reach once the implementation is done); `pnpm josh review:brief` refuses a brief on a tree the last two were not green on | `chain-rule.md` |
-| Implementation is done | Refactor → `main:merge` (no lane child) → `pnpm josh gate` beside a subagent `/code-review`, joined before the commit → round cap → PR → merge | `chain-rule.md` → "Run the review-to-merge chain" |
+| Implementation is done | Refactor → `main:merge` (no lane child) → `pnpm josh gate`, then (green) a subagent `/code-review` → round cap → PR → merge | `chain-rule.md` → "Run the review-to-merge chain" |
 | A review has run | Its verdict counts only once `pnpm josh review:attest --check` answers `ok`; `missing` / `mismatch` are refusals `pnpm josh followup` blocks the merge on | `chain-rule.md` → "The brief names the checkout, and a review that read another one is refused" |
 | A command can take minutes | Issue it in the background; the turn never ends at the push (`pnpm josh followup` stays foreground) | `background-commands.md` → "Background the gate and push" |
 | E2E gate | The CI E2E job where the command ends in a PR (`fullrun` / `prrun` / `backlogrun`, enforced by `pnpm josh followup`); you run `pnpm josh test:e2e` yourself where it does not (`halfrun`) | `prompts/testing-guide.md` → "Closing the E2E gate without a human run" |

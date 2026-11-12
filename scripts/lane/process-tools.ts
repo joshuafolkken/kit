@@ -2,11 +2,8 @@ import path from 'node:path'
 
 // One definition of "the process tools a lane reads are not installed".
 //
-// **`ps` and `pgrep` are a prerequisite, not an optional probe.** The owner check walks the caller's
-// ancestry with `ps`, and lane liveness and reaping match children with `pgrep`. A machine without
-// them (a slim Debian image ships no `procps`) used to read every probe as "nothing there": the
-// ancestry stopped at the caller, `run:step` answered `unknown`, and the parent stopped before its
-// first lane with no word of why. A missing tool is refused by name instead.
+// `ps` supplies caller ancestry and `pgrep` supplies lane liveness and reaping, so missing tools must
+// be refused by name rather than interpreted as an absent process. Slim images may lack `procps`.
 
 // What Node reports when the executable to spawn does not exist.
 const NOT_FOUND_CODE = 'ENOENT'

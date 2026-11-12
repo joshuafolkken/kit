@@ -65,6 +65,6 @@ describe('process_lane_marks.parse — what is never the lane’s', () => {
 
 describe('process_lane_marks.list_all', () => {
 	it('lists nothing on a platform the marks are not read on', () => {
-		expect(process_lane_marks.list_all('linux')).toStrictEqual(new Map())
+		expect(process_lane_marks.list_all('win32')).toStrictEqual(new Map())
 	})
 })

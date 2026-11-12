@@ -7,7 +7,7 @@ import { run_ship_stage, type Stage } from './run-ship-stage'
 
 const ISSUE = '2964'
 const TITLE = `Put the next command in the prompt #${ISSUE}`
-const BODY_PATH = 'scratchpad/evidence.md'
+const BODY_PATH = '.josh/tmp/evidence.md'
 const BODY = ['--body-file', BODY_PATH]
 const CITE = ['--cite', '2965']
 const NOTIFY = ['--notify-message-file', 'notify body.txt']

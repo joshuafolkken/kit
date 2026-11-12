@@ -4,7 +4,14 @@ import { fileURLToPath } from 'node:url'
 import { hook_bundle_stamp } from '#scripts/build/hook-bundle-stamp'
 import { toolchain_inputs } from '#scripts/gate/toolchain-inputs'
 import { atomic_write } from '#scripts/lib/atomic-write'
-import { build, type OnLoadArgs, type OutputFile, type Plugin, type PluginBuild } from 'esbuild'
+import {
+	build,
+	type OnLoadArgs,
+	type OnResolveArgs,
+	type OutputFile,
+	type Plugin,
+	type PluginBuild,
+} from 'esbuild'
 
 const BUILD_SCRIPT = fileURLToPath(import.meta.url)
 const PACKAGE_DIR = path.join(path.dirname(BUILD_SCRIPT), '..', '..')
@@ -15,6 +22,15 @@ const STAGING_PREFIX = '.hooks-staging-'
 // esbuild compiles a plugin filter as a Go regexp, which rejects the `u` flag.
 // eslint-disable-next-line require-unicode-regexp
 const ANY_PATH = /.*/
+// A bare specifier: not relative, absolute, a `#scripts/*` subpath import or a `node:` built-in.
+// eslint-disable-next-line require-unicode-regexp
+const BARE_SPECIFIER = /^[^./#]/
+const NODE_BUILTIN_PREFIX = 'node:'
+const ENTRY_POINT_KIND = 'entry-point'
+const SCOPE_PREFIX = '@'
+const SCOPED_NAME_SEGMENTS = 2
+const NODE_MODULES_SEGMENT = `${path.sep}node_modules${path.sep}`
+const INLINED_PACKAGES: ReadonlySet<string> = new Set(['execa', 'js-yaml', 'semver', 'zod'])
 
 // Each Claude Code hook is bundled to its own `dist/hooks/<name>.js`, so a consumer (and kit itself)
 // invokes `node dist/hooks/<name>.js` directly — no `pnpm` launch and no `tsx` re-spawn from the
@@ -33,10 +49,13 @@ const ANY_PATH = /.*/
 // elsewhere becomes a re-export stub that runs nothing. Each launched hook is therefore a `*-cli.ts`
 // file holding only the self-invoke, which no other module imports.
 //
-// `packages: 'external'` keeps bare dependencies as runtime imports the consumer resolves from kit's
-// node_modules, exactly as the library bundles do, while kit's internal `#scripts/*` graph is inlined.
-// No shebang banner is added: unlike `dist/josh.js` (the `bin.josh` entry, executed directly), a hook
-// bundle is always launched as `node <path>`.
+// Kit's internal `#scripts/*` graph is inlined. **The light dependencies every hook launch loads are
+// inlined too** (`INLINED_PACKAGES`, with whatever they import): resolving and loading their module
+// graphs file by file from node_modules was most of a bundle's import time on every tool call
+// (joshuafolkken/kit#5641). Every other bare dependency stays a runtime import the consumer resolves
+// from kit's node_modules, exactly as the library bundles do — `typescript` alone would grow the
+// bundles tenfold. No shebang banner is added: unlike `dist/josh.js` (the `bin.josh` entry, executed
+// directly), a hook bundle is always launched as `node <path>`.
 interface HookBundle {
 	source: string
 	out: string
@@ -52,6 +71,12 @@ const HOOK_BUNDLES: ReadonlyArray<HookBundle> = [
 	{ source: 'scripts/josh/session-language-main.ts', out: 'session-lang' },
 	{ source: 'scripts/security/security-audit-provision-main.ts', out: 'audit-provision' },
 ]
+
+// Kit's own launch of those hooks (`scripts/hooks/run-hook.sh`): built beside them so a fresh build
+// runs without TypeScript, and kept out of `HOOK_BUNDLES` because no hook config launches it.
+const LAUNCH_GATE: HookBundle = { source: 'tools/hooks/hook-bundle-fast.ts', out: 'ready' }
+// The resident pretool-guard daemon the launcher hands a call to (#6683), built the same way.
+const HOOK_DAEMON: HookBundle = { source: 'tools/hooks/hook-daemon.ts', out: 'daemon' }
 
 function entry_point(bundle: HookBundle): { in: string; out: string } {
 	return { in: path.join(PACKAGE_DIR, bundle.source), out: bundle.out }
@@ -78,24 +103,66 @@ function prune_stale_outputs(out_directory: string, outputs: ReadonlyArray<strin
 // launched entry runs a main, so every other module's guard is built as `false`.
 const SELF_INVOKE_GUARD = 'process.argv[1] === fileURLToPath(import.meta.url)'
 
-function loaded_contents(contents: Uint8Array, is_entry: boolean): string {
-	const source = Buffer.from(contents).toString('utf8')
+type SourceTransform = (source: string, file_path: string) => string
 
-	return is_entry ? source : source.replaceAll(SELF_INVOKE_GUARD, 'false')
+function strip_guards(entries: ReadonlySet<string>): SourceTransform {
+	return function strip(source: string, file_path: string): string {
+		return entries.has(file_path) ? source : source.replaceAll(SELF_INVOKE_GUARD, 'false')
+	}
 }
 
-// Every file the build loads is read here, so the stamp digests the exact bytes that were bundled —
-// a source edited mid-build is recorded as what it was, and the next launch rebuilds it.
-function source_recorder(sources: Map<string, Uint8Array>, entries: ReadonlySet<string>): Plugin {
+function is_dependency_file(file_path: string): boolean {
+	return file_path.includes(NODE_MODULES_SEGMENT)
+}
+
+function package_name(specifier: string): string {
+	const segments = specifier.split('/')
+	const length = specifier.startsWith(SCOPE_PREFIX) ? SCOPED_NAME_SEGMENTS : 1
+
+	return segments.slice(0, length).join('/')
+}
+
+// An import inside node_modules belongs to an inlined package's graph — an external package is never
+// loaded — so it is inlined with it. An entry point is never external: a Windows absolute path such as
+// `C:\…` also reads as bare.
+function is_external(args: OnResolveArgs): boolean {
+	if (args.kind === ENTRY_POINT_KIND) return false
+	if (args.path.startsWith(NODE_BUILTIN_PREFIX)) return true
+
+	return !INLINED_PACKAGES.has(package_name(args.path)) && !is_dependency_file(args.importer)
+}
+
+function dependency_boundary(): Plugin {
+	return {
+		name: 'hook-dependency-boundary',
+		setup(plugin_build: PluginBuild): void {
+			plugin_build.onResolve({ filter: BARE_SPECIFIER }, function resolve(args: OnResolveArgs) {
+				return is_external(args) ? { path: args.path, external: true } : undefined
+			})
+		},
+	}
+}
+
+function record(sources: Map<string, Uint8Array>, file_path: string, contents: Uint8Array): void {
+	if (!is_dependency_file(file_path)) sources.set(path.relative(PACKAGE_DIR, file_path), contents)
+}
+
+// Every first-party file the build loads is read here, so the stamp digests the exact bytes that were
+// bundled — a source edited mid-build is recorded as what it was, and the next launch rebuilds it. An
+// inlined dependency is loaded as esbuild reads it and left out of the record: the lockfile and pnpm's
+// install record among the toolchain inputs already change with it, and every recorded input is
+// stat-ed on every hook launch.
+function source_recorder(sources: Map<string, Uint8Array>, transform: SourceTransform): Plugin {
 	return {
 		name: 'hook-source-recorder',
 		setup(plugin_build: PluginBuild): void {
 			plugin_build.onLoad({ filter: ANY_PATH, namespace: 'file' }, function load(args: OnLoadArgs) {
 				const contents = readFileSync(args.path)
+				const source = Buffer.from(contents).toString('utf8')
 
-				sources.set(path.relative(PACKAGE_DIR, args.path), contents)
+				record(sources, args.path, contents)
 
-				return { contents: loaded_contents(contents, entries.has(args.path)), loader: 'default' }
+				return { contents: transform(source, args.path), loader: 'default' }
 			})
 		},
 	}
@@ -144,32 +211,49 @@ function place_build(out_directory: string, files: ReadonlyArray<OutputFile>, st
 // This script is an input too: it rewrites what it loads, so an edit to it changes the bundles while
 // every bundled source stays byte-identical. So is the toolchain (`toolchain-inputs.ts`): the manifest
 // maps the `#scripts/*` imports esbuild resolves, and the lockfile pins esbuild itself.
-function build_inputs(): Map<string, Uint8Array> {
+function build_inputs(build_script: string = BUILD_SCRIPT): Map<string, Uint8Array> {
 	const toolchain = toolchain_inputs.paths(PACKAGE_DIR)
 
 	return new Map<string, Uint8Array>([
 		[path.relative(PACKAGE_DIR, BUILD_SCRIPT), readFileSync(BUILD_SCRIPT)],
+		[path.relative(PACKAGE_DIR, build_script), readFileSync(build_script)],
 		...toolchain.map((input) => [input, readFileSync(path.join(PACKAGE_DIR, input))] as const),
 	])
 }
 
-async function build_hooks(out_directory: string = OUT_DIR): Promise<void> {
-	const sources = build_inputs()
-	const entry_points = HOOK_BUNDLES.map((bundle) => entry_point(bundle))
+async function bundle_pass(
+	bundles: ReadonlyArray<HookBundle>,
+	is_split: boolean,
+	sources: Map<string, Uint8Array>,
+	out_directory: string,
+): Promise<ReadonlyArray<OutputFile>> {
+	const entry_points = bundles.map((bundle) => entry_point(bundle))
 	const entries = new Set(entry_points.map((entry) => entry.in))
 	const { outputFiles: files } = await build({
 		absWorkingDir: PACKAGE_DIR,
 		entryPoints: entry_points,
 		outdir: out_directory,
 		bundle: true,
-		splitting: true,
+		splitting: is_split,
 		platform: 'node',
 		format: 'esm',
 		target: 'node22',
-		packages: 'external',
 		write: false,
-		plugins: [source_recorder(sources, entries)],
+		plugins: [dependency_boundary(), source_recorder(sources, strip_guards(entries))],
 	})
+
+	return files
+}
+
+// The launch gates are built unsplit: a launch that read the previous `ready.js` would otherwise link
+// chunks a background rebuild had just pruned, and fail open. Both passes share one stamp.
+async function build_hooks(out_directory: string = OUT_DIR): Promise<void> {
+	const sources = build_inputs()
+	const passes = await Promise.all([
+		bundle_pass(HOOK_BUNDLES, true, sources, out_directory),
+		bundle_pass([LAUNCH_GATE, HOOK_DAEMON], false, sources, out_directory),
+	])
+	const files = passes.flat()
 	const stamp = hook_bundle_stamp.stamp_text(
 		sources,
 		files.map((file) => file.path),
@@ -178,5 +262,16 @@ async function build_hooks(out_directory: string = OUT_DIR): Promise<void> {
 	place_build(out_directory, files, stamp)
 }
 
-export type { HookBundle }
-export { build_hooks, HOOK_BUNDLES, OUT_DIR, outfile_for, STAGING_PREFIX }
+export type { HookBundle, SourceTransform }
+export {
+	build_hooks,
+	build_inputs,
+	place_build,
+	source_recorder,
+	strip_guards,
+	HOOK_BUNDLES,
+	INLINED_PACKAGES,
+	OUT_DIR,
+	outfile_for,
+	STAGING_PREFIX,
+}

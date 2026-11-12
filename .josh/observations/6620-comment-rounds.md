@@ -1,0 +1,2 @@
+- rf:tests | low | scripts/run/board/run-board-render-quota-gauge.test.ts:14 | 2026-11-07 | #6620
+- rf:none | none | - | 2026-11-07 | #6620

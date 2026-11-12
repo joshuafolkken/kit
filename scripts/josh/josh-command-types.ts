@@ -75,15 +75,21 @@ interface CommandEntry {
 	// Composite (`sh -c`) commands reject extra CLI arguments instead of swallowing them; this
 	// names the sub-commands that do accept them, so the refusal points somewhere useful.
 	argument_targets?: ReadonlyArray<string>
+	// Flags that turn the invocation into a read whatever its declared side effects — `ship --log` —
+	// so a scope that may not implement passes it (`josh-read-only.ts`). Declared here, not read off
+	// `side_effects`: `none` there is documentation, not a write audit (`edit:files` writes).
+	read_only_flags?: ReadonlyArray<string>
+	// A command whose every invocation only reads — `cost:audit`, `read:set` — so it passes the same
+	// scope with no flag (`josh-read-only.ts`). Declared only after its code paths are audited for writes.
+	is_read_only?: boolean
+	// Flags that keep a declared read from passing when it writes, including --flag=value spellings.
+	write_flags?: ReadonlyArray<string>
 	// A command that only makes sense inside the kit repository itself — the rule-compliance eval and
 	// the run measurements that analyze kit's own development. It is dropped from a consumer's
 	// `josh --help` and refused with guidance when run in a consumer project, so a distributed help
 	// listing carries only what a consumer can run. The audience in
 	// `reference` separately decides whether the command appears in the default listing.
 	is_kit_only?: boolean
-	// Pre-built to `dist/commands/` so a consumer's `dist/josh.js` imports it in its own process
-	// instead of spawning tsx for it (`docs/maintainers/runtime-bundling.md`).
-	is_bundled?: boolean
 	// The cores the command reserves from the machine-wide budget before it starts its heavy tools.
 	// `josh-logic.ts` claims them at the one dispatch point every command
 	// passes through, so the command only declares the number. A function means the weight is read
@@ -135,7 +141,7 @@ const ESLINT_RELATED_CACHE_FILE = '.eslintcache.related'
 const PRETTIER_CACHE_FILE = '.prettiercache'
 const PRETTIER_RELATED_CACHE_FILE = '.prettiercache.related'
 // The pre-commit hook's own, because a staged-files run on the gate's file degrades it: cspell prunes
-// every entry the run did not visit (measured 892 KB down to 18 KB), and `eslint --quiet` stores a
+// every entry the run did not visit, and `eslint --quiet` stores a
 // report without its warnings under the same config hash the gate reads.
 const CSPELL_COMMIT_CACHE_FILE = '.cspellcache.commit'
 const ESLINT_COMMIT_CACHE_FILE = '.eslintcache.commit'
@@ -249,6 +255,18 @@ const PRETTIER_RELATED_CACHE_FLAGS = content_cache_flags(PRETTIER_RELATED_CACHE_
 const CSPELL_COMMIT_CACHE_FLAGS = content_cache_flags(CSPELL_COMMIT_CACHE_FILE)
 const ESLINT_COMMIT_CACHE_FLAGS = content_cache_flags(ESLINT_COMMIT_CACHE_FILE)
 
+// `josh lint:rule`'s own cache and report directory, under `node_modules` so no ignore rule has to
+// name it: its `--rule` override changes every entry's config hash, so on the gate's file each run
+// would leave the gate a cold lint. The workers are its `--concurrency`, and its registration claims
+// the whole-tree scan's cores and memory once per worker. A `--paths` run lints on a cache of its
+// own, so a subset run never rewrites the whole run's cache, whose unvisited entries eslint may drop.
+const LINT_RULE_DIRECTORY = 'node_modules/.cache/josh/lint-rule'
+const LINT_RULE_CACHE_FILE = `${LINT_RULE_DIRECTORY}/.eslintcache`
+const LINT_RULE_CACHE_FLAGS = content_cache_flags(LINT_RULE_CACHE_FILE)
+const LINT_RULE_PATHS_CACHE_FILE = `${LINT_RULE_DIRECTORY}/.eslintcache-paths`
+const LINT_RULE_PATHS_CACHE_FLAGS = content_cache_flags(LINT_RULE_PATHS_CACHE_FILE)
+const LINT_RULE_WORKERS = 2
+
 export type { CommandCategory, CommandEntry, CommandUsage, GateCacheSpec }
 // The three cache files are exported one by one as well as as a list, because `josh bench` clears
 // them per target: the lint step writes only the eslint one, so a target
@@ -273,6 +291,12 @@ export {
 	GATE_CACHE_SPECS,
 	GATE_COMMAND,
 	IGNORED_CACHE_FILES,
+	LINT_RULE_CACHE_FILE,
+	LINT_RULE_CACHE_FLAGS,
+	LINT_RULE_DIRECTORY,
+	LINT_RULE_PATHS_CACHE_FILE,
+	LINT_RULE_PATHS_CACHE_FLAGS,
+	LINT_RULE_WORKERS,
 	OPTIONAL_ENV_FILE_FLAGS,
 	PRETTIER_CACHE_FILE,
 	PRETTIER_CACHE_FLAGS,

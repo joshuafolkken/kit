@@ -10,7 +10,10 @@ import { lane_close } from './lane-close'
 import { lane_install } from './lane-install'
 import { lane_open, type OpenOutcome } from './lane-open'
 import { lane_paths } from './lane-paths'
+import { lane_reap_settle } from './lane-reap-settle'
 import { lane_registry, type LaneInfo } from './lane-registry'
+import { process_directories } from './process-directories'
+import { process_lane_marks } from './process-lane-marks'
 
 // Two lanes, open at the same time, in one real repository — the case every lane defect so far has
 // been an instance of, and the one no suite covered.
@@ -35,7 +38,7 @@ import { lane_registry, type LaneInfo } from './lane-registry'
 // defect: the two seats differ, and each lane's ports are the ones *its own* seat resolves to — a
 // set of ports would have let the two lanes swap theirs and stay green.
 //
-// **What is stubbed, and why it is not the subject.** Three calls, the same three
+// **What is stubbed, and why it is not the subject.** The same three
 // `lane-open-start-point.test.ts` stubs and for the same reasons:
 //
 // - `lane_install.install_dependencies` is stubbed so no real `pnpm install --frozen-lockfile` runs.
@@ -46,6 +49,9 @@ import { lane_registry, type LaneInfo } from './lane-registry'
 //   network guard refuses by design, and the fixture has no remote to ask. `fetch_branch` carries no
 //   timeout of its own, so leaving it live would hang the gate on a machine whose global git config
 //   resolves `origin` somewhere real.
+// - Process directory and environment listings are empty readings: the fixture starts no lane
+//   children. The refused-listing cases below exercise the real settle and close without relying on
+//   the host granting lsof or ps access.
 //
 // **What this file does NOT cover, stated rather than implied.** It does not run two lanes in two
 // operating-system processes: production dispatches a lane child as its own process, and this suite
@@ -157,6 +163,8 @@ function stub_what_the_fixture_cannot_do(): void {
 	vi.spyOn(git_command, 'fetch_branch').mockResolvedValue('')
 	// The stage an open writes is a run's, and this fixture is no run.
 	vi.spyOn(run_event_setup, 'emit').mockResolvedValue()
+	vi.spyOn(process_directories, 'list_all').mockReturnValue(new Map())
+	vi.spyOn(process_lane_marks, 'list_all').mockReturnValue(new Map())
 }
 
 async function build_repository(root: string): Promise<void> {
@@ -298,6 +306,28 @@ describe('closing one of two open lanes', () => {
 			// Closing a lane deletes its own branch, so a defect deleting both would leave the issue
 			// and seat readings above unchanged and only this one red.
 			expect(remaining.map((lane) => lane.branch)).toEqual([second.branch])
+		},
+		TIMEOUT_MS,
+	)
+})
+
+describe('closing with an unreadable process listing', () => {
+	it.each(['directories', 'marks'] as const)(
+		'keeps the close incomplete when the %s listing is refused',
+		async (listing) => {
+			const { first, second } = lanes()
+			const source = listing === 'directories' ? process_directories : process_lane_marks
+
+			vi.spyOn(source, 'list_all').mockReturnValue(undefined)
+
+			const outcome = await lane_close.close_lane(FIRST_ISSUE)
+			const remaining = await lane_registry.list_lanes()
+
+			expect(outcome.kind).toBe('incomplete')
+			expect(outcome.left_behind).toContain(lane_reap_settle.survivor_texts(undefined)[0])
+			expect(existsSync(first.directory)).toBe(false)
+			expect(existsSync(second.directory)).toBe(true)
+			expect(remaining.map((lane) => lane.issue)).toEqual([SECOND_ISSUE])
 		},
 		TIMEOUT_MS,
 	)

@@ -196,7 +196,7 @@ decision oracles:
     command   pnpm josh lane:list
     answers   live | stopped | unknown
     no firing it answers a status question and governs no action of its own to gate before
-    source    docs/josh-commands-run.md → The `in-progress` / lane difference
+    source    docs/josh-commands-lane.md → The `in-progress` / lane difference
   run:entry
     decision  Where a run on an issue starts, and whether the typed command has already been reached
     command   pnpm josh run:entry <N> [--to kickoff|halfrun|prrun|fullrun]

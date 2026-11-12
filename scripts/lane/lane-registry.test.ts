@@ -1,15 +1,10 @@
-import {
-	chmodSync,
-	mkdirSync,
-	mkdtempSync,
-	rmSync,
-	statSync,
-	utimesSync,
-	writeFileSync,
-} from 'node:fs'
-import { tmpdir } from 'node:os'
+import { chmodSync, mkdirSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { lane_seat_ownership } from './lane-seat-ownership'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#1490: the open lanes and their seats are read from git and from each lane's own
 // `.env`, never from a ledger. That is what makes `git worktree remove` erase the record of a seat
@@ -34,17 +29,13 @@ const { git_worktree } = await import('#scripts/git/git-worktree')
 const { git_command } = await import('#scripts/git/git-command')
 const { lane_registry } = await import('./lane-registry')
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'lane-registry-test-'))
+const scratch = make_directory('lane-registry-test-')
 const MAIN_TREE = path.join(scratch, 'kit')
 // What `lane_paths.default_lane_root(MAIN_TREE)` derives, since that is what `list_lanes` now asks
 // for: a work tree only counts as a lane when it sits at `<lane root>/<issue>`, and the root is
 // derived from the main work tree the listing names first.
 const LANE_DIRECTORY = '.kit-lanes'
 const LANE_ROOT = path.join(scratch, LANE_DIRECTORY)
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
 
 const HEAD_LINE = 'HEAD 0000000000000000000000000000000000000000'
 const LANE_BRANCH_LINE = 'branch refs/heads/1490-lane'
@@ -79,6 +70,7 @@ function list_of(...blocks: ReadonlyArray<string>): void {
 }
 
 beforeEach(() => {
+	vi.spyOn(lane_seat_ownership, 'snapshot').mockResolvedValue(undefined)
 	// `JOSH_LANE_ROOT` is a supported setting and vitest loads `.env` into `process.env`, so a machine
 	// that has one set would send `lane_root` somewhere other than the scratch tree and fail every
 	// test below. Blank is how `lane_paths` spells "not set", so this pins the default path.
@@ -88,6 +80,20 @@ beforeEach(() => {
 	vi.mocked(git_command.repository_root).mockResolvedValue(MAIN_TREE)
 	rmSync(LANE_ROOT, { force: true, recursive: true })
 	mkdirSync(LANE_ROOT, { recursive: true })
+})
+
+it('keeps a stopped tree and its saved seat while returning the reservation', async () => {
+	open_on_disk('1490', '6')
+	list_of(lane_block('1490'))
+	vi.mocked(lane_seat_ownership.snapshot).mockResolvedValue({
+		running: new Set(),
+		ports: new Set(),
+	})
+	const lanes = await lane_registry.list_lanes()
+
+	expect(lanes[0]?.seat).toBe(6)
+	expect(lanes[0]?.seat_held).toBe(false)
+	expect(lane_registry.used_seats(lanes)).toEqual([])
 })
 
 describe('reading the open lanes', () => {

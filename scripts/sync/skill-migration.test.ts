@@ -1,7 +1,7 @@
-import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import os from 'node:os'
+import { cpSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { transform_copied_tree } from './directory-copy-guard'
 import { skill_migration, type RemovedSkillManifest } from './skill-migration'
 
@@ -13,16 +13,14 @@ const EPIC_COMMANDS = '.claude/skills/epic-commands'
 const SKILL_FILE = 'SKILL.md'
 const EDITED_BY_CONSUMER = 'edited by the consumer\n'
 
+const make_directory = temporary_directory()
+
 // A holder rather than a bare `let`: `beforeEach` writes a property here rather than reassigning a
 // module binding, which `unicorn/no-top-level-assignment-in-function` forbids.
 const context = { project: '' }
 
 beforeEach(() => {
-	context.project = mkdtempSync(path.join(os.tmpdir(), 'skill-migration-'))
-})
-
-afterEach(() => {
-	rmSync(context.project, { recursive: true, force: true })
+	context.project = make_directory('skill-migration-')
 })
 
 function copy_clean(relative: string): void {

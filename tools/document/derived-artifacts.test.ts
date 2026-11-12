@@ -1,33 +1,12 @@
 import { document_byte_budget } from '#scripts/document/document-byte-budget'
-import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { describe, expect, it } from 'vitest'
 import { derived_artifacts } from './derived-artifacts'
 
 const BUDGETED_PAGE = 'docs/josh-commands.md'
-const STALE_WHY =
-	'For scale: there are 1 `josh` commands, and **0 of them are meant to be run by the agent**, not by a person.'
 
 function ceiling(): number {
 	return document_byte_budget.recorded_bytes_for(BUDGETED_PAGE) ?? 0
 }
-
-describe('docs/why.md command counts', () => {
-	it('counts every command in the registry', () => {
-		const total = String(Object.keys(COMMAND_MAP).length)
-
-		expect(derived_artifacts.why_counts_sentence()).toContain(
-			`there are ${total} \`josh\` commands`,
-		)
-	})
-
-	it('rewrites stale counts and keeps the prose around them', () => {
-		const rewritten = derived_artifacts.rewrite_why_counts(STALE_WHY)
-
-		expect(rewritten).toBe(
-			`For scale: ${derived_artifacts.why_counts_sentence()}**, not by a person.`,
-		)
-	})
-})
 
 describe('the byte report of a written page', () => {
 	it('prints the bytes beside the ceiling and what is left', () => {

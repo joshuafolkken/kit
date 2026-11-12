@@ -51,7 +51,7 @@ describe('reserved_run.parse_arguments', () => {
 	})
 })
 
-// joshuafolkken/kit#4582: the reservation carried no memory, so a 12 GB four-worker eslint was admitted
+// joshuafolkken/kit#4582: the reservation carried no memory, so a memory-heavy four-worker eslint was admitted
 // beside four other lanes. The claim now carries the explicit `--memory`, else the estimate, else none.
 function options_of(argv: ReadonlyArray<string>): {
 	command: string

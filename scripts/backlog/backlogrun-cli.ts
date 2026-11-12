@@ -1,12 +1,15 @@
 #!/usr/bin/env tsx
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import type { AgentEnvironment } from '#scripts/agent/agent-provider'
 import type { AgentProvider } from '#scripts/agent/agent-role-profile'
 import { josh_environment_file } from '#scripts/josh/josh-environment-file'
+import { lane_limit_history } from '#scripts/lane/lane-limit-history'
 import { run_board_cli } from '#scripts/run/board/run-board-cli'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import type { LaunchResult } from '#scripts/run/detached-launch'
 import { run_wake_cli } from '#scripts/run/wake/run-wake-cli'
+import { backlog_preflight, type PreflightResult } from './backlog-preflight'
 import { backlogrun_args, type ArgumentsResult, type BacklogrunArguments } from './backlogrun-args'
 import { backlogrun_launch, type LaunchTarget, type StartResult } from './backlogrun-launch'
 import { backlogrun_replace, type ReplaceVerdict } from './backlogrun-replace'
@@ -35,7 +38,10 @@ interface BacklogrunPorts {
 	repository_directory: () => Promise<string | undefined>
 	is_running: (git_directory: string) => boolean
 	replacement: (invocation: string, git_directory: string) => Promise<ReplaceVerdict>
+	stranded: (git_directory: string) => Promise<ReplaceVerdict | undefined>
 	start: (args: BacklogrunArguments, target: LaunchTarget) => StartResult
+	preflight: (args: BacklogrunArguments, git_directory: string) => PreflightResult
+	record_limit: () => Promise<void>
 	start_supervisor: (git_directory: string, provider: AgentProvider) => LaunchResult
 	stop: (git_directory: string) => Promise<StopReport>
 	restart: (git_directory: string) => Promise<number>
@@ -43,12 +49,22 @@ interface BacklogrunPorts {
 	write: (line: string) => void
 }
 
+interface StartRequest {
+	argv: ReadonlyArray<string>
+	environment: AgentEnvironment
+}
+
 const LIVE_PORTS: BacklogrunPorts = {
 	repository_directory: run_carry.repository_directory,
 	is_running: backlogrun_launch.is_running,
 	replacement: async (invocation, git_directory) =>
 		await backlogrun_replace.decide(invocation, git_directory),
+	stranded: async (git_directory) => await backlogrun_replace.stranded(git_directory),
 	start: (args, target) => backlogrun_launch.start(args.invocation, args.provider, target),
+	preflight: (args, git_directory) => backlog_preflight.preflight({ ...args, git_directory }),
+	record_limit: async () => {
+		await lane_limit_history.record_launch()
+	},
 	start_supervisor: run_wake_cli.start_for_launch,
 	stop: async (git_directory) => await backlogrun_stop.stop(git_directory),
 	restart: async (git_directory) => await backlogrun_restart.restart(git_directory),
@@ -76,6 +92,9 @@ function launched_note(result: Extract<StartResult, { kind: 'launched' }>): stri
 	return `backlogrun: started (pid ${String(pid)}${session_part}); log ${log_path}`
 }
 
+// **The record is handed off before the supervisor starts** (`backlog-preflight.ts`), so its first
+// pass drives at once while the parent plans beside the lanes.
+//
 // **The supervisor is started here, beside the parent, never from the parent's own shell**: Claude
 // Code removes its token from what its Bash tool starts, so only this process can hand a token-only
 // credential on to the sessions the supervisor wakes (joshuafolkken/kit#3804). A supervisor that does
@@ -91,6 +110,12 @@ function target_of(git_directory: string): LaunchTarget {
 	return { worktree: path.dirname(git_directory), git_directory }
 }
 
+function refuse(line: string, ports: BacklogrunPorts): number {
+	ports.write(line)
+
+	return FAILURE_EXIT_CODE
+}
+
 async function launch(
 	args: BacklogrunArguments,
 	git_directory: string,
@@ -98,13 +123,12 @@ async function launch(
 ): Promise<number> {
 	const result = ports.start(args, target_of(git_directory))
 
-	if (result.kind === 'failed') {
-		ports.write(`backlogrun: could not start: ${result.note}`)
-
-		return FAILURE_EXIT_CODE
-	}
+	if (result.kind === 'failed') return refuse(`backlogrun: could not start: ${result.note}`, ports)
 
 	ports.write(launched_note(result))
+	ports.preflight(args, git_directory)
+	// The limit the run starts under, so `lane:stats` sees a `.env` change between runs (joshuafolkken/kit#6139).
+	await ports.record_limit()
 	ports.write(supervisor_note(ports.start_supervisor(git_directory, args.provider)))
 
 	return await ports.show_board()
@@ -116,8 +140,9 @@ async function replace(
 	args: BacklogrunArguments,
 	git_directory: string,
 	ports: BacklogrunPorts,
+	kind = 'idle',
 ): Promise<number> {
-	ports.write(`backlogrun: replacing the idle run with \`${args.invocation}\``)
+	ports.write(`backlogrun: replacing the ${kind} run with \`${args.invocation}\``)
 
 	const report = await ports.stop(git_directory)
 
@@ -128,16 +153,59 @@ async function replace(
 	return await launch(args, git_directory, ports)
 }
 
-async function begin(
+// No process runs the run, yet its record may stand — a launch that died before it ended the record
+// (joshuafolkken/kit#5401). The record gives way to the typed invocation unless `stranded` keeps it.
+async function start_fresh(
 	args: BacklogrunArguments,
 	git_directory: string,
 	ports: BacklogrunPorts,
 ): Promise<number> {
-	if (!ports.is_running(git_directory)) return await launch(args, git_directory, ports)
+	const verdict = await ports.stranded(git_directory)
+
+	if (verdict === undefined) return await launch(args, git_directory, ports)
+
+	if (verdict.kind === 'keep') return refuse(`backlogrun: not starting — ${verdict.reason}`, ports)
+
+	return await replace(args, git_directory, ports, 'stopped')
+}
+
+function refusal_message(note: string | undefined): string {
+	return note === undefined ? USAGE : `${USAGE}\n${note}`
+}
+
+// Resolve a new run's provider only after deciding whether this invocation starts one.
+async function launch_configured(
+	request: StartRequest,
+	git_directory: string,
+	ports: BacklogrunPorts,
+	is_replacement = false,
+): Promise<number> {
+	const parsed = backlogrun_args.parse(request.argv, request.environment)
+
+	if (parsed.kind !== 'args') {
+		return refuse(refusal_message(parsed.kind === 'refused' ? parsed.note : undefined), ports)
+	}
+
+	return is_replacement
+		? await replace(parsed.args, git_directory, ports)
+		: await start_fresh(parsed.args, git_directory, ports)
+}
+
+async function begin(
+	args: BacklogrunArguments,
+	git_directory: string,
+	ports: BacklogrunPorts,
+	request: StartRequest,
+): Promise<number> {
+	if (!ports.is_running(git_directory)) {
+		return await launch_configured(request, git_directory, ports)
+	}
 
 	const verdict = await ports.replacement(args.invocation, git_directory)
 
-	if (verdict.kind === 'replace') return await replace(args, git_directory, ports)
+	if (verdict.kind === 'replace') {
+		return await launch_configured(request, git_directory, ports, true)
+	}
 
 	for (const note of [...kept_notes(verdict), ...running_notes(args.issues)]) ports.write(note)
 
@@ -158,22 +226,18 @@ async function dispatch(
 	parsed: Exclude<ArgumentsResult, { kind: 'refused' }>,
 	git_directory: string,
 	ports: BacklogrunPorts,
+	request: StartRequest,
 ): Promise<number> {
 	if (parsed.kind === 'stop') return await stop(git_directory, ports)
 	if (parsed.kind === 'restart') return await ports.restart(git_directory)
 
-	return await begin(parsed.args, git_directory, ports)
-}
-
-function refuse(line: string, ports: BacklogrunPorts): number {
-	ports.write(line)
-
-	return FAILURE_EXIT_CODE
+	return await begin(parsed.args, git_directory, ports, request)
 }
 
 async function run(
 	argv: ReadonlyArray<string>,
 	ports: BacklogrunPorts = LIVE_PORTS,
+	environment: AgentEnvironment = {},
 ): Promise<number> {
 	const parsed = backlogrun_args.parse(argv)
 
@@ -183,16 +247,16 @@ async function run(
 
 	if (git_directory === undefined) return refuse('backlogrun: not inside a git repository', ports)
 
-	return await dispatch(parsed, git_directory, ports)
+	return await dispatch(parsed, git_directory, ports, { argv, environment })
 }
 
-const backlogrun_cli = { run }
+const backlogrun_cli = { LIVE_PORTS, run }
 
 // `.env` is read inside the guard, as `run:board` reads it, so the board draws in the person's
 // `JOSH_SESSION_LANG` while the unit tests see no developer's `.env`.
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	josh_environment_file.load_environment_file()
-	process.exitCode = await run(process.argv.slice(ARGV_OFFSET))
+	process.exitCode = await run(process.argv.slice(ARGV_OFFSET), LIVE_PORTS, process.env)
 }
 
 export type { BacklogrunPorts }

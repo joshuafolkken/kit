@@ -1,7 +1,7 @@
 import { document_section } from '#scripts/document/document-section'
 
-// The parsing half of `review:lint`: a review's markdown split into its `###` sections, and a
-// section's list items grouped with their indented continuation lines. The checks live in
+// The parsing half of the review lint `review:submit --review` runs: a review's markdown split into
+// its `###` sections, and a section's list items grouped with their indented continuation lines. The checks live in
 // `review-lint.ts` and `review-lint-findings.ts`; nothing here judges what it reads.
 
 interface ReviewSection {

@@ -1,8 +1,10 @@
-import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
-import os from 'node:os'
+import { readdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+const make_directory = temporary_directory()
 
 // Same import-time paths as the other `init` integration tests, so the same getter mock
 // (joshuafolkken/kit#879).
@@ -25,13 +27,12 @@ const PACKAGE_JSON = 'package.json'
 beforeEach(() => {
 	vi.resetModules()
 	paths_mock.package_dir = fileURLToPath(new URL('../../', import.meta.url))
-	paths_mock.root = mkdtempSync(path.join(os.tmpdir(), 'josh-init-main-dry-run-'))
+	paths_mock.root = make_directory('josh-init-main-dry-run-')
 	writeFileSync(path.join(paths_mock.root, PACKAGE_JSON), '{"name":"example"}\n')
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 })
 
 afterEach(() => {
-	rmSync(paths_mock.root, { recursive: true, force: true })
 	vi.restoreAllMocks()
 })
 

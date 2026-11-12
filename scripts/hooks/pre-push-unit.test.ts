@@ -10,7 +10,7 @@ import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-// joshuafolkken/kit#1334: the pre-push hook ran the whole unit suite 40 seconds after `josh gate`
+// joshuafolkken/kit#1334: the pre-push hook ran the whole unit suite right after `josh gate`
 // had printed it green on the same tree, with nothing edited in between.
 //
 // Two things are asserted here, and the second is the one a push needs. The first is that the
@@ -69,7 +69,9 @@ vi.mock('#scripts/git/git-command', () => ({
 
 const run_guarded_unit = vi.hoisted(() => vi.fn(async (): Promise<number> => 0))
 
-vi.mock('#scripts/test/test-unit-guard', () => ({ test_unit_guard: { run_guarded_unit } }))
+vi.mock('#scripts/test/test-unit-guard', () => ({
+	test_unit_guard: { run_guarded_unit, is_skipping: (): boolean => false },
+}))
 
 const run_related_tests = vi.hoisted(() => vi.fn(async (): Promise<number> => 0))
 
@@ -123,7 +125,6 @@ function suite_run_count(): number {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	rmSync(STAMP_PATH, { force: true })
 	repository.tree = CHANGED_TREE
 	repository.base = BASE
@@ -348,50 +349,6 @@ describe('a catch-up merge gated green before its push', () => {
 		expect(text).toContain(
 			'no green gate record matches the changed files (1 changed, record covers 2, 2 differ).',
 		)
-	})
-})
-
-// joshuafolkken/kit#5067: `josh ship` pushes its sync merge ahead of the gate, whose whole suite runs
-// over the same tree next, so that push asks for the related tests instead.
-describe('a push ahead of its gate runs the related tests', () => {
-	beforeEach(() => {
-		vi.stubEnv(RELATED_ENV, RELATED_ON)
-	})
-
-	it('runs the related tests, not the whole suite, when no record covers the push', async () => {
-		const [code, text] = await run_hook()
-
-		expect(code).toBe(0)
-		expect(run_related_tests).toHaveBeenCalledWith([])
-		expect(suite_run_count()).toBe(NOTHING_RAN)
-		expect(text).toContain('running the related unit tests')
-		expect(record_push_miss).toHaveBeenCalledWith({ scope: 'related', reason: 'no-record' })
-	})
-
-	it('still reuses a record that covers the push', async () => {
-		record_green(CHANGED_TREE, BASE)
-
-		await run_hook()
-
-		expect(run_related_tests).not.toHaveBeenCalled()
-	})
-
-	it('runs the whole suite when the escape hatch is set too', async () => {
-		vi.stubEnv(FORCE_ENV, '1')
-
-		await run_hook()
-
-		expect(run_related_tests).not.toHaveBeenCalled()
-		expect(suite_run_count()).toBe(SUITE_RAN)
-	})
-
-	it('runs the whole suite without the switch', async () => {
-		vi.stubEnv(RELATED_ENV, '')
-
-		await run_hook()
-
-		expect(run_related_tests).not.toHaveBeenCalled()
-		expect(suite_run_count()).toBe(SUITE_RAN)
 	})
 })
 

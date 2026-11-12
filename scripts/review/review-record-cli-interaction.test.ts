@@ -1,10 +1,10 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import type { changed_paths } from '#scripts/git/changed-paths'
 import { observation_ledger } from '#scripts/observations/observation-ledger'
 import type { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it, vi } from 'vitest'
 import type { review_comment_round } from './review-comment-round'
 import { review_finding_ledger } from './review-finding-ledger'
 import { review_record_cli } from './review-record-cli'
@@ -30,16 +30,13 @@ vi.mock('#scripts/git/changed-paths', async (original) => {
 	return { changed_paths: { ...actual.changed_paths, read_changed_paths: changed_mock } }
 })
 
-const TEST_DIR = mkdtempSync(path.join(tmpdir(), 'review-record-interaction-'))
+const make_directory = temporary_directory('suite')
+const TEST_DIR = make_directory('review-record-interaction-')
 const NOW = new Date('2026-09-22T00:00:00Z')
 const ISSUE = 4276
 const INTERACTION_FLAG = '--interaction'
 const ISSUE_FLAG = ['--issue', String(ISSUE)]
 const CHECK_ARGV = ['--check', INTERACTION_FLAG, ...ISSUE_FLAG]
-
-afterAll(() => {
-	rmSync(TEST_DIR, { recursive: true, force: true })
-})
 
 function issue_file(root: string): string {
 	return path.join(root, observation_ledger.ledger_file(ISSUE))

@@ -2,11 +2,14 @@
 import { text } from 'node:stream/consumers'
 import { fileURLToPath } from 'node:url'
 import { hook_decision, type GuardOutcome } from '#scripts/josh/hook-decision'
+import { hook_payload_capture } from '#scripts/josh/hook-payload-capture'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { json_value } from '#scripts/lib/json-value'
 import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { z } from 'zod'
+import { bash_revert } from './bash-revert'
 import { build_envelope, compose_context, format_edited_payload } from './format-edited-file'
+import { hook_context } from './hook-context'
 import { pretool_guard } from './pretool-guard'
 
 const APPLY_PATCH_TOOL = 'apply_patch'
@@ -16,9 +19,10 @@ const POSTTOOL_MODE = 'posttool'
 const MODE_ARGUMENT_INDEX = 2
 const PATCH_FILE_PATTERN = /^\*\*\* (?:Add|Delete|Update) File: (.+)$/gmu
 const PATCH_MOVE_PATTERN = /^\*\*\* Move to: (.+)$/gmu
-// One canonical formatter can spend at most 75 seconds across its bounded process fallbacks. Start
-// at most two together and no later work, so every formatter that starts retains the 15-second
-// margin inside the Codex hook's 90-second timeout. Remaining files are left to the verification gate.
+// One canonical formatter's bounded process fallbacks take most of the Codex hook's timeout (the
+// `timeout` of this hook in `.codex/hooks.json`). Start
+// at most two together and no later work, so every formatter that starts keeps a margin inside that
+// timeout. Remaining files are left to the verification gate.
 const MAX_PARALLEL_FORMATS = 2
 // One patch can touch several files, each returning its own unfixed-lint block; a blank line between
 // them keeps the blocks readable when they are joined into the single envelope below.
@@ -33,11 +37,15 @@ const codex_payload_schema = z.looseObject({
 	tool_input: z.unknown(),
 })
 const patch_input_schema = z.object({ command: z.string().min(1) })
+const envelope_schema = z.record(z.string(), z.unknown())
 
 type PayloadFormatter = (raw_payload: string, project_root: string) => Promise<string | undefined>
 
 function parse_payload(raw_payload: string): z.infer<typeof codex_payload_schema> | undefined {
-	return json_value.parse_with(raw_payload, codex_payload_schema)
+	const payload = json_value.parse_with(raw_payload, codex_payload_schema)
+	if (payload === undefined) return undefined
+
+	return { ...payload, tool_name: payload.tool_name.replace(/^functions\./u, '') }
 }
 
 function paths_matching(command: string, pattern: RegExp): Array<string> {
@@ -49,7 +57,9 @@ function paths_matching(command: string, pattern: RegExp): Array<string> {
 }
 
 function patch_paths(tool_input: unknown): Array<string> {
-	const parsed = patch_input_schema.safeParse(tool_input)
+	const parsed = patch_input_schema.safeParse(
+		typeof tool_input === 'string' ? { command: tool_input } : tool_input,
+	)
 	if (!parsed.success) return []
 	const paths = [
 		...paths_matching(parsed.data.command, PATCH_FILE_PATTERN),
@@ -67,12 +77,20 @@ function canonical_payload(
 	return JSON.stringify({ ...payload, tool_name: EDIT_TOOL, tool_input: { file_path, file_paths } })
 }
 
+function shell_payload(payload: z.infer<typeof codex_payload_schema>): string {
+	const input = json_value.is_record(payload.tool_input) ? payload.tool_input : {}
+
+	return JSON.stringify({ ...payload, tool_name: 'Bash', tool_input: { command: input['cmd'] } })
+}
+
 function pretool_payload(raw_payload: string): string {
 	const payload = parse_payload(raw_payload)
-	if (payload?.tool_name !== APPLY_PATCH_TOOL) return raw_payload
+	if (payload === undefined) return raw_payload
+	if (payload.tool_name === 'exec_command') return shell_payload(payload)
+	if (payload.tool_name !== APPLY_PATCH_TOOL) return JSON.stringify(payload)
 	const paths = patch_paths(payload.tool_input)
 	const [file_path] = paths
-	if (file_path === undefined) return raw_payload
+	if (file_path === undefined) return JSON.stringify(payload)
 
 	return canonical_payload(payload, file_path, paths)
 }
@@ -107,28 +125,54 @@ async function format_posttool_payloads(
 	return blocks.length === 0 ? undefined : blocks.join(DIAGNOSTIC_SEPARATOR)
 }
 
+// Codex reads one JSON object per hook, so the shell revert's `decision`/`reason` and the context's
+// `hookSpecificOutput` become fields of that one object. A single envelope is written as it is.
+function merged_envelope(envelopes: Array<string | undefined>): string | undefined {
+	const fields = envelopes
+		.filter((envelope): envelope is string => envelope !== undefined)
+		.map((envelope) => json_value.parse_with(envelope, envelope_schema) ?? {})
+
+	return fields.length === 0 ? undefined : JSON.stringify(Object.assign({}, ...fields))
+}
+
 // The density line and the unfixed-lint blocks reach the model the same way — as additionalContext on
 // this one hook — so they are joined into the single envelope a `PostToolUse` payload can carry rather
-// than written as two objects the harness could not parse.
+// than written as two objects the harness could not parse. The `exec_command` revert reads the
+// payload translated as its pretool stamp did (`bash-revert.ts`).
 async function write_posttool_context(raw_payload: string): Promise<void> {
+	const reverted = bash_revert.revert(pretool_payload(raw_payload))
 	const notice = time_density_hook.density_notice(raw_payload)
 	const diagnostics = await format_posttool_payloads(raw_payload, process.cwd())
 	const context = compose_context(notice, diagnostics)
+	const envelope = merged_envelope([
+		reverted,
+		context === undefined ? undefined : build_envelope(context),
+	])
 
-	if (context !== undefined) process.stdout.write(`${build_envelope(context)}\n`)
+	if (envelope !== undefined) process.stdout.write(`${envelope}\n`)
 }
 
-// The environment file is loaded before the verdict, as `write_outcome` does, so the lane-child marker
-// the phase mark reads is in place; the mark follows the written envelope.
+// The environment file is loaded before the verdict, as `respond_from_stdin` does, so the lane-child marker
+// the phase mark reads is in place; the mark follows the written envelope. A consultation session's
+// shell is stamped here for the `PostToolUse` revert, as `pretool_guard.respond` does on Claude.
 async function write_pretool_outcome(raw_payload: string): Promise<void> {
 	hook_decision.load_environment_file()
-	const outcome = pretool_outcome(raw_payload)
+	const context = hook_context.from_process()
+	const judged = pretool_payload(raw_payload)
+
+	bash_revert.stamp(judged, context.cwd)
+	const outcome = pretool_guard.pretool_outcome(judged, context)
 
 	hook_decision.emit_outcome(outcome)
-	await pretool_guard.mark_phase(outcome)
+	await pretool_guard.mark_phase(outcome, judged, context)
+	await pretool_guard.record_refusal(judged, outcome, context)
 }
 
+// Codex's payload reaches this adapter, not `respond_from_stdin`, so it is captured here, untranslated.
 async function run(raw_payload: string, mode: string): Promise<void> {
+	hook_decision.load_environment_file()
+	hook_payload_capture.capture(`codex-${mode}`, raw_payload)
+
 	if (mode === PRETOOL_MODE) {
 		await write_pretool_outcome(raw_payload)
 
@@ -154,6 +198,7 @@ const codex_hook_adapter = {
 	posttool_payloads,
 	pretool_outcome,
 	pretool_payload,
+	run,
 	write_pretool_outcome,
 }
 

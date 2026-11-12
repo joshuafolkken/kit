@@ -122,7 +122,7 @@ describe('test_pinned.run timed into the ledger', () => {
 			with_rewires(REWIRES)
 			await run_locations()
 			expect(row.mock.calls.map(([skipped, times]) => [skipped, times.length])).toEqual([
-				[{ held: 0, rewired: REWIRES }, runs.mock.calls.length],
+				[{ held: 0, rewired: REWIRES, over_cap: 0 }, runs.mock.calls.length],
 			])
 			runs.mockClear()
 			expect(await held_locations()).toEqual([UNPINNED_HUNK])

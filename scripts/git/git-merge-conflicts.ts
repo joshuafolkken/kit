@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
+import { changed_paths_sync } from './changed-paths-sync'
 import { git_spawn_sync } from './git-spawn-sync'
 
 // The paths merging another branch into this working tree would stop on, read without touching any
@@ -65,15 +66,19 @@ function sides_of(file_path: string, commits: Commits, cwd: string): Sides {
 }
 
 // Of `paths` (relative to `cwd`, the working tree's root), the ones merging `theirs` would stop on;
-// `undefined` where the merge base with `theirs` could not be read.
+// `undefined` where the merge base with `theirs` could not be read. While a merge is in progress the
+// base moves up to where `MERGE_HEAD` meets `theirs`, so a resolution left uncommitted is one side's
+// change rather than a conflict against the branch's old fork point (joshuafolkken/kit#5582).
 function working_tree_conflicts(
 	theirs: string,
 	paths: ReadonlyArray<string>,
 	cwd: string,
 ): ReadonlyArray<string> | undefined {
-	const base = git_spawn_sync.read(['merge-base', HEAD, theirs], { cwd })
+	const fork = git_spawn_sync.read(['merge-base', HEAD, theirs], { cwd })
 
-	if (base === undefined) return undefined
+	if (fork === undefined) return undefined
+
+	const base = changed_paths_sync.through_merge(fork, theirs, { cwd })
 
 	return paths.filter((file_path) => !is_merged(sides_of(file_path, { base, theirs }, cwd), cwd))
 }

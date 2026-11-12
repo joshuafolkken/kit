@@ -1,7 +1,7 @@
 import os from 'node:os'
 import path from 'node:path'
 
-// Resolve the default Codex home in a read-only module, separate from reviewer state setup.
+// Resolve the default Codex home in a read-only module.
 function default_home(): string {
 	return path.join(os.homedir(), '.codex')
 }

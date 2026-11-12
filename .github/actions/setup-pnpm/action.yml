@@ -1,8 +1,8 @@
 name: Setup pnpm
 description: >
   Resolve the project's pnpm version, set pnpm up, and — unless `install` is false — restore the
-  pnpm store, install safe-chain from its hash-verified release installer and install the
-  dependencies through it.
+  pnpm store, install the hash-verified safe-chain release and install the dependencies through
+  it.
 
 # The one place kit's own workflows prepare pnpm (joshuafolkken/kit#2982). Every job that installed
 # dependencies used to carry these steps itself, and `publish.yml` — the workflow holding the npm
@@ -22,8 +22,8 @@ inputs:
     default: 'true'
   cache:
     description: >
-      Restore and save the pnpm store. A release job passes false, so nothing another run saved
-      reaches a job that holds publish credentials.
+      Restore and save the pnpm store and the safe-chain download. A release job passes false, so
+      nothing another run saved reaches a job that holds publish credentials.
     required: false
     default: 'true'
   runtime:
@@ -55,28 +55,101 @@ runs:
     # (joshuafolkken/kit#5315). Caching it in pnpm's store, rather than taking Node from setup-node's
     # tool cache, keeps setup-node the one place the default Node version is written.
     - name: Setup pnpm
-      uses: pnpm/setup@a0881977cd8ea73b1ed212236c99ca10dcc80cf4 # v3.1.1
+      uses: pnpm/setup@fa36a5ef7dcdefc3a7cb25655c122e00cf6e636e # v3.1.2
       with:
         version: ${{ steps.pnpm-version.outputs.version }}
         runtime: ${{ inputs.runtime }}
         cache: ${{ inputs.install == 'true' && inputs.cache == 'true' }}
         install: false
 
-    # The safe-chain release and the SHA-256 of that release's install-safe-chain.sh. The installer
-    # puts the safe-chain binary under ~/.safe-chain/bin and adds it to PATH beside the shims;
-    # `pnpm dlx … setup-ci` left only the shims, which then let every install through without a scan
-    # (joshuafolkken/kit#2711). `josh latest` moves both together.
+    # The safe-chain release and the SHA-256 of that release's install-safe-chain.sh, which `josh
+    # latest` moves together, and with them the cache key. The release asset for this runner sits
+    # beside them: the installer's own `linuxstatic` / `macos` naming, so its baked digest matches.
+    - name: Pin safe-chain
+      id: safe-chain-pin
+      if: inputs.install == 'true'
+      shell: bash
+      env:
+        SAFE_CHAIN_INSTALLER_VERSION: 1.5.27
+        SAFE_CHAIN_INSTALLER_SHA256: 600ebddcb3aaf1fd53653a8d7985df44528722c0f5ee7eb9fff86f26a1a4e5a8
+      run: |
+        case "$RUNNER_OS-$RUNNER_ARCH" in
+          Linux-X64) binary=safe-chain-linuxstatic-x64 ;;
+          Linux-ARM64) binary=safe-chain-linuxstatic-arm64 ;;
+          macOS-X64) binary=safe-chain-macos-x64 ;;
+          macOS-ARM64) binary=safe-chain-macos-arm64 ;;
+          *) echo "::error::No safe-chain binary for $RUNNER_OS-$RUNNER_ARCH"; exit 1 ;;
+        esac
+        echo "version=$SAFE_CHAIN_INSTALLER_VERSION" >> "$GITHUB_OUTPUT"
+        echo "sha256=$SAFE_CHAIN_INSTALLER_SHA256" >> "$GITHUB_OUTPUT"
+        echo "binary=$binary" >> "$GITHUB_OUTPUT"
+
+    # The release download, so a GitHub Releases outage does not turn every job red before its tests
+    # (joshuafolkken/kit#6833). Off with `cache`, like the store, so a release job runs nothing
+    # another run saved (joshuafolkken/kit#4633). What it restores is verified like a fresh download.
+    - name: Restore safe-chain
+      id: safe-chain-cache
+      if: inputs.install == 'true' && inputs.cache == 'true'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.safe-chain-download
+        key: safe-chain-${{ runner.os }}-${{ runner.arch }}-${{ steps.safe-chain-pin.outputs.version }}-${{ steps.safe-chain-pin.outputs.sha256 }}
+
+    # Through the REST API's asset path with the job token: anonymous `releases/download` returned
+    # 504 throughout a GitHub outage that authenticated requests passed (joshuafolkken/kit#6849).
+    # curl and node rather than `gh`, which the Playwright container some jobs run in does not carry.
+    # The token stays in this step, which runs no third-party code, and in a curl config it removes;
+    # curl sends it to api.github.com alone, not across the redirect to the asset's signed URL.
+    - name: Fetch safe-chain
+      if: inputs.install == 'true' && steps.safe-chain-cache.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        SAFE_CHAIN_INSTALLER_VERSION: ${{ steps.safe-chain-pin.outputs.version }}
+        SAFE_CHAIN_BINARY: ${{ steps.safe-chain-pin.outputs.binary }}
+      run: |
+        export CURL_HOME
+        CURL_HOME=$(mktemp -d "$RUNNER_TEMP/safe-chain-curl.XXXXXX")
+        trap 'rm -r "$CURL_HOME"' EXIT
+        printf '%s\n' 'retry = 3' 'retry-delay = 2' 'retry-max-time = 60' "header = \"Authorization: Bearer $GH_TOKEN\"" > "$CURL_HOME/.curlrc"
+        downloads="$HOME/.safe-chain-download"
+        mkdir -p "$downloads"
+        release=$(curl --proto '=https' -fsSL "https://api.github.com/repos/AikidoSec/safe-chain/releases/tags/$SAFE_CHAIN_INSTALLER_VERSION")
+        for asset in install-safe-chain.sh "$SAFE_CHAIN_BINARY"; do
+          url=$(printf '%s' "$release" | node -e 'const { assets } = JSON.parse(require("node:fs").readFileSync(0, "utf8")); const asset = assets.find((candidate) => candidate.name === process.argv[1]); if (asset === undefined) process.exit(1); console.log(asset.url)' "$asset")
+          curl --proto '=https' -fsSL -H 'Accept: application/octet-stream' "$url" -o "$downloads/$asset"
+        done
+
+    # The installer is checked against the pin, then the binary against the digest the release
+    # pipeline baked into that verified installer, so neither is used unverified. The installer is
+    # not run: on a fresh runner its `--ci` does no more than place the binary and run `setup-ci`,
+    # which this step does itself. The binary directory goes on PATH beside the shims, since shims
+    # without a reachable binary let every install through without a scan (joshuafolkken/kit#2711).
     - name: Setup safe-chain
       if: inputs.install == 'true'
       shell: bash
       env:
-        SAFE_CHAIN_INSTALLER_VERSION: 1.5.26
-        SAFE_CHAIN_INSTALLER_SHA256: 9e4af7107f06d9c0d758cb08fb36804c2af88e24972f3a9d3f8c2bd0ca002adf
+        SAFE_CHAIN_INSTALLER_SHA256: ${{ steps.safe-chain-pin.outputs.sha256 }}
+        SAFE_CHAIN_BINARY: ${{ steps.safe-chain-pin.outputs.binary }}
       run: |
-        installer="$RUNNER_TEMP/install-safe-chain.sh"
-        curl --proto '=https' -fsSL "https://github.com/AikidoSec/safe-chain/releases/download/$SAFE_CHAIN_INSTALLER_VERSION/install-safe-chain.sh" -o "$installer"
+        downloads="$HOME/.safe-chain-download"
+        installer="$downloads/install-safe-chain.sh"
         echo "$SAFE_CHAIN_INSTALLER_SHA256  $installer" | sha256sum -c -
-        sh "$installer" --ci
+        platform=$(printf '%s' "${SAFE_CHAIN_BINARY#safe-chain-}" | tr 'a-z-' 'A-Z_')
+        binary_sha256=$(sed -n "s/^SHA256_${platform}=\"\([0-9a-f]\{64\}\)\"\$/\1/p" "$installer")
+        test -n "$binary_sha256"
+        echo "$binary_sha256  $downloads/$SAFE_CHAIN_BINARY" | sha256sum -c -
+        mkdir -p "$HOME/.safe-chain/bin"
+        install -m 755 "$downloads/$SAFE_CHAIN_BINARY" "$HOME/.safe-chain/bin/safe-chain"
+        "$HOME/.safe-chain/bin/safe-chain" setup-ci
+        echo "$HOME/.safe-chain/bin" >> "$GITHUB_PATH"
+
+    - name: Save safe-chain
+      if: inputs.install == 'true' && inputs.cache == 'true' && steps.safe-chain-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.safe-chain-download
+        key: ${{ steps.safe-chain-cache.outputs.cache-primary-key }}
 
     - name: Install dependencies
       if: inputs.install == 'true'

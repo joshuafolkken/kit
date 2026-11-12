@@ -1,6 +1,11 @@
+import { core_priority } from '#scripts/gate/core-priority'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { lane_hand_back_held } from '#scripts/lane/lane-hand-back-held'
+import { run_investigation_record } from '#scripts/run/run-investigation-record'
 import { run_ship } from './run-ship'
 import { run_ship_body_draft } from './run-ship-body-draft'
+import { run_ship_early_push } from './run-ship-early-push'
 import { run_ship_lap } from './run-ship-lap'
 import { run_ship_preflight } from './run-ship-preflight'
 import { run_ship_probe } from './run-ship-probe'
@@ -32,6 +37,7 @@ interface Step {
 	stage: Stage
 	header: string
 	run: (args: ShipArguments, state: ShipState) => Promise<StepResult>
+	beside?: Step
 }
 
 const { STAGE } = run_ship_stage
@@ -49,13 +55,15 @@ const PREFLIGHT_STEP: Step = {
 		await run_ship_preflight.stage({ title: args.title, body_path: args.body_path }),
 }
 
-// The gate stage. **A gate that only reused the tree's green record is not timed**: after `--review`
-// launched the gate itself, this stage ends in seconds without running a check, and those seconds
-// would pull the `gate` row `lane:stats` reads for `JOSH_LANE_LIMIT` toward zero. The record is asked
-// for before the stage runs — afterwards every green gate has one.
-async function gate_stage(): Promise<StepResult> {
+// The gate stage. **A gate that only reused the tree's green record is not timed**: once the lane gate
+// and the whole-tree checks are green on this tree, this stage ends in seconds without running a
+// check, and those seconds would pull the `gate` row `lane:stats` reads for `JOSH_LANE_LIMIT` toward
+// zero. The record is asked for before the stage runs — afterwards every green gate has one.
+async function gate_stage(args: ShipArguments): Promise<StepResult> {
 	const is_skipped = await run_ship_scoped.is_gate_green()
 	const result = await run_ship_scoped.scoped_gate()
+
+	if (args.is_review && result.code === SUCCESS_EXIT_CODE) await run_ship_early_push.push(args)
 
 	return { ...result, is_skipped }
 }
@@ -64,7 +72,8 @@ async function gate_stage(): Promise<StepResult> {
 // a clean merge goes on without waking anyone. A merge after the gate would move the merge base the
 // gate's record pins, so the pre-push hook could not reuse that record. **With `--review` it runs before
 // round 1 too**: the gate round 1 launches then reads the base the commit carries, so a clean round
-// leaves the gate stage a reuse rather than a whole second gate over a moved base (joshuafolkken/kit#4442).
+// leaves the gate stage reusing its records rather than a whole second gate over a moved base
+// (joshuafolkken/kit#4442).
 const SYNC_STEP: Step = {
 	stage: STAGE.SYNC,
 	header: run_ship.SYNC_HEADER,
@@ -72,17 +81,29 @@ const SYNC_STEP: Step = {
 		await run_ship_sync.sync_stage(args.number, args.title, state.is_dirty === true),
 }
 
-// A default branch that moved since the sync stage is merged and gated again before the push
-// (`run_ship_sync.catch_up`, joshuafolkken/kit#4825). A resumed ship with nothing left to push leaves
-// that to the followup, which pushes what it merges; a pushed branch with new work still catches up.
+// A default branch that moved since the sync stage with a conflict is merged and gated again before
+// the push; a clean move is left to the merge ref's CI (`run_ship_sync.catch_up`,
+// joshuafolkken/kit#7058). A resumed ship with nothing left to push leaves that to the followup,
+// which pushes what it merges; a pushed branch with new work still catches up.
+// The commit's hooks claim cores with priority (`core-priority.ts`): a short closing stage need not
+// queue behind other lanes' heavy checks (joshuafolkken/kit#5767). `josh git` and its hooks time their
+// own steps under the commit's lap (joshuafolkken/kit#5831).
 async function commit_stage(args: ShipArguments, state: ShipState): Promise<StepResult> {
 	const stop = run_ship_stage.is_shipped(state) ? undefined : await run_ship_sync.catch_up()
 
 	if (stop !== undefined) return stop
 
 	const argv = ['git', '-y', ...run_ship_stage.commit_flags(state), ...args.body, args.title]
+	const { STEP } = run_ship_lap
+	const environment = {
+		...core_priority.PRIORITY_ENVIRONMENT,
+		...run_ship_lap.environment(STEP.COMMIT),
+	}
 
-	return await run_ship_lap.timed(run_ship_lap.STEP.COMMIT, async () => await josh(argv))
+	return await run_ship_lap.timed(
+		STEP.COMMIT,
+		async () => await josh_command.josh_run(argv, should_forward_stderr, undefined, environment),
+	)
 }
 
 // The gate before the commit, the commit/push/PR before the merge. The gate meets the scoped pair
@@ -93,7 +114,7 @@ const COMMIT_STEPS: ReadonlyArray<Step> = [
 	{
 		stage: STAGE.GATE,
 		header: run_ship.GATE_HEADER,
-		run: async () => await gate_stage(),
+		run: async (args) => await gate_stage(args),
 	},
 	{
 		stage: STAGE.COMMIT,
@@ -116,12 +137,31 @@ function wait_mark(target: string | undefined): WaitMark {
 	}
 }
 
-// The merge, then the ship body draft goes with it (`run-ship-body-draft.ts`).
+// A lane's merge wait is what frees its seat (`backlog-occupied.ts`), so it is where a full driver's
+// hand-back mark becomes the freed seat's hold (joshuafolkken/kit#7121) — not the detach, after which
+// the child still holds the seat. A ship outside a lane frees no seat and leaves the mark alone. The
+// hold is best-effort and swallows its own failure, so the followup does not wait on it.
+function freeing_mark(mark: WaitMark): WaitMark {
+	if (!lane_child_marker.is_child_of(process.cwd())) return mark
+
+	return function mark_freeing(is_merge_waiting: boolean): void {
+		mark(is_merge_waiting)
+		if (is_merge_waiting) void lane_hand_back_held.record()
+	}
+}
+
+async function remove_run_records(issue_number: string): Promise<void> {
+	await run_ship_body_draft.remove(issue_number)
+	await run_investigation_record.remove(issue_number)
+}
+
+// The merge, then the ship body draft and the investigation record go with it
+// (`run-ship-body-draft.ts`, `run-investigation-record.ts`).
 async function followup_stage(args: ShipArguments): Promise<StepResult> {
-	const mark = wait_mark(await run_ship_probe.record_target(args.number))
+	const mark = freeing_mark(wait_mark(await run_ship_probe.record_target(args.number)))
 	const result = await run_ship_sync.followup_stage(args.title, args.notify, mark)
 
-	if (result.code === SUCCESS_EXIT_CODE) await run_ship_body_draft.remove(args.number)
+	if (result.code === SUCCESS_EXIT_CODE) await remove_run_records(args.number)
 
 	return result
 }
@@ -140,11 +180,12 @@ const MERGE_STEPS: ReadonlyArray<Step> = [
 	},
 ]
 
-// `--review` puts the supervised round-1 review in front of the gate: it launches the gate itself, so
-// the gate stage that follows reuses that tree's green record unless the round changed the tree. It
-// also puts the round-2 pass between the commit
-// and the followup, so the PR opens between the rounds and round 2 runs beside CI — a no-op when
-// round 1 left no fix delta.
+// `--review` puts the supervised round-1 review in front of the gate: it launches the lane gate itself,
+// so the gate stage that follows — `josh gate --whole-tree` — reuses that gate's per-check records and
+// runs only the whole-tree checks, unless the round changed the tree. It
+// also joins round 2 beside the gate. The green gate pushes the committed tree and opens its PR
+// while round 2 finishes; the commit stage sends only subsequent changes. Sync and round 1 finish
+// first, so neither can move the review's checkout.
 const REVIEW_STEP: Step = {
 	stage: STAGE.REVIEW,
 	header: run_ship.REVIEW_HEADER,
@@ -164,7 +205,11 @@ const ROUND_TWO_STEP: Step = {
 function steps(args: ShipArguments): ReadonlyArray<Step> {
 	if (!args.is_review) return [PREFLIGHT_STEP, SYNC_STEP, ...COMMIT_STEPS, ...MERGE_STEPS]
 
-	return [PREFLIGHT_STEP, SYNC_STEP, REVIEW_STEP, ...COMMIT_STEPS, ROUND_TWO_STEP, ...MERGE_STEPS]
+	const reviewed_commit = COMMIT_STEPS.map((step) =>
+		step.stage === STAGE.GATE ? { ...step, beside: ROUND_TWO_STEP } : step,
+	)
+
+	return [PREFLIGHT_STEP, SYNC_STEP, REVIEW_STEP, ...reviewed_commit, ...MERGE_STEPS]
 }
 
 const run_ship_steps = { PREFLIGHT_STEP, steps }

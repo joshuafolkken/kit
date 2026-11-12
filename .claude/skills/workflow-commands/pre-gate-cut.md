@@ -4,8 +4,8 @@ The **pre-gate cut**: a dispatched lane child ends its process the moment implem
 **fresh** process resumes the same lane from the gate onward, without the implementation's accumulated
 context.
 
-`run:cut` takes the boundary, `run:cut --resume` is the fresh
-process's entry check. A second boundary — the implementation-phase cut, _during_ implementation — is
+`run:cut` takes the boundary; `run:entry` checks it internally with `run:cut --resume` for the fresh
+process. A second boundary — the implementation-phase cut, _during_ implementation — is
 below; it states only what differs.
 
 ## Where the boundary is
@@ -26,23 +26,14 @@ answers `not-a-lane` outside a lane, so it is safe to issue unconditionally.
 
 ## Taking the cut
 
-`chain-rule.md` step 1 issues it after `pnpm josh main:merge`, before the scoped pair and the gate —
-**unconditionally**:
+`chain-rule.md` step 1 issues it before `pnpm josh run:chain <N>`, the scoped pair and the gate —
+**unconditionally** — first tick in #N's body the criteria this tree meets (`pnpm josh issue:tick <N> <ac-id>...`, using the plan's criterion IDs):
 
 ```bash
 pnpm josh run:cut <N>
 ```
 
-- `cut` (0) — record written and handed to the lane's launch owner (OpenAI supervisor starts the
-  successor after this process exits; Anthropic relaunches directly). **End the turn immediately.**
-- `under-threshold` (0) — the newest request's billed input is under the `pnpm josh cost --cut` threshold; **continue to the gate.**
-- `not-a-lane` (0) — not a dispatched child. **Continue to the gate.**
-- `unready` (1) — the tree is clean or on the default branch. Continue to the gate.
-- `busy` (1) — a cut is already in flight for this tree. Do not relaunch.
-- `failed` (1) — no live OpenAI supervisor, or the Anthropic relaunch could not start. Continue.
-- `unknown` (1) — the git directory could not be read. Continue to the gate.
-- `split-unresolved` (1) — `split-assessment.md` → "Over the guide before the gate".
-
+**Follow the printed `next:` line.** The verdict stays on stdout; its next action is on stderr.
 **`cut` is the only verdict that ends the turn.**
 
 ### The gate refuses until the cut has been taken
@@ -53,21 +44,23 @@ row: `prompts/collaboration-workflow/rule-delivery.md`.
 
 ## Resuming — the fresh process's entry check
 
-A fresh `fullrun #<N>` runs this **at its entry, before `run:hold` and the session-boundary check**:
+`fullrun #<N>` enters once. It checks the carried cut internally
+**before `run:hold` and the session-boundary check**; never call `run:cut --resume` separately:
 
 ```bash
-pnpm josh run:cut --resume <N>
+pnpm josh run:entry <N>
 ```
 
-- `fresh` (0) — an ordinary run; normal entry.
+- `fresh` (0) — normal entry completes; follow its stage and entry report.
 - `resume` (0) — a verified pre-gate cut. **Skip the title, the plan, the fresh hold claim and the
   implementation**; re-read the issue body and comments, then go straight to `pnpm josh gate`.
 - `resume-impl` (0) — the cut was taken **during** implementation. Skip the title, the plan, the
   fresh hold claim and the split assessment, re-read the plan, then **continue implementation** — do
   **not** go straight to the gate. A round 1 the resume prints is continued, not rerun
   (`scripts/run/cut/run-cut-review.ts`).
-- `handed-off` (0) — a successor already adopted this cut. **End the turn quietly and do nothing**;
-  no Telegram owed.
+- `handed-off` (0) — a successor adopted this cut and has not been released. **End the turn quietly
+  and do nothing**; no Telegram owed. After `run:merge` stops and releases that worker to wait or
+  park, the next resume verifies and adopts the saved cut again.
 - `stale` (1) — the record does not match the tree (branch, clean tree, expired, or unknown hand-off).
   **A resume failure**: send a `confirmation` Telegram and stop; never gate the wrong tree.
 - `busy` (1) — another process owns the resume. Send a `confirmation` Telegram and stop.
@@ -89,10 +82,12 @@ or re-normalize the title; the plan and decisions are read back from the issue.
 
 - **The resume verifies the tree against the record**: branch, dirty tree, issue, and the cutting
   run's hold. Any mismatch is `stale`.
-- **No owner is recorded on the cut** (OpenAI keeps its supervisor owner separately).
+- **Adoption records its session**; only that session may replace its adopted pre-gate record with an
+  implementation cut. An unknown adopter stays protected (OpenAI keeps its supervisor owner separately).
 - **The cut is exclusive** — a second cut on the same tree is `busy`.
-- **The resume is unique** — a spent record answers `handed-off`, and the take-over is an exclusive
-  create. One lane crosses the pre-gate boundary exactly once.
+- **The resume is unique until release** — a spent record answers `handed-off`, and the take-over is
+  an exclusive create. After stopping the worker, `run:merge` makes its adopted cut resumable again
+  for a later run, preserving the branch, timestamp and handoff.
 
 ## The implementation-phase cut — a lane child cuts before the gate too
 
@@ -114,16 +109,16 @@ clears. Outside a
 lane, `run:cut --impl` prints the held run's instruction: on `over`, keep the hold, send a
 `confirmation` Telegram naming `fullrun #<N>`, end the turn. **It fires on every threshold crossing,
 not once per run**; **An edit reissued right after a refusal passes**; **The run's own handoff
-`Write` always passes**; **An unmeasurable session
-warrants the cut**; **It is silent between a cut and its resume** (`scripts/rules/implementation-cut.ts`).
+`Write` always passes**; **An unmeasurable session is not cut**;
+**It is silent between a cut and its resume** (`scripts/rules/implementation-cut.ts`).
 A child that ended without cutting is detected by
 `pnpm josh run:ending <N> --output <path>`.
 
 ## The threshold
 
 The threshold is the break-even context `scripts/cost-runtime/context-cut-payback.ts` prices at the
-session's model — `pnpm josh cost --cut` prints it, no fixed figure fits every model; both cuts and the parent hand-off read the same verdict,
-and an unmeasurable session is always cut. Both cuts end the turn **before** the gate, so the push is never a
+session's model — `pnpm josh cost --cut` prints it, no fixed figure fits every model; both cuts and the parent hand-off read the same verdict;
+neither cut fires when it is unmeasurable. Both cuts end the turn **before** the gate, so the push is never a
 turn boundary (`chain-rule.md`).
 
 ## A lane child records its park before it stops

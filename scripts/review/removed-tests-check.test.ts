@@ -1,8 +1,8 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import ts from 'typescript'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { removed_tests } from './removed-tests'
 
 const base_mock = vi.hoisted(() => vi.fn<() => Promise<string | undefined>>())
@@ -32,19 +32,18 @@ const { removed_tests_check } = await import('./removed-tests-check')
 const BASE = 'fedcba9876543210fedcba9876543210fedcba98'
 const KEPT_FILE = 'scripts/board.test.ts'
 const DELETED_FILE = 'scripts/gone.test.ts'
-const ROOT = mkdtempSync(path.join(tmpdir(), 'josh-removed-tests-'))
+const make_directory = temporary_directory('suite')
+const ROOT = make_directory('josh-removed-tests-')
 const BOARD_AT_BASE =
 	"describe('board', () => {\n\tit('kept', () => {})\n\tit('dropped', () => {})\n})\n"
 const BOARD_NOW = "describe('board', () => {\n\tit('kept', () => {})\n})\n"
+const BOARD_GROWN = "describe('board', () => {\n\tit('kept', () => {})\n\tit('new', () => {})\n})\n"
+const REMOVED = ['board > dropped', 'whole file']
 const GONE_AT_BASE = "it('whole file', () => {})\n"
 const AT_BASE: Readonly<Record<string, string>> = {
 	[`${BASE}:${KEPT_FILE}`]: BOARD_AT_BASE,
 	[`${BASE}:${DELETED_FILE}`]: GONE_AT_BASE,
 }
-
-afterAll(() => {
-	rmSync(ROOT, { recursive: true, force: true })
-})
 
 beforeEach(() => {
 	mkdirSync(path.join(ROOT, 'scripts'), { recursive: true })
@@ -59,10 +58,7 @@ beforeEach(() => {
 
 describe('removed_tests_check.read — the tests the change removed', () => {
 	it('lists a test dropped from a kept file and every test of a deleted one', async () => {
-		await expect(removed_tests_check.read()).resolves.toStrictEqual([
-			'board > dropped',
-			'whole file',
-		])
+		await expect(removed_tests_check.read()).resolves.toStrictEqual(REMOVED)
 		expect(held_mock).toHaveBeenCalledWith(BASE, [KEPT_FILE, DELETED_FILE])
 	})
 
@@ -77,6 +73,24 @@ describe('removed_tests_check.read — the tests the change removed', () => {
 		base_mock.mockResolvedValue(undefined)
 
 		await expect(removed_tests_check.read()).resolves.toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#5541: the titles the change added, which meet the draft's acceptance rows.
+describe('removed_tests_check.changes — the titles the change removed and added', () => {
+	it('lists a test added to a kept file beside the removed ones', async () => {
+		writeFileSync(path.join(ROOT, KEPT_FILE), BOARD_GROWN)
+
+		await expect(removed_tests_check.changes()).resolves.toStrictEqual({
+			removed: REMOVED,
+			added: ['board > new'],
+		})
+	})
+
+	it('answers nothing when the base cannot be resolved', async () => {
+		base_mock.mockResolvedValue(undefined)
+
+		await expect(removed_tests_check.changes()).resolves.toBeUndefined()
 	})
 })
 

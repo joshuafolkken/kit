@@ -7,8 +7,8 @@ import { session_language } from '#scripts/josh/session-language'
 import { report_labels } from './report-labels'
 import { report_template, type ChangeInput } from './report-template'
 
-// `josh report:template summary|done [<path>...]` — print the work summary or the completion report
-// skeleton in the session language. Each path is a file the change touches; it fills the target and
+// `josh report:template summary|done|child [<path>...]` — print the work summary, the completion report
+// or the child summary skeleton in the session language (`child` ignores paths). Each path is a file the change touches; it fills the target and
 // changed-file lines, and for the summary its own change block, opened by the abnormal cases
 // `josh cases` owes for it.
 

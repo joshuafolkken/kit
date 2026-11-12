@@ -21,12 +21,12 @@ afterEach(() => {
 })
 
 describe('a stored lane profile across a cut', () => {
-	it('relaunches on the recorded model, taking only the phase effort', () => {
+	it('relaunches on the ship default model with the phase effort', () => {
 		check.mockReturnValue({ kind: 'ready' })
 		const built = agent_argv.resume_argv(INVOCATION, LEGACY_WORKER, PRE_GATE_PHASE, LANE)
 
-		expect(built).toMatchObject({ kind: 'argv', profile: { model: LEGACY_MODEL, effort: 'low' } })
-		expect(built.kind === 'argv' && built.argv.args).toContain(LEGACY_MODEL)
+		expect(built).toMatchObject({ kind: 'argv', profile: { model: SONNET, effort: 'low' } })
+		expect(built.kind === 'argv' && built.argv.args).toContain(SONNET)
 	})
 
 	// joshuafolkken/kit#5343: the ship key moves the pre-gate relaunch off the recorded model.
@@ -51,6 +51,28 @@ describe('a stored lane profile across a cut', () => {
 
 // joshuafolkken/kit#3926: a verification round builds under its own reviewer profile.
 describe('a review round', () => {
+	it.each(['low', 'medium'])('launches the model selected for a %s first round', (level) => {
+		check.mockReturnValue({ kind: 'ready' })
+		const built = agent_argv.review_in(`${level} — review the brief`, 1, LANE, {
+			JOSH_AGENT_PROVIDER: 'anthropic',
+		})
+		const model = level === 'low' ? SONNET : DEFAULT_PROFILES.reviewer.model
+
+		expect(built).toMatchObject({ kind: 'argv', profile: { model } })
+		expect(built.kind === 'argv' && built.argv.args).toContain(model)
+	})
+
+	it.each([1, 2])('keeps the trusted local policy for OpenAI review round %s', (round) => {
+		check.mockReturnValue({ kind: 'ready' })
+		const built = agent_argv.review_in(INVOCATION, round, LANE, { JOSH_AGENT_PROVIDER: 'openai' })
+
+		expect(built.kind === 'argv' && built.argv.args).toContain(
+			'default_permissions=":danger-full-access"',
+		)
+		expect(built.kind === 'argv' && built.argv.args).toContain('approval_policy="never"')
+		expect(built.kind === 'argv' && built.argv.args).toContain('--ephemeral')
+	})
+
 	it('builds a later round under the verification profile', () => {
 		check.mockReturnValue({ kind: 'ready' })
 		const built = agent_argv.review_in(INVOCATION, 2, LANE, {

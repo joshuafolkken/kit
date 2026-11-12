@@ -1,5 +1,5 @@
 import { LANE_SEAT_KEY, PORT_SEED_KEY, ports } from '#ports'
-import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
+import { agent_profile_schema, type AgentProfile } from '#scripts/agent/agent-profile-schema'
 
 // The lane's `.env`, built from the root's.
 //
@@ -162,7 +162,7 @@ function read_lane_output(content: string): string | undefined {
 }
 
 function read_lane_profile(content: string): AgentProfile | undefined {
-	return agent_role_profile.parse({
+	return agent_profile_schema.parse({
 		provider: read_assignment(content, LANE_PROVIDER_KEY),
 		role: read_assignment(content, LANE_ROLE_KEY),
 		model: read_assignment(content, LANE_MODEL_KEY),

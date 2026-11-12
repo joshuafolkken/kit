@@ -1,24 +1,39 @@
+import { shared_cache_fixture } from '#scripts/josh/shared-cache-fixture'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { gh_author_association } from './gh-author-association'
+import type { ConditionalRead } from './git-gh-conditional'
 
 // joshuafolkken/kit#4037: `author_association` alone does not say "can write" — `MEMBER` is any org
 // member and `COLLABORATOR` includes read-only outside collaborators — so those two are asked of the
 // collaborator-permission endpoint.
 
+// The lookup goes through the ETag layer (joshuafolkken/kit#6754), so the mock stands in for its
+// conditional GET, and each test keeps its ETag records in its own memory.
 const api_mock = vi.hoisted(() => vi.fn())
 
-vi.mock('#scripts/gh/git-gh-exec', () => ({ git_gh_exec: { exec_gh_api: api_mock } }))
+vi.mock('#scripts/gh/git-gh-conditional', () => ({
+	git_gh_conditional: { read_conditional: api_mock },
+}))
 
 beforeEach(() => {
 	api_mock.mockReset()
+	vi.restoreAllMocks()
+	shared_cache_fixture.keep_in_memory()
 })
 
 // The REST placeholders `gh api` fills in, kept out of a template literal.
 const COLLABORATORS_PATH = 'repos/{owner}/{repo}/collaborators/'
 const LOOKUP_TIMEOUT_MS = 5000
+const OTHER_REPO = 'joshuafolkken/app-kit'
+const SESSION_REPO = '{owner}/{repo}'
+const ETAG = 'W/"kept"'
 
-function permission(role_name: string, level = role_name): string {
-	return JSON.stringify({ permission: level, role_name })
+function permission(role_name: string, level = role_name): ConditionalRead {
+	return {
+		kind: 'changed',
+		etag: undefined,
+		body: JSON.stringify({ permission: level, role_name }),
+	}
 }
 
 describe('is_trusted — without a request', () => {
@@ -63,7 +78,11 @@ describe('is_trusted — MEMBER / COLLABORATOR', () => {
 		const login = `writer-${role_name}`
 
 		expect(await gh_author_association.is_trusted({ login, association: 'MEMBER' })).toBe(true)
-		expect(api_mock).toHaveBeenCalledWith({ path: `${COLLABORATORS_PATH}${login}/permission` })
+		expect(api_mock).toHaveBeenCalledWith(
+			`${COLLABORATORS_PATH}${login}/permission`,
+			undefined,
+			undefined,
+		)
 	})
 
 	it('asks for an Enterprise Managed User login carrying an underscore', async () => {
@@ -71,7 +90,11 @@ describe('is_trusted — MEMBER / COLLABORATOR', () => {
 		const login = 'jane_acme'
 
 		expect(await gh_author_association.is_trusted({ login, association: 'MEMBER' })).toBe(true)
-		expect(api_mock).toHaveBeenCalledWith({ path: `${COLLABORATORS_PATH}${login}/permission` })
+		expect(api_mock).toHaveBeenCalledWith(
+			`${COLLABORATORS_PATH}${login}/permission`,
+			undefined,
+			undefined,
+		)
 	})
 })
 
@@ -126,10 +149,57 @@ describe('is_trusted — the lookup', () => {
 			association: 'MEMBER',
 			timeout_ms: LOOKUP_TIMEOUT_MS,
 		})
-		expect(api_mock).toHaveBeenCalledWith({
-			path: `${COLLABORATORS_PATH}${login}/permission`,
-			timeout_ms: LOOKUP_TIMEOUT_MS,
-		})
+		expect(api_mock).toHaveBeenCalledWith(
+			`${COLLABORATORS_PATH}${login}/permission`,
+			undefined,
+			LOOKUP_TIMEOUT_MS,
+		)
+	})
+})
+
+// joshuafolkken/kit#6754: a later process asks with the ETag the earlier one kept, and a 304 answers
+// the role it read then. The session's repository named outright is the same path under another
+// in-process key, so it stands in for that later process, whose own memo starts empty.
+describe('is_trusted — the ETag layer', () => {
+	const login = 'kept-writer'
+
+	it('answers the kept role on a 304', async () => {
+		api_mock
+			.mockResolvedValueOnce({ ...permission('write'), etag: ETAG })
+			.mockResolvedValueOnce({ kind: 'unchanged' })
+		const author = { login, association: 'MEMBER' }
+
+		expect(await gh_author_association.is_trusted(author)).toBe(true)
+		expect(await gh_author_association.is_trusted({ ...author, repo: SESSION_REPO })).toBe(true)
+		expect(api_mock.mock.calls.map(([, etag]: Array<unknown>) => etag)).toStrictEqual([
+			undefined,
+			ETAG,
+		])
+	})
+})
+
+// joshuafolkken/kit#5851: `issue:read --repo` reads another repository's authors, and write access is a
+// property of one repository — so it is asked of that one, and never answered from another's lookup.
+describe('is_trusted — the repository asked', () => {
+	it('asks the repository the row was read from', async () => {
+		api_mock.mockResolvedValue(permission('write'))
+		const login = 'other-repo-writer'
+
+		await gh_author_association.is_trusted({ login, association: 'MEMBER', repo: OTHER_REPO })
+		expect(api_mock).toHaveBeenCalledWith(
+			`repos/${OTHER_REPO}/collaborators/${login}/permission`,
+			undefined,
+			undefined,
+		)
+	})
+
+	it('asks again for the same login in another repository', async () => {
+		api_mock.mockResolvedValueOnce(permission('write')).mockResolvedValueOnce(permission('read'))
+		const author = { login: 'writes-here-only', association: 'COLLABORATOR' }
+
+		expect(await gh_author_association.is_trusted(author)).toBe(true)
+		expect(await gh_author_association.is_trusted({ ...author, repo: OTHER_REPO })).toBe(false)
+		expect(api_mock).toHaveBeenCalledTimes(2)
 	})
 })
 

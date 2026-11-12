@@ -1,11 +1,13 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { init_logic } from '#scripts/init/init-logic'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { sync } from './sync'
 
-// The clause `josh init` used to write: a bare install whose failure is swallowed.
+const make_directory = temporary_directory()
+
+// A bare install with a swallowed failure exercises the compatibility rewrite.
 const LEGACY_LEFTHOOK_CMD = 'command -v lefthook >/dev/null 2>&1 && lefthook install'
 const SVELTE_KIT_SYNC = 'svelte-kit sync'
 const WARNING_MARKER = 'git hooks are NOT installed'
@@ -33,13 +35,12 @@ function sync_prepare(prepare: string): string {
 }
 
 beforeEach(() => {
-	ctx.work_directory = mkdtempSync(path.join(tmpdir(), 'sync-prepare-lefthook-'))
+	ctx.work_directory = make_directory('sync-prepare-lefthook-')
 	ctx.package_json_path = path.join(ctx.work_directory, 'package.json')
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 })
 
 afterEach(() => {
-	rmSync(ctx.work_directory, { recursive: true, force: true })
 	vi.restoreAllMocks()
 })
 

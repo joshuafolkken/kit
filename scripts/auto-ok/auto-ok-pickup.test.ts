@@ -114,7 +114,6 @@ vi.spyOn(console, 'info').mockImplementation(streams.info)
 vi.spyOn(console, 'error').mockImplementation(streams.error)
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	// The default answer for a call the case did not queue one for. Every wrapper answers
 	// `{ json, is_capped }` since joshuafolkken/kit#1067, so a bare `vi.fn()` returning `undefined`
 	// is a shape no caller can be handed — and the failed-read path is what an unqueued call means.
@@ -273,8 +272,7 @@ describe('josh auto-ok:next — what the probe actually asks for', () => {
 	})
 })
 
-// The notice used to be printed before the answer was known, asserting "the answer below is opted
-// in" — which contradicted the `none` that followed, in the one situation where the cap mattered.
+// A capped listing can answer `none`, so the notice must describe the actual answer.
 describe('josh auto-ok:next — the cap notice agrees with the answer', () => {
 	it('warns the answer may not be the highest priority when there is one', async () => {
 		issue_list.mockResolvedValueOnce(
@@ -300,8 +298,7 @@ describe('josh auto-ok:next — the cap notice agrees with the answer', () => {
 	})
 })
 
-// Both gaps used to print the message that says to check `gh auth status`, which is the wrong place
-// to look when the listing arrived and only its fields were unexpected.
+// Unexpected fields in a successful listing need a data diagnostic rather than an auth diagnostic.
 describe('josh auto-ok:next — why the listing could not be used', () => {
 	it('sends an unexpected shape to the field list rather than the authentication', async () => {
 		issue_list.mockResolvedValueOnce(listing_outcome('[{"unexpected":true}]'))

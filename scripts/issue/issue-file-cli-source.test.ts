@@ -1,12 +1,12 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { repo_party } from '#scripts/discovery/repo-party'
 import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_list } from '#scripts/gh/git-gh-issue-list'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_closing_pr } from './issue-closing-pr'
 import { issue_file_cap } from './issue-file-cap'
 import { issue_file_cli } from './issue-file-cli'
@@ -25,7 +25,8 @@ const CITED = 4442
 const CLOSING = 4448
 const FAILURE_EXIT_CODE = 1
 
-const work = mkdtempSync(path.join(tmpdir(), 'issue-file-cli-source-'))
+const make_directory = temporary_directory('suite')
+const work = make_directory('issue-file-cli-source-')
 const body_path = path.join(work, 'conditioned.md')
 
 const origin_path = path.join(work, 'origin.md')
@@ -74,8 +75,8 @@ function argv_of(body_file: string, ...extra: ReadonlyArray<string>): Array<stri
 	return ['A title', '--body-file', body_file, ...extra]
 }
 
-// joshuafolkken/kit#5333: the citation is read only once the local checks pass, so a filing that
-// reaches it carries the run label its `auto-ok` owes.
+// joshuafolkken/kit#5833: the citation is read beside the local checks, so these filings carry the
+// run label their `auto-ok` owes to keep that refusal out of the output.
 const RUN_LABEL = ['--label', 'run:lane']
 
 const exec_gh_api = vi.spyOn(git_gh_exec, 'exec_gh_api')
@@ -93,17 +94,12 @@ beforeEach(() => {
 	scout.mockResolvedValue(undefined)
 })
 
-afterEach(() => {
-	vi.clearAllMocks()
-})
-
 afterAll(() => {
 	vi.restoreAllMocks()
-	rmSync(work, { recursive: true, force: true })
 })
 
 describe('issue_file_cli.run — a measurement follow-up with no start condition', () => {
-	it('refuses the filing with the declaration line, before any read or create', async () => {
+	it('refuses the filing with the declaration line, before the create', async () => {
 		expect(await issue_file_cli.run(argv_of(measurement_path))).toBe(FAILURE_EXIT_CODE)
 		expect(vi.mocked(console.error).mock.calls.join('\n')).toContain(issue_sample_gate.DECLARATION)
 		expect(exec_gh_api).not.toHaveBeenCalled()

@@ -140,7 +140,7 @@ function named_figures(
 // closed again by nothing, so it carries no mark (joshuafolkken/kit#4300).
 function leftover_label(pid: number, sources: GroupSources): string {
 	const issue = sources.mark.lanes.get(pid) ?? ''
-	const lane = `${name_of(pid, sources.mark)} ${issue_cite.plain(issue)}`
+	const lane = `${name_of(pid, sources.mark)} ${issue_cite.plain_for('terminal', issue)}`
 	const reason = sources.stuck.get(pid)
 
 	if (reason !== undefined) return `${lane} ⚠ ${reason} (pid ${String(pid)})`

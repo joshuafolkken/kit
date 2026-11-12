@@ -22,8 +22,8 @@ import { issue_cite, type CiteTarget } from './issue-cite'
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-// The same bound `issue:read` puts on its batch read: every read is a `gh` process, and an unbounded
-// fan-out is answered with secondary rate limiting rather than with titles.
+// Every read is a `gh` process, and an unbounded fan-out is answered with secondary rate limiting
+// rather than with titles.
 const READ_CONCURRENCY = 8
 const TITLE_FIELD = 'title'
 const LINE_SEPARATOR = '\n'

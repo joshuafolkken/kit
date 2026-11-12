@@ -1,3 +1,4 @@
+import { hook_context_fixture } from '#tools/hooks/hook-context-fixture'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { issue_watch, type WatchRecord } from './issue-watch'
 import { issue_watch_hook } from './issue-watch-hook'
@@ -12,6 +13,8 @@ const NEXT_PENDING = `${PENDING}\n\nNew comment by person at 2026-10-15\none mor
 const NOTICE = 'The body was edited, but its author is not trusted.'
 const NOW = new Date('2026-10-14T00:00:00.000Z')
 const POLL_TIMEOUT_MS = 5000
+// joshuafolkken/kit#6973: the record is the call's, keyed on the context's cwd, not the process's.
+const CONTEXT = hook_context_fixture.of('/call/checkout', {})
 
 // An in-memory record the stubbed poll answers and the stubbed `mark_shown` updates, so the
 // once-per-update behavior is exercised across two hook calls.
@@ -47,50 +50,59 @@ describe('issue_watch_hook.watch_reason', () => {
 	it('shows a pending update once, not twice for the same text', async () => {
 		stub_record(record(PENDING))
 
-		const first = await issue_watch_hook.watch_reason(NOW)
+		const first = await issue_watch_hook.watch_reason(CONTEXT, NOW)
 
 		expect(first).toContain(PENDING)
 		expect(first).toContain(`pnpm josh issue:ack ${ISSUE}`)
-		await expect(issue_watch_hook.watch_reason(NOW)).resolves.toBeUndefined()
+		await expect(issue_watch_hook.watch_reason(CONTEXT, NOW)).resolves.toBeUndefined()
 	})
 
 	it('shows a further update whose text differs', async () => {
 		const state = stub_record(record(PENDING))
 
-		await issue_watch_hook.watch_reason(NOW)
+		await issue_watch_hook.watch_reason(CONTEXT, NOW)
 
 		state.current = { ...record(NEXT_PENDING), shown: PENDING }
 
-		await expect(issue_watch_hook.watch_reason(NOW)).resolves.toContain('one more')
+		await expect(issue_watch_hook.watch_reason(CONTEXT, NOW)).resolves.toContain('one more')
 	})
 
 	it('polls at most once per interval with a short timeout', async () => {
 		stub_record(undefined)
 
-		await issue_watch_hook.watch_reason(NOW)
+		await issue_watch_hook.watch_reason(CONTEXT, NOW)
 
-		expect(issue_watch.poll).toHaveBeenCalledWith({
-			interval_ms: issue_watch_hook.POLL_INTERVAL_MS,
-			timeout_ms: POLL_TIMEOUT_MS,
-			now: NOW,
-		})
+		expect(issue_watch.poll).toHaveBeenCalledWith(
+			{ interval_ms: issue_watch_hook.POLL_INTERVAL_MS, timeout_ms: POLL_TIMEOUT_MS, now: NOW },
+			CONTEXT.cwd,
+		)
 	})
 
 	it('answers undefined with no record or nothing pending', async () => {
 		const state = stub_record(undefined)
 
-		await expect(issue_watch_hook.watch_reason(NOW)).resolves.toBeUndefined()
+		await expect(issue_watch_hook.watch_reason(CONTEXT, NOW)).resolves.toBeUndefined()
 
 		state.current = record(undefined)
 
-		await expect(issue_watch_hook.watch_reason(NOW)).resolves.toBeUndefined()
+		await expect(issue_watch_hook.watch_reason(CONTEXT, NOW)).resolves.toBeUndefined()
 		expect(issue_watch.mark_shown).not.toHaveBeenCalled()
 	})
 
 	it('fails open when the poll throws', async () => {
 		vi.spyOn(issue_watch, 'poll').mockRejectedValue(new Error('network down'))
 
-		await expect(issue_watch_hook.watch_reason(NOW)).resolves.toBeUndefined()
+		await expect(issue_watch_hook.watch_reason(CONTEXT, NOW)).resolves.toBeUndefined()
+	})
+})
+
+describe('issue_watch_hook.watch_reason — the call context', () => {
+	it("marks the update shown on the record under the context's cwd", async () => {
+		stub_record(record(PENDING))
+
+		await issue_watch_hook.watch_reason(CONTEXT, NOW)
+
+		expect(issue_watch.mark_shown).toHaveBeenCalledWith(expect.anything(), CONTEXT.cwd)
 	})
 })
 
@@ -99,10 +111,10 @@ describe('issue_watch_hook.watch_reason — a withheld body edit', () => {
 	it('shows the notice once, without asking for an ack', async () => {
 		stub_record({ ...record(undefined), notice: NOTICE })
 
-		const first = await issue_watch_hook.watch_reason(NOW)
+		const first = await issue_watch_hook.watch_reason(CONTEXT, NOW)
 
 		expect(first).toBe(NOTICE)
 		expect(first).not.toContain('issue:ack')
-		await expect(issue_watch_hook.watch_reason(NOW)).resolves.toBeUndefined()
+		await expect(issue_watch_hook.watch_reason(CONTEXT, NOW)).resolves.toBeUndefined()
 	})
 })

@@ -1,6 +1,6 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, vi } from 'vitest'
 import { cost_transcript } from './cost-transcript'
 
@@ -54,8 +54,10 @@ function capture_out(message: unknown): void {
 // **The hooks are registered by calling this, not by importing it**, so a suite that wants the
 // capture asks for it in one line and one that does not is untouched.
 function capture_console(): void {
+	const make_directory = temporary_directory()
+
 	beforeEach(() => {
-		state.home = mkdtempSync(path.join(tmpdir(), 'cost-cli-'))
+		state.home = make_directory('cost-cli-')
 		state.printed = []
 		state.out = []
 		vi.spyOn(console, 'info').mockImplementation(capture_out)

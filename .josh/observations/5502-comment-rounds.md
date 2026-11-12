@@ -1,0 +1,1 @@
+- rf:bug-risks | low | scripts/backlog/backlog-next-size.ts:83 | 2026-10-31 | #5502

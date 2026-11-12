@@ -51,7 +51,6 @@ function remote_carries_the_branch(): void {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
 	default_branch.mockResolvedValue(MAIN)
 	fetch_branch.mockResolvedValue('')

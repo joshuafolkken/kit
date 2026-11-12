@@ -3,6 +3,7 @@ import { core_budget } from '#scripts/gate/core-budget'
 import { machine_capacity } from '#scripts/gate/machine-capacity'
 import { lane_process_table } from '#scripts/lane/lane-process-table'
 import type { GatherPorts } from './run-board-gather'
+import { run_board_quota_held } from './run-board-quota-held'
 import { run_board_read } from './run-board-read'
 import { run_board_usage_read } from './run-board-usage-read'
 
@@ -16,6 +17,7 @@ function ports_of(is_live: boolean): GatherPorts {
 		read_machine: machine_capacity.read_sample,
 		read_waits: () => core_budget.budget_waits(),
 		read_usage: run_board_usage_read.usage_reader(),
+		read_quotas: run_board_quota_held.live_quota_reader(),
 		is_live,
 		now: () => Date.now(),
 		sleep: async (ms) => {

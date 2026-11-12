@@ -76,7 +76,6 @@ describe('pure_files_entries.read_moved', () => {
 	const CHANGED = [pure_files_entries.PURE_FILES_PATH]
 
 	beforeEach(() => {
-		vi.clearAllMocks()
 		vi.mocked(git_command.change_base).mockResolvedValue(BASE)
 		vi.mocked(git_command.show_file).mockResolvedValue(list_of([KEPT, REMOVED]))
 		vi.spyOn(file_reader, 'read_if_readable').mockReturnValue(list_of([KEPT, ADDED]))

@@ -1,0 +1,5 @@
+- rf:tests | medium | scripts/backlog/backlog-next-size.test.ts:24 | 2026-11-02 | #5654
+- rf:tests | medium | scripts/backlog/backlog-next-size.test.ts:99 | 2026-11-02 | #5654
+- rf:comments | low | .claude/skills/workflow-commands/split-assessment.md:17 | 2026-11-02 | #5654
+- rf:project-conventions | low | scripts/issue/size-estimate.test.ts:46 | 2026-11-02 | #5654
+- rf:none | none | - | 2026-11-02 | #5654

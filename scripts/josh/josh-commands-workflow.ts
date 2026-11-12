@@ -2,7 +2,7 @@ import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types
 
 const PR_TITLE = '"PR title #N"'
 const BODY_FILE_NOTE =
-	'(`-` reads stdin); use this whenever the body carries a backtick or `$`. Passing both forms is refused.'
+	'written under `.josh/tmp/` (`-` reads stdin); use this whenever the body carries a backtick or `$`. Passing both forms is refused.'
 const ISSUE_URL = '--issue-url "https://..."'
 const REVIEW_ISSUE = '--issue 2325'
 const CHECK = '--check'
@@ -12,8 +12,8 @@ const SKIP_PUSH = '--skip-push'
 
 const GIT_WORKFLOW_SCRIPT = 'scripts/git/git-workflow.ts'
 const GIT_MESSAGE_ARGUMENTS = '[-y] <message>'
+const PERIOD_ARGUMENTS = '[--period <days>]'
 
-/* eslint-disable @typescript-eslint/naming-convention */
 const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 	git: {
 		script: GIT_WORKFLOW_SCRIPT,
@@ -78,7 +78,7 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 			examples: [
 				{ arguments: PR_TITLE, note: 'merges (default)' },
 				{ arguments: String.raw`${PR_TITLE} --notify-message "Implemented X:\n- change 1"` },
-				{ arguments: `${PR_TITLE} --notify-message-file completion.md` },
+				{ arguments: `${PR_TITLE} --notify-message-file .josh/tmp/completion.md` },
 				{ arguments: `${PR_TITLE} --ai-review-ignore-reason "false positive"` },
 				{ arguments: `${PR_TITLE} --no-merge`, note: 'do the work, leave the PR open' },
 			],
@@ -103,6 +103,21 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
+	'checks:failed': {
+		script: 'scripts/gh/git-gh-checks-failed-main.ts',
+		description:
+			'List the failing CI checks of a pull request or commit, required or not (check runs and commit statuses)',
+		category: 'Workflow',
+		reference: ['[<PR|sha>]', 'developer', ['network']],
+		usage: {
+			examples: [
+				{ arguments: '', note: "the current branch's pull request" },
+				{ arguments: '7147', note: 'a pull request by number' },
+				{ arguments: 'c0ffee1', note: 'a commit by sha' },
+			],
+		},
+		is_read_only: true,
+	},
 	notify: {
 		script: 'scripts/notify/telegram-test-main.ts',
 		description: 'Send Telegram notification',
@@ -119,7 +134,7 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 					arguments: String.raw`--task-type planning ${ISSUE_URL} --body="- bullet 1\n- bullet 2"`,
 				},
 				{
-					arguments: `--task-type confirmation ${ISSUE_URL} --body-file r.md --recommended "Go" --alternative "Wait"`,
+					arguments: `--task-type confirmation ${ISSUE_URL} --body-file .josh/tmp/r.md --recommended "Go" --alternative "Wait"`,
 				},
 			],
 			flags: [
@@ -146,8 +161,7 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
-	// One observation-ledger sighting: the key's count, the append and the second-sighting verdict,
-	// which a run used to type as a `cat | grep -c` and judge by hand.
+	// Counting, appending and deciding a second sighting together keeps ledger judgments consistent.
 	'observation:record': {
 		script: 'scripts/observations/observation-record-cli.ts',
 		description: 'Record an observation sighting and answer whether it is now filed',
@@ -169,6 +183,14 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
+	// The depth test's table read off a path, so the `<depth>` above is derived rather than judged.
+	'observation:depth': {
+		script: 'scripts/observations/observation-depth-cli.ts',
+		description: "Print the depth test's depth for a subject path",
+		category: 'Workflow',
+		reference: ['<path>', 'automation', ['none']],
+		usage: { examples: [{ arguments: 'scripts/lane/lane-plan.ts' }] },
+	},
 	// The observation ledger's commit path for the lines no run's own commit carried:
 	// a lane's lines sit in the primary checkout, which
 	// its commit cannot see, and the recurrence count the promotion rule reads is a count of main.
@@ -188,7 +210,7 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Record a review round’s findings, or check a round was recorded',
 		category: 'Workflow',
 		reference: [
-			'--issue <N> [--comment | --interaction] [<category>:<severity>:<file>[ — <reason>] ...] | --check [--interaction] --issue <N>',
+			'--issue <N> [--comment | --interaction] [<category>:<severity>:<file>[ — <reason>] ...] | --from-slot --issue <N> [--comment | --interaction] [<n>=<disposition> ...] | --check [--interaction] --issue <N>',
 			'automation',
 			['files', 'network'],
 		],
@@ -205,6 +227,10 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 					arguments: `${REVIEW_ISSUE} --interaction`,
 					note: 'the interaction review’s pass — a `- ri:` line',
 				},
+				{
+					arguments: `--from-slot ${REVIEW_ISSUE} 2=filed:#7`,
+					note: 'the findings the reviewer wrote with review:submit — each `fixed` unless its line is given another',
+				},
 			],
 		},
 	},
@@ -215,7 +241,7 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			'List the review findings that stopped a josh ship over a period, by kind, file:line and first sentence',
 		category: 'Workflow',
-		reference: ['[--period <days>]', 'developer', ['none']],
+		reference: [PERIOD_ARGUMENTS, 'developer', ['none']],
 		usage: { examples: [{ arguments: '--period 30', note: 'the last 30 days (default 7)' }] },
 	},
 	// The reader over what `review:record` wrote: each recurring category’s
@@ -224,8 +250,13 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/review/review-findings-cli.ts',
 		description: 'Count review findings by category from the observation ledger',
 		category: 'Workflow',
-		reference: ['', 'developer', ['files']],
-		usage: { examples: [{ arguments: '' }] },
+		reference: [PERIOD_ARGUMENTS, 'developer', ['files']],
+		usage: {
+			examples: [
+				{ arguments: '' },
+				{ arguments: '--period 7', note: 'the last 7 days, by category and severity' },
+			],
+		},
 	},
 	// After a behavior-change Issue merges, re-run its declared baseline and print before/after; a value
 	// that did not move appends a refuted-premise line to the observation ledger.
@@ -262,6 +293,5 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 		usage: { examples: [{ arguments: '' }] },
 	},
 }
-/* eslint-enable @typescript-eslint/naming-convention */
 
 export { WORKFLOW_COMMANDS }

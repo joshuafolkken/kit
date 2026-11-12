@@ -39,6 +39,7 @@ type TelegramTaskType =
 	| 'idle'
 	| 'stranded'
 	| 'progress'
+	| 'decision'
 
 interface TelegramSendInput {
 	task_type: TelegramTaskType
@@ -72,6 +73,7 @@ const TASK_DEFINITIONS: Record<TelegramTaskType, TaskDefinition> = {
 	idle: { icon: '💤', label: 'Backlog run idle — nothing left to dispatch' },
 	stranded: { icon: '🚨', label: 'Run stranded — nobody is driving it' },
 	progress: { icon: '📊', label: 'Progress' },
+	decision: { icon: '🤖', label: 'Decided by the run — override with a later decision comment' },
 }
 
 const NOTIFY_SWITCH_KEY = 'JOSH_NOTIFY'
@@ -398,9 +400,25 @@ async function confirm(input: ConfirmInput): Promise<boolean> {
 	)
 }
 
-interface IdleInput {
+interface HeadlineInput {
 	body: string
 	recovery: string
+}
+
+// The shape every headline type shares: the repository looked up under the shared bound, no title or
+// links — the header label names what this is — and the tolerant `send_or_report`.
+async function headline(task_type: TelegramTaskType, input: HeadlineInput): Promise<boolean> {
+	return await send_or_report(
+		{
+			task_type,
+			repo_name: gh_spawn.get_repo_name_with_owner_within(REPO_LOOKUP_TIMEOUT_MS),
+			issue_title: undefined,
+			body: input.body,
+			issue_url: undefined,
+			pr_url: undefined,
+		},
+		input.recovery,
+	)
 }
 
 /**
@@ -413,18 +431,8 @@ interface IdleInput {
  * the caller's own `recovery` line. No `issue_title`: the header label already names what this is, and
  * the body carries what is waiting, so a title line would only repeat the header.
  */
-async function idle(input: IdleInput): Promise<boolean> {
-	return await send_or_report(
-		{
-			task_type: 'idle',
-			repo_name: gh_spawn.get_repo_name_with_owner_within(REPO_LOOKUP_TIMEOUT_MS),
-			issue_title: undefined,
-			body: input.body,
-			issue_url: undefined,
-			pr_url: undefined,
-		},
-		input.recovery,
-	)
+async function idle(input: HeadlineInput): Promise<boolean> {
+	return await headline('idle', input)
 }
 
 interface StrandedInput {
@@ -444,17 +452,7 @@ interface StrandedInput {
  * `issue_title`: the header label already names what this is.
  */
 async function stranded(input: StrandedInput): Promise<boolean> {
-	return await send_or_report(
-		{
-			task_type: 'stranded',
-			repo_name: gh_spawn.get_repo_name_with_owner_within(REPO_LOOKUP_TIMEOUT_MS),
-			issue_title: undefined,
-			body: input.body,
-			issue_url: undefined,
-			pr_url: undefined,
-		},
-		input.recovery,
-	)
+	return await headline('stranded', input)
 }
 
 /**
@@ -465,21 +463,21 @@ async function stranded(input: StrandedInput): Promise<boolean> {
  * to a Telegram timeout is read again by asking for it.
  */
 async function progress(body: string): Promise<boolean> {
-	return await send_or_report(
-		{
-			task_type: 'progress',
-			repo_name: gh_spawn.get_repo_name_with_owner_within(REPO_LOOKUP_TIMEOUT_MS),
-			issue_title: undefined,
-			body,
-			issue_url: undefined,
-			pr_url: undefined,
-		},
-		'pnpm josh run:board --chat',
-	)
+	return await headline('progress', { body, recovery: 'pnpm josh run:board --chat' })
+}
+
+/**
+ * Push the 🤖 decision type — a park with no recommendation the drive decided itself
+ * (joshuafolkken/kit#7077). Information after the fact, never a `confirmation`: the run has moved on,
+ * and a person overrides it with a later decision comment on the issue.
+ */
+async function decided(input: HeadlineInput): Promise<boolean> {
+	return await headline('decision', input)
 }
 
 const telegram_notify = {
 	confirm,
+	decided,
 	idle,
 	progress,
 	send,

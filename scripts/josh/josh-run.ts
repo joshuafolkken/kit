@@ -22,6 +22,7 @@ import { execa } from 'execa'
 
 const PNPM = 'pnpm'
 const JOSH = 'josh'
+const SUCCESS_EXIT_CODE = 0
 const NONZERO_EXIT = 1
 const FORWARDED_STDERR = ['pipe', 'inherit'] as const
 
@@ -34,6 +35,7 @@ interface JoshResult {
 interface ExtraOptions {
 	timeout?: number
 	env?: Readonly<Record<string, string>>
+	cwd?: string
 }
 
 function extra_options(
@@ -46,16 +48,15 @@ function extra_options(
 	}
 }
 
-async function josh_run(
+async function run_with_options(
 	args: ReadonlyArray<string>,
-	should_forward_stderr = false,
-	timeout_ms?: number,
-	environment?: Readonly<Record<string, string>>,
+	should_forward_stderr: boolean,
+	options: ExtraOptions,
 ): Promise<JoshResult> {
 	const result = await execa(PNPM, [JOSH, ...args], {
 		reject: false,
 		stderr: should_forward_stderr ? FORWARDED_STDERR : 'pipe',
-		...extra_options(timeout_ms, environment),
+		...options,
 	})
 
 	return {
@@ -65,7 +66,30 @@ async function josh_run(
 	}
 }
 
-const josh_command = { josh_run }
+async function josh_run(
+	args: ReadonlyArray<string>,
+	should_forward_stderr = false,
+	timeout_ms?: number,
+	environment?: Readonly<Record<string, string>>,
+): Promise<JoshResult> {
+	return await run_with_options(args, should_forward_stderr, extra_options(timeout_ms, environment))
+}
+
+async function josh_run_at(args: ReadonlyArray<string>, cwd: string): Promise<JoshResult> {
+	return await run_with_options(args, false, { cwd })
+}
+
+// A step whose failure ends the composite: its stderr, else its stdout, else the exit code is the
+// error's message.
+function require_success(result: JoshResult, command: string): void {
+	if (result.code === SUCCESS_EXIT_CODE) return
+
+	const reason = [result.err, result.out].find((text) => text?.trim())
+
+	throw new Error(reason ?? `${command} exited ${String(result.code)}`)
+}
+
+const josh_command = { josh_run, josh_run_at, require_success }
 
 export type { JoshResult }
 export { josh_command }

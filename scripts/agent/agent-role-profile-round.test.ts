@@ -9,6 +9,7 @@ const OPENAI_ENV = { CODEX_THREAD_ID: 'codex-thread' }
 const ROUND_ONE = 1
 const ROUND_TWO = 2
 const OPUS = 'claude-opus-5-5'
+const OPENAI_MODEL = 'gpt-6.1-sol'
 const SONNET = 'claude-sonnet-5-5'
 const FABLE = 'claude-fable-5-1'
 const HAIKU = 'claude-haiku-4-5-20251001'
@@ -25,6 +26,36 @@ function review_profile(round: number, environment: AgentEnvironment = {}): Agen
 
 	return result.profile
 }
+
+describe('the low review defaults', () => {
+	it('uses Sonnet for a low Anthropic review', () => {
+		expect(agent_role_profile.resolve_review(ROUND_ONE, ANTHROPIC_ENV, true)).toMatchObject({
+			profile: { model: SONNET, effort: 'medium' },
+		})
+	})
+
+	it('preserves model overrides on a low review', () => {
+		expect(
+			agent_role_profile.resolve_review(ROUND_ONE, { ...ANTHROPIC_ENV, ...REVIEWER }, true),
+		).toMatchObject({ profile: { model: FABLE, effort: 'max' } })
+	})
+
+	it('uses Sonnet when the low review model override is whitespace', () => {
+		expect(
+			agent_role_profile.resolve_review(
+				ROUND_ONE,
+				{ ...ANTHROPIC_ENV, JOSH_REVIEWER_MODEL: '\t' },
+				true,
+			),
+		).toMatchObject({ profile: { model: SONNET } })
+	})
+
+	it('preserves the OpenAI profile on a low review', () => {
+		expect(agent_role_profile.resolve_review(ROUND_ONE, OPENAI_ENV, true)).toMatchObject({
+			profile: { model: OPENAI_MODEL, provider: 'openai' },
+		})
+	})
+})
 
 describe('the review round defaults', () => {
 	it('resolves round 1 exactly as the reviewer role does', () => {
@@ -48,7 +79,7 @@ describe('the review round defaults', () => {
 		const result = agent_role_profile.resolve_review(ROUND_TWO, OPENAI_ENV)
 
 		expect(result).toStrictEqual({ kind: 'profile', profile: VERIFICATION_PROFILES.openai })
-		expect(VERIFICATION_PROFILES.openai).toMatchObject({ model: 'gpt-6.1-sol', effort: 'high' })
+		expect(VERIFICATION_PROFILES.openai).toMatchObject({ model: OPENAI_MODEL, effort: 'high' })
 	})
 
 	it('runs an OpenAI round 1 at medium', () => {
@@ -98,7 +129,7 @@ describe('the review round override refusals', () => {
 describe('describe_review', () => {
 	it('names the round beside the profile', () => {
 		expect(agent_role_profile.describe_review(ROUND_TWO, DEFAULT_PROFILES.reviewer)).toBe(
-			'review round 2 · provider=anthropic role=reviewer model=claude-opus-5-5 effort=medium',
+			'review round 2 · provider=anthropic role=reviewer model=claude-opus-5-5 (opus) effort=medium',
 		)
 	})
 })

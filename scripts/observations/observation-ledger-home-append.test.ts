@@ -1,7 +1,7 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import {
 	LEGACY_LEDGER_FILE,
 	LEGACY_OBSERVATION_LEDGER_PATHS,
@@ -9,15 +9,12 @@ import {
 } from './observation-ledger'
 import { observation_ledger_home } from './observation-ledger-home'
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'observation-ledger-append-test-'))
+const make_directory = temporary_directory('suite')
+const scratch = make_directory('observation-ledger-append-test-')
 const LEDGER_FILE = 'observations.md'
 const LINE = '- k:a | d1 | 2026-09-29 | x | y'
 const OTHER_LINE = '- k:b | d1 | 2026-09-29 | x | z'
 const ISSUE = 2919
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
 
 // joshuafolkken/kit#2701: every ledger writer shares one append rather than spelling its own.
 describe('observation_ledger_home.append', () => {

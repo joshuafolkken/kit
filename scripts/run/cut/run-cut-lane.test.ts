@@ -1,17 +1,22 @@
-import { mkdtempSync, realpathSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { realpathSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { git_fixture_workspace } from '#scripts/git/git-fixture-workspace'
+import { stamp_file } from '#scripts/josh/stamp-file'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, describe, expect, it } from 'vitest'
 import { run_cut, type RunCut } from './run-cut'
+import { run_cut_adoption } from './run-cut-adoption'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#2484: the parent reads a lane's carried cut from outside the lane, so the record
 // has to be found by the lane's path rather than by the process's own checkout.
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-cut-lane-test-'))
+const scratch = make_directory('run-cut-lane-test-')
 const ISSUE = '1839'
 const BRANCH = '1839-lane'
 const GIT_DIR = 'GIT_DIR'
+const MISSING_CUT = 'missing cut'
 // The records `begin_cut` wrote, removed after the suite so none outlives its scratch lane.
 const records: Array<string> = []
 
@@ -55,7 +60,6 @@ function with_inherited_git_directory<T>(git_directory: string, read: () => T): 
 
 afterAll(() => {
 	for (const record of records) rmSync(record, { force: true })
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 describe('a lane’s cut read from outside the lane', () => {
@@ -82,4 +86,41 @@ describe('a lane’s cut read from outside the lane', () => {
 
 		expect(read).toEqual({ target, cut })
 	})
+})
+
+describe('releasing a stopped adopter', () => {
+	it('preserves the saved cut while clearing its adopter and fallback', async () => {
+		const { lane, target, cut } = await declared_lane('release')
+		if (cut === undefined) throw new Error(MISSING_CUT)
+		const adopted = {
+			...cut,
+			is_handed_off: false,
+			adopted_session: 'old-session',
+			is_merge_relaunched: true,
+		}
+
+		stamp_file.replace_stamp(target, adopted)
+		run_cut_adoption.release(target, adopted, ISSUE)
+
+		expect(run_cut.lane_cut_sync(lane)).toEqual({ target, cut })
+	})
+
+	it.each([
+		['declared', { is_handed_off: true }],
+		['unknown', { is_handed_off: undefined }],
+		['foreign-issue', { is_handed_off: false, issue: '1' }],
+		['foreign-invocation', { is_handed_off: false, invocation: 'fullrun #1' }],
+	] as const)(
+		'preserves a cut that cannot belong to the released adopter: %s',
+		async (name, fields) => {
+			const { lane, target, cut } = await declared_lane(name)
+			if (cut === undefined) throw new Error(MISSING_CUT)
+			const previous = { ...cut, ...fields }
+
+			stamp_file.replace_stamp(target, previous)
+			run_cut_adoption.release(target, previous, ISSUE)
+
+			expect(run_cut.lane_cut_sync(lane)).toEqual({ target, cut: previous })
+		},
+	)
 })

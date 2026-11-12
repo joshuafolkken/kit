@@ -1,0 +1,1 @@
+- rf:project-conventions | low | scripts/hooks/codex-hook-adapter.ts:104 | 2026-11-07 | #6587

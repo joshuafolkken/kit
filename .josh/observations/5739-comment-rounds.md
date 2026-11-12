@@ -1,0 +1,4 @@
+- rf:bug-risks | low | scripts/hooks/stop-guard.ts:166 | 2026-11-01 | #5739
+- rf:performance | low | scripts/hooks/stop-guard.ts:228 | 2026-11-01 | #5739
+- rf:bug-risks | low | scripts/run/handoff/run-handoff-launch.ts:79 | 2026-11-01 | #5739
+- rf:tests | low | scripts/hooks/stop-guard.test.ts:122 | 2026-11-01 | #5739

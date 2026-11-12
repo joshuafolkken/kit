@@ -1,18 +1,15 @@
-import { appendFileSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { appendFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it, vi } from 'vitest'
 import { stamped_memo } from './stamped-memo'
 
 // joshuafolkken/kit#4263: an answer is computed again only once its key's stamp moves.
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'stamped-memo-test-'))
+const make_directory = temporary_directory('suite')
+const scratch = make_directory('stamped-memo-test-')
 const KEY = 'key'
 const OTHER = 'other'
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
 
 describe('stamped_memo.create', () => {
 	it('computes once while the stamp holds, and again once it moves', () => {

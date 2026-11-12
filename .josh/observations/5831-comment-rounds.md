@@ -1,0 +1,2 @@
+- rf:performance | low | scripts/hooks/hook-lap.ts:43 | 2026-11-02 | #5831
+- rf:tests | low | scripts/lane/lane-ship-lap-stats.ts:13 | 2026-11-02 | #5831

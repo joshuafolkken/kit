@@ -32,7 +32,7 @@ const WIP_TOPIC = 'prompts/collaboration-workflow/wip-cap.md'
 const LANES_DOC = '.claude/skills/workflow-commands/backlogrun-lanes.md'
 // The guide, written once: the single source and the entry summary have to state the same numbers,
 // and a guide that drifted between them would be two different thresholds under one rule.
-const SPLIT_GUIDE = 'about 10 changed files and about 400 changed lines'
+const SPLIT_GUIDE = 'more than 8 changed files or more than 200 changed lines'
 
 // Default 1 — the split assessment. The number is pinned as well as the default, because a default
 // stated without a guide is read as "split when it feels large", which is the discretion the
@@ -56,15 +56,16 @@ const SPLIT_RATIONALE_MARKERS: ReadonlyArray<string> = [
 // are both pinned: the bar alone still reads as "file unless obviously droppable", and the default
 // alone leaves "or it needs a decision" as a second live route into filing.
 const REVIEW_MARKERS: ReadonlyArray<string> = [
-	'**The default exit is branch 3, and branch 2 has to be earned**',
-	'**confirmed defect that reaches a runtime code path** — both halves, and neither on its own',
+	'**The default exit is branch 3; branch 2 has to be earned.**',
+	'**confirmed defect that reaches a runtime code path**, both halves',
 	// The narrowing is in what *confirmed* means, never in what *reaching* means. Without this the
 	// bar reads as excluding distributed documents, which would contradict the severity test and the
 	// level rule in a repository whose product is its documents.
-	"**Reaching is read exactly as the rubric's Severity test 1 reads it**",
-	'**"It needs a decision" is no longer a branch-2 condition on its own**',
-	'**This is the default, and it takes everything the other two branches did not**',
-	'**The note is not optional**',
+	"Reaching is the rubric's Severity test 1",
+	'a distributed artifact a consumer reads, or the verification',
+	'A design question with no defect under it is branch 3.',
+	'everything the other two did not take',
+	'The note, naming the finding and why it was dropped, is required.',
 ]
 
 // The asymmetry that decides the trade, and the half a later reader mines for a reason to revert. It
@@ -135,10 +136,8 @@ const INTERRUPT_MARKERS: ReadonlyArray<string> = [
 	// How an interrupt is *run* moved to `backlogrun-lanes.md` (joshuafolkken/kit#3181) and is pinned
 	// there by `SOLO_RUN_REACH`; only the pointer stays here.
 	'`.claude/skills/workflow-commands/backlogrun-lanes.md` → "A solo run"',
-	// The blocked-by exemption's enumeration used to be resident and is not any more: `CLAUDE.md` had
-	// 105 bytes of slack under `RESIDENT_CEILING_BYTES`, and the interrupt's three tests had to be
-	// paid for out of it. Moving is only moving if the destination is pinned, so the list is asserted
-	// here — the trade is deliberate and recorded in `residency.md`, not a silent loss.
+	// Pin the blocked-by exemption at its point of use so keeping it outside the resident rules
+	// preserves the enumeration (`residency.md`).
 	'前提 Issue（`prerequisite.md`）、別パッケージ起因の割り込み Issue、ユーザーが `new` と打った入口',
 	'そして分割判定が作る子 Issue と epic',
 ]
@@ -256,7 +255,7 @@ describe.each(AI_DOCS)('%s — carries the trigger for the resident defaults', (
 // topic happened to quote the label, and the assertion would pass on a link that no longer exists.
 describe(`${WORKFLOW_PROMPT} — the WIP cap is reachable from the index`, () => {
 	it('links the topic file', () => {
-		expect(read_index()).toContain('| オープン Issue の WIP 上限 ')
+		expect(read_index()).toContain('| The open-Issue WIP cap ')
 	})
 })
 
@@ -271,6 +270,11 @@ describe(`${WORKFLOW_PROMPT} — the WIP cap is reachable from the index`, () =>
 // `read_unwrapped` collapses whitespace, so every marker here is written as the single line the
 // wrapped source reads as — which is also why a hard-wrapped sentence can be pinned at all.
 const SOLO_RUN_REACH: ReadonlyArray<{ doc: string; marker: string }> = [
+	{ doc: LANES_DOC, marker: 'pnpm josh backlog:triage --decide --defect <answer>' },
+	{
+		doc: '.claude/skills/workflow-commands/backlogrun-steps.md',
+		marker: 'pnpm josh backlog:triage --pass',
+	},
 	{
 		doc: LANES_DOC,
 		marker:

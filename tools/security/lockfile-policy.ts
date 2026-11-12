@@ -12,7 +12,7 @@ import { execaSync } from 'execa'
 // install. A lockfile can therefore hold a version younger than the window: raising the window
 // (#4023 took it from one day to three) left versions pnpm had picked under the old one in place,
 // and the gap surfaced only when a cache-less Publish run downloaded them through Safe Chain, whose
-// mirrored 72-hour window refused them. The check is pnpm's own — the install-time verification
+// mirrored window refused them. The check is pnpm's own — the install-time verification
 // `trustLockfile: false` turns back on — so the policy has one reader.
 //
 // It runs only when the lockfile or the policy moved from the merge-base: the verification

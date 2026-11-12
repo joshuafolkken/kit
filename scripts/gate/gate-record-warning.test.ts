@@ -25,6 +25,8 @@ const VITE_DEPRECATION =
 	"(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`.\n" +
 	'Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.'
 const ESLINT_WARNING = 'src/a.ts:1:1  warning  Unexpected console statement'
+const PNPM_HEADER = '$ node --disable-warning=ExperimentalWarning tools/josh/josh-ready.ts lint'
+const LINT_FILE_LIST = '  - scripts/gate/gate-record-warning.test.ts'
 const EXPORTS_LABEL = 'exports'
 const UNIT_SKIP_NOTICE = `josh test:unit: vitest is not installed ${SKIP_MARKER} vitest unit tests.`
 
@@ -50,6 +52,56 @@ async function record_with(results: ReadonlyArray<GateStepResult>): Promise<void
 
 beforeEach(RECORDS.clear)
 afterEach(RECORDS.clear)
+
+describe('record_green_gate — pnpm script headers are not checker findings', () => {
+	it('writes the reusable record for a header containing ExperimentalWarning', async () => {
+		await record_with([green_saying(gate_labels.LINT_LABEL, PNPM_HEADER)])
+
+		expect(review_stamps.gate_stamp.read(RECORDS.stamp_path)).toBeDefined()
+	})
+
+	it('withholds the record for a real warning following the header', async () => {
+		await record_with([green_saying(gate_labels.LINT_LABEL, `${PNPM_HEADER}\n${ESLINT_WARNING}`)])
+
+		expect(review_stamps.gate_stamp.read(RECORDS.stamp_path)).toBeUndefined()
+	})
+
+	it('withholds the record for an unverified skip following the header', async () => {
+		await record_with([green_saying(gate_labels.LINT_LABEL, `${PNPM_HEADER}\n${UNIT_SKIP_NOTICE}`)])
+
+		expect(review_stamps.gate_stamp.read(RECORDS.stamp_path)).toBeUndefined()
+	})
+})
+
+describe('record_green_gate — lint file listings', () => {
+	it('writes a reusable record for a lint file listing (ac-549c07ea)', async () => {
+		await record_with([green_saying(gate_labels.LINT_LABEL, LINT_FILE_LIST)])
+
+		expect(review_stamps.gate_stamp.read(RECORDS.stamp_path)).toBeDefined()
+	})
+
+	it('withholds for a real warning following a lint file listing (ac-b5e72407)', async () => {
+		await record_with([
+			green_saying(gate_labels.LINT_LABEL, `${LINT_FILE_LIST}\n${ESLINT_WARNING}`),
+		])
+
+		expect(review_stamps.gate_stamp.read(RECORDS.stamp_path)).toBeUndefined()
+	})
+
+	it('withholds for an unverified skip following a lint file listing (ac-a9fcf18d)', async () => {
+		await record_with([
+			green_saying(gate_labels.LINT_LABEL, `${LINT_FILE_LIST}\n${UNIT_SKIP_NOTICE}`),
+		])
+
+		expect(review_stamps.gate_stamp.read(RECORDS.stamp_path)).toBeUndefined()
+	})
+
+	it('keeps warning-shaped bullet lines from other checkers', async () => {
+		await record_with([green_saying(gate_labels.TYPE_CHECK_LABEL, LINT_FILE_LIST)])
+
+		expect(review_stamps.gate_stamp.read(RECORDS.stamp_path)).toBeUndefined()
+	})
+})
 
 describe('record_green_gate — a benign warning does not withhold the record', () => {
 	it('writes the reusable record when a non-checker step forwarded a benign warning', async () => {

@@ -38,10 +38,8 @@ beforeEach(playwright_config_fixture.isolate_project)
 afterEach(playwright_config_fixture.restore_project)
 afterAll(playwright_config_fixture.remove_project)
 
-// #818: every kit consumer used to land on the same 5173 / 4173, so two projects could not run
-// their servers at once and the second one drifted onto an unpredictable port. Both ports now come
-// from kit's single definition offset by PORT_SEED, and — baseURL being derived from webServer.port
-// — this config is what makes the whole suite follow the seed.
+// #818: both ports share kit's definition and PORT_SEED offset so projects can run together on
+// predictable ports. Deriving baseURL from webServer.port keeps the suite on the same seed.
 describe('playwright.config PORT_SEED', () => {
 	it('keeps the historical dev port when the seed is unset', async () => {
 		const web_server = await load_seeded_web_server(undefined, undefined)

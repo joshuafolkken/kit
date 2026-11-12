@@ -1,6 +1,7 @@
 # The progress watcher — every implementing run
 
-**Read this file in full when the run's hold is claimed, before the watcher starts.** It is a
+**"Progress while the run is quiet" is never fetched: `run:entry` prints it after its own section
+outside a lane child, and `run:progress --wait` as it starts — once per session.** It is a
 point-of-use document, never an entry read, and the single source of the heartbeat for `fullrun`,
 `halfrun`, `prrun` and the `backlogrun` parent alike. `kickoff` starts none.
 
@@ -26,25 +27,14 @@ relays none. **It exits only on one of three, and the command computes which:**
 **A report is not an exit, and neither is a decline** — with no run recorded it keeps waiting, and the
 `--hours` exit says so on standard error.
 
-**`pnpm josh run:watcher:guard` detects a missed restart** — via `pretool-guard` it refuses the next
-tool call while lane children are in flight and the watcher's record is stale, once per run.
-
 **`--mark` at every real report** — `pnpm josh run:progress --mark` in the same turn restarts the
-silence clock (`docs/josh-commands-run.md` → "`josh run:progress`").
-
-**Do not keep a progress clock of your own** — the hook refuses the arm
-(`scripts/rules/early-heartbeat.ts` → `decide`), though a single correctly-spaced arm is allowed.
-`--wait` is not a wait timer.
-
-**The default interval is twenty minutes, overridable — by the person, not the run.**
-`JOSH_PROGRESS_INTERVAL_MINUTES` moves both sides; `josh` → `progress_interval_minutes` in
-`package.json` sits one step below it. **`--interval` moves the watcher alone** — quieter, never the
-guard stricter.
+silence clock; the interval and its overrides are the person's (`docs/josh-commands-board.md` →
+"`josh run:progress`"). **Do not keep a progress clock of your own** — the hook refuses the arm.
 
 ### What a report says
 
-**Every unscheduled progress statement is answered by `pnpm josh run:progress --once`** — under
-`backlogrun`, `pnpm josh run:board --chat` in one code block — the reply to an explicit ask and
+**Every unscheduled progress statement is answered by `pnpm josh run:board --chat`** in one code
+block — a `backlogrun`, a `fullrun` or a `halfrun` alike — the reply to an explicit ask and
 the note just after a run starts alike; each is exempt from the interval and records the report
 itself, so no `--mark` beside it. **Relay its lines verbatim** — round, rephrase
 or re-label nothing, and **never write a clock time the command did not print**; where a field is
@@ -56,10 +46,10 @@ person's own; **no session relays the stream** — name the board command once, 
 asked; the person starts it, or the `josh: run board` task in `.vscode/tasks.json`, by hand.
 `pnpm josh run:event --watch` stays for following the raw events one by one. `pnpm josh run:wake --list` is the one-line read for a person who types for it.
 **A request for periodic progress is never a CronCreate job** — on screen, name `pnpm josh run:board`;
-off-screen, start `pnpm josh run:board --every <minutes>` in the background (`docs/josh-commands-run.md`).
+off-screen, start `pnpm josh run:board --every <minutes>` in the background (`docs/josh-commands-board.md`).
 
 **A stop is the only interrupt**: a `backlogrun` that has stopped ends with
-`pnpm josh run:carry --end --stopped "<reason>"`, which sends one ⏸️ confirmation; a parked child sends
+`pnpm josh run:report --end --stopped "<reason>"`, which sends one ⏸️ confirmation; a parked child sends
 its own (`backlogrun-park.md`).
 
 ### Who starts it, and what counts as a report

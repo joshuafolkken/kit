@@ -3,10 +3,12 @@ import path from 'node:path'
 import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
 import { cost_transcript, type SessionFile } from '#scripts/cost-runtime/cost-transcript'
 import { cost_usage, type UsageRecord } from '#scripts/cost-runtime/cost-usage'
+import { file_reader } from '#scripts/lib/read-file'
 import {
 	time_transcript_line,
 	type TranscriptLine,
 } from '#scripts/time-runtime/time-transcript-line'
+import { z } from 'zod'
 import { cost_audit_kind } from './cost-audit-kind'
 import { cost_audit_tool, type ToolCategory } from './cost-audit-tool'
 
@@ -28,12 +30,21 @@ interface AuditSession {
 	// Whether the transcript is a dispatched lane child's own session: in a lane checkout's directory and
 	// not a delegated unit, which the kind cannot tell apart when its prompt names `/code-review`.
 	is_lane: boolean
+	// The Issue of the lane checkout whose directory holds the transcript, its delegated units included;
+	// absent outside a lane. The phase table reads the lane's stages by it (joshuafolkken/kit#5936).
+	issue?: number | undefined
+	// A delegated unit's agent type from its `meta.json`; absent for a main session or a unit with none.
+	agent_type?: string | undefined
 	records: ReadonlyArray<UsageRecord>
 	// The categories of the calls each request issued, keyed by request id; a request absent here
 	// issued none.
 	categories: ReadonlyMap<string, ReadonlyArray<ToolCategory>>
 	lines: ReadonlyArray<TranscriptLine>
 }
+
+const LANE_ISSUE_PATTERN = /-(\d+)$/u
+const TRANSCRIPT_EXTENSION = /\.jsonl$/u
+const META_SCHEMA = z.object({ agentType: z.string().min(1) })
 
 interface SessionParts {
 	records: Array<UsageRecord>
@@ -112,9 +123,46 @@ function session_files(cwd: string, since_ms: number): Array<SessionFile> {
 	return files.filter((file) => file.modified_ms >= since_ms).toReversed()
 }
 
-// A delegated unit's transcript sits below its session's directory, so the test is a path prefix.
-function is_lane_file(file: SessionFile, lanes: ReadonlyArray<string>): boolean {
-	return lanes.some((directory) => file.path.startsWith(`${directory}${path.sep}`))
+// The lane directory holding `file`, `undefined` outside every lane. A delegated unit's transcript sits
+// below its session's directory, so the test is a path prefix.
+function lane_of(file_path: string, lanes: ReadonlyArray<string>): string | undefined {
+	return lanes.find((directory) => file_path.startsWith(`${directory}${path.sep}`))
+}
+
+// A lane directory's Issue: the digits `lane_transcript_directories` matched after its last `-`.
+function issue_of(file_path: string, lanes: ReadonlyArray<string>): number | undefined {
+	const digits = LANE_ISSUE_PATTERN.exec(lane_of(file_path, lanes) ?? '')?.[1]
+
+	return digits === undefined ? undefined : Number(digits)
+}
+
+function json_or_undefined(text: string): unknown {
+	try {
+		return JSON.parse(text)
+	} catch {
+		return undefined
+	}
+}
+
+// A delegated unit's agent type, read from the `agent-<id>.meta.json` beside its transcript; absent
+// when the file is missing or names none, so the unit falls into its kind's row (joshuafolkken/kit#5971).
+function agent_type_of(transcript_path: string): string | undefined {
+	const meta_path = transcript_path.replace(TRANSCRIPT_EXTENSION, '.meta.json')
+	const text = file_reader.read_if_readable(meta_path)
+
+	if (text === undefined) return undefined
+
+	const parsed = META_SCHEMA.safeParse(json_or_undefined(text))
+
+	return parsed.success ? parsed.data.agentType : undefined
+}
+
+function file_session(file: SessionFile, lanes: ReadonlyArray<string>): AuditSession {
+	const issue = issue_of(file.path, lanes)
+	const session = session_of(cost_transcript.read_raw(file), file.is_delegated, issue !== undefined)
+	const agent_type = file.is_delegated ? agent_type_of(file.path) : undefined
+
+	return { ...session, issue, agent_type }
 }
 
 // Every session touched since `since_ms`. A file last written before then holds no request inside the
@@ -124,14 +172,12 @@ function load(cwd: string, since_ms: number): Array<AuditSession> {
 		cost_transcript.session_cwd(cwd),
 		homedir(),
 	)
-	const sessions = session_files(cwd, since_ms).map((file) =>
-		session_of(cost_transcript.read_raw(file), file.is_delegated, is_lane_file(file, lanes)),
-	)
+	const sessions = session_files(cwd, since_ms).map((file) => file_session(file, lanes))
 
 	return dedupe_across(sessions)
 }
 
-const cost_audit_read = { session_of, dedupe_across, load }
+const cost_audit_read = { session_of, dedupe_across, issue_of, agent_type_of, load }
 
 export type { AuditSession }
 export { cost_audit_read }

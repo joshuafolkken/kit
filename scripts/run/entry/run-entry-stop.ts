@@ -1,7 +1,7 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
-import { josh_command } from '#scripts/josh/josh-run'
 import { telegram_notify, type ConfirmInput } from '#scripts/notify/telegram-notify'
 import { lane_park } from '#scripts/rules/lane-park'
+import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
 
 // What `run:entry` does on the way out of a stop it decided itself.
 //
@@ -25,6 +25,8 @@ interface StopNotice {
 	should_release: boolean
 	// The choice the Telegram recommends where a rerun alone would stop the same way again.
 	recommended?: string
+	// The other choices, where a stop left something behind that "nothing was changed" would deny.
+	alternatives?: Array<string>
 }
 
 interface StopPorts {
@@ -40,16 +42,15 @@ const NOTIFY_FAILED_NOTE =
 const RELEASED_NOTE = '(hold released by run:entry — the tree is free for the resume)'
 const RELEASE_FAILED_NOTE =
 	'(the hold could not be released — run `pnpm josh run:release` before stopping)'
-const should_forward_stderr = true
 const SUCCESS_EXIT_CODE = 0
 
 const BUDGET_REASON = 'the session budget is spent'
 const HOLD_REASON = 'the working tree is not held for this run — see the run:entry output'
 
 async function release(issue_number: string): Promise<boolean> {
-	const released = await josh_command.josh_run(['run:release', issue_number], should_forward_stderr)
+	const code = await run_hold_cli.run(['--release', issue_number])
 
-	return released.code === SUCCESS_EXIT_CODE
+	return code === SUCCESS_EXIT_CODE
 }
 
 function is_parking_child(): boolean {
@@ -59,7 +60,7 @@ function is_parking_child(): boolean {
 const DEFAULT_PORTS: StopPorts = { notify: telegram_notify.confirm, release, is_parking_child }
 
 function body_of(notice: StopNotice): string {
-	return `${notice.command} ${issue_cite.plain(notice.issue_number)} stopped at entry: ${notice.reason}.\nResume with \`${notice.command} ${issue_cite.plain(notice.issue_number)}\`.`
+	return `${notice.command} ${issue_cite.plain_for('telegram', notice.issue_number)} stopped at entry: ${notice.reason}.\nResume with \`${notice.command} ${issue_cite.plain_for('telegram', notice.issue_number)}\`.`
 }
 
 // The release runs first, so the resume the Telegram names finds the tree free when a person acts on it.
@@ -78,13 +79,13 @@ async function notify_stop(notice: StopNotice, ports: StopPorts): Promise<void> 
 	if (ports.is_parking_child()) return
 
 	const is_sent = await ports.notify({
-		issue_title: `${notice.command} ${issue_cite.plain(notice.issue_number)} stopped`,
+		issue_title: `${notice.command} ${issue_cite.plain_for('telegram', notice.issue_number)} stopped`,
 		body: body_of(notice),
 		recovery: RECOVERY,
 		recommended:
 			notice.recommended ??
-			`Run \`${notice.command} ${issue_cite.plain(notice.issue_number)}\` again in a fresh session`,
-		alternatives: [LATER_ALTERNATIVE],
+			`Run \`${notice.command} ${issue_cite.plain_for('telegram', notice.issue_number)}\` again in a fresh session`,
+		alternatives: notice.alternatives ?? [LATER_ALTERNATIVE],
 	})
 
 	console.info(is_sent ? lane_park.COMMAND_NOTIFY_MARKER : NOTIFY_FAILED_NOTE)

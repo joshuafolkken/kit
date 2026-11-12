@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#2205: `josh run:event`. The target resolver is mocked to a temp file, so the CLI is
 // exercised end to end — append returns a position, a kind outside the enumeration is refused, `--from`
@@ -23,7 +24,7 @@ vi.mock('#scripts/lane/lane-state', () => ({
 
 const { run_event_cli } = await import('./run-event-cli')
 
-const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-run-event-cli-'))
+const TEMPORARY = make_directory('josh-run-event-cli-')
 const SUCCESS = 0
 const FAILURE = 1
 const stdout: Array<string> = []
@@ -51,10 +52,6 @@ beforeEach(() => {
 
 		return true
 	})
-})
-
-afterAll(() => {
-	rmSync(TEMPORARY, { force: true, recursive: true })
 })
 
 interface StreamRead {

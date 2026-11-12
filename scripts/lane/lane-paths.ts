@@ -49,6 +49,19 @@ function lane_directory(root: string, issue: string): string {
 // `default_lane_root` always writes the leading dot.
 const DEFAULT_LANE_ROOT_PATTERN = new RegExp(String.raw`^\..+${LANE_DIRECTORY_SUFFIX}$`, 'u')
 
+// A file under a default-rooted lane, read as the same file in the checkout beside the lanes root —
+// the inverse of `default_lane_root` and `lane_directory`: `.kit-lanes/7137/docs/x.md` is
+// `kit/docs/x.md`. A tally keyed by path (`josh cost:audit`'s Read rows, joshuafolkken/kit#7137)
+// counts one file once across lanes. A `JOSH_LANE_ROOT` lane is left as written.
+const DEFAULT_LANE_FILE_PATTERN = new RegExp(
+	String.raw`([/\\])\.([^/\\]+)${LANE_DIRECTORY_SUFFIX}[/\\]\d+(?=[/\\]|$)`,
+	'u',
+)
+
+function main_checkout_path(file: string): string {
+	return file.replace(DEFAULT_LANE_FILE_PATTERN, '$1$2')
+}
+
 function is_lane_root(directory: string, environment: LaneEnvironment): boolean {
 	const configured = environment[LANE_ROOT_KEY]?.trim() ?? ''
 
@@ -89,6 +102,17 @@ function lane_issue_of(
 	return is_lane_root(path.dirname(resolved), environment) ? issue : undefined
 }
 
+// The lanes root a checkout belongs to: a lane's parent, or the root beside a main checkout. Two
+// checkouts of one repository share it. A Claude Code worktree under a checkout reads as that
+// checkout (`checkout_of`).
+function lanes_root_of(checkout: string, environment: LaneEnvironment = process.env): string {
+	const resolved = checkout_of(path.resolve(checkout))
+
+	if (lane_issue_of(resolved, environment) === undefined) return lane_root(resolved, environment)
+
+	return path.dirname(resolved)
+}
+
 // The lane `directory` (this process's own by default) sits in, as a number; `undefined` outside a
 // lane — the `issue` a ledger row written from inside a lane carries.
 function issue_here(
@@ -127,6 +151,8 @@ const lane_paths = {
 	lane_directory,
 	lane_issue_of,
 	lane_root,
+	lanes_root_of,
+	main_checkout_path,
 }
 
 export type { LaneEnvironment }

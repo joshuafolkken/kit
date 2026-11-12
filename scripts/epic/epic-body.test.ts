@@ -51,7 +51,7 @@ describe('epic_body.build_epic_body — dependencies', () => {
 })
 
 describe('epic_body.build_epic_body — execution and rationale', () => {
-	// `backlogrun #E --only` takes the epic, not the children: it re-reads state from GitHub each round,
+	// `backlogrun E --only` takes the epic, not the children: it re-reads state from GitHub each round,
 	// so an interrupted run resumes without anyone retyping the remaining numbers (joshuafolkken/kit#861,
 	// joshuafolkken/kit#1985).
 	it('prints the backlogrun --only command rather than a list of children', () => {
@@ -121,7 +121,15 @@ describe('epic_body.build_dependency_pairs', () => {
 describe('epic_body.format_run_command', () => {
 	it('names the epic once its number is known', () => {
 		expect(epic_body.format_run_command(EPIC_NUMBER)).toBe(
-			`backlogrun #${String(EPIC_NUMBER)} --only`,
+			`pnpm josh backlogrun ${String(EPIC_NUMBER)} --only`,
+		)
+	})
+
+	// joshuafolkken/kit#6817 — pasted into a terminal, a `#` starts a comment and drops the epic number.
+	it('is a terminal-runnable command with no #', () => {
+		expect(epic_body.format_run_command(EPIC_NUMBER)).not.toContain('#')
+		expect(epic_body.format_run_command(undefined)).toBe(
+			`pnpm josh backlogrun ${epic_body.EPIC_PLACEHOLDER} --only`,
 		)
 	})
 

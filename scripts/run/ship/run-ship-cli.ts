@@ -10,18 +10,22 @@ import { run_ship_args } from './run-ship-args'
 import { run_ship_body_draft } from './run-ship-body-draft'
 import { run_ship_conflict_probe } from './run-ship-conflict-probe'
 import { run_ship_detach } from './run-ship-detach'
+import { run_ship_detach_wait } from './run-ship-detach-wait'
+import { run_ship_early_push } from './run-ship-early-push'
+import { run_ship_group } from './run-ship-group'
 import { run_ship_handover, type CodeCheck } from './run-ship-handover'
 import { run_ship_infra_retry } from './run-ship-infra-retry'
 import { run_ship_lap } from './run-ship-lap'
 import type { PreDetachResult } from './run-ship-pre-detach'
 import { run_ship_pre_detach_pinned } from './run-ship-pre-detach-pinned'
-import { run_ship_pre_detach_timed } from './run-ship-pre-detach-timed'
+import { run_ship_preflight } from './run-ship-preflight'
 import { run_ship_probe } from './run-ship-probe'
+import { run_ship_reship } from './run-ship-reship'
 import { run_ship_return } from './run-ship-return'
 import { run_ship_stage, type Phase, type ShipState, type Stage } from './run-ship-stage'
 import { run_ship_steps, type ShipArguments, type Step } from './run-ship-steps'
 import { run_ship_stop_cause } from './run-ship-stop-cause'
-import type { StepResult } from './run-ship-sync'
+import { run_ship_supervised } from './run-ship-supervised'
 
 // `josh ship "<title> #<N>"` — one call for the fixed commit-to-report region a run ships a change on.
 // It runs `gate`, `git -y`, `followup` and `run:tail` internally, so no round trip re-bills a lane's
@@ -135,13 +139,6 @@ async function emit_phase(
 	)
 }
 
-// A green stage that found nothing to do ends `skipped` rather than `done` (joshuafolkken/kit#5296).
-function settled_phase(section: ShipSection): Phase {
-	if (section.code !== SUCCESS_EXIT_CODE) return PHASE.FAILED
-
-	return section.is_skipped === true ? PHASE.SKIPPED : PHASE.DONE
-}
-
 // The record is written best-effort, as the event stream is: a record that could not be written costs
 // a resumed ship only the state re-read, never the stage that just succeeded.
 function record(target: string | undefined, write: (path: string) => void): void {
@@ -160,7 +157,7 @@ async function settle(
 	context: ShipContext,
 	section: ShipSection,
 ): Promise<void> {
-	const phase = settled_phase(section)
+	const phase = run_ship_group.settled_phase(section)
 
 	await emit_phase(args, context, { stage: step.stage, phase, reason: section.reason })
 
@@ -228,7 +225,9 @@ async function open_context(args: ShipArguments): Promise<ShipContext> {
 async function record_stop(args: ShipArguments, stage: Stage, failed?: ShipSection): Promise<void> {
 	const issue = Number(args.number)
 
-	await lane_ledger_write.record_stop(run_ship_stop_cause.record_of(issue, stage, failed))
+	await lane_ledger_write.record_stop(
+		await run_ship_reship.with_base(run_ship_stop_cause.record_of(issue, stage, failed)),
+	)
 	review_stop_log.record({ issue, stage, findings: run_ship_stop_cause.details_of(stage, failed) })
 }
 
@@ -261,13 +260,17 @@ async function ship_stage(
 	context: ShipContext,
 	sections: Array<ShipSection>,
 ): Promise<ShipOutcome | undefined> {
-	const section = await run_stage(step, args, context)
+	const failed = await run_ship_group.run(
+		step,
+		async (current) => await run_stage(current, args, context),
+		sections,
+	)
 
-	sections.push(section)
-
-	if (section.code !== SUCCESS_EXIT_CODE) {
-		return { sections: await stopped(sections, args, step, context), is_handed_over: false }
+	if (failed !== undefined) {
+		return { sections: await stopped(sections, args, failed.step, context), is_handed_over: false }
 	}
+
+	set_state(context, await run_ship_early_push.refresh(step.stage, args.is_review, context.state))
 
 	if (step.stage !== STAGE.SYNC) return undefined
 	const handover = await run_ship_handover.hand_over(args, context.is_stale)
@@ -314,7 +317,7 @@ async function print_log(number: string): Promise<number> {
 	return SUCCESS_EXIT_CODE
 }
 
-// The one-token contract `run:cut` keeps: the verdict on stdout, the explanation on stderr.
+// The verdict as its own stdout line, the explanation on stderr; a launch goes on to the wait.
 async function detach(args: ShipArguments): Promise<number> {
 	const repository = await run_ship_probe.repository_directory()
 
@@ -328,8 +331,9 @@ async function detach(args: ShipArguments): Promise<number> {
 
 	console.error(result.note)
 	console.info(result.verdict)
+	if (result.verdict !== run_ship_detach.LAUNCHED) return FAILURE_EXIT_CODE
 
-	return result.verdict === run_ship_detach.LAUNCHED ? SUCCESS_EXIT_CODE : FAILURE_EXIT_CODE
+	return await run_ship_detach_wait.after_launch(args.number)
 }
 
 // A headless lane child's turn ending kills a ship it left in its own process,
@@ -341,29 +345,30 @@ function should_detach(args: ShipArguments): boolean {
 	return !run_ship_detach.is_supervised() && lane_child_marker.is_child_of(process.cwd())
 }
 
-// The preflight stop's unmet kinds, with the red pre-detach checks' own kinds added beside them
-// (`run-ship-pre-detach.ts`).
-function with_checks(stop: ShipSection, checks: PreDetachResult): ShipSection {
-	if (checks.code === SUCCESS_EXIT_CODE) return stop
+// Record the stopped pre-detach stage while preserving the report's refusal order.
+async function pre_detach_stop(
+	args: ShipArguments,
+	stage: Stage,
+	sections: ReadonlyArray<ShipSection>,
+): Promise<ReadonlyArray<ShipSection>> {
+	await record_stop(args, stage, sections[0])
 
-	return {
-		...stop,
-		preconditions: [...(stop.preconditions ?? []), ...(checks.preconditions ?? [])],
-	}
+	return sections
 }
 
-// The stop is the sync stage's, so it is recorded and resumed as that stage's `conflict` is; the
-// preflight's refusal, if any, still prints last.
-async function conflict_sections(
+async function pre_detach_checks(
 	args: ShipArguments,
-	conflict: StepResult,
 	preflight: ShipSection,
+	checks_of: (args: ShipArguments) => Promise<PreDetachResult>,
 ): Promise<ReadonlyArray<ShipSection>> {
-	const section = run_ship.section_of(run_ship.SYNC_HEADER, conflict)
+	const result = await checks_of(args)
+	const checks = { header: run_ship.PRE_DETACH_HEADER, body: result.out, code: result.code }
 
-	await record_stop(args, STAGE.SYNC, section)
+	if (run_ship.exit_code([checks, preflight]) !== SUCCESS_EXIT_CODE) {
+		await record_stop(args, STAGE.PREFLIGHT, run_ship.with_checks(preflight, result))
+	}
 
-	return [section, preflight]
+	return [checks, preflight]
 }
 
 // The preflight is deterministic and fast, so it runs here, in the agent's own turn, before the
@@ -384,27 +389,37 @@ async function conflict_sections(
 //
 // **A conflict with origin/main stops before the checks** (joshuafolkken/kit#5018): the supervisor's
 // sync would stop on it after them, so they would only be run again once it is resolved.
+// A scoped failure stops before both the conflict and pinned probes: the review fix must pass its
+// local checks before costly work starts (joshuafolkken/kit#5472).
 async function pre_detach_sections(args: ShipArguments): Promise<ReadonlyArray<ShipSection>> {
 	const preflight = await run_stage(run_ship_steps.PREFLIGHT_STEP, args, await open_context(args))
-	const conflict = await run_ship_conflict_probe.probe()
 
-	if (conflict !== undefined) return await conflict_sections(args, conflict, preflight)
-
-	const result = await run_ship_pre_detach_timed.checks(
-		args.number,
-		run_ship_pre_detach_pinned.checks_for(args),
-	)
-	const checks = { header: run_ship.PRE_DETACH_HEADER, body: result.out, code: result.code }
-
-	if (run_ship.exit_code([checks, preflight]) !== SUCCESS_EXIT_CODE) {
-		await record_stop(args, run_ship_steps.PREFLIGHT_STEP.stage, with_checks(preflight, result))
+	if (preflight.preconditions?.includes(run_ship_preflight.SCOPED_PRECONDITION)) {
+		return await pre_detach_stop(args, STAGE.PREFLIGHT, [preflight])
 	}
 
-	return [checks, preflight]
+	const conflict = await run_ship_conflict_probe.probe()
+
+	if (conflict !== undefined) {
+		return await pre_detach_stop(args, STAGE.SYNC, [
+			run_ship.section_of(run_ship.SYNC_HEADER, conflict),
+			preflight,
+		])
+	}
+
+	return await pre_detach_checks(args, preflight, run_ship_pre_detach_pinned.timed_checks)
 }
 
+// A re-ship after a review or followup failure on an unmoved base passes over both but a `--review`
+// ship's `test:pinned` (`run-ship-reship.ts`).
 async function detach_after_preflight(args: ShipArguments): Promise<number> {
-	const sections = await pre_detach_sections(args)
+	const sections = (await run_ship_reship.is_due(args.number))
+		? await pre_detach_checks(
+				args,
+				await run_ship_reship.skipped(args.number),
+				run_ship_reship.checks,
+			)
+		: await pre_detach_sections(args)
 	const code = run_ship.exit_code(sections)
 
 	if (code === SUCCESS_EXIT_CODE) return await detach(args)
@@ -412,24 +427,6 @@ async function detach_after_preflight(args: ShipArguments): Promise<number> {
 	console.info(run_ship.format_report(sections))
 
 	return code
-}
-
-async function supervised_repository(): Promise<string | undefined> {
-	return run_ship_detach.is_supervised() ? await run_ship_probe.repository_directory() : undefined
-}
-
-async function claim_supervised_identity(args: ShipArguments): Promise<void> {
-	const repository = await supervised_repository()
-	if (repository !== undefined) await run_ship_detach.claim_identity(repository, args.number)
-}
-
-async function record_supervised_result(
-	args: ShipArguments,
-	sections: ReadonlyArray<ShipSection>,
-): Promise<void> {
-	const repository = await supervised_repository()
-	if (repository === undefined) return
-	await run_ship_detach.mark_result(repository, args.number, run_ship.exit_code(sections))
 }
 
 async function run_ship_command(given: ShipArguments): Promise<number> {
@@ -441,14 +438,20 @@ async function run_ship_command(given: ShipArguments): Promise<number> {
 		return await detach_after_preflight(args)
 	}
 
-	await claim_supervised_identity(args)
+	await run_ship_supervised.claim_identity(args)
 	const { sections, is_handed_over } = await ship(args)
 
 	// The successor carries the same launch record, so its result is the one written there.
-	if (!is_handed_over) await record_supervised_result(args, sections)
+	if (!is_handed_over) await run_ship_supervised.record_result(args, sections)
 	console.info(run_ship.format_report(sections))
 
 	return run_ship.exit_code(sections)
+}
+
+async function run_governed(args: ShipArguments): Promise<number> {
+	const printed = run_ship_supervised.print_section()
+
+	return printed === SUCCESS_EXIT_CODE ? await run_ship_command(args) : printed
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
@@ -462,7 +465,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 
 	return command.kind === 'log'
 		? await print_log(command.number)
-		: await run_ship_command(await run_ship_body_draft.with_draft(command.args))
+		: await run_governed(await run_ship_body_draft.with_draft(command.args))
 }
 
 async function main(argv: ReadonlyArray<string>): Promise<void> {

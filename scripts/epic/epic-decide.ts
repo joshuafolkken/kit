@@ -2,6 +2,7 @@ import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
 import { issue_read } from '#scripts/issue/issue-read'
 import { session_cite } from '#scripts/issue/session-cite'
+import { size_estimate } from '#scripts/issue/size-estimate'
 import { epic_decision } from './epic-decision'
 import { epic_parse } from './epic-parse'
 import { epic_read } from './epic-read'
@@ -9,7 +10,8 @@ import type { EpicSubject } from './epic-validate'
 
 // `josh epic --decide <E> <N...> --decision-file <path|->` — record a decision about children the epic
 // already tracks: the epic's `## Decisions` entry, a comment on each child, and each child's
-// `needs-decision` label removed. The text is the caller's; placing it is this command's.
+// `needs-decision` label removed. The text is the caller's; placing it is this command's. A record
+// that states a size estimate line also replaces each child's own estimate line with it.
 //
 // **A rerun writes nothing twice.** The entry and each comment are looked for before they are
 // written, so a run that stopped half way is finished by running it again.
@@ -33,10 +35,20 @@ function untracked_error(epic_number: number, untracked: ReadonlyArray<number>):
 	return `${format_list(untracked)} not tracked by ${session_cite.issue(epic_number)}; place it with \`pnpm josh epic --add ${String(epic_number)} <N> --decision-file <path>\`. Nothing was written.`
 }
 
+// A size estimate is one child's: stated in a record about several, it would overwrite each child's
+// own with one figure, so the record is refused before anything is written.
+function size_error(input: DecideInput): string | undefined {
+	if (input.children.length === 1 || size_estimate.stated_line(input.decision) === undefined) {
+		return undefined
+	}
+
+	return `The record states a size estimate but names ${format_list(input.children)}; an estimate is one child's, so record it with \`--decide\` for that child alone. Nothing was written.`
+}
+
 // The epic the decision goes to, or why nothing is written: a record `append_decision` would refuse
 // (checked before any read), an unreadable epic, or a child it does not track.
 async function read_decision_target(input: DecideInput): Promise<EpicSubject | { error: string }> {
-	const record_error = epic_decision.find_decision_error(input.decision)
+	const record_error = epic_decision.find_decision_error(input.decision) ?? size_error(input)
 	if (record_error !== undefined) return { error: record_error }
 	const subject = await epic_read.read_subject(input.epic_number)
 
@@ -74,13 +86,37 @@ async function has_comment(child: number, decision: string): Promise<boolean | u
 	return comments?.some((comment) => comment.body.trim() === decision.trim())
 }
 
+async function try_edit_body(child: number, body: string): Promise<boolean> {
+	try {
+		await git_gh_command.issue_edit_body(String(child), body)
+
+		return true
+	} catch {
+		return false
+	}
+}
+
+// joshuafolkken/kit#5758: a record that states a size estimate line restates the child's own, so
+// `lane:plan` reads the widened scope rather than the estimate filed before the decision. `false` when
+// the child cannot be read or written, as a failed comment is, so a rerun finishes it.
+async function restate_size(child: number, decision: string): Promise<boolean> {
+	const line = size_estimate.stated_line(decision)
+	if (line === undefined) return true
+	const subject = await epic_read.read_subject(child)
+	if (subject === undefined) return false
+	const body = subject.body ?? ''
+	const restated = size_estimate.restated(body, line)
+
+	return restated === body || (await try_edit_body(child, restated))
+}
+
 // The label goes only once the child carries the record, so a failed comment leaves it parked.
 async function record_on_child(child: number, decision: string): Promise<boolean> {
 	const has_record = await has_comment(child, decision)
 	if (has_record === undefined) return false
 	const is_commented =
 		has_record || (await git_gh_command.issue_try_comment(String(child), decision))
-	if (!is_commented) return false
+	if (!is_commented || !(await restate_size(child, decision))) return false
 
 	return await git_gh_command.issue_clear_label(String(child), NEEDS_DECISION_LABEL)
 }

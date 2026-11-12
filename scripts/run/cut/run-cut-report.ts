@@ -4,8 +4,9 @@ import { run_cut, type CutState, type RunCut } from './run-cut'
 import { run_cut_handoff } from './run-cut-handoff'
 
 // The verdict tokens `josh run:cut` answers with and the reports that print them, kept apart from
-// `run-cut-cli.ts` so the CLI keeps to acting on the record. **Standard output carries exactly one
-// token** and every explanation goes to standard error.
+// `run-cut-cli.ts` so the CLI keeps to acting on the record. **The first line of standard output is the
+// one token**, followed only by the section a non-trivial verdict follows; every explanation goes to
+// standard error.
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
@@ -38,12 +39,19 @@ const UNKNOWN_VERDICT = 'unknown'
 // The asking session is over the shared context-cut threshold, so an implementation cut was not
 // resumed into it — the same refusal `run:carry` answers `over` with.
 const OVER_VERDICT = 'over'
-const SPLIT_UNRESOLVED_VERDICT = 'split-unresolved'
+
+// The token this process printed last — what decides whether `run:cut` prints its section after it.
+const printed = { verdict: '' }
 
 function report(verdict: string, code: number): number {
+	printed.verdict = verdict
 	console.info(verdict)
 
 	return code
+}
+
+function last_verdict(): string {
+	return printed.verdict
 }
 
 function report_stale(cut_record: RunCut): number {
@@ -144,7 +152,7 @@ function report_reviewer(): number {
 // person is watching, so the run is handed on the way `fullrun`'s entry `over` stop hands it on.
 function report_held_cut(issue: string): number {
 	console.error(
-		`The cut is recorded for ${session_cite.issue(issue)} outside a lane, so nothing was relaunched. Keep the hold, send a \`confirmation\` Telegram whose body names the resume command \`fullrun ${issue_cite.plain(issue)}\`, and end the turn; the fresh session's \`pnpm josh run:cut --resume ${issue}\` answers \`resume-impl\` with the handoff.`,
+		`The cut is recorded for ${session_cite.issue(issue)} outside a lane, so nothing was relaunched. Keep the hold, send a \`confirmation\` Telegram whose body names the resume command \`fullrun ${issue_cite.plain_for('terminal', issue)}\`, and end the turn; the fresh session's \`pnpm josh run:cut --resume ${issue}\` answers \`resume-impl\` with the handoff.`,
 	)
 
 	return report(CUT_VERDICT, SUCCESS_EXIT_CODE)
@@ -184,14 +192,6 @@ function report_missing_supervisor(issue: string): number {
 	return report(FAILED_VERDICT, FAILURE_EXIT_CODE)
 }
 
-// The lane got the split notice and has answered it neither way, so nothing was cut and the run does
-// not go on to the gate until it does (joshuafolkken/kit#4695). `note` says which answers it takes.
-function report_split_unresolved(note: string): number {
-	console.error(note)
-
-	return report(SPLIT_UNRESOLVED_VERDICT, FAILURE_EXIT_CODE)
-}
-
 const run_cut_report = {
 	BAD_HANDOFF_VERDICT,
 	BUSY_VERDICT,
@@ -209,7 +209,6 @@ const run_cut_report = {
 	RELAUNCHED_CUT_MARKER,
 	RESUME_IMPL_VERDICT,
 	RESUME_VERDICT,
-	SPLIT_UNRESOLVED_VERDICT,
 	STALE_VERDICT,
 	SUCCESS_EXIT_CODE,
 	UNDER_THRESHOLD_VERDICT,
@@ -217,6 +216,7 @@ const run_cut_report = {
 	UNREADABLE_VERDICT,
 	UNREADY_VERDICT,
 	refuse_unready,
+	last_verdict,
 	report,
 	report_bad_handoff,
 	report_busy,
@@ -228,7 +228,6 @@ const run_cut_report = {
 	report_over,
 	report_relaunched_cut,
 	report_reviewer,
-	report_split_unresolved,
 	report_stale,
 	report_under_threshold,
 	report_unknown,

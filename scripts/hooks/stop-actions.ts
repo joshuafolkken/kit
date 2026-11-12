@@ -55,13 +55,20 @@ function summary_of(message: string): string {
 	return cut === '' ? trimmed.slice(0, SUMMARY_CHARS) : cut
 }
 
-// The held Issue's URL, or `undefined` for a `new` entry or a repository that cannot be read.
+// The held Issue's URL, or `undefined` for a `new` entry or a repository that cannot be read. The URL
+// is optional: a lookup that throws (an exhausted rate limit) is warned and the confirmation goes bare.
 async function issue_url_of(issue: string): Promise<string | undefined> {
 	if (issue === run_hold.UNNUMBERED_ISSUE) return undefined
 
-	const slug = await git_gh_repo.repo_get_name_with_owner()
+	try {
+		const slug = await git_gh_repo.repo_get_name_with_owner()
 
-	return slug === undefined ? undefined : issue_cite.issue_url(slug, issue)
+		return slug === undefined ? undefined : issue_cite.issue_url(slug, issue)
+	} catch (error) {
+		console.warn(`stop:guard could not resolve the Issue URL, sending without it: ${String(error)}`)
+
+		return undefined
+	}
 }
 
 // The body is the reply's opening copied into a Telegram, so its bare `#N` are linked (`issue-citation.md`).

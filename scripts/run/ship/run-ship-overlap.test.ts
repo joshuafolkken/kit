@@ -1,11 +1,12 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { session_cite } from '#scripts/issue/session-cite'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
 import type { LaneInfo } from '#scripts/lane/lane-registry'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const make_directory = temporary_directory('suite')
 
 const spawn_mock = vi.hoisted(() => vi.fn())
 const running_mock = vi.hoisted(() => vi.fn())
@@ -34,7 +35,7 @@ const { run_ship_overlap } = await import('./run-ship-overlap')
 // changes a path its own change does — an overlap no issue body declared — so the later lane merges
 // the earlier one's change before its gate instead of meeting it as `DIRTY` after CI.
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-ship-overlap-test-'))
+const scratch = make_directory('run-ship-overlap-test-')
 const SELF = '3901'
 const EARLIER = '3870'
 const OTHER = '3871'
@@ -76,10 +77,6 @@ function lane_diffs(diffs: Readonly<Record<string, ReadonlyArray<string>>>): voi
 function launches(since: Readonly<Record<string, number>>): void {
 	since_mock.mockImplementation((issue: string) => since[issue])
 }
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
 
 beforeEach(() => {
 	own_paths_mock.mockReset().mockResolvedValue([SHARED, OWN_ONLY])

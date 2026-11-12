@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#2205: the write side of the event stream. Two things are pinned — the target is
 // keyed on the run's identity (the common git directory `run-carry.ts` uses, the second of the two paths
@@ -22,14 +24,10 @@ const { run_carry } = await import('#scripts/run/carry/run-carry')
 const WORKTREE = '/repo/.git/worktrees/lane'
 const REPOSITORY = '/repo/.git'
 const GIT_GONE = 'git is gone'
-const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-run-event-emit-'))
+const TEMPORARY = make_directory('josh-run-event-emit-')
 
 beforeEach(() => {
 	git_directories_mock.mockReset()
-})
-
-afterAll(() => {
-	rmSync(TEMPORARY, { force: true, recursive: true })
 })
 
 describe('run_event_stream_emit.stream_target', () => {
@@ -124,6 +122,24 @@ describe('run_event_stream_emit.emit_once — one marker per episode', () => {
 		await run_event_stream_emit.emit_once(DRAIN, DRAIN_TEXT)
 
 		expect(await drain_events()).toHaveLength(2)
+	})
+})
+
+// joshuafolkken/kit#5329: the drain flush finishes before the marker a replacing `backlogrun` reads.
+describe('run_event_stream_emit.emit_once — the step before the marker', () => {
+	it('awaits the step before appending, on a fresh episode only', async () => {
+		git_directories_mock.mockResolvedValue([WORKTREE, fresh_repository()])
+		const target = await run_event_stream_emit.stream_target()
+		const markers_seen: Array<number> = []
+		const before_append = vi.fn(async () => {
+			if (target !== undefined) markers_seen.push(run_event_stream.read_events(target).length)
+		})
+
+		await run_event_stream_emit.emit_once(DRAIN, DRAIN_TEXT, before_append)
+		await run_event_stream_emit.emit_once(DRAIN, DRAIN_TEXT, before_append)
+
+		expect(markers_seen).toStrictEqual([0])
+		expect(await drain_events()).toHaveLength(1)
 	})
 })
 
@@ -247,8 +263,35 @@ describe('run_event_stream_emit.current_events — the invocation now running', 
 		git_directories_mock.mockRejectedValue(new Error(GIT_GONE))
 
 		expect(await run_event_stream_emit.current_events()).toStrictEqual([])
+		await expect(run_event_stream_emit.current_events(true)).rejects.toThrow(GIT_GONE)
+	})
+})
+
+describe('required invocation history', () => {
+	it('refuses required history when the stream cannot be read', async () => {
+		const repository = fresh_repository()
+
+		git_directories_mock.mockResolvedValue([WORKTREE, repository])
+		run_carry.begin_carry(run_carry.carry_path(repository), 'backlogrun')
+
+		await expect(run_event_stream_emit.current_events(true)).rejects.toThrow(
+			'Could not read the run event stream.',
+		)
 	})
 
+	it('accepts a readable empty stream as required history', async () => {
+		const repository = fresh_repository()
+		const target = run_event_stream.target_of(repository)
+
+		git_directories_mock.mockResolvedValue([WORKTREE, repository])
+		run_carry.begin_carry(run_carry.carry_path(repository), 'backlogrun')
+		run_event_stream.append(target, MERGE, '#6 merged', EARLIER_ISO)
+
+		expect(await run_event_stream_emit.current_events(true)).toStrictEqual([])
+	})
+})
+
+describe('undetermined invocation scope', () => {
 	it('does not adopt old events when the carry scope is missing', async () => {
 		const repository = fresh_repository()
 
@@ -261,6 +304,9 @@ describe('run_event_stream_emit.current_events — the invocation now running', 
 		)
 
 		expect(await run_event_stream_emit.current_events()).toStrictEqual([])
+		await expect(run_event_stream_emit.current_events(true)).rejects.toThrow(
+			'Could not determine the run event scope.',
+		)
 	})
 })
 

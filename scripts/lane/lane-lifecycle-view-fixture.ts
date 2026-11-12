@@ -77,7 +77,8 @@ async function read_world(world: World): Promise<Read> {
 	const occupied = backlog_occupied.occupied_lanes(infos, idle, records)
 	const read = { events: world.events, lanes: listed, records, started_ms: world.run.started_ms }
 	const sorted = run_board_lane_state.lanes_of(read)
-	const statuses = run_board_status.statuses_of(world.events, sorted, idle(infos))
+	const idle_since = new Map(idle(infos).map((issue) => [issue, world.run.started_ms]))
+	const statuses = run_board_status.statuses_of(world.events, sorted, idle_since)
 
 	return { records, sorted, ...places_of(occupied, sorted), statuses }
 }

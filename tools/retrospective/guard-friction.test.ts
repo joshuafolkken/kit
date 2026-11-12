@@ -69,12 +69,28 @@ describe('guard_friction.guard_rows on a renamed guard', () => {
 	})
 })
 
+describe('guard_friction.guard_rows on a rephrased refusal', () => {
+	it('counts the refusal the next call of its tool rephrased on the guard row', () => {
+		const { bash_call_line, allowed_line } = guard_friction_fixture
+		const rephrased = session(node('rephrased', { records: [record(0, CONTEXT)] }), [
+			bash_call_line(1, 'a'),
+			refusal_line(2, 'a', BATCHING),
+			bash_call_line(3, 'b'),
+			allowed_line(4, 'b'),
+		])
+
+		expect(
+			guard_friction.guard_rows([rephrased]).map((row) => [row.guard, row.refusals, row.rephrased]),
+		).toEqual([['batching', 1, 1]])
+	})
+})
+
 describe('guard_friction.report_lines', () => {
 	it('heads the per-guard rows with the run totals', () => {
 		const lines = guard_friction.report_lines(guard_friction.guard_rows([LANE]))
 
 		expect(lines[0]).toMatch(/^Guard friction: 3 refusal\(s\), 1 Stop re-entry\(ies\), \$/u)
-		expect(lines[1]).toMatch(/^ {2}investigation: 2 refused, 0 stopped, \$/u)
+		expect(lines[1]).toMatch(/^ {2}investigation: 2 refused, 0 rephrased, 0 stopped, \$/u)
 	})
 
 	it('says none when no guard fired', () => {

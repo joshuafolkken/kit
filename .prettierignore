@@ -8,6 +8,8 @@
 .claude/**/*.md
 # Generated one-row-per-command table, pinned by its generator's test; padding would multiply its size (#4162)
 docs/josh-command-catalog.md
+# Append-only ledgers josh writes line by line; Prettier reads a `__` in a recorded path as emphasis (#5808)
+.josh/observations/
 
 # Package Managers
 package-lock.json

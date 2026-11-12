@@ -1,9 +1,11 @@
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, realpathSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { agent_profile_schema } from '#scripts/agent/agent-profile-schema'
+import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { execa } from 'execa'
 
 // A lane child whose own session has crossed the implementation-cut threshold, laid out on disk so the
@@ -16,6 +18,8 @@ const SESSION_ID = '2922aaaa-0000-4000-8000-000000000000'
 const OVER_THRESHOLD_INPUT_TOKENS = 300_000
 const REQUEST_COUNT = 5
 const HOOK_BUNDLE = path.resolve('dist/hooks/pretool-guard.js')
+
+const make_directory = temporary_directory()
 
 interface OverThresholdLane {
 	root: string
@@ -41,8 +45,7 @@ function write_session(home: string, lane: string): void {
 }
 
 function create_over_threshold_lane(): OverThresholdLane {
-	const created = mkdtempSync(path.join(tmpdir(), 'lane-cut-'))
-	const root = realpathSync(created)
+	const root = realpathSync(make_directory('lane-cut-'))
 	const lane = path.join(root, '.kit-lanes', LANE_ISSUE)
 	const home = path.join(root, 'home')
 	const transcript = path.join(root, 'hook.jsonl')
@@ -72,6 +75,7 @@ async function run_edit(fixture: OverThresholdLane): Promise<string> {
 		cwd: fixture.lane,
 		extendEnv: false,
 		env: {
+			...agent_session_role.env_for(agent_profile_schema.WORKER),
 			PATH: process.env['PATH'] ?? '',
 			HOME: fixture.home,
 			[agent_session_environment.SESSION_ID_KEY]: SESSION_ID,
@@ -84,11 +88,7 @@ async function run_edit(fixture: OverThresholdLane): Promise<string> {
 	return stdout
 }
 
-function remove(fixture: OverThresholdLane): void {
-	rmSync(fixture.root, { recursive: true, force: true })
-}
-
-const lane_cut_fixture = { create_over_threshold_lane, remove, run_edit }
+const lane_cut_fixture = { create_over_threshold_lane, run_edit }
 
 export type { OverThresholdLane }
 export { lane_cut_fixture }

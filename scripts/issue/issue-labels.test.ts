@@ -18,6 +18,7 @@ import {
 	MEASURED_LABEL,
 	MEASURED_UNMET_LABEL,
 	NEEDS_DECISION_LABEL,
+	NEEDS_HUMAN_MERGE_LABEL,
 	NEEDS_HUMAN_REVIEW_LABEL,
 	NOT_BEFORE_LABEL,
 	NOT_DIRECTLY_RUNNABLE_LABELS,
@@ -63,8 +64,8 @@ const RUN_STALLED_SPELLING = 'run:stalled'
 const RUN_STALLED_CREATED_CASING = 'Run:Stalled'
 // joshuafolkken/kit#4103: the exclusion `issue-auto-ok.ts` reads, now provisioned so a person can apply it.
 const DEFERRED_SPELLING = 'deferred'
-const NOT_DIRECTLY_RUNNABLE_COUNT = 5
-const PARKED_COUNT = 3
+const NOT_DIRECTLY_RUNNABLE_COUNT = 6
+const PARKED_COUNT = 4
 // joshuafolkken/kit#1083: the route labels are the same GitHub contract, and the aggregation query
 // (`?labels=route:split`) fails silently on a drifted name exactly as the others do.
 const REVIEW_CAP_ROUTE_SPELLING = 'route:review-cap'
@@ -139,6 +140,7 @@ describe('WORKFLOW_LABELS', () => {
 			NEEDS_DECISION_LABEL,
 			RUN_STALLED_LABEL,
 			NEEDS_HUMAN_REVIEW_LABEL,
+			NEEDS_HUMAN_MERGE_LABEL,
 			ALREADY_DONE_LABEL,
 			MEASURED_LABEL,
 			MEASURED_UNMET_LABEL,
@@ -252,7 +254,7 @@ describe('NOT_DIRECTLY_RUNNABLE_LABELS', () => {
 		expect(NOT_DIRECTLY_RUNNABLE_LABELS.has(name)).toBe(false)
 	})
 
-	it('holds those five and nothing else', () => {
+	it('holds those six and nothing else', () => {
 		expect(NOT_DIRECTLY_RUNNABLE_LABELS.size).toBe(NOT_DIRECTLY_RUNNABLE_COUNT)
 	})
 })
@@ -303,11 +305,14 @@ describe('has_label_name', () => {
 
 // joshuafolkken/kit#4102: one set every "is it parked" reading shares.
 describe('PARKED_LABELS', () => {
-	it.each([NEEDS_DECISION_LABEL, RUN_STALLED_LABEL, ALREADY_DONE_LABEL])('holds %s', (label) => {
-		expect(PARKED_LABELS.has(label)).toBe(true)
-	})
+	it.each([NEEDS_DECISION_LABEL, RUN_STALLED_LABEL, ALREADY_DONE_LABEL, NEEDS_HUMAN_MERGE_LABEL])(
+		'holds %s',
+		(label) => {
+			expect(PARKED_LABELS.has(label)).toBe(true)
+		},
+	)
 
-	it('holds those three and nothing else', () => {
+	it('holds those four and nothing else', () => {
 		expect(PARKED_LABELS.size).toBe(PARKED_COUNT)
 	})
 })

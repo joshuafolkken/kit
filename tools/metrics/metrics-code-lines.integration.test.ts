@@ -1,12 +1,13 @@
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { metrics_code_lines } from './metrics-code-lines'
 
-// A real entry point that starts with `#!`: typescript-eslint's single-run inference under `CI=true`
-// used to count its hashbang as code there and as a comment locally (joshuafolkken/kit#3408).
+// A real hashbang entry point verifies that CI single-run inference and local parsing agree about
+// which lines count as code (joshuafolkken/kit#3408).
 const HASHBANG_FILE = path.resolve('tools/metrics/metrics-command.ts')
+const make_directory = temporary_directory()
 
 async function count_with_ci(value: string): Promise<number | undefined> {
 	vi.stubEnv('CI', value)
@@ -28,7 +29,7 @@ const COUNT_TIMEOUT_MS = 120_000
 // Resolved, because eslint reports a file by its real path and macOS keeps its temp directory behind
 // a symlink.
 function broken_tree(): string {
-	const made = mkdtempSync(path.join(tmpdir(), TREE_PREFIX))
+	const made = make_directory(TREE_PREFIX)
 	const tree = realpathSync(made)
 
 	mkdirSync(path.join(tree, path.dirname(SCRIPT_FILE)))
@@ -46,8 +47,6 @@ describe('metrics_code_lines.code_line_counts on a tree whose own configuration 
 			const tree = broken_tree()
 			const file = path.join(tree, SCRIPT_FILE)
 			const counts = await metrics_code_lines.code_line_counts([file], tree)
-
-			rmSync(tree, { recursive: true, force: true })
 
 			expect([...counts]).toStrictEqual([[file, SOURCE_CODE_LINES]])
 		},

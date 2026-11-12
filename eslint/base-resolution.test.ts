@@ -44,6 +44,9 @@ const SOURCE_FILE = 'scripts/josh/josh.ts'
 const TEST_FILE = 'eslint/base.test.ts'
 const INIT_DECLARATIONS_RULE = 'init-declarations'
 const FLOATING_POINT_EQUALITY_RULE = 'sonarjs/no-floating-point-equality'
+const HISTORY_RULE = 'kit/no-history-comment'
+const MEASUREMENT_RULE = 'kit/no-measurement-comment'
+const COMMENT_RULE_FILES = [SOURCE_FILE, TEST_FILE, 'eslint/rules/comment-why-only.js']
 
 async function resolve_rule_entry(file_path: string, rule_name: string): Promise<unknown> {
 	type RuleMap = Record<string, unknown>
@@ -68,6 +71,23 @@ describe('create_base_config — tests block (issue #867)', () => {
 	it('keeps both rules at error for a non-test source file', async () => {
 		await expect(resolve_severity(SOURCE_FILE, INIT_DECLARATIONS_RULE)).resolves.toBe(ERROR)
 		await expect(resolve_severity(SOURCE_FILE, FLOATING_POINT_EQUALITY_RULE)).resolves.toBe(ERROR)
+	})
+})
+
+// joshuafolkken/kit#6030: the kinds whose every file needs the rule off get it by glob.
+describe('create_base_config — naming-convention by file kind', () => {
+	const naming_rule = '@typescript-eslint/naming-convention'
+
+	it.each([
+		'scripts/josh/josh-commands-ai.ts',
+		'scripts/ci/ci-yml-fixture.ts',
+		'scripts/josh/josh-commands-ai.test.ts',
+	])('resolves the rule to off for %s', async (file_path) => {
+		await expect(resolve_severity(file_path, naming_rule)).resolves.toBe(OFF)
+	})
+
+	it('keeps the rule at error for production source', async () => {
+		await expect(resolve_severity(SOURCE_FILE, naming_rule)).resolves.toBe(ERROR)
 	})
 })
 
@@ -111,6 +131,23 @@ const CANONICAL_PROBE_FILE = 'scripts/probe.test.ts'
 function expect_no_fatal(messages: ReadonlyArray<Linter.LintMessage>): void {
 	expect(messages.filter((message) => message.fatal).map((message) => message.message)).toEqual([])
 }
+
+describe.each([
+	{ rule: HISTORY_RULE, comment: '// Previously, the gate waited.\n' },
+	{ rule: MEASUREMENT_RULE, comment: '// The gate took 1.9 seconds.\n' },
+])('kit comment enforcement — $rule', ({ rule, comment }) => {
+	it.each(COMMENT_RULE_FILES)('enables the rule for %s', async (file_path) => {
+		await expect(resolve_severity(file_path, rule)).resolves.toBe(ERROR)
+	})
+
+	it('reports its comment through the repository config', async () => {
+		const [result] = await untyped_linter.lintText(comment, { filePath: TEST_FILE })
+		const messages = result?.messages ?? []
+
+		expect_no_fatal(messages)
+		expect(messages.filter((message) => message.ruleId === rule)).toHaveLength(1)
+	})
+})
 
 async function restricted_syntax_messages(
 	file_path: string,

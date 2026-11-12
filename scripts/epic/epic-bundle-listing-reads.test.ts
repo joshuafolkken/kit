@@ -4,118 +4,98 @@ import { describe, expect, it, vi, type MockInstance } from 'vitest'
 import { epic_bundle_cli } from './epic-bundle-cli'
 import { epic_bundle_fixture } from './epic-bundle-fixture'
 
-// joshuafolkken/kit#1736: the open-issue listing `epic:bundle` already holds carries GitHub's own
-// `issue_dependencies_summary`, so an issue with no blockers can be answered from it instead of
-// costing a request of its own. Before this the command read every open issue individually, which
-// made it heavier exactly as a growing backlog made it more useful.
-//
-// **What these cases pin is the direction of the skip.** Skipping wrongly loses a relation in
-// silence — a bundle that should have been proposed is reported as "no strong signal" — while
-// reading unnecessarily costs one request. So a count of exactly zero is the only thing that skips,
-// and every other answer, an absent summary included, keeps the read.
+// joshuafolkken/kit#6796: the blocker relations ride on the open listing (`blockedBy`, read in one
+// GraphQL query per hundred rows), so `epic:bundle` makes no per-issue relation read at all. Read one
+// issue at a time they cost two REST requests per open issue declaring a blocker — the bulk of an
+// `issue:file` run's calls.
 
 const REPO = 'joshuafolkken/kit'
+const OTHER_REPO = 'joshuafolkken/other'
 const SUBJECT = 10
 const RELATED = 11
 const OTHER_RELATED = 12
+const BLOCKER = 13
 const EPIC = 100
 const OTHER_EPIC = 101
-const NO_BLOCKERS = 0
-const ONE_BLOCKER = 1
 
 interface Row {
 	number: number
 	body?: string
-	blocked_by_count?: number | null
+	blockedBy?: { nodes: Array<Record<string, unknown>> }
 }
 
 interface Reads {
 	backlog: Awaited<ReturnType<typeof epic_bundle_cli.fetch_backlog>>
 	relations: MockInstance<typeof git_gh_command.issue_get_state_and_relations>
+	bodies: MockInstance<typeof git_gh_command.issue_list_open_bodies>
 }
 
 function listing_row(row: Row): Record<string, unknown> {
 	return { title: '', body: '', ...row }
 }
 
-// The backlog listing and the per-issue relation read, both mocked, with the relation spy handed
-// back so a case can assert on what it was *not* asked. The read resolves `undefined`, which the
-// command reads as "this one could not be read" — the answer that separates a skipped row from a
-// failed one.
-async function fetch_with(rows: ReadonlyArray<Row>): Promise<Reads> {
-	vi.spyOn(git_gh_command, 'issue_list_open_bodies').mockResolvedValue(
-		listing_of(rows.map((row) => listing_row(row))),
-	)
-	const relations = vi
-		.spyOn(git_gh_command, 'issue_get_state_and_relations')
-		.mockResolvedValue(undefined)
+// Both listings and the per-issue relation read, mocked, so a case can assert on which listing was
+// asked and that the per-issue read was not.
+async function fetch_with(
+	rows: ReadonlyArray<Row>,
+	options?: { include_relations?: boolean },
+): Promise<Reads> {
+	const listing = listing_of(rows.map((row) => listing_row(row)))
 
-	return { backlog: await epic_bundle_cli.fetch_backlog(REPO, new Map()), relations }
+	vi.spyOn(git_gh_command, 'issue_list_open_relations').mockResolvedValue(listing)
+	const bodies = vi.spyOn(git_gh_command, 'issue_list_open_bodies').mockResolvedValue(listing)
+	const relations = vi.spyOn(git_gh_command, 'issue_get_state_and_relations')
+	const backlog = await epic_bundle_cli.fetch_backlog(REPO, new Map(), undefined, options)
+
+	return { backlog, relations, bodies }
 }
 
-describe('epic_bundle_cli.fetch_backlog — the reads the listing makes unnecessary', () => {
-	it('reads nothing for an issue GitHub reports no blockers on', async () => {
-		const { relations } = await fetch_with([{ number: SUBJECT, blocked_by_count: NO_BLOCKERS }])
+describe('epic_bundle_cli.fetch_backlog — relations from the listing', () => {
+	it('makes no per-issue relation read', async () => {
+		const { relations } = await fetch_with([
+			{ number: SUBJECT, blockedBy: { nodes: [{ number: BLOCKER }] } },
+		])
 
 		expect(relations).not.toHaveBeenCalled()
 	})
 
-	it('still reads an issue that has blockers', async () => {
-		const { relations } = await fetch_with([{ number: SUBJECT, blocked_by_count: ONE_BLOCKER }])
-
-		expect(relations).toHaveBeenCalledWith(String(SUBJECT))
-	})
-
-	// A row the listing carries no summary for — a pull request is the case that occurs, and the
-	// listing filters those out client-side, so this is the guard rather than the everyday path.
-	it('reads a row the listing carries no count for rather than reading it as zero', async () => {
-		const { relations } = await fetch_with([{ number: SUBJECT }])
-
-		expect(relations).toHaveBeenCalledWith(String(SUBJECT))
-	})
-
-	it('reads a row whose count came back null', async () => {
-		// eslint-disable-next-line unicorn/no-null -- the absent summary arrives as JSON null
-		const { relations } = await fetch_with([{ number: SUBJECT, blocked_by_count: null }])
-
-		expect(relations).toHaveBeenCalledWith(String(SUBJECT))
-	})
-})
-
-describe('epic_bundle_cli.fetch_backlog — a mixed backlog', () => {
-	const MIXED: ReadonlyArray<Row> = [
-		{ number: SUBJECT, blocked_by_count: NO_BLOCKERS },
-		{ number: RELATED, blocked_by_count: ONE_BLOCKER },
-		{ number: OTHER_RELATED, blocked_by_count: NO_BLOCKERS },
-	]
-
-	it('reads only the rows that have blockers', async () => {
-		const { relations } = await fetch_with(MIXED)
-
-		expect(relations.mock.calls).toEqual([[String(RELATED)]])
-	})
-
-	// The skip must not borrow the failure signal: a row answered from the listing declares no
-	// blockers, where an unreadable one is a verdict built on data that never arrived.
-	it('reports only the row whose read failed as unreadable', async () => {
-		const { backlog } = await fetch_with(MIXED)
-
-		expect(backlog.unreadable).toEqual([RELATED])
-	})
-
-	it('keeps every row, in order, with the skipped ones declaring no blockers', async () => {
-		const { backlog } = await fetch_with(MIXED)
-
-		expect(backlog.issues.map((issue) => [issue.number, issue.blocked_by])).toEqual([
-			[SUBJECT, []],
-			[RELATED, []],
-			[OTHER_RELATED, []],
+	it('carries each row blocker as a reference in this repository', async () => {
+		const { backlog } = await fetch_with([
+			{ number: SUBJECT, blockedBy: { nodes: [{ number: BLOCKER, state: 'OPEN' }] } },
 		])
+
+		expect(backlog.issues[0]?.blocked_by).toEqual([{ repo: REPO, number: BLOCKER, state: 'OPEN' }])
+	})
+
+	it('keeps a blocker in another repository in that repository', async () => {
+		const repository_url = `https://api.github.com/repos/${OTHER_REPO}`
+		const { backlog } = await fetch_with([
+			{ number: SUBJECT, blockedBy: { nodes: [{ number: BLOCKER, repository_url }] } },
+		])
+
+		expect(backlog.issues[0]?.blocked_by).toEqual([{ repo: OTHER_REPO, number: BLOCKER }])
+	})
+
+	it('reads a row with no relations as declaring no blockers', async () => {
+		const { backlog } = await fetch_with([{ number: SUBJECT }])
+
+		expect(backlog.issues[0]?.blocked_by).toEqual([])
+	})
+
+	it('reports no unreadable issue, since nothing is read one at a time', async () => {
+		const { backlog } = await fetch_with([{ number: SUBJECT }, { number: RELATED }])
+
+		expect(backlog.unreadable).toEqual([])
+	})
+
+	// `issue:scout` asks about an issue that does not exist yet; relations cannot change its answer.
+	it('lists without relations when the caller asks for none', async () => {
+		const { bodies } = await fetch_with([{ number: SUBJECT }], { include_relations: false })
+
+		expect(bodies).toHaveBeenCalledOnce()
 	})
 })
 
-// The four verdicts, each driven by a backlog whose every row reports zero blockers — so the command
-// makes no per-issue read at all and must still print exactly what it printed before.
 function epic_row(number: number, child: number): Record<string, unknown> {
 	return { number, body: `- [ ] #${String(child)}` }
 }
@@ -125,12 +105,10 @@ async function report_with(
 	rows: ReadonlyArray<Row>,
 ): Promise<{ printed: string; relations: MockInstance }> {
 	vi.spyOn(git_gh_command, 'issue_list_by_label').mockResolvedValue(listing_of(epics))
-	vi.spyOn(git_gh_command, 'issue_list_open_bodies').mockResolvedValue(
-		listing_of(rows.map((row) => listing_row({ blocked_by_count: NO_BLOCKERS, ...row }))),
+	vi.spyOn(git_gh_command, 'issue_list_open_relations').mockResolvedValue(
+		listing_of(rows.map((row) => listing_row(row))),
 	)
-	const relations = vi
-		.spyOn(git_gh_command, 'issue_get_state_and_relations')
-		.mockResolvedValue(undefined)
+	const relations = vi.spyOn(git_gh_command, 'issue_get_state_and_relations')
 	const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
 
 	try {
@@ -192,6 +170,16 @@ describe('epic_bundle_cli.report_for — the verdicts that propose a new epic', 
 
 		expect(printed).toContain(action_line('create_epic'))
 		expect(relations).not.toHaveBeenCalled()
+	})
+
+	// The relation the listing carries is a bundle signal on its own, with no body reference.
+	it('creates an epic for a pair joined only by a listed blocker', async () => {
+		const { printed } = await report_with(NO_EPICS, [
+			{ number: SUBJECT, blockedBy: { nodes: [{ number: RELATED }] } },
+			{ number: RELATED },
+		])
+
+		expect(printed).toContain(action_line('create_epic'))
 	})
 
 	it('asks when the related issues sit in more than one epic', async () => {

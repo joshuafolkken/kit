@@ -63,7 +63,6 @@ const mocked_fetch = vi.mocked(epic_fetch.fetch_children)
 const order: Array<string> = []
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	order.length = 0
 	mocked_read.mockResolvedValue(
 		JSON.stringify({ number: EPIC_NUMBER, labels: [{ name: 'epic' }], body: EPIC_BODY }),

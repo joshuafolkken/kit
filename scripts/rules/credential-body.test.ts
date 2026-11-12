@@ -1,8 +1,8 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { token_shape_fixture } from '#scripts/lib/token-shape-fixture'
 import { delivered_rules_harness } from '#tools/rules/delivered-rules-harness'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { credential_body } from './credential-body'
 import { delivered_rules } from './delivered-rules'
@@ -14,7 +14,8 @@ import { delivered_rules } from './delivered-rules'
 const ISSUE = 'repos/{owner}/kit/issues/5'
 const COMMENTS = `${ISSUE}/comments`
 const SAMPLE = token_shape_fixture.sample_of('GitHub token')
-const work = mkdtempSync(path.join(tmpdir(), 'credential-body-'))
+const make_directory = temporary_directory('suite')
+const work = make_directory('credential-body-')
 const TOKEN_FILE = path.join(work, 'token.md')
 const TOKEN_JSON = path.join(work, 'token.json')
 const CLEAN_FILE = path.join(work, 'clean.md')
@@ -29,7 +30,6 @@ const harness = delivered_rules_harness.create_harness('rule-guard-credential-')
 const NOW_MS = 1_700_000_000_000
 
 afterAll(() => {
-	rmSync(work, { recursive: true, force: true })
 	harness.cleanup()
 })
 

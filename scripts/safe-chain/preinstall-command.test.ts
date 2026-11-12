@@ -79,7 +79,7 @@ describe('SAFE_CHAIN_CMD', () => {
 		)
 	})
 
-	// joshuafolkken/kit#3269: the install used to fetch and run an unverified safe-chain every time.
+	// The install must verify safe-chain before running it (joshuafolkken/kit#3269).
 	it('fetches nothing from the network', () => {
 		expect(safe_chain_preinstall.SAFE_CHAIN_CMD).not.toMatch(NETWORK_FETCH_RE)
 	})

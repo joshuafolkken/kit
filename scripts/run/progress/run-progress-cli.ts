@@ -4,8 +4,10 @@ import { backlog_ready } from '#scripts/backlog/backlog-ready'
 import { gh_spawn } from '#scripts/gh/gh-spawn'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { error_text } from '#scripts/lib/error-message'
+import { poll } from '#scripts/lib/poll'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { run_step_section } from '#scripts/run/run-step-section'
 import { run_progress, type ProgressState } from './run-progress'
 import { run_progress_args, type ParsedValues } from './run-progress-args'
 import { run_progress_clock } from './run-progress-clock'
@@ -23,7 +25,8 @@ import { run_progress_read, type ObservationRead } from './run-progress-read'
 // **Standard output carries the progress line and nothing else**, the way `run:liveness` keeps its
 // verdict there: a relaying parent should never have to tell a report apart from an explanation.
 // Notices go to standard error. The one other stdout line is a `--wait` exit's pick-up reading for a
-// `backlogrun` parent — `ready #N · free lanes N` — which is itself something the parent acts on.
+// `backlogrun` parent — `ready #N · free lanes N` — which is itself something the parent acts on —
+// and the governing section a `--wait` prints as it starts, read with that exit.
 //
 // **It cannot send a Telegram.** That is structural rather than a promise — nothing here imports
 // `scripts/notify/telegram-notify`, which is the only egress there is. A heartbeat every twenty minutes on
@@ -39,18 +42,10 @@ const FAILURE_EXIT_CODE = 1
 const TICK_SECONDS = 30
 // How long a tick that printed nothing waits before it reads again.
 //
-// **A decline deliberately does not move the report clock** — the first child to appear is reported at
-// once rather than waiting out an interval the repository spent idle. Without a cooldown, though, that
-// same property re-reads GitHub every 30 seconds for the watcher's whole life, and a batch stacks one
-// fresh watcher per child, so the listings accumulate into secondary-rate-limit territory and would
-// themselves start producing the unreadable listings this branch exists to handle. Two minutes keeps
-// "reported at once" true to within a fraction of the twenty-minute interval and takes the call count
-// down with it.
-const DECLINE_RETRY_SECONDS = 120
 // The clock a fresh loop starts with: nothing has declined yet, so nothing is being waited out.
 const NO_RETRY = 0
 const { DEFAULT_WAIT_MAX_HOURS } = run_progress_args
-const { DISABLED_KEY, DISABLED_VALUE, is_disabled } = run_progress
+const { DECLINE_RETRY_SECONDS, DISABLED_KEY, DISABLED_VALUE, is_disabled } = run_progress
 
 // A malformed `--wait` exits at once, and read as "started" it would leave a person without progress
 // until someone looked at the exit — so the refusal says the relay is down.
@@ -323,6 +318,16 @@ function final_exit(life: string): WatchExit {
 	return run_progress_clock.is_life_ended(life) ? 'ended' : 'bound'
 }
 
+function bounded_exit(
+	options: WatchOptions,
+	life: string,
+	started_ms: number,
+): WatchExit | undefined {
+	return Date.now() - started_ms < options.max_ms && !run_progress_clock.is_life_ended(life)
+		? undefined
+		: final_exit(life)
+}
+
 // The loop both reporting forms share, reading its own liveness record at the top of each pass — the
 // `run-wake-loop.ts` `run_loop` shape. A record gone means `josh followup` removed it at the merge,
 // so the watcher stops at once instead of waiting out its bound; `--wait` also stops at the first
@@ -335,21 +340,23 @@ async function run_ticks(
 ): Promise<WatchExit> {
 	const started_ms = Date.now()
 	let loop = seed_loop(target, started_ms)
+	const result: { exit: WatchExit | undefined } = { exit: undefined }
 
-	while (Date.now() - started_ms < options.max_ms && !run_progress_clock.is_life_ended(life)) {
-		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		await sleep(options.tick_ms)
-		run_progress_clock.ping_life(life)
-		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		loop = await step(options, target, loop)
-
-		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		const exit = await wait_exit(wait)
-
-		if (exit !== undefined) return exit
-	}
-
-	return final_exit(life)
+	return await poll.wait_for(
+		() => {
+			return result.exit ?? bounded_exit(options, life, started_ms)
+		},
+		{
+			interval_ms: options.tick_ms,
+			sleeper: async (milliseconds) => {
+				await sleep(milliseconds)
+				run_progress_clock.ping_life(life)
+				// eslint-disable-next-line require-atomic-updates -- poll awaits each callback before starting the next step
+				loop = await step(options, target, loop)
+				result.exit = await wait_exit(wait)
+			},
+		},
+	)
 }
 
 async function drive(options: WatchOptions, is_wait: boolean): Promise<number> {
@@ -444,12 +451,23 @@ function to_options(values: ParsedValues): WatchOptions | undefined {
 	}
 }
 
+// **`--wait` opens on the section that governs it, once per session** (joshuafolkken/kit#5645): it is
+// the form a run starts, so the reader spends no `doc:section` turn on `progress-watcher.md`. An
+// unresolved heading starts no watcher, so the watcher never runs on a rule nobody read.
+async function start_wait(options: WatchOptions): Promise<number> {
+	const printed = run_step_section.print_once(run_step_section.PROGRESS)
+
+	if (printed !== SUCCESS_EXIT_CODE) return printed
+
+	return await wait_once(options)
+}
+
 async function run_watch(values: ParsedValues): Promise<number> {
 	const options = to_options(values)
 
 	if (options === undefined) return report_repo_unresolved()
 	if (values.once === true) return await once(options)
-	if (values.wait === true) return await wait_once(options)
+	if (values.wait === true) return await start_wait(options)
 
 	return await watch(options)
 }
@@ -479,7 +497,6 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 }
 
 const run_progress_cli = {
-	DECLINE_RETRY_SECONDS,
 	DEFAULT_WAIT_MAX_HOURS,
 	DISABLED_NOTICE,
 	FAILED_TICK_PREFIX,

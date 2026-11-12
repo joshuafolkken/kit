@@ -17,6 +17,7 @@
 // `env git commit` and `(git push -f)` are silently not a git command, and
 // `/usr/bin/time -p pnpm exec eslint .` is not an `eslint` run (joshuafolkken/kit#4356).
 const ENV_ASSIGNMENT = /^[A-Za-z_]\w*=/u
+const WORD_QUOTING = /["'\\]/gu
 const WRAPPER_WORDS: ReadonlySet<string> = new Set([
 	'pnpm',
 	'npx',
@@ -27,16 +28,29 @@ const WRAPPER_WORDS: ReadonlySet<string> = new Set([
 	'env',
 	'time',
 ])
-// The wrappers whose own flags stand between them and the program (`time -p`), skipped with them.
-const FLAGGED_WRAPPERS: ReadonlySet<string> = new Set(['time'])
-// Their flags that consume a separate following value (`time -o <file>`, `time -f <format>`), so the
-// value is not read as the program.
-const WRAPPER_VALUE_FLAGS: ReadonlySet<string> = new Set(['-o', '-f', '--output', '--format'])
+// The wrappers whose own flags stand between them and the program (`time -p`, `pnpm -s`, `env -i`),
+// skipped with them.
+const FLAGGED_WRAPPERS: ReadonlySet<string> = new Set(['time', 'pnpm', 'env'])
+// Their flags that consume a separate following value (`time -o <file>`, `time -f <format>`,
+// `pnpm -C <dir>`), so the value is not read as the program.
+const WRAPPER_VALUE_FLAGS: ReadonlySet<string> = new Set([
+	'-o',
+	'-f',
+	'--output',
+	'--format',
+	'-C',
+	'--dir',
+	'--filter',
+	'-u',
+	'--unset',
+])
 const SUBSHELL_OPEN = '('
 
 // The git global options that consume a **separate** following token as their value, so the parser
 // skips two words rather than one. `--opt=value` carries its value inline and is skipped as one word by
 // the ordinary flag branch below.
+const CONFIG_ENV = '--config-env'
+const ATTACHED_CONFIG = /^(?:-c|--config-env=)(.+)$/u
 const VALUE_TAKING_GLOBALS: ReadonlySet<string> = new Set([
 	'-C',
 	'-c',
@@ -45,6 +59,7 @@ const VALUE_TAKING_GLOBALS: ReadonlySet<string> = new Set([
 	'--namespace',
 	'--exec-path',
 	'--super-prefix',
+	CONFIG_ENV,
 ])
 
 const FLAG_PREFIX = '-'
@@ -76,7 +91,9 @@ function program_name(word: string): string {
 
 function is_wrapper_token(word: string): boolean {
 	return (
-		word === SUBSHELL_OPEN || ENV_ASSIGNMENT.test(word) || WRAPPER_WORDS.has(program_name(word))
+		word === SUBSHELL_OPEN ||
+		ENV_ASSIGNMENT.test(word.replaceAll(WORD_QUOTING, '')) ||
+		WRAPPER_WORDS.has(program_name(word))
 	)
 }
 
@@ -121,8 +138,8 @@ function global_step(flag: string): number {
 }
 
 // Skip git's own global options, so `git -C <path> -c user.name=x push` reaches `push`.
-function after_globals(words: ReadonlyArray<string>, start: number): number {
-	let index = start
+function after_globals(words: ReadonlyArray<string>): number {
+	let index = 0
 
 	while (index < words.length) {
 		const flag = words[index] ?? ''
@@ -170,9 +187,32 @@ function parse(segment: string): GitCall | undefined {
 
 	if (words === undefined) return undefined
 
-	const subcommand_index = after_globals(words, 0)
+	const subcommand_index = after_globals(words)
 
 	return { subcommand: words[subcommand_index], args: words.slice(subcommand_index + NEXT) }
+}
+
+function config_value(flag: string, next: string | undefined): string | undefined {
+	if (flag === '-c' || flag === CONFIG_ENV) return next
+
+	return ATTACHED_CONFIG.exec(flag)?.[1]
+}
+
+function config_arguments_of(segment: string): Array<string> {
+	const words = arguments_of(segment, GIT_COMMAND) ?? []
+	const values: Array<string> = []
+	const end = after_globals(words)
+	let index = 0
+
+	while (index < end) {
+		const flag = words[index] ?? ''
+		const value = config_value(flag, words[index + NEXT])
+
+		if (value !== undefined) values.push(value)
+		index += global_step(flag)
+	}
+
+	return values
 }
 
 // A single-dash cluster of letters (`-uf`, `-D`), never a `--long` flag. The callers ask whether such a
@@ -192,7 +232,14 @@ function short_cluster_has(token: string, letters: string): boolean {
 	return false
 }
 
-const git_argv = { arguments_of, parse, program_of, short_cluster_has }
+const git_argv = {
+	arguments_of,
+	config_arguments_of,
+	parse,
+	program_of,
+	short_cluster_has,
+	words_of,
+}
 
 export { git_argv }
 export type { ProgramCall }

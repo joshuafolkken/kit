@@ -1,0 +1,33 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`run board human merge rows > renders the find action with no open PR in chat 1`] = `
+[
+  "── 🔗 waiting 1 ──────────────────────────────────",
+  "    🔏             6221       Workflow update  → find its PR for #6221",
+  "🔏 human merge",
+]
+`;
+
+exports[`run board human merge rows > renders the find action with no open PR in screen 1`] = `
+[
+  "── 🔗 waiting 1 ──────────────────────────────────",
+  "    🔏             6221       Workflow update  → find its PR for #6221",
+  "🔏 human merge",
+]
+`;
+
+exports[`run board human merge rows > renders the waiting row and legend in chat 1`] = `
+[
+  "── 🔗 waiting 1 ──────────────────────────────────",
+  "    🔏 PR 6225     6221       Workflow update  → merge PR #6225",
+  "🔏 human merge",
+]
+`;
+
+exports[`run board human merge rows > renders the waiting row and legend in screen 1`] = `
+[
+  "── 🔗 waiting 1 ──────────────────────────────────",
+  "    🔏 PR 6225     6221       Workflow update  → merge PR #6225",
+  "🔏 human merge",
+]
+`;

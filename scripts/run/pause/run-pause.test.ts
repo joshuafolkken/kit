@@ -3,6 +3,7 @@ import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { git_stash } from '#scripts/git/stash/git-stash'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_pause } from './run-pause'
+import { run_pause_comment } from './run-pause-comment'
 
 // joshuafolkken/kit#4160: the prerequisite pause as one command. Each write lands in an in-memory
 // stand-in for where it really lands — the stash stack, the Issue's comments, its blocked-by
@@ -21,6 +22,11 @@ const state = vi.hoisted(() => ({
 function fail_if(step: string): void {
 	if (state.failing === step) throw new Error(`${step} is down`)
 }
+
+// Off a lane branch, whatever branch the suite runs on: the lane path is `run-set-aside.test.ts`'s.
+vi.mock('#scripts/run/pause/run-set-aside-commit', () => ({
+	run_set_aside_commit: { is_lane: async () => false },
+}))
 
 vi.mock('#scripts/git/stash/stash-push-cli', () => ({
 	stash_push_cli: {
@@ -88,6 +94,18 @@ const BLOCKED_BY = 'blocked-by'
 const RECORDED_IN_EPIC = 'recorded in epic'
 const BOTH_TRACKED = '- [ ] #10\n- [ ] #11'
 
+it('detects the exact paused issue without confusing a longer number', async () => {
+	state.comments = ['<!-- josh:run-pause #100 for #11 -->']
+	expect(await run_pause_comment.is_paused(REQUEST.issue)).toBe(false)
+	state.comments.push('<!-- josh:run-pause #10 for #11 -->')
+	expect(await run_pause_comment.is_paused(REQUEST.issue)).toBe(true)
+})
+
+it('refuses unreadable pause comments', async () => {
+	vi.spyOn(git_gh_issue_read, 'issue_list_comments').mockResolvedValueOnce(undefined)
+	await expect(run_pause_comment.is_paused(REQUEST.issue)).rejects.toThrow('could not be read')
+})
+
 beforeEach(() => {
 	Object.assign(state, {
 		stashes: [],
@@ -130,12 +148,12 @@ describe('run_pause.pause — the four steps in order', () => {
 		expect(state.blockers).toStrictEqual([11])
 	})
 
-	it('says nothing was stashed on a clean tree', async () => {
+	it('says nothing was set aside on a clean tree', async () => {
 		state.has_work = false
 
 		await run_pause.pause(REQUEST)
 
-		expect(state.comments[0]).toContain('nothing was stashed')
+		expect(state.comments[0]).toContain('nothing was set aside')
 		expect(state.comments[0]).not.toContain('stash:pop')
 	})
 })
@@ -217,7 +235,7 @@ describe('run_pause.pause — a failure stops, and a rerun continues', () => {
 		const result = await run_pause.pause(REQUEST)
 
 		expect(result).toMatchObject({ kind: 'failed', step: 'comment', reason: 'comment is down' })
-		expect(result.done.map(({ step }) => step)).toStrictEqual(['stash'])
+		expect(result.done.map(({ step }) => step)).toStrictEqual(['set-aside'])
 		expect(state.calls).toStrictEqual(['stash'])
 	})
 

@@ -138,9 +138,7 @@ describe('eval_judge.judge — an API the session could not reach', () => {
 		expect(verdict.is_unreachable).toBe(true)
 	})
 
-	// The regression the note's own ordering would cause: stderr wins there, so one deprecation warning
-	// ahead of a refused connection used to hide the refusal behind an ordinary non-measurement —
-	// no `⚠` line, no abort, and a reader sent to fix a harness that was never at fault.
+	// A deprecation warning on stderr must not hide the refused connection that requires aborting.
 	it('sees a refused connection behind an unrelated stderr line', () => {
 		const verdict = eval_judge.judge(SCENARIO, [], {
 			exit_code: 1,
@@ -314,8 +312,8 @@ describe('eval_judge — why a session produced no measurement', () => {
 		expect(note_for(NO_TRANSCRIPT)).toContain(WITHOUT_STARTING)
 	})
 
-	// The distinction the Issue asked for: an expired login and an API drop after the session was
-	// under way both leave no tool calls, and used to print the same sentence.
+	// No tool calls can mean either an expired login or an API drop after startup; diagnostics must
+	// distinguish the causes.
 	it('says a session started but called nothing when it announced itself first', () => {
 		const note = note_for({ exit_code: 1, stderr: '', transcript: INIT_LINE })
 
@@ -333,8 +331,8 @@ describe('eval_judge — why a session produced no measurement', () => {
 		expect(note).not.toContain('exited')
 	})
 
-	// A kill that is not the timeout — an OOM killer, a harness watchdog — used to print the same
-	// sentence as a `claude` that never started, because both arrive with no exit code.
+	// A non-timeout kill and a process that never starts both lack an exit code but need distinct
+	// diagnostics.
 	it('names the signal when something else killed it', () => {
 		const note = note_for({ exit_code: -1, stderr: '', transcript: '', signal: 'SIGKILL' })
 

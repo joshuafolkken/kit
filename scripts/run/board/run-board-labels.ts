@@ -33,7 +33,17 @@ const DEFAULT_FOREGROUND = `${ESC}[39m`
 
 // The words the board draws, English whatever the session language: one set of words reads the same
 // on every board. The board draws most of what it says as a symbol; the words left are the ones a
-// symbol cannot carry, and the legend that names the symbols.
+// symbol cannot carry, and the legend that names the symbols. **How the board spells a word — here
+// or in a render module's own constant — decided here alone:**
+// - a proper noun or an acronym in its own spelling — `Claude`, `Codex`, `GitHub`, `REST`, `GraphQL`,
+//   `PR`, `CPU`, `CodeRabbit`;
+// - a column heading in capitals — `ACTIVE`, `DONE`, `PEAK`, `NOW`, `CPU`, `MEM`, `CMPRS` — so the
+//   `✅ DONE` column reads apart from the `✅ done 18` section on the same rule;
+// - a section name, a state word or a legend entry in lower case — `throughput`, `usage`, `lanes`,
+//   `queued`, `over budget`;
+// - a command, a repository, a unit or an OS process as it is spelled — `backlogrun`, `kit`, `24h`,
+//   `7d`, `/h`, `node`, the processes line's `claude`;
+// - a marker followed by one space — `▶ GraphQL`, as `▶ backlogrun`.
 const WORDS = {
 	no_run: 'no run',
 	plan: 'plan',
@@ -42,11 +52,12 @@ const WORDS = {
 	merged: 'merged',
 	parked: 'parked',
 	done: 'done',
+	already_done: 'already done',
 	withdrawn: 'withdrawn',
 	in_progress: 'running',
 	stopped: 'stopped',
 	paused: 'paused',
-	earlier: 'earlier run',
+	earlier: "earlier run's lane, not counted",
 	unknown: 'lane state unknown',
 	waiting: 'waiting',
 	queued: 'queued',
@@ -69,6 +80,7 @@ const WORDS = {
 	solo_running: 'solo running',
 	// A blocker this run will not finish, which a person has to move (joshuafolkken/kit#4292).
 	on_human: 'needs a person',
+	human_merge: 'human merge',
 	// A lane held back by the machine-wide core budget, and why.
 	held_check: 'held',
 	memory: 'waits for memory',
@@ -131,6 +143,7 @@ const STATE_ICONS: Readonly<Record<ItemState, string>> = {
 	merged: '✅',
 	parked: '💤',
 	done: '🏁',
+	already_done: '⏩',
 	waiting: '⏳',
 	human: '🙋',
 	stopped: '🛑',
@@ -248,6 +261,7 @@ const STAGE_ICONS: Readonly<Partial<Record<string, string>>> = {
 	[STAGE.HANDING_OFF]: '🤝',
 	[STAGE.JUDGING]: '🤔',
 	[STAGE.SESSION]: '💭',
+	[STAGE.RETROSPECTIVE]: PHASE_ICONS.investigate,
 	[STAGE.NO_CHILD]: '🚫',
 	[LANE_STAGE.OPENING]: LANE_STAGE_ICONS.opening,
 	[LANE_STAGE.INSTALLING]: LANE_STAGE_ICONS.installing,
@@ -255,12 +269,13 @@ const STAGE_ICONS: Readonly<Partial<Record<string, string>>> = {
 }
 
 // What a queued or waiting row leads with (joshuafolkken/kit#4288), in place of ⏳: 📂 a path a
-// running issue holds, 📋 the declared order, ✋ a pool held for a judgment, ❓ an issue nobody has
-// judged, 🧍 a `run:solo` issue waiting for the running lanes, 🙅 a row behind it (#4294; 🚧 is a
+// running issue holds, 📋 the declared order, ✋ an unblocked issue held for its judgment, ❓ a
+// blocked issue nobody has judged, 🧍 a `run:solo` issue waiting for the running lanes, 🙅 a row behind it (#4294; 🚧 is a
 // held check's) and 🔒 a row a running `run:solo` issue holds (#4391), chosen on the same rule as
 // every row icon, and 🪫 the account's Claude usage limit until it resets (#4796). The rest are the
 // board's own, shared rather than copied.
 const WAIT_ICONS = {
+	human_merge: '🔏',
 	usage_limit: '🪫',
 	path: '📂',
 	named: '📋',
@@ -278,6 +293,7 @@ const WAIT_ICONS = {
 // The legend's word for each icon a waiting row can lead with — a lane's stage among them. 📝, the
 // planning a row waits on, is the plan phase's icon, which the legend names already.
 const WAIT_WORDS: ReadonlyArray<readonly [icon: string, word: keyof Words]> = [
+	[WAIT_ICONS.human_merge, 'human_merge'],
 	[LANE_STAGE_ICONS.opening, 'opening'],
 	[LANE_STAGE_ICONS.installing, 'installing'],
 	[LANE_STAGE_ICONS.dispatching, 'dispatching'],

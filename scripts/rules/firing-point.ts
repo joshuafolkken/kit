@@ -9,10 +9,11 @@
 // time is the whole point of the check.
 
 // **The hook-deliverable set — the single source is the list `pnpm josh rule:list` renders.** The
-// `PreToolUse` guard is wired to `Bash|Edit|Read|Write` (`scripts/hooks/pretool-guard.ts`), the
-// lane-child interactive-ask row triggers on `AskUserQuestion`, and the `agent-model` row on
-// `Agent|Task`; the `Stop` hook's `pnpm josh stop:guard` judges every finished reply. A firing point
-// naming one of these can be delivered at the moment it binds; anything else cannot.
+// `PreToolUse` guard is wired to the tools below (`scripts/hooks/pretool-guard.ts`), the
+// lane-child interactive-ask row triggers on `AskUserQuestion`, the `agent-model` row on
+// `Agent|Task`, and the `consultation-investigation` row on `Glob|Grep|WebFetch`; the `Stop` hook's
+// `pnpm josh stop:guard` judges every finished reply. A firing point naming one of these can be
+// delivered at the moment it binds; anything else cannot.
 const HOOK_DELIVERABLE_TOOLS: ReadonlyArray<string> = [
 	'Bash',
 	'Edit',
@@ -21,6 +22,9 @@ const HOOK_DELIVERABLE_TOOLS: ReadonlyArray<string> = [
 	'AskUserQuestion',
 	'Agent',
 	'Task',
+	'Glob',
+	'Grep',
+	'WebFetch',
 	'Stop',
 ]
 
@@ -29,14 +33,7 @@ const HOOK_DELIVERABLE_TOOLS: ReadonlyArray<string> = [
 // self-restraint. Kept apart from
 // `HOOK_DELIVERABLE_TOOLS` so `not-delivered` (a real but undeliverable tool) reads differently from
 // `unknown` (not a tool call name at all).
-const KNOWN_UNDELIVERABLE_TOOLS: ReadonlyArray<string> = [
-	'Grep',
-	'Glob',
-	'WebFetch',
-	'WebSearch',
-	'TodoWrite',
-	'NotebookEdit',
-]
+const KNOWN_UNDELIVERABLE_TOOLS: ReadonlyArray<string> = ['WebSearch', 'TodoWrite', 'NotebookEdit']
 
 type FiringPointVerdict = 'delivered' | 'not-delivered' | 'unknown'
 

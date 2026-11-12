@@ -1,4 +1,5 @@
 import { stripVTControlCharacters } from 'node:util'
+import { poll } from '#scripts/lib/poll'
 import type { LocalRead } from './run-board-read'
 import type { BoardPorts } from './run-board-state'
 import { run_board_tick } from './run-board-tick'
@@ -34,12 +35,22 @@ async function chat_frame(ports: BoardPorts): Promise<ChatFrame> {
 	return { text, local }
 }
 
+// The run the pushes follow: the start of the first one drawn, `undefined` before any is.
+interface Followed {
+	started_ms: number | undefined
+}
+
 // Pushes one frame, answering whether the run is still going: no run sends nothing, and an ended run's
-// frame is the last one sent.
-async function push_one(ports: BoardPorts): Promise<boolean> {
+// frame is the last one sent. A frame drawing another run than the first — an older run's end screen
+// once a single run's hold is released — sends nothing and ends the pushes too.
+async function push_one(ports: BoardPorts, followed: Followed): Promise<boolean> {
 	const { text, local } = await chat_frame(ports)
 
 	if (local === undefined) return false
+
+	followed.started_ms ??= local.started_ms
+
+	if (local.started_ms !== followed.started_ms) return false
 
 	await ports.push(text)
 
@@ -47,14 +58,13 @@ async function push_one(ports: BoardPorts): Promise<boolean> {
 }
 
 async function push_until_ended(ports: BoardPorts, interval_ms: number): Promise<void> {
-	let is_running = await push_one(ports)
+	const followed: Followed = { started_ms: undefined }
 
-	while (is_running) {
-		// eslint-disable-next-line no-await-in-loop -- polling: each push waits out the interval
-		await ports.sleep(interval_ms)
-		// eslint-disable-next-line no-await-in-loop -- polling: each push reads the run afresh
-		is_running = await push_one(ports)
-	}
+	await poll.poll_until(async () => !(await push_one(ports, followed)), {
+		attempts: Infinity,
+		interval_ms,
+		sleeper: ports.sleep,
+	})
 }
 
 const run_board_every = { chat_frame, push_until_ended }

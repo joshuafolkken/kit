@@ -18,6 +18,7 @@
 ### 作業前サマリはいつ・どう出すか
 
 - **いつ**: 実装コードを書く前に、Issue ごとに 1 回出す。`fullrun` / `halfrun` / `prrun` / `backlogrun` で必須、`kickoff` は対象外。確認のための停止ではない — 出したらそのまま実装に進む
+- **材料**: `pnpm josh plan:scaffold <N> [<path>...]` 1 回で集める（骨組み・`lines`・`test:declared`・`cases`・`plan:consumers`）。骨組みで埋めるのはテスト名（`docs/josh-commands-run.md` → "`josh run:prep`"）
 - **概要**: `Now` / `Change` / `Check` を各 1 文、セッション言語で、プログラマでない人にも追える文で書く。各行に具体的な主語を書き、主語のない文は不可（下記「具体的な主語を必ず書く」）。ファイルパス・関数名や型名・CLI のオプションフラグは書かない — 禁じるのは内部識別子だけである
 - **技術詳細**: すべての変更をそのテストとともに `<変更内容> — Test: <Unit|E2E> — <file path> — <検証する挙動>` の形で並べる
 - **完了報告**は `Cause` / `Fix` / `Result` を先頭に置く
@@ -35,11 +36,11 @@
 - 第 1 段（ケース）は固定語彙を並べ、**該当しないものは `該当なし` に続けて理由を書いて消す**（例:「重複: 該当なし — 入力は集合なので重複しない」）
 - 第 2 段（壊れるとしたら）は、この変更に固有の壊れうる条件を**最低 3 件**書く。書けないときは `どう呼ばれても壊れない` と明示する
 - 複数ケースは `it.each` 1 本に畳んでよい
-- 差分が HTTP・プロセス起動・ファイル IO・時間の境界を跨ぐとき、または共有状態（`.josh/` 配下・lock）や環境（`process.env`・常駐プロセス）に依存するときは、`pnpm josh cases <path...>` が印字する異常系を第 2 段に載せる。共有状態には同じ状態を読み書きする他のソースが `file:line` で付く
+- 差分が HTTP・プロセス起動・ファイル IO・時間の境界を跨ぐとき、または共有状態（`.josh/` 配下・lock）や環境（`process.env`・常駐プロセス）に依存するときは、`plan:scaffold` の `cases` 節（単独では `pnpm josh cases <path...>`）が印字する異常系を第 2 段に載せる。共有状態には同じ状態を読み書きする他のソースが `file:line` で付く
 
 ### 行数予算は編集前に読む
 
-**「対象」に書くファイルは、書き始める前に `pnpm josh lines <path> [<path>...]` に渡し、上限に近いと言われたファイルには分割方針を「対象」に書く**（joshuafolkken/kit#1425）。行数は `wc -l` で数えない。関数単位の上限は `pnpm josh lint` が報告する。
+**「対象」に書くファイルは、書き始める前に `plan:scaffold` の `lines` 節（単独では `pnpm josh lines <path> [<path>...]`）で読み、上限に近いと言われたファイルには分割方針を「対象」に書く**（joshuafolkken/kit#1425）。行数は `wc -l` で数えない。関数単位の上限は `pnpm josh lint` が報告する。
 
 ### 変更対象はまとめて読んでから編集する（joshuafolkken/kit#2202）
 
@@ -50,15 +51,15 @@
 `pnpm josh report:template done <変更したファイル...>` が印字する。各欄に書くこと:
 
 - 概要の 3 行: なぜそうなっていたか / 何をしたか / 利用者から見て何が変わったか（版を添える）
-- 実行証跡: 実行可能な経路を触った変更では、実際に叩いたコマンドとその出力（UI ならスクリーンショット）。無いなら理由
+- 実行証跡: 実行可能な経路を触った変更では、PR 本文の `## 実機証跡` 節を指す 1 行（出力は貼り直さない。UI ならスクリーンショット）。無いなら理由
 - 捕まえられた検証: 不具合修正のみ。その検証の種類を 1 行（2 回目は台帳で昇格, #2448）
 - 残課題: なければ「なし」
 
-**実行証跡は「動くこと」の証拠であり、gate の緑ではない**（joshuafolkken/kit#2246）。同じ証跡を PR 本文の `## 実機証跡` 節（コマンド＋実出力のフェンス）にも置く。無い実行時の変更は `pnpm josh followup` がマージを拒否する（#2446）。
+**実行証跡は「動くこと」の証拠であり、gate の緑ではない**（joshuafolkken/kit#2246）。証跡は PR 本文の `## 実機証跡` 節（コマンド＋実出力のフェンス）に一度だけ置く — `pnpm josh ship:evidence <N> -- <command...>` がコマンドを実行し、呼び出し行と出力の末尾を ship 本文の下書きのその節に追記する（手で書く道も残る）。無い実行時の変更は `pnpm josh followup` がマージを拒否する（#2446）。
 
 ### PR 本文の受け入れ条件の対応表
 
-`## 受け入れ条件の対応` 節の行の形（`pnpm josh pr` が識別子つきの `未記入` 行を付け、`pnpm josh followup` が照合する — `scripts/review/acceptance-map.ts`）。`pnpm josh ship` の経路では、同じ識別子つきの `未記入` 行を `pnpm josh run:prep` / `pnpm josh run:step` の ship 事前要求が出し、同じ行と `## 実機証跡` 見出しを ship 本文の下書き（作業ツリーの git ディレクトリの `josh-ship-body-<N>.md`）にも書く。`--body-file` を省いた ship はこの下書きを本文として読む（`scripts/run/ship/run-ship-body-draft.ts`）:
+`## 受け入れ条件の対応` 節の行の形（`pnpm josh pr` が識別子つきの `未記入` 行を付け、`pnpm josh followup` が照合する — `scripts/review/acceptance-map.ts`）。`pnpm josh ship` の経路では、同じ識別子つきの `未記入` 行を `pnpm josh run:prep` / `pnpm josh run:step` の ship 事前要求が出し、同じ行と `## 実機証跡` 見出しを ship 本文の下書き（作業ツリーの git ディレクトリの `josh-ship-body-<N>.md`）にも書く。`--body-file` を省いた ship はこの下書きを本文として読む（`scripts/run/ship/run-ship-body-draft.ts`）。追加テストのタイトルが条件の識別子（`(ac-1a2b3c4d)`）を含むと、緑の `pnpm josh test:related` がその `未記入` 行をテスト名で `満たした` にする（`acceptance_map.with_test_rows`、記入済みの行は変えない）:
 
 ```md
 - `ac-1a2b3c4d` <条件> — 満たした: <テスト名・`file:line`・実行出力のいずれか>

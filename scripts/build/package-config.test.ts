@@ -3,6 +3,7 @@ import { package_path } from '#scripts/init/init-paths'
 import { yaml_config_fixture } from '#scripts/lib/yaml-config-fixture'
 import { getFileInfo } from 'prettier'
 import { describe, expect, it } from 'vitest'
+import { PUBLIC_LIBRARIES } from './build-library'
 
 interface PackageJson {
 	description?: string
@@ -188,6 +189,14 @@ describe('pnpm-workspace.yaml built-dependency lists', () => {
 
 const TEST_FILENAME_EXPORT_KEY = './eslint/test-filename'
 const TEST_FILENAME_EXPORT_TARGET = './eslint/rules/test-filename.js'
+const SOURCE_ROOT = '.'
+const DIST_ROOT = './dist'
+// Every barrel a consumer imports: the hand-written ones ship from source, the public libraries from
+// the `dist/` output `pnpm build` writes.
+const BARREL_EXPORTS: ReadonlyArray<[string, string]> = [
+	...['env', 'ports', 'prettier'].map((name): [string, string] => [name, SOURCE_ROOT]),
+	...PUBLIC_LIBRARIES.map((name): [string, string] => [name, DIST_ROOT]),
+]
 
 describe('package.json exports', () => {
 	const manifest = load_manifest()
@@ -200,6 +209,26 @@ describe('package.json exports', () => {
 	it('points the test-filename export at a file that exists on disk', () => {
 		expect(existsSync(package_path(TEST_FILENAME_EXPORT_TARGET))).toBe(true)
 	})
+
+	it.each(BARREL_EXPORTS)('exposes ./%s from %s', (name: string, root: string) => {
+		expect(exports_map[`./${name}`]).toEqual({
+			types: `${root}/${name}/index.d.ts`,
+			default: `${root}/${name}/index.js`,
+		})
+	})
+
+	// `dist/` is gitignored and `publish.yml` installs with `--ignore-scripts`, so a dist-backed
+	// export ships only if `prepack` builds it. One the build skips resolves to a file that was never
+	// written, and the consumer's import throws ERR_MODULE_NOT_FOUND (joshuafolkken/kit#844).
+	it('builds every dist-backed export as a public library', () => {
+		const distribution_exports = Object.entries(exports_map)
+			.filter(([, target]) =>
+				extract_string_paths(target).some((file) => file.startsWith(DIST_ROOT)),
+			)
+			.map(([key]) => key.replace(/^\.\//u, ''))
+
+		expect(new Set(distribution_exports)).toEqual(new Set(PUBLIC_LIBRARIES))
+	})
 })
 
 describe('package.json scripts', () => {
@@ -207,7 +236,9 @@ describe('package.json scripts', () => {
 	const scripts = manifest.scripts ?? {}
 
 	it('exposes josh as the unified CLI entry point', () => {
-		expect(scripts['josh']).toBe('tsx scripts/josh/josh.ts')
+		expect(scripts['josh']).toBe(
+			'node --disable-warning=ExperimentalWarning tools/josh/josh-ready.ts',
+		)
 	})
 
 	it('does not expose audit:security as a standalone script', () => {

@@ -1,7 +1,7 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { repo_party } from './repo-party'
 import { session_owner_pin } from './session-owner-pin'
@@ -15,6 +15,7 @@ const REWRITTEN_REMOTE = 'https://github.com/sveltejs/svelte.git'
 const REWRITTEN_OWNER = 'sveltejs'
 
 const state = { repository: '' }
+const make_directory = temporary_directory()
 
 function write_origin(origin_url: string | undefined): void {
 	const remote = origin_url === undefined ? '' : `[remote "origin"]\n\turl = ${origin_url}\n`
@@ -23,14 +24,13 @@ function write_origin(origin_url: string | undefined): void {
 }
 
 beforeEach(() => {
-	state.repository = mkdtempSync(path.join(tmpdir(), 'session-owner-pin-'))
+	state.repository = make_directory('session-owner-pin-')
 	mkdirSync(path.join(state.repository, '.git'))
 	write_origin(SESSION_REMOTE)
 })
 
 afterEach(() => {
 	stamp_file.remove_stamp(session_owner_pin.pin_path(state.repository))
-	rmSync(state.repository, { recursive: true, force: true })
 })
 
 describe('session_owner_pin — the owner fixed at session start', () => {

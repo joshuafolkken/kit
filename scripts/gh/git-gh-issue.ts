@@ -1,5 +1,6 @@
 import { gh_author_association } from './gh-author-association'
-import { git_gh_issue_list, type IssueListOutcome } from './git-gh-issue-list'
+import { git_gh_etag_read, type ReadDetail } from './git-gh-etag-read'
+import { FIRST_PAGE, git_gh_issue_list, type IssueListOutcome } from './git-gh-issue-list'
 import { git_gh_issue_read } from './git-gh-issue-read'
 import { BLOCKED_BY_COUNT_FIELD } from './git-gh-issue-rest'
 import { git_gh_issue_write } from './git-gh-issue-write'
@@ -14,9 +15,8 @@ const LABELLED_FIELDS = 'number,body,stateReason'
 //
 // `blocked_by_count` rides along for the same reason and is the one field here that `gh --json`
 // never had: it is read out of the `issue_dependencies_summary` the listing response already
-// carries, so it costs no request at all. It is what lets `epic:bundle`
-// tell a row with no blockers from one with some **before** deciding whether that row is worth a
-// per-issue read, which would otherwise be made for every open issue in the repository. Absent on a
+// carries, so it costs no request at all. `epic:bundle` no longer consults it: it reads the
+// relations themselves from `issue_list_open_relations` (joshuafolkken/kit#6796). Absent on a
 // row whose summary is missing, which must not be read as zero; `git-gh-issue-rest.ts` states why.
 //
 // `labels` rides along on the same response too: `epic:bundle` reads the release label off it,
@@ -81,6 +81,13 @@ async function issue_list_open_bodies(limit: number): Promise<IssueListOutcome> 
 	return await issue_list({ json_fields: BACKLOG_SCAN_FIELDS, limit })
 }
 
+// The same listing with each row's blocker relations, for `epic:bundle`. The listing reads them in
+// one GraphQL query per hundred rows (`git-gh-issue-list.ts`), so the cost stays flat as the backlog
+// grows; read row by row they cost two requests per blocked issue (joshuafolkken/kit#6796).
+async function issue_list_open_relations(limit: number): Promise<IssueListOutcome> {
+	return await issue_list({ json_fields: `${BACKLOG_SCAN_FIELDS},blockedBy`, limit })
+}
+
 // The issues that closed most recently, for the duplicate half of `issue:scout`.
 // **The work most likely to be filed twice is the work that just
 // finished**, and a scan that reads only open issues cannot see any of it.
@@ -143,6 +150,18 @@ async function issue_list_by_label_summary(
 	})
 }
 
+// The first page `issue_list_by_label_summary` reads over REST, saying whether it changed since the
+// previous process read it (joshuafolkken/kit#7226): `backlog:drive` asks it of the `auto-ok` listing
+// before an offer, and the `--wait` arrival probe asks the same. It answers for that one page only —
+// a change past its hundred rows reads as unchanged. The ETag is shared with the listing only where
+// the listing reads REST; on GraphQL it keeps its own. A failure throws, as
+// `git_gh_etag_read.read_detail` does.
+async function issue_list_label_first_page(label: string): Promise<ReadDetail> {
+	const path = git_gh_issue_list.listing_path({ label }, FIRST_PAGE)
+
+	return await git_gh_etag_read.read_detail(path)
+}
+
 // Open issues carrying `label` in one named repository — the read `epic:next` makes before it
 // offers a child, to see whether that repository already has one running.
 //
@@ -176,8 +195,10 @@ const git_gh_issue = {
 	issue_list_by_label,
 	issue_list_by_label_in_repo,
 	issue_list_by_label_summary,
+	issue_list_label_first_page,
 	issue_search_body,
 	issue_list_open_bodies,
+	issue_list_open_relations,
 	issue_list_open_for_judgement,
 	issue_list_recently_closed,
 }

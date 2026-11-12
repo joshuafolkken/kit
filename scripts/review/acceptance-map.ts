@@ -34,6 +34,10 @@ const ROW_PATTERN = new RegExp(
 	String.raw`^[-*]\s+${BACKTICK}(?<id>${ID_PREFIX}[0-9a-f]{${String(ID_HEX_LENGTH)}})${BACKTICK}(?:\s.*)?\s(?<kind>${MET}|${DEFERRED}):\s*(?<rest>\S.*)$`,
 	'u',
 )
+const PENDING_ROW_PATTERN = new RegExp(
+	String.raw`^[-*]\s+${BACKTICK}(?<id>${ID_PREFIX}[0-9a-f]{${String(ID_HEX_LENGTH)}})${BACKTICK}.*\s${PENDING_SUFFIX}$`,
+	'u',
+)
 // A deferral names the split-off issue first, then why it was deferred.
 const DEFERRAL_PATTERN = /^(?<issue>(?:[\w.-]+\/[\w.-]+)?#\d+)\s+\S/u
 const ROW_FORMAT = `under ${MAP_HEADING}, one line per acceptance criterion: \`- \`<id>\` <criterion> — ${MET}: <test name, file:line or command output>\` or \`- \`<id>\` <criterion> — ${DEFERRED}: #<split-off issue> <reason>\``
@@ -41,6 +45,11 @@ const ROW_FORMAT = `under ${MAP_HEADING}, one line per acceptance criterion: \`-
 interface Criterion {
 	id: string
 	text: string
+}
+
+interface CriterionLine {
+	text: string
+	index: number
 }
 
 interface Deferral {
@@ -73,19 +82,26 @@ function criterion_id(text: string): string {
 	return `${ID_PREFIX}${digest.slice(0, ID_HEX_LENGTH)}`
 }
 
-function joins(last: string | undefined, line: string): boolean {
+function joins(last: string, line: string): boolean {
 	const is_continuation = line.trim() !== '' && !BLOCK_START_PATTERN.test(line)
 
-	return is_continuation && last !== undefined && CRITERION_PATTERN.test(last)
+	return is_continuation && CRITERION_PATTERN.test(last)
+}
+
+function append_line(items: Array<CriterionLine>, line: string, index: number): void {
+	const last = items.at(-1)
+
+	if (last !== undefined && joins(last.text, line)) last.text += ` ${line.trim()}`
+	else items.push({ text: line, index })
 }
 
 // A criterion wrapped onto continuation lines is one criterion, hashed whole — rewording any of its
 // lines changes its identifier. A blank line or a nested item ends it.
-function unwrapped(lines: ReadonlyArray<string>): ReadonlyArray<string> {
-	const items: Array<string> = []
+function unwrapped(lines: ReadonlyArray<string>): ReadonlyArray<CriterionLine> {
+	const items: Array<CriterionLine> = []
 
-	for (const line of lines) {
-		items.push(joins(items.at(-1), line) ? `${items.pop() ?? ''} ${line.trim()}` : line)
+	for (const [index, line] of lines.entries()) {
+		append_line(items, line, index)
 	}
 
 	return items
@@ -95,11 +111,52 @@ function criteria_of(issue_body: string | undefined): ReadonlyArray<Criterion> {
 	// A list item inside a code fence is an example the Issue quotes, not a criterion. An indented line
 	// outside one is a wrapped criterion's continuation, so it is kept.
 	const lines = markdown_section.fence_free_lines(epic_audit_logic.acceptance_section(issue_body))
-	const texts = unwrapped(lines).map((line) => CRITERION_PATTERN.exec(line)?.groups?.['text'])
+	const texts = unwrapped(lines).map((line) => CRITERION_PATTERN.exec(line.text)?.groups?.['text'])
 
 	return texts
 		.filter((text): text is string => text !== undefined)
 		.map((text) => ({ id: criterion_id(text), text: text.trim() }))
+}
+
+function selected_line(line: CriterionLine, ids: ReadonlySet<string>): boolean {
+	const text = CRITERION_PATTERN.exec(line.text)?.groups?.['text']
+
+	return text !== undefined && ids.has(criterion_id(text))
+}
+
+function tick_line(line: string): string {
+	const checkbox = /^(?<prefix>(?:[-*+]|\d+\.)\s+)\[[ xX]\]/u
+
+	if (!checkbox.test(line)) throw new Error('Selected acceptance criterion has no checkbox')
+
+	return line.replace(/^(?<prefix>(?:[-*+]|\d+\.)\s+)\[ \]/u, '$<prefix>[x]')
+}
+
+function tick_section(section: string, ids: ReadonlySet<string>): string {
+	const visible = markdown_section.fence_free_lines(section)
+	const selected = new Set(
+		unwrapped(visible)
+			.filter((line) => selected_line(line, ids))
+			.map((line) => line.index),
+	)
+
+	return section
+		.split('\n')
+		.map((line, index) => (selected.has(index) ? tick_line(line) : line))
+		.join('\n')
+}
+
+// IDs come from the plan's acceptance map. Resolve every ID before editing, so a stale plan cannot
+// partially tick an Issue. Only checkbox markers in the canonical acceptance section are changed.
+function tick(body: string, ids: ReadonlyArray<string>): string {
+	const criteria = criteria_of(body)
+	const unknown = ids.filter((id) => criteria.every((criterion) => criterion.id !== id))
+
+	if (unknown.length > 0) throw new Error(`Unknown acceptance criteria: ${unknown.join(', ')}`)
+
+	return markdown_section.map_section(body, epic_audit_logic.is_acceptance_heading, (section) =>
+		tick_section(section, new Set(ids)),
+	)
 }
 
 // A deferral row with no issue or no reason is no row at all, so its criterion reads as unmapped.
@@ -127,9 +184,10 @@ function row_of(line: string): Row | undefined {
 	return { id: group(groups, 'id'), kind: group(groups, 'kind'), rest: group(groups, 'rest') }
 }
 
+// A row inside a code fence is an example the body quotes, not a claim (joshuafolkken/kit#6574).
 function rows_of(pr_body = ''): MapRows {
 	const rows = markdown_section
-		.section_lines(pr_body, MAP_HEADING)
+		.fence_free_lines(markdown_section.section_lines(pr_body, MAP_HEADING).join('\n'))
 		.map((line) => row_of(line))
 		.filter((row): row is Row => row !== undefined)
 	const met = rows.filter((row) => row.kind === MET).map((row) => row.id)
@@ -162,6 +220,25 @@ function skeleton(issue_body: string | undefined): string | undefined {
 	)
 
 	return [MAP_HEADING, '', ...rows].join('\n')
+}
+
+function met_line(line: string, titles: ReadonlyArray<string>): string {
+	const id = PENDING_ROW_PATTERN.exec(line.trim())?.groups?.['id']
+	const title = id === undefined ? undefined : titles.find((candidate) => candidate.includes(id))
+
+	if (title === undefined) return line
+
+	return `${line.trimEnd().slice(0, -PENDING.length)}${MET}: ${BACKTICK}${title}${BACKTICK}`
+}
+
+// **A pending row whose criterion a test title names by its identifier is met by that test**, so the
+// run copies no criterion into the body by hand (joshuafolkken/kit#5541). A row with no such title
+// stays pending, and a row already filled in is never rewritten.
+function with_test_rows(body: string, titles: ReadonlyArray<string>): string {
+	return body
+		.split('\n')
+		.map((line) => met_line(line, titles))
+		.join('\n')
 }
 
 function has_map(pr_body = ''): boolean {
@@ -200,6 +277,8 @@ const acceptance_map = {
 	ROW_FORMAT,
 	rows_of,
 	skeleton,
+	with_test_rows,
+	tick,
 }
 
 export type { Criterion, Deferral, MapComparison }

@@ -1,7 +1,8 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { open_issue_schema, type OpenIssueData } from '#scripts/git/git-schemas'
 import { read_json_listing } from '#scripts/git/parse-json-array'
-import { has_any_label, IN_PROGRESS_LABEL, PARKED_LABELS } from '#scripts/issue/issue-labels'
+import { IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
+import { issue_run_hold } from '#scripts/issue/issue-run-hold'
 import { session_cite } from '#scripts/issue/session-cite'
 
 // How much of a repository's parallelism is already spoken for — asked of the *repository*, never of
@@ -16,19 +17,17 @@ import { session_cite } from '#scripts/issue/session-cite'
 // with its own branch and its own ports, so the question is not "is anything running" but "how many
 // are running" — and the answer is a count the caller compares against `lane_capacity`'s limit.
 //
-// **The count is read from GitHub, never kept in the session.** Two `epicrun`s counting to six in
+// **The holders are read from GitHub, never kept in the session.** Two `epicrun`s counting to six in
 // their own memory give twelve lanes; the label on an open issue is the one record both of them
 // read. It is an advisory guard rather than a mutex — the label is applied after the read, so two
 // sessions starting in the same instant can still take one seat twice. What it closes is the window
 // that actually occurs: a lane holding the label for minutes.
+// `epic-lane-occupancy.ts` reconciles these holders with the shared local snapshot before selection.
 
 // Wide enough that the cap is never what decides the answer: a repository with a hundred issues
 // carrying `in-progress` at once is already the state this guard exists to report.
 const LISTING_LIMIT = 100
 
-// Read through `has_any_label` rather than compared directly, for the casing reason
-// `issue-labels.ts` records: GitHub keeps the spelling a label was created with.
-//
 // The park labels (`PARKED_LABELS`): `already-done` and `run:stalled` join `needs-decision` here for
 // the same reason they join it in `epic_classify.local_category`: the run that applied one leaves no
 // uncommitted work for the next child to start on top of. That is exactly what separates them from
@@ -160,8 +159,11 @@ function busy_reason(
 // one lane the run would poll instead of continuing. A child stopped by
 // `needs-human-review` is deliberately not parked and goes on holding its lane: its uncommitted work
 // is still sitting in that checkout.
-function is_parked(issue: OpenIssueData): boolean {
-	return has_any_label(issue.labels, PARKED_LABELS)
+//
+// Read through the shared reader (`issue-run-hold.ts`) that `run:add` and the board read too — the
+// listing's label filter only narrows what it is asked of.
+function is_holder(issue: OpenIssueData): boolean {
+	return issue_run_hold.is_held((issue.labels ?? []).map((label) => label.name))
 }
 
 // A listing that arrived, or a gap. The shared reader tells the two gaps apart — output that is not
@@ -184,7 +186,7 @@ function parse_listing(raw: string, is_capped: boolean): BusyRead {
 	const read = read_json_listing(raw, open_issue_schema)
 	if (read.kind !== 'read') return { kind: 'unreadable' }
 
-	const holders = read.rows.filter((row) => !is_parked(row))
+	const holders = read.rows.filter((row) => is_holder(row))
 	if (holders.length > 0) return { kind: 'busy', issues: holders }
 
 	return { kind: is_capped ? 'truncated' : 'idle' }
@@ -210,7 +212,7 @@ const epic_busy = {
 	unreadable_message,
 	truncated_message,
 	busy_reason,
-	is_parked,
+	is_holder,
 	parse_listing,
 	read_repository,
 }

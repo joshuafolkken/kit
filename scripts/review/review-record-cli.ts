@@ -1,11 +1,11 @@
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
-import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
-import type { StopFinding } from '#scripts/run/ship/run-ship-review'
 import { review_comment_carry } from './review-comment-carry'
+import { review_final_record } from './review-final-record'
 import { review_finding_ledger, type Finding, type LineKind } from './review-finding-ledger'
 import { review_finding_text } from './review-finding-text'
+import { review_fix_round, type DescribedFinding, type RecordedRound } from './review-fix-round'
 import { review_interaction } from './review-interaction'
 import { review_lane_handover } from './review-lane-handover'
 import { review_record, type RecordVerdict } from './review-record'
@@ -13,7 +13,6 @@ import { review_record_code_round } from './review-record-code-round'
 import { review_record_comment } from './review-record-comment'
 import { review_record_interaction } from './review-record-interaction'
 import type { ReuseAnswer } from './review-round-reuse'
-import { review_stop_log } from './review-stop-log'
 
 // `josh review:record --issue <N> [<category>:<severity>:<file> ...]` — the one write path for a
 // `/code-review` round's findings. It appends a `- rb:` round boundary and a `- rf:` line per finding to
@@ -49,30 +48,38 @@ const DISPOSITION_HINT =
 	'  <disposition>: optional — fixed | false-positive | filed:#<M> | deferred:#<M>; josh review:round2 skips only when every High/Medium is fixed or false-positive'
 const REASON_HINT =
 	'  <reason>: optional, one sentence on what was wrong, kept for the lane’s next review and fix — pass each finding with its reason as one single-quoted argument'
-const RECORD_STAGE = 'review:record'
 const CHECK_USAGE = 'Usage: josh review:record --check [--interaction] --issue <N>'
 const RECORDED_LINE = 'Recorded: the review round for this issue is in the ledger.'
 const REUSED_LINE =
 	'Reused: josh ship takes this round as its round 1 — the files this round covers hold still since the record. A default branch the ship’s sync merges in moves them only where it changed a file this round covers, and the ship then reviews round 1 again itself.'
 const DELTA_LINE =
-	'Reused, delta to round 2: josh ship takes this round as its round 1 and does not review it again — every file moved since the record is one round 2 reads after the commit, or the ship’s own round 1 stopped on it.'
+	'Reused, delta to round 2: josh ship takes this round as its round 1 and does not review it again — every moved path a round executes is one round 2 reads after the commit, or the ship’s own round 1 stopped on it.'
 
 // The condition that re-runs round 1, and the path that met it, named rather than listed among every
 // condition that could (joshuafolkken/kit#4941).
-function review_again_line(cause = 'the reuse question gave no reason'): string {
-	return `Not reused: josh ship reviews round 1 again — ${cause}. Run \`pnpm josh run:review\` and the round-1 \`/code-review\` here (chain-rule.md step 0).`
+// A lane child whose attested round 1 refuses the reopen (joshuafolkken/kit#5655) is named the ship,
+// which reviews round 1 again itself, rather than the `run:review` it would be refused.
+function review_again_line(
+	cause = 'the reuse question gave no reason',
+	is_refused = false,
+): string {
+	const next = is_refused
+		? review_lane_handover.SHIP_REVIEWS_LINE
+		: 'Run `pnpm josh run:review` and the round-1 `/code-review` here (chain-rule.md step 0).'
+
+	return `Not reused: josh ship reviews round 1 again — ${cause}. ${next}`
 }
 
-function reuse_line(answer: ReuseAnswer): string {
-	if (answer.reuse === 'again') return review_again_line(answer.cause)
+function reuse_line(answer: ReuseAnswer, is_refused: boolean): string {
+	if (answer.reuse === 'again') return review_again_line(answer.cause, is_refused)
 
-	return answer.reuse === 'delta' ? DELTA_LINE : REUSED_LINE
+	const line = answer.reuse === 'delta' ? DELTA_LINE : REUSED_LINE
+
+	return answer.note === undefined ? line : `${line} — ${answer.note}`
 }
 
 const NOT_REQUIRED_LINE =
 	'No review-finding ledger is kept in this checkout, so there is nothing to check.'
-const LANE_CARRY_LINE =
-	'Not carrying the closed issues’ comment rounds: a lane child leaves them to `pnpm josh observations:flush`.'
 const OPTIONS = {
 	issue: { type: 'string' },
 	check: { type: 'boolean' },
@@ -83,6 +90,7 @@ const OPTIONS = {
 interface Request {
 	issue: number
 	findings: ReadonlyArray<Finding>
+	round?: RecordedRound | undefined
 }
 
 interface Parsed {
@@ -132,14 +140,14 @@ function parse_positional(positional: string): Positional | undefined {
 }
 
 function parse_findings(positionals: ReadonlyArray<string>): ReadonlyArray<Finding> | undefined {
-	const findings: Array<Finding> = []
+	const findings: Array<DescribedFinding> = []
 
 	for (const positional of positionals) {
 		const parsed = parse_positional(positional)
 
 		if (parsed === undefined) return undefined
 
-		findings.push(parsed.finding)
+		findings.push({ ...parsed.finding, description: parsed.description })
 	}
 
 	return findings
@@ -219,8 +227,9 @@ interface CheckMode {
 // than reading "recorded" as "done".
 async function code_recorded(issue: number): Promise<string> {
 	const answer = await review_lane_handover.answer_here(issue)
+	const is_refused = await review_lane_handover.is_reopen_refused(issue)
 
-	return [RECORDED_LINE, reuse_line(answer)].join('\n')
+	return [RECORDED_LINE, reuse_line(answer, is_refused)].join('\n')
 }
 
 async function interaction_recorded(): Promise<string> {
@@ -279,20 +288,6 @@ async function run_check(parsed: Parsed, root: string): Promise<number> {
 	return await report_check(Number(issue), CHECK_MODES[kind_of(parsed)], root)
 }
 
-// The closed issues' comment rounds ride this round's commit (`review-comment-round.ts`) — **except in a
-// lane child** (joshuafolkken/kit#5326): parallel lanes each wrote the same newly closed issue's file,
-// so their ships waited on each other's overlap and their merges with main conflicted on it.
-// `observations:flush` carries them for the lanes, on the default branch, in one pull request.
-async function carry_comment_rounds(root: string): Promise<void> {
-	if (lane_child_marker.is_child_of(root)) {
-		console.info(LANE_CARRY_LINE)
-
-		return
-	}
-
-	await review_comment_carry.carry_reported(root)
-}
-
 // The round lands in its own issue's file, so two lanes recording at once
 // write two files, and their pull requests never conflict on the ledger.
 interface AppendedRound {
@@ -318,7 +313,7 @@ async function append_round(round: AppendedRound): Promise<number> {
 
 	await observation_ledger_home.append(ledger_path, ledger_lines(round))
 	console.info(confirmation(lines.length, ledger_path))
-	await carry_comment_rounds(root)
+	await review_comment_carry.carry_from_record(root)
 
 	if (kind === 'code') await review_record_code_round.follow(issue, root, findings)
 
@@ -334,7 +329,10 @@ async function write_round(
 ): Promise<number> {
 	const kind = kind_of(parsed)
 	const date = observation_ledger_home.ledger_date(now)
-	const lines = build_lines(request, date, kind)
+	const lines = [
+		...build_lines(request, date, kind),
+		...review_fix_round.lines(request.round, root),
+	]
 	const { issue, findings } = request
 
 	if (parsed.comment) return await review_record_comment.post(issue, lines)
@@ -343,43 +341,27 @@ async function write_round(
 		return await review_record_comment.post_after_push({ issue, lines, root, findings })
 	}
 
-	return await append_round({
-		issue: request.issue,
-		lines,
-		root,
-		kind,
-		findings: request.findings,
-		date,
-	})
+	return await append_round({ issue, lines, root, kind, findings, date })
 }
 
-// The stop-log finding a positional carries, or `undefined` for one written without a reason.
-function reason_of(positional: string): StopFinding | undefined {
-	const parsed = parse_positional(positional)
+async function record_prepared(
+	parsed: Parsed,
+	request: Request,
+	now: Date,
+	root: string,
+): Promise<number> {
+	request.round = parsed.interaction
+		? undefined
+		: review_fix_round.prepare(request.issue, request.findings, root)
+	const code = await write_round(parsed, request, now, root)
 
-	if (parsed === undefined || parsed.description.length === 0) return undefined
+	if (code !== 0) return code
 
-	const { finding, description } = parsed
+	if (!parsed.interaction) review_final_record.record(request.issue, request.findings, root)
+	review_fix_round.record_reasons(request.issue, request.findings)
+	if (request.round !== undefined) review_fix_round.save(request.round, root)
 
-	return {
-		kind: `${finding.category}:${finding.severity}`,
-		location: finding.file,
-		sentence: review_finding_text.first_sentence(description),
-	}
-}
-
-function is_reason(finding: StopFinding | undefined): finding is StopFinding {
-	return finding !== undefined
-}
-
-// Recorded only once the round itself is, so the stop log never holds a round the ledger refused.
-function record_reasons(issue: number, positionals: ReadonlyArray<string>): void {
-	review_stop_log.record({
-		issue,
-		stage: RECORD_STAGE,
-		findings: positionals.map((positional) => reason_of(positional)).filter(is_reason),
-		is_fixed: true,
-	})
+	return code
 }
 
 async function run_record(parsed: Parsed, now: Date, root: string): Promise<number> {
@@ -391,11 +373,7 @@ async function run_record(parsed: Parsed, now: Date, root: string): Promise<numb
 		return FAILURE_EXIT_CODE
 	}
 
-	const code = await write_round(parsed, request, now, root)
-
-	if (code === 0) record_reasons(request.issue, parsed.positionals)
-
-	return code
+	return await record_prepared(parsed, request, now, root)
 }
 
 // **The default is the work tree the command runs in, a lane's inside a lane**.
