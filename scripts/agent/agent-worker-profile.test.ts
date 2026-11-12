@@ -78,7 +78,11 @@ describe('agent_worker_profile.read — a josh.worker setting', () => {
 
 	it.each([
 		['a default no profile names', { ...WORKER, default: 'opus-medium' }, 'default must name one'],
-		['a repeated profile name', { ...WORKER, profiles: [HAIKU, HAIKU] }, 'names must be unique'],
+		[
+			'a repeated profile name',
+			{ ...WORKER, profiles: [HAIKU, HAIKU] },
+			'josh.worker.profiles: profile names must be unique',
+		],
 		['an effort outside low to max', with_sonnet({ effort: 'none' }), 'effort none is not one of'],
 		['an unsafe model', with_sonnet({ model: 'claude\nrm' }), 'is not a safe model'],
 		['a consultation model', with_sonnet({ model: 'claude-fable-5-1' }), 'is a consultation model'],

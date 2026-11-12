@@ -44,11 +44,12 @@ function rejected(note: string): Rejected {
 	return { kind: 'rejected', note: `${CONFIG_KEY} ${note}` }
 }
 
-function issue_note(error: z.ZodError): string {
+// A schema rejection: its issue path already starts at `josh.worker`, so it is not prefixed again.
+function schema_rejection(error: z.ZodError): Rejected {
 	const [issue] = error.issues
-	if (issue === undefined) return 'is invalid'
+	if (issue === undefined) return rejected('is invalid')
 
-	return `${issue.path.join('.')}: ${issue.message}`
+	return { kind: 'rejected', note: `${issue.path.join('.')}: ${issue.message}` }
 }
 
 function checked_profile(definition: WorkerProfileDefinition): ProfileCheck {
@@ -95,7 +96,7 @@ function manifest_value(directory: string): unknown {
 // with its reason when the setting breaks a rule, otherwise the checked profiles.
 function read(directory: string): SettingsResult {
 	const parsed = package_manifest.josh_schemas.worker.safeParse(manifest_value(directory))
-	if (!parsed.success) return rejected(issue_note(parsed.error))
+	if (!parsed.success) return schema_rejection(parsed.error)
 
 	const config = parsed.data.josh?.worker
 
