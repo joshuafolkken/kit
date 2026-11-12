@@ -124,12 +124,20 @@ function for_labels(settings: WorkerSettings, labels: ReadonlyArray<string>): Wo
 }
 
 // The profile an Issue's worker runs on. `fetch_labels` is called only once a setting exists, so a
-// repository without one never asks GitHub for the Issue's labels.
-function resolve(directory: string, fetch_labels: () => ReadonlyArray<string>): WorkerResult {
+// repository without one never asks GitHub for the Issue's labels. A label read that fails answers
+// `undefined` and is refused: falling back to the default could run a `worker:<name>` Issue on the
+// wrong model.
+async function resolve(
+	directory: string,
+	fetch_labels: () => Promise<ReadonlyArray<string> | undefined>,
+): Promise<WorkerResult> {
 	const result = read(directory)
 	if (result.kind !== 'settings') return result
 
-	return for_labels(result.settings, fetch_labels())
+	const labels = await fetch_labels()
+	if (labels === undefined) return rejected('could not read the Issue labels')
+
+	return for_labels(result.settings, labels)
 }
 
 // The profile one step above `worker` in the escalation order, or `undefined` at the top.

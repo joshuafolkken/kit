@@ -350,7 +350,7 @@ async function dispatch_child(
 	const lane = await lane_registry.find_open_lane(issue)
 
 	if (lane === undefined) return { kind: 'no-lane' }
-	const built = lane_dispatch_prepare.prepared(lane, start === RESTART_START)
+	const built = await lane_dispatch_prepare.prepared(lane, start === RESTART_START)
 	const log_path = default_log_path(lane)
 
 	if (built.kind === 'rejected') return { kind: 'failed', lane, log_path, note: built.note }
