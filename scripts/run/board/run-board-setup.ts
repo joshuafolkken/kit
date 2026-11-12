@@ -21,17 +21,23 @@ interface SetupRead {
 
 const NO_SETUP: SetupRead = { setup: undefined, setup_ms: undefined }
 
+// Only these stages depend on the judgment session owning the carry.
+const SESSION_STAGES: ReadonlySet<string> = new Set([STAGE.JUDGING, STAGE.SESSION])
+
 // The stages of a hand-back to a session, and of the retrospective unit the driver waits on at a drain
 // (joshuafolkken/kit#6745). Only the run's next stage ends one, whatever the session or the unit writes
 // to the stream meanwhile.
-const SESSION_STAGES: ReadonlySet<string> = new Set([
-	STAGE.JUDGING,
-	STAGE.SESSION,
-	STAGE.RETROSPECTIVE,
-])
+const RETAINED_STAGES: ReadonlySet<string> = new Set([...SESSION_STAGES, STAGE.RETROSPECTIVE])
 
 function is_setup(event: RunEvent): boolean {
 	return event.kind === KIND.SETUP
+}
+
+// Session stages describe the last hand-off even after its owner has returned the budget.
+function is_working(setup: string | undefined, is_session_active: boolean | undefined): boolean {
+	if (setup === undefined) return false
+
+	return !SESSION_STAGES.has(setup) || is_session_active !== false
 }
 
 // A launch that returned without a child (`run_event_setup.no_child`): it ends its own lane's stage,
@@ -65,7 +71,7 @@ function is_opening(events: ReadonlyArray<RunEvent>, stage: RunEvent): boolean {
 // Whether the run is at `stage` now: at any stage while it is starting; after that only at one it is
 // itself working through.
 function is_standing(events: ReadonlyArray<RunEvent>, stage: RunEvent): boolean {
-	if (!has_started(events) || SESSION_STAGES.has(stage.text)) return true
+	if (!has_started(events) || RETAINED_STAGES.has(stage.text)) return true
 
 	return is_opening(events, stage)
 }
@@ -119,7 +125,7 @@ function lane_stage(events: ReadonlyArray<RunEvent>, issue: number): LaneStage |
 	return { text: step.text, at_ms: Date.parse(step.at) }
 }
 
-const run_board_setup = { is_refusal, lane_stage, read }
+const run_board_setup = { is_refusal, is_working, lane_stage, read }
 
 export { run_board_setup }
 export type { LaneStage, SetupRead }

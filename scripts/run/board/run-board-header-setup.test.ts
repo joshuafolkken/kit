@@ -196,6 +196,29 @@ describe('run_board_header.header_lines once a child has launched', () => {
 	})
 })
 
+describe('run_board_header.header_lines retained session stages', () => {
+	it('keeps session words while paused and lets a running lane override the ended session', () => {
+		const activity = { ...standing(STAGE.SESSION), is_setup_working: false }
+		const idle = planned(ONE_PLANNED, activity)
+		const running = planned(ONE_RUNNING, activity)
+
+		expect(title_of(idle)).toMatch(/^⏸ backlogrun/u)
+		expect(now_of(idle)).toContain(STAGE.SESSION)
+		expect(now_of(idle)).not.toContain(SPINNER)
+		expect(title_of(running)).toMatch(/^▶ backlogrun/u)
+		expect(now_of(running)).toContain(SPINNER)
+	})
+
+	it('keeps human and stopped marks despite a retained session description', () => {
+		const activity = { ...standing(STAGE.SESSION), is_setup_working: false }
+
+		expect(title_of(planned(PEOPLE, activity))).toMatch(/^✋ backlogrun/u)
+		expect(title_of(planned(ONE_PLANNED, { ...activity, is_stopped: true }))).toMatch(
+			/^■ backlogrun/u,
+		)
+	})
+})
+
 describe('run_board_header.header_lines marks a setup does not change', () => {
 	it('draws a stopped run as stopped, with the newest thing it did rather than a stage', () => {
 		const activity = { ...standing(STAGE.PLANNING), ...merged(SECOND), is_stopped: true }

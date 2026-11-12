@@ -1,7 +1,7 @@
 import { process_identity } from '#scripts/josh/process-identity'
 import { lane_process_table, type TableRead } from '#scripts/lane/lane-process-table'
 import type { CarryRead } from '#scripts/run/carry/run-carry'
-import { run_wake } from '#scripts/run/wake/run-wake'
+import { run_wake, type RunWake } from '#scripts/run/wake/run-wake'
 import type { ProcessRoots } from './run-board-process-groups'
 
 // The run's own processes the 💻 section names: the supervisor from its wake stamp and the parent
@@ -38,6 +38,29 @@ function roots_of(
 	return { supervisor: supervisor_of(repository, is_same), parent: parent_of(read, is_same) }
 }
 
+// A handed-back budget or the supervisor's own driver is no judgment session. Codex's pid-less
+// carry uses the launch pid already recorded by the wake supervisor instead.
+function is_session_owner(read: CarryRead): boolean {
+	return read.kind === 'carried' && read.carry.is_handed_off !== true
+}
+
+function live_session_pid(
+	pid: number | undefined,
+	start: string | undefined,
+	wake: RunWake | undefined,
+	is_same: SameProcess,
+): boolean {
+	return pid !== undefined && pid !== wake?.pid && is_same(pid, start) !== false
+}
+
+function session_is_active(repository: string, read: CarryRead, is_same: SameProcess): boolean {
+	if (read.kind !== 'carried' || !is_session_owner(read)) return false
+	const wake = run_wake.read_wake(run_wake.wake_path(repository))
+	const pid = read.carry.owner_pid ?? wake?.woke_pid
+
+	return live_session_pid(pid, read.carry.owner_start, wake, is_same)
+}
+
 // `is_same_process` with each start time answered from the redraw's own `ps` snapshot, so the board's
 // read runs no `ps` of its own per pid (joshuafolkken/kit#4263). Without a snapshot no start is known,
 // and a recorded start reads as "cannot tell".
@@ -48,7 +71,7 @@ async function same_in(table: TableRead | undefined): Promise<SameProcess> {
 	return (pid, start) => process_identity.is_same_process(pid, start, read)
 }
 
-const run_board_roots = { roots_of, same_in }
+const run_board_roots = { roots_of, same_in, session_is_active }
 
 export { run_board_roots }
 export type { SameProcess }

@@ -59,6 +59,8 @@ interface LocalRead {
 	is_stranded: boolean
 	// The newest operation of each session of the run, read off the end of its log.
 	operations?: SessionOperations | undefined
+	// The carry's session owner is still running, apart from the supervisor's own driver.
+	is_session_active?: boolean | undefined
 	// The open lanes no child is working in at this read (`lane-spent.ts`); one is drawn stopped once it
 	// has stayed so (`run-board-idle.ts`).
 	idle_lanes?: ReadonlyArray<string> | undefined
@@ -108,6 +110,7 @@ const NO_SPAN: SpanHere = {
 	roots: {},
 	carry: undefined,
 	is_stranded: false,
+	is_session_active: false,
 }
 
 interface SpanHere {
@@ -118,6 +121,7 @@ interface SpanHere {
 	roots: ProcessRoots
 	carry: RunCarry | undefined
 	is_stranded: boolean
+	is_session_active: boolean
 }
 
 // The main work tree, resolved once: it does not move while the board is open, and resolving it runs a
@@ -159,6 +163,7 @@ async function recorded_span_here(
 		resume: run_board_span.resume_of(read, ended, launch),
 		transcript: read.kind === 'carried' ? read.carry.owner_transcript : undefined,
 		roots: run_board_roots.roots_of(repository, read, same_process),
+		is_session_active: run_board_roots.session_is_active(repository, read, same_process),
 		carry: read.kind === 'carried' ? read.carry : undefined,
 		is_stranded: run_stranded_detect.is_stranded_at(repository, stranded_ports),
 	}
@@ -341,7 +346,7 @@ function span_fields(
 // snapshot, so it agrees with the usage columns.
 async function read_local(table?: TableRead): Promise<LocalRead | undefined> {
 	const repository = await run_carry.repository_directory()
-	const { span, resume, transcript, roots, carry, is_stranded } =
+	const { span, resume, transcript, roots, carry, is_stranded, is_session_active } =
 		repository === undefined ? NO_SPAN : await span_here(repository, table)
 
 	if (repository === undefined || span === undefined) return undefined
@@ -361,6 +366,7 @@ async function read_local(table?: TableRead): Promise<LocalRead | undefined> {
 		roots,
 		carry,
 		is_stranded,
+		is_session_active,
 		operations: run_board_operation_read.read(sources_of(repository, lanes, transcript)),
 		...(await lane_room_of(lanes, lane_read.lane_states, table)),
 		...ledger_here(repository),
