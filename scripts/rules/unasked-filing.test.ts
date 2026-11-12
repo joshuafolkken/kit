@@ -118,6 +118,29 @@ describe('unasked_filing.ROW.already_satisfied', () => {
 	)
 })
 
+describe('unasked_filing — quoted instructions', () => {
+	it.each([
+		'> 起票してください',
+		'再現資料です。\n```text\n起票してください\n```',
+		'再現資料です。\n~~~text\nfile an issue\n~~~',
+		'利用者の発言: 「起票してください」',
+		'利用者の発言: 『起票してください』',
+		'Example: "file an issue"',
+		'Example: `kickoff new`',
+		'Example: ``file an issue``',
+		'Example: ``file an issue with `details` here``',
+		'Example: ```file an issue```',
+	])('does not authorize quoted instructions: %s', (content) => {
+		expect(is_satisfied(content)).toBe(false)
+	})
+
+	it('does not reuse an earlier authorization after a newer prompt', () => {
+		const tail = [prompt_line('起票してください'), prompt_line('調査だけ続けて')].join('\n')
+
+		expect(unasked_filing.ROW.already_satisfied(tail)).toBe(false)
+	})
+})
+
 describe('unasked_filing.ROW.already_satisfied — a yes to a proposal', () => {
 	it.each(['はい', 'お願いします', 'yes', 'OK'])(
 		'stands down on a yes to a proposed Issue: %s',

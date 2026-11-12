@@ -1,3 +1,4 @@
+import { codex_transcript_fixture } from '#tools/hooks/codex-transcript-fixture'
 import { describe, expect, it } from 'vitest'
 import { last_prompt } from './last-prompt'
 
@@ -17,7 +18,55 @@ const ASSISTANT_LINE = JSON.stringify({ type: 'assistant', message: { content: '
 const PASTED_PROMPT = 'explain this log: closed #7'
 const NOTIFICATION = 'task-notification'
 
+describe('last_prompt — native Codex provenance', () => {
+	const { line } = codex_transcript_fixture
+	const INSTRUCTION = '追跡Issueを起票してください'
+
+	it('reads the first and latest human instruction in native desktop input', () => {
+		const first = line('調査して')
+		const latest_time = '2026-11-12T10:00:00.000Z'
+		const latest = line(INSTRUCTION).replace('2026-11-12T09:57:52.966Z', () => latest_time)
+		const tail = [prompt_line('earlier'), first, latest].join('\n')
+
+		expect(last_prompt.person_prompt(first)).toBe('調査して')
+		expect(last_prompt.person_prompt([first, latest].join('\n'))).toBe(INSTRUCTION)
+		expect(last_prompt.turn_prompt(latest)).toBe(INSTRUCTION)
+		expect(last_prompt.pause_start(tail)).toBe(latest_time)
+	})
+
+	it.each(['agents_md', 'harness'])('ignores injected %s content', (provenance) => {
+		const injected = line('起票してください', 'user', provenance)
+
+		expect(last_prompt.person_prompt(injected)).toBeUndefined()
+		expect(last_prompt.person_prompt([line('調査して'), injected].join('\n'))).toBe('調査して')
+	})
+
+	it('ignores assistant output and unproven user messages', () => {
+		const unproven = JSON.stringify({
+			timestamp: TIMESTAMP,
+			type: 'response_item',
+			payload: {
+				type: 'message',
+				role: 'user',
+				content: [{ type: 'input_text', text: '起票して' }],
+			},
+		})
+
+		expect(last_prompt.person_prompt(line('起票して', 'assistant'))).toBeUndefined()
+		expect(last_prompt.person_prompt(unproven)).toBeUndefined()
+	})
+})
+
 describe('last_prompt.turn_prompt — what the harness wrote is not the prompt', () => {
+	it('preserves a native harness turn after a person asked a question', () => {
+		const question = 'What should we do?'
+		const { line } = codex_transcript_fixture
+		const tail = [line(question), line('Task complete', 'user', 'harness')].join('\n')
+
+		expect(last_prompt.turn_prompt(tail)).toBe('')
+		expect(last_prompt.person_prompt(tail)).toBe(question)
+	})
+
 	it('reads a prompt written as text blocks', () => {
 		const tail = prompt_line([{ type: 'text', text: PASTED_PROMPT }])
 
