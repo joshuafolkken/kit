@@ -2,6 +2,7 @@ import { gh_author_association } from '#scripts/gh/gh-author-association'
 import { gh_comment_input } from '#scripts/gh/gh-comment-input'
 import { parse_json_object_or_undefined, read_json_listing } from '#scripts/git/parse-json-array'
 import { z } from 'zod'
+import { issue_watch_diff } from './issue-watch-diff'
 
 // The block `josh issue:read` prints for one issue, kept apart from the reading and the printing so
 // the shape of the report is decided by one pure function — the seam `issue-state.ts` already has.
@@ -51,7 +52,7 @@ const issue_fields_schema = z.looseObject({
 
 const comment_schema = z.looseObject({
 	html_url: z.string().optional(),
-	user: z.looseObject({ login: z.string() }).optional(),
+	user: z.looseObject({ login: z.string(), type: z.string().optional() }).optional(),
 	created_at: z.string().optional(),
 	body: z.string().optional(),
 	author_association: z.string().nullish(),
@@ -73,6 +74,7 @@ interface IssueComment {
 	body: string
 	// As `IssueFields.is_body_trusted`: `undefined` when the lookup failed.
 	is_trusted: boolean | undefined
+	is_automated?: boolean
 }
 
 const UNKNOWN_AUTHOR = '(unknown)'
@@ -113,17 +115,19 @@ async function to_comment(
 	repo: string | undefined,
 ): Promise<IssueComment> {
 	const login = raw.user?.login
+	const is_trusted = await gh_author_association.trust_of({
+		login,
+		association: raw.author_association,
+		repo,
+	})
 
 	return {
 		html_url: raw.html_url,
 		author: login ?? UNKNOWN_AUTHOR,
 		created_at: raw.created_at ?? UNKNOWN_TIME,
 		body: raw.body ?? '',
-		is_trusted: await gh_author_association.trust_of({
-			login,
-			association: raw.author_association,
-			repo,
-		}),
+		is_trusted,
+		is_automated: issue_watch_diff.is_automated(raw, is_trusted),
 	}
 }
 
@@ -156,7 +160,8 @@ function trusted_bodies(comments: ReadonlyArray<IssueComment>): ReadonlyArray<st
 
 function format_comment(comment: IssueComment): string {
 	const trust = gh_comment_input.trust_of(comment.author, comment.is_trusted)
-	const heading = `${COMMENT_HEADING}${comment.author}${AT}${comment.created_at} [${trust}]`
+	const source = comment.is_automated === true ? ' [automated]' : ''
+	const heading = `${COMMENT_HEADING}${comment.author}${AT}${comment.created_at} [${trust}]${source}`
 
 	return `${heading}\n${comment.is_trusted === true ? comment.body : UNTRUSTED_COMMENT}`
 }

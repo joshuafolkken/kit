@@ -291,7 +291,7 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 				},
 				{
 					names: ['--no-auto-ok'],
-					description: "needs a person's judgement (Tier B / C); no `auto-ok`.",
+					description: 'needs human judgement or a verified user prohibition; no `auto-ok`.',
 				},
 				{
 					names: ['--release'],

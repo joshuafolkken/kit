@@ -1,5 +1,6 @@
 import { writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { USER_PROHIBITION } from '#scripts/auto-ok/auto-ok-kickoff-fixture'
 import { repo_party } from '#scripts/discovery/repo-party'
 import { epic_bundle_cli } from '#scripts/epic/epic-bundle-cli'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
@@ -57,9 +58,11 @@ const judged_in_path = path.join(work, 'judged-in.md')
 const breaking_path = path.join(work, 'breaking.md')
 const undeclared_path = path.join(work, 'undeclared.md')
 const baseless_path = path.join(work, 'baseless.md')
+const prohibited_path = path.join(work, 'prohibited.md')
 
 writeFileSync(valid_path, VALID_BODY)
 writeFileSync(judged_in_path, body_of(JUDGEMENT_NOT_NEEDED))
+writeFileSync(prohibited_path, `${body_of(JUDGEMENT_NOT_NEEDED)}${USER_PROHIBITION}`)
 writeFileSync(breaking_path, body_of(JUDGEMENT_NOT_NEEDED, '- 互換性: 破壊的変更'))
 writeFileSync(undeclared_path, body_of())
 writeFileSync(baseless_path, body_of(JUDGEMENT_NEEDED, '- 優先度: 緊急'))
@@ -188,7 +191,7 @@ describe('issue_file_cli.run — the auto-ok decision', () => {
 
 	it.each([
 		[[breaking_path, '--label', 'run:lane'], 'a `breaking-change` Issue'],
-		[[judged_in_path, '--no-auto-ok'], '--no-auto-ok declared'],
+		[[prohibited_path, '--no-auto-ok'], '--no-auto-ok declared'],
 		[[origin_path, '--repo', THERE], 'the Issue is filed to another repository'],
 	])('leaves auto-ok off %j, printing why', async ([body_path = '', ...extra], reason) => {
 		expect(await issue_file_cli.run(argv_of(body_path, ...extra))).toBe(SUCCESS_EXIT_CODE)

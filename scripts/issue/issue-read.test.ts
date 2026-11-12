@@ -24,7 +24,9 @@ const FIELDS_JSON = JSON.stringify({
 const COMMENTS_JSON = JSON.stringify([
 	{ user: { login: AUTHOR }, author_association: 'OWNER', created_at: 'then', body: COMMENT_BODY },
 ])
-const COMMENTS = [{ author: AUTHOR, created_at: 'then', body: COMMENT_BODY, is_trusted: true }]
+const COMMENTS = [
+	{ author: AUTHOR, created_at: 'then', body: COMMENT_BODY, is_trusted: true, is_automated: false },
+]
 
 describe('issue_read.parse_issue_fields', () => {
 	it('reads the title, the state and the body', async () => {
@@ -50,6 +52,19 @@ describe('issue_read.parse_issue_fields', () => {
 })
 
 describe('issue_read.parse_comments', () => {
+	it('marks a run comment under the owner login as automated in the rendered read', async () => {
+		const raw = [
+			{
+				user: { login: AUTHOR },
+				author_association: 'OWNER',
+				body: 'Auto-decided: plan only\n<!-- josh:run -->',
+			},
+		]
+		const comments = await issue_read.parse_comments(JSON.stringify(raw))
+
+		expect(comments?.[0]).toMatchObject({ is_trusted: true, is_automated: true })
+		expect(issue_read.format_issue(ISSUE, FIELDS, comments)).toContain('[trusted] [automated]')
+	})
 	it('reads the author, the timestamp and the body of each comment', async () => {
 		expect(await issue_read.parse_comments(COMMENTS_JSON)).toEqual(COMMENTS)
 	})
