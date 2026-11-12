@@ -26,9 +26,11 @@ interface JudgeIssue {
 	is_trusted: boolean
 }
 
-const MARKER_PREFIX = '<!-- josh:auto-ok-judged body='
+// Legacy records owe one reading under the provenance contract. Current records still use the
+// existing body/person-comment invalidation, rather than re-judging every issue on every offer.
+const MARKER_PREFIX = '<!-- josh:auto-ok-judged v=2 body='
 const MARKER_SUFFIX = ' -->'
-const MARKER_PATTERN = /<!-- josh:auto-ok-judged body=(?<digest>[\da-f]+) -->/u
+const MARKER_PATTERN = /<!-- josh:auto-ok-judged v=2 body=(?<digest>[\da-f]+) -->/u
 const DIGEST_LENGTH = 16
 const CRLF = '\r\n'
 const LF = '\n'

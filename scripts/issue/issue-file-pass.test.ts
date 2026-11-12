@@ -24,6 +24,7 @@ const NO_DUPLICATES = { report: 'Duplicates: none', candidates: [] }
 const REFUSED_BODY = '## 背景\n\n- 種別: 不具合\n- 人の判断: 不要\n'
 
 const CLEAR_ESTIMATE = '- 規模見積もり: 約 1 ファイル / 10 行（テスト除く）'
+const JUDGEMENT_NEEDED = '- 人の判断: 要（目視確認）'
 
 // Every local check passes: a judgement-needed body is not opted into `auto-ok`, so it owes no run label.
 const CLEAR_BODY = [
@@ -32,7 +33,7 @@ const CLEAR_BODY = [
 	'- 種別: 不具合',
 	'- 原因: #4201',
 	CLEAR_ESTIMATE,
-	'- 人の判断: 要（目視確認）',
+	JUDGEMENT_NEEDED,
 	'',
 	'## 現象\n\nx\n\n## 期待結果\n\ny\n\n## 受け入れ条件\n\n- [ ] z\n',
 ].join('\n')
@@ -68,6 +69,16 @@ beforeEach(() => {
 
 afterAll(() => {
 	vi.restoreAllMocks()
+})
+
+describe('issue_file_pass.labels_in_one_pass — opt-out provenance', () => {
+	it('refuses a judgement-free opt-out without user evidence before any create', async () => {
+		const body = CLEAR_BODY.replace(JUDGEMENT_NEEDED, '- 人の判断: 不要')
+		const filing = filing_of(body, args_of(['--no-auto-ok']))
+
+		expect(await issue_file_pass.labels_in_one_pass(filing)).toBeUndefined()
+		expect(printed()).toContain('verbatim prohibition')
+	})
 })
 
 describe('issue_file_pass.labels_in_one_pass — every refusal in one call', () => {

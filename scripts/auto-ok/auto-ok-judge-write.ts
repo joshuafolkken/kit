@@ -89,7 +89,8 @@ async function apply_to(
 	read: IssueRead,
 	answers: RunLabelFlags,
 ): Promise<number> {
-	const exclusion = issue_auto_ok.exclusion_of(read.labels)
+	const exclusion =
+		issue_auto_ok.exclusion_of(read.labels) ?? issue_auto_ok.user_constraint_of(read.body)
 
 	if (exclusion !== undefined) return refused(issue, issue_auto_ok.line_of(exclusion))
 

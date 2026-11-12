@@ -61,6 +61,14 @@ describe('auto_ok_judge.is_judged — an author without write access', () => {
 })
 
 describe('auto_ok_judge.is_judged', () => {
+	it('re-evaluates an unversioned judgement once without changing its body digest', () => {
+		const legacy = judgement_of(BODY)
+
+		legacy.body = legacy.body.replace(' v=2', '')
+
+		expect(auto_ok_judge.is_judged(BODY, [legacy])).toBe(false)
+		expect(auto_ok_judge.is_judged(BODY, [legacy, judgement_of(BODY, LATER_ID)])).toBe(true)
+	})
 	it('owes a judgement when no judgement comment exists', () => {
 		expect(auto_ok_judge.is_judged(BODY, [comment(EARLIER_ID, 'a remark')])).toBe(false)
 	})
@@ -101,6 +109,6 @@ describe('auto_ok_judge.comment_of', () => {
 		const text = auto_ok_judge.comment_of(DECLINED, BODY)
 
 		expect(text).toContain(DECLINED.reason)
-		expect(text).toMatch(/<!-- josh:auto-ok-judged body=[\da-f]+ -->$/u)
+		expect(text).toMatch(/<!-- josh:auto-ok-judged v=2 body=[\da-f]+ -->$/u)
 	})
 })

@@ -1,0 +1,11 @@
+{
+	"reason": "Auto-ok の出所検証・旧記録の一度限りの再評価・共通コメント分類を既存の判定へ接続する実装と、Claude/Codex 共通手順の増分。除外一覧や分類処理は複製せず、本文キーと CLI 文書も共通定義を再利用する。",
+	"date": "2026-11-12",
+	"growth": {
+		"scripts.code_lines": 84,
+		"rules.lines": 4,
+		"ai_cost.on_demand_bytes": 1093,
+		"prose.long_paragraphs": 2,
+		"prose.excess_bold": 1
+	}
+}

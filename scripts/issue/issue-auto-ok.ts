@@ -16,11 +16,11 @@ import { markdown_section } from './markdown-section'
 // of an Issue already open reuses `exclusion_of` rather than a second list (joshuafolkken/kit#3854).
 // The order: `--no-auto-ok`, a filing to another repository (whose own `backlogrun` would implement
 // and merge it though nobody opted that repository in), a label that keeps a person in the loop, and
-// last the body's judgement declaration (`JUDGEMENT_NEEDED` / `JUDGEMENT_NOT_NEEDED`): whether a
+// last the body's recorded user prohibition or judgement declaration (`JUDGEMENT_NEEDED` / `JUDGEMENT_NOT_NEEDED`): whether a
 // policy decision, an external account or a human visual check is needed.
 
 interface AutoOkFiling {
-	// `--no-auto-ok`: the filer declared the Issue needs a person's judgement.
+	// `--no-auto-ok`: an existing exclusion or a verified original user prohibition.
 	is_opted_out: boolean
 	is_cross_repository: boolean
 	// Every label the filing carries, including the ones the body's declarations add.
@@ -52,6 +52,26 @@ const JUDGEMENT: AutoOkDecision = {
 const APPLIED: AutoOkDecision = {
 	is_applied: true,
 	reason: 'no exclusion holds and the body declares no judgement is needed',
+}
+const CONSTRAINT_HEADING = issue_body_keys.heading('auto_execution_constraint')
+const CONSTRAINT_SOURCE = `${issue_body_keys.prefix('constraint_source')} user`
+const CONSTRAINT_REFERENCE = `${issue_body_keys.prefix('constraint_reference')} `
+const CONSTRAINT_INSTRUCTION = `${issue_body_keys.prefix('constraint_instruction')} `
+const CONSTRAINT_FIELDS = [CONSTRAINT_REFERENCE, CONSTRAINT_INSTRUCTION]
+const CONSTRAINT_PROBLEM = `--no-auto-ok without an exclusion needs ${CONSTRAINT_HEADING}: ${CONSTRAINT_SOURCE}, ${CONSTRAINT_REFERENCE}<original user prompt or comment URL>, ${CONSTRAINT_INSTRUCTION}<verbatim prohibition>; verify the cited user instruction, not an agent inference or a later judgement. Kickoff ending at planning is not an opt-out.`
+const USER_CONSTRAINT: AutoOkDecision = {
+	is_applied: false,
+	reason: 'a user prohibition is recorded under 自動実行の制約',
+}
+
+function user_constraint_of(body: string): AutoOkDecision | undefined {
+	const section = markdown_section.section_lines(body, CONSTRAINT_HEADING).join('\n')
+	const lines = markdown_section.unfenced_lines(section).map((line) => line.trim())
+	const has_fields = CONSTRAINT_FIELDS.every((prefix) =>
+		lines.some((line) => line.startsWith(prefix) && line.slice(prefix.length).trim() !== ''),
+	)
+
+	return has_fields && lines.includes(CONSTRAINT_SOURCE) ? USER_CONSTRAINT : undefined
 }
 
 // The labels that keep a person in the loop, each with the reason it withholds `auto-ok`. A
@@ -102,18 +122,37 @@ function decision_problem(body: string): string | undefined {
 	return has_rule ? DECISION_PROBLEM : undefined
 }
 
+function body_decision(body: string): AutoOkDecision {
+	return user_constraint_of(body) ?? (judgement_of(body) === false ? APPLIED : JUDGEMENT)
+}
+
 function decide(filing: AutoOkFiling): AutoOkDecision {
 	if (filing.is_opted_out) return OPTED_OUT
 	if (filing.is_cross_repository) return CROSS_REPOSITORY
 
-	return exclusion_of(filing.labels) ?? (judgement_of(filing.body) === false ? APPLIED : JUDGEMENT)
+	return exclusion_of(filing.labels) ?? body_decision(filing.body)
+}
+
+function opt_out_problem(filing: AutoOkFiling): string | undefined {
+	if (!filing.is_opted_out || user_constraint_of(filing.body) !== undefined) return undefined
+	const without_opt_out = decide({ ...filing, is_opted_out: false })
+
+	return without_opt_out.is_applied ? CONSTRAINT_PROBLEM : undefined
 }
 
 function line_of(decision: AutoOkDecision): string {
 	return `auto-ok: ${decision.is_applied ? 'applied' : 'not applied'} — ${decision.reason}`
 }
 
-const issue_auto_ok = { declaration_problem, decide, decision_problem, exclusion_of, line_of }
+const issue_auto_ok = {
+	declaration_problem,
+	decide,
+	decision_problem,
+	exclusion_of,
+	line_of,
+	opt_out_problem,
+	user_constraint_of,
+}
 
 export type { AutoOkDecision, AutoOkFiling }
 export { issue_auto_ok }

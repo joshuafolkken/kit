@@ -56,6 +56,8 @@ describe('josh auto-ok:judge — the listing', () => {
 		expect(await auto_ok_judge_cli.run([])).toBe(SUCCESS_EXIT_CODE)
 		expect(stdout()).toBe(String(OWED_NUMBER))
 		expect(stderr()).toContain(session_cite.issue(OWED_NUMBER, `Issue ${String(OWED_NUMBER)}`))
+		expect(stderr()).toContain('kickoff planning alone is not an opt-out')
+		expect(stderr()).toContain('docs/how-to/auto-ok-provenance.md')
 	})
 
 	it('prints none when every candidate is already judged', async () => {

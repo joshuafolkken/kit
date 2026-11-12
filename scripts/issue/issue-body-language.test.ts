@@ -78,6 +78,22 @@ describe('an Issue body in either language', () => {
 	})
 })
 
+describe('auto-ok provenance in either language', () => {
+	it.each(['ja', 'en'])('preserves both body languages under %s', async (lang) => {
+		under(lang)
+		const { issue_auto_ok } = await import('./issue-auto-ok')
+		const bodies = [
+			'## 自動実行の制約\n- 出所: user\n- 参照: session:prompt\n- 指示: 自動実行禁止',
+			'## Automatic execution constraint\n- Constraint source: user\n- Constraint reference: session:prompt\n- Constraint instruction: Do not run automatically',
+		]
+
+		expect(bodies.map((body) => issue_auto_ok.user_constraint_of(body)?.is_applied)).toEqual([
+			false,
+			false,
+		])
+	})
+})
+
 describe('a line josh writes into an Issue body', () => {
 	it.each([
 		{ lang: 'ja', non_bug: JAPANESE_NON_BUG },

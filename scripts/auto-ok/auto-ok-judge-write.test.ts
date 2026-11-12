@@ -40,7 +40,7 @@ describe('auto_ok_judge_write.apply', () => {
 			AUTO_OK_LABEL,
 		])
 		expect(emit).not.toHaveBeenCalled()
-		expect(post_comment.mock.calls[0]?.[1]).toContain('<!-- josh:auto-ok-judged body=')
+		expect(post_comment.mock.calls[0]?.[1]).toContain('<!-- josh:auto-ok-judged v=2 body=')
 		expect(post_comment.mock.calls[0]?.[1]).toContain(`(${RUN_LANE_LABEL})`)
 	})
 

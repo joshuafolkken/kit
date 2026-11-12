@@ -67,6 +67,9 @@ function parse_request(argv: ReadonlyArray<string>): JudgeRequest | undefined {
 }
 
 async function list(): Promise<number> {
+	console.error(
+		'Judge original user instructions separately from automated plans and prior decisions; kickoff planning alone is not an opt-out. Verify the reference and verbatim prohibition under 自動実行の制約 before treating it as a user constraint (docs/how-to/auto-ok-provenance.md).',
+	)
 	const owed = await auto_ok_judge_read.owed()
 
 	if (owed === undefined) {

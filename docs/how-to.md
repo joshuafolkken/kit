@@ -26,6 +26,7 @@ For anyone who knows what they want to do but not which command does it. Each gu
 | ------------------------------------------------ | ------------------------------------------------------------------------- |
 | Have an agent plan, implement or merge an Issue  | [Run Issues with the workflow keywords](./how-to/run-issues.md)           |
 | Let an agent work through many Issues unattended | [Run the backlog unattended](./how-to/run-backlog.md)                     |
+| Verify a user's automatic-execution prohibition  | [Auto-ok provenance](./how-to/auto-ok-provenance.md)                      |
 | Continue or clean up after a run stopped         | [Recover a stopped run](./how-to/recover-a-run.md)                        |
 | Let one Issue's lane run past its size guide     | [Approve a lane plan past its size guide](./how-to/lane-size-approval.md) |
 

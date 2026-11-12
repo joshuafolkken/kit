@@ -162,7 +162,7 @@ pnpm josh issue:file --batch .josh/tmp/deferred.md --route tier-a
 - `--distinct <N,…>` — duplicate candidates you read and judged distinct.
 - `--found-during <N>` — the Issue whose work the filing came from, when it is not the lane or branch Issue. The filing cap counts per origin (step 2); step 7 never holds it as a candidate here. #N gets a deferral comment.
 - `--over-cap` — the run is blocked by this filing, or a user typed `new` (`kickoff` / `fullrun` / `halfrun` / `prrun new`, whose filing commands carry it); the WIP cap lets it through.
-- `--no-auto-ok` — needs a person's judgement (Tier B / C); no `auto-ok`.
+- `--no-auto-ok` — needs human judgement or a verified user prohibition; no `auto-ok`.
 - `--release` — a consumer can use the change only once it is published. The filed issue becomes a blocker of the target's release issue (step 10).
 - `--blocks-finder` — with `--route interrupt`, the finder cannot go on until this issue is done. The finder is recorded as blocked by the filed issue (step 9); under an epic, `epic --reconcile <E>` after `epic --add` declares it.
 - `--check` — run steps 1–7, create nothing; exit 1 on a refusal. `--batch` refuses it.
@@ -875,11 +875,13 @@ pnpm josh auto-ok:judge --decline 913 --reason "<why>"   # record why it stays o
 
 `backlog:drive` hands back `judge` when the opted-in pool is exhausted, a lane is free and at least one such issue exists.
 
-A candidate is an open issue without `auto-ok` that carries none of the labels [`josh issue:file`](#josh-issuefile) refuses `auto-ok` on. Whether it needs a policy decision, an external account or a person's visual check is read by the agent, never by this command.
+A candidate is open, lacks `auto-ok` and has no [`issue:file`](#josh-issuefile) exclusion label. The agent checks human-judgement needs.
 
-Bare, it prints one number per line on stdout, or `none`, with each title on stderr; exit 1 if the listing could not be read.
+Bare: numbers or `none` on stdout, titles on stderr; unreadable listing exits 1.
 
-Both post a judgement comment with a digest of the body; the issue is listed again only after its body changes or a person comments after it.
+Both record a version and body digest. Re-list after a body change or later human comment; re-evaluate legacy records once.
+
+Filing and judgement share [provenance](how-to/auto-ok-provenance.md).
 
 ### `josh backlog:next`
 

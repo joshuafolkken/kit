@@ -46,7 +46,7 @@ interface FileArguments {
 	// `--over-cap`: the run is blocked by this filing, or a user typed `new`, so the WIP cap does not
 	// hold it (`issue-wip.ts`, `wip-cap.md`).
 	is_over_cap: boolean
-	// `--no-auto-ok`: the Issue needs a person's judgement, so `auto-ok` is not applied (`issue-auto-ok.ts`).
+	// `--no-auto-ok`: an exclusion or verified user prohibition withholds `auto-ok` (`issue-auto-ok.ts`).
 	is_auto_ok_opted_out: boolean
 	// `--release`: the change reaches a consumer only once published, so the Issue is linked to the
 	// repository's release Issue as a blocker (`issue-release-cli.ts`).
