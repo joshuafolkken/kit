@@ -1,5 +1,6 @@
 import { readdirSync } from 'node:fs'
 import path from 'node:path'
+import { direct_importers } from './direct-importers'
 import { test_related_pins } from './test-related-pins'
 import { related_scope, type RelatedScope } from './test-related-scope'
 
@@ -7,7 +8,7 @@ import { related_scope, type RelatedScope } from './test-related-scope'
 // near a hub reaches hundreds of test files, and paying that reach after every small edit repeats it
 // minutes apart. **The touched scope reads no test-read map and no import graph**: it is the diff's own
 // test files and, for each changed module `foo.ts`, its colocated `foo.test.ts` and `foo.*.test.ts`,
-// plus the tests the change pins (`test-related-pins.ts`).
+// plus the tests the change pins (`test-related-pins.ts`) and its modules' direct test importers.
 // The full-reach run checks further away. A touched green admits review round 2, and the lane ledger
 // records it under its own kind.
 
@@ -15,8 +16,8 @@ const TOUCHED_FLAG = '--touched'
 const TOUCHED_KIND = 'touched'
 const TEST_SUFFIX = '.test.ts'
 const TOUCHED_REASON =
-	'the diff test files, the tests named after its modules and the tests it pins'
-const NOTHING_TOUCHED_REASON = 'no test file is in the diff or named after a changed module'
+	"the diff test files, their modules' same-named tests, direct test importers and pinned tests"
+const NOTHING_TOUCHED_REASON = 'no changed file reaches a touched test'
 
 type ListDirectory = (directory: string) => ReadonlyArray<string>
 
@@ -76,11 +77,28 @@ function touched_scope(
 	return { mode: 'related', files, reason: TOUCHED_REASON }
 }
 
+// A shared fixture often has no same-named test. Reuse the direct-import scan, without building
+// a transitive graph, so its consuming suites run before the shipping checks (joshuafolkken/kit#7380).
+async function read_scope(
+	root: string,
+	changed: ReadonlyArray<string> | undefined,
+): Promise<RelatedScope> {
+	if (changed === undefined) return touched_scope(root, changed)
+
+	const importers = await direct_importers.importers_of(
+		root,
+		changed.filter((file) => related_scope.is_relatable(file)),
+	)
+
+	return touched_scope(root, [...changed, ...[...importers.values()].flat()])
+}
+
 const test_related_touched = {
 	NOTHING_TOUCHED_REASON,
 	TOUCHED_FLAG,
 	TOUCHED_KIND,
 	TOUCHED_REASON,
+	read_scope,
 	touched_scope,
 	touched_tests,
 }

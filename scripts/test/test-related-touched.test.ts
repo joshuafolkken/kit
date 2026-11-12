@@ -92,3 +92,15 @@ describe('test_related_touched.touched_scope', () => {
 		expect(test_related_touched.touched_scope(ROOT, undefined, LIST).mode).toBe('all')
 	})
 })
+
+describe('test_related_touched.read_scope', () => {
+	it('preserves the full-suite fallback for an unreadable change', async () => {
+		expect(await test_related_touched.read_scope(ROOT, undefined)).toEqual(
+			test_related_touched.touched_scope(ROOT, undefined),
+		)
+	})
+
+	it('runs no test for an empty change without needing an import graph', async () => {
+		expect(await test_related_touched.read_scope(ROOT, [])).toMatchObject({ mode: 'none' })
+	})
+})
