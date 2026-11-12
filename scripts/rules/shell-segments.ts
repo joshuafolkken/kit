@@ -129,7 +129,7 @@ function parts_of(command: string): Array<string> {
 	return pieces_of(command, cuts).flatMap((piece, index) => {
 		const cut = cuts[index]
 
-		return cut === undefined ? [piece] : [piece, command.slice(cut.begin, cut.end)]
+		return cut === undefined ? piece : [piece, command.slice(cut.begin, cut.end)]
 	})
 }
 
