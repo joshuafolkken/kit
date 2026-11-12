@@ -2,6 +2,7 @@ import { setTimeout } from 'node:timers/promises'
 import { poll as shared_poll } from '#scripts/lib/poll'
 import semver from 'semver'
 import { z } from 'zod'
+import { github_release_notes } from './github-release-notes'
 import { github_release_runs, type PollState, type RunSource } from './github-release-runs'
 
 const API_ROOT = 'https://api.github.com/repos'
@@ -41,6 +42,7 @@ interface Client extends Omit<RunSource, 'read'> {
 	request: ReleaseRequest
 	token: string
 	url: string
+	repository: string
 }
 
 // `fallback` answers when no tag sits between the floor and the target; without one the floor itself
@@ -81,7 +83,11 @@ async function api_post(client: Client, path: string, body: object): Promise<Res
 }
 
 async function read_response(response: Response): Promise<unknown> {
-	if (!response.ok) throw new Error(`GitHub Releases API returned HTTP ${String(response.status)}`)
+	if (!response.ok) {
+		const detail = await response.text()
+
+		throw new Error(`GitHub Releases API returned HTTP ${String(response.status)}: ${detail}`)
+	}
 
 	return await response.json()
 }
@@ -248,10 +254,11 @@ async function create_release(
 	previous: string | undefined,
 ): Promise<void> {
 	const notes = await generate_notes(client, tag, previous)
+	const url = github_release_notes.changelog_url(client.repository, tag, previous)
 	const response = await api_post(client, '/releases', {
 		tag_name: tag,
 		name: notes.name,
-		body: notes.body,
+		body: github_release_notes.cap_body(notes.body, url),
 		draft: false,
 		prerelease: false,
 	})
@@ -268,6 +275,7 @@ function create_client(request: ReleaseRequest, token: string, settings: Release
 		request,
 		token,
 		url: `${API_ROOT}/${settings.repository}`,
+		repository: settings.repository,
 		workflow: settings.workflow,
 		jobs: settings.jobs ?? [],
 		release_run_workflow: settings.release_run_workflow,
