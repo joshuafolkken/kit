@@ -28,6 +28,7 @@ const state_schema = z.object({
 	owner_nonce: z.string(),
 	child_pid: z.number().int().positive().optional(),
 	child_process_start: z.string().optional(),
+	resume_cut: z.string().optional(),
 	epoch: z.number().int().nonnegative(),
 })
 
@@ -140,15 +141,26 @@ function remove_stale_owner(target: string, previous: SupervisorOwner | undefine
 	return true
 }
 
+function previous_resume(
+	lane_directory: string,
+	owner: SupervisorOwner | undefined,
+): string | undefined {
+	if (owner === undefined) return undefined
+
+	return read_state(lane_directory, owner.nonce)?.resume_cut
+}
+
 function claim(issue: string, lane_directory: string, nonce: string): SupervisorOwner | undefined {
 	const target = marker_path(lane_directory)
 	const previous = read(lane_directory)
 	if (!remove_stale_owner(target, previous)) return undefined
 	const child = carried_child(lane_directory, previous)
+	const resume_cut = previous_resume(lane_directory, previous)
 	const owner = { issue, nonce, ...process_identity.own_fields() }
 	if (!stamp_file.create_stamp(target, owner)) return undefined
 	stamp_file.replace_stamp(state_path(lane_directory), {
 		owner_nonce: nonce,
+		resume_cut,
 		epoch: 0,
 		...(child !== undefined && {
 			child_pid: child.pid,
