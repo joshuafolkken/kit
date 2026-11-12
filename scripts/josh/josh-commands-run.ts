@@ -202,7 +202,7 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 				{ arguments: '1839 --clear', note: 'remove needs-decision and the record' },
 				{
 					arguments: '1839 --escalate "needs a stronger model"',
-					note: 'josh.worker.escalate only: run:stalled with the reason, never auto-retried',
+					note: 'josh.worker.escalate only: run:stalled with the reason, resumed one profile up',
 				},
 			],
 		},

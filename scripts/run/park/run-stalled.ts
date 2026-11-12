@@ -56,7 +56,8 @@ function next_step(child: number | string, cause = ''): string {
 }
 
 // The worker's own declaration that its Issue needs a stronger `josh.worker` profile
-// (joshuafolkken/kit#7356). No retry check reads it, so `run:stalled`'s auto-retry never re-offers it.
+// (joshuafolkken/kit#7356). No retry check reads it, so `run:stalled`'s auto-retry never re-offers it
+// on the same profile; the drive resumes it one profile up (joshuafolkken/kit#7357).
 const ESCALATION_REQUESTED: StallCause = {
 	short: 'escalation requested',
 	why: 'the worker declared that its Issue needs a stronger josh.worker profile.',

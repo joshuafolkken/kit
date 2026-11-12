@@ -35,7 +35,7 @@ const ESCALATION_GUIDE = [
 	'',
 	'## Escalation',
 	'',
-	'- This Issue needs a stronger model than the one you run on → `pnpm josh run:park <N> --escalate "<reason>"`, then stop. The reason is required and recorded; the park is not auto-retried.',
+	'- This Issue needs a stronger model than the one you run on → `pnpm josh run:park <N> --escalate "<reason>"`, then stop. The reason is required and recorded; the lane resumes one profile up, or goes to a person at the top profile.',
 ].join('\n')
 
 // An include that resolves to nothing is `undefined`, never an empty string, so a renamed heading

@@ -345,7 +345,7 @@ Park a lane child for a decision or an escalation, or clear the park.
 ```bash
 pnpm josh run:park 1839 --body-file .josh/tmp/park-1839.md    # options, tiers and a recommendation; then needs-decision, the record, run:release
 pnpm josh run:park 1839 --clear                               # remove needs-decision and the record
-pnpm josh run:park 1839 --escalate "needs a stronger model"   # josh.worker.escalate only: run:stalled with the reason, never auto-retried
+pnpm josh run:park 1839 --escalate "needs a stronger model"   # josh.worker.escalate only: run:stalled with the reason, resumed one profile up
 ```
 
 <!-- /usage -->
