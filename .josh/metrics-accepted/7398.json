@@ -1,0 +1,7 @@
+{
+	"reason": "Exclude project scratch records through the existing shared classifier while retaining runtime checks for mixed patches (#7398).",
+	"date": "2026-11-12",
+	"growth": {
+		"scripts.code_lines": 3
+	}
+}

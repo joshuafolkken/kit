@@ -12,9 +12,9 @@ import { test_declared_logic } from '#scripts/test/test-declared-logic'
 // code", so the hook that delivers it is the one that sees that write: the first `Edit` / `Write` of a
 // runtime file in the session.
 //
-// **A runtime file only.** What counts is `test_declared_logic.is_exempt`, the same classification
-// `pnpm josh test:declared` answers at the commit, so a doc or prompt edit neither shows the notice nor
-// spends it. A path outside the working tree (a memory file, a scratchpad) is not this project's code.
+// **A runtime file only.** `test_declared_logic.is_exempt` shares the commit-time classification;
+// project scratch records in `.josh/tmp` are also non-runtime. A doc, prompt or scratch record neither
+// shows the notice nor spends it. A path outside the working tree is not this project's code.
 //
 // **Once per session**, on a stamp keyed by the transcript like every other guard record here. A stamp
 // that cannot be written stays silent rather than repeating the notice on every edit.
@@ -44,8 +44,8 @@ function is_external(relative: string): boolean {
 	return relative.startsWith(PARENT_PREFIX) || path.isAbsolute(relative)
 }
 
-function is_scratch_record(file_path: string): boolean {
-	const relative = path.relative(tmpdir(), file_path)
+function is_scratch_record(file_path: string, scratch_root = tmpdir()): boolean {
+	const relative = path.relative(scratch_root, file_path)
 	const is_scratch = !is_external(relative)
 
 	return is_scratch && ['.md', '.json', '.txt'].includes(path.extname(file_path))
@@ -66,7 +66,10 @@ function is_runtime_file(
 ): boolean {
 	const relative = path.relative(root, path.resolve(root, file_path))
 
-	if (should_skip_external(relative, path.resolve(root, file_path), should_include_external)) {
+	if (
+		is_scratch_record(path.resolve(root, file_path), path.join(root, '.josh/tmp')) ||
+		should_skip_external(relative, path.resolve(root, file_path), should_include_external)
+	) {
 		return false
 	}
 

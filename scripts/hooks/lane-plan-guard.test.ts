@@ -3,6 +3,7 @@ import { git_common_directory } from '#scripts/git/git-common-directory'
 import { lane_plan } from '#scripts/lane/lane-plan'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { codex_hook_adapter } from './codex-hook-adapter'
 import { lane_plan_guard } from './lane-plan-guard'
 
 // joshuafolkken/kit#4864: a dispatched lane child's first runtime edit waits for its recorded plan.
@@ -15,12 +16,20 @@ const LANE = path.join(ROOT, '.kit-lanes', ISSUE)
 const CHILD = { JOSH_LANE_CHILD: ISSUE }
 const RUNTIME_FILE = 'scripts/lane/lane-overrun.ts'
 const DOC_FILE = 'docs/why.md'
+const APPROVAL_FILE = `.josh/tmp/size-approval-${ISSUE}.json`
 const PLAN = { issue: Number(ISSUE), paths: [RUNTIME_FILE], planned_at: '2026-10-25T03:10:00Z' }
 
 function edit_of(file_path: string): string {
 	const transcript_path = path.join(ROOT, 'transcript.jsonl')
 
 	return JSON.stringify({ tool_name: 'Edit', tool_input: { file_path }, transcript_path })
+}
+
+function patch_of(paths: ReadonlyArray<string>, tool_name: string): string {
+	const files = paths.map((file_path) => `*** Add File: ${file_path}\n+{}`).join('\n')
+	const command = `*** Begin Patch\n${files}\n*** End Patch`
+
+	return codex_hook_adapter.pretool_payload(JSON.stringify({ tool_name, tool_input: command }))
 }
 
 beforeEach(() => {
@@ -64,5 +73,25 @@ describe('lane_plan_guard.reason', () => {
 		expect(
 			lane_plan_guard.reason(edit_of(RUNTIME_FILE), LANE, { JOSH_LANE_CHILD: '4858' }),
 		).toBeUndefined()
+	})
+})
+
+describe('lane_plan_guard — Codex approval scratch records (#7398)', () => {
+	it.each(['apply_patch', 'functions.apply_patch'])(
+		'allows an approval scratch record from %s before planning',
+		(tool_name) => {
+			const payload = patch_of([APPROVAL_FILE], tool_name)
+
+			expect(lane_plan_guard.reason(payload, LANE, CHILD)).toBeUndefined()
+		},
+	)
+
+	it.each([
+		[APPROVAL_FILE, RUNTIME_FILE],
+		[RUNTIME_FILE, APPROVAL_FILE],
+	])('refuses a mixed patch starting with %s before planning', (...paths) => {
+		const payload = patch_of(paths, 'apply_patch')
+
+		expect(lane_plan_guard.reason(payload, LANE, CHILD)).toContain('pnpm josh lane:plan')
 	})
 })
