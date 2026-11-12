@@ -1,0 +1,7 @@
+{
+	"reason": "Share per-file scope estimates with actual-size measurement and existing split decisions for issue #7381",
+	"date": "2026-11-12",
+	"growth": {
+		"scripts.code_lines": 68
+	}
+}

@@ -10,6 +10,8 @@ const A_TS = 'scripts/a.ts'
 const TAB_PATH = 'scripts/a\tb.ts'
 const OBSERVATION_RECORD = '.josh/observations/6391.md'
 const GUIDE_TEXT = 'guide 8 files / 200 lines'
+const HOOK_SOURCE = '.claude/settings.json'
+const HOOK_ARTIFACT = '.codex/hooks.json'
 
 // A numstat row: added, deleted, path.
 function row(added: string, deleted: string, path: string): string {
@@ -31,6 +33,15 @@ function runtime_numstat(count: number, lines: number): string {
 // joshuafolkken/kit#6724: the split notice counted a new scripts module and its importer as two files
 // while `lane:plan` cleared them as one, so `run:cut` asked to split off the importer.
 describe('split notice on lane:plan units', () => {
+	it('keeps a registered generated artifact with its source on both estimation and actual measurement', () => {
+		const paths = [HOOK_ARTIFACT, HOOK_SOURCE, 'scripts/a.snap', 'docs/list.md']
+		const changes = paths.map((path) => ({ path, changed_lines: 6 }))
+		const actual = split_assess.assess(paths.map((path) => add_row(6, path)).join('\n'))
+
+		expect(split_assess.measure(changes)).toEqual(actual)
+		expect(actual).toMatchObject({ files: 3, lines: 24 })
+		expect(split_assess.units_of(paths, new Set())).toContainEqual([HOOK_SOURCE, HOOK_ARTIFACT])
+	})
 	const new_module = 'scripts/x/new.ts'
 	const plan_diff = [
 		add_row(1, new_module),

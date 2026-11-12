@@ -436,6 +436,12 @@ pnpm josh lane:plan 4864 scripts/lane/lane-plan.ts scripts/backlog/backlog-next.
 
 A lane child runs it once its work summary settles, before the first edit, naming every file the summary changes. It checks once; until it prints `clear`, `scripts/hooks/lane-plan-guard.ts` refuses its runtime-file edits.
 
+`--estimate scope.json` accepts `{"changes":[{"path":"scripts/a.ts","changed_lines":30}],"added":[]}`. Include callers, docs and verification; count additions plus deletions. `added` names new modules.
+
+`plan:scaffold` prints the same input's size. `lane:plan` saves it for the split bar without lowering the body declaration.
+
+Tests and run records are excluded; docs, snapshots, fixtures and listings count. Generated pairs form one unit; both files' lines count. `--single` keeps an indivisible contract together.
+
 A lane whose plan was cleared, or else recorded first, holds the files, so two lanes never yield to each other; `backlog:next` reads the same record, so a candidate waits on a running lane's plan, read in place of its body. A file under `docs/` never clashes: the lane's sync with main resolves a shared document.
 
 A lane child's `issue:plan` runs it on the recorded plan's backticked paths (`docs/josh-commands-backlog.md` → "`josh issue:plan`").

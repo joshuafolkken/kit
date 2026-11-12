@@ -1,4 +1,3 @@
-import { codex_hooks } from '#scripts/agent/codex-hooks'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { issue_body_keys } from '#scripts/issue/issue-body-keys'
 import { session_cite } from '#scripts/issue/session-cite'
@@ -163,20 +162,10 @@ function files_approved(
 	)
 }
 
-// An artifact a build regenerates from one of `sources` (joshuafolkken/kit#6666): its edit is its source's,
-// so it is not counted and stays or splits off with its source — apart, the parity test fails.
-function is_generated_from(file: string, sources: ReadonlyArray<string>): boolean {
-	const source = codex_hooks.GENERATED_SOURCES.get(file)
-
-	return source !== undefined && sources.includes(source)
-}
-
-function is_counted(file: string, paths: ReadonlyArray<string>): boolean {
-	return !test_declared_logic.is_test_file(file) && !is_generated_from(file, paths)
-}
-
-function with_artifacts(files: ReadonlyArray<string>, paths: ReadonlyArray<string>): Array<string> {
-	return [...files, ...paths.filter((file) => is_generated_from(file, files))]
+// Estimate paths and the actual diff exclude the same tests and run records. Generated pairs are
+// grouped by `split_assess.units_of`, so no caller can split an artifact from its source.
+function is_counted(file: string): boolean {
+	return split_assess.is_deliverable({ path: file, changed_lines: 0 })
 }
 
 function files_over(
@@ -186,7 +175,7 @@ function files_over(
 	signals: PlanSignals,
 ): FilesOver | undefined {
 	const limit = declared * declared_growth.factor(ratios_of(signals), 'files')
-	const counted = plan.paths.filter((file) => is_counted(file, plan.paths))
+	const counted = plan.paths.filter((file) => is_counted(file))
 	const units = units_of(ordered(counted, recorded?.paths ?? []), signals)
 
 	if (units.length <= limit || files_approved(plan, declared, recorded, units.length)) {
@@ -194,8 +183,8 @@ function files_over(
 	}
 
 	const tests = plan.paths.filter((file) => test_declared_logic.is_test_file(file))
-	const kept = with_artifacts(units.slice(0, limit).flat(), plan.paths)
-	const split_off = with_artifacts(units.slice(limit).flat(), plan.paths)
+	const kept = counted.filter((file) => units.slice(0, limit).flat().includes(file))
+	const split_off = counted.filter((file) => units.slice(limit).flat().includes(file))
 
 	return { reason: 'files', declared, limit, kept, split_off, tests }
 }
@@ -286,9 +275,11 @@ function measure_over(
 ): MeasureOver | undefined {
 	if (signals.split_filed) return undefined
 
+	const estimated = Math.max(declared.lines, plan.estimated_size?.lines ?? 0)
+
 	return (
 		hunks_over(declared.files, unplanned_hunks(signals, plan, recorded), signals) ??
-		planned_lines(declared.lines, signals, plan, recorded)
+		planned_lines(estimated, signals, plan, recorded)
 	)
 }
 
@@ -343,7 +334,7 @@ const SIZE_PREFIX = issue_body_keys.prefix('size')
 
 function files_text(issue: number, over: FilesOver): string {
 	const planned = [...over.kept, ...over.split_off]
-	const counted = planned.filter((file) => is_counted(file, planned)).length
+	const counted = split_assess.units_of(planned, new Set()).length
 	const bar = `${String(counted)} files (tests and generated artifacts excluded), over ${String(over.limit)} — ${String(over.limit / over.declared)} times the ${String(over.declared)} its \`${SIZE_PREFIX}\` declares`
 	const replan = ['pnpm josh lane:plan', String(issue), ...over.kept, ...over.tests].join(' ')
 
