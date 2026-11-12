@@ -5,6 +5,8 @@ import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { parse_json, parse_json_array_safe } from '#scripts/git/parse-json-array'
 import { session_cite } from '#scripts/issue/session-cite'
+import { CARRIED_ROUNDS_SUFFIX } from '#scripts/observations/observation-ledger'
+import { observation_ledger_archive } from '#scripts/observations/observation-ledger-archive'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { observation_ledger_line } from '#scripts/observations/observation-ledger-line'
 import { z } from 'zod'
@@ -37,8 +39,7 @@ const COMMENT_NOTE =
 	'Kept here rather than in the observation ledger: a line appended after the commit would be pushed onto the open pull request and restart its CI.'
 const CODE_FENCE = '```'
 const OBSERVATION_LINE_MARK = '- k:'
-const CARRIED_SUFFIX = '-comment-rounds'
-const CARRIED_FILE_PATTERN = new RegExp(String.raw`^\d+${CARRIED_SUFFIX}\.md$`, 'u')
+const CARRIED_FILE_PATTERN = new RegExp(String.raw`^\d+${CARRIED_ROUNDS_SUFFIX}\.md$`, 'u')
 // One page of the newest closed issues: an issue leaves the search's interest once carried, so the
 // ones still to carry are the recently closed.
 const PER_PAGE = '100'
@@ -145,7 +146,7 @@ async function closed_issues(): Promise<ReadonlyArray<number>> {
 }
 
 function carried_path(issue: number, root: string): string {
-	return observation_ledger_home.file_path(`${String(issue)}${CARRIED_SUFFIX}`, root)
+	return observation_ledger_home.file_path(`${String(issue)}${CARRIED_ROUNDS_SUFFIX}`, root)
 }
 
 // A path this carry writes, told by its file name alone so a git status path answers it too.
@@ -173,10 +174,14 @@ async function carry_issue(issue: number, root: string): Promise<number> {
 	return lines.length
 }
 
-// Copies every closed issue's comment rounds not yet in the ledger, and answers how many lines.
+// Copies every closed issue's comment rounds not yet in the ledger, and answers how many lines. A
+// rounds file the archive moved is carried as well (`observation-ledger-archive.ts`).
 async function carry(root: string): Promise<number> {
 	const issues = await closed_issues()
-	const pending = issues.filter((issue) => !existsSync(carried_path(issue, root)))
+	const archived = observation_ledger_archive.archived_rounds(root)
+	const pending = issues.filter(
+		(issue) => !archived.has(issue) && !existsSync(carried_path(issue, root)),
+	)
 	const counts = await Promise.all(pending.map(async (issue) => await carry_issue(issue, root)))
 
 	return counts.reduce((total, count) => total + count, 0)
