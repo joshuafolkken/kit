@@ -1,5 +1,5 @@
 {
-	"reason": "#7339 adds the observation ledger archive (new module + flush/carry wiring) that the #7336 retention policy requires",
+	"reason": "Archive step of the observation ledger retention policy (#7339): new observation-ledger-archive.ts and its flush wiring",
 	"date": "2026-11-12",
 	"growth": {
 		"scripts.code_lines": 148
