@@ -63,12 +63,22 @@ async function print_timeline(issue: string): Promise<number> {
 		records.events,
 		Number(issue),
 	)
-	const timeline =
-		breakdown === undefined ? undefined : lane_timeline.of(records, Number(issue), breakdown)
+	if (breakdown === undefined) return missing(issue)
+	const timeline = lane_timeline.of(records, Number(issue), breakdown)
 
 	if (timeline === undefined) return missing(issue)
 
-	const lines = [records.notice, lane_timeline.text(session_cite.issue(issue), timeline)]
+	const report = lane_breakdown_text.report_of(
+		Number(issue),
+		breakdown,
+		records.entries,
+		records.events,
+	)
+	const lines = [
+		records.notice,
+		lane_timeline.text(session_cite.issue(issue), timeline),
+		report.elapsed ?? '',
+	]
 
 	console.info(lines.filter((line) => line !== '').join('\n'))
 
@@ -84,7 +94,7 @@ async function print(issue: string): Promise<number> {
 
 	if (minutes === undefined || breakdown === undefined) return missing(issue)
 
-	const report = lane_breakdown_text.report_of(Number(issue), breakdown, entries)
+	const report = lane_breakdown_text.report_of(Number(issue), breakdown, entries, events)
 
 	console.info(
 		[

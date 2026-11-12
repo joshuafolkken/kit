@@ -5,6 +5,7 @@ import { lane_breakdown_pause, type PauseMark } from './lane-breakdown-pause'
 import { lane_ledger, type LedgerEntry } from './lane-ledger'
 import { lane_net_time, type LaneSpan } from './lane-net-time'
 import { lane_plan_wait_event } from './lane-plan-wait-event'
+import { lane_stage_events } from './lane-stage-events'
 import { lane_stop_stats } from './lane-stop-stats'
 import { lane_yield_split, type YieldShare } from './lane-yield-split'
 
@@ -329,7 +330,7 @@ function driver_of(ms: number): Array<Stage> {
  * span and intervals `lane_net_time.net_ms` reads, so the stages add up to it and the driver's followup
  * stands apart. `edit_ms`, the lane's first edit, opens the implementation where no event did.
  */
-function of(
+function breakdown_of(
 	entries: ReadonlyArray<LedgerEntry>,
 	events: ReadonlyArray<RunEvent>,
 	issue: number,
@@ -356,6 +357,25 @@ function of(
 		reasons: reasons_of(events, issue, span),
 		pauses: lane_breakdown_pause.of(events, issue, span),
 	}
+}
+
+function of(
+	entries: ReadonlyArray<LedgerEntry>,
+	events: ReadonlyArray<RunEvent>,
+	issue: number,
+	edit_ms?: number,
+): Breakdown | undefined {
+	const span = lane_net_time.span_of(entries, issue)
+	const breakdown = breakdown_of(
+		entries,
+		lane_stage_events.of(entries, events, issue),
+		issue,
+		edit_ms,
+	)
+
+	return breakdown === undefined || span === undefined
+		? undefined
+		: { ...breakdown, reasons: reasons_of(events, issue, span) }
 }
 
 // The stage `at_ms` fell in — the plan, the implementation or a ship stage, by the spans `of` cut — or

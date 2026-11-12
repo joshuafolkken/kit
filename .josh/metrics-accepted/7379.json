@@ -1,0 +1,7 @@
+{
+	"reason": "Issue #7379: historical stage recovery and exclusive end-to-end accounting; review fix shares actual waits without treating a split run as automatic waiting, with regression coverage.",
+	"date": "2026-11-12",
+	"growth": {
+		"scripts.code_lines": 249
+	}
+}

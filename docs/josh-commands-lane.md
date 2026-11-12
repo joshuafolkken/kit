@@ -355,6 +355,18 @@ pnpm josh lane:breakdown 4970 --timeline   # when each stage ran and where the l
 
 The stages — start to plan, implement, each ship stage, between ship stages — add up to `lane:net`'s minutes; the waits it takes out are one line apart. The implementation splits by its tool calls' kind, what no call spent being editing & thinking. A lane the ledger holds no dispatch and merge of exits non-zero (`lane-breakdown.ts`).
 
+Both forms print End-to-end from first dispatch to last merge, including verification, fixes, retries, CI, yield and human wait. The 30-minute decision includes human wait, also reported separately. Legacy `net` has broader exclusions. Internal budgets stay 25 minutes (plan 3, implement 9, ship 8, followup 5), with 5 minutes of headroom; gates stay unchanged.
+
+Exclusive wall-clock categories sum to End-to-end:
+
+- Human wait: park through the next stage or redispatch.
+- Automatic wait: timed tool responses except edits, gate/pre-detach/followup, CI, yield, outage and sleep; human wait takes precedence.
+- Off-tool work: the remainder with transcripts, including unrecorded activity; without transcripts, unclassified.
+
+Tool cumulative time is separate: parallel calls overlap and must not be added to wall clock.
+
+Historical ship boundaries use completed ledger/archive intervals and surviving unfinished-stage events. The board stream has bounded retention. For parallel stages, latest start owns each instant; earlier stages resume when it ends. Without either record, a missing stage cannot be reconstructed.
+
 `--timeline` prints the lane one line an event, oldest first: start (UTC), minutes since the dispatch, duration, name (`lane-timeline.ts`). Its stage lines are the same spans at their net minutes and add up to the net time.
 
 - `[excluded]` — a wait taken out, named by what opened it (park, outage, usage limit, split, yield, sleep).
