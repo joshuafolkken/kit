@@ -4989,3 +4989,8 @@
 - rf:none | none | - | 2026-11-12 | #7414
 - rb:2026-11-12 | #7414
 - rf:none | none | - | 2026-11-12 | #7414
+- rf:none | none | - | 2026-11-12 | #7413
+- ri:none | none | - | 2026-11-12 | #7413
+- rb:2026-11-12 | #7413
+- rf:bug-risks | medium | scripts/run/board/run-board-setup.ts:41 | 2026-11-12 | #7413 | fixed
+- rx:{"round":"af16d93e-2ab7-4fb8-b5ec-3e5c1876c00c","category":"bug-risks","severity":"medium","file":"scripts/run/board/run-board-setup.ts:41","disposition":"fixed","description":"supervisor 所有の retrospective unit 実行中もセッション非稼働判定が適用され、run が ⏸・spinner なしになるため、retrospective の稼働判定をセッション所有者から分離する。","status":"resolved"}
