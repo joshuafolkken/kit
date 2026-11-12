@@ -1,6 +1,8 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { cost_transcript, type SessionFile } from '#scripts/cost-runtime/cost-transcript'
+import { hook_ledger_read } from '#scripts/hooks/hook-ledger-read'
+import { lane_stats_request } from '#scripts/lane/lane-stats-request'
 import { stamped_memo } from '#scripts/lib/stamped-memo'
 import { delivered_rules } from './delivered-rules'
 import { piped_verification_shapes } from './piped-verification-shapes'
@@ -25,6 +27,8 @@ const ARGV_OFFSET = 2
 const REFRESH_FLAG = '--refresh'
 const FRESH_FLAG = '--fresh'
 const PROSE_FLAG = '--prose'
+const PERIOD_FLAG = '--period'
+const PERIOD_USAGE = 'usage: josh rule:value --period <days> — a positive number of days'
 const CACHED_NOTE = 'cached reading taken at'
 const PERCENT_SIGN = '%'
 const COLUMN_GAP = '  '
@@ -65,6 +69,15 @@ function gather_summaries(cwd: string): Array<RunSummary> {
 	store?.save()
 
 	return summaries
+}
+
+// `--period`: only the transcripts last written at or after `since_ms`, read into a memo of its own —
+// the stored per-run counts hold whole runs, so a window must neither read nor evict them.
+function gather_window(cwd: string, since_ms: number): Array<RunSummary> {
+	const files = cost_transcript.list_sessions_across(cost_transcript.transcript_directories(cwd))
+	const runs = group_by_run(files.filter((file) => file.modified_ms >= since_ms))
+
+	return rule_value_runs.summaries_of(runs, stamped_memo.create())
 }
 
 function* summarized(runs: Iterable<ReadonlyArray<string>>): Generator<RunSummary> {
@@ -148,10 +161,31 @@ function cached_text(fresh: FreshReading): string {
 	return `${fresh.text.trimEnd()}\n\n${CACHED_NOTE} ${taken_at} — ${FRESH_FLAG} to measure now, with candidates`
 }
 
-function print_measured(cwd: string): void {
-	const { table, candidates } = render_summaries(gather_summaries(cwd))
+function print_summaries(summaries: Iterable<RunSummary>): void {
+	const { table, candidates } = render_summaries(summaries)
 
 	process.stdout.write(`${[table, candidates].filter(Boolean).join('\n\n')}\n`)
+}
+
+function print_measured(cwd: string): void {
+	print_summaries(gather_summaries(cwd))
+}
+
+// The cache holds the all-time reading, so a period always measures and never stores.
+function print_period(argv: ReadonlyArray<string>, cwd: string): number {
+	const period_days = lane_stats_request.positive(argv[argv.indexOf(PERIOD_FLAG) + 1])
+
+	if (period_days === undefined) {
+		process.stderr.write(`${PERIOD_USAGE}\n`)
+
+		return 1
+	}
+
+	const since_ms = hook_ledger_read.period_start(period_days, new Date())
+
+	print_summaries(gather_window(cwd, since_ms))
+
+	return 0
 }
 
 function print_reading(argv: ReadonlyArray<string>, cwd: string): void {
@@ -178,9 +212,10 @@ function print_transcripts(argv: ReadonlyArray<string>, cwd: string): void {
 // when a rule is retired, not at the loop head, so they print to stdout only and the cache keeps its
 // shape. Bare, a reading cached inside the refresh interval is printed instead of measuring again —
 // the measurement re-reads every transcript and takes minutes (joshuafolkken/kit#5186); `--fresh`
-// measures regardless.
+// measures regardless. `--period <days>` counts only the transcripts of that trailing window.
 function run_rule_value(argv: ReadonlyArray<string> = [], cwd: string = process.cwd()): number {
 	if (argv.includes(PROSE_FLAG)) print_prose(cwd)
+	else if (argv.includes(PERIOD_FLAG)) return print_period(argv, cwd)
 	else print_transcripts(argv, cwd)
 
 	return 0
@@ -199,6 +234,7 @@ const rule_value_cli = {
 	run_rule_value,
 	CACHED_NOTE,
 	NO_TARGETS,
+	PERIOD_USAGE,
 	UNMEASURED,
 	UNREACHED,
 }

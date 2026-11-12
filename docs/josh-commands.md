@@ -1212,10 +1212,11 @@ pnpm josh lane:adopt --all   # every open lane with no record
 Print each delivered rule's unaided compliance — runs reached, kept rate, refusals.
 
 ```bash
-pnpm josh rule:value             # a reading cached under 15 minutes ago, else measure
-pnpm josh rule:value --fresh     # measure now, whatever the cache holds
-pnpm josh rule:value --refresh   # write the reading to the loop-head cache instead of stdout
-pnpm josh rule:value --prose     # class each prose rule: enforced, measured or prose only
+pnpm josh rule:value              # a reading cached under 15 minutes ago, else measure
+pnpm josh rule:value --fresh      # measure now, whatever the cache holds
+pnpm josh rule:value --refresh    # write the reading to the loop-head cache instead of stdout
+pnpm josh rule:value --period 7   # measure only the transcripts written in the last 7 days, cache untouched
+pnpm josh rule:value --prose      # class each prose rule: enforced, measured or prose only
 ```
 
 <!-- /usage -->
@@ -1227,6 +1228,7 @@ The kept rate is the share kept before the rule's trigger fired (`scripts/rules/
 - Printed from a cache at the `backlogrun` loop head (`josh backlog:offer`), refreshed at most every 15 minutes.
 - Bare, it prints that cache while under 15 minutes old, then `cached reading taken at <ISO time>`. A lane reads its parent's cache.
 - On stdout only, a `candidates:` section follows the table: `retire` lists measurable rules no run reached once the reading covers `MIN_RUNS_FOR_RETIREMENT` runs, and `condense` lists rules a hook refuses on every occurrence that it has refused (`scripts/rules/rule-value-candidates.ts`). The cache keeps the table alone, so `--fresh` prints them.
+- `--period <days>` counts only the transcripts last written inside that trailing window. It always measures and never reads or writes the cache. A value that is not a positive number prints the usage and exits 1.
 - `--prose` reads the documents instead: each prose rule's class and `file:line`.
 
 Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh rule:value` in detail".
