@@ -4,7 +4,7 @@ import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { poll } from '#scripts/lib/poll'
 import { file_reader } from '#scripts/lib/read-file'
 import { npm_registry } from '#scripts/version/npm-registry'
-import { release_publish_run } from './release-publish-run'
+import { release_publish_run, type FailedRun } from './release-publish-run'
 import { release_tag } from './release-tag'
 
 // The stage lines `pnpm josh release` prints, and the two stages it waits for after the tag.
@@ -26,7 +26,7 @@ const HTML_URL_FILTER = '.html_url'
 const PUBLISH_WORKFLOW_PATH = '.github/workflows/publish.yml'
 const RELEASE_WORKFLOW_PATH = '.github/workflows/github-release.yml'
 
-type NpmState = { kind: 'published' } | { kind: 'failed'; run_id: number } | { kind: 'pending' }
+type NpmState = { kind: 'published' } | { kind: 'failed'; run: FailedRun } | { kind: 'pending' }
 
 function pr_opened_line(pr_url: string): string {
 	return `📝 Release PR opened: ${pr_url}`
@@ -61,15 +61,27 @@ function missed_npm_line(package_name: string, version: string): string {
 	].join('\n')
 }
 
+function failed_run_headline(tag: string, run: FailedRun): string {
+	const run_label = `Publish ${tag} failed (run ${String(run.run_id)})`
+
+	if (run.has_npm_job_failed) return `❌ ${run_label} before npm listed ${tag}.`
+
+	return `❌ ${run_label} in ${run.failed_jobs.join(', ')}; its publish-npm job succeeded.`
+}
+
 // The run's own failure is known, so the line names the run rather than a stage that never came. It
-// claims no more than the last registry read: a job beside `publish-npm` can fail the run after npm
-// took the version.
-function failed_publish_line(version: string, run_id: number): string {
+// claims no more than the last registry read: when a job beside `publish-npm` failed the run, npm
+// may still take the version, so the npm side is reported as unconfirmed rather than failed.
+function failed_publish_line(package_name: string, version: string, run: FailedRun): string {
 	const tag = release_tag.tag_name(version)
+	const npm_lines = run.has_npm_job_failed
+		? []
+		: [`  npm has not listed ${tag} yet: check ${npm_package_url(package_name, version)}`]
 
 	return [
-		`❌ Publish ${tag} failed (run ${String(run_id)}) before npm listed ${tag}.`,
-		`  Inspect it with: gh run view ${String(run_id)} --log-failed`,
+		failed_run_headline(tag, run),
+		...npm_lines,
+		`  Inspect it with: gh run view ${String(run.run_id)} --log-failed`,
 	].join('\n')
 }
 
@@ -117,16 +129,16 @@ async function read_release_url(version: string): Promise<string | undefined> {
 
 function npm_outcome_line(package_name: string, version: string, state: NpmState): string {
 	if (state.kind === 'published') return npm_line(package_name, version)
-	if (state.kind === 'failed') return failed_publish_line(version, state.run_id)
+	if (state.kind === 'failed') return failed_publish_line(package_name, version, state.run)
 
 	return missed_npm_line(package_name, version)
 }
 
 async function npm_state(package_name: string, version: string): Promise<NpmState> {
 	if (npm_registry.has_public_version(package_name, version)) return { kind: 'published' }
-	const run_id = await release_publish_run.failed_run_id(version)
+	const run = await release_publish_run.failed_run(version)
 
-	return run_id === undefined ? { kind: 'pending' } : { kind: 'failed', run_id }
+	return run === undefined ? { kind: 'pending' } : { kind: 'failed', run }
 }
 
 // `josh release` is distributed to consumers whose packages are not on npm, so a repository that does

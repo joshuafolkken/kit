@@ -6,41 +6,95 @@ const VERSION = '1.342.0'
 const RUN_ID = 39_108_200_869
 const TITLE = 'Publish v1.342.0'
 const RUNS_PATH = 'repos/{owner}/{repo}/actions/workflows/publish.yml/runs?per_page=100'
+const JOBS_PATH = `/actions/runs/${String(RUN_ID)}/jobs`
+const COMPLETED = 'completed'
+const FAILURE = 'failure'
+const SUCCESS = 'success'
+const NPM_JOB = 'publish-npm'
+const RELEASE_JOB = 'create-release'
 
-function given_runs(runs: ReadonlyArray<object>): void {
-	vi.spyOn(git_gh_exec, 'exec_gh_api').mockResolvedValue(JSON.stringify({ workflow_runs: runs }))
+// `jobs` undefined: the jobs read fails.
+function given_runs(runs: ReadonlyArray<object>, jobs?: ReadonlyArray<object>): void {
+	vi.spyOn(git_gh_exec, 'exec_gh_api').mockImplementation(async ({ path }) => {
+		if (!path.includes(JOBS_PATH)) return JSON.stringify({ workflow_runs: runs })
+		if (jobs === undefined) throw new Error('HTTP 500')
+
+		return JSON.stringify({ jobs })
+	})
 }
 
 function run(title: string, status: string, conclusion?: string): object {
 	return { id: RUN_ID, display_title: title, status, conclusion }
 }
 
+function job(name: string, conclusion: string): object {
+	return { name, status: COMPLETED, conclusion }
+}
+
+const FAILED_RUN = run(TITLE, COMPLETED, FAILURE)
+
 afterEach(() => {
 	vi.restoreAllMocks()
 })
 
-describe('release_publish_run.failed_run_id', () => {
+describe('release_publish_run.failed_run — a failed run', () => {
 	it('names the Publish run of the tag once it has failed', async () => {
-		given_runs([run(TITLE, 'completed', 'failure')])
+		given_runs([FAILED_RUN], [job(NPM_JOB, FAILURE)])
 
-		expect(await release_publish_run.failed_run_id(VERSION)).toBe(RUN_ID)
+		expect(await release_publish_run.failed_run(VERSION)).toEqual({
+			run_id: RUN_ID,
+			failed_jobs: [NPM_JOB],
+			has_npm_job_failed: true,
+		})
 		expect(git_gh_exec.exec_gh_api).toHaveBeenCalledWith({ path: RUNS_PATH })
 	})
 
+	it('names the failed jobs and clears npm when publish-npm passed', async () => {
+		given_runs([FAILED_RUN], [job(NPM_JOB, SUCCESS), job(RELEASE_JOB, FAILURE)])
+
+		expect(await release_publish_run.failed_run(VERSION)).toEqual({
+			run_id: RUN_ID,
+			failed_jobs: [RELEASE_JOB],
+			has_npm_job_failed: false,
+		})
+	})
+
+	it('counts npm as failed when publish-npm was skipped behind a failed pack', async () => {
+		given_runs([FAILED_RUN], [job('pack', FAILURE), job(NPM_JOB, 'skipped')])
+
+		expect(await release_publish_run.failed_run(VERSION)).toEqual({
+			run_id: RUN_ID,
+			failed_jobs: ['pack'],
+			has_npm_job_failed: true,
+		})
+	})
+
+	it('counts npm as failed when the jobs cannot be read', async () => {
+		given_runs([FAILED_RUN])
+
+		expect(await release_publish_run.failed_run(VERSION)).toEqual({
+			run_id: RUN_ID,
+			failed_jobs: [],
+			has_npm_job_failed: true,
+		})
+	})
+})
+
+describe('release_publish_run.failed_run — no failed run', () => {
 	it.each([
-		['the run of another tag failed', [run('Publish v1.341.0', 'completed', 'failure')]],
+		['the run of another tag failed', [run('Publish v1.341.0', COMPLETED, FAILURE)]],
 		['the run is still at work', [run(TITLE, 'in_progress')]],
-		['the run succeeded', [run(TITLE, 'completed', 'success')]],
+		['the run succeeded', [run(TITLE, COMPLETED, SUCCESS)]],
 		['no run is listed yet', []],
 	])('answers none when %s', async (_case, runs) => {
-		given_runs(runs)
+		given_runs(runs, [])
 
-		expect(await release_publish_run.failed_run_id(VERSION)).toBeUndefined()
+		expect(await release_publish_run.failed_run(VERSION)).toBeUndefined()
 	})
 
 	it('answers none when the runs cannot be read', async () => {
 		vi.spyOn(git_gh_exec, 'exec_gh_api').mockRejectedValue(new Error('HTTP 404'))
 
-		expect(await release_publish_run.failed_run_id(VERSION)).toBeUndefined()
+		expect(await release_publish_run.failed_run(VERSION)).toBeUndefined()
 	})
 })

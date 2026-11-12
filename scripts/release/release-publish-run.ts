@@ -1,13 +1,22 @@
 import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { json_value } from '#scripts/lib/json-value'
-import { github_release_runs, type RunSource } from './github-release-runs'
+import { github_release_runs, type JobOutcomes, type RunSource } from './github-release-runs'
 import { release_tag } from './release-tag'
 
 // The tag's Publish run as `pnpm josh release` sees it through `gh`, so the npm wait can end the
 // moment that run fails instead of waiting out its timeout for a version that will never appear.
 
 const PUBLISH_WORKFLOW = 'publish.yml'
+const NPM_JOBS = ['publish-npm']
+
+// `has_npm_job_failed` holds unless `publish-npm` succeeded — so also when the jobs could not be
+// read, since nothing then shows that npm took the version.
+interface FailedRun {
+	run_id: number
+	failed_jobs: ReadonlyArray<string>
+	has_npm_job_failed: boolean
+}
 
 function gh_run_source(): RunSource {
 	return {
@@ -21,19 +30,43 @@ function gh_run_source(): RunSource {
 	}
 }
 
+async function read_job_outcomes(source: RunSource, run_id: number): Promise<JobOutcomes> {
+	try {
+		return await github_release_runs.job_outcomes(source, run_id)
+	} catch {
+		return { failed: [], succeeded: [] }
+	}
+}
+
+// Only a `publish-npm` that succeeded clears npm: one skipped because `pack` failed never publishes.
+async function describe_failure(source: RunSource, run_id: number): Promise<FailedRun> {
+	const { failed, succeeded } = await read_job_outcomes(source, run_id)
+	const has_npm_job_failed = succeeded.every(
+		(name) => !github_release_runs.is_named_job(name, NPM_JOBS),
+	)
+
+	return { run_id, failed_jobs: failed, has_npm_job_failed }
+}
+
 // A repository without the workflow, or a read that fails, tells nothing about the run, so the npm
 // wait goes on as it did before the run was asked about.
-async function failed_run_id(version: string): Promise<number | undefined> {
+async function failed_run(version: string): Promise<FailedRun | undefined> {
 	try {
-		const tag = release_tag.tag_name(version)
-		const run = await github_release_runs.publish_run(gh_run_source(), PUBLISH_WORKFLOW, tag)
+		const source = gh_run_source()
+		const run = await github_release_runs.publish_run(
+			source,
+			PUBLISH_WORKFLOW,
+			release_tag.tag_name(version),
+		)
+		if (!run || github_release_runs.run_state(run) !== 'failed') return undefined
 
-		return run && github_release_runs.run_state(run) === 'failed' ? run.id : undefined
+		return await describe_failure(source, run.id)
 	} catch {
 		return undefined
 	}
 }
 
-const release_publish_run = { failed_run_id }
+const release_publish_run = { failed_run }
 
+export type { FailedRun }
 export { release_publish_run }

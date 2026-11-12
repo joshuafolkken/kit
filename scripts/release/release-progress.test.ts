@@ -14,7 +14,12 @@ const SUCCESS = 0
 const FAILURE = 1
 const TAG = 'v1.342.0'
 const RUN_ID = 39_108_200_869
+const ACTIONS_PATH = '/actions/'
 const RUNS_PATH = '/actions/workflows/publish.yml/runs'
+const JOBS_PATH = `/actions/runs/${String(RUN_ID)}/jobs`
+const NPM_FAILED_PHRASE = 'before npm listed'
+const NPM_UNCONFIRMED = 'npm has not listed'
+const NPM_JOB = 'publish-npm'
 // The default npm wait, long enough that a test reaching its end would time out.
 const DEFAULT_NPM_TIMEOUT_SECONDS = '1800'
 const MISSED_NPM = '❌ Not published to npm'
@@ -47,10 +52,16 @@ function given_npm(is_published: boolean): void {
 	vi.spyOn(npm_registry, 'has_public_version').mockReturnValue(is_published)
 }
 
-// `gh api` answers both the release (by its URL, 404 until it exists) and the Publish runs list.
-function given_gh(release_url: string | undefined, runs: ReadonlyArray<object> = []): void {
+// `gh api` answers the release (by its URL, 404 until it exists), the Publish runs list and a
+// run's jobs.
+function given_gh(
+	release_url: string | undefined,
+	runs: ReadonlyArray<object> = [],
+	jobs: ReadonlyArray<object> = [],
+): void {
 	vi.spyOn(git_gh_exec, 'exec_gh_api').mockImplementation(async ({ path }) => {
 		if (path.includes(RUNS_PATH)) return JSON.stringify({ workflow_runs: runs })
+		if (path.includes(JOBS_PATH)) return JSON.stringify({ jobs })
 		if (release_url === undefined) throw new Error('HTTP 404')
 
 		return release_url
@@ -66,10 +77,14 @@ function publish_run(status: string, conclusion?: string): object {
 	return { id: RUN_ID, display_title: `Publish ${TAG}`, status, conclusion }
 }
 
+function job(name: string, conclusion: string): object {
+	return { name, status: 'completed', conclusion }
+}
+
 function release_reads(): number {
 	return vi
 		.mocked(git_gh_exec.exec_gh_api)
-		.mock.calls.filter(([request]) => !request.path.includes(RUNS_PATH)).length
+		.mock.calls.filter(([request]) => !request.path.includes(ACTIONS_PATH)).length
 }
 
 function printed(): string {
@@ -195,6 +210,32 @@ describe('release_progress.wait_for_distribution hint when the GitHub Release ti
 		expect(await release_progress.wait_for_distribution(VERSION)).toBe(FAILURE)
 		expect(printed()).toContain('run pnpm josh sync to install the GitHub Release workflow')
 		expect(printed()).not.toContain(PUBLISH_RUN)
+	})
+})
+
+// The run's jobs tell whether npm's own job failed or only a job beside it.
+describe('release_progress.wait_for_distribution — which job failed the Publish run', () => {
+	it('names the failed job and leaves npm unconfirmed when publish-npm passed', async () => {
+		given_npm(false)
+		given_gh(
+			RELEASE_URL,
+			[publish_run('completed', 'failure')],
+			[job(NPM_JOB, 'success'), job('create-release', 'failure')],
+		)
+
+		expect(await release_progress.wait_for_distribution(VERSION)).toBe(FAILURE)
+		expect(printed()).toContain(`failed (run ${String(RUN_ID)}) in create-release`)
+		expect(printed()).toContain(`${NPM_UNCONFIRMED} ${TAG} yet: check ${NPM_URL}`)
+		expect(printed()).not.toContain(NPM_FAILED_PHRASE)
+	})
+
+	it('reports the npm failure when publish-npm itself failed', async () => {
+		given_npm(false)
+		given_gh(RELEASE_URL, [publish_run('completed', 'failure')], [job(NPM_JOB, 'failure')])
+
+		expect(await release_progress.wait_for_distribution(VERSION)).toBe(FAILURE)
+		expect(printed()).toContain(`failed (run ${String(RUN_ID)}) ${NPM_FAILED_PHRASE} ${TAG}.`)
+		expect(printed()).not.toContain(NPM_UNCONFIRMED)
 	})
 })
 
