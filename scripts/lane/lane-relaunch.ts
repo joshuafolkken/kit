@@ -1,5 +1,5 @@
 import { agent_argv } from '#scripts/agent/agent-argv'
-import { gh_issue_label_names } from '#scripts/gh/gh-issue-label-names'
+import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { error_text } from '#scripts/lib/error-message'
 import { detached_launch, type LaunchResult } from '#scripts/run/detached-launch'
 import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
@@ -23,7 +23,7 @@ const { SUPERVISED_KEY } = run_ship_detach
 const OPENAI_PROVIDER = 'openai'
 
 type RelaunchResult = LaunchResult | { kind: 'rejected'; note: string }
-type Prepared = Exclude<ReturnType<typeof agent_argv.resume_argv>, { kind: 'rejected' }>
+type Prepared = Exclude<Awaited<ReturnType<typeof agent_argv.resume_argv>>, { kind: 'rejected' }>
 
 function launch(lane: LaneInfo, built: Prepared, on_note: (note: string) => void): RelaunchResult {
 	return detached_launch.launch(
@@ -55,10 +55,10 @@ async function relaunch(
 	on_note: (note: string) => void,
 ): Promise<RelaunchResult> {
 	try {
-		const built = agent_argv.resume_argv(invocation, lane.profile, phase, {
+		// The labels are read only when `josh.worker` caps the phase's model; a failed read refuses.
+		const built = await agent_argv.resume_argv(invocation, lane.profile, phase, {
 			cwd: lane.directory,
-			// Read only when `josh.worker` caps the phase's model; a failed read is reported as `failed`.
-			labels: () => gh_issue_label_names.read_sync(lane.issue),
+			labels: async () => await git_gh_issue_write.read_label_names(lane.issue),
 		})
 		if (built.kind === 'rejected') return built
 

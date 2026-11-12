@@ -25,7 +25,7 @@ type AgentArgvResult =
 // Where a cut relaunch runs, and how it reads its Issue's labels when `josh.worker` asks for them.
 interface ResumeSite {
 	cwd: string
-	labels: () => ReadonlyArray<string>
+	labels: () => Promise<ReadonlyArray<string> | undefined>
 }
 
 // **`session_id` forces the fresh session's id, and only the Claude path can honour it**.
@@ -115,18 +115,20 @@ function profiled_in(invocation: string, resolved: ProfileResult, cwd: string): 
 // `JOSH_WORKER_SHIP_MODEL`) and the phase's effort; a lane without one resolves the worker for the
 // phase. An env override wins over the phase in either path. The phase's model is then capped at the
 // Issue's `josh.worker` profile, whose labels `site.labels` reads only when the setting exists.
-function resume_argv(
+async function resume_argv(
 	invocation: string,
 	profile: AgentProfile | undefined,
 	phase: string,
 	site: ResumeSite,
-): AgentArgvResult {
+): Promise<AgentArgvResult> {
 	const resolved =
 		profile === undefined
 			? agent_role_profile.resolve(agent_role_profile.WORKER, process.env, phase)
 			: agent_role_profile.with_phase(profile, phase)
-	const capped = agent_ship_cap.capped(resolved, phase, () =>
-		agent_worker_profile.resolve(site.cwd, site.labels),
+	const capped = await agent_ship_cap.capped(
+		resolved,
+		phase,
+		async () => await agent_worker_profile.resolve(site.cwd, site.labels),
 	)
 
 	return profiled_in(invocation, capped, site.cwd)

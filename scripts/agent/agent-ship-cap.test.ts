@@ -28,57 +28,73 @@ function worker(selected: WorkerProfile, profiles = [HAIKU, SONNET, OPUS]): Work
 	}
 }
 
-function capped_model(result: WorkerResult, phase = PRE_GATE_PHASE): string | undefined {
-	const capped = agent_ship_cap.capped({ kind: 'profile', profile: SHIP }, phase, () => result)
+async function capped_model(
+	result: WorkerResult,
+	phase = PRE_GATE_PHASE,
+): Promise<string | undefined> {
+	const ship: ProfileResult = { kind: 'profile', profile: SHIP }
+	const capped = await agent_ship_cap.capped(ship, phase, async () => await result)
 
 	return capped.kind === 'profile' ? capped.profile.model : undefined
 }
 
+function read_haiku(): () => Promise<WorkerResult> {
+	return vi.fn(async () => await worker(HAIKU))
+}
+
 describe('agent_ship_cap.capped — a josh.worker setting', () => {
-	it('lowers the ship model to the profile of an Issue weaker than it, keeping the ship effort', () => {
-		const capped = agent_ship_cap.capped({ kind: 'profile', profile: SHIP }, PRE_GATE_PHASE, () =>
-			worker(HAIKU),
+	it('lowers the ship model to the profile of an Issue weaker than it, keeping the ship effort', async () => {
+		const capped = await agent_ship_cap.capped(
+			{ kind: 'profile', profile: SHIP },
+			PRE_GATE_PHASE,
+			read_haiku(),
 		)
 
 		expect(capped).toEqual({ kind: 'profile', profile: { ...SHIP, model: HAIKU_MODEL } })
 	})
 
-	it.each([SONNET, OPUS])('keeps the ship model for the %o profile at or above it', (selected) => {
-		expect(capped_model(worker(selected))).toBe(SONNET_MODEL)
-	})
+	it.each([SONNET, OPUS])(
+		'keeps the ship model for the %o profile at or above it',
+		async (selected) => {
+			await expect(capped_model(worker(selected))).resolves.toBe(SONNET_MODEL)
+		},
+	)
 
-	it.each([HAIKU, OPUS])('keeps the ship model no profile names for the %o profile', (selected) => {
-		expect(capped_model(worker(selected, [HAIKU, OPUS]))).toBe(SONNET_MODEL)
-	})
+	it.each([HAIKU, OPUS])(
+		'keeps the ship model no profile names for the %o profile',
+		async (selected) => {
+			await expect(capped_model(worker(selected, [HAIKU, OPUS]))).resolves.toBe(SONNET_MODEL)
+		},
+	)
 
-	it('refuses with the reason when the setting is rejected', () => {
+	it('refuses with the reason when the setting is rejected', async () => {
 		const rejection: WorkerResult = { kind: 'rejected', note: 'josh.worker is invalid' }
 
-		expect(capped_model(rejection)).toBeUndefined()
+		await expect(capped_model(rejection)).resolves.toBeUndefined()
 	})
 })
 
 describe('agent_ship_cap.capped — left as resolved', () => {
-	it('keeps the profile when the repository has no setting', () => {
-		expect(capped_model({ kind: 'unset' })).toBe(SONNET_MODEL)
+	it('keeps the profile when the repository has no setting', async () => {
+		await expect(capped_model({ kind: 'unset' })).resolves.toBe(SONNET_MODEL)
 	})
 
 	it.each<[string, AgentProfile, string]>([
 		['a phase without a model of its own', SHIP, IMPLEMENTATION_PHASE],
 		['an OpenAI session', OPENAI_PROFILES.worker, PRE_GATE_PHASE],
-	])('never reads the setting for %s', (_case, resolved_profile, phase) => {
-		const read = vi.fn(() => worker(HAIKU))
+	])('never reads the setting for %s', async (_case, resolved_profile, phase) => {
+		const read = read_haiku()
 		const resolved: ProfileResult = { kind: 'profile', profile: resolved_profile }
 
-		expect(agent_ship_cap.capped(resolved, phase, read)).toBe(resolved)
+		await expect(agent_ship_cap.capped(resolved, phase, read)).resolves.toBe(resolved)
 		expect(read).not.toHaveBeenCalled()
 	})
 
-	it('passes a rejected profile through without reading the setting', () => {
-		const read = vi.fn(() => worker(HAIKU))
+	it('passes a rejected profile through without reading the setting', async () => {
+		const read = read_haiku()
 		const rejected: ProfileResult = { kind: 'rejected', note: 'bad model' }
 
-		expect(agent_ship_cap.capped(rejected, PRE_GATE_PHASE, read)).toBe(rejected)
+		await expect(agent_ship_cap.capped(rejected, PRE_GATE_PHASE, read)).resolves.toBe(rejected)
 		expect(read).not.toHaveBeenCalled()
 	})
 })

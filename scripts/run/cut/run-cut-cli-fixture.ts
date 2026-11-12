@@ -122,11 +122,13 @@ function printed_errors(): string {
 // the expected profile is resolved for that phase — the default pre-gate cut lowers the worker to the
 // ship/bookkeeping effort and model (Sonnet, or `JOSH_WORKER_SHIP_MODEL`), which is the branch every relaunch
 // case here takes.
-function worker_argv(invocation: string): Extract<AgentArgvResult, { kind: 'argv' }> {
+async function worker_argv(
+	invocation: string,
+): Promise<Extract<AgentArgvResult, { kind: 'argv' }>> {
 	const phase = run_cut.PRE_GATE_PHASE
-	const built = agent_argv.resume_argv(invocation, undefined, phase, {
+	const built = await agent_argv.resume_argv(invocation, undefined, phase, {
 		cwd: LANE_DIRECTORY,
-		labels: () => [],
+		labels: async () => [],
 	})
 	if (built.kind === 'rejected') throw new Error(built.note)
 

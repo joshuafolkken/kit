@@ -34,7 +34,9 @@ const SHIP_ARGS: ReadonlyArray<string> = [
 	'low',
 	INVOCATION,
 ]
-const SITE = { cwd: LANE, labels: (): ReadonlyArray<string> => [] }
+type Labels = () => Promise<ReadonlyArray<string> | undefined>
+
+const SITE = { cwd: LANE, labels: async (): Promise<ReadonlyArray<string>> => [] }
 const make_directory = temporary_directory()
 
 const check = vi.spyOn(agent_diagnostics, 'check')
@@ -43,51 +45,62 @@ afterEach(() => {
 	check.mockReset()
 })
 
-function ship_argv(cwd: string, labels: () => ReadonlyArray<string>): AgentArgvResult {
+async function ship_argv(cwd: string, labels: Labels): Promise<AgentArgvResult> {
 	check.mockReturnValue({ kind: 'ready' })
 
-	return agent_argv.resume_argv(INVOCATION, undefined, PRE_GATE_PHASE, { cwd, labels })
+	return await agent_argv.resume_argv(INVOCATION, undefined, PRE_GATE_PHASE, { cwd, labels })
+}
+
+function worker_directory(): string {
+	const directory = make_directory('agent-argv-worker-')
+	const haiku = { name: 'haiku', model: HAIKU, effort: 'low', when: 'Mechanical work' }
+	const sonnet = { name: 'sonnet', model: SONNET, effort: 'medium', when: 'A brief' }
+	const worker = { default: 'sonnet', profiles: [haiku, sonnet] }
+
+	writeFileSync(path.join(directory, PACKAGE_JSON), JSON.stringify({ josh: { worker } }))
+
+	return directory
 }
 
 // joshuafolkken/kit#7354: `josh.worker` caps the ship phase; without it the launch is byte-identical.
 describe('the ship phase under josh.worker', () => {
-	it('keeps the ship model, effort and argv unchanged and reads no labels without the setting', () => {
-		const labels = vi.fn((): ReadonlyArray<string> => [])
-		const built = ship_argv(make_directory('agent-argv-unset-'), labels)
+	it('keeps the ship model, effort and argv unchanged and reads no labels without the setting', async () => {
+		const labels = vi.fn(SITE.labels)
+		const built = await ship_argv(make_directory('agent-argv-unset-'), labels)
 
 		expect(built).toMatchObject({ kind: 'argv', profile: { model: SONNET, effort: 'low' } })
 		expect(built.kind === 'argv' && built.argv.args).toEqual(SHIP_ARGS)
 		expect(labels).not.toHaveBeenCalled()
 	})
 
-	it('relaunches the ship phase on the weaker profile the Issue label selects', () => {
-		const directory = make_directory('agent-argv-worker-')
-		const haiku = { name: 'haiku', model: HAIKU, effort: 'low', when: 'Mechanical work' }
-		const sonnet = { name: 'sonnet', model: SONNET, effort: 'medium', when: 'A brief' }
-		const worker = { default: 'sonnet', profiles: [haiku, sonnet] }
-
-		writeFileSync(path.join(directory, PACKAGE_JSON), JSON.stringify({ josh: { worker } }))
-		const built = ship_argv(directory, () => ['worker:haiku'])
+	it('relaunches the ship phase on the weaker profile the Issue label selects', async () => {
+		const built = await ship_argv(worker_directory(), async () => ['worker:haiku'])
 
 		expect(built).toMatchObject({ kind: 'argv', profile: { model: HAIKU, effort: 'low' } })
 		expect(built.kind === 'argv' && built.argv.args).toContain(HAIKU)
 	})
+
+	it('refuses the relaunch when the Issue labels cannot be read', async () => {
+		const built = await ship_argv(worker_directory(), async () => await undefined)
+
+		expect(built).toMatchObject({ kind: 'rejected' })
+	})
 })
 
 describe('a stored lane profile across a cut', () => {
-	it('relaunches on the ship default model with the phase effort', () => {
+	it('relaunches on the ship default model with the phase effort', async () => {
 		check.mockReturnValue({ kind: 'ready' })
-		const built = agent_argv.resume_argv(INVOCATION, LEGACY_WORKER, PRE_GATE_PHASE, SITE)
+		const built = await agent_argv.resume_argv(INVOCATION, LEGACY_WORKER, PRE_GATE_PHASE, SITE)
 
 		expect(built).toMatchObject({ kind: 'argv', profile: { model: SONNET, effort: 'low' } })
 		expect(built.kind === 'argv' && built.argv.args).toContain(SONNET)
 	})
 
 	// joshuafolkken/kit#5343: the ship key moves the pre-gate relaunch off the recorded model.
-	it('relaunches the pre-gate phase on the ship model when its key is set', () => {
+	it('relaunches the pre-gate phase on the ship model when its key is set', async () => {
 		check.mockReturnValue({ kind: 'ready' })
 		vi.stubEnv('JOSH_WORKER_SHIP_MODEL', SONNET)
-		const built = agent_argv.resume_argv(INVOCATION, LEGACY_WORKER, PRE_GATE_PHASE, SITE)
+		const built = await agent_argv.resume_argv(INVOCATION, LEGACY_WORKER, PRE_GATE_PHASE, SITE)
 
 		vi.unstubAllEnvs()
 

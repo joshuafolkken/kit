@@ -29,10 +29,14 @@ function capped_by(profile: AgentProfile, result: WorkerResult): ProfileResult {
 }
 
 // `worker` is called only for a phase with a model of its own, so every other relaunch reads nothing.
-function capped(resolved: ProfileResult, phase: string, worker: () => WorkerResult): ProfileResult {
+async function capped(
+	resolved: ProfileResult,
+	phase: string,
+	worker: () => Promise<WorkerResult>,
+): Promise<ProfileResult> {
 	if (resolved.kind === 'rejected' || !has_phase_model(resolved.profile, phase)) return resolved
 
-	return capped_by(resolved.profile, worker())
+	return capped_by(resolved.profile, await worker())
 }
 
 const agent_ship_cap = { capped }

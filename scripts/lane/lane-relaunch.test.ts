@@ -3,11 +3,11 @@ import { lane_seat_fixture } from './lane-seat-fixture'
 
 interface ResumeSite {
 	cwd: string
-	labels: () => ReadonlyArray<string>
+	labels: () => Promise<ReadonlyArray<string> | undefined>
 }
 
 const launch_mock = vi.hoisted(() => vi.fn())
-const read_labels_mock = vi.hoisted(() => vi.fn(() => ['haiku']))
+const read_labels_mock = vi.hoisted(() => vi.fn(async () => ['haiku']))
 const resume_argv_mock = vi.hoisted(() =>
 	vi.fn<(invocation: string, profile: unknown, phase: string, site: ResumeSite) => unknown>(() => ({
 		kind: 'argv',
@@ -17,8 +17,8 @@ const resume_argv_mock = vi.hoisted(() =>
 )
 
 vi.mock('#scripts/agent/agent-argv', () => ({ agent_argv: { resume_argv: resume_argv_mock } }))
-vi.mock('#scripts/gh/gh-issue-label-names', () => ({
-	gh_issue_label_names: { read_sync: read_labels_mock },
+vi.mock('#scripts/gh/git-gh-issue-write', () => ({
+	git_gh_issue_write: { read_label_names: read_labels_mock },
 }))
 vi.mock('#scripts/run/detached-launch', () => ({ detached_launch: { launch: launch_mock } }))
 vi.mock('./lane-dispatch-log', () => ({
@@ -73,7 +73,7 @@ describe('lane_relaunch.resume and is_openai_lane', () => {
 
 		expect(site?.cwd).toBe(LANE.directory)
 		expect(read_labels_mock).not.toHaveBeenCalled()
-		expect(site?.labels()).toEqual(['haiku'])
+		await expect(site?.labels()).resolves.toEqual(['haiku'])
 		expect(read_labels_mock).toHaveBeenCalledWith(ISSUE)
 	})
 
