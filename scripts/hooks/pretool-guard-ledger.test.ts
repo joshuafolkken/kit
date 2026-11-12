@@ -57,7 +57,7 @@ async function recorded_reasons(command: string): Promise<Array<unknown>> {
 
 describe('pretool_guard.respond — the hook ledger', () => {
 	it('hands the ledger the reason it denied the call with', async () => {
-		expect(await recorded_reasons('gh issue view 7')).toEqual([
+		expect(await recorded_reasons('gh issue view 7 --comments')).toEqual([
 			[HOOK, expect.stringContaining('⛔ direct issue read')],
 		])
 	})

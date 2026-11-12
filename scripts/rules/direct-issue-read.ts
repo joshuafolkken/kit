@@ -1,4 +1,9 @@
+import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { session_cite } from '#scripts/issue/session-cite'
+import { json_value } from '#scripts/lib/json-value'
+import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
+import { time_shell } from '#scripts/time-runtime/time-shell'
 import { bash_triggers } from './bash-triggers'
 import { direct_pr_create } from './direct-pr-create'
 import { gh_api } from './gh-api'
@@ -25,6 +30,11 @@ import { shell_segments } from './shell-segments'
 //
 // **It fires on every occurrence**, and before `issue-comments`, whose rewrite would otherwise add the
 // unfiltered comments to the same call.
+//
+// **A standalone `gh issue view <N>` is rewritten rather than refused** (joshuafolkken/kit#7330): the
+// line is that one call with no flag but `-R` / `--repo <owner>/<repo>`, so `issue:read` takes every
+// argument it carries. The rewrite is `issue:read` itself, so an untrusted comment is still withheld.
+// A pipe, a chain, a redirect, a quote, a URL or any other flag keeps the refusal.
 
 const API_SUBCOMMAND = 'api'
 const ISSUE_GROUP = 'issue'
@@ -161,6 +171,67 @@ function is_any_read(command: string): boolean {
 	return is_direct_issue_read(command) || is_josh_read(command)
 }
 
+const VIEW_WORDS = ['gh', ISSUE_GROUP, VIEW_ACTION]
+const WORD_SEPARATOR = ' '
+// A word with no shell syntax in it, so a line of them is one call with nothing chained or redirected.
+const PLAIN_WORD = /^[\w./=-]+$/u
+const REPO_SPELLING = /^(?:(?:-R|--repo) |--repo=)(?<repo>[\w.-]+\/[\w.-]+)$/u
+const ISSUE_READ_COMMAND = 'pnpm josh issue:read'
+const REPO_FLAG = '--repo'
+
+// The words after `gh issue view` on a line that is that one call alone, else `undefined`.
+function view_rest(line: string): ReadonlyArray<string> | undefined {
+	const words = line.split(WORD_SEPARATOR)
+	const is_view =
+		words.slice(0, VIEW_WORDS.length).join(WORD_SEPARATOR) === VIEW_WORDS.join(WORD_SEPARATOR)
+
+	return is_view && words.every((word) => PLAIN_WORD.test(word))
+		? words.slice(VIEW_WORDS.length)
+		: undefined
+}
+
+// The `--repo` pair `issue:read` takes for the view's flags: none, or one `<owner>/<repo>`.
+function carried_repo(flags: string): ReadonlyArray<string> | undefined {
+	if (flags === '') return []
+	const repo = REPO_SPELLING.exec(flags)?.groups?.['repo']
+
+	return repo === undefined ? undefined : [REPO_FLAG, repo]
+}
+
+function issue_read_of(rest: ReadonlyArray<string>): string | undefined {
+	const issues = rest.filter((word) => issue_number_shape.is_issue_number(word))
+	const flags = rest
+		.filter((word) => !issue_number_shape.is_issue_number(word))
+		.join(WORD_SEPARATOR)
+	const repo = issues.length === 1 ? carried_repo(flags) : undefined
+
+	return repo === undefined
+		? undefined
+		: [ISSUE_READ_COMMAND, ...issues, ...repo].join(WORD_SEPARATOR)
+}
+
+// `pnpm josh issue:read` for a refused read that is a standalone `gh issue view`, else `undefined`.
+// The word split runs first: it is cheap, and every Bash call passes through here.
+function issue_read_command(command: string): string | undefined {
+	const line = command.trim()
+	const rest = view_rest(line)
+	const read = rest === undefined ? undefined : issue_read_of(rest)
+
+	return read !== undefined && is_direct_issue_read(line) ? read : undefined
+}
+
+function issue_read_input(call: GuardedCall): Record<string, unknown> | undefined {
+	if (call.name !== cost_blocks.BASH_TOOL || !json_value.is_record(call.input)) return undefined
+
+	const command = issue_read_command(time_shell.bash_command(call.input))
+
+	return command === undefined ? undefined : { ...call.input, command }
+}
+
+const ISSUE_READ_NOTE =
+	'↻ direct issue read: this `gh issue view <N>` ran as `pnpm josh issue:read <N>`, which withholds ' +
+	'a comment from an author without write access (`issue-comments.md`).'
+
 const DIRECT_ISSUE_READ_REASON =
 	'⛔ direct issue read: pnpm josh issue:read <N>\n' +
 	'Run that in place of this read of `…/issues/<N>`, its comments or its timeline (`gh api` or ' +
@@ -176,16 +247,24 @@ const ROW = {
 	decide: (): boolean => true,
 	keeps: bash_triggers.on_bash_command(is_josh_read),
 	reaches: bash_triggers.on_bash_command(is_any_read),
+	rewrite: issue_read_input,
+	rewrite_note: ISSUE_READ_NOTE,
 	about: {
 		title: 'Direct issue read',
 		topic: '`issue-comments.md`',
 		fires:
-			"a `gh api` GET of the checkout's own `repos/<o>/<r>/issues/<N>`, `…/comments` or `…/timeline` (the `{owner}` placeholder or the origin spelled out), or a `gh issue view <N>` of it, with no projection or one naming the body (or, for the view, the comments); it points at `pnpm josh issue:read`. Every occurrence",
+			"a `gh api` GET of the checkout's own `repos/<o>/<r>/issues/<N>`, `…/comments` or `…/timeline` (the `{owner}` placeholder or the origin spelled out), or a `gh issue view <N>` of it, with no projection or one naming the body (or, for the view, the comments); it points at `pnpm josh issue:read`. A line that is only `gh issue view <N>`, with at most `-R` / `--repo <owner>/<repo>`, is rewritten to `pnpm josh issue:read <N>`; every other form is refused, every occurrence",
 		quiet:
 			'`pnpm josh issue:read` / `run:prep` / `run:entry`, a `--jq` / `--json` projection without the body or the comments, `gh issue view --web`, or another repository named outright',
 	},
 }
 
-const direct_issue_read = { DIRECT_ISSUE_READ_REASON, ROW, is_direct_issue_read }
+const direct_issue_read = {
+	DIRECT_ISSUE_READ_REASON,
+	ISSUE_READ_NOTE,
+	ROW,
+	is_direct_issue_read,
+	issue_read_command,
+}
 
 export { direct_issue_read }
