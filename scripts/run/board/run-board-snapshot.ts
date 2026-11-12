@@ -1,4 +1,5 @@
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
+import { issue_outcome } from '#scripts/issue/issue-outcome'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { z } from 'zod'
 import type { ClosedIssue } from './run-board-closed'
@@ -38,6 +39,9 @@ const label_names_schema = z.array(z.string())
 // A close time JSON dropped is read back as unknown.
 const closed_issue_schema = z
 	.object({
+		outcome: z
+			.object({ summary: issue_outcome.summary_schema, url: issue_outcome.url_schema })
+			.optional(),
 		title: z.string(),
 		labels: label_names_schema,
 		closed_ms: z.number().optional(),

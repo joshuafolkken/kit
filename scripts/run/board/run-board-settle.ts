@@ -1,3 +1,4 @@
+import type { IssueOutcome } from '#scripts/issue/issue-outcome'
 import type { ItemState, ItemStatus } from './run-board-status'
 
 // What a child keeps of its run when it settles into a state other than running — shared by the
@@ -25,9 +26,22 @@ function kept_of(
 // The status a child settles into: its start and the track it had reached, so a settled row still
 // draws how it got there.
 function settled_as(previous: ItemStatus | undefined, state: ItemState): ItemStatus {
-	return { state, started_ms: previous?.started_ms, ...kept_of(previous) }
+	return {
+		state,
+		started_ms: previous?.started_ms,
+		...kept_of(previous),
+		...(previous?.outcome !== undefined && { outcome: previous.outcome }),
+	}
 }
 
-const run_board_settle = { relaunch_of, settled_as }
+const OUTCOME_STATES: ReadonlySet<ItemState> = new Set(['done', 'already_done', 'withdrawn'])
+
+function with_outcome(status: ItemStatus, outcome: IssueOutcome | undefined): ItemStatus {
+	return outcome === undefined || !OUTCOME_STATES.has(status.state)
+		? status
+		: { ...status, outcome }
+}
+
+const run_board_settle = { relaunch_of, settled_as, with_outcome }
 
 export { run_board_settle }

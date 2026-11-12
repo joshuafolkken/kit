@@ -55,6 +55,7 @@ interface BoardPlan {
 // (joshuafolkken/kit#4288): the icon it leads with in place of ⏳, the condition column's value, and
 // what follows its title. A parked, withdrawn or stalled row draws its tail alone.
 interface RowReason {
+	evidence_url?: string | undefined
 	icon?: string | undefined
 	// The condition column's figure — a lane count, a memory reading, a start time.
 	value?: string | undefined

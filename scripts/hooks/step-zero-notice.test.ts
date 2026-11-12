@@ -101,6 +101,24 @@ describe('step_zero_notice — a translated Codex patch', () => {
 })
 
 describe('step_zero_notice — default root', () => {
+	it.each(['.json', '.md', '.txt'])(
+		'excludes a project scratch record with extension %s',
+		(extension) => {
+			const raw = edit_of(`/repo/.josh/tmp/approval${extension}`, fresh_transcript())
+
+			expect(step_zero_notice.is_runtime_edit(raw, ROOT)).toBe(false)
+		},
+	)
+
+	it.each(['.josh/tmp/code.ts', '.josh/tmp/../code.json', '.josh/tmp-other/approval.json'])(
+		'keeps the runtime plan requirement for %s',
+		(file_path) => {
+			const raw = edit_of(file_path, fresh_transcript())
+
+			expect(step_zero_notice.is_runtime_edit(raw, ROOT)).toBe(true)
+		},
+	)
+
 	it('uses the current directory when no root is provided', () => {
 		const file_path = path.join(process.cwd(), 'scripts/hooks/example.ts')
 		const raw = JSON.stringify({ tool_name: 'Edit', tool_input: { file_path } })

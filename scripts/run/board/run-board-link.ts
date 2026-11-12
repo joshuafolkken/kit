@@ -46,6 +46,7 @@ type RepoLink = (text: string, page: RepoPage) => string
 
 // The links a board draws, each plain before a plan names the repository.
 interface BoardLinks {
+	comment_link?: Link | undefined
 	// An issue reference as the board draws it — `3450` or `owner/repo#12`.
 	link: (reference: string) => string
 	// A pull request's number (joshuafolkken/kit#4625).
@@ -72,6 +73,7 @@ function repo_linker(repo: string | undefined, link: Link): RepoLink {
 
 function links_of(repo: string | undefined, link: Link): BoardLinks {
 	return {
+		comment_link: link,
 		link: linker(repo, link),
 		pull_link: pull_linker(repo, link),
 		repo_link: repo_linker(repo, link),
