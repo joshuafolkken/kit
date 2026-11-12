@@ -1,0 +1,7 @@
+{
+	"reason": "Build image transcript fixtures with typed content and aligned provenance instead of parsing JSON into any to fix the #7399 lint gate.",
+	"date": "2026-11-12",
+	"growth": {
+		"scripts.code_lines": 104
+	}
+}

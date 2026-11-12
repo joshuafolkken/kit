@@ -1,6 +1,7 @@
 import { json_value } from '#scripts/lib/json-value'
 import { time_reported_failure } from '#scripts/time-runtime/time-reported-failure'
 import { z } from 'zod'
+import { codex_prompt } from './codex-prompt'
 import { turn_filings } from './turn-filings'
 
 // The person's prompts on a transcript tail — what the stop guard reads to tell a question it answers
@@ -34,7 +35,9 @@ function is_person(line: PromptLine): boolean {
 // The prompt line as the person wrote it, or `undefined` when the harness wrote it or it does not
 // read as one.
 function person_line(line: string): PromptLine | undefined {
-	const parsed = PROMPT_LINE_SCHEMA.safeParse(json_value.parse_or_undefined(line))
+	const normalized = codex_prompt.normalize(line)
+	if (!turn_filings.is_prompt_line(normalized)) return undefined
+	const parsed = PROMPT_LINE_SCHEMA.safeParse(json_value.parse_or_undefined(normalized))
 
 	return parsed.success && is_person(parsed.data) ? parsed.data : undefined
 }
@@ -51,7 +54,10 @@ function person_text(line: string): string | undefined {
 // notification, a subagent's hand-back), so a question asked turns ago does not answer for a stop the
 // run reached on its own since (`stop-decision.ts` → `is_question`).
 function turn_prompt(tail: string): string {
-	const opener = tail.split('\n').findLast((line) => turn_filings.is_prompt_line(line))
+	const opener = tail
+		.split('\n')
+		.map((line) => codex_prompt.normalize(line))
+		.findLast((line) => turn_filings.is_prompt_line(line))
 	if (opener === undefined) return NO_PROMPT
 
 	return person_text(opener) ?? NO_PROMPT
@@ -63,7 +69,6 @@ function turn_prompt(tail: string): string {
 function person_prompt(tail: string): string | undefined {
 	return tail
 		.split('\n')
-		.filter((line) => turn_filings.is_prompt_line(line))
 		.map((line) => person_text(line))
 		.findLast((text) => text !== undefined)
 }
@@ -72,7 +77,6 @@ function person_prompt(tail: string): string | undefined {
 function prompt_time(tail: string): string | undefined {
 	return tail
 		.split('\n')
-		.filter((line) => turn_filings.is_prompt_line(line))
 		.map((line) => person_line(line)?.timestamp ?? undefined)
 		.findLast((time) => time !== undefined)
 }
