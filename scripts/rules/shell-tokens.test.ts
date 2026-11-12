@@ -44,3 +44,34 @@ describe('tokens_of', () => {
 		])
 	})
 })
+
+function words_of(line: string): Array<string> {
+	return shell_tokens.words_of(line).map((word) => word.text)
+}
+
+// joshuafolkken/kit#7338: the word reading the argument readers moved onto.
+describe('words_of', () => {
+	it.each([
+		['rg "a|b" short.ts', ['rg', '"a|b"', 'short.ts']],
+		[String.raw`echo a\;b 'c&d'`, ['echo', String.raw`a\;b`, "'c&d'"]],
+		['echo x 2>&1 >| out', ['echo', 'x', '2>&1', '>|', 'out']],
+	])('keeps a quoted separator and a redirection in its word: %j', (line, expected) => {
+		expect(words_of(line)).toStrictEqual(expected)
+	})
+
+	// A quoted space still cuts, as the readers that split on whitespace did.
+	it('cuts a word at a quoted space', () => {
+		expect(words_of('grep "a b" f')).toStrictEqual(['grep', '"a', 'b"', 'f'])
+	})
+
+	it('reads a heredoc line as typed', () => {
+		expect(words_of('cat <<EOF\na|b\nEOF')).toStrictEqual(['cat', '<<EOF', 'a', 'b', 'EOF'])
+	})
+
+	it('gives each word its offsets in the line', () => {
+		expect(shell_tokens.words_of('a "b;c"')).toStrictEqual([
+			{ begin: 0, end: 1, kind: 'word', text: 'a' },
+			{ begin: 2, end: 7, kind: 'word', text: '"b;c"' },
+		])
+	})
+})
