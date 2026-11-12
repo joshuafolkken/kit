@@ -94,6 +94,8 @@ const SHIPPED_UNREACHABLE = new Set([
 	// #6528 stages the judgment launch and the trusted sources; remove these entries when #6531 uses them.
 	'scripts/agent/judgment-agent-argv.ts',
 	'scripts/issue/issue-sources.ts',
+	// #7351 stages the josh.worker resolver; remove this entry when #7353 launches lanes through it.
+	'scripts/agent/agent-worker-profile.ts',
 ])
 
 interface PackedEntry {

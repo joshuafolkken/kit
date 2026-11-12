@@ -374,6 +374,7 @@ const agent_role_profile = {
 	resolve,
 	resolve_provider,
 	resolve_review,
+	validate,
 	warn_of_default,
 	with_phase,
 }
