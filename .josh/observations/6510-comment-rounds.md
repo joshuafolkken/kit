@@ -1,4 +1,0 @@
-- rf:bug-risks | medium | scripts/package/package-scout-reuse.ts:118 | 2026-11-09 | #6510 | fixed
-- rf:bug-risks | medium | scripts/package/package-scout-reuse.ts:51 | 2026-11-09 | #6510 | fixed
-- rf:project-conventions | low | CLAUDE.md:40 | 2026-11-09 | #6510 | fixed
-- rf:bug-risks | medium | scripts/package/package-scout-reuse.ts:167 | 2026-11-09 | #6510

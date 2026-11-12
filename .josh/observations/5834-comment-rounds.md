@@ -1,3 +1,0 @@
-- rf:comments | low | scripts/lane/lane-breakdown-text.ts:31 | 2026-11-02 | #5834
-- rf:comments | low | scripts/lane/lane-breakdown.ts:64 | 2026-11-02 | #5834
-- rf:comments | low | scripts/lane/lane-breakdown-pause.ts:9 | 2026-11-02 | #5834

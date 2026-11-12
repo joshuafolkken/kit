@@ -1,0 +1,4936 @@
+- rb:2026-11-01 | #4933
+- rf:tests | low | scripts/run/board/run-board-render-found.test.ts:247 | 2026-11-01 | #4933 | fixed
+- ri:none | none | - | 2026-11-01 | #4933
+- rb:2026-11-03 | #5346
+- rf:comments | medium | docs/josh-commands-run.md:1129 | 2026-11-03 | #5346 | filed:#5998
+- rf:none | none | - | 2026-11-01 | #5352
+- rb:2026-11-01 | #5352
+- rf:bug-risks | medium | scripts/run/handoff/run-handoff-cli.ts:156 | 2026-11-01 | #5352 | fixed
+- rf:tests | low | scripts/run/handoff/run-handoff-cli.test.ts:57 | 2026-11-01 | #5352 | fixed
+- ri:bug-risks | medium | scripts/run/handoff/run-handoff-cli.ts:155 | 2026-11-01 | #5352 | fixed
+- rb:2026-11-01 | #5352
+- rf:tests | low | scripts/run/hold/run-hold-block.test.ts:37 | 2026-11-01 | #5352
+- rb:2026-11-01 | #5357
+- rf:comments | low | scripts/propagate/propagate-git.ts:37 | 2026-11-01 | #5357 | fixed
+- rf:comments | low | scripts/lane/lane-stage-budget.ts:3 | 2026-11-01 | #5357 | fixed
+- ri:none | none | - | 2026-11-01 | #5357
+- rf:none | none | - | 2026-11-12 | #5507
+- rf:tests | low | scripts/init/init-ai-copy.workspace-npmrc.test.ts:47 | 2026-11-12 | #5507
+- rf:assumptions | low | pnpm-workspace.yaml:42 | 2026-11-12 | #5507
+- rf:none | none | - | 2026-11-12 | #5507
+- rf:bug-risks | low | scripts/agent/agent-role-profile.ts:286 | 2026-11-01 | #5616
+- rf:none | none | - | 2026-11-01 | #5616
+- rb:2026-11-01 | #5616
+- rf:bug-risks | medium | scripts/rules/consultation-handoff.ts:46 | 2026-11-01 | #5616 | fixed
+- rf:bug-risks | medium | scripts/rules/consultation-handoff.ts:1 | 2026-11-01 | #5616 | fixed
+- rf:tests | low | scripts/rules/consultation-handoff.test.ts:111 | 2026-11-01 | #5616 | fixed
+- rb:2026-11-01 | #5616
+- rf:bug-risks | medium | scripts/rules/consultation-handoff.ts:46 | 2026-11-01 | #5616 | fixed
+- rf:bug-risks | medium | scripts/rules/consultation-handoff.ts:1 | 2026-11-01 | #5616 | fixed
+- rf:tests | low | scripts/rules/consultation-handoff.test.ts:111 | 2026-11-01 | #5616 | fixed
+- ri:bug-risks | medium | scripts/lane/lane-dispatch.ts:298 | 2026-11-01 | #5616 | fixed
+- ri:bug-risks | medium | scripts/backlog/backlogrun-launch.ts:124 | 2026-11-01 | #5616 | fixed
+- rb:2026-11-01 | #5617
+- rf:none | none | - | 2026-11-01 | #5617
+- ri:none | none | - | 2026-11-01 | #5617
+- rf:none | none | - | 2026-11-01 | #5618
+- ri:comments | medium | docs/josh-commands-run.md:799 | 2026-11-01 | #5618 | fixed
+- ri:performance | low | scripts/run/board/run-board-quota-held.ts:65 | 2026-11-01 | #5618 | fixed
+- rb:2026-11-01 | #5618
+- rf:bug-risks | medium | scripts/run/board/run-board-render-quota.ts:146 | 2026-11-01 | #5618 | fixed
+- rf:comments | medium | docs/josh-commands-run.md:799 | 2026-11-01 | #5618 | fixed
+- rf:bug-risks | low | scripts/run/board/run-board-quota-spent.ts:59 | 2026-11-01 | #5618 | fixed
+- rf:none | none | - | 2026-11-01 | #5622
+- ri:bug-risks | low | scripts/josh/session-handoff-line.ts:19 | 2026-11-01 | #5622 | fixed
+- rb:2026-11-01 | #5622
+- rf:bug-risks | medium | scripts/josh/session-handoff-line.ts:44 | 2026-11-01 | #5622 | fixed
+- rf:bug-risks | medium | scripts/josh/session-handoff-line.ts:55 | 2026-11-01 | #5622 | fixed
+- rf:bug-risks | low | scripts/josh/session-handoff-line.ts:27 | 2026-11-01 | #5622 | fixed
+- rf:tests | low | scripts/josh/session-handoff-line.test.ts:47 | 2026-11-01 | #5622 | fixed
+- rf:tests | low | scripts/josh/session-language-cli.ts:83 | 2026-11-01 | #5622 | fixed
+- rb:2026-11-01 | #5622
+- rf:bug-risks | low | scripts/josh/session-handoff-line.ts:39 | 2026-11-01 | #5622
+- rf:tests | low | scripts/josh/session-handoff-line.test.ts:69 | 2026-11-01 | #5622
+- rf:none | none | - | 2026-11-01 | #5625
+- rb:2026-11-01 | #5625
+- rf:bug-risks | medium | scripts/run/ship/run-ship-detach-wait.ts:19 | 2026-11-01 | #5625 | fixed
+- rf:bug-risks | low | scripts/run/review/run-chain-cli.ts:41 | 2026-11-01 | #5625 | false-positive
+- rf:project-conventions | low | scripts/rules/lane-background.ts:27 | 2026-11-01 | #5625 | fixed
+- ri:bug-risks | medium | scripts/run/ship/run-ship-detach-wait.ts:17 | 2026-11-01 | #5625 | fixed
+- ri:bug-risks | low | scripts/run/ship/run-ship-cli.ts:330 | 2026-11-01 | #5625 | false-positive
+- ri:comments | low | scripts/rules/lane-background.ts:26 | 2026-11-01 | #5625 | fixed
+- rb:2026-11-01 | #5625
+- rf:none | none | - | 2026-11-01 | #5625
+- rf:none | none | - | 2026-11-01 | #5626
+- rb:2026-11-01 | #5626
+- rf:bug-risks | medium | scripts/run/run-step-cli.ts:204 | 2026-11-01 | #5626 | fixed
+- rf:tests | medium | scripts/run/ship/run-ship-cli.ts:440 | 2026-11-01 | #5626 | fixed
+- rf:project-conventions | low | .claude/skills/workflow-commands/SKILL.md:54 | 2026-11-01 | #5626 | filed:#5645
+- rf:tests | low | scripts/run/review/run-review-cli.ts:404 | 2026-11-01 | #5626
+- rf:comments | low | scripts/run/ship/run-ship-recorded-fixture.ts:16 | 2026-11-01 | #5626 | fixed
+- ri:bug-risks | medium | scripts/run/run-step-cli.ts:204 | 2026-11-01 | #5626 | fixed
+- ri:assumptions | medium | scripts/run/run-step-section-once.ts:69 | 2026-11-01 | #5626 | fixed
+- rb:2026-11-01 | #5626
+- rf:assumptions | low | scripts/run/run-step-section.ts:92 | 2026-11-01 | #5626
+- rf:bug-risks | low | scripts/run/run-step-section.ts:118 | 2026-11-01 | #5626
+- rf:none | none | - | 2026-11-01 | #5627
+- rb:2026-11-01 | #5627
+- rf:bug-risks | medium | scripts/review/review-submit-cli.ts:47 | 2026-11-01 | #5627 | fixed
+- rf:project-conventions | low | .claude/agents/reviewer.md:17 | 2026-11-01 | #5627 | fixed
+- rf:bug-risks | low | tools/hooks/hook-bundle-ready.ts | 2026-11-01 | #5628
+- rb:2026-11-01 | #5628
+- rf:bug-risks | low | tools/hooks/hook-bundle-ready.ts:131 | 2026-11-01 | #5628 | fixed
+- rf:bug-risks | low | tools/hooks/hook-bundle-ready.ts:47 | 2026-11-01 | #5628 | fixed
+- rf:security | low | tools/hooks/hook-bundle-ready.ts:158 | 2026-11-01 | #5628 | fixed
+- rf:project-conventions | low | tools/hooks/hook-bundle-ready.ts:93 | 2026-11-01 | #5628 | fixed
+- rf:tests | low | tools/hooks/hook-bundle-ready.ts:164 | 2026-11-01 | #5628 | fixed
+- ri:bug-risks | medium | scripts/build/build-hooks.ts:184 | 2026-11-01 | #5628 | fixed
+- ri:bug-risks | medium | tools/hooks/hook-bundle-ready.ts:158 | 2026-11-01 | #5628 | fixed
+- ri:comments | medium | docs/maintainers/josh-commands-automation-rationale.md:71 | 2026-11-01 | #5628 | fixed
+- ri:comments | low | package.json:43 | 2026-11-01 | #5628 | fixed
+- rf:none | none | - | 2026-11-01 | #5629
+- ri:comments | low | .claude/skills/workflow-commands/SKILL.md:83 | 2026-11-01 | #5629 | fixed
+- rb:2026-11-01 | #5629
+- rf:bug-risks | low | scripts/run/entry/run-entry-cli.ts:120 | 2026-11-01 | #5629 | fixed
+- rf:bug-risks | low | scripts/run/entry/run-entry-cli.ts:312 | 2026-11-01 | #5629 | fixed
+- rf:bug-risks | low | .claude/skills/workflow-commands/fullrun-steps.md:42 | 2026-11-01 | #5629 | fixed
+- rf:project-conventions | low | .claude/skills/workflow-commands/SKILL.md:83 | 2026-11-01 | #5629 | fixed
+- rf:bug-risks | low | scripts/run/review/run-chain.ts:76 | 2026-11-01 | #5630
+- rf:project-conventions | low | scripts/lane/lane-breakdown-implement.ts:30 | 2026-11-01 | #5630
+- rb:2026-11-01 | #5630
+- rf:tests | medium | scripts/run/run-step-cli-lane.test.ts:119 | 2026-11-01 | #5630 | fixed
+- rf:tests | medium | scripts/rules/round-one-fix-document-rule.test.ts:10 | 2026-11-01 | #5630 | fixed
+- ri:bug-risks | medium | .claude/skills/workflow-commands/chain-rule.md:26 | 2026-11-01 | #5630 | fixed
+- ri:tests | medium | scripts/rules/round-one-fix-document-rule.test.ts:10 | 2026-11-01 | #5630 | fixed
+- ri:project-conventions | low | scripts/lane/lane-breakdown-implement.ts:30 | 2026-11-01 | #5630 | fixed
+- ri:comments | low | .claude/skills/workflow-commands/chain-rule.md:27 | 2026-11-01 | #5630 | fixed
+- rb:2026-11-01 | #5630
+- rf:bug-risks | medium | scripts/run/review/run-chain.ts:64 | 2026-11-01 | #5630
+- rf:comments | low | .claude/skills/workflow-commands/chain-rule.md:29 | 2026-11-01 | #5630
+- rf:comments | low | scripts/document/document-byte-budget.ts:84 | 2026-11-01 | #5630
+- rf:comments | low | scripts/time-runtime/time-bundle-call.ts:204 | 2026-11-01 | #5632
+- rb:2026-11-01 | #5632
+- rf:project-conventions | low | scripts/time-runtime/time-bundle-call.ts:203 | 2026-11-01 | #5632 | fixed
+- rf:bug-risks | low | scripts/ui/ui-shot-cli.ts:48 | 2026-11-01 | #5633
+- rb:2026-11-01 | #5633
+- rf:bug-risks | medium | scripts/ui/ui-shot-cli.ts:64 | 2026-11-01 | #5633 | fixed
+- rf:bug-risks | low | scripts/ui/ui-shot-cli.ts:50 | 2026-11-01 | #5633 | fixed
+- rf:tests | low | scripts/ui/ui-shot-cli.test.ts:57 | 2026-11-01 | #5633 | fixed
+- rf:tests | low | .claude/skills/verify-ui/SKILL.md:21 | 2026-11-01 | #5633 | fixed
+- rb:2026-11-01 | #5635
+- rf:bug-risks | medium | scripts/run/stale/run-stale-cli.ts:48 | 2026-11-01 | #5635 | fixed
+- rf:bug-risks | low | scripts/run/stale/run-stale.ts:86 | 2026-11-01 | #5635 | fixed
+- rf:performance | low | scripts/run/stale/run-stale-cli.ts:41 | 2026-11-01 | #5635 | fixed
+- rf:project-conventions | low | scripts/run/stale/run-stale-cli.ts:30 | 2026-11-01 | #5635 | fixed
+- rf:project-conventions | low | .claude/skills/workflow-commands/backlogrun-park.md:114 | 2026-11-01 | #5635 | fixed
+- rf:tests | low | scripts/run/stale/run-stale-cli.test.ts:106 | 2026-11-01 | #5635 | fixed
+- rf:comments | low | scripts/run/stale/run-stale.ts:12 | 2026-11-01 | #5635 | fixed
+- ri:bug-risks | medium | scripts/run/stale/run-stale.ts:42 | 2026-11-01 | #5635 | fixed
+- ri:tests | medium | scripts/run/stale/run-stale.test.ts:1 | 2026-11-01 | #5635 | fixed
+- ri:bug-risks | low | scripts/run/stale/run-stale-cli.ts:46 | 2026-11-01 | #5635 | fixed
+- ri:project-conventions | low | .claude/skills/workflow-commands/backlogrun-park.md:98 | 2026-11-01 | #5635 | fixed
+- ri:comments | low | scripts/run/stale/run-stale.ts:7 | 2026-11-01 | #5635 | fixed
+- rf:bug-risks | low | scripts/backlog/backlog-triage-cli.ts:107 | 2026-11-01 | #5636
+- rf:project-conventions | low | scripts/backlog/backlog-budget.ts:93 | 2026-11-01 | #5636
+- rf:comments | low | scripts/epic/epic-triage.ts:26 | 2026-11-01 | #5636
+- rb:2026-11-01 | #5636
+- rf:bug-risks | low | scripts/backlog/backlog-triage-cli.ts:100 | 2026-11-01 | #5636 | fixed
+- rf:project-conventions | low | scripts/backlog/backlog-budget.ts:93 | 2026-11-01 | #5636 | fixed
+- ri:comments | low | scripts/epic/epic-triage.ts:26 | 2026-11-01 | #5636 | fixed
+- rf:project-conventions | medium | .claude/skills/workflow-commands/kickoff.md:26 | 2026-11-01 | #5637
+- rf:project-conventions | low | scripts/josh/josh-commands-epic.ts:35 | 2026-11-01 | #5637
+- rf:project-conventions | low | scripts/epic/epic-run.ts:87 | 2026-11-01 | #5637
+- rf:bug-risks | low | scripts/epic/epic.ts:199 | 2026-11-01 | #5637
+- rf:tests | low | scripts/epic/epic.ts:51 | 2026-11-01 | #5637
+- rb:2026-11-01 | #5637
+- rf:bug-risks | medium | docs/environment-variables.md:7 | 2026-11-01 | #5637 | fixed
+- rf:bug-risks | low | scripts/epic/epic.ts:206 | 2026-11-01 | #5637 | fixed
+- rf:project-conventions | low | scripts/josh/josh-commands-epic.ts:35 | 2026-11-01 | #5637 | fixed
+- rf:project-conventions | low | scripts/epic/epic-run.ts:118 | 2026-11-01 | #5637 | fixed
+- rf:tests | low | scripts/epic/epic.ts:62 | 2026-11-01 | #5637 | fixed
+- ri:bug-risks | low | scripts/hooks/implementation-shell.ts:25 | 2026-11-01 | #5638 | fixed
+- rb:2026-11-01 | #5638
+- rf:bug-risks | medium | scripts/hooks/implementation-shell.ts:114 | 2026-11-01 | #5638 | fixed
+- rf:bug-risks | medium | scripts/hooks/implementation-shell.ts:203 | 2026-11-01 | #5638 | fixed
+- rf:bug-risks | low | scripts/hooks/implementation-shell.ts:61 | 2026-11-01 | #5638 | fixed
+- rf:bug-risks | low | scripts/hooks/implementation-shell.ts:249 | 2026-11-01 | #5638 | fixed
+- rb:2026-11-01 | #5638
+- rf:bug-risks | medium | scripts/hooks/implementation-shell.ts:114 | 2026-11-01 | #5638 | fixed
+- rf:bug-risks | medium | scripts/hooks/implementation-shell.ts:203 | 2026-11-01 | #5638 | fixed
+- rf:bug-risks | low | scripts/hooks/implementation-shell.ts:61 | 2026-11-01 | #5638 | fixed
+- rf:bug-risks | low | scripts/hooks/implementation-shell.ts:249 | 2026-11-01 | #5638 | fixed
+- rb:2026-11-01 | #5638
+- rf:bug-risks | medium | scripts/hooks/implementation-shell.ts:67 | 2026-11-01 | #5638
+- rf:bug-risks | medium | scripts/hooks/implementation-shell.ts:56 | 2026-11-01 | #5638
+- rf:project-conventions | low | .claude/skills/workflow-commands/progress-watcher.md:63 | 2026-11-01 | #5639
+- rf:project-conventions | low | .claude/skills/workflow-commands/backlogrun.md:63 | 2026-11-01 | #5639
+- rb:2026-11-01 | #5639
+- rf:bug-risks | low | scripts/run/run-report-end.ts:91 | 2026-11-01 | #5639 | fixed
+- rf:project-conventions | low | .claude/skills/workflow-commands/backlogrun.md:63 | 2026-11-01 | #5639 | fixed
+- rf:project-conventions | low | .claude/skills/workflow-commands/progress-watcher.md:63 | 2026-11-01 | #5639 | fixed
+- rf:tests | low | scripts/run/run-report-cli.ts:45 | 2026-11-01 | #5639 | fixed
+- ri:bug-risks | medium | scripts/rules/lane-carry-conflict.ts:34 | 2026-11-01 | #5639 | fixed
+- ri:project-conventions | low | .claude/skills/workflow-commands/backlogrun.md:63 | 2026-11-01 | #5639 | fixed
+- ri:project-conventions | low | .claude/skills/workflow-commands/progress-watcher.md:63 | 2026-11-01 | #5639 | fixed
+- rb:2026-11-01 | #5640
+- rf:project-conventions | low | scripts/review/review-lint-findings.ts:3 | 2026-11-01 | #5640 | fixed
+- ri:none | none | - | 2026-11-01 | #5640
+- rf:tests | low | scripts/build/build-hooks-dependencies.test.ts:32 | 2026-11-01 | #5641
+- rf:tests | low | scripts/build/build-hooks-dependencies.test.ts:19 | 2026-11-01 | #5641
+- rb:2026-11-01 | #5641
+- rf:bug-risks | low | scripts/build/build-hooks.ts:27 | 2026-11-01 | #5641 | fixed
+- rf:project-conventions | low | scripts/build/build-hooks.ts:56 | 2026-11-01 | #5641 | fixed
+- rf:tests | low | scripts/build/build-hooks-dependencies.test.ts:25 | 2026-11-01 | #5641 | fixed
+- rf:none | none | - | 2026-11-01 | #5642
+- rb:2026-11-01 | #5642
+- rf:bug-risks | low | scripts/test/test-related-cap.ts:72 | 2026-11-01 | #5642 | fixed
+- rf:tests | low | scripts/test/test-related-pins.ts:14 | 2026-11-01 | #5642 | fixed
+- rf:tests | low | docs/why.md:264 | 2026-11-01 | #5644
+- rf:tests | low | scripts/document/why-command-counts.test.ts:19 | 2026-11-01 | #5644
+- rf:tests | low | docs/why.md:264 | 2026-11-01 | #5644
+- rb:2026-11-01 | #5644
+- rf:project-conventions | low | scripts/josh/josh-commands-maintenance.ts:104 | 2026-11-01 | #5644 | fixed
+- rf:tests | low | docs/why.md:264 | 2026-11-01 | #5644 | fixed
+- rf:tests | low | scripts/document/why-command-counts.test.ts:19 | 2026-11-01 | #5644 | fixed
+- rf:project-conventions | low | docs/josh-commands-run.md:757 | 2026-11-01 | #5645
+- rf:project-conventions | low | .claude/skills/workflow-commands/prrun.md:19 | 2026-11-01 | #5645
+- rf:project-conventions | low | scripts/run/run-step-section.ts:126 | 2026-11-01 | #5645
+- rb:2026-11-01 | #5645
+- rf:bug-risks | medium | scripts/run/progress/run-progress-cli.ts:466 | 2026-11-01 | #5645 | fixed
+- rf:bug-risks | medium | scripts/followup/followup-section.ts:14 | 2026-11-01 | #5645 | fixed
+- rf:bug-risks | low | scripts/followup/followup-section.ts:22 | 2026-11-01 | #5645 | fixed
+- rf:project-conventions | low | .claude/skills/workflow-commands/prrun.md:19 | 2026-11-01 | #5645 | fixed
+- rf:project-conventions | low | docs/josh-commands-run.md:757 | 2026-11-01 | #5645 | fixed
+- rf:project-conventions | low | scripts/followup/git-followup-workflow.ts:199 | 2026-11-01 | #5645 | fixed
+- rf:tests | low | scripts/followup/git-followup-workflow.test.ts:176 | 2026-11-01 | #5645 | fixed
+- ri:bug-risks | medium | scripts/followup/followup-section.ts:16 | 2026-11-01 | #5645 | fixed
+- ri:performance | low | scripts/run/progress/run-progress-cli.ts:463 | 2026-11-01 | #5645 | fixed
+- rb:2026-11-01 | #5645
+- rf:project-conventions | low | docs/josh-commands-run.md:757 | 2026-11-01 | #5645
+- rf:project-conventions | low | .claude/skills/workflow-commands/prrun.md:19 | 2026-11-01 | #5645
+- rf:project-conventions | low | scripts/run/run-step-section.ts:126 | 2026-11-01 | #5645
+- rf:comments | low | scripts/lane/lane-breakdown-text.ts:31 | 2026-11-01 | #5646
+- rb:2026-11-01 | #5646
+- rf:comments | low | scripts/lane/lane-breakdown-text.ts:31 | 2026-11-01 | #5646 | fixed
+- ri:comments | low | docs/josh-commands-run.md:1132 | 2026-11-01 | #5646 | fixed
+- ri:comments | low | scripts/lane/lane-breakdown-text.ts:31 | 2026-11-01 | #5646 | fixed
+- rb:2026-11-01 | #5646
+- rf:comments | low | scripts/lane/lane-breakdown-text.ts:31 | 2026-11-01 | #5646
+- rf:project-conventions | low | scripts/lane/lane-breakdown-pause.ts:19 | 2026-11-01 | #5646
+- rf:bug-risks | low | scripts/lane/lane-breakdown-pause.ts:57 | 2026-11-01 | #5646
+- rf:comments | low | scripts/backlog/backlog-triage-cli.ts:30 | 2026-11-01 | #5647
+- rf:comments | low | scripts/josh/josh-commands-backlog.ts | 2026-11-01 | #5647
+- rb:2026-11-01 | #5647
+- rf:none | none | - | 2026-11-01 | #5647
+- ri:bug-risks | medium | scripts/backlog/backlog-triage-cli.ts:129 | 2026-11-01 | #5647 | fixed
+- ri:bug-risks | low | scripts/backlog/backlog-triage-cli.ts:141 | 2026-11-01 | #5647 | fixed
+- rf:tests | low | scripts/lane/lane-breakdown-pause.test.ts:165 | 2026-11-01 | #5649
+- rb:2026-11-01 | #5649
+- rf:bug-risks | high | scripts/lane/lane-breakdown-pause.ts:22 | 2026-11-01 | #5649 | fixed
+- rf:tests | medium | scripts/lane/lane-breakdown-pause.test.ts:25 | 2026-11-01 | #5649 | fixed
+- rf:project-conventions | low | scripts/lane/lane-breakdown.ts:88 | 2026-11-01 | #5649 | fixed
+- rf:tests | low | scripts/lane/lane-breakdown-pause.test.ts:59 | 2026-11-01 | #5649 | fixed
+- ri:bug-risks | low | docs/josh-commands-run.md:1137 | 2026-11-01 | #5649 | fixed
+- rf:bug-risks | low | scripts/lane/lane-breakdown-calls.ts:50 | 2026-11-01 | #5653
+- rb:2026-11-01 | #5653
+- rf:bug-risks | medium | scripts/lane/lane-breakdown-calls.ts:50 | 2026-11-01 | #5653 | fixed
+- rf:bug-risks | low | scripts/lane/lane-breakdown-calls.ts:40 | 2026-11-01 | #5653 | fixed
+- ri:project-conventions | low | docs/josh-commands-run.md:1126 | 2026-11-01 | #5653 | fixed
+- rf:tests | medium | scripts/backlog/backlog-next-size.test.ts:24 | 2026-11-02 | #5654
+- rf:tests | medium | scripts/backlog/backlog-next-size.test.ts:99 | 2026-11-02 | #5654
+- rf:comments | low | .claude/skills/workflow-commands/split-assessment.md:17 | 2026-11-02 | #5654
+- rf:project-conventions | low | scripts/issue/size-estimate.test.ts:46 | 2026-11-02 | #5654
+- rf:none | none | - | 2026-11-02 | #5654
+- ri:assumptions | low | scripts/issue/size-estimate.ts:155 | 2026-11-02 | #5654
+- ri:comments | low | docs/josh-commands-backlog.md:166 | 2026-11-02 | #5654
+- rf:none | none | - | 2026-11-01 | #5655
+- rb:2026-11-01 | #5655
+- rf:bug-risks | medium | scripts/review/review-record-cli.ts:61 | 2026-11-01 | #5655 | fixed
+- rf:tests | medium | scripts/review/review-lane-handover.test.ts:69 | 2026-11-01 | #5655 | fixed
+- ri:bug-risks | medium | scripts/review/review-record-cli.ts:62 | 2026-11-01 | #5655 | fixed
+- ri:tests | low | scripts/run/review/run-review-cli-handover.test.ts:76 | 2026-11-01 | #5655 | fixed
+- rb:2026-11-01 | #5655
+- rf:tests | low | scripts/run/review/run-review-cli-handover.test.ts:76 | 2026-11-01 | #5655
+- rf:performance | low | scripts/review/review-lane-handover.ts:63 | 2026-11-01 | #5655
+- rf:bug-risks | low | scripts/run/ship/run-ship-review-steps.ts:323 | 2026-11-01 | #5656
+- rb:2026-11-01 | #5656
+- rf:bug-risks | medium | scripts/review/review-record-interaction.ts:12 | 2026-11-01 | #5656 | fixed
+- rf:tests | medium | scripts/review/review-interaction.test.ts:115 | 2026-11-01 | #5656 | fixed
+- rf:bug-risks | low | scripts/review/review-code-tree.ts:40 | 2026-11-01 | #5656 | fixed
+- ri:bug-risks | low | scripts/review/review-record-interaction.ts:12 | 2026-11-01 | #5656 | fixed
+- ri:bug-risks | low | scripts/run/ship/run-ship-review-steps.ts:323 | 2026-11-01 | #5656 | fixed
+- ri:comments | low | scripts/review/review-interaction.ts:39 | 2026-11-01 | #5656 | fixed
+- ri:comments | low | scripts/review/review-interaction.ts:22 | 2026-11-01 | #5656 | fixed
+- rb:2026-11-01 | #5657
+- rf:bug-risks | medium | scripts/gate/check-related.ts:294 | 2026-11-01 | #5657 | fixed
+- rf:bug-risks | medium | scripts/gate/tree-verdict.ts:39 | 2026-11-01 | #5657 | fixed
+- rf:bug-risks | low | scripts/gate/check-related.ts:294 | 2026-11-01 | #5657 | fixed
+- rf:tests | low | scripts/gate/check-related-run-reuse.test.ts:127 | 2026-11-01 | #5657 | fixed
+- rb:2026-11-01 | #5657
+- rf:bug-risks | medium | scripts/gate/check-related.ts:226 | 2026-11-01 | #5657
+- rf:bug-risks | low | scripts/gate/check-related.ts:293 | 2026-11-01 | #5657
+- rf:tests | low | scripts/gate/check-related-run-reuse.test.ts:50 | 2026-11-01 | #5657
+- rf:none | none | - | 2026-11-01 | #5658
+- ri:bug-risks | low | scripts/lane/lane-process-load.ts:12 | 2026-11-01 | #5658 | fixed
+- rb:2026-11-01 | #5658
+- rf:bug-risks | low | scripts/lane/lane-process-load.ts:34 | 2026-11-01 | #5658 | fixed
+- rf:tests | low | scripts/issue/issue-file-batch.test.ts:124 | 2026-11-01 | #5660
+- rb:2026-11-01 | #5660
+- rf:bug-risks | medium | scripts/issue/issue-file-batch-entries.ts:58 | 2026-11-01 | #5660 | fixed
+- rf:bug-risks | medium | scripts/issue/issue-file-batch.ts:89 | 2026-11-01 | #5660 | fixed
+- rf:bug-risks | low | scripts/issue/issue-file-batch.ts:116 | 2026-11-01 | #5660 | fixed
+- rf:tests | low | scripts/issue/issue-file-batch.test.ts:131 | 2026-11-01 | #5660 | fixed
+- rf:tests | low | scripts/issue/issue-file-batch-entries.test.ts:39 | 2026-11-01 | #5660 | fixed
+- rb:2026-11-01 | #5661
+- rf:none | none | - | 2026-11-01 | #5661
+- ri:none | none | - | 2026-11-01 | #5661
+- rf:bug-risks | low | scripts/review/review-record-cli.ts:65 | 2026-11-01 | #5662
+- rb:2026-11-01 | #5662
+- rf:bug-risks | low | scripts/review/review-reviewed-tree.ts:104 | 2026-11-01 | #5662 | fixed
+- rf:project-conventions | low | scripts/review/review-record-cli.ts:65 | 2026-11-01 | #5662 | filed:#5674
+- rf:project-conventions | low | docs/maintainers/josh-commands-automation-rationale.md:163 | 2026-11-01 | #5662 | fixed
+- rf:tests | low | scripts/review/review-reviewed-tree-unexecuted.test.ts:56 | 2026-11-01 | #5662 | fixed
+- rf:comments | low | scripts/review/review-reviewed-tree.ts:15 | 2026-11-01 | #5662 | fixed
+- ri:bug-risks | medium | scripts/review/review-record-cli.ts:65 | 2026-11-01 | #5662 | filed:#5674
+- rf:bug-risks | low | scripts/hooks/run-hook.sh:68 | 2026-11-01 | #5663
+- ri:bug-risks | low | scripts/hooks/run-hook.sh:66 | 2026-11-01 | #5663 | fixed
+- rb:2026-11-01 | #5663
+- rf:bug-risks | low | scripts/hooks/run-hook.sh:66 | 2026-11-01 | #5663 | fixed
+- rf:bug-risks | low | scripts/hooks/run-hook.sh:66 | 2026-11-01 | #5663 | fixed
+- rf:none | none | - | 2026-11-01 | #5664
+- rb:2026-11-01 | #5664
+- rf:tests | medium | scripts/lint/lint-rule.test.ts:191 | 2026-11-01 | #5664 | fixed
+- rf:project-conventions | low | scripts/lint/lint-parallel.ts:224 | 2026-11-01 | #5664 | fixed
+- rb:2026-11-01 | #5665
+- rf:project-conventions | low | prompts/collaboration-workflow/measurement.md:38 | 2026-11-01 | #5665 | fixed
+- rf:none | none | - | 2026-11-01 | #5667
+- rf:none | none | - | 2026-11-01 | #5667
+- ri:bug-risks | low | scripts/lane/lane-plan-size.ts:107 | 2026-11-01 | #5672 | fixed
+- ri:bug-risks | low | scripts/lane/lane-plan.ts:45 | 2026-11-01 | #5672 | fixed
+- rb:2026-11-01 | #5672
+- rf:comments | low | scripts/lane/lane-plan-size.ts:28 | 2026-11-01 | #5672 | fixed
+- rf:none | none | - | 2026-11-01 | #5674
+- rb:2026-11-01 | #5674
+- rf:tests | low | scripts/review/review-record-cli-reuse.test.ts:80 | 2026-11-01 | #5674 | fixed
+- rf:comments | low | docs/maintainers/josh-commands-automation-rationale.md:162 | 2026-11-01 | #5674 | fixed
+- rf:performance | low | scripts/issue/issue-file-batch.ts:83 | 2026-11-01 | #5675
+- rb:2026-11-01 | #5675
+- rf:bug-risks | medium | scripts/issue/issue-file-batch.ts:127 | 2026-11-01 | #5675 | fixed
+- rf:bug-risks | low | scripts/issue/issue-file-batch-entries.ts:26 | 2026-11-01 | #5675 | fixed
+- rf:performance | low | scripts/issue/issue-file-batch.ts:81 | 2026-11-01 | #5675 | fixed
+- rf:project-conventions | low | scripts/issue/issue-file-cli.ts:340 | 2026-11-01 | #5675 | fixed
+- rf:project-conventions | low | docs/josh-commands-backlog.md:140 | 2026-11-01 | #5675 | fixed
+- rf:tests | low | scripts/issue/issue-file-batch.test.ts:159 | 2026-11-01 | #5675 | fixed
+- rf:comments | low | scripts/lane/lane-plan-signals.ts:12 | 2026-11-01 | #5679
+- ri:bug-risks | medium | scripts/lane/lane-plan-size.ts:114 | 2026-11-01 | #5679 | fixed
+- ri:comments | low | scripts/lane/lane-plan-size.ts:176 | 2026-11-01 | #5679 | fixed
+- ri:comments | low | scripts/lane/lane-plan-signals.ts:12 | 2026-11-01 | #5679 | fixed
+- rb:2026-11-01 | #5679
+- rf:project-conventions | low | scripts/lane/lane-plan-size.ts:176 | 2026-11-01 | #5679 | fixed
+- rf:comments | low | scripts/lane/lane-plan-size.ts:28 | 2026-11-01 | #5679 | fixed
+- rf:bug-risks | medium | scripts/josh/josh-commands-issue-write.ts:159 | 2026-11-01 | #5683 | fixed
+- rf:tests | low | scripts/lane/lane-plan-signals.ts:39 | 2026-11-01 | #5684
+- rb:2026-11-01 | #5684
+- rf:bug-risks | low | scripts/lane/lane-plan-signals.ts:53 | 2026-11-01 | #5684 | fixed
+- rf:bug-risks | low | scripts/lane/lane-plan-size.ts:116 | 2026-11-01 | #5684 | fixed
+- rf:tests | low | scripts/lane/lane-plan-size.test.ts:221 | 2026-11-01 | #5684 | fixed
+- rf:tests | low | scripts/lane/lane-plan-signals.ts:39 | 2026-11-01 | #5684 | fixed
+- ri:bug-risks | low | scripts/lane/lane-plan-signals.ts:53 | 2026-11-01 | #5684 | fixed
+- ri:comments | low | scripts/lane/lane-plan-size.ts:35 | 2026-11-01 | #5684 | fixed
+- rf:comments | low | scripts/lane/lane-ledger-schema.ts:74 | 2026-11-01 | #5690
+- rb:2026-11-01 | #5690
+- rf:bug-risks | medium | scripts/lane/lane-process-stats.ts:93 | 2026-11-01 | #5690 | fixed
+- rf:tests | low | scripts/lane/lane-process-stats.test.ts:67 | 2026-11-01 | #5690 | fixed
+- ri:bug-risks | medium | scripts/lane/lane-process-stats.ts:93 | 2026-11-01 | #5690 | fixed
+- ri:project-conventions | low | .env.example:26 | 2026-11-01 | #5690 | fixed
+- ri:tests | low | scripts/lane/lane-process-stats.test.ts:67 | 2026-11-01 | #5690 | fixed
+- ri:comments | low | scripts/lane/lane-ledger-schema.ts:74 | 2026-11-01 | #5690 | fixed
+- rb:2026-11-01 | #5690
+- rf:bug-risks | medium | scripts/lane/lane-process-stats.ts:93 | 2026-11-01 | #5690 | fixed
+- rf:tests | low | scripts/lane/lane-process-stats.test.ts:67 | 2026-11-01 | #5690 | fixed
+- rb:2026-11-01 | #5690
+- rf:bug-risks | medium | scripts/lane/lane-process-stats.ts:93 | 2026-11-01 | #5690 | fixed
+- rf:tests | low | scripts/lane/lane-process-stats.test.ts:67 | 2026-11-01 | #5690 | fixed
+- rf:bug-risks | low | scripts/lint/lint-rule.ts:164 | 2026-11-01 | #5692
+- rb:2026-11-01 | #5692
+- rf:bug-risks | low | scripts/lint/lint-rule.ts:168 | 2026-11-01 | #5692 | fixed
+- rf:none | none | - | 2026-11-01 | #5693
+- rb:2026-11-01 | #5693
+- rf:assumptions | low | scripts/run/ship/run-ship-evidence-cli.ts:83 | 2026-11-01 | #5693
+- rf:performance | low | scripts/run/ship/run-ship-evidence-cli.ts:81 | 2026-11-01 | #5693 | fixed
+- rf:comments | low | docs/josh-commands-run.md:681 | 2026-11-01 | #5693 | fixed
+- ri:bug-risks | medium | scripts/run/ship/run-ship-evidence-cli.ts:72 | 2026-11-01 | #5693 | fixed
+- rf:comments | low | scripts/run/entry/run-entry-cli.ts:235 | 2026-11-01 | #5696
+- rb:2026-11-01 | #5696
+- rf:bug-risks | low | scripts/run/entry/run-entry-cli.ts:259 | 2026-11-01 | #5696 | fixed
+- ri:bug-risks | medium | scripts/run/entry/run-entry-cli.ts:318 | 2026-11-01 | #5696 | fixed
+- rb:2026-11-01 | #5696
+- rf:bug-risks | low | scripts/run/entry/run-entry-cli.ts:259 | 2026-11-01 | #5696 | fixed
+- ri:bug-risks | medium | scripts/run/entry/run-entry-cli.ts:318 | 2026-11-01 | #5696 | fixed
+- rf:comments | low | docs/josh-commands.md:12 | 2026-11-01 | #5699
+- ri:none | none | - | 2026-11-01 | #5699
+- rb:2026-11-01 | #5699
+- rf:bug-risks | low | scripts/test/test-related-cap.ts:100 | 2026-11-01 | #5699 | fixed
+- rf:bug-risks | low | scripts/test/test-related-cap.ts:51 | 2026-11-01 | #5699 | fixed
+- rf:tests | low | scripts/lane/lane-breakdown-related.test.ts:36 | 2026-11-01 | #5699 | fixed
+- rf:none | none | - | 2026-11-01 | #5700
+- rb:2026-11-01 | #5700
+- rf:bug-risks | medium | scripts/run/entry/run-entry-cli.ts:338 | 2026-11-01 | #5700 | fixed
+- rf:project-conventions | low | scripts/run/run-prep.ts:13 | 2026-11-01 | #5700 | fixed
+- rf:tests | low | scripts/run/entry/run-entry-cli-probe.test.ts:40 | 2026-11-01 | #5700 | fixed
+- rf:comments | low | scripts/run/run-prep.ts:10 | 2026-11-01 | #5700 | fixed
+- ri:comments | low | docs/josh-commands-run.md:368 | 2026-11-01 | #5700 | fixed
+- ri:comments | low | scripts/run/run-prep.ts:13 | 2026-11-01 | #5700 | fixed
+- rf:project-conventions | low | docs/maintainers/josh-commands-run-rationale.md:205 | 2026-11-01 | #5701
+- rb:2026-11-01 | #5701
+- rf:bug-risks | medium | scripts/lane/lane-sinks.ts:40 | 2026-11-01 | #5701 | fixed
+- rf:project-conventions | low | docs/maintainers/josh-commands-run-rationale.md:205 | 2026-11-01 | #5701 | fixed
+- ri:none | none | - | 2026-11-01 | #5701
+- rb:2026-11-01 | #5701
+- rf:tests | low | scripts/lane/lane-sinks.test.ts:142 | 2026-11-01 | #5701 | fixed
+- rf:comments | low | scripts/josh/josh-commands-lane.ts:243 | 2026-11-01 | #5701 | fixed
+- rf:bug-risks | low | scripts/test/test-related-cap.ts:37 | 2026-11-01 | #5702 | fixed
+- rf:bug-risks | low | scripts/test/test-related-cap.ts:38 | 2026-11-01 | #5702 | fixed
+- rf:project-conventions | low | scripts/test/test-related-cap.ts:122 | 2026-11-01 | #5702 | fixed
+- rf:bug-risks | low | scripts/test/test-related-cap.ts:37 | 2026-11-01 | #5702
+- rf:bug-risks | low | scripts/test/test-related-cap.ts:38 | 2026-11-01 | #5702
+- rf:project-conventions | low | scripts/test/test-related-cap.ts:122 | 2026-11-01 | #5702
+- rb:2026-11-01 | #5706
+- rf:none | none | - | 2026-11-01 | #5706
+- ri:none | none | - | 2026-11-01 | #5706
+- ri:bug-risks | medium | scripts/run/board/run-board-fold.ts:105 | 2026-11-01 | #5708 | fixed
+- ri:performance | medium | scripts/run/board/run-board-read.ts:297 | 2026-11-01 | #5708 | fixed
+- ri:assumptions | low | scripts/run/board/run-board-throughput.ts:100 | 2026-11-01 | #5708 | fixed
+- rb:2026-11-01 | #5708
+- rf:bug-risks | medium | scripts/run/board/run-board-throughput.ts:131 | 2026-11-01 | #5708 | fixed
+- rf:bug-risks | medium | scripts/run/board/run-board-fold.ts:128 | 2026-11-01 | #5708 | fixed
+- rf:bug-risks | low | scripts/run/board/run-board-render-throughput.ts:78 | 2026-11-01 | #5708 | fixed
+- rf:project-conventions | low | scripts/run/board/run-board-throughput.ts:55 | 2026-11-01 | #5708 | fixed
+- ri:none | none | - | 2026-11-01 | #5711
+- rb:2026-11-01 | #5711
+- rf:bug-risks | low | scripts/lane/lane-sinks-issues.ts:37 | 2026-11-01 | #5711 | fixed
+- rf:bug-risks | low | scripts/lane/lane-sinks-issues.ts:22 | 2026-11-01 | #5711 | fixed
+- rf:comments | low | scripts/lint/lint-parallel.ts:119 | 2026-11-01 | #5712
+- rb:2026-11-01 | #5712
+- rf:bug-risks | medium | scripts/lint/lint-parallel.ts:112 | 2026-11-01 | #5712 | fixed
+- rf:bug-risks | medium | scripts/lane/lane-breakdown-calls.ts:55 | 2026-11-01 | #5712 | fixed
+- rf:project-conventions | low | scripts/lint/lint-related.ts:41 | 2026-11-01 | #5712 | fixed
+- rf:tests | low | scripts/lane/lane-breakdown-calls.test.ts:20 | 2026-11-01 | #5712 | fixed
+- ri:none | none | - | 2026-11-01 | #5712
+- rf:tests | low | scripts/lane/lane-implement-stats.test.ts:156 | 2026-11-01 | #5714
+- ri:none | none | - | 2026-11-01 | #5714
+- rb:2026-11-01 | #5714
+- rf:bug-risks | medium | scripts/lane/lane-implement-stats.ts:196 | 2026-11-01 | #5714 | fixed
+- rf:project-conventions | low | docs/josh-commands-run.md:1128 | 2026-11-01 | #5714 | fixed
+- rf:tests | low | scripts/lane/lane-implement-stats.test.ts:31 | 2026-11-01 | #5714 | fixed
+- rf:comments | low | scripts/lane/lane-implement-stats.ts:208 | 2026-11-01 | #5714 | fixed
+- rb:2026-11-01 | #5717
+- rf:comments | low | scripts/lane/lane-breakdown-calls.ts:34 | 2026-11-01 | #5717 | fixed
+- ri:none | none | - | 2026-11-01 | #5717
+- rf:none | none | - | 2026-11-01 | #5723
+- rb:2026-11-01 | #5723
+- rf:comments | low | .claude/skills/workflow-commands/backlogrun.md:66 | 2026-11-01 | #5723 | fixed
+- rf:none | none | - | 2026-11-01 | #5724
+- rf:none | none | - | 2026-11-01 | #5724
+- rf:project-conventions | low | .claude/skills/workflow-commands/split-assessment.md:85 | 2026-11-01 | #5727 | fixed
+- rf:project-conventions | low | .claude/skills/workflow-commands/split-assessment.md:85 | 2026-11-01 | #5727
+- k:followup-unrelated-test-rerun | d1 | 2026-11-01 | scripts/run/event/run-event-stream.test.ts | followup reran Unit Tests (3/6); failed outside the change: isolated scripts/run/event/run-event-stream.test.ts > run_event_stream.append — the one enumeration > appends every enumerated kind
+- rf:none | none | - | 2026-11-01 | #5729
+- rb:2026-11-01 | #5729
+- rf:project-conventions | low | docs/maintainers/verify-ui-rationale.md:11 | 2026-11-01 | #5729 | fixed
+- rf:tests | low | scripts/claude/verify-ui-skill.test.ts:17 | 2026-11-01 | #5729 | fixed
+- rf:none | none | - | 2026-11-01 | #5735
+- rb:2026-11-01 | #5735
+- rf:bug-risks | medium | scripts/run/review/run-chain-join.ts:23 | 2026-11-01 | #5735 | fixed
+- rf:project-conventions | low | scripts/run/review/run-chain-join.ts:31 | 2026-11-01 | #5735 | fixed
+- rf:comments | low | .claude/skills/workflow-commands/chain-rule.md:40 | 2026-11-01 | #5735 | fixed
+- ri:bug-risks | medium | scripts/run/review/run-review-cli.ts:89 | 2026-11-01 | #5735 | fixed
+- ri:tests | low | scripts/rules/round-one-check-related.ts:25 | 2026-11-01 | #5735 | filed:#5752
+- rb:2026-11-01 | #5737
+- rf:bug-risks | low | scripts/run/park/run-park-cli.ts:52 | 2026-11-01 | #5737 | fixed
+- rf:project-conventions | low | scripts/rules/lane-park.ts:125 | 2026-11-01 | #5737 | fixed
+- ri:bug-risks | medium | scripts/run/park/run-park-cli.ts:56 | 2026-11-01 | #5737 | fixed
+- rb:2026-11-01 | #5737
+- rf:bug-risks | medium | scripts/run/park/run-park-release.ts:24 | 2026-11-01 | #5737
+- rf:none | none | - | 2026-11-01 | #5738
+- ri:bug-risks | medium | scripts/issue/issue-plan-cli.ts:151 | 2026-11-01 | #5738 | fixed
+- ri:bug-risks | low | scripts/issue/issue-plan-cli.ts:155 | 2026-11-01 | #5738 | fixed
+- ri:project-conventions | low | scripts/issue/issue-plan-cli.ts:151 | 2026-11-01 | #5738 | fixed
+- rb:2026-11-01 | #5738
+- rf:bug-risks | low | scripts/issue/issue-plan-cli.ts:24 | 2026-11-01 | #5738 | fixed
+- rf:comments | low | docs/josh-commands-backlog.md:289 | 2026-11-01 | #5738 | fixed
+- rf:bug-risks | low | scripts/hooks/stop-guard.ts:166 | 2026-11-01 | #5739
+- rf:performance | low | scripts/hooks/stop-guard.ts:228 | 2026-11-01 | #5739
+- rf:bug-risks | low | scripts/run/handoff/run-handoff-launch.ts:79 | 2026-11-01 | #5739
+- rf:tests | low | scripts/hooks/stop-guard.test.ts:122 | 2026-11-01 | #5739
+- rb:2026-11-01 | #5739
+- rf:bug-risks | low | scripts/hooks/stop-guard.ts:166 | 2026-11-01 | #5739 | fixed
+- rf:comments | low | .claude/skills/workflow-commands/backlogrun-progress.md:75 | 2026-11-01 | #5739 | fixed
+- rf:tests | low | scripts/hooks/stop-guard.test.ts:122 | 2026-11-01 | #5739 | fixed
+- ri:performance | low | scripts/hooks/stop-guard.ts:228 | 2026-11-01 | #5739 | fixed
+- ri:bug-risks | low | scripts/run/handoff/run-handoff-launch.ts:79 | 2026-11-01 | #5739 | fixed
+- rb:2026-11-01 | #5741
+- rf:bug-risks | low | scripts/run/entry/run-entry-lane-plan.ts:36 | 2026-11-01 | #5741 | fixed
+- rf:performance | low | scripts/run/entry/run-entry-cli.ts:311 | 2026-11-01 | #5741 | fixed
+- rf:comments | low | .claude/skills/workflow-commands/kickoff.md:13 | 2026-11-01 | #5741 | fixed
+- ri:bug-risks | low | scripts/lane/lane-plan-check.ts:212 | 2026-11-01 | #5741 | fixed
+- ri:bug-risks | low | scripts/lane/lane-plan-check.ts:165 | 2026-11-01 | #5741 | fixed
+- rf:comments | low | scripts/run/wake/run-wake-loop.ts:92 | 2026-11-01 | #5743
+- ri:bug-risks | medium | scripts/run/wake/run-wake.ts:139 | 2026-11-01 | #5743 | fixed
+- ri:comments | low | docs/josh-commands-backlog.md:899 | 2026-11-01 | #5743 | fixed
+- rb:2026-11-01 | #5743
+- rf:bug-risks | medium | scripts/run/wake/run-wake-ports.ts:67 | 2026-11-01 | #5743 | fixed
+- rf:tests | medium | scripts/run/wake/run-wake-driver.test.ts:208 | 2026-11-01 | #5743 | fixed
+- rf:project-conventions | low | scripts/run/carry/run-carry.ts:478 | 2026-11-01 | #5743 | fixed
+- rf:tests | low | scripts/run/wake/run-wake-loop.ts:105 | 2026-11-01 | #5743 | fixed
+- rf:project-conventions | low | .claude/skills/workflow-commands/entry-sequence.md:35 | 2026-11-01 | #5747
+- rb:2026-11-01 | #5747
+- rf:bug-risks | medium | scripts/run/entry/run-entry-sync.ts:74 | 2026-11-01 | #5747 | fixed
+- rf:bug-risks | medium | scripts/run/entry/run-entry-stop.ts:87 | 2026-11-01 | #5747 | fixed
+- rf:bug-risks | medium | scripts/run/entry/run-entry-sync.ts:37 | 2026-11-01 | #5747 | fixed
+- rf:project-conventions | low | scripts/run/entry/run-entry-cli.ts:397 | 2026-11-01 | #5747
+- rf:tests | low | scripts/run/entry/run-entry-sync.test.ts:102 | 2026-11-01 | #5747 | fixed
+- rf:project-conventions | low | .claude/skills/workflow-commands/entry-sequence.md:35 | 2026-11-01 | #5747
+- ri:bug-risks | medium | scripts/run/entry/run-entry-stop.ts:87 | 2026-11-01 | #5747 | fixed
+- ri:bug-risks | medium | scripts/run/entry/run-entry-sync.ts:37 | 2026-11-01 | #5747 | fixed
+- ri:project-conventions | low | .claude/skills/workflow-commands/entry-sequence.md:35 | 2026-11-01 | #5747 | fixed
+- rb:2026-11-01 | #5752
+- rf:bug-risks | low | scripts/rules/round-one-check-related.ts:26 | 2026-11-01 | #5752 | fixed
+- rf:bug-risks | low | scripts/rules/round-one-check-related.test.ts:109 | 2026-11-01 | #5752 | fixed
+- rf:comments | low | scripts/rules/round-one-check-related.ts:18 | 2026-11-01 | #5752 | fixed
+- rb:2026-11-01 | #5754
+- rf:bug-risks | low | scripts/epic/epic-split-reach.ts:93 | 2026-11-01 | #5754 | fixed
+- rf:bug-risks | low | scripts/epic/epic-split-reach.ts:44 | 2026-11-01 | #5754 | fixed
+- rf:tests | low | scripts/epic/epic.ts:41 | 2026-11-01 | #5754 | fixed
+- rf:comments | low | docs/josh-commands-backlog.md:525 | 2026-11-01 | #5754 | fixed
+- rf:none | none | - | 2026-11-01 | #5755
+- rb:2026-11-01 | #5755
+- rf:project-conventions | low | scripts/lane/lane-breakdown-implement.ts:169 | 2026-11-01 | #5755 | fixed
+- rf:tests | low | scripts/lane/lane-breakdown-laps.test.ts:56 | 2026-11-01 | #5755 | fixed
+- ri:bug-risks | medium | scripts/lane/lane-sinks.ts:59 | 2026-11-01 | #5755 | fixed
+- rf:none | none | - | 2026-11-01 | #5756
+- rb:2026-11-01 | #5756
+- rf:comments | low | scripts/lane/lane-ledger-schema.ts:197 | 2026-11-01 | #5756 | fixed
+- rf:comments | low | scripts/run/cut/run-cut.ts:41 | 2026-11-01 | #5757
+- rb:2026-11-01 | #5757
+- rf:project-conventions | low | scripts/run/cut/run-cut.ts:38 | 2026-11-01 | #5757 | fixed
+- rf:project-conventions | low | scripts/agent/agent-profile-schema.test.ts:6 | 2026-11-01 | #5757 | fixed
+- ri:none | none | - | 2026-11-01 | #5757
+- rb:2026-11-01 | #5757
+- rf:none | none | - | 2026-11-01 | #5757
+- rf:bug-risks | low | scripts/issue/size-estimate.ts:55 | 2026-11-01 | #5758
+- rf:project-conventions | low | scripts/issue/size-estimate.ts:58 | 2026-11-01 | #5758
+- rb:2026-11-01 | #5758
+- rf:bug-risks | medium | scripts/epic/epic-decide.ts:82 | 2026-11-01 | #5758 | fixed
+- rf:bug-risks | low | scripts/epic/epic-decide.ts:90 | 2026-11-01 | #5758 | fixed
+- rf:bug-risks | low | scripts/issue/size-estimate.ts:78 | 2026-11-01 | #5758 | fixed
+- rf:project-conventions | low | scripts/issue/size-estimate.ts:19 | 2026-11-01 | #5758 | fixed
+- rf:tests | low | scripts/security/security-audit-provision-main.test.ts:35 | 2026-11-01 | #5761 | fixed
+- rf:bug-risks | medium | .claude/settings.json:52 | 2026-11-01 | #5761
+- rf:tests | low | scripts/security/security-audit-provision-main.test.ts:35 | 2026-11-01 | #5761
+- rf:project-conventions | low | .claude/skills/workflow-commands/chain-rule.md:9 | 2026-11-01 | #5764
+- rb:2026-11-01 | #5764
+- rf:bug-risks | low | scripts/rules/repeat-check-related.ts:60 | 2026-11-01 | #5764 | fixed
+- rf:project-conventions | low | scripts/rules/repeat-check-related.ts:42 | 2026-11-01 | #5764 | fixed
+- rf:project-conventions | low | .claude/skills/workflow-commands/chain-rule.md:9 | 2026-11-01 | #5764 | fixed
+- rf:project-conventions | low | scripts/run/run-investigation-record.ts:22 | 2026-11-01 | #5765
+- ri:bug-risks | medium | scripts/run/run-investigation-record.ts:43 | 2026-11-01 | #5765 | fixed
+- rb:2026-11-01 | #5765
+- rf:bug-risks | low | scripts/run/run-investigation-record.ts:15 | 2026-11-01 | #5765 | fixed
+- rf:project-conventions | low | scripts/run/run-investigation-record.ts:15 | 2026-11-01 | #5765 | fixed
+- rf:none | none | - | 2026-11-01 | #5766
+- rb:2026-11-01 | #5766
+- rf:none | none | - | 2026-11-01 | #5766
+- rf:bug-risks | low | scripts/run/ship/run-ship-steps.ts:94 | 2026-11-02 | #5767
+- rf:tests | low | scripts/run/ship/run-ship-steps.test.ts:156 | 2026-11-02 | #5767
+- rb:2026-11-02 | #5767
+- rf:bug-risks | medium | scripts/run/ship/run-ship-steps.ts:86 | 2026-11-02 | #5767 | deferred:#5819
+- rf:bug-risks | low | scripts/gate/core-priority.ts:4 | 2026-11-02 | #5767 | fixed
+- rf:tests | low | scripts/run/ship/run-ship-steps.test.ts:156 | 2026-11-02 | #5767 | fixed
+- ri:bug-risks | medium | scripts/hooks/pre-push-unit.ts:138 | 2026-11-02 | #5767 | fixed
+- rb:2026-11-01 | #5770
+- rf:project-conventions | medium | docs/josh-commands-run.md:831 | 2026-11-01 | #5770 | fixed
+- rf:tests | low | scripts/run/board/run-board-quota-held.ts:90 | 2026-11-01 | #5770 | fixed
+- rf:comments | low | scripts/run/board/run-board-quota-spent.ts:5 | 2026-11-01 | #5770 | fixed
+- ri:comments | medium | docs/josh-commands-run.md:831 | 2026-11-01 | #5770 | fixed
+- rb:2026-11-01 | #5770
+- rf:project-conventions | medium | docs/josh-commands-run.md:834 | 2026-11-01 | #5770
+- rf:assumptions | low | scripts/gh/git-pr-checks-missing.ts:27 | 2026-11-01 | #5774
+- rf:project-conventions | low | .josh/metrics-accepted/5774.json:2 | 2026-11-01 | #5774
+- rb:2026-11-01 | #5774
+- rf:bug-risks | medium | scripts/gh/git-pr-checks-missing.ts:41 | 2026-11-01 | #5774 | fixed
+- rf:comments | low | scripts/gh/git-pr-checks-eval.ts:75 | 2026-11-01 | #5774 | fixed
+- rf:project-conventions | low | .josh/metrics-accepted/5774.json:2 | 2026-11-01 | #5774 | fixed
+- rf:none | none | - | 2026-11-01 | #5775
+- rb:2026-11-01 | #5775
+- rf:comments | low | scripts/run/ship/run-ship-return.ts:211 | 2026-11-01 | #5775 | fixed
+- ri:none | none | - | 2026-11-01 | #5775
+- rf:bug-risks | low | scripts/followup/git-pr-followup-checks.ts:152 | 2026-11-01 | #5778
+- rb:2026-11-01 | #5778
+- rf:bug-risks | medium | scripts/followup/git-pr-followup-checks.ts:164 | 2026-11-01 | #5778 | fixed
+- rf:bug-risks | low | scripts/followup/followup-run-rerun.ts:107 | 2026-11-01 | #5778 | fixed
+- rf:project-conventions | low | scripts/followup/followup-run-rerun.ts:139 | 2026-11-01 | #5778 | fixed
+- rf:tests | low | scripts/followup/git-pr-followup-rerun.test.ts:52 | 2026-11-01 | #5778 | fixed
+- rf:none | none | - | 2026-11-01 | #5780
+- rb:2026-11-01 | #5780
+- rf:bug-risks | low | scripts/gh/git-pr-checks-missing.ts:103 | 2026-11-01 | #5780 | fixed
+- ri:bug-risks | low | scripts/run/board/run-board-status.ts:163 | 2026-11-01 | #5780 | fixed
+- rb:2026-11-01 | #5780
+- rf:bug-risks | low | scripts/gh/git-pr-checks-missing.ts:103 | 2026-11-01 | #5780 | fixed
+- ri:bug-risks | low | scripts/run/board/run-board-status.ts:163 | 2026-11-01 | #5780 | fixed
+- rf:none | none | - | 2026-11-01 | #5784
+- rb:2026-11-01 | #5784
+- rf:bug-risks | medium | scripts/rules/round-one-check-related.ts:35 | 2026-11-01 | #5784 | fixed
+- rf:comments | low | scripts/gate/check-related-touched.test.ts:42 | 2026-11-01 | #5784 | fixed
+- ri:none | none | - | 2026-11-01 | #5785
+- rb:2026-11-01 | #5785
+- rf:none | none | - | 2026-11-01 | #5785
+- rf:bug-risks | low | scripts/review/import-specifiers.ts:23 | 2026-11-01 | #5789 | fixed
+- rf:bug-risks | low | scripts/review/import-specifiers.ts:28 | 2026-11-01 | #5789
+- rf:assumptions | low | scripts/review/review-reviewed-tree.ts:150 | 2026-11-01 | #5791
+- rb:2026-11-01 | #5791
+- rf:bug-risks | medium | scripts/review/review-reviewed-tree.ts:53 | 2026-11-01 | #5791 | fixed
+- rf:project-conventions | low | scripts/review/review-reviewed-tree.ts:36 | 2026-11-01 | #5791 | fixed
+- rf:tests | low | scripts/review/review-reviewed-tree.synced.test.ts:37 | 2026-11-01 | #5791 | fixed
+- rf:tests | low | scripts/review/review-round-reuse.test.ts:167 | 2026-11-01 | #5791 | fixed
+- rf:bug-risks | medium | scripts/lint/import-move.ts:147 | 2026-11-01 | #5792
+- rf:project-conventions | low | scripts/lint/rename-cli.ts:39 | 2026-11-01 | #5792
+- rb:2026-11-01 | #5792
+- rf:bug-risks | medium | scripts/lint/import-move.ts:121 | 2026-11-01 | #5792 | fixed
+- rf:bug-risks | medium | scripts/lint/import-move.ts:77 | 2026-11-01 | #5792 | fixed
+- rf:bug-risks | low | scripts/lint/import-move.ts:159 | 2026-11-01 | #5792 | fixed
+- rf:project-conventions | low | scripts/lint/rename-cli.ts:38 | 2026-11-01 | #5792 | fixed
+- rf:tests | low | scripts/lint/import-move.test.ts:71 | 2026-11-01 | #5792 | fixed
+- rf:bug-risks | low | scripts/josh/josh-read-only.ts:28 | 2026-11-01 | #5793
+- rf:bug-risks | low | scripts/hooks/implementation-shell.ts:128 | 2026-11-01 | #5793
+- ri:bug-risks | high | scripts/josh/josh-read-only.ts:34 | 2026-11-01 | #5793 | fixed
+- ri:performance | low | scripts/hooks/implementation-shell.ts:1 | 2026-11-01 | #5793 | fixed
+- ri:comments | low | .claude/agents/investigator.md:10 | 2026-11-01 | #5793 | fixed
+- rb:2026-11-01 | #5793
+- rf:bug-risks | high | scripts/josh/josh-read-only.ts:34 | 2026-11-01 | #5793 | fixed
+- rf:bug-risks | low | scripts/hooks/implementation-shell.ts:128 | 2026-11-01 | #5793 | fixed
+- rf:bug-risks | low | scripts/josh/josh-read-only.ts:35 | 2026-11-01 | #5793 | fixed
+- rf:project-conventions | low | scripts/josh/josh-read-only.ts:11 | 2026-11-01 | #5793 | fixed
+- rf:tests | low | scripts/hooks/implementation-shell.test.ts:47 | 2026-11-01 | #5793 | fixed
+- rb:2026-11-01 | #5800
+- rf:project-conventions | medium | docs/josh-commands-automation.md:45 | 2026-11-01 | #5800 | fixed
+- rf:bug-risks | low | scripts/lint/import-move.ts:160 | 2026-11-01 | #5800 | fixed
+- rf:project-conventions | low | scripts/lint/import-move.ts:17 | 2026-11-01 | #5800 | fixed
+- rf:none | none | - | 2026-11-01 | #5804
+- rb:2026-11-01 | #5804
+- rf:tests | medium | scripts/rules/__snapshots__/rule-list.txt:92 | 2026-11-01 | #5804 | fixed
+- rf:tests | low | scripts/rules/consultation-investigation.test.ts:93 | 2026-11-01 | #5804 | fixed
+- rb:2026-11-01 | #5808
+- rf:project-conventions | low | .prettierignore:11 | 2026-11-01 | #5808 | fixed
+- rf:tests | low | scripts/review/review-finding-ledger-prettier.test.ts:51 | 2026-11-01 | #5808 | fixed
+- rf:tests | low | scripts/review/review-finding-ledger-prettier.test.ts:41 | 2026-11-01 | #5808 | fixed
+- rf:project-conventions | low | scripts/run/ship/run-ship-recorded-fixture.ts:26 | 2026-11-02 | #5815
+- rf:tests | low | scripts/run/ship/run-ship-cli-pre-detach-stop.test.ts:102 | 2026-11-02 | #5815
+- ri:project-conventions | low | scripts/run/ship/run-ship-recorded-fixture.ts:25 | 2026-11-02 | #5815 | fixed
+- rb:2026-11-02 | #5815
+- rf:project-conventions | low | scripts/run/ship/run-ship-recorded-fixture.ts:26 | 2026-11-02 | #5815
+- rf:tests | low | scripts/run/ship/run-ship-cli-pre-detach-stop.test.ts:102 | 2026-11-02 | #5815
+- rf:none | none | - | 2026-11-02 | #5818
+- ri:bug-risks | medium | scripts/backlog/backlog-triage-unblock.ts:37 | 2026-11-02 | #5818 | fixed
+- ri:tests | low | scripts/backlog/backlog-triage-cli.test.ts:61 | 2026-11-02 | #5818 | fixed
+- rb:2026-11-02 | #5818
+- rf:bug-risks | medium | scripts/backlog/backlog-triage-unblock.ts:39 | 2026-11-02 | #5818 | fixed
+- rf:project-conventions | low | scripts/epic/epic-blocked-by.ts:14 | 2026-11-02 | #5818 | fixed
+- rf:tests | low | scripts/backlog/backlog-triage-unblock.test.ts:76 | 2026-11-02 | #5818 | fixed
+- rf:tests | low | scripts/backlog/backlog-triage-cli.test.ts:61 | 2026-11-02 | #5818 | fixed
+- rb:2026-11-02 | #5818
+- rf:bug-risks | medium | scripts/backlog/backlog-triage-unblock.ts:39 | 2026-11-02 | #5818 | fixed
+- rf:project-conventions | low | scripts/epic/epic-blocked-by.ts:14 | 2026-11-02 | #5818 | fixed
+- rf:tests | low | scripts/backlog/backlog-triage-unblock.test.ts:76 | 2026-11-02 | #5818 | fixed
+- rf:tests | low | scripts/backlog/backlog-triage-cli.test.ts:61 | 2026-11-02 | #5818 | fixed
+- rf:project-conventions | low | docs/environment-variables.md:99 | 2026-11-02 | #5819
+- rf:project-conventions | low | docs/environment-variables.md:99 | 2026-11-02 | #5819
+- ri:bug-risks | medium | scripts/run/ship/run-ship-reviewer.ts:69 | 2026-11-02 | #5819 | fixed
+- ri:bug-risks | low | scripts/run/ship/run-ship-reviewer.ts:137 | 2026-11-02 | #5819 | fixed
+- ri:tests | low | scripts/run/ship/run-ship-reviewer.test.ts:43 | 2026-11-02 | #5819 | fixed
+- rb:2026-11-02 | #5819
+- rf:bug-risks | medium | scripts/run/ship/run-ship-reviewer.ts:69 | 2026-11-02 | #5819 | fixed
+- rf:bug-risks | low | scripts/run/ship/run-ship-reviewer.ts:137 | 2026-11-02 | #5819 | fixed
+- rf:project-conventions | low | docs/environment-variables.md:99 | 2026-11-02 | #5819 | fixed
+- rf:comments | low | scripts/run/ship/run-ship-reviewer.ts:66 | 2026-11-02 | #5819 | fixed
+- rb:2026-11-02 | #5820
+- rf:comments | low | scripts/rules/destructive-command.ts:93 | 2026-11-02 | #5820 | false-positive
+- rf:comments | low | docs/environment-variables.md:99 | 2026-11-02 | #5825 | false-positive
+- rf:comments | low | docs/environment-variables.md:99 | 2026-11-02 | #5825
+- rf:none | none | - | 2026-11-02 | #5826
+- ri:bug-risks | medium | scripts/run/board/run-board-quota-held.ts:159 | 2026-11-02 | #5826 | fixed
+- ri:tests | medium | scripts/run/board/run-board-quota-widen.test.ts:58 | 2026-11-02 | #5826 | fixed
+- ri:performance | low | scripts/run/board/run-board-quota-held.ts:161 | 2026-11-02 | #5826 | fixed
+- ri:tests | low | scripts/run/board/run-board-quota-held.test.ts:276 | 2026-11-02 | #5826 | fixed
+- rb:2026-11-02 | #5826
+- rf:bug-risks | low | scripts/run/board/run-board-quota-held.ts:73 | 2026-11-02 | #5826
+- rf:performance | low | scripts/hooks/hook-lap.ts:43 | 2026-11-02 | #5831
+- rf:tests | low | scripts/lane/lane-ship-lap-stats.ts:13 | 2026-11-02 | #5831
+- rb:2026-11-02 | #5831
+- rf:bug-risks | medium | scripts/run/ship/run-ship-lap.ts:15 | 2026-11-02 | #5831 | fixed
+- rf:tests | medium | scripts/run/ship/run-ship-steps.ts:93 | 2026-11-02 | #5831 | fixed
+- rf:project-conventions | low | docs/environment-variables.md:180 | 2026-11-02 | #5831 | fixed
+- rf:performance | low | scripts/hooks/hook-lap.ts:38 | 2026-11-02 | #5831 | fixed
+- ri:bug-risks | medium | tools/test/unit-projects.ts:66 | 2026-11-02 | #5831 | fixed
+- ri:performance | low | scripts/hooks/hook-lap.ts:38 | 2026-11-02 | #5831 | fixed
+- ri:tests | low | scripts/lane/lane-ship-lap-stats.ts:13 | 2026-11-02 | #5831 | fixed
+- rb:2026-11-02 | #5831
+- rf:performance | low | scripts/hooks/hook-lap.ts:43 | 2026-11-02 | #5831
+- rf:tests | low | scripts/lane/lane-ship-lap-stats.test.ts:60 | 2026-11-02 | #5831
+- rf:tests | low | scripts/review/selfcheck-cli.git.test.ts:128 | 2026-11-02 | #5832
+- rf:comments | low | scripts/document/document-byte-budget.ts:89 | 2026-11-02 | #5832
+- rb:2026-11-02 | #5832
+- rf:project-conventions | medium | scripts/josh/josh-commands-review.ts:128 | 2026-11-02 | #5832
+- rf:assumptions | low | scripts/review/selfcheck-cli.ts:122 | 2026-11-02 | #5832
+- rf:assumptions | low | scripts/review/selfcheck-cli.ts:144 | 2026-11-02 | #5832
+- rf:bug-risks | low | scripts/review/selfcheck-cli.ts:139 | 2026-11-02 | #5832
+- rf:bug-risks | low | scripts/issue/issue-file-cli.ts:138 | 2026-11-02 | #5833
+- rb:2026-11-02 | #5833
+- rf:bug-risks | medium | scripts/issue/issue-file-cli.ts:138 | 2026-11-02 | #5833 | filed:#5861
+- rf:tests | low | scripts/issue/issue-file-cli-one-pass.test.ts:115 | 2026-11-02 | #5833 | fixed
+- rf:tests | low | scripts/issue/issue-file-cli-source.test.ts:104 | 2026-11-02 | #5833 | fixed
+- rf:comments | low | scripts/issue/issue-file-cli.test.ts:20 | 2026-11-02 | #5833 | fixed
+- rf:comments | low | scripts/issue/issue-file-cli-source.test.ts:77 | 2026-11-02 | #5833 | fixed
+- rf:comments | low | scripts/lane/lane-breakdown-text.ts:31 | 2026-11-02 | #5834
+- rf:comments | low | scripts/lane/lane-breakdown.ts:64 | 2026-11-02 | #5834
+- rf:comments | low | scripts/lane/lane-breakdown-pause.ts:9 | 2026-11-02 | #5834
+- ri:bug-risks | medium | docs/josh-commands-run.md:1196 | 2026-11-02 | #5834 | fixed
+- ri:bug-risks | low | scripts/lane/lane-breakdown-text.ts:31 | 2026-11-02 | #5834 | fixed
+- ri:bug-risks | low | scripts/lane/lane-breakdown-implement.ts:203 | 2026-11-02 | #5834 | fixed
+- rb:2026-11-02 | #5834
+- rf:bug-risks | medium | scripts/lane/lane-breakdown-implement.ts:152 | 2026-11-02 | #5834 | fixed
+- rf:project-conventions | medium | docs/josh-commands-run.md:1196 | 2026-11-02 | #5834 | fixed
+- rf:comments | low | scripts/lane/lane-breakdown-text.ts:31 | 2026-11-02 | #5834 | deferred:#5865
+- rf:bug-risks | low | scripts/issue/issue-watch-diff.ts:216 | 2026-11-03 | #5835
+- rf:bug-risks | low | scripts/lane/lane-overrun.ts:107 | 2026-11-03 | #5835
+- rf:performance | low | scripts/lane/lane-breakdown-implement.ts:259 | 2026-11-03 | #5835
+- rf:project-conventions | low | scripts/lane/lane-breakdown.ts:12 | 2026-11-03 | #5835
+- rf:tests | low | scripts/issue/issue-watch.test.ts:46 | 2026-11-03 | #5835
+- ri:none | none | - | 2026-11-03 | #5835
+- rb:2026-11-03 | #5835
+- rf:bug-risks | low | scripts/issue/issue-watch.ts:282 | 2026-11-03 | #5835 | fixed
+- rf:bug-risks | low | scripts/issue/issue-watch-diff.ts:216 | 2026-11-03 | #5835 | false-positive
+- rf:bug-risks | low | scripts/lane/lane-overrun.ts:107 | 2026-11-03 | #5835 | deferred:#5994
+- rf:performance | low | scripts/lane/lane-breakdown-implement.ts:259 | 2026-11-03 | #5835 | false-positive
+- rf:project-conventions | low | scripts/lane/lane-breakdown.ts:11 | 2026-11-03 | #5835 | fixed
+- rf:tests | low | scripts/issue/issue-watch.test.ts:46 | 2026-11-03 | #5835 | fixed
+- rf:none | none | - | 2026-11-02 | #5837
+- ri:none | none | - | 2026-11-02 | #5837
+- rb:2026-11-02 | #5837
+- rf:bug-risks | medium | scripts/lane/lane-resolve-hunks.ts:45 | 2026-11-02 | #5837 | fixed
+- rf:bug-risks | medium | scripts/lane/lane-resolve.ts:85 | 2026-11-02 | #5837 | fixed
+- rf:bug-risks | low | scripts/lane/lane-resolve.ts:21 | 2026-11-02 | #5837 | deferred:#5922
+- rf:bug-risks | low | scripts/lane/lane-resolve.ts:106 | 2026-11-02 | #5837 | false-positive
+- rf:project-conventions | low | tools/test/untested-sources.ts:91 | 2026-11-02 | #5837 | false-positive
+- rf:comments | medium | .claude/skills/workflow-commands/issue-scout.md:28 | 2026-11-02 | #5838
+- rf:assumptions | low | scripts/epic/epic-bundle-recommend.ts:26 | 2026-11-02 | #5838
+- rf:none | none | - | 2026-11-02 | #5838
+- rb:2026-11-02 | #5838
+- rf:bug-risks | medium | scripts/issue/issue-scout-cli.ts:155 | 2026-11-02 | #5838 | fixed
+- rf:bug-risks | medium | scripts/epic/epic-bundle-format.ts:18 | 2026-11-02 | #5838 | fixed
+- rf:tests | low | scripts/issue/issue-scout-cli.ts:155 | 2026-11-02 | #5838 | fixed
+- rf:project-conventions | low | scripts/run/prime/run-prime-cli.ts:25 | 2026-11-02 | #5839
+- ri:none | none | - | 2026-11-02 | #5839
+- rb:2026-11-02 | #5839
+- rf:project-conventions | low | scripts/run/prime/run-prime-cli.ts:25 | 2026-11-02 | #5839
+- rf:comments | low | scripts/josh/josh-commands-prime.ts:28 | 2026-11-02 | #5839
+- rf:tests | low | scripts/run/prime/run-prime-cli.test.ts:39 | 2026-11-02 | #5839
+- ri:bug-risks | low | scripts/run/park/run-park-lane.ts:15 | 2026-11-02 | #5840 | false-positive
+- rb:2026-11-02 | #5840
+- rf:project-conventions | low | .claude/skills/workflow-commands/backlogrun-lanes.md:135 | 2026-11-02 | #5840 | false-positive
+- ri:bug-risks | medium | scripts/run/merge/run-merge-cli.ts:450 | 2026-11-02 | #5841 | fixed
+- ri:bug-risks | medium | scripts/run/run-liveness.ts:134 | 2026-11-02 | #5841 | fixed
+- rb:2026-11-02 | #5841
+- rf:bug-risks | medium | scripts/run/run-liveness.ts:134 | 2026-11-02 | #5841 | fixed
+- rf:tests | low | scripts/lane/lane-preserve.test.ts:75 | 2026-11-02 | #5841 | fixed
+- rb:2026-11-02 | #5841
+- rf:bug-risks | medium | scripts/run/run-liveness.ts:134 | 2026-11-02 | #5841
+- rf:tests | low | scripts/lane/lane-preserve.test.ts:43 | 2026-11-02 | #5841
+- rb:2026-11-02 | #5841
+- rf:bug-risks | medium | scripts/run/run-liveness.ts:134 | 2026-11-02 | #5841 | deferred:#5907
+- rf:tests | low | scripts/lane/lane-preserve.test.ts:43 | 2026-11-02 | #5841 | fixed
+- rf:none | none | - | 2026-11-02 | #5842
+- rb:2026-11-02 | #5842
+- rf:comments | low | .claude/skills/workflow-commands/backlogrun-park.md:3 | 2026-11-02 | #5842
+- rf:assumptions | low | scripts/run/pause/run-pause-cli.ts:60 | 2026-11-02 | #5842
+- rf:comments | low | scripts/run/run-step-section.ts:41 | 2026-11-02 | #5842
+- rf:comments | low | docs/josh-commands-run.md:342 | 2026-11-02 | #5842
+- ri:bug-risks | low | scripts/run/pause/run-pause-cli.ts:60 | 2026-11-02 | #5842
+- rf:none | none | - | 2026-11-02 | #5843
+- rf:none | none | - | 2026-11-02 | #5843
+- rf:comments | low | scripts/report/report-template-cli.ts:10 | 2026-11-02 | #5844
+- rf:performance | low | scripts/report/report-template-cli.ts:45 | 2026-11-02 | #5844
+- rb:2026-11-02 | #5844
+- rf:project-conventions | low | scripts/report/report-template-cli.ts:11 | 2026-11-02 | #5844
+- rf:tests | low | scripts/backlog/backlog-plan-cli.ts:192 | 2026-11-02 | #5844
+- rf:assumptions | low | .claude/skills/workflow-commands/backlogrun-steps.md:91 | 2026-11-02 | #5844
+- ri:assumptions | low | scripts/backlog/backlog-waves.ts:168 | 2026-11-02 | #5844
+- ri:project-conventions | low | prompts/collaboration-workflow/report-format.md:11 | 2026-11-02 | #5844
+- rf:project-conventions | low | scripts/rules/lane-carry-conflict.ts:103 | 2026-11-02 | #5845
+- ri:bug-risks | medium | scripts/rules/lane-carry-conflict.ts:34 | 2026-11-02 | #5845 | fixed
+- rb:2026-11-02 | #5845
+- rf:bug-risks | low | scripts/run/handoff-lanes/run-handoff-lanes.ts:153 | 2026-11-02 | #5845 | fixed
+- rf:bug-risks | low | scripts/run/handoff-lanes/run-handoff-lanes.ts:68 | 2026-11-02 | #5845 | fixed
+- rf:tests | low | scripts/run/handoff-lanes/run-handoff-lanes.test.ts:71 | 2026-11-02 | #5845 | fixed
+- rf:none | none | - | 2026-11-02 | #5846
+- ri:none | none | - | 2026-11-02 | #5846
+- rb:2026-11-02 | #5846
+- rf:bug-risks | low | scripts/run/split/run-split.ts:71 | 2026-11-02 | #5846
+- rf:bug-risks | low | scripts/run/split/run-split.ts:93 | 2026-11-02 | #5846
+- rf:project-conventions | low | scripts/run/pause/run-pause.ts:161 | 2026-11-02 | #5846
+- rf:comments | low | docs/josh-commands-automation.md:742 | 2026-11-02 | #5847
+- rb:2026-11-02 | #5847
+- rf:bug-risks | low | scripts/run/run-tail.ts:24 | 2026-11-02 | #5847 | fixed
+- rf:bug-risks | low | scripts/run/run-report.ts:45 | 2026-11-02 | #5847 | fixed
+- rf:project-conventions | low | scripts/release/release-request.ts:16 | 2026-11-02 | #5847 | fixed
+- rf:project-conventions | low | scripts/release/release-request.ts:20 | 2026-11-02 | #5847 | fixed
+- rf:tests | low | scripts/release/release-scope-cli.test.ts:66 | 2026-11-02 | #5847 | fixed
+- rf:comments | low | .claude/skills/workflow-commands/followup.md:116 | 2026-11-02 | #5847 | fixed
+- rf:comments | low | docs/josh-commands-automation.md:742 | 2026-11-02 | #5847 | fixed
+- rf:comments | low | .claude/skills/workflow-commands/issue-fold-existing.md:17 | 2026-11-02 | #5848
+- rf:bug-risks | low | scripts/issue/issue-fold-existing-cli.ts:151 | 2026-11-02 | #5848
+- rf:bug-risks | low | scripts/issue/issue-fold-existing-cli.ts:151 | 2026-11-02 | #5848
+- rf:tests | low | scripts/document/issue-fold-existing-document.test.ts:19 | 2026-11-02 | #5848
+- rf:project-conventions | low | scripts/josh/josh-commands-ai.ts:224 | 2026-11-02 | #5849
+- rf:project-conventions | low | scripts/josh/josh-commands-ai.ts:224 | 2026-11-02 | #5849
+- rf:comments | low | docs/josh-commands-automation.md:1087 | 2026-11-02 | #5849
+- ri:none | none | - | 2026-11-02 | #5849
+- rf:none | none | - | 2026-11-02 | #5850
+- rb:2026-11-02 | #5850
+- rf:bug-risks | medium | scripts/observations/observation-depth.ts:67 | 2026-11-02 | #5850 | fixed
+- rf:comments | medium | .claude/skills/workflow-commands/observation-filing.md:36 | 2026-11-02 | #5850 | deferred:#5885
+- rf:tests | low | scripts/observations/observation-depth.test.ts:15 | 2026-11-02 | #5850 | false-positive
+- rf:comments | low | docs/josh-commands-automation.md:619 | 2026-11-02 | #5850 | fixed
+- rf:bug-risks | low | scripts/issue/issue-read-cli.ts:85 | 2026-11-02 | #5851
+- rf:project-conventions | low | scripts/issue/issue-read-cli.ts:8 | 2026-11-02 | #5851
+- rb:2026-11-02 | #5851
+- rf:bug-risks | low | scripts/issue/issue-read-cli.ts:63 | 2026-11-02 | #5851 | false-positive
+- rf:project-conventions | low | scripts/issue/issue-read-cli.ts:61 | 2026-11-02 | #5851 | false-positive
+- rf:none | none | - | 2026-11-02 | #5852
+- ri:bug-risks | medium | scripts/run/tree-status-cli.ts:81 | 2026-11-02 | #5852 | fixed
+- rb:2026-11-02 | #5852
+- rf:bug-risks | medium | scripts/run/tree-status-cli.ts:81 | 2026-11-02 | #5852 | fixed
+- rf:bug-risks | low | scripts/run/tree-status-cli.ts:38 | 2026-11-02 | #5852 | fixed
+- rf:tests | low | scripts/run/tree-status-cli.test.ts:29 | 2026-11-02 | #5852 | fixed
+- rf:assumptions | medium | .claude/skills/dependency-update/SKILL.md:27 | 2026-11-02 | #5853
+- rf:bug-risks | low | scripts/overrides/overrides-diff.ts:53 | 2026-11-02 | #5853
+- rf:bug-risks | low | scripts/overrides/overrides-check.ts:75 | 2026-11-02 | #5853
+- rf:comments | low | .claude/skills/dependency-update/SKILL.md:27 | 2026-11-02 | #5853
+- rf:none | none | - | 2026-11-02 | #5853
+- rf:comments | low | docs/maintainers/josh-commands-backlog-rationale.md:118 | 2026-11-02 | #5854
+- rf:comments | low | prompts/review.md:114 | 2026-11-02 | #5854
+- rf:comments | low | docs/maintainers/josh-commands-backlog-rationale.md:118 | 2026-11-02 | #5854
+- rf:none | none | - | 2026-11-02 | #5855
+- rb:2026-11-02 | #5855
+- rf:bug-risks | medium | .claude/skills/workflow-commands/background-commands.md:52 | 2026-11-02 | #5855 | fixed
+- rf:bug-risks | low | .claude/skills/workflow-commands/background-commands.md:52 | 2026-11-02 | #5855 | fixed
+- rf:project-conventions | medium | prompts/collaboration-workflow/file-edits.md:23 | 2026-11-02 | #5855 | fixed
+- rf:comments | low | scripts/rules/sed-in-place.ts:95 | 2026-11-02 | #5855 | fixed
+- rf:project-conventions | low | scripts/time-runtime/time-bundle-call.ts:182 | 2026-11-02 | #5856
+- rf:bug-risks | low | scripts/run/run-pickup-cli.ts:51 | 2026-11-02 | #5856
+- rf:comments | low | docs/josh-commands-run.md:22 | 2026-11-02 | #5856
+- ri:project-conventions | low | scripts/time-runtime/time-bundle-call.ts:182 | 2026-11-02 | #5856 | fixed
+- rb:2026-11-02 | #5856
+- rf:bug-risks | medium | scripts/run/run-pickup-cli.ts:33 | 2026-11-02 | #5856 | fixed
+- rf:tests | medium | scripts/run/run-pickup-cli.test.ts:77 | 2026-11-02 | #5856 | fixed
+- rf:bug-risks | low | scripts/run/run-pickup-cli.ts:41 | 2026-11-02 | #5856 | fixed
+- rf:none | none | - | 2026-11-02 | #5860
+- rb:2026-11-02 | #5860
+- rf:bug-risks | low | scripts/run/entry/run-entry-cli.ts:353 | 2026-11-02 | #5860
+- rf:tests | low | scripts/run/entry/run-entry-cli-probe.test.ts:180 | 2026-11-02 | #5860
+- ri:none | none | - | 2026-11-02 | #5860
+- rb:2026-11-02 | #5861
+- rf:project-conventions | low | scripts/issue/issue-file-batch.ts:13 | 2026-11-02 | #5861 | fixed
+- rf:comments | low | scripts/issue/issue-file-cli.ts:213 | 2026-11-02 | #5861 | false-positive
+- rb:2026-11-02 | #5863
+- rf:bug-risks | low | tools/test/unit-projects.ts:20 | 2026-11-02 | #5863 | fixed
+- rf:none | none | - | 2026-11-02 | #5864
+- ri:none | none | - | 2026-11-02 | #5864
+- rb:2026-11-02 | #5864
+- rf:none | none | - | 2026-11-02 | #5864
+- rf:none | none | - | 2026-11-02 | #5865
+- rb:2026-11-02 | #5865
+- rf:comments | low | scripts/lane/lane-sinks.ts:53 | 2026-11-02 | #5865 | fixed
+- rf:comments | low | scripts/lane/lane-breakdown.ts:64 | 2026-11-02 | #5865 | fixed
+- rf:none | none | - | 2026-11-02 | #5869
+- rf:project-conventions | low | prompts/collaboration-workflow/operating-rules.md:37 | 2026-11-02 | #5878 | false-positive
+- rf:bug-risks | low | docs/how-to/recover-a-run.md:9 | 2026-11-02 | #5878 | false-positive
+- rf:none | none | - | 2026-11-02 | #5878
+- rf:assumptions | low | .claude/skills/workflow-commands/target-repository.md:51 | 2026-11-02 | #5879
+- rf:comments | low | .claude/skills/workflow-commands/target-repository.md:51 | 2026-11-02 | #5879
+- rf:project-conventions | low | .claude/skills/workflow-commands/kickoff.md:34 | 2026-11-02 | #5879
+- rf:assumptions | low | .claude/skills/workflow-commands/kickoff.md:34 | 2026-11-02 | #5879
+- rf:tests | low | scripts/rules/issue-comments-rule.test.ts:48 | 2026-11-02 | #5879
+- rf:none | none | - | 2026-11-02 | #5879
+- rf:bug-risks | medium | .claude/skills/workflow-commands/observation-filing.md:40 | 2026-11-02 | #5885
+- rf:assumptions | low | .claude/skills/workflow-commands/observation-filing.md:36 | 2026-11-02 | #5885
+- rf:none | none | - | 2026-11-02 | #5885
+- rb:2026-11-02 | #5885
+- rf:bug-risks | medium | .claude/skills/workflow-commands/observation-filing.md:40 | 2026-11-02 | #5885 | fixed
+- rf:assumptions | low | .claude/skills/workflow-commands/observation-filing.md:36 | 2026-11-02 | #5885 | fixed
+- rb:2026-11-02 | #5886
+- rf:bug-risks | medium | scripts/issue/issue-sample-required.ts:44 | 2026-11-02 | #5886 | fixed
+- rf:bug-risks | low | scripts/issue/issue-sample-required.ts:26 | 2026-11-02 | #5886 | fixed
+- rb:2026-11-02 | #5886
+- rf:bug-risks | medium | scripts/issue/issue-sample-required.ts:44 | 2026-11-02 | #5886
+- rf:tests | low | scripts/issue/issue-sample-required.test.ts:106 | 2026-11-02 | #5886
+- rf:bug-risks | low | scripts/issue/issue-sample-required.ts:27 | 2026-11-02 | #5886
+- rf:project-conventions | low | docs/maintainers/josh-commands-backlog-rationale.md:52 | 2026-11-02 | #5891
+- rf:project-conventions | low | scripts/issue/issue-fold-existing-cli.ts:47 | 2026-11-02 | #5891
+- rb:2026-11-02 | #5891
+- rf:bug-risks | medium | .claude/skills/workflow-commands/issue-fold-existing.md:13 | 2026-11-02 | #5891 | fixed
+- rf:project-conventions | low | scripts/issue/issue-fold-existing-cli.ts:47 | 2026-11-02 | #5891 | false-positive
+- rf:project-conventions | low | docs/maintainers/josh-commands-backlog-rationale.md:52 | 2026-11-02 | #5891 | filed:#5898
+- rf:tests | low | scripts/run/split/run-split-prerequisite.test.ts:131 | 2026-11-02 | #5895
+- ri:none | none | - | 2026-11-02 | #5895
+- rb:2026-11-02 | #5895
+- rf:bug-risks | medium | scripts/run/split/run-split-prerequisite.ts:32 | 2026-11-02 | #5895 | fixed
+- rf:tests | low | scripts/run/split/run-split-prerequisite.test.ts:110 | 2026-11-02 | #5895
+- rf:none | none | - | 2026-11-02 | #5896
+- ri:project-conventions | low | scripts/run/ship/run-ship-lap.ts:108 | 2026-11-02 | #5896 | fixed
+- ri:tests | low | scripts/git/git-workflow.test.ts:13 | 2026-11-02 | #5896 | fixed
+- rb:2026-11-02 | #5896
+- rf:none | none | - | 2026-11-02 | #5896
+- rb:2026-11-03 | #5898
+- rf:project-conventions | medium | docs/maintainers/josh-commands-backlog-rationale.md:52 | 2026-11-03 | #5898
+- rf:none | none | - | 2026-11-02 | #5899
+- rf:none | none | - | 2026-11-02 | #5899
+- rf:none | none | - | 2026-11-02 | #5901
+- ri:bug-risks | medium | scripts/run/run-parent-cut-hook.ts:57 | 2026-11-02 | #5901 | fixed
+- ri:comments | low | scripts/run/run-parent-cut-hook.ts:30 | 2026-11-02 | #5901 | fixed
+- rb:2026-11-02 | #5901
+- rf:bug-risks | medium | scripts/run/run-parent-cut-hook.ts:57 | 2026-11-02 | #5901 | fixed
+- rf:tests | low | scripts/run/handoff-lanes/run-handoff-lanes-document.test.ts:14 | 2026-11-02 | #5901 | false-positive
+- rf:performance | low | tools/retrospective/retrospective.ts:69 | 2026-11-02 | #5902
+- rf:assumptions | low | tools/retrospective/retrospective-picks.ts:56 | 2026-11-02 | #5902
+- rf:comments | low | tools/retrospective/retrospective-picks.ts:28 | 2026-11-02 | #5902
+- rf:performance | low | tools/retrospective/retrospective.ts:69 | 2026-11-02 | #5902
+- rf:assumptions | low | tools/retrospective/retrospective-picks.ts:55 | 2026-11-02 | #5902
+- rf:bug-risks | low | scripts/run/run-liveness.ts:134 | 2026-11-02 | #5907 | false-positive
+- rf:bug-risks | low | scripts/run/run-liveness.ts:386 | 2026-11-02 | #5907
+- ri:none | none | - | 2026-11-02 | #5907
+- rf:project-conventions | low | scripts/josh/command-usage.ts:68 | 2026-11-02 | #5911
+- rf:none | none | - | 2026-11-02 | #5911
+- rf:tests | medium | scripts/epic/epic-main.test.ts:9 | 2026-11-02 | #5912
+- rf:tests | low | scripts/epic/epic-main.test.ts:12 | 2026-11-02 | #5912
+- rf:comments | low | tools/gh/gh-subcommand-guard.test.ts:31 | 2026-11-02 | #5912
+- rf:none | none | - | 2026-11-02 | #5912
+- rf:performance | low | scripts/run/run-step-section.ts:48 | 2026-11-02 | #5920
+- rf:tests | low | scripts/run/wake/run-wake-argv.test.ts:223 | 2026-11-02 | #5920
+- ri:performance | low | scripts/run/run-step-section.ts:82 | 2026-11-02 | #5920 | fixed
+- rb:2026-11-02 | #5920
+- rf:bug-risks | medium | tools/cost-audit/cost-audit-kind.ts:24 | 2026-11-02 | #5920 | fixed
+- rf:project-conventions | low | scripts/run/run-step-section.ts:99 | 2026-11-02 | #5920
+- rf:tests | low | tools/cost-audit/cost-audit-kind.test.ts:17 | 2026-11-02 | #5920
+- rf:comments | low | scripts/run/wake/run-wake-driver.ts:59 | 2026-11-02 | #5920
+- rf:none | none | - | 2026-11-02 | #5922
+- ri:comments | low | scripts/git/git-worktree.ts:18 | 2026-11-02 | #5922 | fixed
+- rb:2026-11-02 | #5922
+- rf:assumptions | low | .claude/skills/workflow-commands/backlogrun-recovery.md:55 | 2026-11-02 | #5922
+- rf:bug-risks | medium | .claude/skills/workflow-commands/backlogrun-child.md:74 | 2026-11-02 | #5925
+- rf:tests | low | scripts/rules/latest-gate-document-rule.test.ts:35 | 2026-11-02 | #5925
+- rf:none | none | - | 2026-11-02 | #5925
+- rf:none | none | - | 2026-11-02 | #5928
+- ri:none | none | - | 2026-11-02 | #5928
+- rb:2026-11-02 | #5928
+- rf:bug-risks | low | scripts/lane/lane-plan-imports.ts:32 | 2026-11-02 | #5928
+- rf:assumptions | low | scripts/lib/main-guard.ts:17 | 2026-11-02 | #5928
+- rf:project-conventions | low | .claude/skills/workflow-commands/backlogrun-lanes.md:116 | 2026-11-02 | #5930
+- ri:bug-risks | medium | scripts/run/merge/run-merge-steps.ts:212 | 2026-11-02 | #5930 | fixed
+- ri:project-conventions | low | .claude/skills/workflow-commands/backlogrun-lanes.md:116 | 2026-11-02 | #5930 | fixed
+- rb:2026-11-02 | #5930
+- rf:project-conventions | low | .claude/skills/workflow-commands/backlogrun-lanes.md:116 | 2026-11-02 | #5930
+- rf:comments | low | docs/josh-commands-run.md:93 | 2026-11-02 | #5930
+- rf:tests | low | scripts/run/run-step-lane-plan.test.ts:57 | 2026-11-02 | #5934
+- ri:bug-risks | medium | scripts/lane/lane-plan-auto.ts:39 | 2026-11-02 | #5934 | fixed
+- ri:comments | low | docs/josh-commands-run.md:533 | 2026-11-02 | #5934 | fixed
+- rb:2026-11-02 | #5934
+- rf:project-conventions | low | scripts/run/run-step-cli-lane.test.ts:46 | 2026-11-02 | #5934 | fixed
+- rf:tests | low | scripts/run/run-step-lane-plan.test.ts:44 | 2026-11-02 | #5934 | fixed
+- rf:none | none | - | 2026-11-02 | #5935
+- ri:project-conventions | low | scripts/backlog/backlog-next-size.ts:11 | 2026-11-02 | #5935 | fixed
+- ri:comments | low | scripts/backlog/backlog-next-size.ts:25 | 2026-11-02 | #5935 | fixed
+- rb:2026-11-02 | #5935
+- rf:none | none | - | 2026-11-02 | #5935
+- rf:none | none | - | 2026-11-02 | #5936
+- rb:2026-11-02 | #5936
+- rf:assumptions | low | tools/cost-audit/cost-audit-phase.ts | 2026-11-02 | #5936
+- ri:project-conventions | low | docs/josh-commands-run.md:1585 | 2026-11-02 | #5936 | fixed
+- rb:2026-11-02 | #5936
+- rf:bug-risks | medium | tools/cost-audit/cost-audit-phase.ts:96 | 2026-11-02 | #5936 | fixed
+- rf:tests | medium | tools/cost-audit/cost-audit-phase.test.ts:67 | 2026-11-02 | #5936 | fixed
+- rf:bug-risks | low | tools/cost-audit/cost-audit.ts:171 | 2026-11-02 | #5936 | fixed
+- rf:project-conventions | low | tools/cost-audit/cost-audit-phase.ts:18 | 2026-11-02 | #5936 | fixed
+- rf:tests | low | tools/cost-audit/cost-audit-cli.test.ts:10 | 2026-11-02 | #5936 | fixed
+- rf:comments | low | tools/cost-audit/cost-audit-phase.ts:13 | 2026-11-02 | #5936 | fixed
+- rf:tests | low | scripts/josh/josh-read-only.test.ts:32 | 2026-11-02 | #5937
+- rf:assumptions | low | scripts/josh/josh-command-types.ts:84 | 2026-11-02 | #5937
+- rf:none | none | - | 2026-11-02 | #5937
+- ri:none | none | - | 2026-11-02 | #5937
+- rf:comments | low | scripts/run/review/run-review.ts:103 | 2026-11-02 | #5938
+- rf:tests | low | scripts/run/review/run-review-cli-order.test.ts:131 | 2026-11-02 | #5938
+- rb:2026-11-02 | #5938
+- rf:project-conventions | medium | .claude/skills/workflow-commands/SKILL.md:94 | 2026-11-02 | #5938 | fixed
+- rf:project-conventions | low | .claude/skills/workflow-commands/halfrun.md:21 | 2026-11-02 | #5938 | fixed
+- rf:bug-risks | low | scripts/run/review/run-review-cli.ts:88 | 2026-11-02 | #5938 | fixed
+- rf:bug-risks | low | scripts/run/review/run-review-cli.ts:183 | 2026-11-02 | #5938 | fixed
+- rf:tests | low | scripts/run/review/run-review-cli-order.test.ts:111 | 2026-11-02 | #5938 | fixed
+- ri:bug-risks | medium | .claude/skills/workflow-commands/chain-rule.md:11 | 2026-11-02 | #5938 | fixed
+- ri:performance | low | scripts/run/review/run-review-cli.ts:236 | 2026-11-02 | #5938 | fixed
+- ri:project-conventions | low | scripts/run/review/run-review-cli.ts:88 | 2026-11-02 | #5938 | fixed
+- ri:comments | low | scripts/run/review/run-review.ts:112 | 2026-11-02 | #5938 | fixed
+- rf:tests | low | scripts/document/backlogrun-progress-relaunch.test.ts:15 | 2026-11-02 | #5939 | false-positive
+- rf:comments | low | scripts/document/backlogrun-progress-relaunch.test.ts:11 | 2026-11-02 | #5939 | fixed
+- rf:tests | low | scripts/document/backlogrun-progress-relaunch.test.ts:15 | 2026-11-02 | #5939
+- rf:comments | low | docs/maintainers/josh-commands-automation-rationale.md:110 | 2026-11-02 | #5941
+- rf:comments | low | .claude/skills/workflow-commands/fullrun-steps.md:32 | 2026-11-02 | #5941
+- rf:comments | low | .claude/skills/workflow-commands/backlogrun-progress.md:45 | 2026-11-02 | #5941
+- ri:bug-risks | medium | scripts/followup/git-followup-finish.ts:30 | 2026-11-02 | #5941 | fixed
+- ri:bug-risks | low | scripts/followup/git-followup-finish.ts:35 | 2026-11-02 | #5941 | fixed
+- ri:performance | low | scripts/followup/git-followup-finish.ts:59 | 2026-11-02 | #5941 | fixed
+- ri:comments | low | .claude/skills/workflow-commands/backlogrun-progress.md:45 | 2026-11-02 | #5941 | fixed
+- rb:2026-11-02 | #5941
+- rf:bug-risks | medium | scripts/followup/git-followup-finish.ts:234 | 2026-11-02 | #5941 | fixed
+- rf:bug-risks | low | scripts/followup/git-followup-finish.ts:239 | 2026-11-02 | #5941 | fixed
+- rf:comments | low | scripts/followup/git-followup-finish.test.ts:10 | 2026-11-02 | #5941 | fixed
+- rf:comments | low | docs/maintainers/josh-commands-automation-rationale.md:110 | 2026-11-02 | #5941 | fixed
+- rf:comments | low | .claude/skills/workflow-commands/fullrun-steps.md:48 | 2026-11-02 | #5942
+- rf:bug-risks | low | scripts/version/latest-if-required-cli.ts:71 | 2026-11-02 | #5942
+- rf:comments | low | .claude/skills/workflow-commands/fullrun-steps.md:48 | 2026-11-02 | #5942
+- ri:none | none | - | 2026-11-02 | #5943
+- rb:2026-11-02 | #5943
+- rf:bug-risks | low | scripts/run/entry/run-entry-sync.ts:136 | 2026-11-02 | #5943 | false-positive
+- rb:2026-11-02 | #5944
+- rf:assumptions | low | scripts/agent/agent-role-profile.ts:331 | 2026-11-02 | #5944
+- ri:none | none | - | 2026-11-02 | #5945
+- rb:2026-11-02 | #5945
+- rf:assumptions | low | scripts/lane/lane-plan-size.ts:141 | 2026-11-02 | #5945
+- ri:none | none | - | 2026-11-02 | #5946
+- rb:2026-11-02 | #5946
+- rf:bug-risks | medium | prompts/refactoring.md:94 | 2026-11-02 | #5946 | fixed
+- rf:bug-risks | low | .claude/skills/workflow-commands/chain-rule.md:30 | 2026-11-02 | #5946 | false-positive
+- rf:bug-risks | medium | scripts/lane/lane-value-cell.ts:63 | 2026-11-02 | #5947
+- rf:tests | low | scripts/lane/lane-measure-cli-cell.test.ts:78 | 2026-11-02 | #5947
+- rf:comments | low | scripts/josh/josh-commands-lane.ts:269 | 2026-11-02 | #5947
+- rf:assumptions | low | docs/josh-commands-run.md:1249 | 2026-11-02 | #5947
+- rf:none | none | - | 2026-11-02 | #5947
+- ri:none | none | - | 2026-11-02 | #5947
+- rf:bug-risks | low | scripts/document/read-set-cli.ts:256 | 2026-11-02 | #5952
+- rf:performance | low | tools/cost-audit/cost-audit-cli.ts:121 | 2026-11-02 | #5952
+- rf:bug-risks | low | scripts/document/read-set-cli.ts:258 | 2026-11-02 | #5952
+- rf:bug-risks | low | scripts/document/read-set-cli.ts:256 | 2026-11-02 | #5952
+- rf:performance | low | tools/cost-audit/cost-audit-cli.ts:121 | 2026-11-02 | #5952
+- rb:2026-11-02 | #5952
+- rf:bug-risks | medium | tools/cost-audit/cost-audit-format.ts:73 | 2026-11-02 | #5952 | fixed
+- rf:tests | medium | tools/cost-audit/cost-audit-cli.test.ts:73 | 2026-11-02 | #5952 | fixed
+- rf:bug-risks | low | scripts/document/read-set-cli.ts:256 | 2026-11-02 | #5952 | fixed
+- rf:performance | low | tools/cost-audit/cost-audit-cli.ts:111 | 2026-11-02 | #5952 | fixed
+- rf:project-conventions | low | docs/josh-commands-run.md:313 | 2026-11-02 | #5953
+- rf:project-conventions | low | docs/josh-commands-run.md:314 | 2026-11-02 | #5953
+- rb:2026-11-02 | #5953
+- rf:bug-risks | high | scripts/run/entry/run-entry-children.ts:102 | 2026-11-02 | #5953 | fixed
+- rf:bug-risks | medium | scripts/run/cut/run-cut-cli.ts:313 | 2026-11-02 | #5953 | fixed
+- rf:bug-risks | low | scripts/run/cut/run-cut-cli.ts:305 | 2026-11-02 | #5953 | fixed
+- rf:project-conventions | low | docs/josh-commands-run.md:313 | 2026-11-02 | #5953 | fixed
+- rf:tests | low | scripts/document/lane-child-read-set.ts:72 | 2026-11-02 | #5953 | fixed
+- ri:bug-risks | medium | scripts/run/entry/run-entry-children.ts:102 | 2026-11-02 | #5953 | fixed
+- ri:bug-risks | low | scripts/run/cut/run-cut-cli.ts:55 | 2026-11-02 | #5953 | fixed
+- rb:2026-11-02 | #5953
+- rf:bug-risks | medium | scripts/run/entry/run-entry-children.ts:102 | 2026-11-02 | #5953
+- rf:bug-risks | low | scripts/run/cut/run-cut-cli.ts:48 | 2026-11-02 | #5953
+- rf:project-conventions | low | docs/josh-commands-run.md:313 | 2026-11-02 | #5953
+- rf:tests | low | scripts/document/lane-child-read-set.ts:72 | 2026-11-02 | #5953
+- rf:bug-risks | low | scripts/run/cut/run-cut-cli.ts:43 | 2026-11-02 | #5953
+- rf:none | none | - | 2026-11-02 | #5958
+- rf:none | none | - | 2026-11-02 | #5958
+- rf:none | none | - | 2026-11-02 | #5966
+- rb:2026-11-02 | #5966
+- rf:bug-risks | medium | .claude/skills/workflow-commands/chain-rule.md:21 | 2026-11-02 | #5966 | fixed
+- rf:bug-risks | low | .claude/skills/workflow-commands/chain-rule.md:73 | 2026-11-02 | #5966 | fixed
+- rf:project-conventions | low | .claude/skills/workflow-commands/chain-rule.md:17 | 2026-11-02 | #5966 | false-positive
+- ri:tests | medium | scripts/run/run-step-cli-lane.test.ts:124 | 2026-11-02 | #5966 | fixed
+- rb:2026-11-02 | #5966
+- rf:project-conventions | low | .claude/skills/workflow-commands/chain-rule.md:10 | 2026-11-02 | #5966
+- rf:comments | low | prompts/review.md:14 | 2026-11-02 | #5966
+- rf:tests | low | tools/cost-audit/cost-audit-format.test.ts:88 | 2026-11-02 | #5971
+- rb:2026-11-02 | #5971
+- rf:tests | low | tools/cost-audit/cost-audit.ts:204 | 2026-11-02 | #5971 | fixed
+- ri:none | none | - | 2026-11-03 | #5984
+- rb:2026-11-03 | #5984
+- rf:bug-risks | medium | scripts/lane/lane-yield-split.ts:59 | 2026-11-03 | #5984 | fixed
+- rf:tests | low | scripts/lane/lane-yield-split.test.ts:47 | 2026-11-03 | #5984 | fixed
+- rb:2026-11-03 | #5985
+- rf:bug-risks | medium | scripts/split/split-direction.ts:45 | 2026-11-03 | #5985 | fixed
+- rf:project-conventions | medium | docs/josh-commands-backlog.md:169 | 2026-11-03 | #5985 | fixed
+- rf:tests | low | scripts/split/split-direction.test.ts:85 | 2026-11-03 | #5985 | fixed
+- rf:tests | low | scripts/split/split-direction.test.ts:12 | 2026-11-03 | #5985 | deferred:#5992
+- ri:bug-risks | low | scripts/lane/lane-plan-check.ts:307 | 2026-11-03 | #5986 | fixed
+- rb:2026-11-03 | #5986
+- rf:bug-risks | medium | scripts/lane/lane-plan-check.ts:220 | 2026-11-03 | #5986 | fixed
+- rf:project-conventions | low | scripts/lane/lane-plan-check.test.ts:37 | 2026-11-03 | #5986 | fixed
+- rf:tests | low | scripts/lane/lane-plan-check.test.ts:47 | 2026-11-03 | #5986 | fixed
+- rb:2026-11-03 | #5986
+- rf:bug-risks | medium | scripts/lane/lane-plan-wait.ts:29 | 2026-11-03 | #5986
+- rf:bug-risks | low | scripts/lane/lane-plan-check.ts:331 | 2026-11-03 | #5986
+- rf:bug-risks | low | scripts/lane/lane-plan-check.ts:211 | 2026-11-03 | #5986
+- rf:tests | low | scripts/lane/lane-plan-wait.test.ts:62 | 2026-11-03 | #5986
+- rb:2026-11-03 | #5986
+- rf:bug-risks | medium | scripts/lane/lane-plan-wait.ts:113 | 2026-11-03 | #5986
+- rf:bug-risks | low | scripts/lane/lane-plan-check.ts:321 | 2026-11-03 | #5986
+- ri:project-conventions | low | .claude/skills/workflow-commands/backlogrun-steps.md:124 | 2026-11-03 | #5987 | fixed
+- rb:2026-11-03 | #5987
+- rf:comments | medium | .claude/skills/workflow-commands/backlogrun-steps.md:124 | 2026-11-03 | #5987 | fixed
+- rf:comments | low | scripts/run/progress/run-progress.ts:53 | 2026-11-03 | #5987 | fixed
+- rf:tests | low | scripts/run/wake/run-wake-window.test.ts:8 | 2026-11-03 | #5987 | fixed
+- rf:project-conventions | low | scripts/run/run-step-section-table.ts:1 | 2026-11-03 | #5987 | fixed
+- ri:none | none | - | 2026-11-03 | #5988
+- rb:2026-11-03 | #5992
+- rf:bug-risks | medium | scripts/split/split-direction.ts:83 | 2026-11-03 | #5992
+- rf:tests | medium | scripts/split/split-direction.test.ts:49 | 2026-11-03 | #5992 | fixed
+- rf:tests | low | scripts/split/split-direction.test.ts:57 | 2026-11-03 | #5992
+- ri:none | none | - | 2026-11-03 | #5994
+- rb:2026-11-03 | #5994
+- rf:none | none | - | 2026-11-03 | #5994
+- rb:2026-11-03 | #5998
+- rf:project-conventions | low | docs/josh-commands-run.md:1133 | 2026-11-03 | #5998 | fixed
+- rf:security | medium | scripts/rules/egress-guard.ts:123 | 2026-11-03 | #5999
+- rf:bug-risks | medium | scripts/rules/egress-guard.ts:65 | 2026-11-03 | #5999
+- rb:2026-11-03 | #5999
+- rf:project-conventions | medium | .claude/settings.json:43 | 2026-11-03 | #5999 | fixed
+- rf:bug-risks | medium | scripts/rules/egress-guard.ts | 2026-11-03 | #5999 | fixed
+- rf:security | medium | scripts/rules/egress-guard.ts | 2026-11-03 | #5999 | fixed
+- rf:bug-risks | low | scripts/rules/nested-commands.ts:8 | 2026-11-03 | #5999
+- rf:security | low | scripts/rules/egress-guard.ts:124 | 2026-11-03 | #5999
+- rf:security | medium | scripts/rules/secret-paths.ts:56 | 2026-11-03 | #6003
+- ri:none | none | - | 2026-11-03 | #6003
+- rb:2026-11-03 | #6003
+- rf:bug-risks | medium | .claude/settings.json:19 | 2026-11-03 | #6003 | fixed
+- rf:security | low | scripts/rules/secret-paths.ts:73 | 2026-11-03 | #6003 | fixed
+- rf:project-conventions | low | cspell/index.yaml:64 | 2026-11-03 | #6003 | fixed
+- rf:tests | low | scripts/lane/lane-breakdown.test.ts:201 | 2026-11-03 | #6006
+- rf:project-conventions | low | docs/josh-commands-run.md:1302 | 2026-11-03 | #6006
+- rf:project-conventions | low | scripts/lane/lane-overrun.ts:148 | 2026-11-03 | #6006
+- ri:bug-risks | low | scripts/lane/lane-breakdown-text.ts:26 | 2026-11-03 | #6006 | fixed
+- ri:project-conventions | low | docs/josh-commands-run.md:1300 | 2026-11-03 | #6006 | fixed
+- ri:project-conventions | low | scripts/lane/lane-overrun.ts:148 | 2026-11-03 | #6006 | fixed
+- rb:2026-11-03 | #6006
+- rf:bug-risks | medium | scripts/lane/lane-yield-split.ts:213 | 2026-11-03 | #6006 | fixed
+- rf:tests | low | scripts/lane/lane-breakdown.test.ts:212 | 2026-11-03 | #6006 | fixed
+- rf:tests | low | scripts/issue/issue-not-before.test.ts:13 | 2026-11-03 | #6007
+- rf:project-conventions | low | prompts/collaboration-workflow/issue-template.md:82 | 2026-11-03 | #6007
+- rf:project-conventions | low | scripts/issue/issue-scout-cli.ts:324 | 2026-11-03 | #6008
+- rf:comments | low | scripts/issue/measure-twin.ts:36 | 2026-11-03 | #6008
+- rf:project-conventions | low | scripts/issue/issue-scout-cli.ts:324 | 2026-11-03 | #6008
+- rf:project-conventions | low | prompts/collaboration-workflow/measurement.md:15 | 2026-11-03 | #6008
+- rf:bug-risks | low | scripts/issue/measure-declaration.ts:28 | 2026-11-03 | #6016
+- rf:bug-risks | low | scripts/issue/measure-declaration.ts:28 | 2026-11-03 | #6016
+- rb:2026-11-03 | #6016
+- rf:bug-risks | low | scripts/issue/measure-declaration.ts:12 | 2026-11-03 | #6016 | fixed
+- rf:none | none | - | 2026-11-03 | #6021
+- ri:none | none | - | 2026-11-03 | #6021
+- rb:2026-11-03 | #6021
+- rf:bug-risks | low | scripts/lane/lane-implement-rate.ts:28 | 2026-11-03 | #6021 | false-positive
+- rf:tests | low | scripts/lane/lane-stage-stats.ts:46 | 2026-11-03 | #6021 | fixed
+- rf:bug-risks | medium | scripts/issue/issue-spill.ts:57 | 2026-11-03 | #6022
+- rb:2026-11-03 | #6022
+- rf:bug-risks | medium | scripts/issue/issue-spill.ts:51 | 2026-11-03 | #6022 | fixed
+- rf:bug-risks | low | scripts/issue/issue-spill-cli.ts:35 | 2026-11-03 | #6022 | fixed
+- rf:tests | low | scripts/issue/issue-spill-cli.test.ts:113 | 2026-11-03 | #6022 | fixed
+- rf:tests | low | scripts/gate/check-related-tail.test.ts:68 | 2026-11-03 | #6023
+- ri:none | none | - | 2026-11-03 | #6023
+- rb:2026-11-03 | #6023
+- rf:comments | medium | scripts/gate/check-related.ts:45 | 2026-11-03 | #6023 | fixed
+- rf:performance | low | scripts/run/review/run-review-cli.ts:394 | 2026-11-03 | #6023
+- rf:comments | low | scripts/run/ship/run-ship-pre-detach.ts:41 | 2026-11-03 | #6023 | fixed
+- rf:none | none | - | 2026-11-03 | #6024
+- ri:none | none | - | 2026-11-03 | #6024
+- rb:2026-11-03 | #6024
+- rf:tests | low | scripts/run/ship/run-ship-scoped.test.ts:283 | 2026-11-03 | #6024 | fixed
+- ri:bug-risks | medium | docs/josh-commands-backlog.md:175 | 2026-11-03 | #6025 | fixed
+- ri:comments | low | scripts/backlog/backlog-next-size.ts:12 | 2026-11-03 | #6025 | fixed
+- rb:2026-11-03 | #6025
+- rf:bug-risks | low | scripts/backlog/backlog-next-size.ts:28 | 2026-11-03 | #6025 | deferred:#6066
+- rf:project-conventions | low | scripts/lane/lane-net-read.ts:12 | 2026-11-03 | #6025 | false-positive
+- rf:comments | low | docs/josh-commands-backlog.md:175 | 2026-11-03 | #6025 | deferred:#6066
+- ri:bug-risks | medium | docs/josh-commands-backlog.md:175 | 2026-11-03 | #6025 | deferred:#6066
+- ri:comments | low | scripts/backlog/backlog-next-size.ts:12 | 2026-11-03 | #6025 | deferred:#6066
+- rf:comments | low | docs/josh-commands-run.md:314 | 2026-11-03 | #6026
+- rf:comments | low | .claude/skills/workflow-commands/pre-gate-cut.md:30 | 2026-11-03 | #6026
+- ri:bug-risks | medium | scripts/run/cut/run-cut-budget.ts:88 | 2026-11-03 | #6026 | fixed
+- ri:bug-risks | low | scripts/rules/pre-gate-cut.ts:166 | 2026-11-03 | #6026 | fixed
+- ri:comments | low | docs/josh-commands-run.md:314 | 2026-11-03 | #6026 | fixed
+- rb:2026-11-03 | #6026
+- rf:bug-risks | medium | scripts/run/cut/run-cut-budget.ts:72 | 2026-11-03 | #6026 | fixed
+- rf:bug-risks | low | scripts/run/cut/run-cut-budget.ts:38 | 2026-11-03 | #6026 | fixed
+- rf:tests | low | scripts/run/cut/run-cut-cli-budget.test.ts:42 | 2026-11-03 | #6026 | fixed
+- rf:comments | low | .claude/skills/workflow-commands/pre-gate-cut.md:45 | 2026-11-03 | #6026 | fixed
+- rf:none | none | - | 2026-11-03 | #6028
+- rb:2026-11-03 | #6028
+- rf:project-conventions | low | scripts/josh/josh-commands-prime.ts:3 | 2026-11-03 | #6028 | fixed
+- rf:tests | low | scripts/josh/josh-command-map.test.ts:93 | 2026-11-03 | #6028 | fixed
+- rf:comments | low | tools/test/unit-durations.json:880 | 2026-11-03 | #6028 | fixed
+- rb:2026-11-03 | #6028
+- rf:project-conventions | low | scripts/josh/josh-commands-prime.ts:3 | 2026-11-03 | #6028 | deferred:#6072
+- rf:tests | low | scripts/josh/josh-command-map.test.ts:93 | 2026-11-03 | #6028 | fixed
+- rf:comments | low | tools/test/unit-durations.json:880 | 2026-11-03 | #6028 | false-positive
+- rf:bug-risks | medium | scripts/issue/enforcement-lint.ts:22 | 2026-11-03 | #6029
+- rf:bug-risks | medium | scripts/issue/enforcement-lint.ts:38 | 2026-11-03 | #6029
+- rf:project-conventions | low | scripts/issue/enforcement-lint.ts:22 | 2026-11-03 | #6029
+- rf:tests | low | scripts/issue/enforcement-lint.test.ts:30 | 2026-11-03 | #6029
+- rf:none | none | - | 2026-11-03 | #6029
+- rf:comments | low | scripts/ci/ci-yml-fixture.ts:7 | 2026-11-03 | #6030
+- rf:assumptions | low | eslint/base.js:259 | 2026-11-03 | #6030
+- rf:comments | low | scripts/ci/ci-yml-fixture.ts:7 | 2026-11-03 | #6030
+- rf:none | none | - | 2026-11-03 | #6031
+- rb:2026-11-03 | #6031
+- rf:bug-risks | medium | scripts/rules/rule-value-prose.ts:20 | 2026-11-03 | #6031
+- rf:project-conventions | medium | scripts/rules/rule-value-prose.ts:150 | 2026-11-03 | #6031
+- rf:comments | low | scripts/rules/rule-value-prose.ts:149 | 2026-11-03 | #6031
+- rf:bug-risks | low | scripts/rules/rule-value-prose.ts:77 | 2026-11-03 | #6031
+- rf:none | none | - | 2026-11-03 | #6032
+- rb:2026-11-03 | #6032
+- rf:bug-risks | medium | scripts/rules/rule-value-cli.ts:135 | 2026-11-03 | #6032 | fixed
+- rf:bug-risks | low | tools/retrospective/guard-friction.ts:146 | 2026-11-03 | #6032 | fixed
+- rf:tests | low | scripts/rules/rule-rephrase.test.ts:21 | 2026-11-03 | #6032 | fixed
+- rf:tests | low | scripts/time-runtime/guard-rephrase.test.ts:20 | 2026-11-03 | #6032 | fixed
+- rb:2026-11-03 | #6033
+- rf:bug-risks | medium | scripts/hooks/run-hook.sh:21 | 2026-11-03 | #6033
+- rf:bug-risks | low | scripts/hooks/run-hook.sh:22 | 2026-11-03 | #6033
+- rf:performance | low | scripts/init/hook-command-rewrite.ts:32 | 2026-11-03 | #6033
+- ri:bug-risks | low | scripts/hooks/run-hook.sh:21 | 2026-11-03 | #6033
+- ri:performance | low | scripts/init/hook-command-rewrite.ts:32 | 2026-11-03 | #6033
+- ri:bug-risks | low | scripts/init/hook-launch.ts:43 | 2026-11-03 | #6033
+- ri:bug-risks | low | scripts/hooks/run-hook.sh:23 | 2026-11-03 | #6033
+- rb:2026-11-03 | #6033
+- rf:bug-risks | medium | scripts/hooks/run-hook.sh:23 | 2026-11-03 | #6033
+- rf:bug-risks | low | scripts/hooks/run-hook.sh:21 | 2026-11-03 | #6033
+- rf:performance | low | scripts/init/hook-command-rewrite.ts:32 | 2026-11-03 | #6033
+- rf:none | none | - | 2026-11-03 | #6035
+- rb:2026-11-03 | #6035
+- rf:tests | medium | tools/document/generate-lint-prose.test.ts:48 | 2026-11-03 | #6035
+- rf:comments | low | eslint/english-only-prose-document.test.ts:14 | 2026-11-03 | #6035
+- rf:tests | low | docs/maintainers/claude-md-history.md:45 | 2026-11-03 | #6035
+- rf:assumptions | low | templates/AGENTS.basic.md:3 | 2026-11-03 | #6036
+- ri:none | none | - | 2026-11-03 | #6036
+- rb:2026-11-03 | #6036
+- rf:assumptions | low | templates/AGENTS.basic.md:3 | 2026-11-03 | #6036
+- rf:bug-risks | low | prompts/review-rubric.md:4 | 2026-11-03 | #6037
+- ri:none | none | - | 2026-11-03 | #6037
+- rb:2026-11-03 | #6037
+- rf:bug-risks | low | prompts/review.md:134 | 2026-11-03 | #6037 | fixed
+- rf:bug-risks | low | prompts/review.md:148 | 2026-11-03 | #6037 | fixed
+- rf:bug-risks | low | prompts/review-rubric.md:4 | 2026-11-03 | #6037 | fixed
+- rf:tests | low | scripts/backlog/backlog-manufacturing-rule.test.ts:63 | 2026-11-03 | #6037 | fixed
+- rf:none | none | - | 2026-11-03 | #6038
+- rf:none | none | - | 2026-11-03 | #6038
+- rf:project-conventions | low | scripts/hooks/pretool-guard.ts:42 | 2026-11-03 | #6041
+- ri:none | none | - | 2026-11-03 | #6041
+- rb:2026-11-03 | #6041
+- rf:project-conventions | low | scripts/hooks/pretool-guard.ts:40 | 2026-11-03 | #6041 | fixed
+- rf:tests | low | scripts/hooks/pretool-guard-read-tools.test.ts:76 | 2026-11-03 | #6041 | fixed
+- rf:comments | low | prompts/collaboration-workflow/overview.md:16 | 2026-11-03 | #6042
+- rf:tests | low | scripts/claude/collaboration-prose-duplicates.test.ts:35 | 2026-11-03 | #6042
+- rf:none | none | - | 2026-11-03 | #6042
+- rf:assumptions | low | .claude/skills/workflow-commands/backlogrun-lanes.md:109 | 2026-11-03 | #6043
+- rf:comments | low | .claude/skills/workflow-commands/backlogrun-progress.md:19 | 2026-11-03 | #6043
+- rf:project-conventions | low | .claude/skills/workflow-commands/backlogrun-recovery.md | 2026-11-03 | #6043
+- rf:none | none | - | 2026-11-03 | #6043
+- ri:none | none | - | 2026-11-03 | #6044
+- rb:2026-11-03 | #6044
+- rf:tests | low | scripts/hooks/hook-brevity.test.ts:52 | 2026-11-03 | #6044 | fixed
+- rf:comments | low | docs/maintainers/rule-delivery-rationale.md:241 | 2026-11-03 | #6044 | fixed
+- rb:2026-11-03 | #6044
+- rf:none | none | - | 2026-11-03 | #6044
+- rf:none | none | - | 2026-11-03 | #6045
+- rf:none | none | - | 2026-11-03 | #6045
+- rf:project-conventions | low | scripts/gh/git-pr-checks-observe.test.ts:1 | 2026-11-03 | #6047 | fixed
+- rf:project-conventions | low | tools/test/unit-durations.json:523 | 2026-11-03 | #6047 | fixed
+- rf:project-conventions | low | scripts/gh/git-pr-checks-observe.test.ts:1 | 2026-11-03 | #6047 | false-positive
+- rf:project-conventions | low | tools/test/unit-durations.json:523 | 2026-11-03 | #6047 | false-positive
+- rf:project-conventions | low | tools/test/unit-durations.json:523 | 2026-11-03 | #6047
+- rf:bug-risks | medium | scripts/rules/workflow-edit.ts:50 | 2026-11-03 | #6050
+- rf:bug-risks | low | scripts/rules/workflow-edit.ts:53 | 2026-11-03 | #6050
+- rf:tests | low | scripts/rules/workflow-edit.test.ts:26 | 2026-11-03 | #6050
+- rb:2026-11-03 | #6050
+- rf:bug-risks | medium | scripts/rules/workflow-edit.ts:29 | 2026-11-03 | #6050 | fixed
+- rf:bug-risks | medium | scripts/rules/workflow-edit.ts:51 | 2026-11-03 | #6050 | fixed
+- rf:bug-risks | low | scripts/rules/workflow-edit.ts:38 | 2026-11-03 | #6050 | fixed
+- rf:bug-risks | low | scripts/rules/workflow-edit.ts:90 | 2026-11-03 | #6050 | fixed
+- rf:tests | low | scripts/rules/workflow-edit.test.ts:26 | 2026-11-03 | #6050 | fixed
+- rf:comments | low | docs/maintainers/rule-delivery-rationale.md:412 | 2026-11-03 | #6050 | fixed
+- rf:project-conventions | low | scripts/josh/josh-commands-project.ts:101 | 2026-11-03 | #6055
+- ri:bug-risks | low | scripts/josh/josh-commands-issue-write.ts:155 | 2026-11-03 | #6055 | fixed
+- rb:2026-11-03 | #6055
+- rf:bug-risks | medium | scripts/issue/issue-file-cli.ts:57 | 2026-11-03 | #6055 | fixed
+- rf:project-conventions | medium | scripts/josh/josh-commands-issue-write.ts:59 | 2026-11-03 | #6055 | fixed
+- rf:project-conventions | low | scripts/josh/josh-commands-project.ts:101 | 2026-11-03 | #6055 | fixed
+- rb:2026-11-03 | #6055
+- rf:project-conventions | low | scripts/josh/josh-commands-project.ts:101 | 2026-11-03 | #6055
+- rf:bug-risks | low | scripts/issue/issue-lint-cli.ts:79 | 2026-11-03 | #6056
+- rf:security | low | scripts/run/handoff/run-handoff-cli.ts:212 | 2026-11-03 | #6056
+- rf:tests | low | scripts/issue/issue-file-batch-entries.test.ts:27 | 2026-11-03 | #6056
+- ri:bug-risks | medium | scripts/run/ship/run-ship-preflight.ts:69 | 2026-11-03 | #6056 | fixed
+- ri:bug-risks | low | scripts/issue/upstream-interrupt-cli.ts:188 | 2026-11-03 | #6056 | fixed
+- rb:2026-11-03 | #6056
+- rf:bug-risks | medium | scripts/run/ship/run-ship-preflight.ts:69 | 2026-11-03 | #6056 | fixed
+- rf:bug-risks | low | scripts/issue/issue-lint-cli.ts:79 | 2026-11-03 | #6056 | fixed
+- rf:security | low | scripts/run/handoff/run-handoff-cli.ts:105 | 2026-11-03 | #6056 | fixed
+- rf:project-conventions | low | scripts/josh/cli-body.ts:50 | 2026-11-03 | #6056 | fixed
+- rf:tests | low | scripts/issue/issue-file-batch-entries.test.ts:27 | 2026-11-03 | #6056 | fixed
+- rf:project-conventions | low | scripts/backlog/backlog-next-size.ts:30 | 2026-11-03 | #6066
+- ri:none | none | - | 2026-11-03 | #6066
+- rb:2026-11-03 | #6066
+- rf:bug-risks | medium | docs/josh-commands-backlog.md:175 | 2026-11-03 | #6066 | fixed
+- rf:project-conventions | low | scripts/backlog/backlog-next-size.ts:30 | 2026-11-03 | #6066 | fixed
+- rb:2026-11-03 | #6067
+- rf:bug-risks | medium | docs/maintainers/sync-rationale.md:265 | 2026-11-03 | #6067 | fixed
+- rf:bug-risks | low | .claude/settings.json:20 | 2026-11-03 | #6067 | false-positive
+- rf:project-conventions | low | docs/sync.md:97 | 2026-11-03 | #6067 | false-positive
+- rf:none | none | - | 2026-11-03 | #6072
+- rf:none | none | - | 2026-11-03 | #6072
+- rf:performance | low | scripts/gh/git-pr-checks-poll.test.ts:59 | 2026-11-03 | #6075 | fixed
+- rf:performance | low | scripts/gh/git-pr-checks-poll.test.ts:59 | 2026-11-03 | #6075
+- rf:bug-risks | low | scripts/review/prose-stale-read.ts:42 | 2026-11-03 | #6077 | false-positive
+- rf:bug-risks | low | scripts/review/prose-stale-read.ts:48 | 2026-11-03 | #6077 | false-positive
+- rf:none | none | - | 2026-11-03 | #6077
+- rf:comments | low | scripts/gh/git-pr-checks-e2e-gate.test.ts:19 | 2026-11-03 | #6079
+- rf:tests | low | scripts/gh/git-pr-checks-mocked-snapshot.test.ts:57 | 2026-11-03 | #6079
+- rf:none | none | - | 2026-11-03 | #6079
+- rf:tests | low | scripts/git/git-command-push-base.test.ts:194 | 2026-11-03 | #6083 | false-positive
+- rf:none | none | - | 2026-11-03 | #6083
+- rf:tests | low | scripts/agent/agent-role-profile-documents.test.ts:8 | 2026-11-03 | #6089
+- rb:2026-11-03 | #6089
+- rf:bug-risks | low | .claude/skills/workflow-commands/backlogrun-child.md:30 | 2026-11-03 | #6089 | fixed
+- rf:tests | low | scripts/agent/agent-role-profile-documents.test.ts:31 | 2026-11-03 | #6089 | fixed
+- rf:none | none | - | 2026-11-03 | #6094
+- rb:2026-11-03 | #6094
+- rf:bug-risks | medium | .claude/skills/workflow-commands/SKILL.md:43 | 2026-11-03 | #6094 | fixed
+- rf:tests | low | scripts/claude/investigator-agent.test.ts:15 | 2026-11-03 | #6094 | fixed
+- rf:project-conventions | low | prompts/refactoring.md:18 | 2026-11-03 | #6097
+- rf:none | none | - | 2026-11-03 | #6097
+- rf:comments | low | .claude/skills/workflow-commands/latest-gate.md:20 | 2026-11-03 | #6102
+- rf:comments | low | .claude/skills/workflow-commands/chain-rule.md:20 | 2026-11-03 | #6102
+- rf:comments | low | .claude/skills/workflow-commands/latest-gate.md:20 | 2026-11-03 | #6102
+- rf:tests | low | scripts/document/lane-child-read-set.test.ts:84 | 2026-11-03 | #6102
+- rb:2026-11-03 | #6102
+- rf:bug-risks | low | .claude/skills/workflow-commands/chain-rule.md:16 | 2026-11-03 | #6102 | fixed
+- rf:comments | low | .claude/skills/workflow-commands/latest-gate.md:20 | 2026-11-03 | #6102 | fixed
+- rf:tests | medium | scripts/document/workflow-temporary-path-document.test.ts:23 | 2026-11-03 | #6114
+- rb:2026-11-03 | #6114
+- rf:tests | low | scripts/document/workflow-temporary-path-document.test.ts:22 | 2026-11-03 | #6114 | fixed
+- rf:bug-risks | low | scripts/rules/shell-body-trigger.ts:191 | 2026-11-03 | #6115
+- rb:2026-11-03 | #6115
+- rf:bug-risks | low | scripts/rules/shell-body-trigger.ts:191 | 2026-11-03 | #6115 | fixed
+- rf:bug-risks | low | prompts/collaboration-workflow/measurement.md:26 | 2026-11-03 | #6115 | fixed
+- ri:none | none | - | 2026-11-03 | #6116
+- rb:2026-11-03 | #6116
+- rf:none | none | - | 2026-11-03 | #6116
+- rf:none | none | - | 2026-11-05 | #6118
+- rf:none | none | - | 2026-11-05 | #6118
+- rb:2026-11-05 | #6118
+- rf:none | none | - | 2026-11-05 | #6118
+- rf:none | none | - | 2026-11-03 | #6119
+- rb:2026-11-03 | #6119
+- rf:bug-risks | medium | scripts/lane/lane-breakdown-implement.ts:201 | 2026-11-03 | #6119 | fixed
+- ri:none | none | - | 2026-11-03 | #6119
+- rf:project-conventions | low | docs/josh-commands-run.md:1345 | 2026-11-03 | #6120
+- ri:bug-risks | medium | docs/josh-commands-run.md:1345 | 2026-11-03 | #6120 | fixed
+- rb:2026-11-03 | #6120
+- rf:assumptions | low | scripts/lane/lane-why.ts:99 | 2026-11-03 | #6120
+- rf:none | none | - | 2026-11-03 | #6121
+- rb:2026-11-03 | #6121
+- rf:comments | low | docs/josh-commands-automation.md:1018 | 2026-11-03 | #6121 | fixed
+- ri:bug-risks | medium | scripts/hooks/pre-push-unit.ts:200 | 2026-11-03 | #6121 | fixed
+- rb:2026-11-03 | #6121
+- rf:comments | low | docs/josh-commands-automation.md:1018 | 2026-11-03 | #6121 | fixed
+- rf:performance | low | scripts/lane/lane-why-cli.ts:28 | 2026-11-03 | #6124
+- ri:performance | low | scripts/lane/lane-why-cli.ts:19 | 2026-11-03 | #6124 | fixed
+- ri:project-conventions | low | scripts/lane/lane-why-ci.ts:43 | 2026-11-03 | #6124 | fixed
+- ri:comments | low | docs/josh-commands-run.md:1343 | 2026-11-03 | #6124 | fixed
+- rb:2026-11-03 | #6124
+- rf:performance | low | scripts/lane/lane-why-cli.ts:28 | 2026-11-03 | #6124
+- rf:none | none | - | 2026-11-03 | #6125
+- rb:2026-11-03 | #6125
+- rf:bug-risks | low | .claude/skills/workflow-commands/backlogrun-progress.md:97 | 2026-11-03 | #6125 | fixed
+- rf:project-conventions | low | docs/josh-commands-backlog.md:1036 | 2026-11-03 | #6130
+- rf:assumptions | low | scripts/review/review-readers-scan.ts:175 | 2026-11-03 | #6130
+- rf:project-conventions | low | docs/josh-commands-backlog.md:1036 | 2026-11-03 | #6130
+- rf:tests | low | scripts/josh/command-usage.test.ts:16 | 2026-11-03 | #6132
+- rb:2026-11-03 | #6132
+- rf:project-conventions | low | scripts/josh/josh-commands-ship.ts:184 | 2026-11-03 | #6132 | fixed
+- rf:tests | low | scripts/josh/command-usage.test.ts:16 | 2026-11-03 | #6132 | false-positive
+- rf:none | none | - | 2026-11-03 | #6135
+- rf:none | none | - | 2026-11-03 | #6135
+- ri:bug-risks | medium | scripts/lane/lane-limit-cli.ts:153 | 2026-11-03 | #6139 | fixed
+- ri:comments | medium | docs/maintainers/lane-limit-measurement.md:60 | 2026-11-03 | #6139 | fixed
+- rb:2026-11-03 | #6139
+- rf:bug-risks | low | scripts/lane/lane-limit-history.ts:36 | 2026-11-03 | #6139 | fixed
+- rf:bug-risks | low | scripts/lane/lane-limit-history.ts:16 | 2026-11-03 | #6139 | fixed
+- rf:tests | low | scripts/lane/lane-limit-cli.test.ts:22 | 2026-11-03 | #6139 | fixed
+- rf:none | none | - | 2026-11-03 | #6140
+- ri:comments | low | scripts/run/event/run-event-stream.ts:178 | 2026-11-03 | #6140 | fixed
+- ri:comments | low | docs/josh-commands-run.md:1304 | 2026-11-03 | #6140 | fixed
+- rb:2026-11-03 | #6140
+- rf:none | none | - | 2026-11-03 | #6140
+- rf:bug-risks | low | scripts/run/ship/run-ship-cli.ts:413 | 2026-11-03 | #6141
+- ri:bug-risks | medium | scripts/run/ship/run-ship-cli.ts:414 | 2026-11-03 | #6141 | fixed
+- ri:bug-risks | low | scripts/run/ship/run-ship-cli.ts:414 | 2026-11-03 | #6141 | fixed
+- rb:2026-11-03 | #6141
+- rf:bug-risks | medium | scripts/run/ship/run-ship-reship.ts:45 | 2026-11-03 | #6141 | fixed
+- rf:tests | medium | scripts/run/ship/run-ship-cli.ts:228 | 2026-11-03 | #6141 | fixed
+- rf:comments | low | docs/josh-commands-run.md:697 | 2026-11-03 | #6141 | fixed
+- rb:2026-11-03 | #6141
+- rf:bug-risks | low | scripts/run/ship/run-ship-reship.ts:87 | 2026-11-03 | #6141
+- rf:assumptions | low | scripts/run/ship/run-ship-reship.ts:117 | 2026-11-03 | #6141
+- rf:none | none | - | 2026-11-03 | #6142
+- ri:none | none | - | 2026-11-03 | #6142
+- rb:2026-11-03 | #6142
+- rf:bug-risks | medium | scripts/lane/lane-plan-probe.ts:74 | 2026-11-03 | #6142 | fixed
+- rf:comments | low | scripts/run/review/run-review-unplanned.ts:26 | 2026-11-03 | #6142 | fixed
+- rf:tests | low | scripts/run/review/run-review-cli.ts:413 | 2026-11-03 | #6142 | fixed
+- rf:assumptions | low | scripts/run/review/run-review-unplanned.ts:22 | 2026-11-03 | #6145
+- rb:2026-11-03 | #6145
+- rf:assumptions | low | scripts/run/review/run-review-unplanned.ts:28 | 2026-11-03 | #6145
+- rf:project-conventions | low | scripts/run/review/run-review-unplanned.ts:27 | 2026-11-03 | #6145
+- ri:assumptions | low | scripts/run/review/run-review-unplanned.ts:22 | 2026-11-03 | #6145
+- ri:none | none | - | 2026-11-03 | #6147
+- rb:2026-11-03 | #6147
+- rf:bug-risks | low | scripts/run/carry/run-carry-cli.ts:181 | 2026-11-03 | #6147 | false-positive
+- rf:project-conventions | low | scripts/lane/lane-ledger-write.ts:31 | 2026-11-03 | #6147 | fixed
+- rf:none | none | - | 2026-11-03 | #6151
+- rb:2026-11-03 | #6151
+- rf:project-conventions | low | scripts/time-runtime/time-density-hook.ts:150 | 2026-11-03 | #6151 | fixed
+- ri:project-conventions | low | scripts/time-runtime/time-density-hook.ts:150 | 2026-11-03 | #6151
+- ri:bug-risks | low | scripts/lane/lane-implement-stats.ts:38 | 2026-11-03 | #6152 | fixed
+- rb:2026-11-03 | #6152
+- rf:comments | low | scripts/lane/lane-breakdown-implement.ts:11 | 2026-11-03 | #6152 | fixed
+- ri:bug-risks | medium | scripts/run/run-investigation-record.ts:16 | 2026-11-03 | #6153 | fixed
+- rb:2026-11-03 | #6153
+- rf:bug-risks | medium | scripts/lane/lane-withdraw.ts:205 | 2026-11-03 | #6153
+- rf:comments | low | scripts/run/run-investigation-record.ts:56 | 2026-11-03 | #6153
+- rf:comments | low | docs/josh-commands-run.md:445 | 2026-11-03 | #6153
+- rf:tests | low | scripts/run/run-investigation-record.test.ts:87 | 2026-11-03 | #6153
+- rb:2026-11-03 | #6153
+- rf:bug-risks | medium | scripts/lane/lane-withdraw.ts:205 | 2026-11-03 | #6153
+- rf:tests | low | scripts/run/run-prep-cli.test.ts:329 | 2026-11-03 | #6153
+- rf:project-conventions | low | scripts/josh/josh-commands-ai.ts:573 | 2026-11-03 | #6154
+- ri:bug-risks | low | scripts/lane/lane-why-cli.ts:45 | 2026-11-03 | #6154 | fixed
+- ri:project-conventions | low | scripts/josh/josh-commands-ai.ts:572 | 2026-11-03 | #6154 | fixed
+- rb:2026-11-03 | #6154
+- rf:bug-risks | medium | scripts/lane/lane-why-ship.ts:56 | 2026-11-03 | #6154 | fixed
+- rf:bug-risks | low | scripts/lane/lane-why-ship.ts:35 | 2026-11-03 | #6154 | fixed
+- rf:tests | medium | scripts/lane/lane-why-ship.test.ts:37 | 2026-11-03 | #6154 | fixed
+- rf:none | none | - | 2026-11-03 | #6156
+- rf:none | none | - | 2026-11-03 | #6156
+- rf:comments | low | scripts/time-runtime/time-josh-names.ts:5 | 2026-11-03 | #6159
+- rf:comments | low | scripts/time-runtime/time-josh-names.test.ts:6 | 2026-11-03 | #6159
+- rf:comments | low | scripts/time-runtime/time-josh-names.ts:5 | 2026-11-03 | #6159
+- rf:comments | low | scripts/time-runtime/time-josh-names.ts:12 | 2026-11-03 | #6161
+- rf:comments | low | scripts/time-runtime/time-josh-names.ts:12 | 2026-11-03 | #6161
+- ri:none | none | - | 2026-11-03 | #6161
+- rb:2026-11-03 | #6161
+- rf:tests | low | scripts/time-runtime/time-josh-names.test.ts:13 | 2026-11-03 | #6161 | fixed
+- rf:comments | low | scripts/time-runtime/time-josh-names.ts:6 | 2026-11-03 | #6161 | fixed
+- ri:bug-risks | medium | scripts/lane/lane-limit-override.ts:46 | 2026-11-03 | #6166 | fixed
+- ri:bug-risks | low | scripts/lane/lane-limit-cli.ts:119 | 2026-11-03 | #6166 | fixed
+- ri:bug-risks | low | scripts/lane/lane-limit-history.ts:45 | 2026-11-03 | #6166 | fixed
+- rb:2026-11-03 | #6166
+- rf:bug-risks | low | scripts/lane/lane-limit-history.ts:45 | 2026-11-03 | #6166
+- rf:project-conventions | low | scripts/backlog/backlogrun-cli.ts:253 | 2026-11-03 | #6166
+- rb:2026-11-03 | #6166
+- rf:bug-risks | medium | scripts/lane/lane-limit-override.ts:44 | 2026-11-03 | #6166
+- rf:bug-risks | low | scripts/lane/lane-limit-cli.ts:119 | 2026-11-03 | #6166
+- rf:bug-risks | low | scripts/lane/lane-limit-override.ts:60 | 2026-11-03 | #6166
+- rf:none | none | - | 2026-11-03 | #6168
+- rb:2026-11-03 | #6168
+- rf:bug-risks | low | scripts/build/pack-boundary.test.ts:137 | 2026-11-03 | #6168 | fixed
+- rf:none | none | - | 2026-11-03 | #6173
+- rf:none | none | - | 2026-11-03 | #6173
+- rf:none | none | - | 2026-11-03 | #6177
+- rb:2026-11-03 | #6177
+- rf:tests | low | scripts/epic/epic-next-stopped.test.ts:25 | 2026-11-03 | #6177
+- ri:none | none | - | 2026-11-03 | #6182
+- rb:2026-11-03 | #6182
+- rf:none | none | - | 2026-11-03 | #6182
+- rf:none | none | - | 2026-11-04 | #6185
+- ri:none | none | - | 2026-11-04 | #6185
+- rb:2026-11-04 | #6185
+- rf:bug-risks | low | scripts/run/ship/run-ship-synced-scope.ts:160 | 2026-11-04 | #6185 | false-positive
+- rf:tests | low | scripts/run/ship/run-ship-synced-scope.test.ts:114 | 2026-11-04 | #6185 | fixed
+- rf:none | none | - | 2026-11-04 | #6186
+- rb:2026-11-04 | #6186
+- rf:tests | medium | scripts/test/test-no-base.test.ts:38 | 2026-11-04 | #6186
+- rf:assumptions | low | scripts/test/test-no-base.ts:18 | 2026-11-04 | #6186
+- rf:bug-risks | low | scripts/test/test-no-base.ts:34 | 2026-11-04 | #6186
+- ri:bug-risks | medium | docs/josh-commands.md:318 | 2026-11-04 | #6187 | deferred:#6193
+- ri:bug-risks | medium | docs/josh-commands.md:317 | 2026-11-04 | #6187 | deferred:#6193
+- rb:2026-11-04 | #6187
+- rf:comments | medium | docs/josh-commands.md:318 | 2026-11-04 | #6187 | deferred:#6193
+- rf:comments | medium | docs/josh-commands.md:317 | 2026-11-04 | #6187 | deferred:#6193
+- rf:project-conventions | low | scripts/test/test-related.ts:315 | 2026-11-04 | #6187 | fixed
+- rf:tests | low | scripts/test/test-related-record.test.ts:163 | 2026-11-04 | #6187
+- rf:tests | low | scripts/lane/lane-breakdown-related.test.ts:13 | 2026-11-04 | #6187 | fixed
+- rb:2026-11-04 | #6187
+- rf:comments | medium | docs/josh-commands.md:318 | 2026-11-04 | #6187 | deferred:#6193
+- rf:comments | medium | docs/josh-commands.md:317 | 2026-11-04 | #6187 | deferred:#6193
+- rf:tests | low | scripts/lane/lane-breakdown-related.test.ts:29 | 2026-11-04 | #6187 | fixed
+- rf:comments | low | scripts/lane/lane-implement-read.ts:17 | 2026-11-04 | #6188
+- ri:none | none | - | 2026-11-04 | #6188
+- rb:2026-11-04 | #6188
+- rf:bug-risks | medium | scripts/lane/lane-implement-read.ts:20 | 2026-11-04 | #6188 | fixed
+- rf:project-conventions | low | scripts/lane/lane-implement-read.ts:12 | 2026-11-04 | #6188 | fixed
+- rf:project-conventions | low | docs/josh-commands-run.md:1316 | 2026-11-04 | #6188 | fixed
+- ri:comments | low | docs/maintainers/josh-commands-run-rationale.md:207 | 2026-11-04 | #6189 | fixed
+- rb:2026-11-04 | #6189
+- rf:comments | low | docs/maintainers/josh-commands-run-rationale.md:207 | 2026-11-04 | #6189
+- rf:assumptions | low | scripts/lane/lane-pairs.ts:31 | 2026-11-04 | #6189
+- rf:tests | low | scripts/lane/lane-pairs.test.ts:70 | 2026-11-04 | #6189
+- rb:2026-11-04 | #6193
+- rf:project-conventions | low | docs/josh-commands.md:319 | 2026-11-04 | #6193 | fixed
+- rf:none | none | - | 2026-11-04 | #6196
+- ri:none | none | - | 2026-11-04 | #6196
+- rb:2026-11-04 | #6196
+- rf:tests | low | scripts/run/ship/run-ship-scoped.unsplit.test.ts:95 | 2026-11-04 | #6196 | fixed
+- ri:none | none | - | 2026-11-04 | #6197
+- rb:2026-11-04 | #6197
+- rf:none | none | - | 2026-11-04 | #6197
+- rf:bug-risks | low | scripts/lane/lane-why.ts:93 | 2026-11-04 | #6198
+- rf:bug-risks | low | scripts/lane/lane-sinks.ts:112 | 2026-11-04 | #6198
+- ri:bug-risks | low | scripts/lane/lane-over.ts:124 | 2026-11-04 | #6198 | fixed
+- rb:2026-11-04 | #6198
+- rf:bug-risks | medium | scripts/lane/lane-over.ts:124 | 2026-11-04 | #6198 | fixed
+- rf:bug-risks | low | scripts/lane/lane-sinks.ts:52 | 2026-11-04 | #6198 | fixed
+- rf:none | none | - | 2026-11-04 | #6204
+- rb:2026-11-04 | #6204
+- rf:bug-risks | medium | scripts/review/review-submit-cli.ts:18 | 2026-11-04 | #6204 | false-positive
+- rf:tests | medium | scripts/review/review-submit-cli.test.ts:109 | 2026-11-04 | #6204 | fixed
+- rf:bug-risks | low | scripts/review/review-submit-cli.ts:18 | 2026-11-04 | #6204 | fixed
+- ri:performance | medium | scripts/split/split-early-notice.ts:99 | 2026-11-04 | #6206 | fixed
+- ri:bug-risks | low | scripts/split/split-assess.ts:164 | 2026-11-04 | #6206 | fixed
+- ri:comments | low | scripts/split/split-early-notice.ts:16 | 2026-11-04 | #6206 | fixed
+- rb:2026-11-04 | #6206
+- rf:bug-risks | medium | scripts/split/split-assess.ts:149 | 2026-11-04 | #6206 | fixed
+- rf:bug-risks | low | scripts/split/split-assess.ts:150 | 2026-11-04 | #6206 | fixed
+- rf:performance | low | scripts/split/split-early-notice.ts:99 | 2026-11-04 | #6206 | fixed
+- rf:tests | medium | scripts/split/split-early-notice.test.ts:159 | 2026-11-04 | #6206 | fixed
+- rf:tests | low | scripts/issue/issue-declared-size.test.ts:35 | 2026-11-04 | #6206 | fixed
+- rf:comments | low | scripts/split/split-early-notice.ts:14 | 2026-11-04 | #6206 | fixed
+- rb:2026-11-04 | #6206
+- rf:bug-risks | medium | scripts/split/split-early-notice.ts:72 | 2026-11-04 | #6206
+- rf:tests | low | scripts/issue/issue-declared-size.test.ts:40 | 2026-11-04 | #6206
+- rf:comments | low | scripts/split/split-assess.ts:65 | 2026-11-04 | #6206
+- rf:tests | low | scripts/split/split-assess.test.ts:137 | 2026-11-04 | #6206
+- rf:none | none | - | 2026-11-04 | #6207
+- ri:bug-risks | low | scripts/run/review/run-review-pinned-accepted.ts:86 | 2026-11-04 | #6207 | fixed
+- ri:bug-risks | low | scripts/run/review/run-review-pinned-accepted.ts:86 | 2026-11-04 | #6207 | fixed
+- rb:2026-11-04 | #6207
+- rf:bug-risks | low | scripts/run/review/run-review-pinned-accepted.ts:86 | 2026-11-04 | #6207 | false-positive
+- rf:tests | low | scripts/run/review/run-review-pinned-accepted.test.ts:67 | 2026-11-04 | #6207 | fixed
+- rf:bug-risks | low | scripts/lane/lane-turn-stats.ts:96 | 2026-11-04 | #6209
+- ri:none | none | - | 2026-11-04 | #6209
+- rb:2026-11-04 | #6209
+- rf:bug-risks | medium | scripts/lane/lane-turn-stats.ts:71 | 2026-11-04 | #6209 | fixed
+- rf:bug-risks | low | scripts/lane/lane-turn-stats.ts:115 | 2026-11-04 | #6209 | false-positive
+- ri:none | none | - | 2026-11-04 | #6212
+- rb:2026-11-04 | #6212
+- rf:bug-risks | medium | scripts/split/split-resolution.ts:49 | 2026-11-04 | #6212 | fixed
+- rb:2026-11-04 | #6212
+- rf:bug-risks | medium | scripts/split/split-resolution.ts:49 | 2026-11-04 | #6212 | deferred:#6300
+- ri:none | none | - | 2026-11-04 | #6212
+- rb:2026-11-04 | #6212
+- rf:none | none | - | 2026-11-04 | #6212
+- ri:none | none | - | 2026-11-04 | #6213
+- rb:2026-11-04 | #6213
+- rf:none | none | - | 2026-11-04 | #6213
+- ri:none | none | - | 2026-11-04 | #6221
+- ri:none | none | - | 2026-11-04 | #6221
+- rb:2026-11-04 | #6221
+- rf:bug-risks | medium | scripts/followup/followup-human-merge.ts:74 | 2026-11-04 | #6221 | fixed
+- rf:tests | medium | scripts/followup/git-followup-workflow.ts:237 | 2026-11-04 | #6221 | fixed
+- rb:2026-11-04 | #6221
+- rf:tests | medium | scripts/followup/git-followup-workflow.test.ts:197 | 2026-11-04 | #6221 | fixed
+- rf:none | none | - | 2026-11-04 | #6222
+- ri:none | none | - | 2026-11-04 | #6222
+- ri:none | none | - | 2026-11-04 | #6222
+- rb:2026-11-04 | #6222
+- rf:bug-risks | medium | scripts/run/board/run-board-layout.ts:364 | 2026-11-04 | #6222 | fixed
+- rf:tests | medium | scripts/run/board/run-board-human-merge.test.ts:35 | 2026-11-04 | #6222 | fixed
+- rf:comments | low | docs/maintainers/rule-delivery-rationale.md:412 | 2026-11-05 | #6223 | deferred:#6423
+- rb:2026-11-05 | #6223
+- rf:comments | low | docs/maintainers/rule-delivery-rationale.md:412 | 2026-11-05 | #6223
+- rx:{"round":"f8150e11-7675-43e4-98f6-92ca449544ed","previous":"7b5121e1-2615-4543-8eaf-cc85dc556adc","category":"comments","severity":"low","file":"docs/maintainers/rule-delivery-rationale.md:412","description":"削除済みの workflow guard テストを現役として説明しており scripts/rules/shell-redirects.ts:5 も削除済み helper 利用先を示すが、整理は #6423 に先送り済み。","status":"new"}
+- rx:{"round":"f8150e11-7675-43e4-98f6-92ca449544ed","previous":"7b5121e1-2615-4543-8eaf-cc85dc556adc","category":"comments","severity":"low","file":"docs/maintainers/rule-delivery-rationale.md:412","description":"削除済みの guard テストと helper コメントに旧説明が残るが、整理は #6423 に起票済み。","disposition":"deferred:#6423","status":"resolved"}
+- ri:none | none | - | 2026-11-04 | #6225
+- rb:2026-11-04 | #6225
+- rf:none | none | - | 2026-11-04 | #6225
+- rb:2026-11-04 | #6225
+- rf:none | none | - | 2026-11-04 | #6225
+- ri:none | none | - | 2026-11-04 | #6226
+- rb:2026-11-04 | #6226
+- rf:none | none | - | 2026-11-04 | #6226
+- ri:none | none | - | 2026-11-04 | #6227
+- rb:2026-11-04 | #6227
+- rf:none | none | - | 2026-11-04 | #6227
+- ri:none | none | - | 2026-11-04 | #6227
+- rb:2026-11-04 | #6227
+- rf:none | none | - | 2026-11-04 | #6227
+- rb:2026-11-04 | #6227
+- rf:none | none | - | 2026-11-04 | #6227
+- ri:none | none | - | 2026-11-04 | #6229
+- ri:none | none | - | 2026-11-04 | #6229
+- rb:2026-11-04 | #6229
+- rf:none | none | - | 2026-11-04 | #6229
+- rb:2026-11-04 | #6230
+- rf:bug-risks | medium | scripts/review/review-round2.ts:158 | 2026-11-04 | #6230 | fixed
+- rf:bug-risks | medium | scripts/agent/agent-role-profile.ts:325 | 2026-11-04 | #6230 | fixed
+- rx:{"round":"48582fa2-1340-4d8a-a0a1-bb0e585d1f82","category":"bug-risks","severity":"medium","file":"scripts/review/review-round2.ts:158","disposition":"fixed","description":"low skip の理由に全 delta を含めないため未レビュー修正パスがコメントに残らず異なる delta も既存記録との一致で省略される。","status":"resolved"}
+- rx:{"round":"48582fa2-1340-4d8a-a0a1-bb0e585d1f82","category":"bug-risks","severity":"medium","file":"scripts/agent/agent-role-profile.ts:325","disposition":"fixed","description":"空白だけの JOSH_REVIEWER_MODEL を明示 override と誤認し Anthropic low round 1 を Sonnet ではなく Opus で起動する。","status":"resolved"}
+- rb:2026-11-04 | #6230
+- rf:none | none | - | 2026-11-04 | #6230
+- rx:{"round":"4ee433d7-a3e0-49de-997b-de169094583c","previous":"48582fa2-1340-4d8a-a0a1-bb0e585d1f82","category":"bug-risks","severity":"medium","file":"scripts/review/review-round2.ts:158","description":"low skip の理由に全 delta を含めないため未レビュー修正パスがコメントに残らず異なる delta も既存記録との一致で省略される。","disposition":"fixed","status":"resolved"}
+- rx:{"round":"4ee433d7-a3e0-49de-997b-de169094583c","previous":"48582fa2-1340-4d8a-a0a1-bb0e585d1f82","category":"bug-risks","severity":"medium","file":"scripts/agent/agent-role-profile.ts:325","description":"空白だけの JOSH_REVIEWER_MODEL を明示 override と誤認し Anthropic low round 1 を Sonnet ではなく Opus で起動する。","disposition":"fixed","status":"resolved"}
+- rb:2026-11-04 | #6230
+- rf:bug-risks | medium | scripts/review/review-round2.ts:161 | 2026-11-04 | #6230
+- rx:{"round":"8b9a4b10-2c5b-4bc8-9b6e-6efc8b1b15d9","previous":"4ee433d7-a3e0-49de-997b-de169094583c","category":"bug-risks","severity":"medium","file":"scripts/review/review-round2.ts:161","description":"low skip の理由を受け取る記録側が前方一致するため既存の docs/guide.md.bak の記録を docs/guide.md の記録と誤認して新しい未レビュー修正パスの投稿を省略するので、理由行全体を照合する必要がある; other sites: scripts/review/review-round2-skip-comment.ts:30, scripts/review/review-round2.ts:121","status":"new"}
+- rb:2026-11-04 | #6233
+- rf:none | none | - | 2026-11-04 | #6233
+- rf:none | none | - | 2026-11-04 | #6234
+- ri:none | none | - | 2026-11-04 | #6234
+- ri:none | none | - | 2026-11-04 | #6234
+- rb:2026-11-04 | #6234
+- rf:none | none | - | 2026-11-04 | #6234
+- ri:none | none | - | 2026-11-04 | #6235
+- ri:none | none | - | 2026-11-04 | #6235
+- rb:2026-11-04 | #6235
+- rf:none | none | - | 2026-11-04 | #6235
+- rb:2026-11-04 | #6235
+- rf:none | none | - | 2026-11-04 | #6235
+- ri:none | none | - | 2026-11-04 | #6236
+- rb:2026-11-04 | #6236
+- rf:none | none | - | 2026-11-04 | #6236
+- rb:2026-11-04 | #6236
+- rf:none | none | - | 2026-11-04 | #6236
+- rf:none | none | - | 2026-11-04 | #6237
+- ri:none | none | - | 2026-11-04 | #6237
+- ri:none | none | - | 2026-11-04 | #6237
+- rb:2026-11-04 | #6237
+- rf:none | none | - | 2026-11-04 | #6237
+- rf:none | none | - | 2026-11-04 | #6238
+- rb:2026-11-04 | #6238
+- rf:bug-risks | medium | scripts/agent/lane-instructions.ts:21 | 2026-11-04 | #6238 | fixed
+- rf:bug-risks | medium | scripts/document/lane-child-read-set.ts:62 | 2026-11-04 | #6238 | fixed
+- rf:bug-risks | medium | tools/josh/josh-ready.ts:13 | 2026-11-04 | #6239 | false-positive
+- rb:2026-11-04 | #6239
+- rf:bug-risks | medium | scripts/build/build-bin.ts:27 | 2026-11-04 | #6239 | fixed
+- rf:bug-risks | medium | tools/josh/josh-ready.ts:13 | 2026-11-04 | #6239 | fixed
+- rx:{"round":"07476992-5c63-4c13-a660-d94e5685bd06","category":"bug-risks","severity":"medium","file":"scripts/build/build-bin.ts:27","disposition":"fixed","description":"Atomic replacement resets an npm-linked executable from 0755 to 0644, so rebuilding breaks direct josh execution with EACCES; preserve executable mode and test rebuilding an executable output.","status":"resolved"}
+- rx:{"round":"07476992-5c63-4c13-a660-d94e5685bd06","category":"bug-risks","severity":"medium","file":"tools/josh/josh-ready.ts:13","disposition":"fixed","description":"Editing a stamped dispatcher or command output leaves is_fresh true and launches broken code despite the documented source fallback; verify output content in the shared stamp and test edited outputs.","status":"resolved"}
+- rb:2026-11-04 | #6239
+- rf:bug-risks | medium | tools/josh/josh-ready.ts:13 | 2026-11-04 | #6239
+- rf:bug-risks | medium | scripts/hooks/implementation-shell-read.ts:40 | 2026-11-04 | #6240
+- ri:none | none | - | 2026-11-04 | #6240
+- ri:none | none | - | 2026-11-04 | #6240
+- rb:2026-11-04 | #6240
+- rf:bug-risks | medium | scripts/hooks/implementation-shell-read.ts:54 | 2026-11-04 | #6240 | fixed
+- rf:bug-risks | medium | scripts/hooks/implementation-shell-read.ts:32 | 2026-11-04 | #6240 | fixed
+- rf:bug-risks | medium | scripts/hooks/implementation-shell-read.ts:63 | 2026-11-04 | #6240 | fixed
+- rf:none | none | - | 2026-11-04 | #6241
+- ri:none | none | - | 2026-11-04 | #6241
+- ri:none | none | - | 2026-11-04 | #6241
+- rb:2026-11-04 | #6241
+- rf:bug-risks | medium | scripts/backlog/backlog-next-shared.ts:63 | 2026-11-04 | #6241 | fixed
+- rf:bug-risks | medium | scripts/backlog/backlog-offer-timing.ts:16 | 2026-11-04 | #6241 | fixed
+- rb:2026-11-04 | #6241
+- rf:bug-risks | medium | scripts/backlog/backlog-offer-timing.ts:25 | 2026-11-04 | #6241 | fixed
+- rf:none | none | - | 2026-11-04 | #6242
+- rf:none | none | - | 2026-11-05 | #6242
+- rb:2026-11-04 | #6242
+- rf:bug-risks | medium | scripts/gate/change-scope-action.ts:7 | 2026-11-04 | #6242 | fixed
+- rf:none | none | - | 2026-11-04 | #6243
+- ri:none | none | - | 2026-11-04 | #6243
+- ri:none | none | - | 2026-11-04 | #6243
+- rb:2026-11-04 | #6243
+- rf:bug-risks | medium | scripts/review/review-round-one-skip.ts:26 | 2026-11-04 | #6243 | fixed
+- rx:{"round":"eed3f7ff-4021-41ee-8f6a-b1d896c7b21a","category":"bug-risks","severity":"medium","file":"scripts/review/review-round-one-skip.ts:26","disposition":"fixed","description":"Issue コメントに残る High/Medium を履歴判定に含めないため、宣言サイズ内のブランチで round 1 を誤って省略する。","status":"resolved"}
+- rf:security | medium | scripts/rules/shell-permissions.ts:21 | 2026-11-04 | #6244
+- rf:bug-risks | medium | scripts/rules/shell-permissions.ts:24 | 2026-11-04 | #6244
+- rb:2026-11-04 | #6244
+- rf:bug-risks | medium | scripts/rules/shell-permissions.ts:58 | 2026-11-04 | #6244 | fixed
+- rf:security | medium | scripts/rules/shell-permissions.ts:91 | 2026-11-04 | #6244 | fixed
+- rb:2026-11-04 | #6244
+- rf:security | medium | scripts/rules/gh-api.ts:80 | 2026-11-04 | #6244
+- rf:security | medium | scripts/rules/shell-permissions.ts:202 | 2026-11-04 | #6244
+- rf:bug-risks | medium | scripts/rules/egress-guard.ts:280 | 2026-11-04 | #6244
+- rb:2026-11-04 | #6244
+- rf:security | medium | scripts/rules/gh-api.ts:80 | 2026-11-04 | #6244 | fixed
+- rf:security | medium | scripts/rules/shell-permissions.ts:202 | 2026-11-04 | #6244 | fixed
+- rf:bug-risks | medium | scripts/rules/egress-guard.ts:280 | 2026-11-04 | #6244 | fixed
+- rf:none | none | - | 2026-11-04 | #6245
+- ri:none | none | - | 2026-11-04 | #6245
+- ri:none | none | - | 2026-11-04 | #6245
+- rb:2026-11-04 | #6245
+- rf:none | none | - | 2026-11-04 | #6245
+- ri:none | none | - | 2026-11-04 | #6246
+- rb:2026-11-04 | #6246
+- rf:none | none | - | 2026-11-04 | #6246
+- rb:2026-11-04 | #6246
+- rf:none | none | - | 2026-11-04 | #6246
+- rb:2026-11-04 | #6247
+- rf:none | none | - | 2026-11-04 | #6247
+- rf:none | none | - | 2026-11-04 | #6249
+- rf:none | none | - | 2026-11-04 | #6249
+- ri:none | none | - | 2026-11-04 | #6249
+- ri:none | none | - | 2026-11-04 | #6249
+- rb:2026-11-04 | #6249
+- rf:bug-risks | medium | scripts/test/test-related-verdict.ts:45 | 2026-11-04 | #6249 | fixed
+- rb:2026-11-04 | #6249
+- rf:performance | medium | scripts/test/test-related-verdict.ts:47 | 2026-11-04 | #6249
+- ri:none | none | - | 2026-11-04 | #6251
+- ri:none | none | - | 2026-11-04 | #6251
+- rb:2026-11-04 | #6251
+- rf:none | none | - | 2026-11-04 | #6251
+- rf:none | none | - | 2026-11-04 | #6253
+- ri:none | none | - | 2026-11-04 | #6253
+- ri:none | none | - | 2026-11-04 | #6253
+- rb:2026-11-04 | #6253
+- rf:bug-risks | medium | scripts/run/board/run-board-decision-read.ts:83 | 2026-11-04 | #6253 | fixed
+- rf:none | none | - | 2026-11-04 | #6255
+- ri:none | none | - | 2026-11-04 | #6255
+- ri:none | none | - | 2026-11-04 | #6255
+- rb:2026-11-04 | #6255
+- rf:bug-risks | medium | scripts/run/run-label-main.ts:13 | 2026-11-04 | #6255 | fixed
+- ri:none | none | - | 2026-11-04 | #6258
+- rb:2026-11-04 | #6258
+- rf:none | none | - | 2026-11-04 | #6258
+- ri:none | none | - | 2026-11-04 | #6263
+- rb:2026-11-04 | #6263
+- rf:none | none | - | 2026-11-04 | #6263
+- ri:none | none | - | 2026-11-04 | #6267
+- ri:none | none | - | 2026-11-04 | #6267
+- rb:2026-11-04 | #6267
+- rf:none | none | - | 2026-11-04 | #6267
+- ri:none | none | - | 2026-11-04 | #6268
+- ri:none | none | - | 2026-11-04 | #6268
+- ri:none | none | - | 2026-11-04 | #6268
+- rb:2026-11-04 | #6268
+- rf:none | none | - | 2026-11-04 | #6268
+- rb:2026-11-04 | #6268
+- rf:none | none | - | 2026-11-04 | #6268
+- rb:2026-11-04 | #6276
+- rf:none | none | - | 2026-11-04 | #6276
+- rb:2026-11-04 | #6276
+- rf:none | none | - | 2026-11-04 | #6276
+- rf:none | none | - | 2026-11-04 | #6277
+- ri:none | none | - | 2026-11-04 | #6277
+- ri:none | none | - | 2026-11-04 | #6277
+- rb:2026-11-04 | #6277
+- rf:bug-risks | medium | scripts/run/ship/run-ship-review-checkpoint.ts:52 | 2026-11-04 | #6277 | fixed
+- rb:2026-11-04 | #6277
+- rf:bug-risks | medium | scripts/run/ship/run-ship-review-checkpoint.ts:52 | 2026-11-04 | #6277 | fixed
+- rb:2026-11-04 | #6278
+- rf:none | none | - | 2026-11-04 | #6278
+- ri:none | none | - | 2026-11-04 | #6279
+- rb:2026-11-04 | #6279
+- rf:none | none | - | 2026-11-04 | #6279
+- rb:2026-11-04 | #6279
+- rf:none | none | - | 2026-11-04 | #6279
+- rf:none | none | - | 2026-11-04 | #6286
+- rb:2026-11-04 | #6286
+- rf:bug-risks | medium | scripts/review/review-fix-round.ts:102 | 2026-11-04 | #6286 | fixed
+- rx:{"round":"9c674809-17e1-4def-9858-8dc1cb60bf13","category":"bug-risks","severity":"medium","file":"scripts/review/review-fix-round.ts:102","disposition":"fixed","description":"Ship discards finding descriptions before review:record, so a stopped round always saves empty bodies and its fix-only rerun falls back to the whole change.","status":"resolved"}
+- rb:2026-11-04 | #6286
+- rf:bug-risks | medium | scripts/review/review-fix-round.ts:102 | 2026-11-04 | #6286 | fixed
+- rx:{"round":"37471f98-d4e3-4572-a2d6-f5f0240df704","previous":"9c674809-17e1-4def-9858-8dc1cb60bf13","category":"bug-risks","severity":"medium","file":"scripts/review/review-fix-round.ts:102","disposition":"fixed","description":"Ship preserves finding descriptions through passing and blocking rounds after #6325.","status":"resolved"}
+- rx:{"round":"37471f98-d4e3-4572-a2d6-f5f0240df704","previous":"9c674809-17e1-4def-9858-8dc1cb60bf13","category":"bug-risks","severity":"medium","file":"scripts/review/review-fix-round.ts:102","description":"Ship discards finding descriptions before review:record, so a stopped round always saves empty bodies and its fix-only rerun falls back to the whole change.","disposition":"fixed","status":"resolved"}
+- rb:2026-11-04 | #6286
+- rf:none | none | - | 2026-11-04 | #6286
+- rx:{"round":"3b01f2cf-958a-4939-85d3-6280a6ba2b51","previous":"37471f98-d4e3-4572-a2d6-f5f0240df704","category":"bug-risks","severity":"medium","file":"scripts/review/review-fix-round.ts:102","description":"Ship preserves finding descriptions through passing and blocking rounds after #6325.","disposition":"fixed","status":"resolved"}
+- rb:2026-11-04 | #6289
+- rf:none | none | - | 2026-11-04 | #6289
+- rb:2026-11-04 | #6289
+- rf:none | none | - | 2026-11-04 | #6289
+- rb:2026-11-04 | #6289
+- rf:none | none | - | 2026-11-04 | #6289
+- rb:2026-11-04 | #6290
+- rf:none | none | - | 2026-11-04 | #6290
+- rb:2026-11-04 | #6290
+- rf:none | none | - | 2026-11-04 | #6290
+- rf:none | none | - | 2026-11-04 | #6291
+- rb:2026-11-04 | #6291
+- rf:bug-risks | medium | scripts/test/test-pinned-snapshot.ts:51 | 2026-11-04 | #6291 | fixed
+- rf:bug-risks | medium | scripts/test/test-pinned-snapshot.ts:78 | 2026-11-04 | #6291 | fixed
+- rf:none | none | - | 2026-11-04 | #6292
+- rb:2026-11-04 | #6292
+- rf:none | none | - | 2026-11-04 | #6292
+- rf:none | none | - | 2026-11-04 | #6293
+- rb:2026-11-04 | #6293
+- rf:tests | medium | scripts/init/init-logic-deploy-vps.ts:33 | 2026-11-04 | #6293 | fixed
+- rb:2026-11-04 | #6295
+- rf:none | none | - | 2026-11-04 | #6295
+- ri:none | none | - | 2026-11-04 | #6299
+- rb:2026-11-04 | #6299
+- rf:none | none | - | 2026-11-04 | #6299
+- rf:none | none | - | 2026-11-04 | #6300
+- rb:2026-11-04 | #6300
+- rf:bug-risks | medium | scripts/split/split-direction.ts:131 | 2026-11-04 | #6300 | fixed
+- rf:none | none | - | 2026-11-04 | #6301
+- ri:none | none | - | 2026-11-04 | #6301
+- ri:none | none | - | 2026-11-04 | #6301
+- rb:2026-11-04 | #6301
+- rf:bug-risks | medium | tools/lane/historical-log-evidence.ts:11 | 2026-11-04 | #6301 | fixed
+- rf:none | none | - | 2026-11-04 | #6302
+- ri:none | none | - | 2026-11-04 | #6302
+- ri:none | none | - | 2026-11-04 | #6302
+- rb:2026-11-04 | #6302
+- rf:bug-risks | medium | scripts/lane/lane-breakdown-estimate.ts:123 | 2026-11-04 | #6302 | fixed
+- rx:{"round":"f7629510-9993-414a-b41e-39e6e0a409c4","category":"bug-risks","severity":"medium","file":"scripts/lane/lane-breakdown-estimate.ts:123","disposition":"fixed","description":"PR discovery failures collapse to missing and disappear from unreadable-source diagnostics; expose a distinct failure result and propagate it.","status":"resolved"}
+- ri:none | none | - | 2026-11-04 | #6303
+- rb:2026-11-04 | #6303
+- rf:none | none | - | 2026-11-04 | #6303
+- ri:none | none | - | 2026-11-04 | #6304
+- rb:2026-11-04 | #6304
+- rf:none | none | - | 2026-11-04 | #6304
+- rb:2026-11-04 | #6304
+- rf:none | none | - | 2026-11-04 | #6304
+- rb:2026-11-04 | #6310
+- rf:none | none | - | 2026-11-04 | #6310
+- rb:2026-11-04 | #6310
+- rf:none | none | - | 2026-11-04 | #6310
+- rb:2026-11-04 | #6310
+- rf:none | none | - | 2026-11-04 | #6310
+- rb:2026-11-04 | #6312
+- rf:none | none | - | 2026-11-04 | #6312
+- ri:none | none | - | 2026-11-04 | #6313
+- rb:2026-11-04 | #6313
+- rf:none | none | - | 2026-11-04 | #6313
+- rb:2026-11-04 | #6313
+- rf:none | none | - | 2026-11-04 | #6313
+- ri:none | none | - | 2026-11-04 | #6313
+- rb:2026-11-04 | #6313
+- rf:none | none | - | 2026-11-04 | #6313
+- rf:none | none | - | 2026-11-04 | #6316
+- ri:none | none | - | 2026-11-04 | #6316
+- ri:none | none | - | 2026-11-04 | #6316
+- ri:none | none | - | 2026-11-04 | #6318
+- rb:2026-11-04 | #6318
+- rf:none | none | - | 2026-11-04 | #6318
+- rb:2026-11-04 | #6318
+- rf:none | none | - | 2026-11-04 | #6318
+- rf:none | none | - | 2026-11-10 | #6319
+- rf:project-conventions | medium | docs/sync.md:53 | 2026-11-10 | #6319
+- k:followup-unrelated-test-rerun | d1 | 2026-11-04 | scripts/epic/epic-lane-occupancy.test.ts | followup reran Unit Tests (1/6); failed outside the change: isolated scripts/epic/epic-lane-occupancy.test.ts > epic_lane_occupancy.read — protected holders > keeps human review after its process exits
+- ri:none | none | - | 2026-11-04 | #6323
+- ri:none | none | - | 2026-11-04 | #6323
+- rb:2026-11-04 | #6323
+- rf:none | none | - | 2026-11-04 | #6323
+- ri:none | none | - | 2026-11-04 | #6325
+- rb:2026-11-04 | #6325
+- rf:none | none | - | 2026-11-04 | #6325
+- rf:none | none | - | 2026-11-04 | #6326
+- ri:none | none | - | 2026-11-04 | #6326
+- ri:none | none | - | 2026-11-04 | #6326
+- rb:2026-11-04 | #6326
+- rf:bug-risks | medium | scripts/split/split-child-recover-cli.ts:27 | 2026-11-04 | #6326 | fixed
+- rf:none | none | - | 2026-11-05 | #6331
+- rb:2026-11-04 | #6331
+- rf:none | none | - | 2026-11-04 | #6331
+- rb:2026-11-05 | #6331
+- rf:bug-risks | medium | scripts/lint/format.ts:20 | 2026-11-05 | #6331 | deferred:#6402
+- rf:bug-risks | low | scripts/hooks/format-edited-file.ts:287 | 2026-11-05 | #6331 | false-positive
+- rf:comments | low | scripts/lint/eslint-heap.ts:7 | 2026-11-05 | #6331 | fixed
+- rx:{"round":"8ba557f0-eecc-4857-91b1-460f70bbd2e9","previous":"ebd2bc17-8d33-4bd4-97b2-1a0ca64cdafc","category":"bug-risks","severity":"medium","file":"scripts/lint/format.ts:20","disposition":"deferred:#6402","description":"josh format and the refactor scan run whole-tree ESLint without the heap; split to #6402 past the split guide","status":"new"}
+- rx:{"round":"8ba557f0-eecc-4857-91b1-460f70bbd2e9","previous":"ebd2bc17-8d33-4bd4-97b2-1a0ca64cdafc","category":"bug-risks","severity":"low","file":"scripts/hooks/format-edited-file.ts:287","disposition":"false-positive","description":"the hook lints one file, and run_or_cold restarts a daemon the hook started under the heap","status":"resolved"}
+- rx:{"round":"8ba557f0-eecc-4857-91b1-460f70bbd2e9","previous":"ebd2bc17-8d33-4bd4-97b2-1a0ca64cdafc","category":"comments","severity":"low","file":"scripts/lint/eslint-heap.ts:7","disposition":"fixed","description":"comment narrowed to the josh lint paths this change covers","status":"resolved"}
+- rf:none | none | - | 2026-11-04 | #6333
+- ri:none | none | - | 2026-11-04 | #6333
+- ri:none | none | - | 2026-11-04 | #6333
+- rb:2026-11-04 | #6333
+- rf:bug-risks | medium | scripts/run/handoff/run-handoff-cli.ts:249 | 2026-11-04 | #6333 | fixed
+- rf:none | none | - | 2026-11-04 | #6334
+- ri:none | none | - | 2026-11-04 | #6334
+- rb:2026-11-04 | #6334
+- rf:bug-risks | medium | scripts/rules/stop-decision.ts:68 | 2026-11-04 | #6334 | fixed
+- rx:{"round":"1be537cb-505d-4771-a26f-206785a9003d","category":"bug-risks","severity":"medium","file":"scripts/rules/stop-decision.ts:68","disposition":"fixed","description":"A query URL in a mechanical failure reply is split at its question mark and incorrectly parks the child as needs-decision without counting the failure.","status":"resolved"}
+- ri:none | none | - | 2026-11-04 | #6334
+- ri:none | none | - | 2026-11-04 | #6336
+- rb:2026-11-04 | #6336
+- rf:none | none | - | 2026-11-04 | #6336
+- ri:none | none | - | 2026-11-04 | #6338
+- ri:none | none | - | 2026-11-04 | #6338
+- rb:2026-11-04 | #6338
+- rf:none | none | - | 2026-11-04 | #6338
+- rf:bug-risks | medium | scripts/run/merge/run-merge-decision.ts:54 | 2026-11-04 | #6339
+- rf:bug-risks | medium | scripts/run/merge/run-merge-decision.ts:60 | 2026-11-04 | #6339
+- rf:bug-risks | medium | scripts/run/merge/run-merge-decision.ts:54 | 2026-11-04 | #6339 | fixed
+- rf:bug-risks | medium | scripts/run/merge/run-merge-decision.ts:60 | 2026-11-04 | #6339 | fixed
+- ri:none | none | - | 2026-11-04 | #6339
+- ri:none | none | - | 2026-11-04 | #6339
+- rb:2026-11-04 | #6339
+- rf:bug-risks | medium | scripts/run/merge/run-merge-decision.ts:44 | 2026-11-04 | #6339 | fixed
+- rb:2026-11-04 | #6339
+- rf:bug-risks | medium | scripts/run/merge/run-merge-decision.ts:48 | 2026-11-04 | #6339
+- rf:bug-risks | medium | scripts/run/merge/run-merge-decision.ts:49 | 2026-11-04 | #6339
+- rx:{"round":"3fd9047c-6ece-4914-af54-4e22d0c955ae","category":"bug-risks","severity":"medium","file":"scripts/run/merge/run-merge-decision.ts:48","description":"Quoted shell invocations such as /bin/zsh -lc 'pnpm josh run:entry 6339' lose their executable body in unquoted(), so a successful handed-off entry is incorrectly parked as session unfinished; decode executable shell arguments through the shared command reader; other sites: scripts/run/merge/run-merge-decision.ts:59, scripts/run/merge/run-merge-decision.ts:89","status":"new"}
+- rx:{"round":"3fd9047c-6ece-4914-af54-4e22d0c955ae","category":"bug-risks","severity":"medium","file":"scripts/run/merge/run-merge-decision.ts:49","description":"false && pnpm josh run:entry 6339; cat previous-run.log exits successfully without executing entry, yet a handed-off line read from that log is diagnosed as stale hand-off because merely naming entry anywhere in the chain is treated as provenance; require successful execution evidence for the originating entry; other sites: scripts/run/merge/run-merge-decision.ts:59, scripts/run/merge/run-merge-decision.ts:89","status":"new"}
+- rb:2026-11-04 | #6339
+- rf:bug-risks | medium | scripts/run/merge/run-merge-decision.ts:48 | 2026-11-04 | #6339 | fixed
+- rf:bug-risks | medium | scripts/run/merge/run-merge-decision.ts:49 | 2026-11-04 | #6339 | fixed
+- rx:{"round":"73e1a1a2-4648-452a-bf12-13527dc1de2c","previous":"3fd9047c-6ece-4914-af54-4e22d0c955ae","category":"bug-risks","severity":"medium","file":"scripts/run/merge/run-merge-decision.ts:48","disposition":"fixed","description":"Quoted shell invocations such as /bin/zsh -lc 'pnpm josh run:entry 6339' lose their executable body in unquoted(), so a successful handed-off entry is incorrectly parked as session unfinished; decode executable shell arguments through the shared command reader; other sites: scripts/run/merge/run-merge-decision.ts:59, scripts/run/merge/run-merge-decision.ts:89","status":"resolved"}
+- rx:{"round":"73e1a1a2-4648-452a-bf12-13527dc1de2c","previous":"3fd9047c-6ece-4914-af54-4e22d0c955ae","category":"bug-risks","severity":"medium","file":"scripts/run/merge/run-merge-decision.ts:49","disposition":"fixed","description":"false && pnpm josh run:entry 6339; cat previous-run.log exits successfully without executing entry, yet a handed-off line read from that log is diagnosed as stale hand-off because merely naming entry anywhere in the chain is treated as provenance; require successful execution evidence for the originating entry; other sites: scripts/run/merge/run-merge-decision.ts:59, scripts/run/merge/run-merge-decision.ts:89","status":"resolved"}
+- rb:2026-11-04 | #6339
+- rf:bug-risks | medium | scripts/run/merge/run-merge-decision.ts:48 | 2026-11-04 | #6339 | fixed
+- rf:bug-risks | medium | scripts/run/merge/run-merge-decision.ts:49 | 2026-11-04 | #6339 | fixed
+- rx:{"round":"4bc18c7e-0771-46a9-9ee8-75190910573b","previous":"73e1a1a2-4648-452a-bf12-13527dc1de2c","category":"bug-risks","severity":"medium","file":"scripts/run/merge/run-merge-decision.ts:48","disposition":"fixed","description":"Quoted shell invocations such as /bin/zsh -lc 'pnpm josh run:entry 6339' lose their executable body in unquoted(), so a successful handed-off entry is incorrectly parked as session unfinished; decode executable shell arguments through the shared command reader; other sites: scripts/run/merge/run-merge-decision.ts:59, scripts/run/merge/run-merge-decision.ts:89","status":"resolved"}
+- rx:{"round":"4bc18c7e-0771-46a9-9ee8-75190910573b","previous":"73e1a1a2-4648-452a-bf12-13527dc1de2c","category":"bug-risks","severity":"medium","file":"scripts/run/merge/run-merge-decision.ts:49","disposition":"fixed","description":"false && pnpm josh run:entry 6339; cat previous-run.log exits successfully without executing entry, yet a handed-off line read from that log is diagnosed as stale hand-off because merely naming entry anywhere in the chain is treated as provenance; require successful execution evidence for the originating entry; other sites: scripts/run/merge/run-merge-decision.ts:59, scripts/run/merge/run-merge-decision.ts:89","status":"resolved"}
+- ri:none | none | - | 2026-11-08 | #6347
+- rb:2026-11-08 | #6347
+- rf:bug-risks | medium | scripts/lane/lane-phase.ts:34 | 2026-11-08 | #6347 | fixed
+- rx:{"round":"8b5f647f-9981-473d-a588-423e6b5ecf50","category":"bug-risks","severity":"medium","file":"scripts/lane/lane-phase.ts:34","disposition":"fixed","description":"同一 child の最初の runtime 編集を並行実行すると両 hook が未記録と読み、append の排他区間外の判定により同一 launch の implement を2回記録するため、判定から plan/implement 記録までをプロセス間で直列化し並行テストを追加する; other sites: scripts/hooks/pretool-guard.ts:165, scripts/hooks/codex-hook-adapter.ts:142, scripts/lane/lane-phase.test.ts:48, scripts/hooks/codex-hook-adapter-phase.test.ts:46","status":"resolved"}
+- ri:none | none | - | 2026-11-08 | #6347
+- rb:2026-11-08 | #6347
+- rf:none | none | - | 2026-11-08 | #6347
+- rx:{"round":"476dc073-ec1a-4cf5-90dd-b9721e21738e","previous":"0384b4e9-d2d1-4ca3-89ae-d669072a3554","category":"bug-risks","severity":"medium","file":"scripts/lane/lane-phase.ts:34","description":"Serialize the launch check and both event appends with the existing repository lock; concurrent runtime edits now write each event once.","disposition":"fixed","status":"resolved"}
+- ri:none | none | - | 2026-11-04 | #6351
+- rb:2026-11-04 | #6351
+- rf:none | none | - | 2026-11-04 | #6351
+- ri:none | none | - | 2026-11-04 | #6356
+- rb:2026-11-04 | #6356
+- rf:none | none | - | 2026-11-04 | #6356
+- rb:2026-11-04 | #6356
+- rf:none | none | - | 2026-11-04 | #6356
+- rb:2026-11-04 | #6357
+- rf:bug-risks | low | scripts/backlog/backlog-next-size.ts:59 | 2026-11-04 | #6357 | deferred:#6365
+- rx:{"round":"7b19ad7e-bcd4-4aa0-bf08-2a1963e0dc4e","category":"bug-risks","severity":"low","file":"scripts/backlog/backlog-next-size.ts:59","disposition":"deferred:#6365","description":"測定予算で追加された警告に固定 guide を表示する接続残りは先送り済み #6365 が全体をカバーする。","status":"new"}
+- rf:bug-risks | medium | scripts/split/split-measure.ts:55 | 2026-11-04 | #6360
+- rb:2026-11-04 | #6360
+- rf:bug-risks | medium | scripts/split/split-relocations.ts:91 | 2026-11-04 | #6360 | fixed
+- rf:comments | low | .josh/metrics-accepted/6360.json:2 | 2026-11-04 | #6360 | fixed
+- rx:{"round":"22d80faf-bf6e-4bd3-8dd4-77b27e773734","category":"bug-risks","severity":"medium","file":"scripts/split/split-relocations.ts:91","disposition":"fixed","description":"rawの実パスとC-quoted numstatを直接比較するため特殊文字を含む無変更移動が削除として残り誤ってsplitになる。","status":"resolved"}
+- rx:{"round":"22d80faf-bf6e-4bd3-8dd4-77b27e773734","category":"comments","severity":"low","file":".josh/metrics-accepted/6360.json:2","disposition":"fixed","description":"reasonに別Issueへ分離したfresh split-notice reassessmentが残り最終スコープと一致しない。","status":"resolved"}
+- rb:2026-11-04 | #6364
+- rf:none | none | - | 2026-11-04 | #6364
+- ri:none | none | - | 2026-11-04 | #6365
+- rb:2026-11-04 | #6365
+- rf:tests | medium | scripts/backlog/backlog-next-size.test.ts:134 | 2026-11-04 | #6365 | fixed
+- rx:{"round":"589b9669-9bed-4878-ba69-501b8f0567d4","category":"tests","severity":"medium","file":"scripts/backlog/backlog-next-size.test.ts:134","disposition":"fixed","description":"Add measured-guide silence and measured running-set dependency tests so dropping rate propagation fails.","status":"resolved"}
+- ri:none | none | - | 2026-11-05 | #6365
+- rb:2026-11-05 | #6365
+- rf:none | none | - | 2026-11-05 | #6365
+- rx:{"round":"3c92f91f-b88c-48e5-858c-5db17ef79d75","previous":"589b9669-9bed-4878-ba69-501b8f0567d4","category":"tests","severity":"medium","file":"scripts/backlog/backlog-next-size.test.ts:134","description":"Add measured-guide silence and measured running-set dependency tests so dropping rate propagation fails.","disposition":"fixed","status":"resolved"}
+- rf:none | none | - | 2026-11-04 | #6369
+- ri:none | none | - | 2026-11-04 | #6369
+- ri:none | none | - | 2026-11-04 | #6369
+- rb:2026-11-04 | #6369
+- rf:none | none | - | 2026-11-04 | #6369
+- rf:none | none | - | 2026-11-04 | #6372
+- ri:none | none | - | 2026-11-04 | #6372
+- ri:none | none | - | 2026-11-04 | #6372
+- rb:2026-11-04 | #6372
+- rf:tests | medium | scripts/run/ship/run-ship-final-review.ts:22 | 2026-11-04 | #6372 | fixed
+- rx:{"round":"cecd061d-165b-4350-97ec-e3141d598964","category":"tests","severity":"medium","file":"scripts/run/ship/run-ship-final-review.ts:22","disposition":"fixed","description":"review callback 中に nonce が変わる成功経路を検証し、stamp 再書き込みの削除で再開時に不要な最終レビューが走る退行を検出するテストを追加する。","status":"resolved"}
+- rf:none | none | - | 2026-11-04 | #6373
+- rf:none | none | - | 2026-11-04 | #6373
+- rf:none | none | - | 2026-11-04 | #6373
+- rf:none | none | - | 2026-11-04 | #6373
+- rf:none | none | - | 2026-11-04 | #6373
+- rf:none | none | - | 2026-11-04 | #6373
+- rf:none | none | - | 2026-11-04 | #6373
+- rf:none | none | - | 2026-11-05 | #6373
+- rb:2026-11-04 | #6373
+- rf:none | none | - | 2026-11-04 | #6373
+- rb:2026-11-04 | #6373
+- rf:none | none | - | 2026-11-04 | #6373
+- rb:2026-11-04 | #6373
+- rf:none | none | - | 2026-11-04 | #6373
+- rb:2026-11-04 | #6373
+- rf:none | none | - | 2026-11-04 | #6373
+- rb:2026-11-04 | #6373
+- rf:none | none | - | 2026-11-04 | #6373
+- rb:2026-11-04 | #6373
+- rf:none | none | - | 2026-11-04 | #6373
+- rb:2026-11-05 | #6373
+- rf:none | none | - | 2026-11-05 | #6373
+- rb:2026-11-05 | #6373
+- rf:none | none | - | 2026-11-05 | #6373
+- ri:none | none | - | 2026-11-04 | #6375
+- rb:2026-11-04 | #6375
+- rf:none | none | - | 2026-11-04 | #6375
+- rb:2026-11-04 | #6375
+- rf:none | none | - | 2026-11-04 | #6375
+- ri:none | none | - | 2026-11-04 | #6376
+- rb:2026-11-04 | #6376
+- rf:none | none | - | 2026-11-04 | #6376
+- rf:bug-risks | medium | scripts/lane/lane-implement-stats.ts:169 | 2026-11-04 | #6385
+- rf:bug-risks | medium | scripts/lane/lane-implement-stats.ts:158 | 2026-11-04 | #6385
+- ri:none | none | - | 2026-11-04 | #6385
+- rb:2026-11-04 | #6385
+- rf:bug-risks | medium | scripts/lane/lane-implement-stats.ts:153 | 2026-11-04 | #6385 | fixed
+- rx:{"round":"2d5bc5a6-4701-4e27-ab2c-de1ae77361d7","category":"bug-risks","severity":"medium","file":"scripts/lane/lane-implement-stats.ts:153","disposition":"fixed","description":"A lane shipped solely through run:chain --join --ship is omitted from implement statistics because the ship-boundary reader recognizes only a separate ship command.","status":"resolved"}
+- k:followup-unrelated-test-rerun | d1 | 2026-11-04 | scripts/review/review-brief-interaction.test.ts | followup reran Unit Tests (1/6); failed outside the change: isolated scripts/review/review-brief-interaction.test.ts > review:brief automatic final round > automatically briefs the whole change with the final profile when round one can be skipped; isolated scripts/review/review-brief-interaction.test.ts > review:brief automatic final round > keeps an explicit round one and records no skip when the scoped gate refuses
+- rf:none | none | - | 2026-11-05 | #6386
+- rb:2026-11-04 | #6386
+- rf:none | none | - | 2026-11-04 | #6386
+- rb:2026-11-05 | #6386
+- rf:none | none | - | 2026-11-05 | #6386
+- rf:none | none | - | 2026-11-04 | #6389
+- rb:2026-11-04 | #6389
+- rf:bug-risks | medium | scripts/review/review-size.ts:25 | 2026-11-04 | #6389 | fixed
+- rx:{"round":"ba40545a-7130-4c74-8ff6-ff511edea4f8","category":"bug-risks","severity":"medium","file":"scripts/review/review-size.ts:25","disposition":"fixed","description":"staged numstat に core.quotePath=false がなく非 ASCII パスの 20 行以下の変更を medium に誤分類するため同じ Git option と回帰テストを追加する。","status":"resolved"}
+- rf:none | none | - | 2026-11-05 | #6391
+- ri:none | none | - | 2026-11-04 | #6391
+- ri:none | none | - | 2026-11-05 | #6391
+- rb:2026-11-05 | #6391
+- rf:none | none | - | 2026-11-05 | #6391
+- rb:2026-11-04 | #6393
+- rf:comments | low | scripts/split/split-measure.test.ts:95 | 2026-11-04 | #6393 | fixed
+- rx:{"round":"5a8b38e5-f439-4df6-95ee-0824dcb0f9b0","category":"comments","severity":"low","file":"scripts/split/split-measure.test.ts:95","disposition":"fixed","description":"Move the merge-conflict explanation directly above read_branch base so it describes the intended tests.","status":"resolved"}
+- rb:2026-11-05 | #6393
+- rf:none | none | - | 2026-11-05 | #6393
+- rx:{"round":"1abf32da-238b-4eb8-8849-93fca33041c5","previous":"5a8b38e5-f439-4df6-95ee-0824dcb0f9b0","category":"comments","severity":"low","file":"scripts/split/split-measure.test.ts:95","description":"Move the merge-conflict explanation directly above read_branch base so it describes the intended tests.","disposition":"fixed","status":"resolved"}
+- rf:none | none | - | 2026-11-05 | #6398
+- rb:2026-11-05 | #6398
+- rf:none | none | - | 2026-11-05 | #6398
+- rb:2026-11-05 | #6398
+- rf:none | none | - | 2026-11-05 | #6398
+- rb:2026-11-05 | #6401
+- rf:bug-risks | low | scripts/run/ts-entry-loader.ts:23 | 2026-11-05 | #6401 | fixed
+- rf:bug-risks | low | scripts/lane/openai-lane-supervisor.ts:210 | 2026-11-05 | #6401
+- rx:{"round":"9c582c60-7ea7-4702-88b2-c1876d147d3f","category":"bug-risks","severity":"low","file":"scripts/run/ts-entry-loader.ts:23","disposition":"fixed","description":"has_loader matches any flag containing 'tsx', so a path-bearing flag could suppress the loader.","status":"resolved"}
+- rx:{"round":"9c582c60-7ea7-4702-88b2-c1876d147d3f","category":"bug-risks","severity":"low","file":"scripts/lane/openai-lane-supervisor.ts:210","description":"the same execArgv-only .ts re-spawn pattern remains here and in lane-session-reread.ts:41; out of #6401's scope, returned to the parent as an observation","status":"new"}
+- ri:bug-risks | low | scripts/lane/openai-lane-supervisor.ts:210 | 2026-11-05 | #6401
+- rf:none | none | - | 2026-11-05 | #6402
+- rb:2026-11-05 | #6402
+- rf:none | none | - | 2026-11-05 | #6402
+- rf:none | none | - | 2026-11-05 | #6403
+- rf:bug-risks | medium | scripts/lint/eslint-memory.js:13 | 2026-11-05 | #6403
+- rb:2026-11-05 | #6403
+- rf:none | none | - | 2026-11-05 | #6403
+- rf:comments | low | scripts/dependabot/dependabot-config.test.ts:10 | 2026-11-05 | #6404
+- rb:2026-11-05 | #6404
+- rf:none | none | - | 2026-11-05 | #6404
+- rf:none | none | - | 2026-11-05 | #6405
+- rb:2026-11-05 | #6405
+- rf:none | none | - | 2026-11-05 | #6405
+- ri:none | none | - | 2026-11-05 | #6408
+- ri:none | none | - | 2026-11-05 | #6408
+- rb:2026-11-05 | #6408
+- rf:none | none | - | 2026-11-05 | #6408
+- ri:none | none | - | 2026-11-05 | #6410
+- rb:2026-11-05 | #6410
+- rf:none | none | - | 2026-11-05 | #6410
+- rb:2026-11-05 | #6410
+- rf:none | none | - | 2026-11-05 | #6410
+- rf:tests | medium | scripts/backlog/backlog-next-rank.test.ts:132 | 2026-11-05 | #6411 | fixed
+- rf:none | none | - | 2026-11-05 | #6411
+- ri:none | none | - | 2026-11-05 | #6411
+- rb:2026-11-05 | #6411
+- rf:tests | medium | scripts/backlog/backlog-next-rank.test.ts:132 | 2026-11-05 | #6411 | fixed
+- rx:{"round":"31d100ea-4bd8-46b1-8e1d-1fde1e2db8e0","category":"tests","severity":"medium","file":"scripts/backlog/backlog-next-rank.test.ts:132","disposition":"fixed","description":"Standalone size tests are re-ranked through epic_rank, so removing the git_next_issues estimated_lines adapter still passes; add direct order or prioritize regression coverage for different and missing estimates.","status":"resolved"}
+- rf:none | none | - | 2026-11-05 | #6412
+- k:followup-unrelated-test-rerun | d1 | 2026-11-05 | scripts/auto-ok/auto-ok-epic-tracking.test.ts | followup reran Unit Tests (3/6); failed outside the change: isolated scripts/auto-ok/auto-ok-epic-tracking.test.ts > josh auto-ok:next — an epic that is not opted in > hands back a child it tracks; isolated scripts/auto-ok/auto-ok-epic-tracking.test.ts > josh auto-ok:next — an epic that is not opted in > still answers an issue no epic tracks
+- k:followup-unrelated-test-rerun | d1 | 2026-11-05 | scripts/auto-ok/auto-ok-epic-tracking.test.ts | followup reran Unit Tests (5/6); failed outside the change: isolated scripts/auto-ok/auto-ok-epic-tracking.test.ts > josh auto-ok:next — an epic that is not opted in > hands back a child it tracks; isolated scripts/auto-ok/auto-ok-epic-tracking.test.ts > josh auto-ok:next — an epic that is not opted in > still answers an issue no epic tracks
+- ri:none | none | - | 2026-11-05 | #6412
+- rb:2026-11-05 | #6412
+- rf:tests | medium | scripts/issue/git-next-issues.test.ts:125 | 2026-11-05 | #6412 | fixed
+- rx:{"round":"7620f63f-9d8e-46f3-a8eb-69bbfa1d4860","category":"tests","severity":"medium","file":"scripts/issue/git-next-issues.test.ts:125","disposition":"fixed","description":"Expected-effect and run-last integration fixtures now agree with FIFO, so missing gain_minutes or is_last mappings pass; reverse their ages so each key must override FIFO.","status":"resolved"}
+- rf:none | none | - | 2026-11-05 | #6413
+- ri:none | none | - | 2026-11-05 | #6413
+- rb:2026-11-05 | #6413
+- rf:comments | medium | scripts/backlog/backlog-plan-words.ts:34 | 2026-11-05 | #6413 | fixed
+- rx:{"round":"57e7181d-a03d-4395-8cfa-b6c26933b1be","category":"comments","severity":"medium","file":"scripts/backlog/backlog-plan-words.ts:34","disposition":"fixed","description":"Both ready headings promise the wave fits the lane limit although an unreadable limit leaves it uncapped and epic children are excluded from the cap; remove the unconditional guarantee and pin the wording in tests.","status":"resolved"}
+- rf:none | none | - | 2026-11-05 | #6417
+- rb:2026-11-05 | #6417
+- rf:none | none | - | 2026-11-05 | #6417
+- ri:none | none | - | 2026-11-05 | #6419
+- rb:2026-11-05 | #6419
+- rf:none | none | - | 2026-11-05 | #6419
+- rf:none | none | - | 2026-11-05 | #6423
+- ri:none | none | - | 2026-11-05 | #6423
+- rb:2026-11-05 | #6423
+- rf:none | none | - | 2026-11-05 | #6423
+- rf:none | none | - | 2026-11-05 | #6428
+- rf:none | none | - | 2026-11-05 | #6428
+- rf:none | none | - | 2026-11-05 | #6429
+- rf:none | none | - | 2026-11-05 | #6429
+- rf:none | none | - | 2026-11-05 | #6429
+- ri:none | none | - | 2026-11-05 | #6429
+- ri:none | none | - | 2026-11-05 | #6429
+- rf:none | none | - | 2026-11-05 | #6432
+- rf:none | none | - | 2026-11-05 | #6432
+- rb:2026-11-05 | #6432
+- rf:none | none | - | 2026-11-05 | #6432
+- rf:tests | medium | scripts/test/test-pinned-native.test.ts:19 | 2026-11-05 | #6433 | fixed
+- rb:2026-11-05 | #6433
+- rf:none | none | - | 2026-11-05 | #6433
+- rx:{"round":"96892e43-a249-485f-86c3-ff289db86337","previous":"48885600-6ebe-4b3f-9861-6e6cb7b15d4e","category":"tests","severity":"medium","file":"scripts/test/test-pinned-native.test.ts:19","description":"The native fixture expects base:1.0.0, but probes run under the synthetic Pinned snapshot commit, so the unchanged test is already red and cannot prove each function is pinned; use a snapshot-stable git query and verify the baseline inside the snapshot; other sites: scripts/test/test-pinned-native.test.ts:39, scripts/test/test-pinned-native.test.ts:74","disposition":"fixed","status":"resolved"}
+- rf:none | none | - | 2026-11-05 | #6437
+- rf:none | none | - | 2026-11-05 | #6437
+- ri:none | none | - | 2026-11-05 | #6437
+- rb:2026-11-05 | #6437
+- rf:none | none | - | 2026-11-05 | #6437
+- rf:none | none | - | 2026-11-05 | #6438
+- rf:none | none | - | 2026-11-05 | #6438
+- rf:none | none | - | 2026-11-05 | #6438
+- ri:none | none | - | 2026-11-05 | #6438
+- rb:2026-11-05 | #6438
+- rf:none | none | - | 2026-11-05 | #6438
+- rf:none | none | - | 2026-11-05 | #6440
+- rf:none | none | - | 2026-11-05 | #6440
+- ri:none | none | - | 2026-11-05 | #6440
+- rb:2026-11-05 | #6440
+- rf:bug-risks | medium | scripts/issue/issue-closing-pr.ts:99 | 2026-11-05 | #6440 | fixed
+- rx:{"round":"6ebac09b-8264-42bc-8676-1b3ff769cf26","category":"bug-risks","severity":"medium","file":"scripts/issue/issue-closing-pr.ts:99","disposition":"fixed","description":"open PR の参照後に Issue を reopen すると merged 用の境界で参照が捨てられ、open PR がある作業を再開可能と判定しない。reopen 境界を merged 検索だけに限定する。","status":"resolved"}
+- ri:none | none | - | 2026-11-05 | #6443
+- ri:none | none | - | 2026-11-05 | #6443
+- rb:2026-11-05 | #6443
+- rf:bug-risks | low | scripts/backlog/backlog-triage-cli.ts:88 | 2026-11-05 | #6443 | deferred:#6451
+- rf:comments | low | scripts/auto-ok/auto-ok-judge-cli.ts:22 | 2026-11-05 | #6443 | deferred:#6451
+- rx:{"round":"383d5e14-abd3-4ce3-84c9-e375af21ce8b","category":"bug-risks","severity":"low","file":"scripts/backlog/backlog-triage-cli.ts:88","disposition":"deferred:#6451","description":"不成立の solo と関係変更の併用が副作用後に成功する既知制限は open の #6451 に先送り済み。","status":"new"}
+- rx:{"round":"383d5e14-abd3-4ce3-84c9-e375af21ce8b","category":"comments","severity":"low","file":"scripts/auto-ok/auto-ok-judge-cli.ts:22","disposition":"deferred:#6451","description":"両 CLI usage と単独実行手順に apply 時の三回答を案内する更新は open の #6451 に先送り済み。","status":"new"}
+- rb:2026-11-05 | #6444
+- rf:none | none | - | 2026-11-05 | #6444
+- rb:2026-11-05 | #6445
+- rf:none | none | - | 2026-11-05 | #6445
+- ri:none | none | - | 2026-11-05 | #6448
+- ri:none | none | - | 2026-11-05 | #6448
+- ri:none | none | - | 2026-11-05 | #6448
+- rb:2026-11-05 | #6448
+- rf:none | none | - | 2026-11-05 | #6448
+- rf:none | none | - | 2026-11-05 | #6450
+- ri:none | none | - | 2026-11-05 | #6450
+- ri:none | none | - | 2026-11-05 | #6450
+- rb:2026-11-05 | #6450
+- rf:bug-risks | medium | scripts/run/board/run-board-human-merge.ts:64 | 2026-11-05 | #6450 | fixed
+- rx:{"round":"c06dfa1c-6e52-4f6e-89ed-953ccc967b10","category":"bug-risks","severity":"medium","file":"scripts/run/board/run-board-human-merge.ts:64","disposition":"fixed","description":"Occupied earlier or unknown human-merge workers remain in the classifier-generated unreached list and are drawn twice; remove their queued/unreached copies while preserving lane rows and test the real unreached partition.","status":"resolved"}
+- ri:none | none | - | 2026-11-05 | #6451
+- rb:2026-11-05 | #6451
+- rf:none | none | - | 2026-11-05 | #6451
+- rb:2026-11-05 | #6452
+- rf:none | none | - | 2026-11-05 | #6452
+- rb:2026-11-05 | #6452
+- rf:none | none | - | 2026-11-05 | #6452
+- rf:project-conventions | low | scripts/josh/josh-command-map.ts:25 | 2026-11-09 | #6453
+- rb:2026-11-09 | #6453
+- rf:bug-risks | medium | scripts/josh/josh-completion-scripts.ts:50 | 2026-11-09 | #6453 | fixed
+- rf:project-conventions | medium | scripts/josh/josh-command-map.ts:25 | 2026-11-09 | #6453 | deferred:#6944
+- rf:tests | low | scripts/josh/josh-completion-scripts.test.ts:48 | 2026-11-09 | #6453 | fixed
+- rx:{"round":"72600c82-3469-4079-899c-effb92ae92d1","category":"bug-risks","severity":"medium","file":"scripts/josh/josh-completion-scripts.ts:50","disposition":"fixed","description":"The bash script registers its pnpm completer before a bash-completion lazy-loaded pnpm completer exists, so pnpm completion is lost.","status":"resolved"}
+- rx:{"round":"72600c82-3469-4079-899c-effb92ae92d1","category":"project-conventions","severity":"medium","file":"scripts/josh/josh-command-map.ts:25","disposition":"deferred:#6944","description":"The completion registry entry documents only --names, so josh help and the generated usage span omit the zsh/bash/fish scripts.","status":"new"}
+- rx:{"round":"72600c82-3469-4079-899c-effb92ae92d1","category":"tests","severity":"low","file":"scripts/josh/josh-completion-scripts.test.ts:48","disposition":"fixed","description":"The syntax test returns early and passes when the shell is missing, so the fish script is parsed nowhere.","status":"resolved"}
+- rb:2026-11-05 | #6462
+- rf:none | none | - | 2026-11-05 | #6462
+- rb:2026-11-05 | #6462
+- rf:none | none | - | 2026-11-05 | #6462
+- rb:2026-11-05 | #6463
+- rf:none | none | - | 2026-11-05 | #6463
+- ri:none | none | - | 2026-11-05 | #6464
+- rb:2026-11-05 | #6464
+- rf:none | none | - | 2026-11-05 | #6464
+- rf:none | none | - | 2026-11-05 | #6465
+- rf:none | none | - | 2026-11-05 | #6465
+- ri:none | none | - | 2026-11-05 | #6465
+- rb:2026-11-05 | #6465
+- rf:none | none | - | 2026-11-05 | #6465
+- rf:none | none | - | 2026-11-05 | #6466
+- rb:2026-11-05 | #6466
+- rf:none | none | - | 2026-11-05 | #6466
+- rf:none | none | - | 2026-11-05 | #6468
+- rb:2026-11-05 | #6468
+- rf:bug-risks | medium | scripts/split/split-direction.ts:140 | 2026-11-05 | #6468 | fixed
+- rx:{"round":"78cfc696-3f3f-4b21-886b-ea606bdc2ce5","category":"bug-risks","severity":"medium","file":"scripts/split/split-direction.ts:140","disposition":"fixed","description":"A valid promoted epic labeled Epic is still treated as a kept deliverable because the reused epic shape check compares labels case-sensitively; use the shared case-insensitive label comparator and cover both spellings through issue-file.","status":"resolved"}
+- rb:2026-11-05 | #6468
+- rf:none | none | - | 2026-11-05 | #6468
+- rb:2026-11-05 | #6471
+- rf:none | none | - | 2026-11-05 | #6471
+- rf:none | none | - | 2026-11-05 | #6475
+- ri:none | none | - | 2026-11-05 | #6475
+- ri:none | none | - | 2026-11-05 | #6475
+- rb:2026-11-05 | #6475
+- rf:none | none | - | 2026-11-05 | #6475
+- rb:2026-11-05 | #6475
+- rf:none | none | - | 2026-11-05 | #6475
+- ri:none | none | - | 2026-11-05 | #6476
+- rb:2026-11-05 | #6476
+- rf:none | none | - | 2026-11-05 | #6476
+- ri:none | none | - | 2026-11-05 | #6478
+- rb:2026-11-05 | #6478
+- rf:none | none | - | 2026-11-05 | #6478
+- rf:none | none | - | 2026-11-05 | #6483
+- rf:none | none | - | 2026-11-05 | #6483
+- ri:none | none | - | 2026-11-05 | #6483
+- ri:none | none | - | 2026-11-05 | #6483
+- rb:2026-11-05 | #6483
+- rf:none | none | - | 2026-11-05 | #6483
+- ri:none | none | - | 2026-11-06 | #6484
+- rb:2026-11-06 | #6484
+- rf:none | none | - | 2026-11-06 | #6484
+- ri:none | none | - | 2026-11-09 | #6485
+- rb:2026-11-09 | #6485
+- rf:none | none | - | 2026-11-09 | #6485
+- ri:bug-risks | low | tools/test/classify-isolation.ts:38 | 2026-11-09 | #6486 | fixed
+- rb:2026-11-09 | #6486
+- rf:none | none | - | 2026-11-09 | #6486
+- rf:none | none | - | 2026-11-09 | #6487
+- rf:none | none | - | 2026-11-09 | #6488
+- rb:2026-11-09 | #6488
+- rf:tests | medium | docs/maintainers/residency-rationale.md:98 | 2026-11-09 | #6488 | fixed
+- rf:tests | low | scripts/claude/verify-ui-skill.test.ts:31 | 2026-11-09 | #6488 | false-positive
+- rx:{"round":"ca87f7c2-903c-4f5a-8859-7d51278016b7","category":"tests","severity":"medium","file":"docs/maintainers/residency-rationale.md:98","disposition":"fixed","description":"The overrides/devEngines resident-rule marker was removed, so the doc claim that a marker test pins each listed rule in CLAUDE.md is now false and CLAUDE.md:25 is unguarded.","status":"resolved"}
+- rx:{"round":"ca87f7c2-903c-4f5a-8859-7d51278016b7","category":"tests","severity":"low","file":"scripts/claude/verify-ui-skill.test.ts:31","disposition":"false-positive","description":"The negative assertion against the old /verify or /run pointer was removed without replacement; intentional — the issue prunes stale-wording assertions and the positive `/verify-ui` pointer assertion keeps the contract.","status":"resolved"}
+- rf:bug-risks | low | tools/test/classify-isolation.ts:39 | 2026-11-09 | #6489
+- ri:bug-risks | low | tools/test/classify-isolation.ts:39 | 2026-11-09 | #6489 | fixed
+- rb:2026-11-09 | #6489
+- rf:none | none | - | 2026-11-09 | #6489
+- ri:none | none | - | 2026-11-05 | #6498
+- ri:none | none | - | 2026-11-05 | #6498
+- rb:2026-11-06 | #6498
+- rf:bug-risks | medium | scripts/backlog/backlog-drive.ts:247 | 2026-11-06 | #6498 | fixed
+- rx:{"round":"1fef8290-cdb1-4c09-821e-cdc545fd6a3f","category":"bug-risks","severity":"medium","file":"scripts/backlog/backlog-drive.ts:247","disposition":"fixed","description":"park 済みバッチの後続 child が retry 等で即時 hand-back すると park 記録が消え、再開後に triage を省略して offer する。","status":"resolved"}
+- rb:2026-11-09 | #6498
+- rf:none | none | - | 2026-11-09 | #6498
+- rx:{"round":"21c2dca0-24d4-4e30-a754-498beea26bc9","previous":"1fef8290-cdb1-4c09-821e-cdc545fd6a3f","category":"bug-risks","severity":"medium","file":"scripts/backlog/backlog-drive.ts:247","description":"park 済みバッチの後続 child が retry 等で即時 hand-back すると park 記録が消え、再開後に triage を省略して offer する。","disposition":"fixed","status":"resolved"}
+- rf:none | none | - | 2026-11-05 | #6500
+- rf:none | none | - | 2026-11-05 | #6501
+- rb:2026-11-09 | #6502
+- rf:bug-risks | medium | scripts/run/merge/run-merge-github-limit.ts:33 | 2026-11-09 | #6502 | fixed
+- rf:bug-risks | low | scripts/run/merge/run-merge-signals.ts:37 | 2026-11-09 | #6502 | fixed
+- rf:project-conventions | low | scripts/run/event/run-event-render.ts:29 | 2026-11-09 | #6502 | fixed
+- rx:{"round":"c0896c9f-f6c4-4303-b85d-13524472549a","category":"bug-risks","severity":"medium","file":"scripts/run/merge/run-merge-github-limit.ts:33","disposition":"fixed","description":"GitHub-stop markers are matched against the raw transcript tail including tool results and prose, so ordinary 'HTTP 401' or rate-limit text turns a failed child into a re-dispatched outage and can hold launches 30 minutes.","status":"resolved"}
+- rx:{"round":"c0896c9f-f6c4-4303-b85d-13524472549a","category":"bug-risks","severity":"low","file":"scripts/run/merge/run-merge-signals.ts:37","disposition":"fixed","description":"Rate-limit read precedes the API-outage read, so a concurrent real outage is booked streak-exempt.","status":"resolved"}
+- rx:{"round":"c0896c9f-f6c4-4303-b85d-13524472549a","category":"project-conventions","severity":"low","file":"scripts/run/event/run-event-render.ts:29","disposition":"fixed","description":"A GitHub rate-limit hold is rendered under the usage-limit kind label.","status":"resolved"}
+- ri:bug-risks | medium | scripts/run/merge/run-merge-usage-limit.ts:35 | 2026-11-09 | #6502 | fixed
+- ri:comments | low | scripts/run/merge/run-merge-usage-limit.ts:31 | 2026-11-09 | #6502 | fixed
+- ri:comments | low | scripts/run/board/run-board-read.ts:280 | 2026-11-09 | #6502 | fixed
+- rb:2026-11-09 | #6502
+- rf:bug-risks | medium | scripts/run/merge/run-merge-github-limit.ts:33 | 2026-11-09 | #6502 | fixed
+- rf:bug-risks | low | scripts/run/merge/run-merge-signals.ts:37 | 2026-11-09 | #6502 | fixed
+- rf:project-conventions | low | scripts/run/event/run-event-render.ts:29 | 2026-11-09 | #6502 | fixed
+- rx:{"round":"10daf797-6abc-4c3f-9430-499678e1c32a","previous":"c0896c9f-f6c4-4303-b85d-13524472549a","category":"bug-risks","severity":"medium","file":"scripts/run/merge/run-merge-github-limit.ts:33","disposition":"fixed","description":"GitHub-stop markers are matched against the raw transcript tail including tool results and prose, so ordinary 'HTTP 401' or rate-limit text turns a failed child into a re-dispatched outage and can hold launches 30 minutes.","status":"resolved"}
+- rx:{"round":"10daf797-6abc-4c3f-9430-499678e1c32a","previous":"c0896c9f-f6c4-4303-b85d-13524472549a","category":"bug-risks","severity":"low","file":"scripts/run/merge/run-merge-signals.ts:37","disposition":"fixed","description":"Rate-limit read precedes the API-outage read, so a concurrent real outage is booked streak-exempt.","status":"resolved"}
+- rx:{"round":"10daf797-6abc-4c3f-9430-499678e1c32a","previous":"c0896c9f-f6c4-4303-b85d-13524472549a","category":"project-conventions","severity":"low","file":"scripts/run/event/run-event-render.ts:29","disposition":"fixed","description":"A GitHub rate-limit hold is rendered under the usage-limit kind label.","status":"resolved"}
+- ri:bug-risks | medium | scripts/run/merge/run-merge-usage-limit.ts:35 | 2026-11-09 | #6502 | fixed
+- ri:comments | low | scripts/run/merge/run-merge-usage-limit.ts:31 | 2026-11-09 | #6502 | fixed
+- ri:comments | low | scripts/run/board/run-board-read.ts:280 | 2026-11-09 | #6502 | fixed
+- rb:2026-11-09 | #6502
+- rf:bug-risks | low | scripts/run/merge/run-merge-signals.ts:37 | 2026-11-09 | #6502
+- rf:project-conventions | low | scripts/run/event/run-event-render.ts:29 | 2026-11-09 | #6502
+- rf:comments | low | scripts/run/merge/run-merge-usage-limit.ts:53 | 2026-11-09 | #6502
+- rx:{"round":"8ed835ed-6b63-421e-8bda-8d183e26b1b6","previous":"10daf797-6abc-4c3f-9430-499678e1c32a","category":"bug-risks","severity":"low","file":"scripts/run/merge/run-merge-signals.ts:37","description":"is_exempt_stop still reads the GitHub rate limit before read_is_outage, so a child whose exit record shows a real API outage and whose tail also holds a gh rate-limit error is booked streak-exempt; no failure scenario — the API-outage exit record and an errored gh tool result in the same last 20 lines needs both outages at once, which the cap still bounds.","status":"new"}
+- rx:{"round":"8ed835ed-6b63-421e-8bda-8d183e26b1b6","previous":"10daf797-6abc-4c3f-9430-499678e1c32a","category":"project-conventions","severity":"low","file":"scripts/run/event/run-event-render.ts:29","description":"A GitHub rate-limit hold is still emitted under the usage-limit kind and rendered with the 利用上限 / usage limit label; no failure scenario — the event text itself says GitHub rate limit, so the row is labelled loosely, not misread.","status":"new"}
+- rx:{"round":"8ed835ed-6b63-421e-8bda-8d183e26b1b6","previous":"10daf797-6abc-4c3f-9430-499678e1c32a","category":"comments","severity":"low","file":"scripts/run/merge/run-merge-usage-limit.ts:53","description":"held_count's comment and run-board-read.ts:280 still describe children a usage limit stopped, though GitHub-rate-limited children now count in the same ⛽ usage section; no failure scenario — the count is right, only its description lags.","status":"new"}
+- rx:{"round":"8ed835ed-6b63-421e-8bda-8d183e26b1b6","previous":"10daf797-6abc-4c3f-9430-499678e1c32a","category":"bug-risks","severity":"medium","file":"scripts/run/merge/run-merge-github-limit.ts:33","description":"GitHub-stop markers are matched against the raw transcript tail including tool results and prose, so ordinary 'HTTP 401' or rate-limit text turns a failed child into a re-dispatched outage and can hold launches 30 minutes.","disposition":"fixed","status":"resolved"}
+- rx:{"round":"8ed835ed-6b63-421e-8bda-8d183e26b1b6","previous":"10daf797-6abc-4c3f-9430-499678e1c32a","category":"bug-risks","severity":"low","file":"scripts/run/merge/run-merge-signals.ts:37","description":"Rate-limit read precedes the API-outage read, so a concurrent real outage is booked streak-exempt.","disposition":"fixed","status":"resolved"}
+- rx:{"round":"8ed835ed-6b63-421e-8bda-8d183e26b1b6","previous":"10daf797-6abc-4c3f-9430-499678e1c32a","category":"project-conventions","severity":"low","file":"scripts/run/event/run-event-render.ts:29","description":"A GitHub rate-limit hold is rendered under the usage-limit kind label.","disposition":"fixed","status":"resolved"}
+- ri:bug-risks | medium | scripts/backlog/backlog-drive-restore.ts:80 | 2026-11-09 | #6503 | fixed
+- ri:bug-risks | medium | scripts/backlog/backlog-drive-idle.ts:165 | 2026-11-09 | #6503 | fixed
+- rb:2026-11-09 | #6503
+- rf:bug-risks | medium | scripts/backlog/backlog-drive-idle.ts:165 | 2026-11-09 | #6503 | fixed
+- rf:bug-risks | low | scripts/backlog/backlog-measure-close.ts:116 | 2026-11-09 | #6503 | fixed
+- rf:comments | low | docs/josh-commands-backlog.md:1018 | 2026-11-09 | #6503 | fixed
+- rx:{"round":"084e9b90-7208-4ce2-b223-cfffc21a3d1c","category":"bug-risks","severity":"medium","file":"scripts/backlog/backlog-drive-idle.ts:165","disposition":"fixed","description":"The idle Telegram counts state.exclude as merges, and unsampled issues now land in exclude, so a waiting issue is reported as merged.","status":"resolved"}
+- rx:{"round":"084e9b90-7208-4ce2-b223-cfffc21a3d1c","category":"bug-risks","severity":"low","file":"scripts/backlog/backlog-measure-close.ts:116","disposition":"fixed","description":"Each new drive run re-measures a waiting issue and posts another sample-condition comment.","status":"resolved"}
+- rx:{"round":"084e9b90-7208-4ce2-b223-cfffc21a3d1c","category":"comments","severity":"low","file":"docs/josh-commands-backlog.md:1018","disposition":"fixed","description":"The out-of-scope edit drops the list of what the idle Telegram names, which the rationale still keeps.","status":"resolved"}
+- rb:2026-11-09 | #6503
+- rf:bug-risks | medium | scripts/backlog/backlog-drive-cli.ts:331 | 2026-11-09 | #6503
+- rf:bug-risks | medium | scripts/lane/lane-value-missing.ts:19 | 2026-11-09 | #6503
+- rf:comments | low | docs/josh-commands-backlog.md:1018 | 2026-11-09 | #6503
+- rx:{"round":"7ed9d7a5-d70d-41a0-ad7b-97a9752034e6","previous":"084e9b90-7208-4ce2-b223-cfffc21a3d1c","category":"bug-risks","severity":"medium","file":"scripts/backlog/backlog-drive-cli.ts:331","description":"seeded_state never restores the waiting list and resume_line does not carry it, so after any hand-back (a merge, judge or triage) the resumed drive offers a sample-waiting issue again, re-measures it and posts a duplicate sample-condition comment and sample-wait event; seed waiting from the stream's sample-wait events beside withdrawn. other sites: scripts/backlog/backlog-drive-cli.ts:295, scripts/backlog/backlog-drive-args.ts:127","status":"new"}
+- rx:{"round":"7ed9d7a5-d70d-41a0-ad7b-97a9752034e6","previous":"084e9b90-7208-4ce2-b223-cfffc21a3d1c","category":"bug-risks","severity":"medium","file":"scripts/lane/lane-value-missing.ts:19","description":"every no single numeric cell failure is read as a sample wait, yet lane_value_cell.value also returns it for a misspelled table/row/column or a filter matching several numeric cells, so a defective declaration waits every run under a sample condition not met comment and never reaches a lane that could fix it; tell an absent sample apart from an ambiguous or unmatched address. other sites: scripts/lane/lane-measure-cli.ts:273, scripts/lane/lane-value-cell.ts:124","status":"new"}
+- rx:{"round":"7ed9d7a5-d70d-41a0-ad7b-97a9752034e6","previous":"084e9b90-7208-4ce2-b223-cfffc21a3d1c","category":"comments","severity":"low","file":"docs/josh-commands-backlog.md:1018","description":"the earlier finding is recorded fixed but the public doc still drops what the idle Telegram names, which the rationale keeps; no failure scenario — the rationale still lists it, so no reader is misled about behavior.","status":"new"}
+- rx:{"round":"7ed9d7a5-d70d-41a0-ad7b-97a9752034e6","previous":"084e9b90-7208-4ce2-b223-cfffc21a3d1c","category":"bug-risks","severity":"medium","file":"scripts/backlog/backlog-drive-idle.ts:165","description":"The idle Telegram counts state.exclude as merges, and unsampled issues now land in exclude, so a waiting issue is reported as merged.","disposition":"fixed","status":"resolved"}
+- rx:{"round":"7ed9d7a5-d70d-41a0-ad7b-97a9752034e6","previous":"084e9b90-7208-4ce2-b223-cfffc21a3d1c","category":"bug-risks","severity":"low","file":"scripts/backlog/backlog-measure-close.ts:116","description":"Each new drive run re-measures a waiting issue and posts another sample-condition comment.","disposition":"fixed","status":"resolved"}
+- rx:{"round":"7ed9d7a5-d70d-41a0-ad7b-97a9752034e6","previous":"084e9b90-7208-4ce2-b223-cfffc21a3d1c","category":"comments","severity":"low","file":"docs/josh-commands-backlog.md:1018","description":"The out-of-scope edit drops the list of what the idle Telegram names, which the rationale still keeps.","disposition":"fixed","status":"resolved"}
+- rf:bug-risks | medium | scripts/epic/epic.ts:134 | 2026-11-05 | #6506 | filed:#6514
+- rb:2026-11-05 | #6506
+- rf:bug-risks | low | scripts/epic/epic.ts:134 | 2026-11-05 | #6506
+- rx:{"round":"cd8200ce-d907-4e2b-a32b-05b4e149cf72","previous":"d90b650b-9354-45fa-b023-dc4300d12dd2","category":"bug-risks","severity":"low","file":"scripts/epic/epic.ts:134","description":"子行と関係を外すオプションがなく既存 --remove は Progress 行を残すため誤配置を josh 経由で修復できないが、Issue #6506 の先送りコメントが示す open follow-up #6514 に全体を委譲済み。","status":"new"}
+- rx:{"round":"cd8200ce-d907-4e2b-a32b-05b4e149cf72","previous":"d90b650b-9354-45fa-b023-dc4300d12dd2","category":"bug-risks","severity":"medium","file":"scripts/epic/epic.ts:134","description":"#6506 が要求する子行と関係を削除する epic オプションがなく、既存 --remove は Progress 行を保持するため、#6454・#6406・#6460 の残存する誤配置を josh 経由で修復できない。","disposition":"filed:#6514","status":"resolved"}
+- rf:none | none | - | 2026-11-05 | #6508
+- ri:none | none | - | 2026-11-05 | #6508
+- rb:2026-11-05 | #6508
+- rf:none | none | - | 2026-11-05 | #6508
+- rf:bug-risks | medium | scripts/package/package-scout-reuse.ts:118 | 2026-11-09 | #6510 | fixed
+- rf:bug-risks | medium | scripts/package/package-scout-reuse.ts:51 | 2026-11-09 | #6510 | fixed
+- rf:project-conventions | low | CLAUDE.md:40 | 2026-11-09 | #6510 | fixed
+- rf:bug-risks | medium | scripts/package/package-scout-reuse.ts:167 | 2026-11-09 | #6510
+- rb:2026-11-05 | #6514
+- rf:none | none | - | 2026-11-05 | #6514
+- rf:none | none | - | 2026-11-05 | #6517
+- k:followup-unrelated-test-rerun | d1 | 2026-11-05 | scripts/build/pack-boundary.test.ts | followup reran Unit Tests (3/6); failed outside the change: isolated scripts/build/pack-boundary.test.ts > the published package carries nothing kit-internal > ships no scripts module that no consumer entry reaches
+- rb:2026-11-05 | #6517
+- rf:none | none | - | 2026-11-05 | #6517
+- rb:2026-11-05 | #6520
+- rf:none | none | - | 2026-11-05 | #6520
+- rf:tests | medium | tools/test/josh-harness-epic-untrack.test.ts:113 | 2026-11-05 | #6522 | fixed
+- rf:tests | medium | tools/test/josh-harness-epic-untrack.test.ts:113 | 2026-11-05 | #6522 | fixed
+- rb:2026-11-09 | #6528
+- rf:bug-risks | low | scripts/issue/issue-sources.ts:84 | 2026-11-09 | #6528 | fixed
+- rf:project-conventions | low | scripts/issue/issue-sources.ts:19 | 2026-11-09 | #6528 | fixed
+- rf:tests | low | scripts/issue/issue-sources.test.ts:60 | 2026-11-09 | #6528 | fixed
+- rx:{"round":"60806dd6-7088-4e3c-89f8-7296852b7140","category":"bug-risks","severity":"low","file":"scripts/issue/issue-sources.ts:84","disposition":"fixed","description":"order counts trusted sources only, so an untrusted body shifts the first comment to order 0 and untrusted gaps vanish.","status":"resolved"}
+- rx:{"round":"60806dd6-7088-4e3c-89f8-7296852b7140","category":"project-conventions","severity":"low","file":"scripts/issue/issue-sources.ts:19","disposition":"fixed","description":"author and created_at are typed optional yet carry the (unknown)/(undated) placeholders, never undefined.","status":"resolved"}
+- rx:{"round":"60806dd6-7088-4e3c-89f8-7296852b7140","category":"tests","severity":"low","file":"scripts/issue/issue-sources.test.ts:60","disposition":"fixed","description":"no case covers an untrusted body or an interleaved untrusted comment, so order numbering is unpinned.","status":"resolved"}
+- rb:2026-11-07 | #6530
+- rf:bug-risks | medium | scripts/run/wake/run-wake-resume.ts:34 | 2026-11-07 | #6530 | fixed
+- rf:project-conventions | low | scripts/run/wake/run-wake-resume.ts:56 | 2026-11-07 | #6530 | fixed
+- rf:tests | low | scripts/run/wake/run-wake-resume.test.ts:68 | 2026-11-07 | #6530 | fixed
+- rx:{"round":"c92e77b1-e9a8-47b1-92ec-c0c3d7e6067a","category":"bug-risks","severity":"medium","file":"scripts/run/wake/run-wake-resume.ts:34","disposition":"fixed","description":"The kept resume line carries --active into the pass after a hand-back, so the idle watch no longer restarts after a cut as backlogrun-driver.md requires.","status":"resolved"}
+- rx:{"round":"c92e77b1-e9a8-47b1-92ec-c0c3d7e6067a","category":"project-conventions","severity":"low","file":"scripts/run/wake/run-wake-resume.ts:56","disposition":"fixed","description":"The keyed .resume file beside the carry record is never removed when the record ends.","status":"resolved"}
+- rx:{"round":"c92e77b1-e9a8-47b1-92ec-c0c3d7e6067a","category":"tests","severity":"low","file":"scripts/run/wake/run-wake-resume.test.ts:68","disposition":"fixed","description":"No test exercises the remove_stamp branch that clears the kept line after a resume-less run.","status":"resolved"}
+- ri:bug-risks | low | scripts/run/wake/run-wake-resume.ts:77 | 2026-11-07 | #6530 | fixed
+- rf:performance | low | scripts/agent/answer-judge.ts:66 | 2026-11-09 | #6531
+- ri:bug-risks | high | scripts/agent/answer-judge.ts:145 | 2026-11-09 | #6531 | fixed
+- ri:bug-risks | medium | scripts/backlog/backlog-yield-cap.ts:97 | 2026-11-09 | #6531 | fixed
+- ri:comments | low | scripts/agent/judgment-agent-argv.ts:7 | 2026-11-09 | #6531 | fixed
+- rb:2026-11-09 | #6531
+- rf:bug-risks | medium | scripts/agent/answer-judge.ts:65 | 2026-11-09 | #6531 | fixed
+- rf:bug-risks | medium | scripts/run/park/run-park-cli.ts:76 | 2026-11-09 | #6531 | fixed
+- rf:bug-risks | low | docs/josh-commands-run.md:359 | 2026-11-09 | #6531 | fixed
+- rf:performance | low | scripts/agent/answer-judge.ts:58 | 2026-11-09 | #6531 | fixed
+- rf:project-conventions | low | scripts/agent/judgment-agent-argv.ts:7 | 2026-11-09 | #6531 | fixed
+- rx:{"round":"d62048e7-ecce-4d9c-bad7-4e8a46bef740","category":"bug-risks","severity":"medium","file":"scripts/agent/answer-judge.ts:65","disposition":"fixed","description":"The judgment profile follows the caller's detected session, so every run:park from a Codex session is refused and the printed JOSH_AGENT_PROVIDER retry cannot work.","status":"resolved"}
+- rx:{"round":"d62048e7-ecce-4d9c-bad7-4e8a46bef740","category":"bug-risks","severity":"medium","file":"scripts/run/park/run-park-cli.ts:76","disposition":"fixed","description":"The drive's yield-cap park now depends on a model judgment, so a failed or refused judgment leaves the capped issue unlabelled and the yield loop resumes on the next drive.","status":"resolved"}
+- rx:{"round":"d62048e7-ecce-4d9c-bad7-4e8a46bef740","category":"bug-risks","severity":"low","file":"docs/josh-commands-run.md:359","disposition":"fixed","description":"The Failed line says re-run the same command, but a missing Issue prints a check-the-number retry that a re-run cannot satisfy.","status":"resolved"}
+- rx:{"round":"d62048e7-ecce-4d9c-bad7-4e8a46bef740","category":"performance","severity":"low","file":"scripts/agent/answer-judge.ts:58","disposition":"fixed","description":"Each park leaves a temp log directory and the judgment launch has no timeout.","status":"resolved"}
+- rx:{"round":"d62048e7-ecce-4d9c-bad7-4e8a46bef740","category":"project-conventions","severity":"low","file":"scripts/agent/judgment-agent-argv.ts:7","disposition":"fixed","description":"The edited comment line runs far past the block's wrap width.","status":"resolved"}
+- ri:none | none | - | 2026-11-06 | #6534
+- rb:2026-11-06 | #6534
+- rf:none | none | - | 2026-11-06 | #6534
+- rf:none | none | - | 2026-11-07 | #6535
+- ri:none | none | - | 2026-11-07 | #6535
+- rb:2026-11-07 | #6535
+- rf:bug-risks | medium | scripts/run/board/run-board-status.ts:409 | 2026-11-07 | #6535 | fixed
+- rf:tests | low | scripts/run/board/run-board-status-closed.test.ts:109 | 2026-11-07 | #6535 | fixed
+- rx:{"round":"f6d990cc-6dbd-463e-ab5d-2a08c0cc8581","category":"bug-risks","severity":"medium","file":"scripts/run/board/run-board-status.ts:409","disposition":"fixed","description":"parked_settled skips is_closed_before_launch once a listing has landed, so a stale close from before a relaunch draws a live parked child closed.","status":"resolved"}
+- rx:{"round":"f6d990cc-6dbd-463e-ab5d-2a08c0cc8581","category":"tests","severity":"low","file":"scripts/run/board/run-board-status-closed.test.ts:109","disposition":"fixed","description":"no test covers a parked child relaunched after an earlier close while the listing does not hold it.","status":"resolved"}
+- rf:none | none | - | 2026-11-07 | #6537
+- k:followup-unrelated-test-rerun | d1 | 2026-11-07 | tools/document/command-derive.test.ts, scripts/document/document-byte-check.test.ts, scripts/document/document-byte-budget.test.ts | followup reran Unit Tests (1/6), Unit Tests (5/6), Unit Tests (2/6); failed outside the change: isolated tools/document/command-derive.test.ts > command derivation > writes the current catalog without running snapshot tests; isolated tools/document/command-derive.test.ts > command derivation > writes the lint prose spans of CLAUDE.md; isolated tools/document/command-derive.test.ts > command derivation > writes the lint prose spans of prompts/coding-standards.md; isolated tools/document/command-derive.test.ts > command derivation > writes the lint prose spans of prompts/refactoring.md; pure scripts/document/document-byte-check.test.ts > check_all — the whole-budget fallback > answers zero on a tree where every budgeted document is within its ceiling; pure scripts/document/document-byte-budget.test.ts > agent-read document byte budget > docs/josh-commands-run.md stays within its block ceiling
+- rb:2026-11-07 | #6537
+- rf:bug-risks | medium | scripts/run/board/run-board-ending-reason.ts:118 | 2026-11-07 | #6537 | fixed
+- rf:bug-risks | low | scripts/run/board/run-board-human-merge.ts:42 | 2026-11-07 | #6537 | deferred:#6648
+- rf:bug-risks | low | scripts/run/board/run-board-ending-reason.ts:84 | 2026-11-07 | #6537 | false-positive
+- rx:{"round":"7e6ec126-daad-45b9-8b4b-cbb358a86b7c","category":"bug-risks","severity":"medium","file":"scripts/run/board/run-board-ending-reason.ts:118","disposition":"fixed","description":"A run:stalled child parked in this run is a touched row with no waits, so it still offers run:add --retry instead of waiting on #<B> once a blocker is recorded.","status":"resolved"}
+- rx:{"round":"7e6ec126-daad-45b9-8b4b-cbb358a86b7c","category":"bug-risks","severity":"low","file":"scripts/run/board/run-board-human-merge.ts:42","disposition":"deferred:#6648","description":"The needs-human-merge merge-action acceptance criterion is not in this diff; open follow-up #6648 covers it.","status":"new"}
+- rx:{"round":"7e6ec126-daad-45b9-8b4b-cbb358a86b7c","category":"bug-risks","severity":"low","file":"scripts/run/board/run-board-ending-reason.ts:84","disposition":"false-positive","description":"A blocked stalled plan row draws its blocker twice, as 🔗 and as waiting on, as the legend documents.","status":"resolved"}
+- ri:bug-risks | medium | scripts/run/board/run-board-ending-reason.ts:118 | 2026-11-07 | #6537 | fixed
+- ri:bug-risks | low | scripts/run/board/run-board-render-condition.ts:89 | 2026-11-07 | #6537 | false-positive
+- ri:bug-risks | medium | scripts/run/board/run-board-fold.ts:75 | 2026-11-09 | #6538 | fixed
+- ri:bug-risks | medium | scripts/run/board/run-board-tick.ts:226 | 2026-11-09 | #6538 | fixed
+- rb:2026-11-09 | #6538
+- rf:bug-risks | medium | scripts/run/board/run-board-seat.ts:63 | 2026-11-09 | #6538 | fixed
+- rf:bug-risks | medium | scripts/run/board/run-board-seat.ts:69 | 2026-11-09 | #6538 | fixed
+- rf:bug-risks | low | scripts/run/board/run-board-seat.ts:20 | 2026-11-09 | #6538 | fixed
+- rf:tests | low | scripts/run/board/run-board-seat.test.ts:80 | 2026-11-09 | #6538 | fixed
+- rx:{"round":"62a520e2-ddf9-4d53-994e-631d5fe1dc2f","category":"bug-risks","severity":"medium","file":"scripts/run/board/run-board-seat.ts:63","disposition":"fixed","description":"is_runnable ignores row.state, so a queued run:stalled or needs-decision row with a tail-only reason counts as a runnable candidate and suppresses the empty-seat line.","status":"resolved"}
+- rx:{"round":"62a520e2-ddf9-4d53-994e-631d5fe1dc2f","category":"bug-risks","severity":"medium","file":"scripts/run/board/run-board-seat.ts:69","disposition":"fixed","description":"before the plan is read the local layout has no queued rows, so every free seat wrongly draws no runnable candidate until GitHub answers.","status":"resolved"}
+- rx:{"round":"62a520e2-ddf9-4d53-994e-631d5fe1dc2f","category":"bug-risks","severity":"low","file":"scripts/run/board/run-board-seat.ts:20","disposition":"fixed","description":"a queued row at a lane stage icon is not a candidate, so a seat may read no runnable candidate while that row opens into it.","status":"resolved"}
+- rx:{"round":"62a520e2-ddf9-4d53-994e-631d5fe1dc2f","category":"tests","severity":"low","file":"scripts/run/board/run-board-seat.test.ts:80","disposition":"fixed","description":"no test covers stopped or human queued rows or the pre-plan local layout, which is why both medium findings pass the gate.","status":"resolved"}
+- rf:tests | medium | scripts/lane/lane-breakdown-text.test.ts:303 | 2026-11-07 | #6540
+- rf:comments | low | scripts/lane/lane-breakdown-text.test.ts:287 | 2026-11-07 | #6540
+- ri:bug-risks | low | scripts/backlog/backlog-next-size.ts:47 | 2026-11-07 | #6540 | fixed
+- ri:bug-risks | low | scripts/lane/lane-why-period.ts:51 | 2026-11-07 | #6540 | fixed
+- rb:2026-11-07 | #6540
+- rf:tests | low | scripts/lane/lane-stage-budget.test.ts:17 | 2026-11-07 | #6540 | fixed
+- rx:{"round":"074352b6-5dc5-4d6a-b028-f06041f84df5","category":"tests","severity":"low","file":"scripts/lane/lane-stage-budget.test.ts:17","disposition":"fixed","description":"renamed test needs a 置き換え line in the PR body","status":"resolved"}
+- rf:bug-risks | low | scripts/lane/lane-why-ship.ts:46 | 2026-11-09 | #6541
+- rf:bug-risks | low | scripts/lane/lane-net-time.ts:174 | 2026-11-09 | #6541
+- ri:bug-risks | low | scripts/lane/lane-why-ship.ts:44 | 2026-11-09 | #6541 | fixed
+- ri:comments | low | docs/maintainers/josh-commands-run-rationale.md:224 | 2026-11-09 | #6541 | fixed
+- rb:2026-11-09 | #6541
+- rf:tests | medium | scripts/lane/lane-breakdown-text.ts:183 | 2026-11-09 | #6541 | fixed
+- rf:bug-risks | low | scripts/lane/lane-net-time.ts:174 | 2026-11-09 | #6541 | fixed
+- rf:project-conventions | low | docs/josh-commands-lane.md:374 | 2026-11-09 | #6541 | fixed
+- rx:{"round":"850f33b0-238f-4470-b2b7-017370fc7a9e","category":"tests","severity":"medium","file":"scripts/lane/lane-breakdown-text.ts:183","disposition":"fixed","description":"The driver followup line's laps are untested since the only followup-lap test was moved onto gate laps.","status":"resolved"}
+- rx:{"round":"850f33b0-238f-4470-b2b7-017370fc7a9e","category":"bug-risks","severity":"low","file":"scripts/lane/lane-net-time.ts:174","disposition":"fixed","description":"A followup interval ignores a ship stop, so fix time after a followup stopped without its failed line would count as driver time.","status":"resolved"}
+- rx:{"round":"850f33b0-238f-4470-b2b7-017370fc7a9e","category":"project-conventions","severity":"low","file":"docs/josh-commands-lane.md:374","disposition":"fixed","description":"The lane:why paragraph still counts the followup in the lane's 25 minutes though it is now outside the net time.","status":"resolved"}
+- rb:2026-11-08 | #6543
+- rf:bug-risks | medium | scripts/test/test-related-cap.ts:123 | 2026-11-08 | #6543 | fixed
+- rf:bug-risks | medium | scripts/lane/lane-split-stats.ts:15 | 2026-11-08 | #6543 | fixed
+- rf:tests | low | scripts/test/test-related-cap.test.ts:256 | 2026-11-08 | #6543 | fixed
+- rf:tests | low | scripts/lane/lane-plan-size-hub.test.ts:53 | 2026-11-08 | #6543 | fixed
+- rx:{"round":"e452d5d9-6eea-48f1-9a60-ac049fc9c85e","category":"bug-risks","severity":"medium","file":"scripts/test/test-related-cap.ts:123","disposition":"fixed","description":"hubs_of reuses the cumulative over_cap_of, so a planned file under the cap is refused as a hub when the plan's summed reach passes the cap.","status":"resolved"}
+- rx:{"round":"e452d5d9-6eea-48f1-9a60-ac049fc9c85e","category":"bug-risks","severity":"medium","file":"scripts/lane/lane-split-stats.ts:15","disposition":"fixed","description":"REASONS lacks 'hub', so lane:stats shows no row for the new split (hub) notices.","status":"resolved"}
+- rx:{"round":"e452d5d9-6eea-48f1-9a60-ac049fc9c85e","category":"tests","severity":"low","file":"scripts/test/test-related-cap.test.ts:256","disposition":"fixed","description":"hubs_of cases pass a single file and never cover files under the cap whose summed reach passes it.","status":"resolved"}
+- rx:{"round":"e452d5d9-6eea-48f1-9a60-ac049fc9c85e","category":"tests","severity":"low","file":"scripts/lane/lane-plan-size-hub.test.ts:53","disposition":"fixed","description":"the --single case checks is_waived on a separately built plan, which no hub-axis change can fail.","status":"resolved"}
+- ri:bug-risks | medium | scripts/test/test-related-cap.ts:118 | 2026-11-08 | #6543 | fixed
+- ri:bug-risks | medium | scripts/lane/lane-split-stats.ts:15 | 2026-11-08 | #6543 | fixed
+- rb:2026-11-08 | #6543
+- rf:bug-risks | medium | scripts/test/test-related-cap.ts:123 | 2026-11-08 | #6543 | fixed
+- rf:bug-risks | medium | scripts/lane/lane-split-stats.ts:15 | 2026-11-08 | #6543 | fixed
+- rf:tests | low | scripts/test/test-related-cap.test.ts:256 | 2026-11-08 | #6543 | fixed
+- rf:tests | low | scripts/lane/lane-plan-size-hub.test.ts:53 | 2026-11-08 | #6543 | fixed
+- rx:{"round":"403c6cae-9a3a-4711-b52a-2be07a48671c","previous":"e452d5d9-6eea-48f1-9a60-ac049fc9c85e","category":"bug-risks","severity":"medium","file":"scripts/test/test-related-cap.ts:123","disposition":"fixed","description":"hubs_of reuses the cumulative over_cap_of, so a planned file under the cap is refused as a hub when the plan's summed reach passes the cap.","status":"resolved"}
+- rx:{"round":"403c6cae-9a3a-4711-b52a-2be07a48671c","previous":"e452d5d9-6eea-48f1-9a60-ac049fc9c85e","category":"bug-risks","severity":"medium","file":"scripts/lane/lane-split-stats.ts:15","disposition":"fixed","description":"REASONS lacks 'hub', so lane:stats shows no row for the new split (hub) notices.","status":"resolved"}
+- rx:{"round":"403c6cae-9a3a-4711-b52a-2be07a48671c","previous":"e452d5d9-6eea-48f1-9a60-ac049fc9c85e","category":"tests","severity":"low","file":"scripts/test/test-related-cap.test.ts:256","disposition":"fixed","description":"hubs_of cases pass a single file and never cover files under the cap whose summed reach passes it.","status":"resolved"}
+- rx:{"round":"403c6cae-9a3a-4711-b52a-2be07a48671c","previous":"e452d5d9-6eea-48f1-9a60-ac049fc9c85e","category":"tests","severity":"low","file":"scripts/lane/lane-plan-size-hub.test.ts:53","disposition":"fixed","description":"the --single case checks is_waived on a separately built plan, which no hub-axis change can fail.","status":"resolved"}
+- ri:bug-risks | medium | scripts/test/test-related-cap.ts:118 | 2026-11-08 | #6543 | fixed
+- ri:bug-risks | medium | scripts/lane/lane-split-stats.ts:15 | 2026-11-08 | #6543 | fixed
+- ri:bug-risks | medium | scripts/split/split-early-notice.ts:59 | 2026-11-09 | #6544 | fixed
+- ri:bug-risks | low | scripts/split/split-early-notice.ts:37 | 2026-11-09 | #6544 | fixed
+- ri:performance | low | scripts/split/split-early-notice.ts:132 | 2026-11-09 | #6544 | fixed
+- rb:2026-11-09 | #6544
+- rf:bug-risks | medium | scripts/split/split-early-notice.ts:148 | 2026-11-09 | #6544 | fixed
+- rf:bug-risks | medium | scripts/split/split-early-notice.ts:127 | 2026-11-09 | #6544 | fixed
+- rf:tests | low | scripts/split/split-early-notice-budget.test.ts:103 | 2026-11-09 | #6544 | fixed
+- rx:{"round":"840e752b-fe0f-4f76-9736-a9ca84dceb76","category":"bug-risks","severity":"medium","file":"scripts/split/split-early-notice.ts:148","disposition":"fixed","description":"The time bar claims the shared once-per-Issue split marker and ledger line, so a later size-bar crossing never prints the size notice in scoped checks and the stats count a size crossing that never happened.","status":"resolved"}
+- rx:{"round":"840e752b-fe0f-4f76-9736-a9ca84dceb76","category":"bug-risks","severity":"medium","file":"scripts/split/split-early-notice.ts:127","disposition":"fixed","description":"The budget notice and chain-rule route to spill-and-ship without run:cut's green-part check, so a lane with no criterion met spills everything and ships nothing.","status":"resolved"}
+- rx:{"round":"840e752b-fe0f-4f76-9736-a9ca84dceb76","category":"tests","severity":"low","file":"scripts/split/split-early-notice-budget.test.ts:103","disposition":"fixed","description":"No test covers the time bar firing first and the diff then crossing the size bar.","status":"resolved"}
+- rb:2026-11-09 | #6544
+- rf:bug-risks | medium | scripts/split/split-early-notice.ts:146 | 2026-11-09 | #6544
+- rf:tests | low | scripts/split/split-early-notice-budget.test.ts:96 | 2026-11-09 | #6544
+- rf:assumptions | low | scripts/lane/lane-split-stats.ts:18 | 2026-11-09 | #6544
+- rx:{"round":"9e031dfa-c335-4bbb-901a-49365de9fc84","previous":"840e752b-fe0f-4f76-9736-a9ca84dceb76","category":"bug-risks","severity":"medium","file":"scripts/split/split-early-notice.ts:146","description":"pending_budget_notice measures the diff with split_measure.read_branch before claiming, and that throws when the change base cannot be resolved, so an over-budget lane with an unmeasurable diff never sees the time-bar notice although surface (:182) promises \"an unmeasurable diff still lets the time bar print\"; catch the measurement and record the budget notice without it (other sites: none).","status":"new"}
+- rx:{"round":"9e031dfa-c335-4bbb-901a-49365de9fc84","previous":"840e752b-fe0f-4f76-9736-a9ca84dceb76","category":"tests","severity":"low","file":"scripts/split/split-early-notice-budget.test.ts:96","description":"No test covers the time bar with an unresolvable change base, which is the case surface documents as still printing; no failure scenario beyond the medium above — tried the existing cases, all mock change_base as resolved.","status":"new"}
+- rx:{"round":"9e031dfa-c335-4bbb-901a-49365de9fc84","previous":"840e752b-fe0f-4f76-9736-a9ca84dceb76","category":"assumptions","severity":"low","file":"scripts/lane/lane-split-stats.ts:18","description":"The all row of the split table now counts budget-noticed lanes too, so its noticed-lanes series shifts against earlier periods; no failure scenario — the per-reason rows still separate diff from budget.","status":"new"}
+- rx:{"round":"9e031dfa-c335-4bbb-901a-49365de9fc84","previous":"840e752b-fe0f-4f76-9736-a9ca84dceb76","category":"bug-risks","severity":"medium","file":"scripts/split/split-early-notice.ts:148","description":"The time bar claims the shared once-per-Issue split marker and ledger line, so a later size-bar crossing never prints the size notice in scoped checks and the stats count a size crossing that never happened.","disposition":"fixed","status":"resolved"}
+- rx:{"round":"9e031dfa-c335-4bbb-901a-49365de9fc84","previous":"840e752b-fe0f-4f76-9736-a9ca84dceb76","category":"bug-risks","severity":"medium","file":"scripts/split/split-early-notice.ts:127","description":"The budget notice and chain-rule route to spill-and-ship without run:cut's green-part check, so a lane with no criterion met spills everything and ships nothing.","disposition":"fixed","status":"resolved"}
+- rx:{"round":"9e031dfa-c335-4bbb-901a-49365de9fc84","previous":"840e752b-fe0f-4f76-9736-a9ca84dceb76","category":"tests","severity":"low","file":"scripts/split/split-early-notice-budget.test.ts:103","description":"No test covers the time bar firing first and the diff then crossing the size bar.","disposition":"fixed","status":"resolved"}
+- rf:comments | low | .claude/skills/workflow-commands/backlogrun-steps.md:131 | 2026-11-09 | #6547
+- ri:performance | medium | scripts/backlog/backlog-drive-rate.ts:64 | 2026-11-09 | #6547 | fixed
+- ri:tests | low | scripts/backlog/backlog-drive-rate.test.ts:153 | 2026-11-09 | #6547 | fixed
+- ri:comments | low | .claude/skills/workflow-commands/backlogrun-steps.md:131 | 2026-11-09 | #6547 | fixed
+- rb:2026-11-09 | #6547
+- rf:tests | low | scripts/backlog/backlog-drive-rate.ts:64 | 2026-11-09 | #6547 | fixed
+- rx:{"round":"3858d4df-3da4-4f0b-a880-f1f67f6768b8","category":"tests","severity":"low","file":"scripts/backlog/backlog-drive-rate.ts:64","disposition":"fixed","description":"prune has no timeout; no failure scenario found","status":"resolved"}
+- ri:bug-risks | medium | scripts/backlog/backlog-drive-launch.ts:59 | 2026-11-09 | #6551 | fixed
+- rb:2026-11-09 | #6551
+- rf:performance | low | scripts/backlog/backlog-drive-launch.ts:60 | 2026-11-09 | #6551 | fixed
+- rf:project-conventions | low | scripts/lane/lane-launch-cli-detail.test.ts:8 | 2026-11-09 | #6551 | fixed
+- rx:{"round":"7c5643cc-db2a-4e3d-90c7-23ea07bd15aa","category":"performance","severity":"low","file":"scripts/backlog/backlog-drive-launch.ts:60","disposition":"fixed","description":"The folded refusal detail is unbounded, so a long install failure becomes one very long event and board line.","status":"resolved"}
+- rx:{"round":"7c5643cc-db2a-4e3d-90c7-23ea07bd15aa","category":"project-conventions","severity":"low","file":"scripts/lane/lane-launch-cli-detail.test.ts:8","disposition":"fixed","description":"The module-mock harness near-copies the one in lane-launch-cli.test.ts.","status":"resolved"}
+- ri:none | none | - | 2026-11-07 | #6554
+- rb:2026-11-07 | #6554
+- rf:tests | low | scripts/run/tree-status-cli.test.ts:184 | 2026-11-07 | #6554 | false-positive
+- rx:{"round":"125756bd-969d-4261-b9d0-23291ca1c2eb","category":"tests","severity":"low","file":"scripts/run/tree-status-cli.test.ts:184","disposition":"false-positive","description":"The new consultation-scope pin repeats the same refusal assertion as josh-read-only.test.ts:14 under a different AC tag.","status":"resolved"}
+- rf:none | none | - | 2026-11-09 | #6555
+- rf:none | none | - | 2026-11-09 | #6555
+- rf:none | none | - | 2026-11-07 | #6557
+- ri:none | none | - | 2026-11-06 | #6557
+- rb:2026-11-07 | #6557
+- rf:performance | medium | scripts/backlog/backlog-drive.ts:374 | 2026-11-07 | #6557 | fixed
+- rx:{"round":"dd397c01-bf8e-494b-9090-55b31ffe26a0","category":"performance","severity":"medium","file":"scripts/backlog/backlog-drive.ts:374","disposition":"fixed","description":"dated wait の期限到来時に容量 0 で offer を省略すると期限が残り sleep(0) の読取ループになるため、期限を消費して通常のポーリングに戻す。","status":"resolved"}
+- ri:bug-risks | medium | scripts/run/run-report.ts:60 | 2026-11-07 | #6558 | fixed
+- rb:2026-11-07 | #6558
+- rf:bug-risks | medium | scripts/backlog/backlog-drive-rate.ts:35 | 2026-11-07 | #6558 | fixed
+- rf:project-conventions | low | scripts/backlog/backlog-drive-rate.ts:18 | 2026-11-07 | #6558 | fixed
+- rf:tests | low | scripts/backlog/backlog-drive-cli.ts:227 | 2026-11-07 | #6558 | fixed
+- rf:comments | low | scripts/backlog/backlog-drive-rate.ts:9 | 2026-11-07 | #6558 | fixed
+- rx:{"round":"44961794-58c5-4bae-af58-09bd6ae6133b","category":"bug-risks","severity":"medium","file":"scripts/backlog/backlog-drive-rate.ts:35","disposition":"fixed","description":"The rate_limit read goes through the counted, retried exec_gh_api instead of gh_core_rate_limit's uncounted, unretried reader, so a transient failure delays each offer cycle by up to ~14 s.","status":"resolved"}
+- rx:{"round":"44961794-58c5-4bae-af58-09bd6ae6133b","category":"project-conventions","severity":"low","file":"scripts/backlog/backlog-drive-rate.ts:18","disposition":"fixed","description":"core_schema and read_core near-copy gh_core_rate_limit's schema and reader with a different retry and count policy.","status":"resolved"}
+- rx:{"round":"44961794-58c5-4bae-af58-09bd6ae6133b","category":"tests","severity":"low","file":"scripts/backlog/backlog-drive-cli.ts:227","disposition":"fixed","description":"No test pins offer_for being wrapped in backlog_drive_rate.measured.","status":"resolved"}
+- rx:{"round":"44961794-58c5-4bae-af58-09bd6ae6133b","category":"comments","severity":"low","file":"scripts/backlog/backlog-drive-rate.ts:9","disposition":"fixed","description":"The header says the event is what a cycle spent, but used_delta is an account-wide upper bound that includes concurrent lanes.","status":"resolved"}
+- rf:bug-risks | low | scripts/run/board/run-board-render-quota.ts:321 | 2026-11-07 | #6559
+- ri:comments | low | scripts/run/board/run-board-fit.ts:249 | 2026-11-07 | #6559 | fixed
+- ri:comments | low | scripts/run/board/run-board-render-quota.ts:10 | 2026-11-07 | #6559 | fixed
+- rb:2026-11-07 | #6559
+- rf:bug-risks | medium | scripts/run/board/run-board-render-quota.ts:283 | 2026-11-07 | #6559 | fixed
+- rf:bug-risks | low | scripts/run/board/run-board-render-quota.ts:313 | 2026-11-07 | #6559 | fixed
+- rf:tests | low | scripts/run/board/run-board-render-quota-rate-limit.test.ts:22 | 2026-11-07 | #6559 | fixed
+- rx:{"round":"5a26b396-66f6-42ad-b818-3c69fd6730d9","category":"bug-risks","severity":"medium","file":"scripts/run/board/run-board-render-quota.ts:283","disposition":"fixed","description":"After the GitHub reset time passes, the usage row keeps drawing the old allowance and a past reset time for up to 120 s instead of treating the allowance as refilled the way the Claude and Codex rows do.","status":"resolved"}
+- rx:{"round":"5a26b396-66f6-42ad-b818-3c69fd6730d9","category":"bug-risks","severity":"low","file":"scripts/run/board/run-board-render-quota.ts:313","disposition":"fixed","description":"The github row exists only inside usage_part, which returns nothing until quotas are read, so the GitHub allowance cannot show without a quotas reading.","status":"resolved"}
+- rx:{"round":"5a26b396-66f6-42ad-b818-3c69fd6730d9","category":"tests","severity":"low","file":"scripts/run/board/run-board-render-quota-rate-limit.test.ts:22","disposition":"fixed","description":"No test case has a reset time in the past, so nothing tests the row after GitHub's window has refilled.","status":"resolved"}
+- rb:2026-11-07 | #6559
+- rf:bug-risks | medium | scripts/run/board/run-board-render-quota.ts:283 | 2026-11-07 | #6559 | fixed
+- rf:bug-risks | low | scripts/run/board/run-board-render-quota.ts:313 | 2026-11-07 | #6559 | fixed
+- rf:tests | low | scripts/run/board/run-board-render-quota-rate-limit.test.ts:22 | 2026-11-07 | #6559 | fixed
+- rx:{"round":"2a33d40f-086a-40fe-beef-8c12ce0cac22","previous":"5a26b396-66f6-42ad-b818-3c69fd6730d9","category":"bug-risks","severity":"medium","file":"scripts/run/board/run-board-render-quota.ts:283","disposition":"fixed","description":"After the GitHub reset time passes, the usage row keeps drawing the old allowance and a past reset time for up to 120 s instead of treating the allowance as refilled the way the Claude and Codex rows do.","status":"resolved"}
+- rx:{"round":"2a33d40f-086a-40fe-beef-8c12ce0cac22","previous":"5a26b396-66f6-42ad-b818-3c69fd6730d9","category":"bug-risks","severity":"low","file":"scripts/run/board/run-board-render-quota.ts:313","disposition":"fixed","description":"The github row exists only inside usage_part, which returns nothing until quotas are read, so the GitHub allowance cannot show without a quotas reading.","status":"resolved"}
+- rx:{"round":"2a33d40f-086a-40fe-beef-8c12ce0cac22","previous":"5a26b396-66f6-42ad-b818-3c69fd6730d9","category":"tests","severity":"low","file":"scripts/run/board/run-board-render-quota-rate-limit.test.ts:22","disposition":"fixed","description":"No test case has a reset time in the past, so nothing tests the row after GitHub's window has refilled.","status":"resolved"}
+- rf:performance | low | scripts/gh/git-gh-etag-read.ts:42 | 2026-11-07 | #6560
+- rf:bug-risks | low | scripts/gh/git-gh-etag-read.ts:50 | 2026-11-07 | #6560
+- ri:project-conventions | low | scripts/gh/git-gh-etag-read.ts:14 | 2026-11-07 | #6560 | fixed
+- rb:2026-11-07 | #6560
+- rf:bug-risks | low | scripts/gh/git-gh-etag-read.ts:53 | 2026-11-07 | #6560 | fixed
+- rf:performance | low | scripts/gh/git-gh-etag-read.ts:45 | 2026-11-07 | #6560 | fixed
+- rf:project-conventions | low | scripts/gh/git-gh-issue-read.ts:114 | 2026-11-07 | #6560 | fixed
+- rf:comments | low | scripts/gh/git-gh-etag-read.ts:9 | 2026-11-07 | #6560 | fixed
+- rx:{"round":"7de3211b-0226-4432-8640-5d256a7aac4e","category":"bug-risks","severity":"low","file":"scripts/gh/git-gh-etag-read.ts:53","disposition":"fixed","description":"A failed conditional read now throws an error whose message carries the HTTP status line and headers, not only the JSON error body.","status":"resolved"}
+- rx:{"round":"7de3211b-0226-4432-8640-5d256a7aac4e","category":"performance","severity":"low","file":"scripts/gh/git-gh-etag-read.ts:45","disposition":"fixed","description":"Each path gets its own temp file that the 24 h TTL never removes, so stale per-path records pile up until the OS cleans the temp directory.","status":"resolved"}
+- rx:{"round":"7de3211b-0226-4432-8640-5d256a7aac4e","category":"project-conventions","severity":"low","file":"scripts/gh/git-gh-issue-read.ts:114","disposition":"fixed","description":"PathRead and read_unconditionally sit between read_issue_fields's docblock and the function it describes.","status":"resolved"}
+- rx:{"round":"7de3211b-0226-4432-8640-5d256a7aac4e","category":"comments","severity":"low","file":"scripts/gh/git-gh-etag-read.ts:9","disposition":"fixed","description":"The header says a timeline and epic:next read through this layer, but the timeline was deferred to #6636 and none is wired.","status":"resolved"}
+- rf:none | none | - | 2026-11-07 | #6563
+- k:followup-unrelated-test-rerun | d1 | 2026-11-07 | scripts/build/pack-boundary.test.ts | followup reran Unit Tests (3/6); failed outside the change: isolated scripts/build/pack-boundary.test.ts > the published package carries nothing kit-internal > ships no scripts module that no consumer entry reaches
+- rf:none | none | - | 2026-11-07 | #6563
+- ri:none | none | - | 2026-11-07 | #6563
+- rb:2026-11-07 | #6563
+- rf:project-conventions | low | scripts/backlog/backlog-drive-rate-limit.ts:18 | 2026-11-07 | #6563 | fixed
+- rx:{"round":"c70379eb-d2d7-4283-909a-cbfc00d2fbc4","category":"project-conventions","severity":"low","file":"scripts/backlog/backlog-drive-rate-limit.ts:18","disposition":"fixed","description":"held has no caller yet; wiring is split off to #6632.","status":"resolved"}
+- rf:bug-risks | low | scripts/gh/git-gh-rate-limit.ts:83 | 2026-11-07 | #6564
+- rf:project-conventions | low | scripts/gh/git-gh-rate-limit.ts:25 | 2026-11-07 | #6564
+- k:followup-unrelated-test-rerun | d1 | 2026-11-07 | scripts/build/pack-boundary.test.ts | followup reran Unit Tests (3/6); failed outside the change: isolated scripts/build/pack-boundary.test.ts > the published package carries nothing kit-internal > ships no scripts module that no consumer entry reaches
+- rb:2026-11-07 | #6564
+- rf:bug-risks | low | scripts/gh/git-gh-rate-limit.ts:19 | 2026-11-07 | #6564 | fixed
+- rf:bug-risks | low | scripts/gh/git-gh-rate-limit.ts:83 | 2026-11-07 | #6564 | fixed
+- rf:project-conventions | low | scripts/gh/git-gh-rate-limit.ts:24 | 2026-11-07 | #6564 | fixed
+- rf:comments | low | scripts/gh/git-gh-rate-limit.ts:6 | 2026-11-07 | #6564 | fixed
+- rx:{"round":"9c2af2c6-3243-447f-b6be-850353daa9c2","category":"bug-risks","severity":"low","file":"scripts/gh/git-gh-rate-limit.ts:19","disposition":"fixed","description":"The rate-limit message regex misses GitHub's GraphQL wording 'API rate limit already exceeded', so such a failure falls back to the auth hint.","status":"resolved"}
+- rx:{"round":"9c2af2c6-3243-447f-b6be-850353daa9c2","category":"bug-risks","severity":"low","file":"scripts/gh/git-gh-rate-limit.ts:83","disposition":"fixed","description":"A secondary-limit failure is reported with the core primary reset time, telling a reader to wait up to an hour for a limit that clears in about a minute.","status":"resolved"}
+- rx:{"round":"9c2af2c6-3243-447f-b6be-850353daa9c2","category":"project-conventions","severity":"low","file":"scripts/gh/git-gh-rate-limit.ts:24","disposition":"fixed","description":"status_of re-implements git_gh_exec.parse_status_line and gh_failure.parse_response_status with a looser regex copy.","status":"resolved"}
+- rx:{"round":"9c2af2c6-3243-447f-b6be-850353daa9c2","category":"comments","severity":"low","file":"scripts/gh/git-gh-rate-limit.ts:6","disposition":"fixed","description":"The header comment claims every failed GitHub read is classified here, but no reader calls the module until #6614 and #6502.","status":"resolved"}
+- rb:2026-11-09 | #6565
+- rf:bug-risks | low | scripts/rules/implementation-cut.ts:99 | 2026-11-09 | #6565 | fixed
+- rf:bug-risks | low | scripts/rules/implementation-cut.ts:126 | 2026-11-09 | #6565 | fixed
+- rf:performance | low | scripts/rules/implementation-cut.ts:294 | 2026-11-09 | #6565 | fixed
+- rf:tests | low | scripts/rules/implementation-cut-session.test.ts:85 | 2026-11-09 | #6565 | fixed
+- rf:comments | low | scripts/rules/implementation-cut-verdict.ts:15 | 2026-11-09 | #6565 | fixed
+- rf:comments | low | scripts/run/run-parent-cut-hook.ts:47 | 2026-11-09 | #6565 | fixed
+- rx:{"round":"a5c169de-2fec-4157-8484-c58ad6df01eb","category":"bug-risks","severity":"low","file":"scripts/rules/implementation-cut.ts:99","disposition":"fixed","description":"environment_for overwrites the session id with a unit transcript's basename (agent-<id>), which never matches the corpus id <session>/agent-<id>, so unit edits are now always unmeasurable.","status":"resolved"}
+- rx:{"round":"a5c169de-2fec-4157-8484-c58ad6df01eb","category":"bug-risks","severity":"low","file":"scripts/rules/implementation-cut.ts:126","disposition":"fixed","description":"the transcript-undefined branch of current_state is unreachable from production and keeps the old checkout-keyed read.","status":"resolved"}
+- rx:{"round":"a5c169de-2fec-4157-8484-c58ad6df01eb","category":"performance","severity":"low","file":"scripts/rules/implementation-cut.ts:294","disposition":"fixed","description":"is_trigger widened to every Edit/Write, so each edit now pays this guard's tail read before decide.","status":"resolved"}
+- rx:{"round":"a5c169de-2fec-4157-8484-c58ad6df01eb","category":"tests","severity":"low","file":"scripts/rules/implementation-cut-session.test.ts:85","disposition":"fixed","description":"no test pins ROW.is_trigger to is_edit_call or covers the unit-transcript path.","status":"resolved"}
+- rx:{"round":"a5c169de-2fec-4157-8484-c58ad6df01eb","category":"comments","severity":"low","file":"scripts/rules/implementation-cut-verdict.ts:15","disposition":"fixed","description":"header still calls the cache a per-checkout stamp and the parameter is named directory though it is now keyed by transcript.","status":"resolved"}
+- rx:{"round":"a5c169de-2fec-4157-8484-c58ad6df01eb","category":"comments","severity":"low","file":"scripts/run/run-parent-cut-hook.ts:47","disposition":"fixed","description":"the parent cut guard keeps the bare-env, checkout-keyed verdict read this change fixes for the lane child.","status":"resolved"}
+- rf:bug-risks | medium | scripts/split/split-verified-single.ts:26 | 2026-11-06 | #6572 | filed:#6574
+- rb:2026-11-07 | #6572
+- rf:tests | low | scripts/split/split-verified-single.test.ts:94 | 2026-11-07 | #6572
+- rx:{"round":"f77fee52-fefa-449e-8ddf-2952f32de834","previous":"6a883b30-61ef-40e7-a536-856367b4e815","category":"tests","severity":"low","file":"scripts/split/split-verified-single.test.ts:94","description":"前回所見（受け入れ条件セクションのコードフェンス内の例示行だけで完了判定が通る）は acceptance_map.criteria_of のフェンス除外で閉じているが、split_verified_single.all_met 側にフェンス内例示行と未完了の独立条件を組み合わせた回帰テストが無く、判定を独自解析へ戻す変更が検出されない; no failure scenario — 現行コードでフェンス内例示と未完了条件の組み合わせを辿ると false を返し、実害の経路は見つからなかった","status":"new"}
+- rx:{"round":"f77fee52-fefa-449e-8ddf-2952f32de834","previous":"6a883b30-61ef-40e7-a536-856367b4e815","category":"bug-risks","severity":"medium","file":"scripts/split/split-verified-single.ts:26","description":"受け入れ条件の対応セクションのコードフェンス内にある例示行だけで完了判定が通り、独立した未完了成果物が残っていても分割通知を解除できる。","disposition":"filed:#6574","status":"resolved"}
+- rf:none | none | - | 2026-11-07 | #6574
+- rb:2026-11-06 | #6575
+- rf:comments | low | .claude/skills/workflow-commands/pre-gate-cut.md:122 | 2026-11-06 | #6575 | deferred:#6576
+- rx:{"round":"f333f964-34de-40b8-a881-15746f5a3d75","previous":"9c582c60-7ea7-4702-88b2-c1876d147d3f","category":"comments","severity":"low","file":".claude/skills/workflow-commands/pre-gate-cut.md:122","disposition":"deferred:#6576","description":"共有 threshold 説明が新 implementation-cut 契約と矛盾するが #6576 が更新を所管する。","status":"new"}
+- rf:project-conventions | low | docs/maintainers/josh-commands-automation-rationale.md:88 | 2026-11-07 | #6576
+- ri:bug-risks | low | scripts/run/cut/run-cut-report.ts:131 | 2026-11-07 | #6576 | fixed
+- ri:bug-risks | low | .claude/skills/workflow-commands/pre-gate-cut.md:122 | 2026-11-07 | #6576 | fixed
+- rb:2026-11-07 | #6576
+- rf:bug-risks | medium | scripts/run/cut/run-cut-cli.ts:97 | 2026-11-07 | #6576 | fixed
+- rf:project-conventions | low | docs/maintainers/josh-commands-automation-rationale.md:88 | 2026-11-07 | #6576 | fixed
+- rf:project-conventions | low | .claude/skills/workflow-commands/pre-gate-cut.md:122 | 2026-11-07 | #6576 | fixed
+- rx:{"round":"4e5294dc-97d1-4277-8552-237add48ea95","category":"bug-risks","severity":"medium","file":"scripts/run/cut/run-cut-cli.ts:97","disposition":"fixed","description":"An unmeasurable session is reported through report_under_threshold, whose verdict and message falsely claim the context was measured under the cut threshold.","status":"resolved"}
+- rx:{"round":"4e5294dc-97d1-4277-8552-237add48ea95","category":"project-conventions","severity":"low","file":"docs/maintainers/josh-commands-automation-rationale.md:88","disposition":"fixed","description":"Still describes the implementation-phase cut reading unmeasurable as !== UNDER on the safety-net side, stale since #6575.","status":"resolved"}
+- rx:{"round":"4e5294dc-97d1-4277-8552-237add48ea95","category":"project-conventions","severity":"low","file":".claude/skills/workflow-commands/pre-gate-cut.md:122","disposition":"fixed","description":"Grouping the parent hand-off with \"an unmeasurable session is not cut\" reads as if the hand-off also skips unmeasurable sessions.","status":"resolved"}
+- ri:performance | low | scripts/run/board/run-board-read.ts:200 | 2026-11-09 | #6577 | fixed
+- ri:comments | low | docs/josh-commands-run.md:912 | 2026-11-09 | #6577 | fixed
+- rb:2026-11-09 | #6577
+- rf:bug-risks | medium | scripts/run/board/run-board-lane-stop.ts:57 | 2026-11-09 | #6577 | fixed
+- rf:bug-risks | medium | scripts/run/board/run-board-lane-stop.ts:81 | 2026-11-09 | #6577 | fixed
+- rf:bug-risks | low | scripts/run/board/run-board-lane-stop.ts:66 | 2026-11-09 | #6577 | fixed
+- rf:performance | medium | scripts/run/board/run-board-read.ts:195 | 2026-11-09 | #6577 | fixed
+- rf:tests | medium | scripts/run/board/run-board-lane-state.ts:93 | 2026-11-09 | #6577 | fixed
+- rx:{"round":"36245132-437f-491f-975c-446e116b9904","category":"bug-risks","severity":"medium","file":"scripts/run/board/run-board-lane-stop.ts:57","disposition":"fixed","description":"An idle-only stop is dated by the board process's first idle read, so after a board restart or on every one-shot run:board the stopped row's time runs to the read rather than freezing at the real stop.","status":"resolved"}
+- rx:{"round":"36245132-437f-491f-975c-446e116b9904","category":"bug-risks","severity":"medium","file":"scripts/run/board/run-board-lane-stop.ts:81","disposition":"fixed","description":"Every missing in-progress label is attributed to run:release although run:stale, run:merge and lane:withdraw also remove it, so the row names a command nobody ran.","status":"resolved"}
+- rx:{"round":"36245132-437f-491f-975c-446e116b9904","category":"bug-risks","severity":"low","file":"scripts/run/board/run-board-lane-stop.ts:66","disposition":"fixed","description":"An ended record is applied without checking it postdates the child's newest launch; no failure scenario since lane:open rewrites the record before the relaunch event.","status":"resolved"}
+- rx:{"round":"36245132-437f-491f-975c-446e116b9904","category":"performance","severity":"medium","file":"scripts/run/board/run-board-read.ts:195","disposition":"fixed","description":"results_here reads and parses every open lane's whole transcript on each one-second gather round instead of memoising by size and mtime.","status":"resolved"}
+- rx:{"round":"36245132-437f-491f-975c-446e116b9904","category":"tests","severity":"medium","file":"scripts/run/board/run-board-lane-state.ts:93","disposition":"fixed","description":"No test covers with_result or results_here, so dropping the transcript result plumbing would pass the suite while working children are drawn stopped again.","status":"resolved"}
+- rb:2026-11-09 | #6577
+- rf:bug-risks | medium | scripts/run/board/run-board-lane-stop.ts:84 | 2026-11-09 | #6577
+- rf:tests | low | scripts/run/board/run-board-status.test.ts | 2026-11-09 | #6577
+- rx:{"round":"4c3056c3-87df-4496-9542-f59231dfc4a8","previous":"36245132-437f-491f-975c-446e116b9904","category":"bug-risks","severity":"medium","file":"scripts/run/board/run-board-lane-stop.ts:84","description":"label_stop checks only run:stalled before falling to is_held, so a child still holding in-progress but parked with needs-human-merge (followup) or already-done reads is_held false and its row names run:release, a command nobody ran; take the reason from issue_labels.parked_label_of and test [in-progress, needs-human-merge] (fix refused by this session's edit-scope hook, left unfixed). other sites: none","status":"new"}
+- rx:{"round":"4c3056c3-87df-4496-9542-f59231dfc4a8","previous":"36245132-437f-491f-975c-446e116b9904","category":"tests","severity":"low","file":"scripts/run/board/run-board-status.test.ts","description":"the removed test 'draws the child stopped with its lane, its phase no longer timed' is superseded by run-board-lane-stop.test.ts lane_status tests (phase now frozen by ended_ms per #6577), but the PR body still needs its ## 消えたテストの処置 line; no failure scenario — the behaviour is guarded by the new lane_status/render-time tests.","status":"new"}
+- rx:{"round":"4c3056c3-87df-4496-9542-f59231dfc4a8","previous":"36245132-437f-491f-975c-446e116b9904","category":"bug-risks","severity":"medium","file":"scripts/run/board/run-board-lane-stop.ts:57","description":"An idle-only stop is dated by the board process's first idle read, so after a board restart or on every one-shot run:board the stopped row's time runs to the read rather than freezing at the real stop.","disposition":"fixed","status":"resolved"}
+- rx:{"round":"4c3056c3-87df-4496-9542-f59231dfc4a8","previous":"36245132-437f-491f-975c-446e116b9904","category":"bug-risks","severity":"medium","file":"scripts/run/board/run-board-lane-stop.ts:81","description":"Every missing in-progress label is attributed to run:release although run:stale, run:merge and lane:withdraw also remove it, so the row names a command nobody ran.","disposition":"fixed","status":"resolved"}
+- rx:{"round":"4c3056c3-87df-4496-9542-f59231dfc4a8","previous":"36245132-437f-491f-975c-446e116b9904","category":"bug-risks","severity":"low","file":"scripts/run/board/run-board-lane-stop.ts:66","description":"An ended record is applied without checking it postdates the child's newest launch; no failure scenario since lane:open rewrites the record before the relaunch event.","disposition":"fixed","status":"resolved"}
+- rx:{"round":"4c3056c3-87df-4496-9542-f59231dfc4a8","previous":"36245132-437f-491f-975c-446e116b9904","category":"performance","severity":"medium","file":"scripts/run/board/run-board-read.ts:195","description":"results_here reads and parses every open lane's whole transcript on each one-second gather round instead of memoising by size and mtime.","disposition":"fixed","status":"resolved"}
+- rx:{"round":"4c3056c3-87df-4496-9542-f59231dfc4a8","previous":"36245132-437f-491f-975c-446e116b9904","category":"tests","severity":"medium","file":"scripts/run/board/run-board-lane-state.ts:93","description":"No test covers with_result or results_here, so dropping the transcript result plumbing would pass the suite while working children are drawn stopped again.","disposition":"fixed","status":"resolved"}
+- rb:2026-11-09 | #6577
+- rf:tests | medium | scripts/run/board/run-board-read.ts:206 | 2026-11-09 | #6577
+- rx:{"round":"4a63b4df-3425-4847-ab5d-0d3b98844714","previous":"4c3056c3-87df-4496-9542-f59231dfc4a8","category":"tests","severity":"medium","file":"scripts/run/board/run-board-read.ts:206","description":"no test reaches `results: run_board_lane_result.results_of(lanes)` in sorted_here (lane-state tests pass `results` directly, lane-result tests call results_of alone, and run-board-read.test.ts never asserts a lane result), so deleting that line passes the suite while every working child with a stopped label is drawn stopped again; add a read_local test with a running record and a lane transcript asserting lane_states.own carries result and written_ms — other sites: scripts/run/board/run-board-read.test.ts:309","status":"new"}
+- rx:{"round":"4a63b4df-3425-4847-ab5d-0d3b98844714","previous":"4c3056c3-87df-4496-9542-f59231dfc4a8","category":"bug-risks","severity":"medium","file":"scripts/run/board/run-board-lane-stop.ts:84","description":"label_stop checks only run:stalled before falling to is_held, so a child still holding in-progress but parked with needs-human-merge (followup) or already-done reads is_held false and its row names run:release, a command nobody ran; take the reason from issue_labels.parked_label_of and test [in-progress, needs-human-merge] (fix refused by this session's edit-scope hook, left unfixed). other sites: none","status":"resolved"}
+- rx:{"round":"4a63b4df-3425-4847-ab5d-0d3b98844714","previous":"4c3056c3-87df-4496-9542-f59231dfc4a8","category":"tests","severity":"low","file":"scripts/run/board/run-board-status.test.ts","description":"the removed test 'draws the child stopped with its lane, its phase no longer timed' is superseded by run-board-lane-stop.test.ts lane_status tests (phase now frozen by ended_ms per #6577), but the PR body still needs its ## 消えたテストの処置 line; no failure scenario — the behaviour is guarded by the new lane_status/render-time tests.","status":"resolved"}
+- rf:none | none | - | 2026-11-06 | #6584
+- ri:none | none | - | 2026-11-06 | #6584
+- ri:none | none | - | 2026-11-06 | #6584
+- rb:2026-11-06 | #6584
+- rf:none | none | - | 2026-11-06 | #6584
+- ri:none | none | - | 2026-11-06 | #6584
+- rf:none | none | - | 2026-11-06 | #6585
+- ri:none | none | - | 2026-11-06 | #6585
+- ri:none | none | - | 2026-11-06 | #6585
+- ri:none | none | - | 2026-11-06 | #6585
+- rb:2026-11-06 | #6585
+- rf:none | none | - | 2026-11-06 | #6585
+- rf:bug-risks | medium | scripts/hooks/implementation-shell.ts:28 | 2026-11-09 | #6586
+- rf:bug-risks | medium | scripts/hooks/implementation-shell-deny.ts:290 | 2026-11-09 | #6586
+- rf:bug-risks | medium | scripts/hooks/implementation-shell.ts:17 | 2026-11-09 | #6586
+- ri:bug-risks | medium | scripts/hooks/implementation-shell.ts:83 | 2026-11-09 | #6586 | fixed
+- ri:bug-risks | medium | scripts/hooks/bash-revert.ts:122 | 2026-11-09 | #6586 | fixed
+- ri:comments | low | scripts/hooks/implementation-authority.ts:10 | 2026-11-09 | #6586 | fixed
+- rb:2026-11-09 | #6586
+- rf:bug-risks | high | scripts/hooks/implementation-shell.ts:93 | 2026-11-09 | #6586 | fixed
+- rf:bug-risks | medium | scripts/hooks/implementation-shell-deny.ts:217 | 2026-11-09 | #6586 | fixed
+- rf:bug-risks | medium | scripts/hooks/implementation-shell-deny.ts:117 | 2026-11-09 | #6586 | fixed
+- rf:bug-risks | medium | scripts/hooks/implementation-shell-deny.ts:235 | 2026-11-09 | #6586 | fixed
+- rf:bug-risks | medium | scripts/hooks/implementation-shell-deny.ts:160 | 2026-11-09 | #6586 | fixed
+- rf:bug-risks | medium | scripts/hooks/implementation-shell.ts:12 | 2026-11-09 | #6586 | fixed
+- rf:tests | medium | scripts/hooks/implementation-shell.test.ts:5 | 2026-11-09 | #6586 | fixed
+- rf:comments | medium | docs/josh-commands-automation.md:243 | 2026-11-09 | #6586 | fixed
+- rf:comments | low | prompts/collaboration-workflow/rule-delivery.md:15 | 2026-11-09 | #6586 | fixed
+- rx:{"round":"acb1e5f2-ec3f-4b4d-94c2-395fb3b192b2","category":"bug-risks","severity":"high","file":"scripts/hooks/implementation-shell.ts:93","disposition":"fixed","description":"call_of strips only the do keyword, so then/else/{ }/!/(cd x && git push) spellings hide git push from the deny-list and it runs.","status":"resolved"}
+- rx:{"round":"acb1e5f2-ec3f-4b4d-94c2-395fb3b192b2","category":"bug-risks","severity":"medium","file":"scripts/hooks/implementation-shell-deny.ts:217","disposition":"fixed","description":"subcommand_refusal re-parses the raw segment, so git 'push', \"git\" push and pnpm 'install' keep their quotes, miss the deny tables and run.","status":"resolved"}
+- rx:{"round":"acb1e5f2-ec3f-4b4d-94c2-395fb3b192b2","category":"bug-risks","severity":"medium","file":"scripts/hooks/implementation-shell-deny.ts:117","disposition":"fixed","description":"GH_WRITES misses add, revert, label clone and the gh project item/field verbs, so gh ssh-key add, gh pr revert and gh project item-add run.","status":"resolved"}
+- rx:{"round":"acb1e5f2-ec3f-4b4d-94c2-395fb3b192b2","category":"bug-risks","severity":"medium","file":"scripts/hooks/implementation-shell-deny.ts:235","disposition":"fixed","description":"is_gh_api_write reads a graphql call as a read unless an argument contains mutation, so a mutation passed by -F query=@file or --input runs.","status":"resolved"}
+- rx:{"round":"acb1e5f2-ec3f-4b4d-94c2-395fb3b192b2","category":"bug-risks","severity":"medium","file":"scripts/hooks/implementation-shell-deny.ts:160","disposition":"fixed","description":"npm/pnpm version (commit plus tag) and env -i git push pass the deny-list, though both change refs bash-revert cannot take back.","status":"resolved"}
+- rx:{"round":"acb1e5f2-ec3f-4b4d-94c2-395fb3b192b2","category":"bug-risks","severity":"medium","file":"scripts/hooks/implementation-shell.ts:12","disposition":"fixed","description":"sed -i, cp and mv writes outside the checkout (another worktree) are neither refused nor reverted, since bash-revert snapshots only the session root.","status":"resolved"}
+- rx:{"round":"acb1e5f2-ec3f-4b4d-94c2-395fb3b192b2","category":"tests","severity":"medium","file":"scripts/hooks/implementation-shell.test.ts:5","disposition":"fixed","description":"NESTED_REFUSED pins no if/then, else, braces, unspaced subshell or quoted-subcommand spelling, so the compound and quoting bypasses ship untested.","status":"resolved"}
+- rx:{"round":"acb1e5f2-ec3f-4b4d-94c2-395fb3b192b2","category":"comments","severity":"medium","file":"docs/josh-commands-automation.md:243","disposition":"fixed","description":"the paragraph cites implementation-shell-deny.ts for the nested-command walk, which lives in implementation-shell-nested.ts.","status":"resolved"}
+- rx:{"round":"acb1e5f2-ec3f-4b4d-94c2-395fb3b192b2","category":"comments","severity":"low","file":"prompts/collaboration-workflow/rule-delivery.md:15","disposition":"fixed","description":"the pointer names only implementation-shell-deny.ts though the redirect, rm, heredoc, cd and stdin-shell refusals come from implementation-shell.ts.","status":"resolved"}
+- rf:project-conventions | low | scripts/hooks/codex-hook-adapter.ts:104 | 2026-11-07 | #6587
+- ri:comments | low | scripts/hooks/hook-ledger.ts:18 | 2026-11-07 | #6587 | fixed
+- ri:assumptions | low | scripts/hooks/codex-hook-adapter.ts:139 | 2026-11-07 | #6587 | fixed
+- rb:2026-11-07 | #6587
+- rf:bug-risks | medium | scripts/hooks/hook-ledger.ts:44 | 2026-11-07 | #6587 | fixed
+- rf:project-conventions | low | scripts/hooks/codex-hook-adapter.ts:104 | 2026-11-07 | #6587 | fixed
+- rf:comments | low | scripts/hooks/hook-ledger.ts:16 | 2026-11-07 | #6587 | fixed
+- rx:{"round":"64f25617-b397-4b13-80ca-f9d896513f2b","category":"bug-risks","severity":"medium","file":"scripts/hooks/hook-ledger.ts:44","disposition":"fixed","description":"A null transcript_path (or non-record tool_input) fails payload_schema, so the refusal is recorded as tool Stop with no command or session.","status":"resolved"}
+- rx:{"round":"64f25617-b397-4b13-80ca-f9d896513f2b","category":"project-conventions","severity":"low","file":"scripts/hooks/codex-hook-adapter.ts:104","disposition":"fixed","description":"The exported pretool_outcome duplicates the two lines inlined in write_pretool_outcome.","status":"resolved"}
+- rx:{"round":"64f25617-b397-4b13-80ca-f9d896513f2b","category":"comments","severity":"low","file":"scripts/hooks/hook-ledger.ts:16","disposition":"fixed","description":"The comment names josh hook:ledger, which only exists once follow-up #6664 lands.","status":"resolved"}
+- rf:project-conventions | low | package.json:42 | 2026-11-07 | #6588
+- rf:bug-risks | low | scripts/hooks/codex-hook-adapter.ts:148 | 2026-11-07 | #6588
+- rb:2026-11-07 | #6588
+- rf:bug-risks | medium | scripts/josh/hook-payload-capture.ts:34 | 2026-11-07 | #6588 | fixed
+- rf:bug-risks | low | scripts/hooks/codex-hook-adapter.ts:148 | 2026-11-07 | #6588 | fixed
+- rf:tests | low | scripts/josh/hook-decision.ts:501 | 2026-11-07 | #6588 | fixed
+- rx:{"round":"71efe792-f64f-47cf-bcc8-622cbf443223","category":"bug-risks","severity":"medium","file":"scripts/josh/hook-payload-capture.ts:34","disposition":"fixed","description":"Count-based numbering with a wx write silently drops captures when parallel tool calls race for the same n or a removed earlier capture leaves a gap.","status":"resolved"}
+- rx:{"round":"71efe792-f64f-47cf-bcc8-622cbf443223","category":"bug-risks","severity":"low","file":"scripts/hooks/codex-hook-adapter.ts:148","disposition":"fixed","description":"run now loads the env file for posttool too and twice on pretool, harmless because the loader only fills unset keys.","status":"resolved"}
+- rx:{"round":"71efe792-f64f-47cf-bcc8-622cbf443223","category":"tests","severity":"low","file":"scripts/josh/hook-decision.ts:501","disposition":"fixed","description":"No test proves capture is wired into respond_from_stdin or the Codex adapter run, so removing either call stays green.","status":"resolved"}
+- ri:project-conventions | low | package.json:42 | 2026-11-07 | #6588 | fixed
+- ri:tests | low | scripts/josh/hook-decision-stdin.test.ts:43 | 2026-11-07 | #6588 | fixed
+- rf:tests | low | scripts/hooks/bash-revert.test.ts | 2026-11-07 | #6589
+- ri:bug-risks | medium | scripts/hooks/bash-revert.ts:112 | 2026-11-07 | #6589 | fixed
+- ri:bug-risks | low | scripts/hooks/format-edited-cli.ts:18 | 2026-11-07 | #6589 | fixed
+- ri:performance | low | .claude/settings.json:107 | 2026-11-07 | #6589 | fixed
+- ri:comments | low | scripts/time-runtime/time-density-hook.ts:11 | 2026-11-07 | #6589 | fixed
+- rb:2026-11-07 | #6589
+- rf:bug-risks | medium | scripts/hooks/bash-revert.ts:112 | 2026-11-07 | #6589 | fixed
+- rf:bug-risks | medium | .codex/hooks.json:50 | 2026-11-07 | #6589 | fixed
+- rf:tests | medium | scripts/hooks/bash-revert.test.ts:150 | 2026-11-07 | #6589 | fixed
+- rf:bug-risks | low | scripts/hooks/bash-revert.ts:40 | 2026-11-07 | #6589 | fixed
+- rf:comments | low | scripts/claude/claude-settings-hooks.test.ts:58 | 2026-11-07 | #6589 | fixed
+- rx:{"round":"43607865-254b-4ab0-96c4-aca04b7106e0","category":"bug-risks","severity":"medium","file":"scripts/hooks/bash-revert.ts:112","disposition":"fixed","description":"The revert attributes every runtime-file change in the call window to the shell and irrecoverably discards a concurrent editor or session write with no backup.","status":"resolved"}
+- rx:{"round":"43607865-254b-4ab0-96c4-aca04b7106e0","category":"bug-risks","severity":"medium","file":".codex/hooks.json:50","disposition":"fixed","description":"Codex PostToolUse now matches Bash but the Codex adapter neither stamps nor reverts, adding a per-shell-call process start and density read with no revert.","status":"resolved"}
+- rx:{"round":"43607865-254b-4ab0-96c4-aca04b7106e0","category":"tests","severity":"medium","file":"scripts/hooks/bash-revert.test.ts:150","disposition":"fixed","description":"No test covers the pretool-guard stamp call or the format-edited-cli Bash routing, so removing either leaves the suite green while the revert never fires.","status":"resolved"}
+- rx:{"round":"43607865-254b-4ab0-96c4-aca04b7106e0","category":"bug-risks","severity":"low","file":"scripts/hooks/bash-revert.ts:40","disposition":"fixed","description":"An untracked nested repository entry ending in a slash makes content_hash throw on reading a directory, silently disabling the stamp.","status":"resolved"}
+- rx:{"round":"43607865-254b-4ab0-96c4-aca04b7106e0","category":"comments","severity":"low","file":"scripts/claude/claude-settings-hooks.test.ts:58","disposition":"fixed","description":"The comment says exactly the two edit tools above a three-item FORMAT_TOOLS list.","status":"resolved"}
+- rf:comments | low | scripts/hooks/pretool-guard.ts:147 | 2026-11-09 | #6591
+- ri:bug-risks | medium | scripts/hooks/pretool-guard.ts:170 | 2026-11-09 | #6591 | fixed
+- ri:bug-risks | medium | scripts/hooks/pretool-guard.ts:178 | 2026-11-09 | #6591 | fixed
+- rb:2026-11-09 | #6591
+- rf:bug-risks | medium | scripts/hooks/pretool-guard.ts:170 | 2026-11-09 | #6591 | fixed
+- rf:bug-risks | medium | scripts/hooks/hook-demoted.ts:58 | 2026-11-09 | #6591 | fixed
+- rf:bug-risks | low | scripts/hooks/hook-ledger-demote.ts:20 | 2026-11-09 | #6591 | false-positive
+- rf:project-conventions | low | docs/josh-commands-automation.md:271 | 2026-11-09 | #6591 | fixed
+- rx:{"round":"2feedbd2-436b-450a-a83c-94cf4a3e6bd5","category":"bug-risks","severity":"medium","file":"scripts/hooks/pretool-guard.ts:170","disposition":"fixed","description":"a demoted notice returned early and skipped the async guards and mark_phase","status":"resolved"}
+- rx:{"round":"2feedbd2-436b-450a-a83c-94cf4a3e6bd5","category":"bug-risks","severity":"medium","file":"scripts/hooks/hook-demoted.ts:58","disposition":"fixed","description":"the notice kept the refusal wording, so a \"reissue it\" could run the call twice","status":"resolved"}
+- rx:{"round":"2feedbd2-436b-450a-a83c-94cf4a3e6bd5","category":"bug-risks","severity":"low","file":"scripts/hooks/hook-ledger-demote.ts:20","disposition":"false-positive","description":"stop-guard lines carry no tool or command, so they never reach the passed-later share","status":"resolved"}
+- rx:{"round":"2feedbd2-436b-450a-a83c-94cf4a3e6bd5","category":"project-conventions","severity":"low","file":"docs/josh-commands-automation.md:271","disposition":"fixed","description":"the example named batch, not the batching rule","status":"resolved"}
+- rf:bug-risks | medium | scripts/issue/size-estimate.ts:143 | 2026-11-06 | #6593 | fixed
+- k:followup-unrelated-test-rerun | d1 | 2026-11-06 | scripts/git/main-merge.test.ts | followup reran Unit Tests (5/6); failed outside the change: isolated scripts/git/main-merge.test.ts > the measured split notice before the gate > uses the measured guide below the legacy bar (ac-9e07d12c)
+- ri:none | none | - | 2026-11-06 | #6593
+- ri:bug-risks | medium | scripts/issue/size-estimate.ts:232 | 2026-11-06 | #6593 | fixed
+- ri:none | none | - | 2026-11-06 | #6593
+- rb:2026-11-06 | #6593
+- rf:none | none | - | 2026-11-06 | #6593
+- rx:{"round":"8cc79fcc-b0e7-4424-8783-c8c10cc48482","previous":"3f0b95ec-a8a0-4d40-82b7-5a3fdcc8091d","category":"bug-risks","severity":"medium","file":"scripts/issue/size-estimate.ts:143","description":"ガイド下限内でも予算超過する宣言が生じ、起票拒否とbacklog通知がガイド超過と誤表示するため、予算のみ超過する場合の表示と両経路の回帰テストを修正する。","disposition":"fixed","status":"resolved"}
+- ri:none | none | - | 2026-11-06 | #6594
+- rb:2026-11-06 | #6594
+- rf:none | none | - | 2026-11-06 | #6594
+- rf:none | none | - | 2026-11-06 | #6596
+- ri:none | none | - | 2026-11-06 | #6596
+- ri:none | none | - | 2026-11-06 | #6596
+- rb:2026-11-06 | #6596
+- rf:none | none | - | 2026-11-06 | #6596
+- ri:none | none | - | 2026-11-06 | #6596
+- rb:2026-11-06 | #6596
+- rf:none | none | - | 2026-11-06 | #6596
+- rb:2026-11-09 | #6597
+- rf:bug-risks | medium | scripts/run/board/run-board-single.ts:33 | 2026-11-09 | #6597 | fixed
+- rf:bug-risks | medium | scripts/run/board/run-board-single.ts:50 | 2026-11-09 | #6597 | fixed
+- rf:bug-risks | medium | .claude/skills/workflow-commands/progress-watcher.md:36 | 2026-11-09 | #6597 | fixed
+- rx:{"round":"09e15a1f-0cc5-469e-bada-9bb450b12818","category":"bug-risks","severity":"medium","file":"scripts/run/board/run-board-single.ts:33","disposition":"fixed","description":"A stop-marked hold (halfrun, human-review or prrun stop) is drawn as a running halfrun for hours after the run stopped.","status":"resolved"}
+- rx:{"round":"09e15a1f-0cc5-469e-bada-9bb450b12818","category":"bug-risks","severity":"medium","file":"scripts/run/board/run-board-single.ts:50","disposition":"fixed","description":"The git-directory memo keeps a rejected promise, so one git timeout leaves every later redraw failing.","status":"resolved"}
+- rx:{"round":"09e15a1f-0cc5-469e-bada-9bb450b12818","category":"bug-risks","severity":"medium","file":".claude/skills/workflow-commands/progress-watcher.md:36","disposition":"fixed","description":"A fullrun session asked for progress while a backlogrun carry record exists relays the backlogrun board as its own.","status":"resolved"}
+- ri:bug-risks | medium | scripts/run/board/run-board-single.ts:33 | 2026-11-09 | #6597 | fixed
+- ri:bug-risks | medium | .claude/skills/workflow-commands/progress-watcher.md:36 | 2026-11-09 | #6597 | false-positive
+- ri:bug-risks | medium | scripts/run/board/run-board-read.ts:166 | 2026-11-09 | #6597 | fixed
+- ri:bug-risks | low | scripts/run/board/run-board-single.ts:39 | 2026-11-09 | #6597 | false-positive
+- ri:comments | low | docs/josh-commands-run.md:876 | 2026-11-09 | #6597 | fixed
+- rf:project-conventions | low | docs/josh-commands-board.md:56 | 2026-11-09 | #6598
+- rf:project-conventions | low | docs/maintainers/josh-commands-run-rationale.md:166 | 2026-11-09 | #6598
+- rf:performance | low | scripts/run/event/run-event-step.ts:70 | 2026-11-09 | #6598
+- ri:none | none | - | 2026-11-09 | #6598
+- rb:2026-11-09 | #6598
+- rf:bug-risks | medium | scripts/run/run-step-progress.ts:30 | 2026-11-09 | #6598
+- rf:bug-risks | low | scripts/run/run-step-progress.ts:36 | 2026-11-09 | #6598
+- rf:performance | low | scripts/run/event/run-event-step.ts:80 | 2026-11-09 | #6598
+- rf:project-conventions | low | docs/josh-commands-board.md:56 | 2026-11-09 | #6598
+- rf:comments | low | scripts/run/board/run-board-lane-event.ts:7 | 2026-11-09 | #6598
+- rx:{"round":"425357a4-418a-457e-8927-a19adbcd8369","category":"bug-risks","severity":"medium","file":"scripts/run/run-step-progress.ts:30","description":"after a failed ship (newest step still 5/8 implement), the lane child's next run:step maps SHIP_STOP to the gate step and appends '#N step 6/8 gate' after the ship-stage 'gate failed' line, so run_board_lane_event.newest_of (>= at_ms) now draws 'step 6/8 gate' and hides the 'ship gate failed' words the board showed before; the new tests only cover the step-then-ship order. other sites: scripts/run/run-step-progress.ts:29, scripts/run/board/run-board-lane-event.ts:52","status":"new"}
+- rx:{"round":"425357a4-418a-457e-8927-a19adbcd8369","category":"bug-risks","severity":"low","file":"scripts/run/run-step-progress.ts:36","description":"a terminal action (merge owed, or a closed issue holding uncommitted work) still falls through to EVENT_STEPS and records gate/followup from the newest event; no failure scenario — tried a closed issue whose last event is pr-opened, which writes 'step 7/8 followup', a step the run did reach, so nothing is misread.","status":"new"}
+- rx:{"round":"425357a4-418a-457e-8927-a19adbcd8369","category":"performance","severity":"low","file":"scripts/run/event/run-event-step.ts:80","description":"record reads the whole stream a second time on every run:step / run:entry (run:step already read it to compute the position); no failure scenario — the stream is pruned per invocation, so the extra read is bounded and fail-quiet.","status":"new"}
+- rx:{"round":"425357a4-418a-457e-8927-a19adbcd8369","category":"project-conventions","severity":"low","file":"docs/josh-commands-board.md:56","description":"the kind list gains 'step' without the one-line meaning every neighboring kind gets, and the unrelated 'written only on change' → 'written on change' edit drops a qualifier the code still honours; no failure scenario — a reader still finds the kind in run-event-stream.ts.","status":"new"}
+- rx:{"round":"425357a4-418a-457e-8927-a19adbcd8369","category":"comments","severity":"low","file":"scripts/run/board/run-board-lane-event.ts:7","description":"the edited header comment line runs to ~170 characters instead of re-wrapping with its paragraph; no failure scenario — cosmetic.","status":"new"}
+- ri:bug-risks | low | scripts/lane/lane-plan-probe.ts:93 | 2026-11-08 | #6602 | fixed
+- ri:bug-risks | low | scripts/run/review/run-review-unplanned.ts:38 | 2026-11-08 | #6602 | fixed
+- ri:project-conventions | low | scripts/run/review/run-chain.ts:24 | 2026-11-08 | #6602 | fixed
+- ri:tests | low | scripts/auto-ok/auto-ok-cli.ts:354 | 2026-11-08 | #6602 | fixed
+- rf:none | none | - | 2026-11-07 | #6608
+- ri:none | none | - | 2026-11-07 | #6608
+- rb:2026-11-07 | #6608
+- rf:none | none | - | 2026-11-07 | #6608
+- rb:2026-11-09 | #6609
+- rf:bug-risks | medium | scripts/issue/issue-consolidate.ts:196 | 2026-11-09 | #6609 | fixed
+- rf:comments | low | scripts/josh/josh-commands-issue-write.ts:41 | 2026-11-09 | #6609 | fixed
+- rx:{"round":"5d60488d-0883-49e7-9a32-f99096c40673","category":"bug-risks","severity":"medium","file":"scripts/issue/issue-consolidate.ts:196","disposition":"fixed","description":"When the target epic tracks a duplicate, rewrite_target demotes it before fold_duplicate removes the duplicate from it, so the untrack refuses and the run stops with the target already rewritten.","status":"resolved"}
+- rx:{"round":"5d60488d-0883-49e7-9a32-f99096c40673","category":"comments","severity":"low","file":"scripts/josh/josh-commands-issue-write.ts:41","disposition":"fixed","description":"In the --body-file help, 'Its author' reads as the body file's author rather than the target issue's author.","status":"resolved"}
+- rf:none | none | - | 2026-11-07 | #6610
+- rb:2026-11-07 | #6610
+- rf:bug-risks | low | scripts/backlog/backlog-resume-reads.ts:43 | 2026-11-07 | #6610 | fixed
+- rf:bug-risks | low | scripts/backlog/backlog-resume-reads.ts:85 | 2026-11-07 | #6610 | fixed
+- rf:performance | low | scripts/backlog/backlog-resume-reads.ts:67 | 2026-11-07 | #6610 | fixed
+- rf:tests | low | scripts/backlog/backlog-next-budget.test.ts:92 | 2026-11-07 | #6610 | fixed
+- rx:{"round":"c96e7e4f-d1f8-4d99-b758-567e34489e58","category":"bug-risks","severity":"low","file":"scripts/backlog/backlog-resume-reads.ts:43","disposition":"fixed","description":"The open-PR signal narrows from any cross-referencing open PR to a body whose first closes #N names the child, diverging from acceptance criterion 3.","status":"resolved"}
+- rx:{"round":"c96e7e4f-d1f8-4d99-b758-567e34489e58","category":"bug-risks","severity":"low","file":"scripts/backlog/backlog-resume-reads.ts:85","disposition":"fixed","description":"A partial GraphQL errors response sends every child to the per-child fallback, silently losing the batched budget.","status":"resolved"}
+- rx:{"round":"c96e7e4f-d1f8-4d99-b758-567e34489e58","category":"performance","severity":"low","file":"scripts/backlog/backlog-resume-reads.ts:67","disposition":"fixed","description":"One query fetching 100 comment bodies per child can grow large enough to time out into per-child fallback.","status":"resolved"}
+- rx:{"round":"c96e7e4f-d1f8-4d99-b758-567e34489e58","category":"tests","severity":"low","file":"scripts/backlog/backlog-next-budget.test.ts:92","disposition":"fixed","description":"The pre-fix count is derived from the post-fix count rather than measured, so it re-asserts the cap.","status":"resolved"}
+- ri:bug-risks | medium | scripts/backlog/backlog-resume-reads.ts:43 | 2026-11-07 | #6610 | fixed
+- ri:project-conventions | low | scripts/issue/issue-closing-pr.ts:116 | 2026-11-07 | #6610 | filed:#6615
+- rf:none | none | - | 2026-11-07 | #6611
+- ri:bug-risks | medium | scripts/epic/epic-child-source.ts:62 | 2026-11-07 | #6611 | fixed
+- ri:project-conventions | low | scripts/epic/epic-fetch.ts:13 | 2026-11-07 | #6611 | fixed
+- rb:2026-11-07 | #6611
+- rf:bug-risks | medium | scripts/epic/epic-child-source.ts:52 | 2026-11-07 | #6611 | fixed
+- rf:project-conventions | low | scripts/epic/epic-child-source.ts:16 | 2026-11-07 | #6611 | fixed
+- rf:tests | low | scripts/epic/epic-child-source.test.ts:114 | 2026-11-07 | #6611 | fixed
+- rx:{"round":"98764580-92f8-4359-b869-8c43dd8cefa5","category":"bug-risks","severity":"medium","file":"scripts/epic/epic-child-source.ts:52","disposition":"fixed","description":"A reopened closed blocker is answered CLOSED from the cache for up to 6h, so a dependent child is classified ready and started while its blocker is open.","status":"resolved"}
+- rx:{"round":"98764580-92f8-4359-b869-8c43dd8cefa5","category":"project-conventions","severity":"low","file":"scripts/epic/epic-child-source.ts:16","disposition":"fixed","description":"The comment says one record per repository, but shared_cache holds one record per slot and a different key replaces it.","status":"resolved"}
+- rx:{"round":"98764580-92f8-4359-b869-8c43dd8cefa5","category":"tests","severity":"low","file":"scripts/epic/epic-child-source.test.ts:114","disposition":"fixed","description":"No test pins the CLOSED-only filter in remember_closed, so caching unlisted open children would pass every case.","status":"resolved"}
+- rf:bug-risks | low | scripts/gh/git-gh-exec.ts:184 | 2026-11-07 | #6612 | false-positive
+- rf:none | none | - | 2026-11-07 | #6612
+- ri:security | low | scripts/gh/gh-permission-cache.ts:13 | 2026-11-07 | #6613 | fixed
+- rb:2026-11-07 | #6613
+- rf:comments | low | scripts/gh/gh-permission-cache.ts:13 | 2026-11-07 | #6613 | fixed
+- rx:{"round":"7df7d095-b512-42b1-8f4a-9d7792d762b7","category":"comments","severity":"low","file":"scripts/gh/gh-permission-cache.ts:13","disposition":"fixed","description":"The header says the opt-in record is never read by a caller that runs a body, yet auto-ok, its only caller, gates unattended runs on issue bodies; reword it to name auto-ok as the caller accepting the one-hour window.","status":"resolved"}
+- rf:none | none | - | 2026-11-09 | #6615
+- rf:none | none | - | 2026-11-09 | #6615
+- rf:project-conventions | low | pnpm-lock.yaml:1696 | 2026-11-07 | #6619
+- rb:2026-11-07 | #6619
+- rf:bug-risks | medium | scripts/backlog/backlog-offer-timing.ts:35 | 2026-11-07 | #6619 | fixed
+- rf:tests | low | scripts/backlog/backlog-offer-timing.test.ts:35 | 2026-11-07 | #6619 | fixed
+- rx:{"round":"5dd2d428-0dd0-4fad-966a-cc9354ed29d6","previous":"45f35c38-1052-4929-89a9-c35810b0a975","category":"bug-risks","severity":"medium","file":"scripts/backlog/backlog-offer-timing.ts:35","disposition":"fixed","description":"a passed deadline kept due_ms due on every poll, so the drive re-asked the offer every poll_ms; due_ms now honors a deadline only after the last ask","status":"resolved"}
+- rx:{"round":"5dd2d428-0dd0-4fad-966a-cc9354ed29d6","previous":"45f35c38-1052-4929-89a9-c35810b0a975","category":"tests","severity":"low","file":"scripts/backlog/backlog-offer-timing.test.ts:35","disposition":"fixed","description":"no loop-level test fixed the ask rate under a persisting passed deadline; added one in backlog-drive-interval.test.ts","status":"resolved"}
+- rb:2026-11-07 | #6619
+- rf:project-conventions | low | pnpm-lock.yaml:1696 | 2026-11-07 | #6619
+- rx:{"round":"69858d3b-e226-4a28-80ca-7e1d110f2d73","previous":"5dd2d428-0dd0-4fad-966a-cc9354ed29d6","category":"project-conventions","severity":"low","file":"pnpm-lock.yaml:1696","description":"the commit for #6619 carries unrelated transitive lockfile bumps (electron-to-chromium 1.5.473→1.5.475, table 6.9.0→6.9.2) outside the Issue's scope; no failure scenario — both are patch bumps inside existing ranges and the gate passed on this tree","status":"new"}
+- rx:{"round":"69858d3b-e226-4a28-80ca-7e1d110f2d73","previous":"5dd2d428-0dd0-4fad-966a-cc9354ed29d6","category":"bug-risks","severity":"medium","file":"scripts/backlog/backlog-offer-timing.ts:35","description":"a passed deadline kept due_ms due on every poll, so the drive re-asked the offer every poll_ms; due_ms now honors a deadline only after the last ask","disposition":"fixed","status":"resolved"}
+- rx:{"round":"69858d3b-e226-4a28-80ca-7e1d110f2d73","previous":"5dd2d428-0dd0-4fad-966a-cc9354ed29d6","category":"tests","severity":"low","file":"scripts/backlog/backlog-offer-timing.test.ts:35","description":"no loop-level test fixed the ask rate under a persisting passed deadline; added one in backlog-drive-interval.test.ts","disposition":"fixed","status":"resolved"}
+- ri:none | none | - | 2026-11-07 | #6619
+- rf:tests | low | scripts/run/board/run-board-render-quota-gauge.test.ts:14 | 2026-11-07 | #6620
+- rf:none | none | - | 2026-11-07 | #6620
+- ri:none | none | - | 2026-11-07 | #6620
+- ri:tests | low | scripts/run/board/run-board-render-quota-rate-limit.test.ts:60 | 2026-11-07 | #6621 | fixed
+- ri:comments | low | docs/josh-commands-run.md:900 | 2026-11-07 | #6621 | fixed
+- rb:2026-11-07 | #6621
+- rf:none | none | - | 2026-11-07 | #6621
+- rf:none | none | - | 2026-11-07 | #6625
+- ri:none | none | - | 2026-11-07 | #6625
+- rb:2026-11-07 | #6625
+- rf:none | none | - | 2026-11-07 | #6625
+- rf:comments | low | scripts/issue/issue-cite-cli.ts:25 | 2026-11-09 | #6627
+- rf:comments | low | scripts/run/board/run-board-closed.ts:51 | 2026-11-09 | #6627
+- rf:comments | low | scripts/issue/issue-cite-cli.ts:25 | 2026-11-09 | #6627
+- rf:comments | low | scripts/run/board/run-board-closed.ts:51 | 2026-11-09 | #6627
+- rb:2026-11-09 | #6627
+- rf:bug-risks | medium | scripts/gh/git-gh-issue-list.ts:214 | 2026-11-09 | #6627 | fixed
+- rf:tests | low | scripts/gh/git-gh-spawn-limit-callers.test.ts:118 | 2026-11-09 | #6627 | fixed
+- rf:comments | low | scripts/lib/bounded-pool.ts:5 | 2026-11-09 | #6627 | fixed
+- rf:comments | low | scripts/issue/issue-cite-cli.ts:25 | 2026-11-09 | #6627 | fixed
+- rf:comments | low | scripts/run/board/run-board-closed.ts:51 | 2026-11-09 | #6627 | fixed
+- rx:{"round":"39fd1a7f-2b9b-4a0c-855b-080063522b5f","category":"bug-risks","severity":"medium","file":"scripts/gh/git-gh-issue-list.ts:214","disposition":"fixed","description":"read_relations swapped bounded_map for Promise.all, so after one blocker read throws every remaining read still spawns from the shared FIFO gh queue instead of stopping.","status":"resolved"}
+- rx:{"round":"39fd1a7f-2b9b-4a0c-855b-080063522b5f","category":"tests","severity":"low","file":"scripts/gh/git-gh-spawn-limit-callers.test.ts:118","disposition":"fixed","description":"the listing case pins the spawn width but not the stop-on-failure the removed pool gave read_relations.","status":"resolved"}
+- rx:{"round":"39fd1a7f-2b9b-4a0c-855b-080063522b5f","category":"comments","severity":"low","file":"scripts/lib/bounded-pool.ts:5","disposition":"fixed","description":"the header still names epic-bundle-referenced.ts as a bounded_map caller although it now relies on the gh limiter.","status":"resolved"}
+- rx:{"round":"39fd1a7f-2b9b-4a0c-855b-080063522b5f","category":"comments","severity":"low","file":"scripts/issue/issue-cite-cli.ts:25","disposition":"fixed","description":"the comment cites a batch-read bound that issue:read no longer has.","status":"resolved"}
+- rx:{"round":"39fd1a7f-2b9b-4a0c-855b-080063522b5f","category":"comments","severity":"low","file":"scripts/run/board/run-board-closed.ts:51","disposition":"fixed","description":"the comment cites a read bound that issue:state no longer has.","status":"resolved"}
+- rf:comments | low | docs/josh-commands-run.md:900 | 2026-11-07 | #6629
+- ri:project-conventions | low | scripts/run/board/run-board-render-quota.ts:139 | 2026-11-07 | #6629 | fixed
+- rb:2026-11-07 | #6629
+- rf:tests | low | scripts/run/board/run-board-render-quota.test.ts:110 | 2026-11-07 | #6629 | fixed
+- rf:comments | low | docs/josh-commands-run.md:900 | 2026-11-07 | #6629 | fixed
+- rx:{"round":"29d6e77d-517a-4a54-848c-d8cb8373cdc6","category":"tests","severity":"low","file":"scripts/run/board/run-board-render-quota.test.ts:110","disposition":"fixed","description":"Two test titles still name the removed fixed usage columns and aligned headings.","status":"resolved"}
+- rx:{"round":"29d6e77d-517a-4a54-848c-d8cb8373cdc6","category":"comments","severity":"low","file":"docs/josh-commands-run.md:900","disposition":"fixed","description":"The usage section line does not say only reported windows are drawn after the name with a trailing length.","status":"resolved"}
+- rf:bug-risks | medium | scripts/split/split-resolution.ts:111 | 2026-11-07 | #6630 | fixed
+- rf:bug-risks | low | scripts/split/split-resolution.ts:109 | 2026-11-07 | #6630 | fixed
+- rf:bug-risks | low | scripts/split/split-resolution.ts:105 | 2026-11-07 | #6630 | fixed
+- rf:project-conventions | low | scripts/josh/josh-commands-issue.ts:166 | 2026-11-07 | #6630 | fixed
+- rf:project-conventions | low | scripts/split/split-resolution.ts:43 | 2026-11-07 | #6630 | fixed
+- rf:bug-risks | low | scripts/split/split-resolution.ts:105 | 2026-11-07 | #6630
+- rf:project-conventions | low | scripts/split/split-resolution.ts:41 | 2026-11-07 | #6630
+- rf:project-conventions | low | scripts/josh/josh-commands-issue.ts:166 | 2026-11-07 | #6630
+- rf:bug-risks | low | scripts/split/split-resolution.ts:111 | 2026-11-07 | #6630
+- rb:2026-11-08 | #6634
+- rf:bug-risks | low | scripts/gh/git-gh-blocked-by-graphql.ts:45 | 2026-11-08 | #6634 | fixed
+- rx:{"round":"6f608f34-06e6-4586-a289-fceeff0ee0bc","category":"bug-risks","severity":"low","file":"scripts/gh/git-gh-blocked-by-graphql.ts:45","disposition":"fixed","description":"needs_read does not skip pull requests as read_blocked_by does, so a pull request row would send its whole chunk back to REST (no caller passes one today).","status":"resolved"}
+- ri:bug-risks | medium | scripts/split/split-assess.ts:245 | 2026-11-07 | #6635 | fixed
+- ri:bug-risks | low | scripts/lane/lane-plan-approval.ts:102 | 2026-11-07 | #6635 | fixed
+- rb:2026-11-07 | #6635
+- rf:bug-risks | medium | scripts/lane/lane-plan-size.ts:132 | 2026-11-07 | #6635 | fixed
+- rf:tests | low | scripts/lane/lane-plan-size-units.test.ts:47 | 2026-11-07 | #6635 | fixed
+- rx:{"round":"78e8a7a8-b88f-4bac-91b0-305f34b3231c","category":"bug-risks","severity":"medium","file":"scripts/lane/lane-plan-size.ts:132","disposition":"fixed","description":"partners_of pairs new modules with planned base .ts files by position, so an unrelated existing file listed first takes the module and the real importer is split off, stranding the module.","status":"resolved"}
+- rx:{"round":"78e8a7a8-b88f-4bac-91b0-305f34b3231c","category":"tests","severity":"low","file":"scripts/lane/lane-plan-size-units.test.ts:47","disposition":"fixed","description":"no case lists an unrelated base file beside the importer, so positional pairing is indistinguishable from import pairing.","status":"resolved"}
+- rb:2026-11-07 | #6636
+- rf:tests | low | scripts/epic/epic-label-age.test.ts:72 | 2026-11-07 | #6636 | fixed
+- rx:{"round":"8603494f-0710-46fb-b2ef-e857e5bd0e26","category":"tests","severity":"low","file":"scripts/epic/epic-label-age.test.ts:72","disposition":"fixed","description":"No fixture holds an unlabeled in-progress event, so dropping the labeled-event check in is_in_progress_labeling passes every test.","status":"resolved"}
+- rf:none | none | - | 2026-11-07 | #6639
+- rf:project-conventions | low | .claude/skills/workflow-commands/issue-fold-existing.md:23 | 2026-11-09 | #6641 | false-positive
+- rf:none | none | - | 2026-11-09 | #6641
+- rf:none | none | - | 2026-11-09 | #6643
+- rb:2026-11-09 | #6643
+- rf:bug-risks | medium | scripts/issue/issue-fold-existing-cli.ts:127 | 2026-11-09 | #6643 | fixed
+- rx:{"round":"4df0511d-2e0b-46da-8303-0ef5759231cd","category":"bug-risks","severity":"medium","file":"scripts/issue/issue-fold-existing-cli.ts:127","disposition":"fixed","description":"The rerun hint prints an unquoted path and bare josh, so the printed command breaks on a path with spaces or where josh is not on PATH.","status":"resolved"}
+- ri:none | none | - | 2026-11-07 | #6647
+- ri:none | none | - | 2026-11-07 | #6647
+- rb:2026-11-07 | #6647
+- rf:bug-risks | low | scripts/lane/lane-plan-size.ts:277 | 2026-11-07 | #6647 | fixed
+- rf:bug-risks | low | scripts/lane/lane-plan-probe.ts:92 | 2026-11-07 | #6647 | fixed
+- rf:project-conventions | low | scripts/lane/lane-plan-cli.ts:8 | 2026-11-07 | #6647 | fixed
+- rx:{"round":"d6827e35-d6db-48ae-ae31-7f1e580c342d","category":"bug-risks","severity":"low","file":"scripts/lane/lane-plan-size.ts:277","disposition":"fixed","description":"waiver_text omits that the notice also lapses once the branch measures back under the notice bar.","status":"resolved"}
+- rx:{"round":"d6827e35-d6db-48ae-ae31-7f1e580c342d","category":"bug-risks","severity":"low","file":"scripts/lane/lane-plan-probe.ts:92","disposition":"fixed","description":"extend records a waived --single widening without the ledger split notice check_plan writes.","status":"resolved"}
+- rx:{"round":"d6827e35-d6db-48ae-ae31-7f1e580c342d","category":"project-conventions","severity":"low","file":"scripts/lane/lane-plan-cli.ts:8","disposition":"fixed","description":"the header usage line omits --single and --size-approval that USAGE lists.","status":"resolved"}
+- rf:none | none | - | 2026-11-09 | #6648
+- ri:none | none | - | 2026-11-09 | #6648
+- rb:2026-11-09 | #6648
+- rf:bug-risks | low | scripts/run/board/run-board-human-merge.ts:50 | 2026-11-09 | #6648 | fixed
+- rf:comments | low | docs/labels-and-run-states.md:56 | 2026-11-09 | #6648 | fixed
+- rx:{"round":"18e7c095-fbfd-48d2-b3f6-220be1844309","category":"bug-risks","severity":"low","file":"scripts/run/board/run-board-human-merge.ts:50","disposition":"fixed","description":"The find tail claims no open PR closes the issue, but read_prs pairs PRs only through the first literal closes #N, so a Fixes #N or second-listed PR still shows it.","status":"resolved"}
+- rx:{"round":"18e7c095-fbfd-48d2-b3f6-220be1844309","category":"comments","severity":"low","file":"docs/labels-and-run-states.md:56","disposition":"fixed","description":"The run-states row omits the unread-listing state in which the human-merge row carries neither tail.","status":"resolved"}
+- rf:none | none | - | 2026-11-07 | #6651
+- ri:none | none | - | 2026-11-07 | #6651
+- rb:2026-11-07 | #6651
+- rf:none | none | - | 2026-11-07 | #6651
+- ri:none | none | - | 2026-11-07 | #6652
+- rb:2026-11-07 | #6652
+- rf:bug-risks | low | scripts/lane/lane-plan-signals.ts:55 | 2026-11-07 | #6652 | fixed
+- rx:{"round":"e6eede69-0ec4-45ad-aefe-adb34fa8e24d","category":"bug-risks","severity":"low","file":"scripts/lane/lane-plan-signals.ts:55","disposition":"fixed","description":"a failed ls-tree yields an empty Set rather than undefined, unlike the documented unresolved-base case","status":"resolved"}
+- rb:2026-11-07 | #6652
+- rf:bug-risks | low | scripts/lane/lane-plan-signals.ts:57 | 2026-11-07 | #6652
+- rf:assumptions | low | scripts/lane/lane-plan-signals.ts:57 | 2026-11-07 | #6652
+- rx:{"round":"967ddcd8-df15-496a-92ff-80bfc5102ad7","previous":"e6eede69-0ec4-45ad-aefe-adb34fa8e24d","category":"bug-risks","severity":"low","file":"scripts/lane/lane-plan-signals.ts:57","description":"git ls-tree prints paths relative to the process cwd (unlike diff --name-only, which is root-relative), so a lane:plan run from a subdirectory would list base files that never match planned root-relative paths; adding --full-tree pins it, but no failure scenario — pnpm josh always runs with cwd at the package root, so no reachable invocation was found.","status":"new"}
+- rx:{"round":"967ddcd8-df15-496a-92ff-80bfc5102ad7","previous":"e6eede69-0ec4-45ad-aefe-adb34fa8e24d","category":"assumptions","severity":"low","file":"scripts/lane/lane-plan-signals.ts:57","description":"the listing relies on the default core.quotePath, so a non-ASCII path comes back C-quoted and would read as new to the #6635 reader; no failure scenario — the repository holds no non-ASCII paths and committed_files shares the same quoting.","status":"new"}
+- rx:{"round":"967ddcd8-df15-496a-92ff-80bfc5102ad7","previous":"e6eede69-0ec4-45ad-aefe-adb34fa8e24d","category":"bug-risks","severity":"low","file":"scripts/lane/lane-plan-signals.ts:55","description":"a failed ls-tree yields an empty Set rather than undefined, unlike the documented unresolved-base case","disposition":"fixed","status":"resolved"}
+- ri:tests | low | scripts/backlog/backlog-empty-start.test.ts:33 | 2026-11-08 | #6655 | fixed
+- rb:2026-11-08 | #6655
+- rf:none | none | - | 2026-11-08 | #6655
+- ri:none | none | - | 2026-11-07 | #6657
+- rb:2026-11-07 | #6657
+- rf:none | none | - | 2026-11-07 | #6657
+- rb:2026-11-07 | #6659
+- rf:comments | low | scripts/epic/epic-chains.ts:65 | 2026-11-07 | #6659 | fixed
+- rf:comments | low | scripts/epic/epic-chains.ts:39 | 2026-11-07 | #6659 | fixed
+- rf:comments | low | docs/maintainers/epic-commands-rationale.md:246 | 2026-11-07 | #6659 | fixed
+- rx:{"round":"bb115bab-d211-4138-bd8d-f341f9bb9a67","category":"comments","severity":"low","file":"scripts/epic/epic-chains.ts:65","disposition":"fixed","description":"The chains_containing comment still calls any multi-chain target ambiguous, which a shared --before no longer is.","status":"resolved"}
+- rx:{"round":"bb115bab-d211-4138-bd8d-f341f9bb9a67","category":"comments","severity":"low","file":"scripts/epic/epic-chains.ts:39","disposition":"fixed","description":"The links_of comment writes the spliced link as #M -> #A, reversing the file's #N addition / #M target convention.","status":"resolved"}
+- rx:{"round":"bb115bab-d211-4138-bd8d-f341f9bb9a67","category":"comments","severity":"low","file":"docs/maintainers/epic-commands-rationale.md:246","disposition":"fixed","description":"The --before refusal rationale omits the new is_shared_before exception for chains sharing the target's predecessor.","status":"resolved"}
+- rf:bug-risks | medium | scripts/hooks/hook-ledger-issues.ts:46 | 2026-11-09 | #6664
+- rf:bug-risks | low | scripts/hooks/hook-ledger-cli.ts:65 | 2026-11-09 | #6664
+- ri:bug-risks | medium | scripts/hooks/hook-ledger-cli.ts:67 | 2026-11-09 | #6664 | fixed
+- ri:tests | low | scripts/hooks/hook-ledger-cli.test.ts:87 | 2026-11-09 | #6664 | fixed
+- rb:2026-11-09 | #6664
+- rf:bug-risks | medium | scripts/hooks/hook-ledger-cli.ts:65 | 2026-11-09 | #6664 | fixed
+- rf:bug-risks | medium | scripts/hooks/hook-ledger-issues.ts:46 | 2026-11-09 | #6664 | fixed
+- rf:performance | medium | scripts/hooks/hook-ledger-cli.ts:57 | 2026-11-09 | #6664 | fixed
+- rf:bug-risks | low | scripts/hooks/hook-ledger-issues.ts:23 | 2026-11-09 | #6664 | fixed
+- rf:bug-risks | low | scripts/hooks/hook-ledger-cli.ts:74 | 2026-11-09 | #6664 | fixed
+- rf:tests | low | scripts/hooks/hook-ledger-cli.test.ts:28 | 2026-11-09 | #6664 | fixed
+- rx:{"round":"102bd6eb-f04a-4852-8bde-09ec9a8cbc30","category":"bug-risks","severity":"medium","file":"scripts/hooks/hook-ledger-cli.ts:65","disposition":"fixed","description":"is_same_call rebuilds the head from command/file_path only, so Grep, Glob, WebFetch and Agent refusals never count as passed later.","status":"resolved"}
+- rx:{"round":"102bd6eb-f04a-4852-8bde-09ec9a8cbc30","category":"bug-risks","severity":"medium","file":"scripts/hooks/hook-ledger-issues.ts:46","disposition":"fixed","description":"a bare substring match of the rule counts any interrupt Issue mentioning common words like investigation or batching.","status":"resolved"}
+- rx:{"round":"102bd6eb-f04a-4852-8bde-09ec9a8cbc30","category":"performance","severity":"medium","file":"scripts/hooks/hook-ledger-cli.ts:57","disposition":"fixed","description":"every period transcript is read in parallel without a bound and every call output is kept, risking heap exhaustion or EMFILE silently zeroing passed later.","status":"resolved"}
+- rx:{"round":"102bd6eb-f04a-4852-8bde-09ec9a8cbc30","category":"bug-risks","severity":"low","file":"scripts/hooks/hook-ledger-issues.ts:23","disposition":"fixed","description":"is_capped from the issue listing is dropped, so a capped listing prints an exact count instead of unknown.","status":"resolved"}
+- rx:{"round":"102bd6eb-f04a-4852-8bde-09ec9a8cbc30","category":"bug-risks","severity":"low","file":"scripts/hooks/hook-ledger-cli.ts:74","disposition":"fixed","description":"a later Bash call that ran but exited non-zero counts as not passed although the hook let it through.","status":"resolved"}
+- rx:{"round":"102bd6eb-f04a-4852-8bde-09ec9a8cbc30","category":"tests","severity":"low","file":"scripts/hooks/hook-ledger-cli.test.ts:28","disposition":"fixed","description":"fixtures cover only Bash calls, so the non-Bash head mismatch goes uncaught.","status":"resolved"}
+- rf:bug-risks | low | scripts/lane/lane-plan-check.ts:116 | 2026-11-09 | #6666
+- ri:bug-risks | low | scripts/lane/lane-plan-check.ts:116 | 2026-11-09 | #6666 | fixed
+- ri:comments | low | scripts/lane/lane-plan-size.ts:325 | 2026-11-09 | #6666 | fixed
+- rb:2026-11-09 | #6666
+- rf:bug-risks | medium | scripts/lane/lane-plan-size.ts:190 | 2026-11-09 | #6666 | fixed
+- rf:tests | medium | scripts/lane/lane-plan-size-generated.test.ts:56 | 2026-11-09 | #6666 | fixed
+- rf:bug-risks | low | scripts/lane/lane-plan-size.ts:325 | 2026-11-09 | #6666 | fixed
+- rx:{"round":"2691f7e6-bcfb-4c63-90b7-46b8760ab302","category":"bug-risks","severity":"medium","file":"scripts/lane/lane-plan-size.ts:190","disposition":"fixed","description":"carried keeps a generated artifact in the re-plan while its source is split off, so the lane keeps a hooks.json without its settings edit and the parity test fails.","status":"resolved"}
+- rx:{"round":"2691f7e6-bcfb-4c63-90b7-46b8760ab302","category":"tests","severity":"medium","file":"scripts/lane/lane-plan-size-generated.test.ts:56","disposition":"fixed","description":"the test pins the wrong grouping, artifact carried while its source is split off, instead of splitting both together.","status":"resolved"}
+- rx:{"round":"2691f7e6-bcfb-4c63-90b7-46b8760ab302","category":"bug-risks","severity":"low","file":"scripts/lane/lane-plan-size.ts:325","disposition":"fixed","description":"the split bar still says tests excluded though generated artifacts beside their source are excluded too.","status":"resolved"}
+- ri:bug-risks | medium | .claude/skills/workflow-commands/backlogrun-park.md:31 | 2026-11-07 | #6669 | fixed
+- ri:bug-risks | low | .claude/skills/workflow-commands/backlogrun-park.md:62 | 2026-11-07 | #6669 | fixed
+- rb:2026-11-07 | #6669
+- rf:comments | low | scripts/run/park/run-park-body.ts:148 | 2026-11-07 | #6669 | fixed
+- rx:{"round":"e75261b8-5567-4c6a-9ffc-56fc7c186202","category":"comments","severity":"low","file":"scripts/run/park/run-park-body.ts:148","disposition":"fixed","description":"summary_of has no caller though the header says every reader uses it.","status":"resolved"}
+- rb:2026-11-08 | #6670
+- rf:bug-risks | medium | docs/josh-commands-backlog.md:890 | 2026-11-08 | #6670 | deferred:#6806
+- rf:bug-risks | low | scripts/backlog/backlog-triage-adopt.ts:142 | 2026-11-08 | #6670 | fixed
+- rf:tests | low | scripts/backlog/backlog-triage-adopt.test.ts:142 | 2026-11-08 | #6670 | fixed
+- rx:{"round":"3dc45157-a15d-45f6-b8c8-3337233a1fe2","category":"bug-risks","severity":"medium","file":"docs/josh-commands-backlog.md:890","disposition":"deferred:#6806","description":"The backlog:triage usage block and the CLI USAGE omit --adopt, so help never offers the one-call adopt and the docs-match acceptance criterion is unmet.","status":"new"}
+- rx:{"round":"3dc45157-a15d-45f6-b8c8-3337233a1fe2","category":"bug-risks","severity":"low","file":"scripts/backlog/backlog-triage-adopt.ts:142","disposition":"fixed","description":"A re-run after a successful adopt clears the park and requeues again with no parked check.","status":"resolved"}
+- rx:{"round":"3dc45157-a15d-45f6-b8c8-3337233a1fe2","category":"tests","severity":"low","file":"scripts/backlog/backlog-triage-adopt.test.ts:142","disposition":"fixed","description":"The re-run test proves only identical decide input, not that nothing is written twice, since epic_decide is mocked.","status":"resolved"}
+- ri:bug-risks | medium | scripts/backlog/backlog-triage-adopt.ts:118 | 2026-11-08 | #6670 | fixed
+- ri:project-conventions | medium | scripts/josh/josh-commands-backlog.ts:75 | 2026-11-08 | #6670 | deferred:#6806
+- rf:tests | low | scripts/backlog/backlog-park-adopt-document.test.ts:35 | 2026-11-09 | #6671
+- ri:bug-risks | medium | .claude/skills/workflow-commands/backlogrun-steps.md:100 | 2026-11-09 | #6671 | fixed
+- ri:bug-risks | low | .claude/skills/workflow-commands/backlogrun-park.md:81 | 2026-11-09 | #6671 | fixed
+- ri:project-conventions | low | .claude/skills/workflow-commands/backlogrun-park.md:89 | 2026-11-09 | #6671 | fixed
+- rb:2026-11-09 | #6671
+- rf:bug-risks | medium | .claude/skills/workflow-commands/backlogrun-park.md:89 | 2026-11-09 | #6671 | fixed
+- rf:tests | low | scripts/backlog/backlog-park-adopt-document.test.ts:28 | 2026-11-09 | #6671 | fixed
+- rx:{"round":"2e2e359c-5ad3-4053-bc74-8b7475ea7430","category":"bug-risks","severity":"medium","file":".claude/skills/workflow-commands/backlogrun-park.md:89","disposition":"fixed","description":"The new sections push the read-against-this-list paragraph under the person-park heading, whose list omits the upstream defect, so a mechanical label on such a park gets removed.","status":"resolved"}
+- rx:{"round":"2e2e359c-5ad3-4053-bc74-8b7475ea7430","category":"tests","severity":"low","file":"scripts/backlog/backlog-park-adopt-document.test.ts:28","disposition":"fixed","description":"The no-restatement test guards only one exact CLAUDE.md phrase, so a paraphrase passes.","status":"resolved"}
+- rf:none | none | - | 2026-11-07 | #6673
+- rf:none | none | - | 2026-11-07 | #6673
+- ri:comments | low | scripts/run/ship/run-ship-cli.ts:413 | 2026-11-09 | #6675 | fixed
+- ri:comments | low | scripts/lane/lane-ledger-schema-ship.ts:25 | 2026-11-09 | #6675 | fixed
+- rb:2026-11-09 | #6675
+- rf:comments | low | scripts/run/ship/run-ship-cli.ts:414 | 2026-11-09 | #6675 | fixed
+- rx:{"round":"3b7cb140-8640-49e3-97fd-0a0ae459dfd5","category":"comments","severity":"low","file":"scripts/run/ship/run-ship-cli.ts:414","disposition":"fixed","description":"comment still says review failure only while is_due now covers a followup check","status":"resolved"}
+- rf:tests | low | scripts/document/command-reference-line-budget.ts:11 | 2026-11-09 | #6676
+- rf:comments | low | scripts/document/ai-document-fixture.ts:47 | 2026-11-09 | #6676
+- ri:bug-risks | medium | scripts/rules/decision-oracle.ts:211 | 2026-11-09 | #6676 | fixed
+- rb:2026-11-09 | #6676
+- rf:tests | low | scripts/document/command-reference-line-budget.ts:11 | 2026-11-09 | #6676 | fixed
+- rf:comments | low | scripts/rules/prose-command-document-rule.test.ts:9 | 2026-11-09 | #6676 | fixed
+- rx:{"round":"1ea4b3b6-4f87-408f-8643-d17b6903956c","category":"tests","severity":"low","file":"scripts/document/command-reference-line-budget.ts:11","disposition":"fixed","description":"No test pins that every docs/josh-commands-*.md page is listed in all three page registries together.","status":"resolved"}
+- rx:{"round":"1ea4b3b6-4f87-408f-8643-d17b6903956c","category":"comments","severity":"low","file":"scripts/rules/prose-command-document-rule.test.ts:9","disposition":"fixed","description":"The rewritten header comment line runs to 163 characters while the block wraps near 100.","status":"resolved"}
+- ri:bug-risks | medium | scripts/rules/decision-oracle.ts:211 | 2026-11-09 | #6676 | fixed
+- rb:2026-11-09 | #6676
+- rf:tests | low | scripts/document/command-reference-line-budget.ts:11 | 2026-11-09 | #6676 | fixed
+- rf:comments | low | scripts/rules/prose-command-document-rule.test.ts:9 | 2026-11-09 | #6676 | fixed
+- rx:{"round":"252b5ee5-1b64-4f9a-94a2-4613e73e238e","previous":"1ea4b3b6-4f87-408f-8643-d17b6903956c","category":"tests","severity":"low","file":"scripts/document/command-reference-line-budget.ts:11","disposition":"fixed","description":"No test pins that every docs/josh-commands-*.md page is listed in all three page registries together.","status":"resolved"}
+- rx:{"round":"252b5ee5-1b64-4f9a-94a2-4613e73e238e","previous":"1ea4b3b6-4f87-408f-8643-d17b6903956c","category":"comments","severity":"low","file":"scripts/rules/prose-command-document-rule.test.ts:9","disposition":"fixed","description":"The rewritten header comment line runs to 163 characters while the block wraps near 100.","status":"resolved"}
+- rf:tests | medium | scripts/run/board/run-board-throughput.test.ts:82 | 2026-11-09 | #6677
+- rf:performance | low | scripts/run/event/run-event-stream.ts:225 | 2026-11-09 | #6677
+- rf:none | none | - | 2026-11-09 | #6677
+- ri:bug-risks | medium | scripts/run/board/run-board-throughput.ts:97 | 2026-11-09 | #6677 | fixed
+- ri:performance | low | scripts/run/event/run-event-stream.ts:225 | 2026-11-09 | #6677 | fixed
+- ri:comments | low | docs/josh-commands-board.md:55 | 2026-11-09 | #6677 | fixed
+- rb:2026-11-09 | #6677
+- rf:tests | low | scripts/run/merge/run-merge-dated.ts:58 | 2026-11-09 | #6677 | fixed
+- rx:{"round":"ea8dd940-3803-44f9-bfcd-bfbb1251c00f","category":"tests","severity":"low","file":"scripts/run/merge/run-merge-dated.ts:58","disposition":"fixed","description":"put_on_record's use of the dated time is untested, so passing confirmed_at instead of the report time to emit and record_merge would still pass every test.","status":"resolved"}
+- rf:bug-risks | medium | scripts/lane/lane-breakdown-text.ts:20 | 2026-11-09 | #6678
+- rf:bug-risks | low | scripts/lane/lane-breakdown-implement.ts:193 | 2026-11-09 | #6678
+- ri:bug-risks | medium | scripts/lane/lane-breakdown-text.ts:20 | 2026-11-09 | #6678 | fixed
+- ri:bug-risks | low | scripts/lane/lane-breakdown-implement.ts:193 | 2026-11-09 | #6678 | fixed
+- rb:2026-11-09 | #6678
+- rf:none | none | - | 2026-11-09 | #6678
+- rf:bug-risks | low | scripts/lane/lane-why-causes.ts:30 | 2026-11-09 | #6679
+- rf:bug-risks | low | scripts/lane/lane-why-causes.ts:77 | 2026-11-09 | #6679
+- ri:project-conventions | medium | docs/josh-commands-lane.md:376 | 2026-11-09 | #6679 | fixed
+- rb:2026-11-09 | #6679
+- rf:bug-risks | medium | scripts/lane/lane-why-causes.ts:34 | 2026-11-09 | #6679 | fixed
+- rf:bug-risks | low | scripts/lane/lane-why-causes.ts:72 | 2026-11-09 | #6679 | fixed
+- rf:bug-risks | low | scripts/lane/lane-why-causes.ts:24 | 2026-11-09 | #6679 | fixed
+- rf:tests | low | scripts/lane/lane-why-causes.test.ts:38 | 2026-11-09 | #6679 | fixed
+- rx:{"round":"1a8626ef-a92f-4ca5-8d27-16fa8d505011","category":"bug-risks","severity":"medium","file":"scripts/lane/lane-why-causes.ts:34","disposition":"fixed","description":"FAILED_CHECKS stops at the first \")\" so matrix check names like \"Static Checks (lint)\" are truncated and later failed checks dropped.","status":"resolved"}
+- rx:{"round":"1a8626ef-a92f-4ca5-8d27-16fa8d505011","category":"bug-risks","severity":"low","file":"scripts/lane/lane-why-causes.ts:72","disposition":"fixed","description":"an unknown check key is matched as a bare substring of Issue titles, so a generic key like \"checks\" over-matches.","status":"resolved"}
+- rx:{"round":"1a8626ef-a92f-4ca5-8d27-16fa8d505011","category":"bug-risks","severity":"low","file":"scripts/lane/lane-why-causes.ts:24","disposition":"fixed","description":"the main move key misses the run-ship-sync MERGED_AGAIN_NOTE, the ship-side report of a main move.","status":"resolved"}
+- rx:{"round":"1a8626ef-a92f-4ca5-8d27-16fa8d505011","category":"tests","severity":"low","file":"scripts/lane/lane-why-causes.test.ts:38","disposition":"fixed","description":"no keys_of fixture uses a parenthesised matrix check name, so the truncation passes the suite.","status":"resolved"}
+- rb:2026-11-09 | #6679
+- rf:bug-risks | medium | scripts/lane/lane-why-causes.ts:34 | 2026-11-09 | #6679 | fixed
+- rf:bug-risks | low | scripts/lane/lane-why-causes.ts:72 | 2026-11-09 | #6679 | fixed
+- rf:bug-risks | low | scripts/lane/lane-why-causes.ts:24 | 2026-11-09 | #6679 | fixed
+- rf:tests | low | scripts/lane/lane-why-causes.test.ts:38 | 2026-11-09 | #6679 | fixed
+- rx:{"round":"00da4355-9c6f-4ecc-ade5-e155056b5532","previous":"1a8626ef-a92f-4ca5-8d27-16fa8d505011","category":"bug-risks","severity":"medium","file":"scripts/lane/lane-why-causes.ts:34","disposition":"fixed","description":"FAILED_CHECKS stops at the first \")\" so matrix check names like \"Static Checks (lint)\" are truncated and later failed checks dropped.","status":"resolved"}
+- rx:{"round":"00da4355-9c6f-4ecc-ade5-e155056b5532","previous":"1a8626ef-a92f-4ca5-8d27-16fa8d505011","category":"bug-risks","severity":"low","file":"scripts/lane/lane-why-causes.ts:72","disposition":"fixed","description":"an unknown check key is matched as a bare substring of Issue titles, so a generic key like \"checks\" over-matches.","status":"resolved"}
+- rx:{"round":"00da4355-9c6f-4ecc-ade5-e155056b5532","previous":"1a8626ef-a92f-4ca5-8d27-16fa8d505011","category":"bug-risks","severity":"low","file":"scripts/lane/lane-why-causes.ts:24","disposition":"fixed","description":"the main move key misses the run-ship-sync MERGED_AGAIN_NOTE, the ship-side report of a main move.","status":"resolved"}
+- rx:{"round":"00da4355-9c6f-4ecc-ade5-e155056b5532","previous":"1a8626ef-a92f-4ca5-8d27-16fa8d505011","category":"tests","severity":"low","file":"scripts/lane/lane-why-causes.test.ts:38","disposition":"fixed","description":"no keys_of fixture uses a parenthesised matrix check name, so the truncation passes the suite.","status":"resolved"}
+- rf:none | none | - | 2026-11-09 | #6682
+- ri:bug-risks | medium | scripts/test/unit-run-marker.ts:143 | 2026-11-09 | #6682 | fixed
+- ri:bug-risks | medium | scripts/gate/gate-plan.ts:386 | 2026-11-09 | #6682 | fixed
+- ri:tests | medium | scripts/gate/gate-plan.ts:189 | 2026-11-09 | #6682 | fixed
+- rb:2026-11-09 | #6682
+- rf:bug-risks | medium | scripts/gate/gate-plan.ts:391 | 2026-11-09 | #6682 | fixed
+- rf:bug-risks | medium | scripts/test/unit-run-marker.ts:39 | 2026-11-09 | #6682 | fixed
+- rf:tests | low | scripts/test/test-unit-guard.test.ts:337 | 2026-11-09 | #6682 | fixed
+- rf:tests | low | scripts/test/unit-worker-share.ts:116 | 2026-11-09 | #6682 | fixed
+- rx:{"round":"835da662-1c62-4d7b-bcca-a7498832653b","category":"bug-risks","severity":"medium","file":"scripts/gate/gate-plan.ts:391","disposition":"fixed","description":"direct_unit_weight sizes the ledger claim without the live lanes, so a direct unit run over-holds cores and memory that vitest_share no longer opens.","status":"resolved"}
+- rx:{"round":"835da662-1c62-4d7b-bcca-a7498832653b","category":"bug-risks","severity":"medium","file":"scripts/test/unit-run-marker.ts:39","disposition":"fixed","description":"live_lane_count counts stopped, paused and uncollected lane directories as live, narrowing a lone working lane's suite and gate to a sliver of the machine.","status":"resolved"}
+- rx:{"round":"835da662-1c62-4d7b-bcca-a7498832653b","category":"tests","severity":"low","file":"scripts/test/test-unit-guard.test.ts:337","disposition":"fixed","description":"the lane argument is matched as expect.any(Number), so a constant in place of live_lane_count() would pass.","status":"resolved"}
+- rx:{"round":"835da662-1c62-4d7b-bcca-a7498832653b","category":"tests","severity":"low","file":"scripts/test/unit-worker-share.ts:116","disposition":"fixed","description":"the Issue's isolated-to-pure inventory acceptance criterion is not in this change.","status":"resolved"}
+- k:run-review-relaunches-detached-gate | d1 | 2026-11-10 | pnpm josh run:review | Each re-run at its wait cap launched a new detached gate while the earlier ones kept running, so two or three gates of the same lane ran at once
+- rb:2026-11-09 | #6682
+- rf:tests | medium | scripts/test/test-unit-guard.test.ts:337 | 2026-11-09 | #6682
+- rf:tests | low | scripts/test/unit-worker-share.ts:116 | 2026-11-09 | #6682
+- rx:{"round":"01113812-abf6-4ed9-b4ae-dea3714a0a56","previous":"835da662-1c62-4d7b-bcca-a7498832653b","category":"tests","severity":"medium","file":"scripts/test/test-unit-guard.test.ts:337","description":"the round-1 finding is not closed: the lane argument is still matched as expect.any(Number) and live_lane_count is not mocked there, so replacing unit_worker_share.live_lane_count() with a constant in test_unit_guard.vitest_share (scripts/test/test-unit-guard.ts:200) keeps every test green and silently drops the lane division the Issue exists for; spy live_lane_count to a distinct value such as 3 and assert current_share receives it; other sites: scripts/gate/gate-plan.ts:390, scripts/gate/gate-plan.ts:411, tools/test/vitest-config-workers.ts:70","status":"new"}
+- rx:{"round":"01113812-abf6-4ed9-b4ae-dea3714a0a56","previous":"835da662-1c62-4d7b-bcca-a7498832653b","category":"tests","severity":"low","file":"scripts/test/unit-worker-share.ts:116","description":"the round-1 finding is closed only by deferral, not by a change: the isolated-to-pure inventory criterion is covered by open #6905 (split from #6682) yet #6682 carries no 先送り comment pointing at it (only #6916), so the Issue still lists it as unmet; post the 先送り: #6905 comment (no failure scenario — the code path is unaffected, only Issue bookkeeping)","status":"new"}
+- rx:{"round":"01113812-abf6-4ed9-b4ae-dea3714a0a56","previous":"835da662-1c62-4d7b-bcca-a7498832653b","category":"bug-risks","severity":"medium","file":"scripts/gate/gate-plan.ts:391","description":"direct_unit_weight sizes the ledger claim without the live lanes, so a direct unit run over-holds cores and memory that vitest_share no longer opens.","disposition":"fixed","status":"resolved"}
+- rx:{"round":"01113812-abf6-4ed9-b4ae-dea3714a0a56","previous":"835da662-1c62-4d7b-bcca-a7498832653b","category":"bug-risks","severity":"medium","file":"scripts/test/unit-run-marker.ts:39","description":"live_lane_count counts stopped, paused and uncollected lane directories as live, narrowing a lone working lane's suite and gate to a sliver of the machine.","disposition":"fixed","status":"resolved"}
+- rx:{"round":"01113812-abf6-4ed9-b4ae-dea3714a0a56","previous":"835da662-1c62-4d7b-bcca-a7498832653b","category":"tests","severity":"low","file":"scripts/test/test-unit-guard.test.ts:337","description":"the lane argument is matched as expect.any(Number), so a constant in place of live_lane_count() would pass.","disposition":"fixed","status":"resolved"}
+- rx:{"round":"01113812-abf6-4ed9-b4ae-dea3714a0a56","previous":"835da662-1c62-4d7b-bcca-a7498832653b","category":"tests","severity":"low","file":"scripts/test/unit-worker-share.ts:116","description":"the Issue's isolated-to-pure inventory acceptance criterion is not in this change.","disposition":"fixed","status":"resolved"}
+- rf:bug-risks | low | scripts/hooks/run-hook.sh:68 | 2026-11-10 | #6683
+- ri:bug-risks | high | scripts/lane/lane-reap.ts:122 | 2026-11-10 | #6683 | fixed
+- ri:bug-risks | medium | scripts/hooks/run-hook.sh:58 | 2026-11-10 | #6683 | fixed
+- ri:bug-risks | low | tools/hooks/hook-daemon.ts:113 | 2026-11-10 | #6683 | fixed
+- rb:2026-11-10 | #6683
+- rf:bug-risks | medium | scripts/hooks/run-hook.sh:90 | 2026-11-10 | #6683 | fixed
+- rf:bug-risks | low | scripts/hooks/run-hook.sh:63 | 2026-11-10 | #6683 | fixed
+- rf:tests | low | scripts/build/build-hooks.ts:80 | 2026-11-10 | #6683 | fixed
+- rx:{"round":"d829c7b5-94cb-4d80-a329-06183f01de1f","category":"bug-risks","severity":"medium","file":"scripts/hooks/run-hook.sh:90","disposition":"fixed","description":"The launcher trusts a pid file that survives an unclean daemon death, so a recycled pid stalls the call 10 s and SIGTERMs an unrelated user process.","status":"resolved"}
+- rx:{"round":"d829c7b5-94cb-4d80-a329-06183f01de1f","category":"bug-risks","severity":"low","file":"scripts/hooks/run-hook.sh:63","disposition":"fixed","description":"A launcher killed mid-call leaves its call directory, payload included, under kit-hook-daemon with nothing to sweep it.","status":"resolved"}
+- rx:{"round":"d829c7b5-94cb-4d80-a329-06183f01de1f","category":"tests","severity":"low","file":"scripts/build/build-hooks.ts:80","disposition":"fixed","description":"No test asserts build_hooks emits dist/hooks/daemon.js, so dropping it silently disables the daemon.","status":"resolved"}
+- rf:bug-risks | low | docs/cloud-session.md:81 | 2026-11-09 | #6685
+- ri:bug-risks | low | docs/cloud-session.md:81 | 2026-11-09 | #6685 | fixed
+- rb:2026-11-09 | #6685
+- rf:none | none | - | 2026-11-09 | #6685
+- ri:none | none | - | 2026-11-08 | #6688
+- rb:2026-11-08 | #6688
+- rf:none | none | - | 2026-11-08 | #6688
+- ri:none | none | - | 2026-11-08 | #6692
+- rb:2026-11-08 | #6692
+- rf:tests | low | scripts/run/board/run-board-quota-held.ts:184 | 2026-11-08 | #6692 | fixed
+- rx:{"round":"3d45fc09-f6bc-408c-807f-785894a040ed","category":"tests","severity":"low","file":"scripts/run/board/run-board-quota-held.ts:184","disposition":"fixed","description":"The tie-break that keeps the newer file on equal taken_ms is not pinned by a timed-tie test, so a findLast mutation is caught only by accident.","status":"resolved"}
+- rb:2026-11-07 | #6694
+- rf:project-conventions | low | scripts/gh/gh-request-tally.ts:5 | 2026-11-07 | #6694 | fixed
+- rf:project-conventions | low | scripts/init/start-exec.ts:101 | 2026-11-07 | #6694 | fixed
+- rx:{"round":"4a306751-66ea-4a22-8c4e-8d3040dd084a","previous":"a14ed1c7-432e-4112-a4b1-d4822247dfd8","category":"project-conventions","severity":"low","file":"scripts/gh/gh-request-tally.ts:5","disposition":"fixed","description":"The header promises a later step that writes snapshot() out, but nothing outside tests reads it yet.","status":"resolved"}
+- rx:{"round":"4a306751-66ea-4a22-8c4e-8d3040dd084a","previous":"a14ed1c7-432e-4112-a4b1-d4822247dfd8","category":"project-conventions","severity":"low","file":"scripts/init/start-exec.ts:101","disposition":"fixed","description":"The repo-create spawn is a REST request outside the exec layer and is not counted, as the tally header documents.","status":"resolved"}
+- ri:bug-risks | low | scripts/run/run-report.ts:28 | 2026-11-07 | #6695 | fixed
+- rb:2026-11-07 | #6695
+- rf:bug-risks | low | scripts/run/event/run-event-stream.ts:241 | 2026-11-07 | #6695 | fixed
+- rf:bug-risks | low | scripts/run/event/run-event-stream.ts:1 | 2026-11-07 | #6695 | fixed
+- rx:{"round":"ae1e2f6d-be15-4ed1-be1a-9a59373363b0","category":"bug-risks","severity":"low","file":"scripts/run/event/run-event-stream.ts:241","disposition":"fixed","description":"The conflict resolution dropped the lane's elapsed_ms comment clause naming the gh-usage process run time.","status":"resolved"}
+- rx:{"round":"ae1e2f6d-be15-4ed1-be1a-9a59373363b0","category":"bug-risks","severity":"low","file":"scripts/run/event/run-event-stream.ts:1","disposition":"fixed","description":"run-event-stream.ts and run-event-render.ts remain unmerged in the index, so a commit refuses until they are staged.","status":"resolved"}
+- ri:none | none | - | 2026-11-07 | #6696
+- rb:2026-11-07 | #6696
+- rf:none | none | - | 2026-11-07 | #6696
+- rf:none | none | - | 2026-11-07 | #6697
+- ri:none | none | - | 2026-11-07 | #6697
+- rb:2026-11-07 | #6697
+- rf:bug-risks | low | scripts/gh/gh-request-tally.ts:44 | 2026-11-07 | #6697 | fixed
+- rf:bug-risks | low | scripts/gh/gh-core-rate-limit.ts:25 | 2026-11-07 | #6697
+- rx:{"round":"f2179fe1-ea44-495a-a0c6-f364a9efc93e","previous":"4a306751-66ea-4a22-8c4e-8d3040dd084a","category":"bug-risks","severity":"low","file":"scripts/gh/gh-request-tally.ts:44","disposition":"fixed","description":"the held start reading had no rejection handler; watch_core now wraps the reader so a throwing reader reads as none","status":"resolved"}
+- rx:{"round":"f2179fe1-ea44-495a-a0c6-f364a9efc93e","previous":"4a306751-66ea-4a22-8c4e-8d3040dd084a","category":"bug-risks","severity":"low","file":"scripts/gh/gh-core-rate-limit.ts:25","description":"dropped: read_core now also requires used, but GitHub always answers used in .resources.core and the board only reads github.com","status":"new"}
+- rb:2026-11-07 | #6698
+- rf:bug-risks | low | scripts/issue/issue-merged.ts:84 | 2026-11-07 | #6698 | fixed
+- rx:{"round":"3339e6c0-32f1-4f00-8ca9-84e8ba1e8500","category":"bug-risks","severity":"low","file":"scripts/issue/issue-merged.ts:84","disposition":"fixed","description":"A page array with an element event_schema rejects throws out of page_rows to an undefined answer instead of falling to the paged read the comment promises.","status":"resolved"}
+- ri:none | none | - | 2026-11-07 | #6700
+- rb:2026-11-07 | #6700
+- rf:bug-risks | low | scripts/gh/git-gh-issue-read.ts:385 | 2026-11-07 | #6700 | fixed
+- rf:comments | low | scripts/run/board/run-board-decision-read.ts:19 | 2026-11-07 | #6700 | fixed
+- rf:comments | low | scripts/gh/git-gh-issue-read.ts:111 | 2026-11-07 | #6700 | fixed
+- rx:{"round":"6b4fc589-91f7-473f-a4e0-f5994632dee1","category":"bug-risks","severity":"low","file":"scripts/gh/git-gh-issue-read.ts:385","disposition":"fixed","description":"issue_list_comments drops timeout_ms when read_path is given; no caller passes both today.","status":"resolved"}
+- rx:{"round":"6b4fc589-91f7-473f-a4e0-f5994632dee1","category":"comments","severity":"low","file":"scripts/run/board/run-board-decision-read.ts:19","disposition":"fixed","description":"comment claims no core request on an unchanged answer, but a blocked node's relations follow-up is still unconditional.","status":"resolved"}
+- rx:{"round":"6b4fc589-91f7-473f-a4e0-f5994632dee1","category":"comments","severity":"low","file":"scripts/gh/git-gh-issue-read.ts:111","disposition":"fixed","description":"edited comment line runs to about 150 columns, unwrapped unlike the comments around it.","status":"resolved"}
+- rf:none | none | - | 2026-11-07 | #6701
+- k:followup-unrelated-test-rerun | d1 | 2026-11-07 | tools/test/josh-harness-epic-untrack.test.ts | followup reran Unit Tests (1/6); failed outside the change: isolated tools/test/josh-harness-epic-untrack.test.ts > josh harness — epic child removal > removes connected relations and rows without reconnecting survivors in kit, safely twice; isolated tools/test/josh-harness-epic-untrack.test.ts > josh harness — epic child removal > removes connected relations and rows without reconnecting survivors in consumer, safely twice; isolated tools/test/josh-harness-epic-untrack.test.ts > josh harness — epic child removal > removes connected relations and rows without reconnecting survivors in lane, safely twice
+- k:followup-unrelated-test-rerun | d1 | 2026-11-07 | tools/test/josh-harness-epic-untrack.test.ts | followup reran Unit Tests (1/6); failed outside the change: isolated tools/test/josh-harness-epic-untrack.test.ts > josh harness — epic child removal > removes connected relations and rows without reconnecting survivors in kit, safely twice; isolated tools/test/josh-harness-epic-untrack.test.ts > josh harness — epic child removal > removes connected relations and rows without reconnecting survivors in consumer, safely twice; isolated tools/test/josh-harness-epic-untrack.test.ts > josh harness — epic child removal > removes connected relations and rows without reconnecting survivors in lane, safely twice
+- ri:performance | medium | scripts/josh/josh-gh-usage.ts:35 | 2026-11-08 | #6707 | fixed
+- ri:bug-risks | low | scripts/josh/josh-gh-usage.ts:33 | 2026-11-08 | #6707 | fixed
+- rb:2026-11-08 | #6707
+- rf:performance | low | scripts/josh/josh-gh-usage.ts:30 | 2026-11-08 | #6707 | fixed
+- rf:project-conventions | low | scripts/gh/gh-usage-log.ts:30 | 2026-11-08 | #6707 | fixed
+- rf:tests | low | scripts/josh/josh-gh-usage.test.ts:57 | 2026-11-08 | #6707 | fixed
+- rx:{"round":"32ecea8d-fcbe-4cf9-a3e8-d37f3360ac20","category":"performance","severity":"low","file":"scripts/josh/josh-gh-usage.ts:30","disposition":"fixed","description":"every gh-calling josh command now waits at exit for a serial rate_limit read and a locked log rewrite, and the issue's requested exit-time measurement is not recorded.","status":"resolved"}
+- rx:{"round":"32ecea8d-fcbe-4cf9-a3e8-d37f3360ac20","category":"project-conventions","severity":"low","file":"scripts/gh/gh-usage-log.ts:30","disposition":"fixed","description":"the locked read-cap-rewrite duplicates run_event_stream.append_event's shape, leaving two capped-JSONL writers that can drift.","status":"resolved"}
+- rx:{"round":"32ecea8d-fcbe-4cf9-a3e8-d37f3360ac20","category":"tests","severity":"low","file":"scripts/josh/josh-gh-usage.test.ts:57","disposition":"fixed","description":"the extra manual write after recorded() muddles what the entry test asserts and duplicates the write-once test.","status":"resolved"}
+- ri:performance | low | scripts/run/board/run-board-human-merge.ts:30 | 2026-11-07 | #6708 | fixed
+- rb:2026-11-07 | #6708
+- rf:none | none | - | 2026-11-07 | #6708
+- rb:2026-11-07 | #6718
+- rf:bug-risks | medium | scripts/run/wake/run-wake-cli.ts:96 | 2026-11-07 | #6718 | fixed
+- rf:project-conventions | medium | docs/maintainers/backlogrun-progress-rationale.md:128 | 2026-11-07 | #6718 | fixed
+- rf:bug-risks | low | scripts/backlog/backlog-drive-owner.ts:57 | 2026-11-07 | #6718 | fixed
+- rx:{"round":"e81b1ee8-3516-4040-8557-0f713571c4cc","category":"bug-risks","severity":"medium","file":"scripts/run/wake/run-wake-cli.ts:96","disposition":"fixed","description":"The wake supervisor's default interval follows OFFER_INTERVAL_MS, so a judgment session that cuts within 180 s is never seen as a claim and the run sits pending for the 10-minute grace and burns wake attempts.","status":"resolved"}
+- rx:{"round":"e81b1ee8-3516-4040-8557-0f713571c4cc","category":"project-conventions","severity":"medium","file":"docs/maintainers/backlogrun-progress-rationale.md:128","disposition":"fixed","description":"The interval rationale docs and several comments still state the offer interval as 60 seconds or once a minute and omit the REST-budget reason for 180.","status":"resolved"}
+- rx:{"round":"e81b1ee8-3516-4040-8557-0f713571c4cc","category":"bug-risks","severity":"low","file":"scripts/backlog/backlog-drive-owner.ts:57","disposition":"fixed","description":"An unreadable carry record now takes 18 minutes rather than 6 to fail the driver.","status":"resolved"}
+- ri:comments | medium | docs/josh-commands-backlog.md:926 | 2026-11-07 | #6718 | fixed
+- ri:bug-risks | low | scripts/backlog/backlog-drive.ts:427 | 2026-11-07 | #6718 | fixed
+- ri:bug-risks | low | scripts/run/wake/run-wake-cli.ts:96 | 2026-11-07 | #6718 | fixed
+- ri:bug-risks | low | scripts/backlog/backlog-drive-owner.ts:57 | 2026-11-07 | #6718 | fixed
+- rb:2026-11-07 | #6719
+- rf:bug-risks | medium | scripts/gh/git-pr-checks.ts:301 | 2026-11-07 | #6719 | fixed
+- rf:bug-risks | low | scripts/lib/poll.ts:113 | 2026-11-07 | #6719 | fixed
+- rf:tests | low | scripts/gh/git-pr-checks.ts:284 | 2026-11-07 | #6719 | fixed
+- rx:{"round":"c547659f-069b-4ec5-9568-120c8c0a4670","category":"bug-risks","severity":"medium","file":"scripts/gh/git-pr-checks.ts:301","disposition":"fixed","description":"Under the backoff the progress line still shows max_attempts as its denominator, so a default wait times out at about (19/97) and reads as giving up early.","status":"resolved"}
+- rx:{"round":"c547659f-069b-4ec5-9568-120c8c0a4670","category":"bug-risks","severity":"low","file":"scripts/lib/poll.ts:113","disposition":"fixed","description":"poll_for now reads once even when attempts is 0, which changes its contract, though no caller currently passes 0.","status":"resolved"}
+- rx:{"round":"c547659f-069b-4ec5-9568-120c8c0a4670","category":"tests","severity":"low","file":"scripts/gh/git-pr-checks.ts:284","disposition":"fixed","description":"No test covers the seen wiring in pr_poll_options, so a constant seen or a dropped backoff option would pass every test.","status":"resolved"}
+- rb:2026-11-07 | #6721
+- rf:performance | low | scripts/gh/git-gh-pr-snapshot.ts:108 | 2026-11-07 | #6721 | fixed
+- rf:project-conventions | low | scripts/gh/git-gh-pr-graphql-state.ts:55 | 2026-11-07 | #6721 | fixed
+- rf:tests | low | scripts/gh/git-gh-poll-read.ts:70 | 2026-11-07 | #6721 | fixed
+- rf:comments | low | scripts/gh/git-gh-pr-snapshot.ts:12 | 2026-11-07 | #6721 | fixed
+- rx:{"round":"cf1646b5-727d-42bf-a679-97ef11709bf2","category":"performance","severity":"low","file":"scripts/gh/git-gh-pr-snapshot.ts:108","disposition":"fixed","description":"A failed conditional detail read is re-read unconditionally, so a too-large pull request costs two failing core requests per tick instead of one.","status":"resolved"}
+- rx:{"round":"cf1646b5-727d-42bf-a679-97ef11709bf2","category":"project-conventions","severity":"low","file":"scripts/gh/git-gh-pr-graphql-state.ts:55","disposition":"fixed","description":"try_read_merge_state is an identity wrapper over try_query_merge_state.","status":"resolved"}
+- rx:{"round":"cf1646b5-727d-42bf-a679-97ef11709bf2","category":"tests","severity":"low","file":"scripts/gh/git-gh-poll-read.ts:70","disposition":"fixed","description":"The read_detail undefined answer and the read_pull fallback it drives are never exercised, because the fixture conditional read throws where the real one answers unreadable.","status":"resolved"}
+- rx:{"round":"cf1646b5-727d-42bf-a679-97ef11709bf2","category":"comments","severity":"low","file":"scripts/gh/git-gh-pr-snapshot.ts:12","disposition":"fixed","description":"The file header still says GraphQL is used only for too-large pull requests, though it now supplies the state on every 304 tick.","status":"resolved"}
+- rb:2026-11-07 | #6722
+- rf:bug-risks | low | scripts/gh/git-gh-issue-graphql.ts:117 | 2026-11-07 | #6722 | false-positive
+- rf:performance | low | scripts/gh/git-gh-issue-read.ts:413 | 2026-11-07 | #6722 | deferred:#6722
+- rf:project-conventions | low | scripts/gh/git-gh-issue-graphql.ts:189 | 2026-11-07 | #6722 | fixed
+- rx:{"round":"f60d7421-bcdf-4d02-9003-e2ebf51654fc","category":"bug-risks","severity":"low","file":"scripts/gh/git-gh-issue-graphql.ts:117","disposition":"false-positive","description":"A deleted author maps to no user on the GraphQL path where REST serves the ghost login, changing only the displayed name.","status":"resolved"}
+- rx:{"round":"f60d7421-bcdf-4d02-9003-e2ebf51654fc","category":"performance","severity":"low","file":"scripts/gh/git-gh-issue-read.ts:413","disposition":"deferred:#6722","description":"A GraphQL-refused session pays one failed GraphQL round trip before every REST fallback read.","status":"new"}
+- rx:{"round":"f60d7421-bcdf-4d02-9003-e2ebf51654fc","category":"project-conventions","severity":"low","file":"scripts/gh/git-gh-issue-graphql.ts:189","disposition":"fixed","description":"ISSUE_QUERY is exported but imported nowhere.","status":"resolved"}
+- rb:2026-11-07 | #6722
+- rf:bug-risks | low | scripts/gh/git-gh-issue-graphql.ts:117 | 2026-11-07 | #6722 | false-positive
+- rf:performance | low | scripts/gh/git-gh-issue-read.ts:413 | 2026-11-07 | #6722 | false-positive
+- rf:project-conventions | low | scripts/gh/git-gh-issue-graphql.ts:189 | 2026-11-07 | #6722 | fixed
+- rx:{"round":"8f4509a1-2836-469b-b023-f34363d9ce1c","previous":"f60d7421-bcdf-4d02-9003-e2ebf51654fc","category":"bug-risks","severity":"low","file":"scripts/gh/git-gh-issue-graphql.ts:117","disposition":"false-positive","description":"A deleted author maps to no user on the GraphQL path where REST serves the ghost login, changing only the displayed name.","status":"resolved"}
+- rx:{"round":"8f4509a1-2836-469b-b023-f34363d9ce1c","previous":"f60d7421-bcdf-4d02-9003-e2ebf51654fc","category":"performance","severity":"low","file":"scripts/gh/git-gh-issue-read.ts:413","disposition":"false-positive","description":"A GraphQL-refused session pays one failed GraphQL round trip before every REST fallback read.","status":"resolved"}
+- rx:{"round":"8f4509a1-2836-469b-b023-f34363d9ce1c","previous":"f60d7421-bcdf-4d02-9003-e2ebf51654fc","category":"project-conventions","severity":"low","file":"scripts/gh/git-gh-issue-graphql.ts:189","disposition":"fixed","description":"ISSUE_QUERY is exported but imported nowhere.","status":"resolved"}
+- ri:none | none | - | 2026-11-07 | #6724
+- rb:2026-11-07 | #6724
+- rf:tests | medium | scripts/split/split-relocations.ts:96 | 2026-11-07 | #6724 | fixed
+- rx:{"round":"e70df6a0-a8bf-4c26-8e64-a5dd46532ce7","category":"tests","severity":"medium","file":"scripts/split/split-relocations.ts:96","disposition":"fixed","description":"The tracked half of the added list (added_paths of the raw diff) is exercised by no test, so dropping it would bring back the two-file count for a committed module and its importer with the suite green.","status":"resolved"}
+- rb:2026-11-08 | #6725
+- rf:performance | low | scripts/followup/followup-run-rerun.ts:93 | 2026-11-08 | #6725 | fixed
+- rf:tests | low | scripts/followup/followup-run-rerun.test.ts:96 | 2026-11-08 | #6725 | fixed
+- rf:comments | low | scripts/followup/followup-job-rerun.ts:53 | 2026-11-08 | #6725 | fixed
+- rx:{"round":"6f4ffcc7-382a-44fb-9b0a-b230c912d5cf","category":"performance","severity":"low","file":"scripts/followup/followup-run-rerun.ts:93","disposition":"fixed","description":"The latest-jobs reading serializes whole loose job objects, so step progress resets the backoff and it degrades to a near-fixed 30 s cadence during a rerun.","status":"resolved"}
+- rx:{"round":"6f4ffcc7-382a-44fb-9b0a-b230c912d5cf","category":"tests","severity":"low","file":"scripts/followup/followup-run-rerun.test.ts:96","disposition":"fixed","description":"No test shows a changed reading resets the interval for the latest-jobs or register polls, so dropping either seen passes.","status":"resolved"}
+- rx:{"round":"6f4ffcc7-382a-44fb-9b0a-b230c912d5cf","category":"comments","severity":"low","file":"scripts/followup/followup-job-rerun.ts:53","disposition":"fixed","description":"The comment calls attempts × interval the wait budget, but poll.ts budgets (attempts − 1) × interval.","status":"resolved"}
+- ri:none | none | - | 2026-11-08 | #6729
+- rb:2026-11-08 | #6729
+- rf:none | none | - | 2026-11-08 | #6729
+- ri:bug-risks | medium | scripts/issue/issue-classification.ts:67 | 2026-11-08 | #6732 | fixed
+- rb:2026-11-08 | #6732
+- rf:bug-risks | medium | scripts/ci/pr-classification.ts:55 | 2026-11-08 | #6732 | fixed
+- rf:bug-risks | low | scripts/ci/pr-classification.ts:21 | 2026-11-08 | #6732 | fixed
+- rf:bug-risks | low | scripts/ci/pr-classification.ts:86 | 2026-11-08 | #6732 | fixed
+- rf:tests | low | scripts/ci/pr-classification.test.ts:11 | 2026-11-08 | #6732 | fixed
+- rx:{"round":"210a9534-078d-42e1-b8e6-0bc63315d632","category":"bug-risks","severity":"medium","file":"scripts/ci/pr-classification.ts:55","disposition":"fixed","description":"with_declaration glues the declaration onto a trailing '## 背景' heading with no newline, destroying the heading and leaving the classification unread.","status":"resolved"}
+- rx:{"round":"210a9534-078d-42e1-b8e6-0bc63315d632","category":"bug-risks","severity":"low","file":"scripts/ci/pr-classification.ts:21","disposition":"fixed","description":"DECLARATION_LINE also strips fenced example declarations, consistent with the non-fence-aware reader.","status":"resolved"}
+- rx:{"round":"210a9534-078d-42e1-b8e6-0bc63315d632","category":"bug-risks","severity":"low","file":"scripts/ci/pr-classification.ts:86","disposition":"fixed","description":"the found-none hint names an issue number that issue:file does not yet have, though no reachable body was found.","status":"resolved"}
+- rx:{"round":"210a9534-078d-42e1-b8e6-0bc63315d632","category":"tests","severity":"low","file":"scripts/ci/pr-classification.test.ts:11","disposition":"fixed","description":"with_declaration lacks cases for a bullet-less background section and a heading at the end of the body.","status":"resolved"}
+- rb:2026-11-08 | #6733
+- rf:bug-risks | medium | scripts/issue/issue-file-cli.ts:288 | 2026-11-08 | #6733 | fixed
+- rf:bug-risks | low | scripts/issue/issue-classification.ts:17 | 2026-11-08 | #6733 | fixed
+- rf:bug-risks | low | scripts/ci/pr-classification.ts:89 | 2026-11-08 | #6733 | fixed
+- rf:tests | medium | scripts/issue/issue-file-cli-one-pass.test.ts:137 | 2026-11-08 | #6733 | fixed
+- rf:comments | medium | prompts/collaboration-workflow/issue-template.md:77 | 2026-11-08 | #6733 | fixed
+- rx:{"round":"b39834c5-3c16-40df-9652-29d350bf2cc5","category":"bug-risks","severity":"medium","file":"scripts/issue/issue-file-cli.ts:288","disposition":"fixed","description":"The other-change completion and filing-time refusal ignore extra --label release classifications, so a non-bug body filed with --label ignore-for-release ships an Issue josh pr refuses as ambiguous.","status":"resolved"}
+- rx:{"round":"b39834c5-3c16-40df-9652-29d350bf2cc5","category":"bug-risks","severity":"low","file":"scripts/issue/issue-classification.ts:17","disposition":"fixed","description":"NON_BUG_LINE requires the exact canonical line while the bug check trims, so a trailing-space non-bug line is refused with found: none instead of being completed.","status":"resolved"}
+- rx:{"round":"b39834c5-3c16-40df-9652-29d350bf2cc5","category":"bug-risks","severity":"low","file":"scripts/ci/pr-classification.ts:89","disposition":"fixed","description":"The shared refusal text says before opening the PR although issue:file now prints it at filing time.","status":"resolved"}
+- rx:{"round":"b39834c5-3c16-40df-9652-29d350bf2cc5","category":"tests","severity":"medium","file":"scripts/issue/issue-file-cli-one-pass.test.ts:137","disposition":"fixed","description":"No test fails if filing_of stops applying with_release_classification, so the filed body could lose the other-change declaration unnoticed.","status":"resolved"}
+- rx:{"round":"b39834c5-3c16-40df-9652-29d350bf2cc5","category":"comments","severity":"medium","file":"prompts/collaboration-workflow/issue-template.md:77","disposition":"fixed","description":"The note on the bug row tells filers to add a release classification declaration, which on a bug body creates the ambiguity issue:file refuses.","status":"resolved"}
+- rb:2026-11-08 | #6737
+- rf:bug-risks | medium | scripts/review/prose-stale-scan.ts:203 | 2026-11-08 | #6737 | fixed
+- rx:{"round":"43ca4071-99c3-4b24-8ed0-9b01e4961521","category":"bug-risks","severity":"medium","file":"scripts/review/prose-stale-scan.ts:203","disposition":"fixed","description":"is_code_use drops plain-word names written as code inside Markdown fences or import braces, so removing an export like the prettier config leaves docs/manual-config.md:14 unreported.","status":"resolved"}
+- ri:bug-risks | medium | scripts/backlog/backlog-drive-cli.ts:143 | 2026-11-08 | #6738 | fixed
+- rb:2026-11-08 | #6738
+- rf:bug-risks | medium | scripts/backlog/backlog-drive-cli.ts:143 | 2026-11-08 | #6738 | fixed
+- rf:tests | low | scripts/backlog/backlog-drive-after-merge.test.ts:57 | 2026-11-08 | #6738 | fixed
+- rx:{"round":"0fb50df7-9bab-4b16-a275-c6a6a4f770bb","category":"bug-risks","severity":"medium","file":"scripts/backlog/backlog-drive-cli.ts:143","disposition":"fixed","description":"mark_done runs before the park is auto-resolved, so a named or --only run books the resolved child and its declared successors done and never re-dispatches them.","status":"resolved"}
+- rx:{"round":"0fb50df7-9bab-4b16-a275-c6a6a4f770bb","category":"tests","severity":"low","file":"scripts/backlog/backlog-drive-after-merge.test.ts:57","disposition":"fixed","description":"no backlog_drive_cli.merge test covers the parked path's ordering against mark_done.","status":"resolved"}
+- rb:2026-11-08 | #6741
+- rf:bug-risks | medium | scripts/issue/issue-file-interrupt.ts:82 | 2026-11-08 | #6741 | fixed
+- rf:bug-risks | low | scripts/issue/issue-file-interrupt.ts:86 | 2026-11-08 | #6741 | fixed
+- rx:{"round":"bc51f6dd-d8b4-4cac-8479-3b9d712c767d","category":"bug-risks","severity":"medium","file":"scripts/issue/issue-file-interrupt.ts:82","disposition":"fixed","description":"convert_park ignores a failed decision comment and still clears needs-decision silently, leaving the park question unanswered on relaunch.","status":"resolved"}
+- rx:{"round":"bc51f6dd-d8b4-4cac-8479-3b9d712c767d","category":"bug-risks","severity":"low","file":"scripts/issue/issue-file-interrupt.ts:86","disposition":"fixed","description":"the conversion clears the label but not the local park record that run:park --clear also removes.","status":"resolved"}
+- rb:2026-11-08 | #6742
+- rf:bug-risks | medium | .claude/skills/workflow-commands/prerequisite.md:34 | 2026-11-08 | #6742 | fixed
+- rx:{"round":"598ae6d8-1b5f-4180-92ec-878f98b2d43a","category":"bug-risks","severity":"medium","file":".claude/skills/workflow-commands/prerequisite.md:34","disposition":"fixed","description":"The added line promises a 🙋 decision row for every protected label, but only needs-decision parks render there; needs-human-review and already-done re-parks show as 💤 parked rows.","status":"resolved"}
+- ri:bug-risks | medium | scripts/run/board/run-board-decision.ts:4 | 2026-11-08 | #6742 | fixed
+- ri:bug-risks | low | scripts/lane/lane-breakdown-pause.ts:28 | 2026-11-08 | #6742 | fixed
+- ri:tests | low | scripts/backlog/backlog-drive-retry.test.ts:62 | 2026-11-08 | #6742 | fixed
+- ri:comments | low | .claude/skills/workflow-commands/prerequisite.md:34 | 2026-11-08 | #6742 | fixed
+- rb:2026-11-08 | #6743
+- rf:bug-risks | medium | .claude/skills/workflow-commands/retrospective.md:3 | 2026-11-08 | #6743 | fixed
+- rf:bug-risks | low | scripts/run/handoff/run-handoff-cli.ts:150 | 2026-11-08 | #6743 | fixed
+- rf:project-conventions | low | scripts/run/handoff/run-handoff-launch.ts:44 | 2026-11-08 | #6743 | fixed
+- rf:comments | low | docs/josh-commands-run.md:985 | 2026-11-08 | #6743 | fixed
+- rx:{"round":"01f8f716-5256-49e7-8873-a33d1512cc97","category":"bug-risks","severity":"medium","file":".claude/skills/workflow-commands/retrospective.md:3","disposition":"fixed","description":"The doc hands the retrospective to a unit no step starts: run:step still prints pnpm josh retrospective and SKILL.md:100 still gives the procedure to the parent.","status":"resolved"}
+- rx:{"round":"01f8f716-5256-49e7-8873-a33d1512cc97","category":"bug-risks","severity":"low","file":"scripts/run/handoff/run-handoff-cli.ts:150","disposition":"fixed","description":"A carry already marked before launch makes run:handoff retrospective exit 0 even when the unit did nothing.","status":"resolved"}
+- rx:{"round":"01f8f716-5256-49e7-8873-a33d1512cc97","category":"project-conventions","severity":"low","file":"scripts/run/handoff/run-handoff-launch.ts:44","disposition":"fixed","description":"The shared PREAMBLE tells the retrospective unit it was handed over by a consultation session, which is untrue.","status":"resolved"}
+- rx:{"round":"01f8f716-5256-49e7-8873-a33d1512cc97","category":"comments","severity":"low","file":"docs/josh-commands-run.md:985","disposition":"fixed","description":"The role line says kickoff is the only scheduler keyword, but retrospective now runs as scheduler too.","status":"resolved"}
+- ri:bug-risks | medium | scripts/run/handoff/run-handoff-launch.ts:79 | 2026-11-08 | #6743 | fixed
+- ri:bug-risks | low | .claude/skills/workflow-commands/SKILL.md:100 | 2026-11-08 | #6743 | fixed
+- ri:bug-risks | low | .claude/skills/workflow-commands/retrospective.md:3 | 2026-11-08 | #6743 | fixed
+- rb:2026-11-08 | #6745
+- rf:bug-risks | high | scripts/backlog/backlog-drive-retrospective-unit.ts:80 | 2026-11-08 | #6745 | fixed
+- rf:bug-risks | medium | scripts/backlog/backlog-drive-retrospective-unit.ts:82 | 2026-11-08 | #6745 | fixed
+- rf:bug-risks | low | scripts/backlog/backlog-drive-retrospective-unit.ts:21 | 2026-11-08 | #6745 | fixed
+- rf:tests | low | scripts/backlog/backlog-drive-retrospective-unit.test.ts:47 | 2026-11-08 | #6745 | fixed
+- rx:{"round":"7fc81e3e-76b3-4175-a282-2885da826bc8","category":"bug-risks","severity":"high","file":"scripts/backlog/backlog-drive-retrospective-unit.ts:80","disposition":"fixed","description":"The retrospective unit launches against a run record the live supervisor owns, so its run:carry --retrospective close is refused as busy and the retrospective event is lost.","status":"resolved"}
+- rx:{"round":"7fc81e3e-76b3-4175-a282-2885da826bc8","category":"bug-risks","severity":"medium","file":"scripts/backlog/backlog-drive-retrospective-unit.ts:82","disposition":"fixed","description":"Unit success is read from exit 0 rather than the carry's retrospective-done mark, so a session that stops on a question ends the run with the retrospective never run.","status":"resolved"}
+- rx:{"round":"7fc81e3e-76b3-4175-a282-2885da826bc8","category":"bug-risks","severity":"low","file":"scripts/backlog/backlog-drive-retrospective-unit.ts:21","disposition":"fixed","description":"The unit brief never names pnpm josh retrospective, leaving the child to discover the digest command.","status":"resolved"}
+- rx:{"round":"7fc81e3e-76b3-4175-a282-2885da826bc8","category":"tests","severity":"low","file":"scripts/backlog/backlog-drive-retrospective-unit.test.ts:47","disposition":"fixed","description":"The unit tests fake only the exit code and leave the provider-rejected branch untested.","status":"resolved"}
+- ri:bug-risks | medium | scripts/run/board/run-board-setup.ts:63 | 2026-11-08 | #6745 | fixed
+- ri:bug-risks | medium | scripts/run/carry/run-carry-cli.ts:311 | 2026-11-08 | #6745 | fixed
+- rb:2026-11-08 | #6752
+- rf:bug-risks | medium | scripts/issue/issue-closing-pr.ts:81 | 2026-11-08 | #6752 | fixed
+- rf:bug-risks | low | scripts/hooks/stop-actions.ts:62 | 2026-11-08 | #6752 | fixed
+- rf:comments | low | scripts/gh/gh-spawn.ts:5 | 2026-11-08 | #6752 | fixed
+- rx:{"round":"a73d8ad0-0773-46fb-a312-1998104bcab0","category":"bug-risks","severity":"medium","file":"scripts/issue/issue-closing-pr.ts:81","disposition":"fixed","description":"The slug now comes from the remote URL spelling, so the === comparison against the timeline's canonical full_name misses on a case difference or a renamed repository and the merged closing PR is not found.","status":"resolved"}
+- rx:{"round":"a73d8ad0-0773-46fb-a312-1998104bcab0","category":"bug-risks","severity":"low","file":"scripts/hooks/stop-actions.ts:62","disposition":"fixed","description":"The new rate-limit throw on the API fallback turns a notify that used to be sent without an issue URL into one that is dropped.","status":"resolved"}
+- rx:{"round":"a73d8ad0-0773-46fb-a312-1998104bcab0","category":"comments","severity":"low","file":"scripts/gh/gh-spawn.ts:5","disposition":"fixed","description":"The header still says the sync reader reads the slug the same way as repo_get_name_with_owner, which now resolves locally first.","status":"resolved"}
+- rf:none | none | - | 2026-11-08 | #6754
+- k:followup-unrelated-test-rerun | d1 | 2026-11-08 | scripts/issue/issue-body-or-comment.test.ts, scripts/issue/issue-watch-diff.test.ts, scripts/backlog/backlog-next-budget.test.ts | followup reran Unit Tests (1/6), Unit Tests (6/6); failed outside the change: isolated scripts/issue/issue-body-or-comment.test.ts > issue_body_or_comment.post — a member is asked for write access > writes into the blank body of a member with write access; isolated scripts/issue/issue-watch-diff.test.ts > issue_watch_diff — an author without write access > does not trust a read-only COLLABORATOR, asking within the caller’s timeout; isolated scripts/backlog/backlog-next-budget.test.ts > asks a member author once in the first scan and keeps the write role
+- ri:bug-risks | medium | scripts/issue/issue-watch-hook.ts:22 | 2026-11-08 | #6754 | fixed
+- rb:2026-11-08 | #6755
+- rf:comments | low | scripts/gh/git-gh-poll-read.ts:9 | 2026-11-08 | #6755 | fixed
+- rx:{"round":"449db724-f33d-462a-9c49-a8d76f007c38","category":"comments","severity":"low","file":"scripts/gh/git-gh-poll-read.ts:9","disposition":"fixed","description":"The module header says every read is ETag-conditional, but the newly hosted read_array_pages sends no ETag.","status":"resolved"}
+- rb:2026-11-08 | #6756
+- rf:none | none | - | 2026-11-08 | #6756
+- rb:2026-11-08 | #6757
+- rf:bug-risks | medium | scripts/issue/issue-priority.ts:243 | 2026-11-08 | #6757 | fixed
+- rf:tests | medium | scripts/issue/issue-priority-raise.test.ts:80 | 2026-11-08 | #6757 | fixed
+- rf:bug-risks | low | scripts/issue/issue-priority-raise.ts:47 | 2026-11-08 | #6757 | fixed
+- rx:{"round":"4860a18c-72c9-4e3d-8e7d-8cabc7da6b10","category":"bug-risks","severity":"medium","file":"scripts/issue/issue-priority.ts:243","disposition":"fixed","description":"raise_label ignores the high floor when the body has a priority declaration, so a declared-normal issue whose appended cause-loss lines reach 30 minutes is no longer raised.","status":"resolved"}
+- rx:{"round":"4860a18c-72c9-4e3d-8e7d-8cabc7da6b10","category":"tests","severity":"medium","file":"scripts/issue/issue-priority-raise.test.ts:80","disposition":"fixed","description":"no test pairs a declaration with a floor line, so the dropped-floor regression passes the suite.","status":"resolved"}
+- rx:{"round":"4860a18c-72c9-4e3d-8e7d-8cabc7da6b10","category":"bug-risks","severity":"low","file":"scripts/issue/issue-priority-raise.ts:47","disposition":"fixed","description":"raising high to critical leaves priority:high on the issue beside priority:critical.","status":"resolved"}
+- rb:2026-11-08 | #6758
+- rf:bug-risks | medium | scripts/issue/issue-priority-critical.ts:23 | 2026-11-08 | #6758 | fixed
+- rx:{"round":"474c0d69-1560-4d7b-a47c-dc23f481786e","category":"bug-risks","severity":"medium","file":"scripts/issue/issue-priority-critical.ts:23","disposition":"fixed","description":"Label is applied before the reason comment, so a failed comment followed by a retry answers labelled and the person's instruction is never recorded.","status":"resolved"}
+- ri:bug-risks | medium | scripts/hooks/stop-actions.ts:63 | 2026-11-08 | #6766 | fixed
+- ri:tests | low | scripts/hooks/stop-actions.test.ts:218 | 2026-11-08 | #6766 | fixed
+- rb:2026-11-08 | #6766
+- rf:none | none | - | 2026-11-08 | #6766
+- rf:comments | low | scripts/lint/eslint-daemon.ts:247 | 2026-11-09 | #6768
+- rb:2026-11-09 | #6768
+- rf:tests | medium | eslint/untyped.test.ts:148 | 2026-11-09 | #6768
+- rf:tests | low | eslint/untyped.test.ts:148 | 2026-11-09 | #6768
+- rf:comments | low | scripts/lint/eslint-warm.ts:8 | 2026-11-09 | #6768
+- rx:{"round":"876acfd5-d86a-4fc0-ac5b-9456c7ef81b2","category":"tests","severity":"medium","file":"eslint/untyped.test.ts:148","description":"nothing pins `linterOptions: { reportUnusedDisableDirectives: 'off' }` (eslint/untyped.js:60): UNFIXED has no disable comment, so deleting that line keeps every test green, and the hook's `eslint --fix` (default `warn`) would then strip a legitimate `// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition` from an edited file because the rule is off in the untyped run, after which the typed gate fails on the restored violation; add a case that lints a typed-rule disable comment with the untyped switch and expects the output to keep it — other sites: eslint/untyped.js:28","status":"new"}
+- rx:{"round":"876acfd5-d86a-4fc0-ac5b-9456c7ef81b2","category":"tests","severity":"low","file":"eslint/untyped.test.ts:148","description":"no test asserts any entry of TYPE_GUESSING_RULES (eslint/untyped.js:28) is off, so dropping one still passes and the hook then reports a code the typed gate accepts (noisy diagnostics only, no breakage)","status":"new"}
+- rx:{"round":"876acfd5-d86a-4fc0-ac5b-9456c7ef81b2","category":"comments","severity":"low","file":"scripts/lint/eslint-warm.ts:8","description":"the header and line 18 still say the warm-up pays for the type program that only a typed source lint pays, but the daemon it starts is now untyped; no failure scenario — the warm-up still loads the config and plugins, only its explanation is stale","status":"new"}
+- ri:bug-risks | high | scripts/hooks/format-edited-file.ts:4 | 2026-11-09 | #6768
+- ri:performance | medium | scripts/hooks/format-edited-file.ts:4 | 2026-11-09 | #6768
+- ri:bug-risks | low | scripts/lint/eslint-daemon.ts:318 | 2026-11-09 | #6768
+- rf:tests | low | tools/josh/josh-ready.test.ts:144 | 2026-11-09 | #6769
+- rf:bug-risks | low | tools/hooks/bundle-rebuild-lock.ts:30 | 2026-11-09 | #6769
+- rb:2026-11-09 | #6769
+- rf:bug-risks | medium | tools/josh/josh-ready.ts:53 | 2026-11-09 | #6769 | fixed
+- rf:bug-risks | medium | tools/josh/josh-ready.ts:74 | 2026-11-09 | #6769 | fixed
+- rf:bug-risks | low | tools/hooks/bundle-rebuild-lock.ts:23 | 2026-11-09 | #6769 | fixed
+- rf:tests | low | tools/josh/josh-ready.ts:35 | 2026-11-09 | #6769 | fixed
+- rx:{"round":"68c9fe38-0a55-495b-bb8b-e7b3da7226a6","category":"bug-risks","severity":"medium","file":"tools/josh/josh-ready.ts:53","disposition":"fixed","description":"A failed rebuild is re-run serially by every waiter and by every later launch, because no failure is recorded the way the hook launcher records it.","status":"resolved"}
+- rx:{"round":"68c9fe38-0a55-495b-bb8b-e7b3da7226a6","category":"bug-risks","severity":"medium","file":"tools/josh/josh-ready.ts:74","disposition":"fixed","description":"FAILED_NOTICE claims the rebuild failed even when the build succeeded and the source was only edited during it.","status":"resolved"}
+- rx:{"round":"68c9fe38-0a55-495b-bb8b-e7b3da7226a6","category":"bug-risks","severity":"low","file":"tools/hooks/bundle-rebuild-lock.ts:23","disposition":"fixed","description":"A build longer than 60 s lets a waiter take over the live lock, and the first holder's release then deletes the second holder's lock.","status":"resolved"}
+- rx:{"round":"68c9fe38-0a55-495b-bb8b-e7b3da7226a6","category":"tests","severity":"low","file":"tools/josh/josh-ready.ts:35","disposition":"fixed","description":"The default rebuild_from_source and its stdout-to-stderr redirection are never exercised by a test.","status":"resolved"}
+- rf:bug-risks | low | scripts/backlog/backlog-triage-adopt.ts:198 | 2026-11-09 | #6776
+- ri:bug-risks | medium | scripts/run/entry/run-entry-lane-plan.ts:34 | 2026-11-09 | #6776 | fixed
+- ri:project-conventions | low | docs/josh-commands-run.md:351 | 2026-11-09 | #6776 | fixed
+- rb:2026-11-09 | #6776
+- rf:bug-risks | medium | scripts/run/park/run-park-body.ts:110 | 2026-11-09 | #6776 | fixed
+- rf:bug-risks | low | scripts/backlog/backlog-triage-approval.ts:54 | 2026-11-09 | #6776 | fixed
+- rf:bug-risks | low | scripts/backlog/backlog-triage-adopt.ts:198 | 2026-11-09 | #6776 | fixed
+- rx:{"round":"58ea235b-58b1-4eb2-b0b9-be840e2494a8","category":"bug-risks","severity":"medium","file":"scripts/run/park/run-park-body.ts:110","disposition":"fixed","description":"The park schema accepts an empty path segment or a zero bound that lane-plan-approval's json schema rejects, so the child's lane:plan fails with only USAGE.","status":"resolved"}
+- rx:{"round":"58ea235b-58b1-4eb2-b0b9-be840e2494a8","category":"bug-risks","severity":"low","file":"scripts/backlog/backlog-triage-approval.ts:54","disposition":"fixed","description":"The startsWith reuse test matches a comment whose last bound only shares a prefix (max_files 60 against 6), so the json cites the wrong comment as its source.","status":"resolved"}
+- rx:{"round":"58ea235b-58b1-4eb2-b0b9-be840e2494a8","category":"bug-risks","severity":"low","file":"scripts/backlog/backlog-triage-adopt.ts:198","disposition":"fixed","description":"A failure writing the approval throws out of adopt instead of returning a refused problem like every other failure.","status":"resolved"}
+- rb:2026-11-09 | #6776
+- rf:bug-risks | medium | scripts/run/park/run-park-body.ts:110 | 2026-11-09 | #6776 | fixed
+- rf:bug-risks | low | scripts/backlog/backlog-triage-approval.ts:54 | 2026-11-09 | #6776 | fixed
+- rf:bug-risks | low | scripts/backlog/backlog-triage-adopt.ts:198 | 2026-11-09 | #6776 | fixed
+- rx:{"round":"ebee6acd-fa58-484d-b4d3-3d6d3eeaf909","previous":"58ea235b-58b1-4eb2-b0b9-be840e2494a8","category":"bug-risks","severity":"medium","file":"scripts/run/park/run-park-body.ts:110","disposition":"fixed","description":"The park schema accepts an empty path segment or a zero bound that lane-plan-approval's json schema rejects, so the child's lane:plan fails with only USAGE.","status":"resolved"}
+- rx:{"round":"ebee6acd-fa58-484d-b4d3-3d6d3eeaf909","previous":"58ea235b-58b1-4eb2-b0b9-be840e2494a8","category":"bug-risks","severity":"low","file":"scripts/backlog/backlog-triage-approval.ts:54","disposition":"fixed","description":"The startsWith reuse test matches a comment whose last bound only shares a prefix (max_files 60 against 6), so the json cites the wrong comment as its source.","status":"resolved"}
+- rx:{"round":"ebee6acd-fa58-484d-b4d3-3d6d3eeaf909","previous":"58ea235b-58b1-4eb2-b0b9-be840e2494a8","category":"bug-risks","severity":"low","file":"scripts/backlog/backlog-triage-adopt.ts:198","disposition":"fixed","description":"A failure writing the approval throws out of adopt instead of returning a refused problem like every other failure.","status":"resolved"}
+- rf:comments | low | .claude/skills/workflow-commands/backlogrun-steps.md:93 | 2026-11-09 | #6777
+- rf:bug-risks | low | scripts/backlog/backlog-triage-park.ts:41 | 2026-11-09 | #6777
+- ri:performance | low | scripts/backlog/backlog-triage-pass.ts:21 | 2026-11-09 | #6777 | fixed
+- ri:comments | low | .claude/skills/workflow-commands/backlogrun-steps.md:93 | 2026-11-09 | #6777 | fixed
+- rb:2026-11-09 | #6777
+- rf:bug-risks | medium | scripts/backlog/backlog-triage-pass.ts:40 | 2026-11-09 | #6777 | fixed
+- rf:bug-risks | low | scripts/backlog/backlog-triage-park.ts:43 | 2026-11-09 | #6777 | fixed
+- rf:performance | low | scripts/backlog/backlog-triage-pass.ts:21 | 2026-11-09 | #6777 | fixed
+- rx:{"round":"f47e6b7e-23f8-4cc3-afc9-a5ccd6cbd9a5","category":"bug-risks","severity":"medium","file":"scripts/backlog/backlog-triage-pass.ts:40","disposition":"fixed","description":"The pass prints a stale --adopt line for run:stalled children whose latest schema park was already adopted, inviting a duplicate decision and a blind requeue.","status":"resolved"}
+- rx:{"round":"f47e6b7e-23f8-4cc3-afc9-a5ccd6cbd9a5","category":"bug-risks","severity":"low","file":"scripts/backlog/backlog-triage-park.ts:43","disposition":"fixed","description":"A failed comment read prints nothing, indistinguishable from an off-schema park.","status":"resolved"}
+- rx:{"round":"f47e6b7e-23f8-4cc3-afc9-a5ccd6cbd9a5","category":"performance","severity":"low","file":"scripts/backlog/backlog-triage-pass.ts:21","disposition":"fixed","description":"One unbounded parallel comment read per parked child, duplicated by the following issue:read.","status":"resolved"}
+- ri:performance | low | scripts/hooks/direct-gh-usage.ts:77 | 2026-11-08 | #6781 | fixed
+- ri:project-conventions | low | scripts/hooks/pretool-guard.ts:233 | 2026-11-08 | #6781 | fixed
+- ri:comments | low | scripts/hooks/direct-gh-usage.ts:14 | 2026-11-08 | #6781 | fixed
+- ri:comments | low | scripts/gh/gh-usage-log.ts:5 | 2026-11-08 | #6781 | fixed
+- rb:2026-11-08 | #6781
+- rf:bug-risks | medium | scripts/hooks/direct-gh-usage.ts:42 | 2026-11-08 | #6781 | fixed
+- rf:bug-risks | medium | scripts/hooks/direct-gh-usage.ts:34 | 2026-11-08 | #6781 | fixed
+- rf:comments | low | scripts/hooks/direct-gh-usage.ts:14 | 2026-11-08 | #6781 | fixed
+- rx:{"round":"6ecec1c6-63be-4c60-aca6-5ebd7b7c2bfd","category":"bug-risks","severity":"medium","file":"scripts/hooks/direct-gh-usage.ts:42","disposition":"fixed","description":"a gh inside $(…), backticks or bash -c is never counted because the cut is quote_aware_commands_of instead of nested_commands.commands_of.","status":"resolved"}
+- rx:{"round":"6ecec1c6-63be-4c60-aca6-5ebd7b7c2bfd","category":"bug-risks","severity":"medium","file":"scripts/hooks/direct-gh-usage.ts:34","disposition":"fixed","description":"gh api /rate_limit and gh api --method GET rate_limit are counted as direct:api although the free endpoint must not be.","status":"resolved"}
+- rx:{"round":"6ecec1c6-63be-4c60-aca6-5ebd7b7c2bfd","category":"comments","severity":"low","file":"scripts/hooks/direct-gh-usage.ts:14","disposition":"fixed","description":"the header names josh gh:usage, a command that does not exist until #6753 lands.","status":"resolved"}
+- rb:2026-11-09 | #6784
+- rf:bug-risks | medium | scripts/gh/git-gh-transport.ts:81 | 2026-11-09 | #6784 | fixed
+- rf:bug-risks | low | docs/environment-variables.md:109 | 2026-11-09 | #6784 | fixed
+- rf:project-conventions | low | scripts/gh/gh-core-rate-limit.ts:20 | 2026-11-09 | #6784 | fixed
+- rf:project-conventions | low | scripts/gh/git-gh-pr-graphql-state.ts:51 | 2026-11-09 | #6784 | fixed
+- rx:{"round":"9e9b29be-8db0-422e-ae81-00ee09d06aec","category":"bug-risks","severity":"medium","file":"scripts/gh/git-gh-transport.ts:81","disposition":"fixed","description":"Any 403, including a secondary rate limit or SSO refusal, is read as a GraphQL refusal and pins the whole repository to REST for an hour (or stops with a misleading message under graphql).","status":"resolved"}
+- rx:{"round":"9e9b29be-8db0-422e-ae81-00ee09d06aec","category":"bug-risks","severity":"low","file":"docs/environment-variables.md:109","disposition":"fixed","description":"The doc says rest sends no GraphQL, yet backlog-resume-reads.ts and trusted-measure-source.ts still send GraphQL outside the switch.","status":"resolved"}
+- rx:{"round":"9e9b29be-8db0-422e-ae81-00ee09d06aec","category":"project-conventions","severity":"low","file":"scripts/gh/gh-core-rate-limit.ts:20","disposition":"fixed","description":"A display-only transport label is added to the GitHub core allowance type rather than to the board view.","status":"resolved"}
+- rx:{"round":"9e9b29be-8db0-422e-ae81-00ee09d06aec","category":"project-conventions","severity":"low","file":"scripts/gh/git-gh-pr-graphql-state.ts:51","disposition":"fixed","description":"GRAPHQL_PATH is re-exported as a shim instead of moving its eight importers to git-gh-transport.","status":"resolved"}
+- ri:bug-risks | medium | scripts/gh/git-gh-transport.ts:115 | 2026-11-09 | #6784 | fixed
+- ri:bug-risks | low | scripts/gh/git-gh-transport.ts:84 | 2026-11-09 | #6784 | fixed
+- ri:project-conventions | low | scripts/gh/git-gh-transport.ts:68 | 2026-11-09 | #6784 | fixed
+- ri:performance | low | scripts/gh/git-gh-issue-list.ts:63 | 2026-11-09 | #6785 | fixed
+- ri:comments | low | scripts/gh/git-gh-issue-list.ts:15 | 2026-11-09 | #6785 | fixed
+- rb:2026-11-09 | #6785
+- rf:tests | medium | scripts/gh/git-gh-issue-list-graphql.test.ts:199 | 2026-11-09 | #6785 | fixed
+- rf:performance | low | scripts/gh/git-gh-issue-list.ts:50 | 2026-11-09 | #6785 | fixed
+- rf:project-conventions | low | scripts/gh/git-gh-issue-list-graphql.ts:57 | 2026-11-09 | #6785 | fixed
+- rf:tests | low | scripts/gh/git-gh-issue-list-graphql.test.ts:169 | 2026-11-09 | #6785 | fixed
+- rf:comments | low | scripts/gh/git-gh-issue-list.ts:15 | 2026-11-09 | #6785 | fixed
+- rx:{"round":"9883ae70-13f1-4338-a209-da83152701c5","category":"tests","severity":"medium","file":"scripts/gh/git-gh-issue-list-graphql.test.ts:199","disposition":"fixed","description":"No test pins the open/newest-first guard, so a closed or updated-sorted listing could be answered from the open GraphQL query unnoticed.","status":"resolved"}
+- rx:{"round":"9883ae70-13f1-4338-a209-da83152701c5","category":"performance","severity":"low","file":"scripts/gh/git-gh-issue-list.ts:50","disposition":"fixed","description":"A listing whose limit exceeds one page still spends a GraphQL query that is discarded when the backlog is over one page.","status":"resolved"}
+- rx:{"round":"9883ae70-13f1-4338-a209-da83152701c5","category":"project-conventions","severity":"low","file":"scripts/gh/git-gh-issue-list-graphql.ts:57","disposition":"fixed","description":"The rateLimit cost and remaining fields are queried and carried but never read.","status":"resolved"}
+- rx:{"round":"9883ae70-13f1-4338-a209-da83152701c5","category":"tests","severity":"low","file":"scripts/gh/git-gh-issue-list-graphql.test.ts:169","disposition":"fixed","description":"The limit cut-off test serves has_next_page false, so the wants_more check on the GraphQL page is not pinned.","status":"resolved"}
+- rx:{"round":"9883ae70-13f1-4338-a209-da83152701c5","category":"comments","severity":"low","file":"scripts/gh/git-gh-issue-list.ts:15","disposition":"fixed","description":"The module header still describes the listing as REST-only after the GraphQL path was added.","status":"resolved"}
+- rb:2026-11-09 | #6786
+- rf:bug-risks | medium | scripts/gh/git-gh-pr-graphql-snapshot.ts:233 | 2026-11-09 | #6786 | fixed
+- rf:bug-risks | low | scripts/gh/git-gh-pr-graphql-snapshot.ts:48 | 2026-11-09 | #6786 | fixed
+- rf:project-conventions | low | scripts/gh/git-gh-pr-graphql-snapshot.ts:141 | 2026-11-09 | #6786 | fixed
+- rx:{"round":"18351788-5f15-4e79-8126-87ab62bb7273","category":"bug-risks","severity":"medium","file":"scripts/gh/git-gh-pr-graphql-snapshot.ts:233","disposition":"fixed","description":"The GraphQL rollup passes every suite's check run through without the newest-suite ranking REST applies, so an older cancelled suite fails a PR GitHub reports CLEAN.","status":"resolved"}
+- rx:{"round":"18351788-5f15-4e79-8126-87ab62bb7273","category":"bug-risks","severity":"low","file":"scripts/gh/git-gh-pr-graphql-snapshot.ts:48","disposition":"fixed","description":"The head is selected as commits(last: 1) rather than checked against headRefOid, which may not be the head above the 250-commit cap.","status":"resolved"}
+- rx:{"round":"18351788-5f15-4e79-8126-87ab62bb7273","category":"project-conventions","severity":"low","file":"scripts/gh/git-gh-pr-graphql-snapshot.ts:141","disposition":"fixed","description":"GraphqlSnapshot.rate_limit and its cost accumulation have no production reader.","status":"resolved"}
+- ri:none | none | - | 2026-11-09 | #6787
+- rb:2026-11-09 | #6787
+- rf:none | none | - | 2026-11-09 | #6787
+- ri:performance | low | scripts/backlog/backlog-offer-timing.ts:24 | 2026-11-08 | #6788 | fixed
+- rb:2026-11-08 | #6788
+- rf:bug-risks | low | scripts/backlog/backlog-offer-timing.ts:59 | 2026-11-08 | #6788
+- rf:comments | low | scripts/backlog/backlog-budget.ts:43 | 2026-11-08 | #6788
+- rx:{"round":"e092dc60-ab64-4b4f-8f79-316eb555bad7","category":"bug-risks","severity":"low","file":"scripts/backlog/backlog-offer-timing.ts:59","description":"run:add appends the ADD event before it writes the carry (run-add-cli.ts:189-193), so a poll landing in that millisecond gap asks without the new issue and then sees the event as older than offered_ms, falling back to the 30 s / 180 s interval; no regression versus the old fixed interval and the gap is milliseconds against a 5 s poll, so no practical failure scenario.","status":"new"}
+- rx:{"round":"e092dc60-ab64-4b4f-8f79-316eb555bad7","category":"comments","severity":"low","file":"scripts/backlog/backlog-budget.ts:43","description":"\"That stretch ends at the named issue's dispatch\" overstates it: named_left counts every named issue not marked done, so a named issue held in an undated wait keeps the 30 s interval for the watch's whole stretch; the budget arithmetic (about 2,280 warm REST core an hour) still holds, so no failure scenario — tried a parked or blocked named issue under an 8 h idle watch.","status":"new"}
+- ri:performance | low | scripts/run/board/run-board-cli.ts:56 | 2026-11-09 | #6791 | fixed
+- rb:2026-11-09 | #6791
+- rf:project-conventions | low | scripts/gh/git-gh-issue-alias-graphql.ts:17 | 2026-11-09 | #6791 | fixed
+- rf:tests | low | scripts/run/board/run-board-closed-graphql.test.ts:137 | 2026-11-09 | #6791 | fixed
+- rf:comments | low | scripts/run/board/run-board-closed.ts:12 | 2026-11-09 | #6791 | fixed
+- rf:comments | low | scripts/run/board/run-board-closed-graphql.ts:80 | 2026-11-09 | #6791 | fixed
+- rx:{"round":"e2c91f97-27f4-431a-8d89-aca115fe5c75","category":"project-conventions","severity":"low","file":"scripts/gh/git-gh-issue-alias-graphql.ts:17","disposition":"fixed","description":"The generic alias reader near-copies git-gh-issue-batch-graphql.ts, whose read_many was not moved onto it.","status":"resolved"}
+- rx:{"round":"e2c91f97-27f4-431a-8d89-aca115fe5c75","category":"tests","severity":"low","file":"scripts/run/board/run-board-closed-graphql.test.ts:137","disposition":"fixed","description":"No test covers a mixed answer where GraphQL answers one child and REST reads only the missing one.","status":"resolved"}
+- rx:{"round":"e2c91f97-27f4-431a-8d89-aca115fe5c75","category":"comments","severity":"low","file":"scripts/run/board/run-board-closed.ts:12","disposition":"fixed","description":"The header still says closed children are read one issue at a time, though read_all now batches them through GraphQL first.","status":"resolved"}
+- rx:{"round":"e2c91f97-27f4-431a-8d89-aca115fe5c75","category":"comments","severity":"low","file":"scripts/run/board/run-board-closed-graphql.ts:80","disposition":"fixed","description":"The comment says gh spells stateReason in lower case, but gh passes the GraphQL enum through; the lower case comes from the REST mapping.","status":"resolved"}
+- ri:project-conventions | low | scripts/gh/git-gh-issue-batch-graphql.ts:46 | 2026-11-09 | #6792 | fixed
+- ri:tests | low | scripts/backlog/backlog-fixture.ts:219 | 2026-11-09 | #6792 | fixed
+- ri:comments | low | scripts/epic/epic-fetch.ts:308 | 2026-11-09 | #6792 | fixed
+- rb:2026-11-09 | #6792
+- rf:performance | low | scripts/gh/git-gh-issue-batch-graphql.ts:25 | 2026-11-09 | #6792 | fixed
+- rf:project-conventions | low | scripts/gh/git-gh-issue-batch-graphql.ts:44 | 2026-11-09 | #6792 | fixed
+- rf:comments | low | scripts/epic/epic-fetch.ts:309 | 2026-11-09 | #6792 | fixed
+- rx:{"round":"dfcb25dd-3ce4-46eb-bb21-f85c3ee58921","category":"performance","severity":"low","file":"scripts/gh/git-gh-issue-batch-graphql.ts:25","disposition":"fixed","description":"One pull-request or nonexistent number fails the whole hundred-issue query, so that chunk falls back to REST and the budget saving is lost.","status":"resolved"}
+- rx:{"round":"dfcb25dd-3ce4-46eb-bb21-f85c3ee58921","category":"project-conventions","severity":"low","file":"scripts/gh/git-gh-issue-batch-graphql.ts:44","disposition":"fixed","description":"BatchRead.cost and remaining are computed and tested but no production caller reads them.","status":"resolved"}
+- rx:{"round":"dfcb25dd-3ce4-46eb-bb21-f85c3ee58921","category":"comments","severity":"low","file":"scripts/epic/epic-fetch.ts:309","disposition":"fixed","description":"The fetch_external_children header still describes the read as a REST path though it now goes through a GraphQL batch first.","status":"resolved"}
+- rb:2026-11-09 | #6793
+- rf:bug-risks | medium | prompts/collaboration-workflow/gh-rest.md:17 | 2026-11-09 | #6793 | fixed
+- rf:project-conventions | low | prompts/collaboration-workflow/gh-rest.md:25 | 2026-11-09 | #6793 | fixed
+- rf:project-conventions | low | docs/maintainers/gh-rest-rationale.md:14 | 2026-11-09 | #6793 | fixed
+- rf:comments | low | scripts/rules/pr-merge.ts:15 | 2026-11-09 | #6793 | fixed
+- rx:{"round":"9fc1cfb7-28da-4870-a4c3-2aa1b348bc32","category":"bug-risks","severity":"medium","file":"prompts/collaboration-workflow/gh-rest.md:17","disposition":"fixed","description":"The rule says only git_gh_transport.query sends GraphQL reads, but trusted-measure-source.ts sends one directly, so a GraphQL-refused session refuses the trusted measure while the docs promise a REST fallback.","status":"resolved"}
+- rx:{"round":"9fc1cfb7-28da-4870-a4c3-2aa1b348bc32","category":"project-conventions","severity":"low","file":"prompts/collaboration-workflow/gh-rest.md:25","disposition":"fixed","description":"The prose-instruction section and the line-38 heading still say REST after the rule became gh api.","status":"resolved"}
+- rx:{"round":"9fc1cfb7-28da-4870-a4c3-2aa1b348bc32","category":"project-conventions","severity":"low","file":"docs/maintainers/gh-rest-rationale.md:14","disposition":"fixed","description":"Mutations stay blocked overstates the cited guards, which refuse only GraphQL merge mutations.","status":"resolved"}
+- rx:{"round":"9fc1cfb7-28da-4870-a4c3-2aa1b348bc32","category":"comments","severity":"low","file":"scripts/rules/pr-merge.ts:15","disposition":"fixed","description":"The comment says kit's own GitHub calls are REST, which contradicts the rewritten gh-rest.md it cites.","status":"resolved"}
+- rb:2026-11-08 | #6796
+- rf:bug-risks | low | scripts/epic/epic-bundle-cli.ts:266 | 2026-11-08 | #6796 | fixed
+- rf:bug-risks | low | scripts/epic/epic-bundle-cli.ts:267 | 2026-11-08 | #6796 | fixed
+- rf:project-conventions | low | scripts/gh/git-gh-issue.ts:15 | 2026-11-08 | #6796 | fixed
+- rf:comments | low | scripts/lib/bounded-pool.ts:4 | 2026-11-08 | #6796 | fixed
+- rx:{"round":"33ea5411-71ea-4846-9095-6871f445f66c","category":"bug-risks","severity":"low","file":"scripts/epic/epic-bundle-cli.ts:266","disposition":"fixed","description":"A failed subject read is reported as \"not an open issue\", conflating a gap with an answer.","status":"resolved"}
+- rx:{"round":"33ea5411-71ea-4846-9095-6871f445f66c","category":"bug-risks","severity":"low","file":"scripts/epic/epic-bundle-cli.ts:267","disposition":"fixed","description":"find_subject mutates the backlog it was handed instead of returning a new one.","status":"resolved"}
+- rx:{"round":"33ea5411-71ea-4846-9095-6871f445f66c","category":"project-conventions","severity":"low","file":"scripts/gh/git-gh-issue.ts:15","disposition":"fixed","description":"The comment still says epic:bundle reads blocked_by_count to decide per-issue reads, which it no longer does.","status":"resolved"}
+- rx:{"round":"33ea5411-71ea-4846-9095-6871f445f66c","category":"comments","severity":"low","file":"scripts/lib/bounded-pool.ts:4","disposition":"fixed","description":"Comments here and at git-gh-issue-list.ts:202 still name epic-bundle-cli.ts as a pool caller and its removed RELATION_CONCURRENCY.","status":"resolved"}
+- ri:bug-risks | medium | scripts/lane/lane-plan.ts:194 | 2026-11-08 | #6798 | fixed
+- ri:bug-risks | low | scripts/lane/lane-plan-probe.ts:38 | 2026-11-08 | #6798 | fixed
+- ri:comments | low | scripts/lane/lane-plan-check.ts:254 | 2026-11-08 | #6798 | fixed
+- rb:2026-11-08 | #6798
+- rf:bug-risks | low | scripts/lane/lane-plan.ts:29 | 2026-11-08 | #6798 | fixed
+- rf:comments | low | scripts/backlog/backlog-plan-comment.ts:10 | 2026-11-08 | #6798 | fixed
+- rx:{"round":"ed1d5567-4839-4642-aa2c-f0156e377ca1","category":"bug-risks","severity":"low","file":"scripts/lane/lane-plan.ts:29","disposition":"fixed","description":"is_after compares GitHub's created_at with the record file's local mtime, two clocks whose skew could flip the order.","status":"resolved"}
+- rx:{"round":"ed1d5567-4839-4642-aa2c-f0156e377ca1","category":"comments","severity":"low","file":"scripts/backlog/backlog-plan-comment.ts:10","disposition":"fixed","description":"The module header and lane-plan-check.ts:254 still say a recorded plan beats the plan comment unconditionally.","status":"resolved"}
+- rb:2026-11-08 | #6798
+- rf:bug-risks | low | scripts/lane/lane-plan-probe.ts:38 | 2026-11-08 | #6798
+- rf:bug-risks | low | scripts/lane/lane-plan.ts:29 | 2026-11-08 | #6798
+- rf:comments | low | scripts/lane/lane-plan-check.ts:254 | 2026-11-08 | #6798
+- rf:bug-risks | low | scripts/backlog/backlog-drive-named-offer.ts:63 | 2026-11-08 | #6798
+- rx:{"round":"e5887fe4-2182-47f4-88fb-0e70a0521730","previous":"ed1d5567-4839-4642-aa2c-f0156e377ca1","category":"bug-risks","severity":"low","file":"scripts/lane/lane-plan-probe.ts:38","description":"clash_among still calls with_plans without plan comment times though the round-1 record marks it fixed, so other lanes read a yielded holder's (just dispatched again) stale record until its lane:plan re-records; no failure scenario beyond that transient window — the holder's entry yield or lane:plan rewrites the record with the comment's paths.","status":"new"}
+- rx:{"round":"e5887fe4-2182-47f4-88fb-0e70a0521730","previous":"ed1d5567-4839-4642-aa2c-f0156e377ca1","category":"bug-risks","severity":"low","file":"scripts/lane/lane-plan.ts:29","description":"is_after still compares GitHub's created_at with the local record mtime though the round-1 record marks it fixed; no failure scenario at normal NTP skew — a flip needs a plan comment posted within the skew of a yield's re-record.","status":"new"}
+- rx:{"round":"e5887fe4-2182-47f4-88fb-0e70a0521730","previous":"ed1d5567-4839-4642-aa2c-f0156e377ca1","category":"comments","severity":"low","file":"scripts/lane/lane-plan-check.ts:254","description":"entry_plan's comment still reads recorded plan, else plan comment, else body with no mention that a newer plan comment now beats the record, though the round-1 record marks it fixed.","status":"new"}
+- rx:{"round":"e5887fe4-2182-47f4-88fb-0e70a0521730","previous":"ed1d5567-4839-4642-aa2c-f0156e377ca1","category":"bug-risks","severity":"low","file":"scripts/backlog/backlog-drive-named-offer.ts:63","description":"a yielded named issue absent from the opted-in listing is read as a bare number without the planned label, so no comment time reaches with_plans and the hold keeps the stale record; no failure scenario of a loop — entry_plan reads the same listing and skips such an issue, so it only delays the offer until the holder ends, as before this change.","status":"new"}
+- rx:{"round":"e5887fe4-2182-47f4-88fb-0e70a0521730","previous":"ed1d5567-4839-4642-aa2c-f0156e377ca1","category":"bug-risks","severity":"low","file":"scripts/lane/lane-plan.ts:29","description":"is_after compares GitHub's created_at with the record file's local mtime, two clocks whose skew could flip the order.","disposition":"fixed","status":"resolved"}
+- rx:{"round":"e5887fe4-2182-47f4-88fb-0e70a0521730","previous":"ed1d5567-4839-4642-aa2c-f0156e377ca1","category":"comments","severity":"low","file":"scripts/backlog/backlog-plan-comment.ts:10","description":"The module header and lane-plan-check.ts:254 still say a recorded plan beats the plan comment unconditionally.","disposition":"fixed","status":"resolved"}
+- ri:bug-risks | medium | scripts/backlog/backlog-drive-idle.ts:165 | 2026-11-08 | #6799 | fixed
+- ri:bug-risks | medium | scripts/backlog/backlog-drive-args.ts:120 | 2026-11-08 | #6799 | fixed
+- rb:2026-11-08 | #6799
+- rf:bug-risks | medium | scripts/backlog/backlog-yield-cap.ts:66 | 2026-11-08 | #6799 | fixed
+- rf:tests | low | scripts/backlog/backlog-yield-cap.ts:78 | 2026-11-08 | #6799 | fixed
+- rx:{"round":"313c5711-6645-4253-a593-e72aa90a22a4","category":"bug-risks","severity":"medium","file":"scripts/backlog/backlog-yield-cap.ts:66","disposition":"fixed","description":"The park body tells a person run:park --clear releases the issue, but the drive keeps it in --exclude for the rest of the run, so a released issue is silently never re-dispatched until the next drive.","status":"resolved"}
+- rx:{"round":"313c5711-6645-4253-a593-e72aa90a22a4","category":"tests","severity":"low","file":"scripts/backlog/backlog-yield-cap.ts:78","disposition":"fixed","description":"Removing the outcome === yielded guard in is_capped fails no test, since every harness merge in the cap test is scripted yielded.","status":"resolved"}
+- ri:performance | low | scripts/backlog/backlog-drive-named-offer.ts:51 | 2026-11-08 | #6800 | fixed
+- rb:2026-11-08 | #6800
+- rf:bug-risks | low | scripts/backlog/backlog-drive-named-offer.ts:166 | 2026-11-08 | #6800 | false-positive
+- rx:{"round":"52cac448-7e97-4f16-b50b-5a6c761155e0","category":"bug-risks","severity":"low","file":"scripts/backlog/backlog-drive-named-offer.ts:166","disposition":"false-positive","description":"a stale in-progress holder also makes lane:plan yield, so the hold matches the yield a relaunch would hit","status":"resolved"}
+- ri:none | none | - | 2026-11-09 | #6807
+- rb:2026-11-09 | #6807
+- rf:none | none | - | 2026-11-09 | #6807
+- rf:none | none | - | 2026-11-09 | #6810
+- ri:none | none | - | 2026-11-09 | #6810
+- rb:2026-11-09 | #6810
+- rf:project-conventions | low | scripts/lane/lane-child-invocation.ts:28 | 2026-11-09 | #6810 | fixed
+- rx:{"round":"67f7790b-124c-44ed-ad6e-6f943766b99d","category":"project-conventions","severity":"low","file":"scripts/lane/lane-child-invocation.ts:28","disposition":"fixed","description":"Process patterns, child prompts, run-event-stream texts and a parse key declare the 'terminal' reason where the PlainReason doc assigns them 'program' (and lane-dispatch.ts:485 is a Telegram warning), copied from the deleted table's over-broad group comment.","status":"resolved"}
+- ri:bug-risks | medium | scripts/hooks/bash-revert.ts:118 | 2026-11-09 | #6812 | fixed
+- ri:comments | low | scripts/hooks/bash-revert.ts:113 | 2026-11-09 | #6812 | fixed
+- rb:2026-11-09 | #6812
+- rf:bug-risks | medium | scripts/hooks/bash-revert.ts:118 | 2026-11-09 | #6812 | fixed
+- rf:bug-risks | low | scripts/hooks/bash-revert.ts:192 | 2026-11-09 | #6812 | fixed
+- rx:{"round":"9cbabda1-7344-459a-9694-ff7546961554","category":"bug-risks","severity":"medium","file":"scripts/hooks/bash-revert.ts:118","disposition":"fixed","description":"save_dirty runs before write_text_stamp, so a failed save leaves the previous call stamp in place and the revert can reset files against it.","status":"resolved"}
+- rx:{"round":"9cbabda1-7344-459a-9694-ff7546961554","category":"bug-risks","severity":"low","file":"scripts/hooks/bash-revert.ts:192","disposition":"fixed","description":"restore_saved restores worktree content only, so an edit staged before the call comes back unstaged.","status":"resolved"}
+- ri:bug-risks | low | scripts/hooks/codex-hook-adapter.ts:88 | 2026-11-09 | #6813 | fixed
+- rb:2026-11-09 | #6813
+- rf:tests | low | scripts/hooks/codex-hook-adapter-revert.test.ts:84 | 2026-11-09 | #6813
+- rx:{"round":"eb8d3a9d-b48d-4278-b998-5ee1a1fdbfd6","category":"tests","severity":"low","file":"scripts/hooks/codex-hook-adapter-revert.test.ts:84","description":"The Issue asks for the stamp→revert round trip in the recorded-payload replay (codex-hook-adapter.capture.test.ts, #6588) but it is added with a hand-built exec_command payload, and no recorded exec_command payload exists to confirm the tool_input.cmd shape; no failure scenario — the cmd key predates this change in shell_payload and the spawned test exercises the real adapter entry end to end.","status":"new"}
+- rb:2026-11-09 | #6814
+- rf:bug-risks | medium | scripts/test/test-red.ts:92 | 2026-11-09 | #6814 | fixed
+- rf:bug-risks | low | scripts/test/test-red.ts:104 | 2026-11-09 | #6814 | fixed
+- rx:{"round":"7cc2442b-16aa-4bc5-a2f9-0cfa6bcc89fa","category":"bug-risks","severity":"medium","file":"scripts/test/test-red.ts:92","disposition":"fixed","description":"Detaching vitest puts it outside the test:pinned process group and disables execa exit cleanup, so a SIGTERM stop or early exit leaves the probe (a spinning one included) running against a deleted tree.","status":"resolved"}
+- rx:{"round":"7cc2442b-16aa-4bc5-a2f9-0cfa6bcc89fa","category":"bug-risks","severity":"low","file":"scripts/test/test-red.ts:104","disposition":"fixed","description":"The timer can fire after the run ended but before clearTimeout, so a finished run near the limit throws a timeout.","status":"resolved"}
+- ri:bug-risks | medium | .claude/skills/workflow-commands/backlogrun-child.md:31 | 2026-11-09 | #6817 | fixed
+- ri:bug-risks | low | scripts/epic/epic-body.ts:52 | 2026-11-09 | #6817 | fixed
+- ri:tests | low | scripts/josh/josh-commands-epic.ts:55 | 2026-11-09 | #6817 | fixed
+- rb:2026-11-09 | #6817
+- rf:bug-risks | medium | .claude/skills/workflow-commands/backlogrun-child.md:31 | 2026-11-09 | #6817 | fixed
+- rf:project-conventions | low | docs/how-to/run-backlog.md:11 | 2026-11-09 | #6817 | fixed
+- rf:project-conventions | low | scripts/josh/josh-commands-epic.ts:55 | 2026-11-09 | #6817 | fixed
+- rf:comments | low | scripts/epic/epic-body.ts:42 | 2026-11-09 | #6817 | fixed
+- rx:{"round":"f36f205e-8f71-4e8b-951b-a1a72392a898","category":"bug-risks","severity":"medium","file":".claude/skills/workflow-commands/backlogrun-child.md:31","disposition":"fixed","description":"The example `pnpm josh backlogrun <E> --only <N>` is refused by the launcher grammar instead of exiting 0 with a skip note; write `pnpm josh backlogrun <E> <N> --only`.","status":"resolved"}
+- rx:{"round":"f36f205e-8f71-4e8b-951b-a1a72392a898","category":"project-conventions","severity":"low","file":"docs/how-to/run-backlog.md:11","disposition":"fixed","description":"Step 3 and the following \"From a terminal ... the same run\" paragraph now describe the same command twice, and the in-session keyword is no longer mentioned.","status":"resolved"}
+- rx:{"round":"f36f205e-8f71-4e8b-951b-a1a72392a898","category":"project-conventions","severity":"low","file":"scripts/josh/josh-commands-epic.ts:55","disposition":"fixed","description":"The --notify description still says `Next: backlogrun #<E> --only`, wholly covered by open follow-up #6823.","status":"resolved"}
+- rx:{"round":"f36f205e-8f71-4e8b-951b-a1a72392a898","category":"comments","severity":"low","file":"scripts/epic/epic-body.ts:42","disposition":"fixed","description":"The rewrapped comment leaves one line of about 175 characters among lines wrapped near 100.","status":"resolved"}
+- ri:none | none | - | 2026-11-09 | #6819
+- rb:2026-11-09 | #6819
+- rf:project-conventions | low | scripts/run/board/run-board-decision-graphql.ts:33 | 2026-11-09 | #6819 | fixed
+- rf:tests | low | scripts/run/board/run-board-decision-graphql.ts:80 | 2026-11-09 | #6819 | fixed
+- rx:{"round":"b5f46a39-7075-404b-b6cd-334a6ce6cd5c","category":"project-conventions","severity":"low","file":"scripts/run/board/run-board-decision-graphql.ts:33","disposition":"fixed","description":"to_view near-duplicates to_read in git-gh-issue-batch-graphql.ts; a shared GraphQL-to-gh view mapping would keep them from drifting.","status":"resolved"}
+- rx:{"round":"b5f46a39-7075-404b-b6cd-334a6ce6cd5c","category":"tests","severity":"low","file":"scripts/run/board/run-board-decision-graphql.ts:80","disposition":"fixed","description":"the settle catch that rejects every pending ask when read_views throws has no test, so removing it would hang with_decisions unnoticed.","status":"resolved"}
+- ri:bug-risks | low | scripts/run/board/run-board-cli.ts:58 | 2026-11-09 | #6822 | fixed
+- ri:comments | low | scripts/run/board/run-board-state.ts:49 | 2026-11-09 | #6822 | fixed
+- ri:comments | low | scripts/run/board/run-board-render-quota.ts:61 | 2026-11-09 | #6822 | fixed
+- rb:2026-11-09 | #6822
+- rf:bug-risks | medium | scripts/run/board/run-board-cli.ts:35 | 2026-11-09 | #6822 | fixed
+- rf:project-conventions | low | scripts/run/board/run-board-render-quota-github.ts:47 | 2026-11-09 | #6822 | fixed
+- rf:comments | low | scripts/run/board/run-board-state.ts:49 | 2026-11-09 | #6822 | fixed
+- rx:{"round":"71f8ac48-f89a-4d46-905c-9588e5288ad6","category":"bug-risks","severity":"medium","file":"scripts/run/board/run-board-cli.ts:35","disposition":"fixed","description":"read_transport calls git_gh_transport.current(), which sends a GraphQL probe from the display when the transport cache is cold and re-probes each tick while the probe fails, where label() read without one.","status":"resolved"}
+- rx:{"round":"71f8ac48-f89a-4d46-905c-9588e5288ad6","category":"project-conventions","severity":"low","file":"scripts/run/board/run-board-render-quota-github.ts:47","disposition":"fixed","description":"pace_of, RESET_MARK and PERCENT near-copy the ones in run-board-render-quota.ts.","status":"resolved"}
+- rx:{"round":"71f8ac48-f89a-4d46-905c-9588e5288ad6","category":"comments","severity":"low","file":"scripts/run/board/run-board-state.ts:49","disposition":"fixed","description":"the read_rate_limit and rate_limit comments still say core REST allowance though both allowances and the transport are carried.","status":"resolved"}
+- rf:none | none | - | 2026-11-09 | #6823
+- rf:none | none | - | 2026-11-09 | #6823
+- rb:2026-11-09 | #6828
+- rf:bug-risks | medium | scripts/run/board/run-board-render-quota-github.ts:68 | 2026-11-09 | #6828 | fixed
+- rf:project-conventions | low | scripts/run/board/run-board-render-quota-github.ts:18 | 2026-11-09 | #6828 | fixed
+- rf:tests | low | scripts/run/board/run-board-render-quota-rate-limit.test.ts:83 | 2026-11-09 | #6828 | fixed
+- rx:{"round":"abb848da-b764-46d7-96bc-1f4d171f8348","category":"bug-risks","severity":"medium","file":"scripts/run/board/run-board-render-quota-github.ts:68","disposition":"fixed","description":"The ▶ transport mark makes ▶rest overflow the 4-wide label column, shifting the github row one column off the claude/codex columns whenever the session reads through REST.","status":"resolved"}
+- rx:{"round":"abb848da-b764-46d7-96bc-1f4d171f8348","category":"project-conventions","severity":"low","file":"scripts/run/board/run-board-render-quota-github.ts:18","disposition":"fixed","description":"The rewritten header comment line is left unwrapped at about 190 bytes.","status":"resolved"}
+- rx:{"round":"abb848da-b764-46d7-96bc-1f4d171f8348","category":"tests","severity":"low","file":"scripts/run/board/run-board-render-quota-rate-limit.test.ts:83","disposition":"fixed","description":"The three-row alignment test never sets a transport, so the ▶-marked label production always draws is uncovered.","status":"resolved"}
+- ri:bug-risks | low | scripts/run/board/run-board-render-quota.ts:53 | 2026-11-09 | #6828 | fixed
+- ri:bug-risks | low | scripts/run/board/run-board-render-quota-github.ts:73 | 2026-11-09 | #6828 | fixed
+- rb:2026-11-09 | #6833
+- rf:bug-risks | medium | .github/actions/setup-pnpm/action.yml:106 | 2026-11-09 | #6833 | fixed
+- rf:security | medium | .github/actions/setup-pnpm/action.yml:86 | 2026-11-09 | #6833 | fixed
+- rf:project-conventions | low | scripts/ci/ci-yml-safe-chain.test.ts:65 | 2026-11-09 | #6833 | fixed
+- rx:{"round":"109a1ba4-b461-4064-9772-f0d63d86d2b6","category":"bug-risks","severity":"medium","file":".github/actions/setup-pnpm/action.yml:106","disposition":"fixed","description":"The cache-hit path relies on setup-ci to put ~/.safe-chain/bin on GITHUB_PATH, and if it adds only the shims every later pnpm install runs without a scan behind a filtered warning, as in #2711.","status":"resolved"}
+- rx:{"round":"109a1ba4-b461-4064-9772-f0d63d86d2b6","category":"security","severity":"medium","file":".github/actions/setup-pnpm/action.yml:86","disposition":"fixed","description":"actions/cache saves the binary in its post-job step, after the job code has run, and the restored binary then executes unverified because the hash check covers only the installer that the hit path never runs.","status":"resolved"}
+- rx:{"round":"109a1ba4-b461-4064-9772-f0d63d86d2b6","category":"project-conventions","severity":"low","file":"scripts/ci/ci-yml-safe-chain.test.ts:65","disposition":"fixed","description":"The no-dlx guard toContain(safe-chain setup-ci) now passes only because of a quote character in the new hit-path command.","status":"resolved"}
+- ri:none | none | - | 2026-11-09 | #6836
+- ri:none | none | - | 2026-11-09 | #6836
+- rb:2026-11-09 | #6836
+- rf:comments | low | scripts/run/board/run-board-plan.test.ts:27 | 2026-11-09 | #6836 | fixed
+- rx:{"round":"df42a644-be03-40b9-b583-e05c702a0ccb","category":"comments","severity":"low","file":"scripts/run/board/run-board-plan.test.ts:27","disposition":"fixed","description":"the #4222 comment is now detached from the running-issues describe it explains","status":"resolved"}
+- rf:none | none | - | 2026-11-09 | #6839
+- ri:bug-risks | medium | scripts/run/run-report-handoff.ts:58 | 2026-11-09 | #6839 | fixed
+- ri:bug-risks | medium | scripts/run/carry/run-carry-cli.ts:82 | 2026-11-09 | #6839 | fixed
+- rb:2026-11-09 | #6839
+- rf:none | none | - | 2026-11-09 | #6839
+- rf:bug-risks | medium | scripts/backlog/backlog-drive-named-offer.ts:232 | 2026-11-09 | #6840
+- ri:bug-risks | medium | scripts/backlog/backlog-drive-named.ts:33 | 2026-11-09 | #6840 | fixed
+- ri:bug-risks | low | scripts/run/board/run-board-read.ts:354 | 2026-11-09 | #6840 | fixed
+- rb:2026-11-09 | #6840
+- rf:bug-risks | medium | scripts/run/add/run-add-cli.ts:97 | 2026-11-09 | #6840 | fixed
+- rf:project-conventions | low | scripts/run/add/run-add.ts:247 | 2026-11-09 | #6840 | fixed
+- rx:{"round":"5e080d12-95eb-4328-a4a9-28013d75e865","category":"bug-risks","severity":"medium","file":"scripts/run/add/run-add-cli.ts:97","disposition":"fixed","description":"An epic root recorded in added makes next_of return it every pass, so its WAIT answer idles free lanes and starves the pool and declared items until the epic completes, despite --no-priority printing end of the queue.","status":"resolved"}
+- rx:{"round":"5e080d12-95eb-4328-a4a9-28013d75e865","category":"project-conventions","severity":"low","file":"scripts/run/add/run-add.ts:247","disposition":"fixed","description":"is_all_queued now also accepts tracked epic roots, so its name no longer says what it checks.","status":"resolved"}
+- ri:performance | low | scripts/run/ship/run-ship-reship.ts:46 | 2026-11-09 | #6848 | fixed
+- rb:2026-11-09 | #6848
+- rf:none | none | - | 2026-11-09 | #6848
+- rb:2026-11-09 | #6849
+- rf:bug-risks | high | .github/actions/setup-pnpm/action.yml:80 | 2026-11-09 | #6849 | fixed
+- rf:tests | medium | scripts/ci/ci-safe-chain-download.test.ts:152 | 2026-11-09 | #6849 | fixed
+- rf:bug-risks | low | .github/actions/setup-pnpm/action.yml:82 | 2026-11-09 | #6849 | fixed
+- rx:{"round":"a69c306f-d0b6-4c92-923f-271fc404522d","category":"bug-risks","severity":"high","file":".github/actions/setup-pnpm/action.yml:80","disposition":"fixed","description":"Fetch safe-chain needed gh, absent from the Playwright container; now curl + REST API + node asset lookup","status":"resolved"}
+- rx:{"round":"a69c306f-d0b6-4c92-923f-271fc404522d","category":"tests","severity":"medium","file":"scripts/ci/ci-safe-chain-download.test.ts:152","disposition":"fixed","description":"fetch tests put a fake gh first on PATH; now a fake curl serves the release and a fake gh fails and must never be called","status":"resolved"}
+- rx:{"round":"a69c306f-d0b6-4c92-923f-271fc404522d","category":"bug-risks","severity":"low","file":".github/actions/setup-pnpm/action.yml:82","disposition":"fixed","description":"sleep after the last failed attempt; replaced by curl retries","status":"resolved"}
+- ri:none | none | - | 2026-11-09 | #6857
+- rb:2026-11-09 | #6857
+- rf:none | none | - | 2026-11-09 | #6857
+- ri:performance | low | scripts/backlog/backlog-offer-timing.ts:61 | 2026-11-09 | #6861 | fixed
+- rb:2026-11-09 | #6861
+- rf:project-conventions | low | scripts/backlog/backlog-arrival-added.ts:4 | 2026-11-09 | #6861 | fixed
+- rx:{"round":"2bc31784-74a5-4c84-97cb-c21ed6cc70c5","category":"project-conventions","severity":"low","file":"scripts/backlog/backlog-arrival-added.ts:4","disposition":"fixed","description":"The run:add-named module and header now also host is_raised_since, beside an existing position-based raise reader in lane-limit-override.ts.","status":"resolved"}
+- rf:none | none | - | 2026-11-09 | #6864
+- ri:bug-risks | low | scripts/run/event/run-event-stream.ts:240 | 2026-11-09 | #6864 | fixed
+- rb:2026-11-09 | #6864
+- rf:tests | medium | scripts/run/event/run-event-stream-emit.ts:55 | 2026-11-09 | #6864 | fixed
+- rf:bug-risks | low | scripts/run/event/run-event-stream.ts:241 | 2026-11-09 | #6864 | fixed
+- rx:{"round":"e1f7a7f3-f332-4aa4-b776-6d35b48c4eda","category":"tests","severity":"medium","file":"scripts/run/event/run-event-stream-emit.ts:55","disposition":"fixed","description":"The fields pass-through in emit is untested, so dropping it would leave real parks without a stop while every test stays green.","status":"resolved"}
+- rx:{"round":"e1f7a7f3-f332-4aa4-b776-6d35b48c4eda","category":"bug-risks","severity":"low","file":"scripts/run/event/run-event-stream.ts:241","disposition":"fixed","description":"A pre-change writer's strip-and-rewrite of the shared stream erases stop from parks already written.","status":"resolved"}
+- rf:comments | low | scripts/backlog/backlog-drive-stalled-retry.ts:99 | 2026-11-09 | #6865
+- ri:bug-risks | medium | scripts/backlog/backlog-drive-stalled-retry.ts:97 | 2026-11-09 | #6865 | fixed
+- ri:performance | medium | scripts/backlog/backlog-drive-stalled-retry.ts:110 | 2026-11-09 | #6865 | fixed
+- ri:bug-risks | low | scripts/run/event/run-event-retry.ts:12 | 2026-11-09 | #6865 | fixed
+- ri:comments | low | scripts/lane/lane-gap-stats.ts:97 | 2026-11-09 | #6865 | fixed
+- rb:2026-11-09 | #6865
+- rf:bug-risks | medium | scripts/backlog/backlog-drive-stalled-retry.ts:39 | 2026-11-09 | #6865 | fixed
+- rf:bug-risks | medium | scripts/backlog/backlog-drive-stalled-retry.ts:97 | 2026-11-09 | #6865 | fixed
+- rf:performance | low | scripts/backlog/backlog-drive-stalled-retry.ts:66 | 2026-11-09 | #6865 | fixed
+- rf:comments | low | scripts/backlog/backlog-drive-stalled-retry.ts:112 | 2026-11-09 | #6865 | fixed
+- rx:{"round":"80421fc3-a1bd-49c0-bb91-fd2e0bcdf9f7","category":"bug-risks","severity":"medium","file":"scripts/backlog/backlog-drive-stalled-retry.ts:39","disposition":"fixed","description":"is_followup_clear ignores the merge state and stop cause, so a followup timeout parked on mergeStateStatus BLOCKED with green checks is relaunched twice into the same blocked merge wait.","status":"resolved"}
+- rx:{"round":"80421fc3-a1bd-49c0-bb91-fd2e0bcdf9f7","category":"bug-risks","severity":"medium","file":"scripts/backlog/backlog-drive-stalled-retry.ts:97","disposition":"fixed","description":"a refused run:add --retry throws out of sweep before every offer and ends the whole backlogrun through run_safe.","status":"resolved"}
+- rx:{"round":"80421fc3-a1bd-49c0-bb91-fd2e0bcdf9f7","category":"performance","severity":"low","file":"scripts/backlog/backlog-drive-stalled-retry.ts:66","disposition":"fixed","description":"every offer re-reads each uncapped followup park issue over gh, including parks a person already cleared.","status":"resolved"}
+- rx:{"round":"80421fc3-a1bd-49c0-bb91-fd2e0bcdf9f7","category":"comments","severity":"low","file":"scripts/backlog/backlog-drive-stalled-retry.ts:112","disposition":"fixed","description":"the cap counts manual and merged-cause retries though the docs describe it as the auto-retry limit.","status":"resolved"}
+- rf:bug-risks | low | scripts/gh/gh-call-kind.ts:49 | 2026-11-09 | #6867
+- rf:performance | low | scripts/gh/gh-usage-log.ts:36 | 2026-11-09 | #6867
+- rb:2026-11-09 | #6867
+- rf:bug-risks | medium | scripts/gh/gh-usage-tally.ts:140 | 2026-11-09 | #6867 | fixed
+- rf:bug-risks | low | scripts/gh/gh-call-kind.ts:44 | 2026-11-09 | #6867 | fixed
+- rf:project-conventions | low | scripts/gh/gh-call-kind.ts:28 | 2026-11-09 | #6867 | fixed
+- rx:{"round":"ff066b77-fc92-42c8-9fbb-31fab469e257","category":"bug-risks","severity":"medium","file":"scripts/gh/gh-usage-tally.ts:140","disposition":"fixed","description":"unrecorded also absorbs every post-change hook-written direct gh line (direct-gh-usage.ts:77 writes no endpoints), contradicting the docs and hiding those calls from the endpoint table.","status":"resolved"}
+- rx:{"round":"ff066b77-fc92-42c8-9fbb-31fab469e257","category":"bug-risks","severity":"low","file":"scripts/gh/gh-call-kind.ts:44","disposition":"fixed","description":"branch names containing a slash and hex-only words split or wrongly fold endpoint rows.","status":"resolved"}
+- rx:{"round":"ff066b77-fc92-42c8-9fbb-31fab469e257","category":"project-conventions","severity":"low","file":"scripts/gh/gh-call-kind.ts:28","disposition":"fixed","description":"the gh api flag sets re-spell those in scripts/rules/gh-api.ts and already diverge from them.","status":"resolved"}
+- ri:performance | low | scripts/hooks/direct-gh-usage.ts:95 | 2026-11-09 | #6867 | fixed
+- rf:none | none | - | 2026-11-10 | #6868
+- rb:2026-11-10 | #6868
+- rf:tests | low | scripts/lib/poll.test.ts:38 | 2026-11-10 | #6868 | fixed
+- rf:comments | low | scripts/gh/git-pr-checks.ts:275 | 2026-11-10 | #6868 | fixed
+- rf:comments | low | scripts/lib/poll.ts:33 | 2026-11-10 | #6868 | fixed
+- rx:{"round":"0675357f-af23-4a77-acca-d4fbf433aa6c","category":"tests","severity":"low","file":"scripts/lib/poll.test.ts:38","disposition":"fixed","description":"No test pins the lead step's unset seen, so mutating it to keep seen survives every case.","status":"resolved"}
+- rx:{"round":"0675357f-af23-4a77-acca-d4fbf433aa6c","category":"comments","severity":"low","file":"scripts/gh/git-pr-checks.ts:275","disposition":"fixed","description":"The pr_poll_options comment still promises a reset to the shortest interval on a changed or unreadable read, which the checks schedule no longer does.","status":"resolved"}
+- rx:{"round":"0675357f-af23-4a77-acca-d4fbf433aa6c","category":"comments","severity":"low","file":"scripts/lib/poll.ts:33","disposition":"fixed","description":"The POLL_BACKOFF rationale still describes the CI-run wait, which now uses PR_POLL_SCHEDULES.checks instead.","status":"resolved"}
+- rf:performance | low | scripts/gh/git-gh-issue-batch-graphql.ts:61 | 2026-11-09 | #6869 | filed:#6964
+- rf:none | none | - | 2026-11-10 | #6869
+- rf:bug-risks | medium | scripts/backlog/backlog-drive.ts:347 | 2026-11-09 | #6871
+- ri:none | none | - | 2026-11-09 | #6871
+- rb:2026-11-09 | #6871
+- rf:bug-risks | medium | scripts/backlog/backlog-drive.ts:337 | 2026-11-09 | #6871 | fixed
+- rx:{"round":"f72b08de-933a-4744-adbf-bee3d376b459","category":"bug-risks","severity":"medium","file":"scripts/backlog/backlog-drive.ts:337","disposition":"fixed","description":"A park-owed pass whose offer is not run can end judge/watch/retrospective and mark the drain before the parked child is triaged, instead of ending triage.","status":"resolved"}
+- ri:bug-risks | low | scripts/backlog/backlog-drive-launch-pass.ts:117 | 2026-11-09 | #6878 | fixed
+- ri:bug-risks | low | scripts/backlog/backlog-drive-record.ts:39 | 2026-11-09 | #6878 | fixed
+- ri:comments | low | scripts/backlog/backlog-drive-launch-pass.ts:24 | 2026-11-09 | #6878 | fixed
+- rb:2026-11-09 | #6878
+- rf:bug-risks | low | scripts/backlog/backlog-drive-launch-pass.ts:121 | 2026-11-09 | #6878
+- rf:bug-risks | low | scripts/backlog/backlog-drive-record.ts:36 | 2026-11-09 | #6878
+- rf:comments | low | scripts/backlog/backlog-drive-launch-pass.ts:24 | 2026-11-09 | #6878
+- rx:{"round":"ca3f2cbb-cb78-49f5-aa09-7a599e008395","category":"bug-risks","severity":"low","file":"scripts/backlog/backlog-drive-launch-pass.ts:121","description":"Only the first refused launch in a pass is parked run:stalled (refusal = outcomes.find), so a second refused issue stays unlabelled and is relaunched once more on the next offer before it is parked; the earlier round's finding is recorded fixed in .josh/observations/6878.md but the tree still carries it.","status":"new"}
+- rx:{"round":"ca3f2cbb-cb78-49f5-aa09-7a599e008395","category":"bug-risks","severity":"low","file":"scripts/backlog/backlog-drive-record.ts:36","description":"stall drops run_stalled_park.apply's false result, so when the label write fails the launch hand-back row still says the driver parked #N run:stalled and the unlabelled issue is re-offered; the earlier round's finding is recorded fixed but the tree still carries it.","status":"new"}
+- rx:{"round":"ca3f2cbb-cb78-49f5-aa09-7a599e008395","category":"comments","severity":"low","file":"scripts/backlog/backlog-drive-launch-pass.ts:24","description":"The comment says the next offer does not hand a refused launch straight back, which holds only for the first refusal in a pass; the earlier round's finding is recorded fixed but the comment is unchanged.","status":"new"}
+- rf:none | none | - | 2026-11-09 | #6883
+- ri:bug-risks | medium | scripts/backlog/backlog-drive-cli.ts:98 | 2026-11-09 | #6883 | fixed
+- rb:2026-11-09 | #6883
+- rf:none | none | - | 2026-11-09 | #6883
+- rf:none | none | - | 2026-11-09 | #6886
+- rb:2026-11-09 | #6886
+- rf:comments | low | scripts/run/board/run-board-ending-states.ts:16 | 2026-11-09 | #6886 | fixed
+- rx:{"round":"c2bc95f7-a340-4c32-b084-33e0935ee22c","category":"comments","severity":"low","file":"scripts/run/board/run-board-ending-states.ts:16","disposition":"fixed","description":"The is_requeued comment sentence is garbled (\"closes a yielded lane with ends no child\") and does not parse.","status":"resolved"}
+- ri:bug-risks | medium | scripts/run/board/run-board-lane-state.ts:73 | 2026-11-09 | #6886 | fixed
+- ri:comments | low | scripts/run/board/run-board-ending-states.ts:26 | 2026-11-09 | #6886 | fixed
+- rf:project-conventions | low | docs/josh-commands-run.md:908 | 2026-11-09 | #6887
+- ri:comments | low | scripts/run/board/run-board-render-quota.ts:256 | 2026-11-09 | #6887 | fixed
+- rb:2026-11-09 | #6887
+- rf:project-conventions | low | docs/josh-commands-run.md:908 | 2026-11-09 | #6887 | fixed
+- rx:{"round":"7146c57d-b2c1-4da2-aefc-d1ce9104c7f2","category":"project-conventions","severity":"low","file":"docs/josh-commands-run.md:908","disposition":"fixed","description":"The run:board reference still names the github gauges rest and graphql while the board now draws REST and GraphQL.","status":"resolved"}
+- rb:2026-11-09 | #6889
+- rf:comments | low | scripts/run/board/run-board-labels.ts:46 | 2026-11-09 | #6889 | deferred:#6887
+- rf:comments | low | scripts/run/board/run-board-labels.ts:36 | 2026-11-09 | #6889 | fixed
+- rx:{"round":"e4405f80-4f87-438b-b493-45523dddb31a","category":"comments","severity":"low","file":"scripts/run/board/run-board-labels.ts:46","disposition":"deferred:#6887","description":"The marker rule's ▶ GraphQL example is not yet true at HEAD, where run-board-render-quota-cell.ts still draws ▶rest, pending sibling #6887.","status":"new"}
+- rx:{"round":"e4405f80-4f87-438b-b493-45523dddb31a","category":"comments","severity":"low","file":"scripts/run/board/run-board-labels.ts:36","disposition":"fixed","description":"The decided-here-alone lead sits above WORDS although most words it governs live in render modules, which a clause naming them would clarify.","status":"resolved"}
+- ri:none | none | - | 2026-11-09 | #6891
+- rb:2026-11-09 | #6891
+- rf:tests | low | scripts/run/board/run-board-status-closed.test.ts:39 | 2026-11-09 | #6891
+- rx:{"round":"a5b6a28b-00df-4e5b-8eab-23a858bf6f96","category":"tests","severity":"low","file":"scripts/run/board/run-board-status-closed.test.ts:39","description":"The plan's fourth test (a child made human by a lane record's human-review state via run-board-lane-state.ts) was not added; no failure scenario — the lane path yields the same 'human' ItemState that settled() routes through WAITING_STATES, so the event-stream tests already cover the settle branch.","status":"new"}
+- rf:none | none | - | 2026-11-09 | #6898
+- ri:none | none | - | 2026-11-09 | #6898
+- rb:2026-11-09 | #6898
+- rf:bug-risks | medium | tools/cost-audit/cost-audit-kind.ts:36 | 2026-11-09 | #6898
+- rx:{"round":"c482b063-c824-4472-976c-cd0ff2b0296b","category":"bug-risks","severity":"medium","file":"tools/cost-audit/cost-audit-kind.ts:36","description":"the handoff rule sits after the review rule, so a run:handoff child whose free-text brief names `/code-review` (e.g. kickoff brief \"tighten the /code-review round cap\") matches REVIEW first and is counted as `review`, not `handoff`, reintroducing the misclassification for those children; move the handoff rule above the review rule (the preamble marker is written by the launcher, unlike the brief) and add a test with a brief naming `/code-review`.","status":"new"}
+- rf:performance | low | tools/cost-audit/cost-audit-phase.ts:34 | 2026-11-09 | #6899
+- rf:none | none | - | 2026-11-09 | #6900
+- ri:bug-risks | medium | scripts/run/review/run-chain-review-fix.ts:49 | 2026-11-09 | #6900 | fixed
+- ri:tests | low | scripts/run/review/run-chain-review-fix.test.ts:44 | 2026-11-09 | #6900 | fixed
+- rb:2026-11-09 | #6900
+- rf:bug-risks | low | scripts/run/review/run-chain-review-fix.ts:36 | 2026-11-09 | #6900 | fixed
+- rx:{"round":"f996c722-8f8d-4568-b693-827f5516b8c6","category":"bug-risks","severity":"low","file":"scripts/run/review/run-chain-review-fix.ts:36","disposition":"fixed","description":"write_handoff's unguarded mkdirSync/writeFileSync would crash run:chain --join after the attest instead of falling back to the in-place next action","status":"resolved"}
+- rf:bug-risks | low | scripts/rules/broad-investigation.ts:76 | 2026-11-10 | #6901
+- rb:2026-11-10 | #6901
+- rf:bug-risks | medium | scripts/rules/consultation-investigation.ts:60 | 2026-11-10 | #6901 | fixed
+- rf:bug-risks | low | scripts/rules/consultation-investigation.ts:61 | 2026-11-10 | #6901 | fixed
+- rf:project-conventions | low | .claude/skills/workflow-commands/delegation.md:61 | 2026-11-10 | #6901 | fixed
+- rx:{"round":"b6a2ae35-6037-4a1d-80b2-70ee95751601","category":"bug-risks","severity":"medium","file":"scripts/rules/consultation-investigation.ts:60","disposition":"fixed","description":"a cheaper main line with no launcher role (Haiku, older Sonnet, non-Sol gpt) was refused and told to hand off to a costlier unit","status":"resolved"}
+- rx:{"round":"b6a2ae35-6037-4a1d-80b2-70ee95751601","category":"bug-risks","severity":"low","file":"scripts/rules/consultation-investigation.ts:61","disposition":"fixed","description":"investigation_model read process.env beside run.context.env","status":"resolved"}
+- rx:{"round":"b6a2ae35-6037-4a1d-80b2-70ee95751601","category":"project-conventions","severity":"low","file":".claude/skills/workflow-commands/delegation.md:61","disposition":"fixed","description":"pointer lacked kit:design-consultant and design → was cryptic","status":"resolved"}
+- rf:tests | low | scripts/run/review/run-review-cli.ts:151 | 2026-11-09 | #6902
+- rf:tests | low | scripts/review/review-pair-cli.test.ts:69 | 2026-11-09 | #6902
+- rf:bug-risks | low | scripts/run/review/run-review-cli.ts:151 | 2026-11-09 | #6902
+- ri:none | none | - | 2026-11-09 | #6902
+- rb:2026-11-09 | #6902
+- rf:bug-risks | medium | scripts/run/review/run-review-cli.ts:151 | 2026-11-09 | #6902 | fixed
+- rf:bug-risks | medium | scripts/review/review-pair.ts:54 | 2026-11-09 | #6902 | fixed
+- rf:tests | low | scripts/review/review-pair-cli.test.ts:69 | 2026-11-09 | #6902 | fixed
+- rf:tests | low | scripts/run/review/run-review-cli.ts:151 | 2026-11-09 | #6902 | fixed
+- rx:{"round":"4e57869c-a4e4-4ff3-9596-5ed84cefd93c","category":"bug-risks","severity":"medium","file":"scripts/run/review/run-review-cli.ts:151","disposition":"fixed","description":"josh ship opens round 1 with run:review --code-only, which never reaches save_brief, so JOSH_REVIEWER_PAIRED=1 pairs nothing on the lane path the docs describe.","status":"resolved"}
+- rx:{"round":"4e57869c-a4e4-4ff3-9596-5ed84cefd93c","category":"bug-risks","severity":"medium","file":"scripts/review/review-pair.ts:54","disposition":"fixed","description":"the paired reviewer's prompt and agent definition still direct attest and review:submit, which overwrites the gating code slot if Sonnet follows them over the appended override.","status":"resolved"}
+- rx:{"round":"4e57869c-a4e4-4ff3-9596-5ed84cefd93c","category":"tests","severity":"low","file":"scripts/review/review-pair-cli.test.ts:69","disposition":"fixed","description":"the title claims attest and the merge gate are untouched but only asserts opus_text was called once.","status":"resolved"}
+- rx:{"round":"4e57869c-a4e4-4ff3-9596-5ed84cefd93c","category":"tests","severity":"low","file":"scripts/run/review/run-review-cli.ts:151","disposition":"fixed","description":"the save_brief wiring that offers only code briefs has no test.","status":"resolved"}
+- rf:assumptions | low | tools/test/pure-files.ts | 2026-11-09 | #6905
+- rf:none | none | - | 2026-11-09 | #6913
+- rf:none | none | - | 2026-11-09 | #6916
+- ri:none | none | - | 2026-11-09 | #6916
+- rb:2026-11-09 | #6916
+- rf:bug-risks | medium | scripts/test/unit-run-marker.ts:172 | 2026-11-09 | #6916 | fixed
+- rf:comments | low | scripts/lane/lane-state-record.ts:49 | 2026-11-09 | #6916 | fixed
+- rx:{"round":"0a8f2182-6e6e-4b02-8fe2-c80ba33d0f3a","category":"bug-risks","severity":"medium","file":"scripts/test/unit-run-marker.ts:172","disposition":"fixed","description":"live_lane_count drops the asking checkout's own lane when its record says paused, human-review or ended, so a gate run by hand in a human-review lane takes a wider worker share than the lanes allow.","status":"resolved"}
+- rx:{"round":"0a8f2182-6e6e-4b02-8fe2-c80ba33d0f3a","category":"comments","severity":"low","file":"scripts/lane/lane-state-record.ts:49","disposition":"fixed","description":"the read_record_file comment names state_root and the issue, but the function takes a full file path.","status":"resolved"}
+- rf:bug-risks | low | scripts/followup/followup-run-rerun.ts:155 | 2026-11-09 | #6922
+- rb:2026-11-09 | #6922
+- rf:bug-risks | medium | scripts/followup/followup-run-rerun.ts:18 | 2026-11-09 | #6922 | fixed
+- rf:bug-risks | low | scripts/followup/followup-run-rerun.ts:147 | 2026-11-09 | #6922 | fixed
+- rf:tests | low | scripts/followup/followup-run-rerun.test.ts:83 | 2026-11-09 | #6922 | fixed
+- rx:{"round":"59078d58-7fbc-4241-9e71-cec34977715d","category":"bug-risks","severity":"medium","file":"scripts/followup/followup-run-rerun.ts:18","disposition":"fixed","description":"is_truncated treats a concurrency-cancelled zero-job run as truncated, so a superseded run is rerun and the poll waits out its budget for contexts it never carries.","status":"resolved"}
+- rx:{"round":"59078d58-7fbc-4241-9e71-cec34977715d","category":"bug-risks","severity":"low","file":"scripts/followup/followup-run-rerun.ts:147","disposition":"fixed","description":"rerun_truncated waits for every missing context, so an absent outside-app context makes the poll run out its full budget.","status":"resolved"}
+- rx:{"round":"59078d58-7fbc-4241-9e71-cec34977715d","category":"tests","severity":"low","file":"scripts/followup/followup-run-rerun.test.ts:83","disposition":"fixed","description":"the cap test uses MAX_CHECK_RERUNS + 1, so a > to >= off-by-one and the cancelled conclusion stay unpinned.","status":"resolved"}
+- rf:bug-risks | medium | scripts/followup/followup-job-needs.ts:96 | 2026-11-09 | #6923 | fixed
+- rf:comments | low | scripts/followup/followup-job-needs.ts:13 | 2026-11-09 | #6923 | fixed
+- rf:none | none | - | 2026-11-09 | #6923
+- rf:comments | low | scripts/followup/followup-job-rerun.ts:329 | 2026-11-09 | #6924
+- rf:comments | low | scripts/followup/followup-failed-tests.ts:84 | 2026-11-09 | #6924
+- rb:2026-11-09 | #6924
+- rf:bug-risks | high | scripts/followup/followup-job-needs.ts:139 | 2026-11-09 | #6924 | fixed
+- rf:bug-risks | medium | scripts/followup/followup-job-needs.ts:23 | 2026-11-09 | #6924 | fixed
+- rf:comments | low | scripts/followup/followup-job-rerun.ts:329 | 2026-11-09 | #6924 | fixed
+- rx:{"round":"ae2146cd-88c8-496b-a3dd-f0de3dda0c65","category":"bug-risks","severity":"high","file":"scripts/followup/followup-job-needs.ts:139","disposition":"fixed","description":"has_succeeded rejects a skipped or absent need, so Checks (which needs the push-only reuse-pr-checks) is never rerun on a pull request and the #6682 incident is never recovered.","status":"resolved"}
+- rx:{"round":"ae2146cd-88c8-496b-a3dd-f0de3dda0c65","category":"bug-risks","severity":"medium","file":"scripts/followup/followup-job-needs.ts:23","disposition":"fixed","description":"NEEDS_READ treats any step mentioning needs.*.outputs as a gate, so a deterministic change-caused failure there is rerun three times and reported as an infrastructure outage.","status":"resolved"}
+- rx:{"round":"ae2146cd-88c8-496b-a3dd-f0de3dda0c65","category":"comments","severity":"low","file":"scripts/followup/followup-job-rerun.ts:329","disposition":"fixed","description":"the rerun banner and module header do not name the needs-gate rerun class.","status":"resolved"}
+- rf:none | none | - | 2026-11-09 | #6926
+- rf:none | none | - | 2026-11-09 | #6944
+- rf:none | none | - | 2026-11-09 | #6944
+- rf:tests | low | tools/hooks/hook-bundle-fast.test.ts:57 | 2026-11-09 | #6948
+- ri:performance | low | tools/hooks/hook-bundle-fast.ts:40 | 2026-11-09 | #6948 | fixed
+- ri:comments | low | package.json:43 | 2026-11-09 | #6948 | fixed
+- rb:2026-11-09 | #6948
+- rf:bug-risks | medium | scripts/hooks/run-hook.sh:46 | 2026-11-09 | #6948 | fixed
+- rf:project-conventions | low | scripts/build/build-hooks.ts:251 | 2026-11-09 | #6948 | fixed
+- rf:tests | low | tools/hooks/hook-bundle-fast.test.ts:57 | 2026-11-09 | #6948 | fixed
+- rx:{"round":"5b34a3b6-a5fa-4f2e-8629-e0542dd66989","category":"bug-risks","severity":"medium","file":"scripts/hooks/run-hook.sh:46","disposition":"fixed","description":"The built dist/hooks/ready.js statically imports split chunks, so a background rebuild that prunes them mid-launch fails the hook with ERR_MODULE_NOT_FOUND and the guard fails open, a race import_bundle closes for hook bundles but a main module cannot retry.","status":"resolved"}
+- rx:{"round":"5b34a3b6-a5fa-4f2e-8629-e0542dd66989","category":"project-conventions","severity":"low","file":"scripts/build/build-hooks.ts:251","disposition":"fixed","description":"LAUNCH_GATE is exported but no module or test reads it.","status":"resolved"}
+- rx:{"round":"5b34a3b6-a5fa-4f2e-8629-e0542dd66989","category":"tests","severity":"low","file":"tools/hooks/hook-bundle-fast.test.ts:57","disposition":"fixed","description":"No test runs the built ready.js itself, so a stubbed or non-firing ready.js would silently skip every kit hook with the suite green.","status":"resolved"}
+- rb:2026-11-09 | #6948
+- rf:none | none | - | 2026-11-09 | #6948
+- rx:{"round":"8f057255-e83a-4fea-af13-01ef18bd84ae","previous":"5b34a3b6-a5fa-4f2e-8629-e0542dd66989","category":"bug-risks","severity":"medium","file":"scripts/hooks/run-hook.sh:46","description":"The built dist/hooks/ready.js statically imports split chunks, so a background rebuild that prunes them mid-launch fails the hook with ERR_MODULE_NOT_FOUND and the guard fails open, a race import_bundle closes for hook bundles but a main module cannot retry.","disposition":"fixed","status":"resolved"}
+- rx:{"round":"8f057255-e83a-4fea-af13-01ef18bd84ae","previous":"5b34a3b6-a5fa-4f2e-8629-e0542dd66989","category":"project-conventions","severity":"low","file":"scripts/build/build-hooks.ts:251","description":"LAUNCH_GATE is exported but no module or test reads it.","disposition":"fixed","status":"resolved"}
+- rx:{"round":"8f057255-e83a-4fea-af13-01ef18bd84ae","previous":"5b34a3b6-a5fa-4f2e-8629-e0542dd66989","category":"tests","severity":"low","file":"tools/hooks/hook-bundle-fast.test.ts:57","description":"No test runs the built ready.js itself, so a stubbed or non-firing ready.js would silently skip every kit hook with the suite green.","disposition":"fixed","status":"resolved"}
+- rf:none | none | - | 2026-11-09 | #6952
+- ri:none | none | - | 2026-11-09 | #6952
+- rf:none | none | - | 2026-11-09 | #6956
+- rf:bug-risks | low | scripts/hooks/pretool-guard.ts:177 | 2026-11-09 | #6961
+- ri:bug-risks | low | scripts/hooks/pretool-guard.ts:177 | 2026-11-09 | #6961 | fixed
+- rf:none | none | - | 2026-11-10 | #6962
+- ri:none | none | - | 2026-11-10 | #6962
+- rb:2026-11-10 | #6962
+- rf:none | none | - | 2026-11-10 | #6962
+- ri:none | none | - | 2026-11-10 | #6963
+- rb:2026-11-10 | #6963
+- rf:bug-risks | low | scripts/run/cut/run-cut-cli-fixture.ts:51 | 2026-11-10 | #6963
+- rf:project-conventions | low | scripts/run/cut/run-cut-cli-fixture.ts:35 | 2026-11-10 | #6963
+- rx:{"round":"3dcc88fc-a064-4a69-82f4-300952721eb9","category":"bug-risks","severity":"low","file":"scripts/run/cut/run-cut-cli-fixture.ts:51","description":"The case mocks now outlive a suite under isolate:false and beforeEach only clears calls, so an unconsumed mockReturnValueOnce would leak into the next pure suite; no failure scenario — the only Once overrides (run-cut-cli-impl.test.ts:251,264, run-cut-cli-digest.test.ts:17) are consumed by the case that sets them.","status":"new"}
+- rx:{"round":"3dcc88fc-a064-4a69-82f4-300952721eb9","category":"project-conventions","severity":"low","file":"scripts/run/cut/run-cut-cli-fixture.ts:35","description":"The scratch directory is now a hand-rolled mkdtempSync/rmSync pair beside tools/test/temporary-directory.ts, whose afterAll-at-creation lifetime cannot express a per-suite recreate; no failure scenario — cleanup runs in the fixture's own afterAll on every suite.","status":"new"}
+- rf:project-conventions | low | scripts/gh/git-gh-exec.test.ts:257 | 2026-11-10 | #6964 | fixed
+- rf:comments | low | scripts/gh/git-gh-failure.ts:51 | 2026-11-10 | #6964 | fixed
+- rf:project-conventions | low | scripts/gh/git-gh-exec.test.ts:257 | 2026-11-10 | #6964
+- rf:comments | low | scripts/gh/git-gh-failure.ts:51 | 2026-11-10 | #6964
+- rf:comments | low | scripts/gh/git-gh-failure.ts:47 | 2026-11-10 | #6964
+- rf:none | none | - | 2026-11-09 | #6965
+- rb:2026-11-09 | #6965
+- rf:comments | low | scripts/josh/josh-gh-usage.ts:55 | 2026-11-09 | #6965 | fixed
+- rf:bug-risks | low | scripts/gh/gh-tally-handoff.ts:53 | 2026-11-09 | #6965
+- rf:tests | medium | scripts/josh/josh-logic.ts:204 | 2026-11-09 | #6965 | fixed
+- rx:{"round":"6ff21239-cb37-47dc-a1a9-2446a13401f3","category":"comments","severity":"low","file":"scripts/josh/josh-gh-usage.ts:55","disposition":"fixed","description":"the comment claimed the line carries no difference for the child calls; it does when the dispatcher called gh before the spawn","status":"resolved"}
+- rx:{"round":"6ff21239-cb37-47dc-a1a9-2446a13401f3","category":"bug-risks","severity":"low","file":"scripts/gh/gh-tally-handoff.ts:53","description":"a detached descendant exiting after taken() can recreate the temp file; accepted as rare and harmless, no double count","status":"new"}
+- rx:{"round":"6ff21239-cb37-47dc-a1a9-2446a13401f3","category":"tests","severity":"medium","file":"scripts/josh/josh-logic.ts:204","disposition":"fixed","description":"the spawn env wiring and the count_call arm condition had no test","status":"resolved"}
+- rf:none | none | - | 2026-11-09 | #6966
+- rf:bug-risks | low | scripts/hooks/pretool-guard.ts:148 | 2026-11-10 | #6967
+- ri:bug-risks | low | scripts/hooks/pretool-guard.ts:148 | 2026-11-10 | #6967 | fixed
+- rb:2026-11-10 | #6967
+- rf:bug-risks | medium | scripts/delegation/investigation-reads.ts:64 | 2026-11-10 | #6967 | fixed
+- rf:tests | medium | scripts/hooks/batch-guard.test.ts:352 | 2026-11-10 | #6967 | fixed
+- rf:project-conventions | low | scripts/josh/hook-envelope.ts:1 | 2026-11-10 | #6967 | fixed
+- rx:{"round":"55e76b53-1b24-4212-9edf-fea16a27292c","category":"bug-risks","severity":"medium","file":"scripts/delegation/investigation-reads.ts:64","disposition":"fixed","description":"investigation_outcome still resolves paths against the module-load process.cwd() and reads the branch diff without the context cwd, so a context naming another checkout is judged against the process's.","status":"resolved"}
+- rx:{"round":"55e76b53-1b24-4212-9edf-fea16a27292c","category":"tests","severity":"medium","file":"scripts/hooks/batch-guard.test.ts:352","disposition":"fixed","description":"the lane-mark-removed test was moved out of the lane-child describe, so it no longer runs in a marked lane checkout and passes vacuously.","status":"resolved"}
+- rx:{"round":"55e76b53-1b24-4212-9edf-fea16a27292c","category":"project-conventions","severity":"low","file":"scripts/josh/hook-envelope.ts:1","disposition":"fixed","description":"extracting the envelopes is outside the issue scope and should be noted in the PR body.","status":"resolved"}
+- rf:none | none | - | 2026-11-10 | #6970
+- rf:comments | low | scripts/run/run-parent-cut-hook.ts:44 | 2026-11-10 | #6973
+- rf:tests | low | scripts/hooks/pretool-guard-context.test.ts:140 | 2026-11-10 | #6973
+- rf:tests | low | scripts/hooks/pretool-guard-context.test.ts:173 | 2026-11-10 | #6973
+- ri:bug-risks | low | scripts/hooks/codex-hook-adapter.ts:175 | 2026-11-10 | #6973 | fixed
+- ri:bug-risks | low | scripts/rules/delivered-rules.ts:223 | 2026-11-10 | #6973 | fixed
+- rb:2026-11-10 | #6973
+- rf:bug-risks | low | scripts/rules/delivered-rules.ts:218 | 2026-11-10 | #6973 | fixed
+- rf:bug-risks | low | scripts/rules/implementation-cut.ts:127 | 2026-11-10 | #6973 | fixed
+- rf:project-conventions | low | scripts/rules/lane-spilled-read.ts:50 | 2026-11-10 | #6973 | fixed
+- rf:tests | low | scripts/hooks/pretool-guard-context.test.ts:173 | 2026-11-10 | #6973 | fixed
+- rf:tests | low | scripts/hooks/pretool-guard-context.test.ts:140 | 2026-11-10 | #6973 | fixed
+- rf:comments | low | scripts/rules/delivered-rules-guard.ts:12 | 2026-11-10 | #6973 | fixed
+- rf:comments | low | scripts/run/run-parent-cut-hook.ts:44 | 2026-11-10 | #6973 | fixed
+- rx:{"round":"4462e810-73e9-4eda-b916-45d857d2dfd6","category":"bug-risks","severity":"low","file":"scripts/rules/delivered-rules.ts:218","disposition":"fixed","description":"The call_only rows (lane-park, direct-issue-comment, rule-body, protected-files) still read process.cwd/process.env instead of the per-call HookContext.","status":"resolved"}
+- rx:{"round":"4462e810-73e9-4eda-b916-45d857d2dfd6","category":"bug-risks","severity":"low","file":"scripts/rules/implementation-cut.ts:127","disposition":"fixed","description":"current_state takes directory and env from the context but carried_cut_sync/held_issue_sync still resolve the worktree from the process cwd.","status":"resolved"}
+- rx:{"round":"4462e810-73e9-4eda-b916-45d857d2dfd6","category":"project-conventions","severity":"low","file":"scripts/rules/lane-spilled-read.ts:50","disposition":"fixed","description":"Three rows replaced their pure boolean seam with HookContext and now need mocks, unlike the _in adapter shape the other rows kept.","status":"resolved"}
+- rx:{"round":"4462e810-73e9-4eda-b916-45d857d2dfd6","category":"tests","severity":"low","file":"scripts/hooks/pretool-guard-context.test.ts:173","disposition":"fixed","description":"The watcher-quiet test also passes if is_active reverts to process.env, because no live run makes the watcher stale.","status":"resolved"}
+- rx:{"round":"4462e810-73e9-4eda-b916-45d857d2dfd6","category":"tests","severity":"low","file":"scripts/hooks/pretool-guard-context.test.ts:140","disposition":"fixed","description":"The demoted-rules test also passes if rules() ignores its env, because the demoted file does not exist.","status":"resolved"}
+- rx:{"round":"4462e810-73e9-4eda-b916-45d857d2dfd6","category":"comments","severity":"low","file":"scripts/rules/delivered-rules-guard.ts:12","disposition":"fixed","description":"The header says rows never read the process, which is false for the call_only rows.","status":"resolved"}
+- rx:{"round":"4462e810-73e9-4eda-b916-45d857d2dfd6","category":"comments","severity":"low","file":"scripts/run/run-parent-cut-hook.ts:44","disposition":"fixed","description":"The comment says the carry record is read under the call's cwd, but read_carry_here resolves it from the process cwd.","status":"resolved"}
+- ri:none | none | - | 2026-11-10 | #6976
+- rb:2026-11-10 | #6976
+- rf:none | none | - | 2026-11-10 | #6976
+- ri:bug-risks | medium | scripts/lane/lane-restart.ts:76 | 2026-11-10 | #6979 | fixed
+- ri:comments | low | docs/how-to/recover-a-run.md:23 | 2026-11-10 | #6979 | fixed
+- rb:2026-11-10 | #6979
+- rf:bug-risks | medium | scripts/git/stash/git-stash.ts:128 | 2026-11-10 | #6979 | fixed
+- rf:tests | medium | scripts/git/stash/git-stash-work.test.ts:32 | 2026-11-10 | #6979 | fixed
+- rf:comments | low | scripts/git/stash/git-stash.ts:107 | 2026-11-10 | #6979 | fixed
+- rx:{"round":"d81c361b-14ec-4be2-8c47-047a4919c889","category":"bug-risks","severity":"medium","file":"scripts/git/stash/git-stash.ts:128","disposition":"fixed","description":"DELETION_STATUS treats staged deletions and DD conflicts as mid-removal, so a deliberate git rm is dropped unstashed and a conflicted lane is removed; narrow to unstaged deletions only.","status":"resolved"}
+- rx:{"round":"d81c361b-14ec-4be2-8c47-047a4919c889","category":"tests","severity":"medium","file":"scripts/git/stash/git-stash-work.test.ts:32","disposition":"fixed","description":"the fixture locks in staged and DD deletions as no work, guarding the over-broad pattern instead of the incident shape.","status":"resolved"}
+- rx:{"round":"d81c361b-14ec-4be2-8c47-047a4919c889","category":"comments","severity":"low","file":"scripts/git/stash/git-stash.ts:107","disposition":"fixed","description":"the has_changes doc comment now sits above the inserted status_of helper instead of the function it describes.","status":"resolved"}
+- rb:2026-11-10 | #6979
+- rf:comments | medium | docs/how-to/recover-a-run.md:23 | 2026-11-10 | #6979
+- rx:{"round":"583e7d88-a952-4b8a-92ff-793caac36c77","previous":"d81c361b-14ec-4be2-8c47-047a4919c889","category":"comments","severity":"medium","file":"docs/how-to/recover-a-run.md:23","description":"the earlier-recorded fix is absent from the change (no docs file in the diff): the failure line still says to \"use the full message\" on an ambiguous stash:pop, so a reader who hits two same-message stashes retries the full message, gets ambiguous again and never learns the new hash form (docs/josh-commands-backlog.md:567-572 and the usage block also omit the <hash> argument); other sites: docs/josh-commands-backlog.md:567","status":"new"}
+- rx:{"round":"583e7d88-a952-4b8a-92ff-793caac36c77","previous":"d81c361b-14ec-4be2-8c47-047a4919c889","category":"bug-risks","severity":"medium","file":"scripts/git/stash/git-stash.ts:128","description":"DELETION_STATUS treats staged deletions and DD conflicts as mid-removal, so a deliberate git rm is dropped unstashed and a conflicted lane is removed; narrow to unstaged deletions only.","disposition":"fixed","status":"resolved"}
+- rx:{"round":"583e7d88-a952-4b8a-92ff-793caac36c77","previous":"d81c361b-14ec-4be2-8c47-047a4919c889","category":"tests","severity":"medium","file":"scripts/git/stash/git-stash-work.test.ts:32","description":"the fixture locks in staged and DD deletions as no work, guarding the over-broad pattern instead of the incident shape.","disposition":"fixed","status":"resolved"}
+- rx:{"round":"583e7d88-a952-4b8a-92ff-793caac36c77","previous":"d81c361b-14ec-4be2-8c47-047a4919c889","category":"comments","severity":"low","file":"scripts/git/stash/git-stash.ts:107","description":"the has_changes doc comment now sits above the inserted status_of helper instead of the function it describes.","disposition":"fixed","status":"resolved"}
+- rf:none | none | - | 2026-11-10 | #6982
+- rf:performance | low | scripts/test/test-related.ts:384 | 2026-11-10 | #6982
+- rf:performance | low | scripts/test/test-related.ts:384 | 2026-11-10 | #6982
+- rb:2026-11-10 | #6982
+- rf:tests | low | scripts/test/test-related.ts:388 | 2026-11-10 | #6982 | fixed
+- rf:project-conventions | low | scripts/test/test-related-record.ts:42 | 2026-11-10 | #6982 | fixed
+- rf:performance | low | scripts/test/test-related.ts:384 | 2026-11-10 | #6982
+- rx:{"round":"0f6835b2-1367-4538-b10f-e4f70375d235","category":"tests","severity":"low","file":"scripts/test/test-related.ts:388","disposition":"fixed","description":"No test proved run_fresh passes the branch parts into the recorded input","status":"resolved"}
+- rx:{"round":"0f6835b2-1367-4538-b10f-e4f70375d235","category":"project-conventions","severity":"low","file":"scripts/test/test-related-record.ts:42","disposition":"fixed","description":"RunInput.parts reused a name parts_of and MovedParts use; renamed branch_parts","status":"resolved"}
+- rx:{"round":"0f6835b2-1367-4538-b10f-e4f70375d235","category":"performance","severity":"low","file":"scripts/test/test-related.ts:384","description":"read_changed_parts repeats git reads branch_change already made","status":"new"}
+- ri:none | none | - | 2026-11-10 | #6982
+- rf:none | none | - | 2026-11-10 | #6983
+- ri:bug-risks | medium | scripts/lane/lane-why.ts:134 | 2026-11-10 | #6983 | fixed
+- ri:comments | medium | docs/josh-commands-lane.md:378 | 2026-11-10 | #6983 | fixed
+- ri:bug-risks | low | scripts/lane/lane-implement-signals-record.ts:46 | 2026-11-10 | #6983 | fixed
+- ri:performance | low | scripts/run/run-step-progress.ts:56 | 2026-11-10 | #6983 | fixed
+- rb:2026-11-10 | #6983
+- rf:bug-risks | medium | scripts/lane/lane-why.ts:133 | 2026-11-10 | #6983 | fixed
+- rf:bug-risks | low | scripts/lane/lane-implement-signals.ts:39 | 2026-11-10 | #6983 | fixed
+- rf:performance | low | scripts/lane/lane-implement-signals-record.ts:48 | 2026-11-10 | #6983 | fixed
+- rf:tests | low | scripts/lane/lane-implement-signals.test.ts:103 | 2026-11-10 | #6983 | fixed
+- rf:comments | low | scripts/lane/lane-why.ts:123 | 2026-11-10 | #6983 | fixed
+- rx:{"round":"2e3cad78-17fa-48e7-bde9-a686e9386e7b","category":"bug-risks","severity":"medium","file":"scripts/lane/lane-why.ts:133","disposition":"fixed","description":"an implement row whose signals passed no bar lost the stage-named open Issues","status":"resolved"}
+- rx:{"round":"2e3cad78-17fa-48e7-bde9-a686e9386e7b","category":"bug-risks","severity":"low","file":"scripts/lane/lane-implement-signals.ts:39","disposition":"fixed","description":"the related-run patterns also counted searches for the command name and longer commands","status":"resolved"}
+- rx:{"round":"2e3cad78-17fa-48e7-bde9-a686e9386e7b","category":"performance","severity":"low","file":"scripts/lane/lane-implement-signals-record.ts:48","disposition":"fixed","description":"the plan lookup was a linear array scan per edited file","status":"resolved"}
+- rx:{"round":"2e3cad78-17fa-48e7-bde9-a686e9386e7b","category":"tests","severity":"low","file":"scripts/lane/lane-implement-signals.test.ts:103","disposition":"fixed","description":"the within-bar test never exercised values exactly at each bar","status":"resolved"}
+- rx:{"round":"2e3cad78-17fa-48e7-bde9-a686e9386e7b","category":"comments","severity":"low","file":"scripts/lane/lane-why.ts:123","disposition":"fixed","description":"the comment said undefined for a row with no keys while an implement row returned an empty list","status":"resolved"}
+- rf:none | none | - | 2026-11-10 | #6984
+- rf:none | none | - | 2026-11-10 | #6984
+- rf:comments | low | docs/josh-commands-lane.md:204 | 2026-11-10 | #6985
+- ri:comments | low | docs/josh-commands-lane.md:204 | 2026-11-10 | #6985 | fixed
+- rb:2026-11-10 | #6985
+- rf:none | none | - | 2026-11-10 | #6985
+- rf:bug-risks | low | scripts/run/ship/run-ship-preflight.ts:199 | 2026-11-10 | #6986
+- ri:bug-risks | medium | scripts/run/ship/run-ship-preflight-reuse.ts:42 | 2026-11-10 | #6986 | fixed
+- ri:bug-risks | low | scripts/run/ship/run-ship-preflight.ts:193 | 2026-11-10 | #6986 | fixed
+- rb:2026-11-10 | #6986
+- rf:tests | medium | scripts/run/ship/run-ship-preflight.test.ts:53 | 2026-11-10 | #6986 | fixed
+- rf:bug-risks | low | scripts/run/ship/run-ship-preflight-reuse.ts:42 | 2026-11-10 | #6986 | fixed
+- rf:performance | low | scripts/run/ship/run-ship-preflight.ts:195 | 2026-11-10 | #6986 | fixed
+- rf:comments | low | docs/josh-commands-run.md:17 | 2026-11-10 | #6986 | fixed
+- rx:{"round":"71bfca8f-6888-4280-8e13-3f99266eecc5","category":"tests","severity":"medium","file":"scripts/run/ship/run-ship-preflight.test.ts:53","disposition":"fixed","description":"the stage-to-reuse wiring (issue/title/body key, no key on an unreadable body) was untested behind a pass-through mock","status":"resolved"}
+- rx:{"round":"71bfca8f-6888-4280-8e13-3f99266eecc5","category":"bug-risks","severity":"low","file":"scripts/run/ship/run-ship-preflight-reuse.ts:42","disposition":"fixed","description":"a refused ask left an older pass reusable; the record is now cleared before each ask","status":"resolved"}
+- rx:{"round":"71bfca8f-6888-4280-8e13-3f99266eecc5","category":"performance","severity":"low","file":"scripts/run/ship/run-ship-preflight.ts:195","disposition":"fixed","description":"the branch and body reads of the reuse key ran in sequence","status":"resolved"}
+- rx:{"round":"71bfca8f-6888-4280-8e13-3f99266eecc5","category":"comments","severity":"low","file":"docs/josh-commands-run.md:17","disposition":"fixed","description":"the preflight reuse sentence omitted the base, and the round-2 re-entry rule now names it","status":"resolved"}
+- ri:tests | low | scripts/lane/lane-why-period.test.ts:27 | 2026-11-10 | #6988 | fixed
+- ri:comments | low | docs/josh-commands-lane.md:211 | 2026-11-10 | #6988 | fixed
+- rb:2026-11-10 | #6988
+- rf:comments | low | docs/josh-commands-lane.md:211 | 2026-11-10 | #6988
+- rf:tests | low | scripts/lane/lane-why-period.test.ts:27 | 2026-11-10 | #6988
+- rf:assumptions | low | scripts/lane/lane-why-period.ts:63 | 2026-11-10 | #6988
+- rx:{"round":"921422cb-c613-4d65-99a7-a0ccb592f034","category":"comments","severity":"low","file":"docs/josh-commands-lane.md:211","description":"The earlier round's fix is not in the tree (the diff from e376ee23f leaves docs untouched): the --why paragraph still describes no per-key implement / ship rows, no 'implement (no signal over its bar)' row, and still says open issues match the stage names, which keyed rows no longer pass to the matcher; no failure scenario — tried a reader running --why, who sees row names the doc does not define but no wrong command or output follows.","status":"new"}
+- rx:{"round":"921422cb-c613-4d65-99a7-a0ccb592f034","category":"tests","severity":"low","file":"scripts/lane/lane-why-period.test.ts:27","description":"The renamed base test 'uses shared budgets and keeps implement attribution uncertain' still needs a 置き換え line under 消えたテストの処置 pointing at the renamed test at :27; no PR exists yet to carry it; no failure scenario — josh followup refuses the merge until it is written, so nothing ships wrong.","status":"new"}
+- rx:{"round":"921422cb-c613-4d65-99a7-a0ccb592f034","category":"assumptions","severity":"low","file":"scripts/lane/lane-why-period.ts:63","description":"Keyed rows link open Issues by cause key only, so an open Issue titled after the stage (e.g. 'Shorten ship gate') that the old 'other' row linked now shows 'none' on 'ship: <key>'; no failure scenario as a defect — the comment at :53 states key-only linking is intended, so it is a design trade-off that only the stale doc at docs/josh-commands-lane.md:211 contradicts.","status":"new"}
+- rf:bug-risks | low | scripts/issue/issue-spill.ts:121 | 2026-11-10 | #6992
+- rb:2026-11-10 | #6992
+- rf:bug-risks | low | scripts/issue/issue-spill.ts:121 | 2026-11-10 | #6992 | fixed
+- rx:{"round":"702f81c4-6a08-428c-9a92-025a68a2c84d","category":"bug-risks","severity":"low","file":"scripts/issue/issue-spill.ts:121","disposition":"fixed","description":"A last-section expected effect without a trailing newline abuts the acceptance heading with no blank line.","status":"resolved"}
+- rf:bug-risks | medium | .github/workflows/ci.yml:428 | 2026-11-10 | #6997
+- rf:none | none | - | 2026-11-10 | #7000
+- rb:2026-11-10 | #7000
+- rf:bug-risks | medium | scripts/issue/issue-priority-raise.ts:80 | 2026-11-10 | #7000 | fixed
+- rf:bug-risks | medium | scripts/issue/issue-priority-raise.ts:43 | 2026-11-10 | #7000 | fixed
+- rx:{"round":"11b1a9bf-a746-45da-954b-d524da43e579","category":"bug-risks","severity":"medium","file":"scripts/issue/issue-priority-raise.ts:80","disposition":"fixed","description":"A rerun after a partly failed replace answers labelled and leaves both priority labels, because raise only clears lower labels when it adds one.","status":"resolved"}
+- rx:{"round":"11b1a9bf-a746-45da-954b-d524da43e579","category":"bug-risks","severity":"medium","file":"scripts/issue/issue-priority-raise.ts:43","disposition":"fixed","description":"Priority label matching is case-sensitive unlike has_label_name, so a differently cased stored label is neither replaced nor seen as present.","status":"resolved"}
+- rf:comments | low | scripts/backlog/backlog-triage-park.ts:33 | 2026-11-10 | #7001
+- ri:comments | low | .claude/skills/workflow-commands/backlogrun-park.md:84 | 2026-11-10 | #7001 | fixed
+- ri:comments | low | scripts/backlog/backlog-drive-after-merge.ts:10 | 2026-11-10 | #7001 | fixed
+- rb:2026-11-10 | #7001
+- rf:bug-risks | medium | scripts/run/board/run-board-decision.ts:54 | 2026-11-10 | #7001 | fixed
+- rf:bug-risks | low | scripts/run/board/run-board-decision.ts:46 | 2026-11-10 | #7001 | fixed
+- rf:bug-risks | low | scripts/backlog/backlog-triage-adopt.ts:168 | 2026-11-10 | #7001 | fixed
+- rf:tests | low | scripts/run/board/run-board-decision-read.test.ts:28 | 2026-11-10 | #7001 | fixed
+- rf:comments | low | docs/josh-commands-backlog.md:916 | 2026-11-10 | #7001 | fixed
+- rx:{"round":"414f2fde-b208-4e60-8f95-b466d189d71a","category":"bug-risks","severity":"medium","file":"scripts/run/board/run-board-decision.ts:54","disposition":"fixed","description":"The park round is appended even when the latest body is not a park, so the row shows only 'park N 回目' instead of falling back to the issue title.","status":"resolved"}
+- rx:{"round":"414f2fde-b208-4e60-8f95-b466d189d71a","category":"bug-risks","severity":"low","file":"scripts/run/board/run-board-decision.ts:46","disposition":"fixed","description":"The round counts every park, not only parks after an adoption as the comment says.","status":"resolved"}
+- rx:{"round":"414f2fde-b208-4e60-8f95-b466d189d71a","category":"bug-risks","severity":"low","file":"scripts/backlog/backlog-triage-adopt.ts:168","disposition":"fixed","description":"The --done text is recorded as a parent action even for an option that needs none.","status":"resolved"}
+- rx:{"round":"414f2fde-b208-4e60-8f95-b466d189d71a","category":"tests","severity":"low","file":"scripts/run/board/run-board-decision-read.test.ts:28","disposition":"fixed","description":"No test covers a non-park latest body after two parks.","status":"resolved"}
+- rx:{"round":"414f2fde-b208-4e60-8f95-b466d189d71a","category":"comments","severity":"low","file":"docs/josh-commands-backlog.md:916","disposition":"fixed","description":"The doc says the permission is 親, but the code matches any value starting with 親.","status":"resolved"}
+- rb:2026-11-10 | #7001
+- rf:comments | low | scripts/backlog/backlog-triage-park.ts:33 | 2026-11-10 | #7001
+- rx:{"round":"35788f84-f5b6-4a53-950a-4bce342f9435","previous":"414f2fde-b208-4e60-8f95-b466d189d71a","category":"comments","severity":"low","file":"scripts/backlog/backlog-triage-park.ts:33","description":"The printed --adopt line and the adopt USAGE name the placeholder '<the parent action taken>' while backlog-triage-cli.ts USAGE and the docs say '<text>', so one flag carries two placeholder names; no failure scenario — tried a parent copying either form, both parse as the same --done string.","status":"new"}
+- rx:{"round":"35788f84-f5b6-4a53-950a-4bce342f9435","previous":"414f2fde-b208-4e60-8f95-b466d189d71a","category":"bug-risks","severity":"medium","file":"scripts/run/board/run-board-decision.ts:54","description":"The park round is appended even when the latest body is not a park, so the row shows only 'park N 回目' instead of falling back to the issue title.","disposition":"fixed","status":"resolved"}
+- rx:{"round":"35788f84-f5b6-4a53-950a-4bce342f9435","previous":"414f2fde-b208-4e60-8f95-b466d189d71a","category":"bug-risks","severity":"low","file":"scripts/run/board/run-board-decision.ts:46","description":"The round counts every park, not only parks after an adoption as the comment says.","disposition":"fixed","status":"resolved"}
+- rx:{"round":"35788f84-f5b6-4a53-950a-4bce342f9435","previous":"414f2fde-b208-4e60-8f95-b466d189d71a","category":"bug-risks","severity":"low","file":"scripts/backlog/backlog-triage-adopt.ts:168","description":"The --done text is recorded as a parent action even for an option that needs none.","disposition":"fixed","status":"resolved"}
+- rx:{"round":"35788f84-f5b6-4a53-950a-4bce342f9435","previous":"414f2fde-b208-4e60-8f95-b466d189d71a","category":"tests","severity":"low","file":"scripts/run/board/run-board-decision-read.test.ts:28","description":"No test covers a non-park latest body after two parks.","disposition":"fixed","status":"resolved"}
+- rx:{"round":"35788f84-f5b6-4a53-950a-4bce342f9435","previous":"414f2fde-b208-4e60-8f95-b466d189d71a","category":"comments","severity":"low","file":"docs/josh-commands-backlog.md:916","description":"The doc says the permission is 親, but the code matches any value starting with 親.","disposition":"fixed","status":"resolved"}
+- rf:none | none | - | 2026-11-10 | #7002
+- ri:none | none | - | 2026-11-10 | #7002
+- rb:2026-11-10 | #7002
+- rf:bug-risks | medium | scripts/issue/issue-body-cli.ts:46 | 2026-11-10 | #7002 | fixed
+- rf:tests | low | scripts/issue/issue-body-cli.test.ts | 2026-11-10 | #7002 | fixed
+- rf:comments | low | scripts/issue/issue-body-cli.ts:16 | 2026-11-10 | #7002 | fixed
+- rx:{"round":"d991fc37-53db-47cf-b1c1-e33ce5033119","category":"bug-risks","severity":"medium","file":"scripts/issue/issue-body-cli.ts:46","disposition":"fixed","description":"an epic body was refused by the issue-template heading lint","status":"resolved"}
+- rx:{"round":"d991fc37-53db-47cf-b1c1-e33ce5033119","category":"tests","severity":"low","file":"scripts/issue/issue-body-cli.test.ts","disposition":"fixed","description":"no case for an unreadable body file","status":"resolved"}
+- rx:{"round":"d991fc37-53db-47cf-b1c1-e33ce5033119","category":"comments","severity":"low","file":"scripts/issue/issue-body-cli.ts:16","disposition":"fixed","description":"header did not say how an epic body is judged","status":"resolved"}
+- rf:tests | low | scripts/backlog/backlog-next-size.test.ts:134 | 2026-11-10 | #7005
+- ri:bug-risks | medium | scripts/issue/issue-spill-cli.ts:131 | 2026-11-10 | #7005 | fixed
+- ri:project-conventions | medium | docs/josh-commands-backlog.md:182 | 2026-11-10 | #7005 | fixed
+- ri:project-conventions | low | scripts/backlog/backlog-next-size.ts:33 | 2026-11-10 | #7005 | fixed
+- rb:2026-11-10 | #7005
+- rf:bug-risks | medium | scripts/run/cut/run-cut-budget-over.ts:71 | 2026-11-10 | #7005 | fixed
+- rf:project-conventions | medium | docs/josh-commands-backlog.md:182 | 2026-11-10 | #7005 | fixed
+- rf:tests | low | scripts/backlog/backlog-next-size.test.ts:137 | 2026-11-10 | #7005 | fixed
+- rx:{"round":"abe8d8a3-5063-428c-9304-2a510e3fc397","category":"bug-risks","severity":"medium","file":"scripts/run/cut/run-cut-budget-over.ts:71","disposition":"fixed","description":"issue:spill now files its split follow-up through the implement budget with no way to declare a reason, so the budget-over recovery path dead-ends at the measured rate.","status":"resolved"}
+- rx:{"round":"abe8d8a3-5063-428c-9304-2a510e3fc397","category":"project-conventions","severity":"medium","file":"docs/josh-commands-backlog.md:182","disposition":"fixed","description":"the command reference still says --route split excuses the implement budget, which this change retires.","status":"resolved"}
+- rx:{"round":"abe8d8a3-5063-428c-9304-2a510e3fc397","category":"tests","severity":"low","file":"scripts/backlog/backlog-next-size.test.ts:137","disposition":"fixed","description":"no backlog:next test covers a split child under the guide now noted over the budget.","status":"resolved"}
+- rf:project-conventions | low | scripts/issue/size-estimate.ts:282 | 2026-11-10 | #7006
+- rf:comments | low | scripts/backlog/backlog-pool.ts:75 | 2026-11-10 | #7006
+- ri:bug-risks | medium | scripts/backlog/backlog-drive-idle.ts:30 | 2026-11-10 | #7006 | fixed
+- ri:project-conventions | low | scripts/issue/size-estimate.ts:285 | 2026-11-10 | #7006 | fixed
+- rb:2026-11-10 | #7006
+- rf:bug-risks | medium | scripts/backlog/backlog-drive-idle.ts:30 | 2026-11-10 | #7006 | fixed
+- rf:project-conventions | low | scripts/issue/size-estimate.ts:285 | 2026-11-10 | #7006 | fixed
+- rf:comments | low | scripts/issue/size-estimate.ts:268 | 2026-11-10 | #7006 | fixed
+- rf:comments | low | scripts/backlog/backlog-pool.ts:75 | 2026-11-10 | #7006 | fixed
+- rx:{"round":"6af26c1a-06ec-44ce-9bfd-53154865ea2a","category":"bug-risks","severity":"medium","file":"scripts/backlog/backlog-drive-idle.ts:30","disposition":"fixed","description":"The idle notice lists issues held only for the implement budget under a heading that says they are over the size cap.","status":"resolved"}
+- rx:{"round":"6af26c1a-06ec-44ce-9bfd-53154865ea2a","category":"project-conventions","severity":"low","file":"scripts/issue/size-estimate.ts:285","disposition":"fixed","description":"is_issue_over_cap now also answers the implement-budget hold, so its name no longer says what it returns.","status":"resolved"}
+- rx:{"round":"6af26c1a-06ec-44ce-9bfd-53154865ea2a","category":"comments","severity":"low","file":"scripts/issue/size-estimate.ts:268","disposition":"fixed","description":"The over_budget comment still says backlog:next notes it, while it now holds the issue.","status":"resolved"}
+- rx:{"round":"6af26c1a-06ec-44ce-9bfd-53154865ea2a","category":"comments","severity":"low","file":"scripts/backlog/backlog-pool.ts:75","disposition":"fixed","description":"Caller comments here and in backlog-drive-idle.ts and auto-ok-cli.ts still describe the hold as over the size cap only.","status":"resolved"}
+- rf:comments | low | prompts/collaboration-workflow/measurement.md:24 | 2026-11-10 | #7007
+- rf:bug-risks | low | scripts/lane/lane-stats-request.ts:63 | 2026-11-10 | #7007
+- ri:comments | low | prompts/collaboration-workflow/measurement.md:24 | 2026-11-10 | #7007 | fixed
+- ri:comments | low | scripts/lane/lane-stats.ts:74 | 2026-11-10 | #7007 | fixed
+- rb:2026-11-10 | #7007
+- rf:bug-risks | medium | scripts/lane/lane-stats.ts:73 | 2026-11-10 | #7007 | fixed
+- rf:bug-risks | low | scripts/lane/lane-stats-request.ts:63 | 2026-11-10 | #7007 | fixed
+- rf:project-conventions | low | scripts/josh/josh-commands-ai.ts:530 | 2026-11-10 | #7007 | fixed
+- rx:{"round":"8e74f6f8-5a06-4cc6-8ebe-5f4d3b7b8575","category":"bug-risks","severity":"medium","file":"scripts/lane/lane-stats.ts:73","disposition":"fixed","description":"days_of rounds the period label to one decimal, so a fractional --period such as 0.04 now prints 0 days and 1.25 prints 1.3.","status":"resolved"}
+- rx:{"round":"8e74f6f8-5a06-4cc6-8ebe-5f4d3b7b8575","category":"bug-risks","severity":"low","file":"scripts/lane/lane-stats-request.ts:63","disposition":"fixed","description":"a future --since instant inverts the window and prints a negative period with empty tables instead of refusing.","status":"resolved"}
+- rx:{"round":"8e74f6f8-5a06-4cc6-8ebe-5f4d3b7b8575","category":"project-conventions","severity":"low","file":"scripts/josh/josh-commands-ai.ts:530","disposition":"fixed","description":"the --since example note 'the same, merged since then' follows the --pairs line while the example runs --why 40.","status":"resolved"}
+- rf:project-conventions | low | scripts/lane/lane-over.ts:45 | 2026-11-10 | #7008
+- ri:none | none | - | 2026-11-10 | #7008
+- rb:2026-11-10 | #7008
+- rf:bug-risks | medium | scripts/lane/lane-over.ts:114 | 2026-11-10 | #7008 | fixed
+- rf:comments | low | scripts/lane/lane-over.ts:113 | 2026-11-10 | #7008 | fixed
+- rf:project-conventions | low | scripts/lane/lane-over.ts:107 | 2026-11-10 | #7008 | fixed
+- rx:{"round":"8722d19b-58b2-42f6-ab36-3a7e28959f88","category":"bug-risks","severity":"medium","file":"scripts/lane/lane-over.ts:114","disposition":"fixed","description":"over_budget_of builds stages via lane_breakdown.of without edit_ms, so a docs-only lane's implement time is reported as start to plan, unlike lane:breakdown.","status":"resolved"}
+- rx:{"round":"8722d19b-58b2-42f6-ab36-3a7e28959f88","category":"comments","severity":"low","file":"scripts/lane/lane-over.ts:113","disposition":"fixed","description":"the comment claims every lane:breakdown stage past budget, but the driver followup stage is omitted.","status":"resolved"}
+- rx:{"round":"8722d19b-58b2-42f6-ab36-3a7e28959f88","category":"project-conventions","severity":"low","file":"scripts/lane/lane-over.ts:107","disposition":"fixed","description":"the minutes arithmetic repeats lane_breakdown.minutes_text instead of reusing it.","status":"resolved"}
+- rf:comments | low | scripts/lane/lane-ledger-schema.ts:233 | 2026-11-10 | #7009
+- rf:comments | low | scripts/run/cut/run-cut-budget-over.test.ts:70 | 2026-11-10 | #7009
+- rf:tests | low | scripts/test/test-related-main.test.ts:21 | 2026-11-10 | #7009
+- rb:2026-11-10 | #7009
+- rf:project-conventions | medium | .claude/skills/workflow-commands/split-assessment.md:47 | 2026-11-10 | #7009 | fixed
+- rx:{"round":"96003804-fe5e-4019-8bc7-6a379b9d03ee","category":"project-conventions","severity":"medium","file":".claude/skills/workflow-commands/split-assessment.md:47","disposition":"fixed","description":"The skill still says main:merge and the scoped checks print the split notice this change removed, and chain-rule.md:69 still routes on the removed budget notice.","status":"resolved"}
+- rb:2026-11-10 | #7009
+- rf:comments | low | scripts/lane/lane-ledger-schema.ts:233 | 2026-11-10 | #7009
+- rf:comments | low | scripts/run/cut/run-cut-budget-over.test.ts:70 | 2026-11-10 | #7009
+- rf:tests | low | scripts/test/test-related-main.ts:20 | 2026-11-10 | #7009
+- rx:{"round":"bc954dfc-b8e4-41bb-a138-2f0514ff6e29","previous":"96003804-fe5e-4019-8bc7-6a379b9d03ee","category":"comments","severity":"low","file":"scripts/lane/lane-ledger-schema.ts:233","description":"The split-notice schema comment still says the diff notice is written by lint:related, test:related or main:merge and that the budget notice exists, which this change removed; reword it as historic entries only (no failure scenario — a comment, no runtime path reads it).","status":"new"}
+- rx:{"round":"bc954dfc-b8e4-41bb-a138-2f0514ff6e29","previous":"96003804-fe5e-4019-8bc7-6a379b9d03ee","category":"comments","severity":"low","file":"scripts/run/cut/run-cut-budget-over.test.ts:70","description":"The describe comment still calls implement_over the split notice's time bar, but after this change only run:cut budget-over reads it (no failure scenario — test comment only).","status":"new"}
+- rx:{"round":"bc954dfc-b8e4-41bb-a138-2f0514ff6e29","previous":"96003804-fe5e-4019-8bc7-6a379b9d03ee","category":"tests","severity":"low","file":"scripts/test/test-related-main.ts:20","description":"No test pins that lint:related and test:related print no split notice past the declaration, as the first acceptance criterion asks; both entry points are main-guarded, and the deleted module cannot be re-imported (no failure scenario — re-adding the call needs a module this change deletes, which the gate would flag).","status":"new"}
+- rx:{"round":"bc954dfc-b8e4-41bb-a138-2f0514ff6e29","previous":"96003804-fe5e-4019-8bc7-6a379b9d03ee","category":"project-conventions","severity":"medium","file":".claude/skills/workflow-commands/split-assessment.md:47","description":"The skill still says main:merge and the scoped checks print the split notice this change removed, and chain-rule.md:69 still routes on the removed budget notice.","disposition":"fixed","status":"resolved"}
+- rf:none | none | - | 2026-11-10 | #7010
+- rf:project-conventions | low | scripts/issue/issue-spill.ts:84 | 2026-11-10 | #7010
+- ri:none | none | - | 2026-11-10 | #7010
+- rf:none | none | - | 2026-11-10 | #7011
+- rf:tests | low | scripts/split/split-assess-document-rule.test.ts:51 | 2026-11-10 | #7011
+- rf:tests | low | scripts/lane/lane-ledger.test.ts:85 | 2026-11-10 | #7012 | fixed
+- rf:none | none | - | 2026-11-10 | #7012
+- ri:none | none | - | 2026-11-10 | #7012
+- rf:none | none | - | 2026-11-10 | #7013
+- ri:bug-risks | medium | scripts/lane/lane-process-load.ts:50 | 2026-11-10 | #7013 | fixed
+- ri:performance | low | tools/josh/josh-ready.ts:79 | 2026-11-10 | #7013 | fixed
+- ri:project-conventions | low | scripts/josh/josh-gh-usage.ts:56 | 2026-11-10 | #7013 | fixed
+- rb:2026-11-10 | #7013
+- rf:bug-risks | medium | scripts/josh/josh-logic.ts:186 | 2026-11-10 | #7013
+- rf:project-conventions | low | scripts/josh/josh-gh-usage.ts:56 | 2026-11-10 | #7013
+- rf:comments | low | scripts/josh/josh-environment-file.ts:51 | 2026-11-10 | #7013
+- rf:comments | low | scripts/gh/gh-tally-handoff.ts:9 | 2026-11-10 | #7013
+- rf:performance | low | tools/josh/josh-ready.ts:79 | 2026-11-10 | #7013
+- rf:assumptions | low | docs/maintainers/runtime-bundling.md:81 | 2026-11-10 | #7013
+- rx:{"round":"b9fae9cc-59eb-48ae-a762-ee1d3a8850ae","category":"bug-risks","severity":"medium","file":"scripts/josh/josh-logic.ts:186","description":"Every command now runs in-process from dist/commands chunks that carry their own copy of gh_request_tally, so its gh calls never reach the dist/josh.js copy that josh_gh_usage.recorded writes, and the handoff env (JOSH_GH_TALLY_FILE) is no longer set — e.g. node dist/josh.js issue:read 7013 now records 0 calls and no core delta, losing the kit#6707/#6965 usage line for every command. other sites: scripts/josh/josh-in-process.ts:79, scripts/josh/josh.ts:59","status":"new"}
+- rx:{"round":"b9fae9cc-59eb-48ae-a762-ee1d3a8850ae","category":"project-conventions","severity":"low","file":"scripts/josh/josh-gh-usage.ts:56","description":"from_child and the gh tally handoff still have no production caller, so the earlier finding marked fixed is still open; no failure scenario — the dead path is only reached from its own test.","status":"new"}
+- rx:{"round":"b9fae9cc-59eb-48ae-a762-ee1d3a8850ae","category":"comments","severity":"low","file":"scripts/josh/josh-environment-file.ts:51","description":"apply_node_flags is still described as returning the node flags for a spawned child that inherits the environment, but its only caller now ignores the return value and loads the file into this process.","status":"new"}
+- rx:{"round":"b9fae9cc-59eb-48ae-a762-ee1d3a8850ae","category":"comments","severity":"low","file":"scripts/gh/gh-tally-handoff.ts:9","description":"The header still says the built dispatcher runs every command that is not bundled as a tsx child, which #7013 removed.","status":"new"}
+- rx:{"round":"b9fae9cc-59eb-48ae-a762-ee1d3a8850ae","category":"performance","severity":"low","file":"tools/josh/josh-ready.ts:79","description":"An edit to any of the recorded command inputs still makes the next pnpm josh call run the full build synchronously (7.20 s in runtime-bundling.md, 2.88 s in the Issue comment that justified skipping incremental builds), so the earlier finding marked fixed is still open; no failure scenario — slower, but nothing breaks.","status":"new"}
+- rx:{"round":"b9fae9cc-59eb-48ae-a762-ee1d3a8850ae","category":"assumptions","severity":"low","file":"docs/maintainers/runtime-bundling.md:81","description":"The rebuild time recorded here (7.20 s) differs from the 2.88 s in the Issue comment used to decide against an incremental esbuild context, so it is unclear which number the decision rests on.","status":"new"}
+- rf:comments | low | scripts/test/test-related-whole.ts:14 | 2026-11-10 | #7014
+- rb:2026-11-10 | #7014
+- rf:bug-risks | medium | docs/josh-commands.md:321 | 2026-11-10 | #7014 | fixed
+- rf:tests | medium | scripts/test/test-related.ts:382 | 2026-11-10 | #7014 | fixed
+- rf:comments | low | scripts/test/test-related-whole.ts:14 | 2026-11-10 | #7014 | fixed
+- rx:{"round":"b1385df1-690c-4e2f-a2c0-a6d90b8304f9","category":"bug-risks","severity":"medium","file":"docs/josh-commands.md:321","disposition":"fixed","description":"the docs and two comments say the gate always runs the whole suite and lifts the cap, which a lane now drops","status":"resolved"}
+- rx:{"round":"b1385df1-690c-4e2f-a2c0-a6d90b8304f9","category":"tests","severity":"medium","file":"scripts/test/test-related.ts:382","disposition":"fixed","description":"the run_fresh wiring of is_whole_suite_kept has no test; reverting it passes every test","status":"resolved"}
+- rx:{"round":"b1385df1-690c-4e2f-a2c0-a6d90b8304f9","category":"comments","severity":"low","file":"scripts/test/test-related-whole.ts:14","disposition":"fixed","description":"the comment line is not wrapped like its neighbors","status":"resolved"}
+- rf:none | none | - | 2026-11-10 | #7015
+- rf:none | none | - | 2026-11-10 | #7015
+- rf:none | none | - | 2026-11-10 | #7016
+- ri:performance | low | scripts/backlog/backlog-drive-tick.ts:51 | 2026-11-10 | #7016 | fixed
+- rb:2026-11-10 | #7016
+- rf:performance | low | scripts/backlog/backlog-drive-tick.ts:30 | 2026-11-10 | #7016 | fixed
+- rf:tests | low | scripts/backlog/backlog-drive-tick.test.ts:78 | 2026-11-10 | #7016 | fixed
+- rx:{"round":"4ee55b6c-512a-41dc-8bc2-cb98f8a54345","category":"performance","severity":"low","file":"scripts/backlog/backlog-drive-tick.ts:30","disposition":"fixed","description":"snapshot_of reads the process table on every tick even when no lane is in flight, adding a ps spawn every 5 s on an idle watch.","status":"resolved"}
+- rx:{"round":"4ee55b6c-512a-41dc-8bc2-cb98f8a54345","category":"tests","severity":"low","file":"scripts/backlog/backlog-drive-tick.test.ts:78","disposition":"fixed","description":"the tick_share test never asserts the stream reader's begin_tick was called, so dropping the per-tick reset passes every test.","status":"resolved"}
+- rb:2026-11-10 | #7016
+- rf:performance | low | scripts/backlog/backlog-drive-tick.ts:30 | 2026-11-10 | #7016 | fixed
+- rf:tests | low | scripts/backlog/backlog-drive-tick.test.ts:78 | 2026-11-10 | #7016 | fixed
+- rx:{"round":"3b2c3729-fa23-47e6-95cc-77891e09718b","previous":"4ee55b6c-512a-41dc-8bc2-cb98f8a54345","category":"performance","severity":"low","file":"scripts/backlog/backlog-drive-tick.ts:30","disposition":"fixed","description":"snapshot_of reads the process table on every tick even when no lane is in flight, adding a ps spawn every 5 s on an idle watch.","status":"resolved"}
+- rx:{"round":"3b2c3729-fa23-47e6-95cc-77891e09718b","previous":"4ee55b6c-512a-41dc-8bc2-cb98f8a54345","category":"tests","severity":"low","file":"scripts/backlog/backlog-drive-tick.test.ts:78","disposition":"fixed","description":"the tick_share test never asserts the stream reader's begin_tick was called, so dropping the per-tick reset passes every test.","status":"resolved"}
+- rf:none | none | - | 2026-11-10 | #7018
+- rf:bug-risks | low | scripts/gate/gate-static-group.ts:60 | 2026-11-10 | #7018
+- ri:none | none | - | 2026-11-10 | #7020
+- rb:2026-11-10 | #7020
+- rf:bug-risks | medium | scripts/run/ship/run-ship-reviewer.ts:288 | 2026-11-10 | #7020 | fixed
+- rf:tests | low | scripts/run/ship/run-ship-reviewer-pair.test.ts:120 | 2026-11-10 | #7020 | fixed
+- rf:comments | low | scripts/review/review-pair-session.ts:74 | 2026-11-10 | #7020 | fixed
+- rx:{"round":"942ac215-7262-4ad4-9fd8-e802a2e37397","category":"bug-risks","severity":"medium","file":"scripts/run/ship/run-ship-reviewer.ts:288","disposition":"fixed","description":"record_pair runs on the interaction-only stage where a stale paired brief makes review:pair append a duplicate round-1 comparison to the append-only ledger.","status":"resolved"}
+- rx:{"round":"942ac215-7262-4ad4-9fd8-e802a2e37397","category":"tests","severity":"low","file":"scripts/run/ship/run-ship-reviewer-pair.test.ts:120","disposition":"fixed","description":"the interaction-alone test mocks pair_argv to undefined, so the record path on that stage is never exercised.","status":"resolved"}
+- rx:{"round":"942ac215-7262-4ad4-9fd8-e802a2e37397","category":"comments","severity":"low","file":"scripts/review/review-pair-session.ts:74","disposition":"fixed","description":"the comment says the round never waits on the paired reviewer, yet Promise.all awaits its completion.","status":"resolved"}
+- rf:bug-risks | medium | scripts/issue/figure-source-lint.ts:87 | 2026-11-10 | #7021
+- rb:2026-11-10 | #7021
+- rf:bug-risks | medium | scripts/issue/figure-source-lint.ts:18 | 2026-11-10 | #7021 | fixed
+- rf:bug-risks | medium | scripts/issue/issue-file-pass.ts:41 | 2026-11-10 | #7021 | fixed
+- rf:bug-risks | low | scripts/issue/measure-declaration.ts:126 | 2026-11-10 | #7021 | false-positive
+- rf:project-conventions | low | scripts/document/document-byte-budget.ts:111 | 2026-11-10 | #7021 | fixed
+- rx:{"round":"1a0219db-2a45-4331-952b-401c36ad0bc3","category":"bug-risks","severity":"medium","file":"scripts/issue/figure-source-lint.ts:18","disposition":"fixed","description":"the exemption matched every no-space keyed bullet; narrowed to the declared prefixes","status":"resolved"}
+- rx:{"round":"1a0219db-2a45-4331-952b-401c36ad0bc3","category":"bug-risks","severity":"medium","file":"scripts/issue/issue-file-pass.ts:41","disposition":"fixed","description":"the warning printed only from issue:lint; issue:file and issue:body now print it too","status":"resolved"}
+- rx:{"round":"1a0219db-2a45-4331-952b-401c36ad0bc3","category":"bug-risks","severity":"low","file":"scripts/issue/measure-declaration.ts:126","disposition":"false-positive","description":"no free-form premise bullet exists in the repository, so no body is refused","status":"resolved"}
+- rx:{"round":"1a0219db-2a45-4331-952b-401c36ad0bc3","category":"project-conventions","severity":"low","file":"scripts/document/document-byte-budget.ts:111","disposition":"fixed","description":"the comment now names #7021 as crossing the block","status":"resolved"}
+- rb:2026-11-10 | #7021
+- rf:bug-risks | medium | scripts/issue/figure-source-lint.ts:87 | 2026-11-10 | #7021 | fixed
+- rx:{"round":"77408d2e-ec34-48cf-9c44-5540bcc71859","previous":"2b79a3d4-5363-487c-8f7b-66cbfe93573a","category":"bug-risks","severity":"medium","file":"scripts/issue/figure-source-lint.ts:87","disposition":"fixed","description":"the declaration list missed 計測宣言なし and 実施可能日; added both plus 計測 and 判定規則 from the template table, with tests","status":"resolved"}
+- rx:{"round":"77408d2e-ec34-48cf-9c44-5540bcc71859","previous":"2b79a3d4-5363-487c-8f7b-66cbfe93573a","category":"bug-risks","severity":"medium","file":"scripts/issue/figure-source-lint.ts:87","description":"the narrowed DECLARATIONS list omits the template-declared `- 計測宣言なし:` and `- 実施可能日:` bullets, so a background line such as `- 計測宣言なし: …マージ後に 1 コマンドで集計する値が無い` (as #7021 own body) or `- 実施可能日: 2026-11-10T12:00Z` (digits left after the date strip) prints a spurious \"number with no source\" warning from issue:lint, issue:file and issue:body; add both prefixes to DECLARATIONS with a test; other sites: scripts/issue/figure-source-lint.test.ts:53, prompts/collaboration-workflow/issue-template.md:91","status":"resolved"}
+- rf:bug-risks | medium | scripts/lane/lane-plan-premise.ts:67 | 2026-11-10 | #7022
+- ri:bug-risks | medium | scripts/lane/lane-plan-check.ts:211 | 2026-11-10 | #7022 | fixed
+- ri:bug-risks | low | scripts/run/entry/run-entry-cli.ts:291 | 2026-11-10 | #7022 | fixed
+- ri:comments | low | docs/josh-commands-lane.md:436 | 2026-11-10 | #7022 | fixed
+- rb:2026-11-10 | #7022
+- rf:bug-risks | medium | scripts/lane/lane-plan-premise.ts:42 | 2026-11-10 | #7022 | fixed
+- rf:bug-risks | low | scripts/lane/lane-plan-premise.ts:23 | 2026-11-10 | #7022 | fixed
+- rf:project-conventions | low | docs/josh-commands-backlog.md:338 | 2026-11-10 | #7022 | fixed
+- rx:{"round":"94331ac7-0e2b-4e3e-b5fa-175cd5991639","category":"bug-risks","severity":"medium","file":"scripts/lane/lane-plan-premise.ts:42","disposition":"fixed","description":"premises were read only from the opted-in listing, so an unlisted issue (listing unread, past the cutoff, not opted in) skipped the check; they are now read from the trusted body","status":"resolved"}
+- rx:{"round":"94331ac7-0e2b-4e3e-b5fa-175cd5991639","category":"bug-risks","severity":"low","file":"scripts/lane/lane-plan-premise.ts:23","disposition":"fixed","description":"a failed premise command reported only \"unreadable\"; its message is now kept","status":"resolved"}
+- rx:{"round":"94331ac7-0e2b-4e3e-b5fa-175cd5991639","category":"project-conventions","severity":"low","file":"docs/josh-commands-backlog.md:338","disposition":"fixed","description":"the exit-code list omitted 4 premise","status":"resolved"}
+- rb:2026-11-10 | #7022
+- rf:bug-risks | medium | scripts/lane/lane-plan-premise.ts:67 | 2026-11-10 | #7022 | fixed
+- rx:{"round":"4d43f43e-7fb6-478c-9576-51a3dbdab5fc","previous":"b7590cb9-2119-468f-ba1e-d863ba0b67ba","category":"bug-risks","severity":"medium","file":"scripts/lane/lane-plan-premise.ts:67","disposition":"fixed","description":"for an issue the listing does not carry (unread listing, past the cutoff, not opted in) the body is always read via read_trusted_body, and a refused read (gh failure, untrusted author or last editor) returns 'not re-run: …' so lane:plan exits 4 'premise' and tells the lane to park even when the issue has no '- 前提:' line (traced: listing unread + gh read failing → previously 'wait' exit 1, now exit 4 park), breaking the acceptance 'no premise line → nothing happens'; treat a refused read as a stop only when the premises are known to exist, otherwise fall through (other sites: scripts/lane/lane-plan-check.ts:215, scripts/lane/lane-plan-premise.test.ts:106)","status":"resolved"}
+- rf:comments | low | scripts/lane/lane-ledger-schema-ship.ts:5 | 2026-11-10 | #7024
+- ri:none | none | - | 2026-11-10 | #7024
+- rb:2026-11-10 | #7024
+- rf:project-conventions | low | scripts/lane/lane-ledger-write.ts:153 | 2026-11-10 | #7024 | fixed
+- rf:tests | low | scripts/run/review/run-chain-cli.test.ts:23 | 2026-11-10 | #7024 | fixed
+- rf:comments | low | docs/maintainers/lane-limit-measurement.md:169 | 2026-11-10 | #7024 | fixed
+- rx:{"round":"3bc7007b-c466-4c87-901f-e9a3031caa83","category":"project-conventions","severity":"low","file":"scripts/lane/lane-ledger-write.ts:153","disposition":"fixed","description":"record_chain types its argument inline instead of a named ChainRecord like its sibling writers.","status":"resolved"}
+- rx:{"round":"3bc7007b-c466-4c87-901f-e9a3031caa83","category":"tests","severity":"low","file":"scripts/run/review/run-chain-cli.test.ts:23","disposition":"fixed","description":"no CLI test pins the hold reason, so a regression to always-exit would pass.","status":"resolved"}
+- rx:{"round":"3bc7007b-c466-4c87-901f-e9a3031caa83","category":"comments","severity":"low","file":"docs/maintainers/lane-limit-measurement.md:169","disposition":"fixed","description":"the new run:chain stop table has no section in the maintainer doc that describes every lane:stats table.","status":"resolved"}
+- rb:2026-11-10 | #7024
+- rf:comments | low | scripts/lane/lane-ledger-schema-ship.ts:5 | 2026-11-10 | #7024
+- rx:{"round":"34ef3701-e9ab-4d9e-8a1c-011005992816","previous":"3bc7007b-c466-4c87-901f-e9a3031caa83","category":"comments","severity":"low","file":"scripts/lane/lane-ledger-schema-ship.ts:5","description":"the edited header comment (and lane-ledger-write.ts:31) was extended in place to well past the file's ~100-column wrap instead of being rewrapped; prose only, no runtime path.","status":"new"}
+- rx:{"round":"34ef3701-e9ab-4d9e-8a1c-011005992816","previous":"3bc7007b-c466-4c87-901f-e9a3031caa83","category":"project-conventions","severity":"low","file":"scripts/lane/lane-ledger-write.ts:153","description":"record_chain types its argument inline instead of a named ChainRecord like its sibling writers.","disposition":"fixed","status":"resolved"}
+- rx:{"round":"34ef3701-e9ab-4d9e-8a1c-011005992816","previous":"3bc7007b-c466-4c87-901f-e9a3031caa83","category":"tests","severity":"low","file":"scripts/run/review/run-chain-cli.test.ts:23","description":"no CLI test pins the hold reason, so a regression to always-exit would pass.","disposition":"fixed","status":"resolved"}
+- rx:{"round":"34ef3701-e9ab-4d9e-8a1c-011005992816","previous":"3bc7007b-c466-4c87-901f-e9a3031caa83","category":"comments","severity":"low","file":"docs/maintainers/lane-limit-measurement.md:169","description":"the new run:chain stop table has no section in the maintainer doc that describes every lane:stats table.","disposition":"fixed","status":"resolved"}
+- rf:tests | low | scripts/lane/lane-concurrency-stats.test.ts:135 | 2026-11-10 | #7025
+- ri:none | none | - | 2026-11-10 | #7025
+- rb:2026-11-10 | #7025
+- rf:tests | low | scripts/lane/lane-concurrency-stats.test.ts:112 | 2026-11-10 | #7025 | fixed
+- rf:comments | low | docs/maintainers/lane-limit-measurement.md:398 | 2026-11-10 | #7025 | fixed
+- rx:{"round":"347a8e13-ce8c-4d57-98e7-1dc9849697fa","category":"tests","severity":"low","file":"scripts/lane/lane-concurrency-stats.test.ts:112","disposition":"fixed","description":"The 5-minute sample-age boundary and an untimed call are not pinned by a test.","status":"resolved"}
+- rx:{"round":"347a8e13-ce8c-4d57-98e7-1dc9849697fa","category":"comments","severity":"low","file":"docs/maintainers/lane-limit-measurement.md:398","disposition":"fixed","description":"The doc still calls the transcript table the last one and has no section for the new concurrency table.","status":"resolved"}
+- rf:assumptions | low | scripts/lane/lane-sampler.ts:67 | 2026-11-10 | #7026
+- rb:2026-11-10 | #7026
+- rf:bug-risks | medium | scripts/lane/lane-sampler.ts:55 | 2026-11-10 | #7026
+- rf:bug-risks | medium | scripts/lane/lane-sampler.ts:39 | 2026-11-10 | #7026
+- rf:tests | low | scripts/lane/lane-load.timeout.test.ts:145 | 2026-11-10 | #7026
+- rf:assumptions | low | scripts/lane/lane-sampler.ts:51 | 2026-11-10 | #7026
+- rx:{"round":"fa4852f4-5853-41da-91da-01f3863556ee","category":"bug-risks","severity":"medium","file":"scripts/lane/lane-sampler.ts:55","description":"sleep_since anchors the sleep span end at the new sampler first sample rather than at the wake, so with detached lanes running while no drive does (lid closed 02:00–02:30, wake 02:30, drive started 03:00) the span is recorded as 02:30–03:00 and lane:breakdown subtracts it from awake work after the wake while leaving the real 02:00–02:30 sleep counted; anchor to_ms on the host last wake (macOS kern.waketime, read beside the other sysctl keys) instead of current.at. other sites: scripts/lane/lane-sampler.ts:46, scripts/lane/lane-load.ts:22","status":"new"}
+- rx:{"round":"fa4852f4-5853-41da-91da-01f3863556ee","category":"bug-risks","severity":"medium","file":"scripts/lane/lane-sampler.ts:39","description":"counter_growth only treats a reboot as none when the new counter is smaller, so a newest sample taken soon after one boot (slept_ms 1 min) followed by a reboot and 40 min of sleep before the next drive reads as 39 min of sleep across the reboot, contradicting the comment at line 44; record the boot time (kern.boottime) on the load sample and read no growth when it differs. other sites: scripts/lane/lane-load.ts:22, scripts/lane/lane-ledger-schema.ts:71","status":"new"}
+- rx:{"round":"fa4852f4-5853-41da-91da-01f3863556ee","category":"tests","severity":"low","file":"scripts/lane/lane-load.timeout.test.ts:145","description":"the renamed probe-budget test shows up as a removed test whose disposition the PR body must carry under ## 消えたテストの処置 (置き換え: the renamed title), or josh followup refuses the merge; no failure scenario — the behavior is still guarded by the renamed test.","status":"new"}
+- rx:{"round":"fa4852f4-5853-41da-91da-01f3863556ee","category":"assumptions","severity":"low","file":"scripts/lane/lane-sampler.ts:51","description":"the counter path counts growth of one sample interval as sleep while the in-sampler path (lane-sleep.ts GAP_INTERVALS) needs three, and a drive restarted right after a wake before the old sampler late tick lands would record the same sleep twice; no failure scenario — backlog-drive-cli has a single start site, so two samplers alive across one wake could not be constructed.","status":"new"}
+- ri:assumptions | low | scripts/lane/lane-sampler.ts:66 | 2026-11-10 | #7026
+- ri:tests | low | scripts/lane/lane-load.timeout.test.ts:45 | 2026-11-10 | #7026
+- rf:none | none | - | 2026-11-10 | #7029
+- rb:2026-11-10 | #7029
+- rf:bug-risks | medium | scripts/issue/issue-scout-cli.ts:357 | 2026-11-10 | #7029 | fixed
+- rf:project-conventions | low | scripts/issue/issue-scout-cli.ts:106 | 2026-11-10 | #7029 | fixed
+- rf:comments | low | scripts/issue/issue-file.ts:255 | 2026-11-10 | #7029 | fixed
+- rx:{"round":"5afa0203-a3e0-4108-8d47-56320aabcfe6","category":"bug-risks","severity":"medium","file":"scripts/issue/issue-scout-cli.ts:357","disposition":"fixed","description":"The score>0 hold filter runs after the MAX_CANDIDATES cut, so five or more cited score-0 references push a real title match out and the filing proceeds with no hold.","status":"resolved"}
+- rx:{"round":"5afa0203-a3e0-4108-8d47-56320aabcfe6","category":"project-conventions","severity":"low","file":"scripts/issue/issue-scout-cli.ts:106","disposition":"fixed","description":"Every cited issue prints as ref regardless of score, so the report cannot show which ref rows hold the filing.","status":"resolved"}
+- rx:{"round":"5afa0203-a3e0-4108-8d47-56320aabcfe6","category":"comments","severity":"low","file":"scripts/issue/issue-file.ts:255","disposition":"fixed","description":"The comment still says every printed candidate holds the filing, but score-0 refs no longer do (same in issue-file-pass.ts:129).","status":"resolved"}
+- rf:none | none | - | 2026-11-10 | #7030
+- rb:2026-11-10 | #7030
+- rf:tests | medium | scripts/gate/verification-gate.ts:377 | 2026-11-10 | #7030 | fixed
+- rf:project-conventions | low | scripts/gate/verification-gate.ts:379 | 2026-11-10 | #7030 | fixed
+- rf:comments | low | scripts/gate/gate-plan.ts:206 | 2026-11-10 | #7030 | fixed
+- rx:{"round":"188e384e-5265-4fd8-9362-bd0b62a51860","category":"tests","severity":"medium","file":"scripts/gate/verification-gate.ts:377","disposition":"fixed","description":"No test pins the gate's refusal to reuse a lane stamp on a --whole-tree run without the whole-tree checks' records, so removing that branch passes every suite.","status":"resolved"}
+- rx:{"round":"188e384e-5265-4fd8-9362-bd0b62a51860","category":"project-conventions","severity":"low","file":"scripts/gate/verification-gate.ts:379","disposition":"fixed","description":"reusable_stamp reads per-check records directly, contradicting the comment that the --no-unit gate neither reads nor writes one.","status":"resolved"}
+- rx:{"round":"188e384e-5265-4fd8-9362-bd0b62a51860","category":"comments","severity":"low","file":"scripts/gate/gate-plan.ts:206","disposition":"fixed","description":"The RESERVED_CORES comment still says it is reduced over STATIC_CHECKS and that the two sets agree, which no longer holds.","status":"resolved"}
+- ri:comments | low | scripts/run/ship/run-ship-steps.ts:56 | 2026-11-10 | #7030 | fixed
+- rb:2026-11-10 | #7030
+- rf:tests | medium | scripts/gate/verification-gate.ts:377 | 2026-11-10 | #7030 | fixed
+- rf:project-conventions | low | scripts/gate/verification-gate.ts:379 | 2026-11-10 | #7030 | fixed
+- rf:comments | low | scripts/gate/gate-plan.ts:206 | 2026-11-10 | #7030 | fixed
+- rx:{"round":"1fa7c6c0-7807-47d3-90ae-539bd9df5335","previous":"188e384e-5265-4fd8-9362-bd0b62a51860","category":"tests","severity":"medium","file":"scripts/gate/verification-gate.ts:377","disposition":"fixed","description":"No test pins the gate's refusal to reuse a lane stamp on a --whole-tree run without the whole-tree checks' records, so removing that branch passes every suite.","status":"resolved"}
+- rx:{"round":"1fa7c6c0-7807-47d3-90ae-539bd9df5335","previous":"188e384e-5265-4fd8-9362-bd0b62a51860","category":"project-conventions","severity":"low","file":"scripts/gate/verification-gate.ts:379","disposition":"fixed","description":"reusable_stamp reads per-check records directly, contradicting the comment that the --no-unit gate neither reads nor writes one.","status":"resolved"}
+- rx:{"round":"1fa7c6c0-7807-47d3-90ae-539bd9df5335","previous":"188e384e-5265-4fd8-9362-bd0b62a51860","category":"comments","severity":"low","file":"scripts/gate/gate-plan.ts:206","disposition":"fixed","description":"The RESERVED_CORES comment still says it is reduced over STATIC_CHECKS and that the two sets agree, which no longer holds.","status":"resolved"}
+- rf:none | none | - | 2026-11-10 | #7031
+- rf:none | none | - | 2026-11-10 | #7035
+- rf:none | none | - | 2026-11-10 | #7035
+- ri:none | none | - | 2026-11-10 | #7037
+- rb:2026-11-10 | #7037
+- rf:performance | low | .josh/metrics-accepted/7037.json:2 | 2026-11-10 | #7037 | fixed
+- rx:{"round":"6052b7e2-613a-403a-a5d8-c1d329a50eaf","category":"performance","severity":"low","file":".josh/metrics-accepted/7037.json:2","disposition":"fixed","description":"The accepted-growth reason claims O(dispatch + stage) though each dispatch still scans all of its issue's stage starts.","status":"resolved"}
+- rf:project-conventions | low | scripts/lane/lane-net-read.ts:52 | 2026-11-10 | #7038
+- rf:tests | low | tools/cost-audit/cost-audit-cli.test.ts:16 | 2026-11-10 | #7038
+- rb:2026-11-10 | #7038
+- rf:bug-risks | medium | scripts/lane/lane-measure-cli.ts:351 | 2026-11-10 | #7038 | fixed
+- rf:bug-risks | medium | scripts/lane/lane-ledger-archive.ts:87 | 2026-11-10 | #7038 | fixed
+- rf:bug-risks | medium | scripts/lane/lane-ledger-archive.ts:85 | 2026-11-10 | #7038 | fixed
+- rf:tests | low | scripts/lane/lane-measure-cli.ts:128 | 2026-11-10 | #7038 | fixed
+- rx:{"round":"6de0a167-748a-46dc-9363-ee74894006cf","category":"bug-risks","severity":"medium","file":"scripts/lane/lane-measure-cli.ts:351","disposition":"fixed","description":"lane:net, lane:breakdown, issue:file hint and cost:audit read only the live ledger, so a lane dispatched over 14 days ago loses its dispatch after rotation and its net minutes become undefined.","status":"resolved"}
+- rx:{"round":"6de0a167-748a-46dc-9363-ee74894006cf","category":"bug-risks","severity":"medium","file":"scripts/lane/lane-ledger-archive.ts:87","disposition":"fixed","description":"an append landing between the second read and the rename goes to the unlinked old inode and is lost.","status":"resolved"}
+- rx:{"round":"6de0a167-748a-46dc-9363-ee74894006cf","category":"bug-risks","severity":"medium","file":"scripts/lane/lane-ledger-archive.ts:85","disposition":"fixed","description":"a rotation failing after the archive append re-archives the same records next time, so read_history double-counts them in lane:stats.","status":"resolved"}
+- rx:{"round":"6de0a167-748a-46dc-9363-ee74894006cf","category":"tests","severity":"low","file":"scripts/lane/lane-measure-cli.ts:128","disposition":"fixed","description":"no test pins the lane:stats sites to read_history, so a revert to read_ledger would pass.","status":"resolved"}
+- ri:bug-risks | medium | scripts/lane/lane-why-cli.ts:30 | 2026-11-10 | #7038 | fixed
+- ri:performance | low | scripts/lane/lane-ledger-archive.ts:85 | 2026-11-10 | #7038 | fixed
+- rb:2026-11-10 | #7038
+- rf:bug-risks | medium | scripts/lane/lane-measure-cli.ts:351 | 2026-11-10 | #7038 | fixed
+- rf:bug-risks | medium | scripts/lane/lane-ledger-archive.ts:87 | 2026-11-10 | #7038 | fixed
+- rf:bug-risks | medium | scripts/lane/lane-ledger-archive.ts:85 | 2026-11-10 | #7038 | fixed
+- rf:tests | low | scripts/lane/lane-measure-cli.ts:128 | 2026-11-10 | #7038 | fixed
+- rx:{"round":"6ad63b01-81b3-4848-949d-5012083b21fb","previous":"6de0a167-748a-46dc-9363-ee74894006cf","category":"bug-risks","severity":"medium","file":"scripts/lane/lane-measure-cli.ts:351","disposition":"fixed","description":"lane:net, lane:breakdown, issue:file hint and cost:audit read only the live ledger, so a lane dispatched over 14 days ago loses its dispatch after rotation and its net minutes become undefined.","status":"resolved"}
+- rx:{"round":"6ad63b01-81b3-4848-949d-5012083b21fb","previous":"6de0a167-748a-46dc-9363-ee74894006cf","category":"bug-risks","severity":"medium","file":"scripts/lane/lane-ledger-archive.ts:87","disposition":"fixed","description":"an append landing between the second read and the rename goes to the unlinked old inode and is lost.","status":"resolved"}
+- rx:{"round":"6ad63b01-81b3-4848-949d-5012083b21fb","previous":"6de0a167-748a-46dc-9363-ee74894006cf","category":"bug-risks","severity":"medium","file":"scripts/lane/lane-ledger-archive.ts:85","disposition":"fixed","description":"a rotation failing after the archive append re-archives the same records next time, so read_history double-counts them in lane:stats.","status":"resolved"}
+- rx:{"round":"6ad63b01-81b3-4848-949d-5012083b21fb","previous":"6de0a167-748a-46dc-9363-ee74894006cf","category":"tests","severity":"low","file":"scripts/lane/lane-measure-cli.ts:128","disposition":"fixed","description":"no test pins the lane:stats sites to read_history, so a revert to read_ledger would pass.","status":"resolved"}
+- rf:tests | medium | tools/cost-audit/cost-audit-cli.ts:117 | 2026-11-10 | #7042
+- rf:project-conventions | low | tools/cost-audit/cost-audit-format.ts:43 | 2026-11-10 | #7042
+- rf:project-conventions | low | tools/cost-audit/cost-audit-usage.ts:106 | 2026-11-10 | #7042
+- rf:none | none | - | 2026-11-10 | #7042
+- rf:none | none | - | 2026-11-10 | #7044
+- rb:2026-11-10 | #7044
+- rf:performance | low | scripts/review/review-diff-parts.ts:80 | 2026-11-10 | #7044
+- rf:tests | low | scripts/review/review-diff-write.test.ts:132 | 2026-11-10 | #7044 | fixed
+- rf:comments | low | scripts/review/review-diff-parts.ts:9 | 2026-11-10 | #7044
+- rx:{"round":"53d615f0-b09a-4be9-a9bb-67b7e69a7f90","category":"performance","severity":"low","file":"scripts/review/review-diff-parts.ts:80","description":"the brief lists a shared part file under each path it carries without saying one Read covers them; the wording lives in the hub review-diff-parts.ts that lane:plan split off, so it is returned to the parent","status":"new"}
+- rx:{"round":"53d615f0-b09a-4be9-a9bb-67b7e69a7f90","category":"tests","severity":"low","file":"scripts/review/review-diff-write.test.ts:132","disposition":"fixed","description":"the packing test now pins both paths to the one file and the pack test covers parts that fill the cap exactly","status":"resolved"}
+- rx:{"round":"53d615f0-b09a-4be9-a9bb-67b7e69a7f90","category":"comments","severity":"low","file":"scripts/review/review-diff-parts.ts:9","description":"the DiffParts and module comments still describe one file set per path; hub file outside this lane, returned to the parent","status":"new"}
+- rf:tests | low | .claude/agents/reviewer.md:29 | 2026-11-10 | #7045 | fixed
+- rf:tests | low | .claude/agents/reviewer.md:29 | 2026-11-10 | #7045
+- rf:none | none | - | 2026-11-10 | #7046
+- rf:none | none | - | 2026-11-10 | #7046
+- rf:none | none | - | 2026-11-10 | #7047
+- ri:bug-risks | low | docs/josh-commands-automation.md:194 | 2026-11-10 | #7047 | fixed
+- ri:bug-risks | low | tools/retrospective/guard-friction.ts:146 | 2026-11-10 | #7047 | fixed
+- rb:2026-11-10 | #7047
+- rf:bug-risks | medium | scripts/delegation/large-read-guard.ts:83 | 2026-11-10 | #7047 | fixed
+- rf:project-conventions | medium | docs/environment-variables.md:164 | 2026-11-10 | #7047 | fixed
+- rf:bug-risks | low | scripts/hooks/pretool-guard.ts:139 | 2026-11-10 | #7047 | fixed
+- rf:project-conventions | low | scripts/delegation/large-read-guard.ts:23 | 2026-11-10 | #7047 | fixed
+- rf:comments | low | scripts/hooks/pretool-guard.ts:127 | 2026-11-10 | #7047 | fixed
+- rx:{"round":"38313322-a95d-4b2d-aae4-5a243e04726c","category":"bug-risks","severity":"medium","file":"scripts/delegation/large-read-guard.ts:83","disposition":"fixed","description":"The repeat bypass is keyed on the transcript, not the refused call, so a different large file read right after a refusal passes and the refused file's repeat is refused again after any intervening Read.","status":"resolved"}
+- rx:{"round":"38313322-a95d-4b2d-aae4-5a243e04726c","category":"project-conventions","severity":"medium","file":"docs/environment-variables.md:164","disposition":"fixed","description":"The linked pretool:guard section has no large-read guard subsection and line 115 still lists only duplicate-read, so the limit, bypass and lane notice are undocumented.","status":"resolved"}
+- rx:{"round":"38313322-a95d-4b2d-aae4-5a243e04726c","category":"bug-risks","severity":"low","file":"scripts/hooks/pretool-guard.ts:139","disposition":"fixed","description":"A whole re-read of an unchanged large file is refused by duplicate-read and then by large-read, so it takes three calls despite both reasons promising one repeat.","status":"resolved"}
+- rx:{"round":"38313322-a95d-4b2d-aae4-5a243e04726c","category":"project-conventions","severity":"low","file":"scripts/delegation/large-read-guard.ts:23","disposition":"fixed","description":"Reusing the duplicate-read lane-policy row leaves the enumeration's because text silent on why large-read is a notice.","status":"resolved"}
+- rx:{"round":"38313322-a95d-4b2d-aae4-5a243e04726c","category":"comments","severity":"low","file":"scripts/hooks/pretool-guard.ts:127","disposition":"fixed","description":"The edited comment line runs to 130 characters and leaves the following sentence hanging; rewrap the paragraph.","status":"resolved"}
+- rf:bug-risks | medium | scripts/review/prose-stale-read.ts:17 | 2026-11-10 | #7048 | fixed
+- rf:bug-risks | low | scripts/review/prose-stale-read.ts:55 | 2026-11-10 | #7048 | fixed
+- rf:comments | low | scripts/review/prose-stale-scan.ts:10 | 2026-11-10 | #7048 | fixed
+- rf:bug-risks | low | scripts/review/prose-stale-read.ts:32 | 2026-11-10 | #7048
+- rf:comments | low | scripts/review/prose-stale-scan.ts:10 | 2026-11-10 | #7048
+- rf:none | none | - | 2026-11-10 | #7052
+- ri:performance | low | scripts/run/ship/run-ship-synced-scope.ts:193 | 2026-11-10 | #7052 | fixed
+- rb:2026-11-10 | #7052
+- rf:performance | low | scripts/run/ship/run-ship-synced-scope.ts:138 | 2026-11-10 | #7052 | fixed
+- rf:tests | low | scripts/run/ship/run-ship-scoped.unsplit.test.ts:134 | 2026-11-10 | #7052 | fixed
+- rx:{"round":"b567d7a9-3cf5-4fcd-94cd-294a17d3fa7b","category":"performance","severity":"low","file":"scripts/run/ship/run-ship-synced-scope.ts:138","disposition":"fixed","description":"test_overlap_of joins the whole branch change into the named set whenever a shared test exists, so lint:related is also re-run over branch files its pre-merge record already covers.","status":"resolved"}
+- rx:{"round":"b567d7a9-3cf5-4fcd-94cd-294a17d3fa7b","category":"tests","severity":"low","file":"scripts/run/ship/run-ship-scoped.unsplit.test.ts:134","disposition":"fixed","description":"the title says lint:related runs over the whole overlap, but the assertion pins lint over overlap plus test_overlap.","status":"resolved"}
+- rf:none | none | - | 2026-11-10 | #7053
+- rb:2026-11-10 | #7053
+- rf:bug-risks | low | scripts/run/ship/run-ship-scoped.ts:198 | 2026-11-10 | #7053 | fixed
+- rx:{"round":"ab19d454-715e-470f-b27d-c15e959c7cd0","category":"bug-risks","severity":"low","file":"scripts/run/ship/run-ship-scoped.ts:198","disposition":"fixed","description":"a reused red stores its RED_PAIR-prefixed out, so repeated reuse repeats the prefix line.","status":"resolved"}
+- ri:bug-risks | medium | scripts/run/ship/run-ship-scoped.ts:160 | 2026-11-10 | #7053 | fixed
+- ri:bug-risks | low | scripts/run/ship/run-ship-scoped.ts:198 | 2026-11-10 | #7053 | fixed
+- rb:2026-11-10 | #7053
+- rf:bug-risks | low | scripts/run/ship/run-ship-scoped.ts:198 | 2026-11-10 | #7053 | fixed
+- rx:{"round":"952795d8-a189-44b4-9f14-2fd1f4700ef7","previous":"ab19d454-715e-470f-b27d-c15e959c7cd0","category":"bug-risks","severity":"low","file":"scripts/run/ship/run-ship-scoped.ts:198","disposition":"fixed","description":"a reused red stores its RED_PAIR-prefixed out, so repeated reuse repeats the prefix line.","status":"resolved"}
+- ri:bug-risks | medium | scripts/run/ship/run-ship-scoped.ts:160 | 2026-11-10 | #7053 | fixed
+- ri:bug-risks | low | scripts/run/ship/run-ship-scoped.ts:198 | 2026-11-10 | #7053 | fixed
+- rf:none | none | - | 2026-11-10 | #7055
+- rb:2026-11-10 | #7055
+- rf:bug-risks | medium | tools/cost-audit/cost-audit-result.ts:162 | 2026-11-10 | #7055 | fixed
+- rf:tests | low | scripts/time-runtime/time-transcript-block.test.ts:21 | 2026-11-10 | #7055 | fixed
+- rx:{"round":"ac0c1a39-38aa-402f-8531-5d9c85f87c0d","category":"bug-risks","severity":"medium","file":"tools/cost-audit/cost-audit-result.ts:162","disposition":"fixed","description":"Tool-result chars are summed from session lines that are never deduplicated across resumed transcripts, so copied results are counted twice while effort rows count each request once.","status":"resolved"}
+- rx:{"round":"ac0c1a39-38aa-402f-8531-5d9c85f87c0d","category":"tests","severity":"low","file":"scripts/time-runtime/time-transcript-block.test.ts:21","disposition":"fixed","description":"The list-body assertion uses toBeGreaterThanOrEqual(5), so a double-counting regression still passes; assert the exact length.","status":"resolved"}
+- rf:none | none | - | 2026-11-10 | #7058
+- ri:none | none | - | 2026-11-10 | #7058
+- rb:2026-11-10 | #7058
+- rf:comments | low | scripts/run/ship/run-ship-steps.ts:83 | 2026-11-10 | #7058 | fixed
+- rf:comments | low | scripts/run/ship/run-ship-sync.ts:207 | 2026-11-10 | #7058 | fixed
+- rf:tests | low | scripts/run/ship/run-ship-sync.ts:224 | 2026-11-10 | #7058 | fixed
+- rx:{"round":"a23bc044-15d2-4af1-b634-be400d9fd293","category":"comments","severity":"low","file":"scripts/run/ship/run-ship-steps.ts:83","disposition":"fixed","description":"comment line ran to ~155 columns; rewrapped","status":"resolved"}
+- rx:{"round":"a23bc044-15d2-4af1-b634-be400d9fd293","category":"comments","severity":"low","file":"scripts/run/ship/run-ship-sync.ts:207","disposition":"fixed","description":"gate_merged comment still said the combined break is always reproduced locally; now names the clean-move skip left to the merge ref CI","status":"resolved"}
+- rx:{"round":"a23bc044-15d2-4af1-b634-be400d9fd293","category":"tests","severity":"low","file":"scripts/run/ship/run-ship-sync.ts:224","disposition":"fixed","description":"is_behind_default catch branch had no test; added one for an unreadable commit count","status":"resolved"}
+- rf:none | none | - | 2026-11-10 | #7066
+- ri:none | none | - | 2026-11-10 | #7066
+- rb:2026-11-10 | #7066
+- rf:none | none | - | 2026-11-10 | #7066
+- rf:none | none | - | 2026-11-10 | #7074
+- ri:performance | low | scripts/auto-ok/auto-ok-cli.ts:451 | 2026-11-10 | #7074 | fixed
+- ri:comments | low | scripts/backlog/backlog-next.ts:191 | 2026-11-10 | #7074 | fixed
+- rb:2026-11-10 | #7074
+- rf:bug-risks | medium | scripts/backlog/backlog-next-size.ts:81 | 2026-11-10 | #7074 | fixed
+- rf:bug-risks | low | scripts/auto-ok/auto-ok-cli.ts:451 | 2026-11-10 | #7074 | fixed
+- rf:comments | low | scripts/backlog/backlog-next.ts:192 | 2026-11-10 | #7074 | fixed
+- rf:comments | low | scripts/backlog/backlog-next-size.ts:16 | 2026-11-10 | #7074 | fixed
+- rf:comments | low | .claude/skills/workflow-commands/split-assessment.md:22 | 2026-11-10 | #7074 | fixed
+- rx:{"round":"901dc978-43aa-4c41-989a-27be192c9f91","category":"bug-risks","severity":"medium","file":"scripts/backlog/backlog-next-size.ts:81","disposition":"fixed","description":"warn_over_guide reads only opted_in.issues, so an epic child offered over the cap or size bar gets no stderr note now that held_children is gone.","status":"resolved"}
+- rx:{"round":"901dc978-43aa-4c41-989a-27be192c9f91","category":"bug-risks","severity":"low","file":"scripts/auto-ok/auto-ok-cli.ts:451","disposition":"fixed","description":"answer still awaits lane_net_read.measurements() though nothing reads implement_rate or growth any more.","status":"resolved"}
+- rx:{"round":"901dc978-43aa-4c41-989a-27be192c9f91","category":"comments","severity":"low","file":"scripts/backlog/backlog-next.ts:192","disposition":"fixed","description":"the epic_half comment still says untrusted includes children declared over the size cap.","status":"resolved"}
+- rx:{"round":"901dc978-43aa-4c41-989a-27be192c9f91","category":"comments","severity":"low","file":"scripts/backlog/backlog-next-size.ts:16","disposition":"fixed","description":"the comment says lane:plan answers split on an over-cap issue, which holds only past the size bar.","status":"resolved"}
+- rx:{"round":"901dc978-43aa-4c41-989a-27be192c9f91","category":"comments","severity":"low","file":".claude/skills/workflow-commands/split-assessment.md:22","disposition":"fixed","description":"the lane:plan line says just lines and no longer names the 2 × budget bar it measures against.","status":"resolved"}
+- rf:assumptions | low | scripts/lib/stdin-text.ts:172 | 2026-11-10 | #7075
+- rf:tests | low | scripts/lib/stdin-text.test.ts:106 | 2026-11-10 | #7075
+- rf:assumptions | low | scripts/lib/stdin-text.ts:172 | 2026-11-10 | #7075
+- rf:tests | low | scripts/lib/stdin-text.test.ts:106 | 2026-11-10 | #7075
+- rf:none | none | - | 2026-11-10 | #7076
+- ri:bug-risks | medium | scripts/backlog/backlog-drive-stalled-retry.ts:81 | 2026-11-10 | #7076 | fixed
+- ri:bug-risks | medium | scripts/backlog/backlog-drive-stalled-retry.ts:78 | 2026-11-10 | #7076 | fixed
+- ri:comments | medium | docs/labels-and-run-states.md:30 | 2026-11-10 | #7076 | fixed
+- ri:project-conventions | low | scripts/backlog/backlog-drive.ts:79 | 2026-11-10 | #7076 | fixed
+- rb:2026-11-10 | #7076
+- rf:bug-risks | medium | scripts/backlog/backlog-drive-stalled-retry.ts:79 | 2026-11-10 | #7076 | fixed
+- rf:bug-risks | low | scripts/run/park/run-stalled.ts:43 | 2026-11-10 | #7076 | fixed
+- rf:comments | medium | docs/labels-and-run-states.md:30 | 2026-11-10 | #7076 | fixed
+- rf:comments | low | scripts/backlog/backlog-drive.ts:78 | 2026-11-10 | #7076 | fixed
+- rx:{"round":"2854a7f7-7880-4e55-b222-a0478bac133c","category":"bug-risks","severity":"medium","file":"scripts/backlog/backlog-drive-stalled-retry.ts:79","disposition":"fixed","description":"The session-unfinished check matches only the literal short, while run:merge writes the first line of the child last message as the cause, so most session-unfinished parks are never auto-retried.","status":"resolved"}
+- rx:{"round":"2854a7f7-7880-4e55-b222-a0478bac133c","category":"bug-risks","severity":"low","file":"scripts/run/park/run-stalled.ts:43","disposition":"fixed","description":"Stale hand-off parks are auto-retried although its recovery says retry alone does not clear it, spending two bounded launches before the cap.","status":"resolved"}
+- rx:{"round":"2854a7f7-7880-4e55-b222-a0478bac133c","category":"comments","severity":"medium","file":"docs/labels-and-run-states.md:30","disposition":"fixed","description":"The doc says any other run:stalled cause is retried on the next sweep, but only the three run:merge literals and yield cap are, and backlogrun-park.md repeats the overstatement.","status":"resolved"}
+- rx:{"round":"2854a7f7-7880-4e55-b222-a0478bac133c","category":"comments","severity":"low","file":"scripts/backlog/backlog-drive.ts:78","disposition":"fixed","description":"The DriveState.exclude comment still says a yield-capped issue stays out, though the auto-retry now re-adds it through run:add --retry.","status":"resolved"}
+- rf:bug-risks | medium | docs/josh-commands-run.md:362 | 2026-11-10 | #7077
+- rf:comments | low | .josh/observations/7077.md:8 | 2026-11-10 | #7077
+- ri:bug-risks | medium | prompts/collaboration-workflow/upstream-interrupt.md:10 | 2026-11-10 | #7077 | fixed
+- ri:bug-risks | medium | docs/josh-commands-run.md:362 | 2026-11-10 | #7077 | fixed
+- rb:2026-11-10 | #7077
+- rf:project-conventions | low | scripts/notify/telegram-notify.ts:424 | 2026-11-10 | #7077 | fixed
+- rf:tests | low | scripts/backlog/backlog-drive-after-merge.ts:50 | 2026-11-10 | #7077 | fixed
+- rf:comments | low | scripts/run/park/run-park-body.ts:188 | 2026-11-10 | #7077 | fixed
+- rf:comments | low | .claude/skills/workflow-commands/backlogrun-park.md:96 | 2026-11-10 | #7077 | fixed
+- rx:{"round":"1a88ecb7-09f6-4f10-98eb-9b82917d21bd","category":"project-conventions","severity":"low","file":"scripts/notify/telegram-notify.ts:424","disposition":"fixed","description":"decided and headline typed a decision notice with the idle notice's input type, a name that read as idle-specific.","status":"resolved"}
+- rx:{"round":"1a88ecb7-09f6-4f10-98eb-9b82917d21bd","category":"tests","severity":"low","file":"scripts/backlog/backlog-drive-after-merge.ts:50","disposition":"fixed","description":"the default notify_decided port and the decision TASK_DEFINITIONS entry are exercised by no test.","status":"resolved"}
+- rx:{"round":"1a88ecb7-09f6-4f10-98eb-9b82917d21bd","category":"comments","severity":"low","file":"scripts/run/park/run-park-body.ts:188","disposition":"fixed","description":"default_pick's doc comment sits above unpicked_options, which never returns undefined.","status":"resolved"}
+- rx:{"round":"1a88ecb7-09f6-4f10-98eb-9b82917d21bd","category":"comments","severity":"low","file":".claude/skills/workflow-commands/backlogrun-park.md:96","disposition":"fixed","description":"the auto-decide condition omits the no-size-approval rule is_narrowest enforces.","status":"resolved"}
+- rf:project-conventions | medium | .claude/skills/workflow-commands/backlogrun.md:69 | 2026-11-10 | #7078
+- rf:project-conventions | low | scripts/run/merge/run-merge-auth.ts:15 | 2026-11-10 | #7078
+- ri:bug-risks | medium | scripts/run/merge/run-merge-health.ts:159 | 2026-11-10 | #7078 | fixed
+- ri:bug-risks | medium | scripts/run/merge/run-merge-health.ts:142 | 2026-11-10 | #7078 | fixed
+- ri:tests | medium | scripts/run/merge/run-merge-signals.test.ts:130 | 2026-11-10 | #7078 | fixed
+- ri:performance | low | scripts/run/merge/run-merge-cli.ts:267 | 2026-11-10 | #7078 | fixed
+- ri:comments | low | scripts/backlog/backlog-drive-hold.ts:72 | 2026-11-10 | #7078 | fixed
+- rb:2026-11-10 | #7078
+- rf:bug-risks | medium | scripts/run/merge/run-merge-auth.ts:119 | 2026-11-10 | #7078 | fixed
+- rf:bug-risks | medium | scripts/run/merge/run-merge-cli.ts:297 | 2026-11-10 | #7078 | fixed
+- rf:project-conventions | medium | docs/josh-commands-run.md:619 | 2026-11-10 | #7078 | fixed
+- rf:performance | low | scripts/run/merge/run-merge-health.ts:159 | 2026-11-10 | #7078 | fixed
+- rf:tests | low | scripts/run/merge/run-merge.test.ts:155 | 2026-11-10 | #7078 | fixed
+- rf:comments | low | scripts/run/merge/run-merge-health.ts:149 | 2026-11-10 | #7078 | fixed
+- rx:{"round":"84f89590-c17e-402f-ad54-fcee29d9d6d3","category":"bug-risks","severity":"medium","file":"scripts/run/merge/run-merge-auth.ts:119","disposition":"fixed","description":"is_first_hold scans the whole run, so a second authentication episode after a /login sends no confirmation and the run holds silently.","status":"resolved"}
+- rx:{"round":"84f89590-c17e-402f-ad54-fcee29d9d6d3","category":"bug-risks","severity":"medium","file":"scripts/run/merge/run-merge-cli.ts:297","disposition":"fixed","description":"the per-child outage cap turns a re-offered child's fourth outage into a failure that resets the outage streak, so the growing wait is unreachable and a sustained outage parks children.","status":"resolved"}
+- rx:{"round":"84f89590-c17e-402f-ad54-fcee29d9d6d3","category":"project-conventions","severity":"medium","file":"docs/josh-commands-run.md:619","disposition":"fixed","description":"docs, run-liveness guidance and token comments still say outages and auth failures emit environment and stop the run.","status":"resolved"}
+- rx:{"round":"84f89590-c17e-402f-ad54-fcee29d9d6d3","category":"performance","severity":"low","file":"scripts/run/merge/run-merge-health.ts:159","disposition":"fixed","description":"the gate runs synchronously inside the driver's collection and blocks other collections for its duration.","status":"resolved"}
+- rx:{"round":"84f89590-c17e-402f-ad54-fcee29d9d6d3","category":"tests","severity":"low","file":"scripts/run/merge/run-merge.test.ts:155","disposition":"fixed","description":"the cap test feeds a millisecond value back in as an outage count.","status":"resolved"}
+- rx:{"round":"84f89590-c17e-402f-ad54-fcee29d9d6d3","category":"comments","severity":"low","file":"scripts/run/merge/run-merge-health.ts:149","disposition":"fixed","description":"the issue:file result is discarded, so a refused solo filing leaves no trace.","status":"resolved"}
+- rf:bug-risks | medium | scripts/followup/followup-coderabbit-retrigger.ts:249 | 2026-11-10 | #7079 | fixed
+- rf:project-conventions | medium | scripts/josh/josh-commands-issue-write.ts:152 | 2026-11-10 | #7079 | fixed
+- rf:project-conventions | low | .claude/skills/workflow-commands/followup.md:30 | 2026-11-10 | #7079 | fixed
+- rf:comments | low | scripts/lane/lane-ledger-write.ts:61 | 2026-11-10 | #7079
+- rb:2026-11-10 | #7079
+- rf:bug-risks | medium | scripts/followup/followup-coderabbit-retrigger.ts:249 | 2026-11-10 | #7079 | fixed
+- rf:project-conventions | medium | scripts/josh/josh-commands-issue-write.ts:152 | 2026-11-10 | #7079 | fixed
+- rf:project-conventions | low | .claude/skills/workflow-commands/followup.md:30 | 2026-11-10 | #7079 | fixed
+- rx:{"round":"a6e60563-50dd-4e1a-878f-64dbecb4f053","previous":"d4426a7f-d195-40f3-9fa5-f863a8478b6b","category":"bug-risks","severity":"medium","file":"scripts/followup/followup-coderabbit-retrigger.ts:249","disposition":"fixed","description":"attempt dropped its own retriggers on a mid-run cap stop and returned AGAIN_NOTE when the rounds ran out","status":"resolved"}
+- rx:{"round":"a6e60563-50dd-4e1a-878f-64dbecb4f053","previous":"d4426a7f-d195-40f3-9fa5-f863a8478b6b","category":"project-conventions","severity":"medium","file":"scripts/josh/josh-commands-issue-write.ts:152","disposition":"fixed","description":"issue:already-done description still said it only labels","status":"resolved"}
+- rx:{"round":"a6e60563-50dd-4e1a-878f-64dbecb4f053","previous":"d4426a7f-d195-40f3-9fa5-f863a8478b6b","category":"project-conventions","severity":"low","file":".claude/skills/workflow-commands/followup.md:30","disposition":"fixed","description":"read as if followup parks the run itself","status":"resolved"}
+- rx:{"round":"a6e60563-50dd-4e1a-878f-64dbecb4f053","previous":"d4426a7f-d195-40f3-9fa5-f863a8478b6b","category":"bug-risks","severity":"medium","file":"scripts/followup/followup-coderabbit-retrigger.ts:249","description":"attempt drops the run's own retriggers and returns AGAIN_NOTE instead of CAP_NOTE when the cap is reached within one run.","disposition":"fixed","status":"resolved"}
+- rx:{"round":"a6e60563-50dd-4e1a-878f-64dbecb4f053","previous":"d4426a7f-d195-40f3-9fa5-f863a8478b6b","category":"project-conventions","severity":"medium","file":"scripts/josh/josh-commands-issue-write.ts:152","description":"the issue:already-done description and example still say it applies the label, but a cited merge now closes the issue.","disposition":"fixed","status":"resolved"}
+- rx:{"round":"a6e60563-50dd-4e1a-878f-64dbecb4f053","previous":"d4426a7f-d195-40f3-9fa5-f863a8478b6b","category":"project-conventions","severity":"low","file":".claude/skills/workflow-commands/followup.md:30","description":"the prose says followup parks run:stalled itself, but only its CAP_NOTE asks for the park.","disposition":"fixed","status":"resolved"}
+- rb:2026-11-10 | #7079
+- rf:bug-risks | medium | scripts/followup/followup-coderabbit-retrigger.ts:240 | 2026-11-10 | #7079
+- rf:assumptions | low | scripts/issue/issue-already-done-cli.ts:26 | 2026-11-10 | #7079
+- rx:{"round":"43e0e301-72d3-4224-905d-b4f61ff57b84","previous":"a6e60563-50dd-4e1a-878f-64dbecb4f053","category":"bug-risks","severity":"medium","file":"scripts/followup/followup-coderabbit-retrigger.ts:240","description":"attempt loops only after its own retrigger: when it waits on an already-pending retrigger (posted by a person or an interrupted run) and CodeRabbit rate-limits again, it returns AGAIN_NOTE and stops with retriggers left under RETRIGGER_CAP, instead of deciding afresh as the retrigger branch does (fix: route the await outcome through the same AGAIN_NOTE check); not fixed because this session's scope hook refused the edit. other sites: none","status":"new"}
+- rx:{"round":"43e0e301-72d3-4224-905d-b4f61ff57b84","previous":"a6e60563-50dd-4e1a-878f-64dbecb4f053","category":"assumptions","severity":"low","file":"scripts/issue/issue-already-done-cli.ts:26","description":"cites_merge matches text only, so evidence that names an unmerged PR (e.g. 'the open PR #123') or a 7+ hex token such as a UUID fragment would close the issue; no failure scenario — the evidence is written by a lane that has already confirmed the merge, per issue-comments.md","status":"new"}
+- rx:{"round":"43e0e301-72d3-4224-905d-b4f61ff57b84","previous":"a6e60563-50dd-4e1a-878f-64dbecb4f053","category":"bug-risks","severity":"medium","file":"scripts/followup/followup-coderabbit-retrigger.ts:249","description":"attempt dropped its own retriggers on a mid-run cap stop and returned AGAIN_NOTE when the rounds ran out","disposition":"fixed","status":"resolved"}
+- rx:{"round":"43e0e301-72d3-4224-905d-b4f61ff57b84","previous":"a6e60563-50dd-4e1a-878f-64dbecb4f053","category":"project-conventions","severity":"medium","file":"scripts/josh/josh-commands-issue-write.ts:152","description":"issue:already-done description still said it only labels","disposition":"fixed","status":"resolved"}
+- rx:{"round":"43e0e301-72d3-4224-905d-b4f61ff57b84","previous":"a6e60563-50dd-4e1a-878f-64dbecb4f053","category":"project-conventions","severity":"low","file":".claude/skills/workflow-commands/followup.md:30","description":"read as if followup parks the run itself","disposition":"fixed","status":"resolved"}
+- rf:bug-risks | low | scripts/issue/issue-human-stops.ts:143 | 2026-11-10 | #7080
+- rf:project-conventions | low | CLAUDE.md:19 | 2026-11-10 | #7080
+- ri:comments | low | docs/maintainers/josh-commands-backlog-rationale.md:114 | 2026-11-10 | #7080 | fixed
+- ri:comments | low | scripts/backlog/backlog-drive-idle.ts:26 | 2026-11-10 | #7080 | fixed
+- rb:2026-11-10 | #7080
+- rf:bug-risks | medium | scripts/issue/issue-human-stops.ts:143 | 2026-11-10 | #7080
+- rf:comments | low | docs/maintainers/josh-commands-backlog-rationale.md:114 | 2026-11-10 | #7080
+- rf:comments | low | scripts/backlog/backlog-drive-idle.ts:26 | 2026-11-10 | #7080
+- rx:{"round":"8dc44bc9-d5ab-48f4-9419-dcaa7d5ca0de","category":"bug-risks","severity":"medium","file":"scripts/issue/issue-human-stops.ts:143","description":"Issue #7080's acceptance criteria are only partly met: the registry feeds the idle notice alone, so run:board's and backlog:next's waiting-on-a-person sections still count on their own, and a stop added to the registry is shown in the idle Telegram but missing from run:board, which is the drift the Issue sets out to remove; CLAUDE.md Decision autonomy and backlogrun-park.md park and continue also do not reference the list — other sites: scripts/epic/epic-report.ts:181, CLAUDE.md:19, .claude/skills/workflow-commands/backlogrun-park.md:25","status":"new"}
+- rx:{"round":"8dc44bc9-d5ab-48f4-9419-dcaa7d5ca0de","category":"comments","severity":"low","file":"docs/maintainers/josh-commands-backlog-rationale.md:114","description":"The earlier round's fix is missing from the tree: the idle-notice sentence still lists only needs-decision, stalled and not-before issues, but the notice now also lists needs-human-merge, already-done and untrusted-author issues, and .josh/observations/7080.md records this finding as fixed when it is not","status":"new"}
+- rx:{"round":"8dc44bc9-d5ab-48f4-9419-dcaa7d5ca0de","category":"comments","severity":"low","file":"scripts/backlog/backlog-drive-idle.ts:26","description":"The earlier round's fix is missing from the tree: IDLE_RECOVERY still says only to decide parked issues and release stalled ones, and does not mention merging the needs-human-merge PRs or closing the already-done issues that the new sections ask for; the observation file records it as fixed","status":"new"}
+- rf:none | none | - | 2026-11-10 | #7088
+- ri:bug-risks | low | scripts/run/board/run-board-github.ts:254 | 2026-11-10 | #7088 | fixed
+- rb:2026-11-10 | #7088
+- rf:bug-risks | medium | scripts/run/board/run-board-issue-count.ts:115 | 2026-11-10 | #7088 | fixed
+- rf:tests | low | scripts/run/board/run-board-github-issue-count.test.ts:57 | 2026-11-10 | #7088 | fixed
+- rx:{"round":"2e243209-089f-47ec-9a2d-10b8e6c6f52e","category":"bug-risks","severity":"medium","file":"scripts/run/board/run-board-issue-count.ts:115","disposition":"fixed","description":"The count is read through GraphQL only, so a session whose transport is REST (cloud 403 or JOSH_GH_TRANSPORT=rest) never draws the 📮 chip the doc promises unconditionally.","status":"resolved"}
+- rx:{"round":"2e243209-089f-47ec-9a2d-10b8e6c6f52e","category":"tests","severity":"low","file":"scripts/run/board/run-board-github-issue-count.test.ts:57","disposition":"fixed","description":"No test covers the in-flight guard in is_issue_count_due, which the 120 s throttle masks.","status":"resolved"}
+- rf:tests | low | scripts/run/board/run-board-header-issue-count.test.ts:48 | 2026-11-10 | #7089
+- ri:none | none | - | 2026-11-10 | #7089
+- rb:2026-11-10 | #7089
+- rf:tests | low | scripts/run/board/run-board-header-issue-count.test.ts:109 | 2026-11-10 | #7089
+- rx:{"round":"5221dab1-8c1b-4bcd-bdc8-cb5aa55c153c","category":"tests","severity":"low","file":"scripts/run/board/run-board-header-issue-count.test.ts:109","description":"The bracketed link helper is now copied into three test files (run-board-link.test.ts, run-board-cli.test.ts, this one) instead of living in run-board-render-fixture.ts; no failure scenario — each copy is identical and only shapes test output, so no copy can drift into a passing wrong assertion.","status":"new"}
+- rf:comments | low | scripts/issue/issue-labels.ts:263 | 2026-11-10 | #7093
+- rf:assumptions | low | .claude/skills/epic-commands/SKILL.md:63 | 2026-11-10 | #7093
+- rf:bug-risks | low | scripts/issue/already-done-citation.ts:124 | 2026-11-10 | #7093
+- rf:comments | low | scripts/issue/issue-labels.ts:263 | 2026-11-10 | #7093
+- rf:assumptions | low | .claude/skills/epic-commands/SKILL.md:63 | 2026-11-10 | #7093
+- rf:bug-risks | low | scripts/issue/already-done-citation.ts:124 | 2026-11-10 | #7093
+- rf:bug-risks | low | docs/maintainers/josh-commands-run-rationale.md:178 | 2026-11-10 | #7095
+- rf:comments | low | scripts/run/board/run-board-status.ts:389 | 2026-11-10 | #7095
+- rf:tests | low | scripts/run/board/run-board-render-found.test.ts:338 | 2026-11-10 | #7095
+- ri:none | none | - | 2026-11-10 | #7095
+- rb:2026-11-10 | #7095
+- rf:bug-risks | low | docs/josh-commands-run.md:595 | 2026-11-10 | #7095 | fixed
+- rx:{"round":"9bd251e9-8e96-4fa2-b2fc-fcb3ba639468","category":"bug-risks","severity":"low","file":"docs/josh-commands-run.md:595","disposition":"fixed","description":"the sentence \"a 🏁 row keeps all the numbers\" does not name the ⏩ row that DONE_STATES now treats the same way; add \"or ⏩\".","status":"resolved"}
+- ri:none | none | - | 2026-11-10 | #7097
+- rb:2026-11-10 | #7097
+- rf:bug-risks | low | scripts/run/board/run-board-human.ts:82 | 2026-11-10 | #7097 | false-positive
+- rx:{"round":"aea123f5-9dd5-4043-8767-18ec759f26d0","category":"bug-risks","severity":"low","file":"scripts/run/board/run-board-human.ts:82","disposition":"false-positive","description":"is_decision widens to every registry label while the decision tail parse and comment read still know only needs-decision, so a future registry label would draw a 🙋 row with no question.","status":"resolved"}
+- rf:none | none | - | 2026-11-10 | #7098
+- ri:bug-risks | medium | scripts/run/board/run-board-render.ts:235 | 2026-11-10 | #7098 | fixed
+- rb:2026-11-10 | #7098
+- rf:bug-risks | medium | scripts/run/board/run-board-render.ts:240 | 2026-11-10 | #7098 | fixed
+- rx:{"round":"5a512928-ceb4-4f40-9162-550910b94d51","category":"bug-risks","severity":"medium","file":"scripts/run/board/run-board-render.ts:240","disposition":"fixed","description":"row_fit judged is_tailed from the tail before the 🧳 mark, so a non-running earlier row drawing 🧳 alone was neither line-kept nor in the shared overrun; both now read one drawn_tail","status":"resolved"}
+- rf:none | none | - | 2026-11-10 | #7101
+- rb:2026-11-10 | #7101
+- rf:project-conventions | low | scripts/issue/already-done-citation.ts:68 | 2026-11-10 | #7101 | fixed
+- rx:{"round":"e0f5a73b-0b4c-495a-842f-6931d41137c8","category":"project-conventions","severity":"low","file":"scripts/issue/already-done-citation.ts:68","disposition":"fixed","description":"is_not_ancestor re-derives the execa exit code inline instead of reusing get_exit_code from scripts/git/git-execa-error.ts.","status":"resolved"}
+- rf:none | none | - | 2026-11-10 | #7104
+- rf:none | none | - | 2026-11-10 | #7104
+- rf:none | none | - | 2026-11-11 | #7108
+- rb:2026-11-11 | #7108
+- rf:tests | low | scripts/ci/ci-yml-checks-gate.test.ts:81 | 2026-11-11 | #7108 | fixed
+- rf:comments | low | scripts/ci/ci-yml-eslint-cache-seed.test.ts:22 | 2026-11-11 | #7108 | fixed
+- rx:{"round":"bccfa288-377b-4a54-95a0-b498413beb8c","category":"tests","severity":"low","file":"scripts/ci/ci-yml-checks-gate.test.ts:81","disposition":"fixed","description":"The test title says the lint leg lints the whole tree, but two shard legs now lint it together.","status":"resolved"}
+- rx:{"round":"bccfa288-377b-4a54-95a0-b498413beb8c","category":"comments","severity":"low","file":"scripts/ci/ci-yml-eslint-cache-seed.test.ts:22","disposition":"fixed","description":"The comment says only the lint leg restores and writes the cache, but both lint- legs now do.","status":"resolved"}
+- rf:none | none | - | 2026-11-10 | #7111
+- rf:assumptions | low | scripts/run/entry/run-entry-spill.ts:120 | 2026-11-10 | #7111
+- ri:bug-risks | low | docs/josh-commands-run.md:546 | 2026-11-10 | #7111 | fixed
+- rb:2026-11-10 | #7113
+- rf:project-conventions | low | docs/environment-variables.md:93 | 2026-11-10 | #7113 | fixed
+- rx:{"round":"245800eb-59d6-49a7-8915-3c4dc8e72d12","category":"project-conventions","severity":"low","file":"docs/environment-variables.md:93","disposition":"fixed","description":"The \"Capped by shape instead\" line still describes only the 60-line investigator cap and the shape-only reviewer reply, omitting the new 3,000- and 2,000-character caps.","status":"resolved"}
+- rf:tests | low | scripts/backlog/backlog-drive.ts:328 | 2026-11-10 | #7120
+- ri:bug-risks | high | scripts/run/run-headless.ts:164 | 2026-11-10 | #7120 | fixed
+- rb:2026-11-10 | #7120
+- rf:bug-risks | medium | scripts/backlog/backlog-drive-park-triage.ts:18 | 2026-11-10 | #7120 | fixed
+- rf:tests | medium | scripts/run/wake/run-wake-ports.ts:45 | 2026-11-10 | #7120 | fixed
+- rf:bug-risks | low | scripts/backlog/backlog-drive.ts:328 | 2026-11-10 | #7120 | fixed
+- rx:{"round":"70417c18-9d56-4e60-8b9f-6ef2371f5033","category":"bug-risks","severity":"medium","file":"scripts/backlog/backlog-drive-park-triage.ts:18","disposition":"fixed","description":"is_beside trusts is_live_pid alone, so a recycled triage pid holds stop/judge/retrospective and the owed triage forever; record and compare the start time.","status":"resolved"}
+- rx:{"round":"70417c18-9d56-4e60-8b9f-6ef2371f5033","category":"tests","severity":"medium","file":"scripts/run/wake/run-wake-ports.ts:45","disposition":"fixed","description":"the production wake_beside (launch then name_beside on the kept line) has no test, so dropping or inverting the name_beside call passes every test while overlapping triage sessions launch.","status":"resolved"}
+- rx:{"round":"70417c18-9d56-4e60-8b9f-6ef2371f5033","category":"bug-risks","severity":"low","file":"scripts/backlog/backlog-drive.ts:328","disposition":"fixed","description":"a failed offer is held as continue while a triage session runs beside, delaying the offer hand-back until the session ends.","status":"resolved"}
+- ri:bug-risks | medium | scripts/run/ship/run-ship-detach-wait.ts:16 | 2026-11-10 | #7121 | fixed
+- ri:bug-risks | low | scripts/lane/lane-gap-stats.ts:85 | 2026-11-10 | #7121 | fixed
+- ri:comments | low | docs/maintainers/lane-limit-measurement.md:276 | 2026-11-10 | #7121 | fixed
+- rb:2026-11-10 | #7121
+- rf:bug-risks | medium | scripts/run/ship/run-ship-detach-wait.ts:16 | 2026-11-10 | #7121 | fixed
+- rf:tests | low | scripts/run/ship/run-ship-detach-wait.test.ts:36 | 2026-11-10 | #7121 | fixed
+- rx:{"round":"606e9d70-6654-4077-9ef2-7fb7dfc70a81","category":"bug-risks","severity":"medium","file":"scripts/run/ship/run-ship-detach-wait.ts:16","disposition":"fixed","description":"An explicit josh ship --detach outside a lane child takes the hand-back mark and writes a free-lane hold while every lane is still taken.","status":"resolved"}
+- rx:{"round":"606e9d70-6654-4077-9ef2-7fb7dfc70a81","category":"tests","severity":"low","file":"scripts/run/ship/run-ship-detach-wait.test.ts:36","disposition":"fixed","description":"The title claims the record runs before the cost cut but only a single call is asserted, not the order.","status":"resolved"}
+- rb:2026-11-10 | #7121
+- rf:bug-risks | medium | scripts/run/ship/run-ship-detach-wait.ts:16 | 2026-11-10 | #7121
+- rf:comments | low | docs/maintainers/lane-limit-measurement.md:276 | 2026-11-10 | #7121
+- rf:bug-risks | low | scripts/lane/lane-gap-stats.ts:85 | 2026-11-10 | #7121
+- rx:{"round":"d7c6cae9-5b84-4470-83f1-637a510e9a99","previous":"606e9d70-6654-4077-9ef2-7fb7dfc70a81","category":"bug-risks","severity":"medium","file":"scripts/run/ship/run-ship-detach-wait.ts:16","description":"Round-1 finding not closed: the hold is still written at detach launch, before the cost cut, but a lane child whose verdict is `under` stays alive in ship:wait through the gate and review and nothing sets the merge-wait mark until `josh followup` runs, so `backlog_occupied.occupied_lanes` counts the lane taken and `lane:stats` `held by hand-back:…` and the board launch hold report a free lane empty while every lane is still occupied (the comment \"a lane child detach frees its seat\" is false for that case); write the hold where the seat is actually freed (the child ending or the merge-wait mark going up), or only when the verdict is not `under` — other sites: scripts/run/ship/run-ship-cli.ts:336","status":"new"}
+- rx:{"round":"d7c6cae9-5b84-4470-83f1-637a510e9a99","previous":"606e9d70-6654-4077-9ef2-7fb7dfc70a81","category":"comments","severity":"low","file":"docs/maintainers/lane-limit-measurement.md:276","description":"Round-1 finding not closed (the file is absent from the diff): the doc still says \"The driver records the hold only while a lane is free\" and lists only driver-written holds, never naming that a freed lane detached ship writes `hand-back:<reason>` from the mark (no failure scenario — the doc only misleads a maintainer reading the `held by` table).","status":"new"}
+- rx:{"round":"d7c6cae9-5b84-4470-83f1-637a510e9a99","previous":"606e9d70-6654-4077-9ef2-7fb7dfc70a81","category":"bug-risks","severity":"low","file":"scripts/lane/lane-gap-stats.ts:85","description":"Round-1 finding not closed (the file is unchanged): `offer_times` still reads the driverless `held` line a detached ship wrote as an offer answer via `OFFER_ANSWERS`, which can end a park span early (no failure scenario — a hand-back hold only follows a `released` and I could not construct a park that straddles it).","status":"new"}
+- rx:{"round":"d7c6cae9-5b84-4470-83f1-637a510e9a99","previous":"606e9d70-6654-4077-9ef2-7fb7dfc70a81","category":"bug-risks","severity":"medium","file":"scripts/run/ship/run-ship-detach-wait.ts:16","description":"An explicit josh ship --detach outside a lane child takes the hand-back mark and writes a free-lane hold while every lane is still taken.","disposition":"fixed","status":"resolved"}
+- rx:{"round":"d7c6cae9-5b84-4470-83f1-637a510e9a99","previous":"606e9d70-6654-4077-9ef2-7fb7dfc70a81","category":"tests","severity":"low","file":"scripts/run/ship/run-ship-detach-wait.test.ts:36","description":"The title claims the record runs before the cost cut but only a single call is asserted, not the order.","disposition":"fixed","status":"resolved"}
+- rf:none | none | - | 2026-11-10 | #7124
+- rf:none | none | - | 2026-11-10 | #7124
+- rf:bug-risks | medium | scripts/hooks/run-hook.sh:71 | 2026-11-10 | #7125
+- ri:bug-risks | medium | scripts/josh/durable-state-root.ts:31 | 2026-11-10 | #7125 | fixed
+- rb:2026-11-10 | #7125
+- rf:bug-risks | medium | scripts/hooks/run-hook.sh:51 | 2026-11-10 | #7125 | fixed
+- rf:security | low | scripts/hooks/run-hook.sh:71 | 2026-11-10 | #7125 | fixed
+- rx:{"round":"fc6261ba-b5f8-4117-9bce-e7f2d6c8c3ec","category":"bug-risks","severity":"medium","file":"scripts/hooks/run-hook.sh:51","disposition":"fixed","description":"one daemon per checkout kept its import-time JOSH_TEMP_ROOT roots while answering calls under another root; such calls now reply stale","status":"resolved"}
+- rx:{"round":"fc6261ba-b5f8-4117-9bce-e7f2d6c8c3ec","category":"security","severity":"low","file":"scripts/hooks/run-hook.sh:71","disposition":"fixed","description":"the env file with the caller secrets outlived a killed launcher; the daemon now removes it once read","status":"resolved"}
+- rf:none | none | - | 2026-11-10 | #7126
+- rb:2026-11-10 | #7126
+- rf:tests | low | scripts/ci/ci-yml-eslint-cache-seed.test.ts:100 | 2026-11-10 | #7126 | fixed
+- rx:{"round":"5664451e-693d-4477-b1b6-992466deff95","category":"tests","severity":"low","file":"scripts/ci/ci-yml-eslint-cache-seed.test.ts:100","disposition":"fixed","description":"endsWith asserts a test constant, not the workflow; drop the tautological line.","status":"resolved"}
+- rf:none | none | - | 2026-11-10 | #7130
+- rb:2026-11-10 | #7130
+- rf:bug-risks | medium | scripts/review/review-findings-cli.ts:70 | 2026-11-10 | #7130 | fixed
+- rx:{"round":"aadaeb6d-a77c-46c4-9b23-fb19aeb87181","category":"bug-risks","severity":"medium","file":"scripts/review/review-findings-cli.ts:70","disposition":"fixed","description":"A --period of about 1e8 days or more makes since_of build an Invalid Date, so ledger_date throws a RangeError instead of printing a report or the usage line.","status":"resolved"}
+- rf:tests | low | scripts/gate/core-weights.ts:78 | 2026-11-10 | #7131 | false-positive
+- rf:none | none | - | 2026-11-10 | #7131
+- rf:performance | low | scripts/rules/rule-value-runs.ts:159 | 2026-11-10 | #7134
+- rb:2026-11-10 | #7134
+- rf:bug-risks | high | scripts/rules/rule-value-cli.ts:38 | 2026-11-10 | #7134
+- rf:tests | low | scripts/rules/rule-value-runs.test.ts:151 | 2026-11-10 | #7134
+- rf:tests | low | scripts/rules/rule-value-cli.test.ts:26 | 2026-11-10 | #7134
+- rx:{"round":"e9e811bc-7630-4411-8285-717f3a96ae7e","category":"bug-risks","severity":"high","file":"scripts/rules/rule-value-cli.ts:38","description":"MODULE_FILE resolves to the rule-value-cli.ts source even from dist, so the store version never moves when the counting code changes and stale run counts are reused.","status":"new"}
+- rx:{"round":"e9e811bc-7630-4411-8285-717f3a96ae7e","category":"tests","severity":"low","file":"scripts/rules/rule-value-runs.test.ts:151","description":"the version tests use a synthetic module file, so nothing checks that the production version moves when the counting code changes.","status":"new"}
+- rx:{"round":"e9e811bc-7630-4411-8285-717f3a96ae7e","category":"tests","severity":"low","file":"scripts/rules/rule-value-cli.test.ts:26","description":"the removed one-run-at-a-time test has no replacement.","status":"new"}
+- rb:2026-11-10 | #7134
+- rf:bug-risks | high | scripts/rules/rule-value-cli.ts:38 | 2026-11-10 | #7134 | fixed
+- rf:tests | low | scripts/rules/rule-value-runs.test.ts:151 | 2026-11-10 | #7134 | fixed
+- rf:tests | low | scripts/rules/rule-value-cli.test.ts:26 | 2026-11-10 | #7134 | fixed
+- rx:{"round":"51a083d4-02e2-48c8-af84-8ea89bad6887","previous":"e9e811bc-7630-4411-8285-717f3a96ae7e","category":"bug-risks","severity":"high","file":"scripts/rules/rule-value-cli.ts:38","disposition":"fixed","description":"MODULE_FILE resolves to the rule-value-cli.ts source even from dist, so the store version never moves when rule-value.ts, piped-verification-shapes.ts or rule-rephrase.ts counting changes and stale run counts are reused.","status":"resolved"}
+- rx:{"round":"51a083d4-02e2-48c8-af84-8ea89bad6887","previous":"e9e811bc-7630-4411-8285-717f3a96ae7e","category":"tests","severity":"low","file":"scripts/rules/rule-value-runs.test.ts:151","disposition":"fixed","description":"the version tests use a synthetic module file, so nothing checks that the production version moves when the counting code changes.","status":"resolved"}
+- rx:{"round":"51a083d4-02e2-48c8-af84-8ea89bad6887","previous":"e9e811bc-7630-4411-8285-717f3a96ae7e","category":"tests","severity":"low","file":"scripts/rules/rule-value-cli.test.ts:26","disposition":"fixed","description":"the removed one-run-at-a-time test has no replacement and the PR body's removed-test disposition is unfilled.","status":"resolved"}
+- rx:{"round":"51a083d4-02e2-48c8-af84-8ea89bad6887","previous":"e9e811bc-7630-4411-8285-717f3a96ae7e","category":"bug-risks","severity":"high","file":"scripts/rules/rule-value-cli.ts:38","description":"MODULE_FILE resolves to the rule-value-cli.ts source even from dist, so the store version never moves when the counting code changes and stale run counts are reused.","status":"resolved"}
+- rx:{"round":"51a083d4-02e2-48c8-af84-8ea89bad6887","previous":"e9e811bc-7630-4411-8285-717f3a96ae7e","category":"tests","severity":"low","file":"scripts/rules/rule-value-cli.test.ts:26","description":"the removed one-run-at-a-time test has no replacement.","status":"resolved"}
+- rf:none | none | - | 2026-11-10 | #7137
+- ri:none | none | - | 2026-11-10 | #7137
+- rb:2026-11-10 | #7137
+- rf:bug-risks | low | tools/cost-audit/cost-audit-result.ts:138 | 2026-11-10 | #7137 | fixed
+- rf:comments | low | docs/josh-commands-session.md:275 | 2026-11-10 | #7137 | fixed
+- rx:{"round":"05d4c5d1-f44e-473b-96fd-ec3334067afe","category":"bug-risks","severity":"low","file":"tools/cost-audit/cost-audit-result.ts:138","disposition":"fixed","description":"A bare or flag-only josh call fails JOSH_PATTERN and lands in the other-command table as `pnpm josh`.","status":"resolved"}
+- rx:{"round":"05d4c5d1-f44e-473b-96fd-ec3334067afe","category":"comments","severity":"low","file":"docs/josh-commands-session.md:275","disposition":"fixed","description":"The doc says the command key cuts at the first argument, but lowercase arguments stay in the key (`git log origin`).","status":"resolved"}
+- rf:comments | low | docs/josh-commands-session.md:276 | 2026-11-10 | #7138
+- rf:bug-risks | low | tools/cost-audit/cost-audit-sequence.ts:103 | 2026-11-10 | #7138
+- rf:comments | low | docs/josh-commands-session.md:276 | 2026-11-10 | #7138
+- rf:comments | low | scripts/document/read-set-cli.test.ts:140 | 2026-11-10 | #7139
+- rb:2026-11-10 | #7139
+- rf:bug-risks | medium | scripts/document/read-set-cli.ts:57 | 2026-11-10 | #7139 | fixed
+- rf:tests | low | scripts/document/backlogrun-parent-read-set.test.ts:81 | 2026-11-10 | #7139 | fixed
+- rx:{"round":"b120b7a7-97a9-45de-b24c-22bf08065e5b","category":"bug-risks","severity":"medium","file":"scripts/document/read-set-cli.ts:57","disposition":"fixed","description":"The printed read:set backlogrun note still claims the parent keeps every point-of-use document, though the trim now drops background-commands.md, chain-rule.md and fullrun.md (also read-set-cli.ts:53 and docs/josh-commands-session.md:89).","status":"resolved"}
+- rx:{"round":"b120b7a7-97a9-45de-b24c-22bf08065e5b","category":"tests","severity":"low","file":"scripts/document/backlogrun-parent-read-set.test.ts:81","disposition":"fixed","description":"The label test filters by SKIPPED_POINT_OF_USE itself, so dropping fullrun.md or background-commands.md from the skip set passes every test.","status":"resolved"}
+- rf:bug-risks | medium | scripts/code/code-symbol.ts:35 | 2026-11-10 | #7140 | fixed
+- rf:bug-risks | low | scripts/code/code-symbol-cli.ts:73 | 2026-11-10 | #7140 | fixed
+- rf:none | none | - | 2026-11-10 | #7140
+- rb:2026-11-10 | #7140
+- rf:bug-risks | medium | scripts/code/code-symbol.ts:35 | 2026-11-10 | #7140 | fixed
+- rf:bug-risks | low | scripts/code/code-symbol-cli.ts:73 | 2026-11-10 | #7140 | fixed
+- rx:{"round":"1f066fc9-1e76-4a87-b954-9a1fa4343845","previous":"89cae8dc-7686-4b61-9b19-293cbee5ed0c","category":"bug-risks","severity":"medium","file":"scripts/code/code-symbol.ts:35","disposition":"fixed","description":"BLANK_LINE does not match a CRLF blank line, so a comment a blank line separates prints as part of the declaration in a CRLF file.","status":"resolved"}
+- rx:{"round":"1f066fc9-1e76-4a87-b954-9a1fa4343845","previous":"89cae8dc-7686-4b61-9b19-293cbee5ed0c","category":"bug-risks","severity":"low","file":"scripts/code/code-symbol-cli.ts:73","disposition":"fixed","description":"An empty name passes the usage guard and parses every source file before exiting 1.","status":"resolved"}
+- rf:none | none | - | 2026-11-10 | #7141
+- k:followup-unrelated-test-rerun | d1 | 2026-11-10 | scripts/gh/git-gh-issue-list-relations.test.ts, scripts/gh/git-gh-issue-list.test.ts | followup reran Unit Tests (1/6); failed outside the change: isolated scripts/gh/git-gh-issue-list-relations.test.ts > issue_list — concurrent blocker relations > starts the second read before the first one has finished; isolated scripts/gh/git-gh-issue-list.test.ts > issue_list — the blocker relations > answers undefined when the blocker relations cannot be read
+- rb:2026-11-10 | #7141
+- rf:comments | low | scripts/gh/git-gh-issue-write.ts:62 | 2026-11-10 | #7141 | fixed
+- rx:{"round":"f76de485-19ac-4ae7-b1f2-7b28c307597a","category":"comments","severity":"low","file":"scripts/gh/git-gh-issue-write.ts:62","disposition":"fixed","description":"the comment says every write below goes through write_api, but label_ensure and issue_create_with_label still call exec_gh_api directly; say \"every write to an existing issue\".","status":"resolved"}
+- rf:none | none | - | 2026-11-10 | #7143
+- rb:2026-11-10 | #7143
+- rf:tests | low | scripts/gh/git-pr-checks-watch.test.ts:52 | 2026-11-10 | #7143 | fixed
+- rx:{"round":"226534c8-22f9-40ed-b81b-9ff308f205b3","category":"tests","severity":"low","file":"scripts/gh/git-pr-checks-watch.test.ts:52","disposition":"fixed","description":"module mock and fetch_review still name pr_get_review_decision, no longer called by default_fetch_pr_state; point them at pr_read_review_decision","status":"resolved"}
+- rf:none | none | - | 2026-11-10 | #7144
+- k:followup-unrelated-test-rerun | d1 | 2026-11-10 | scripts/hooks/pretool-guard-ledger.test.ts | followup reran Unit Tests (4/6); failed outside the change: isolated scripts/hooks/pretool-guard-ledger.test.ts > pretool_guard.respond — the hook ledger > hands the ledger no reason for a call it let through
+- k:followup-unrelated-test-rerun | d1 | 2026-11-10 | scripts/hooks/pretool-guard-ledger.test.ts | followup reran Unit Tests (1/6); failed outside the change: isolated scripts/hooks/pretool-guard-ledger.test.ts > pretool_guard.respond — the hook ledger > hands the ledger no reason for a call it let through
+- k:followup-unrelated-test-rerun | d1 | 2026-11-10 | scripts/hooks/pretool-guard-ledger.test.ts | followup reran Unit Tests (1/6); failed outside the change: isolated scripts/hooks/pretool-guard-ledger.test.ts > pretool_guard.respond — the hook ledger > hands the ledger no reason for a call it let through
+- rb:2026-11-10 | #7144
+- rf:bug-risks | low | scripts/rules/direct-vitest-run.ts:72 | 2026-11-10 | #7144 | fixed
+- rf:project-conventions | low | docs/how-to/recover-a-run.md:9 | 2026-11-10 | #7144 | false-positive
+- rf:comments | low | scripts/rules/direct-vitest-run.ts:12 | 2026-11-10 | #7144 | fixed
+- rx:{"round":"2f2875d5-f89e-41d4-abe9-6fbbbc8875dd","category":"bug-risks","severity":"low","file":"scripts/rules/direct-vitest-run.ts:72","disposition":"fixed","description":"The refusal says test:related forwards every flag, but it carries value-taking flags only as --flag=value, so a reissued `-t \"a title\"` reads the title as a file.","status":"resolved"}
+- rx:{"round":"2f2875d5-f89e-41d4-abe9-6fbbbc8875dd","category":"project-conventions","severity":"low","file":"docs/how-to/recover-a-run.md:9","disposition":"false-positive","description":"The doc still says to check the tree with `git status` and `git stash list`, which the new direct-git-status rule steers to `pnpm josh tree:status`.","status":"resolved"}
+- rx:{"round":"2f2875d5-f89e-41d4-abe9-6fbbbc8875dd","category":"comments","severity":"low","file":"scripts/rules/direct-vitest-run.ts:12","disposition":"fixed","description":"The comment says test:related cannot carry --project/--config, but it does carry their --flag=value form.","status":"resolved"}
+- ri:none | none | - | 2026-11-10 | #7144
+- rf:none | none | - | 2026-11-10 | #7145
+- ri:none | none | - | 2026-11-10 | #7145
+- rb:2026-11-10 | #7145
+- rf:bug-risks | medium | scripts/plan/plan-scaffold-cli.ts:173 | 2026-11-10 | #7145 | fixed
+- rf:bug-risks | low | scripts/plan/plan-scaffold-cli.ts:116 | 2026-11-10 | #7145 | fixed
+- rf:tests | low | scripts/plan/plan-scaffold-cli.test.ts:4 | 2026-11-10 | #7145 | fixed
+- rx:{"round":"cae6fb64-e5ee-4c3f-a1e5-f17d06ef250e","category":"bug-risks","severity":"medium","file":"scripts/plan/plan-scaffold-cli.ts:173","disposition":"fixed","description":"An unreadable issue body prints the usage line instead of an unreadable note, so a gh failure reads as an argument error.","status":"resolved"}
+- rx:{"round":"cae6fb64-e5ee-4c3f-a1e5-f17d06ef250e","category":"bug-risks","severity":"low","file":"scripts/plan/plan-scaffold-cli.ts:116","disposition":"fixed","description":"existsSync counts a backticked directory as a planned file, which then reaches the test:declared line.","status":"resolved"}
+- rx:{"round":"cae6fb64-e5ee-4c3f-a1e5-f17d06ef250e","category":"tests","severity":"low","file":"scripts/plan/plan-scaffold-cli.test.ts:4","disposition":"fixed","description":"The CLI test covers only argument refusals, not the unreadable-issue path or the choice between given paths and body targets.","status":"resolved"}
+- rf:none | none | - | 2026-11-10 | #7146
+- ri:bug-risks | medium | scripts/security/security-audit-cache.ts:126 | 2026-11-10 | #7146 | fixed
+- ri:comments | low | scripts/hooks/reserved-run.ts:10 | 2026-11-10 | #7146 | fixed
+- rb:2026-11-10 | #7146
+- rf:bug-risks | medium | scripts/security/security-audit-cache.ts:126 | 2026-11-10 | #7146 | fixed
+- rx:{"round":"6b66b8e2-8531-4800-955a-d25a4a022266","category":"bug-risks","severity":"medium","file":"scripts/security/security-audit-cache.ts:126","disposition":"fixed","description":"A clean exit from a below-floor PATH scanner, whose result the audit itself says proves nothing, is recorded as a pass and skips every push for 24 h, even after a scanner that meets the floor is provisioned.","status":"resolved"}
+- rf:tests | low | scripts/gh/git-gh-checks-failed.ts:65 | 2026-11-10 | #7147
+- rf:tests | low | scripts/gh/git-gh-checks-failed.ts:65 | 2026-11-10 | #7147
+- rf:project-conventions | low | scripts/gh/git-gh-checks-failed.ts:62 | 2026-11-10 | #7147
+- rb:2026-11-10 | #7147
+- rf:bug-risks | medium | scripts/gh/git-gh-checks-failed.ts:29 | 2026-11-10 | #7147 | fixed
+- rf:tests | low | scripts/gh/git-gh-checks-failed.test.ts:109 | 2026-11-10 | #7147 | fixed
+- rx:{"round":"a185013e-07c6-4377-b43f-ded904ae1f4c","category":"bug-risks","severity":"medium","file":"scripts/gh/git-gh-checks-failed.ts:29","disposition":"fixed","description":"An all-digit short sha matches PR_NUMBER_PATTERN first and is looked up as a pull request, so checks:failed 4815162 exits 1 on a 404 instead of listing that commit.","status":"resolved"}
+- rx:{"round":"a185013e-07c6-4377-b43f-ded904ae1f4c","category":"tests","severity":"low","file":"scripts/gh/git-gh-checks-failed.test.ts:109","disposition":"fixed","description":"The #N target form and the non-failure failed conclusions (timed_out, cancelled, action_required, startup_failure) have no test case.","status":"resolved"}
+- rf:none | none | - | 2026-11-10 | #7148
+- k:followup-unrelated-test-rerun | d1 | 2026-11-10 | scripts/gh/gh-usage-log.test.ts | followup reran Unit Tests (6/6); failed outside the change: pure scripts/gh/gh-usage-log.test.ts > gh_usage_log.append — the lines > keeps only the newest lines past its cap
+- rb:2026-11-10 | #7148
+- rf:bug-risks | medium | scripts/version/latest-scope-cli.ts:112 | 2026-11-10 | #7148 | fixed
+- rf:comments | low | docs/how-to/update-dependencies.md:19 | 2026-11-10 | #7148 | fixed
+- rx:{"round":"986682c6-6754-4ea7-9e20-81d4055df026","category":"bug-risks","severity":"medium","file":"scripts/version/latest-scope-cli.ts:112","disposition":"fixed","description":"josh latest now exits 1 on a moved override, so latest:if-required reports josh latest failed, keeps the stash and never pops or prints PIN_MOVED.","status":"resolved"}
+- rx:{"round":"986682c6-6754-4ea7-9e20-81d4055df026","category":"comments","severity":"low","file":"docs/how-to/update-dependencies.md:19","disposition":"fixed","description":"the check-it-worked line still says the last overrides line of josh latest reads unchanged rather than overrides: keep, and omits the new non-zero exit.","status":"resolved"}
+- rf:none | none | - | 2026-11-10 | #7150
+- rf:bug-risks | low | scripts/run/merge/run-merge-github-limit.ts:81 | 2026-11-10 | #7150
+- rf:none | none | - | 2026-11-10 | #7159
+- rb:2026-11-10 | #7159
+- rf:tests | low | scripts/lane/lane-hand-back-hold.test.ts:47 | 2026-11-10 | #7159 | fixed
+- rx:{"round":"3f278ed6-341a-47c5-8d68-bad3b78eba31","category":"tests","severity":"low","file":"scripts/lane/lane-hand-back-hold.test.ts:47","disposition":"fixed","description":"The \"writes nothing in a test run\" case only asserts mark resolves, so it still passes if the VITEST guard is removed and a real mark is written.","status":"resolved"}
+- ri:bug-risks | medium | scripts/lane/lane-gap-stats.ts:98 | 2026-11-10 | #7159 | fixed
+- rf:none | none | - | 2026-11-10 | #7160
+- rb:2026-11-10 | #7162
+- rf:bug-risks | low | .claude/skills/dependency-update/SKILL.md:22 | 2026-11-10 | #7162 | fixed
+- rx:{"round":"2eba6264-bfc2-4050-87b7-34870cd62b8e","category":"bug-risks","severity":"low","file":".claude/skills/dependency-update/SKILL.md:22","disposition":"fixed","description":"\"print it last\" is inaccurate for josh latest:if-required, whose judge/stop line follows the overrides verdict.","status":"resolved"}
+- rf:none | none | - | 2026-11-10 | #7171
+- rf:none | none | - | 2026-11-10 | #7171
+- rf:assumptions | low | scripts/run/board/run-board-render-condition.ts:44 | 2026-11-11 | #7181
+- rf:project-conventions | low | scripts/run/board/run-board-render-condition.ts:58 | 2026-11-11 | #7181
+- rf:project-conventions | low | scripts/run/board/run-board-render-condition.ts:8 | 2026-11-11 | #7181
+- ri:none | none | - | 2026-11-11 | #7181
+- rf:none | none | - | 2026-11-11 | #7182
+- ri:bug-risks | high | scripts/backlog/backlog-drive-split-unit.ts:58 | 2026-11-11 | #7182 | fixed
+- ri:bug-risks | medium | scripts/backlog/backlog-drive-split-unit.ts:72 | 2026-11-11 | #7182 | fixed
+- ri:bug-risks | low | scripts/backlog/backlog-drive-split-unit.ts:46 | 2026-11-11 | #7182 | fixed
+- ri:performance | low | scripts/backlog/backlog-drive-launch-pass.ts:104 | 2026-11-11 | #7182 | fixed
+- ri:comments | low | scripts/backlog/backlog-next-size.ts:18 | 2026-11-11 | #7182 | fixed
+- rb:2026-11-11 | #7182
+- rf:bug-risks | medium | scripts/backlog/backlog-drive-launch.ts:89 | 2026-11-11 | #7182 | fixed
+- rf:performance | low | scripts/backlog/backlog-drive-launch-pass.ts:117 | 2026-11-11 | #7182 | fixed
+- rf:comments | low | scripts/backlog/backlog-drive-launch.ts:73 | 2026-11-11 | #7182 | fixed
+- rx:{"round":"2819764d-a338-4f7a-bda3-fa1ece138b50","category":"bug-risks","severity":"medium","file":"scripts/backlog/backlog-drive-launch.ts:89","disposition":"fixed","description":"Ownership is asserted once before a minutes-long split-only unit, so a superseded driver can still open the lane afterwards; re-assert the owner after the unit answers launch.","status":"resolved"}
+- rx:{"round":"2819764d-a338-4f7a-bda3-fa1ece138b50","category":"performance","severity":"low","file":"scripts/backlog/backlog-drive-launch-pass.ts:117","disposition":"fixed","description":"A split-only unit holds the whole pass for its duration, so no new lanes open and no merges are acted on meanwhile.","status":"resolved"}
+- rx:{"round":"2819764d-a338-4f7a-bda3-fa1ece138b50","category":"comments","severity":"low","file":"scripts/backlog/backlog-drive-launch.ts:73","disposition":"fixed","description":"The split-only unit clause sits on measured() though the unit runs in opened(), and the is_settled comment omits split.","status":"resolved"}
+- rb:2026-11-11 | #7182
+- rf:bug-risks | medium | scripts/backlog/backlog-drive-split-unit.ts:47 | 2026-11-11 | #7182
+- rf:assumptions | low | scripts/backlog/backlog-drive-split-unit.ts:28 | 2026-11-11 | #7182
+- rx:{"round":"0d84c38c-9985-41a3-b7e9-ead2ffa2501a","previous":"2819764d-a338-4f7a-bda3-fa1ece138b50","category":"bug-risks","severity":"medium","file":"scripts/backlog/backlog-drive-split-unit.ts:47","description":"launch_all runs a pass's launches side by side, so two over-bar issues get two split-only units in the driver's one checkout, and the filing the brief points to (split-assessment.md: --body-file .josh/tmp/body.md) lets one unit's child body overwrite the other's before issue:file reads it, filing a child under the wrong parent's content; name a per-issue body path such as .josh/tmp/split-<issue>-<k>.md in the brief (left unfixed: the session-scope hook refused the edit). other sites: .claude/skills/workflow-commands/split-assessment.md:84","status":"new"}
+- rx:{"round":"0d84c38c-9985-41a3-b7e9-ead2ffa2501a","previous":"2819764d-a338-4f7a-bda3-fa1ece138b50","category":"assumptions","severity":"low","file":"scripts/backlog/backlog-drive-split-unit.ts:28","description":"the unit promotes via epic --promote where Issue #7182's expected result says run:split; the deviation is reasoned in the file comment but not recorded on the Issue, so a reader of the acceptance criteria meets a mismatch; no failure scenario — the epic label and children satisfy the criteria.","status":"new"}
+- rx:{"round":"0d84c38c-9985-41a3-b7e9-ead2ffa2501a","previous":"2819764d-a338-4f7a-bda3-fa1ece138b50","category":"bug-risks","severity":"medium","file":"scripts/backlog/backlog-drive-launch.ts:89","description":"Ownership is asserted once before a minutes-long split-only unit, so a superseded driver can still open the lane afterwards; re-assert the owner after the unit answers launch.","disposition":"fixed","status":"resolved"}
+- rx:{"round":"0d84c38c-9985-41a3-b7e9-ead2ffa2501a","previous":"2819764d-a338-4f7a-bda3-fa1ece138b50","category":"performance","severity":"low","file":"scripts/backlog/backlog-drive-launch-pass.ts:117","description":"A split-only unit holds the whole pass for its duration, so no new lanes open and no merges are acted on meanwhile.","disposition":"fixed","status":"resolved"}
+- rx:{"round":"0d84c38c-9985-41a3-b7e9-ead2ffa2501a","previous":"2819764d-a338-4f7a-bda3-fa1ece138b50","category":"comments","severity":"low","file":"scripts/backlog/backlog-drive-launch.ts:73","description":"The split-only unit clause sits on measured() though the unit runs in opened(), and the is_settled comment omits split.","disposition":"fixed","status":"resolved"}
+- rf:comments | low | scripts/lane/lane-plan-size.ts:351 | 2026-11-11 | #7183
+- rf:project-conventions | low | docs/maintainers/lane-limit-measurement.md:266 | 2026-11-11 | #7183
+- ri:bug-risks | medium | scripts/lane/lane-split-stats.ts:38 | 2026-11-11 | #7183 | fixed
+- rb:2026-11-11 | #7183
+- rf:bug-risks | medium | scripts/split/split-resolution.ts:42 | 2026-11-11 | #7183 | fixed
+- rf:project-conventions | medium | .claude/skills/workflow-commands/backlogrun-park.md:127 | 2026-11-11 | #7183 | fixed
+- rf:project-conventions | low | .claude/skills/workflow-commands/split-assessment.md:23 | 2026-11-11 | #7183 | fixed
+- rx:{"round":"880f6d54-6de7-4b3a-a2ab-61f29014c90e","category":"bug-risks","severity":"medium","file":"scripts/split/split-resolution.ts:42","disposition":"fixed","description":"is_split_clear reads only the named --found-during, so a --route split filing in a dispatched lane that omits it is inferred as the lane's own split child and passes the refusal.","status":"resolved"}
+- rx:{"round":"880f6d54-6de7-4b3a-a2ab-61f29014c90e","category":"project-conventions","severity":"medium","file":".claude/skills/workflow-commands/backlogrun-park.md:127","disposition":"fixed","description":"Splitting a child mid-run still tells a dispatched child to file route:split children, contradicting the new rule that a dispatched lane is never split.","status":"resolved"}
+- rx:{"round":"880f6d54-6de7-4b3a-a2ab-61f29014c90e","category":"project-conventions","severity":"low","file":".claude/skills/workflow-commands/split-assessment.md:23","disposition":"fixed","description":"The first lane:plan line omits that a dispatched lane's first plan answers clear with a size warning.","status":"resolved"}
+- rb:2026-11-11 | #7183
+- rf:none | none | - | 2026-11-11 | #7183
+- rx:{"round":"46f8fcf5-bd55-4435-8958-a17262362d64","previous":"880f6d54-6de7-4b3a-a2ab-61f29014c90e","category":"bug-risks","severity":"medium","file":"scripts/split/split-resolution.ts:42","description":"is_split_clear reads only the named --found-during, so a --route split filing in a dispatched lane that omits it is inferred as the lane's own split child and passes the refusal.","disposition":"fixed","status":"resolved"}
+- rx:{"round":"46f8fcf5-bd55-4435-8958-a17262362d64","previous":"880f6d54-6de7-4b3a-a2ab-61f29014c90e","category":"project-conventions","severity":"medium","file":".claude/skills/workflow-commands/backlogrun-park.md:127","description":"Splitting a child mid-run still tells a dispatched child to file route:split children, contradicting the new rule that a dispatched lane is never split.","disposition":"fixed","status":"resolved"}
+- rx:{"round":"46f8fcf5-bd55-4435-8958-a17262362d64","previous":"880f6d54-6de7-4b3a-a2ab-61f29014c90e","category":"project-conventions","severity":"low","file":".claude/skills/workflow-commands/split-assessment.md:23","description":"The first lane:plan line omits that a dispatched lane's first plan answers clear with a size warning.","disposition":"fixed","status":"resolved"}
+- rb:2026-11-11 | #7183
+- rf:project-conventions | medium | docs/josh-commands-lane.md:428 | 2026-11-11 | #7183 | fixed
+- rf:comments | low | scripts/lane/lane-plan-size.ts:351 | 2026-11-11 | #7183
+- rf:project-conventions | low | docs/maintainers/lane-limit-measurement.md:266 | 2026-11-11 | #7183
+- rx:{"round":"462f3855-88d5-4a7e-8162-069ccd8c04bb","previous":"46f8fcf5-bd55-4435-8958-a17262362d64","category":"project-conventions","severity":"medium","file":"docs/josh-commands-lane.md:428","disposition":"fixed","description":"The lane:plan reference still says every first plan over its bar answers split and every re-plan prints a size warning, so a dispatched child reading it expects split and plans a --route split filing that issue:file now refuses; added the dispatched-lane rule. other sites: none","status":"resolved"}
+- rx:{"round":"462f3855-88d5-4a7e-8162-069ccd8c04bb","previous":"46f8fcf5-bd55-4435-8958-a17262362d64","category":"comments","severity":"low","file":"scripts/lane/lane-plan-size.ts:351","description":"waiver_text tells a dispatched lane its overrun was \"recorded and noted on the ledger\", but its first plan now notes nothing (lane-plan-check.ts:58); no failure scenario — the misstatement changes no step the child takes, which finishes the Issue as the text says.","status":"new"}
+- rx:{"round":"462f3855-88d5-4a7e-8162-069ccd8c04bb","previous":"46f8fcf5-bd55-4435-8958-a17262362d64","category":"project-conventions","severity":"low","file":"docs/maintainers/lane-limit-measurement.md:266","description":"The measurement page names neither the pre-split misses column nor the miss table lane:stats now prints, and still says issue:file --route split \"from a lane\" writes split-filed; no failure scenario — the page is maintainer rationale, not an instruction a lane follows.","status":"new"}
+- rf:bug-risks | low | scripts/run/merge/run-merge-health.ts:83 | 2026-11-11 | #7184
+- ri:bug-risks | low | scripts/run/merge/run-merge-health.ts:83 | 2026-11-11 | #7184 | fixed
+- ri:performance | low | scripts/backlog/backlog-next-size.ts:105 | 2026-11-11 | #7184 | fixed
+- rb:2026-11-11 | #7184
+- rf:bug-risks | medium | scripts/issue/issue-cap-files.ts:88 | 2026-11-11 | #7184 | fixed
+- rf:performance | low | scripts/backlog/backlog-next-size.ts:105 | 2026-11-11 | #7184 | false-positive
+- rf:project-conventions | low | scripts/issue/issue-cap-files.ts:22 | 2026-11-11 | #7184 | fixed
+- rx:{"round":"2a837999-210c-405e-82a2-1a9c4b4d35d6","category":"bug-risks","severity":"medium","file":"scripts/issue/issue-cap-files.ts:88","disposition":"fixed","description":"the refile route was refused again until the refactor merged; a 先行リファクタ: #<N> declaration now passes it","status":"resolved"}
+- rx:{"round":"2a837999-210c-405e-82a2-1a9c4b4d35d6","category":"performance","severity":"low","file":"scripts/backlog/backlog-next-size.ts:105","disposition":"false-positive","description":"the offer-time warning is an acceptance criterion and its probe is one batched, bounded, failure-safe run","status":"resolved"}
+- rx:{"round":"2a837999-210c-405e-82a2-1a9c4b4d35d6","category":"project-conventions","severity":"low","file":"scripts/issue/issue-cap-files.ts:22","disposition":"fixed","description":"CODE_FILE left out the mjs/cjs/tsx variants max-lines also limits","status":"resolved"}
+- rf:tests | low | scripts/backlog/backlog-next.ts:354 | 2026-11-11 | #7185
+- ri:none | none | - | 2026-11-11 | #7185
+- rb:2026-11-11 | #7185
+- rf:tests | low | scripts/backlog/backlog-next.ts:358 | 2026-11-11 | #7185 | fixed
+- rx:{"round":"92ef088a-c3c4-4943-9060-c650234ec6dc","category":"tests","severity":"low","file":"scripts/backlog/backlog-next.ts:358","disposition":"fixed","description":"The gate_scope(context, read) wiring has no test, so reverting it to the idle default leaves every new test green.","status":"resolved"}
+- rf:none | none | - | 2026-11-11 | #7186
+- ri:bug-risks | medium | scripts/josh/josh-commands-ai.ts:577 | 2026-11-11 | #7186 | fixed
+- rb:2026-11-11 | #7186
+- rf:tests | medium | scripts/lane/lane-breakdown-cli.ts:91 | 2026-11-11 | #7186 | fixed
+- rf:project-conventions | low | scripts/lane/lane-timeline.ts:132 | 2026-11-11 | #7186 | fixed
+- rf:bug-risks | medium | scripts/josh/josh-commands-ai.ts:577 | 2026-11-11 | #7186 | fixed
+- rx:{"round":"35291865-c0f5-4779-ae27-92804917b4dd","category":"tests","severity":"medium","file":"scripts/lane/lane-breakdown-cli.ts:91","disposition":"fixed","description":"no test drove run([issue, --timeline]); added print, no-merge and unknown-flag tests in lane-breakdown-cli.test.ts","status":"resolved"}
+- rx:{"round":"35291865-c0f5-4779-ae27-92804917b4dd","category":"project-conventions","severity":"low","file":"scripts/lane/lane-timeline.ts:132","disposition":"fixed","description":"stage_rows re-derived the net formula; Breakdown.segments now carries net_ms from lane-breakdown.ts","status":"resolved"}
+- rx:{"round":"35291865-c0f5-4779-ae27-92804917b4dd","category":"bug-risks","severity":"medium","file":"scripts/josh/josh-commands-ai.ts:577","disposition":"fixed","description":"registry declared only <issue>; added [--timeline], its flag and example, regenerated the catalog and usage block","status":"resolved"}
+- ri:none | none | - | 2026-11-11 | #7196
+- rb:2026-11-11 | #7196
+- rf:none | none | - | 2026-11-11 | #7196
+- rb:2026-11-11 | #7198
+- rf:security | medium | scripts/rules/keychain-read.ts:115 | 2026-11-11 | #7198 | fixed
+- rf:security | low | scripts/rules/keychain-read.ts:114 | 2026-11-11 | #7198 | fixed
+- rx:{"round":"85735f97-9152-469f-a812-0c18fde545bd","category":"security","severity":"medium","file":"scripts/rules/keychain-read.ts:115","disposition":"fixed","description":"Clustered getopt flags (security -qi, security -qp x dump-keychain) bypass the exact-match -i and -p checks, so the keychain read is not refused.","status":"resolved"}
+- rx:{"round":"85735f97-9152-469f-a812-0c18fde545bd","category":"security","severity":"low","file":"scripts/rules/keychain-read.ts:114","disposition":"fixed","description":"xcrun security dump-keychain is left alone; unverified whether xcrun reaches the system security tool.","status":"resolved"}
+- rb:2026-11-11 | #7198
+- rf:security | medium | scripts/rules/keychain-read.ts:11 | 2026-11-11 | #7198
+- rf:security | medium | scripts/rules/launched-call.ts:37 | 2026-11-11 | #7198
+- rx:{"round":"2cce2080-cc1b-4e9b-85e0-c8ec94f2f08f","previous":"85735f97-9152-469f-a812-0c18fde545bd","category":"security","severity":"medium","file":"scripts/rules/keychain-read.ts:11","description":"VALUE_CLUSTER /^-[a-z]*p$/ also matches a `-p` whose prompt is attached and ends in `p` (`security -pstop dump-keychain`), so subcommand_index skips `dump-keychain` as the prompt value, finds no subcommand and the keychain read is not refused (getopt takes the rest of `-pstop` as the prompt); fix with /^-[a-oq-z]*p$/u and add the case to keychain-read.test.ts — other sites: scripts/rules/keychain-read.ts:30","status":"new"}
+- rx:{"round":"2cce2080-cc1b-4e9b-85e0-c8ec94f2f08f","previous":"85735f97-9152-469f-a812-0c18fde545bd","category":"security","severity":"medium","file":"scripts/rules/launched-call.ts:37","description":"the xcrun launcher lists only `--sdk` and `--toolchain` as value flags, but xcrun also accepts the single-dash `-sdk` / `-toolchain`, so `xcrun -sdk macosx security dump-keychain` takes `macosx` as the program and the keychain read is not refused (round 1 xcrun finding only partly closed); add `-sdk` and `-toolchain` to the value flags and a test in egress-guard.test.ts — other sites: scripts/rules/egress-guard.test.ts:206","status":"new"}
+- rx:{"round":"2cce2080-cc1b-4e9b-85e0-c8ec94f2f08f","previous":"85735f97-9152-469f-a812-0c18fde545bd","category":"security","severity":"medium","file":"scripts/rules/keychain-read.ts:115","description":"Clustered getopt flags (security -qi, security -qp x dump-keychain) bypass the exact-match -i and -p checks, so the keychain read is not refused.","disposition":"fixed","status":"resolved"}
+- rx:{"round":"2cce2080-cc1b-4e9b-85e0-c8ec94f2f08f","previous":"85735f97-9152-469f-a812-0c18fde545bd","category":"security","severity":"low","file":"scripts/rules/keychain-read.ts:114","description":"xcrun security dump-keychain is left alone; unverified whether xcrun reaches the system security tool.","disposition":"fixed","status":"resolved"}
+- rb:2026-11-11 | #7200
+- rf:project-conventions | medium | docs/init.md:117 | 2026-11-11 | #7200 | fixed
+- rx:{"round":"bf4de896-637d-4d78-bc80-fcbf3be24cc2","category":"project-conventions","severity":"medium","file":"docs/init.md:117","disposition":"fixed","description":"The \"Run from outside the project\" step 1 lists what the bootstrap writes before installing but omits the minimumReleaseAge it now writes into pnpm-workspace.yaml.","status":"resolved"}
+- rf:project-conventions | low | docs/maintainers/wip-cap-rationale.md:112 | 2026-11-11 | #7201
+- rf:tests | low | scripts/issue/issue-file-cli-source.test.ts | 2026-11-11 | #7201
+- rb:2026-11-11 | #7201
+- rf:bug-risks | medium | scripts/issue/issue-file-cli.test.ts:116 | 2026-11-11 | #7201 | fixed
+- rf:tests | medium | scripts/issue/issue-file-cli.test.ts:270 | 2026-11-11 | #7201 | fixed
+- rf:project-conventions | low | docs/environment-variables.md:113 | 2026-11-11 | #7201 | fixed
+- rx:{"round":"4df40aa9-5b84-4c85-a0f8-670bf3bcec55","category":"bug-risks","severity":"medium","file":"scripts/issue/issue-file-cli.test.ts:116","disposition":"fixed","description":"The WIP-cap CLI suite reads the ambient JOSH_WIP_CAP unstubbed, so a lane inheriting JOSH_WIP_CAP=off or a typo fails the held-filing tests.","status":"resolved"}
+- rx:{"round":"4df40aa9-5b84-4c85-a0f8-670bf3bcec55","category":"tests","severity":"medium","file":"scripts/issue/issue-file-cli.test.ts:270","disposition":"fixed","description":"No CLI test covers is_wip_clear refusing a malformed JOSH_WIP_CAP, so a fall back to the default would pass the suite.","status":"resolved"}
+- rx:{"round":"4df40aa9-5b84-4c85-a0f8-670bf3bcec55","category":"project-conventions","severity":"low","file":"docs/environment-variables.md:113","disposition":"fixed","description":"The new env row and .env.example restate the number 30 that wip-cap.md says only DEFAULT_WIP_CAP and wip-cap.md may state.","status":"resolved"}
+- rf:comments | low | docs/josh-commands-lane.md:256 | 2026-11-11 | #7202
+- ri:bug-risks | low | scripts/followup/followup-ci-path.ts:14 | 2026-11-11 | #7202 | fixed
+- ri:comments | low | docs/josh-commands-lane.md:256 | 2026-11-11 | #7202 | fixed
+- rb:2026-11-11 | #7202
+- rf:bug-risks | medium | scripts/followup/followup-ci-path.ts:62 | 2026-11-11 | #7202 | fixed
+- rx:{"round":"707f3590-b338-4b6a-9889-79a8940da7a1","category":"bug-risks","severity":"medium","file":"scripts/followup/followup-ci-path.ts:62","disposition":"fixed","description":"A check already failed at the first poll never enters check_ms, so its rerun is not marked has_rerun and its contaminated time enters the critical-path median and maximum.","status":"resolved"}
+- rf:none | none | - | 2026-11-11 | #7203
+- rf:performance | low | scripts/lane/lane-setup.ts:53 | 2026-11-11 | #7203
+- ri:performance | low | scripts/lane/lane-setup.ts:178 | 2026-11-11 | #7203 | fixed
+- rf:bug-risks | medium | docs/init.md:318 | 2026-11-11 | #7204 | fixed
+- rf:tests | medium | scripts/lint/format.ts:121 | 2026-11-11 | #7204 | fixed
+- rf:none | none | - | 2026-11-11 | #7204
+- rf:bug-risks | medium | scripts/init/init-logic.ts:90 | 2026-11-11 | #7205
+- rb:2026-11-11 | #7205
+- rf:bug-risks | medium | scripts/gate/project-step-reuse.ts:24 | 2026-11-11 | #7205 | fixed
+- rf:bug-risks | medium | scripts/gate/check-reuse.ts:155 | 2026-11-11 | #7205 | fixed
+- rf:project-conventions | low | scripts/gate/project-step-reuse.ts:23 | 2026-11-11 | #7205 | fixed
+- rf:tests | low | scripts/gate/project-step-reuse.test.ts:78 | 2026-11-11 | #7205 | fixed
+- rx:{"round":"d7ad6b61-5177-426c-8fc7-60c36bebfe33","category":"bug-risks","severity":"medium","file":"scripts/gate/project-step-reuse.ts:24","disposition":"fixed","description":"A bare directory pattern like `crates/core` never matches files under it, so the step stays reused over edits inside that crate; also match `${pattern}/**` as change-scope-action.ts:41 does.","status":"resolved"}
+- rx:{"round":"d7ad6b61-5177-426c-8fc7-60c36bebfe33","category":"bug-risks","severity":"medium","file":"scripts/gate/check-reuse.ts:155","disposition":"fixed","description":"A step name containing `/` gives a record path in a missing temp subdirectory; the write throws and the shared try drops every later step's record too; encode the label or reject `/` and `..` in the name schema.","status":"resolved"}
+- rx:{"round":"d7ad6b61-5177-426c-8fc7-60c36bebfe33","category":"project-conventions","severity":"low","file":"scripts/gate/project-step-reuse.ts:23","disposition":"fixed","description":"`touches` near-copies the `matches` helper in change-scope-action.ts without its subtree half; share one helper.","status":"resolved"}
+- rx:{"round":"d7ad6b61-5177-426c-8fc7-60c36bebfe33","category":"tests","severity":"low","file":"scripts/gate/project-step-reuse.test.ts:78","disposition":"fixed","description":"No case covers a bare-directory pattern or a step name containing `/`, the two inputs behind the medium findings.","status":"resolved"}
+- rf:tests | medium | scripts/gate/project-gate-steps.ts:142 | 2026-11-11 | #7206 | fixed
+- rf:none | none | - | 2026-11-11 | #7206
+- rb:2026-11-11 | #7207
+- rf:project-conventions | low | scripts/gate/gate-checks.ts:31 | 2026-11-11 | #7207 | fixed
+- rx:{"round":"87c9d98c-0c16-45a3-8079-cfa3d63db4b2","category":"project-conventions","severity":"low","file":"scripts/gate/gate-checks.ts:31","disposition":"fixed","description":"The moved comment cites gate-plan.test.ts for the kit-only pin (it is gate-plan-selection.test.ts:111) and names RESERVED_CORES without saying it now lives in gate-plan.ts.","status":"resolved"}
+- rf:project-conventions | low | docs/josh-commands.md:54 | 2026-11-11 | #7208
+- rb:2026-11-11 | #7208
+- rf:bug-risks | medium | scripts/lib/package-manifest.ts:141 | 2026-11-11 | #7208 | fixed
+- rf:performance | low | scripts/gate/project-gate-steps.ts:84 | 2026-11-11 | #7208 | fixed
+- rx:{"round":"0fccdc7b-a56d-4e72-8218-b1ce03012cdf","category":"bug-risks","severity":"medium","file":"scripts/lib/package-manifest.ts:141","disposition":"fixed","description":"Project step names may collide with fixed check labels like lint, so a passing project step writes the fixed check green record and a failing ESLint run is later reused as green.","status":"resolved"}
+- rx:{"round":"0fccdc7b-a56d-4e72-8218-b1ce03012cdf","category":"performance","severity":"low","file":"scripts/gate/project-gate-steps.ts:84","disposition":"fixed","description":"Project steps bypass the machine-wide core budget that the docs say every check waits for.","status":"resolved"}
+- rf:none | none | - | 2026-11-11 | #7209
+- ri:none | none | - | 2026-11-11 | #7209
+- rb:2026-11-11 | #7209
+- rf:project-conventions | low | scripts/issue/enforcement-lint.ts:14 | 2026-11-11 | #7209 | fixed
+- rx:{"round":"7e4accc4-0dcb-4f00-ae14-bbe7091715f7","category":"project-conventions","severity":"low","file":"scripts/issue/enforcement-lint.ts:14","disposition":"fixed","description":"NONE_VALUE 'なし' is a fixed declaration value left outside issue-body-keys VALUES, though issue-template.md now calls the table the single source of fixed values.","status":"resolved"}
+- rf:none | none | - | 2026-11-11 | #7210
+- rb:2026-11-11 | #7210
+- rf:bug-risks | medium | scripts/issue/size-estimate.ts:88 | 2026-11-11 | #7210
+- rf:bug-risks | medium | scripts/issue/issue-plan-notify.ts:29 | 2026-11-11 | #7210
+- rx:{"round":"9c23cad5-350e-4243-97b9-d84c19220c08","category":"bug-risks","severity":"medium","file":"scripts/issue/size-estimate.ts:88","description":"restated slices the raw line at indexOf(PREFIX) while the index comes from canonical lines, so an other-language size line is written back garbled","status":"new"}
+- rx:{"round":"9c23cad5-350e-4243-97b9-d84c19220c08","category":"bug-risks","severity":"medium","file":"scripts/issue/issue-plan-notify.ts:29","description":"fence_free_lines now returns lines translated into the session language, and this display reader sends them to Telegram as written","status":"new"}
+- ri:bug-risks | medium | scripts/issue/size-estimate.ts:88 | 2026-11-11 | #7210 | fixed
+- rf:none | none | - | 2026-11-11 | #7211
+- rb:2026-11-11 | #7211
+- rf:bug-risks | medium | prompts/collaboration-workflow/issue-template.en.md:62 | 2026-11-11 | #7211 | fixed
+- rf:bug-risks | medium | prompts/collaboration-workflow/issue-template.en.md:9 | 2026-11-11 | #7211 | fixed
+- rf:tests | low | scripts/issue/issue-template-en.test.ts:79 | 2026-11-11 | #7211 | fixed
+- rx:{"round":"53684810-1272-4ae7-993a-b7ff3df64cfb","category":"bug-risks","severity":"medium","file":"prompts/collaboration-workflow/issue-template.en.md:62","disposition":"fixed","description":"The en template's Expected effect labels (Hit rate / Gain per hit / Loss per miss / Source) are rejected by expected-effect-lint.ts, which hard-codes the Japanese labels, so a body filled in from the template fails issue:lint.","status":"resolved"}
+- rx:{"round":"53684810-1272-4ae7-993a-b7ff3df64cfb","category":"bug-risks","severity":"medium","file":"prompts/collaboration-workflow/issue-template.en.md:9","disposition":"fixed","description":"The template writes Cause: unknown (<reason>) with ASCII parentheses, but defect-origin-line.ts accepts only full-width parentheses, so issue:lint refuses it as a malformed origin line.","status":"resolved"}
+- rx:{"round":"53684810-1272-4ae7-993a-b7ff3df64cfb","category":"tests","severity":"low","file":"scripts/issue/issue-template-en.test.ts:79","disposition":"fixed","description":"The test never lints the template's example lines under the en session language, so lines the lint rejects pass the gate.","status":"resolved"}
+- rf:none | none | - | 2026-11-11 | #7213
+- rf:none | none | - | 2026-11-11 | #7213
+- ri:none | none | - | 2026-11-11 | #7213
+- rb:2026-11-11 | #7218
+- rf:security | low | scripts/fresh-machine/fresh-machine-patterns.ts:101 | 2026-11-11 | #7218
+- rf:comments | low | docs/maintainers/fresh-machine.md:90 | 2026-11-11 | #7218 | fixed
+- rx:{"round":"fb79ef17-9985-4010-ae55-9aba1cdfdf60","category":"security","severity":"low","file":"scripts/fresh-machine/fresh-machine-patterns.ts:101","description":"not fixed here: limiting GH_TOKEN to repository-creating patterns changes the scenario spec shape; returned to the parent as an observation security:low:scripts/fresh-machine/fresh-machine-patterns.ts:101 — requires_github is set only for git, yet it makes the run require and forward the host GH_TOKEN into a container running npm install scripts.","status":"new"}
+- rx:{"round":"fb79ef17-9985-4010-ae55-9aba1cdfdf60","category":"comments","severity":"low","file":"docs/maintainers/fresh-machine.md:90","disposition":"fixed","description":"re-wrapped the probes bullet to 100 columns comments:low:docs/maintainers/fresh-machine.md:90 — the edited probes bullet is not re-wrapped to the 100-column width the file keeps.","status":"resolved"}
+- rf:none | none | - | 2026-11-11 | #7224
+- rb:2026-11-11 | #7224
+- rf:bug-risks | medium | .env.example:171 | 2026-11-11 | #7224 | fixed
+- rf:tests | medium | scripts/document/environment-example-fixture.ts:154 | 2026-11-11 | #7224 | fixed
+- rf:tests | low | scripts/document/environment-example-fixture.ts:140 | 2026-11-11 | #7224 | fixed
+- rf:comments | low | .env.example:12 | 2026-11-11 | #7224 | fixed
+- rx:{"round":"f56cd365-489f-4a99-a793-f01b4ad797f4","category":"bug-risks","severity":"medium","file":".env.example:171","disposition":"fixed","description":"JOSH_TEMP_ROOT is offered for .env without a caveat, so .env-loading commands and real-env-only ones (run:progress, gate) use different run-state and core-budget roots.","status":"resolved"}
+- rx:{"round":"f56cd365-489f-4a99-a793-f01b4ad797f4","category":"tests","severity":"medium","file":"scripts/document/environment-example-fixture.ts:154","disposition":"fixed","description":"The default check is a bare startsWith, so a stale example default such as 12 still passes when the docs say 1.","status":"resolved"}
+- rx:{"round":"f56cd365-489f-4a99-a793-f01b4ad797f4","category":"tests","severity":"low","file":"scripts/document/environment-example-fixture.ts:140","disposition":"fixed","description":"value_drift takes tokens from the whole row prose, so a common word such as on passes as an accepted value.","status":"resolved"}
+- rx:{"round":"f56cd365-489f-4a99-a793-f01b4ad797f4","category":"comments","severity":"low","file":".env.example:12","disposition":"fixed","description":"The header says every key kit reads from .env is listed, but the legacy JOSH_LANE_MODEL/EFFORT aliases are left out.","status":"resolved"}
+- rb:2026-11-11 | #7226
+- rf:bug-risks | low | scripts/gh/git-gh-issue.ts:157 | 2026-11-11 | #7226 | fixed
+- rf:bug-risks | low | scripts/gh/git-gh-issue-label-page.test.ts:9 | 2026-11-11 | #7226 | fixed
+- rx:{"round":"2a84963d-81c0-4df4-b776-49e5c9fb2a1b","category":"bug-risks","severity":"low","file":"scripts/gh/git-gh-issue.ts:157","disposition":"fixed","description":"issue_list_label_first_page answers for page 1 only, so a change past 100 rows reads as unchanged while the comment claims the whole listing.","status":"resolved"}
+- rx:{"round":"2a84963d-81c0-4df4-b776-49e5c9fb2a1b","category":"bug-risks","severity":"low","file":"scripts/gh/git-gh-issue-label-page.test.ts:9","disposition":"fixed","description":"the shared-ETag claim holds only on REST; the default GraphQL listing writes no ETag, so the probe reads as changed.","status":"resolved"}
+- rf:none | none | - | 2026-11-11 | #7227
+- ri:performance | medium | scripts/backlog/backlog-drive-listing.ts:166 | 2026-11-11 | #7227 | fixed
+- rb:2026-11-11 | #7227
+- rf:bug-risks | medium | scripts/backlog/backlog-drive-listing.ts:12 | 2026-11-11 | #7227 | fixed
+- rx:{"round":"d3a90ef9-89db-42fe-929a-f9dc6675064f","category":"bug-risks","severity":"medium","file":"scripts/backlog/backlog-drive-listing.ts:12","disposition":"fixed","description":"Any ETag change of the auto-ok first page, including a running lane's own comments or label edits, triggers a backlog:next ask every 10 s instead of only a newly listed issue.","status":"resolved"}
+- rb:2026-11-11 | #7227
+- rf:none | none | - | 2026-11-11 | #7227
+- rx:{"round":"3b8291ec-7b46-46b5-b20a-629051071aed","previous":"d3a90ef9-89db-42fe-929a-f9dc6675064f","category":"bug-risks","severity":"medium","file":"scripts/backlog/backlog-drive-listing.ts:12","description":"Any ETag change of the auto-ok first page, including a running lane's own comments or label edits, triggers a backlog:next ask every 10 s instead of only a newly listed issue.","disposition":"fixed","status":"resolved"}
+- rf:comments | low | scripts/backlog/backlog-arrival.ts:200 | 2026-11-11 | #7229
+- ri:bug-risks | medium | scripts/backlog/backlog-arrival.ts:210 | 2026-11-11 | #7229 | fixed
+- ri:bug-risks | medium | scripts/backlog/backlog-arrival.ts:217 | 2026-11-11 | #7229 | fixed
+- ri:comments | low | scripts/backlog/backlog-stalled-detect.ts:167 | 2026-11-11 | #7229 | fixed
+- rb:2026-11-11 | #7229
+- rf:bug-risks | medium | scripts/backlog/backlog-arrival.ts:101 | 2026-11-11 | #7229 | false-positive
+- rf:bug-risks | medium | scripts/backlog/backlog-drive-listing.ts:28 | 2026-11-11 | #7229 | fixed
+- rf:comments | low | scripts/backlog/backlog-stalled-detect.ts:167 | 2026-11-11 | #7229 | fixed
+- rx:{"round":"18bbe004-f11b-4d4a-9ffd-4494a70049ea","category":"bug-risks","severity":"medium","file":"scripts/backlog/backlog-arrival.ts:101","disposition":"false-positive","description":"the Issue specifies a 304 listing reads no backlog and records observe_offerable only on read rounds; an unblock with no new number waits for the merge wake or the stall detector by that decision","status":"resolved"}
+- rx:{"round":"18bbe004-f11b-4d4a-9ffd-4494a70049ea","category":"bug-risks","severity":"medium","file":"scripts/backlog/backlog-drive-listing.ts:28","disposition":"fixed","description":"a failed first listing read now leaves an empty baseline, so the next read that answers counts its issues as new","status":"resolved"}
+- rx:{"round":"18bbe004-f11b-4d4a-9ffd-4494a70049ea","category":"comments","severity":"low","file":"scripts/backlog/backlog-stalled-detect.ts:167","disposition":"fixed","description":"the once-a-minute wording here, in backlog-arrival-added.ts and docs/josh-commands.md now matches the listing-gated ten-second probe","status":"resolved"}
+- ri:none | none | - | 2026-11-11 | #7234
+- rb:2026-11-11 | #7234
+- rf:none | none | - | 2026-11-11 | #7234
+- rf:tests | low | scripts/lib/poll.test.ts:253 | 2026-11-11 | #7237 | fixed
+- rf:tests | low | scripts/lib/poll.test.ts:253 | 2026-11-11 | #7237
+- rf:none | none | - | 2026-11-11 | #7238
+- rb:2026-11-11 | #7238
+- rf:bug-risks | high | scripts/gh/git-pr-checks-gate.ts:97 | 2026-11-11 | #7238 | fixed
+- rx:{"round":"f82fbb8e-bfb6-4dad-9190-1086f636a60c","category":"bug-risks","severity":"high","file":"scripts/gh/git-pr-checks-gate.ts:97","disposition":"fixed","description":"The gate reuses a stale BLOCKED (or base-drifted) snapshot on 304s once checks settle, so the merge-gate wait times out on a green CLEAN PR; reuse only while the rollup has a pending check.","status":"resolved"}
+- rf:none | none | - | 2026-11-11 | #7241
+- rf:none | none | - | 2026-11-11 | #7241
+- ri:none | none | - | 2026-11-11 | #7244
+- rb:2026-11-11 | #7244
+- rf:bug-risks | low | scripts/lane/lane-process-load.ts:113 | 2026-11-11 | #7244 | false-positive
+- rx:{"round":"bf991f97-f01a-436d-a0c6-5f6253578a22","category":"bug-risks","severity":"low","file":"scripts/lane/lane-process-load.ts:113","disposition":"false-positive","description":"A kind footprint sums only readable processes while rss and count sum all, so a mixed kind like other prints a partial footprint peak.","status":"resolved"}
+- rf:tests | medium | scripts/lint/eslint-daemon.calls.test.ts:75 | 2026-11-11 | #7245
+- ri:none | none | - | 2026-11-11 | #7245
+- rb:2026-11-11 | #7245
+- rf:bug-risks | low | scripts/lint/eslint-daemon-calls.ts:157 | 2026-11-11 | #7245 | fixed
+- rf:project-conventions | low | scripts/hooks/format-edited-file.ts:396 | 2026-11-11 | #7245 | fixed
+- rf:tests | low | scripts/lint/eslint-daemon.ts:31 | 2026-11-11 | #7245 | fixed
+- rx:{"round":"953e3d0e-71b8-4ef7-9f12-bd69c7d1ca4f","category":"bug-risks","severity":"low","file":"scripts/lint/eslint-daemon-calls.ts:157","disposition":"fixed","description":"Concurrent read-then-append can lose one call from the running total.","status":"resolved"}
+- rx:{"round":"953e3d0e-71b8-4ef7-9f12-bd69c7d1ca4f","category":"project-conventions","severity":"low","file":"scripts/hooks/format-edited-file.ts:396","disposition":"fixed","description":"Callers spell caller names as literals instead of eslint_daemon_calls.DAEMON_CALLER.","status":"resolved"}
+- rx:{"round":"953e3d0e-71b8-4ef7-9f12-bd69c7d1ca4f","category":"tests","severity":"low","file":"scripts/lint/eslint-daemon.ts:31","disposition":"fixed","description":"The borrowed-install guard in record_call has no test.","status":"resolved"}
+- rf:none | none | - | 2026-11-11 | #7246
+- ri:none | none | - | 2026-11-11 | #7246
+- rb:2026-11-11 | #7246
+- rf:tests | medium | scripts/hooks/format-edited-file.daemon.test.ts:40 | 2026-11-11 | #7246 | fixed
+- rf:bug-risks | low | scripts/lint/eslint-daemon.ts:324 | 2026-11-11 | #7246 | fixed
+- rf:project-conventions | low | scripts/lint/eslint-daemon.ts:323 | 2026-11-11 | #7246 | fixed
+- rx:{"round":"661ab092-a89f-4557-b1b6-b92d8aa0cd68","category":"tests","severity":"medium","file":"scripts/hooks/format-edited-file.daemon.test.ts:40","disposition":"fixed","description":"No test checks that format_edited_file calls eslint_trim.trim for a linted edit, so deleting that call would ship with the suite still green.","status":"resolved"}
+- rx:{"round":"661ab092-a89f-4557-b1b6-b92d8aa0cd68","category":"bug-risks","severity":"low","file":"scripts/lint/eslint-daemon.ts:324","disposition":"fixed","description":"stop ignores the exit code of eslint_d stop and sets no timeout, so a failed stop still warms and a stop that never answers holds the edit hook.","status":"resolved"}
+- rx:{"round":"661ab092-a89f-4557-b1b6-b92d8aa0cd68","category":"project-conventions","severity":"low","file":"scripts/lint/eslint-daemon.ts:323","disposition":"fixed","description":"The is_borrowed_install arm in stop cannot be reached because resolve_daemon_cli already returns undefined for a borrowed install.","status":"resolved"}
+- rb:2026-11-11 | #7246
+- rf:none | none | - | 2026-11-11 | #7246
+- rx:{"round":"ec864fc2-8418-4b38-a6c6-294531b69196","previous":"661ab092-a89f-4557-b1b6-b92d8aa0cd68","category":"tests","severity":"medium","file":"scripts/hooks/format-edited-file.daemon.test.ts:40","description":"No test checks that format_edited_file calls eslint_trim.trim for a linted edit, so deleting that call would ship with the suite still green.","disposition":"fixed","status":"resolved"}
+- rx:{"round":"ec864fc2-8418-4b38-a6c6-294531b69196","previous":"661ab092-a89f-4557-b1b6-b92d8aa0cd68","category":"bug-risks","severity":"low","file":"scripts/lint/eslint-daemon.ts:324","description":"stop ignores the exit code of eslint_d stop and sets no timeout, so a failed stop still warms and a stop that never answers holds the edit hook.","disposition":"fixed","status":"resolved"}
+- rx:{"round":"ec864fc2-8418-4b38-a6c6-294531b69196","previous":"661ab092-a89f-4557-b1b6-b92d8aa0cd68","category":"project-conventions","severity":"low","file":"scripts/lint/eslint-daemon.ts:323","description":"The is_borrowed_install arm in stop cannot be reached because resolve_daemon_cli already returns undefined for a borrowed install.","disposition":"fixed","status":"resolved"}
+- rf:tests | low | scripts/hooks/format-edited-file.untyped.test.ts:48 | 2026-11-11 | #7247
+- ri:none | none | - | 2026-11-11 | #7247
+- rf:none | none | - | 2026-11-11 | #7248
+- ri:none | none | - | 2026-11-11 | #7248
+- rb:2026-11-11 | #7248
+- rf:project-conventions | low | scripts/lane/lane-test-related-stats.ts:10 | 2026-11-11 | #7248 | fixed
+- rx:{"round":"baa10745-d6e7-4936-9c72-331fdda75005","category":"project-conventions","severity":"low","file":"scripts/lane/lane-test-related-stats.ts:10","disposition":"fixed","description":"The edited header comment line runs to 152 columns, unlike its ~100-column neighbors; rewrap the paragraph.","status":"resolved"}
+- rf:none | none | - | 2026-11-11 | #7250
+- rf:none | none | - | 2026-11-11 | #7250
+- rf:none | none | - | 2026-11-11 | #7251
+- rb:2026-11-11 | #7251
+- rf:bug-risks | low | scripts/gate/check-related-reuse.ts:54 | 2026-11-11 | #7251 | fixed
+- rf:comments | low | scripts/gate/check-related-reuse.ts:21 | 2026-11-11 | #7251 | fixed
+- rx:{"round":"8ece356f-9b76-40ac-ae35-b077ebe947d8","category":"bug-risks","severity":"low","file":"scripts/gate/check-related-reuse.ts:54","disposition":"fixed","description":"a replayed lint:related verdict omits the since-green line, so is_narrowed would read a narrowed replay as a whole-branch green.","status":"resolved"}
+- rx:{"round":"8ece356f-9b76-40ac-ae35-b077ebe947d8","category":"comments","severity":"low","file":"scripts/gate/check-related-reuse.ts:21","disposition":"fixed","description":"the #7250 paragraph still says a lint:related green never vouches for the gate lint, contradicting the #7251 paragraph below it.","status":"resolved"}
+- rf:performance | low | scripts/lint/import-graph-store.ts:158 | 2026-11-11 | #7252
+- rb:2026-11-11 | #7252
+- rf:bug-risks | medium | scripts/lint/import-graph-store.ts:150 | 2026-11-11 | #7252 | fixed
+- rx:{"round":"585ed1fd-d446-4426-9e5a-f349400fa847","category":"bug-risks","severity":"medium","file":"scripts/lint/import-graph-store.ts:150","disposition":"fixed","description":"A stored entry omitted non-relative imports that resolved to nothing, so a later-created target was never linked; such files are now never stored.","status":"resolved"}
+- rf:none | none | - | 2026-11-11 | #7254
+- rb:2026-11-11 | #7254
+- rf:performance | low | tools/test/vitest-config-workers.ts:131 | 2026-11-11 | #7254 | false-positive
+- rf:tests | low | tools/test/vitest-config-workers.test.ts:88 | 2026-11-11 | #7254 | fixed
+- rx:{"round":"2bfb2097-f3f9-47bf-b2c8-0c2e245c620e","category":"performance","severity":"low","file":"tools/test/vitest-config-workers.ts:131","disposition":"false-positive","description":"The synchronous lane-count child runs on every config load with a 2 s cap and silently counts 0 lanes when it times out on a loaded machine.","status":"resolved"}
+- rx:{"round":"2bfb2097-f3f9-47bf-b2c8-0c2e245c620e","category":"tests","severity":"low","file":"tools/test/vitest-config-workers.test.ts:88","disposition":"fixed","description":"The no-number test passes without the isSafeInteger guard because empty stdout already maps to 0; make the child print a non-number.","status":"resolved"}
+- rb:2026-11-11 | #7255
+- rf:bug-risks | low | docs/maintainers/josh-commands-rationale.md:34 | 2026-11-11 | #7255 | fixed
+- rx:{"round":"ac549369-00ec-441a-b81a-d6c51906a1b3","category":"bug-risks","severity":"low","file":"docs/maintainers/josh-commands-rationale.md:34","disposition":"fixed","description":"The \"55–65 ms per launch\" figure matches neither table column (50–57 ms over the shim, 62–64 ms over node <bin entry>).","status":"resolved"}
+- rf:none | none | - | 2026-11-11 | #7256
+- rb:2026-11-11 | #7256
+- rf:tests | low | scripts/lint/eslint-heap.ts:134 | 2026-11-11 | #7256 | fixed
+- rf:comments | low | scripts/lint/lint-parallel.ts:104 | 2026-11-11 | #7256 | fixed
+- rx:{"round":"962731b5-2f44-4963-8d72-feca1a587637","category":"tests","severity":"low","file":"scripts/lint/eslint-heap.ts:134","disposition":"fixed","description":"No test asserts run_cold or lint-parallel run_prettier route through run_buffered_direct, so a revert to the pnpm wrapper passes every test.","status":"resolved"}
+- rx:{"round":"962731b5-2f44-4963-8d72-feca1a587637","category":"comments","severity":"low","file":"scripts/lint/lint-parallel.ts:104","disposition":"fixed","description":"Comments still call the cold route `pnpm exec eslint` though it now launches directly (also eslint-daemon.ts:163, eslint-heap.ts:99).","status":"resolved"}
+- rf:tests | low | tools/metrics/run-board-profile-main.test.ts:16 | 2026-11-11 | #7257
+- rb:2026-11-11 | #7257
+- rf:bug-risks | medium | tools/metrics/run-board-profile-main.ts:72 | 2026-11-11 | #7257 | fixed
+- rf:bug-risks | medium | tools/metrics/run-board-profile-main.ts:119 | 2026-11-11 | #7257 | fixed
+- rf:bug-risks | medium | tools/metrics/run-board-profile-main.ts:59 | 2026-11-11 | #7257 | fixed
+- rx:{"round":"6e01e749-26ee-49cd-b3b8-2433c55735a5","category":"bug-risks","severity":"medium","file":"tools/metrics/run-board-profile-main.ts:72","disposition":"fixed","description":"round_piece reuses gather state across runs, so is_due skips every read after the first and the gather-round row reports about 1/runs of a round.","status":"resolved"}
+- rx:{"round":"6e01e749-26ee-49cd-b3b8-2433c55735a5","category":"bug-risks","severity":"medium","file":"tools/metrics/run-board-profile-main.ts:119","disposition":"fixed","description":"an unchecked Number(argv[0]) lets NaN make repeat loop forever spawning ps and git, and 0 divides by zero in measure.","status":"resolved"}
+- rx:{"round":"6e01e749-26ee-49cd-b3b8-2433c55735a5","category":"bug-risks","severity":"medium","file":"tools/metrics/run-board-profile-main.ts:59","disposition":"fixed","description":"the redraw piece's live tick starts background GitHub reads whose landing CPU and heap are charged to later pieces and which rewrite the live snapshot file.","status":"resolved"}
+- ri:none | none | - | 2026-11-11 | #7258
+- rb:2026-11-11 | #7258
+- rf:performance | low | scripts/run/event/run-event-tail.ts:54 | 2026-11-11 | #7258 | fixed
+- rx:{"round":"da6d50f9-eb61-43b3-8978-43925832d709","category":"performance","severity":"low","file":"scripts/run/event/run-event-tail.ts:54","disposition":"fixed","description":"At EVENT_CAP every append drops a middle line, so each later tick fails the boundary check and parses the whole stream again.","status":"resolved"}
+- ri:none | none | - | 2026-11-11 | #7259
+- rb:2026-11-11 | #7259
+- rf:tests | low | scripts/hooks/format-edited-file.test.ts:209 | 2026-11-11 | #7259
+- rf:tests | low | scripts/hooks/format-edited-file.test.ts:65 | 2026-11-11 | #7259
+- rf:comments | low | scripts/hooks/format-edited-file.ts:244 | 2026-11-11 | #7259
+- rx:{"round":"b0f3c0f5-c192-4732-a906-7897c1df795e","category":"tests","severity":"low","file":"scripts/hooks/format-edited-file.test.ts:209","description":"'never takes the daemon route for prettier' tells the daemon apart by bin !== process.execPath, but a direct launch of an installed prettier now also runs under process.execPath, so the assertion only holds because the tmp root resolves no prettier; no failure scenario — tried a root with prettier installed, where the test would fail loudly rather than pass wrongly.","status":"new"}
+- rx:{"round":"b0f3c0f5-c192-4732-a906-7897c1df795e","category":"tests","severity":"low","file":"scripts/hooks/format-edited-file.test.ts:65","description":"'runs the installed package entry under this node' checks only bin and the trailing arguments, not that command_arguments[0] is prettier's CLI entry; no failure scenario — a wrong entry path would fail the live hook spawn, and local-bin.test.ts covers the entry resolution.","status":"new"}
+- rx:{"round":"b0f3c0f5-c192-4732-a906-7897c1df795e","category":"comments","severity":"low","file":"scripts/hooks/format-edited-file.ts:244","description":"the resolve_invocations comment still calls the second entry 'the one that has always been here', which no longer describes the direct_launch route that replaced the shim/pnpm pair; no failure scenario — comment only.","status":"new"}
+- rf:none | none | - | 2026-11-11 | #7269
+- rb:2026-11-11 | #7269
+- rf:bug-risks | low | .claude/skills/workflow-commands/issue-scout.md:9 | 2026-11-11 | #7269 | fixed
+- rf:comments | low | scripts/issue/issue-file.ts:46 | 2026-11-11 | #7269 | fixed
+- rx:{"round":"73e9166c-863c-4ae3-a123-32274dd16df4","category":"bug-risks","severity":"low","file":".claude/skills/workflow-commands/issue-scout.md:9","disposition":"fixed","description":"The --distinct reissue example carries no --over-cap, so a typed new filing reissued from it over the cap is held once more by the WIP cap.","status":"resolved"}
+- rx:{"round":"73e9166c-863c-4ae3-a123-32274dd16df4","category":"comments","severity":"low","file":"scripts/issue/issue-file.ts:46","disposition":"fixed","description":"The is_over_cap field comment still names only a run-blocking filing, not the typed new entry the help text now adds.","status":"resolved"}
+- rf:none | none | - | 2026-11-11 | #7281
+- ri:bug-risks | medium | scripts/run/board/run-board-fit.ts:245 | 2026-11-11 | #7281 | fixed
+- rb:2026-11-11 | #7281
+- rf:bug-risks | medium | scripts/run/board/run-board-fit.ts:245 | 2026-11-11 | #7281 | fixed
+- rf:bug-risks | medium | scripts/run/board/run-board-fit.ts:193 | 2026-11-11 | #7281 | fixed
+- rx:{"round":"bc1ac540-d46b-4a37-b058-4a678ab361d0","category":"bug-risks","severity":"medium","file":"scripts/run/board/run-board-fit.ts:245","disposition":"fixed","description":"The always-kept empty queued head pushes the plan's cut-row 'more N' under 'queued 0', so cut lane rows read as hidden queued rows.","status":"resolved"}
+- rx:{"round":"bc1ac540-d46b-4a37-b058-4a678ab361d0","category":"bug-risks","severity":"medium","file":"scripts/run/board/run-board-fit.ts:193","disposition":"fixed","description":"The empty queued head never yields, so in a short pane a finding is dropped while the empty 'queued 0' head stays.","status":"resolved"}
+- rf:none | none | - | 2026-11-11 | #7282
+- rf:none | none | - | 2026-11-11 | #7282
+- rb:2026-11-11 | #7286
+- rf:comments | low | prompts/collaboration-workflow/issue-template.md:11 | 2026-11-11 | #7286 | fixed
+- rx:{"round":"3086ed15-391b-4236-bb12-b90b299aa6aa","category":"comments","severity":"low","file":"prompts/collaboration-workflow/issue-template.md:11","disposition":"fixed","description":"The 中止条件 placeholder line is duplicated (line 10 is an earlier draft of line 11); delete line 10.","status":"resolved"}
+- ri:none | none | - | 2026-11-11 | #7287
+- rb:2026-11-11 | #7287
+- rf:bug-risks | low | scripts/backlog/backlog-hold-text.ts:28 | 2026-11-11 | #7287
+- rf:bug-risks | low | scripts/backlog/backlog-hold-text.ts:38 | 2026-11-11 | #7287
+- rx:{"round":"2cbbb47b-b474-47d6-9266-2ad0f58b2934","category":"bug-risks","severity":"low","file":"scripts/backlog/backlog-hold-text.ts:28","description":"HAND_BACK_TEXT has no row for the drain hand-back hand-back:watch (backlog-drive.ts:275), so it reads 'the driver paused (watch); the session restarts it' with the raw verdict; no failure scenario — the fallback still names the code and who acts, so nothing is misread.","status":"new"}
+- rx:{"round":"2cbbb47b-b474-47d6-9266-2ad0f58b2934","category":"bug-risks","severity":"low","file":"scripts/backlog/backlog-hold-text.ts:38","description":"OFFER_TEXT omits the 'candidates' answer (backlog-offer.ts:136), so an offer:<verdict>:candidates hold falls back to 'the backlog is waiting (<verdict>:candidates)'; no failure scenario — tried a continuing pass with candidates but nothing started, and the fallback keeps the code readable.","status":"new"}
+- rf:none | none | - | 2026-11-11 | #7292
+- rf:bug-risks | medium | scripts/rules/unasked-filing.ts:47 | 2026-11-11 | #7293
+- rf:bug-risks | medium | scripts/rules/unasked-filing.ts:80 | 2026-11-11 | #7293
+- rf:project-conventions | low | scripts/rules/unasked-filing.ts:57 | 2026-11-11 | #7293
+- rb:2026-11-11 | #7293
+- rf:bug-risks | medium | scripts/rules/unasked-filing.ts:31 | 2026-11-11 | #7293 | fixed
+- rf:bug-risks | medium | scripts/rules/unasked-filing.ts:36 | 2026-11-11 | #7293 | fixed
+- rf:bug-risks | medium | scripts/rules/unasked-filing.ts:39 | 2026-11-11 | #7293 | fixed
+- rf:tests | low | scripts/rules/unasked-filing.test.ts:80 | 2026-11-11 | #7293 | fixed
+- rx:{"round":"61bc6a5c-2ac7-4a9d-bab1-330dbaff14b8","category":"bug-risks","severity":"medium","file":"scripts/rules/unasked-filing.ts:31","disposition":"fixed","description":"A plain confirmation of a proposed Issue (はい/yes/OK) matches no FILING_WORDS, so the rule's own propose-then-confirm remedy is refused again.","status":"resolved"}
+- rx:{"round":"61bc6a5c-2ac7-4a9d-bab1-330dbaff14b8","category":"bug-risks","severity":"medium","file":"scripts/rules/unasked-filing.ts:36","disposition":"fixed","description":"The typed-command pattern omits halfrun and prrun, whose `new` forms file through issue:file, so an interactive `halfrun new` is refused.","status":"resolved"}
+- rx:{"round":"61bc6a5c-2ac7-4a9d-bab1-330dbaff14b8","category":"bug-risks","severity":"medium","file":"scripts/rules/unasked-filing.ts:39","disposition":"fixed","description":"CHECK_FLAG tests the whole command, so a title containing ` --check` or a `--check && issue:file` chain files unasked.","status":"resolved"}
+- rx:{"round":"61bc6a5c-2ac7-4a9d-bab1-330dbaff14b8","category":"tests","severity":"low","file":"scripts/rules/unasked-filing.test.ts:80","disposition":"fixed","description":"The stand-down table covers neither a plain confirmation nor halfrun/prrun new, so the mediums cannot fail a test.","status":"resolved"}
+- rf:none | none | - | 2026-11-11 | #7296
+- rf:none | none | - | 2026-11-11 | #7296
+- rb:2026-11-11 | #7296
+- rf:bug-risks | medium | scripts/release/release-workflow-check.ts:18 | 2026-11-11 | #7296 | fixed
+- rf:project-conventions | low | docs/josh-commands-automation.md:857 | 2026-11-11 | #7296 | fixed
+- rx:{"round":"100507b9-87d9-43c5-94f6-ae94a9f1075b","category":"bug-risks","severity":"medium","file":"scripts/release/release-workflow-check.ts:18","disposition":"fixed","description":"Any publish.yml passes the check, so a consumer whose npm workflow is publish.yml but lacks github-release.yml still tags, moves production and times out waiting for the GitHub Release.","status":"resolved"}
+- rx:{"round":"100507b9-87d9-43c5-94f6-ae94a9f1075b","category":"project-conventions","severity":"low","file":"docs/josh-commands-automation.md:857","disposition":"fixed","description":"Comma splice before a capital When, and 'checks first' contradicts 'after printing the plan'.","status":"resolved"}
+- rf:none | none | - | 2026-11-11 | #7297
+- rf:none | none | - | 2026-11-11 | #7298
+- rb:2026-11-11 | #7298
+- rf:bug-risks | medium | scripts/release/release-progress.ts:51 | 2026-11-11 | #7298 | fixed
+- rx:{"round":"62796902-5424-453a-9eb3-5a5195d6dabf","category":"bug-risks","severity":"medium","file":"scripts/release/release-progress.ts:51","disposition":"fixed","description":"The hint checks publish.yml before github-release.yml, so a consumer with both gets told to check a create-release job its Publish run does not have instead of its GitHub Release run.","status":"resolved"}
+- rf:bug-risks | medium | .github/workflows/publish.yml:60 | 2026-11-11 | #7303 | fixed
+- rf:bug-risks | medium | .github/workflows/publish.yml:71 | 2026-11-11 | #7303 | fixed
+- rf:tests | low | .github/workflows/publish.yml:148 | 2026-11-11 | #7303 | fixed
+- rf:bug-risks | low | .github/workflows/publish.yml:233 | 2026-11-11 | #7303 | fixed
+- rf:bug-risks | low | scripts/release/release-progress.ts:172 | 2026-11-11 | #7303 | fixed
+- rf:project-conventions | medium | scripts/sync/managed-config-scope.ts:36 | 2026-11-11 | #7303
+- rf:tests | low | scripts/release/github-release-workflow.test.ts:123 | 2026-11-11 | #7303
+- rf:bug-risks | low | .github/workflows/publish.yml:194 | 2026-11-11 | #7303
+- rf:bug-risks | low | scripts/release/release-progress.ts:172 | 2026-11-11 | #7303
+- rf:comments | low | scripts/sync/managed-config-scope.ts:75 | 2026-11-11 | #7303
+- rf:comments | low | docs/maintainers/josh-commands-automation-rationale.md:136 | 2026-11-11 | #7303
+- rf:none | none | - | 2026-11-11 | #7303
+- rb:2026-11-11 | #7303
+- rf:tests | medium | scripts/sync/sync-ai-files.ts:204 | 2026-11-11 | #7303 | fixed
+- rf:tests | low | scripts/release/publish-tag-cli.ts:45 | 2026-11-11 | #7303 | fixed
+- rf:project-conventions | low | scripts/build/pack-boundary.test.ts:89 | 2026-11-11 | #7303 | fixed
+- rf:bug-risks | low | .github/workflows/publish.yml:198 | 2026-11-11 | #7303 | fixed
+- rx:{"round":"5366fd6a-88e6-4a62-acef-d12b3deabded","previous":"bfe3625d-3b9d-43a5-a729-ad5dd2ecae17","category":"tests","severity":"medium","file":"scripts/sync/sync-ai-files.ts:204","disposition":"fixed","description":"No test checks that sync/init copies the publish.yml that depends on the registry, so changing copied_files back to ai_files here or at init-ai-copy.ts:384 passes every test.","status":"resolved"}
+- rx:{"round":"5366fd6a-88e6-4a62-acef-d12b3deabded","previous":"bfe3625d-3b9d-43a5-a729-ad5dd2ecae17","category":"tests","severity":"low","file":"scripts/release/publish-tag-cli.ts:45","disposition":"fixed","description":"The new main that publish.yml runs through josh release:tag has no test and is still listed in untested-sources.ts:104.","status":"resolved"}
+- rx:{"round":"5366fd6a-88e6-4a62-acef-d12b3deabded","previous":"bfe3625d-3b9d-43a5-a729-ad5dd2ecae17","category":"project-conventions","severity":"low","file":"scripts/build/pack-boundary.test.ts:89","disposition":"fixed","description":"publish-tag-cli.ts is still in SHIPPED_UNREACHABLE although the release:tag command now reaches it from consumers.","status":"resolved"}
+- rx:{"round":"5366fd6a-88e6-4a62-acef-d12b3deabded","previous":"bfe3625d-3b9d-43a5-a729-ad5dd2ecae17","category":"bug-risks","severity":"low","file":".github/workflows/publish.yml:198","disposition":"fixed","description":"In a consumer, production.yml runs twice per tag (auto-tag dispatch plus this workflow_call); the second merge does nothing.","status":"resolved"}
+- rx:{"round":"5366fd6a-88e6-4a62-acef-d12b3deabded","previous":"bfe3625d-3b9d-43a5-a729-ad5dd2ecae17","category":"comments","severity":"low","file":"scripts/sync/managed-config-scope.ts:75","description":"the table comment still says 'a fifth distribution surface is then one row' though the fix made NPM_PUBLISH_FILES the sixth row; no failure scenario — a reader miscounts the rows, nothing runs differently.","status":"resolved"}
+- rx:{"round":"5366fd6a-88e6-4a62-acef-d12b3deabded","previous":"bfe3625d-3b9d-43a5-a729-ad5dd2ecae17","category":"comments","severity":"low","file":"docs/maintainers/josh-commands-automation-rationale.md:136","description":"the 'Config claims' list names four sources and omits NPM_PUBLISH_FILES (and already PLUGIN_SKILL_DIRECTORIES), so a reader of the doc does not learn that publish.yml is claimed; no failure scenario — josh sync:scope output is correct, only the prose is incomplete.","status":"resolved"}
+- rf:none | none | - | 2026-11-11 | #7305
+- k:followup-unrelated-test-rerun | d1 | 2026-11-11 | scripts/josh/josh-command-reference.test.ts | followup reran Unit Tests (6/6); failed outside the change: pure scripts/josh/josh-command-reference.test.ts > command reference — the synopsis matches the script it describes > never advertises a flag the script does not mention
+- ri:none | none | - | 2026-11-11 | #7305
+- rb:2026-11-11 | #7305
+- rf:tests | low | scripts/backlog/backlog-next-report.test.ts:64 | 2026-11-11 | #7305 | fixed
+- rf:comments | low | scripts/backlog/backlog-next-report.ts:201 | 2026-11-11 | #7305 | fixed
+- rf:comments | low | scripts/backlog/backlog-next-report.ts:80 | 2026-11-11 | #7305 | fixed
+- rx:{"round":"6bd93f6b-245b-4399-aa88-6ac8e204f77d","category":"tests","severity":"low","file":"scripts/backlog/backlog-next-report.test.ts:64","disposition":"fixed","description":"The complete-to-none token assertion duplicates backlog-contract.test.ts:58 and adds no coverage the end-to-end suites lack.","status":"resolved"}
+- rx:{"round":"6bd93f6b-245b-4399-aa88-6ac8e204f77d","category":"comments","severity":"low","file":"scripts/backlog/backlog-next-report.ts:201","disposition":"fixed","description":"The report_none comment points to listings \"below\" that now live in backlog-next.ts answer(), not in this file.","status":"resolved"}
+- rx:{"round":"6bd93f6b-245b-4399-aa88-6ac8e204f77d","category":"comments","severity":"low","file":"scripts/backlog/backlog-next-report.ts:80","disposition":"fixed","description":"The moved warn_epic_gap comment states the untracked-children sentence twice.","status":"resolved"}
+- rf:none | none | - | 2026-11-11 | #7306
+- ri:none | none | - | 2026-11-11 | #7306
+- rb:2026-11-11 | #7306
+- rf:bug-risks | medium | scripts/backlog/backlog-next-offer.ts:54 | 2026-11-11 | #7306 | fixed
+- rf:tests | medium | scripts/gh/git-gh-issue-list.ts:82 | 2026-11-11 | #7306 | fixed
+- rx:{"round":"74366ec9-4a1a-4372-b624-9733146b7d2d","category":"bug-risks","severity":"medium","file":"scripts/backlog/backlog-next-offer.ts:54","disposition":"fixed","description":"Children withheld by the run:solo gate, overlap separation or cap are recorded with reason wait, indistinguishable from an in-progress child.","status":"resolved"}
+- rx:{"round":"74366ec9-4a1a-4372-b624-9733146b7d2d","category":"tests","severity":"medium","file":"scripts/gh/git-gh-issue-list.ts:82","disposition":"fixed","description":"No test pins the every-page-304 aggregation of is_unchanged, so mutating every to some passes the suite.","status":"resolved"}
+- rb:2026-11-11 | #7306
+- rf:none | none | - | 2026-11-11 | #7306
+- rx:{"round":"c4aa5584-b979-433e-9261-ed168801cf63","previous":"74366ec9-4a1a-4372-b624-9733146b7d2d","category":"bug-risks","severity":"medium","file":"scripts/backlog/backlog-next-offer.ts:54","description":"Children withheld by the run:solo gate, overlap separation or cap are recorded with reason wait, indistinguishable from an in-progress child.","disposition":"fixed","status":"resolved"}
+- rx:{"round":"c4aa5584-b979-433e-9261-ed168801cf63","previous":"74366ec9-4a1a-4372-b624-9733146b7d2d","category":"tests","severity":"medium","file":"scripts/gh/git-gh-issue-list.ts:82","description":"No test pins the every-page-304 aggregation of is_unchanged, so mutating every to some passes the suite.","disposition":"fixed","status":"resolved"}
+- rf:comments | low | scripts/backlog/backlog-next-report.ts:109 | 2026-11-11 | #7307
+- rf:comments | low | scripts/lane/lane-ledger-schema.ts:93 | 2026-11-11 | #7307
+- ri:bug-risks | medium | scripts/backlog/backlog-wait-cause.ts:45 | 2026-11-11 | #7307 | fixed
+- rb:2026-11-11 | #7307
+- rf:bug-risks | medium | scripts/backlog/backlog-wait-cause.ts:45 | 2026-11-11 | #7307 | fixed
+- rf:comments | low | scripts/backlog/backlog-offer.ts:47 | 2026-11-11 | #7307 | fixed
+- rx:{"round":"552294a7-d6ea-416f-9b00-0664d6ca9196","category":"bug-risks","severity":"medium","file":"scripts/backlog/backlog-wait-cause.ts:45","disposition":"fixed","description":"cause_of names lane for a child whose closed cross-repo blocker awaits its release, booking a publish wait as a running-lane hold.","status":"resolved"}
+- rx:{"round":"552294a7-d6ea-416f-9b00-0664d6ca9196","category":"comments","severity":"low","file":"scripts/backlog/backlog-offer.ts:47","disposition":"fixed","description":"the waiting comment and two sibling comments still name only chain and gate.","status":"resolved"}
+- rf:tests | low | scripts/rules/delivered-rules-filing.test.ts:68 | 2026-11-11 | #7309
+- ri:none | none | - | 2026-11-11 | #7309
+- rf:none | none | - | 2026-11-11 | #7312
+- rb:2026-11-11 | #7312
+- rf:comments | low | scripts/followup/git-followup-workflow.test.ts:81 | 2026-11-11 | #7312 | fixed
+- rx:{"round":"45e0a979-9ab6-458a-8727-f33251692039","category":"comments","severity":"low","file":"scripts/followup/git-followup-workflow.test.ts:81","disposition":"fixed","description":"The #3023 merged-by-hand comment now sits above the #7312 human-merge test it does not describe.","status":"resolved"}
+- rf:bug-risks | medium | scripts/run/run-pr-return.ts:89 | 2026-11-11 | #7313
+- rf:tests | low | scripts/run/run-stage.test.ts:25 | 2026-11-11 | #7313
+- ri:bug-risks | low | scripts/run/run-pr-return.ts:44 | 2026-11-11 | #7313 | fixed
+- rb:2026-11-11 | #7313
+- rf:bug-risks | medium | scripts/run/run-pr-return.ts:43 | 2026-11-11 | #7313
+- rf:tests | low | scripts/run/run-label.test.ts:32 | 2026-11-11 | #7313
+- rf:assumptions | low | scripts/run/run-pr-return.ts:29 | 2026-11-11 | #7313
+- rf:assumptions | low | scripts/run/run-label.ts:55 | 2026-11-11 | #7313
+- rx:{"round":"9eb94bde-ec9b-4a15-879a-483cdf1676af","category":"bug-risks","severity":"medium","file":"scripts/run/run-pr-return.ts:43","description":"Every josh-posted comment carries RUN_MARKER (git-gh-issue-write.ts:105), so a person's return-for-fix comment posted through `josh issue:comment` — as #7303's own \"Returned to the lane\" comment at 16:30:26Z was, followed by marked 先送り comments — counts as the run's own and is dropped, so a returned PR with green CI resumes at the gate and ships unfixed, failing acceptance criterion 2 on its motivating case; anchor \"since the run\" on something the run alone writes (e.g. the lane's last launch/event time or the PR head commit time) instead of the marker. other sites: scripts/run/run-pr-return.ts:36, scripts/run/run-pr-return.ts:47","status":"new"}
+- rx:{"round":"9eb94bde-ec9b-4a15-879a-483cdf1676af","category":"tests","severity":"low","file":"scripts/run/run-label.test.ts:32","description":"The title promises the park comes off before in-progress goes on but no assertion checks call order; no failure scenario — tried reordering claim's two writes, both still precede the launch, so nothing observable breaks.","status":"new"}
+- rx:{"round":"9eb94bde-ec9b-4a15-879a-483cdf1676af","category":"assumptions","severity":"low","file":"scripts/run/run-pr-return.ts:29","description":"A snapshot with no readable required contexts yields no red checks at all, so a repository without branch protection never re-enters implementation on red CI; no failure scenario — kit's own PRs carry required contexts and the comment path is the stated fallback.","status":"new"}
+- rx:{"round":"9eb94bde-ec9b-4a15-879a-483cdf1676af","category":"assumptions","severity":"low","file":"scripts/run/run-label.ts:55","description":"Only needs-human-merge is cleared on dispatch while every PARKED_LABELS label refuses the lane's review (lane-parked.ts); no failure scenario — tried needs-decision/run-stalled on a dispatched-back issue, but backlog pickup excludes them and the Issue scopes the fix to needs-human-merge.","status":"new"}
+- rf:none | none | - | 2026-11-11 | #7314
+- k:followup-unrelated-test-rerun | d1 | 2026-11-11 | scripts/test/test-related-touched.test.ts | followup reran Unit Tests (6/6); failed outside the change: pure scripts/test/test-related-touched.test.ts > test_related_touched.touched_tests > adds the pinned registry tests to a command-table change
+- k:followup-unrelated-test-rerun | d1 | 2026-11-11 | scripts/test/test-related-touched.test.ts | followup reran Unit Tests (4/6); failed outside the change: pure scripts/test/test-related-touched.test.ts > test_related_touched.touched_tests > adds the pinned registry tests to a command-table change
+- rf:none | none | - | 2026-11-12 | #7323
+- rf:bug-risks | medium | scripts/release/release-publish-run.ts:38 | 2026-11-12 | #7324 | fixed
+- rf:none | none | - | 2026-11-12 | #7324
+- rf:none | none | - | 2026-11-12 | #7329
+- rf:none | none | - | 2026-11-12 | #7329
+- rf:none | none | - | 2026-11-12 | #7330
+- ri:none | none | - | 2026-11-12 | #7330
+- rb:2026-11-12 | #7330
+- rf:comments | low | scripts/rules/guard-remedy.ts:29 | 2026-11-12 | #7330 | fixed
+- rf:tests | low | scripts/hooks/pretool-guard.test.ts:407 | 2026-11-12 | #7330 | fixed
+- rx:{"round":"24b83e50-7f1e-43a3-90e2-7bd977c87584","category":"comments","severity":"low","file":"scripts/rules/guard-remedy.ts:29","disposition":"fixed","description":"The direct-issue-comment why claims an inline --body names no file, but issue:comment accepts --body, so the stated reason is wrong.","status":"resolved"}
+- rx:{"round":"24b83e50-7f1e-43a3-90e2-7bd977c87584","category":"tests","severity":"low","file":"scripts/hooks/pretool-guard.test.ts:407","disposition":"fixed","description":"No hook-level respond test pins that a standalone gh issue view N is rewritten to issue:read with its note.","status":"resolved"}
+- rb:2026-11-12 | #7330
+- rf:none | none | - | 2026-11-12 | #7330
+- rx:{"round":"741d5766-1645-4ef2-82d0-ed56c7aa956d","previous":"24b83e50-7f1e-43a3-90e2-7bd977c87584","category":"comments","severity":"low","file":"scripts/rules/guard-remedy.ts:29","description":"The direct-issue-comment why claims an inline --body names no file, but issue:comment accepts --body, so the stated reason is wrong.","disposition":"fixed","status":"resolved"}
+- rx:{"round":"741d5766-1645-4ef2-82d0-ed56c7aa956d","previous":"24b83e50-7f1e-43a3-90e2-7bd977c87584","category":"tests","severity":"low","file":"scripts/hooks/pretool-guard.test.ts:407","description":"No hook-level respond test pins that a standalone gh issue view N is rewritten to issue:read with its note.","disposition":"fixed","status":"resolved"}
+- rf:project-conventions | low | scripts/document/command-flag-reference.test.ts:45 | 2026-11-12 | #7331 | false-positive
+- rf:none | none | - | 2026-11-12 | #7331
+- rf:performance | low | scripts/rules/rule-value-trend.ts:76 | 2026-11-12 | #7332
+- rf:comments | low | scripts/rules/rule-value-trend.ts:75 | 2026-11-12 | #7332
+- rf:bug-risks | low | scripts/rules/rule-value-trend.ts:47 | 2026-11-12 | #7332
+- rf:performance | low | scripts/rules/rule-value-trend.ts:73 | 2026-11-12 | #7332
+- rf:comments | low | scripts/rules/rule-value-trend.ts:68 | 2026-11-12 | #7332
+- rf:bug-risks | low | scripts/rules/rule-value-trend.ts:42 | 2026-11-12 | #7332
+- k:followup-unrelated-test-rerun | d1 | 2026-11-12 | scripts/lint/eslint-cache-reuse.test.ts | followup reran Unit Tests (5/6); failed outside the change: isolated scripts/lint/eslint-cache-reuse.test.ts > reusing an ESLint verdict — the cache guard and the daemon agree with the reference model > keeps an entry and a warm daemon only while nothing they read moved
+- ri:none | none | - | 2026-11-12 | #7333
+- rb:2026-11-12 | #7333
+- rf:bug-risks | low | scripts/gh/git-pr-checks-failed.ts:12 | 2026-11-12 | #7333
+- rf:assumptions | low | scripts/lane/lane-stop-check-stats.ts:105 | 2026-11-12 | #7333
+- rx:{"round":"7bc6b466-e9e7-44e1-a356-2d52be84aaa7","category":"bug-risks","severity":"low","file":"scripts/gh/git-pr-checks-failed.ts:12","description":"names_of keeps a check name each time the failure line repeats in one body, so a followup body carrying the wait's failure twice would record and print 'CodeQL, CodeQL' in the longest-stop causes cell; no failure scenario — traced run-ship-cli record_stop and the single throw in git-pr-checks.ts:163 and found no path that prints the line twice in one followup section, and check_table already counts a stop once per check via includes.","status":"new"}
+- rx:{"round":"7bc6b466-e9e7-44e1-a356-2d52be84aaa7","category":"assumptions","severity":"low","file":"scripts/lane/lane-stop-check-stats.ts:105","description":"longest_table drops stops nothing resumed, so a stop still open at the period's end (the longest wait of all) never appears in the longest-stop table; no failure scenario — this is the documented choice (docs/maintainers/lane-limit-measurement.md names 'ended stops') and the stop table's not-resumed column still counts it.","status":"new"}
+- rf:none | none | - | 2026-11-12 | #7334
+- ri:none | none | - | 2026-11-12 | #7334
+- rb:2026-11-12 | #7334
+- rf:bug-risks | low | scripts/rules/shell-segments.ts:62 | 2026-11-12 | #7334 | fixed
+- rx:{"round":"d8384a4f-f476-4746-a7fc-bef69734d2dd","category":"bug-risks","severity":"low","file":"scripts/rules/shell-segments.ts:62","disposition":"fixed","description":"A multi-line case arm (pattern after a newline) is not cut and the doc's \"Not read yet\" list omits that spelling.","status":"resolved"}
+- ri:comments | low | docs/josh-commands-automation.md:269 | 2026-11-12 | #7335 | fixed
+- rb:2026-11-12 | #7335
+- rf:comments | low | docs/josh-commands-automation.md:270 | 2026-11-12 | #7335
+- rx:{"round":"5fcc2e4f-9e6a-4dc2-aee5-d2340c513c34","category":"comments","severity":"low","file":"docs/josh-commands-automation.md:270","description":"The prose still names implementation-shell-deny.ts as the deny-list though the git deny tables moved to implementation-shell-deny-git.ts, and .josh/observations/7335.md records this earlier-round finding as fixed while no doc changed (same at prompts/collaboration-workflow/rule-delivery.md:15); no failure scenario — the entry module still dispatches every refusal, so a reader following the pointer reaches the git tables through its import.","status":"new"}
+- rb:2026-11-12 | #7336
+- rf:bug-risks | low | docs/maintainers/observation-ledger-rationale.md:75 | 2026-11-12 | #7336 | fixed
+- rf:bug-risks | low | docs/maintainers/observation-ledger-rationale.md:78 | 2026-11-12 | #7336 | fixed
+- rf:bug-risks | low | docs/maintainers/observation-ledger-rationale.md:64 | 2026-11-12 | #7336 | fixed
+- rf:bug-risks | low | docs/maintainers/observation-ledger-rationale.md:94 | 2026-11-12 | #7336 | fixed
+- rf:bug-risks | low | docs/maintainers/observation-ledger-rationale.md:103 | 2026-11-12 | #7336 | fixed
+- rx:{"round":"c7d804a4-ec2d-4546-8c70-b2bb8dd40d89","category":"bug-risks","severity":"low","file":"docs/maintainers/observation-ledger-rationale.md:75","disposition":"fixed","description":"The carry row says it needs closed issues' lines, but the carry reads GitHub comment rounds and checks only the carried-mark file's existence (review-comment-round.ts:179).","status":"resolved"}
+- rx:{"round":"c7d804a4-ec2d-4546-8c70-b2bb8dd40d89","category":"bug-risks","severity":"low","file":"docs/maintainers/observation-ledger-rationale.md:78","disposition":"fixed","description":"git-staging.ts is listed as reading no content, yet it calls observation_ledger_prepare.prepare (git-staging.ts:88), which reads every ledger file (observation-ledger-prepare.ts:15).","status":"resolved"}
+- rx:{"round":"c7d804a4-ec2d-4546-8c70-b2bb8dd40d89","category":"bug-risks","severity":"low","file":"docs/maintainers/observation-ledger-rationale.md:64","disposition":"fixed","description":"the claim that every content reader goes through read omits observation-ledger-migrate.ts, which reads legacy paths directly before any read.","status":"resolved"}
+- rx:{"round":"c7d804a4-ec2d-4546-8c70-b2bb8dd40d89","category":"bug-risks","severity":"low","file":"docs/maintainers/observation-ledger-rationale.md:94","disposition":"fixed","description":"flush's PR body says it adds lines and changes none (observations-flush.ts:63-65), which an archive commit that deletes lines would make false.","status":"resolved"}
+- rx:{"round":"c7d804a4-ec2d-4546-8c70-b2bb8dd40d89","category":"bug-risks","severity":"low","file":"docs/maintainers/observation-ledger-rationale.md:103","disposition":"fixed","description":"the cite observation-ledger-home.ts:16 supports lines reaching the default branch, not that a lane's tree is default-branch files plus its own.","status":"resolved"}
+- rf:bug-risks | medium | tools/metrics/metrics-duration-probe.ts:49 | 2026-11-12 | #7337 | fixed
+- rf:none | none | - | 2026-11-12 | #7337
+- rf:comments | low | scripts/rules/shell-tokens.ts:9 | 2026-11-12 | #7338
+- rf:project-conventions | low | scripts/rules/shell-tokens.ts:145 | 2026-11-12 | #7338
+- rf:tests | low | scripts/rules/broad-investigation-shell.test.ts:47 | 2026-11-12 | #7338
+- rf:assumptions | low | scripts/rules/shell-tokens.ts:132 | 2026-11-12 | #7338
+- rf:comments | low | scripts/rules/shell-tokens.ts:9 | 2026-11-12 | #7338
+- rf:tests | low | scripts/rules/broad-investigation-shell.test.ts:73 | 2026-11-12 | #7338
+- rb:2026-11-12 | #7339
+- rf:bug-risks | low | scripts/observations/observation-ledger-archive.ts:159 | 2026-11-12 | #7339 | fixed
+- rf:project-conventions | low | docs/maintainers/observation-ledger-rationale.md:100 | 2026-11-12 | #7339 | fixed
+- rx:{"round":"1db144a8-0536-4fd9-86ea-9c782b4ccfa0","category":"bug-risks","severity":"low","file":"scripts/observations/observation-ledger-archive.ts:159","disposition":"fixed","description":"The rounds mark is written only after every move resolves, so a move that throws after its append leaves archived rounds unmarked and re-carried.","status":"resolved"}
+- rx:{"round":"1db144a8-0536-4fd9-86ea-9c782b4ccfa0","category":"project-conventions","severity":"low","file":"docs/maintainers/observation-ledger-rationale.md:100","disposition":"fixed","description":"The rationale still says the flush body changes none and cites observations-flush.ts:65 and review-comment-round.ts:22, which shifted.","status":"resolved"}
+- rf:bug-risks | medium | scripts/rules/shell-segments.ts:75 | 2026-11-12 | #7340
+- rf:bug-risks | high | scripts/hooks/implementation-shell.ts:58 | 2026-11-12 | #7340
+- rf:tests | medium | scripts/hooks/implementation-shell.test.ts:118 | 2026-11-12 | #7340
+- ri:bug-risks | medium | scripts/rules/shell-segments.ts:70 | 2026-11-12 | #7340 | fixed
+- rb:2026-11-12 | #7340
+- rf:bug-risks | high | scripts/hooks/implementation-shell.ts:56 | 2026-11-12 | #7340 | fixed
+- rf:tests | medium | scripts/hooks/implementation-shell.test.ts:108 | 2026-11-12 | #7340 | fixed
+- rx:{"round":"75b8e698-547f-4dd3-9829-977bd31c9bc5","category":"bug-risks","severity":"high","file":"scripts/hooks/implementation-shell.ts:56","disposition":"fixed","description":"An arm whose command touches its `)` (`case x in a) ls;; b)git push;; esac`) is no longer refused, so `git push` runs past the guard.","status":"resolved"}
+- rx:{"round":"75b8e698-547f-4dd3-9829-977bd31c9bc5","category":"tests","severity":"medium","file":"scripts/hooks/implementation-shell.test.ts:108","disposition":"fixed","description":"No refused case covers an arm with no blank after `)`, so the regression passes the suite.","status":"resolved"}
+- rf:tests | low | scripts/run/board/run-board-operation.test.ts:135 | 2026-11-12 | #7342
+- rf:bug-risks | low | scripts/lib/home-tilde.ts:16 | 2026-11-12 | #7342
+- ri:none | none | - | 2026-11-12 | #7342
+- rb:2026-11-12 | #7342
+- rf:project-conventions | low | scripts/lib/home-tilde.ts:90 | 2026-11-12 | #7342 | fixed
+- rx:{"round":"5d59508d-2e67-4387-9338-b831e43d4a1c","category":"project-conventions","severity":"low","file":"scripts/lib/home-tilde.ts:90","disposition":"fixed","description":"split(home) matches by prefix so a sibling account path like /Users/anna becomes ~a","status":"resolved"}
+- ri:none | none | - | 2026-11-12 | #7349
+- rb:2026-11-12 | #7349
+- rf:project-conventions | low | scripts/lane/lane-dispatch-prepare.ts:176 | 2026-11-12 | #7349
+- rx:{"round":"fc06a180-3603-480d-88ce-a1ac25854b5f","category":"project-conventions","severity":"low","file":"scripts/lane/lane-dispatch-prepare.ts:176","description":"export type { Prepared } has no importer (lane-dispatch.ts reads it only through inference), an unused export the split added; no failure scenario — tried a caller depending on the type name and found none.","status":"new"}
+- rf:none | none | - | 2026-11-12 | #7350
+- rf:none | none | - | 2026-11-12 | #7350
+- rb:2026-11-12 | #7351
+- rf:bug-risks | low | scripts/agent/agent-worker-profile.ts:58 | 2026-11-12 | #7351 | fixed
+- rf:bug-risks | low | scripts/agent/agent-worker-profile.ts:63 | 2026-11-12 | #7351 | fixed
+- rx:{"round":"3773ea24-ad3f-403b-b61d-436691eb1998","category":"bug-risks","severity":"low","file":"scripts/agent/agent-worker-profile.ts:58","disposition":"fixed","description":"A zod rejection note repeats the key as `josh.worker josh.worker.profiles: …` because both rejected() and the issue path prefix it.","status":"resolved"}
+- rx:{"round":"3773ea24-ad3f-403b-b61d-436691eb1998","category":"bug-risks","severity":"low","file":"scripts/agent/agent-worker-profile.ts:63","disposition":"fixed","description":"Worker profiles always resolve with provider anthropic, so an OpenAI-provider repository would pair a gpt model with the anthropic provider once a launch reads it.","status":"resolved"}
+- rf:none | none | - | 2026-11-12 | #7353
+- ri:none | none | - | 2026-11-12 | #7353
+- rb:2026-11-12 | #7353
+- rf:tests | low | scripts/agent/agent-worker-profile.test.ts:134 | 2026-11-12 | #7353 | fixed
+- rx:{"round":"dd3b5a59-74d5-4d4c-9e63-af3029445ca1","category":"tests","severity":"low","file":"scripts/agent/agent-worker-profile.test.ts:134","disposition":"fixed","description":"renamed it.each title reads as a removed test; PR body needs a 置き換え line","status":"resolved"}
+- rf:none | none | - | 2026-11-12 | #7354
+- ri:bug-risks | low | scripts/lane/lane-relaunch.ts:33 | 2026-11-12 | #7354 | fixed
+- ri:comments | low | scripts/run/cut/run-cut-cli.ts:131 | 2026-11-12 | #7354 | fixed
+- rb:2026-11-12 | #7354
+- rf:bug-risks | medium | scripts/agent/agent-ship-cap.ts:24 | 2026-11-12 | #7354 | fixed
+- rf:comments | medium | docs/josh-commands-lane.md:150 | 2026-11-12 | #7354 | fixed
+- rf:project-conventions | low | scripts/lane/lane-relaunch.ts:24 | 2026-11-12 | #7354 | fixed
+- rf:tests | low | scripts/lane/lane-relaunch.ts:24 | 2026-11-12 | #7354 | fixed
+- rx:{"round":"88877323-ecfc-4594-8682-ea0cbdeb193e","category":"bug-risks","severity":"medium","file":"scripts/agent/agent-ship-cap.ts:24","disposition":"fixed","description":"An unranked ship model takes the Issue model even when stronger, so profiles [haiku, opus-high] with an opus Issue raise the pre-gate relaunch from Sonnet to Opus.","status":"resolved"}
+- rx:{"round":"88877323-ecfc-4594-8682-ea0cbdeb193e","category":"comments","severity":"medium","file":"docs/josh-commands-lane.md:150","disposition":"fixed","description":"Docs still say a pre-gate cut runs on Sonnet or JOSH_WORKER_SHIP_MODEL without the josh.worker cap, also at docs/environment-variables.md:87, docs/maintainers/josh-commands-run-rationale.md:122 and scripts/run/cut/run-cut-cli.ts:131.","status":"resolved"}
+- rx:{"round":"88877323-ecfc-4594-8682-ea0cbdeb193e","category":"project-conventions","severity":"low","file":"scripts/lane/lane-relaunch.ts:24","disposition":"fixed","description":"issue_labels near-copies fetch_current_labels in scripts/ci/pr-classification.ts:174.","status":"resolved"}
+- rx:{"round":"88877323-ecfc-4594-8682-ea0cbdeb193e","category":"tests","severity":"low","file":"scripts/lane/lane-relaunch.ts:24","disposition":"fixed","description":"The labels closure and issue_labels are never exercised because lane-relaunch.test.ts mocks resume_argv.","status":"resolved"}
+- rb:2026-11-12 | #7354
+- rf:assumptions | low | scripts/agent/agent-ship-cap.ts:29 | 2026-11-12 | #7354
+- rx:{"round":"15f0a1da-f672-455f-9a2c-1ed0ea33000c","previous":"88877323-ecfc-4594-8682-ea0cbdeb193e","category":"assumptions","severity":"low","file":"scripts/agent/agent-ship-cap.ts:29","description":"When the ship model is not among the josh.worker profiles (e.g. profiles [haiku, opus-high], Issue worker:haiku), the ship phase stays on Sonnet, above the Issue's Haiku; the Issue's spec ranks only by the profiles order, so this unranked case is a documented choice it leaves open, not a defect.","status":"new"}
+- rx:{"round":"15f0a1da-f672-455f-9a2c-1ed0ea33000c","previous":"88877323-ecfc-4594-8682-ea0cbdeb193e","category":"bug-risks","severity":"medium","file":"scripts/agent/agent-ship-cap.ts:24","description":"An unranked ship model takes the Issue model even when stronger, so profiles [haiku, opus-high] with an opus Issue raise the pre-gate relaunch from Sonnet to Opus.","disposition":"fixed","status":"resolved"}
+- rx:{"round":"15f0a1da-f672-455f-9a2c-1ed0ea33000c","previous":"88877323-ecfc-4594-8682-ea0cbdeb193e","category":"comments","severity":"medium","file":"docs/josh-commands-lane.md:150","description":"Docs still say a pre-gate cut runs on Sonnet or JOSH_WORKER_SHIP_MODEL without the josh.worker cap, also at docs/environment-variables.md:87, docs/maintainers/josh-commands-run-rationale.md:122 and scripts/run/cut/run-cut-cli.ts:131.","disposition":"fixed","status":"resolved"}
+- rx:{"round":"15f0a1da-f672-455f-9a2c-1ed0ea33000c","previous":"88877323-ecfc-4594-8682-ea0cbdeb193e","category":"project-conventions","severity":"low","file":"scripts/lane/lane-relaunch.ts:24","description":"issue_labels near-copies fetch_current_labels in scripts/ci/pr-classification.ts:174.","disposition":"fixed","status":"resolved"}
+- rx:{"round":"15f0a1da-f672-455f-9a2c-1ed0ea33000c","previous":"88877323-ecfc-4594-8682-ea0cbdeb193e","category":"tests","severity":"low","file":"scripts/lane/lane-relaunch.ts:24","description":"The labels closure and issue_labels are never exercised because lane-relaunch.test.ts mocks resume_argv.","disposition":"fixed","status":"resolved"}
+- rf:none | none | - | 2026-11-12 | #7355
+- rb:2026-11-12 | #7355
+- rf:bug-risks | low | scripts/issue/issue-file-worker.ts:60 | 2026-11-12 | #7355 | fixed
+- rf:comments | low | scripts/repo/repository-labels.test.ts:83 | 2026-11-12 | #7355 | fixed
+- rx:{"round":"2f06eb51-4fe0-4c6e-8aa6-324ec0655047","category":"bug-risks","severity":"low","file":"scripts/issue/issue-file-worker.ts:60","disposition":"fixed","description":"The same worker:<name> label given twice is refused as two worker labels; dedupe before for_labels.","status":"resolved"}
+- rx:{"round":"2f06eb51-4fe0-4c6e-8aa6-324ec0655047","category":"comments","severity":"low","file":"scripts/repo/repository-labels.test.ts:83","disposition":"fixed","description":"The new extra-labels describe sits between the entry-points comment and the block it describes.","status":"resolved"}
+- ri:none | none | - | 2026-11-12 | #7356
+- rb:2026-11-12 | #7356
+- rf:tests | medium | scripts/run/park/run-park-cli.ts:48 | 2026-11-12 | #7356 | fixed
+- rx:{"round":"4c1886b2-4fe8-427d-b8cb-94645943a852","category":"tests","severity":"medium","file":"scripts/run/park/run-park-cli.ts:48","disposition":"fixed","description":"No test drives run() with --escalate or the WORKER-only role mapping in claude-agent-argv.ts:113, so removing either ships green.","status":"resolved"}
+- ri:bug-risks | medium | scripts/backlog/backlog-drive-escalate.ts:95 | 2026-11-12 | #7357 | fixed
+- ri:bug-risks | medium | scripts/backlog/backlog-drive-stalled-retry.ts:125 | 2026-11-12 | #7357 | fixed
+- rb:2026-11-12 | #7357
+- rf:bug-risks | medium | scripts/backlog/backlog-drive-stalled-retry.ts:125 | 2026-11-12 | #7357 | fixed
+- rx:{"round":"ace920af-af0e-4a05-b652-c29c27f80f95","category":"bug-risks","severity":"medium","file":"scripts/backlog/backlog-drive-stalled-retry.ts:125","disposition":"fixed","description":"a refused resume left the escalation park in place, so the next sweep would step the already moved worker label up a second time","status":"resolved"}
+- rf:none | none | - | 2026-11-12 | #7358
+- rb:2026-11-12 | #7358
+- rf:bug-risks | medium | docs/package-settings.md:14 | 2026-11-12 | #7358 | fixed
+- rx:{"round":"a89509fb-60f9-41af-946a-4b4d5555a947","category":"bug-risks","severity":"medium","file":"docs/package-settings.md:14","disposition":"fixed","description":"The page and full example say josh.review_gate changes no review behavior, but \"ci\" disables the round-one in-size skip (review-round-one-skip.ts:42).","status":"resolved"}
+- rb:2026-11-12 | #7373
+- rf:none | none | - | 2026-11-12 | #7373
+- rf:none | none | - | 2026-11-12 | #7379
+- ri:none | none | - | 2026-11-12 | #7379
+- rb:2026-11-12 | #7379
+- rf:bug-risks | medium | scripts/lane/lane-elapsed-time.ts:97 | 2026-11-12 | #7379 | fixed
+- rx:{"round":"8ad34edd-fd43-49d7-825e-ec5b7f01fd62","category":"bug-risks","severity":"medium","file":"scripts/lane/lane-elapsed-time.ts:97","disposition":"fixed","description":"A split run is excluded from its dispatch, so reusing legacy outside intervals classifies actual pre-split work as automatic wait; construct only actual waiting intervals.","status":"resolved"}
+- rb:2026-11-12 | #7380
+- rf:none | none | - | 2026-11-12 | #7380
+- rf:none | none | - | 2026-11-12 | #7381
+- ri:none | none | - | 2026-11-12 | #7381
+- ri:none | none | - | 2026-11-12 | #7381
+- rb:2026-11-12 | #7381
+- rf:none | none | - | 2026-11-12 | #7381
+- rf:none | none | - | 2026-11-12 | #7386
+- rb:2026-11-12 | #7386
+- rf:none | none | - | 2026-11-12 | #7386

@@ -1,1 +1,0 @@
-- rf:comments | low | scripts/gate/scoped-green.ts:171 | 2026-10-27 | #5156

@@ -1,3 +1,0 @@
-- rf:none | none | - | 2026-11-11 | #7314
-- k:followup-unrelated-test-rerun | d1 | 2026-11-11 | scripts/test/test-related-touched.test.ts | followup reran Unit Tests (6/6); failed outside the change: pure scripts/test/test-related-touched.test.ts > test_related_touched.touched_tests > adds the pinned registry tests to a command-table change
-- k:followup-unrelated-test-rerun | d1 | 2026-11-11 | scripts/test/test-related-touched.test.ts | followup reran Unit Tests (4/6); failed outside the change: pure scripts/test/test-related-touched.test.ts > test_related_touched.touched_tests > adds the pinned registry tests to a command-table change

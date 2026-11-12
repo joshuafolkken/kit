@@ -1,1 +1,0 @@
-- rf:bug-risks | low | scripts/review/selfcheck-report.ts:33 | 2026-10-31 | #5540

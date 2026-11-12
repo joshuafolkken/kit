@@ -1,2 +1,0 @@
-- rf:bug-risks | low | scripts/run/ship/run-ship-steps.ts:94 | 2026-11-02 | #5767
-- rf:tests | low | scripts/run/ship/run-ship-steps.test.ts:156 | 2026-11-02 | #5767

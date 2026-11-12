@@ -1,2 +1,0 @@
-- rf:bug-risks | low | scripts/lane/lane-breakdown-pinned.ts:48 | 2026-10-27 | #5078
-- rf:bug-risks | low | scripts/lane/lane-breakdown-pinned.ts:19 | 2026-10-27 | #5078

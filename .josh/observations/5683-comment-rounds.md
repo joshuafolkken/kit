@@ -1,1 +1,0 @@
-- rf:bug-risks | medium | scripts/josh/josh-commands-issue-write.ts:159 | 2026-11-01 | #5683 | fixed

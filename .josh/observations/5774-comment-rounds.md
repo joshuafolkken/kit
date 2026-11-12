@@ -1,2 +1,0 @@
-- rf:assumptions | low | scripts/gh/git-pr-checks-missing.ts:27 | 2026-11-01 | #5774
-- rf:project-conventions | low | .josh/metrics-accepted/5774.json:2 | 2026-11-01 | #5774

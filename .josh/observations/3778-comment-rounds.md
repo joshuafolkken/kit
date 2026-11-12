@@ -1,2 +1,0 @@
-- rf:security | medium | scripts/auth/claude-token-output.ts:35 | 2026-10-14 | #3778
-- rf:bug-risks | low | scripts/auth/auth-setup-cli.ts:57 | 2026-10-14 | #3778

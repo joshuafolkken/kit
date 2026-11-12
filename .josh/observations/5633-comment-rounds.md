@@ -1,1 +1,0 @@
-- rf:bug-risks | low | scripts/ui/ui-shot-cli.ts:48 | 2026-11-01 | #5633

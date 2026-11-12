@@ -1,1 +1,0 @@
-- rf:tests | low | scripts/delegation/investigation-reads.refused-dispatch.test.ts:19 | 2026-10-23 | #4721

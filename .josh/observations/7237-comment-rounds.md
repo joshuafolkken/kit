@@ -1,2 +1,0 @@
-- rf:tests | low | scripts/lib/poll.test.ts:253 | 2026-11-11 | #7237 | fixed
-- rf:tests | low | scripts/lib/poll.test.ts:253 | 2026-11-11 | #7237

@@ -1,1 +1,0 @@
-- rf:project-conventions | low | scripts/security/sonar-config.test.ts:58 | 2026-10-26 | #5072

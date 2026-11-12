@@ -1,1 +1,0 @@
-- rf:project-conventions | low | scripts/rules/lane-direct-tool.ts:143 | 2026-10-27 | #5147

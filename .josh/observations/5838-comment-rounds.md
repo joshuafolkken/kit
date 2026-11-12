@@ -1,3 +1,0 @@
-- rf:comments | medium | .claude/skills/workflow-commands/issue-scout.md:28 | 2026-11-02 | #5838
-- rf:assumptions | low | scripts/epic/epic-bundle-recommend.ts:26 | 2026-11-02 | #5838
-- rf:none | none | - | 2026-11-02 | #5838

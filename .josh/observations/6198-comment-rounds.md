@@ -1,2 +1,0 @@
-- rf:bug-risks | low | scripts/lane/lane-why.ts:93 | 2026-11-04 | #6198
-- rf:bug-risks | low | scripts/lane/lane-sinks.ts:112 | 2026-11-04 | #6198

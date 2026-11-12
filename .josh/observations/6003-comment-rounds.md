@@ -1,1 +1,0 @@
-- rf:security | medium | scripts/rules/secret-paths.ts:56 | 2026-11-03 | #6003

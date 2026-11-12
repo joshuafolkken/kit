@@ -1,2 +1,0 @@
-- rf:bug-risks | low | scripts/lane/lane-why-causes.ts:30 | 2026-11-09 | #6679
-- rf:bug-risks | low | scripts/lane/lane-why-causes.ts:77 | 2026-11-09 | #6679

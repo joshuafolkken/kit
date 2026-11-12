@@ -1,4 +1,0 @@
-- rf:bug-risks | medium | scripts/followup/followup-coderabbit-retrigger.ts:249 | 2026-11-10 | #7079 | fixed
-- rf:project-conventions | medium | scripts/josh/josh-commands-issue-write.ts:152 | 2026-11-10 | #7079 | fixed
-- rf:project-conventions | low | .claude/skills/workflow-commands/followup.md:30 | 2026-11-10 | #7079 | fixed
-- rf:comments | low | scripts/lane/lane-ledger-write.ts:61 | 2026-11-10 | #7079

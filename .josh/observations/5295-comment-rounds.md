@@ -1,1 +1,0 @@
-- rf:bug-risks | low | scripts/followup/followup-ci-path.ts:47 | 2026-10-28 | #5295

@@ -1,1 +1,0 @@
-- rf:tests | low | scripts/rules/shell-shape-filing-fixture.ts:75 | 2026-10-22 | #4517

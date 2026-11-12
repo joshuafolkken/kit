@@ -1,4 +1,0 @@
-- rf:bug-risks | medium | scripts/run/merge/run-merge-decision.ts:54 | 2026-11-04 | #6339
-- rf:bug-risks | medium | scripts/run/merge/run-merge-decision.ts:60 | 2026-11-04 | #6339
-- rf:bug-risks | medium | scripts/run/merge/run-merge-decision.ts:54 | 2026-11-04 | #6339 | fixed
-- rf:bug-risks | medium | scripts/run/merge/run-merge-decision.ts:60 | 2026-11-04 | #6339 | fixed

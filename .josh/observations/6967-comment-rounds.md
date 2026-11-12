@@ -1,1 +1,0 @@
-- rf:bug-risks | low | scripts/hooks/pretool-guard.ts:148 | 2026-11-10 | #6967

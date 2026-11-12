@@ -1,2 +1,0 @@
-- rf:assumptions | low | scripts/gate/check-inputs.ts:21 | 2026-10-18 | #4085
-- rf:project-conventions | low | scripts/josh/gate-cache-flags.test.ts:152 | 2026-10-18 | #4085

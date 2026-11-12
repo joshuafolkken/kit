@@ -1,1 +1,0 @@
-- rf:bug-risks | medium | scripts/hooks/implementation-shell-read.ts:40 | 2026-11-04 | #6240

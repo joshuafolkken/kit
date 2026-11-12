@@ -1,2 +1,0 @@
-- rf:bug-risks | low | scripts/issue/measure-declaration.ts:28 | 2026-11-03 | #6016
-- rf:bug-risks | low | scripts/issue/measure-declaration.ts:28 | 2026-11-03 | #6016

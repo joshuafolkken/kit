@@ -1,2 +1,0 @@
-- rf:security | medium | scripts/rules/shell-permissions.ts:21 | 2026-11-04 | #6244
-- rf:bug-risks | medium | scripts/rules/shell-permissions.ts:24 | 2026-11-04 | #6244

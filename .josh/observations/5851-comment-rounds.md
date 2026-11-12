@@ -1,2 +1,0 @@
-- rf:bug-risks | low | scripts/issue/issue-read-cli.ts:85 | 2026-11-02 | #5851
-- rf:project-conventions | low | scripts/issue/issue-read-cli.ts:8 | 2026-11-02 | #5851

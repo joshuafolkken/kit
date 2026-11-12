@@ -1,1 +1,0 @@
-- rf:bug-risks | low | scripts/issue/issue-sample-required.ts:19 | 2026-10-25 | #4901

@@ -1,1 +1,0 @@
-- rf:project-conventions | low | scripts/rules/lane-carry-conflict.ts:103 | 2026-11-02 | #5845

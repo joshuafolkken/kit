@@ -1,2 +1,0 @@
-- rf:bug-risks | low | .github/workflows/ci.yml:427 | 2026-10-21 | #4449
-- rf:security | low | .github/workflows/ci.yml:444 | 2026-10-21 | #4449

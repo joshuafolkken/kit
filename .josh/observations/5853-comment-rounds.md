@@ -1,5 +1,0 @@
-- rf:assumptions | medium | .claude/skills/dependency-update/SKILL.md:27 | 2026-11-02 | #5853
-- rf:bug-risks | low | scripts/overrides/overrides-diff.ts:53 | 2026-11-02 | #5853
-- rf:bug-risks | low | scripts/overrides/overrides-check.ts:75 | 2026-11-02 | #5853
-- rf:comments | low | .claude/skills/dependency-update/SKILL.md:27 | 2026-11-02 | #5853
-- rf:none | none | - | 2026-11-02 | #5853
