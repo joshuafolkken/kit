@@ -68,6 +68,9 @@ describe('broad_investigation_shell.is_broad_command — the narrow', () => {
 		'cat <<EOF\nbody\nEOF',
 		'git status',
 		'git diff | rg TODO',
+		// joshuafolkken/kit#7338: a quoted `|` stays in the pattern rather than naming a path.
+		'rg "a|b" short.ts',
+		"grep -n 'a;b' short.ts",
 	])('lets %s through', (command) => {
 		expect(is_broad_command(command)).toBe(false)
 	})

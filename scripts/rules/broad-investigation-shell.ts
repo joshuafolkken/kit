@@ -2,6 +2,7 @@ import { readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { time_josh_names } from '#scripts/time-runtime/time-josh-names'
 import { shell_segments } from './shell-segments'
+import { shell_tokens } from './shell-tokens'
 
 // Which shell commands are broad investigation (joshuafolkken/kit#5351): a search over a tree, a
 // read past the line cap, an aggregation script. A narrow check — a bounded range of one file, a
@@ -19,7 +20,6 @@ const LINE_COUNT_PREFIXES = ['--lines=', '-n', '-']
 const DIGITS = /^\d+$/u
 const FROM_LINE = /^\+\d+$/u
 const QUOTES = /^['"]|['"]$/gu
-const WHITESPACE = /\s+/u
 const ASSIGNMENT = /^\w+=/u
 const ALWAYS_BROAD: ReadonlySet<string> = new Set(['find', 'for', 'node', 'python', 'python3'])
 const ANALYSIS_PREFIX = 'josh cost:'
@@ -139,7 +139,7 @@ const COMMAND_TESTS: ReadonlyMap<string, CommandTest> = new Map([
 ])
 
 function words_of(segment: string): Array<string> {
-	const words = segment.split(WHITESPACE).map((word) => word.replaceAll(QUOTES, ''))
+	const words = shell_tokens.words_of(segment).map((word) => word.text.replaceAll(QUOTES, ''))
 	const start = words.findIndex((word) => !ASSIGNMENT.test(word))
 
 	return start === -1 ? [] : words.slice(start)

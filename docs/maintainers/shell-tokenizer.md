@@ -2,6 +2,16 @@
 
 The guards read a Bash line through `scripts/rules/shell-tokens.ts`, a hand-written tokenizer, and `scripts/rules/shell-segments.ts` cuts the line where that tokenizer puts a control operator or a compound command's opening word (joshuafolkken/kit#7334). The other modules that parse a line move onto it in later children of the same epic.
 
+## The argument readers' words
+
+`shell_tokens.words_of` is the word reading for the readers that inspect a command's arguments rather than cut the line: `shell-redirects.ts` and `broad-investigation-shell.ts` (joshuafolkken/kit#7338).
+
+- A word ends at whitespace or an unquoted operator; its text is the typed line's.
+- A `;`, `&` or `|` inside quotes or after a backslash stays in its word, so `rg "a|b" f` names one pattern, not the path `b"`.
+- A quoted space still cuts, as the readers' former whitespace split did.
+
+`shell-permissions.ts` reads the words `git_argv.words_of` gives, and `shell-body-trigger.ts` matches a quoted value's text. Neither cuts the line itself.
+
 ## Why not a parser package
 
 `pnpm josh pkg:scout shell tokenizer split quote` (2026-11-12) named two shell candidates: `shell-quote@1.12.0` and `shlex@3.0.0`. Both were rejected because of what they return:

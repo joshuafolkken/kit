@@ -1,0 +1,7 @@
+{
+	"reason": "#7338: shell_tokens.words_of gives the argument readers one quote-aware word reading on the shared tokenizer, replacing their own whitespace splits",
+	"date": "2026-11-12",
+	"growth": {
+		"scripts.code_lines": 22
+	}
+}
