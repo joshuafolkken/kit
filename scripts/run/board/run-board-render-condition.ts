@@ -57,8 +57,17 @@ function value_of(reason: RowReason, header: BoardHeader): string {
 
 // The row's reason after its title, `cut` columns given up as `reason_text` gives them, its pull
 // request linked.
+function evidence_linked(text: string, url: string, header: BoardHeader): string {
+	return header.comment_link?.(text, url) ?? text
+}
+
 function tail_of(row: BoardRow, cut: number, header: BoardHeader): string {
-	return pr_linked(run_board_render_title.reason_text(row, cut) ?? '', row.reason?.pr, header)
+	const text = run_board_render_title.reason_text(row, cut) ?? ''
+	const url = row.reason?.evidence_url
+
+	return url === undefined
+		? pr_linked(text, row.reason?.pr, header)
+		: evidence_linked(text, url, header)
 }
 
 // A finished row's end, `MM-DD HH:MM`, emphasized while fresh (joshuafolkken/kit#4292); blank where

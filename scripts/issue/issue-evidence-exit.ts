@@ -4,6 +4,7 @@ import { cli_body } from '#scripts/josh/cli-body'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { error_text } from '#scripts/lib/error-message'
 import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
+import { issue_outcome } from './issue-outcome'
 
 // The shape every evidence exit shares — `josh issue:already-done` and `josh issue:measured`: the
 // evidence comment, the exit's own finishing write, then the `run:release`, in that order.
@@ -14,7 +15,7 @@ import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
 
 const FAILURE_EXIT_CODE = 1
 const EVIDENCE_FILE_FLAG = '--evidence-file'
-const OPTIONS = { 'evidence-file': { type: 'string' } } as const
+const OPTIONS = { 'evidence-file': { type: 'string' }, outcome: { type: 'string' } } as const
 
 interface EvidenceRequest {
 	issue_number: string
@@ -41,7 +42,10 @@ function parse_request(argv: ReadonlyArray<string>): EvidenceRequest | undefined
 	const evidence = cli_body.read_file_or_stdin(file_path).trim()
 	if (evidence.length === 0) throw new Error(`Evidence file is empty: ${file_path}`)
 
-	return { issue_number, evidence }
+	return {
+		issue_number,
+		evidence: issue_outcome.body_of({ body: evidence, summary: parsed.values.outcome }),
+	}
 }
 
 // A file-read failure or an empty file is an `Error` naming the path, printed as-is; every other

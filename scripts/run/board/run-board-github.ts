@@ -126,6 +126,13 @@ function is_unlisted(issue: number, read: OpenRead): boolean {
 	return open !== undefined && !open.has(issue)
 }
 
+// A late evidence note or a failed comment read is retried at the existing GitHub read interval.
+function is_closed_cached(issue: number, read: OpenRead): boolean {
+	const closed = read.closed.get(issue)
+
+	return closed?.is_merged === true || closed?.outcome !== undefined
+}
+
 // A child still drawn stopped or running holds no closed read of this launch — any it holds closed
 // before it relaunched — so it is asked again. A running child is asked too while the plan read fails:
 // the kept plan still lists it, and an empty listing — failed, or a repository whose last open issue
@@ -141,7 +148,7 @@ function is_closed_candidate(
 	if (ALWAYS_ASKED_STATES.has(status.state)) return true
 	if (status.state === RUNNING_STATE) return is_plan_failed || is_unlisted(issue, read)
 
-	return is_unlisted(issue, read) && !read.closed.has(issue)
+	return is_unlisted(issue, read) && !is_closed_cached(issue, read)
 }
 
 // An ended run asks until one ask after it ended has answered whole, then holds what it has, as its

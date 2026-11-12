@@ -1,4 +1,5 @@
 import type { AgentResult } from '#scripts/agent/agent-event'
+import type { IssueOutcome } from '#scripts/issue/issue-outcome'
 import type { Span } from '#scripts/lane/lane-spans'
 import type { PrChecks } from '#scripts/run/event/run-event-checks'
 import { run_event_retry } from '#scripts/run/event/run-event-retry'
@@ -40,6 +41,7 @@ type ItemState =
 	| 'unknown'
 
 interface ItemStatus {
+	outcome?: IssueOutcome | undefined
 	state: ItemState
 	// When the child first launched in this run — a re-dispatch or a restart does not move it.
 	started_ms?: number | undefined
@@ -395,7 +397,15 @@ function settle_closed(
 	statuses: ReadonlyMap<number, ItemStatus>,
 	read: OpenRead,
 ): ReadonlyMap<number, ItemStatus> {
-	return new Map([...statuses].map(([issue, status]) => [issue, settled(issue, status, read)]))
+	return new Map(
+		[...statuses].map(([issue, status]) => {
+			const closed = read.closed.get(issue)
+			const outcome =
+				closed === undefined || is_closed_before_launch(status, closed) ? undefined : closed.outcome
+
+			return [issue, run_board_settle.with_outcome(settled(issue, status, read), outcome)]
+		}),
+	)
 }
 
 function is_run_stop(event: RunEvent | undefined): boolean {
