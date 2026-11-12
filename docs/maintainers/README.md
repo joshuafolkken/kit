@@ -113,6 +113,8 @@ so a split is a publish boundary, not a topic one.
 
 ## The observation ledger
 
+- [observations-flush-recovery.md](./observations-flush-recovery.md) — flushing and recovering observation records
+
 [`.josh/observations/`](../../.josh/observations/) holds one file per Issue: the review findings and
 observations a run recorded. `josh` commands write it. It sits outside `docs/` because its files are
 data lines, not documents (joshuafolkken/kit#3341).
