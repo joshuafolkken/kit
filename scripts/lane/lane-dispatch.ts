@@ -1,4 +1,4 @@
-import { agent_argv, type AgentArgv, type AgentArgvResult } from '#scripts/agent/agent-argv'
+import type { AgentArgv } from '#scripts/agent/agent-argv'
 import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
 import type { LabelWrite } from '#scripts/gh/git-gh-issue-write'
 import { issue_cite } from '#scripts/issue/issue-cite'
@@ -10,15 +10,14 @@ import { detached_launch, type LaunchArgv } from '#scripts/run/detached-launch'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_park } from '#scripts/run/park/run-park'
-import { run_ending } from '#scripts/run/run-ending'
 import { run_label } from '#scripts/run/run-label'
 import { lane_child_invocation } from './lane-child-invocation'
 import { lane_child_marker } from './lane-child-marker'
 import { lane_dispatch_log } from './lane-dispatch-log'
+import { lane_dispatch_prepare } from './lane-dispatch-prepare'
 import { lane_ledger_write } from './lane-ledger-write'
 import { lane_output } from './lane-output'
 import { lane_registry, type LaneInfo } from './lane-registry'
-import { lane_resume, type ResumePlan } from './lane-resume'
 import { lane_seat_start } from './lane-seat-start'
 import { lane_state } from './lane-state'
 import { openai_lane_supervisor } from './openai-lane-supervisor'
@@ -51,7 +50,6 @@ const WARNING_RECOVERY =
 // once rather than inlined at each use.
 const LABEL_UNSET_KIND = 'label-unset'
 const RESTART_START = 'restart'
-// The role a lane child runs under, resolved once so the fresh and resume builders read the same one.
 
 interface Dispatched {
 	kind: 'dispatched'
@@ -92,16 +90,6 @@ interface StartRequest {
 	profile: AgentProfile
 	resumed_from: string | undefined
 }
-
-type Prepared =
-	| {
-			kind: 'prepared'
-			invocation: string
-			argv: AgentArgv
-			profile: AgentProfile
-			resumed_from: string | undefined
-	  }
-	| { kind: 'rejected'; note: string }
 
 /** The prompt the headless child is given: `fullrun #<N>`, and nothing a caller supplied verbatim. */
 function child_invocation(issue: string): string {
@@ -276,44 +264,6 @@ async function started(request: StartRequest): Promise<DispatchOutcome> {
 	return await dispatched_start(request, result.pid, notes, nonce)
 }
 
-// Build the argv the plan calls for: a resume carries the stored session id, a fresh start does not.
-// Both run the same profile diagnostics under the already-resolved profile, so a resume is refused for
-// exactly the reasons a fresh dispatch is.
-function built_for(plan: ResumePlan, profile: AgentProfile, lane: LaneInfo): AgentArgvResult {
-	if (plan.kind === 'resume') {
-		return agent_argv.with_resume_in(plan.invocation, profile, plan.session_id, lane.directory)
-	}
-
-	return agent_argv.with_profile_in(plan.invocation, profile, lane.directory)
-}
-
-// **The re-dispatch decides resume-or-fresh from the lane's own exit record**.
-// The record is read from the log the previous dispatch of this lane wrote — a first dispatch finds
-// none and starts fresh, an `outage` ending with a session id resumes it. The provider is resolved
-// first because the resume mechanism is Claude Code's, and an OpenAI lane falls back to fresh. **A
-// fresh dispatch never reads the record**: a person restarting a child (`lane:restart`) wants a new
-// session that reads the Issue from the start, whatever the previous one ended on.
-function prepared(lane: LaneInfo, is_fresh: boolean): Prepared {
-	const resolved = agent_role_profile.resolve(agent_role_profile.WORKER)
-
-	if (resolved.kind === 'rejected') return resolved
-
-	const record = is_fresh ? undefined : run_ending.read_exit(default_log_path(lane))
-	const plan = lane_resume.plan(lane.issue, record, resolved.profile.provider)
-	const built = built_for(plan, resolved.profile, lane)
-
-	if (built.kind === 'rejected') return built
-	const resumed_from = plan.kind === 'resume' ? plan.session_id : undefined
-
-	return {
-		kind: 'prepared',
-		invocation: plan.invocation,
-		argv: built.argv,
-		profile: built.profile,
-		resumed_from,
-	}
-}
-
 // **The parent claims the marker before it starts the child**, so the window in which a running child
 // is uncounted closes at dispatch rather than tens of minutes later once the child's own `fullrun` gets
 // to its (idempotent) apply. `issue_add_label` creates the label if the repository lacks it — a
@@ -400,7 +350,7 @@ async function dispatch_child(
 	const lane = await lane_registry.find_open_lane(issue)
 
 	if (lane === undefined) return { kind: 'no-lane' }
-	const built = prepared(lane, start === RESTART_START)
+	const built = lane_dispatch_prepare.prepared(lane, start === RESTART_START)
 	const log_path = default_log_path(lane)
 
 	if (built.kind === 'rejected') return { kind: 'failed', lane, log_path, note: built.note }

@@ -25,6 +25,10 @@ const LEDGER_DIRECTORIES: ReadonlyArray<string> = [
 
 const LEDGER_FILE_EXTENSION = '.md'
 
+// The suffix of a closed issue's carried comment rounds, `<issue>-comment-rounds.md` — named here
+// because both the carry that writes it and the archive that moves it read it.
+const CARRIED_ROUNDS_SUFFIX = '-comment-rounds'
+
 // What the single-file ledgers held is moved here (`observation-ledger-migrate.ts`), so no line is
 // lost to the split.
 const LEGACY_LEDGER_FILE = `legacy${LEDGER_FILE_EXTENSION}`
@@ -135,6 +139,7 @@ const observation_ledger = {
 }
 
 export {
+	CARRIED_ROUNDS_SUFFIX,
 	LEDGER_DIRECTORIES,
 	LEDGER_EXCLUSION_PATHSPEC,
 	LEDGER_FILE_EXTENSION,

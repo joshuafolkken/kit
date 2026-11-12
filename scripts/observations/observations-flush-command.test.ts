@@ -84,6 +84,10 @@ vi.mock('#scripts/review/review-comment-carry', () => ({
 		discard_uncommitted: vi.fn(),
 	},
 }))
+// The archive reads GitHub and moves this checkout's ledger files, so it is mocked like the carry.
+vi.mock('./observation-ledger-archive', () => ({
+	observation_ledger_archive: { archive_reported: vi.fn(async () => 0) },
+}))
 
 const HOOK_REJECTION = 'cspell found an unknown word'
 const CHECKOUT_FAILURE = 'index.lock exists'
@@ -174,7 +178,7 @@ describe('observations_flush — the success path command sequence', () => {
 		expect(git_command.push).toHaveBeenCalled()
 		expect(git_gh_command.pr_create).toHaveBeenCalledWith(
 			observations_flush.COMMIT_MESSAGE,
-			observations_flush.pull_request_body(),
+			observations_flush.pull_request_body(0),
 			'ignore-for-release',
 		)
 	})

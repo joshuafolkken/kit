@@ -129,7 +129,11 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			"Print each delivered rule's unaided compliance — runs reached, kept rate, refusals",
 		category: 'AI tools',
-		reference: ['[--fresh | --refresh | --period <days> | --prose]', 'developer', ['files']],
+		reference: [
+			'[--fresh | --refresh | --period <days> | --weekly <rule-id>... | --prose]',
+			'developer',
+			['files'],
+		],
 		usage: {
 			examples: [
 				{ arguments: '', note: 'a reading cached under 15 minutes ago, else measure' },
@@ -141,6 +145,10 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 				{
 					arguments: '--period 7',
 					note: 'measure only the transcripts written in the last 7 days, cache untouched',
+				},
+				{
+					arguments: '--weekly <rule-id>...',
+					note: 'reached / refused / rephrased of the named rules, one line per week',
 				},
 				{ arguments: '--prose', note: 'class each prose rule: enforced, measured or prose only' },
 			],

@@ -689,6 +689,13 @@ It commits only the ledger lines (`.josh/observations/`) no run's own commit car
 
 It first carries the closed issues' comment rounds no lane carries into `<N>-comment-rounds.md`, in the same pull request.
 
+Then it archives:
+
+- Each closed issue's `<N>.md` and `<N>-comment-rounds.md` move, verbatim and in name order, into `archive-YYYY-MM.md` for the month the issue closed. The state and close date come from one GitHub GraphQL query per 100 issues.
+- An archived rounds file's issue is listed in `archived-comment-rounds.txt`, so the carry does not read it again.
+- Open issues' files, date files, and issues GitHub did not answer stay where they are. A failed read moves nothing; the next flush retries.
+- Every reader still reads the archive files, so its counts do not change. The pull request body says lines were moved and none dropped.
+
 **Behavior:** refused off the default branch or beside any other change; prints `clean` when there is nothing to commit. `pnpm josh run:tail` runs it after a merge.
 
 Related: [`josh followup`](#josh-followup).

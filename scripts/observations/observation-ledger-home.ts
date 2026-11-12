@@ -131,6 +131,7 @@ const observation_ledger_home = {
 	ledger_date,
 	ledger_root,
 	read,
+	read_file,
 	writer_path,
 }
 
