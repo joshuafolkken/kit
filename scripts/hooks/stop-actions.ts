@@ -2,6 +2,7 @@ import { git_gh_repo } from '#scripts/gh/git-gh-repo'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { session_cite } from '#scripts/issue/session-cite'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
+import { home_tilde } from '#scripts/lib/home-tilde'
 import { stdout_on_stderr } from '#scripts/lib/stdout-on-stderr'
 import { telegram_test } from '#scripts/notify/telegram-test'
 import type { CliValues } from '#scripts/notify/telegram-test-logic'
@@ -71,13 +72,14 @@ async function issue_url_of(issue: string): Promise<string | undefined> {
 	}
 }
 
-// The body is the reply's opening copied into a Telegram, so its bare `#N` are linked (`issue-citation.md`).
+// The body is the reply's opening copied into a Telegram, so its bare `#N` are linked (`issue-citation.md`)
+// and its home directory is written as `~` before the cut (joshuafolkken/kit#7342).
 // The choices are the reply's own decision lines (joshuafolkken/kit#3961).
 function notify_values(issue_url: string | undefined, action: NotifyAction): CliValues {
 	const { recommended, alternative } = action.decision
 	const values: CliValues = {
 		'task-type': 'confirmation',
-		body: session_cite.text(summary_of(action.message)),
+		body: session_cite.text(summary_of(home_tilde.mask(action.message))),
 		recommended,
 		...(alternative !== undefined && { alternative: [alternative] }),
 	}

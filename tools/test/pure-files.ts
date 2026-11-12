@@ -1108,6 +1108,8 @@ const PURE_FILES: ReadonlyArray<string> = [
 	'scripts/git/git-path-quoting.test.ts',
 	'scripts/git/main-merge-budget-conflict.test.ts',
 	'scripts/hooks/hook-brevity.test.ts',
+	'scripts/hooks/implementation-shell-deny-expansion.test.ts',
+	'scripts/hooks/implementation-shell-deny-git.test.ts',
 	'scripts/hooks/implementation-shell-deny.test.ts',
 	'scripts/hooks/implementation-shell-handoff.test.ts',
 	'scripts/hooks/implementation-shell-nested.test.ts',
