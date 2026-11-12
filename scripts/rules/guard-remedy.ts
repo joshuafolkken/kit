@@ -60,8 +60,9 @@ const GUARD_REMEDIES: Readonly<Record<string, GuardRemedy>> = {
 	'rule-body': judgment('a trigger-plus-pointer line is written, not derived'),
 	'direct-filing': judgment(ANOTHER_COMMAND),
 	'unasked-filing': judgment(NO_RUN),
-	// `issue:comment` takes `--body-file`, and an inline `--body` names no file (joshuafolkken/kit#7330).
-	'direct-issue-comment': judgment(BODY_TO_FILE),
+	// A standalone `gh issue comment <N> --body-file <path>` run as `pnpm josh issue:comment`; an inline
+	// `--body` is refused, since `issue:comment` trims it and expands `\n` (joshuafolkken/kit#7330).
+	'direct-issue-comment': rewrite(),
 	'direct-issue-read': rewrite(), // a standalone `gh issue view <N>` run as `pnpm josh issue:read <N>`
 	'direct-git-status': judgment(
 		'the refusal is spent once per run and its reissue passes, so a rewrite saves at most one ' +

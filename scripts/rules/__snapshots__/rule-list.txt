@@ -17,9 +17,9 @@
   - silent: an unattended run (a kit-launched or headless session, a lane child, the `backlogrun` parent), `--check`, or a prompt that asks for filing
   - not automated: the call must not run at all, or only on a person's word — refusing is the remedy
 - **Direct issue comment** (`direct-issue-comment`, `shell-body.md`)
-  - fires: `pnpm josh pretool:guard` — a comment to the checkout's own repository outside `josh issue:comment` (`gh issue comment` with no `--repo`, or a `gh api` write to `repos/<owner>/<r>/issues/<N>/comments` whose owner is the `{owner}` placeholder or the checkout's own `owner/repo` spelled out); it points at `pnpm josh issue:comment`. Every occurrence
+  - fires: `pnpm josh pretool:guard` — a comment to the checkout's own repository outside `josh issue:comment` (`gh issue comment` with no `--repo`, or a `gh api` write to `repos/<owner>/<r>/issues/<N>/comments` whose owner is the `{owner}` placeholder or the checkout's own `owner/repo` spelled out); it points at `pnpm josh issue:comment`. A line that is only `gh issue comment <N>` with one `--body-file` / `-F <path>` is rewritten to `pnpm josh issue:comment <N> --body-file <path>`; every other form is refused, every occurrence
   - silent: `pnpm josh issue:comment`, or reading the comments — the path that writes the run marker
-  - not automated: the body moves to a file the call does not name
+  - not automated: the hook makes the same call right itself; it refuses only a spelling it cannot rewrite
 - **Direct issue read** (`direct-issue-read`, `issue-comments.md`)
   - fires: `pnpm josh pretool:guard` — a `gh api` GET of the checkout's own `repos/<o>/<r>/issues/<N>`, `…/comments` or `…/timeline` (the `{owner}` placeholder or the origin spelled out), or a `gh issue view <N>` of it, with no projection or one naming the body (or, for the view, the comments); it points at `pnpm josh issue:read`. A line that is only `gh issue view <N>`, with at most `-R` / `--repo <owner>/<repo>`, is rewritten to `pnpm josh issue:read <N>`; every other form is refused, every occurrence
   - silent: `pnpm josh issue:read` / `run:prep` / `run:entry`, a `--jq` / `--json` projection without the body or the comments, `gh issue view --web`, or another repository named outright

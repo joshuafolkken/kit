@@ -1,15 +1,12 @@
-import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
-import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { session_cite } from '#scripts/issue/session-cite'
-import { json_value } from '#scripts/lib/json-value'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
-import { time_shell } from '#scripts/time-runtime/time-shell'
 import { bash_triggers } from './bash-triggers'
 import { direct_pr_create } from './direct-pr-create'
 import { gh_api } from './gh-api'
 import { git_argv } from './git-argv'
 import { issue_comments } from './issue-comments'
 import { shell_segments } from './shell-segments'
+import { standalone_gh_call, type StandaloneCall } from './standalone-gh-call'
 
 // The `direct-issue-read` row of `delivered-rules.ts` (joshuafolkken/kit#4663). `pnpm josh issue:read`
 // is the one read that withholds a comment from an author without write access and marks an untrusted
@@ -172,23 +169,9 @@ function is_any_read(command: string): boolean {
 }
 
 const VIEW_WORDS = ['gh', ISSUE_GROUP, VIEW_ACTION]
-const WORD_SEPARATOR = ' '
-// A word with no shell syntax in it, so a line of them is one call with nothing chained or redirected.
-const PLAIN_WORD = /^[\w./=-]+$/u
 const REPO_SPELLING = /^(?:(?:-R|--repo) |--repo=)(?<repo>[\w.-]+\/[\w.-]+)$/u
 const ISSUE_READ_COMMAND = 'pnpm josh issue:read'
 const REPO_FLAG = '--repo'
-
-// The words after `gh issue view` on a line that is that one call alone, else `undefined`.
-function view_rest(line: string): ReadonlyArray<string> | undefined {
-	const words = line.split(WORD_SEPARATOR)
-	const is_view =
-		words.slice(0, VIEW_WORDS.length).join(WORD_SEPARATOR) === VIEW_WORDS.join(WORD_SEPARATOR)
-
-	return is_view && words.every((word) => PLAIN_WORD.test(word))
-		? words.slice(VIEW_WORDS.length)
-		: undefined
-}
 
 // The `--repo` pair `issue:read` takes for the view's flags: none, or one `<owner>/<repo>`.
 function carried_repo(flags: string): ReadonlyArray<string> | undefined {
@@ -198,34 +181,25 @@ function carried_repo(flags: string): ReadonlyArray<string> | undefined {
 	return repo === undefined ? undefined : [REPO_FLAG, repo]
 }
 
-function issue_read_of(rest: ReadonlyArray<string>): string | undefined {
-	const issues = rest.filter((word) => issue_number_shape.is_issue_number(word))
-	const flags = rest
-		.filter((word) => !issue_number_shape.is_issue_number(word))
-		.join(WORD_SEPARATOR)
-	const repo = issues.length === 1 ? carried_repo(flags) : undefined
+function issue_read_of(view: StandaloneCall): string | undefined {
+	const repo = carried_repo(view.flags)
 
 	return repo === undefined
 		? undefined
-		: [ISSUE_READ_COMMAND, ...issues, ...repo].join(WORD_SEPARATOR)
+		: standalone_gh_call.line_of([ISSUE_READ_COMMAND, view.issue, ...repo])
 }
 
 // `pnpm josh issue:read` for a refused read that is a standalone `gh issue view`, else `undefined`.
 // The word split runs first: it is cheap, and every Bash call passes through here.
 function issue_read_command(command: string): string | undefined {
-	const line = command.trim()
-	const rest = view_rest(line)
-	const read = rest === undefined ? undefined : issue_read_of(rest)
+	const view = standalone_gh_call.call_of(command, VIEW_WORDS)
+	const read = view === undefined ? undefined : issue_read_of(view)
 
-	return read !== undefined && is_direct_issue_read(line) ? read : undefined
+	return read !== undefined && is_direct_issue_read(command.trim()) ? read : undefined
 }
 
 function issue_read_input(call: GuardedCall): Record<string, unknown> | undefined {
-	if (call.name !== cost_blocks.BASH_TOOL || !json_value.is_record(call.input)) return undefined
-
-	const command = issue_read_command(time_shell.bash_command(call.input))
-
-	return command === undefined ? undefined : { ...call.input, command }
+	return standalone_gh_call.input_of(call, issue_read_command)
 }
 
 const ISSUE_READ_NOTE =

@@ -1,7 +1,7 @@
 {
-	"reason": "#7330: direct-issue-read rewrites a standalone gh issue view to issue:read (new rewrite path, ~50 code lines)",
+	"reason": "direct-issue-comment gains a body-file rewrite beside direct-issue-read's, both reading one shared standalone-gh-call module (#7330 AC4)",
 	"date": "2026-11-12",
 	"growth": {
-		"scripts.code_lines": 60
+		"scripts.code_lines": 124
 	}
 }

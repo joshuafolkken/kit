@@ -1,3 +1,4 @@
+import path from 'node:path'
 import { hook_context } from '#scripts/hooks/hook-context'
 import { hook_context_fixture } from '#tools/hooks/hook-context-fixture'
 import { temporary_directory } from '#tools/test/temporary-directory'
@@ -67,6 +68,67 @@ describe('direct_issue_comment.is_direct_issue_comment — is silent on', () => 
 		const command = 'gh api repos/joshuafolkken/kit/issues/5/comments -F body=@b.md'
 
 		expect(direct_issue_comment.is_direct_issue_comment(command, () => undefined)).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#7330: a standalone body-file post maps exactly onto `issue:comment`, which reads the
+// file as it is; an inline `--body` is trimmed and has `\n` expanded there, so it stays refused.
+const CWD_CONTEXT = hook_context_fixture.of(OUTSIDE_REPOSITORY, process.env)
+const ABSOLUTE_BODY = '/work/.josh/tmp/body.md'
+
+describe('direct_issue_comment.issue_comment_command — rewrites a standalone body-file post', () => {
+	it.each([
+		[`gh issue comment 7 --body-file ${ABSOLUTE_BODY}`, ABSOLUTE_BODY],
+		[`gh issue comment 7 -F ${ABSOLUTE_BODY}`, ABSOLUTE_BODY],
+		[`gh issue comment --body-file=${ABSOLUTE_BODY} 7`, ABSOLUTE_BODY],
+		[`  gh issue comment 7 --body-file ${ABSOLUTE_BODY}  `, ABSOLUTE_BODY],
+		['gh issue comment 7 -F .josh/tmp/b.md', path.join(OUTSIDE_REPOSITORY, '.josh/tmp/b.md')],
+	])('rewrites %j to read %j', (command, file) => {
+		expect(direct_issue_comment.issue_comment_command(command, CWD_CONTEXT)).toBe(
+			`pnpm josh issue:comment 7 --body-file ${file}`,
+		)
+	})
+
+	it.each([
+		'gh issue comment 7 --body x',
+		'gh issue comment 7 -b x',
+		'gh issue comment 7 --body-file -',
+		`gh issue comment 7 --body-file ${ABSOLUTE_BODY} --edit-last`,
+		`gh issue comment 7 --repo joshuafolkken/kit --body-file ${ABSOLUTE_BODY}`,
+		`gh issue comment 7 8 --body-file ${ABSOLUTE_BODY}`,
+		`gh issue comment 7 --body-file ${ABSOLUTE_BODY} && echo done`,
+		`gh issue comment 7 --body-file "${ABSOLUTE_BODY}"`,
+		'gh issue comment 7 --body-file $BODY',
+		`cd x && gh issue comment 7 --body-file ${ABSOLUTE_BODY}`,
+	])('leaves %j refused', (command) => {
+		expect(direct_issue_comment.issue_comment_command(command, CWD_CONTEXT)).toBeUndefined()
+	})
+})
+
+describe('direct_issue_comment.ROW.rewrite — the call made right', () => {
+	it('rewrites the Bash input, keeping its other fields, and nothing else', () => {
+		const command = `gh issue comment 7 -F ${ABSOLUTE_BODY}`
+		const input = { command, description: 'Post' }
+		const { rewrite } = direct_issue_comment.ROW
+
+		expect(rewrite({ name: 'Bash', input }, () => '', CWD_CONTEXT)).toEqual({
+			command: `pnpm josh issue:comment 7 --body-file ${ABSOLUTE_BODY}`,
+			description: 'Post',
+		})
+		expect(rewrite({ name: 'Read', input }, () => '', CWD_CONTEXT)).toBeUndefined()
+	})
+
+	it('rewrites to a call the row keeps', () => {
+		const command = `gh issue comment 7 -F ${ABSOLUTE_BODY}`
+		const rewritten = direct_issue_comment.ROW.rewrite(
+			{ name: 'Bash', input: { command } },
+			() => '',
+			CWD_CONTEXT,
+		)
+		const call = { name: 'Bash', input: rewritten }
+
+		expect(direct_issue_comment.ROW.keeps(call)).toBe(true)
+		expect(direct_issue_comment.ROW.is_trigger(call, CWD_CONTEXT)).toBe(false)
 	})
 })
 
