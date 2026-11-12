@@ -6,6 +6,7 @@ import { AGENT_HOOK_COMMANDS } from './josh-commands-agent-hooks'
 import { TEST_CHECK_COMMANDS } from './josh-commands-test-check'
 
 const NARROWED = { arguments: 'scripts/thing.ts', note: 'narrow by the given files instead' }
+const FORWARDED_TO_VITEST = 'flags are forwarded to vitest'
 // The unseeded ports are read from `ports/index.js`, their one definition (#818).
 const UNSEEDED: Readonly<Record<string, string | undefined>> = {}
 
@@ -50,13 +51,14 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/lint/lint-parallel-main.ts',
 		description: 'Check code with prettier and eslint (skips a tool a basic project lacks)',
 		category: 'Development',
-		reference: ['[--changed]', 'developer', ['processes']],
+		reference: ['[--changed] [--shard=<n>]', 'developer', ['processes']],
 		core_weight: core_weights.CORE_WEIGHTS.lint,
 		memory_mb: core_weights.MEMORY_MB.lint,
 		usage: {
 			examples: [
 				{ arguments: '' },
 				{ arguments: '--changed', note: "the branch's changed files — the gate's form" },
+				{ arguments: '--shard=1', note: 'one of two fixed halves of the tree (1 or 2) — a CI leg' },
 			],
 		},
 	},
@@ -241,7 +243,9 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Development',
 		reference: [FILTER_ARGUMENTS, 'developer', ['processes']],
 		...gate_plan.DIRECT_UNIT_CLAIM,
-		usage: { examples: [{ arguments: '' }] },
+		usage: {
+			examples: [{ arguments: '' }, { arguments: '--shard=1/3', note: FORWARDED_TO_VITEST }],
+		},
 	},
 	'test:related': {
 		script: 'scripts/test/test-related-main.ts',
@@ -253,7 +257,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 				{ arguments: '' },
 				NARROWED,
 				{ arguments: '--touched', note: "only the diff's tests and its modules' same-named ones" },
-				{ arguments: '--silent', note: 'flags are forwarded to vitest' },
+				{ arguments: '--silent', note: FORWARDED_TO_VITEST },
 			],
 		},
 	},

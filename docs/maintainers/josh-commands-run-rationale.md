@@ -242,7 +242,7 @@ Answer whether the next turn exceeds a threshold from active-provider usage. `--
 
 ## `josh time` in detail
 
-**Output:** the run-tree report `josh cost --run` builds — a header (session count, active wall clock, total dollars, run and merge counts, and counts of transcripts outside this run and unreadable ones), a by-role breakdown (cost and wall clock with their shares, session and request counts, preamble tokens), and a per-session list. When the run this checkout carries is unfinished, a run-state block (read from `run:carry` / `run:wake`) leads the report so a cut, handed-off or stalled run is surfaced at the front rather than buried. An unmeasured figure prints `not measured` rather than a zero.
+**Output:** the run-tree report `josh time --run` builds — a header (session count, active wall clock, total dollars, run and merge counts, and counts of transcripts outside this run and unreadable ones), a by-role breakdown (cost and wall clock with their shares, session and request counts, preamble tokens), and a per-session list. When the run this checkout carries is unfinished, a run-state block (read from `run:carry` / `run:wake`) leads the report so a cut, handed-off or stalled run is surfaced at the front rather than buried. An unmeasured figure prints `not measured` rather than a zero.
 
 `--split-at <ISO time>` adds a before → after block: each session goes to the side its first request falls on, and every role prints its wall-clock share, cost share and requests per session on both sides — `pnpm josh time --split-at 2026-10-16T21:33:19Z` reads a merge's effect on the run that spans it. An unparseable time is a usage error (exit 1).
 

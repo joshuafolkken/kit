@@ -66,6 +66,7 @@ Check code with prettier and eslint (skips a tool a basic project lacks).
 ```bash
 pnpm josh lint
 pnpm josh lint --changed   # the branch's changed files — the gate's form
+pnpm josh lint --shard=1   # one of two fixed halves of the tree (1 or 2) — a CI leg
 ```
 
 <!-- /usage -->
@@ -292,6 +293,7 @@ Run unit tests with Vitest (without Vitest: a basic project runs its own test sc
 
 ```bash
 pnpm josh test:unit
+pnpm josh test:unit --shard=1/3   # flags are forwarded to vitest
 ```
 
 <!-- /usage -->
@@ -578,7 +580,8 @@ See [init.md](./init.md) for the full file list and [`josh doctor`](#josh-doctor
 Sync config files.
 
 ```bash
-pnpm josh sync   # overwrite managed files
+pnpm josh sync           # overwrite managed files
+pnpm josh sync --force   # also replace a file you added to, dropping your additions
 ```
 
 <!-- /usage -->
@@ -661,6 +664,7 @@ pnpm josh git -y --skip-commit --skip-push   # open the PR without committing/pu
 
 - `-y` / `--yes` — run non-interactively; works without a TTY (agent or CI shell).
 - `--skip-commit` / `--skip-push` — recover/open a PR without a new commit or push.
+- `--body-file <path>` — extra PR body text after `closes #N`, from a file (`-` = stdin); use it when the text holds a backtick or `$`.
 
 <!-- /usage -->
 
