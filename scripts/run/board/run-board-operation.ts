@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { home_tilde } from '#scripts/lib/home-tilde'
 import { json_value } from '#scripts/lib/json-value'
 import { token_shape } from '#scripts/lib/token-shape'
 import { transcript_record, type TranscriptRecord } from '#scripts/lib/transcript-record'
@@ -63,12 +64,15 @@ function without_assignments(command: string): string {
 
 // The first line of what the command runs, cut to the limit. A command whose variable cannot be read
 // to its end is drawn as nothing: a part of the value would stand where the command should. A
-// credential later in the line is redacted before the cut, which would leave a head no shape matches.
+// credential later in the line is redacted before the cut, which would leave a head no shape matches;
+// the home directory is written as `~` before it too, so no part of the account name is left.
 function command_target(command: string): string {
 	const [first = ''] = without_assignments(command.trim()).split(NEWLINE)
 	if (UNREAD_ASSIGNMENT.test(first)) return ''
 
-	return cut(ascii_head(token_shape.redact(first).replaceAll(SPACES, ' ')))
+	const masked = home_tilde.mask(token_shape.redact(first))
+
+	return cut(ascii_head(masked.replaceAll(SPACES, ' ')))
 }
 
 // The path from `root` down; a file outside it is drawn by its name alone, never by where it is.

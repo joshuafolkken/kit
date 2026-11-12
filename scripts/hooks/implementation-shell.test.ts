@@ -103,7 +103,8 @@ const OTHER_REFUSED: ReadonlyArray<readonly [string, string]> = [
 	["cd ../6688 && sed -i '' 's/a/b/' notes.md", CD_WRITE],
 	// joshuafolkken/kit#6586 review round 2: an unread compound body and the other outside writers.
 	['case x in a) git push ;; esac', UNREAD_BODY],
-	['f() { git push; }; f', UNREAD_BODY],
+	// joshuafolkken/kit#7334: the segment cut reads a `name() {` body, so the write in it is named.
+	['f() { git push; }; f', '`git push`, a git write'],
 	['function f { git push; }; f', UNREAD_BODY],
 	['rsync -a /tmp/x/ ../6688/scripts/', '`rsync` to a runtime path outside'],
 	['install /tmp/a ../6688/scripts/a.ts', '`install` to a runtime path outside'],
