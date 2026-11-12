@@ -326,7 +326,8 @@ pnpm josh session:lang   # run by the UserPromptSubmit hook; `ja` prints nothing
 <!-- /usage -->
 
 - Timeout 10. Read via `process.loadEnvFile` (environment wins). Unset / empty / no-`.env` resolve to `ja`; `JOSH_SESSION_LANG=en` opts into English.
-- While a `backlogrun` is live in the repository, it prints one line telling the session to answer a progress question with `pnpm josh run:board --chat`, even a session not driving the run.
+- A live `backlogrun` tells sessions to answer progress-only questions with `pnpm josh run:board --chat`, verbatim in one code block.
+- Cause questions and improvement requests require relevant state, logs and code investigation, with evidence and uncertainty explained, even with quoted board lines. Mixed questions receive both the board and explanation.
 - On a consultation model (Fable, Codex Astra), a prompt carrying a `run:handoff` keyword gets one line pointing at [`josh run:handoff`](./josh-commands-board.md#josh-runhandoff). It reads the stdin payload (`prompt`, `transcript_path`, `model`); Codex wires the same hook in `.codex/hooks.json`.
 - Claude Code's payload names no model, so the transcript's last assistant turn does: a session's first prompt gets no line, and only the `run:entry` refusal catches it.
 

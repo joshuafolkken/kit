@@ -19,8 +19,8 @@ const ENGLISH_RESULT = { lang: 'en', is_default: false }
 const ENGLISH_LINE = `Session language (${ENV_KEY}): en`
 const SCOPE_LINE = agent_session_role.scope_line()
 const GIT_DIRECTORY = '/repository/.git'
-// Characters, a little above the line as written: it is injected on every prompt while a run is live.
-const BOARD_LINE_LIMIT = 130
+// Budget for the progress format and investigation scope, injected only while a run is live.
+const BOARD_LINE_LIMIT = 300
 
 function ports_of(
 	git_directory: string | undefined,
@@ -80,7 +80,7 @@ describe('prompt_lines', () => {
 	})
 
 	it('names the command to answer a progress question with', () => {
-		expect(BOARD_LINE).toContain('pnpm josh run:board --chat')
+		expect(BOARD_LINE).toContain('run `pnpm josh run:board --chat`; relay output')
 	})
 
 	it('prints the scope and language when no backlogrun is live', () => {
@@ -125,7 +125,24 @@ describe('lane child prompt guidance', () => {
 	)
 })
 
+// Wording contracts only; actual model responses are checked separately.
 describe('board line bound', () => {
+	it('limits board-only replies to progress-only questions', () => {
+		expect(BOARD_LINE).toContain('for progress-only questions')
+		expect(BOARD_LINE).toContain('verbatim in one code block')
+	})
+
+	it('requires evidence for cause and improvement questions, including quoted board lines', () => {
+		expect(BOARD_LINE).toContain(
+			'For cause or improvement questions, investigate state, logs and code',
+		)
+		expect(BOARD_LINE).toContain('cite evidence and uncertainty, even with quoted board lines')
+	})
+
+	it('requires progress and explanation for mixed questions', () => {
+		expect(BOARD_LINE).toContain('For mixed questions, do both')
+	})
+
 	it('keeps the board line within its bound', () => {
 		expect(BOARD_LINE.length).toBeLessThanOrEqual(BOARD_LINE_LIMIT)
 	})
