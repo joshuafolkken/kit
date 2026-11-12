@@ -1,7 +1,0 @@
-{
-	"reason": "最新停止と補完記録の一致、未知理由でも根拠URLを保持する共通処理に必要な24行。既存RowReasonと読取経路を再利用し、実本文はJSON fixtureへ分離した。",
-	"date": "2026-11-12",
-	"growth": {
-		"scripts.code_lines": 24
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "Splitting lane-dispatch.ts into lane-dispatch-prepare.ts adds the new module's imports, Prepared type and export lines (+10); behaviour unchanged, issue #7349 requires the split",
-	"date": "2026-11-12",
-	"growth": {
-		"scripts.code_lines": 10
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "Shared shell tokenizer plus compound-command cuts in shell-segments (case arms incl. multi-line patterns, { groups, function bodies) #7334",
-	"date": "2026-11-12",
-	"growth": {
-		"scripts.code_lines": 69
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "#7337: startups timed at the check are read against one live load sample (counting the caller's own lane only inside a lane), so a manual josh metrics beside other lanes warns instead of failing",
-	"date": "2026-11-12",
-	"growth": {
-		"scripts.code_lines": 16
-	}
-}

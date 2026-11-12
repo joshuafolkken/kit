@@ -1,7 +1,0 @@
-{
-	"reason": "home_tilde helper (#7342) masks the home directory on the run board and in the stop notification",
-	"date": "2026-11-12",
-	"growth": {
-		"scripts.code_lines": 16
-	}
-}

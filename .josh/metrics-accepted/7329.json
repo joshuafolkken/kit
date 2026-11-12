@@ -1,7 +1,0 @@
-{
-	"reason": "rule:value --period window (#7329): gather_window and print_period are the feature's code",
-	"date": "2026-11-12",
-	"growth": {
-		"scripts.code_lines": 24
-	}
-}

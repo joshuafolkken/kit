@@ -1,8 +1,0 @@
-{
-	"reason": "Shared fixture consumers must join touched verification through the existing direct-import scan; the async caller and regression tests require these additional lines.",
-	"date": "2026-11-12",
-	"growth": {
-		"scripts.code_lines": 13,
-		"prose.long_paragraphs": 1
-	}
-}
