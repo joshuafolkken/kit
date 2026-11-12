@@ -1,6 +1,7 @@
 import { run_board_fit } from './run-board-fit'
 import { run_board_labels } from './run-board-labels'
 import type { BoardRow } from './run-board-layout'
+import { run_board_pause } from './run-board-pause'
 
 // A row's title and the reason it makes room for — pure. A title is cut to the title column; a row
 // that says why it waits, or draws a tail, keeps its line on a narrow pane, its title giving up the
@@ -22,7 +23,13 @@ interface RowCut {
 const WHOLE: RowCut = { title_limit: TITLE_LIMIT, reason_cut: 0 }
 const WHOLE_TAIL_STATES: ReadonlySet<string> = new Set(['stopped', 'parked', 'human'])
 
+function has_short_reason(reason: BoardRow['reason']): boolean {
+	return reason?.evidence_url !== undefined || reason?.tail === run_board_pause.FALLBACK
+}
+
 function keeps_tail(row: BoardRow): boolean {
+	if (has_short_reason(row.reason)) return false
+
 	return WHOLE_TAIL_STATES.has(row.state) || row.reason?.icon === run_board_labels.STATE_ICONS.human
 }
 

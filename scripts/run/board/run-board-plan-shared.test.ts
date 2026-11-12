@@ -16,6 +16,16 @@ const MINUTE_MS = 60_000
 const AUTO_OK = 'auto-ok'
 
 const PLAN: BoardPlan = {
+	pause_reasons: new Map([
+		[
+			2,
+			{
+				summary: 'Approval needed',
+				at_ms: Date.parse(AT),
+				url: 'https://github.com/joshuafolkken/kit/issues/2#issuecomment-1',
+			},
+		],
+	]),
 	decision_questions: new Map([[2, 'Choose the account']]),
 	decision_waits: new Map([[3, '→ decide #2: Choose the account']]),
 	waves: {

@@ -2,11 +2,17 @@ import { epic_graph, type EpicChild, type IssueReference } from '#scripts/epic/e
 import { epic_issue } from '#scripts/epic/epic-issue'
 import { git_gh_etag_read } from '#scripts/gh/git-gh-etag-read'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
-import { has_label_name, NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
-import { issue_read } from '#scripts/issue/issue-read'
+import { has_label_name, has_parked_label, NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
+import { issue_read, type IssueComment } from '#scripts/issue/issue-read'
 import { run_board_decision } from './run-board-decision'
 import { run_board_decision_graphql, type ViewLoader } from './run-board-decision-graphql'
 import { run_board_layout, type BoardPlan } from './run-board-layout'
+import { run_board_pause, type PauseRecord } from './run-board-pause'
+
+interface CommentReasons {
+	question: string | undefined
+	pause: PauseRecord
+}
 
 interface DecisionNode extends EpicChild {
 	title: string
@@ -109,11 +115,11 @@ async function blocker_of(
 	return blockers.find((blocker) => blocker !== undefined) ?? terminal_of(node)
 }
 
-async function question_of(
+async function read_comments(
 	number: number,
 	repo: string,
 	answered: ReadonlyMap<number, string>,
-): Promise<readonly [number, string] | undefined> {
+): Promise<ReadonlyArray<IssueComment>> {
 	const json =
 		answered.get(number) ??
 		(await git_gh_issue_read.issue_list_comments(
@@ -122,23 +128,55 @@ async function question_of(
 			repo,
 			git_gh_issue_read.read_comments_conditionally,
 		))
-	const comments = await issue_read.parse_comments(json, repo)
-	const question = run_board_decision.comment_question(issue_read.trusted_bodies(comments ?? []))
 
-	return question === undefined ? undefined : [number, question]
+	return (await issue_read.parse_comments(json, repo)) ?? []
 }
 
-async function questions_of(plan: BoardPlan): Promise<ReadonlyMap<number, string>> {
+async function comments_of(
+	number: number,
+	repo: string,
+	answered: ReadonlyMap<number, string>,
+): Promise<ReadonlyArray<IssueComment>> {
+	try {
+		return await read_comments(number, repo, answered)
+	} catch {
+		return []
+	}
+}
+
+async function question_of(
+	number: number,
+	repo: string,
+	answered: ReadonlyMap<number, string>,
+): Promise<readonly [number, CommentReasons]> {
+	const comments = await comments_of(number, repo, answered)
+	const question = run_board_decision.comment_question(issue_read.trusted_bodies(comments))
+
+	return [number, { question, pause: run_board_pause.from_comments(comments) }]
+}
+
+function question_pair([number, value]: readonly [number, CommentReasons]): Array<
+	readonly [number, string]
+> {
+	return value.question === undefined ? [] : [[number, value.question]]
+}
+
+async function questions_of(
+	plan: BoardPlan,
+): Promise<Pick<BoardPlan, 'decision_questions' | 'pause_reasons'>> {
 	const { repo } = plan.context
 	const numbers = [...plan.labels]
-		.filter(([, labels]) => has_label_name(labels, NEEDS_DECISION_LABEL))
+		.filter(([, labels]) => has_parked_label(labels))
 		.map(([number]) => number)
 	const answered = await run_board_decision_graphql.read_comments(numbers, repo)
 	const pairs = await Promise.all(
 		numbers.map(async (number) => await question_of(number, repo, answered)),
 	)
 
-	return new Map(pairs.filter((pair) => pair !== undefined))
+	return {
+		decision_questions: new Map(pairs.flatMap((pair) => question_pair(pair))),
+		pause_reasons: new Map(pairs.map(([number, value]) => [number, value.pause])),
+	}
 }
 
 async function wait_of(
@@ -178,14 +216,14 @@ async function with_decisions(plan: BoardPlan | undefined): Promise<BoardPlan | 
 		...(plan.waves.running ?? []),
 	]
 	const read = read_of(plan, children)
-	const [decision_questions, waits] = await Promise.all([
+	const [questions, waits] = await Promise.all([
 		questions_of(plan),
 		Promise.all(children.map(async (child) => await wait_of(child, read))),
 	])
 
 	return {
 		...plan,
-		decision_questions,
+		...questions,
 		decision_waits: new Map(waits.filter((pair) => pair !== undefined)),
 	}
 }

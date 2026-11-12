@@ -15,6 +15,7 @@ import { run_board_ending_reason } from './run-board-ending-reason'
 import { run_board_human } from './run-board-human'
 import { run_board_human_merge } from './run-board-human-merge'
 import { run_board_kind, type BoardPriority } from './run-board-kind'
+import type { PauseRead } from './run-board-pause'
 import { run_board_standing_waits } from './run-board-standing-waits'
 import type { ItemState, ItemStatus } from './run-board-status'
 
@@ -29,7 +30,7 @@ import type { ItemState, ItemStatus } from './run-board-status'
 // **An epic and its children are a tree; every other dependency is not.** A child an opted-in epic
 // tracks is drawn under its epic; a `blocked_by` edge is a DAG, so it stays a waiting-on note at the end of the row.
 
-interface BoardPlan {
+interface BoardPlan extends PauseRead {
 	decision_questions?: ReadonlyMap<number, string> | undefined
 	decision_waits?: ReadonlyMap<number, string> | undefined
 	is_backlog_live?: boolean | undefined
@@ -111,7 +112,7 @@ interface BoardLayout {
 }
 
 // What an active row is named and classified by — each issue's title and labels.
-interface RowRead {
+interface RowRead extends PauseRead {
 	decision_questions?: ReadonlyMap<number, string> | undefined
 	is_backlog_live?: boolean | undefined
 	titles: ReadonlyMap<number, string>
@@ -225,7 +226,7 @@ function touched_row(number: number, status: ItemStatus, read: RowRead): BoardRo
 
 	return {
 		...(is_asked
-			? { reason: run_board_decision.reason_of(number, status.reason, read) }
+			? { reason: run_board_decision.reason_of(number, status.reason, read, status) }
 			: run_board_ending_reason.row_reason(number, status, read)),
 		...solo_flag(labels),
 		number,
