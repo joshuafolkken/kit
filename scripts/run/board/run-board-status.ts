@@ -82,6 +82,8 @@ interface LatestEvent {
 // The run as a whole, read off the same stream. The setup half is `run-board-setup.ts`'s, absent
 // where a stream carries no stage.
 interface RunActivity extends Partial<SetupRead> {
+	// Runtime evidence for the stage, independent of its retained description.
+	is_setup_working?: boolean | undefined
 	last_event_ms: number | undefined
 	// The newest thing the run did — its newest position, or its newest event where it has none yet —
 	// in the event's own words, and when.

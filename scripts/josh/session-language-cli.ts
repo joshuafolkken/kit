@@ -32,7 +32,7 @@ import { session_language, type Resolution } from './session-language'
 const { DEFAULT_SESSION_LANG, ENV_KEY, resolve_session_lang } = session_language
 
 const BOARD_LINE =
-	'A backlogrun is live here: answer a progress question with `pnpm josh run:board --chat`, verbatim in one code block.'
+	'Live backlogrun: for progress-only questions, run `pnpm josh run:board --chat`; relay output verbatim in one code block. For cause or improvement questions, investigate state, logs and code; cite evidence and uncertainty, even with quoted board lines. For mixed questions, do both.'
 
 interface LivePorts {
 	// The common git directory the run's records are keyed on; `undefined` outside a repository.

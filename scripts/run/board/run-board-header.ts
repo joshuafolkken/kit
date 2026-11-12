@@ -19,6 +19,7 @@ import type { QuotaHold, QuotaView } from './run-board-render-quota'
 import { run_board_render_slot } from './run-board-render-slot'
 import { run_board_render_title } from './run-board-render-title'
 import type { SeatRead } from './run-board-seat'
+import { run_board_setup } from './run-board-setup'
 import type { RunActivity } from './run-board-status'
 import type { LaneUsages, UsageScale } from './run-board-usage'
 import type { UsualTimes } from './run-board-usual'
@@ -46,7 +47,6 @@ const { padded } = run_board_fresh
 const aged_fresh = run_board_fresh.aged
 const UNKNOWN = '-'
 const BLANK = ' '
-const REPO_SEPARATOR = '/'
 const { GAP, PERCENT_WIDTH } = run_board_machine
 // A running run whose newest event is older than this is drawn as stale, so a hang stands out; past
 // twice that it is drawn as alarming.
@@ -165,9 +165,8 @@ const WORKING_MARKS: ReadonlySet<RunMark> = new Set<RunMark>(['running', 'setup'
 // Nothing running: the run is at work on a stage of its own; else it is waiting on a person when all
 // the plan has left is what `needs-decision` holds, or idle.
 function quiet_mark(header: BoardHeader): RunMark {
-	const { layout } = header
-
-	if (header.activity.setup !== undefined) return 'setup'
+	const { activity, layout } = header
+	if (run_board_setup.is_working(activity.setup, activity.is_setup_working)) return 'setup'
 
 	return layout?.queued.length === 0 && run_board_layout.people_of(layout).length > 0
 		? 'human'
@@ -191,7 +190,7 @@ function run_part(mark: RunMark, name = RUN_NAME): string {
 // The repository's own name — `kit` of `owner/kit` — under the run's, past the mark's columns, so a
 // board open beside another repository's is told apart. Blank before a plan names one.
 function repo_part(header: BoardHeader, mark: RunMark): string {
-	const name = header.repo?.split(REPO_SEPARATOR).at(-1) ?? ''
+	const name = header.repo?.split('/').at(-1) ?? ''
 	const indent = run_board_fit.width_of(RUN_MARKS[mark].glyph) + BLANK.length
 
 	return `${BLANK.repeat(indent)}${header.repo_link(name, 'home')}`
