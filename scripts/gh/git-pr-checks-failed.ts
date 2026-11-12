@@ -5,7 +5,10 @@ import { FAILURE_REASON_CHECKS } from './git-pr-checks-eval'
 // a followup `check` stop's record (joshuafolkken/kit#7333). The list ends at the next reason or the
 // closing `).`, so a matrix name such as `Unit Tests (3/6)` stays whole.
 
-const FAILED_CHECKS = new RegExp(`${FAILURE_REASON_CHECKS}: (?<names>.+?)(?=; |\\)\\.$)`, 'gmu')
+const FAILED_CHECKS = new RegExp(
+	String.raw`${FAILURE_REASON_CHECKS}: (?<names>.+?)(?=; |\)\.$)`,
+	'gmu',
+)
 const NAME_SEPARATOR = ', '
 
 // Every check name `text` lists as failed, in order, each list read whole.
