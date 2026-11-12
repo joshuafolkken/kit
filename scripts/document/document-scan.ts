@@ -6,6 +6,13 @@
 // would otherwise read "will" as a command name.
 const COMMAND_PATTERN = /`(?:pnpm )?josh ([a-z][a-z0-9:-]+)/gu
 
+// A flag a command reference passes — `` `pnpm josh ship --detach` `` — read up to the next shell
+// separator, so a flag of a chained command is not read as this command's (#7331).
+const CODE_SPAN_PATTERN = /`([^`\n]+)`/gu
+const COMMAND_SEPARATOR_PATTERN = /&&|\|\||[|;]/u
+const INVOCATION_PATTERN = /\bjosh ([a-z][a-z0-9:-]+)/u
+const FLAG_PATTERN = /(?<![\w-])--[a-z][a-z0-9-]*/gu
+
 // A label the documents operate on — applied (`labels[]=…`), removed (`…/labels/<name>`) or created
 // (`labels -f name=…`). Prose that merely names a label is not scanned; a mistyped name only breaks
 // where a command carries it.
@@ -54,6 +61,26 @@ function command_references(text: string): Array<string> {
 		.filter((name) => !name.endsWith(':'))
 }
 
+// The long flags a text spells, without a `=value`: `--shard=<n>` reads as `--shard`.
+function flag_names(text: string): Array<string> {
+	return text.match(FLAG_PATTERN) ?? []
+}
+
+function invocation_flags(segment: string): Array<FlagReference> {
+	const match = INVOCATION_PATTERN.exec(segment)
+	if (match === null) return []
+	const [invocation, command = ''] = match
+	const rest = segment.slice(match.index + invocation.length)
+
+	return flag_names(rest).map((flag) => ({ command, flag }))
+}
+
+function command_flag_references(text: string): Array<FlagReference> {
+	return matches(text, CODE_SPAN_PATTERN)
+		.flatMap((span) => (span[1] ?? '').split(COMMAND_SEPARATOR_PATTERN))
+		.flatMap((segment) => invocation_flags(segment))
+}
+
 // A `<placeholder>` inside a command, and `label:<n>` after the char class stops at `<`, both leave a
 // token that is not a real label. Real labels never end in a colon and never carry angle brackets.
 function is_real_label(token: string): boolean {
@@ -77,6 +104,11 @@ function is_placeholder_file(name: string): boolean {
 interface SectionReference {
 	file: string
 	heading: string
+}
+
+interface FlagReference {
+	command: string
+	flag: string
 }
 
 function section_references(text: string): Array<SectionReference> {
@@ -127,7 +159,9 @@ function reference_forms(title: string): Array<string> {
 const document_scan = {
 	adjacent_references,
 	bare_arrow_references,
+	command_flag_references,
 	command_references,
+	flag_names,
 	label_references,
 	link_targets,
 	normalize_reference,
@@ -135,5 +169,5 @@ const document_scan = {
 	section_references,
 }
 
-export type { SectionReference }
+export type { FlagReference, SectionReference }
 export { document_scan }

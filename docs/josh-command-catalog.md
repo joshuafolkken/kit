@@ -21,7 +21,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh gate` · `josh ga` | `[--verbose\|--force\|--no-unit\|--whole-tree\|--static-group=<group>]` | developer | files, processes | Run lint, type check, spell check and unit tests concurrently |
 | `josh hook:ledger` · `josh hkl` | `--period <days> [--demote [--apply]] \| --restore <rule>` | maintainer | network, files | Print Claude Code hook refusals per hook and rule over a period: refusals, the same call passing later, and route:interrupt issues naming the rule; list, demote or restore rules that mostly refuse allowed work |
 | `josh lines` · `josh ln` | `<files...>` | developer | none | Print a file's code lines against the max-lines limit and the headroom left |
-| `josh lint` · `josh l` | `[--changed]` | developer | processes | Check code with prettier and eslint (skips a tool a basic project lacks) |
+| `josh lint` · `josh l` | `[--changed] [--shard=<n>]` | developer | processes | Check code with prettier and eslint (skips a tool a basic project lacks) |
 | `josh lint:related` · `josh lr` | `[files...]` | developer | processes | Check only the changed files with prettier and eslint, and in kit the source guard tests (whole tree on fallback) |
 | `josh lint:rule` · `josh lrr` | `<rule> [--config <path>] [--output <path>] [--paths <path>...]` | developer | files, processes | Run one eslint rule over the whole repository, or with --paths a subset, on a cache of its own and write the rule's violations to a file |
 | `josh metrics` · `josh mt` · **kit only** | `[--no-startup \| --totals-only [--rerecord] \| --accept --reason "<why>"]` | developer | files | Print repository-wide quality totals and durations, and fail when a total grew past the merge-base or a duration past its baseline |
@@ -56,7 +56,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh sonar:hotspots` | `<PR>` | automation | network | Fetch SonarCloud hotspots on a pull request and print each one's Step B disposition |
 | `josh sonar:new-code` | `<PR>` | automation | network | Fail when a pull request adds any new SonarCloud issue or duplicated block |
 | `josh start` · `josh st` | `[--profile basic\|full] [--yes] [--github] [--public] [--dry-run] [--init-command <command>] [--push-preflight-command <command>]` | developer | files, git, network, processes | Set a project up for the GitHub Issue workflow, from git init to the setup PR |
-| `josh sync` · `josh sy` | — | developer | files | Sync config files |
+| `josh sync` · `josh sy` | `[--force]` | developer | files | Sync config files |
 | `josh sync:scope` | `[--staged] [--json]` | automation | none | Say whether this change touches a file josh sync distributes |
 | `josh ui:routes` | `[--staged]` | automation | none | List the screenshot-target routes the current change touches |
 | `josh ui:shot` | `<route> [route...]` | automation | processes | Capture routes with this project's own screenshot command |
