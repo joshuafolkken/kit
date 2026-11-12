@@ -62,21 +62,24 @@ back on its own, which no single sighting can demonstrate.
 Measured for joshuafolkken/kit#7336: 2,912 of 8,242 tracked files, 1–2 more per issue.
 
 Every content reader goes through `observation_ledger_home.read`
-(`scripts/observations/observation-ledger-home.ts:104`). It reads every file in the working tree's
+(`scripts/observations/observation-ledger-home.ts:104`). It takes every file in the working tree's
 directory in name order (`:83`, `:100`), with no git call (`:20`).
+
+The one exception is the one-time move of the old single-file ledgers
+(`scripts/observations/observation-ledger-migrate.ts`), which reads only those legacy paths.
 
 So no reader skips a closed issue's file today; the table says which ones need it.
 
-| Reader                                                                                                                                                                                 | Needs closed issues' lines                                                     | Period                                                                                                                                              |
-| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Second-sighting count — `sightings` / `assess` (`scripts/observations/observation-record.ts:70`, `:89`), also via `scripts/followup/followup-failed-tests.ts:113`                      | yes — a sighting counts whichever issue's file it sits in                      | all history, no window                                                                                                                              |
-| `review:findings` (`scripts/review/review-findings-cli.ts:99`)                                                                                                                         | yes — aggregates every `rf:` line                                              | `--period <days>` (`:61`), default all time (`:25`); filtered by the line's date field (`scripts/review/review-finding-ledger.ts:202`), not by file |
-| Commit precondition — `observation_ledger_prepare` (`scripts/observations/observation-ledger-prepare.ts:15`)                                                                           | validates them, does not use them                                              | all files                                                                                                                                           |
-| Comment-round carry (`scripts/review/review-comment-round.ts:179`)                                                                                                                     | yes — the existence of `<issue>-comment-rounds.md` is the carried mark (`:22`) | all closed issues                                                                                                                                   |
-| Review-record checks — `scripts/review/review-record.ts:64`, `review-record-pinned.ts:79`, `review-interaction.ts:96`, `review-round-one-closure.ts:56`, `review-round-one-skip.ts:27` | no — they ask about the current issue only                                     | current issue                                                                                                                                       |
+| Reader                                                                                                                                                                                 | Needs closed issues' lines                                                                    | Period                                                                                                                                              |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Second-sighting count — `sightings` / `assess` (`scripts/observations/observation-record.ts:70`, `:89`), also via `scripts/followup/followup-failed-tests.ts:113`                      | yes — a sighting counts whichever issue's file it sits in                                     | all history, no window                                                                                                                              |
+| `review:findings` (`scripts/review/review-findings-cli.ts:99`)                                                                                                                         | yes — aggregates every `rf:` line                                                             | `--period <days>` (`:61`), default all time (`:25`); filtered by the line's date field (`scripts/review/review-finding-ledger.ts:202`), not by file |
+| Commit precondition — `observation_ledger_prepare` (`scripts/observations/observation-ledger-prepare.ts:15`), called from `scripts/git/git-staging.ts:88`                              | validates them, does not use them                                                             | all files                                                                                                                                           |
+| Comment-round carry (`scripts/review/review-comment-round.ts:179`)                                                                                                                     | no lines — only whether `<issue>-comment-rounds.md` exists, which is the carried mark (`:22`) | all closed issues                                                                                                                                   |
+| Review-record checks — `scripts/review/review-record.ts:64`, `review-record-pinned.ts:79`, `review-interaction.ts:96`, `review-round-one-closure.ts:56`, `review-round-one-skip.ts:27` | no — they ask about the current issue only                                                    | current issue                                                                                                                                       |
 
-Writers and path matchers read no content: `scripts/git/git-staging.ts`,
-`scripts/git/stash/stash-push-cli.ts:11`, `scripts/hooks/bash-revert.ts:25`,
+Writers and path matchers read no content: `scripts/git/git-staging.ts` (apart from the
+precondition above), `scripts/git/stash/stash-push-cli.ts:11`, `scripts/hooks/bash-revert.ts:25`,
 `scripts/josh/josh-commands-workflow.ts:166`, and the comment at
 `scripts/cases/cases-interaction.ts:117`.
 
@@ -94,13 +97,18 @@ fix is the shape:
 - When: on the default branch, by `observations:flush`, which already commits ledger-only changes.
   Never in a lane: parallel lanes writing one shared file conflict, which is why the carry stays off
   lanes (`scripts/review/review-comment-round.ts:22`).
+- Pull request wording: flush's body says it adds lines and changes none
+  (`scripts/observations/observations-flush.ts:65`). An archive commit needs its own: it moves lines
+  and drops none.
 - Carried mark: the carry counts an issue as carried when its file exists. The archive must answer
   that too (a carried-issue list, or the carry reading the archive), or every archived issue is
   carried again.
 - Default-branch count: the aggregate sits in the same directory, and `read` takes every `.md` file
   there (`scripts/observations/observation-ledger.ts:55`). The count still reads all of the default
-  branch's lines (`.claude/skills/workflow-commands/observation-ledger.md:87`), and a lane's tree is
-  still the default branch's files plus its own (`scripts/observations/observation-ledger-home.ts:16`).
+  branch's lines (`.claude/skills/workflow-commands/observation-ledger.md:87`).
+- Lanes: a lane appends only to its own open issue's file and brings it to the default branch with
+  its own pull request (`scripts/observations/observation-ledger-home.ts:13-16`), so the archive
+  never touches a file a lane writes.
 - Open issues' files and date files stay as they are, since lines can still be appended to them.
 
 ## Where each rule came from
