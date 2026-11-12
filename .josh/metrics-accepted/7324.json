@@ -1,0 +1,7 @@
+{
+	"reason": "#7324: josh release reads the failed Publish run's jobs to name the failed job and keep npm apart from it",
+	"date": "2026-11-12",
+	"growth": {
+		"scripts.code_lines": 48
+	}
+}
