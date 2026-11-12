@@ -73,6 +73,8 @@ Each role's model and effort for a `backlogrun`. The invoking CLI picks the prov
 
 Set `JOSH_AGENT_PROVIDER=openai` in the project's `.env` to start `pnpm josh backlogrun` with Codex and its existing role profiles. `anthropic`, an unset value, or a blank value selects Claude Code.
 
+A repository that sets [`josh.worker`](./package-settings.md#joshworker) in `package.json` picks each lane worker's model and effort per Issue: the Issue's `worker:<name>` label, else the configured default, wins over `JOSH_WORKER_MODEL` and `JOSH_WORKER_EFFORT`, which then decide nothing.
+
 An exported value takes precedence over `.env`; `--agent claude|codex` takes precedence over both. Other nonempty provider values are rejected before launch. This default selects a new run; opening an existing run's board or using `--restart` keeps its recorded provider.
 
 Detached launchers also hand this variable to processes without an agent session. A detected session keeps determining its own provider.
@@ -105,29 +107,19 @@ Which steps run at a lowered effort:
 
 `JOSH_REVIEW_GATE` accepts `ci` or `local` and overrides `josh.review_gate` in the nearest declaring
 `package.json`, searched upward. Invalid values fall through to the next source; the default is
-`local`. This setting currently provides the shared reader only; review execution is unchanged.
+`local`. Only `local` lets a lane within its size guide skip round one of the review; `ci` keeps
+round one for every lane.
 
 #### Package settings
 
-- `josh.review_gate`: `"ci" | "local"`, default `"local"`; overridden by `JOSH_REVIEW_GATE`.
-- `josh.progress_interval_minutes`: a positive number of minutes, default `20`; overridden by
-  `JOSH_PROGRESS_INTERVAL_MINUTES`.
-- `josh.lane.setup`: one shell command, unset by default; `josh lane:open` runs it in the new lane
-  after the install and cache seeding, with `JOSH_MAIN_CHECKOUT` set
-  ([`josh lane:open`](./josh-commands-lane.md#josh-laneopen--josh-laneclose--josh-lanelist--josh-laneprune)).
-- `josh.gate.steps`: a list of `{ name, command, paths?, cores? }`, unset by default; `josh gate` runs each
-  command after its fixed checks and reports it under its name ([`josh gate`](./josh-commands.md#josh-gate)).
-- `josh.format`: `"auto" | "all"`, default `"auto"`; what Prettier formats and checks in a basic
-  project (`josh format`, `josh lint`, `josh lint:related`). `auto` formats only the HTML, CSS and
-  JavaScript files that enabled Prettier; `all` formats every file type Prettier reads, such as
-  Markdown, JSON and YAML. A full project always formats every type. Not an environment variable,
-  so local runs and CI format the same files.
+The `josh.*` settings in `package.json`, their defaults and examples are on
+[package-settings.md](./package-settings.md).
 
 | Variable                         | Required | Default                                                          | Used when                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | -------------------------------- | -------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `JOSH_PROGRESS_INTERVAL_MINUTES` | No       | `josh.progress_interval_minutes` in `package.json`, else `20`    | How long a run goes quiet before `josh run:progress` prints a line ([`josh run:progress`](./josh-commands-board.md#josh-runprogress)).                                                                                                                                                                                                                                                                                                                |
 | `JOSH_PROGRESS`                  | No       | on                                                               | `0` turns the progress lines off.                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| `JOSH_REVIEW_GATE`               | No       | `josh.review_gate` in `package.json`, else `local`               | Shared review location setting: `ci` or `local`; review execution does not consume it yet.                                                                                                                                                                                                                                                                                                                                                            |
+| `JOSH_REVIEW_GATE`               | No       | `josh.review_gate` in `package.json`, else `local`               | Shared review location setting: `ci` or `local`; only `local` allows the in-size round-one review skip.                                                                                                                                                                                                                                                                                                                                               |
 | `JOSH_WIP_CAP`                   | No       | `DEFAULT_WIP_CAP` in `scripts/issue/issue-wip.ts`                | The open-Issue cap [`josh issue:file`](./josh-commands-backlog.md#josh-issuefile) holds a filing past ([`wip-cap.md`](../prompts/collaboration-workflow/wip-cap.md)): a positive integer replaces the default and `off` turns the cap off; blank keeps the default, and any other value refuses the filing by name rather than falling back to it. Lanes inherit it from `.env`.                                                                      |
 | `JOSH_RETROSPECTIVE`             | No       | off                                                              | `on` / `1` / `true` / `yes` runs the end-of-run retrospective when a backlog drains ([`josh retrospective`](./josh-commands-session.md#josh-retrospective)).                                                                                                                                                                                                                                                                                          |
 | `JOSH_LANE_INVESTIGATION`        | No       | off                                                              | `on` / `1` / `true` / `yes` lets `josh run:merge` launch the overrun and baseline investigations of merged lanes ([`josh run:merge`](./josh-commands-run.md#josh-runmerge)); off, an overrun only notes its skip. Not `JOSH_LANE_OVERRUN`, the mark josh sets inside an investigation session.                                                                                                                                                        |
