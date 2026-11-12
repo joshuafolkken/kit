@@ -1,7 +1,0 @@
-{
-	"reason": "Issue #6251 adds green-gate push orchestration, fresh state after reviewed ships, and shared early-push ledger statistics for its four acceptance criteria.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 104
-	}
-}

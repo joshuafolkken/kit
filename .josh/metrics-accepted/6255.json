@@ -1,7 +1,0 @@
-{
-	"reason": "Issue #6255 adds bounded label maintenance, detached sweeping and per-stage lap recording; the 116 added runtime lines implement these behaviors without duplicating the launch mechanism.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 116
-	}
-}

@@ -288,6 +288,24 @@ function parse_line(line: string): RunEvent | undefined {
 	return event_schema.safeParse(json_value.parse_or_undefined(line)).data
 }
 
+// Every line of `raw` that parses, oldest first, whatever its kind.
+function lines_of(raw: string): ReadonlyArray<RunEvent> {
+	return raw
+		.split(LINE_SEPARATOR)
+		.map((line) => line.trim())
+		.filter((line) => line.length > 0)
+		.map((line) => parse_line(line))
+		.filter(is_present)
+}
+
+// The events of `raw`, oldest first. A line whose kind the enumeration no longer names — one a
+// previous version wrote — reads as no event, so no reader takes it for a position or for the run's
+// newest activity. Pure per line, so the incremental reader (`run-event-tail.ts`) parses only the
+// appended text with it and still agrees with a whole read.
+function events_of_text(raw: string): ReadonlyArray<RunEvent> {
+	return lines_of(raw).filter((event) => is_event_kind(event.kind))
+}
+
 // Every line on the stream that parses, oldest first, whatever its kind. An absent or unreadable file
 // is an empty stream, the same fail-quiet direction `stamp_file.read_stamp_text` takes for a planted or
 // unowned file. A required read refuses that unknown history instead of treating it as empty.
@@ -297,17 +315,10 @@ function read_lines(target: string, is_required = false): ReadonlyArray<RunEvent
 	if (raw === undefined && is_required) throw new Error('Could not read the run event stream.')
 	if (raw === undefined) return []
 
-	return raw
-		.split(LINE_SEPARATOR)
-		.map((line) => line.trim())
-		.filter((line) => line.length > 0)
-		.map((line) => parse_line(line))
-		.filter(is_present)
+	return lines_of(raw)
 }
 
-// Every event on the stream, oldest first. A line whose kind the enumeration no longer names — one a
-// previous version wrote — reads as no event, so no reader takes it for a position or for the run's
-// newest activity.
+// Every event on the stream, oldest first.
 function read_events(target: string, is_required = false): ReadonlyArray<RunEvent> {
 	return read_lines(target, is_required).filter((event) => is_event_kind(event.kind))
 }
@@ -498,6 +509,7 @@ const run_event_stream = {
 	TRACE_KINDS,
 	append,
 	append_event,
+	events_of_text,
 	format_event,
 	has_since,
 	is_stage_start,

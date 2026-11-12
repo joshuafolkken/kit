@@ -1,7 +1,0 @@
-{
-	"reason": "#6559 adds the GitHub core rate-limit reader and its usage-row wiring to run:board",
-	"date": "2026-11-07",
-	"growth": {
-		"scripts.code_lines": 80
-	}
-}

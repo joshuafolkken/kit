@@ -1,7 +1,0 @@
-{
-	"reason": "#6401 adds ts-entry-loader so detached .ts supervisors get the tsx loader under the dist launcher",
-	"date": "2026-11-05",
-	"growth": {
-		"scripts.code_lines": 19
-	}
-}

@@ -1,7 +1,10 @@
+import os from 'node:os'
+import path from 'node:path'
 import { token_shape } from '#scripts/lib/token-shape'
 import { token_shape_fixture } from '#scripts/lib/token-shape-fixture'
 import { describe, expect, it } from 'vitest'
 import { run_board_operation, type Operation } from './run-board-operation'
+import { run_board_operation_codex_fixture } from './run-board-operation-codex-fixture'
 
 // joshuafolkken/kit#3757: the newest operation of a session, read off the end of its log — the tool
 // and what it was pointed at, never the session's own description of the call.
@@ -20,6 +23,10 @@ const JAPANESE = /[぀-ヿ一-鿿]/u
 const LONG_LINE_LENGTH = 50_000
 // How much of a credential is looked for in a target: enough to tell it from the command around it.
 const TOKEN_HEAD = 8
+const USER_HOME = os.homedir()
+const ACCOUNT = path.basename(USER_HOME)
+// How much of the account name an unmasked cut would draw.
+const ACCOUNT_SHOWN = 2
 
 interface Call {
 	name: string
@@ -112,6 +119,30 @@ describe('run_board_operation.latest_of — what a command shows', () => {
 
 		expect(operation?.target).toBe('git commit -m "')
 		expect(JSON.stringify(operation)).not.toMatch(JAPANESE)
+	})
+})
+
+// joshuafolkken/kit#7342: the home directory carries the account name, so it is drawn as `~`.
+// The machine's own home is used, not a mocked one, so this file stays in the pure test project.
+describe('run_board_operation.latest_of — the home directory in a command', () => {
+	it('writes the home directory as ~', () => {
+		expect(latest_of(bash(`cd ${USER_HOME}/Development`))?.target).toBe('cd ~/Development')
+	})
+
+	// Unmasked, the cut would fall two characters into the account name.
+	it('leaves no part of the account name where the home directory crosses the cut', () => {
+		const before_account = `cd ${path.dirname(USER_HOME)}/`.length
+		const head = 'x'.repeat(run_board_operation.TARGET_LIMIT - before_account + ACCOUNT_SHOWN)
+		const target = latest_of(bash(`cd ${head}${USER_HOME}/a`))?.target
+
+		expect(target).toBe(`cd ${head}~/a`)
+		expect(target).not.toContain(ACCOUNT.slice(0, ACCOUNT_SHOWN))
+	})
+
+	it('writes the home directory as ~ in a Codex command too', () => {
+		const line = run_board_operation_codex_fixture.command(`ls ${USER_HOME}/kit`)
+
+		expect(latest_of(line)?.target).toBe('ls ~/kit')
 	})
 })
 

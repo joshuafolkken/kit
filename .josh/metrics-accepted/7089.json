@@ -1,7 +1,0 @@
-{
-	"reason": "#7089 adds the run:board header repository links (repo_url, repo_linker, links_of moved into run-board-link.ts)",
-	"date": "2026-11-10",
-	"growth": {
-		"scripts.code_lines": 24
-	}
-}

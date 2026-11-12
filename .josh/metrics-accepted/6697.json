@@ -1,7 +1,0 @@
-{
-	"reason": "#6697 adds the core rate-limit used delta to the gh request tally (watch_core/core_delta with a non-throwing reader wrapper, the uncounted rate_limit spawn and read_usage); the board reader moved to scripts/gh without duplication",
-	"date": "2026-11-07",
-	"growth": {
-		"scripts.code_lines": 59
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "backlog:triage --pass prints each park's recommendation and --adopt line (#6777): a shared park reader module and adoptable_pick",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 38
-	}
-}

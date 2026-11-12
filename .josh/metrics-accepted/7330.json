@@ -1,0 +1,7 @@
+{
+	"reason": "direct-issue-comment gains a body-file rewrite beside direct-issue-read's, both reading one shared standalone-gh-call module (#7330 AC4)",
+	"date": "2026-11-12",
+	"growth": {
+		"scripts.code_lines": 124
+	}
+}

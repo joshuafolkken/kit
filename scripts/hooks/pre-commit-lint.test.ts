@@ -155,7 +155,10 @@ describe('pre_commit_lint.run — eslint', () => {
 		vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
 
 		expect(await pre_commit_lint.run(['eslint', ...STAGED])).toBe(1)
-		expect(mocked_run_or_cold).toHaveBeenCalledWith(built('eslint'))
+		expect(mocked_run_or_cold).toHaveBeenCalledWith(built('eslint'), {
+			caller: 'pre-commit',
+			files: STAGED.length,
+		})
 		expect(mocked_execa).not.toHaveBeenCalled()
 		expect(reservation).toHaveBeenCalledOnce()
 		reservation.mockRestore()

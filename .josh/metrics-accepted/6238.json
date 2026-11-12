@@ -1,8 +1,0 @@
-{
-	"reason": "Dedicated lane entry reduces actual child reads to 13339 bytes including the printed entry question; additional runtime lines route and classify that entry, with regression coverage for both entry roots and consumer launch instructions.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 7,
-		"ai_cost.on_demand_bytes": 1785
-	}
-}

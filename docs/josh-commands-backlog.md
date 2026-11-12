@@ -156,12 +156,12 @@ pnpm josh issue:file --batch .josh/tmp/deferred.md --route tier-a
 - `--body-file <path>` — the body. Required unless `--batch`.
 - `--batch <dir|file>` — file each `*.md` in `<dir>` by name, or each `%%%`-separated part of `<file>`, other flags applied to each; every scout report prints once before the first filing. Title: front matter `title:`, else the first line; front matter `distinct: <N,…>` is its `--distinct`. A refused filing stays unfiled, the rest are filed, the summary names each; any refusal exits 1.
 - `--route <tier-a|split|interrupt|review-cap>` — the `route:` label naming the filing route. Omit it for a filing with no route.
-- `--label <name>` — an extra label (for example `epic`). Repeatable.
+- `--label <name>` — an extra label (e.g. `epic`). Repeatable. With `josh.worker`, `worker:<name>` names a printed profile.
 - `--defect / --verification / --every-run <yes|no|unknown>` — `--label run:solo` requires all three `yes`: a verification defect affecting unrelated PRs every run. Missing, invalid, `no` or `unknown` answers file nothing; success comments the three answers on the issue.
 - `--repo <owner/repo>` — the target repository. Defaults to this repository.
 - `--distinct <N,…>` — duplicate candidates you read and judged distinct.
 - `--found-during <N>` — the Issue whose work the filing came from, when it is not the lane or branch Issue. The filing cap counts per origin (step 2); step 7 never holds it as a candidate here. #N gets a deferral comment.
-- `--over-cap` — the run is blocked by this filing; the WIP cap lets it through.
+- `--over-cap` — the run is blocked by this filing, or a user typed `new` (`kickoff` / `fullrun` / `halfrun` / `prrun new`, whose filing commands carry it); the WIP cap lets it through.
 - `--no-auto-ok` — needs a person's judgement (Tier B / C); no `auto-ok`.
 - `--release` — a consumer can use the change only once it is published. The filed issue becomes a blocker of the target's release issue (step 10).
 - `--blocks-finder` — with `--route interrupt`, the finder cannot go on until this issue is done. The finder is recorded as blocked by the filed issue (step 9); under an epic, `epic --reconcile <E>` after `epic --add` declares it.
@@ -369,6 +369,24 @@ pnpm josh plan:scaffold 123 scripts/a.ts scripts/b.ts   # the files this plan to
 
 <!-- /usage -->
 
+### `josh issue:premise-unmet`
+
+<!-- usage: issue:premise-unmet -->
+
+Exit an issue whose declared close condition holds: post the verdict, close it as not planned, release the hold.
+
+```bash
+pnpm josh issue:premise-unmet 7249 --evidence-file .josh/tmp/premise-unmet.md   # comment, not-planned close, release — in that order
+```
+
+**Options:**
+
+- `--evidence-file <path>` — the verdict comment: the measured values and why the close condition holds; an empty file is refused
+
+<!-- /usage -->
+
+See `issue-comments.md` → "When a declared close condition holds".
+
 ### `josh issue:already-done`
 
 <!-- usage: issue:already-done -->
@@ -385,7 +403,7 @@ pnpm josh issue:already-done 4130 --evidence-file .josh/tmp/already-done.md   # 
 
 <!-- /usage -->
 
-See `issue-comments.md` → "When the work turns out to be already merged". Steps stop at the first failure. The Issue is never closed. A follow-up measurement — a body declaring `- 実施可能条件: #<PR> のマージ後 <K> マージ` — or a body that cannot be read is refused before anything is written; a measurement exits with `josh issue:measured`.
+See `issue-comments.md` → "When the work turns out to be already merged". Steps stop at the first failure. A follow-up measurement — a body declaring `- 実施可能条件: #<PR> のマージ後 <K> マージ` — or a body that cannot be read is refused before anything is written; a measurement exits with `josh issue:measured`.
 
 ### `josh issue:measured`
 
@@ -717,7 +735,7 @@ pnpm josh epic:next 858 --repo joshuafolkken/kit --lanes   # one child per free 
 **Options:**
 
 - `--repo <owner/repo>` — answer for one repository; stdout carries one token (an issue number, or `wait`/`stop`/`complete`), everything else on stderr.
-- `--lanes` — print one issue number per free lane (requires `--repo`); `JOSH_LANE_LIMIT` sets the ceiling, default 8. Prints `triage` instead while any candidate carries neither `run:solo` nor `run:lane` (the triage gate in `josh backlog:next`).
+- `--lanes` — print one issue number per free lane (requires `--repo`); `JOSH_LANE_LIMIT` sets the ceiling, default 4. Prints `triage` instead while any candidate carries neither `run:solo` nor `run:lane` (the triage gate in `josh backlog:next`).
 
 <!-- /usage -->
 
@@ -729,7 +747,7 @@ Several leading epic arguments merge into one candidate pool per repository. `ru
 
 **Priority and duplicates:** the order the epics were named, then each epic's task-list order (its declared chain still decides what is runnable). A child two epics track enters once, under the epic named earlier. Reordering with `josh epic --add … --order-before` / `--order-after` leaves declarations and `blocked-by` relations as they were.
 
-**Lanes:** free places are `JOSH_LANE_LIMIT` (default 8) minus `backlog_occupied`'s count; at zero, `wait` names holders on stderr. Lanes without a worker, paused or merge-waiting hold no place. Human-review stops retain their tree and hold. Launches also wait for shared-core memory.
+**Lanes:** free places are `JOSH_LANE_LIMIT` (default 4) minus `backlog_occupied`'s count; at zero, `wait` names holders on stderr. Lanes without a worker, paused or merge-waiting hold no place. Human-review stops retain their tree and hold. Launches also wait for shared-core memory.
 
 **Nested epics:** a child that is itself an epic is never offered and waits on a person. The test is the child's `epic` label, not how its row is written: a cross-repository `owner/repo#N` row that is not an epic stays runnable. A parent epic over an epic never auto-closes; `epic:audit` reports the row.
 

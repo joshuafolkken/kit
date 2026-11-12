@@ -1,7 +1,0 @@
-{
-	"reason": "new run:prime command (#5839): its CLI and its command entry",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 77
-	}
-}

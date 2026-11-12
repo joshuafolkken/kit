@@ -1,7 +1,0 @@
-{
-	"reason": "Exclude pnpm script headers before checker warning and skip classification; adds two source lines.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 2
-	}
-}

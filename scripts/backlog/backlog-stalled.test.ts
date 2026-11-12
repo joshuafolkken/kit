@@ -144,8 +144,14 @@ describe('backlog_stalled.open_hold', () => {
 })
 
 describe('backlog_stalled.describe', () => {
-	it('names the hold reason so a memory hold reads apart from a slow dispatch', () => {
-		expect(backlog_stalled.describe(reading({ hold: MEMORY }))).toContain('(held: memory)')
+	it('names the hold as a sentence so a memory hold reads apart from a slow dispatch', () => {
+		expect(backlog_stalled.describe(reading({ hold: MEMORY }))).toContain(
+			'both (memory pressure is high; lanes resume when it eases)',
+		)
+	})
+
+	it('names an unknown hold by its own code', () => {
+		expect(backlog_stalled.describe(reading({ hold: 'pause:other' }))).toContain('(pause:other)')
 	})
 
 	it('names no hold when the driver holds none', () => {

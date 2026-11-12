@@ -1,7 +1,0 @@
-{
-	"reason": "transcript-tail.ts is a new leaf module split out of time-density-hook.ts to cut josh-aliases.ts test reach (#6151); +3 lines are its import and namespace",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 3
-	}
-}

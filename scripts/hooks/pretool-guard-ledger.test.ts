@@ -1,5 +1,7 @@
 import { writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { direct_issue_comment } from '#scripts/rules/direct-issue-comment'
+import { direct_issue_read } from '#scripts/rules/direct-issue-read'
 import { hook_context_fixture } from '#tools/hooks/hook-context-fixture'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -7,8 +9,8 @@ import { direct_gh_usage } from './direct-gh-usage'
 import { hook_demoted } from './hook-demoted'
 import { hook_ledger } from './hook-ledger'
 
-// joshuafolkken/kit#6587: the one hook process hands the ledger what it denied. A separate suite from
-// `pretool-guard.test.ts`, which is at its length limit.
+// joshuafolkken/kit#6587: the one hook process hands the ledger what it denied, and #7330's rewrites
+// at the hook. A separate suite from `pretool-guard.test.ts`, which is at its length limit.
 
 vi.mock('#scripts/hooks/lane-plan-guard', () => ({
 	lane_plan_guard: { reason: vi.fn().mockReturnValue(undefined) },
@@ -57,7 +59,7 @@ async function recorded_reasons(command: string): Promise<Array<unknown>> {
 
 describe('pretool_guard.respond — the hook ledger', () => {
 	it('hands the ledger the reason it denied the call with', async () => {
-		expect(await recorded_reasons('gh issue view 7')).toEqual([
+		expect(await recorded_reasons('gh issue view 7 --comments')).toEqual([
 			[HOOK, expect.stringContaining('⛔ direct issue read')],
 		])
 	})
@@ -65,6 +67,36 @@ describe('pretool_guard.respond — the hook ledger', () => {
 	it('hands the ledger no reason for a call it let through', async () => {
 		expect(await recorded_reasons(ALLOWED_COMMAND)).toEqual([[HOOK, undefined]])
 	})
+})
+
+async function envelope_of(command: string): Promise<string> {
+	vi.spyOn(hook_ledger, 'record_reason').mockResolvedValue(undefined)
+	const write = vi.spyOn(process.stdout, 'write').mockReturnValue(true)
+
+	await pretool_guard.respond(bash_payload(command))
+
+	return write.mock.calls.map((call) => String(call[0])).join('')
+}
+
+// joshuafolkken/kit#7330: a standalone issue read or body-file post is rewritten, not denied.
+describe('pretool_guard.respond — the standalone issue-command rewrites', () => {
+	it.each([
+		['gh issue view 7', 'pnpm josh issue:read 7', direct_issue_read.ISSUE_READ_NOTE],
+		[
+			'gh issue comment 7 -F /work/.josh/tmp/b.md',
+			'pnpm josh issue:comment 7 --body-file /work/.josh/tmp/b.md',
+			direct_issue_comment.ISSUE_COMMENT_NOTE,
+		],
+	])(
+		'runs %j as %j, deciding nothing, with the note attached',
+		async (command, rewritten, note) => {
+			const envelope = await envelope_of(command)
+
+			expect(envelope).not.toContain('"permissionDecision"')
+			expect(envelope).toContain(`"updatedInput":${JSON.stringify({ command: rewritten })}`)
+			expect(envelope).toContain(JSON.stringify(note).slice(1, -1))
+		},
+	)
 })
 
 describe('pretool_guard.record_refusal — the call context', () => {

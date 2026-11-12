@@ -4,6 +4,8 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 // Native Node resolves the distributed source directly, without TypeScript's extension rewriting.
 // eslint-disable-next-line import/extensions
+import { path_glob } from './path-glob.ts'
+// eslint-disable-next-line import/extensions
 import { toolchain_inputs } from './toolchain-inputs.ts'
 
 interface Manifest {
@@ -38,9 +40,7 @@ function metadata(manifest: Manifest): string {
 	return JSON.stringify(rest)
 }
 
-function matches(file: string, pattern: string): boolean {
-	return path.matchesGlob(file, pattern) || path.matchesGlob(file, `${pattern}/**`)
-}
+const { matches } = path_glob
 
 function published(file: string, entries: Array<string> = []): boolean {
 	const included = entries.filter((entry) => !entry.startsWith('!'))
@@ -61,6 +61,11 @@ function consumer_input(file: string, before: Manifest, after: Manifest): boolea
 	)
 }
 
+// The version bump is the release itself, so it publishes even though it runs no checks.
+function version_changed(before: Manifest, after: Manifest): boolean {
+	return before.version !== after.version
+}
+
 function classify(paths: Array<string>, before: Manifest, after: Manifest): ChangeScope {
 	const changed = paths.filter(
 		(file) => file !== PACKAGE_JSON || metadata(before) !== metadata(after),
@@ -70,7 +75,8 @@ function classify(paths: Array<string>, before: Manifest, after: Manifest): Chan
 		runtime: changed.some((file) =>
 			DOCUMENTATION.every((pattern) => !path.matchesGlob(file, pattern)),
 		),
-		publish: changed.some((file) => consumer_input(file, before, after)),
+		publish:
+			version_changed(before, after) || changed.some((file) => consumer_input(file, before, after)),
 	}
 }
 

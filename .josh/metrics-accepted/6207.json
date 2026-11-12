@@ -1,7 +1,0 @@
-{
-	"reason": "keep_reason records the run:review open's --unpinned-ok reason for the branch so the ship carries it (#6207)",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 9
-	}
-}

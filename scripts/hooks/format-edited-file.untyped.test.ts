@@ -1,4 +1,5 @@
 import { untyped_environment } from '#eslint/untyped-environment.js'
+import { eslint_heap } from '#scripts/lint/eslint-heap'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it, vi } from 'vitest'
 import { make_directory_helpers, payload_for } from './format-edited-file-fixtures'
@@ -38,5 +39,25 @@ describe('format_edited_payload — the type program', () => {
 		for (const environment of spawned_environments()) {
 			expect(environment).toMatchObject(untyped_environment.environment())
 		}
+	})
+})
+
+// joshuafolkken/kit#7247: a daemon the hook starts gets the heap the lint path starts it with.
+describe('format_edited_payload — the heap', () => {
+	it('spawns every formatter with the daemon launch heap', async () => {
+		vi.stubEnv('NODE_OPTIONS', '')
+		mocked_execa.mockResolvedValue({ exitCode: 0, stdout: '' } as unknown as Awaited<
+			ReturnType<typeof execa_module.execa>
+		>)
+
+		await format_edited_payload(payload_for(write_fixture('edited.ts')), TEST_DIRECTORY)
+
+		expect(spawned_environments().length).toBeGreaterThan(0)
+
+		for (const environment of spawned_environments()) {
+			expect(environment).toMatchObject({ NODE_OPTIONS: eslint_heap.with_heap('') })
+		}
+
+		vi.unstubAllEnvs()
 	})
 })

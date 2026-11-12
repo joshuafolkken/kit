@@ -46,7 +46,9 @@ Also runs [behavior](#josh-behavior) and the [lockfile policy](josh-commands-aut
 - **The last line is the verdict, counting ran apart from skipped**: `✔ verification gate passed (6 checks) in 41.2s.`, or `⚠ verification gate not verified (0 ran, 6 skipped) in 0.2s.` — which exits `0` but writes no green record.
 - Exit `1` if any check failed. Refuses any argument other than the four flags and `--static-group=<group>`.
 - [`josh test:related`](#josh-testrelated) narrows the unit leg; CI runs the whole sharded suite regardless.
-- Project steps (`josh.gate.steps` in `package.json`: `{ name, command, paths? }`) run after the fixed checks, in order, as `pnpm exec --shell-mode <command>`; `paths` is validated, not used yet.
+- Project steps (`josh.gate.steps` in `package.json`: `{ name, command, paths?, cores? }`) run after the fixed checks, in order, as `pnpm exec --shell-mode <command>`.
+  - `cores`: the places the step claims in the core budget below before it starts; unset → the whole budget, so two lanes' heavy steps run one at a time. A light step sets a smaller count.
+  - `paths`: repo-relative globs or directories (`src/**/*.rs`, `crates/core`). The step is `reused` until a path moved since its green record matches one (`check-reuse.ts`); no `paths` → always runs. It runs on a changed `command`/`paths`, no record, `--force` or `--no-unit`. One step per crate narrows per crate.
   - A failed step makes the gate red under its `name`; later steps still run.
   - An invalid definition (a fixed check's label as `name` included) runs none and fails as one `josh.gate.steps` check naming the error.
   - With `--static-group`, only `rest` runs them.
@@ -64,6 +66,7 @@ Check code with prettier and eslint (skips a tool a basic project lacks).
 ```bash
 pnpm josh lint
 pnpm josh lint --changed   # the branch's changed files — the gate's form
+pnpm josh lint --shard=1   # one of two fixed halves of the tree (1 or 2) — a CI leg
 ```
 
 <!-- /usage -->
@@ -290,6 +293,7 @@ Run unit tests with Vitest (without Vitest: a basic project runs its own test sc
 
 ```bash
 pnpm josh test:unit
+pnpm josh test:unit --shard=1/3   # flags are forwarded to vitest
 ```
 
 <!-- /usage -->
@@ -576,7 +580,8 @@ See [init.md](./init.md) for the full file list and [`josh doctor`](#josh-doctor
 Sync config files.
 
 ```bash
-pnpm josh sync   # overwrite managed files
+pnpm josh sync           # overwrite managed files
+pnpm josh sync --force   # also replace a file you added to, dropping your additions
 ```
 
 <!-- /usage -->
@@ -659,6 +664,7 @@ pnpm josh git -y --skip-commit --skip-push   # open the PR without committing/pu
 
 - `-y` / `--yes` — run non-interactively; works without a TTY (agent or CI shell).
 - `--skip-commit` / `--skip-push` — recover/open a PR without a new commit or push.
+- `--body-file <path>` — extra PR body text after `closes #N`, from a file (`-` = stdin); use it when the text holds a backtick or `$`.
 
 <!-- /usage -->
 
@@ -1070,7 +1076,7 @@ pnpm josh lane:limit --reset   # clear the override; the run’s start limit app
 
 The run keeps the environment it started with, so this writes an override onto the run's record, read before `JOSH_LANE_LIMIT`.
 
-- The next lane allocation uses the new limit. Raising it writes a `lane-limit` event: a running `backlog:drive` asks for work on its next tick, seconds later, to fill the freed lanes, and the parent's `run:progress --wait` watcher wakes within a minute.
+- The next lane allocation uses the new limit. Raising it writes a `lane-limit` event: a running `backlog:drive` asks for work on its next tick, seconds later, to fill the freed lanes, and the parent's `run:progress --wait` watcher wakes within ten seconds.
 - Lowering it stops no running child; a lane that finishes is not refilled.
 - The lanes in use are the open lane work trees whose child is working, or whose process probe did not answer. A stopped lane keeps its tree and changes; its port seat becomes free once its owned processes and listeners are gone.
 - Every dispatch atomically acquires a seat and updates `.env` and the child's environment before starting. Kept trees are prioritized within the same free-seat limit as fresh launches.
@@ -1210,10 +1216,12 @@ pnpm josh lane:adopt --all   # every open lane with no record
 Print each delivered rule's unaided compliance — runs reached, kept rate, refusals.
 
 ```bash
-pnpm josh rule:value             # a reading cached under 15 minutes ago, else measure
-pnpm josh rule:value --fresh     # measure now, whatever the cache holds
-pnpm josh rule:value --refresh   # write the reading to the loop-head cache instead of stdout
-pnpm josh rule:value --prose     # class each prose rule: enforced, measured or prose only
+pnpm josh rule:value                         # a reading cached under 15 minutes ago, else measure
+pnpm josh rule:value --fresh                 # measure now, whatever the cache holds
+pnpm josh rule:value --refresh               # write the reading to the loop-head cache instead of stdout
+pnpm josh rule:value --period 7              # measure only the transcripts written in the last 7 days, cache untouched
+pnpm josh rule:value --weekly <rule-id>...   # reached / refused / rephrased of the named rules, one line per week
+pnpm josh rule:value --prose                 # class each prose rule: enforced, measured or prose only
 ```
 
 <!-- /usage -->
@@ -1225,6 +1233,8 @@ The kept rate is the share kept before the rule's trigger fired (`scripts/rules/
 - Printed from a cache at the `backlogrun` loop head (`josh backlog:offer`), refreshed at most every 15 minutes.
 - Bare, it prints that cache while under 15 minutes old, then `cached reading taken at <ISO time>`. A lane reads its parent's cache.
 - On stdout only, a `candidates:` section follows the table: `retire` lists measurable rules no run reached once the reading covers `MIN_RUNS_FOR_RETIREMENT` runs, and `condense` lists rules a hook refuses on every occurrence that it has refused (`scripts/rules/rule-value-candidates.ts`). The cache keeps the table alone, so `--fresh` prints them.
+- `--period <days>` counts only the transcripts last written inside that trailing window. It always measures and never reads or writes the cache. A value that is not a positive number prints the usage and exits 1.
+- `--weekly <rule-id>...` prints each named measured rule's reached / refused / rephrased, one line per week opening Monday 00:00 UTC. A run counts in the week its newest transcript was last written. `--period <days>` narrows it to that window. Like `--period`, it always measures and never touches the cache. No id, or one that is not a measured rule, prints the usage and exits 1.
 - `--prose` reads the documents instead: each prose rule's class and `file:line`.
 
 Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh rule:value` in detail".

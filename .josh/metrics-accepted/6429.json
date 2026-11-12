@@ -1,8 +1,0 @@
-{
-	"reason": "Native dependent retry wiring and complete dependency reads add 61 code lines; retry behavior and protection documentation add 303 on-demand bytes.",
-	"date": "2026-11-05",
-	"growth": {
-		"scripts.code_lines": 61,
-		"ai_cost.on_demand_bytes": 303
-	}
-}

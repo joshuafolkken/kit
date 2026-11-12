@@ -45,13 +45,18 @@ function heading_lines(heading: string | undefined): Array<string> {
 	return heading === undefined ? [''] : ['', rule_of(heading)]
 }
 
+// A section drawn even with no lines, its head saying `0` (joshuafolkken/kit#7281).
+function kept_section(heading: string | undefined, lines: ReadonlyArray<PlanLine>): PlanSection {
+	return { head: heading_lines(heading), lines, label: heading }
+}
+
 function plan_section(
 	heading: string | undefined,
 	lines: ReadonlyArray<PlanLine>,
 ): Array<PlanSection> {
 	if (lines.length === 0) return []
 
-	return [{ head: heading_lines(heading), lines, label: heading }]
+	return [kept_section(heading, lines)]
 }
 
 // The issue rows among a section's lines — an epic's own line and an empty seat's are none.
@@ -146,6 +151,7 @@ const run_board_render_section = {
 	done_section,
 	folded_head,
 	heading_lines,
+	kept_section,
 	keyed,
 	open_head,
 	plan_section,

@@ -1,8 +1,8 @@
 import { agent_consultation_model } from './agent-consultation-model'
+import { agent_phase_profile } from './agent-phase-profile'
 import {
 	agent_profile_schema,
 	type AgentEffort,
-	type AgentPhase,
 	type AgentProfile,
 	type AgentRole,
 } from './agent-profile-schema'
@@ -27,6 +27,7 @@ const {
 	warn_of_default,
 } = agent_provider
 const { consultation_provider } = agent_consultation_model
+const { SONNET_MODEL, phase_effort, phase_model, phase_model_keys } = agent_phase_profile
 
 const {
 	DEFAULT_PROFILES,
@@ -34,7 +35,6 @@ const {
 	IMPLEMENTATION_PHASE,
 	OPENAI_MODEL,
 	OPENAI_PROFILES,
-	PHASE_SCHEMA,
 	PRE_GATE_PHASE,
 	REVIEWER,
 	SCHEDULER,
@@ -52,13 +52,6 @@ interface Override {
 	value: string | undefined
 }
 
-interface PhaseModel {
-	key: string
-	value: string
-}
-
-type PhaseTable<Value> = Readonly<Partial<Record<AgentRole, Partial<Record<AgentPhase, Value>>>>>
-
 // What a resolution is keyed on beyond the role: the run phase (effort) and the review round (profile).
 interface AgentStage {
 	phase?: string | undefined
@@ -73,7 +66,6 @@ const PROVIDER_PROFILES = { anthropic: DEFAULT_PROFILES, openai: OPENAI_PROFILES
 // first only checks that the first round's findings were fixed, so its model and effort are set apart:
 // its own keys win, then the reviewer's, then its own default.
 const FIRST_REVIEW_ROUND = 1
-const SONNET_MODEL = 'claude-sonnet-5-5'
 const VERIFICATION_PROFILES: Readonly<Record<AgentProvider, AgentProfile>> = {
 	anthropic: {
 		...DEFAULT_PROFILES.reviewer,
@@ -99,25 +91,6 @@ const INVESTIGATION_MODELS: Readonly<Record<AgentProvider, string>> = {
 }
 const INVESTIGATION_MODEL_KEY = 'JOSH_INVESTIGATION_MODEL'
 
-// **Effort as a function of the run phase, not the role alone**. For the first
-// merge only the mechanical ship/bookkeeping region is lowered: the pre-gate resume drives the gate,
-// commit, PR and merge, applying fixes the gate has already named — work delegation.md calls the opposite
-// of judgement. The design-judgment implementation phases keep the role default, as does any role/phase
-// with no entry, and the review's own judgement is the reviewer role's, untouched by lowering
-// the worker here. The investigation phase — highest output density — is left for a later merge, once
-// the delegation half of this Issue has moved its reading out.
-const SHIP_EFFORT: AgentEffort = 'low'
-const PHASE_EFFORT: PhaseTable<AgentEffort> = {
-	worker: { [PRE_GATE_PHASE]: SHIP_EFFORT },
-}
-
-// **The ship phase may run on a model of its own** (joshuafolkken/kit#5343), read from its key ahead of
-// the role's and applied on the same cut relaunch as `SHIP_EFFORT`. Unset, the phase runs on its default:
-// Sonnet held the ship phase's duration and stop rates against Opus across a lane trial (joshuafolkken/kit#5346).
-const PHASE_MODELS: PhaseTable<PhaseModel> = {
-	worker: { [PRE_GATE_PHASE]: { key: 'JOSH_WORKER_SHIP_MODEL', value: SONNET_MODEL } },
-}
-
 const ENV_KEYS: Readonly<Record<AgentRole, { model: string; effort: string }>> = {
 	scheduler: { model: 'JOSH_SCHEDULER_MODEL', effort: 'JOSH_SCHEDULER_EFFORT' },
 	worker: { model: 'JOSH_WORKER_MODEL', effort: 'JOSH_WORKER_EFFORT' },
@@ -125,12 +98,6 @@ const ENV_KEYS: Readonly<Record<AgentRole, { model: string; effort: string }>> =
 }
 
 const LEGACY_WORKER_KEYS = { model: 'JOSH_LANE_MODEL', effort: 'JOSH_LANE_EFFORT' }
-
-function phase_model_keys(): ReadonlyArray<string> {
-	return Object.values(PHASE_MODELS).flatMap((phases) =>
-		Object.values(phases).map(({ key }) => key),
-	)
-}
 
 // Every env key a profile is read from. The unit suite blanks them so a lane's model and effort never
 // reach its fixtures (joshuafolkken/kit#5863); its test pins each to the pattern its config blanks.
@@ -175,31 +142,6 @@ function override_value(
 		: { key, value: trimmed(environment[key]) }
 }
 
-// A role's entry in a phase table; `undefined` for a phase-less or unrecognized phase, or no entry.
-function phase_entry<Value>(
-	table: PhaseTable<Value>,
-	role: AgentRole,
-	phase: string | undefined,
-): Value | undefined {
-	const parsed = PHASE_SCHEMA.safeParse(phase)
-
-	return parsed.success ? table[role]?.[parsed.data] : undefined
-}
-
-// The phase's own model — its key when set, else its default; `undefined` for a phase with no entry or
-// an OpenAI session, whose model is never read from env.
-function phase_model(
-	role: AgentRole,
-	provider: AgentProvider,
-	phase: string | undefined,
-	environment: AgentEnvironment,
-): PhaseModel | undefined {
-	const entry = provider === OPENAI_PROVIDER ? undefined : phase_entry(PHASE_MODELS, role, phase)
-	if (entry === undefined) return undefined
-
-	return { key: entry.key, value: trimmed(environment[entry.key]) ?? entry.value }
-}
-
 function model_override(
 	role: AgentRole,
 	environment: AgentEnvironment,
@@ -235,17 +177,6 @@ function validate(profile: AgentProfile, model_key: string): ProfileResult {
 	}
 
 	return { kind: 'profile', profile }
-}
-
-// The effort a phase resolves to before any env override: the phase's own value where the table names
-// one, otherwise the fallback. A phase-less or unrecognized call returns the
-// fallback unchanged, which is what keeps every existing caller reading the current default.
-function phase_effort(
-	role: AgentRole,
-	phase: string | undefined,
-	fallback: AgentEffort,
-): AgentEffort {
-	return phase_entry(PHASE_EFFORT, role, phase) ?? fallback
 }
 
 // The effort a stored profile takes in a phase: an env override wins, then the phase value, then the
@@ -374,6 +305,7 @@ const agent_role_profile = {
 	resolve,
 	resolve_provider,
 	resolve_review,
+	validate,
 	warn_of_default,
 	with_phase,
 }

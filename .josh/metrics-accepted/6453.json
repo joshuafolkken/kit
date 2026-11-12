@@ -1,7 +1,0 @@
-{
-	"reason": "#6453 adds the zsh/bash/fish completion script templates josh completion prints, with their tests, and the bash lazy-loader fix from review",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 72
-	}
-}

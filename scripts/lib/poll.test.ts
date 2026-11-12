@@ -250,10 +250,35 @@ describe('PR_POLL_SCHEDULES', () => {
 		])
 	})
 
-	it('reads the merge from 10 seconds, 1.5 times longer each tick, up to 30 seconds', async () => {
+	// #7237: the low cap bounds how late a landed merge is detected.
+	it('reads the merge from 10 seconds, then every 15 seconds at most', async () => {
 		await expect(first_waits_of(PR_POLL_SCHEDULES.merge)).resolves.toEqual([
-			10_000, 15_000, 22_500, 30_000, 30_000, 30_000,
+			10_000, 15_000, 15_000, 15_000, 15_000, 15_000,
 		])
+	})
+
+	// #7238
+	it('reads the gated checks every 30 seconds four times, then every 10 seconds', async () => {
+		await expect(first_waits_of(PR_POLL_SCHEDULES.checks_gated)).resolves.toEqual([
+			30_000, 30_000, 30_000, 30_000, 10_000, 10_000,
+		])
+	})
+})
+
+describe('PR_POLL_SCHEDULES.checks_gated budget', () => {
+	it('spends the same total wait as the fixed cadence', async () => {
+		const waits: Array<number> = []
+
+		await poll.poll_for(() => undefined, {
+			attempts: 10,
+			interval_ms: 60_000,
+			sleeper: async (duration_ms: number) => {
+				waits.push(duration_ms)
+			},
+			backoff: { schedule: PR_POLL_SCHEDULES.checks_gated },
+		})
+
+		expect(waits.reduce((total, wait_ms) => total + wait_ms, 0)).toBe(9 * 60_000)
 	})
 })
 

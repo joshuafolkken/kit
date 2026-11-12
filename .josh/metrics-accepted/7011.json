@@ -1,7 +1,0 @@
-{
-	"reason": "#7011 adds the single-source rule that a started implementation never splits, spills or stops for size, plus pointers to it",
-	"date": "2026-11-10",
-	"growth": {
-		"ai_cost.on_demand_bytes": 353
-	}
-}

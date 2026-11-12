@@ -1,7 +1,0 @@
-{
-	"reason": "#7125: daemon calls carry the launcher environment (parse + call reader), so one daemon serves each checkout",
-	"date": "2026-11-10",
-	"growth": {
-		"scripts.code_lines": 27
-	}
-}

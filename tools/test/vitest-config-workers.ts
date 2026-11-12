@@ -1,7 +1,9 @@
+import { spawnSync } from 'node:child_process'
 import { availableParallelism } from 'node:os'
 import path from 'node:path'
 import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { unit_run_marker } from '#scripts/test/unit-run-marker'
 
 // The worker count `vitest.config.ts` hands vitest, so a run that does not go through `josh` — a
@@ -62,18 +64,48 @@ function guarded_share(
 	}
 }
 
+// **The lanes are counted in a child process, never imported** (joshuafolkken/kit#7254). Every module
+// this config imports, statically or not, is a whole-suite file, and the lane reading pulls in the lane
+// paths, the lane-state records and the git directory — each of which would then send any change to it
+// to the whole suite, though the count moves only the worker share and never a result. The child
+// resolves `#scripts` from the working directory, as the config does. A child that fails or prints no
+// number counts no lane, which leaves the division to the run count, as `live_lane_count` does.
+const LANE_COUNT_SOURCE = `import { unit_lane_count } from '#scripts/test/unit-lane-count'
+process.stdout.write(String(unit_lane_count.live_lane_count(process.argv[1])))`
+
+function spawned_lane_count(
+	checkout: string = process.cwd(),
+	environment: NodeJS.ProcessEnv = process.env,
+): number {
+	const child = spawnSync(
+		process.execPath,
+		['--input-type=module', '-e', LANE_COUNT_SOURCE, checkout],
+		{
+			encoding: 'utf8',
+			env: environment,
+			timeout: PROBE_TIMEOUT_MS,
+		},
+	)
+	const count = Number(child.stdout)
+
+	return Number.isSafeInteger(count) ? count : 0
+}
+
+const lane_count_probe = { spawned_lane_count }
+
 // `lanes` is the live lanes on the machine (joshuafolkken/kit#6682): each holds a share before its
-// suite starts, so a direct run beside idle lanes still takes only its own.
+// suite starts, so a direct run beside idle lanes still takes only its own. A nested run spawns no
+// lane count, since `josh` sizes it.
 function config_workers(
 	available_cores: number = availableParallelism(),
 	directory: string = PLATFORM_TEMP_ROOT,
-	lanes: number = unit_run_marker.live_lane_count(),
+	lanes?: number,
 ): number | undefined {
 	if (unit_run_marker.is_nested_run()) return undefined
 
-	return guarded_share(available_cores, directory, lanes)
+	return guarded_share(available_cores, directory, lanes ?? lane_count_probe.spawned_lane_count())
 }
 
-const vitest_config_workers = { config_workers }
+const vitest_config_workers = { config_workers, lane_count_probe }
 
 export { vitest_config_workers }

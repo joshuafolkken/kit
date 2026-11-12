@@ -1,7 +1,0 @@
-{
-	"reason": "cost:audit per-model and per-token-type dollar breakdown module (#6899)",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 61
-	}
-}

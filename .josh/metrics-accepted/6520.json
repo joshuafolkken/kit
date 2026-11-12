@@ -1,7 +1,0 @@
-{
-	"reason": "Add the epic child-untrack writer and CLI dispatch; reuse the existing parser and removal plan.",
-	"date": "2026-11-05",
-	"growth": {
-		"scripts.code_lines": 44
-	}
-}

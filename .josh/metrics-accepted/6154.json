@@ -1,7 +1,0 @@
-{
-	"reason": "lane:why ship total table (#6154): new lane-why-ship.ts module and ship_parts export",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 57
-	}
-}

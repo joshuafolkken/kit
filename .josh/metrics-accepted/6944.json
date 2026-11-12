@@ -1,7 +1,0 @@
-{
-	"reason": "completion registration lists the zsh/bash/fish usage examples #6453 added (#6944)",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 7
-	}
-}

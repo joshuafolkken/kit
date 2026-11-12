@@ -1,9 +1,0 @@
-{
-	"reason": "run:split adds a command and shares the set-aside steps with run:pause; the review round added the rerun guard on the place step",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 275,
-		"prose.long_paragraphs": 1,
-		"prose.excess_bold": 1
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "Issue #6241 adds deadline transport, bounded timer and cache expiry, plus idle expiry propagation required by round 1; +114 runtime lines remain within the planned 120-line estimate.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 114
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "#6614 wires the rate-limit classifier into issue:read failure reports: the read keeps the failed request's error text and the report names the classified cause",
-	"date": "2026-11-07",
-	"growth": {
-		"scripts.code_lines": 15
-	}
-}

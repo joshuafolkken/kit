@@ -35,10 +35,27 @@ const DYNAMIC_PATH = /[$`*?{}\\]/u
 // runs: `if x; then git push; fi` and `(cd x && git push)` launch `git push`.
 const COMPOUND_HEAD = /^\s*(?:[({!]\s*|(?:if|then|else|elif|while|until|do)\s+)+/u
 const COMPOUND_CLOSERS = new Set([')', '}', ' ', '\t', '\n'])
-const KEYWORDS: ReadonlySet<string> = new Set(['for', 'do', 'done', 'then', 'else', 'fi', 'esac'])
-// A `case` arm or a function body sits behind a pattern or a name the cut does not read, so the line is
-// refused rather than guessed.
-const UNREAD_BODY = /^(?:case|select|function)\s|^[\w.:-]+\s*\(\s*\)/u
+const KEYWORDS: ReadonlySet<string> = new Set([
+	'for',
+	'do',
+	'done',
+	'then',
+	'else',
+	'fi',
+	'case',
+	'select',
+	'function',
+	'esac',
+])
+// The shared cut reads a `case` arm and a `{` function body as segments of their own
+// (joshuafolkken/kit#7340). What it leaves unread — a function head with another body, or an arm
+// pattern still on its segment — is refused rather than guessed.
+const FUNCTION_START = /^(?:function\s|[\w.:-]+\s*\(\s*\))/u
+// `body_of` has stripped the head's closing `)` and trailing blanks with the other closers.
+const FUNCTION_HEAD = /^(?:function\s+)?[\w.:-]+(?:\s*\()?$/u
+// An arm's command may touch its `)` (`b)git push`), so a `)` anywhere in the first word, outside an
+// expansion, is a pattern.
+const UNREAD_ARMS: ReadonlyArray<RegExp> = [/^case\s[\s\S]*\)/u, /^[^\s$`]*\)/u]
 const ARGUMENT_QUOTES = /['"\\]/gu
 const TIME_PROGRAM = /(?:^|\/)time$/u
 const TIME_WRITE = /^-(?:[A-Za-z]*o|-o)/u
@@ -174,9 +191,15 @@ function command_refusal(segment: string, root: string): Refusal {
 	return call === undefined ? undefined : call_refusal(body_of(segment), call, root)
 }
 
+function is_unread_body(body: string): boolean {
+	if (FUNCTION_START.test(body)) return !FUNCTION_HEAD.test(body)
+
+	return UNREAD_ARMS.some((pattern) => pattern.test(body))
+}
+
 function segment_refusal(segment: string, root: string): Refusal {
 	if (wrapper_writes(segment)) return 'a time output file'
-	if (UNREAD_BODY.test(body_of(segment))) return 'a `case` arm or function body'
+	if (is_unread_body(body_of(segment))) return 'a `case` arm or function body'
 
 	const target = redirected_paths(segment).find((redirected) => unsafe_path(redirected, root))
 

@@ -1,7 +1,0 @@
-{
-	"reason": "New lane:stats stage turns table (lane-turn-stats.ts and its test) for #6209, plus the round-1 fix counting an open implement interval for a lane with no ship stage",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 141
-	}
-}

@@ -6,6 +6,7 @@ import { issue_auto_ok } from './issue-auto-ok'
 import { issue_cap_files } from './issue-cap-files'
 import { issue_file, type FileArguments } from './issue-file'
 import { issue_file_lane_hint } from './issue-file-lane-hint'
+import { issue_file_worker } from './issue-file-worker'
 import { issue_lint_cli } from './issue-lint-cli'
 import { issue_priority } from './issue-priority'
 import { issue_sample_required } from './issue-sample-required'
@@ -224,6 +225,7 @@ async function labels_in_one_pass(filing: Filing): Promise<ReadonlyArray<string>
 	const verdicts = [
 		is_body_clear,
 		labels !== undefined,
+		issue_file_worker.is_worker_clear(filing, labels ?? filing.args.labels),
 		await is_source_clear(filing),
 		await is_wip_clear(filing),
 		await is_scout_clear(filing),

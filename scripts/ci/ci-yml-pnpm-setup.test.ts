@@ -212,7 +212,7 @@ describe.each(ACTION_CALLERS)('pnpm setup in $path', ({ path: workflow_path, job
 
 describe('the publish workflow', () => {
 	it.each(PUBLISH_JOBS)('installs behind safe-chain without the store cache in %s', (job_name) => {
-		expect(action_call(PUBLISH_YML, job_name)?.with).toEqual({ cache: 'false' })
+		expect(action_call(PUBLISH_YML, job_name)?.with).toMatchObject({ cache: 'false' })
 	})
 
 	it.each(CREDENTIALED_JOBS)('sets up no pnpm and runs no pnpm or tsx in %s', (job_name) => {

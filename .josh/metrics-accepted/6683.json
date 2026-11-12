@@ -1,7 +1,0 @@
-{
-	"reason": "#6683 adds the resident pretool-guard daemon (hook-daemon.ts, hook-daemon-call.ts), its launcher branch and a shared hook-context test fixture; the code is new capability, not duplication",
-	"date": "2026-11-10",
-	"growth": {
-		"scripts.code_lines": 293
-	}
-}

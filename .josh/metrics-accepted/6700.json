@@ -1,7 +1,0 @@
-{
-	"reason": "ETag read seam for the run board's decision issue and comment reads (#6700): a comment-listing read seam and the shared page size",
-	"date": "2026-11-07",
-	"growth": {
-		"scripts.code_lines": 15
-	}
-}

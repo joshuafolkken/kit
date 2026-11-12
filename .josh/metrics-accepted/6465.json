@@ -1,7 +1,0 @@
-{
-	"reason": "Issue #6465 connects measured implementation rates to the shared plan guide; eight source lines add the signal and budget-based threshold without duplicating the guide.",
-	"date": "2026-11-05",
-	"growth": {
-		"scripts.code_lines": 8
-	}
-}

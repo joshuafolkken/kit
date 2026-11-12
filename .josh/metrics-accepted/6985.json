@@ -1,7 +1,0 @@
-{
-	"reason": "lane:stats --over gains a cause table that bundles over-threshold lanes by over-cap hub and CI job and lists the unfiled ones as filing candidates (#6985)",
-	"date": "2026-11-10",
-	"growth": {
-		"scripts.code_lines": 100
-	}
-}

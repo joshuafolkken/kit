@@ -168,7 +168,7 @@ describe('issue_file_cli.run — a filing that clears every step', () => {
 describe('issue_file_cli.run — the labels it applies exist first', () => {
 	it('provisions the missing labels in the target repository before the create call', async () => {
 		expect(await issue_file_cli.run(argv_of(origin_path, '--repo', THERE))).toBe(SUCCESS_EXIT_CODE)
-		expect(ensure_labels).toHaveBeenCalledExactlyOnceWith(THERE)
+		expect(ensure_labels).toHaveBeenCalledExactlyOnceWith(THERE, [])
 		expect(ensure_labels.mock.invocationCallOrder[0]).toBeLessThan(
 			exec_gh_api.mock.invocationCallOrder[0] ?? 0,
 		)

@@ -1,7 +1,0 @@
-{
-	"reason": "run:park appends the lane directory, held seat and lane:close hint in a new module (#5840)",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 28
-	}
-}

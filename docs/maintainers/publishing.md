@@ -2,6 +2,12 @@
 
 For kit maintainers releasing the package; projects that use kit can skip this page. Kit publishes each release to GitHub Packages and public npm in separate jobs. `auto-tag.yml` starts the workflow on the release tag itself (`gh workflow run publish.yml --ref <tag>`), so both jobs publish the tag's source revision and npm provenance records the tag's commit, even when `main` has moved on since the tag was created. A failure in one job does not prevent the other job from running.
 
+## Which repositories publish
+
+The registry decides: a repository publishes to npm when public npm already carries its `@joshuafolkken/` package (`npm_registry.published_package_name`); `private` in `package.json` is not read. `josh sync` then distributes kit's `publish.yml` to it, and `josh release` waits for the npm stage.
+
+The first version is therefore published by hand, as below — trusted publishing needs the package to exist.
+
 ## One-time public npm setup
 
 An npm account that owns the `@joshuafolkken` scope must publish the package once before its trusted publisher can be configured. Confirm that the account controls the scope and [enable two-factor authentication](https://docs.npmjs.com/configuring-two-factor-authentication/): npm requires it for the first direct publish. Complete any browser authentication in the browser; never share authentication or recovery codes. Inspect the tarball before publishing. The repository is public, but the tarball includes the distributed prompts, scripts, and AI configuration as well as compiled code.

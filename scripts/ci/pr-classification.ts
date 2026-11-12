@@ -21,7 +21,11 @@ const CLASSIFICATION_SET: ReadonlySet<string> = new Set(CLASSIFICATION_LABELS)
 // one format.
 const DECLARATION_PREFIX = `${issue_body_keys.prefix('release')} `
 const DECLARATION = new RegExp(`^${DECLARATION_PREFIX}(.+)$`, 'gmu')
-const DECLARATION_LINE = new RegExp(String.raw`^${DECLARATION_PREFIX}.*(?:\n|$)`, 'gmu')
+// Either language's declaration, so a rewrite never leaves the filer's own behind (joshuafolkken/kit#7210).
+const DECLARATION_LINE = new RegExp(
+	String.raw`^(?:${issue_body_keys.prefix_variants('release').join('|')}) .*(?:\n|$)`,
+	'gmu',
+)
 const BACKGROUND_HEADING = issue_body_keys.heading('background')
 const BULLET = '- '
 const NEWLINE = '\n'
@@ -115,7 +119,9 @@ function issue_candidates(
 	body: string,
 ): ReadonlyArray<ReleaseClassification> {
 	const names = labels.map((label) => label.toLowerCase())
-	const declared = [...body.matchAll(DECLARATION)].map((match) => match[1] ?? '')
+	const declared = [
+		...markdown_section.canonical_lines(body).join(NEWLINE).matchAll(DECLARATION),
+	].map((match) => match[1] ?? '')
 	const candidates = [...release_candidates([...names, ...declared].filter(is_classification))]
 	const unknown = declared.filter((value) => !is_classification(value))
 

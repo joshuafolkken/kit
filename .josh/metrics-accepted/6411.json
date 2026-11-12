@@ -1,7 +1,0 @@
-{
-	"reason": "Reuse the existing size parser in both ranking adapters and add one estimated-lines key after dependents for #6411.",
-	"date": "2026-11-05",
-	"growth": {
-		"scripts.code_lines": 6
-	}
-}

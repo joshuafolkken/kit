@@ -1,7 +1,0 @@
-{
-	"reason": "The branch adds the GraphQL snapshot suite (13 tests); unit 1.9s -> 2.1s is that suite, unchanged after a gate rerun",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 299
-	}
-}

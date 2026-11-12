@@ -1,7 +1,0 @@
-{
-	"reason": "Solo labels now require validated evidence through the existing decision; the additional shared validation prevents unjustified serialization of other lanes.",
-	"date": "2026-11-05",
-	"growth": {
-		"scripts.code_lines": 16
-	}
-}

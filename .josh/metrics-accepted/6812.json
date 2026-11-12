@@ -1,7 +1,0 @@
-{
-	"reason": "#6812 saves and restores the pre-call content of dirty runtime files in bash-revert (security gap fix)",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 39
-	}
-}

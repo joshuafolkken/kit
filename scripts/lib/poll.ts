@@ -45,8 +45,18 @@ const PR_POLL_SCHEDULES = {
 		factor: 1,
 		max_ms: 20_000,
 	},
-	// A merge lands soon after the checks pass, so its wait starts fine and keeps a low cap.
-	merge: { initial_ms: 10_000, factor: 1.5, max_ms: 30_000 },
+	// The CI completion wait and its watch: a poll where the head's checks did not move costs only
+	// two conditional reads (`git-pr-checks-gate.ts`), so after the same lead it polls twice as often
+	// (joshuafolkken/kit#7238). `checks` stays the CodeRabbit retrigger wait's, which has no gate.
+	checks_gated: {
+		lead: { count: 4, interval_ms: 30_000 },
+		initial_ms: 10_000,
+		factor: 1,
+		max_ms: 10_000,
+	},
+	// A merge lands soon after the checks pass, so its wait starts fine and keeps a low cap that
+	// bounds the delay between the merge landing and its detection (joshuafolkken/kit#7237).
+	merge: { initial_ms: 10_000, factor: 1.5, max_ms: 15_000 },
 } satisfies Record<string, BackoffSchedule>
 
 interface PollBackoff {

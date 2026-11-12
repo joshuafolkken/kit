@@ -1,8 +1,0 @@
-{
-	"reason": "Documentation, prompt and test-only reviews share a low classifier and Sonnet routing; round-two refusal guards and explicit model overrides stay intact. Runtime size classification is deferred to #6389.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 39,
-		"ai_cost.on_demand_bytes": 125
-	}
-}

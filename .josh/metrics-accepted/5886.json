@@ -1,7 +1,0 @@
-{
-	"reason": "#5886: the lane:breakdown ledger-read check, exempting a criterion whose closing note names a test",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 9
-	}
-}

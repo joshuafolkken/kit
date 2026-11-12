@@ -5,12 +5,12 @@ import { write_file } from '#tools/test/write-file'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('execa', () => ({ execa: vi.fn() }))
-vi.mock('#scripts/build/local-bin', () => ({ resolve_package_bin: vi.fn() }))
+vi.mock('#scripts/build/local-bin', async () => await import('#tools/test/local-bin-mock'))
 vi.mock('#scripts/git/git-spawn-sync', () => ({ git_spawn_sync: { read: vi.fn() } }))
 
 const execa_module = await import('execa')
 const mocked_execa = vi.mocked(execa_module.execa)
-const { resolve_package_bin } = await import('#scripts/build/local-bin')
+const { DIRECT_LAUNCH_FILE, resolve_package_bin } = await import('#tools/test/local-bin-mock')
 const mocked_resolve = vi.mocked(resolve_package_bin)
 const { git_spawn_sync } = await import('#scripts/git/git-spawn-sync')
 const mocked_git_read = vi.mocked(git_spawn_sync.read)
@@ -242,6 +242,27 @@ describe('eslint_daemon.run', () => {
 	})
 })
 
+describe('eslint_daemon.stop', () => {
+	// A stop that failed or timed out is not reported as stopped.
+	it.each([
+		[0, true],
+		[1, false],
+	])('stops through its own cli, bounded: exit %i → %s', async (code, stopped) => {
+		mocked_execa.mockResolvedValue(answer(code, ''))
+
+		expect(await eslint_daemon.stop(project_root)).toBe(stopped)
+		expect(mocked_execa.mock.lastCall?.[1]).toEqual([CLI, 'stop'])
+		expect(mocked_execa.mock.lastCall?.at(-1)).toMatchObject({ timeout: expect.any(Number) })
+	})
+
+	it('stops nothing where no daemon cli resolves', async () => {
+		mocked_resolve.mockReturnValue(undefined)
+
+		expect(await eslint_daemon.stop(project_root)).toBe(false)
+		expect(mocked_execa).not.toHaveBeenCalled()
+	})
+})
+
 describe('eslint_daemon.run — a stale daemon', () => {
 	it('stops a daemon whose config moved since it started before linting', async () => {
 		current_checkout()
@@ -362,11 +383,11 @@ describe('eslint_daemon.run_or_cold', () => {
 		])
 	})
 
-	it('runs the cold pnpm eslint when the daemon cannot answer', async () => {
+	it('launches the cold eslint directly when the daemon cannot answer', async () => {
 		mocked_resolve.mockReturnValue(undefined)
 		mocked_execa.mockResolvedValueOnce(answer(0, 'cold'))
 
 		expect(await eslint_daemon.run_or_cold(PNPM_ESLINT)).toMatchObject({ exit_code: 0 })
-		expect(mocked_execa).toHaveBeenCalledExactlyOnceWith('pnpm', PNPM_ESLINT, expect.anything())
+		expect(mocked_execa.mock.calls).toEqual([[DIRECT_LAUNCH_FILE, PNPM_ESLINT, expect.anything()]])
 	})
 })

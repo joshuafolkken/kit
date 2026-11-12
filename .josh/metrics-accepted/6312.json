@@ -1,7 +1,0 @@
-{
-	"reason": "Exclude lint file listings only from checker warnings while retaining skip detection",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 1
-	}
-}

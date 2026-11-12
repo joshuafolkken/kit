@@ -1,7 +1,0 @@
-{
-	"reason": "run:board fold state persistence (#7213): new fold store module and its wiring into the key reader",
-	"date": "2026-11-11",
-	"growth": {
-		"scripts.code_lines": 62
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "Exclude Markdown command mentions from split dependency inference; the predicate and early return add two runtime lines.",
-	"date": "2026-11-05",
-	"growth": {
-		"scripts.code_lines": 2
-	}
-}

@@ -40,6 +40,7 @@ This table is the single description of the keywords; the README and the [tutori
 | `prrun-stopped`   | reached — report and stop | reached — report and stop            | reached — report and stop       | followup → merged         |
 | `merged`          | reached — report and stop | reached — report and stop            | reached — report and stop       | reached — report and stop |
 | `pr-open`         | reached — report and stop | gate → gated, before the commit      | gate → green, mergeable PR      | gate → merged             |
+| `pr-returned`     | reached — report and stop | implement → gated, before the commit | implement → green, mergeable PR | implement → merged        |
 
 Each stop's notification lists the keywords further up, nearest first. How each state is read is in [`josh run:entry`](../josh-commands-run.md#josh-runentry).
 

@@ -1,8 +1,0 @@
-{
-	"reason": "workflow-edit guard: new pretool-guard row plus shared shell-redirects module, widened after review to cover cp -t (bundled too), dd of=, patch/unlink/shred and cd into .github",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 142,
-		"prose.long_paragraphs": 1
-	}
-}

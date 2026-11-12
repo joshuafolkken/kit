@@ -5,7 +5,7 @@ Every environment variable kit reads, in one place. Set the ones you need in a `
 Only these load `.env` themselves, and only when it exists:
 
 - **Workflow** — `josh notify`, `josh followup`, `josh ship`, `josh backlogrun`, `josh backlog:drive`, `josh epic:next`, `josh upstream:interrupt`, `josh issue:plan`, whose `--planned` sends the planning Telegram, and `josh epic`, whose `--notify` sends the split path's.
-- **Run state** — `josh run:entry`, `josh run:hold`, `josh run:release`, `josh run:pause`, `josh run:split`, `josh run:step`, `josh run:event`, `josh run:carry`, `josh run:board`, `josh run:wake`, `josh run:merge`, and `josh run:park`, `josh issue:already-done` and `josh issue:measured`, which release the hold.
+- **Run state** — `josh run:entry`, `josh run:hold`, `josh run:release`, `josh run:pause`, `josh run:split`, `josh run:step`, `josh run:event`, `josh run:carry`, `josh run:board`, `josh run:wake`, `josh run:merge`, and `josh run:park`, `josh issue:already-done`, `josh issue:premise-unmet` and `josh issue:measured`, which release the hold.
 - **Lanes** — every lane command except `lane:launch`: `josh lane:open`, `josh lane:close`, `josh lane:list`, `josh lane:prune`, `josh lane:output`, `josh lane:dispatch`, `josh lane:await`, `josh lane:limit`, `josh lane:restart`, `josh lane:withdraw`, `josh lane:pause`, `josh lane:resume`, `josh lane:plan`, `josh lane:adopt`, `josh lane:sample`, `josh lane:stats`, `josh lane:value`, `josh lane:net`, `josh lane:breakdown`, `josh lane:why`.
 - **Setup** — `josh doctor`, `josh latest:scope`, `josh latest:if-required`, `josh run:prime` (which runs it), `josh latest:update`, `josh port`, `josh session:lang`.
 - **Reports** — `josh report:template`, `josh plan:scaffold`, `josh report:lint`, `josh backlog:plan`, `josh run:tail` and `josh run:report`, whose labels follow `JOSH_SESSION_LANG`; `run:report --handoff` also sends its report to Telegram.
@@ -14,7 +14,15 @@ Only these load `.env` themselves, and only when it exists:
 
 `scripts/document/environment-file-reference.test.ts` checks this list against the command registry, both ways.
 
-Every other command — `josh gate`, `josh review:brief`, `josh clone:scan`, `josh release`, `josh eval`, `josh run:progress` and the git hooks among them — reads only the real environment. Set the variables they read (`JOSH_SCOPED_GREEN`, `JOSH_RELEASE_TAG_TIMEOUT_SECONDS`, `JOSH_EVAL_MODEL`, `JOSH_EVAL_CONCURRENCY`, `JOSH_PROGRESS`, the two `*_FORCE` switches) in the shell that runs them.
+Every other command — `josh gate`, `josh review:brief`, `josh clone:scan`, `josh release`, `josh eval`, `josh run:progress` and the git hooks among them — reads only the real environment. Set the variables they read in the shell that runs them — the two `*_FORCE` switches and these:
+
+- Gate and git hooks — `JOSH_SCOPED_GREEN`, `JOSH_PRE_PUSH_RELATED`, `JOSH_PRE_COMMIT_LINT`, `JOSH_SECRETLINT_REQUIRE`.
+- Release and metrics — `JOSH_RELEASE_TAG_TIMEOUT_SECONDS`, `JOSH_RELEASE_NPM_TIMEOUT_SECONDS`, `JOSH_RELEASE_GITHUB_RELEASE_TIMEOUT_SECONDS`, `JOSH_METRICS_BASE`.
+- Unit suite — `JOSH_UNIT_DURATIONS`, `JOSH_VITEST_CACHE_DIR`.
+- Evaluation and progress — `JOSH_EVAL_MODEL`, `JOSH_EVAL_CONCURRENCY`, `JOSH_PROGRESS`.
+- Read by every command — `JOSH_TEMP_ROOT`: from `.env` it would reach only the commands that load the file, splitting the run state and core budget between two roots.
+
+`.env.example` lists every other variable below, and `scripts/document/environment-example-reference.test.ts` holds it to this page.
 
 Set `JOSH_PROGRESS_INTERVAL_MINUTES` in the shell, or commit `josh.progress_interval_minutes` in `package.json`: in `.env` it reaches only the `josh pretool:guard` heartbeat, not `josh run:progress`.
 
@@ -55,7 +63,7 @@ A missing `.env` file is not itself an error: both commands also read the two va
 | ------------------------- | -------- | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `PORT_SEED`               | No       | `0` (dev 5173, preview 4173)                      | Several kit projects run on one machine: an integer `0`–`99` that moves this project's dev and preview ports by `seed × 10` ([`josh port`](./josh-commands.md#josh-port)).                                                 |
 | `JOSH_LANE_ROOT`          | No       | `.<repository-name>-lanes`, beside the repository | Where `josh lane:open` puts a lane's work tree.                                                                                                                                                                            |
-| `JOSH_LANE_LIMIT`         | No       | `8`                                               | How many lanes one repository runs at once ([`josh epic:next`](./josh-commands-backlog.md#josh-epicnext)), and a followup relaunch may run one past it; set `2` on a small container.                                      |
+| `JOSH_LANE_LIMIT`         | No       | `4`                                               | How many lanes one repository runs at once ([`josh epic:next`](./josh-commands-backlog.md#josh-epicnext)), and a followup relaunch may run one past it; set `2` on a small container.                                      |
 | `JOSH_LANE_RESIDENT_APPS` | No       | `Google Chrome.app,Visual Studio Code.app`        | The apps whose summed resident size a `load` sample records and `josh lane:stats` reports, as comma-separated command-line substrings; an empty value in `.env` records none (pnpm drops an empty exported one).           |
 | `PLAYWRIGHT_REUSE_SERVER` | No       | off                                               | `1` / `true` / `yes` / `on` lets the E2E run reuse this project's own server already on the port instead of booting one ([troubleshooting](./troubleshooting.md#local-e2e-aborts-with-httplocalhost5173-is-already-used)). |
 
@@ -73,14 +81,14 @@ Detached launchers also hand this variable to processes without an agent session
 | ----------------------------------- | -------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | `JOSH_AGENT_PROVIDER`               | No       | `anthropic`                                        | The default provider for a new `josh backlogrun`: `anthropic` or `openai`.                                                            |
 | `JOSH_SCHEDULER_MODEL`              | No       | `claude-opus-5-5`                                  | The model of the run that schedules the batch.                                                                                        |
-| `JOSH_SCHEDULER_EFFORT`             | No       | `medium`                                           | The effort of the run that schedules the batch.                                                                                       |
+| `JOSH_SCHEDULER_EFFORT`             | No       | `medium`                                           | The effort of the run that schedules the batch: `low`, `medium`, `high`, `xhigh` or `max`.                                            |
 | `JOSH_WORKER_MODEL`                 | No       | `claude-opus-5-5`                                  | The model of each lane that implements an Issue, outside the ship phase.                                                              |
-| `JOSH_WORKER_EFFORT`                | No       | `medium`, and `low` once the lane reaches the gate | The effort of each lane that implements an Issue.                                                                                     |
-| `JOSH_WORKER_SHIP_MODEL`            | No       | `claude-sonnet-5-5`                                | The model a lane relaunches on once it reaches the gate (the ship phase).                                                             |
+| `JOSH_WORKER_EFFORT`                | No       | `medium`, and `low` once the lane reaches the gate | The effort of each lane that implements an Issue: `low`, `medium`, `high`, `xhigh` or `max`.                                          |
+| `JOSH_WORKER_SHIP_MODEL`            | No       | `claude-sonnet-5-5`                                | The model a lane relaunches on once it reaches the gate (the ship phase); a weaker `josh.worker` profile of the Issue lowers it.      |
 | `JOSH_REVIEWER_MODEL`               | No       | `claude-opus-5-5`                                  | The model of the review a lane's change gets.                                                                                         |
-| `JOSH_REVIEWER_EFFORT`              | No       | `medium`                                           | The effort of the review a lane's change gets.                                                                                        |
+| `JOSH_REVIEWER_EFFORT`              | No       | `medium`                                           | The effort of the review a lane's change gets: `low`, `medium`, `high`, `xhigh` or `max`.                                             |
 | `JOSH_REVIEWER_VERIFICATION_MODEL`  | No       | `claude-sonnet-5-5`                                | Round 2 and later verification pass; falls back to `JOSH_REVIEWER_MODEL`.                                                             |
-| `JOSH_REVIEWER_VERIFICATION_EFFORT` | No       | `high`                                             | Round 2 and later verification pass; falls back to `JOSH_REVIEWER_EFFORT`.                                                            |
+| `JOSH_REVIEWER_VERIFICATION_EFFORT` | No       | `high`                                             | Round 2 and later verification pass: `low`, `medium`, `high`, `xhigh` or `max`; falls back to `JOSH_REVIEWER_EFFORT`.                 |
 | `JOSH_REVIEWER_PAIRED`              | No       | off                                                | `1` pairs a round 1 — `josh run:review`'s or the one `josh ship` opens — with a Sonnet reviewer, recorded by `josh review:pair` only. |
 | `JOSH_INVESTIGATION_MODEL`          | No       | `claude-sonnet-5-5`                                | The model the consultation main line hands broad investigation to.                                                                    |
 | `JOSH_LANE_MODEL`                   | No       | —                                                  | Legacy worker-only alias; use `JOSH_WORKER_MODEL` instead.                                                                            |
@@ -107,8 +115,13 @@ Which steps run at a lowered effort:
 - `josh.lane.setup`: one shell command, unset by default; `josh lane:open` runs it in the new lane
   after the install and cache seeding, with `JOSH_MAIN_CHECKOUT` set
   ([`josh lane:open`](./josh-commands-lane.md#josh-laneopen--josh-laneclose--josh-lanelist--josh-laneprune)).
-- `josh.gate.steps`: a list of `{ name, command, paths? }`, unset by default; `josh gate` runs each
+- `josh.gate.steps`: a list of `{ name, command, paths?, cores? }`, unset by default; `josh gate` runs each
   command after its fixed checks and reports it under its name ([`josh gate`](./josh-commands.md#josh-gate)).
+- `josh.format`: `"auto" | "all"`, default `"auto"`; what Prettier formats and checks in a basic
+  project (`josh format`, `josh lint`, `josh lint:related`). `auto` formats only the HTML, CSS and
+  JavaScript files that enabled Prettier; `all` formats every file type Prettier reads, such as
+  Markdown, JSON and YAML. A full project always formats every type. Not an environment variable,
+  so local runs and CI format the same files.
 
 | Variable                         | Required | Default                                                          | Used when                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | -------------------------------- | -------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

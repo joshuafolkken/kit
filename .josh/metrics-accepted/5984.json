@@ -1,7 +1,0 @@
-{
-	"reason": "#5984 adds lane-yield-split.ts and its tests: the yield → redispatch gap split into holder running, offer wait and launch, with the holder ending at any done kind",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 137
-	}
-}

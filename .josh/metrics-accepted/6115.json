@@ -1,7 +1,0 @@
-{
-	"reason": "Examples now name the .josh/tmp/ body-file path in place of a bare <path> (#6115); the growth is the path text itself",
-	"date": "2026-11-03",
-	"growth": {
-		"ai_cost.on_demand_bytes": 166
-	}
-}

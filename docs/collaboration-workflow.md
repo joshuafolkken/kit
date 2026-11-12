@@ -11,6 +11,7 @@ A document that points at a topic cites the file that holds the body, never this
 | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
 | Overview                                                                   | [`overview.md`](../prompts/collaboration-workflow/overview.md)                     |
 | Step 1: the Issue template                                                 | [`issue-template.md`](../prompts/collaboration-workflow/issue-template.md)         |
+| Step 1: the Issue template in English, and its key correspondence table    | [`issue-template.en.md`](../prompts/collaboration-workflow/issue-template.en.md)   |
 | Step 2: asking for a proposal                                              | [`proposal-request.md`](../prompts/collaboration-workflow/proposal-request.md)     |
 | Step 3: recording the plan comment and notifying                           | [`plan-comment.md`](../prompts/collaboration-workflow/plan-comment.md)             |
 | The report format (plain summary + technical detail)                       | [`report-format.md`](../prompts/collaboration-workflow/report-format.md)           |

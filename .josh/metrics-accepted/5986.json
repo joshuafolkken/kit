@@ -1,8 +1,0 @@
-{
-	"reason": "#5986 adds the bounded-wait rule for lane:plan (new lane-plan-wait.ts with its blocking hold, its branch in lane-plan-check.ts, and the 600000 timeout the blocking lane:plan call needs in fullrun-steps.md)",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 121,
-		"ai_cost.on_demand_bytes": 19
-	}
-}

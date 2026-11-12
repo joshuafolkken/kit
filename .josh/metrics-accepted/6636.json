@@ -1,7 +1,0 @@
-{
-	"reason": "timeline zod schema and predicate replace the jq filter so the read can go through the ETag layer (#6636)",
-	"date": "2026-11-07",
-	"growth": {
-		"scripts.code_lines": 20
-	}
-}

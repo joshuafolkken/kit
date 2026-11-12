@@ -1,7 +1,0 @@
-{
-	"reason": "Extract the measured implement rate into an independent reader and publish the shared three-day window without duplicating ledger reads; preserve the existing net-reader API.",
-	"date": "2026-11-05",
-	"growth": {
-		"scripts.code_lines": 8
-	}
-}

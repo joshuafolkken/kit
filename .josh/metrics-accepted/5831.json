@@ -1,7 +1,0 @@
-{
-	"reason": "#5831 adds lap timing for run:entry children, josh git steps and git hooks (new hook-lap and run-entry-children modules)",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 135
-	}
-}

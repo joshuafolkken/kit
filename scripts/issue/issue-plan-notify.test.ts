@@ -57,6 +57,16 @@ describe('issue_plan_notify.summary_of — the plan summary the notification car
 		expect(issue_plan_notify.summary_of(plan)).toEqual(['one', 'two', 'three'])
 	})
 
+	// joshuafolkken/kit#7210: the readers translate a body key into the session language; the summary
+	// shows the plan as written.
+	it('keeps an item that looks like a body key as written, in either language', () => {
+		const items = ['種別: 非不具合', 'Type: non-defect']
+		const listed = items.map((item) => `- ${item}`).join('\n')
+
+		expect(issue_plan_notify.summary_of(`### 変更\n${listed}`)).toEqual(items)
+		expect(issue_plan_notify.summary_of(listed)).toEqual(items)
+	})
+
 	it('is empty for a plan with no list items', () => {
 		expect(issue_plan_notify.summary_of('## 方針\nprose only')).toEqual([])
 	})

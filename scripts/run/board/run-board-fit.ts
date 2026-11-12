@@ -189,9 +189,16 @@ function section_lines(section: PlanSection, cut: ReadonlySet<PlanLine>): Array<
 
 	const kept = kept_lines(section, cut)
 
-	if (kept.length === 0) return []
+	// A section with every line cut goes; one drawn with none keeps its head (joshuafolkken/kit#7281).
+	if (kept.length === 0 && section.lines.length > 0) return []
 
 	return [...section.head, ...kept, ...fold_lines(section, cut)]
+}
+
+// Whether a section draws any of its rows, open or folded; a head kept with none draws no row, so the
+// plan's `more N` never reads as its hidden rows (joshuafolkken/kit#7281).
+function draws_row(section: PlanSection, cut: ReadonlySet<PlanLine>): boolean {
+	return section.lines.length > 0 && section_lines(section, cut).length > 0
 }
 
 // The cut rows no folding section counts; a seat line is no row.
@@ -230,7 +237,7 @@ function detail_lines(part: DetailPart | undefined, is_cut: boolean): Array<stri
 }
 
 // The plan's sections around the notes, its cut rows counted on one line after its last drawn section —
-// under `below` while any of it is drawn, else above the processes and the notes, never under the
+// under `below` while any of its rows is drawn, else above the processes and the notes, never under the
 // notes' own `more` — and under a blank when no section is left above it.
 function body_lines(parts: FrameParts, cut: Cut): Array<string> {
 	const below = parts.below ?? []
@@ -241,11 +248,13 @@ function body_lines(parts: FrameParts, cut: Cut): Array<string> {
 	]
 	const more = more_lines(unfolded([...parts.plan, ...below], cut.rows))
 
-	if (under.length > 0) return [...plan, ...notes, ...under, ...more]
+	if (below.some((section) => draws_row(section, cut.rows))) {
+		return [...plan, ...notes, ...under, ...more]
+	}
 
 	const lead = plan.length === 0 && more.length > 0 ? [''] : []
 
-	return [...lead, ...plan, ...more, ...notes]
+	return [...lead, ...plan, ...more, ...notes, ...under]
 }
 
 // The throughput rows and the usage gauges give way whole: their rows are no details to drop.

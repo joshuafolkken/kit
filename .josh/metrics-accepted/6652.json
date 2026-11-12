@@ -1,7 +1,0 @@
-{
-	"reason": "lane:plan signals carry the change base's file listing (#6652)",
-	"date": "2026-11-07",
-	"growth": {
-		"scripts.code_lines": 10
-	}
-}

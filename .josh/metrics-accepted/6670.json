@@ -1,7 +1,0 @@
-{
-	"reason": "New backlog:triage --adopt module, its live-run check and run_park_body.adopt_problem (#6670)",
-	"date": "2026-11-08",
-	"growth": {
-		"scripts.code_lines": 149
-	}
-}

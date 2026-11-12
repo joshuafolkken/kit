@@ -1,8 +1,0 @@
-{
-	"reason": "An epic added to a live run must not hold the free lanes while its children wait, nor let the pool read the drain past it: the named offer passes it and the pool counts it running (review findings), plus regression tests",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 93,
-		"ai_cost.on_demand_bytes": 127
-	}
-}

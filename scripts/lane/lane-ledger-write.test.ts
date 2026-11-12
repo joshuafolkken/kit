@@ -15,6 +15,7 @@ const make_directory = temporary_directory('suite')
 const scratch = make_directory('lane-ledger-write-test-')
 const AT = '2026-10-06T00:00:00.000Z'
 const GATE_MS = 90_000
+const MISSING_DIRECTORY = 'missing-directory'
 
 function ledger(name: string): string {
 	return path.join(scratch, `${name}.jsonl`)
@@ -22,7 +23,7 @@ function ledger(name: string): string {
 
 describe('lane_ledger_write.record', () => {
 	it('swallows a failed append', async () => {
-		const unwritable = path.join(scratch, 'missing-directory', 'ledger.jsonl')
+		const unwritable = path.join(scratch, MISSING_DIRECTORY, 'ledger.jsonl')
 
 		await expect(
 			lane_ledger_write.record({ kind: 'merge', at: AT, issue: 4 }, unwritable),
@@ -263,6 +264,32 @@ describe('lane_ledger_write — the split notice and the split child', () => {
 			{ kind: lane_ledger_write.KIND.SPLIT_NOTICE, issue: 4695, files: 11, lines: 550 },
 			{ kind: lane_ledger_write.KIND.SPLIT_FILED, issue: 4695, child: '#4700' },
 		])
+	})
+})
+
+// joshuafolkken/kit#7306: one `backlog:next` answer reads back as one `offer` line, and a failed
+// append leaves the ask's answer alone.
+describe('lane_ledger_write.record_offer', () => {
+	const offer = {
+		verdict: 'wait',
+		seen: [7303, 7304],
+		started: [],
+		excluded: [{ issue: 7304, reason: 'chain' }],
+		is_unchanged: true,
+	}
+
+	it('records an ask decision, read back whole', async () => {
+		const target = ledger('offer')
+
+		await lane_ledger_write.record_offer(offer, target)
+
+		expect(lane_ledger.read_entries(target)).toMatchObject([{ kind: 'offer', ...offer }])
+	})
+
+	it('drops a failed offer append rather than raising it', async () => {
+		const unwritable = path.join(scratch, MISSING_DIRECTORY, 'offer.jsonl')
+
+		await expect(lane_ledger_write.record_offer(offer, unwritable)).resolves.toBeUndefined()
 	})
 })
 

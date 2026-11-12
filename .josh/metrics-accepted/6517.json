@@ -1,7 +1,0 @@
-{
-	"reason": "Add the strict epic child untrack argument parser; 27 code lines implement the separately tested input contract.",
-	"date": "2026-11-05",
-	"growth": {
-		"scripts.code_lines": 28
-	}
-}

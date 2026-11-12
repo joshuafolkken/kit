@@ -1,7 +1,0 @@
-{
-	"reason": "shared in-progress reader (issue-run-hold.ts), epic refusal in run:add and the board's close-after-listing reopen read (#6535)",
-	"date": "2026-11-07",
-	"growth": {
-		"scripts.code_lines": 30
-	}
-}

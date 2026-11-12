@@ -1,7 +1,0 @@
-{
-	"reason": "exports:unused entry declares is_read_only so a consultation session can run the scan (#6045)",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 1
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "Add the account-wide statusLine usage recorder and shared path required by #6316; reuse existing JSON validation and atomic persistence.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 48
-	}
-}

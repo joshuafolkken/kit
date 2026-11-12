@@ -405,7 +405,7 @@ describe('pretool_guard.respond — the issue-comments rewrite', () => {
 	})
 
 	it('still refuses a `gh issue view` body read', async () => {
-		const envelope = await written(payload_with_transcript('gh issue view 7'))
+		const envelope = await written(payload_with_transcript('gh issue view 7 --json title,body'))
 
 		expect(envelope).toContain(DENY_DECISION)
 	})

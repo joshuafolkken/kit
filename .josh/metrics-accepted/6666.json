@@ -1,7 +1,0 @@
-{
-	"reason": "#6666: lane:plan files axis excludes a generated artifact planned beside its source and splits it with that source; the source-artifact map is single-sourced in codex-hooks.ts",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 25
-	}
-}

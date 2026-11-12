@@ -1,9 +1,0 @@
-{
-	"reason": "Add the shared decision-rule contradiction check and document its declaration and application contract for #6501",
-	"date": "2026-11-05",
-	"growth": {
-		"scripts.code_lines": 14,
-		"rules.lines": 3,
-		"ai_cost.on_demand_bytes": 376
-	}
-}

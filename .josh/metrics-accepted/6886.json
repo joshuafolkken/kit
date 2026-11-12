@@ -1,7 +1,0 @@
-{
-	"reason": "#6886: the board folds a yielded lane's close back into the queue (one fold helper and the requeue check)",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 10
-	}
-}

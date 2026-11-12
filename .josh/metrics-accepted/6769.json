@@ -1,7 +1,0 @@
-{
-	"reason": "josh launcher rebuilds a stale dist under a lock shared with the hook launcher instead of falling back to tsx; waiters never rebuild after a failed holder (#6769)",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 67
-	}
-}

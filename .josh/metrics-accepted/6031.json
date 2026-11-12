@@ -1,9 +1,0 @@
-{
-	"reason": "rule:value --prose audit command and its tests; guard_rule_rows shared with rule:list, wrapped-line guard",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 145,
-		"prose.long_paragraphs": 1,
-		"prose.excess_bold": 1
-	}
-}

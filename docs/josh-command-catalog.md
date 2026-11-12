@@ -21,7 +21,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh gate` · `josh ga` | `[--verbose\|--force\|--no-unit\|--whole-tree\|--static-group=<group>]` | developer | files, processes | Run lint, type check, spell check and unit tests concurrently |
 | `josh hook:ledger` · `josh hkl` | `--period <days> [--demote [--apply]] \| --restore <rule>` | maintainer | network, files | Print Claude Code hook refusals per hook and rule over a period: refusals, the same call passing later, and route:interrupt issues naming the rule; list, demote or restore rules that mostly refuse allowed work |
 | `josh lines` · `josh ln` | `<files...>` | developer | none | Print a file's code lines against the max-lines limit and the headroom left |
-| `josh lint` · `josh l` | `[--changed]` | developer | processes | Check code with prettier and eslint (skips a tool a basic project lacks) |
+| `josh lint` · `josh l` | `[--changed] [--shard=<n>]` | developer | processes | Check code with prettier and eslint (skips a tool a basic project lacks) |
 | `josh lint:related` · `josh lr` | `[files...]` | developer | processes | Check only the changed files with prettier and eslint, and in kit the source guard tests (whole tree on fallback) |
 | `josh lint:rule` · `josh lrr` | `<rule> [--config <path>] [--output <path>] [--paths <path>...]` | developer | files, processes | Run one eslint rule over the whole repository, or with --paths a subset, on a cache of its own and write the rule's violations to a file |
 | `josh metrics` · `josh mt` · **kit only** | `[--no-startup \| --totals-only [--rerecord] \| --accept --reason "<why>"]` | developer | files | Print repository-wide quality totals and durations, and fail when a total grew past the merge-base or a duration past its baseline |
@@ -56,7 +56,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh sonar:hotspots` | `<PR>` | automation | network | Fetch SonarCloud hotspots on a pull request and print each one's Step B disposition |
 | `josh sonar:new-code` | `<PR>` | automation | network | Fail when a pull request adds any new SonarCloud issue or duplicated block |
 | `josh start` · `josh st` | `[--profile basic\|full] [--yes] [--github] [--public] [--dry-run] [--init-command <command>] [--push-preflight-command <command>]` | developer | files, git, network, processes | Set a project up for the GitHub Issue workflow, from git init to the setup PR |
-| `josh sync` · `josh sy` | — | developer | files | Sync config files |
+| `josh sync` · `josh sy` | `[--force]` | developer | files | Sync config files |
 | `josh sync:scope` | `[--staged] [--json]` | automation | none | Say whether this change touches a file josh sync distributes |
 | `josh ui:routes` | `[--staged]` | automation | none | List the screenshot-target routes the current change touches |
 | `josh ui:shot` | `<route> [route...]` | automation | processes | Capture routes with this project's own screenshot command |
@@ -90,6 +90,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh release` · `josh re` | `[--dry-run]` | maintainer | git, network, release | Release the merges main has taken since the version last changed |
 | `josh release:github` | — | automation | network, release | Create the GitHub Release for a published tag, with generated notes |
 | `josh release:scope` | `[--json]` | automation | none | Say whether a release is owed, from the unreleased merges on main |
+| `josh release:tag` | `<version> <latest>` | automation | none | Print the npm dist-tag a version publishes under, given the current latest |
 | `josh version` · `josh v` | `[--upgrade]` | developer | files, network, processes | Show kit versions; --upgrade updates the global and project install |
 
 ## Maintenance
@@ -133,7 +134,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh auto-ok:next` | `[--exclude <n>[,<n>...]] [--label <name>]` | automation | network | Print the next opted-in issue an unattended run may pick up outside an epic |
 | `josh backlog:budget` | `[options]` | automation | none | Say whether a backlogrun may start more work, keep watching, or finish |
 | `josh backlog:drive` | `[--owner <pid>] [options]` | automation | network | Drive backlogrun through offer, launch and merge; restore this run’s lanes and report when complete |
-| `josh backlog:next` | `[--exclude <n>[,<n>...]] [--repo <owner/repo>]` | automation | network | Order the whole opted-in backlog: auto-ok issues and the descendants of auto-ok epics, transitively through nested epics |
+| `josh backlog:next` | `[--exclude <n>[,<n>...]]` | automation | network | Order the whole opted-in backlog: auto-ok issues and the descendants of auto-ok epics, transitively through nested epics |
 | `josh backlog:offer` | `[options]` | automation | files, git, network, processes | Collapse a backlogrun loop-head event into one call: read backlog:next, ask backlog:budget, return the verdict and any issues to start |
 | `josh backlog:plan` | `[issue...] [--only] [--waves] [--exclude <n>[,<n>...]]` | automation | network | Print the whole backlog as a plan: ready now, waiting on what, waiting on a person, out of scope |
 | `josh backlog:triage` | `--pass [--exclude <n>] \| --decide --defect yes\|no\|unknown --verification yes\|no\|unknown --every-run yes\|no\|unknown \| --apply <n> [--lane \| --solo --defect yes --verification yes --every-run yes] [--blocked-by <m> \| --unblock <m>] --reason <text> [--clear] \| --apply <n> --adopt <k> --reason <text> [--done <text>]` | automation | files, network | Run a parent triage pass, decide solo/lane from three conditions, or apply one issue's verdict |
@@ -171,6 +172,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh issue:lint` | `<path>` | automation | files | Check an issue body file for the template's required headings |
 | `josh issue:measured` | `<issue> --evidence-file <path> [--unmet]` | automation | network, files | Complete a measurement-only issue: post the result, label it measured, close it, release the hold |
 | `josh issue:plan` | `<issue> --body-file <path> [--title <title>] [--planned] [--no-notify] [--repo <owner/name>]` | automation | network | Record a plan: normalize the title, fill a blank body or comment, apply run:planned |
+| `josh issue:premise-unmet` | `<issue> --evidence-file <path>` | automation | network, files | Exit an issue whose declared close condition holds: post the verdict, close it as not planned, release the hold |
 | `josh issue:priority` | `<issue> [--critical\|--high\|--normal --reason <text>]` | automation | network | Raise an issue to the priority its body declares or reaches, or set the one a person instructs |
 | `josh issue:read` | `<issue...> [--repo <owner/repo>]` | automation | network | Print each issue's title, body and every comment on it, in one call |
 | `josh issue:release` | `<issue> [--wait]` | automation | network | Link an Issue to the repository's open release Issue as its blocker (or, with --wait, as waiting on it), filing one when none is open |
@@ -197,7 +199,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh lane:restart` · `josh lrs` | `<issue>` | developer | files, git, processes, network | Stop a running lane child, stash its uncommitted work and re-dispatch its issue in a fresh session — not counted as an outage or a failure |
 | `josh lane:resume` · `josh lru` | `<issue> \| --all` | developer | processes | Let a paused lane child carry on from where it stopped (SIGCONT) |
 | `josh lane:sample` · `josh lsm` | `[--every <seconds>]` | maintainer | files | Record the machine load (load average, swap, free memory, working lanes) to the lane ledger — a backlogrun samples itself, this is for a reading outside one |
-| `josh lane:stats` · `josh lst` | `(--period <days> \| --since <instant>) [--limit <lane-limit> \| --sinks [<minutes>] \| --over <minutes> \| --why <minutes> \| --pairs]` | maintainer | none | Print period lane throughput, stage, stop, check and machine-load statistics; --sinks shows stage totals, --over lane chains, --why cause groups above a net-minute threshold, and --pairs scoped pair runs |
+| `josh lane:stats` · `josh lst` | `(--period <days> \| --since <instant>) [--limit <lane-limit> \| --sinks [<minutes>] \| --over <minutes> \| --why <minutes> \| --pairs]` | maintainer | none | Print period lane throughput, stage, stop (by failed CI check, longest first), check and machine-load statistics; --sinks shows stage totals, --over lane chains, --why cause groups above a net-minute threshold, and --pairs scoped pair runs |
 | `josh lane:value` · `josh lva` | `<metric> --since <instant>` | maintainer | none | Print one lane measurement since an instant as a single number: cell (a lane:stats table cell, --table --row --where --column --item --zero), lint-unmoved (median s of a lint:related that found nothing moved), metrics-stops (pre-detach metrics stops per lane), lint-core-wait (lint:related core-budget wait, min per lane), edit (median s of one Edit) |
 | `josh lane:why` · `josh lwy` | `<issue>` | maintainer | processes, network | Print a merged lane's stages over budget, one row each, beside the records that say why |
 | `josh lane:withdraw` · `josh lwd` | `<issue> --reason <text>` | developer | files, git, processes, network | Stop a running lane child, stash its uncommitted work and close the lane, leaving its issue open for the next run — booked withdrawn, not as an outage or a failure |
@@ -220,7 +222,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh review:selfcheck` | `[--interaction-answered]` | automation | files, processes | Answer the pre-commit self-check questions 2, 4 and 10 — stale prose, untouched readers, new command examples run — in one command |
 | `josh review:submit` | `[--interaction] [--review <absolute-path> [--round <1\|2>]] < findings \| … --none` | automation | files | Write a reviewer's findings, read from stdin, where the ship or review:record --from-slot reads them; --review lints the review in the same call |
 | `josh rule:list` | — | automation | none | Print the trigger-delivered rules — each one's source, firing call and silent turn — from the guard rows |
-| `josh rule:value` · `josh ruv` | `[--fresh \| --refresh \| --prose]` | developer | files | Print each delivered rule's unaided compliance — runs reached, kept rate, refusals |
+| `josh rule:value` · `josh ruv` | `[--fresh \| --refresh \| --period <days> \| --weekly <rule-id>... \| --prose]` | developer | files | Print each delivered rule's unaided compliance — runs reached, kept rate, refusals |
 | `josh run:add` | `<issue...> [--no-priority] [--retry]` | automation | network, files | Add issues to a live backlogrun, ahead of the queue unless --no-priority; epics become roots |
 | `josh run:board` | `[--once \| --chat \| --every <minutes>]` | automation | files, network | Draw a live board of the running backlogrun, redrawn every second |
 | `josh run:carry` | `<operation> [arguments...]` | automation | files | Carry one invocation’s budget across its own session cuts |

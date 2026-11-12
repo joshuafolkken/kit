@@ -1,7 +1,0 @@
-{
-	"reason": "The lane-park, direct-issue-comment, implementation-cut and pre-gate-cut rows read the cut, hold and repository under the per-call HookContext cwd and env, adding small context adapters",
-	"date": "2026-11-10",
-	"growth": {
-		"scripts.code_lines": 124
-	}
-}

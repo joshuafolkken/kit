@@ -123,6 +123,8 @@ words:
   - fprint
   # Names and established technical terms quoted in the historical release audit.
   - execa
+  # npm_execpath / npm_node_execpath, set by pnpm for the command it launches.
+  - execpath
   - sveltejs
   - lockfiles
   - iwasakishinya
@@ -303,6 +305,8 @@ words:
   # document-rule test quotes verbatim.
   - unrecordable
   - runwake
+  # A model the `josh.worker` profiles do not name, so it has no rank (joshuafolkken/kit#7354).
+  - unranked
   - fromjson
   - dryrun
   - overridability
@@ -369,6 +373,8 @@ words:
   # `shutil.copy`/`shutil.move` into an existing path. They appear only in that module's patterns and tests.
   - writelines
   - shutil
+  # npm package name weighed in `docs/maintainers/shell-tokenizer.md` (joshuafolkken/kit#7334).
+  - shlex
   # English word in `scripts/rules/worktree-guard.ts` — a message-tagged stash is "findable and poppable"
   # by `pnpm josh stash:pop` (joshuafolkken/kit#2120). Appears only in that module's comment.
   - poppable

@@ -91,12 +91,21 @@ function is_direct_filing(command: string): boolean {
 // spelling quoted inside another command's body is not read as a filing.
 const FILING_NAMES: ReadonlySet<string> = new Set(['issue:file'])
 
-function is_issue_filing(command: string): boolean {
-	return shell_segments
-		.segments_of(command)
-		.some((segment) => shell_segments.is_josh_command(segment, FILING_NAMES))
+// One segment of a command line, for a reader that also judges the segment's own flags.
+function is_issue_filing_segment(segment: string): boolean {
+	return shell_segments.is_josh_command(segment, FILING_NAMES)
 }
 
-const bash_triggers = { is_direct_filing, is_issue_filing, on_bash_command, shell_script_of }
+function is_issue_filing(command: string): boolean {
+	return shell_segments.segments_of(command).some((segment) => is_issue_filing_segment(segment))
+}
+
+const bash_triggers = {
+	is_direct_filing,
+	is_issue_filing,
+	is_issue_filing_segment,
+	on_bash_command,
+	shell_script_of,
+}
 
 export { bash_triggers }

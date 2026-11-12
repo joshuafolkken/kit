@@ -1,7 +1,0 @@
-{
-	"reason": "Round-2 fix: read_carried checks owner liveness (is_run_live) so a crashed run's carry record does not pin launch_limit; adds the helper and its test stubs",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 41
-	}
-}

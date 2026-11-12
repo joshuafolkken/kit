@@ -1,9 +1,0 @@
-{
-	"reason": "Confirmed duplicate application adds an explicit CLI mode and reuses the epic dependency recorder; command documentation and generated usage add 50 runtime code lines and 479 on-demand bytes, with one additional procedure paragraph.",
-	"date": "2026-11-05",
-	"growth": {
-		"scripts.code_lines": 50,
-		"ai_cost.on_demand_bytes": 479,
-		"prose.long_paragraphs": 1
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "Round-2 regressions cover shell comments, positional arguments and preserved inner quotes in both transcript formats; reuse the shared shell option index.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 79
-	}
-}

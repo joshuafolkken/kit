@@ -1,7 +1,0 @@
-{
-	"reason": "Lane premise re-run per #7022: review fixes read an unlisted issue's premises from its trusted body, stop on a refused read only when the listing shows premises, and keep a failed command's message",
-	"date": "2026-11-10",
-	"growth": {
-		"scripts.code_lines": 76
-	}
-}

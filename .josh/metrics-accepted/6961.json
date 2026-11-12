@@ -1,7 +1,0 @@
-{
-	"reason": "pretool-guard threads a per-call HookContext (cwd, env) to its guards for the resident hook daemon (#6961)",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 39
-	}
-}

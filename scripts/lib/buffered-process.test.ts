@@ -5,6 +5,10 @@ import { SUITE_TIMEOUT_MS } from './timeouts'
 vi.mock('execa', () => ({
 	execa: vi.fn(),
 }))
+vi.mock('#scripts/build/local-bin', () => ({ direct_launch: vi.fn() }))
+
+const { direct_launch } = await import('#scripts/build/local-bin')
+const mocked_direct_launch = vi.mocked(direct_launch)
 
 const { buffered_process } = await import('./buffered-process')
 const execa_module = await import('execa')
@@ -133,6 +137,41 @@ describe('run_buffered_process', () => {
 
 		expect(Number.isFinite(result.elapsed_ms)).toBe(true)
 		expect(result.elapsed_ms).toBeGreaterThanOrEqual(0)
+	})
+})
+
+const PRETTIER_EXEC = ['exec', 'prettier', '--check', '.']
+const PRETTIER_LAUNCH = { file: '/usr/bin/node', args: ['/prettier/bin.cjs', '--check', '.'] }
+
+// joshuafolkken/kit#7256: a lint tool runs without pnpm's wrapper process, under the same
+// environment and options the pnpm route had.
+describe('run_buffered_direct', () => {
+	it('spawns the launch resolved from the working directory with the same options', async () => {
+		mock_execa()
+		mocked_direct_launch.mockReturnValue(PRETTIER_LAUNCH)
+		const environment = { NODE_OPTIONS: '--max-old-space-size=4096' }
+
+		await buffered_process.run_buffered_direct(PRETTIER_EXEC, { cwd: LANE_DIRECTORY, environment })
+
+		expect(mocked_direct_launch).toHaveBeenCalledWith(LANE_DIRECTORY, PRETTIER_EXEC)
+		expect(mocked_execa).toHaveBeenCalledWith(PRETTIER_LAUNCH.file, PRETTIER_LAUNCH.args, {
+			env: environment,
+			extendEnv: false,
+			all: true,
+			reject: false,
+			cwd: LANE_DIRECTORY,
+			timeout: SUITE_TIMEOUT_MS,
+		})
+	})
+
+	it('resolves the launch from the process directory when no caller named one', async () => {
+		mock_execa()
+		mocked_direct_launch.mockReturnValue(PRETTIER_LAUNCH)
+
+		await buffered_process.run_buffered_direct(PRETTIER_EXEC)
+
+		expect(mocked_direct_launch).toHaveBeenCalledWith(process.cwd(), PRETTIER_EXEC)
+		expect(spawn_options[0]?.env).toEqual(buffered_process.child_environment())
 	})
 })
 

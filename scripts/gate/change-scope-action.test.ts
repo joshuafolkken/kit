@@ -34,19 +34,16 @@ describe('code and consumer package classification', () => {
 	it('keeps checks for code mixed into documentation', () => {
 		expect(classify([DOC, CODE], PACKAGE, BUMP).runtime).toBe(true)
 	})
-	it('skips a version-only publish', () => {
-		expect(classify([MANIFEST], PACKAGE, BUMP)).toEqual({ runtime: false, publish: false })
-	})
 	it.each([DOC, TEST, 'scripts/__snapshots__/a.snap', 'scripts-other/a.ts'])(
 		'does not publish %s',
 		(path) => {
-			expect(classify([path], PACKAGE, BUMP).publish).toBe(false)
+			expect(classify([path], PACKAGE, PACKAGE).publish).toBe(false)
 		},
 	)
 	it.each([PROMPT, CODE, README, 'LICENSE', 'pnpm-lock.yaml', '.npmrc', 'eslint.config.js'])(
 		'publishes consumer input %s',
 		(path) => {
-			expect(classify([path], PACKAGE, BUMP).publish).toBe(true)
+			expect(classify([path], PACKAGE, PACKAGE).publish).toBe(true)
 		},
 	)
 	it('publishes package metadata changes', () => {
@@ -55,5 +52,20 @@ describe('code and consumer package classification', () => {
 	it('uses both revisions when an exclusion or a distributed directory is removed', () => {
 		expect(classify([TEST], PACKAGE, { files: ['scripts'] }).publish).toBe(true)
 		expect(classify([CODE], PACKAGE, { files: [] }).publish).toBe(true)
+	})
+})
+
+describe('release version classification', () => {
+	it('publishes a version-only bump without running checks', () => {
+		expect(classify([MANIFEST], PACKAGE, BUMP)).toEqual({ runtime: false, publish: true })
+	})
+	it('publishes a release commit that also drops accepted metrics', () => {
+		expect(classify([MANIFEST, '.josh/metrics-accepted/x.json'], PACKAGE, BUMP)).toEqual({
+			runtime: true,
+			publish: true,
+		})
+	})
+	it('does not publish a package.json change that leaves the manifest unchanged', () => {
+		expect(classify([MANIFEST], PACKAGE, PACKAGE)).toEqual({ runtime: false, publish: false })
 	})
 })

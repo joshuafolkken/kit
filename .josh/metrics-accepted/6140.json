@@ -1,7 +1,0 @@
-{
-	"reason": "#6140 adds the plan-wait event module, its render label and ship-stop closing in lane:breakdown (new feature code)",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 121
-	}
-}

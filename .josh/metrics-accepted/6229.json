@@ -1,7 +1,0 @@
-{
-	"reason": "Reserve parent and child agent memory and hold heavy claims during measured swap traffic for #6229; adds six runtime lines with coverage for admission and recovery.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 6
-	}
-}

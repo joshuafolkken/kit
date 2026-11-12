@@ -1,7 +1,0 @@
-{
-	"reason": "#7066 records the branch-diff share of test:related's changed count: two optional ledger fields and their computation",
-	"date": "2026-11-10",
-	"growth": {
-		"scripts.code_lines": 7
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "Followup rerun polls pass a backoff with a seen reading (#6725)",
-	"date": "2026-11-08",
-	"growth": {
-		"scripts.code_lines": 24
-	}
-}

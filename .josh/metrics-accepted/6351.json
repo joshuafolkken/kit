@@ -1,7 +1,0 @@
-{
-	"reason": "Add six code lines to distinguish the dedicated stale hand-off cause while preserving existing recovery text and shared resume formatting (#6351).",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 6
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "#7012 adds the ledger tail reader (incremental byte-offset read) and the usual-times memo",
-	"date": "2026-11-10",
-	"growth": {
-		"scripts.code_lines": 72
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "#6752 adds the local slug resolution, the ETag-layer API fallback with rate-limit surfacing, and a case-insensitive repository match in issue-closing-pr",
-	"date": "2026-11-08",
-	"growth": {
-		"scripts.code_lines": 18
-	}
-}

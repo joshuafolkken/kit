@@ -1,7 +1,0 @@
-{
-	"reason": "gate --static-group=lint-1|lint-2 hands the lint check josh lint --shard (#7018), with its tests",
-	"date": "2026-11-10",
-	"growth": {
-		"scripts.code_lines": 24
-	}
-}

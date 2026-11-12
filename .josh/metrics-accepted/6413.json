@@ -1,7 +1,0 @@
-{
-	"reason": "Reuse the first wave and add shared seven-issue cap fixtures plus tests for both languages and unreadable limits (#6413).",
-	"date": "2026-11-05",
-	"growth": {
-		"scripts.code_lines": 69
-	}
-}

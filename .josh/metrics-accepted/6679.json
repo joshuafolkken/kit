@@ -1,7 +1,0 @@
-{
-	"reason": "lane:why gains the cause-key module (lane-why-causes.ts) and causes/unfiled columns for #6679",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 113
-	}
-}

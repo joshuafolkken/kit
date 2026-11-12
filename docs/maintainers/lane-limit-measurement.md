@@ -184,6 +184,14 @@ stop late in the period whose end falls after it reads as `not resumed` as well.
 keeps about a week of a run's events, so a park older than that is gone and its stop reads as
 `not resumed`.
 
+Two tables under it say what the waits were spent on (`lane-stop-check-stats.ts`,
+[#7333](https://github.com/joshuafolkken/kit/issues/7333)). The failed-check table counts followup
+`check` stops per CI check their recorded `checks` name, longest total first; a stop naming two
+checks counts under each, and an older one reads as `none named`.
+
+The longest-stop table lists the period's ten longest ended stops of every reason with issue,
+`stopped at`, causes and wait, so a wait spent overnight or on a person reads by its time and issue.
+
 The `causes` column counts each reason's stops by cause, most frequent first (`infra 2, check 1`):
 `finding`, `conflict`, `infra` (a rate limit, missing checks, a network failure), `check`, `auth` (a
 reviewer that could not authenticate) or `attest` (a refused review attestation).
@@ -280,9 +288,10 @@ the next offer in that same pass, so a freed lane is offered at once. Two passes
   `offer:wait:blocked`. A `stop` verdict is not a hold, because the run is finishing. A wait the
   `run:solo` gate caused names its cause in place of the answer, `offer:watch:solo`, so the lanes a
   solo run left empty show apart from every other `blocked` offer.
-- A `blocked` offer whose issues wait on another issue or on a start condition (`実施可能日` /
-  `実施可能条件`) names the cause: `offer:<verdict>:chain`, `:gate` or `:chain+gate`, and `waiting`
-  lists those issues. Other waits stay `blocked` (`scripts/backlog/backlog-wait-cause.ts`).
+- A `blocked` offer whose issues wait on another issue, on a start condition (`実施可能日` /
+  `実施可能条件`) or on a running lane (a path overlap or the `run:solo` gate) names the cause:
+  `offer:<verdict>:chain`, `:gate`, `:lane` or a `+` join such as `:gate+lane`, and `waiting` lists
+  those issues. Other waits stay `blocked` (`scripts/backlog/backlog-wait-cause.ts`).
 - A driver end that hands control back to a session. The entry is `hand-back:<reason>`, for example
   `hand-back:merge` or `hand-back:window`. A finished run (`stop`, or the drain's `watch` or
   `retrospective`) is not a hold.

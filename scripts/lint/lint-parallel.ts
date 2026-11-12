@@ -14,7 +14,7 @@ import {
 } from '#scripts/lib/buffered-process'
 import { SKIP_MARKER } from '#scripts/test/skip-marker'
 import { eslint_cache_dependencies, type CacheDrop } from './eslint-cache-dependencies'
-import { eslint_daemon, type DaemonState } from './eslint-daemon'
+import { eslint_daemon, type DaemonCall, type DaemonState } from './eslint-daemon'
 import { eslint_heap } from './eslint-heap'
 import { lint_gate_scope } from './lint-gate-scope'
 import { lint_shard, type LintShard } from './lint-shard'
@@ -32,13 +32,18 @@ const ESLINT_ARGS = eslint_args_of(undefined)
 
 // Prettier's cache stays this checkout's own, never shared through `lane_cache_run` as eslint's is:
 // its entries do not survive a move (`josh-command-types.ts` → `GATE_CACHE_SPECS`).
-const PRETTIER_ARGS = [
-	'exec',
-	'prettier',
-	'--check',
-	lint_shard.WHOLE_TREE,
-	...PRETTIER_CACHE_FLAGS,
-] as const
+function prettier_check_args(targets: ReadonlyArray<string>): ReadonlyArray<string> {
+	return ['exec', 'prettier', '--check', ...targets, ...PRETTIER_CACHE_FLAGS]
+}
+
+const PRETTIER_ARGS = prettier_check_args([lint_shard.WHOLE_TREE])
+
+// The whole tree as this project formats it (`project_checks.prettier_targets`).
+function project_prettier_args(): ReadonlyArray<string> {
+	return prettier_check_args(
+		project_checks.prettier_targets(process.cwd(), [lint_shard.WHOLE_TREE]),
+	)
+}
 
 // `undefined` is a shard that leaves formatting to the other one (`lint-shard.ts`).
 type PrettierArguments = ReadonlyArray<string> | undefined
@@ -51,7 +56,7 @@ const LEFT_TO_FORMATTING_SHARD: BufferedProcessResult = {
 }
 
 function prettier_args_of(shard: LintShard | undefined): PrettierArguments {
-	return lint_shard.checks_formatting(shard) ? PRETTIER_ARGS : undefined
+	return lint_shard.checks_formatting(shard) ? project_prettier_args() : undefined
 }
 
 const GATE_TIMING_LABEL = 'lint'
@@ -61,6 +66,7 @@ interface EslintRun {
 	args: ReadonlyArray<string>
 	cache_file: string
 	warm_daemon: boolean
+	call?: DaemonCall | undefined
 }
 
 // The name a run's timing line carries and what it read (`lint-timing.ts`).
@@ -75,6 +81,8 @@ interface LintRunTiming {
 interface LintRunOptions {
 	warm_daemon: boolean
 	timing?: LintRunTiming | undefined
+	// What a warm run records beside the daemon (`eslint-daemon-calls.ts`).
+	call?: DaemonCall | undefined
 }
 
 const COLD_RUN: LintRunOptions = { warm_daemon: false }
@@ -93,9 +101,9 @@ interface LintPair {
 	eslint: EslintResult
 }
 
-// The warm daemon when asked for and reachable, else the cold `pnpm exec eslint` it falls back to.
+// The warm daemon when asked for and reachable, else the cold eslint it falls back to.
 async function run_eslint_process(eslint: EslintRun): Promise<EslintResult> {
-	if (eslint.warm_daemon) return await eslint_daemon.run_or_cold(eslint.args)
+	if (eslint.warm_daemon) return await eslint_daemon.run_or_cold(eslint.args, eslint.call)
 
 	return await eslint_heap.run_cold(eslint.args)
 }
@@ -138,7 +146,7 @@ async function run_prettier(
 	const reason = project_checks.prettier_skip_reason(directory)
 	if (reason !== undefined) return skipped('prettier', reason)
 
-	return await buffered_process.run_buffered_process(prettier_args)
+	return await buffered_process.run_buffered_direct(prettier_args)
 }
 
 async function run_checked_eslint(directory: string, eslint: EslintRun): Promise<EslintResult> {
@@ -264,7 +272,7 @@ async function run_timed_lint_checks(
 }
 
 async function run_lint_parallel_checks(options: LintRunOptions = COLD_RUN): Promise<number> {
-	return await run_lint_checks(PRETTIER_ARGS, ESLINT_ARGS, ESLINT_CACHE_FILE, options)
+	return await run_lint_checks(project_prettier_args(), ESLINT_ARGS, ESLINT_CACHE_FILE, options)
 }
 
 // `josh lint --changed`, the gate's lint: the branch's changed files on the gate's own caches, or the

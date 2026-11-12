@@ -1,7 +1,0 @@
-{
-	"reason": "New batched GraphQL read for run:board decision nodes (#6819): one alias query replaces a REST read per node outside the plan",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 87
-	}
-}

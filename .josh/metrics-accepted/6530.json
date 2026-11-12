@@ -1,7 +1,0 @@
-{
-	"reason": "Supervisor keeps the driver resume line across re-drives and hand-backs (#6530): new run-wake-resume module, and a re-drive limit that ends on a non-numeric count",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 86
-	}
-}

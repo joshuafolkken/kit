@@ -1,7 +1,0 @@
-{
-	"reason": "#6817 presents the epic run command as the terminal-runnable pnpm josh backlogrun <E> --only; the prefix adds the bytes",
-	"date": "2026-11-09",
-	"growth": {
-		"ai_cost.on_demand_bytes": 38
-	}
-}

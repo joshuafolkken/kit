@@ -1,7 +1,0 @@
-{
-	"reason": "New read-only tree:status command (#5852): formatter, CLI, registration and stale-hold wording",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 150
-	}
-}

@@ -1,9 +1,0 @@
-{
-	"reason": "Split-direction refusal documented in issue:file step 2 and pointed to from split-assessment.md (#5985)",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 74,
-		"ai_cost.on_demand_bytes": 95,
-		"prose.long_paragraphs": 1
-	}
-}

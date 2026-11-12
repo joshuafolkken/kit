@@ -1,7 +1,0 @@
-{
-	"reason": "read_listing takes the first-page reader the merge gate passes (#6756); the formatter splits its signature",
-	"date": "2026-11-08",
-	"growth": {
-		"scripts.code_lines": 2
-	}
-}

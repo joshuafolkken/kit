@@ -1,8 +1,0 @@
-{
-	"reason": "run:review now stops on an unaccepted metrics growth before the brief, sharing the totals judgment with the ship pre-detach (#6023)",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 21,
-		"ai_cost.on_demand_bytes": 35
-	}
-}

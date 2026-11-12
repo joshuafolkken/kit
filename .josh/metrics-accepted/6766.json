@@ -1,7 +1,0 @@
-{
-	"reason": "#6766: optional Issue URL / repo-name lookups catch a thrown rate limit in stop-actions and telegram-test so the Stop confirmation is still sent",
-	"date": "2026-11-08",
-	"growth": {
-		"scripts.code_lines": 9
-	}
-}

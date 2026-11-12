@@ -1,9 +1,0 @@
-{
-	"reason": "#7097: board human state reads the human-stop registry (new run-board-human.ts + test); CLAUDE.md and backlogrun-park.md point at the registry as the issue's acceptance requires",
-	"date": "2026-11-10",
-	"growth": {
-		"scripts.code_lines": 22,
-		"ai_cost.resident_bytes": 81,
-		"ai_cost.on_demand_bytes": 67
-	}
-}

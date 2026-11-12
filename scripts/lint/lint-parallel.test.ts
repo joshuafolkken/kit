@@ -6,14 +6,14 @@ import {
 } from '#scripts/josh/josh-command-types'
 import { lane_cache_run } from '#scripts/lane/lane-cache-run'
 import { fake_result } from '#tools/test/execa-result'
+import { DIRECT_LAUNCH_FILE } from '#tools/test/local-bin-mock'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import type { DaemonState } from './eslint-daemon'
 import type { LintRunTiming } from './lint-parallel'
 import { lint_shard } from './lint-shard'
 
-vi.mock('execa', () => ({
-	execa: vi.fn(),
-}))
+vi.mock('execa', () => ({ execa: vi.fn() }))
+vi.mock('#scripts/build/local-bin', async () => await import('#tools/test/local-bin-mock'))
 vi.mock('#scripts/lane/lane-cache-run', () => ({
 	lane_cache_run: {
 		run: vi.fn(async (_cache_file: string, work: () => Promise<unknown>) => await work()),
@@ -89,7 +89,7 @@ describe('run_lint_parallel_checks', () => {
 
 		await run_lint_parallel_checks()
 
-		expect(mocked_execa.mock.calls[0]?.[1]).toEqual(PRETTIER_ARGS)
+		expect(mocked_execa.mock.calls[0]?.slice(0, 2)).toEqual([DIRECT_LAUNCH_FILE, PRETTIER_ARGS])
 		expect(PRETTIER_ARGS.join(' ')).toContain(PRETTIER_CACHE_FLAGS.join(' '))
 		expect(mocked_cache_run).not.toHaveBeenCalledWith(PRETTIER_CACHE_FILE, expect.any(Function))
 	})
@@ -133,6 +133,13 @@ describe('josh lint --shard', () => {
 			expect.arrayContaining([...lint_shard.FIRST_SHARD_DIRECTORIES]),
 		)
 		expect(mocked_cache_run).toHaveBeenCalledWith(ESLINT_CACHE_FILE, expect.any(Function))
+	})
+
+	it('lints shard 1 with the prettier targets the project formats (josh.format)', async () => {
+		vi.spyOn(project_checks, 'prettier_targets').mockReturnValue([project_checks.WEB_FILES])
+		mock_exit_codes(0, 0)
+		await lint_parallel.run_lint_command(['--shard=1'])
+		expect(mocked_execa.mock.calls[0]?.[1]).toContain(project_checks.WEB_FILES)
 	})
 
 	it('lints shard 2 alone, saying prettier is left to shard 1', async () => {
@@ -184,7 +191,7 @@ describe('run_lint_checks', () => {
 
 const ESLINT = ['exec', 'eslint', TARGET]
 const PRETTIER = ['exec', 'prettier', TARGET]
-const WARM = { warm_daemon: true }
+const WARM = { warm_daemon: true, call: { caller: 'lint:related', files: 1 } } as const
 const LINT_RELATED_LABEL = 'josh lint:related'
 const DAEMON_REUSED: DaemonState = 'daemon reused'
 
@@ -202,7 +209,7 @@ describe('run_lint_checks — the warm eslint daemon', () => {
 		vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
 
 		expect(await run_lint_checks(PRETTIER, ESLINT, RELATED_CACHE_FILE, WARM)).toBe(1)
-		expect(mocked_run_or_cold).toHaveBeenCalledWith(ESLINT)
+		expect(mocked_run_or_cold).toHaveBeenCalledWith(ESLINT, WARM.call)
 		expect(mocked_execa).toHaveBeenCalledOnce()
 	})
 

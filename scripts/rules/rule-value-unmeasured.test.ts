@@ -15,6 +15,8 @@ const UNMEASURABLE_ROWS: ReadonlyArray<string> = [
 	// Not publishing a credential is the absence of a call, and the body file a past call named may
 	// be gone by the time its transcript is scored.
 	'credential-body',
+	// Filing only when asked is a call judged by the prompt, not by its own shape.
+	'unasked-filing',
 	'raw-field-body',
 	'round-one-check-related',
 	'repeat-check-related',

@@ -1,7 +1,0 @@
-{
-	"reason": "#6798 threads plan comment times into lane_plan.with_plans and the named-run yield hold so a newer plan comment beats a yielded record",
-	"date": "2026-11-08",
-	"growth": {
-		"scripts.code_lines": 54
-	}
-}

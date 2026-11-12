@@ -1,7 +1,0 @@
-{
-	"reason": "#7037: index stage starts by issue and next dispatches in one pass to make implement_spans O(dispatch + stage); the two index helpers add 14 code lines",
-	"date": "2026-11-10",
-	"growth": {
-		"scripts.code_lines": 14
-	}
-}

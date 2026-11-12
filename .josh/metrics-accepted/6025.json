@@ -1,7 +1,0 @@
-{
-	"reason": "#6025 adds the projected implement-time refusal at filing (rate read, projection, refusal text)",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 43
-	}
-}

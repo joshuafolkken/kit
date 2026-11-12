@@ -1,7 +1,0 @@
-{
-	"reason": "Keep occupied workers in their lane using shared snapshot identities; 13 net runtime lines include removing queued and unreached duplicates for earlier and unknown workers, verified by regression tests.",
-	"date": "2026-11-05",
-	"growth": {
-		"scripts.code_lines": 13
-	}
-}

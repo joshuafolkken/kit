@@ -146,9 +146,10 @@ function parse_options(argv: ReadonlyArray<string>, usage: string = USAGE): Next
 // empty listing: reading a failed read as "none" ends the run reporting a confident absence built on
 // a response nobody parsed. They stay apart from each other because the zod
 // rejection `parse_json_array_or_undefined` deliberately rethrows means the listing's *fields*
-// changed, not that the caller's authentication lapsed.
+// changed, not that the caller's authentication lapsed. `is_unchanged` is whether the listing answered
+// 304 throughout (`IssueListOutcome`), recorded by `backlog:next` (joshuafolkken/kit#7306).
 type OptedInRead =
-	| { kind: 'read'; issues: Array<OpenIssueData>; cutoff: ScanCutoff }
+	| { kind: 'read'; issues: Array<OpenIssueData>; cutoff: ScanCutoff; is_unchanged?: boolean }
 	| { kind: 'unreadable' }
 	| { kind: 'unexpected_shape' }
 	| { kind: 'blockers_unreadable' }
@@ -205,7 +206,7 @@ async function classify_failed_read(): Promise<OptedInRead> {
 }
 
 async function fetch_opted_in(): Promise<OptedInRead> {
-	const { json, is_capped } = await git_gh_command.issue_list_by_label_summary(
+	const { json, is_capped, is_unchanged } = await git_gh_command.issue_list_by_label_summary(
 		AUTO_OK_LABEL,
 		LISTING_LIMIT,
 	)
@@ -218,7 +219,7 @@ async function fetch_opted_in(): Promise<OptedInRead> {
 
 	await issue_sample_prime.prime(issues.map((issue) => issue.body))
 
-	return { ...read, issues }
+	return { ...read, issues, is_unchanged: is_unchanged === true }
 }
 
 // Whether every issue this one declares as a blocker has closed. `blockedBy` is the same native

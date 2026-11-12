@@ -5,12 +5,16 @@ import { backlog_arrival, type ArrivalPorts } from './backlog-arrival'
 // untriaged issues — so the arrival probe reads it as an arrival, never as an empty pool.
 
 const START_MS = 1_000_000
-const MINUTE_MS = backlog_arrival.PROBE_INTERVAL_MS
+const PROBE_MS = backlog_arrival.PROBE_INTERVAL_MS
 const FREE = 3
 const TRIAGE = 'triage'
 
 interface Pool {
 	issues: Array<string>
+}
+
+async function always_changed(): Promise<boolean> {
+	return true
 }
 
 function ports_of(pool: Pool): ArrivalPorts {
@@ -19,6 +23,7 @@ function ports_of(pool: Pool): ArrivalPorts {
 		ready_issues: vi.fn(async () => [...pool.issues]),
 		is_added_since: vi.fn(async () => false),
 		observe_offerable: vi.fn<ArrivalPorts['observe_offerable']>(),
+		listing_watcher: () => always_changed,
 	}
 }
 
@@ -39,7 +44,7 @@ describe('backlog_arrival.start — triage', () => {
 
 		pool.issues = [TRIAGE]
 
-		await expect(probe.has_arrived(START_MS + MINUTE_MS)).resolves.toBe(true)
+		await expect(probe.has_arrived(START_MS + PROBE_MS)).resolves.toBe(true)
 	})
 
 	it('reads nothing into a baseline taken during triage, so judging it wakes nobody for the whole pool', async () => {
@@ -48,7 +53,7 @@ describe('backlog_arrival.start — triage', () => {
 
 		pool.issues = ['2445', '2446']
 
-		await expect(probe.has_arrived(START_MS + MINUTE_MS)).resolves.toBe(false)
-		await expect(probe.has_arrived(START_MS + MINUTE_MS + MINUTE_MS)).resolves.toBe(false)
+		await expect(probe.has_arrived(START_MS + PROBE_MS)).resolves.toBe(false)
+		await expect(probe.has_arrived(START_MS + PROBE_MS + PROBE_MS)).resolves.toBe(false)
 	})
 })

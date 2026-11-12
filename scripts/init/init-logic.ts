@@ -87,6 +87,7 @@ const AI_COPY_FILES: ReadonlyArray<string> = [
 	'.github/actions/setup-node/action.yml',
 	'.github/actions/change-scope/action.yml',
 	'scripts/gate/change-scope-action.ts',
+	'scripts/gate/path-glob.ts',
 	'scripts/gate/toolchain-inputs.ts',
 	'.github/pull_request_template.md',
 	'.github/release.yml',
@@ -117,7 +118,8 @@ const AI_COPY_FILE_MAPPINGS: ReadonlyArray<FileCopyMapping> = [
 		dest: '.github/workflows/dependabot-auto-merge.yml',
 	},
 	// A template rather than a copy of kit's own file: kit releases from its publish.yml, so the file
-	// must not run in kit as well.
+	// must not run in kit as well. Repositories public npm carries also receive kit's publish.yml
+	// (npm-publish-files.ts), which skips its GitHub Release steps where this file exists.
 	{ src: 'templates/workflows/github-release.yml', dest: '.github/workflows/github-release.yml' },
 ]
 

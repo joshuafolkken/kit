@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { followup_human_merge, HumanMergeRequiredError } from './followup-human-merge'
+import { followup_human_merge } from './followup-human-merge'
 
 const RESOLVED_BRANCH = vi.hoisted(() => 'resolved-branch')
 // Deliberately not the real line's shape. What these two cases can prove is the wiring — that
@@ -219,26 +219,22 @@ describe('main — followup opens on its governing section', () => {
 	})
 })
 
-// joshuafolkken/kit#3023. A pull request a person merged by hand is finished by re-running `followup`;
-// the gates guard a merge this run no longer makes, and a ledger commit would land on a merged branch.
-it('stops an open workflow PR before every gate and ledger commit', async () => {
-	vi.mocked(followup_human_merge.assert_allowed).mockRejectedValueOnce(
-		new HumanMergeRequiredError('manual merge'),
-	)
-	attested_mock.mockClear()
+// joshuafolkken/kit#7312. The human-merge stop waits for green CI in `before_merge`, so a red PR fails as red.
+it('leaves the human-merge stop to the post-CI guard', async () => {
+	vi.mocked(followup_human_merge.assert_allowed).mockClear()
 	vi.mocked(git_followup_flush.commit_ledger_step).mockClear()
 
-	await expect(
-		git_followup_workflow.prepare_merge(
-			{ is_merged: false, should_merge: true, merged_at: undefined },
-			'6221',
-			FEATURE_BRANCH,
-		),
-	).rejects.toThrow(HumanMergeRequiredError)
-	expect(attested_mock).not.toHaveBeenCalled()
-	expect(git_followup_flush.commit_ledger_step).not.toHaveBeenCalled()
+	await git_followup_workflow.prepare_merge(
+		{ is_merged: false, should_merge: true, merged_at: undefined },
+		'6221',
+		FEATURE_BRANCH,
+	)
+	expect(followup_human_merge.assert_allowed).not.toHaveBeenCalled()
+	expect(git_followup_flush.commit_ledger_step).toHaveBeenCalledOnce()
 })
 
+// joshuafolkken/kit#3023. A pull request a person merged by hand is finished by re-running `followup`;
+// the gates guard a merge this run no longer makes, and a ledger commit would land on a merged branch.
 describe('prepare_merge — a pull request that has already merged', () => {
 	const ISSUE = '3023'
 	const BRANCH = 'merged-branch'

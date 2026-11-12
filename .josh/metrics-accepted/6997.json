@@ -1,7 +1,0 @@
-{
-	"reason": "josh lint --shard adds lint-shard.ts so CI can split the lint leg into two runners (#6997)",
-	"date": "2026-11-10",
-	"growth": {
-		"scripts.code_lines": 82
-	}
-}

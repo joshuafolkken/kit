@@ -30,6 +30,7 @@ import { backlog_drive_finish } from './backlog-drive-finish'
 import { backlog_drive_hold, type HoldRecorder } from './backlog-drive-hold'
 import { backlog_drive_idle } from './backlog-drive-idle'
 import { backlog_drive_launch } from './backlog-drive-launch'
+import { backlog_drive_listing } from './backlog-drive-listing'
 import { backlog_drive_memory } from './backlog-drive-memory'
 import { backlog_drive_named } from './backlog-drive-named'
 import { backlog_drive_named_offer } from './backlog-drive-named-offer'
@@ -181,13 +182,15 @@ function reporters(holds: HoldRecorder): Pick<LoopPorts, 'hold' | 'idle' | 'paus
 	}
 }
 
-// What a launch is weighed against: the free lanes, a kept lane, and the memory for one more.
+// What a launch is weighed against: the free lanes, a kept lane, and the memory for one more — and
+// whether a free lane has a new `auto-ok` issue to ask about.
 function room_ports(): Pick<
 	LoopPorts,
-	'free_lanes' | 'has_lane' | 'limit_room' | 'memory_held' | 'usage_limited'
+	'free_lanes' | 'has_lane' | 'limit_room' | 'memory_held' | 'usage_limited' | 'listing_changed'
 > {
 	return {
 		free_lanes: backlog_ready.drive_free_lane_count,
+		listing_changed: backlog_drive_listing.watcher(),
 		limit_room: backlog_ready.drive_limit_room,
 		has_lane: backlog_drive_seats.has_kept_lane,
 		memory_held: backlog_drive_memory.gauge(),
@@ -286,6 +289,7 @@ function loop_config(window_ms: number | undefined): LoopConfig {
 		poll_ms: POLL_MS,
 		offer_ms: backlog_budget.OFFER_INTERVAL_MS,
 		idle_offer_ms: backlog_budget.IDLE_OFFER_INTERVAL_MS,
+		check_ms: backlog_budget.LISTING_CHECK_INTERVAL_MS,
 		window_ms,
 	}
 }

@@ -1,7 +1,0 @@
-{
-	"reason": "The ledger archive's rotation keeps a descriptor across the rename, truncates the archive back on a failed replace, and routes the per-issue ledger readers to the archive with the ledger",
-	"date": "2026-11-10",
-	"growth": {
-		"scripts.code_lines": 153
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "Add shared resumable ranking enrichment and stash ownership signal for #6408; existing stash readers are reused.",
-	"date": "2026-11-05",
-	"growth": {
-		"scripts.code_lines": 40
-	}
-}

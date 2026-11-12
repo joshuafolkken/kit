@@ -85,8 +85,6 @@ const SHIPPED_UNREACHABLE = new Set([
 	'scripts/package/verify-optional-eslint-install.ts',
 	'scripts/release/github-release.ts',
 	'scripts/release/github-release-cli.ts',
-	'scripts/release/publish-tag.ts',
-	'scripts/release/publish-tag-cli.ts',
 	// #6514 stages the child removal plan; remove this entry when #6517 adds its consumer command.
 	'scripts/epic/epic-untrack-plan.ts',
 	// #6299 stages the shared reader without callers; remove this entry when #6243 or #6048 uses it.
@@ -96,6 +94,8 @@ const SHIPPED_UNREACHABLE = new Set([
 	// #6528 stages the judgment launch and the trusted sources; remove these entries when #6531 uses them.
 	'scripts/agent/judgment-agent-argv.ts',
 	'scripts/issue/issue-sources.ts',
+	// #7351 stages the josh.worker resolver; remove this entry when #7353 launches lanes through it.
+	'scripts/agent/agent-worker-profile.ts',
 ])
 
 interface PackedEntry {

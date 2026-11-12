@@ -1,7 +1,0 @@
-{
-	"reason": "#6834 adds the bounded followup rerun loop: reruns on download failures at any attempt, doubling backoff between rounds, MAX_CHECK_RERUNS cap and the reruns-spent stop message",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 59
-	}
-}

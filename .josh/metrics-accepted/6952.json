@@ -1,7 +1,0 @@
-{
-	"reason": "lane:stats --why driver row adds the lane's ledger cause keys (#6952)",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 9
-	}
-}

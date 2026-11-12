@@ -1,8 +1,0 @@
-{
-	"reason": "Review round 2: issue_declared_size.read throws on a failed body read so the kept declaration never stores a passing failure as none",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 65,
-		"ai_cost.on_demand_bytes": 84
-	}
-}

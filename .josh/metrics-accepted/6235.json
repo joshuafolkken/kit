@@ -1,7 +1,0 @@
-{
-	"reason": "Issue #6235 adds the nine verdict next-action mapping and CLI final-path output; the 33 added code lines implement the requested behavior.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 33
-	}
-}

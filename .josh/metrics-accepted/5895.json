@@ -1,7 +1,0 @@
-{
-	"reason": "run:split gains the --prerequisite form (#5895): a new module and its CLI parsing",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 109
-	}
-}

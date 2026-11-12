@@ -512,7 +512,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 	'lane:stats': {
 		...MEASURE_ARGUMENTS,
 		description:
-			'Print period lane throughput, stage, stop, check and machine-load statistics; --sinks shows stage totals, --over lane chains, --why cause groups above a net-minute threshold, and --pairs scoped pair runs',
+			'Print period lane throughput, stage, stop (by failed CI check, longest first), check and machine-load statistics; --sinks shows stage totals, --over lane chains, --why cause groups above a net-minute threshold, and --pairs scoped pair runs',
 		category: 'AI tools',
 		reference: [
 			'(--period <days> | --since <instant>) [--limit <lane-limit> | --sinks [<minutes>] | --over <minutes> | --why <minutes> | --pairs]',

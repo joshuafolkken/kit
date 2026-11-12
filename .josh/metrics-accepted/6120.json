@@ -1,7 +1,0 @@
-{
-	"reason": "lane:why (#6120) adds one command that joins existing records into a cause table",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 126
-	}
-}

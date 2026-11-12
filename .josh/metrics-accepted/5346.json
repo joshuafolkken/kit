@@ -1,7 +1,0 @@
-{
-	"reason": "the ship phase gains a default model (#5346)",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 1
-	}
-}

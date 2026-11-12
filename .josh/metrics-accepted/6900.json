@@ -1,8 +1,0 @@
-{
-	"reason": "#6900 moves a lane child's round-1 review-fix to a fresh session via the implementation cut, with in-place fallbacks for a committed tree or an unwritable handoff",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 46,
-		"ai_cost.on_demand_bytes": 70
-	}
-}

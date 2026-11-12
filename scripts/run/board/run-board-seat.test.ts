@@ -26,6 +26,7 @@ const REFUSAL = {
 }
 const LAUNCH = { pos: 3, at: AT, kind: 'child-launch', text: '#6243 a' }
 const HOLD = 'offer:wait:blocked'
+const HOLD_TEXT = 'every queued issue is blocked'
 const LIMIT = 3
 const NARROW = 40
 // A pane short enough that the seat lines give way.
@@ -79,7 +80,7 @@ describe('run_board_render the empty lane seats', () => {
 		expect(seats[1]).toContain(NO_CANDIDATE)
 	})
 
-	it('says no runnable candidate when every queued row waits on a blocker', () => {
+	it('says no issue is ready, with the hold as a sentence, when every queued row waits on a blocker', () => {
 		const layout = queued([
 			queued_row({ waits: ['#1'] }),
 			queued_row({ reason: { icon: WAIT_ICONS.held } }),
@@ -87,7 +88,7 @@ describe('run_board_render the empty lane seats', () => {
 		const seats = seats_of({ seats: read_of([], HOLD), layout })
 
 		expect(seats).toStrictEqual(
-			Array.from({ length: 2 }, () => expect.stringContaining(`${NO_CANDIDATE} (${HOLD})`)),
+			Array.from({ length: 2 }, () => expect.stringContaining(`${NO_CANDIDATE} — ${HOLD_TEXT}`)),
 		)
 	})
 
@@ -107,7 +108,17 @@ describe('run_board_render the empty lane seats', () => {
 		const layout = queued([queued_row({ reason: { icon: WAIT_ICONS.lane, value: '1/3' } })])
 
 		expect(seats_of({ seats: read_of([], undefined), layout })).toStrictEqual([])
-		expect(seats_of({ seats: read_of([], HOLD), layout })[0]).toContain(`held: ${HOLD}`)
+		expect(seats_of({ seats: read_of([], HOLD), layout })[0]).toContain(`held — ${HOLD_TEXT}`)
+	})
+})
+
+// joshuafolkken/kit#7287: the seat line says who fills the seat, never the ledger code.
+describe('run_board_seat a hold as a sentence', () => {
+	it('names your triage for a judge hand-back', () => {
+		const seats = seats_of({ seats: read_of([], 'hand-back:judge'), layout: queued([]) })
+
+		expect(seats[0]).toContain('💺 no issue ready to start — open issues await your triage')
+		expect(seats[0]).not.toContain('hand-back')
 	})
 })
 

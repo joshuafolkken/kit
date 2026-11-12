@@ -1,7 +1,0 @@
-{
-	"reason": "Pin Claude binaries for two fresh-machine scenarios and share verified download logic with pnpm; the added runtime lines implement the required architecture and integrity checks.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 29
-	}
-}

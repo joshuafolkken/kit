@@ -1,7 +1,0 @@
-{
-	"reason": "New alias-expanding josh name layer (time-josh-names.ts) that #6159 moves the expansion into; +28 code lines is the layer itself",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 28
-	}
-}

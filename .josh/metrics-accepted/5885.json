@@ -1,7 +1,0 @@
-{
-	"reason": "#5885: observation:depth refuses a nonexistent path instead of answering d0 (round-2 review root-cause fix)",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 12
-	}
-}

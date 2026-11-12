@@ -1,7 +1,0 @@
-{
-	"reason": "#6677 adds drive-step traces (backlog-drive-trace, -collect), the dated merge record (run-merge-dated) and time-ordered throughput spans, with their tests",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 76
-	}
-}

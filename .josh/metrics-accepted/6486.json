@@ -1,7 +1,0 @@
-{
-	"reason": "Single-sourcing test helpers adds shared tools/test helpers with their tests and an explicit root argument at each write_file call; removes 19 duplicated local definitions",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 14
-	}
-}

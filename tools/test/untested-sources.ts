@@ -101,7 +101,6 @@ const UNTESTED_SOURCES: ReadonlyArray<string> = [
 	'tools/package/production-dependency-graph.ts',
 	'scripts/package/verify-optional-eslint-install.ts',
 	'scripts/refactor/refactor-scan-cli.ts',
-	'scripts/release/publish-tag-cli.ts',
 	'scripts/repo/required-checks-report.ts',
 	'scripts/review/review-brief-cli.ts',
 	'scripts/review/review-checkout.ts',

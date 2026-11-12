@@ -1,7 +1,0 @@
-{
-	"reason": "New stalled-followup auto-retry sweep (backlog-drive-stalled-retry.ts), its shared helpers and round-1 review fixes (merge-state check, refused-retry catch, throttle), the feature of #6865",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 130
-	}
-}

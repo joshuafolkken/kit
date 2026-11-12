@@ -1,7 +1,0 @@
-{
-	"reason": "#6016 refuses a placeholder left in a measurement declaration's command at filing",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 17
-	}
-}

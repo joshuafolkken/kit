@@ -14,6 +14,30 @@ Most commands are a TypeScript file under `scripts/`; the rest are a shell line 
 
 A new josh script keeps the canonical main guard `process.argv[1] === fileURLToPath(import.meta.url)`, or none at all. `scripts/josh/josh-in-process.test.ts` asserts the shape for every script command.
 
+## Launching a tool through `pnpm exec`
+
+Measured on 2026-11-11 (pnpm 12.17.0, Node 26.12.1, macOS arm64; median of 15 `<tool> --version` runs, under load average 7–9) ([#7255](https://github.com/joshuafolkken/kit/issues/7255)):
+
+| Tool     | `pnpm exec` | `node_modules/.bin` shim | `node <bin entry>` |
+| -------- | ----------- | ------------------------ | ------------------ |
+| vitest   | 101 ms      | 49 ms                    | 37 ms              |
+| prettier | 107 ms      | 57 ms                    | 45 ms              |
+| eslint   | 139 ms      | 82 ms                    | 76 ms              |
+| cspell   | 265 ms      | 208 ms                   | —                  |
+
+The wrapper costs about 50–65 ms per launch, not the 0.3–0.5 s once estimated, and leaves one pnpm process alive per running tool.
+
+What `pnpm exec` adds over a direct launch, and what that loses:
+
+- `node_modules/.bin` on `PATH` — the shim does not add it. A tool that spawns another package's bin by name needs it; vitest, prettier, eslint and cspell spawn none by name.
+- `npm_command`, `npm_config_user_agent`, `npm_execpath`, `npm_node_execpath`, `INIT_CWD`, `PNPM_PACKAGE_NAME`, `pnpm_config_verify_deps_before_run` — of the four tools, only vitest reads one (`npm_config_user_agent`, to pick the package manager it suggests for a missing optional dependency).
+- The dependency check before the run (`verify-deps-before-run`) — a direct launch runs on a stale install without the warning.
+- `NODE_OPTIONS` — pnpm sets none; the callers set it (`scripts/lint/eslint-heap.ts`). `.npmrc` holds only a scoped registry, read at install time.
+
+The shim itself exports `NODE_PATH`; `node <bin entry>` (`resolve_package_bin`, `scripts/build/local-bin.ts`) does not, and pnpm's symlinked layout resolves the tools' own dependencies without it. cspell's `exports` map hides `cspell/package.json`, so `resolve_package_bin` returns nothing for it and the shim is its direct route.
+
+`scripts/test/test-unit-guard.ts`, `scripts/hooks/format-edited-file.ts` and `scripts/hooks/edited-cspell.ts` launch through `direct_launch`, which falls back to `pnpm exec` only when neither the bin entry nor a shim at or above the root is installed ([#7259](https://github.com/joshuafolkken/kit/issues/7259)).
+
 ## `josh gate`'s core budget
 
 Each check claims a place in a machine-wide weighted core budget before it starts (joshuafolkken/kit#2351). The weights are the same measured table the plan already uses — the static checks' reserved cores and the unit suite's worker cap — so a lone gate's four claims sum to exactly the core count and, on a machine with room, every one is admitted at once: a solo run's concurrency and worker count are unchanged. Under concurrency the machine-wide sum is what bounds admission, so overlapping gates can no longer each reserve the whole machine, and the "whoever started first took everything" asymmetry is gone — a later gate waits rather than shrinking everyone.
@@ -23,6 +47,12 @@ Each check claims a place in a machine-wide weighted core budget before it start
 A leaked place is swept on read by the same pid-and-start-time liveness the unit-run marker uses, and a reservation that never fits is admitted after a wait cap of two minutes, or sooner once the mean busy cores it reads have not fallen by a whole core for 30 s, since waiting on a load that does not ease gains it nothing — where only load outside the ledger holds it ([#4982](https://github.com/joshuafolkken/kit/issues/4982)), or only other claims' cores hold a claim no heavier than a static check (lint's weight) that the measured busy cores leave room for on a machine the run queue does not read overloaded ([#5391](https://github.com/joshuafolkken/kit/issues/5391)); a claim a swap stall holds waits past both — a unit suite's claim narrowed to the cores the admitted claims leave free (never below one worker), and its workers never exceed the weight it was admitted at ([#4235](https://github.com/joshuafolkken/kit/issues/4235)) — and the gate's summary then prints a `⚠ <check> — started past the core budget …` line above the verdict, so an over-subscribed run does not look like one that fitted. A gate nested inside another gate's unit suite (this repository's own gate tests) takes no place, so it never waits on cores the outer gate is holding. The pre-push `pnpm install` joins the same budget through [`josh reserved-run`](../josh-commands-automation.md#josh-reserved-run), `pnpm josh audit` claims its own place after its lockfile-record check ([#7146](https://github.com/joshuafolkken/kit/issues/7146)), and the pre-push unit suite reserves the gate's unit-suite weight and memory whenever it runs rather than reusing a passed gate's result ([#3874](https://github.com/joshuafolkken/kit/issues/3874)).
 
 A waiting claim is visible ([#3943](https://github.com/joshuafolkken/kit/issues/3943)): its marker records the command, the checkout and the reason — cores, memory or memory pressure — the command prints one `⏳ <command> waits for the core budget — <reason>` line when its wait starts.
+
+A project step claims from the same budget ([#7206](https://github.com/joshuafolkken/kit/issues/7206), `scripts/gate/project-gate-steps.ts`):
+
+- `josh.gate.steps` run one at a time after the fixed checks, each under a claim of its `cores`. Unset, the claim is the whole budget, since a `cargo build` takes every core it finds.
+- The steps run under the held mark, so a step that is itself a weighted `pnpm josh` command claims nothing more. A nested gate claims nothing, as its fixed checks do.
+- Only cores and memory are budgeted. A GPU, a device or a port is not serialized, so two lanes' steps may use it at once. File an Issue when steps contend for one in practice: a step fails or slows only while another lane's step holds the same device.
 
 `josh run:board` draws a lane's waiting claim on that lane's row — `🚧` leading it, the reason's header icon, the wait and the check in place of its newest activity — and any other waiting claim as one `🚧` line right before the legend, so nothing is added under the header ([#4052](https://github.com/joshuafolkken/kit/issues/4052)).
 
@@ -170,5 +200,7 @@ Print each delivered rule's **unaided compliance** — how far the carried text 
 
 - Read once per iteration at the `backlogrun` loop head (`josh backlog:offer`), so a rule that never fires appears as a printed row rather than as something a person has to think to measure. The loop head never measures: it prints the last reading from `rule-value.txt` in the common git directory's `josh/` (`node_modules/.cache/josh/` outside a repository) to stderr and, at most once every 15 minutes, starts a detached `josh rule:value --refresh` that rewrites it, so the offer never waits on the measurement and a failed one never changes its answer. Single sources: `scripts/rules/rule-value-cli.ts` and `scripts/rules/rule-value-cache.ts`.
 - A bare `josh rule:value` prints that cache while it is under 15 minutes old, so a lane taking a baseline skips minutes of rescanning (#5186).
+- `--period <days>` keeps only the transcripts whose file was last written inside the trailing window, so a reading after a rule change shows whether its refusals fell (#7329). A run straddling the window start counts its in-window files alone.
+- A window is measured into a memo of its own: the cache and the stored per-run counts hold the all-time reading, so it neither reads nor overwrites them.
 - `--prose` turns the audit to the rules no row registers: one row per bold-led paragraph or list item in `prompts/**`, `.claude/skills/**` and `CLAUDE.md` — `強制あり` where a guard row's `topic` cites its section, `計測のみ` where only a decision oracle's `single_source` does, `文章だけ` otherwise — then the totals (`scripts/rules/rule-value-prose.ts`). A citation is a file plus a section, resolved with the reader `doc:section` uses, so a row cites exactly the paragraphs its section holds; a file cited without a section covers the whole file. A guard row outranks an oracle, because a guard refuses and an oracle only answers (#6031).
 - Every work tree reads one cache in the common git directory. Only the main checkout writes it: a lane measures only its own transcripts.

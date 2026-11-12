@@ -6,7 +6,8 @@ import { lane_spent } from '#scripts/lane/lane-spent'
 import { lane_state, type LaneStateRecord } from '#scripts/lane/lane-state'
 import { run_carry, type CarryRead } from '#scripts/run/carry/run-carry'
 import type { EndedRun } from '#scripts/run/carry/run-carry-ended'
-import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
+import type { RunEvent } from '#scripts/run/event/run-event-stream'
+import { run_event_tail } from '#scripts/run/event/run-event-tail'
 import { run_stranded_detect } from '#scripts/run/run-stranded-detect'
 import { run_wake } from '#scripts/run/wake/run-wake'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -104,7 +105,7 @@ describe('run_board_read.read_local — an overrun note after the run ended', ()
 		arrange(NONE, { invocation: EPIC_RUN, started_at: STARTED_AT, ended_at: ENDED_AT })
 		const result = { ...AFTER, kind: 'note', text: '#3432 overrun: none: CI wait' }
 
-		vi.spyOn(run_event_stream, 'read_events').mockReturnValue([INSIDE, result])
+		vi.spyOn(run_event_tail, 'read_events').mockReturnValue([INSIDE, result])
 
 		const read = await run_board_read.read_local()
 
@@ -337,7 +338,7 @@ describe('run_board_read.read_local lane states', () => {
 		}
 
 		arrange(NONE, { invocation: EPIC_RUN, started_at: STARTED_AT, ended_at: ENDED_AT })
-		vi.mocked(run_event_stream.read_events).mockReturnValue([launch])
+		vi.mocked(run_event_tail.read_events).mockReturnValue([launch])
 		vi.mocked(lane_registry.list_lanes).mockResolvedValue([lane('3431')])
 		arrange_states([record_of('3431', EARLIER_AT)])
 

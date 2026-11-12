@@ -83,7 +83,7 @@ Codex hooks in a lane: Codex runs the main checkout's `.codex/hooks.json` in eve
 **Settings:**
 
 - `JOSH_LANE_ROOT` — where lanes go; unset means `.<repository-name>-lanes`, a hidden sibling of the repository root.
-- `JOSH_LANE_LIMIT` — how many lanes one repository may run at once (default 8); applied by `josh epic:next`. A live `lane:limit` override takes precedence; memory admission may hold starts below the limit.
+- `JOSH_LANE_LIMIT` — how many lanes one repository may run at once (default 4); applied by `josh epic:next`. A live `lane:limit` override takes precedence; memory admission may hold starts below the limit.
 
 **Output / exit codes:** `lane:open` prints its directory on stdout, reasons on stderr; refusal exits non-zero with empty stdout. Seats `1..9` (main: 0) are claimed atomically. Install or `josh.lane.setup` failure fails; warming is best-effort. `lane:list`: one row per lane — issue, seat, ports, branch, state, directory, output path, profile.
 
@@ -147,7 +147,8 @@ refuses launch with that update named — never a quiet switch to an older model
 profile it recorded at dispatch: a cut, resume or wake of a lane created before a migration stays on
 its recorded model (a model the floor table does not name is not version-checked), and only a newly
 dispatched lane takes the new default. The one exception is a pre-gate cut of a Claude lane: it moves
-to the ship phase's default, `claude-sonnet-5-5`, or to `JOSH_WORKER_SHIP_MODEL` when that is set.
+to the ship phase's default, `claude-sonnet-5-5`, or to `JOSH_WORKER_SHIP_MODEL` when that is set, lowered to the Issue's
+`josh.worker` profile when that is weaker.
 `JOSH_{ROLE}_MODEL` overrides reach new Claude Code launches
 only; they never rewrite a recorded lane. Legacy
 `JOSH_LANE_MODEL/EFFORT` is worker-only; migrate to `JOSH_WORKER_MODEL/EFFORT`.
@@ -207,7 +208,7 @@ pnpm josh lane:sample   # one machine-load reading
 
 <!-- usage: lane:stats -->
 
-Print period lane throughput, stage, stop, check and machine-load statistics; --sinks shows stage totals, --over lane chains, --why cause groups above a net-minute threshold, and --pairs scoped pair runs.
+Print period lane throughput, stage, stop (by failed CI check, longest first), check and machine-load statistics; --sinks shows stage totals, --over lane chains, --why cause groups above a net-minute threshold, and --pairs scoped pair runs.
 
 ```bash
 pnpm josh lane:stats --period 7                           # a 7-day period's stage medians and maxima
@@ -267,6 +268,9 @@ including zero-stop and transcript-missing lanes; no dispatched lanes means `not
 Between them, the followup critical path table (`lane-ci-path-stats.ts`) counts, per check that settled last in `followup`'s CI wait,
 its runs and the median and maximum seconds into the wait it settled at. A check is timed only once seen pending, and CodeRabbit is
 left to the `coderabbit-wait` row (`followup-ci-path.ts`).
+
+Under the stop table, the failed-check table (`lane-stop-check-stats.ts`) counts followup `check` stops per failed CI check
+(stops, wait total and maximum, not resumed), and the longest-stop table lists the ten longest stops with issue, `stopped at` and causes.
 
 Under the gate check table, the claim-versus-measured table (`lane-claim-stats.ts`) prints, per check, the median cores it
 claimed, the cores it used (`cpu_ms ÷ elapsed_ms`: median, p90, maximum) and the seconds its claims waited — reused runs and

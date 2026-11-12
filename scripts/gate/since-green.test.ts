@@ -249,3 +249,11 @@ describe('since_green.describe', () => {
 		)
 	})
 })
+
+describe('since_green.is_narrowed', () => {
+	it('answers true for a narrowed or an unmoved run and false for a whole-branch one', () => {
+		expect(since_green.is_narrowed(since_green.describe(LABEL, [SOURCE]))).toBe(true)
+		expect(since_green.is_narrowed(`${LABEL}: ${since_green.UNMOVED_REASON}`)).toBe(true)
+		expect(since_green.is_narrowed(since_green.fallback_line(LABEL, 'no-record'))).toBe(false)
+	})
+})

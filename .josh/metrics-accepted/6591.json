@@ -1,7 +1,0 @@
-{
-	"reason": "#6591 adds hook:ledger --demote/--apply/--restore and demoted-rule notices in the PreToolUse guard; round-1 fixes run the async guards past a demoted notice",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 165
-	}
-}

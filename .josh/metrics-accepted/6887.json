@@ -1,7 +1,0 @@
-{
-	"reason": "Display-name maps for usage providers and GitHub transports (#6887): labels drawn in proper case while data keys stay lower case",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 4
-	}
-}

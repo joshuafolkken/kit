@@ -1,8 +1,0 @@
-{
-	"reason": "#6008 adds the duplicate measurement-declaration refusal to issue:file (measure-twin.ts) and its one doc line",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 36,
-		"ai_cost.on_demand_bytes": 2
-	}
-}

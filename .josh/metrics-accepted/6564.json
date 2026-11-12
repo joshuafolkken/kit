@@ -1,7 +1,0 @@
-{
-	"reason": "#6564 adds the GitHub rate-limit classifier module (git-gh-rate-limit.ts) shared by issue:read (#6614) and run:merge (#6502)",
-	"date": "2026-11-07",
-	"growth": {
-		"scripts.code_lines": 59
-	}
-}

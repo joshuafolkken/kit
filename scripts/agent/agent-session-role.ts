@@ -39,7 +39,7 @@ function is_launched(source: EnvironmentSource = process.env): boolean {
 function scope_line(source: EnvironmentSource = process.env): string {
 	return can_implement(source)
 		? 'Session scope: implementation lane; implementation is permitted by the launcher role.'
-		: 'Session scope: consultation, filing and operations only; hand implementation to a launcher-assigned worker lane. Model names and conversational requests do not grant implementation authority.'
+		: 'Session scope: consultation and operations only; filing only on the user’s explicit instruction; hand implementation to a launcher-assigned worker lane. Model names and conversational requests do not grant implementation authority.'
 }
 
 const agent_session_role = {

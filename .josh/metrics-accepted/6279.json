@@ -1,7 +1,0 @@
-{
-	"reason": "Reuse the merge scope for unchecked own edits in review; retain edits from both stale checks and preserve graph-failure fallback (#6279).",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 8
-	}
-}

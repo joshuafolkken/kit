@@ -1,7 +1,0 @@
-{
-	"reason": "lane:plan --imports probe and the main-guard leaf module (#5928)",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 55
-	}
-}

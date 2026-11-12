@@ -1,6 +1,8 @@
 import { z } from 'zod'
 import { lane_ledger_kind } from './lane-ledger-kind'
 import { lane_ledger_pinned_origin } from './lane-ledger-pinned-origin'
+import { lane_ledger_schema_load } from './lane-ledger-schema-load'
+import { lane_ledger_schema_offer } from './lane-ledger-schema-offer'
 import { lane_ledger_schema_ship } from './lane-ledger-schema-ship'
 
 // The shape of each line `lane-ledger.ts` appends and reads back — one schema per entry kind.
@@ -9,6 +11,7 @@ const { KIND } = lane_ledger_kind
 const { early_push_schema, ship_lap_schema, size_schema, stop_schema, unplanned_notice_schema } =
 	lane_ledger_schema_ship
 const { pinned_origin_schema } = lane_ledger_pinned_origin
+const { load_schema } = lane_ledger_schema_load
 
 const merge_schema = z.object({ kind: z.literal(KIND.MERGE), at: z.string(), issue: z.number() })
 const check_schema = z.object({
@@ -49,35 +52,6 @@ const gate_schema = z.object({
 	// The lane the gate ran in, so `josh lane:breakdown` puts its checks under the lane's ship gate;
 	// absent outside a lane and on a row written before it (joshuafolkken/kit#5319).
 	issue: z.number().optional(),
-})
-// `available_mb`, `swapped_mb` and `lanes` are optional because each read can fail on its own — a
-// platform with no memory reading, a `git worktree` call that did not answer — and a sample is still
-// worth its load. `swapped_mb` is `machine_capacity`'s counter, every page swapped since boot.
-// Both memory fields were renamed with their meaning (joshuafolkken/kit#3593): an older row's
-// `free_mb` / `swap_mb` are stripped on read, so the two measurements never share a column.
-const process_kind_schema = z.object({
-	kind: z.string(),
-	cpu_percent: z.number(),
-	rss_mb: z.number(),
-	count: z.number(),
-})
-const load_schema = z.object({
-	kind: z.literal(KIND.LOAD),
-	at: z.string(),
-	load: z.number(),
-	available_mb: z.number().optional(),
-	swapped_mb: z.number().optional(),
-	lanes: z.number().optional(),
-	// The heaviest process kinds at the instant of the sample (`lane-process-load.ts`), so the load the
-	// core budget's ledger does not explain can be read back by what made it (joshuafolkken/kit#3874).
-	processes: z.array(process_kind_schema).optional(),
-	// The resident apps' summed size (`lane_process_load.RESIDENT_APPS`, joshuafolkken/kit#5658).
-	resident_mb: z.number().optional(),
-	// The host's sleep since boot (`lane-load.ts`, joshuafolkken/kit#7026).
-	slept_ms: z.number().optional(),
-	// The boot and last-wake instants, epoch ms (`kern.boottime`, `kern.waketime`).
-	booted_ms: z.number().optional(),
-	woke_ms: z.number().optional(),
 })
 // A lane child started on `issue` — the instant its implementation is timed from.
 const dispatch_schema = z.object({
@@ -189,6 +163,7 @@ const test_related_schema = z.object({
 	reuse_missed: z.number().optional(),
 	reuse_reason: z.string().optional(),
 	reuse_elapsed_ms: z.number().optional(),
+	select_elapsed_ms: z.number().optional(),
 	kind: z.literal(KIND.TEST_RELATED),
 	at: z.string(),
 	issue: z.number().optional(),
@@ -285,6 +260,7 @@ const entry_schema = z.discriminatedUnion('kind', [
 	round_one_schema,
 	round_two_schema,
 	offerable_schema,
+	lane_ledger_schema_offer.offer_schema,
 	core_wait_schema,
 	unit_files_schema,
 	test_related_schema,

@@ -198,7 +198,7 @@ describe('run_board_render.render sections', () => {
 		const start = lines.indexOf(decision_rule)
 
 		expect(lines.slice(start, start + 2)).toStrictEqual([decision_rule, decision_row])
-		expect(lines.at(-1)).toBe(decision_row)
+		expect(lines.slice(-3)).toStrictEqual([decision_row, '', rule('⏳ queued 0')])
 	})
 })
 

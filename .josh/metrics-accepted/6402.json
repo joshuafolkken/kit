@@ -1,7 +1,0 @@
-{
-	"reason": "Reuse the shared ESLint heap environment in format and refactor launchers; 14 runtime lines preserve caller options and keep Prettier unchanged.",
-	"date": "2026-11-05",
-	"growth": {
-		"scripts.code_lines": 14
-	}
-}

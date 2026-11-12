@@ -1,7 +1,0 @@
-{
-	"reason": "Issue #6301 exposes the existing timestamp extraction separately and validates ISO timestamps before adopting historical log evidence; five additional code lines close the attested medium finding without changing quota readers.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 154
-	}
-}

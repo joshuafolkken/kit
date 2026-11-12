@@ -1,9 +1,0 @@
-{
-	"reason": "#6007 adds the K cap and the measurement calendar-wait refusals the issue asks for, with their measurement.md guidance",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 26,
-		"rules.lines": 1,
-		"ai_cost.on_demand_bytes": 271
-	}
-}

@@ -1,8 +1,0 @@
-{
-	"reason": "#6066: backlog:next shares the projected-implement-time judgment (over_budget export, PoolContext rate) and the docs name the budget bar beside the lowered 1.5x cap",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 27,
-		"ai_cost.on_demand_bytes": 68
-	}
-}

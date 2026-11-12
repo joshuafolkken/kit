@@ -1,7 +1,0 @@
-{
-	"reason": "#6547: backlog:drive runs lane:prune inside the measured offer cycle (4 lines)",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 4
-	}
-}

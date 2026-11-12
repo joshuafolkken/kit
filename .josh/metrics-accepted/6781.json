@@ -1,7 +1,0 @@
-{
-	"reason": "#6781 adds the direct gh usage recorder the hook needs to count session-typed gh calls",
-	"date": "2026-11-08",
-	"growth": {
-		"scripts.code_lines": 63
-	}
-}

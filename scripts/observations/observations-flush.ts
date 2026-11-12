@@ -5,6 +5,7 @@ import { IGNORE_FOR_RELEASE_LABEL } from '#scripts/issue/issue-labels'
 import { error_text } from '#scripts/lib/error-message'
 import { review_comment_carry } from '#scripts/review/review-comment-carry'
 import { observation_ledger, OBSERVATION_LEDGER_DIRECTORY } from './observation-ledger'
+import { observation_ledger_archive } from './observation-ledger-archive'
 import type { BrokenLine } from './observation-ledger-line'
 import { observation_ledger_prepare } from './observation-ledger-prepare'
 import { observations_flush_landing } from './observations-flush-landing'
@@ -36,6 +37,7 @@ const TIME_START = 11
 const TIME_END = 19
 const COLON = ':'
 const NO_COMMITS = 0
+const NO_ARCHIVED_FILES = 0
 
 // **A count that could not be read is treated as "it may hold a commit".** Of the two refusals below
 // it chooses the one that warns about the only copy, because printing "nothing is stranded" on a
@@ -58,11 +60,22 @@ function branch_name_for(stamp: string): string {
 
 // **No `closes #N`.** A flush carries whatever observations the last cycle recorded; it answers to no
 // single issue, and the ledger's own lines say where each one was seen.
-function pull_request_body(): string {
+//
+// **A flush that archived says it moved lines** (joshuafolkken/kit#7336): "changes none" would be
+// false of the removed files, so it says what holds instead — every line moved, none dropped.
+function ledger_change_sentence(archived_files: number): string {
+	if (archived_files === NO_ARCHIVED_FILES) {
+		return 'so this pull request adds lines and changes none.'
+	}
+
+	return `so this pull request drops none: it adds lines, and moves ${String(archived_files)} closed issues' file(s) verbatim into the monthly \`archive-YYYY-MM.md\` files.`
+}
+
+function pull_request_body(archived_files: number): string {
 	return [
 		`Appended observations from \`${OBSERVATION_LEDGER_DIRECTORY}\` that no run's own commit carried.`,
 		'',
-		'The ledger is append-only, and a second line under one key is what promotes an observation to an issue — so this pull request adds lines and changes none.',
+		`The ledger is append-only, and a second line under one key is what promotes an observation to an issue — ${ledger_change_sentence(archived_files)}`,
 		'',
 		'Opened by `pnpm josh observations:flush` (joshuafolkken/kit#1756).',
 	].join('\n')
@@ -257,15 +270,11 @@ async function return_to_default_branch(default_branch: string): Promise<void> {
 
 // Everything after the commit, so a failure here can say what is on the branch and what it costs to
 // walk away from it.
-async function push_and_open(branch_name: string): Promise<string> {
+async function push_and_open(branch_name: string, body: string): Promise<string> {
 	try {
 		await git_command.push()
 
-		return await git_gh_command.pr_create(
-			COMMIT_MESSAGE,
-			pull_request_body(),
-			IGNORE_FOR_RELEASE_LABEL,
-		)
+		return await git_gh_command.pr_create(COMMIT_MESSAGE, body, IGNORE_FOR_RELEASE_LABEL)
 	} catch (error) {
 		throw new Error(stranded_branch_message(branch_name, error_text.message_of(error)), {
 			cause: error,
@@ -335,11 +344,15 @@ async function commit_ledger(branch_name: string, default_branch: string): Promi
 	}
 }
 
-async function open_pull_request(branch_name: string, default_branch: string): Promise<string> {
+async function open_pull_request(
+	branch_name: string,
+	default_branch: string,
+	body: string,
+): Promise<string> {
 	await git_command.checkout_b(branch_name)
 	await commit_ledger(branch_name, default_branch)
 
-	return await push_and_open(branch_name)
+	return await push_and_open(branch_name, body)
 }
 
 // **The checkout goes back to the default branch only on the way that merged.** A `finally` here
@@ -367,8 +380,12 @@ async function land(
 	await return_to_default_branch(default_branch)
 }
 
-async function open_and_land(branch_name: string, default_branch: string): Promise<void> {
-	console.info(await open_pull_request(branch_name, default_branch))
+async function open_and_land(
+	branch_name: string,
+	default_branch: string,
+	body: string,
+): Promise<void> {
+	console.info(await open_pull_request(branch_name, default_branch, body))
 
 	const is_auto_merge = await observations_flush_landing.request_auto_merge(branch_name)
 
@@ -410,10 +427,15 @@ async function ready_default_branch(status_output: string): Promise<string> {
 // (joshuafolkken/kit#5326): a lane child leaves them to this flush, so the carried files ride its pull
 // request, and the status is read again so a carry alone is a change to flush. A carry left behind by
 // a later stop is discarded by the next flush's `ready_default_branch`.
-async function carried_status(): Promise<string> {
+//
+// **The closed issues' files are archived after the carry** (joshuafolkken/kit#7336), so a rounds file
+// carried here is archived with the rest, and only here: a lane never writes the shared archive.
+async function carried_status(): Promise<{ status_output: string; archived_files: number }> {
 	await review_comment_carry.carry_reported(process.cwd())
 
-	return await git_command.status()
+	const archived_files = await observation_ledger_archive.archive_reported(process.cwd())
+
+	return { status_output: await git_command.status(), archived_files }
 }
 
 // **Nothing pulls in front of the branch, and that is deliberate.** The ledger is dirty by
@@ -432,7 +454,7 @@ async function flush(now: Date): Promise<string> {
 	const deferred = await observations_flush_landing.refuse_open_flush(BRANCH_PREFIX)
 	if (deferred !== undefined) return deferred
 
-	const status_output = await carried_status()
+	const { status_output, archived_files } = await carried_status()
 
 	if (!has_ledger_change(status_output)) return CLEAN_MESSAGE
 
@@ -440,7 +462,7 @@ async function flush(now: Date): Promise<string> {
 
 	const branch_name = branch_name_for(timestamp_for(now))
 
-	await open_and_land(branch_name, default_branch)
+	await open_and_land(branch_name, default_branch, pull_request_body(archived_files))
 
 	return merged_message(branch_name)
 }

@@ -1,7 +1,0 @@
-{
-	"reason": "#6839: remaining_of folds run:add roots into a pool run's list (listed_of helper)",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 5
-	}
-}

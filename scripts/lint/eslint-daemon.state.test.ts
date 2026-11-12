@@ -5,7 +5,7 @@ import { write_file } from '#tools/test/write-file'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('execa', () => ({ execa: vi.fn() }))
-vi.mock('#scripts/build/local-bin', () => ({ resolve_package_bin: vi.fn() }))
+vi.mock('#scripts/build/local-bin', async () => await import('#tools/test/local-bin-mock'))
 vi.mock('#scripts/git/git-spawn-sync', () => ({ git_spawn_sync: { read: vi.fn() } }))
 
 const execa_module = await import('execa')
@@ -129,6 +129,16 @@ describe('eslint_daemon.run_or_cold heap', () => {
 			NODE_OPTIONS: ESLINT_HEAP,
 			ESLINT_D_MISS: 'fail',
 		})
+	})
+
+	// joshuafolkken/kit#7247: the edit hook launches with the same switches, so either path that
+	// starts the daemon gives it the same heap.
+	it('starts the daemon forwarder with the shared launch environment', async () => {
+		installed()
+
+		await eslint_daemon.run_or_cold(PNPM_ESLINT)
+
+		expect(spawned_environment()).toMatchObject(eslint_daemon.launch_environment())
 	})
 
 	it('hands the cold fallback the eslint heap', async () => {

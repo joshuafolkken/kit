@@ -1,7 +1,0 @@
-{
-	"reason": "Security #6244: shared argv classification and interpreter option boundaries close attested review bypasses while preserving named scripts and quoted field values.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 231
-	}
-}

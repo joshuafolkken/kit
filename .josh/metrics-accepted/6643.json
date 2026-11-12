@@ -1,7 +1,0 @@
-{
-	"reason": "#6643 adds the rerun recovery for a fold whose split-child record failed: the prior-write branch in issue_fold_apply.apply and the rerun hint in issue:fold-existing",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 20
-	}
-}

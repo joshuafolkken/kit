@@ -1,7 +1,0 @@
-{
-	"reason": "Preserve matching per-test green blobs during replay and cover stale tree, base, and inputs for the round-2 fix #6249",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 101
-	}
-}

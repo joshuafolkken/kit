@@ -1,7 +1,0 @@
-{
-	"reason": "pretool-guard gains the per-tool guard table that skips edit guards on read-only calls (#6041)",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 18
-	}
-}

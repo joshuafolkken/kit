@@ -1,7 +1,0 @@
-{
-	"reason": "Lane-state read moved into git-free modules for the vitest config, plus the review fix that keeps the asking lane counted (#6916)",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 77
-	}
-}

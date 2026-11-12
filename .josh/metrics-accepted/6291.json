@@ -1,7 +1,0 @@
-{
-	"reason": "Immutable snapshot capture replaces retries; review fixes preserve force-added ignored sources and the original lane ledger context.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 86
-	}
-}

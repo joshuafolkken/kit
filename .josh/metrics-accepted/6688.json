@@ -1,7 +1,0 @@
-{
-	"reason": "run:board park rows read the park body parser for the recommendation and tier (#6688)",
-	"date": "2026-11-08",
-	"growth": {
-		"scripts.code_lines": 9
-	}
-}

@@ -1,5 +1,6 @@
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, realpathSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { project_checks } from '#scripts/gate/project-checks'
 import { ESLINT_CACHE_FILE } from '#scripts/josh/josh-command-types'
 import { fake_result } from '#tools/test/execa-result'
 import { temporary_directory } from '#tools/test/temporary-directory'
@@ -9,7 +10,7 @@ import { eslint_heap } from './eslint-heap'
 
 vi.mock('execa', () => ({ execa: vi.fn() }))
 
-const { format } = await import('./format')
+const { ESLINT_FIX_ARGS, format, PRETTIER_WRITE_ARGS } = await import('./format')
 const execa_module = await import('execa')
 const mocked_execa = vi.mocked(execa_module.execa)
 
@@ -23,25 +24,46 @@ const WEB_FILES: ProjectFiles = [
 	['site.js', 'console.log(1)\n'],
 ]
 const PYTHON_FILES: ProjectFiles = [['main.py', 'print(1)\n']]
+const ESLINT_MANIFEST = '{"name":"eslint","bin":{"eslint":"bin/eslint.js"}}'
+const PNPM_EXEC_PREFIX_LENGTH = 2
+const PACKAGE_JSON = 'package.json'
+const NODE_MODULES = 'node_modules'
 
 function write_project(manifest: Record<string, unknown>, files: ProjectFiles = WEB_FILES): string {
 	const root = make_directory('josh-format-')
 
-	writeFileSync(path.join(root, 'package.json'), JSON.stringify(manifest))
+	writeFileSync(path.join(root, PACKAGE_JSON), JSON.stringify(manifest))
 	for (const [name, content] of files) writeFileSync(path.join(root, name), content)
 
 	return root
 }
 
-function install_prettier(root: string): void {
-	const bin_directory = path.join(root, 'node_modules', '.bin')
+function install_prettier(root: string): string {
+	const shim = path.join(root, NODE_MODULES, '.bin', 'prettier')
 
-	mkdirSync(bin_directory, { recursive: true })
-	writeFileSync(path.join(bin_directory, 'prettier'), '')
+	mkdirSync(path.dirname(shim), { recursive: true })
+	writeFileSync(shim, '')
+
+	return shim
 }
 
+function install_eslint(root: string): string {
+	const package_directory = path.join(root, NODE_MODULES, 'eslint')
+	const entry = path.join(package_directory, 'bin', 'eslint.js')
+
+	mkdirSync(path.dirname(entry), { recursive: true })
+	writeFileSync(path.join(package_directory, PACKAGE_JSON), ESLINT_MANIFEST)
+	writeFileSync(entry, '')
+
+	// Node resolves through symlinks, and the temporary directory is one on macOS.
+	return realpathSync(entry)
+}
+
+// The tool each spawn ran: pnpm's `exec` operand, or the installed shim's name.
 function invoked_tools(): Array<unknown> {
-	return mocked_execa.mock.calls.map((call) => (call[1] as ReadonlyArray<string>)[1])
+	return mocked_execa.mock.calls.map(([file, args]) =>
+		file === 'pnpm' ? (args as ReadonlyArray<string>)[1] : path.basename(String(file)),
+	)
 }
 
 beforeEach(() => {
@@ -124,6 +146,17 @@ describe('josh format', () => {
 	})
 })
 
+describe('josh format targets', () => {
+	it('writes only the Web files of a basic project under the default josh.format', async () => {
+		const root = write_project({ josh: { profile: 'basic' } })
+
+		install_prettier(root)
+		await format.run_format(root)
+		expect(mocked_execa.mock.calls[0]?.[1]).toContain(project_checks.WEB_FILES)
+		expect(mocked_execa.mock.calls[0]?.[1]).not.toContain('.')
+	})
+})
+
 describe('josh format without Web files', () => {
 	it('skips Prettier with a reason and exits 0 on a basic Python project', async () => {
 		const root = write_project({ josh: { profile: 'basic' } }, PYTHON_FILES)
@@ -145,5 +178,36 @@ describe('josh format — the dependency guard', () => {
 
 		expect(await format.run_format(root)).toBe(0)
 		expect(guard).toHaveBeenCalledWith(ESLINT_CACHE_FILE, expect.any(Function), root)
+	})
+})
+
+// joshuafolkken/kit#7256: each tool runs without pnpm's wrapper process, with the arguments and
+// environment the `pnpm exec` route gave it.
+describe('josh format — direct launch', () => {
+	it('runs the installed prettier shim with the pnpm route arguments', async () => {
+		const root = write_project({ josh: { profile: 'full' } })
+		const shim = install_prettier(root)
+
+		await format.run_format(root)
+		expect(mocked_execa).toHaveBeenNthCalledWith(
+			1,
+			shim,
+			PRETTIER_WRITE_ARGS.slice(PNPM_EXEC_PREFIX_LENGTH),
+			{ cwd: root, stdio: 'inherit', reject: false },
+		)
+	})
+
+	it('runs the installed eslint CLI entry under this node with the shared heap', async () => {
+		const root = write_project({ josh: { profile: 'full' } })
+		const entry = install_eslint(root)
+		const environment = { NODE_OPTIONS: eslint_heap.with_heap(undefined) }
+
+		vi.spyOn(eslint_heap, 'environment').mockReturnValue(environment)
+		await format.run_format(root)
+		expect(mocked_execa).toHaveBeenLastCalledWith(
+			process.execPath,
+			[entry, ...ESLINT_FIX_ARGS.slice(PNPM_EXEC_PREFIX_LENGTH)],
+			{ cwd: root, stdio: 'inherit', reject: false, env: environment, extendEnv: false },
+		)
 	})
 })

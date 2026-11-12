@@ -1,7 +1,0 @@
-{
-	"reason": "lane:breakdown start-to-plan outside-calls minutes and its backgrounded-call count (#6119): a new measurement, no existing code to remove",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 35
-	}
-}

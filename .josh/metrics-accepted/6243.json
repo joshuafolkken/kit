@@ -1,9 +1,0 @@
-{
-	"reason": "6243 checks declared size and all blocking history across the strict ledger and existing issue-comment reader before skipping initial review; records the skipped outcome and documents final-round disposition.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 77,
-		"rules.lines": 5,
-		"ai_cost.on_demand_bytes": 459
-	}
-}

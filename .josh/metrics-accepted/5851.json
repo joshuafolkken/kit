@@ -1,7 +1,0 @@
-{
-	"reason": "issue:read gains --repo (#5851): parse_request, the repo thread through both reads and the trust lookup",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 39
-	}
-}

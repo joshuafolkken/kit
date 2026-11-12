@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { project_checks } from '#scripts/gate/project-checks'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
 import { ESLINT_CACHE_FLAGS } from '#scripts/josh/josh-command-types'
@@ -11,6 +12,7 @@ import { lint_parallel } from './lint-parallel'
 // changed files to both linters and fail on what they report; it must never narrow in CI.
 
 vi.mock('execa', () => ({ execa: vi.fn() }))
+vi.mock('#scripts/build/local-bin', async () => await import('#tools/test/local-bin-mock'))
 vi.mock('#scripts/git/git-command', () => ({ git_command: { repository_root: vi.fn() } }))
 vi.mock('#scripts/git/changed-paths', () => ({ changed_paths: { read_changed_paths: vi.fn() } }))
 vi.mock('#scripts/lane/lane-cache-run', () => ({
@@ -206,5 +208,21 @@ describe('lint_parallel.run_lint_command timing', () => {
 		await lint_parallel.run_lint_command([])
 
 		expect(process.stdout.write).not.toHaveBeenCalledWith(expect.stringMatching(TIMING_LINE))
+	})
+})
+
+// joshuafolkken/kit#7204: the gate's whole-tree lint checks what `josh.format` leaves to Prettier.
+describe('lint_parallel.run_lint_parallel_checks prettier targets', () => {
+	it('checks the targets the project formats rather than the whole tree', async () => {
+		const targets = vi
+			.spyOn(project_checks, 'prettier_targets')
+			.mockReturnValue([project_checks.WEB_FILES])
+
+		mock_exit_codes(0, 0)
+		await lint_parallel.run_lint_parallel_checks()
+		targets.mockRestore()
+
+		expect(linter_arguments()[0]).toContain(project_checks.WEB_FILES)
+		expect(linter_arguments()[0]).not.toContain(WHOLE_TREE)
 	})
 })

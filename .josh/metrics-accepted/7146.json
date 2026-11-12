@@ -1,7 +1,0 @@
-{
-	"reason": "Pass record for the pre-push audit, gated on a scanner at or above the floor (#7146)",
-	"date": "2026-11-10",
-	"growth": {
-		"scripts.code_lines": 111
-	}
-}

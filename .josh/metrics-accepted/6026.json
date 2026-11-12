@@ -1,8 +1,0 @@
-{
-	"reason": "#6026 adds the run:cut budget-over verdict: a new run-cut-budget.ts module, its lane-child doc lines, and the tick-before-run:cut line in pre-gate-cut.md",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 81,
-		"ai_cost.on_demand_bytes": 439
-	}
-}

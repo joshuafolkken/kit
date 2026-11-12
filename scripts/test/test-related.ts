@@ -249,14 +249,26 @@ async function scope_of(
 	})
 }
 
+// The summary line names the hub the ledger records: the widest capped file of the run's own change.
+function report_capped(capped: CappedImporters, change: ChangeReading): void {
+	test_related_cap.report_over_cap(capped, test_related_record.own_of(change))
+}
+
+// The test selection's own time — the import graph and the importer index (joshuafolkken/kit#7248) —
+// recorded apart from vitest's so the ledger shows what selecting costs.
 async function capped_of(
 	root: string,
 	change: ChangeReading,
 	is_whole: boolean,
-): Promise<CappedImporters> {
+): Promise<{ capped: CappedImporters; select_elapsed_ms: number }> {
 	const files = change.is_unmoved === true ? [] : (change.changed ?? [])
+	const started_ms = performance.now()
+	const capped = await test_related_cap.capped_importers(root, files, is_whole)
+	const select_elapsed_ms = performance.now() - started_ms
 
-	return await test_related_cap.capped_importers(root, files, is_whole)
+	report_capped(capped, change)
+
+	return { capped, select_elapsed_ms }
 }
 
 // **Whether a set of changed files can reach any test**, answered by the decision this command
@@ -292,11 +304,6 @@ function owed_of(red: RedReading | undefined): ReadonlyArray<string> {
 	return red?.owed ?? []
 }
 
-// The summary line names the hub the ledger records: the widest capped file of the run's own change.
-function report_capped(capped: CappedImporters, change: ChangeReading): void {
-	test_related_cap.report_over_cap(capped, test_related_record.own_of(change))
-}
-
 async function read_run_input(
 	root: string,
 	command_arguments: ReadonlyArray<string>,
@@ -305,10 +312,8 @@ async function read_run_input(
 ): Promise<RelatedInput> {
 	const red = await test_related_red.read_red(before)
 	const change = await read_change(root, command_arguments, is_whole, red)
-	const capped = await capped_of(root, change, is_whole)
+	const { capped, select_elapsed_ms } = await capped_of(root, change, is_whole)
 	const { changed, synced = [], since_map = [], branch } = change
-
-	report_capped(capped, change)
 	const scope = await resolve_change(root, change, capped)
 	const reuse = await test_related_reuse.read(root, scope, red === undefined ? before : undefined)
 
@@ -322,6 +327,7 @@ async function read_run_input(
 		owed: owed_of(red),
 		reuse,
 		over_cap: capped.over_cap,
+		select_elapsed_ms,
 	}
 }
 

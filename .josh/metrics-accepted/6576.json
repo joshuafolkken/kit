@@ -1,7 +1,0 @@
-{
-	"reason": "run:cut gives an unmeasurable session its own report so it is not told it is under the threshold (#6576 review medium)",
-	"date": "2026-11-07",
-	"growth": {
-		"scripts.code_lines": 8
-	}
-}

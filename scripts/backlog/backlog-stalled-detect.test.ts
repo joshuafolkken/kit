@@ -62,7 +62,9 @@ describe('backlog_stalled_detect.detect_and_report hold reason', () => {
 			THRESHOLD_MS,
 		)
 
-		expect(emit_stall).toHaveBeenCalledWith(expect.stringContaining('(held: memory)'))
+		expect(emit_stall).toHaveBeenCalledWith(
+			expect.stringContaining('(memory pressure is high; lanes resume when it eases)'),
+		)
 	})
 
 	// joshuafolkken/kit#4015: a stall resolves at the next dispatch, so it reaches nobody off-screen.

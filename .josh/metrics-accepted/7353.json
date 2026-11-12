@@ -1,0 +1,7 @@
+{
+	"reason": "Lane dispatch resolves the josh.worker profile from the Issue labels (#7353)",
+	"date": "2026-11-12",
+	"growth": {
+		"scripts.code_lines": 19
+	}
+}

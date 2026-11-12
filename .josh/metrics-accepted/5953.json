@@ -1,7 +1,0 @@
-{
-	"reason": "run:cut prints its pre-gate-cut.md section, run:entry relays it, and read:set charges it per section (#5953)",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 72
-	}
-}

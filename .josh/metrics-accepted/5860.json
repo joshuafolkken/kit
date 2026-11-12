@@ -1,7 +1,0 @@
-{
-	"reason": "run:entry laps for the overlap probe, plan event and report (#5860)",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 18
-	}
-}

@@ -10,10 +10,12 @@ import {
 	AI_COPY_FILE_MAPPINGS_LIST,
 	AI_COPY_FILES_LIST,
 	managed_config_scope,
+	NPM_PUBLISH_FILES_LIST,
 	PLUGIN_SKILL_DIRECTORIES_LIST,
 	SYNCED_PATHS_LIST,
 } from './managed-config-scope'
 
+const PUBLISH_WORKFLOW = '.github/workflows/publish.yml'
 const UNDISTRIBUTED_FILE = 'scripts/sync/managed-config-scope.ts'
 const SKILL_DIRECTORY = '.claude/skills/workflow-commands'
 
@@ -94,6 +96,15 @@ describe('managed_config_scope.find_managed_paths — AI_COPY_FILE_MAPPINGS', ()
 		expect(managed_config_scope.find_managed_paths([MAPPING.dest])).toEqual([
 			{ path: MAPPING.dest, list: AI_COPY_FILE_MAPPINGS_LIST },
 		])
+	})
+})
+
+// #7303: sync copies the publish workflow only where the registry says so, so no static list holds it.
+describe('managed_config_scope.find_managed_paths — NPM_PUBLISH_FILES', () => {
+	it('claims the publish workflow sync copies to a repository that publishes to npm', () => {
+		const hits = managed_config_scope.find_managed_paths([PUBLISH_WORKFLOW])
+
+		expect(hits).toEqual([{ path: PUBLISH_WORKFLOW, list: NPM_PUBLISH_FILES_LIST }])
 	})
 })
 

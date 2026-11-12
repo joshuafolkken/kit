@@ -1,7 +1,0 @@
-{
-	"reason": "Lint timing line now reports how many ESLint cache entries the import-closure guard dropped, to measure the slow CI lint step (#6984)",
-	"date": "2026-11-10",
-	"growth": {
-		"scripts.code_lines": 26
-	}
-}

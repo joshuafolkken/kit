@@ -1,7 +1,0 @@
-{
-	"reason": "#6913 adds the per-model breakdown to the cost:audit session-kind rows (new feature code)",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 26
-	}
-}

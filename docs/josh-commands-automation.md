@@ -689,6 +689,13 @@ It commits only the ledger lines (`.josh/observations/`) no run's own commit car
 
 It first carries the closed issues' comment rounds no lane carries into `<N>-comment-rounds.md`, in the same pull request.
 
+Then it archives:
+
+- Each closed issue's `<N>.md` and `<N>-comment-rounds.md` move, verbatim and in name order, into `archive-YYYY-MM.md` for the month the issue closed. The state and close date come from one GitHub GraphQL query per 100 issues.
+- An archived rounds file's issue is listed in `archived-comment-rounds.txt`, so the carry does not read it again.
+- Open issues' files, date files, and issues GitHub did not answer stay where they are. A failed read moves nothing; the next flush retries.
+- Every reader still reads the archive files, so its counts do not change. The pull request body says lines were moved and none dropped.
+
 **Behavior:** refused off the default branch or beside any other change; prints `clean` when there is nothing to commit. `pnpm josh run:tail` runs it after a merge.
 
 Related: [`josh followup`](#josh-followup).
@@ -850,13 +857,24 @@ It raises the version by one minor per merge, opens and merges a `release/v<vers
 🎉 Release vX.Y.Z complete
 ```
 
-A `private: true` package skips the npm stage.
+A repository whose `@joshuafolkken/` package public npm does not carry skips the npm stage; the registry decides, not `private` in `package.json`.
+
+In a consumer repository the release runs through workflows kit syncs:
+
+1. The `release/v<version>` pull request merges into main.
+2. `auto-tag.yml` tags `vX.Y.Z` once main's CI passes.
+3. `production.yml` merges the tag into the `production` branch.
+4. `github-release.yml` creates the GitHub Release; its notes are grouped by the labels in `.github/release.yml` (breaking changes, features, bug fixes, other).
+
+All three workflows ship with kit v1.1093.0 or later (see [What gets synced](sync.md#ai-files-overwritten)); on an older install, run `pnpm josh sync` first.
 
 **Runs in its own work tree, never the root checkout**, so it can run beside a [`backlogrun`](how-to/run-issues.md) on a dirty root.
 
+After printing the plan, a live run and `--dry-run` alike check `origin/<default>` for a GitHub Release workflow: `github-release.yml` or `publish.yml` that runs `josh release:github`. They print the one found. With none, they exit non-zero before any branch, pull request or tag. Fix: kit v1.1093.0 or later, then `pnpm josh sync`.
+
 Watch budgets (default 30 minutes each): `JOSH_RELEASE_TAG_TIMEOUT_SECONDS` (tag), `JOSH_RELEASE_NPM_TIMEOUT_SECONDS` (npm publish), `JOSH_RELEASE_GITHUB_RELEASE_TIMEOUT_SECONDS` (GitHub Release).
 
-**Output / exit codes:** exits 0 and writes nothing when the pending count is zero; exits non-zero if `origin/<default>` cannot be read, no version base is found, `release/v<version>` already exists (locally or on origin), or a watched stage never appears (printed with ❌).
+**Output / exit codes:** exits 0 and writes nothing when the pending count is zero; exits non-zero if `origin/<default>` cannot be read, no version base is found, no GitHub Release workflow is found (above), `release/v<version>` already exists (locally or on origin), or a watched stage never appears (printed with ❌).
 
 The npm watch stops early when the tag's `Publish` run fails; its ❌ line names the run ID.
 
@@ -891,7 +909,7 @@ pnpm josh release:github   # run by CI with GH_TOKEN, RELEASE_TAG and GITHUB_REP
 
 <!-- /usage -->
 
-The notes come from `.github/release.yml`. Run by CI — kit's `publish.yml`, and the `github-release.yml` every consumer receives.
+The notes come from `.github/release.yml`. Run by CI — kit's `publish.yml`, and the `github-release.yml` every consumer receives. `josh sync` also distributes kit's `publish.yml` to repositories public npm carries; there it skips the GitHub Release steps when `github-release.yml` exists.
 
 It takes no arguments: `--help` / `-h` prints the usage line and exits 0 without reading the environment; any other argument is refused with the usage line and a non-zero exit, before anything is released.
 
@@ -911,6 +929,18 @@ Releases are created in version order: a later tag waits for the nearest lower o
 **Output / exit codes:** prints `published <tag> from <baseline>` or `already-published`; exits non-zero on an API error, an invalid tag or repository, a latest release that is not older than the tag, or a lower tag that never gets a release within the wait budget.
 
 Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh release:github` in detail".
+
+### `josh release:tag`
+
+<!-- usage: release:tag -->
+
+Print the npm dist-tag a version publishes under, given the current latest.
+
+```bash
+pnpm josh release:tag 1.2.0 1.1.0   # → latest
+```
+
+<!-- /usage -->
 
 ## Maintenance
 

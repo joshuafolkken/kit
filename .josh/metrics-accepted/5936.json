@@ -1,7 +1,0 @@
-{
-	"reason": "cost:audit per-phase table (#5936): phase module, lane breakdown stage lookup, and the review-fix placement between ship stages from round 1",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 181
-	}
-}

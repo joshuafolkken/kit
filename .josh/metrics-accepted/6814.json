@@ -1,7 +1,0 @@
-{
-	"reason": "base-tree.ts stops on SIGINT and SIGHUP as on SIGTERM, so an interrupted test:pinned or test:red removes its trees and its detached probes; test-red.ts types the probed run",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 109
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "backlog:drive fills free lanes before a park-owed triage end and hands triage back before the judge/drain/retrospective read a non-run answer (#6871): backlog-drive-park-triage module and its offer guard",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 23
-	}
-}

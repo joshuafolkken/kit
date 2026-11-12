@@ -5,7 +5,7 @@ import { find_package_directory } from '#scripts/josh/package-directory'
 import { buffered_process, type BufferedProcessResult } from '#scripts/lib/buffered-process'
 
 // ESLint takes its heap from here in `josh lint`, `josh format` and the refactor scan: the cold
-// `pnpm exec eslint`, direct launches and the eslint_d forwarder, whose launcher hands its
+// eslint (`run_cold`), direct launches and the eslint_d forwarder, whose launcher hands its
 // environment on to the daemon. CI sets nothing of its own; its `josh gate` / `josh lint` arrive
 // here too. The size is the core budget's (`core-weights.ts`), which reserves it for each lint.
 const { ESLINT_HEAP_MIB } = core_weights
@@ -36,11 +36,11 @@ function environment(): NodeJS.ProcessEnv {
 	return { ...child, [NODE_OPTIONS]: with_heap(child[NODE_OPTIONS]) }
 }
 
-// `pnpm exec eslint` as a buffered child under this heap.
+// A `pnpm exec eslint` list as a buffered child under this heap, launched without pnpm.
 async function run_cold(pnpm_arguments: ReadonlyArray<string>): Promise<BufferedProcessResult> {
 	const child = environment()
 
-	return await buffered_process.run_buffered_process(pnpm_arguments, {
+	return await buffered_process.run_buffered_direct(pnpm_arguments, {
 		environment: { ...child, [NODE_OPTIONS]: `${child[NODE_OPTIONS] ?? ''} ${MEMORY_IMPORT}` },
 	})
 }

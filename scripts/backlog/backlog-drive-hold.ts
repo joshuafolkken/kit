@@ -1,6 +1,7 @@
 import { lane_hand_back_hold } from '#scripts/lane/lane-hand-back-hold'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import type { DriveEnd, DrivePorts, DriveState, OfferRead, PassResult } from './backlog-drive'
+import { backlog_hold_codes } from './backlog-hold-codes'
 import { backlog_ready } from './backlog-ready'
 
 // Why a free lane stayed empty, written where `josh lane:stats` reads it (joshuafolkken/kit#3995).
@@ -19,9 +20,7 @@ import { backlog_ready } from './backlog-ready'
 // leaves `lane-hand-back-hold.ts`'s mark beside it; the finished run's is written every time.
 
 const NO_FREE_LANES = 0
-const OFFER_PREFIX = 'offer'
-const HAND_BACK_PREFIX = 'hand-back'
-const REASON_SEPARATOR = ':'
+const { OFFER_PREFIX, HAND_BACK_PREFIX, REASON_SEPARATOR } = backlog_hold_codes
 // The verdict that starts nothing more: the run is finishing, so the lanes it frees are no hold.
 const STOP_VERDICT = 'stop'
 // The ends that finished the run: nothing is owed a lane after them.
@@ -49,8 +48,8 @@ interface HoldLedger {
 
 // The reason an offer that started nothing holds a free lane, or `undefined` for the run's stop. The
 // offer's cause stands in for its answer, so a `run:solo` wait is `offer:watch:solo` rather than one
-// more `offer:watch:blocked` (joshuafolkken/kit#4396), and a dependency-chain or start-condition wait is
-// `offer:watch:chain`, `offer:watch:gate` or `offer:watch:chain+gate` (joshuafolkken/kit#4513).
+// more `offer:watch:blocked` (joshuafolkken/kit#4396), and a dependency-chain, start-condition or
+// running-lane wait is `offer:watch:chain`, `offer:watch:gate+lane` and the like (joshuafolkken/kit#4513).
 function offer_reason(read: OfferRead): string | undefined {
 	if (read.verdict === STOP_VERDICT) return undefined
 

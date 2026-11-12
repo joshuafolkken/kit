@@ -1,7 +1,0 @@
-{
-	"reason": "Add needs-human-merge to the shared park-label set so all candidate paths withhold human merge waits; the single added production line avoids separate drive guards.",
-	"date": "2026-11-05",
-	"growth": {
-		"scripts.code_lines": 1
-	}
-}

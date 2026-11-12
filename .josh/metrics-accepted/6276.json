@@ -1,7 +1,0 @@
-{
-	"reason": "Issue #6276 adds one shared task-state pattern so body comparisons ignore checkbox ticks while retaining wording changes.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 1
-	}
-}

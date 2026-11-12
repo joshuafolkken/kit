@@ -1,7 +1,0 @@
-{
-	"reason": "#6694 adds the gh request tally module and its count calls in the exec layer (new feature)",
-	"date": "2026-11-07",
-	"growth": {
-		"scripts.code_lines": 32
-	}
-}

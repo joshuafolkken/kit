@@ -35,7 +35,7 @@ File Issues with `pnpm josh issue:file` (it applies the classification labels); 
 ## The `fullrun new` step list
 
 `kickoff new` + `fullrun #N` in one run. Steps: (1) Derive an English title, or use the provided one.
-(2) Create Issue: `pnpm josh issue:file "<title>" --body-file .josh/tmp/body.md`,
+(2) Create Issue: `pnpm josh issue:file "<title>" --body-file .josh/tmp/body.md --over-cap`,
 with the labels `kickoff.md` → "Words typed after `new`" maps (per
 `prompts/collaboration-workflow/issue-template.md`) — its duplicate scan runs first, and a candidate
 that covers the same work stops the run rather than filing a second Issue (`issue-scout.md`). Capture

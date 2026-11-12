@@ -1,12 +1,13 @@
 #!/usr/bin/env tsx
 import { existsSync } from 'node:fs'
 import path from 'node:path'
-import { untyped_environment } from '#eslint/untyped-environment.js'
-import { resolve_local_bin } from '#scripts/build/local-bin'
+import { direct_launch, type LocalLaunch } from '#scripts/build/local-bin'
 import { ESLINT_EDIT_CACHE_FLAGS } from '#scripts/josh/josh-command-types'
 import { json_value } from '#scripts/lib/json-value'
 import { HOOK_PROCESS_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { eslint_daemon } from '#scripts/lint/eslint-daemon'
+import { eslint_daemon_calls } from '#scripts/lint/eslint-daemon-calls'
+import { eslint_trim } from '#scripts/lint/eslint-trim'
 import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { execa } from 'execa'
 import { z } from 'zod'
@@ -53,10 +54,9 @@ const EXCLUDED_ANYWHERE = new Set(['node_modules', '.git'])
 const EXCLUDED_AT_ROOT = new Set(['dist', 'build'])
 const PARENT_SEGMENT = '..'
 
-// The shims under `node_modules/.bin` are spawned directly rather than through `pnpm exec`. This
+// The formatters are launched directly (`direct_launch`) rather than through `pnpm exec`. This
 // runs on every edit, and each `pnpm exec` is another process start on a chain that already holds
 // `pnpm josh` and tsx — the two saved are the ones this file controls.
-const PNPM = 'pnpm'
 const PRETTIER_BIN = 'prettier'
 const PRETTIER_ARGUMENTS: ReadonlyArray<string> = ['--write', '--ignore-unknown']
 // `--no-error-on-unmatched-pattern` covers a file the eslint config does not cover: the hook has
@@ -106,14 +106,15 @@ interface FormatCommand {
 	command_arguments: ReadonlyArray<string>
 }
 
-// The three ways this hook can reach a formatter, fastest first — a warm daemon, the project's own
-// shim, then `pnpm exec`. Each later route exists because the one before it can be absent, so a
-// project without the daemon behaves exactly as it did before it was introduced. Both fields are
-// declared rather than optional: `exactOptionalPropertyTypes` makes an absent key and an explicit
-// `undefined` different types, and every caller here computes the value rather than omitting it.
+// The two ways this hook can reach a formatter, fastest first — a warm daemon, then the direct launch
+// (`direct_launch`: the package's CLI under this node, the shim, `pnpm exec` when neither is
+// installed). The direct launch exists because the daemon can be absent, so a project without the
+// daemon behaves exactly as it did before it was introduced. `daemon_cli` is declared rather than
+// optional: `exactOptionalPropertyTypes` makes an absent key and an explicit `undefined` different
+// types, and every caller here computes the value rather than omitting it.
 interface BinRoutes {
 	daemon_cli: string | undefined
-	shim: string | undefined
+	launch: LocalLaunch
 }
 
 // What one spawn answered. The exit code alone cannot say whether a formatter ran, because
@@ -190,11 +191,11 @@ function plan_commands(file_path: string, project_root: string): ReadonlyArray<F
 	return commands
 }
 
-// The daemon when it is installed, the local shim when it is there, `pnpm exec` when neither is. A
-// workspace sub-package keeps its binaries somewhere other than the root's `node_modules/.bin`, and
-// with output ignored a missing shim would otherwise make the hook a permanent silent no-op rather
-// than a slower one. Kept pure and separate from the disk lookups so the choice itself is what the
-// unit tests read.
+// The daemon when it is installed, the direct launch otherwise. A workspace sub-package keeps its
+// binaries somewhere other than the root's `node_modules/.bin`, and with output ignored a missing
+// shim would otherwise make the hook a permanent silent no-op rather than a slower one — which is
+// why the direct launch still ends in `pnpm exec`. Kept pure and separate from the disk lookups so
+// the choice itself is what the unit tests read.
 function select_invocation(command: FormatCommand, routes: BinRoutes): FormatCommand {
 	if (routes.daemon_cli !== undefined) {
 		return {
@@ -203,11 +204,7 @@ function select_invocation(command: FormatCommand, routes: BinRoutes): FormatCom
 		}
 	}
 
-	if (routes.shim !== undefined) {
-		return { bin: routes.shim, command_arguments: command.command_arguments }
-	}
-
-	return { bin: PNPM, command_arguments: ['exec', command.bin, ...command.command_arguments] }
+	return { bin: routes.launch.file, command_arguments: routes.launch.args }
 }
 
 // Only eslint has a daemon here. prettier costs 0.21s against eslint's 1.70s, so a second warm
@@ -251,10 +248,9 @@ function resolve_invocations(
 	command: FormatCommand,
 	project_root: string,
 ): ReadonlyArray<FormatCommand> {
-	const shim = resolve_local_bin(project_root, command.bin)
 	const routes: BinRoutes = {
 		daemon_cli: resolve_daemon_cli(command.bin, project_root),
-		shim: existsSync(shim) ? shim : undefined,
+		launch: direct_launch(project_root, ['exec', command.bin, ...command.command_arguments]),
 	}
 	const without_daemon = select_invocation(command, { ...routes, daemon_cli: undefined })
 
@@ -278,7 +274,8 @@ function is_start_failure(outcome: CommandOutcome): boolean {
 // `ESLINT_D_MISS=fail` refuses the bundled eslint the daemon would otherwise fall back to when the
 // project's own is not resolvable — the hook must format with the project's eslint or not at all,
 // and a refusal here is a start failure, which the caller retries on the slower route.
-// Every route lints without a type program (`eslint/untyped.js`), the daemon this may start included.
+// Every route lints without a type program (`eslint/untyped.js`) and under the daemon's own heap,
+// the daemon this may start included (`eslint_daemon.launch_environment`).
 async function spawn_invocation(
 	invocation: FormatCommand,
 	project_root: string,
@@ -286,7 +283,7 @@ async function spawn_invocation(
 	const result = await execa(invocation.bin, [...invocation.command_arguments], {
 		reject: false,
 		cwd: project_root,
-		env: { ESLINT_D_MISS: 'fail', ...untyped_environment.environment() },
+		env: eslint_daemon.launch_environment(),
 		stdout: 'pipe',
 		stderr: 'ignore',
 		timeout: HOOK_PROCESS_TIMEOUT_MS,
@@ -375,6 +372,15 @@ function linted_path(
 	return relative_to_root(project_root, file_path)
 }
 
+// The lint as the daemon's call record counts it, then the daemon restarted once it has grown
+// heavy (joshuafolkken/kit#7246).
+async function record_lint(project_root: string): Promise<void> {
+	const call = { caller: eslint_daemon_calls.DAEMON_CALLER.EDIT_HOOK, files: 1 }
+
+	eslint_daemon.record_call(project_root, call)
+	await eslint_trim.trim(project_root)
+}
+
 async function format_edited_file(
 	raw_payload: string,
 	runner: CommandRunner,
@@ -390,12 +396,10 @@ async function format_edited_file(
 	]
 	const daemon_before = eslint_daemon.read_record(project_root)
 	const unfixed = await collect_unfixed(plan, runner, project_root)
+	const linted = linted_path(plan, file_path, project_root)
 
-	eslint_daemon.remember_after_edit(
-		project_root,
-		daemon_before,
-		linted_path(plan, file_path, project_root),
-	)
+	eslint_daemon.remember_after_edit(project_root, daemon_before, linted)
+	if (linted !== undefined) await record_lint(project_root)
 
 	return format_diagnostics(unfixed === '' ? undefined : unfixed)
 }

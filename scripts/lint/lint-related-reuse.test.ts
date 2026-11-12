@@ -131,6 +131,7 @@ describe('lint_related.run_related_lint — the timing line it asks for', () => 
 		expect(vi.mocked(lint_parallel.run_lint_checks).mock.calls[0]?.[3]).toStrictEqual({
 			warm_daemon: true,
 			timing: { label: LABEL, targets: '1 file(s)' },
+			call: { caller: 'lint:related', files: 1 },
 		})
 	})
 })

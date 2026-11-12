@@ -20,7 +20,11 @@ const FEATURE_DECLARATIONS = [
 ]
 const BREAKING_DECLARATION = issue_body_keys.line('compatibility', 'breaking')
 const NON_BUG_DECLARATION = issue_body_keys.line('kind', 'non_bug')
-const NON_BUG_LINE = new RegExp(String.raw`^ {0,3}${NON_BUG_DECLARATION}[ \t]*$`, 'mu')
+// The non-bug line as the filer wrote it, in either language (joshuafolkken/kit#7210).
+const NON_BUG_LINE = new RegExp(
+	String.raw`^ {0,3}(?:${issue_body_keys.line_variants('kind', 'non_bug').join('|')})[ \t]*$`,
+	'mu',
+)
 const CLASSIFICATION_LABELS = [BUG_LABEL, ENHANCEMENT_LABEL, BREAKING_CHANGE_LABEL]
 const CONFLICT = 'bug and enhancement declarations cannot be combined'
 const MISSING_BUG_CLASSIFICATION = 'missing bug classification'

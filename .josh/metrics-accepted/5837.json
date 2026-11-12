@@ -1,7 +1,0 @@
-{
-	"reason": "lane:resolve adds the command, its hunk reader, the branch refusal and the identical-hunk rule (#5837)",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 183
-	}
-}

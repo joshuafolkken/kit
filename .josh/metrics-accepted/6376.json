@@ -1,7 +1,0 @@
-{
-	"reason": "Group completed Codex rollouts into lane tasks and retain the latest lane end time for #6376; reuse the existing spend calculation.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 20
-	}
-}

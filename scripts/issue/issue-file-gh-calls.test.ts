@@ -14,9 +14,11 @@ vi.mock('#scripts/gh/git-gh-exec', () => ({
 }))
 
 // The page reads go through `exec_gh_api` here, as in `git-gh-issue-list-relations.test.ts`.
-vi.mock('#scripts/gh/git-gh-etag-read', () => ({
-	git_gh_etag_read: { read: async (path: string) => await git_gh_exec.exec_gh_api({ path }) },
-}))
+vi.mock('#scripts/gh/git-gh-etag-read', async () => {
+	const { git_gh_etag_read_fixture } = await import('#scripts/gh/git-gh-etag-read-fixture')
+
+	return { git_gh_etag_read: git_gh_etag_read_fixture.through_exec }
+})
 
 const mocked_api = vi.mocked(git_gh_exec.exec_gh_api)
 

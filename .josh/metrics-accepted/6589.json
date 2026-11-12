@@ -1,7 +1,0 @@
-{
-	"reason": "#6589 adds the consultation-scope Bash revert hook (bash-revert.ts) with its pre-revert backup; the owner approved up to 130 lines on 2026-11-07 (https://github.com/joshuafolkken/kit/issues/6589#issuecomment-6707640773)",
-	"date": "2026-11-07",
-	"growth": {
-		"scripts.code_lines": 128
-	}
-}

@@ -75,6 +75,14 @@ it by any other path** — Tier C.
 **Looking familiar is no license to skip the work**: a criterion you cannot point at merged code for is
 one this run still owes.
 
+## When a declared close condition holds
+
+The body's `## 背景` declares `- 中止条件:` and the run's finding meets it → before any commit, run
+`pnpm josh issue:premise-unmet <N> --evidence-file .josh/tmp/premise-unmet.md` with the measured
+values and the reason (refusals: `scripts/issue/issue-premise-unmet-cli.ts`).
+
+With no declared line, a judgement that the work is not worth doing still parks.
+
 ## A measurement-only Issue
 
 **Every criterion is a measurement, so no pull request closes it** → `pnpm josh issue:measured <N>

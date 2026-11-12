@@ -1,7 +1,0 @@
-{
-	"reason": "#6331: eslint-heap.ts gives every ESLint child one heap setting, replacing the CI-only NODE_OPTIONS",
-	"date": "2026-11-05",
-	"growth": {
-		"scripts.code_lines": 24
-	}
-}

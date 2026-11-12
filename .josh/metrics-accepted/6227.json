@@ -1,7 +1,0 @@
-{
-	"reason": "Issue #6227 adds the finished-row reason formatter and connects it to the existing title fitting path.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 12
-	}
-}

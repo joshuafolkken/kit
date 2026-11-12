@@ -1,7 +1,7 @@
 # Headless lane child
 
 - Read this entry for a fresh `fullrun #N` lane child; follow a resume prompt before entry reads. Do not read `SKILL.md`, `fullrun.md` or `entry-sequence.md`.
-- Run `pnpm josh run:entry <N>` first. Follow its hold, stage and prep verdicts; `start: reached` stops, `start: gate` enters the verification chain without planning or implementation. Follow `run:cut --resume`'s printed section when resuming.
+- Run `pnpm josh run:entry <N>` first. Follow its hold, stage and prep verdicts; `start: reached` stops, `start: gate` enters the verification chain without planning or implementation; `at: pr-returned` → its `=== returned for a fix ===` lines (`scripts/run/run-pr-return.ts`). Follow `run:cut --resume`'s printed section when resuming.
 - Otherwise run `pnpm josh run:step <N>` and carry out its next action and printed governing section. Read `fullrun-steps.md` only for the named step's detail.
 - Before implementation, present the work summary and tests (`prompts/collaboration-workflow/report-format.md`). Follow prep's investigation dispatch; read only edit targets in the main line.
 - Before the gate, issue `pnpm josh run:cut <N>` alone. Follow its printed section; the verification and shipping chain is printed by `run:step` / `run:chain` (`chain-rule.md` → "A lane child"). `followup.md` → "Run `pnpm josh followup`" is printed by that command; do not fetch it.

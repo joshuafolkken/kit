@@ -44,7 +44,8 @@ const HUMAN_STOPS: ReadonlyArray<HumanStop> = [
 	{
 		key: ALREADY_DONE_LABEL,
 		label: ALREADY_DONE_LABEL,
-		reason: 'The work is already merged and closing an issue is Tier C.',
+		reason:
+			'The work is already merged but the evidence cites no merged PR or commit on main that `issue:already-done` can check, so a person closes it.',
 		idle_heading: `Waiting on a person to close (${ALREADY_DONE_LABEL}):`,
 	},
 	{

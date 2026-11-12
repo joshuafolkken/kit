@@ -31,10 +31,13 @@ function read_existing(repo: string): ReadonlyArray<string> | undefined {
 	return listing?.split('\n').filter((name) => name.length > 0)
 }
 
-function missing_labels(existing: ReadonlyArray<string>): ReadonlyArray<LabelDefinition> {
+function missing_labels(
+	existing: ReadonlyArray<string>,
+	wanted: ReadonlyArray<LabelDefinition>,
+): ReadonlyArray<LabelDefinition> {
 	const names = new Set(existing.map((name) => name.toLowerCase()))
 
-	return REPOSITORY_LABELS.filter((label) => !names.has(label.name.toLowerCase()))
+	return wanted.filter((label) => !names.has(label.name.toLowerCase()))
 }
 
 function create_label(label: LabelDefinition, repo: string): boolean {
@@ -52,9 +55,11 @@ function label_names(labels: ReadonlyArray<LabelDefinition>): ReadonlyArray<stri
 
 // An unreadable listing is not an empty one: nothing is created, and every label is reported as
 // unconfirmed rather than as missing. An unresolved repository (no GitHub remote) is the same case.
-function unreadable(repo: string | undefined = 'this repository'): ReadonlyArray<string> {
-	const names = label_names(REPOSITORY_LABELS)
-	const target = repo
+function unreadable(
+	wanted: ReadonlyArray<LabelDefinition>,
+	target = 'this repository',
+): ReadonlyArray<string> {
+	const names = label_names(wanted)
 
 	console.warn(
 		`  ⚠ could not read the labels of ${target}; make sure these exist: ${names.join(', ')}`,
@@ -76,14 +81,19 @@ function create_missing(
 	return names
 }
 
-// The label names not confirmed present afterwards — empty when the repository has every one.
-function ensure_labels(repo: string | undefined): ReadonlyArray<string> {
-	if (repo === undefined) return unreadable(repo)
+// The label names not confirmed present afterwards — empty when the repository has every one. `extra`
+// adds labels outside kit's set (an Issue's `worker:<name>`) to the same single listing read.
+function ensure_labels(
+	repo: string | undefined,
+	extra: ReadonlyArray<LabelDefinition> = [],
+): ReadonlyArray<string> {
+	const wanted = [...REPOSITORY_LABELS, ...extra]
+	if (repo === undefined) return unreadable(wanted)
 
 	const existing = read_existing(repo)
-	if (existing === undefined) return unreadable(repo)
+	if (existing === undefined) return unreadable(wanted, repo)
 
-	return create_missing(missing_labels(existing), repo)
+	return create_missing(missing_labels(existing, wanted), repo)
 }
 
 // The label names `ensure_labels` would create, read without creating any — every one when the
@@ -93,7 +103,9 @@ function planned_labels(repo: string | undefined): ReadonlyArray<string> | undef
 	if (repo === undefined) return label_names(REPOSITORY_LABELS)
 	const existing = read_existing(repo)
 
-	return existing === undefined ? undefined : label_names(missing_labels(existing))
+	return existing === undefined
+		? undefined
+		: label_names(missing_labels(existing, REPOSITORY_LABELS))
 }
 
 const repository_labels = { ensure_labels, planned_labels }

@@ -1,7 +1,0 @@
-{
-	"reason": "Concrete .josh/tmp/ paths replace bare placeholders in workflow-commands procedures, plus one SKILL.md pointer row (#6114)",
-	"date": "2026-11-03",
-	"growth": {
-		"ai_cost.on_demand_bytes": 380
-	}
-}

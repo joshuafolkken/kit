@@ -1,7 +1,0 @@
-{
-	"reason": "Issue #6475 adds period-wide cause aggregation and exclusive --why parsing while sharing lane:why budgets and existing issue linking; 119 net runtime lines implement the accepted scope.",
-	"date": "2026-11-05",
-	"growth": {
-		"scripts.code_lines": 119
-	}
-}

@@ -1,5 +1,6 @@
 import type { CarryRead } from '#scripts/run/carry/run-carry'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
+import { run_event_tail } from '#scripts/run/event/run-event-tail'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_read } from './run-board-read'
 import { run_board_read_fixture } from './run-board-read-fixture'
@@ -24,7 +25,7 @@ const STOP = {
 
 function arrange_stop(carry: CarryRead, now_ms: number, stop = STOP): void {
 	arrange(carry, carry.kind === 'carried' ? undefined : ENDED)
-	vi.spyOn(run_event_stream, 'read_events').mockReturnValue([stop])
+	vi.spyOn(run_event_tail, 'read_events').mockReturnValue([stop])
 	vi.spyOn(Date, 'now').mockReturnValue(now_ms)
 }
 
