@@ -33,6 +33,7 @@ const CASE_ARM_ENDS: ReadonlySet<string> = new Set([';;', ';;&', ';&'])
 const GROUP_OPENER = '{'
 const FUNCTION_HEAD_END = '()'
 const PATTERN_END = ')'
+const NEWLINE = '\n'
 
 type Cut = Pick<ShellToken, 'begin' | 'end'>
 
@@ -50,17 +51,23 @@ function follows_case_head(tokens: ReadonlyArray<ShellToken>, index: number): bo
 	return tokens.slice(0, index).some((token) => token.text === 'case')
 }
 
+// A pattern may start the line after `in` or `;;`, so the newlines between are passed over.
+function lead_index(tokens: ReadonlyArray<ShellToken>, index: number): number {
+	return tokens.slice(0, index).findLastIndex((token) => token.text !== NEWLINE)
+}
+
 function is_case_pattern(
 	tokens: ReadonlyArray<ShellToken>,
 	index: number,
 	token: ShellToken,
 ): boolean {
-	const previous = tokens[index - 1]
+	const lead_at = lead_index(tokens, index)
+	const previous = tokens[lead_at]
 
 	if (previous === undefined || !token.text.endsWith(PATTERN_END)) return false
 	if (CASE_ARM_ENDS.has(previous.text)) return true
 
-	return previous.text === 'in' && follows_case_head(tokens, index - 1)
+	return previous.text === 'in' && follows_case_head(tokens, lead_at)
 }
 
 function is_cut(

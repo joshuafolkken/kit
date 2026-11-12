@@ -30,4 +30,5 @@ Reaching the same cut would need both a wrapper that maps the tokens back to off
 
 - One operator per control operator, longest first: `;;`, `;;&` and `;&` end a `case` arm as one cut, so an arm no longer leaves an empty segment between two `;`.
 - A compound opener is a cut. A `{` at a command's start or after `name()` opens a group or a function body, so `f() { rm -rf x; }` yields `rm -rf x` as a segment a rule anchored at `^rm` reads. A word ending in `)` right after `case … in`, or after an arm's `;;`, is a pattern, so the arm's command starts a segment too.
+- An arm's pattern may start the line after `in` or `;;`: the newlines between are passed over when looking for them.
 - Not read yet: a pattern spelled with `|` (`a|b)`), `function f {` and a subshell body `f() ( … )`. `implementation-shell.ts` still refuses those as an unread body.

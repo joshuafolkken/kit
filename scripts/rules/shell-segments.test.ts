@@ -45,9 +45,15 @@ describe('segments_of', () => {
 // joshuafolkken/kit#7334: a compound command's opening word is a cut, so the command after it starts a
 // segment a rule anchored at `^` reads.
 describe('compound commands', () => {
+	const case_head = 'case $x in'
+
 	it.each([
-		['case $x in a) rm -rf y;; b) ls;; esac', ['case $x in', 'rm -rf y', '', 'ls', 'esac']],
+		[`${case_head} a) rm -rf y;; b) ls;; esac`, [case_head, 'rm -rf y', '', 'ls', 'esac']],
 		['case "$x" in a) rm -rf y;& *) ls;;& esac', ['case "$x" in', 'rm -rf y', '', 'ls', 'esac']],
+		[
+			`${case_head}\n a) rm -rf y;;\n b) ls;;\nesac`,
+			[case_head, '', 'rm -rf y', '', '', 'ls', '', 'esac'],
+		],
 		['f() { rm -rf y; }', ['f()', 'rm -rf y', '}']],
 		['{ rm -rf y; ls; }', ['', 'rm -rf y', 'ls', '}']],
 	])('cuts %j', (command, expected) => {

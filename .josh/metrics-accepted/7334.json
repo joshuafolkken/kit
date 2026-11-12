@@ -1,7 +1,7 @@
 {
-	"reason": "#7334 adds the shared shell tokenizer (shell-tokens.ts) and the compound-opener cut in shell-segments.ts, which the Issue asks for",
+	"reason": "Shared shell tokenizer plus compound-command cuts in shell-segments (case arms incl. multi-line patterns, { groups, function bodies) #7334",
 	"date": "2026-11-12",
 	"growth": {
-		"scripts.code_lines": 64
+		"scripts.code_lines": 69
 	}
 }
