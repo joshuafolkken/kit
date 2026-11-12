@@ -1,3 +1,4 @@
+import { git_pr_checks_failed } from '#scripts/gh/git-pr-checks-failed'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { lane_ci_path_stats } from './lane-ci-path-stats'
 import type { LedgerEntry } from './lane-ledger'
@@ -28,28 +29,19 @@ const KNOWN: ReadonlyArray<KnownCause> = [
 	},
 	{ key: 'byte budget', log: /byte budget/iu },
 ]
-// `git-pr-checks-eval.ts`'s `PR checks failed (failed checks: <a>, <b>; …).`, ended by the next
-// reason or the closing `).` so a matrix name such as `Unit Tests (3/6)` stays whole.
-const FAILED_CHECKS = /failed checks: (?<names>.+?)(?=; |\)\.$)/gmu
 const NAME_SEPARATOR = ', '
 
 function key_of(check: string): string {
 	return KNOWN.find((known) => known.check?.test(check) === true)?.key ?? check.toLowerCase()
 }
 
-function failed_checks(log: string): Array<string> {
-	return [...log.matchAll(FAILED_CHECKS)]
-		.flatMap((match) => (match.groups?.['names'] ?? '').split(NAME_SEPARATOR))
-		.map((name) => name.trim())
-		.filter((name) => name !== '')
-}
-
 function log_keys(log: string | undefined): Array<string> {
 	if (log === undefined) return []
 
 	const verdicts = KNOWN.filter((known) => known.log?.test(log) === true)
+	const failed = git_pr_checks_failed.names_of(log)
 
-	return [...failed_checks(log).map((check) => key_of(check)), ...verdicts.map(({ key }) => key)]
+	return [...failed.map((check) => key_of(check)), ...verdicts.map(({ key }) => key)]
 }
 
 // `issue`'s cause keys, each once: from its ship `log` (`undefined` when gone) and its ledger rows.
