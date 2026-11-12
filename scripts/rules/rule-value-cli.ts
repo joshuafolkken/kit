@@ -12,6 +12,7 @@ import { rule_value_cache, type FreshReading } from './rule-value-cache'
 import { rule_value_candidates } from './rule-value-candidates'
 import { rule_value_prose } from './rule-value-prose'
 import { rule_value_runs, type RunSummary } from './rule-value-runs'
+import { rule_value_trend } from './rule-value-trend'
 
 // `josh rule:value` — what each delivered rule earns on the channel that carries it, one row per rule.
 // `rule_value.measure` was public but had no caller outside its own test, so
@@ -71,13 +72,17 @@ function gather_summaries(cwd: string): Array<RunSummary> {
 	return summaries
 }
 
-// `--period`: only the transcripts last written at or after `since_ms`, read into a memo of its own —
-// the stored per-run counts hold whole runs, so a window must neither read nor evict them.
-function gather_window(cwd: string, since_ms: number): Array<RunSummary> {
+// The runs of the transcripts last written at or after `since_ms`.
+function window_runs(cwd: string, since_ms: number): Map<string, Array<SessionFile>> {
 	const files = cost_transcript.list_sessions_across(cost_transcript.transcript_directories(cwd))
-	const runs = group_by_run(files.filter((file) => file.modified_ms >= since_ms))
 
-	return rule_value_runs.summaries_of(runs, stamped_memo.create())
+	return group_by_run(files.filter((file) => file.modified_ms >= since_ms))
+}
+
+// `--period`: the window's runs read into a memo of its own — the stored per-run counts hold whole
+// runs, so a window must neither read nor evict them.
+function gather_window(cwd: string, since_ms: number): Array<RunSummary> {
+	return rule_value_runs.summaries_of(window_runs(cwd, since_ms), stamped_memo.create())
 }
 
 function* summarized(runs: Iterable<ReadonlyArray<string>>): Generator<RunSummary> {
@@ -171,19 +176,50 @@ function print_measured(cwd: string): void {
 	print_summaries(gather_summaries(cwd))
 }
 
-// The cache holds the all-time reading, so a period always measures and never stores.
-function print_period(argv: ReadonlyArray<string>, cwd: string): number {
+// The start of the `--period` window, or `undefined` when its value is not a positive number of days.
+function period_since(argv: ReadonlyArray<string>): number | undefined {
 	const period_days = lane_stats_request.positive(argv[argv.indexOf(PERIOD_FLAG) + 1])
 
-	if (period_days === undefined) {
-		process.stderr.write(`${PERIOD_USAGE}\n`)
+	return period_days === undefined
+		? undefined
+		: hook_ledger_read.period_start(period_days, new Date())
+}
 
-		return 1
-	}
+function refuse(usage: string): number {
+	process.stderr.write(`${usage}\n`)
 
-	const since_ms = hook_ledger_read.period_start(period_days, new Date())
+	return 1
+}
+
+// The cache holds the all-time reading, so a period always measures and never stores.
+function print_period(argv: ReadonlyArray<string>, cwd: string): number {
+	const since_ms = period_since(argv)
+
+	if (since_ms === undefined) return refuse(PERIOD_USAGE)
 
 	print_summaries(gather_window(cwd, since_ms))
+
+	return 0
+}
+
+// `--weekly` reads every transcript unless `--period` narrows it.
+function weekly_since(argv: ReadonlyArray<string>): number | undefined {
+	return argv.includes(PERIOD_FLAG) ? period_since(argv) : 0
+}
+
+// Like `--period`, the trend always measures and never touches the cache (`rule-value-trend.ts`).
+function print_weekly(argv: ReadonlyArray<string>, cwd: string): number {
+	const ids = rule_value_trend.requested_ids(argv)
+
+	if (ids === undefined) return refuse(rule_value_trend.WEEKLY_USAGE)
+
+	const since_ms = weekly_since(argv)
+
+	if (since_ms === undefined) return refuse(PERIOD_USAGE)
+
+	const weeks = rule_value_trend.tallies(window_runs(cwd, since_ms))
+
+	process.stdout.write(`${rule_value_trend.render(weeks, ids) ?? NO_TARGETS}\n`)
 
 	return 0
 }
@@ -207,16 +243,25 @@ function print_transcripts(argv: ReadonlyArray<string>, cwd: string): void {
 	} else print_reading(argv, cwd)
 }
 
+function print_windowed(argv: ReadonlyArray<string>, cwd: string): number {
+	if (argv.includes(rule_value_trend.WEEKLY_FLAG)) return print_weekly(argv, cwd)
+	if (argv.includes(PERIOD_FLAG)) return print_period(argv, cwd)
+
+	print_transcripts(argv, cwd)
+
+	return 0
+}
+
 // `--refresh` is the detached measurement the `backlogrun` loop head starts: the table goes to the
 // cache `backlog:offer` prints from, never to stdout (`rule-value-cache.ts`). The candidates are read
 // when a rule is retired, not at the loop head, so they print to stdout only and the cache keeps its
 // shape. Bare, a reading cached inside the refresh interval is printed instead of measuring again —
 // the measurement re-reads every transcript and takes minutes (joshuafolkken/kit#5186); `--fresh`
-// measures regardless. `--period <days>` counts only the transcripts of that trailing window.
+// measures regardless. `--period <days>` counts only the transcripts of that trailing window;
+// `--weekly <rule-id>...` prints those rules week by week, inside that window when one is given.
 function run_rule_value(argv: ReadonlyArray<string> = [], cwd: string = process.cwd()): number {
 	if (argv.includes(PROSE_FLAG)) print_prose(cwd)
-	else if (argv.includes(PERIOD_FLAG)) return print_period(argv, cwd)
-	else print_transcripts(argv, cwd)
+	else return print_windowed(argv, cwd)
 
 	return 0
 }
