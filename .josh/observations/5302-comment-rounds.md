@@ -1,1 +1,0 @@
-- rf:comments | low | scripts/issue/expected-effect-lint.ts:79 | 2026-10-28 | #5302

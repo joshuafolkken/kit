@@ -1,2 +1,0 @@
-- rf:bug-risks | medium | scripts/run/add/run-add-cli.ts:160 | 2026-10-30 | #5451
-- rf:bug-risks | medium | scripts/run/add/run-add-cli.ts:160 | 2026-10-30 | #5451 | fixed

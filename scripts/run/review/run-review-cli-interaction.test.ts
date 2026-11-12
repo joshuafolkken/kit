@@ -294,6 +294,35 @@ describe('run:review that briefs code alone', () => {
 })
 
 // joshuafolkken/kit#4907: the push waits on the gate this pair launched, so it follows a written brief.
+describe('run:review early push with multiple slots', () => {
+	it('launches after both due briefs are written for the same prepared tree', async () => {
+		early_prepare.mockResolvedValue(true)
+
+		expect(await run_review_cli.run([])).toBe(0)
+		expect(early_prepare).toHaveBeenCalledWith({
+			is_code_only: false,
+			slots: [CODE, INTERACTION],
+		})
+		expect(write_text_stamp.mock.calls.map(([target]) => target)).toStrictEqual([
+			CODE_PATH,
+			INTERACTION_PATH,
+		])
+		expect(early_launch).toHaveBeenCalledOnce()
+		expect(early_launch.mock.invocationCallOrder[0]).toBeGreaterThan(
+			write_text_stamp.mock.invocationCallOrder[1] ?? 0,
+		)
+	})
+
+	it('launches nothing when the second due brief refuses', async () => {
+		early_prepare.mockResolvedValue(true)
+		brief_run_to.mockResolvedValueOnce(0).mockResolvedValueOnce(FAILURE_EXIT_CODE)
+
+		expect(await run_review_cli.run([])).toBe(FAILURE_EXIT_CODE)
+		expect(write_text_stamp.mock.calls.map(([target]) => target)).toStrictEqual([CODE_PATH])
+		expect(early_launch).not.toHaveBeenCalled()
+	})
+})
+
 describe('run:review early push', () => {
 	it('launches the early push after a written brief, when the open prepared one', async () => {
 		interaction_reading.mockResolvedValue({ status: 'ok' })

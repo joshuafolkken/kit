@@ -1,12 +1,13 @@
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { describe, expect, it, vi } from 'vitest'
+import type { ClosedIssue } from './run-board-closed'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_github, type Gather } from './run-board-github'
 import type { BoardLanes } from './run-board-lane-state'
 import type { BoardPlan } from './run-board-layout'
 import type { LocalRead } from './run-board-read'
 import type { GithubRateLimit } from './run-board-render-quota-github'
-import { run_board_state, type Pace } from './run-board-state'
+import { run_board_state, type BoardState, type Pace } from './run-board-state'
 import type { ItemStatus } from './run-board-status'
 
 const { LOCAL, START, harness, plan_titled } = run_board_fixture
@@ -78,6 +79,50 @@ function lane_gather(issue: number, started_ms: number, now_ms: number): Gather 
 
 	return { ports: harness(local, [plan_titled('a')]).ports, local, now_ms, pace: 'settled' }
 }
+
+const CACHED_CLOSED: ClosedIssue = {
+	title: 'a',
+	labels: [],
+	closed_ms: START + 1,
+	is_merged: false,
+	is_not_planned: false,
+}
+
+function outcome_cache(closed: ClosedIssue, gather: Gather): BoardState {
+	const { plan } = READ_STATE
+
+	return {
+		...READ_STATE,
+		attempted_ms: gather.now_ms,
+		plan: { ...plan, context: { ...plan.context, open_numbers: new Set() } },
+		closed: new Map([[UNTITLED, closed]]),
+		closed_attempted_ms: START,
+		closed_asked: new Set([UNTITLED]),
+	}
+}
+
+describe('run_board_github — missing outcome cache', () => {
+	it.each([false, true])('retries a missing conclusion, merged %s', async (is_merged) => {
+		const gather = lane_gather(UNTITLED, START, START + PLAN_RETRY_MS)
+		const state = outcome_cache({ ...CACHED_CLOSED, is_merged }, gather)
+		const read = vi.mocked(gather.ports.read_closed)
+
+		await gather_github(state, gather)
+		expect(read).toHaveBeenCalledTimes(is_merged ? 0 : 1)
+	})
+
+	it('keeps a closed outcome without reading it again', async () => {
+		const outcome = {
+			summary: 'No change needed',
+			url: 'https://github.com/o/r/issues/1#issuecomment-1',
+		}
+		const gather = lane_gather(UNTITLED, START, START + PLAN_RETRY_MS)
+		const state = outcome_cache({ ...CACHED_CLOSED, outcome }, gather)
+
+		await gather_github(state, gather)
+		expect(gather.ports.read_closed).not.toHaveBeenCalled()
+	})
+})
 
 describe('run_board_github.gather_github with an untitled lane', () => {
 	it('reads the plan inside the retry interval for a lane started after the last read', async () => {

@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import type { session_cite } from '#scripts/issue/session-cite'
+import { observation_ledger_archive } from '#scripts/observations/observation-ledger-archive'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { FILE_VERDICT, observation_record } from '#scripts/observations/observation-record'
 import { temporary_directory } from '#tools/test/temporary-directory'
@@ -188,6 +189,17 @@ describe('review_comment_round.carry — what it leaves', () => {
 		expect(readFileSync(review_comment_round.carried_path(ISSUE, root), 'utf8')).toBe(
 			`${ROUND.join('\n')}\n`,
 		)
+	})
+
+	// joshuafolkken/kit#7336: an archived rounds file no longer exists, and its issue is carried all the same.
+	it('reads an issue whose rounds file was archived no more', async () => {
+		const root = root_of('archived')
+
+		vi.spyOn(observation_ledger_archive, 'archived_rounds').mockReturnValueOnce(new Set([ISSUE]))
+
+		expect(await review_comment_round.carry(root)).toBe(0)
+		expect(comments_mock).not.toHaveBeenCalled()
+		expect(existsSync(review_comment_round.carried_path(ISSUE, root))).toBe(false)
 	})
 
 	it('writes no file where the comments could not be read, so the next run reads them again', async () => {

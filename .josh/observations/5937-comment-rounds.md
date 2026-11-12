@@ -1,3 +1,0 @@
-- rf:tests | low | scripts/josh/josh-read-only.test.ts:32 | 2026-11-02 | #5937
-- rf:assumptions | low | scripts/josh/josh-command-types.ts:84 | 2026-11-02 | #5937
-- rf:none | none | - | 2026-11-02 | #5937

@@ -61,6 +61,7 @@ checked out here. A third-party owner is Tier C: stop rather than file.
   Without `josh`: `issue-template.md` → "複数 Issue に分割するときの epic Issue".
 
 `pnpm josh issue:file` lints the body and applies the classification labels it declares (`issue-template.md`; `docs/josh-commands-backlog.md` → `josh issue:file`).
+`issue:file` printed `worker profiles (josh.worker …)` → add `--label worker:<name>`, the weakest whose `when` fits (`docs/josh-commands-backlog.md` → `josh issue:file`).
 An Issue a consumer can use only once it is published is filed with `--release` (`kickoff new`), or linked with `pnpm josh issue:release <N>` (`kickoff #N`) — either makes it a blocker of the repository's `release` Issue, which never gets `auto-ok` on its own.
 
 ## Words typed after `new`
@@ -68,6 +69,11 @@ An Issue a consumer can use only once it is published is filed with `--release` 
 **`auto-ok` is judged by `pnpm josh issue:file`, never typed** — the excluded labels and the body's
 `- 人の判断:` declaration; a `不要` declaration also needs a run label (`issue-template.md`).
 `auto ok` typed after `new` adds nothing.
+
+**Planning ends this invocation only; it does not prohibit a separate run.** Never infer
+`--no-auto-ok` from `kickoff` or a request to plan only. Before opting out an otherwise eligible
+filing, verify and record the original user's prohibition, its reference and verbatim instruction
+under `## 自動実行の制約` (`docs/how-to/auto-ok-provenance.md`).
 
 **Words after `new`** (`kickoff new high`) are read like `into <target>`, never inferred. Each adds its
 labels to the filing; a word not in the table is asked about:

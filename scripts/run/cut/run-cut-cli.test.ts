@@ -45,7 +45,7 @@ describe('cutting a lane child before the gate', () => {
 		expect(verdict()).toBe(run_cut_cli.CUT_VERDICT)
 		// joshuafolkken/kit#2022: the relaunch prompt is the resume-specific instruction, not the record's
 		// bare `fullrun #<N>`, so the fresh process skips the workflow-commands entry documents.
-		const built = worker_argv(lane_dispatch.resume_invocation(ISSUE))
+		const built = await worker_argv(lane_dispatch.resume_invocation(ISSUE))
 
 		expect(launch.mock.calls[0]?.[0]).toMatchObject({
 			argv: built.argv,
@@ -153,7 +153,7 @@ describe('the resume prompt the relaunch carries', () => {
 	it('relaunches with the resume prompt, not the bare fullrun invocation', async () => {
 		await run_cut_cli.run([ISSUE])
 
-		const bare = worker_argv(INVOCATION)
+		const bare = await worker_argv(INVOCATION)
 
 		expect(launch.mock.calls[0]?.[0].argv).not.toStrictEqual(bare.argv)
 	})

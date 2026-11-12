@@ -1,2 +1,0 @@
-- rf:none | none | - | 2026-11-11 | #7305
-- k:followup-unrelated-test-rerun | d1 | 2026-11-11 | scripts/josh/josh-command-reference.test.ts | followup reran Unit Tests (6/6); failed outside the change: pure scripts/josh/josh-command-reference.test.ts > command reference — the synopsis matches the script it describes > never advertises a flag the script does not mention

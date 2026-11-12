@@ -1,5 +1,7 @@
 import path from 'node:path'
+import { issue_body_keys } from '#scripts/issue/issue-body-keys'
 import { line_budget, type FileBudget } from '#scripts/lines/line-budget'
+import type { DeclaredSize } from '#scripts/split/split-assess'
 import { test_declared_logic, type Verdict } from '#scripts/test/test-declared-logic'
 
 // The formatting half of `josh plan:scaffold`: each section is an existing command's answer, computed
@@ -25,6 +27,7 @@ interface ScaffoldParts {
 	declared: string
 	cases: ReadonlyArray<string>
 	consumers: string | undefined
+	estimate?: DeclaredSize | undefined
 }
 
 // A body target that names a file is a planned file; any other name is an identifier whose consumers
@@ -94,9 +97,17 @@ function file_sections(parts: ScaffoldParts): ReadonlyArray<string> {
 	]
 }
 
+function estimate_lines(size: DeclaredSize | undefined): Array<string> {
+	if (size === undefined) return []
+	const counts = issue_body_keys.size_value(String(size.files), String(size.lines))
+
+	return [`${issue_body_keys.prefix('size')} ${counts}`]
+}
+
 function format(parts: ScaffoldParts): string {
 	return [
 		parts.summary,
+		...estimate_lines(parts.estimate),
 		...file_sections(parts),
 		section(
 			'plan:consumers',

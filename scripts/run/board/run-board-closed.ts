@@ -4,6 +4,7 @@ import { issue_label_schema } from '#scripts/git/git-schemas'
 import { parse_json_object_or_undefined } from '#scripts/git/parse-json-array'
 import { ALREADY_DONE_LABEL, has_label_name } from '#scripts/issue/issue-labels'
 import { issue_merged } from '#scripts/issue/issue-merged'
+import { issue_outcome, type IssueOutcome } from '#scripts/issue/issue-outcome'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { z } from 'zod'
 import { run_board_closed_graphql, type ClosedSource } from './run-board-closed-graphql'
@@ -15,6 +16,7 @@ import { run_board_closed_graphql, type ClosedSource } from './run-board-closed-
 // keeps the answer for the run and asks GitHub only about children it has not read yet.
 
 interface ClosedIssue {
+	outcome?: IssueOutcome | undefined
 	title: string
 	// Its label names, so a closed row still draws its release category (joshuafolkken/kit#3577).
 	labels: ReadonlyArray<string>
@@ -115,7 +117,14 @@ async function read_closed(issue: number, source?: ClosedSource): Promise<Closed
 
 	const is_not_planned = view.stateReason === NOT_PLANNED_REASON
 
-	return { title: view.title, labels, closed_ms: closed_ms_of(view), is_merged, is_not_planned }
+	return {
+		title: view.title,
+		labels,
+		closed_ms: closed_ms_of(view),
+		is_merged,
+		is_not_planned,
+		...(await issue_outcome.recorded(issue, is_merged)),
+	}
 }
 
 async function read_all(

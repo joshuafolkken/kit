@@ -147,7 +147,8 @@ refuses launch with that update named — never a quiet switch to an older model
 profile it recorded at dispatch: a cut, resume or wake of a lane created before a migration stays on
 its recorded model (a model the floor table does not name is not version-checked), and only a newly
 dispatched lane takes the new default. The one exception is a pre-gate cut of a Claude lane: it moves
-to the ship phase's default, `claude-sonnet-5-5`, or to `JOSH_WORKER_SHIP_MODEL` when that is set.
+to the ship phase's default, `claude-sonnet-5-5`, or to `JOSH_WORKER_SHIP_MODEL` when that is set, lowered to the Issue's
+`josh.worker` profile when that is weaker.
 `JOSH_{ROLE}_MODEL` overrides reach new Claude Code launches
 only; they never rewrite a recorded lane. Legacy
 `JOSH_LANE_MODEL/EFFORT` is worker-only; migrate to `JOSH_WORKER_MODEL/EFFORT`.
@@ -207,7 +208,7 @@ pnpm josh lane:sample   # one machine-load reading
 
 <!-- usage: lane:stats -->
 
-Print period lane throughput, stage, stop, check and machine-load statistics; --sinks shows stage totals, --over lane chains, --why cause groups above a net-minute threshold, and --pairs scoped pair runs.
+Print period lane throughput, stage, stop (by failed CI check, longest first), check and machine-load statistics; --sinks shows stage totals, --over lane chains, --why cause groups above a net-minute threshold, and --pairs scoped pair runs.
 
 ```bash
 pnpm josh lane:stats --period 7                           # a 7-day period's stage medians and maxima
@@ -267,6 +268,9 @@ including zero-stop and transcript-missing lanes; no dispatched lanes means `not
 Between them, the followup critical path table (`lane-ci-path-stats.ts`) counts, per check that settled last in `followup`'s CI wait,
 its runs and the median and maximum seconds into the wait it settled at. A check is timed only once seen pending, and CodeRabbit is
 left to the `coderabbit-wait` row (`followup-ci-path.ts`).
+
+Under the stop table, the failed-check table (`lane-stop-check-stats.ts`) counts followup `check` stops per failed CI check
+(stops, wait total and maximum, not resumed), and the longest-stop table lists the ten longest stops with issue, `stopped at` and causes.
 
 Under the gate check table, the claim-versus-measured table (`lane-claim-stats.ts`) prints, per check, the median cores it
 claimed, the cores it used (`cpu_ms ÷ elapsed_ms`: median, p90, maximum) and the seconds its claims waited — reused runs and
@@ -351,6 +355,18 @@ pnpm josh lane:breakdown 4970 --timeline   # when each stage ran and where the l
 
 The stages — start to plan, implement, each ship stage, between ship stages — add up to `lane:net`'s minutes; the waits it takes out are one line apart. The implementation splits by its tool calls' kind, what no call spent being editing & thinking. A lane the ledger holds no dispatch and merge of exits non-zero (`lane-breakdown.ts`).
 
+Both forms print End-to-end from first dispatch to last merge, including verification, fixes, retries, CI, yield and human wait. The 30-minute decision includes human wait, also reported separately. Legacy `net` has broader exclusions. Internal budgets stay 25 minutes (plan 3, implement 9, ship 8, followup 5), with 5 minutes of headroom; gates stay unchanged.
+
+Exclusive wall-clock categories sum to End-to-end:
+
+- Human wait: park through the next stage or redispatch.
+- Automatic wait: timed tool responses except edits, gate/pre-detach/followup, CI, yield, outage and sleep; human wait takes precedence.
+- Off-tool work: the remainder with transcripts, including unrecorded activity; without transcripts, unclassified.
+
+Tool cumulative time is separate: parallel calls overlap and must not be added to wall clock.
+
+Historical ship boundaries use completed ledger/archive intervals and surviving unfinished-stage events. The board stream has bounded retention. For parallel stages, latest start owns each instant; earlier stages resume when it ends. Without either record, a missing stage cannot be reconstructed.
+
 `--timeline` prints the lane one line an event, oldest first: start (UTC), minutes since the dispatch, duration, name (`lane-timeline.ts`). Its stage lines are the same spans at their net minutes and add up to the net time.
 
 - `[excluded]` — a wait taken out, named by what opened it (park, outage, usage limit, split, yield, sleep).
@@ -419,6 +435,12 @@ pnpm josh lane:plan 4864 scripts/lane/lane-plan.ts scripts/backlog/backlog-next.
 <!-- /usage -->
 
 A lane child runs it once its work summary settles, before the first edit, naming every file the summary changes. It checks once; until it prints `clear`, `scripts/hooks/lane-plan-guard.ts` refuses its runtime-file edits.
+
+`--estimate scope.json` accepts `{"changes":[{"path":"scripts/a.ts","changed_lines":30}],"added":[]}`. Include callers, docs and verification; count additions plus deletions. `added` names new modules.
+
+`plan:scaffold` prints the same input's size. `lane:plan` saves it for the split bar without lowering the body declaration.
+
+Tests and run records are excluded; docs, snapshots, fixtures and listings count. Generated pairs form one unit; both files' lines count. `--single` keeps an indivisible contract together.
 
 A lane whose plan was cleared, or else recorded first, holds the files, so two lanes never yield to each other; `backlog:next` reads the same record, so a candidate waits on a running lane's plan, read in place of its body. A file under `docs/` never clashes: the lane's sync with main resolves a shared document.
 

@@ -1,0 +1,52 @@
+{
+	"josh": {
+		"lane": {
+			"setup": "cp -R \"$JOSH_MAIN_CHECKOUT/target\" target"
+		},
+		"gate": {
+			"steps": [
+				{
+					"name": "core",
+					"command": "cargo clippy -p core && cargo test -p core",
+					"paths": ["crates/core"]
+				}
+			]
+		},
+		"worker": {
+			"default": "opus-medium",
+			"escalate": true,
+			"profiles": [
+				{
+					"name": "haiku",
+					"model": "claude-haiku-5-5",
+					"effort": "low",
+					"when": "Mechanical work with a command that checks it"
+				},
+				{
+					"name": "sonnet-low",
+					"model": "claude-sonnet-5-5",
+					"effort": "low",
+					"when": "Docs, merges, renames, small fixes"
+				},
+				{
+					"name": "sonnet-medium",
+					"model": "claude-sonnet-5-5",
+					"effort": "medium",
+					"when": "A clear brief in a known pattern"
+				},
+				{
+					"name": "opus-medium",
+					"model": "claude-opus-5-5",
+					"effort": "medium",
+					"when": "Most game work: unfamiliar systems, or an unknown cause"
+				},
+				{
+					"name": "opus-high",
+					"model": "claude-opus-5-5",
+					"effort": "high",
+					"when": "Rebuilding a core system many things stand on"
+				}
+			]
+		}
+	}
+}

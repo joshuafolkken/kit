@@ -1,4 +1,0 @@
-- rf:bug-risks | low | scripts/josh/command-usage.ts:63 | 2026-10-16 | #3932
-- rf:bug-risks | low | scripts/josh/josh.ts:47 | 2026-10-16 | #3932
-- rf:project-conventions | low | docs/cli.md:25 | 2026-10-16 | #3932
-- rf:comments | low | scripts/josh/josh.test.ts:84 | 2026-10-16 | #3932

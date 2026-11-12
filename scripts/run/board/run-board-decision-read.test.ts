@@ -2,12 +2,14 @@ import type { EpicChild } from '#scripts/epic/epic-graph'
 import { git_gh_etag_read } from '#scripts/gh/git-gh-etag-read'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { TRANSPORT_ENV_VAR } from '#scripts/gh/git-gh-transport'
-import { NEEDS_DECISION_LABEL, RUN_LANE_LABEL } from '#scripts/issue/issue-labels'
+import { NEEDS_DECISION_LABEL, PARKED_LABELS, RUN_LANE_LABEL } from '#scripts/issue/issue-labels'
+import { issue_outcome } from '#scripts/issue/issue-outcome'
 import { issue_read } from '#scripts/issue/issue-read'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_board_decision } from './run-board-decision'
 import { run_board_decision_read } from './run-board-decision-read'
 import { run_board_layout, type BoardPlan } from './run-board-layout'
+import { run_board_pause } from './run-board-pause'
 import { run_board_reason } from './run-board-reason'
 
 const REPO = 'joshuafolkken/kit'
@@ -19,6 +21,7 @@ const QUESTION = 'Which account should run the probe?'
 const DETAIL = '外部アカウント'
 const TAIL = `→ decide #${String(PERSON)}: ${TITLE} (${DETAIL})`
 const MISSING_PLAN = 'Missing plan'
+const PAUSE_SUMMARY = 'Approval needed'
 
 function child(number: number, blockers: ReadonlyArray<number> = []): EpicChild {
 	return {
@@ -109,6 +112,42 @@ function park_body(heading: string, pick: string): string {
 	return `${heading}${PARK_OPTIONS}\n\n### 推奨\n${pick}\n`
 }
 
+describe('run_board_decision_read pause evidence', () => {
+	it.each([...PARKED_LABELS])('propagates a stop reason and URL for %s', async (label) => {
+		const body = issue_outcome.body_of({
+			body: park_body('', PICK_ONE),
+			summary: PAUSE_SUMMARY,
+		})
+		const url = `https://github.com/${REPO}/issues/${String(PERSON)}#issuecomment-1`
+
+		vi.spyOn(issue_read, 'parse_comments').mockResolvedValue([
+			{
+				author: 'owner',
+				body,
+				html_url: url,
+				created_at: '2026-11-12T09:00:00Z',
+				is_trusted: true,
+			},
+		])
+		const asking = { ...child(PERSON), labels: [label] }
+		const plan = await run_board_decision_read.with_decisions(plan_of([asking]))
+
+		expect(plan?.pause_reasons?.get(PERSON)).toMatchObject({ summary: PAUSE_SUMMARY, url })
+	})
+
+	it('returns a plain fallback when the comment request fails', async () => {
+		vi.mocked(git_gh_issue_read.issue_list_comments).mockRejectedValue(new Error('offline'))
+		const asking = { ...child(PERSON), labels: [NEEDS_DECISION_LABEL] }
+		const plan = await run_board_decision_read.with_decisions(plan_of([asking]))
+
+		expect(plan?.pause_reasons?.get(PERSON)).toEqual({
+			summary: run_board_pause.FALLBACK,
+			url: `https://github.com/${REPO}/issues/${String(PERSON)}`,
+			at_ms: 0,
+		})
+	})
+})
+
 describe('run_board_decision park summary (ac-0be6b188)', () => {
 	it.each([
 		[park_body(`## ${QUESTION}\n\n`, '2 the key leaked'), `${QUESTION} — 推奨: 2（層 C）`],
@@ -188,7 +227,10 @@ describe('run_board_decision_read question comments', () => {
 		const layout = run_board_layout.layout_of(plan, new Map())
 
 		expect(plan.decision_questions?.get(PERSON)).toBe(QUESTION)
-		expect(layout.people[0]?.reason?.tail).toBe(`→ decide: ${QUESTION}`)
+		expect(layout.people[0]?.reason).toMatchObject({
+			tail: run_board_pause.FALLBACK,
+			evidence_url: `https://github.com/${REPO}/issues/${String(PERSON)}`,
+		})
 	})
 })
 

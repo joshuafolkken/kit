@@ -1,1 +1,0 @@
-- rf:tests | low | scripts/hooks/format-edited-file.untyped.test.ts:48 | 2026-11-11 | #7247

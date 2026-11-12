@@ -135,8 +135,13 @@ const PROJECT_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/sync/sync-main.ts',
 		description: 'Sync config files',
 		category: 'Project',
-		reference: ['', 'developer', ['files']],
-		usage: { examples: [{ arguments: '', note: 'overwrite managed files' }] },
+		reference: ['[--force]', 'developer', ['files']],
+		usage: {
+			examples: [
+				{ arguments: '', note: 'overwrite managed files' },
+				{ arguments: '--force', note: 'also replace a file you added to, dropping your additions' },
+			],
+		},
 	},
 	uninstall: {
 		script: 'scripts/uninstall/uninstall.ts',

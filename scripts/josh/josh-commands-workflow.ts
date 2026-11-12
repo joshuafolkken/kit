@@ -40,6 +40,11 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 					names: [SKIP_COMMIT, SKIP_PUSH],
 					description: 'recover/open a PR without a new commit or push.',
 				},
+				{
+					names: ['--body-file <path>'],
+					description:
+						'extra PR body text after `closes #N`, from a file (`-` = stdin); use it when the text holds a backtick or `$`.',
+				},
 			],
 		},
 	},

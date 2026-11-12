@@ -1,2 +1,0 @@
-- rf:project-conventions | low | package.json:42 | 2026-11-07 | #6588
-- rf:bug-risks | low | scripts/hooks/codex-hook-adapter.ts:148 | 2026-11-07 | #6588

@@ -1,1 +1,0 @@
-- rf:bug-risks | medium | scripts/backlog/backlog-drive.ts:347 | 2026-11-09 | #6871

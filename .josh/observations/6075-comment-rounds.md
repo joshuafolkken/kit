@@ -1,2 +1,0 @@
-- rf:performance | low | scripts/gh/git-pr-checks-poll.test.ts:59 | 2026-11-03 | #6075 | fixed
-- rf:performance | low | scripts/gh/git-pr-checks-poll.test.ts:59 | 2026-11-03 | #6075

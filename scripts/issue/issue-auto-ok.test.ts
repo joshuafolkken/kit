@@ -1,3 +1,4 @@
+import { KICKOFF_PLAN, USER_PROHIBITION } from '#scripts/auto-ok/auto-ok-kickoff-fixture'
 import { describe, expect, it } from 'vitest'
 import { issue_auto_ok, type AutoOkFiling } from './issue-auto-ok'
 
@@ -12,6 +13,8 @@ const BOTH_BODY = '## 背景\n\n- 人の判断: 不要\n- 人の判断: 要\n'
 const FENCED_BODY = '## 背景\n\n```md\n- 人の判断: 不要\n```\n'
 const OUTSIDE_BACKGROUND_BODY = '## 背景\n\n- 種別: 非不具合\n\n## 期待結果\n\n- 人の判断: 不要\n'
 const DECISION_RULE = '- 判定規則: A で足りるなら A、そうでなければ B（#6403）'
+const SOURCE_USER = '- 出所: user'
+const EXCLUDED_LABELS = ['release', 'breaking-change', 'deferred', 'needs-human-review', 'epic']
 
 function filing_of(overrides: Partial<AutoOkFiling>): AutoOkFiling {
 	return {
@@ -24,6 +27,11 @@ function filing_of(overrides: Partial<AutoOkFiling>): AutoOkFiling {
 }
 
 describe('issue_auto_ok.decide — applied', () => {
+	it('does not treat an automated kickoff plan as a user prohibition', () => {
+		expect(
+			issue_auto_ok.decide(filing_of({ body: `${NOT_NEEDED_BODY}\n${KICKOFF_PLAN}` })).is_applied,
+		).toBe(true)
+	})
 	it('applies auto-ok when no exclusion holds and the body declares no judgement is needed', () => {
 		const decision = issue_auto_ok.decide(filing_of({}))
 
@@ -31,6 +39,43 @@ describe('issue_auto_ok.decide — applied', () => {
 		expect(issue_auto_ok.line_of(decision)).toBe(
 			'auto-ok: applied — no exclusion holds and the body declares no judgement is needed',
 		)
+	})
+})
+
+describe('issue_auto_ok.opt_out_problem', () => {
+	it('refuses an otherwise eligible opt-out without original user evidence', () => {
+		expect(issue_auto_ok.opt_out_problem(filing_of({ is_opted_out: true }))).toContain(
+			'verbatim prohibition',
+		)
+	})
+
+	it.each([
+		USER_PROHIBITION.replace(SOURCE_USER, '- 出所: agent'),
+		USER_PROHIBITION.replace(SOURCE_USER, '- 出所: judgement'),
+		USER_PROHIBITION.replace('- 参照: session:original-user-prompt', '- 参照: '),
+		USER_PROHIBITION.replace('- 指示: この Issue は自動実行しないでください。', '- 指示: '),
+		`\n## 自動実行の制約\n\`\`\`md\n${USER_PROHIBITION}\`\`\``,
+	])('refuses unsupported evidence: %s', (evidence) => {
+		expect(
+			issue_auto_ok.opt_out_problem(
+				filing_of({ body: `${NOT_NEEDED_BODY}${evidence}`, is_opted_out: true }),
+			),
+		).toBeDefined()
+	})
+
+	it.each(EXCLUDED_LABELS)(
+		'preserves the existing %s exclusion without extra user evidence',
+		(label) => {
+			expect(
+				issue_auto_ok.opt_out_problem(filing_of({ labels: [label], is_opted_out: true })),
+			).toBeUndefined()
+		},
+	)
+
+	it('preserves a genuine human-judgement exclusion without extra evidence', () => {
+		expect(
+			issue_auto_ok.opt_out_problem(filing_of({ body: NEEDED_BODY, is_opted_out: true })),
+		).toBeUndefined()
 	})
 })
 
@@ -60,19 +105,15 @@ describe('issue_auto_ok.decide — withheld by the filing', () => {
 })
 
 describe('issue_auto_ok.decide — an excluded label', () => {
-	it.each([
-		'release',
-		'breaking-change',
-		'deferred',
-		'needs-human-review',
-		'epic',
-		'Needs-Human-Review',
-	])('does not apply auto-ok to a filing labelled %s, and names the label', (label) => {
-		const decision = issue_auto_ok.decide(filing_of({ labels: ['bug', label] }))
+	it.each([...EXCLUDED_LABELS, 'Needs-Human-Review'])(
+		'does not apply auto-ok to a filing labelled %s, and names the label',
+		(label) => {
+			const decision = issue_auto_ok.decide(filing_of({ labels: ['bug', label] }))
 
-		expect(decision.is_applied).toBe(false)
-		expect(decision.reason).toContain(`a \`${label.toLowerCase()}\` Issue`)
-	})
+			expect(decision.is_applied).toBe(false)
+			expect(decision.reason).toContain(`a \`${label.toLowerCase()}\` Issue`)
+		},
+	)
 })
 
 describe('issue_auto_ok.exclusion_of', () => {

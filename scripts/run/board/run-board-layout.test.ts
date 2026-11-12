@@ -217,6 +217,7 @@ describe('run_board_layout.layout_of waiting reasons', () => {
 // joshuafolkken/kit#4045: a parked or withdrawn row says why it ended where ⏳ says why it waits.
 describe('run_board_layout.layout_of ending reasons', () => {
 	const CAP = 'ship-stop cap'
+	const WITHDRAWN = 'Run withdrawn'
 	const statuses = new Map<number, ItemStatus>([
 		[1, { state: 'parked', started_ms: 100, reason: CAP }],
 		[2, { state: 'withdrawn', started_ms: 200, ended_ms: 300, reason: 'superseded' }],
@@ -231,8 +232,8 @@ describe('run_board_layout.layout_of ending reasons', () => {
 		expect(reasons).toStrictEqual([
 			[1, { tail: CAP }],
 			[4, undefined],
-			[3, { tail: 'nothing to do · withdrawn: run withdrawn' }],
-			[2, { tail: 'nothing to do · withdrawn: superseded' }],
+			[3, { tail: WITHDRAWN }],
+			[2, { tail: WITHDRAWN }],
 		])
 	})
 

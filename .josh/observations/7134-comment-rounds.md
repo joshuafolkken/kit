@@ -1,1 +1,0 @@
-- rf:performance | low | scripts/rules/rule-value-runs.ts:159 | 2026-11-10 | #7134

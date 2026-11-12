@@ -9,9 +9,10 @@ import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { time_reported_failure } from '#scripts/time-runtime/time-reported-failure'
 import { z } from 'zod'
 import { bash_triggers } from './bash-triggers'
+import { codex_prompt } from './codex-prompt'
+import { issue_citation } from './issue-citation'
 import { last_prompt } from './last-prompt'
 import { shell_segments } from './shell-segments'
-import { turn_filings } from './turn-filings'
 
 // The `unasked-filing` row of `delivered-rules.ts` (joshuafolkken/kit#7293). An interactive session
 // files only on the person's instruction; an unattended run files without asking
@@ -61,20 +62,27 @@ const UNASKED_FILING_REASON =
 	'(`.claude/skills/workflow-commands/observation-filing.md`).'
 
 function is_instructed(prompt: string): boolean {
-	const trimmed = prompt.trim()
+	const trimmed = issue_citation
+		.prose_lines(prompt)
+		.join('\n')
+		.replaceAll(/(?<!`)(`+)(?!`)[\s\S]*?(?<!`)\1(?!`)/gu, '')
+		.replaceAll(/「[^「」\n]*」|『[^『』\n]*』|"[^"\n]*"|'[^'\n]*'/gu, '')
+		.trim()
 
 	return FILING_WORDS.some((pattern) => pattern.test(trimmed))
 }
 
 function reply_text(line: string): string {
-	const parsed = ASSISTANT_LINE_SCHEMA.safeParse(json_value.parse_or_undefined(line))
+	const parsed = ASSISTANT_LINE_SCHEMA.safeParse(
+		json_value.parse_or_undefined(codex_prompt.normalize(line)),
+	)
 
 	return parsed.success ? time_reported_failure.result_text(parsed.data.message.content) : ''
 }
 
 // A prompt line the person wrote — not a skill body or a hand-back the harness wrote on a prompt line.
 function is_person_line(line: string): boolean {
-	return turn_filings.is_prompt_line(line) && last_prompt.person_prompt(line) !== undefined
+	return last_prompt.person_prompt(line) !== undefined
 }
 
 // The model's last words before the person's last prompt — where the proposal a yes confirms sits.

@@ -2,10 +2,11 @@ import { git_gh_issue_list, MAX_SCANNED } from '#scripts/gh/git-gh-issue-list'
 import type { ImplementRate } from '#scripts/lane/lane-implement-rate'
 import { lane_net_read } from '#scripts/lane/lane-net-read'
 import type { SizeRatios } from '#scripts/lane/lane-size-stats'
-import { issue_auto_ok } from './issue-auto-ok'
+import { issue_auto_ok, type AutoOkFiling } from './issue-auto-ok'
 import { issue_cap_files } from './issue-cap-files'
 import { issue_file, type FileArguments } from './issue-file'
 import { issue_file_lane_hint } from './issue-file-lane-hint'
+import { issue_file_worker } from './issue-file-worker'
 import { issue_lint_cli } from './issue-lint-cli'
 import { issue_priority } from './issue-priority'
 import { issue_sample_required } from './issue-sample-required'
@@ -32,6 +33,15 @@ interface Filing {
 	scouted?: ScoutOutcome | undefined
 }
 
+function auto_ok_filing(filing: Filing): AutoOkFiling {
+	return {
+		is_opted_out: filing.args.is_auto_ok_opted_out,
+		is_cross_repository: !issue_file.is_same_repository(filing.target, filing.current),
+		labels: issue_file.labels_of(filing.args, filing.body),
+		body: filing.body,
+	}
+}
+
 // Every refusal the body and the arguments carry, read locally — `[]` when the body is admitted.
 function refusals_of(
 	filing: Filing,
@@ -43,6 +53,7 @@ function refusals_of(
 		size_estimate.guide_problem(filing.body, filing.args.route, rate, growth),
 		issue_sample_required.problem(filing.body),
 		issue_auto_ok.declaration_problem(filing.body),
+		issue_auto_ok.opt_out_problem(auto_ok_filing(filing)),
 		issue_priority.problem(filing.body, filing.args.labels),
 		issue_file.origin_problem(filing.body, filing.target, filing.current),
 	]
@@ -157,12 +168,7 @@ async function is_scout_clear(filing: Filing): Promise<boolean> {
 // The decision reads the labels the body's declarations add, so a declared breaking change is excluded
 // like its label.
 function labels_of(filing: Filing): ReadonlyArray<string> | undefined {
-	const auto_ok = issue_auto_ok.decide({
-		is_opted_out: filing.args.is_auto_ok_opted_out,
-		is_cross_repository: !issue_file.is_same_repository(filing.target, filing.current),
-		labels: issue_file.labels_of(filing.args, filing.body),
-		body: filing.body,
-	})
+	const auto_ok = issue_auto_ok.decide(auto_ok_filing(filing))
 
 	console.info(issue_auto_ok.line_of(auto_ok))
 	const labels = issue_file.labels_of(filing.args, filing.body, auto_ok.is_applied)
@@ -224,6 +230,7 @@ async function labels_in_one_pass(filing: Filing): Promise<ReadonlyArray<string>
 	const verdicts = [
 		is_body_clear,
 		labels !== undefined,
+		issue_file_worker.is_worker_clear(filing, labels ?? filing.args.labels),
 		await is_source_clear(filing),
 		await is_wip_clear(filing),
 		await is_scout_clear(filing),

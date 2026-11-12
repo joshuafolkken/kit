@@ -185,10 +185,14 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 	},
 	'run:park': {
 		script: 'scripts/run/park/run-park-cli.ts',
-		description: 'Park a lane child for a decision, or clear the park',
+		description: 'Park a lane child for a decision or an escalation, or clear the park',
 		category: 'AI tools',
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
-		reference: ['<issue> --body-file <path> | <issue> --clear', 'automation', ['files', 'network']],
+		reference: [
+			'<issue> --body-file <path> | <issue> --clear | <issue> --escalate <reason>',
+			'automation',
+			['files', 'network'],
+		],
 		usage: {
 			examples: [
 				{
@@ -196,6 +200,10 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 					note: 'options, tiers and a recommendation; then needs-decision, the record, run:release',
 				},
 				{ arguments: '1839 --clear', note: 'remove needs-decision and the record' },
+				{
+					arguments: '1839 --escalate "needs a stronger model"',
+					note: 'josh.worker.escalate only: run:stalled with the reason, resumed one profile up',
+				},
 			],
 		},
 	},

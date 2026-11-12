@@ -1,2 +1,0 @@
-- rf:tests | low | .claude/agents/reviewer.md:29 | 2026-11-10 | #7045 | fixed
-- rf:tests | low | .claude/agents/reviewer.md:29 | 2026-11-10 | #7045

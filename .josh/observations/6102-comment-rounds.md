@@ -1,4 +1,0 @@
-- rf:comments | low | .claude/skills/workflow-commands/latest-gate.md:20 | 2026-11-03 | #6102
-- rf:comments | low | .claude/skills/workflow-commands/chain-rule.md:20 | 2026-11-03 | #6102
-- rf:comments | low | .claude/skills/workflow-commands/latest-gate.md:20 | 2026-11-03 | #6102
-- rf:tests | low | scripts/document/lane-child-read-set.test.ts:84 | 2026-11-03 | #6102

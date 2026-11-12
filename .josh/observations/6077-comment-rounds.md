@@ -1,3 +1,0 @@
-- rf:bug-risks | low | scripts/review/prose-stale-read.ts:42 | 2026-11-03 | #6077 | false-positive
-- rf:bug-risks | low | scripts/review/prose-stale-read.ts:48 | 2026-11-03 | #6077 | false-positive
-- rf:none | none | - | 2026-11-03 | #6077

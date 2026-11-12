@@ -1,2 +1,0 @@
-- rf:bug-risks | low | scripts/josh/josh-read-only.ts:28 | 2026-11-01 | #5793
-- rf:bug-risks | low | scripts/hooks/implementation-shell.ts:128 | 2026-11-01 | #5793

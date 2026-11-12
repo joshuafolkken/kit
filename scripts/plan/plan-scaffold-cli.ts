@@ -8,6 +8,7 @@ import { project_checks } from '#scripts/gate/project-checks'
 import { plan_consumers } from '#scripts/issue/plan-consumers'
 import { josh_environment_file } from '#scripts/josh/josh-environment-file'
 import { session_language } from '#scripts/josh/session-language'
+import { lane_plan_estimate } from '#scripts/lane/lane-plan-estimate'
 import { line_budget } from '#scripts/lines/line-budget'
 import { run_prep_cli } from '#scripts/run/run-prep-cli'
 import { run_prep_locate } from '#scripts/run/run-prep-locate'
@@ -22,7 +23,7 @@ import { plan_scaffold, type ScaffoldParts, type Targets } from './plan-scaffold
 const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const USAGE = 'Usage: josh plan:scaffold <issue-number> [<path>...]'
+const USAGE = 'Usage: josh plan:scaffold <issue-number> [<path>...] [--estimate <json-file>]'
 
 // A backticked directory is not a planned file: only a regular file reaches `lines` and `test:declared`.
 function is_file(target: string): boolean {
@@ -79,7 +80,11 @@ async function gather(
 	return { summary, files, near_limit: rows, declared, cases: owed, consumers }
 }
 
-async function scaffold(issue_number: string, paths: ReadonlyArray<string>): Promise<number> {
+async function scaffold(
+	issue_number: string,
+	paths: ReadonlyArray<string>,
+	estimate?: string,
+): Promise<number> {
 	const summary = await run_prep_cli.read_summary(issue_number)
 
 	if (summary === undefined) {
@@ -92,16 +97,22 @@ async function scaffold(issue_number: string, paths: ReadonlyArray<string>): Pro
 		run_prep_locate.extract_targets(summary.body),
 		is_file,
 	)
-	const files = paths.length > 0 ? paths : targets.files
+	const planned = estimate !== undefined || paths.length > 0 ? paths : targets.files
+	const scope = await lane_plan_estimate.attach(
+		{ issue: Number(issue_number), paths: [...planned], planned_at: '' },
+		estimate,
+	)
+	const parts = await gather(summary.text, scope.paths, targets)
 
-	console.info(plan_scaffold.format(await gather(summary.text, files, targets)))
+	console.info(plan_scaffold.format({ ...parts, estimate: scope.estimated_size }))
 
 	return SUCCESS_EXIT_CODE
 }
 
 // A malformed number is an argument error (usage); an unreadable body is a read failure (its own note).
 async function run(argv: ReadonlyArray<string>): Promise<number> {
-	const [first = '', ...paths] = argv
+	const input = lane_plan_estimate.split(argv)
+	const [first = '', ...paths] = input.tokens
 	const issue_number = run_prep_cli.parse_number([first])
 
 	if (issue_number === undefined) {
@@ -110,7 +121,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	return await scaffold(issue_number, paths)
+	return await scaffold(issue_number, paths, input.file)
 }
 
 async function main(argv: ReadonlyArray<string>): Promise<void> {

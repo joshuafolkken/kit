@@ -1,1 +1,0 @@
-- rf:comments | low | scripts/dependabot/dependabot-config.test.ts:10 | 2026-11-05 | #6404

@@ -1,1 +1,0 @@
-- rf:tests | low | scripts/issue/issue-priority.test.ts:200 | 2026-10-24 | #4767

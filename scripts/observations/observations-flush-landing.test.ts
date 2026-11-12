@@ -6,6 +6,7 @@ import { main_sync } from '#scripts/git/main-sync'
 import { error_text } from '#scripts/lib/error-message'
 import { review_comment_carry } from '#scripts/review/review-comment-carry'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { observation_ledger_archive } from './observation-ledger-archive'
 import { observations_flush } from './observations-flush'
 import {
 	DEFAULT_BRANCH,
@@ -14,6 +15,7 @@ import {
 	MORNING_INSTANT,
 } from './observations-flush-fixture'
 import { observations_flush_landing } from './observations-flush-landing'
+import { observations_flush_transaction } from './observations-flush-transaction'
 
 // Requesting auto-merge before waiting gives a flush PR a landing path even when the wait ends
 // early. The mocked git/GitHub harness also pins discovery of an open earlier flush
@@ -63,8 +65,16 @@ vi.mock('#scripts/review/review-comment-carry', () => ({
 		discard_uncommitted: vi.fn(),
 	},
 }))
+// The archive reads GitHub and moves the ledger's files (joshuafolkken/kit#7336).
+vi.mock('./observation-ledger-archive', () => ({
+	observation_ledger_archive: { archive: vi.fn(async () => 0) },
+}))
+vi.mock('./observations-flush-transaction', () => ({
+	observations_flush_transaction: { pending: vi.fn(), run: vi.fn() },
+}))
 
 const NO_COMMITS = 0
+const ARCHIVED_FILES = 3
 const PUSHED_SHA = 'c0ffee1'
 const SUCCESS_EXIT_CODE = 0
 const WAIT_INTERRUPTED = 'the wait was interrupted'
@@ -92,6 +102,12 @@ function stub_git_on_default_branch(): void {
 
 function on_default_branch(): void {
 	stub_git_on_default_branch()
+	vi.mocked(observations_flush_transaction.pending).mockResolvedValue(false)
+	vi.mocked(observations_flush_transaction.run).mockImplementation(async (_root, branch, steps) => {
+		await steps.publish(branch, await steps.prepare())
+
+		return branch
+	})
 	vi.mocked(git_gh_command.pr_list_open_with_head_prefix).mockResolvedValue([])
 	vi.mocked(git_pr_checks.wait_for_pr_merged).mockResolvedValue('merged')
 	vi.mocked(git_pr_checks.read_merge_progress).mockResolvedValue('waiting')
@@ -132,7 +148,11 @@ describe('observations_flush — auto-merge', () => {
 
 		expect(git_gh_command.pr_enable_auto_merge).toHaveBeenCalledWith(FLUSH_BRANCH, PUSHED_SHA)
 		expect(message).toContain(WAIT_INTERRUPTED)
-		expect(message).toContain(FLUSH_BRANCH)
+		expect(observations_flush_transaction.run).toHaveBeenCalledWith(
+			process.cwd(),
+			FLUSH_BRANCH,
+			expect.any(Object),
+		)
 	})
 })
 
@@ -214,23 +234,17 @@ describe('observations_flush — an earlier flush pull request still open', () =
 	})
 })
 
-// joshuafolkken/kit#5326: a carry left untracked by a stopped flush would block the next
-// fast-forward, so it is discarded first and a deferring flush never carries.
+// The source carry belongs to the writer; only the isolated transaction prepares a carry.
 describe('observations_flush — the comment-round carry beside an open flush', () => {
 	beforeEach(() => {
 		on_default_branch()
 	})
 
-	it('discards an uncommitted carried file before it looks', async () => {
+	it('preserves an uncommitted carried file in the original checkout', async () => {
 		await flush_message()
 
-		expect(review_comment_carry.discard_uncommitted).toHaveBeenCalledWith(
-			MODIFIED_LEDGER,
-			process.cwd(),
-		)
-		expect(first_call_order(review_comment_carry.discard_uncommitted)).toBeLessThan(
-			first_call_order(git_gh_command.pr_list_open_with_head_prefix),
-		)
+		expect(review_comment_carry.discard_uncommitted).not.toHaveBeenCalled()
+		expect(observations_flush_transaction.run).toHaveBeenCalledOnce()
 	})
 
 	it('never carries the comment rounds when it defers', async () => {
@@ -266,5 +280,28 @@ describe('observations_flush — the merge progress of an earlier auto-merge flu
 		expect(message).toBe(observations_flush_landing.stuck_flush_message([LANDING_PULL]))
 		expect(git_pr_checks.read_merge_progress).toHaveBeenCalledWith(LANDING_PULL.head_ref)
 		expect(git_command.checkout_b).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#7336: the closed issues' files are archived after the carry, and the pull request
+// says it moved them.
+describe('observations_flush — the archive', () => {
+	beforeEach(() => {
+		on_default_branch()
+	})
+
+	it('archives after the carry and opens the pull request with the moving wording', async () => {
+		vi.mocked(observation_ledger_archive.archive).mockResolvedValueOnce(ARCHIVED_FILES)
+
+		await flush_message()
+
+		expect(first_call_order(review_comment_carry.carry_reported)).toBeLessThan(
+			first_call_order(observation_ledger_archive.archive),
+		)
+		expect(git_gh_command.pr_create).toHaveBeenCalledWith(
+			observations_flush.COMMIT_MESSAGE,
+			observations_flush.pull_request_body(ARCHIVED_FILES),
+			'ignore-for-release',
+		)
 	})
 })

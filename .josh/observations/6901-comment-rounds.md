@@ -1,1 +1,0 @@
-- rf:bug-risks | low | scripts/rules/broad-investigation.ts:76 | 2026-11-10 | #6901

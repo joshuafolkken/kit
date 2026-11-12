@@ -77,6 +77,25 @@ beforeEach(() => {
 	])
 })
 
+describe('lane_breakdown_cli.run — human wait', () => {
+	it.each([{ args: [String(ISSUE)] }, { args: TIMELINE }])(
+		'reports park events as human wait: $args',
+		async ({ args }) => {
+			mocks.all_events.mockResolvedValue([
+				{ pos: 1, at: at(5), kind: 'park', text: `#${String(ISSUE)} parked on a decision` },
+			])
+			mocks.read_entries.mockReturnValue([
+				{ kind: 'dispatch', at: at(0), issue: ISSUE },
+				{ kind: 'dispatch', at: at(15), issue: ISSUE },
+				{ kind: 'merge', at: at(61), issue: ISSUE },
+			])
+
+			await expect(lane_breakdown_cli.run(args)).resolves.toBe(0)
+			expect(console.info).toHaveBeenCalledWith(expect.stringContaining('human wait 10.0 min'))
+		},
+	)
+})
+
 describe('lane_breakdown_cli.run', () => {
 	it('prints the stages longest first under the net minutes', async () => {
 		await expect(lane_breakdown_cli.run([String(ISSUE)])).resolves.toBe(0)
@@ -87,10 +106,12 @@ describe('lane_breakdown_cli.run', () => {
 				'- implement 51.0 min, over budget +42 min (editing & thinking 51.0 min)',
 				'- start to plan 10.0 min, over budget +7 min',
 				'- waits taken out (park, outage, usage limit, yield, split run, host sleep) 0.0 min, of which yield wait 0.0 min, of which host sleep 0.0 min',
+				'End-to-end 61.0 min (over target); target 30 min dispatch to merge (human wait reported separately, included); internal stage budgets 25 min (plan 3 + implement 9 + ship 8 + followup 5)',
+				'Exclusive wall clock: off-tool work 0.0 min; automatic wait 0.0 min; human wait 0.0 min; unclassified (missing transcripts) 61.0 min',
+				'Tool cumulative 0.0 min (parallel calls overlap; not additive to wall clock). Off-tool work includes unrecorded activity; automatic wait includes tool responses, gate, CI, yield, outage and sleep. Legacy net excludes more than human wait.',
 				'- Largest time sinks (stages and laps overlap): implement 51.0 min; start to plan 10.0 min',
 			].join('\n'),
 		)
-		expect(mocks.evidence).not.toHaveBeenCalled()
 	})
 
 	// joshuafolkken/kit#7038: a dispatch a rotation moved into the archive still starts the lane.
@@ -125,6 +146,22 @@ describe('lane_breakdown_cli.run — --timeline', () => {
 			expect.stringMatching(
 				/^\[#4970\]\(.*\) timeline .*\n2026-10-26 05:43Z +\+0\.0 +10\.0 min {2}start to plan\n/u,
 			),
+		)
+	})
+
+	it('recovers ship and followup from archived ledger rows after event compaction', async () => {
+		mocks.read_archive.mockReturnValue([
+			{ kind: 'dispatch', at: at(0), issue: ISSUE },
+			{ kind: 'stage', at: at(30), issue: ISSUE, stage: 'gate', elapsed_ms: 10 * MINUTE_MS },
+			{ kind: 'stage', at: at(60), issue: ISSUE, stage: 'followup', elapsed_ms: 20 * MINUTE_MS },
+		])
+		mocks.read_entries.mockReturnValue([{ kind: 'merge', at: at(61), issue: ISSUE }])
+
+		await expect(lane_breakdown_cli.run(TIMELINE)).resolves.toBe(0)
+		expect(console.info).toHaveBeenCalledWith(expect.stringContaining('ship gate'))
+		expect(console.info).toHaveBeenCalledWith(expect.stringContaining('driver followup (CI wait)'))
+		expect(console.info).toHaveBeenCalledWith(
+			expect.stringContaining('End-to-end 61.0 min (over target)'),
 		)
 	})
 

@@ -55,20 +55,40 @@ function next_step(child: number | string, cause = ''): string {
 	return `${recovery}, then use \`${resume_of(child, true)}\` in the live backlogrun or resume it with \`${resume_of(child, false)}\``
 }
 
-const SESSION_UNFINISHED_LEAD = `${SESSION_UNFINISHED.short}: `
+// The worker's own declaration that its Issue needs a stronger `josh.worker` profile
+// (joshuafolkken/kit#7356). No retry check reads it, so `run:stalled`'s auto-retry never re-offers it
+// on the same profile; the drive resumes it one profile up (joshuafolkken/kit#7357).
+const ESCALATION_REQUESTED: StallCause = {
+	short: 'escalation requested',
+	why: 'the worker declared that its Issue needs a stronger josh.worker profile.',
+}
 
-// The child's first message line rides behind its class, so a reader keyed on the class still finds it.
-function session_unfinished(message: string): StallCause {
+const CARRYING_CLASSES = [SESSION_UNFINISHED, ESCALATION_REQUESTED]
+
+function lead_of(cause: StallCause): string {
+	return `${cause.short}: `
+}
+
+// The message's first line rides behind its class, so a reader keyed on the class still finds it.
+function carrying(cause: StallCause, message: string): StallCause {
 	const first = message.split(/\r?\n/u, 1)[0]?.trim() ?? ''
 
-	return first === ''
-		? SESSION_UNFINISHED
-		: { short: `${SESSION_UNFINISHED_LEAD}${first}`, why: first }
+	return first === '' ? cause : { short: `${lead_of(cause)}${first}`, why: first }
+}
+
+function session_unfinished(message: string): StallCause {
+	return carrying(SESSION_UNFINISHED, message)
+}
+
+function escalation_requested(reason: string): StallCause {
+	return carrying(ESCALATION_REQUESTED, reason)
 }
 
 // The class a park's cause names: `session unfinished` for one carrying the child's message too.
 function class_of(cause: string): string {
-	return cause.startsWith(SESSION_UNFINISHED_LEAD) ? SESSION_UNFINISHED.short : cause
+	const carried = CARRYING_CLASSES.find((known) => cause.startsWith(lead_of(known)))
+
+	return carried?.short ?? cause
 }
 
 function park_event(child: number | string, cause: string): string {
@@ -113,11 +133,13 @@ function waiting_text(waits: ReadonlyArray<string>): string {
 
 const run_stalled = {
 	CUT_NOT_RELAUNCHED,
+	ESCALATION_REQUESTED,
 	SESSION_UNFINISHED,
 	STALE_HANDOFF,
 	cause_in,
 	cause_of,
 	class_of,
+	escalation_requested,
 	next_step,
 	park_event,
 	resume_of,

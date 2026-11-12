@@ -1,2 +1,0 @@
-- rf:bug-risks | low | scripts/issue/size-estimate.ts:55 | 2026-11-01 | #5758
-- rf:project-conventions | low | scripts/issue/size-estimate.ts:58 | 2026-11-01 | #5758

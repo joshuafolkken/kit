@@ -61,6 +61,7 @@ To walk the Issue-driven loop once — file an Issue, have an agent plan and imp
 - [josh-commands-session.md](./josh-commands-session.md) — the session-budget and document-reading commands
 - [josh-commands-backlog.md](./josh-commands-backlog.md) — the issue, epic, backlog and review commands a workflow run calls
 - [environment-variables.md](./environment-variables.md) — every environment variable kit reads
+- [package-settings.md](./package-settings.md) — every `josh.*` setting kit reads from `package.json`
 - [init.md](./init.md) — what `josh init` creates
 - [sync.md](./sync.md) — what `josh sync` updates
 - [manual-config.md](./manual-config.md) — the presets without `josh init`

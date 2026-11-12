@@ -7,6 +7,8 @@ import {
 	type AgentRole,
 	type ProfileResult,
 } from './agent-role-profile'
+import { agent_ship_cap } from './agent-ship-cap'
+import { agent_worker_profile } from './agent-worker-profile'
 import { claude_agent_argv } from './claude-agent-argv'
 import { codex_agent_argv } from './codex-agent-argv'
 
@@ -19,6 +21,12 @@ interface AgentArgv {
 
 type AgentArgvResult =
 	{ kind: 'argv'; argv: AgentArgv; profile: AgentProfile } | { kind: 'rejected'; note: string }
+
+// Where a cut relaunch runs, and how it reads its Issue's labels when `josh.worker` asks for them.
+interface ResumeSite {
+	cwd: string
+	labels: () => Promise<ReadonlyArray<string> | undefined>
+}
 
 // **`session_id` forces the fresh session's id, and only the Claude path can honour it**.
 // Codex has no such flag, and the run-state report reads Claude transcripts
@@ -105,19 +113,25 @@ function profiled_in(invocation: string, resolved: ProfileResult, cwd: string): 
 // **A cut relaunch's profile, resolved for the phase the resumed child is entering**.
 // A stored lane profile takes the phase's model where the phase has one (pre-gate: Sonnet, or
 // `JOSH_WORKER_SHIP_MODEL`) and the phase's effort; a lane without one resolves the worker for the
-// phase. An env override wins over the phase in either path.
-function resume_argv(
+// phase. An env override wins over the phase in either path. The phase's model is then capped at the
+// Issue's `josh.worker` profile, whose labels `site.labels` reads only when the setting exists.
+async function resume_argv(
 	invocation: string,
 	profile: AgentProfile | undefined,
 	phase: string,
-	cwd: string,
-): AgentArgvResult {
+	site: ResumeSite,
+): Promise<AgentArgvResult> {
 	const resolved =
 		profile === undefined
 			? agent_role_profile.resolve(agent_role_profile.WORKER, process.env, phase)
 			: agent_role_profile.with_phase(profile, phase)
+	const capped = await agent_ship_cap.capped(
+		resolved,
+		phase,
+		async () => await agent_worker_profile.resolve(site.cwd, site.labels),
+	)
 
-	return profiled_in(invocation, resolved, cwd)
+	return profiled_in(invocation, capped, site.cwd)
 }
 
 function resolve_in(
@@ -155,5 +169,5 @@ const agent_argv = {
 	with_resume_in,
 }
 
-export type { AgentArgv, AgentArgvResult }
+export type { AgentArgv, AgentArgvResult, ResumeSite }
 export { agent_argv }

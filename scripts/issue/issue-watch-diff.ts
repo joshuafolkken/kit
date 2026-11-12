@@ -86,7 +86,7 @@ function is_bot(user: z.infer<typeof comment_schema>['user']): boolean {
 }
 
 function is_automated(
-	raw: z.infer<typeof comment_schema>,
+	raw: Pick<z.infer<typeof comment_schema>, 'user' | 'body'>,
 	is_trusted: boolean | undefined,
 ): boolean {
 	return is_bot(raw.user) || (is_trusted === true && (raw.body?.includes(RUN_MARKER) ?? false))
@@ -228,6 +228,7 @@ const issue_watch_diff = {
 	RUN_MARKER,
 	WITHHELD_BODY_EDIT,
 	baseline_of,
+	is_automated,
 	landed_times,
 	parse_comments,
 	unread_diff,

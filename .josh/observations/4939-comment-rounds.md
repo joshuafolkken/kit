@@ -1,1 +1,0 @@
-- rf:bug-risks | low | scripts/gate/check-related.ts:118 | 2026-10-25 | #4939

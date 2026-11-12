@@ -1,2 +1,0 @@
-- rf:tests | low | scripts/review/selfcheck-cli.git.test.ts:128 | 2026-11-02 | #5832
-- rf:comments | low | scripts/document/document-byte-budget.ts:89 | 2026-11-02 | #5832

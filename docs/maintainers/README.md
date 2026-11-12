@@ -49,6 +49,7 @@ the procedure, so a change to a rationale page changes no rule.
 - [rule-delivery-rationale.md](./rule-delivery-rationale.md) — how a rule reaches the agent
 - [file-edits-rationale.md](./file-edits-rationale.md) — file edits
 - [shell-body-rationale.md](./shell-body-rationale.md) — shell bodies
+- [shell-tokenizer.md](./shell-tokenizer.md) — the guards' shared shell tokenizer
 - [turn-batching-rationale.md](./turn-batching-rationale.md) — turn batching
 - [output-bounds-rationale.md](./output-bounds-rationale.md) — the Bash output cap and piped checks
 - [wip-cap-rationale.md](./wip-cap-rationale.md) — the open-Issue cap
@@ -111,6 +112,8 @@ the procedure, so a change to a rationale page changes no rule.
 so a split is a publish boundary, not a topic one.
 
 ## The observation ledger
+
+- [observations-flush-recovery.md](./observations-flush-recovery.md) — flushing and recovering observation records
 
 [`.josh/observations/`](../../.josh/observations/) holds one file per Issue: the review findings and
 observations a run recorded. `josh` commands write it. It sits outside `docs/` because its files are

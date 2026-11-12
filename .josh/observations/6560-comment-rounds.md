@@ -1,2 +1,0 @@
-- rf:performance | low | scripts/gh/git-gh-etag-read.ts:42 | 2026-11-07 | #6560
-- rf:bug-risks | low | scripts/gh/git-gh-etag-read.ts:50 | 2026-11-07 | #6560

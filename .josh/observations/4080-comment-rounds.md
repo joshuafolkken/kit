@@ -1,2 +1,0 @@
-- rf:project-conventions | low | scripts/run/board/run-board-released.ts:16 | 2026-10-18 | #4080
-- rf:tests | low | scripts/run/board/run-board-released.test.ts:25 | 2026-10-18 | #4080

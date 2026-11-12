@@ -5,6 +5,7 @@ import { document_section } from '#scripts/document/document-section'
 import { distributed_paths } from '#scripts/init/distributed-paths'
 import { find_package_directory } from '#scripts/josh/package-directory'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { run_park_escalate } from '#scripts/run/park/run-park-escalate'
 
 interface LaneSet {
 	text: string
@@ -28,6 +29,14 @@ const SETTINGS_FLAG = '--settings'
 const PROMPT_FILE_PREFIX = 'josh-lane-instructions-'
 const PROMPT_FILE_SUFFIX = '.md'
 const PACKAGE_DIRECTORY = find_package_directory(path.dirname(fileURLToPath(import.meta.url)))
+// Appended only where `josh.worker.escalate` is true, so a repository without it keeps today's text
+// to the byte (joshuafolkken/kit#7356).
+const ESCALATION_GUIDE = [
+	'',
+	'## Escalation',
+	'',
+	'- This Issue needs a stronger model than the one you run on → `pnpm josh run:park <N> --escalate "<reason>"`, then stop. The reason is required and recorded; the lane resumes one profile up, or goes to a person at the top profile.',
+].join('\n')
 
 // An include that resolves to nothing is `undefined`, never an empty string, so a renamed heading
 // fails the whole composition rather than silently dropping a rule.
@@ -63,7 +72,7 @@ function composed_from(lane_markdown: string, rules_path: string): string | unde
 	return rules === undefined ? undefined : compose(lane_markdown, rules)
 }
 
-function composed_set(cwd: string, package_directory: string): LaneSet | undefined {
+function rules_set(cwd: string, package_directory: string): LaneSet | undefined {
 	const lane_markdown = document_section.read_optional(path.join(package_directory, LANE_DOCUMENT))
 
 	if (lane_markdown === undefined) return undefined
@@ -75,6 +84,19 @@ function composed_set(cwd: string, package_directory: string): LaneSet | undefin
 	}
 
 	return undefined
+}
+
+// Only a worker can declare an escalation: a review session never parks the Issue it reads.
+function composed_set(
+	cwd: string,
+	package_directory: string,
+	is_worker = false,
+): LaneSet | undefined {
+	const set = rules_set(cwd, package_directory)
+
+	if (set === undefined || !is_worker || !run_park_escalate.is_enabled(cwd)) return set
+
+	return { ...set, text: `${set.text}${ESCALATION_GUIDE}` }
 }
 
 function composed_in(
@@ -108,13 +130,17 @@ function excluded_settings(rules_path: string, cwd: string): string {
 
 // No flags when the set cannot be composed or safely written: the child then loads `CLAUDE.md` as
 // before, which costs tokens but never loses a rule.
-function flags(cwd: string = process.cwd()): ReadonlyArray<string> {
-	const set = composed_set(cwd, PACKAGE_DIRECTORY)
+function flags_of(set: LaneSet | undefined, cwd: string): ReadonlyArray<string> {
 	const prompt_file = set === undefined ? undefined : written(set.text)
 
 	if (set === undefined || prompt_file === undefined) return []
 
 	return [PROMPT_FILE_FLAG, prompt_file, SETTINGS_FLAG, excluded_settings(set.rules_path, cwd)]
+}
+
+// `is_worker` adds the escalation guide where the repository allows one (joshuafolkken/kit#7356).
+function flags(cwd: string = process.cwd(), is_worker = false): ReadonlyArray<string> {
+	return flags_of(composed_set(cwd, PACKAGE_DIRECTORY, is_worker), cwd)
 }
 
 function tokens_of(text: string): string {

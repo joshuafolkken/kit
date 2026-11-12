@@ -110,7 +110,7 @@ function tool_flags(role: AgentRole, cwd: string = process.cwd()): ReadonlyArray
 function instruction_flags(profile: AgentProfile, cwd?: string): ReadonlyArray<string> {
 	if (profile.role === agent_role_profile.SCHEDULER) return []
 
-	return lane_instructions.flags(cwd)
+	return lane_instructions.flags(cwd, profile.role === agent_role_profile.WORKER)
 }
 
 function build(

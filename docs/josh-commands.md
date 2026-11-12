@@ -66,6 +66,7 @@ Check code with prettier and eslint (skips a tool a basic project lacks).
 ```bash
 pnpm josh lint
 pnpm josh lint --changed   # the branch's changed files — the gate's form
+pnpm josh lint --shard=1   # one of two fixed halves of the tree (1 or 2) — a CI leg
 ```
 
 <!-- /usage -->
@@ -292,6 +293,7 @@ Run unit tests with Vitest (without Vitest: a basic project runs its own test sc
 
 ```bash
 pnpm josh test:unit
+pnpm josh test:unit --shard=1/3   # flags are forwarded to vitest
 ```
 
 <!-- /usage -->
@@ -313,7 +315,7 @@ Run only the unit tests related to the changed files (full suite on fallback).
 ```bash
 pnpm josh test:related
 pnpm josh test:related scripts/thing.ts   # narrow by the given files instead
-pnpm josh test:related --touched          # only the diff's tests and its modules' same-named ones
+pnpm josh test:related --touched          # diff tests, same-named tests and direct test importers
 pnpm josh test:related --silent           # flags are forwarded to vitest
 ```
 
@@ -321,7 +323,7 @@ pnpm josh test:related --silent           # flags are forwarded to vitest
 
 `josh gate` runs it as its unit leg.
 
-- `--touched` rechecks the diff's test files (or the given files') and each changed module's colocated `foo.test.ts` / `foo.*.test.ts`, without the test-read map or import graph (`scripts/test/test-related-touched.ts`). The lane ledger records it as `touched`.
+- `--touched` rechecks changed tests, each changed module's `foo.test.ts` / `foo.*.test.ts`, and its direct test importers, including fixture consumers (`scripts/test/test-related-touched.ts`). It scans import text without a read map or transitive graph. The `touched` record never replaces full-reach verification.
   With no other arguments, its separate green record admits review round 2; round 1 and the gate's reuse require a full-reach run.
 
 - Changed set handed to `vitest related`; value-taking flags must be `--flag=value`. Falls back to the whole suite (naming which case) when a changed non-code file has no map or no recorded reader and is new since the map's tree, or a changed file is one every test depends on (counting only files this change moved); a narrowed run matching nothing prints `No test files found` and exits 0.
@@ -578,7 +580,8 @@ See [init.md](./init.md) for the full file list and [`josh doctor`](#josh-doctor
 Sync config files.
 
 ```bash
-pnpm josh sync   # overwrite managed files
+pnpm josh sync           # overwrite managed files
+pnpm josh sync --force   # also replace a file you added to, dropping your additions
 ```
 
 <!-- /usage -->
@@ -661,6 +664,7 @@ pnpm josh git -y --skip-commit --skip-push   # open the PR without committing/pu
 
 - `-y` / `--yes` — run non-interactively; works without a TTY (agent or CI shell).
 - `--skip-commit` / `--skip-push` — recover/open a PR without a new commit or push.
+- `--body-file <path>` — extra PR body text after `closes #N`, from a file (`-` = stdin); use it when the text holds a backtick or `$`.
 
 <!-- /usage -->
 
@@ -1212,10 +1216,12 @@ pnpm josh lane:adopt --all   # every open lane with no record
 Print each delivered rule's unaided compliance — runs reached, kept rate, refusals.
 
 ```bash
-pnpm josh rule:value             # a reading cached under 15 minutes ago, else measure
-pnpm josh rule:value --fresh     # measure now, whatever the cache holds
-pnpm josh rule:value --refresh   # write the reading to the loop-head cache instead of stdout
-pnpm josh rule:value --prose     # class each prose rule: enforced, measured or prose only
+pnpm josh rule:value                         # a reading cached under 15 minutes ago, else measure
+pnpm josh rule:value --fresh                 # measure now, whatever the cache holds
+pnpm josh rule:value --refresh               # write the reading to the loop-head cache instead of stdout
+pnpm josh rule:value --period 7              # measure only the transcripts written in the last 7 days, cache untouched
+pnpm josh rule:value --weekly <rule-id>...   # reached / refused / rephrased of the named rules, one line per week
+pnpm josh rule:value --prose                 # class each prose rule: enforced, measured or prose only
 ```
 
 <!-- /usage -->
@@ -1227,6 +1233,8 @@ The kept rate is the share kept before the rule's trigger fired (`scripts/rules/
 - Printed from a cache at the `backlogrun` loop head (`josh backlog:offer`), refreshed at most every 15 minutes.
 - Bare, it prints that cache while under 15 minutes old, then `cached reading taken at <ISO time>`. A lane reads its parent's cache.
 - On stdout only, a `candidates:` section follows the table: `retire` lists measurable rules no run reached once the reading covers `MIN_RUNS_FOR_RETIREMENT` runs, and `condense` lists rules a hook refuses on every occurrence that it has refused (`scripts/rules/rule-value-candidates.ts`). The cache keeps the table alone, so `--fresh` prints them.
+- `--period <days>` counts only the transcripts last written inside that trailing window. It always measures and never reads or writes the cache. A value that is not a positive number prints the usage and exits 1.
+- `--weekly <rule-id>...` prints each named measured rule's reached / refused / rephrased, one line per week opening Monday 00:00 UTC. A run counts in the week its newest transcript was last written. `--period <days>` narrows it to that window. Like `--period`, it always measures and never touches the cache. No id, or one that is not a measured rule, prints the usage and exits 1.
 - `--prose` reads the documents instead: each prose rule's class and `file:line`.
 
 Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh rule:value` in detail".

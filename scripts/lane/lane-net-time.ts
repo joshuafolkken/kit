@@ -4,6 +4,7 @@ import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
 import type { LedgerEntry } from './lane-ledger'
 import { lane_sleep } from './lane-sleep'
 import { lane_spans, type IssueAt, type Span } from './lane-spans'
+import { lane_stage_events } from './lane-stage-events'
 import { lane_stage_stats } from './lane-stage-stats'
 import { lane_stop_stats } from './lane-stop-stats'
 import { lane_yield } from './lane-yield'
@@ -35,7 +36,9 @@ function entries_of(entries: ReadonlyArray<LedgerEntry>, issue: number): Array<L
 // The first dispatch of `issue` to its merge, or `undefined` while either is missing or the merge comes
 // first.
 function span_of(entries: ReadonlyArray<LedgerEntry>, issue: number): LaneSpan | undefined {
-	const of_issue = entries_of(entries, issue)
+	const of_issue = entries_of(entries, issue).toSorted(
+		(left, right) => Date.parse(left.at) - Date.parse(right.at),
+	)
 	const from = of_issue.find((entry) => lane_stage_stats.is_dispatch(entry))
 	const to = of_issue.findLast((entry) => lane_stage_stats.is_merge(entry))
 
@@ -191,10 +194,7 @@ function split_waits(
 	return cut_inside(split_spans(entries, events_of_issue(events, issue)), span)
 }
 
-// The waits `net_ms` takes out of `span` — each hold from itself to its end, cut at the merge, each
-// yield and split run until its redispatch, and each sleep of the host — the intervals `josh
-// lane:breakdown` counts as excluded (`lane-breakdown.ts`).
-function waits(
+function waiting(
 	entries: ReadonlyArray<LedgerEntry>,
 	events: ReadonlyArray<RunEvent>,
 	issue: number,
@@ -203,8 +203,20 @@ function waits(
 	return joined([
 		...hold_waits(entries, events, issue, span),
 		...yielded(entries, events, issue, span),
-		...split_waits(entries, events, issue, span),
 		...slept(events, span),
+	])
+}
+
+// Legacy net also leaves out the complete run that split its issue.
+function waits(
+	entries: ReadonlyArray<LedgerEntry>,
+	events: ReadonlyArray<RunEvent>,
+	issue: number,
+	span: LaneSpan,
+): Array<LaneSpan> {
+	return joined([
+		...waiting(entries, events, issue, span),
+		...split_waits(entries, events, issue, span),
 	])
 }
 
@@ -230,6 +242,17 @@ function followed(events: ReadonlyArray<RunEvent>, issue: number, span: LaneSpan
 		.map(({ line, to_ms }) => ({ from_ms: line.at_ms, to_ms }))
 }
 
+function automatic_waits(
+	entries: ReadonlyArray<LedgerEntry>,
+	events: ReadonlyArray<RunEvent>,
+	issue: number,
+	span: LaneSpan,
+): Array<LaneSpan> {
+	const stages = lane_stage_events.of(entries, events, issue)
+
+	return joined([...waiting(entries, events, issue, span), ...followed(stages, issue, span)])
+}
+
 // Every interval `net_ms` leaves out of `span`: the waits and the driver's followups, joined.
 function outside(
 	entries: ReadonlyArray<LedgerEntry>,
@@ -237,7 +260,10 @@ function outside(
 	issue: number,
 	span: LaneSpan,
 ): Array<LaneSpan> {
-	return joined([...waits(entries, events, issue, span), ...followed(events, issue, span)])
+	return joined([
+		...automatic_waits(entries, events, issue, span),
+		...split_waits(entries, events, issue, span),
+	])
 }
 
 /**
@@ -282,6 +308,8 @@ function missing_reason(entries: ReadonlyArray<LedgerEntry>, issue: number): str
 }
 
 const lane_net_time = {
+	automatic_waits,
+	hold_waits,
 	missing_reason,
 	net_minutes,
 	net_ms,

@@ -143,6 +143,10 @@ A stopped row's times freeze at its stop — the record's end, else its first id
 
 A finished row leads with `✅` merged, `🏁` done, `⏩` closed by `josh issue:already-done` or `🚫` withdrawn.
 
+マージせず終了した行は、記録済みの短い英語の結論を右端に表示し、その文全体から根拠のIssueコメントを開く。結論（ASCII、1行、80文字以内）は `issue:comment`・`issue:already-done`・`issue:measured`・`issue:premise-unmet` の `--outcome <summary>` で記録する。過去の根拠には `issue:comment --evidence-url <comment URL>` を併用する。同じIssue内に実在する信頼済みコメントだけを根拠とする。管理用のwithdrawコメントは結論を上書きしない。根拠なし・取得失敗では短い英語の代替表示になる。狭い端末では文を省略してからリンクを付け、chat/plainでは同じ可視文字をリンク制御なしで表示する。
+
+停止中のparked/decision行も同じ短い英文と根拠リンクを使う。markerのない過去の停止は、本文を確認して `issue:comment --outcome <next action> --evidence-url <stop comment URL>` で補完する。補完は最新停止に紐づくものだけが有効で、再開後の新しい停止には引き継がない。説明不明でも最新停止コメントのリンクを残し、取得失敗ならIssueを開く `Reason unavailable: inspect issue` を表示する。描画時のAI要約は行わない。リンク非対応の端末やchat/plainでは行頭のIssue番号からIssueを開き、最新停止コメントを確認する（CLIでは `pnpm josh issue:read <N>`）。補完記録は承認・解除・再開を代行しない。
+
 A queued or waiting row draws `<icon> <condition> <number> <kind> <title>  <tail>`: the icon says what it waits on, in place of `⏳`, and the condition column — 11 columns in both sections, the width of `MM-DD HH:MM` — holds its figure, so every row's number starts in one column. The legend names each wait icon the frame draws. A row leads with one icon only, the first of these that holds:
 
 - `🚪` / `📥` / `📤` `<time>` — how long its lane has been opening, installing or dispatching.

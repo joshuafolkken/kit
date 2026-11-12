@@ -1,2 +1,0 @@
-- rf:bug-risks | medium | docs/josh-commands-run.md:362 | 2026-11-10 | #7077
-- rf:comments | low | .josh/observations/7077.md:8 | 2026-11-10 | #7077

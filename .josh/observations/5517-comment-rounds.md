@@ -1,2 +1,0 @@
-- rf:assumptions | low | scripts/backlog/backlog-plan.ts:95 | 2026-10-31 | #5517
-- rf:assumptions | low | scripts/time-runtime/time-bundle-call.ts:184 | 2026-10-31 | #5517

@@ -1,3 +1,0 @@
-- rf:bug-risks | low | scripts/issue/plan-consumers-section.ts:16 | 2026-10-20 | #4273
-- rf:bug-risks | low | scripts/issue/plan-consumers-section.ts:36 | 2026-10-20 | #4273
-- rf:bug-risks | low | scripts/issue/plan-consumers.ts:101 | 2026-10-20 | #4273

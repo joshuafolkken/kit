@@ -1,2 +1,0 @@
-- rf:none | none | - | 2026-11-05 | #6517
-- k:followup-unrelated-test-rerun | d1 | 2026-11-05 | scripts/build/pack-boundary.test.ts | followup reran Unit Tests (3/6); failed outside the change: isolated scripts/build/pack-boundary.test.ts > the published package carries nothing kit-internal > ships no scripts module that no consumer entry reaches

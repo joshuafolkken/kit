@@ -3,6 +3,7 @@ import { lane_withdraw } from '#scripts/lane/lane-withdraw'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_stalled } from '#scripts/run/park/run-stalled'
 import type { BoardRow, RowRead, RowReason } from './run-board-layout'
+import { run_board_pause } from './run-board-pause'
 import { run_board_render_title } from './run-board-render-title'
 import type { ItemState, ItemStatus } from './run-board-status'
 
@@ -101,10 +102,10 @@ function is_stalled(status: ItemStatus, labels: ReadonlyArray<string> = []): boo
 
 // Each finished state that did not merge: how its tail names it, and the reason it draws when none
 // was recorded.
-const FINISHED_ENDINGS: Partial<Record<ItemState, { word: string; fallback: string }>> = {
-	done: { word: 'done', fallback: 'closed without a PR to merge' },
-	withdrawn: { word: 'withdrawn', fallback: 'run withdrawn' },
-	already_done: { word: 'already done', fallback: 'closed with verified evidence' },
+const FINISHED_ENDINGS: Partial<Record<ItemState, string>> = {
+	done: 'Closed without a merged PR',
+	withdrawn: 'Run withdrawn',
+	already_done: 'Closed with verified evidence',
 }
 
 // Finished rows name why no action remains; merge rows keep their existing tail.
@@ -113,7 +114,7 @@ function tail_of(status: ItemStatus): string | undefined {
 
 	if (ending === undefined) return status.reason
 
-	return `nothing to do · ${ending.word}: ${status.reason ?? ending.fallback}`
+	return status.outcome?.summary ?? ending
 }
 
 // joshuafolkken/kit#6577: what stopped a lane, or the ship of a child still working, by the command its
@@ -133,19 +134,32 @@ function stop_row_reason(status: ItemStatus): Pick<BoardRow, 'reason'> {
 }
 
 // Raw event reasons remain cacheable; only drawing selects an action from the current live state.
-function row_reason(number: number, status: ItemStatus, read: RowRead): Pick<BoardRow, 'reason'> {
+function ending_row_reason(
+	number: number,
+	status: ItemStatus,
+	read: RowRead,
+): Pick<BoardRow, 'reason'> {
 	const reason = tail_of(status)
 	const waits = read.waits?.get(number)
 
 	if (reason !== undefined) {
 		const tail = park_row_reason(number, reason, read.is_backlog_live === true, waits)
 
-		return { reason: { tail } }
+		return {
+			reason: { tail, ...(status.outcome !== undefined && { evidence_url: status.outcome.url }) },
+		}
 	}
 
 	return is_stalled(status, read.labels.get(number))
 		? { reason: stalled_reason(number, read, waits) }
 		: stop_row_reason(status)
+}
+
+function row_reason(number: number, status: ItemStatus, read: RowRead): Pick<BoardRow, 'reason'> {
+	const pause =
+		status.state === 'parked' ? run_board_pause.reason_of(number, read, status) : undefined
+
+	return pause === undefined ? ending_row_reason(number, status, read) : { reason: pause }
 }
 
 const run_board_ending_reason = {

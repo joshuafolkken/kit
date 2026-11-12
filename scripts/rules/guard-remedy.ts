@@ -31,6 +31,7 @@ const HOLD_RELEASE = 'the hook releases the hold itself; it blocks only when tha
 const FILING_OFFER = 'the filing needs a title and a body only the model can write'
 const CONCISE_REPLY = 'the shorter reply is prose only the model can write'
 const NARROW_ENOUGH = 'which reading is narrow enough to keep is the author’s call'
+const BODY_TO_FILE = 'the body moves to a file the call does not name'
 
 function rewrite(): GuardRemedy {
 	return { remedy: 'rewrite', why: REWRITTEN }
@@ -52,16 +53,21 @@ const GUARD_REMEDIES: Readonly<Record<string, GuardRemedy>> = {
 	'shell-body': judgment(
 		"which part of the body the shell was meant to expand is the author's, not the hook's",
 	),
-	'raw-field-body': judgment('the body moves to a file the call does not name'),
+	'raw-field-body': judgment(BODY_TO_FILE),
 	'credential-body': judgment(
 		'which text is the credential, and what replaces it, is the author’s',
 	),
 	'rule-body': judgment('a trigger-plus-pointer line is written, not derived'),
 	'direct-filing': judgment(ANOTHER_COMMAND),
 	'unasked-filing': judgment(NO_RUN),
-	'direct-issue-comment': judgment(ANOTHER_COMMAND),
-	'direct-issue-read': judgment(ANOTHER_COMMAND),
-	'direct-git-status': judgment(ANOTHER_COMMAND),
+	// A standalone `gh issue comment <N> --body-file <path>` run as `pnpm josh issue:comment`; an inline
+	// `--body` is refused, since `issue:comment` trims it and expands `\n` (joshuafolkken/kit#7330).
+	'direct-issue-comment': rewrite(),
+	'direct-issue-read': rewrite(), // a standalone `gh issue view <N>` run as `pnpm josh issue:read <N>`
+	'direct-git-status': judgment(
+		'the refusal is spent once per run and its reissue passes, so a rewrite saves at most one ' +
+			'round trip while trading the long-format listing the call asked for for porcelain',
+	),
 	'direct-vitest-run': judgment(ANOTHER_COMMAND),
 	'direct-pr-create': judgment(ANOTHER_COMMAND),
 	'pr-merge': judgment(ANOTHER_COMMAND),

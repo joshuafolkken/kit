@@ -155,7 +155,7 @@ function carry_npmrc_setting(template: string, npmrc: string, setting: MovedNpmr
 }
 
 // Lines kit's own install needs but a consumer must not receive, fenced by `# kit-only:start` and
-// `# kit-only:end` — e.g. an override that only works with a patch kit does not publish (#5500).
+// `# kit-only:end` — e.g. a cross-major override of ESLint's dependencies (#5500).
 const KIT_ONLY_REGION_PATTERN =
 	/^[ \t]*# kit-only:start\b.*\n(?:.*\n)*?[ \t]*# kit-only:end\b.*\n/gmu
 

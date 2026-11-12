@@ -152,16 +152,27 @@ function collect_line_references(line: string, found: Array<string>): void {
 	for (const reference of line_references(line)) found.push(`${reference.prefix}${reference.text}`)
 }
 
-// The message lines that sit outside every fenced-code block, with the fence delimiter lines
-// themselves dropped: toggling on each delimiter brackets the block, so a `#N` shown in an example is
-// never scanned.
+function closes_fence(line: string, marker: string, fence: string): boolean {
+	return marker.startsWith(fence) && line.trim() === marker
+}
+
+function fence_after(line: string, fence: string): string {
+	const match = FENCE_MARKER.exec(line)
+	if (match === null) return fence
+	const marker = match[0].trimStart()
+	if (fence === '') return marker
+
+	return closes_fence(line, marker, fence) ? '' : fence
+}
+
+// Skip through a matching closing fence, including unlike or shorter delimiters inside it.
 function lines_outside_fences(message: string): ReadonlyArray<string> {
 	const lines: Array<string> = []
-	let is_in_fence = false
+	let fence = ''
 
 	for (const line of message.split('\n')) {
-		if (FENCE_MARKER.test(line)) is_in_fence = !is_in_fence
-		else if (!is_in_fence) lines.push(line)
+		fence = fence_after(line, fence)
+		if (fence === '' && !FENCE_MARKER.test(line)) lines.push(line)
 	}
 
 	return lines
@@ -231,11 +242,11 @@ function rewrite_line(line: string, slug: string, is_in_fence: boolean): string 
 // fed the duplicate reply. Fence state is carried across lines, since a fenced block spans them.
 function linkify(message: string, slug: string): string {
 	const out: Array<string> = []
-	let is_in_fence = false
+	let fence = ''
 
 	for (const line of message.split('\n')) {
-		if (FENCE_MARKER.test(line)) is_in_fence = !is_in_fence
-		out.push(rewrite_line(line, slug, is_in_fence))
+		fence = fence_after(line, fence)
+		out.push(rewrite_line(line, slug, fence !== ''))
 	}
 
 	return out.join('\n')

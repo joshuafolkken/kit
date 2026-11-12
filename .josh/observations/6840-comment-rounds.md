@@ -1,1 +1,0 @@
-- rf:bug-risks | medium | scripts/backlog/backlog-drive-named-offer.ts:232 | 2026-11-09 | #6840

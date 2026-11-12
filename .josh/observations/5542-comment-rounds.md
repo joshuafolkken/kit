@@ -1,2 +1,0 @@
-- rf:bug-risks | low | scripts/review/disposition-cli.ts:34 | 2026-10-31 | #5542
-- rf:tests | low | scripts/review/disposition-cli.test.ts:39 | 2026-10-31 | #5542

@@ -42,6 +42,9 @@ const KEYS = {
 	sample_gate: { ja: '実施可能条件', en: 'Sample gate' },
 	not_before: { ja: '実施可能日', en: 'Not before' },
 	source: { ja: '出どころ', en: 'Source' },
+	constraint_source: { ja: '出所', en: 'Constraint source' },
+	constraint_reference: { ja: '参照', en: 'Constraint reference' },
+	constraint_instruction: { ja: '指示', en: 'Constraint instruction' },
 } as const satisfies Record<string, Row>
 
 const VALUES = {
@@ -72,6 +75,7 @@ const HEADINGS = {
 	baseline: { ja: 'ベースライン', en: 'Baseline' },
 	reproduction: { ja: '再現', en: 'Reproduction' },
 	expected_effect: { ja: '期待効果', en: 'Expected effect' },
+	auto_execution_constraint: { ja: '自動実行の制約', en: 'Automatic execution constraint' },
 } as const satisfies Record<string, Row>
 
 // The size estimate's value: `<files>` and `<lines>` stand for its counts.

@@ -1,2 +1,0 @@
-- rf:project-conventions | low | scripts/hooks/reserved-run.ts:94 | 2026-10-24 | #4821
-- rf:bug-risks | low | prompts/review-rubric.md:209 | 2026-10-24 | #4821

@@ -1,3 +1,0 @@
-- rf:bug-risks | medium | scripts/hooks/implementation-shell.ts:28 | 2026-11-09 | #6586
-- rf:bug-risks | medium | scripts/hooks/implementation-shell-deny.ts:290 | 2026-11-09 | #6586
-- rf:bug-risks | medium | scripts/hooks/implementation-shell.ts:17 | 2026-11-09 | #6586

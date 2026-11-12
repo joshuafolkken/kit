@@ -23,6 +23,7 @@ import { issue_file_deferral } from './issue-file-deferral'
 import { issue_file_fold } from './issue-file-fold'
 import { issue_file_interrupt } from './issue-file-interrupt'
 import { issue_file_pass, type Filing } from './issue-file-pass'
+import { issue_file_worker } from './issue-file-worker'
 import { has_label_name, has_parked_label, RUN_SOLO_LABEL } from './issue-labels'
 import { issue_priority } from './issue-priority'
 import { issue_release_cli } from './issue-release-cli'
@@ -72,7 +73,10 @@ function party_refusal(target: string): string | undefined {
 // rather than printed, so it is printed here — otherwise the filing fails with no reason given. A label
 // the create applies is provisioned first, so it never arrives with a generated color.
 async function create(filing: Filing, labels: ReadonlyArray<string>): Promise<string | undefined> {
-	repository_labels.ensure_labels(filing.target)
+	repository_labels.ensure_labels(
+		filing.target,
+		issue_file_worker.label_definitions(filing, labels),
+	)
 	const request = git_gh_issue_write.issue_create_request({
 		title: filing.args.title,
 		body: filing.body,

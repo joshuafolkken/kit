@@ -81,7 +81,7 @@ const LINT_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			"Print a work summary's inputs in one call: the run:prep skeleton, planned files near the line limit, the test:declared verdict, the owed cases and the plan:consumers draft",
 		category: 'AI tools',
-		reference: ['<issue> [<path>...]', 'automation', ['network']],
+		reference: ['<issue> [<path>...] [--estimate <json-file>]', 'automation', ['network']],
 		usage: {
 			examples: [
 				{ arguments: '123', note: 'planned files from the issue body' },

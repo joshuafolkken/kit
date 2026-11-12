@@ -1,3 +1,0 @@
-- rf:comments | low | .claude/skills/workflow-commands/fullrun-steps.md:48 | 2026-11-02 | #5942
-- rf:bug-risks | low | scripts/version/latest-if-required-cli.ts:71 | 2026-11-02 | #5942
-- rf:comments | low | .claude/skills/workflow-commands/fullrun-steps.md:48 | 2026-11-02 | #5942

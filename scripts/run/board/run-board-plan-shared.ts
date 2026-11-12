@@ -3,6 +3,7 @@ import type { NamedPlan } from '#scripts/backlog/backlog-plan'
 import { shared_cache, type CacheSlot } from '#scripts/josh/shared-cache'
 import { z } from 'zod'
 import type { BoardPlan } from './run-board-layout'
+import { run_board_pause } from './run-board-pause'
 import { run_board_plan } from './run-board-plan'
 
 // `run:board`'s plan read, shared the way the drive's assignment and the arrival probe share
@@ -83,6 +84,7 @@ const context_schema = z.object({
 })
 
 const board_plan_schema = z.object({
+	pause_reasons: map_of(run_board_pause.record_schema).optional(),
 	decision_questions: map_of(z.string()).optional(),
 	decision_waits: map_of(z.string()).optional(),
 	human_merge_prs: map_of(z.number()).optional(),

@@ -35,6 +35,7 @@ vi.mock('./run-review-steps', () => ({ run_review_steps: { launch_josh, wait_for
 const LANE = { JOSH_LANE_CHILD: '4907' }
 const LANE_DIRECTORY = '/home/dev/.kit-lanes/4907'
 const CODE_PLAN = { is_code_only: false, slots: ['code'] as const }
+const MULTI_PLAN = { is_code_only: false, slots: ['code', 'interaction'] as const }
 const DRAFT = '/git/josh-ship-body-4907.md'
 const COMMIT = ['git', '-y', '--skip-push', '--skip-pr']
 const PUSH = ['git', '-y', '--skip-commit']
@@ -55,21 +56,31 @@ describe('run_review_early_push.is_due', () => {
 		expect(run_review_early_push.is_due(CODE_PLAN, LANE, LANE_DIRECTORY)).toBe(true)
 	})
 
+	it('is due for a lane child briefing both code and interaction', () => {
+		expect(run_review_early_push.is_due(MULTI_PLAN, LANE, LANE_DIRECTORY)).toBe(true)
+	})
+
 	it.each([
 		['outside a lane child', CODE_PLAN, {}],
 		['under a mark leaked from another lane', CODE_PLAN, { JOSH_LANE_CHILD: '4900' }],
 		['for the ship’s own --code-only open', { is_code_only: true, slots: ['code'] as const }, LANE],
-		[
-			'while an interaction brief is due',
-			{ is_code_only: false, slots: ['code', 'interaction'] as const },
-			LANE,
-		],
+		['for a code-only open with multiple slots', { ...MULTI_PLAN, is_code_only: true }, LANE],
+		['without any briefs', { is_code_only: false, slots: [] }, LANE],
+		['without a code brief', { is_code_only: false, slots: ['interaction'] as const }, LANE],
 	])('is not due %s', (_name, plan, environment) => {
 		expect(run_review_early_push.is_due(plan, environment, LANE_DIRECTORY)).toBe(false)
 	})
 })
 
 describe('run_review_early_push.prepare', () => {
+	it('commits the shared tree before either slot attests in a multiple-slot open', async () => {
+		is_tree_dirty.mockResolvedValue(true)
+
+		expect(await run_review_early_push.prepare(MULTI_PLAN, LANE, LANE_DIRECTORY)).toBe(true)
+		expect(josh_run).toHaveBeenCalledExactlyOnceWith(COMMIT)
+		expect(early_push_record.record).not.toHaveBeenCalled()
+	})
+
 	it('commits a dirty tree locally, without pushing or opening a pull request', async () => {
 		is_tree_dirty.mockResolvedValue(true)
 
@@ -93,7 +104,7 @@ describe('run_review_early_push.prepare', () => {
 	it.each([
 		[CODE_PLAN, {}, 'not-lane-child'],
 		[{ is_code_only: true, slots: ['code'] as const }, LANE, 'code-only'],
-		[{ is_code_only: false, slots: ['code', 'interaction'] as const }, LANE, 'multiple-slots'],
+		[{ is_code_only: false, slots: ['interaction'] as const }, LANE, 'multiple-slots'],
 	])('records why preparation skips %j', async (plan, environment, reason) => {
 		expect(await run_review_early_push.prepare(plan, environment, LANE_DIRECTORY)).toBe(false)
 		expect(is_tree_dirty).not.toHaveBeenCalled()

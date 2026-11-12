@@ -1,6 +1,8 @@
 import { markdown_section } from '#scripts/issue/markdown-section'
 import { run_park_body } from '#scripts/run/park/run-park-body'
 import type { BoardPlan, RowRead, RowReason } from './run-board-layout'
+import { run_board_pause } from './run-board-pause'
+import type { ItemStatus } from './run-board-status'
 
 // The park's question, then after `;` a note on why it parked that is not the question
 // (`backlog-drive-retry.ts`: `needs-decision; blocker #M closed`).
@@ -67,7 +69,10 @@ function reason_of(
 	number: number,
 	reason: string | undefined,
 	read: RowRead,
+	status?: ItemStatus,
 ): RowReason | undefined {
+	const pause = run_board_pause.reason_of(number, read, status)
+	if (pause !== undefined) return pause
 	const parts = parts_of(reason)
 	const question = question_of(parts.question) ?? read_question(number, read)
 

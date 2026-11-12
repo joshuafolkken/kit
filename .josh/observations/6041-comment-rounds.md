@@ -1,1 +1,0 @@
-- rf:project-conventions | low | scripts/hooks/pretool-guard.ts:42 | 2026-11-03 | #6041

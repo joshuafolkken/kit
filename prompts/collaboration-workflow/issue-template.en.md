@@ -71,55 +71,59 @@ The `en` column of `issue-template.md`'s template; its rules and label table →
 
 ### Correspondence table
 
-| Kind    | ja             | en                     |
-| ------- | -------------- | ---------------------- |
-| key     | 種別           | Type                   |
-| key     | 目的           | Purpose                |
-| key     | 互換性         | Compatibility          |
-| key     | リリース分類   | Release classification |
-| key     | 人の判断       | Human judgement        |
-| key     | 判定規則       | Decision rule          |
-| key     | 中止条件       | Close condition        |
-| key     | 優先度         | Priority               |
-| key     | セキュリティ   | Security               |
-| key     | 原因の park    | Cause park             |
-| key     | 原因のレーン   | Cause lane             |
-| key     | 原因の損失     | Cause loss             |
-| key     | 実施順         | Order                  |
-| key     | 原因           | Cause                  |
-| key     | 規模見積もり   | Size estimate          |
-| key     | 分割しない理由 | No-split reason        |
-| key     | 行を増やさない | No added lines         |
-| key     | 先行リファクタ | Refactor first         |
-| key     | 強制           | Enforcement            |
-| key     | 計測           | Measurement            |
-| key     | 計測宣言       | Measure declaration    |
-| key     | 前提           | Premise                |
-| key     | 計測宣言なし   | No measure declaration |
-| key     | 実施可能条件   | Sample gate            |
-| key     | 実施可能日     | Not before             |
-| key     | 出どころ       | Source                 |
-| value   | 不具合         | defect                 |
-| value   | 非不具合       | non-defect             |
-| value   | 振る舞い変更   | behavior change        |
-| value   | 機能追加       | feature                |
-| value   | 機能改善       | improvement            |
-| value   | 時間短縮       | time saving            |
-| value   | 不具合修正     | bug fix                |
-| value   | 破壊的変更     | breaking change        |
-| value   | 不要           | not needed             |
-| value   | 要             | needed                 |
-| value   | 通常           | normal                 |
-| value   | 高             | high                   |
-| value   | 緊急           | critical               |
-| value   | 最後           | last                   |
-| value   | 不明           | unknown                |
-| value   | なし           | none                   |
-| heading | 背景           | Background             |
-| heading | 現象           | Symptom                |
-| heading | 期待結果       | Expected result        |
-| heading | 受け入れ条件   | Acceptance criteria    |
-| heading | 発火点         | Trigger                |
-| heading | ベースライン   | Baseline               |
-| heading | 再現           | Reproduction           |
-| heading | 期待効果       | Expected effect        |
+| Kind    | ja             | en                             |
+| ------- | -------------- | ------------------------------ |
+| key     | 種別           | Type                           |
+| key     | 目的           | Purpose                        |
+| key     | 互換性         | Compatibility                  |
+| key     | リリース分類   | Release classification         |
+| key     | 人の判断       | Human judgement                |
+| key     | 判定規則       | Decision rule                  |
+| key     | 中止条件       | Close condition                |
+| key     | 優先度         | Priority                       |
+| key     | セキュリティ   | Security                       |
+| key     | 原因の park    | Cause park                     |
+| key     | 原因のレーン   | Cause lane                     |
+| key     | 原因の損失     | Cause loss                     |
+| key     | 実施順         | Order                          |
+| key     | 原因           | Cause                          |
+| key     | 規模見積もり   | Size estimate                  |
+| key     | 分割しない理由 | No-split reason                |
+| key     | 行を増やさない | No added lines                 |
+| key     | 先行リファクタ | Refactor first                 |
+| key     | 強制           | Enforcement                    |
+| key     | 計測           | Measurement                    |
+| key     | 計測宣言       | Measure declaration            |
+| key     | 前提           | Premise                        |
+| key     | 計測宣言なし   | No measure declaration         |
+| key     | 実施可能条件   | Sample gate                    |
+| key     | 実施可能日     | Not before                     |
+| key     | 出どころ       | Source                         |
+| key     | 出所           | Constraint source              |
+| key     | 参照           | Constraint reference           |
+| key     | 指示           | Constraint instruction         |
+| value   | 不具合         | defect                         |
+| value   | 非不具合       | non-defect                     |
+| value   | 振る舞い変更   | behavior change                |
+| value   | 機能追加       | feature                        |
+| value   | 機能改善       | improvement                    |
+| value   | 時間短縮       | time saving                    |
+| value   | 不具合修正     | bug fix                        |
+| value   | 破壊的変更     | breaking change                |
+| value   | 不要           | not needed                     |
+| value   | 要             | needed                         |
+| value   | 通常           | normal                         |
+| value   | 高             | high                           |
+| value   | 緊急           | critical                       |
+| value   | 最後           | last                           |
+| value   | 不明           | unknown                        |
+| value   | なし           | none                           |
+| heading | 背景           | Background                     |
+| heading | 現象           | Symptom                        |
+| heading | 期待結果       | Expected result                |
+| heading | 受け入れ条件   | Acceptance criteria            |
+| heading | 発火点         | Trigger                        |
+| heading | ベースライン   | Baseline                       |
+| heading | 再現           | Reproduction                   |
+| heading | 期待効果       | Expected effect                |
+| heading | 自動実行の制約 | Automatic execution constraint |

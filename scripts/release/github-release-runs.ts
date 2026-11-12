@@ -21,6 +21,11 @@ const JOBS_SCHEMA = z.object({ jobs: z.array(JOB_SCHEMA) })
 type Run = z.infer<typeof RUN_SCHEMA>
 type PollState = 'ready' | 'failed' | 'pending'
 
+interface JobOutcomes {
+	failed: ReadonlyArray<string>
+	succeeded: ReadonlyArray<string>
+}
+
 // `read` answers a GET on a repository API path. `workflow` is the publish workflow and `jobs` the
 // jobs in it whose failure counts (empty: every job). `release_run_workflow` is the workflow that
 // creates a tag's release — the publish workflow itself when its run creates the release.
@@ -31,11 +36,15 @@ interface RunSource {
 	release_run_workflow: string | undefined
 }
 
+// A reusable workflow's jobs are listed as `<caller job> / <job>`, so the caller's name covers them.
+function is_named_job(job_name: string, names: ReadonlyArray<string>): boolean {
+	return names.some((name) => job_name === name || job_name.startsWith(`${name} /`))
+}
+
 function is_failed_job(job: z.infer<typeof JOB_SCHEMA>, names: ReadonlyArray<string>): boolean {
 	if (job.status !== 'completed' || !FAILED_CONCLUSIONS.has(job.conclusion ?? '')) return false
-	if (names.length === 0) return true
 
-	return names.some((name) => job.name === name || job.name.startsWith(`${name} /`))
+	return names.length === 0 || is_named_job(job.name, names)
 }
 
 async function list_runs(source: RunSource, workflow_name: string): Promise<ReadonlyArray<Run>> {
@@ -55,12 +64,22 @@ async function find_run(
 	return runs.find((item) => item.display_title === title)
 }
 
-async function has_failed_job(source: RunSource, run_id: number): Promise<boolean> {
+// A job skipped because the one it needs failed is in neither list.
+async function job_outcomes(source: RunSource, run_id: number): Promise<JobOutcomes> {
 	const { jobs } = JOBS_SCHEMA.parse(
 		await source.read(`/actions/runs/${String(run_id)}/jobs?per_page=100`),
 	)
 
-	return jobs.some((job) => is_failed_job(job, source.jobs))
+	return {
+		failed: jobs.filter((job) => is_failed_job(job, source.jobs)).map((job) => job.name),
+		succeeded: jobs.filter((job) => job.conclusion === 'success').map((job) => job.name),
+	}
+}
+
+async function has_failed_job(source: RunSource, run_id: number): Promise<boolean> {
+	const { failed } = await job_outcomes(source, run_id)
+
+	return failed.length > 0
 }
 
 // A run started before its title named the tag may be at work on any tag.
@@ -120,7 +139,14 @@ async function publication_state(
 	return run_state(await publish_run(source, workflow, tag))
 }
 
-const github_release_runs = { is_release_lost, publication_state, publish_run, run_state }
+const github_release_runs = {
+	is_named_job,
+	job_outcomes,
+	is_release_lost,
+	publication_state,
+	publish_run,
+	run_state,
+}
 
-export type { PollState, Run, RunSource }
+export type { JobOutcomes, PollState, Run, RunSource }
 export { github_release_runs }

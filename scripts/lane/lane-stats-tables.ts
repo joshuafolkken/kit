@@ -22,6 +22,7 @@ import { lane_size_stats } from './lane-size-stats'
 import { lane_split_stats } from './lane-split-stats'
 import { lane_stage_stats } from './lane-stage-stats'
 import type { StatsWindow } from './lane-stats'
+import { lane_stop_check_stats } from './lane-stop-check-stats'
 import { lane_stop_stats } from './lane-stop-stats'
 import { lane_test_related_stats } from './lane-test-related-stats'
 import type { ToolCall } from './lane-transcript-calls'
@@ -61,6 +62,8 @@ function stop_tables(
 ): Array<string> {
 	return [
 		lane_stop_stats.table(entries, window, events),
+		lane_stop_check_stats.check_table(entries, window, events),
+		lane_stop_check_stats.longest_table(entries, window, events),
 		lane_chain_stop_stats.table(entries, window),
 		lane_gap_stats.table(entries, window, events),
 		lane_cut_stats.table(entries, window, events),

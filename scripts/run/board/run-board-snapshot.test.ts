@@ -33,6 +33,27 @@ function scratch(): string {
 	return make_directory('run-board-snapshot-')
 }
 
+describe('run_board_snapshot.file_store — outcome metadata', () => {
+	it('keeps the concise outcome and its evidence URL across board restarts', () => {
+		const outcome = {
+			summary: 'No change needed',
+			url: 'https://github.com/o/r/issues/1#issuecomment-1',
+		}
+		const store = file_store(path.join(scratch(), FILE_NAME))
+		const closed = {
+			title: 'Outcome',
+			labels: [],
+			closed_ms: undefined,
+			is_merged: false,
+			is_not_planned: true,
+			outcome,
+		}
+
+		store.save({ ...SNAPSHOT, closed: new Map([[1, closed]]) })
+		expect(store.load()?.closed.get(1)).toStrictEqual(closed)
+	})
+})
+
 describe('run_board_snapshot.file_store — what it keeps', () => {
 	it('loads what it saved', () => {
 		const store = file_store(path.join(scratch(), FILE_NAME))
