@@ -5,6 +5,7 @@ import path from 'node:path'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import { lane_ledger, type LedgerEntry } from '#scripts/lane/lane-ledger'
 import { lane_load } from '#scripts/lane/lane-load'
+import { lane_paths } from '#scripts/lane/lane-paths'
 import { file_reader } from '#scripts/lib/read-file'
 import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { run_carry } from '#scripts/run/carry/run-carry'
@@ -91,7 +92,8 @@ async function measure(root: string, is_startup_timed: boolean): Promise<Measure
 	if (!is_startup_timed) return { durations: recorded, is_busy, is_startup_busy: false }
 	const startups = time_startups(root)
 	const load = await lane_load.sample(new Date().toISOString())
-	const is_startup_busy = metrics_duration_load.is_loaded(load, cores)
+	const is_in_lane = lane_paths.issue_here(root) !== undefined
+	const is_startup_busy = metrics_duration_load.is_startup_loaded(load, cores, is_in_lane)
 
 	return { durations: { ...recorded, ...startups }, is_busy, is_startup_busy }
 }

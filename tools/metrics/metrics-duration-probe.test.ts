@@ -194,12 +194,13 @@ describe('metrics_duration_probe.baseline_path under a concurrent move', () => {
 
 describe('metrics_duration_probe.measure', () => {
 	beforeEach(() => {
-		vi.spyOn(lane_load, 'sample').mockResolvedValue({ kind: 'load', at: '', load: 1, lanes: 1 })
+		vi.spyOn(lane_load, 'sample').mockResolvedValue({ kind: 'load', at: '', load: 1, lanes: 0 })
 	})
 
-	it('reads the startups as busy where another lane works right after their runs', async () => {
+	// The scratch root sits outside any lane, so the one working lane is another's.
+	it('reads the startups as busy where one lane works beside a run outside any lane', async () => {
 		vi.spyOn(lane_ledger, 'target').mockResolvedValue(undefined)
-		vi.spyOn(lane_load, 'sample').mockResolvedValue({ kind: 'load', at: '', load: 1, lanes: 2 })
+		vi.spyOn(lane_load, 'sample').mockResolvedValue({ kind: 'load', at: '', load: 1, lanes: 1 })
 		vi.mocked(spawnSync).mockReturnValue(spawnSync(process.execPath, ['--version']))
 
 		const { is_startup_busy } = await metrics_duration_probe.measure(scratch, true)

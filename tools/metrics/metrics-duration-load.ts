@@ -33,8 +33,13 @@ interface LoadReading {
 	is_startup_busy: boolean
 }
 
-function is_loaded(entry: LoadEntry, cores: number): boolean {
-	return (entry.lanes ?? 0) > OWN_LANES || entry.load > cores
+function is_loaded(entry: LoadEntry, cores: number, own_lanes = OWN_LANES): boolean {
+	return (entry.lanes ?? 0) > own_lanes || entry.load > cores
+}
+
+// The startups' live sample: run outside a lane, no working lane is the caller's own.
+function is_startup_loaded(entry: LoadEntry, cores: number, is_in_lane: boolean): boolean {
+	return is_loaded(entry, cores, is_in_lane ? OWN_LANES : 0)
 }
 
 function is_inside(entry: LoadEntry, window: MeasuredWindow): boolean {
@@ -81,7 +86,7 @@ function render_warning(regressions: ReadonlyArray<DurationChange>, baseline_pat
 
 const metrics_duration_load = {
 	is_busy,
-	is_loaded,
+	is_startup_loaded,
 	render_warning,
 	split,
 }

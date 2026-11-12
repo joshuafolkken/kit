@@ -128,23 +128,33 @@ describe('metrics_duration_load.split', () => {
 	})
 })
 
-// The machine's load at the check, read from one live sample.
-function is_loaded(sample: { load: number; lanes?: number }): boolean {
-	return metrics_duration_load.is_loaded({ kind: 'load', at: '', ...sample }, CORES)
+// The machine's load at the check, read from one live sample taken inside a lane or outside one.
+function is_startup_loaded(sample: { load: number; lanes?: number }, is_in_lane = true): boolean {
+	const entry = { kind: 'load' as const, at: '', ...sample }
+
+	return metrics_duration_load.is_startup_loaded(entry, CORES, is_in_lane)
 }
 
 // joshuafolkken/kit#7337: a startup is read against the machine's load at the check.
-describe('metrics_duration_load.is_loaded', () => {
+describe('metrics_duration_load.is_startup_loaded', () => {
 	it('is busy where another lane is working', () => {
-		expect(is_loaded({ load: 1, lanes: 2 })).toBe(true)
+		expect(is_startup_loaded({ load: 1, lanes: 2 })).toBe(true)
 	})
 
 	it('is busy where the load average passed the cores', () => {
-		expect(is_loaded({ load: CORES + 1, lanes: 1 })).toBe(true)
+		expect(is_startup_loaded({ load: CORES + 1, lanes: 1 })).toBe(true)
 	})
 
 	it('is quiet where only its own lane works under the cores', () => {
-		expect(is_loaded({ load: CORES, lanes: 1 })).toBe(false)
+		expect(is_startup_loaded({ load: CORES, lanes: 1 })).toBe(false)
+	})
+
+	it('is busy where one lane works beside a run outside any lane', () => {
+		expect(is_startup_loaded({ load: 1, lanes: 1 }, false)).toBe(true)
+	})
+
+	it('is quiet where no lane works beside a run outside any lane', () => {
+		expect(is_startup_loaded({ load: 1, lanes: 0 }, false)).toBe(false)
 	})
 })
 
