@@ -1,0 +1,81 @@
+// Every setting kit reads from the "josh" key of package.json, documented in docs/package-settings.md.
+// All of them are optional: leave one out and kit keeps its default behavior.
+// package.json cannot hold comments, so remove them when you copy from this file.
+{
+	"josh": {
+		// Where the review gate runs: "local" | "ci". Default: "local".
+		// The JOSH_REVIEW_GATE environment variable overrides it.
+		// kit only reads the value for now: review execution does not change with it.
+		"review_gate": "local",
+
+		// Minutes a run stays quiet before josh run:progress prints a line. A positive number. Default: 20.
+		// --interval, then the JOSH_PROGRESS_INTERVAL_MINUTES environment variable, override it.
+		"progress_interval_minutes": 20,
+
+		// What Prettier formats in a basic project: "auto" | "all". Default: "auto".
+		// "auto" covers HTML, CSS and JavaScript only; "all" adds Markdown, JSON, YAML and the rest.
+		// A full project always formats every type.
+		"format": "auto",
+
+		"lane": {
+			// One shell command josh lane:open runs once in a new lane. Default: unset (runs nothing).
+			// JOSH_MAIN_CHECKOUT holds the path of the main checkout.
+			"setup": "cp -R \"$JOSH_MAIN_CHECKOUT/target\" target"
+		},
+
+		"gate": {
+			// Project steps josh gate runs after its fixed checks. Default: unset (adds nothing).
+			"steps": [
+				{
+					// The label the gate reports the step under (required, unique).
+					"name": "core",
+					// The shell command to run (required).
+					"command": "cargo test -p core",
+					// A step with paths is skipped when none of them moved since it last passed.
+					// Omit it to run the step every time.
+					"paths": ["crates/core"],
+					// CPU cores the step claims. Omit it to claim the whole machine,
+					// so heavy steps run one at a time.
+					"cores": 4
+				}
+			]
+		},
+
+		// Picks each lane worker's model and effort per Issue. Default: unset.
+		// Unset, JOSH_WORKER_MODEL / JOSH_WORKER_EFFORT and kit's defaults decide, as before.
+		// Set, the Issue's profile wins over those two environment variables.
+		"worker": {
+			// The profile an Issue with no worker:<name> label runs on (required).
+			"default": "opus-medium",
+			// true lets a stuck worker resume one profile up. Default: false.
+			"escalate": true,
+			// Listed weakest first; this order is the escalation order and the ship-phase cap.
+			// An Issue labeled worker:<name> runs on that profile.
+			"profiles": [
+				{
+					// The profile's name, used in the worker:<name> label (required, unique).
+					"name": "haiku",
+					// The Claude model (required).
+					"model": "claude-haiku-5-5",
+					// "low" | "medium" | "high" | "xhigh" | "max" (required).
+					// A model without an effort setting, such as Haiku, takes "low".
+					"effort": "low",
+					// The work this profile is for: josh issue:file shows it to whoever files an Issue (required).
+					"when": "Mechanical work with a command that checks it"
+				},
+				{
+					"name": "sonnet-low",
+					"model": "claude-sonnet-5-5",
+					"effort": "low",
+					"when": "Docs, merges, renames, small fixes"
+				},
+				{
+					"name": "opus-medium",
+					"model": "claude-opus-5-5",
+					"effort": "medium",
+					"when": "Most work: unfamiliar systems, or an unknown cause"
+				}
+			]
+		}
+	}
+}

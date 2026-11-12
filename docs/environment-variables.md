@@ -73,6 +73,8 @@ Each role's model and effort for a `backlogrun`. The invoking CLI picks the prov
 
 Set `JOSH_AGENT_PROVIDER=openai` in the project's `.env` to start `pnpm josh backlogrun` with Codex and its existing role profiles. `anthropic`, an unset value, or a blank value selects Claude Code.
 
+A repository that sets [`josh.worker`](./package-settings.md#joshworker) in `package.json` picks each lane worker's model and effort per Issue: the Issue's `worker:<name>` label, else the configured default, wins over `JOSH_WORKER_MODEL` and `JOSH_WORKER_EFFORT`, which then decide nothing.
+
 An exported value takes precedence over `.env`; `--agent claude|codex` takes precedence over both. Other nonempty provider values are rejected before launch. This default selects a new run; opening an existing run's board or using `--restart` keeps its recorded provider.
 
 Detached launchers also hand this variable to processes without an agent session. A detected session keeps determining its own provider.
@@ -109,19 +111,8 @@ Which steps run at a lowered effort:
 
 #### Package settings
 
-- `josh.review_gate`: `"ci" | "local"`, default `"local"`; overridden by `JOSH_REVIEW_GATE`.
-- `josh.progress_interval_minutes`: a positive number of minutes, default `20`; overridden by
-  `JOSH_PROGRESS_INTERVAL_MINUTES`.
-- `josh.lane.setup`: one shell command, unset by default; `josh lane:open` runs it in the new lane
-  after the install and cache seeding, with `JOSH_MAIN_CHECKOUT` set
-  ([`josh lane:open`](./josh-commands-lane.md#josh-laneopen--josh-laneclose--josh-lanelist--josh-laneprune)).
-- `josh.gate.steps`: a list of `{ name, command, paths?, cores? }`, unset by default; `josh gate` runs each
-  command after its fixed checks and reports it under its name ([`josh gate`](./josh-commands.md#josh-gate)).
-- `josh.format`: `"auto" | "all"`, default `"auto"`; what Prettier formats and checks in a basic
-  project (`josh format`, `josh lint`, `josh lint:related`). `auto` formats only the HTML, CSS and
-  JavaScript files that enabled Prettier; `all` formats every file type Prettier reads, such as
-  Markdown, JSON and YAML. A full project always formats every type. Not an environment variable,
-  so local runs and CI format the same files.
+The `josh.*` settings in `package.json`, their defaults and examples are on
+[package-settings.md](./package-settings.md).
 
 | Variable                         | Required | Default                                                          | Used when                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | -------------------------------- | -------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
