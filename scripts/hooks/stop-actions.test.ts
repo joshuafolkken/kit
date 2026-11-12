@@ -1,3 +1,4 @@
+import os from 'node:os'
 import { repo_discovery } from '#scripts/discovery/repo-discovery'
 import { git_gh_repo } from '#scripts/gh/git-gh-repo'
 import { telegram_test } from '#scripts/notify/telegram-test'
@@ -72,6 +73,14 @@ describe('stop_actions.envelope_of — the Telegram body', () => {
 		expect(sent_values().body).toContain(
 			'[#3919](https://github.com/joshuafolkken/kit/issues/3919)',
 		)
+	})
+
+	// joshuafolkken/kit#7342: the home directory carries the account name.
+	it('writes the home directory in the reply as ~', async () => {
+		vi.spyOn(os, 'homedir').mockReturnValue('/Users/account')
+		await envelope([{ ...NOTIFY, message: 'edited /Users/account/kit/a.ts' }])
+
+		expect(sent_values().body).toBe('edited ~/kit/a.ts')
 	})
 })
 
