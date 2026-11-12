@@ -1,10 +1,12 @@
 import { session_cite } from '#scripts/issue/session-cite'
+import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { bash_triggers } from './bash-triggers'
 import { direct_pr_create } from './direct-pr-create'
 import { gh_api } from './gh-api'
 import { git_argv } from './git-argv'
 import { issue_comments } from './issue-comments'
 import { shell_segments } from './shell-segments'
+import { standalone_gh_call, type StandaloneCall } from './standalone-gh-call'
 
 // The `direct-issue-read` row of `delivered-rules.ts` (joshuafolkken/kit#4663). `pnpm josh issue:read`
 // is the one read that withholds a comment from an author without write access and marks an untrusted
@@ -25,6 +27,11 @@ import { shell_segments } from './shell-segments'
 //
 // **It fires on every occurrence**, and before `issue-comments`, whose rewrite would otherwise add the
 // unfiltered comments to the same call.
+//
+// **A standalone `gh issue view <N>` is rewritten rather than refused** (joshuafolkken/kit#7330): the
+// line is that one call with no flag but `-R` / `--repo <owner>/<repo>`, so `issue:read` takes every
+// argument it carries. The rewrite is `issue:read` itself, so an untrusted comment is still withheld.
+// A pipe, a chain, a redirect, a quote, a URL or any other flag keeps the refusal.
 
 const API_SUBCOMMAND = 'api'
 const ISSUE_GROUP = 'issue'
@@ -161,6 +168,44 @@ function is_any_read(command: string): boolean {
 	return is_direct_issue_read(command) || is_josh_read(command)
 }
 
+const VIEW_WORDS = ['gh', ISSUE_GROUP, VIEW_ACTION]
+const REPO_SPELLING = /^(?:(?:-R|--repo) |--repo=)(?<repo>[\w.-]+\/[\w.-]+)$/u
+const ISSUE_READ_COMMAND = 'pnpm josh issue:read'
+const REPO_FLAG = '--repo'
+
+// The `--repo` pair `issue:read` takes for the view's flags: none, or one `<owner>/<repo>`.
+function carried_repo(flags: string): ReadonlyArray<string> | undefined {
+	if (flags === '') return []
+	const repo = REPO_SPELLING.exec(flags)?.groups?.['repo']
+
+	return repo === undefined ? undefined : [REPO_FLAG, repo]
+}
+
+function issue_read_of(view: StandaloneCall): string | undefined {
+	const repo = carried_repo(view.flags)
+
+	return repo === undefined
+		? undefined
+		: standalone_gh_call.line_of([ISSUE_READ_COMMAND, view.issue, ...repo])
+}
+
+// `pnpm josh issue:read` for a refused read that is a standalone `gh issue view`, else `undefined`.
+// The word split runs first: it is cheap, and every Bash call passes through here.
+function issue_read_command(command: string): string | undefined {
+	const view = standalone_gh_call.call_of(command, VIEW_WORDS)
+	const read = view === undefined ? undefined : issue_read_of(view)
+
+	return read !== undefined && is_direct_issue_read(command.trim()) ? read : undefined
+}
+
+function issue_read_input(call: GuardedCall): Record<string, unknown> | undefined {
+	return standalone_gh_call.input_of(call, issue_read_command)
+}
+
+const ISSUE_READ_NOTE =
+	'↻ direct issue read: this `gh issue view <N>` ran as `pnpm josh issue:read <N>`, which withholds ' +
+	'a comment from an author without write access (`issue-comments.md`).'
+
 const DIRECT_ISSUE_READ_REASON =
 	'⛔ direct issue read: pnpm josh issue:read <N>\n' +
 	'Run that in place of this read of `…/issues/<N>`, its comments or its timeline (`gh api` or ' +
@@ -176,16 +221,24 @@ const ROW = {
 	decide: (): boolean => true,
 	keeps: bash_triggers.on_bash_command(is_josh_read),
 	reaches: bash_triggers.on_bash_command(is_any_read),
+	rewrite: issue_read_input,
+	rewrite_note: ISSUE_READ_NOTE,
 	about: {
 		title: 'Direct issue read',
 		topic: '`issue-comments.md`',
 		fires:
-			"a `gh api` GET of the checkout's own `repos/<o>/<r>/issues/<N>`, `…/comments` or `…/timeline` (the `{owner}` placeholder or the origin spelled out), or a `gh issue view <N>` of it, with no projection or one naming the body (or, for the view, the comments); it points at `pnpm josh issue:read`. Every occurrence",
+			"a `gh api` GET of the checkout's own `repos/<o>/<r>/issues/<N>`, `…/comments` or `…/timeline` (the `{owner}` placeholder or the origin spelled out), or a `gh issue view <N>` of it, with no projection or one naming the body (or, for the view, the comments); it points at `pnpm josh issue:read`. A line that is only `gh issue view <N>`, with at most `-R` / `--repo <owner>/<repo>`, is rewritten to `pnpm josh issue:read <N>`; every other form is refused, every occurrence",
 		quiet:
 			'`pnpm josh issue:read` / `run:prep` / `run:entry`, a `--jq` / `--json` projection without the body or the comments, `gh issue view --web`, or another repository named outright',
 	},
 }
 
-const direct_issue_read = { DIRECT_ISSUE_READ_REASON, ROW, is_direct_issue_read }
+const direct_issue_read = {
+	DIRECT_ISSUE_READ_REASON,
+	ISSUE_READ_NOTE,
+	ROW,
+	is_direct_issue_read,
+	issue_read_command,
+}
 
 export { direct_issue_read }
