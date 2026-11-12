@@ -1,1 +1,0 @@
-- rf:bug-risks | low | docs/cloud-session.md:81 | 2026-11-09 | #6685

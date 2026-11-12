@@ -1,1 +1,0 @@
-- k:followup-unrelated-test-rerun | d1 | 2026-11-04 | scripts/epic/epic-lane-occupancy.test.ts | followup reran Unit Tests (1/6); failed outside the change: isolated scripts/epic/epic-lane-occupancy.test.ts > epic_lane_occupancy.read — protected holders > keeps human review after its process exits

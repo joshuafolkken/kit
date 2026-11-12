@@ -1,1 +1,0 @@
-- rf:bug-risks | low | scripts/lint/lint-rule.ts:164 | 2026-11-01 | #5692

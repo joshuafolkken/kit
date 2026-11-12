@@ -1,1 +1,0 @@
-- rf:bug-risks | low | scripts/rules/shell-body-trigger.ts:191 | 2026-11-03 | #6115

@@ -1,5 +1,0 @@
-- rf:bug-risks | medium | scripts/review/prose-stale-read.ts:17 | 2026-11-10 | #7048 | fixed
-- rf:bug-risks | low | scripts/review/prose-stale-read.ts:55 | 2026-11-10 | #7048 | fixed
-- rf:comments | low | scripts/review/prose-stale-scan.ts:10 | 2026-11-10 | #7048 | fixed
-- rf:bug-risks | low | scripts/review/prose-stale-read.ts:32 | 2026-11-10 | #7048
-- rf:comments | low | scripts/review/prose-stale-scan.ts:10 | 2026-11-10 | #7048

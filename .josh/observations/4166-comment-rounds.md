@@ -1,2 +1,0 @@
-- rf:comments | low | scripts/lane/lane-ledger.ts:109 | 2026-10-19 | #4166
-- rf:project-conventions | low | scripts/git/git-preflight.ts:13 | 2026-10-19 | #4166

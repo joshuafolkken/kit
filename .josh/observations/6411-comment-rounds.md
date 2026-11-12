@@ -1,2 +1,0 @@
-- rf:tests | medium | scripts/backlog/backlog-next-rank.test.ts:132 | 2026-11-05 | #6411 | fixed
-- rf:none | none | - | 2026-11-05 | #6411

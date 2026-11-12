@@ -1,1 +1,0 @@
-- rf:bug-risks | low | tools/hooks/hook-bundle-ready.ts | 2026-11-01 | #5628

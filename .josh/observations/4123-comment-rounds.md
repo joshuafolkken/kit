@@ -1,3 +1,0 @@
-- rf:tests | low | scripts/build/build-hooks-self-invoke.test.ts:81 | 2026-10-18 | #4123
-- rf:comments | low | scripts/build/build-hooks.ts:31 | 2026-10-18 | #4123
-- rf:project-conventions | low | scripts/build/build-hooks-self-invoke.test.ts:20 | 2026-10-18 | #4123

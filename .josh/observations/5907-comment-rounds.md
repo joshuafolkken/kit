@@ -1,2 +1,0 @@
-- rf:bug-risks | low | scripts/run/run-liveness.ts:134 | 2026-11-02 | #5907 | false-positive
-- rf:bug-risks | low | scripts/run/run-liveness.ts:386 | 2026-11-02 | #5907

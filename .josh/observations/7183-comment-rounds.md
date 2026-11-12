@@ -1,2 +1,0 @@
-- rf:comments | low | scripts/lane/lane-plan-size.ts:351 | 2026-11-11 | #7183
-- rf:project-conventions | low | docs/maintainers/lane-limit-measurement.md:266 | 2026-11-11 | #7183

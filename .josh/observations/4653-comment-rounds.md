@@ -1,3 +1,0 @@
-- rf:assumptions | low | scripts/agent/codex-agent-argv.ts:40 | 2026-10-23 | #4653
-- rf:tests | low | tools/metrics/metrics-duration-probe.test.ts:114 | 2026-10-23 | #4653
-- rf:comments | low | tools/metrics/metrics-duration-probe.ts:77 | 2026-10-23 | #4653

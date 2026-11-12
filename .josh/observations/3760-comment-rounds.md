@@ -1,2 +1,0 @@
-- rf:assumptions | low | scripts/fresh-machine/specs/kit-test-backlogrun.json:15 | 2026-10-14 | #3760
-- rf:confidence | low | scripts/fresh-machine/specs/kit-test-backlogrun.json:19 | 2026-10-14 | #3760

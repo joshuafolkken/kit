@@ -1,2 +1,0 @@
-- rf:comments | low | scripts/report/report-template-cli.ts:10 | 2026-11-02 | #5844
-- rf:performance | low | scripts/report/report-template-cli.ts:45 | 2026-11-02 | #5844

@@ -1,2 +1,0 @@
-- rf:bug-risks | low | scripts/agent/agent-role-profile.ts:286 | 2026-11-01 | #5616
-- rf:none | none | - | 2026-11-01 | #5616

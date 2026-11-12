@@ -1,1 +1,0 @@
-- rf:bug-risks | low | scripts/lane/lane-plan-check.ts:116 | 2026-11-09 | #6666

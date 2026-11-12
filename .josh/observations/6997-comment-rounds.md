@@ -1,1 +1,0 @@
-- rf:bug-risks | medium | .github/workflows/ci.yml:428 | 2026-11-10 | #6997

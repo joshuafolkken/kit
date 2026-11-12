@@ -1,1 +1,0 @@
-- rf:bug-risks | medium | scripts/issue/figure-source-lint.ts:87 | 2026-11-10 | #7021

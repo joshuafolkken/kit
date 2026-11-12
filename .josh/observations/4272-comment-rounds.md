@@ -1,1 +1,0 @@
-- rf:bug-risks | low | scripts/issue/defect-report.ts:86 | 2026-10-20 | #4272

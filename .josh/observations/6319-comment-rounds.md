@@ -1,2 +1,0 @@
-- rf:none | none | - | 2026-11-10 | #6319
-- rf:project-conventions | medium | docs/sync.md:53 | 2026-11-10 | #6319

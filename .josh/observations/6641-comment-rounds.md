@@ -1,2 +1,0 @@
-- rf:project-conventions | low | .claude/skills/workflow-commands/issue-fold-existing.md:23 | 2026-11-09 | #6641 | false-positive
-- rf:none | none | - | 2026-11-09 | #6641

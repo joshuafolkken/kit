@@ -1,1 +1,0 @@
-- rf:project-conventions | low | tools/test/unit-file-reporter.ts:17 | 2026-10-27 | #5202

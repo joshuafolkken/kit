@@ -1,1 +1,0 @@
-- rf:project-conventions | low | scripts/followup/git-followup-finish.ts:27 | 2026-10-27 | #5131

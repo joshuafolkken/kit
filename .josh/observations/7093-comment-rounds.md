@@ -1,6 +1,0 @@
-- rf:comments | low | scripts/issue/issue-labels.ts:263 | 2026-11-10 | #7093
-- rf:assumptions | low | .claude/skills/epic-commands/SKILL.md:63 | 2026-11-10 | #7093
-- rf:bug-risks | low | scripts/issue/already-done-citation.ts:124 | 2026-11-10 | #7093
-- rf:comments | low | scripts/issue/issue-labels.ts:263 | 2026-11-10 | #7093
-- rf:assumptions | low | .claude/skills/epic-commands/SKILL.md:63 | 2026-11-10 | #7093
-- rf:bug-risks | low | scripts/issue/already-done-citation.ts:124 | 2026-11-10 | #7093

@@ -1,2 +1,0 @@
-- rf:bug-risks | low | scripts/issue/upstream-interrupt-cli.ts:219 | 2026-10-31 | #5546
-- rf:bug-risks | low | scripts/issue/upstream-interrupt-cli.ts:146 | 2026-10-31 | #5546

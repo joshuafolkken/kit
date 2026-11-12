@@ -1,1 +1,0 @@
-- rf:bug-risks | low | prompts/review-rubric.md:4 | 2026-11-03 | #6037

@@ -1,4 +1,0 @@
-- rf:tests | medium | tools/cost-audit/cost-audit-cli.ts:117 | 2026-11-10 | #7042
-- rf:project-conventions | low | tools/cost-audit/cost-audit-format.ts:43 | 2026-11-10 | #7042
-- rf:project-conventions | low | tools/cost-audit/cost-audit-usage.ts:106 | 2026-11-10 | #7042
-- rf:none | none | - | 2026-11-10 | #7042

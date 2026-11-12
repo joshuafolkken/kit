@@ -1,1 +1,0 @@
-- rf:project-conventions | low | pnpm-lock.yaml:1696 | 2026-11-07 | #6619

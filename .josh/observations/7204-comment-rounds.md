@@ -1,3 +1,0 @@
-- rf:bug-risks | medium | docs/init.md:318 | 2026-11-11 | #7204 | fixed
-- rf:tests | medium | scripts/lint/format.ts:121 | 2026-11-11 | #7204 | fixed
-- rf:none | none | - | 2026-11-11 | #7204
