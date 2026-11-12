@@ -46,6 +46,33 @@ afterEach(() => {
 	vi.restoreAllMocks()
 })
 
+describe('issue_comment_cli.run — outcome metadata', () => {
+	it('records an explicit English outcome with its evidence', async () => {
+		const code = await issue_comment_cli.run([
+			'5',
+			'--body',
+			INLINE_BODY,
+			'--outcome',
+			'No change needed',
+			'--evidence-url',
+			COMMENT_URL,
+		])
+
+		expect(code).toBe(0)
+		expect(issue_comment).toHaveBeenCalledWith(
+			'5',
+			expect.stringContaining(
+				`<!-- josh:outcome {"summary":"No change needed","url":"${COMMENT_URL}"} -->`,
+			),
+		)
+	})
+
+	it('refuses an unsafe summary before posting', async () => {
+		expect(await issue_comment_cli.run(['5', '--body', INLINE_BODY, '--outcome', 'a\nb'])).toBe(1)
+		expect(issue_comment).not.toHaveBeenCalled()
+	})
+})
+
 describe('issue_comment_cli.run — posts one comment and prints its URL', () => {
 	it('posts an inline --body and prints the returned URL', async () => {
 		const code = await issue_comment_cli.run(['5', '--body', INLINE_BODY])
@@ -86,7 +113,9 @@ describe('issue_comment_cli.run — refuses a call it cannot post', () => {
 		expect(code).toBe(1)
 		expect(issue_comment).not.toHaveBeenCalled()
 	})
+})
 
+describe('issue_comment_cli.run — remaining refusals', () => {
 	it('refuses a call with no body at all', async () => {
 		const code = await issue_comment_cli.run(['5'])
 

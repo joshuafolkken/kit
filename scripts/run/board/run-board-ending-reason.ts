@@ -101,10 +101,10 @@ function is_stalled(status: ItemStatus, labels: ReadonlyArray<string> = []): boo
 
 // Each finished state that did not merge: how its tail names it, and the reason it draws when none
 // was recorded.
-const FINISHED_ENDINGS: Partial<Record<ItemState, { word: string; fallback: string }>> = {
-	done: { word: 'done', fallback: 'closed without a PR to merge' },
-	withdrawn: { word: 'withdrawn', fallback: 'run withdrawn' },
-	already_done: { word: 'already done', fallback: 'closed with verified evidence' },
+const FINISHED_ENDINGS: Partial<Record<ItemState, string>> = {
+	done: 'Closed without a merged PR',
+	withdrawn: 'Run withdrawn',
+	already_done: 'Closed with verified evidence',
 }
 
 // Finished rows name why no action remains; merge rows keep their existing tail.
@@ -113,7 +113,7 @@ function tail_of(status: ItemStatus): string | undefined {
 
 	if (ending === undefined) return status.reason
 
-	return `nothing to do · ${ending.word}: ${status.reason ?? ending.fallback}`
+	return status.outcome?.summary ?? ending
 }
 
 // joshuafolkken/kit#6577: what stopped a lane, or the ship of a child still working, by the command its
@@ -140,7 +140,9 @@ function row_reason(number: number, status: ItemStatus, read: RowRead): Pick<Boa
 	if (reason !== undefined) {
 		const tail = park_row_reason(number, reason, read.is_backlog_live === true, waits)
 
-		return { reason: { tail } }
+		return {
+			reason: { tail, ...(status.outcome !== undefined && { evidence_url: status.outcome.url }) },
+		}
 	}
 
 	return is_stalled(status, read.labels.get(number))

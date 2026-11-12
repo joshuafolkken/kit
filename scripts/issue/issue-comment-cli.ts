@@ -3,6 +3,7 @@ import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { cli_body } from '#scripts/josh/cli-body'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { error_text } from '#scripts/lib/error-message'
+import { issue_outcome } from './issue-outcome'
 
 // `josh issue:comment <N> --body <text> | --body-file <path>` — post one comment to an issue (a PR
 // comment is an issue comment over REST) and print the comment URL.
@@ -28,7 +29,12 @@ interface CommentRequest {
 
 // The read is strict: an unknown flag refuses the call rather than being
 // ignored. `cli_body.resolve` owns the both-flags-at-once refusal and the file read.
-const OPTIONS = { body: { type: 'string' }, 'body-file': { type: 'string' } } as const
+const OPTIONS = {
+	body: { type: 'string' },
+	'body-file': { type: 'string' },
+	outcome: { type: 'string' },
+	'evidence-url': { type: 'string' },
+} as const
 
 // `resolve` may throw when both body flags are given, which `run` reports — the message names the two
 // flags a caller must pick between.
@@ -47,7 +53,14 @@ function parse_request(argv: ReadonlyArray<string>): CommentRequest | undefined 
 
 	if (body === undefined || body.length === 0) return undefined
 
-	return { issue_number, body }
+	return {
+		issue_number,
+		body: issue_outcome.body_of({
+			body,
+			summary: parsed.values.outcome,
+			url: parsed.values['evidence-url'],
+		}),
+	}
 }
 
 // A both-flags refusal and a file-read failure both surface as an `Error` from `resolve`, and its

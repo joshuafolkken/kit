@@ -72,7 +72,7 @@ describe('run_board_tick.tick — a parked child a person closed', () => {
 		['merged when a merge closed it', { is_merged: true }, '✅'],
 	])('draws it %s and leaves it out of the parked count', async (_label, closed, icon) => {
 		const lines = await frame_after(answer_of(closed))
-		const tail = closed.is_not_planned === true ? '  nothing to do · withdrawn: run withdrawn' : ''
+		const tail = closed.is_not_planned === true ? '  Run withdrawn' : ''
 
 		// Timed launch to park: the wait on a person after the park is off the lanes (#4463).
 		expect(row_of(lines)).toMatch(
@@ -88,10 +88,7 @@ describe('run_board_tick.tick — a parked child a person closed', () => {
 		const lines = await frame_after(answer_of({ is_not_planned: true, closed_ms: undefined }))
 
 		expect(row_of(lines)).toMatch(
-			new RegExp(
-				`🚫 {13}${String(ISSUE)} +${TITLE} +nothing to do · withdrawn: run withdrawn$`,
-				'u',
-			),
+			new RegExp(`🚫 {13}${String(ISSUE)} +${TITLE} +Run withdrawn$`, 'u'),
 		)
 	})
 

@@ -3,7 +3,8 @@ import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { TRANSPORT_ENV_VAR } from '#scripts/gh/git-gh-transport'
 import { ALREADY_DONE_LABEL } from '#scripts/issue/issue-labels'
 import { issue_merged } from '#scripts/issue/issue-merged'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { issue_outcome } from '#scripts/issue/issue-outcome'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_board_closed } from './run-board-closed'
 
 // joshuafolkken/kit#3451: a child that left the open listing, read from GitHub — its title, when it
@@ -16,6 +17,8 @@ vi.mock('#scripts/issue/issue-merged', () => ({ issue_merged: { read_merge_state
 
 const CLOSED_AT = '2026-10-08T08:45:48Z'
 const TITLE = 'Show closed children'
+
+afterEach(() => vi.restoreAllMocks())
 
 function view(state: string, state_reason?: string): string {
 	return JSON.stringify({
@@ -35,6 +38,19 @@ beforeEach(() => {
 })
 
 describe('run_board_closed.read_closed', () => {
+	it('reads the outcome only for an issue closed without a merge', async () => {
+		const outcome = {
+			summary: 'No change needed',
+			url: 'https://github.com/o/r/issues/3439#issuecomment-1',
+		}
+		const read = vi.spyOn(issue_outcome, 'recorded').mockResolvedValue({ outcome })
+
+		vi.mocked(git_gh_issue_read.issue_view_json).mockResolvedValue(view('CLOSED'))
+		vi.mocked(issue_merged.read_merge_state).mockResolvedValue(false)
+
+		await expect(run_board_closed.read_closed(3439)).resolves.toMatchObject({ outcome })
+		expect(read).toHaveBeenCalledWith(3439, false)
+	})
 	it.each([true, false])('reads a closed issue, merged %s', async (is_merged) => {
 		vi.mocked(git_gh_issue_read.issue_view_json).mockResolvedValue(view('CLOSED'))
 		vi.mocked(issue_merged.read_merge_state).mockResolvedValue(is_merged)

@@ -109,6 +109,23 @@ afterEach(() => {
 	vi.restoreAllMocks()
 })
 
+it('posts the explicit outcome before closing without changing the exit order', async () => {
+	expect(
+		await issue_already_done_cli.run([
+			ISSUE,
+			FLAG,
+			EVIDENCE_FILE,
+			'--outcome',
+			'Already implemented',
+		]),
+	).toBe(0)
+	expect(issue_comment).toHaveBeenCalledWith(
+		ISSUE,
+		expect.stringContaining('<!-- josh:outcome {"summary":"Already implemented"} -->'),
+	)
+	expect(calls).toEqual(['comment', 'label', 'close', 'release'])
+})
+
 describe('issue_already_done_cli.run — the exit in order', () => {
 	it('posts the evidence, labels it, closes it as completed, then releases the hold', async () => {
 		const code = await issue_already_done_cli.run([ISSUE, FLAG, EVIDENCE_FILE])

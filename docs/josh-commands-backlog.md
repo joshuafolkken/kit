@@ -293,6 +293,8 @@ pnpm josh issue:comment 2304 --body "a short note"           # inline, for a bod
 
 It accepts a PR as well as an issue and prints the comment URL.
 
+結論の記録は [board の `--outcome`・`--evidence-url`](josh-commands-board.md) を参照。
+
 The body travels through [`cli-body.ts`](../scripts/josh/cli-body.ts), shared with `notify` / `followup`; `--body` and `--body-file` at once is refused. The `raw-field-body` row of `pnpm josh rule:list` refuses the `-f body=@…` misfire before it runs, so the literal `@<path>` cannot reach GitHub.
 
 Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh issue:comment` in detail".
