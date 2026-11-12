@@ -20,8 +20,8 @@ import { run_review_steps } from './run-review-steps'
 // already moved, pushes nothing and the ship's commit stage pushes as before. A round recorded once
 // the branch is pushed goes to the issue (`review-record-comment.ts`).
 //
-// Only a lane child's own open, briefing code alone: the ship's `--code-only` open commits through its
-// own sync stage, and an interaction review is still to come.
+// Only a lane child's own open, after every due brief is written: the ship's `--code-only` open
+// commits through its own sync stage. All due slots still have to attest before the ship can merge.
 
 const PUSH_FLAG = '--push'
 const RUN_REVIEW_COMMAND = 'run:review'
@@ -43,10 +43,10 @@ interface EarlyPushPlan {
 
 type Environment = Readonly<Record<string, string | undefined>>
 
-function is_code_alone(plan: EarlyPushPlan): boolean {
+function is_full_open(plan: EarlyPushPlan): boolean {
 	if (plan.is_code_only) return false
 
-	return plan.slots.length === 1 && plan.slots[0] === review_attest.REVIEW_SLOT.CODE
+	return plan.slots.includes(review_attest.REVIEW_SLOT.CODE)
 }
 
 // The mark counts only in the checkout of the issue it names: a leaked one pushes nothing.
@@ -55,7 +55,7 @@ function is_due(
 	environment: Environment = process.env,
 	directory = PROJECT_ROOT,
 ): boolean {
-	return lane_child_marker.is_child_of(directory, environment) && is_code_alone(plan)
+	return lane_child_marker.is_child_of(directory, environment) && is_full_open(plan)
 }
 
 // A clean tree is already committed; a refused commit says why and leaves the round to the ship.
@@ -77,7 +77,7 @@ function preparation_skip(
 	if (!lane_child_marker.is_child_of(directory, environment)) return 'not-lane-child'
 	if (plan.is_code_only) return 'code-only'
 
-	return is_code_alone(plan) ? undefined : 'multiple-slots'
+	return is_full_open(plan) ? undefined : 'multiple-slots'
 }
 
 // Whether this open pushes early: due here, and the tree committed for the brief to attest.
