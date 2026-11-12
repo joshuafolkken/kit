@@ -84,22 +84,36 @@ describe('observations_flush — the branch a flush opens', () => {
 	})
 })
 
+const UNCHANGED_LEDGER = 'changes none'
+
 describe('observations_flush — the pull request it opens', () => {
 	// A flush answers to no single issue, so a `closes #N` would close whichever issue the number
 	// happened to name — the ledger's own lines are where each observation says what it is about.
 	it('carries no closing keyword', () => {
-		expect(observations_flush.pull_request_body()).not.toContain('closes #')
+		expect(observations_flush.pull_request_body(0)).not.toContain('closes #')
 	})
 
 	it('names the ledger and the command that opened it', () => {
-		const body = observations_flush.pull_request_body()
+		const body = observations_flush.pull_request_body(0)
 
 		expect(body).toContain(OBSERVATION_LEDGER_PATH)
 		expect(body).toContain(FLUSH_COMMAND)
 	})
 
 	it('says the ledger is append-only in the diff a reviewer reads', () => {
-		expect(observations_flush.pull_request_body()).toContain('append-only')
+		const body = observations_flush.pull_request_body(0)
+
+		expect(body).toContain('append-only')
+		expect(body).toContain(UNCHANGED_LEDGER)
+	})
+
+	// joshuafolkken/kit#7336: an archiving flush removes files, so "changes none" would be false.
+	it('says an archiving flush moves the closed issues’ files and drops no line', () => {
+		const body = observations_flush.pull_request_body(2)
+
+		expect(body).toContain('moves 2 closed issues')
+		expect(body).toContain('drops none')
+		expect(body).not.toContain(UNCHANGED_LEDGER)
 	})
 })
 
