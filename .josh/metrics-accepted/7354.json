@@ -1,0 +1,7 @@
+{
+	"reason": "New ship-phase cap module (agent-ship-cap.ts) and the Issue label read for josh.worker, #7354",
+	"date": "2026-11-12",
+	"growth": {
+		"scripts.code_lines": 49
+	}
+}

@@ -305,6 +305,8 @@ words:
   # document-rule test quotes verbatim.
   - unrecordable
   - runwake
+  # A model the `josh.worker` profiles do not name, so it has no rank (joshuafolkken/kit#7354).
+  - unranked
   - fromjson
   - dryrun
   - overridability
