@@ -33,13 +33,15 @@ silence clock; the interval and its overrides are the person's (`docs/josh-comma
 
 ### What a report says
 
-**Every unscheduled progress statement is answered by `pnpm josh run:board --chat`** in one code
-block — a `backlogrun`, a `fullrun` or a `halfrun` alike — the reply to an explicit ask and
-the note just after a run starts alike; each is exempt from the interval and records the report
-itself, so no `--mark` beside it. **Relay its lines verbatim** — round, rephrase
-or re-label nothing, and **never write a clock time the command did not print**; where a field is
-missing, say so. **A field's empty value is an observation, never a state** (`record unread` is not
-*not stalled*), and **nothing in the lines is a verification result** — no gate, CI or check rollup.
+**For progress-only questions or unsolicited progress, run `pnpm josh run:board --chat`**; relay
+output verbatim in one code block (`backlogrun`, `fullrun`, `halfrun`; entry included).
+It records reports without interval or `--mark`. Never round, rephrase, relabel or invent
+times. Name missing fields; empty values are observations, not states (`record unread` is not
+*not stalled*). Board lines prove no gate, CI or check result.
+
+**Investigate cause and improvement questions**, even missing pause reasons or quoted board lines:
+read state, logs and code; explain evidence and uncertainty. Mixed questions need the verbatim board
+and explanation. Boards never replace investigation.
 
 **The heartbeat is ambient, never a Telegram.** `pnpm josh run:board` is its reader, in a pane of the
 person's own; **no session relays the stream** — name the board command once, at the first cut or when
@@ -48,7 +50,7 @@ asked; the person starts it, or the `josh: run board` task in `.vscode/tasks.jso
 **A request for periodic progress is never a CronCreate job** — on screen, name `pnpm josh run:board`;
 off-screen, start `pnpm josh run:board --every <minutes>` in the background (`docs/josh-commands-board.md`).
 
-**A stop is the only interrupt**: a `backlogrun` that has stopped ends with
+**Only a stop interrupts**: a stopped `backlogrun` ends with
 `pnpm josh run:report --end --stopped "<reason>"`, which sends one ⏸️ confirmation; a parked child sends
 its own (`backlogrun-park.md`).
 
