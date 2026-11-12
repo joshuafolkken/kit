@@ -1,7 +1,0 @@
-{
-	"reason": "publish-tag-cli.ts wraps its body in a guarded main() so the in-process josh release:tag route does not run it at import (#7303)",
-	"date": "2026-11-11",
-	"growth": {
-		"scripts.code_lines": 30
-	}
-}
