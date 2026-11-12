@@ -6,6 +6,7 @@ import { main_sync } from '#scripts/git/main-sync'
 import { error_text } from '#scripts/lib/error-message'
 import { review_comment_carry } from '#scripts/review/review-comment-carry'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { observation_ledger_archive } from './observation-ledger-archive'
 import { observations_flush } from './observations-flush'
 import {
 	DEFAULT_BRANCH,
@@ -63,8 +64,13 @@ vi.mock('#scripts/review/review-comment-carry', () => ({
 		discard_uncommitted: vi.fn(),
 	},
 }))
+// The archive reads GitHub and moves the ledger's files (joshuafolkken/kit#7336).
+vi.mock('./observation-ledger-archive', () => ({
+	observation_ledger_archive: { archive_reported: vi.fn(async () => 0) },
+}))
 
 const NO_COMMITS = 0
+const ARCHIVED_FILES = 3
 const PUSHED_SHA = 'c0ffee1'
 const SUCCESS_EXIT_CODE = 0
 const WAIT_INTERRUPTED = 'the wait was interrupted'
@@ -266,5 +272,28 @@ describe('observations_flush — the merge progress of an earlier auto-merge flu
 		expect(message).toBe(observations_flush_landing.stuck_flush_message([LANDING_PULL]))
 		expect(git_pr_checks.read_merge_progress).toHaveBeenCalledWith(LANDING_PULL.head_ref)
 		expect(git_command.checkout_b).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#7336: the closed issues' files are archived after the carry, and the pull request
+// says it moved them.
+describe('observations_flush — the archive', () => {
+	beforeEach(() => {
+		on_default_branch()
+	})
+
+	it('archives after the carry and opens the pull request with the moving wording', async () => {
+		vi.mocked(observation_ledger_archive.archive_reported).mockResolvedValueOnce(ARCHIVED_FILES)
+
+		await flush_message()
+
+		expect(first_call_order(review_comment_carry.carry_reported)).toBeLessThan(
+			first_call_order(observation_ledger_archive.archive_reported),
+		)
+		expect(git_gh_command.pr_create).toHaveBeenCalledWith(
+			observations_flush.COMMIT_MESSAGE,
+			observations_flush.pull_request_body(ARCHIVED_FILES),
+			'ignore-for-release',
+		)
 	})
 })

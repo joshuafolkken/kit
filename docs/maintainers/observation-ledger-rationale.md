@@ -101,8 +101,11 @@ fix is the shape:
   (`scripts/observations/observations-flush.ts:65`). An archive commit needs its own: it moves lines
   and drops none.
 - Carried mark: the carry counts an issue as carried when its file exists. The archive must answer
-  that too (a carried-issue list, or the carry reading the archive), or every archived issue is
-  carried again.
+  that too, or every archived issue is carried again. It lists each archived rounds file's issue
+  in `archived-comment-rounds.txt`, which the carry reads. Reading the archive itself would not
+  work: a carried sighting line (`- k:`) does not name its issue.
+- Implementation: `scripts/observations/observation-ledger-archive.ts`, run by `flush` after the
+  carry (joshuafolkken/kit#7339).
 - Default-branch count: the aggregate sits in the same directory, and `read` takes every `.md` file
   there (`scripts/observations/observation-ledger.ts:55`). The count still reads all of the default
   branch's lines (`.claude/skills/workflow-commands/observation-ledger.md:87`).
