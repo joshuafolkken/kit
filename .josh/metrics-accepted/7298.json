@@ -1,7 +1,0 @@
-{
-	"reason": "release timeout hint now names the workflow the repository actually has (publish.yml, GitHub Release, or josh sync) #7298",
-	"date": "2026-11-11",
-	"growth": {
-		"scripts.code_lines": 15
-	}
-}

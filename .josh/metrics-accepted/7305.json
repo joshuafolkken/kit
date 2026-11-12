@@ -1,7 +1,0 @@
-{
-	"reason": "Split of backlog-next.ts (#7305): the new report module repeats its imports and namespace object, and untested-sources requires a test named after it",
-	"date": "2026-11-11",
-	"growth": {
-		"scripts.code_lines": 26
-	}
-}
