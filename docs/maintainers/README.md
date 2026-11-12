@@ -49,6 +49,7 @@ the procedure, so a change to a rationale page changes no rule.
 - [rule-delivery-rationale.md](./rule-delivery-rationale.md) — how a rule reaches the agent
 - [file-edits-rationale.md](./file-edits-rationale.md) — file edits
 - [shell-body-rationale.md](./shell-body-rationale.md) — shell bodies
+- [shell-tokenizer.md](./shell-tokenizer.md) — the guards' shared shell tokenizer
 - [turn-batching-rationale.md](./turn-batching-rationale.md) — turn batching
 - [output-bounds-rationale.md](./output-bounds-rationale.md) — the Bash output cap and piped checks
 - [wip-cap-rationale.md](./wip-cap-rationale.md) — the open-Issue cap

@@ -42,6 +42,55 @@ describe('segments_of', () => {
 	})
 })
 
+// joshuafolkken/kit#7334: a compound command's opening word is a cut, so the command after it starts a
+// segment a rule anchored at `^` reads.
+describe('compound commands', () => {
+	const case_head = 'case $x in'
+
+	it.each([
+		[`${case_head} a) rm -rf y;; b) ls;; esac`, [case_head, 'rm -rf y', '', 'ls', 'esac']],
+		['case "$x" in a) rm -rf y;& *) ls;;& esac', ['case "$x" in', 'rm -rf y', '', 'ls', 'esac']],
+		[
+			`${case_head}\n a) rm -rf y;;\n b) ls;;\nesac`,
+			[case_head, '', 'rm -rf y', '', '', 'ls', '', 'esac'],
+		],
+		['f() { rm -rf y; }', ['f()', 'rm -rf y', '}']],
+		['{ rm -rf y; ls; }', ['', 'rm -rf y', 'ls', '}']],
+	])('cuts %j', (command, expected) => {
+		expect(shell_segments.segments_of(command)).toStrictEqual(expected)
+	})
+
+	it.each([["gh api --jq '{ a: .b }'"], ['echo { x'], ['echo in a)']])(
+		'leaves a `{` or `)` that opens nothing in %j as text',
+		(command) => {
+			expect(shell_segments.segments_of(command)).toStrictEqual([command])
+		},
+	)
+
+	it('cuts a substitution at its `;` but reads its closing `)` as no pattern', () => {
+		expect(shell_segments.segments_of('x=$(a; b)')).toStrictEqual(['x=$(a', 'b)'])
+	})
+
+	it('cuts a function body on the quote-aware reading too', () => {
+		expect(shell_segments.quote_aware_commands_of("f() { echo 'a; b' | rm -rf y; }")).toStrictEqual(
+			['f()', "echo 'a; b'", 'rm -rf y', '}'],
+		)
+	})
+})
+
+describe('parts_of', () => {
+	it.each([['a && b; c'], ['case $x in a) b;; esac'], ['f() { a; }']])(
+		'keeps each cut so the parts of %j join back to the line',
+		(command) => {
+			expect(shell_segments.parts_of(command).join('')).toBe(command)
+		},
+	)
+
+	it('keeps the separator between its commands', () => {
+		expect(shell_segments.parts_of('a && b')).toStrictEqual(['a ', '&&', ' b'])
+	})
+})
+
 describe('first_of', () => {
 	it.each([
 		[LONE_COMMAND, LONE_COMMAND],
