@@ -9,6 +9,7 @@ const SECOND = 'b'
 const BOTH: ReadonlyArray<string> = [FIRST, SECOND]
 const LONE_COMMAND = 'pnpm josh gate'
 const QUOTED_SEPARATOR = "echo 'x && y'"
+const CASE_HEAD = 'case $x in'
 
 describe('joined_continuations', () => {
 	it('joins a backslash-continued line into one command', () => {
@@ -44,8 +45,24 @@ describe('segments_of', () => {
 
 // joshuafolkken/kit#7334: a compound command's opening word is a cut, so the command after it starts a
 // segment a rule anchored at `^` reads.
+describe('case arm patterns', () => {
+	const case_head = CASE_HEAD
+
+	it.each([
+		// A command touching its `)` is cut at the `)`; a `)` inside quotes closes nothing.
+		[`${case_head} a) ls;; b)rm -rf y;; esac`, [case_head, 'ls', '', 'rm -rf y', 'esac']],
+		[`${case_head} a) ls;; b )rm -rf y;; esac`, [case_head, 'ls', 'b', 'rm -rf y', 'esac']],
+		[`${case_head} a) ls;; $y)rm -rf y;; esac`, [case_head, 'ls', '', 'rm -rf y', 'esac']],
+		[`${case_head} 'a)' ) rm -rf y;; esac`, [`${case_head} 'a)'`, 'rm -rf y', 'esac']],
+		// A newline stands only before a pattern, so the words after `esac` start none.
+		[`${case_head} a) ls;; esac\n(rm -rf y)`, [case_head, 'ls', 'esac', '(rm -rf y)']],
+	])('cuts %j', (command, expected) => {
+		expect(shell_segments.segments_of(command)).toStrictEqual(expected)
+	})
+})
+
 describe('compound commands', () => {
-	const case_head = 'case $x in'
+	const case_head = CASE_HEAD
 
 	it.each([
 		[`${case_head} a) rm -rf y;; b) ls;; esac`, [case_head, 'rm -rf y', '', 'ls', 'esac']],

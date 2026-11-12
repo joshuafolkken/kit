@@ -8,6 +8,7 @@ const GH_API_WRITE = 'a `gh api` call other than GET'
 const INSTALL = '`install`, a dependency change'
 const STDIN_SHELL = 'a shell running the commands its standard input spells'
 const UNREAD_BODY = 'a `case` arm or function body'
+const RM_RUNTIME = '`rm` to a runtime path'
 
 // joshuafolkken/kit#6586: the investigation spellings the old allowlist refused now run.
 const ISSUE_REPRODUCTIONS = [
@@ -59,7 +60,7 @@ const RUNS = [
 const REFUSED: ReadonlyArray<readonly [string, string]> = [
 	['git push --force', GIT_PUSH],
 	['gh api -X PATCH repos/owner/repo/issues/1', GH_API_WRITE],
-	['rm -rf scripts/', '`rm` to a runtime path'],
+	['rm -rf scripts/', RM_RUNTIME],
 	['pnpm josh git -y', '`josh git`, a shared-state write'],
 	['pnpm install', INSTALL],
 	['gh pr checkout 123', '`gh pr checkout`'],
@@ -111,11 +112,16 @@ const OTHER_REFUSED: ReadonlyArray<readonly [string, string]> = [
 	['case x in a|b) git push ;; esac', GIT_PUSH],
 	['case x in a ) git push ;; esac', GIT_PUSH],
 	['case x in a) ls;; b) cp /tmp/a ../6688/scripts/a.ts;; esac', '`cp` to a runtime path outside'],
-	// An arm whose command touches its `)` is not cut, so it is refused as unread.
-	['case x in a) ls;; b)git push;; esac', UNREAD_BODY],
-	['case x in\na) ls;;\nb)git push;;\nesac', UNREAD_BODY],
-	['case x in a) ls;; b|c)git push;; esac', UNREAD_BODY],
-	['case x in a) ls;; (b)git push;; esac', UNREAD_BODY],
+	// An arm whose command touches its `)` is cut at the `)`, so its write is named.
+	['case x in a) ls;; b)git push;; esac', GIT_PUSH],
+	['case x in\na) ls;;\nb)git push;;\nesac', GIT_PUSH],
+	['case x in a) ls;; b|c)git push;; esac', GIT_PUSH],
+	['case x in a) ls;; (b)git push;; esac', GIT_PUSH],
+	['case x in a) ls;; b )git push;; esac', GIT_PUSH],
+	['case x in a) ls;; $y)git push;; esac', GIT_PUSH],
+	// The words after `esac` and a newline start no arm, so the subshell's write stays whole.
+	['case x in a) ls;; esac\n(git commit -m x)', '`git commit`'],
+	['case x in a) ls;; esac\n(rm -rf ../6688/scripts)', RM_RUNTIME],
 	['f() { git push; }; f', '`git push`, a git write'],
 	['function f { git push; }; f', GIT_PUSH],
 	['function f() { npm --prefix web install; }; f', INSTALL],
