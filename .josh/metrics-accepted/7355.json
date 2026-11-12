@@ -1,0 +1,8 @@
+{
+	"reason": "#7355: issue:file shows josh.worker profiles, checks worker:<name> and provisions it (new issue-file-worker module, kickoff pointer)",
+	"date": "2026-11-12",
+	"growth": {
+		"scripts.code_lines": 81,
+		"ai_cost.on_demand_bytes": 177
+	}
+}

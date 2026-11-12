@@ -82,6 +82,22 @@ describe('repository_labels.ensure_labels', () => {
 
 // `josh start` provisions a new repository and `josh sync` every existing one; both go through the
 // one module, and neither keeps a label creation of its own.
+describe('repository_labels.ensure_labels — extra labels', () => {
+	it('creates a missing extra label from the same single listing read', () => {
+		const name = 'worker:haiku'
+
+		list_then_create(ALL_NAMES)
+
+		expect(
+			repository_labels.ensure_labels(REPO, [
+				{ name, color: 'bfd4f2', description: 'Lane worker' },
+			]),
+		).toStrictEqual([])
+		expect(created_names()).toStrictEqual([name])
+		expect(mocked_api).toHaveBeenCalledTimes(2)
+	})
+})
+
 describe('the entry points that provision labels', () => {
 	it.each(['init/start-steps.ts', 'sync/sync.ts'])('%s calls the shared label step', (file) => {
 		const source = readFileSync(path.join(SCRIPTS_DIR, file), 'utf8')
