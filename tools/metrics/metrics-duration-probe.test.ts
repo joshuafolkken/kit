@@ -10,6 +10,7 @@ import {
 } from 'node:fs'
 import path from 'node:path'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
+import { lane_load } from '#scripts/lane/lane-load'
 import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { temporary_directory } from '#tools/test/temporary-directory'
@@ -41,7 +42,7 @@ const READ_ONLY_MODE = 0o555
 const WRITABLE_MODE = 0o755
 
 function quiet(durations: Durations): Measurement {
-	return { durations, is_busy: false }
+	return { durations, is_busy: false, is_startup_busy: false }
 }
 
 function baseline_on_disk(): unknown {
@@ -80,9 +81,9 @@ describe('metrics_duration_probe.check — a busy machine', () => {
 	it('warns and passes on a duration past the tolerance measured while the machine was busy', () => {
 		writeFileSync(baseline_file, GATE_BASELINE)
 
-		expect(
-			metrics_duration_probe.check(baseline_file, { durations: { gate: 1200 }, is_busy: true }),
-		).toBe(0)
+		const measurement = { ...quiet({ gate: 1200 }), is_busy: true }
+
+		expect(metrics_duration_probe.check(baseline_file, measurement)).toBe(0)
 		expect(vi.mocked(process.stderr.write)).toHaveBeenCalledWith(expect.stringContaining(WARNING))
 		expect(baseline_on_disk()).toStrictEqual({ gate: 1000 })
 	})
@@ -96,13 +97,24 @@ describe('metrics_duration_probe.check — a busy machine', () => {
 		)
 	})
 
-	it('still fails a startup timed at the check on a busy interval', () => {
+	it('still fails a startup timed on a quiet machine at the check of a busy interval', () => {
 		writeFileSync(baseline_file, GATE_STARTUP_BASELINE)
 
-		const measurement = { durations: { gate: 1200, josh_startup: 340 }, is_busy: true }
+		const measurement = { ...quiet({ gate: 1200, josh_startup: 340 }), is_busy: true }
 
 		expect(metrics_duration_probe.check(baseline_file, measurement)).toBe(FAIL)
 		expect(vi.mocked(process.stderr.write)).toHaveBeenCalledWith(expect.stringContaining(WARNING))
+	})
+
+	// joshuafolkken/kit#7337: a manual `josh metrics` beside other lanes timed the startups slow.
+	it('warns and passes on a startup timed while the machine was busy', () => {
+		writeFileSync(baseline_file, GATE_STARTUP_BASELINE)
+
+		const measurement = { ...quiet({ josh_startup: 340 }), is_startup_busy: true }
+
+		expect(metrics_duration_probe.check(baseline_file, measurement)).toBe(0)
+		expect(vi.mocked(process.stderr.write)).toHaveBeenCalledWith(expect.stringContaining(WARNING))
+		expect(baseline_on_disk()).toStrictEqual({ gate: 1000, josh_startup: 170 })
 	})
 })
 
@@ -181,6 +193,21 @@ describe('metrics_duration_probe.baseline_path under a concurrent move', () => {
 })
 
 describe('metrics_duration_probe.measure', () => {
+	beforeEach(() => {
+		vi.spyOn(lane_load, 'sample').mockResolvedValue({ kind: 'load', at: '', load: 1, lanes: 1 })
+	})
+
+	it('reads the startups as busy where another lane works right after their runs', async () => {
+		vi.spyOn(lane_ledger, 'target').mockResolvedValue(undefined)
+		vi.spyOn(lane_load, 'sample').mockResolvedValue({ kind: 'load', at: '', load: 1, lanes: 2 })
+		vi.mocked(spawnSync).mockReturnValue(spawnSync(process.execPath, ['--version']))
+
+		const { is_startup_busy } = await metrics_duration_probe.measure(scratch, true)
+
+		expect(is_startup_busy).toBe(true)
+		vi.mocked(spawnSync).mockReset()
+	})
+
 	it('times the same launcher used by pnpm josh (ac-cbdaa1f2)', async () => {
 		vi.spyOn(lane_ledger, 'target').mockResolvedValue(undefined)
 		vi.mocked(spawnSync).mockReturnValue(spawnSync(process.execPath, ['--version']))
@@ -237,7 +264,11 @@ describe('metrics_duration_probe.measure and check — the #4695 gate', () => {
 
 		const measurement = await metrics_duration_probe.measure(scratch, false)
 
-		expect(measurement).toStrictEqual({ durations: { gate: 10_500, unit: 1500 }, is_busy: true })
+		expect(measurement).toStrictEqual({
+			durations: { gate: 10_500, unit: 1500 },
+			is_busy: true,
+			is_startup_busy: false,
+		})
 		expect(metrics_duration_probe.check(baseline_file, measurement)).toBe(0)
 	})
 })
