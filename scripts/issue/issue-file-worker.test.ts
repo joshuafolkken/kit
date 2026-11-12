@@ -57,6 +57,10 @@ describe('issue_file_worker.is_worker_clear — with josh.worker set', () => {
 		expect(printed.error()).toContain('has no profile for the label worker:opus')
 	})
 
+	it('admits the same worker label given twice', () => {
+		expect(issue_file_worker.is_worker_clear(HERE, [HAIKU_LABEL, HAIKU_LABEL])).toBe(true)
+	})
+
 	it('refuses two worker labels', () => {
 		expect(issue_file_worker.is_worker_clear(HERE, [HAIKU_LABEL, 'worker:sonnet'])).toBe(false)
 		expect(printed.error()).toContain('allows one worker:<name> label')

@@ -26,8 +26,9 @@ function settings_of(place: Target): SettingsResult | undefined {
 	return agent_worker_profile.read(process.cwd())
 }
 
+// Deduplicated: a label typed twice is one label on the Issue, not two profiles chosen.
 function worker_labels(labels: ReadonlyArray<string>): ReadonlyArray<string> {
-	return labels.filter((label) => label.startsWith(LABEL_PREFIX))
+	return [...new Set(labels.filter((label) => label.startsWith(LABEL_PREFIX)))]
 }
 
 // The profiles weakest first, as `josh.worker` lists them, and the one an unlabelled Issue runs on.
@@ -57,7 +58,7 @@ function is_unchecked_clear(note: string, labels: ReadonlyArray<string>): boolea
 
 function is_choice_clear(settings: WorkerSettings, labels: ReadonlyArray<string>): boolean {
 	console.info(guide_of(settings))
-	const chosen = agent_worker_profile.for_labels(settings, labels)
+	const chosen = agent_worker_profile.for_labels(settings, worker_labels(labels))
 
 	if (chosen.kind === 'worker') return true
 	console.error(`✖ ${chosen.kind === 'rejected' ? chosen.note : chosen.kind}`)

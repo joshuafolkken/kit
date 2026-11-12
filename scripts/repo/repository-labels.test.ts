@@ -80,8 +80,7 @@ describe('repository_labels.ensure_labels', () => {
 	})
 })
 
-// `josh start` provisions a new repository and `josh sync` every existing one; both go through the
-// one module, and neither keeps a label creation of its own.
+// joshuafolkken/kit#7355: `issue:file` adds an Issue's `worker:<name>` to the one listing read.
 describe('repository_labels.ensure_labels — extra labels', () => {
 	it('creates a missing extra label from the same single listing read', () => {
 		const name = 'worker:haiku'
@@ -98,6 +97,8 @@ describe('repository_labels.ensure_labels — extra labels', () => {
 	})
 })
 
+// `josh start` provisions a new repository and `josh sync` every existing one; both go through the
+// one module, and neither keeps a label creation of its own.
 describe('the entry points that provision labels', () => {
 	it.each(['init/start-steps.ts', 'sync/sync.ts'])('%s calls the shared label step', (file) => {
 		const source = readFileSync(path.join(SCRIPTS_DIR, file), 'utf8')
