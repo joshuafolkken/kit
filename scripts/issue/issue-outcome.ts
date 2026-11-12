@@ -64,8 +64,11 @@ function outcome_of(comment: IssueComment): IssueOutcome | undefined {
 	return record === undefined ? undefined : cited_outcome(record, comment)
 }
 
-function from_comments(comments: ReadonlyArray<IssueComment>): IssueOutcome | undefined {
-	const outcomes = comments.flatMap((comment) => {
+function from_comments(
+	comments: ReadonlyArray<IssueComment>,
+	candidates: ReadonlyArray<IssueComment> = comments,
+): IssueOutcome | undefined {
+	const outcomes = candidates.flatMap((comment) => {
 		const outcome = outcome_of(comment)
 		const evidence = comments.find((entry) => entry.html_url === outcome?.url)
 

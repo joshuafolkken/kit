@@ -3,6 +3,7 @@ import { lane_withdraw } from '#scripts/lane/lane-withdraw'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_stalled } from '#scripts/run/park/run-stalled'
 import type { BoardRow, RowRead, RowReason } from './run-board-layout'
+import { run_board_pause } from './run-board-pause'
 import { run_board_render_title } from './run-board-render-title'
 import type { ItemState, ItemStatus } from './run-board-status'
 
@@ -133,7 +134,11 @@ function stop_row_reason(status: ItemStatus): Pick<BoardRow, 'reason'> {
 }
 
 // Raw event reasons remain cacheable; only drawing selects an action from the current live state.
-function row_reason(number: number, status: ItemStatus, read: RowRead): Pick<BoardRow, 'reason'> {
+function ending_row_reason(
+	number: number,
+	status: ItemStatus,
+	read: RowRead,
+): Pick<BoardRow, 'reason'> {
 	const reason = tail_of(status)
 	const waits = read.waits?.get(number)
 
@@ -148,6 +153,13 @@ function row_reason(number: number, status: ItemStatus, read: RowRead): Pick<Boa
 	return is_stalled(status, read.labels.get(number))
 		? { reason: stalled_reason(number, read, waits) }
 		: stop_row_reason(status)
+}
+
+function row_reason(number: number, status: ItemStatus, read: RowRead): Pick<BoardRow, 'reason'> {
+	const pause =
+		status.state === 'parked' ? run_board_pause.reason_of(number, read, status) : undefined
+
+	return pause === undefined ? ending_row_reason(number, status, read) : { reason: pause }
 }
 
 const run_board_ending_reason = {
