@@ -39,6 +39,10 @@ function given_workflows(...workflows: ReadonlyArray<string>): void {
 	})
 }
 
+function given_publishing(package_name: string | undefined): void {
+	vi.spyOn(npm_registry, 'published_package_name').mockReturnValue(package_name)
+}
+
 function given_npm(is_published: boolean): void {
 	vi.spyOn(npm_registry, 'has_public_version').mockReturnValue(is_published)
 }
@@ -81,6 +85,7 @@ beforeEach(() => {
 	vi.stubEnv(release_progress.GITHUB_RELEASE_TIMEOUT_ENV, '1')
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	given_manifest({ name: PACKAGE, version: VERSION })
+	given_publishing(PACKAGE)
 })
 
 afterEach(() => {
@@ -144,8 +149,8 @@ describe('release_progress.wait_for_distribution when a stage is not reached', (
 		expect(printed()).not.toContain('🎉')
 	})
 
-	it('skips the npm stage for a private package', async () => {
-		given_manifest({ name: 'consumer-app', private: true })
+	it('skips the npm stage for a repository that does not publish to npm', async () => {
+		given_publishing(undefined)
 		given_npm(false)
 		given_release(RELEASE_URL)
 
@@ -237,17 +242,24 @@ describe('release_progress.wait_for_distribution when the Publish run fails', ()
 	})
 })
 
-describe('release_progress.read_manifest', () => {
-	it('refuses a manifest without a package name', () => {
-		given_manifest({ version: VERSION })
+// The npm stage asks the one publishing answer `josh sync` distributes publish.yml on, never
+// `private`: a private manifest npm carries is still waited for.
+describe('release_progress.wait_for_distribution — which repositories wait for npm', () => {
+	it('asks the publishing answer of the release work tree', async () => {
+		given_npm(true)
+		given_release(RELEASE_URL)
 
-		expect(() => release_progress.read_manifest('/repo')).toThrow('has no package name')
+		await release_progress.wait_for_distribution(VERSION)
+
+		expect(npm_registry.published_package_name).toHaveBeenCalledWith(process.cwd())
 	})
 
-	// The basic profile's `josh init` writes `{ "private": true }` with no name.
-	it('accepts a private manifest without a package name', () => {
-		given_manifest({ private: true, version: VERSION })
+	it('waits for npm whatever the manifest says about private', async () => {
+		given_manifest({ name: PACKAGE, private: true })
+		given_npm(true)
+		given_release(RELEASE_URL)
 
-		expect(release_progress.read_manifest('/repo')).toEqual({ is_private: true })
+		expect(await release_progress.wait_for_distribution(VERSION)).toBe(SUCCESS)
+		expect(printed()).toContain(`📦 Published to npm: ${NPM_URL}`)
 	})
 })

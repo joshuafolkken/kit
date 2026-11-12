@@ -126,7 +126,7 @@ describe('get_ai_copy_files - AI and community files', () => {
 		expect(result).toContain('CODE_OF_CONDUCT.md')
 	})
 
-	it('includes GitHub workflow and template files (except ci.yml mapping and non-distributed publish.yml)', () => {
+	it('includes GitHub workflow and template files (except ci.yml mapping and the conditionally distributed publish.yml)', () => {
 		const result = init_logic.get_ai_copy_files()
 
 		expect(result).not.toContain(CI_YML_DEST)

@@ -850,7 +850,7 @@ It raises the version by one minor per merge, opens and merges a `release/v<vers
 🎉 Release vX.Y.Z complete
 ```
 
-A `private: true` package skips the npm stage.
+A repository whose `@joshuafolkken/` package public npm does not carry skips the npm stage; the registry decides, not `private` in `package.json`.
 
 In a consumer repository the release runs through workflows kit syncs:
 
@@ -902,7 +902,7 @@ pnpm josh release:github   # run by CI with GH_TOKEN, RELEASE_TAG and GITHUB_REP
 
 <!-- /usage -->
 
-The notes come from `.github/release.yml`. Run by CI — kit's `publish.yml`, and the `github-release.yml` every consumer receives.
+The notes come from `.github/release.yml`. Run by CI — kit's `publish.yml`, and the `github-release.yml` every consumer receives. `josh sync` also distributes kit's `publish.yml` to repositories public npm carries; there it skips the GitHub Release steps when `github-release.yml` exists.
 
 It takes no arguments: `--help` / `-h` prints the usage line and exits 0 without reading the environment; any other argument is refused with the usage line and a non-zero exit, before anything is released.
 
@@ -922,6 +922,18 @@ Releases are created in version order: a later tag waits for the nearest lower o
 **Output / exit codes:** prints `published <tag> from <baseline>` or `already-published`; exits non-zero on an API error, an invalid tag or repository, a latest release that is not older than the tag, or a lower tag that never gets a release within the wait budget.
 
 Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh release:github` in detail".
+
+### `josh release:tag`
+
+<!-- usage: release:tag -->
+
+Print the npm dist-tag a version publishes under, given the current latest.
+
+```bash
+pnpm josh release:tag 1.2.0 1.1.0   # → latest
+```
+
+<!-- /usage -->
 
 ## Maintenance
 

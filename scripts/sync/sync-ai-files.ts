@@ -201,7 +201,7 @@ function sync_ai_copy_all(is_force: boolean, shape?: ProjectShape): void {
 
 	sync_claude_md(path.join(PROJECT_ROOT, CLAUDE_MD_FILENAME), shape)
 
-	for (const filename of init_ai_copy.ai_files(shape)) {
+	for (const filename of init_ai_copy.copied_files(shape)) {
 		sync_ai_copy_file(filename, is_force, shape)
 	}
 

@@ -133,7 +133,8 @@ The completion notification's `Checks:` list follows the `--notify-message` text
   `JOSH_REQUIRED_CHECKS`); its findings are audit notes.
 
 **Config claims:** every changed path is matched against what `josh sync` distributes
-(`AI_COPY_FILES`, `AI_COPY_FILE_MAPPINGS`, `AI_COPY_DIRECTORIES`, `SYNCED_PATHS`), and the claimed
+(`AI_COPY_FILES`, `AI_COPY_FILE_MAPPINGS`, `AI_COPY_DIRECTORIES`, `SYNCED_PATHS`,
+`PLUGIN_SKILL_DIRECTORIES`, `NPM_PUBLISH_FILES`), and the claimed
 paths are reported in the notification and the Issue report. It stops nothing; `josh sync:scope`
 gives the same answer.
 

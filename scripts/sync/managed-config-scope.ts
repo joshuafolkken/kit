@@ -1,4 +1,5 @@
 import { init_logic } from '#scripts/init/init-logic'
+import { npm_publish_files } from '#scripts/init/npm-publish-files'
 import { PLUGIN_SKILL_DIRECTORIES } from './plugin-skill-directories'
 import { synced_paths } from './synced-paths'
 
@@ -17,6 +18,11 @@ const SYNCED_PATHS_LIST = 'SYNCED_PATHS'
 // They are no longer in `AI_COPY_DIRECTORIES`, but a change to one still
 // reaches consumers through the package, so the gate keeps flagging it.
 const PLUGIN_SKILL_DIRECTORIES_LIST = 'PLUGIN_SKILL_DIRECTORIES'
+
+// The sixth source: the publish workflow sync copies only to a repository npm carries under kit's
+// scope. Matched by path alone — whether a given consumer receives it is the registry's answer, but a
+// change to it reaches every one that does (#7303).
+const NPM_PUBLISH_FILES_LIST = 'NPM_PUBLISH_FILES'
 
 const PATH_SEPARATOR = '/'
 
@@ -62,7 +68,11 @@ function matches_synced_path(path: string): boolean {
 	return synced_paths.get_synced_paths().includes(path)
 }
 
-// A table rather than a chain of `if`s: a fifth distribution surface is then one row, and the search
+function matches_npm_publish_file(path: string): boolean {
+	return path === npm_publish_files.PUBLISH_WORKFLOW
+}
+
+// A table rather than a chain of `if`s: another distribution surface is then one row, and the search
 // order stays visible in one place. The sources are searched top to bottom and the first to claim the
 // path wins — a path on two is reported once, because naming the second changes nothing the reader
 // does and a second row per path would make the count of hits disagree with the count of files.
@@ -72,6 +82,7 @@ const MATCHERS: ReadonlyArray<{ list: string; matches: (path: string) => boolean
 	{ list: AI_COPY_DIRECTORIES_LIST, matches: matches_directory },
 	{ list: PLUGIN_SKILL_DIRECTORIES_LIST, matches: matches_plugin_skill },
 	{ list: SYNCED_PATHS_LIST, matches: matches_synced_path },
+	{ list: NPM_PUBLISH_FILES_LIST, matches: matches_npm_publish_file },
 ]
 
 function find_list(path: string): string | undefined {
@@ -119,5 +130,6 @@ export {
 	AI_COPY_DIRECTORIES_LIST,
 	PLUGIN_SKILL_DIRECTORIES_LIST,
 	SYNCED_PATHS_LIST,
+	NPM_PUBLISH_FILES_LIST,
 }
 export type { ManagedHit }
