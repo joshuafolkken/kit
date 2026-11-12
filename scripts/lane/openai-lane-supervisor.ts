@@ -67,6 +67,7 @@ interface Generation {
 	owner: SupervisorOwner
 	profile: AgentProfile
 	invocation?: string
+	resume_cut?: string | undefined
 }
 
 function completion_code(result: ChildResult, ship: string): number {
@@ -81,6 +82,7 @@ function record_child(generation: Generation, child_pid: number): void {
 		owner_nonce: owner.nonce,
 		epoch,
 		child_pid,
+		resume_cut: generation.resume_cut,
 		...(child_process_start !== undefined && { child_process_start }),
 	})
 }
@@ -97,8 +99,34 @@ function child_result(
 	return { kind: 'abnormal', note }
 }
 
-async function run_child(generation: Generation): Promise<ChildResult> {
+// An unchanged, unspent handoff after its successor exited is a failed resume, not a new cut.
+// Persist the attempt before launching so a recovered supervisor makes the same decision.
+async function prepare_generation(generation: Generation): Promise<Generation | undefined> {
+	const { lane, owner } = generation
+	const cut = await standing_cut(lane.issue)
+	if (cut === undefined) return { ...generation, resume_cut: undefined }
+	const resume_cut = JSON.stringify(cut)
+
+	if (read_state(lane.directory, owner.nonce)?.resume_cut === resume_cut) {
+		console.error(
+			`OpenAI supervisor ${session_cite.issue(lane.issue)}: resume did not adopt cut ${cut.cut_at}; stopping with work and cut preserved`,
+		)
+
+		return undefined
+	}
+
+	return { ...generation, resume_cut }
+}
+
+async function launch_child(generation: Generation): Promise<ChildResult> {
 	const { lane, profile, is_resume } = generation
+
+	update(lane.directory, generation.owner, {
+		owner_nonce: generation.owner.nonce,
+		epoch: generation.epoch,
+		resume_cut: generation.resume_cut,
+	})
+
 	const result = await detached_launch.launch_attached(
 		{
 			argv: child_argv(lane, profile, is_resume, generation.invocation),
@@ -122,6 +150,13 @@ async function stop_invocation(issue: string): Promise<string> {
 	const current = await openai_lane_ship.current(issue)
 
 	return current?.stop_invocation ?? lane_child_invocation.ship_stop_invocation(issue)
+}
+
+async function run_child(generation: Generation): Promise<ChildResult> {
+	const ready = await prepare_generation(generation)
+	if (ready === undefined) return { kind: LAUNCH_FAILED_KIND, note: 'cut resume failed' }
+
+	return await launch_child(ready)
 }
 
 async function run_generations(generation: Generation): Promise<number> {
