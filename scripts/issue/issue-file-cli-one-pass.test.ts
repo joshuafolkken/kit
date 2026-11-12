@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { agent_worker_profile, type WorkerSettings } from '#scripts/agent/agent-worker-profile'
 import { repo_party } from '#scripts/discovery/repo-party'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
@@ -23,6 +24,12 @@ const DUPLICATE = 2801
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const CHECK_FLAG = '--check'
+const AGENT_PROFILE = {
+	provider: 'anthropic',
+	role: 'worker',
+	model: 'claude-haiku-5-5',
+	effort: 'low',
+} as const
 
 const make_directory = temporary_directory('suite')
 const work = make_directory('issue-file-cli-one-pass-')
@@ -214,6 +221,58 @@ describe('issue_file_cli.run — the other-change completion', () => {
 			'ignore-for-release, other-change',
 		)
 		expect(exec_gh_api).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#7355: without `josh.worker` the filing prints and asks GitHub what it did before;
+// with it, the profiles are printed, an unknown `worker:<name>` is refused and a chosen one provisioned.
+const WORKER_SETTINGS: WorkerSettings = {
+	default: 'haiku',
+	escalate: false,
+	profiles: [{ name: 'haiku', when: 'Mechanical work', agent: AGENT_PROFILE }],
+}
+const GUIDE = 'worker profiles (josh.worker'
+const UNKNOWN_LABEL = 'worker:opus'
+const CHOSEN_LABEL = 'worker:haiku'
+
+describe('issue_file_cli.run — josh.worker', () => {
+	const read = vi.spyOn(agent_worker_profile, 'read')
+
+	// The create call is refused, so the run stops at it, before any post-filing read.
+	beforeEach(() => {
+		scout_finds_none()
+		exec_gh_api.mockRejectedValue(new Error('HTTP 502'))
+		read.mockReturnValue({ kind: 'settings', settings: WORKER_SETTINGS })
+	})
+
+	afterAll(() => {
+		read.mockRestore()
+	})
+
+	it('without the setting, provisions only kit labels and prints no profiles', async () => {
+		read.mockReturnValue({ kind: 'unset' })
+		await issue_file_cli.run(CLEAR_ARGV)
+
+		expect(repository_labels.ensure_labels).toHaveBeenCalledExactlyOnceWith(HERE, [])
+		expect(exec_gh_api).toHaveBeenCalledOnce()
+		expect(vi.mocked(console.info).mock.calls.join('\n')).not.toContain(GUIDE)
+	})
+
+	it('with the setting, prints the profiles and refuses an unknown worker label', async () => {
+		expect(await issue_file_cli.run([...CLEAR_ARGV, '--label', UNKNOWN_LABEL])).toBe(
+			FAILURE_EXIT_CODE,
+		)
+		expect(vi.mocked(console.info).mock.calls.join('\n')).toContain(GUIDE)
+		expect(vi.mocked(console.error).mock.calls.join('\n')).toContain(UNKNOWN_LABEL)
+		expect(exec_gh_api).not.toHaveBeenCalled()
+	})
+
+	it('with the setting, provisions the chosen worker label before the create', async () => {
+		await issue_file_cli.run([...CLEAR_ARGV, '--label', CHOSEN_LABEL])
+
+		expect(vi.mocked(repository_labels.ensure_labels).mock.calls[0]?.[1]).toMatchObject([
+			{ name: CHOSEN_LABEL },
+		])
 	})
 })
 

@@ -156,7 +156,7 @@ pnpm josh issue:file --batch .josh/tmp/deferred.md --route tier-a
 - `--body-file <path>` — the body. Required unless `--batch`.
 - `--batch <dir|file>` — file each `*.md` in `<dir>` by name, or each `%%%`-separated part of `<file>`, other flags applied to each; every scout report prints once before the first filing. Title: front matter `title:`, else the first line; front matter `distinct: <N,…>` is its `--distinct`. A refused filing stays unfiled, the rest are filed, the summary names each; any refusal exits 1.
 - `--route <tier-a|split|interrupt|review-cap>` — the `route:` label naming the filing route. Omit it for a filing with no route.
-- `--label <name>` — an extra label (for example `epic`). Repeatable.
+- `--label <name>` — an extra label (e.g. `epic`). Repeatable. With `josh.worker`, `worker:<name>` names a printed profile.
 - `--defect / --verification / --every-run <yes|no|unknown>` — `--label run:solo` requires all three `yes`: a verification defect affecting unrelated PRs every run. Missing, invalid, `no` or `unknown` answers file nothing; success comments the three answers on the issue.
 - `--repo <owner/repo>` — the target repository. Defaults to this repository.
 - `--distinct <N,…>` — duplicate candidates you read and judged distinct.

@@ -263,7 +263,8 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 				},
 				{
 					names: ['--label <name>'],
-					description: 'an extra label (for example `epic`). Repeatable.',
+					description:
+						'an extra label (e.g. `epic`). Repeatable. With `josh.worker`, `worker:<name>` names a printed profile.',
 				},
 				{
 					names: ['--defect / --verification / --every-run <yes|no|unknown>'],

@@ -148,7 +148,7 @@ function next(settings: WorkerSettings, worker: WorkerProfile): WorkerProfile | 
 	return settings.profiles[index + 1]
 }
 
-const agent_worker_profile = { next, read, resolve }
+const agent_worker_profile = { LABEL_PREFIX, for_labels, next, read, resolve }
 
 export type { SettingsResult, WorkerProfile, WorkerResult, WorkerSettings }
 export { agent_worker_profile }
