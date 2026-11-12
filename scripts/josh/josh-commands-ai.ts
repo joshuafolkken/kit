@@ -444,7 +444,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 			"Record a lane child's planned files; yield its lane, naming file and holder, when an earlier-planned running lane declares or plans one; `--size-approval` bounds lines/files",
 		category: 'AI tools',
 		reference: [
-			'<issue> <path>... [--probe] [--single] [--size-approval <json-file>] [--imports <path>...]',
+			'<issue> <path>... [--probe] [--single] [--estimate <json-file>] [--size-approval <json-file>] [--imports <path>...]',
 			'automation',
 			['files', 'network'],
 		],

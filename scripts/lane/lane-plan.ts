@@ -24,6 +24,7 @@ const lane_plan_schema = z.object({
 	issue: z.number(),
 	paths: z.array(z.string()),
 	planned_at: z.string(),
+	estimated_size: z.object({ files: z.number(), lines: z.number() }).optional(),
 	size_approval: lane_plan_approval.approval_schema.optional(),
 	// `--single`: the plan is one deliverable with no separately-mergeable part, so a files-axis overrun
 	// is noted for the pre-gate `run:cut` to verify rather than refused (joshuafolkken/kit#6647).

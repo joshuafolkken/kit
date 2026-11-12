@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import type { LanePlan } from './lane-plan'
 import { lane_plan_approval } from './lane-plan-approval'
 import { lane_plan_check } from './lane-plan-check'
+import { lane_plan_estimate } from './lane-plan-estimate'
 import { lane_plan_imports } from './lane-plan-imports'
 
 // `josh lane:plan <issue> <path>... [--probe] [--imports <path>...]` — the command line over
@@ -16,7 +17,7 @@ const PROBE_FLAG = '--probe'
 const SINGLE_FLAG = '--single'
 const FLAGS = new Set([PROBE_FLAG, SINGLE_FLAG])
 const USAGE =
-	'Usage: josh lane:plan <issue-number> <path> [<path> ...] [--probe] [--single] [--size-approval <json-file>] [--imports <path> ...]'
+	'Usage: josh lane:plan <issue-number> <path> [<path> ...] [--probe] [--single] [--estimate <json-file>] [--size-approval <json-file>] [--imports <path> ...]'
 const { YIELD_EXIT_CODE } = lane_plan_check
 
 async function planned(
@@ -24,12 +25,15 @@ async function planned(
 	directory: string,
 	is_single: boolean,
 ): Promise<LanePlan | undefined> {
-	const input = lane_plan_approval.split(tokens)
+	const estimate = lane_plan_estimate.split(tokens)
+	const input = lane_plan_approval.split(estimate.tokens)
 	const plan = lane_plan_check.plan_of(input.tokens, new Date())
 	if (plan === undefined) return undefined
 	const declared = is_single ? { ...plan, single: true } : plan
 
-	return await lane_plan_approval.attach(lane_plan_check.placed(declared, directory), input.file)
+	const scoped = await lane_plan_estimate.attach(declared, estimate.file)
+
+	return await lane_plan_approval.attach(lane_plan_check.placed(scoped, directory), input.file)
 }
 
 async function run(

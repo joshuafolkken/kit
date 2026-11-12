@@ -24,12 +24,42 @@ function write(name: string, content: string, directory = create_directory(PREFI
 }
 
 describe('plan_scaffold_cli.run', () => {
+	it('checks selected consumers and docs from the same estimate used by lane:plan', async () => {
+		const estimate = write(
+			'scope.json',
+			JSON.stringify({
+				changes: [
+					{ path: GIVEN, changed_lines: 20 },
+					{ path: 'docs/a.md', changed_lines: 6 },
+				],
+			}),
+		)
+
+		vi.spyOn(run_prep_cli, 'read_summary').mockResolvedValue({
+			body: 'See `package.json`.',
+			text: 'summary',
+		})
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+		const format = vi.spyOn(plan_scaffold, 'format')
+
+		await expect(plan_scaffold_cli.run([ISSUE, '--estimate', estimate])).resolves.toBe(0)
+		expect(format.mock.calls[0]?.[0]).toMatchObject({
+			files: [GIVEN, 'docs/a.md'],
+			estimate: { files: 2, lines: 26 },
+		})
+		expect(info).toHaveBeenCalledWith(expect.stringContaining('約 2 ファイル / 26 行'))
+	})
+})
+
+describe('plan_scaffold_cli.run arguments', () => {
 	it.each([[[]], [['abc']], [['-1']]])('refuses %j with exit 1 before any read', async (argv) => {
 		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
 		const read = vi.spyOn(run_prep_cli, 'read_summary')
 
 		await expect(plan_scaffold_cli.run(argv)).resolves.toBe(1)
-		expect(error).toHaveBeenCalledWith('Usage: josh plan:scaffold <issue-number> [<path>...]')
+		expect(error).toHaveBeenCalledWith(
+			'Usage: josh plan:scaffold <issue-number> [<path>...] [--estimate <json-file>]',
+		)
 		expect(read).not.toHaveBeenCalled()
 	})
 

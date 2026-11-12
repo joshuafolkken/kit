@@ -1,3 +1,4 @@
+import { codex_hooks } from '#scripts/agent/codex-hooks'
 import { git_path_quoting } from '#scripts/git/git-path-quoting'
 import { issue_body_keys } from '#scripts/issue/issue-body-keys'
 import { run_record_path } from '#scripts/josh/run-record-path'
@@ -160,15 +161,21 @@ function partners_of(
 
 // The files grouped into what splits as one, each group at its first file: a new scripts module and an
 // importer of its directory count as one (joshuafolkken/kit#6635), for `lane:plan` and the split notice
-// alike (joshuafolkken/kit#6724). With no `added` file, every file stands alone.
+// alike (joshuafolkken/kit#6724). A registered generated artifact also stays with its source (#7381);
+// the two files' changed lines still count in full. Other files stand alone when none is added.
 function units_of(files: ReadonlyArray<string>, added: ReadonlySet<string>): Array<Array<string>> {
-	const partners = partners_of(files, added)
+	const artifacts = codex_hooks.GENERATED_SOURCES
+	const sources = files.filter((file) => !files.includes(artifacts.get(file) ?? ''))
+	const partners = partners_of(sources, added)
 
-	return files.flatMap((file) => {
+	return sources.flatMap((file) => {
 		const partner = partners.get(file)
-		if (partner === undefined) return [[file]]
+		const unit = partner === undefined ? [file] : [file, partner]
+		const generated = files.filter((path) => unit.includes(artifacts.get(path) ?? ''))
 
-		return files.indexOf(partner) < files.indexOf(file) ? [] : [[file, partner]]
+		return partner !== undefined && sources.indexOf(partner) < sources.indexOf(file)
+			? []
+			: [[...unit, ...generated]]
 	})
 }
 
@@ -315,8 +322,10 @@ const split_assess = {
 	SINGLE_VERDICT,
 	assess,
 	guide_for,
+	is_deliverable,
 	is_over_cap,
 	notice,
+	measure,
 	parse_numstat,
 	policy_text,
 	reason,
