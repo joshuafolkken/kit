@@ -106,7 +106,11 @@ async function move(
 	)
 
 	await appendFile(path.join(directory, target), contents.join(''), 'utf8')
-	await Promise.all(files.map(async (file) => await rm(path.join(directory, file.name))))
+	await Promise.all(
+		files.map(async (file) => {
+			await rm(path.join(directory, file.name))
+		}),
+	)
 }
 
 function archived_rounds_path(root: string): string {
@@ -140,7 +144,11 @@ async function archive(root: string): Promise<number> {
 	const groups = by_archive(files, await closed_archives(files.map((file) => file.issue)))
 	const moved = [...groups.values()].flat()
 
-	await Promise.all([...groups].map(async ([name, group]) => await move(directory, name, group)))
+	await Promise.all(
+		[...groups].map(async ([name, group]) => {
+			await move(directory, name, group)
+		}),
+	)
 	await record_rounds(root, moved)
 
 	return moved.length
