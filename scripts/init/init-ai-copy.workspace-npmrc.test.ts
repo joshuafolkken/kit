@@ -37,8 +37,8 @@ describe('init_ai_copy.read_workspace_template', () => {
 		expect(init_ai_copy.read_workspace_template(template_path, destination)).toBe(TEMPLATE)
 	})
 
-	// kit's own file fences the minimatch override and the import-x patch it needs; the patch file
-	// is not published, so neither may reach a consumer (joshuafolkken/kit#5500).
+	// kit's own file fences its minimatch override, which must not reach a consumer
+	// (joshuafolkken/kit#5500).
 	it('drops the kit-only regions of kit’s own workspace file and keeps the rest valid', () => {
 		const destination = path.join(project, WORKSPACE_YAML)
 		const content = init_ai_copy.read_workspace_template(package_path(WORKSPACE_YAML), destination)

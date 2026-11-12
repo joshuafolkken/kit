@@ -26,7 +26,7 @@ function locked_majors(package_name: string): Array<number> {
 }
 
 // joshuafolkken/kit#5500: GHSA-g3hv-75wg-m249 is fixed only in minimatch 11, which ESLint and its
-// plugins do not yet accept. Remove these with the override and the import-x patch (#5507).
+// parents do not yet accept. Remove these with the override (#7228).
 describe('pnpm-workspace.yaml advisory overrides', () => {
 	it('floors minimatch at the release clearing GHSA-g3hv-75wg-m249', () => {
 		expect(load_overrides()['minimatch']).toBe('^11.0.1')
@@ -51,12 +51,12 @@ describe('pnpm-workspace.yaml advisory overrides', () => {
 		expect(messages.map((message) => message.ruleId)).toEqual(['import-x/no-internal-modules'])
 	})
 
-	it('keeps the override and the unpublished patch out of what josh sync distributes', () => {
+	it('keeps the override out of what josh sync distributes', () => {
 		const workspace = readFileSync(package_path(WORKSPACE_YAML), 'utf8')
 		const distributed = init_logic_workspace.drop_kit_only_regions(workspace)
 
-		expect(workspace).toContain('patchedDependencies:')
-		expect(distributed).not.toMatch(/minimatch|patchedDependencies|kit-only/u)
+		expect(workspace).toContain('minimatch: ^11.0.1')
+		expect(distributed).not.toMatch(/minimatch|kit-only/u)
 		expect(distributed).toContain('vite: ^8.0.16')
 	})
 })
