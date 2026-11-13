@@ -1,11 +1,13 @@
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { devNull, tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { git_utilities } from '#scripts/git/constants'
 import { git_location_environment } from '#scripts/git/git-location-environment'
+import { json_value } from '#scripts/lib/json-value'
 import { execa } from 'execa'
+import { z } from 'zod'
 import { backlog_measure_schema, type MeasureScenario } from './backlog-measure-schema'
 
 const WORKER = fileURLToPath(new URL('backlog-measure-worker.ts', import.meta.url))
@@ -13,6 +15,23 @@ const FAILURE_EXIT = 1
 const POSITIONALS_START = 2
 const STATUS_FILE = 'status.json'
 const GIT_BINARY = git_utilities.get_git_command_for_spawn()
+const result_schema = z.object({
+	completeness: z.object({
+		status: z.enum(['normal', 'waiting', 'degraded', 'failed', 'incomplete']),
+	}),
+})
+
+function complete(root: string, expected: number): boolean {
+	const files = readdirSync(root).filter((file) => /^result-\d+\.json$/u.test(file))
+	if (files.length !== expected) return false
+
+	return files.every((file) => {
+		const text = readFileSync(path.join(root, file), 'utf8')
+		const result = json_value.parse_with(text, result_schema)
+
+		return result !== undefined && ['normal', 'waiting'].includes(result.completeness.status)
+	})
+}
 
 function environment(root: string): NodeJS.ProcessEnv {
 	const inherited = Object.fromEntries(
@@ -75,11 +94,13 @@ async function trial(scenario: MeasureScenario, root: string): Promise<boolean> 
 		timeout: scenario.timeout_ms,
 	})
 	const status = child.exitCode === 0 ? 'completed' : 'failed'
+	const is_complete = complete(root, scenario.mode === 'warm' ? scenario.repetitions + 1 : 1)
 
 	writeFileSync(
 		path.join(root, STATUS_FILE),
 		JSON.stringify({
 			status,
+			measurement_complete: is_complete,
 			exit: child.exitCode,
 			signal: child.signal,
 			timed_out: child.timedOut,
@@ -87,7 +108,7 @@ async function trial(scenario: MeasureScenario, root: string): Promise<boolean> 
 		}),
 	)
 
-	return status === 'completed'
+	return status === 'completed' && is_complete
 }
 
 async function run(input: unknown): Promise<{ root: string; succeeded: boolean }> {

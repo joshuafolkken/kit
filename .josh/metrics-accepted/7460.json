@@ -1,0 +1,7 @@
+{
+	"reason": "Issue #7460 requires measurement-only completeness classification, warmup provenance and sanitized HTTP failure observations; the added modules share this logic across trial persistence and regression tests without changing production selection.",
+	"date": "2026-11-13",
+	"growth": {
+		"scripts.code_lines": 220
+	}
+}

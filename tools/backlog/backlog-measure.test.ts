@@ -14,6 +14,7 @@ const PARTS = 2
 const RESULT_FILE = 'result-0.json'
 const STATUS_FILE = 'status.json'
 const INPUT_FILE = 'input.json'
+const MEASUREMENT_DOCUMENT = 'docs/backlog-measurement.md'
 const INPUT = {
 	name: 'empty',
 	mode: 'cold',
@@ -115,7 +116,7 @@ test(
 	'executes the documented one-candidate five-waiting recipe without tracker or worker effects',
 	async () => {
 		vi.stubEnv('TMPDIR', directory('measure-recipe-'))
-		const document = readFileSync('docs/backlog-measurement.md', 'utf8')
+		const document = readFileSync(MEASUREMENT_DOCUMENT, 'utf8')
 		const input: unknown = JSON.parse(
 			document.split('```json\n', PARTS)[1]?.split('```', 1)[0] ?? '',
 		)
@@ -150,3 +151,35 @@ test.each([0, 1])('reports CLI success or interrupted failure with exit code %i'
 	expect(child.exitCode).toBe(exit)
 	expect(JSON.parse(child.stdout)).toMatchObject({ succeeded: exit === 0 })
 })
+
+test.each(['cold', 'warm'])(
+	'refuses capped %s samples despite completed selection',
+	async (mode) => {
+		vi.stubEnv('TMPDIR', directory('measure-capped-'))
+		const document = readFileSync(MEASUREMENT_DOCUMENT, 'utf8')
+		const input: unknown = JSON.parse(
+			document.split('```json\n', PARTS)[1]?.split('```', 1)[0] ?? '',
+		)
+		const scenario = backlog_measure_schema.scenario_schema.parse(input)
+		const reads = scenario.reads.map((read) =>
+			read.method === 'defect.measure_window'
+				? {
+						...read,
+						value: { days: 14, since: '2026-10-30', defects: 1, enhancements: 1, is_capped: true },
+					}
+				: read,
+		)
+		const result = await backlog_measure.run({ ...scenario, reads, mode, repetitions: 1 })
+		const trial = path.join(result.root, '0')
+
+		expect(result.succeeded).toBe(false)
+		expect(read_json(trial, STATUS_FILE)).toMatchObject({
+			status: 'completed',
+			measurement_complete: false,
+		})
+		expect(read_json(trial, RESULT_FILE)).toMatchObject({
+			completeness: { status: 'degraded', normal_sample: false },
+		})
+	},
+	TIMEOUT_MS,
+)

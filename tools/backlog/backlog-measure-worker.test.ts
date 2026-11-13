@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { auto_ok_fixture, CREATED_EARLIER } from '#scripts/auto-ok/auto-ok-fixture'
 import { backlog_fixture } from '#scripts/backlog/backlog-fixture'
+import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { shared_cache_fixture } from '#scripts/josh/shared-cache-fixture'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
@@ -18,6 +19,9 @@ const SCENARIO = backlog_measure_schema.scenario_schema.parse({
 })
 const CANDIDATE = 901
 const WAITING = [902, 903, 904, 905, 906]
+const RESULT_FILE = 'result-0.json'
+const WARM_RESULT_FILE = 'result-1.json'
+const WARMUP_ATTEMPT = 'selection:0'
 
 afterEach(() => vi.restoreAllMocks())
 beforeEach(() => shared_cache_fixture.keep_in_memory())
@@ -62,20 +66,78 @@ test('excludes in-flight issues through production selection before launching an
 })
 
 test('replays selection in the worker and persists the measured result and boundaries', async () => {
+	const original_http = git_gh_exec.exec_gh_api
+
 	backlog_fixture.stub_backlog({ opted_in: [auto_ok_fixture.issue(CANDIDATE, CREATED_EARLIER)] })
 	const root = directory('measure-replay-')
 	const reads = [{ method: 'gh.issue_list_by_label_summary', encoding: 'listing', value: [] }]
 	const scenario = backlog_measure_schema.scenario_schema.parse({ ...SCENARIO, reads })
 
 	await backlog_measure_worker.run(scenario, root)
-	const result: unknown = JSON.parse(readFileSync(path.join(root, 'result-0.json'), 'utf8'))
+	expect(git_gh_exec.exec_gh_api).toBe(original_http)
+	const result: unknown = JSON.parse(readFileSync(path.join(root, RESULT_FILE), 'utf8'))
 
 	expect(result).toMatchObject({
-		attempt: 'selection:0',
+		attempt: WARMUP_ATTEMPT,
 		result: { answer: { issues: [] } },
 		boundaries: expect.arrayContaining([
 			expect.objectContaining({ source: 'replay', operation: reads[0]?.method }),
 		]),
+	})
+})
+
+test.each([true, false])(
+	'persists capped=%s completeness through warm repetitions',
+	async (is_capped) => {
+		backlog_fixture.stub_backlog({ opted_in: [auto_ok_fixture.issue(CANDIDATE, CREATED_EARLIER)] })
+		const root = directory('measure-completeness-')
+		const scenario = backlog_measure_schema.scenario_schema.parse({
+			...SCENARIO,
+			mode: 'warm',
+			reads: [
+				{
+					method: 'defect.measure_window',
+					value: {
+						days: 14,
+						since: '2026-10-30',
+						defects: 1,
+						enhancements: 1,
+						is_capped,
+					},
+				},
+			],
+		})
+
+		await backlog_measure_worker.run(scenario, root)
+		const result: unknown = JSON.parse(readFileSync(path.join(root, WARM_RESULT_FILE), 'utf8'))
+
+		expect(result).toMatchObject({
+			completeness: {
+				status: is_capped ? 'degraded' : 'normal',
+				normal_sample: !is_capped,
+				warmup_origin: WARMUP_ATTEMPT,
+			},
+		})
+	},
+)
+
+test('retains failed warmup reads when candidate cache skips subsequent selection', async () => {
+	backlog_fixture.stub_backlog({
+		opted_in: [auto_ok_fixture.issue(CANDIDATE, CREATED_EARLIER)],
+		is_rate_unreadable: true,
+	})
+	const root = directory('measure-unread-')
+
+	await backlog_measure_worker.run({ ...SCENARIO, mode: 'warm' }, root)
+	const result: unknown = JSON.parse(readFileSync(path.join(root, WARM_RESULT_FILE), 'utf8'))
+
+	expect(result).toMatchObject({
+		completeness: {
+			status: 'degraded',
+			normal_sample: false,
+			warmup_origin: WARMUP_ATTEMPT,
+			reasons: expect.arrayContaining(['missing: defect.measure_window']),
+		},
 	})
 })
 

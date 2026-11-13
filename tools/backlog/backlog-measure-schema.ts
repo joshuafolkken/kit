@@ -28,10 +28,15 @@ type MeasureScenario = z.infer<typeof scenario_schema>
 
 interface MeasureBoundary {
 	attempt: string
-	source: 'live' | 'replay' | 'replacement' | 'denied'
+	source: 'live' | 'replay' | 'replacement' | 'denied' | 'observation'
 	operation: string
+	read_status?: 'capped' | 'missing' | 'failed'
+	http_status?: number
+	failure?: 'http' | 'unreported'
+	response_reason?: string
+	endpoint_index?: number
 }
 
-const backlog_measure_schema = { scenario_schema, string_set: z.array(z.string()) }
+const backlog_measure_schema = { scenario_schema, read_schema, string_set: z.array(z.string()) }
 export { backlog_measure_schema }
 export type { MeasureScenario, MeasureBoundary }

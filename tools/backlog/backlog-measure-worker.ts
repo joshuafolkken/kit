@@ -11,7 +11,9 @@ import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { run_startup } from '#scripts/run/startup/run-startup'
 import { run_startup_schema, type StartupScope } from '#scripts/run/startup/run-startup-schema'
 import { run_startup_store } from '#scripts/run/startup/run-startup-store'
+import { backlog_measure_completeness, type Completeness } from './backlog-measure-completeness'
 import { backlog_measure_guard } from './backlog-measure-guard'
+import { backlog_measure_observe } from './backlog-measure-observe'
 import { backlog_measure_ports } from './backlog-measure-ports'
 import {
 	backlog_measure_schema,
@@ -23,11 +25,20 @@ const NAME_PARTS = 2
 const POSITIONALS_START = 2
 const NEXT_COMMAND = 'backlog:next'
 const STARTUP_FILE = 'startup.jsonl'
+const MEASUREMENT_SCOPE =
+	'Selection and driver only; budget, lane preparation and real workers are replaced'
 
 interface Execution {
 	read: JoshResult
 	answer: OfferAnswer
 	pass: PassResult
+}
+
+interface AttemptContext {
+	directory: string
+	index: number
+	boundaries: Array<MeasureBoundary>
+	warmup?: { attempt: string; completeness: Completeness }
 }
 
 function decoded(read: MeasureScenario['reads'][number]): unknown {
@@ -69,7 +80,7 @@ function replay_target(targets: Map<string, object>, name: string): object {
 async function replay_reads(
 	scenario: MeasureScenario,
 	records: Array<MeasureBoundary>,
-): Promise<void> {
+): Promise<() => void> {
 	const { git_gh_command } = await import('#scripts/gh/git-gh-command')
 	const { defect_rate_cli } = await import('#scripts/issue/defect-rate-cli')
 	const { lane_net_read } = await import('#scripts/lane/lane-net-read')
@@ -84,6 +95,8 @@ async function replay_reads(
 	for (const read of scenario.reads) {
 		install_read(replay_target(targets, read.method), read, records)
 	}
+
+	return backlog_measure_observe.install_reads(targets, records)
 }
 
 async function select(
@@ -179,27 +192,35 @@ function summaries(
 	return run_startup_store.summarize(entries.filter((row) => row.attempt === attempt))
 }
 
+function write_result(directory: string, index: number, payload: unknown): void {
+	writeFileSync(path.join(directory, `result-${String(index)}.json`), JSON.stringify(payload))
+}
+
 function save_result(
-	context: { directory: string; index: number; attempt: string },
+	context: Omit<AttemptContext, 'boundaries'> & { attempt: string },
 	result: Execution,
 	boundaries: Array<MeasureBoundary>,
 	scenario: MeasureScenario,
-): void {
-	const destination = path.join(context.directory, STARTUP_FILE)
-	const summary = summaries(destination, context.attempt)
-	if (summary.length === 0) throw new Error('Measurement has no persisted startup records')
-
-	writeFileSync(
-		path.join(context.directory, `result-${String(context.index)}.json`),
-		JSON.stringify({
-			attempt: context.attempt,
-			warmup: scenario.mode === 'warm' && context.index === 0,
-			result,
-			boundaries,
-			summaries: summary,
-			scope: 'Selection and driver only; budget, lane preparation and real workers are replaced',
-		}),
+): Completeness {
+	const summary = summaries(path.join(context.directory, STARTUP_FILE), context.attempt)
+	const completeness = backlog_measure_completeness.assess(
+		summary,
+		boundaries,
+		execution_edge(result),
+		context.warmup,
 	)
+
+	write_result(context.directory, context.index, {
+		attempt: context.attempt,
+		warmup: scenario.mode === 'warm' && context.index === 0,
+		completeness,
+		result,
+		boundaries,
+		summaries: summary,
+		scope: MEASUREMENT_SCOPE,
+	})
+
+	return completeness
 }
 
 async function measured(
@@ -226,41 +247,62 @@ async function measured(
 
 async function one_attempt(
 	scenario: MeasureScenario,
-	context: {
-		directory: string
-		index: number
-		boundaries: Array<MeasureBoundary>
-	},
-): Promise<void> {
+	context: AttemptContext,
+): Promise<Completeness> {
 	const { directory, index, boundaries } = context
 	const attempt = `${scenario.name}:${String(index)}`
 	const scope = { run: directory, attempt, destination: path.join(directory, STARTUP_FILE) }
 	const from = boundaries.length
 	const result = await measured(scenario, scope, boundaries)
 
-	save_result({ directory, index, attempt }, result, boundaries.slice(from), scenario)
+	const completeness = save_result(
+		{ directory, index, attempt, ...('warmup' in context && { warmup: context.warmup }) },
+		result,
+		boundaries.slice(from),
+		scenario,
+	)
 
 	if (boundaries.some((row) => row.source === 'denied') || execution_edge(result) === 'failed') {
 		throw new Error('Measurement refused or failed an operation')
+	}
+
+	return completeness
+}
+
+async function attempts(
+	scenario: MeasureScenario,
+	directory: string,
+	boundaries: Array<MeasureBoundary>,
+): Promise<void> {
+	const completeness = await one_attempt(scenario, { directory, index: 0, boundaries })
+	if (scenario.mode === 'cold') return
+	const warmup = { attempt: `${scenario.name}:0`, completeness }
+
+	for (let index = 1; index <= scenario.repetitions; index++) {
+		// Sequential attempts deliberately retain only this trial's cache.
+		// eslint-disable-next-line no-await-in-loop
+		await one_attempt(scenario, {
+			directory,
+			index,
+			boundaries,
+			warmup,
+		})
 	}
 }
 
 async function run(scenario: MeasureScenario, directory: string): Promise<void> {
 	const boundaries: Array<MeasureBoundary> = []
 	const restore = backlog_measure_guard.install(scenario, process.cwd(), boundaries)
-	const count = scenario.mode === 'warm' ? scenario.repetitions + 1 : 1
+	const restore_http = backlog_measure_observe.install_http(boundaries, scenario.live_get)
+	const restore_reads = await replay_reads(scenario, boundaries)
 
 	try {
-		await replay_reads(scenario, boundaries)
-
-		for (let index = 0; index < count; index++) {
-			// Sequential attempts deliberately retain only this trial's cache.
-			// eslint-disable-next-line no-await-in-loop
-			await one_attempt(scenario, { directory, index, boundaries })
-		}
+		await attempts(scenario, directory, boundaries)
 	} finally {
 		writeFileSync(path.join(directory, 'boundaries.json'), JSON.stringify(boundaries))
 		restore()
+		restore_http()
+		restore_reads()
 	}
 }
 
