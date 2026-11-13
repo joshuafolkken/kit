@@ -1,6 +1,8 @@
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { error_text } from '#scripts/lib/error-message'
 import type { LaunchResult } from '#scripts/run/detached-launch'
+import { test_pinned } from '#scripts/test/test-pinned'
+import { test_pinned_logic } from '#scripts/test/test-pinned-logic'
 import { test_pinned_record, type PinnedSummary } from '#scripts/test/test-pinned-record'
 import { run_review_pinned_join } from './run-review-pinned-join'
 import { run_review_pinned_steps } from './run-review-pinned-steps'
@@ -29,13 +31,36 @@ async function start(root: string = PROJECT_ROOT): Promise<LaunchResult> {
 	}
 }
 
+function is_failed(summary: PinnedSummary | undefined): summary is PinnedSummary {
+	return summary?.counts === undefined && summary?.is_unchecked === true
+}
+
+async function recover_failed(summary: PinnedSummary, root: string): Promise<PinnedSummary> {
+	try {
+		const report = await test_pinned.cached(test_pinned_logic.DEFAULT_MAX_HUNKS)
+
+		if (report.is_stale === true || report.unpinned.length === 0) return summary
+		const known = test_pinned_record.summary_of(report, root)
+
+		return { ...known, is_cut: true, is_unchecked: true, text: `${known.text}${summary.text}` }
+	} catch (error) {
+		error_text.trace_swallowed('run_review_pinned_remaining.recover_failed', error)
+
+		return summary
+	}
+}
+
 async function current_answer(root: string): Promise<PinnedSummary | undefined> {
 	const summary = await run_review_pinned_steps.wait_alone(root)
 	const tree = await run_review_pinned_tree.key()
 
-	return tree !== undefined && run_review_pinned_steps.launched_tree(root) === tree
-		? summary
-		: test_pinned_record.not_run_summary(MOVED_NOTE)
+	if (tree === undefined || run_review_pinned_steps.launched_tree(root) !== tree) {
+		return test_pinned_record.not_run_summary(MOVED_NOTE)
+	}
+
+	const answer = is_failed(summary) ? await recover_failed(summary, root) : summary
+
+	return (await is_current(tree)) ? answer : test_pinned_record.not_run_summary(MOVED_NOTE)
 }
 
 async function relaunched_answer(root: string): Promise<PinnedSummary | undefined> {
