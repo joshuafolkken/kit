@@ -37,7 +37,7 @@ interface ViewAnswer {
 const FETCH_SCRIPT = [
 	'const [url, accept] = process.argv.slice(1)',
 	'const response = await fetch(url, { headers: { accept } })',
-	'if (!response.ok) process.exit(1)',
+	'if (!response.ok) { console.error(`HTTP ${response.status}`); process.exit(1) }',
 	'process.stdout.write(await response.text())',
 ].join('\n')
 
@@ -45,6 +45,11 @@ const FETCH_SCRIPT = [
 // install command, so `1.0.0;curl…|sh` or any other text is refused at the source, not downstream.
 const version_schema = z.string().refine((value) => semver.valid(value) === value)
 const latest_schema = z.looseObject({ 'dist-tags': z.looseObject({ latest: version_schema }) })
+const public_version_schema = z.looseObject({
+	name: z.string(),
+	version: version_schema,
+	dist: z.looseObject({ tarball: z.url(), integrity: z.string() }),
+})
 const times_schema = z.looseObject({ time: release_age.release_times_schema })
 const name_schema = z.looseObject({ name: z.string().optional() })
 const PUBLISHING_SCOPE = '@joshuafolkken/'
@@ -55,13 +60,27 @@ function packument_url(package_name: string): string {
 	return `${PUBLIC_REGISTRY}/${package_name.replace(SCOPE_SEPARATOR, () => ENCODED_SCOPE_SEPARATOR)}`
 }
 
-function read_packument(package_name: string, accept: string): unknown {
+function read_packument(
+	package_name: string,
+	accept: string,
+	should_require = false,
+	version?: string,
+): unknown {
+	const base = packument_url(package_name)
+	const url = version === undefined ? base : `${base}/${version}`
 	const result = execaSync(
 		process.execPath,
-		['--input-type=module', '-e', FETCH_SCRIPT, packument_url(package_name), accept],
+		['--input-type=module', '-e', FETCH_SCRIPT, url, accept],
 		{ reject: false, timeout: FETCH_TIMEOUT_MS },
 	)
-	if (result.exitCode !== 0) return undefined
+
+	if (result.exitCode !== 0) {
+		if (should_require) {
+			throw new Error(`Public npm request failed: ${package_name}: ${result.stderr}`)
+		}
+
+		return undefined
+	}
 
 	return json_value.parse_or_undefined(result.stdout)
 }
@@ -130,6 +149,21 @@ function has_public_version(package_name: string, version: string): boolean {
 	return parsed.success && parsed.data.time[version] !== undefined
 }
 
+// The destination artifact, regardless of the checkout's old scope registry mapping.
+function read_public_version(
+	package_name: string,
+	version: string,
+): z.infer<typeof public_version_schema> | undefined {
+	if (!version_schema.safeParse(version).success) return undefined
+	const selected = public_version_schema.safeParse(
+		read_packument(package_name, FULL_ACCEPT, true, version),
+	)
+	if (!selected.success) return undefined
+	const entry = selected.data
+
+	return entry.name === package_name && entry.version === version ? entry : undefined
+}
+
 // **The one answer to "does this repository publish to npm"**: its package name when public npm
 // already carries it under kit's scope, otherwise nothing. Neither GitHub visibility nor `private`
 // decides it — a forgotten `private: true` must not turn publishing on — and the scope keeps a
@@ -170,6 +204,7 @@ const npm_registry = {
 	packument_url,
 	published_package_name,
 	read_latest,
+	read_public_version,
 	read_release_times,
 	valid_version,
 	view,
