@@ -6,6 +6,7 @@ import { git_gh_pr_too_large } from '#scripts/gh/git-gh-pr-too-large'
 import { git_closes_keyword } from '#scripts/git/git-closes-keyword'
 import { lane_ledger, type MergeEntry } from '#scripts/lane/lane-ledger'
 import { issue_closing_pr } from './issue-closing-pr'
+import { issue_observation_prime } from './issue-observation-prime'
 import {
 	issue_sample_gate,
 	type Condition,
@@ -105,6 +106,7 @@ async function prime(
 	bodies: ReadonlyArray<string | undefined>,
 	ports: PrimePorts = DEFAULT_PORTS,
 ): Promise<void> {
+	await issue_observation_prime.prime(bodies)
 	const unread = issue_sample_gate.unread_of(bodies)
 
 	if (unread.length === 0) return

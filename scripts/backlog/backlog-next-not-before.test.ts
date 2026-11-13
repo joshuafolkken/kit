@@ -7,6 +7,8 @@ import {
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { PRIORITY_CRITICAL_LABEL } from '#scripts/issue/issue-labels'
+import { issue_observation_fixture as observation } from '#scripts/issue/issue-observation-fixture'
+import { issue_observation_gate } from '#scripts/issue/issue-observation-gate'
 import { issue_sample_gate } from '#scripts/issue/issue-sample-gate'
 import { issue_sample_prime } from '#scripts/issue/issue-sample-prime'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -49,6 +51,7 @@ function classify(row: OpenIssueData): ReturnType<typeof backlog_pool.classify_s
 beforeEach(() => {
 	vi.restoreAllMocks()
 	issue_sample_gate.reset()
+	issue_observation_gate.reset()
 	vi.spyOn(console, 'info').mockImplementation(streams.info)
 	vi.spyOn(console, 'error').mockImplementation(streams.error)
 	vi.spyOn(git_gh_issue_write, 'label_ensure').mockResolvedValue()
@@ -68,6 +71,16 @@ describe('backlog_pool.classify_standalone with a declared start time', () => {
 	it('offers the same row once its time has passed', () => {
 		expect(classify(dated(PAST)).runnable.map((child) => child.number)).toEqual([OLD_ISSUE_NUMBER])
 	})
+})
+
+it('holds observation waits and offers them through the usual pool after all required evidence', () => {
+	const row = { ...dated(PAST), body: observation.BODY }
+
+	issue_observation_gate.record(observation.URL, observation.comment(['same-head']))
+	expect(classify(row).time.map((child) => child.number)).toEqual([OLD_ISSUE_NUMBER])
+	expect(classify(row).runnable).toEqual([])
+	issue_observation_gate.record(observation.URL, observation.comment(observation.KEYS))
+	expect(classify(row).runnable.map((child) => child.number)).toEqual([OLD_ISSUE_NUMBER])
 })
 
 describe('backlog:next with a declared start time', () => {

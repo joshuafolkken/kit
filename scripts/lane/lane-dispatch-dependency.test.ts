@@ -4,6 +4,7 @@ import type { EpicChild } from '#scripts/epic/epic-graph'
 import { epic_live } from '#scripts/epic/epic-live'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
+import { issue_observation_fixture as observation } from '#scripts/issue/issue-observation-fixture'
 import { issue_publication_state } from '#scripts/issue/issue-publication-state'
 import { propagate_publish } from '#scripts/propagate/propagate-publish'
 import { run_label } from '#scripts/run/run-label'
@@ -86,6 +87,31 @@ it('releases the in-progress claim when a resume is withheld', async () => {
 
 	await lane_dispatch_dependency.defer(String(ISSUE))
 	expect(unmark).toHaveBeenCalledWith(String(ISSUE))
+})
+
+it('rechecks observation evidence before spawning a selected or resumed worker', async () => {
+	read.mockResolvedValue({ ...child(ISSUE), body: observation.BODY })
+	const evidence = vi.spyOn(git_gh_exec, 'exec_gh_api').mockResolvedValue(
+		JSON.stringify({
+			body: observation.comment(),
+			html_url: observation.URL,
+			author_association: 'OWNER',
+			user: { login: 'owner' },
+		}),
+	)
+
+	expect(await lane_dispatch_dependency.check(String(ISSUE))).toMatchObject({ kind: WAIT_KIND })
+	evidence.mockResolvedValue(
+		JSON.stringify({
+			body: observation.comment(observation.KEYS),
+			html_url: observation.URL,
+			author_association: 'OWNER',
+			user: { login: 'owner' },
+		}),
+	)
+	expect(await lane_dispatch_dependency.check(String(ISSUE))).toBeUndefined()
+	evidence.mockRejectedValue(new Error('offline'))
+	expect(await lane_dispatch_dependency.check(String(ISSUE))).toMatchObject({ kind: WAIT_KIND })
 })
 
 it('revalidates a cross-repository release instead of reusing the selection cache', async () => {
