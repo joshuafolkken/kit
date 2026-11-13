@@ -3,6 +3,7 @@ import { run_startup } from '#scripts/run/startup/run-startup'
 import { z } from 'zod'
 import { defect_rate, type DefectRate } from './defect-rate'
 import { issue_search } from './issue-search'
+import { issue_search_count } from './issue-search-count'
 
 const MS_PER_MINUTE = 60_000
 const CACHE_TTL_MINUTES = 15
@@ -30,20 +31,18 @@ async function measure_uncached(
 ): Promise<DefectRate | undefined> {
 	const [filed, completed] = await Promise.all([
 		issue_search.search_complete(defect_rate.filed_query(repo, since), now_ms),
-		issue_search.search_complete(defect_rate.completed_query(repo, since), now_ms),
+		issue_search_count.count(defect_rate.completed_query(repo, since)),
 	])
 
 	if (filed === undefined || completed === undefined) return undefined
 
-	const is_capped = filed.is_capped || completed.is_capped
-
-	return defect_rate.measure({
+	return {
 		days,
 		since,
-		filed: filed.issues,
-		completed: completed.issues,
-		is_capped,
-	})
+		defects: filed.issues.filter((issue) => defect_rate.is_defect(issue)).length,
+		enhancements: completed,
+		is_capped: filed.is_capped,
+	}
 }
 
 // The rate over a window, or `undefined` when either search could not be read. `backlog:next` asks it.
