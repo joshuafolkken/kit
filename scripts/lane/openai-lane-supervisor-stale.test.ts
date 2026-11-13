@@ -11,6 +11,7 @@ import { run_cut_resume } from '#scripts/run/cut/run-cut-resume'
 import { detached_launch } from '#scripts/run/detached-launch'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { lane_dispatch_dependency } from './lane-dispatch-dependency'
 import type { LaneInfo } from './lane-registry'
 import { lane_session_broker } from './lane-session-broker'
 import { openai_lane_ship } from './openai-lane-ship'
@@ -26,6 +27,7 @@ const BRANCH = '7405-lane'
 const CHILD_PID = 8123
 const INTERRUPTED = 'interrupted'
 const INTERRUPTION = 'supervisor interrupted'
+const WAIT_KIND = 'dependency-wait'
 const OTHER_BRANCH = 'different-lane'
 const DIRTY_WORK = 'work to preserve'
 const profile = agent_role_profile.OPENAI_PROFILES.worker
@@ -71,6 +73,17 @@ async function supervise(nonce: string): Promise<number> {
 	return await openai_lane_supervisor.supervise(lane, profile, nonce)
 }
 
+it('withholds a new supervisor generation and records a retryable dependency wait', async () => {
+	vi.mocked(lane_dispatch_dependency.check).mockResolvedValue({
+		kind: WAIT_KIND,
+		reason: 'new blocker',
+	})
+	vi.spyOn(lane_dispatch_dependency, 'defer').mockResolvedValue()
+	expect(await supervise(WAIT_KIND)).toBe(1)
+	expect(launch).not.toHaveBeenCalled()
+	expect(lane_dispatch_dependency.defer).toHaveBeenCalledWith(ISSUE)
+})
+
 async function interrupt_supervisor(): Promise<void> {
 	let saved: ReturnType<typeof openai_lane_supervisor_owner.read_state>
 
@@ -105,6 +118,7 @@ function reset_environment(): void {
 }
 
 beforeEach(() => {
+	vi.spyOn(lane_dispatch_dependency, 'check').mockResolvedValue(undefined)
 	run_cut.end_cut(target)
 	stamp_file.remove_stamp(openai_lane_supervisor.marker_path(directory))
 	stamp_file.remove_stamp(openai_lane_supervisor.state_path(directory))

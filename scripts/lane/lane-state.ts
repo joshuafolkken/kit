@@ -46,7 +46,7 @@ type LaneRecords = ReadonlyMap<string, LaneStateRecord>
 // The states each one moves to. A lane with no record yet (opened before the record existed) moves to
 // any of them.
 const TRANSITIONS: Record<LaneState, ReadonlyArray<LaneState>> = {
-	open: ['open', 'running', HUMAN_REVIEW, 'ended'],
+	open: ['open', 'running', 'paused', HUMAN_REVIEW, 'ended'],
 	running: ['running', 'paused', HUMAN_REVIEW, 'ended'],
 	paused: ['paused', 'running', 'ended'],
 	[HUMAN_REVIEW]: [HUMAN_REVIEW, 'running', 'ended'],
@@ -110,6 +110,13 @@ function next_record(
 	directory: string,
 	now: Date,
 ): LaneStateRecord {
+	if (
+		previous?.changed_by === lane_state_record.DEPENDENCY_WAIT_COMMAND &&
+		change.is_launch === true
+	) {
+		return previous
+	}
+
 	return {
 		// An open starts a fresh life: a reopened lane keeps nothing of the run that launched it before.
 		...(change.state !== 'open' && previous),

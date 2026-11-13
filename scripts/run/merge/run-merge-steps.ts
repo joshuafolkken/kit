@@ -1,11 +1,5 @@
-import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
-import { issue_cite } from '#scripts/issue/issue-cite'
-import { has_label_name, NOT_BEFORE_LABEL } from '#scripts/issue/issue-labels'
-import { issue_not_before } from '#scripts/issue/issue-not-before'
 import { issue_park } from '#scripts/issue/issue-park'
-import { issue_sample_prime } from '#scripts/issue/issue-sample-prime'
-import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { session_cite } from '#scripts/issue/session-cite'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { lane_preserve } from '#scripts/lane/lane-preserve'
@@ -31,6 +25,7 @@ import { run_merge_cap } from './run-merge-cap'
 import { run_merge_close } from './run-merge-close'
 import { run_merge_decision } from './run-merge-decision'
 import { run_merge_github_limit } from './run-merge-github-limit'
+import { run_merge_waits } from './run-merge-waits'
 
 // The result of attempting to apply a carry change. Distinguishing `refused` from `applied` lets
 // callers surface the refusal as a hard failure rather than silently continuing on a carry that was
@@ -53,7 +48,6 @@ const LANES = '--lanes'
 const REPO_FLAG = '--repo'
 const CLOSE_CAUSE = '`run:merge` closed it'
 const STOPPED_CAUSE = 'the unit stopped and `run:merge --stash` classified it'
-const OPEN_STATE = 'OPEN'
 const SYNC_RETRY = { attempts: 3, interval_ms: 5000 }
 
 // One returned child's context, gathered from the command line by the CLI, and the ending signals its
@@ -92,8 +86,6 @@ interface FailedResult {
 }
 
 const NO_WAITS: ReadonlyArray<string> = []
-// The wait a `not-before` label alone records: the label carries no date, only that one is ahead.
-const NOT_BEFORE_WAIT = 'a start date still ahead (`not-before`)'
 
 // A captured `pnpm josh` subprocess: its output is read back rather than inherited, and a non-zero
 // exit is a value to branch on rather than a throw. The step's stderr stays piped here — `run:merge`
@@ -293,42 +285,6 @@ function refused_result(carry: RunCarry): FailedResult {
 	return { carry, is_parked: false, is_refused: true, waits: NO_WAITS }
 }
 
-// The child's open `blocked-by` blockers, cited. A read that fails answers none, so the child is
-// parked — a relation nobody could read is never taken as a dependency.
-async function open_blockers(child: string): Promise<ReadonlyArray<string>> {
-	try {
-		const references = await git_gh_command.issue_blocked_by_references(child, '')
-
-		return references
-			.filter((blocker) => blocker.state === OPEN_STATE)
-			.map((blocker) => issue_cite.plain_for('github', blocker.number, blocker.repo))
-	} catch {
-		return NO_WAITS
-	}
-}
-
-// Whether the child carries `not-before` — the body's start date copied to a label. Read only where the
-// body could not be: the body is the source, so a label it no longer backs is never a wait.
-async function has_not_before_label(ctx: MergeContext): Promise<boolean> {
-	const read = await issue_state_cli.read_issue(ctx.child, ctx.repo)
-
-	return read.kind === 'state' && has_label_name(read.state.labels, NOT_BEFORE_LABEL)
-}
-
-// The child's declared start date while it is still ahead (joshuafolkken/kit#4076), or its `not-before`
-// label when the body could not be read (joshuafolkken/kit#4102), or the samples it still waits on. A
-// due date or none answers none, so the child is parked as before.
-async function start_date_wait(ctx: MergeContext): Promise<ReadonlyArray<string>> {
-	const body = await git_gh_command.issue_get_body(ctx.child, ctx.repo)
-
-	if (body === undefined) return (await has_not_before_label(ctx)) ? [NOT_BEFORE_WAIT] : NO_WAITS
-
-	await issue_sample_prime.prime([body])
-	const reason = issue_not_before.waiting_reason(body)
-
-	return reason === undefined ? NO_WAITS : [reason]
-}
-
 // A child that ended unfinished while an open blocker it records still has to land first, or while
 // its declared start date is still ahead, is waiting, not failed: nothing is counted and
 // `needs-decision` is not applied — when it runs is already recorded, so there is nothing for a person
@@ -381,7 +337,7 @@ async function park_failed(ctx: MergeContext, cause: StallCause): Promise<Failed
 // person. Without a cause of the caller's, a child whose detached ship ended is parked for the ship's
 // stop.
 async function do_failed(ctx: MergeContext, cause?: StallCause): Promise<FailedResult> {
-	const waits = [...(await open_blockers(ctx.child)), ...(await start_date_wait(ctx))]
+	const waits = await run_merge_waits.read(ctx)
 
 	if (waits.length > 0) return await do_waiting(ctx, waits)
 

@@ -83,6 +83,10 @@ is the non-closing home for the split rationale.
 **Each split child is filed with the `route:split` label** —
 `pnpm josh issue:file "<sub-title>" --body-file .josh/tmp/body.md --route split` — and judged like any
 filing (`kickoff.md` → "Words typed after `new`").
+It is created unpublished. Record every child's plan with `issue:plan --planned --no-notify`,
+create/promote the epic and register its native dependencies, then run
+`pnpm josh issue:file --publish <E>` to validate the batch and publish its prepared children.
+Retry the same epic after a partial failure; never recreate its prepared children.
 
 Over the bar before dispatch → a split-only unit answers question 1 (`scripts/backlog/backlog-drive-split-unit.ts`).
 

@@ -294,6 +294,15 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 					description: 'needs human judgement or a verified user prohibition; no `auto-ok`.',
 				},
 				{
+					names: ['--prepare'],
+					description: 'create an unpublished child; `--route split` implies this.',
+				},
+				{
+					names: ['--publish <E>'],
+					description:
+						"validate/publish epic E's prepared children; retry the same epic on failure.",
+				},
+				{
 					names: ['--release'],
 					description:
 						"a consumer can use the change only once it is published. The filed issue becomes a blocker of the target's release issue (step 10).",

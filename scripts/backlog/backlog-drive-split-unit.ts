@@ -47,6 +47,7 @@ function brief_of(issue: string): string {
 		`\`pnpm josh doc:section .claude/skills/workflow-commands/split-assessment.md "${split_assess.QUESTION_SECTION}"\`.`,
 		`Separately-mergeable parts → file each child k with \`pnpm josh issue:file "<title>" --body-file .josh/tmp/split-${issue}-<k>.md --route split\`, then`,
 		`\`pnpm josh epic --promote ${issue} <N1> <N2> ... [--ordered]\`.`,
+		'Before publishing, record every child plan with `issue:plan --planned --no-notify`, then `pnpm josh issue:file --publish <E>`; retry the same epic on failure.',
 		`One deliverable → add \`${split_assess.REASON_PREFIX} <理由>\` under 背景 with \`pnpm josh issue:body ${issue} --body-file -\`.`,
 		'Nobody answers this session: end it once either is written.',
 	].join(' ')

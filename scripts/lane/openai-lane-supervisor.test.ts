@@ -9,6 +9,7 @@ import { detached_launch, type LaunchRequest } from '#scripts/run/detached-launc
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, beforeEach, describe, expect, it, test, vi } from 'vitest'
 import { lane_child_invocation } from './lane-child-invocation'
+import { lane_dispatch_dependency } from './lane-dispatch-dependency'
 import type { LaneInfo } from './lane-registry'
 import { lane_session_broker } from './lane-session-broker'
 import { openai_lane_ship } from './openai-lane-ship'
@@ -82,6 +83,7 @@ function reset_ship(): void {
 }
 
 beforeEach(() => {
+	vi.spyOn(lane_dispatch_dependency, 'check').mockResolvedValue(undefined)
 	run_cut.end_cut(target)
 	stamp_file.remove_stamp(openai_lane_supervisor.marker_path(lane_directory))
 	stamp_file.remove_stamp(openai_lane_supervisor.state_path(lane_directory))

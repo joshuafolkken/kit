@@ -40,6 +40,7 @@ function args_of(overrides: Partial<FileArguments> = {}): FileArguments {
 		is_release: false,
 		is_blocking_finder: false,
 		is_check: false,
+		is_prepared: false,
 		...overrides,
 	}
 }
@@ -64,6 +65,7 @@ describe('issue_file.parse — the arguments a filing owes', () => {
 		['--release', { is_release: true }],
 		['--blocks-finder', { is_blocking_finder: true }],
 		['--check', { is_check: true }],
+		['--prepare', { is_prepared: true }],
 	])('reads %s', (flag, expected) => {
 		expect(issue_file.parse([...FILED, flag])).toStrictEqual(args_of(expected))
 	})

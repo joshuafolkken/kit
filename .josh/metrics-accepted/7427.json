@@ -1,0 +1,9 @@
+{
+	"reason": "#7427: publication reuses issue_auto_ok.decide to respect user prohibitions and exclusion labels added during preparation; the additional executable lines replace unconditional saved approval restoration. Fresh dependency admission and recoverable publication remain one contract, reusing native readers, resolver and lifecycle locks.",
+	"date": "2026-11-13",
+	"growth": {
+		"scripts.code_lines": 379,
+		"ai_cost.on_demand_bytes": 1118,
+		"prose.long_paragraphs": 1
+	}
+}

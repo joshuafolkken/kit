@@ -27,6 +27,7 @@ const DISPATCH = 'lane:dispatch'
 const PAUSE = 'lane:pause'
 const CLOSE = 'lane:close'
 const HUMAN_REVIEW = 'human-review'
+const DEPENDENCY_WAIT = 'lane:dependency-wait'
 
 const state = { directory: '' }
 
@@ -130,6 +131,21 @@ describe('lane_state.read_states and paused_note', () => {
 			lane_state.paused_note(await lane_state.read_state(ISSUE, state.directory)),
 		).toBeUndefined()
 		expect(lane_state.paused_note(undefined)).toBeUndefined()
+	})
+})
+
+describe('lane_state.record_change — dependency launch ordering', () => {
+	it('keeps a supervisor dependency wait when the parent records launch after the refusal', async () => {
+		await record_at(change_of('open', OPEN), OPENED_AT)
+		await record_at(change_of('paused', DEPENDENCY_WAIT), PAUSED_AT)
+		await record_at(change_of('running', DISPATCH, { is_launch: true }), PAUSED_AT)
+		expect(await lane_state.read_state(ISSUE, state.directory)).toMatchObject({
+			state: 'paused',
+			changed_by: DEPENDENCY_WAIT,
+		})
+		await record_at(change_of('running', DISPATCH), PAUSED_AT)
+		await record_at(change_of('running', DISPATCH, { is_launch: true }), PAUSED_AT)
+		expect(await lane_state.read_state(ISSUE, state.directory)).toMatchObject({ state: 'running' })
 	})
 })
 
