@@ -1,4 +1,5 @@
 import { shared_cache, type CacheSlot } from '#scripts/josh/shared-cache'
+import { run_startup } from '#scripts/run/startup/run-startup'
 import { z } from 'zod'
 import { defect_rate, type DefectRate } from './defect-rate'
 import { issue_search } from './issue-search'
@@ -54,10 +55,15 @@ async function measure_window(
 	const since = defect_rate.window_start(now_ms, days)
 	const key = [repo, String(days), since].join(' ')
 
-	return await shared_cache.remember(
-		{ slot: RATE_CACHE, key, schema: defect_rate_schema },
-		async () => await measure_uncached(repo, days, since),
-		now_ms,
+	return await run_startup.phase(
+		'defect rate',
+		async () =>
+			await shared_cache.remember(
+				{ slot: RATE_CACHE, key, schema: defect_rate_schema },
+				async () => await measure_uncached(repo, days, since),
+				now_ms,
+			),
+		{ edge_of: (value) => (value === undefined ? 'failed' : 'done') },
 	)
 }
 

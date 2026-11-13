@@ -4,6 +4,9 @@ import { core_budget } from '#scripts/gate/core-budget'
 import { buffered_process, type BufferedProcessResult } from '#scripts/lib/buffered-process'
 import { PACKAGE_JSON } from '#scripts/lib/package-manifest'
 import { INSTALL_TIMEOUT_MS } from '#scripts/lib/timeouts'
+import { run_startup } from '#scripts/run/startup/run-startup'
+import type { StartupEntry } from '#scripts/run/startup/run-startup-schema'
+import { run_startup_store } from '#scripts/run/startup/run-startup-store'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { INSTALL_ARGUMENTS, lane_install, NO_MANIFEST_OUTPUT } from './lane-install'
@@ -62,6 +65,28 @@ beforeEach(() => {
 })
 
 describe('install_dependencies — what it asks for', () => {
+	it('persists successful install time separately from admission and launch preparation', async () => {
+		process_answers(SUCCESS_EXIT_CODE, DONE_LINE)
+		const rows: Array<StartupEntry> = []
+		const recording = vi.spyOn(run_startup_store, 'record').mockImplementation(async (row) => {
+			rows.push(row)
+		})
+
+		await run_startup.within(
+			{ run: 'run', attempt: 'install', issue: '7422' },
+			async () => await lane_install.install_dependencies(lane.directory),
+		)
+
+		expect(rows.find((row) => row.edge === 'done')).toMatchObject({
+			phase: 'dependency install',
+			elapsed_ms: expect.any(Number),
+		})
+		expect(rows.find((row) => row.edge === 'waiting')).toMatchObject({
+			phase: 'install resource wait',
+		})
+		expect(mocked_run).toHaveBeenCalledTimes(1)
+		recording.mockRestore()
+	})
 	// The lane, not the process's own directory: `lane:open` is typed in the primary checkout, so an
 	// install that inherited the working directory would reinstall the repository it was run from and
 	// leave the lane exactly as empty as before.

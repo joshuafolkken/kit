@@ -1,6 +1,7 @@
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { json_value } from '#scripts/lib/json-value'
+import { run_startup } from '#scripts/run/startup/run-startup'
 import { z } from 'zod'
 import { stamp_file } from './stamp-file'
 
@@ -49,6 +50,12 @@ function read<T>(
 ): T | undefined {
 	const parsed = schema.safeParse(read_value(slot, key, now_ms))
 
+	run_startup.metric(
+		'cache',
+		parsed.success && parsed.data !== undefined ? 'hit' : 'miss',
+		`${slot.prefix}:${key}`,
+	)
+
 	return parsed.success ? parsed.data : undefined
 }
 
@@ -73,7 +80,15 @@ async function remember<T>(
 
 	if (cached !== undefined) return cached
 
-	const value = await compute()
+	const value = await run_startup.phase(
+		`cache fill ${request.slot.prefix}`,
+		async () => {
+			run_startup.metric('cache', 'fill', `${request.slot.prefix}:${request.key}`)
+
+			return await compute()
+		},
+		{ edge_of: (result) => (result === undefined ? 'failed' : 'done') },
+	)
 
 	if (value !== undefined) write(request.slot, request.key, value, now_ms)
 
