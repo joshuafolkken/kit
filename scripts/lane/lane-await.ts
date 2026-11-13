@@ -14,6 +14,8 @@ import {
 } from '#scripts/run/run-liveness'
 import { lane_child_invocation } from './lane-child-invocation'
 import { lane_handoff } from './lane-handoff'
+import { lane_process_table } from './lane-process-table'
+import { lane_reap } from './lane-reap'
 import { process_tools } from './process-tools'
 
 // Detached lane children are not harness-tracked processes, so their completion fires no
@@ -109,6 +111,18 @@ function process_trace_default(issue: string): ProcessTrace {
 
 function is_process_running_default(issue: string): boolean {
 	return process_trace_default(issue) === PROCESS_ALIVE
+}
+
+// A repair requested inside its replacement worker must still refuse every other owner.
+async function other_process_trace(issue: string): Promise<ProcessTrace> {
+	if (lane_handoff.is_ship_running(issue, process.cwd())) return PROCESS_ALIVE
+	const rows = await lane_process_table.read_table()
+
+	if (!rows?.some((row) => row.pid === process.pid)) return PROCESS_UNKNOWN
+
+	return lane_reap.is_child_running(issue, lane_process_table.probes_of(rows))
+		? PROCESS_ALIVE
+		: PROCESS_NONE
 }
 
 function is_shipped_default(issue: string, since_ms: number): boolean {
@@ -309,6 +323,7 @@ const lane_await = {
 	is_process_running_default,
 	is_shipped_default,
 	parse_arguments,
+	other_process_trace,
 	process_trace_default,
 	wait_for_any,
 }

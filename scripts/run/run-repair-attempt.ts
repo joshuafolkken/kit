@@ -17,7 +17,7 @@ import { run_event_stream_emit } from './event/run-event-stream-emit'
 import { run_pr_return } from './run-pr-return'
 import { run_ship_detach } from './ship/run-ship-detach'
 
-// A reviewed PR starts a repair only before a new worker owns it. The existing retry event is
+// A reviewed PR starts a repair only after the previous worker ended. The existing retry event is
 // the attempt boundary; its repair suffix makes a repeated queue request idempotent.
 const REPAIR_SUFFIX = ' repair'
 const LOCK_WAIT_MS = 5000
@@ -121,7 +121,7 @@ async function has_ended_ship(issue: string): Promise<boolean> {
 }
 
 async function ready_lane(issue: string): Promise<LaneInfo | undefined> {
-	if (lane_await.process_trace_default(issue) !== 'none' || !(await has_ended_ship(issue))) {
+	if ((await lane_await.other_process_trace(issue)) !== 'none' || !(await has_ended_ship(issue))) {
 		return undefined
 	}
 

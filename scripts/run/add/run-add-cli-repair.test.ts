@@ -4,10 +4,12 @@ import { git_common_directory } from '#scripts/git/git-common-directory'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { lane_await } from '#scripts/lane/lane-await'
+import { lane_process_table } from '#scripts/lane/lane-process-table'
 import { lane_registry } from '#scripts/lane/lane-registry'
 import { lane_spent } from '#scripts/lane/lane-spent'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_cut } from '#scripts/run/cut/run-cut'
+import { run_cut_adoption } from '#scripts/run/cut/run-cut-adoption'
 import { run_cut_cli } from '#scripts/run/cut/run-cut-cli'
 import { run_cut_cli_fixture } from '#scripts/run/cut/run-cut-cli-fixture'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
@@ -35,6 +37,7 @@ const PORTS: AddPorts = {
 }
 const REVIEWED_AT = '2026-11-12T01:00:00Z'
 const REQUESTED_AT = '2026-11-12T02:00:00Z'
+const MISSING_ADOPTION = 'Missing fixture adoption'
 const COMMENT = {
 	id: 7477,
 	author: 'joshuafolkken',
@@ -75,7 +78,7 @@ function setup_stream(directory: string): void {
 
 function setup_lane(directory: string): void {
 	vi.spyOn(lane_spent, 'lanes_in_use').mockResolvedValue({ working: [], unread: [] })
-	vi.spyOn(lane_await, 'process_trace_default').mockReturnValue('none')
+	vi.spyOn(lane_await, 'other_process_trace').mockResolvedValue('none')
 	vi.spyOn(lane_registry, 'find_open_lane').mockResolvedValue(lane())
 	vi.spyOn(git_common_directory, 'own').mockReturnValue(directory)
 	vi.spyOn(run_cut, 'cut_path').mockReturnValue(CUT_TARGET)
@@ -135,8 +138,10 @@ describe('reviewed pull request repair through the resume CLI', () => {
 	it.each(['alive', 'unknown'] as const)(
 		'preserves the adoption with a %s owner',
 		async (trace) => {
-			vi.mocked(lane_await.process_trace_default).mockReturnValue(trace)
+			vi.mocked(lane_await.other_process_trace).mockResolvedValue(trace)
 			expect(await run_add_cli.run([ISSUE, '--retry'], PORTS)).toBe(1)
+			await run_cut_cli.run(['--resume', ISSUE])
+			expect(run_cut_cli_fixture.verdict()).toBe('handed-off')
 			expect(run_cut.read_cut(target()).kind).toBe('carried')
 		},
 	)
@@ -231,6 +236,37 @@ describe('repair ownership records', () => {
 })
 
 describe('repair history beyond the active invocation', () => {
+	it('reaches implementation when the replacement worker itself matches the live probe', async () => {
+		vi.spyOn(lane_await, 'process_trace_default').mockReturnValue('alive')
+		vi.mocked(lane_await.other_process_trace).mockRestore()
+		vi.spyOn(lane_process_table, 'read_table').mockResolvedValue(
+			lane_process_table.parse(
+				`${String(process.pid)} 1 00:00 0 S Fri Nov 13 00:00:00 2026 agent fullrun #${ISSUE}`,
+			),
+		)
+		await run_cut_cli.run(['--resume', ISSUE])
+		expect(run_cut_cli_fixture.verdict()).toBe('fresh')
+		expect(run_cut.read_cut(target()).kind).toBe('none')
+		const stage = await run_stage_read.read_stage(ISSUE)
+
+		expect(run_stage.decide(stage.state, 'fullrun').start).toBe('implement')
+	})
+
+	it('repairs an adoption released by human-review collection before direct entry', async () => {
+		const read = run_cut.read_cut(target())
+
+		if (read.kind !== 'carried') throw new Error(MISSING_ADOPTION)
+		run_cut_adoption.release(target(), read.cut, ISSUE)
+		await run_cut_cli.run(['--resume', ISSUE])
+		expect(run_cut_cli_fixture.verdict()).toBe('fresh')
+		expect(run_cut.read_cut(target()).kind).toBe('none')
+		const stage = await run_stage_read.read_stage(ISSUE)
+
+		expect(run_stage.decide(stage.state, 'fullrun').start).toBe('implement')
+	})
+})
+
+describe('repair history across carries and expiration', () => {
 	it('reads the real issue history even when its review predates the new carry', async () => {
 		vi.mocked(run_event_stream_emit.all_events).mockRestore()
 		expect(await run_add_cli.run([ISSUE, '--retry'], PORTS)).toBe(0)
@@ -240,7 +276,7 @@ describe('repair history beyond the active invocation', () => {
 	it('ends an expired adopted cut for a verified repair instead of resuming stale work', async () => {
 		const read = run_cut.read_cut(target())
 
-		if (read.kind !== 'carried') throw new Error('Missing fixture adoption')
+		if (read.kind !== 'carried') throw new Error(MISSING_ADOPTION)
 		stamp_file.replace_stamp(target(), { ...read.cut, cut_at: REVIEWED_AT })
 		await run_cut_cli.run(['--resume', ISSUE])
 		expect(run_cut_cli_fixture.verdict()).toBe('fresh')

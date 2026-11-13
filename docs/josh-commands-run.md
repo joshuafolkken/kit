@@ -489,7 +489,9 @@ After the budget and before the reads, the entry synchronizes the tree (skipped 
 
 An issue with `run:planned` or a trusted plan comment reads as `planned`, and its `=== investigation ===` section says to skip the investigator — a lane dispatched again after a yield starts at its recorded plan.
 
-A prior adopted cut may be ended for a reviewed PR's repair under the same checks as `run:add --retry`; `run:entry <N>` in the lane then reads the returned PR and starts at implementation. A cut record alone does not prove its adopter is alive. In a live backlogrun, use `pnpm josh run:add <N> --retry` before dispatching the replacement worker; an active or unreadable owner keeps its cut.
+A prior cut, including an adoption released after human review, may be ended for a reviewed PR's repair under the same checks as `run:add --retry`; `run:entry <N>` in the replacement worker then starts at implementation.
+
+The process probe excludes the requesting worker's ancestry; another worker, a ship or unreadable ownership keeps the cut. In a live backlogrun, use `pnpm josh run:add <N> --retry` before dispatching the replacement worker.
 
 A lane child entering a `planned` issue whose plan `lane:plan` has not cleared runs `lane:plan` on its plan comment's backticked paths before the report, printing the command and its verdict; `yield` gives the lane back at the entry with exit 2, as the entry probe does. A plan comment naming no path runs nothing, and `run:step`'s `lane:plan` line stays.
 

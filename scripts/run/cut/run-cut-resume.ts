@@ -117,7 +117,7 @@ async function resume_carried(
 	issue: string,
 	is_expired: boolean,
 ): Promise<number> {
-	if (cut.is_handed_off === false && (await run_repair_attempt.prepare(issue, target))) {
+	if (await run_repair_attempt.prepare(issue, target)) {
 		return report(FRESH_VERDICT, SUCCESS_EXIT_CODE)
 	}
 
