@@ -12,7 +12,6 @@ const PACKAGE_API_REFERENCE = 'docs/package-api.md'
 const TROUBLESHOOTING_GUIDE = 'docs/troubleshooting.md'
 const TEMPLATE_CI_YML = 'templates/workflows/ci.yml'
 const PUBLISH_JOB_NAMES = ['publish-github', 'publish-npm'] as const
-const GITHUB_AUTH_LINE = '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}'
 const DISPATCH_TAG = '${{ github.ref_name }}'
 const TAG_REF_GUARD = "startsWith(github.ref, 'refs/tags/v')"
 const PRODUCTION_WORKFLOW = './.github/workflows/production.yml'
@@ -77,10 +76,6 @@ function template_steps(job_name: string): TemplateSteps {
 	if (steps === undefined) throw new Error(`Missing template steps in ${job_name}`)
 
 	return steps
-}
-
-function command_index(steps: TemplateSteps, marker: string): number {
-	return steps.findIndex((step) => step.run?.includes(marker))
 }
 
 describe('release tag checkout', () => {
@@ -280,13 +275,11 @@ describe('new project CI registry', () => {
 	it.each(['checks', 'e2e'])('keeps public npm as default in %s', (job_name: string) => {
 		const steps = template_steps(job_name)
 		const setup = steps.find((step) => step.name === 'Setup Node.js')
-		const auth_index = command_index(steps, GITHUB_AUTH_LINE)
 		const install_index = steps.findIndex((step) => step.uses === SETUP_PNPM_ACTION)
 
 		expect(setup).toMatchObject({ uses: SETUP_NODE_ACTION })
 		expect(setup).not.toHaveProperty(['with', 'registry-url'])
-		expect(auth_index).toBeGreaterThanOrEqual(0)
-		expect(install_index).toBeGreaterThan(auth_index)
-		expect(steps[install_index]?.with?.['node-auth-token']).toContain('GITHUB_TOKEN')
+		expect(install_index).toBeGreaterThanOrEqual(0)
+		expect(steps[install_index]?.with?.['node-auth-token']).toBeUndefined()
 	})
 })

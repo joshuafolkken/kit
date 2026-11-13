@@ -59,11 +59,10 @@ describe('publish.yml — one built artifact for both registries', () => {
 		expect(job(PACK_JOB).permissions).toEqual({ contents: 'read', packages: 'read' })
 	})
 
-	// A published kit may install @joshuafolkken/kit from GitHub Packages (#7303).
-	it('passes the read-only token to the install in the job that builds', () => {
+	it('leaves acquisition authentication to the registry-aware setup action', () => {
 		const [setup] = steps_using(job(PACK_JOB), './.github/actions/setup-pnpm')
 
-		expect(setup?.with?.['node-auth-token']).toBe('${{ secrets.GITHUB_TOKEN }}')
+		expect(setup?.with?.['node-auth-token']).toBeUndefined()
 	})
 
 	it.each(PUBLISH_JOB_NAMES)('publishes the downloaded tarball in %s', (job_name) => {

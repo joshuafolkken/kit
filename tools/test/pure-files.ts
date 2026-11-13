@@ -1149,7 +1149,6 @@ const PURE_FILES: ReadonlyArray<string> = [
 	'scripts/sync/publish-artifact.test.ts',
 	'scripts/sync/publish-workflow.test.ts',
 	'scripts/sync/sync-project-config-order.test.ts',
-	'scripts/sync/workflow-content.test.ts',
 	'scripts/time-runtime/guard-rephrase.test.ts',
 	'scripts/time-runtime/time-batch-guard-search.test.ts',
 	'scripts/time-runtime/time-bundles-dependent.test.ts',

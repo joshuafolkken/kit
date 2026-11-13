@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
+import { is_workflow_destination } from '#scripts/claude/workflow-destination'
 import { init_ai_copy } from '#scripts/init/init-ai-copy'
 import { transform_copied_content } from '#scripts/init/init-copy-content'
 import { init_logic } from '#scripts/init/init-logic'
@@ -7,7 +8,9 @@ import { PACKAGE_DIR, PROJECT_ROOT } from '#scripts/init/init-paths'
 import type { ProjectShape } from '#scripts/init/project-profile'
 import { security_policy } from '#scripts/init/security-policy'
 import { file_reader } from '#scripts/lib/read-file'
+import { managed_marker_logic } from '#scripts/managed-marker/managed-marker-logic'
 import { pack_hook } from '#scripts/safe-chain/pack-hook'
+import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
 import { claude_settings_merge } from './claude-settings-merge'
 import { copy_directory_failure, directory_copy_blocker } from './directory-copy-guard'
 import { file_content } from './file-content'
@@ -20,7 +23,21 @@ const CLAUDE_MD_FILENAME = 'CLAUDE.md'
 const CLAUDE_SETTINGS_FILE = '.claude/settings.json'
 const CODEX_HOOKS_FILE = '.codex/hooks.json'
 
+function keep_custom_workflow(destination: string): boolean {
+	if (!is_workflow_destination(destination)) return false
+	const existing = file_reader.read_optional(destination)
+	if (existing === undefined) return false
+	const marker = `${managed_marker_logic.MARKER_PREFIX} ${KIT_PACKAGE_NAME}`
+	if (existing.split(/\r?\n/u, 1)[0] === marker) return false
+	console.warn(
+		`  ⚠ kept      ${destination} (custom workflow; migrate its acquisition settings manually)`,
+	)
+
+	return true
+}
+
 function sync_ai_file(source_path: string, destination_path: string): boolean {
+	if (keep_custom_workflow(destination_path)) return false
 	const content = readFileSync(source_path, 'utf8')
 
 	return file_content.write_text_if_changed(

@@ -63,7 +63,6 @@ jobs:
       - uses: ./.github/actions/setup-pnpm
         with:
           cache: 'false'
-          node-auth-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Select publish tag
         id: publish-tag
