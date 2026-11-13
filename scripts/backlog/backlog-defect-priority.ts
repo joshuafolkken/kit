@@ -20,7 +20,7 @@ function above_message(measured: DefectRate): string {
 }
 
 function should_defer_mechanisms(measured: DefectRate | undefined): boolean {
-	if (measured === undefined) {
+	if (measured === undefined || measured.is_capped) {
 		console.error(UNMEASURED_MESSAGE)
 
 		return false

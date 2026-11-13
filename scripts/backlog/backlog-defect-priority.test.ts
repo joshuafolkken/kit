@@ -197,4 +197,16 @@ describe('backlog:next at or below the baseline', () => {
 		expect(stderr()).toContain(backlog_defect_priority.UNMEASURED_MESSAGE)
 		expect(stderr()).toContain('defects are offered first without deferring new mechanisms')
 	})
+
+	it.each([ABOVE_BASELINE, { ...ABOVE_BASELINE, defects: 0 }])(
+		'treats a capped population as unmeasured regardless of its partial rate',
+		async (rate) => {
+			stub({ defect_rate: { ...rate, is_capped: true } })
+
+			expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
+			expect(offered()).toBe(joined(RANKED_GRAPH_ORDER))
+			expect(stderr()).toContain(backlog_defect_priority.UNMEASURED_MESSAGE)
+			expect(stderr()).not.toContain(ABOVE_NOTE)
+		},
+	)
 })
