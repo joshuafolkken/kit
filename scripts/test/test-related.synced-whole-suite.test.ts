@@ -6,7 +6,6 @@ import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
 import { lane_paths } from '#scripts/lane/lane-paths'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { direct_importers } from './direct-importers'
 import { pure_files_entries } from './pure-files-entries'
 import { test_read_map } from './test-read-map'
 import { test_related } from './test-related'
@@ -149,19 +148,13 @@ describe('test_related.run_related_tests — an entries-only edit of the pure-fi
 		])
 	})
 
-	// joshuafolkken/kit#5122: the list is a file every test imports, so it reaches the test files
-	// importing it directly — never the whole suite, which the gate and CI run.
-	it('runs the test files importing the list when the change base cannot be read', async () => {
+	// Unknown import history cannot vouch for a direct-only selection (#7453).
+	it('keeps the whole suite when the list import structure cannot be compared', async () => {
 		vi.mocked(git_command.show_file).mockRejectedValue(NOT_A_REPOSITORY)
-		const importers = await direct_importers.every_test_importers(REPOSITORY_ROOT, [PURE_FILES])
 
 		await test_related.run_related_tests([])
 
-		expect(vitest_arguments()).toEqual([
-			'related',
-			...(importers.get(PURE_FILES) ?? []).map((file) => path.join(REPOSITORY_ROOT, file)),
-			'--run',
-		])
+		expect(vitest_arguments()).toEqual(WHOLE_SUITE)
 	})
 })
 

@@ -23,12 +23,16 @@ const FIXTURE_FILES: Readonly<Record<string, string>> = {
 async function open_fixture(): Promise<FixtureWorkspace> {
 	const fixture = git_fixture_workspace.open_workspace('test-related-pins-')
 
-	await git_fixture_workspace.git(fixture.workspace, ['init', '--quiet'])
+	await git_fixture_workspace.git(fixture.workspace, ['init', '--quiet', '--initial-branch=main'])
 
 	for (const [file, content] of Object.entries(FIXTURE_FILES)) {
 		mkdirSync(path.dirname(path.join(fixture.workspace, file)), { recursive: true })
 		writeFileSync(path.join(fixture.workspace, file), content)
 	}
+
+	await git_fixture_workspace.git(fixture.workspace, ['add', '.'])
+	await git_fixture_workspace.git(fixture.workspace, ['commit', '-m', 'base'])
+	await git_fixture_workspace.git(fixture.workspace, ['switch', '-c', 'change'])
 
 	return fixture
 }
@@ -82,6 +86,7 @@ describe('test_related_cap.capped_importers with a registry file past the cap', 
 
 	beforeEach(async () => {
 		fixture = await open_fixture()
+		process.chdir(fixture.workspace)
 	})
 
 	afterEach(async () => {

@@ -38,6 +38,12 @@ vi.mock(import('#scripts/gate/since-green'), async (import_original) => {
 	return { since_green: { ...since_green, read_verdict: vi.fn(async () => no_record) } }
 })
 vi.mock('./test-pinned-reach')
+// The cap cases assume stable imports; changed imports are covered by test-related.imports.test.ts.
+vi.mock('./test-related-imports', () => ({
+	test_related_imports: {
+		stable_files: async (_root: string, files: ReadonlyArray<string>) => [...files],
+	},
+}))
 
 const REPOSITORY_ROOT = process.cwd()
 const CHANGED_SOURCE = path.join('scripts', 'test', 'test-related-cap.ts')
