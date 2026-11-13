@@ -8,7 +8,7 @@ const TARBALL_PREFIX = '      tarball: '
 const FLOW_RESOLUTION_LINE_START = '\n    resolution: {'
 const FLOW_TARBALL_KEY = ', tarball: '
 const NPMRC_AUTH_TOKEN_PREFIX = `//${GH_PACKAGES_HOST}/:_authToken=`
-const REGISTRY_KEY = ':registry='
+const REGISTRY_KEY = ':registry'
 
 interface PackageResolution {
 	integrity?: string | undefined
@@ -44,29 +44,35 @@ function parse_lockfile_packages(raw: string): Record<string, LockfilePackage> {
 	return merged
 }
 
-function extract_gh_registry_scope(line: string): string | undefined {
+function registry_entry(line: string): [string, string] | undefined {
 	const trimmed = line.trim()
 	if (!trimmed.startsWith('@')) return undefined
-	const eq_index = trimmed.indexOf(REGISTRY_KEY)
-	if (eq_index === -1) return undefined
-	const registry = trimmed
-		.slice(eq_index + REGISTRY_KEY.length)
-		.trim()
-		.replace(/\/$/u, '')
-	if (registry !== `https://${GH_PACKAGES_HOST}`) return undefined
+	const eq_index = trimmed.indexOf('=')
+	const key = trimmed.slice(0, eq_index).trim()
+	if (eq_index === -1 || !key.endsWith(REGISTRY_KEY)) return undefined
 
-	return trimmed.slice(0, eq_index)
+	return [key.slice(0, -REGISTRY_KEY.length), trimmed.slice(eq_index + 1).trim()]
+}
+
+function parse_scope_registries(npmrc: string): Map<string, string> {
+	const registries = new Map<string, string>()
+
+	for (const line of npmrc.split('\n')) {
+		const entry = registry_entry(line)
+		if (entry !== undefined) registries.set(...entry)
+	}
+
+	return registries
 }
 
 function parse_gh_scopes(npmrc: string): Set<string> {
-	const scopes = new Set<string>()
+	const entries = [...parse_scope_registries(npmrc)]
 
-	for (const line of npmrc.split('\n')) {
-		const scope = extract_gh_registry_scope(line)
-		if (scope !== undefined) scopes.add(scope)
-	}
-
-	return scopes
+	return new Set(
+		entries
+			.filter(([, registry]) => registry.replace(/\/$/u, '') === `https://${GH_PACKAGES_HOST}`)
+			.map(([scope]) => scope),
+	)
 }
 
 function extract_auth_token_from_line(line: string): string | undefined {
@@ -218,6 +224,7 @@ function resolve_token(
 
 const fix_gh_packages_logic = {
 	parse_gh_scopes,
+	parse_scope_registries,
 	parse_npmrc_auth_token,
 	parse_lockfile_packages,
 	package_path_from_key,

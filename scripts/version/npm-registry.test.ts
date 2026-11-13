@@ -19,6 +19,7 @@ const GITHUB_REGISTRY = 'https://npm.pkg.github.com/'
 // A scope whose registry names the GitHub host only in its path, which is not GitHub Packages.
 const PATH_PACKAGE = '@path-routed/kit'
 const SCOPE_REGISTRIES = [
+	['@joshuafolkken', GITHUB_REGISTRY],
 	['@github-routed', GITHUB_REGISTRY],
 	['@path-routed', 'https://example.com/npm.pkg.github.com/'],
 ] as const
@@ -58,6 +59,23 @@ describe('npm_registry.packument_url', () => {
 
 	it('leaves an unscoped package name as is', () => {
 		expect(npm_registry.packument_url('execa')).toBe('https://registry.npmjs.org/execa')
+	})
+})
+
+describe('npm_registry kit acquisition', () => {
+	it('reads kit from npm despite a legacy user scope mapping to GitHub', () => {
+		respond_with(fake_result(LATEST_BODY))
+
+		expect(npm_registry.read_latest(KIT_PACKAGE)).toBe(LATEST)
+		expect(packument_requests()).toHaveLength(1)
+		expect(execa_outcomes).not.toHaveBeenCalledWith('pnpm', expect.anything(), expect.anything())
+	})
+
+	it('keeps a same-scope legacy package on its effective GitHub registry', () => {
+		respond_with(fake_result(LATEST_BODY))
+
+		expect(npm_registry.read_latest('@joshuafolkken/legacy')).toBeUndefined()
+		expect(packument_requests()).toHaveLength(0)
 	})
 })
 

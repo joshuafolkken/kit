@@ -1,3 +1,6 @@
+import path from 'node:path'
+import { PACKAGE_DIR } from '#scripts/init/init-paths'
+import { shell_quote } from '#scripts/lib/shell-quote'
 import { execaSync } from 'execa'
 import { describe, expect, it, vi } from 'vitest'
 import { build_upgrade_command, shell_upgrade_command } from './upgrade-shell-command'
@@ -7,6 +10,9 @@ import { fetch_latest_version } from './version-remote'
 import { version_targets } from './version-targets'
 
 vi.mock('execa', () => ({ execaSync: vi.fn() }))
+vi.mock('#scripts/registry-migration/npm-acquisition', () => ({
+	npm_acquisition: { is_project_npm: () => false },
+}))
 vi.mock('./version-remote', () => ({
 	fetch_latest_version: vi.fn(),
 	fetch_release_times: vi.fn(),
@@ -64,7 +70,7 @@ describe('version_commands.run_upgrade_command', () => {
 		version_commands.run_upgrade_command(command)
 
 		expect(mocked_execa_sync).toHaveBeenNthCalledWith(
-			1,
+			2,
 			'pnpm',
 			['add', '-D', `${KIT_PACKAGE}@1.0.0`],
 			SPAWN_OPTIONS,
@@ -144,8 +150,8 @@ describe('version_commands.run_check for a package with no upstreams', () => {
 				`  Project:  ${KIT_STALE}${STATUS_GAP}⚠ → ${KIT_LATEST}`,
 				`  Latest:  ${KIT_LATEST}`,
 				'',
-				`Run: pnpm add -g ${KIT_PACKAGE}@${KIT_LATEST}`,
-				`Run: pnpm add -D ${KIT_PACKAGE}@${KIT_LATEST} && node_modules/.bin/tsx node_modules/${KIT_PACKAGE}/scripts/gh/fix-gh-packages.ts`,
+				`Run: pnpm add -g --config.@joshuafolkken:registry=https://registry.npmjs.org/ ${KIT_PACKAGE}@${KIT_LATEST}`,
+				`Run: node ${shell_quote.word(path.join(PACKAGE_DIR, 'dist/registry-migrate.mjs'))} ${KIT_LATEST} && pnpm add -D ${KIT_PACKAGE}@${KIT_LATEST} && node_modules/.bin/tsx node_modules/${KIT_PACKAGE}/scripts/gh/fix-gh-packages.ts`,
 			].join('\n'),
 		)
 		info_spy.mockRestore()
@@ -161,7 +167,7 @@ describe('version_commands.run_upgrade for a package with no upstreams', () => {
 		const info_spy = vi.spyOn(console, 'info').mockImplementation(() => undefined)
 
 		expect(version_commands.run_upgrade(config_with({}))).toBe(0)
-		expect(mocked_execa_sync).toHaveBeenCalledTimes(3)
+		expect(mocked_execa_sync).toHaveBeenCalledTimes(4)
 		expect(info_spy).not.toHaveBeenCalled()
 		info_spy.mockRestore()
 	})

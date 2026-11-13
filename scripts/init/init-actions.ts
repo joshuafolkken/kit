@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { json_format } from '#scripts/config-merge/json-format'
 import { string_array_schema, vscode_settings_schema } from '#scripts/lib/schemas'
+import { migrate_lock } from '#scripts/registry-migration/migrate-lock'
+import { npm_acquisition } from '#scripts/registry-migration/npm-acquisition'
 import { init_logic } from './init-logic'
 import { package_path, PROJECT_ROOT } from './init-paths'
 import type { ProjectShape } from './project-profile'
@@ -201,8 +203,20 @@ function build_gitignore_action(): FileAction {
 	)
 }
 
+function build_npmrc_actions(): Array<FileAction> {
+	if (!npm_acquisition.can_manage(PROJECT_ROOT)) return []
+
+	return [
+		build_action(
+			'.npmrc',
+			() => migrate_lock.npmrc(''),
+			(existing) => init_logic.merge_npmrc(existing, PROJECT_ROOT),
+		),
+	]
+}
+
 function build_basic_actions(shape: ProjectShape): ReadonlyArray<FileAction> {
-	const actions: Array<FileAction> = []
+	const actions: Array<FileAction> = [...build_npmrc_actions()]
 	if (shape.has_git) actions.push(build_gitignore_action())
 	if (shape.has_typescript) actions.push(build_basic_tsconfig_action())
 
@@ -226,6 +240,7 @@ function build_file_actions(shape?: ProjectShape): ReadonlyArray<FileAction> {
 	if (shape?.profile === 'basic') return build_basic_actions(shape)
 
 	return [
+		...build_npmrc_actions(),
 		...(shape?.has_git === false ? [] : [build_gitignore_action()]),
 		build_eslint_action(),
 		build_action(

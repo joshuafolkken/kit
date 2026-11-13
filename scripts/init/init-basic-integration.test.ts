@@ -296,7 +296,7 @@ describe('a kit run from outside the project', () => {
 		const workspace = readFileSync(path.join(paths_mock.root, WORKSPACE_YAML), 'utf8')
 
 		expect(new Set(readdirSync(paths_mock.root))).toStrictEqual(
-			new Set([INDEX_HTML, PACKAGE_JSON, WORKSPACE_YAML]),
+			new Set(['.npmrc', INDEX_HTML, PACKAGE_JSON, WORKSPACE_YAML]),
 		)
 		expect(JSON.parse(manifest)).toStrictEqual({ private: true })
 		expect(workspace).toBe('minimumReleaseAge: 4320\n')

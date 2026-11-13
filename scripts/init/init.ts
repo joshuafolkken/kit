@@ -5,6 +5,7 @@ import { doctor_io } from '#scripts/doctor/doctor-io'
 import { error_text } from '#scripts/lib/error-message'
 import { PACKAGE_JSON } from '#scripts/lib/package-manifest'
 import { package_version_schema, with_package_manager_schema } from '#scripts/lib/schemas'
+import { npm_acquisition } from '#scripts/registry-migration/npm-acquisition'
 import { auto_merge_setting } from '#scripts/repo/auto-merge-setting'
 import { pack_hook } from '#scripts/safe-chain/pack-hook'
 import { security_updates } from '#scripts/security/security-updates'
@@ -78,7 +79,10 @@ function get_kit_self_dependency(): Record<string, string> {
 // the toolchain is added here: without it the first `josh gate` after `pnpm install` fails.
 function apply_dependency_merges(content: string, has_git = true): string {
 	const migrated = init_logic.strip_managed_postinstall(content)
-	const suggested = init_logic.get_suggested_scripts_for_content(migrated)
+	const suggested = init_logic.get_suggested_scripts_for_content(
+		migrated,
+		npm_acquisition.is_npm_only(PROJECT_ROOT),
+	)
 	const merged = init_logic.merge_package_scripts(
 		migrated,
 		has_git
@@ -97,12 +101,16 @@ function apply_dependency_merges(content: string, has_git = true): string {
 function apply_package_json_merges(content: string, has_git = true): string {
 	const with_kit = apply_dependency_merges(content, has_git)
 	const upgraded = has_git ? init_logic.upgrade_prepare_lefthook_warning(with_kit) : with_kit
-	const with_lifecycle = has_git ? init_logic.merge_prepare_lifecycle_cmd(upgraded) : upgraded
+	const with_lifecycle = has_git
+		? init_logic.merge_prepare_lifecycle_cmd(upgraded, npm_acquisition.is_npm_only(PROJECT_ROOT))
+		: upgraded
 	const kit_pm = get_kit_package_manager()
 	const with_pm =
 		kit_pm === undefined ? with_lifecycle : init_logic.merge_package_manager(with_lifecycle, kit_pm)
 	const with_de = init_logic.merge_development_engines(with_pm, get_kit_development_engines())
-	const sorted = init_logic.sort_package_json_keys(with_de)
+	const sorted = init_logic.sort_package_json_keys(
+		init_logic.upgrade_npm_lifecycle(with_de, PROJECT_ROOT),
+	)
 
 	// Pin devEngines.packageManager.version to the packageManager just written so a
 	// freshly scaffolded (or re-initialized) consumer never trips the pnpm

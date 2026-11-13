@@ -1,3 +1,6 @@
+import path from 'node:path'
+import { PACKAGE_DIR } from '#scripts/init/init-paths'
+import { shell_quote } from '#scripts/lib/shell-quote'
 import { describe, expect, it, vi } from 'vitest'
 import {
 	CHAINED_CONFIG,
@@ -20,6 +23,9 @@ import type { UpstreamHookContext } from './version-command-config'
 import { version_commands } from './version-commands'
 
 vi.mock('execa', () => ({ execaSync: vi.fn() }))
+vi.mock('#scripts/registry-migration/npm-acquisition', () => ({
+	npm_acquisition: { is_project_npm: () => false },
+}))
 vi.mock('./version-remote', () => ({
 	fetch_latest_version: vi.fn(),
 	fetch_release_times: vi.fn(),
@@ -30,6 +36,7 @@ vi.mock('./version-targets', () => ({
 
 const { arrange_chain_versions, config_with_context_hooks, fake_sync_result } =
 	version_chain_fixture
+const MIGRATION = path.join(PACKAGE_DIR, 'dist/registry-migrate.mjs')
 
 describe('version_commands.run_check threads the fetched latest without re-fetching', () => {
 	it('feeds read_snapshot latest into the hook and fetches latest only once per package', () => {
@@ -60,7 +67,9 @@ describe('version_commands.run_check with upstreams', () => {
 		const output = String(info_spy.mock.calls[0]?.[0])
 
 		expect(output.indexOf(UPSTREAM_PACKAGE)).toBeGreaterThan(output.indexOf(MAIN_PACKAGE))
-		expect(output).toContain(`Run: ${UPSTREAM_UPGRADE_COMMAND}`)
+		expect(output).toContain(
+			`Run: node ${shell_quote.word(MIGRATION)} ${UPSTREAM_LATEST} && ${UPSTREAM_UPGRADE_COMMAND}`,
+		)
 		info_spy.mockRestore()
 	})
 })
@@ -72,6 +81,7 @@ describe('version_commands.run_upgrade with upstreams', () => {
 
 		expect(version_commands.run_upgrade(CHAINED_CONFIG)).toBe(0)
 		expect(mocked_execa_sync.mock.calls.map(([file, argv]) => [file, argv])).toStrictEqual([
+			['node', [MIGRATION, UPSTREAM_LATEST]],
 			['pnpm', UPSTREAM_UPGRADE_COMMAND.split(' ').slice(1)],
 			['node_modules/.bin/tsx', [`node_modules/${UPSTREAM_PACKAGE}/scripts/gh/fix-gh-packages.ts`]],
 		])
@@ -160,7 +170,7 @@ describe('version_commands.run_upgrade outcome for a suppressed global command',
 		// The project dependency is stale, so an upgrade does run — but the effective global command
 		// was suppressed as a no-op and must not be reported as having failed to change anything.
 		expect(version_commands.run_upgrade(CHAINED_CONFIG_WITH_PINNED_COMMAND)).toBe(0)
-		expect(mocked_execa_sync).toHaveBeenCalledTimes(2)
+		expect(mocked_execa_sync).toHaveBeenCalledTimes(3)
 		expect(info_spy).not.toHaveBeenCalled()
 		info_spy.mockRestore()
 	})

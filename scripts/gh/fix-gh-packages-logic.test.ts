@@ -50,6 +50,29 @@ describe('fix_gh_packages_logic.parse_gh_scopes', () => {
 	})
 })
 
+describe('effective scope registry mapping', () => {
+	it('uses the last mapping instead of restoring GitHub URLs after migration', () => {
+		const npmrc = `${GH_SCOPE}:registry=https://npm.pkg.github.com/\n${GH_SCOPE}:registry=https://registry.npmjs.org/\n`
+
+		expect(fix_gh_packages_logic.parse_gh_scopes(npmrc).has(GH_SCOPE)).toBe(false)
+		expect(fix_gh_packages_logic.parse_scope_registries(npmrc).get(GH_SCOPE)).toBe(
+			'https://registry.npmjs.org/',
+		)
+	})
+
+	it('keeps another GitHub scope and accepts whitespace around the assignment', () => {
+		const npmrc = `${GH_SCOPE}:registry = https://registry.npmjs.org/\n@other:registry = https://npm.pkg.github.com/\n`
+
+		expect(fix_gh_packages_logic.parse_gh_scopes(npmrc)).toEqual(new Set(['@other']))
+	})
+
+	it('ignores comments, ordinary settings and an incomplete scope assignment', () => {
+		expect(
+			fix_gh_packages_logic.parse_scope_registries('# @other:registry=x\nregistry=x\n@broken\n'),
+		).toEqual(new Map())
+	})
+})
+
 describe('fix_gh_packages_logic.parse_npmrc_auth_token', () => {
 	it('returns token when a real token is present', () => {
 		const npmrc = '//npm.pkg.github.com/:_authToken=abc123\n'
