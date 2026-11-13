@@ -46,7 +46,7 @@ beforeEach(() => {
 	vi.spyOn(lane_vacant, 'is_vacant').mockResolvedValue(false)
 	vi.spyOn(run_cut, 'lane_cut_sync').mockImplementation(carried)
 	vi.spyOn(git_gh_command, 'issue_blocked_by_references').mockResolvedValue([BLOCKER])
-	vi.spyOn(git_gh_command, 'issue_get_body').mockResolvedValue(undefined)
+	vi.spyOn(git_gh_command, 'issue_get_body').mockResolvedValue('')
 	vi.spyOn(issue_state_cli, 'read_issue').mockResolvedValue({ kind: 'missing' })
 })
 

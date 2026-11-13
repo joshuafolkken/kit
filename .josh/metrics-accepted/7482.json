@@ -1,7 +1,7 @@
 {
-	"reason": "Observation waits require 158 added code lines for evidence parsing, fresh trusted-comment reads and shared selection/launch/board integration; the regression fixture uses the existing Issue heading source.",
+	"reason": "本文取得失敗を通常失敗と区別して再試行可能な待機にするレビュー修正と、その回帰テストのため。既存の待機経路を再利用する。",
 	"date": "2026-11-13",
 	"growth": {
-		"scripts.code_lines": 158
+		"scripts.code_lines": 160
 	}
 }

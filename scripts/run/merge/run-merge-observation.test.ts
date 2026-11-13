@@ -109,3 +109,25 @@ it('releases an unfinished investigation, withholds it across restart and offers
 	expect_released()
 	expect_resume()
 })
+
+it.each(['readable', 'unknown'])(
+	'keeps an unreadable investigation body retryable with %s labels',
+	async (state) => {
+		vi.spyOn(git_gh_command, 'issue_get_body').mockResolvedValue(undefined)
+
+		if (state === 'unknown') {
+			vi.spyOn(issue_state_cli, 'read_issue').mockResolvedValue({ kind: 'unreadable' })
+		}
+
+		const count = vi.spyOn(run_carry, 'apply_change')
+		const result = await run_merge_steps.do_failed(CONTEXT)
+
+		expect(result).toMatchObject({
+			is_parked: false,
+			is_refused: false,
+			waits: ['issue body confirmation'],
+		})
+		expect(count).not.toHaveBeenCalled()
+		expect_released()
+	},
+)
