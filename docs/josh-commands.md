@@ -77,7 +77,7 @@ pnpm josh lint --shard=1   # one of two fixed halves of the tree (1 or 2) — a 
 
 <!-- usage: lint:related -->
 
-Check only the changed files with prettier and eslint, and in kit the source guard tests (whole tree on fallback).
+Apply eslint fixes and prettier to the resolved scope, then check remaining errors and in kit the source guard tests (whole tree on fallback).
 
 ```bash
 pnpm josh lint:related
@@ -87,6 +87,8 @@ pnpm josh lint:related scripts/thing.ts   # narrow by the given files instead
 <!-- /usage -->
 
 Keeps caches of its own, apart from the gate's.
+
+Before checking, applies ESLint fixes and then Prettier to the resolved scope, using its own caches and the project's skip conditions. Remaining errors still fail. Verification and green records read the tree after both writers finish.
 
 - Changed set = branch diff plus untracked files (cache `.eslintcache.related`); flags are named rather than forwarded (`--fix` is reported ignored).
 - A bare run after a green one lints only what moved since, main syncs included (`scripts/gate/since-green.ts`); nothing moved lints nothing and exits green; the branch diff when there is no comparable record (none, or one written under other tool versions or `NODE_ENV`), nothing lintable moved, or a toolchain or lint config moved (`scripts/gate/verification-inputs.ts`).

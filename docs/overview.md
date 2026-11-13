@@ -41,6 +41,7 @@ To walk the Issue-driven loop once — file an Issue, have an agent plan and imp
 - [setup/full.md](./setup/full.md) — a Node project, with `josh init` or `josh start`
 - [cli.md](./cli.md) — the global `josh` command
 - [troubleshooting.md](./troubleshooting.md) — install and auth errors
+- [registry-migration.md](./registry-migration.md) — prepare npm registry access before upgrading kit
 
 **Use**
 

@@ -640,7 +640,7 @@ pnpm josh run:review --code-only                 # josh ship's own open: code's 
 pnpm josh run:review --unpinned-ok "only logs"   # check beside the pair as ever; the join prints the list and the reason and carries on past unpinned places
 pnpm josh run:review --join                      # after the review returns: join the gate and test:pinned; exit 3 on an unpinned change
 pnpm josh run:review --join --fixing             # the join when round 1 has fixes to make: no grace on test:pinned, left running; prints the unpinned places the cache already holds
-pnpm josh run:review --pinned                    # read test:pinned alone (the ship's pre-detach reads it anyway); a lane child returns at once
+pnpm josh run:review --pinned                    # collect a stopped ship's remaining verdicts before editing or retrying; a lane child waits only for this continuation
 pnpm josh run:review --push                      # launched by a lane open: push and open the PR at a green gate
 ```
 
@@ -661,7 +661,14 @@ and its gate stage re-runs on the moved tree. `josh test:pinned --record <token>
 the gate; `--join` prints its lines and **exits `3` on an unpinned change**, which `josh ship --review`
 never drains (`--unpinned-ok`: above). A check `--join` started again on a moved tree is not waited on:
 it is left running for the ship's pre-detach, as under `--fixing`. `review:record` reads a skipped
-`--join`. The reason and places `--unpinned-ok` accepted stay for the
+`--join`.
+
+A finished first-unpinned cut without a reason collects the existing remaining probe at
+the join; `review:record` also collects a ship's remaining probe even after the join was read.
+An unchanged tree reuses the answer. A moved tree settles the old probe into the cache before probing
+the current tree's cache misses. Unchecked limits and incomplete/failed probes remain explicit.
+
+The reason and places `--unpinned-ok` accepted stay for the
 branch in the git directory (`josh-unpinned-ok.json`), the reason from the launch on, so a round-1
 fix that moves the tree past the join still leaves it; a later run with no reason carries on under it
 while every place, keyed by file, function and the lines replaced and put in, is recorded, and a
@@ -706,7 +713,7 @@ pnpm josh ship --log <N>                                          # a detached s
 
 - `--body-file <path>` — the PR body carrying the live-execution evidence `followup` gates on, written under `.josh/tmp/`; forwarded to `git -y` alone.
 - `--notify-message <text>` — forwarded to `followup` alone.
-- `--review` — runs round 1 beside the gate; after sync and round 1, an owed round 2 runs beside the gate and joins before the PR opens. A High or unfixed Medium stops the ship. A pre-detach `test:pinned` stop probes remaining hunks in the background for the next pre-detach.
+- `--review` — runs round 1 beside the gate; after sync and round 1, an owed round 2 runs beside the gate and joins before the PR opens. A High or unfixed Medium stops the ship. After a pre-detach `test:pinned` stop, collect remaining verdicts with `pnpm josh run:review --pinned` before editing or retrying.
 - `--unpinned-ok <reason>` — forwarded to round 1's `run:review`, past `unpinned` places no test can pin.
 - `--detach` — hands the ship to a supervisor (implied in a lane child); a stop emits `ship-stop` (`--log <N>`). The preflight, type check, unused exports, cspell, guard tests and (`--review`, under `--unpinned-ok`, given or recorded, only if round 1 is reused) `test:pinned` precede hand-off, the checks even after a preflight refusal, so one stop reports every failure.
 

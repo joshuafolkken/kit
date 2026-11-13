@@ -88,6 +88,28 @@ describe('command entry usage', () => {
 	})
 })
 
+describe('scoped lint command help', () => {
+	it('describes scoped lint fixes and remaining errors while preserving its command contract', () => {
+		const command = 'lint:related'
+		const entry = COMMAND_MAP[command]
+		const description =
+			'Apply eslint fixes and prettier to the resolved scope, then check remaining errors and in kit the source guard tests (whole tree on fallback)'
+
+		expect(entry?.description).toBe(description)
+		expect(entry?.script).toBe('scripts/lint/lint-related.ts')
+		expect(entry?.reference[0]).toBe('[files...]')
+		expect(command_usage.format_command_help(command)).toContain(description)
+		expect(command_usage.format_usage(command)).toBe(
+			[
+				'```bash',
+				'pnpm josh lint:related',
+				'pnpm josh lint:related scripts/thing.ts   # narrow by the given files instead',
+				'```',
+			].join('\n'),
+		)
+	})
+})
+
 describe('command help', () => {
 	it('includes all solo evidence in the triage synopsis and example (ac-71557ea7)', () => {
 		const help = command_usage.format_command_help('backlog:triage') ?? ''

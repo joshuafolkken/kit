@@ -22,7 +22,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh hook:ledger` · `josh hkl` | `--period <days> [--demote [--apply]] \| --restore <rule>` | maintainer | network, files | Print Claude Code hook refusals per hook and rule over a period: refusals, the same call passing later, and route:interrupt issues naming the rule; list, demote or restore rules that mostly refuse allowed work |
 | `josh lines` · `josh ln` | `<files...>` | developer | none | Print a file's code lines against the max-lines limit and the headroom left |
 | `josh lint` · `josh l` | `[--changed] [--shard=<n>]` | developer | processes | Check code with prettier and eslint (skips a tool a basic project lacks) |
-| `josh lint:related` · `josh lr` | `[files...]` | developer | processes | Check only the changed files with prettier and eslint, and in kit the source guard tests (whole tree on fallback) |
+| `josh lint:related` · `josh lr` | `[files...]` | developer | processes | Apply eslint fixes and prettier to the resolved scope, then check remaining errors and in kit the source guard tests (whole tree on fallback) |
 | `josh lint:rule` · `josh lrr` | `<rule> [--config <path>] [--output <path>] [--paths <path>...]` | developer | files, processes | Run one eslint rule over the whole repository, or with --paths a subset, on a cache of its own and write the rule's violations to a file |
 | `josh metrics` · `josh mt` · **kit only** | `[--no-startup \| --totals-only [--rerecord] \| --accept --reason "<why>"]` | developer | files | Print repository-wide quality totals and durations, and fail when a total grew past the merge-base or a duration past its baseline |
 | `josh port` · `josh pt` | `<dev\|preview>` | developer | none | Print the PORT_SEED-resolved dev or preview port |

@@ -17,6 +17,7 @@ import { changed_file_scope, type ChangedFileScope } from '#scripts/git/changed-
 import { review_stamps } from '#scripts/review/review-stamps'
 import { eslint_daemon_calls } from './eslint-daemon-calls'
 import { lint_parallel, type LintRunTiming } from './lint-parallel'
+import { lint_related_fix } from './lint-related-fix'
 import { lint_related_scope } from './lint-related-scope'
 
 // `josh lint:related` — the lint check an implementation loop runs between edits.
@@ -29,16 +30,6 @@ import { lint_related_scope } from './lint-related-scope'
 // eslint and nothing to `prettier --check`. Sending a flag to both would fail the run over the
 // argument list, and dropping it silently would run a check the caller did not ask for, so the run
 // says which arguments it ignored.
-function report_ignored_flags(command_arguments: ReadonlyArray<string>): void {
-	const flags = changed_file_scope.flags_of(command_arguments)
-
-	if (flags.length === 0) return
-
-	process.stdout.write(
-		`${lint_related_scope.COMMAND_LABEL}: ignored — prettier and eslint take different flags: ${flags.join(' ')}\n`,
-	)
-}
-
 // The timing line names what the run read, so a slow first run is told apart from a wide one
 // (joshuafolkken/kit#5712).
 function timing_of(targets: string): LintRunTiming {
@@ -202,23 +193,6 @@ async function outcome_with_notice(
 	return { ...outcome, notice: await metrics_totals.growth_notice(root) }
 }
 
-// The narrowing line is printed before either child starts, so a scoped run is never read as a
-// whole one, and a fallback says which of the two it was rather than looking like a narrow run
-// that found nothing.
-function report_scope(
-	command_arguments: ReadonlyArray<string>,
-	scope: ChangedFileScope,
-	root: string,
-): void {
-	changed_file_scope.report_unusable_arguments(
-		command_arguments,
-		scope,
-		lint_related_scope.COMMAND_LABEL,
-	)
-	report_ignored_flags(command_arguments)
-	process.stdout.write(`${lint_related_scope.describe_scope(scope, root)}\n`)
-}
-
 // **Nothing moved since the last green run lints nothing** (joshuafolkken/kit#4593), as
 // `josh test:related` runs no test.
 function report_unmoved(): LintOutcome {
@@ -233,14 +207,18 @@ async function checked_outcome(
 	command_arguments: ReadonlyArray<string>,
 	root: string,
 	moved: ReadonlyArray<string> | undefined,
-): Promise<LintOutcome> {
-	if (moved?.length === 0) return report_unmoved()
+	before: GateTree | undefined,
+): Promise<{ outcome: LintOutcome; before: GateTree | undefined }> {
+	if (moved?.length === 0) return { outcome: report_unmoved(), before }
 
 	const scope = await resolve_lint_scope(command_arguments, root, moved)
+	const verified = await lint_related_fix.prepare(command_arguments, scope, root)
+	const outcome = await outcome_with_notice(command_arguments, scope, root)
 
-	report_scope(command_arguments, scope, root)
-
-	return await outcome_with_notice(command_arguments, scope, root)
+	return {
+		outcome,
+		before: verified,
+	}
 }
 
 // The run's last line names the stage that failed, or says it passed; the console is the only copy of
@@ -266,13 +244,22 @@ async function fresh_exit_code(
 	before: GateTree | undefined,
 ): Promise<number> {
 	const moved = await read_since_green(before)
-	const outcome = await checked_outcome(command_arguments, root, moved)
+	const { outcome, before: verified } = await checked_outcome(
+		command_arguments,
+		root,
+		moved,
+		before,
+	)
 	const { exit_code } = outcome
 	const tail = verdict_tail(outcome)
+	const entry = { before: verified, exit_code, tail }
 
 	process.stdout.write(tail)
-	await scoped_green.record_if_green(review_stamps.lint_related_stamp, { before, exit_code })
-	await tree_verdict.record({ before, exit_code, tail }, gate_tree.read_gate_tree, VERDICT_RECORD)
+	await scoped_green.record_if_green(review_stamps.lint_related_stamp, {
+		before: verified,
+		exit_code,
+	})
+	await tree_verdict.record(entry, gate_tree.read_gate_tree, VERDICT_RECORD)
 
 	return exit_code
 }

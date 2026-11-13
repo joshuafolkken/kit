@@ -68,8 +68,14 @@ beforeEach(() => {
 describe('run_ship_pre_detach_pinned.pinned_check on a cut answer', () => {
 	it('still stops, and launches the rest on this tree with their count printed', async () => {
 		expect(await stopped_out()).toContain(`probing 3 remaining hunks ${NOTE}`)
-		expect(steps_clear_mock).toHaveBeenCalledOnce()
+		expect(steps_clear_mock).toHaveBeenCalledWith(expect.any(String))
 		expect(launch_mock).toHaveBeenCalledWith(expect.any(String), TREE)
+	})
+
+	it('names the existing collection command before edits or a ship retry', async () => {
+		expect(await stopped_out()).toContain(
+			'before editing or retrying ship, collect every verdict with `pnpm josh run:review --pinned`',
+		)
 	})
 
 	it("goes on past the run:review check's cut answer as well, running no probe of its own", async () => {

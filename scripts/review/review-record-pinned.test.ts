@@ -148,6 +148,38 @@ function spy_join(is_due: boolean, joined: JoinVerdict | undefined): void {
 	)
 }
 
+describe('review_record_pinned.read_skipped_join remaining verdicts', () => {
+	it('collects remaining verdicts even after the original join mark was consumed', async () => {
+		spy_join(false, STOPPED)
+		vi.spyOn(run_review_pinned_steps, 'is_remaining').mockReturnValue(true)
+
+		await review_record_pinned.read_skipped_join(ROOT)
+
+		expect(run_review_join_read.read_finished).toHaveBeenCalledWith(ROOT)
+		expect(console.info).toHaveBeenCalledWith(expect.stringContaining(UNPINNED_LINE))
+	})
+
+	it('shows incomplete remaining results without calling them resolved', async () => {
+		const incomplete_text = 'remaining probe timeout — unchecked'
+
+		spy_join(false, {
+			...STOPPED,
+			is_stop: false,
+			summary: {
+				...STOPPED.summary,
+				is_partial: true,
+				is_unchecked: true,
+			},
+			text: incomplete_text,
+		})
+		vi.spyOn(run_review_pinned_steps, 'is_remaining').mockReturnValue(true)
+
+		await review_record_pinned.read_skipped_join(ROOT)
+
+		expect(console.info).toHaveBeenCalledWith(incomplete_text)
+	})
+})
+
 describe('review_record_pinned.read_skipped_join', () => {
 	it('prints the unpinned lines and the two ways out when the join is still due', async () => {
 		spy_join(true, STOPPED)

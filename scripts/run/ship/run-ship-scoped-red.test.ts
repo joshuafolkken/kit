@@ -1,5 +1,6 @@
+import { gate_tree, type GateTree } from '#scripts/gate/gate-tree'
 import { metrics_totals } from '#scripts/gate/metrics-totals'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { LINT, TEST } = vi.hoisted(() => ({ LINT: 'lint:related', TEST: 'test:related' }))
 const josh_run_mock = vi.hoisted(() => vi.fn())
@@ -57,9 +58,41 @@ beforeEach(() => {
 	run_ship_pair_runs.forget()
 })
 
+afterEach(() => vi.restoreAllMocks())
+
 function commands(): ReadonlyArray<string> {
 	return josh_run_mock.mock.calls.map(([args]) => (args as Array<string>).join(' '))
 }
+
+function autofix_tree(): GateTree {
+	const fixed = { files: { 'scripts/a.ts': 'fixed' }, base: 'base' }
+	let current = { files: { 'scripts/a.ts': 'unfixed' }, base: 'base' }
+
+	vi.spyOn(gate_tree, 'read_gate_tree').mockImplementation(async () => current)
+	josh_run_mock.mockImplementation(async ([command]) => {
+		if (command === LINT) current = fixed
+		if (command === TEST) expect(current).toBe(fixed)
+
+		return { code: OK, out: '' }
+	})
+
+	return fixed
+}
+
+describe('run_ship_scoped.scoped_pair — after autofix', () => {
+	it('remembers the fixed tree before starting the following test (ac-0986ec74)', async () => {
+		const fixed = autofix_tree()
+		const record = vi.spyOn(run_ship_narrowed, 'record')
+		const remember = vi.spyOn(run_ship_narrowed, 'remember')
+
+		vi.spyOn(run_ship_narrowed, 'moved_since_green').mockResolvedValue(['scripts/a.ts'])
+		await run_ship_scoped.scoped_pair()
+		expect(record).toHaveBeenCalledWith(expect.any(Array), fixed)
+		expect(remember).toHaveBeenCalledWith(fixed)
+		expect(run_ship_pair_runs.current()).toMatchObject({ runs: 1 })
+		expect(commands()).toEqual([LINT, TEST].map((command) => `${command} scripts/a.ts`))
+	})
+})
 
 describe('run_ship_scoped.scoped_pair — after a red pair', () => {
 	it('answers a pair queued behind a red one on the unmoved tree with that red, running nothing', async () => {

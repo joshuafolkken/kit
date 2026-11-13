@@ -97,12 +97,12 @@ describe('check_related_order.lint_first', () => {
 })
 
 describe('check_related.run_checks — lint:related first', () => {
-	it('starts the others beside lint:related and test:related only after it is green', async () => {
+	it('starts all readers after lint has finished rewriting files', async () => {
 		const { execute, release, started } = held_executor()
 		const results = check_related.run_checks(execute, COMMANDS)
 
 		await vi.waitFor(() => {
-			expect(started).toStrictEqual([LINT_COMMAND, TYPE_CHECK_COMMAND])
+			expect(started).toStrictEqual([LINT_COMMAND])
 		})
 		release(LINT_COMMAND)
 		await vi.waitFor(() => {
