@@ -1,0 +1,7 @@
+{
+	"reason": "#7422: Persist startup spans and API/cache observations using the existing lane ledger and shared scope; review fixes classify returned failures and waits without altering startup results.",
+	"date": "2026-11-13",
+	"growth": {
+		"scripts.code_lines": 402
+	}
+}

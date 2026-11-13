@@ -3,6 +3,7 @@ import { core_budget } from '#scripts/gate/core-budget'
 import { buffered_process } from '#scripts/lib/buffered-process'
 import { PACKAGE_JSON, package_manifest } from '#scripts/lib/package-manifest'
 import { INSTALL_TIMEOUT_MS } from '#scripts/lib/timeouts'
+import { run_startup } from '#scripts/run/startup/run-startup'
 
 // Filling the lane, which is the other half of opening one.
 //
@@ -61,16 +62,25 @@ function has_manifest(directory: string): boolean {
  */
 async function install_dependencies(directory: string): Promise<InstallResult> {
 	if (!has_manifest(directory)) return { is_installed: true, output: NO_MANIFEST_OUTPUT }
+	const admitted = await run_startup.waiting('install resource wait')
 
 	// The install claims its place in the core budget (joshuafolkken/kit#3944): a batch opens its lanes
 	// together, and each install ran beside the other lanes' gates off the ledger.
 	const result = await core_budget.with_command_reservation(
 		core_budget.CORE_WEIGHTS.install,
-		async () =>
-			await buffered_process.run_buffered_process(INSTALL_ARGUMENTS, {
-				cwd: directory,
-				timeout_ms: INSTALL_TIMEOUT_MS,
-			}),
+		async () => {
+			await admitted()
+
+			return await run_startup.phase(
+				'dependency install',
+				async () =>
+					await buffered_process.run_buffered_process(INSTALL_ARGUMENTS, {
+						cwd: directory,
+						timeout_ms: INSTALL_TIMEOUT_MS,
+					}),
+				{ edge_of: (value) => (buffered_process.is_process_failed(value) ? 'failed' : 'done') },
+			)
+		},
 		{ memory_mb: core_budget.MEMORY_MB.install, command: 'lane install' },
 	)
 

@@ -1,3 +1,4 @@
+import { run_startup } from '#scripts/run/startup/run-startup'
 import { execa } from 'execa'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { josh_command } from './josh-run'
@@ -75,6 +76,26 @@ describe('josh_command.josh_run — the captured pnpm josh subprocess', () => {
 
 // joshuafolkken/kit#4985: `josh ship` switches the local commit's lint hooks off this way.
 describe('josh_command.josh_run — the environment', () => {
+	it('forwards the active startup span through both subprocess entries', async () => {
+		const place = { run: 'run', attempt: 'attempt', issue: '7422', span: 'span' }
+
+		stub(OK, '')
+
+		await run_startup.within(place, async () => {
+			await josh_command.josh_run([BUDGET], false, undefined, { EXTRA: 'kept' })
+			await josh_command.josh_run_at([BUDGET], '/lane')
+		})
+
+		expect(mocked_execa).toHaveBeenNthCalledWith(1, PNPM, [JOSH, BUDGET], {
+			...PIPED,
+			env: { JOSH_STARTUP_SCOPE: JSON.stringify(place), EXTRA: 'kept' },
+		})
+		expect(mocked_execa).toHaveBeenNthCalledWith(2, PNPM, [JOSH, BUDGET], {
+			...PIPED,
+			cwd: '/lane',
+			env: { JOSH_STARTUP_SCOPE: JSON.stringify(place) },
+		})
+	})
 	it('adds the given variables to the environment the subprocess inherits', async () => {
 		const environment = { JOSH_PRE_COMMIT_LINT: 'off' }
 
