@@ -15,18 +15,22 @@ vi.mock('#scripts/issue/trusted-measure', () => ({
 vi.mock('#scripts/issue/issue-measured-close', () => ({
 	issue_measured_close: { close: vi.fn() },
 }))
-vi.mock('#scripts/gh/git-gh-command', () => ({ git_gh_command: { issue_comment: vi.fn() } }))
+vi.mock('#scripts/gh/git-gh-command', () => ({
+	git_gh_command: { issue_comment: vi.fn(), issue_get_body: vi.fn() },
+}))
 vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
 	run_event_stream_emit: { emit: vi.fn() },
 }))
 
 const ISSUE = '4599'
+const COMMAND = 'pnpm josh count'
 const DECLARED = '## 背景\n\n- 計測宣言: `pnpm josh count` <= 5\n'
 const UNREADABLE = 'Value: unreadable'
 const UNSAMPLED = 'sample condition not met'
 const SINCE = 'since 2026-11-01T00:00:00.000Z'
 
 function given(body: string, run: CommandRun): void {
+	vi.mocked(git_gh_command.issue_get_body).mockResolvedValue(body)
 	vi.mocked(trusted_measure.read_trusted_body).mockResolvedValue({
 		kind: 'trusted',
 		body,
@@ -38,6 +42,7 @@ function given(body: string, run: CommandRun): void {
 }
 
 beforeEach(() => {
+	vi.mocked(git_gh_command.issue_get_body).mockReset().mockResolvedValue(DECLARED)
 	vi.mocked(trusted_measure.text_of).mockReturnValue('output')
 	vi.mocked(issue_measured_close.close).mockReset().mockResolvedValue(true)
 	vi.mocked(git_gh_command.issue_comment).mockReset().mockResolvedValue('url')
@@ -116,6 +121,7 @@ describe('backlog_measure_close.outcome — nothing to run', () => {
 		given('## 背景\n\n- 種別: 非不具合\n', { kind: 'ok', output: '3' })
 
 		await expect(backlog_measure_close.outcome(ISSUE)).resolves.toBe('launch')
+		expect(trusted_measure.read_trusted_body).not.toHaveBeenCalled()
 		expect(trusted_measure.run_command).not.toHaveBeenCalled()
 		expect(git_gh_command.issue_comment).not.toHaveBeenCalled()
 	})
@@ -127,5 +133,36 @@ describe('backlog_measure_close.outcome — nothing to run', () => {
 		await expect(backlog_measure_close.outcome(ISSUE)).resolves.toBe('launch')
 		expect(trusted_measure.run_command).not.toHaveBeenCalled()
 		expect(git_gh_command.issue_comment).not.toHaveBeenCalled()
+	})
+})
+
+describe('backlog_measure_close.outcome — unverified hints never authorize execution', () => {
+	it('uses the verified snapshot when the hint declares a different command', async () => {
+		given(DECLARED, { kind: 'ok', output: '3' })
+		vi.mocked(git_gh_command.issue_get_body).mockResolvedValue(
+			DECLARED.replace(COMMAND, 'untrusted-command'),
+		)
+
+		await expect(backlog_measure_close.outcome(ISSUE)).resolves.toBe('closed')
+		expect(trusted_measure.run_command).toHaveBeenCalledWith(
+			COMMAND,
+			expect.objectContaining({ body: DECLARED }),
+		)
+	})
+
+	it('falls back to the verified snapshot when the body hint is unavailable', async () => {
+		given(DECLARED, { kind: 'ok', output: '3' })
+		vi.mocked(git_gh_command.issue_get_body).mockResolvedValue(undefined)
+
+		await expect(backlog_measure_close.outcome(ISSUE)).resolves.toBe('closed')
+		expect(trusted_measure.read_trusted_body).toHaveBeenCalledWith(ISSUE)
+	})
+
+	it('does not execute a stale declaration removed from the verified snapshot', async () => {
+		given('', { kind: 'ok', output: '3' })
+		vi.mocked(git_gh_command.issue_get_body).mockResolvedValue(DECLARED)
+
+		await expect(backlog_measure_close.outcome(ISSUE)).resolves.toBe('launch')
+		expect(trusted_measure.run_command).not.toHaveBeenCalled()
 	})
 })

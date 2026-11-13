@@ -112,6 +112,11 @@ describe('run_cut_report — record-carrying failures explain on stderr with the
 		expect(run_cut_report.report_handed_off(RECORD)).toBe(SUCCESS_EXIT_CODE)
 		expect_verdict(run_cut_report.HANDED_OFF_VERDICT)
 		expect(error_spy.mock.calls).toStrictEqual([[run_cut.handed_off_message(RECORD)]])
+		expect(run_cut.handed_off_message(RECORD)).toContain('record alone does not establish')
+		expect(run_cut.handed_off_message(RECORD)).toContain(
+			`pnpm josh run:add ${RECORD.issue} --retry`,
+		)
+		expect(run_cut.handed_off_message(RECORD)).toContain(`pnpm josh run:entry ${RECORD.issue}`)
 	})
 })
 

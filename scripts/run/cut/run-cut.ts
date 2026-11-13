@@ -450,7 +450,7 @@ function busy_message(cut: RunCut): string {
 // A successor already resumed this cut, so a process that reaches `--resume` after its own hand-off is
 // told to stop quietly rather than to investigate a tree that is not wrong.
 function handed_off_message(cut: RunCut): string {
-	return `This cut was already handed off to a successor — ${describe_cut(cut)}. Nothing was resumed here; the run is being carried on by the process that adopted it, so this one has nothing to do.`
+	return `This cut was already adopted — ${describe_cut(cut)}. Nothing was resumed here; the record alone does not establish whether its owner is still running. After a trusted repair request on an open PR and confirmed owner exit, use \`pnpm josh run:add ${cut.issue} --retry\` in a live backlogrun, or \`pnpm josh run:entry ${cut.issue}\` in its lane. Active or unreadable owners remain protected.`
 }
 
 // The record does not match the tree the fresh process is in — wrong branch, a clean tree, an expired

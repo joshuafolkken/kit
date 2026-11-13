@@ -58,6 +58,12 @@ function measured(declaration: MeasureDeclaration, source: TrustedBody): Measure
 }
 
 async function declared(issue: string): Promise<Measurement | undefined> {
+	// The REST memo also serves split assessment (10-second TTL, invalidated by writes).
+	// An unverified body may only skip execution; it never authorizes a command.
+	const body = await git_gh_command.issue_get_body(issue)
+
+	if (body !== undefined && measure_declaration.parse(body) === undefined) return undefined
+
 	const read = await trusted_measure.read_trusted_body(issue)
 
 	if (read.kind === 'refused') return undefined

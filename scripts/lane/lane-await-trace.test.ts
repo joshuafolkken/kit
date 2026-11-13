@@ -4,6 +4,7 @@ import { PROCESS_ALIVE, PROCESS_NONE, PROCESS_UNKNOWN } from '#scripts/run/run-l
 import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_await } from './lane-await'
+import { lane_process_table } from './lane-process-table'
 
 vi.mock('node:child_process', () => ({ spawnSync: vi.fn() }))
 
@@ -67,5 +68,49 @@ describe('process_trace_default', () => {
 		})
 
 		expect(() => lane_await.process_trace_default(ISSUE)).toThrow('`pgrep` is not installed')
+	})
+})
+
+const OTHER_PID = 7477
+const PARENT_PID = 7478
+
+function process_row(pid: number, parent: number, command = 'node'): string {
+	return `${String(pid)} ${String(parent)} 00:00 0 S Fri Nov 13 00:00:00 2026 ${command}`
+}
+
+describe('other_process_trace for repair entry', () => {
+	it('excludes the requesting worker above the CLI process', async () => {
+		vi.spyOn(lane_process_table, 'read_table').mockResolvedValue(
+			lane_process_table.parse(
+				[
+					process_row(process.pid, PARENT_PID),
+					process_row(PARENT_PID, 1, `agent fullrun #${ISSUE}`),
+				].join('\n'),
+			),
+		)
+
+		expect(await lane_await.other_process_trace(ISSUE)).toBe(PROCESS_NONE)
+	})
+
+	it.each(['agent fullrun', 'agent the reviewer of lane', 'josh ship title'])(
+		'preserves another matching owner: %s',
+		async (command) => {
+			vi.spyOn(lane_process_table, 'read_table').mockResolvedValue(
+				lane_process_table.parse(
+					[
+						process_row(process.pid, 1, `agent fullrun #${ISSUE}`),
+						process_row(OTHER_PID, 1, `${command} #${ISSUE}`),
+					].join('\n'),
+				),
+			)
+
+			expect(await lane_await.other_process_trace(ISSUE)).toBe(PROCESS_ALIVE)
+		},
+	)
+
+	it.each([undefined, []])('refuses unreadable or incomplete process rows (%s)', async (rows) => {
+		vi.spyOn(lane_process_table, 'read_table').mockResolvedValue(rows)
+
+		expect(await lane_await.other_process_trace(ISSUE)).toBe(PROCESS_UNKNOWN)
 	})
 })
