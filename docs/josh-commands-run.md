@@ -612,6 +612,7 @@ against no streak, and a `usage-limit` event names the reset (unreadable or past
 a **failed** child (OPEN, unparked, not an outage) has it dropped, is parked with `run:stalled` and counts against the failure guard — unless it records
 an open blocker, a `- 実施可能日:` still ahead or a `- 実施可能条件:` not yet met (or, its body unreadable, carries `not-before`): then it
 is **waiting**, unparked and uncounted, its comment naming the wait.
+調査後に不足が判明した証拠も、[観測待ちの宣言と証拠チェックリスト](./observation-waits.md)で待機できる。初回のマージ件数条件とは独立して判定し、未知形式・証拠の取得失敗では再開しない。
 A **withdrawn** child (a `lane:withdraw` on the stream, or CLOSED with no merged pull request) counts and logs nothing
 and launches no investigation; its lane is withdrawn through `lane:withdraw`'s path unless already withdrawn — kept, as the `run:wake` sweep keeps one, where its branch has commits on no remote; a retry where the withdrawal cannot read it.
 A failed child whose detached `josh ship` ended is parked for its stop: the comment's `Why` names the

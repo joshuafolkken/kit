@@ -32,7 +32,7 @@ const CONTEXT = {
 
 beforeEach(() => {
 	vi.spyOn(git_gh_command, 'issue_blocked_by_references').mockResolvedValue([])
-	vi.spyOn(git_gh_command, 'issue_get_body').mockResolvedValue(undefined)
+	vi.spyOn(git_gh_command, 'issue_get_body').mockResolvedValue('')
 	vi.spyOn(issue_state_cli, 'read_issue').mockResolvedValue({ kind: 'unreadable' })
 	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue('/stub')
 	vi.spyOn(run_carry, 'read_carry').mockReturnValue({ kind: 'carried', carry: CARRY })

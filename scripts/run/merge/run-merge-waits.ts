@@ -29,7 +29,11 @@ async function has_not_before_label(ctx: MergeContext): Promise<boolean> {
 
 async function start_date_wait(ctx: MergeContext): Promise<ReadonlyArray<string>> {
 	const body = await git_gh_command.issue_get_body(ctx.child, ctx.repo)
-	if (body === undefined) return (await has_not_before_label(ctx)) ? [NOT_BEFORE_WAIT] : []
+
+	if (body === undefined) {
+		return [(await has_not_before_label(ctx)) ? NOT_BEFORE_WAIT : 'issue body confirmation']
+	}
+
 	await issue_sample_prime.prime([body])
 	const reason = issue_not_before.waiting_reason(body)
 
