@@ -74,15 +74,6 @@ async function run_pair_phases(phases: ReadonlyArray<ScopedPhase>): Promise<Pair
 	return { ...result, verified: snapshot.tree }
 }
 
-// The tree after the branch's metrics approval is re-recorded (`metrics-totals.ts`): every review fix
-// and the gate stage meet the pair here, so a rewrite lands before any record is written for the tree.
-async function rerecorded_tree(): Promise<GateTree> {
-	const tree = await gate_tree.read_gate_tree()
-	const is_rerecorded = await metrics_totals.rerecord(process.cwd(), tree.files)
-
-	return is_rerecorded ? await gate_tree.read_gate_tree() : tree
-}
-
 function printed(line: string): JoshResult {
 	process.stdout.write(`${line}\n`)
 
@@ -236,7 +227,7 @@ async function remember_result(tree: GateTree, result: PairResult): Promise<Pair
 }
 
 async function settled_pair(): Promise<PairResult> {
-	const tree = await rerecorded_tree()
+	const tree = await metrics_totals.rerecorded_tree()
 	const scripts = scoped_green.missing_scripts(tree.files, tree.base)
 
 	// Nothing stale ran nothing, so the records already vouch for the tree read — a ship retried over

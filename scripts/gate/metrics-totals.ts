@@ -1,5 +1,6 @@
 import { buffered_process, type BufferedProcessResult } from '#scripts/lib/buffered-process'
 import { release_approval_prune } from '#scripts/release/release-approval-prune'
+import { gate_tree, type GateTree } from './gate-tree'
 import { project_checks } from './project-checks'
 
 // kit's metrics ratchet totals (`josh metrics --totals-only`), brought forward from the detached
@@ -78,6 +79,16 @@ const metrics_totals = {
 	REVIEW_REFUSAL_HEADING,
 	growth_notice,
 	rerecord,
+	// Finish the existing approval writer before fixing the tree any verification will read.
+	async rerecorded_tree(
+		read: () => Promise<GateTree> = gate_tree.read_gate_tree,
+		directory: string = process.cwd(),
+	): Promise<GateTree> {
+		const tree = await read()
+		const is_rerecorded = await metrics_totals.rerecord(directory, tree.files)
+
+		return is_rerecorded ? await read() : tree
+	},
 	totals_check,
 	totals_refusal,
 }

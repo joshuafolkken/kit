@@ -305,7 +305,7 @@ async function run_all(
 	execute: CheckExecutor = execute_check,
 	is_full = false,
 ): Promise<number> {
-	const tree = await check_related_reuse.read_tree()
+	const tree = await metrics_totals.rerecorded_tree(check_related_reuse.read_tree, root)
 	const kept = is_full ? undefined : tree_verdict.read(tree, VERDICT_RECORD)
 
 	if (kept === undefined) return await run_fresh(tree, root, execute, is_full)
