@@ -1,0 +1,8 @@
+{
+	"reason": "Reuse the existing remaining probe in join and review-record, with explicit incomplete results and current-tree checks; the shared collector replaces the ship launcher and the CLI does not grow.",
+	"date": "2026-11-13",
+	"growth": {
+		"scripts.code_lines": 106,
+		"prose.long_paragraphs": 1
+	}
+}
