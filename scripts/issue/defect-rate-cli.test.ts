@@ -96,6 +96,33 @@ describe('defect_rate_cli.measure_window', () => {
 	})
 })
 
+describe('defect_rate_cli.measure_window — denominator count', () => {
+	it('counts the complete denominator beyond the listing ceiling with one request', async () => {
+		const api = stub_search(page([DEFECT_ITEM]), page([ENHANCEMENT_ITEM], OVER_CEILING))
+
+		expect(await measure()).toMatchObject({
+			defects: 1,
+			enhancements: OVER_CEILING,
+			is_capped: false,
+		})
+		expect(requested_pages(api, 'closed')).toEqual([1])
+		expect(api).toHaveBeenCalledTimes(TWO_SEARCHES)
+	})
+
+	it('keeps no incomplete denominator and retries on the next measure', async () => {
+		const api = stub_search(page([DEFECT_ITEM]), {
+			...page([ENHANCEMENT_ITEM]),
+			incomplete_results: true,
+		})
+
+		expect(await measure()).toBeUndefined()
+		stub_search(page([DEFECT_ITEM]), page([ENHANCEMENT_ITEM]))
+
+		expect(await measure()).toMatchObject({ defects: 1, enhancements: 1, is_capped: false })
+		expect(api).toHaveBeenCalledTimes(TWO_SEARCHES * 2)
+	})
+})
+
 // joshuafolkken/kit#4550: every `backlog:next` a backlogrun's drive, probe and board made searched again,
 // holding the 30-a-minute search limit near its ceiling.
 describe('defect_rate_cli.measure_window — the shared cache', () => {
