@@ -1,0 +1,7 @@
+{
+	"reason": "Reviewed-PR repair reuses retry boundaries, trusted return checks and cut release. The additional 11 runtime lines beyond the earlier approval reuse the process snapshot and ancestry walker so a replacement worker can enter without hiding other owners; regression tests cover released cuts and process ownership.",
+	"date": "2026-11-13",
+	"growth": {
+		"scripts.code_lines": 225
+	}
+}

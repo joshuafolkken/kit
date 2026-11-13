@@ -11,6 +11,7 @@ import { run_event_retry } from '#scripts/run/event/run-event-retry'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_invocation } from '#scripts/run/run-invocation'
+import { run_repair_attempt } from '#scripts/run/run-repair-attempt'
 import { run_add, type AddContext, type AddOutcome, type AddPorts, type IssueView } from './run-add'
 import { run_add_epic } from './run-add-epic'
 import { run_add_issue } from './run-add-issue'
@@ -136,6 +137,17 @@ async function announce(
 	await announce(rest, roots, is_retry)
 }
 
+async function prepare_repairs(request: AddRequest): Promise<ReadonlySet<number>> {
+	if (!request.is_retry) return new Set()
+	const prepared = await Promise.all(
+		request.issues.map(async (issue) =>
+			(await run_repair_attempt.prepare(String(issue))) ? issue : undefined,
+		),
+	)
+
+	return new Set(prepared.filter((issue) => issue !== undefined))
+}
+
 // The blockers still open. A blocker whose state did not come back counts as open, so an issue is
 // never reported free to run on a read that did not say so.
 function view_of(issue: EpicIssue): IssueView {
@@ -191,6 +203,7 @@ function report(outcomes: ReadonlyArray<AddOutcome>, is_priority: boolean): numb
 }
 
 async function add(request: AddRequest, live: LiveRun, ports: AddPorts): Promise<number> {
+	const repairs = await prepare_repairs(request)
 	const outcomes: ReadonlyArray<AddOutcome> = await run_add.add_all(
 		request.issues,
 		request.is_priority,
@@ -203,7 +216,7 @@ async function add(request: AddRequest, live: LiveRun, ports: AddPorts): Promise
 	if (additions.length === 0) return report(outcomes, request.is_priority)
 
 	await announce(
-		additions.map((addition) => addition.issue),
+		additions.map((addition) => addition.issue).filter((issue) => !repairs.has(issue)),
 		roots,
 		request.is_retry,
 	)

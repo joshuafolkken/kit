@@ -1,14 +1,42 @@
 import { NEEDS_HUMAN_MERGE_LABEL } from '#scripts/issue/issue-labels'
+import { lane_await } from '#scripts/lane/lane-await'
 import { lane_state } from '#scripts/lane/lane-state'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { expect, it, vi } from 'vitest'
 import { run_merge } from './run-merge'
+import { run_merge_cut_release } from './run-merge-cut-release'
 import { run_merge_human_review } from './run-merge-human-review'
 
 vi.mock('#scripts/lane/lane-state')
 vi.mock('#scripts/run/event/run-event-stream-emit')
+vi.mock('#scripts/lane/lane-await')
+vi.mock('./run-merge-cut-release')
 
 const ISSUE = '5410'
+const HUMAN_REVIEW = 'human-review'
+const RETAINED = {
+	kind: 'written',
+	record: { issue: ISSUE, state: HUMAN_REVIEW, changed_at: '', changed_by: 'run:merge' },
+} as const
+
+it('releases a reviewed attempt only after its adopter ended', async () => {
+	vi.mocked(lane_state.record_change).mockResolvedValue(RETAINED)
+	vi.mocked(lane_await.process_trace_default).mockReturnValue('none')
+
+	expect(await run_merge_human_review.retain(ISSUE)).toBe(true)
+	expect(run_merge_cut_release.release).toHaveBeenCalledWith(ISSUE)
+})
+
+it.each(['alive', 'unknown'] as const)(
+	'keeps a reviewed %s owner without interrupting it',
+	async (trace) => {
+		vi.mocked(lane_state.record_change).mockResolvedValue(RETAINED)
+		vi.mocked(lane_await.process_trace_default).mockReturnValue(trace)
+
+		expect(await run_merge_human_review.retain(ISSUE)).toBe(true)
+		expect(run_merge_cut_release.release).not.toHaveBeenCalled()
+	},
+)
 
 it('does not settle a dispatch whose lane state could not be recorded', async () => {
 	vi.mocked(lane_state.record_change).mockResolvedValue({ kind: 'skipped', reason: 'write failed' })
@@ -23,7 +51,7 @@ it('waits for an OPEN human merge without counting failure or outage', () => {
 		{ is_outage: true, is_cut: false },
 	)
 
-	expect(outcome).toBe('human-review')
+	expect(outcome).toBe(HUMAN_REVIEW)
 	expect(run_merge.change_of(outcome)).toBeUndefined()
 })
 

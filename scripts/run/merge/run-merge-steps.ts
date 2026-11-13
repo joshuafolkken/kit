@@ -17,12 +17,12 @@ import {
 } from '#scripts/run/carry/run-carry'
 import { run_carry_conversation } from '#scripts/run/carry/run-carry-conversation'
 import { run_cut, type RunCut } from '#scripts/run/cut/run-cut'
-import { run_cut_adoption } from '#scripts/run/cut/run-cut-adoption'
 import type { StallCause } from '#scripts/run/park/run-stalled'
 import { run_label } from '#scripts/run/run-label'
 import { run_merge, type EndingSignals } from './run-merge'
 import { run_merge_cap } from './run-merge-cap'
 import { run_merge_close } from './run-merge-close'
+import { run_merge_cut_release } from './run-merge-cut-release'
 import { run_merge_decision } from './run-merge-decision'
 import { run_merge_github_limit } from './run-merge-github-limit'
 import { run_merge_waits } from './run-merge-waits'
@@ -262,21 +262,12 @@ async function do_merged(
 	return undefined
 }
 
-async function release_cut(child: string): Promise<void> {
-	const lane = await lane_registry.find_open_lane(child)
-	if (lane === undefined) return
-	const carried = run_cut.lane_cut_sync(lane.directory)
-	if (carried === undefined) return
-
-	run_cut_adoption.release(carried.target, carried.cut, child)
-}
-
 // A child that ended without a merge: end whatever of its process still runs, release its adoption, drop its stale
 // `in-progress`, and close its lane if the child left nothing in it. The reap comes first, so the lane
 // reads with no live process.
 async function release_child(child: string): Promise<void> {
 	await lane_seat_stop.stop(child)
-	await release_cut(child)
+	await run_merge_cut_release.release(child)
 	await run_label.unmark(child)
 	await close_vacant_lane(child)
 }
