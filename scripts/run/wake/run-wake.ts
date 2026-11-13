@@ -45,6 +45,8 @@ interface RunWake {
 	woke: number
 	// The grace window is measured from this; cleared when the woken session claims the record.
 	woke_at?: string | undefined
+	// Kept after claim so legacy shared-log completion can authenticate the launch.
+	launch_at?: string | undefined
 	// Launches for the current cut: what was started, against `woke`'s what arrived.
 	attempts?: number | undefined
 	// Named in the failure warning, never killed — a slow session is still doing the run's work.
@@ -100,6 +102,7 @@ const run_wake_schema = process_owner_schema.extend({
 	started_at: z.string(),
 	woke: z.number(),
 	woke_at: z.string().optional(),
+	launch_at: z.string().optional(),
 	// Every optional `RunWake` field must be listed: `z.object` strips undeclared ones on the round trip.
 	attempts: z.number().optional(),
 	woke_pid: z.number().optional(),
@@ -199,6 +202,7 @@ function carried_state(existing: RunWake | undefined, invocation: string): Parti
 	return {
 		woke: existing.woke,
 		woke_at: existing.woke_at,
+		launch_at: existing.launch_at,
 		attempts: existing.attempts,
 		woke_pid: existing.woke_pid,
 		spawned: existing.spawned,
@@ -266,6 +270,7 @@ function count_claim(wake: RunWake): RunWake {
 	return {
 		...wake,
 		woke,
+		launch_at: wake.woke_at ?? wake.launch_at,
 		woke_at: undefined,
 		attempts: undefined,
 		idle_since: undefined,

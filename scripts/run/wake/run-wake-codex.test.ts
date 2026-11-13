@@ -16,7 +16,7 @@ import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_headless } from '#scripts/run/run-headless'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, expect, test, vi, type MockInstance } from 'vitest'
-import { run_wake } from './run-wake'
+import { run_wake, type RunWake } from './run-wake'
 import type { WakeContext } from './run-wake-describe'
 import { run_wake_loop } from './run-wake-loop'
 import { run_wake_ports } from './run-wake-ports'
@@ -34,6 +34,7 @@ const SUCCESS_EVENT = '{"type":"turn.completed"}\n'
 const FAILED_EVENT = '{"type":"turn.failed","error":{"message":"quota exhausted"}}\n'
 const FAILURE_REASON = 'quota exhausted'
 const MISSING_CARRY = 'Missing carry'
+const MISSING_RESULT = 'without a successful result'
 
 function context(): WakeContext {
 	return {
@@ -73,6 +74,10 @@ test('tracks a Codex judgment through its launched process during a long silent 
 
 	expect(ports().is_owner_live(ports().read_carry())).toBe(true)
 	expect(ports().read_carry()).toMatchObject({ carry: { owner_pid: process.ppid } })
+	expect(vi.mocked(run_wake_session.launch).mock.calls[0]?.[0]).toMatchObject({
+		log_path: `${context().log_target}.${SID}`,
+		env: { JOSH_CARRY_SESSION: SID, JOSH_RUN_HEADLESS: '1' },
+	})
 })
 
 test('authenticates the launched Codex session without accepting a foreign owner', () => {
@@ -87,7 +92,7 @@ test('authenticates the launched Codex session without accepting a foreign owner
 	expect(run_carry.is_count_refused(read.carry, run_carry.session_owner())).toBe(true)
 })
 
-test('recovers a completed legacy pid-less judgment even with an exhausted wake mark', () => {
+function legacy_wake(is_live = false): RunWake {
 	const legacy = { provider: 'openai', is_headless: true } as const
 	const carry = run_carry.begin_carry(
 		path.join(scratch.directory, 'legacy.json'),
@@ -108,11 +113,69 @@ test('recovers a completed legacy pid-less judgment even with an exhausted wake 
 		context().log_target,
 		'=== 2020-01-01T00:00:00.000Z · started by process 1 ===\n{"type":"turn.completed"}\n',
 	)
-	vi.spyOn(process_identity, 'is_same_process').mockImplementation((pid) => pid === process.pid)
+	vi.spyOn(process_identity, 'is_same_process').mockImplementation(
+		(pid) => pid === process.pid || is_live,
+	)
+
+	return wake
+}
+
+test('recovers a completed legacy pid-less judgment even with an exhausted wake mark', () => {
+	legacy_wake()
 
 	expect(ports().read_carry()).toMatchObject({ carry: { is_handed_off: true, cuts: 1 } })
 	expect(run_wake.read_wake(context().wake_target)).toMatchObject({ woke: 1 })
 	expect(run_wake.read_wake(context().wake_target)?.woke_at).toBeUndefined()
+})
+
+test('returns a legacy judgment after observing it live before normal completion', () => {
+	const wake = legacy_wake(true)
+
+	expect(ports().is_owner_live(ports().read_carry())).toBe(true)
+	run_wake.update_wake(context().wake_target, run_wake.count_claim(wake))
+	vi.mocked(process_identity.is_same_process).mockImplementation((pid) => pid === process.pid)
+
+	expect(ports().read_carry()).toMatchObject({ carry: { is_handed_off: true, cuts: 1 } })
+})
+
+test.each(['', '=== 2019-01-01T00:00:00.000Z · started by process 1 ===\n'])(
+	'rejects legacy completion without matching launch evidence: %s',
+	(header) => {
+		legacy_wake()
+		writeFileSync(context().log_target, `${header}${SUCCESS_EVENT}`)
+
+		expect(ports().read_carry()).toMatchObject({ carry: { cuts: 0 } })
+		expect(ports().session_failure?.()).toContain(MISSING_RESULT)
+	},
+)
+
+test('resumes the production driver after a live legacy judgment completes', async () => {
+	legacy_wake(true)
+	vi.spyOn(run_event_setup, 'emit').mockResolvedValue()
+	const driver = vi.spyOn(josh_command, 'josh_run').mockImplementation(async (args) => {
+		expect(args).toEqual(expect.arrayContaining(['backlog:drive', '--max', '5', '--idle', '30']))
+		run_carry.end_carry(context().carry_target)
+
+		return { code: 0, out: 'stop' }
+	})
+	let waits = 0
+	const production = {
+		...ports(),
+		retry_closes: async () => undefined,
+		sleep: async () => {
+			waits += 1
+			expect(waits).toBe(1)
+			expect(driver).not.toHaveBeenCalled()
+			expect(run_wake.read_wake(context().wake_target)?.woke_at).toBeUndefined()
+			vi.mocked(process_identity.is_same_process).mockImplementation((pid) => pid === process.pid)
+		},
+	}
+
+	expect(await run_wake_loop.run_loop(context().wake_target, production, 0)).toMatchObject({
+		reason: 'ended',
+	})
+	expect(driver).toHaveBeenCalledOnce()
+	expect(run_wake_session.launch).not.toHaveBeenCalled()
 })
 
 function ended_log(text: string): void {
@@ -273,6 +336,6 @@ test.each(['', '{"type":"turn.failed"}\n'])(
 		ended_log(output)
 
 		expect(ports().read_carry()).toMatchObject({ carry: { is_handed_off: false, cuts: 0 } })
-		expect(ports().session_failure?.()).toContain('without a successful result')
+		expect(ports().session_failure?.()).toContain(MISSING_RESULT)
 	},
 )

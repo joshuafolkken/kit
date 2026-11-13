@@ -1,7 +1,7 @@
 {
-	"reason": "#7484: Codex scheduler authentication, generation-specific completion evidence and bounded driver hand-back require 210 additional code lines; shared process identity and reclaim writers are reused.",
+	"reason": "既存の scheduler lifecycle 修正に加え、round 1 medium の旧 pid-less launch 証拠を claim と restart 後も保持する。pnpm josh metrics --totals-only の +218 行は既承認 +210 行に schema・保存・認証読込の8行を追加したもので、grace と完了証拠の寿命を分けるために必要。",
 	"date": "2026-11-13",
 	"growth": {
-		"scripts.code_lines": 210
+		"scripts.code_lines": 218
 	}
 }

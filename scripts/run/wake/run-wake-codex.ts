@@ -41,9 +41,14 @@ function launched_at(output: string): number {
 	return Date.parse(header?.slice('=== '.length).split(' · ', 1)[0] ?? '')
 }
 
-function is_legacy_result(context: WakeContext, output: string): boolean {
+function launch_mark(context: WakeContext): number {
 	const wake = run_wake.read_wake(context.wake_target)
-	const marked = Date.parse(wake?.woke_at ?? '')
+
+	return Date.parse(wake?.woke_at ?? wake?.launch_at ?? '')
+}
+
+function is_legacy_result(context: WakeContext, output: string): boolean {
+	const marked = launch_mark(context)
 	const launched = launched_at(output)
 
 	return (
