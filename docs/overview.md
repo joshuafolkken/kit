@@ -73,6 +73,7 @@ To walk the Issue-driven loop once — file an Issue, have an agent plan and imp
 - [set-up-notifications.md](./how-to/set-up-notifications.md) — Telegram notifications for the Issue workflow
 - [cloud-session.md](./cloud-session.md) — running in an agent container
 - [josh-startup-telemetry.md](./josh-startup-telemetry.md) — persisted backlog startup phase measurements
+- [backlog-measurement.md](./backlog-measurement.md) — isolated backlog startup measurement trials
 - [authentication.md](./authentication.md) — existing GitHub Packages installs only
 
 **Maintaining kit** — for kit's own maintainers; projects that use kit can skip this group
