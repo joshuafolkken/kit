@@ -2,6 +2,7 @@ import path from 'node:path'
 import { isDeepStrictEqual } from 'node:util'
 import { fix_gh_packages_logic } from '#scripts/gh/fix-gh-packages-logic'
 import { yaml_document } from '#scripts/lib/yaml-document'
+import { dump } from 'js-yaml'
 
 const SCOPE = '@joshuafolkken/'
 const KIT = `${SCOPE}kit`
@@ -103,6 +104,32 @@ function assert_preserved(before: string, after: string): void {
 	}
 }
 
+// --ignore-pnpmfile omits this checksum. Restore only a missing value before the full
+// comparison, so changed checksums and all unrelated metadata still fail validation.
+function restore_checksum(
+	original: Record<string, unknown>,
+	resolved: Record<string, unknown>,
+): boolean {
+	const checksum = original['pnpmfileChecksum']
+	if (checksum === undefined || resolved['pnpmfileChecksum'] !== undefined) return false
+	resolved['pnpmfileChecksum'] = checksum
+
+	return true
+}
+
+function restore_pnpmfile_checksum(before: string, after: string): string {
+	const originals = yaml_document.parse_yaml_documents(before)
+	const resolved = yaml_document.parse_yaml_documents(after)
+	const restored = resolved.map((document, index) =>
+		restore_checksum(originals[index] ?? {}, document),
+	)
+	const prefix = after.startsWith('---') ? '---\n' : ''
+
+	return restored.includes(true)
+		? prefix + resolved.map((document) => dump(document)).join('---\n')
+		: after
+}
+
 const migrate_lock = {
 	SCOPE,
 	KIT,
@@ -111,6 +138,7 @@ const migrate_lock = {
 	scoped_artifacts,
 	npmrc,
 	assert_preserved,
+	restore_pnpmfile_checksum,
 	assert_npm_sources,
 	has_npm_sources,
 	importer_manifests,

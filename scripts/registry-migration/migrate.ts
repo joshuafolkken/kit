@@ -194,11 +194,15 @@ async function prepare(
 		migrate_lock.npmrc(migrate_files.read(root, '.npmrc').content ?? ''),
 	)
 	dependencies.resolve(root)
-	const after = readFileSync(path.join(root, LOCKFILE), 'utf8')
+	const after = migrate_lock.restore_pnpmfile_checksum(
+		before,
+		readFileSync(path.join(root, LOCKFILE), 'utf8'),
+	)
 
 	migrate_lock.assert_preserved(before, after)
 	migrate_lock.assert_npm_sources(after)
 	await verify_all(after, version, dependencies)
+	writeFileSync(path.join(root, LOCKFILE), after)
 }
 
 async function migrate(
