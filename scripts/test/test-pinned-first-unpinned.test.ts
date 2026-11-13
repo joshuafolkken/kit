@@ -10,9 +10,21 @@ import { test_red } from './test-red'
 // hunks it left as cut, and keeps the verdict it reached for the next run.
 
 const RUN_TIMEOUT = 240_000
+const TSCONFIG = 'tsconfig.json'
 const { build_change_branch, write } = test_pinned_fixture
 const TSCONFIG_CONTENT =
 	'{ "compilerOptions": { "allowJs": true, "moduleResolution": "bundler", "module": "esnext" } }\n'
+const REACHING_TEST = `import { expect, it } from 'vitest'
+import { label, token_of } from './driver.js'
+it('reads the default token', () => {
+	expect(token_of({ token: 't', code: 0 }, [])).toBe('t')
+})
+`
+const PINNING_TEST = `
+it('reads the code on the driver path', () => {
+	expect(token_of({ token: 't', code: 0 }, ['--driver'])).toBe('0')
+})
+`
 
 const fixture: { current?: FixtureWorkspace } = {}
 
@@ -31,11 +43,43 @@ afterEach(async () => {
 // One lane, and every probe answers green, so the first probe is unpinned.
 async function build_green(): Promise<MockInstance<typeof test_red.probe_in>> {
 	await build_change_branch()
-	await write('tsconfig.json', TSCONFIG_CONTENT)
+	await write(TSCONFIG, TSCONFIG_CONTENT)
 	vi.spyOn(test_pinned_pool, 'lane_plan').mockReturnValue({ lanes: 1, workers: 1 })
 
 	return vi.spyOn(test_red, 'probe_in').mockResolvedValue({ verdict: 'green', failed: [], ran: 1 })
 }
+
+async function build_unpinned(): Promise<void> {
+	await build_change_branch()
+	await write(TSCONFIG, TSCONFIG_CONTENT)
+	await write(test_pinned_fixture.TEST_FILE, REACHING_TEST)
+	vi.spyOn(test_pinned_pool, 'lane_plan').mockReturnValue({ lanes: 1, workers: 1 })
+}
+
+describe('test_pinned.run real remaining verdicts', () => {
+	it(
+		'collects both real unpinned hunks before retry, then pins them only with regression assertions',
+		async () => {
+			await build_unpinned()
+			const first = await test_pinned.run(test_pinned_logic.DEFAULT_MAX_HUNKS, true)
+
+			expect([first.unpinned.length, first.cut?.length]).toEqual([1, 1])
+			const whole = await test_pinned.run(test_pinned_logic.DEFAULT_MAX_HUNKS)
+
+			expect(whole.unpinned.map((hunk) => hunk.new_start)).toEqual([3, 6])
+			expect(whole.cut).toBeUndefined()
+			await write(
+				test_pinned_fixture.TEST_FILE,
+				test_pinned_fixture.DEFAULT_PATH_TEST + PINNING_TEST,
+			)
+			const pinned = await test_pinned.run(test_pinned_logic.DEFAULT_MAX_HUNKS)
+
+			expect(pinned.unpinned).toEqual([])
+			expect(test_pinned_logic.has_unchecked(pinned)).toBe(false)
+		},
+		RUN_TIMEOUT,
+	)
+})
 
 describe('test_pinned.run with is_first_unpinned', () => {
 	it(

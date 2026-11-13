@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto'
 import { check_reuse } from '#scripts/gate/check-reuse'
-import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import type { JoshResult } from '#scripts/josh/josh-run'
 import { buffered_process } from '#scripts/lib/buffered-process'
 import { error_text } from '#scripts/lib/error-message'
@@ -8,8 +7,8 @@ import { review_round_reuse } from '#scripts/review/review-round-reuse'
 import { run_review_pinned } from '#scripts/run/review/run-review-pinned'
 import { run_review_pinned_accepted } from '#scripts/run/review/run-review-pinned-accepted'
 import { run_review_pinned_join } from '#scripts/run/review/run-review-pinned-join'
+import { run_review_pinned_remaining } from '#scripts/run/review/run-review-pinned-remaining'
 import { run_review_pinned_steps } from '#scripts/run/review/run-review-pinned-steps'
-import { run_review_pinned_tree } from '#scripts/run/review/run-review-pinned-tree'
 import { test_pinned } from '#scripts/test/test-pinned'
 import { test_pinned_logic } from '#scripts/test/test-pinned-logic'
 import { test_pinned_record, type PinnedSummary } from '#scripts/test/test-pinned-record'
@@ -60,7 +59,7 @@ function remaining_note(remaining: number | undefined): string {
 	const hunks =
 		remaining === undefined ? 'the remaining hunks' : `${String(remaining)} remaining hunks`
 
-	return `test:pinned: probing ${hunks} in the background — the next ship's pre-detach reads their verdicts\n`
+	return `test:pinned: probing ${hunks} in the background — before editing or retrying ship, collect every verdict with \`pnpm josh run:review --pinned\`\n`
 }
 
 // **A stop at the first unpinned hunk leaves the rest probing in the background**
@@ -68,17 +67,9 @@ function remaining_note(remaining: number | undefined): string {
 // this tree, or waits it out on a fixed one so its verdicts reach the cache and only the hunks the fix
 // moved are probed again. A launch that failed or threw adds no note, and never fails the check.
 async function is_rest_launched(): Promise<boolean> {
-	try {
-		const tree = await run_review_pinned_tree.key()
+	const launched = await run_review_pinned_remaining.start()
 
-		run_review_pinned_steps.clear()
-
-		return run_review_pinned_steps.launch_remaining(PROJECT_ROOT, tree).kind === 'launched'
-	} catch (error) {
-		error_text.trace_swallowed('run_ship_pre_detach_pinned.is_rest_launched', error)
-
-		return false
-	}
+	return launched.kind === 'launched'
 }
 
 async function continued(answer: PinnedSummary): Promise<PinnedSummary> {

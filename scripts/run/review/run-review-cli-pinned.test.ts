@@ -1,3 +1,4 @@
+import { git_command } from '#scripts/git/git-command'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { review_brief_cli } from '#scripts/review/review-brief-cli'
@@ -31,6 +32,7 @@ const REFUSAL = 'scoped checks not green on this tree'
 const TREE = 'briefed-tree'
 
 beforeEach(() => {
+	vi.spyOn(git_command, 'git_directories').mockResolvedValue([])
 	vi.spyOn(review_brief_cli, 'scoped_refusal').mockResolvedValue(undefined)
 	vi.spyOn(run_review_pinned_tree, 'key').mockResolvedValue(TREE)
 })

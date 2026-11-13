@@ -21,6 +21,7 @@ import { run_review_steps } from './run-review-steps'
 // a check that could not run does.
 
 const PINNED_COMMAND = 'test:pinned'
+const REMAINING_ORIGIN: PinnedOrigin = 'pre-detach'
 const LAUNCH_PREFIX = 'josh-run-review-pinned-launch-'
 const LOG_PREFIX = 'josh-run-review-pinned-log-'
 const MS_PER_SECOND = 1000
@@ -117,7 +118,7 @@ function launch(root: string = PROJECT_ROOT, reason?: string, tree?: string): La
 // pre-detach joins it (`run-review-pinned-join.ts`) and `clear` discards it as it does that one.
 function launch_remaining(root: string = PROJECT_ROOT, tree?: string): LaunchResult {
 	const token = randomUUID()
-	const origin: PinnedOrigin = 'pre-detach'
+	const origin = REMAINING_ORIGIN
 	const argv = test_pinned_record.launch_argv(token, undefined, origin, true)
 
 	return launch_with({ root, token, argv, origin, tree })
@@ -304,6 +305,10 @@ function launched_tree(root: string = PROJECT_ROOT): string | undefined {
 	return read_launch(root)?.tree
 }
 
+function is_remaining(root: string = PROJECT_ROOT): boolean {
+	return read_launch(root)?.origin === REMAINING_ORIGIN
+}
+
 // `undefined` when no check was launched. `is_left_running` is false where nothing reads a late answer.
 async function wait_for_answer(
 	root: string = PROJECT_ROOT,
@@ -376,6 +381,7 @@ const run_review_pinned_steps = {
 	is_answered,
 	is_live,
 	is_pending,
+	is_remaining,
 	launch,
 	launch_remaining,
 	launched_reason,

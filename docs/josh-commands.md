@@ -88,6 +88,8 @@ pnpm josh lint:related scripts/thing.ts   # narrow by the given files instead
 
 Keeps caches of its own, apart from the gate's.
 
+Before checking, applies ESLint fixes and then Prettier to the resolved scope, using its own caches and the project's skip conditions. Remaining errors still fail. Verification and green records read the tree after both writers finish.
+
 - Changed set = branch diff plus untracked files (cache `.eslintcache.related`); flags are named rather than forwarded (`--fix` is reported ignored).
 - A bare run after a green one lints only what moved since, main syncs included (`scripts/gate/since-green.ts`); nothing moved lints nothing and exits green; the branch diff when there is no comparable record (none, or one written under other tool versions or `NODE_ENV`), nothing lintable moved, or a toolchain or lint config moved (`scripts/gate/verification-inputs.ts`).
 - A bare run on a tree it already answered (same file contents and base) runs nothing and prints `reused: tree <hash> <green|red> at <time>` with the kept verdict; a red one names its record to remove (`tree-verdict.ts`).

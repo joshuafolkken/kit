@@ -104,6 +104,24 @@ describe('check_related.run_all reuses a check whose green record still holds', 
 	})
 })
 
+describe('check_related.run_all after autofix', () => {
+	beforeEach(stub_run)
+	afterEach(() => vi.restoreAllMocks())
+	it('records readers on the tree lint rewrote (ac-0986ec74)', async () => {
+		const fixed = { ...TREE, files: { [SOURCE]: 'fixed' } }
+
+		reuse([])
+		vi.mocked(check_related_reuse.read_tree).mockResolvedValueOnce(TREE).mockResolvedValue(fixed)
+		await run()
+		expect(check_related_reuse.record).toHaveBeenCalledWith(expect.any(Array), fixed)
+		expect(tree_verdict.record).toHaveBeenCalledWith(
+			expect.objectContaining({ before: fixed }),
+			expect.any(Function),
+			expect.any(String),
+		)
+	})
+})
+
 describe('check_related.run_all reads and records the reuse on one tree', () => {
 	beforeEach(stub_run)
 	afterEach(() => {

@@ -54,7 +54,7 @@ import { run_review_unplanned } from './run-review-unplanned'
 // `josh check:related` before its round is recorded, joshuafolkken/kit#4948) starts it again on a tree a round-1 fix
 // moved, after the join has closed the pair, and reads its answer without joining a gate that already
 // settled. The ship's pre-detach reads that answer anyway, so a lane need not
-// (joshuafolkken/kit#4895), and a lane child's `--pinned` returns at once rather than wait in the
+// (joshuafolkken/kit#4895), and a lane child's `--pinned` returns at once except for a ship's remaining
 // foreground (joshuafolkken/kit#5293). **`--join --fixing` waits no grace on the check**: round 1's fixes will move
 // its tree. **A lane child's open commits first and `--push` pushes at the green gate**
 // (`run-review-early-push.ts`).
@@ -441,15 +441,13 @@ async function run_open(is_code_only: boolean, argv: ReadonlyArray<string>): Pro
 }
 
 async function run_pinned(): Promise<number> {
-	if (lane_child_marker.is_child_of(process.cwd())) {
+	if (lane_child_marker.is_child_of(process.cwd()) && !run_review_pinned_steps.is_remaining()) {
 		process.stdout.write(`${LANE_PINNED_NOTE}\n`)
 
 		return SUCCESS_EXIT_CODE
 	}
 
-	const is_unpinned = await show_pinned(
-		run_review_join_read.read_with(run_review_pinned_steps.wait_alone),
-	)
+	const is_unpinned = await show_pinned(run_review_join_read.read_remaining())
 
 	return is_unpinned ? run_review.UNPINNED_EXIT_CODE : SUCCESS_EXIT_CODE
 }
