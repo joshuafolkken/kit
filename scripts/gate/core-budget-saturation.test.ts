@@ -347,11 +347,11 @@ describe('core_budget.reserve — an overloaded machine holds the first waiter',
 })
 
 describe('core_admission.is_admitted — a busy CPU does not hold the head', () => {
-	// Busy cores say nothing about memory: a head whose cores fit still runs past a memory shortfall.
-	it('keeps the head exempt from memory while the CPU is only partly busy', () => {
+	// The CPU exemption cannot release a memory shortfall.
+	it('holds the head on memory while the CPU is only partly busy', () => {
 		const head = { key: 'only', reservation: { weight: 1, claimed_at: 1, memory_mb: 2400 } }
 		const budget = { cores: CORES - 1, memory_mb: 500, busy_excess: 1 }
 
-		expect(core_admission.is_admitted('only', [head], budget)).toBe(true)
+		expect(core_admission.is_admitted('only', [head], budget)).toBe(false)
 	})
 })

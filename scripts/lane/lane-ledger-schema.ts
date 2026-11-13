@@ -139,11 +139,23 @@ const offerable_schema = z.object({
 // command itself, so a wait inside a gate, a scoped check or a ship lands in one record. `issue` is the
 // lane the claim ran in, absent outside a lane (joshuafolkken/kit#4382).
 const core_wait_schema = z.object({
-	kind: z.literal(KIND.CORE_WAIT),
+	kind: z.enum([KIND.CORE_WAIT, KIND.CORE_ADMISSION]),
 	at: z.string(),
 	command: z.string(),
 	waited_ms: z.number(),
 	issue: z.number().optional(),
+	admission_reason: z.string().optional(),
+	overflow: z.boolean().optional(),
+	budget_cores: z.number().optional(),
+	budget_memory_mb: z.number().optional(),
+	available_mb: z.number().optional(),
+	busy_cores: z.number().optional(),
+	requested_cores: z.number().optional(),
+	granted_cores: z.number().optional(),
+	memory_mb: z.number().optional(),
+	wait_reason: z.string().optional(),
+	admission_waited_ms: z.number().optional(),
+	memory_pressured: z.boolean().optional(),
 })
 // One vitest run's slowest test files, each with its wall time from environment setup to its last
 // test, so a unit run whose wall time far outran its CPU names the file it stalled on

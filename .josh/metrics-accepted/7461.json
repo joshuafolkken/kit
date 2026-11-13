@@ -1,0 +1,7 @@
+{
+	"reason": "Issue #7461 requires memory-fit validation on both admission paths, supported-probe failure and physical-capacity refusal, and persistent admission evidence without changing wait aggregates; poll extraction preserves the 300-line limit and reuses the existing reservation and ledger mechanisms.",
+	"date": "2026-11-13",
+	"growth": {
+		"scripts.code_lines": 157
+	}
+}
