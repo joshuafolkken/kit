@@ -220,6 +220,10 @@ async function placed(issue: SpillIssue, follow_up: number): Promise<number> {
 async function place(issue: SpillIssue, follow_up: number): Promise<number> {
 	const exit_code = await placed(issue, follow_up)
 
+	console.info(
+		`Prepared ${session_cite.issue(follow_up)} stays unpublished: record its plan with issue:plan --planned --no-notify, then run pnpm josh issue:file --publish <E> after placement succeeds.`,
+	)
+
 	if (exit_code !== SUCCESS_EXIT_CODE) {
 		console.error(
 			`✖ ${session_cite.issue(follow_up)} was not placed — place it with \`pnpm josh epic --add <E> ${String(follow_up)} --after ${String(issue.issue_number)}\`.`,

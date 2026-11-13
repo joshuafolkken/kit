@@ -58,6 +58,7 @@ const ISSUE = '1490'
 const OTHER_ISSUE = '1491'
 const SUCCESS = 0
 const FAILURE = 1
+const DEPENDENCY_WAIT_EXIT_CODE = 75
 const LANE: LaneInfo = {
 	issue: ISSUE,
 	seat: 6,
@@ -364,4 +365,15 @@ describe('lane:dispatch cut-session guard', () => {
 		expect(await lane_cli.run(['dispatch', ISSUE])).toBe(FAILURE)
 		expect(vi.mocked(lane_dispatch.dispatch_child)).not.toHaveBeenCalled()
 	})
+})
+
+it('returns the retryable dispatch code without printing a pid on a dependency wait', async () => {
+	vi.mocked(lane_dispatch.dispatch_child).mockResolvedValue({
+		kind: 'dependency-wait',
+		reason: 'unfinished blocker',
+	})
+
+	expect(await lane_cli.run(['dispatch', ISSUE])).toBe(DEPENDENCY_WAIT_EXIT_CODE)
+	expect(printed).toStrictEqual([])
+	expect(lane_dispatch.warn_of_problem).not.toHaveBeenCalled()
 })

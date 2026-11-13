@@ -10,6 +10,7 @@ import { detached_launch, type LaunchArgv } from '#scripts/run/detached-launch'
 import { ts_entry_loader } from '#scripts/run/ts-entry-loader'
 import { lane_child_invocation } from './lane-child-invocation'
 import { lane_child_marker } from './lane-child-marker'
+import { lane_dispatch_dependency } from './lane-dispatch-dependency'
 import { lane_dispatch_log } from './lane-dispatch-log'
 import type { LaneInfo } from './lane-registry'
 import { lane_session_broker } from './lane-session-broker'
@@ -118,7 +119,7 @@ async function prepare_generation(generation: Generation): Promise<Generation | 
 	return { ...generation, resume_cut }
 }
 
-async function launch_child(generation: Generation): Promise<ChildResult> {
+async function launch_ready_child(generation: Generation): Promise<ChildResult> {
 	const { lane, profile, is_resume } = generation
 
 	update(lane.directory, generation.owner, {
@@ -144,6 +145,20 @@ async function launch_child(generation: Generation): Promise<ChildResult> {
 	)
 
 	return child_result(result)
+}
+
+async function launch_child(generation: Generation): Promise<ChildResult> {
+	const wait = await lane_dispatch_dependency.check(generation.lane.issue)
+
+	if (wait !== undefined) {
+		await lane_dispatch_dependency.defer(generation.lane.issue)
+
+		return { kind: LAUNCH_FAILED_KIND, note: wait.reason }
+	}
+
+	await lane_dispatch_dependency.begin(generation.lane.issue)
+
+	return await launch_ready_child(generation)
 }
 
 async function stop_invocation(issue: string): Promise<string> {

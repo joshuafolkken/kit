@@ -56,6 +56,7 @@ interface FileArguments {
 	is_blocking_finder: boolean
 	// `--check`: every filing step runs and prints its verdict, and nothing is created on GitHub.
 	is_check: boolean
+	is_prepared?: boolean
 }
 
 const OPTIONS = {
@@ -71,6 +72,7 @@ const OPTIONS = {
 	release: { type: 'boolean' },
 	'blocks-finder': { type: 'boolean' },
 	check: { type: 'boolean' },
+	prepare: { type: 'boolean' },
 } as const
 
 // The label a `--route` value names, or `undefined` when it names none — read against the route
@@ -157,6 +159,7 @@ function arguments_of(values: ParsedValues, title: string | undefined): FileArgu
 		is_release: values.release === true,
 		is_blocking_finder: values['blocks-finder'] === true,
 		is_check: values.check === true,
+		is_prepared: values.prepare === true,
 	}
 }
 

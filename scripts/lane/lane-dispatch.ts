@@ -13,10 +13,12 @@ import { run_park } from '#scripts/run/park/run-park'
 import { run_label } from '#scripts/run/run-label'
 import { lane_child_invocation } from './lane-child-invocation'
 import { lane_child_marker } from './lane-child-marker'
+import { lane_dispatch_dependency, type DependencyWait } from './lane-dispatch-dependency'
 import { lane_dispatch_log } from './lane-dispatch-log'
 import { lane_dispatch_prepare } from './lane-dispatch-prepare'
 import { lane_ledger_write } from './lane-ledger-write'
 import { lane_output } from './lane-output'
+import { lane_reap } from './lane-reap'
 import { lane_registry, type LaneInfo } from './lane-registry'
 import { lane_seat_start } from './lane-seat-start'
 import { lane_state } from './lane-state'
@@ -50,6 +52,7 @@ const WARNING_RECOVERY =
 // once rather than inlined at each use.
 const LABEL_UNSET_KIND = 'label-unset'
 const RESTART_START = 'restart'
+const DEPENDENCY_WAIT = 'dependency-wait'
 
 interface Dispatched {
 	kind: 'dispatched'
@@ -71,6 +74,7 @@ interface Dispatched {
 
 type DispatchOutcome =
 	| Dispatched
+	| DependencyWait
 	| { kind: 'failed'; lane: LaneInfo; log_path: string; note: string }
 	| { kind: 'no-lane' }
 	| { kind: 'unrecordable'; reason: string }
@@ -319,14 +323,34 @@ async function claimed(issue: string, start: DispatchStart): Promise<LabelWrite>
 	return await mark_in_progress(issue)
 }
 
+async function start_wait(
+	issue: string,
+	request: StartRequest,
+	start: DispatchStart,
+): Promise<DependencyWait | undefined> {
+	if (request.profile.provider !== 'openai' && lane_reap.is_child_running(issue)) {
+		return { kind: DEPENDENCY_WAIT, reason: 'child is already running' }
+	}
+
+	const wait = await lane_dispatch_dependency.check(issue)
+
+	if (wait !== undefined && start === RESTART_START) await lane_dispatch_dependency.defer(issue)
+
+	return wait
+}
+
 async function finish_dispatch(
 	issue: string,
 	request: StartRequest,
 	start: DispatchStart,
 ): Promise<DispatchOutcome> {
+	const wait = await start_wait(issue, request, start)
+	if (wait !== undefined) return wait
+
 	const mark = await claimed(issue, start)
 
 	if (!mark.is_applied) return { kind: LABEL_UNSET_KIND, reason: mark.reason }
+	await lane_dispatch_dependency.begin(issue)
 	const outcome = await started(request)
 
 	const is_failed = outcome.kind === 'failed'
@@ -396,7 +420,10 @@ function resume_sentence(outcome: Dispatched): string {
 
 // Never throws: it is reached from `warn_of_problem`, and a formatter that raised would lose the very
 // message the warning exists to carry — the pid among it, with the child already running.
-function describe(outcome: DispatchOutcome, issue: string): string {
+function describe_dispatch(
+	outcome: Exclude<DispatchOutcome, DependencyWait>,
+	issue: string,
+): string {
 	if (outcome.kind === 'no-lane') {
 		return `No lane is open for ${session_cite.issue(issue)}. Run \`pnpm josh lane:open ${issue}\` first, then dispatch into it.`
 	}
@@ -414,6 +441,10 @@ function describe(outcome: DispatchOutcome, issue: string): string {
 	return `Dispatched \`${outcome.invocation}\` as process ${String(outcome.pid)} in ${outcome.lane.directory} with ${agent_role_profile.describe(outcome.profile)}.${agent_role_profile.default_notice()}${resume_sentence(outcome)}${log_sentence(outcome, issue)}`
 }
 
+function describe(outcome: DispatchOutcome, issue: string): string {
+	return outcome.kind === DEPENDENCY_WAIT ? outcome.reason : describe_dispatch(outcome, issue)
+}
+
 /**
  * Whether this outcome is one nobody would otherwise hear about.
  *
@@ -422,6 +453,8 @@ function describe(outcome: DispatchOutcome, issue: string): string {
  * exit zero *silently*, leaving an operator to poll a file the launcher already said it could not open.
  */
 function is_worth_warning(outcome: DispatchOutcome): boolean {
+	if (outcome.kind === DEPENDENCY_WAIT) return false
+
 	return outcome.kind !== 'dispatched' || outcome.notes.length > 0
 }
 

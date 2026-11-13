@@ -2,6 +2,8 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # The remote dependency check and local spawn cannot form one atomic operation (#7427).
+  - TOCTOU
   # The project and Rust linter named in its package settings example (#7373).
   - hacco
   - clippy

@@ -12,6 +12,7 @@ import { run_carry_reclaim } from '#scripts/run/carry/run-carry-reclaim'
 import { lane_await } from './lane-await'
 import { lane_close, type CloseOutcome, type SweepOutcome } from './lane-close'
 import { lane_dispatch, type DispatchOutcome } from './lane-dispatch'
+import { lane_dispatch_dependency } from './lane-dispatch-dependency'
 import { lane_occupancy } from './lane-occupancy'
 import { lane_open, type OpenOutcome } from './lane-open'
 import { lane_output, type ReadOutcome, type RecordOutcome } from './lane-output'
@@ -360,6 +361,7 @@ async function output_command(rest: ReadonlyArray<string>): Promise<number> {
 // write** — `is_worth_warning` is what decides, rather than this function reading the outcome's shape.
 async function report_dispatch(outcome: DispatchOutcome, issue: string): Promise<number> {
 	console.error(lane_dispatch.describe(outcome, issue))
+	if (outcome.kind === 'dependency-wait') return lane_dispatch_dependency.WAIT_EXIT_CODE
 
 	if (lane_dispatch.is_worth_warning(outcome)) await lane_dispatch.warn_of_problem(outcome, issue)
 

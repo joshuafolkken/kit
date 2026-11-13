@@ -10,6 +10,7 @@ import { read_json_listing } from '#scripts/git/parse-json-array'
 import { git_next_issues } from '#scripts/issue/git-next-issues'
 import { AUTO_OK_LABEL } from '#scripts/issue/issue-labels'
 import { issue_not_before } from '#scripts/issue/issue-not-before'
+import { issue_publication_state } from '#scripts/issue/issue-publication-state'
 import { issue_sample_prime } from '#scripts/issue/issue-sample-prime'
 import { session_cite } from '#scripts/issue/session-cite'
 
@@ -344,6 +345,7 @@ interface RunnableOptions {
 
 function is_ready(issue: OpenIssueData, options: RunnableOptions): boolean {
 	return (
+		!issue_publication_state.is_pending(issue.body) &&
 		auto_ok_author.is_author_trusted(issue) &&
 		is_unblocked(issue) &&
 		issue_not_before.is_due(issue.body, options.now ?? Date.now())

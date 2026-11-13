@@ -1,6 +1,7 @@
 import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
 import { detached_launch } from '#scripts/run/detached-launch'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { lane_dispatch_dependency } from './lane-dispatch-dependency'
 import type { LaneInfo } from './lane-registry'
 import { lane_relaunch } from './lane-relaunch'
 import { lane_seat_start } from './lane-seat-start'
@@ -19,6 +20,7 @@ const LANE: LaneInfo = {
 }
 
 beforeEach(() => {
+	vi.spyOn(lane_dispatch_dependency, 'check').mockResolvedValue(undefined)
 	vi.spyOn(agent_diagnostics, 'check').mockReturnValue({ kind: 'ready' })
 	vi.spyOn(detached_launch, 'launch').mockReturnValue({ kind: 'launched', pid: 1 })
 	vi.spyOn(lane_seat_start, 'start').mockImplementation(
@@ -54,4 +56,15 @@ it('returns an allocation refusal through the existing relaunch failure protocol
 		note,
 	})
 	expect(detached_launch.launch).not.toHaveBeenCalled()
+})
+
+it('defers a resume with an unknown dependency and starts no worker', async () => {
+	vi.mocked(lane_dispatch_dependency.check).mockResolvedValue({
+		kind: 'dependency-wait',
+		reason: 'unknown dependency',
+	})
+	vi.spyOn(lane_dispatch_dependency, 'defer').mockResolvedValue()
+	expect(await lane_relaunch.resume(LANE, 'pre-gate', vi.fn())).toMatchObject({ kind: 'rejected' })
+	expect(detached_launch.launch).not.toHaveBeenCalled()
+	expect(lane_dispatch_dependency.defer).toHaveBeenCalledWith(ISSUE)
 })

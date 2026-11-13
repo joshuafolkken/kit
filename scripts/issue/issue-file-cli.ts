@@ -26,6 +26,7 @@ import { issue_file_pass, type Filing } from './issue-file-pass'
 import { issue_file_worker } from './issue-file-worker'
 import { has_label_name, has_parked_label, RUN_SOLO_LABEL } from './issue-labels'
 import { issue_priority } from './issue-priority'
+import { issue_publication_state } from './issue-publication-state'
 import { issue_release_cli } from './issue-release-cli'
 import { issue_run_verdict } from './issue-run-verdict'
 import type { ScoutOutcome } from './issue-scout-cli'
@@ -79,8 +80,11 @@ async function create(filing: Filing, labels: ReadonlyArray<string>): Promise<st
 	)
 	const request = git_gh_issue_write.issue_create_request({
 		title: filing.args.title,
-		body: filing.body,
-		labels,
+		...issue_publication_state.creation(
+			filing.body,
+			labels,
+			filing.args.is_prepared === true || has_label_name(labels, 'route:split'),
+		),
 		repo: filing.target,
 	})
 
