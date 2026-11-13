@@ -6,9 +6,11 @@ const { run, batch_run, is_batch } = vi.hoisted(() => ({
 	batch_run: vi.fn(),
 	is_batch: vi.fn(() => false),
 }))
+const publication_run = vi.hoisted(() => vi.fn())
 
 vi.mock('./issue-file-cli', () => ({ issue_file_cli: { run } }))
 vi.mock('./issue-file-batch', () => ({ issue_file_batch: { is_batch, run: batch_run } }))
+vi.mock('./issue-publication', () => ({ issue_publication: { run: publication_run } }))
 
 const BATCH_ARGUMENTS: ReadonlyArray<string> = ['--batch', 'deferred']
 const BATCH_EXIT_CODE = 4
@@ -22,6 +24,17 @@ const CASES = main_entry_fixture.entry_cases({
 })
 
 describe('issue-file-main', () => {
+	it.each([['--publish', '7430'], ['--publish=7430']])(
+		'routes publication %j without creating issues',
+		async (...argv) => {
+			run.mockReset()
+			publication_run.mockResolvedValue(0)
+			expect(await main_entry_fixture.run_entry(ENTRY, argv)).toBe(0)
+			expect(publication_run).toHaveBeenCalledWith(argv)
+			expect(run).not.toHaveBeenCalled()
+		},
+	)
+
 	it.each(CASES)('%s', async (_name, check) => {
 		await check()
 	})

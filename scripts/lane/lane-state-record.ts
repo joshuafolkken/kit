@@ -9,6 +9,7 @@ import { z } from 'zod'
 // lanes out of the worker share (`unit-run-marker.ts`, joshuafolkken/kit#6916).
 
 const STATE_SUFFIX = '.json'
+const DEPENDENCY_WAIT_COMMAND = 'lane:dependency-wait'
 // `as const` so the literal type survives export on `lane_state_record` (a bare const widens there).
 const HUMAN_REVIEW = 'human-review' as const
 const LANE_STATES = ['open', 'running', 'paused', HUMAN_REVIEW, 'ended'] as const
@@ -62,6 +63,7 @@ function is_idle(state_root: string, common: string, issue: string): boolean {
 }
 
 const lane_state_record = {
+	DEPENDENCY_WAIT_COMMAND,
 	HUMAN_REVIEW,
 	LANE_STATES,
 	STATE_SUFFIX,

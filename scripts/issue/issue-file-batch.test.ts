@@ -7,6 +7,7 @@ import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_list } from '#scripts/gh/git-gh-issue-list'
 import { repository_labels } from '#scripts/repo/repository-labels'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { split_resolution } from '#scripts/split/split-resolution'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_file_batch } from './issue-file-batch'
@@ -29,13 +30,14 @@ const BODY_FILE_FLAG = '--body-file'
 const FIRST = 'First filing'
 const SECOND = 'Second filing'
 const THIRD = 'Third filing'
+const JUDGEMENT = '- 人の判断: 要（目視確認）'
 const VALID_BODY = [
 	'## 背景',
 	'',
 	'- 種別: 不具合',
 	'- 原因: #4201',
 	'- 規模見積もり: 約 1 ファイル / 10 行（テスト除く）',
-	'- 人の判断: 要（目視確認）',
+	JUDGEMENT,
 	'',
 	'## 現象\n\nx\n\n## 期待結果\n\ny\n\n## 受け入れ条件\n\n- [ ] z\n',
 ].join('\n')
@@ -222,6 +224,25 @@ describe('issue_file_batch.run — the arguments around --batch', () => {
 		expect(issue_scout_cli.scout).not.toHaveBeenCalled()
 		expect(exec_gh_api).not.toHaveBeenCalled()
 	})
+})
+
+describe('issue_file_batch.run — preparation', () => {
+	it.each([['--prepare'], ['--route', 'split'], ['--label', 'route:split']])(
+		'creates unpublished children with %j',
+		async (...flags) => {
+			vi.spyOn(split_resolution, 'record_child').mockResolvedValue()
+			const body = VALID_BODY.replace(JUDGEMENT, '- 人の判断: 不要')
+			const directory = batch_of('prepared', [[FIRST, body]])
+
+			await issue_file_batch.run(['--batch', directory, '--label', 'run:lane', ...flags])
+			const created: { body: string; labels: Array<string> } = JSON.parse(
+				exec_gh_api.mock.calls[0]?.[0].body ?? '{}',
+			)
+
+			expect(created.body).toContain('<!-- josh:publication ')
+			expect(created.labels).not.toContain('auto-ok')
+		},
+	)
 
 	it('refuses a directory holding no .md body file', async () => {
 		const directory = batch_of('empty', [])

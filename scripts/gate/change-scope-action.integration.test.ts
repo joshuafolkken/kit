@@ -1,25 +1,40 @@
 import { execFileSync } from 'node:child_process'
-import { readFileSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { package_path } from '#scripts/init/init-paths'
-import { temporary_directory } from '#tools/test/temporary-directory'
-import { expect, it } from 'vitest'
+import { fileURLToPath } from 'node:url'
+import { expect, it, onTestFinished } from 'vitest'
 
-const make_directory = temporary_directory()
-const SCRIPT = package_path('scripts/gate/change-scope-action.ts')
+// cspell:words gpgsign
+const SCRIPT = fileURLToPath(new URL('change-scope-action.ts', import.meta.url))
 const MANIFEST = 'package.json'
 const RELEASED = 'runtime=false\npublish=true\n'
+const ENVIRONMENT = Object.fromEntries(
+	Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')),
+)
 
 function git(root: string, args: Array<string>): string {
 	return execFileSync(
 		'/usr/bin/git',
-		['-c', 'user.name=Test', '-c', 'user.email=test@example.com', ...args],
-		{ cwd: root, encoding: 'utf8' },
+		[
+			'-c',
+			'user.name=Test',
+			'-c',
+			'user.email=test@example.com',
+			'-c',
+			'commit.gpgsign=false',
+			...args,
+		],
+		{ cwd: root, encoding: 'utf8', env: ENVIRONMENT },
 	).trim()
 }
 
 function repository(): string {
-	const root = make_directory('change-scope-action-')
+	// Distributed tests cannot import kit's unpublished tools/test helper; cleanup is registered below.
+	// eslint-disable-next-line no-restricted-syntax
+	const root = mkdtempSync(path.join(tmpdir(), 'change-scope-action-'))
+
+	onTestFinished(() => rmSync(root, { recursive: true, force: true }))
 
 	git(root, ['init', '--quiet'])
 	writeFileSync(path.join(root, MANIFEST), JSON.stringify({ version: '1.0.0', files: ['src'] }))
@@ -35,7 +50,7 @@ function run(root: string, base: string): string {
 	return execFileSync(process.execPath, [SCRIPT], {
 		cwd: root,
 		encoding: 'utf8',
-		env: { ...process.env, CHANGE_BASE: base, CHANGE_HEAD: 'HEAD', GITHUB_OUTPUT: output },
+		env: { ...ENVIRONMENT, CHANGE_BASE: base, CHANGE_HEAD: 'HEAD', GITHUB_OUTPUT: output },
 	})
 }
 
@@ -54,4 +69,20 @@ it('fails instead of skipping checks when the base revision cannot be read', () 
 	const root = repository()
 
 	expect(() => run(root, 'missing-revision')).toThrow()
+})
+
+it.each([
+	['source.ts', 'runtime=true\npublish=false\n'],
+	['README.md', RELEASED],
+	['pnpm-lock.yaml', 'runtime=true\npublish=true\n'],
+])('classifies committed %s through the local action (ac-c3170ba1)', (name, expected) => {
+	const root = repository()
+	const base = git(root, ['rev-parse', 'HEAD'])
+
+	writeFileSync(path.join(root, name), 'changed\n')
+	git(root, ['add', name])
+	git(root, ['commit', '--quiet', '-m', 'Change input'])
+
+	expect(run(root, base)).toBe(expected)
+	expect(readFileSync(path.join(root, 'outputs'), 'utf8')).toBe(expected)
 })

@@ -69,10 +69,14 @@ describe('backlog_drive_split_unit.run — over the size bar', () => {
 		const { ports, requests } = fake([OVER, subject_of(body_of(OVER_LINES), [EPIC_LABEL])])
 
 		await expect(backlog_drive_split_unit.run(ISSUE, ports)).resolves.toBe('split')
+		const argv = JSON.stringify(requests[0]?.argv)
+
 		expect(requests).toHaveLength(1)
-		expect(JSON.stringify(requests[0]?.argv)).toContain(`epic --promote ${ISSUE}`)
-		expect(JSON.stringify(requests[0]?.argv)).not.toContain('run:split')
-		expect(JSON.stringify(requests[0]?.argv)).toContain(`.josh/tmp/split-${ISSUE}-<k>.md`)
+		expect(argv).toContain(`epic --promote ${ISSUE}`)
+		expect(argv).not.toContain('run:split')
+		expect(argv).toContain(`.josh/tmp/split-${ISSUE}-<k>.md`)
+		expect(argv).toContain('issue:plan --planned --no-notify')
+		expect(argv).toContain('issue:file --publish <E>')
 		expect(requests[0]?.log_path).toContain(`-split-${ISSUE}-1.log`)
 	})
 

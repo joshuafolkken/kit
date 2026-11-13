@@ -13,6 +13,7 @@ const scope_schema = z.object({
 const entry_schema = scope_schema.omit({ destination: true }).extend({
 	kind: z.literal(lane_ledger_kind.KIND.STARTUP),
 	at: z.string(),
+	at_ms: z.number().nonnegative().optional(),
 	id: z.string(),
 	parent: z.string().optional(),
 	phase: z.string(),

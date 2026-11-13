@@ -92,6 +92,10 @@ function summarize(entries: ReadonlyArray<StartupEntry>): Array<StartupSummary> 
 		.map((start) => summary(start, groups.get(start.id) ?? []))
 }
 
+function timestamp(row: StartupEntry): number {
+	return row.at_ms ?? Date.parse(row.at)
+}
+
 function before_end(
 	row: StartupEntry,
 	other: StartupEntry,
@@ -99,7 +103,7 @@ function before_end(
 ): boolean {
 	const end = endings.get(other.id)
 
-	return end !== undefined && Date.parse(row.at) < end
+	return end !== undefined && timestamp(row) < end
 }
 
 function overlaps(
@@ -116,7 +120,7 @@ function overlaps(
 // key are concurrent misses, including separate processes; no deduplication or lock is introduced.
 function concurrent_misses(entries: ReadonlyArray<StartupEntry>): Array<StartupEntry> {
 	const fills = entries.filter((row) => row.edge === 'cache' && row.metric === 'fill')
-	const endings = new Map(entries.filter(is_terminal).map((row) => [row.id, Date.parse(row.at)]))
+	const endings = new Map(entries.filter(is_terminal).map((row) => [row.id, timestamp(row)]))
 
 	return fills.filter((row) => fills.some((other) => overlaps(row, other, endings)))
 }

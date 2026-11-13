@@ -5,6 +5,7 @@ import { detached_launch, type LaunchResult } from '#scripts/run/detached-launch
 import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
 import { lane_child_invocation } from './lane-child-invocation'
 import { lane_child_marker } from './lane-child-marker'
+import { lane_dispatch_dependency } from './lane-dispatch-dependency'
 import { lane_dispatch_log } from './lane-dispatch-log'
 import type { LaneInfo } from './lane-registry'
 import { lane_seat_start } from './lane-seat-start'
@@ -25,7 +26,11 @@ const OPENAI_PROVIDER = 'openai'
 type RelaunchResult = LaunchResult | { kind: 'rejected'; note: string }
 type Prepared = Exclude<Awaited<ReturnType<typeof agent_argv.resume_argv>>, { kind: 'rejected' }>
 
-function launch(lane: LaneInfo, built: Prepared, on_note: (note: string) => void): RelaunchResult {
+function launch_ready(
+	lane: LaneInfo,
+	built: Prepared,
+	on_note: (note: string) => void,
+): RelaunchResult {
 	return detached_launch.launch(
 		{
 			argv: built.argv,
@@ -48,6 +53,24 @@ function launch(lane: LaneInfo, built: Prepared, on_note: (note: string) => void
 	)
 }
 
+async function launch(
+	lane: LaneInfo,
+	built: Prepared,
+	on_note: (note: string) => void,
+): Promise<RelaunchResult> {
+	const wait = await lane_dispatch_dependency.check(lane.issue)
+
+	if (wait !== undefined) {
+		await lane_dispatch_dependency.defer(lane.issue)
+
+		return { kind: 'rejected', note: wait.reason }
+	}
+
+	await lane_dispatch_dependency.begin(lane.issue)
+
+	return launch_ready(lane, built, on_note)
+}
+
 async function relaunch(
 	lane: LaneInfo,
 	invocation: string,
@@ -62,7 +85,7 @@ async function relaunch(
 		})
 		if (built.kind === 'rejected') return built
 
-		return await lane_seat_start.start(lane, async (seated) => launch(seated, built, on_note))
+		return await lane_seat_start.start(lane, async (seated) => await launch(seated, built, on_note))
 	} catch (error) {
 		return { kind: 'failed', note: error_text.message_of(error) }
 	}

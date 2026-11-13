@@ -3,6 +3,7 @@ import { issue_label_schema } from '#scripts/git/git-schemas'
 import { parse_json_object_or_undefined } from '#scripts/git/parse-json-array'
 import { issue_auto_ok, type AutoOkDecision } from '#scripts/issue/issue-auto-ok'
 import { AUTO_OK_LABEL, has_label_name } from '#scripts/issue/issue-labels'
+import { issue_publication_state } from '#scripts/issue/issue-publication-state'
 import { issue_run_verdict, type RunLabelFlags } from '#scripts/issue/issue-run-verdict'
 import { session_cite } from '#scripts/issue/session-cite'
 import { z } from 'zod'
@@ -116,6 +117,7 @@ async function apply(
 	const read = await read_issue(issue)
 
 	if (read === undefined) return refused(issue, UNREADABLE)
+	if (issue_publication_state.is_pending(read.body)) return refused(issue, 'publication is pending')
 
 	const settled = settled_of(read)
 

@@ -108,6 +108,14 @@ describe('generate_playwright_config - CI detection helper', () => {
 	})
 })
 
+it.each([
+	'scripts/gate/change-scope-action.integration.test.ts',
+	'scripts/gate/path-glob.test.ts',
+	'scripts/gate/toolchain-inputs.consumer.test.ts',
+])('distributes the consumer regression test %s', (file) => {
+	expect(init_logic.get_ai_copy_files()).toContain(file)
+})
+
 describe('get_ai_copy_files - AI and community files', () => {
 	it('distributes the dependency-free action used by Sonar classification', () => {
 		expect(init_logic.get_ai_copy_files()).toContain('.github/actions/change-scope/action.yml')

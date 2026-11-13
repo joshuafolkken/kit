@@ -29,6 +29,15 @@ async function measured<T>(run: () => Promise<T>): Promise<T> {
 }
 
 describe('run_startup.phase', () => {
+	it('persists fractional epoch timestamps for starts, metrics and endings', async () => {
+		const instant = 0.2
+
+		vi.spyOn(performance, 'now').mockReturnValue(instant)
+		await measured(async () => run_startup.metric('cache', 'fill', 'same'))
+		expect(rows.map((row) => row.edge)).toEqual(['start', 'cache', 'done'])
+		expect(rows.every((row) => row.at_ms === performance.timeOrigin + instant)).toBe(true)
+	})
+
 	it('keeps nested spans and propagated identities on parallel issues', async () => {
 		await measured(
 			async () =>
@@ -132,10 +141,17 @@ describe('startup request and cache accounting', () => {
 
 describe('startup concurrent cache misses', () => {
 	it('observes concurrent misses without coalescing computations', async () => {
-		vi.useFakeTimers({ now: 0 })
+		let clock = 0
+
+		vi.spyOn(performance, 'now').mockImplementation(() => {
+			const instant = clock
+
+			clock += 1
+
+			return instant
+		})
 		const compute = vi.fn(async () => {
 			await Promise.resolve()
-			vi.setSystemTime(Date.now() + 1)
 
 			return 'value'
 		})

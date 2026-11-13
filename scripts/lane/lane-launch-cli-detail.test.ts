@@ -91,6 +91,13 @@ describe('lane_launch_cli.launch_lane — the detail a refused lane:open carries
 })
 
 describe('lane_launch_cli.launch_lane — the detail a step after the open carries', () => {
+	it('returns a retryable wait when dispatch finds a new blocker', async () => {
+		stub({ open: OPENED, dispatch: { code: 75, out: '', err: 'unfinished blocker' } })
+		expect(await lane_launch_cli.launch_lane({ issue: ISSUE, stash: undefined })).toEqual({
+			kind: 'waiting',
+		})
+	})
+
 	it('keeps a refused stash pop’s stderr on the failed outcome', async () => {
 		stub({ open: OPENED, pop: { code: FAILED, out: 'ignored', err: 'no-match' } })
 

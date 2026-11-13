@@ -43,10 +43,13 @@ vi.mock('#scripts/run/detached-launch', () => ({
 	detached_launch: { launch_attached: launch_mock },
 }))
 vi.mock('./lane-parked', () => ({ lane_parked: { is_parked: parked_mock } }))
-vi.mock(import('node:fs'), async (import_original) => ({
-	...(await import_original()),
-	existsSync: exists_mock,
-}))
+vi.mock(import('node:fs'), async (import_original) => {
+	const original = await import_original()
+
+	exists_mock.mockImplementation(original.existsSync)
+
+	return { ...original, existsSync: exists_mock }
+})
 
 beforeEach(() => {
 	argv_mock.mockReset().mockReturnValue({

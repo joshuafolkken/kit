@@ -1,4 +1,5 @@
 import { vi } from 'vitest'
+import { lane_dispatch_dependency } from './lane-dispatch-dependency'
 import { lane_reap_settle } from './lane-reap-settle'
 import { lane_residents } from './lane-residents'
 import { lane_seat_ownership } from './lane-seat-ownership'
@@ -12,6 +13,7 @@ function mock_ownership(): void {
 }
 
 function mock_start(): void {
+	vi.spyOn(lane_dispatch_dependency, 'check').mockResolvedValue(undefined)
 	vi.spyOn(lane_seat_start, 'start').mockImplementation(
 		async (seated, action) => await action(seated),
 	)

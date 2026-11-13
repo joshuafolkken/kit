@@ -60,6 +60,23 @@ describe('startup durable ledger', () => {
 	})
 })
 
+describe('startup precise overlap', () => {
+	it('detects sub-millisecond overlap across attempts and excludes touching fills', () => {
+		const first = { ...START, edge: 'cache' as const, metric: 'fill', key: 'same', at_ms: 0.2 }
+		const second = { ...first, id: 'second', attempt: 'other', at_ms: 1.2 }
+		const done = { ...START, edge: 'done' as const, at_ms: 1.8 }
+		const ending = { ...done, id: 'second', attempt: 'other', at_ms: 3.3 }
+
+		expect(run_startup_store.concurrent_misses([first, second, done, ending])).toEqual([
+			first,
+			second,
+		])
+		expect(
+			run_startup_store.concurrent_misses([first, { ...second, at_ms: done.at_ms }, done, ending]),
+		).toEqual([])
+	})
+})
+
 describe('startup summaries', () => {
 	it('excludes sequential fills sharing a millisecond and includes only positive overlap', () => {
 		const first = { ...START, edge: 'cache' as const, metric: 'fill', key: 'same' }

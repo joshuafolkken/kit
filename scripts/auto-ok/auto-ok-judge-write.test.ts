@@ -1,4 +1,5 @@
 import { AUTO_OK_LABEL, DEFERRED_LABEL, RUN_LANE_LABEL } from '#scripts/issue/issue-labels'
+import { issue_publication_state } from '#scripts/issue/issue-publication-state'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { FAILURE_EXIT_CODE, SUCCESS_EXIT_CODE } from './auto-ok-fixture'
@@ -31,6 +32,15 @@ beforeEach(() => {
 })
 
 describe('auto_ok_judge_write.apply', () => {
+	it('refuses preparation discovered after the judgement listing without publishing approval', async () => {
+		const body = issue_publication_state.prepare('Child plan', [AUTO_OK_LABEL])
+
+		read_issue.mockResolvedValueOnce(JSON.stringify({ labels: [], body }))
+		expect(await auto_ok_judge_write.apply(ISSUE, RUN_LANE_LABEL)).toBe(FAILURE_EXIT_CODE)
+		expect(apply_label).not.toHaveBeenCalled()
+		expect(post_comment).not.toHaveBeenCalled()
+	})
+
 	it('applies the run label before auto-ok and records the judgement without a board note', async () => {
 		read_issue.mockResolvedValueOnce(labels_and_body([]))
 

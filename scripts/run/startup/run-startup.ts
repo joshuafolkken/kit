@@ -28,6 +28,7 @@ function entry(current: StartupScope, name: string, edge: StartupEntry['edge']):
 		...current,
 		kind: lane_ledger_kind.KIND.STARTUP,
 		at: new Date().toISOString(),
+		at_ms: performance.timeOrigin + performance.now(),
 		id: current.span ?? randomUUID(),
 		phase: name,
 		edge,
