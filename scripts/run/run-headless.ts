@@ -2,6 +2,7 @@ import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_reap } from '#scripts/lane/lane-reap'
 import { lane_registry } from '#scripts/lane/lane-registry'
 import { run_carry, type CarryRead, type RunCarry } from '#scripts/run/carry/run-carry'
+import { run_carry_session } from '#scripts/run/carry/run-carry-session'
 import { run_headless_keys } from '#scripts/run/run-headless-keys'
 
 // The headless `backlogrun` parent. `run:wake` starts a cut's successor as
@@ -100,6 +101,8 @@ async function current_carry(): Promise<RunCarry | undefined> {
 // owner is `--owner "$PPID"`, the session process, which is an ancestor of every hook it runs; a
 // record that declared no owner proves no one is its parent.
 function is_owned_here(carry: RunCarry, ancestry: () => ReadonlySet<number>): boolean {
+	if (carry.owner_session !== undefined) return carry.owner_session === run_carry_session.own()
+
 	return carry.owner_pid !== undefined && ancestry().has(carry.owner_pid)
 }
 

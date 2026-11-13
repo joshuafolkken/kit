@@ -211,6 +211,7 @@ describe('run_wake — launches counted apart from arrivals', () => {
 		expect(run_wake.count_claim(woken).woke_at).toBeUndefined()
 		expect(run_wake.count_claim(woken).attempts).toBeUndefined()
 		expect(run_wake.count_claim(woken).woke).toBe(1)
+		expect(run_wake.count_claim(woken).launch_at).toBe(NOW.toISOString())
 	})
 
 	// A record with no wake outstanding is an ordinary live session working through its budget, which
@@ -314,6 +315,23 @@ describe('run_wake.claim — the wake state a restart keeps', () => {
 		})
 
 		expect(run_wake.claim(scratch.target, INVOCATION, NOW)?.woke).toBe(0)
+	})
+})
+
+describe('run_wake.claim — launch evidence and removed records', () => {
+	it('retains the launch evidence across claim and supervisor restart', () => {
+		const launched = run_wake.count_wake(run_wake.fresh_wake(INVOCATION, NOW), NOW, 99, SID)
+
+		run_wake.write_wake(scratch.target, {
+			...run_wake.count_claim(launched),
+			pid: 0,
+			process_start: DEAD_START,
+		})
+
+		const restarted = run_wake.claim(scratch.target, INVOCATION, NOW)
+
+		expect(restarted?.woke_at).toBeUndefined()
+		expect(restarted?.launch_at).toBe(NOW.toISOString())
 	})
 
 	// `--stop` removes the record; a loop pass still in flight must not write it back.

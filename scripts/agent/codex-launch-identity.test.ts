@@ -75,6 +75,21 @@ describe('Codex launch identity refusal', () => {
 })
 
 describe('Codex launch identity isolation', () => {
+	it('passes the explicit scheduler identity and headless mark to Codex shells', () => {
+		const { scheduler } = agent_role_profile.OPENAI_PROFILES
+		const launch = {
+			...request('/work/kit'),
+			profile: scheduler,
+			env: { JOSH_CARRY_SESSION: 'generation', JOSH_RUN_HEADLESS: '1', PRIVATE: 'secret' },
+		}
+		const args = codex_launch_identity.arguments_for(launch)
+
+		expect(args).toContain('shell_environment_policy.set.JOSH_CARRY_SESSION="generation"')
+		expect(args).toContain('shell_environment_policy.set.JOSH_RUN_HEADLESS="1"')
+		expect(args.join(' ')).not.toContain('PRIVATE')
+		expect(args.at(-1)).toBe(PROMPT)
+	})
+
 	it('does not forward arbitrary launcher environment or change core inheritance', () => {
 		const launch = request()
 
