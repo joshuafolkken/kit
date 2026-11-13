@@ -1,0 +1,7 @@
+{
+	"reason": "Observation waits require 158 added code lines for evidence parsing, fresh trusted-comment reads and shared selection/launch/board integration; the regression fixture uses the existing Issue heading source.",
+	"date": "2026-11-13",
+	"growth": {
+		"scripts.code_lines": 158
+	}
+}

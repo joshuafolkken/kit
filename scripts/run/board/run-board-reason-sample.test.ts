@@ -1,5 +1,7 @@
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import { RUN_LANE_LABEL } from '#scripts/issue/issue-labels'
+import { issue_observation_fixture as observation } from '#scripts/issue/issue-observation-fixture'
+import { issue_observation_gate } from '#scripts/issue/issue-observation-gate'
 import { issue_sample_gate } from '#scripts/issue/issue-sample-gate'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_labels } from './run-board-labels'
@@ -16,14 +18,14 @@ const NOW_MS = Date.parse('2026-10-20T00:00:00.000Z')
 const { WAIT_ICONS } = run_board_labels
 const BODY = `## 背景\n\n- 実施可能条件: #${String(PR)} のマージ後 10 マージ\n`
 
-function row(): EpicChild {
+function row(body = BODY): EpicChild {
 	return {
 		number: ROW,
 		repo: REPO,
 		state: 'OPEN',
 		labels: [RUN_LANE_LABEL],
 		blocked_by: [],
-		body: BODY,
+		body,
 	}
 }
 
@@ -36,8 +38,8 @@ function plan_of(children: Array<EpicChild>): BoardPlan {
 	}
 }
 
-function reason(): RowReason | undefined {
-	const children = [row()]
+function reason(body = BODY): RowReason | undefined {
+	const children = [row(body)]
 	const read = {
 		plan: plan_of(children),
 		statuses: new Map(),
@@ -47,11 +49,22 @@ function reason(): RowReason | undefined {
 		now_ms: NOW_MS,
 	}
 
-	return run_board_reason.reader(read)(row(), [])
+	return run_board_reason.reader(read)(row(body), [])
 }
 
 afterEach(() => {
 	vi.restoreAllMocks()
+	issue_observation_gate.reset()
+})
+
+it('shows unmet observation requirements and the evidence needed to resume', () => {
+	issue_observation_gate.record(observation.URL, observation.comment(['same-head']))
+	expect(reason(observation.BODY)).toStrictEqual({
+		icon: WAIT_ICONS.not_before,
+		value: 'evidence',
+		tail: 'observation evidence required: multi-slot, comparison, cost',
+		evidence_url: observation.URL,
+	})
 })
 
 describe('run_board_reason.reader — a row waiting on its declared samples', () => {

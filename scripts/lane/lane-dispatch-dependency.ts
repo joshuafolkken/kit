@@ -3,7 +3,9 @@ import { epic_cross_repo } from '#scripts/epic/epic-cross-repo'
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import { epic_live } from '#scripts/epic/epic-live'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { issue_not_before } from '#scripts/issue/issue-not-before'
 import { issue_publication_state } from '#scripts/issue/issue-publication-state'
+import { issue_sample_prime } from '#scripts/issue/issue-sample-prime'
 import { session_cite } from '#scripts/issue/session-cite'
 import { error_text } from '#scripts/lib/error-message'
 import { run_label } from '#scripts/run/run-label'
@@ -31,12 +33,20 @@ async function unresolved(child: EpicChild): Promise<Array<EpicChild>> {
 	)
 }
 
+async function start_wait(child: EpicChild): Promise<string | undefined> {
+	if (issue_publication_state.is_pending(child.body)) return 'publication is pending'
+	if (child.state !== 'OPEN') return 'issue is no longer open'
+	await issue_sample_prime.prime([child.body])
+
+	return issue_not_before.waiting_reason(child.body)
+}
+
 async function reason_of(issue: string): Promise<string | undefined> {
 	const repo = await git_gh_command.repo_get_name_with_owner()
 	if (repo === undefined) throw new Error('Cannot resolve launch repository')
 	const child = await epic_live.child(Number(issue), repo)
-	if (issue_publication_state.is_pending(child.body)) return 'publication is pending'
-	if (child.state !== 'OPEN') return 'issue is no longer open'
+	const wait = await start_wait(child)
+	if (wait !== undefined) return wait
 	const blockers = await unresolved(child)
 	if (blockers.length === 0) return undefined
 
