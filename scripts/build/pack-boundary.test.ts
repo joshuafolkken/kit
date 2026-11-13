@@ -67,6 +67,7 @@ const PATH_LAUNCHED_ENTRIES = [
 	'scripts/lane/openai-lane-supervisor-entry.ts',
 	'scripts/lint/eslint-memory.js',
 	'scripts/lint/eslint-warm-cli.ts',
+	'scripts/registry-migration/migrate-cli.ts',
 	'scripts/run/board/run-board-gather-worker.ts',
 	'scripts/run/run-label-main.ts',
 ]
@@ -81,6 +82,7 @@ const SHIPPED_UNREACHABLE = new Set([
 	'scripts/build/build-commands.ts',
 	'scripts/build/build-hooks.ts',
 	'scripts/build/build-library.ts',
+	'scripts/build/build-migration.ts',
 	'scripts/build/hook-bundle-stamp.ts',
 	'scripts/build/build.ts',
 	'scripts/build/source-location.ts',

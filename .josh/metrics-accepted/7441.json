@@ -1,0 +1,8 @@
+{
+	"reason": "単独 npm 移行入口の配布・公開確認・配布物照合・原子的反映を実装する。レビュー修正では外部 lockfileDir の staging 固定と CLI run の直接検証を追加し、実 pnpm の回帰テストで dry-run と失敗時の外部 lock 保持を確認した。",
+	"date": "2026-11-13",
+	"growth": {
+		"scripts.code_lines": 498,
+		"prose.long_paragraphs": 1
+	}
+}

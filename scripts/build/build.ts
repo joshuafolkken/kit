@@ -6,6 +6,7 @@ import { build_claude_md } from './build-claude-md'
 import { build_commands } from './build-commands'
 import { build_hooks, OUT_DIR as HOOKS_OUT_DIR } from './build-hooks'
 import { build_library, PUBLIC_LIBRARIES } from './build-library'
+import { build_migration } from './build-migration'
 
 interface BuildStep {
 	name: string
@@ -44,6 +45,7 @@ function build_steps(): ReadonlyArray<BuildStep> {
 		{ name: 'bin', run: bin_step },
 		{ name: 'hooks', run: hooks_step },
 		{ name: 'commands', run: async () => await build_commands() },
+		{ name: 'migration', run: async () => await build_migration() },
 		...PUBLIC_LIBRARIES.map((name) => ({ name, run: async () => await library_step(name) })),
 		{ name: 'claude-md', run: claude_md_step },
 	]
