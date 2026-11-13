@@ -181,6 +181,7 @@ async function read_job_log(job: Job): Promise<string> {
 
 function is_download_failure(log: string): boolean {
 	const plain_log = stripVTControlCharacters(log)
+	if (followup_failed_tests.read_failed_tests(plain_log).import_failure !== undefined) return false
 
 	return DOWNLOAD_ERRORS.some((error) => error.test(plain_log))
 }
@@ -195,10 +196,9 @@ async function judge_job(job: Job, changed: ReadonlySet<string>): Promise<Judged
 	const log = await read_job_log(job)
 	if (is_download_failure(log)) return { job, verdict: RERUN_VERDICT }
 	if (!is_first_attempt(job)) return { job, verdict: UNNAMED_VERDICT }
-
 	const tests = followup_failed_tests.read_failed_tests(log)
 
-	return { job, verdict: followup_failed_tests.verdict_of(tests, changed), tests }
+	return { job, verdict: await followup_failed_tests.read_verdict(tests, changed), tests }
 }
 
 // A job red with no test named qualifies as a gate that failed though every job it needs succeeded, and

@@ -1,6 +1,8 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec, type GhApiRequest } from '#scripts/gh/git-gh-exec'
+import { import_graph, type ImportGraph } from '#scripts/lint/import-graph'
 import { vi } from 'vitest'
+import { followup_job_needs } from './followup-job-needs'
 
 // One picture of the GitHub Actions world `followup_job_rerun` reads — the checks rollup, the jobs, the
 // runs and a job's log — answered from the mocked `git_gh_command` and `git_gh_exec` of the test that
@@ -13,9 +15,47 @@ const ACTIONS = 'repos/{owner}/{repo}/actions/'
 const SUCCESS = 'success'
 const PASSED_STEPS = [SUCCESS, 'skipped', SUCCESS]
 const WORKFLOW_PATH = '.github/workflows/ci.yml'
+const INDIRECT_TEST = 'scripts/sync/sync-directory-guards.test.ts'
+const INDIRECT_CHANGE = 'scripts/run/startup/run-startup-store.ts'
+// Reduced from #7422's dispatch line 932 and ship lines 483–510: the direct subject was unchanged.
+const IMPORT_DIAGNOSTIC =
+	'Error: [vitest] No "constants" export is defined on the "node:fs" mock. Did you forget to return it from "vi.mock"?'
+const IMPORT_LOG = [
+	` FAIL  |isolated| ${INDIRECT_TEST} [ ${INDIRECT_TEST} ]`,
+	IMPORT_DIAGNOSTIC,
+	' ❯ scripts/lane/lane-ledger-write.ts:71:53',
+	` ❯ ${INDIRECT_CHANGE}:2:1`,
+	' Test Files  1 failed (1)',
+	'      Tests  no tests',
+]
+	.map((line) => `2026-11-13T06:20:16.000Z ${line}`)
+	.join('\n')
 
 const fetch_checks = vi.mocked(git_gh_command.pr_get_checks_snapshot)
 const api = vi.mocked(git_gh_exec.exec_gh_api)
+
+// A closed test with no runtime input besides itself; individual tests replace this proof.
+function answer_closed_inputs(): void {
+	const graph: ImportGraph = {
+		test_inputs: (file) => [file],
+		closure: () => [],
+		closure_hash: () => '',
+		imports: () => [],
+		importers: () => new Set(),
+		runtime_importers: () => new Set(),
+		strings: () => [],
+	}
+
+	vi.spyOn(import_graph, 'create').mockResolvedValue(graph)
+}
+
+function answer_unit_needs(): void {
+	vi.mocked(followup_job_needs.read_graph).mockResolvedValue(
+		followup_job_needs.parse_graph(
+			'jobs:\n  unit:\n    name: Unit Tests\n  checks:\n    name: Checks\n    needs: unit\n',
+		),
+	)
+}
 
 interface JobInput {
 	id: number
@@ -37,6 +77,10 @@ function job(input: JobInput): object {
 	const { steps = PASSED_STEPS, run_id = RUN_ID, ...rest } = input
 
 	return { ...rest, run_id, steps: steps.map((conclusion) => ({ conclusion })) }
+}
+
+function failed_checks(id: number): object {
+	return job({ id, name: 'Checks', conclusion: 'failure', steps: ['success', 'failure'] })
 }
 
 function as_check(item: object): object {
@@ -98,9 +142,23 @@ function rerun_paths(): Array<string> {
 const followup_job_rerun_fixture = {
 	answer_actions,
 	answer_checks,
+	answer_closed_inputs,
+	answer_unit_needs,
+	failed_checks,
 	as_check,
 	job,
 	rerun_paths,
 }
 
-export { ACTIONS, followup_job_rerun_fixture, RUN_ID, SUCCESS, UNIT_ID, WORKFLOW_PATH }
+export {
+	ACTIONS,
+	followup_job_rerun_fixture,
+	RUN_ID,
+	SUCCESS,
+	UNIT_ID,
+	WORKFLOW_PATH,
+	INDIRECT_TEST,
+	INDIRECT_CHANGE,
+	IMPORT_DIAGNOSTIC,
+	IMPORT_LOG,
+}

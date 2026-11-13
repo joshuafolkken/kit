@@ -3,6 +3,10 @@ import { followup_job_rerun } from './followup-job-rerun'
 import {
 	ACTIONS,
 	followup_job_rerun_fixture,
+	IMPORT_DIAGNOSTIC,
+	IMPORT_LOG,
+	INDIRECT_CHANGE,
+	INDIRECT_TEST,
 	RUN_ID,
 	SUCCESS,
 	UNIT_ID,
@@ -112,6 +116,8 @@ beforeEach(() => {
 	comment.mockReset().mockResolvedValue('https://comment')
 	read_changed.mockReset().mockResolvedValue(['scripts/followup/followup-job-rerun.ts'])
 	merge_first.mockReset().mockResolvedValue(false)
+	followup_job_rerun_fixture.answer_closed_inputs()
+	followup_job_rerun_fixture.answer_unit_needs()
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 })
 
@@ -132,6 +138,34 @@ describe('rerun_failed_jobs — a run whose only failures stopped after every st
 })
 
 describe('rerun_failed_jobs — a failure of the change itself is never rerun', () => {
+	it.each([
+		['the archived import failure', IMPORT_LOG],
+		[
+			'a prior download failure',
+			`${IMPORT_LOG}\n2026-11-13T06:20:16.000Z ##[error]Failed to download archive`,
+		],
+	])(
+		'stops #7422 with repair guidance instead of rerunning Unit Tests and Checks: %s',
+		async (_label, log) => {
+			const unit = failed_unit()
+			const checks = followup_job_rerun_fixture.failed_checks(DETECT_E2E_ID)
+
+			read_changed.mockResolvedValue([INDIRECT_CHANGE])
+			answer_checks([as_check(unit), as_check(checks)])
+			answer_actions({ jobs: [unit, checks], log })
+
+			await expect_no_rerun()
+
+			expect(console.info).toHaveBeenCalledWith(expect.stringContaining(IMPORT_DIAGNOSTIC))
+			expect(console.info).toHaveBeenCalledWith(
+				expect.stringContaining(`pnpm josh test:unit ${INDIRECT_TEST}`),
+			)
+			expect(assess).not.toHaveBeenCalled()
+		},
+	)
+})
+
+describe('rerun_failed_jobs — failures requiring repair', () => {
 	it.each([
 		['a failed step', [SUCCESS, 'failure']],
 		['a cancelled step', [SUCCESS, CANCELLED]],
