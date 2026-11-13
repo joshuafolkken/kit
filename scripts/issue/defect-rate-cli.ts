@@ -26,10 +26,11 @@ async function measure_uncached(
 	repo: string,
 	days: number,
 	since: string,
+	now_ms: number,
 ): Promise<DefectRate | undefined> {
 	const [filed, completed] = await Promise.all([
-		issue_search.search(defect_rate.filed_query(repo, since)),
-		issue_search.search(defect_rate.completed_query(repo, since)),
+		issue_search.search_complete(defect_rate.filed_query(repo, since), now_ms),
+		issue_search.search_complete(defect_rate.completed_query(repo, since), now_ms),
 	])
 
 	if (filed === undefined || completed === undefined) return undefined
@@ -60,7 +61,7 @@ async function measure_window(
 		async () =>
 			await shared_cache.remember(
 				{ slot: RATE_CACHE, key, schema: defect_rate_schema },
-				async () => await measure_uncached(repo, days, since),
+				async () => await measure_uncached(repo, days, since, now_ms),
 				now_ms,
 			),
 		{ edge_of: (value) => (value === undefined ? 'failed' : 'done') },

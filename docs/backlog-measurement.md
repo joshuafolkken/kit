@@ -140,6 +140,10 @@ kit checkout で `pnpm exec tsx tools/backlog/backlog-measure.ts <input.json>` �
 
 ## 同じ条件での実通信標本
 
+不具合率の検索は、1000件超のときだけ元の `created:>=` / `closed:>=` 期間を秒単位の互いに重ならない区間へ分割する。最後の区間には上限を設けず、元の母集団を保つ。各区間は100件/page、最大1000件を取得し、一つの元検索あたり最大15区間（分割前の検索を含む）を読む。1000件超の区間では最初のpageだけを読み、再試行はしない。HTTP失敗は欠測、不完全応答・件数不一致・重複・分割予算切れ・秒単位でも上限超過は `is_capped: true` のまま正常群から除外する。
+
+再測定には保存済み入力のコピーを新しい隔離入口で使い、候補・依存・資源条件・元query・開始日を保持する。分割の基準日は集計時刻のUTC日付で、同じUTC日内は固定される。cold/warm間で基準日を揃え、各区間の完全一致endpointとpageを `live_get` に追加する。許可リストにない区間は従来どおり拒否されるため、その試行を正常標本には採用しない。必要な検索API予算が回復し、全区間・全pageが成功し、元検索の件数と重複のない和集合が一致した場合だけ正常な実通信反復へ戻れる。現行live runの入力・状態・起動には触れず、正常判定と外部書込み拒否は維持する。性能比較と削減秒数の認定は #7423 で行う。秒単位の期間指定は [GitHubの検索仕様](https://docs.github.com/en/search-github/searching-on-github/searching-issues-and-pull-requests#search-by-when-an-issue-or-pull-request-was-created-or-last-updated) に従う。
+
 候補901〜906とその依存、開始条件、空き枠、検索query・日付・pageを固定した元入力を保持する。候補一覧・依存などをreplayし、計測対象の不具合率GETだけを実通信にすれば、候補集合を変えずに対象読取を測れる。ただしGitHub上の検索母集団は固定できず、同じqueryでも後続の更新や取得上限で不完全になり得る。正常系を採用するには対象の全検索が成功し、`is_capped: false` であり、coldの独立試行とwarmの事前実行・全反復が完全であることを毎回確認する。全replay群は実通信baselineへ混ぜない。
 
 2026-11-13、#7423 の保存済み `live-one-cold` / `live-one-warm` / `live-multiple-cold` / `live-multiple-warm` 入力をそのまま隔離入口で再実行した。coldは各3回、warmは事前実行と各5回。検索上限またはHTTP403による欠測と、そのwarm由来の継承により、4群とも正常系 **n=0**。実GETが成功した試行も検索上限を理由に除外した。許可したGETの取得条件を満たせる証拠は得られておらず、性能比較は未成立である。元入力と成果物はローカルのgit共通ディレクトリ配下 `josh/measurements/7460-completeness/` に保持する。本番ラン操作や検索範囲の変更で代用しない。

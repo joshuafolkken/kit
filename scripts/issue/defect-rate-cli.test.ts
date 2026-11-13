@@ -16,6 +16,7 @@ const ENHANCEMENT_ITEM = { body: '', labels: [{ name: 'enhancement' }] }
 const TWO_SEARCHES = 2
 const THREE_PAGES_TOTAL = 201
 const OVER_CEILING = 5000
+const MAX_WINDOW_READS = 15
 const CEILING_PAGES = 10
 const WITHIN_TTL_MS = 60_000
 const RATE_LIMITED = 'rate limited'
@@ -146,7 +147,7 @@ describe('defect_rate_cli.measure_window — the search pages', () => {
 		const api = stub_search(filed, page([ENHANCEMENT_ITEM]))
 
 		expect(await measure()).toMatchObject({ is_capped: true })
-		expect(requested_pages(api, 'created')).toHaveLength(CEILING_PAGES)
+		expect(requested_pages(api, 'created')).toHaveLength(MAX_WINDOW_READS)
 	})
 
 	it('answers nothing rather than measuring part of a search when a later page cannot be read', async () => {
