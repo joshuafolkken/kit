@@ -1,0 +1,7 @@
+{
+	"reason": "Capture the finder repository before filing, fail closed when unresolved, and explicitly scope backlink writes and recovery commands for #7431.",
+	"date": "2026-11-13",
+	"growth": {
+		"scripts.code_lines": 11
+	}
+}

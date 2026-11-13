@@ -6,7 +6,7 @@ import { stash_push_cli } from '#scripts/git/stash/stash-push-cli'
 import { cli_body_repository } from '#scripts/josh/cli-body-repository-fixture'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { temporary_directory } from '#tools/test/temporary-directory'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_file_cli } from './issue-file-cli'
 import { session_cite } from './session-cite'
 import { upstream_interrupt_cli } from './upstream-interrupt-cli'
@@ -17,6 +17,7 @@ const FINDER = '5546'
 const TITLE = 'Root cause title'
 const FIRST_PARTY_REPO = 'joshuafolkken/kit'
 const THIRD_PARTY_REPO = 'sveltejs/kit'
+const CALLING_REPO = 'joshuafolkken/app-kit'
 const FILED_URL = 'https://github.com/joshuafolkken/kit/issues/9001'
 const COMMENT_URL = 'https://github.com/joshuafolkken/kit/issues/5546#issuecomment-1'
 const DRAFT = 'Minimal reproduction and expected result.'
@@ -73,10 +74,50 @@ beforeEach(() => {
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
 	vi.spyOn(repo_party, 'current_owner').mockReturnValue('joshuafolkken')
+	vi.spyOn(git_gh_command, 'repo_get_name_with_owner').mockResolvedValue(FIRST_PARTY_REPO)
 	vi.spyOn(stash_push_cli, 'set_aside').mockResolvedValue('stashed')
 	vi.spyOn(issue_file_cli, 'file_issue').mockResolvedValue(FILED_URL)
 	vi.spyOn(git_gh_command, 'issue_comment').mockResolvedValue(COMMENT_URL)
 	vi.spyOn(telegram_notify, 'confirm').mockResolvedValue(true)
+})
+
+afterEach(() => {
+	vi.unstubAllEnvs()
+})
+
+describe('josh upstream:interrupt finder repository', () => {
+	it('backlinks app-kit despite GH_REPO changing during filing (ac-b468af78) (ac-8a763cb7) (ac-95ce8a7d)', async () => {
+		vi.stubEnv('GH_REPO', CALLING_REPO)
+		vi.mocked(git_gh_command.repo_get_name_with_owner).mockResolvedValue(CALLING_REPO)
+		vi.mocked(issue_file_cli.file_issue).mockImplementation(async () => {
+			vi.stubEnv('GH_REPO', FIRST_PARTY_REPO)
+
+			return FILED_URL
+		})
+
+		const code = await upstream_interrupt_cli.run(argv_for(FIRST_PARTY_REPO))
+
+		expect(code).toBe(SUCCESS_EXIT_CODE)
+		expect(process.env['GH_REPO']).toBe(FIRST_PARTY_REPO)
+		expect(git_gh_command.issue_comment).toHaveBeenCalledExactlyOnceWith(
+			FINDER,
+			posted_body(),
+			CALLING_REPO,
+		)
+		expect(call_order(vi.mocked(git_gh_command.repo_get_name_with_owner))).toBeLessThan(
+			call_order(vi.mocked(issue_file_cli.file_issue)),
+		)
+	})
+
+	it('stops before stash or writing when the finder repository is unresolved', async () => {
+		vi.mocked(git_gh_command.repo_get_name_with_owner).mockResolvedValue(undefined)
+
+		expect(await upstream_interrupt_cli.run(argv_for(FIRST_PARTY_REPO))).toBe(FAILURE_EXIT_CODE)
+		expect(stash_push_cli.set_aside).not.toHaveBeenCalled()
+		expect(issue_file_cli.file_issue).not.toHaveBeenCalled()
+		expect(git_gh_command.issue_comment).not.toHaveBeenCalled()
+		expect(stderr_text()).toContain('finder repository could not be resolved')
+	})
 })
 
 describe('josh upstream:interrupt to a first-party repository', () => {
@@ -126,7 +167,11 @@ describe('josh upstream:interrupt filing and backlink', () => {
 	it('backlinks the filed reference under ## Upstream issues on the finder', async () => {
 		await upstream_interrupt_cli.run(argv_for(FIRST_PARTY_REPO))
 
-		expect(vi.mocked(git_gh_command.issue_comment)).toHaveBeenCalledWith(FINDER, posted_body())
+		expect(vi.mocked(git_gh_command.issue_comment)).toHaveBeenCalledWith(
+			FINDER,
+			posted_body(),
+			FIRST_PARTY_REPO,
+		)
 		expect(posted_body()).toContain('## Upstream issues\n\n- joshuafolkken/kit#9001')
 		expect(posted_body()).toContain(`pnpm josh stash:pop "${STASH_MESSAGE}"`)
 	})
@@ -201,13 +246,14 @@ describe('josh upstream:interrupt on a failing step', () => {
 
 	it('sends no confirmation when the backlink fails, and prints the comment to re-run', async () => {
 		vi.mocked(git_gh_command.issue_comment).mockRejectedValue(new Error('gh failed'))
+		vi.mocked(git_gh_command.repo_get_name_with_owner).mockResolvedValue(CALLING_REPO)
 
 		const code = await upstream_interrupt_cli.run(argv_for(FIRST_PARTY_REPO))
 
 		expect(code).toBe(FAILURE_EXIT_CODE)
 		expect(vi.mocked(telegram_notify.confirm)).not.toHaveBeenCalled()
 		expect(stderr_text()).toMatch(
-			/stopped at comment: gh failed — re-run: `pnpm josh issue:comment 5546 --body-file \S+`/u,
+			/stopped at comment: gh failed — re-run: `GH_REPO=joshuafolkken\/app-kit pnpm josh issue:comment 5546 --body-file \S+`/u,
 		)
 	})
 })

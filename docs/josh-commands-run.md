@@ -390,6 +390,10 @@ pnpm josh upstream:interrupt 2304 "<root-cause title>" --repo joshuafolkken/kit 
 
 <!-- /usage -->
 
+`--blocks-finder` は呼び出し元と起票先が同じリポジトリの場合だけ finder の依存関係を記録する。別リポジトリ間の依存登録は未対応で、警告し、依存関係や finder のラベルを変更しない。
+
+finder のリポジトリは起票前に確定し、バックリンクとコメント失敗時の再実行先に明示する。起票で現在のリポジトリ設定が変わっても投稿先は変わらない。解決できなければ stash や書き込みの前に停止する。
+
 A third-party `--repo` files nothing: the body goes to the finder under `## Upstream candidate` for a person to post. An `unknown` party writes nothing. Each step prints one line; a failing step stops the rest and prints the command to re-run. Resume with the `stash:pop` line the backlink carries.
 
 ### `josh run:liveness`
