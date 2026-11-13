@@ -17,7 +17,7 @@ async function read(source: ObservationSource): Promise<string | undefined> {
 	const path = `${git_gh_api_path.issues_api_path(source.repo)}/comments/${source.comment}`
 	const raw = await git_gh_exec.exec_gh_api({ path })
 	const comment = parse_json.parse_json_object_or_undefined(raw, comment_schema)
-	if (comment === undefined || comment.html_url !== source.url) return undefined
+	if (comment?.html_url !== source.url) return undefined
 	const author = { ...gh_author_association.author_of(comment), repo: source.repo }
 
 	return (await gh_author_association.is_trusted(author)) ? comment.body : undefined
