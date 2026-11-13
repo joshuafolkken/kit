@@ -27,19 +27,51 @@ const REUSED_PAIR = 'scoped pair: reused — both checks are green on this tree'
 const RED_PAIR = 'scoped pair: red on this tree in this ship — not run again'
 
 type Phase = () => Promise<JoshResult>
-// A pair's result with the files it was named over, or why a merge could not split, for its lap.
-type PairResult = JoshResult & { note?: Pick<LapNote, 'named' | 'unsplit'> }
 
-async function run_phases(phases: ReadonlyArray<Phase>): Promise<JoshResult> {
+interface ScopedPhase {
+	script: string
+	run: () => Promise<JoshResult>
+}
+
+// A pair's result with the files it was named over, or why a merge could not split, for its lap.
+type PairResult = JoshResult & { note?: Pick<LapNote, 'named' | 'unsplit'>; verified?: GateTree }
+
+async function run_phases(
+	phases: ReadonlyArray<Phase>,
+	after_phase?: (index: number) => Promise<void>,
+): Promise<JoshResult> {
 	let last: JoshResult = { code: SUCCESS_EXIT_CODE, out: '' }
 
-	for (const phase of phases) {
-		// eslint-disable-next-line no-await-in-loop -- phases run in order and the first failure stops the rest
+	for (const [index, phase] of phases.entries()) {
+		// eslint-disable-next-line no-await-in-loop -- stop at the first failed phase
 		last = await phase()
+		// eslint-disable-next-line no-await-in-loop -- snapshot a completed writer before starting readers
+		await after_phase?.(index)
 		if (last.code !== SUCCESS_EXIT_CODE) return last
 	}
 
 	return last
+}
+
+async function take_snapshot(
+	phase: ScopedPhase | undefined,
+	snapshot: { tree: GateTree },
+): Promise<void> {
+	if (phase?.script !== scoped_green.LINT_SCRIPT) return
+
+	snapshot.tree = await gate_tree.read_gate_tree()
+}
+
+async function run_pair_phases(phases: ReadonlyArray<ScopedPhase>): Promise<PairResult> {
+	const snapshot = { tree: await gate_tree.read_gate_tree() }
+	const result = await run_phases(
+		phases.map((phase) => phase.run),
+		async (index) => {
+			await take_snapshot(phases[index], snapshot)
+		},
+	)
+
+	return { ...result, verified: snapshot.tree }
 }
 
 // The tree after the branch's metrics approval is re-recorded (`metrics-totals.ts`): every review fix
@@ -58,16 +90,19 @@ function printed(line: string): JoshResult {
 }
 
 // Each check bare; every output is kept, so the lap reads each one's fallback reason.
-async function bare_pair(scripts: ReadonlyArray<string>): Promise<JoshResult> {
+async function bare_pair(scripts: ReadonlyArray<string>): Promise<PairResult> {
 	const outs: Array<string> = []
-	const result = await run_phases(
-		scripts.map((script) => async () => {
-			const ran = await josh_command.josh_run([script], should_forward_stderr)
+	const result = await run_pair_phases(
+		scripts.map((script) => ({
+			script,
+			run: async () => {
+				const ran = await josh_command.josh_run([script], should_forward_stderr)
 
-			outs.push(ran.out)
+				outs.push(ran.out)
 
-			return ran
-		}),
+				return ran
+			},
+		})),
 	)
 
 	return { ...result, out: outs.filter((out) => out !== '').join('\n') }
@@ -93,12 +128,11 @@ function check_phases(
 	checks: ReadonlyArray<SyncedCheck>,
 	files: ReadonlyArray<string>,
 	sync: SyncReading | undefined,
-): ReadonlyArray<Phase> {
+): ReadonlyArray<ScopedPhase> {
 	return checks.flatMap((check) =>
-		run_ship_narrowed.named_phases(
-			[check],
-			run_ship_synced_scope.files_for(sync, check.script, files),
-		),
+		run_ship_narrowed
+			.named_phases([check], run_ship_synced_scope.files_for(sync, check.script, files))
+			.map((run) => ({ script: check.script, run })),
 	)
 }
 
@@ -146,10 +180,12 @@ async function narrowed_or_bare(
 	printed(run_ship_narrowed.describe(named.files, named.why))
 
 	const checks = run_ship_synced_scope.checks_of(scripts)
-	const result = await run_phases(check_phases(checks, named.files, sync))
+	const result = await run_pair_phases(check_phases(checks, named.files, sync))
 
-	if (result.code === SUCCESS_EXIT_CODE && (await is_still(tree))) {
-		run_ship_narrowed.record(checks, tree)
+	const verified = result.verified ?? tree
+
+	if (result.code === SUCCESS_EXIT_CODE && (await is_still(verified))) {
+		run_ship_narrowed.record(checks, verified)
 	}
 
 	return { ...result, note: { named: named.files.length } }
@@ -187,6 +223,18 @@ async function stale_pair(tree: GateTree, scripts: ReadonlyArray<string>): Promi
 // base runs nothing when the merge shares nothing with the branch (`run-ship-synced-scope.ts`), and
 // only where the two meet when they do; a pair stale since this ship last met it green on this base
 // runs over what moved since (`run-ship-narrowed.ts`).
+async function remember_result(tree: GateTree, result: PairResult): Promise<PairResult> {
+	const { verified = tree, ...answer } = result
+
+	run_ship_pair_runs.met(verified, result.code, result.out)
+
+	if (result.code === SUCCESS_EXIT_CODE && (await is_still(verified))) {
+		run_ship_narrowed.remember(verified)
+	}
+
+	return answer
+}
+
 async function settled_pair(): Promise<PairResult> {
 	const tree = await rerecorded_tree()
 	const scripts = scoped_green.missing_scripts(tree.files, tree.base)
@@ -202,10 +250,7 @@ async function settled_pair(): Promise<PairResult> {
 
 	const result = await stale_pair(tree, scripts)
 
-	run_ship_pair_runs.met(tree, result.code, result.out)
-	if (result.code === SUCCESS_EXIT_CODE && (await is_still(tree))) run_ship_narrowed.remember(tree)
-
-	return result
+	return await remember_result(tree, result)
 }
 
 function pair_note({ out, note }: PairResult): LapNote {

@@ -5,6 +5,7 @@ import { test_pinned_logic } from '#scripts/test/test-pinned-logic'
 import type { PinnedSummary } from '#scripts/test/test-pinned-record'
 import { run_review_pinned_accepted } from './run-review-pinned-accepted'
 import { run_review_pinned_join } from './run-review-pinned-join'
+import { run_review_pinned_remaining } from './run-review-pinned-remaining'
 import { run_review_pinned_steps } from './run-review-pinned-steps'
 
 // The read of `josh run:review --join` on the background `josh test:pinned` (joshuafolkken/kit#5212).
@@ -76,19 +77,45 @@ async function read(
 	is_fixing = false,
 ): Promise<JoinVerdict | undefined> {
 	return await read_with(
-		async () => await run_review_pinned_join.wait_for_join(root, undefined, is_fixing),
+		async () =>
+			await run_review_pinned_remaining.collect(
+				await run_review_pinned_join.wait_for_join(root, undefined, is_fixing),
+				root,
+			),
 		root,
 	)
 }
 
-// `review:record`'s read: only an answer already left on this very tree
-// (`run_review_pinned_join.finished_on_tree`). It neither waits (joshuafolkken/kit#4895) nor starts a
-// check, so the restart that follows on a moved tree still says who reads its answer.
+// Record collects an existing remaining probe, but never waits for a fresh round-1 check.
 async function read_finished(root: string = PROJECT_ROOT): Promise<JoinVerdict | undefined> {
-	return await read_with(async () => await run_review_pinned_join.finished_on_tree(root), root)
+	return await read_with(
+		async () =>
+			(await run_review_pinned_remaining.read(root)) ??
+			(await run_review_pinned_remaining.collect(
+				await run_review_pinned_join.finished_on_tree(root),
+				root,
+			)),
+		root,
+	)
 }
 
-const run_review_join_read = { is_due, mark_due, read, read_finished, read_with, verdict }
+async function read_remaining(): Promise<JoinVerdict | undefined> {
+	return await read_with(
+		async () =>
+			(await run_review_pinned_remaining.read()) ??
+			(await run_review_pinned_remaining.collect(await run_review_pinned_steps.wait_alone())),
+	)
+}
+
+const run_review_join_read = {
+	is_due,
+	mark_due,
+	read,
+	read_finished,
+	read_remaining,
+	read_with,
+	verdict,
+}
 
 export type { JoinVerdict, PinnedWait }
 export { run_review_join_read }
