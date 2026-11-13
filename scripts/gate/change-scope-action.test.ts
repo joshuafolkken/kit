@@ -31,6 +31,12 @@ describe('documentation and package change classification', () => {
 })
 
 describe('code and consumer package classification', () => {
+	it('publishes an explicitly shipped regression test despite the broad test exclusion', () => {
+		const manifest = { ...PACKAGE, files: [...PACKAGE.files, TEST] }
+
+		expect(classify([TEST], manifest, manifest).publish).toBe(true)
+		expect(classify(['scripts/other.test.ts'], manifest, manifest).publish).toBe(false)
+	})
 	it('keeps checks for code mixed into documentation', () => {
 		expect(classify([DOC, CODE], PACKAGE, BUMP).runtime).toBe(true)
 	})
