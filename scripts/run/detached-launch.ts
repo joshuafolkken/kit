@@ -3,6 +3,7 @@ import { closeSync, constants, openSync, writeSync } from 'node:fs'
 import { agent_launch_environment } from '#scripts/agent/agent-launch-environment'
 import { agent_profile_schema, type AgentProfile } from '#scripts/agent/agent-profile-schema'
 import { agent_safe_text } from '#scripts/agent/agent-safe-text'
+import { codex_launch_identity } from '#scripts/agent/codex-launch-identity'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { launch_priority } from '#scripts/run/launch-priority'
@@ -25,9 +26,8 @@ const NO_PID_NOTE = 'the process started without a pid'
 const UNSAFE_NOTE =
 	'the wake command or its arguments are empty, over length, or contain characters that are not safe to execute'
 
-// Provider-specific commands and flags are composed before this boundary. This module accepts only
-// an argv vector and never infers policy from it; role/model/effort arrive separately as log metadata.
-// The provider adapter keeps the fixed binary and permission flags in one reviewed place.
+// Provider adapters own commands and flags. At this boundary the Codex adapter binds the launcher's
+// explicit lane identity to shell configuration before the final argv safety check.
 // **The inputs that reach `spawn` are validated rather than trusted, and that is a control rather than
 // a formality.** Two things already bound this — the argument vector never goes through a shell, so
 // there is no shell to inject into, and the invocation travels as exactly one argv element rather than
@@ -319,7 +319,15 @@ function spawned(
 // execs before it returns, so the child already holds its own duplicate of the descriptor by then;
 // what is closed here is this process's copy. Left open it would outlive the launch in a supervisor
 // that runs for hours and launches once per cut.
-function launch(request: LaunchRequest, on_error: (note: string) => void): LaunchResult {
+function prepared_request(request: LaunchRequest): LaunchRequest {
+	return {
+		...request,
+		argv: { ...request.argv, args: codex_launch_identity.arguments_for(request) },
+	}
+}
+
+function launch(input: LaunchRequest, on_error: (note: string) => void): LaunchResult {
+	const request = prepared_request(input)
 	if (!is_safe_argv(request.argv)) return { kind: 'failed', note: UNSAFE_NOTE }
 
 	const log = open_log(request.log_path, on_error)
@@ -336,10 +344,11 @@ function launch(request: LaunchRequest, on_error: (note: string) => void): Launc
 }
 
 async function launch_attached(
-	request: LaunchRequest,
+	input: LaunchRequest,
 	on_error: (note: string) => void,
 	on_spawn: (pid: number) => void = ignore_spawn,
 ): Promise<AttachedLaunchResult> {
+	const request = prepared_request(input)
 	if (!is_safe_argv(request.argv)) return { kind: 'failed', note: UNSAFE_NOTE }
 	const log = open_log(request.log_path, on_error)
 
