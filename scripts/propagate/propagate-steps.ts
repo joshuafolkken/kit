@@ -64,10 +64,11 @@ function sync_command(bin_name: string): ReadonlyArray<string> {
 function upgrade_command(
 	package_name: string,
 	version: string,
+	root: string = process.cwd(),
 ): ReadonlyArray<ReadonlyArray<string>> {
 	const config = create_version_command_config({ package_name })
 
-	return build_upgrade_command(version, true, config).steps
+	return build_upgrade_command(version, true, config, root).steps
 }
 
 const PROPAGATE_ORIGIN =
@@ -392,9 +393,12 @@ function run_each(
 }
 
 // One entry per step, so `run_each` stops a toolkit's lockfile repair after its failed install.
-function upgrade_commands(plan: ReleasePlan): ReadonlyArray<ToolkitCommand> {
+function upgrade_commands(
+	plan: ReleasePlan,
+	root: string = process.cwd(),
+): ReadonlyArray<ToolkitCommand> {
 	return plan.releases.flatMap((release) =>
-		upgrade_command(release.package_name, release.version).map((command) => ({
+		upgrade_command(release.package_name, release.version, root).map((command) => ({
 			package_name: release.package_name,
 			command,
 		})),
@@ -414,7 +418,8 @@ function create_step_runner(plan: ReleasePlan): RunStep {
 	const issue_numbers = new Map<string, string>()
 	const handlers: Record<string, (target: PropagateTarget, step: string) => StepResult> = {
 		[propagate_run.STEP_PRECHECK]: precheck_step,
-		[propagate_run.STEP_UPGRADE]: (target, step) => run_each(target, step, upgrade_commands(plan)),
+		[propagate_run.STEP_UPGRADE]: (target, step) =>
+			run_each(target, step, upgrade_commands(plan, target.path)),
 		[propagate_run.STEP_SYNC]: (target, step) => run_each(target, step, sync_commands(plan)),
 		[propagate_run.STEP_ISSUE]: (target, step) => issue_step(target, step, plan, issue_numbers),
 		[propagate_run.STEP_PR]: (target, step) => pull_request_step(target, step, plan, issue_numbers),

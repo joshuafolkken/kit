@@ -1,3 +1,8 @@
+import path from 'node:path'
+import { PACKAGE_DIR } from '#scripts/init/init-paths'
+import { shell_quote } from '#scripts/lib/shell-quote'
+import { npm_acquisition } from '#scripts/registry-migration/npm-acquisition'
+import { KIT_PACKAGE_NAME } from './kit-descriptor'
 import type { PackageVersionConfig } from './version-command-config'
 
 // One upgrade the version commands offer and run: `text` is the line printed after `Run:`, and
@@ -20,7 +25,18 @@ function update_argv(
 	is_local: boolean,
 	config: PackageVersionConfig,
 ): Array<string> {
-	return ['pnpm', 'add', update_scope_flag(is_local), `${config.package_name}@${latest}`]
+	const registry =
+		!is_local && config.package_name === KIT_PACKAGE_NAME
+			? ['--config.@joshuafolkken:registry=https://registry.npmjs.org/']
+			: []
+
+	return [
+		'pnpm',
+		'add',
+		update_scope_flag(is_local),
+		...registry,
+		`${config.package_name}@${latest}`,
+	]
 }
 
 // The bare `pnpm add` invocation that installs one package at an exact version, in the global or the
@@ -33,6 +49,11 @@ function format_update_command(
 	return update_argv(latest, is_local, config).join(' ')
 }
 
+function needs_migration(is_local: boolean, package_name: string, root: string): boolean {
+	return is_local && package_name === KIT_PACKAGE_NAME && !npm_acquisition.is_project_npm(root)
+}
+
+// A kit project before migration first verifies the whole scope through the transactional entry.
 // The upgrade for one target. A project-scope install is followed by kit's lockfile repair
 // (`fix-gh-packages`), which a global install does not need. The printed text is derived from the
 // steps, so the hint and what actually runs cannot drift apart.
@@ -40,11 +61,22 @@ function build_upgrade_command(
 	latest: string,
 	is_local: boolean,
 	config: PackageVersionConfig,
+	root: string = process.cwd(),
 ): UpgradeCommand {
 	const steps = [update_argv(latest, is_local, config)]
+
+	if (needs_migration(is_local, config.package_name, root)) {
+		steps.unshift(['node', path.join(PACKAGE_DIR, 'dist/registry-migrate.mjs'), latest])
+	}
+
 	if (is_local) steps.push(['node_modules/.bin/tsx', config.fix_gh_packages_path])
 
-	return { text: steps.map((step) => step.join(' ')).join(STEP_SEPARATOR), steps }
+	return {
+		text: steps
+			.map((step) => step.map((argument) => shell_quote.word(argument)).join(' '))
+			.join(STEP_SEPARATOR),
+		steps,
+	}
 }
 
 // The consumer's own configured command — `pnpm add -g …`, or a chain with `&&` — is inside the trust

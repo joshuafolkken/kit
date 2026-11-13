@@ -35,7 +35,7 @@ function importer_manifests(content: string): Array<string> {
 		.map((importer) => path.join(importer, 'package.json'))
 }
 
-function assert_npm_sources(content: string): void {
+function non_npm_resolution(content: string): string | undefined {
 	const entries = Object.entries(fix_gh_packages_logic.parse_lockfile_packages(content)).filter(
 		([key]) => key.startsWith(SCOPE),
 	)
@@ -43,10 +43,19 @@ function assert_npm_sources(content: string): void {
 	for (const [key, entry] of entries) {
 		const tarball = entry.resolution?.tarball
 
-		if (tarball !== undefined && !tarball.startsWith(REGISTRY)) {
-			throw new Error(`Non-npm resolution remains: ${key}`)
-		}
+		if (tarball !== undefined && !tarball.startsWith(REGISTRY)) return key
 	}
+
+	return undefined
+}
+
+function has_npm_sources(content: string): boolean {
+	return non_npm_resolution(content) === undefined
+}
+
+function assert_npm_sources(content: string): void {
+	const key = non_npm_resolution(content)
+	if (key !== undefined) throw new Error(`Non-npm resolution remains: ${key}`)
 }
 
 function npmrc(content: string): string {
@@ -103,6 +112,7 @@ const migrate_lock = {
 	npmrc,
 	assert_preserved,
 	assert_npm_sources,
+	has_npm_sources,
 	importer_manifests,
 }
 export { migrate_lock }

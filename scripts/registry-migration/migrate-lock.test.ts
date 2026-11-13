@@ -37,3 +37,27 @@ describe('migration lockfile contracts', () => {
 		expect(migrate_lock.npmrc(migrated)).toBe(migrated)
 	})
 })
+
+describe('migration source checks', () => {
+	it('rejects the same non-npm source for assertions and migration-state detection', () => {
+		const lock = PROJECT.replace(
+			'integrity: sha512-old',
+			'tarball: https://npm.pkg.github.com/old.tgz',
+		)
+
+		expect(migrate_lock.has_npm_sources(lock)).toBe(false)
+		expect(() => migrate_lock.assert_npm_sources(lock)).toThrow('Non-npm resolution remains:')
+	})
+
+	it.each(['', PROJECT, `${SELF_MANAGEMENT}---\n${PROJECT}`])(
+		'accepts npm/default sources: %s',
+		(lock) => {
+			expect(migrate_lock.has_npm_sources(lock)).toBe(true)
+			expect(() => migrate_lock.assert_npm_sources(lock)).not.toThrow()
+		},
+	)
+
+	it('surfaces malformed lockfiles rather than treating a parse failure as migrated', () => {
+		expect(() => migrate_lock.has_npm_sources('packages: [')).toThrow()
+	})
+})

@@ -35,7 +35,17 @@ function sync_with_merge(
 // lines, including env-var forms: npmrcAuthFile can opt the file into authentication from a deploy
 // dashboard that sync cannot inspect.
 function sync_npmrc(destination_path: string): void {
-	sync_with_merge(destination_path, '.npmrc', init_logic.merge_npmrc)
+	const existing = existsSync(destination_path) ? readFileSync(destination_path, 'utf8') : ''
+	const merged = init_logic.merge_npmrc(existing, path.dirname(destination_path))
+
+	if (merged === existing) {
+		console.info('  ✔ unchanged .npmrc')
+
+		return
+	}
+
+	file_content.write_contained(destination_path, merged)
+	console.info('  ✔ synced    .npmrc')
 }
 
 // Union-merge kit's .gitignore entries into the consumer file instead of overwriting it,

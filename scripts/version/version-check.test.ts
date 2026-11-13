@@ -21,7 +21,7 @@ describe('version_check_logic.format_update_command', () => {
 
 	it('uses -g for a global invocation', () => {
 		expect(version_check_logic.format_update_command('2.0.0', is_global, KIT_CONFIG)).toBe(
-			'pnpm add -g @joshuafolkken/kit@2.0.0',
+			'pnpm add -g --config.@joshuafolkken:registry=https://registry.npmjs.org/ @joshuafolkken/kit@2.0.0',
 		)
 	})
 })

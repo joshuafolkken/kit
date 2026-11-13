@@ -127,7 +127,6 @@ const UNTESTED_SOURCES: ReadonlyArray<string> = [
 	'scripts/time-runtime/time-tool-call.ts',
 	'scripts/ui/ui-routes-cli.ts',
 	'scripts/version/index.ts',
-	'scripts/version/upgrade-shell-command.ts',
 	'scripts/version/version-check-arguments.ts',
 ]
 

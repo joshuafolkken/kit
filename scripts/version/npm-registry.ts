@@ -4,12 +4,14 @@ import { COMMAND_TIMEOUT_MS, FETCH_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execaSync } from 'execa'
 import semver from 'semver'
 import { z } from 'zod'
+import { KIT_PACKAGE_NAME } from './kit-descriptor'
 import { release_age } from './release-age'
 
 // The public npm registry, read without credentials so a consumer who installed from public npm
 // can see the latest release without a `read:packages` GitHub token. The
-// GitHub Packages versions API stays the source for a scope routed there, and the fallback for a
-// package public npm does not carry.
+// GitHub Packages versions API stays the source for other packages whose scope is routed there.
+// Kit always checks npm; version-remote retains GitHub as a diagnostic/legacy lookup fallback,
+// while kit upgrades still require npm publication and never switch acquisition back to GitHub.
 const PUBLIC_REGISTRY = 'https://registry.npmjs.org'
 // The abbreviated packument carries `dist-tags` without every version's full manifest.
 const ABBREVIATED_ACCEPT = 'application/vnd.npm.install-v1+json'
@@ -100,7 +102,7 @@ function is_github_registry(value: string): boolean {
 // `pnpm config get` (project `.npmrc` over user `~/.npmrc`). The two
 // registries are published by parallel jobs and can drift, so a consumer routed to GitHub Packages
 // keeps reading it: public npm could otherwise offer a release its registry does not carry yet.
-// Memoized per scope — kit and app-kit share one, and one report asks for both packages.
+// Memoized per scope for the generic consumers; kit bypasses this legacy registry routing.
 function is_github_scope(scope: string): boolean {
 	const is_cached_github = github_scopes.get(scope)
 	if (is_cached_github !== undefined) return is_cached_github
@@ -116,6 +118,7 @@ function is_github_scope(scope: string): boolean {
 }
 
 function is_public_source(package_name: string): boolean {
+	if (package_name === KIT_PACKAGE_NAME) return true
 	const scope = SCOPE_PATTERN.exec(package_name)?.[0]
 
 	return scope === undefined || !is_github_scope(scope)

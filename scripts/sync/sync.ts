@@ -194,7 +194,11 @@ function sync_consumer_resolved_development_deps(destination_path: string): void
 function sync_prepare_lefthook_warning(destination_path: string): void {
 	sync_package_json_with(
 		destination_path,
-		(existing) => init_logic.upgrade_prepare_lefthook_warning(existing),
+		(existing) =>
+			init_logic.upgrade_npm_lifecycle(
+				init_logic.upgrade_prepare_lefthook_warning(existing),
+				path.dirname(destination_path),
+			),
 		'  ✔ synced    prepare lefthook install warning (run `pnpm install`)',
 	)
 }
