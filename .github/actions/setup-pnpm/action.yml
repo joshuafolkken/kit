@@ -157,9 +157,22 @@ runs:
       if: inputs.install == 'true'
       shell: bash
       run: |
-        if [ -f .npmrc ] && grep -Eq '^[[:space:]]*@[^:]+:registry[[:space:]]*=[[:space:]]*https://npm[.]pkg[.]github[.]com/?[[:space:]]*$' .npmrc; then
-          if [ ! -f "$HOME/.npmrc" ] || ! grep -Eq '^[[:space:]]*//npm[.]pkg[.]github[.]com/:_authToken[[:space:]]*=' "$HOME/.npmrc"; then
-            printf '\n//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}\n' >> "$HOME/.npmrc"
+        userconfig="${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}"
+        configs=(/dev/null)
+        for config in "$userconfig" .npmrc; do
+          if [ -f "$config" ]; then configs+=("$config"); fi
+        done
+        required=$(awk -F '=' '
+          /^[[:space:]]*@[^:]+:registry[[:space:]]*=/ {
+            key = $1; value = $2
+            gsub(/[[:space:]]/, "", key); gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+            registries[key] = value
+          }
+          END { for (key in registries) if (registries[key] ~ /^https:\/\/npm[.]pkg[.]github[.]com\/?$/) { print "true"; exit } }
+        ' "${configs[@]}")
+        if [ "$required" = true ]; then
+          if ! grep -Eq '^[[:space:]]*//npm[.]pkg[.]github[.]com/:_authToken[[:space:]]*=' "${configs[@]}"; then
+            printf '\n//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}\n' >> "$userconfig"
           fi
           echo 'required=true' >> "$GITHUB_OUTPUT"
         fi

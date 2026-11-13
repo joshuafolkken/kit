@@ -31,14 +31,15 @@ function is_npm(content: string): boolean {
 	return registry === NPM || registry === NPM.slice(0, -1)
 }
 
-function is_project_npm(root: string = process.cwd()): boolean {
-	return is_npm(read(root, '.npmrc')) && migrate_lock.has_npm_sources(read(root, LOCKFILE))
+function is_project_npm(
+	root: string = process.cwd(),
+	npmrc: string = read(root, '.npmrc'),
+): boolean {
+	return is_npm(npmrc) && migrate_lock.has_npm_sources(read(root, LOCKFILE))
 }
 
-function is_npm_only(root: string): boolean {
-	const npmrc = read(root, '.npmrc')
-
-	return is_project_npm(root) && fix_gh_packages_logic.parse_gh_scopes(npmrc).size === 0
+function is_npm_only(root: string, npmrc: string = read(root, '.npmrc')): boolean {
+	return is_project_npm(root, npmrc) && fix_gh_packages_logic.parse_gh_scopes(npmrc).size === 0
 }
 
 function has_scoped_name(dependencies: Record<string, string> | undefined): boolean {

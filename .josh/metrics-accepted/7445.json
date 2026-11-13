@@ -1,7 +1,7 @@
 {
-	"reason": "npm acquisition needs a shared conditional-auth install path, workflow ownership preservation and hosting diagnostics; existing migration and registry parsers are reused",
+	"reason": "Review fixes reuse npm acquisition detection for candidate npmrc settings; effective user configuration and regression coverage preserve existing authentication.",
 	"date": "2026-11-13",
 	"growth": {
-		"scripts.code_lines": 43
+		"scripts.code_lines": 45
 	}
 }

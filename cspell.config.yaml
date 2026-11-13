@@ -149,8 +149,6 @@ words:
   - rrexml
   # Python virtual-environment directory names excluded from project file discovery.
   - venv
-  # npm's CLI option for selecting the registry-auth configuration file.
-  - userconfig
   # git's `for-each-ref` modifier that removes leading path components (joshuafolkken/kit#2504).
   - lstrip
   # git's `for-each-ref` atom naming the work tree a branch is checked out in (joshuafolkken/kit#2504).

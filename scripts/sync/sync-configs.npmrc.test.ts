@@ -95,16 +95,19 @@ describe('sync_configs.sync_npmrc — consumer auth line', () => {
 })
 
 describe('sync_configs.sync_npmrc — hosting diagnostics', () => {
-	it('reports hosting dashboard checks through npmrc sync while retaining authentication', () => {
-		writeFileSync(ctx.destination, `${AUTH_LINE}${NPM_LINE}`)
-		writeFileSync(path.join(ctx.work_directory, 'pnpm-lock.yaml'), 'lockfileVersion: 9\n')
-		writeFileSync(path.join(ctx.work_directory, 'vercel.json'), '{}')
-		const warn_spy = vi.spyOn(console, 'warn').mockImplementation(() => {
-			/* suppress */
-		})
+	it.each([AUTH_LINE, `${AUTH_LINE}${NPM_LINE}`])(
+		'reports hosting checks before writing merged settings from %s',
+		(npmrc) => {
+			writeFileSync(ctx.destination, npmrc)
+			writeFileSync(path.join(ctx.work_directory, 'pnpm-lock.yaml'), 'lockfileVersion: 9\n')
+			writeFileSync(path.join(ctx.work_directory, 'vercel.json'), '{}')
+			const warn_spy = vi.spyOn(console, 'warn').mockImplementation(() => {
+				/* suppress */
+			})
 
-		sync_configs.sync_npmrc(ctx.destination)
-		expect(warn_spy).toHaveBeenCalledWith(expect.stringContaining('Vercel config detected'))
-		expect(readFileSync(ctx.destination, 'utf8')).toBe(`${AUTH_LINE}${NPM_LINE}`)
-	})
+			sync_configs.sync_npmrc(ctx.destination)
+			expect(warn_spy).toHaveBeenCalledWith(expect.stringContaining('Vercel config detected'))
+			expect(readFileSync(ctx.destination, 'utf8')).toBe(`${AUTH_LINE}${NPM_LINE}`)
+		},
+	)
 })

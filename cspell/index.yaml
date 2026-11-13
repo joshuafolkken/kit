@@ -47,6 +47,8 @@ ignorePaths:
   #   - '**/*.min.js'
   #   - '**/*.svg'
 words:
+  # npm's user config selector is read by the distributed setup-pnpm action (#7445).
+  - userconfig
   - curlrc
   - mktemp
   # safe-chain's release asset name for its static Linux binary, which the distributed

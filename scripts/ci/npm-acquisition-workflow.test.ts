@@ -18,31 +18,45 @@ const WORKFLOWS = [
 	'templates/workflows/github-release.yml',
 ]
 
-function configure_registry(npmrc?: string, home_npmrc = ''): { auth: string; output: string } {
-	const root = make_directory('workflow-registry-')
-	const home = make_directory('workflow-home-')
-	const output = path.join(root, 'output')
+function run_registry(root: string, environment: NodeJS.ProcessEnv): void {
 	const { steps } = ci_yml_fixture.load_action(ci_yml_fixture.SETUP_PNPM_ACTION).runs
-
-	writeFileSync(path.join(home, '.npmrc'), home_npmrc)
-	if (npmrc !== undefined) writeFileSync(path.join(root, '.npmrc'), npmrc)
-	writeFileSync(output, '')
 	const result = spawnSync(
 		'bash',
 		['-e', '-c', steps.find((step) => step.id === 'registry-auth')?.run ?? 'exit 1'],
 		{
 			cwd: root,
 			encoding: 'utf8',
-			env: { ...process.env, HOME: home, GITHUB_OUTPUT: output },
+			env: { ...process.env, ...environment },
 		},
 	)
 
 	expect(result.status, result.stderr).toBe(0)
+}
 
-	return {
-		auth: readFileSync(path.join(home, '.npmrc'), 'utf8'),
-		output: readFileSync(output, 'utf8'),
-	}
+function registry_path(home: string, custom: boolean): string {
+	return path.join(home, custom ? 'custom.npmrc' : '.npmrc')
+}
+
+function configure_registry(
+	npmrc?: string,
+	home_npmrc = '',
+	custom = false,
+): { auth: string; output: string } {
+	const root = make_directory('workflow-registry-')
+	const home = make_directory('workflow-home-')
+	const userconfig = registry_path(home, custom)
+	const output = path.join(root, 'output')
+
+	writeFileSync(userconfig, home_npmrc)
+	if (npmrc !== undefined) writeFileSync(path.join(root, '.npmrc'), npmrc)
+	writeFileSync(output, '')
+	run_registry(root, {
+		HOME: home,
+		GITHUB_OUTPUT: output,
+		NPM_CONFIG_USERCONFIG: custom ? userconfig : '',
+	})
+
+	return { auth: readFileSync(userconfig, 'utf8'), output: readFileSync(output, 'utf8') }
 }
 
 describe('npm acquisition in workflows', () => {
@@ -95,5 +109,37 @@ describe('GitHub registry authentication line boundaries', () => {
 			auth: `${existing}\n${AUTH}\n`,
 			output: REQUIRED,
 		})
+	})
+})
+
+describe('effective user registry configuration', () => {
+	it.each([false, true])('reads user-only scopes with custom config %s', (custom) => {
+		expect(configure_registry(NPM, GITHUB, custom)).toEqual({
+			auth: `${GITHUB}\n${AUTH}\n`,
+			output: REQUIRED,
+		})
+	})
+
+	it.each([false, true])(
+		'keeps npm-only user settings unauthenticated with custom config %s',
+		(custom) => {
+			expect(configure_registry(undefined, NPM, custom)).toEqual({ auth: NPM, output: '' })
+		},
+	)
+
+	it('lets a project mapping override the same user scope', () => {
+		const project = '@other:registry=https://registry.npmjs.org/\n'
+
+		expect(configure_registry(project, GITHUB)).toEqual({ auth: GITHUB, output: '' })
+	})
+
+	it.each([false, true])('preserves a user-only credential with custom config %s', (custom) => {
+		const existing = `${GITHUB}//npm.pkg.github.com/:_authToken=existing-token\n`
+
+		expect(configure_registry(NPM, existing, custom)).toEqual({ auth: existing, output: REQUIRED })
+	})
+
+	it('preserves a project credential instead of appending user authentication', () => {
+		expect(configure_registry(`${GITHUB}${AUTH}\n`)).toEqual({ auth: '', output: REQUIRED })
 	})
 })

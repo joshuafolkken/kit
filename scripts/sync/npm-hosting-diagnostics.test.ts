@@ -50,4 +50,12 @@ describe('npm hosting diagnostics', () => {
 		writeFileSync(path.join(root, VERCEL), '{}')
 		expect(npm_hosting_diagnostics.messages(root, npmrc)).toEqual([])
 	})
+
+	it('uses candidate scopes rather than the previous disk settings', () => {
+		const root = project(NPM)
+		const candidate = `${NPM}@other:registry=https://npm.pkg.github.com/\n${AUTH}`
+
+		writeFileSync(path.join(root, VERCEL), '{}')
+		expect(npm_hosting_diagnostics.messages(root, candidate)).toEqual([])
+	})
 })

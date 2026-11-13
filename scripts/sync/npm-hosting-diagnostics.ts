@@ -9,7 +9,7 @@ const HOSTS = [
 ]
 
 function messages(root: string, npmrc: string): Array<string> {
-	if (!npm_acquisition.is_npm_only(root)) return []
+	if (!npm_acquisition.is_npm_only(root, npmrc)) return []
 	const hosts = HOSTS.filter((host) => host.files.some((file) => existsSync(path.join(root, file))))
 	const diagnostics = hosts.map(
 		(host) =>
