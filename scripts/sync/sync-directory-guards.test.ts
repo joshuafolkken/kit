@@ -25,7 +25,8 @@ function as_absent(): never {
 	throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
 }
 
-vi.mock('node:fs', () => ({
+vi.mock(import('node:fs'), async (importOriginal) => ({
+	...(await importOriginal()),
 	cpSync: cp_sync_mock,
 	existsSync: exists_sync_mock,
 	lstatSync: lstat_sync_mock,
