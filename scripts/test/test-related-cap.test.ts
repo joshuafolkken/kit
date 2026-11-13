@@ -7,6 +7,14 @@ import type { ReachedCount } from './test-pinned-reach'
 import { test_related_cap, type CappedImporters, type CountReader } from './test-related-cap'
 import { related_scope, type RelatedScope } from './test-related-scope'
 
+// These cases size an already-vouched import structure; real git changes are covered by
+// test-related.imports.test.ts and comparison failures by test-related-imports.test.ts.
+vi.mock('./test-related-imports', () => ({
+	test_related_imports: {
+		stable_files: async (_root: string, files: ReadonlyArray<string>) => [...files],
+	},
+}))
+
 // joshuafolkken/kit#5532: a change whose imports reach more test files than the cap runs only the tests
 // importing its widest files directly, and the run's summary names them.
 
