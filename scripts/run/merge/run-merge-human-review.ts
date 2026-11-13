@@ -1,7 +1,9 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
+import { lane_await } from '#scripts/lane/lane-await'
 import { lane_state } from '#scripts/lane/lane-state'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { run_merge_cut_release } from './run-merge-cut-release'
 
 // A child may exit before its stop marker: retain its lane before settling its dispatch.
 async function retain(issue: string): Promise<boolean> {
@@ -12,6 +14,10 @@ async function retain(issue: string): Promise<boolean> {
 	})
 
 	if (retained.kind !== 'written') return false
+
+	if (lane_await.process_trace_default(issue) === 'none') {
+		await run_merge_cut_release.release(issue)
+	}
 
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.HUMAN_REVIEW,

@@ -98,6 +98,8 @@ function attach_run_spies(): void {
 	vi.spyOn(cost_cli, 'session_verdict').mockImplementation(session_verdict)
 	vi.spyOn(agent_session_role, 'is_reviewer').mockImplementation(is_reviewer)
 	vi.spyOn(run_event_stream_emit, 'emit').mockImplementation(emit)
+	vi.spyOn(run_event_stream_emit, 'current_events').mockResolvedValue([])
+	vi.spyOn(run_event_stream_emit, 'all_events').mockResolvedValue([])
 }
 
 function attach_review_spies(): void {

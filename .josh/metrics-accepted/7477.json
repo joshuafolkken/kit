@@ -1,0 +1,7 @@
+{
+	"reason": "Reviewed PR repair requires one shared issue-scoped transition with required history reads, owner protection, idempotent retry recording and cut termination; existing retry and collection logic is reused.",
+	"date": "2026-11-13",
+	"growth": {
+		"scripts.code_lines": 214
+	}
+}
