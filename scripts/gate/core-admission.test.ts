@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { core_admission, type LedgerEntry } from './core-admission'
+import { machine_capacity } from './machine-capacity'
 
 // joshuafolkken/kit#3371: the machine reading holds only what a tool has already allocated, so a claim
 // admitted moments ago must not have its declared memory added back onto the free memory — that
@@ -44,6 +45,34 @@ describe('core_admission.ledger_load — the load already inside the machine rea
 			memory_mb: 0,
 		})
 	})
+
+	it.each([core_admission.RAMP_UP_MS - 1, core_admission.RAMP_UP_MS])(
+		'accounts for a growing tool at age %i independently of its actual allocation',
+		(age) => {
+			const running = admitted('running', NOW - age)
+			const ledger = core_admission.ledger_load([running], NOW)
+			const reading = { busy_cores: 0, available_mb: TOOL_MEMORY_MB }
+			const budget = machine_capacity.machine_budget(BUDGET_CORES, reading, ledger)
+			const is_ramped = age >= core_admission.RAMP_UP_MS
+
+			expect(budget.memory_mb).toBe(TOOL_MEMORY_MB * (is_ramped ? 2 : 1))
+			expect(
+				core_admission.is_admitted('next', [running, admitted('next', undefined)], budget),
+			).toBe(is_ramped)
+		},
+	)
+})
+
+describe('memory admission with bounded light-claim bypass', () => {
+	it.each([1, core_admission.HEAVIER_BYPASS_WINDOW_MS])('bounds bypass at claim age %i', (age) => {
+		const heavy = admitted('heavy', undefined)
+		const light = { key: 'light', reservation: { weight: 1, claimed_at: age, memory_mb: 1 } }
+		const entries = [heavy, light]
+		const budget = { cores: BUDGET_CORES, memory_mb: 1 }
+
+		expect(core_admission.is_admitted('heavy', entries, budget)).toBe(false)
+		expect(core_admission.is_admitted('light', entries, budget)).toBe(age === 1)
+	})
 })
 
 describe('core_admission.describe_overflow — the summary line past the budget', () => {
@@ -87,16 +116,16 @@ describe('core_admission.is_admitted — the oldest claim under a swap stall', (
 		expect(core_admission.is_admitted('lone', lone, budget)).toBe(false)
 	})
 
-	it('runs the oldest claim alone heavier than free memory on a machine with no swap traffic', () => {
+	it('holds the oldest claim heavier than free memory even without swap traffic', () => {
 		const budget = { cores: BUDGET_CORES, memory_mb: STALL_FREE_MB, memory_pressured: false }
 
-		expect(core_admission.is_admitted('lone', lone, budget)).toBe(true)
+		expect(core_admission.is_admitted('lone', lone, budget)).toBe(false)
 	})
 
 	it('names the oldest claim held by the stall', () => {
 		const budget = { cores: BUDGET_CORES, memory_mb: STALL_FREE_MB, memory_pressured: true }
 
-		expect(core_admission.is_swap_held('lone', lone, budget)).toBe(true)
+		expect(core_admission.is_memory_held('lone', lone, budget)).toBe(true)
 	})
 
 	it('holds a claim beside a running one when their memory together is not free', () => {
@@ -104,14 +133,14 @@ describe('core_admission.is_admitted — the oldest claim under a swap stall', (
 		const budget = { cores: BUDGET_CORES, memory_mb: BESIDE_FREE_MB, memory_pressured: true }
 		const beside = [...lone, admitted('running', 0)]
 
-		expect(core_admission.is_swap_held('lone', beside, budget)).toBe(true)
+		expect(core_admission.is_memory_held('lone', beside, budget)).toBe(true)
 	})
 
 	it('releases a claim beside a running one when their memory together is free', () => {
 		const budget = { cores: BUDGET_CORES, memory_mb: FREE_MB, memory_pressured: true }
 		const light = { key: 'light', reservation: { weight: TOOL_CORES, claimed_at: 0, memory_mb: 1 } }
 
-		expect(core_admission.is_swap_held('light', [light, admitted('running', 0)], budget)).toBe(
+		expect(core_admission.is_memory_held('light', [light, admitted('running', 0)], budget)).toBe(
 			false,
 		)
 	})

@@ -192,7 +192,10 @@ async function record_round_two(round_two: RoundTwoRecord, path?: string): Promi
 }
 
 async function record_core_wait(wait: CoreWaitRecord, path?: string): Promise<void> {
-	await record({ kind: KIND.CORE_WAIT, at: now_iso(), ...wait }, path)
+	const is_immediate = wait.admission_reason !== undefined && wait.wait_reason === undefined
+	const kind = is_immediate ? KIND.CORE_ADMISSION : KIND.CORE_WAIT
+
+	await record({ kind, at: now_iso(), ...wait }, path)
 }
 
 async function record_unit_files(

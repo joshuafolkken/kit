@@ -18,6 +18,7 @@ const KIND = {
 	OFFERABLE: 'offerable',
 	OFFER: 'offer',
 	CORE_WAIT: 'core-wait',
+	CORE_ADMISSION: 'core-admission',
 	UNIT_FILES: 'unit-files',
 	TEST_RELATED: 'test-related',
 	TEST_PINNED: 'test-pinned',

@@ -1,6 +1,6 @@
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { core_budget_timing } from './core-budget-timing'
-import type { LedgerLoad, MachineBudget } from './machine-capacity'
+import type { LedgerLoad, MachineBudget, MachineReading } from './machine-capacity'
 
 // The ledger's admission arithmetic, kept apart from the markers `core-budget.ts` reads and writes so
 // that file stays under its line ceiling as the budget grew a memory side.
@@ -65,6 +65,7 @@ interface Admission {
 	overflow: Overflow | undefined
 	granted?: number | undefined
 	waited_ms?: number | undefined
+	decision?: { reason: string; budget: MachineBudget; reading: MachineReading } | undefined
 }
 
 function priority_rank(reservation: LedgerReservation): number {
@@ -177,34 +178,25 @@ function fits_in_order({ own, ahead, running }: Placement, budget: MachineBudget
 	return fits([...running, ...ahead, own], limit)
 }
 
-// **A host-wide swap stall holds the oldest claim too** (joshuafolkken/kit#4451). Running alone skipped
-// the memory test, so a lone gate started lint into a stall and prolonged it.
-// Only both together hold: traffic alone is this machine's daily norm (#4313), and a claim
-// heavier than free memory on a calm machine would wait for room that never comes.
-function is_swap_stalled({ own, running }: Placement, budget: MachineBudget): boolean {
-	const needed_mb = sum_load([...running, own]).memory_mb
-
-	return budget.memory_pressured === true && needed_mb > budget.memory_mb
-}
-
-// **The wait cap does not release a swap-stall hold, for any claim** (joshuafolkken/kit#4451): the cap
-// exists so a wedged sibling cannot stall the machine for good, but a stall ends when its traffic stops
-// or its memory is free, so the hold cannot outlive it. Released at the cap, lint started into
-// the stall it waited on and prolonged it — and holding only a lone claim let a gate's
-// later claims start into the stall at their own caps, after which the lint was no longer alone.
-function is_swap_held(
+// Non-unit memory cannot be narrowed or released by a CPU deadline. Unit launchers size their
+// workers from free memory after admission; retain that exemption unless swap pressure holds them.
+function is_memory_held(
 	key: string,
 	reservations: ReadonlyArray<LedgerEntry>,
 	budget: MachineBudget,
 ): boolean {
 	const placement = place(key, reservations)
 
-	return placement !== undefined && is_swap_stalled(placement, budget)
+	if (placement === undefined) return false
+	if (placement.own.reservation.is_unit === true && budget.memory_pressured !== true) return false
+
+	return !fits([...placement.running, placement.own], {
+		cores: Infinity,
+		memory_mb: budget.memory_mb,
+	})
 }
 
-// The oldest claim runs alone once nothing else does — unless the machine is overloaded, where it waits
-// like the first waiter (`first_waiter_limit`) until a poll reads the load back under the cap, or stalled
-// on swap (`is_swap_stalled`), where it waits until the traffic stops or its memory is free.
+// CPU-only exemption for the oldest claim; is_admitted checks memory before reaching it.
 function runs_alone(placement: Placement, budget: MachineBudget): boolean {
 	if (
 		!placement.is_oldest ||
@@ -214,16 +206,11 @@ function runs_alone(placement: Placement, budget: MachineBudget): boolean {
 		return false
 	}
 
-	return budget.is_overloaded !== true && !is_swap_stalled(placement, budget)
+	return budget.is_overloaded !== true
 }
 
 // **Admission: the oldest claim runs once nothing else does, then claim order, then a bounded pass.**
-// The oldest runs because a single check heavier than the whole machine must not wait for room that will
-// never come — except into a swap stall (`is_swap_stalled`), which passes. Claims that passed it are
-// still running beside it, and their room does come back, so it waits for them rather than starting on
-// top of their cores and memory. A later claim runs when every running claim, every claim waiting
-// ahead of it and its own load fit the budget — the first waiter against the ledger alone
-// (`first_waiter_limit`) — or when it may pass the waiters ahead (`may_pass`).
+// The CPU exemption never lifts a memory hold. Later claims fit in order or make a bounded pass.
 function is_admitted(
 	key: string,
 	reservations: ReadonlyArray<LedgerEntry>,
@@ -231,7 +218,7 @@ function is_admitted(
 ): boolean {
 	const placement = place(key, reservations)
 
-	if (placement === undefined) return false
+	if (placement === undefined || is_memory_held(key, reservations, budget)) return false
 	if (runs_alone(placement, budget)) return true
 
 	return fits_in_order(placement, budget) || may_pass(placement, budget)
@@ -384,7 +371,7 @@ const core_admission = {
 	compare_claim,
 	describe_overflow,
 	is_admitted,
-	is_swap_held,
+	is_memory_held,
 	is_too_narrow,
 	ledger_load,
 	narrowed_weight,

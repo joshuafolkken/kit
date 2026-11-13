@@ -300,6 +300,7 @@ describe('machine_capacity.pressured_available — the kernel verdict', () => {
 })
 
 const SWAPOUTS_TOTAL = 512
+const MACHINE_MODULE = './machine-capacity'
 const BYTES_PER_MB = 1_048_576
 // One megabyte past the threshold, in pages, swapped out during the window.
 const SWAPPED_PAGES = ((machine_capacity.SWAP_PRESSURE_MB + 1) * BYTES_PER_MB) / PAGE_BYTES
@@ -312,7 +313,7 @@ const SWAPPING_SYSCTL = DARWIN_SYSCTL.replace(
 // counter advances while the window is waited out.
 async function read_swapping_machine(): Promise<MachineReading> {
 	const actual = await vi.importActual<{ machine_capacity: typeof machine_capacity }>(
-		'./machine-capacity',
+		MACHINE_MODULE,
 	)
 
 	vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin')
@@ -330,6 +331,8 @@ describe('machine_capacity.read_machine — memory read at both ends of the wind
 
 		expect(reading.memory_pressured).toBe(true)
 		expect(reading.available_mb).toBe(0)
+		expect(reading.memory_supported).toBe(true)
+		expect(reading.total_mb).toBeGreaterThan(0)
 	})
 
 	// joshuafolkken/kit#4361: the run queue is read on the host, and never under a CPU quota.
@@ -339,5 +342,20 @@ describe('machine_capacity.read_machine — memory read at both ends of the wind
 		const expected = is_host ? 'number' : 'undefined'
 
 		expect(typeof reading.run_queue).toBe(expected)
+	})
+})
+
+describe('machine_capacity.read_machine — support and failed measurement', () => {
+	it.each(['darwin', 'win32'] as const)('marks unread memory on %s', async (platform) => {
+		const actual = await vi.importActual<{ machine_capacity: typeof machine_capacity }>(
+			MACHINE_MODULE,
+		)
+
+		vi.spyOn(process, 'platform', 'get').mockReturnValue(platform)
+		hanging_execa.answer_with('sysctl', '')
+		const reading = await actual.machine_capacity.read_machine(async () => await undefined)
+
+		expect(reading.available_mb).toBeUndefined()
+		expect(reading.memory_supported).toBe(platform === 'darwin')
 	})
 })

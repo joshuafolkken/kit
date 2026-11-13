@@ -4,7 +4,7 @@ const POLL_INTERVAL_MS = 50
 // The longest a reservation waits before it is admitted at minimum width regardless — a heavy step must
 // make progress even if the budget never clears, so a leaked or wedged sibling cannot stall the machine
 // for good. Two minutes is well past a unit suite's worst measured time under six-way load. A claim a
-// swap stall holds is the exception (`core_admission.is_swap_held`).
+// memory shortage holds is the exception (`core_admission.is_memory_held`).
 const WAIT_CAP_MS = 120_000
 // How long the load may go without easing before a held reservation is admitted at minimum width ahead
 // of the cap (`busy_average.is_unrelieved`): ten of the busy average's windows.

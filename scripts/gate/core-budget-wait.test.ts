@@ -194,11 +194,13 @@ async function records_its_wait(): Promise<void> {
 	const lane = lane_paths.lane_issue_of(process.cwd())
 	const issue = lane === undefined ? {} : { issue: Number(lane) }
 
-	expect(record_wait).toHaveBeenCalledExactlyOnceWith({
-		command: 'lint',
-		waited_ms: WAITED_MS,
-		...issue,
-	})
+	expect(record_wait).toHaveBeenCalledExactlyOnceWith(
+		expect.objectContaining({
+			command: 'lint',
+			waited_ms: WAITED_MS,
+			...issue,
+		}),
+	)
 }
 
 async function records_no_wait_solo(): Promise<void> {
@@ -212,12 +214,22 @@ async function records_no_wait_solo(): Promise<void> {
 		record_wait,
 	})
 
-	expect(record_wait).not.toHaveBeenCalled()
+	expect(record_wait).toHaveBeenCalledExactlyOnceWith(
+		expect.objectContaining({
+			command: 'a step',
+			waited_ms: 0,
+			admission_reason: 'budget-fit',
+			overflow: false,
+		}),
+	)
 }
 
 describe('core_budget.reserve — how long a claim waited', () => {
 	it('records the command, the wait and the lane once it is admitted', records_its_wait)
-	it('records nothing for a claim admitted at once', records_no_wait_solo)
+	it(
+		'records admission grounds with zero waiting for a claim admitted at once',
+		records_no_wait_solo,
+	)
 })
 
 describe('core_budget.reserve — a claim that waits says why', () => {

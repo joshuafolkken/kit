@@ -291,7 +291,12 @@ async function reserve_waits_on_memory(): Promise<void> {
 			directory,
 			budget: MEASURED_CORES,
 			memory_mb: TOOL_MEMORY_MB,
-			read_machine: async () => ({ busy_cores: 0, available_mb: LOW_AVAILABLE_MB }),
+			read_machine: async () => ({
+				busy_cores: 0,
+				available_mb: existsSync(path.join(directory, ALIVE_MARKER))
+					? LOW_AVAILABLE_MB
+					: TOOL_MEMORY_MB,
+			}),
 			now: () => 1,
 			sleep,
 		})
