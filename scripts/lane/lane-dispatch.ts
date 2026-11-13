@@ -11,6 +11,7 @@ import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_park } from '#scripts/run/park/run-park'
 import { run_label } from '#scripts/run/run-label'
+import { run_startup } from '#scripts/run/startup/run-startup'
 import { lane_child_invocation } from './lane-child-invocation'
 import { lane_child_marker } from './lane-child-marker'
 import { lane_dispatch_dependency, type DependencyWait } from './lane-dispatch-dependency'
@@ -240,6 +241,14 @@ async function dispatched_start(
 // again only once `needs-decision` is off, so a record still on disk is one a person cleared by hand on
 // GitHub, and left in place it would silence `lane-park` on this child's own stop
 // (joshuafolkken/kit#4132).
+function worker_environment(lane: LaneInfo): Record<string, string> {
+	return {
+		...lane_child_marker.env_for(lane.issue),
+		...lane_seat_start.environment(lane),
+		[run_startup.ENVIRONMENT_KEY]: '',
+	}
+}
+
 async function started(request: StartRequest): Promise<DispatchOutcome> {
 	const notes: Array<string> = []
 	const existing = existing_dispatch(request)
@@ -253,10 +262,7 @@ async function started(request: StartRequest): Promise<DispatchOutcome> {
 			cwd: request.lane.directory,
 			log_path: request.log_path,
 			profile: request.profile,
-			env: {
-				...lane_child_marker.env_for(request.lane.issue),
-				...lane_seat_start.environment(request.lane),
-			},
+			env: worker_environment(request.lane),
 		},
 		(note) => {
 			notes.push(note)

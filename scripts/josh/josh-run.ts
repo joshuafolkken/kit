@@ -1,3 +1,4 @@
+import { run_startup } from '#scripts/run/startup/run-startup'
 import { execa } from 'execa'
 
 // One captured `pnpm josh` subprocess. A composite command that collapses a
@@ -42,9 +43,11 @@ function extra_options(
 	timeout_ms: number | undefined,
 	environment: Readonly<Record<string, string>> | undefined,
 ): ExtraOptions {
+	const child_environment = { ...run_startup.environment(), ...environment }
+
 	return {
 		...(timeout_ms !== undefined && { timeout: timeout_ms }),
-		...(environment !== undefined && { env: environment }),
+		...(Object.keys(child_environment).length > 0 && { env: child_environment }),
 	}
 }
 
@@ -76,7 +79,7 @@ async function josh_run(
 }
 
 async function josh_run_at(args: ReadonlyArray<string>, cwd: string): Promise<JoshResult> {
-	return await run_with_options(args, false, { cwd })
+	return await run_with_options(args, false, { ...extra_options(undefined, undefined), cwd })
 }
 
 // A step whose failure ends the composite: its stderr, else its stdout, else the exit code is the

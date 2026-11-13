@@ -1,3 +1,4 @@
+import { run_startup_schema } from '#scripts/run/startup/run-startup-schema'
 import { z } from 'zod'
 import { lane_ledger_kind } from './lane-ledger-kind'
 import { lane_ledger_pinned_origin } from './lane-ledger-pinned-origin'
@@ -247,6 +248,7 @@ const push_miss_schema = z.object({
 const limit_schema = z.object({ kind: z.literal(KIND.LIMIT), at: z.string(), limit: z.number() })
 const entry_schema = z.discriminatedUnion('kind', [
 	early_push_schema,
+	run_startup_schema.entry_schema,
 	merge_schema,
 	gate_schema,
 	load_schema,

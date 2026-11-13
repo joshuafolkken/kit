@@ -14,6 +14,7 @@ import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { issue_not_before_label } from '#scripts/issue/issue-not-before-label'
 import { lane_net_read } from '#scripts/lane/lane-net-read'
+import { run_startup } from '#scripts/run/startup/run-startup'
 import { backlog_auto_triage } from './backlog-auto-triage'
 import { backlog_defect_priority } from './backlog-defect-priority'
 import { backlog_gate_scope, type OptedIn, type PoolContext } from './backlog-gate-scope'
@@ -196,7 +197,7 @@ function is_transport_failure(result: EpicNextResult): boolean {
 // `resolve` and a plan made before the run lists everything. The holders are
 // read only on a `run` answer — the one answer the gate can change. The cap follows the gate
 // (`backlog-rank.ts`).
-async function gate_solo(result: EpicNextResult, context: PoolContext): Promise<EpicNextResult> {
+async function gate_ready(result: EpicNextResult, context: PoolContext): Promise<EpicNextResult> {
 	if (result.verdict !== 'run') return result
 
 	const { repo } = context
@@ -213,6 +214,18 @@ async function gate_solo(result: EpicNextResult, context: PoolContext): Promise<
 	if (gated.notice !== undefined) console.error(gated.notice)
 
 	return gated.result
+}
+
+function result_edge(value: EpicNextResult | undefined): 'done' | 'failed' | 'waiting' {
+	if (value === undefined || value.verdict === 'error') return 'failed'
+
+	return value.verdict === 'wait' || value.verdict === 'stop' ? 'waiting' : 'done'
+}
+
+async function gate_solo(result: EpicNextResult, context: PoolContext): Promise<EpicNextResult> {
+	return await run_startup.phase('eligibility', async () => await gate_ready(result, context), {
+		edge_of: result_edge,
+	})
 }
 
 // The untriaged candidates are held out before the `run:solo` gate, which cannot read a label not
@@ -232,7 +245,13 @@ async function answer_held(
 
 // Each answer is recorded once in the lane ledger before it is printed (`backlog-next-offer.ts`).
 async function answer_pool(context: PoolContext): Promise<number> {
-	const resolved = await resolve(context)
+	const resolved = await run_startup.phase(
+		'candidate eligibility',
+		async () => await resolve(context),
+		{
+			edge_of: result_edge,
+		},
+	)
 
 	if (resolved === undefined) return FAILURE_EXIT_CODE
 
@@ -308,7 +327,9 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	const opted_in = await auto_ok_cli.fetch_opted_in()
+	const opted_in = await run_startup.phase('candidate listing', auto_ok_cli.fetch_opted_in, {
+		edge_of: (value) => (value.kind === 'read' ? 'done' : 'failed'),
+	})
 
 	if (opted_in.kind !== 'read') {
 		console.error(READ_FAILURES[opted_in.kind])

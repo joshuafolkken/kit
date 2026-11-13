@@ -1,7 +1,7 @@
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { assert, describe, expect, it } from 'vitest'
 import { lane_breakdown } from './lane-breakdown'
-import type { LedgerEntry } from './lane-ledger'
+import type { LedgerEntry, StageEntry } from './lane-ledger'
 import { lane_net_time } from './lane-net-time'
 import { lane_stage_events } from './lane-stage-events'
 import { lane_timeline } from './lane-timeline'
@@ -16,7 +16,7 @@ function at(minute: number): string {
 	return new Date(START + minute * MINUTE).toISOString()
 }
 
-function stage(name: string, start: number, end: number): LedgerEntry {
+function stage(name: string, start: number, end: number): StageEntry {
 	return {
 		kind: 'stage',
 		issue: ISSUE,

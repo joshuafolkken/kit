@@ -1,4 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { run_startup } from '#scripts/run/startup/run-startup'
+import type { StartupEntry } from '#scripts/run/startup/run-startup-schema'
+import { run_startup_store } from '#scripts/run/startup/run-startup-store'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const josh_run_mock = vi.hoisted(() => vi.fn())
 
@@ -20,6 +23,9 @@ const SKIP = { code: OK, out: 'skip' }
 const REQUIRED = { code: OK, out: 'required\nlockfile updated' }
 const STASHED = { code: OK, out: 'stashed' }
 const CLEAN = { code: OK, out: 'clean' }
+const SCOPE = { run: 'prime-run', issue: '7422', attempt: 'prime-attempt' }
+const INITIAL_SYNC = 'initialization main:sync'
+const rows: Array<StartupEntry> = []
 const LATEST_REQUIRED = 'latest required'
 const STASH_CLEAN = 'stash clean'
 
@@ -49,9 +55,47 @@ function printed(): ReadonlyArray<unknown> {
 }
 
 beforeEach(() => {
+	rows.length = 0
+	vi.spyOn(run_startup_store, 'record').mockImplementation(async (row) => {
+		rows.push(row)
+	})
 	josh_run_mock.mockReset()
 	info.mockClear()
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
+})
+
+afterEach(() => vi.mocked(run_startup_store.record).mockRestore())
+
+it.each([OK, FAILED])('records initialization and child step status for exit %s', async (code) => {
+	answer([
+		[MAIN_SYNC, { code, out: '' }],
+		[LATEST, SKIP],
+	])
+	await run_startup.within(SCOPE, async () => await run_prime_cli.run([]))
+	const phases = run_startup_store.summarize(rows)
+	const root = phases.find((row) => row.start.phase === 'initialization')
+	const child = phases.find((row) => row.start.phase === INITIAL_SYNC)
+	const status = code === OK ? 'done' : 'failed'
+
+	expect(root).toMatchObject({ status, elapsed_ms: expect.any(Number) })
+	expect(child).toMatchObject({
+		start: { parent: root?.start.id },
+		status,
+		elapsed_ms: expect.any(Number),
+	})
+	expect(
+		rows.every(
+			(row) => row.run === SCOPE.run && row.issue === SCOPE.issue && row.attempt === SCOPE.attempt,
+		),
+	).toBe(true)
+	expect(phases.map((row) => row.start.phase)).toEqual(
+		code === OK
+			? [
+					'initialization',
+					...[MAIN_SYNC, LATEST, PRUNE, TIDY].map((argv) => `initialization ${argv[0]}`),
+				]
+			: ['initialization', INITIAL_SYNC],
+	)
 })
 
 describe('run_prime_cli.run — a primed checkout', () => {

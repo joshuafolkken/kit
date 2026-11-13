@@ -1,6 +1,7 @@
 import { git_stash } from '#scripts/git/stash/git-stash'
 import { lane_launch_cli, type LaunchOutcome } from '#scripts/lane/lane-launch-cli'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
+import { run_startup } from '#scripts/run/startup/run-startup'
 import { backlog_drive_launch_pass, type DriveLaunch } from './backlog-drive-launch-pass'
 import { backlog_drive_owner } from './backlog-drive-owner'
 import { backlog_drive_split_unit } from './backlog-drive-split-unit'
@@ -79,17 +80,7 @@ async function measured(issue: string): Promise<DriveLaunch | undefined> {
 	return outcome === 'wait' ? UNSAMPLED_LAUNCH : undefined
 }
 
-// An issue over the size bar that its split-only unit split takes no lane either
-// (`backlog-drive-split-unit.ts`). The unit runs for minutes, so ownership is asserted again after it:
-// a driver superseded meanwhile opens no lane.
-async function opened(issue: string, owner: string): Promise<DriveLaunch> {
-	await backlog_drive_owner.assert_current(owner)
-
-	const settled = await measured(issue)
-
-	if (settled !== undefined) return settled
-	if ((await backlog_drive_split_unit.run(issue)) === 'split') return SPLIT_LAUNCH
-	await backlog_drive_owner.assert_current(owner)
+async function launch_and_report(issue: string): Promise<DriveLaunch> {
 	await run_event_setup.emit(run_event_setup.opening_lane(issue))
 
 	const outcome = await launch_ready(issue)
@@ -102,12 +93,43 @@ async function opened(issue: string, owner: string): Promise<DriveLaunch> {
 	return outcome.kind
 }
 
+// Ownership is rechecked after the split-only unit, before any lane opens.
+async function opened(issue: string, owner: string): Promise<DriveLaunch> {
+	await backlog_drive_owner.assert_current(owner)
+	const settled = await run_startup.phase('measurement', async () => await measured(issue), {
+		edge_of: (value) => (value === UNSAMPLED_LAUNCH ? 'waiting' : 'done'),
+	})
+	if (settled !== undefined) return settled
+	const split = await run_startup.phase(
+		'split assessment',
+		async () => await backlog_drive_split_unit.run(issue),
+	)
+	if (split === 'split') return SPLIT_LAUNCH
+	await backlog_drive_owner.assert_current(owner)
+
+	return await launch_and_report(issue)
+}
+
+function launch_edge(value: DriveLaunch): 'done' | 'failed' {
+	return value === 'unopened' || value === 'failed' ? 'failed' : 'done'
+}
+
 // The launch opened and closed on the stream (`backlog-drive-trace.ts`).
 async function launch(issue: string, owner: string): Promise<DriveLaunch> {
-	return await backlog_drive_trace.traced(
-		issue,
-		backlog_drive_trace.STEP.LAUNCH,
-		async () => await opened(issue, owner),
+	return await run_startup.phase(
+		'launch',
+		async () =>
+			await backlog_drive_trace.traced(
+				issue,
+				backlog_drive_trace.STEP.LAUNCH,
+				async () => await opened(issue, owner),
+			),
+		{
+			issue,
+			root: true,
+			edge_of: (value) =>
+				value === 'waiting' || value === 'unsampled' ? 'waiting' : launch_edge(value),
+		},
 	)
 }
 
