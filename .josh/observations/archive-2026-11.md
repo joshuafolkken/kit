@@ -5133,3 +5133,19 @@
 - rx:{"round":"e5d42be1-9c9f-43a1-beaf-18b788716f24","category":"bug-risks","severity":"medium","file":"scripts/run/cut/run-cut-resume.ts:120","disposition":"fixed","description":"human-review 回収で is_handed_off:true に解放した cut は修復判定を飛ばし直接 entry が旧 gate/stale に進むため、解放済み cut も共有判定へ渡す; other sites: scripts/run/merge/run-merge-human-review.ts:18, scripts/run/merge/run-merge-cut-release.ts:12, scripts/run/cut/run-cut-adoption.ts:57, scripts/run/cut/run-cut-cli.ts:336, scripts/run/entry/run-entry-cli.ts:425, scripts/run/add/run-add-cli-repair.test.ts:119, docs/josh-commands-run.md:492","status":"resolved"}
 - rx:{"round":"e5d42be1-9c9f-43a1-beaf-18b788716f24","category":"bug-risks","severity":"medium","file":"scripts/run/run-repair-attempt.ts:124","disposition":"fixed","description":"replacement fullrun worker 自身が process probe の alive に一致して entry の修復が handed-off で止まるため、再開要求者と旧所有者を区別するか起動前準備を必須化する; other sites: scripts/lane/lane-await.ts:106, scripts/lane/lane-child-invocation.ts:51, scripts/lane/lane-child-invocation.ts:76, scripts/run/cut/run-cut-resume.ts:120, scripts/run/add/run-add-cli-repair.test.ts:78, scripts/run/cut/run-cut.ts:453, docs/josh-commands-run.md:492","status":"resolved"}
 - rf:none | none | - | 2026-11-13 | #7480
+- rf:none | none | - | 2026-11-13 | #7482
+- ri:none | none | - | 2026-11-13 | #7482
+- rb:2026-11-13 | #7482
+- rf:bug-risks | medium | scripts/run/merge/run-merge-waits.ts:32 | 2026-11-13 | #7482
+- rx:{"round":"351d5ea0-99a2-4fd2-854c-b48be392f353","category":"bug-risks","severity":"medium","file":"scripts/run/merge/run-merge-waits.ts:32","description":"調査中に観測宣言を追記してまだ not-before ラベルがない Issue で本文取得が失敗すると待機理由が空になり do_failed が run:stalled と失敗回数増加へ進むため、本文の不明状態を通常失敗と区別して再試行可能な待機にする必要がある; other sites: none","status":"new"}
+- rb:2026-11-13 | #7482
+- rf:bug-risks | medium | scripts/run/merge/run-merge-waits.ts:32 | 2026-11-13 | #7482 | fixed
+- rx:{"round":"c53f60da-c297-4c65-9e84-793a5bbe5351","previous":"351d5ea0-99a2-4fd2-854c-b48be392f353","category":"bug-risks","severity":"medium","file":"scripts/run/merge/run-merge-waits.ts:32","disposition":"fixed","description":"調査中に観測宣言を追記してまだ not-before ラベルがない Issue で本文取得が失敗すると待機理由が空になり do_failed が run:stalled と失敗回数増加へ進むため、本文の不明状態を通常失敗と区別して再試行可能な待機にする必要がある; other sites: none","status":"resolved"}
+- rb:2026-11-13 | #7482
+- rf:bug-risks | medium | scripts/run/merge/run-merge-waits.ts:32 | 2026-11-13 | #7482 | fixed
+- rx:{"round":"444bf15a-27e2-4cd1-bf1c-730bb7bab0f8","previous":"c53f60da-c297-4c65-9e84-793a5bbe5351","category":"bug-risks","severity":"medium","file":"scripts/run/merge/run-merge-waits.ts:32","disposition":"fixed","description":"調査中に観測宣言を追記してまだ not-before ラベルがない Issue で本文取得が失敗すると待機理由が空になり do_failed が run:stalled と失敗回数増加へ進むため、本文の不明状態を通常失敗と区別して再試行可能な待機にする必要がある; other sites: none","status":"resolved"}
+- rf:none | none | - | 2026-11-13 | #7484
+- ri:none | none | - | 2026-11-13 | #7484
+- rb:2026-11-13 | #7484
+- rf:bug-risks | medium | scripts/run/wake/run-wake-codex.ts:46 | 2026-11-13 | #7484 | fixed
+- rx:{"round":"04fb91da-4181-476d-9307-53f9d047e21b","category":"bug-risks","severity":"medium","file":"scripts/run/wake/run-wake-codex.ts:46","disposition":"fixed","description":"旧 pid-less 判断を live として一巡観測すると woke_at が消え、後の正常終了を失敗扱いするため旧 launch mark を保持する。","status":"resolved"}
