@@ -15,6 +15,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { lint_parallel } from './lint-parallel'
 import { lint_related } from './lint-related'
 
+vi.mock('./format-steps', () => ({ format_steps: { run_scoped: vi.fn(async () => 0) } }))
+
 vi.mock('#scripts/git/git-command', () => ({ git_command: { repository_root: vi.fn() } }))
 vi.mock('#scripts/git/changed-paths', () => ({ changed_paths: { read_changed_paths: vi.fn() } }))
 vi.mock('./lint-parallel', () => ({
