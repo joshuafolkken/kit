@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
+import { import_graph } from '#scripts/lint/import-graph'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import {
 	observation_record,
@@ -9,6 +10,7 @@ import {
 import { review_comment_round } from '#scripts/review/review-comment-round'
 import { test_related_pins } from '#scripts/test/test-related-pins'
 import { vitest_failure_summary } from '#scripts/test/vitest-failure-summary'
+import { whole_suite_files } from '#scripts/test/whole-suite-files'
 
 // A CI job that ended `failure` because a unit test went red can still owe nothing to the change: a test
 // the diff never touched fails under runner load (joshuafolkken/kit#5152, a frame-budget test on a busy
@@ -16,9 +18,8 @@ import { vitest_failure_summary } from '#scripts/test/vitest-failure-summary'
 // these are the readings that decide it: the failed tests a job's log names, and whether any of them
 // belongs to the change.
 //
-// **A test belongs to the change when its own file or its subject module moved** — `foo.claim.test.ts`
-// tests `foo.claim.ts` and `foo.ts`. A test reaching a moved module only through an import is missed,
-// and costs one rerun: the second red still stops `followup`, since a rerun attempt is never rerun.
+// A rerun needs proof that the test's complete runtime inputs exclude the change. Missing inputs
+// keep the failure for repair, as do import diagnostics that another runner cannot repair.
 
 // GitHub Actions stamps every log line `<ISO timestamp> `, which vitest's ` FAIL  ` line does not begin with.
 const LOG_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\S+Z /u
@@ -39,7 +40,10 @@ type TestVerdict = typeof RERUN_VERDICT | typeof KEPT_VERDICT | typeof UNNAMED_V
 interface FailedTests {
 	files: ReadonlyArray<string>
 	names: ReadonlyArray<string>
+	import_failure?: string
 }
+
+type InputsReader = (file: string) => ReadonlyArray<string> | undefined
 
 interface UnrelatedFailure {
 	job: string
@@ -49,9 +53,15 @@ interface UnrelatedFailure {
 // The failed tests vitest named in a job's log — empty when the job failed on anything but a test.
 function read_failed_tests(log: string): FailedTests {
 	const lines = log.split('\n').map((line) => line.replace(LOG_TIMESTAMP, ''))
-	const names = vitest_failure_summary.failed_tests(lines.join('\n'))
+	const plain = lines.join('\n')
+	const names = vitest_failure_summary.failed_tests(plain)
+	const diagnostic = vitest_failure_summary.import_failure(plain)
 
-	return { files: vitest_failure_summary.failed_files(names), names }
+	return {
+		files: vitest_failure_summary.failed_files(names),
+		names,
+		...(diagnostic !== undefined && { import_failure: diagnostic }),
+	}
 }
 
 // The test file itself, then the module each leading run of its name's segments names.
@@ -73,19 +83,69 @@ function subjects_of(test_file: string): ReadonlyArray<string> {
 }
 
 // A test the change pins (`test-related-pins.ts`) belongs to it, as a subject's test does.
-function is_in_change(test_file: string, changed: ReadonlySet<string>): boolean {
-	if (test_related_pins.pinned_tests(changed).includes(test_file)) return true
+function inputs_in_change(
+	inputs: ReadonlyArray<string> | undefined,
+	test_file: string,
+	changed: ReadonlySet<string>,
+): boolean {
+	if (!inputs?.includes(path.resolve(test_file))) return true
 
-	return subjects_of(test_file).some((subject) => changed.has(subject))
+	return [...changed].some(
+		(file) => whole_suite_files.WHOLE_SUITE_FILES.has(file) || inputs.includes(path.resolve(file)),
+	)
+}
+
+function is_in_change(
+	test_file: string,
+	changed: ReadonlySet<string>,
+	read?: InputsReader,
+): boolean {
+	if (
+		test_related_pins.pinned_tests(changed).includes(test_file) ||
+		subjects_of(test_file).some((subject) => changed.has(subject))
+	) {
+		return true
+	}
+
+	const inputs = read?.(path.resolve(test_file))
+
+	return inputs_in_change(inputs, test_file, changed)
 }
 
 // **`rerun` only when the log named a failed test and none of them belongs to the change**, `kept`
 // when one does. A job red with no test named — a lint, a build, a job gathering others' results — is
 // `unnamed`: rerun only as one waiting on a job red on tests outside the change (`followup-job-needs.ts`).
-function verdict_of(tests: FailedTests, changed: ReadonlySet<string>): TestVerdict {
+function verdict_of(
+	tests: FailedTests,
+	changed: ReadonlySet<string>,
+	read?: InputsReader,
+): TestVerdict {
+	if (tests.import_failure !== undefined) return KEPT_VERDICT
 	if (tests.files.length === 0) return UNNAMED_VERDICT
 
-	return tests.files.every((file) => !is_in_change(file, changed)) ? RERUN_VERDICT : KEPT_VERDICT
+	const is_outside = tests.files.every((file) => !is_in_change(file, changed, read))
+
+	return is_outside ? RERUN_VERDICT : KEPT_VERDICT
+}
+
+async function read_verdict(
+	tests: FailedTests,
+	changed: ReadonlySet<string>,
+): Promise<TestVerdict> {
+	if (tests.import_failure !== undefined) {
+		console.info(`🔧 Repair CI import failure before rerunning: ${tests.import_failure}`)
+
+		if (tests.files.length > 0) {
+			console.info(`${vitest_failure_summary.RERUN_PREFIX}${tests.files.join(' ')}`)
+		}
+
+		return KEPT_VERDICT
+	}
+
+	if (tests.files.length === 0) return UNNAMED_VERDICT
+	const graph = await import_graph.create(process.cwd())
+
+	return verdict_of(tests, changed, graph?.test_inputs)
 }
 
 // The ledger line a rerun leaves, so a test that keeps failing beside unrelated changes is counted
@@ -154,6 +214,7 @@ async function record(
 const followup_failed_tests = {
 	observation_of,
 	read_failed_tests,
+	read_verdict,
 	record,
 	record_entry,
 	subjects_of,

@@ -1,6 +1,10 @@
+import { realpathSync, writeFileSync } from 'node:fs'
+import path from 'node:path'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
+import { import_graph, type ImportGraph } from '#scripts/lint/import-graph'
 import { observation_record } from '#scripts/observations/observation-record'
 import { review_comment_round } from '#scripts/review/review-comment-round'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
 	followup_failed_tests,
@@ -19,7 +23,30 @@ const CLAIM_NAME = `|isolated| ${CLAIM_TEST} > claim > holds`
 const ISSUE = 5197
 const SIGHTING = `- k:${OBSERVATION_SLUG} | d1 | 2026-10-28 | ${BUDGET_TEST} | followup reran`
 const FIFTH_SHARD = 'Unit Tests (5/6)'
+const GRAPH_UNAVAILABLE = 'graph unavailable'
 const FAILURES = [{ job: FIFTH_SHARD, tests: { files: [BUDGET_TEST], names: [BUDGET_NAME] } }]
+const make_directory = temporary_directory()
+
+async function indirect_fixture(): Promise<{
+	test: string
+	leaf: string
+	read: ImportGraph['test_inputs']
+}> {
+	const root = realpathSync(make_directory('followup-indirect-'))
+	const test = path.join(root, 'subject.test.ts')
+	const leaf = path.join(root, 'leaf.ts')
+
+	writeFileSync(
+		path.join(root, 'tsconfig.json'),
+		'{"compilerOptions":{"moduleResolution":"bundler"}}',
+	)
+	writeFileSync(test, "import { value } from './subject'\nexport const result = value\n")
+	writeFileSync(path.join(root, 'subject.ts'), "export { value } from './leaf'\n")
+	writeFileSync(leaf, 'export const value = 1\n')
+	const graph = await import_graph.create(root)
+
+	return { test, leaf, read: graph?.test_inputs }
+}
 
 vi.mock('#scripts/gh/git-gh-issue-write', () => ({
 	git_gh_issue_write: { issue_comment: vi.fn() },
@@ -80,11 +107,39 @@ describe('followup_failed_tests.subjects_of', () => {
 })
 
 describe('followup_failed_tests.verdict_of', () => {
+	it('follows an indirect runtime import while the test and its direct subject are unchanged', async () => {
+		const { test, leaf, read } = await indirect_fixture()
+
+		expect(read).toBeTypeOf('function')
+		expect(followup_failed_tests.verdict_of(tests_of(test), new Set([leaf]), read)).toBe(
+			KEPT_VERDICT,
+		)
+		expect(followup_failed_tests.verdict_of(tests_of(test), new Set(['unrelated.ts']), read)).toBe(
+			RERUN_VERDICT,
+		)
+	})
+
+	it.each([undefined, () => undefined, () => []])('keeps unknown dependency inputs: %s', (read) => {
+		expect(followup_failed_tests.verdict_of(tests_of(BUDGET_TEST), new Set(), read)).toBe(
+			KEPT_VERDICT,
+		)
+	})
+
+	it('keeps a failure when the shared test configuration changed', () => {
+		const tests = tests_of(BUDGET_TEST)
+
+		expect(
+			followup_failed_tests.verdict_of(tests, new Set(['vitest.config.ts']), (file) => [file]),
+		).toBe(KEPT_VERDICT)
+	})
+})
+
+describe('followup_failed_tests.verdict_of — direct subjects and pins', () => {
 	it('reruns when no failed test or its subject moved', () => {
 		const changed = new Set(['scripts/followup/followup-job-rerun.ts'])
 		const tests = tests_of(BUDGET_TEST, CLAIM_TEST)
 
-		expect(followup_failed_tests.verdict_of(tests, changed)).toBe(RERUN_VERDICT)
+		expect(followup_failed_tests.verdict_of(tests, changed, (file) => [file])).toBe(RERUN_VERDICT)
 	})
 
 	it.each([
@@ -106,6 +161,31 @@ describe('followup_failed_tests.verdict_of', () => {
 
 	it('answers unnamed when the log named no failed test', () => {
 		expect(followup_failed_tests.verdict_of(tests_of(), new Set())).toBe(UNNAMED_VERDICT)
+	})
+})
+
+describe('followup_failed_tests.read_verdict — unknown inputs', () => {
+	it('keeps the failure when no dependency graph is available', async () => {
+		vi.spyOn(import_graph, 'create').mockResolvedValueOnce(undefined)
+
+		await expect(
+			followup_failed_tests.read_verdict(tests_of(BUDGET_TEST), new Set()),
+		).resolves.toBe(KEPT_VERDICT)
+	})
+
+	it('propagates an exploration error so the caller preserves the original CI failure', async () => {
+		vi.spyOn(import_graph, 'create').mockRejectedValueOnce(new Error(GRAPH_UNAVAILABLE))
+
+		await expect(
+			followup_failed_tests.read_verdict(tests_of(BUDGET_TEST), new Set()),
+		).rejects.toThrow(GRAPH_UNAVAILABLE)
+	})
+
+	it('keeps an import diagnostic even when no test file was named', async () => {
+		const log = 'Error: [vitest] No "constants" export is defined on the "node:fs" mock.'
+		const tests = followup_failed_tests.read_failed_tests(log)
+
+		await expect(followup_failed_tests.read_verdict(tests, new Set())).resolves.toBe(KEPT_VERDICT)
 	})
 })
 
