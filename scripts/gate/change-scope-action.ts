@@ -43,6 +43,8 @@ function metadata(manifest: Manifest): string {
 const { matches } = path_glob
 
 function published(file: string, entries: Array<string> = []): boolean {
+	// npm keeps an explicitly named file even when a broader test exclusion matches it.
+	if (entries.includes(file)) return true
 	const included = entries.filter((entry) => !entry.startsWith('!'))
 	const excluded = entries.filter((entry) => entry.startsWith('!'))
 
