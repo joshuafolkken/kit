@@ -59,6 +59,19 @@ function pnpm_version(): string {
 	return execaSync('pnpm', ['--version'], { timeout: COMMAND_TIMEOUT_MS }).stdout.trim()
 }
 
+function assert_lockfile_directory(root: string): void {
+	const directory = execaSync('pnpm', ['config', 'get', 'lockfile-dir'], {
+		cwd: root,
+		timeout: COMMAND_TIMEOUT_MS,
+	}).stdout.trim()
+	if (directory === 'undefined') return
+	const configured = path.resolve(root, directory)
+
+	if (!existsSync(configured) || realpathSync(configured) !== realpathSync(root)) {
+		throw new Error('Nonstandard lockfile directory refused; no files changed')
+	}
+}
+
 const defaults: MigrationDependencies = {
 	publication: npm_registry.read_public_version,
 	download,
@@ -164,6 +177,8 @@ function validate(root: string, version: string, dependencies: MigrationDependen
 			`Verified pnpm version: ${migrate_lock.PNPM_VERSION}; actual: ${actual}; no files changed`,
 		)
 	}
+
+	assert_lockfile_directory(root)
 }
 
 async function prepare(

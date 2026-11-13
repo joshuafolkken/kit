@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { write_file } from '#tools/test/write-file'
@@ -22,6 +22,7 @@ const BYTES = new TextEncoder().encode('fixture')
 const MANIFEST = 'package.json'
 const PRIVATE_MANIFEST = '{"private":true}'
 const EXTERNAL_PREFIX = 'external-lock-'
+const DIRECTORY_ERROR = 'lockfile directory'
 
 function dependencies(): MigrationDependencies {
 	return {
@@ -49,7 +50,7 @@ function config(root: string, source: string, external: string): void {
 		}
 
 		default: {
-			vi.stubEnv('npm_config_lockfile_dir', external)
+			vi.stubEnv('PNPM_CONFIG_LOCKFILE_DIR', external)
 		}
 	}
 }
@@ -90,20 +91,41 @@ describe('migration runtime dependencies', () => {
 })
 
 describe('migration resolver write isolation', () => {
-	it.each(['workspace', 'npmrc', 'environment'])(
-		'keeps the external %s lock unchanged after a successful dry-run',
-		async (source) => {
+	it.each([
+		{ source: 'workspace', dry: true },
+		{ source: 'workspace', dry: false },
+		{ source: 'environment', dry: true },
+		{ source: 'environment', dry: false },
+	])(
+		'refuses an external $source lock with no root lock and dry-run=$dry',
+		async ({ source, dry }) => {
 			const root = make_directory('migration-dry-run-')
 			const external = make_directory(EXTERNAL_PREFIX)
 
 			write_file(root, MANIFEST, PRIVATE_MANIFEST)
 			write_file(external, LOCKFILE, ORIGINAL)
 			config(root, source, external)
-			expect(await migrate(root, '1.0.0', true, dependencies())).toContain(LOCKFILE)
+			await expect(migrate(root, '1.0.0', dry, dependencies())).rejects.toThrow(DIRECTORY_ERROR)
 			expect(readFileSync(path.join(external, LOCKFILE), 'utf8')).toBe(ORIGINAL)
+			expect(existsSync(path.join(root, LOCKFILE))).toBe(false)
 		},
 	)
+})
 
+describe('migration ignored project configuration', () => {
+	it('keeps an ignored project npmrc lockfile-dir unchanged during a dry-run', async () => {
+		const root = make_directory('migration-npmrc-')
+		const external = make_directory(EXTERNAL_PREFIX)
+
+		write_file(root, MANIFEST, PRIVATE_MANIFEST)
+		write_file(external, LOCKFILE, ORIGINAL)
+		config(root, 'npmrc', external)
+		expect(await migrate(root, '1.0.0', true, dependencies())).toContain(LOCKFILE)
+		expect(readFileSync(path.join(external, LOCKFILE), 'utf8')).toBe(ORIGINAL)
+	})
+})
+
+describe('migration existing lock isolation', () => {
 	it.each([
 		{ source: 'workspace', dry: true },
 		{ source: 'workspace', dry: false },
@@ -119,7 +141,9 @@ describe('migration resolver write isolation', () => {
 		write_file(root, LOCKFILE, BEFORE)
 		write_file(external, LOCKFILE, ORIGINAL)
 		config(root, source, external)
-		await expect(migrate(root, '1.0.0', dry, dependencies())).rejects.toThrow('dependency graph')
+		await expect(migrate(root, '1.0.0', dry, dependencies())).rejects.toThrow(
+			source === 'npmrc' ? 'dependency graph' : DIRECTORY_ERROR,
+		)
 		expect(readFileSync(path.join(external, LOCKFILE), 'utf8')).toBe(ORIGINAL)
 		expect(readFileSync(path.join(root, LOCKFILE), 'utf8')).toBe(BEFORE)
 	})
