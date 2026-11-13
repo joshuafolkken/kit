@@ -67,6 +67,7 @@ describe('run_event_setup stages', () => {
 			STARTING: 'starting session',
 			PLANNING: 'planning',
 			HANDING_OFF: 'handing off',
+			WATCHING: 'watching',
 			JUDGING: 'waiting on judgment',
 			SESSION: 'judgment session running',
 			RETROSPECTIVE: 'retrospective',

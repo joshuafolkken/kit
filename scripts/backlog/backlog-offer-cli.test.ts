@@ -1,3 +1,4 @@
+import { deferred_answer, type DeferredAnswer } from '#scripts/git/deferred-answer-fixture'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const josh_run_mock = vi.hoisted(() => vi.fn())
@@ -215,6 +216,44 @@ describe('backlog_offer_cli.run — a watching poll leaves the stream alone', ()
 // stream untouched.
 const DRAIN_KIND = 'drain'
 
+function controlled_flush(): {
+	flush: DeferredAnswer<undefined>
+	entered: DeferredAnswer<undefined>
+	drained: ReturnType<typeof vi.fn>
+} {
+	const signals = {
+		flush: deferred_answer<undefined>(),
+		entered: deferred_answer<undefined>(),
+		drained: vi.fn(),
+	}
+
+	emit_once_mock.mockImplementation(async (_kind, _text, before_append) => {
+		await before_append()
+		signals.drained()
+
+		return true
+	})
+	flush_mock.mockImplementation(async () => {
+		signals.entered.answer(undefined)
+		await signals.flush.promise
+	})
+
+	return signals
+}
+
+it('announces idle while a controlled flush is pending without releasing the drain', async () => {
+	const signals = controlled_flush()
+	const offered = answer_for({ code: OK, out: 'wait' }, 'watch')
+
+	await signals.entered.promise
+	expect(emit_mock).toHaveBeenCalledWith('setup', 'watching')
+	expect(signals.drained).not.toHaveBeenCalled()
+	expect(info_lines).toHaveLength(0)
+	signals.flush.answer(undefined)
+	await offered
+	expect(signals.drained).toHaveBeenCalledOnce()
+})
+
 describe('backlog_offer_cli.run — flush before the retrospective', () => {
 	it.each(['watch', 'stop'])('flushes a fresh drain before returning %s', async (verdict) => {
 		emit_once_mock.mockImplementation(
@@ -226,22 +265,12 @@ describe('backlog_offer_cli.run — flush before the retrospective', () => {
 		)
 		flush_mock.mockImplementation(async () => {
 			expect(info_lines).toHaveLength(0)
+			expect(emit_mock).toHaveBeenCalledWith('setup', 'watching')
 		})
 
 		expect(await answer_for({ code: OK, out: 'none' }, verdict)).toBe('exhausted')
 		expect(flush_mock).toHaveBeenCalledExactlyOnceWith()
 		expect(info_lines.length).toBeGreaterThan(0)
-	})
-
-	it('hands the flush to the marker as the step before it is appended', async () => {
-		await answer_for({ code: OK, out: 'none' }, 'watch')
-
-		expect(emit_once_mock).toHaveBeenCalledExactlyOnceWith(
-			DRAIN_KIND,
-			expect.any(String),
-			flush_mock,
-		)
-		expect(flush_mock).not.toHaveBeenCalled()
 	})
 })
 
@@ -249,13 +278,21 @@ describe('backlog_offer_cli.run — the drain marks the stream before the idle w
 	it('marks the stream once when the backlog drains with nothing in flight', async () => {
 		await answer_for({ code: OK, out: 'none' }, 'watch')
 
-		expect(emit_once_mock).toHaveBeenCalledWith(DRAIN_KIND, expect.any(String), flush_mock)
+		expect(emit_once_mock).toHaveBeenCalledWith(
+			DRAIN_KIND,
+			expect.any(String),
+			expect.any(Function),
+		)
 	})
 
 	it('marks a drain when idle zero stops on an empty backlog', async () => {
 		await answer_for({ code: OK, out: 'none' }, 'stop')
 
-		expect(emit_once_mock).toHaveBeenCalledWith(DRAIN_KIND, expect.any(String), flush_mock)
+		expect(emit_once_mock).toHaveBeenCalledWith(
+			DRAIN_KIND,
+			expect.any(String),
+			expect.any(Function),
+		)
 	})
 
 	it('does not mark the stream on a watch that opened while children were still merging', async () => {

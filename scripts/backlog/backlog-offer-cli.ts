@@ -2,6 +2,7 @@ import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { json_value } from '#scripts/lib/json-value'
 import { rule_value_cache } from '#scripts/rules/rule-value-cache'
+import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_startup } from '#scripts/run/startup/run-startup'
@@ -185,6 +186,12 @@ function refuse(): number {
 	return FAILURE_EXIT_CODE
 }
 
+// Idle is visible before maintenance; the replaceable drain still waits for that maintenance.
+async function prepare_drain(): Promise<void> {
+	await run_event_setup.emit(run_event_setup.STAGE.WATCHING)
+	await backlog_drain_flush.flush()
+}
+
 // The drain: the backlog is empty (`exhausted`) and nothing of the run's own is in flight, so the run is
 // about to open its idle watch or stop with `--idle 0`. Marking once per drain with `emit_once`
 // is what lets `run:step` fire the end-of-run retrospective *before* the watch rather than after it,
@@ -201,7 +208,7 @@ async function mark_drain(verdict: string, answer: string, running: number): Pro
 	return await run_event_stream_emit.emit_once(
 		run_event_stream.EVENT_KIND.DRAIN,
 		DRAIN_TEXT,
-		backlog_drain_flush.flush,
+		prepare_drain,
 	)
 }
 
