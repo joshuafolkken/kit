@@ -94,6 +94,14 @@ describe('run_board_setup.read — when the run entered its stage', () => {
 describe('run_board_setup.read after a drain that came before any launch', () => {
 	const DRAIN: Step = [KIND.DRAIN, 'backlog drained']
 
+	it('ends initial preparation at the idle decision before the drain flush finishes', () => {
+		const events = stream(setup(STAGE.HANDING_OFF), setup('watching'))
+		const resumed = [...events, ...stream(setup(STAGE.HANDING_OFF))]
+
+		expect(run_board_setup.read(events)).toStrictEqual(IDLE)
+		expect(run_board_setup.read(resumed)).toStrictEqual(IDLE)
+	})
+
 	it('reads the hand-off each wake of the idle watch writes as no stage', () => {
 		const events = stream(setup(STAGE.HANDING_OFF), DRAIN, setup(STAGE.HANDING_OFF))
 

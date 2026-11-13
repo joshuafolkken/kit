@@ -196,6 +196,16 @@ describe('backlog_drive_hold.recorder — hold', () => {
 })
 
 describe('backlog_drive_hold.recorder — end', () => {
+	it('replaces the previous window reason when the next driver reads a waiting offer', async () => {
+		const holds = backlog_drive_hold.recorder(free)
+
+		await holds.end(WINDOW_END)
+		await holds.hold(CHAIN_REASON, [WAITED_ISSUE])
+
+		expect(record_held).toHaveBeenLastCalledWith({ reason: CHAIN_REASON, waiting: [WAITED_ISSUE] })
+		expect(clear).toHaveBeenCalled()
+	})
+
 	it('records the hand-back of a driver end', async () => {
 		await backlog_drive_hold.recorder(free).end(WINDOW_END)
 

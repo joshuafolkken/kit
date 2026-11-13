@@ -20,6 +20,7 @@ const LONG_STDERR_REPEAT = 1000
 const HAND_OFF_STEPS = 2
 const EPIC_OUTPUT = 'epic #1\nresume: --owner 1'
 const WINDOW_OUTPUT = 'window\nresume: --owner 1'
+const WINDOW_PASSES = 2
 const BUSY_OUTPUT = 'merge busy #2509\nresume: --owner 1'
 const TRIAGE_OUTPUT = 'triage\nresume: --owner 1'
 const HAND_BACK = 'then end the turn, which hands the loop back'
@@ -256,10 +257,11 @@ async function no_pause(): Promise<void> {
 test('releases a spent window to the supervisor instead of re-driving it', async () => {
 	const subprocess = vi
 		.spyOn(josh_command, 'josh_run')
-		.mockResolvedValue({ code: 0, out: WINDOW_OUTPUT })
+		.mockResolvedValue({ code: 0, out: WINDOW_OUTPUT, err: 'observations:flush skipped: failed' })
 
 	expect(await run_wake_driver.drive(scratch.target, no_pause)).toStrictEqual({ kind: 'released' })
-	expect(subprocess).toHaveBeenCalledOnce()
+	expect(await run_wake_driver.drive(scratch.target, no_pause)).toStrictEqual({ kind: 'released' })
+	expect(subprocess).toHaveBeenCalledTimes(WINDOW_PASSES)
 	expect(run_event_setup.emit).not.toHaveBeenCalledWith(run_event_setup.STAGE.JUDGING)
 })
 
