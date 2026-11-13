@@ -16,6 +16,7 @@ const FIRST = 'scripts/a.test.ts > suite > fails first'
 const SECOND = 'scripts/b.test.ts [ scripts/b.test.ts ]'
 const RELATED: ReadonlyArray<string> = ['related', 'scripts/a.ts', '--run']
 const LOG_PATH = path.join('logs', 'josh-unit-log-x.log')
+const ASSERTION_ERROR = 'AssertionError: expected 1 to be 2'
 const FAILED_OUTPUT = [
 	' RUN  v4.0.0 /repo',
 	' ❯ scripts/a.test.ts (2 tests | 1 failed)',
@@ -23,7 +24,7 @@ const FAILED_OUTPUT = [
 	'⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯',
 	'',
 	` FAIL  ${FIRST}`,
-	'AssertionError: expected 1 to be 2',
+	ASSERTION_ERROR,
 	` \u{1B}[31mFAIL\u{1B}[39m  ${SECOND}`,
 	` FAIL  ${FIRST}`,
 	' Test Files  2 failed (2)',
@@ -41,6 +42,27 @@ afterEach(() => {
 })
 
 const { capture_stdout } = gate_test_fixture
+
+describe('vitest_failure_summary.import_failure', () => {
+	it.each([
+		'Error: [vitest] No "constants" export is defined on the "node:fs" mock.',
+		"SyntaxError: The requested module './leaf' does not provide an export named 'x'",
+		"Error: Cannot find module './leaf'",
+		'Error: Failed to resolve import "./leaf" from "reader.ts"',
+	])('preserves the deterministic import diagnostic: %s', (diagnostic) => {
+		expect(vitest_failure_summary.import_failure(diagnostic)).toBe(diagnostic)
+	})
+
+	it.each([
+		ASSERTION_ERROR,
+		'Error: Worker exited unexpectedly',
+		'Error: socket hang up',
+		'##[error]Failed to download archive',
+		' Test Files  1 failed (1)\n      Tests  no tests',
+	])('keeps existing failure classification without an import diagnostic: %s', (output) => {
+		expect(vitest_failure_summary.import_failure(output)).toBeUndefined()
+	})
+})
 
 describe('vitest_failure_summary.failed_tests', () => {
 	it('lists each FAIL line once, colors stripped, in order', () => {
