@@ -1,0 +1,7 @@
+{
+	"reason": "Reuse the existing REST memo to skip executable-provenance reads only for issues without a measurement declaration; two runtime lines prevent one unnecessary GraphQL spawn per selected issue. Add focused safety tests and measured adoption evidence.",
+	"date": "2026-11-13",
+	"growth": {
+		"scripts.code_lines": 2
+	}
+}
