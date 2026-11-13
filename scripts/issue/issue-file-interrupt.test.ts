@@ -171,10 +171,13 @@ describe('issue_file_interrupt.block_finder — nothing to record', () => {
 		['a route other than interrupt', { route: SPLIT_ROUTE_LABEL }, route_reason],
 		['no route', { route: undefined }, route_reason],
 		['a filing in another repository', { is_here: false }, finder_reason],
-	])('records no relation and says so for %s', async (_case, change, reason) => {
+	])('records no relation and says so for %s (ac-04fe7e7a)', async (_case, change, reason) => {
 		await issue_file_interrupt.block_finder({ ...interrupt_filing(), ...change })
 
 		expect(apply_relations).not.toHaveBeenCalled()
+		expect(read_label_names).not.toHaveBeenCalled()
+		expect(issue_try_comment).not.toHaveBeenCalled()
+		expect(issue_clear_label).not.toHaveBeenCalled()
 		expect(warn).toHaveBeenCalledExactlyOnceWith(expect.stringContaining(reason))
 	})
 })

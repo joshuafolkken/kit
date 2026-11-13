@@ -1,0 +1,7 @@
+{
+	"reason": "Restore GH_REPO in a shared finally scope for file, check and scout; serialize batch scouts to prevent shared-environment races (#7430).",
+	"date": "2026-11-13",
+	"growth": {
+		"scripts.code_lines": 22
+	}
+}
