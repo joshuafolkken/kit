@@ -1,10 +1,11 @@
 import { stripVTControlCharacters, styleText } from 'node:util'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
+import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_header, type BoardHeader } from './run-board-header'
 import type { BoardLayout, BoardRow } from './run-board-layout'
-import type { RunActivity } from './run-board-status'
+import { run_board_status, type RunActivity } from './run-board-status'
 
 // joshuafolkken/kit#3696: the header while the run is at a stage of its own. joshuafolkken/kit#3767:
 // the mark stands still; the spinner turns on the third line, before the stage's time and icon.
@@ -94,6 +95,33 @@ function title_of(board: BoardHeader): string {
 function now_of(board: BoardHeader): string {
 	return (lines_of(board)[2] ?? '').trimStart()
 }
+
+function staged(...stages: ReadonlyArray<string>): RunActivity {
+	const events: Array<RunEvent> = stages.map((text, index) => ({
+		kind: 'setup',
+		text,
+		pos: index + 1,
+		at: new Date(STARTED + index * SECOND).toISOString(),
+	}))
+
+	return run_board_status.activity_of(events, false)
+}
+
+describe('run_board_header.header_lines idle before the drain flush', () => {
+	it('pauses immediately, stays paused across handoffs and resumes at real work', () => {
+		const stages = [STAGE.HANDING_OFF, 'watching']
+		const idle = planned(ONE_PLANNED, staged(...stages))
+		const next_window = planned(ONE_PLANNED, staged(...stages, STAGE.HANDING_OFF))
+		const opening = planned(ONE_PLANNED, staged(...stages, OPENING))
+
+		expect(title_of(idle)).toMatch(/^⏸ backlogrun /u)
+		expect(now_of(idle)).not.toContain(SPINNER)
+		expect(title_of(next_window)).toMatch(/^⏸ backlogrun /u)
+		expect(now_of(next_window)).not.toContain(SPINNER)
+		expect(title_of(opening)).toMatch(/^▶ backlogrun /u)
+		expect(now_of(opening)).toContain(SPINNER)
+	})
+})
 
 afterEach(() => {
 	vi.unstubAllEnvs()
