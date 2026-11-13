@@ -42,6 +42,8 @@ const VALID_BODY = [
 	'## 現象\n\nx\n\n## 期待結果\n\ny\n\n## 受け入れ条件\n\n- [ ] z\n',
 ].join('\n')
 const INVALID_BODY = '## 背景\n'
+const TARGET = 'joshuafolkken/app-kit'
+const CROSS_BODY = `${VALID_BODY}\n## Origin\n\n${HERE}#2808\n`
 
 interface CreateRequest {
 	title: string
@@ -151,6 +153,40 @@ describe('issue_file_batch.run — several body files in one call', () => {
 
 // joshuafolkken/kit#5675: one `%%%`-separated file is a batch too, and every filing's scout report is
 // printed together once before the first filing rather than inside each.
+describe('issue_file_batch.run — serialized cross-repository scouts', () => {
+	it('finishes each scout and restores GH_REPO before starting the next', async () => {
+		const environments: Array<string | undefined> = []
+		const counter = { active: 0, peak: 0 }
+		const directory = batch_of('serial', [
+			[FIRST, CROSS_BODY],
+			[SECOND, CROSS_BODY],
+		])
+
+		vi.stubEnv('GH_REPO', HERE)
+		vi.mocked(issue_scout_cli.scout).mockImplementation(async () => {
+			counter.active += 1
+			counter.peak = Math.max(counter.peak, counter.active)
+			await Promise.resolve()
+			environments.push(process.env['GH_REPO'])
+			counter.active -= 1
+
+			return { report: SCOUT_REPORT, candidates: [] }
+		})
+
+		try {
+			await issue_file_batch.run([BATCH_FLAG, directory, '--repo', TARGET])
+
+			expect(counter.peak).toBe(1)
+			expect({ environments, restored: process.env['GH_REPO'] }).toStrictEqual({
+				environments: [TARGET, TARGET, TARGET],
+				restored: HERE,
+			})
+		} finally {
+			vi.unstubAllEnvs()
+		}
+	})
+})
+
 describe('issue_file_batch.run — one separated file and the combined scout report', () => {
 	it('files the three parts of one separated file in one call', async () => {
 		expect(await issue_file_batch.run([BATCH_FLAG, separated_file('three')])).toBe(
