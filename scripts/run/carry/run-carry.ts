@@ -10,6 +10,7 @@ import { z } from 'zod'
 import { run_carry_added, type CarryAddition } from './run-carry-added'
 import { run_carry_change } from './run-carry-change'
 import { run_carry_conversation } from './run-carry-conversation'
+import { run_carry_session } from './run-carry-session'
 
 // A `backlogrun` declares a budget — `--max` and `--idle` — and the session
 // cut ends the session, so the next one would start from nothing. **The cut is an execution detail of
@@ -99,6 +100,7 @@ interface RunCarry {
 	// `undefined`, so absent and explicitly-undefined are the *same* record on disk — a type that told
 	// them apart would be asserting a distinction nothing here can observe.
 	owner_pid?: number | undefined
+	owner_session?: string | undefined
 	owner_start?: string | undefined
 	// The owner conversation's transcript, which outlives a restart of its process
 	// (`run-carry-conversation.ts`). Optional for the same reason as the pid.
@@ -142,6 +144,7 @@ interface RunCarry {
 // token, so a reissued pid is never mistaken for the process that wrote the record — and the
 // transcript of the conversation that process runs, which outlives it (`run-carry-conversation.ts`).
 interface CarryOwner {
+	session?: string | undefined
 	provider?: AgentProvider | undefined
 	pid?: number | undefined
 	start?: string | undefined
@@ -207,6 +210,7 @@ const run_carry_schema = z.object({
 	// An absent owner reads as "no owner declared", which is the not-provably-live answer rather than a
 	// live one.
 	owner_pid: z.number().optional(),
+	owner_session: z.string().optional(),
 	owner_start: z.string().optional(),
 	owner_transcript: z.string().optional(),
 	is_owner_headless: z.boolean().optional(),
@@ -269,8 +273,10 @@ function owner_of(
 // none exported, no owner is declared.
 function session_owner(): CarryOwner {
 	const pid = agent_session_environment.own_session_pid()
+	const owner = pid === undefined ? NO_OWNER : owner_of(pid)
+	const session = run_carry_session.own()
 
-	return pid === undefined ? NO_OWNER : owner_of(pid)
+	return session === undefined ? owner : { ...owner, session }
 }
 
 function fresh_carry(invocation: string, owner: CarryOwner, now: Date): RunCarry {
@@ -284,6 +290,7 @@ function fresh_carry(invocation: string, owner: CarryOwner, now: Date): RunCarry
 		failures: NO_INCREMENT,
 		outages: NO_INCREMENT,
 		owner_pid: owner.pid,
+		owner_session: owner.session,
 		owner_start: owner.start,
 		owner_transcript: owner.transcript,
 		is_owner_headless: owner.is_headless,
@@ -318,17 +325,19 @@ function adopt_carry(
 	carry: RunCarry,
 	owner: CarryOwner = NO_OWNER,
 ): RunCarry | undefined {
+	const next_owner = run_carry_session.retain_execution(carry, owner)
 	// The run's own fields carry across untouched — the counters, the outage fold timestamp, `done` so the successor does not re-run what the cut session finished,
 	// and `retrospective` so a run resumed after a cut does not repeat its retrospective. Only the
 	// ownership fields are overridden: the new owner replaces the old — a caller that declared none
 	// writes `undefined`, so the previous owner cannot survive — and the declared hand-off is spent.
 	const next: RunCarry = {
 		...carry,
-		scheduler_provider: owner.provider,
-		owner_pid: owner.pid,
-		owner_start: owner.start,
+		scheduler_provider: next_owner.provider,
+		owner_pid: next_owner.pid,
+		owner_session: owner.session,
+		owner_start: next_owner.start,
 		owner_transcript: owner.transcript,
-		is_owner_headless: owner.is_headless,
+		is_owner_headless: next_owner.is_headless,
 		is_handed_off: false,
 	}
 
@@ -352,11 +361,7 @@ function is_owner_live(
 	return carry.is_owner_headless !== true && run_carry_conversation.is_conversation_live(carry, now)
 }
 
-function is_owned_by(carry: RunCarry, owner: CarryOwner): boolean {
-	if (run_carry_conversation.is_same_conversation(carry, owner)) return true
-
-	return carry.owner_pid === owner.pid && carry.owner_start === owner.start
-}
+const { is_owned_by } = run_carry_session
 
 // The one case that is not this caller's to touch: the record's owner is still running and it is
 // somebody else. **The invocation text is not consulted** — a live owner holds the budget whatever

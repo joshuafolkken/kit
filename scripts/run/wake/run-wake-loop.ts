@@ -30,6 +30,8 @@ const STOPPED_BY_PERSON: LoopStop = { reason: STOPPED_REASON, note: undefined }
 const CODE_CHANGED: LoopStop = { reason: RELOAD_REASON, note: undefined }
 
 interface LoopPorts {
+	refresh?: () => void
+	session_failure?: () => string | undefined
 	// The carry record, re-read every pass rather than cached: it is written by the parent loop of a
 	// different session, which is the whole point of reading it here.
 	read_carry: () => CarryRead
@@ -200,14 +202,25 @@ async function retry_closes(ports: LoopPorts): Promise<void> {
 // stopping any lane. A record already removed ends the loop before this pass is reached, and a carry
 // record that ended or became unreadable stops the run before the code is checked, so a reload never
 // hands a finished run to a successor.
+async function preflight_stop(
+	decision: WakeDecision,
+	ports: LoopPorts,
+): Promise<LoopStop | undefined> {
+	if (decision.kind === 'stop') return undefined
+	const failure = ports.session_failure?.()
+	if (failure !== undefined) return { reason: FAILED_REASON, note: failure }
+
+	return (await ports.is_code_stale()) ? CODE_CHANGED : undefined
+}
+
 async function run_pass(
 	target: string,
 	wake: RunWake,
 	ports: LoopPorts,
 ): Promise<LoopStop | undefined> {
 	const decision = await decide_pass(wake, ports)
-
-	if (decision.kind !== 'stop' && (await ports.is_code_stale())) return CODE_CHANGED
+	const stop = await preflight_stop(decision, ports)
+	if (stop !== undefined) return stop
 
 	await retry_closes(ports)
 
@@ -254,12 +267,19 @@ function without_release_gap(ports: LoopPorts): LoopPorts {
 	}
 }
 
+function refreshed_wake(target: string, ports: LoopPorts): RunWake | undefined {
+	if (run_wake.read_own_wake(target) === undefined) return undefined
+	ports.refresh?.()
+
+	return run_wake.read_own_wake(target)
+}
+
 async function run_loop(target: string, ports: LoopPorts, interval_ms: number): Promise<LoopStop> {
 	const continuous = without_release_gap(ports)
 
 	return await poll.wait_for(
 		async () => {
-			const wake = run_wake.read_own_wake(target)
+			const wake = refreshed_wake(target, continuous)
 
 			return wake === undefined ? STOPPED_BY_PERSON : await run_pass(target, wake, continuous)
 		},
