@@ -1,4 +1,5 @@
 import type { GateTree } from '#scripts/gate/gate-tree'
+import { metrics_totals } from '#scripts/gate/metrics-totals'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SyncReading } from './run-ship-synced-scope'
 
@@ -40,7 +41,6 @@ const read_tree_mock = vi.hoisted(() =>
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 vi.mock('#scripts/gate/gate-tree', () => ({ gate_tree: { read_gate_tree: read_tree_mock } }))
-vi.mock('#scripts/gate/metrics-totals', () => ({ metrics_totals: { rerecord: rerecord_mock } }))
 vi.mock('#scripts/gate/scoped-green', () => ({
 	scoped_green: {
 		LINT_SCRIPT: LINT,
@@ -91,6 +91,7 @@ function commands(): ReadonlyArray<string> {
 }
 
 function forget_ship_memory(): void {
+	vi.spyOn(metrics_totals, 'rerecord').mockImplementation(rerecord_mock)
 	run_ship_narrowed.forget()
 	run_ship_pair_runs.forget()
 	run_ship_gate_runs.forget()

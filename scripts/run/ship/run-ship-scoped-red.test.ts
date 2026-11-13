@@ -1,3 +1,4 @@
+import { metrics_totals } from '#scripts/gate/metrics-totals'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { LINT, TEST } = vi.hoisted(() => ({ LINT: 'lint:related', TEST: 'test:related' }))
@@ -10,7 +11,6 @@ vi.mock('#scripts/gate/gate-tree', () => ({
 		read_gate_tree: async () => ({ files: { 'scripts/a.ts': 'digest' }, base: 'base' }),
 	},
 }))
-vi.mock('#scripts/gate/metrics-totals', () => ({ metrics_totals: { rerecord: async () => false } }))
 vi.mock('#scripts/gate/scoped-green', () => ({
 	scoped_green: {
 		LINT_SCRIPT: LINT,
@@ -49,6 +49,7 @@ const OK = 0
 const FAILED = 1
 
 beforeEach(() => {
+	vi.spyOn(metrics_totals, 'rerecord').mockResolvedValue(false)
 	josh_run_mock.mockReset().mockResolvedValue({ code: OK, out: '' })
 	unmoved_mock.mockReset().mockReturnValue(true)
 	vi.spyOn(process.stdout, 'write').mockReturnValue(true)

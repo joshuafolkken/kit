@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { review_attest } from './review-attest'
 import { review_fix_round, type RecordedRound } from './review-fix-round'
 import { review_record_cli } from './review-record-cli'
+import { review_record_code_round } from './review-record-code-round'
 import { review_stamps } from './review-stamps'
 
 vi.mock('./review-record-code-round', () => ({ review_record_code_round: { follow: vi.fn() } }))
@@ -50,6 +51,15 @@ async function record(finding: string): Promise<void> {
 }
 
 describe('review_record_cli round correspondence (ac-2f995d55)', () => {
+	it('finishes the round record before starting follow-up verification', async () => {
+		vi.mocked(review_record_code_round.follow).mockImplementationOnce(async () => {
+			expect(recorded().findings[0]?.description).toBe(REASON)
+			expect(recorded().findings[0]?.disposition).toBe('fixed')
+		})
+
+		await record(`fixed ${FINDING}`)
+	})
+
 	it('persists the body and links resolved findings to the previous recorded round', async () => {
 		await record(FINDING)
 		const first = recorded()

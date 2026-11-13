@@ -295,7 +295,6 @@ interface AppendedRound {
 	lines: ReadonlyArray<string>
 	root: string
 	kind: LineKind
-	findings: ReadonlyArray<Finding>
 	date: string
 }
 
@@ -308,16 +307,19 @@ function ledger_lines({ issue, lines, kind, date }: AppendedRound): ReadonlyArra
 
 // A code round goes on to what its tree means for the ship (`review-record-code-round.ts`).
 async function append_round(round: AppendedRound): Promise<number> {
-	const { issue, lines, root, kind, findings } = round
+	const { issue, lines, root } = round
 	const ledger_path = observation_ledger_home.issue_path(issue, root)
 
 	await observation_ledger_home.append(ledger_path, ledger_lines(round))
 	console.info(confirmation(lines.length, ledger_path))
 	await review_comment_carry.carry_from_record(root)
 
-	if (kind === 'code') await review_record_code_round.follow(issue, root, findings)
-
 	return 0
+}
+
+interface WrittenRound {
+	code: number
+	is_ledger: boolean
 }
 
 // A code round recorded after the push goes to the issue unasked (`review-record-comment.ts`).
@@ -326,7 +328,7 @@ async function write_round(
 	request: Request,
 	now: Date,
 	root: string,
-): Promise<number> {
+): Promise<WrittenRound> {
 	const kind = kind_of(parsed)
 	const date = observation_ledger_home.ledger_date(now)
 	const lines = [
@@ -335,13 +337,23 @@ async function write_round(
 	]
 	const { issue, findings } = request
 
-	if (parsed.comment) return await review_record_comment.post(issue, lines)
-
-	if (kind === 'code' && (await review_record_comment.is_after_push())) {
-		return await review_record_comment.post_after_push({ issue, lines, root, findings })
+	if (parsed.comment) {
+		return { code: await review_record_comment.post(issue, lines), is_ledger: false }
 	}
 
-	return await append_round({ issue, lines, root, kind, findings, date })
+	if (kind === 'code' && (await review_record_comment.is_after_push())) {
+		const code = await review_record_comment.post_after_push({ issue, lines, root, findings })
+
+		return { code, is_ledger: false }
+	}
+
+	return { code: await append_round({ issue, lines, root, kind, date }), is_ledger: true }
+}
+
+function finish_record(request: Request, is_interaction: boolean, root: string): void {
+	if (!is_interaction) review_final_record.record(request.issue, request.findings, root)
+	review_fix_round.record_reasons(request.issue, request.findings)
+	if (request.round !== undefined) review_fix_round.save(request.round, root)
 }
 
 async function record_prepared(
@@ -353,15 +365,17 @@ async function record_prepared(
 	request.round = parsed.interaction
 		? undefined
 		: review_fix_round.prepare(request.issue, request.findings, root)
-	const code = await write_round(parsed, request, now, root)
+	const { code, is_ledger } = await write_round(parsed, request, now, root)
 
 	if (code !== 0) return code
 
-	if (!parsed.interaction) review_final_record.record(request.issue, request.findings, root)
-	review_fix_round.record_reasons(request.issue, request.findings)
-	if (request.round !== undefined) review_fix_round.save(request.round, root)
+	finish_record(request, parsed.interaction, root)
 
-	return code
+	if (is_ledger && !parsed.interaction) {
+		await review_record_code_round.follow(request.issue, root, request.findings)
+	}
+
+	return 0
 }
 
 async function run_record(parsed: Parsed, now: Date, root: string): Promise<number> {

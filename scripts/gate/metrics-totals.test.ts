@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { gate_tree } from './gate-tree'
 
 const run_mock = vi.hoisted(() => vi.fn())
 const is_kit_mock = vi.hoisted(() => vi.fn(() => true))
@@ -125,5 +126,24 @@ describe('metrics_totals.rerecord', () => {
 
 		await expect(metrics_totals.rerecord(DIRECTORY, WITH_APPROVAL)).resolves.toBe(false)
 		expect(run_mock).not.toHaveBeenCalled()
+	})
+})
+
+describe('metrics_totals.rerecorded_tree', () => {
+	it('keeps the original tree when no approval needs writing', async () => {
+		const tree = { files: { 'a.ts': 'source' }, base: 'base' }
+		const read = vi.fn(async () => tree)
+
+		expect(await metrics_totals.rerecorded_tree(read, DIRECTORY)).toBe(tree)
+		expect(read).toHaveBeenCalledOnce()
+	})
+
+	it('uses the shared tree reader by default', async () => {
+		const tree = { files: {}, base: 'base' }
+		const read = vi.spyOn(gate_tree, 'read_gate_tree').mockResolvedValue(tree)
+
+		expect(await metrics_totals.rerecorded_tree()).toBe(tree)
+		expect(read).toHaveBeenCalledOnce()
+		read.mockRestore()
 	})
 })
