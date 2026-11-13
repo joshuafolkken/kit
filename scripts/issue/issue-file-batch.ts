@@ -71,9 +71,13 @@ async function planned_of(
 async function scout_all(
 	planned: ReadonlyArray<Planned>,
 ): Promise<ReadonlyArray<ScoutOutcome | undefined>> {
-	const outcomes = await Promise.all(
-		planned.map(async ({ argv }) => await issue_file_cli.scout(argv)),
-	)
+	const outcomes: Array<ScoutOutcome | undefined> = []
+
+	for (const { argv } of planned) {
+		// eslint-disable-next-line no-await-in-loop -- scouts temporarily share GH_REPO
+		outcomes.push(await issue_file_cli.scout(argv))
+	}
+
 	const sections = planned.map(({ entry }, index) => {
 		const report = outcomes[index]?.report ?? SCOUT_UNANSWERED
 
