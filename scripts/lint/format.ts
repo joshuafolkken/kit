@@ -1,6 +1,5 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { direct_launch } from '#scripts/build/local-bin'
 import { project_checks } from '#scripts/gate/project-checks'
 import {
 	ESLINT_CACHE_FILE,
@@ -8,14 +7,11 @@ import {
 	PRETTIER_CACHE_FLAGS,
 } from '#scripts/josh/josh-command-types'
 import { composite_arguments, USAGE_ERROR_EXIT_CODE } from '#scripts/josh/josh-composite-arguments'
-import { execa } from 'execa'
-import { eslint_cache_dependencies } from './eslint-cache-dependencies'
-import { eslint_heap } from './eslint-heap'
+import { format_steps } from './format-steps'
 import { lint_shard } from './lint-shard'
 
 const COMMAND_NAME = 'format'
 const ARGV_OFFSET = 2
-const FAIL_EXIT_CODE = 1
 
 function prettier_write_args_of(targets: ReadonlyArray<string>): ReadonlyArray<string> {
 	return ['exec', 'prettier', '--write', ...targets, ...PRETTIER_CACHE_FLAGS]
@@ -30,52 +26,13 @@ function prettier_write_args(directory: string): ReadonlyArray<string> {
 
 const ESLINT_FIX_ARGS = ['exec', 'eslint', '.', '--fix', ...ESLINT_CACHE_FLAGS] as const
 
-async function run_step(
-	check: string,
-	args: ReadonlyArray<string>,
-	directory: string,
-): Promise<number> {
-	const environment = check === 'eslint' ? { env: eslint_heap.environment(), extendEnv: false } : {}
-	const launch = direct_launch(directory, args)
-	const result = await execa(launch.file, [...launch.args], {
-		cwd: directory,
-		stdio: 'inherit',
-		reject: false,
-		...environment,
-	})
-
-	return result.exitCode ?? FAIL_EXIT_CODE
-}
-
-// prettier first, deliberately: `eslint --fix` exits 1 whenever a non-autofixable error remains, so
-// putting it first would mean one unused variable anywhere in the tree stops prettier from running.
-// A basic project without Prettier or ESLint is skipped with the same reason `josh lint` prints.
-async function run_unless_skipped(
-	check: string,
-	reason: string | undefined,
-	args: ReadonlyArray<string>,
-	directory: string,
-): Promise<number> {
-	if (reason === undefined) return await run_step(check, args, directory)
-	console.info(project_checks.skip_notice(check, reason))
-
-	return 0
-}
-
 async function run_format(directory: string): Promise<number> {
-	const prettier_reason = project_checks.prettier_skip_reason(directory)
-	const prettier_exit_code = await run_unless_skipped(
-		'prettier',
-		prettier_reason,
-		prettier_write_args(directory),
-		directory,
-	)
-	if (prettier_exit_code !== 0) return prettier_exit_code
-	const eslint_reason = project_checks.eslint_skip_reason(directory)
-
-	return await eslint_cache_dependencies.guard(
+	return await format_steps.run(
+		[
+			{ check: 'eslint', args: ESLINT_FIX_ARGS },
+			{ check: 'prettier', args: prettier_write_args(directory) },
+		],
 		ESLINT_CACHE_FILE,
-		async () => await run_unless_skipped('eslint', eslint_reason, ESLINT_FIX_ARGS, directory),
 		directory,
 	)
 }

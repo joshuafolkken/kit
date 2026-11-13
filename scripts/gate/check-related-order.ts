@@ -2,8 +2,8 @@ import type { CheckResult } from './check-related-section'
 
 // **`test:related` starts only once `lint:related` is green** (joshuafolkken/kit#5387): a lint failure,
 // a document over its budget found in seconds, still let a full-reach `test:related` run its minutes
-// out, and the fix paid that reach again. The other checks still start beside `lint:related`; a run
-// whose `lint:related` is reused starts `test:related` at once. A `test:related --touched` waits the same.
+// out, and the fix paid that reach again. All readers wait for lint's writers; a run
+// whose `lint:related` is reused starts them at once. A `test:related --touched` waits the same.
 
 const LINT_RELATED = 'lint:related'
 const TEST_RELATED = 'test:related'
@@ -36,9 +36,7 @@ async function is_lint_green(lint: Promise<CheckResult>): Promise<boolean> {
 // An executor that runs `lint:related` once, at whichever call asks first, and holds `test:related`
 // behind its verdict.
 function lint_first(execute: CheckExecutor, commands: ReadonlyArray<string>): CheckExecutor {
-	const has_test = commands.some((command) => is_test_related(command))
-
-	if (!has_test || !commands.includes(LINT_RELATED)) return execute
+	if (!commands.includes(LINT_RELATED)) return execute
 
 	const runs = new Map<string, Promise<CheckResult>>()
 
@@ -52,9 +50,10 @@ function lint_first(execute: CheckExecutor, commands: ReadonlyArray<string>): Ch
 
 	async function ordered(command: string): Promise<CheckResult> {
 		if (command === LINT_RELATED) return await lint_run()
-		if (!is_test_related(command)) return await execute(command)
+		const is_green = await is_lint_green(lint_run())
+		if (!is_green && is_test_related(command)) return skipped_result(command)
 
-		return (await is_lint_green(lint_run())) ? await execute(command) : skipped_result(command)
+		return await execute(command)
 	}
 
 	return ordered

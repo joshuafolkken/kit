@@ -8,6 +8,7 @@ import { HOOK_PROCESS_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { eslint_daemon } from '#scripts/lint/eslint-daemon'
 import { eslint_daemon_calls } from '#scripts/lint/eslint-daemon-calls'
 import { eslint_trim } from '#scripts/lint/eslint-trim'
+import { format_steps } from '#scripts/lint/format-steps'
 import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { execa } from 'execa'
 import { z } from 'zod'
@@ -343,20 +344,17 @@ async function collect_unfixed(
 	runner: CommandRunner,
 	project_root: string,
 ): Promise<string> {
-	let unfixed = ''
-
-	for (const command of plan) {
+	const results = await format_steps.in_order(plan, async (command) => {
 		try {
-			// eslint-disable-next-line no-await-in-loop -- formatters rewrite the same file, in plan order
-			unfixed = eslint_unfixed(command, await runner(command, project_root)) ?? unfixed
+			return eslint_unfixed(command, await runner(command, project_root))
 		} catch {
 			// One formatter failing to start is not a reason to skip the next: prettier runs last, and
 			// it is the one whose output the project's own lint step checks.
-			continue
+			return ''
 		}
-	}
+	})
 
-	return unfixed
+	return results.findLast(Boolean) ?? ''
 }
 
 // The edited file as the daemon read it, or nothing when no eslint command linted it — a `.json`
