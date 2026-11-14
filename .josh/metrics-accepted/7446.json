@@ -1,8 +1,0 @@
-{
-	"reason": "Migration guidance links from each install path (three new paragraphs) and the retired bootstrap note list in distributed-paths.ts #7446",
-	"date": "2026-11-14",
-	"growth": {
-		"scripts.code_lines": 9,
-		"prose.long_paragraphs": 3
-	}
-}

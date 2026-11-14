@@ -1,8 +1,0 @@
-{
-	"reason": "Detached drain flush (#7505): a launcher, a --drain-flush body and a duration line keep the driver offering during the flush",
-	"date": "2026-11-14",
-	"growth": {
-		"scripts.code_lines": 29,
-		"ai_cost.on_demand_bytes": 29
-	}
-}

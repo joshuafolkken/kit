@@ -1,7 +1,0 @@
-{
-	"reason": "Board releases a run:add --retry waiting status the plan leaves unreached so observation waits draw in the waiting section (#7488)",
-	"date": "2026-11-14",
-	"growth": {
-		"scripts.code_lines": 22
-	}
-}

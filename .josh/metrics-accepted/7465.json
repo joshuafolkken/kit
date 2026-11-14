@@ -1,8 +1,0 @@
-{
-	"reason": "Complete date-window populations require bounded partition reads, count and duplicate checks; document the unchanged measurement isolation and normal-sample contract.",
-	"date": "2026-11-13",
-	"growth": {
-		"scripts.code_lines": 99,
-		"prose.long_paragraphs": 1
-	}
-}

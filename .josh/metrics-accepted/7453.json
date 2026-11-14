@@ -1,7 +1,0 @@
-{
-	"reason": "Keep indirect test reach for new, changed or unknown imports; reuse the existing dependency graph and compare import syntax without a new cache.",
-	"date": "2026-11-13",
-	"growth": {
-		"scripts.code_lines": 75
-	}
-}

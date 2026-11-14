@@ -1,7 +1,0 @@
-{
-	"reason": "Restore only omitted pnpmfileChecksum before full lock metadata validation; reuse existing YAML parser and serializer (+26 code lines).",
-	"date": "2026-11-13",
-	"growth": {
-		"scripts.code_lines": 26
-	}
-}

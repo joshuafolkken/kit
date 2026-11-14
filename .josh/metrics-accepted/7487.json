@@ -1,7 +1,0 @@
-{
-	"reason": "run:add --retry clears needs-human-merge for a recorded repair attempt (#7487); the stop helper is shared with the label writes",
-	"date": "2026-11-14",
-	"growth": {
-		"scripts.code_lines": 12
-	}
-}

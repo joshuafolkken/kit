@@ -1,7 +1,0 @@
-{
-	"reason": "解決済みscopeの自動修正と修正後treeの記録を共有処理へ接続する。basic文書のみ指定・混在指定・全体fallbackの実formatter回帰と、shipの記録対象を固定する検証を追加した。",
-	"date": "2026-11-13",
-	"growth": {
-		"scripts.code_lines": 100
-	}
-}

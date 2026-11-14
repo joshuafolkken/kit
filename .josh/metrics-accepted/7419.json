@@ -1,7 +1,0 @@
-{
-	"reason": "Separate the idle decision from the replaceable drain so slow maintenance cannot keep the board spinning; retain the existing flush and replacement safety contract.",
-	"date": "2026-11-12",
-	"growth": {
-		"scripts.code_lines": 14
-	}
-}

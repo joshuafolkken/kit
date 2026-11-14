@@ -1,7 +1,0 @@
-{
-	"reason": "#7507: one dispatch-bound module and a label-aware listing watcher; the run doc gains its dispatch-bound paragraph",
-	"date": "2026-11-14",
-	"growth": {
-		"scripts.code_lines": 21
-	}
-}
