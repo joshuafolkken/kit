@@ -293,8 +293,6 @@ jobs:
       - name: Setup Node.js
         id: setup-node
         uses: ./.github/actions/setup-node
-        with:
-          registry-url: 'https://npm.pkg.github.com'
 
       - name: Setup ESLint cache
         if: startsWith(matrix.group, 'lint-')
@@ -386,8 +384,6 @@ jobs:
 
       - name: Setup pnpm and install dependencies
         uses: ./.github/actions/setup-pnpm
-        with:
-          node-auth-token: ${{ secrets.GITHUB_TOKEN }}
 
       # One step rather than five, and concurrent rather than serial (joshuafolkken/kit#1216).
       # `josh gate` is the command a developer runs before committing; it fans out to the same
@@ -552,8 +548,6 @@ jobs:
       - name: Setup Node.js
         id: setup-node
         uses: ./.github/actions/setup-node
-        with:
-          registry-url: 'https://npm.pkg.github.com'
 
       - name: Setup ESLint cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -569,8 +563,6 @@ jobs:
       - name: Setup pnpm and install dependencies
         if: steps.eslint-cache.outputs.cache-hit != 'true'
         uses: ./.github/actions/setup-pnpm
-        with:
-          node-auth-token: ${{ secrets.GITHUB_TOKEN }}
 
       # joshuafolkken/kit#7108: each leg lints only its group's shard, the files its lineage holds.
       - name: Lint to write this release's lineage
@@ -623,13 +615,9 @@ jobs:
 
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
-        with:
-          registry-url: 'https://npm.pkg.github.com'
 
       - name: Setup pnpm and install dependencies
         uses: ./.github/actions/setup-pnpm
-        with:
-          node-auth-token: ${{ secrets.GITHUB_TOKEN }}
 
       # **Through `josh test:unit`, never `vitest run` directly, and that is what makes a job split
       # safe rather than a hole.** The guard decides between a skip and a failure, and
@@ -754,13 +742,9 @@ jobs:
 
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
-        with:
-          registry-url: 'https://npm.pkg.github.com'
 
       - name: Setup pnpm and install dependencies
         uses: ./.github/actions/setup-pnpm
-        with:
-          node-auth-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Scan the changed files for secrets
         id: scan
@@ -857,13 +841,9 @@ jobs:
 
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
-        with:
-          registry-url: 'https://npm.pkg.github.com'
 
       - name: Setup pnpm and install dependencies
         uses: ./.github/actions/setup-pnpm
-        with:
-          node-auth-token: ${{ secrets.GITHUB_TOKEN }}
 
       # Only needed on the fallback path: the container image already ships browsers
       # matching its own Playwright version. Invoked through the local bin rather than

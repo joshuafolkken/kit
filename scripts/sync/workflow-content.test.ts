@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { temporary_directory } from '#tools/test/temporary-directory'
@@ -19,6 +19,39 @@ const AUTO_TAG_PATH = '../../.github/workflows/auto-tag.yml'
 const PRODUCTION_PATH = '../../.github/workflows/production.yml'
 const CI_TEMPLATE_PATH = '../../templates/workflows/ci.yml'
 const GITHUB_RELEASE_TEMPLATE_PATH = '../../templates/workflows/github-release.yml'
+const CI_DESTINATION = '.github/workflows/ci.yml'
+
+describe('workflow sync ownership', () => {
+	it.each(['name: Custom CI\n', '# josh-managed-workflow: @other/package\nname: Other CI\n'])(
+		'preserves a workflow outside kit ownership',
+		(existing) => {
+			const root = make_directory('workflow-custom-')
+			const destination = path.join(root, CI_DESTINATION)
+
+			mkdirSync(path.dirname(destination), { recursive: true })
+			writeFileSync(destination, existing)
+			sync.sync_file_mapping(fileURLToPath(new URL(CI_TEMPLATE_PATH, import.meta.url)), destination)
+			expect(readFileSync(destination, 'utf8')).toBe(existing)
+		},
+	)
+
+	it.each(['\n', '\r\n'])('updates a kit-managed workflow with %j line endings', (newline) => {
+		const root = make_directory('workflow-managed-')
+		const destination = path.join(root, CI_DESTINATION)
+
+		mkdirSync(path.dirname(destination), { recursive: true })
+		writeFileSync(
+			destination,
+			`# josh-managed-workflow: @joshuafolkken/kit${newline}name: Old CI${newline}`,
+		)
+		sync.sync_file_mapping(fileURLToPath(new URL(CI_TEMPLATE_PATH, import.meta.url)), destination)
+		const content = readFileSync(destination, 'utf8')
+
+		expect(content).toContain('./.github/actions/setup-pnpm')
+		expect(content).not.toContain('node-auth-token:')
+		expect(content).not.toContain('name: Old CI')
+	})
+})
 
 describe('auto-tag.yml — remote tag awareness', () => {
 	it('fetches remote tags before checking whether the tag exists', () => {

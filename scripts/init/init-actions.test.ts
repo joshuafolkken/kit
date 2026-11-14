@@ -2,6 +2,10 @@ import { describe, expect, it, vi } from 'vitest'
 import { init_actions, type FileAction } from './init-actions'
 import type { ProjectShape } from './project-profile'
 
+vi.mock('#scripts/registry-migration/npm-acquisition', () => ({
+	npm_acquisition: { can_manage: () => true },
+}))
+
 // The real builder reads this checkout's own `.claude/settings.json`, which wires the hook and so
 // yields nothing; a fixed action keeps the destination lists independent of the checkout.
 vi.mock('./session-language-environment', () => ({
@@ -13,6 +17,7 @@ vi.mock('./session-language-environment', () => ({
 }))
 
 const GITIGNORE = '.gitignore'
+const NPMRC = '.npmrc'
 const ESLINT = 'eslint.config.js'
 const PRETTIER = 'prettier.config.js'
 const BASIC_PRETTIER = 'prettier.config.mjs'
@@ -36,7 +41,14 @@ const COMMON_TAIL_DESTINATIONS = [
 	ENV_FILE,
 ]
 
-const VANILLA_DESTINATIONS = [GITIGNORE, ESLINT, PRETTIER, PLAYWRIGHT, ...COMMON_TAIL_DESTINATIONS]
+const VANILLA_DESTINATIONS = [
+	NPMRC,
+	GITIGNORE,
+	ESLINT,
+	PRETTIER,
+	PLAYWRIGHT,
+	...COMMON_TAIL_DESTINATIONS,
+]
 
 describe('init_actions.build_file_actions', () => {
 	it('returns the expected ordered destination list', () => {
@@ -149,14 +161,14 @@ describe('basic profile file actions', () => {
 	it('keeps a Web-free, Git-free project minimal', () => {
 		const destinations = init_actions.build_file_actions(shape()).map((action) => action.dest)
 
-		expect(destinations).toEqual([VSCODE_EXTENSIONS])
+		expect(destinations).toEqual([NPMRC, VSCODE_EXTENSIONS])
 	})
 
 	it('adds Web formatting without Svelte or Playwright tooling', () => {
 		const actions = init_actions.build_file_actions(shape({ should_use_prettier: true }))
 		const destinations = actions.map((action) => action.dest)
 
-		expect(destinations).toEqual([BASIC_PRETTIER, VSCODE_EXTENSIONS, VSCODE_SETTINGS])
+		expect(destinations).toEqual([NPMRC, BASIC_PRETTIER, VSCODE_EXTENSIONS, VSCODE_SETTINGS])
 		expect(actions.find((action) => action.dest === BASIC_PRETTIER)?.create()).toContain(
 			'prettier/basic',
 		)
@@ -191,7 +203,7 @@ describe('basic profile merge and optional settings', () => {
 			)
 			.map((action) => action.dest)
 
-		expect(destinations).toEqual([GITIGNORE, TSCONFIG, VSCODE_EXTENSIONS])
+		expect(destinations).toEqual([NPMRC, GITIGNORE, TSCONFIG, VSCODE_EXTENSIONS])
 	})
 
 	// The distributed settings wire the session:lang hook, whose unset default is ja (#3796).

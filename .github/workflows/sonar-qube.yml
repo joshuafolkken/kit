@@ -67,14 +67,9 @@ jobs:
       - name: Setup Node.js
         if: env.SONAR_TOKEN != ''
         uses: ./.github/actions/setup-node
-      - name: Configure GitHub Packages authentication for existing projects
-        if: env.SONAR_TOKEN != ''
-        run: printf '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}\n' >> "$HOME/.npmrc"
       - name: Setup pnpm and install dependencies
         if: env.SONAR_TOKEN != ''
         uses: ./.github/actions/setup-pnpm
-        with:
-          node-auth-token: ${{ secrets.GITHUB_TOKEN }}
       # SonarCloud's New Code starts at the previous version, so an analysis without
       # `sonar.projectVersion` never moves that start and New Code grows without end, diluting every
       # ratio the Quality Gate judges (joshuafolkken/kit#3045). The version is `package.json`'s, so

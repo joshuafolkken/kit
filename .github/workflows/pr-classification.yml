@@ -33,15 +33,10 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
 
-      - name: Configure GitHub Packages authentication for existing projects
-        run: printf '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}\n' >> "$HOME/.npmrc"
-
       # The shared pnpm preamble — version, store cache, the safe-chain installer pin and the install
       # (joshuafolkken/kit#2765, joshuafolkken/kit#2982).
       - name: Setup pnpm and install dependencies
         uses: ./.github/actions/setup-pnpm
-        with:
-          node-auth-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Check release classification
         env:
