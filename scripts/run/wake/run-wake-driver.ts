@@ -1,3 +1,4 @@
+import { backlog_drive_retrospective_unit } from '#scripts/backlog/backlog-drive-retrospective-unit'
 import { epic_triage } from '#scripts/epic/epic-triage'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { run_carry, type CarryRead, type RunCarry } from '#scripts/run/carry/run-carry'
@@ -16,6 +17,8 @@ const TRUNCATION_MARK = '... '
 const ERROR_PREFIX = 'error '
 const { WINDOW_MINUTES } = run_wake_window
 const WINDOW_VERDICT = 'window'
+// `backlog-drive.ts`'s drain owing the retrospective.
+const WATCH_VERDICT = 'watch'
 const { TRIAGE_VERDICT } = epic_triage
 
 function driver_args(invocation: string): ReadonlyArray<string> | undefined {
@@ -74,11 +77,24 @@ const NEXT_BY_VERDICT: ReadonlyArray<readonly [string, string]> = [
 const NEXT_DEFAULT = `act on the result by the sections below, ${HAND_BACK}`
 // **A triage session is woken beside the driver, never in its place** (joshuafolkken/kit#7120): the
 // record stays the supervisor's, so the session counts nothing and its turn end hands nothing back.
-const NEXT_BESIDE =
-	"\nNext: the carry record stays the supervisor's, whose driver keeps collecting and filling lanes beside this session, so run no pnpm josh run:carry; act on the result by the sections below, then end the turn"
+const BESIDE =
+	"\nNext: the carry record stays the supervisor's, whose driver keeps collecting and filling lanes beside this session"
+const NEXT_BESIDE = `${BESIDE}, so run no pnpm josh run:carry; act on the result by the sections below, then end the turn`
+
+// **A drain's retrospective runs beside the driver too** (joshuafolkken/kit#7506): handed over, the
+// record left the backlog unread until the session ended and the next pass re-drove, so an issue
+// filed meanwhile waited on the retrospective. Beside it, the driver's re-drive dispatches that issue,
+// and the session's process on the resume line holds the next `watch` back until it has ended
+// (`backlog_drive_park_triage.hand_back`). The record stays this process's, so the close names it.
+const BESIDE_VERDICTS: ReadonlySet<string> = new Set([TRIAGE_VERDICT, WATCH_VERDICT])
 
 function next_move(verdict: string): string {
 	if (verdict === TRIAGE_VERDICT) return NEXT_BESIDE
+
+	if (verdict === WATCH_VERDICT) {
+		return `${BESIDE}. ${backlog_drive_retrospective_unit.brief_of(String(process.pid))} Then end the turn`
+	}
+
 	const found = NEXT_BY_VERDICT.find(([prefix]) => verdict.startsWith(prefix))
 
 	return `\nNext: ${ALREADY_CLAIMED} ${found?.[1] ?? NEXT_DEFAULT}`
@@ -102,7 +118,7 @@ function judged(verdict: string, resume: string, details: string): DriveResult {
 		return { kind: 'failed', note: `backlog:drive returned an invalid resume line: ${resume}` }
 	}
 
-	const kind = verdict === TRIAGE_VERDICT ? 'triage' : 'judgment'
+	const kind = BESIDE_VERDICTS.has(verdict) ? 'triage' : 'judgment'
 
 	return { kind, material: handoff_material(verdict, resume, details) }
 }

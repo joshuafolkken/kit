@@ -27,7 +27,8 @@ const scratch = make_directory('run-wake-judgment-claim-')
 const WORKTREE = path.join(scratch, 'worktree.git')
 const REPOSITORY = path.join(scratch, 'repository.git')
 const INVOCATION = 'backlogrun --idle 0'
-const DRIVER_OUTPUT = 'watch\nresume: --owner 1'
+// A failed retrospective unit's hand-back: a drain's `watch` runs beside the driver instead.
+const DRIVER_OUTPUT = 'retrospective\nresume: --owner 1'
 const SUCCESS = 0
 // The woken session's own process: a live process that is not the supervisor running this suite.
 const SESSION_PID = process.ppid
