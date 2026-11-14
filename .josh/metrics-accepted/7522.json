@@ -1,7 +1,0 @@
-{
-	"reason": "Split the span read into run-board-span-read.ts (#7522): the new module's imports and export add 13 code lines; run-board-read.ts drops below 90% of the file limit",
-	"date": "2026-11-14",
-	"growth": {
-		"scripts.code_lines": 13
-	}
-}
