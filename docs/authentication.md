@@ -1,6 +1,6 @@
 # Existing GitHub Packages authentication
 
-New installations of `@joshuafolkken/kit` use the public npm registry and need no GitHub token or `.npmrc` mapping. The steps below apply to existing projects that still route `@joshuafolkken` packages to GitHub Packages, including projects using other packages in the same scope. GitHub Packages requires authentication even for public packages.
+New installations of `@joshuafolkken/kit` use the public npm registry and need no GitHub token or `.npmrc` mapping. The steps below apply to existing projects that still route `@joshuafolkken` packages to GitHub Packages, including projects using other packages in the same scope. GitHub Packages requires authentication even for public packages. To stop needing it for kit, [move the project to npm](./registry-migration.md); keep the steps below for any other scope still installed from GitHub Packages.
 
 On a fresh checkout, run `pnpm config get "@joshuafolkken:registry"` from the project root before `pnpm install`. This shows the effective scoped registry, including a mapping in your user-level `~/.npmrc` when the project does not override it. If it points to `https://npm.pkg.github.com`, complete §§1–2 below first, then install dependencies and reread the project's `CLAUDE.md`. If it does not point to GitHub Packages, the public npm installation needs no GitHub Packages authentication.
 
@@ -63,6 +63,8 @@ Commit that file — it holds no secret. The mapping routes every `@joshuafolkke
 ## 4. Build platforms with no user-level npmrc
 
 A hosted builder — Cloudflare Workers Builds, Vercel, Netlify, a Docker image — is neither your machine nor a GitHub Actions runner. There is no `~/.npmrc` from §2 and no kit CI authentication step, so an existing project `.npmrc` from §3 routes `@joshuafolkken/*` to GitHub Packages with no credential behind it and the install fails with `401`. **A green CI run does not clear this**: the kit CI template supplies GitHub Packages credentials for existing projects, while another builder may not.
+
+After the project [moves to npm](./registry-migration.md#移行後に残る作業), remove these builder settings unless another dependency still comes from GitHub Packages.
 
 Supply the credential from a source pnpm reads. Any one of the four below is enough — pick the one your platform allows. Each needs the token itself in the platform's secret store, never in a committed file.
 

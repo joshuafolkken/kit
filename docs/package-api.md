@@ -36,6 +36,8 @@ only its own package name + GitHub Packages versions endpoint:
 
 The version commands read the latest release (and the publish times behind a `Held:` line) from public npm, without credentials, so a consumer who installed from public npm needs no `read:packages` token. When `pnpm config get "@<scope>:registry"` points to GitHub Packages, or public npm does not answer for the package, they read its GitHub Packages versions endpoint through `gh api` as before. `josh latest` resolves dependency updates with pnpm using the registry configured by the current project; a new kit-only project uses public npm, while an existing project with a GitHub Packages scope mapping continues to use GitHub Packages.
 
+For kit itself, `version --upgrade` passes `--config.@joshuafolkken:registry=https://registry.npmjs.org/` to the global `pnpm add -g`, leaving `~/.npmrc` alone. In a project whose `.npmrc` does not yet map `@joshuafolkken` to npm, it first runs the installed kit's `dist/registry-migrate.mjs <latest>` and stops there if that fails ([registry-migration.md](./registry-migration.md)).
+
 ```ts
 // scripts/version/version-check.ts (consumer)
 import path from 'node:path'

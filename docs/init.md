@@ -241,6 +241,8 @@ The `full` profile adds these scripts to your `package.json`; the `basic` profil
 
 - When a `prepare` already exists, `josh init` appends the lifecycle to it; your own steps stay fail-fast.
 - A script that already runs `fix-gh-packages` is not given a second copy.
+- A project whose `.npmrc` maps `@joshuafolkken` to npm, with no other scope on GitHub Packages, gets `prepare` without the `fix-gh-packages` step.
+- `josh init` and `josh sync` write `@joshuafolkken:registry=https://registry.npmjs.org/` to `.npmrc` only when the project already maps the scope to npm, or has no `@joshuafolkken` mapping, dependency or lockfile entry and no `pnpm-workspace.yaml`. Any other project [moves to npm](./registry-migration.md) through the migration entry, which verifies the lockfile first.
 - A kit-managed `postinstall` from an earlier version is moved to `prepare`; a custom `postinstall` is left alone.
 - `josh sync` rewrites the `prepare` clause an earlier kit wrote to this form, and nothing else in `scripts`; run `pnpm install` afterwards for it to take effect.
 

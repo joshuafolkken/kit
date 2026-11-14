@@ -4,7 +4,13 @@ For anyone who wants `josh` on their PATH, for both project profiles. Install `@
 
 ## 1. Install globally
 
-The public npm registry serves `@joshuafolkken/kit` without a GitHub token or registry mapping. If your existing `~/.npmrc` maps `@joshuafolkken` to GitHub Packages, that mapping still takes precedence; see [authentication.md](./authentication.md) for the existing setup until you migrate it.
+The public npm registry serves `@joshuafolkken/kit` without a GitHub token or registry mapping. If your existing `~/.npmrc` maps `@joshuafolkken` to GitHub Packages, that mapping still takes precedence; `pnpm config get "@joshuafolkken:registry"` shows which one applies. To install from npm without changing `~/.npmrc` — other projects may still need that mapping — pass the registry for this one command, as `josh version --upgrade` does:
+
+```bash
+pnpm add -g --config.@joshuafolkken:registry=https://registry.npmjs.org/ @joshuafolkken/kit
+```
+
+A project that installs kit from GitHub Packages moves to npm separately: [registry-migration.md](./registry-migration.md).
 
 pnpm requires a one-time setup before any global install — it registers `PNPM_HOME` and appends it to your `PATH` via your shell rc file:
 
