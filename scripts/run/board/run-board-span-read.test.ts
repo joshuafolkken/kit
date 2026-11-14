@@ -55,7 +55,29 @@ describe('run_board_span_read.span_here — no run', () => {
 
 describe('run_board_span_read.span_here — a single run', () => {
 	it('draws the single run this checkout holds and names no process', async () => {
-		arrange({ kind: 'carried', carry: CARRY }, STOPPED)
+		arrange(NONE, STOPPED)
+		vi.spyOn(run_board_single, 'span_here').mockResolvedValue(SINGLE)
+
+		await expect(run_board_span_read.span_here(REPOSITORY, undefined)).resolves.toStrictEqual({
+			...NO_SPAN,
+			span: SINGLE,
+		})
+	})
+
+	// joshuafolkken/kit#7524: a root checkout's single run beside a carried run keeps the carried run's
+	// frame and is drawn as a row of its own.
+	it('keeps the carried run drawn and reads the held single run beside it', async () => {
+		arrange({ kind: 'carried', carry: CARRY }, undefined)
+		const span_here = vi.spyOn(run_board_single, 'span_here').mockResolvedValue(SINGLE)
+		const here = await run_board_span_read.span_here(REPOSITORY, undefined)
+
+		expect(here).toMatchObject({ carry: CARRY, root: SINGLE })
+		expect(here.span).not.toStrictEqual(SINGLE)
+		expect(span_here).toHaveBeenCalledWith(true)
+	})
+
+	it('draws the held single run where the carry record is unreadable', async () => {
+		arrange({ kind: 'unreadable' }, undefined)
 		vi.spyOn(run_board_single, 'span_here').mockResolvedValue(SINGLE)
 
 		await expect(run_board_span_read.span_here(REPOSITORY, undefined)).resolves.toStrictEqual({

@@ -24,7 +24,7 @@ import {
 import type { ProcessRoots } from './run-board-process-groups'
 import type { QuotaProvider } from './run-board-quota-read'
 import { run_board_scope } from './run-board-scope'
-import { run_board_single } from './run-board-single'
+import { run_board_single, type RootRun } from './run-board-single'
 import { run_board_span, type BoardSpan } from './run-board-span'
 import { run_board_span_read } from './run-board-span-read'
 import { run_board_throughput, type ThroughputRow } from './run-board-throughput'
@@ -39,6 +39,8 @@ interface LocalRead {
 	ended_ms: number | undefined
 	// The single run's name the header draws; `undefined` for a `backlogrun` (`run-board-single.ts`).
 	run_name?: string | undefined
+	// The root checkout's single run beside a carried run, drawn above its lanes.
+	root?: RootRun | undefined
 	// What the run was asked to do, from its invocation.
 	scope: NamedPlan
 	events: ReadonlyArray<RunEvent>
@@ -265,11 +267,14 @@ async function span_events_here(
 	}
 }
 
+// The span's own fields, with the root checkout's single run beside it.
 function span_fields(
 	span: BoardSpan,
-): Pick<LocalRead, 'started_ms' | 'ended_ms' | 'scheduler_provider' | 'run_name'> {
+	root: Pick<LocalRead, 'root'>,
+): Pick<LocalRead, 'started_ms' | 'ended_ms' | 'scheduler_provider' | 'run_name' | 'root'> {
 	const run_name = run_board_single.name_of(span.invocation)
 	const times = {
+		...root,
 		started_ms: span.started_ms,
 		ended_ms: span.ended_ms,
 		...(run_name !== undefined && { run_name }),
@@ -280,11 +285,18 @@ function span_fields(
 	return { ...times, scheduler_provider: span.scheduler_provider === 'openai' ? 'codex' : 'claude' }
 }
 
+function root_here(
+	root: BoardSpan | undefined,
+	events: ReadonlyArray<RunEvent>,
+): Pick<LocalRead, 'root'> {
+	return root === undefined ? {} : { root: run_board_single.root_of(root, events) }
+}
+
 // `undefined` when no run has started here. The lane count reads `table`, the redraw's process
 // snapshot, so it agrees with the usage columns.
 async function read_local(table?: TableRead): Promise<LocalRead | undefined> {
 	const repository = await run_carry.repository_directory()
-	const { span, resume, transcript, roots, carry, is_stranded, is_session_active } =
+	const { span, root, resume, transcript, roots, carry, is_stranded, is_session_active } =
 		await run_board_span_read.span_here(repository, table)
 
 	if (repository === undefined || span === undefined) return undefined
@@ -294,7 +306,7 @@ async function read_local(table?: TableRead): Promise<LocalRead | undefined> {
 	const lane_read = await lanes_here(lanes, repository, events, span.started_ms)
 
 	return {
-		...span_fields(span),
+		...span_fields(span, root_here(root, events)),
 		scope: run_board_scope.scope_of(span.invocation, carry?.added),
 		...(await span_events_here(events, span, table, carry)),
 		throughput: run_board_throughput.rows_of(events, Date.now()),

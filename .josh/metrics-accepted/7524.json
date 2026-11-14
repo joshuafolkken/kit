@@ -1,0 +1,7 @@
+{
+	"reason": "#7524 draws a root single run's row above the lanes beside a carried backlogrun: a new read field, its row and its section",
+	"date": "2026-11-14",
+	"growth": {
+		"scripts.code_lines": 49
+	}
+}
