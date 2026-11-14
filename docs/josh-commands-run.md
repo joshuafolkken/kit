@@ -269,7 +269,18 @@ The driver runs with `--window 5`, so a pass boundary comes at least every five 
 are active.
 
 The lanes and the carry record stay, as `backlogrun --restart` leaves them. A successor that does not
-start, or does not claim the run within two minutes, is a `failed` stop; an unclaimed one is stopped.
+start, or does not claim the run within 35 seconds, is a `failed` stop; an unclaimed one is stopped.
+
+One bound holds every dispatch wait (`scripts/backlog/backlog-dispatch-bound.ts`): an issue that
+becomes ready to start — or the seat it waits for freeing — reaches its `child-launch` within 60
+seconds. A fresh driver's start takes 25 of them, so the supervisor's pause between passes and the
+successor's claim on a reload each get the 35 left.
+
+Within a driver window a free seat checks the
+`auto-ok` listing every 10 seconds by its ETag (a 304 spends no REST core), and an issue new to its
+first page, or relabelled outside a lane, is asked about at once. A window that ends re-drives without
+the pause. The 180-second offer interval is a REST floor, not a dispatch path: with no seat free a
+collected child is asked about at once.
 
 Unattended profiles: Codex → OpenAI; Claude Code → Anthropic.
 [Codex permissions](./maintainers/josh-commands-run-rationale.md#codex-batch-permissions).
