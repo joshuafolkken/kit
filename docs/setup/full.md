@@ -18,7 +18,7 @@ pnpm josh gate
 
 On a branch, `josh gate` refuses to start until the scoped checks `lint:related` and `test:related` have passed on the files the branch changed, so the second line runs them first. A project without vitest needs only `lint:related`: `test:related` skips there and the gate does not ask for it.
 
-`pnpm dlx` fetches kit from the public npm registry without a GitHub token or project `.npmrc` mapping, adds `@joshuafolkken/kit` to the project's development dependencies, and hands the run to the `josh init` of the kit it just added ([init.md → Run from outside the project](../init.md#run-from-outside-the-project)). Existing projects with a `@joshuafolkken` mapping to GitHub Packages keep using it; see [authentication.md](../authentication.md) until those projects migrate.
+`pnpm dlx` fetches kit from the public npm registry without a GitHub token or project `.npmrc` mapping, adds `@joshuafolkken/kit` to the project's development dependencies, and hands the run to the `josh init` of the kit it just added ([init.md → Run from outside the project](../init.md#run-from-outside-the-project)). An existing project with a `@joshuafolkken` mapping to GitHub Packages keeps using it until it [moves to npm](../registry-migration.md); until then it needs [authentication.md](../authentication.md).
 
 `josh init` creates or merges the config files, adds the development dependencies the generated configs need — ESLint and its plugins, TypeScript, Prettier, cspell, Playwright and, when Git exists, lefthook ([init.md → Dependencies](../init.md#dependencies)) — then runs `pnpm install` and `josh format`. So the dependencies are installed, the Git hooks are in place and the new files are formatted before `josh gate` runs. `--no-install` skips both steps. See [init.md](../init.md) for the full list of managed files.
 
@@ -49,7 +49,7 @@ pnpm josh ruleset:check --apply
 
 ## 4. Keep it up to date
 
-After upgrading the package, pull in updated AI files, workflow templates and other managed files with `pnpm exec josh sync` ([sync.md](../sync.md)); the full procedure is [Update kit](../how-to/update-kit.md). A project-local `josh` is available via `pnpm josh …` after installation, so the CLI works even without the global install.
+After upgrading the package, pull in updated AI files, workflow templates and other managed files with `pnpm exec josh sync` ([sync.md](../sync.md)); the full procedure is [Update kit](../how-to/update-kit.md). A project that still installs kit from GitHub Packages [moves to npm](../registry-migration.md) before that upgrade. A project-local `josh` is available via `pnpm josh …` after installation, so the CLI works even without the global install.
 
 ## Next
 

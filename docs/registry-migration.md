@@ -3,6 +3,41 @@
 この入口は既存の kit を読み込まず、プロジェクトの `.npmrc` とロックだけを移行する。
 ユーザーの `~/.npmrc`、認証設定、インストール済み kit は変更しない。
 
+## 移行の順序
+
+`@joshuafolkken` を GitHub Packages から取得している既存プロジェクトは、次の順で進める。
+新規導入は移行不要（[README → Quick start](../README.md#quick-start)）。
+
+1. 取得前の確認：プロジェクトのルートで `pnpm config get "@joshuafolkken:registry"` を実行する。
+   `https://npm.pkg.github.com` を指す場合が移行対象。ユーザーの `~/.npmrc` の設定もこの値に現れる。
+2. 入口を取得し（[配布と境界](#配布と境界)）、`--dry-run` で変更予定のファイル、または失敗した name@version と理由を確認する。
+3. dry-run が通ったら同じ版で本実行する。失敗時はファイルを変更しない。原因を直して同じコマンドを再実行する。
+4. npm から対象 kit を取得し、その kit の sync を実行する。
+
+   ```sh
+   pnpm add -D @joshuafolkken/kit@<target-version>
+   pnpm exec josh sync
+   pnpm install
+   ```
+
+5. 認証なしの確認：`pnpm config get "@joshuafolkken:registry"` が `https://registry.npmjs.org/` を返し、`pnpm-lock.yaml` に `npm.pkg.github.com` が残らないこと。
+
+この入口を含む kit を導入済みのプロジェクトでは、`pnpm josh version --upgrade` が手順 3 の入口を先に実行してから npm の kit を追加する（[package-api.md → Version-command library](./package-api.md#version-command-library-joshuafolkkenkitversion)）。その後に手順 4 の `josh sync` と `pnpm install` を実行する。
+global CLI は `~/.npmrc` を変えずに npm から取得できる（[cli.md](./cli.md#1-install-globally)）。
+
+### 移行後に残る作業
+
+- プロジェクトの `.npmrc` には `@joshuafolkken:registry=https://registry.npmjs.org/` が入る。commit する。秘密情報は含まない。
+- ユーザーの `~/.npmrc` は変更しない。`@joshuafolkken` の GitHub mapping とトークン行は、他のプロジェクトがまだ GitHub Packages から取得しているなら残す。不要になった時点で自分で削除する。
+- 他スコープを GitHub Packages から取得するプロジェクトは、そのスコープの mapping と認証を残す（[authentication.md](./authentication.md)）。
+- Cloudflare Workers Builds・Vercel・Netlify・Docker 等のビルダーに設定した `NODE_AUTH_TOKEN`、`npm_config_//npm.pkg.github.com/:_authToken`、`PNPM_CONFIG_NPMRC_AUTH_FILE` は、他に GitHub Packages の依存がなければ削除する。残す依存があれば維持する（[authentication.md §4](./authentication.md#4-build-platforms-with-no-user-level-npmrc)）。
+- kit の CI テンプレートは npm から取得する。独自の CI に GitHub Packages 用の認証手順を追加していれば、同じ基準で削除または維持する。
+
+### 対象外
+
+- GitHub Packages への publish 停止と、既存版の削除はこの移行に含まない。既存の GitHub 取得は引き続き動く。
+- 公開済み版を実際の consumer リポジトリと公開 tarball で通す最終実証は、公開後に #7447 で行う。それまでこの文書の確認済み範囲は、pack した候補 tarball による検証に限る。
+
 ## 配布と境界
 
 公開する kit tarball の `package/dist/registry-migrate.mjs` が依存を内包する独立入口。
@@ -24,10 +59,12 @@ node /path/to/registry-migrate.mjs <target-version> --dry-run
 node /path/to/registry-migrate.mjs <target-version>
 ```
 
-移行成功後に通常の pnpm 操作で対象 kit を npm から取得し、その kit の `josh sync` を実行する。
+引数なしや不明なフラグでは使い方を表示し、ファイルを変更せず終了コード 1 で終わる。`--help` は使い方だけを表示する。
+
+移行成功後に通常の pnpm 操作で対象 kit を npm から取得し、その kit の `josh sync` を実行する（[移行の順序](#移行の順序)の手順 4）。
 入口自身は kit の更新・新規初期化・sync を実行しない。
 既存の `josh init` bootstrap と retired な `registry:migrate` は変更しない。
-sync、prepare、CI、利用案内の追従は #7443・#7445・#7446 が担当する。
+npm へ移行したプロジェクトでは、`josh sync` が kit の書いた `prepare` から `fix-gh-packages` を外す（[sync.md](./sync.md#what-does-not-get-synced)）。
 
 ## 検証する条件
 

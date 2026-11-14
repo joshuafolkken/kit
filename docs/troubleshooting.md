@@ -7,6 +7,7 @@ Common errors when installing or using `@joshuafolkken/kit`, and how to fix them
 Check which registry the install uses before changing `.npmrc`.
 
 - For a new kit-only install, public npm is the expected registry. Check `https://registry.npmjs.org/@joshuafolkken%2fkit/<version>` for the exact version requested — the package URL can return `200` while that version returns `404`. A GitHub Packages mapping does not fix it.
+- For an existing project still installing kit from GitHub Packages, a newer kit may need npm: [move the project to npm](./registry-migration.md) first.
 - For an existing project intentionally using GitHub Packages, confirm its `.npmrc` still contains the mapping. See §3 of [authentication.md](./authentication.md) if it is missing:
   ```ini
   @joshuafolkken:registry=https://npm.pkg.github.com
@@ -129,7 +130,7 @@ To stop Playwright's own modules, which treat any non-empty `CI` as CI, from sil
 
 ## `pnpm install` fails with `401 Unauthorized` / `403 Forbidden`
 
-`pnpm` reached GitHub Packages but the token was missing or expired.
+`pnpm` reached GitHub Packages but the token was missing or expired. If only kit comes from there, [moving the project to npm](./registry-migration.md) removes the need for the token; otherwise:
 
 1. Confirm the credential lives in your **user-level** `~/.npmrc`, not the project `.npmrc` — pnpm ignores a project-level one unless `npmrcAuthFile` opts it in (see the warning below). `pnpm config get "//npm.pkg.github.com/:_authToken"` should print the token or the `${NODE_AUTH_TOKEN}` placeholder; if it is empty, run §2 of [authentication.md](./authentication.md).
 2. Using the placeholder form? Confirm the env var is set in the current shell:
@@ -160,6 +161,7 @@ pnpm ignores a credential line in a project `.npmrc` unless `npmrcAuthFile` decl
 
 ## Still stuck?
 
+- Moving off GitHub Packages? Follow [registry-migration.md](./registry-migration.md) in order.
 - Installing from GitHub Packages? Re-read [authentication.md](./authentication.md) end to end — the ordering (token → env var → `~/.npmrc` credential → project registry mapping) matters.
 - Check installed vs. latest version: `josh version`.
 - Open an issue: <https://github.com/joshuafolkken/kit/issues>.
