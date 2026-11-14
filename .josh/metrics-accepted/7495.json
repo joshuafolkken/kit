@@ -1,7 +1,8 @@
 {
-	"reason": "bash-revert attributes a change to the shell only when its command names the path (#7495)",
+	"reason": "bash-revert reverts only paths its command names and reports the rest; docs describe the narrower revert (#7495)",
 	"date": "2026-11-14",
 	"growth": {
-		"scripts.code_lines": 29
+		"scripts.code_lines": 33,
+		"ai_cost.on_demand_bytes": 192
 	}
 }

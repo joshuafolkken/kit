@@ -31,6 +31,8 @@ const OPERATIONAL_RECORDS = '.josh/'
 const BACKUP_DIRECTORY = '.josh/tmp/bash-revert'
 const BEFORE_CALL_DIRECTORY = 'before-call'
 const STAMP_EXTENSION = '.json'
+// Any run of characters a path word does not carry: quotes, spaces, operators.
+const PATH_BREAK = /[^\w./-]+/u
 const snapshot_schema = z.record(z.string(), z.string())
 
 type Snapshot = Record<string, string>
@@ -179,6 +181,12 @@ function moved_entries(transcript: string, root: string): Moved {
 	}
 }
 
+// A whole word of `command` is `file`, relative or under an absolute root — `src/app.ts` does not
+// name `src/app.tsx`.
+function names(command: string, file: string): boolean {
+	return command.split(PATH_BREAK).some((word) => word === file || word.endsWith(`/${file}`))
+}
+
 // Splits the moved files into the ones `command` names, this shell's, and the rest, `unknown`.
 function attributed(moved: Moved, command: string): Moved {
 	const changed = [
@@ -188,10 +196,10 @@ function attributed(moved: Moved, command: string): Moved {
 	]
 
 	return {
-		revert: moved.revert.filter((entry) => command.includes(entry_file(entry))),
-		restore: moved.restore.filter((file) => command.includes(file)),
-		keep: moved.keep.filter((file) => command.includes(file)),
-		unknown: changed.filter((file) => !command.includes(file)),
+		revert: moved.revert.filter((entry) => names(command, entry_file(entry))),
+		restore: moved.restore.filter((file) => names(command, file)),
+		keep: moved.keep.filter((file) => names(command, file)),
+		unknown: changed.filter((file) => !names(command, file)),
 	}
 }
 

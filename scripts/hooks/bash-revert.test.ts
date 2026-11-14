@@ -250,6 +250,24 @@ describe('bash_revert with a change its command does not name', () => {
 	})
 })
 
+describe('bash_revert reading the paths its command names', () => {
+	it('does not take a path the command names only as a prefix of a longer one', () => {
+		stamp()
+		write(APP, WRITTEN)
+
+		expect(revert(`cat ${APP}x`)).toContain(`left in place: ${APP}.`)
+		expect(read(APP)).toBe(WRITTEN)
+	})
+
+	it('takes a path the command names under an absolute root', () => {
+		stamp()
+		write(APP, WRITTEN)
+
+		expect(revert(`node write.mjs '${in_workspace(APP)}'`)).toContain(`Reverted: ${APP}.`)
+		expect(read(APP)).toBe(ORIGINAL)
+	})
+})
+
 describe('bash_revert in an implementation session', () => {
 	it('neither stamps nor reverts', () => {
 		vi.stubEnv(agent_session_role.KEY, 'worker')
