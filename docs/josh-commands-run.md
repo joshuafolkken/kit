@@ -23,6 +23,7 @@ pnpm josh run:hold --adopt 1091     # hand a `new` run's hold to the issue it fi
 - `--fullrun` — marks the record as `fullrun #N`'s.
 - `--adopt <issue>` — re-keys the unnumbered `new` run's record to the filed issue and applies `in-progress`; answers `none` (exit 1) when the tree holds no record.
 - `--halfrun-stop` — marks a `halfrun` stop for `run:entry` to adopt, and sends its `confirmation` Telegram; answers `e2e-owed` (exit 1) until `test:e2e` answered green on this tree.
+- `--halfrun-round` — starts a `halfrun` fix round: re-opens the issue's stopped `halfrun` record as running, owned by this session; answers `busy` (exit 1) when the tree holds no such stop.
 - `--human-review-stop` — marks a `halfrun` stop and a `human-review` lane, retaining its tree and hold. Sends `confirmation`; its worker's exit frees the execution place. Answers `e2e-owed` (exit 1) until `test:e2e` is green on this tree.
 - `--prrun-stop` — marks a `prrun` stop with the commit its pull request is on, and sends its `confirmation` Telegram.
 
