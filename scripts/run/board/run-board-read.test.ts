@@ -126,6 +126,7 @@ describe('run_board_read.read_local', () => {
 		await expect(run_board_read.read_local()).resolves.toStrictEqual({
 			started_ms: Date.parse(STARTED_AT),
 			ended_ms: Date.parse(ENDED_AT),
+			ended_roots: [],
 			scope: { issues: [3431], only: true },
 			events: [INSIDE],
 			throughput: expect.any(Array) as Array<unknown>,

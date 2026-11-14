@@ -16,6 +16,7 @@ const KIND = run_event_stream.EVENT_KIND
 const ROOT = 7521
 const LANE = 7530
 const LANE_LIMIT = 6
+const RUN_MS = 1_500_000
 const AT = new Date(START).toISOString()
 
 function event(kind: string, text: string): RunEvent {
@@ -106,6 +107,26 @@ describe('run_board_tick.tick — the root single run’s legend and absence', (
 	it('draws no 🏠 rule without a root run', async () => {
 		const lines = await frame_of(CARRIED)
 
+		expect(lines.some((line) => line.includes('🏠'))).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#7525: a root single run a merge ended leaves 🏠 and joins ✅ done as a lane does.
+const ENDED: LocalRead = {
+	...CARRIED,
+	ended_roots: [{ command: 'fullrun', issue: ROOT, started_ms: START, ended_ms: START + RUN_MS }],
+}
+
+describe('run_board_tick.tick — a root single run that merged', () => {
+	it('lists the run under ✅ done with its merged mark and time, and no 🏠 rule', async () => {
+		const lines = await frame_of(ENDED)
+		const done = index_of(lines, `${STATE_ICONS.merged} done`)
+		const row = lines[done + 1] ?? ''
+
+		expect(done).toBeGreaterThan(-1)
+		expect(row).toContain(`${STATE_ICONS.merged} `)
+		expect(row).toContain(String(ROOT))
+		expect(row).toContain('25′00″')
 		expect(lines.some((line) => line.includes('🏠'))).toBe(false)
 	})
 })

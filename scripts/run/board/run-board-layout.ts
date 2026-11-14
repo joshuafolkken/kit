@@ -424,6 +424,7 @@ function listed_parks(layout: BoardLayout): ReadonlySet<number> {
 
 const run_board_layout = {
 	EMPTY_LAYOUT,
+	active_order,
 	drawn_rows,
 	is_blocked,
 	is_decision: run_board_human.is_decision,
