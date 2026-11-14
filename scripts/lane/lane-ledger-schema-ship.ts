@@ -6,13 +6,17 @@ import { lane_ledger_kind } from './lane-ledger-kind'
 
 const { KIND } = lane_ledger_kind
 
-// Every early-push decision, including a skip before a push process could start.
+// Every early-push decision, including a skip before a push process could start. `head` is the commit
+// it decided on and `slots` how many review slots the round opened (joshuafolkken/kit#7503), absent
+// where unknown and on a line recorded before it had them.
 const early_push_schema = z.object({
 	kind: z.literal(KIND.EARLY_PUSH),
 	at: z.string(),
 	issue: z.number().optional(),
 	source: z.enum(['review', 'ship']),
 	result: z.string(),
+	head: z.string().optional(),
+	slots: z.number().optional(),
 })
 
 // A `josh ship` that stopped on `issue`: `reason` is the stage it stopped at, or `conflict` — the

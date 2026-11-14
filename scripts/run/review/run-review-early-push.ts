@@ -87,28 +87,37 @@ async function prepare(
 	directory?: string,
 ): Promise<boolean> {
 	const reason = preparation_skip(plan, environment ?? process.env, directory ?? PROJECT_ROOT)
+	const slots = plan.slots.length
 
 	if (reason !== undefined) {
-		await early_push_record.record('review', reason)
+		await early_push_record.record('review', reason, slots)
 
 		return false
 	}
 
 	const is_committed = await commit_locally()
 
-	if (!is_committed) await early_push_record.record('review', 'commit-refused')
+	if (!is_committed) await early_push_record.record('review', 'commit-refused', slots)
 
 	return is_committed
 }
 
-function launch(): void {
+// The background push records the round's slot count, so it rides on the argv.
+function launch(slots: number): void {
 	const log_path = stamp_file.stamp_path(PUSH_LOG_PREFIX, PROJECT_ROOT)
-	const result = run_review_steps.launch_josh([RUN_REVIEW_COMMAND, PUSH_FLAG], log_path)
+	const argv = [RUN_REVIEW_COMMAND, PUSH_FLAG, String(slots)]
+	const result = run_review_steps.launch_josh(argv, log_path)
 
 	if (result.kind !== 'failed') return
 
 	process.stderr.write(`${SKIPPED_NOTE}the push could not be started: ${result.note}\n`)
-	void early_push_record.record('review', 'launch-failed')
+	void early_push_record.record('review', 'launch-failed', slots)
+}
+
+function slot_count(argument: string | undefined): number | undefined {
+	const slots = Number(argument)
+
+	return Number.isSafeInteger(slots) && slots > 0 ? slots : undefined
 }
 
 async function skip_reason(): Promise<string | undefined> {
@@ -127,13 +136,14 @@ async function body_arguments(): Promise<ReadonlyArray<string>> {
 	return run_ship_body_draft.body_arguments(draft)
 }
 
-// `josh run:review --push`, the background half: a skipped push exits 0, as nothing failed.
-async function push(): Promise<number> {
+// `josh run:review --push <slots>`, the background half: a skipped push exits 0, as nothing failed.
+async function push(slots_argument?: string): Promise<number> {
+	const slots = slot_count(slots_argument)
 	const reason = await skip_reason()
 
 	if (reason !== undefined) {
 		process.stdout.write(`${SKIPPED_NOTE}${reason === DIRTY_REASON ? DIRTY_NOTE : RED_NOTE}\n`)
-		await early_push_record.record('review', reason)
+		await early_push_record.record('review', reason, slots)
 
 		return SUCCESS_EXIT_CODE
 	}
@@ -143,6 +153,7 @@ async function push(): Promise<number> {
 	await early_push_record.record(
 		'review',
 		result.code === SUCCESS_EXIT_CODE ? 'pushed' : 'push-failed',
+		slots,
 	)
 
 	process.stdout.write(`${result.out}\n`)

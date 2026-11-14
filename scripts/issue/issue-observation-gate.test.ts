@@ -1,3 +1,4 @@
+import { lane_early_push_count } from '#scripts/lane/lane-early-push-count'
 import { afterEach, expect, it } from 'vitest'
 import { issue_not_before } from './issue-not-before'
 import { issue_observation_fixture as fixture } from './issue-observation-fixture'
@@ -47,6 +48,33 @@ it.each([
 ])('keeps waiting on %s', (_name, comment) => {
 	issue_observation_gate.record(fixture.URL, comment)
 	expect(issue_not_before.is_due(fixture.BODY)).toBe(false)
+})
+
+const METRIC = lane_early_push_count.MULTI_SLOT_EARLY_PUSH
+const UNKNOWN_METRIC = 'unknown-metric'
+const LEDGER_BODY = fixture.ledger_body(METRIC)
+
+it('releases a ledger-conditioned wait once the ledger holds the declared samples', () => {
+	issue_observation_gate.record(fixture.URL, fixture.comment([]))
+	issue_observation_gate.record_sample(METRIC, 0)
+	expect(issue_not_before.is_due(LEDGER_BODY)).toBe(false)
+	expect(issue_not_before.waiting_reason(LEDGER_BODY)).toContain('multi-slot, same-head')
+	issue_observation_gate.record_sample(METRIC, 1)
+	expect(issue_not_before.is_due(LEDGER_BODY)).toBe(true)
+})
+
+it('still releases a ledger-conditioned wait on checked evidence', () => {
+	issue_observation_gate.record(fixture.URL, fixture.comment(fixture.KEYS))
+	expect(issue_not_before.is_due(LEDGER_BODY)).toBe(true)
+})
+
+it('withholds an unknown ledger metric instead of treating it as fulfilled', () => {
+	const body = fixture.ledger_body(UNKNOWN_METRIC)
+
+	issue_observation_gate.record_sample(UNKNOWN_METRIC, 1)
+	issue_observation_gate.record(fixture.URL, fixture.comment(fixture.KEYS))
+	expect(issue_not_before.is_due(body)).toBe(false)
+	expect(issue_not_before.waiting_reason(body)).toContain('unknown observation condition')
 })
 
 it('does not reinterpret a free-text stop or an ordinary failure as an observation wait', () => {
