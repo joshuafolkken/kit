@@ -5149,3 +5149,83 @@
 - rb:2026-11-13 | #7484
 - rf:bug-risks | medium | scripts/run/wake/run-wake-codex.ts:46 | 2026-11-13 | #7484 | fixed
 - rx:{"round":"04fb91da-4181-476d-9307-53f9d047e21b","category":"bug-risks","severity":"medium","file":"scripts/run/wake/run-wake-codex.ts:46","disposition":"fixed","description":"旧 pid-less 判断を live として一巡観測すると woke_at が消え、後の正常終了を失敗扱いするため旧 launch mark を保持する。","status":"resolved"}
+- rf:none | none | - | 2026-11-13 | #7445
+- rf:none | none | - | 2026-11-13 | #7445
+- rf:none | none | - | 2026-11-13 | #7445
+- rf:bug-risks | low | scripts/sync/sync-ai-files.ts:26 | 2026-11-14 | #7445
+- rf:tests | low | scripts/sync/publish-artifact.test.ts:163 | 2026-11-14 | #7445
+- rf:none | none | - | 2026-11-14 | #7445
+- rb:2026-11-13 | #7445
+- rf:bug-risks | medium | .github/actions/setup-pnpm/action.yml:163 | 2026-11-13 | #7445 | fixed
+- rx:{"round":"85123e82-0ede-4065-bfe9-da3cc74e3bcb","category":"bug-risks","severity":"medium","file":".github/actions/setup-pnpm/action.yml:163","disposition":"fixed","description":"Existing user npmrc without a final newline is corrupted by concatenated auth configuration, breaking GitHub-scope installs; ensure a line boundary before appending.","status":"resolved"}
+- rb:2026-11-13 | #7445
+- rf:none | none | - | 2026-11-13 | #7445
+- rb:2026-11-14 | #7446
+- rf:bug-risks | medium | docs/init.md:244 | 2026-11-14 | #7446 | fixed
+- rx:{"round":"6cddb573-8c04-43ba-bd36-5f65085f553d","category":"bug-risks","severity":"medium","file":"docs/init.md:244","disposition":"fixed","description":"The npm-only prepare condition omits that is_npm_only also requires a lockfile with no GitHub Packages resolution, so a hand-edited .npmrc with a stale lock still gets fix-gh-packages contrary to the doc.","status":"resolved"}
+- ri:none | none | - | 2026-11-14 | #7487
+- rb:2026-11-14 | #7487
+- rf:none | none | - | 2026-11-14 | #7487
+- ri:none | none | - | 2026-11-14 | #7488
+- rb:2026-11-14 | #7488
+- rf:project-conventions | medium | docs/observation-waits.md:20 | 2026-11-14 | #7488 | fixed
+- rx:{"round":"5b60d3dc-c2db-4e8e-90ec-b2596f0af3ce","category":"project-conventions","severity":"medium","file":"docs/observation-waits.md:20","disposition":"fixed","description":"The doc says every run:add --retry issue stays out of lanes until launch, but only one the plan leaves unreached does; one the plan starts next keeps its lane.","status":"resolved"}
+- ri:bug-risks | medium | scripts/run/add/run-add.ts:105 | 2026-11-14 | #7493 | fixed
+- rb:2026-11-14 | #7493
+- rf:none | none | - | 2026-11-14 | #7493
+- rf:project-conventions | low | .claude/skills/workflow-commands/working-tree-hold.md:57 | 2026-11-14 | #7494
+- ri:bug-risks | medium | scripts/run/run-halfrun-resume.ts:117 | 2026-11-14 | #7494 | fixed
+- rb:2026-11-14 | #7494
+- rf:bug-risks | low | scripts/run/run-halfrun-resume.ts | 2026-11-14 | #7494 | fixed
+- rf:tests | low | scripts/run/hold/run-hold-cli.ts | 2026-11-14 | #7494 | fixed
+- rx:{"round":"37aec414-eefc-42aa-a80d-ef12f593bb61","category":"bug-risks","severity":"low","file":"scripts/run/run-halfrun-resume.ts","disposition":"fixed","description":"reopen now returns a human-review lane to running via the shared resume_lane","status":"resolved"}
+- rx:{"round":"37aec414-eefc-42aa-a80d-ef12f593bb61","category":"tests","severity":"low","file":"scripts/run/hold/run-hold-cli.ts","disposition":"fixed","description":"run-hold-cli-round.test.ts covers the hold/busy verdicts and exits","status":"resolved"}
+- ri:bug-risks | medium | scripts/run/run-halfrun-resume.ts | 2026-11-14 | #7494 | fixed
+- rf:bug-risks | medium | scripts/hooks/bash-revert.ts:191 | 2026-11-14 | #7495 | fixed
+- rf:bug-risks | medium | scripts/hooks/bash-revert.ts:192 | 2026-11-14 | #7495 | fixed
+- rf:bug-risks | low | scripts/hooks/bash-revert.ts:268 | 2026-11-14 | #7495 | fixed
+- rf:bug-risks | medium | scripts/hooks/bash-revert.ts:199 | 2026-11-14 | #7495
+- rf:bug-risks | low | scripts/hooks/bash-revert.ts:282 | 2026-11-14 | #7495
+- ri:bug-risks | medium | scripts/hooks/implementation-shell.ts:10 | 2026-11-14 | #7495 | fixed
+- rf:none | none | - | 2026-11-14 | #7500
+- rf:none | none | - | 2026-11-14 | #7500
+- rf:project-conventions | low | scripts/run/review/run-review-cli.ts:72 | 2026-11-14 | #7503
+- ri:project-conventions | low | scripts/josh/josh-commands-ship.ts:92 | 2026-11-14 | #7503 | fixed
+- rb:2026-11-14 | #7503
+- rf:tests | medium | scripts/run/review/run-review-cli.ts:94 | 2026-11-14 | #7503 | fixed
+- rf:project-conventions | low | scripts/josh/josh-commands-ship.ts:61 | 2026-11-14 | #7503 | fixed
+- rx:{"round":"9b01e767-1a30-47ef-874c-8b20464fcaab","category":"tests","severity":"medium","file":"scripts/run/review/run-review-cli.ts:94","disposition":"fixed","description":"The CLI's forwarding of the slot count (launch(slots.length) and push(argv[1])) is not asserted by any test, so dropping it would silently stop ledger-conditioned waits from ever releasing.","status":"resolved"}
+- rx:{"round":"9b01e767-1a30-47ef-874c-8b20464fcaab","category":"project-conventions","severity":"low","file":"scripts/josh/josh-commands-ship.ts:61","disposition":"fixed","description":"The run:review reference and usage (and generated docs/josh-commands-run.md:652) still show --push without the new optional <slots> argument.","status":"resolved"}
+- rf:none | none | - | 2026-11-14 | #7505
+- rb:2026-11-14 | #7505
+- rf:none | none | - | 2026-11-14 | #7505
+- ri:comments | low | scripts/run/event/run-event-stream-emit.ts:132 | 2026-11-14 | #7505 | fixed
+- rf:comments | low | scripts/run/carry/run-carry.ts:373 | 2026-11-14 | #7506
+- ri:bug-risks | medium | scripts/run/wake/run-wake-driver.ts:95 | 2026-11-14 | #7506 | fixed
+- ri:bug-risks | medium | scripts/run/wake/run-wake-driver.ts:89 | 2026-11-14 | #7506 | fixed
+- rb:2026-11-14 | #7506
+- rf:bug-risks | medium | .claude/skills/workflow-commands/backlogrun-steps.md:136 | 2026-11-14 | #7506 | fixed
+- rx:{"round":"17eaed2e-d469-4eb9-9ed0-95e164b8a29d","category":"bug-risks","severity":"medium","file":".claude/skills/workflow-commands/backlogrun-steps.md:136","disposition":"fixed","description":"the `watch` row still says to run `run:handoff retrospective` though the session now runs beside the driver, so its close names the wrong owner and is refused busy.","status":"resolved"}
+- ri:bug-risks | medium | scripts/run/ship/run-ship-handover.ts:62 | 2026-11-14 | #7507 | fixed
+- rb:2026-11-14 | #7507
+- rf:bug-risks | low | scripts/run/wake/run-wake-takeover.ts:19 | 2026-11-14 | #7507 | false-positive
+- rf:bug-risks | low | scripts/run/wake/run-wake-supervise.ts:29 | 2026-11-14 | #7507 | false-positive
+- rx:{"round":"593eb4b1-b8fa-40e2-80e2-25dbf2dcc41b","category":"bug-risks","severity":"low","file":"scripts/run/wake/run-wake-takeover.ts:19","disposition":"false-positive","description":"the 35 s claim wait is the Issue-mandated derivation from the 60 s dispatch bound, and no claim slower than a few seconds is recorded","status":"resolved"}
+- rx:{"round":"593eb4b1-b8fa-40e2-80e2-25dbf2dcc41b","category":"bug-risks","severity":"low","file":"scripts/run/wake/run-wake-supervise.ts:29","disposition":"false-positive","description":"the restart pause sharing the pass interval is intended by the one-bound policy, and no transient fault of 105–180 s is recorded","status":"resolved"}
+- rf:none | none | - | 2026-11-14 | #7508
+- ri:none | none | - | 2026-11-14 | #7508
+- rb:2026-11-14 | #7508
+- rf:bug-risks | medium | scripts/lane/lane-dispatch-wait-stats.ts:149 | 2026-11-14 | #7508 | fixed
+- rf:bug-risks | medium | scripts/lane/lane-dispatch-wait-stats.ts:138 | 2026-11-14 | #7508 | fixed
+- rf:tests | low | scripts/lane/lane-dispatch-wait-stats.test.ts:159 | 2026-11-14 | #7508 | fixed
+- rx:{"round":"b6523771-79ae-4c45-b0c0-6e43bd3e7678","category":"bug-risks","severity":"medium","file":"scripts/lane/lane-dispatch-wait-stats.ts:149","disposition":"fixed","description":"With no blocked offer since the previous dispatch, after_ms is -Infinity, so a re-dispatch's wait starts at the issue's original filing and spans the earlier lane's whole run.","status":"resolved"}
+- rx:{"round":"b6523771-79ae-4c45-b0c0-6e43bd3e7678","category":"bug-risks","severity":"medium","file":"scripts/lane/lane-dispatch-wait-stats.ts:138","disposition":"fixed","description":"Retry offers exclude only requested issues, so a chain-, triage- or person-blocked issue looks runnable and its wait starts too early.","status":"resolved"}
+- rx:{"round":"b6523771-79ae-4c45-b0c0-6e43bd3e7678","category":"tests","severity":"low","file":"scripts/lane/lane-dispatch-wait-stats.test.ts:159","disposition":"fixed","description":"The re-dispatch test has no filing, so it cannot catch the -Infinity bound.","status":"resolved"}
+- rf:none | none | - | 2026-11-14 | #7509
+- rf:none | none | - | 2026-11-14 | #7510
+- ri:none | none | - | 2026-11-14 | #7510
+- rb:2026-11-14 | #7510
+- rf:bug-risks | medium | scripts/backlog/backlog-drive-hold.ts:186 | 2026-11-14 | #7510 | fixed
+- rf:project-conventions | low | docs/josh-commands-board.md:166 | 2026-11-14 | #7510 | fixed
+- rx:{"round":"3a5f3d57-3ded-4bfc-a2f6-3020c9d55411","category":"bug-risks","severity":"medium","file":"scripts/backlog/backlog-drive-hold.ts:186","disposition":"fixed","description":"last_reason goes stale after an offer that launches (no hold call), so a window end after watch-then-run is recorded as hand-back:drained.","status":"resolved"}
+- rx:{"round":"3a5f3d57-3ded-4bfc-a2f6-3020c9d55411","category":"project-conventions","severity":"low","file":"docs/josh-commands-board.md:166","disposition":"fixed","description":"seat-line prose does not name the new \"driver restart pending\" lead.","status":"resolved"}
