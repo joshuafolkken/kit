@@ -27,8 +27,9 @@ green on this tree; it also sends the `confirmation` Telegram, its body led by
 `Next: prrun #<N> | fullrun #<N>` — never compose one) → **stop**. Plan comments are in
 the session language. The stop report names `prrun #<N>` (recommended) and `fullrun #<N>`, in that order.
 **Invoking `halfrun` is _not_ authorization to commit, push, or merge** — do not run `pnpm josh git -y` or `pnpm josh followup` yourself. If the user comes
-back with fixes, treat each as a new round: implement, re-run `pnpm josh gate`, mark the stop again
-(it sends the `confirmation`), stop again.
+back with fixes, treat each as a new round: open it with `pnpm josh run:hold <N> --halfrun-round`
+(also as a child handed the round through `run:handoff`), implement, re-run `pnpm josh gate`, mark
+the stop again (it sends the `confirmation`), stop again.
 
 `halfrun new` or `halfrun new "<title>"`: `kickoff new` + `halfrun #<N>` (no Issue exists yet). Steps
 mirror `fullrun new` (1)–(6): derive an English title (or use the provided one) → create the Issue

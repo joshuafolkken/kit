@@ -1,3 +1,4 @@
+import { session_cite } from '#scripts/issue/session-cite'
 import { lane_state } from '#scripts/lane/lane-state'
 import {
 	run_hold,
@@ -29,10 +30,14 @@ function hold_of(read: HoldRead): RunHold | undefined {
 	return read.kind === 'held' || read.kind === 'stale' ? read.hold : undefined
 }
 
-function is_halfrun_stop(read: HoldRead, issue: string, is_dirty: boolean): boolean {
+function is_stop_record(read: HoldRead, issue: string): boolean {
 	const hold = hold_of(read)
 
-	return is_dirty && hold?.issue === issue && hold.is_halfrun_stop === true
+	return hold?.issue === issue && hold.is_halfrun_stop === true
+}
+
+function is_halfrun_stop(read: HoldRead, issue: string, is_dirty: boolean): boolean {
+	return is_dirty && is_stop_record(read, issue)
 }
 
 // The stopping run's own record names its issue, or `new` when it entered as `halfrun new`; a free tree
@@ -66,6 +71,26 @@ function take_over(target: string, issue: string): boolean {
 	run_hold.release_hold(target)
 
 	return run_hold.create_hold(target, issue, new Date(), true)
+}
+
+// **A fix round re-opens the stop** (`run:hold <N> --halfrun-round`, joshuafolkken/kit#7494): the person
+// came back with fixes, so the stopped record is replaced by a running `halfrun`'s owned by the round's
+// session — `run:board` draws the round and `tree:status` names its process — until the round's own
+// `--halfrun-stop` marks it again. `MARKED` here is the record written; only #N's own stop qualifies.
+function reopen_at(target: string, issue: string): StopMark {
+	const read = run_hold.read_hold(target)
+
+	if (read.kind === 'unreadable') return UNREADABLE
+
+	if (!is_stop_record(read, issue)) return FOREIGN
+
+	run_hold.release_hold(target)
+
+	return run_hold.create_hold(target, issue) ? MARKED : FOREIGN
+}
+
+function no_stop_message(issue: string): string {
+	return `run:hold: this tree holds no stopped \`halfrun\` of ${session_cite.issue(issue)} — a fix round re-opens only that record.`
 }
 
 // `false` leaves the record untouched, so the ordinary claim that follows decides the tree.
@@ -121,6 +146,8 @@ const run_halfrun_resume = {
 	hold_target,
 	is_pending,
 	mark_stop_at,
+	no_stop_message,
+	reopen_at,
 	take_over,
 }
 

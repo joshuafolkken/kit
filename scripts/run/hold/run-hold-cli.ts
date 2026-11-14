@@ -50,6 +50,8 @@ const FORCE_FLAG = '--force'
 // implementation cut outside a lane resumes as `fullrun #N`.
 const FULLRUN_FLAG = '--fullrun'
 const HALFRUN_STOP_FLAG = '--halfrun-stop'
+// A `halfrun` fix round's start: the stopped record re-opened as the round's (`run-halfrun-resume.ts`).
+const HALFRUN_ROUND_FLAG = '--halfrun-round'
 // A `prrun`'s stop before merge: its record keeps the commit it stopped on.
 const PRRUN_STOP_FLAG = '--prrun-stop'
 // A `needs-human-review` stop: marked as a `halfrun` stop is, with its own confirmation.
@@ -59,7 +61,7 @@ const ADOPT_FLAG = '--adopt'
 // The most a claim reads: the issue number and the one flag after it.
 const MAX_CLAIM_ARGUMENTS = 2
 const USAGE =
-	'Usage: josh run:hold [<issue-number> [--fullrun | --halfrun-stop | --human-review-stop | --prrun-stop]] | josh run:hold --adopt <issue-number> | josh run:release [<issue-number> | --force]'
+	'Usage: josh run:hold [<issue-number> [--fullrun | --halfrun-stop | --halfrun-round | --human-review-stop | --prrun-stop]] | josh run:hold --adopt <issue-number> | josh run:release [<issue-number> | --force]'
 
 const COMMAND = 'run:hold'
 
@@ -79,8 +81,15 @@ const HALFRUN_STOP_KIND = 'halfrun-stop'
 const HUMAN_REVIEW_STOP_KIND = 'human-review-stop'
 const PRRUN_STOP_KIND = 'prrun-stop'
 const ADOPT_KIND = 'adopt'
+const HALFRUN_ROUND_KIND = 'halfrun-round'
 
 type StopKind = typeof HALFRUN_STOP_KIND | typeof HUMAN_REVIEW_STOP_KIND | typeof PRRUN_STOP_KIND
+
+// The requests that take over a record this issue's own run left: `--adopt` and `--halfrun-round`.
+interface TakeOverRequest {
+	kind: typeof ADOPT_KIND | typeof HALFRUN_ROUND_KIND
+	issue: string
+}
 
 interface ClaimRequest {
 	kind: 'claim'
@@ -96,7 +105,7 @@ interface StopRequest {
 type HoldRequest =
 	| ClaimRequest
 	| StopRequest
-	| { kind: typeof ADOPT_KIND; issue: string }
+	| TakeOverRequest
 	| { kind: 'release'; claimant: string }
 	| { kind: typeof FORCE_RELEASE_KIND }
 
@@ -108,6 +117,12 @@ const STOP_KINDS: ReadonlySet<string> = new Set([
 
 function is_stop_request(request: HoldRequest): request is StopRequest {
 	return STOP_KINDS.has(request.kind)
+}
+
+const TAKE_OVER_KINDS: ReadonlySet<string> = new Set([ADOPT_KIND, HALFRUN_ROUND_KIND])
+
+function is_take_over_request(request: HoldRequest): request is TakeOverRequest {
+	return TAKE_OVER_KINDS.has(request.kind)
 }
 
 const FORCE_RELEASE_REQUEST: HoldRequest = { kind: FORCE_RELEASE_KIND }
@@ -122,14 +137,16 @@ const STOP_KIND_BY_FLAG: ReadonlyMap<string, StopKind> = new Map([
 	[PRRUN_STOP_FLAG, PRRUN_STOP_KIND],
 ])
 
-// The flag after a numbered claim: absent, `--fullrun`, `--halfrun-stop`, `--human-review-stop` or
-// `--prrun-stop`. Anything else is a usage error.
+// The flag after a numbered claim: absent, `--fullrun`, `--halfrun-stop`, `--halfrun-round`,
+// `--human-review-stop` or `--prrun-stop`. Anything else is a usage error.
 function numbered_claim(issue: string, flag: string | undefined): HoldRequest | undefined {
 	if (flag === undefined) return { kind: 'claim', issue }
 
 	const stop_kind = STOP_KIND_BY_FLAG.get(flag)
 
 	if (stop_kind !== undefined) return { kind: stop_kind, issue }
+
+	if (flag === HALFRUN_ROUND_FLAG) return { kind: HALFRUN_ROUND_KIND, issue }
 
 	return flag === FULLRUN_FLAG ? { kind: 'claim', issue, is_fullrun: true } : undefined
 }
@@ -414,10 +431,28 @@ async function adopt(target: string, issue: string): Promise<number> {
 	return report(run_hold_adopt.foreign_message(issue), BUSY_VERDICT, FAILURE_EXIT_CODE)
 }
 
+// The re-opened record answers `hold`; anything but #N's own stop answers `busy`, a failure, since
+// the round has no stopped `halfrun` to pick up.
+function reopen_round(target: string, issue: string): number {
+	const result = run_halfrun_resume.reopen_at(target, issue)
+
+	if (result === run_halfrun_resume.MARKED) return report_hold()
+
+	if (result === run_halfrun_resume.UNREADABLE) return report_unreadable_record()
+
+	return report(run_halfrun_resume.no_stop_message(issue), BUSY_VERDICT, FAILURE_EXIT_CODE)
+}
+
+async function take_over(target: string, request: TakeOverRequest): Promise<number> {
+	const { kind, issue } = request
+
+	return kind === ADOPT_KIND ? await adopt(target, issue) : reopen_round(target, issue)
+}
+
 async function dispatch(request: HoldRequest, target: string, is_linked: boolean): Promise<number> {
 	if (request.kind === 'claim') return await claim(target, request, is_linked)
 
-	if (request.kind === ADOPT_KIND) return await adopt(target, request.issue)
+	if (is_take_over_request(request)) return await take_over(target, request)
 
 	if (is_stop_request(request)) return await mark_stop(target, request)
 
