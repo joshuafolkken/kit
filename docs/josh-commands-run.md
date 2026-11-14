@@ -649,7 +649,7 @@ pnpm josh run:review --unpinned-ok "only logs"   # check beside the pair as ever
 pnpm josh run:review --join                      # after the review returns: join the gate and test:pinned; exit 3 on an unpinned change
 pnpm josh run:review --join --fixing             # the join when round 1 has fixes to make: no grace on test:pinned, left running; prints the unpinned places the cache already holds
 pnpm josh run:review --pinned                    # collect a stopped ship's remaining verdicts before editing or retrying; a lane child waits only for this continuation
-pnpm josh run:review --push                      # launched by a lane open: push and open the PR at a green gate
+pnpm josh run:review --push 2                    # launched by a lane open: push and open the PR at a green gate, recording the review plan’s slot count on the ledger
 ```
 
 <!-- /usage -->

@@ -58,7 +58,7 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 			'Start test:pinned in the background, run the gate and, once it is green, write the /code-review brief to a file, printing its path (--join to join them; it stops on an unpinned change)',
 		category: 'AI tools',
 		reference: [
-			'[--code-only] [--unpinned-ok "<reason>"] | --join [--fixing] | --pinned | --push',
+			'[--code-only] [--unpinned-ok "<reason>"] | --join [--fixing] | --pinned | --push [<slots>]',
 			'automation',
 			['processes', 'files', 'git', 'network'],
 		],
@@ -89,8 +89,8 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 					note: "collect a stopped ship's remaining verdicts before editing or retrying; a lane child waits only for this continuation",
 				},
 				{
-					arguments: '--push',
-					note: 'launched by a lane open: push and open the PR at a green gate',
+					arguments: '--push 2',
+					note: 'launched by a lane open: push and open the PR at a green gate, recording the review plan’s slot count on the ledger',
 				},
 			],
 		},
