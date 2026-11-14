@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
+import { config_fingerprint } from '#eslint/config-fingerprint.js'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_spawn } from '#scripts/git/git-spawn'
 import { run_record_path } from '#scripts/josh/run-record-path'
@@ -104,6 +105,17 @@ async function kept_digests_of(is_kept: (file: string) => boolean): Promise<Map<
 	return await digests_of(await work_tree_files(is_kept))
 }
 
+// Each test runner configuration file and every local module it imports — where an `include` list may
+// sit, as `tools/test/vitest-include-globs.ts` does here — with its content digest.
+async function config_digests_of(): Promise<Map<string, string>> {
+	const configs = await work_tree_files((file) => test_runner_config.is_config(file))
+	const reached = config_fingerprint.list_reachable_modules(
+		configs.map((file) => path.resolve(file)),
+	)
+
+	return await digests_of([...reached].map((file) => path.relative(process.cwd(), file)))
+}
+
 // One digest over every test file's path and content.
 function contents_digest(digests: ReadonlyMap<string, string>): string {
 	return test_pinned_cache_logic.test_set_of(
@@ -133,7 +145,7 @@ async function code_change(base: string): Promise<CodeChange> {
 async function read_tree(base: string): Promise<TreeRead> {
 	const [test_digests, configs, code] = await Promise.all([
 		kept_digests_of((file) => test_declared_logic.is_test_file(file)),
-		kept_digests_of((file) => test_runner_config.is_config(file)),
+		config_digests_of(),
 		code_change(base),
 	])
 	const test_contents = contents_digest(new Map([...test_digests, ...configs]))

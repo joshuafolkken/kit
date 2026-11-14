@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { test_runner_config } from './test-runner-config'
 
 describe('test_runner_config.is_config', () => {
-	it('accepts a vitest or vite configuration at the repository root', () => {
+	it('accepts a vitest, vitest workspace or vite configuration at the repository root', () => {
 		expect(test_runner_config.is_config('vitest.config.ts')).toBe(true)
+		expect(test_runner_config.is_config('vitest.workspace.ts')).toBe(true)
 		expect(test_runner_config.is_config('vite.config.js')).toBe(true)
 	})
 

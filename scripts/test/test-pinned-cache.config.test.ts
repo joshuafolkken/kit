@@ -12,6 +12,11 @@ const RUN_TIMEOUT = 240_000
 const CONFIG_FILE = 'vitest.config.js'
 const NARROW_CONFIG = `export default { test: { include: ['none/**/*.test.ts'], passWithNoTests: true } }\n`
 const WIDE_CONFIG = `export default { test: { passWithNoTests: true } }\n`
+// A config whose `include` sits in a module it imports, as `tools/test/vitest-include-globs.ts` does here.
+const GLOBS_FILE = 'include-globs.js'
+const IMPORTING_CONFIG = `import { INCLUDE } from './${GLOBS_FILE}'\n\nexport default { test: { include: INCLUDE, passWithNoTests: true } }\n`
+const NARROW_GLOBS = `export const INCLUDE = ['none/**/*.test.ts']\n`
+const WIDE_GLOBS = `export const INCLUDE = ['**/*.test.ts']\n`
 const { DRIVER_FILE, build_change_branch, write } = test_pinned_fixture
 const UNPINNED_HUNK = `${DRIVER_FILE}:6`
 
@@ -46,6 +51,23 @@ describe('test_pinned.run after the test runner config widened its include', () 
 			const narrow = await driver_unpinned()
 
 			await write(CONFIG_FILE, WIDE_CONFIG)
+			const wide = await driver_unpinned()
+
+			expect(narrow).toHaveLength(2)
+			expect(wide).toEqual([UNPINNED_HUNK])
+		},
+		RUN_TIMEOUT,
+	)
+
+	it(
+		'probes it again when only a module the config imports widened the include',
+		async () => {
+			await build_change_branch()
+			await write(CONFIG_FILE, IMPORTING_CONFIG)
+			await write(GLOBS_FILE, NARROW_GLOBS)
+			const narrow = await driver_unpinned()
+
+			await write(GLOBS_FILE, WIDE_GLOBS)
 			const wide = await driver_unpinned()
 
 			expect(narrow).toHaveLength(2)

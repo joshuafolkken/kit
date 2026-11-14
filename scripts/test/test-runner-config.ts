@@ -5,7 +5,7 @@ import path from 'node:path'
 // leaf module, so `verification-inputs.ts` and `josh test:pinned`'s verdict cache share the names.
 
 // A file name starting with one of these configures vitest.
-const PREFIXES: ReadonlyArray<string> = ['vitest.config.', 'vite.config.']
+const PREFIXES: ReadonlyArray<string> = ['vitest.config.', 'vitest.workspace.', 'vite.config.']
 
 // A configuration vitest reads from the repository root; one nested deeper is a fixture or a package's own.
 function is_config(relative: string): boolean {
