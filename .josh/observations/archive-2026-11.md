@@ -5229,3 +5229,29 @@
 - rf:project-conventions | low | docs/josh-commands-board.md:166 | 2026-11-14 | #7510 | fixed
 - rx:{"round":"3a5f3d57-3ded-4bfc-a2f6-3020c9d55411","category":"bug-risks","severity":"medium","file":"scripts/backlog/backlog-drive-hold.ts:186","disposition":"fixed","description":"last_reason goes stale after an offer that launches (no hold call), so a window end after watch-then-run is recorded as hand-back:drained.","status":"resolved"}
 - rx:{"round":"3a5f3d57-3ded-4bfc-a2f6-3020c9d55411","category":"project-conventions","severity":"low","file":"docs/josh-commands-board.md:166","disposition":"fixed","description":"seat-line prose does not name the new \"driver restart pending\" lead.","status":"resolved"}
+- rf:none | none | - | 2026-11-14 | #7521
+- rb:2026-11-14 | #7521
+- rf:bug-risks | medium | scripts/test/test-pinned-cache.ts:75 | 2026-11-14 | #7521 | fixed
+- rf:bug-risks | low | scripts/test/test-runner-config.ts:9 | 2026-11-14 | #7521 | fixed
+- rx:{"round":"a0344147-b0a2-4db8-9335-3af4ebcdc959","category":"bug-risks","severity":"medium","file":"scripts/test/test-pinned-cache.ts:75","disposition":"fixed","description":"The config digest covers only root config files' bytes, so widening include in an imported module (this repo's tools/test/vitest-include-globs.ts) still reuses a stale no-test verdict.","status":"resolved"}
+- rx:{"round":"a0344147-b0a2-4db8-9335-3af4ebcdc959","category":"bug-risks","severity":"low","file":"scripts/test/test-runner-config.ts:9","disposition":"fixed","description":"vitest.workspace.* files are not among the config prefixes, so a workspace edit widening a project is not detected.","status":"resolved"}
+- ri:none | none | - | 2026-11-14 | #7522
+- rb:2026-11-14 | #7522
+- rf:none | none | - | 2026-11-14 | #7522
+- ri:none | none | - | 2026-11-14 | #7523
+- rb:2026-11-14 | #7523
+- rf:none | none | - | 2026-11-14 | #7523
+- rf:bug-risks | low | scripts/run/board/run-board-render-lanes.ts:90 | 2026-11-14 | #7524
+- ri:bug-risks | low | scripts/run/board/run-board-render-lanes.ts:90 | 2026-11-14 | #7524 | fixed
+- rb:2026-11-14 | #7524
+- rf:bug-risks | medium | scripts/run/board/run-board-span-read.ts:72 | 2026-11-14 | #7524 | fixed
+- rf:bug-risks | medium | scripts/run/board/run-board-layout.ts:388 | 2026-11-14 | #7524 | fixed
+- rx:{"round":"4f8bfa56-8efb-459f-babe-56aa391078b1","category":"bug-risks","severity":"medium","file":"scripts/run/board/run-board-span-read.ts:72","disposition":"fixed","description":"Beside an unreadable carry record the recorded span is undefined, so read_local returns undefined and a running root single run is no longer drawn at all.","status":"resolved"}
+- rx:{"round":"4f8bfa56-8efb-459f-babe-56aa391078b1","category":"bug-risks","severity":"medium","file":"scripts/run/board/run-board-layout.ts:388","disposition":"fixed","description":"drawn_rows omits layout.root.row, so the legend never names a phase icon only the 🏠 row draws.","status":"resolved"}
+- rf:none | none | - | 2026-11-14 | #7525
+- ri:bug-risks | low | scripts/run/board/run-board-header.ts:320 | 2026-11-14 | #7525 | fixed
+- rb:2026-11-14 | #7525
+- rf:bug-risks | medium | scripts/run/board/run-board-tick.ts:329 | 2026-11-14 | #7525 | fixed
+- rf:tests | low | scripts/run/board/run-board-root-layout.test.ts:72 | 2026-11-14 | #7525 | fixed
+- rx:{"round":"5281ceb4-f24e-4edf-842d-1b940ad976a1","category":"bug-risks","severity":"medium","file":"scripts/run/board/run-board-tick.ts:329","disposition":"fixed","description":"Ended root rows join layout.active, so the header tally counts the root run and draws a false (+1) arrival mid-backlogrun.","status":"resolved"}
+- rx:{"round":"5281ceb4-f24e-4edf-842d-1b940ad976a1","category":"tests","severity":"low","file":"scripts/run/board/run-board-root-layout.test.ts:72","disposition":"fixed","description":"The no-ended-run test builds a layout with an ended run and its title does not match what it checks.","status":"resolved"}
