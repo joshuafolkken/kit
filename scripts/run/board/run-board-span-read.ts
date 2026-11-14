@@ -73,9 +73,10 @@ async function span_here(
 	const single = await run_board_single.span_here(is_carried)
 
 	if (single === undefined) return await recorded_span_here(repository, table, read)
-	if (!is_carried) return { ...NO_SPAN, span: single }
+	const recorded = is_carried ? await recorded_span_here(repository, table, read) : NO_SPAN
 
-	return { ...(await recorded_span_here(repository, table, read)), root: single }
+	// A carried record that reads no span leaves the single run the one drawn.
+	return recorded.span === undefined ? { ...NO_SPAN, span: single } : { ...recorded, root: single }
 }
 
 const run_board_span_read = { span_here }

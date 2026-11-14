@@ -11,7 +11,7 @@ import { run_board_tick } from './run-board-tick'
 
 const { LOCAL, START, harness } = run_board_fixture
 const { FRESH_STATE, tick } = run_board_tick
-const { LANES_ICON, PHASE_ICONS, STATE_ICONS } = run_board_labels
+const { LANES_ICON, PHASE_ICONS, STATE_ICONS, WORDS } = run_board_labels
 const KIND = run_event_stream.EVENT_KIND
 const ROOT = 7521
 const LANE = 7530
@@ -73,14 +73,15 @@ describe('run_board_tick.tick — a root single run beside a backlogrun', () => 
 		expect(lines[home + 1]).toContain(PHASE_ICONS.implement)
 	})
 
+	// The legend, the frame's last two lines, also names the root run's phase.
 	it('keeps the backlogrun header and lane rows', async () => {
 		const lines = await frame_of(ROOTED)
 		const plain = await frame_of(CARRIED)
 
 		expect(lines[0]).toBe(plain[0])
 		expect(lines[0]).toContain('backlogrun')
-		expect(lines.slice(index_of(lines, `${LANES_ICON} lanes`))).toStrictEqual(
-			plain.slice(index_of(plain, `${LANES_ICON} lanes`)),
+		expect(lines.slice(index_of(lines, `${LANES_ICON} lanes`), -2)).toStrictEqual(
+			plain.slice(index_of(plain, `${LANES_ICON} lanes`), -2),
 		)
 	})
 
@@ -92,6 +93,14 @@ describe('run_board_tick.tick — a root single run beside a backlogrun', () => 
 		expect(lines.some((line) => line.includes(lanes))).toBe(true)
 		expect(header(lines)).toStrictEqual(header(plain))
 		expect(header(lines).join('\n')).toContain(STATE_ICONS.running)
+	})
+})
+
+describe('run_board_tick.tick — the root single run’s legend and absence', () => {
+	it('names the root run’s phase in the legend', async () => {
+		const lines = await frame_of(ROOTED)
+
+		expect(lines.at(-2)).toContain(`${PHASE_ICONS.implement} ${WORDS.implement}`)
 	})
 
 	it('draws no 🏠 rule without a root run', async () => {

@@ -384,9 +384,10 @@ function rows_of(layout: BoardLayout): Array<BoardRow> {
 	return [...layout.active, ...queued_rows(layout), ...layout.people, ...layout.unreached]
 }
 
-// Every row the frame draws — the counted ones and the earlier run's lanes — what the legend reads.
+// Every row the frame draws — the root checkout's single run's, the counted ones and the earlier run's
+// lanes — what the legend reads.
 function drawn_rows(layout: BoardLayout): Array<BoardRow> {
-	return [...rows_of(layout), ...(layout.earlier ?? [])]
+	return [layout.root?.row ?? [], rows_of(layout), layout.earlier ?? []].flat()
 }
 
 // Every row waiting on a person's decision: the touched children parked on one, then the untouched
@@ -401,9 +402,8 @@ function people_of(layout: BoardLayout): Array<BoardRow> {
 // run's lanes still holding a place.
 function lane_rows(layout: BoardLayout, apart: ReadonlyArray<BoardRow>): Array<BoardRow> {
 	const own = layout.active.filter((row) => !apart.includes(row))
-	const root = layout.root === undefined ? [] : [layout.root.row]
 
-	return [...root, ...own, ...(layout.earlier ?? [])]
+	return [layout.root?.row ?? [], own, layout.earlier ?? []].flat()
 }
 
 // The lanes section's rows: those neither finished nor waiting on a person's decision.

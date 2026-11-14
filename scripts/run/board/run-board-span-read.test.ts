@@ -75,6 +75,16 @@ describe('run_board_span_read.span_here — a single run', () => {
 		expect(here.span).not.toStrictEqual(SINGLE)
 		expect(span_here).toHaveBeenCalledWith(true)
 	})
+
+	it('draws the held single run where the carry record is unreadable', async () => {
+		arrange({ kind: 'unreadable' }, undefined)
+		vi.spyOn(run_board_single, 'span_here').mockResolvedValue(SINGLE)
+
+		await expect(run_board_span_read.span_here(REPOSITORY, undefined)).resolves.toStrictEqual({
+			...NO_SPAN,
+			span: SINGLE,
+		})
+	})
 })
 
 describe('run_board_span_read.span_here — the run’s record', () => {
