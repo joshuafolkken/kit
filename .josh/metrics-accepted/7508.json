@@ -2,6 +2,6 @@
 	"reason": "New lane:stats table measuring runnable-to-dispatch wait (#7508): one module plus its regression tests",
 	"date": "2026-11-14",
 	"growth": {
-		"scripts.code_lines": 157
+		"scripts.code_lines": 162
 	}
 }

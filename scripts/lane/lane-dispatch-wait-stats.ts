@@ -201,7 +201,12 @@ function table(
 	window: StatsWindow,
 	events: ReadonlyArray<RunEvent> = [],
 ): string {
-	const period = new Set(lane_stats.in_window(entries.filter(is_dispatch), window))
+	const period = new Set(
+		lane_stats.in_window(
+			entries.filter((entry) => is_dispatch(entry)),
+			window,
+		),
+	)
 	const records = { entries, seatless: seatless_spans(entries), filed: filed_times(events) }
 	const waits = entries.flatMap((entry, index) =>
 		is_dispatch(entry) && period.has(entry) ? (wait_of(records, entry, index) ?? []) : [],
