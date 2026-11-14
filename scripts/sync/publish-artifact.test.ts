@@ -59,7 +59,7 @@ describe('publish.yml — one built artifact for both registries', () => {
 		expect(job(PACK_JOB).permissions).toEqual({ contents: 'read', packages: 'read' })
 	})
 
-	it('leaves acquisition authentication to the registry-aware setup action', () => {
+	it('installs in the job that builds without a registry token', () => {
 		const [setup] = steps_using(job(PACK_JOB), './.github/actions/setup-pnpm')
 
 		expect(setup?.with?.['node-auth-token']).toBeUndefined()

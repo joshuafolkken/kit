@@ -151,35 +151,9 @@ runs:
         path: ~/.safe-chain-download
         key: ${{ steps.safe-chain-cache.outputs.cache-primary-key }}
 
-    # Keep legacy and unrelated GitHub scopes working without authenticating npm-only installs.
-    - name: Configure package registry authentication
-      id: registry-auth
-      if: inputs.install == 'true'
-      shell: bash
-      run: |
-        userconfig="${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}"
-        configs=(/dev/null)
-        for config in "$userconfig" .npmrc; do
-          if [ -f "$config" ]; then configs+=("$config"); fi
-        done
-        required=$(awk -F '=' '
-          /^[[:space:]]*@[^:]+:registry[[:space:]]*=/ {
-            key = $1; value = $2
-            gsub(/[[:space:]]/, "", key); gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
-            registries[key] = value
-          }
-          END { for (key in registries) if (registries[key] ~ /^https:\/\/npm[.]pkg[.]github[.]com\/?$/) { print "true"; exit } }
-        ' "${configs[@]}")
-        if [ "$required" = true ]; then
-          if ! grep -Eq '^[[:space:]]*//npm[.]pkg[.]github[.]com/:_authToken[[:space:]]*=' "${configs[@]}"; then
-            printf '\n//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}\n' >> "$userconfig"
-          fi
-          echo 'required=true' >> "$GITHUB_OUTPUT"
-        fi
-
     - name: Install dependencies
       if: inputs.install == 'true'
       shell: bash
       env:
-        NODE_AUTH_TOKEN: ${{ inputs.node-auth-token || env.NODE_AUTH_TOKEN || (steps.registry-auth.outputs.required == 'true' && github.token) || '' }}
+        NODE_AUTH_TOKEN: ${{ inputs.node-auth-token || env.NODE_AUTH_TOKEN }}
       run: pnpm install --frozen-lockfile --ignore-scripts

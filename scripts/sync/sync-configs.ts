@@ -5,7 +5,6 @@ import { PACKAGE_DIR } from '#scripts/init/init-paths'
 import { vscode_tasks } from '#scripts/init/vscode-tasks'
 import { string_array_schema, vscode_settings_schema } from '#scripts/lib/schemas'
 import { file_content } from './file-content'
-import { npm_hosting_diagnostics } from './npm-hosting-diagnostics'
 
 type MergeFunction = (existing: string) => string
 
@@ -38,8 +37,6 @@ function sync_with_merge(
 function sync_npmrc(destination_path: string): void {
 	const existing = existsSync(destination_path) ? readFileSync(destination_path, 'utf8') : ''
 	const merged = init_logic.merge_npmrc(existing, path.dirname(destination_path))
-
-	npm_hosting_diagnostics.report(path.dirname(destination_path), merged)
 
 	if (merged === existing) {
 		console.info('  ✔ unchanged .npmrc')
