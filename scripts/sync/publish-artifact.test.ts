@@ -60,9 +60,10 @@ describe('publish.yml — one built artifact for both registries', () => {
 	})
 
 	it('installs in the job that builds without a registry token', () => {
-		const [setup] = steps_using(job(PACK_JOB), './.github/actions/setup-pnpm')
+		const setups = steps_using(job(PACK_JOB), './.github/actions/setup-pnpm')
 
-		expect(setup?.with?.['node-auth-token']).toBeUndefined()
+		expect(setups).toHaveLength(1)
+		expect(setups[0]?.with?.['node-auth-token']).toBeUndefined()
 	})
 
 	it.each(PUBLISH_JOB_NAMES)('publishes the downloaded tarball in %s', (job_name) => {
