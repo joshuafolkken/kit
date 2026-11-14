@@ -6,6 +6,7 @@ import { lane_claim_stats } from './lane-claim-stats'
 import { lane_concurrency_stats } from './lane-concurrency-stats'
 import { lane_core_wait_stats } from './lane-core-wait-stats'
 import { lane_cut_stats } from './lane-cut-stats'
+import { lane_dispatch_wait_stats } from './lane-dispatch-wait-stats'
 import { lane_early_push_stats } from './lane-early-push-stats'
 import { lane_gap_stats } from './lane-gap-stats'
 import { lane_held_stats } from './lane-held-stats'
@@ -85,6 +86,7 @@ function tables_of({ entries, events, calls }: PeriodRecords, window: StatsWindo
 		lane_size_stats.table(entries, window),
 		lane_implement_rate.table(entries, window),
 		lane_held_stats.table(entries, window),
+		lane_dispatch_wait_stats.table(entries, window, events),
 		lane_core_wait_stats.table(entries, window),
 		lane_process_stats.table(entries, window),
 		lane_check_stats.table(entries, window),
