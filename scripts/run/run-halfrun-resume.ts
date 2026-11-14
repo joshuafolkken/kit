@@ -89,6 +89,24 @@ function reopen_at(target: string, issue: string): StopMark {
 	return run_hold.create_hold(target, issue) ? MARKED : FOREIGN
 }
 
+// A stop picked up again is running, so a `human-review` lane is returned to `running` — else lane
+// readers count the round's tree as idle while the board draws it running.
+async function resume_lane(issue: string, command: string): Promise<void> {
+	const lane = await lane_state.read_state(issue)
+
+	if (lane?.state === 'human-review') {
+		await lane_state.record_change({ issue, state: 'running', command })
+	}
+}
+
+async function reopen(target: string, issue: string): Promise<StopMark> {
+	const mark = reopen_at(target, issue)
+
+	if (mark === MARKED) await resume_lane(issue, 'run:hold --halfrun-round')
+
+	return mark
+}
+
 function no_stop_message(issue: string): string {
 	return `run:hold: this tree holds no stopped \`halfrun\` of ${session_cite.issue(issue)} — a fix round re-opens only that record.`
 }
@@ -127,11 +145,8 @@ async function adopt(issue: string): Promise<boolean> {
 	if (target === undefined) return false
 
 	const is_adopted = adopt_at(target, issue, await run_hold.is_tree_dirty())
-	const lane = is_adopted ? await lane_state.read_state(issue) : undefined
 
-	if (lane?.state === 'human-review') {
-		await lane_state.record_change({ issue, state: 'running', command: 'run:entry' })
-	}
+	if (is_adopted) await resume_lane(issue, 'run:entry')
 
 	return is_adopted
 }
@@ -147,6 +162,7 @@ const run_halfrun_resume = {
 	is_pending,
 	mark_stop_at,
 	no_stop_message,
+	reopen,
 	reopen_at,
 	take_over,
 }

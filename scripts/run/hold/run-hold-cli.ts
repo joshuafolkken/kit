@@ -433,8 +433,8 @@ async function adopt(target: string, issue: string): Promise<number> {
 
 // The re-opened record answers `hold`; anything but #N's own stop answers `busy`, a failure, since
 // the round has no stopped `halfrun` to pick up.
-function reopen_round(target: string, issue: string): number {
-	const result = run_halfrun_resume.reopen_at(target, issue)
+async function reopen_round(target: string, issue: string): Promise<number> {
+	const result = await run_halfrun_resume.reopen(target, issue)
 
 	if (result === run_halfrun_resume.MARKED) return report_hold()
 
@@ -446,7 +446,7 @@ function reopen_round(target: string, issue: string): number {
 async function take_over(target: string, request: TakeOverRequest): Promise<number> {
 	const { kind, issue } = request
 
-	return kind === ADOPT_KIND ? await adopt(target, issue) : reopen_round(target, issue)
+	return kind === ADOPT_KIND ? await adopt(target, issue) : await reopen_round(target, issue)
 }
 
 async function dispatch(request: HoldRequest, target: string, is_linked: boolean): Promise<number> {
