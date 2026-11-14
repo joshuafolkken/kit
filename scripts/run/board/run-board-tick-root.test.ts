@@ -2,6 +2,7 @@ import { stripVTControlCharacters } from 'node:util'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { describe, expect, it } from 'vitest'
 import { run_board_fixture } from './run-board-fixture'
+import { run_board_gather } from './run-board-gather'
 import { run_board_labels } from './run-board-labels'
 import type { LocalRead } from './run-board-read'
 import { run_board_tick } from './run-board-tick'
@@ -9,13 +10,15 @@ import { run_board_tick } from './run-board-tick'
 // joshuafolkken/kit#7524: a single run in the root checkout beside a running `backlogrun` keeps the
 // `backlogrun` frame and adds its `🏠` row above the lanes, counted as no lane.
 
-const { LOCAL, START, harness } = run_board_fixture
+const { LOCAL, START, harness, plan_titled } = run_board_fixture
 const { FRESH_STATE, tick } = run_board_tick
 const { LANES_ICON, PHASE_ICONS, STATE_ICONS, WORDS } = run_board_labels
 const KIND = run_event_stream.EVENT_KIND
 const ROOT = 7521
 const LANE = 7530
+const LATER_LANE = 7531
 const LANE_LIMIT = 6
+const RUN_MS = 1_500_000
 const AT = new Date(START).toISOString()
 
 function event(kind: string, text: string): RunEvent {
@@ -107,5 +110,52 @@ describe('run_board_tick.tick — the root single run’s legend and absence', (
 		const lines = await frame_of(CARRIED)
 
 		expect(lines.some((line) => line.includes('🏠'))).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#7525: a root single run a merge ended leaves 🏠 and joins ✅ done as a lane does.
+const ENDED: LocalRead = {
+	...CARRIED,
+	ended_roots: [{ command: 'fullrun', issue: ROOT, started_ms: START, ended_ms: START + RUN_MS }],
+}
+
+describe('run_board_tick.tick — a root single run that merged', () => {
+	it('lists the run under ✅ done with its merged mark and time, and no 🏠 rule', async () => {
+		const lines = await frame_of(ENDED)
+		const done = index_of(lines, `${STATE_ICONS.merged} done`)
+		const row = lines[done + 1] ?? ''
+
+		expect(done).toBeGreaterThan(-1)
+		expect(row).toContain(`${STATE_ICONS.merged} `)
+		expect(row).toContain(String(ROOT))
+		expect(row).toContain('25′00″')
+		expect(lines.some((line) => line.includes('🏠'))).toBe(false)
+	})
+
+	it('draws no arrival in the header for it once the plan’s total is taken', async () => {
+		const { ports, frames, read_local, clock } = harness(CARRIED, [plan_titled('a')])
+		const first = await tick(FRESH_STATE, ports)
+
+		read_local.mockResolvedValue(ENDED)
+		clock.now_ms += run_board_gather.LOCAL_READ_MS
+		await tick(first, ports)
+		const lines = stripVTControlCharacters(frames.at(-1) ?? '').split('\n')
+
+		expect(first.baseline_total).toBeDefined()
+		expect(lines.some((line) => line.includes(String(ROOT)))).toBe(true)
+		expect(header(lines).join('\n')).not.toMatch(/\(\+\d+\)/u)
+	})
+
+	it('still draws a lane that arrives after it as an arrival', async () => {
+		const { ports, frames, read_local, clock } = harness(ENDED, [plan_titled('a')])
+		const first = await tick(FRESH_STATE, ports)
+		const arrival = event(KIND.CHILD_LAUNCH, `#${String(LATER_LANE)} fullrun`)
+
+		read_local.mockResolvedValue({ ...ENDED, events: [...ENDED.events, arrival] })
+		clock.now_ms += run_board_gather.LOCAL_READ_MS
+		await tick(first, ports)
+		const lines = stripVTControlCharacters(frames.at(-1) ?? '').split('\n')
+
+		expect(header(lines).join('\n')).toContain('(+1)')
 	})
 })

@@ -13,6 +13,7 @@ import type { LocalRead } from './run-board-read'
 import { run_board_reason, type ReasonRead } from './run-board-reason'
 import { run_board_released } from './run-board-released'
 import { run_board_render } from './run-board-render'
+import { run_board_root_layout } from './run-board-root-layout'
 import { run_board_seat, type SeatRead } from './run-board-seat'
 import { run_board_setup } from './run-board-setup'
 import type { Known } from './run-board-snapshot'
@@ -320,30 +321,21 @@ function draw(ports: BoardPorts, lines: ReadonlyArray<string>): void {
 	ports.write(`${lines.join('\n')}\n`)
 }
 
-// The root checkout's single run beside the run (joshuafolkken/kit#7524): its row read off its own
-// span's events and kept out of `active`, so the header counts no lane and no 🔄 for it.
-function root_layout(state: BoardState, local: LocalRead): Pick<BoardLayout, 'root'> {
-	const { root } = local
-
-	if (root === undefined) return {}
-	const status = run_board_status.statuses_of(root.events, local.lane_states).get(root.issue)
-
-	if (status === undefined) return {}
-	const read = closed_under(known_of(state), state.closed)
-	const statuses = new Map([[root.issue, status]])
-	const [row] = run_board_layout.local_layout_of(statuses, undefined, read).active
-
-	return row === undefined ? {} : { root: { name: root.command, row } }
-}
-
 // The first total the plan gives is the baseline every later arrival is counted against; the run's own
-// children before it are no total.
+// children before it are no total. The root checkout's single runs are laid over the run's.
 function draw_run(state: BoardState, local: LocalRead, redraw: Redraw): BoardState {
-	const layout = { ...layout_for(state, local, redraw.now_ms), ...root_layout(state, local) }
+	const read = closed_under(known_of(state), state.closed)
+	const run_layout = layout_for(state, local, redraw.now_ms)
+	const layout = run_board_root_layout.layout_of(run_layout, local, read)
 	const first_total =
-		state.plan === undefined ? undefined : run_board_header.counts_of(layout).total
+		state.plan === undefined ? undefined : run_board_header.counts_of(run_layout).total
 	const settled = { ...state, baseline_total: state.baseline_total ?? first_total }
-	const { lines, spots } = frame_of(settled, local, layout, redraw)
+	const baseline_total = run_board_root_layout.baseline_of(
+		settled.baseline_total,
+		run_layout,
+		layout,
+	)
+	const { lines, spots } = frame_of({ ...settled, baseline_total }, local, layout, redraw)
 
 	draw(redraw.ports, lines)
 

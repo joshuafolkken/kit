@@ -26,6 +26,32 @@ function held(hold: Partial<RunHold> = {}): HoldRead {
 
 afterEach(() => vi.restoreAllMocks())
 
+// joshuafolkken/kit#7525: the runs a merge released are read back for the run's ✅ done.
+describe('run_board_single.ended_in', () => {
+	const ENDED_AT = '2026-10-08T09:30:00.000Z'
+	const ENDED_MS = Date.parse(ENDED_AT)
+	const RECORD = { issue: String(ISSUE), taken_at: TAKEN_AT, ended_at: ENDED_AT }
+	const SPAN = { invocation: 'backlogrun', started_ms: TAKEN_MS, ended_ms: undefined }
+
+	it('reads a fullrun and a halfrun that ended inside the run', () => {
+		const records = [{ ...RECORD, is_fullrun: true }, RECORD]
+
+		expect(run_board_single.ended_in(records, SPAN)).toStrictEqual([
+			{ command: FULLRUN, issue: ISSUE, started_ms: TAKEN_MS, ended_ms: ENDED_MS },
+			{ command: 'halfrun', issue: ISSUE, started_ms: TAKEN_MS, ended_ms: ENDED_MS },
+		])
+	})
+
+	it.each([
+		['before the run began', { ...SPAN, started_ms: ENDED_MS + 1 }, RECORD],
+		['after the run ended', { ...SPAN, ended_ms: ENDED_MS - 1 }, RECORD],
+		['with no issue number', SPAN, { ...RECORD, issue: 'new' }],
+		['with no moment', SPAN, { ...RECORD, ended_at: 'later' }],
+	])('reads none that ended %s', (_, span, record) => {
+		expect(run_board_single.ended_in([record], span)).toStrictEqual([])
+	})
+})
+
 describe('run_board_single.span_of', () => {
 	it.each([
 		{ read: held({ is_fullrun: true }), invocation: `fullrun #${String(ISSUE)}` },

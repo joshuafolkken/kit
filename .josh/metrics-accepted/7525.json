@@ -1,0 +1,7 @@
+{
+	"reason": "#7525: record a released root single run and list it in run:board's done rows, its row no arrival in the header (new run-hold-ended and run-board-root-layout modules)",
+	"date": "2026-11-14",
+	"growth": {
+		"scripts.code_lines": 127
+	}
+}

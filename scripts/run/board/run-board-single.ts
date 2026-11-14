@@ -6,6 +6,7 @@ import { stamped_memo } from '#scripts/lib/stamped-memo'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_hold, type HoldRead } from '#scripts/run/hold/run-hold'
+import { run_hold_ended, type EndedHold } from '#scripts/run/hold/run-hold-ended'
 import { run_board_span, type BoardSpan } from './run-board-span'
 
 // A single `fullrun #N` or `halfrun #N` has no carry record; the only record that says it is running
@@ -26,6 +27,11 @@ interface SingleRun {
 
 interface RootRun extends SingleRun {
 	events: ReadonlyArray<RunEvent>
+}
+
+interface EndedRoot extends SingleRun {
+	started_ms: number
+	ended_ms: number
 }
 
 // The checkout's own git directory, resolved once per working directory: resolving it runs a `git`
@@ -84,6 +90,41 @@ async function span_here(is_carried: boolean): Promise<BoardSpan | undefined> {
 	return span_of(run_hold.read_hold(run_hold.hold_path(directory)))
 }
 
+// A run the root checkout's merge released, as `run-hold-ended.ts` kept it; `undefined` where its
+// record names no issue or no moment.
+function ended_of(ended: EndedHold): EndedRoot | undefined {
+	if (!issue_number_shape.is_issue_number(ended.issue)) return undefined
+
+	const started_ms = run_event_scope.moment_of(ended.taken_at)
+	const ended_ms = run_event_scope.moment_of(ended.ended_at)
+
+	if (started_ms === undefined || ended_ms === undefined) return undefined
+
+	const command = ended.is_fullrun === true ? FULLRUN : HALFRUN
+
+	return { command, issue: Number(ended.issue), started_ms, ended_ms }
+}
+
+function is_inside(run: EndedRoot, span: BoardSpan): boolean {
+	return run.ended_ms >= span.started_ms && run.ended_ms <= (span.ended_ms ?? Infinity)
+}
+
+// The released runs that ended inside `span`, which the board lists in `✅ done` (joshuafolkken/kit#7525).
+function ended_in(records: ReadonlyArray<EndedHold>, span: BoardSpan): Array<EndedRoot> {
+	return records
+		.map((record) => ended_of(record))
+		.filter((run): run is EndedRoot => run !== undefined && is_inside(run, span))
+}
+
+// This checkout's released single runs inside `span`; none in a lane, where no merge records one.
+async function ended_here(span: BoardSpan): Promise<Array<EndedRoot>> {
+	const directory = await directory_here()
+
+	if (directory === undefined) return []
+
+	return ended_in(run_hold_ended.read_ended(run_hold_ended.ended_path(directory)), span)
+}
+
 // The command and issue of a single run's invocation; `undefined` for any other run's.
 function single_of(invocation: string): SingleRun | undefined {
 	const { command, issue } = SINGLE_INVOCATION.exec(invocation)?.groups ?? {}
@@ -132,7 +173,16 @@ function root_of(span: BoardSpan, events: ReadonlyArray<RunEvent>): RootRun | un
 	return { ...single, events: events_of(span, run_board_span.events_of(events, span)) }
 }
 
-const run_board_single = { events_of, name_of, root_of, scope_of, span_here, span_of }
+const run_board_single = {
+	ended_here,
+	ended_in,
+	events_of,
+	name_of,
+	root_of,
+	scope_of,
+	span_here,
+	span_of,
+}
 
 export { run_board_single }
-export type { RootRun }
+export type { EndedRoot, RootRun }

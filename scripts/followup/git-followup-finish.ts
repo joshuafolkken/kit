@@ -2,10 +2,12 @@ import { git_command } from '#scripts/git/git-command'
 import { git_next_issues } from '#scripts/issue/git-next-issues'
 import { issue_watch } from '#scripts/issue/issue-watch'
 import { josh_command } from '#scripts/josh/josh-run'
+import { lane_paths } from '#scripts/lane/lane-paths'
 import { lane_registry } from '#scripts/lane/lane-registry'
 import { review_attest } from '#scripts/review/review-attest'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { run_hold } from '#scripts/run/hold/run-hold'
+import { run_hold_ended } from '#scripts/run/hold/run-hold-ended'
 import { run_progress_clock } from '#scripts/run/progress/run-progress-clock'
 import { parse_completed_issue_number } from './followup-issue-number'
 import { git_followup_cleanup, type CleanupStep } from './git-followup-cleanup'
@@ -133,13 +135,26 @@ async function clear_review_records(should_merge: boolean): Promise<void> {
 // It swallows its own failure for the same reason the gate's in-flight marker does: the record must
 // never decide whether a merged run reports success. A record that survives anyway expires on its own
 // eight hours later, which is what covers an abnormally ended run.
+//
+// A run outside a lane is recorded before its hold goes, so `run:board` lists it in `✅ done`
+// (joshuafolkken/kit#7525); a lane's hold is its `backlogrun` child's, which the board reads elsewhere.
+function keep_ended(directory: string, target: string): void {
+	if (lane_paths.lane_issue_of(process.cwd()) !== undefined) return
+
+	run_hold_ended.record_ended(run_hold_ended.ended_path(directory), run_hold.read_hold(target))
+}
+
 async function release_worktree_hold(should_merge: boolean): Promise<void> {
 	if (!should_merge) return
 
 	try {
 		const directory = await run_hold.worktree_directory()
 
-		if (directory !== undefined) run_hold.release_hold(run_hold.hold_path(directory))
+		if (directory === undefined) return
+		const target = run_hold.hold_path(directory)
+
+		keep_ended(directory, target)
+		run_hold.release_hold(target)
 	} catch {
 		/* the record expires on its own, and `pnpm josh run:release --force` clears it early */
 	}
