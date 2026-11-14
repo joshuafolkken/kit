@@ -95,11 +95,14 @@ async function first_failed(
 // The stops a retry clears: `run:stalled` always, and `needs-human-merge` only for an issue whose
 // repair attempt was recorded — a merge wait with no repair stays a person's (joshuafolkken/kit#7487).
 // The ship re-parks it while the diff still needs a person's merge (`followup-human-merge.ts`).
+// A recorded repair also clears the ended lane's `in-progress`, which the offer otherwise reads as
+// another session's work (joshuafolkken/kit#7493): the record is made only once no process holds
+// the issue and its lane tree is clean (`run-repair-attempt.ts`).
 function stops_of(issue: number, context: AddContext): ReadonlyArray<string> {
 	if (!context.is_retry) return []
 
 	return context.repairs?.has(issue) === true
-		? [RUN_STALLED_LABEL, NEEDS_HUMAN_MERGE_LABEL]
+		? [RUN_STALLED_LABEL, NEEDS_HUMAN_MERGE_LABEL, IN_PROGRESS_LABEL]
 		: [RUN_STALLED_LABEL]
 }
 
