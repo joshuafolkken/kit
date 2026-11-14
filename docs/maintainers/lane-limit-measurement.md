@@ -316,6 +316,26 @@ ended at the hour.
 made of. `hand-back:*` rows are time spent waiting on a session, and `offer:*` rows are the backlog's
 own answer. Compare the rows from one period to the next to show the idle time shrinking.
 
+## How long a runnable issue waited for its dispatch
+
+Under the held-by table, `lane:stats` prints one `runnable → dispatch` row: the period's dispatches, the
+median and longest wait in minutes, the issue that waited longest, how many waits passed the one-minute
+bound (`over 1 min`), and how many dispatches no offer saw (`not measured`, such as a ledger written
+before `offer` entries or a lane opened by hand).
+
+The time is derived, not recorded (`scripts/lane/lane-dispatch-wait-stats.ts`):
+
+- The wait starts at the first offer of the runnable stretch the dispatch ended: the offers since the
+  issue's previous dispatch, from the first one whose `seen` lists it and whose `excluded` does not. When
+  the run filed the issue (a `filed` run event in this repository) after the last offer that could not
+  start it, the wait starts at the filing.
+- A seat that was not there is not waiting: a hold by `memory`, `usage-limit` or the `run:solo` gate
+  (`offer:…:solo`), and the time after a `released` entry, each lasting until the next `held`,
+  `released` or `dispatch` entry, are taken out.
+
+**The decision the table is for**: whether a runnable issue is dispatched within a minute of becoming
+runnable. A `hand-back:*` hold counts, since that wait is a session the run did not restart.
+
 ## How often a lane cut
 
 Under the gap table, `lane:stats` prints the period's `run:cut`s (`scripts/lane/lane-cut-stats.ts`). The
