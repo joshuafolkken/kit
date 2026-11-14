@@ -7,7 +7,7 @@ import { dump } from 'js-yaml'
 const SCOPE = '@joshuafolkken/'
 const KIT = `${SCOPE}kit`
 const REGISTRY = 'https://registry.npmjs.org/'
-const PNPM_VERSION = '12.17.0'
+const PNPM_VERSION = '12.19.0'
 
 interface LockedArtifact {
 	name: string

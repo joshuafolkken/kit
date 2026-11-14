@@ -38,8 +38,8 @@ function consumer_resolved_names(has_git: boolean): ReadonlyArray<string> {
 }
 
 // What `josh init` adds: every kit peer — the ones only kit's own configs import included — and the
-// tools above. Versions mirror kit's own devDependencies, so the consumer runs the toolchain kit is
-// verified with.
+// tools above. Versions mirror kit's own devDependencies (`kit_development_versions.versions_of`), so
+// the consumer runs the toolchain kit is verified with.
 function get_toolchain_development_dependencies(has_git: boolean): Record<string, string> {
 	return kit_development_versions.versions_of([
 		...kit_development_versions.peer_names(),

@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { kit_development_versions } from '#scripts/init/kit-development-versions'
 import { PACKAGE_JSON, package_manifest } from '#scripts/lib/package-manifest'
 import { execaSync } from 'execa'
 import { z } from 'zod'
@@ -11,7 +12,7 @@ const IGNORE_SCRIPTS = '--ignore-scripts'
 const version_map_schema = z.record(z.string(), z.string())
 const manifest = package_manifest.read_manifest(
 	root,
-	z.object({ devDependencies: version_map_schema, peerDependencies: version_map_schema }),
+	z.object({ peerDependencies: version_map_schema }),
 )
 const eslint_peers = Object.keys(manifest.peerDependencies).filter((name) =>
 	/^(?:@eslint\/|@stylistic\/|eslint|globals$|typescript)/u.test(name),
@@ -32,13 +33,10 @@ try {
 		'auto-install-peers=false\nstrict-peer-dependencies=true\n',
 	)
 	writeFileSync(path.join(scratch, PACKAGE_JSON), '{"private":true,"type":"module"}\n')
-	const peer_specs = eslint_peers.map((name) => {
-		const version = manifest.devDependencies[name]
-
-		if (version === undefined) throw new Error(`Missing development dependency for ${name}`)
-
-		return `${name}@${version}`
-	})
+	// The versions `josh init` gives a consumer, so the check installs what a consumer installs.
+	const peer_specs = Object.entries(kit_development_versions.versions_of(eslint_peers)).map(
+		([name, version]) => `${name}@${version}`,
+	)
 
 	execaSync('pnpm', ['--dir', scratch, 'add', IGNORE_SCRIPTS, tarball, ...peer_specs], {
 		cwd: root,

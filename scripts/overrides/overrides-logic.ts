@@ -156,8 +156,9 @@ function extract_overridden_package_names(overrides: Record<string, string>): Ar
 // Packages always held back from `pnpm update --latest`, regardless of overrides.
 // `typescript`: 7.x is the native (Go) port whose `require('typescript')` returns a stub with no
 // `SyntaxKind`, crashing the type-aware ESLint stack (typescript-eslint, eslint-plugin-sonarjs,
-// ts-api-utils) at rule-load time. Hold at 6.x until that stack supports the native API, then
-// remove this entry to fix forward (kit #658).
+// ts-api-utils) at rule-load time. The `typescript` name stays on the 6.x API
+// (`npm:@typescript/typescript6`) while `tsc` comes from the `@typescript/native` alias of 7.x, which
+// updates normally (kit #5272). Remove this entry once that stack supports the native API (kit #658).
 const HELD_BACK_PACKAGE_NAMES: Array<string> = ['typescript']
 
 // The union of built-in held-back packages and every overridden package — the dependency names
