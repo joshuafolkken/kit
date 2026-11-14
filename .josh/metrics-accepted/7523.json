@@ -1,7 +1,0 @@
-{
-	"reason": "#7523: lane_label draws a single run under its own 🏠 <command> heading (+2 lines)",
-	"date": "2026-11-14",
-	"growth": {
-		"scripts.code_lines": 2
-	}
-}
