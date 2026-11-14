@@ -268,7 +268,8 @@ operation. The check reads nested commands too:
 substitutions, compound bodies, `xargs`, `timeout`, `find -exec`, `sh -c` and `eval`
 (`scripts/hooks/implementation-shell-nested.ts`); the deny-list is
 `scripts/hooks/implementation-shell-deny.ts`. A runtime file any other call changes in the session's
-own checkout is restored after the call (`scripts/hooks/bash-revert.ts`); a file-writing program
+own checkout is restored after the call when the command names its path, and only reported when it
+does not, since another session may have written it (`scripts/hooks/bash-revert.ts`); a file-writing program
 (`cp`, `mv`, `rsync`, `tar`, `dd`, `sed -i`, …) aimed at a runtime path outside it is refused, as the
 restore does not reach another checkout.
 
