@@ -161,13 +161,22 @@ function read_result(result: JoshResult | undefined, target: string): DriveResul
 // **A record this process already owns is claimed again.** A driver that failed leaves the record
 // adopted for the supervisor and not handed off, and the restarted pass re-drives it from here; only a
 // record another live process holds is refused.
+//
+// **A record this process already holds is kept as it is, never rewritten** (joshuafolkken/kit#7506):
+// the adopt removes and re-creates it from this read, so a beside session's `run:carry
+// --retrospective` landing between the two would lose its mark or read no record to close.
+function standing_of(carry: RunCarry): 'adopt' | 'kept' | 'refused' {
+	if (carry.is_handed_off === true) return 'adopt'
+	if (run_carry.is_held_by_self(carry)) return 'kept'
+
+	return run_carry.is_held_by_another(carry) ? 'refused' : 'adopt'
+}
+
 function claim_record(target: string, invocation: string): boolean {
 	const current = run_carry.read_carry(target)
 	if (current.kind !== 'carried' || current.carry.invocation !== invocation) return false
-
-	if (current.carry.is_handed_off !== true && run_carry.is_held_by_another(current.carry)) {
-		return false
-	}
+	const standing = standing_of(current.carry)
+	if (standing !== 'adopt') return standing === 'kept'
 
 	const owner = {
 		...run_carry.owner_of(process.pid),

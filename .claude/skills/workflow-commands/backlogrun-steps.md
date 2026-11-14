@@ -133,7 +133,7 @@ run `run:carry --begin`; act on the row, then end the turn:
 | `launch #N` | The driver parked `#N` `run:stalled`: "Resolve what the plan can resolve" → "A recovered mechanical failure" |
 | `merge [<token>] #N` | Re-read the child |
 | `epic #N` | A named epic's turn |
-| `watch` | The retrospective is owed (`run:step`): run `pnpm josh run:handoff retrospective` (`retrospective.md`) |
+| `watch` | The retrospective is owed (`run:step`): run `pnpm josh run:handoff retrospective` (`retrospective.md`); woken beside the driver → the close its Next line names (`run-wake-driver.ts` → `next_move`) |
 | `window` | Hand the loop back as is |
 
 **A round starts with the initial plan or a batch of collected children.** A batch containing at least

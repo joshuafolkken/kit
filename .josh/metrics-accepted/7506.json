@@ -1,7 +1,9 @@
 {
-	"reason": "A drain's watch now wakes its retrospective session beside the driver (#7506): a beside-verdict set and the watch next move reusing the retrospective unit's exported brief",
+	"reason": "A drain's watch wakes its retrospective session beside the driver (#7506): the beside-verdict set and watch next move, the claim that keeps a record this process already holds so a beside close is not overwritten, and the docs naming the beside close",
 	"date": "2026-11-14",
 	"growth": {
-		"scripts.code_lines": 7
+		"scripts.code_lines": 13,
+		"ai_cost.on_demand_bytes": 242,
+		"prose.long_paragraphs": 1
 	}
 }

@@ -179,6 +179,8 @@ The parked child is not relaunched in that pass: `run:merge` writes its park lab
 so `backlog:next` no longer offers it. A launch that fills the lanes records the ledger's
 release; a lane still free records `hand-back:triage` (`scripts/backlog/backlog-drive-hold.ts`).
 
+## Running beside the driver
+
 The judgment session runs beside the driver, never in its place (joshuafolkken/kit#7120). On
 `triage` `run:wake` launches the session without handing the carry record over, names its pid on the
 kept resume line (`--triage-pid`) and drives again at once — the carry and `--exclude` stay the
@@ -188,6 +190,10 @@ While that pid lives the driver keeps collecting, offering and launching, holds 
 but `run` (judge, drain, retrospective) as a continued pass, and keeps a park collected meanwhile owed
 (`scripts/backlog/backlog-drive-park-triage.ts`). Once the pid has ended the driver drops it and hands
 the owed `triage` back.
+
+A `watch` drain's retrospective session runs beside the driver the same way (joshuafolkken/kit#7506):
+the record stays the supervisor's, so the session closes with `run:carry --retrospective --owner
+<supervisor pid>`, and an issue filed meanwhile is dispatched without waiting for it.
 
 ## Waiting while something is in flight
 
