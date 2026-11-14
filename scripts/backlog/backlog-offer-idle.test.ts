@@ -4,6 +4,7 @@ import { shared_cache_fixture } from '#scripts/josh/shared-cache-fixture'
 import { lane_registry } from '#scripts/lane/lane-registry'
 import { rule_value_cache } from '#scripts/rules/rule-value-cache'
 import { run_board_setup } from '#scripts/run/board/run-board-setup'
+import { detached_launch } from '#scripts/run/detached-launch'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { temporary_directory } from '#tools/test/temporary-directory'
@@ -47,13 +48,8 @@ async function offer(): Promise<number> {
 	return await backlog_offer_cli.run(['--started', STARTED, '--json'])
 }
 
-it('keeps idle visible after failed maintenance and does not repeat it at the next handoff', async () => {
-	vi.mocked(josh_command.josh_run_at).mockImplementation(async (argv) => {
-		expect(run_board_setup.read(events()).setup).toBeUndefined()
-		expect(events().some((event) => event.kind === DRAIN)).toBe(false)
-
-		return { code: argv[0] === 'main:sync' ? 0 : 1, out: '', err: 'push failed' }
-	})
+it('keeps idle visible after a failed flush launch and does not repeat it at the next handoff', async () => {
+	vi.spyOn(detached_launch, 'launch').mockReturnValue({ kind: 'failed', note: 'no pnpm' })
 	await run_event_setup.emit(STAGE.HANDING_OFF)
 	expect(await offer()).toBe(0)
 	await run_event_setup.emit(STAGE.HANDING_OFF)
@@ -61,7 +57,7 @@ it('keeps idle visible after failed maintenance and does not repeat it at the ne
 
 	expect(events().filter((event) => event.text === STAGE.WATCHING)).toHaveLength(1)
 	expect(events().filter((event) => event.kind === DRAIN)).toHaveLength(1)
-	expect(josh_command.josh_run_at).toHaveBeenCalledTimes(2)
+	expect(detached_launch.launch).toHaveBeenCalledOnce()
 	expect(run_board_setup.read(events()).setup).toBeUndefined()
-	expect(console.error).toHaveBeenCalledWith('observations:flush skipped: push failed')
+	expect(console.error).toHaveBeenCalledWith('observations:flush skipped: no pnpm')
 })

@@ -130,7 +130,8 @@ async function fresh_target(kind: string): Promise<string | undefined> {
  * `false`: neither is a fresh episode.
  *
  * `before_append` runs only on a fresh episode and is awaited before the marker becomes visible, for an
- * effect a reader of the marker must see finished — the drain flush (joshuafolkken/kit#5329).
+ * effect a reader of the marker must see finished — the drain's idle stage, set before the drain
+ * flush starts detached (joshuafolkken/kit#7505).
  */
 async function emit_once(
 	kind: string,

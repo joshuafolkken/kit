@@ -42,6 +42,7 @@ const USAGE =
 	'Usage: josh backlog:offer --started <ISO-8601> [--active <ISO-8601>] [--merged <n>] [--running <n>] [--max <n>] [--idle <minutes>] [--retries <n>] [--exclude <n>[,<n>...]]... [--repo <owner/repo>] [--json]'
 
 const OPTIONS = {
+	[backlog_drain_flush.OPTION]: { type: 'boolean' },
 	active: { type: 'string' },
 	exclude: { type: 'string', multiple: true },
 	idle: { type: 'string' },
@@ -186,10 +187,10 @@ function refuse(): number {
 	return FAILURE_EXIT_CODE
 }
 
-// Idle is visible before maintenance; the replaceable drain still waits for that maintenance.
+// Idle is visible first; the flush only starts, detached, so the next offer is never held behind it.
 async function prepare_drain(): Promise<void> {
 	await run_event_setup.emit(run_event_setup.STAGE.WATCHING)
-	await backlog_drain_flush.flush()
+	backlog_drain_flush.start()
 }
 
 // The drain: the backlog is empty (`exhausted`) and nothing of the run's own is in flight, so the run is
@@ -204,7 +205,7 @@ async function mark_drain(verdict: string, answer: string, running: number): Pro
 	if (answer !== EXHAUSTED_ANSWER || running !== NO_RUNNING) return false
 	if (verdict !== WATCH_VERDICT && verdict !== STOP_VERDICT) return false
 
-	// The flush finishes before the marker is visible: `backlogrun-replace` reads a drain as replaceable.
+	// A replace that reads this drain stops the parent's pid alone, never the detached flush.
 	return await run_event_stream_emit.emit_once(
 		run_event_stream.EVENT_KIND.DRAIN,
 		DRAIN_TEXT,
@@ -261,10 +262,18 @@ async function decide(values: ParsedValues, counts: OfferCounts): Promise<OfferR
 	return { code: emit(decision, offer, values.json === true), edge: offer_edge(next, decision) }
 }
 
+// `--drain-flush`: the detached body `prepare_drain` starts, which never fails the process.
+async function flush_alone(): Promise<number> {
+	await backlog_drain_flush.flush()
+
+	return SUCCESS_EXIT_CODE
+}
+
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const values = read_values(argv)
 
 	if (values === undefined) return refuse()
+	if (values[backlog_drain_flush.OPTION] === true) return await flush_alone()
 
 	// The loop head is the one place `rule:value` is read from: once per iteration, the parent's
 	// context still small, so a rule that never fires shows up as a printed row rather than as
