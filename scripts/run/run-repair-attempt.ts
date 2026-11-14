@@ -1,5 +1,6 @@
 import { statSync } from 'node:fs'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { git_command } from '#scripts/git/git-command'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import { pr_info_schema } from '#scripts/git/git-schemas'
 import { repository_lock } from '#scripts/git/repository-lock'
@@ -120,6 +121,20 @@ async function has_ended_ship(issue: string): Promise<boolean> {
 	return result !== undefined && result.result !== 'running'
 }
 
+// Uncommitted work in the lane means its `in-progress` still marks a live hand-off; a tree git
+// cannot read counts as uncommitted (joshuafolkken/kit#7493).
+async function is_clean(lane: LaneInfo): Promise<boolean> {
+	try {
+		return (await git_command.status(lane.directory)) === ''
+	} catch {
+		return false
+	}
+}
+
+async function is_repairable(issue: string, lane: LaneInfo): Promise<boolean> {
+	return (await is_unprotected(issue)) && (await is_clean(lane))
+}
+
 async function ready_lane(issue: string): Promise<LaneInfo | undefined> {
 	if ((await lane_await.other_process_trace(issue)) !== 'none' || !(await has_ended_ship(issue))) {
 		return undefined
@@ -127,7 +142,7 @@ async function ready_lane(issue: string): Promise<LaneInfo | undefined> {
 
 	const lane = await lane_registry.find_open_lane(issue)
 
-	if (lane === undefined || !(await is_unprotected(issue))) return undefined
+	if (lane === undefined || !(await is_repairable(issue, lane))) return undefined
 
 	return lane
 }
