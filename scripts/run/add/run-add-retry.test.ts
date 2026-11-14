@@ -120,11 +120,21 @@ describe('retry of an issue waiting on a person merge', () => {
 		expect(ports.clear_label).toHaveBeenCalledWith(ISSUE, NEEDS_HUMAN_MERGE_LABEL)
 	})
 
-	it('keeps needs-human-merge without a recorded repair', async () => {
-		const ports = ports_for([NEEDS_HUMAN_MERGE_LABEL])
+	// joshuafolkken/kit#7493: the ended lane's in-progress would hold the offer.
+	it('clears the ended lane in-progress for a recorded repair', async () => {
+		const ports = ports_for([NEEDS_HUMAN_MERGE_LABEL, IN_PROGRESS_LABEL])
+		const context = { ...CONTEXT, repairs: new Set([ISSUE]) }
+
+		expect(await run_add.add_all([ISSUE], true, ports, context)).toMatchObject([{ kind: 'queued' }])
+		expect(ports.clear_label).toHaveBeenCalledWith(ISSUE, IN_PROGRESS_LABEL)
+	})
+
+	it('keeps needs-human-merge and in-progress without a recorded repair', async () => {
+		const ports = ports_for([NEEDS_HUMAN_MERGE_LABEL, IN_PROGRESS_LABEL])
 
 		await run_add.add_all([ISSUE], true, ports, CONTEXT)
 		expect(ports.clear_label).not.toHaveBeenCalledWith(ISSUE, NEEDS_HUMAN_MERGE_LABEL)
+		expect(ports.clear_label).not.toHaveBeenCalledWith(ISSUE, IN_PROGRESS_LABEL)
 	})
 
 	it('refuses when the merge wait does not clear', async () => {

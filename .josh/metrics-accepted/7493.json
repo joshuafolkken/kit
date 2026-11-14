@@ -1,0 +1,7 @@
+{
+	"reason": "Regression tests for the repair dispatch (#7493): a shared repair fixture and an offer-level suite split from run-add-cli-repair.test.ts to stay under the file cap; production code grows by the in-progress stop and the lane clean-tree check",
+	"date": "2026-11-14",
+	"growth": {
+		"scripts.code_lines": 122
+	}
+}
