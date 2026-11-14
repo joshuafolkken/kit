@@ -1,5 +1,6 @@
 import { gh_author_association } from '#scripts/gh/gh-author-association'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
+import { lane_early_push_count } from '#scripts/lane/lane-early-push-count'
 import { afterEach, expect, it, vi } from 'vitest'
 import { issue_observation_fixture as fixture } from './issue-observation-fixture'
 import { issue_observation_gate } from './issue-observation-gate'
@@ -39,6 +40,34 @@ it('reads each source once per prime and rechecks previously satisfied evidence'
 	read.mockRejectedValue(new Error('offline'))
 	await issue_observation_prime.prime([fixture.BODY], read)
 	expect(issue_observation_gate.wait_of(fixture.BODY)?.reason).toContain('unread')
+})
+
+const LEDGER_BODY = fixture.ledger_body(lane_early_push_count.MULTI_SLOT_EARLY_PUSH)
+const MULTI_SLOT_PUSH = {
+	kind: 'early-push',
+	at: '2026-11-14T00:00:00.000Z',
+	source: 'review',
+	result: 'pushed',
+	slots: 2,
+} as const
+
+it('primes the ledger sample a declaration names', async () => {
+	const read = vi.fn().mockResolvedValue(fixture.comment([]))
+
+	await issue_observation_prime.prime([LEDGER_BODY], read, async () => [])
+	expect(issue_observation_gate.wait_of(LEDGER_BODY)?.reason).toContain('required')
+	await issue_observation_prime.prime([LEDGER_BODY], read, async () => [MULTI_SLOT_PUSH])
+	expect(issue_observation_gate.wait_of(LEDGER_BODY)).toBeUndefined()
+})
+
+it('reads no ledger without a ledger condition, and counts nothing on a failed read', async () => {
+	const read = vi.fn().mockResolvedValue(fixture.comment([]))
+	const ledger = vi.fn().mockRejectedValue(new Error('unreadable'))
+
+	await issue_observation_prime.prime([fixture.BODY], read, ledger)
+	expect(ledger).not.toHaveBeenCalled()
+	await issue_observation_prime.prime([LEDGER_BODY], read, ledger)
+	expect(issue_observation_gate.wait_of(LEDGER_BODY)?.reason).toContain('required')
 })
 
 it('withholds an unreadable or untrusted evidence comment', async () => {

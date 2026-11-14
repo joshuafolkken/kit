@@ -52,3 +52,14 @@ describe('lane_ledger_schema_ship — the lines josh ship writes, read through t
 		expect(lane_ledger_schema.entry_schema.parse(stop)).toEqual(stop)
 	})
 })
+
+describe('lane_ledger_schema_ship — the early-push line', () => {
+	it.each([
+		['with its head and slot count', { head: 'a'.repeat(40), slots: 2 }],
+		['recorded before it had them', {}],
+	])('reads an early push %s back as written', (_name, fields) => {
+		const push = { kind: 'early-push', at: AT, source: 'review', result: 'pushed', ...fields }
+
+		expect(lane_ledger_schema.entry_schema.parse(push)).toEqual(push)
+	})
+})

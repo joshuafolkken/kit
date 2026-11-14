@@ -98,7 +98,7 @@ describe('run_review_early_push.prepare', () => {
 		josh_run.mockResolvedValue({ code: 1, out: 'refused' })
 
 		expect(await run_review_early_push.prepare(CODE_PLAN, LANE, LANE_DIRECTORY)).toBe(false)
-		expect(early_push_record.record).toHaveBeenCalledWith('review', 'commit-refused')
+		expect(early_push_record.record).toHaveBeenCalledWith('review', 'commit-refused', 1)
 	})
 
 	it.each([
@@ -108,7 +108,7 @@ describe('run_review_early_push.prepare', () => {
 	])('records why preparation skips %j', async (plan, environment, reason) => {
 		expect(await run_review_early_push.prepare(plan, environment, LANE_DIRECTORY)).toBe(false)
 		expect(is_tree_dirty).not.toHaveBeenCalled()
-		expect(early_push_record.record).toHaveBeenCalledWith('review', reason)
+		expect(early_push_record.record).toHaveBeenCalledWith('review', reason, 1)
 	})
 })
 
@@ -116,18 +116,27 @@ describe('run_review_early_push.launch', () => {
 	it('records a failed background launch', () => {
 		launch_josh.mockReturnValue({ kind: 'failed', note: 'spawn refused' })
 
-		run_review_early_push.launch()
+		run_review_early_push.launch(2)
 
-		expect(early_push_record.record).toHaveBeenCalledWith('review', 'launch-failed')
+		expect(early_push_record.record).toHaveBeenCalledWith('review', 'launch-failed', 2)
 	})
 
-	it('leaves `josh run:review --push` running in the background', () => {
-		run_review_early_push.launch()
+	it('leaves `josh run:review --push <slots>` running in the background', () => {
+		run_review_early_push.launch(2)
 
 		expect(launch_josh.mock.lastCall?.[0]).toStrictEqual([
 			'run:review',
 			run_review_early_push.PUSH_FLAG,
+			'2',
 		])
+	})
+})
+
+describe('run_review_early_push.push — the slot count argument', () => {
+	it.each([undefined, 'two', '0'])('records no slot count from a %j argument', async (argument) => {
+		await run_review_early_push.push(argument)
+
+		expect(early_push_record.record).toHaveBeenCalledWith('review', 'pushed', undefined)
 	})
 })
 
@@ -135,10 +144,10 @@ describe('run_review_early_push.push', () => {
 	it('pushes and opens the pull request with the body draft on a green gate over a clean tree', async () => {
 		existing.mockResolvedValue(DRAFT)
 
-		expect(await run_review_early_push.push()).toBe(0)
+		expect(await run_review_early_push.push('2')).toBe(0)
 		expect(existing).toHaveBeenCalledWith('4907')
 		expect(josh_run).toHaveBeenCalledExactlyOnceWith([...PUSH, '--body-file', DRAFT], true)
-		expect(early_push_record.record).toHaveBeenCalledWith('review', 'pushed')
+		expect(early_push_record.record).toHaveBeenCalledWith('review', 'pushed', 2)
 	})
 
 	it('pushes without a body file when no draft exists', async () => {
@@ -151,7 +160,7 @@ describe('run_review_early_push.push', () => {
 		josh_run.mockResolvedValue({ code: 1, out: 'push refused' })
 
 		expect(await run_review_early_push.push()).toBe(1)
-		expect(early_push_record.record).toHaveBeenCalledWith('review', 'push-failed')
+		expect(early_push_record.record).toHaveBeenCalledWith('review', 'push-failed', undefined)
 	})
 
 	it.each([run_review.GATE_RED, run_review.GATE_MOVED])(
@@ -161,7 +170,7 @@ describe('run_review_early_push.push', () => {
 
 			expect(await run_review_early_push.push()).toBe(0)
 			expect(josh_run).not.toHaveBeenCalled()
-			expect(early_push_record.record).toHaveBeenCalledWith('review', state)
+			expect(early_push_record.record).toHaveBeenCalledWith('review', state, undefined)
 		},
 	)
 
@@ -170,6 +179,6 @@ describe('run_review_early_push.push', () => {
 
 		expect(await run_review_early_push.push()).toBe(0)
 		expect(josh_run).not.toHaveBeenCalled()
-		expect(early_push_record.record).toHaveBeenCalledWith('review', 'dirty-tree')
+		expect(early_push_record.record).toHaveBeenCalledWith('review', 'dirty-tree', undefined)
 	})
 })

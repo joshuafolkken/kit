@@ -181,7 +181,7 @@ function join_hint(slots: ReadonlyArray<ReviewSlot>): string {
 // The early push waits on the gate this pair launched, so it follows a written brief alone.
 function follow_brief(slots: ReadonlyArray<ReviewSlot>, is_early_push: boolean): void {
 	process.stderr.write(`${join_hint(slots)}\n`)
-	if (is_early_push) run_review_early_push.launch()
+	if (is_early_push) run_review_early_push.launch(slots.length)
 }
 
 const GREEN_NOTE = 'Gate green — the review verdict may be adopted.'
@@ -457,13 +457,13 @@ const LONE_MODES: ReadonlyMap<string, () => Promise<number>> = new Map([
 	[JOIN_FLAG, run_join],
 	[`${JOIN_FLAG} ${FIXING_FLAG}`, run_join_fixing],
 	[PINNED_FLAG, run_pinned],
-	[run_review_early_push.PUSH_FLAG, run_review_early_push.push],
 ])
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const lone = LONE_MODES.get(argv.join(' '))
 
 	if (lone !== undefined) return await lone()
+	if (argv[0] === run_review_early_push.PUSH_FLAG) return await run_review_early_push.push(argv[1])
 	const is_code_only = argv[0] === run_review.CODE_ONLY_FLAG
 
 	return await run_open(is_code_only, argv.slice(is_code_only ? 1 : 0))
