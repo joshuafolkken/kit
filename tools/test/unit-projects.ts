@@ -75,6 +75,13 @@ const MAIN_EXCLUDE: ReadonlyArray<string> = ['scripts/build/packed-consumer.test
 // **The headless agent and run marks are blanked as well** (joshuafolkken/kit#7309): a lane carries
 // them, so every rule that reads "unattended" from them passed the gate there and failed in CI, which
 // runs unmarked. A suite about an unattended run sets the mark itself.
+//
+// **The live run's startup scope is blanked as well** (joshuafolkken/kit#7509): the drain's
+// `observations:flush` pushes under it, so the pre-push unit run added it to every captured `pnpm josh`
+// spawn's `env` and gave every `run_startup.phase` a live destination to record into. A suite about
+// the scope sets it itself. The key is `run_startup.ENVIRONMENT_KEY`, which the suite pins; importing
+// it here would pull the startup store into the config's import graph.
+const STARTUP_SCOPE_KEY = 'JOSH_STARTUP_SCOPE'
 const SHIP_MARK = /^JOSH_SHIP_[A-Z0-9_]+$/u
 const PROFILE_KEY = /^JOSH_[A-Z0-9_]+_(?:MODEL|EFFORT)$/u
 
@@ -107,6 +114,7 @@ function unit_environment(source: EnvironmentSource): Record<string, string> {
 		JOSH_GH_TRANSPORT: 'graphql',
 		JOSH_REVIEWER_PAIRED: '',
 		JOSH_SHIP_SUPERVISED: '',
+		[STARTUP_SCOPE_KEY]: '',
 	}
 }
 
