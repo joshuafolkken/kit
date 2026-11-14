@@ -60,6 +60,21 @@ describe('backlog_drive — a triage session beside the driver', () => {
 	})
 })
 
+// joshuafolkken/kit#7506: a drain's retrospective session runs beside the driver, so the drain is not
+// handed back again and an issue filed meanwhile is dispatched before the session has ended.
+describe('backlog_drive — a retrospective session beside the driver', () => {
+	it('dispatches an issue filed after a drain while its retrospective session runs', async () => {
+		const drained = { ...offer('watch'), answer: 'exhausted', is_retrospective_owed: true }
+		const { ports, calls } = harness({ offers: [drained, offer('run', [OFFERED])] })
+		const held = await backlog_drive.run_pass(beside([], true), true, ports)
+		const next = await backlog_drive.run_pass(held.state, true, ports)
+
+		expect(held.kind).toBe('continue')
+		expect(next.kind).toBe('continue')
+		expect(calls).toStrictEqual(['offer', 'offer', `launch ${OFFERED}`])
+	})
+})
+
 // The context the next driver run reads back from the resume line `named` writes.
 function resumed(named: DriveState): DriveContext {
 	const context = backlog_drive_args.parse(['--owner', OWNER])

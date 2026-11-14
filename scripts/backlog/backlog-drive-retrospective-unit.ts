@@ -14,7 +14,8 @@ import { backlog_drive_unit } from './backlog-drive-unit'
 
 // The record is held by the driver's owner (the supervisor, or the attached parent), never by the
 // unit's own session, so the close names that owner or `run:carry` refuses it as `busy`. The unit is
-// no run parent `run:step` answers, so the digest command is named here.
+// no run parent `run:step` answers, so the digest command is named here. The session `run:wake` wakes
+// beside the driver at a `watch` drain reads the same brief (`run-wake-driver.ts`).
 function brief_of(owner: string): string {
 	return [
 		'Run the backlogrun retrospective as the run parent would: `pnpm josh doc:read retrospective.md`;',
@@ -74,7 +75,7 @@ async function run(owner: string, ports: UnitPorts = production_ports()): Promis
 	return ports.is_marked(git_directory)
 }
 
-const backlog_drive_retrospective_unit = { run }
+const backlog_drive_retrospective_unit = { brief_of, run }
 
 export type { UnitPorts }
 export { backlog_drive_retrospective_unit }
