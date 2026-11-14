@@ -178,7 +178,11 @@ async function clear_label(issue: number, label: string): Promise<boolean> {
 
 const GH_PORTS: AddPorts = { read_issue, apply_label, clear_label }
 
-async function context_of(live: LiveRun, is_retry: boolean): Promise<AddContext> {
+async function context_of(
+	live: LiveRun,
+	is_retry: boolean,
+	repairs: ReadonlySet<number>,
+): Promise<AddContext> {
 	const lanes = await lane_spent.lanes_in_use()
 	const events = await run_event_stream_emit.current_events(is_retry)
 	const active = backlog_drive_restore.active_issues(events)
@@ -186,6 +190,7 @@ async function context_of(live: LiveRun, is_retry: boolean): Promise<AddContext>
 
 	return {
 		is_retry,
+		repairs,
 		done: live.carry.done ?? [],
 		active: new Set([...active, ...lanes.working, ...lanes.unread]),
 		settled: new Set([
@@ -208,7 +213,7 @@ async function add(request: AddRequest, live: LiveRun, ports: AddPorts): Promise
 		request.issues,
 		request.is_priority,
 		ports,
-		await context_of(live, request.is_retry),
+		await context_of(live, request.is_retry, repairs),
 	)
 	const additions = run_add.additions_of(outcomes, request.is_priority)
 	const roots = run_add.roots_of(outcomes)

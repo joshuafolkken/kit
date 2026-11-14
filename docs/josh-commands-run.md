@@ -215,6 +215,7 @@ Adds to this repository's live `backlogrun` at the next free lane, without inter
 - Each `add` event wakes `run:progress --wait`.
 - `--retry` records a fresh attempt and clears this issue's `run:stalled` and `done`. A restarted driver ignores earlier parks. Without it, completed or stalled issues are refused.
 - A reviewed PR may start a repair attempt through `--retry` after a trusted comment newer than its review stop, an open PR, and confirmed worker/ship exit. The retry boundary is recorded once and the previous cut is ended before a replacement worker starts. Merges, withdrawals, splits, protected labels, and active or unreadable owners remain refused.
+- Only such a repair clears `needs-human-merge`, so the next offer dispatches it; its ship re-parks the PR while the diff still needs a person's merge.
 - A live `backlog:drive` runs `--retry` itself on the `run:stalled` causes it can re-offer, 2 times per issue ([labels and run states](./labels-and-run-states.md)); any other cause, or one at that cap, waits for this command.
 
 **Output / exit codes:** one line per issue — `queued #N · next free lane`, `queued #N · end of the queue`, `queued #N · waiting: blocked by #M`, `tracking #E · <where>`, or `refused #N · <reason>`. Exits 0 when every issue was added, 1 when any was refused or no `backlogrun` is running here (nothing is added then), 2 on a malformed argument.
