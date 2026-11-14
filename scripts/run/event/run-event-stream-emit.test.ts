@@ -125,7 +125,7 @@ describe('run_event_stream_emit.emit_once — one marker per episode', () => {
 	})
 })
 
-// joshuafolkken/kit#5329: the drain flush finishes before the marker a replacing `backlogrun` reads.
+// joshuafolkken/kit#5329: a drain's preparation finishes before the marker a replacing `backlogrun` reads.
 describe('run_event_stream_emit.emit_once — the step before the marker', () => {
 	it('awaits the step before appending, on a fresh episode only', async () => {
 		git_directories_mock.mockResolvedValue([WORKTREE, fresh_repository()])
