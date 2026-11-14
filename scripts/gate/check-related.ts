@@ -251,16 +251,26 @@ function exit_code(results: ReadonlyArray<CheckResult>): number {
 async function results_not_reused(
 	tree: GateTree,
 	execute: CheckExecutor,
-): Promise<{ results: Array<CheckResult>; reused: ReadonlySet<string> }> {
-	const reused = await check_related_reuse.reusable(CHECKS, tree)
+): Promise<{ results: Array<CheckResult>; reused: ReadonlySet<string>; verified: GateTree }> {
+	const available = await check_related_reuse.reusable(CHECKS, tree)
+	const reused = available.has(LINT_RELATED) ? available : new Set<string>()
+	let verified = tree
+
+	async function read_after_lint(command: string): Promise<CheckResult> {
+		const result = await execute(command)
+		if (command === LINT_RELATED) verified = await check_related_reuse.read_tree()
+
+		return result
+	}
+
 	const results = await run_checks(
-		execute,
+		read_after_lint,
 		CHECKS.filter((command) => !reused.has(command)),
 	)
 
-	await check_related_reuse.record(results, tree)
+	await check_related_reuse.record(results, verified)
 
-	return { results, reused }
+	return { results, reused, verified }
 }
 
 async function run_fresh(
@@ -269,8 +279,8 @@ async function run_fresh(
 	execute: CheckExecutor,
 	is_full: boolean,
 ): Promise<number> {
+	const { results, reused, verified } = await results_not_reused(tree, execute)
 	const is_started = await review_record_pinned.restart_in_lane(root)
-	const { results, reused } = await results_not_reused(tree, execute)
 	const tail = report_results(results, {
 		is_full,
 		pinned_notice: await check_related_pinned.notice(root, is_started),
@@ -280,7 +290,7 @@ async function run_fresh(
 	const code = exit_code(results)
 
 	await tree_verdict.record(
-		{ before: tree, exit_code: code, tail },
+		{ before: verified, exit_code: code, tail },
 		check_related_reuse.read_tree,
 		VERDICT_RECORD,
 	)
@@ -295,7 +305,7 @@ async function run_all(
 	execute: CheckExecutor = execute_check,
 	is_full = false,
 ): Promise<number> {
-	const tree = await check_related_reuse.read_tree()
+	const tree = await metrics_totals.rerecorded_tree(check_related_reuse.read_tree, root)
 	const kept = is_full ? undefined : tree_verdict.read(tree, VERDICT_RECORD)
 
 	if (kept === undefined) return await run_fresh(tree, root, execute, is_full)

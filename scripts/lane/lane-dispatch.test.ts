@@ -25,6 +25,7 @@ import { openai_lane_supervisor_owner } from './openai-lane-supervisor-owner'
 // (joshuafolkken/kit#1749).
 
 const ISSUE = '1749'
+const CHILD_ENVIRONMENT = { ...lane_child_marker.env_for(ISSUE), JOSH_STARTUP_SCOPE: '' }
 const LANE_DIRECTORY = path.join(os.tmpdir(), 'josh-test-lanes', `${ISSUE}-lane`)
 // What the older flow recorded in a lane: the unit's own transcript, a file to read rather than write.
 const RECORDED_TRANSCRIPT = path.join(os.tmpdir(), 'josh-test-session.jsonl')
@@ -231,9 +232,8 @@ describe('lane_dispatch.dispatch_child — the request the lane gets', () => {
 			cwd: LANE_DIRECTORY,
 			log_path: DERIVED_LOG,
 			profile: WORKER_PROFILE,
-			env: lane_child_marker.env_for(ISSUE),
+			env: CHILD_ENVIRONMENT,
 		})
-		expect(launched_request().profile).toMatchObject({ model: 'claude-opus-5-5', effort: 'medium' })
 	})
 
 	// **The mark is what tells the child it was dispatched rather than typed** (joshuafolkken/kit#1904),
@@ -241,7 +241,7 @@ describe('lane_dispatch.dispatch_child — the request the lane gets', () => {
 	it('marks the child as dispatched for this issue', async () => {
 		await lane_dispatch.dispatch_child(ISSUE)
 
-		expect(launch.mock.calls[0]?.[0].env).toStrictEqual(lane_child_marker.env_for(ISSUE))
+		expect(launch.mock.calls[0]?.[0].env).toStrictEqual(CHILD_ENVIRONMENT)
 	})
 
 	it('records the path it writes to, so an unrecorded lane is not a reachable state', async () => {

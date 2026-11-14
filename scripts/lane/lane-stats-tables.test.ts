@@ -27,6 +27,7 @@ const FIRST_HEADER_CELLS = [
 	'measured lanes',
 	'implement-rate lanes',
 	'held by',
+	'dispatch wait',
 	'lane',
 	'process',
 	'check',

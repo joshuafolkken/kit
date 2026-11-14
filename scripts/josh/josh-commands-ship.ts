@@ -58,7 +58,7 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 			'Start test:pinned in the background, run the gate and, once it is green, write the /code-review brief to a file, printing its path (--join to join them; it stops on an unpinned change)',
 		category: 'AI tools',
 		reference: [
-			'[--code-only] [--unpinned-ok "<reason>"] | --join [--fixing] | --pinned | --push',
+			'[--code-only] [--unpinned-ok "<reason>"] | --join [--fixing] | --pinned | --push [<slots>]',
 			'automation',
 			['processes', 'files', 'git', 'network'],
 		],
@@ -86,11 +86,11 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 				},
 				{
 					arguments: '--pinned',
-					note: "read test:pinned alone (the ship's pre-detach reads it anyway); a lane child returns at once",
+					note: "collect a stopped ship's remaining verdicts before editing or retrying; a lane child waits only for this continuation",
 				},
 				{
-					arguments: '--push',
-					note: 'launched by a lane open: push and open the PR at a green gate',
+					arguments: '--push 2',
+					note: 'launched by a lane open: push and open the PR at a green gate, recording the review plan’s slot count on the ledger',
 				},
 			],
 		},
@@ -191,7 +191,7 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: ['--review'],
 					description:
-						'runs round 1 beside the gate; after sync and round 1, an owed round 2 runs beside the gate and joins before the PR opens. A High or unfixed Medium stops the ship. A pre-detach `test:pinned` stop probes remaining hunks in the background for the next pre-detach.',
+						'runs round 1 beside the gate; after sync and round 1, an owed round 2 runs beside the gate and joins before the PR opens. A High or unfixed Medium stops the ship. After a pre-detach `test:pinned` stop, collect remaining verdicts with `pnpm josh run:review --pinned` before editing or retrying.',
 				},
 				{
 					names: ['--unpinned-ok <reason>'],

@@ -15,6 +15,9 @@
 // include that call's cost. The difference is an upper bound for this process: the account's other
 // processes spend the same allowance.
 
+import { run_startup } from '#scripts/run/startup/run-startup'
+import { gh_call_kind } from './gh-call-kind'
+
 interface CallCount {
 	calls: number
 	not_modified: number
@@ -97,6 +100,7 @@ function snapshot(): GhRequestTally {
 
 // `kind` is the call's `gh_call_kind` key.
 function count_call(kind: string): void {
+	run_startup.metric('api', gh_call_kind.class_of(kind))
 	if (core.read !== undefined) core.start ??= core.read()
 	tally.calls += 1
 	endpoint_of(kind).calls += 1

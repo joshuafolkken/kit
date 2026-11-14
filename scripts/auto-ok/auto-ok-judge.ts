@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import { issue_auto_ok, type AutoOkDecision } from '#scripts/issue/issue-auto-ok'
 import { AUTO_OK_LABEL, has_label_name } from '#scripts/issue/issue-labels'
+import { issue_publication_state } from '#scripts/issue/issue-publication-state'
 import type { WatchComment } from '#scripts/issue/issue-watch-diff'
 
 // The pure half of `josh auto-ok:judge`: which open issues `backlogrun` judges for `auto-ok` when a lane
@@ -36,7 +37,8 @@ const CRLF = '\r\n'
 const LF = '\n'
 
 function is_candidate(issue: JudgeIssue): boolean {
-	if (!issue.is_trusted || has_label_name(issue.labels, AUTO_OK_LABEL)) return false
+	const is_excluded = issue_publication_state.is_pending(issue.body) || !issue.is_trusted
+	if (is_excluded || has_label_name(issue.labels, AUTO_OK_LABEL)) return false
 
 	return issue_auto_ok.exclusion_of(issue.labels) === undefined
 }

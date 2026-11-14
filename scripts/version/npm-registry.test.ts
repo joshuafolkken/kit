@@ -19,6 +19,7 @@ const GITHUB_REGISTRY = 'https://npm.pkg.github.com/'
 // A scope whose registry names the GitHub host only in its path, which is not GitHub Packages.
 const PATH_PACKAGE = '@path-routed/kit'
 const SCOPE_REGISTRIES = [
+	['@joshuafolkken', GITHUB_REGISTRY],
 	['@github-routed', GITHUB_REGISTRY],
 	['@path-routed', 'https://example.com/npm.pkg.github.com/'],
 ] as const
@@ -58,6 +59,23 @@ describe('npm_registry.packument_url', () => {
 
 	it('leaves an unscoped package name as is', () => {
 		expect(npm_registry.packument_url('execa')).toBe('https://registry.npmjs.org/execa')
+	})
+})
+
+describe('npm_registry kit acquisition', () => {
+	it('reads kit from npm despite a legacy user scope mapping to GitHub', () => {
+		respond_with(fake_result(LATEST_BODY))
+
+		expect(npm_registry.read_latest(KIT_PACKAGE)).toBe(LATEST)
+		expect(packument_requests()).toHaveLength(1)
+		expect(execa_outcomes).not.toHaveBeenCalledWith('pnpm', expect.anything(), expect.anything())
+	})
+
+	it('keeps a same-scope legacy package on its effective GitHub registry', () => {
+		respond_with(fake_result(LATEST_BODY))
+
+		expect(npm_registry.read_latest('@joshuafolkken/legacy')).toBeUndefined()
+		expect(packument_requests()).toHaveLength(0)
 	})
 })
 
@@ -186,6 +204,51 @@ describe('npm_registry.has_public_version', () => {
 })
 
 const make_directory = temporary_directory()
+
+describe('npm_registry.read_public_version', () => {
+	it.each(['execa', KIT_PACKAGE])('uses the version endpoint for %s', (name) => {
+		const artifact = {
+			name,
+			version: LATEST,
+			dist: { tarball: `${KIT_URL}/kit.tgz`, integrity: 'sha512-fixture' },
+		}
+
+		respond_with(fake_result(JSON.stringify(artifact)))
+		expect(npm_registry.read_public_version(name, LATEST)).toEqual(artifact)
+		expect(packument_requests().at(-1)?.at(-2)).toBe(
+			`${npm_registry.packument_url(name)}/${LATEST}`,
+		)
+	})
+})
+
+describe('npm_registry.read_public_version — publication validation', () => {
+	it('reports a failed npm request instead of treating it as an unpublished version', () => {
+		respond_with(fake_result('', 1))
+
+		expect(() => npm_registry.read_public_version(KIT_PACKAGE, LATEST)).toThrow(
+			'Public npm request failed',
+		)
+	})
+	it('reads an exact npm artifact despite scope routing (ac-143d65d9)', () => {
+		const artifact = {
+			name: GITHUB_PACKAGE,
+			version: LATEST,
+			dist: { tarball: `${KIT_URL}/kit.tgz`, integrity: 'sha512-example' },
+		}
+
+		respond_with(fake_result(JSON.stringify(artifact)))
+		expect(npm_registry.read_public_version(GITHUB_PACKAGE, LATEST)).toEqual(artifact)
+		expect(npm_registry.read_public_version(GITHUB_PACKAGE, '9.9.9')).toBeUndefined()
+	})
+
+	it.each(['{}', 'invalid json', '{"versions":{}}'])(
+		'refuses missing or malformed publication metadata: %s',
+		(body) => {
+			respond_with(fake_result(body))
+			expect(npm_registry.read_public_version(KIT_PACKAGE, LATEST)).toBeUndefined()
+		},
+	)
+})
 
 // The answer for a project whose package.json is `manifest`.
 function published_for(manifest: object): string | undefined {

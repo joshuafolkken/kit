@@ -5,8 +5,10 @@ import { lane_close } from '#scripts/lane/lane-close'
 import { lane_withdraw_closed } from '#scripts/lane/lane-withdraw-closed'
 import { poll } from '#scripts/lib/poll'
 import { run_carry, type CarryOwner, type RunCarry } from '#scripts/run/carry/run-carry'
+import { run_carry_session } from '#scripts/run/carry/run-carry-session'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_headless } from '#scripts/run/run-headless'
+import { run_wake_codex } from './run-wake-codex'
 import type { WakeContext } from './run-wake-describe'
 import { run_wake_driver } from './run-wake-driver'
 import { run_wake_handoff } from './run-wake-handoff'
@@ -66,7 +68,12 @@ function launch_session(
 	if (built === undefined) return { kind: 'failed', note: UNSAFE_INVOCATION_NOTE }
 	if (built.kind === 'rejected') return { kind: 'failed', note: built.note }
 
-	const target = { cwd: context.worktree, env: session.environment, log_path: context.log_target }
+	const target = {
+		cwd: context.worktree,
+		env: session.environment,
+		log_path: run_wake_codex.log_path(context, session.id, profile),
+	}
+	if (profile.provider === 'openai') note_to_stderr(`session output: ${target.log_path}`)
 
 	return run_wake_session.launch({ argv: built.argv, ...target, profile }, note_to_stderr)
 }
@@ -136,7 +143,10 @@ function session_ports(context: WakeContext, profile: AgentProfile): SessionPort
 			wake_session(context, invocation, profile, {
 				id: session_id,
 				material,
-				environment: run_headless.environment(),
+				environment:
+					profile.provider === 'openai'
+						? { ...run_headless.environment(), [run_carry_session.KEY]: session_id }
+						: run_headless.environment(),
 			}),
 		wake_beside: (invocation, session_id, material) =>
 			wake_beside(context, invocation, profile, {
@@ -164,7 +174,11 @@ function ports_for(
 
 	return {
 		is_code_stale,
-		read_carry: () => run_carry.read_carry(context.carry_target),
+		refresh: () => {
+			run_wake_codex.refresh(context)
+		},
+		session_failure: () => run_wake_codex.failure(context),
+		read_carry: () => run_wake_codex.read_carry(context),
 		is_owner_live: (read) => read.kind === 'carried' && is_session_at_work(read.carry),
 		has_work: async () => true,
 		...session_ports(context, profile),

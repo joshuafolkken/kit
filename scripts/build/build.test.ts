@@ -12,6 +12,7 @@ describe('build_steps', () => {
 			'bin',
 			'hooks',
 			'commands',
+			'migration',
 			...PUBLIC_LIBRARIES,
 			'claude-md',
 		])

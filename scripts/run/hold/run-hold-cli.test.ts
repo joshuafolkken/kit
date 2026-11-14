@@ -89,6 +89,7 @@ describe('parse_request', () => {
 		[[ISSUE], 'claim'],
 		[[ISSUE, '--fullrun'], 'claim'],
 		[[ISSUE, HALFRUN_STOP_FLAG], 'halfrun-stop'],
+		[[ISSUE, '--halfrun-round'], 'halfrun-round'],
 		[[ISSUE, '--prrun-stop'], 'prrun-stop'],
 		[[ISSUE, '--human-review-stop'], 'human-review-stop'],
 		[['--adopt', ISSUE], 'adopt'],

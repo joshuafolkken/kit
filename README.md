@@ -63,6 +63,8 @@ Next: [tutorial](./docs/tutorial.md#without-github-one-change-checked-locally)
 
 Check first: [what kit changes in your project](./docs/how-to/add-kit.md#what-kit-changes-in-your-project)
 
+Already installing kit from GitHub Packages? [Move the project to npm](./docs/registry-migration.md) before upgrading.
+
 ## Docs
 
 [How-to](./docs/how-to.md) · [All docs](./docs/overview.md)

@@ -41,6 +41,7 @@ To walk the Issue-driven loop once — file an Issue, have an agent plan and imp
 - [setup/full.md](./setup/full.md) — a Node project, with `josh init` or `josh start`
 - [cli.md](./cli.md) — the global `josh` command
 - [troubleshooting.md](./troubleshooting.md) — install and auth errors
+- [registry-migration.md](./registry-migration.md) — prepare npm registry access before upgrading kit
 
 **Use**
 
@@ -56,6 +57,7 @@ To walk the Issue-driven loop once — file an Issue, have an agent plan and imp
 - [josh-commands.md](./josh-commands.md) — the `josh` commands you type by hand ([catalog](./josh-command-catalog.md) of every command)
 - [josh-commands-automation.md](./josh-commands-automation.md) — the commands hooks, workflow runs and lanes call
 - [josh-commands-run.md](./josh-commands-run.md) — the run lifecycle commands a workflow run calls
+- [observation-waits.md](./observation-waits.md) — 観測条件と証拠を記録し、条件成立後に調査を再開する
 - [josh-commands-board.md](./josh-commands-board.md) — the run report, board and handoff commands
 - [josh-commands-lane.md](./josh-commands-lane.md) — the lane commands a workflow run calls
 - [josh-commands-session.md](./josh-commands-session.md) — the session-budget and document-reading commands
@@ -71,6 +73,8 @@ To walk the Issue-driven loop once — file an Issue, have an agent plan and imp
 
 - [set-up-notifications.md](./how-to/set-up-notifications.md) — Telegram notifications for the Issue workflow
 - [cloud-session.md](./cloud-session.md) — running in an agent container
+- [josh-startup-telemetry.md](./josh-startup-telemetry.md) — persisted backlog startup phase measurements
+- [backlog-measurement.md](./backlog-measurement.md) — isolated backlog startup measurement trials
 - [authentication.md](./authentication.md) — existing GitHub Packages installs only
 
 **Maintaining kit** — for kit's own maintainers; projects that use kit can skip this group

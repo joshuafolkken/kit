@@ -161,7 +161,7 @@ describe('issue_file_cli.run — a filing that clears every step', () => {
 
 	it('points the scout at the target repository when filing elsewhere', async () => {
 		expect(await issue_file_cli.run(argv_of(origin_path, '--repo', THERE))).toBe(SUCCESS_EXIT_CODE)
-		expect(process.env['GH_REPO']).toBe(THERE)
+		expect(process.env['GH_REPO']).toBeUndefined()
 		expect(scout).toHaveBeenCalledWith(expect.anything(), THERE)
 	})
 })

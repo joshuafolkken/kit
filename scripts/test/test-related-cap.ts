@@ -4,11 +4,12 @@ import { direct_importers } from './direct-importers'
 import { test_declared_logic } from './test-declared-logic'
 import { test_pinned_logic } from './test-pinned-logic'
 import { test_pinned_reach, type ReachedCount } from './test-pinned-reach'
+import { test_related_imports } from './test-related-imports'
 import { test_related_pins } from './test-related-pins'
 import { related_scope } from './test-related-scope'
 
 // **A change whose imports reach more than `test_pinned_logic.MAX_TEST_FILES` test files runs only the
-// tests importing its widest files directly** (joshuafolkken/kit#5532, #5702), as a file every test imports does
+// tests importing its widest files directly when their imports are unchanged** (#7453, #5532, #5702), as a file every test imports does
 // (`direct-importers.ts`): the tests past them stay unchecked here, for `josh gate`'s whole suite and
 // CI to run. `--keep-whole-suite` (the gate's unit leg) lifts the cap outside a lane
 // (`test-related-whole.ts`), and so does a missing graph.
@@ -85,7 +86,8 @@ async function direct_of(
 	root: string,
 	over_cap: ReadonlyArray<string>,
 ): Promise<Array<[string, Array<string>]>> {
-	const importers = await direct_importers.importers_of(root, over_cap)
+	const stable = await test_related_imports.stable_files(root, over_cap)
+	const importers = await direct_importers.importers_of(root, stable)
 	const narrowed = [...importers].filter(([, tests]) => tests.length > 0)
 
 	return narrowed.map(([file, tests]) => [file, test_related_pins.with_pins(file, tests)])
@@ -96,7 +98,9 @@ async function split_of(
 	root: string,
 	files: ReadonlyArray<string>,
 ): Promise<[Map<string, Array<string>>, Array<string>]> {
-	const every_test = await direct_importers.every_test_importers(root, files)
+	const shared = direct_importers.every_test_imports_of(files)
+	const stable = await test_related_imports.stable_files(root, shared)
+	const every_test = await direct_importers.every_test_importers(root, stable)
 
 	return [every_test, candidates_of(root, files, every_test)]
 }

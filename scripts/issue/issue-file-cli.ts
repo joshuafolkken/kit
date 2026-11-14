@@ -26,6 +26,7 @@ import { issue_file_pass, type Filing } from './issue-file-pass'
 import { issue_file_worker } from './issue-file-worker'
 import { has_label_name, has_parked_label, RUN_SOLO_LABEL } from './issue-labels'
 import { issue_priority } from './issue-priority'
+import { issue_publication_state } from './issue-publication-state'
 import { issue_release_cli } from './issue-release-cli'
 import { issue_run_verdict } from './issue-run-verdict'
 import type { ScoutOutcome } from './issue-scout-cli'
@@ -79,8 +80,11 @@ async function create(filing: Filing, labels: ReadonlyArray<string>): Promise<st
 	)
 	const request = git_gh_issue_write.issue_create_request({
 		title: filing.args.title,
-		body: filing.body,
-		labels,
+		...issue_publication_state.creation(
+			filing.body,
+			labels,
+			filing.args.is_prepared === true || has_label_name(labels, 'route:split'),
+		),
 		repo: filing.target,
 	})
 
@@ -326,7 +330,9 @@ async function file_issue(
 ): Promise<string | undefined> {
 	const filing = await parsed_filing(argv)
 
-	return filing === undefined ? undefined : await file({ ...filing, scouted })
+	return filing === undefined
+		? undefined
+		: await issue_file_pass.with_repository_restored(async () => await file({ ...filing, scouted }))
 }
 
 // The scout `file_issue` would run, for `issue:file --batch` to run for every filing before the first.
@@ -334,16 +340,23 @@ async function scout(argv: ReadonlyArray<string>): Promise<ScoutOutcome | undefi
 	const args = issue_file.parse(argv)
 	const filing = args === undefined ? undefined : await filing_of(args)
 
-	return typeof filing === 'object' ? await issue_file_pass.scout_filing(filing) : undefined
+	return typeof filing === 'object'
+		? await issue_file_pass.with_repository_restored(
+				async () => await issue_file_pass.scout_filing(filing),
+			)
+		: undefined
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const filing = await parsed_filing(argv)
 
 	if (filing === undefined) return FAILURE_EXIT_CODE
-	if (filing.args.is_check) return await check(filing)
 
-	return (await file(filing)) === undefined ? FAILURE_EXIT_CODE : SUCCESS_EXIT_CODE
+	return await issue_file_pass.with_repository_restored(async () => {
+		if (filing.args.is_check) return await check(filing)
+
+		return (await file(filing)) === undefined ? FAILURE_EXIT_CODE : SUCCESS_EXIT_CODE
+	})
 }
 
 const issue_file_cli = {

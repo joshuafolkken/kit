@@ -20,8 +20,12 @@ const LONG_STDERR_REPEAT = 1000
 const HAND_OFF_STEPS = 2
 const EPIC_OUTPUT = 'epic #1\nresume: --owner 1'
 const WINDOW_OUTPUT = 'window\nresume: --owner 1'
+const WINDOW_PASSES = 2
 const BUSY_OUTPUT = 'merge busy #2509\nresume: --owner 1'
 const TRIAGE_OUTPUT = 'triage\nresume: --owner 1'
+const WATCH_OUTPUT = 'watch\nresume: --owner 1'
+const OWNER = String(process.pid)
+const BESIDE_NOTE = "the carry record stays the supervisor's"
 const HAND_BACK = 'then end the turn, which hands the loop back'
 const ALREADY_CLAIMED =
 	"the carry record is already this session's, so run no pnpm josh run:carry --begin;"
@@ -256,10 +260,11 @@ async function no_pause(): Promise<void> {
 test('releases a spent window to the supervisor instead of re-driving it', async () => {
 	const subprocess = vi
 		.spyOn(josh_command, 'josh_run')
-		.mockResolvedValue({ code: 0, out: WINDOW_OUTPUT })
+		.mockResolvedValue({ code: 0, out: WINDOW_OUTPUT, err: 'observations:flush skipped: failed' })
 
 	expect(await run_wake_driver.drive(scratch.target, no_pause)).toStrictEqual({ kind: 'released' })
-	expect(subprocess).toHaveBeenCalledOnce()
+	expect(await run_wake_driver.drive(scratch.target, no_pause)).toStrictEqual({ kind: 'released' })
+	expect(subprocess).toHaveBeenCalledTimes(WINDOW_PASSES)
 	expect(run_event_setup.emit).not.toHaveBeenCalledWith(run_event_setup.STAGE.JUDGING)
 })
 
@@ -288,8 +293,23 @@ test('wakes a triage session beside the driver once no launched parent is planni
 	const material = result.kind === 'triage' ? result.material : ''
 
 	expect(result.kind).toBe('triage')
-	expect(material).toContain("the carry record stays the supervisor's")
+	expect(material).toContain(BESIDE_NOTE)
 	expect(material).not.toContain(ALREADY_CLAIMED)
+})
+
+// joshuafolkken/kit#7506: a drain's retrospective session runs beside the driver, so the supervisor
+// re-drives at once and an issue filed meanwhile is dispatched while the session still runs.
+test('wakes a drain retrospective beside the driver, closed under the supervisor owner', async () => {
+	vi.spyOn(josh_command, 'josh_run').mockResolvedValue({ code: 0, out: WATCH_OUTPUT })
+
+	const result = await run_wake_driver.drive(scratch.target, no_pause)
+	const material = result.kind === 'triage' ? result.material : ''
+
+	expect(result.kind).toBe('triage')
+	expect(material).toContain(BESIDE_NOTE)
+	expect(material).toContain(`run:carry --retrospective --summary "<result>" --owner ${OWNER}`)
+	expect(material).not.toContain(ALREADY_CLAIMED)
+	expect(run_event_setup.emit).not.toHaveBeenCalledWith(run_event_setup.STAGE.JUDGING)
 })
 
 test.each(['merge busy #2509', 'merge retry #2509'])(

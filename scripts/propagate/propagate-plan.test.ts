@@ -145,11 +145,23 @@ describe('propagate_plan.build_plan', () => {
 	})
 
 	it('upgrades every carried package to its pinned version', () => {
-		const commands = propagate_steps.upgrade_commands(plan_of(make_app_kit(), APP_KIT_VERSION))
+		const commands = propagate_steps.upgrade_commands(
+			plan_of(make_app_kit(), APP_KIT_VERSION),
+			make_consumer({ [KIT]: JOSH, [APP_KIT]: JOSH_APP }).path,
+		)
+		const [migration, kit_install, , app_install] = commands
 
-		expect(commands.map(({ package_name }) => package_name)).toEqual([KIT, KIT, APP_KIT, APP_KIT])
-		expect(commands[0]?.command).toContain(`${KIT}@${KIT_INSTALLED}`)
-		expect(commands[2]?.command).toContain(`${APP_KIT}@${APP_KIT_VERSION}`)
+		expect(commands.map(({ package_name }) => package_name)).toEqual([
+			KIT,
+			KIT,
+			KIT,
+			APP_KIT,
+			APP_KIT,
+		])
+		expect(migration?.command[0]).toBe('node')
+		expect(migration?.command).toContain(KIT_INSTALLED)
+		expect(kit_install?.command).toContain(`${KIT}@${KIT_INSTALLED}`)
+		expect(app_install?.command).toContain(`${APP_KIT}@${APP_KIT_VERSION}`)
 	})
 })
 

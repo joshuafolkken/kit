@@ -4989,3 +4989,163 @@
 - rf:none | none | - | 2026-11-12 | #7414
 - rb:2026-11-12 | #7414
 - rf:none | none | - | 2026-11-12 | #7414
+- rf:none | none | - | 2026-11-12 | #7413
+- ri:none | none | - | 2026-11-12 | #7413
+- rb:2026-11-12 | #7413
+- rf:bug-risks | medium | scripts/run/board/run-board-setup.ts:41 | 2026-11-12 | #7413 | fixed
+- rx:{"round":"af16d93e-2ab7-4fb8-b5ec-3e5c1876c00c","category":"bug-risks","severity":"medium","file":"scripts/run/board/run-board-setup.ts:41","disposition":"fixed","description":"supervisor 所有の retrospective unit 実行中もセッション非稼働判定が適用され、run が ⏸・spinner なしになるため、retrospective の稼働判定をセッション所有者から分離する。","status":"resolved"}
+- rf:none | none | - | 2026-11-13 | #7419
+- ri:none | none | - | 2026-11-12 | #7419
+- ri:none | none | - | 2026-11-13 | #7419
+- ri:none | none | - | 2026-11-13 | #7419
+- rb:2026-11-13 | #7419
+- rf:none | none | - | 2026-11-13 | #7419
+- rf:none | none | - | 2026-11-13 | #7422
+- k:followup-unrelated-test-rerun | d1 | 2026-11-13 | scripts/sync/sync-directory-guards.test.ts | followup reran Unit Tests (5/6); failed outside the change: isolated scripts/sync/sync-directory-guards.test.ts [ scripts/sync/sync-directory-guards.test.ts ]
+- ri:none | none | - | 2026-11-13 | #7422
+- ri:none | none | - | 2026-11-13 | #7422
+- rb:2026-11-13 | #7422
+- rf:bug-risks | medium | scripts/backlog/backlog-next.ts:322 | 2026-11-13 | #7422 | fixed
+- rf:bug-risks | medium | scripts/backlog/backlog-offer-cli.ts:250 | 2026-11-13 | #7422 | fixed
+- rf:bug-risks | medium | scripts/run/startup/run-startup-store.ts:102 | 2026-11-13 | #7422 | fixed
+- rx:{"round":"72edeeba-b97e-4d21-bbfa-40699ede2348","category":"bug-risks","severity":"medium","file":"scripts/backlog/backlog-next.ts:322","disposition":"fixed","description":"返り値による listing・eligibility・cache fill の失敗が done として保存される。","status":"resolved"}
+- rx:{"round":"72edeeba-b97e-4d21-bbfa-40699ede2348","category":"bug-risks","severity":"medium","file":"scripts/backlog/backlog-offer-cli.ts:250","disposition":"fixed","description":"wait/hold の回答が exit 0 のため起動待機を done として保存する。","status":"resolved"}
+- rx:{"round":"72edeeba-b97e-4d21-bbfa-40699ede2348","category":"bug-risks","severity":"medium","file":"scripts/run/startup/run-startup-store.ts:102","disposition":"fixed","description":"同一ミリ秒の逐次 fill を並行 miss と誤判定する。","status":"resolved"}
+- rb:2026-11-13 | #7422
+- rf:bug-risks | medium | scripts/run/startup/run-startup-store.ts:102 | 2026-11-13 | #7422
+- rx:{"round":"cd377f22-9c84-420d-a1dc-72a6a59a621c","previous":"72edeeba-b97e-4d21-bbfa-40699ede2348","category":"bug-risks","severity":"medium","file":"scripts/run/startup/run-startup-store.ts:102","description":"fill A が 0.2〜1.8ms、同じキーの fill B が 1.2〜3.3ms に実行されると B の開始と A の終了が同じミリ秒に丸められ、厳密比較により実際の並行 miss が空になるため、逐次 fill を除外しつつ重なりを識別できる時刻精度と回帰テストが必要; other sites: scripts/run/startup/run-startup-store.ts:119, scripts/run/startup/run-startup.ts:30","status":"new"}
+- rx:{"round":"cd377f22-9c84-420d-a1dc-72a6a59a621c","previous":"72edeeba-b97e-4d21-bbfa-40699ede2348","category":"bug-risks","severity":"medium","file":"scripts/backlog/backlog-next.ts:322","description":"返り値による listing・eligibility・cache fill の失敗が done として保存される。","disposition":"fixed","status":"resolved"}
+- rx:{"round":"cd377f22-9c84-420d-a1dc-72a6a59a621c","previous":"72edeeba-b97e-4d21-bbfa-40699ede2348","category":"bug-risks","severity":"medium","file":"scripts/backlog/backlog-offer-cli.ts:250","description":"wait/hold の回答が exit 0 のため起動待機を done として保存する。","disposition":"fixed","status":"resolved"}
+- rx:{"round":"cd377f22-9c84-420d-a1dc-72a6a59a621c","previous":"72edeeba-b97e-4d21-bbfa-40699ede2348","category":"bug-risks","severity":"medium","file":"scripts/run/startup/run-startup-store.ts:102","description":"同一ミリ秒の逐次 fill を並行 miss と誤判定する。","disposition":"fixed","status":"resolved"}
+- rb:2026-11-13 | #7422
+- rf:bug-risks | medium | scripts/run/startup/run-startup-store.ts:102 | 2026-11-13 | #7422 | fixed
+- rx:{"round":"461a4c9f-1420-4d22-bed8-533f010a0496","previous":"cd377f22-9c84-420d-a1dc-72a6a59a621c","category":"bug-risks","severity":"medium","file":"scripts/run/startup/run-startup-store.ts:102","disposition":"fixed","description":"fill A が 0.2〜1.8ms、同じキーの fill B が 1.2〜3.3ms に実行されると B の開始と A の終了が同じミリ秒に丸められ、厳密比較により実際の並行 miss が空になるため、逐次 fill を除外しつつ重なりを識別できる時刻精度と回帰テストが必要; other sites: scripts/run/startup/run-startup-store.ts:119, scripts/run/startup/run-startup.ts:30","status":"resolved"}
+- rb:2026-11-13 | #7422
+- rf:bug-risks | medium | scripts/run/startup/run-startup-store.ts:102 | 2026-11-13 | #7422 | fixed
+- rx:{"round":"5b9ecd10-f137-498b-a6e7-e87c92c3094d","previous":"461a4c9f-1420-4d22-bed8-533f010a0496","category":"bug-risks","severity":"medium","file":"scripts/run/startup/run-startup-store.ts:102","disposition":"fixed","description":"fill A が 0.2〜1.8ms、同じキーの fill B が 1.2〜3.3ms に実行されると B の開始と A の終了が同じミリ秒に丸められ、厳密比較により実際の並行 miss が空になるため、逐次 fill を除外しつつ重なりを識別できる時刻精度と回帰テストが必要; other sites: scripts/run/startup/run-startup-store.ts:119, scripts/run/startup/run-startup.ts:30","status":"resolved"}
+- ri:none | none | - | 2026-11-13 | #7422
+- rf:none | none | - | 2026-11-13 | #7423
+- rb:2026-11-13 | #7423
+- rf:none | none | - | 2026-11-13 | #7423
+- rf:comments | medium | docs/backlog-measurement.md:182 | 2026-11-13 | #7424 | fixed
+- rb:2026-11-13 | #7424
+- rf:none | none | - | 2026-11-13 | #7424
+- rx:{"round":"9da027c5-fd27-44b1-8443-64c413cbdbe2","previous":"9de1298b-a94d-4ace-b281-cd8a7b80fe52","category":"comments","severity":"medium","file":"docs/backlog-measurement.md:182","description":"HTTP503は既存transportで再試行され成功時はcacheされるため、HTTP失敗も無再試行で欠測とする記述と対応するテスト名を実装に合わせる。","disposition":"fixed","status":"resolved"}
+- rf:none | none | - | 2026-11-13 | #7425
+- ri:none | none | - | 2026-11-13 | #7425
+- ri:none | none | - | 2026-11-13 | #7425
+- rb:2026-11-13 | #7425
+- rf:none | none | - | 2026-11-13 | #7425
+- rf:none | none | - | 2026-11-13 | #7427
+- ri:none | none | - | 2026-11-13 | #7427
+- ri:none | none | - | 2026-11-13 | #7427
+- rb:2026-11-13 | #7427
+- rf:bug-risks | medium | scripts/issue/issue-publication-state.ts:34 | 2026-11-13 | #7427 | fixed
+- rx:{"round":"847f4819-5fd5-40c4-b8da-d9e2f2c70a99","category":"bug-risks","severity":"medium","file":"scripts/issue/issue-publication-state.ts:34","disposition":"fixed","description":"公開前に追加されたユーザー禁止を再判定せず保存済み auto-ok を復元するため、禁止した子を自動実行候補にする。","status":"resolved"}
+- rb:2026-11-13 | #7427
+- rf:bug-risks | medium | scripts/issue/issue-publication-state.ts:34 | 2026-11-13 | #7427 | fixed
+- rx:{"round":"f3c4dc78-50ce-4946-8953-1ad8323987c8","previous":"847f4819-5fd5-40c4-b8da-d9e2f2c70a99","category":"bug-risks","severity":"medium","file":"scripts/issue/issue-publication-state.ts:34","disposition":"fixed","description":"公開前に追加されたユーザー禁止を再判定せず保存済み auto-ok を復元するため、禁止した子を自動実行候補にする。","status":"resolved"}
+- rb:2026-11-13 | #7427
+- rf:bug-risks | medium | scripts/issue/issue-publication-state.ts:34 | 2026-11-13 | #7427 | fixed
+- rx:{"round":"c53b100a-8375-4988-9f36-0915a50fdcc9","previous":"f3c4dc78-50ce-4946-8953-1ad8323987c8","category":"bug-risks","severity":"medium","file":"scripts/issue/issue-publication-state.ts:34","disposition":"fixed","description":"公開前に追加されたユーザー禁止を再判定せず保存済み auto-ok を復元するため、禁止した子を自動実行候補にする。","status":"resolved"}
+- rb:2026-11-13 | #7427
+- rf:bug-risks | medium | scripts/issue/issue-publication-state.ts:34 | 2026-11-13 | #7427 | fixed
+- rx:{"round":"b56f4415-410f-4676-8098-d6a357b70989","previous":"c53b100a-8375-4988-9f36-0915a50fdcc9","category":"bug-risks","severity":"medium","file":"scripts/issue/issue-publication-state.ts:34","disposition":"fixed","description":"公開前に追加されたユーザー禁止を再判定せず保存済み auto-ok を復元するため、禁止した子を自動実行候補にする。","status":"resolved"}
+- rb:2026-11-13 | #7427
+- rf:bug-risks | medium | scripts/issue/issue-publication-state.ts:34 | 2026-11-13 | #7427 | fixed
+- rx:{"round":"2c309918-2c70-4f9b-b946-75bb0c421cc5","previous":"b56f4415-410f-4676-8098-d6a357b70989","category":"bug-risks","severity":"medium","file":"scripts/issue/issue-publication-state.ts:34","disposition":"fixed","description":"公開前に追加されたユーザー禁止を再判定せず保存済み auto-ok を復元するため、禁止した子を自動実行候補にする。","status":"resolved"}
+- rb:2026-11-13 | #7427
+- rf:bug-risks | medium | scripts/issue/issue-publication-state.ts:34 | 2026-11-13 | #7427 | fixed
+- rx:{"round":"93a948d1-70aa-4b93-b765-0f63172906c0","previous":"2c309918-2c70-4f9b-b946-75bb0c421cc5","category":"bug-risks","severity":"medium","file":"scripts/issue/issue-publication-state.ts:34","disposition":"fixed","description":"公開前に追加されたユーザー禁止を再判定せず保存済み auto-ok を復元するため、禁止した子を自動実行候補にする。","status":"resolved"}
+- rf:none | none | - | 2026-11-13 | #7428
+- rb:2026-11-13 | #7428
+- rf:none | none | - | 2026-11-13 | #7428
+- rb:2026-11-13 | #7430
+- rf:none | none | - | 2026-11-13 | #7430
+- rf:none | none | - | 2026-11-13 | #7431
+- rb:2026-11-13 | #7431
+- rf:none | none | - | 2026-11-13 | #7431
+- rf:none | none | - | 2026-11-13 | #7437
+- ri:none | none | - | 2026-11-13 | #7437
+- ri:none | none | - | 2026-11-13 | #7437
+- ri:none | none | - | 2026-11-13 | #7437
+- rb:2026-11-13 | #7437
+- rf:bug-risks | medium | scripts/lint/format-steps.ts:77 | 2026-11-13 | #7437 | fixed
+- rx:{"round":"f1fc020e-ca1f-400e-9f0d-4a3dde1897c4","category":"bug-risks","severity":"medium","file":"scripts/lint/format-steps.ts:77","disposition":"fixed","description":"basic profile の非Webファイルだけを選ぶと Prettier の対象が全Webファイルへ広がり、選択外ファイルまで書き換える。","status":"resolved"}
+- rf:bug-risks | medium | scripts/run/review/run-review-join-read.ts:105 | 2026-11-13 | #7438
+- rf:bug-risks | medium | scripts/run/review/run-review-join-read.ts:105 | 2026-11-13 | #7438 | fixed
+- ri:none | none | - | 2026-11-13 | #7438
+- rb:2026-11-13 | #7438
+- rf:bug-risks | medium | scripts/run/review/run-review-pinned-remaining.ts:72 | 2026-11-13 | #7438 | fixed
+- rx:{"round":"275b7c5a-1e2c-4933-a0b4-6fab0b342cf0","category":"bug-risks","severity":"medium","file":"scripts/run/review/run-review-pinned-remaining.ts:72","disposition":"fixed","description":"A failed or timed-out continuation turns a known-unpinned cut into a non-stopping partial result, so join and pinned return success instead of exit 3.","status":"resolved"}
+- rb:2026-11-13 | #7440
+- rf:none | none | - | 2026-11-13 | #7440
+- rb:2026-11-13 | #7441
+- rf:bug-risks | medium | scripts/registry-migration/migrate.ts:41 | 2026-11-13 | #7441 | fixed
+- rx:{"round":"8d9469b1-213f-4c90-a3e3-ca422c766a4b","category":"bug-risks","severity":"medium","file":"scripts/registry-migration/migrate.ts:41","disposition":"fixed","description":"絶対 lockfileDir が staging の外部へ pnpm の書き込みを逃がし、dry-run と rollback の境界を破る; other sites: scripts/registry-migration/migrate-files.ts:50, scripts/registry-migration/migrate.ts:183, scripts/registry-migration/migrate.ts:209","status":"resolved"}
+- rb:2026-11-13 | #7441
+- rf:bug-risks | medium | scripts/registry-migration/migrate.ts:47 | 2026-11-13 | #7441
+- rx:{"round":"e5b72983-8f88-471d-8691-fc018f4239bf","previous":"8d9469b1-213f-4c90-a3e3-ca422c766a4b","category":"bug-risks","severity":"medium","file":"scripts/registry-migration/migrate.ts:47","description":"外部 lockfileDir に実ロックがありルートにロックがないプロジェクトでは、staging への強制指定が実ロックを検証せず別ロックを新規生成し、外部を参照する設定を残したまま未使用のルートロックだけを反映して成功するため、旧ロックの全版・integrity 照合を省略し移行後も旧 tarball を参照するので、非標準 lockfileDir を事前拒否するか実ロックをトランザクション対象にしてください; other sites: scripts/registry-migration/migrate-files.ts:15, scripts/registry-migration/migrate.ts:174, scripts/registry-migration/migrate.ts:182, scripts/registry-migration/migrate.ts:209, scripts/registry-migration/migrate-isolation.test.ts:102","status":"new"}
+- rx:{"round":"e5b72983-8f88-471d-8691-fc018f4239bf","previous":"8d9469b1-213f-4c90-a3e3-ca422c766a4b","category":"bug-risks","severity":"medium","file":"scripts/registry-migration/migrate.ts:41","description":"絶対 lockfileDir が staging の外部へ pnpm の書き込みを逃がし、dry-run と rollback の境界を破る; other sites: scripts/registry-migration/migrate-files.ts:50, scripts/registry-migration/migrate.ts:183, scripts/registry-migration/migrate.ts:209","disposition":"fixed","status":"resolved"}
+- rb:2026-11-13 | #7443
+- rf:none | none | - | 2026-11-13 | #7443
+- rf:none | none | - | 2026-11-13 | #7444
+- ri:none | none | - | 2026-11-13 | #7444
+- rb:2026-11-13 | #7444
+- rf:bug-risks | medium | tools/backlog/backlog-measure-worker.ts:103 | 2026-11-13 | #7444 | fixed
+- rx:{"round":"4d9909b3-d97e-4189-b866-f7b1e265deb1","category":"bug-risks","severity":"medium","file":"tools/backlog/backlog-measure-worker.ts:103","disposition":"fixed","description":"in_flightのIssueが候補から除外されず、文書入力へ開始済み901を追加するとDuplicate workerで計測が失敗する。","status":"resolved"}
+- rf:none | none | - | 2026-11-13 | #7450
+- rf:none | none | - | 2026-11-13 | #7450
+- ri:none | none | - | 2026-11-13 | #7450
+- rb:2026-11-13 | #7451
+- rf:none | none | - | 2026-11-13 | #7451
+- rb:2026-11-13 | #7451
+- rf:none | none | - | 2026-11-13 | #7451
+- rf:none | none | - | 2026-11-13 | #7453
+- rb:2026-11-13 | #7453
+- rf:none | none | - | 2026-11-13 | #7453
+- rf:none | none | - | 2026-11-13 | #7460
+- rb:2026-11-13 | #7460
+- rf:none | none | - | 2026-11-13 | #7460
+- ri:none | none | - | 2026-11-13 | #7461
+- ri:none | none | - | 2026-11-13 | #7461
+- rb:2026-11-13 | #7461
+- rf:none | none | - | 2026-11-13 | #7461
+- rf:none | none | - | 2026-11-13 | #7465
+- rb:2026-11-13 | #7465
+- rf:bug-risks | medium | scripts/backlog/backlog-defect-priority.ts:28 | 2026-11-13 | #7465 | fixed
+- rx:{"round":"69b7f108-7a07-4ce2-8d56-d349146a2e7e","category":"bug-risks","severity":"medium","file":"scripts/backlog/backlog-defect-priority.ts:28","disposition":"fixed","description":"分割予算切れで空のcapped母集団が返ると、is_cappedを無視する呼出側が0の不具合率として新機構の繰延べを解除するため、capped測定を未測定として扱う。","status":"resolved"}
+- ri:none | none | - | 2026-11-13 | #7465
+- rb:2026-11-13 | #7466
+- rf:none | none | - | 2026-11-13 | #7466
+- rf:none | none | - | 2026-11-13 | #7462
+- rf:none | none | - | 2026-11-13 | #7462
+- ri:none | none | - | 2026-11-13 | #7462
+- rb:2026-11-13 | #7462
+- rf:none | none | - | 2026-11-13 | #7462
+- rb:2026-11-13 | #7462
+- rf:none | none | - | 2026-11-13 | #7462
+- rf:none | none | - | 2026-11-13 | #7477
+- ri:none | none | - | 2026-11-13 | #7477
+- rb:2026-11-13 | #7477
+- rf:bug-risks | medium | scripts/run/cut/run-cut-resume.ts:120 | 2026-11-13 | #7477 | fixed
+- rf:bug-risks | medium | scripts/run/run-repair-attempt.ts:124 | 2026-11-13 | #7477 | fixed
+- rx:{"round":"e5d42be1-9c9f-43a1-beaf-18b788716f24","category":"bug-risks","severity":"medium","file":"scripts/run/cut/run-cut-resume.ts:120","disposition":"fixed","description":"human-review 回収で is_handed_off:true に解放した cut は修復判定を飛ばし直接 entry が旧 gate/stale に進むため、解放済み cut も共有判定へ渡す; other sites: scripts/run/merge/run-merge-human-review.ts:18, scripts/run/merge/run-merge-cut-release.ts:12, scripts/run/cut/run-cut-adoption.ts:57, scripts/run/cut/run-cut-cli.ts:336, scripts/run/entry/run-entry-cli.ts:425, scripts/run/add/run-add-cli-repair.test.ts:119, docs/josh-commands-run.md:492","status":"resolved"}
+- rx:{"round":"e5d42be1-9c9f-43a1-beaf-18b788716f24","category":"bug-risks","severity":"medium","file":"scripts/run/run-repair-attempt.ts:124","disposition":"fixed","description":"replacement fullrun worker 自身が process probe の alive に一致して entry の修復が handed-off で止まるため、再開要求者と旧所有者を区別するか起動前準備を必須化する; other sites: scripts/lane/lane-await.ts:106, scripts/lane/lane-child-invocation.ts:51, scripts/lane/lane-child-invocation.ts:76, scripts/run/cut/run-cut-resume.ts:120, scripts/run/add/run-add-cli-repair.test.ts:78, scripts/run/cut/run-cut.ts:453, docs/josh-commands-run.md:492","status":"resolved"}
+- rf:none | none | - | 2026-11-13 | #7480
+- rf:none | none | - | 2026-11-13 | #7482
+- ri:none | none | - | 2026-11-13 | #7482
+- rb:2026-11-13 | #7482
+- rf:bug-risks | medium | scripts/run/merge/run-merge-waits.ts:32 | 2026-11-13 | #7482
+- rx:{"round":"351d5ea0-99a2-4fd2-854c-b48be392f353","category":"bug-risks","severity":"medium","file":"scripts/run/merge/run-merge-waits.ts:32","description":"調査中に観測宣言を追記してまだ not-before ラベルがない Issue で本文取得が失敗すると待機理由が空になり do_failed が run:stalled と失敗回数増加へ進むため、本文の不明状態を通常失敗と区別して再試行可能な待機にする必要がある; other sites: none","status":"new"}
+- rb:2026-11-13 | #7482
+- rf:bug-risks | medium | scripts/run/merge/run-merge-waits.ts:32 | 2026-11-13 | #7482 | fixed
+- rx:{"round":"c53f60da-c297-4c65-9e84-793a5bbe5351","previous":"351d5ea0-99a2-4fd2-854c-b48be392f353","category":"bug-risks","severity":"medium","file":"scripts/run/merge/run-merge-waits.ts:32","disposition":"fixed","description":"調査中に観測宣言を追記してまだ not-before ラベルがない Issue で本文取得が失敗すると待機理由が空になり do_failed が run:stalled と失敗回数増加へ進むため、本文の不明状態を通常失敗と区別して再試行可能な待機にする必要がある; other sites: none","status":"resolved"}
+- rb:2026-11-13 | #7482
+- rf:bug-risks | medium | scripts/run/merge/run-merge-waits.ts:32 | 2026-11-13 | #7482 | fixed
+- rx:{"round":"444bf15a-27e2-4cd1-bf1c-730bb7bab0f8","previous":"c53f60da-c297-4c65-9e84-793a5bbe5351","category":"bug-risks","severity":"medium","file":"scripts/run/merge/run-merge-waits.ts:32","disposition":"fixed","description":"調査中に観測宣言を追記してまだ not-before ラベルがない Issue で本文取得が失敗すると待機理由が空になり do_failed が run:stalled と失敗回数増加へ進むため、本文の不明状態を通常失敗と区別して再試行可能な待機にする必要がある; other sites: none","status":"resolved"}
+- rf:none | none | - | 2026-11-13 | #7484
+- ri:none | none | - | 2026-11-13 | #7484
+- rb:2026-11-13 | #7484
+- rf:bug-risks | medium | scripts/run/wake/run-wake-codex.ts:46 | 2026-11-13 | #7484 | fixed
+- rx:{"round":"04fb91da-4181-476d-9307-53f9d047e21b","category":"bug-risks","severity":"medium","file":"scripts/run/wake/run-wake-codex.ts:46","disposition":"fixed","description":"旧 pid-less 判断を live として一巡観測すると woke_at が消え、後の正常終了を失敗扱いするため旧 launch mark を保持する。","status":"resolved"}

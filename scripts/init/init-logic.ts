@@ -1,5 +1,6 @@
 import { json_format } from '#scripts/config-merge/json-format'
 import { vscode_settings_schema } from '#scripts/lib/schemas'
+import { npm_acquisition } from '#scripts/registry-migration/npm-acquisition'
 import { safe_chain_preinstall } from '#scripts/safe-chain/preinstall-command'
 import { distributed_paths } from './distributed-paths'
 import { init_logic_deploy_vps } from './init-logic-deploy-vps'
@@ -89,6 +90,9 @@ const AI_COPY_FILES: ReadonlyArray<string> = [
 	'scripts/gate/change-scope-action.ts',
 	'scripts/gate/path-glob.ts',
 	'scripts/gate/toolchain-inputs.ts',
+	'scripts/gate/change-scope-action.integration.test.ts',
+	'scripts/gate/path-glob.test.ts',
+	'scripts/gate/toolchain-inputs.consumer.test.ts',
 	'.github/pull_request_template.md',
 	'.github/release.yml',
 	'.claude/settings.json',
@@ -263,11 +267,13 @@ function append_missing_lines(existing: string, missing: ReadonlyArray<string>):
 // the credential expanded, and that setting can live in a deploy platform's dashboard — so no
 // reading of the repository tells an inert auth line apart from a live one. Deleting it took down a
 // working production deploy. See docs/authentication.md §4(d).
-function merge_npmrc(content: string): string {
+function merge_npmrc(content: string, root?: string): string {
 	const lines = content.split('\n')
 	const kept = lines.filter((line) => !LEGACY_NPMRC_LINES.has(line.trim()))
 
-	return kept.length === lines.length ? content : kept.join('\n')
+	const merged = kept.length === lines.length ? content : kept.join('\n')
+
+	return root === undefined ? merged : npm_acquisition.merge_npmrc(merged, root)
 }
 
 // A gitignore line worth appending during a union merge: real ignore patterns only.
@@ -361,10 +367,15 @@ function get_suggested_scripts(): Record<string, string> {
 // Drop the suggested `prepare` when the consumer already runs fix-gh-packages in
 // any script, so re-running `josh init` does not re-inject a duplicate hook that
 // fights the consumer's intentional consolidation.
-function get_suggested_scripts_for_content(content: string): Record<string, string> {
-	const scripts = get_suggested_scripts()
+function get_suggested_scripts_for_content(
+	content: string,
+	is_npm = false,
+): Record<string, string> {
+	const scripts = is_npm
+		? { ...get_suggested_scripts(), prepare: `(${GUARDED_LEFTHOOK_CMD} || true)` }
+		: get_suggested_scripts()
 	const has_fix = init_logic_json_merge.has_package_scripts_marker(content, FIX_GH_PACKAGES_MARKER)
-	if (!has_fix) return scripts
+	if (!has_fix || is_npm) return scripts
 
 	return Object.fromEntries(Object.entries(scripts).filter(([key]) => key !== PREPARE_KEY))
 }
@@ -387,11 +398,13 @@ function upgrade_prepare_lefthook_warning(content: string): string {
 // Append the guarded lifecycle commands to an existing `prepare` when no script yet runs
 // fix-gh-packages, so the dev-only hooks land in `prepare` instead of being lost when the
 // suggested-scripts merge skips the already-present `prepare` key.
-function merge_prepare_lifecycle_cmd(content: string): string {
+function merge_prepare_lifecycle_cmd(content: string, is_npm = false): string {
 	const has_fix = init_logic_json_merge.has_package_scripts_marker(content, FIX_GH_PACKAGES_MARKER)
-	if (has_fix) return content
+	if (has_fix && !is_npm) return content
 
-	return init_logic_json_merge.merge_package_script_suffix(content, PREPARE_KEY, PREPARE_CMD)
+	const command = is_npm ? `(${GUARDED_LEFTHOOK_CMD} || true)` : PREPARE_CMD
+
+	return init_logic_json_merge.merge_package_script_suffix(content, PREPARE_KEY, command)
 }
 
 // Migration: remove a kit-managed `postinstall` (one running the fix-gh-packages
@@ -399,11 +412,28 @@ function merge_prepare_lifecycle_cmd(content: string): string {
 // rather than the bare marker avoids stripping a consumer's unrelated postinstall that
 // merely mentions `fix-gh-packages` (e.g. `npm run my-fix-gh-packages-helper`).
 function strip_managed_postinstall(content: string): string {
+	const legacy = `${LEGACY_GUARDED_LEFTHOOK_CMD}; ${GUARDED_FIX_GH_PACKAGES_CMD}; true`
+	if (!npm_acquisition.is_script_value(content, LEGACY_POSTINSTALL_KEY, legacy)) return content
+
 	return init_logic_json_merge.remove_script_with_marker(
 		content,
 		LEGACY_POSTINSTALL_KEY,
 		FIX_GH_PACKAGES_CMD,
 	)
+}
+
+function upgrade_npm_lifecycle(content: string, root: string): string {
+	if (!npm_acquisition.is_npm_only(root)) return content
+	const stripped = strip_managed_postinstall(content)
+	const prepared =
+		stripped === content
+			? content
+			: init_logic_json_merge.merge_package_scripts(stripped, {
+					prepare: `(${GUARDED_LEFTHOOK_CMD} || true)`,
+				})
+	const merged = stripped === content ? prepared : merge_prepare_lifecycle_cmd(prepared, true)
+
+	return npm_acquisition.merge_lifecycle(merged, root, GUARDED_FIX_GH_PACKAGES_CMD)
 }
 
 const init_logic = {
@@ -433,6 +463,7 @@ const init_logic = {
 	VSCODE_EXTENSIONS_FILENAME,
 	SAFE_CHAIN_CMD,
 	GUARDED_LEFTHOOK_CMD,
+	GUARDED_FIX_GH_PACKAGES_CMD,
 	upgrade_prepare_lefthook_warning,
 	get_development_engines_value,
 	get_ai_copy_files,
@@ -442,6 +473,7 @@ const init_logic = {
 	get_suggested_scripts_for_content,
 	merge_prepare_lifecycle_cmd,
 	strip_managed_postinstall,
+	upgrade_npm_lifecycle,
 }
 
 export { init_logic }

@@ -7,15 +7,16 @@ import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { poll } from '#scripts/lib/poll'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
-import { busy_average, type BusySample, type LoadEase } from './busy-average'
-import { core_admission, type Admission, type LedgerEntry, type Overflow } from './core-admission'
+import type { BusySample, LoadEase } from './busy-average'
+import { core_admission, type Admission, type LedgerEntry } from './core-admission'
+import { core_budget_poll } from './core-budget-poll'
 import { core_budget_timing, type TimingConfig } from './core-budget-timing'
 import { core_reservation, type Reservation, type ReservationFields } from './core-reservation'
-import { core_wait, type BudgetWait, type WaitReason } from './core-wait'
+import { core_wait, type BudgetWait } from './core-wait'
 import { core_wait_record, type WaitSink } from './core-wait-record'
 import { core_weights } from './core-weights'
 import { held_mark } from './held-mark'
-import { machine_capacity, type MachineBudget, type MachineReading } from './machine-capacity'
+import { machine_capacity, type MachineReading } from './machine-capacity'
 
 // A machine-wide weighted core budget with admission control.
 //
@@ -175,122 +176,28 @@ interface WaitContext extends TimingConfig {
 // wait's recent readings of load outside the ledger (`busy-average.ts`). That load holds every claim but
 // the first waiter, which it narrows instead (`core_admission.is_admitted`, joshuafolkken/kit#4313) unless
 // the run queue reads the machine overloaded (`machine_capacity.machine_budget`, joshuafolkken/kit#4361).
-async function current_budget(
-	context: WaitContext,
-	reservations: ReadonlyArray<LiveReservation>,
-): Promise<MachineBudget> {
-	const reading = await context.read_machine()
-	const ledger = core_admission.ledger_load(reservations, context.now())
-
-	context.busy_samples = busy_average.with_reading(
-		context.busy_samples,
-		reading,
-		ledger.cores,
-		context.now(),
-	)
-
-	const mean = busy_average.averaged(reading, context.busy_samples, ledger.cores)
-
-	context.ease = busy_average.with_ease(context.ease, mean.busy_cores, context.now())
-
-	return machine_capacity.machine_budget(context.budget, mean, ledger)
-}
-
-// The claim is admitted: its marker records when, which moves its load from "load outside the ledger"
-// to "load the ledger holds" for every later reader — its cores at once, its memory once its tool has
-// had time to ramp up.
-function admit(context: WaitContext, overflow?: Overflow, granted?: number): Admission {
-	const admitted_at = context.now()
-
-	write_reservation(context.target, { ...context.fields, admitted_at, granted })
-
-	return { overflow, granted, waited_ms: admitted_at - context.fields.claimed_at }
-}
-
-function overflow_of(
-	context: WaitContext,
-	reservations: ReadonlyArray<LiveReservation>,
-	budget: MachineBudget,
-): Overflow {
-	return {
-		waited_ms: context.now() - context.fields.claimed_at,
-		ledger: core_admission.sum_load(reservations),
-		budget,
-	}
-}
-
-// The marker records why the claim waits, rewritten only when the reason changes, and the command says
-// so once, when its wait starts.
-function mark_waiting(context: WaitContext, reason: WaitReason): void {
-	const previous = context.fields.wait_reason
-
-	if (previous === reason) return
-
-	context.fields = { ...context.fields, wait_reason: reason }
-	write_reservation(context.target, context.fields)
-
-	if (previous === undefined) context.report(core_wait.wait_line(context.fields.command, reason))
-}
-
-// Past the cap a held claim runs regardless, and so does one held in vain (`core_wait.is_held_in_vain`)
-// once the load has not eased for a window of the wait. A claim a swap stall holds is the exception to both.
-function is_wait_spent(
-	context: WaitContext,
-	reservations: ReadonlyArray<LiveReservation>,
-	budget: MachineBudget,
-): boolean {
-	if (
-		context.fields.is_strict_admission === true ||
-		core_admission.is_swap_held(context.key, reservations, budget)
-	) {
-		return false
-	}
-
-	const now = context.now()
-
-	if (now >= context.deadline) return true
-
-	const busy_cores = busy_average.mean_busy(context.busy_samples)
-	const room = { busy_cores, cores: context.budget, now }
-
-	return (
-		busy_average.is_unrelieved(context.ease, now, context.ease_window_ms) &&
-		core_wait.is_held_in_vain(context.key, reservations, budget, room)
-	)
-}
-
 async function poll_admission(context: WaitContext): Promise<Admission | undefined> {
-	const reservations = live_reservations(context.directory)
-	const budget = await current_budget(context, reservations)
-	// A unit claim is admitted at the room the budget leaves rather than at full width — the first
-	// waiter, which load outside the ledger does not hold, as well as one whose wait is spent.
-	const granted = core_admission.narrowed_weight(context.key, reservations, budget.cores)
-	const reason = core_wait.hold_reason(context.key, reservations, budget, granted)
-
-	if (reason === undefined) return admit(context, undefined, granted)
-
-	if (is_wait_spent(context, reservations, budget)) {
-		const held = core_admission.with_grant(context.key, reservations, granted)
-
-		return admit(context, overflow_of(context, held, budget), granted)
+	try {
+		return await core_budget_poll.poll_admission(context, live_reservations(context.directory))
+	} catch (error) {
+		sweep_marker(context.target)
+		throw error
 	}
-
-	mark_waiting(context, reason)
-
-	return undefined
 }
 
-// Poll the ledger until this reservation is admitted, or until the wait cap — or, for a claim held in
-// vain (`core_wait.is_held_in_vain`), the load not easing — admits it at minimum width.
-// A solo run is admitted on the first read — its own claim is the ledger's head — so the loop body never
-// runs and the wait costs nothing.
+// Poll until non-unit memory fits. Unit launchers retain their downstream worker sizing.
 async function await_admission(context: WaitContext): Promise<Admission> {
 	const admission = await poll.wait_for(async () => await poll_admission(context), {
 		interval_ms: context.poll_interval_ms,
 		sleeper: context.sleep,
 	})
 
-	await core_wait_record.record_admitted(context.fields, context.now(), context.record_wait)
+	await core_wait_record.record_admitted(
+		context.fields,
+		context.now(),
+		context.record_wait,
+		admission,
+	)
 
 	return admission
 }
@@ -343,7 +250,12 @@ async function poll_claim(context: WaitContext): Promise<Handle | undefined> {
 
 	if (admission === undefined) return undefined
 
-	await core_wait_record.record_admitted(context.fields, context.now(), context.record_wait)
+	await core_wait_record.record_admitted(
+		context.fields,
+		context.now(),
+		context.record_wait,
+		admission,
+	)
 
 	return { target: context.target, admission }
 }
@@ -440,7 +352,7 @@ const core_budget = {
 	with_held_mark: held_mark.with_held_mark,
 }
 
-export type { Handle, LiveReservation, ReserveOptions }
+export type { Handle, LiveReservation, ReserveOptions, WaitContext }
 export type { Reservation } from './core-reservation'
 export { core_budget }
 

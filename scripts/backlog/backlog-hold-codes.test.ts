@@ -6,12 +6,14 @@ import { backlog_hold_codes } from './backlog-hold-codes'
 describe('backlog_hold_codes — the ledger hold codes', () => {
 	it('keeps the codes the ledger already records', () => {
 		expect(backlog_hold_codes).toStrictEqual({
+			DRAINED_REASON: 'drained',
 			DRIVERLESS_PREFIX: 'driverless:',
 			HAND_BACK_PREFIX: 'hand-back',
 			MEMORY_REASON: 'memory',
 			OFFER_PREFIX: 'offer',
 			REASON_SEPARATOR: ':',
 			USAGE_LIMIT_REASON: 'usage-limit',
+			WATCH_VERDICT: 'watch',
 		})
 	})
 })

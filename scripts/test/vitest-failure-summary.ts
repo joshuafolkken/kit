@@ -16,6 +16,8 @@ const UNIT_LOG_PREFIX = 'josh-unit-log-'
 const UNIT_LOG_HEADER = 'vitest'
 const FAILED_LINE = /^FAIL\s+(?<name>\S.*)$/u
 const FAILED_HEADING = 'failed tests:'
+const IMPORT_FAILURE =
+	/^(?:Error|SyntaxError): (?:\[vitest\] No "[^"\r\n]+" export is defined on the "[^"\r\n]+" mock\.|The requested module '[^'\r\n]+' does not provide an export named|Cannot find (?:module|package) |Failed to resolve import )[^\r\n]*$/mu
 const NONE_NAMED = '  (none named in the output — read the full output)'
 const NONE_NAMED_VERDICT = 'none named'
 // A name is `<file> > <suite> > <test>` or `<file> [ <file> ]`, prefixed `|<project>| ` in a workspace —
@@ -44,6 +46,10 @@ function failed_tests(output: string): ReadonlyArray<string> {
 	const names = output.split('\n').map((line) => failed_name(line))
 
 	return [...new Set(names.filter((name) => name !== undefined))]
+}
+
+function import_failure(output: string): string | undefined {
+	return IMPORT_FAILURE.exec(stripVTControlCharacters(output))?.[0]
 }
 
 // The files the failed names belong to, each once — what to run after a fix, before the whole related
@@ -103,6 +109,7 @@ const vitest_failure_summary = {
 	RERUN_PREFIX,
 	failed_files,
 	failed_tests,
+	import_failure,
 	format_failure_summary,
 	report,
 	unit_log_path,

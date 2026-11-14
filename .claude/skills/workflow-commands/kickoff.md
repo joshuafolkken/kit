@@ -20,7 +20,9 @@
   ... --title "<title>" --notify [--ordered] [--rationale-file .josh/tmp/rationale.md]` (when `#N` is a request, a discussion
   or a container) — `--title` renames it to the step-2 title — or keep `#N` as a child of a new epic
   made with `pnpm josh epic … --notify`, renamed when its own plan is recorded (`issue:plan --title`). That branch is Tier A: choose and
-  record the reasoning on the Issue. Present `pnpm josh backlogrun <E> --only` and stop.
+  record the reasoning on the Issue. Record each prepared child's plan with `issue:plan --planned --no-notify`,
+  then run `pnpm josh issue:file --publish <E>` to verify the entire epic and publish its prepared children.
+  Present `pnpm josh backlogrun <E> --only` and stop.
 
   `--notify` sends the split path's `planning` Telegram — the epic's URL, every child's URL and the
   `backlogrun` line (`docs/josh-commands-backlog.md` → "`josh epic`").
@@ -49,7 +51,12 @@ checked out here. A third-party owner is Tier C: stop rather than file.
     the originating Issue lists children and epic under `## Upstream issues`. (2) **Epic — always, for
     every split into two or more Issues**: `pnpm josh epic "<epic-title>" <N1> <N2> ... --notify [--ordered]
     [--rationale-file .josh/tmp/rationale.md] [--origin <owner/repo#N>]`, capturing `<E>`; check a hand-edited epic
-    with `pnpm josh epic:check <E>`. (3) `--notify` sends the Telegram listing every created Issue.
+    with `pnpm josh epic:check <E>`. (3) Record every child's plan with
+    `pnpm josh issue:plan <N> --body-file .josh/tmp/plan.md --planned --no-notify`, then
+    `pnpm josh issue:file --publish <E>`. Split children remain unpublished until this command
+    verifies all plans and native dependency links. A failed or interrupted preparation is resumed
+    on the same issue numbers; retry publication after repairing the missing step, never refile.
+    `--notify` sends the Telegram listing every created Issue.
     (4) Present `pnpm josh backlogrun <E> --only`. (5) **Stop**.
 
   **The epic itself is never implemented** — `backlogrun` runs its *children*, and it closes itself

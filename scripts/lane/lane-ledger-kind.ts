@@ -2,6 +2,7 @@
 // apart so a schema module of its own can name its kind without importing the union it joins.
 
 const KIND = {
+	STARTUP: 'startup',
 	MERGE: 'merge',
 	GATE: 'gate',
 	LOAD: 'load',
@@ -17,6 +18,7 @@ const KIND = {
 	OFFERABLE: 'offerable',
 	OFFER: 'offer',
 	CORE_WAIT: 'core-wait',
+	CORE_ADMISSION: 'core-admission',
 	UNIT_FILES: 'unit-files',
 	TEST_RELATED: 'test-related',
 	TEST_PINNED: 'test-pinned',

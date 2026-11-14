@@ -1,9 +1,12 @@
+import { statSync } from 'node:fs'
 import { lane_state, type LaneStateRecord } from '#scripts/lane/lane-state'
 import { error_text } from '#scripts/lib/error-message'
 import { run_board_lane_time } from '#scripts/run/board/run-board-lane-time'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_event_scope } from './run-event-scope'
 import { run_event_stream, type AppendResult, type RunEvent } from './run-event-stream'
+
+const UNRESOLVED_STREAM = 'Could not resolve the run event stream.'
 
 // The write side of the run's event stream. It resolves the run's identity and
 // appends, and it is where the "reporting must not break the work it reports on" contract is kept: every
@@ -127,7 +130,8 @@ async function fresh_target(kind: string): Promise<string | undefined> {
  * `false`: neither is a fresh episode.
  *
  * `before_append` runs only on a fresh episode and is awaited before the marker becomes visible, for an
- * effect a reader of the marker must see finished — the drain flush (joshuafolkken/kit#5329).
+ * effect a reader of the marker must see finished — the drain's idle stage, set before the drain
+ * flush starts detached (joshuafolkken/kit#7505).
  */
 async function emit_once(
 	kind: string,
@@ -215,7 +219,7 @@ function read_current_events(
 	repository: string | undefined,
 	is_required: boolean,
 ): ReadonlyArray<RunEvent> {
-	if (repository === undefined) throw new Error('Could not resolve the run event stream.')
+	if (repository === undefined) throw new Error(UNRESOLVED_STREAM)
 
 	const read = run_carry.read_carry(run_carry.carry_path(repository))
 	const scope = run_event_scope.scope_of(read)
@@ -252,14 +256,30 @@ async function invocation_or_all_events(): Promise<ReadonlyArray<RunEvent>> {
 	}
 }
 
-// Every event on the stream, across invocations, for a reader that scopes by the event's own text
-// rather than by the carry record (`issue:file`'s fold). Fail-quiet like `current_events`.
-async function all_events(): Promise<ReadonlyArray<RunEvent>> {
+function read_existing_events(target: string, is_required: boolean): ReadonlyArray<RunEvent> {
+	if (is_required && statSync(target, { throwIfNoEntry: false }) === undefined) return []
+
+	return run_event_stream.read_events(target, is_required)
+}
+
+function read_all_events(
+	target: string | undefined,
+	is_required: boolean,
+): ReadonlyArray<RunEvent> {
+	if (target === undefined && is_required) throw new Error(UNRESOLVED_STREAM)
+
+	return target === undefined ? [] : read_existing_events(target, is_required)
+}
+
+// Every invocation, for issue-scoped readers. Required reads preserve failures, as current_events does.
+async function all_events(is_required = false): Promise<ReadonlyArray<RunEvent>> {
 	try {
 		const target = await stream_target()
 
-		return target === undefined ? [] : run_event_stream.read_events(target)
-	} catch {
+		return read_all_events(target, is_required)
+	} catch (error) {
+		if (is_required) throw error
+
 		return []
 	}
 }

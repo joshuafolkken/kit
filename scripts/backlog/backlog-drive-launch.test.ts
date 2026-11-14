@@ -3,6 +3,9 @@ import { lane_launch_cli } from '#scripts/lane/lane-launch-cli'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { run_startup } from '#scripts/run/startup/run-startup'
+import type { StartupEntry } from '#scripts/run/startup/run-startup-schema'
+import { run_startup_store } from '#scripts/run/startup/run-startup-store'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_drive_launch } from './backlog-drive-launch'
 import { backlog_drive_owner } from './backlog-drive-owner'
@@ -18,6 +21,28 @@ const MESSAGE = backlog_drive_launch.LATEST_STASH_MESSAGE
 const LATEST: StashEntry = { selector: 'stash@{0}', subject: `On main: ${MESSAGE}` }
 const OTHER: StashEntry = { selector: 'stash@{1}', subject: 'On 3200-lane: 3200: parked' }
 const DUPLICATE: StashEntry = { selector: 'stash@{2}', subject: `On main: ${MESSAGE}` }
+
+it('records distinct measurement and split phases without adding launches or ownership checks', async () => {
+	const rows: Array<StartupEntry> = []
+
+	vi.spyOn(run_startup_store, 'record').mockImplementation(async (row) => {
+		rows.push(row)
+	})
+	vi.spyOn(git_stash, 'list').mockResolvedValue([])
+
+	await run_startup.within(
+		{ run: 'run', attempt: 'attempt' },
+		async () => await backlog_drive_launch.launch(FIRST, OWNER),
+	)
+
+	expect(rows.filter((row) => row.edge === 'start').map((row) => row.phase)).toEqual([
+		'launch',
+		'measurement',
+		'split assessment',
+	])
+	expect(backlog_drive_owner.assert_current).toHaveBeenCalledTimes(2)
+	expect(lane_launch_cli.launch_ready_lane).toHaveBeenCalledOnce()
+})
 
 function launched_with(): ReadonlyArray<string | undefined> {
 	return vi.mocked(lane_launch_cli.launch_ready_lane).mock.calls.map(([context]) => context.stash)
@@ -83,9 +108,23 @@ describe('backlog_drive_launch.launch — a measured close', () => {
 // joshuafolkken/kit#6503: an issue whose declaration has no sample yet waits without a lane.
 describe('backlog_drive_launch.launch — no sample yet', () => {
 	it('answers unsampled without opening a lane or a stage', async () => {
+		const rows: Array<StartupEntry> = []
+
+		vi.spyOn(run_startup_store, 'record').mockImplementation(async (row) => {
+			rows.push(row)
+		})
 		vi.mocked(backlog_measure_close.outcome).mockResolvedValue('wait')
 
-		await expect(backlog_drive_launch.launch(FIRST, OWNER)).resolves.toBe('unsampled')
+		await expect(
+			run_startup.within(
+				{ run: 'run', attempt: 'unsampled' },
+				async () => await backlog_drive_launch.launch(FIRST, OWNER),
+			),
+		).resolves.toBe('unsampled')
+		expect(rows.filter((row) => row.edge === 'waiting').map((row) => row.phase)).toEqual([
+			'measurement',
+			'launch',
+		])
 		expect(lane_launch_cli.launch_ready_lane).not.toHaveBeenCalled()
 		expect(run_event_setup.emit).not.toHaveBeenCalled()
 	})

@@ -1,4 +1,5 @@
 import { issue_body_keys } from './issue-body-keys'
+import { issue_observation_gate } from './issue-observation-gate'
 import { issue_sample_gate } from './issue-sample-gate'
 import { markdown_section } from './markdown-section'
 import { measure_declaration } from './measure-declaration'
@@ -73,7 +74,11 @@ function is_date_due(body: string | undefined, now: number): boolean {
 
 // Whether the issue may start: its declared time has arrived and its declared samples are recorded.
 function is_due(body: string | undefined, now: number = Date.now()): boolean {
-	return is_date_due(body, now) && issue_sample_gate.wait_of(body) === undefined
+	return (
+		is_date_due(body, now) &&
+		issue_sample_gate.wait_of(body) === undefined &&
+		issue_observation_gate.wait_of(body) === undefined
+	)
 }
 
 // The declared time as epoch milliseconds while it is still ahead, or `undefined` when it has arrived —
@@ -97,7 +102,9 @@ function waiting_reason(body: string | undefined, now: number = Date.now()): str
 
 	const wait = issue_sample_gate.wait_of(body)
 
-	return wait === undefined ? undefined : issue_sample_gate.reason_of(wait)
+	return wait === undefined
+		? issue_observation_gate.wait_of(body)?.reason
+		: issue_sample_gate.reason_of(wait)
 }
 
 function stray_heading_problems(body: string): ReadonlyArray<string> {

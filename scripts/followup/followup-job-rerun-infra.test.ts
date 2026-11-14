@@ -103,6 +103,7 @@ async function rerun_with_timers(
 }
 
 beforeEach(() => {
+	followup_job_rerun_fixture.answer_closed_inputs()
 	vi.mocked(git_gh_command.pr_get_checks_snapshot).mockReset()
 	vi.mocked(git_gh_exec.exec_gh_api).mockReset()
 	assess.mockReset()

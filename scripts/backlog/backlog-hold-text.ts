@@ -8,6 +8,7 @@ import { backlog_wait_cause, type WaitCause } from './backlog-wait-cause'
 // The writers' own constants name the codes (`backlog-hold-codes.ts`).
 
 const {
+	DRAINED_REASON,
 	DRIVERLESS_PREFIX,
 	HAND_BACK_PREFIX,
 	MEMORY_REASON,
@@ -26,7 +27,10 @@ const HAND_BACK_TEXT: ReadonlyMap<string, string> = new Map([
 	['launch', 'a lane launch failed; the session restarts the driver'],
 	['offer', 'the backlog offer failed; the session restarts the driver'],
 	['window', "the run's time window closed; the session restarts the driver"],
+	[DRAINED_REASON, 'the backlog had nothing to start; the session restarts the driver'],
 ])
+// The hand-backs only a person ends; every other one ends when the session restarts the driver.
+const PERSON_HAND_BACKS: ReadonlySet<string> = new Set(['judge', 'triage'])
 
 // `offer:<verdict>:<detail>`: the offer started nothing, for its cause or its answer.
 const OFFER_TEXT: ReadonlyMap<string, string> = new Map([
@@ -102,6 +106,15 @@ function text_of(code: string): string {
 	return prefixed_text(code) ?? whole_text(code) ?? code
 }
 
-const backlog_hold_text = { text_of }
+// Whether the hold is the driver's hand-back a session restart ends, a driverless mark's included —
+// told apart from a hand-back that waits on a person (joshuafolkken/kit#7510).
+function is_driver_restart(code: string): boolean {
+	const own = code.startsWith(DRIVERLESS_PREFIX) ? code.slice(DRIVERLESS_PREFIX.length) : code
+	const reason = rest_after(own, HAND_BACK_PREFIX)
+
+	return reason !== undefined && !PERSON_HAND_BACKS.has(reason)
+}
+
+const backlog_hold_text = { is_driver_restart, text_of }
 
 export { backlog_hold_text }

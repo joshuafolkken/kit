@@ -169,6 +169,7 @@ These files are created by `josh init`. `josh sync` refreshes them in place with
 | `.vscode/tasks.json`      | A task with a label kit ships (`josh: run board`) is replaced, a missing one appended, others kept. Rename your own task if it shares a kit label               |
 
 - **`.npmrc`**: the removed lines are `engine-strict=true`, `minimum-release-age=1440`, `confirmModulesPurge=false` and `lockfile-include-tarball-url=true`, which pnpm 12 ignores there. A `//npm.pkg.github.com/:_authToken=…` line is never removed ([authentication.md §4(d)](./authentication.md#4-build-platforms-with-no-user-level-npmrc)).
+- The `.npmrc` npm mapping for `@joshuafolkken` is written under the conditions in [init.md → Package scripts](./init.md#package-scripts). A GitHub Packages mapping is never rewritten; [registry-migration.md](./registry-migration.md) changes it after verifying the lockfile.
 - **`.vscode/settings.json`**: kit-only keys (currently `sonarlint.connectedMode.project`) are never written. The Claude Code `bypassPermissions` keys and how to opt out are in [`init.md` → "Claude Code permission mode"](init.md#claude-code-permission-mode).
 - **Formatting**: every rewrite is emitted the way prettier formats that file, so it passes your own `prettier --check`.
 
@@ -230,6 +231,7 @@ Rationale: `docs/maintainers/sync-rationale.md` → "The self-sync refusal".
   - `devEngines.packageManager.onFail` moves from `"error"` to `"download"`, so a pnpm of another version fetches the pinned one instead of refusing to run. A `"warn"` or `"ignore"` you set is kept.
   - The tools your project resolves itself are added to `devDependencies` when missing: `eslint`, `prettier`, `typescript`, `@playwright/test`, `cspell`, `lefthook` (only with Git), the three Prettier preset plugins and `@types/node`. A tool you already list in any dependency field is left alone. The secretlint packages are added when `devDependencies` lacks them; a version you pinned there is kept. kit's optional ESLint peers are not added — re-run `josh init` for those ([init.md → Dependencies](./init.md#dependencies)).
   - The `prepare` clause kit itself wrote is rewritten so a failed `lefthook install` warns ([init.md → Package scripts](./init.md#package-scripts)).
+  - In a project [moved to npm](./registry-migration.md), the `fix-gh-packages` step kit wrote is removed from `prepare`, and an old kit-managed `postinstall` becomes `prepare`. A custom script is left as it is.
 
   Run `pnpm install` afterwards. Rationale: `docs/maintainers/sync-rationale.md` → "The package.json migrations".
 

@@ -1,9 +1,11 @@
-import { josh_command } from '#scripts/josh/josh-run'
+import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { json_value } from '#scripts/lib/json-value'
 import { rule_value_cache } from '#scripts/rules/rule-value-cache'
+import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { run_startup } from '#scripts/run/startup/run-startup'
 import { z } from 'zod'
 import { backlog_drain_flush } from './backlog-drain-flush'
 import { backlog_next_shared } from './backlog-next-shared'
@@ -40,6 +42,7 @@ const USAGE =
 	'Usage: josh backlog:offer --started <ISO-8601> [--active <ISO-8601>] [--merged <n>] [--running <n>] [--max <n>] [--idle <minutes>] [--retries <n>] [--exclude <n>[,<n>...]]... [--repo <owner/repo>] [--json]'
 
 const OPTIONS = {
+	[backlog_drain_flush.OPTION]: { type: 'boolean' },
 	active: { type: 'string' },
 	exclude: { type: 'string', multiple: true },
 	idle: { type: 'string' },
@@ -125,6 +128,11 @@ interface BudgetRead {
 	is_finish: boolean
 }
 
+interface OfferResult {
+	code: number
+	edge: ReturnType<typeof backlog_next_shared.edge_of>
+}
+
 function budget_of(out: string): BudgetRead | undefined {
 	const read = json_value.parse_with(out, budget_read_schema)
 	if (read === undefined) return undefined
@@ -179,6 +187,12 @@ function refuse(): number {
 	return FAILURE_EXIT_CODE
 }
 
+// Idle is visible first; the flush only starts, detached, so the next offer is never held behind it.
+async function prepare_drain(): Promise<void> {
+	await run_event_setup.emit(run_event_setup.STAGE.WATCHING)
+	backlog_drain_flush.start()
+}
+
 // The drain: the backlog is empty (`exhausted`) and nothing of the run's own is in flight, so the run is
 // about to open its idle watch or stop with `--idle 0`. Marking once per drain with `emit_once`
 // is what lets `run:step` fire the end-of-run retrospective *before* the watch rather than after it,
@@ -191,41 +205,75 @@ async function mark_drain(verdict: string, answer: string, running: number): Pro
 	if (answer !== EXHAUSTED_ANSWER || running !== NO_RUNNING) return false
 	if (verdict !== WATCH_VERDICT && verdict !== STOP_VERDICT) return false
 
-	// The flush finishes before the marker is visible: `backlogrun-replace` reads a drain as replaceable.
+	// A replace that reads this drain stops the parent's pid alone, never the detached flush.
 	return await run_event_stream_emit.emit_once(
 		run_event_stream.EVENT_KIND.DRAIN,
 		DRAIN_TEXT,
-		backlog_drain_flush.flush,
+		prepare_drain,
 	)
 }
 
-async function decide(values: ParsedValues, counts: OfferCounts): Promise<number> {
-	const next = await backlog_next_shared.read(next_argv(values), should_forward_stderr)
+function budget_edge(value: BudgetRead | undefined): OfferResult['edge'] {
+	if (value === undefined) return 'failed'
+
+	return value.verdict === WATCH_VERDICT || value.verdict === 'triage' ? 'waiting' : 'done'
+}
+
+async function read_budget(
+	values: ParsedValues,
+	offer: OfferAnswer,
+): Promise<BudgetRead | undefined> {
+	return await run_startup.phase(
+		'conditions',
+		async () => {
+			const result = await josh_command.josh_run(
+				budget_argv(values, offer.answer),
+				should_forward_stderr,
+			)
+
+			return result.code === SUCCESS_EXIT_CODE ? budget_of(result.out) : undefined
+		},
+		{ edge_of: budget_edge },
+	)
+}
+
+function offer_edge(next: JoshResult, budget: BudgetRead): OfferResult['edge'] {
+	const edge = backlog_next_shared.edge_of(next)
+
+	return edge === 'done' ? budget_edge(budget) : edge
+}
+
+async function decide(values: ParsedValues, counts: OfferCounts): Promise<OfferResult> {
+	const next = await run_startup.phase(
+		'candidates',
+		async () => await backlog_next_shared.read(next_argv(values), should_forward_stderr),
+		{ edge_of: backlog_next_shared.edge_of },
+	)
 	const offer = backlog_offer.answer_of(
 		{ code: next.code, tokens: to_tokens(next.out), err: next.err },
 		counts.running,
 		counts.retries,
 	)
-	const budget = await josh_command.josh_run(
-		budget_argv(values, offer.answer),
-		should_forward_stderr,
-	)
-
-	if (budget.code !== SUCCESS_EXIT_CODE) return FAILURE_EXIT_CODE
-
-	const decision = budget_of(budget.out)
-
-	if (decision === undefined) return FAILURE_EXIT_CODE
+	const decision = await read_budget(values, offer)
+	if (decision === undefined) return { code: FAILURE_EXIT_CODE, edge: 'failed' }
 
 	await mark_drain(decision.verdict, offer.answer, counts.running)
 
-	return emit(decision, offer, values.json === true)
+	return { code: emit(decision, offer, values.json === true), edge: offer_edge(next, decision) }
+}
+
+// `--drain-flush`: the detached body `prepare_drain` starts, which never fails the process.
+async function flush_alone(): Promise<number> {
+	await backlog_drain_flush.flush()
+
+	return SUCCESS_EXIT_CODE
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const values = read_values(argv)
 
 	if (values === undefined) return refuse()
+	if (values[backlog_drain_flush.OPTION] === true) return await flush_alone()
 
 	// The loop head is the one place `rule:value` is read from: once per iteration, the parent's
 	// context still small, so a rule that never fires shows up as a printed row rather than as
@@ -238,7 +286,12 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 
 	if (counts === undefined) return refuse()
 
-	return await decide(values, counts)
+	const result = await run_startup.phase('offer', async () => await decide(values, counts), {
+		root: true,
+		edge_of: (value) => value.edge,
+	})
+
+	return result.code
 }
 
 const backlog_offer_cli = {

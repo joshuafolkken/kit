@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { DriveState } from './backlog-drive'
 
 // joshuafolkken/kit#3995: the driver dispatches the moment a lane frees, and a free lane it leaves
 // empty is recorded with why — the offer that started nothing, or the hand-back to a session.
@@ -44,8 +45,9 @@ const WAIT_REASON = 'offer:wait'
 const CHAIN_REASON = 'offer:watch:chain'
 const WAITED_ISSUE = 4496
 const WINDOW_END = { reason: 'window', token: undefined, issue: undefined }
+const WINDOW_HAND_BACK = 'hand-back:window'
 // A full pool's hand-back: one release of the open hold, then the mark.
-const FULL_HAND_BACK = ['released', 'clear', 'mark hand-back:window']
+const FULL_HAND_BACK = ['released', 'clear', `mark ${WINDOW_HAND_BACK}`]
 
 async function free(): Promise<number> {
 	return 1
@@ -196,10 +198,20 @@ describe('backlog_drive_hold.recorder — hold', () => {
 })
 
 describe('backlog_drive_hold.recorder — end', () => {
+	it('replaces the previous window reason when the next driver reads a waiting offer', async () => {
+		const holds = backlog_drive_hold.recorder(free)
+
+		await holds.end(WINDOW_END)
+		await holds.hold(CHAIN_REASON, [WAITED_ISSUE])
+
+		expect(record_held).toHaveBeenLastCalledWith({ reason: CHAIN_REASON, waiting: [WAITED_ISSUE] })
+		expect(clear).toHaveBeenCalled()
+	})
+
 	it('records the hand-back of a driver end', async () => {
 		await backlog_drive_hold.recorder(free).end(WINDOW_END)
 
-		expect(record_held).toHaveBeenCalledWith({ reason: 'hand-back:window', waiting: undefined })
+		expect(record_held).toHaveBeenCalledWith({ reason: WINDOW_HAND_BACK, waiting: undefined })
 	})
 
 	it('releases the open hold at the finished run, whatever lanes are free', async () => {
@@ -220,6 +232,53 @@ describe('backlog_drive_hold.recorder — end', () => {
 		await holds.hold(undefined)
 
 		expect(record_released).toHaveBeenCalledTimes(2)
+	})
+})
+
+// Asks the offer `left` times, one after another.
+async function ask_each(ask: (read: DriveState) => Promise<unknown>, left: number): Promise<void> {
+	if (left === 0) return
+
+	await ask(state())
+	await ask_each(ask, left - 1)
+}
+
+// joshuafolkken/kit#7510: the drain wins over the window it closed beside.
+describe('backlog_drive_hold.recorder — a window end after the drain', () => {
+	// The offer answers in turn; the window closes after the last.
+	async function end_after(verdicts: ReadonlyArray<string | undefined>): Promise<void> {
+		const answers = verdicts.map((verdict) => (verdict === undefined ? undefined : offer(verdict)))
+		const holds = backlog_drive_hold.recorder(free)
+		const ask = holds.answering(async () => answers.shift())
+
+		await ask_each(ask, verdicts.length)
+		await holds.end(WINDOW_END)
+	}
+
+	it('records the drain when the window closes after an offer that found nothing to start', async () => {
+		await end_after(['watch'])
+
+		expect(record_held).toHaveBeenLastCalledWith({
+			reason: 'hand-back:drained',
+			waiting: undefined,
+		})
+	})
+
+	it.each([
+		['an offer that launched after the watch', ['watch', 'run']],
+		['a failed offer read after the watch', ['watch', undefined]],
+		['no offer', []],
+	])('keeps the window after %s', async (_, verdicts) => {
+		await end_after(verdicts)
+
+		expect(record_held).toHaveBeenLastCalledWith({ reason: WINDOW_HAND_BACK, waiting: undefined })
+	})
+
+	it('passes the offer’s answer through unchanged', async () => {
+		const read = offer('watch')
+		const ask = backlog_drive_hold.recorder(free).answering(async () => read)
+
+		await expect(ask(state())).resolves.toBe(read)
 	})
 })
 

@@ -14,9 +14,9 @@ import { run_review_cli } from './run-review-cli'
 // stdout carries only the paths, so the two briefs together never overrun the Bash output cap.
 
 const { early_launch, early_prepare, early_push } = vi.hoisted(() => ({
-	early_launch: vi.fn(),
+	early_launch: vi.fn<(slots: number) => void>(),
 	early_prepare: vi.fn<() => Promise<boolean>>(),
-	early_push: vi.fn<() => Promise<number>>(),
+	early_push: vi.fn<(slots_argument?: string) => Promise<number>>(),
 }))
 
 const { branch, brief_run, brief_run_to, interaction_reading, launch_pinned } = vi.hoisted(() => ({
@@ -307,7 +307,7 @@ describe('run:review early push with multiple slots', () => {
 			CODE_PATH,
 			INTERACTION_PATH,
 		])
-		expect(early_launch).toHaveBeenCalledOnce()
+		expect(early_launch).toHaveBeenCalledExactlyOnceWith(2)
 		expect(early_launch.mock.invocationCallOrder[0]).toBeGreaterThan(
 			write_text_stamp.mock.invocationCallOrder[1] ?? 0,
 		)
@@ -346,5 +346,12 @@ describe('run:review early push', () => {
 		expect(await run_review_cli.run(['--push'])).toBe(0)
 		expect(early_push).toHaveBeenCalledOnce()
 		expect(brief_run_to).not.toHaveBeenCalled()
+	})
+
+	it('forwards the slot count after --push to the push', async () => {
+		early_push.mockResolvedValue(0)
+
+		expect(await run_review_cli.run(['--push', '2'])).toBe(0)
+		expect(early_push).toHaveBeenCalledExactlyOnceWith('2')
 	})
 })

@@ -1,5 +1,6 @@
 import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { deferred_answer } from '#scripts/git/deferred-answer-fixture'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_registry, type LaneInfo } from './lane-registry'
@@ -91,6 +92,25 @@ describe('lane seat start', () => {
 })
 
 describe('failed lane seat starts', () => {
+	it('holds one same-issue start during confirmation, then releases a wait for retry', async () => {
+		const entered = deferred_answer<undefined>()
+		const confirmation = deferred_answer<string>()
+		const first = lane_seat_start.start(lane(), async () => {
+			entered.answer(undefined)
+
+			return await confirmation.promise
+		})
+
+		await entered.promise
+		await expect(lane_seat_start.start(lane(), async () => 'duplicate')).rejects.toThrow(
+			'already acquiring',
+		)
+		confirmation.answer('waiting')
+		expect(await first).toBe('waiting')
+		expect(readdirSync(path.join(LANES, LOCKS))).toEqual([])
+		expect(await lane_seat_start.start(lane(), async () => 'launched')).toBe('launched')
+	})
+
 	it('returns the reservation after a launch failure', async () => {
 		await expect(
 			lane_seat_start.start(lane(), async () => {

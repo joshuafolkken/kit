@@ -12,6 +12,8 @@ const LEGACY_LEFTHOOK_CMD = 'command -v lefthook >/dev/null 2>&1 && lefthook ins
 const SVELTE_KIT_SYNC = 'svelte-kit sync'
 const WARNING_MARKER = 'git hooks are NOT installed'
 const PREPARE = 'prepare'
+const NPM = '@joshuafolkken:registry=https://registry.npmjs.org/\n'
+const REPAIR = 'fix-gh-packages'
 
 const ctx = { package_json_path: '', work_directory: '' }
 
@@ -75,5 +77,29 @@ describe('sync_prepare_lefthook_warning', () => {
 		expect(() => {
 			sync.sync_prepare_lefthook_warning(ctx.package_json_path)
 		}).not.toThrow()
+	})
+})
+
+describe('sync managed npm lifecycle', () => {
+	it('strips only the managed repair in a migrated project and stays byte-identical on rerun', () => {
+		writeFileSync(path.join(ctx.work_directory, '.npmrc'), NPM)
+		const prepare = init_logic.get_suggested_scripts()['prepare'] ?? ''
+		const upgraded = sync_prepare(`${SVELTE_KIT_SYNC} && ${prepare}`)
+		const once = readFileSync(ctx.package_json_path, 'utf8')
+
+		expect(upgraded).toContain(SVELTE_KIT_SYNC)
+		expect(upgraded).not.toContain(REPAIR)
+		sync.sync_prepare_lefthook_warning(ctx.package_json_path)
+		expect(readFileSync(ctx.package_json_path, 'utf8')).toBe(once)
+	})
+
+	it('retains the managed repair for another scope still using GitHub', () => {
+		writeFileSync(
+			path.join(ctx.work_directory, '.npmrc'),
+			`${NPM}@other:registry=https://npm.pkg.github.com/\n`,
+		)
+		const prepare = init_logic.get_suggested_scripts()['prepare'] ?? ''
+
+		expect(sync_prepare(prepare)).toContain(REPAIR)
 	})
 })

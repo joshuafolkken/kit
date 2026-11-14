@@ -1,4 +1,4 @@
-import { execFileSync, spawn, type ChildProcess } from 'node:child_process'
+import { execFileSync, spawn, spawnSync, type ChildProcess } from 'node:child_process'
 import {
 	chmodSync,
 	copyFileSync,
@@ -25,6 +25,8 @@ const LAUNCHER = 'scripts/hooks/run-hook.sh'
 const PAYLOAD = '{"tool_name":"Bash"}'
 const REFUSED = 2
 const LAUNCH_TIMEOUT_MS = 60_000
+// Under the default hook timeout, so a process that never ends fails the wait rather than the hook.
+const SETTLE_TIMEOUT_MS = 5000
 const DETACH_PATTERN = /--detach (?<directory>\S+)/u
 // The gate stub echoes its arguments and the payload it reads, so a fallback shows it got the call.
 const GATE_STUB =
@@ -166,9 +168,19 @@ beforeEach(() => {
 	workspace.environment = counting_environment()
 })
 
-afterEach(() => {
+// A process whose command line names the workspace: a daemon the launcher started detached, which
+// may still write its compile cache there after the launch returns.
+function is_workspace_process_alive(): boolean {
+	return spawnSync('pgrep', ['-f', workspace.root]).status === 0
+}
+
+afterEach(async () => {
 	for (const daemon of started.splice(0)) hook_daemon.close(daemon)
 	for (const child of running.splice(0)) child.kill()
+	// The workspace is removed next; one still written to fails that with ENOTEMPTY.
+	await vi.waitFor(() => {
+		if (is_workspace_process_alive()) throw new Error('a workspace process is still running')
+	}, SETTLE_TIMEOUT_MS)
 })
 
 describe(

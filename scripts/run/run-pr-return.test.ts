@@ -95,6 +95,7 @@ describe('run_pr_return.format', () => {
 })
 
 const BRANCH = '7313-lane'
+const COMMIT_AT = '2026-11-11T01:30:00Z'
 const LAST_COMMIT = ['log', '--first-parent', '--no-merges', '-1', '--format=%cI']
 const RED = { __typename: 'CheckRun', name: REQUIRED, status: 'COMPLETED', conclusion: 'FAILURE' }
 const RAW = JSON.stringify({ statusCheckRollup: [RED], requiredContexts: [REQUIRED] })
@@ -102,7 +103,7 @@ const RAW = JSON.stringify({ statusCheckRollup: [RED], requiredContexts: [REQUIR
 describe('run_pr_return.read', () => {
 	beforeEach(() => {
 		vi.spyOn(git_command, 'branch').mockResolvedValue(BRANCH)
-		vi.spyOn(git_spawn, 'read').mockResolvedValue('2026-11-11T01:30:00Z')
+		vi.spyOn(git_spawn, 'read').mockResolvedValue(COMMIT_AT)
 	})
 
 	it('reads the red required checks of the branch and the comments since the last commit', async () => {
@@ -139,5 +140,24 @@ describe('run_pr_return.read', () => {
 		vi.spyOn(issue_watch_diff, 'parse_comments').mockResolvedValue(undefined)
 
 		expect(await run_pr_return.read('7313')).toStrictEqual({ red_checks: [], comments: [] })
+	})
+})
+
+describe('run_pr_return.read in another lane', () => {
+	beforeEach(() => {
+		vi.spyOn(git_command, 'branch').mockResolvedValue(BRANCH)
+		vi.spyOn(git_spawn, 'read').mockResolvedValue(COMMIT_AT)
+	})
+
+	it('reads the repair branch and commit from the target lane instead of the driver', async () => {
+		const directory = '/lanes/7313'
+		const branch = vi.spyOn(git_command, 'branch_at').mockResolvedValue(BRANCH)
+
+		vi.spyOn(git_gh_pr_snapshot, 'pr_get_state_snapshot').mockResolvedValue('{}')
+		vi.spyOn(git_gh_issue_read, 'issue_list_comments').mockResolvedValue('[]')
+		await run_pr_return.read('7313', directory)
+		expect(branch).toHaveBeenCalledWith(directory)
+		expect(git_spawn.read).toHaveBeenCalledWith(['-C', directory, ...LAST_COMMIT])
+		expect(git_command.branch).not.toHaveBeenCalled()
 	})
 })

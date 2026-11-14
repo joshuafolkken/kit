@@ -7,8 +7,9 @@ import { implementation_shell_nested } from './implementation-shell-nested'
 import { step_zero_notice } from './step-zero-notice'
 
 // A consultation scope's pre-execution check (joshuafolkken/kit#6586): a shell runs unless it makes a
-// change no later check takes back. A runtime file a call changes is restored after it
-// (`bash-revert.ts`); a visible write to one is still refused here, as is every call
+// change no later check takes back. A runtime file a call changes and names is restored after it
+// (`bash-revert.ts`; one it does not name is only reported, #7495); a visible write to one is still
+// refused here, as is every call
 // `implementation-shell-deny.ts` names — in a segment, a substitution or a program another one launches.
 const FILE_PROGRAMS: ReadonlySet<string> = new Set(['tee', 'touch', 'rm', 'truncate'])
 // The other programs that write the files their arguments name. `bash-revert.ts` restores only the

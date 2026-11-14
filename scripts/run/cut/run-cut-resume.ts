@@ -3,6 +3,7 @@ import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { run_repair_attempt } from '#scripts/run/run-repair-attempt'
 import { run_cut, type RunCut } from './run-cut'
 import { run_cut_report } from './run-cut-report'
 import { run_cut_review } from './run-cut-review'
@@ -110,6 +111,19 @@ async function verify_and_adopt(
 	return await adopt(target, cut_record)
 }
 
+async function resume_carried(
+	target: string,
+	cut: RunCut,
+	issue: string,
+	is_expired: boolean,
+): Promise<number> {
+	if (await run_repair_attempt.prepare(issue, target)) {
+		return report(FRESH_VERDICT, SUCCESS_EXIT_CODE)
+	}
+
+	return is_expired ? report_stale(cut) : await verify_and_adopt(target, cut, issue)
+}
+
 async function resume(target: string, issue: string): Promise<number> {
 	const read = run_cut.read_cut(target)
 
@@ -117,9 +131,7 @@ async function resume(target: string, issue: string): Promise<number> {
 
 	if (read.kind === 'unreadable') return report_unreadable()
 
-	if (read.kind === 'expired') return report_stale(read.cut)
-
-	return await verify_and_adopt(target, read.cut, issue)
+	return await resume_carried(target, read.cut, issue, read.kind === 'expired')
 }
 
 const run_cut_resume = {

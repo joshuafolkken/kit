@@ -13,9 +13,9 @@ import { run_board_decision } from './run-board-decision'
 import { run_board_earlier, type EarlierLanes } from './run-board-earlier'
 import { run_board_ending_reason } from './run-board-ending-reason'
 import { run_board_human } from './run-board-human'
-import { run_board_human_merge } from './run-board-human-merge'
 import { run_board_kind, type BoardPriority } from './run-board-kind'
 import type { PauseRead } from './run-board-pause'
+import { run_board_retry_wait } from './run-board-retry-wait'
 import { run_board_standing_waits } from './run-board-standing-waits'
 import type { ItemState, ItemStatus } from './run-board-status'
 
@@ -327,7 +327,7 @@ function layout_of(
 	reason_of?: ReasonOf,
 	earlier: EarlierLanes = run_board_earlier.NO_EARLIER,
 ): BoardLayout {
-	const current = run_board_human_merge.overlay_of(input_plan, input_statuses)
+	const current = run_board_retry_wait.overlay_of(input_plan, input_statuses)
 	const { plan, statuses } = current
 	const overlay = { plan, statuses, reason_of }
 	const queue = plan.waves.waves.flat().filter((child) => is_untouched(child, overlay))

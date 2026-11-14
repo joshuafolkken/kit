@@ -25,6 +25,22 @@ import { size_estimate } from './size-estimate'
 // scout and `epic:bundle` make at the target repository rather than at this checkout.
 const GH_REPO_VARIABLE = 'GH_REPO'
 
+function restore_repository(original: string | undefined): void {
+	if (original === undefined) Reflect.deleteProperty(process.env, GH_REPO_VARIABLE)
+	else process.env[GH_REPO_VARIABLE] = original
+}
+
+// Keep the target available through placement, then restore the caller's exact environment.
+async function with_repository_restored<Result>(action: () => Promise<Result>): Promise<Result> {
+	const original = process.env[GH_REPO_VARIABLE]
+
+	try {
+		return await action()
+	} finally {
+		restore_repository(original)
+	}
+}
+
 interface Filing {
 	args: FileArguments
 	body: string
@@ -243,6 +259,7 @@ const issue_file_pass = {
 	GH_REPO_VARIABLE,
 	labels_in_one_pass,
 	scout_filing,
+	with_repository_restored,
 }
 
 export { issue_file_pass }

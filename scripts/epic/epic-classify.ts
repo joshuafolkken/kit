@@ -1,5 +1,6 @@
 import { has_label_name, has_parked_label, IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
 import { issue_not_before } from '#scripts/issue/issue-not-before'
+import { issue_publication_state } from '#scripts/issue/issue-publication-state'
 import { epic_graph, type EpicChild, type IssueReference } from './epic-graph'
 import { epic_nested } from './epic-nested'
 import {
@@ -55,7 +56,11 @@ function has_human_label(child: EpicChild): boolean {
 // A child someone else's session is finishing, or one held until its declared start time
 // (joshuafolkken/kit#4007). Either way waiting resolves it.
 function is_waiting(child: EpicChild): boolean {
-	return has_label(child, IN_PROGRESS_LABEL) || !issue_not_before.is_due(child.body)
+	return (
+		issue_publication_state.is_pending(child.body) ||
+		has_label(child, IN_PROGRESS_LABEL) ||
+		!issue_not_before.is_due(child.body)
+	)
 }
 
 // What a child is before its dependencies are considered. A parked child is `human` whatever blocks

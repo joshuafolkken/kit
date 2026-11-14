@@ -9,6 +9,7 @@ const UNCHANGED_LABEL = 'unchanged'
 const SYNCED_LABEL = 'synced'
 const HOME_NPMRC = '~/.npmrc'
 const REGISTRY_LINE = '@joshuafolkken:registry=https://npm.pkg.github.com\n'
+const NPM_LINE = '@joshuafolkken:registry=https://registry.npmjs.org/\n'
 const LEGACY_LINES = 'engine-strict=true\nminimum-release-age=1440\nconfirmModulesPurge=false\n'
 // The kit does not distribute this line, but a consumer may keep it: with `npmrcAuthFile`
 // pointing at the project .npmrc, pnpm expands it and it is the only credential the deploy
@@ -34,10 +35,11 @@ function spy_console_info(): MockInstance<typeof console.info> {
 }
 
 describe('sync_configs.sync_npmrc', () => {
-	it('does nothing when .npmrc does not exist', () => {
+	it('creates an explicit npm mapping when a new project has no .npmrc', () => {
 		sync_configs.sync_npmrc(ctx.destination)
 
-		expect(existsSync(ctx.destination)).toBe(false)
+		expect(existsSync(ctx.destination)).toBe(true)
+		expect(readFileSync(ctx.destination, 'utf8')).toBe(NPM_LINE)
 	})
 
 	it('logs unchanged when no legacy line is present', () => {
@@ -88,6 +90,28 @@ describe('sync_configs.sync_npmrc — consumer auth line', () => {
 		spy_console_info()
 
 		sync_configs.sync_npmrc(ctx.destination)
-		expect(readFileSync(ctx.destination, 'utf8')).toBe(AUTH_LINE)
+		expect(readFileSync(ctx.destination, 'utf8')).toBe(`${AUTH_LINE}${NPM_LINE}`)
+	})
+})
+
+describe('sync_configs.sync_npmrc — no GitHub Packages handling', () => {
+	it.each([NPM_LINE, REGISTRY_LINE])('adds no auth line to %s', (npmrc) => {
+		writeFileSync(ctx.destination, npmrc)
+		spy_console_info()
+
+		sync_configs.sync_npmrc(ctx.destination)
+		expect(readFileSync(ctx.destination, 'utf8')).toBe(npmrc)
+	})
+
+	it('prints no hosting warning', () => {
+		writeFileSync(ctx.destination, AUTH_LINE)
+		writeFileSync(path.join(ctx.work_directory, 'vercel.json'), '{}')
+		spy_console_info()
+		const warn_spy = vi.spyOn(console, 'warn').mockImplementation(() => {
+			/* suppress */
+		})
+
+		sync_configs.sync_npmrc(ctx.destination)
+		expect(warn_spy).not.toHaveBeenCalled()
 	})
 })

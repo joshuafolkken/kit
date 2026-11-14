@@ -128,9 +128,6 @@ jobs:
         id: setup-node
         uses: ./.github/actions/setup-node
 
-      - name: Configure GitHub Packages authentication for existing projects
-        run: printf '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}\n' >> "$HOME/.npmrc"
-
       - name: Setup ESLint cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: eslint-cache
@@ -172,8 +169,6 @@ jobs:
 
       - name: Setup pnpm and install dependencies
         uses: ./.github/actions/setup-pnpm
-        with:
-          node-auth-token: ${{ secrets.GITHUB_TOKEN }}
 
       # A `basic` project has no `prepare`, no build and no SvelteKit, so the ordered steps below
       # would fail on its first pull request (joshuafolkken/kit#2814). The profile is read from
@@ -274,13 +269,8 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
 
-      - name: Configure GitHub Packages authentication for existing projects
-        run: printf '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}\n' >> "$HOME/.npmrc"
-
       - name: Setup pnpm and install dependencies
         uses: ./.github/actions/setup-pnpm
-        with:
-          node-auth-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Scan the changed files for secrets
         id: scan
@@ -425,9 +415,6 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
 
-      - name: Configure GitHub Packages authentication for existing projects
-        run: printf '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}\n' >> "$HOME/.npmrc"
-
       - name: Setup build cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: build-cache
@@ -441,8 +428,6 @@ jobs:
 
       - name: Setup pnpm and install dependencies
         uses: ./.github/actions/setup-pnpm
-        with:
-          node-auth-token: ${{ secrets.GITHUB_TOKEN }}
 
       # --ignore-scripts suppresses the install-time `prepare`, so generated framework
       # files never appear. Playwright >= 1.62 hard-throws when a tsconfig `extends`

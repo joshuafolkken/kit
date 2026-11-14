@@ -66,7 +66,10 @@ describe('run_wake_handoff.session_owner', () => {
 	})
 
 	it('names no transcript for a Codex session, whose id cannot be forced', () => {
-		expect(run_wake_handoff.session_owner(CODEX_SESSION)).toStrictEqual({ is_headless: true })
+		expect(run_wake_handoff.session_owner(CODEX_SESSION)).toStrictEqual({
+			is_headless: true,
+			session: CODEX_SESSION.session_id,
+		})
 	})
 })
 
@@ -156,12 +159,15 @@ describe('run_wake_handoff.hand_on', () => {
 		expect(run_carry.is_count_refused(read_back(), { transcript: TRANSCRIPT })).toBe(false)
 	})
 
-	it('leaves a Codex session pid-less, so its own counts are not a foreign owner', () => {
+	it('tracks the Codex process while authenticating its counts by launch identity', () => {
 		stamp_file.write_stamp(TARGET, carry())
 
 		hand_off_and_on(CODEX_SESSION, process.ppid)
 
-		expect(read_back().owner_pid).toBeUndefined()
-		expect(run_carry.is_count_refused(read_back(), run_carry.NO_OWNER)).toBe(false)
+		expect(read_back().owner_pid).toBe(process.ppid)
+		expect(run_carry.is_count_refused(read_back(), { session: CODEX_SESSION.session_id })).toBe(
+			false,
+		)
+		expect(run_carry.is_count_refused(read_back(), run_carry.NO_OWNER)).toBe(true)
 	})
 })

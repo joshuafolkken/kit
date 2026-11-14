@@ -1,6 +1,7 @@
 import {
 	EPIC_LABEL,
 	IN_PROGRESS_LABEL,
+	NEEDS_HUMAN_MERGE_LABEL,
 	PRIORITY_CRITICAL_LABEL,
 	PRIORITY_HIGH_LABEL,
 	RUN_STALLED_LABEL,
@@ -106,6 +107,46 @@ describe('retry and the shared in-progress reader', () => {
 		const ports = ports_for([RUN_STALLED_LABEL, IN_PROGRESS_LABEL])
 
 		expect(await run_add.add_all([ISSUE], true, ports, CONTEXT)).toMatchObject([{ kind: 'queued' }])
+	})
+})
+
+// joshuafolkken/kit#7487: only a recorded repair lifts a merge wait.
+describe('retry of an issue waiting on a person merge', () => {
+	it('clears needs-human-merge for a recorded repair', async () => {
+		const ports = ports_for([NEEDS_HUMAN_MERGE_LABEL])
+		const context = { ...CONTEXT, repairs: new Set([ISSUE]) }
+
+		expect(await run_add.add_all([ISSUE], true, ports, context)).toMatchObject([{ kind: 'queued' }])
+		expect(ports.clear_label).toHaveBeenCalledWith(ISSUE, NEEDS_HUMAN_MERGE_LABEL)
+	})
+
+	// joshuafolkken/kit#7493: the ended lane's in-progress would hold the offer.
+	it('clears the ended lane in-progress for a recorded repair', async () => {
+		const ports = ports_for([NEEDS_HUMAN_MERGE_LABEL, IN_PROGRESS_LABEL])
+		const context = { ...CONTEXT, repairs: new Set([ISSUE]) }
+
+		expect(await run_add.add_all([ISSUE], true, ports, context)).toMatchObject([{ kind: 'queued' }])
+		expect(ports.clear_label).toHaveBeenCalledWith(ISSUE, IN_PROGRESS_LABEL)
+	})
+
+	it('keeps needs-human-merge and in-progress without a recorded repair', async () => {
+		const ports = ports_for([NEEDS_HUMAN_MERGE_LABEL, IN_PROGRESS_LABEL])
+
+		await run_add.add_all([ISSUE], true, ports, CONTEXT)
+		expect(ports.clear_label).not.toHaveBeenCalledWith(ISSUE, NEEDS_HUMAN_MERGE_LABEL)
+		expect(ports.clear_label).not.toHaveBeenCalledWith(ISSUE, IN_PROGRESS_LABEL)
+	})
+
+	it('refuses when the merge wait does not clear', async () => {
+		const ports = {
+			...ports_for([NEEDS_HUMAN_MERGE_LABEL]),
+			clear_label: async (_issue: number, label: string) => label !== NEEDS_HUMAN_MERGE_LABEL,
+		}
+		const context = { ...CONTEXT, repairs: new Set([ISSUE]) }
+
+		expect(await run_add.add_all([ISSUE], true, ports, context)).toMatchObject([
+			{ kind: 'refused', reason: `could not clear ${NEEDS_HUMAN_MERGE_LABEL}` },
+		])
 	})
 })
 

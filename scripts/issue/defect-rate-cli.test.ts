@@ -16,6 +16,7 @@ const ENHANCEMENT_ITEM = { body: '', labels: [{ name: 'enhancement' }] }
 const TWO_SEARCHES = 2
 const THREE_PAGES_TOTAL = 201
 const OVER_CEILING = 5000
+const MAX_WINDOW_READS = 15
 const CEILING_PAGES = 10
 const WITHIN_TTL_MS = 60_000
 const RATE_LIMITED = 'rate limited'
@@ -95,6 +96,33 @@ describe('defect_rate_cli.measure_window', () => {
 	})
 })
 
+describe('defect_rate_cli.measure_window — denominator count', () => {
+	it('counts the complete denominator beyond the listing ceiling with one request', async () => {
+		const api = stub_search(page([DEFECT_ITEM]), page([ENHANCEMENT_ITEM], OVER_CEILING))
+
+		expect(await measure()).toMatchObject({
+			defects: 1,
+			enhancements: OVER_CEILING,
+			is_capped: false,
+		})
+		expect(requested_pages(api, 'closed')).toEqual([1])
+		expect(api).toHaveBeenCalledTimes(TWO_SEARCHES)
+	})
+
+	it('keeps no incomplete denominator and retries on the next measure', async () => {
+		const api = stub_search(page([DEFECT_ITEM]), {
+			...page([ENHANCEMENT_ITEM]),
+			incomplete_results: true,
+		})
+
+		expect(await measure()).toBeUndefined()
+		stub_search(page([DEFECT_ITEM]), page([ENHANCEMENT_ITEM]))
+
+		expect(await measure()).toMatchObject({ defects: 1, enhancements: 1, is_capped: false })
+		expect(api).toHaveBeenCalledTimes(TWO_SEARCHES * 2)
+	})
+})
+
 // joshuafolkken/kit#4550: every `backlog:next` a backlogrun's drive, probe and board made searched again,
 // holding the 30-a-minute search limit near its ceiling.
 describe('defect_rate_cli.measure_window — the shared cache', () => {
@@ -146,7 +174,7 @@ describe('defect_rate_cli.measure_window — the search pages', () => {
 		const api = stub_search(filed, page([ENHANCEMENT_ITEM]))
 
 		expect(await measure()).toMatchObject({ is_capped: true })
-		expect(requested_pages(api, 'created')).toHaveLength(CEILING_PAGES)
+		expect(requested_pages(api, 'created')).toHaveLength(MAX_WINDOW_READS)
 	})
 
 	it('answers nothing rather than measuring part of a search when a later page cannot be read', async () => {

@@ -1,3 +1,4 @@
+import { metrics_totals } from '#scripts/gate/metrics-totals'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SyncReading } from './run-ship-synced-scope'
 
@@ -11,7 +12,6 @@ vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mo
 vi.mock('#scripts/gate/gate-tree', () => ({
 	gate_tree: { read_gate_tree: async () => ({ files: {}, base: 'base' }) },
 }))
-vi.mock('#scripts/gate/metrics-totals', () => ({ metrics_totals: { rerecord: async () => false } }))
 vi.mock('#scripts/gate/scoped-green', () => ({
 	scoped_green: {
 		LINT_SCRIPT: LINT,
@@ -51,6 +51,7 @@ function commands(): ReadonlyArray<string> {
 }
 
 beforeEach(() => {
+	vi.spyOn(metrics_totals, 'rerecord').mockResolvedValue(false)
 	josh_run_mock.mockReset().mockResolvedValue({ code: 0, out: '' })
 	vi.spyOn(process.stdout, 'write').mockReturnValue(true)
 	run_ship_pair_runs.forget()

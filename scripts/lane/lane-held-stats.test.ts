@@ -50,6 +50,20 @@ describe('lane_held_stats.table — launch admission', () => {
 	})
 })
 
+// joshuafolkken/kit#7510: the drain's hand-back rows apart, leaving the window's row as it was.
+describe('lane_held_stats.table — the drain beside the window', () => {
+	it('rows the drained hand-back apart from the window’s', () => {
+		const window = 'hand-back:window'
+		const drained = 'hand-back:drained'
+		const entries = [held(window, 40), dispatch(30), held(drained, 20), dispatch(8)]
+
+		expect([row_of(entries, window), row_of(entries, drained)]).toStrictEqual([
+			`| ${window} | 10.0 | 10.0 | 10.0 | 1 | 0 |`,
+			`| ${drained} | 12.0 | 12.0 | 12.0 | 1 | 0 |`,
+		])
+	})
+})
+
 // joshuafolkken/kit#7121: the hold a freed lane wrote from a full driver's hand-back mark.
 describe('lane_held_stats.table — hand-back mark', () => {
 	it('rows a hand-back hold written after the full driver’s release', () => {

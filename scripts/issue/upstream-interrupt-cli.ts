@@ -41,12 +41,16 @@ const RECOMMENDED = 'Wait for the upstream fix'
 const NOTIFY_COMMAND = 'pnpm josh notify --task-type confirmation'
 const ALTERNATIVES = ['Defer the upstream issue and resume the finder now']
 
-interface Interrupt {
+interface ParsedInterrupt {
 	finder: string
 	title: string
 	repo: string
 	body_file: string
 	is_blocking_finder: boolean
+}
+
+interface Interrupt extends ParsedInterrupt {
+	finder_repo: string
 }
 
 interface Positionals {
@@ -64,7 +68,7 @@ function positionals_of(positionals: ReadonlyArray<string>): Positionals | undef
 	return is_shaped ? { finder, title } : undefined
 }
 
-function parse(argv: ReadonlyArray<string>): Interrupt | undefined {
+function parse(argv: ReadonlyArray<string>): ParsedInterrupt | undefined {
 	const parsed = cli_flags.arguments_of(argv, OPTIONS)
 
 	if (parsed === undefined) return undefined
@@ -197,11 +201,13 @@ async function kept_body(interrupt: Interrupt): Promise<Interrupt | undefined> {
 
 async function comment(interrupt: Interrupt, body: string): Promise<boolean> {
 	try {
-		console.info(`comment: ${await git_gh_command.issue_comment(interrupt.finder, body)}`)
+		const url = await git_gh_command.issue_comment(interrupt.finder, body, interrupt.finder_repo)
+
+		console.info(`comment: ${url}`)
 
 		return true
 	} catch (error) {
-		const rerun = `pnpm josh issue:comment ${interrupt.finder} --body-file ${await saved(body)}`
+		const rerun = `GH_REPO=${shell_quote.word(interrupt.finder_repo)} pnpm josh issue:comment ${interrupt.finder} --body-file ${await saved(body)}`
 
 		return stopped('comment', error_text.message_of(error), rerun)
 	}
@@ -272,7 +278,17 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	return (await interrupt_by_party(interrupt)) ? SUCCESS_EXIT_CODE : FAILURE_EXIT_CODE
+	const finder_repo = await git_gh_command.repo_get_name_with_owner()
+
+	if (finder_repo === undefined) {
+		console.error('✖ upstream:interrupt stopped: the finder repository could not be resolved.')
+
+		return FAILURE_EXIT_CODE
+	}
+
+	return (await interrupt_by_party({ ...interrupt, finder_repo }))
+		? SUCCESS_EXIT_CODE
+		: FAILURE_EXIT_CODE
 }
 
 const upstream_interrupt_cli = { run }

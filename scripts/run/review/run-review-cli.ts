@@ -54,7 +54,7 @@ import { run_review_unplanned } from './run-review-unplanned'
 // `josh check:related` before its round is recorded, joshuafolkken/kit#4948) starts it again on a tree a round-1 fix
 // moved, after the join has closed the pair, and reads its answer without joining a gate that already
 // settled. The ship's pre-detach reads that answer anyway, so a lane need not
-// (joshuafolkken/kit#4895), and a lane child's `--pinned` returns at once rather than wait in the
+// (joshuafolkken/kit#4895), and a lane child's `--pinned` returns at once except for a ship's remaining
 // foreground (joshuafolkken/kit#5293). **`--join --fixing` waits no grace on the check**: round 1's fixes will move
 // its tree. **A lane child's open commits first and `--push` pushes at the green gate**
 // (`run-review-early-push.ts`).
@@ -181,7 +181,7 @@ function join_hint(slots: ReadonlyArray<ReviewSlot>): string {
 // The early push waits on the gate this pair launched, so it follows a written brief alone.
 function follow_brief(slots: ReadonlyArray<ReviewSlot>, is_early_push: boolean): void {
 	process.stderr.write(`${join_hint(slots)}\n`)
-	if (is_early_push) run_review_early_push.launch()
+	if (is_early_push) run_review_early_push.launch(slots.length)
 }
 
 const GREEN_NOTE = 'Gate green — the review verdict may be adopted.'
@@ -441,15 +441,13 @@ async function run_open(is_code_only: boolean, argv: ReadonlyArray<string>): Pro
 }
 
 async function run_pinned(): Promise<number> {
-	if (lane_child_marker.is_child_of(process.cwd())) {
+	if (lane_child_marker.is_child_of(process.cwd()) && !run_review_pinned_steps.is_remaining()) {
 		process.stdout.write(`${LANE_PINNED_NOTE}\n`)
 
 		return SUCCESS_EXIT_CODE
 	}
 
-	const is_unpinned = await show_pinned(
-		run_review_join_read.read_with(run_review_pinned_steps.wait_alone),
-	)
+	const is_unpinned = await show_pinned(run_review_join_read.read_remaining())
 
 	return is_unpinned ? run_review.UNPINNED_EXIT_CODE : SUCCESS_EXIT_CODE
 }
@@ -459,13 +457,13 @@ const LONE_MODES: ReadonlyMap<string, () => Promise<number>> = new Map([
 	[JOIN_FLAG, run_join],
 	[`${JOIN_FLAG} ${FIXING_FLAG}`, run_join_fixing],
 	[PINNED_FLAG, run_pinned],
-	[run_review_early_push.PUSH_FLAG, run_review_early_push.push],
 ])
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const lone = LONE_MODES.get(argv.join(' '))
 
 	if (lone !== undefined) return await lone()
+	if (argv[0] === run_review_early_push.PUSH_FLAG) return await run_review_early_push.push(argv[1])
 	const is_code_only = argv[0] === run_review.CODE_ONLY_FLAG
 
 	return await run_open(is_code_only, argv.slice(is_code_only ? 1 : 0))

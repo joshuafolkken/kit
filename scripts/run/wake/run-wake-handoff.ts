@@ -19,10 +19,7 @@ import { run_carry_reclaim } from '#scripts/run/carry/run-carry-reclaim'
 // The adoption also recovers a record whose owner died without a cut (`run-wake.ts` →
 // `decide_not_handed_off`): it rewrites the owner and clears any hand-off, whoever held it.
 //
-// **A Codex session cannot be given its session id** (`agent-argv.ts` → `build`), so neither its
-// transcript nor its pid is known here: it is adopted with the pid-less owner `run:carry --resume`
-// writes for it, and its pid is never moved onto the record — a pid it cannot match would make its
-// own counts a foreign live owner's.
+// Codex authenticates with a launch identity; the launched PID supplies liveness independently.
 //
 // `hand_off` is the older recovery the backlog preflight still runs: it marks the record handed off,
 // as a `--cut` does, so a later claim over it reads `resume` rather than `standing`.
@@ -34,7 +31,9 @@ interface WakeSession {
 }
 
 function session_owner(session: WakeSession): CarryOwner {
-	if (session.provider === agent_provider.OPENAI_PROVIDER) return { is_headless: true }
+	if (session.provider === agent_provider.OPENAI_PROVIDER) {
+		return { session: session.session_id, is_headless: true }
+	}
 
 	const directory = cost_transcript.transcript_directory(session.worktree)
 	const transcript = run_carry_conversation.transcript_of(session.session_id, directory)
@@ -60,11 +59,13 @@ function hand_to(target: string, owner: CarryOwner): void {
 	run_carry.adopt_carry(target, read.carry, { ...owner, provider: read.carry.scheduler_provider })
 }
 
-// Through `reclaim_at`, so the transcript the adoption named is what lets the pid move — one writer.
+// Through the shared reclaim writer, authenticated by transcript or launch identity.
 function hand_on(target: string, owner: CarryOwner, pid: number): void {
-	if (owner.transcript === undefined) return
+	if (owner.transcript === undefined && owner.session === undefined) return
 
-	run_carry_reclaim.reclaim_at(target, run_carry.owner_of(pid, undefined, owner.transcript))
+	const process_owner = run_carry.owner_of(pid, undefined, owner.transcript)
+
+	run_carry_reclaim.reclaim_at(target, { ...process_owner, session: owner.session })
 }
 
 // **The launched pid is the supervisor's own write, so it is no sign the session picked the run up**:

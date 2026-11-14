@@ -37,7 +37,7 @@ function exec_payload(hook_event_name: string): string {
 		hook_event_name,
 		tool_name: 'exec_command',
 		tool_use_id: 'call-1',
-		tool_input: { cmd: 'node write.mjs' },
+		tool_input: { cmd: `node write.mjs ${APP} ${CREATED}` },
 	})
 }
 

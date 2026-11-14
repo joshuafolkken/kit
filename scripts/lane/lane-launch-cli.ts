@@ -5,7 +5,9 @@ import { lane_vacant } from '#scripts/lane/lane-vacant'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { INSTALL_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
+import { run_startup } from '#scripts/run/startup/run-startup'
 import { execa } from 'execa'
+import { lane_dispatch_dependency } from './lane-dispatch-dependency'
 import { lane_launch_admission } from './lane-launch-admission'
 import { lane_launch_pending } from './lane-launch-pending'
 
@@ -114,7 +116,9 @@ async function prepare(context: LaunchContext, directory: string): Promise<JoshR
 
 	await run_event_setup.emit(run_event_setup.installing(issue))
 
-	return await install(directory)
+	return await run_startup.phase('dependency reinstall', async () => await install(directory), {
+		edge_of: (value) => (value.code === SUCCESS_EXIT_CODE ? 'done' : 'failed'),
+	})
 }
 
 async function close_if_vacant(lane: LaneInfo | undefined): Promise<void> {
@@ -144,28 +148,45 @@ async function lane_directory(issue: string): Promise<JoshResult> {
 	return await josh_command.josh_run(['lane:open', issue], should_forward_stderr)
 }
 
-// The launch chain in-process. The CLI prints the pid; `backlog:drive` launches through this same
-// chain. The dispatch is said on the run's stream before it starts, so the board draws a lane that is
-// ready apart from one still being filled.
-async function launch_admitted(context: LaunchContext): Promise<LaunchOutcome> {
-	const opened = await lane_directory(context.issue)
+function dispatch_edge(value: JoshResult): 'done' | 'failed' | 'waiting' {
+	if (value.code === lane_dispatch_dependency.WAIT_EXIT_CODE) return 'waiting'
 
-	if (opened.code !== SUCCESS_EXIT_CODE) return refused('unopened', opened)
+	return value.code === SUCCESS_EXIT_CODE ? 'done' : 'failed'
+}
 
-	const prepared = await prepare(context, opened.out)
-
-	if (prepared.code !== SUCCESS_EXIT_CODE) return refused('failed', prepared)
-
+async function dispatch(context: LaunchContext): Promise<LaunchOutcome> {
 	await run_event_setup.emit(run_event_setup.dispatching(context.issue))
 
-	const dispatched = await josh_command.josh_run(
-		['lane:dispatch', context.issue],
-		should_forward_stderr,
+	const dispatched = await run_startup.phase(
+		'worker dispatch',
+		async () =>
+			await josh_command.josh_run(['lane:dispatch', context.issue], should_forward_stderr),
+		{ edge_of: dispatch_edge },
 	)
+
+	if (dispatched.code === lane_dispatch_dependency.WAIT_EXIT_CODE) {
+		await close_if_vacant(await lane_registry.find_open_lane(context.issue))
+
+		return { kind: 'waiting' }
+	}
 
 	if (dispatched.code !== SUCCESS_EXIT_CODE) return refused('failed', dispatched)
 
 	return { kind: 'launched', pid: dispatched.out }
+}
+
+// The CLI and driver share this chain, including retryable dependency refusals.
+async function launch_admitted(context: LaunchContext): Promise<LaunchOutcome> {
+	const opened = await run_startup.phase(
+		'lane creation',
+		async () => await lane_directory(context.issue),
+		{ edge_of: (value) => (value.code === SUCCESS_EXIT_CODE ? 'done' : 'failed') },
+	)
+	if (opened.code !== SUCCESS_EXIT_CODE) return refused('unopened', opened)
+	const prepared = await prepare(context, opened.out)
+	if (prepared.code !== SUCCESS_EXIT_CODE) return refused('failed', prepared)
+
+	return await dispatch(context)
 }
 
 async function launch_lane(context: LaunchContext): Promise<LaunchOutcome> {

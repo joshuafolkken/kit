@@ -1,5 +1,5 @@
 import { stamp_file } from '#scripts/josh/stamp-file'
-import { run_carry, type CarryOwner } from './run-carry'
+import { run_carry, type CarryOwner, type RunCarry } from './run-carry'
 import { run_carry_conversation } from './run-carry-conversation'
 
 // **A resumed conversation has to take its record back before it falls quiet**.
@@ -12,12 +12,22 @@ import { run_carry_conversation } from './run-carry-conversation'
 
 // Writes the record back under the caller's process when the caller is the record's own conversation
 // in a new one; answers whether it did.
+function reclaimed_owner(carry: RunCarry, owner: CarryOwner): RunCarry {
+	if (owner.session === undefined || owner.session !== carry.owner_session) {
+		return run_carry_conversation.reclaim_owner(carry, owner)
+	}
+
+	if (owner.pid === undefined || carry.is_handed_off === true) return carry
+
+	return { ...carry, owner_pid: owner.pid, owner_start: owner.start }
+}
+
 function reclaim_at(target: string, owner: CarryOwner): boolean {
 	const read = run_carry.read_carry(target)
 
 	if (read.kind !== 'carried') return false
 
-	const reclaimed = run_carry_conversation.reclaim_owner(read.carry, owner)
+	const reclaimed = reclaimed_owner(read.carry, owner)
 
 	if (reclaimed === read.carry) return false
 

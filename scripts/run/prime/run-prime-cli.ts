@@ -2,6 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import { backlog_drive_launch } from '#scripts/backlog/backlog-drive-launch'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
+import { run_startup } from '#scripts/run/startup/run-startup'
 
 // `josh run:prime` — what a backlogrun owes once per repository before its first lane opens, in one
 // call (`backlogrun-lanes.md` → "Once per repository, before the first lane opens"): `main:sync`,
@@ -30,7 +31,13 @@ function first_line(result: JoshResult): string {
 
 // `undefined` once the step failed, its failure named on stderr.
 async function step(argv: ReadonlyArray<string>): Promise<JoshResult | undefined> {
-	const result = await josh_command.josh_run(argv, should_forward_stderr)
+	const result = await run_startup.phase(
+		`initialization ${argv[0] ?? ''}`,
+		async () => await josh_command.josh_run(argv, should_forward_stderr),
+		{
+			edge_of: (value) => (value.code === SUCCESS_EXIT_CODE ? 'done' : 'failed'),
+		},
+	)
 
 	if (result.out !== '') console.error(result.out)
 	if (result.code === SUCCESS_EXIT_CODE) return result
@@ -93,7 +100,14 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	return (await primed()) ? await sweep() : FAILURE_EXIT_CODE
+	return await run_startup.phase(
+		'initialization',
+		async () => ((await primed()) ? await sweep() : FAILURE_EXIT_CODE),
+		{
+			root: true,
+			edge_of: (value) => (value === SUCCESS_EXIT_CODE ? 'done' : 'failed'),
+		},
+	)
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

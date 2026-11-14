@@ -163,6 +163,8 @@ pnpm josh issue:file --batch .josh/tmp/deferred.md --route tier-a
 - `--found-during <N>` — the Issue whose work the filing came from, when it is not the lane or branch Issue. The filing cap counts per origin (step 2); step 7 never holds it as a candidate here. #N gets a deferral comment.
 - `--over-cap` — the run is blocked by this filing, or a user typed `new` (`kickoff` / `fullrun` / `halfrun` / `prrun new`, whose filing commands carry it); the WIP cap lets it through.
 - `--no-auto-ok` — needs human judgement or a verified user prohibition; no `auto-ok`.
+- `--prepare` — create an unpublished child; `--route split` implies this.
+- `--publish <E>` — validate/publish epic E's prepared children; retry the same epic on failure.
 - `--release` — a consumer can use the change only once it is published. The filed issue becomes a blocker of the target's release issue (step 10).
 - `--blocks-finder` — with `--route interrupt`, the finder cannot go on until this issue is done. The finder is recorded as blocked by the filed issue (step 9); under an epic, `epic --reconcile <E>` after `epic --add` declares it.
 - `--check` — run steps 1–7, create nothing; exit 1 on a refusal. `--batch` refuses it.
@@ -171,13 +173,15 @@ pnpm josh issue:file --batch .josh/tmp/deferred.md --route tier-a
 
 The `direct-filing` guard refuses `gh api …/issues` and `gh issue create`, pointing here.
 
+[Preparation and recovery](how-to/prepare-issues.md).
+
 **Steps (run in this order):**
 
 Steps 1–2 stop on refusal. Steps 3–7 report problems, including duplicates when lint fails. Refusals file nothing.
 
-1. Refuse unless the target is first-party: a third-party target (Tier C), and one whose owner cannot be read (`unknown`). The `third-party-write` guard stays silent on `unknown`; this command files only to a tracker known to be ours.
-2. In a run's session, refuse an origin's eleventh run filing (origin: `--found-during <N>`, else the lane or branch issue; none: the run invocation). Then, on a finder's second filing into the same repository, ask the [`josh issue:fold`](#josh-issuefold) question; only `fold` refuses, and `--distinct <N>` declares a separate deliverable. A split child (`--route split`) asks nothing.
-   A split child with a plain `--found-during <N>` is refused when a code span in `#N`'s `## 期待結果` / `## 受け入れ条件` names the module of a file the child declares. `#N` depends on that part, so the refusal points to a prerequisite and `josh run:split <N> --prerequisite <P>`; an unreadable body refuses nothing.
+1. Refuse third-party (Tier C) and unknown owners; file only to a known first-party tracker, even when the `third-party-write` hook is silent.
+2. Refuse the eleventh run filing per origin: `--found-during <N>`, else lane/branch Issue, else invocation. On the second filing into the same repository, ask [`josh issue:fold`](#josh-issuefold); only `fold` refuses. `--distinct <N>` declares a separate deliverable; `--route split` skips the question.
+   Refuse a split child's plain `--found-during <N>` when a code span in `#N`'s `## 期待結果` / `## 受け入れ条件` names its declared file's module: use a prerequisite and `josh run:split <N> --prerequisite <P>`. An unreadable body refuses nothing.
 3. Check the body against the same criteria as [`josh issue:lint`](#josh-issuelint), and for exactly one `- 人の判断: 不要` / `- 人の判断: 要` line under `## 背景`. Refuse on any problem, including a `- 優先度:` declaration that names no basis or sits below its floor (`issue-template.md`); a typed `--label priority:*` skips this judgement.
    A `- セキュリティ: <経路>` or `- 原因の park: #<N>` line sets that floor, and so do `- 原因の損失:` lines summing to 30 minutes or more (`josh issue:priority <N>` re-applies it after a recurrence); `- 原因のレーン:` only ranks, and no reduction percentage is asked for or judged. A malformed one is refused; a body with no declaration is filed at the floor.
    A malformed `- 実施可能条件:`, `- 実施可能日:`, `- 規模見積もり:` or `- 計測宣言:` refusal ends in a line ready to paste. A refused `--found-during <N>` filing whose body declares no causing lane ends in `- 原因のレーン: <分> 分（#<N>）`, filled from [`josh lane:net <N>`](josh-commands-lane.md#josh-lanenet) once the ledger holds that lane's dispatch and merge.
@@ -1049,7 +1053,7 @@ This section is the single source of the mapping from `backlog:next`'s answer to
 
 At the drain — a `watch` verdict over an `exhausted` answer with `--running 0` — it marks a `drain` event on the event stream (once per drain, best-effort), so the next `run:step` fires the retrospective before the idle watch. A watch opened while children still merge is unmarked.
 
-Before a fresh marker it runs `main:sync` and `observations:flush` in the primary checkout (git effect); a failure prints one `observations:flush skipped:` line and the offer goes on.
+A fresh marker starts `main:sync` + `observations:flush` (git effect) detached, not awaited; failure and duration lines go to the `backlogrun` log.
 
 Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh backlog:offer` in detail".
 

@@ -7,6 +7,7 @@ import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_list } from '#scripts/gh/git-gh-issue-list'
 import { repository_labels } from '#scripts/repo/repository-labels'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { split_resolution } from '#scripts/split/split-resolution'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_file_batch } from './issue-file-batch'
@@ -29,17 +30,20 @@ const BODY_FILE_FLAG = '--body-file'
 const FIRST = 'First filing'
 const SECOND = 'Second filing'
 const THIRD = 'Third filing'
+const JUDGEMENT = '- 人の判断: 要（目視確認）'
 const VALID_BODY = [
 	'## 背景',
 	'',
 	'- 種別: 不具合',
 	'- 原因: #4201',
 	'- 規模見積もり: 約 1 ファイル / 10 行（テスト除く）',
-	'- 人の判断: 要（目視確認）',
+	JUDGEMENT,
 	'',
 	'## 現象\n\nx\n\n## 期待結果\n\ny\n\n## 受け入れ条件\n\n- [ ] z\n',
 ].join('\n')
 const INVALID_BODY = '## 背景\n'
+const TARGET = 'joshuafolkken/app-kit'
+const CROSS_BODY = `${VALID_BODY}\n## Origin\n\n${HERE}#2808\n`
 
 interface CreateRequest {
 	title: string
@@ -149,6 +153,40 @@ describe('issue_file_batch.run — several body files in one call', () => {
 
 // joshuafolkken/kit#5675: one `%%%`-separated file is a batch too, and every filing's scout report is
 // printed together once before the first filing rather than inside each.
+describe('issue_file_batch.run — serialized cross-repository scouts', () => {
+	it('finishes each scout and restores GH_REPO before starting the next', async () => {
+		const environments: Array<string | undefined> = []
+		const counter = { active: 0, peak: 0 }
+		const directory = batch_of('serial', [
+			[FIRST, CROSS_BODY],
+			[SECOND, CROSS_BODY],
+		])
+
+		vi.stubEnv('GH_REPO', HERE)
+		vi.mocked(issue_scout_cli.scout).mockImplementation(async () => {
+			counter.active += 1
+			counter.peak = Math.max(counter.peak, counter.active)
+			await Promise.resolve()
+			environments.push(process.env['GH_REPO'])
+			counter.active -= 1
+
+			return { report: SCOUT_REPORT, candidates: [] }
+		})
+
+		try {
+			await issue_file_batch.run([BATCH_FLAG, directory, '--repo', TARGET])
+
+			expect(counter.peak).toBe(1)
+			expect({ environments, restored: process.env['GH_REPO'] }).toStrictEqual({
+				environments: [TARGET, TARGET, TARGET],
+				restored: HERE,
+			})
+		} finally {
+			vi.unstubAllEnvs()
+		}
+	})
+})
+
 describe('issue_file_batch.run — one separated file and the combined scout report', () => {
 	it('files the three parts of one separated file in one call', async () => {
 		expect(await issue_file_batch.run([BATCH_FLAG, separated_file('three')])).toBe(
@@ -222,6 +260,25 @@ describe('issue_file_batch.run — the arguments around --batch', () => {
 		expect(issue_scout_cli.scout).not.toHaveBeenCalled()
 		expect(exec_gh_api).not.toHaveBeenCalled()
 	})
+})
+
+describe('issue_file_batch.run — preparation', () => {
+	it.each([['--prepare'], ['--route', 'split'], ['--label', 'route:split']])(
+		'creates unpublished children with %j',
+		async (...flags) => {
+			vi.spyOn(split_resolution, 'record_child').mockResolvedValue()
+			const body = VALID_BODY.replace(JUDGEMENT, '- 人の判断: 不要')
+			const directory = batch_of('prepared', [[FIRST, body]])
+
+			await issue_file_batch.run(['--batch', directory, '--label', 'run:lane', ...flags])
+			const created: { body: string; labels: Array<string> } = JSON.parse(
+				exec_gh_api.mock.calls[0]?.[0].body ?? '{}',
+			)
+
+			expect(created.body).toContain('<!-- josh:publication ')
+			expect(created.labels).not.toContain('auto-ok')
+		},
+	)
 
 	it('refuses a directory holding no .md body file', async () => {
 		const directory = batch_of('empty', [])

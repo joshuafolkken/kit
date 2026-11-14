@@ -51,8 +51,16 @@ function comments_since(
 
 // When the run last committed its own work: the newest non-merge commit on the branch's own line,
 // so a merge of main (and the commits it brings) does not move it past a comment already written.
-async function last_work_ms(): Promise<number> {
-	const date = await git_spawn.read(['log', '--first-parent', '--no-merges', '-1', '--format=%cI'])
+async function last_work_ms(directory?: string): Promise<number> {
+	const location = directory === undefined ? [] : ['-C', directory]
+	const date = await git_spawn.read([
+		...location,
+		'log',
+		'--first-parent',
+		'--no-merges',
+		'-1',
+		'--format=%cI',
+	])
 
 	return Date.parse(date)
 }
@@ -79,12 +87,13 @@ async function read_comments(issue: string): Promise<ReadonlyArray<WatchComment>
 	return (await issue_watch_diff.parse_comments(json)) ?? []
 }
 
-async function read(issue: string): Promise<PrReturn> {
-	const branch = await git_command.branch()
+async function read(issue: string, directory?: string): Promise<PrReturn> {
+	const branch =
+		directory === undefined ? await git_command.branch() : await git_command.branch_at(directory)
 	const [snapshot_json, comments, since_ms] = await Promise.all([
 		git_gh_pr_snapshot.pr_get_state_snapshot(branch),
 		read_comments(issue),
-		last_work_ms(),
+		last_work_ms(directory),
 	])
 
 	return {

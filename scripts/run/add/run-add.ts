@@ -4,6 +4,7 @@ import {
 	has_label_name,
 	IN_PROGRESS_LABEL,
 	NEEDS_DECISION_LABEL,
+	NEEDS_HUMAN_MERGE_LABEL,
 	NEEDS_HUMAN_REVIEW_LABEL,
 	PRIORITY_HIGH_LABEL,
 	RUN_LANE_LABEL,
@@ -44,6 +45,8 @@ interface AddContext {
 	settled?: ReadonlySet<number>
 	// What the run already tracks, so an epic root is never recorded twice (`run_add_epic.tracked_of`).
 	tracked?: ReadonlySet<number>
+	// The issues whose repair attempt this call recorded (`run_repair_attempt.prepare`).
+	repairs?: ReadonlySet<number>
 }
 
 const DEFAULT_CONTEXT: AddContext = { is_retry: false, done: [], active: new Set() }
@@ -73,20 +76,34 @@ function labels_for(
 		: opted_in
 }
 
-// The first label that would not apply, or `undefined` once every one landed. Sequential, so a
+// The first label whose write failed, or `undefined` once every one landed. Sequential, so a
 // refused write stops the rest rather than leaving a half-labelled issue the pool reads differently.
-async function first_unapplied(
+async function first_failed(
 	issue: number,
 	labels: ReadonlyArray<string>,
-	ports: AddPorts,
+	write: AddPorts['apply_label'],
 ): Promise<string | undefined> {
 	const [label, ...rest] = labels
 
 	if (label === undefined) return undefined
 
-	if (!(await ports.apply_label(issue, label))) return label
+	if (!(await write(issue, label))) return label
 
-	return await first_unapplied(issue, rest, ports)
+	return await first_failed(issue, rest, write)
+}
+
+// The stops a retry clears: `run:stalled` always, and `needs-human-merge` only for an issue whose
+// repair attempt was recorded — a merge wait with no repair stays a person's (joshuafolkken/kit#7487).
+// The ship re-parks it while the diff still needs a person's merge (`followup-human-merge.ts`).
+// A recorded repair also clears the ended lane's `in-progress`, which the offer otherwise reads as
+// another session's work (joshuafolkken/kit#7493): the record is made only once no process holds
+// the issue and its lane tree is clean (`run-repair-attempt.ts`).
+function stops_of(issue: number, context: AddContext): ReadonlyArray<string> {
+	if (!context.is_retry) return []
+
+	return context.repairs?.has(issue) === true
+		? [RUN_STALLED_LABEL, NEEDS_HUMAN_MERGE_LABEL, IN_PROGRESS_LABEL]
+		: [RUN_STALLED_LABEL]
 }
 
 function retry_required(
@@ -131,13 +148,13 @@ async function label_one(
 	ports: AddPorts,
 	context: AddContext,
 ): Promise<AddOutcome> {
-	const label = await first_unapplied(issue, labels, ports)
+	const label = await first_failed(issue, labels, ports.apply_label)
 
 	if (label !== undefined) return { kind: 'unlabeled', issue, label }
 
-	if (context.is_retry && !(await ports.clear_label(issue, RUN_STALLED_LABEL))) {
-		return { kind: 'refused', issue, reason: 'could not clear run:stalled' }
-	}
+	const stop = await first_failed(issue, stops_of(issue, context), ports.clear_label)
+
+	if (stop !== undefined) return { kind: 'refused', issue, reason: `could not clear ${stop}` }
 
 	return { kind: 'queued', issue, blockers: [] }
 }

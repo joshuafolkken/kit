@@ -162,6 +162,35 @@ describe('lane_ledger_write.record_core_wait', () => {
 
 		expect(lane_ledger.read_entries(target)).toMatchObject([{ kind: 'core-wait', ...wait }])
 	})
+
+	it.each([undefined, 'memory'])(
+		'keeps admission evidence with wait reason %s',
+		async (wait_reason) => {
+			const target = ledger(`admission-${String(wait_reason)}`)
+			const reason_fields = wait_reason === undefined ? {} : { wait_reason }
+			const wait = {
+				command: 'lint',
+				waited_ms: 0,
+				admission_reason: 'budget-fit',
+				...reason_fields,
+				overflow: false,
+				budget_cores: 2,
+				budget_memory_mb: 2400,
+				available_mb: 2400,
+				busy_cores: 0,
+				requested_cores: 2,
+				granted_cores: 2,
+				memory_mb: 2400,
+				admission_waited_ms: 0,
+				memory_pressured: false,
+			}
+
+			await lane_ledger_write.record_core_wait(wait, target)
+			const kind = wait_reason === undefined ? 'core-admission' : 'core-wait'
+
+			expect(lane_ledger.read_entries(target)).toMatchObject([{ kind, ...wait }])
+		},
+	)
 })
 
 // joshuafolkken/kit#5203: the `unplanned` answer `check:related` printed reads back as one entry.

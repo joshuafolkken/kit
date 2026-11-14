@@ -23,6 +23,7 @@ pnpm josh run:hold --adopt 1091     # hand a `new` run's hold to the issue it fi
 - `--fullrun` — marks the record as `fullrun #N`'s.
 - `--adopt <issue>` — re-keys the unnumbered `new` run's record to the filed issue and applies `in-progress`; answers `none` (exit 1) when the tree holds no record.
 - `--halfrun-stop` — marks a `halfrun` stop for `run:entry` to adopt, and sends its `confirmation` Telegram; answers `e2e-owed` (exit 1) until `test:e2e` answered green on this tree.
+- `--halfrun-round` — starts a `halfrun` fix round: re-opens the issue's stopped `halfrun` record as running, owned by this session; answers `busy` (exit 1) when the tree holds no such stop.
 - `--human-review-stop` — marks a `halfrun` stop and a `human-review` lane, retaining its tree and hold. Sends `confirmation`; its worker's exit frees the execution place. Answers `e2e-owed` (exit 1) until `test:e2e` is green on this tree.
 - `--prrun-stop` — marks a `prrun` stop with the commit its pull request is on, and sends its `confirmation` Telegram.
 
@@ -214,6 +215,8 @@ Adds to this repository's live `backlogrun` at the next free lane, without inter
 - Refuses closed/unreadable issues, failed writes, `needs-decision`, `needs-human-review`, `already-done`, a run-held `in-progress`, active/unreadable lanes, and prior withdrawals, merges, reviews or splits. Open blockers wait.
 - Each `add` event wakes `run:progress --wait`.
 - `--retry` records a fresh attempt and clears this issue's `run:stalled` and `done`. A restarted driver ignores earlier parks. Without it, completed or stalled issues are refused.
+- A reviewed PR may start a repair attempt through `--retry` after a trusted comment newer than its review stop, an open PR, and confirmed worker/ship exit. The retry boundary is recorded once and the previous cut is ended before a replacement worker starts. Merges, withdrawals, splits, protected labels, and active or unreadable owners remain refused.
+- Only such a repair clears `needs-human-merge`, so the next offer dispatches it; its ship re-parks the PR while the diff still needs a person's merge.
 - A live `backlog:drive` runs `--retry` itself on the `run:stalled` causes it can re-offer, 2 times per issue ([labels and run states](./labels-and-run-states.md)); any other cause, or one at that cap, waits for this command.
 
 **Output / exit codes:** one line per issue — `queued #N · next free lane`, `queued #N · end of the queue`, `queued #N · waiting: blocked by #M`, `tracking #E · <where>`, or `refused #N · <reason>`. Exits 0 when every issue was added, 1 when any was refused or no `backlogrun` is running here (nothing is added then), 2 on a malformed argument.
@@ -266,7 +269,18 @@ The driver runs with `--window 5`, so a pass boundary comes at least every five 
 are active.
 
 The lanes and the carry record stay, as `backlogrun --restart` leaves them. A successor that does not
-start, or does not claim the run within two minutes, is a `failed` stop; an unclaimed one is stopped.
+start, or does not claim the run within 35 seconds, is a `failed` stop; an unclaimed one is stopped.
+
+One bound holds every dispatch wait (`scripts/backlog/backlog-dispatch-bound.ts`): an issue that
+becomes ready to start — or the seat it waits for freeing — reaches its `child-launch` within 60
+seconds. A fresh driver's start takes 25 of them, so the supervisor's pause between passes and the
+successor's claim on a reload each get the 35 left.
+
+Within a driver window a free seat checks the
+`auto-ok` listing every 10 seconds by its ETag (a 304 spends no REST core), and an issue new to its
+first page, or relabelled outside a lane, is asked about at once. A window that ends re-drives without
+the pause. The 180-second offer interval is a REST floor, not a dispatch path: with no seat free a
+collected child is asked about at once.
 
 Unattended profiles: Codex → OpenAI; Claude Code → Anthropic.
 [Codex permissions](./maintainers/josh-commands-run-rationale.md#codex-batch-permissions).
@@ -390,6 +404,10 @@ pnpm josh upstream:interrupt 2304 "<root-cause title>" --repo joshuafolkken/kit 
 
 <!-- /usage -->
 
+`--blocks-finder` は呼び出し元と起票先が同じリポジトリの場合だけ finder の依存関係を記録する。別リポジトリ間の依存登録は未対応で、警告し、依存関係や finder のラベルを変更しない。
+
+finder のリポジトリは起票前に確定し、バックリンクとコメント失敗時の再実行先に明示する。起票で現在のリポジトリ設定が変わっても投稿先は変わらない。解決できなければ stash や書き込みの前に停止する。
+
 A third-party `--repo` files nothing: the body goes to the finder under `## Upstream candidate` for a person to post. An `unknown` party writes nothing. Each step prints one line; a failing step stops the rest and prints the command to re-run. Resume with the `stash:pop` line the backlink carries.
 
 ### `josh run:liveness`
@@ -483,6 +501,10 @@ After the budget and before the reads, the entry synchronizes the tree (skipped 
 `--to kickoff|halfrun|prrun|fullrun` names how far the run goes (default `fullrun`); the first line, `stage #<N> — at: … · to: … · start: …`, says where it starts. The stage table is `docs/how-to/run-issues.md`.
 
 An issue with `run:planned` or a trusted plan comment reads as `planned`, and its `=== investigation ===` section says to skip the investigator — a lane dispatched again after a yield starts at its recorded plan.
+
+A prior cut, including an adoption released after human review, may be ended for a reviewed PR's repair under the same checks as `run:add --retry`; `run:entry <N>` in the replacement worker then starts at implementation.
+
+The process probe excludes the requesting worker's ancestry; another worker, a ship or unreadable ownership keeps the cut. In a live backlogrun, use `pnpm josh run:add <N> --retry` before dispatching the replacement worker.
 
 A lane child entering a `planned` issue whose plan `lane:plan` has not cleared runs `lane:plan` on its plan comment's backticked paths before the report, printing the command and its verdict; `yield` gives the lane back at the entry with exit 2, as the entry probe does. A plan comment naming no path runs nothing, and `run:step`'s `lane:plan` line stays.
 
@@ -603,6 +625,7 @@ against no streak, and a `usage-limit` event names the reset (unreadable or past
 a **failed** child (OPEN, unparked, not an outage) has it dropped, is parked with `run:stalled` and counts against the failure guard — unless it records
 an open blocker, a `- 実施可能日:` still ahead or a `- 実施可能条件:` not yet met (or, its body unreadable, carries `not-before`): then it
 is **waiting**, unparked and uncounted, its comment naming the wait.
+調査後に不足が判明した証拠も、[観測待ちの宣言と証拠チェックリスト](./observation-waits.md)で待機できる。初回のマージ件数条件とは独立して判定し、未知形式・証拠の取得失敗では再開しない。
 A **withdrawn** child (a `lane:withdraw` on the stream, or CLOSED with no merged pull request) counts and logs nothing
 and launches no investigation; its lane is withdrawn through `lane:withdraw`'s path unless already withdrawn — kept, as the `run:wake` sweep keeps one, where its branch has commits on no remote; a retry where the withdrawal cannot read it.
 A failed child whose detached `josh ship` ended is parked for its stop: the comment's `Why` names the
@@ -636,8 +659,8 @@ pnpm josh run:review --code-only                 # josh ship's own open: code's 
 pnpm josh run:review --unpinned-ok "only logs"   # check beside the pair as ever; the join prints the list and the reason and carries on past unpinned places
 pnpm josh run:review --join                      # after the review returns: join the gate and test:pinned; exit 3 on an unpinned change
 pnpm josh run:review --join --fixing             # the join when round 1 has fixes to make: no grace on test:pinned, left running; prints the unpinned places the cache already holds
-pnpm josh run:review --pinned                    # read test:pinned alone (the ship's pre-detach reads it anyway); a lane child returns at once
-pnpm josh run:review --push                      # launched by a lane open: push and open the PR at a green gate
+pnpm josh run:review --pinned                    # collect a stopped ship's remaining verdicts before editing or retrying; a lane child waits only for this continuation
+pnpm josh run:review --push 2                    # launched by a lane open: push and open the PR at a green gate, recording the review plan’s slot count on the ledger
 ```
 
 <!-- /usage -->
@@ -657,7 +680,14 @@ and its gate stage re-runs on the moved tree. `josh test:pinned --record <token>
 the gate; `--join` prints its lines and **exits `3` on an unpinned change**, which `josh ship --review`
 never drains (`--unpinned-ok`: above). A check `--join` started again on a moved tree is not waited on:
 it is left running for the ship's pre-detach, as under `--fixing`. `review:record` reads a skipped
-`--join`. The reason and places `--unpinned-ok` accepted stay for the
+`--join`.
+
+A finished first-unpinned cut without a reason collects the existing remaining probe at
+the join; `review:record` also collects a ship's remaining probe even after the join was read.
+An unchanged tree reuses the answer. A moved tree settles the old probe into the cache before probing
+the current tree's cache misses. Unchecked limits and incomplete/failed probes remain explicit.
+
+The reason and places `--unpinned-ok` accepted stay for the
 branch in the git directory (`josh-unpinned-ok.json`), the reason from the launch on, so a round-1
 fix that moves the tree past the join still leaves it; a later run with no reason carries on under it
 while every place, keyed by file, function and the lines replaced and put in, is recorded, and a
@@ -702,7 +732,7 @@ pnpm josh ship --log <N>                                          # a detached s
 
 - `--body-file <path>` — the PR body carrying the live-execution evidence `followup` gates on, written under `.josh/tmp/`; forwarded to `git -y` alone.
 - `--notify-message <text>` — forwarded to `followup` alone.
-- `--review` — runs round 1 beside the gate; after sync and round 1, an owed round 2 runs beside the gate and joins before the PR opens. A High or unfixed Medium stops the ship. A pre-detach `test:pinned` stop probes remaining hunks in the background for the next pre-detach.
+- `--review` — runs round 1 beside the gate; after sync and round 1, an owed round 2 runs beside the gate and joins before the PR opens. A High or unfixed Medium stops the ship. After a pre-detach `test:pinned` stop, collect remaining verdicts with `pnpm josh run:review --pinned` before editing or retrying.
 - `--unpinned-ok <reason>` — forwarded to round 1's `run:review`, past `unpinned` places no test can pin.
 - `--detach` — hands the ship to a supervisor (implied in a lane child); a stop emits `ship-stop` (`--log <N>`). The preflight, type check, unused exports, cspell, guard tests and (`--review`, under `--unpinned-ok`, given or recorded, only if round 1 is reused) `test:pinned` precede hand-off, the checks even after a preflight refusal, so one stop reports every failure.
 

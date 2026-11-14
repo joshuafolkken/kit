@@ -208,7 +208,7 @@ pnpm josh lane:sample   # one machine-load reading
 
 <!-- usage: lane:stats -->
 
-Print period lane throughput, stage, stop (by failed CI check, longest first), check and machine-load statistics; --sinks shows stage totals, --over lane chains, --why cause groups above a net-minute threshold, and --pairs scoped pair runs.
+Print period lane throughput, stage, stop (by failed CI check, longest first), check, runnable-to-dispatch wait and machine-load statistics; --sinks shows stage totals, --over lane chains, --why cause groups above a net-minute threshold, and --pairs scoped pair runs.
 
 ```bash
 pnpm josh lane:stats --period 7                           # a 7-day period's stage medians and maxima

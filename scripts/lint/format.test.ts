@@ -88,13 +88,13 @@ describe('josh format heap', () => {
 			const root = write_project({ josh: { profile: 'full' } })
 
 			await format.run_format(root)
-			expect(mocked_execa).toHaveBeenNthCalledWith(1, 'pnpm', expect.any(Array), {
+			expect(mocked_execa).toHaveBeenNthCalledWith(2, 'pnpm', expect.any(Array), {
 				cwd: root,
 				stdio: 'inherit',
 				reject: false,
 			})
 			expect(mocked_execa).toHaveBeenNthCalledWith(
-				2,
+				1,
 				'pnpm',
 				expect.any(Array),
 				expect.objectContaining({ env: environment, extendEnv: false }),
@@ -113,20 +113,20 @@ describe('josh format', () => {
 		expect(console.info).toHaveBeenCalledWith(expect.stringContaining('josh eslint:'))
 	})
 
-	it('runs prettier and then eslint --fix on a full project', async () => {
+	it('runs eslint --fix and then prettier on a full project', async () => {
 		const root = write_project({ josh: { profile: 'full' } })
 
 		expect(await format.run_format(root)).toBe(0)
-		expect(invoked_tools()).toEqual(['prettier', 'eslint'])
+		expect(invoked_tools()).toEqual(['eslint', 'prettier'])
 	})
 
-	it('stops at a prettier failure without running eslint', async () => {
+	it('still formats after ESLint reports remaining errors', async () => {
 		const root = write_project({ josh: { profile: 'full' } })
 
 		mocked_execa.mockResolvedValueOnce(fake_result(PRETTIER_FAILURE_EXIT_CODE))
 
 		expect(await format.run_format(root)).toBe(PRETTIER_FAILURE_EXIT_CODE)
-		expect(invoked_tools()).toEqual(['prettier'])
+		expect(invoked_tools()).toEqual(['eslint', 'prettier'])
 	})
 
 	it('refuses extra arguments instead of formatting the whole tree', async () => {
@@ -142,7 +142,7 @@ describe('josh format', () => {
 		const root = write_project({ josh: { profile: 'full' } })
 
 		expect(await format.run([], root)).toBe(0)
-		expect(invoked_tools()).toEqual(['prettier', 'eslint'])
+		expect(invoked_tools()).toEqual(['eslint', 'prettier'])
 	})
 })
 
@@ -190,7 +190,7 @@ describe('josh format — direct launch', () => {
 
 		await format.run_format(root)
 		expect(mocked_execa).toHaveBeenNthCalledWith(
-			1,
+			2,
 			shim,
 			PRETTIER_WRITE_ARGS.slice(PNPM_EXEC_PREFIX_LENGTH),
 			{ cwd: root, stdio: 'inherit', reject: false },
@@ -204,7 +204,8 @@ describe('josh format — direct launch', () => {
 
 		vi.spyOn(eslint_heap, 'environment').mockReturnValue(environment)
 		await format.run_format(root)
-		expect(mocked_execa).toHaveBeenLastCalledWith(
+		expect(mocked_execa).toHaveBeenNthCalledWith(
+			1,
 			process.execPath,
 			[entry, ...ESLINT_FIX_ARGS.slice(PNPM_EXEC_PREFIX_LENGTH)],
 			{ cwd: root, stdio: 'inherit', reject: false, env: environment, extendEnv: false },

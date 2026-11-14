@@ -2,6 +2,7 @@ import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { shared_cache, type CacheSlot } from '#scripts/josh/shared-cache'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { run_startup } from '#scripts/run/startup/run-startup'
 import { z } from 'zod'
 import { backlog_next } from './backlog-next'
 import { backlog_wait_cause } from './backlog-wait-cause'
@@ -42,6 +43,15 @@ function is_kept(result: JoshResult): boolean {
 	return !result.out.split('\n').includes(backlog_next.VERDICT_TOKENS.retry)
 }
 
+function edge_of(result: JoshResult): 'done' | 'failed' | 'waiting' {
+	const [token = ''] = result.out.split('\n', 1)
+	const { error, retry, wait, stop, triage } = backlog_next.VERDICT_TOKENS
+	const is_failed = [error, retry].includes(token)
+	if (is_failed || result.code !== SUCCESS_EXIT_CODE) return 'failed'
+
+	return [wait, stop, triage].includes(token) ? 'waiting' : 'done'
+}
+
 // A kept answer replays its explanation where the live one would have streamed it.
 function replay(result: JoshResult, should_forward_stderr: boolean): JoshResult {
 	if (should_forward_stderr && result.err !== undefined && result.err !== '') {
@@ -79,13 +89,21 @@ async function read(
 
 	if (kept !== undefined) return replay(kept, should_forward_stderr)
 
-	const result = await josh_command.josh_run(argv, should_forward_stderr, timeout_ms)
+	const result = await run_startup.phase(
+		'candidate cache fill',
+		async () => {
+			run_startup.metric('cache', 'fill', `${NEXT_CACHE.prefix}:${key}`)
+
+			return await josh_command.josh_run(argv, should_forward_stderr, timeout_ms)
+		},
+		{ edge_of },
+	)
 
 	if (is_kept(result)) shared_cache.write(NEXT_CACHE, key, result, now_ms)
 
 	return result
 }
 
-const backlog_next_shared = { NEXT_CACHE, read, stream_key }
+const backlog_next_shared = { NEXT_CACHE, edge_of, read, stream_key }
 
 export { backlog_next_shared }

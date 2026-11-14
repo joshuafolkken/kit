@@ -7,6 +7,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { lint_parallel } from './lint-parallel'
 import { lint_related } from './lint-related'
 
+vi.mock('./format-steps', () => ({ format_steps: { run_scoped: vi.fn(async () => 0) } }))
+
 // joshuafolkken/kit#5657: a bare run on a tree it already answered for linted it again.
 
 vi.mock('#scripts/git/git-command', () => ({ git_command: { repository_root: vi.fn() } }))

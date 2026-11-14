@@ -1,6 +1,6 @@
 import { workflow_pin_logic } from '#scripts/sync/workflow-pin-logic'
 import { describe, expect, it } from 'vitest'
-import { ci_yml_fixture } from './ci-yml-fixture'
+import { ci_yml_fixture, type WorkflowStep } from './ci-yml-fixture'
 
 // The refs are deliberately excluded from this comparison. templates/workflows/ci.yml reaches a
 // consumer through workflow_pin_logic.apply_pins_for_destination, which resolves every pin from
@@ -30,10 +30,10 @@ const SHARED_JOBS = [
 	{ template: SECRET_SCAN_JOB, runtime: SECRET_SCAN_JOB },
 ]
 
-function setup_pnpm_inputs(relative_path: string, job_name: string): unknown {
+function setup_pnpm_step(relative_path: string, job_name: string): WorkflowStep | undefined {
 	return ci_yml_fixture
 		.find_job(relative_path, job_name)
-		?.steps?.find((step) => step.uses === ci_yml_fixture.SETUP_PNPM_USES)?.with
+		?.steps?.find((step) => step.uses === ci_yml_fixture.SETUP_PNPM_USES)
 }
 
 function all_step_names(relative_path: string): Array<string | undefined> {
@@ -58,10 +58,12 @@ describe('ci.yml action parity (templates/workflows/ci.yml vs .github/workflows/
 	it.each(SHARED_JOBS)(
 		'the template job $template calls setup-pnpm with the inputs of $runtime',
 		({ template, runtime }) => {
-			const template_inputs = setup_pnpm_inputs(ci_yml_fixture.TEMPLATE_CI_YML, template)
+			const template_step = setup_pnpm_step(ci_yml_fixture.TEMPLATE_CI_YML, template)
+			const runtime_step = setup_pnpm_step(ci_yml_fixture.RUNTIME_CI_YML, runtime)
 
-			expect(template_inputs).toBeDefined()
-			expect(template_inputs).toEqual(setup_pnpm_inputs(ci_yml_fixture.RUNTIME_CI_YML, runtime))
+			expect(template_step).toBeDefined()
+			expect(runtime_step).toBeDefined()
+			expect(template_step?.with).toEqual(runtime_step?.with)
 		},
 	)
 

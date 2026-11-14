@@ -4,6 +4,7 @@ import { GH_REQUEST_TIMEOUT_MESSAGE, git_gh_exec, type GhApiRequest } from '#scr
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { OTHER_CHANGE_LABEL } from '#scripts/issue/issue-labels'
 import { GATE_COMMAND } from '#scripts/josh/josh-command-types'
+import { npm_acquisition } from '#scripts/registry-migration/npm-acquisition'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { propagate_run, type StepResult } from './propagate-run'
 import { propagate_steps } from './propagate-steps'
@@ -38,6 +39,7 @@ const REFUSAL =
 
 beforeEach(() => {
 	mocked_api_sync.mockReturnValue(ISSUE_URL)
+	vi.spyOn(npm_acquisition, 'is_project_npm').mockReturnValue(true)
 })
 
 // What a refused write throws: `to_gh_error` puts gh's one-line stderr summary ahead of the JSON

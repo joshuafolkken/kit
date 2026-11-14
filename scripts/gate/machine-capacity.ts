@@ -16,8 +16,8 @@ import { execa } from 'execa'
 // average trails by a minute, so a gate started just after another one finished would see the finished
 // one's load as external and wait out the decay. `os.cpus()` is one read with no process spawned.
 //
-// A failed reading answers undefined so CI runners and containers, whose host CPU times may not
-// describe their quota, can budget by core count without a misleading memory constraint.
+// Unavailable readings stay undefined. Admission distinguishes an unsupported memory probe from a
+// failed supported probe; CPU quotas still fall back to the declared core count.
 //
 // **`run:board` draws its machine gauges from the same reading**, so what the
 // board shows a person is what the gate admits against — the gate reading the free memory as none
@@ -84,6 +84,8 @@ const SYSCTL_LINE = /^(?<name>[\w.]+): (?<value>\d+)$/gmu
 interface MachineReading {
 	busy_cores: number | undefined
 	available_mb: number | undefined
+	memory_supported?: boolean | undefined
+	total_mb?: number | undefined
 	memory_pressured?: boolean | undefined
 	run_queue?: number | undefined
 }
@@ -328,6 +330,8 @@ async function read_machine(
 		run_queue: is_host ? loadavg()[0] : undefined,
 		available_mb: pressured_available(memory_after, memory_before),
 		memory_pressured: is_pressured(memory_before, memory_after),
+		memory_supported: process.platform === 'darwin' || process.platform === 'linux',
+		total_mb: totalmem() / BYTES_PER_MB,
 	}
 }
 

@@ -1,3 +1,4 @@
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
@@ -11,8 +12,10 @@ import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_headless } from '#scripts/run/run-headless'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { run_wake } from './run-wake'
 import type { WakeContext } from './run-wake-describe'
 import { run_wake_driver } from './run-wake-driver'
+import { run_wake_loop } from './run-wake-loop'
 import { run_wake_ports } from './run-wake-ports'
 import { run_wake_resume } from './run-wake-resume'
 import { run_wake_session, type LaunchResult } from './run-wake-session'
@@ -66,6 +69,40 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.restoreAllMocks()
+})
+
+function completed_codex(): ReturnType<typeof run_wake_ports.ports_for> {
+	const ports = run_wake_ports.ports_for(context(), agent_role_profile.OPENAI_PROFILES.scheduler)
+	const now = new Date()
+
+	run_carry.begin_carry(context().carry_target, INVOCATION, { provider: 'openai' })
+	ports.hand_off(SID)
+	vi.spyOn(run_wake_session, 'launch').mockReturnValue({ kind: 'launched', pid: SESSION_PID })
+	ports.wake(INVOCATION, SID, MATERIAL)
+	run_wake.write_wake(
+		context().wake_target,
+		run_wake.count_wake(run_wake.fresh_wake(INVOCATION, now), now, SESSION_PID, SID),
+	)
+	writeFileSync(`${context().log_target}.${SID}`, '{"type":"turn.completed"}\n')
+	vi.spyOn(process_identity, 'is_same_process').mockImplementation((pid) => pid === process.pid)
+
+	return ports
+}
+
+it('drives immediately when a Codex session completes before its first poll', async () => {
+	const ports = completed_codex()
+	const drive = vi.spyOn(run_wake_driver, 'drive').mockResolvedValue({ kind: 'finished' })
+	const sleep = vi.fn(async () => {
+		run_wake.remove_wake(context().wake_target)
+	})
+	const production = { ...ports, sleep, retry_closes: async () => undefined }
+
+	expect(await run_wake_loop.run_loop(context().wake_target, production, 0)).toMatchObject({
+		reason: 'ended',
+	})
+	expect(drive).toHaveBeenCalledOnce()
+	expect(sleep).not.toHaveBeenCalled()
+	expect(run_wake.read_wake(context().wake_target)).toMatchObject({ woke: 1 })
 })
 
 describe('the supervisor waking a judgment session', () => {

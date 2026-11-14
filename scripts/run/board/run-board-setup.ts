@@ -50,11 +50,13 @@ function has_launched(events: ReadonlyArray<RunEvent>): boolean {
 	return events.some((event) => event.kind === KIND.CHILD_LAUNCH)
 }
 
-// The start is over at the first launch, or at a drain that came before one: a run whose backlog
-// emptied with nothing launched is watching, and the hand-off each wake of that watch writes is not a
-// run getting ready.
+// An idle decision ends preparation before the drain's maintenance finishes.
+function is_idle_decision(event: RunEvent): boolean {
+	return event.kind === KIND.DRAIN || (is_setup(event) && event.text === STAGE.WATCHING)
+}
+
 function has_started(events: ReadonlyArray<RunEvent>): boolean {
-	return has_launched(events) || events.some((event) => event.kind === KIND.DRAIN)
+	return has_launched(events) || events.some((event) => is_idle_decision(event))
 }
 
 // A lane is opening while the stage naming its issue is newer than the run's newest position: the

@@ -20,7 +20,7 @@ const RETIRED_COMMANDS = [
 	'investigation:guard',
 	'duplicate-read:guard',
 	'batch:guard',
-	'registry:migrate',
+	'registry:migrate', // The standalone packed migration entry runs before kit installation.
 	'defect:rate',
 	'backlog:stalled',
 	'run:stranded',

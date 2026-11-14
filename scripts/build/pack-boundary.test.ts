@@ -54,13 +54,20 @@ interface PackageManifest {
 // supervisor spawns its CLI, the lane broker its request reread, `run:board` its gathering worker and
 // `lane:open` its eslint warm-up by URL. The hook sources (the Codex adapter's fallback included) are
 // seeded from `HOOK_BUNDLES`.
+const CONSUMER_TESTS = [
+	'scripts/gate/change-scope-action.integration.test.ts',
+	'scripts/gate/path-glob.test.ts',
+	'scripts/gate/toolchain-inputs.consumer.test.ts',
+]
 const PATH_LAUNCHED_ENTRIES = [
 	'scripts/gate/change-scope-action.ts',
+	...CONSUMER_TESTS,
 	'scripts/gh/fix-gh-packages.ts',
 	'scripts/lane/lane-session-reread-main.ts',
 	'scripts/lane/openai-lane-supervisor-entry.ts',
 	'scripts/lint/eslint-memory.js',
 	'scripts/lint/eslint-warm-cli.ts',
+	'scripts/registry-migration/migrate-cli.ts',
 	'scripts/run/board/run-board-gather-worker.ts',
 	'scripts/run/run-label-main.ts',
 ]
@@ -75,6 +82,7 @@ const SHIPPED_UNREACHABLE = new Set([
 	'scripts/build/build-commands.ts',
 	'scripts/build/build-hooks.ts',
 	'scripts/build/build-library.ts',
+	'scripts/build/build-migration.ts',
 	'scripts/build/hook-bundle-stamp.ts',
 	'scripts/build/build.ts',
 	'scripts/build/source-location.ts',
@@ -306,6 +314,12 @@ describe('the published package carries no per-machine hook scratch', () => {
 
 describe('the published package carries nothing kit-internal', () => {
 	const packed = PACKED
+
+	it('ships precisely the regression tests synced into consumers', () => {
+		const tests = [...packed].filter((file) => file.endsWith('.test.ts'))
+
+		expect(new Set(tests)).toEqual(new Set(CONSUMER_TESTS))
+	})
 
 	it('ships no scripts module that no consumer entry reaches', () => {
 		const reachable = reachable_files()

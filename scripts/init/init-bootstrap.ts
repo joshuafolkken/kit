@@ -2,6 +2,7 @@ import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import path from 'node:path'
 import { package_manifest } from '#scripts/lib/package-manifest'
 import { file_content } from '#scripts/sync/file-content'
+import { sync_configs } from '#scripts/sync/sync-configs'
 import { z } from 'zod'
 import { init_basic } from './init-basic'
 import { init_install, type InstallStep } from './init-install'
@@ -130,6 +131,7 @@ function hand_off(
 	const install = kit_install_step(has_kit_dependency(project_root), template)
 
 	ensure_project_manifest(project_root)
+	sync_configs.sync_npmrc(path.join(project_root, NPMRC_FILE))
 	ensure_release_age(project_root, template)
 	if (!init_install.did_step_succeed(install, project_root)) return install_failure(install)
 	if (!init_install.did_step_succeed(handoff_step(args), project_root)) return HANDOFF_FAILURE

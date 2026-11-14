@@ -7,7 +7,10 @@ const TREE_BASE = 'https://github.com/joshuafolkken/kit/tree/main/'
 const IMPORT_LINE = '@node_modules/@joshuafolkken/kit/dist/CLAUDE.md'
 const OLD_BOOTSTRAP =
 	'> Fresh checkout: if kit is not installed, run `pnpm install` first, then reread this file before doing any other work.'
+const PREVIOUS_BOOTSTRAP =
+	'> Fresh checkout: before `pnpm install`, run `pnpm config get "@joshuafolkken:registry"` from the project root to check the effective registry, including user-level settings. If it points to GitHub Packages, [set up authentication](https://github.com/joshuafolkken/kit/blob/main/docs/authentication.md#1-get-a-token-from-the-gh-cli) first. Then run `pnpm install` and reread this file before doing any other work.'
 const BOOTSTRAP_START = '> Fresh checkout: before `pnpm install`'
+const MIGRATION_LINK = 'https://github.com/joshuafolkken/kit/blob/main/docs/registry-migration.md'
 const LOCAL_SECTION = '# Local\n'
 
 function bootstrap_line(content: string): string {
@@ -63,6 +66,7 @@ describe('distributed_paths.transform_distributed_paths', () => {
 describe('distributed_paths.ensure_claude_md_import', () => {
 	it('writes the bootstrap note and import line for a new file', () => {
 		expect(BOOTSTRAP.startsWith(BOOTSTRAP_START)).toBe(true)
+		expect(BOOTSTRAP).toContain(MIGRATION_LINK)
 		expect(distributed_paths.ensure_claude_md_import(undefined)).toBe(
 			`${BOOTSTRAP}\n\n${IMPORT_LINE}\n`,
 		)
@@ -74,11 +78,14 @@ describe('distributed_paths.ensure_claude_md_import', () => {
 		)
 	})
 
-	it('upgrades the old bootstrap note in place without duplicating the import', () => {
-		expect(distributed_paths.ensure_claude_md_import(`${OLD_BOOTSTRAP}\n\n${IMPORT_LINE}\n`)).toBe(
-			`${BOOTSTRAP}\n\n${IMPORT_LINE}\n`,
-		)
-	})
+	it.each([OLD_BOOTSTRAP, PREVIOUS_BOOTSTRAP])(
+		'upgrades an earlier bootstrap note in place without duplicating the import',
+		(earlier) => {
+			expect(distributed_paths.ensure_claude_md_import(`${earlier}\n\n${IMPORT_LINE}\n`)).toBe(
+				`${BOOTSTRAP}\n\n${IMPORT_LINE}\n`,
+			)
+		},
+	)
 
 	it('adds only the bootstrap note when the import line is already present', () => {
 		const existing = `${IMPORT_LINE}\n${LOCAL_SECTION}`
@@ -107,11 +114,14 @@ describe('distributed_paths.remove_claude_md_import', () => {
 		expect(distributed_paths.remove_claude_md_import(written)).toBe(LOCAL_SECTION)
 	})
 
-	it('removes the old bootstrap note as well', () => {
-		const content = `${OLD_BOOTSTRAP}\n\n${IMPORT_LINE}\n\n${LOCAL_SECTION}`
+	it.each([OLD_BOOTSTRAP, PREVIOUS_BOOTSTRAP])(
+		'removes an earlier bootstrap note as well',
+		(earlier) => {
+			const content = `${earlier}\n\n${IMPORT_LINE}\n\n${LOCAL_SECTION}`
 
-		expect(distributed_paths.remove_claude_md_import(content)).toBe(LOCAL_SECTION)
-	})
+			expect(distributed_paths.remove_claude_md_import(content)).toBe(LOCAL_SECTION)
+		},
+	)
 
 	it('empties a file that only holds the written lines', () => {
 		const written = distributed_paths.ensure_claude_md_import(undefined)

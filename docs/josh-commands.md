@@ -77,7 +77,7 @@ pnpm josh lint --shard=1   # one of two fixed halves of the tree (1 or 2) — a 
 
 <!-- usage: lint:related -->
 
-Check only the changed files with prettier and eslint, and in kit the source guard tests (whole tree on fallback).
+Apply eslint fixes and prettier to the resolved scope, then check remaining errors and in kit the source guard tests (whole tree on fallback).
 
 ```bash
 pnpm josh lint:related
@@ -87,6 +87,8 @@ pnpm josh lint:related scripts/thing.ts   # narrow by the given files instead
 <!-- /usage -->
 
 Keeps caches of its own, apart from the gate's.
+
+Before checking, applies ESLint fixes and then Prettier to the resolved scope, using its own caches and the project's skip conditions. Remaining errors still fail. Verification and green records read the tree after both writers finish.
 
 - Changed set = branch diff plus untracked files (cache `.eslintcache.related`); flags are named rather than forwarded (`--fix` is reported ignored).
 - A bare run after a green one lints only what moved since, main syncs included (`scripts/gate/since-green.ts`); nothing moved lints nothing and exits green; the branch diff when there is no comparable record (none, or one written under other tool versions or `NODE_ENV`), nothing lintable moved, or a toolchain or lint config moved (`scripts/gate/verification-inputs.ts`).
@@ -327,8 +329,8 @@ pnpm josh test:related --silent           # flags are forwarded to vitest
   With no other arguments, its separate green record admits review round 2; round 1 and the gate's reuse require a full-reach run.
 
 - Changed set handed to `vitest related`; value-taking flags must be `--flag=value`. Falls back to the whole suite (naming which case) when a changed non-code file has no map or no recorded reader and is new since the map's tree, or a changed file is one every test depends on (counting only files this change moved); a narrowed run matching nothing prints `No test files found` and exits 0.
-- A changed module the vitest config or a setup file imports (`IMPORTED_BY_EVERY_TEST` in `scripts/test/whole-suite-files.ts`) runs only the test files importing it directly, and none when no test does; `josh gate`'s `test:unit` passes `--keep-whole-suite` to run the whole suite for it, as CI does. `josh test:pinned`'s probe narrows by the same rule and leaves out the same heavy files.
-- A changed file whose imports reach more test files than `test_pinned_logic.MAX_TEST_FILES` (150) narrows the same way, to the test files importing it directly, and prints `<N> over cap`, the hub, the count of test files run in place of the reach, and the files (`scripts/test/test-related-cap.ts`).
+- A changed module imported by the vitest config or setup (`IMPORTED_BY_EVERY_TEST` in `scripts/test/whole-suite-files.ts`) narrows to direct test importers only with unchanged imports at the change base. Otherwise its full reach is kept. The pinned probe retains its direct-importer policy. Outside a lane, the gate's `--keep-whole-suite` runs the whole suite, as CI does.
+- A changed file past the 150-test-file cap narrows to direct test importers only with unchanged imports at the change base. New or changed imports and unknown history keep full related reach, with a reason. Stable imports keep the over-cap summary (`scripts/test/test-related-cap.ts`).
 - `--keep-whole-suite` does nothing in a lane: its gate leaves the whole suite to CI's required `Checks` (`scripts/test/test-related-whole.ts`).
 - The hub is the capped file of the widest reach in the branch's own change, left off where a main merge or the map's tree brought every capped file.
 - The lane ledger row records `<N>` as `over_cap` and the hub as `over_cap_hub`; `josh lane:breakdown` prints the widest run's count, the one its summary line printed. `--keep-whole-suite` lifts the cap outside a lane; `josh gate` there and CI run the rest.

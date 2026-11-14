@@ -66,7 +66,7 @@ function serve_labels(...names: ReadonlyArray<string>): void {
 
 function stub_issue_reads(): void {
 	vi.spyOn(git_gh_command, 'issue_blocked_by_references').mockResolvedValue([])
-	vi.spyOn(git_gh_command, 'issue_get_body').mockResolvedValue(undefined)
+	vi.spyOn(git_gh_command, 'issue_get_body').mockResolvedValue('')
 	vi.spyOn(issue_state_cli, 'read_issue').mockResolvedValue({
 		kind: 'state',
 		state: { state: 'OPEN', labels: [IN_PROGRESS], is_human_review: false },
@@ -309,7 +309,6 @@ describe('run_merge_steps.do_failed — a child waiting on its declared start da
 	it.each([
 		['a date already past', start_date_body(-DAY_MS)],
 		['no declaration', '## 背景\n\n- 種別: 不具合\n'],
-		['an unreadable body', undefined],
 	])('parks the child for %s', async (_label, body) => {
 		vi.spyOn(git_gh_command, 'issue_get_body').mockResolvedValue(body)
 
@@ -345,6 +344,7 @@ describe('run_merge_steps.do_failed — a child carrying the not-before label', 
 	})
 
 	it('releases the child to wait on its not-before label when the body cannot be read', async () => {
+		vi.spyOn(git_gh_command, 'issue_get_body').mockResolvedValue(undefined)
 		const result = await run_merge_steps.do_failed(CONTEXT)
 
 		expect(result.waits).toStrictEqual(['a start date still ahead (`not-before`)'])

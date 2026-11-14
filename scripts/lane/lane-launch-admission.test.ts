@@ -117,12 +117,15 @@ describe('lane_launch_admission.launch — memory admission', () => {
 })
 
 describe('lane_launch_admission.launch — failures', () => {
-	it.each(['unopened', 'failed'] as const)('releases the claim when launch is %s', async (kind) => {
-		stub_machine(available)
+	it.each(['unopened', 'failed', 'waiting'] as const)(
+		'releases the claim when launch is %s',
+		async (kind) => {
+			stub_machine(available)
 
-		expect(await lane_launch_admission.launch(CONTEXT, async () => ({ kind }))).toEqual({ kind })
-		expect(core_budget.live_reservations(probe.directory)).toEqual([])
-	})
+			expect(await lane_launch_admission.launch(CONTEXT, async () => ({ kind }))).toEqual({ kind })
+			expect(core_budget.live_reservations(probe.directory)).toEqual([])
+		},
+	)
 
 	it('releases the claim when launch throws', async () => {
 		stub_machine(available)

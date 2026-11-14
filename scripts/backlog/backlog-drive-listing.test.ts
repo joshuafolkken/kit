@@ -1,5 +1,5 @@
 import { git_gh_issue } from '#scripts/gh/git-gh-issue'
-import { AUTO_OK_LABEL } from '#scripts/issue/issue-labels'
+import { AUTO_OK_LABEL, IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { backlog_budget } from './backlog-budget'
 import { backlog_drive } from './backlog-drive'
@@ -142,14 +142,21 @@ const PULL = 7003
 const EARLIER = '2026-11-01T00:00:00Z'
 const LATER = '2026-11-02T00:00:00Z'
 
+const BLOCKED = 'blocked'
+const READY: ReadonlyArray<string> = [AUTO_OK_LABEL]
+const IN_LANE: ReadonlyArray<string> = [AUTO_OK_LABEL, IN_PROGRESS_LABEL]
+
 interface Page {
 	numbers: ReadonlyArray<number>
 	updated_at: string
 	pulls?: ReadonlyArray<number>
+	// The label names every listed issue carries.
+	labels?: ReadonlyArray<string>
 }
 
 function body_of(page: Page): string {
-	const issues = page.numbers.map((number) => ({ number, updated_at: page.updated_at }))
+	const labels = (page.labels ?? READY).map((name) => ({ name }))
+	const issues = page.numbers.map((number) => ({ number, updated_at: page.updated_at, labels }))
 	const pulls = (page.pulls ?? []).map((number) => ({ number, pull_request: { url: '' } }))
 
 	return JSON.stringify([...issues, ...pulls])
@@ -202,6 +209,40 @@ describe('backlog_drive_listing.watcher', () => {
 	})
 })
 
+// joshuafolkken/kit#7507: a label taken off an issue already listed can make it ready.
+describe('backlog_drive_listing.watcher — a relabelled issue', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('asks when a listed issue outside a lane was relabelled', async () => {
+		const pages: readonly [Page, Page] = [
+			{ numbers: [LISTED], updated_at: EARLIER, labels: [...READY, BLOCKED] },
+			{ numbers: [LISTED], updated_at: LATER, labels: READY },
+		]
+
+		await expect(answers(pages)).resolves.toStrictEqual([false, true])
+	})
+
+	it('leaves backlog:next unasked when a lane relabels its own issue', async () => {
+		const pages: readonly [Page, Page] = [
+			{ numbers: [LISTED], updated_at: EARLIER, labels: IN_LANE },
+			{ numbers: [LISTED], updated_at: LATER, labels: [...IN_LANE, BLOCKED] },
+		]
+
+		await expect(answers(pages)).resolves.toStrictEqual([false, false])
+	})
+
+	it('leaves backlog:next unasked when an issue went into a lane', async () => {
+		const pages: readonly [Page, Page] = [
+			{ numbers: [LISTED], updated_at: EARLIER },
+			{ numbers: [LISTED], updated_at: LATER, labels: IN_LANE },
+		]
+
+		await expect(answers(pages)).resolves.toStrictEqual([false, false])
+	})
+})
+
 describe('backlog_drive_listing.watcher — a failed first read', () => {
 	afterEach(() => {
 		vi.restoreAllMocks()
@@ -231,7 +272,7 @@ describe('backlog_drive_cli.ports_of — the listing check', () => {
 		const check = vi.fn(async () => false)
 
 		vi.spyOn(backlog_drive_listing, 'watcher').mockReturnValue(check)
-		const holds = { hold: vi.fn(), end: vi.fn() }
+		const holds = { hold: vi.fn(), answering: <T>(offer: T): T => offer, end: vi.fn() }
 		const ports = backlog_drive_cli.ports_of(CONTEXT, [], { state: undefined as never }, holds)
 
 		expect(ports.listing_changed).toBe(check)

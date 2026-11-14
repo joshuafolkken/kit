@@ -1,6 +1,6 @@
-import { AsyncLocalStorage } from 'node:async_hooks'
 import type { ShipLapRecord } from '#scripts/lane/lane-ledger-schema'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
+import { inherited_scope } from '#scripts/lib/inherited-scope'
 import { z } from 'zod'
 
 // The inner steps of a `josh ship` stage, each timed into the lane ledger as a lap, so `lane:breakdown`
@@ -39,7 +39,7 @@ const STEP = {
 	COMMIT: 'josh git',
 } as const
 
-const scope = new AsyncLocalStorage<LapScope>()
+const scope = inherited_scope.create(ENVIRONMENT_KEY, lap_scope_schema)
 
 async function to_ledger(lap: ShipLapRecord): Promise<void> {
 	await lane_ledger_write.record_ship_lap(lap)
@@ -51,23 +51,11 @@ async function within<T>(
 	run: () => Promise<T>,
 	parent?: string,
 ): Promise<T> {
-	return await scope.run({ issue: Number(issue), stage, parent }, run)
-}
-
-// The scope a parent process handed down, `undefined` when none or unreadable.
-function inherited(): LapScope | undefined {
-	const text = process.env[ENVIRONMENT_KEY]
-	if (text === undefined || text === '') return undefined
-
-	try {
-		return lap_scope_schema.safeParse(JSON.parse(text)).data
-	} catch {
-		return undefined
-	}
+	return await scope.within({ issue: Number(issue), stage, parent }, run)
 }
 
 function current_scope(): LapScope | undefined {
-	return scope.getStore() ?? inherited()
+	return scope.current()
 }
 
 // The environment that times a child process's steps under `parent`, `{}` outside any scope.
@@ -113,7 +101,7 @@ const startup = { recorded: false }
 // `timeOrigin` until that lap, the tsx load among it — so the parent's lap is explained by its
 // children (joshuafolkken/kit#5896). A scope this process opened with `within` started no process.
 async function record_startup(current: LapScope, sink: LapSink, is_wanted: boolean): Promise<void> {
-	if (!is_wanted || startup.recorded || scope.getStore() !== undefined) return
+	if (!is_wanted || startup.recorded || scope.local() !== undefined) return
 	startup.recorded = true
 
 	await sink(lap_of(current, STARTUP_STEP, 0, {}))

@@ -20,10 +20,13 @@ const GITHUB_REPO_TREE_BASE = 'https://github.com/joshuafolkken/kit/tree/main/'
 // The consumer imports kit's published, already path-transformed rules. A tracked bootstrap note
 // remains readable before installation, while the rule body stays in the package (kit#1878).
 const CLAUDE_MD_IMPORT_LINE = '@node_modules/@joshuafolkken/kit/dist/CLAUDE.md'
-const OLD_CLAUDE_MD_BOOTSTRAP =
-	'> Fresh checkout: if kit is not installed, run `pnpm install` first, then reread this file before doing any other work.'
+// Earlier bootstrap notes, oldest first. Sync replaces each in place with the current one.
+const OLD_CLAUDE_MD_BOOTSTRAPS = [
+	'> Fresh checkout: if kit is not installed, run `pnpm install` first, then reread this file before doing any other work.',
+	'> Fresh checkout: before `pnpm install`, run `pnpm config get "@joshuafolkken:registry"` from the project root to check the effective registry, including user-level settings. If it points to GitHub Packages, [set up authentication](https://github.com/joshuafolkken/kit/blob/main/docs/authentication.md#1-get-a-token-from-the-gh-cli) first. Then run `pnpm install` and reread this file before doing any other work.',
+]
 const CLAUDE_MD_BOOTSTRAP =
-	'> Fresh checkout: before `pnpm install`, run `pnpm config get "@joshuafolkken:registry"` from the project root to check the effective registry, including user-level settings. If it points to GitHub Packages, [set up authentication](https://github.com/joshuafolkken/kit/blob/main/docs/authentication.md#1-get-a-token-from-the-gh-cli) first. Then run `pnpm install` and reread this file before doing any other work.'
+	'> Fresh checkout: before `pnpm install`, run `pnpm config get "@joshuafolkken:registry"` from the project root to check the effective registry, including user-level settings. If it points to GitHub Packages, [migrate the project to npm](https://github.com/joshuafolkken/kit/blob/main/docs/registry-migration.md) first, or [set up authentication](https://github.com/joshuafolkken/kit/blob/main/docs/authentication.md#1-get-a-token-from-the-gh-cli) while it still installs from there. Then run `pnpm install` and reread this file before doing any other work.'
 
 // A span containing `*` is excluded: it is a **glob**, not a reference to a file a consumer can
 // open. A distributed document that writes a directory set as `prompts/**` means "anything beneath
@@ -81,12 +84,22 @@ function transform_distributed_paths(content: string): string {
 	return transform_documentation_paths(with_tests)
 }
 
+function replace_old_bootstraps(content: string): string {
+	let updated = content
+
+	for (const old of OLD_CLAUDE_MD_BOOTSTRAPS) {
+		updated = updated.replace(old, () => CLAUDE_MD_BOOTSTRAP)
+	}
+
+	return updated
+}
+
 // Keep the bootstrap note ahead of the import so an agent can read it in a fresh checkout. Preserve
 // project additions and update older one-line files without duplicating either line.
 function ensure_claude_md_import(existing: string | undefined): string {
 	if (existing === undefined) return `${CLAUDE_MD_BOOTSTRAP}\n\n${CLAUDE_MD_IMPORT_LINE}\n`
 
-	const updated = existing.replace(OLD_CLAUDE_MD_BOOTSTRAP, () => CLAUDE_MD_BOOTSTRAP)
+	const updated = replace_old_bootstraps(existing)
 
 	if (updated.includes(CLAUDE_MD_IMPORT_LINE)) {
 		if (updated.includes(CLAUDE_MD_BOOTSTRAP)) return updated
@@ -101,7 +114,7 @@ function ensure_claude_md_import(existing: string | undefined): string {
 // or a switch from full, leaves these behind for it to remove.
 const FULL_CLAUDE_MD_LINES = new Set([
 	CLAUDE_MD_BOOTSTRAP,
-	OLD_CLAUDE_MD_BOOTSTRAP,
+	...OLD_CLAUDE_MD_BOOTSTRAPS,
 	CLAUDE_MD_IMPORT_LINE,
 ])
 
