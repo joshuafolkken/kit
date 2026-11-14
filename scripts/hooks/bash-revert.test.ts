@@ -255,8 +255,17 @@ describe('bash_revert reading the paths its command names', () => {
 		stamp()
 		write(APP, WRITTEN)
 
-		expect(revert(`cat ${APP}x`)).toContain(`left in place: ${APP}.`)
+		expect(revert(`node write.mjs ${APP}x`)).toContain(`left in place: ${APP}.`)
 		expect(read(APP)).toBe(WRITTEN)
+	})
+
+	it('does not take a path a reading command names', () => {
+		write(APP, WRITTEN)
+		stamp()
+		write(APP, SHELL_WRITTEN)
+
+		expect(revert(`cat ${APP}`)).toContain(`left in place: ${APP}.`)
+		expect(read(APP)).toBe(SHELL_WRITTEN)
 	})
 
 	it('takes a path the command names under an absolute root', () => {

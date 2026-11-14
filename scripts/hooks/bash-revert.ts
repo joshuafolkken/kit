@@ -5,6 +5,7 @@ import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { json_value } from '#scripts/lib/json-value'
+import { time_bundle_call } from '#scripts/time-runtime/time-bundle-call'
 import { time_shell } from '#scripts/time-runtime/time-shell'
 import { z } from 'zod'
 import { step_zero_notice } from './step-zero-notice'
@@ -182,8 +183,11 @@ function moved_entries(transcript: string, root: string): Moved {
 }
 
 // A whole word of `command` is `file`, relative or under an absolute root — `src/app.ts` does not
-// name `src/app.tsx`.
+// name `src/app.tsx`. A read (`cat`, `grep`, a reading `josh` command — `time_bundle_call`'s reading)
+// names a file without writing it, so a change to one it reads is another writer's.
 function names(command: string, file: string): boolean {
+	if (time_bundle_call.bash_facts(command).is_bundleable) return false
+
 	return command.split(PATH_BREAK).some((word) => word === file || word.endsWith(`/${file}`))
 }
 
