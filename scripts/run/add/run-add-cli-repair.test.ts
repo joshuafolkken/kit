@@ -1,119 +1,27 @@
-import { auto_ok_fixture, CREATED_EARLIER } from '#scripts/auto-ok/auto-ok-fixture'
-import { backlog_fixture } from '#scripts/backlog/backlog-fixture'
-import { backlog_next } from '#scripts/backlog/backlog-next'
-import { backlog_plan_comment } from '#scripts/backlog/backlog-plan-comment'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
-import { git_common_directory } from '#scripts/git/git-common-directory'
-import { AUTO_OK_LABEL, NEEDS_HUMAN_MERGE_LABEL, RUN_LANE_LABEL } from '#scripts/issue/issue-labels'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { lane_await } from '#scripts/lane/lane-await'
 import { lane_process_table } from '#scripts/lane/lane-process-table'
-import { lane_registry } from '#scripts/lane/lane-registry'
-import { lane_spent } from '#scripts/lane/lane-spent'
-import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_cut } from '#scripts/run/cut/run-cut'
 import { run_cut_adoption } from '#scripts/run/cut/run-cut-adoption'
 import { run_cut_cli } from '#scripts/run/cut/run-cut-cli'
 import { run_cut_cli_fixture } from '#scripts/run/cut/run-cut-cli-fixture'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
-import { run_halfrun_resume } from '#scripts/run/run-halfrun-resume'
-import { run_open_pr } from '#scripts/run/run-open-pr'
 import { run_pr_return } from '#scripts/run/run-pr-return'
-import { run_prrun_resume } from '#scripts/run/run-prrun-resume'
 import { run_stage } from '#scripts/run/run-stage'
 import { run_stage_read } from '#scripts/run/run-stage-read'
 import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
-import { temporary_directory } from '#tools/test/temporary-directory'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AddPorts } from './run-add'
+import { describe, expect, it, vi } from 'vitest'
 import { run_add_cli } from './run-add-cli'
+import { run_add_cli_repair_fixture } from './run-add-cli-repair-fixture'
 
-const { ISSUE, existing_cut, lane, target } = run_cut_cli_fixture
-const CUT_TARGET = target()
-const make_directory = temporary_directory('suite')
-const LABELS = ['run:stalled']
-const PORTS: AddPorts = {
-	read_issue: async () => ({ is_open: true, labels: LABELS, blockers: [] }),
-	apply_label: async () => true,
-	clear_label: async () => true,
-}
-const REVIEWED_AT = '2026-11-12T01:00:00Z'
-const REQUESTED_AT = '2026-11-12T02:00:00Z'
+const { ISSUE, target } = run_cut_cli_fixture
+const { COMMENT, PORTS, REQUESTED_AT, REVIEWED_AT, state } = run_add_cli_repair_fixture
 const MISSING_ADOPTION = 'Missing fixture adoption'
-const COMMENT = {
-	id: 7477,
-	author: 'joshuafolkken',
-	is_trusted: true,
-	is_automated: false,
-	created_at: REQUESTED_AT,
-	body: 'Please fix the review findings.',
-}
-const state = { stream: '', directory: '' }
 
-run_cut_cli_fixture.install()
-
-afterEach(() => {
-	if (vi.isMockFunction(run_event_stream_emit.append_at)) {
-		run_event_stream_emit.append_at.mockRestore()
-	}
-})
-
-function setup_stream(directory: string): void {
-	state.directory = directory
-	state.stream = run_event_stream.target_of(directory)
-	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(directory)
-	run_carry.end_carry(run_carry.carry_path(directory))
-	run_carry.begin_carry(
-		run_carry.carry_path(directory),
-		`backlogrun #${ISSUE}`,
-		run_carry.NO_OWNER,
-		new Date(),
-	)
-	vi.spyOn(run_event_stream_emit, 'stream_target').mockResolvedValue(state.stream)
-	vi.spyOn(run_event_stream_emit, 'current_events').mockImplementation(async () =>
-		run_event_stream.read_events(state.stream),
-	)
-	vi.spyOn(run_event_stream_emit, 'all_events').mockImplementation(async () =>
-		run_event_stream.read_events(state.stream),
-	)
-}
-
-function setup_lane(directory: string): void {
-	vi.spyOn(lane_spent, 'lanes_in_use').mockResolvedValue({ working: [], unread: [] })
-	vi.spyOn(lane_await, 'other_process_trace').mockResolvedValue('none')
-	vi.spyOn(lane_registry, 'find_open_lane').mockResolvedValue(lane())
-	vi.spyOn(git_common_directory, 'own').mockReturnValue(directory)
-	vi.spyOn(run_cut, 'cut_path').mockReturnValue(CUT_TARGET)
-}
-
-function setup_pr(): void {
-	vi.spyOn(run_open_pr, 'is_pending').mockResolvedValue(true)
-	vi.spyOn(run_halfrun_resume, 'is_pending').mockResolvedValue(false)
-	vi.spyOn(run_prrun_resume, 'resume_token').mockResolvedValue(undefined)
-	vi.spyOn(backlog_plan_comment, 'read_plan').mockResolvedValue(undefined)
-	vi.spyOn(issue_state_cli, 'read_issue').mockResolvedValue({
-		kind: 'state',
-		state: { state: 'OPEN', labels: LABELS, is_human_review: false },
-	})
-	vi.spyOn(git_gh_command, 'pr_view').mockResolvedValue(JSON.stringify({ state: 'OPEN' }))
-	vi.spyOn(run_pr_return, 'read').mockResolvedValue({ red_checks: [], comments: [COMMENT] })
-}
-
-beforeEach(async () => {
-	const directory = make_directory('repair-attempt-')
-
-	setup_stream(directory)
-	setup_lane(directory)
-	setup_pr()
-	existing_cut()
-	await run_cut_cli.run(['--resume', ISSUE])
-
-	for (const kind of ['human-review', 'child-launch', 'park']) {
-		run_event_stream.append(state.stream, kind, `#${ISSUE} stale hand-off`, REVIEWED_AT)
-	}
-})
+run_add_cli_repair_fixture.install(run_cut_cli.run)
 
 describe('reviewed pull request repair through the resume CLI', () => {
 	it('resumes an ended adopted cut directly through the entry resume seam', async () => {
@@ -267,48 +175,6 @@ describe('repair history beyond the active invocation', () => {
 		const stage = await run_stage_read.read_stage(ISSUE)
 
 		expect(run_stage.decide(stage.state, 'fullrun').start).toBe('implement')
-	})
-})
-
-function waiting_store(): { ports: AddPorts; labels: Set<string> } {
-	const labels = new Set([AUTO_OK_LABEL, RUN_LANE_LABEL, NEEDS_HUMAN_MERGE_LABEL])
-	const ports: AddPorts = {
-		read_issue: async () => ({ is_open: true, labels: [...labels], blockers: [] }),
-		apply_label: async (_issue, label) => Boolean(labels.add(label)),
-		clear_label: async (_issue, label) => labels.delete(label) || true,
-	}
-
-	return { ports, labels }
-}
-
-// The issue the backlog selection offers next, read off its printed answer.
-async function offered(labels: ReadonlySet<string>): Promise<string | undefined> {
-	backlog_fixture.stub_backlog({
-		opted_in: [auto_ok_fixture.issue(Number(ISSUE), CREATED_EARLIER, [...labels])],
-	})
-	vi.mocked(console.info).mockClear()
-	await backlog_next.run([])
-
-	return vi.mocked(console.info).mock.calls.flat().map(String).at(-1)
-}
-
-// joshuafolkken/kit#7487: a recorded repair on a merge wait is offered, not excluded as a person's.
-describe('repair of a pull request waiting on a person merge', () => {
-	it('dispatches the repair on the next offer', async () => {
-		const store = waiting_store()
-
-		expect(await run_add_cli.run([ISSUE, '--retry'], store.ports)).toBe(0)
-		expect(store.labels.has(NEEDS_HUMAN_MERGE_LABEL)).toBe(false)
-		expect(await offered(store.labels)).toBe(ISSUE)
-	})
-
-	it('keeps the merge wait without a repair boundary', async () => {
-		vi.mocked(git_gh_command.pr_view).mockResolvedValue(JSON.stringify({ state: 'MERGED' }))
-		const store = waiting_store()
-
-		await run_add_cli.run([ISSUE, '--retry'], store.ports)
-		expect(store.labels.has(NEEDS_HUMAN_MERGE_LABEL)).toBe(true)
-		expect(await offered(store.labels)).not.toBe(ISSUE)
 	})
 })
 
