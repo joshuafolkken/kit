@@ -326,9 +326,10 @@ before `offer` entries or a lane opened by hand).
 The time is derived, not recorded (`scripts/lane/lane-dispatch-wait-stats.ts`):
 
 - The wait starts at the first offer of the runnable stretch the dispatch ended: the offers since the
-  issue's previous dispatch, from the first one whose `seen` lists it and whose `excluded` does not. When
-  the run filed the issue (a `filed` run event in this repository) after the last offer that could not
-  start it, the wait starts at the filing.
+  issue's previous dispatch, from the first one whose `seen` lists it and whose `excluded` does not. A
+  `retry` offer is skipped, since it excludes only the issues it was asked to. When the run filed the
+  issue (a `filed` run event in this repository) after the last offer that could not start it and after
+  its previous dispatch, the wait starts at the filing.
 - A seat that was not there is not waiting: a hold by `memory`, `usage-limit` or the `run:solo` gate
   (`offer:…:solo`), and the time after a `released` entry, each lasting until the next `held`,
   `released` or `dispatch` entry, are taken out.

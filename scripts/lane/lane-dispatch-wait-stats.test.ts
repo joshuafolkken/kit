@@ -149,9 +149,24 @@ describe('lane_dispatch_wait_stats.table — records without an offer', () => {
 		expect(cells_of([])).toStrictEqual(['0', ...unread, '0', '0'])
 	})
 
-	it('measures a re-dispatch from the offers after the previous one', () => {
+	it('measures a re-dispatch from the offers after the previous one, not its first filing', () => {
 		const entries = [offer(30, [ISSUE]), dispatch(29), offer(5, [ISSUE]), dispatch(3)]
 
-		expect(cells_of(entries).slice(0, 3)).toStrictEqual(['2', '1.5', '2.0'])
+		expect(cells_of(entries, [filed(40)]).slice(0, 4)).toStrictEqual(['2', '6.5', '11.0', '#7503'])
+	})
+
+	it('reads nothing from a retry offer, which excludes only the issues asked to', () => {
+		const retry: LedgerEntry = {
+			kind: 'offer',
+			at: minutes_before_now(20),
+			verdict: 'retry',
+			seen: [ISSUE],
+			started: [],
+			excluded: [],
+			is_unchanged: false,
+		}
+		const entries = [offer(30, [ISSUE], [ISSUE]), retry, offer(6, [ISSUE]), dispatch(2)]
+
+		expect(cells_of(entries)[2]).toBe('4.0')
 	})
 })

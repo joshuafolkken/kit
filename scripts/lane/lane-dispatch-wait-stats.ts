@@ -1,4 +1,5 @@
 import { backlog_hold_codes } from '#scripts/backlog/backlog-hold-codes'
+import { backlog_next_report } from '#scripts/backlog/backlog-next-report'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_event_filed } from '#scripts/run/event/run-event-filed'
@@ -26,6 +27,7 @@ import { lane_stats, type StatsWindow } from './lane-stats'
 const { KIND } = lane_ledger
 const { MEMORY_REASON, REASON_SEPARATOR, USAGE_LIMIT_REASON } = backlog_hold_codes
 const { NOT_MEASURED, is_dispatch } = lane_stage_stats
+const RETRY_VERDICT = backlog_next_report.VERDICT_TOKENS.retry
 const LIMIT_MS = MS_PER_MINUTE
 const SEATLESS_REASONS: ReadonlySet<string> = new Set([MEMORY_REASON, USAGE_LIMIT_REASON])
 const SOLO_SUFFIX = `${REASON_SEPARATOR}solo`
@@ -50,6 +52,11 @@ interface Span {
 interface Stretch {
 	from_ms: number
 	after_ms: number
+}
+
+interface History {
+	offers: ReadonlyArray<OfferEntry>
+	since_ms: number
 }
 
 interface Wait {
@@ -127,18 +134,26 @@ function filed_times(events: ReadonlyArray<RunEvent>): Map<number, number> {
 	return new Map(pairs.toReversed())
 }
 
-function offers_before(
-	entries: ReadonlyArray<LedgerEntry>,
-	index: number,
-	issue: number,
-): Array<OfferEntry> {
-	const before = entries.slice(0, index)
-	const previous = before.findLastIndex((entry) => is_dispatch(entry) && entry.issue === issue)
-
-	return before.slice(previous + 1).filter((entry) => is_offer(entry))
+// A `retry` offer excludes only the issues it was asked to, so it says nothing about the rest.
+function is_decision(entry: LedgerEntry): entry is OfferEntry {
+	return is_offer(entry) && entry.verdict !== RETRY_VERDICT
 }
 
-function stretch_of(offers: ReadonlyArray<OfferEntry>, issue: number): Stretch | undefined {
+// The offers since the issue's previous dispatch that decided on it, and when that dispatch was.
+function history_of(entries: ReadonlyArray<LedgerEntry>, index: number, issue: number): History {
+	const before = entries.slice(0, index)
+	const previous_index = before.findLastIndex(
+		(entry) => is_dispatch(entry) && entry.issue === issue,
+	)
+	const previous = before[previous_index]
+	const offers = before.slice(previous_index + 1).filter((entry) => is_decision(entry))
+
+	return { offers, since_ms: previous === undefined ? -Infinity : ms_of(previous) }
+}
+
+// A stretch with no offer holding the issue back starts after its previous dispatch at the earliest.
+function stretch_of(history: History, issue: number): Stretch | undefined {
+	const { offers, since_ms } = history
 	const blocked_index = offers.findLastIndex((offer) => !is_runnable(offer, issue))
 	const first = offers[blocked_index + 1]
 
@@ -146,7 +161,7 @@ function stretch_of(offers: ReadonlyArray<OfferEntry>, issue: number): Stretch |
 
 	const blocked = offers[blocked_index]
 
-	return { from_ms: ms_of(first), after_ms: blocked === undefined ? -Infinity : ms_of(blocked) }
+	return { from_ms: ms_of(first), after_ms: blocked === undefined ? since_ms : ms_of(blocked) }
 }
 
 // A filing between the last offer that could not start the issue and the stretch's first offer is when
@@ -162,7 +177,7 @@ function overlap_ms(span: Span, from_ms: number, to_ms: number): number {
 }
 
 function wait_of(records: Records, dispatch: DispatchEntry, index: number): Wait | undefined {
-	const stretch = stretch_of(offers_before(records.entries, index, dispatch.issue), dispatch.issue)
+	const stretch = stretch_of(history_of(records.entries, index, dispatch.issue), dispatch.issue)
 
 	if (stretch === undefined) return undefined
 
