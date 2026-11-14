@@ -10,6 +10,10 @@ const WORKTREE_DIRECTORY = vi.hoisted(() => '/scratch/.git')
 const NEXT_ISSUES_HEADER = '🗒 Next issues (newest first):'
 
 const release_hold_mock = vi.hoisted(() => vi.fn())
+const record_ended_mock = vi.hoisted(() => vi.fn())
+const lane_issue_of_mock = vi.hoisted(() =>
+	vi.fn<(cwd: string) => string | undefined>().mockReturnValue(undefined),
+)
 const end_life_mock = vi.hoisted(() => vi.fn())
 const worktree_directory_mock = vi.hoisted(() =>
 	vi.fn<() => Promise<string | undefined>>().mockResolvedValue(WORKTREE_DIRECTORY),
@@ -44,9 +48,21 @@ vi.mock('#scripts/review/review-attest', () => ({
 vi.mock('#scripts/run/hold/run-hold', () => ({
 	run_hold: {
 		hold_path: (directory: string) => `${directory}/hold.json`,
+		read_hold: (target: string) => ({ kind: 'held', hold: { issue: target } }),
 		release_hold: release_hold_mock,
 		worktree_directory: worktree_directory_mock,
 	},
+}))
+
+vi.mock('#scripts/run/hold/run-hold-ended', () => ({
+	run_hold_ended: {
+		ended_path: (directory: string) => `${directory}/ended.json`,
+		record_ended: record_ended_mock,
+	},
+}))
+
+vi.mock('#scripts/lane/lane-paths', () => ({
+	lane_paths: { lane_issue_of: lane_issue_of_mock },
 }))
 
 vi.mock('#scripts/run/progress/run-progress-clock', () => ({
@@ -228,6 +244,25 @@ describe('the working-tree hold is released only by a merged run', () => {
 		await git_followup_finish.release_worktree_hold(false)
 
 		expect(release_hold_mock).not.toHaveBeenCalled()
+	})
+
+	// joshuafolkken/kit#7525: the board lists a merged run outside a lane in done from this record.
+	it('records the released hold for the board outside a lane', async () => {
+		await git_followup_finish.release_worktree_hold(true)
+
+		expect(record_ended_mock).toHaveBeenCalledWith(`${WORKTREE_DIRECTORY}/ended.json`, {
+			kind: 'held',
+			hold: { issue: `${WORKTREE_DIRECTORY}/hold.json` },
+		})
+	})
+
+	it('records nothing in a lane, whose hold is its backlogrun child’s', async () => {
+		lane_issue_of_mock.mockReturnValueOnce('7530')
+
+		await git_followup_finish.release_worktree_hold(true)
+
+		expect(record_ended_mock).not.toHaveBeenCalled()
+		expect(release_hold_mock).toHaveBeenCalledWith(`${WORKTREE_DIRECTORY}/hold.json`)
 	})
 
 	it('reports success when the work tree could not be read', async () => {

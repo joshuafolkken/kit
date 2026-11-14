@@ -26,6 +26,32 @@ function held(hold: Partial<RunHold> = {}): HoldRead {
 
 afterEach(() => vi.restoreAllMocks())
 
+// joshuafolkken/kit#7525: the runs a merge released are read back for the run's ✅ done.
+describe('run_board_single.ended_in', () => {
+	const ENDED_AT = '2026-10-08T09:30:00.000Z'
+	const ENDED_MS = Date.parse(ENDED_AT)
+	const RECORD = { issue: String(ISSUE), taken_at: TAKEN_AT, ended_at: ENDED_AT }
+	const SPAN = { invocation: 'backlogrun', started_ms: TAKEN_MS, ended_ms: undefined }
+
+	it('reads a fullrun and a halfrun that ended inside the run', () => {
+		const records = [{ ...RECORD, is_fullrun: true }, RECORD]
+
+		expect(run_board_single.ended_in(records, SPAN)).toStrictEqual([
+			{ command: FULLRUN, issue: ISSUE, started_ms: TAKEN_MS, ended_ms: ENDED_MS },
+			{ command: 'halfrun', issue: ISSUE, started_ms: TAKEN_MS, ended_ms: ENDED_MS },
+		])
+	})
+
+	it.each([
+		['before the run began', { ...SPAN, started_ms: ENDED_MS + 1 }, RECORD],
+		['after the run ended', { ...SPAN, ended_ms: ENDED_MS - 1 }, RECORD],
+		['with no issue number', SPAN, { ...RECORD, issue: 'new' }],
+		['with no moment', SPAN, { ...RECORD, ended_at: 'later' }],
+	])('reads none that ended %s', (_, span, record) => {
+		expect(run_board_single.ended_in([record], span)).toStrictEqual([])
+	})
+})
+
 describe('run_board_single.span_of', () => {
 	it.each([
 		{ read: held({ is_fullrun: true }), invocation: `fullrun #${String(ISSUE)}` },
@@ -123,12 +149,17 @@ describe('run_board_read.read_local beside a carried run', () => {
 		expect(run_carry.read_carry).toHaveBeenCalled()
 	})
 
-	it('reads the fullrun a checkout outside a lane holds beside a carried run', async () => {
+	// joshuafolkken/kit#7524: the carried run stays the frame; the root checkout's run is read beside it.
+	it('reads the fullrun a checkout outside a lane holds as the root run beside a carried run', async () => {
 		arrange({ kind: 'carried', carry: CARRY }, undefined)
 		vi.spyOn(lane_paths, 'lane_issue_of').mockReturnValue(undefined)
 		vi.spyOn(run_hold, 'read_hold').mockReturnValue(held({ is_fullrun: true }))
 
-		await expect(run_board_read.read_local()).resolves.toMatchObject({ run_name: FULLRUN })
+		const local = await run_board_read.read_local()
+
+		expect(local?.run_name).toBeUndefined()
+		expect(local?.carry).toStrictEqual(CARRY)
+		expect(local?.root).toMatchObject({ command: FULLRUN, issue: ISSUE })
 	})
 
 	it('asks git again on the next read after a failed resolve', async () => {

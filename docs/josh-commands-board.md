@@ -181,6 +181,8 @@ On a terminal it draws on the alternate screen, so redraws never grow the scroll
 
 A running `fullrun #N` or `halfrun #N` this checkout's `run:hold` record holds is drawn as a one-row board under its own name, the row's phase read from #N's events — over a carry record too, outside a lane; a stop-marked hold is not running.
 
+Beside a backlogrun, the root checkout's running single run is drawn under its own `🏠` heading above the `🧵` lanes; the header counts no lane and no `🔄` for it. The merge that releases its hold keeps the run's issue, start and end, so a merge inside the backlogrun's span moves it out of `🏠` into `✅ done`, placed by its end like a lane's finished row.
+
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh run:board` in detail".
 
 ### `josh run:pickup`

@@ -1,20 +1,17 @@
 import { backlog_drive_memory } from '#scripts/backlog/backlog-drive-memory'
 import type { NamedPlan } from '#scripts/backlog/backlog-plan'
 import { backlog_ready } from '#scripts/backlog/backlog-ready'
-import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
 import { lane_held_stats } from '#scripts/lane/lane-held-stats'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
 import type { TableRead } from '#scripts/lane/lane-process-table'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_state, type LaneStateRecord } from '#scripts/lane/lane-state'
 import { stamped_memo } from '#scripts/lib/stamped-memo'
-import { run_carry, type CarryRead, type RunCarry } from '#scripts/run/carry/run-carry'
-import { run_carry_ended } from '#scripts/run/carry/run-carry-ended'
+import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_event_tail } from '#scripts/run/event/run-event-tail'
 import { run_merge_usage_limit } from '#scripts/run/merge/run-merge-usage-limit'
-import { run_stranded_detect } from '#scripts/run/run-stranded-detect'
 import { run_wake } from '#scripts/run/wake/run-wake'
 import { run_board_found, type FoundOf } from './run-board-found'
 import { run_board_lane_result } from './run-board-lane-result'
@@ -26,10 +23,10 @@ import {
 } from './run-board-operation-read'
 import type { ProcessRoots } from './run-board-process-groups'
 import type { QuotaProvider } from './run-board-quota-read'
-import { run_board_roots } from './run-board-roots'
 import { run_board_scope } from './run-board-scope'
-import { run_board_single } from './run-board-single'
+import { run_board_single, type EndedRoot, type RootRun } from './run-board-single'
 import { run_board_span, type BoardSpan } from './run-board-span'
+import { run_board_span_read } from './run-board-span-read'
 import { run_board_throughput, type ThroughputRow } from './run-board-throughput'
 import { run_board_usual, type UsualTimes } from './run-board-usual'
 
@@ -42,6 +39,10 @@ interface LocalRead {
 	ended_ms: number | undefined
 	// The single run's name the header draws; `undefined` for a `backlogrun` (`run-board-single.ts`).
 	run_name?: string | undefined
+	// The root checkout's single run beside a carried run, drawn above its lanes.
+	root?: RootRun | undefined
+	// The root checkout's single runs a merge ended inside the run, drawn in `✅ done`.
+	ended_roots?: ReadonlyArray<EndedRoot> | undefined
 	// What the run was asked to do, from its invocation.
 	scope: NamedPlan
 	events: ReadonlyArray<RunEvent>
@@ -103,27 +104,6 @@ interface LocalRead {
 	found?: FoundOf | undefined
 }
 
-const NO_SPAN: SpanHere = {
-	span: undefined,
-	resume: undefined,
-	transcript: undefined,
-	roots: {},
-	carry: undefined,
-	is_stranded: false,
-	is_session_active: false,
-}
-
-interface SpanHere {
-	span: BoardSpan | undefined
-	resume: string | undefined
-	// The parent session's transcript, where the run's record names one.
-	transcript: string | undefined
-	roots: ProcessRoots
-	carry: RunCarry | undefined
-	is_stranded: boolean
-	is_session_active: boolean
-}
-
 // The main work tree, resolved once: it does not move while the board is open, and resolving it runs a
 // `git` subprocess the redraw would wait on (joshuafolkken/kit#4263). A failed resolve is forgotten,
 // so a `git` that timed out once is asked again on the next redraw rather than failing every one.
@@ -140,44 +120,6 @@ async function main_root(): Promise<string> {
 		main_roots.keep(new Set())
 		throw error
 	}
-}
-
-// Every process the run's record names is asked of `table`, the redraw's own `ps` snapshot — only once
-// a run is found, so a repository with no run waits on no `ps`.
-async function recorded_span_here(
-	repository: string,
-	table: TableRead | undefined,
-	read: CarryRead,
-): Promise<SpanHere> {
-	const ended = run_carry_ended.read_ended(run_carry_ended.ended_path(repository))
-	const launch = backlogrun_launch.pending_launch(repository)
-	const span = run_board_span.span_of(read, ended, launch)
-
-	if (span === undefined) return NO_SPAN
-
-	const same_process = await run_board_roots.same_in(table)
-	const stranded_ports = run_stranded_detect.ports_with(same_process)
-
-	return {
-		span,
-		resume: run_board_span.resume_of(read, ended, launch),
-		transcript: read.kind === 'carried' ? read.carry.owner_transcript : undefined,
-		roots: run_board_roots.roots_of(repository, read, same_process),
-		is_session_active: run_board_roots.session_is_active(repository, read, same_process),
-		carry: read.kind === 'carried' ? read.carry : undefined,
-		is_stranded: run_stranded_detect.is_stranded_at(repository, stranded_ports),
-	}
-}
-
-// A single run this checkout holds is the one drawn (`run-board-single.ts`), before the ended run and,
-// outside a lane, before the carried one; it names no process.
-async function span_here(repository: string, table: TableRead | undefined): Promise<SpanHere> {
-	const read = run_carry.read_carry(run_carry.carry_path(repository))
-	const single = await run_board_single.span_here(read.kind !== 'none')
-
-	return single === undefined
-		? await recorded_span_here(repository, table, read)
-		: { ...NO_SPAN, span: single }
 }
 
 // Where each session of the run writes what it does: a lane's child to its dispatch log, in the lane's
@@ -327,11 +269,16 @@ async function span_events_here(
 	}
 }
 
+type RootFields = Pick<LocalRead, 'root' | 'ended_roots'>
+
+// The span's own fields, with the root checkout's single runs beside it.
 function span_fields(
 	span: BoardSpan,
-): Pick<LocalRead, 'started_ms' | 'ended_ms' | 'scheduler_provider' | 'run_name'> {
+	root: RootFields,
+): Pick<LocalRead, 'started_ms' | 'ended_ms' | 'scheduler_provider' | 'run_name'> & RootFields {
 	const run_name = run_board_single.name_of(span.invocation)
 	const times = {
+		...root,
 		started_ms: span.started_ms,
 		ended_ms: span.ended_ms,
 		...(run_name !== undefined && { run_name }),
@@ -342,12 +289,25 @@ function span_fields(
 	return { ...times, scheduler_provider: span.scheduler_provider === 'openai' ? 'codex' : 'claude' }
 }
 
+// The root checkout's single run beside the span, and its runs a merge ended inside it.
+async function roots_here(
+	span: BoardSpan,
+	root: BoardSpan | undefined,
+	events: ReadonlyArray<RunEvent>,
+): Promise<RootFields> {
+	const ended_roots = await run_board_single.ended_here(span)
+
+	return root === undefined
+		? { ended_roots }
+		: { root: run_board_single.root_of(root, events), ended_roots }
+}
+
 // `undefined` when no run has started here. The lane count reads `table`, the redraw's process
 // snapshot, so it agrees with the usage columns.
 async function read_local(table?: TableRead): Promise<LocalRead | undefined> {
 	const repository = await run_carry.repository_directory()
-	const { span, resume, transcript, roots, carry, is_stranded, is_session_active } =
-		repository === undefined ? NO_SPAN : await span_here(repository, table)
+	const { span, root, resume, transcript, roots, carry, is_stranded, is_session_active } =
+		await run_board_span_read.span_here(repository, table)
 
 	if (repository === undefined || span === undefined) return undefined
 
@@ -356,7 +316,7 @@ async function read_local(table?: TableRead): Promise<LocalRead | undefined> {
 	const lane_read = await lanes_here(lanes, repository, events, span.started_ms)
 
 	return {
-		...span_fields(span),
+		...span_fields(span, await roots_here(span, root, events)),
 		scope: run_board_scope.scope_of(span.invocation, carry?.added),
 		...(await span_events_here(events, span, table, carry)),
 		throughput: run_board_throughput.rows_of(events, Date.now()),

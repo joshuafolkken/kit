@@ -9,6 +9,7 @@ import { run_carry_ended, type EndedRun } from '#scripts/run/carry/run-carry-end
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_event_tail } from '#scripts/run/event/run-event-tail'
 import { run_hold } from '#scripts/run/hold/run-hold'
+import { run_hold_ended } from '#scripts/run/hold/run-hold-ended'
 import { run_wake } from '#scripts/run/wake/run-wake'
 import { transcript_tail } from '#scripts/time-runtime/transcript-tail'
 import { vi } from 'vitest'
@@ -56,6 +57,7 @@ function arrange_records(read: CarryRead, ended: EndedRun | undefined): void {
 	// This checkout's hold, read for a single run with no carry record: none held unless a test holds one.
 	vi.spyOn(run_hold, 'worktree_directory').mockResolvedValue(REPOSITORY)
 	vi.spyOn(run_hold, 'read_hold').mockReturnValue({ kind: 'free' })
+	vi.spyOn(run_hold_ended, 'read_ended').mockReturnValue([])
 	vi.spyOn(run_wake, 'read_wake').mockReturnValue(undefined)
 	vi.spyOn(lane_state, 'read_states').mockResolvedValue(new Map())
 	vi.spyOn(lane_state, 'read_records').mockResolvedValue([])

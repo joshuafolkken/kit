@@ -20,7 +20,8 @@ import { run_board_usage_text, type CellLimits } from './run-board-usage-text'
 const { HEADER_ICONS } = run_board_labels
 const { cell_widths, cells_of, lane_limits } = run_board_usage_text
 const { columns_rule } = run_board_render_section
-const { ELAPSED_START, LANES_LABEL, USAGE_START, column_offset, lane_label } = run_board_render_lead
+const { ELAPSED_START, LANES_LABEL, USAGE_START, column_offset, lane_label, root_label } =
+	run_board_render_lead
 const { width_of } = run_board_fit
 const { columns_cut } = run_board_render_title
 const { reasons_of } = run_board_seat
@@ -150,25 +151,41 @@ function seat_lines(header: BoardHeader, columns: number | undefined): Array<Pla
 	}))
 }
 
-// The run's own rows under the lanes rule, ⏰ over the run's time and the usage labels over their
-// cells where they are drawn, then the empty seats' reasons.
+// A section of lane rows under `label`'s rule, ⏰ over the run's time and the usage labels over their
+// cells where they are drawn; none without a line.
+function rows_section(
+	lines: Array<PlanLine>,
+	label: string,
+	cells: LaneCells | undefined,
+	header: BoardHeader,
+): Array<PlanSection> {
+	if (lines.length === 0) return []
+
+	const offset = column_offset(header)
+	const elapsed = { label: HEADER_ICONS.elapsed, start: ELAPSED_START + offset }
+	const usage = cells === undefined ? [] : label_columns(USAGE_START + offset, cells.gauge)
+	const rule = columns_rule(label, [elapsed, ...usage])
+
+	return [{ head: ['', rule], lines, label, key: 'lanes' }]
+}
+
+// The root checkout's single run's row, the first of `rows` (`run_board_layout.lane_rows`), under its
+// own `🏠` rule above the run's lanes (joshuafolkken/kit#7524); then the run's own rows under the lanes
+// rule and the empty seats' reasons.
 function lanes_section(
 	rows: ReadonlyArray<PlanLine>,
 	cells: LaneCells | undefined,
 	header: BoardHeader,
 	columns?: number,
 ): Array<PlanSection> {
-	const lines = [...rows, ...seat_lines(header, columns)]
+	const root = header.layout?.root
+	const root_count = root === undefined ? 0 : 1
+	const lanes = [...rows.slice(root_count), ...seat_lines(header, columns)]
 
-	if (lines.length === 0) return []
-
-	const offset = column_offset(header)
-	const label = lane_label(header)
-	const elapsed = { label: HEADER_ICONS.elapsed, start: ELAPSED_START + offset }
-	const usage = cells === undefined ? [] : label_columns(USAGE_START + offset, cells.gauge)
-	const rule = columns_rule(label, [elapsed, ...usage])
-
-	return [{ head: ['', rule], lines, label, key: 'lanes' }]
+	return [
+		...rows_section(rows.slice(0, root_count), root_label(root?.name ?? ''), cells, header),
+		...rows_section(lanes, lane_label(header), cells, header),
+	]
 }
 
 const run_board_render_lanes = {
