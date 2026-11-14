@@ -141,10 +141,13 @@ lane spends the allowance beside it (`backlog-budget.ts` → `IDLE_OFFER_INTERVA
 
 A new `auto-ok` issue asks sooner too (joshuafolkken/kit#7227). A free lane checks the listing's ETag
 every 10 seconds, running or idle: a 304 spends no REST core, and only a first page holding an issue
-number the previous read lacked asks at once (`backlog-budget.ts` → `LISTING_CHECK_INTERVAL_SECONDS`).
+number the previous read lacked, or an issue outside a lane whose labels changed, asks at once
+(`backlog-budget.ts` → `LISTING_CHECK_INTERVAL_SECONDS`).
 
-The number, not the ETag, decides: a running lane's own comments and label edits change the ETag too; read as a change, they would ask
-every 10 seconds instead of at the 180-second floor (joshuafolkken/kit#6718).
+The numbers and labels, not the ETag, decide: a running lane's own comments and label edits change the ETag too; read as a change, they would ask
+every 10 seconds instead of at the 180-second floor (joshuafolkken/kit#6718). An `in-progress` issue's
+labels are left out for that reason, while a label taken off an issue already listed can make it ready
+(joshuafolkken/kit#7507).
 
 The 180 and 30 seconds stay the floor for what that ETag does not show: a blocker closed, a later page,
 an epic.

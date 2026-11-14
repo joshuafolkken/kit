@@ -1,3 +1,4 @@
+import { backlog_dispatch_bound } from '#scripts/backlog/backlog-dispatch-bound'
 import { process_identity } from '#scripts/josh/process-identity'
 import { poll } from '#scripts/lib/poll'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
@@ -13,8 +14,10 @@ import { run_wake_stop } from './run-wake-stop'
 // bound, is a reload that failed.
 
 const TAKEOVER_INTERVAL_MS = MS_PER_SECOND
-// A cold `tsx` start claims within seconds; the bound is generous so a loaded machine is not a failure.
-const TAKEOVER_ATTEMPTS = 120
+// A cold `tsx` start claims within seconds. The successor still has a driver to start after its claim,
+// so the claim gets what the dispatch bound leaves after that start (joshuafolkken/kit#7507).
+const TAKEOVER_WAIT_MS = backlog_dispatch_bound.NOTICE_MS
+const TAKEOVER_ATTEMPTS = TAKEOVER_WAIT_MS / TAKEOVER_INTERVAL_MS
 
 type TakeoverResult = 'taken' | 'died' | 'unclaimed'
 
@@ -60,7 +63,7 @@ async function await_takeover(
 	return result
 }
 
-const run_wake_takeover = { await_takeover, ports_of }
+const run_wake_takeover = { TAKEOVER_WAIT_MS, await_takeover, ports_of }
 
 export type { TakeoverPorts, TakeoverResult }
 export { run_wake_takeover }

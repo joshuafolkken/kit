@@ -7,6 +7,7 @@ import { lane_child_mark_keys } from '#scripts/lane/lane-child-mark-keys'
 import { review_pair } from '#scripts/review/review-pair'
 import { run_headless_keys } from '#scripts/run/run-headless-keys'
 import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
+import { run_startup } from '#scripts/run/startup/run-startup'
 import { PURE_FILES } from '#tools/test/pure-files'
 import { unit_projects, type UnitProject } from '#tools/test/unit-projects'
 import { VITEST_INCLUDE_GLOBS } from '#tools/test/vitest-include-globs'
@@ -228,6 +229,42 @@ describe('the unit environment blanks the headless agent and run marks', () => {
 
 	it('leaves no launcher headless mark in a test process', () => {
 		expect(MARKS.filter((key) => (process.env[key] ?? '') !== '')).toStrictEqual([])
+	})
+})
+
+// joshuafolkken/kit#7509: the drain's flush pushed under the live run's startup scope, so the pre-push
+// unit run added it to every captured `pnpm josh` spawn and josh-run.test.ts failed there alone.
+describe('the unit environment blanks the live run startup scope', () => {
+	const LIVE_SCOPE = JSON.stringify({
+		run: '/repo/.git:2026-11-14T05:24:31.627Z',
+		attempt: '1',
+		span: 'b6d1a2f0-7c1e-4d55-9a37-1f0e2c4b8a90',
+		destination: '/repo/.git/josh/startup-ledger',
+	})
+
+	afterEach(() => {
+		vi.unstubAllEnvs()
+	})
+
+	it('blanks the key run_startup inherits its scope through', () => {
+		const environment = unit_environment({ [run_startup.ENVIRONMENT_KEY]: LIVE_SCOPE })
+
+		expect(environment[run_startup.ENVIRONMENT_KEY]).toBe('')
+	})
+
+	it('leaves run_startup no scope to hand a spawned step', () => {
+		vi.stubEnv(run_startup.ENVIRONMENT_KEY, LIVE_SCOPE)
+		expect(run_startup.environment()).not.toStrictEqual({})
+
+		const environment = unit_environment({ [run_startup.ENVIRONMENT_KEY]: LIVE_SCOPE })
+
+		for (const [key, value] of Object.entries(environment)) vi.stubEnv(key, value)
+
+		expect(run_startup.environment()).toStrictEqual({})
+	})
+
+	it('leaves no startup scope in a test process', () => {
+		expect(process.env[run_startup.ENVIRONMENT_KEY] ?? '').toBe('')
 	})
 })
 

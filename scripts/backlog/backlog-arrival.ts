@@ -25,7 +25,7 @@ import { backlog_stalled_detect } from './backlog-stalled-detect'
 //
 // **The `auto-ok` listing gates the read** (joshuafolkken/kit#7229): each probe first asks the listing
 // check `backlog:drive` asks (`backlog_drive_listing.watcher`), whose 304 spends no REST core, and reads
-// the backlog only once the listing holds a new issue — so the probe shares that check's ten-second
+// the backlog only once the listing holds a new or relabelled issue — so the probe shares that check's ten-second
 // interval. A raised lane limit changes no listing, so it reads regardless, and a listing change whose
 // reading failed is read again at the next probe.
 //
