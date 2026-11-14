@@ -39,10 +39,20 @@ it('wires one tick share into the loop tick start and the stream reads', () => {
 	const share = { is_running: vi.fn(() => true), read: vi.fn(async () => []), begin_tick: vi.fn() }
 	const tick_share = vi.spyOn(backlog_drive_tick, 'tick_share').mockReturnValue(share)
 	const record_ports = vi.spyOn(backlog_drive_record, 'record_ports')
-	const holds = { hold: vi.fn(), end: vi.fn() }
+	const holds = { hold: vi.fn(), answering: <T>(offer: T): T => offer, end: vi.fn() }
 	const ports = backlog_drive_cli.ports_of(CONTEXT, [], { state: undefined as never }, holds)
 
 	expect(tick_share).toHaveBeenCalledTimes(1)
 	expect(ports.begin_tick).toBe(share.begin_tick)
 	expect(record_ports).toHaveBeenCalledWith(share.read)
+})
+
+// joshuafolkken/kit#7510: the hold recorder reads every offer answer, so the driver's end can name a drain.
+it('hands the offer port to the hold recorder', () => {
+	const offer = vi.fn()
+	const holds = { hold: vi.fn(), answering: vi.fn(() => offer), end: vi.fn() }
+	const ports = backlog_drive_cli.ports_of(CONTEXT, [], { state: undefined as never }, holds)
+
+	expect(holds.answering).toHaveBeenCalledOnce()
+	expect(ports.offer).toBe(offer)
 })

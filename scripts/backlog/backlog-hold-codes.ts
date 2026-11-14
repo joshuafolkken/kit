@@ -10,14 +10,21 @@ const USAGE_LIMIT_REASON = 'usage-limit'
 const MEMORY_REASON = 'memory'
 // Before a hand-back mark's reason no driver recorded (`lane-hand-back-held.ts`).
 const DRIVERLESS_PREFIX = 'driverless:'
+// The offer verdict that started nothing because nothing could start (`backlog-drive.ts`).
+const WATCH_VERDICT = 'watch'
+// The hand-back reason of a window that closed after a `watch` offer: the backlog had drained
+// (joshuafolkken/kit#7510), told apart from a window that closed mid-work.
+const DRAINED_REASON = 'drained'
 
 const backlog_hold_codes = {
+	DRAINED_REASON,
 	DRIVERLESS_PREFIX,
 	HAND_BACK_PREFIX,
 	MEMORY_REASON,
 	OFFER_PREFIX,
 	REASON_SEPARATOR,
 	USAGE_LIMIT_REASON,
+	WATCH_VERDICT,
 }
 
 export { backlog_hold_codes }

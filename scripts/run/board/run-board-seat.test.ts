@@ -1,4 +1,6 @@
 import { stripVTControlCharacters } from 'node:util'
+import { lane_held_stats } from '#scripts/lane/lane-held-stats'
+import type { LedgerEntry } from '#scripts/lane/lane-ledger'
 import { describe, expect, it } from 'vitest'
 import { run_board_fit } from './run-board-fit'
 import type { BoardHeader } from './run-board-header'
@@ -13,7 +15,9 @@ import { run_board_seat } from './run-board-seat'
 // joshuafolkken/kit#6538: each lane seat no lane holds says why, drawn under the lanes rule.
 
 const { EMPTY_LAYOUT, header, lines_of } = run_board_render_fixture
-const { NO_CANDIDATE, read_of } = run_board_seat
+const { NO_CANDIDATE, RESTART_PENDING, read_of } = run_board_seat
+const HELD_LEAD = 'held — '
+const JUDGE = 'hand-back:judge'
 const { WAIT_ICONS } = run_board_labels
 const AT = '2026-10-08T09:00:00.000Z'
 const FAILED = 6242
@@ -115,10 +119,43 @@ describe('run_board_render the empty lane seats', () => {
 // joshuafolkken/kit#7287: the seat line says who fills the seat, never the ledger code.
 describe('run_board_seat a hold as a sentence', () => {
 	it('names your triage for a judge hand-back', () => {
-		const seats = seats_of({ seats: read_of([], 'hand-back:judge'), layout: queued([]) })
+		const seats = seats_of({ seats: read_of([], JUDGE), layout: queued([]) })
 
 		expect(seats[0]).toContain('💺 no issue ready to start — open issues await your triage')
 		expect(seats[0]).not.toContain('hand-back')
+	})
+})
+
+// The seat line the board draws from these ledger entries, its open hold read as `run:board` reads it.
+function seat_from_ledger(reasons: ReadonlyArray<string>, layout: BoardLayout): string | undefined {
+	const entries: Array<LedgerEntry> = reasons.map((reason) => ({ kind: 'held', at: AT, reason }))
+	const hold = lane_held_stats.open_reason(entries, Date.parse(AT))
+
+	return seats_of({ seats: read_of([], hold), layout })[0]
+}
+
+// joshuafolkken/kit#7510: the seat line names the driver's real end, from the ledger the driver wrote.
+describe('run_board_seat the driver’s end', () => {
+	const runnable = queued([queued_row()])
+
+	it('names the drain, not the window, after a watch offer the window closed beside', () => {
+		const seat = seat_from_ledger(['offer:watch:chain+gate', 'hand-back:drained'], runnable)
+
+		expect(seat).toContain(`${RESTART_PENDING} — the backlog had nothing to start`)
+		expect(seat).not.toContain('time window')
+	})
+
+	it('says a runnable row waits for the driver restart at the window, not held', () => {
+		const seat = seat_from_ledger(['hand-back:window'], runnable)
+
+		expect(seat).toContain(`${RESTART_PENDING} — the run's time window closed`)
+		expect(seat).not.toContain(HELD_LEAD)
+	})
+
+	it('keeps held for a hand-back that waits on a person', () => {
+		expect(seat_from_ledger([JUDGE], runnable)).toContain(
+			`${HELD_LEAD}open issues await your triage`,
+		)
 	})
 })
 

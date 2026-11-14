@@ -20,14 +20,19 @@ import { backlog_ready } from './backlog-ready'
 // leaves `lane-hand-back-hold.ts`'s mark beside it; the finished run's is written every time.
 
 const NO_FREE_LANES = 0
-const { OFFER_PREFIX, HAND_BACK_PREFIX, REASON_SEPARATOR } = backlog_hold_codes
+const { DRAINED_REASON, OFFER_PREFIX, HAND_BACK_PREFIX, REASON_SEPARATOR, WATCH_VERDICT } =
+	backlog_hold_codes
 // The verdict that starts nothing more: the run is finishing, so the lanes it frees are no hold.
 const STOP_VERDICT = 'stop'
 // The ends that finished the run: nothing is owed a lane after them.
 const FINISHED_REASONS: ReadonlySet<string> = new Set([STOP_VERDICT, 'watch', 'retrospective'])
+const WINDOW_REASON = 'window'
 
 interface HoldRecorder {
 	hold: DrivePorts['hold']
+	// The offer port, its every answer kept — `undefined` for a failed read — so the end reads the
+	// latest verdict (joshuafolkken/kit#7510).
+	answering: (offer: DrivePorts['offer']) => DrivePorts['offer']
 	end: (end: DriveEnd) => Promise<void>
 }
 
@@ -41,9 +46,11 @@ interface HeldDraft extends HeldWaiting {
 	reason: string | undefined
 }
 
-// Whether a hold may still be open — at a driver's start, one an earlier driver's hand-back left.
+// Whether a hold may still be open — at a driver's start, one an earlier driver's hand-back left — and
+// the latest offer verdict this driver read.
 interface HoldLedger {
 	is_open: boolean
+	last_verdict?: string | undefined
 }
 
 // The reason an offer that started nothing holds a free lane, or `undefined` for the run's stop. The
@@ -81,11 +88,20 @@ async function stopped(
 	if (after.is_stopping && !before.is_stopping) await ports.hold(undefined)
 }
 
+// A window that closed while the latest offer found nothing to start is the backlog's drain, not the
+// window's: the drain wins, so the seat names it (joshuafolkken/kit#7510).
+function end_cause(end: DriveEnd, last_verdict: string | undefined): string {
+	const is_drained = last_verdict === WATCH_VERDICT && end.reason === WINDOW_REASON
+
+	return is_drained ? DRAINED_REASON : end.reason
+}
+
 // The reason a driver's end leaves the lanes waiting on a session, or `undefined` for the finished run.
-function hand_back_reason(end: DriveEnd): string | undefined {
+// `last_verdict` is the latest offer verdict the driver read before it ended.
+function hand_back_reason(end: DriveEnd, last_verdict?: string): string | undefined {
 	if (FINISHED_REASONS.has(end.reason)) return undefined
 
-	return [HAND_BACK_PREFIX, end.reason].join(REASON_SEPARATOR)
+	return [HAND_BACK_PREFIX, end_cause(end, last_verdict)].join(REASON_SEPARATOR)
 }
 
 // The free count, or `undefined` where the lane limit is unreadable: no hold is known then. The
@@ -172,8 +188,15 @@ function recorder(
 
 	return {
 		hold: write,
+		answering: (offer) => async (state) => {
+			const read = await offer(state)
+
+			ledger.last_verdict = read?.verdict
+
+			return read
+		},
 		end: async (end) => {
-			const reason = hand_back_reason(end)
+			const reason = hand_back_reason(end, ledger.last_verdict)
 
 			await hand_back(ledger, reason, await free_count(free_lanes, reason))
 		},
