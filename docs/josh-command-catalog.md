@@ -233,7 +233,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh run:event` | `--append <kind> <text> \| --from\|--follow <n> \| --watch [<n>] \| --last` | automation | files | Append to, read or watch the run’s append-only event stream (--append <kind> <text> \| --from\|--follow <n> \| --watch [<n>] \| --last) |
 | `josh run:handoff` | `<keyword> [N\|new ...] --brief-file <path>` | automation | processes, files | Hand a workflow keyword typed in a consultation session to a child on the role profile model |
 | `josh run:handoff-lanes` | — | automation | processes, files, network | Chain a backlogrun hand-off: cost --cut, the lane reading, run:carry --cut, run:board --chat and run:report --handoff, answering under, cut, blocked or capped |
-| `josh run:hold` | `[<issue> [--fullrun \| --halfrun-stop \| --human-review-stop \| --prrun-stop]] \| --adopt <issue>` | automation | files | Claim this working tree for a run, or say which run already holds it |
+| `josh run:hold` | `[<issue> [--fullrun \| --halfrun-stop \| --halfrun-round \| --human-review-stop \| --prrun-stop]] \| --adopt <issue>` | automation | files | Claim this working tree for a run, or say which run already holds it |
 | `josh run:liveness` | `<issue> --output <path> [options]` | automation | processes | Say whether a delegated unit is still working, or stopped without reporting |
 | `josh run:merge` | `<issue> [options]` | automation | git, network | Collapse a backlogrun merge event into one call: confirm the child, do the post-merge steps, offer the next child |
 | `josh run:next` | `<issue>` | automation | network | Print the next step a fullrun takes, computed from the run’s state |

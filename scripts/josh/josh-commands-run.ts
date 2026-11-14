@@ -22,7 +22,7 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 		// A `--halfrun-stop` / `--human-review-stop` / `--prrun-stop` sends the stop confirmation.
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		reference: [
-			'[<issue> [--fullrun | --halfrun-stop | --human-review-stop | --prrun-stop]] | --adopt <issue>',
+			'[<issue> [--fullrun | --halfrun-stop | --halfrun-round | --human-review-stop | --prrun-stop]] | --adopt <issue>',
 			'automation',
 			['files'],
 		],
@@ -43,6 +43,11 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 					names: ['--halfrun-stop'],
 					description:
 						'marks a `halfrun` stop for `run:entry` to adopt, and sends its `confirmation` Telegram; answers `e2e-owed` (exit 1) until `test:e2e` answered green on this tree.',
+				},
+				{
+					names: ['--halfrun-round'],
+					description:
+						"starts a `halfrun` fix round: re-opens the issue's stopped `halfrun` record as running, owned by this session; answers `busy` (exit 1) when the tree holds no such stop.",
 				},
 				{
 					names: ['--human-review-stop'],
