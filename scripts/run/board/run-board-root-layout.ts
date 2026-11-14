@@ -51,6 +51,19 @@ function layout_of(layout: BoardLayout, local: RootRead, read: RowRead): BoardLa
 	}
 }
 
-const run_board_root_layout = { layout_of }
+// The baseline the header counts arrivals against: the rows the ended runs add to the run's are no
+// arrival to its plan.
+function baseline_of(
+	baseline_total: number | undefined,
+	run_layout: BoardLayout,
+	layout: BoardLayout,
+): number | undefined {
+	if (baseline_total === undefined) return undefined
+	const { rows_of } = run_board_layout
+
+	return baseline_total + rows_of(layout).length - rows_of(run_layout).length
+}
+
+const run_board_root_layout = { baseline_of, layout_of }
 
 export { run_board_root_layout }

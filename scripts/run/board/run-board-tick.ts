@@ -328,9 +328,14 @@ function draw_run(state: BoardState, local: LocalRead, redraw: Redraw): BoardSta
 	const run_layout = layout_for(state, local, redraw.now_ms)
 	const layout = run_board_root_layout.layout_of(run_layout, local, read)
 	const first_total =
-		state.plan === undefined ? undefined : run_board_header.counts_of(layout).total
+		state.plan === undefined ? undefined : run_board_header.counts_of(run_layout).total
 	const settled = { ...state, baseline_total: state.baseline_total ?? first_total }
-	const { lines, spots } = frame_of(settled, local, layout, redraw)
+	const baseline_total = run_board_root_layout.baseline_of(
+		settled.baseline_total,
+		run_layout,
+		layout,
+	)
+	const { lines, spots } = frame_of({ ...settled, baseline_total }, local, layout, redraw)
 
 	draw(redraw.ports, lines)
 

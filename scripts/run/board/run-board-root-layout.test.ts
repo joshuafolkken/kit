@@ -62,14 +62,17 @@ describe('run_board_root_layout.layout_of — a root single run a merge ended', 
 		expect(active.filter((row) => row.number === LANE)).toHaveLength(1)
 	})
 
-	it('leaves the run’s rows as they are with no ended run, and draws no 🏠 row', () => {
+	it('leaves the run’s rows as they are with no ended run', () => {
+		expect(active_of([]).map((row) => row.number)).toStrictEqual([OLDER_LANE, LANE])
+	})
+
+	it('draws no 🏠 row for an ended run', () => {
 		const layout = run_board_root_layout.layout_of(
 			{ ...run_board_layout.EMPTY_LAYOUT, active: [lane_row(LANE, START)] },
 			{ ended_roots: [ENDED], lane_states: NO_LANES },
 			READ,
 		)
 
-		expect(active_of([]).map((row) => row.number)).toStrictEqual([OLDER_LANE, LANE])
 		expect(layout.root).toBeUndefined()
 	})
 })
