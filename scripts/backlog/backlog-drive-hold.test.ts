@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { DriveState } from './backlog-drive'
 
 // joshuafolkken/kit#3995: the driver dispatches the moment a lane frees, and a free lane it leaves
 // empty is recorded with why — the offer that started nothing, or the hand-back to a session.
@@ -234,13 +235,28 @@ describe('backlog_drive_hold.recorder — end', () => {
 	})
 })
 
+// Asks the offer `left` times, one after another.
+async function ask_each(ask: (read: DriveState) => Promise<unknown>, left: number): Promise<void> {
+	if (left === 0) return
+
+	await ask(state())
+	await ask_each(ask, left - 1)
+}
+
 // joshuafolkken/kit#7510: the drain wins over the window it closed beside.
 describe('backlog_drive_hold.recorder — a window end after the drain', () => {
-	it('records the drain when the window closes after an offer that found nothing to start', async () => {
+	// The offer answers in turn; the window closes after the last.
+	async function end_after(verdicts: ReadonlyArray<string | undefined>): Promise<void> {
+		const answers = verdicts.map((verdict) => (verdict === undefined ? undefined : offer(verdict)))
 		const holds = backlog_drive_hold.recorder(free)
+		const ask = holds.answering(async () => answers.shift())
 
-		await holds.hold('offer:watch:chain+gate', [WAITED_ISSUE])
+		await ask_each(ask, verdicts.length)
 		await holds.end(WINDOW_END)
+	}
+
+	it('records the drain when the window closes after an offer that found nothing to start', async () => {
+		await end_after(['watch'])
 
 		expect(record_held).toHaveBeenLastCalledWith({
 			reason: 'hand-back:drained',
@@ -248,13 +264,21 @@ describe('backlog_drive_hold.recorder — a window end after the drain', () => {
 		})
 	})
 
-	it('keeps the window when the last hold was not a watch offer', async () => {
-		const holds = backlog_drive_hold.recorder(free)
-
-		await holds.hold('memory')
-		await holds.end(WINDOW_END)
+	it.each([
+		['an offer that launched after the watch', ['watch', 'run']],
+		['a failed offer read after the watch', ['watch', undefined]],
+		['no offer', []],
+	])('keeps the window after %s', async (_, verdicts) => {
+		await end_after(verdicts)
 
 		expect(record_held).toHaveBeenLastCalledWith({ reason: WINDOW_HAND_BACK, waiting: undefined })
+	})
+
+	it('passes the offer’s answer through unchanged', async () => {
+		const read = offer('watch')
+		const ask = backlog_drive_hold.recorder(free).answering(async () => read)
+
+		await expect(ask(state())).resolves.toBe(read)
 	})
 })
 

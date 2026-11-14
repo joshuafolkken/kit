@@ -231,7 +231,7 @@ describe('backlog_drive_cli.ports_of — the listing check', () => {
 		const check = vi.fn(async () => false)
 
 		vi.spyOn(backlog_drive_listing, 'watcher').mockReturnValue(check)
-		const holds = { hold: vi.fn(), end: vi.fn() }
+		const holds = { hold: vi.fn(), answering: <T>(offer: T): T => offer, end: vi.fn() }
 		const ports = backlog_drive_cli.ports_of(CONTEXT, [], { state: undefined as never }, holds)
 
 		expect(ports.listing_changed).toBe(check)

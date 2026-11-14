@@ -239,7 +239,7 @@ function ports_of(
 	return {
 		...child_ports(seeded, context.owner, tick.is_running),
 		begin_tick: tick.begin_tick,
-		offer: async (state) => await offer_for(state, context),
+		offer: holds.answering(async (state) => await offer_for(state, context)),
 		launch: async (issue) => await backlog_drive_launch.launch(issue, context.owner),
 		...room_ports(),
 		judgement_owed: judgement_reader(),
