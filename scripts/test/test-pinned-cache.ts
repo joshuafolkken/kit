@@ -18,6 +18,7 @@ import type { Hunk } from './test-pinned-logic'
 import { test_pinned_prune_logic, type CodeChange } from './test-pinned-prune-logic'
 import { test_pinned_reach, type Reach } from './test-pinned-reach'
 import type { RedProbe } from './test-red-logic'
+import { test_runner_config } from './test-runner-config'
 
 // The reads and writes of `josh test:pinned`'s verdict cache (joshuafolkken/kit#4706); what a key is and
 // when an entry holds is `test-pinned-cache-logic.ts`. `josh run:review` calls the same `test_pinned.run`,
@@ -31,9 +32,11 @@ const LINE_BREAK = '\n'
 // Peels a ref or tag to the commit it names, so a branch name and its SHA key the same change.
 const AS_COMMIT = '^{commit}'
 
+// `config` is one digest over the test runner's configuration files, which `test_contents` covers too.
 interface TreeRead {
 	test_digests: ReadonlyMap<string, string>
 	code: CodeChange
+	config: string
 	test_contents: string
 	change: string
 }
@@ -45,6 +48,7 @@ interface LoadedCache extends VerdictCache {
 	base: string
 	freshness: Freshness
 	test_digests: ReadonlyMap<string, string>
+	config: string
 	reach: Reach
 	code: CodeChange
 	hunks: ReadonlyArray<Hunk>
@@ -79,11 +83,11 @@ async function contents_of(files: ReadonlyArray<string>): Promise<Map<string, st
 	return new Map(existing.map((file, index) => [file, texts[index] ?? '']))
 }
 
-// Every test file in the work tree, tracked or untracked but not ignored.
-async function test_files(): Promise<Array<string>> {
+// Every file in the work tree `is_kept` accepts, tracked or untracked but not ignored.
+async function work_tree_files(is_kept: (file: string) => boolean): Promise<Array<string>> {
 	const listed = await test_pinned_reach.work_tree_files()
 
-	return listed.filter((file) => test_declared_logic.is_test_file(file))
+	return listed.filter((file) => is_kept(file))
 }
 
 // The digest of each named file the work tree still holds.
@@ -95,9 +99,9 @@ async function digests_of(files: ReadonlyArray<string>): Promise<Map<string, str
 	)
 }
 
-// Each test file's content digest, keyed by its path.
-async function test_digests_of(): Promise<Map<string, string>> {
-	return await digests_of(await test_files())
+// Each work tree file's content digest `is_kept` accepts, keyed by its path.
+async function kept_digests_of(is_kept: (file: string) => boolean): Promise<Map<string, string>> {
+	return await digests_of(await work_tree_files(is_kept))
 }
 
 // One digest over every test file's path and content.
@@ -123,13 +127,19 @@ async function code_change(base: string): Promise<CodeChange> {
 	return { commit: commit.trim(), code, digests: await digests_of(code) }
 }
 
-// The work tree's tree-wide digests, with what they were read off.
+// The work tree's tree-wide digests, with what they were read off. A test runner configuration change
+// can make a test run that never ran, so it moves `test_contents` as a test file would
+// (joshuafolkken/kit#7521).
 async function read_tree(base: string): Promise<TreeRead> {
-	const [test_digests, code] = await Promise.all([test_digests_of(), code_change(base)])
-	const test_contents = contents_digest(test_digests)
+	const [test_digests, configs, code] = await Promise.all([
+		kept_digests_of((file) => test_declared_logic.is_test_file(file)),
+		kept_digests_of((file) => test_runner_config.is_config(file)),
+		code_change(base),
+	])
+	const test_contents = contents_digest(new Map([...test_digests, ...configs]))
 	const change = test_pinned_cache_logic.change_of(code.commit, code.code, code.digests)
 
-	return { test_digests, code, test_contents, change }
+	return { test_digests, code, config: contents_digest(configs), test_contents, change }
 }
 
 // The cache file's text and what the work tree holds now, with the files `hunks` and the recorded
@@ -176,7 +186,7 @@ async function basis_of(
 	if (probe.verdict !== 'red') {
 		const tests = await cache.reach.related(file)
 
-		return tests && test_pinned_cache_logic.related_basis(tests, cache.test_digests)
+		return tests && test_pinned_cache_logic.related_basis(tests, cache.test_digests, cache.config)
 	}
 
 	const digest = await cache.reach.failed(probe.failed)

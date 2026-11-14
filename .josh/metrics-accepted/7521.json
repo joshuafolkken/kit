@@ -1,0 +1,7 @@
+{
+	"reason": "test:pinned verdict cache folds the test runner config into its basis (#7521): a leaf module naming the vitest configs, shared with verification-inputs",
+	"date": "2026-11-14",
+	"growth": {
+		"scripts.code_lines": 20
+	}
+}

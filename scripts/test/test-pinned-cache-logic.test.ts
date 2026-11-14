@@ -17,6 +17,7 @@ const DIGESTS = new Map([
 const FAILED_TEST = 'a.test.ts'
 const FAILED_DIGEST = 'digest-t'
 const TEST_DIGESTS = new Map([[FAILED_TEST, FAILED_DIGEST]])
+const CONFIG = 'config-digest'
 const RED: StoredVerdict = { verdict: 'red', tests: { [FAILED_TEST]: FAILED_DIGEST } }
 const RED_PROBE = { verdict: 'red' as const, failed: [FAILED_TEST] }
 const ONLY_TESTS_SAME: Freshness = { is_same_change: false, is_unchanged: true, is_pruned: false }
@@ -281,24 +282,38 @@ describe('test_pinned_cache_logic.fresh_verdict with a basis', () => {
 	})
 })
 
-describe('test_pinned_cache_logic bases', () => {
+describe('test_pinned_cache_logic.related_basis', () => {
 	it('reads a related basis whatever order the tests are listed in, and moves with their content', () => {
 		const digests = new Map([...TEST_DIGESTS, ['b.test.ts', 'digest-b']])
-		const basis = test_pinned_cache_logic.related_basis([FAILED_TEST, 'b.test.ts'], digests)
+		const basis = test_pinned_cache_logic.related_basis([FAILED_TEST, 'b.test.ts'], digests, CONFIG)
 
-		expect(test_pinned_cache_logic.related_basis(['b.test.ts', FAILED_TEST], digests)).toEqual(
-			basis,
-		)
-		expect(test_pinned_cache_logic.related_basis([FAILED_TEST], digests).digest).not.toBe(
+		expect(
+			test_pinned_cache_logic.related_basis(['b.test.ts', FAILED_TEST], digests, CONFIG),
+		).toEqual(basis)
+		expect(test_pinned_cache_logic.related_basis([FAILED_TEST], digests, CONFIG).digest).not.toBe(
 			basis.digest,
 		)
 		expect(basis.related).toEqual(Object.fromEntries(digests))
 		expect(
-			test_pinned_cache_logic.related_basis([FAILED_TEST], new Map([[FAILED_TEST, 'digest-x']]))
-				.digest,
-		).not.toBe(test_pinned_cache_logic.related_basis([FAILED_TEST], TEST_DIGESTS).digest)
+			test_pinned_cache_logic.related_basis(
+				[FAILED_TEST],
+				new Map([[FAILED_TEST, 'digest-x']]),
+				CONFIG,
+			).digest,
+		).not.toBe(test_pinned_cache_logic.related_basis([FAILED_TEST], TEST_DIGESTS, CONFIG).digest)
 	})
 
+	// joshuafolkken/kit#7521: a widened `include` runs a related test that never ran.
+	it('moves a related basis with the test runner configuration alone, keeping its tests', () => {
+		const basis = test_pinned_cache_logic.related_basis([FAILED_TEST], TEST_DIGESTS, CONFIG)
+		const widened = test_pinned_cache_logic.related_basis([FAILED_TEST], TEST_DIGESTS, 'widened')
+
+		expect(widened.digest).not.toBe(basis.digest)
+		expect(widened.related).toEqual(basis.related)
+	})
+})
+
+describe('test_pinned_cache_logic.red_basis', () => {
 	it('reads a red basis whatever order the closures are in, and moves with the assets', () => {
 		const basis = test_pinned_cache_logic.red_basis('x', [
 			['a', '1'],
