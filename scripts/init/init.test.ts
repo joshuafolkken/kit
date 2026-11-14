@@ -6,6 +6,7 @@ import { execaSync } from 'execa'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { init } from './init'
 import { PROJECT_ROOT } from './init-paths'
+import { kit_development_versions } from './kit-development-versions'
 
 vi.mock('execa', () => ({ execaSync: vi.fn() }))
 
@@ -139,8 +140,10 @@ describe('apply_package_json_merges', () => {
 	it('adds every public peer from the kit development versions', () => {
 		const deps = merge_development_dependencies('{}\n')
 
+		const carried = kit_development_versions.versions_of(Object.keys(KIT_MANIFEST.peerDependencies))
+
 		for (const name of Object.keys(KIT_MANIFEST.peerDependencies)) {
-			expect(deps[name]).toBe(KIT_MANIFEST.devDependencies[name])
+			expect(deps[name]).toBe(carried[name])
 		}
 	})
 

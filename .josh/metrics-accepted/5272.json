@@ -1,0 +1,7 @@
+{
+	"reason": "consumer_version maps an npm-aliased devDependency (typescript -> TS6 alias) to its peer range so josh init keeps writing the bare TS6 range (#5272)",
+	"date": "2026-11-14",
+	"growth": {
+		"scripts.code_lines": 5
+	}
+}

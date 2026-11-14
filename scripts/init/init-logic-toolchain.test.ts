@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { init_logic_toolchain } from './init-logic-toolchain'
+import { kit_development_versions } from './kit-development-versions'
 
 const KIT_MANIFEST = JSON.parse(
 	readFileSync(new URL('../../package.json', import.meta.url), 'utf8'),
@@ -31,7 +32,7 @@ describe('consumer_resolved_names', () => {
 	it.each(WITH_GIT)('names a tool josh init adds too: %s', (name) => {
 		const added = init_logic_toolchain.get_toolchain_development_dependencies(true)
 
-		expect(added[name]).toBe(KIT_MANIFEST.devDependencies[name])
+		expect(added[name]).toBe(kit_development_versions.versions_of([name])[name])
 	})
 
 	it('leaves lefthook out for a project without Git', () => {
@@ -46,7 +47,7 @@ describe('get_toolchain_development_dependencies', () => {
 		const added = init_logic_toolchain.get_toolchain_development_dependencies(true)
 
 		for (const name of Object.keys(KIT_MANIFEST.peerDependencies)) {
-			expect(added[name], name).toBe(KIT_MANIFEST.devDependencies[name])
+			expect(added[name], name).toBe(kit_development_versions.versions_of([name])[name])
 		}
 	})
 })
@@ -55,7 +56,9 @@ describe('merge_consumer_resolved_development_deps', () => {
 	it('adds every missing tool at the range kit carries', () => {
 		const deps = synced_deps({ name: 'demo' })
 
-		for (const name of WITH_GIT) expect(deps[name], name).toBe(KIT_MANIFEST.devDependencies[name])
+		const carried = kit_development_versions.versions_of(WITH_GIT)
+
+		for (const name of WITH_GIT) expect(deps[name], name).toBe(carried[name])
 	})
 
 	it('adds only the tool that is missing', () => {

@@ -77,7 +77,6 @@ const UNTESTED_SOURCES: ReadonlyArray<string> = [
 	'scripts/hooks/format-edited-cli.ts',
 	'scripts/hooks/pretool-guard-cli.ts',
 	'scripts/init/initial-commit.ts',
-	'scripts/init/kit-development-versions.ts',
 	'scripts/issue/defect-report-cli.ts',
 	'scripts/issue/issue-reference.ts',
 	'scripts/josh/file-map-stamp.ts',

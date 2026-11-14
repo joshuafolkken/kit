@@ -13,12 +13,24 @@ function read_kit_manifest(): KitManifest {
 	return package_manifest.read_manifest(PACKAGE_DIR, kit_manifest_schema)
 }
 
-// The version kit's own devDependencies carry for each name, so a consumer runs the toolchain kit
-// is verified with rather than a copy of it that drifts.
+const NPM_ALIAS_PREFIX = 'npm:'
+
+// A devDependency kit installs under another package's name (`npm:<package>@<range>`) is a
+// substitute only kit runs, not the package the name stands for. A consumer gets the range kit
+// publishes for that name as a peer instead: the bare package, with its own bins (#5272).
+function consumer_version(manifest: KitManifest, name: string): string | undefined {
+	const version = manifest.devDependencies[name]
+	if (version?.startsWith(NPM_ALIAS_PREFIX) !== true) return version
+
+	return manifest.peerDependencies[name]
+}
+
+// The version kit's own devDependencies carry for each name (the peer range for an aliased one), so a
+// consumer runs the toolchain kit is verified with rather than a copy of it that drifts.
 function versions_of(names: ReadonlyArray<string>): Record<string, string> {
-	const { devDependencies: versions } = read_kit_manifest()
+	const manifest = read_kit_manifest()
 	const entries = names.map((name): [string, string] => {
-		const version = versions[name]
+		const version = consumer_version(manifest, name)
 		if (version === undefined) throw new Error(`Missing development version for ${name}`)
 
 		return [name, version]

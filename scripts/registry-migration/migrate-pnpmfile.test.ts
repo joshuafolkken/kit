@@ -74,7 +74,7 @@ afterEach(() => {
 })
 
 describe('standalone migration with ignored pnpmfile metadata', () => {
-	it('dry-runs with real pnpm 12.17.0 without changing originals (ac-d9fd28ba)', async () => {
+	it('dry-runs with the pinned real pnpm without changing originals (ac-d9fd28ba)', async () => {
 		const root = project()
 		const before = contents(root)
 

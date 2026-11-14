@@ -70,8 +70,8 @@ runs:
       if: inputs.install == 'true'
       shell: bash
       env:
-        SAFE_CHAIN_INSTALLER_VERSION: 1.5.27
-        SAFE_CHAIN_INSTALLER_SHA256: 600ebddcb3aaf1fd53653a8d7985df44528722c0f5ee7eb9fff86f26a1a4e5a8
+        SAFE_CHAIN_INSTALLER_VERSION: 1.5.29
+        SAFE_CHAIN_INSTALLER_SHA256: e9bfa05430bca0efcf26e5a0f06d09b9da8cc21de2e0ffab03f512dde649ebbe
       run: |
         case "$RUNNER_OS-$RUNNER_ARCH" in
           Linux-X64) binary=safe-chain-linuxstatic-x64 ;;
