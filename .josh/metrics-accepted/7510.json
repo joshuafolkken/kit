@@ -1,0 +1,7 @@
+{
+	"reason": "#7510 adds the drained hand-back code, its sentence and the driver-restart seat lead",
+	"date": "2026-11-14",
+	"growth": {
+		"scripts.code_lines": 27
+	}
+}

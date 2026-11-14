@@ -16,6 +16,8 @@ const { STAGE } = run_event_setup
 const { WAIT_ICONS } = run_board_labels
 const NO_CANDIDATE = 'no issue ready to start'
 const HELD = 'held'
+// A runnable row waits only for the driver a session restarts, not for a person (joshuafolkken/kit#7510).
+const RESTART_PENDING = 'driver restart pending'
 // The row waits that a free seat itself, or the driver's hold, answers — the row could run in the seat.
 const ROOM_ICONS: ReadonlySet<string> = new Set([
 	WAIT_ICONS.lane,
@@ -77,6 +79,11 @@ function with_hold(lead: string, hold: string | undefined): string {
 	return hold === undefined ? lead : `${lead} — ${backlog_hold_text.text_of(hold)}`
 }
 
+// What keeps a runnable row out: the driver's absence a session restart ends, or a hold.
+function held_lead(hold: string): string {
+	return backlog_hold_text.is_driver_restart(hold) ? RESTART_PENDING : HELD
+}
+
 // What a seat no refusal explains says: no runnable row, or the hold that keeps a runnable one out —
 // the hold as a sentence, never its ledger code (`backlog-hold-text.ts`).
 function idle_reason(room: SeatRoom): string | undefined {
@@ -84,7 +91,7 @@ function idle_reason(room: SeatRoom): string | undefined {
 
 	if (!has_candidate(room.layout)) return with_hold(NO_CANDIDATE, hold)
 
-	return hold === undefined ? undefined : with_hold(HELD, hold)
+	return hold === undefined ? undefined : with_hold(held_lead(hold), hold)
 }
 
 // No seat line where the seats are unread — before the plan is read, or once the run stopped.
@@ -101,7 +108,7 @@ function reasons_of(room: SeatRoom): Array<string> {
 	return reasons.filter((reason) => reason !== undefined)
 }
 
-const run_board_seat = { NO_CANDIDATE, read_of, reasons_of }
+const run_board_seat = { NO_CANDIDATE, RESTART_PENDING, read_of, reasons_of }
 
 export { run_board_seat }
 export type { SeatRead, SeatRoom }

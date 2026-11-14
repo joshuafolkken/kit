@@ -44,8 +44,9 @@ const WAIT_REASON = 'offer:wait'
 const CHAIN_REASON = 'offer:watch:chain'
 const WAITED_ISSUE = 4496
 const WINDOW_END = { reason: 'window', token: undefined, issue: undefined }
+const WINDOW_HAND_BACK = 'hand-back:window'
 // A full pool's hand-back: one release of the open hold, then the mark.
-const FULL_HAND_BACK = ['released', 'clear', 'mark hand-back:window']
+const FULL_HAND_BACK = ['released', 'clear', `mark ${WINDOW_HAND_BACK}`]
 
 async function free(): Promise<number> {
 	return 1
@@ -209,7 +210,7 @@ describe('backlog_drive_hold.recorder — end', () => {
 	it('records the hand-back of a driver end', async () => {
 		await backlog_drive_hold.recorder(free).end(WINDOW_END)
 
-		expect(record_held).toHaveBeenCalledWith({ reason: 'hand-back:window', waiting: undefined })
+		expect(record_held).toHaveBeenCalledWith({ reason: WINDOW_HAND_BACK, waiting: undefined })
 	})
 
 	it('releases the open hold at the finished run, whatever lanes are free', async () => {
@@ -230,6 +231,30 @@ describe('backlog_drive_hold.recorder — end', () => {
 		await holds.hold(undefined)
 
 		expect(record_released).toHaveBeenCalledTimes(2)
+	})
+})
+
+// joshuafolkken/kit#7510: the drain wins over the window it closed beside.
+describe('backlog_drive_hold.recorder — a window end after the drain', () => {
+	it('records the drain when the window closes after an offer that found nothing to start', async () => {
+		const holds = backlog_drive_hold.recorder(free)
+
+		await holds.hold('offer:watch:chain+gate', [WAITED_ISSUE])
+		await holds.end(WINDOW_END)
+
+		expect(record_held).toHaveBeenLastCalledWith({
+			reason: 'hand-back:drained',
+			waiting: undefined,
+		})
+	})
+
+	it('keeps the window when the last hold was not a watch offer', async () => {
+		const holds = backlog_drive_hold.recorder(free)
+
+		await holds.hold('memory')
+		await holds.end(WINDOW_END)
+
+		expect(record_held).toHaveBeenLastCalledWith({ reason: WINDOW_HAND_BACK, waiting: undefined })
 	})
 })
 
