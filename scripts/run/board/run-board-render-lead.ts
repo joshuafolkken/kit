@@ -39,8 +39,12 @@ const SINGLE_RUN_ICON = '🏠'
 // Two leading rules, a space, and the separator before the first column.
 const RULE_ROOM = 6
 
+function root_label(run_name: string): string {
+	return `${SINGLE_RUN_ICON} ${run_name}`
+}
+
 function lane_label(header: BoardHeader): string {
-	if (header.run_name !== undefined) return `${SINGLE_RUN_ICON} ${header.run_name}`
+	if (header.run_name !== undefined) return root_label(header.run_name)
 	if (header.occupied_count === undefined) return LANES_LABEL
 
 	return `${LANES_LABEL} ${String(header.occupied_count)}/${String(header.lane_limit ?? '—')}`
@@ -106,6 +110,7 @@ const run_board_render_lead = {
 	indent_of,
 	lead_of,
 	lane_label,
+	root_label,
 	running_fresh,
 }
 

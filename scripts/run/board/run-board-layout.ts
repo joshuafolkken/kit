@@ -109,6 +109,8 @@ interface BoardLayout {
 	// The earlier run's lanes that still hold a place under the limit, and the lanes with no record —
 	// drawn after the run's own lanes, and no row the header counts.
 	earlier?: ReadonlyArray<BoardRow> | undefined
+	// The root checkout's single run beside the run, drawn above its lanes and no row the header counts.
+	root?: { name: string; row: BoardRow } | undefined
 }
 
 // What an active row is named and classified by — each issue's title and labels.
@@ -395,11 +397,13 @@ function people_of(layout: BoardLayout): Array<BoardRow> {
 	return [...asked, ...layout.people]
 }
 
-// The run's own rows `apart` does not name, then the earlier run's lanes still holding a place.
+// The root checkout's single run's row, the run's own rows `apart` does not name, then the earlier
+// run's lanes still holding a place.
 function lane_rows(layout: BoardLayout, apart: ReadonlyArray<BoardRow>): Array<BoardRow> {
 	const own = layout.active.filter((row) => !apart.includes(row))
+	const root = layout.root === undefined ? [] : [layout.root.row]
 
-	return [...own, ...(layout.earlier ?? [])]
+	return [...root, ...own, ...(layout.earlier ?? [])]
 }
 
 // The lanes section's rows: those neither finished nor waiting on a person's decision.

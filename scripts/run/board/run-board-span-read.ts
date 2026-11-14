@@ -19,6 +19,8 @@ interface SpanHere {
 	carry: RunCarry | undefined
 	is_stranded: boolean
 	is_session_active: boolean
+	// The root checkout's single run beside the carried one.
+	root?: BoardSpan | undefined
 }
 
 const NO_SPAN: SpanHere = {
@@ -58,19 +60,22 @@ async function recorded_span_here(
 	}
 }
 
-// A single run this checkout holds is the one drawn (`run-board-single.ts`), before the ended run and,
-// outside a lane, before the carried one; it names no process. No repository, no run.
+// A single run this checkout holds is the one drawn (`run-board-single.ts`) before the ended run; it
+// names no process. Beside a carried run it is the root checkout's, drawn as a row above the carried
+// run's lanes, which stays the frame (joshuafolkken/kit#7524). No repository, no run.
 async function span_here(
 	repository: string | undefined,
 	table: TableRead | undefined,
 ): Promise<SpanHere> {
 	if (repository === undefined) return NO_SPAN
 	const read = run_carry.read_carry(run_carry.carry_path(repository))
-	const single = await run_board_single.span_here(read.kind !== 'none')
+	const is_carried = read.kind !== 'none'
+	const single = await run_board_single.span_here(is_carried)
 
-	return single === undefined
-		? await recorded_span_here(repository, table, read)
-		: { ...NO_SPAN, span: single }
+	if (single === undefined) return await recorded_span_here(repository, table, read)
+	if (!is_carried) return { ...NO_SPAN, span: single }
+
+	return { ...(await recorded_span_here(repository, table, read)), root: single }
 }
 
 const run_board_span_read = { span_here }

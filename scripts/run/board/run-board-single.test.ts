@@ -123,12 +123,17 @@ describe('run_board_read.read_local beside a carried run', () => {
 		expect(run_carry.read_carry).toHaveBeenCalled()
 	})
 
-	it('reads the fullrun a checkout outside a lane holds beside a carried run', async () => {
+	// joshuafolkken/kit#7524: the carried run stays the frame; the root checkout's run is read beside it.
+	it('reads the fullrun a checkout outside a lane holds as the root run beside a carried run', async () => {
 		arrange({ kind: 'carried', carry: CARRY }, undefined)
 		vi.spyOn(lane_paths, 'lane_issue_of').mockReturnValue(undefined)
 		vi.spyOn(run_hold, 'read_hold').mockReturnValue(held({ is_fullrun: true }))
 
-		await expect(run_board_read.read_local()).resolves.toMatchObject({ run_name: FULLRUN })
+		const local = await run_board_read.read_local()
+
+		expect(local?.run_name).toBeUndefined()
+		expect(local?.carry).toStrictEqual(CARRY)
+		expect(local?.root).toMatchObject({ command: FULLRUN, issue: ISSUE })
 	})
 
 	it('asks git again on the next read after a failed resolve', async () => {
