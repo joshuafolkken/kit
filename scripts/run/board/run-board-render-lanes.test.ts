@@ -117,6 +117,18 @@ describe('run_board_render_lanes.lanes_section', () => {
 		expect(column_of(rule, '⏰')).toBe(ELAPSED_START)
 	})
 
+	// joshuafolkken/kit#7523: a single run runs in the root checkout, not in a lane.
+	it.each(['fullrun', 'halfrun'])('heads a single %s row with 🏠 and its name', (run_name) => {
+		const [section] = lanes_section([LINE], CELLS, header({ run_name }))
+		const rule = section?.head[1] ?? ''
+
+		expect(rule.startsWith(`── 🏠 ${run_name} `)).toBe(true)
+		expect(rule).not.toContain(LANES_LABEL)
+		expect(section?.lines).toStrictEqual([LINE])
+		expect(column_of(rule, '💪 CPU')).toBe(USAGE_START)
+		expect(column_of(rule, '⏰')).toBe(ELAPSED_START)
+	})
+
 	// joshuafolkken/kit#4223: a text-default icon is counted one column wide but drawn two.
 	it('marks the rule and its columns with icons two columns wide', () => {
 		const icons = [LANES_LABEL, ...COLUMN_LABELS].map((label) => label.split(' ', 1)[0] ?? '')
