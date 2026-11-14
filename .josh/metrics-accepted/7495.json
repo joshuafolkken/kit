@@ -1,0 +1,7 @@
+{
+	"reason": "bash-revert attributes a change to the shell only when its command names the path (#7495)",
+	"date": "2026-11-14",
+	"growth": {
+		"scripts.code_lines": 29
+	}
+}

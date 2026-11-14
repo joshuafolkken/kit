@@ -5,6 +5,7 @@ import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { json_value } from '#scripts/lib/json-value'
+import { time_shell } from '#scripts/time-runtime/time-shell'
 import { z } from 'zod'
 import { step_zero_notice } from './step-zero-notice'
 
@@ -16,7 +17,9 @@ import { step_zero_notice } from './step-zero-notice'
 // the edit it carried survives (#6812); a dirty file whose saved copy no longer matches its stamp is
 // only named — and the session is told which paths it may not write. A session that can
 // implement is never stamped nor reverted, and a path outside the runtime set (`.josh/`, a doc) is
-// left as the shell wrote it.
+// left as the shell wrote it. **Only a change the call's own command names is this shell's**
+// (joshuafolkken/kit#7495): another session sharing the checkout writes in the same window and a hash
+// cannot tell the writers apart, so a change the command does not name is left in place and named.
 
 const STAMP_PREFIX = 'josh-bash-revert-'
 const UNTRACKED = '??'
@@ -33,16 +36,20 @@ const snapshot_schema = z.record(z.string(), z.string())
 type Snapshot = Record<string, string>
 
 // `revert` holds the dirty entries clean before the call; `restore` the files dirty before it whose
-// saved content matches the stamp; `keep` the rest dirty before it, which nothing can put back.
+// saved content matches the stamp; `keep` the rest dirty before it, which nothing can put back;
+// `unknown` the changed files the command does not name, whose writer may be another process.
 interface Moved {
 	revert: Array<string>
 	restore: Array<string>
 	keep: Array<string>
+	unknown: Array<string>
 }
 
-const NONE_MOVED: Moved = { revert: [], restore: [], keep: [] }
+const NONE_MOVED: Moved = { revert: [], restore: [], keep: [], unknown: [] }
 
 const HANDOFF = 'This shell wrote runtime files; hand implementation to a worker lane.'
+const UNKNOWN_WRITER =
+	'Changed during the call by a writer its command does not name, so left in place:'
 
 function content_hash(file: string): string {
 	return existsSync(file) ? stamp_file.digest(readFileSync(file)) : ABSENT
@@ -74,13 +81,23 @@ function snapshot(root: string, entries: Array<string> = dirty_entries(root)): S
 	return Object.fromEntries(runtime.map((file) => [file, content_hash(path.join(root, file))]))
 }
 
-// The transcript of a consultation session's `Bash` call, the only call this guards.
-function guarded_transcript(raw_payload: string): string | undefined {
+interface GuardedCall {
+	transcript: string
+	command: string
+}
+
+// The transcript and command of a consultation session's `Bash` call, the only call this guards.
+function guarded_call(raw_payload: string): GuardedCall | undefined {
 	if (agent_session_role.can_implement()) return undefined
 
 	const payload = hook_decision.parse_hook_payload(raw_payload)
 
-	return payload?.tool_name === 'Bash' ? payload.transcript_path : undefined
+	if (payload?.tool_name !== 'Bash') return undefined
+
+	return {
+		transcript: payload.transcript_path,
+		command: time_shell.bash_command(payload.tool_input),
+	}
 }
 
 function copy_into(source: string, destination: string): void {
@@ -104,7 +121,7 @@ function save_dirty(before: Snapshot, root: string, saved: string): void {
 }
 
 function stamp(raw_payload: string, root: string = process.cwd()): void {
-	const transcript = guarded_transcript(raw_payload)
+	const transcript = guarded_call(raw_payload)?.transcript
 
 	if (transcript === undefined) return
 
@@ -158,6 +175,23 @@ function moved_entries(transcript: string, root: string): Moved {
 		}),
 		restore: intact,
 		keep: dirty.filter((file) => !intact.includes(file)),
+		unknown: [],
+	}
+}
+
+// Splits the moved files into the ones `command` names, this shell's, and the rest, `unknown`.
+function attributed(moved: Moved, command: string): Moved {
+	const changed = [
+		...moved.revert.map((entry) => entry_file(entry)),
+		...moved.restore,
+		...moved.keep,
+	]
+
+	return {
+		revert: moved.revert.filter((entry) => command.includes(entry_file(entry))),
+		restore: moved.restore.filter((file) => command.includes(file)),
+		keep: moved.keep.filter((file) => command.includes(file)),
+		unknown: changed.filter((file) => !command.includes(file)),
 	}
 }
 
@@ -199,41 +233,43 @@ function put_back(moved: Moved, root: string, backup: string, saved: string): vo
 	for (const file of moved.restore) restore_saved(file, root, backup, saved)
 }
 
+// Each sentence of the block with the files it is about; one about no file is left out.
+function reason_parts(moved: Moved, backup: string): Array<[Array<string>, string]> {
+	const reverted = moved.revert.map((entry) => entry_file(entry))
+	const put_back_files = [...reverted, ...moved.restore]
+
+	return [
+		[[...put_back_files, ...moved.keep], HANDOFF],
+		[reverted, `Reverted: ${reverted.join(', ')}.`],
+		[moved.restore, `Restored to their content before the call: ${moved.restore.join(', ')}.`],
+		[put_back_files, `Their content before the revert: ${backup}/.`],
+		[moved.keep, `Changed, kept as dirty before the call: ${moved.keep.join(', ')}.`],
+		[moved.unknown, `${UNKNOWN_WRITER} ${moved.unknown.join(', ')}.`],
+	]
+}
+
 function block_reason(moved: Moved, backup: string): string {
-	const parts = [HANDOFF]
-
-	if (moved.revert.length > 0) {
-		parts.push(`Reverted: ${moved.revert.map((entry) => entry_file(entry)).join(', ')}.`)
-	}
-
-	if (moved.restore.length > 0) {
-		parts.push(`Restored to their content before the call: ${moved.restore.join(', ')}.`)
-	}
-
-	if (moved.revert.length + moved.restore.length > 0) {
-		parts.push(`Their content before the revert: ${backup}/.`)
-	}
-
-	if (moved.keep.length > 0) {
-		parts.push(`Changed, kept as dirty before the call: ${moved.keep.join(', ')}.`)
-	}
-
-	return parts.join(' ')
+	return reason_parts(moved, backup)
+		.filter(([files]) => files.length > 0)
+		.map(([, sentence]) => sentence)
+		.join(' ')
 }
 
 // The block a `PostToolUse` hook answers with, naming the moved paths, or nothing to say.
 function revert(raw_payload: string, root: string = process.cwd()): string | undefined {
-	const transcript = guarded_transcript(raw_payload)
+	const call = guarded_call(raw_payload)
 
-	if (transcript === undefined) return undefined
+	if (call === undefined) return undefined
 
-	const moved = moved_entries(transcript, root)
+	const moved = attributed(moved_entries(call.transcript, root), call.command)
 
-	if (moved.revert.length + moved.restore.length + moved.keep.length === 0) return undefined
+	const { revert: reverted, restore: restored, keep, unknown } = moved
+
+	if ([reverted, restored, keep, unknown].every((files) => files.length === 0)) return undefined
 
 	const backup = path.join(BACKUP_DIRECTORY, new Date().toISOString().replaceAll(':', '-'))
 
-	put_back(moved, root, path.join(root, backup), saved_directory(transcript, root))
+	put_back(moved, root, path.join(root, backup), saved_directory(call.transcript, root))
 
 	return JSON.stringify({ decision: 'block', reason: block_reason(moved, backup) })
 }

@@ -18,6 +18,7 @@ const BEFORE_CALL = '.josh/tmp/bash-revert/before-call'
 const OBSERVATION = '.josh/observations/2026-11-07.json'
 const DOC = 'docs/guide.md'
 const TRANSCRIPT = 'transcript.jsonl'
+const HANDOFF = 'hand implementation to a worker lane'
 const SETTINGS = path.join(import.meta.dirname, '../../.claude/settings.json')
 const TSX_BIN = path.join(import.meta.dirname, '../../node_modules/.bin/tsx')
 const POSTTOOL_ENTRY = path.join(import.meta.dirname, 'format-edited-cli.ts')
@@ -41,10 +42,11 @@ function read(relative: string): string {
 	return readFileSync(in_workspace(relative), 'utf8')
 }
 
-function shell_payload(): string {
+// The shell names the files it writes, which is what makes a change this shell's.
+function shell_payload(command = `node write.mjs ${APP} ${CREATED}`): string {
 	return JSON.stringify({
 		tool_name: 'Bash',
-		tool_input: { command: 'node write.mjs' },
+		tool_input: { command },
 		transcript_path: in_workspace(TRANSCRIPT),
 	})
 }
@@ -57,8 +59,8 @@ function stamp(): void {
 	bash_revert.stamp(shell_payload(), root())
 }
 
-function revert(): string | undefined {
-	return bash_revert.revert(shell_payload(), root())
+function revert(command?: string): string | undefined {
+	return bash_revert.revert(shell_payload(command), root())
 }
 
 beforeEach(async () => {
@@ -91,7 +93,7 @@ describe('bash_revert reverting a consultation shell', () => {
 		expect(JSON.parse(envelope)).toMatchObject({ decision: 'block' })
 		expect(envelope).toContain(APP)
 		expect(envelope).toContain(CREATED)
-		expect(envelope).toContain('hand implementation to a worker lane')
+		expect(envelope).toContain(HANDOFF)
 		expect(read(APP)).toBe(ORIGINAL)
 		expect(existsSync(in_workspace(CREATED))).toBe(false)
 	})
@@ -206,6 +208,45 @@ describe('bash_revert leaving a consultation shell alone', () => {
 
 		expect(revert()).toBeUndefined()
 		expect(read(APP)).toBe(WRITTEN)
+	})
+})
+
+describe('bash_revert with a change its command does not name', () => {
+	const READ_ONLY = 'pnpm josh tree:status'
+
+	it('keeps another process write to a file clean before the call and names it', () => {
+		stamp()
+		write(APP, WRITTEN)
+		write(CREATED, WRITTEN)
+
+		const reason = String(JSON.parse(revert(READ_ONLY) ?? '{}').reason)
+
+		expect(reason).toContain(`left in place: ${APP}, ${CREATED}.`)
+		expect(reason).not.toContain(HANDOFF)
+		expect(read(APP)).toBe(WRITTEN)
+		expect(read(CREATED)).toBe(WRITTEN)
+	})
+
+	it('keeps another process write to a file dirty before the call', () => {
+		write(APP, WRITTEN)
+		stamp()
+		write(APP, SHELL_WRITTEN)
+
+		expect(revert(READ_ONLY)).toContain(`left in place: ${APP}.`)
+		expect(read(APP)).toBe(SHELL_WRITTEN)
+	})
+
+	it('reverts the file the command names and keeps the one it does not', () => {
+		stamp()
+		write(APP, WRITTEN)
+		write(CREATED, WRITTEN)
+
+		const reason = String(JSON.parse(revert(`node write.mjs ${CREATED}`) ?? '{}').reason)
+
+		expect(reason).toContain(`Reverted: ${CREATED}.`)
+		expect(reason).toContain(`left in place: ${APP}.`)
+		expect(read(APP)).toBe(WRITTEN)
+		expect(existsSync(in_workspace(CREATED))).toBe(false)
 	})
 })
 
