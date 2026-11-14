@@ -1,7 +1,8 @@
 # The end-of-run retrospective
 
 **When `run:step` prints the retrospective step, the parent runs `pnpm josh run:handoff retrospective`
-in the background;** its unit reads this file. `SKILL.md` → §2's table keeps the rule: run the digest
+in the background;** its unit reads this file. Woken beside the driver → the close its Next
+line names (`run-wake-driver.ts` → `next_move`). `SKILL.md` → §2's table keeps the rule: run the digest
 once, file the improvements worth carrying, stack the rest, mark the step done. Read it in full before
 filing.
 
