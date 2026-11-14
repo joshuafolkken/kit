@@ -1,3 +1,4 @@
+import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { describe, expect, it, vi } from 'vitest'
 import { run_wake_takeover, type TakeoverPorts } from './run-wake-takeover'
 
@@ -45,6 +46,17 @@ describe('run_wake_takeover.await_takeover', () => {
 			'unclaimed',
 		)
 		expect(ports.sleeper).toHaveBeenCalledTimes(ATTEMPTS - 1)
+	})
+
+	// joshuafolkken/kit#7507: the default wait is what the dispatch bound leaves after a driver's start.
+	it('waits out the takeover wait by default before answering unclaimed', async () => {
+		const ports = ports_of([OLD_PID])
+
+		await run_wake_takeover.await_takeover(SUCCESSOR_PID, ports)
+
+		expect(ports.sleeper).toHaveBeenCalledTimes(
+			run_wake_takeover.TAKEOVER_WAIT_MS / MS_PER_SECOND - 1,
+		)
 	})
 })
 

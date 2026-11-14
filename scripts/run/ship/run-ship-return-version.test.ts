@@ -47,7 +47,7 @@ const UNREADABLE = {
 	reason: 'the broker could not read the request — unrecognized key: action.stop.unpinned_ok',
 }
 // Past a driver window and the pause between passes, inside the wait for the supervisor's reload.
-const RELOAD_POLLS = 400
+const RELOAD_POLLS = 390
 // The lane read before the ask, then the minute a broker that failed for a reason other than its code is
 // waited for.
 const SERVING_READS = 61

@@ -35,7 +35,9 @@ const DEFAULT_IDLE_MS = DEFAULT_IDLE_MINUTES * MS_PER_MINUTE
 // once, without waiting it out. `backlogrun-progress.md` → "Waiting, and never waiting forever" holds
 // the row; the figure is here because `idle_watch_reason` below has to say it. Three minutes keeps the
 // asks within the REST core budget while lanes run (joshuafolkken/kit#6718); the wake supervisor's
-// pause is its own (`run-wake-window.ts`).
+// pause is its own (`run-wake-window.ts`). **It is no dispatch path, so the dispatch bound does not
+// shorten it** (joshuafolkken/kit#7507): with no seat free nothing can start before a child is
+// collected, which asks at once, and with one free the listing check below holds the bound.
 const OFFER_INTERVAL_SECONDS = 180
 const OFFER_INTERVAL_MS = OFFER_INTERVAL_SECONDS * MS_PER_SECOND
 
@@ -50,7 +52,8 @@ const IDLE_OFFER_INTERVAL_MS = IDLE_OFFER_INTERVAL_SECONDS * MS_PER_SECOND
 // **How often a free seat checks the `auto-ok` listing between two asks** (joshuafolkken/kit#7227).
 // The check reads the listing's first page by its ETag, and a 304 spends no REST core, so the floor is
 // the drive's own poll (`backlog-drive-cli.ts` → `POLL_MS`); a changed listing asks at once, an unchanged one waits out the intervals
-// above.
+// above. It stays within what the dispatch bound leaves to notice a change
+// (`backlog-dispatch-bound.ts` → `NOTICE_MS`).
 const LISTING_CHECK_INTERVAL_SECONDS = 10
 const LISTING_CHECK_INTERVAL_MS = LISTING_CHECK_INTERVAL_SECONDS * MS_PER_SECOND
 
