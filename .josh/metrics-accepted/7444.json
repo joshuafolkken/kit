@@ -1,7 +1,0 @@
-{
-	"reason": "#7444 adds an isolated measurement harness and regression tests for replay, separate state, active issue exclusion, and CLI exit status.",
-	"date": "2026-11-13",
-	"growth": {
-		"scripts.code_lines": 634
-	}
-}

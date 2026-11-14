@@ -1,8 +1,0 @@
-{
-	"reason": "New run:hold --halfrun-round flag (#7494): reopen_at + CLI dispatch and its registry/usage doc entry",
-	"date": "2026-11-14",
-	"growth": {
-		"scripts.code_lines": 46,
-		"ai_cost.on_demand_bytes": 112
-	}
-}

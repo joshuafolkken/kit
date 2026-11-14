@@ -1,7 +1,0 @@
-{
-	"reason": "#7503 adds the ledger condition to observation waits (gate, prime, early-push count module) and records head/slots on early-push lines",
-	"date": "2026-11-14",
-	"growth": {
-		"scripts.code_lines": 85
-	}
-}

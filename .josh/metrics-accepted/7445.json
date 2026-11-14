@@ -1,7 +1,0 @@
-{
-	"reason": "Review fixes reuse npm acquisition detection for candidate npmrc settings; effective user configuration and regression coverage preserve existing authentication.",
-	"date": "2026-11-13",
-	"growth": {
-		"scripts.code_lines": 45
-	}
-}

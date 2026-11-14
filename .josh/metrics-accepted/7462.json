@@ -1,7 +1,0 @@
-{
-	"reason": "Codexの共通起動境界で明示レーン識別情報のみをshell設定へ引き渡すため、専用adapterと最終argv検査前の接続を追加。起動と再起動の重複実装を避け、役割・checkout一致を既存判定で検証する。",
-	"date": "2026-11-13",
-	"growth": {
-		"scripts.code_lines": 46
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "Blank the live run's JOSH_STARTUP_SCOPE in the unit environment (+2 code lines: the key constant and its blank entry) #7509",
-	"date": "2026-11-14",
-	"growth": {
-		"scripts.code_lines": 2
-	}
-}

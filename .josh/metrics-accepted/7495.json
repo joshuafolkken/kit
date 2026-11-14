@@ -1,8 +1,0 @@
-{
-	"reason": "bash-revert reverts only paths a writing command names and reports the rest (#7495)",
-	"date": "2026-11-14",
-	"growth": {
-		"scripts.code_lines": 35,
-		"ai_cost.on_demand_bytes": 192
-	}
-}

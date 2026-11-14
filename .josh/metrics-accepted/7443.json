@@ -1,7 +1,0 @@
-{
-	"reason": "Verified npm acquisition policy, safe whole-scope migration, lifecycle ownership and shared effective registry parsing for #7443 require new runtime code; existing migration/parser APIs are reused.",
-	"date": "2026-11-13",
-	"growth": {
-		"scripts.code_lines": 194
-	}
-}
