@@ -17,13 +17,14 @@ import type { RedProbe, RedVerdict } from './test-red-logic'
 // failed before the revert reads red too — and a red kept past any of those, or past an edit to the test
 // that failed, would pass an unpinned hunk. A test added or edited elsewhere cannot make that test
 // pass, so it keeps the red. A red with no failed file recorded holds only while no test file changed either.
-// **A `green` or `no-test` one holds while no test file's path or content changed** (`test_contents`):
-// it is only rechecked when a test could have come to reach it, and a stale one stops a lane rather
-// than passing it.
+// **A `green` or `no-test` one holds while no test file's path or content changed, nor the test
+// runner's configuration** (`test_contents`, joshuafolkken/kit#7521 — a widened `include` runs a test
+// that never ran): it is only rechecked when a test could have come to reach it, and a stale one stops a
+// lane rather than passing it.
 // **Past those tree-wide digests, a verdict also holds while its own `basis` is the same**
 // (joshuafolkken/kit#4873): for a `red`, the base commit, the changed non-code and whole-suite files,
 // and each failed test's import closure; for any other, the tests whose imports reach the hunk's file,
-// with their content. An edit outside them keeps the verdict; with no basis — no import graph, no
+// with their content, and the test runner's configuration. An edit outside them keeps the verdict; with no basis — no import graph, no
 // failed file recorded — only the tree-wide digests hold it, as before.
 // **A `red` verdict also holds while `pruned` reads the same** (joshuafolkken/kit#5004): the code
 // change since differs only by lines removed from `green` hunks (`test-pinned-prune-logic.ts`).
@@ -219,11 +220,16 @@ function fresh_verdict(
 	return { verdict: entry.verdict, failed: Object.keys(entry.tests) }
 }
 
-// A `green` or `no-test` verdict's basis: each test whose imports reach the hunk's file, with its content.
-function related_basis(tests: ReadonlyArray<string>, digests: ReadonlyMap<string, string>): Basis {
+// A `green` or `no-test` verdict's basis: each test whose imports reach the hunk's file, with its content,
+// and `config`, the test runner's configuration — which of those tests a run collects.
+function related_basis(
+	tests: ReadonlyArray<string>,
+	digests: ReadonlyMap<string, string>,
+	config: string,
+): Basis {
 	const pairs = sorted(tests).map((file) => [file, digests.get(file) ?? ''] as const)
 
-	return { digest: digest_of(JSON.stringify(pairs)), related: Object.fromEntries(pairs) }
+	return { digest: digest_of(JSON.stringify([config, pairs])), related: Object.fromEntries(pairs) }
 }
 
 // The tests added or edited since `before` was read; `undefined` once one of its tests is gone or no

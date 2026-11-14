@@ -3,6 +3,7 @@ import path from 'node:path'
 import { config_fingerprint } from '#eslint/config-fingerprint.js'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { lint_related_scope } from '#scripts/lint/lint-related-scope'
+import { test_runner_config } from '#scripts/test/test-runner-config'
 import { gate_labels } from './gate-labels'
 import { input_fingerprint } from './input-fingerprint'
 import { toolchain_inputs } from './toolchain-inputs'
@@ -52,7 +53,7 @@ const PRETTIER_CONFIG_PREFIX = '.prettierrc'
 // A file name starting with one of these configures the TypeScript program a check compiles, and the
 // test runner for the unit step.
 const COMPILER_CONFIG_PREFIXES = ['tsconfig', 'svelte.config.'] as const
-const TEST_CONFIG_PREFIXES = [...COMPILER_CONFIG_PREFIXES, 'vitest.config.', 'vite.config.']
+const TEST_CONFIG_PREFIXES = [...COMPILER_CONFIG_PREFIXES, ...test_runner_config.PREFIXES]
 
 // A file name starting with one of these, a path under one of the directories, or a module the eslint
 // config imports configures prettier, eslint or the TypeScript program its type-aware rules read.
