@@ -73,7 +73,7 @@ beforeEach(() => {
 	vi.spyOn(lane_registry, 'find_open_lane').mockResolvedValue(LANE)
 	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(undefined)
 	vi.spyOn(git_gh_command, 'issue_blocked_by_references').mockResolvedValue([])
-	vi.spyOn(git_gh_command, 'issue_get_body').mockResolvedValue(undefined)
+	vi.spyOn(git_gh_command, 'issue_get_body').mockResolvedValue('')
 	vi.spyOn(issue_state_cli, 'read_issue').mockResolvedValue({ kind: 'missing' })
 })
 

@@ -1,6 +1,10 @@
+import { auto_ok_fixture, CREATED_EARLIER } from '#scripts/auto-ok/auto-ok-fixture'
+import { backlog_fixture } from '#scripts/backlog/backlog-fixture'
+import { backlog_next } from '#scripts/backlog/backlog-next'
 import { backlog_plan_comment } from '#scripts/backlog/backlog-plan-comment'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_common_directory } from '#scripts/git/git-common-directory'
+import { AUTO_OK_LABEL, NEEDS_HUMAN_MERGE_LABEL, RUN_LANE_LABEL } from '#scripts/issue/issue-labels'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { lane_await } from '#scripts/lane/lane-await'
@@ -263,6 +267,48 @@ describe('repair history beyond the active invocation', () => {
 		const stage = await run_stage_read.read_stage(ISSUE)
 
 		expect(run_stage.decide(stage.state, 'fullrun').start).toBe('implement')
+	})
+})
+
+function waiting_store(): { ports: AddPorts; labels: Set<string> } {
+	const labels = new Set([AUTO_OK_LABEL, RUN_LANE_LABEL, NEEDS_HUMAN_MERGE_LABEL])
+	const ports: AddPorts = {
+		read_issue: async () => ({ is_open: true, labels: [...labels], blockers: [] }),
+		apply_label: async (_issue, label) => Boolean(labels.add(label)),
+		clear_label: async (_issue, label) => labels.delete(label) || true,
+	}
+
+	return { ports, labels }
+}
+
+// The issue the backlog selection offers next, read off its printed answer.
+async function offered(labels: ReadonlySet<string>): Promise<string | undefined> {
+	backlog_fixture.stub_backlog({
+		opted_in: [auto_ok_fixture.issue(Number(ISSUE), CREATED_EARLIER, [...labels])],
+	})
+	vi.mocked(console.info).mockClear()
+	await backlog_next.run([])
+
+	return vi.mocked(console.info).mock.calls.flat().map(String).at(-1)
+}
+
+// joshuafolkken/kit#7487: a recorded repair on a merge wait is offered, not excluded as a person's.
+describe('repair of a pull request waiting on a person merge', () => {
+	it('dispatches the repair on the next offer', async () => {
+		const store = waiting_store()
+
+		expect(await run_add_cli.run([ISSUE, '--retry'], store.ports)).toBe(0)
+		expect(store.labels.has(NEEDS_HUMAN_MERGE_LABEL)).toBe(false)
+		expect(await offered(store.labels)).toBe(ISSUE)
+	})
+
+	it('keeps the merge wait without a repair boundary', async () => {
+		vi.mocked(git_gh_command.pr_view).mockResolvedValue(JSON.stringify({ state: 'MERGED' }))
+		const store = waiting_store()
+
+		await run_add_cli.run([ISSUE, '--retry'], store.ports)
+		expect(store.labels.has(NEEDS_HUMAN_MERGE_LABEL)).toBe(true)
+		expect(await offered(store.labels)).not.toBe(ISSUE)
 	})
 })
 

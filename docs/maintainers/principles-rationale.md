@@ -63,6 +63,11 @@ to about 1,100 characters — a table and four paragraphs — where the owner wa
 points and the next step (joshuafolkken/kit#5328). A local memory note only reached the session that
 loaded it and never a consumer, so `stop:guard` measures the reply instead.
 
+Ordering alone left replies ending at uncertainty without an actionable next step
+(joshuafolkken/kit#7480). The existing section now specifies an action, waiting conditions and a
+verification method. Content judgment stays with the agent; the length guard, fixed-output exception
+and consultation/implementation boundary keep their existing scope.
+
 ## Why a remedy for defects never halts evolution
 
 Asked about the number of defects, the agent proposed pausing new optimizations as the root fix

@@ -1,0 +1,8 @@
+{
+	"reason": "Issue #7480 requires three existing concise-reply bullets to define concrete action, wait conditions and authorized execution; no new rule, guard or runtime logic.",
+	"date": "2026-11-13",
+	"growth": {
+		"rules.lines": 3,
+		"ai_cost.on_demand_bytes": 615
+	}
+}

@@ -5,6 +5,7 @@ import { epic_solo, type Labelled, type SoloQueue } from '#scripts/epic/epic-sol
 import { epic_triage } from '#scripts/epic/epic-triage'
 import { has_label_name, has_parked_label, IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
 import { issue_not_before } from '#scripts/issue/issue-not-before'
+import { issue_observation_gate } from '#scripts/issue/issue-observation-gate'
 import { issue_sample_gate } from '#scripts/issue/issue-sample-gate'
 import { lane_state } from '#scripts/lane/lane-state'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
@@ -266,6 +267,17 @@ function offer_wait(child: EpicChild, read: ReasonRead, pool: Pool): RowReason |
 // waits on; `📅 4313` while that pull request has not merged or its merge is unread — the cited issue
 // for a condition waiting on the pull request that closes it.
 function sample_wait_of(child: EpicChild): RowReason | undefined {
+	const observation = issue_observation_gate.wait_of(child.body)
+
+	if (observation !== undefined) {
+		return {
+			icon: WAIT_ICONS.not_before,
+			value: 'evidence',
+			tail: observation.reason,
+			evidence_url: observation.url,
+		}
+	}
+
 	const wait = issue_sample_gate.wait_of(child.body)
 
 	if (wait === undefined) return undefined

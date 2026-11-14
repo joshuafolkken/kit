@@ -1,6 +1,8 @@
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_paths } from '#scripts/lane/lane-paths'
+import { run_carry_session } from '#scripts/run/carry/run-carry-session'
 import type { LaunchRequest } from '#scripts/run/detached-launch'
+import { run_headless_keys } from '#scripts/run/run-headless-keys'
 import { agent_profile_schema } from './agent-profile-schema'
 
 const CONFIG_FLAG = '-c'
@@ -35,12 +37,32 @@ function is_codex_worker(request: LaunchRequest): boolean {
 	)
 }
 
+function scheduler_arguments(request: LaunchRequest): ReadonlyArray<string> {
+	if (request.profile?.role !== agent_profile_schema.SCHEDULER) return []
+	const keys = [run_carry_session.KEY, ...run_headless_keys.MARK_KEYS]
+
+	return keys.flatMap((key) =>
+		request.env?.[key] === undefined
+			? []
+			: [CONFIG_FLAG, `${SHELL_SET}${key}=${JSON.stringify(request.env[key])}`],
+	)
+}
+
 // Only the launcher's explicit mark grants identity; a checkout path or inherited mark cannot.
+function is_codex(request: LaunchRequest): boolean {
+	return request.profile?.provider === 'openai' && request.argv.command === 'codex'
+}
+
 function arguments_for(request: LaunchRequest): ReadonlyArray<string> {
 	const { argv } = request
-	if (!is_codex_worker(request)) return argv.args
 
-	return [...argv.args.slice(0, -1), ...identity_arguments(request), ...argv.args.slice(-1)]
+	if (!is_codex(request) || argv.ends_with_prompt !== true) return argv.args
+
+	const identity = is_codex_worker(request)
+		? identity_arguments(request)
+		: scheduler_arguments(request)
+
+	return [...argv.args.slice(0, -1), ...identity, ...argv.args.slice(-1)]
 }
 
 const codex_launch_identity = { arguments_for }
