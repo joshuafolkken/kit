@@ -71,10 +71,8 @@ const VALUE_OPTIONS = {
 // `--where <header>=<text>`: the header ends at the first `=`, so the text may hold one.
 const WHERE_SEPARATOR = '='
 
-function refuse(): number {
-	console.error(USAGE)
-
-	return FAILURE_EXIT_CODE
+function refuse(argv: ReadonlyArray<string>): number {
+	return cli_flags.answer_usage(argv, USAGE)
 }
 
 // The `--every` interval: `{ seconds: undefined }` for a single sample, `undefined` for a refusal.
@@ -105,7 +103,7 @@ async function sample_command(
 ): Promise<number> {
 	const interval = sample_interval(rest)
 
-	if (interval === undefined) return refuse()
+	if (interval === undefined) return refuse(rest)
 
 	await lane_sampler.take(context)
 
@@ -197,7 +195,7 @@ async function stats_command(
 ): Promise<number> {
 	const request = lane_stats_request.stats_request(rest)
 
-	if (request === undefined) return refuse()
+	if (request === undefined) return refuse(rest)
 
 	const window = window_of(request.start, context.now_ms ?? Date.now())
 
@@ -325,7 +323,7 @@ async function value_command(
 ): Promise<number> {
 	const request = value_request(rest)
 
-	if (request === undefined) return refuse()
+	if (request === undefined) return refuse(rest)
 
 	const window = { since_ms: request.since_ms, until_ms: context.now_ms ?? Date.now() }
 
@@ -348,7 +346,7 @@ async function value_command(
 async function net_command(rest: ReadonlyArray<string>, context: MeasureContext): Promise<number> {
 	const [issue = ''] = rest
 
-	if (rest.length !== 1 || !issue_number_shape.is_issue_number(issue)) return refuse()
+	if (rest.length !== 1 || !issue_number_shape.is_issue_number(issue)) return refuse(rest)
 
 	const net = await lane_net_read.net_minutes_of(Number(issue), context)
 
@@ -378,7 +376,7 @@ async function run(argv: ReadonlyArray<string>, context: MeasureContext = {}): P
 	const [verb = '', ...rest] = argv
 	const command = Object.hasOwn(VERBS, verb) ? VERBS[verb] : undefined
 
-	return command === undefined ? refuse() : await command(rest, context)
+	return command === undefined ? refuse(argv) : await command(rest, context)
 }
 
 async function main(argv: ReadonlyArray<string>): Promise<void> {

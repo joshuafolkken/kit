@@ -122,4 +122,10 @@ describe('review_findings_cli.run --period refusal', () => {
 			error.mockRestore()
 		},
 	)
+
+	it.each(['--help', '-h'])('prints the usage and succeeds for %s', async (flag) => {
+		expect(await report_of(root_with(), [flag])).toBe(
+			'Usage: josh review:findings [--period <days>]',
+		)
+	})
 })

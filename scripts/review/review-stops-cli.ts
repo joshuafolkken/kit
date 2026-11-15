@@ -12,7 +12,7 @@ import { review_stop_log, type StopLine } from './review-stop-log'
 
 const OPTIONS = { period: { type: 'string' } } as const
 const DEFAULT_PERIOD_DAYS = 7
-const USAGE = 'usage: josh review:stops [--period <days>]'
+const USAGE = 'Usage: josh review:stops [--period <days>]'
 const NO_SENTENCE = '(no sentence)'
 const DATE_LENGTH = 10
 // `process.argv` holds the runtime and the script before the command's own arguments.
@@ -60,11 +60,7 @@ function format_report(stops: ReadonlyArray<StopLine>, period_days: number): str
 function run(argv: ReadonlyArray<string>, context: StopsContext = {}): number {
 	const period_days = period_of(argv)
 
-	if (period_days === undefined) {
-		console.error(USAGE)
-
-		return 1
-	}
+	if (period_days === undefined) return cli_flags.answer_usage(argv, USAGE)
 
 	const window = lane_stats.window_of(period_days, context.now_ms ?? Date.now())
 	const stopped = review_stop_log.read(context.log_path).filter((line) => line.fixed !== true)

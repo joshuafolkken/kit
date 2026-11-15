@@ -157,6 +157,15 @@ describe('cost_audit_cli.run — the printed report', () => {
 	})
 })
 
+describe('cost_audit_cli.run — help', () => {
+	it.each(['--help', '-h'])('prints the usage and exits 0 on %s', async (flag) => {
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		expect(await cost_audit_cli.run([flag], '/repo', NOW_MS)).toBe(0)
+		expect(info).toHaveBeenCalledWith(cost_audit_cli.USAGE)
+	})
+})
+
 describe('cost_audit_cli.run — a dated period', () => {
 	beforeEach(stub_sources)
 

@@ -109,7 +109,16 @@ describe('review_stops_cli.run', () => {
 			const { code, text } = captured(argv)
 
 			expect(code).toBe(1)
-			expect(text).toContain('usage: josh review:stops')
+			expect(text).toContain('Usage: josh review:stops')
 		},
 	)
+})
+
+describe('review_stops_cli.run — help', () => {
+	it.each(['--help', '-h'])('answers %s with the usage and 0', (flag) => {
+		const { code, text } = captured([flag])
+
+		expect(code).toBe(0)
+		expect(text).toBe('Usage: josh review:stops [--period <days>]')
+	})
 })

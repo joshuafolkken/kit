@@ -9,7 +9,7 @@ import { review_interaction } from './review-interaction'
 import { selfcheck_cli } from './selfcheck-cli'
 import { selfcheck_report } from './selfcheck-report'
 
-const USAGE_LINE = 'usage: josh review:selfcheck [--interaction-answered]'
+const USAGE_LINE = 'Usage: josh review:selfcheck [--interaction-answered]'
 const DUE = ['scripts/run/ship/x.ts']
 const ISSUE = 5832
 const make_directory = temporary_directory('suite')
@@ -52,6 +52,18 @@ describe('selfcheck_cli.run', () => {
 		)
 		expect(error).toHaveBeenCalledWith(USAGE_LINE)
 	})
+
+	it.each(['--help', '-h'])(
+		'prints the usage and succeeds for %s, before reading git',
+		async (flag) => {
+			const info = vi.spyOn(console, 'info').mockReturnValue(undefined)
+			const resolved = vi.spyOn(change_base, 'resolved')
+
+			expect(await selfcheck_cli.run([flag])).toBe(0)
+			expect(info).toHaveBeenCalledWith(USAGE_LINE)
+			expect(resolved).not.toHaveBeenCalled()
+		},
+	)
 })
 
 // joshuafolkken/kit#5832: a passing, due self-check run with `--interaction-answered` records the

@@ -2,6 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import { change_base } from '#scripts/git/change-base'
 import { git_spawn } from '#scripts/git/git-spawn'
+import { cli_flags } from '#scripts/lib/cli-flags'
 import { prose_stale_read } from './prose-stale-read'
 import { prose_stale_scan } from './prose-stale-scan'
 
@@ -11,7 +12,7 @@ import { prose_stale_scan } from './prose-stale-scan'
 // The diff runs from the change base to the working tree, so an uncommitted edit counts. Exit 1 on a
 // reference, 2 when the base or a search could not be read.
 
-const USAGE = 'usage: josh prose:stale'
+const USAGE = 'Usage: josh prose:stale'
 const NO_BASE = 'prose:stale: no change base — fetch the default branch, then re-run'
 // `process.argv` holds the runtime and the script before the command's own arguments.
 const FIRST_ARGUMENT = 2
@@ -23,6 +24,7 @@ function refuse(message: string): number {
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
+	if (cli_flags.is_help_request(argv)) return cli_flags.answer_usage(argv, USAGE)
 	if (argv.length > 0) return refuse(USAGE)
 
 	const base = await change_base.resolved()

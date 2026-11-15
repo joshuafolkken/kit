@@ -247,11 +247,15 @@ const MIN_TARGET_LENGTH = 3
 // file was read as a chain of dependent calls and no sequence ever formed. One answer, one place.
 const WRITING_TOOLS: ReadonlySet<string> = new Set(['Edit', 'Write', 'NotebookEdit'])
 
-// A shell line that writes even though its leading word reads. `sed` is the one that matters — it is
-// in `READ_COMMANDS` because `sed -n` is a read, so `sed -i` would otherwise be classified as one.
-const WRITING_WORDS: ReadonlySet<string> = new Set(['dd', 'sed', 'tee'])
+// A shell line that writes even though its leading word reads. `sed` is in `READ_COMMANDS` because
+// `sed -n` is a read, so `may_write_command` asks for its in-place flag instead of listing it here.
+const WRITING_WORDS: ReadonlySet<string> = new Set(['dd', 'tee'])
 
 const REDIRECTION = '>'
+
+// A redirection that writes no file: a stream discarded to `/dev/null` (`2>/dev/null`, `&>/dev/null`,
+// `>>/dev/null`) or duplicated onto another descriptor (`2>&1`).
+const DISCARDED_STREAM_PATTERN = /[\d&]?>>?\s*\/dev\/null\b|\d?>&\d/gu
 
 // The one bundleable shell spelling of an edit. `sed -n` prints and `sed -i` rewrites, so the flag is
 // the whole of the difference.
@@ -354,10 +358,18 @@ function is_read_josh(command: string): boolean {
 // an edit whose siblings would then land alone. It matches `>` as a character rather than a token, so
 // `awk '$1 > 5'` is caught too — a call allowed that could have been refused, which is the safe
 // direction here and **only** here.
+//
+// **Wide, but not past what can write a file** (joshuafolkken/kit#7616). A stream sent to `/dev/null`
+// or duplicated onto another (`2>&1`) writes none, and `sed` writes only with an in-place flag — still
+// looked for anywhere on the line, so a downstream `grep -i` keeps the over-call. Calling those writes
+// kept every `grep … 2>/dev/null` and `grep …; sed -n …` out of the investigation guard's search count.
 function may_write_command(command: string): boolean {
-	if (command.includes(REDIRECTION)) return true
+	if (command.replaceAll(DISCARDED_STREAM_PATTERN, '').includes(REDIRECTION)) return true
 
-	return words_of(command).some((word) => WRITING_WORDS.has(word))
+	const words = words_of(command)
+	if (words.some((word) => WRITING_WORDS.has(word))) return true
+
+	return words.includes(IN_PLACE_COMMAND) && words.some((word) => IN_PLACE_FLAG_PATTERN.test(word))
 }
 
 // **The certain half**, which the dependency test reads and which therefore may not over-call. The

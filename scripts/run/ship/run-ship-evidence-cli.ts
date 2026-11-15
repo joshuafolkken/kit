@@ -5,6 +5,7 @@ import { gate_tree } from '#scripts/gate/gate-tree'
 import { tree_verdict } from '#scripts/gate/tree-verdict'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { cli_flags } from '#scripts/lib/cli-flags'
 import { execa } from 'execa'
 import { run_ship_body_draft } from './run-ship-body-draft'
 import { run_ship_evidence } from './run-ship-evidence'
@@ -19,7 +20,7 @@ const COMMAND_KEY_LENGTH = 12
 const FAILURE_EXIT_CODE = 1
 const SEPARATOR = '--'
 const FRESH_FLAG = '--fresh'
-const USAGE = 'usage: josh ship:evidence <N> [--fresh] -- <command...>'
+const USAGE = 'Usage: josh ship:evidence <N> [--fresh] -- <command...>'
 
 interface Evidence {
 	readonly issue: string
@@ -109,6 +110,10 @@ async function record(draft: string, evidence: Evidence): Promise<number> {
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const evidence = parse(argv)
+	// Only the first argument: the recorded command can carry its own `--help`.
+	const first = argv.slice(0, 1)
+
+	if (cli_flags.is_help_request(first)) return cli_flags.answer_usage(first, USAGE)
 
 	if (evidence === undefined) {
 		console.error(USAGE)

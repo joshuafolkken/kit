@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { text } from 'node:stream/consumers'
 import { fileURLToPath } from 'node:url'
+import { agent_provider } from '#scripts/agent/agent-provider'
 import { hook_decision, type GuardOutcome } from '#scripts/josh/hook-decision'
 import { hook_payload_capture } from '#scripts/josh/hook-payload-capture'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
@@ -9,7 +10,7 @@ import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { z } from 'zod'
 import { bash_revert } from './bash-revert'
 import { build_envelope, compose_context, format_edited_payload } from './format-edited-file'
-import { hook_context } from './hook-context'
+import { hook_context, type HookContext } from './hook-context'
 import { pretool_guard } from './pretool-guard'
 
 const APPLY_PATCH_TOOL = 'apply_patch'
@@ -36,6 +37,7 @@ const codex_payload_schema = z.looseObject({
 	tool_name: z.string().min(1),
 	tool_input: z.unknown(),
 })
+const session_payload_schema = z.looseObject({ session_id: z.string().min(1) })
 const patch_input_schema = z.object({ command: z.string().min(1) })
 const envelope_schema = z.record(z.string(), z.unknown())
 
@@ -104,8 +106,25 @@ function posttool_payloads(raw_payload: string): Array<string> {
 	)
 }
 
+// **The session a Codex hook judges is the payload's, never the inherited environment's**
+// (joshuafolkken/kit#7607). Codex names its own thread only to the commands its shell tool runs; a
+// hook inherits the codex process's environment, whose `CODEX_THREAD_ID` is whatever started that
+// process. A lane supervisor started from a Codex parent handed the parent's thread to every child,
+// so the implementation cut priced the parent's frozen 117k context and refused each child's first
+// edit. The payload's `session_id` is the hook's own thread.
+function session_context(raw_payload: string): HookContext {
+	const context = hook_context.from_process()
+	const payload = json_value.parse_with(raw_payload, session_payload_schema)
+	if (payload === undefined) return context
+
+	return {
+		...context,
+		env: { ...context.env, [agent_provider.CODEX_SESSION_KEY]: payload.session_id },
+	}
+}
+
 function pretool_outcome(raw_payload: string): GuardOutcome {
-	return pretool_guard.pretool_outcome(pretool_payload(raw_payload))
+	return pretool_guard.pretool_outcome(pretool_payload(raw_payload), session_context(raw_payload))
 }
 
 // The formatters apply what eslint could fix silently and return what it could not; each patched
@@ -157,7 +176,7 @@ async function write_posttool_context(raw_payload: string): Promise<void> {
 // shell is stamped here for the `PostToolUse` revert, as `pretool_guard.respond` does on Claude.
 async function write_pretool_outcome(raw_payload: string): Promise<void> {
 	hook_decision.load_environment_file()
-	const context = hook_context.from_process()
+	const context = session_context(raw_payload)
 	const judged = pretool_payload(raw_payload)
 
 	bash_revert.stamp(judged, context.cwd)
@@ -199,6 +218,7 @@ const codex_hook_adapter = {
 	pretool_outcome,
 	pretool_payload,
 	run,
+	session_context,
 	write_pretool_outcome,
 }
 

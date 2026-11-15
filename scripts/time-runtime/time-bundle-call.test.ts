@@ -1,6 +1,8 @@
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { describe, expect, it } from 'vitest'
 import { time_bundle_call } from './time-bundle-call'
+import { time_search_call } from './time-search-call'
+import { time_shell } from './time-shell'
 import { time_writes } from './time-writes'
 
 const READ_PATH = 'tools/time/time-spans.ts'
@@ -230,15 +232,45 @@ describe('time_bundle_call — which calls write', () => {
 	])('reads the shell line %s as certainly writing: %s', (command, is_expected) => {
 		expect(time_bundle_call.bash_facts(command).is_writing).toBe(is_expected)
 	})
+})
 
+describe('time_bundle_call — which shell lines may write', () => {
 	// The conservative half stays wide: everything it over-calls is a call allowed that could have been
 	// refused, which is the safe direction for the refusal test and for nothing else.
 	it.each([
-		[`sed -n '1,200p' ${READ_PATH}`, true],
+		[`sed -i '' s/a/b/ ${READ_PATH}`, true],
+		[`sed -n '1,200p' ${READ_PATH} | grep -i handler`, true],
 		[`cat a.ts > ${READ_PATH}`, true],
+		[`grep -rn handler scripts 2>/dev/null > ${READ_PATH}`, true],
+		[`echo a | tee ${READ_PATH}`, true],
 		[`cat ${READ_PATH}`, false],
 	])('reads the shell line %s as possibly writing: %s', (command, is_expected) => {
 		expect(time_bundle_call.bash_facts(command).may_write).toBe(is_expected)
+	})
+
+	// **Wide is not blind** (joshuafolkken/kit#7616). A discarded stream and a printing `sed` write no
+	// file, yet a lane child's `grep … 2>/dev/null` and `grep …; sed -n …` read as writes, so the
+	// investigation guard never counted them as search turns and the main line searched on past it.
+	it.each([
+		[`sed -n '1,200p' ${READ_PATH}`],
+		[`grep -rn handler scripts 2>/dev/null`],
+		[`grep -rn handler scripts >/dev/null 2>&1`],
+		[`grep -rn handler scripts &>/dev/null`],
+		[`grep -rn handler scripts; sed -n '1,20p' ${READ_PATH}`],
+	])('reads the shell line %s as not writing', (command) => {
+		expect(time_bundle_call.bash_facts(command).may_write).toBe(false)
+	})
+})
+
+describe('time_bundle_call — search turns the investigation guard counts', () => {
+	it.each([
+		[`grep -rn handler scripts 2>/dev/null | head`],
+		[`grep -rn handler scripts | grep -v test; sed -n '1,20p' ${READ_PATH}`],
+	])('counts %s as a read-only search', (command) => {
+		const facts = time_bundle_call.bash_facts(command)
+		const label = time_shell.bash_label(command)
+
+		expect(time_search_call.is_read_only_search({ label, ...facts })).toBe(true)
 	})
 })
 
