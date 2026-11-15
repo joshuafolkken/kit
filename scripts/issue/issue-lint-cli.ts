@@ -67,8 +67,8 @@ function problems(body: string, labels?: ReadonlyArray<string>): ReadonlyArray<s
 // `issue:body` rewrites, and Issues filed before the rule have none.
 function summary_problem(body: string): string | undefined {
 	if (issue_lint.starts_with_summary(body)) return undefined
-	const heading = issue_lint.SUMMARY_HEADING
-	const problem = `the body must start with ${heading}: a plain-language summary for a person deciding on the Issue — how to write it: the ${heading} section of issue-template.md's template`
+	const heading = issue_lint.summary_heading()
+	const problem = `the body must start with ${heading}: a plain-language summary for a person deciding on the Issue — how to write it: the ${heading} section of ${issue_template_section.document_name()}'s template`
 	const template = issue_template_section.section(heading)
 
 	return template === undefined ? problem : `${problem}\n${template}`

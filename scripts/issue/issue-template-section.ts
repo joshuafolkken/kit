@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs'
+import path from 'node:path'
 import { package_path } from '#scripts/init/init-paths'
 import { issue_body_keys, type Column } from './issue-body-keys'
 import { markdown_section } from './markdown-section'
@@ -34,6 +35,11 @@ function section_of(document: string, heading: string): string | undefined {
 	return [heading, ...markdown_section.section_lines(template, heading)].join('\n').trimEnd()
 }
 
+// The template document's file name in the body's column, for a refusal that sends the filer to it.
+function document_name(): string {
+	return path.basename(TEMPLATE_PATHS[issue_body_keys.column()])
+}
+
 // A package without the template prints the bare problem rather than failing the lint.
 function section(heading: string): string | undefined {
 	const template_path = package_path(TEMPLATE_PATHS[issue_body_keys.column()])
@@ -43,6 +49,6 @@ function section(heading: string): string | undefined {
 	return section_of(readFileSync(template_path, 'utf8'), heading)
 }
 
-const issue_template_section = { section, section_of }
+const issue_template_section = { document_name, section, section_of }
 
 export { issue_template_section }

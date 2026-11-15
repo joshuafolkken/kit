@@ -141,6 +141,10 @@ async function lint_body(body: string): Promise<number> {
 
 // joshuafolkken/kit#7544: the pre-filing check answers as `issue:file` does about the leading summary.
 describe('issue:lint leading summary', () => {
+	afterEach(() => {
+		vi.unstubAllEnvs()
+	})
+
 	it('rejects a body that does not start with the summary', async () => {
 		const report = vi.spyOn(console, 'error').mockImplementation(() => undefined)
 
@@ -151,6 +155,23 @@ describe('issue:lint leading summary', () => {
 			expect.stringMatching(/^✖ the body must start with ## 概要/u),
 		)
 	})
+
+	it('cites the English template for an en session', () => {
+		vi.stubEnv('JOSH_SESSION_LANG', 'en')
+
+		expect(issue_lint_cli.summary_problem('## Background\n')).toMatch(
+			/^the body must start with ## Summary: .* the ## Summary section of issue-template\.en\.md's template\n## Summary\n/u,
+		)
+	})
+
+	it.each(['## Summary', '## 概要'])(
+		'accepts a body opening with %s in an en session',
+		(heading) => {
+			vi.stubEnv('JOSH_SESSION_LANG', 'en')
+
+			expect(issue_lint_cli.summary_problem(`${heading}\n\nsummary\n`)).toBeUndefined()
+		},
+	)
 
 	it('leaves the summary out of problems, which issue:body also runs on older Issues', () => {
 		expect(
