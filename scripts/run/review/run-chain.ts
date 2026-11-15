@@ -81,7 +81,7 @@ function review_stages(review_args: ReadonlyArray<string>): ReadonlyArray<ChainS
 			name: RUN_REVIEW,
 			argv: [RUN_REVIEW, ...review_args],
 			next: (issue) =>
-				`settle what \`${RUN_REVIEW}\` refused (a metrics growth: add \`--accept-metrics "<why>"\`), ${rerun(issue, RUN_REVIEW)}`,
+				`settle what \`${RUN_REVIEW}\` refused (only where it refused a metrics growth: add \`--accept-metrics "<why>"\`), ${rerun(issue, RUN_REVIEW)}`,
 		},
 	]
 }

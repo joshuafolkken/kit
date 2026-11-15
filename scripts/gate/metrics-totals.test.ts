@@ -146,6 +146,14 @@ describe('metrics_totals.totals_refusal with an accept reason — no growth', ()
 		expect(info).toHaveBeenCalledWith(metrics_totals.ACCEPT_UNUSED_NOTE)
 	})
 
+	it('says nothing outside kit, where no metrics ran', async () => {
+		is_kit_mock.mockReturnValue(false)
+		const info = spy_info()
+
+		await expect(metrics_totals.totals_refusal(DIRECTORY, REASON)).resolves.toBeUndefined()
+		expect(info).not.toHaveBeenCalled()
+	})
+
 	it('says nothing when no reason was given and no total grew', async () => {
 		const info = spy_info()
 

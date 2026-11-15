@@ -166,6 +166,10 @@ describe('run_chain_cli.run — refusals', () => {
 		expect(error_lines.join('\n')).toContain(run_chain_cli.USAGE)
 	})
 
+	it('names the --accept-metrics reason in the usage', () => {
+		expect(run_chain_cli.USAGE).toContain('[--accept-metrics "<reason>"]')
+	})
+
 	it('names the --join form in the usage', () => {
 		expect(run_chain_cli.USAGE).toContain('<N> --join [--fixing] [--from <stage>]')
 		expect(run_chain_cli.USAGE).toContain('[--ship "<title> #<N>"]')

@@ -93,7 +93,7 @@ async function totals_refusal(
 		return await grown_refusal(directory, result, accept_reason)
 	}
 
-	if (accept_reason !== undefined) console.info(ACCEPT_UNUSED_NOTE)
+	if (result !== undefined && accept_reason !== undefined) console.info(ACCEPT_UNUSED_NOTE)
 
 	return undefined
 }
