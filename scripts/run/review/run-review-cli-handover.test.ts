@@ -178,6 +178,16 @@ describe('run_review_cli.run — an unaccepted metrics growth', () => {
 		expect(brief_run).toHaveBeenCalledWith([], expect.any(Function))
 	})
 
+	// joshuafolkken/kit#7599: the reason given to run:review is the one the open records the growth under.
+	it('hands the --accept-metrics reason to the totals refusal', async () => {
+		const reason = 'a new command'
+
+		handed_over.mockResolvedValue(false)
+
+		expect(await run_review_cli.run(['--accept-metrics', reason])).toBe(SUCCESS_EXIT_CODE)
+		expect(grown).toHaveBeenCalledWith(expect.any(String), reason)
+	})
+
 	it('never asks on the ship’s own --code-only open, which has just passed the pre-detach', async () => {
 		expect(await run_review_cli.run([run_review.CODE_ONLY_FLAG])).toBe(SUCCESS_EXIT_CODE)
 		expect(grown).not.toHaveBeenCalled()
