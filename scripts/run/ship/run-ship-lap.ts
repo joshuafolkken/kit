@@ -133,7 +133,15 @@ async function timed<T>(
 	}
 }
 
-const run_ship_lap = { ENVIRONMENT_KEY, STARTUP_STEP, STEP, environment, timed, within }
+const run_ship_lap = {
+	ENVIRONMENT_KEY,
+	PARENT_SEPARATOR,
+	STARTUP_STEP,
+	STEP,
+	environment,
+	timed,
+	within,
+}
 
 export type { LapNote, LapOptions, LapSink }
 export { run_ship_lap }

@@ -226,6 +226,11 @@ The `concurrent lanes` table gives `lint:related` / `test:related` per lane coun
 median core wait: the call's own lane's `core_wait` records for it while it ran. No such record reads
 `not measured`, not 0 (`lane-concurrency-wait.ts`).
 
+The `recording command` table times one call of `lane:plan`, `run:entry`, `review:record`, `cost`, `run:cut` and
+`metrics` from the transcripts: solo runs, median and max seconds, total minutes. A chained or backgrounded call is
+left out, as for `lint:related`. The time includes the launcher's start and any `dist` rebuild, so the `run:entry`
+row sets beside it the sum of the ledger's `run:entry › …` step medians (`lane-record-command-stats.ts`).
+
 The followup row is `followup (driver, outside lane net)`; `--why` groups a followup over budget as `driver followup over budget (outside lane net)`, apart from the lane's own causes (`lane-why-period.ts`). Its `open issues` matches each lane's ledger cause key (the last CI check) as well as the stage names, through `lane:why`'s matcher (`lane-why-causes.ts`).
 
 `--sinks [<minutes>]` (default 30) prints one table instead: per `lane:breakdown` stage and lap of the period's merged
