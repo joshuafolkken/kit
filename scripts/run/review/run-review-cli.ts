@@ -1,33 +1,24 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { metrics_totals } from '#scripts/gate/metrics-totals'
-import { git_branch } from '#scripts/git/git-branch'
-import { git_command } from '#scripts/git/git-command'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
-import { stamp_file } from '#scripts/josh/stamp-file'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
-import { lane_session_broker } from '#scripts/lane/lane-session-broker'
 import { review_attest, type ReviewSlot } from '#scripts/review/review-attest'
 import { review_brief_cli } from '#scripts/review/review-brief-cli'
-import { review_interaction } from '#scripts/review/review-interaction'
-import { review_lane_handover } from '#scripts/review/review-lane-handover'
-import { review_pair } from '#scripts/review/review-pair'
-import { review_round } from '#scripts/review/review-round'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { run_step_section } from '#scripts/run/run-step-section'
-import { run_ship_review } from '#scripts/run/ship/run-ship-review'
 import { test_pinned_record, type PinnedSummary } from '#scripts/test/test-pinned-record'
 import { run_review, type GateState, type ReviewTiming } from './run-review'
+import { run_review_briefs, type BriefPlan } from './run-review-briefs'
 import { run_review_early_push } from './run-review-early-push'
 import { run_review_join_read, type JoinVerdict } from './run-review-join-read'
 import { run_review_join_ready } from './run-review-join-ready'
+import { run_review_open_refusal } from './run-review-open-refusal'
 import { run_review_pinned } from './run-review-pinned'
 import { run_review_pinned_accepted } from './run-review-pinned-accepted'
 import { run_review_pinned_join } from './run-review-pinned-join'
 import { run_review_pinned_steps } from './run-review-pinned-steps'
 import { run_review_pinned_tree } from './run-review-pinned-tree'
 import { run_review_steps } from './run-review-steps'
-import { run_review_unplanned } from './run-review-unplanned'
 
 // `josh run:review` — one call that runs `josh gate` and, once it is green, writes the `/code-review`
 // brief to a file, printing its path, so round 1 reads the tree the gate passed (joshuafolkken/kit#5938).
@@ -65,12 +56,11 @@ const FIXING_FLAG = '--fixing'
 const PINNED_FLAG = '--pinned'
 const LANE_PINNED_NOTE =
 	"Lane child — not waiting on test:pinned; the ship's pre-detach joins this check."
-const INTERACTION_FLAG = '--interaction'
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const USAGE =
 	'Usage: josh run:review [--code-only] [--unpinned-ok "<reason>"] | --join [--fixing] | --pinned | --push'
-const { CODE, INTERACTION } = review_attest.REVIEW_SLOT
+const { INTERACTION } = review_attest.REVIEW_SLOT
 
 function now_iso(): string {
 	return new Date().toISOString()
@@ -93,86 +83,6 @@ const JOIN_HINT =
 
 const INTERACTION_HINT =
 	'Two brief files above: launch one `reviewer` per brief side by side, each with its own printed prompt, and once both are attested record the interaction pass the reviewer wrote with `pnpm josh review:submit --interaction` by `pnpm josh review:record --from-slot --interaction --issue <N>` beside round 1.'
-
-// The briefs an open writes: the slots this branch's issue owes round 1, and whether this is the ship's
-// own `--code-only` open, which prints code's brief instead.
-interface BriefPlan {
-	is_code_only: boolean
-	slots: ReadonlyArray<ReviewSlot>
-}
-
-const SLOT_ARGV: Readonly<Record<ReviewSlot, ReadonlyArray<string>>> = {
-	code: [],
-	interaction: [INTERACTION_FLAG],
-}
-
-// The slots this branch's issue owes round 1. A branch that names no issue, or the ship's own open,
-// briefs code alone.
-async function brief_slots(is_code_only: boolean): Promise<ReadonlyArray<ReviewSlot>> {
-	if (is_code_only) return [CODE]
-	const issue = git_branch.issue_from_branch(await git_command.branch())
-	if (issue === undefined) return [CODE]
-	const answer = await review_interaction.reading(issue)
-	if (answer.inert_line !== undefined) process.stderr.write(`${answer.inert_line}\n`)
-
-	return review_interaction.round_one_slots(answer.status)
-}
-
-// A lane child's reopen after an attested round 1 is refused before anything is launched, a widened
-// plan included (`review-lane-handover.ts`); the ship's own `--code-only` open is never refused.
-async function handover_refusal(is_code_only: boolean): Promise<string | undefined> {
-	if (is_code_only) return undefined
-	const issue = git_branch.issue_from_branch(await git_command.branch())
-	if (issue === undefined) return undefined
-
-	return (await review_lane_handover.is_reopen_refused(issue))
-		? review_lane_handover.refusal(issue)
-		: undefined
-}
-
-// One slot's brief, written to the file `josh ship` hands that slot's reviewer, with only its path on
-// stdout: the two briefs together exceed the Bash output cap, and a truncated brief sent the lane back
-// to `review:brief`, whose new code nonce dropped the interaction slot (joshuafolkken/kit#4863). Its
-// launch prompt follows, the one `josh ship` opens a reviewer with: the brief no longer travels in the
-// prompt, and `/code-review` beside `review:attest` is how the time and cost readers tell a review.
-// The slot's findings go with the old brief, read for a resume by then: a reviewer that ends without
-// `review:submit` leaves `review:record --from-slot` nothing to record, not the last round's findings.
-function save_brief(slot: ReviewSlot, text: string): void {
-	const { brief, findings } = lane_session_broker.review_paths(PROJECT_ROOT, slot)
-
-	stamp_file.write_text_stamp(brief, `${text}\n`)
-	stamp_file.remove_stamp(findings)
-	const opening =
-		review_round.from_brief(text) === '2'
-			? run_ship_review.final_opening(brief)
-			: run_ship_review.round_one_opening(brief)
-
-	process.stdout.write(`${slot} brief: ${brief}\n${slot} prompt: ${opening}\n`)
-	const paired = slot === CODE ? review_pair.offer(text) : undefined
-	if (paired !== undefined) process.stdout.write(`${paired}\n`)
-}
-
-async function write_brief(slot: ReviewSlot): Promise<number> {
-	const texts: Array<string> = []
-	const code = await review_brief_cli.run_to(SLOT_ARGV[slot], (text) => {
-		texts.push(text)
-	})
-
-	if (code === SUCCESS_EXIT_CODE) save_brief(slot, texts.join('\n'))
-
-	return code
-}
-
-// Code's brief, then the interaction brief — never after a code brief that refused. `--code-only`, the
-// ship's own open, prints code's brief: the ship reads it off stdout and writes that file itself.
-async function open_briefs(plan: BriefPlan): Promise<number> {
-	if (plan.is_code_only) return await review_brief_cli.run([])
-	const code = await write_brief(CODE)
-
-	if (code !== SUCCESS_EXIT_CODE || !plan.slots.includes(INTERACTION)) return code
-
-	return await write_brief(INTERACTION)
-}
 
 function join_hint(slots: ReadonlyArray<ReviewSlot>): string {
 	return slots.includes(INTERACTION) ? `${JOIN_HINT}\n${INTERACTION_HINT}` : JOIN_HINT
@@ -250,7 +160,7 @@ async function start_pair(plan: BriefPlan, is_early_push: boolean): Promise<numb
 
 	if (gate_started_at === undefined) return FAILURE_EXIT_CODE
 	run_review_steps.write_timing_start({ gate_started_at, review_started_at: now_iso() })
-	const code = await open_briefs(plan)
+	const code = await run_review_briefs.open_briefs(plan)
 
 	// The hint follows a written brief and nothing else: a brief that refused (a tree the scoped pair
 	// has not been green on) exits non-zero, and a "gate running, launch the review" line under that
@@ -397,35 +307,16 @@ function refuse(text: string): number {
 	return FAILURE_EXIT_CODE
 }
 
-// A metrics total grown past every approval stops the open, right after the implementation and before
-// anything is launched, rather than the ship's pre-detach after the review (joshuafolkken/kit#6023).
-// The ship's own `--code-only` open has just passed that pre-detach.
-async function metrics_refusal(is_code_only: boolean): Promise<string | undefined> {
-	if (is_code_only) return undefined
-
-	return await metrics_totals.totals_refusal(PROJECT_ROOT)
-}
-
-// An unplanned file's overlap stops the open while the file can still be dropped (joshuafolkken/kit#6142);
-// the ship's own open has just passed the `unplanned` preflight.
-async function unplanned_refusal(is_code_only: boolean): Promise<string | undefined> {
-	if (is_code_only) return undefined
-
-	return await run_review_unplanned.refusal()
-}
-
 async function open_accepted(is_code_only: boolean, reason: string | undefined): Promise<number> {
 	const accepted = await accept_finished(is_code_only, reason)
 
 	if (accepted !== undefined) return accepted
-	const stop =
-		(await handover_refusal(is_code_only)) ??
-		(await metrics_refusal(is_code_only)) ??
-		(await unplanned_refusal(is_code_only))
+	const stop = await run_review_open_refusal.refusal(is_code_only)
 
 	if (stop !== undefined) return refuse(stop)
+	const slots = await run_review_briefs.brief_slots(is_code_only)
 
-	return await run_start({ is_code_only, slots: await brief_slots(is_code_only) }, reason)
+	return await run_start({ is_code_only, slots }, reason)
 }
 
 // The open's arguments after `--code-only`: none, or `--unpinned-ok "<reason>"`. The governing section
