@@ -72,6 +72,16 @@ it('reads only a record line as pending, not the prefix quoted in prose or a cod
 	expect(issue_publication_state.labels_of(prepared, [PLANNED])).toEqual([PLANNED])
 })
 
+it.each([
+	['an unclosed fence', '```ts\nconst x = 1'],
+	['a fence a different marker never closes', '````\n```\n~~~'],
+])('still reads the record appended after %s', (_case, fence) => {
+	const prepared = issue_publication_state.prepare(`${BODY}\n\n${fence}`, ['run:lane'])
+
+	expect(issue_publication_state.is_pending(prepared)).toBe(true)
+	expect(issue_publication_state.public_body(prepared)).toBe(`${BODY}\n\n${fence}`)
+})
+
 it('does not hold a published child that only quotes the record prefix', () => {
 	const body = `${BODY}\n\nQuoting \`<!-- josh:publication \` in the background.`
 	const child: EpicChild = {

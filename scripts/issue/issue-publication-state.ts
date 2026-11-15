@@ -9,21 +9,55 @@ import { AUTO_OK_LABEL, has_label_name } from './issue-labels'
 const PREFIX = '<!-- josh:publication '
 const RECORDS = /^<!-- josh:publication (?<record>[^\n]*?) -->/gmu
 const RECORD_LINE = /^<!-- josh:publication /mu
-const FENCE_LINE = /^ {0,3}(?:```|~~~)/u
+const FENCE_LINE = /^ {0,3}(?<marker>`{3,}|~{3,})/u
 const schema = z.object({ labels: z.array(z.string()) })
 
+interface Fence {
+	marker: string
+	lines: Array<string>
+}
+
+interface FenceScan {
+	kept: Array<string>
+	fence: Fence | undefined
+}
+
+function fence_marker(line: string): string | undefined {
+	return FENCE_LINE.exec(line)?.groups?.['marker']
+}
+
+// A fence closes only on a bare marker of its own character, at least as long as the opener.
+function is_close(fence: Fence, line: string): boolean {
+	const marker = fence_marker(line) ?? ''
+	const is_same = marker.startsWith(fence.marker.charAt(0))
+
+	return is_same && marker.length >= fence.marker.length && line.trim() === marker
+}
+
+function continued(fence: Fence, line: string): Fence | undefined {
+	if (is_close(fence, line)) return undefined
+	fence.lines.push(line)
+
+	return fence
+}
+
+function opened(kept: Array<string>, line: string): Fence | undefined {
+	const marker = fence_marker(line)
+	if (marker === undefined) kept.push(line)
+
+	return marker === undefined ? undefined : { marker, lines: [line] }
+}
+
+function scan_line({ kept, fence }: FenceScan, line: string): FenceScan {
+	return { kept, fence: fence === undefined ? opened(kept, line) : continued(fence, line) }
+}
+
+// An unclosed fence is kept: dropping it would hide the record `prepare` appends after it.
 function unfenced(body: string): string {
-	let is_fenced = false
+	let scan: FenceScan = { kept: [], fence: undefined }
+	for (const line of body.split('\n')) scan = scan_line(scan, line)
 
-	return body
-		.split('\n')
-		.filter((line) => {
-			const is_fence = FENCE_LINE.test(line)
-			if (is_fence) is_fenced = !is_fenced
-
-			return !is_fence && !is_fenced
-		})
-		.join('\n')
+	return [...scan.kept, ...(scan.fence?.lines ?? [])].join('\n')
 }
 
 function is_pending(body = ''): boolean {
