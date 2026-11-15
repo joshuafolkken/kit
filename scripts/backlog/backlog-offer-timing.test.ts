@@ -58,3 +58,35 @@ describe('backlog_offer_timing.interval_of', () => {
 		expect(backlog_offer_timing.interval_of(state(in_flight), CONFIG, is_named_left)).toBe(expected)
 	})
 })
+
+// joshuafolkken/kit#7583: three of six lanes ran when four issues were published to the listing.
+describe('backlog_offer_timing.is_due — a waiting driver with free lanes', () => {
+	const { CONFIG, harness, state } = backlog_drive_fixture
+	const RUNNING = ['7571', '7572', '7573']
+	const FREE_LANES = 3
+
+	async function is_due_at(now_ms: number, is_changed: boolean): Promise<boolean> {
+		const { ports } = harness({})
+		const due_ports = {
+			...ports,
+			free_lanes: async (): Promise<number> => FREE_LANES,
+			listing_changed: async (): Promise<boolean> => is_changed,
+		}
+		const run = {
+			...backlog_offer_timing.first_run(state(RUNNING), 0),
+			offered_ms: 0,
+			checked_ms: 0,
+		}
+
+		return await backlog_offer_timing.is_due(run, CONFIG, due_ports, now_ms)
+	}
+
+	it('asks at the first check after the listing changed, before the interval', async () => {
+		expect(CONFIG.check_ms).toBeLessThan(CONFIG.offer_ms)
+		await expect(is_due_at(CONFIG.check_ms, true)).resolves.toBe(true)
+	})
+
+	it('waits out the interval while the listing is unchanged', async () => {
+		await expect(is_due_at(CONFIG.check_ms, false)).resolves.toBe(false)
+	})
+})

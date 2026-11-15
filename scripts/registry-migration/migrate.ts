@@ -3,7 +3,7 @@ import { existsSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'n
 import path from 'node:path'
 import { error_text } from '#scripts/lib/error-message'
 import { timed_fetch } from '#scripts/lib/timed-fetch'
-import { COMMAND_TIMEOUT_MS } from '#scripts/lib/timeouts'
+import { COMMAND_TIMEOUT_MS, INSTALL_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { npm_registry } from '#scripts/version/npm-registry'
 import { execaSync } from 'execa'
 import { migrate_files } from './migrate-files'
@@ -42,6 +42,8 @@ function resolve(directory: string): void {
 			'update',
 			'--patches',
 			'--lockfile-only',
+			// Without it pnpm raises each range to its locked version, in package.json and the lock.
+			'--no-save',
 			'--ignore-scripts',
 			'--ignore-pnpmfile',
 			'--lockfile-dir',
@@ -49,7 +51,7 @@ function resolve(directory: string): void {
 		],
 		{
 			cwd: directory,
-			timeout: COMMAND_TIMEOUT_MS,
+			timeout: INSTALL_TIMEOUT_MS,
 			stdio: 'pipe',
 		},
 	)
@@ -174,7 +176,8 @@ function validate(root: string, version: string, dependencies: MigrationDependen
 
 	if (actual !== migrate_lock.PNPM_VERSION) {
 		throw new Error(
-			`Verified pnpm version: ${migrate_lock.PNPM_VERSION}; actual: ${actual}; no files changed`,
+			`Verified pnpm version: ${migrate_lock.PNPM_VERSION}; actual: ${actual}; no files changed. ` +
+				`Run \`pnpm self-update ${migrate_lock.PNPM_VERSION}\` in the project root, then run the migration again`,
 		)
 	}
 

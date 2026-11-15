@@ -7,7 +7,8 @@ import { issue_lint_cli } from './issue-lint-cli'
 import { issue_template_section } from './issue-template-section'
 
 const make_directory = temporary_directory()
-const VALID_BODY = '## 背景\n\n- 規模見積もり: 約 1 ファイル / 10 行（テスト除く）\n'
+const SUMMARY = '## 概要\n\n要約\n\n'
+const VALID_BODY = `${SUMMARY}## 背景\n\n- 規模見積もり: 約 1 ファイル / 10 行（テスト除く）\n`
 const REQUIRED_SECTIONS = '## 現象\n\n## 期待結果\n\n## 受け入れ条件\n'
 const ENHANCEMENT_OUTPUT = 'labels: enhancement'
 
@@ -80,7 +81,10 @@ describe('issue:lint fenced headings', () => {
 		const directory = make_directory('issue-lint-fenced-heading-')
 		const body_path = path.join(directory, 'issue.md')
 
-		await writeFile(body_path, `\`\`\`md\n## 背景\n- 種別: 不具合\n\`\`\`\n${REQUIRED_SECTIONS}`)
+		await writeFile(
+			body_path,
+			`${SUMMARY}\`\`\`md\n## 背景\n- 種別: 不具合\n\`\`\`\n${REQUIRED_SECTIONS}`,
+		)
 		const report = vi.spyOn(console, 'error').mockImplementation(() => undefined)
 
 		expect(await issue_lint_cli.run(body_path)).toBe(1)
@@ -134,6 +138,49 @@ async function lint_body(body: string): Promise<number> {
 
 	return await issue_lint_cli.run(body_path)
 }
+
+// joshuafolkken/kit#7544: the pre-filing check answers as `issue:file` does about the leading summary.
+describe('issue:lint leading summary', () => {
+	afterEach(() => {
+		vi.unstubAllEnvs()
+	})
+
+	it('rejects a body that does not start with the summary', async () => {
+		const report = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		expect(
+			await lint_body(`${VALID_BODY.replace(SUMMARY, '')}- 種別: 非不具合\n${REQUIRED_SECTIONS}`),
+		).toBe(1)
+		expect(report).toHaveBeenCalledWith(
+			expect.stringMatching(/^✖ the body must start with ## 概要/u),
+		)
+	})
+
+	it('cites the English template for an en session', () => {
+		vi.stubEnv('JOSH_SESSION_LANG', 'en')
+
+		expect(issue_lint_cli.summary_problem('## Background\n')).toMatch(
+			/^the body must start with ## Summary: .* the ## Summary section of issue-template\.en\.md's template\n## Summary\n/u,
+		)
+	})
+
+	it.each(['## Summary', '## 概要'])(
+		'accepts a body opening with %s in an en session',
+		(heading) => {
+			vi.stubEnv('JOSH_SESSION_LANG', 'en')
+
+			expect(issue_lint_cli.summary_problem(`${heading}\n\nsummary\n`)).toBeUndefined()
+		},
+	)
+
+	it('leaves the summary out of problems, which issue:body also runs on older Issues', () => {
+		expect(
+			issue_lint_cli.problems(
+				`${VALID_BODY.replace(SUMMARY, '')}- 種別: 非不具合\n${REQUIRED_SECTIONS}`,
+			),
+		).toStrictEqual([])
+	})
+})
 
 describe('issue:lint expected effect (joshuafolkken/kit#3909)', () => {
 	it('rejects a run-time-shortening body without the expected-effect section', async () => {

@@ -15,18 +15,27 @@ const MINUTE = 60_000
 const HOUR = 3_600_000
 const STALE_MINUTES = 10
 const SAMPLE_MAX_AGE_MINUTES = 5
-const LINT = 'pnpm josh lint:related'
-const TEST = 'pnpm josh test:related'
+const LINT_WAIT = 'lint:related'
+const TEST_WAIT = 'test:related'
+const LINT = `pnpm josh ${LINT_WAIT}`
+const TEST = `pnpm josh ${TEST_WAIT}`
+const ISSUE = 7
 const { NOT_MEASURED } = lane_stage_stats
 
 function sample(lanes: number, at_ms: number): LedgerEntry {
 	return { kind: 'load', at: new Date(at_ms).toISOString(), load: 1, lanes }
 }
 
+function wait(command: string, at_ms: number, seconds: number): LedgerEntry {
+	const at = new Date(at_ms).toISOString()
+
+	return { kind: 'core-wait', at, command, waited_ms: seconds * SECOND, issue: ISSUE }
+}
+
 function call(command: string, started_ms: number, seconds: number): ToolCall {
 	return {
 		session_id: 'one',
-		lane: 'lane-1',
+		lane: `/home/.claude/projects/-kit-lanes-${String(ISSUE)}`,
 		started_ms,
 		duration_ms: seconds * SECOND,
 		tool: 'Bash',
@@ -63,8 +72,8 @@ describe('lane_concurrency_stats.table', () => {
 		]
 
 		expect(rows_of(entries, calls)).toStrictEqual([
-			'1 | 1 | 30.0 | 2 | 30.0',
-			`6 | 2 | 80.0 | 0 | ${NOT_MEASURED}`,
+			`1 | 1 | 30.0 | ${NOT_MEASURED} | 2 | 30.0 | ${NOT_MEASURED}`,
+			`6 | 2 | 80.0 | ${NOT_MEASURED} | 0 | ${NOT_MEASURED} | ${NOT_MEASURED}`,
 		])
 	})
 
@@ -84,7 +93,53 @@ describe('lane_concurrency_stats.table', () => {
 			sample(2, dropped - (SAMPLE_MAX_AGE_MINUTES + 1) * MINUTE),
 		]
 		const calls = [call(TEST, kept, 50), call(TEST, dropped, 50)]
+		const row = `4 | 0 | ${NOT_MEASURED} | ${NOT_MEASURED} | 1 | 50.0 | ${NOT_MEASURED}`
 
-		expect(rows_of(entries, calls)).toStrictEqual([`4 | 0 | ${NOT_MEASURED} | 1 | 50.0`])
+		expect(rows_of(entries, calls)).toStrictEqual([row])
+	})
+})
+
+describe('lane_concurrency_stats.table core wait', () => {
+	it('heads each command with its runs, median and core wait median columns', () => {
+		const [header] = lane_concurrency_stats.table([], [], WINDOW).split('\n', 1)
+
+		expect(header).toBe(
+			'| concurrent lanes | lint:related runs | lint:related median (s) | lint:related core wait median (s) | test:related runs | test:related median (s) | test:related core wait median (s) |',
+		)
+	})
+
+	it('gives each lane count the median core wait of the calls a wait record ties to', () => {
+		const solo = NOW - HOUR
+		const busy = NOW - 2 * HOUR
+		const entries = [
+			sample(1, solo - MINUTE),
+			sample(5, busy - MINUTE),
+			wait(LINT_WAIT, solo + SECOND, 2),
+			wait(TEST_WAIT, busy + SECOND, 10),
+			wait(TEST_WAIT, busy + 2 * MINUTE + SECOND, 30),
+		]
+		const calls = [
+			call(LINT, solo, 30),
+			call(TEST, busy, 40),
+			call(TEST, busy + 2 * MINUTE, 60),
+			call(TEST, busy + 3 * MINUTE, 50),
+		]
+
+		expect(rows_of(entries, calls)).toStrictEqual([
+			`1 | 1 | 30.0 | 2.0 | 0 | ${NOT_MEASURED} | ${NOT_MEASURED}`,
+			`5 | 0 | ${NOT_MEASURED} | ${NOT_MEASURED} | 3 | 50.0 | 20.0`,
+		])
+	})
+})
+
+describe('lane_concurrency_stats.table core wait across the period edge', () => {
+	it('leaves a wait to an overlapping same-lane call that started before the period', () => {
+		const since = WINDOW.since_ms
+		const entries = [sample(2, since), wait(LINT_WAIT, since + 20 * SECOND, 25)]
+		const calls = [call(LINT, since - 10 * SECOND, 60), call(LINT, since + 5 * SECOND, 30)]
+
+		expect(rows_of(entries, calls)).toStrictEqual([
+			`2 | 1 | 30.0 | ${NOT_MEASURED} | 0 | ${NOT_MEASURED} | ${NOT_MEASURED}`,
+		])
 	})
 })

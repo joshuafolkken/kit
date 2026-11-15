@@ -1,7 +1,8 @@
 // **Switched on, a pre-push unit run the gate record does not cover runs the related tests rather than
 // the whole suite** — set by `josh ship`'s push ahead of the gate (`run-ship-sync.ts`), whose gate over
-// the same tree runs the whole suite next (joshuafolkken/kit#5067). Off by default. Its own module
-// because the hook is an entry with a main guard, which nothing may import.
+// the same tree runs the whole suite next (joshuafolkken/kit#5067), and by `josh release`'s push
+// (`release-publish.ts`), whose pull request CI runs it before the merge (joshuafolkken/kit#7539). Off
+// by default. Its own module because the hook is an entry with a main guard, which nothing may import.
 const SWITCH_ENV_KEY = 'JOSH_PRE_PUSH_RELATED'
 const SWITCH_ON = '1'
 

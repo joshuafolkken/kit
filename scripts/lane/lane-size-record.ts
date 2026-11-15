@@ -7,8 +7,9 @@ import { lane_ledger_write } from './lane-ledger-write'
 // before the merge — after it the branch is gone — so `lane:stats` can calibrate the split guide
 // against real lanes (joshuafolkken/kit#5384). Best-effort, like every ledger line: an unreadable
 // Issue, an Issue with no estimate or an unmeasurable branch records nothing and never blocks a merge.
-// A diff past the split notice bar is recorded `missed` — a pre-split miss, since the started lane
-// was never split (joshuafolkken/kit#7183).
+// A diff past the split cap is recorded `missed` — a pre-split miss, since the started lane was never
+// split (joshuafolkken/kit#7183). The notice bar (declared × measured ratio) stays a warning: a median
+// ratio puts about half of all lanes past it however good the estimates are (joshuafolkken/kit#7579).
 
 async function measure_and_record(issue: string): Promise<void> {
 	const declared = await issue_declared_size.read(issue)
@@ -20,7 +21,7 @@ async function measure_and_record(issue: string): Promise<void> {
 		issue: Number(issue),
 		declared,
 		actual: { files: measurement.files, lines: measurement.lines },
-		missed: split_assess.notice(measurement, declared) !== undefined,
+		missed: split_assess.is_over_cap(measurement.files, measurement.lines, measurement.guide),
 	})
 }
 

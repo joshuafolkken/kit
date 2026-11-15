@@ -153,7 +153,9 @@ async function run_reserved_suite(vitest_arguments: ReadonlyArray<string>): Prom
 // **A push its caller makes ahead of the gate runs the related tests, not the whole suite**
 // (joshuafolkken/kit#5067). `josh ship` pushes the tree its sync merged with the default branch onto an
 // open pull request so CI starts beside the gate, and the gate that follows runs the whole suite over
-// that same tree; the push itself only needs what this branch's change reaches. Only the caller sets
+// that same tree; the push itself only needs what this branch's change reaches. `josh release` pushes
+// its release commit from a fresh worktree no gate record covers, and the release pull request's CI
+// runs the whole suite over it before the merge (joshuafolkken/kit#7539). Only the caller sets
 // it, `--force` and the escape hatch still win, and a narrowed run asked for its own arguments rather
 // than this scope.
 function is_related_requested(extra_arguments: ReadonlyArray<string>): boolean {

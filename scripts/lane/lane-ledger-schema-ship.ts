@@ -30,8 +30,19 @@ const early_push_schema = z.object({
 // failure or a followup `check` stopped on, so its re-ship can tell a fix-only tree from a moved base
 // (joshuafolkken/kit#6141, joshuafolkken/kit#6675), absent on every other stop. `checks` names the CI
 // checks a followup `check` stop's wait reported failed (joshuafolkken/kit#7333), absent on every other
-// stop and on one recorded before it had them. How long it stayed stopped is derived
+// stop and on one recorded before it had them. `unpinned` is the path an `unpinned` stop took and the
+// unpinned places it found (joshuafolkken/kit#7552): `no-reason` with no recorded `--unpinned-ok` reason,
+// `new-site` with one the places outran, `truncated` with one a check cut at its first unpinned hunk
+// never applies (`run-review-pinned-accepted.ts`), absent on any other stop and on one recorded before
+// it had it. On a cut check `hunks` is a lower bound and `remaining` counts the hunks it never probed,
+// absent on an uncut one. How long it stayed stopped is derived
 // from the next ship stage, not recorded, so a resumed ship never has to know the stop it ends.
+const UNPINNED_PATHS = ['no-reason', 'new-site', 'truncated'] as const
+const unpinned_stop_schema = z.object({
+	path: z.enum(UNPINNED_PATHS),
+	hunks: z.number(),
+	remaining: z.number().optional(),
+})
 const stop_schema = z.object({
 	kind: z.literal(KIND.STOP),
 	at: z.string(),
@@ -42,6 +53,7 @@ const stop_schema = z.object({
 	findings: z.array(z.string()).optional(),
 	base: z.string().optional(),
 	checks: z.array(z.string()).optional(),
+	unpinned: unpinned_stop_schema.optional(),
 })
 // One `josh run:chain` on `issue`, done or stopped: `at` is its end and `elapsed_ms` its length, so the
 // next run's start ends the wait after a stop. `stage` names where it stopped and `reason` why — the
@@ -94,7 +106,7 @@ const ship_lap_schema = z.object({
 // A merging `josh followup`'s size of `issue`: the Issue's declared size estimate and the branch's
 // measured diff, test files excluded, so `lane:stats` reads how far estimates miss the guide's
 // counting (joshuafolkken/kit#5384). Written before the merge, while the branch is still checked out.
-// `missed` marks a diff past the split notice bar: a size the pre-dispatch assessment let through, as
+// `missed` marks a diff past the split cap (the notice bar before joshuafolkken/kit#7579): a size the pre-dispatch assessment let through, as
 // the started lane is never split (joshuafolkken/kit#7183).
 const counts_schema = z.object({ files: z.number(), lines: z.number() })
 const size_schema = z.object({
@@ -108,6 +120,8 @@ const size_schema = z.object({
 
 type ChainEntry = z.infer<typeof chain_schema>
 type ChainRecord = Omit<ChainEntry, 'kind' | 'at'>
+type UnpinnedStop = z.infer<typeof unpinned_stop_schema>
+type UnpinnedPath = UnpinnedStop['path']
 
 const lane_ledger_schema_ship = {
 	chain_schema,
@@ -118,5 +132,5 @@ const lane_ledger_schema_ship = {
 	unplanned_notice_schema,
 }
 
-export type { ChainEntry, ChainRecord }
+export type { ChainEntry, ChainRecord, UnpinnedPath, UnpinnedStop }
 export { lane_ledger_schema_ship }

@@ -49,6 +49,68 @@ function scope_of(
 	})
 }
 
+// joshuafolkken/kit#7538: a release commit moves `package.json`'s version alone and deletes the
+// accepted metrics records, which reaches the tests reading `package.json` rather than every test.
+describe('related_scope.resolve_scope — a version-only package.json', () => {
+	const package_reader = path.join(SCRIPTS_DIRECTORY, 'package-reader.ts')
+	const accepted = path.join('.josh', 'metrics-accepted', 'kit-7537.json')
+	const release: ScopeRequest = {
+		root: ROOT,
+		changed: [PACKAGE_FILE, accepted],
+		map: { ...MAP, readers: { ...MAP.readers, [PACKAGE_FILE]: [package_reader] } },
+		recorded: new Set([PACKAGE_FILE, accepted]),
+		is_present: () => true,
+		version_only: new Set([PACKAGE_FILE]),
+	}
+
+	it('narrows a release-shaped change to the tests reading package.json', () => {
+		expect(related_scope.resolve_scope(release)).toMatchObject({
+			mode: 'related',
+			files: [at(package_reader)],
+		})
+	})
+
+	it('still runs the whole suite when more than the version moved', () => {
+		const scope = related_scope.resolve_scope({ ...release, version_only: new Set() })
+
+		expect(scope).toMatchObject({ mode: 'all', files: [at(PACKAGE_FILE)] })
+	})
+})
+
+// joshuafolkken/kit#7554: a lockfile change moving no unit runtime package reaches the modules
+// importing a package it moved, and the tests reading the lockfile, rather than every test.
+describe('related_scope.resolve_scope — a lockfile moving packages', () => {
+	const importer = path.join(SCRIPTS_DIRECTORY, 'uses-leaf.ts')
+	const lock_reader = path.join(SCRIPTS_DIRECTORY, 'lock-reader.ts')
+	const bump: ScopeRequest = {
+		root: ROOT,
+		changed: [LOCK_FILE],
+		map: { ...MAP, readers: { ...MAP.readers, [LOCK_FILE]: [lock_reader] } },
+		recorded: new Set([LOCK_FILE]),
+		is_present: () => true,
+		lockfile_importers: [importer],
+	}
+
+	it('narrows to the modules importing a moved package and the tests reading the lockfile', () => {
+		expect(related_scope.resolve_scope(bump)).toMatchObject({
+			mode: 'related',
+			files: [at(lock_reader), at(importer)],
+		})
+	})
+
+	it('runs no test when no module imports a moved package and no test reads the lockfile', () => {
+		const scope = related_scope.resolve_scope({ ...bump, map: MAP, lockfile_importers: [] })
+
+		expect(scope).toMatchObject({ mode: 'none', files: [at(LOCK_FILE)] })
+	})
+
+	it('still runs the whole suite when the change reaches every test', () => {
+		const scope = related_scope.resolve_scope({ ...bump, lockfile_importers: undefined })
+
+		expect(scope).toMatchObject({ mode: 'all', files: [at(LOCK_FILE)] })
+	})
+})
+
 // joshuafolkken/kit#4572: the worker share's bounds change often, so the vitest config imports only
 // the run markers and a change to the bounds narrows like any module.
 describe('related_scope.resolve_scope — the worker share', () => {

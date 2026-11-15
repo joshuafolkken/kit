@@ -50,6 +50,7 @@ describe('backlog_hold_text.text_of — offer holds', () => {
 		['offer:watch:chain+gate', 'queued issues wait on other issues or a start condition'],
 		['offer:watch:lane', 'queued issues wait on a running lane'],
 		['offer:watch:gate+lane', 'queued issues wait on a start condition or a running lane'],
+		['offer:watch:publication', 'queued issues wait on their publication'],
 		['offer:wait:blocked', 'every queued issue is blocked'],
 		['offer:wait:exhausted', 'the backlog has nothing left to start'],
 		['offer:wait:untriaged', AWAIT_TRIAGE],

@@ -75,21 +75,53 @@ function strip_tarball(resolution: unknown): void {
 	if (yaml_document.is_mapping_document(resolution)) delete resolution['tarball']
 }
 
-function strip_resolutions(document: Record<string, unknown>): void {
-	if (!yaml_document.is_mapping_document(document['packages'])) return
-	const scoped = Object.entries(document['packages']).filter(([key]) => key.startsWith(SCOPE))
-
-	for (const [, entry] of scoped) {
-		if (yaml_document.is_mapping_document(entry)) strip_tarball(entry['resolution'])
-	}
+// Registry metadata that differs between registries without changing what resolves: npm marks
+// packages deprecated, and lists this scope's optional peers where GitHub Packages omits them.
+function strip_registry_metadata(key: string, entry: Record<string, unknown>): void {
+	delete entry['deprecated']
+	if (!key.startsWith(SCOPE)) return
+	delete entry['peerDependenciesMeta']
+	strip_tarball(entry['resolution'])
 }
 
-// Compare every document, importer, snapshot and unrelated resolution. The resolver may only
-// replace this scope's tarball locations; integrity and unrelated metadata must stay unchanged.
+function mapping_entries(section: unknown): Array<[string, Record<string, unknown>]> {
+	if (!yaml_document.is_mapping_document(section)) return []
+
+	return Object.entries(section).filter((pair): pair is [string, Record<string, unknown>] =>
+		yaml_document.is_mapping_document(pair[1]),
+	)
+}
+
+function strip_resolutions(document: Record<string, unknown>): void {
+	const entries = mapping_entries(document['packages'])
+
+	for (const [key, entry] of entries) strip_registry_metadata(key, entry)
+}
+
+function sort_peers(entry: Record<string, unknown>): void {
+	const peers: unknown = entry['transitivePeerDependencies']
+	if (!Array.isArray(peers)) return
+	entry['transitivePeerDependencies'] = peers
+		.map(String)
+		.toSorted((left, right) => left.localeCompare(right))
+}
+
+// That peer metadata reorders this scope's transitive peer lists; their members still compare.
+function sort_peer_lists(document: Record<string, unknown>): void {
+	const scoped = mapping_entries(document['snapshots']).filter(([key]) => key.startsWith(SCOPE))
+
+	for (const [, entry] of scoped) sort_peers(entry)
+}
+
+// Compare every document, importer, snapshot and resolution. The resolver may only replace this
+// scope's tarball locations and registry metadata; versions, integrity and the graph must stay.
 function graph(content: string): Array<Record<string, unknown>> {
 	const documents = yaml_document.parse_yaml_documents(content)
 
-	for (const document of documents) strip_resolutions(document)
+	for (const document of documents) {
+		strip_resolutions(document)
+		sort_peer_lists(document)
+	}
 
 	return documents
 }

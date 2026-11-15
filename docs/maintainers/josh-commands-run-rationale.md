@@ -106,7 +106,7 @@ Four steps, in order: set the work aside — on `<issue>`'s own lane branch (`<i
 
 ## `josh run:hold` / `josh run:release` in detail
 
-**Output / exit codes:** stdout is one token; explanations go to stderr. `run:hold`: `hold`, `busy`, `reclaim` / `resume` / `park` (preflight found uncommitted work, an open PR or a branch with commits beyond the default branch or uncommitted changes in its lane, or a merged/closed PR; a branch with none of those is no leftover work), `unknown` (exit 1). `run:release`: `released`, `none`, or `held` (exit 1). A record over 8 hours old on a clean tree is replaced; on a dirty or unreadable one, `busy`. A `hold` answer is followed by the `josh run:tidy` sweep below, reported on stderr.
+**Output / exit codes:** stdout is one token; explanations go to stderr. `run:hold`: `hold`, `busy`, `reclaim` / `resume` / `park` (preflight found uncommitted work, an open PR or a branch with commits beyond the default branch or uncommitted changes in its lane, or a merged/closed PR; a branch with none of those is no leftover work; a clean tree already on the issue's own `<N>-*` branch is where the run resumes, so it takes the hold, and `resume` from the default branch names the `git switch` that gets there — or the `cd` into the lane directory when an open lane has the branch checked out), `unknown` (exit 1). `run:release`: `released`, `none`, or `held` (exit 1). A record over 8 hours old on a clean tree is replaced; on a dirty or unreadable one, `busy`. A `hold` answer is followed by the `josh run:tidy` sweep below, reported on stderr.
 
 ## `josh run:carry` in detail
 
@@ -207,6 +207,12 @@ Open and close a lane: one linked git work tree with its own branch and its own 
 ## `josh lane:sample` / `josh lane:stats` in detail
 
 Measure a lane limit: a per-repository ledger holds merges, gates, each lane's dispatch, ship stages and ship stops, and the machine load `backlog:drive` samples while it runs (`lane:sample [--every <seconds>]` takes a reading outside a run); `lane:stats --period <days> [--limit <n> | --sinks [<minutes>]]` prints a period as one table row, under it the median and maximum of each stage of a lane, and under those how long a stopped `josh ship` waited to resume, per stop reason. Procedure and columns: [lane-limit-measurement.md](./lane-limit-measurement.md).
+
+The `implement read by call` table (`lane-implement-read-calls.ts`) splits the `read` tool time by call kind, the ten largest totals first:
+
+- a josh run: `josh <subcommand>`, several joined by `+`
+- another Bash command: its leading word past a `cd`
+- a subagent: `Agent:<type>`; any other call: its tool name
 
 The gap table (`lane-gap-stats.ts`) times each wait on the lane machinery rather than on work. Its `start → first lane` row runs from a `backlogrun` session's `starting session` to its first `opening lane`, read off the run-event stream (`run_event_setup.first_lane_spans`); `run:board` draws the newest session's span as `🛫` on the header's first line, once that first opening began.
 

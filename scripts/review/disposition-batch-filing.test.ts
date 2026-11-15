@@ -52,8 +52,14 @@ describe('disposition_batch_filing.body_of', () => {
 	it('names the parent issue and the finding', () => {
 		const body = disposition_batch_filing.body_of(finding(), ISSUE)
 
-		expect(body.startsWith(`parent: #${String(ISSUE)}\n`)).toBe(true)
+		expect(body).toMatch(new RegExp(`^parent: #${String(ISSUE)}$`, 'mu'))
 		expect(body).toContain('a null deref when the list is empty')
+	})
+
+	it('opens with the summary issue:file requires', () => {
+		const body = disposition_batch_filing.body_of(finding(), ISSUE)
+
+		expect(issue_lint_cli.summary_problem(body)).toBeUndefined()
 	})
 })
 

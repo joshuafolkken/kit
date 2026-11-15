@@ -33,7 +33,9 @@ describe('split-assessment.md carries the pre-gate notice steps', () => {
 		expect(document).toContain(`## ${split_assess.NOTICE_SECTION}`)
 		expect(document).toContain('A dispatched lane is never split')
 		expect(document).toContain('file it as an observation, without `--route split`')
-		expect(document).toContain('recorded as a pre-split miss')
+		expect(document).toContain('a diff past the cap on either axis is recorded as a pre-split miss')
+		// joshuafolkken/kit#7579: an extraction into a new file was declared once and measured twice.
+		expect(document).toContain('listings/moves (twice) count')
 		expect(document).toContain(
 			'The quality gates, the clash and unread checks, and the review stay stops',
 		)

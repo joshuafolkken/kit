@@ -208,10 +208,11 @@ pnpm josh lane:sample   # one machine-load reading
 
 <!-- usage: lane:stats -->
 
-Print period lane throughput, stage, stop (by failed CI check, longest first), check, runnable-to-dispatch wait and machine-load statistics; --sinks shows stage totals, --over lane chains, --why cause groups above a net-minute threshold, and --pairs scoped pair runs.
+Print period lane throughput, stage, stop (by failed CI check, longest first), check, runnable-to-dispatch wait and machine-load statistics; the per-lane core-budget wait and pre-split miss tables show their first 10 rows and a count of the rest unless --all; --sinks shows stage totals, --over lane chains, --why cause groups above a net-minute threshold, and --pairs scoped pair runs.
 
 ```bash
 pnpm josh lane:stats --period 7                           # a 7-day period's stage medians and maxima
+pnpm josh lane:stats --period 7 --all                     # the same with every per-lane table row
 pnpm josh lane:stats --period 1 --sinks                   # stage totals of the lanes over 30 net min
 pnpm josh lane:stats --period 1 --over 40                 # ledger chains of lanes over 40 net min
 pnpm josh lane:stats --period 1 --why 40                  # cause groups of lanes over 40 net min
@@ -220,6 +221,10 @@ pnpm josh lane:stats --since 2026-11-10T01:00Z --why 40   # cause groups since a
 ```
 
 <!-- /usage -->
+
+The `concurrent lanes` table gives `lint:related` / `test:related` per lane count the runs, median seconds and
+median core wait: the call's own lane's `core_wait` records for it while it ran. No such record reads
+`not measured`, not 0 (`lane-concurrency-wait.ts`).
 
 The followup row is `followup (driver, outside lane net)`; `--why` groups a followup over budget as `driver followup over budget (outside lane net)`, apart from the lane's own causes (`lane-why-period.ts`). Its `open issues` matches each lane's ledger cause key (the last CI check) as well as the stage names, through `lane:why`'s matcher (`lane-why-causes.ts`).
 
@@ -252,12 +257,12 @@ A lap overlaps its stage, so those rows do not add up to the lanes' time. The ti
 only, not by Bash kind, since a transcript call names no lane.
 
 Under the stage table, the implement stage is broken down from the lane transcripts up to each lane's first `josh ship`
-(`lane-implement-stats.ts`): `plan` before the first edit, then `read`, `edit`, `check` (a scoped check or gate) and
-`review-fix` from `run:review` on, each call's span counted from the previous call's end, less its `lane:pause` time.
+(`lane-implement-stats.ts`): `plan` before the first edit, then `read`, `edit`, `check` (a scoped check, gate or open
+`run:chain`) and `review-fix` from a review on, each call's span from the prior call's end, less `lane:pause` time.
 
-The `implement read` table under it splits `read` by lane medians (`lane-implement-read.ts`): the calls' own run time
-(`tool`), the turns before them (`thinking`), the distinct files `Read` opened (`files read`), and how many of those an
-investigator's report cited by `path:line` (`investigator-cited`).
+`implement read` (`lane-implement-read.ts`) splits `read` by lane medians: `tool` run time, `thinking` before calls,
+distinct `files read`, and those an investigator cited by `path:line`. `implement read by call`
+(`lane-implement-read-calls.ts`) splits its tool time by kind, the ten largest totals first.
 
 The `stage turns` table (`lane-turn-stats.ts`) groups period-dispatched lanes' calls by ledger interval:
 `implement` until the first ship stage (open until then), the shortest stage holding a call, or `between stages`.

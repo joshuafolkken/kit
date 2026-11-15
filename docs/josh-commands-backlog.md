@@ -319,7 +319,8 @@ pnpm josh issue:body 6982 --body-file .josh/tmp/issue-6982-body.md
 
 <!-- /usage -->
 
-It prints the issue URL. `issue:plan` writes only a blank body; this replaces a non-blank one. An epic body (`## Split rationale`) skips `issue:lint`; check it with `epic:check`. A consultation session refuses every non-GET `gh api`, so a body rewrite goes through this command.
+It prints the issue URL. It replaces a non-blank body (`issue:plan` writes a blank one). An epic body (`## Split rationale`) skips `issue:lint`; check it with `epic:check`. It is a consultation session's body rewrite route (non-GET `gh api` is refused).
+An unpublished child keeps its `issue:file --publish` record.
 
 ### `josh issue:plan`
 
@@ -464,7 +465,7 @@ pnpm josh issue:lint .josh/tmp/issue-body.md
 
 <!-- /usage -->
 
-The required headings are `## 背景`, `## 現象`, `## 期待結果` and `## 受け入れ条件`, plus the bug classification (source: `prompts/collaboration-workflow/issue-template.md`). Run this before filing.
+The required headings are `## 背景`, `## 現象`, `## 期待結果` and `## 受け入れ条件`, plus the bug classification (source: `prompts/collaboration-workflow/issue-template.md`), led by `## 概要`. Run this before filing.
 
 Prints `ok` and the labels to apply when the headings and one `- 種別:` declaration are present; a missing or conflicting declaration exits 1, as does a `- 種別: 不具合` body without a well-formed `- 原因:` origin line ([`josh defect:origin`](#josh-defectorigin) lists candidates). [`josh issue:file`](#josh-issuefile) runs it as a filing step.
 

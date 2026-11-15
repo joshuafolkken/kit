@@ -183,6 +183,7 @@ describe('run_ship_pre_detach_pinned.pinned_check', () => {
 		expect(await check([])).toStrictEqual({
 			code: FAILED,
 			out: `${UNPINNED_TEXT}${run_review_pinned.STOP_NOTE}\n`,
+			unpinned: { path: 'no-reason', hunks: 1 },
 		})
 	})
 

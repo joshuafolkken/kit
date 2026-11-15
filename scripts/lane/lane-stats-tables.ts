@@ -12,6 +12,7 @@ import { lane_gap_stats } from './lane-gap-stats'
 import { lane_held_stats } from './lane-held-stats'
 import { lane_implement_rate } from './lane-implement-rate'
 import { lane_implement_read } from './lane-implement-read'
+import { lane_implement_read_calls } from './lane-implement-read-calls'
 import { lane_implement_stats } from './lane-implement-stats'
 import type { lane_ledger } from './lane-ledger'
 import { lane_paused_spans } from './lane-paused-spans'
@@ -25,6 +26,7 @@ import { lane_stage_stats } from './lane-stage-stats'
 import type { StatsWindow } from './lane-stats'
 import { lane_stop_check_stats } from './lane-stop-check-stats'
 import { lane_stop_stats } from './lane-stop-stats'
+import type { TableOptions } from './lane-table-rows'
 import { lane_test_related_stats } from './lane-test-related-stats'
 import type { ToolCall } from './lane-transcript-calls'
 import { lane_transcript_stats } from './lane-transcript-stats'
@@ -50,6 +52,7 @@ function call_tables(
 	return [
 		lane_implement_stats.table(calls, window, paused),
 		lane_implement_read.table(calls, window, paused),
+		lane_implement_read_calls.table(calls, window, paused),
 		lane_turn_stats.table(entries, calls, window),
 	]
 }
@@ -71,23 +74,41 @@ function stop_tables(
 	]
 }
 
-// The tables under the period's row, in the order `lane:stats` prints them.
-function tables_of({ entries, events, calls }: PeriodRecords, window: StatsWindow): Array<string> {
+// The tables of a lane's review rounds, its size against the plan and what it waited on before work.
+function plan_tables(
+	{ entries, events }: PeriodRecords,
+	window: StatsWindow,
+	options: TableOptions,
+): Array<string> {
+	return [
+		lane_round_one_stats.table(entries, window),
+		lane_round_two_stats.table(entries, window),
+		lane_early_push_stats.table(entries, window),
+		lane_split_stats.table(entries, window),
+		lane_size_stats.table(entries, window, options),
+		lane_implement_rate.table(entries, window),
+		lane_held_stats.table(entries, window),
+		lane_dispatch_wait_stats.table(entries, window, events),
+		lane_core_wait_stats.table(entries, window, options),
+	]
+}
+
+// The tables under the period's row, in the order `lane:stats` prints them; `options` caps the
+// per-lane tables (`lane-table-rows.ts`).
+function tables_of(
+	records: PeriodRecords,
+	window: StatsWindow,
+	options: TableOptions,
+): Array<string> {
+	const { entries, events, calls } = records
+
 	return [
 		lane_stage_stats.table(entries, window),
 		lane_ship_lap_stats.table(entries, window),
 		lane_ci_path_stats.table(entries, window),
 		...call_tables(entries, calls, window),
 		...stop_tables(entries, events, window),
-		lane_round_one_stats.table(entries, window),
-		lane_round_two_stats.table(entries, window),
-		lane_early_push_stats.table(entries, window),
-		lane_split_stats.table(entries, window),
-		lane_size_stats.table(entries, window),
-		lane_implement_rate.table(entries, window),
-		lane_held_stats.table(entries, window),
-		lane_dispatch_wait_stats.table(entries, window, events),
-		lane_core_wait_stats.table(entries, window),
+		...plan_tables(records, window, options),
 		lane_process_stats.table(entries, window),
 		lane_check_stats.table(entries, window),
 		lane_claim_stats.table(entries, window),

@@ -32,6 +32,10 @@ const SECOND = 'Second filing'
 const THIRD = 'Third filing'
 const JUDGEMENT = '- 人の判断: 要（目視確認）'
 const VALID_BODY = [
+	'## 概要',
+	'',
+	'要約',
+	'',
 	'## 背景',
 	'',
 	'- 種別: 不具合',

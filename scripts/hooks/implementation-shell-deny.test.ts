@@ -12,6 +12,7 @@ const ADD = '`add`, a dependency change'
 const JOSH_GIT = '`josh git`'
 const GIT_REFLOG = '`git reflog`'
 const EXPANSION = 'an expansion that may spell a write'
+const CONFIG_REWRITE = 'rewrites its configuration'
 
 const REFUSED: ReadonlyArray<readonly [string, string]> = [
 	['git push --force', GIT_PUSH],
@@ -25,7 +26,8 @@ const REFUSED: ReadonlyArray<readonly [string, string]> = [
 	['git stash pop', GIT_STASH],
 	['git worktree add ../x', '`git worktree`'],
 	['git config user.name x', '`git config`'],
-	['git -c core.fsmonitor=x status', 'rewrites its configuration'],
+	['git -c core.fsmonitor=x status', CONFIG_REWRITE],
+	['git -C p -c k=v status', CONFIG_REWRITE],
 	['git diff --output=app.ts', 'writes a file'],
 	['gh pr merge 1', '`gh pr merge`'],
 	['gh issue close 1', GH_ISSUE_CLOSE],
@@ -98,6 +100,7 @@ const RUNS: ReadonlyArray<string> = [
 	'git branch --format %(refname) --sort refname',
 	'git reflog',
 	'git reflog show main',
+	"git grep -c 'eslint-disable' -- scripts eslint",
 	'git diff $base HEAD',
 	'gh issue view $number',
 	'gh issue list --search close',

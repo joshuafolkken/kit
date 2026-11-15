@@ -7,6 +7,7 @@ import type { DriveContext } from './backlog-drive-args'
 import { backlog_drive_cli } from './backlog-drive-cli'
 import { backlog_drive_fixture, type Script } from './backlog-drive-fixture'
 import { backlog_drive_listing } from './backlog-drive-listing'
+import { backlog_listing_trace } from './backlog-listing-trace'
 
 // joshuafolkken/kit#7227: a free seat checks the `auto-ok` listing by its ETag between two asks; an
 // unchanged listing leaves `backlog:next` unasked, a changed one asks at once.
@@ -276,5 +277,6 @@ describe('backlog_drive_cli.ports_of — the listing check', () => {
 		const ports = backlog_drive_cli.ports_of(CONTEXT, [], { state: undefined as never }, holds)
 
 		expect(ports.listing_changed).toBe(check)
+		expect(backlog_drive_listing.watcher).toHaveBeenCalledWith(backlog_listing_trace.drive)
 	})
 })

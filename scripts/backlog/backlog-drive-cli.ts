@@ -45,6 +45,7 @@ import { backlog_drive_retrospective } from './backlog-drive-retrospective'
 import { backlog_drive_retrospective_unit } from './backlog-drive-retrospective-unit'
 import { backlog_drive_seats } from './backlog-drive-seats'
 import { backlog_drive_tick, type RunningCheck } from './backlog-drive-tick'
+import { backlog_listing_trace } from './backlog-listing-trace'
 import { backlog_offer_cli } from './backlog-offer-cli'
 import { backlog_ready } from './backlog-ready'
 
@@ -190,7 +191,7 @@ function room_ports(): Pick<
 > {
 	return {
 		free_lanes: backlog_ready.drive_free_lane_count,
-		listing_changed: backlog_drive_listing.watcher(),
+		listing_changed: backlog_drive_listing.watcher(backlog_listing_trace.drive),
 		limit_room: backlog_ready.drive_limit_room,
 		has_lane: backlog_drive_seats.has_kept_lane,
 		memory_held: backlog_drive_memory.gauge(),

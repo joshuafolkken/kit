@@ -7,7 +7,6 @@ import { since_green, type FallbackReason } from '#scripts/gate/since-green'
 import { changed_file_scope } from '#scripts/git/changed-file-scope'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { direct_importers } from './direct-importers'
-import { pure_files_entries } from './pure-files-entries'
 import { test_no_base } from './test-no-base'
 import { test_read_map, type ReadMap } from './test-read-map'
 import { test_related_cap, type CappedImporters } from './test-related-cap'
@@ -21,6 +20,7 @@ import { test_related_synced } from './test-related-synced'
 import { test_related_touched } from './test-related-touched'
 import { test_related_verdict } from './test-related-verdict'
 import { test_related_whole } from './test-related-whole'
+import { whole_suite_narrowing } from './whole-suite-narrowing'
 
 // `josh test:related` — the unit check an implementation loop runs between edits.
 // The narrowing itself is `test-related-scope.ts` over the shared
@@ -236,14 +236,14 @@ async function scope_of(
 ): Promise<RelatedScope> {
 	const recorded = await recorded_files(change)
 	const naming = naming_moved(root, change)
-	const pure_entries = await pure_files_entries.read_moved(root, change.changed)
+	const narrowing = await whole_suite_narrowing.read(root, change.changed)
 
 	return related_scope.resolve_scope({
 		root,
 		...change,
+		...narrowing,
 		recorded,
 		naming_moved: naming,
-		pure_entries,
 		every_test_importers: capped.importers,
 		is_present: existsSync,
 	})

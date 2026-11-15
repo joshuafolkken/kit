@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { lane_stats } from './lane-stats'
 import { lane_stats_tables } from './lane-stats-tables'
+import { lane_table_rows } from './lane-table-rows'
 
 // joshuafolkken/kit#5144: the tables `lane:stats` prints are listed once, in print order, so
 // `lane:value cell` addresses the same tables by their first header cell.
@@ -13,6 +14,7 @@ const FIRST_HEADER_CELLS = [
 	'followup critical path',
 	'implement sub-stage',
 	'implement read',
+	'implement read by call',
 	'stage turns',
 	'stop',
 	'failed check',
@@ -44,7 +46,11 @@ function first_header_cell(table: string): string {
 
 describe('lane_stats_tables.tables_of', () => {
 	it('lists every lane:stats table in print order', () => {
-		const tables = lane_stats_tables.tables_of({ entries: [], events: [], calls: [] }, WINDOW)
+		const tables = lane_stats_tables.tables_of(
+			{ entries: [], events: [], calls: [] },
+			WINDOW,
+			lane_table_rows.ALL_ROWS,
+		)
 
 		expect(tables.map((table) => first_header_cell(table))).toStrictEqual(FIRST_HEADER_CELLS)
 	})

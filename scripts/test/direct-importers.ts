@@ -15,6 +15,9 @@ const PACKAGE_FILE = 'package.json'
 const WILDCARD = '*'
 const CURRENT_DIRECTORY_PREFIX = './'
 const NUL = '\0'
+const SCOPE_PREFIX = '@'
+const SCOPED_SEGMENTS = 2
+const NON_PACKAGE_PATTERN = /(?:^[.#/])|:/u
 
 // The module specifiers a source names in a static or dynamic import, an export-from or a `vi.mock`.
 const SPECIFIER_PATTERN = /(?:\bfrom\s+|\bimport\s*\(\s*|\bimport\s+|\bmock\(\s*)["']([^"']+)["']/gu
@@ -115,11 +118,18 @@ function source_reader(root: string): SourceReader {
 	return { imports: read_imports(root), read_source: (file) => read_source_at(root, file) }
 }
 
-// The test files the work tree at `root` holds, tracked or not but not ignored, repository-relative.
-async function test_files(root: string): Promise<Array<string>> {
+// The files the work tree at `root` holds, tracked or not but not ignored, repository-relative.
+async function work_tree_files(root: string): Promise<Array<string>> {
 	const listed = await git_spawn.read(['-C', root, 'ls-files', '-coz', '--exclude-standard'])
 
-	return listed.split(NUL).filter((file) => test_declared_logic.is_test_file(file))
+	return listed.split(NUL).filter((file) => file !== '')
+}
+
+// The test files among them.
+async function test_files(root: string): Promise<Array<string>> {
+	const files = await work_tree_files(root)
+
+	return files.filter((file) => test_declared_logic.is_test_file(file))
 }
 
 // The test files of `tests` importing `file` directly; an unreadable one imports nothing.
@@ -169,8 +179,41 @@ async function every_test_importers(
 	return await importers_of(root, every_test_imports_of(files))
 }
 
+// The package a bare specifier names — `name` or `@scope/name`, its subpath dropped — or `undefined`
+// for a relative, `#` alias or `node:` specifier.
+function package_of(specifier: string): string | undefined {
+	if (NON_PACKAGE_PATTERN.test(specifier)) return undefined
+
+	const segments = specifier.split(path.posix.sep)
+
+	const kept = specifier.startsWith(SCOPE_PREFIX) ? SCOPED_SEGMENTS : 1
+
+	return segments.slice(0, kept).join(path.posix.sep)
+}
+
+function imports_package(source: string, packages: ReadonlySet<string>): boolean {
+	return specifiers_of(source).some((specifier) => packages.has(package_of(specifier) ?? ''))
+}
+
+// The files of the work tree at `root` that `is_source` admits and whose text imports one of
+// `packages` by its bare specifier (joshuafolkken/kit#7554) — what `vitest related` walks to the tests
+// a lockfile change reaches.
+async function package_importers(
+	root: string,
+	packages: ReadonlySet<string>,
+	is_source: (file: string) => boolean,
+): Promise<Array<string>> {
+	if (packages.size === 0) return []
+
+	const files = await work_tree_files(root)
+	const sources = files.filter((file) => is_source(file))
+
+	return sources.filter((file) => imports_package(read_source_at(root, file) ?? '', packages))
+}
+
 const direct_importers = {
 	every_test_importers,
+	package_importers,
 	every_test_imports_of,
 	importers_of,
 	is_every_test_import,

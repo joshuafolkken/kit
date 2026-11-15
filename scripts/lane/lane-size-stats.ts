@@ -1,11 +1,15 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
+import { split_cap } from '#scripts/split/split-cap'
 import type { LedgerEntry, SizeEntry } from './lane-ledger-schema'
 import { lane_stats, type StatsWindow } from './lane-stats'
+import { lane_table_rows, type TableOptions } from './lane-table-rows'
 
 // Compare actual non-test changes with the declaration for merged lanes only. A followup retry
 // may record size twice; use the latest measurement before each merge (joshuafolkken/kit#5384). A merge
-// recorded past the split notice bar counts as a pre-split miss, listed with its declared and actual size
-// so the pre-dispatch assessment can be tuned (joshuafolkken/kit#7183).
+// recorded `missed` past the split cap counts as a pre-split miss, listed with its declared and actual
+// size so the pre-dispatch assessment can be tuned (joshuafolkken/kit#7183). The cap check drops a
+// flag recorded before #7579 past the notice bar alone; a measured guide's cap is never below the
+// default cap, so it drops no flag recorded past the cap (joshuafolkken/kit#7579).
 const COLUMNS = [
 	'measured lanes',
 	'files actual / declared median',
@@ -13,6 +17,7 @@ const COLUMNS = [
 	'pre-split misses',
 ]
 const MISS_COLUMNS = ['pre-split miss', 'files declared → actual', 'lines declared → actual']
+const MISS_ROWS = 10
 const DECIMALS = 1
 
 interface SizeRatios {
@@ -75,8 +80,9 @@ function change_cell(size: SizeEntry, axis: 'files' | 'lines'): string {
 	return `${String(size.declared[axis])} → ${String(size.actual[axis])}`
 }
 
-// One row per merged lane recorded past the split notice bar; none prints no table.
-function miss_rows(misses: ReadonlyArray<SizeEntry>): Array<string> {
+// One row per pre-split miss, at most `MISS_ROWS` unless `options`
+// asks for all; none prints no table.
+function miss_rows(misses: ReadonlyArray<SizeEntry>, options: TableOptions): Array<string> {
 	if (misses.length === 0) return []
 	const rows = misses.map((size) =>
 		lane_stats.to_row([
@@ -86,12 +92,18 @@ function miss_rows(misses: ReadonlyArray<SizeEntry>): Array<string> {
 		]),
 	)
 
-	return ['', ...header(MISS_COLUMNS), ...rows]
+	return ['', ...header(MISS_COLUMNS), ...lane_table_rows.capped(rows, MISS_ROWS, options)]
 }
 
-function table(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): string {
+function table(
+	entries: ReadonlyArray<LedgerEntry>,
+	window: StatsWindow,
+	options: TableOptions,
+): string {
 	const sizes = merged_sizes(entries, window)
-	const misses = sizes.filter((size) => size.missed === true)
+	const misses = sizes.filter(
+		(size) => size.missed === true && split_cap.is_over(size.actual.files, size.actual.lines),
+	)
 
 	return [
 		...header(COLUMNS),
@@ -101,11 +113,11 @@ function table(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): string
 			ratio_cell(sizes, 'lines'),
 			String(misses.length),
 		]),
-		...miss_rows(misses),
+		...miss_rows(misses, options),
 	].join('\n')
 }
 
-const lane_size_stats = { lines_ratio, merged_sizes, ratios, table }
+const lane_size_stats = { MISS_ROWS, lines_ratio, merged_sizes, ratios, table }
 
 export { lane_size_stats }
 export type { SizeRatios }

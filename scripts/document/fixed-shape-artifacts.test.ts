@@ -67,6 +67,12 @@ describe('issue:lint agrees with issue-template.md', () => {
 	it.each(issue_lint.REQUIRED_HEADINGS)('the template defines the heading %s', (heading) => {
 		expect(document).toContain(heading)
 	})
+
+	it('the template opens with the summary issue:file requires', () => {
+		const template = document.slice(document.indexOf('````md') + '````md'.length)
+
+		expect(issue_lint.starts_with_summary(template)).toBe(true)
+	})
 })
 
 describe('issue_backlinks agrees with issue-template.md', () => {

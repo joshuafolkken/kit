@@ -65,6 +65,14 @@ describe('run_merge_health.check', () => {
 	})
 })
 
+describe('run_merge_health.body_of', () => {
+	it('opens with the summary issue:file requires', async () => {
+		const { issue_lint_cli } = await import('#scripts/issue/issue-lint-cli')
+
+		expect(issue_lint_cli.summary_problem(run_merge_health.body_of(CHILD, RED.all))).toBeUndefined()
+	})
+})
+
 describe('run_merge_health.check — main red twice', () => {
 	beforeEach(() => {
 		execa_mock.mockResolvedValueOnce(RED).mockResolvedValueOnce(RED)

@@ -89,6 +89,20 @@ describe('git_argv.arguments_of', () => {
 	})
 })
 
+// The words after `git`, and how many of them are globals in front of the subcommand, values included.
+const GLOBALS: ReadonlyArray<readonly [string, ReadonlyArray<string>, number]> = [
+	['a -C <path> and a -c key=value', ['-C', 'p', '-c', 'k=v', 'status'], 4],
+	['a spaced value as one word', ['-C', 'my dir', 'status'], 2],
+	['an --attr-source <tree> value', ['--attr-source', 'HEAD', 'status'], 2],
+	['none when a -c follows the subcommand', ['grep', '-c', 'x'], 0],
+]
+
+describe('git_argv.globals_of', () => {
+	it.each(GLOBALS)('returns %s', (_name, words, count) => {
+		expect(git_argv.globals_of(words)).toStrictEqual(words.slice(0, count))
+	})
+})
+
 describe('git_argv.short_cluster_has', () => {
 	it('finds a letter bundled in a single-dash cluster', () => {
 		expect(git_argv.short_cluster_has('-uf', 'f')).toBe(true)

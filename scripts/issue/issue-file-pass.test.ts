@@ -27,7 +27,8 @@ const CLEAR_ESTIMATE = '- 規模見積もり: 約 1 ファイル / 10 行（テ�
 const JUDGEMENT_NEEDED = '- 人の判断: 要（目視確認）'
 
 // Every local check passes: a judgement-needed body is not opted into `auto-ok`, so it owes no run label.
-const CLEAR_BODY = [
+const SUMMARY = '## 概要\n\n要約\n\n'
+const BODY_WITHOUT_SUMMARY = [
 	'## 背景',
 	'',
 	'- 種別: 不具合',
@@ -37,6 +38,7 @@ const CLEAR_BODY = [
 	'',
 	'## 現象\n\nx\n\n## 期待結果\n\ny\n\n## 受け入れ条件\n\n- [ ] z\n',
 ].join('\n')
+const CLEAR_BODY = `${SUMMARY}${BODY_WITHOUT_SUMMARY}`
 
 function args_of(extra: ReadonlyArray<string> = []): FileArguments {
 	const args = issue_file.parse(['A title', '--body-file', 'body.md', ...extra])
@@ -120,6 +122,23 @@ describe('issue_file_pass.labels_in_one_pass — every refusal in one call', () 
 	it('answers the labels when no step refuses', async () => {
 		expect(await issue_file_pass.labels_in_one_pass(filing_of(CLEAR_BODY))).toBeDefined()
 		expect(console.error).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#7544: a body must open with the plain-language summary for the person deciding.
+describe('issue_file_pass.labels_in_one_pass — the leading summary', () => {
+	const refusal = 'must start with ## 概要'
+
+	it('refuses a body that does not start with the summary heading', async () => {
+		const filing = filing_of(BODY_WITHOUT_SUMMARY)
+
+		expect(await issue_file_pass.labels_in_one_pass(filing)).toBeUndefined()
+		expect(printed()).toContain(refusal)
+	})
+
+	it('admits the same body with the summary first', async () => {
+		expect(await issue_file_pass.labels_in_one_pass(filing_of(CLEAR_BODY))).toBeDefined()
+		expect(printed()).not.toContain(refusal)
 	})
 })
 

@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { since_green } from '#scripts/gate/since-green'
 import { changed_file_scope, type ChangedFileScope } from '#scripts/git/changed-file-scope'
+import { lockfile_changed_packages } from './lockfile-changed-packages'
 import { pure_files_entries } from './pure-files-entries'
 import { test_read_map, type ReadMap } from './test-read-map'
 import { whole_suite_files } from './whole-suite-files'
@@ -16,7 +17,8 @@ import { whole_suite_files } from './whole-suite-files'
 // snapshot — which no module graph holds — reaches the modules that read it through that map alone. **Whatever neither can answer runs the whole suite**: no map, a
 // non-code file added since the recorded tree that no recorded test read, where a test read inside its
 // directory, or a file every test
-// depends on — each counted only when this change moved it (joshuafolkken/kit#4527). A non-code file the recorded tree already held and no test read is one no test reads
+// depends on — `package.json` only when more than its `version` moved (joshuafolkken/kit#7538),
+// `pnpm-lock.yaml` only when it moved a unit runtime package or more than resolutions (joshuafolkken/kit#7554) — each counted only when this change moved it (joshuafolkken/kit#4527). A non-code file the recorded tree already held and no test read is one no test reads
 // (joshuafolkken/kit#4073), and so is one added since to a directory no test read inside
 // (joshuafolkken/kit#4303, joshuafolkken/kit#4597), so a change made only of those runs nothing. CI runs the whole suite
 // regardless, so a read the recorder could not see — one a child process makes — is still caught
@@ -51,6 +53,7 @@ const RELATABLE_EXTENSIONS: ReadonlySet<string> = new Set([
 ])
 
 const { WHOLE_SUITE_FILES } = whole_suite_files
+const { LOCKFILE_PATH } = lockfile_changed_packages
 const { UNREADABLE_REASON } = changed_file_scope
 const NOTHING_RELATABLE_REASON = 'no changed file is one a test can import or read'
 const NO_MAP_REASON = 'no test-read map covers the changed non-code file'
@@ -109,6 +112,13 @@ interface ScopeRequest {
 	// The entries a change of `tools/test/pure-files.ts` moved, when it moved nothing else there — the
 	// list then reaches those test files rather than every test (`pure-files-entries.ts`).
 	pure_entries?: ReadonlyArray<string> | undefined
+	// The changed whole-suite files whose change is their `version` alone — `package.json` on a release
+	// commit (`package-version-only.ts`) — resolved through the map rather than the whole suite.
+	version_only?: ReadonlySet<string>
+	// The modules importing a package a `pnpm-lock.yaml` change moved, when it moved no unit runtime
+	// package (`lockfile-changed-packages.ts`) — handed to vitest, and the lockfile resolved through the
+	// map, rather than the whole suite.
+	lockfile_importers?: ReadonlyArray<string> | undefined
 	// The changed files every test imports, each with the test files importing it directly
 	// (`direct-importers.ts`) — the run narrows to those rather than the whole suite.
 	every_test_importers?: ReadonlyMap<string, ReadonlyArray<string>>
@@ -242,13 +252,27 @@ function direct_selection(request: ScopeRequest, changed: ReadonlyArray<string>)
 	return { files: tests.flat(), unread: moved.filter((_file, index) => tests[index]?.length === 0) }
 }
 
+function is_resolved_elsewhere(request: ScopeRequest, file: string): boolean {
+	if (file === LOCKFILE_PATH) return request.lockfile_importers !== undefined
+
+	return request.version_only?.has(file) === true
+}
+
+function is_whole_suite_trigger(request: ScopeRequest, file: string): boolean {
+	if (is_resolved_elsewhere(request, file)) return false
+
+	return WHOLE_SUITE_FILES.has(file) && !is_narrowed(request, file) && is_moved(request, file)
+}
+
+// **A `package.json` moved in `version` alone is no trigger** (joshuafolkken/kit#7538), **nor a
+// `pnpm-lock.yaml` moving no unit runtime package** (joshuafolkken/kit#7554): each reaches the tests
+// reading it through the map, as any other non-code file does, and the lockfile also the modules
+// importing a package it moved.
 function whole_suite_triggers(
 	request: ScopeRequest,
 	changed: ReadonlyArray<string>,
 ): Array<string> {
-	return changed.filter(
-		(file) => WHOLE_SUITE_FILES.has(file) && !is_narrowed(request, file) && is_moved(request, file),
-	)
+	return changed.filter((file) => is_whole_suite_trigger(request, file))
 }
 
 function resolve_read(
@@ -287,8 +311,9 @@ function resolve_scope(request: ScopeRequest): RelatedScope {
 	if (request.changed === undefined) return all_scope(UNREADABLE_REASON)
 
 	const pure = without_pure_entries(request.changed, request.pure_entries)
+	const lockfile_importers = request.lockfile_importers ?? []
 
-	return resolve_read({ ...request, changed: pure.unread }, pure.files)
+	return resolve_read({ ...request, changed: pure.unread }, [...pure.files, ...lockfile_importers])
 }
 
 function describe_scope(scope: RelatedScope, root: string): string {

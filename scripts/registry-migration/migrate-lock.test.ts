@@ -1,3 +1,4 @@
+import { dump } from 'js-yaml'
 import { describe, expect, it } from 'vitest'
 import { migrate_lock } from './migrate-lock'
 
@@ -6,6 +7,8 @@ const SELF_MANAGEMENT =
 const PROJECT =
 	'lockfileVersion: "9.0"\npackages:\n  "@joshuafolkken/child@1.0.0":\n    resolution: {integrity: sha512-old}\n'
 const OLD_INTEGRITY = 'sha512-old'
+const CHANGED_INTEGRITY = 'sha512-changed'
+const OTHER_INTEGRITY = 'sha512-other'
 const GRAPH_ERROR = 'dependency graph'
 const CHECKSUM = 'pnpmfileChecksum: sha256-original\n'
 const CHECKSUM_VALUE = 'sha256-original'
@@ -52,10 +55,10 @@ describe('migration pnpmfile metadata', () => {
 	})
 
 	it.each([
-		{ name: 'integrity', from: OLD_INTEGRITY, to: 'sha512-changed' },
+		{ name: 'integrity', from: OLD_INTEGRITY, to: CHANGED_INTEGRITY },
 		{ name: 'version', from: '1.0.0', to: '2.0.0' },
 		{ name: 'other metadata', from: 'packageManagerDependencies: {}', to: 'other: true' },
-		{ name: 'other scope resolution', from: 'sha512-other', to: 'sha512-replaced' },
+		{ name: 'other scope resolution', from: OTHER_INTEGRITY, to: 'sha512-replaced' },
 		{ name: 'snapshot', from: 'kept: {}', to: 'changed: {}' },
 		{ name: 'checksum', from: CHECKSUM_VALUE, to: 'sha256-changed' },
 	])('still refuses a changed $name after checksum restoration', ({ from, to }) => {
@@ -66,6 +69,56 @@ describe('migration pnpmfile metadata', () => {
 		expect(() =>
 			migrate_lock.assert_preserved(before, migrate_lock.restore_pnpmfile_checksum(before, after)),
 		).toThrow(GRAPH_ERROR)
+	})
+})
+
+const KIT_KEY = `${migrate_lock.KIT}@1.0.0`
+const OTHER_KEY = '@other/child@1.0.0'
+
+function registry_lock(kit: object, other: object, peers: Array<string>): string {
+	return dump({
+		lockfileVersion: '9.0',
+		packages: {
+			[KIT_KEY]: { resolution: { integrity: OLD_INTEGRITY }, ...kit },
+			[OTHER_KEY]: { resolution: { integrity: OTHER_INTEGRITY }, ...other },
+		},
+		snapshots: {
+			[KIT_KEY]: { dependencies: { '@other/child': '1.0.0' }, transitivePeerDependencies: peers },
+			[OTHER_KEY]: {},
+		},
+	})
+}
+
+const PEERS = ['svelte', 'vite']
+const OPTIONAL_PEERS = { peerDependenciesMeta: { vite: { optional: true } } }
+const DEPRECATED = { deprecated: 'use the new preset' }
+const GITHUB_LOCK = registry_lock({}, {}, PEERS)
+
+describe('migration registry metadata (ac-b88de8f7)', () => {
+	it('accepts npm-only peer metadata, its peer order and an unrelated deprecation', () => {
+		const npm_lock = registry_lock(OPTIONAL_PEERS, DEPRECATED, PEERS.toReversed())
+
+		expect(() => migrate_lock.assert_preserved(GITHUB_LOCK, npm_lock)).not.toThrow()
+	})
+
+	it.each([
+		{ name: 'integrity', from: OLD_INTEGRITY, to: CHANGED_INTEGRITY },
+		{ name: 'version', from: '1.0.0', to: '1.0.1' },
+		{ name: 'peer list member', from: 'vite', to: 'rollup' },
+		{ name: 'graph edge', from: "'@other/child': 1.0.0", to: "'@other/child': 2.0.0" },
+	])('still refuses a changed $name', ({ from, to }) => {
+		expect(() =>
+			migrate_lock.assert_preserved(
+				GITHUB_LOCK,
+				GITHUB_LOCK.replaceAll(from, () => to),
+			),
+		).toThrow(GRAPH_ERROR)
+	})
+
+	it('still refuses peer metadata outside this scope', () => {
+		const changed = registry_lock({}, OPTIONAL_PEERS, PEERS)
+
+		expect(() => migrate_lock.assert_preserved(GITHUB_LOCK, changed)).toThrow(GRAPH_ERROR)
 	})
 })
 

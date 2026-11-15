@@ -30,9 +30,10 @@ const GH_API_TIMEOUT_MS = 20_000
 const COMMAND_TIMEOUT_MS = 30_000
 // A type-aware ESLint run over a few files. A cold one is seconds; this is two orders beyond that.
 const LINT_TIMEOUT_MS = 180_000
-// A `pnpm install` or a global install, which can download the whole dependency tree on a cold
-// store. Ten minutes covers that fetch and still ends the command when a registry never answers. It
-// is well under `SUITE_TIMEOUT_MS` because it blocks a command a person is waiting on.
+// A `pnpm install`, a global install or a `--lockfile-only` resolution, which can fetch the whole
+// dependency tree (tarballs, or every package's metadata) on a cold store or cache. Ten minutes covers
+// that fetch and still ends the command when a registry never answers. It is well under
+// `SUITE_TIMEOUT_MS` because it blocks a command a person is waiting on.
 const INSTALL_TIMEOUT_MS = 600_000
 // A check or step that can run a consumer's full unit suite or a `pnpm add` — long enough for a cold
 // suite on a large consumer, short enough that a hung child ends the run instead of holding it open

@@ -67,6 +67,7 @@ const VALUES = {
 } as const satisfies Record<string, Row>
 
 const HEADINGS = {
+	summary: { ja: '概要', en: 'Summary' },
 	background: { ja: '背景', en: 'Background' },
 	symptom: { ja: '現象', en: 'Symptom' },
 	expected: { ja: '期待結果', en: 'Expected result' },

@@ -186,21 +186,21 @@ function isolated_unit_environment(
 //
 // **The machine is read only when no count was typed.** The reading waits out a sample window, and a
 // caller's `--maxWorkers` wins whatever it says. The gate's cap is one: its admission narrows it to the
-// free cores, and its unit step bounds it by the free memory once admitted (`gate-run-steps.ts`).
+// free cores, and its unit step bounds it by the free memory once admitted (`gate-run-steps.ts`); a
+// sharing run admitted on a claim is bounded the same way (`unit_worker_share.admitted_capacity`).
 async function vitest_share(vitest_arguments: ReadonlyArray<string>): Promise<number | undefined> {
 	if (unit_worker_share.has_worker_flag(vitest_arguments)) return undefined
 
 	const available_cores = availableParallelism()
+	const live_runs = unit_worker_share.live_run_count()
+	const live_lanes = unit_worker_share.live_lane_count()
+	const claim = core_budget.held_unit_claim()
 	// The cores and the memory free right now (joshuafolkken/kit#4528), from one reading.
-	const free = await free_cores.read({ available_cores })
-	const share = unit_worker_share.current_share(
-		available_cores,
-		unit_worker_share.live_run_count(),
-		free,
-		unit_worker_share.live_lane_count(),
-	)
+	const reading = await free_cores.read({ available_cores })
+	const free = unit_worker_share.admitted_capacity(reading, claim, live_runs, live_lanes)
+	const share = unit_worker_share.current_share(available_cores, live_runs, free, live_lanes)
 
-	return unit_worker_share.cap_to_claim(share, core_budget.held_unit_claim())
+	return unit_worker_share.cap_to_claim(share, claim)
 }
 
 async function execute_vitest(

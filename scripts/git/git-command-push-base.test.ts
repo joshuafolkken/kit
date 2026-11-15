@@ -68,7 +68,9 @@ async function mock_execa(_cmd: string, arguments_: Array<string>): Promise<{ st
 vi.mock('execa', () => ({ execa: mock_execa }))
 
 // `change_base` and the diffs never reach the hook, so mocking it leaves their readings untouched.
-const hook_mock = vi.hoisted(() => ({ run: vi.fn<() => Promise<boolean>>() }))
+const hook_mock = vi.hoisted(() => ({
+	run: vi.fn<(environment?: Readonly<Record<string, string>>) => Promise<boolean>>(),
+}))
 
 vi.mock('./git-pre-push-hook', () => ({ git_pre_push_hook: hook_mock }))
 
@@ -151,6 +153,24 @@ describe('git_command.push runs the pre-push hook outside the push budget', () =
 
 		await expect(git_command.push()).rejects.toThrow(HOOK_FAILURE)
 		expect(execa_mock.state.calls).toStrictEqual([])
+	})
+})
+
+// joshuafolkken/kit#7539: a caller's setting reaches the hook run ahead, never the transfer.
+describe('git_command.push hands the caller environment to the hook', () => {
+	it('relays it to the hook and not to the push', async () => {
+		const environment = { JOSH_PRE_PUSH_RELATED: '1' }
+
+		await git_command.push(environment)
+
+		expect(hook_mock.run).toHaveBeenCalledWith(environment)
+		expect(last_call()).toStrictEqual(['push', NO_VERIFY])
+	})
+
+	it('adds nothing when the caller names none', async () => {
+		await git_command.push()
+
+		expect(hook_mock.run).toHaveBeenCalledWith({})
 	})
 })
 

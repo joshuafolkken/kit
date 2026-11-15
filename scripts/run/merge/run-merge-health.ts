@@ -41,8 +41,15 @@ function is_filed(events: ReadonlyArray<RunEvent>): boolean {
 		)
 }
 
-// The lines `issue:file` requires of a defect whose origin is unknown (`issue:file --check`).
+// The lines `issue:file` requires of a defect whose origin is unknown (`issue:file --check`), after the
+// plain-language summary it requires first.
 const DECLARATIONS = [
+	issue_body_keys.heading('summary'),
+	'',
+	'**The verification gate fails on `main`, so every lane is held until it is repaired.**',
+	'',
+	'Several lanes failed one after another, and the same verification then failed on `main` twice in a row, so the cause is on `main` rather than in any one lane. Fix whatever makes the verification fail on `main`; the output is under the reproduction below.',
+	'',
 	issue_body_keys.heading('background'),
 	'',
 	issue_body_keys.line('kind', 'bug'),
@@ -132,6 +139,6 @@ async function check(child: string): Promise<boolean> {
 	return false
 }
 
-const run_merge_health = { TITLE, check }
+const run_merge_health = { TITLE, body_of, check }
 
 export { run_merge_health }
