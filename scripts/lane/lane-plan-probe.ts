@@ -5,7 +5,7 @@ import { has_any_label, IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
 import { session_cite } from '#scripts/issue/session-cite'
 import { lane_plan, type LanePlan } from './lane-plan'
 import { lane_plan_signals } from './lane-plan-signals'
-import { lane_plan_size, type Oversize } from './lane-plan-size'
+import { lane_plan_size, type Oversize, type PlanSignals } from './lane-plan-size'
 
 // `lane:plan`'s overlap check without its wait or its yield (`lane-plan-check.ts` acts on it), kept apart
 // so `run:review`'s open widens a plan (joshuafolkken/kit#6142) without importing the yield's release.
@@ -66,16 +66,44 @@ function record_cleared(plan: LanePlan, directory: string): void {
 	)
 }
 
+// The signals read, its failure kept as a value until the size bar uses it, so an unused read that
+// failed rejects nothing.
+async function signals_or_error(plan: LanePlan): Promise<PlanSignals | Error> {
+	try {
+		return await lane_plan_signals.signals_of(plan.issue, plan.paths)
+	} catch (error) {
+		return error instanceof Error ? error : new Error(String(error))
+	}
+}
+
 // A plan grown past twice its Issue's declaration is refused before it is recorded (`lane-plan-size.ts`).
 async function oversize_of(
 	plan: LanePlan,
 	issues: ReadonlyArray<OpenIssueData> | undefined,
 	directory: string,
+	read: Promise<PlanSignals | Error>,
 ): Promise<Oversize | undefined> {
 	if (issues === undefined || !lane_plan_size.declares(plan.issue, issues)) return undefined
-	const signals = await lane_plan_signals.signals_of(plan.issue, plan.paths)
+	const signals = await read
+
+	if (signals instanceof Error) throw signals
 
 	return lane_plan_size.oversize(plan, issues, lane_plan.read(plan.issue, directory), signals)
+}
+
+interface SizedListing {
+	issues: ReadonlyArray<OpenIssueData> | undefined
+	over: Oversize | undefined
+}
+
+// The listing and the size bar's verdict on `plan`. The signals are read beside the listing, not after
+// it (joshuafolkken/kit#7596): their graph walk for the hubs is `lane:plan`'s longest step, so it runs
+// under the `gh` read. An Issue that declares no size leaves them unused.
+async function sized_listing(plan: LanePlan, directory: string): Promise<SizedListing> {
+	const read = signals_or_error(plan)
+	const issues = await opted_in()
+
+	return { issues, over: await oversize_of(plan, issues, directory, read) }
 }
 
 function is_oversize(found: Extended): found is typeof OVERSIZE {
@@ -87,8 +115,7 @@ function is_oversize(found: Extended): found is typeof OVERSIZE {
 // started (`sized`) plan is not — a clash or an unread listing writes nothing and is returned; the
 // ship's `unplanned` preflight still checks.
 async function extend(plan: LanePlan, directory: string): Promise<Extended> {
-	const issues = await opted_in()
-	const over = await oversize_of(plan, issues, directory)
+	const { issues, over } = await sized_listing(plan, directory)
 
 	if (over !== undefined && !lane_plan_size.is_waived(plan, over)) return OVERSIZE
 	const found = probe(plan, issues, directory)
@@ -105,10 +132,10 @@ const lane_plan_probe = {
 	is_unread,
 	opted_in,
 	overlap_text,
-	oversize_of,
 	probe,
 	record_cleared,
 	running_of,
+	sized_listing,
 }
 
 export { lane_plan_probe }
