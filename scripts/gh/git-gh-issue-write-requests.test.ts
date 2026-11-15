@@ -1,4 +1,7 @@
+import { shared_cache_fixture } from '#scripts/josh/shared-cache-fixture'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { FULL_PAGE_QUERY, git_gh_api_path } from './git-gh-api-path'
+import { git_gh_conditional, type ConditionalRead } from './git-gh-conditional'
 import { git_gh_exec, type GhApiRequest } from './git-gh-exec'
 import { gh_failure } from './git-gh-failure'
 import { git_gh_issue_write } from './git-gh-issue-write'
@@ -11,9 +14,13 @@ vi.mock('./git-gh-exec', () => ({
 }))
 
 const mocked_api = vi.mocked(git_gh_exec.exec_gh_api)
+// The label read-back's first page, answered through the ETag layer (joshuafolkken/kit#7619).
+const read_conditional = vi.spyOn(git_gh_conditional, 'read_conditional')
 
 beforeEach(() => {
-	mocked_api.mockResolvedValue('')
+	shared_cache_fixture.keep_in_memory()
+	mocked_api.mockReset().mockResolvedValue('')
+	read_conditional.mockReset()
 })
 
 // joshuafolkken/kit#3312: a write that threw after the label landed refused a lane dispatch, so a
@@ -22,16 +29,18 @@ const LABELED_ISSUE = '3291'
 const LABEL_NAME = 'in-progress'
 const ISSUES_PATH = 'repos/{owner}/{repo}/issues'
 const ISSUE_LABELS_PATH = `${ISSUES_PATH}/${LABELED_ISSUE}/labels`
+const LABELS_PAGE_PATH = `${ISSUE_LABELS_PATH}${FULL_PAGE_QUERY}`
 const WRITE_FAILED = 'gh: API rate limit exceeded (HTTP 403)'
-const READ_FAILED = 'gh: timed out'
+const UNREADABLE: ConditionalRead = { kind: 'unreadable' }
 
-// The POST throws; the read-back answers what `read_back` does.
-function serve_failed_write(read_back: () => Promise<string>): void {
-	mocked_api.mockImplementation(async (request) => {
-		if (request.body !== undefined) throw new Error(WRITE_FAILED)
+function labels_page(...names: Array<string>): ConditionalRead {
+	return { kind: 'changed', etag: undefined, body: JSON.stringify(names.map((name) => ({ name }))) }
+}
 
-		return await read_back()
-	})
+// The POST throws; the read-back answers `read_back`.
+function serve_failed_write(read_back: ConditionalRead): void {
+	mocked_api.mockRejectedValue(new Error(WRITE_FAILED))
+	read_conditional.mockResolvedValue(read_back)
 }
 
 async function apply(): Promise<unknown> {
@@ -42,20 +51,18 @@ describe('issue_apply_label', () => {
 	it('reads nothing back when the write succeeds', async () => {
 		expect(await apply()).toStrictEqual({ is_applied: true })
 		expect(mocked_api).toHaveBeenCalledTimes(1)
+		expect(read_conditional).not.toHaveBeenCalled()
 	})
 
 	it('counts a thrown write as applied when the read-back finds the label', async () => {
-		serve_failed_write(async () => `bug\n${LABEL_NAME}\n`)
+		serve_failed_write(labels_page('bug', LABEL_NAME))
 
 		expect(await apply()).toStrictEqual({ is_applied: true })
-		expect(mocked_api.mock.calls[1]?.[0]).toMatchObject({
-			path: ISSUE_LABELS_PATH,
-			should_paginate: true,
-		})
+		expect(read_conditional.mock.calls[0]?.[0]).toBe(LABELS_PAGE_PATH)
 	})
 
 	it('answers the write error when the read-back does not find the label', async () => {
-		serve_failed_write(async () => 'bug\n')
+		serve_failed_write(labels_page('bug'))
 
 		expect(await apply()).toStrictEqual({ is_applied: false, reason: WRITE_FAILED })
 	})
@@ -67,27 +74,68 @@ describe('issue_apply_label', () => {
 	})
 
 	it('answers the write error when the read-back itself fails', async () => {
-		serve_failed_write(async () => {
-			throw new Error(READ_FAILED)
-		})
+		serve_failed_write(UNREADABLE)
 
 		expect(await apply()).toStrictEqual({ is_applied: false, reason: WRITE_FAILED })
 	})
 
 	it('keeps issue_add_label answering the same verdict as a boolean', async () => {
-		serve_failed_write(async () => `${LABEL_NAME}\n`)
+		serve_failed_write(labels_page(LABEL_NAME))
 
 		expect(await git_gh_issue_write.issue_add_label(LABELED_ISSUE, LABEL_NAME)).toBe(true)
 	})
 })
 
-// The DELETE throws; the read-back answers what `read_back` does.
-function serve_failed_delete(read_back: () => Promise<string>): void {
-	mocked_api.mockImplementation(async (request) => {
-		if (request.method === 'DELETE') throw new Error(WRITE_FAILED)
+// joshuafolkken/kit#7619: the label read's first page goes through the ETag layer, a full one falls
+// back to a paginated read parsed the same way, and a failed read answers `undefined`.
+async function read(): Promise<Array<string> | undefined> {
+	return await git_gh_issue_write.read_label_names(LABELED_ISSUE)
+}
 
-		return await read_back()
+describe('read_label_names', () => {
+	it('answers the same names from the kept page on a 304', async () => {
+		const etag = 'W/"labels"'
+		const body = JSON.stringify([{ name: LABEL_NAME }])
+
+		read_conditional
+			.mockResolvedValueOnce({ kind: 'changed', etag, body })
+			.mockResolvedValueOnce({ kind: 'unchanged' })
+
+		expect(await read()).toStrictEqual([LABEL_NAME])
+		expect(await read()).toStrictEqual([LABEL_NAME])
+		expect(read_conditional.mock.calls[1]).toStrictEqual([LABELS_PAGE_PATH, etag, undefined])
 	})
+
+	it('reads every page with --paginate when the first page is full', async () => {
+		const names = Array.from(
+			{ length: git_gh_api_path.FULL_PAGE_SIZE },
+			(_, index) => `l${String(index)}`,
+		)
+
+		read_conditional.mockResolvedValue(labels_page(...names))
+		mocked_api.mockResolvedValue(JSON.stringify([...names, LABEL_NAME].map((name) => ({ name }))))
+
+		expect(await read()).toContain(LABEL_NAME)
+		expect(mocked_api).toHaveBeenCalledWith({ path: LABELS_PAGE_PATH, should_paginate: true })
+	})
+
+	it('answers an empty list for an issue with no labels', async () => {
+		read_conditional.mockResolvedValue(labels_page())
+
+		expect(await read()).toStrictEqual([])
+	})
+
+	it('answers undefined when the read fails', async () => {
+		read_conditional.mockResolvedValue(UNREADABLE)
+
+		expect(await read()).toBeUndefined()
+	})
+})
+
+// The DELETE throws; the read-back answers `read_back`.
+function serve_failed_delete(read_back: ConditionalRead): void {
+	mocked_api.mockRejectedValue(new Error(WRITE_FAILED))
+	read_conditional.mockResolvedValue(read_back)
 }
 
 async function clear(): Promise<boolean> {
@@ -101,21 +149,19 @@ describe('issue_clear_label', () => {
 	})
 
 	it('answers true when the delete throws and the read-back lacks the label', async () => {
-		serve_failed_delete(async () => 'bug\n')
+		serve_failed_delete(labels_page('bug'))
 
 		expect(await clear()).toBe(true)
 	})
 
 	it('answers false when the delete throws and the read-back still has the label', async () => {
-		serve_failed_delete(async () => `bug\n${LABEL_NAME}\n`)
+		serve_failed_delete(labels_page('bug', LABEL_NAME))
 
 		expect(await clear()).toBe(false)
 	})
 
 	it('answers false when the delete throws and the read-back itself fails', async () => {
-		serve_failed_delete(async () => {
-			throw new Error(READ_FAILED)
-		})
+		serve_failed_delete(UNREADABLE)
 
 		expect(await clear()).toBe(false)
 	})
