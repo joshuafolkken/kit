@@ -279,7 +279,11 @@ describe('check counts the uncommitted work a lane holds on a branch with no com
 	it('resumes when the lane checked out on the branch has uncommitted changes', async () => {
 		arrange_lane_on(BRANCH, LANE_CHANGE)
 
-		expect(await verdict_from_check()).toBe('resume')
+		const decision = await run_preflight.check(ISSUE)
+
+		expect(decision.verdict).toBe('resume')
+		expect(decision.advice).toContain(`cd ${LANE_DIRECTORY}`)
+		expect(decision.advice).not.toContain('git switch')
 		expect(find_open_lane).toHaveBeenCalledWith(ISSUE)
 		expect(status).toHaveBeenCalledWith(LANE_DIRECTORY)
 	})

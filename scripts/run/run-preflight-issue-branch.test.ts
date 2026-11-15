@@ -97,6 +97,29 @@ describe('from the default branch, resume names the one command that leads to a 
 	it('answers clean once the switch is made, so resume and reclaim never alternate', () => {
 		expect(verdict_of(ON_ISSUE_BRANCH, OPEN_ON_BRANCH)).toBe('clean')
 	})
+
+	it('resumes onto the sibling branch that holds the open pull request', () => {
+		const sibling: ChildState = { branch_name: '926-retry', pr_state: 'open' }
+		const decision = run_preflight.decide(ON_ISSUE_BRANCH, sibling, ISSUE)
+
+		expect(decision.verdict).toBe('resume')
+		expect(decision.advice).toContain('git switch 926-retry')
+	})
+
+	it('quotes a branch name so shell metacharacters stay one argument', () => {
+		const odd: ChildState = { branch_name: '926-a;b', pr_state: 'open' }
+
+		expect(run_preflight.decide(ON_MAIN, odd, ISSUE).advice).toContain("git switch '926-a;b'")
+	})
+
+	it('names the lane worktree instead of switching onto a branch it has checked out', () => {
+		const in_lane: ChildState = { ...OPEN_ON_BRANCH, lane_directory: '/lanes/926 x' }
+		const decision = run_preflight.decide(ON_MAIN, in_lane, ISSUE)
+
+		expect(decision.verdict).toBe('resume')
+		expect(decision.advice).toContain("cd '/lanes/926 x'")
+		expect(decision.advice).not.toContain('git switch')
+	})
 })
 
 function arrange_issue_branch_with_open_pr(): void {

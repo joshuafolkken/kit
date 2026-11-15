@@ -266,9 +266,15 @@ async function preflight_gate(issue: string, is_linked: boolean): Promise<number
 
 	const decision = await run_preflight.check(issue)
 
-	if (decision.verdict === run_preflight.CLEAN_VERDICT) return undefined
+	if (decision.verdict !== run_preflight.CLEAN_VERDICT) return report_preflight(decision)
 
-	return report_preflight(decision)
+	// A clean tree on the issue's own branch is a resume: the hold is taken, and the whole-gate rule is
+	// still said, because nobody verified what the earlier run committed.
+	if (decision.advice === run_preflight.RESUME_ADVICE) {
+		console.error(`${decision.reason}\n${decision.advice}`)
+	}
+
+	return undefined
 }
 
 async function claim(target: string, request: ClaimRequest, is_linked: boolean): Promise<number> {
