@@ -58,7 +58,7 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 			'Start test:pinned in the background, run the gate and, once it is green, write the /code-review brief to a file, printing its path (--join to join them; it stops on an unpinned change)',
 		category: 'AI tools',
 		reference: [
-			'[--code-only] [--unpinned-ok "<reason>"] | --join [--fixing] | --pinned | --push [<slots>]',
+			'[--code-only] [--unpinned-ok "<reason>"] [--accept-metrics "<reason>"] | --join [--fixing] | --pinned | --push [<slots>]',
 			'automation',
 			['processes', 'files', 'git', 'network'],
 		],
@@ -103,7 +103,7 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 			'Open the review, or --join to join, attest and record it; --ship starts ship --detach --review after a clean record. Stops at the first refusal with its next action',
 		category: 'AI tools',
 		reference: [
-			'<issue> [--from <stage>] [--unpinned-ok "<reason>"] | <issue> --join [--fixing] [--from <stage>] [--ship "<title> #<N>"]',
+			'<issue> [--from <stage>] [--unpinned-ok "<reason>"] [--accept-metrics "<reason>"] | <issue> --join [--fixing] [--from <stage>] [--ship "<title> #<N>"]',
 			'automation',
 			['processes', 'files', 'git', 'network'],
 		],
@@ -120,6 +120,10 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 				{
 					arguments: '<N> --unpinned-ok "only logs"',
 					note: 'forwarded to run:review as given',
+				},
+				{
+					arguments: '<N> --accept-metrics "<why>"',
+					note: 'forwarded to run:review, whose open records a grown metrics total as `metrics --accept` does',
 				},
 				{
 					arguments: '<N> --join',
