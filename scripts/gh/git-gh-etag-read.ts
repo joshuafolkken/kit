@@ -87,18 +87,20 @@ async function read(path: string, timeout_ms?: number): Promise<string> {
 // A listing whose first page holds `per_page` rows (joshuafolkken/kit#6699). The ETag covers one page
 // only, so a full first page — more may follow — is read unconditionally with `--paginate` instead;
 // an answer that is no array is handed back for the caller's own parser to reject. `read_page` reads
-// the first page: the merge gate passes its in-process read (joshuafolkken/kit#6756).
+// the first page: the merge gate passes its in-process read (joshuafolkken/kit#6756). `timeout_ms`
+// bounds both the first page and the paged read.
 async function read_listing(
 	path: string,
 	per_page: number,
-	read_page: (page_path: string) => Promise<string> = read,
+	read_page: (page_path: string, timeout_ms?: number) => Promise<string> = read,
+	timeout_ms?: number,
 ): Promise<string> {
-	const first = await read_page(path)
+	const first = await read_page(path, timeout_ms)
 	const rows = parse_json_array_or_undefined(first, z.unknown())
 
 	if (rows === undefined || rows.length < per_page) return first
 
-	return await git_gh_exec.exec_gh_api({ path, should_paginate: true })
+	return await git_gh_exec.exec_gh_api({ path, should_paginate: true, timeout_ms })
 }
 
 const git_gh_etag_read = { read, read_detail, read_listing, settle, slot_of }

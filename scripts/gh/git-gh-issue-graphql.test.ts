@@ -18,9 +18,11 @@ vi.mock('./git-gh-exec', () => ({
 	git_gh_exec: { exec_gh_api: vi.fn(), exec_gh_api_status: vi.fn() },
 }))
 
-vi.mock('./git-gh-etag-read', () => ({
-	git_gh_etag_read: { read: async (path: string) => await git_gh_exec.exec_gh_api({ path }) },
-}))
+vi.mock('./git-gh-etag-read', async () => {
+	const { git_gh_etag_read_fixture } = await import('./git-gh-etag-read-fixture')
+
+	return { git_gh_etag_read: git_gh_etag_read_fixture.through_exec }
+})
 
 // `issue_read_with_comments` — one issue's fields and comments from one GraphQL query, or from the
 // REST reads it replaces when that query is refused (joshuafolkken/kit#6722). The two paths have to

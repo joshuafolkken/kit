@@ -22,10 +22,13 @@ vi.mock('./git-gh-exec', () => ({
 	git_gh_exec: { exec_gh_api: vi.fn(), exec_gh_api_status: vi.fn() },
 }))
 
-// The relations reads go through `exec_gh_api` here; the ETag is pinned in `git-gh-issue-read-etag.test.ts`.
-vi.mock('./git-gh-etag-read', () => ({
-	git_gh_etag_read: { read: async (path: string) => await git_gh_exec.exec_gh_api({ path }) },
-}))
+// The relations and comment reads go through `exec_gh_api` here; the ETag is pinned in
+// `git-gh-issue-read-etag.test.ts`.
+vi.mock('./git-gh-etag-read', async () => {
+	const { git_gh_etag_read_fixture } = await import('./git-gh-etag-read-fixture')
+
+	return { git_gh_etag_read: git_gh_etag_read_fixture.through_exec }
+})
 
 const mocked_api = vi.mocked(git_gh_exec.exec_gh_api)
 const mocked_status = vi.mocked(git_gh_exec.exec_gh_api_status)
