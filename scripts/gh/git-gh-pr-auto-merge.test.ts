@@ -19,6 +19,7 @@ import { forget_pr_numbers } from './git-gh-pr-read'
 
 // joshuafolkken/kit#2497. Auto-merge is what lets a flush pull request land after the flush that
 // opened it is gone, and the open listing is what lets the next flush notice one that did not.
+
 // The branch lookup reads through `exec_gh_api` here; its ETag is pinned in `git-gh-pr-read-etag.test.ts`.
 vi.mock('./git-gh-etag-read', async () => {
 	const { git_gh_etag_read_fixture } = await import('./git-gh-etag-read-fixture')
