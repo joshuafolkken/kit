@@ -103,8 +103,10 @@ async function run(body_path: string | undefined): Promise<number> {
 	}
 
 	const body = cli_body.read_file_or_stdin(body_path)
+	const summary = summary_problem(body)
 
-	return report(problems(body), body)
+	// A pre-filing check: it answers as `issue:file` will, the leading summary included.
+	return report(summary === undefined ? problems(body) : [summary, ...problems(body)], body)
 }
 
 const issue_lint_cli = { problems, run, summary_problem, warn }
