@@ -31,6 +31,14 @@ import { gh_retry } from './git-gh-retry'
 // **The read is the whole point, so the merge and the detail are answered separately.** "The write
 // failed and the pull request is merged" needs two different *outcomes* on two paths, which is why
 // the shared `gh_api_routes` accepts a thunk beside a body instead of requiring a copied fixture.
+
+// The branch lookup reads through `exec_gh_api` here; its ETag is pinned in `git-gh-pr-read-etag.test.ts`.
+vi.mock('./git-gh-etag-read', async () => {
+	const { git_gh_etag_read_fixture } = await import('./git-gh-etag-read-fixture')
+
+	return { git_gh_etag_read: git_gh_etag_read_fixture.through_exec }
+})
+
 vi.mock('./git-gh-exec', () => ({
 	git_gh_exec: {
 		exec_gh_command: vi.fn(),

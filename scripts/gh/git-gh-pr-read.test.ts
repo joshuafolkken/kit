@@ -27,6 +27,13 @@ import {
 // 403 in a cloud session. `gh pr view` also accepted a branch name where REST is keyed by number, so
 // the branch → number resolution these share is asserted here too.
 
+// The branch lookup reads through `exec_gh_api` here; its ETag is pinned in `git-gh-pr-read-etag.test.ts`.
+vi.mock('./git-gh-etag-read', async () => {
+	const { git_gh_etag_read_fixture } = await import('./git-gh-etag-read-fixture')
+
+	return { git_gh_etag_read: git_gh_etag_read_fixture.through_exec }
+})
+
 vi.mock('./git-gh-exec', () => ({
 	git_gh_exec: { exec_gh_command: vi.fn(), exec_gh_api: vi.fn() },
 	has_stderr_field: (): boolean => false,

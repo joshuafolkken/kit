@@ -1,6 +1,7 @@
 import { error_text } from '#scripts/lib/error-message'
 import { FULL_PAGE_QUERY, git_gh_api_path } from './git-gh-api-path'
 import { note_unreadable_comments } from './git-gh-comments-unreadable'
+import { git_gh_etag_read } from './git-gh-etag-read'
 import { git_gh_exec } from './git-gh-exec'
 import { git_gh_helpers } from './git-gh-helpers'
 import { git_gh_issue_memo } from './git-gh-issue-memo'
@@ -65,8 +66,10 @@ function lookup_path(branch_name: string): string {
 	return `${git_gh_api_path.pulls_api_path()}?head=${head}&${LOOKUP_QUERY}`
 }
 
+// Through the ETag layer: a branch whose pull requests have not changed is a free 304
+// (joshuafolkken/kit#7620). The kept record's key is the path before `gh` expands `{owner}`.
 async function fetch_branch_pull(branch_name: string): Promise<RestPull | undefined> {
-	const json = await git_gh_exec.exec_gh_api({ path: lookup_path(branch_name) })
+	const json = await git_gh_etag_read.read(lookup_path(branch_name))
 
 	return git_gh_pr_rest.select_pull(git_gh_pr_rest.parse_rest_pulls(json))
 }
