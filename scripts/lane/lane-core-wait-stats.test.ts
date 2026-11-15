@@ -22,9 +22,36 @@ function core_wait(waited_minutes: number, issue?: number, minutes_before = 1): 
 	return issue === undefined ? wait : { ...wait, issue }
 }
 
-function lines_of(entries: ReadonlyArray<LedgerEntry>): Array<string> {
-	return lane_core_wait_stats.table(entries, WINDOW).split('\n')
+function lines_of(entries: ReadonlyArray<LedgerEntry>, is_all = false): Array<string> {
+	return lane_core_wait_stats.table(entries, WINDOW, { is_all }).split('\n')
 }
+
+// One wait per lane, the lane numbered by its rank: lane 1 waited longest.
+function lanes(count: number): Array<LedgerEntry> {
+	return Array.from({ length: count }, (_, index) => core_wait(count - index, index + 1))
+}
+
+// joshuafolkken/kit#7578: a period of hundreds of lanes overflowed a session's output cap.
+describe('lane_core_wait_stats.table row cap', () => {
+	const { LANE_ROWS } = lane_core_wait_stats
+
+	it('prints every lane when the period has no more than LANE_ROWS', () => {
+		expect(lines_of(lanes(LANE_ROWS))).toHaveLength(LANE_ROWS + 2)
+	})
+
+	it('prints the first LANE_ROWS lanes and a count of the rest past it', () => {
+		const lines = lines_of(lanes(LANE_ROWS + 3))
+
+		expect(lines.slice(2, -2).map((line) => line.split(' | ', 1)[0])).toStrictEqual(
+			Array.from({ length: LANE_ROWS }, (_, index) => `| ${String(index + 1)}`),
+		)
+		expect(lines.at(-1)).toBe('… 3 more rows omitted — `--all` prints every row')
+	})
+
+	it('prints every lane with --all', () => {
+		expect(lines_of(lanes(LANE_ROWS + 3), true)).toHaveLength(LANE_ROWS + 3 + 2)
+	})
+})
 
 describe('lane_core_wait_stats.table', () => {
 	it('sums each lane’s waits, the longest total first', () => {

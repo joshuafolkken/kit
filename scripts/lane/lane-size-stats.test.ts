@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { LedgerEntry, SizeEntry } from './lane-ledger-schema'
 import { lane_size_stats } from './lane-size-stats'
 import { lane_stats } from './lane-stats'
+import { lane_table_rows } from './lane-table-rows'
 
 const NOW = Date.parse('2026-10-30T12:00:00Z')
 const WINDOW = lane_stats.window_of(1, NOW)
@@ -23,8 +24,19 @@ function merge(issue: number, at = DURING): LedgerEntry {
 	return { kind: 'merge', at, issue }
 }
 
+function text_of(entries: ReadonlyArray<LedgerEntry>, options = lane_table_rows.ALL_ROWS): string {
+	return lane_size_stats.table(entries, WINDOW, options)
+}
+
 function row(entries: ReadonlyArray<LedgerEntry>): string | undefined {
-	return lane_size_stats.table(entries, WINDOW).split('\n', 3)[2]
+	return text_of(entries).split('\n', 3)[2]
+}
+
+function missed_lanes(count: number): Array<LedgerEntry> {
+	return Array.from({ length: count }, (_, index) => [
+		{ ...size(index + 1, 12, 300), missed: true },
+		merge(index + 1),
+	]).flat()
 }
 
 describe('lane_size_stats.table', () => {
@@ -61,7 +73,7 @@ describe('lane_size_stats.table', () => {
 describe('lane_size_stats.table pre-split misses', () => {
 	it('counts the missed merges and lists each with its declared and actual size', () => {
 		const missed = { ...size(1, 12, 300), missed: true }
-		const lines = lane_size_stats.table([missed, size(2, 2, 100), merge(1), merge(2)], WINDOW)
+		const lines = text_of([missed, size(2, 2, 100), merge(1), merge(2)], { is_all: false })
 
 		expect(lines.split('\n')).toStrictEqual([
 			'| measured lanes | files actual / declared median | lines actual / declared median | pre-split misses |',
@@ -75,9 +87,23 @@ describe('lane_size_stats.table pre-split misses', () => {
 	})
 
 	it('prints no miss table when no merge missed', () => {
-		expect(lane_size_stats.table([size(1, 2, 100), merge(1)], WINDOW)).not.toContain(
-			'pre-split miss |',
-		)
+		expect(text_of([size(1, 2, 100), merge(1)])).not.toContain('pre-split miss |')
+	})
+
+	// joshuafolkken/kit#7578: the miss list is capped by default, every row with --all.
+	it('lists the first MISS_ROWS misses and a count of the rest by default', () => {
+		const lines = text_of(missed_lanes(lane_size_stats.MISS_ROWS + 2), { is_all: false })
+
+		expect(lines).toContain(`| #${String(lane_size_stats.MISS_ROWS)} | 2 → 12 | 100 → 300 |`)
+		expect(lines).not.toContain(`| #${String(lane_size_stats.MISS_ROWS + 1)} |`)
+		expect(lines).toContain('… 2 more rows omitted')
+	})
+
+	it('lists every miss with --all', () => {
+		const lines = text_of(missed_lanes(lane_size_stats.MISS_ROWS + 2))
+
+		expect(lines).toContain(`| #${String(lane_size_stats.MISS_ROWS + 2)} | 2 → 12 | 100 → 300 |`)
+		expect(lines).not.toContain('omitted')
 	})
 })
 

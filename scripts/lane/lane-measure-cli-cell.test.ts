@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto'
 import path from 'node:path'
+import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { lane_core_wait_stats } from './lane-core-wait-stats'
 import { lane_ledger_write } from './lane-ledger-write'
 import { lane_measure_cli } from './lane-measure-cli'
 
@@ -102,5 +104,45 @@ describe('lane_measure_cli.run — value cell --where', () => {
 
 		await expect(lane_measure_cli.run(filtered, staged_context())).resolves.toBe(0)
 		expect(console.info).toHaveBeenCalledWith('0.00')
+	})
+})
+
+// joshuafolkken/kit#7578: `lane:stats` caps its per-lane tables unless `--all`; a cell read reads them
+// all, so a lane past the cap stays addressable.
+describe('lane_measure_cli.run — value cell past the row cap', () => {
+	const { LANE_ROWS } = lane_core_wait_stats
+
+	// One core-budget wait per lane, the last lane waited least, so it sorts past the cap.
+	function waited_context(): ReturnType<typeof fresh_context> {
+		const context = fresh_context()
+
+		for (let lane = 1; lane <= LANE_ROWS + 1; lane += 1) {
+			const waited_ms = (LANE_ROWS + 2 - lane) * MS_PER_SECOND
+
+			lane_ledger_write.append(context.ledger_path, {
+				kind: 'core-wait',
+				at: AT,
+				command: 'lint',
+				waited_ms,
+				issue: lane,
+			})
+		}
+
+		return context
+	}
+
+	it('reads a lane the default lane:stats table leaves out', async () => {
+		const address = ['--table', 'lane', '--row', String(LANE_ROWS + 1), '--column', 'waits']
+
+		await expect(
+			lane_measure_cli.run(['value', 'cell', '--since', SINCE, ...address], waited_context()),
+		).resolves.toBe(0)
+		expect(console.info).toHaveBeenCalledWith('1.00')
+	})
+
+	it('names --all in the lane:stats usage it prints', () => {
+		expect(lane_measure_cli.USAGE).toContain(
+			'josh lane:stats --period <days> [--limit <lane-limit>] [--all]',
+		)
 	})
 })

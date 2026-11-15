@@ -1,6 +1,7 @@
 import { lane_ledger, type CoreWaitEntry, type LedgerEntry } from './lane-ledger'
 import { lane_stage_stats } from './lane-stage-stats'
 import { lane_stats, type StatsWindow } from './lane-stats'
+import { lane_table_rows, type TableOptions } from './lane-table-rows'
 
 // How long each lane's commands waited for the core budget: the ledger's `core-wait` entries of one
 // period reduced to one row per lane, printed by `josh lane:stats` so a lane's time splits into work
@@ -8,6 +9,7 @@ import { lane_stats, type StatsWindow } from './lane-stats'
 // main checkout's — by its own row.
 
 const COLUMNS = ['lane', 'total (min)', 'median (min)', 'waits'] as const
+const LANE_ROWS = 10
 const OUTSIDE_A_LANE = 'outside a lane'
 const { NOT_MEASURED } = lane_stage_stats
 // A period with no wait: the table still prints, so a reader sees zero waits rather than no table.
@@ -49,18 +51,25 @@ function lanes_of(waits: ReadonlyArray<CoreWaitEntry>): Array<string> {
 	)
 }
 
-// The period's table: `entries` is the whole ledger, filtered here to `window`.
-function table(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): string {
+// The period's table: `entries` is the whole ledger, filtered here to `window`; at most `LANE_ROWS`
+// lanes unless `options` asks for all.
+function table(
+	entries: ReadonlyArray<LedgerEntry>,
+	window: StatsWindow,
+	options: TableOptions,
+): string {
 	const waits = lane_stats.in_window(entries, window).filter((entry) => is_core_wait(entry))
 	const rows = lanes_of(waits).map((lane) => lane_row(lane, waits))
 
 	return [
 		lane_stats.to_row(COLUMNS),
 		lane_stats.to_row(COLUMNS.map(() => '---')),
-		...(rows.length === 0 ? [lane_stats.to_row(NONE_ROW)] : rows),
+		...(rows.length === 0
+			? [lane_stats.to_row(NONE_ROW)]
+			: lane_table_rows.capped(rows, LANE_ROWS, options)),
 	].join('\n')
 }
 
-const lane_core_wait_stats = { table }
+const lane_core_wait_stats = { LANE_ROWS, table }
 
 export { lane_core_wait_stats }

@@ -1,0 +1,7 @@
+{
+	"reason": "#7578 adds the row cap helper and the --all flag for the per-lane lane:stats tables",
+	"date": "2026-11-15",
+	"growth": {
+		"scripts.code_lines": 51
+	}
+}

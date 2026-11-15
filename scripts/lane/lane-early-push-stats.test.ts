@@ -6,6 +6,7 @@ import { lane_ledger, type LedgerEntry } from './lane-ledger'
 import { lane_ledger_write } from './lane-ledger-write'
 import { lane_stats } from './lane-stats'
 import { lane_stats_tables } from './lane-stats-tables'
+import { lane_table_rows } from './lane-table-rows'
 
 const make_directory = temporary_directory('suite')
 
@@ -28,6 +29,7 @@ describe('lane early push decisions', () => {
 		const tables = lane_stats_tables.tables_of(
 			{ entries, events: [], calls: [] },
 			lane_stats.window_of(1, Date.now()),
+			lane_table_rows.ALL_ROWS,
 		)
 
 		expect(entries).toMatchObject([{ kind: KIND, source: SOURCE, result: REASON, issue: 6251 }])
