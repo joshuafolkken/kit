@@ -1,0 +1,7 @@
+{
+	"reason": "is_pending, public_body and labels_of read one record: the last record line outside a closed fence, so quoted prefixes and fenced examples are not records while an unclosed fence cannot hide the record (#7573)",
+	"date": "2026-11-15",
+	"growth": {
+		"scripts.code_lines": 41
+	}
+}

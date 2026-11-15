@@ -60,6 +60,43 @@ it('refuses corrupt and duplicate preparation records', () => {
 	expect(() => issue_publication_state.labels_of('<!-- josh:publication broken -->', [])).toThrow()
 })
 
+it('reads only a record line as pending, not the prefix quoted in prose or a code block', () => {
+	const inline = 'The record starts with `<!-- josh:publication `.'
+	const example = '<!-- josh:publication {"labels":["epic"]} -->'
+	const quoted = `${BODY}\n\n${inline}\n\n\`\`\`\n${example}\n\`\`\`\n\n~~~~\n${example}\n~~~~`
+	const prepared = issue_publication_state.prepare(quoted, ['run:lane'])
+
+	expect(issue_publication_state.is_pending(quoted)).toBe(false)
+	expect(issue_publication_state.is_pending(prepared)).toBe(true)
+	expect(issue_publication_state.public_body(prepared)).toBe(quoted)
+	expect(issue_publication_state.labels_of(prepared, [PLANNED])).toEqual([PLANNED])
+})
+
+it.each([
+	['an unclosed fence', '```ts\nconst x = 1'],
+	['a fence a different marker never closes', '````\n```\n~~~'],
+])('still reads the record appended after %s', (_case, fence) => {
+	const prepared = issue_publication_state.prepare(`${BODY}\n\n${fence}`, ['run:lane'])
+
+	expect(issue_publication_state.is_pending(prepared)).toBe(true)
+	expect(issue_publication_state.public_body(prepared)).toBe(`${BODY}\n\n${fence}`)
+})
+
+it('does not hold a published child that only quotes the record prefix', () => {
+	const body = `${BODY}\n\nQuoting \`<!-- josh:publication \` in the background.`
+	const child: EpicChild = {
+		number: NUMBER,
+		repo: REPO,
+		state: 'OPEN',
+		body,
+		labels: [],
+		blocked_by: [],
+	}
+
+	expect(epic_classify.classify_children([child]).time).toEqual([])
+	expect(epic_classify.classify_children([child]).runnable).toEqual([child])
+})
+
 it('withholds a prepared standalone child even if auto-ok is applied manually', () => {
 	const body = issue_publication_state.prepare(BODY, LABELS)
 	const issue = { ...auto_ok_fixture.issue(NUMBER, CREATED_EARLIER), body }
