@@ -1,7 +1,9 @@
+import { git_command } from '#scripts/git/git-command'
 import { git_worktree } from '#scripts/git/git-worktree'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { run_preflight } from '#scripts/run/run-preflight'
 
 // The tree sync every entry runs before its reads — `#N` (joshuafolkken/kit#5943) and `new`
 // (`--adopt`, joshuafolkken/kit#5747) — so no run issues it as commands of its own: pre-existing changes
@@ -60,8 +62,17 @@ async function step(argv: ReadonlyArray<string>): Promise<JoshResult> {
 	return await josh_command.josh_run(argv, should_forward_stderr)
 }
 
-async function sync_command(): Promise<string> {
-	return (await git_worktree.is_linked()) ? 'main:merge' : 'main:sync'
+// **A primary checkout on the issue's own branch merges, too** (joshuafolkken/kit#7543): the hold was
+// taken there to resume a returned pull request, and `main:sync` would check out the default branch
+// under it, so the fix would land on main instead of the pull request's branch.
+async function is_merged_in_place(issue_number: string): Promise<boolean> {
+	if (await git_worktree.is_linked()) return true
+
+	return run_preflight.is_issue_branch(await git_command.branch(), issue_number)
+}
+
+async function sync_command(issue_number: string): Promise<string> {
+	return (await is_merged_in_place(issue_number)) ? 'main:merge' : 'main:sync'
 }
 
 function stopped({ failed, kept, recommended, later }: StopText): EntryStop {
@@ -117,7 +128,8 @@ async function restore(message: string, is_stashed: boolean): Promise<EntryStop 
 	return verdict === CONFLICTED_VERDICT ? pop_conflicted(message) : pop_unmatched(message)
 }
 
-async function sync_tree(message: string): Promise<EntryStop | undefined> {
+async function sync_tree(entry: SyncEntry): Promise<EntryStop | undefined> {
+	const message = stash_message(entry)
 	const pushed = await step([STASH_PUSH, message])
 
 	if (pushed.code !== SUCCESS_EXIT_CODE) {
@@ -125,7 +137,7 @@ async function sync_tree(message: string): Promise<EntryStop | undefined> {
 	}
 
 	const is_stashed = verdict_of(pushed) === STASHED_VERDICT
-	const command = await sync_command()
+	const command = await sync_command(entry.issue_number)
 	const synced = await step([command])
 
 	if (synced.code === SUCCESS_EXIT_CODE) return await restore(message, is_stashed)
@@ -137,7 +149,7 @@ async function sync_tree(message: string): Promise<EntryStop | undefined> {
 async function sync(entry: SyncEntry): Promise<EntryStop | undefined> {
 	if (lane_child_marker.is_child_of(process.cwd())) return undefined
 
-	return await sync_tree(stash_message(entry))
+	return await sync_tree(entry)
 }
 
 const run_entry_sync = {

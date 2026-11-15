@@ -106,7 +106,7 @@ Four steps, in order: set the work aside — on `<issue>`'s own lane branch (`<i
 
 ## `josh run:hold` / `josh run:release` in detail
 
-**Output / exit codes:** stdout is one token; explanations go to stderr. `run:hold`: `hold`, `busy`, `reclaim` / `resume` / `park` (preflight found uncommitted work, an open PR or a branch with commits beyond the default branch or uncommitted changes in its lane, or a merged/closed PR; a branch with none of those is no leftover work), `unknown` (exit 1). `run:release`: `released`, `none`, or `held` (exit 1). A record over 8 hours old on a clean tree is replaced; on a dirty or unreadable one, `busy`. A `hold` answer is followed by the `josh run:tidy` sweep below, reported on stderr.
+**Output / exit codes:** stdout is one token; explanations go to stderr. `run:hold`: `hold`, `busy`, `reclaim` / `resume` / `park` (preflight found uncommitted work, an open PR or a branch with commits beyond the default branch or uncommitted changes in its lane, or a merged/closed PR; a branch with none of those is no leftover work; a clean tree already on the issue's own `<N>-*` branch is where the run resumes, so it takes the hold, and `resume` from the default branch names the `git switch` that gets there — or the `cd` into the lane directory when an open lane has the branch checked out), `unknown` (exit 1). `run:release`: `released`, `none`, or `held` (exit 1). A record over 8 hours old on a clean tree is replaced; on a dirty or unreadable one, `busy`. A `hold` answer is followed by the `josh run:tidy` sweep below, reported on stderr.
 
 ## `josh run:carry` in detail
 
