@@ -5,6 +5,7 @@ import { agent_session_environment } from '#scripts/josh/agent-session-environme
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { codex_hook_adapter } from './codex-hook-adapter'
+import { pretool_guard } from './pretool-guard'
 
 // joshuafolkken/kit#7607: a lane supervisor started from a Codex parent handed the parent's
 // `CODEX_THREAD_ID` to every child, and each child's hook priced that thread — 117,240 against the
@@ -77,6 +78,7 @@ function setup(): SessionFixture {
 
 afterEach(() => {
 	vi.unstubAllEnvs()
+	vi.restoreAllMocks()
 })
 
 describe('codex_hook_adapter.session_context — the hook prices its own thread', () => {
@@ -85,6 +87,19 @@ describe('codex_hook_adapter.session_context — the hook prices its own thread'
 		const context = codex_hook_adapter.session_context(edit_payload(OWN_THREAD))
 
 		expect(context.env['CODEX_THREAD_ID']).toBe(OWN_THREAD)
+	})
+
+	it("hands the guards the payload's session on the read-only pre-tool path", () => {
+		setup()
+		const guard = vi.spyOn(pretool_guard, 'pretool_outcome').mockReturnValue({
+			reason: undefined,
+			notice: undefined,
+			fault: undefined,
+		})
+
+		codex_hook_adapter.pretool_outcome(edit_payload(OWN_THREAD))
+
+		expect(guard.mock.calls[0]?.[1]?.env['CODEX_THREAD_ID']).toBe(OWN_THREAD)
 	})
 
 	it('keeps the inherited environment when the payload names no session', () => {
