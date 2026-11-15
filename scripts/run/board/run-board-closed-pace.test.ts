@@ -41,6 +41,18 @@ describe('run_board_closed_pace.closed_retry_ms', () => {
 		expect(closed_retry_ms(LANE_ENDED, [CHILD + 1], START, USUAL_MS)).toBe(USUAL_MS)
 		expect(closed_retry_ms(LOCAL, [CHILD], START, USUAL_MS)).toBe(USUAL_MS)
 	})
+
+	it('keeps the usual interval for a child whose lane was withdrawn', () => {
+		const withdrawn = {
+			...LOCAL,
+			lane_states: {
+				...LOCAL.lane_states,
+				ended: new Map([[CHILD, { ended_ms: START, by: 'lane:withdraw' }]]),
+			},
+		}
+
+		expect(closed_retry_ms(withdrawn, [CHILD], START, USUAL_MS)).toBe(USUAL_MS)
+	})
 })
 
 describe('run_board_closed_pace.ended_asked_states', () => {

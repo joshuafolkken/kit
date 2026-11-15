@@ -23,6 +23,8 @@ const FRESH_END_WINDOW_SECONDS = 120
 const FRESH_RETRY_SECONDS = 15
 const FRESH_END_WINDOW_MS = FRESH_END_WINDOW_SECONDS * MS_PER_SECOND
 const FRESH_RETRY_MS = FRESH_RETRY_SECONDS * MS_PER_SECOND
+// Only a closed lane is about to merge; a withdrawn one never closes its Issue.
+const CLOSING_END = 'lane:close'
 
 function has_asked_since_end(state: BoardState, ended_ms: number | undefined): boolean {
 	const { closed_answered_ms } = state
@@ -48,7 +50,7 @@ function ended_asked_states(
 function is_fresh_end(local: LocalRead, issue: number, now_ms: number): boolean {
 	const end = local.lane_states.ended?.get(issue)
 
-	return end !== undefined && now_ms - end.ended_ms <= FRESH_END_WINDOW_MS
+	return end?.by === CLOSING_END && now_ms - end.ended_ms <= FRESH_END_WINDOW_MS
 }
 
 // How long after the last closed read the next is due: sooner while a child it asks about has just had
