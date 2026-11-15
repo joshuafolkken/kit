@@ -12,6 +12,7 @@ import { lane_gap_stats } from './lane-gap-stats'
 import { lane_held_stats } from './lane-held-stats'
 import { lane_implement_rate } from './lane-implement-rate'
 import { lane_implement_read } from './lane-implement-read'
+import { lane_implement_read_calls } from './lane-implement-read-calls'
 import { lane_implement_stats } from './lane-implement-stats'
 import type { lane_ledger } from './lane-ledger'
 import { lane_paused_spans } from './lane-paused-spans'
@@ -50,6 +51,7 @@ function call_tables(
 	return [
 		lane_implement_stats.table(calls, window, paused),
 		lane_implement_read.table(calls, window, paused),
+		lane_implement_read_calls.table(calls, window, paused),
 		lane_turn_stats.table(entries, calls, window),
 	]
 }
