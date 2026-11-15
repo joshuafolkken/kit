@@ -2,6 +2,8 @@ import { fileURLToPath } from 'node:url'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { issue_lint_cli } from '#scripts/issue/issue-lint-cli'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
+import { issue_publication_state } from '#scripts/issue/issue-publication-state'
+import { session_cite } from '#scripts/issue/session-cite'
 import { size_estimate } from '#scripts/issue/size-estimate'
 import { cli_body } from '#scripts/josh/cli-body'
 import { cli_flags } from '#scripts/lib/cli-flags'
@@ -11,7 +13,7 @@ import { error_text } from '#scripts/lib/error-message'
 // passes `issue:lint`. `issue:plan` writes only a blank body, and a consultation session's hook refuses
 // every non-GET `gh api`, so a body rewrite had no route a session could run (joshuafolkken/kit#7002).
 // An epic body (`## Split rationale`) is not an issue-template body, so `issue:lint` does not judge it;
-// `epic:check` does.
+// `epic:check` does. An unpublished split child's publication record is carried over (#7571).
 const BODY_FILE_FLAG = '--body-file'
 const USAGE = `Usage: josh issue:body <issue-number> ${BODY_FILE_FLAG} <path>`
 const OPTIONS = { 'body-file': { type: 'string' } } as const
@@ -37,6 +39,18 @@ function request_of(argv: ReadonlyArray<string>): BodyRequest {
 	return { issue, body_path }
 }
 
+// A failed read is refused, not taken for a body with no publication record: writing over it could
+// drop an unpublished child's record.
+async function current_body(issue: string): Promise<string | undefined> {
+	const read = await git_gh_command.issue_get_body_classified(issue)
+
+	if (read.kind !== 'read') {
+		throw new Error(`Cannot read the current body of ${session_cite.issue(issue)}: ${read.kind}`)
+	}
+
+	return read.text
+}
+
 async function apply(request: BodyRequest): Promise<number> {
 	const body = cli_body.read_file_or_stdin(request.body_path)
 	const problems = size_estimate.is_epic(body) ? [] : issue_lint_cli.problems(body)
@@ -49,7 +63,9 @@ async function apply(request: BodyRequest): Promise<number> {
 		return FAILURE
 	}
 
-	console.info(await git_gh_command.issue_edit_body(request.issue, body))
+	const next = issue_publication_state.carried(await current_body(request.issue), body)
+
+	console.info(await git_gh_command.issue_edit_body(request.issue, next))
 
 	return SUCCESS
 }
