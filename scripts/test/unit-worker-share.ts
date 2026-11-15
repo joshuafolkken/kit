@@ -109,6 +109,26 @@ function own_run(): number {
 	return is_nested_run() ? 0 : SOLO_RUNS
 }
 
+// **A sharing run's admitted claim is not cut to the free cores** (joshuafolkken/kit#7551). Under
+// concurrency the claim is already this run's slice of the machine, admitted against the ledger and
+// the load. The free cores read afterwards count the other lanes' use beyond their claims and the load
+// average's trailing minute, so a two-worker share fell to one while the ledger kept the second core
+// held for nobody — `test:related` ran 38 s alone and 71 s beside three lanes with no core wait. The
+// gate's unit step is already bounded only by the free memory once admitted; so is this. A solo run and
+// a run with no claim keep both bounds.
+function admitted_capacity(
+	free: FreeCapacity,
+	claim: UnitClaim | undefined,
+	live_runs: number,
+	live_lanes: number,
+): FreeCapacity {
+	const is_sharing = sharing_runs(live_runs + own_run(), live_lanes) > SOLO_RUNS
+
+	if (claim === undefined || !is_sharing) return free
+
+	return { cores: undefined, memory_workers: free.memory_workers }
+}
+
 // The share this run may take, read from the machine. Separate from `resolve_unit_workers` so that
 // one stays a pure function of two numbers and every test of it can pass them.
 //
@@ -180,6 +200,7 @@ const unit_worker_share = {
 	...unit_run_marker,
 	...unit_lane_count,
 	MAIN_PROCESS_CORES,
+	admitted_capacity,
 	cap_to_capacity,
 	cap_to_claim,
 	cap_to_free,
