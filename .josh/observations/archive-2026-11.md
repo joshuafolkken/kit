@@ -5258,3 +5258,69 @@
 - rf:none | none | - | 2026-11-15 | #7534
 - rb:2026-11-15 | #7534
 - rf:none | none | - | 2026-11-15 | #7534
+- rf:none | none | - | 2026-11-15 | #7538
+- rf:none | none | - | 2026-11-15 | #7538
+- rb:2026-11-15 | #7539
+- rf:comments | low | scripts/hooks/pre-push-related-switch.ts:4 | 2026-11-15 | #7539 | fixed
+- rx:{"round":"56c30a2c-2390-476f-8d16-5b0de121fb5f","category":"comments","severity":"low","file":"scripts/hooks/pre-push-related-switch.ts:4","disposition":"fixed","description":"The reflowed comment strands \"by default. Its own module\" mid-paragraph; rewrap it.","status":"resolved"}
+- rb:2026-11-15 | #7540
+- rf:comments | low | docs/josh-commands-automation.md:851 | 2026-11-15 | #7540 | fixed
+- rx:{"round":"bea01eac-b9e6-47e1-b482-8e3b75ec22d0","category":"comments","severity":"low","file":"docs/josh-commands-automation.md:851","disposition":"fixed","description":"The release output sample omits the three new step-time lines printed before the PR line.","status":"resolved"}
+- rf:none | none | - | 2026-11-15 | #7543
+- ri:tests | low | scripts/run/entry/run-entry-sync.test.ts:85 | 2026-11-15 | #7543 | fixed
+- rb:2026-11-15 | #7543
+- rf:comments | low | docs/josh-commands-run.md:49 | 2026-11-15 | #7543 | fixed
+- rx:{"round":"a19058cb-2f2a-43c9-9177-5515ca300984","category":"comments","severity":"low","file":"docs/josh-commands-run.md:49","disposition":"fixed","description":"resume is documented as naming only the git switch, but a lane-held branch gets a cd into the lane instead (also the rationale doc line 109).","status":"resolved"}
+- rb:2026-11-15 | #7543
+- rf:comments | low | docs/josh-commands-run.md:49 | 2026-11-15 | #7543 | fixed
+- rx:{"round":"09c60fc1-66ef-4109-8665-0caeb2fa3be8","previous":"a19058cb-2f2a-43c9-9177-5515ca300984","category":"comments","severity":"low","file":"docs/josh-commands-run.md:49","disposition":"fixed","description":"resume is documented as naming only the git switch, but a lane-held branch gets a cd into the lane instead (also the rationale doc line 109).","status":"resolved"}
+- rf:project-conventions | low | scripts/josh/josh-commands-issue-write.ts:103 | 2026-11-15 | #7544
+- ri:bug-risks | low | scripts/josh/josh-commands-issue-write.ts:103 | 2026-11-15 | #7544 | fixed
+- rb:2026-11-15 | #7544
+- rf:project-conventions | low | docs/maintainers/josh-commands-backlog-rationale.md:64 | 2026-11-15 | #7544 | fixed
+- rf:i18n | low | scripts/issue/issue-lint-cli.ts:71 | 2026-11-15 | #7544 | fixed
+- rx:{"round":"5242881f-6e82-4fe2-9180-ee74659f11d8","category":"project-conventions","severity":"low","file":"docs/maintainers/josh-commands-backlog-rationale.md:64","disposition":"fixed","description":"The issue:lint detail still describes ok as headings plus the 種別 declaration and omits the leading ## 概要 the lint now requires.","status":"resolved"}
+- rx:{"round":"5242881f-6e82-4fe2-9180-ee74659f11d8","category":"i18n","severity":"low","file":"scripts/issue/issue-lint-cli.ts:71","disposition":"fixed","description":"In an en session the refusal cites the ## Summary section of issue-template.md, which only has ## 概要.","status":"resolved"}
+- rf:none | none | - | 2026-11-15 | #7548
+- ri:none | none | - | 2026-11-15 | #7548
+- rb:2026-11-15 | #7548
+- rf:bug-risks | medium | scripts/lane/lane-implement-read-calls.ts:47 | 2026-11-15 | #7548 | fixed
+- rx:{"round":"ce2a57ef-5fa2-44bf-b6e1-5d52f7f0a50f","category":"bug-risks","severity":"medium","file":"scripts/lane/lane-implement-read-calls.ts:47","disposition":"fixed","description":"a local leading-word reader cloned time_shell.leading_word without its assignment, wrapper and quoted-operator handling, so FOO=1 rg or timeout 60 rg named the wrong kind","status":"resolved"}
+- rf:bug-risks | low | scripts/lane/lane-concurrency-wait.ts:39 | 2026-11-15 | #7550
+- rf:none | none | - | 2026-11-15 | #7550
+- ri:none | none | - | 2026-11-15 | #7550
+- rb:2026-11-15 | #7550
+- rf:bug-risks | low | scripts/lane/lane-concurrency-wait.ts:39 | 2026-11-15 | #7550 | fixed
+- rx:{"round":"f1541bb6-e874-445a-8892-18670f9228b8","category":"bug-risks","severity":"low","file":"scripts/lane/lane-concurrency-wait.ts:39","disposition":"fixed","description":"Overlapping same-lane calls of one command would each sum the other call's core-wait records.","status":"resolved"}
+- rb:2026-11-15 | #7550
+- rf:bug-risks | medium | scripts/lane/lane-concurrency-stats.ts:118 | 2026-11-15 | #7550 | fixed
+- rf:comments | low | scripts/lane/lane-concurrency-stats.ts:13 | 2026-11-15 | #7550 | fixed
+- rx:{"round":"df982284-0085-4bb2-9273-5ca40973f916","category":"bug-risks","severity":"medium","file":"scripts/lane/lane-concurrency-stats.ts:118","disposition":"fixed","description":"Rivals are clipped to the period window, so a same-lane call started just before --since loses its core-wait record to an in-window call.","status":"resolved"}
+- rx:{"round":"df982284-0085-4bb2-9273-5ca40973f916","category":"comments","severity":"low","file":"scripts/lane/lane-concurrency-stats.ts:13","disposition":"fixed","description":"The header comment invites subtracting two medians taken over different call sets.","status":"resolved"}
+- rf:none | none | - | 2026-11-15 | #7551
+- rf:none | none | - | 2026-11-15 | #7552
+- ri:none | none | - | 2026-11-15 | #7552
+- rb:2026-11-15 | #7552
+- rf:bug-risks | medium | scripts/run/review/run-review-pinned-accepted.ts:151 | 2026-11-15 | #7552 | fixed
+- rx:{"round":"9a41321b-61f2-404b-92ec-423f920928ff","category":"bug-risks","severity":"medium","file":"scripts/run/review/run-review-pinned-accepted.ts:151","disposition":"fixed","description":"On a no-reason stop the check is cut at its first unpinned hunk, so hunks records 1 and not the real unpinned hunk count.","status":"resolved"}
+- rf:bug-risks | low | scripts/test/direct-importers.ts:22 | 2026-11-15 | #7554
+- rb:2026-11-15 | #7554
+- rf:tests | medium | scripts/test/lockfile-changed-packages.test.ts:68 | 2026-11-15 | #7554 | fixed
+- rf:comments | low | scripts/test/direct-importers.ts:121 | 2026-11-15 | #7554 | fixed
+- rx:{"round":"9a68a140-39f6-49ef-a83f-337a3ad98ef6","category":"tests","severity":"medium","file":"scripts/test/lockfile-changed-packages.test.ts:68","disposition":"fixed","description":"No test covers a runner dependency or a @vitest/-scoped package moving, so checking moved instead of reached, or dropping the scope entry, would pass every test.","status":"resolved"}
+- rx:{"round":"9a68a140-39f6-49ef-a83f-337a3ad98ef6","category":"comments","severity":"low","file":"scripts/test/direct-importers.ts:121","disposition":"fixed","description":"The test-files comment now sits above work_tree_files, which returns every file, and test_files has no comment.","status":"resolved"}
+- ri:none | none | - | 2026-11-15 | #7556
+- rb:2026-11-15 | #7556
+- rf:none | none | - | 2026-11-15 | #7556
+- rf:none | none | - | 2026-11-15 | #7557
+- ri:none | none | - | 2026-11-15 | #7557
+- rb:2026-11-15 | #7557
+- rf:bug-risks | low | scripts/run/board/run-board-closed-pace.ts:97 | 2026-11-15 | #7557 | fixed
+- rx:{"round":"eed89044-0cf6-467c-8208-a3870020a430","category":"bug-risks","severity":"low","file":"scripts/run/board/run-board-closed-pace.ts:97","disposition":"fixed","description":"is_fresh_end also fast-retries lanes ended by lane:withdraw, which will not merge; require end.by === 'lane:close'.","status":"resolved"}
+- rf:none | none | - | 2026-11-15 | #7566
+- rb:2026-11-15 | #7566
+- rf:bug-risks | medium | scripts/lane/lane-implement-stats.ts:78 | 2026-11-15 | #7566 | fixed
+- rf:bug-risks | low | scripts/lane/lane-implement-stats.ts:37 | 2026-11-15 | #7566 | fixed
+- rx:{"round":"5c7de25b-82dc-4c92-a442-1153c9d2a166","category":"bug-risks","severity":"medium","file":"scripts/lane/lane-implement-stats.ts:78","disposition":"fixed","description":"An open run:chain that stopped before run:review still flips the lane to review-fix, so the fix-and-rerun edits and checks after a stop are misfiled.","status":"resolved"}
+- rx:{"round":"5c7de25b-82dc-4c92-a442-1153c9d2a166","category":"bug-risks","severity":"low","file":"scripts/lane/lane-implement-stats.ts:37","disposition":"fixed","description":"run:chain in CHECK_COMMANDS also classes a joined chain as check, while the header names only an open chain.","status":"resolved"}
+- ri:comments | medium | docs/josh-commands-lane.md:255 | 2026-11-15 | #7566 | fixed
