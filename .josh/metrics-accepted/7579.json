@@ -1,7 +1,0 @@
-{
-	"reason": "split-cap.ts holds the guide and cap with no imports so lane:stats can count a pre-split miss only past the cap without an import cycle (#7579)",
-	"date": "2026-11-15",
-	"growth": {
-		"scripts.code_lines": 12
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "issue:body carries an unpublished child's publication record and refuses an unreadable current body (#7571)",
-	"date": "2026-11-15",
-	"growth": {
-		"scripts.code_lines": 22
-	}
-}

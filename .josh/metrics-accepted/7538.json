@@ -1,7 +1,0 @@
-{
-	"reason": "#7538 adds the version-only package.json narrowing (package-version-only.ts) and gathers the whole-suite file readings into whole-suite-narrowing.ts",
-	"date": "2026-11-15",
-	"growth": {
-		"scripts.code_lines": 55
-	}
-}

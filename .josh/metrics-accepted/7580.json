@@ -1,7 +1,0 @@
-{
-	"reason": "lane:stats stop wait also ends at a josh ship lap: Resume type and is_resume guard (#7580)",
-	"date": "2026-11-15",
-	"growth": {
-		"scripts.code_lines": 7
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "Issue #7552 adds the unpinned stop path and hunk count to the ledger stop record and threads it from the pinned check to lane:stats",
-	"date": "2026-11-15",
-	"growth": {
-		"scripts.code_lines": 49
-	}
-}

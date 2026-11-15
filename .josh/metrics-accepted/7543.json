@@ -1,7 +1,0 @@
-{
-	"reason": "#7543 preflight recognizes the issue's own branch and names the switch onto it, plus regression tests for the three paths",
-	"date": "2026-11-15",
-	"growth": {
-		"scripts.code_lines": 53
-	}
-}
