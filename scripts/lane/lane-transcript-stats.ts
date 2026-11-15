@@ -115,10 +115,14 @@ function share_cell(part: number, whole: number): string {
 	return `${String(part)} of ${String(whole)} (${((part / whole) * PERCENT).toFixed(1)}%)`
 }
 
-// The calls that ran the verification command `name` and no other, so each one's time is its own.
-function solo_calls(calls: ReadonlyArray<ToolCall>, name: string): Array<ToolCall> {
+// The calls that ran the command `name` and no other `commands_of` names, so each one's time is its own.
+function solo_calls(
+	calls: ReadonlyArray<ToolCall>,
+	name: string,
+	commands_of: (command?: string) => Array<string> = verification_commands,
+): Array<ToolCall> {
 	return calls.filter((call) => {
-		const named = verification_commands(call.command)
+		const named = commands_of(call.command)
 
 		return named.length === 1 && named[0] === name
 	})

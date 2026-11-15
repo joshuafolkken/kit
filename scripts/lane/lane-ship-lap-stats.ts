@@ -71,6 +71,6 @@ function table(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): string
 	return [...lane_check_stats.header(COLUMNS), ...rows].join('\n')
 }
 
-const lane_ship_lap_stats = { table }
+const lane_ship_lap_stats = { is_ship_lap, table }
 
 export { lane_ship_lap_stats }

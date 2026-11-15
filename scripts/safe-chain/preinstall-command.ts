@@ -30,6 +30,7 @@ const safe_chain_preinstall = {
 	LOCAL_INTEGRATION_CHECK_SOURCE,
 	INTEGRATION_HINT,
 	INSTALL_GUIDE_ANCHOR,
+	INSTALL_GUIDE_URL,
 	migrate_preinstall,
 }
 
