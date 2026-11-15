@@ -115,3 +115,33 @@ describe('lane_plan_probe.extend size signals', () => {
 		expect(signals_of).toHaveBeenCalledWith(LANE, paths)
 	})
 })
+
+describe('lane_plan_probe.sized_listing (joshuafolkken/kit#7596)', () => {
+	it('starts the size signals read before the listing is requested', async () => {
+		signals_of.mockClear()
+		fetch_opted_in.mockImplementationOnce(async () => {
+			expect(signals_of).toHaveBeenCalledWith(LANE, [PLANNED])
+
+			return await listing(DECLARED)
+		})
+
+		expect(await lane_plan_probe.sized_listing(LANE_PLAN, directory)).toMatchObject({
+			over: undefined,
+		})
+	})
+
+	it('leaves a failed signals read unused when the Issue declares no size', async () => {
+		signals_of.mockRejectedValueOnce(new Error('graph'))
+
+		expect(await lane_plan_probe.sized_listing(LANE_PLAN, directory)).toMatchObject({
+			over: undefined,
+		})
+	})
+
+	it('rethrows a failed signals read the size bar uses', async () => {
+		fetch_opted_in.mockResolvedValue(listing(DECLARED))
+		signals_of.mockRejectedValueOnce(new Error('graph'))
+
+		await expect(lane_plan_probe.sized_listing(LANE_PLAN, directory)).rejects.toThrow('graph')
+	})
+})
