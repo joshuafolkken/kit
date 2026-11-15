@@ -12,7 +12,7 @@ import { diff_summary } from './diff-summary'
 // in this worktree's own git directory, so it never shows as a working-tree change.
 // Exit 0, 2 when the base or the diff could not be read.
 
-const USAGE = 'usage: josh diff:summary [<base>]'
+const USAGE = 'Usage: josh diff:summary [<base>]'
 const NO_BASE = 'diff:summary: no change base — fetch the default branch, or name a base'
 const SAVED_NAME = 'josh-diff-summary.patch'
 const FAILED_EXIT = 2

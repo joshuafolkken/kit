@@ -19,7 +19,7 @@ const COMMAND_KEY_LENGTH = 12
 const FAILURE_EXIT_CODE = 1
 const SEPARATOR = '--'
 const FRESH_FLAG = '--fresh'
-const USAGE = 'usage: josh ship:evidence <N> [--fresh] -- <command...>'
+const USAGE = 'Usage: josh ship:evidence <N> [--fresh] -- <command...>'
 
 interface Evidence {
 	readonly issue: string

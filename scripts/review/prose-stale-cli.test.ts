@@ -12,7 +12,7 @@ describe('prose_stale_cli.run', () => {
 		const error = vi.spyOn(console, 'error').mockReturnValue(undefined)
 
 		expect(await prose_stale_cli.run(['--all'])).toBe(prose_stale_scan.FAILED_EXIT)
-		expect(error).toHaveBeenCalledWith('usage: josh prose:stale')
+		expect(error).toHaveBeenCalledWith('Usage: josh prose:stale')
 	})
 })
 

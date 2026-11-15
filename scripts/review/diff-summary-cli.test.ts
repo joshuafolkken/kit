@@ -13,6 +13,6 @@ describe('diff_summary_cli.guarded', () => {
 		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
 
 		expect(await diff_summary_cli.guarded(['a', 'b'])).toBe(2)
-		expect(error).toHaveBeenCalledWith('usage: josh diff:summary [<base>]')
+		expect(error).toHaveBeenCalledWith('Usage: josh diff:summary [<base>]')
 	})
 })

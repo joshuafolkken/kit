@@ -147,26 +147,26 @@ describe('josh gate --static-group', () => {
 	})
 
 	it('refuses a group the gate does not define', async () => {
-		const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true)
+		const error = vi.spyOn(console, 'error').mockReturnValue(undefined)
 
 		expect(await run_gate([`${gate_static_group.STATIC_GROUP_FLAG_PREFIX}nope`])).toBe(
 			USAGE_ERROR_EXIT_CODE,
 		)
 		expect(spawned_checks()).toEqual([])
-		stderr.mockRestore()
+		error.mockRestore()
 	})
 
 	// The accepted-here line is built from `STATIC_GROUPS`, so a group added there is offered here too.
 	it('names every group it accepts in the refusal', async () => {
-		const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true)
+		const error = vi.spyOn(console, 'error').mockReturnValue(undefined)
 		const groups = Object.keys(gate_static_group.STATIC_GROUPS).join('|')
 
 		await run_gate(['--nope'])
 
-		expect(stderr.mock.calls.map((call) => String(call[0])).join('')).toContain(
-			`${gate_static_group.STATIC_GROUP_FLAG_PREFIX}<${groups}>`,
+		expect(error).toHaveBeenCalledWith(
+			expect.stringContaining(`${gate_static_group.STATIC_GROUP_FLAG_PREFIX}<${groups}>`),
 		)
-		stderr.mockRestore()
+		error.mockRestore()
 	})
 })
 

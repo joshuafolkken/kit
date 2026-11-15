@@ -11,7 +11,7 @@ import { prose_stale_scan } from './prose-stale-scan'
 // The diff runs from the change base to the working tree, so an uncommitted edit counts. Exit 1 on a
 // reference, 2 when the base or a search could not be read.
 
-const USAGE = 'usage: josh prose:stale'
+const USAGE = 'Usage: josh prose:stale'
 const NO_BASE = 'prose:stale: no change base — fetch the default branch, then re-run'
 // `process.argv` holds the runtime and the script before the command's own arguments.
 const FIRST_ARGUMENT = 2

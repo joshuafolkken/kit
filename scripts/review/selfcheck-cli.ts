@@ -26,7 +26,7 @@ import { selfcheck_report, type Sections } from './selfcheck-report'
 // The diff runs from the change base to the working tree; an untracked file counts as wholly added.
 // Exit 0 pass, 1 a stale mention or a failed command, 2 when the base or a search could not be read.
 
-const USAGE = 'usage: josh review:selfcheck [--interaction-answered]'
+const USAGE = 'Usage: josh review:selfcheck [--interaction-answered]'
 const ANSWERED_FLAG = '--interaction-answered'
 const NO_ISSUE =
 	'review:selfcheck: the branch names no issue — the interaction answer is not recorded'

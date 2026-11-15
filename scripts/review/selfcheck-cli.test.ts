@@ -9,7 +9,7 @@ import { review_interaction } from './review-interaction'
 import { selfcheck_cli } from './selfcheck-cli'
 import { selfcheck_report } from './selfcheck-report'
 
-const USAGE_LINE = 'usage: josh review:selfcheck [--interaction-answered]'
+const USAGE_LINE = 'Usage: josh review:selfcheck [--interaction-answered]'
 const DUE = ['scripts/run/ship/x.ts']
 const ISSUE = 5832
 const make_directory = temporary_directory('suite')
