@@ -13,7 +13,9 @@ function line_of(outcome: ListingOutcome): string {
 
 function printed(outcomes: ReadonlyArray<ListingOutcome>): Array<string> {
 	const lines: Array<string> = []
-	const note = backlog_listing_trace.tracer((line) => lines.push(line))
+	const note = backlog_listing_trace.tracer((line) => {
+		lines.push(line)
+	})
 
 	for (const outcome of outcomes) note(outcome)
 
