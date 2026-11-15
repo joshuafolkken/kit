@@ -37,6 +37,8 @@ type CloseReason = 'completed' | 'not_planned' | 'duplicate'
 // object, so the same value is unwrapped out of it rather than the shape being changed.
 const HTML_URL_FILTER = '.html_url'
 const ID_FILTER = '.id'
+
+// One row of the labels listing, parsed client-side so the first page can go through the ETag layer.
 const label_schema = z.object({ name: z.string() })
 
 const LABELS_SEGMENT = '/labels'
