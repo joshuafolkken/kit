@@ -59,6 +59,7 @@ const VALUE_TAKING_GLOBALS: ReadonlySet<string> = new Set([
 	'--namespace',
 	'--exec-path',
 	'--super-prefix',
+	'--attr-source',
 	CONFIG_ENV,
 ])
 
@@ -198,13 +199,18 @@ function config_value(flag: string, next: string | undefined): string | undefine
 	return ATTACHED_CONFIG.exec(flag)?.[1]
 }
 
+// The git global options in front of the subcommand among the words after `git`, values included:
+// `-C p -c k=v status` gives `['-C', 'p', '-c', 'k=v']`.
+function globals_of(words: ReadonlyArray<string>): Array<string> {
+	return words.slice(0, after_globals(words))
+}
+
 function config_arguments_of(segment: string): Array<string> {
-	const words = arguments_of(segment, GIT_COMMAND) ?? []
+	const words = globals_of(arguments_of(segment, GIT_COMMAND) ?? [])
 	const values: Array<string> = []
-	const end = after_globals(words)
 	let index = 0
 
-	while (index < end) {
+	while (index < words.length) {
 		const flag = words[index] ?? ''
 		const value = config_value(flag, words[index + NEXT])
 
@@ -235,6 +241,7 @@ function short_cluster_has(token: string, letters: string): boolean {
 const git_argv = {
 	arguments_of,
 	config_arguments_of,
+	globals_of,
 	parse,
 	program_of,
 	short_cluster_has,
