@@ -4,15 +4,34 @@ import { AUTO_OK_LABEL, has_label_name } from './issue-labels'
 
 // A body record survives process termination without adding a workflow label or a user prohibition.
 // The record is an HTML comment starting its own line outside a fence: the prefix quoted inline or in
-// a code block is prose about the record, not one (joshuafolkken/kit#7573).
+// a code block is prose about the record, not one; `prepare` appends it, so the last one is the record
+// (joshuafolkken/kit#7573).
 const PREFIX = '<!-- josh:publication '
-const PATTERN = /^<!-- josh:publication (?<record>[^\n]*?) -->/mu
+const RECORDS = /^<!-- josh:publication (?<record>[^\n]*?) -->/gmu
 const RECORD_LINE = /^<!-- josh:publication /mu
-const FENCE = /^```[\s\S]*?^```/gmu
+const FENCE_LINE = /^ {0,3}(?:```|~~~)/u
 const schema = z.object({ labels: z.array(z.string()) })
 
+function unfenced(body: string): string {
+	let is_fenced = false
+
+	return body
+		.split('\n')
+		.filter((line) => {
+			const is_fence = FENCE_LINE.test(line)
+			if (is_fence) is_fenced = !is_fenced
+
+			return !is_fence && !is_fenced
+		})
+		.join('\n')
+}
+
 function is_pending(body = ''): boolean {
-	return RECORD_LINE.test(body.replaceAll(FENCE, ''))
+	return RECORD_LINE.test(unfenced(body))
+}
+
+function last_record(body: string): RegExpExecArray | undefined {
+	return [...unfenced(body).matchAll(RECORDS)].at(-1)
 }
 
 function prepare(body: string, labels: ReadonlyArray<string>): string {
@@ -22,11 +41,14 @@ function prepare(body: string, labels: ReadonlyArray<string>): string {
 }
 
 function public_body(body: string): string {
-	return body.replace(PATTERN, '').trimEnd()
+	const record = last_record(body)?.[0] ?? ''
+	const at = body.lastIndexOf(record)
+
+	return `${body.slice(0, at)}${body.slice(at + record.length)}`.trimEnd()
 }
 
 function intended_labels(body = ''): ReadonlyArray<string> {
-	const record = PATTERN.exec(body)?.groups?.['record']
+	const record = last_record(body)?.groups?.['record']
 
 	return schema.parse(JSON.parse(record ?? 'null')).labels
 }

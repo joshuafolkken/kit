@@ -62,11 +62,14 @@ it('refuses corrupt and duplicate preparation records', () => {
 
 it('reads only a record line as pending, not the prefix quoted in prose or a code block', () => {
 	const inline = 'The record starts with `<!-- josh:publication `.'
-	const quoted = `${BODY}\n\n${inline}\n\n\`\`\`\n<!-- josh:publication {} -->\n\`\`\``
-	const prepared = issue_publication_state.prepare(quoted, LABELS)
+	const example = '<!-- josh:publication {"labels":["epic"]} -->'
+	const quoted = `${BODY}\n\n${inline}\n\n\`\`\`\n${example}\n\`\`\`\n\n~~~~\n${example}\n~~~~`
+	const prepared = issue_publication_state.prepare(quoted, ['run:lane'])
 
 	expect(issue_publication_state.is_pending(quoted)).toBe(false)
 	expect(issue_publication_state.is_pending(prepared)).toBe(true)
+	expect(issue_publication_state.public_body(prepared)).toBe(quoted)
+	expect(issue_publication_state.labels_of(prepared, [PLANNED])).toEqual([PLANNED])
 })
 
 it('does not hold a published child that only quotes the record prefix', () => {
