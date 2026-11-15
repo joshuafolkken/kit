@@ -217,6 +217,15 @@ async function read_pull(pr_number: number): Promise<RestPull> {
 	return git_gh_pr_rest.parse_rest_pull(json)
 }
 
+// `read_pull` through the ETag layer, for a reader of `merged_at` and `body` alone: either moving
+// changes the ETag, so an unchanged pull request costs nothing (joshuafolkken/kit#7618). The merge
+// gate keeps `read_pull`: `mergeable_state` changes under an unchanged ETag (`git-gh-poll-read.ts`).
+async function read_pull_by_etag(pr_number: number): Promise<RestPull> {
+	const json = await git_gh_etag_read.read(git_gh_api_path.pull_api_path(String(pr_number)))
+
+	return git_gh_pr_rest.parse_rest_pull(json)
+}
+
 // The identity check keeps a failure from evicting a read that `forget_pr_numbers` already replaced.
 async function read_remembered_pull(pr_number: number): Promise<RestPull> {
 	const pending = pull_by_number.get(pr_number) ?? read_pull(pr_number)
@@ -429,6 +438,7 @@ export {
 	forget_pr_numbers,
 	read_listed_pull,
 	read_pull,
+	read_pull_by_etag,
 	read_pull_or_listed,
 	require_pr_number,
 	resolve_pr_number,
