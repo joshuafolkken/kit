@@ -12,8 +12,10 @@ import { lane_transcript_stats } from './lane-transcript-stats'
 // median over the period's lanes.
 //
 // **A lane's implement ends at its first `ship` or `run:chain --join --ship` call**, so a lane that never shipped in the period
-// has no implement here. **`review-fix` runs from `run:review` on** — the round's fixes and their scoped
-// checks; before it, an edit is `edit`, a scoped check or gate is `check`, and any other call is `plan`
+// has no implement here. **`review-fix` runs from `run:review` on, or from the call after an open
+// `run:chain`** (no `--join`), which runs `run:review` inside it (joshuafolkken/kit#7566) — the round's
+// reviewer, fixes and their scoped checks; before it, an edit is `edit`, a scoped check, gate or open
+// `run:chain` is `check`, and any other call is `plan`
 // before the first edit, `read` after it. **A session's first call spans its own duration**, so the gap
 // between two sessions of one lane is nobody's. **Nor is the time the lane stood paused**: a
 // `lane:pause` leaves the call in flight on the clock, so its overlap with the lane's paused spans is
@@ -32,6 +34,7 @@ const CHECK_COMMANDS: ReadonlySet<string> = new Set([
 	'gate',
 	LINT_RELATED,
 	'metrics',
+	'run:chain',
 	'test:pinned',
 	'test:related',
 ])
@@ -53,6 +56,7 @@ const COLUMNS = [
 interface Phase {
 	edited: boolean
 	reviewing: boolean
+	chained: boolean
 }
 
 // The latest end of the calls seen so far in one session; calls run side by side overlap.
@@ -71,11 +75,21 @@ function is_edit(call: ToolCall): boolean {
 	return EDIT_TOOLS.has(call.tool ?? '')
 }
 
-// The phase once `call` ran: an edit, or a review started, holds for the rest of the lane.
+function opens_chain(segment: string): boolean {
+	return (
+		lane_transcript_stats.josh_commands(segment).includes('run:chain') && !JOIN_FLAG.test(segment)
+	)
+}
+
+// The phase once `call` ran: an edit, or a review started, holds for the rest of the lane; an open
+// `run:chain` is its own `check` and starts the review from the next call.
 function next_phase(call: ToolCall, phase: Phase): Phase {
 	return {
 		edited: phase.edited || is_edit(call),
-		reviewing: phase.reviewing || runs_any(call, REVIEW_COMMANDS),
+		reviewing: phase.reviewing || phase.chained || runs_any(call, REVIEW_COMMANDS),
+		chained:
+			phase.chained ||
+			lane_transcript_stats.command_segments(call.command).some((segment) => opens_chain(segment)),
 	}
 }
 
@@ -124,7 +138,7 @@ function staged(
 	paused: ReadonlyArray<PausedSpan>,
 ): Array<StagedCall> {
 	const result: Array<StagedCall> = []
-	let phase: Phase = { edited: false, reviewing: false }
+	let phase: Phase = { edited: false, reviewing: false, chained: false }
 	let reach = NO_REACH
 
 	for (const call of calls) {
