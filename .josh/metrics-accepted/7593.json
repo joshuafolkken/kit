@@ -1,7 +1,7 @@
 {
-	"reason": "#7593: lane-scoped test:related needs the outer-command marker (outer-command.ts) and the CLI-entry scope switch; the lane refusal test moved to its own file to stay under max-lines",
+	"reason": "#7593: lane-scoped test:related needs the outer-command marker (outer-command.ts) and the CLI-entry scope switch; the brokered ship reviewer carries the ship's outer mark so its fix check keeps the full reach; the lane refusal test moved to its own file to stay under max-lines",
 	"date": "2026-11-15",
 	"growth": {
-		"scripts.code_lines": 50
+		"scripts.code_lines": 56
 	}
 }
