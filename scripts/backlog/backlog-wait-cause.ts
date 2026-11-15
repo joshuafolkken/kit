@@ -3,6 +3,7 @@ import type { EpicChild } from '#scripts/epic/epic-graph'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { has_label_name, IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
 import { issue_not_before } from '#scripts/issue/issue-not-before'
+import { issue_publication_state } from '#scripts/issue/issue-publication-state'
 
 // Why the backlog had nothing to offer while children ran (joshuafolkken/kit#4513): which waiting
 // issues wait on a dependency chain, and which on a declared start condition (a start date or a
@@ -15,17 +16,21 @@ import { issue_not_before } from '#scripts/issue/issue-not-before'
 // A waiting child with neither cause waits on a running lane: the overlap separation withheld it on a
 // path a running lane declares, or the `run:solo` gate withheld it (joshuafolkken/kit#7307). Left
 // unnamed, the hold read as its siblings' `gate` alone and listed none of those children.
+//
+// A child whose filing has not published yet (`issue-publication-state.ts`) waits on that publication,
+// not on a running lane (joshuafolkken/kit#7572).
 
-type WaitCause = 'chain' | 'gate' | 'lane'
+type WaitCause = 'chain' | 'gate' | 'publication' | 'lane'
 
 type WaitCauses = Readonly<Record<WaitCause, ReadonlyArray<number>>> & {
 	not_before_ms?: number
 }
 
-const CAUSES: ReadonlyArray<WaitCause> = ['chain', 'gate', 'lane']
+const CAUSES: ReadonlyArray<WaitCause> = ['chain', 'gate', 'publication', 'lane']
 const MARKS: Readonly<Record<WaitCause, string>> = {
 	chain: 'Waiting on a dependency chain:',
 	gate: 'Waiting on a start condition:',
+	publication: 'Waiting on publication:',
 	lane: 'Waiting on a running lane:',
 }
 const TAG_SEPARATOR = '+'
@@ -49,6 +54,7 @@ function has_pending_blocker(child: EpicChild): boolean {
 
 function cause_of(child: EpicChild): WaitCause | undefined {
 	if (has_label_name(child.labels, IN_PROGRESS_LABEL)) return undefined
+	if (issue_publication_state.is_pending(child.body)) return 'publication'
 	if (!issue_not_before.is_due(child.body)) return 'gate'
 
 	return has_pending_blocker(child) ? 'chain' : 'lane'
@@ -74,6 +80,7 @@ function classify(children: ReadonlyArray<EpicChild>, repo: string): WaitCauses 
 	return {
 		chain: numbers_with(here, 'chain'),
 		gate: numbers_with(here, 'gate'),
+		publication: numbers_with(here, 'publication'),
 		lane: numbers_with(here, 'lane'),
 		...deadline_of(here),
 	}
@@ -107,6 +114,7 @@ function parse(text: string): WaitCauses {
 	return {
 		chain: numbers_on(text, 'chain'),
 		gate: numbers_on(text, 'gate'),
+		publication: numbers_on(text, 'publication'),
 		lane: numbers_on(text, 'lane'),
 		...(Number.isFinite(not_before_ms) && { not_before_ms }),
 	}

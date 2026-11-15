@@ -1,5 +1,6 @@
 import { epic_cross_repo } from '#scripts/epic/epic-cross-repo'
 import type { EpicChild } from '#scripts/epic/epic-graph'
+import { issue_publication_state } from '#scripts/issue/issue-publication-state'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { backlog_wait_cause } from './backlog-wait-cause'
 
@@ -18,6 +19,9 @@ function child(number: number, overrides: Partial<EpicChild> = {}): EpicChild {
 
 const BLOCKER = { number: 1, repo: REPO }
 
+const NONE = { chain: [], gate: [], publication: [], lane: [] }
+const PENDING_BODY = issue_publication_state.prepare('## 背景\n', ['run:lane'])
+
 afterEach(() => {
 	vi.restoreAllMocks()
 })
@@ -33,6 +37,7 @@ describe('backlog_wait_cause.classify', () => {
 		]
 
 		expect(backlog_wait_cause.classify(children, REPO)).toStrictEqual({
+			...NONE,
 			chain: [10],
 			gate: [11],
 			lane: [13],
@@ -53,10 +58,24 @@ describe('backlog_wait_cause.classify', () => {
 		]
 
 		expect(backlog_wait_cause.classify(children, REPO)).toStrictEqual({
+			...NONE,
 			chain: [17],
-			gate: [],
 			lane: [15],
 		})
+	})
+})
+
+// joshuafolkken/kit#7572: a child whose filing has not published read as a running-lane wait.
+describe('backlog_wait_cause.classify — a publication wait', () => {
+	it('names a child whose filing has not published as a publication wait, not a lane one', () => {
+		const children = [
+			child(20, { body: PENDING_BODY }),
+			child(21, { body: `${PENDING_BODY}${FUTURE_BODY}`, blocked_by: [BLOCKER] }),
+		]
+		const causes = backlog_wait_cause.classify(children, REPO)
+
+		expect(causes).toStrictEqual({ ...NONE, publication: [20, 21] })
+		expect(backlog_wait_cause.lines_of(causes)).toStrictEqual(['Waiting on publication: #20 #21'])
 	})
 })
 
@@ -72,8 +91,8 @@ describe('backlog_wait_cause.classify — a cross-repo blocker', () => {
 		]
 
 		expect(backlog_wait_cause.classify(children, REPO)).toStrictEqual({
+			...NONE,
 			chain: [18],
-			gate: [],
 			lane: [19],
 		})
 	})
@@ -110,7 +129,7 @@ describe('backlog_wait_cause — the stderr line round trip', () => {
 	})
 
 	it('reads back the issues the lines name, linkified or not', () => {
-		const causes = { chain: [10, 12], gate: [11], lane: [13] }
+		const causes = { chain: [10, 12], gate: [11], publication: [14], lane: [13] }
 		const text = ['explanation', ...backlog_wait_cause.lines_of(causes)].join('\n')
 		const linked = text.replace('#11', '[#11](https://github.com/o/r/issues/11)')
 
@@ -118,30 +137,27 @@ describe('backlog_wait_cause — the stderr line round trip', () => {
 	})
 
 	it('writes no line for an empty cause and parses an unrelated text as empty', () => {
-		expect(backlog_wait_cause.lines_of({ chain: [], gate: [], lane: [] })).toStrictEqual([])
-		expect(backlog_wait_cause.parse('#12 is blocked by #11.')).toStrictEqual({
-			chain: [],
-			gate: [],
-			lane: [],
-		})
+		expect(backlog_wait_cause.lines_of(NONE)).toStrictEqual([])
+		expect(backlog_wait_cause.parse('#12 is blocked by #11.')).toStrictEqual(NONE)
 	})
 })
 
 describe('backlog_wait_cause.tag_of and numbers_of', () => {
 	it.each([
-		[{ chain: [10], gate: [], lane: [] }, 'chain'],
-		[{ chain: [], gate: [11], lane: [] }, 'gate'],
-		[{ chain: [10], gate: [11], lane: [] }, 'chain+gate'],
-		[{ chain: [], gate: [11], lane: [12] }, 'gate+lane'],
-		[{ chain: [], gate: [], lane: [] }, undefined],
+		[{ ...NONE, chain: [10] }, 'chain'],
+		[{ ...NONE, gate: [11] }, 'gate'],
+		[{ ...NONE, chain: [10], gate: [11] }, 'chain+gate'],
+		[{ ...NONE, gate: [11], lane: [12] }, 'gate+lane'],
+		[{ ...NONE, publication: [13], lane: [12] }, 'publication+lane'],
+		[NONE, undefined],
 	])('tags %j as %s', (causes, tag) => {
 		expect(backlog_wait_cause.tag_of(causes)).toBe(tag)
 	})
 
-	it('lists the chain issues, then the gate issues, then the running-lane ones', () => {
-		expect(backlog_wait_cause.numbers_of({ chain: [10], gate: [11], lane: [12] })).toStrictEqual([
-			10, 11, 12,
-		])
+	it('lists the chain, gate, publication and running-lane issues in that order', () => {
+		const causes = { chain: [10], gate: [11], publication: [13], lane: [12] }
+
+		expect(backlog_wait_cause.numbers_of(causes)).toStrictEqual([10, 11, 13, 12])
 	})
 })
 

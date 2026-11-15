@@ -46,6 +46,7 @@ const OFFER_TEXT: ReadonlyMap<string, string> = new Map([
 const CAUSE_TEXT: Readonly<Record<WaitCause, string>> = {
 	chain: 'other issues',
 	gate: 'a start condition',
+	publication: 'their publication',
 	lane: 'a running lane',
 }
 const CAUSE_JOINER = ' or '

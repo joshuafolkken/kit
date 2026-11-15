@@ -1,0 +1,7 @@
+{
+	"reason": "#7572 adds publication-pending as its own wait cause in backlog:next and a board wait reason",
+	"date": "2026-11-15",
+	"growth": {
+		"scripts.code_lines": 16
+	}
+}
