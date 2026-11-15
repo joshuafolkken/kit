@@ -1,3 +1,4 @@
+import { time_shell } from '#scripts/time-runtime/time-shell'
 import { lane_implement_read } from './lane-implement-read'
 import { lane_implement_stats } from './lane-implement-stats'
 import type { ImplementLane } from './lane-implement-subagents'
@@ -13,9 +14,7 @@ import { lane_transcript_stats } from './lane-transcript-stats'
 
 const BASH_TOOL = 'Bash'
 const AGENT_TOOL = 'Agent'
-const CHANGE_DIRECTORY = 'cd'
 const UNKNOWN = 'unknown'
-const WORD_PATTERN = /\s+/u
 const TOP_KINDS = 10
 const COLUMNS = [
 	'implement read by call',
@@ -36,14 +35,12 @@ interface KindRow {
 	total_ms: number
 }
 
-// The first word of each segment the shell `command` runs, a leading `cd` passed over.
+// The command `time_shell` reads at the command position — past assignments, wrappers and navigation
+// builtins such as `cd` — so the kinds match the per-command tables.
 function leading_word(command: string): string {
-	const words = lane_transcript_stats
-		.command_segments(command)
-		.map((segment) => segment.trim().split(WORD_PATTERN)[0] ?? '')
-		.filter((word) => word !== '')
+	const word = time_shell.leading_word(time_shell.unquoted(command))
 
-	return words.find((word) => word !== CHANGE_DIRECTORY) ?? words[0] ?? UNKNOWN
+	return word === '' ? UNKNOWN : word
 }
 
 function bash_kind(command = ''): string {

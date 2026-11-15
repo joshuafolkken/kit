@@ -42,6 +42,10 @@ function rows(calls: ReadonlyArray<ToolCall>): Array<string> {
 	return lane_implement_read_calls.table(calls, WINDOW, NO_PAUSE).split('\n').slice(2)
 }
 
+function kind_of_command(command: string): string {
+	return lane_implement_read_calls.kind_of(call(0, { command }))
+}
+
 describe('lane_implement_read_calls.kind_of', () => {
 	it('names a josh run by its subcommands', () => {
 		expect(
@@ -55,6 +59,12 @@ describe('lane_implement_read_calls.kind_of', () => {
 		expect(
 			lane_implement_read_calls.kind_of(call(0, { command: 'cd /repo && sed -n 1,2p a.ts' })),
 		).toBe('sed')
+	})
+
+	it('names a Bash command past assignments, wrappers and quoted operators', () => {
+		expect(kind_of_command('LC_ALL=C timeout 60 rg -n x src')).toBe('rg')
+		expect(kind_of_command('grep -n "a; b | c" file.ts')).toBe('grep')
+		expect(kind_of_command('cd /repo')).toBe('unknown')
 	})
 
 	it('names a subagent by its type and any other call by its tool', () => {
