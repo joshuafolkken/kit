@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({ comments: vi.fn(), pull: vi.fn(), api: vi.fn()
 vi.mock('#scripts/gh/git-gh-issue-read', () => ({
 	git_gh_issue_read: { issue_list_comments: mocks.comments },
 }))
-vi.mock('#scripts/gh/git-gh-pr-read', () => ({ read_pull: mocks.pull }))
+vi.mock('#scripts/gh/git-gh-pr-read', () => ({ read_pull_by_etag: mocks.pull }))
 vi.mock('#scripts/gh/git-gh-exec', () => ({ git_gh_exec: { exec_gh_api: mocks.api } }))
 vi.mock('./historical-log-evidence', () => ({ historical_log_evidence: { read: mocks.logs } }))
 

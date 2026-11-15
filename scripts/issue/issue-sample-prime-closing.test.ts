@@ -9,10 +9,13 @@ const CLOSING_PR = 5049
 const MERGED_AT = '2026-10-26T15:00:19Z'
 
 vi.mock('#scripts/gh/git-gh-pr-read', () => ({
-	read_pull: vi.fn(async () => ({ merged_at: MERGED_AT, body: `closes #${String(ISSUE)}` })),
+	read_pull_by_etag: vi.fn(async () => ({
+		merged_at: MERGED_AT,
+		body: `closes #${String(ISSUE)}`,
+	})),
 }))
 
-const { read_pull } = await import('#scripts/gh/git-gh-pr-read')
+const { read_pull_by_etag } = await import('#scripts/gh/git-gh-pr-read')
 const { issue_sample_prime } = await import('./issue-sample-prime')
 
 afterEach(() => {
@@ -27,7 +30,7 @@ describe('issue_sample_prime.read_closing', () => {
 			merged_at: MERGED_AT,
 			closes: ISSUE,
 		})
-		expect(read_pull).toHaveBeenCalledWith(CLOSING_PR)
+		expect(read_pull_by_etag).toHaveBeenCalledWith(CLOSING_PR)
 	})
 
 	it('reads as unmerged when no pull request closes the issue yet', async () => {

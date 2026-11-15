@@ -1,11 +1,20 @@
 import { gh_author_association } from '#scripts/gh/gh-author-association'
-import { git_gh_exec } from '#scripts/gh/git-gh-exec'
+import { git_gh_conditional } from '#scripts/gh/git-gh-conditional'
+import { git_gh_etag_read } from '#scripts/gh/git-gh-etag-read'
+import { shared_cache_fixture } from '#scripts/josh/shared-cache-fixture'
 import { lane_early_push_count } from '#scripts/lane/lane-early-push-count'
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { issue_observation_fixture as fixture } from './issue-observation-fixture'
 import { issue_observation_gate } from './issue-observation-gate'
 import { issue_observation_prime } from './issue-observation-prime'
 import { issue_sample_prime } from './issue-sample-prime'
+
+const COMMENT_PATH = 'repos/joshuafolkken/kit/issues/comments/123'
+const ETAG = 'W/"comment"'
+
+beforeEach(() => {
+	shared_cache_fixture.keep_in_memory()
+})
 
 afterEach(() => {
 	vi.restoreAllMocks()
@@ -13,7 +22,7 @@ afterEach(() => {
 })
 
 function serve_comment(): void {
-	vi.spyOn(git_gh_exec, 'exec_gh_api').mockResolvedValue(
+	vi.spyOn(git_gh_etag_read, 'read').mockResolvedValue(
 		JSON.stringify({
 			body: fixture.comment(fixture.KEYS),
 			html_url: fixture.URL,
@@ -27,9 +36,28 @@ it('primes observation facts through the existing shared primer without a merge 
 	serve_comment()
 	await issue_sample_prime.prime([fixture.BODY])
 	expect(issue_observation_gate.wait_of(fixture.BODY)).toBeUndefined()
-	expect(git_gh_exec.exec_gh_api).toHaveBeenCalledWith({
-		path: 'repos/joshuafolkken/kit/issues/comments/123',
+	expect(git_gh_etag_read.read).toHaveBeenCalledWith(COMMENT_PATH)
+})
+
+// joshuafolkken/kit#7618: the comment read goes through the ETag layer, so an unchanged comment
+// answers from the kept body.
+it('reads an unchanged evidence comment from the previous body on a 304', async () => {
+	const body = JSON.stringify({
+		body: fixture.comment(fixture.KEYS),
+		html_url: fixture.URL,
+		author_association: 'OWNER',
+		user: { login: 'owner' },
 	})
+	const conditional = vi
+		.spyOn(git_gh_conditional, 'read_conditional')
+		.mockResolvedValueOnce({ kind: 'changed', etag: ETAG, body })
+		.mockResolvedValueOnce({ kind: 'unchanged' })
+
+	await issue_observation_prime.prime([fixture.BODY])
+	issue_observation_gate.reset()
+	await issue_observation_prime.prime([fixture.BODY])
+	expect(issue_observation_gate.wait_of(fixture.BODY)).toBeUndefined()
+	expect(conditional).toHaveBeenLastCalledWith(COMMENT_PATH, ETAG, undefined)
 })
 
 it('reads each source once per prime and rechecks previously satisfied evidence', async () => {
@@ -75,7 +103,7 @@ it('withholds an unreadable or untrusted evidence comment', async () => {
 	vi.spyOn(gh_author_association, 'is_trusted').mockResolvedValue(false)
 	await issue_observation_prime.prime([fixture.BODY])
 	expect(issue_observation_gate.wait_of(fixture.BODY)?.reason).toContain('unread')
-	vi.mocked(git_gh_exec.exec_gh_api).mockResolvedValue('invalid json')
+	vi.mocked(git_gh_etag_read.read).mockResolvedValue('invalid json')
 	await issue_observation_prime.prime([fixture.BODY])
 	expect(issue_observation_gate.wait_of(fixture.BODY)?.reason).toContain('unread')
 })

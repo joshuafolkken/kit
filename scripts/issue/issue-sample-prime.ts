@@ -1,7 +1,7 @@
 import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_rest } from '#scripts/gh/git-gh-issue-rest'
-import { read_pull } from '#scripts/gh/git-gh-pr-read'
+import { read_pull_by_etag } from '#scripts/gh/git-gh-pr-read'
 import { git_gh_pr_too_large } from '#scripts/gh/git-gh-pr-too-large'
 import { git_closes_keyword } from '#scripts/git/git-closes-keyword'
 import { lane_ledger, type MergeEntry } from '#scripts/lane/lane-ledger'
@@ -43,7 +43,7 @@ async function read_as_issue(pr: number): Promise<PullFields> {
 
 async function read_fields(pr: number): Promise<PullFields> {
 	try {
-		return await read_pull(pr)
+		return await read_pull_by_etag(pr)
 	} catch (error) {
 		if (!git_gh_pr_too_large.is_too_many_files(error)) throw error
 
