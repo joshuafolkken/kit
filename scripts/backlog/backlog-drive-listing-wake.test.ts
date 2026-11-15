@@ -5,9 +5,11 @@ import { shared_cache_fixture } from '#scripts/josh/shared-cache-fixture'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { backlog_drive_fixture } from './backlog-drive-fixture'
 import { backlog_drive_listing } from './backlog-drive-listing'
-import type { ListingOutcome } from './backlog-listing-trace'
+import { backlog_listing_trace, type ListingOutcome } from './backlog-listing-trace'
 import { backlog_next_shared } from './backlog-next-shared'
+import { backlog_offer_timing } from './backlog-offer-timing'
 
 // joshuafolkken/kit#7583: a published issue changed the `auto-ok` listing and woke the waiting driver,
 // but its ask replayed the minute-kept `backlog:next` answer from before the publish, and the change,
@@ -84,5 +86,32 @@ describe('backlog_drive_listing.watcher — the traced outcome', () => {
 		await is_changed()
 
 		expect(note.mock.calls).toStrictEqual([['unchanged'], ['changed'], ['failed']])
+	})
+})
+
+describe('backlog_offer_timing.is_due — the traced full pool', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('traces a check a full pool skips', async () => {
+		const { CONFIG, harness, state } = backlog_drive_fixture
+		const note = vi.spyOn(backlog_listing_trace, 'drive').mockImplementation(() => undefined)
+		const { ports } = harness({})
+		const due_ports = {
+			...ports,
+			free_lanes: async (): Promise<number> => 0,
+			listing_changed: async (): Promise<boolean> => true,
+		}
+		const run = {
+			...backlog_offer_timing.first_run(state([String(LISTED)]), 0),
+			offered_ms: 0,
+			checked_ms: 0,
+		}
+
+		await expect(
+			backlog_offer_timing.is_due(run, CONFIG, due_ports, CONFIG.check_ms),
+		).resolves.toBe(false)
+		expect(note).toHaveBeenCalledExactlyOnceWith('no-free-lane')
 	})
 })
