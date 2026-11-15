@@ -59,6 +59,7 @@ const VALUE_TAKING_GLOBALS: ReadonlySet<string> = new Set([
 	'--namespace',
 	'--exec-path',
 	'--super-prefix',
+	'--attr-source',
 	CONFIG_ENV,
 ])
 

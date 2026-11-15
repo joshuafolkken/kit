@@ -19,6 +19,7 @@ const REFUSED: ReadonlyArray<readonly [string, string]> = [
 	["git '-c' k=v status", WRITE_FLAG],
 	["git -C 'my dir' -c core.fsmonitor=x status", WRITE_FLAG],
 	['git -C "my dir" --exec-path=x status', WRITE_FLAG],
+	['git --attr-source HEAD -c core.fsmonitor=x status', WRITE_FLAG],
 	['git diff --output=f', WRITE_FLAG],
 	['git log --ext-diff', WRITE_FLAG],
 	['git show --textconv', WRITE_FLAG],

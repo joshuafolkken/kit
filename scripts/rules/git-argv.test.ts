@@ -89,27 +89,17 @@ describe('git_argv.arguments_of', () => {
 	})
 })
 
+// The words after `git`, and how many of them are globals in front of the subcommand, values included.
+const GLOBALS: ReadonlyArray<readonly [string, ReadonlyArray<string>, number]> = [
+	['a -C <path> and a -c key=value', ['-C', 'p', '-c', 'k=v', 'status'], 4],
+	['a spaced value as one word', ['-C', 'my dir', 'status'], 2],
+	['an --attr-source <tree> value', ['--attr-source', 'HEAD', 'status'], 2],
+	['none when a -c follows the subcommand', ['grep', '-c', 'x'], 0],
+]
+
 describe('git_argv.globals_of', () => {
-	it('returns the globals in front of the subcommand, values included', () => {
-		expect(git_argv.globals_of(['-C', 'p', '-c', 'k=v', 'status'])).toStrictEqual([
-			'-C',
-			'p',
-			'-c',
-			'k=v',
-		])
-	})
-
-	it('returns none when a -c follows the subcommand', () => {
-		expect(git_argv.globals_of(['grep', '-c', 'x'])).toStrictEqual([])
-	})
-
-	it('keeps a spaced value as one word', () => {
-		expect(git_argv.globals_of(['-C', 'my dir', '-c', 'k=v', 'status'])).toStrictEqual([
-			'-C',
-			'my dir',
-			'-c',
-			'k=v',
-		])
+	it.each(GLOBALS)('returns %s', (_name, words, count) => {
+		expect(git_argv.globals_of(words)).toStrictEqual(words.slice(0, count))
 	})
 })
 
