@@ -8,6 +8,7 @@ import { change_base } from '#scripts/git/change-base'
 import { git_branch } from '#scripts/git/git-branch'
 import { git_command } from '#scripts/git/git-command'
 import { git_spawn } from '#scripts/git/git-spawn'
+import { cli_flags } from '#scripts/lib/cli-flags'
 import { COMMAND_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import type { Hunk } from '#scripts/test/test-pinned-logic'
@@ -158,6 +159,7 @@ async function report_change(base: string, is_answered: boolean): Promise<number
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const flags = argv.join(' ')
 
+	if (cli_flags.is_help_request(argv)) return cli_flags.answer_usage(argv, USAGE)
 	if (!['', ANSWERED_FLAG].includes(flags)) return refuse(USAGE)
 
 	const base = await change_base.resolved()

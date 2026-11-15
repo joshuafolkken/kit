@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { change_base } from '#scripts/git/change-base'
 import { git_command } from '#scripts/git/git-command'
 import { git_spawn } from '#scripts/git/git-spawn'
+import { cli_flags } from '#scripts/lib/cli-flags'
 import { diff_summary } from './diff-summary'
 
 // `josh diff:summary [<base>]` — the diff from `<base>` (default: the change base) to the working tree
@@ -53,6 +54,7 @@ async function summarize(base: string): Promise<string> {
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
+	if (cli_flags.is_help_request(argv)) return cli_flags.answer_usage(argv, USAGE)
 	if (argv.length > MAX_ARGUMENTS) return refuse(USAGE)
 
 	const base = argv[0] ?? (await change_base.resolved())

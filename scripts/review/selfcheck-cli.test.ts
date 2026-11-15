@@ -52,6 +52,18 @@ describe('selfcheck_cli.run', () => {
 		)
 		expect(error).toHaveBeenCalledWith(USAGE_LINE)
 	})
+
+	it.each(['--help', '-h'])(
+		'prints the usage and succeeds for %s, before reading git',
+		async (flag) => {
+			const info = vi.spyOn(console, 'info').mockReturnValue(undefined)
+			const resolved = vi.spyOn(change_base, 'resolved')
+
+			expect(await selfcheck_cli.run([flag])).toBe(0)
+			expect(info).toHaveBeenCalledWith(USAGE_LINE)
+			expect(resolved).not.toHaveBeenCalled()
+		},
+	)
 })
 
 // joshuafolkken/kit#5832: a passing, due self-check run with `--interaction-answered` records the
