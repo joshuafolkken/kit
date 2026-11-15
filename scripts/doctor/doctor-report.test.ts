@@ -4,6 +4,7 @@ import { pnpm_reach } from '#scripts/lib/pnpm-reach'
 import { auto_merge_setting } from '#scripts/repo/auto-merge-setting'
 import type { RequiredChecksReport } from '#scripts/repo/required-checks-report'
 import { ruleset_check } from '#scripts/repo/ruleset-check'
+import { safe_chain_local_version } from '#scripts/safe-chain/local-version'
 import { security_updates } from '#scripts/security/security-updates'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { doctor } from './doctor'
@@ -47,6 +48,8 @@ function stub_doctor_io(): void {
 	// Stubbed rather than left to call through: without this the suite would scan the real parent
 	// directory of the checkout it runs in, making the result depend on the machine.
 	vi.spyOn(repo_discovery, 'discover_repositories').mockReturnValue(new Map())
+	// Stubbed so the suite never spawns the machine's own `safe-chain --version`.
+	vi.spyOn(safe_chain_local_version, 'report_local_version').mockReturnValue(undefined)
 }
 
 beforeEach(() => {
@@ -116,6 +119,19 @@ function printed_lines(): Array<string> {
 
 // joshuafolkken/kit#3712: a gate run without `pnpm` on its PATH failed every check with nothing
 // printed; `doctor` is where a user can learn it first.
+// joshuafolkken/kit#7597: a safe-chain too old to read the `.aikido` age exclusions is reported.
+describe('josh doctor — the local safe-chain version', () => {
+	it('runs the safe-chain version check', () => {
+		const report = vi
+			.spyOn(safe_chain_local_version, 'report_local_version')
+			.mockReturnValue(undefined)
+
+		doctor.main()
+
+		expect(report).toHaveBeenCalledOnce()
+	})
+})
+
 describe('josh doctor — whether pnpm can be started', () => {
 	it('prints the version of the pnpm this process reaches, and no warning', () => {
 		const lines = printed_lines()

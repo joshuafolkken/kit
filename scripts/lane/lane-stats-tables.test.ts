@@ -37,6 +37,7 @@ const FIRST_HEADER_CELLS = [
 	'test:related scope',
 	'test:related whole-suite trigger',
 	'transcript metric',
+	'recording command',
 	'concurrent lanes',
 ]
 

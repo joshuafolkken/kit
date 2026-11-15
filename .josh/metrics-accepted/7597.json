@@ -1,0 +1,7 @@
+{
+	"reason": "joshuafolkken/kit#7597: josh doctor gains a safe-chain version check (new scripts/safe-chain/local-version.ts) warning when the local safe-chain predates 1.5.15 and ignores the .aikido age exclusions",
+	"date": "2026-11-15",
+	"growth": {
+		"scripts.code_lines": 44
+	}
+}

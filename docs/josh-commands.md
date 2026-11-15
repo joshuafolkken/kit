@@ -846,6 +846,8 @@ pnpm josh doctor --ports   # also print the per-repository port-seed table
 
 It reports the running binary, the `josh` first on `PATH` and the pnpm-global install; in a kit consumer it adds a **Consumer setup** section and repository settings, including the [`josh ruleset:check`](josh-commands-automation.md#josh-rulesetcheck) report. None of these fails the command or changes a setting.
 
+It also warns when the `safe-chain` on `PATH` is older than 1.5.15, which ignores the `.aikido` age exclusions `josh sync` copies from `minimumReleaseAgeExclude`.
+
 Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh doctor` in detail".
 
 #### The discovered repository map
