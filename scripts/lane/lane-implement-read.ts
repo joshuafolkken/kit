@@ -80,10 +80,15 @@ function sum(values: ReadonlyArray<number>): number {
 	return values.reduce((total, value) => total + value, 0)
 }
 
-function breakdown(lane: ImplementLane): ReadBreakdown {
-	const reads = lane_implement_stats
+// The lane's implement calls put to the `read` sub-stage.
+function read_calls(lane: ImplementLane): Array<StagedCall> {
+	return lane_implement_stats
 		.staged(lane.calls, lane.paused)
 		.filter((entry) => entry.stage === READ_STAGE)
+}
+
+function breakdown(lane: ImplementLane): ReadBreakdown {
+	const reads = read_calls(lane)
 	const tool = sum(reads.map((entry) => tool_ms(entry)))
 	const files = files_read(reads)
 	const cited = cited_paths(lane.calls)
@@ -124,6 +129,6 @@ function table(calls: ReadonlyArray<ToolCall>, window: StatsWindow, paused: Paus
 	].join('\n')
 }
 
-const lane_implement_read = { table }
+const lane_implement_read = { read_calls, sum, table, tool_ms }
 
 export { lane_implement_read }

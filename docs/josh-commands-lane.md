@@ -255,9 +255,9 @@ Under the stage table, the implement stage is broken down from the lane transcri
 (`lane-implement-stats.ts`): `plan` before the first edit, then `read`, `edit`, `check` (a scoped check or gate) and
 `review-fix` from `run:review` on, each call's span counted from the previous call's end, less its `lane:pause` time.
 
-The `implement read` table under it splits `read` by lane medians (`lane-implement-read.ts`): the calls' own run time
-(`tool`), the turns before them (`thinking`), the distinct files `Read` opened (`files read`), and how many of those an
-investigator's report cited by `path:line` (`investigator-cited`).
+`implement read` (`lane-implement-read.ts`) splits `read` by lane medians: `tool` run time, `thinking` before calls,
+distinct `files read`, and those an investigator cited by `path:line`. `implement read by call`
+(`lane-implement-read-calls.ts`) splits its tool time by kind, the ten largest totals first.
 
 The `stage turns` table (`lane-turn-stats.ts`) groups period-dispatched lanes' calls by ledger interval:
 `implement` until the first ship stage (open until then), the shortest stage holding a call, or `between stages`.

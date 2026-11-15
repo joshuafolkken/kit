@@ -208,6 +208,12 @@ Open and close a lane: one linked git work tree with its own branch and its own 
 
 Measure a lane limit: a per-repository ledger holds merges, gates, each lane's dispatch, ship stages and ship stops, and the machine load `backlog:drive` samples while it runs (`lane:sample [--every <seconds>]` takes a reading outside a run); `lane:stats --period <days> [--limit <n> | --sinks [<minutes>]]` prints a period as one table row, under it the median and maximum of each stage of a lane, and under those how long a stopped `josh ship` waited to resume, per stop reason. Procedure and columns: [lane-limit-measurement.md](./lane-limit-measurement.md).
 
+The `implement read by call` table (`lane-implement-read-calls.ts`) splits the `read` tool time by call kind, the ten largest totals first:
+
+- a josh run: `josh <subcommand>`, several joined by `+`
+- another Bash command: its leading word past a `cd`
+- a subagent: `Agent:<type>`; any other call: its tool name
+
 The gap table (`lane-gap-stats.ts`) times each wait on the lane machinery rather than on work. Its `start → first lane` row runs from a `backlogrun` session's `starting session` to its first `opening lane`, read off the run-event stream (`run_event_setup.first_lane_spans`); `run:board` draws the newest session's span as `🛫` on the header's first line, once that first opening began.
 
 Under its `yield → redispatch` row, four rows split each yield by where its wait went (`lane-yield-split.ts`, joshuafolkken/kit#5984):
