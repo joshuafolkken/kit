@@ -57,8 +57,11 @@ const LIST_MODE =
 // List flags whose value is the next word, so the value is not read as a new ref's name.
 const LIST_VALUE_FLAGS: ReadonlySet<string> = new Set(['--sort', '--format'])
 const REFLOG_WRITES: ReadonlySet<string> = new Set(['expire', 'delete'])
-// A global that rewrites git's configuration or launcher, or an option that writes a file or runs one.
-const GIT_WRITE_FLAGS = /^-c$|^--(?:config-env|exec-path|output|ext-diff|textconv)/u
+// A global that rewrites git's configuration or launcher. Read only in front of the subcommand: after
+// it, `-c` is `git grep -c` (a count) or `git log -c` (a combined diff) (joshuafolkken/kit#7574).
+const GIT_GLOBAL_WRITE_FLAGS = /^-c|^--(?:config-env|exec-path)/u
+// An option that writes a file or runs a program, read wherever it stands.
+const GIT_OPTION_WRITE_FLAGS = /^--(?:output|ext-diff|textconv)/u
 const QUOTES = /['"\\]/gu
 
 function is_branch_change(argument: string): boolean {
@@ -115,8 +118,18 @@ function subcommand_refusal(segment: string): Refusal {
 	return is_git_write(subcommand, args) ? `\`git ${subcommand}\`, a git write` : undefined
 }
 
+// A quoted global runs as the bare one: `git '-c' k=v status` is `git -c k=v status`.
+function has_write_flag(segment: string, args: ReadonlyArray<string>): boolean {
+	const globals = git_argv.globals_of(segment.replaceAll(QUOTES, ''))
+
+	return (
+		globals.some((word) => GIT_GLOBAL_WRITE_FLAGS.test(word)) ||
+		args.some((argument) => GIT_OPTION_WRITE_FLAGS.test(argument))
+	)
+}
+
 function refusal(segment: string, args: ReadonlyArray<string>): Refusal {
-	if (args.some((argument) => GIT_WRITE_FLAGS.test(argument))) {
+	if (has_write_flag(segment, args)) {
 		return 'a git option that rewrites its configuration, runs a program or writes a file'
 	}
 

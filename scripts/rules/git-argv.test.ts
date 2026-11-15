@@ -89,6 +89,20 @@ describe('git_argv.arguments_of', () => {
 	})
 })
 
+describe('git_argv.globals_of', () => {
+	it('returns the globals in front of the subcommand, values included', () => {
+		expect(git_argv.globals_of('git -C p -c k=v status')).toStrictEqual(['-C', 'p', '-c', 'k=v'])
+	})
+
+	it('returns none when a -c follows the subcommand', () => {
+		expect(git_argv.globals_of('git grep -c x')).toStrictEqual([])
+	})
+
+	it('returns none for a non-git segment', () => {
+		expect(git_argv.globals_of('grep -c x')).toStrictEqual([])
+	})
+})
+
 describe('git_argv.short_cluster_has', () => {
 	it('finds a letter bundled in a single-dash cluster', () => {
 		expect(git_argv.short_cluster_has('-uf', 'f')).toBe(true)

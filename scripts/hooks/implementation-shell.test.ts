@@ -9,6 +9,7 @@ const INSTALL = '`install`, a dependency change'
 const STDIN_SHELL = 'a shell running the commands its standard input spells'
 const UNREAD_BODY = 'a `case` arm or function body'
 const RM_RUNTIME = '`rm` to a runtime path'
+const CONFIG_REWRITE = 'rewrites its configuration'
 
 // joshuafolkken/kit#6586: the investigation spellings the old allowlist refused now run.
 const ISSUE_REPRODUCTIONS = [
@@ -27,6 +28,7 @@ const RUNS = [
 	'cat scripts/hooks/*.ts',
 	'echo $(git log -1 --format=%H)',
 	'GIT_PAGER=cat git log -1',
+	'git log -c',
 	'node scripts/probe.ts',
 	'time node scripts/probe.ts',
 	'pnpm josh check',
@@ -65,7 +67,8 @@ const REFUSED: ReadonlyArray<readonly [string, string]> = [
 	['pnpm install', INSTALL],
 	['gh pr checkout 123', '`gh pr checkout`'],
 	['git diff --output=app.ts', 'writes a file'],
-	['git -c core.fsmonitor=custom-editor status', 'rewrites its configuration'],
+	['git -c core.fsmonitor=custom-editor status', CONFIG_REWRITE],
+	['git -C p -c k=v status', CONFIG_REWRITE],
 	['echo git push | sh', STDIN_SHELL],
 	['cat notes.sh | bash -s arg', STDIN_SHELL],
 ]
