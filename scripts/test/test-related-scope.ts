@@ -16,7 +16,7 @@ import { whole_suite_files } from './whole-suite-files'
 // snapshot — which no module graph holds — reaches the modules that read it through that map alone. **Whatever neither can answer runs the whole suite**: no map, a
 // non-code file added since the recorded tree that no recorded test read, where a test read inside its
 // directory, or a file every test
-// depends on — each counted only when this change moved it (joshuafolkken/kit#4527). A non-code file the recorded tree already held and no test read is one no test reads
+// depends on — `package.json` only when more than its `version` moved (joshuafolkken/kit#7538) — each counted only when this change moved it (joshuafolkken/kit#4527). A non-code file the recorded tree already held and no test read is one no test reads
 // (joshuafolkken/kit#4073), and so is one added since to a directory no test read inside
 // (joshuafolkken/kit#4303, joshuafolkken/kit#4597), so a change made only of those runs nothing. CI runs the whole suite
 // regardless, so a read the recorder could not see — one a child process makes — is still caught
@@ -109,6 +109,9 @@ interface ScopeRequest {
 	// The entries a change of `tools/test/pure-files.ts` moved, when it moved nothing else there — the
 	// list then reaches those test files rather than every test (`pure-files-entries.ts`).
 	pure_entries?: ReadonlyArray<string> | undefined
+	// The changed whole-suite files whose change is their `version` alone — `package.json` on a release
+	// commit (`package-version-only.ts`) — resolved through the map rather than the whole suite.
+	version_only?: ReadonlySet<string>
 	// The changed files every test imports, each with the test files importing it directly
 	// (`direct-importers.ts`) — the run narrows to those rather than the whole suite.
 	every_test_importers?: ReadonlyMap<string, ReadonlyArray<string>>
@@ -242,13 +245,19 @@ function direct_selection(request: ScopeRequest, changed: ReadonlyArray<string>)
 	return { files: tests.flat(), unread: moved.filter((_file, index) => tests[index]?.length === 0) }
 }
 
+function is_whole_suite_trigger(request: ScopeRequest, file: string): boolean {
+	if (request.version_only?.has(file) === true) return false
+
+	return WHOLE_SUITE_FILES.has(file) && !is_narrowed(request, file) && is_moved(request, file)
+}
+
+// **A `package.json` moved in `version` alone is no trigger** (joshuafolkken/kit#7538): it reaches the
+// tests reading it through the map, as any other non-code file does.
 function whole_suite_triggers(
 	request: ScopeRequest,
 	changed: ReadonlyArray<string>,
 ): Array<string> {
-	return changed.filter(
-		(file) => WHOLE_SUITE_FILES.has(file) && !is_narrowed(request, file) && is_moved(request, file),
-	)
+	return changed.filter((file) => is_whole_suite_trigger(request, file))
 }
 
 function resolve_read(

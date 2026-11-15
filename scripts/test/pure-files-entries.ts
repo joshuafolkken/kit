@@ -1,6 +1,4 @@
 import path from 'node:path'
-import { git_command } from '#scripts/git/git-command'
-import { file_reader } from '#scripts/lib/read-file'
 
 // **`tools/test/pure-files.ts` is a whole-suite file only for what is not its entries**
 // (joshuafolkken/kit#5001). The vitest config imports it, so `vitest related` widens to every test on
@@ -54,30 +52,6 @@ function tests_of(entries: ReadonlyArray<string>): ReadonlyArray<string> {
 	return [...LIST_TESTS, ...entries]
 }
 
-async function base_text(): Promise<string | undefined> {
-	try {
-		return await git_command.show_file(`${await git_command.change_base()}:${PURE_FILES_PATH}`)
-	} catch {
-		return undefined
-	}
-}
-
-// The entries this branch moved in the list against its change base, or `undefined` when the list did
-// not change, changed beyond its entries, or either side cannot be read.
-async function read_moved(
-	root: string,
-	changed: ReadonlyArray<string> | undefined,
-): Promise<ReadonlyArray<string> | undefined> {
-	if (changed?.includes(PURE_FILES_PATH) !== true) return undefined
-
-	const before = await base_text()
-	const after = file_reader.read_if_readable(path.join(root, PURE_FILES_PATH))
-
-	if (before === undefined || after === undefined) return undefined
-
-	return moved_entries(before, after)
-}
-
-const pure_files_entries = { PURE_FILES_PATH, moved_entries, read_moved, tests_of }
+const pure_files_entries = { PURE_FILES_PATH, moved_entries, tests_of }
 
 export { pure_files_entries }

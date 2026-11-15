@@ -49,6 +49,34 @@ function scope_of(
 	})
 }
 
+// joshuafolkken/kit#7538: a release commit moves `package.json`'s version alone and deletes the
+// accepted metrics records, which reaches the tests reading `package.json` rather than every test.
+describe('related_scope.resolve_scope — a version-only package.json', () => {
+	const package_reader = path.join(SCRIPTS_DIRECTORY, 'package-reader.ts')
+	const accepted = path.join('.josh', 'metrics-accepted', 'kit-7537.json')
+	const release: ScopeRequest = {
+		root: ROOT,
+		changed: [PACKAGE_FILE, accepted],
+		map: { ...MAP, readers: { ...MAP.readers, [PACKAGE_FILE]: [package_reader] } },
+		recorded: new Set([PACKAGE_FILE, accepted]),
+		is_present: () => true,
+		version_only: new Set([PACKAGE_FILE]),
+	}
+
+	it('narrows a release-shaped change to the tests reading package.json', () => {
+		expect(related_scope.resolve_scope(release)).toMatchObject({
+			mode: 'related',
+			files: [at(package_reader)],
+		})
+	})
+
+	it('still runs the whole suite when more than the version moved', () => {
+		const scope = related_scope.resolve_scope({ ...release, version_only: new Set() })
+
+		expect(scope).toMatchObject({ mode: 'all', files: [at(PACKAGE_FILE)] })
+	})
+})
+
 // joshuafolkken/kit#4572: the worker share's bounds change often, so the vitest config imports only
 // the run markers and a change to the bounds narrows like any module.
 describe('related_scope.resolve_scope — the worker share', () => {
