@@ -101,7 +101,9 @@ async function can_run_hooks(stdin_path: string): Promise<boolean> {
 	return await can_probe([HOOK_RUN, ...options])
 }
 
-async function run_with_stdin(stdin_line: string): Promise<boolean> {
+type HookEnvironment = Readonly<Record<string, string>>
+
+async function run_with_stdin(stdin_line: string, environment: HookEnvironment): Promise<boolean> {
 	const directory = await mkdtemp(path.join(tmpdir(), TEMPORARY_PREFIX))
 	const stdin_path = path.join(directory, STDIN_FILE)
 
@@ -113,7 +115,7 @@ async function run_with_stdin(stdin_line: string): Promise<boolean> {
 		await git_spawn.with_output(
 			'hook',
 			[...to_hook_run_arguments(stdin_path, HOOK_NAME), '--', REMOTE, url],
-			{ timeout_ms: SUITE_TIMEOUT_MS },
+			{ timeout_ms: SUITE_TIMEOUT_MS, environment },
 		)
 
 		return true
@@ -124,13 +126,14 @@ async function run_with_stdin(stdin_line: string): Promise<boolean> {
 
 // `true` when the hook is settled here — run, or nothing to push — so the push skips it; `false` when
 // this git cannot run it, so the push runs it as it always did. A hook that fails throws
-// `git hook exited with code <n>`, and the push is never attempted.
-async function run(): Promise<boolean> {
+// `git hook exited with code <n>`, and the push is never attempted. `environment` reaches the hook's process
+// only — added to the inherited environment, never written into this one.
+async function run(environment: HookEnvironment = {}): Promise<boolean> {
 	const references = await read_push_references()
 
 	if (references.local_oid === references.remote_oid) return true
 
-	return await run_with_stdin(to_stdin_line(references))
+	return await run_with_stdin(to_stdin_line(references), environment)
 }
 
 const git_pre_push_hook = {
@@ -138,3 +141,4 @@ const git_pre_push_hook = {
 }
 
 export { git_pre_push_hook }
+export type { HookEnvironment }
