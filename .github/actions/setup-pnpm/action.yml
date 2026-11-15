@@ -66,10 +66,10 @@ runs:
     # latest` moves together, and with them the cache key. The release asset for this runner sits
     # beside them: the installer's own `linuxstatic` / `macos` naming, so its baked digest matches.
     # The download directory is resolved here from the job's `$HOME`, once for the cache and the
-    # steps that read it: a cache path of `~` expanded to the host's home while a Playwright
-    # container job reads `/github/home`, so a host job's entry hit in the container and restored
-    # outside it. The resolved path also separates the two entries, since it is part of the cache
-    # version (joshuafolkken/kit#7534).
+    # steps that read it: a literal `~` path was one cache version for a host job and a Playwright
+    # container job, whose `$HOME` is `/github/home`, so a host job's entry hit in the container
+    # and restored outside its `$HOME`. The resolved path, part of the cache version, separates the
+    # two entries (joshuafolkken/kit#7534).
     - name: Pin safe-chain
       id: safe-chain-pin
       if: inputs.install == 'true'
