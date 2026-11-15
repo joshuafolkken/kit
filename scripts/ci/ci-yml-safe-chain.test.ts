@@ -17,6 +17,9 @@ const SHA256_VARIABLE = 'SAFE_CHAIN_INSTALLER_SHA256'
 const SHA256_LENGTH = 64
 const BINARY_VARIABLE = 'SAFE_CHAIN_BINARY'
 const PIN_BINARY = '${{ steps.safe-chain-pin.outputs.binary }}'
+const DOWNLOADS_VARIABLE = 'SAFE_CHAIN_DOWNLOADS'
+// joshuafolkken/kit#7534: the same directory the cache restores into and saves from.
+const PIN_DOWNLOADS = '${{ steps.safe-chain-pin.outputs.downloads }}'
 const FETCH_STEP = 'Fetch safe-chain'
 const TOKEN_VARIABLES = ['GH_TOKEN', 'GITHUB_TOKEN']
 
@@ -112,16 +115,18 @@ describe.each(WORKFLOWS)('safe-chain download in %s', (relative_path) => {
 		expect(fetch_step(relative_path)?.run).not.toMatch(/(?:^|\s)sh\s|safe-chain" |\$installer/mu)
 	})
 
-	it('fetches and installs the release the pin step declares', () => {
+	it('fetches and installs the release the pin step declares, in the directory it resolves', () => {
 		const setup = all_steps(relative_path).find((step) => step.name === SAFE_CHAIN_STEP)
 
 		expect(fetch_step(relative_path)?.env).toMatchObject({
 			[VERSION_VARIABLE]: '${{ steps.safe-chain-pin.outputs.version }}',
 			[BINARY_VARIABLE]: PIN_BINARY,
+			[DOWNLOADS_VARIABLE]: PIN_DOWNLOADS,
 		})
 		expect(setup?.env).toMatchObject({
 			[SHA256_VARIABLE]: '${{ steps.safe-chain-pin.outputs.sha256 }}',
 			[BINARY_VARIABLE]: PIN_BINARY,
+			[DOWNLOADS_VARIABLE]: PIN_DOWNLOADS,
 		})
 	})
 })
