@@ -1,4 +1,4 @@
-import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
+import { MS_PER_MINUTE, MS_PER_SECOND } from '#scripts/lib/timeouts'
 import type { LocalRead } from './run-board-read'
 import type { BoardState } from './run-board-state'
 import { run_board_status, type ItemState } from './run-board-status'
@@ -15,6 +15,14 @@ const ALWAYS_ASKED_STATES: ReadonlySet<ItemState> = new Set([STOPPED_STATE, ...W
 // well past the lag of a merge that already happened.
 const STOPPED_ASK_MINUTES = 15
 const STOPPED_ASK_LIMIT_MS = STOPPED_ASK_MINUTES * MS_PER_MINUTE
+// The first closed read after a lane ends often lands before GitHub shows the merge, which kept the
+// child drawn 🛑 a whole retry interval (joshuafolkken/kit#7557). While a child the read asks about ended
+// its lane within the window, the read is asked again this often. Rate limit: one lane end adds at most
+// window ÷ retry (8) closed reads, each one read of the children still unanswered.
+const FRESH_END_WINDOW_SECONDS = 120
+const FRESH_RETRY_SECONDS = 15
+const FRESH_END_WINDOW_MS = FRESH_END_WINDOW_SECONDS * MS_PER_SECOND
+const FRESH_RETRY_MS = FRESH_RETRY_SECONDS * MS_PER_SECOND
 
 function has_asked_since_end(state: BoardState, ended_ms: number | undefined): boolean {
 	const { closed_answered_ms } = state
@@ -37,6 +45,30 @@ function ended_asked_states(
 	return now_ms - ended_ms <= STOPPED_ASK_LIMIT_MS ? ALWAYS_ASKED_STATES : WAITING_STATES
 }
 
-const run_board_closed_pace = { ALWAYS_ASKED_STATES, STOPPED_ASK_LIMIT_MS, ended_asked_states }
+function is_fresh_end(local: LocalRead, issue: number, now_ms: number): boolean {
+	const end = local.lane_states.ended?.get(issue)
+
+	return end !== undefined && now_ms - end.ended_ms <= FRESH_END_WINDOW_MS
+}
+
+// How long after the last closed read the next is due: sooner while a child it asks about has just had
+// its lane ended by its record, else `usual_ms`.
+function closed_retry_ms(
+	local: LocalRead,
+	unread: ReadonlyArray<number>,
+	now_ms: number,
+	usual_ms: number,
+): number {
+	return unread.some((issue) => is_fresh_end(local, issue, now_ms)) ? FRESH_RETRY_MS : usual_ms
+}
+
+const run_board_closed_pace = {
+	ALWAYS_ASKED_STATES,
+	FRESH_END_WINDOW_MS,
+	FRESH_RETRY_MS,
+	STOPPED_ASK_LIMIT_MS,
+	closed_retry_ms,
+	ended_asked_states,
+}
 
 export { run_board_closed_pace }

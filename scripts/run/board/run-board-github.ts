@@ -27,7 +27,7 @@ const PLAN_RETRY_MS = run_progress.DECLINE_RETRY_SECONDS * MS_PER_SECOND
 const UNANSWERED: ClosedAnswer = { closed: new Map(), is_whole: false }
 const { is_due } = run_board_state
 const RUNNING_STATE: ItemState = 'running'
-const { ALWAYS_ASKED_STATES, ended_asked_states } = run_board_closed_pace
+const { ALWAYS_ASKED_STATES, closed_retry_ms, ended_asked_states } = run_board_closed_pace
 
 // What a step of the GitHub reads works against.
 interface Gather {
@@ -175,13 +175,15 @@ function has_new_child(state: BoardState, unread: ReadonlyArray<number>): boolea
 function is_closed_due(state: BoardState, gather: Gather, unread: ReadonlyArray<number>): boolean {
 	if (state.closed_fetch !== undefined) return false
 
-	return (
-		has_new_child(state, unread) || is_due(state.closed_attempted_ms, PLAN_RETRY_MS, gather.now_ms)
-	)
+	const { local, now_ms } = gather
+	const retry_ms = closed_retry_ms(local, unread, now_ms, PLAN_RETRY_MS)
+
+	return has_new_child(state, unread) || is_due(state.closed_attempted_ms, retry_ms, now_ms)
 }
 
 // A closed child is read once and its answer kept; one that has not answered closed is asked again no
-// sooner than the plan is — unless a child the last ask did not hold has joined it.
+// sooner than the plan is — unless a child the last ask did not hold has joined it, or one just ended
+// its lane (`run-board-closed-pace.ts`).
 function launch_closed(state: BoardState, gather: Gather): BoardState {
 	const unread = unread_closed(state, gather)
 
