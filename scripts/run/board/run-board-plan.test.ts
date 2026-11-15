@@ -219,7 +219,6 @@ describe('run_board_plan.read_plan decision questions', () => {
 			String(SINGLE),
 			undefined,
 			REPO,
-			git_gh_issue_read.read_comments_conditionally,
 		)
 	})
 })

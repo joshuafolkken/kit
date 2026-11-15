@@ -80,12 +80,7 @@ function from_comments(
 
 async function read(issue: number): Promise<IssueOutcome | undefined> {
 	try {
-		const json = await git_gh_issue_read.issue_list_comments(
-			String(issue),
-			undefined,
-			undefined,
-			git_gh_issue_read.read_comments_conditionally,
-		)
+		const json = await git_gh_issue_read.issue_list_comments(String(issue))
 		const comments = json === undefined ? undefined : await issue_read.parse_comments(json)
 
 		return comments === undefined ? undefined : from_comments(comments)
