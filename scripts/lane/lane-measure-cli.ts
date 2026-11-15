@@ -17,6 +17,7 @@ import { lane_sinks_issues } from './lane-sinks-issues'
 import { lane_stats, type StatsWindow } from './lane-stats'
 import { lane_stats_request, type StatsRequest, type StatsStart } from './lane-stats-request'
 import { lane_stats_tables, type PeriodRecords } from './lane-stats-tables'
+import { lane_table_rows } from './lane-table-rows'
 import { lane_transcript_stats } from './lane-transcript-stats'
 import { lane_value } from './lane-value'
 import { lane_value_cell, type CellAddress, type CellFilter } from './lane-value-cell'
@@ -46,7 +47,7 @@ const CELL_METRIC = 'cell'
 const VALUE_DIGITS = 2
 const USAGE = [
 	'Usage: josh lane:sample [--every <seconds>]',
-	'       josh lane:stats --period <days> [--limit <lane-limit>]',
+	'       josh lane:stats --period <days> [--limit <lane-limit>] [--all]',
 	'       josh lane:stats --period <days> --sinks [<minutes>]',
 	'       josh lane:stats --period <days> --over <minutes>',
 	'       josh lane:stats --period <days> --why <minutes>',
@@ -178,7 +179,7 @@ async function stats_text(
 	const records = await period_records(context, window)
 	const limit = await lane_limit_history.label(request.limit, records.entries, window)
 	const row = lane_stats.row(records.entries, window, { limit })
-	const tables = lane_stats_tables.tables_of(records, window)
+	const tables = lane_stats_tables.tables_of(records, window, { is_all: request.is_all })
 
 	return [`${lane_stats.header()}\n${row}`, ...tables].join('\n\n')
 }
@@ -307,7 +308,8 @@ async function cell_value(
 	window: StatsWindow,
 	context: MeasureContext,
 ): Promise<Measured> {
-	const tables = lane_stats_tables.tables_of(await period_records(context, window), window)
+	const records = await period_records(context, window)
+	const tables = lane_stats_tables.tables_of(records, window, lane_table_rows.ALL_ROWS)
 	const { MISSING } = lane_value_missing
 	const is_several = lane_value_cell.is_several(tables, address)
 

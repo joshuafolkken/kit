@@ -12,10 +12,12 @@ const STATS_OPTIONS = {
 	over: { type: 'string' },
 	why: { type: 'string' },
 	pairs: { type: 'boolean' },
+	all: { type: 'boolean' },
 } as const
 
 interface StatsFlags {
 	limit?: string | undefined
+	all?: boolean | undefined
 	sinks?: boolean | undefined
 	over?: string | undefined
 	why?: string | undefined
@@ -41,6 +43,8 @@ interface StatsRequest {
 	why: number | undefined
 	// `--pairs`: the scoped pair table (`lane-pairs.ts`).
 	is_pairs: boolean
+	// `--all`: every row of the per-lane tables (`lane-table-rows.ts`).
+	is_all: boolean
 }
 
 // A positive finite number, or `undefined` for anything else — a typo must not become a zero period.
@@ -111,7 +115,12 @@ function threshold_choice(text: string | undefined): { minutes: number | undefin
 	return minutes === undefined ? undefined : { minutes }
 }
 
-// Each alternate table is exclusive and carries no lane-limit label.
+// The flags only the period's row and tables read.
+function is_period_only(values: StatsFlags): boolean {
+	return values.limit !== undefined || values.all === true
+}
+
+// Each alternate table is exclusive and carries no lane-limit label and no row cap.
 function is_one_table(values: StatsFlags): boolean {
 	const selected = [
 		values.sinks === true,
@@ -120,7 +129,7 @@ function is_one_table(values: StatsFlags): boolean {
 		values.pairs === true,
 	].filter(Boolean).length
 
-	return selected <= 1 && (selected === 0 || values.limit === undefined)
+	return selected <= 1 && (selected === 0 || !is_period_only(values))
 }
 
 // The one table the flags choose, `undefined` for a refused combination.
@@ -154,7 +163,7 @@ function stats_request(rest: ReadonlyArray<string>): StatsRequest | undefined {
 
 	if (start === undefined || table === undefined) return undefined
 
-	return { start, limit: parsed.values.limit, ...table }
+	return { start, limit: parsed.values.limit, is_all: parsed.values.all === true, ...table }
 }
 
 const lane_stats_request = { positive, since_of, stats_request }
