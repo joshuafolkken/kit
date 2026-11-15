@@ -5255,3 +5255,6 @@
 - rf:tests | low | scripts/run/board/run-board-root-layout.test.ts:72 | 2026-11-14 | #7525 | fixed
 - rx:{"round":"5281ceb4-f24e-4edf-842d-1b940ad976a1","category":"bug-risks","severity":"medium","file":"scripts/run/board/run-board-tick.ts:329","disposition":"fixed","description":"Ended root rows join layout.active, so the header tally counts the root run and draws a false (+1) arrival mid-backlogrun.","status":"resolved"}
 - rx:{"round":"5281ceb4-f24e-4edf-842d-1b940ad976a1","category":"tests","severity":"low","file":"scripts/run/board/run-board-root-layout.test.ts:72","disposition":"fixed","description":"The no-ended-run test builds a layout with an ended run and its title does not match what it checks.","status":"resolved"}
+- rf:none | none | - | 2026-11-15 | #7534
+- rb:2026-11-15 | #7534
+- rf:none | none | - | 2026-11-15 | #7534
