@@ -17,6 +17,7 @@ const LANE_ISSUE = 4887
 const NO_PAUSE: PausedSpans = new Map()
 const CHAIN_SHIPPED = 'run:chain 4887 — ran run:review → review:attest → review:record → ship'
 const CHAIN_SHIP = 'pnpm josh run:chain 4887 --join --ship "Title #4887"'
+const CHAIN_JOIN = 'pnpm josh run:chain 4887 --join'
 
 // A call that starts at `start` minutes and runs for one minute.
 function call(start: number, fields: Partial<ToolCall>): ToolCall {
@@ -102,12 +103,80 @@ describe('lane_implement_stats — a join that stops', () => {
 
 describe('lane_implement_stats — commands that do not ship', () => {
 	it.each([
-		'pnpm josh run:chain 4887 --join',
+		CHAIN_JOIN,
 		'echo "pnpm josh run:chain 4887 --join --ship Title"',
 		'pnpm josh run:chain 4887 --ship "Title --join #4887"',
 		'pnpm josh run:chain 4887 --join; echo --ship',
 	])('does not infer a ship from another command or quoted flag: %s', (command) => {
 		expect(minutes_of(with_ship(command))).toStrictEqual({})
+	})
+})
+
+// joshuafolkken/kit#7566: an open `run:chain` runs the check and `run:review` inside it, so it is
+// `check` and the reviewer and record after it are `review-fix`, never `read`.
+const REVIEWER = { tool: 'Agent', subagent: { type: 'reviewer', model: 'opus' } }
+const CHAIN_REVIEWED = 'run:chain 4887 — ran review:selfcheck → check:related → run:review'
+const OPEN_CHAIN = 'pnpm josh run:chain 4887'
+
+function chain_lane(chain: string, output = CHAIN_REVIEWED): Array<ToolCall> {
+	return [
+		call(0, { tool: 'Edit' }),
+		call(2, { command: chain, output }),
+		call(4, REVIEWER),
+		call(6, { tool: 'Agent', subagent: { type: 'reviewer-verification', model: 'opus' } }),
+		call(8, { command: 'pnpm josh review:record 4887' }),
+		call(10, { command: SHIP }),
+	]
+}
+
+describe('lane_implement_stats — an open run:chain', () => {
+	it.each([OPEN_CHAIN, `pnpm josh review:selfcheck 4887 && ${OPEN_CHAIN}`])(
+		'counts the chain as check and the review after it as review-fix: %s',
+		(chain) => {
+			expect(minutes_of(chain_lane(chain))).toStrictEqual({
+				plan: 0,
+				read: 0,
+				edit: 1,
+				check: 2,
+				'review-fix': 6,
+			})
+		},
+	)
+
+	it('does not start the review on a joined run:chain', () => {
+		expect(minutes_of(chain_lane(CHAIN_JOIN))['review-fix']).toBe(0)
+	})
+
+	it('keeps a joined run:chain before any review out of check', () => {
+		expect(minutes_of(chain_lane(CHAIN_JOIN))['check']).toBe(0)
+	})
+
+	it('keeps a reviewer with no chain or run:review before it in read', () => {
+		const calls = [call(0, { tool: 'Edit' }), call(2, REVIEWER), call(4, { command: SHIP })]
+
+		expect(minutes_of(calls)['read']).toBe(2)
+	})
+})
+
+describe('lane_implement_stats — an open run:chain that stopped before run:review', () => {
+	it('keeps the fix and the re-run after it in edit and check', () => {
+		const stopped = 'run:chain 4887 — stopped at check:related (exit 1)\nnext: fix'
+		const calls = [
+			call(0, { tool: 'Edit' }),
+			call(2, { command: OPEN_CHAIN, output: stopped }),
+			call(4, { tool: 'Edit' }),
+			call(6, { command: OPEN_CHAIN, output: CHAIN_REVIEWED }),
+			call(8, REVIEWER),
+			call(10, { command: SHIP }),
+		]
+
+		expect(minutes_of(calls)).toStrictEqual({
+			plan: 0,
+			read: 0,
+			edit: 3,
+			check: 4,
+			'review-fix': 2,
+		})
 	})
 })
 
