@@ -292,11 +292,11 @@ const NOTICE_SECTION = 'Over the guide before the gate'
 const QUESTION_SECTION = 'The question'
 // The filing's reason line (`size_estimate`); it does not answer a later split notice.
 const REASON_PREFIX = issue_body_keys.prefix('no_split_reason')
-const NOTICE_ACTION = `go on to the end; a started Issue is never split, and the merge records the overrun as a pre-split miss — split-assessment.md → "${NOTICE_SECTION}"`
+const NOTICE_ACTION = `go on to the end; a started Issue is never split, and the merge records an overrun past the cap as a pre-split miss — split-assessment.md → "${NOTICE_SECTION}"`
 
 // The notice for a diff past `notice_bar` on either axis — strictly greater than, as the guide is — and
-// a diff at or under it gives none. A merge past it is recorded as a pre-split miss
-// (`lane-size-record.ts`, joshuafolkken/kit#7183); size alone never stops the run (joshuafolkken/kit#6602).
+// a diff at or under it gives none. A merge past the cap, not this bar, is recorded as a pre-split
+// miss (`lane-size-record.ts`, joshuafolkken/kit#7579); size alone never stops the run (joshuafolkken/kit#6602).
 function notice(
 	measurement: SizeMeasurement,
 	declared?: DeclaredSize,

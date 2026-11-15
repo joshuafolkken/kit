@@ -201,7 +201,7 @@ describe('notice', () => {
 		expect(notice).not.toContain('stop implementation')
 		expect(notice).not.toContain(split_assess.REASON_PREFIX)
 		expect(notice).not.toContain('--route split')
-		expect(notice).toContain('records the overrun as a pre-split miss')
+		expect(notice).toContain('records an overrun past the cap as a pre-split miss')
 		expect(notice).toContain('Over the guide before the gate')
 	})
 

@@ -22,20 +22,20 @@ beforeEach(() => {
 		text: '## 背景\n- 規模見積もり: 約 7 ファイル / 160 行（テスト除く）',
 	})
 	vi.mocked(split_measure.read_branch).mockResolvedValue({
-		files: 12,
+		files: 13,
 		lines: 300,
 		verdict: 'split',
 	})
 })
 
 describe('lane_size_record.record', () => {
-	it('records declared and measured non-test size before merging, past the bar as missed', async () => {
+	it('records declared and measured non-test size before merging, past the cap as missed', async () => {
 		await lane_size_record.record(true, '5384')
 
 		expect(lane_ledger_write.record_size).toHaveBeenCalledWith({
 			issue: 5384,
 			declared: { files: 7, lines: 160 },
-			actual: { files: 12, lines: 300 },
+			actual: { files: 13, lines: 300 },
 			missed: true,
 		})
 	})
@@ -69,13 +69,14 @@ describe('lane_size_record.record', () => {
 	})
 })
 
-// joshuafolkken/kit#7183: only a diff past the split notice bar is a pre-split miss.
-describe('lane_size_record.record within the bar', () => {
-	it('records a diff within the bar as not missed', async () => {
+// joshuafolkken/kit#7579: only a diff past the split cap is a pre-split miss; the notice bar, declared ×
+// the measured ratio, is not.
+describe('lane_size_record.record against the cap', () => {
+	it('records a diff past the notice bar but within the cap as not missed', async () => {
 		vi.mocked(split_measure.read_branch).mockResolvedValue({
-			files: 7,
-			lines: 160,
-			verdict: 'single',
+			files: 12,
+			lines: 300,
+			verdict: 'split',
 		})
 
 		await lane_size_record.record(true, '5384')
@@ -83,5 +84,33 @@ describe('lane_size_record.record within the bar', () => {
 		expect(lane_ledger_write.record_size).toHaveBeenCalledWith(
 			expect.objectContaining({ missed: false }),
 		)
+	})
+
+	it('judges the cap of the measured guide', async () => {
+		const guide = { files: 16, lines: 400, cap: { files: 24, lines: 600 } }
+
+		vi.mocked(split_measure.read_branch).mockResolvedValue({
+			files: 13,
+			lines: 500,
+			verdict: 'single',
+			guide,
+		})
+
+		await lane_size_record.record(true, '5384')
+
+		expect(lane_ledger_write.record_size).toHaveBeenCalledWith(
+			expect.objectContaining({ missed: false }),
+		)
+	})
+
+	it('records nothing for an Issue with no declared size', async () => {
+		vi.mocked(git_gh_command.issue_get_body_classified).mockResolvedValue({
+			kind: 'read',
+			text: '## 背景\n- 種別: 非不具合',
+		})
+
+		await lane_size_record.record(true, '5384')
+
+		expect(lane_ledger_write.record_size).not.toHaveBeenCalled()
 	})
 })
