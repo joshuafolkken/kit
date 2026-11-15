@@ -8,6 +8,7 @@ import { metrics_totals } from '#scripts/gate/metrics-totals'
 import { structural_checks } from '#scripts/gate/structural-checks'
 import { type_check_step } from '#scripts/gate/type-check-step'
 import type { JoshResult } from '#scripts/josh/josh-run'
+import type { UnpinnedStop } from '#scripts/lane/lane-ledger-schema-ship'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { buffered_process, type BufferedProcessResult } from '#scripts/lib/buffered-process'
 
@@ -145,7 +146,12 @@ function verdict(runs: ReadonlyArray<PreDetachRun>): JoshResult {
 }
 
 // The `test:pinned` check a `--review` ship adds (`run-ship-pre-detach-pinned.ts`); none is asked by default.
-type PinnedCheck = () => Promise<JoshResult>
+// A red one carries the path its stop took (joshuafolkken/kit#7552).
+interface PinnedResult extends JoshResult {
+	unpinned?: UnpinnedStop
+}
+
+type PinnedCheck = () => Promise<PinnedResult>
 
 async function not_asked(): Promise<JoshResult> {
 	return { code: SUCCESS_EXIT_CODE, out: PASSED }
@@ -153,8 +159,8 @@ async function not_asked(): Promise<JoshResult> {
 
 // The checks' answer, with the kinds a `stop` record names its red by: `pre-detach` for the static
 // checks, `unpinned` for `test:pinned`, so `lane:stats` tells an unpinned stop apart
-// (joshuafolkken/kit#5228).
-interface PreDetachResult extends JoshResult {
+// (joshuafolkken/kit#5228), and the path that `unpinned` stop took.
+interface PreDetachResult extends PinnedResult {
 	preconditions?: ReadonlyArray<string>
 }
 
@@ -173,11 +179,14 @@ function red_kinds(result: JoshResult, pinned: JoshResult): ReadonlyArray<string
 }
 
 // The pinned check's stop joins the others' rather than hiding them.
-function with_pinned(result: JoshResult, pinned: JoshResult): PreDetachResult {
+function with_pinned(result: JoshResult, pinned: PinnedResult): PreDetachResult {
 	const preconditions = red_kinds(result, pinned)
-	const answer = joined(result, pinned)
+	const { code, out } = joined(result, pinned)
+	const { unpinned } = pinned
 
-	return preconditions.length === 0 ? answer : { ...answer, preconditions }
+	if (preconditions.length === 0) return { code, out }
+
+	return { code, out, preconditions, ...(unpinned !== undefined && { unpinned }) }
 }
 
 // All run at once, buffered, and every failure is reported, so one ship shows all there is to fix.
@@ -213,5 +222,5 @@ const run_ship_pre_detach = {
 	with_pinned,
 }
 
-export type { PinnedCheck, PreDetachCheck, PreDetachResult }
+export type { PinnedCheck, PinnedResult, PreDetachCheck, PreDetachResult }
 export { run_ship_pre_detach }

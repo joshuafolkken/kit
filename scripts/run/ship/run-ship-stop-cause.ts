@@ -8,6 +8,7 @@ import { is_blocked_cause } from '#scripts/gh/git-pr-checks-missing'
 import { NO_CHECKS_MESSAGE } from '#scripts/gh/git-pr-checks-watch'
 import { git_error } from '#scripts/git/git-error'
 import type { StopRecord } from '#scripts/lane/lane-ledger-schema'
+import type { UnpinnedStop } from '#scripts/lane/lane-ledger-schema-ship'
 import { run_ship_review, type StopFinding } from './run-ship-review'
 import { run_ship_stage, type Stage } from './run-ship-stage'
 
@@ -89,6 +90,8 @@ interface StoppedOutput {
 	out?: string
 	conflicts?: ReadonlyArray<string>
 	preconditions?: ReadonlyArray<string>
+	// The path an `unpinned` precondition's stop took (joshuafolkken/kit#7552).
+	unpinned?: UnpinnedStop
 	cause?: Cause
 }
 
@@ -191,12 +194,20 @@ function details_of(stage: Stage, failed: StoppedOutput = NO_OUTPUT): ReadonlyAr
 	return run_ship_review.blocking_details(failed.body)
 }
 
+// A preflight stop's unmet preconditions and the path its `unpinned` one took (joshuafolkken/kit#7552).
+function preflight_of({ preconditions, unpinned }: StoppedOutput): Partial<StopRecord> {
+	return {
+		...(preconditions !== undefined && { preconditions: [...preconditions] }),
+		...(unpinned !== undefined && { unpinned }),
+	}
+}
+
 // The lane ledger's record of one stop — the stage, its cause and, for a preflight, which
 // preconditions were unmet, so `lane:stats` counts the one worth meeting before a ship
 // (joshuafolkken/kit#4166); for a review, which kinds of finding stopped it (joshuafolkken/kit#4426);
 // for a followup red on a check, which checks failed (joshuafolkken/kit#7333).
 function record_of(issue: number, stage: Stage, failed: StoppedOutput = NO_OUTPUT): StopRecord {
-	const { body, conflicts, preconditions } = failed
+	const { body, conflicts } = failed
 	const cause = cause_of(stage, failed)
 	const findings = findings_of(stage, cause, body)
 	const checks = checks_of(stage, cause, body)
@@ -205,7 +216,7 @@ function record_of(issue: number, stage: Stage, failed: StoppedOutput = NO_OUTPU
 		issue,
 		reason: run_ship_stage.stop_reason(stage, conflicts),
 		cause,
-		...(preconditions !== undefined && { preconditions: [...preconditions] }),
+		...preflight_of(failed),
 		...(findings.length > 0 && { findings: [...findings] }),
 		...(checks.length > 0 && { checks: [...checks] }),
 	}
