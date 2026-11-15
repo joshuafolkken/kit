@@ -4,6 +4,7 @@ import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { git_branch } from '#scripts/git/git-branch'
 import { git_command } from '#scripts/git/git-command'
+import { cli_flags } from '#scripts/lib/cli-flags'
 import { file_reader } from '#scripts/lib/read-file'
 import { line_targets } from '#scripts/lines/line-targets'
 import { skill_meta } from '#tools/claude/skill-meta'
@@ -335,7 +336,7 @@ async function run_full(root: string, metrics: Metrics, parsed: MetricsArguments
 async function run_metrics(argv: ReadonlyArray<string>): Promise<number> {
 	const parsed = parse_arguments(argv)
 
-	if (parsed === undefined) return fail(USAGE)
+	if (parsed === undefined) return cli_flags.answer_usage(argv, USAGE)
 
 	const root = await git_command.repository_root()
 	const metrics = await measure(root)
@@ -353,6 +354,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 const metrics_command = {
 	command_names,
 	parse_arguments,
+	run_metrics,
 }
 
 export { metrics_command }

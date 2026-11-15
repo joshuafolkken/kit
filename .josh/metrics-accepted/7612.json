@@ -1,0 +1,7 @@
+{
+	"reason": "#7612: four more commands (prose:stale, review:selfcheck, diff:summary, ship:evidence) answer --help through cli_flags.answer_usage",
+	"date": "2026-11-15",
+	"growth": {
+		"scripts.code_lines": 9
+	}
+}

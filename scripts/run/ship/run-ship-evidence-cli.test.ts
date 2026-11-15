@@ -33,6 +33,7 @@ const DRAFT = path.join(TEMPORARY, 'josh-ship-body-5585.md')
 const RUNTIME_PATH = 'scripts/run/ship/run-ship-evidence-cli.ts'
 const FAILURE_EXIT_CODE = 1
 const PRINT_42 = ['5585', '--', 'node', '-e', 'console.log(42)']
+const USAGE_LINE = 'Usage: josh ship:evidence <N> [--fresh] -- <command...>'
 
 beforeEach(() => {
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
@@ -179,8 +180,24 @@ describe('run_ship_evidence_cli.run — refusals', () => {
 			await expect(run_ship_evidence_cli.run(argv)).resolves.toBe(FAILURE_EXIT_CODE)
 
 			expect(existing_mock).not.toHaveBeenCalled()
+			expect(console.error).toHaveBeenCalledWith(USAGE_LINE)
 		},
 	)
+
+	it.each(['--help', '-h'])('prints the usage and succeeds for %s', async (flag) => {
+		await expect(run_ship_evidence_cli.run([flag])).resolves.toBe(0)
+
+		expect(console.info).toHaveBeenCalledWith(USAGE_LINE)
+		expect(existing_mock).not.toHaveBeenCalled()
+	})
+
+	it('records a command that carries its own --help instead of answering it', async () => {
+		await expect(
+			run_ship_evidence_cli.run(['5585', '--', 'node', '-e', 'console.log(1)', '--help']),
+		).resolves.toBe(0)
+
+		expect(existing_mock).toHaveBeenCalled()
+	})
 
 	it('refuses when the issue has no draft, running nothing', async () => {
 		existing_mock.mockResolvedValue(undefined)

@@ -142,6 +142,12 @@ describe('rule_value_cli.run_rule_value — --weekly refuses what it cannot read
 		},
 	)
 
+	it('names the command in the shared Usage: form', () => {
+		expect(rule_value_trend.WEEKLY_USAGE).toBe(
+			'Usage: josh rule:value --weekly <rule-id>... [--period <days>] — one or more measured rule ids',
+		)
+	})
+
 	it('refuses a --period that is not a positive number with the period usage line', () => {
 		const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
 		const argv = ['--weekly', FIRST_ID, '--period', '0']

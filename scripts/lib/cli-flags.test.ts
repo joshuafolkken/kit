@@ -106,6 +106,33 @@ describe('cli_flags.usage_line', () => {
 	})
 })
 
+describe('cli_flags.answer_usage', () => {
+	const USAGE = 'Usage: josh demo [--period <days>]'
+
+	it.each(['--help', '-h'])('prints the usage on stdout and answers 0 on %s', (flag) => {
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		expect(cli_flags.answer_usage(['--period', flag], USAGE)).toBe(0)
+		expect(info).toHaveBeenCalledWith(USAGE)
+	})
+
+	it('prints the usage on stderr and answers 1 on any other argument', () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		expect(cli_flags.answer_usage(['--period', 'x'], USAGE)).toBe(1)
+		expect(error).toHaveBeenCalledWith(USAGE)
+	})
+
+	it('prints the given refusal instead of the usage on a failure', () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		const refusal = 'refused: --bogus'
+
+		expect(cli_flags.answer_usage(['--bogus'], USAGE, refusal)).toBe(1)
+		expect(error).toHaveBeenCalledWith(refusal)
+	})
+})
+
 describe('cli_flags.answer_help_or_unknown', () => {
 	it.each(['--help', '-h'])('prints the usage and answers 0 on %s', (flag) => {
 		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
