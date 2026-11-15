@@ -202,7 +202,9 @@ describe('standalone registry migration — resolution failures', () => {
 
 		await expect(
 			migrate(root, TARGET, false, { ...dependencies(), pnpm_version: () => '10.0.0' }),
-		).rejects.toThrow('Verified pnpm version')
+		).rejects.toThrow(
+			`actual: 10.0.0; no files changed. Run \`pnpm self-update ${migrate_lock.PNPM_VERSION}\``,
+		)
 		await expect(migrate(root, 'latest', false, dependencies())).rejects.toThrow('exact target')
 		expect(contents(root)).toEqual([NPMRC, lockfile(FOREIGN)])
 	})
