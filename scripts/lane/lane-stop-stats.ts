@@ -1,5 +1,6 @@
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_ship_planned } from '#scripts/run/ship/run-ship-planned'
+import { run_ship_pre_detach } from '#scripts/run/ship/run-ship-pre-detach'
 import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
 import { lane_ledger, type LedgerEntry, type StopEntry } from './lane-ledger'
 import type { IssueAt } from './lane-spans'
@@ -128,11 +129,19 @@ function noticed(cause: string, stop: IssueAt, notices: ReadonlyArray<IssueAt>):
 	return is_noticed ? `${cause}${NOTICED}` : cause
 }
 
+// An `unpinned` precondition counts under the path its stop took, `unpinned:no-reason`
+// (joshuafolkken/kit#7552); one recorded before it had the path stays `unpinned`.
+function with_path(kind: string, stop: StopEntry): string {
+	if (kind !== run_ship_pre_detach.UNPINNED || stop.unpinned === undefined) return kind
+
+	return `${kind}:${stop.unpinned.path}`
+}
+
 // A stop recorded before it named its preconditions (joshuafolkken/kit#4166) or its finding kinds
 // (joshuafolkken/kit#4426) counts under its cause.
 function causes_of(stop: StopEntry, notices: ReadonlyArray<IssueAt>): ReadonlyArray<string> {
 	const { preconditions = [], findings = [] } = stop
-	const kinds = [...preconditions, ...findings]
+	const kinds = [...preconditions.map((kind) => with_path(kind, stop)), ...findings]
 
 	if (kinds.length === 0) return [stop.cause ?? UNRECORDED_CAUSE]
 
