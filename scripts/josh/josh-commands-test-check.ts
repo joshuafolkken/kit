@@ -31,14 +31,18 @@ const TEST_CHECK_COMMANDS: Record<string, CommandEntry> = {
 	'test:reach': {
 		script: 'scripts/test/test-reach-cli.ts',
 		description:
-			"Print how many test files each file's imports reach — the count test:related sizes its claim by — one '<count> <file>' line per file",
+			"Print how many test files each file's imports reach — the count test:related sizes its claim by — one '<count> <file>' line per file, or with --count one file's count alone",
 		category: 'Development',
-		reference: ['<files...>', 'automation', ['none']],
+		reference: ['<files...> | --count <file>', 'automation', ['none']],
 		usage: {
 			examples: [
 				{
 					arguments: 'scripts/lane/lane-ledger.ts',
 					note: 'a reach count to measure before and after a change',
+				},
+				{
+					arguments: '--count scripts/lane/lane-ledger.ts',
+					note: 'the count alone, for a premise or measure declaration line',
 				},
 			],
 		},
