@@ -7,8 +7,10 @@ import { lane_stats, type StatsWindow } from './lane-stats'
 // reduced to one row per stage and reason, printed by `josh lane:stats` so the re-runs that dominate a
 // lane's implement time are counted by cause (joshuafolkken/kit#7024).
 //
-// **A stop lasts until the next `run:chain` on its issue starts** — that run's end less its length. A
-// stop no run followed is counted under `not re-run`, kept out of the minutes.
+// **A stop lasts until the run goes on for its issue** — the next `run:chain` or `josh ship` lap to
+// start, its end less its length: a held review is settled and shipped, not re-chained
+// (joshuafolkken/kit#7580). A stop nothing followed is counted under `not re-run`, kept out of the
+// minutes.
 
 const COLUMNS = ['stopped at', 'stops', 'to re-run (min)', 'median (min)', 'not re-run'] as const
 const JOIN_SUFFIX = ' --join'
@@ -21,15 +23,25 @@ interface ChainStop {
 	wait_ms: number | undefined
 }
 
+// A ledger row that marks the run going on: a `run:chain` or a `josh ship` lap.
+type Resume = Extract<
+	LedgerEntry,
+	{ kind: typeof lane_ledger.KIND.CHAIN | typeof lane_ledger.KIND.SHIP_LAP }
+>
+
 function is_chain(entry: LedgerEntry): entry is ChainEntry {
 	return entry.kind === lane_ledger.KIND.CHAIN
 }
 
-function started_ms(chain: ChainEntry): number {
-	return Date.parse(chain.at) - chain.elapsed_ms
+function is_resume(entry: LedgerEntry): entry is Resume {
+	return is_chain(entry) || entry.kind === lane_ledger.KIND.SHIP_LAP
 }
 
-function wait_ms(stop: ChainEntry, runs: ReadonlyArray<ChainEntry>): number | undefined {
+function started_ms(run: Resume): number {
+	return Date.parse(run.at) - run.elapsed_ms
+}
+
+function wait_ms(stop: ChainEntry, runs: ReadonlyArray<Resume>): number | undefined {
 	const stopped_ms = Date.parse(stop.at)
 	const starts = runs
 		.filter((run) => run.issue === stop.issue)
@@ -48,7 +60,7 @@ function cause_of(chain: ChainEntry): string | undefined {
 
 function stops_of(
 	period: ReadonlyArray<ChainEntry>,
-	runs: ReadonlyArray<ChainEntry>,
+	runs: ReadonlyArray<Resume>,
 ): Array<ChainStop> {
 	return period.flatMap((chain) => {
 		const cause = cause_of(chain)
@@ -94,7 +106,7 @@ function causes_of(stops: ReadonlyArray<ChainStop>): Array<string> {
 function table(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): string {
 	const stops = stops_of(
 		lane_stats.in_window(entries, window).filter(is_chain),
-		entries.filter(is_chain),
+		entries.filter(is_resume),
 	)
 	const rows = causes_of(stops).map((cause) => cause_row(cause, stops))
 

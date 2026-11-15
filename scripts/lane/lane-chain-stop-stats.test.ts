@@ -38,6 +38,18 @@ function chain(run: Run): LedgerEntry {
 	}
 }
 
+// A `josh ship` lap of `RUN_MINUTES` on `issue` that ended `ended_before` minutes before now.
+function ship_lap(issue: number, ended_before: number): LedgerEntry {
+	return {
+		kind: 'ship-lap',
+		at: minutes_before_now(ended_before),
+		issue,
+		stage: 'preflight',
+		step: 'preflight',
+		elapsed_ms: RUN_MINUTES * MS_PER_MINUTE,
+	}
+}
+
 function rows_of(entries: ReadonlyArray<LedgerEntry>): Array<string> {
 	return lane_chain_stop_stats.table(entries, WINDOW).split('\n').slice(2)
 }
@@ -62,6 +74,43 @@ describe('lane_chain_stop_stats.table', () => {
 		expect(rows_of(entries)).toStrictEqual([
 			'| run:review --join (hold) | 1 | not measured | not measured | 1 |',
 		])
+	})
+
+	it('counts an exit no run followed as not re-run', () => {
+		const entries = [
+			chain({ issue: 4, ended_before: 30, stage: RUN_REVIEW, reason: 'exit', join: true }),
+			ship_lap(5, 10),
+		]
+
+		expect(rows_of(entries)).toStrictEqual([
+			'| run:review --join (exit) | 1 | not measured | not measured | 1 |',
+		])
+	})
+})
+
+// joshuafolkken/kit#7580: a held review is settled and shipped, not re-chained, so the ship's first
+// lap ends the wait as a later `run:chain` does.
+describe('lane_chain_stop_stats.table — a ship goes on', () => {
+	it('ends a hold at the first ship lap on its issue to start', () => {
+		const entries = [
+			chain({ issue: 6, ended_before: 40, stage: 'review:attest', reason: 'hold', join: true }),
+			ship_lap(6, 26),
+			ship_lap(6, 10),
+		]
+
+		expect(rows_of(entries)).toStrictEqual([
+			'| review:attest --join (hold) | 1 | 10.0 | 10.0 | 0 |',
+		])
+	})
+
+	it('ends a stop at a re-run that starts before the ship', () => {
+		const entries = [
+			chain({ issue: 7, ended_before: 50, stage: RUN_REVIEW, reason: 'exit', join: true }),
+			chain({ issue: 7, ended_before: 40 }),
+			ship_lap(7, 20),
+		]
+
+		expect(rows_of(entries)).toStrictEqual(['| run:review --join (exit) | 1 | 6.0 | 6.0 | 0 |'])
 	})
 })
 
