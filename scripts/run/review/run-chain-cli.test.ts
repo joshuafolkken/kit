@@ -20,6 +20,7 @@ const FROM = '--from'
 const MAIN_LINE = [[MAIN_MERGE], [SELFCHECK], [CHECK_RELATED], [RUN_REVIEW]]
 const STOP_EXIT = 2
 const UNPINNED_OK = ['--unpinned-ok', 'only logs']
+const ACCEPT_METRICS = ['--accept-metrics', 'a new command']
 const TITLE = 'Title #5630'
 const RESUME_PAST_SELFCHECK = '`pnpm josh run:chain 5630 --from check:related`'
 
@@ -134,6 +135,14 @@ describe('run_chain_cli.run — resume and forwarding', () => {
 		expect(ran().at(-1)).toStrictEqual([RUN_REVIEW, ...UNPINNED_OK])
 		expect(ran()[0]).toStrictEqual([MAIN_MERGE])
 	})
+
+	// joshuafolkken/kit#7599: the metrics accept reason rides the same way, in one pass.
+	it('forwards --accept-metrics to run:review alone, beside --unpinned-ok', async () => {
+		await run_chain_cli.run([ISSUE, ...UNPINNED_OK, ...ACCEPT_METRICS])
+
+		expect(ran().at(-1)).toStrictEqual([RUN_REVIEW, ...UNPINNED_OK, ...ACCEPT_METRICS])
+		expect(ran().slice(0, -1).flat()).not.toContain(ACCEPT_METRICS[0])
+	})
 })
 
 describe('run_chain_cli.run — refusals', () => {
@@ -144,6 +153,7 @@ describe('run_chain_cli.run — refusals', () => {
 		['an unknown flag', [ISSUE, '--bogus']],
 		['--fixing without --join', [ISSUE, '--fixing']],
 		['--unpinned-ok on the join', [ISSUE, '--join', ...UNPINNED_OK]],
+		['--accept-metrics on the join', [ISSUE, '--join', ...ACCEPT_METRICS]],
 		['--ship without --join', [ISSUE, '--ship', TITLE]],
 		['--ship without a title', [ISSUE, '--join', '--ship']],
 		['--ship without an issue suffix', [ISSUE, '--join', '--ship', 'Title']],

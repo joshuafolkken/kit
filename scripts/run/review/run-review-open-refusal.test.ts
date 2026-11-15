@@ -3,7 +3,7 @@ import { run_review_open_refusal } from './run-review-open-refusal'
 
 const { branch, grown, handed_over, unplanned } = vi.hoisted(() => ({
 	branch: vi.fn<() => Promise<string>>(),
-	grown: vi.fn<(directory: string) => Promise<string | undefined>>(),
+	grown: vi.fn<(directory: string, accept_reason?: string) => Promise<string | undefined>>(),
 	handed_over: vi.fn<(issue: number) => Promise<boolean>>(),
 	unplanned: vi.fn<() => Promise<string | undefined>>(),
 }))
@@ -70,5 +70,16 @@ describe('run_review_open_refusal.refusal', () => {
 
 		await expect(run_review_open_refusal.refusal(true)).resolves.toBeUndefined()
 		expect(branch).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#7599: `--accept-metrics` reaches the totals' judgment, which records the growth.
+describe('run_review_open_refusal.refusal — --accept-metrics', () => {
+	it('hands the reason to the totals judgment', async () => {
+		const reason = 'a new command'
+
+		await run_review_open_refusal.refusal(false, reason)
+
+		expect(grown).toHaveBeenCalledWith(expect.any(String), reason)
 	})
 })

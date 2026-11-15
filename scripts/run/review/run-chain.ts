@@ -62,8 +62,9 @@ const MERGE_STAGE: ChainStage = {
 		`settle what \`${MAIN_MERGE}\` refused (\`chain-rule.md\` → "Orchestration facts single-sourced here"), ${rerun(issue)}`,
 }
 
-// `--unpinned-ok "<reason>"` as given, forwarded to `run:review` alone; empty when absent.
-function review_stages(unpinned_ok: ReadonlyArray<string>): ReadonlyArray<ChainStage> {
+// `review_args` — `--unpinned-ok "<reason>"` and `--accept-metrics "<reason>"` as given — goes to
+// `run:review` alone; empty when absent.
+function review_stages(review_args: ReadonlyArray<string>): ReadonlyArray<ChainStage> {
 	return [
 		{
 			name: SELFCHECK,
@@ -78,14 +79,15 @@ function review_stages(unpinned_ok: ReadonlyArray<string>): ReadonlyArray<ChainS
 		},
 		{
 			name: RUN_REVIEW,
-			argv: [RUN_REVIEW, ...unpinned_ok],
-			next: (issue) => `settle what \`${RUN_REVIEW}\` refused, ${rerun(issue, RUN_REVIEW)}`,
+			argv: [RUN_REVIEW, ...review_args],
+			next: (issue) =>
+				`settle what \`${RUN_REVIEW}\` refused (a metrics growth: add \`--accept-metrics "<why>"\`), ${rerun(issue, RUN_REVIEW)}`,
 		},
 	]
 }
 
-function main_line_stages(unpinned_ok: ReadonlyArray<string>): ReadonlyArray<ChainStage> {
-	return [MERGE_STAGE, ...review_stages(unpinned_ok)]
+function main_line_stages(review_args: ReadonlyArray<string>): ReadonlyArray<ChainStage> {
+	return [MERGE_STAGE, ...review_stages(review_args)]
 }
 
 // The stages from `from` on; `undefined` when no stage has that name.

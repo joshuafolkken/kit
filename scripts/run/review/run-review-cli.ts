@@ -12,8 +12,8 @@ import { run_review_briefs, type BriefPlan } from './run-review-briefs'
 import { run_review_early_push } from './run-review-early-push'
 import { run_review_join_read, type JoinVerdict } from './run-review-join-read'
 import { run_review_join_ready } from './run-review-join-ready'
+import { run_review_open_args, type OpenArguments } from './run-review-open-args'
 import { run_review_open_refusal } from './run-review-open-refusal'
-import { run_review_pinned } from './run-review-pinned'
 import { run_review_pinned_accepted } from './run-review-pinned-accepted'
 import { run_review_pinned_join } from './run-review-pinned-join'
 import { run_review_pinned_steps } from './run-review-pinned-steps'
@@ -59,7 +59,7 @@ const LANE_PINNED_NOTE =
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const USAGE =
-	'Usage: josh run:review [--code-only] [--unpinned-ok "<reason>"] | --join [--fixing] | --pinned | --push'
+	'Usage: josh run:review [--code-only] [--unpinned-ok "<reason>"] [--accept-metrics "<reason>"] | --join [--fixing] | --pinned | --push'
 const { INTERACTION } = review_attest.REVIEW_SLOT
 
 function now_iso(): string {
@@ -307,11 +307,12 @@ function refuse(text: string): number {
 	return FAILURE_EXIT_CODE
 }
 
-async function open_accepted(is_code_only: boolean, reason: string | undefined): Promise<number> {
+async function open_accepted(is_code_only: boolean, open: OpenArguments): Promise<number> {
+	const reason = open.unpinned_ok
 	const accepted = await accept_finished(is_code_only, reason)
 
 	if (accepted !== undefined) return accepted
-	const stop = await run_review_open_refusal.refusal(is_code_only)
+	const stop = await run_review_open_refusal.refusal(is_code_only, open.accept_metrics)
 
 	if (stop !== undefined) return refuse(stop)
 	const slots = await run_review_briefs.brief_slots(is_code_only)
@@ -319,16 +320,16 @@ async function open_accepted(is_code_only: boolean, reason: string | undefined):
 	return await run_start({ is_code_only, slots }, reason)
 }
 
-// The open's arguments after `--code-only`: none, or `--unpinned-ok "<reason>"`. The governing section
+// The open's arguments after `--code-only` (`run-review-open-args.ts`). The governing section
 // prints once they are accepted, so a refused argv prints its usage line alone; the ship's own
 // `--code-only` open prints nothing, since the ship printed the section it runs under.
 async function run_open(is_code_only: boolean, argv: ReadonlyArray<string>): Promise<number> {
-	const reason = run_review_pinned.ok_reason_of(argv)
+	const open = run_review_open_args.parse(argv)
 
-	if (reason === undefined && argv.length > 0) return refuse(USAGE)
+	if (open === undefined) return refuse(USAGE)
 	const printed = is_code_only ? SUCCESS_EXIT_CODE : run_step_section.print_once('run:review')
 
-	return printed === SUCCESS_EXIT_CODE ? await open_accepted(is_code_only, reason) : printed
+	return printed === SUCCESS_EXIT_CODE ? await open_accepted(is_code_only, open) : printed
 }
 
 async function run_pinned(): Promise<number> {

@@ -21,13 +21,17 @@ async function handover_refusal(): Promise<string | undefined> {
 
 // A metrics total grown past every approval stops the open, right after the implementation and before
 // anything is launched, rather than the ship's pre-detach after the review (joshuafolkken/kit#6023).
-// An unplanned file's overlap stops it while the file can still be dropped (joshuafolkken/kit#6142).
-async function refusal(is_code_only: boolean): Promise<string | undefined> {
+// `--accept-metrics "<reason>"` records that growth instead (joshuafolkken/kit#7599). An unplanned
+// file's overlap stops it while the file can still be dropped (joshuafolkken/kit#6142).
+async function refusal(
+	is_code_only: boolean,
+	accept_metrics?: string,
+): Promise<string | undefined> {
 	if (is_code_only) return undefined
 
 	return (
 		(await handover_refusal()) ??
-		(await metrics_totals.totals_refusal(PROJECT_ROOT)) ??
+		(await metrics_totals.totals_refusal(PROJECT_ROOT, accept_metrics)) ??
 		(await run_review_unplanned.refusal())
 	)
 }
