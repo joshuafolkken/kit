@@ -16,9 +16,21 @@ function missing_headings(body: string): ReadonlyArray<string> {
 	return REQUIRED_HEADINGS.filter((heading) => !markdown_section.has_line(body, heading))
 }
 
+// The plain-language summary a person reads before any internal detail (joshuafolkken/kit#7544).
+const SUMMARY_HEADING = issue_body_keys.heading('summary')
+
+// Whether the body's first non-blank line is the summary heading — present further down does not count.
+function starts_with_summary(body: string): boolean {
+	const first = markdown_section.lines_of(body).find((line) => line.trim() !== '')
+
+	return first?.trim() === SUMMARY_HEADING
+}
+
 const issue_lint = {
 	missing_headings,
 	REQUIRED_HEADINGS,
+	starts_with_summary,
+	SUMMARY_HEADING,
 }
 
 export { issue_lint }

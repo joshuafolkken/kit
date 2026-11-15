@@ -40,7 +40,7 @@ const SOLO_ANSWERS = ['--defect', 'yes', '--verification', 'yes', '--every-run',
 
 const SECTIONS = '## 現象\n\nx\n\n## 期待結果\n\ny\n\n## 受け入れ条件\n\n- [ ] z\n'
 const ESTIMATE = '- 規模見積もり: 約 1 ファイル / 10 行（テスト除く）'
-const BACKGROUND = ['## 背景', '', '- 種別: 不具合', '- 原因: #4201', ESTIMATE]
+const BACKGROUND = ['## 概要\n\n要約\n', '## 背景', '', '- 種別: 不具合', '- 原因: #4201', ESTIMATE]
 
 // A body the lint accepts, with `declarations` under its background.
 function body_of(...declarations: ReadonlyArray<string>): string {

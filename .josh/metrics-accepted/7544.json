@@ -1,0 +1,9 @@
+{
+	"reason": "#7544: issue:file requires a leading ## 概要; the template carries its writing rule and model, and the filing generators emit the section",
+	"date": "2026-11-15",
+	"growth": {
+		"scripts.code_lines": 38,
+		"rules.lines": 18,
+		"ai_cost.on_demand_bytes": 1835
+	}
+}
