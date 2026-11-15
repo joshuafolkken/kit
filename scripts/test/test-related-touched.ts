@@ -1,5 +1,7 @@
 import { readdirSync } from 'node:fs'
 import path from 'node:path'
+import { outer_command } from '#scripts/josh/outer-command'
+import { lane_child_marker, type MarkerSource } from '#scripts/lane/lane-child-marker'
 import { direct_importers } from './direct-importers'
 import { test_related_pins } from './test-related-pins'
 import { related_scope, type RelatedScope } from './test-related-scope'
@@ -18,8 +20,18 @@ const TEST_SUFFIX = '.test.ts'
 const TOUCHED_REASON =
 	"the diff test files, their modules' same-named tests, direct test importers and pinned tests"
 const NOTHING_TOUCHED_REASON = 'no changed file reaches a touched test'
+const COMMAND = 'test:related'
+const LANE_NOTICE =
+	'test:related: a lane call runs the --touched scope; check:related runs the full reach'
 
 type ListDirectory = (directory: string) => ReadonlyArray<string>
+
+// Where a `josh test:related` call was typed: its checkout, its environment and its notice line.
+interface CallSite {
+	directory: string
+	source: MarkerSource
+	notify: (line: string) => void
+}
 
 // A directory that cannot be listed holds no test to run.
 function list_directory(directory: string): ReadonlyArray<string> {
@@ -77,6 +89,31 @@ function touched_scope(
 	return { mode: 'related', files, reason: TOUCHED_REASON }
 }
 
+// **A lane's own bare call runs the touched scope** (joshuafolkken/kit#7593): the full reach is paid
+// later by `check:related` and the ship's scoped pair, so a lane child that typed `josh test:related`
+// while implementing gets `--touched`. A call another josh command made (`outer-command.ts`) and a
+// call outside a lane keep the full reach. The flag joins the arguments, so the green record is the
+// touched one and never answers a full-reach reuse.
+function is_lane_direct(directory: string, source: MarkerSource): boolean {
+	return (
+		outer_command.is_outermost(COMMAND, source) && lane_child_marker.is_child_of(directory, source)
+	)
+}
+
+function live_call_site(): CallSite {
+	return { directory: process.cwd(), source: process.env, notify: console.info }
+}
+
+function scoped_arguments(
+	given: ReadonlyArray<string>,
+	site: CallSite = live_call_site(),
+): ReadonlyArray<string> {
+	if (given.length > 0 || !is_lane_direct(site.directory, site.source)) return given
+	site.notify(LANE_NOTICE)
+
+	return [TOUCHED_FLAG]
+}
+
 // A shared fixture often has no same-named test. Reuse the direct-import scan, without building
 // a transitive graph, so its consuming suites run before the shipping checks (joshuafolkken/kit#7380).
 async function read_scope(
@@ -99,9 +136,10 @@ const test_related_touched = {
 	TOUCHED_KIND,
 	TOUCHED_REASON,
 	read_scope,
+	scoped_arguments,
 	touched_scope,
 	touched_tests,
 }
 
-export type { ListDirectory }
+export type { CallSite, ListDirectory }
 export { test_related_touched }
