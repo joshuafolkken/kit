@@ -3,12 +3,16 @@ import { issue_auto_ok } from './issue-auto-ok'
 import { AUTO_OK_LABEL, has_label_name } from './issue-labels'
 
 // A body record survives process termination without adding a workflow label or a user prohibition.
+// The record is an HTML comment starting its own line outside a fence: the prefix quoted inline or in
+// a code block is prose about the record, not one (joshuafolkken/kit#7573).
 const PREFIX = '<!-- josh:publication '
-const PATTERN = /<!-- josh:publication (?<record>[^\n]*?) -->/u
+const PATTERN = /^<!-- josh:publication (?<record>[^\n]*?) -->/mu
+const RECORD_LINE = /^<!-- josh:publication /mu
+const FENCE = /^```[\s\S]*?^```/gmu
 const schema = z.object({ labels: z.array(z.string()) })
 
-function is_pending(body: string | undefined): boolean {
-	return body?.includes(PREFIX) === true
+function is_pending(body = ''): boolean {
+	return RECORD_LINE.test(body.replaceAll(FENCE, ''))
 }
 
 function prepare(body: string, labels: ReadonlyArray<string>): string {

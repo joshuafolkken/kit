@@ -60,6 +60,30 @@ it('refuses corrupt and duplicate preparation records', () => {
 	expect(() => issue_publication_state.labels_of('<!-- josh:publication broken -->', [])).toThrow()
 })
 
+it('reads only a record line as pending, not the prefix quoted in prose or a code block', () => {
+	const inline = 'The record starts with `<!-- josh:publication `.'
+	const quoted = `${BODY}\n\n${inline}\n\n\`\`\`\n<!-- josh:publication {} -->\n\`\`\``
+	const prepared = issue_publication_state.prepare(quoted, LABELS)
+
+	expect(issue_publication_state.is_pending(quoted)).toBe(false)
+	expect(issue_publication_state.is_pending(prepared)).toBe(true)
+})
+
+it('does not hold a published child that only quotes the record prefix', () => {
+	const body = `${BODY}\n\nQuoting \`<!-- josh:publication \` in the background.`
+	const child: EpicChild = {
+		number: NUMBER,
+		repo: REPO,
+		state: 'OPEN',
+		body,
+		labels: [],
+		blocked_by: [],
+	}
+
+	expect(epic_classify.classify_children([child]).time).toEqual([])
+	expect(epic_classify.classify_children([child]).runnable).toEqual([child])
+})
+
 it('withholds a prepared standalone child even if auto-ok is applied manually', () => {
 	const body = issue_publication_state.prepare(BODY, LABELS)
 	const issue = { ...auto_ok_fixture.issue(NUMBER, CREATED_EARLIER), body }
