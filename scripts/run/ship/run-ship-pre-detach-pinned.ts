@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto'
 import { check_reuse } from '#scripts/gate/check-reuse'
-import type { JoshResult } from '#scripts/josh/josh-run'
 import { buffered_process } from '#scripts/lib/buffered-process'
 import { error_text } from '#scripts/lib/error-message'
 import { review_round_reuse } from '#scripts/review/review-round-reuse'
@@ -12,7 +11,7 @@ import { run_review_pinned_steps } from '#scripts/run/review/run-review-pinned-s
 import { test_pinned } from '#scripts/test/test-pinned'
 import { test_pinned_logic } from '#scripts/test/test-pinned-logic'
 import { test_pinned_record, type PinnedSummary } from '#scripts/test/test-pinned-record'
-import { run_ship_pre_detach, type PreDetachResult } from './run-ship-pre-detach'
+import { run_ship_pre_detach, type PinnedResult, type PreDetachResult } from './run-ship-pre-detach'
 import { run_ship_pre_detach_timed } from './run-ship-pre-detach-timed'
 import type { ShipArguments } from './run-ship-steps'
 
@@ -125,21 +124,27 @@ async function is_listed_after_detach(number: string): Promise<boolean> {
 	}
 }
 
+// A stop carries the path it took into the ledger's stop record (joshuafolkken/kit#7552).
+async function judged(answer: PinnedSummary, reason: string | undefined): Promise<PinnedResult> {
+	const verdict = await run_review_pinned_accepted.judge(answer, reason)
+
+	if (verdict.kind !== 'stop') return { code: SUCCESS_EXIT_CODE, out: verdict.text }
+
+	const unpinned = await run_review_pinned_accepted.unpinned_stop(answer)
+
+	return { code: FAILURE_EXIT_CODE, out: verdict.text, unpinned }
+}
+
 // **A reason accepts any answer, so no probe is waited on** (joshuafolkken/kit#4833) when a fresh
 // round 1 lists the places after the detach.
-async function pinned_check(options: CheckOptions): Promise<JoshResult> {
+async function pinned_check(options: CheckOptions): Promise<PinnedResult> {
 	const reason = run_review_pinned.ok_reason_of(options.unpinned_ok)
 
 	if (reason !== undefined && (await is_listed_after_detach(options.number))) {
 		return { code: SUCCESS_EXIT_CODE, out: `${SKIPPED_NOTE}${reason}\n` }
 	}
 
-	const verdict = await run_review_pinned_accepted.judge(await summary_for(reason), reason)
-
-	return {
-		code: verdict.kind === 'stop' ? FAILURE_EXIT_CODE : SUCCESS_EXIT_CODE,
-		out: verdict.text,
-	}
+	return await judged(await summary_for(reason), reason)
 }
 
 // **A ship with no `--review` reads no background probe, so it stops the one left running**
