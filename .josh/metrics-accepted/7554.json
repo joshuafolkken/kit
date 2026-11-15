@@ -1,7 +1,0 @@
-{
-	"reason": "#7554 adds the lockfile change narrowing for test:related (new lockfile-changed-packages module, the package importer lookup and their tests)",
-	"date": "2026-11-15",
-	"growth": {
-		"scripts.code_lines": 175
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "#7556 adds run-board-closed-pace.ts: an ended run keeps asking about stopped children until a named limit",
-	"date": "2026-11-15",
-	"growth": {
-		"scripts.code_lines": 19
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "Release local steps print their elapsed time (#7540): a small step timer module plus its wiring in release-publish",
-	"date": "2026-11-15",
-	"growth": {
-		"scripts.code_lines": 52
-	}
-}
