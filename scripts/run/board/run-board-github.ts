@@ -1,6 +1,7 @@
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { run_progress } from '#scripts/run/progress/run-progress'
 import type { ClosedAnswer } from './run-board-closed'
+import { run_board_closed_pace } from './run-board-closed-pace'
 import { run_board_fetch, type Fetch } from './run-board-fetch'
 import { run_board_idle } from './run-board-idle'
 import type { BoardPlan } from './run-board-layout'
@@ -25,11 +26,8 @@ const PLAN_RETRY_MS = run_progress.DECLINE_RETRY_SECONDS * MS_PER_SECOND
 // A rejected closed read answers nothing closed and not whole, so it is asked again.
 const UNANSWERED: ClosedAnswer = { closed: new Map(), is_whole: false }
 const { is_due } = run_board_state
-const STOPPED_STATE: ItemState = 'stopped'
 const RUNNING_STATE: ItemState = 'running'
-// A child waiting on a person, drawn in 🙋 decision until a closed read settles it.
-const { WAITING_STATES } = run_board_status
-const ALWAYS_ASKED_STATES: ReadonlySet<ItemState> = new Set([STOPPED_STATE, ...WAITING_STATES])
+const { ALWAYS_ASKED_STATES, ended_asked_states } = run_board_closed_pace
 
 // What a step of the GitHub reads works against.
 interface Gather {
@@ -151,31 +149,21 @@ function is_closed_candidate(
 	return is_unlisted(issue, read) && !is_closed_cached(issue, read)
 }
 
-// An ended run asks until one ask after it ended has answered whole, then holds what it has, as its
-// plan is held: the board is left open between runs, so a child that never answers closed would
-// otherwise be asked about every retry interval while no run is going. A child waiting on a person
-// is the exception — the person closing it is what the board waits to draw.
-function has_asked_since_end(state: BoardState, local: LocalRead): boolean {
-	const { closed_answered_ms } = state
-	if (closed_answered_ms === undefined || local.ended_ms === undefined) return false
-
-	return closed_answered_ms >= local.ended_ms
-}
-
 // The children the board has not read closed yet that the open listing no longer holds, or that it
 // draws stopped or waiting: a child that merged itself and left its lane is drawn stopped until GitHub
-// says it merged (joshuafolkken/kit#4401), and a listing cut short proves nothing missing.
-function unread_closed(state: BoardState, local: LocalRead): Array<number> {
+// says it merged (joshuafolkken/kit#4401), and a listing cut short proves nothing missing. An ended
+// run narrows them as `run-board-closed-pace.ts` says.
+function unread_closed(state: BoardState, gather: Gather): Array<number> {
 	const read = open_read_of(state, state.plan)
-	const drawn = run_board_status.settle_closed(statuses_for(state, local), read)
+	const drawn = run_board_status.settle_closed(statuses_for(state, gather.local), read)
 	const is_plan_failed = state.failed_ms !== undefined
-	const is_ended = has_asked_since_end(state, local)
+	const ended_asked = ended_asked_states(state, gather.local, gather.now_ms)
 
 	return [...drawn]
 		.filter(([issue, status]) =>
-			is_ended
-				? WAITING_STATES.has(status.state)
-				: is_closed_candidate(issue, status, read, is_plan_failed),
+			ended_asked === undefined
+				? is_closed_candidate(issue, status, read, is_plan_failed)
+				: ended_asked.has(status.state),
 		)
 		.map(([issue]) => issue)
 }
@@ -193,10 +181,9 @@ function is_closed_due(state: BoardState, gather: Gather, unread: ReadonlyArray<
 }
 
 // A closed child is read once and its answer kept; one that has not answered closed is asked again no
-// sooner than the plan is — unless a child the last ask did not hold has joined it — and an ended
-// run's not again once an ask after the end has answered whole.
+// sooner than the plan is — unless a child the last ask did not hold has joined it.
 function launch_closed(state: BoardState, gather: Gather): BoardState {
-	const unread = unread_closed(state, gather.local)
+	const unread = unread_closed(state, gather)
 
 	if (unread.length === 0 || !is_closed_due(state, gather, unread)) return state
 
