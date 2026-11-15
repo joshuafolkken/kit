@@ -198,16 +198,14 @@ function config_value(flag: string, next: string | undefined): string | undefine
 	return ATTACHED_CONFIG.exec(flag)?.[1]
 }
 
-// The git global options in front of the subcommand, values included: `git -C p -c k=v status` gives
-// `['-C', 'p', '-c', 'k=v']`, and a non-git segment gives none.
-function globals_of(segment: string): Array<string> {
-	const words = arguments_of(segment, GIT_COMMAND) ?? []
-
+// The git global options in front of the subcommand among the words after `git`, values included:
+// `-C p -c k=v status` gives `['-C', 'p', '-c', 'k=v']`.
+function globals_of(words: ReadonlyArray<string>): Array<string> {
 	return words.slice(0, after_globals(words))
 }
 
 function config_arguments_of(segment: string): Array<string> {
-	const words = globals_of(segment)
+	const words = globals_of(arguments_of(segment, GIT_COMMAND) ?? [])
 	const values: Array<string> = []
 	let index = 0
 

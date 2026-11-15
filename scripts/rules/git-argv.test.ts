@@ -91,15 +91,25 @@ describe('git_argv.arguments_of', () => {
 
 describe('git_argv.globals_of', () => {
 	it('returns the globals in front of the subcommand, values included', () => {
-		expect(git_argv.globals_of('git -C p -c k=v status')).toStrictEqual(['-C', 'p', '-c', 'k=v'])
+		expect(git_argv.globals_of(['-C', 'p', '-c', 'k=v', 'status'])).toStrictEqual([
+			'-C',
+			'p',
+			'-c',
+			'k=v',
+		])
 	})
 
 	it('returns none when a -c follows the subcommand', () => {
-		expect(git_argv.globals_of('git grep -c x')).toStrictEqual([])
+		expect(git_argv.globals_of(['grep', '-c', 'x'])).toStrictEqual([])
 	})
 
-	it('returns none for a non-git segment', () => {
-		expect(git_argv.globals_of('grep -c x')).toStrictEqual([])
+	it('keeps a spaced value as one word', () => {
+		expect(git_argv.globals_of(['-C', 'my dir', '-c', 'k=v', 'status'])).toStrictEqual([
+			'-C',
+			'my dir',
+			'-c',
+			'k=v',
+		])
 	})
 })
 

@@ -118,9 +118,10 @@ function subcommand_refusal(segment: string): Refusal {
 	return is_git_write(subcommand, args) ? `\`git ${subcommand}\`, a git write` : undefined
 }
 
-// A quoted global runs as the bare one: `git '-c' k=v status` is `git -c k=v status`.
-function has_write_flag(segment: string, args: ReadonlyArray<string>): boolean {
-	const globals = git_argv.globals_of(segment.replaceAll(QUOTES, ''))
+// A quoted global runs as the bare one: `git '-c' k=v status` is `git -c k=v status`. The quotes come
+// off each word after the split, so a spaced value (`-C 'my dir'`) stays one word.
+function has_write_flag(args: ReadonlyArray<string>): boolean {
+	const globals = git_argv.globals_of(args.map((argument) => argument.replaceAll(QUOTES, '')))
 
 	return (
 		globals.some((word) => GIT_GLOBAL_WRITE_FLAGS.test(word)) ||
@@ -129,7 +130,7 @@ function has_write_flag(segment: string, args: ReadonlyArray<string>): boolean {
 }
 
 function refusal(segment: string, args: ReadonlyArray<string>): Refusal {
-	if (has_write_flag(segment, args)) {
+	if (has_write_flag(args)) {
 		return 'a git option that rewrites its configuration, runs a program or writes a file'
 	}
 
