@@ -17,7 +17,8 @@ const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#7183: a dispatched lane is never split by its size — the overrun is warned once,
 // on its first plan, and the lane goes on to the end. No split notice is noted, since no split child
-// can answer it; the merge's size entry records the overrun as a pre-split miss.
+// can answer it; the merge's size entry records an overrun past the cap as a pre-split miss
+// (joshuafolkken/kit#7579).
 
 const ROOT = make_directory('lane-plan-check-dispatched-')
 const LANE = 5171
@@ -73,6 +74,16 @@ describe('lane:plan in a dispatched lane over its size bar', () => {
 		expect(lane_plan.read(LANE, directory)?.paths).toStrictEqual([FILE])
 		expect(warnings()).toBe(1)
 		expect(record_split_notice).not.toHaveBeenCalled()
+	})
+
+	it('names the cap as what records a pre-split miss at the merge', async () => {
+		await lane_plan_cli.run(PLAN, directory)
+
+		expect(error).toHaveBeenCalledWith(
+			expect.stringContaining(
+				'an overrun past the cap at the merge is recorded as a pre-split miss',
+			),
+		)
 	})
 
 	it('does not answer `split` to `--probe`', async () => {

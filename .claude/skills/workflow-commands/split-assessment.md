@@ -8,7 +8,7 @@ point applies this.
 **The default is not to split.** Two questions have to answer yes **together**:
 
 1. Mergeable parts (separability)?
-2. Over guide? (test files excluded) Docs/snapshots/listings count.
+2. Over guide? (test files excluded) Docs/snapshots/listings/moves (twice) count.
 
 The same trailing 3-day period as the implement budget;
 median implement minutes per 100 actual changed lines;
@@ -52,8 +52,7 @@ A dispatched lane is never split: it is finished to the end, and never splits, s
 
 - An independent new requirement found in the lane → file it as an observation, without `--route split`.
   `issue:file --route split --found-during <N>` from lane `#N` is refused.
-- At the merge, a diff past the Issue's declared size × the growth factor, capped at the guide
-  (no declaration: the guide), on either axis, is recorded as a pre-split miss with its declared and
+- At the merge, a diff past the cap on either axis is recorded as a pre-split miss with its declared and
   actual size (`scripts/lane/lane-size-record.ts`). `pnpm josh lane:stats --period <days>` counts and lists the misses;
   use them to tune the pre-dispatch assessment.
 
