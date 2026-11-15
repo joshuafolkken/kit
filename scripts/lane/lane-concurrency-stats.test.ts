@@ -131,3 +131,15 @@ describe('lane_concurrency_stats.table core wait', () => {
 		])
 	})
 })
+
+describe('lane_concurrency_stats.table core wait across the period edge', () => {
+	it('leaves a wait to an overlapping same-lane call that started before the period', () => {
+		const since = WINDOW.since_ms
+		const entries = [sample(2, since), wait(LINT_WAIT, since + 20 * SECOND, 25)]
+		const calls = [call(LINT, since - 10 * SECOND, 60), call(LINT, since + 5 * SECOND, 30)]
+
+		expect(rows_of(entries, calls)).toStrictEqual([
+			`2 | 1 | 30.0 | ${NOT_MEASURED} | 0 | ${NOT_MEASURED} | ${NOT_MEASURED}`,
+		])
+	})
+})

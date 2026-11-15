@@ -10,8 +10,9 @@ import { lane_transcript_stats } from './lane-transcript-stats'
 // (joshuafolkken/kit#7025): the evidence a `JOSH_LANE_LIMIT` or verification-parallelism change is
 // filed from. A call's lane count is the latest load sample's `lanes` at or before it started; a call
 // with no sample within `SAMPLE_MAX_AGE_MS` before it is left out, since an old sample says nothing of
-// the lanes it ran beside. Each command also reads the median core-budget wait inside its calls
-// (joshuafolkken/kit#7550), so the elapsed time minus the wait is the run after admission.
+// the lanes it ran beside. Each command also reads the median core-budget wait of the calls a wait
+// record ties to (joshuafolkken/kit#7550): beside the elapsed median, it shows how much of a run was
+// admission rather than the run itself.
 
 const TIMED_COMMANDS: ReadonlyArray<string> = ['lint:related', 'test:related']
 const SAMPLE_MAX_AGE_MINUTES = 5
@@ -75,11 +76,11 @@ function timed_run(name: string, call: ToolCall, records: RunRecords): Array<Tim
 	return [{ name, lanes, ms: call.duration_ms, wait_ms }]
 }
 
-function timed_runs(records: RunRecords): Array<TimedRun> {
+// `timed` is the period's calls; `records.calls` is every call, so a call started before the period
+// still holds its own wait records against one inside it.
+function timed_runs(timed: ReadonlyArray<ToolCall>, records: RunRecords): Array<TimedRun> {
 	return TIMED_COMMANDS.flatMap((name) =>
-		lane_transcript_stats
-			.solo_calls(records.calls, name)
-			.flatMap((call) => timed_run(name, call, records)),
+		lane_transcript_stats.solo_calls(timed, name).flatMap((call) => timed_run(name, call, records)),
 	)
 }
 
@@ -115,10 +116,10 @@ function table(
 	calls: ReadonlyArray<ToolCall>,
 	window: StatsWindow,
 ): string {
-	const runs = timed_runs({
+	const runs = timed_runs(lane_transcript_stats.in_period(calls, window), {
 		samples: samples_of(entries),
 		waits: lane_concurrency_wait.waits_of(entries),
-		calls: lane_transcript_stats.in_period(calls, window),
+		calls,
 	})
 	const counts = [...new Set(runs.map((run) => run.lanes))].toSorted((left, right) => left - right)
 
