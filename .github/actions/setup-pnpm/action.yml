@@ -65,6 +65,11 @@ runs:
     # The safe-chain release and the SHA-256 of that release's install-safe-chain.sh, which `josh
     # latest` moves together, and with them the cache key. The release asset for this runner sits
     # beside them: the installer's own `linuxstatic` / `macos` naming, so its baked digest matches.
+    # The download directory is resolved here from the job's `$HOME`, once for the cache and the
+    # steps that read it: a literal `~` path was one cache version for a host job and a Playwright
+    # container job, whose `$HOME` is `/github/home`, so a host job's entry hit in the container
+    # and restored outside its `$HOME`. The resolved path, part of the cache version, separates the
+    # two entries (joshuafolkken/kit#7534).
     - name: Pin safe-chain
       id: safe-chain-pin
       if: inputs.install == 'true'
@@ -83,6 +88,7 @@ runs:
         echo "version=$SAFE_CHAIN_INSTALLER_VERSION" >> "$GITHUB_OUTPUT"
         echo "sha256=$SAFE_CHAIN_INSTALLER_SHA256" >> "$GITHUB_OUTPUT"
         echo "binary=$binary" >> "$GITHUB_OUTPUT"
+        echo "downloads=$HOME/.safe-chain-download" >> "$GITHUB_OUTPUT"
 
     # The release download, so a GitHub Releases outage does not turn every job red before its tests
     # (joshuafolkken/kit#6833). Off with `cache`, like the store, so a release job runs nothing
@@ -92,7 +98,7 @@ runs:
       if: inputs.install == 'true' && inputs.cache == 'true'
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
-        path: ~/.safe-chain-download
+        path: ${{ steps.safe-chain-pin.outputs.downloads }}
         key: safe-chain-${{ runner.os }}-${{ runner.arch }}-${{ steps.safe-chain-pin.outputs.version }}-${{ steps.safe-chain-pin.outputs.sha256 }}
 
     # Through the REST API's asset path with the job token: anonymous `releases/download` returned
@@ -107,12 +113,13 @@ runs:
         GH_TOKEN: ${{ github.token }}
         SAFE_CHAIN_INSTALLER_VERSION: ${{ steps.safe-chain-pin.outputs.version }}
         SAFE_CHAIN_BINARY: ${{ steps.safe-chain-pin.outputs.binary }}
+        SAFE_CHAIN_DOWNLOADS: ${{ steps.safe-chain-pin.outputs.downloads }}
       run: |
         export CURL_HOME
         CURL_HOME=$(mktemp -d "$RUNNER_TEMP/safe-chain-curl.XXXXXX")
         trap 'rm -r "$CURL_HOME"' EXIT
         printf '%s\n' 'retry = 3' 'retry-delay = 2' 'retry-max-time = 60' "header = \"Authorization: Bearer $GH_TOKEN\"" > "$CURL_HOME/.curlrc"
-        downloads="$HOME/.safe-chain-download"
+        downloads="$SAFE_CHAIN_DOWNLOADS"
         mkdir -p "$downloads"
         release=$(curl --proto '=https' -fsSL "https://api.github.com/repos/AikidoSec/safe-chain/releases/tags/$SAFE_CHAIN_INSTALLER_VERSION")
         for asset in install-safe-chain.sh "$SAFE_CHAIN_BINARY"; do
@@ -131,8 +138,9 @@ runs:
       env:
         SAFE_CHAIN_INSTALLER_SHA256: ${{ steps.safe-chain-pin.outputs.sha256 }}
         SAFE_CHAIN_BINARY: ${{ steps.safe-chain-pin.outputs.binary }}
+        SAFE_CHAIN_DOWNLOADS: ${{ steps.safe-chain-pin.outputs.downloads }}
       run: |
-        downloads="$HOME/.safe-chain-download"
+        downloads="$SAFE_CHAIN_DOWNLOADS"
         installer="$downloads/install-safe-chain.sh"
         echo "$SAFE_CHAIN_INSTALLER_SHA256  $installer" | sha256sum -c -
         platform=$(printf '%s' "${SAFE_CHAIN_BINARY#safe-chain-}" | tr 'a-z-' 'A-Z_')
@@ -148,7 +156,7 @@ runs:
       if: inputs.install == 'true' && inputs.cache == 'true' && steps.safe-chain-cache.outputs.cache-hit != 'true'
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
-        path: ~/.safe-chain-download
+        path: ${{ steps.safe-chain-pin.outputs.downloads }}
         key: ${{ steps.safe-chain-cache.outputs.cache-primary-key }}
 
     - name: Install dependencies
