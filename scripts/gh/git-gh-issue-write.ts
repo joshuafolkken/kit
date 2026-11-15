@@ -1,7 +1,10 @@
+import { read_json_listing } from '#scripts/git/parse-json-array'
 import { issue_watch_diff } from '#scripts/issue/issue-watch-diff'
 import { session_cite } from '#scripts/issue/session-cite'
 import { error_text } from '#scripts/lib/error-message'
-import { git_gh_api_path } from './git-gh-api-path'
+import { z } from 'zod'
+import { FULL_PAGE_QUERY, git_gh_api_path } from './git-gh-api-path'
+import { git_gh_etag_read } from './git-gh-etag-read'
 import { git_gh_exec, type GhApiRequest } from './git-gh-exec'
 import { gh_failure } from './git-gh-failure'
 import { git_gh_issue_memo } from './git-gh-issue-memo'
@@ -34,7 +37,7 @@ type CloseReason = 'completed' | 'not_planned' | 'duplicate'
 // object, so the same value is unwrapped out of it rather than the shape being changed.
 const HTML_URL_FILTER = '.html_url'
 const ID_FILTER = '.id'
-const LABEL_NAMES_FILTER = '.[].name'
+const label_schema = z.object({ name: z.string() })
 
 const LABELS_SEGMENT = '/labels'
 const COMMENTS_SEGMENT = '/comments'
@@ -259,19 +262,19 @@ type LabelWrite = { is_applied: true } | { is_applied: false; reason: string }
 
 // The issue's label names, every page of them — read back after a failed write, and by a pull
 // request's classification read. A read that itself fails answers `undefined`, which the write
-// treats as "not applied" — its own error is the reason then.
+// treats as "not applied" — its own error is the reason then. The first page goes through the ETag
+// layer, so an unchanged label set costs no rate limit (joshuafolkken/kit#7619).
 async function read_label_names(
 	issue_number: string,
 	repo?: string,
 ): Promise<Array<string> | undefined> {
 	try {
-		const raw = await git_gh_exec.exec_gh_api({
-			path: git_gh_api_path.issue_labels_api_path(issue_number, repo),
-			should_paginate: true,
-			jq_filter: LABEL_NAMES_FILTER,
-		})
+		const path = `${git_gh_api_path.issue_labels_api_path(issue_number, repo)}${FULL_PAGE_QUERY}`
+		const raw = await git_gh_etag_read.read_listing(path, git_gh_api_path.FULL_PAGE_SIZE)
+		const page = read_json_listing(raw, label_schema)
+		if (page.kind !== 'read') throw new Error(`unreadable label listing: ${path}`)
 
-		return raw.split('\n').map((name) => name.trim())
+		return page.rows.map((label) => label.name)
 	} catch (error) {
 		error_text.trace_swallowed('git_gh_issue_write.read_label_names', error)
 
