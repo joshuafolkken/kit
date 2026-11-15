@@ -30,16 +30,18 @@ const early_push_schema = z.object({
 // failure or a followup `check` stopped on, so its re-ship can tell a fix-only tree from a moved base
 // (joshuafolkken/kit#6141, joshuafolkken/kit#6675), absent on every other stop. `checks` names the CI
 // checks a followup `check` stop's wait reported failed (joshuafolkken/kit#7333), absent on every other
-// stop and on one recorded before it had them. `unpinned` is the path an `unpinned` stop took and its
-// unpinned place count (joshuafolkken/kit#7552): `no-reason` with no recorded `--unpinned-ok` reason,
+// stop and on one recorded before it had them. `unpinned` is the path an `unpinned` stop took and the
+// unpinned places it found (joshuafolkken/kit#7552): `no-reason` with no recorded `--unpinned-ok` reason,
 // `new-site` with one the places outran, `truncated` with one a check cut at its first unpinned hunk
 // never applies (`run-review-pinned-accepted.ts`), absent on any other stop and on one recorded before
-// it had it. How long it stayed stopped is derived
+// it had it. On a cut check `hunks` is a lower bound and `remaining` counts the hunks it never probed,
+// absent on an uncut one. How long it stayed stopped is derived
 // from the next ship stage, not recorded, so a resumed ship never has to know the stop it ends.
 const UNPINNED_PATHS = ['no-reason', 'new-site', 'truncated'] as const
 const unpinned_stop_schema = z.object({
 	path: z.enum(UNPINNED_PATHS),
 	hunks: z.number(),
+	remaining: z.number().optional(),
 })
 const stop_schema = z.object({
 	kind: z.literal(KIND.STOP),

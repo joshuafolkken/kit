@@ -144,12 +144,12 @@ function stop_path(summary: PinnedSummary, reason: string | undefined): Unpinned
 
 // Which path a `judge` stop without a reason took (joshuafolkken/kit#7552): no recorded reason, a
 // recorded one a place outside its record outran, or one a cut check never applies — and how many
-// unpinned places it listed.
+// unpinned places it found, with the hunks a cut check never probed.
 async function unpinned_stop(summary: PinnedSummary): Promise<UnpinnedStop> {
-	return {
-		path: stop_path(summary, await recorded_reason()),
-		hunks: summary.unpinned.length,
-	}
+	const stop = { path: stop_path(summary, await recorded_reason()), hunks: summary.unpinned.length }
+	const { is_cut, remaining } = summary
+
+	return is_cut === true && remaining !== undefined ? { ...stop, remaining } : stop
 }
 
 const run_review_pinned_accepted = {

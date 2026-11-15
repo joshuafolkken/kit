@@ -148,6 +148,17 @@ describe('run_review_pinned_accepted.unpinned_stop', () => {
 
 		expect(stop).toStrictEqual({ path: 'truncated', hunks: 1 })
 	})
+
+	it('records the hunks a cut check never probed', async () => {
+		const stop = await run_review_pinned_accepted.unpinned_stop({
+			text: 'L\n',
+			unpinned: [SITE],
+			is_cut: true,
+			remaining: 3,
+		})
+
+		expect(stop).toStrictEqual({ path: 'no-reason', hunks: 1, remaining: 3 })
+	})
 })
 
 // joshuafolkken/kit#4974: the pre-detach check skips its probe under the reason this branch recorded.
