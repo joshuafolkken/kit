@@ -106,7 +106,8 @@ function errored(): string {
 }
 
 // joshuafolkken/kit#4878: the join after a round-1 fix reads the fixed tree's check;
-// joshuafolkken/kit#5002: as it stands, never waiting the grace on a probe it just started.
+// joshuafolkken/kit#7553: waiting the grace on the probe it just started, so the join, not the ship's
+// pre-detach, returns an unpinned hunk with no reason.
 describe('run --join on a tree a round-1 fix moved', () => {
 	const fixed_tree = 'fixed-tree'
 
@@ -117,7 +118,7 @@ describe('run --join on a tree a round-1 fix moved', () => {
 		vi.spyOn(run_review_pinned_steps, 'is_pending').mockReturnValue(false)
 	})
 
-	it('starts the check again on the fixed tree and reads it without waiting', async () => {
+	it('starts the check again on the fixed tree and waits the grace for its answer', async () => {
 		const launch = vi
 			.spyOn(run_review_pinned_steps, 'launch')
 			.mockReturnValue({ kind: 'launched', pid: 1 })
@@ -126,11 +127,8 @@ describe('run --join on a tree a round-1 fix moved', () => {
 		await run_review_cli.run(['--join'])
 
 		expect(launch).toHaveBeenCalledWith(expect.any(String), undefined, fixed_tree)
-		expect(answer_now).toHaveBeenCalledWith(
-			expect.any(String),
-			expect.stringContaining('started again on the moved tree'),
-		)
-		expect(run_review_pinned_steps.wait_for_answer).not.toHaveBeenCalled()
+		expect(run_review_pinned_steps.wait_for_answer).toHaveBeenCalledOnce()
+		expect(answer_now).not.toHaveBeenCalled()
 	})
 })
 

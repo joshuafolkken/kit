@@ -683,8 +683,9 @@ exits non-zero with no brief. `--join` reads the settled gate, prints the timing
 (a review fix in place) exits `2` and says so rather than `Gate RED`; `josh ship --review` drains it
 and its gate stage re-runs on the moved tree. `josh test:pinned --record <token>` runs detached beside
 the gate; `--join` prints its lines and **exits `3` on an unpinned change**, which `josh ship --review`
-never drains (`--unpinned-ok`: above). A check `--join` started again on a moved tree is not waited on:
-it is left running for the ship's pre-detach, as under `--fixing`. `review:record` reads a skipped
+never drains (`--unpinned-ok`: above). A check `--join` started again on a moved tree is waited on for
+the grace, so an unpinned hunk stops the join rather than the ship; under `--fixing`, or past the grace,
+it is left running for the ship's pre-detach. `review:record` reads a skipped
 `--join`.
 
 A finished first-unpinned cut without a reason collects the existing remaining probe at
