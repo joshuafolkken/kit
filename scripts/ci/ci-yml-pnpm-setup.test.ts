@@ -155,7 +155,8 @@ describe('the setup-pnpm safe-chain cache', () => {
 			uses: expect.stringMatching(/^actions\/cache\/restore@[\da-f]{40}$/u),
 			if: WHEN_CACHING,
 			with: {
-				path: expect.not.stringContaining('pnpm'),
+				// joshuafolkken/kit#7534: the directory the job's own `$HOME` resolves, never `~`.
+				path: '${{ steps.safe-chain-pin.outputs.downloads }}',
 				key: expect.stringMatching(
 					/steps\.safe-chain-pin\.outputs\.version.*steps\.safe-chain-pin\.outputs\.sha256/u,
 				),

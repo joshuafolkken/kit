@@ -48,6 +48,9 @@ const DOWNLOADS = '.safe-chain-download'
 const EXECUTABLE = 0o755
 const FETCH_STEP = 'Fetch safe-chain'
 const SETUP_STEP = 'Setup safe-chain'
+const PIN_STEP = 'Pin safe-chain'
+const HOST_HOME = '/home/runner'
+const CONTAINER_HOME = '/github/home'
 
 function sha256(content: string): string {
 	return createHash('sha256').update(content).digest('hex')
@@ -94,6 +97,7 @@ function run_step(name: string, directory: string, environment: Record<string, s
 			GITHUB_PATH: path.join(directory, GITHUB_PATH_FILE),
 			RUNNER_TEMP: directory,
 			SAFE_CHAIN_BINARY: BINARY_NAME,
+			SAFE_CHAIN_DOWNLOADS: path.join(directory, DOWNLOADS),
 			...environment,
 		},
 	})
@@ -114,6 +118,21 @@ function run_setup(directory: string, installer_digest = sha256(INSTALLER)): num
 	return run_step(SETUP_STEP, directory, { SAFE_CHAIN_INSTALLER_SHA256: installer_digest })
 }
 
+// The pin step's `downloads` output, resolved under `home` as the job's `$HOME`.
+function pinned_downloads(home: string): string | undefined {
+	const directory = setup()
+	const output = path.join(directory, 'github-output')
+
+	run_step(PIN_STEP, directory, {
+		HOME: home,
+		GITHUB_OUTPUT: output,
+		RUNNER_OS: 'Linux',
+		RUNNER_ARCH: 'X64',
+	})
+
+	return /^downloads=(.*)$/mu.exec(readFileSync(output, 'utf8'))?.[1]
+}
+
 function curl_calls(directory: string): Array<string> {
 	return readFileSync(path.join(directory, CURL_CALLS), 'utf8').trimEnd().split('\n')
 }
@@ -125,6 +144,15 @@ function downloaded(directory: string, name: string): string {
 function setup_ran(directory: string): boolean {
 	return existsSync(path.join(directory, BINARY_CALLS))
 }
+
+// joshuafolkken/kit#7534: a cache path of `~` expanded to the host's home, so a host job's entry
+// hit in a Playwright container job, whose `$HOME` is `/github/home`, and restored outside it.
+describe(PIN_STEP, () => {
+	it('resolves the download directory under the job’s own $HOME', () => {
+		expect(pinned_downloads(HOST_HOME)).toBe(path.join(HOST_HOME, DOWNLOADS))
+		expect(pinned_downloads(CONTAINER_HOME)).toBe(path.join(CONTAINER_HOME, DOWNLOADS))
+	})
+})
 
 describe(FETCH_STEP, () => {
 	it('downloads the pinned installer and this runner’s binary through the REST API', () => {
