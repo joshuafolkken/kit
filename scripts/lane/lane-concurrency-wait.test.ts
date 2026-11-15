@@ -25,11 +25,11 @@ function admission(offset_s: number): LedgerEntry {
 	return { kind: 'core-admission', at, command: LINT, waited_ms: 0, issue: ISSUE }
 }
 
-function call(seconds: number): ToolCall {
+function call(seconds: number, started_s = 0): ToolCall {
 	return {
 		session_id: 'one',
 		lane: `/home/.claude/projects/-kit-lanes-${String(ISSUE)}`,
-		started_ms: STARTED,
+		started_ms: STARTED + started_s * SECOND,
 		duration_ms: seconds * SECOND,
 		tool: 'Bash',
 		background: false,
@@ -40,7 +40,11 @@ function call(seconds: number): ToolCall {
 }
 
 function wait_of(entries: ReadonlyArray<LedgerEntry>, seconds: number): number | undefined {
-	return lane_concurrency_wait.wait_ms(lane_concurrency_wait.waits_of(entries), LINT, call(seconds))
+	const target = call(seconds)
+
+	return lane_concurrency_wait.wait_ms(lane_concurrency_wait.waits_of(entries), LINT, target, [
+		target,
+	])
 }
 
 describe('lane_concurrency_wait.wait_ms', () => {
@@ -64,5 +68,18 @@ describe('lane_concurrency_wait.wait_ms', () => {
 
 	it('reads an immediate admission as a measured zero wait', () => {
 		expect(wait_of([admission(1)], 30)).toBe(0)
+	})
+
+	it('gives each record to one of two overlapping same-lane calls of the command', () => {
+		const background = call(60)
+		const foreground = call(20, 30)
+		const calls = [background, foreground]
+		const waits = lane_concurrency_wait.waits_of([
+			wait(LINT, 5, 3, ISSUE),
+			wait(LINT, 40, 4, ISSUE),
+		])
+
+		expect(lane_concurrency_wait.wait_ms(waits, LINT, background, calls)).toBe(3 * SECOND)
+		expect(lane_concurrency_wait.wait_ms(waits, LINT, foreground, calls)).toBe(4 * SECOND)
 	})
 })

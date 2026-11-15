@@ -62,6 +62,7 @@ function lanes_at(samples: ReadonlyArray<LaneSample>, started_ms: number): numbe
 interface RunRecords {
 	samples: ReadonlyArray<LaneSample>
 	waits: ReadonlyArray<LaneWait>
+	calls: ReadonlyArray<ToolCall>
 }
 
 function timed_run(name: string, call: ToolCall, records: RunRecords): Array<TimedRun> {
@@ -69,14 +70,16 @@ function timed_run(name: string, call: ToolCall, records: RunRecords): Array<Tim
 
 	if (lanes === undefined || call.duration_ms === undefined) return []
 
-	const wait_ms = lane_concurrency_wait.wait_ms(records.waits, name, call)
+	const wait_ms = lane_concurrency_wait.wait_ms(records.waits, name, call, records.calls)
 
 	return [{ name, lanes, ms: call.duration_ms, wait_ms }]
 }
 
-function timed_runs(calls: ReadonlyArray<ToolCall>, records: RunRecords): Array<TimedRun> {
+function timed_runs(records: RunRecords): Array<TimedRun> {
 	return TIMED_COMMANDS.flatMap((name) =>
-		lane_transcript_stats.solo_calls(calls, name).flatMap((call) => timed_run(name, call, records)),
+		lane_transcript_stats
+			.solo_calls(records.calls, name)
+			.flatMap((call) => timed_run(name, call, records)),
 	)
 }
 
@@ -112,9 +115,10 @@ function table(
 	calls: ReadonlyArray<ToolCall>,
 	window: StatsWindow,
 ): string {
-	const runs = timed_runs(lane_transcript_stats.in_period(calls, window), {
+	const runs = timed_runs({
 		samples: samples_of(entries),
 		waits: lane_concurrency_wait.waits_of(entries),
+		calls: lane_transcript_stats.in_period(calls, window),
 	})
 	const counts = [...new Set(runs.map((run) => run.lanes))].toSorted((left, right) => left - right)
 
