@@ -100,6 +100,14 @@ describe('lane_concurrency_stats.table', () => {
 })
 
 describe('lane_concurrency_stats.table core wait', () => {
+	it('heads each command with its runs, median and core wait median columns', () => {
+		const [header] = lane_concurrency_stats.table([], [], WINDOW).split('\n', 1)
+
+		expect(header).toBe(
+			'| concurrent lanes | lint:related runs | lint:related median (s) | lint:related core wait median (s) | test:related runs | test:related median (s) | test:related core wait median (s) |',
+		)
+	})
+
 	it('gives each lane count the median core wait of the calls a wait record ties to', () => {
 		const solo = NOW - HOUR
 		const busy = NOW - 2 * HOUR
