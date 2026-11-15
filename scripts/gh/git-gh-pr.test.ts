@@ -68,8 +68,7 @@ const BODY = 'closes #1029\n\n- one\n- two'
 const BUGFIX = 'bugfix'
 const PR_LABELS_PATH = `${REPO_PATH}/issues/1045/labels`
 const EXISTING_PR_LABELS_PATH = `${REPO_PATH}/issues/${String(PR_NUMBER)}/labels`
-// The label reads' first page, which goes through the ETag layer (joshuafolkken/kit#7619).
-const PR_LABELS_READ = `${PR_LABELS_PATH}${FULL_PAGE_QUERY}`
+// The label read's first page, which goes through the ETag layer (joshuafolkken/kit#7619).
 const EXISTING_PR_LABELS_READ = `${EXISTING_PR_LABELS_PATH}${FULL_PAGE_QUERY}`
 const CHOOSE_ERROR = 'Choose one release classification'
 const RATE_LIMITED_MESSAGE = 'rate limited'
@@ -163,7 +162,7 @@ describe('pr_create classification', () => {
 				[PR_LABELS_PATH]: async () => {
 					throw new Error(RATE_LIMITED_MESSAGE)
 				},
-				[PR_LABELS_READ]: labels_json(BUGFIX),
+				[`${PR_LABELS_PATH}${FULL_PAGE_QUERY}`]: labels_json(BUGFIX),
 			}),
 		)
 
@@ -189,11 +188,8 @@ describe('existing pull request classification', () => {
 
 		await git_gh_pr.pr_ensure_classification(PR_BRANCH, BUGFIX)
 
-		const write = requests().find(
-			(request) => request.path === EXISTING_PR_LABELS_PATH && request.body !== undefined,
-		)
-
-		expect(write?.body).toBe(JSON.stringify({ labels: [BUGFIX] }))
+		// The read goes to the `?per_page=` path, so the bare labels path is the write alone.
+		expect(parsed_body(EXISTING_PR_LABELS_PATH)).toStrictEqual({ labels: [BUGFIX] })
 	})
 
 	it('reuses an existing classification without writing another label', async () => {
