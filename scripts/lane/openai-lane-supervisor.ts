@@ -212,11 +212,13 @@ async function after_child(
 	const ship = await openai_lane_ship.wait_for_ship(issue, prior_launch)
 	if (ship !== 'failed') return completion_code(result, ship)
 
+	// A generation that ended without a cut breaks the run of no-progress cuts.
 	return {
 		...generation,
 		epoch: generation.epoch + 1,
 		is_resume: false,
 		invocation: await stop_invocation(issue),
+		idle_cuts: 0,
 	}
 }
 

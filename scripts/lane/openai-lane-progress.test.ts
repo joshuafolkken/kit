@@ -1,4 +1,4 @@
-import { writeFileSync } from 'node:fs'
+import { rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
@@ -151,6 +151,26 @@ describe('openai_lane_progress.fingerprint — the worktree state', () => {
 		expect(openai_lane_progress.fingerprint(lane_directory())).not.toBe(before)
 	})
 
+	it('moves on an edit to an untracked file whose name git would quote', () => {
+		const quoted = path.join(lane_directory(), 'ファイル name.txt')
+
+		writeFileSync(quoted, 'first\n')
+		const before = openai_lane_progress.fingerprint(lane_directory())
+
+		writeFileSync(quoted, 'second\n')
+		expect(before).toBeDefined()
+		expect(openai_lane_progress.fingerprint(lane_directory())).not.toBe(before)
+		rmSync(quoted)
+	})
+
+	it('is undefined when an untracked path cannot be hashed', async () => {
+		const nested = path.join(lane_directory(), 'nested')
+
+		await git_fixture_workspace.git(lane_directory(), ['init', '-q', nested])
+		expect(openai_lane_progress.fingerprint(lane_directory())).toBeUndefined()
+		rmSync(nested, { recursive: true, force: true })
+	})
+
 	it('is undefined outside a git worktree', () => {
 		expect(openai_lane_progress.fingerprint(make_directory('not-a-repo-'))).toBeUndefined()
 	})
@@ -164,6 +184,25 @@ describe('openai_lane_supervisor.supervise — no-progress cut limit', () => {
 		expect(launch).toHaveBeenCalledTimes(NO_PROGRESS_CUT_LIMIT)
 		expect(stop_events()).toHaveLength(1)
 		expect(run_cut.read_cut(target).kind).toBe('carried')
+	})
+
+	it('starts the count over after a generation that ended without a cut and failed to ship', async () => {
+		const ends_without_cut = 2
+		const last = 5
+
+		vi.mocked(openai_lane_ship.wait_for_ship).mockResolvedValueOnce('failed')
+		launch.mockImplementation(async () => {
+			const generation = launch.mock.calls.length - 1
+
+			if (generation === ends_without_cut || generation === last) run_cut.end_cut(target)
+			else cut()
+
+			return COMPLETED
+		})
+
+		expect(await supervise()).toBe(0)
+		expect(launch).toHaveBeenCalledTimes(last + 1)
+		expect(stop_events()).toHaveLength(0)
 	})
 
 	it('keeps relaunching while generations cut with progress', async () => {
