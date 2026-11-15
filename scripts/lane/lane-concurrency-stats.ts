@@ -1,4 +1,5 @@
 import { MS_PER_MINUTE, MS_PER_SECOND } from '#scripts/lib/timeouts'
+import { lane_concurrency_wait, type LaneWait } from './lane-concurrency-wait'
 import { lane_ledger, type LedgerEntry, type LoadEntry } from './lane-ledger'
 import { lane_stage_stats } from './lane-stage-stats'
 import { lane_stats, type StatsWindow } from './lane-stats'
@@ -9,7 +10,8 @@ import { lane_transcript_stats } from './lane-transcript-stats'
 // (joshuafolkken/kit#7025): the evidence a `JOSH_LANE_LIMIT` or verification-parallelism change is
 // filed from. A call's lane count is the latest load sample's `lanes` at or before it started; a call
 // with no sample within `SAMPLE_MAX_AGE_MS` before it is left out, since an old sample says nothing of
-// the lanes it ran beside.
+// the lanes it ran beside. Each command also reads the median core-budget wait inside its calls
+// (joshuafolkken/kit#7550), so the elapsed time minus the wait is the run after admission.
 
 const TIMED_COMMANDS: ReadonlyArray<string> = ['lint:related', 'test:related']
 const SAMPLE_MAX_AGE_MINUTES = 5
@@ -17,7 +19,11 @@ const SAMPLE_MAX_AGE_MS = SAMPLE_MAX_AGE_MINUTES * MS_PER_MINUTE
 const DECIMALS = 1
 const COLUMNS = [
 	'concurrent lanes',
-	...TIMED_COMMANDS.flatMap((name) => [`${name} runs`, `${name} median (s)`]),
+	...TIMED_COMMANDS.flatMap((name) => [
+		`${name} runs`,
+		`${name} median (s)`,
+		`${name} core wait median (s)`,
+	]),
 ]
 
 type CountedSample = LoadEntry & { lanes: number }
@@ -31,6 +37,7 @@ interface TimedRun {
 	name: string
 	lanes: number
 	ms: number
+	wait_ms: number | undefined
 }
 
 function is_counted(entry: LedgerEntry): entry is CountedSample {
@@ -52,21 +59,30 @@ function lanes_at(samples: ReadonlyArray<LaneSample>, started_ms: number): numbe
 		: undefined
 }
 
-function timed_run(name: string, call: ToolCall, lanes: number | undefined): Array<TimedRun> {
-	if (lanes === undefined || call.duration_ms === undefined) return []
-
-	return [{ name, lanes, ms: call.duration_ms }]
+interface RunRecords {
+	samples: ReadonlyArray<LaneSample>
+	waits: ReadonlyArray<LaneWait>
 }
 
-function timed_runs(
-	calls: ReadonlyArray<ToolCall>,
-	samples: ReadonlyArray<LaneSample>,
-): Array<TimedRun> {
+function timed_run(name: string, call: ToolCall, records: RunRecords): Array<TimedRun> {
+	const lanes = lanes_at(records.samples, call.started_ms)
+
+	if (lanes === undefined || call.duration_ms === undefined) return []
+
+	const wait_ms = lane_concurrency_wait.wait_ms(records.waits, name, call)
+
+	return [{ name, lanes, ms: call.duration_ms, wait_ms }]
+}
+
+function timed_runs(calls: ReadonlyArray<ToolCall>, records: RunRecords): Array<TimedRun> {
 	return TIMED_COMMANDS.flatMap((name) =>
-		lane_transcript_stats
-			.solo_calls(calls, name)
-			.flatMap((call) => timed_run(name, call, lanes_at(samples, call.started_ms))),
+		lane_transcript_stats.solo_calls(calls, name).flatMap((call) => timed_run(name, call, records)),
 	)
+}
+
+// A row's waits are the calls a record tied to; a row with none reads `not measured`, never 0.
+function waits_of(runs: ReadonlyArray<TimedRun>): Array<number> {
+	return runs.flatMap((run) => (run.wait_ms === undefined ? [] : [run.wait_ms]))
 }
 
 function seconds_cell(values: ReadonlyArray<number>): string {
@@ -80,9 +96,10 @@ function seconds_cell(values: ReadonlyArray<number>): string {
 function lane_row(lanes: number, runs: ReadonlyArray<TimedRun>): string {
 	const at_count = runs.filter((run) => run.lanes === lanes)
 	const cells = TIMED_COMMANDS.flatMap((name) => {
-		const durations = at_count.filter((run) => run.name === name).map((run) => run.ms)
+		const named = at_count.filter((run) => run.name === name)
+		const durations = named.map((run) => run.ms)
 
-		return [String(durations.length), seconds_cell(durations)]
+		return [String(durations.length), seconds_cell(durations), seconds_cell(waits_of(named))]
 	})
 
 	return lane_stats.to_row([String(lanes), ...cells])
@@ -95,7 +112,10 @@ function table(
 	calls: ReadonlyArray<ToolCall>,
 	window: StatsWindow,
 ): string {
-	const runs = timed_runs(lane_transcript_stats.in_period(calls, window), samples_of(entries))
+	const runs = timed_runs(lane_transcript_stats.in_period(calls, window), {
+		samples: samples_of(entries),
+		waits: lane_concurrency_wait.waits_of(entries),
+	})
 	const counts = [...new Set(runs.map((run) => run.lanes))].toSorted((left, right) => left - right)
 
 	return [

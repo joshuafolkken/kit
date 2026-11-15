@@ -221,6 +221,10 @@ pnpm josh lane:stats --since 2026-11-10T01:00Z --why 40   # cause groups since a
 
 <!-- /usage -->
 
+The `concurrent lanes` table gives `lint:related` / `test:related` per lane count the runs, median seconds and
+median core wait: the call's own lane's `core_wait` records for it while it ran. No such record reads
+`not measured`, not 0 (`lane-concurrency-wait.ts`).
+
 The followup row is `followup (driver, outside lane net)`; `--why` groups a followup over budget as `driver followup over budget (outside lane net)`, apart from the lane's own causes (`lane-why-period.ts`). Its `open issues` matches each lane's ledger cause key (the last CI check) as well as the stage names, through `lane:why`'s matcher (`lane-why-causes.ts`).
 
 `--sinks [<minutes>]` (default 30) prints one table instead: per `lane:breakdown` stage and lap of the period's merged
