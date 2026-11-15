@@ -20,8 +20,9 @@ function missing_headings(body: string): ReadonlyArray<string> {
 const SUMMARY_HEADING = issue_body_keys.heading('summary')
 
 // Whether the body's first non-blank line is the summary heading — present further down does not count.
+// Read canonically, so the other language's heading counts as every other heading check does.
 function starts_with_summary(body: string): boolean {
-	const first = markdown_section.lines_of(body).find((line) => line.trim() !== '')
+	const first = markdown_section.canonical_lines(body).find((line) => line.trim() !== '')
 
 	return first?.trim() === SUMMARY_HEADING
 }
