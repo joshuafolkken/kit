@@ -1,5 +1,6 @@
 import type { DriveState, LoopConfig, LoopPorts } from './backlog-drive'
 import { backlog_drive_memory } from './backlog-drive-memory'
+import { backlog_listing_trace } from './backlog-listing-trace'
 
 interface OfferTiming {
 	idle_until_ms?: number | undefined
@@ -57,14 +58,21 @@ function is_check_due(run: LoopRun, config: LoopConfig, now_ms: number): boolean
 }
 
 // The `auto-ok` listing, checked by its ETag at `check_ms` while a seat is free: a 304 spends no REST
-// core, so a new issue is asked about without waiting out the interval (joshuafolkken/kit#7227).
+// core, so a new issue is asked about without waiting out the interval (joshuafolkken/kit#7227). A
+// check a full pool skips is traced beside the watcher's own outcomes (joshuafolkken/kit#7583).
 async function is_listing_changed(
 	run: LoopRun,
 	config: LoopConfig,
 	ports: DuePorts,
 	now_ms: number,
 ): Promise<boolean> {
-	if (!is_check_due(run, config, now_ms) || (await ports.free_lanes()) === 0) return false
+	if (!is_check_due(run, config, now_ms)) return false
+
+	if ((await ports.free_lanes()) === 0) {
+		backlog_listing_trace.drive('no-free-lane')
+
+		return false
+	}
 
 	return await ports.listing_changed()
 }
