@@ -14,7 +14,7 @@ import { run_review_steps } from './run-review-steps'
 // `josh run:review` launched — `--join`, `josh review:record` and the ship's pre-detach — reads it for
 // the tree in front of it, and none runs the check again by hand.
 //
-// **A moved tree starts the check again on it, and the old one is not waited on.** A round-1 fix moves
+// **A moved tree starts the check again on it, and the old one is not waited out.** A round-1 fix moves
 // the tree under the launch; `--join` then waited out the grace on the pre-fix check and stopped it
 // (joshuafolkken/kit#4878). Restarting on the current tree, with the launch's `--unpinned-ok` reason,
 // probes only the hunks the shared verdict cache no longer holds (`test-pinned-cache.ts`).
@@ -27,8 +27,6 @@ type Pause = () => Promise<void>
 
 const PENDING_NOTE =
 	'`josh test:pinned` is still running; the hunks below are unpinned by the verdicts it already reached; the round is not stopped on them:'
-const RESTARTED_NOTE =
-	"started again on the moved tree — it is left running for the ship's pre-detach to read"
 
 // The current tree's digest when it differs from the launch's; `undefined` when nothing is to start.
 async function moved_tree(root: string): Promise<string | undefined> {
@@ -93,20 +91,19 @@ async function fixing_answer(root: string, note: string): Promise<PinnedSummary 
 // Restarts the check on a moved tree whatever the round, then why the join waits no grace on it;
 // `undefined` when it does wait.
 async function graceless_note(root: string, is_fixing: boolean): Promise<string | undefined> {
-	const is_fresh = await is_restarted(root)
+	await is_restarted(root)
 
-	if (is_fixing) return run_review_pinned_steps.FIXING_NOTE
-
-	return is_fresh ? RESTARTED_NOTE : undefined
+	return is_fixing ? run_review_pinned_steps.FIXING_NOTE : undefined
 }
 
 // `--join`'s read: the current tree's answer, never a pre-fix tree's. `undefined` when no check was
 // launched. **A ship's own round restarts nothing and leaves nothing running**: under its supervisor
 // no `--pinned` read follows, and the check would hold cores the ship's gate waits on
 // (`review-record-code-round.ts`). **A round 1 with fixes to make waits no grace**
-// (joshuafolkken/kit#4895): the fix moves the tree, so this tree's late answer would go unused. **Nor
-// does a check it just started again** (joshuafolkken/kit#5002), `--fixing` or not: a fresh probe never
-// ends within the grace, and the ship's pre-detach reads it on this tree.
+// (joshuafolkken/kit#4895): the fix moves the tree, so this tree's late answer would go unused. **A
+// check it just started again is waited on** (joshuafolkken/kit#7553): left for the ship's pre-detach,
+// an unpinned hunk with no reason stopped the ship there; the restart probes only the hunks the cache
+// no longer holds, and one past the grace is still left running for the pre-detach.
 async function wait_for_join(
 	root: string = PROJECT_ROOT,
 	now?: Clock,
