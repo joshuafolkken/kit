@@ -44,18 +44,27 @@ function total(values: ReadonlyArray<number>): number | undefined {
 	return values.length === 0 ? undefined : values.reduce((sum, value) => sum + value, 0)
 }
 
+// A step `run:entry` times itself: a child's own laps (`run:entry › run:hold › …`) are inside its
+// parent's step, so summing them too would count that time twice.
+function is_entry_step(step: string): boolean {
+	return (
+		step.startsWith(ENTRY_STEP_PREFIX) &&
+		!step.slice(ENTRY_STEP_PREFIX.length).includes(run_ship_lap.PARENT_SEPARATOR)
+	)
+}
+
 // The sum of the period's `run:entry › <step>` medians, one median per step.
 function entry_step_sum(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): string {
 	const laps = lane_stats
 		.in_window(entries, window)
 		.filter((entry) => lane_ship_lap_stats.is_ship_lap(entry))
-		.filter((lap) => lap.step.startsWith(ENTRY_STEP_PREFIX))
-		.map((lap) => ({ step: lap.step, elapsed: lap.elapsed_ms }))
+		.filter((lap) => is_entry_step(lap.step))
 	const steps = [...new Set(laps.map((lap) => lap.step))]
-	const medians = steps.map(
-		(step) =>
-			lane_stats.median(laps.filter((lap) => lap.step === step).map((lap) => lap.elapsed)) ?? 0,
-	)
+	const medians = steps
+		.map((step) =>
+			lane_stats.median(laps.filter((lap) => lap.step === step).map((lap) => lap.elapsed_ms)),
+		)
+		.filter((median) => median !== undefined)
 	const sum = total(medians)
 
 	return sum === undefined ? lane_stage_stats.NOT_MEASURED : (sum / MS_PER_SECOND).toFixed(1)

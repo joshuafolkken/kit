@@ -99,6 +99,12 @@ describe('lane_record_command_stats.table — run:entry ledger steps', () => {
 		expect(cell(entries, [], { row: 'cost', column })).toBe('—')
 	})
 
+	it('leaves out a child lap nested inside a run:entry step', () => {
+		const nested = [...entries, lap('run:entry › run:hold › startup', 4)]
+
+		expect(cell(nested, [], { row: 'run:entry', column })).toBe('20.0')
+	})
+
 	it('reads not measured when the ledger holds no run:entry step', () => {
 		expect(cell([], [], { row: 'run:entry', column })).toBe(NOT_MEASURED)
 	})
