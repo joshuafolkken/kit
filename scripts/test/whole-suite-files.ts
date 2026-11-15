@@ -2,7 +2,9 @@ import path from 'node:path'
 import { unit_setup_files } from './unit-setup-files'
 
 // The files every test depends on without importing or reading them: the package and its lock,
-// the vitest configuration, and the setup files every worker runs before every test.
+// the vitest configuration, and the setup files every worker runs before every test. A `package.json`
+// change of its `version` alone is none of them: `test:related` resolves it through the test-read map
+// instead (`package-version-only.ts`, joshuafolkken/kit#7538).
 const SETUP_FILES: ReadonlyArray<string> = [
 	...unit_setup_files.NETWORK_GUARD,
 	...unit_setup_files.STATE_GUARD,
