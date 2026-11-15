@@ -23,7 +23,7 @@ describe('the advice names what the rule requires', () => {
 	// A clean checkout parked on a feature branch also answers `reclaim`, and telling the caller to
 	// record a stash `git stash push` never created posts an Issue comment naming nothing.
 	it('prescribes no stash over a clean tree that is merely on the wrong branch', () => {
-		const tree: TreeState = { branch: '926-x', default_branch: 'main', is_dirty: false }
+		const tree: TreeState = { branch: '927-x', default_branch: 'main', is_dirty: false }
 		const { advice } = run_preflight.decide(tree, NO_WORK, ISSUE)
 
 		expect(advice).not.toContain('git stash')
@@ -40,7 +40,7 @@ describe('the advice names what the rule requires', () => {
 	})
 
 	it('requires the whole verification gate when a branch is reused', () => {
-		expect(run_preflight.decide(CLEAN_TREE, child('open', '926-x'), ISSUE).advice).toBe(
+		expect(run_preflight.decide(CLEAN_TREE, child('open', '926-x'), ISSUE).advice).toContain(
 			run_preflight.RESUME_ADVICE,
 		)
 		expect(run_preflight.RESUME_ADVICE).toContain('from the start')

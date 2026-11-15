@@ -94,8 +94,25 @@ const STASH_LABEL_PREFIX = 'run:hold reclaimed before #'
 const { require_issue_number } = issue_number_shape
 const UNREADABLE_PR_MESSAGE = 'The pull request could not be read for branch '
 
-function needs_reclaim(tree: TreeState): boolean {
-	return tree.is_dirty || tree.branch !== tree.default_branch
+const RESUME_IN_PLACE_REASON =
+	'HEAD is on this issue’s own branch over a clean tree, so the run resumes there.'
+
+const ISSUE_BRANCH_SEPARATOR = '-'
+
+// The same `<N>-` rule `read_branch_candidates` globs by, so `<N><digit>-…` is another issue's branch.
+function is_issue_branch(branch: string, issue: string): boolean {
+	return branch.startsWith(`${issue}${ISSUE_BRANCH_SEPARATOR}`)
+}
+
+function is_off_default(tree: TreeState): boolean {
+	return tree.branch !== tree.default_branch
+}
+
+// **The issue's own branch over a clean tree is where a resume belongs, not something to reclaim**
+// (joshuafolkken/kit#7543): reclaiming it sends the run to the default branch, where `resume` sends it
+// straight back, and neither answer takes the hold. Another issue's branch is still reclaimed.
+function needs_reclaim(tree: TreeState, issue: string): boolean {
+	return tree.is_dirty || (is_off_default(tree) && !is_issue_branch(tree.branch, issue))
 }
 
 // A pull request that was merged or closed is a decision somebody already made. Carrying on over a
@@ -116,13 +133,14 @@ function has_leftover_work(child: ChildState): boolean {
 
 // The precedence is fixed, and the first row is why it has to be. A `resume` or a `park` decided over
 // a dirty tree hands the next child a checkout it cannot switch — so the tree is reclaimed first and
-// the question asked again on the clean tree, rather than two answers being merged into one.
-function to_verdict(tree: TreeState, child: ChildState): PreflightVerdict {
-	if (needs_reclaim(tree)) return RECLAIM_VERDICT
+// the question asked again on the clean tree, rather than two answers being merged into one. A clean
+// tree already on the issue's branch has followed `resume`'s advice, so it answers `clean`.
+function to_verdict(tree: TreeState, child: ChildState, issue: string): PreflightVerdict {
+	if (needs_reclaim(tree, issue)) return RECLAIM_VERDICT
 
 	if (is_pr_decided(child.pr_state)) return PARK_VERDICT
 
-	if (has_leftover_work(child)) return RESUME_VERDICT
+	if (has_leftover_work(child) && !is_off_default(tree)) return RESUME_VERDICT
 
 	return CLEAN_VERDICT
 }
@@ -154,7 +172,7 @@ function to_reason(verdict: PreflightVerdict, tree: TreeState, child: ChildState
 
 	if (verdict === RESUME_VERDICT) return resume_reason(child)
 
-	return CLEAN_REASON
+	return is_off_default(tree) ? RESUME_IN_PLACE_REASON : CLEAN_REASON
 }
 
 // **`-u` is not optional.** What an interrupted run leaves almost always includes a new `*.test.ts`,
@@ -183,21 +201,37 @@ function reclaim_advice(tree: TreeState, issue: string): string {
 	].join('\n')
 }
 
-function to_advice(verdict: PreflightVerdict, issue: string, tree: TreeState): string {
+// **`resume` names the one command that leads to a hold.** Switched onto the branch, the same ask
+// answers `clean` and takes the hold, so the caller never alternates between `resume` and `reclaim`.
+function resume_advice(child: ChildState): string {
+	const steps =
+		child.branch_name === undefined
+			? []
+			: [`git switch ${child.branch_name}`, 'Then ask this command again: it takes the hold there.']
+
+	return [...steps, RESUME_ADVICE].join('\n')
+}
+
+function to_advice(
+	verdict: PreflightVerdict,
+	issue: string,
+	tree: TreeState,
+	child: ChildState,
+): string {
 	if (verdict === RECLAIM_VERDICT) return reclaim_advice(tree, issue)
 
-	if (verdict === RESUME_VERDICT) return RESUME_ADVICE
+	if (verdict === RESUME_VERDICT) return resume_advice(child)
 
 	if (verdict === PARK_VERDICT) return PARK_ADVICE
 
-	return CLEAN_ADVICE
+	return is_off_default(tree) ? RESUME_ADVICE : CLEAN_ADVICE
 }
 
 function decide(tree: TreeState, child: ChildState, issue: string): PreflightDecision {
-	const verdict = to_verdict(tree, child)
+	const verdict = to_verdict(tree, child, issue)
 
 	return {
-		advice: to_advice(verdict, issue, tree),
+		advice: to_advice(verdict, issue, tree, child),
 		reason: to_reason(verdict, tree, child),
 		verdict,
 	}
@@ -389,7 +423,7 @@ async function check(issue: string): Promise<PreflightDecision> {
 
 	const tree = await read_tree_state()
 
-	if (needs_reclaim(tree)) return decide(tree, NO_CHILD_WORK, issue)
+	if (needs_reclaim(tree, issue)) return decide(tree, NO_CHILD_WORK, issue)
 
 	return decide(tree, await read_child_state(issue), issue)
 }
