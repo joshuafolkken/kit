@@ -14,8 +14,21 @@ describe('lane_stats_request.stats_request', () => {
 			over: undefined,
 			why: undefined,
 			is_pairs: false,
+			is_all: false,
 		})
 	})
+
+	// joshuafolkken/kit#7578: `--all` prints every row of the capped per-lane tables.
+	it('reads --all as every per-lane table row', () => {
+		expect(lane_stats_request.stats_request(['--period', '7', '--all'])?.is_all).toBe(true)
+	})
+
+	it.each([['--sinks'], ['--over', '40'], ['--why', '40'], ['--pairs']])(
+		'refuses --all beside %s',
+		(...flags) => {
+			expect(lane_stats_request.stats_request(['--period', '1', '--all', ...flags])).toBeUndefined()
+		},
+	)
 
 	it('reads --pairs as the pairs table', () => {
 		expect(lane_stats_request.stats_request(['--period', '1', '--pairs'])?.is_pairs).toBe(true)

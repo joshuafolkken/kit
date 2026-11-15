@@ -1,7 +1,10 @@
 import { git_gh_issue } from '#scripts/gh/git-gh-issue'
 import { git_gh_issue_rest, type RestIssue } from '#scripts/gh/git-gh-issue-rest'
 import { AUTO_OK_LABEL, IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
+import { shared_cache } from '#scripts/josh/shared-cache'
 import { z } from 'zod'
+import { backlog_listing_trace, type ListingNote } from './backlog-listing-trace'
+import { backlog_next_shared } from './backlog-next-shared'
 
 type ListingCheck = () => Promise<boolean>
 
@@ -43,24 +46,35 @@ function has_change(seen: Listing | undefined, listing: Listing): boolean {
 // one outside a lane, counts. The first read is the baseline, and a read that fails reads as unchanged:
 // the ask's interval still comes. A first read that fails leaves an empty baseline rather than none, so
 // an issue listed before the next read that answers still counts as new (joshuafolkken/kit#7229).
-function watcher(): ListingCheck {
+//
+// **A change drops the kept `backlog:next` answer**: its key moves only with the run's stream, which an
+// `issue:file --publish` does not touch, so the ask the change wakes would replay the answer from before
+// it, and the change, already seen, wakes nothing more (joshuafolkken/kit#7583).
+function watcher(note: ListingNote = backlog_listing_trace.ignore): ListingCheck {
 	const memory: { seen?: Listing } = {}
 
 	function keep(listing: Listing): void {
 		memory.seen = listing
 	}
 
+	function settle(listing: Listing): boolean {
+		const is_new = has_change(memory.seen, listing)
+
+		keep(listing)
+		if (is_new) shared_cache.clear(backlog_next_shared.NEXT_CACHE)
+		note(is_new ? 'changed' : 'unchanged')
+
+		return is_new
+	}
+
 	return async function is_changed(): Promise<boolean> {
 		try {
 			const detail = await git_gh_issue.issue_list_label_first_page(AUTO_OK_LABEL)
-			const listing = listing_of(detail.body)
-			const is_new = has_change(memory.seen, listing)
 
-			keep(listing)
-
-			return is_new
+			return settle(listing_of(detail.body))
 		} catch {
 			keep(memory.seen ?? new Map())
+			note('failed')
 
 			return false
 		}
