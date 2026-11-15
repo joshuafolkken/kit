@@ -82,7 +82,7 @@ function timed_runs(calls: ReadonlyArray<ToolCall>, records: RunRecords): Array<
 
 // A row's waits are the calls a record tied to; a row with none reads `not measured`, never 0.
 function waits_of(runs: ReadonlyArray<TimedRun>): Array<number> {
-	return runs.flatMap((run) => (run.wait_ms === undefined ? [] : [run.wait_ms]))
+	return runs.map((run) => run.wait_ms).filter((wait_ms) => wait_ms !== undefined)
 }
 
 function seconds_cell(values: ReadonlyArray<number>): string {
