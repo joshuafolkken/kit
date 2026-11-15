@@ -11,7 +11,6 @@ import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { codex_hook_adapter } from './codex-hook-adapter'
 import { format_edited_file, parse_edited_path, type CommandRunner } from './format-edited-file'
-import { hook_context } from './hook-context'
 import { pretool_guard } from './pretool-guard'
 
 const make_directory = temporary_directory('suite')
@@ -189,8 +188,10 @@ describe('Codex pre-tool adaptation', () => {
 
 		expect(time_batch_guard.should_block(unbatched_text(MARKDOWN_FILE), call, 0)).toBe(false)
 	})
+})
 
-	// joshuafolkken/kit#3444: a Codex lane child marks its implement phase like a Claude one.
+// joshuafolkken/kit#3444: a Codex lane child marks its implement phase like a Claude one.
+describe('Codex pre-tool phase mark', () => {
 	it('writes the verdict and hands the same outcome to the phase mark', async () => {
 		const outcome: GuardOutcome = { ...ALLOW, notice: 'reminder' }
 
@@ -198,13 +199,18 @@ describe('Codex pre-tool adaptation', () => {
 		vi.spyOn(hook_decision, 'load_environment_file').mockReturnValue(undefined)
 		const emit = vi.spyOn(hook_decision, 'emit_outcome').mockReturnValue(undefined)
 		const mark = vi.spyOn(pretool_guard, 'mark_phase').mockResolvedValue(undefined)
+		const raw_payload = codex_payload([TYPESCRIPT_FILE])
 
-		await codex_hook_adapter.write_pretool_outcome(codex_payload([TYPESCRIPT_FILE]))
+		await codex_hook_adapter.write_pretool_outcome(raw_payload)
 
 		expect(emit).toHaveBeenCalledWith(outcome)
-		const judged = codex_hook_adapter.pretool_payload(codex_payload([TYPESCRIPT_FILE]))
+		const { pretool_payload, session_context } = codex_hook_adapter
 
-		expect(mark).toHaveBeenCalledWith(outcome, judged, hook_context.from_process())
+		expect(mark).toHaveBeenCalledWith(
+			outcome,
+			pretool_payload(raw_payload),
+			session_context(raw_payload),
+		)
 	})
 })
 
@@ -226,7 +232,7 @@ describe('Codex pre-tool hook ledger', () => {
 		expect(record).toHaveBeenCalledWith(
 			codex_hook_adapter.pretool_payload(raw_payload),
 			outcome,
-			hook_context.from_process(),
+			codex_hook_adapter.session_context(raw_payload),
 		)
 	})
 })

@@ -205,11 +205,7 @@ async function run(
 ): Promise<number> {
 	const span = read_span(argv, now_ms)
 
-	if (span === undefined) {
-		console.error(USAGE)
-
-		return FAILURE_EXIT_CODE
-	}
+	if (span === undefined) return cli_flags.answer_usage(argv, USAGE)
 
 	return printed(printed_lines(argv, await measure(cwd, span.days, span.now_ms)))
 }

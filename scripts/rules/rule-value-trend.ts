@@ -12,7 +12,7 @@ import { rule_value_runs, type Tally } from './rule-value-runs'
 
 const WEEKLY_FLAG = '--weekly'
 const WEEKLY_USAGE =
-	'usage: josh rule:value --weekly <rule-id>... [--period <days>] — one or more measured rule ids'
+	'Usage: josh rule:value --weekly <rule-id>... [--period <days>] — one or more measured rule ids'
 const FLAG_PREFIX = '--'
 const MS_PER_DAY = 86_400_000
 const DAYS_PER_WEEK = 7

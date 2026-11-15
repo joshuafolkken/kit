@@ -27,6 +27,25 @@ function refuse_unknown_flags(
 	return `Unknown argument(s): ${unknown.join(' ')}\n${usage_line(known_flags, command)}`
 }
 
+function is_help_request(argv: ReadonlyArray<string>): boolean {
+	return argv.some((argument) => HELP_FLAGS.has(argument))
+}
+
+// The exit of a command whose arguments did not read as a run: a help request (`--help`, `-h`) prints
+// the usage and succeeds, anything else prints the refusal — the usage unless given — and fails. Every
+// command answers both from here, so asking for help never reads as a failed command.
+function answer_usage(argv: ReadonlyArray<string>, usage: string, refusal: string = usage): number {
+	if (is_help_request(argv)) {
+		console.info(usage)
+
+		return 0
+	}
+
+	console.error(refusal)
+
+	return 1
+}
+
 // The argument gate of a command that publishes (`josh release`, `josh release:github`): a help
 // request prints the usage and exits 0, an unknown argument is refused with exit 1, both before any side effect. `undefined` means the
 // arguments are all known and the command may run.
@@ -35,18 +54,10 @@ function answer_help_or_unknown(
 	known_flags: ReadonlyArray<string>,
 	command: string,
 ): number | undefined {
-	if (argv.some((argument) => HELP_FLAGS.has(argument))) {
-		console.info(usage_line(known_flags, command))
-
-		return 0
-	}
-
 	const refusal = refuse_unknown_flags(argv, known_flags, command)
-	if (refusal === undefined) return undefined
+	if (refusal === undefined && !is_help_request(argv)) return undefined
 
-	console.error(refusal)
-
-	return 1
+	return answer_usage(argv, usage_line(known_flags, command), refusal)
 }
 
 // `parseArgs`, answering `undefined` where it would throw — an unknown flag, a missing option value,
@@ -208,6 +219,8 @@ const cli_flags = {
 	attach_values,
 	usage_line,
 	refuse_unknown_flags,
+	is_help_request,
+	answer_usage,
 	answer_help_or_unknown,
 	parse_or_undefined,
 	values_of,
