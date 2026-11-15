@@ -2,6 +2,6 @@
 	"reason": "Count an open run:chain as check and the review after it as review-fix in the implement sub-stages (#7566)",
 	"date": "2026-11-15",
 	"growth": {
-		"scripts.code_lines": 10
+		"scripts.code_lines": 19
 	}
 }

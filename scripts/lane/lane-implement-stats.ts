@@ -13,7 +13,7 @@ import { lane_transcript_stats } from './lane-transcript-stats'
 //
 // **A lane's implement ends at its first `ship` or `run:chain --join --ship` call**, so a lane that never shipped in the period
 // has no implement here. **`review-fix` runs from `run:review` on, or from the call after an open
-// `run:chain`** (no `--join`), which runs `run:review` inside it (joshuafolkken/kit#7566) — the round's
+// `run:chain`** (no `--join`) whose output shows it ran `run:review` (joshuafolkken/kit#7566) — the round's
 // reviewer, fixes and their scoped checks; before it, an edit is `edit`, a scoped check, gate or open
 // `run:chain` is `check`, and any other call is `plan`
 // before the first edit, `read` after it. **A session's first call spans its own duration**, so the gap
@@ -34,7 +34,6 @@ const CHECK_COMMANDS: ReadonlySet<string> = new Set([
 	'gate',
 	LINT_RELATED,
 	'metrics',
-	'run:chain',
 	'test:pinned',
 	'test:related',
 ])
@@ -43,6 +42,7 @@ const SHIP_COMMANDS: ReadonlySet<string> = new Set(['ship'])
 const JOIN_FLAG = /\s--join(?:\s|$)/u
 const SHIP_FLAG = /\s--ship(?:\s|=|$)/u
 const CHAIN_REACHED_SHIP = /^run:chain \d+ — (?:ran (?:[^\s]+ → )*ship$|stopped at ship \()/mu
+const CHAIN_RAN_REVIEW = /^run:chain \d+ — ran (?:[^\s]+ → )*run:review$/mu
 const FIRST_LINT_ROW = `lane first ${LINT_RELATED}`
 // `backgrounded` counts a subagent row's untimed calls (`lane-implement-subagents.ts`); a sub-stage has none.
 const COLUMNS = [
@@ -81,22 +81,35 @@ function opens_chain(segment: string): boolean {
 	)
 }
 
+function runs_open_chain(call: ToolCall): boolean {
+	return lane_transcript_stats
+		.command_segments(call.command)
+		.some((segment) => opens_chain(segment))
+}
+
+function is_check(call: ToolCall): boolean {
+	return runs_any(call, CHECK_COMMANDS) || runs_open_chain(call)
+}
+
+function chain_ran_review(call: ToolCall): boolean {
+	return runs_open_chain(call) && CHAIN_RAN_REVIEW.test(call.output)
+}
+
 // The phase once `call` ran: an edit, or a review started, holds for the rest of the lane; an open
-// `run:chain` is its own `check` and starts the review from the next call.
+// `run:chain` is its own `check` and, once it ran `run:review`, starts the review from the next call —
+// one that stopped before it leaves the fix and re-run that follow in `edit` and `check`.
 function next_phase(call: ToolCall, phase: Phase): Phase {
 	return {
 		edited: phase.edited || is_edit(call),
 		reviewing: phase.reviewing || phase.chained || runs_any(call, REVIEW_COMMANDS),
-		chained:
-			phase.chained ||
-			lane_transcript_stats.command_segments(call.command).some((segment) => opens_chain(segment)),
+		chained: phase.chained || chain_ran_review(call),
 	}
 }
 
 function sub_stage_of(call: ToolCall, phase: Phase): SubStage {
 	if (phase.reviewing) return REVIEW_FIX
 	if (is_edit(call)) return EDIT
-	if (runs_any(call, CHECK_COMMANDS)) return CHECK
+	if (is_check(call)) return CHECK
 
 	return phase.edited ? READ : PLAN
 }

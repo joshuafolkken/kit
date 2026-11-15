@@ -252,8 +252,8 @@ A lap overlaps its stage, so those rows do not add up to the lanes' time. The ti
 only, not by Bash kind, since a transcript call names no lane.
 
 Under the stage table, the implement stage is broken down from the lane transcripts up to each lane's first `josh ship`
-(`lane-implement-stats.ts`): `plan` before the first edit, then `read`, `edit`, `check` (a scoped check or gate) and
-`review-fix` from `run:review` on, each call's span counted from the previous call's end, less its `lane:pause` time.
+(`lane-implement-stats.ts`): `plan` before the first edit, then `read`, `edit`, `check` (a scoped check, gate or open
+`run:chain`) and `review-fix` from a review on, each call's span from the prior call's end, less `lane:pause` time.
 
 `implement read` (`lane-implement-read.ts`) splits `read` by lane medians: `tool` run time, `thinking` before calls,
 distinct `files read`, and those an investigator cited by `path:line`. `implement read by call`
