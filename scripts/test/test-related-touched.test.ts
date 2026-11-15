@@ -1,6 +1,8 @@
 import path from 'node:path'
+import { outer_command } from '#scripts/josh/outer-command'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { describe, expect, it } from 'vitest'
-import { test_related_touched, type ListDirectory } from './test-related-touched'
+import { test_related_touched, type CallSite, type ListDirectory } from './test-related-touched'
 
 const ROOT = path.resolve('/repo')
 const DIRECTORY = path.join('scripts', 'test')
@@ -90,6 +92,50 @@ describe('test_related_touched.touched_scope', () => {
 
 	it('runs the whole suite when the diff could not be read', () => {
 		expect(test_related_touched.touched_scope(ROOT, undefined, LIST).mode).toBe('all')
+	})
+})
+
+// joshuafolkken/kit#7593: a lane's own bare call runs the touched scope; a nested call or one outside a
+// lane keeps the full reach.
+describe('test_related_touched.scoped_arguments', () => {
+	const ISSUE = '7593'
+	const COMMAND = 'test:related'
+	const LANE = `/home/dev/.kit-lanes/${ISSUE}`
+	const CHECK_RELATED = 'check:related'
+	const { TOUCHED_FLAG, scoped_arguments } = test_related_touched
+
+	function site(outer: string, options: { directory?: string; is_lane?: boolean } = {}): CallSite {
+		const { directory = LANE, is_lane = true } = options
+		const mark = is_lane ? { [lane_child_marker.KEY]: ISSUE } : {}
+
+		return { directory, source: { ...mark, [outer_command.KEY]: outer }, notify: () => undefined }
+	}
+
+	it('runs a lane bare call typed by its session with --touched, and says so in one line', () => {
+		const lines: Array<string> = []
+		const typed = {
+			...site(COMMAND),
+			notify: (line: string): void => {
+				lines.push(line)
+			},
+		}
+
+		expect(scoped_arguments([], typed)).toEqual([TOUCHED_FLAG])
+		expect(lines).toHaveLength(1)
+		expect(lines[0]).toContain(CHECK_RELATED)
+	})
+
+	it('keeps an explicit --touched as given', () => {
+		expect(scoped_arguments([TOUCHED_FLAG], site(COMMAND))).toEqual([TOUCHED_FLAG])
+	})
+
+	it('keeps the full reach for a call check:related makes inside a lane', () => {
+		expect(scoped_arguments([], site(CHECK_RELATED))).toEqual([])
+	})
+
+	it('keeps the full reach outside a lane', () => {
+		expect(scoped_arguments([], site(COMMAND, { directory: '/home/dev/repo' }))).toEqual([])
+		expect(scoped_arguments([], site(COMMAND, { is_lane: false }))).toEqual([])
 	})
 })
 

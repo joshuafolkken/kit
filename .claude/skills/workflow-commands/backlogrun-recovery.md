@@ -51,7 +51,7 @@ rebase**; no step rewrites a pushed commit.
    (`docs/josh-commands.md` → "`josh lane:resolve`"): `conflict <paths>` → resolve in place;
    `step-back 2|3` → park (below). Do not close the lane, open another, or switch its branch.
 2. **Re-run the whole gate.** The tree changed, so the green recorded before the conflict is void:
-   `pnpm josh lint:related` and `pnpm josh test:related`, then `pnpm josh gate`.
+   `pnpm josh check:related`, then `pnpm josh gate`.
 3. **Review the resolution, one round.** Brief it with `pnpm josh review:brief` and run `/code-review`
    over the resolution diff, then require `pnpm josh review:attest --check` to answer `ok`. The round
    spends none of the cap (`prompts/review.md` → "Review round cap").

@@ -47,6 +47,7 @@ function sources(): ScopedSources {
 		lint: path.join(DIRECTORY, 'lint.json'),
 		test: path.join(DIRECTORY, 'test.json'),
 		is_unit_skipped: false,
+		is_lane: false,
 	}
 }
 

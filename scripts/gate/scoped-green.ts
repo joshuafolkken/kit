@@ -1,6 +1,7 @@
 import { file_map_stamp, type FileMapStampAccess } from '#scripts/josh/file-map-stamp'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { run_record_path } from '#scripts/josh/run-record-path'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { test_unit_guard } from '#scripts/test/test-unit-guard'
 import { gate_tree, type GateTree } from './gate-tree'
@@ -46,6 +47,7 @@ const LINT_SCRIPT = 'lint:related'
 const TEST_SCRIPT = 'test:related'
 const LINT_COMMAND = `pnpm josh ${LINT_SCRIPT}`
 const TEST_COMMAND = `pnpm josh ${TEST_SCRIPT}`
+const CHECK_RELATED_COMMAND = 'pnpm josh check:related'
 
 interface ScopedCheck {
 	script: string
@@ -67,6 +69,8 @@ interface ScopedSources {
 	test?: string
 	is_unit_skipped?: boolean
 	is_lane_child?: boolean
+	// Defaults to whether this checkout is the running lane child's own (`lane-child-marker.ts`).
+	is_lane?: boolean
 }
 
 // **`test:related` is required only where it can ever answer**. In a project
@@ -202,24 +206,34 @@ const LANE_CHILD_STEP =
 	'gate — this is a dispatched lane child, and ship runs the gate beside the review ' +
 	'(`.claude/skills/workflow-commands/chain-rule.md` step 0).'
 
-function refusal(missing: ReadonlyArray<string>, next_step: string): string {
+// **Only the gate's pre-check sets `is_lane_child`**: a lane child refused at `josh run:review` reissues
+// it as chain-rule step 0 says, so `review:brief`'s callers keep the reissue wording.
+function next_step_of(sources: ScopedSources): string {
+	return sources.is_lane_child === true ? LANE_CHILD_STEP : REISSUE_STEP
+}
+
+// joshuafolkken/kit#7593: a lane's own bare `test:related` runs the touched scope and records no
+// full-reach green, so a lane closes the refusal with `check:related`, whose nested call is full reach.
+function closing_command(sources: ScopedSources): string {
+	const is_lane = sources.is_lane ?? lane_child_marker.is_child_of(process.cwd())
+
+	return is_lane
+		? `\`${CHECK_RELATED_COMMAND}\`, which runs both at full reach`
+		: `\`${LINT_COMMAND} && ${TEST_COMMAND}\`, measured at 13.8 seconds`
+}
+
+function refusal(missing: ReadonlyArray<string>, sources: ScopedSources): string {
 	return (
 		`${REFUSAL_HEADLINE}: ${missing.join(' and ')} ` +
 		'have not passed on the files this branch changed. The gate and review round 1 start together, ' +
 		'so a brief composed now describes a tree neither check has read — joshuafolkken/kit#1503 spent ' +
 		'282 seconds, 31% of the run, picking up one lint rule and one failing test at a time after its ' +
 		'review had already started. Run them in one call — ' +
-		`\`${LINT_COMMAND} && ${TEST_COMMAND}\`, measured at 13.8 seconds — ${next_step} ` +
+		`${closing_command(sources)} — ${next_step_of(sources)} ` +
 		'The record fixes when the checks run: only a merge with the default branch sharing nothing ' +
 		"with this branch's change is recorded without a run. " +
 		'`.claude/skills/workflow-commands/chain-rule.md` → "Orchestration facts single-sourced here".'
 	)
-}
-
-// **Only the gate's pre-check sets `is_lane_child`**: a lane child refused at `josh run:review` reissues
-// it as chain-rule step 0 says, so `review:brief`'s callers keep the reissue wording.
-function next_step_of(sources: ScopedSources): string {
-	return sources.is_lane_child === true ? LANE_CHILD_STEP : REISSUE_STEP
 }
 
 function refusal_for(
@@ -229,7 +243,7 @@ function refusal_for(
 ): string | undefined {
 	const missing = missing_checks(tree, base, sources)
 
-	return missing.length === 0 ? undefined : refusal(missing, next_step_of(sources))
+	return missing.length === 0 ? undefined : refusal(missing, sources)
 }
 
 // **A record is written only by a bare invocation, and any argument at all withholds it.** A path

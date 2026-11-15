@@ -6,6 +6,7 @@ import type { AgentProvider } from '#scripts/agent/agent-provider'
 import { api_auth } from '#scripts/agent/api-auth'
 import { core_priority } from '#scripts/gate/core-priority'
 import { distributed_paths } from '#scripts/init/distributed-paths'
+import { outer_command } from '#scripts/josh/outer-command'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { error_text } from '#scripts/lib/error-message'
 import { review_attest, type ReviewSlot } from '#scripts/review/review-attest'
@@ -28,6 +29,7 @@ import { lane_relaunch } from './lane-relaunch'
 // unexplained in the ship log (joshuafolkken/kit#3974).
 
 const BRIEF_PREFIX = 'josh-ship-review-brief-'
+const SHIP_COMMAND = 'ship'
 const FINDINGS_PREFIX = 'josh-ship-review-findings-'
 const LOG_PREFIX = 'josh-ship-review-log-'
 const SUBMIT_SCRIPT = 'scripts/review/review-submit-cli.ts'
@@ -152,8 +154,14 @@ function reviewer_answer(result: AttachedLaunchResult, log_path: string): Broker
 	return result.exit_code === 0 ? SUCCESS : exited_answer(result.exit_code, log_path)
 }
 
+// The reviewer works for the ship that asked, so its josh calls carry the ship's outer mark: a fix it
+// verifies runs the full reach, never the lane child's touched scope (joshuafolkken/kit#7593).
 function reviewer_environment(lane: LaneInfo): LaunchEnvironment {
-	return { ...lane_child_marker.env_for(lane.issue), ...core_priority.PRIORITY_ENVIRONMENT }
+	return {
+		...lane_child_marker.env_for(lane.issue),
+		[outer_command.KEY]: SHIP_COMMAND,
+		...core_priority.PRIORITY_ENVIRONMENT,
+	}
 }
 
 async function launch_review(
