@@ -46,7 +46,12 @@ pnpm josh run:release --force   # clear a record left by a run that has ended
 
 The unit is the working tree, so two lanes of one repository key differently.
 
-**Output / exit codes:** stdout is one token; explanations go to stderr. `run:hold` answers `hold`, `busy`, `reclaim` / `resume` / `park` (leftover work found) or `unknown` (exit 1). A clean tree on the issue's own `<N>-*` branch answers `hold`, and `resume` names the `git switch` onto the branch; `run:release` answers `released`, `none` or `held` (exit 1).
+**Output / exit codes:** stdout is one token; explanations go to stderr.
+`run:hold` answers `hold`, `busy`, `reclaim` / `resume` / `park` (leftover work found) or `unknown` (exit 1).
+
+A clean tree on the issue's own `<N>-*` branch answers `hold`.
+`resume` names the `git switch` onto the branch, or the `cd` into the lane directory when an open lane has it checked out.
+`run:release` answers `released`, `none` or `held` (exit 1).
 
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh run:hold` / `josh run:release` in detail".
 
