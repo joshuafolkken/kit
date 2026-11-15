@@ -20,9 +20,6 @@ function is_file(path: string): boolean {
 	return existsSync(path) && statSync(path).isFile()
 }
 
-// A path no file answers — absent, or a directory — reaches no test, so its `0` would read as a
-// measured count: `pnpm josh` runs from the repository root, where a path typed relative to a
-// subdirectory names nothing.
 function is_count_mode(argv: ReadonlyArray<string>): boolean {
 	return argv[0] === COUNT_FLAG
 }
@@ -38,6 +35,9 @@ function is_shape_valid(argv: ReadonlyArray<string>): boolean {
 	return is_count_mode(argv) ? length === 1 : length > 0
 }
 
+// A path no file answers — absent, or a directory — reaches no test, so its `0` would read as a
+// measured count: `pnpm josh` runs from the repository root, where a path typed relative to a
+// subdirectory names nothing.
 function refusal(argv: ReadonlyArray<string>): string | undefined {
 	if (!is_shape_valid(argv)) return USAGE
 	const missing = file_arguments(argv).filter((file) => !is_file(file))
