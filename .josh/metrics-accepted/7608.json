@@ -1,0 +1,7 @@
+{
+	"reason": "The no-progress cut limit for the Codex lane supervisor, with the round-1 fixes: verbatim untracked paths, an unreadable worktree assumed as progress, and the count reset after a failed ship",
+	"date": "2026-11-15",
+	"growth": {
+		"scripts.code_lines": 74
+	}
+}
