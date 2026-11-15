@@ -9,6 +9,10 @@ const WINDOW = lane_stats.window_of(1, NOW)
 const BEFORE = '2026-10-28T12:00:00Z'
 const DURING = '2026-10-30T11:00:00Z'
 const EMPTY_ROW = '| 0 | — | — | 0 |'
+// Past the 12-file cap; `lines` stays at the 300-line cap, which is not past it.
+const OVER_CAP_FILES = 14
+const CAP_LINES = 300
+const MISS_HEADER = 'pre-split miss |'
 
 function size(issue: number, files: number, lines: number): SizeEntry {
 	return {
@@ -34,7 +38,7 @@ function row(entries: ReadonlyArray<LedgerEntry>): string | undefined {
 
 function missed_lanes(count: number): Array<LedgerEntry> {
 	return Array.from({ length: count }, (_, index) => [
-		{ ...size(index + 1, 12, 300), missed: true },
+		{ ...size(index + 1, OVER_CAP_FILES, CAP_LINES), missed: true },
 		merge(index + 1),
 	]).flat()
 }
@@ -68,33 +72,33 @@ describe('lane_size_stats.table', () => {
 	})
 })
 
-// joshuafolkken/kit#7183: a merge recorded past the split notice bar is a pre-split miss, counted and
+// joshuafolkken/kit#7183: a merge recorded `missed` past the split cap is a pre-split miss, counted and
 // listed with its declared and actual size.
 describe('lane_size_stats.table pre-split misses', () => {
 	it('counts the missed merges and lists each with its declared and actual size', () => {
-		const missed = { ...size(1, 12, 300), missed: true }
+		const missed = { ...size(1, OVER_CAP_FILES, CAP_LINES), missed: true }
 		const lines = text_of([missed, size(2, 2, 100), merge(1), merge(2)], { is_all: false })
 
 		expect(lines.split('\n')).toStrictEqual([
 			'| measured lanes | files actual / declared median | lines actual / declared median | pre-split misses |',
 			'| --- | --- | --- | --- |',
-			'| 2 | 3.5 | 2.0 | 1 |',
+			'| 2 | 4.0 | 2.0 | 1 |',
 			'',
 			'| pre-split miss | files declared → actual | lines declared → actual |',
 			'| --- | --- | --- |',
-			'| #1 | 2 → 12 | 100 → 300 |',
+			'| #1 | 2 → 14 | 100 → 300 |',
 		])
 	})
 
 	it('prints no miss table when no merge missed', () => {
-		expect(text_of([size(1, 2, 100), merge(1)])).not.toContain('pre-split miss |')
+		expect(text_of([size(1, 2, 100), merge(1)])).not.toContain(MISS_HEADER)
 	})
 
 	// joshuafolkken/kit#7578: the miss list is capped by default, every row with --all.
 	it('lists the first MISS_ROWS misses and a count of the rest by default', () => {
 		const lines = text_of(missed_lanes(lane_size_stats.MISS_ROWS + 2), { is_all: false })
 
-		expect(lines).toContain(`| #${String(lane_size_stats.MISS_ROWS)} | 2 → 12 | 100 → 300 |`)
+		expect(lines).toContain(`| #${String(lane_size_stats.MISS_ROWS)} | 2 → 14 | 100 → 300 |`)
 		expect(lines).not.toContain(`| #${String(lane_size_stats.MISS_ROWS + 1)} |`)
 		expect(lines).toContain('… 2 more rows omitted')
 	})
@@ -102,8 +106,23 @@ describe('lane_size_stats.table pre-split misses', () => {
 	it('lists every miss with --all', () => {
 		const lines = text_of(missed_lanes(lane_size_stats.MISS_ROWS + 2))
 
-		expect(lines).toContain(`| #${String(lane_size_stats.MISS_ROWS + 2)} | 2 → 12 | 100 → 300 |`)
+		expect(lines).toContain(`| #${String(lane_size_stats.MISS_ROWS + 2)} | 2 → 14 | 100 → 300 |`)
 		expect(lines).not.toContain('omitted')
+	})
+})
+
+// joshuafolkken/kit#7579: only a flag past the cap counts, so a flag recorded before the cap took over,
+// past the notice bar alone, does not.
+describe('lane_size_stats.table pre-split miss cap', () => {
+	it('does not count a merge recorded missed at or under the cap', () => {
+		const stale = { ...size(1, 12, CAP_LINES), missed: true }
+
+		expect(row([stale, merge(1)])).toBe('| 1 | 6.0 | 3.0 | 0 |')
+		expect(text_of([stale, merge(1)])).not.toContain(MISS_HEADER)
+	})
+
+	it('does not count a merge past the cap that was not recorded missed', () => {
+		expect(row([size(1, OVER_CAP_FILES, CAP_LINES), merge(1)])).toBe('| 1 | 7.0 | 3.0 | 0 |')
 	})
 })
 

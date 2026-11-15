@@ -6,6 +6,7 @@ import { lane_implement_rate, type ImplementRate } from '#scripts/lane/lane-impl
 import type { SizeRatios } from '#scripts/lane/lane-size-stats'
 import { test_declared_logic } from '#scripts/test/test-declared-logic'
 import { declared_growth } from './declared-growth'
+import { split_cap } from './split-cap'
 
 // The size half of the split assessment, measured rather than estimated.
 //
@@ -46,23 +47,8 @@ interface SplitGuide extends DeclaredSize {
 	growth?: SizeRatios
 }
 
-// The guide's single source: `split-assessment.md` states these once and a test pins the two equal.
-// Strictly greater than: "more than" puts the bar above the number, not at it. Lowered from 10 / 400
-// once a lane estimated at 6 files / 250 lines merged at about 23 files / 390 lines (joshuafolkken/kit#5384).
-const FILE_GUIDE = 8
-const LINE_GUIDE = 200
-// The cap, one and a half times the guide: past it a declared reason no longer keeps an Issue as one. A
-// lane declared past it with a reason overran both its time budget and its declared files by far
-// (joshuafolkken/kit#5502). Lowered from 3 once the projected implement time became the main bar — the
-// cap is the backstop where no rate is measured (joshuafolkken/kit#6066).
-const CAP_FACTOR = 1.5
-const FILE_CAP = FILE_GUIDE * CAP_FACTOR
-const LINE_CAP = LINE_GUIDE * CAP_FACTOR
-const DEFAULT_GUIDE: SplitGuide = {
-	files: FILE_GUIDE,
-	lines: LINE_GUIDE,
-	cap: { files: FILE_CAP, lines: LINE_CAP },
-}
+const { CAP_FACTOR, DEFAULT_CAP, FILE_CAP, FILE_GUIDE, LINE_CAP, LINE_GUIDE } = split_cap
+const DEFAULT_GUIDE: SplitGuide = { files: FILE_GUIDE, lines: LINE_GUIDE, cap: DEFAULT_CAP }
 
 // Keep fractional thresholds: rounding would change the budget's strict comparison boundary.
 function guide_for(minutes: number, measured?: ImplementRate, growth?: SizeRatios): SplitGuide {
@@ -190,9 +176,8 @@ function verdict_for(
 	return files > guide.files || lines > guide.lines ? SPLIT_VERDICT : SINGLE_VERDICT
 }
 
-// Strictly greater than, as the guide is: the cap itself still runs as one Issue.
 function is_over_cap(files: number, lines: number, guide: SplitGuide = DEFAULT_GUIDE): boolean {
-	return files > guide.cap.files || lines > guide.cap.lines
+	return split_cap.is_over(files, lines, guide.cap)
 }
 
 // `added` lists the files the branch adds, so a new module and its importer count as one file.

@@ -1,12 +1,15 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
+import { split_cap } from '#scripts/split/split-cap'
 import type { LedgerEntry, SizeEntry } from './lane-ledger-schema'
 import { lane_stats, type StatsWindow } from './lane-stats'
 import { lane_table_rows, type TableOptions } from './lane-table-rows'
 
 // Compare actual non-test changes with the declaration for merged lanes only. A followup retry
 // may record size twice; use the latest measurement before each merge (joshuafolkken/kit#5384). A merge
-// recorded past the split notice bar counts as a pre-split miss, listed with its declared and actual size
-// so the pre-dispatch assessment can be tuned (joshuafolkken/kit#7183).
+// recorded `missed` past the split cap counts as a pre-split miss, listed with its declared and actual
+// size so the pre-dispatch assessment can be tuned (joshuafolkken/kit#7183). The cap check drops a
+// flag recorded before #7579 past the notice bar alone; a measured guide's cap is never below the
+// default cap, so it drops no flag recorded past the cap (joshuafolkken/kit#7579).
 const COLUMNS = [
 	'measured lanes',
 	'files actual / declared median',
@@ -77,7 +80,7 @@ function change_cell(size: SizeEntry, axis: 'files' | 'lines'): string {
 	return `${String(size.declared[axis])} → ${String(size.actual[axis])}`
 }
 
-// One row per merged lane recorded past the split notice bar, at most `MISS_ROWS` unless `options`
+// One row per pre-split miss, at most `MISS_ROWS` unless `options`
 // asks for all; none prints no table.
 function miss_rows(misses: ReadonlyArray<SizeEntry>, options: TableOptions): Array<string> {
 	if (misses.length === 0) return []
@@ -98,7 +101,9 @@ function table(
 	options: TableOptions,
 ): string {
 	const sizes = merged_sizes(entries, window)
-	const misses = sizes.filter((size) => size.missed === true)
+	const misses = sizes.filter(
+		(size) => size.missed === true && split_cap.is_over(size.actual.files, size.actual.lines),
+	)
 
 	return [
 		...header(COLUMNS),
