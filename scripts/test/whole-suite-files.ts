@@ -4,7 +4,9 @@ import { unit_setup_files } from './unit-setup-files'
 // The files every test depends on without importing or reading them: the package and its lock,
 // the vitest configuration, and the setup files every worker runs before every test. A `package.json`
 // change of its `version` alone is none of them: `test:related` resolves it through the test-read map
-// instead (`package-version-only.ts`, joshuafolkken/kit#7538).
+// instead (`package-version-only.ts`, joshuafolkken/kit#7538). Nor is a `pnpm-lock.yaml` change that
+// moves no unit runtime package (`UNIT_RUNTIME_PACKAGES`): it reaches the modules importing the packages
+// it moved (`lockfile-changed-packages.ts`, joshuafolkken/kit#7554).
 const SETUP_FILES: ReadonlyArray<string> = [
 	...unit_setup_files.NETWORK_GUARD,
 	...unit_setup_files.STATE_GUARD,
@@ -73,6 +75,23 @@ const EVERY_TEST_IMPORTS: ReadonlySet<string> = new Set(
 	IMPORTED_BY_EVERY_TEST.map((file) => path.normalize(file)),
 )
 
-const whole_suite_files = { EVERY_TEST_IMPORTS, WHOLE_SUITE_FILES }
+// The packages every unit test runs on — the runner, its bundler and the compiler — so a lockfile
+// change moving one, or a package one depends on, runs the whole suite. An entry ending in `/` names a
+// scope.
+const UNIT_RUNTIME_PACKAGES: ReadonlyArray<string> = [
+	'vitest',
+	'vite',
+	'vite-node',
+	'typescript',
+	'@vitest/',
+]
+
+function is_unit_runtime_package(name: string): boolean {
+	return UNIT_RUNTIME_PACKAGES.some((entry) =>
+		entry.endsWith(path.posix.sep) ? name.startsWith(entry) : name === entry,
+	)
+}
+
+const whole_suite_files = { EVERY_TEST_IMPORTS, WHOLE_SUITE_FILES, is_unit_runtime_package }
 
 export { whole_suite_files }

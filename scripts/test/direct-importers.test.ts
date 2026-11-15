@@ -21,6 +21,8 @@ const UNIMPORTED_MODULE = 'tools/test/pure-files.ts'
 const OTHER_MODULE = 'scripts/other.ts'
 const ALIASED_IMPORTER = 'tools/test/unit-projects.test.ts'
 const RELATIVE_IMPORTER = 'scripts/test/vitest-config.test.ts'
+const LEAF_IMPORTER = 'scripts/uses-leaf.ts'
+const SCOPED_IMPORTER = 'scripts/uses-scoped.ts'
 
 const FIXTURE_FILES: Readonly<Record<string, string>> = {
 	[PACKAGE_FILE]: JSON.stringify({ imports: IMPORTS }),
@@ -31,6 +33,8 @@ const FIXTURE_FILES: Readonly<Record<string, string>> = {
 	[RELATIVE_IMPORTER]: "import { projects } from '../../tools/test/unit-projects.ts'\n",
 	[OTHER_TEST]: "import { other } from './other'\n",
 	[NON_TEST_IMPORTER]: "import { pure } from './pure-files'\n",
+	[LEAF_IMPORTER]: "import { readFileSync } from 'node:fs'\nimport leaf from 'leaf/sub'\n",
+	[SCOPED_IMPORTER]: "export { pkg } from '@scope/pkg/deep'\n",
 }
 
 describe('direct_importers.specifiers_of', () => {
@@ -71,7 +75,9 @@ describe('direct_importers.resolve_specifier', () => {
 	})
 })
 
-describe('direct_importers.every_test_importers', () => {
+// Opens the fixture work tree before each test of the calling `describe` and closes it after; answers
+// the open work tree's path.
+function use_fixture(): () => string {
 	let fixture: FixtureWorkspace
 
 	beforeEach(async () => {
@@ -88,32 +94,54 @@ describe('direct_importers.every_test_importers', () => {
 		await git_fixture_workspace.close_workspace(fixture)
 	})
 
+	return () => fixture.workspace
+}
+
+describe('direct_importers.every_test_importers', () => {
+	const workspace = use_fixture()
+
 	it('maps a file every test imports to the test files importing it directly', async () => {
-		const importers = await direct_importers.every_test_importers(fixture.workspace, [
-			EVERY_TEST_MODULE,
-		])
+		const importers = await direct_importers.every_test_importers(workspace(), [EVERY_TEST_MODULE])
 
 		expect(importers.get(EVERY_TEST_MODULE)).toEqual([RELATIVE_IMPORTER, ALIASED_IMPORTER])
 	})
 
 	// joshuafolkken/kit#5292: `importers_of` reads any file, not only the ones every test imports.
 	it('maps any file to the test files importing it directly through importers_of', async () => {
-		const importers = await direct_importers.importers_of(fixture.workspace, [OTHER_MODULE])
+		const importers = await direct_importers.importers_of(workspace(), [OTHER_MODULE])
 
 		expect(importers.get(OTHER_MODULE)).toEqual([OTHER_TEST])
 	})
 
 	it('maps one only a non-test file imports to no test file', async () => {
-		const importers = await direct_importers.every_test_importers(fixture.workspace, [
-			UNIMPORTED_MODULE,
-		])
+		const importers = await direct_importers.every_test_importers(workspace(), [UNIMPORTED_MODULE])
 
 		expect(importers.get(UNIMPORTED_MODULE)).toEqual([])
 	})
 
 	it('leaves out a file not every test imports', async () => {
-		const importers = await direct_importers.every_test_importers(fixture.workspace, [OTHER_MODULE])
+		const importers = await direct_importers.every_test_importers(workspace(), [OTHER_MODULE])
 
 		expect(importers.has(OTHER_MODULE)).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#7554: a lockfile change reaches the files importing a package it moved.
+describe('direct_importers.package_importers', () => {
+	const workspace = use_fixture()
+
+	it('lists the admitted files importing a package by its bare specifier, subpath or scope', async () => {
+		const packages = new Set(['leaf', '@scope/pkg', 'node', 'tools'])
+		const importers = await direct_importers.package_importers(workspace(), packages, (file) =>
+			file.endsWith('.ts'),
+		)
+
+		expect(new Set(importers)).toEqual(new Set([LEAF_IMPORTER, SCOPED_IMPORTER]))
+	})
+
+	it('lists no file for no package', async () => {
+		await expect(
+			direct_importers.package_importers(workspace(), new Set(), () => true),
+		).resolves.toEqual([])
 	})
 })
