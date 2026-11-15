@@ -74,6 +74,15 @@ function prepare(body: string, labels: ReadonlyArray<string>): string {
 	return `${body}\n\n${PREFIX}${JSON.stringify({ labels })} -->\n`
 }
 
+// A body rewrite keeps a pending child's record unless the new body brings its own: without it,
+// `--publish` would publish the child with none of its intended labels (joshuafolkken/kit#7571).
+function carried(previous: string | undefined, next: string): string {
+	const record = last_record(previous ?? '')?.[0]
+	if (record === undefined || is_pending(next)) return next
+
+	return `${next.trimEnd()}\n\n${record}\n`
+}
+
 function public_body(body: string): string {
 	const record = last_record(body)?.[0] ?? ''
 	const at = body.lastIndexOf(record)
@@ -116,6 +125,13 @@ function creation(
 	}
 }
 
-const issue_publication_state = { is_pending, prepare, public_body, labels_of, creation }
+const issue_publication_state = {
+	is_pending,
+	prepare,
+	carried,
+	public_body,
+	labels_of,
+	creation,
+}
 
 export { issue_publication_state }
