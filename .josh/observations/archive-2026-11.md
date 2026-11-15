@@ -5324,3 +5324,43 @@
 - rx:{"round":"5c7de25b-82dc-4c92-a442-1153c9d2a166","category":"bug-risks","severity":"medium","file":"scripts/lane/lane-implement-stats.ts:78","disposition":"fixed","description":"An open run:chain that stopped before run:review still flips the lane to review-fix, so the fix-and-rerun edits and checks after a stop are misfiled.","status":"resolved"}
 - rx:{"round":"5c7de25b-82dc-4c92-a442-1153c9d2a166","category":"bug-risks","severity":"low","file":"scripts/lane/lane-implement-stats.ts:37","disposition":"fixed","description":"run:chain in CHECK_COMMANDS also classes a joined chain as check, while the header names only an open chain.","status":"resolved"}
 - ri:comments | medium | docs/josh-commands-lane.md:255 | 2026-11-15 | #7566 | fixed
+- rf:none | none | - | 2026-11-15 | #7571
+- rf:none | none | - | 2026-11-15 | #7571
+- ri:bug-risks | medium | docs/maintainers/lane-limit-measurement.md:291 | 2026-11-15 | #7572 | fixed
+- rb:2026-11-15 | #7572
+- rf:bug-risks | low | scripts/backlog/backlog-wait-cause.ts:65 | 2026-11-15 | #7572 | fixed
+- rf:comments | low | docs/maintainers/lane-limit-measurement.md:290 | 2026-11-15 | #7572 | fixed
+- rx:{"round":"55cfec07-2c5b-4db3-916f-ec4382a5896e","category":"bug-risks","severity":"low","file":"scripts/backlog/backlog-wait-cause.ts:65","disposition":"fixed","description":"deadline_of keeps only gate children, so a pending-publication child with a future start date no longer sets not_before_ms.","status":"resolved"}
+- rx:{"round":"55cfec07-2c5b-4db3-916f-ec4382a5896e","category":"comments","severity":"low","file":"docs/maintainers/lane-limit-measurement.md:290","disposition":"fixed","description":"the doc lists the cause tags as chain, gate and lane and leaves out the new publication tag.","status":"resolved"}
+- rf:bug-risks | medium | scripts/issue/issue-publication-state.ts:15 | 2026-11-15 | #7573
+- rb:2026-11-15 | #7573
+- rf:bug-risks | medium | scripts/issue/issue-publication-state.ts:9 | 2026-11-15 | #7573 | fixed
+- rf:bug-risks | low | scripts/issue/issue-publication-state.ts:11 | 2026-11-15 | #7573 | fixed
+- rx:{"round":"fc86df03-9d5b-44f3-8a8c-0dd3e9127b9e","category":"bug-risks","severity":"medium","file":"scripts/issue/issue-publication-state.ts:9","disposition":"fixed","description":"PATTERN ignores the fence stripping is_pending applies and takes the first record line, so a fenced example record makes labels_of throw or publish the wrong labels and leave the real record pending.","status":"resolved"}
+- rx:{"round":"fc86df03-9d5b-44f3-8a8c-0dd3e9127b9e","category":"bug-risks","severity":"low","file":"scripts/issue/issue-publication-state.ts:11","disposition":"fixed","description":"FENCE strips only column-0 triple-backtick fences, so a record prefix quoted in a tilde, indented or four-backtick fence still reads as pending.","status":"resolved"}
+- rf:bug-risks | medium | scripts/rules/git-argv.ts:54 | 2026-11-15 | #7574
+- ri:none | none | - | 2026-11-15 | #7574
+- rb:2026-11-15 | #7574
+- rf:bug-risks | high | scripts/hooks/implementation-shell-deny-git.ts:84 | 2026-11-15 | #7574 | fixed
+- rx:{"round":"c4847cf7-b85d-4398-8847-60a7c7fe6561","category":"bug-risks","severity":"high","file":"scripts/hooks/implementation-shell-deny-git.ts:84","disposition":"fixed","description":"has_write_flag strips quotes before splitting, so a spaced global value like git -C 'my dir' -c core.fsmonitor=x status ends the globals early and the -c write flag is no longer refused (regression from the all-args scan).","status":"resolved"}
+- rf:comments | low | docs/maintainers/lane-limit-measurement.md:357 | 2026-11-15 | #7578
+- rf:comments | low | .claude/skills/workflow-commands/split-assessment.md:57 | 2026-11-15 | #7578
+- rf:comments | low | docs/maintainers/lane-limit-measurement.md:357 | 2026-11-15 | #7578
+- rf:comments | low | .claude/skills/workflow-commands/split-assessment.md:57 | 2026-11-15 | #7578
+- ri:comments | low | docs/maintainers/lane-limit-measurement.md:357 | 2026-11-15 | #7578 | fixed
+- ri:comments | low | .claude/skills/workflow-commands/split-assessment.md:57 | 2026-11-15 | #7578 | fixed
+- rf:bug-risks | medium | scripts/lane/lane-size-stats.ts:94 | 2026-11-15 | #7579
+- rf:comments | low | scripts/lane/lane-ledger-schema-ship.ts:109 | 2026-11-15 | #7579
+- rf:none | none | - | 2026-11-15 | #7579
+- ri:bug-risks | medium | scripts/lane/lane-size-stats.ts:94 | 2026-11-15 | #7579 | fixed
+- ri:comments | low | scripts/lane/lane-ledger-schema-ship.ts:109 | 2026-11-15 | #7579 | fixed
+- ri:none | none | - | 2026-11-15 | #7579
+- ri:none | none | - | 2026-11-15 | #7580
+- rb:2026-11-15 | #7580
+- rf:none | none | - | 2026-11-15 | #7580
+- rf:none | none | - | 2026-11-15 | #7583
+- ri:none | none | - | 2026-11-15 | #7583
+- rb:2026-11-15 | #7583
+- rf:none | none | - | 2026-11-15 | #7583
+- rf:none | none | - | 2026-11-15 | #7589
+- rf:bug-risks | low | scripts/registry-migration/migrate.ts:180 | 2026-11-15 | #7589
