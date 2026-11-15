@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { unit_worker_share } from './unit-worker-share'
+import { unit_worker_share, type FreeCapacity, type UnitClaim } from './unit-worker-share'
 
 // joshuafolkken/kit#3945: the share divided the machine by the unit runs in flight and never asked
 // what the machine had free, so load from outside the core budget's ledger — 22 of 38 heavy samples
@@ -128,5 +128,59 @@ describe('unit_worker_share.cap_to_capacity — the free memory bounds the share
 		expect(unit_worker_share.cap_to_capacity(PAIRED_SHARE, free, MEASURED_CORES)).toBe(
 			SCARCE_FREE - 1,
 		)
+	})
+})
+
+// joshuafolkken/kit#7551: four lanes, this run the only unit run, a load average past the cores — the
+// free cores read zero — and the claim `gate-plan.ts` sizes from the same share: ⌊11 ÷ 4⌋ workers plus
+// vitest itself.
+const SHARING_LANES = 4
+const LANE_SHARE = 2
+const LOADED = { cores: 0, memory_workers: AMPLE_MEMORY_WORKERS }
+const LANE_CLAIM = { weight: LANE_SHARE + unit_worker_share.MAIN_PROCESS_CORES }
+
+function admitted_workers(
+	free: FreeCapacity,
+	claim: UnitClaim | undefined,
+	live_lanes: number,
+): number | undefined {
+	const capacity = unit_worker_share.admitted_capacity(free, claim, 0, live_lanes)
+	const share = unit_worker_share.current_share(MEASURED_CORES, 0, capacity, live_lanes)
+
+	return unit_worker_share.cap_to_claim(share, claim)
+}
+
+describe('unit_worker_share.admitted_capacity — a sharing run keeps its admitted claim', () => {
+	const outer_flag = process.env[unit_worker_share.NESTED_KEY]
+
+	beforeEach(() => {
+		process.env[unit_worker_share.NESTED_KEY] = ''
+	})
+
+	afterEach(() => {
+		process.env[unit_worker_share.NESTED_KEY] = outer_flag ?? ''
+	})
+
+	it('keeps the claimed workers beside other lanes however loaded the machine reads', () => {
+		expect(admitted_workers(LOADED, LANE_CLAIM, SHARING_LANES)).toBe(LANE_SHARE)
+	})
+
+	it('still bounds a sharing run by the free memory', () => {
+		const short_of_memory = { cores: 0, memory_workers: unit_worker_share.MIN_WORKERS }
+
+		expect(admitted_workers(short_of_memory, LANE_CLAIM, SHARING_LANES)).toBe(
+			unit_worker_share.MIN_WORKERS,
+		)
+	})
+
+	it('still cuts a sharing run that holds no claim to the free cores', () => {
+		expect(admitted_workers(LOADED, undefined, SHARING_LANES)).toBe(unit_worker_share.MIN_WORKERS)
+	})
+
+	it('leaves a solo run bounded by the free cores as before', () => {
+		const solo_claim = { weight: MEASURED_CORES }
+
+		expect(unit_worker_share.admitted_capacity(LOADED, solo_claim, 0, 1)).toBe(LOADED)
+		expect(admitted_workers(LOADED, solo_claim, 1)).toBe(unit_worker_share.MIN_WORKERS)
 	})
 })
