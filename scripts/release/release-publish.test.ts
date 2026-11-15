@@ -3,6 +3,7 @@ import { git_pr_checks } from '#scripts/gh/git-pr-checks'
 import { git_command } from '#scripts/git/git-command'
 import { git_remote_branch, type RemoteAnswer } from '#scripts/git/git-remote-branch'
 import { repository_lock } from '#scripts/git/repository-lock'
+import { pre_push_related_switch } from '#scripts/hooks/pre-push-related-switch'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { release_approval_prune } from './release-approval-prune'
 import { release_issue_close } from './release-issue-close'
@@ -31,6 +32,8 @@ const PUBLISH_PLAN: ReleasePlan = {
 	current_version: '1.1.0',
 	next_version: '1.2.0',
 }
+const STEP_LINE = /^⏱️ Release /u
+const PUSH_FAILURE = 'hook failed'
 const PR_SNAPSHOT = {
 	rollup: [],
 	merge_state_status: undefined,
@@ -174,6 +177,19 @@ describe('release_publish.publish', () => {
 	})
 })
 
+// joshuafolkken/kit#7539: the release PR's CI runs the whole suite, so the push runs the related tests.
+describe('release_publish.publish and the pre-push hook', () => {
+	it('pushes with the related-tests switch the hook reads', async () => {
+		arrange_publish()
+
+		await release_publish.publish(PUBLISH_PLAN)
+
+		expect(git_command.push).toHaveBeenCalledWith({
+			[pre_push_related_switch.SWITCH_ENV_KEY]: pre_push_related_switch.SWITCH_ON,
+		})
+	})
+})
+
 describe('release_publish.publish around the work tree', () => {
 	// A leftover branch of the same name is cleared before the guard asks, or the guard would refuse
 	// it as a release already opened (joshuafolkken/kit#3058).
@@ -218,6 +234,36 @@ describe('release_publish.publish around the work tree', () => {
 	})
 })
 
+function step_lines(info: { mock: { calls: Array<Array<unknown>> } }): Array<string> {
+	return info.mock.calls.map((call) => String(call[0])).filter((line) => STEP_LINE.test(line))
+}
+
+// joshuafolkken/kit#7540: the local steps print their elapsed time, a failed one included.
+describe('release_publish.publish step times', () => {
+	it('prints the work tree, commit and push steps in order', async () => {
+		arrange_publish()
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		await release_publish.publish(PUBLISH_PLAN)
+
+		expect(step_lines(info)).toEqual([
+			expect.stringMatching(/^⏱️ Release work tree and install: \d+\.\d s$/u),
+			expect.stringMatching(/^⏱️ Release commit: \d+\.\d s$/u),
+			expect.stringMatching(/^⏱️ Release push: \d+\.\d s$/u),
+		])
+	})
+
+	it('prints the failed push step before the push error stops the release', async () => {
+		arrange_publish()
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		vi.spyOn(git_command, 'push').mockRejectedValue(new Error(PUSH_FAILURE))
+
+		await expect(release_publish.publish(PUBLISH_PLAN)).rejects.toThrow(PUSH_FAILURE)
+		expect(step_lines(info).at(-1)).toMatch(/^⏱️ Release push: \d+\.\d s \(failed\)$/u)
+	})
+})
+
 describe('release_publish.publish progress', () => {
 	const PR_URL = `https://github.com/joshuafolkken/kit/pull/${String(PR_NUMBER)}`
 
@@ -228,6 +274,9 @@ describe('release_publish.publish progress', () => {
 		await release_publish.publish(PUBLISH_PLAN)
 
 		expect(info.mock.calls.map((call) => String(call[0]))).toEqual([
+			expect.stringMatching(STEP_LINE),
+			expect.stringMatching(STEP_LINE),
+			expect.stringMatching(STEP_LINE),
 			`📝 Release PR opened: ${PR_URL}`,
 			`🔀 Release PR merged: ${PR_URL}`,
 			'tagged',

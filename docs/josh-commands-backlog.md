@@ -464,7 +464,7 @@ pnpm josh issue:lint .josh/tmp/issue-body.md
 
 <!-- /usage -->
 
-The required headings are `## 背景`, `## 現象`, `## 期待結果` and `## 受け入れ条件`, plus the bug classification (source: `prompts/collaboration-workflow/issue-template.md`). Run this before filing.
+The required headings are `## 背景`, `## 現象`, `## 期待結果` and `## 受け入れ条件`, plus the bug classification (source: `prompts/collaboration-workflow/issue-template.md`), led by `## 概要`. Run this before filing.
 
 Prints `ok` and the labels to apply when the headings and one `- 種別:` declaration are present; a missing or conflicting declaration exits 1, as does a `- 種別: 不具合` body without a well-formed `- 原因:` origin line ([`josh defect:origin`](#josh-defectorigin) lists candidates). [`josh issue:file`](#josh-issuefile) runs it as a filing step.
 

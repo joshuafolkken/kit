@@ -1,6 +1,7 @@
 import type { ImplementRate } from '#scripts/lane/lane-implement-rate'
 import { describe, expect, it } from 'vitest'
 import { expected_effect_lint } from './expected-effect-lint'
+import { issue_lint } from './issue-lint'
 import { issue_spill } from './issue-spill'
 import { size_estimate } from './size-estimate'
 
@@ -120,6 +121,10 @@ describe('issue_spill.follow_up_body', () => {
 		expect(body).not.toContain(FENCED)
 		expect(body).toContain('## 現象')
 		expect(body).toContain('## 期待結果')
+	})
+
+	it('opens with the summary issue:file requires', () => {
+		expect(issue_lint.starts_with_summary(body)).toBe(true)
 	})
 
 	it('titles the follow-up after the original', () => {

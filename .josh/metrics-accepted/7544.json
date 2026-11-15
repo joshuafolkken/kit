@@ -1,0 +1,9 @@
+{
+	"reason": "Review fixes for #7544: the summary heading is read per call so an en session names ## Summary, and the refusal cites the template file of the session's column",
+	"date": "2026-11-15",
+	"growth": {
+		"scripts.code_lines": 57,
+		"rules.lines": 18,
+		"ai_cost.on_demand_bytes": 1835
+	}
+}

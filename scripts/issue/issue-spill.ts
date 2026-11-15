@@ -138,15 +138,29 @@ function follow_up_title(subject: SpillSubject): string {
 	return `Follow up ${issue_cite.plain_for('github', subject.issue_number)}: ${subject.title}`
 }
 
+// The plain-language summary `issue:file` requires first, for the person deciding on the follow-up,
+// then the background's opening line.
+function opening_lines(origin: string): ReadonlyArray<string> {
+	return [
+		issue_body_keys.heading('summary'),
+		'',
+		`**${origin} の受け入れ条件のうち、終わらなかった分を引き継ぐ Issue です。**`,
+		'',
+		`${origin} は一度に収まらなかったため、残った条件をここへ移し、${origin} は終わった分だけで閉じます。下の受け入れ条件を満たせば完了です。`,
+		'',
+		BACKGROUND_HEADING,
+		'',
+		`${origin} から切り出し。`,
+		'',
+	]
+}
+
 // `sizing` is the caller's size lines: the estimate, then a reason line when one was given.
 function follow_up_body(subject: SpillSubject, sizing: ReadonlyArray<string>): string {
 	const origin = issue_cite.plain_for('github', subject.issue_number)
 
 	return [
-		BACKGROUND_HEADING,
-		'',
-		`${origin} から切り出し。`,
-		'',
+		...opening_lines(origin),
 		...declarations(subject.body),
 		...sizing,
 		'',

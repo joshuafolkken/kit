@@ -56,8 +56,21 @@ function background_lines(finding: BatchFinding, issue: number): ReadonlyArray<s
 	]
 }
 
+// The plain-language summary `issue:file` requires first, for the person deciding on the finding.
+function summary_lines(issue: number): ReadonlyArray<string> {
+	return [
+		issue_body_keys.heading('summary'),
+		'',
+		`**${cite(issue)} のレビューで見つかり、その場では直さずに持ち越した指摘です。**`,
+		'',
+		'レビューの回数に上限があるため、上限に達した時点で残った指摘をここへ移しました。下の現象が起きないように直せば完了です。',
+		'',
+	]
+}
+
 function body_of(finding: BatchFinding, issue: number): string {
 	return [
+		...summary_lines(issue),
 		`parent: ${cite(issue)}`,
 		'',
 		...background_lines(finding, issue),

@@ -848,9 +848,12 @@ pnpm josh release --dry-run   # count and report, write nothing
 
 <!-- /usage -->
 
-It raises the version by one minor per merge, opens and merges a `release/v<version>` pull request, then waits for the tag, npm publish and GitHub Release, one line per stage:
+It raises the version by one minor per merge, opens and merges a `release/v<version>` pull request, then waits for the tag, npm publish and GitHub Release, one line per stage. The local steps before the pull request — the work tree and its install, the commit, the push — each print their elapsed time, a failed one with `(failed)`:
 
 ```text
+⏱️ Release work tree and install: 41.2 s
+⏱️ Release commit: 1.3 s
+⏱️ Release push: 28.7 s
 📝 Release PR opened: https://github.com/<owner>/<repo>/pull/<N>
 🔀 Release PR merged: https://github.com/<owner>/<repo>/pull/<N>
 🏷 Tag vX.Y.Z created

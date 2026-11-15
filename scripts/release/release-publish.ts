@@ -3,6 +3,7 @@ import { git_pr_merge_checked } from '#scripts/gh/git-pr-merge-checked'
 import { git_command } from '#scripts/git/git-command'
 import { git_remote_branch } from '#scripts/git/git-remote-branch'
 import { repository_lock } from '#scripts/git/repository-lock'
+import { pre_push_related_switch } from '#scripts/hooks/pre-push-related-switch'
 import { IGNORE_FOR_RELEASE_LABEL } from '#scripts/issue/issue-labels'
 import { PACKAGE_JSON } from '#scripts/lib/package-manifest'
 import { write_version } from '#scripts/version/bump-version'
@@ -10,6 +11,7 @@ import { release_approval_prune } from './release-approval-prune'
 import { release_issue_close } from './release-issue-close'
 import type { ReleasePlan } from './release-plan'
 import { release_progress } from './release-progress'
+import { release_step_time } from './release-step-time'
 import { release_tag } from './release-tag'
 import { release_worktree } from './release-worktree'
 
@@ -26,6 +28,13 @@ const FAILURE_EXIT_CODE = 1
 const RELEASE_LOCK_PREFIX = 'josh-release-lock-'
 // A release waits on CI for minutes, so a second run refuses rather than queueing behind it.
 const RELEASE_LOCK_MAX_WAIT_MS = 0
+// The release push runs the related unit tests rather than the whole suite: this worktree is new, so
+// no gate record covers it, and the release pull request's CI runs the whole suite over the same tree
+// before it merges (joshuafolkken/kit#7539).
+const RELATED_PUSH_ENVIRONMENT = {
+	[pre_push_related_switch.SWITCH_ENV_KEY]: pre_push_related_switch.SWITCH_ON,
+}
+const { STEP, timed } = release_step_time
 
 function branch_name_for(version: string): string {
 	return `release/v${version}`
@@ -106,12 +115,20 @@ async function clear_the_way(branch_name: string): Promise<void> {
 // before that creation, because `worktree_add` makes the branch local and `branch_exists` would then
 // report every release as already taken. This runs after `process.chdir` into the work tree, so the
 // version write and the git commands all act on it rather than on the root.
-async function commit_release(plan: ReleasePlan): Promise<string> {
+async function commit_version(plan: ReleasePlan): Promise<void> {
 	write_version(plan.next_version)
 	await git_command.add_path(PACKAGE_JSON)
 	await release_approval_prune.prune()
 	await git_command.commit(commit_message(plan.next_version))
-	await git_command.push()
+}
+
+async function commit_release(plan: ReleasePlan): Promise<string> {
+	await timed(STEP.COMMIT, async () => {
+		await commit_version(plan)
+	})
+	await timed(STEP.PUSH, async () => {
+		await git_command.push(RELATED_PUSH_ENVIRONMENT)
+	})
 	const pr_url = await git_gh_command.pr_create(
 		commit_message(plan.next_version),
 		pull_request_body(plan),
@@ -159,7 +176,10 @@ async function publish_locked(plan: ReleasePlan): Promise<number> {
 
 	await clear_the_way(branch_name)
 
-	const directory = await release_worktree.create(branch_name)
+	const directory = await timed(
+		STEP.WORKTREE,
+		async () => await release_worktree.create(branch_name),
+	)
 	const previous_cwd = process.cwd()
 
 	try {

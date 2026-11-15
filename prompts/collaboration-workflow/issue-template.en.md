@@ -3,6 +3,10 @@
 The `en` column of `issue-template.md`'s template; its rules and label table → `issue-template.md`. Keys, fixed values and headings → `scripts/issue/issue-body-keys.ts`, mirrored in the table below. The parentheses `（）`, the minute unit `分` and the `## Expected effect` labels stay as `issue:lint` reads them.
 
 ````md
+## Summary
+
+<for the person deciding whether to act or wait — the order, style rules and model are `issue-template.md`'s `## 概要` section>
+
 ## Background
 
 <`- Type: defect` for a defect, else `- Type: non-defect`>
@@ -118,6 +122,7 @@ The `en` column of `issue-template.md`'s template; its rules and label table →
 | value   | 最後           | last                           |
 | value   | 不明           | unknown                        |
 | value   | なし           | none                           |
+| heading | 概要           | Summary                        |
 | heading | 背景           | Background                     |
 | heading | 現象           | Symptom                        |
 | heading | 期待結果       | Expected result                |
