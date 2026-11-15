@@ -14,6 +14,7 @@ import { lane_dispatch_dependency } from './lane-dispatch-dependency'
 import { lane_dispatch_log } from './lane-dispatch-log'
 import type { LaneInfo } from './lane-registry'
 import { lane_session_broker } from './lane-session-broker'
+import { openai_lane_progress } from './openai-lane-progress'
 import { openai_lane_ship } from './openai-lane-ship'
 import { openai_lane_supervisor_decision } from './openai-lane-supervisor-decision'
 import { openai_lane_supervisor_owner, type SupervisorOwner } from './openai-lane-supervisor-owner'
@@ -69,6 +70,7 @@ interface Generation {
 	profile: AgentProfile
 	invocation?: string
 	resume_cut?: string | undefined
+	idle_cuts?: number
 }
 
 function completion_code(result: ChildResult, ship: string): number {
@@ -174,27 +176,58 @@ async function run_child(generation: Generation): Promise<ChildResult> {
 	return await launch_child(ready)
 }
 
+// A cut that left the worktree as its generation found it counts toward the no-progress limit;
+// any change resets the count, so a lane that keeps working is relaunched as before.
+// Undefined once the limit is reached: the lane stops with its work and cut preserved.
+async function successor_after_cut(
+	generation: Generation,
+	before: string | undefined,
+): Promise<Generation | undefined> {
+	const { lane } = generation
+	const after = openai_lane_progress.fingerprint(lane.directory)
+	const idle_cuts = openai_lane_progress.next_idle_cuts(generation.idle_cuts ?? 0, before, after)
+
+	if (openai_lane_progress.is_exhausted(idle_cuts)) {
+		await openai_lane_progress.record_stop(lane.issue, idle_cuts)
+
+		return undefined
+	}
+
+	return { ...generation, epoch: generation.epoch + 1, is_resume: true, idle_cuts }
+}
+
+// The generation to launch after a child exits, or the supervisor's exit code when none follows.
+async function after_child(
+	generation: Generation,
+	result: ChildResult,
+	before: string | undefined,
+	prior_launch: string | undefined,
+): Promise<Generation | number> {
+	const { issue } = generation.lane
+
+	if ((await standing_cut(issue)) !== undefined) {
+		return (await successor_after_cut(generation, before)) ?? 1
+	}
+
+	const ship = await openai_lane_ship.wait_for_ship(issue, prior_launch)
+	if (ship !== 'failed') return completion_code(result, ship)
+
+	return {
+		...generation,
+		epoch: generation.epoch + 1,
+		is_resume: false,
+		invocation: await stop_invocation(issue),
+	}
+}
+
 async function run_generations(generation: Generation): Promise<number> {
 	const prior = await openai_lane_ship.current(generation.lane.issue)
+	const before = openai_lane_progress.fingerprint(generation.lane.directory)
 	const result = await run_child(generation)
 	if (result.kind === LAUNCH_FAILED_KIND) return 1
+	const next = await after_child(generation, result, before, prior?.launch_id)
 
-	if ((await standing_cut(generation.lane.issue)) !== undefined) {
-		return await run_generations({ ...generation, epoch: generation.epoch + 1, is_resume: true })
-	}
-
-	const ship = await openai_lane_ship.wait_for_ship(generation.lane.issue, prior?.launch_id)
-
-	if (ship === 'failed') {
-		return await run_generations({
-			...generation,
-			epoch: generation.epoch + 1,
-			is_resume: false,
-			invocation: await stop_invocation(generation.lane.issue),
-		})
-	}
-
-	return completion_code(result, ship)
+	return typeof next === 'number' ? next : await run_generations(next)
 }
 
 async function wait_for_inherited_child(

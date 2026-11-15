@@ -1,0 +1,7 @@
+{
+	"reason": "No-progress cut guard for the OpenAI lane supervisor (#7608): new progress module plus its supervisor wiring",
+	"date": "2026-11-15",
+	"growth": {
+		"scripts.code_lines": 72
+	}
+}
