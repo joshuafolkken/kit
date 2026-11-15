@@ -2,7 +2,7 @@ import { SUITE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { PORCELAIN_FLAG, UNTRACKED_FILES_FLAG } from './constants'
 import { git_diff_reads } from './git-diff-reads'
 import { create_spawn_error } from './git-execa-error'
-import { git_pre_push_hook } from './git-pre-push-hook'
+import { git_pre_push_hook, type HookEnvironment } from './git-pre-push-hook'
 import { git_push_transport } from './git-push-transport'
 import { git_spawn } from './git-spawn'
 import { git_spawn_sync } from './git-spawn-sync'
@@ -225,8 +225,12 @@ async function push_with_upstream(
 // on a suite's budget of its own, before either push and outside the `try`; both transfers then skip it with `--no-verify`,
 // so neither the timeout retry nor the `--set-upstream` fallback repeats it, and a failed hook is not
 // mistaken for a missing upstream. A git too old to run the hook ahead leaves it to the push, as before.
-async function push(): Promise<void> {
-	const verify_flags = (await git_pre_push_hook.run()) ? [NO_VERIFY_FLAG] : []
+//
+// `hook_environment` reaches the hook run ahead and nothing else (joshuafolkken/kit#7539). The
+// transfers do not carry it: where the push itself runs the hook, the hook runs without the caller's
+// setting — for `pre_push_related_switch`, the whole suite, which is the safe side.
+async function push(hook_environment: HookEnvironment = {}): Promise<void> {
+	const verify_flags = (await git_pre_push_hook.run(hook_environment)) ? [NO_VERIFY_FLAG] : []
 
 	try {
 		await git_push_transport.push([...verify_flags])

@@ -1,0 +1,7 @@
+{
+	"reason": "The release push hands the related-tests switch to the pre-push hook (#7539): an optional environment threaded through git_command.push, git_pre_push_hook.run and git_spawn.with_output, plus the release constant built from pre_push_related_switch",
+	"date": "2026-11-15",
+	"growth": {
+		"scripts.code_lines": 16
+	}
+}

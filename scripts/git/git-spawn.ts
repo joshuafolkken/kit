@@ -112,9 +112,25 @@ async function with_output_remote(command: string, arguments_list: Array<string>
 //
 // `timeout_ms` defaults to a local command's budget. A command that runs hooks — a commit, a merge,
 // `git hook run` — is not one, and names the longer budget itself.
+//
+// `environment` is added to the inherited one for this one child — execa extends `process.env` with
+// it — so a caller hands a hook a setting without writing it into its own process.
 interface OutputOptions {
 	config_options?: ReadonlyArray<string>
 	timeout_ms?: number
+	environment?: Readonly<Record<string, string>>
+}
+
+interface OutputSpawnOptions {
+	stdio: 'inherit'
+	timeout: number
+	env: Readonly<Record<string, string>>
+}
+
+function to_output_spawn_options(options: OutputOptions): OutputSpawnOptions {
+	const { timeout_ms = GIT_TIMEOUT_MS, environment = {} } = options
+
+	return { stdio: 'inherit', timeout: timeout_ms, env: environment }
 }
 
 async function with_output(
@@ -122,17 +138,17 @@ async function with_output(
 	arguments_list: Array<string>,
 	options: OutputOptions = {},
 ): Promise<void> {
-	const { config_options = [], timeout_ms = GIT_TIMEOUT_MS } = options
 	const git_command_bin = git_utilities.get_git_command_for_spawn()
-	const spawn_arguments = [...config_options, command, ...arguments_list]
+	const spawn_arguments = [...(options.config_options ?? []), command, ...arguments_list]
+	const spawn_options = to_output_spawn_options(options)
 
 	try {
 		// execa runs the binary directly with an argument array and no `shell` option, so CLI
 		// args cannot break out of a shell sandbox; the git command and args are internally
 		// controlled, never untrusted input. tssecurity:S8705 is a false positive here.
-		await execa(git_command_bin, spawn_arguments, { stdio: 'inherit', timeout: timeout_ms }) // NOSONAR
+		await execa(git_command_bin, spawn_arguments, spawn_options) // NOSONAR
 	} catch (error) {
-		throw to_budget_error(command, error, timeout_ms)
+		throw to_budget_error(command, error, spawn_options.timeout)
 	}
 }
 

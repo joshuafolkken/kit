@@ -13,6 +13,9 @@ const REMOTE = 'remote.git'
 const HOOKS = 'hooks'
 const ARGUMENTS_FILE = 'arguments.txt'
 const STDIN_FILE = 'stdin.txt'
+const ENVIRONMENT_FILE = 'environment.txt'
+const PROBE_KEY = 'KIT_PRE_PUSH_HOOK_PROBE'
+const PROBE_VALUE = 'handed'
 const MAIN_REFERENCE = 'refs/heads/main'
 const HEAD = 'HEAD'
 const TRACKING_REFERENCE = 'refs/remotes/origin/main'
@@ -65,6 +68,7 @@ async function install_hook(exit_code: number): Promise<void> {
 		'#!/bin/sh',
 		`printf '%s %s' "$1" "$2" > '${in_workspace(ARGUMENTS_FILE)}'`,
 		`cat > '${in_workspace(STDIN_FILE)}'`,
+		`printf '%s' "$${PROBE_KEY}" > '${in_workspace(ENVIRONMENT_FILE)}'`,
 		`exit ${String(exit_code)}`,
 	].join('\n')
 
@@ -157,7 +161,37 @@ describe('the budget the pre-push hook runs on', () => {
 
 			expect(with_output).toHaveBeenCalledWith('hook', expect.any(Array), {
 				timeout_ms: SUITE_TIMEOUT_MS,
+				environment: {},
 			})
+		},
+		TIMEOUT_MS,
+	)
+})
+
+// joshuafolkken/kit#7539: a caller's setting reaches the hook's process without being written into
+// this one.
+describe('the environment the pre-push hook runs in', () => {
+	it(
+		'hands the hook the environment the caller names',
+		async () => {
+			await install_hook(0)
+
+			await git_pre_push_hook.run({ [PROBE_KEY]: PROBE_VALUE })
+
+			expect(await read_recorded(ENVIRONMENT_FILE)).toBe(PROBE_VALUE)
+			expect(process.env[PROBE_KEY]).toBeUndefined()
+		},
+		TIMEOUT_MS,
+	)
+
+	it(
+		'adds nothing when the caller names none',
+		async () => {
+			await install_hook(0)
+
+			await git_pre_push_hook.run()
+
+			expect(await read_recorded(ENVIRONMENT_FILE)).toBe('')
 		},
 		TIMEOUT_MS,
 	)
