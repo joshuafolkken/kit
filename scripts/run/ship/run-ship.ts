@@ -9,6 +9,7 @@
 // `run:tail`, ship stops at the first failed step: a red gate must never reach the commit, so the
 // composite ends at the failure, and the report names the step that failed so the run reads only it.
 
+import type { UnpinnedStop } from '#scripts/lane/lane-ledger-schema-ship'
 import { run_section, type Section } from '#scripts/run/run-section'
 import { run_tail } from '#scripts/run/run-tail'
 import type { PreDetachResult } from './run-ship-pre-detach'
@@ -36,6 +37,8 @@ type ShipSection = Section & {
 	conflicts?: ReadonlyArray<string>
 	// The kinds of the preconditions a stopped preflight found unmet, recorded with the stop.
 	preconditions?: ReadonlyArray<string>
+	// The path an `unpinned` precondition's stop took, recorded with the stop (joshuafolkken/kit#7552).
+	unpinned?: UnpinnedStop
 	// The cause a stopped review round tagged its stop with, recorded with the stop.
 	cause?: Cause
 	// The stage found nothing to do, and why it ran or was skipped — both read onto its event line.
@@ -89,13 +92,16 @@ function format_report(sections: ReadonlyArray<ShipSection>): string {
 	return `${body}${run_section.SECTION_SEPARATOR}${STOPPED_PREFIX}${failed.header}`
 }
 
-// Preserve the preflight refusal and add any failed pre-detach check kinds to its stop record.
+// Preserve the preflight refusal and add any failed pre-detach check kinds, and the path an `unpinned`
+// one took, to its stop record.
 function with_checks(stop: ShipSection, checks: PreDetachResult): ShipSection {
 	if (checks.code === run_section.SUCCESS_EXIT_CODE) return stop
+	const { unpinned } = checks
 
 	return {
 		...stop,
 		preconditions: [...(stop.preconditions ?? []), ...(checks.preconditions ?? [])],
+		...(unpinned !== undefined && { unpinned }),
 	}
 }
 

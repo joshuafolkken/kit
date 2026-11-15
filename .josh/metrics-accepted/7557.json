@@ -1,0 +1,7 @@
+{
+	"reason": "The closed read's short retry window for a child whose lane just ended (#7557) adds its pace decision and named constants",
+	"date": "2026-11-15",
+	"growth": {
+		"scripts.code_lines": 24
+	}
+}
