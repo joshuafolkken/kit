@@ -8,6 +8,7 @@ import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { pnpm_reach } from '#scripts/lib/pnpm-reach'
 import { auto_merge_setting } from '#scripts/repo/auto-merge-setting'
 import { ruleset_check } from '#scripts/repo/ruleset-check'
+import { safe_chain_local_version } from '#scripts/safe-chain/local-version'
 import { security_updates } from '#scripts/security/security-updates'
 import { running_binary } from '#scripts/version/running-binary'
 import { doctor_consumer } from './doctor-consumer'
@@ -226,6 +227,7 @@ function run_reports(ctx: DoctorContext, git: GitTopLevel, options: DoctorOption
 	print_report(ctx)
 	report_path_diagnosis(ctx, options.is_fix)
 	report_pnpm_reach(ctx)
+	safe_chain_local_version.report_local_version()
 	doctor_consumer.report_consumer_setup(consumer_root(git))
 	report_repository_map(git)
 	if (options.show_ports) report_port_seeds(git)
