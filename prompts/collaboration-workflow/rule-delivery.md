@@ -22,6 +22,8 @@
 pnpm josh notify --task-type confirmation --issue-url "<url>" --body=$'<reason>' --recommended "<choice>" --alternative "<other>"
 ```
 
+レーンの子の停止は通知せず、`Recommended:` 行も求めない — 人を待つ停止は `run:park`（`backlogrun-park.md` → "park and continue"）が受け持つ。
+
 ## 配送は 1 ラン 1 回
 
 配送文はラン 1 回につき 1 度しか出ないので、**「同じ呼び出しをもう一度出せ」と明記する**。例外: 繰り返す行為を止める項目は毎回発火し（joshuafolkken/kit#1570）、前提の行為を求める項目は前提が末尾に現れるまで毎回拒否する（joshuafolkken/kit#2807）— その配送文にはそれぞれ「これは毎回発火する」「前提が末尾に現れるまで拒否する」と明記する。バッチングと調査の 2 ガードは違反が間隔分続けば再び発火する（joshuafolkken/kit#2164）。前提の証拠を読めないときは拒否する。

@@ -269,7 +269,12 @@ function is_held_idle(context: StopContext): boolean {
 
 // **A stop that answers the person's question is no pause** (joshuafolkken/kit#3961): they are reading
 // the reply where it was written, whatever the tree's hold says.
+//
+// **A lane child's stop owes no notify** (joshuafolkken/kit#7605): its stop for a person is a park,
+// which notifies nobody, and any other stop — a wait on a prerequisite — the driver resumes by itself.
 function needs_notify(context: StopContext): boolean {
+	if (context.lane_child) return false
+
 	return is_held_idle(context) && !context.notified && !context.answers_question
 }
 

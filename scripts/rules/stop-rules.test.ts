@@ -49,11 +49,26 @@ describe('stop_rules.stop_outcome — hand-off to the detached ship', () => {
 
 		expect(stop_rules.stop_outcome(handed_off)).toEqual(stop_rules.NO_OUTCOME)
 	})
+})
 
-	it('still demands the notify from a lane child that parks for a decision', () => {
-		const parked = { lane_child: true, hold_issue: '7', message: DECISION_MESSAGE }
+// joshuafolkken/kit#7605: a lane child's stop for a person is a park, so its turn-end notifies nobody.
+describe('stop_rules.stop_outcome — lane child stop', () => {
+	it('sends no notify from a held lane child whose reply names a decision', () => {
+		const held = context({ lane_child: true, hold_issue: '7', message: DECISION_MESSAGE })
 
-		expect(action_kinds(parked)).toEqual(['notify'])
+		expect(stop_rules.stop_outcome(held)).toEqual(stop_rules.NO_OUTCOME)
+	})
+
+	it('does not send a held lane child back for a missing Recommended: line', () => {
+		const held = context({ lane_child: true, hold_issue: '7', message: 'waiting on #8' })
+
+		expect(stop_rules.stop_outcome(held).reason).toBeUndefined()
+	})
+
+	it('still releases the hold over a clean tree', () => {
+		const held = { lane_child: true, hold_issue: '7', tree_clean: true, message: DECISION_MESSAGE }
+
+		expect(action_kinds(held)).toEqual(['release'])
 	})
 })
 
