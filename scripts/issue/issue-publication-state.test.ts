@@ -52,6 +52,28 @@ it('preserves user opt-out and unrelated labels when preparing and publishing', 
 	expect(issue_publication_state.public_body(body)).toBe(BODY)
 })
 
+it('carries a pending record into a rewritten body, so publishing still applies auto-ok', () => {
+	const previous = issue_publication_state.prepare('old body', LABELS)
+	const carried = issue_publication_state.carried(previous, `${BODY}\n`)
+
+	expect(issue_publication_state.public_body(carried)).toBe(BODY)
+	expect(issue_publication_state.labels_of(carried, [PLANNED])).toEqual([PLANNED, 'auto-ok'])
+})
+
+it.each([
+	['a published body', BODY],
+	['an unread body', undefined],
+])('leaves a rewrite of %s unchanged', (_case, previous) => {
+	expect(issue_publication_state.carried(previous, BODY)).toBe(BODY)
+})
+
+it('keeps the record a rewritten body brings instead of adding a second one', () => {
+	const previous = issue_publication_state.prepare('old body', LABELS)
+	const next = issue_publication_state.prepare(BODY, ['run:lane'])
+
+	expect(issue_publication_state.carried(previous, next)).toBe(next)
+})
+
 it('refuses corrupt and duplicate preparation records', () => {
 	const body = issue_publication_state.prepare(BODY, LABELS)
 
