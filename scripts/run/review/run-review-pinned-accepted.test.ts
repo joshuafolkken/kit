@@ -118,6 +118,38 @@ describe('run_review_pinned_accepted.judge — a check cut at its first unpinned
 	})
 })
 
+// joshuafolkken/kit#7552: a stop without a reason names the path it took and its unpinned place count.
+describe('run_review_pinned_accepted.unpinned_stop', () => {
+	it('names no-reason where this branch recorded no reason', async () => {
+		const stop = await run_review_pinned_accepted.unpinned_stop({ text: 'L\n', unpinned: [SITE] })
+
+		expect(stop).toStrictEqual({ path: 'no-reason', hunks: 1 })
+	})
+
+	it('names new-site where a place outran the recorded reason', async () => {
+		await accept([SITE])
+
+		const stop = await run_review_pinned_accepted.unpinned_stop({
+			text: 'L\n',
+			unpinned: [SITE, OTHER_SITE],
+		})
+
+		expect(stop).toStrictEqual({ path: 'new-site', hunks: 2 })
+	})
+
+	it('names truncated where a cut check never applied the recorded reason', async () => {
+		await accept([SITE])
+
+		const stop = await run_review_pinned_accepted.unpinned_stop({
+			text: 'L\n',
+			unpinned: [SITE],
+			is_cut: true,
+		})
+
+		expect(stop).toStrictEqual({ path: 'truncated', hunks: 1 })
+	})
+})
+
 // joshuafolkken/kit#4974: the pre-detach check skips its probe under the reason this branch recorded.
 describe('run_review_pinned_accepted.recorded_reason', () => {
 	it("returns this branch's recorded reason", async () => {

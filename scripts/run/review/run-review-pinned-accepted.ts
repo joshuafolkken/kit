@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { git_command } from '#scripts/git/git-command'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import type { UnpinnedPath, UnpinnedStop } from '#scripts/lane/lane-ledger-schema-ship'
 import { error_text } from '#scripts/lib/error-message'
 import { test_pinned_logic } from '#scripts/test/test-pinned-logic'
 import { test_pinned_record, type PinnedSummary } from '#scripts/test/test-pinned-record'
@@ -135,6 +136,28 @@ async function judge(summary: PinnedSummary, reason: string | undefined): Promis
 	return { kind: 'accepted', text: test_pinned_logic.report_text(summary, note) }
 }
 
-const run_review_pinned_accepted = { RECORD_NAME, judge, keep_reason, recorded_reason }
+function stop_path(summary: PinnedSummary, reason: string | undefined): UnpinnedPath {
+	if (reason === undefined) return 'no-reason'
+
+	return summary.is_cut === true ? 'truncated' : 'new-site'
+}
+
+// Which path a `judge` stop without a reason took (joshuafolkken/kit#7552): no recorded reason, a
+// recorded one a place outside its record outran, or one a cut check never applies — and how many
+// unpinned places it listed.
+async function unpinned_stop(summary: PinnedSummary): Promise<UnpinnedStop> {
+	return {
+		path: stop_path(summary, await recorded_reason()),
+		hunks: summary.unpinned.length,
+	}
+}
+
+const run_review_pinned_accepted = {
+	RECORD_NAME,
+	judge,
+	keep_reason,
+	recorded_reason,
+	unpinned_stop,
+}
 
 export { run_review_pinned_accepted }
