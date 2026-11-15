@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { git_fixture_workspace, type FixtureWorkspace } from '#scripts/git/git-fixture-workspace'
+import { measure_declaration } from '#scripts/issue/measure-declaration'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_pinned_reach } from './test-pinned-reach'
 import { test_reach_cli } from './test-reach-cli'
@@ -19,6 +20,13 @@ const FILES: ReadonlyArray<readonly [string, string]> = [
 	['middle.ts', "export { leaf } from './leaf'\n"],
 	['leaf.test.ts', `import './leaf'\n${TEST_BODY}`],
 	['middle.test.ts', `import './middle'\n${TEST_BODY}`],
+]
+
+// No file, and `--count` with other than one file.
+const USAGE_CASES: ReadonlyArray<{ argv: ReadonlyArray<string> }> = [
+	{ argv: [] },
+	{ argv: ['--count'] },
+	{ argv: ['--count', 'leaf.ts', 'middle.ts'] },
 ]
 
 const fixture: { current?: FixtureWorkspace } = {}
@@ -81,8 +89,30 @@ describe('test_reach_cli.run', () => {
 		expect(console.error).toHaveBeenCalledWith(expect.stringContaining('no import graph'))
 	})
 
-	it('prints the usage for no file', async () => {
-		expect(await test_reach_cli.run([])).toBe(FAILURE)
+	it.each(USAGE_CASES)('prints the usage for $argv', async ({ argv }) => {
+		expect(await test_reach_cli.run(argv)).toBe(FAILURE)
 		expect(console.error).toHaveBeenCalledWith(test_reach_cli.USAGE)
 	})
+})
+
+// joshuafolkken/kit#7604: a premise line reads the last output line as a number, so `--count`
+// prints the count alone.
+describe('test_reach_cli.run --count', () => {
+	it(
+		'prints the count alone, which a premise line reads as a number',
+		async () => {
+			await write_graph()
+
+			expect(await test_reach_cli.run(['--count', 'leaf.ts'])).toBe(0)
+			expect(console.info).toHaveBeenCalledWith('2')
+
+			const output = vi.mocked(console.info).mock.calls.at(0)?.at(0)
+			const premise = { command: 'pnpm josh test:reach --count leaf.ts', operator: '>=' } as const
+
+			expect(measure_declaration.judge({ ...premise, threshold: 2 }, String(output))).toStrictEqual(
+				{ kind: 'pass', value: 2 },
+			)
+		},
+		RUN_TIMEOUT,
+	)
 })
