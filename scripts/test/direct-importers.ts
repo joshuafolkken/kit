@@ -118,13 +118,14 @@ function source_reader(root: string): SourceReader {
 	return { imports: read_imports(root), read_source: (file) => read_source_at(root, file) }
 }
 
-// The test files the work tree at `root` holds, tracked or not but not ignored, repository-relative.
+// The files the work tree at `root` holds, tracked or not but not ignored, repository-relative.
 async function work_tree_files(root: string): Promise<Array<string>> {
 	const listed = await git_spawn.read(['-C', root, 'ls-files', '-coz', '--exclude-standard'])
 
 	return listed.split(NUL).filter((file) => file !== '')
 }
 
+// The test files among them.
 async function test_files(root: string): Promise<Array<string>> {
 	const files = await work_tree_files(root)
 

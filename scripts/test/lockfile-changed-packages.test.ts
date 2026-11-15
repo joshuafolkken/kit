@@ -7,6 +7,7 @@ import { lockfile_changed_packages } from './lockfile-changed-packages'
 const HEADER = ['lockfileVersion: "9.0"', 'importers:', '  .:']
 const SELF_DOCUMENT = [...HEADER, '    configDependencies: {}']
 const DEPENDENCIES = '    dependencies:'
+const SNAPSHOTS = 'snapshots:'
 
 interface Versions {
 	leaf: string
@@ -34,7 +35,7 @@ function project_document(versions: Versions): Array<string> {
 		...entries_of(versions),
 		'  middle@1.0.0: {}',
 		'  parent@1.0.0: {}',
-		'snapshots:',
+		SNAPSHOTS,
 		...entries_of(versions),
 		'  middle@1.0.0:',
 		DEPENDENCIES,
@@ -50,6 +51,22 @@ function lockfile_of(versions: Versions): string {
 }
 
 const BEFORE = lockfile_of({ leaf: '1.0.0' })
+
+// The runner depends on `pool`; `@vitest/expect` stands for the runner's scoped packages.
+function runtime_lockfile(pool: string, expect_version: string): string {
+	return [
+		...HEADER,
+		'    dependencies: {}',
+		SNAPSHOTS,
+		`  pool@${pool}: {}`,
+		`  '@vitest/expect@${expect_version}': {}`,
+		'  vitest@1.0.0:',
+		DEPENDENCIES,
+		`      pool: ${pool}`,
+	].join('\n')
+}
+
+const RUNTIME_BEFORE = runtime_lockfile('1.0.0', '1.0.0')
 
 describe('lockfile_changed_packages.affected_packages', () => {
 	it('answers the moved package with every package depending on it, however far', () => {
@@ -69,6 +86,18 @@ describe('lockfile_changed_packages.affected_packages', () => {
 		const after = lockfile_of({ leaf: '1.0.0', runner: '1.1.0' })
 
 		expect(lockfile_changed_packages.affected_packages(BEFORE, after)).toBeUndefined()
+	})
+
+	it('answers undefined when a package the unit runtime depends on moved', () => {
+		const after = runtime_lockfile('1.0.1', '1.0.0')
+
+		expect(lockfile_changed_packages.affected_packages(RUNTIME_BEFORE, after)).toBeUndefined()
+	})
+
+	it('answers undefined when a scoped unit runtime package moved', () => {
+		const after = runtime_lockfile('1.0.0', '1.0.1')
+
+		expect(lockfile_changed_packages.affected_packages(RUNTIME_BEFORE, after)).toBeUndefined()
 	})
 
 	it('answers undefined when a root importer moved more than its resolved versions', () => {
