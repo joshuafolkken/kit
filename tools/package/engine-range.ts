@@ -1,3 +1,4 @@
+import { lockfile_changed_packages } from '#scripts/test/lockfile-changed-packages'
 import { loadAll } from 'js-yaml'
 import semver from 'semver'
 import { z } from 'zod'
@@ -18,12 +19,7 @@ const document_schema = z.looseObject({
 
 type LockfileDocument = z.infer<typeof document_schema>
 
-// A snapshot key carries the peer suffix (`name@1.0.0(peer@2.0.0)`); its package key does not.
-function to_package_key(snapshot_key: string): string {
-	const peer_start = snapshot_key.indexOf('(', 1)
-
-	return peer_start === -1 ? snapshot_key : snapshot_key.slice(0, peer_start)
-}
+const { to_package_key } = lockfile_changed_packages
 
 // pnpm skips an optional package whose engines the running Node fails instead of failing the
 // install, so only a package some non-optional snapshot reaches can refuse an install.

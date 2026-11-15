@@ -1,6 +1,7 @@
 import { git_command } from '#scripts/git/git-command'
 import { file_reader } from '#scripts/lib/read-file'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { direct_importers } from './direct-importers'
 import { whole_suite_narrowing } from './whole-suite-narrowing'
 
 // joshuafolkken/kit#5001 and joshuafolkken/kit#7538: a whole-suite file narrows by what moved in it
@@ -14,12 +15,19 @@ const ROOT = '/repo'
 const BASE = 'b45e'
 const PURE_FILES = 'tools/test/pure-files.ts'
 const PACKAGE_FILE = 'package.json'
+const LOCK_FILE = 'pnpm-lock.yaml'
 const KEPT = 'scripts/a/kept.test.ts'
 const ADDED = 'scripts/b/added.test.ts'
 const NO_BASE = new Error('bad object')
 
 function list_of(entries: ReadonlyArray<string>): string {
 	return ['const PURE_FILES = [', ...entries.map((entry) => `\t'${entry}',`), ']', ''].join('\n')
+}
+
+function lockfile_of(version: string): string {
+	return ['packages:', `  leaf@${version}: {}`, 'snapshots:', `  leaf@${version}: {}`, ''].join(
+		'\n',
+	)
 }
 
 function manifest_of(version: string, scripts: Record<string, string> = {}): string {
@@ -110,6 +118,50 @@ describe('whole_suite_narrowing.read', () => {
 		await expect(whole_suite_narrowing.read(ROOT, [PACKAGE_FILE])).resolves.toStrictEqual({
 			pure_entries: undefined,
 			version_only: new Set([PACKAGE_FILE]),
+			lockfile_importers: undefined,
 		})
+	})
+})
+
+// joshuafolkken/kit#7554: a lockfile change narrows to the modules importing a package it moved.
+describe('whole_suite_narrowing.read_lockfile_importers', () => {
+	const importer = 'scripts/a/uses-leaf.ts'
+
+	beforeEach(() => {
+		vi.mocked(git_command.show_file).mockResolvedValue(lockfile_of('1.0.0'))
+		vi.spyOn(file_reader, 'read_if_readable').mockReturnValue(lockfile_of('1.0.1'))
+		vi.spyOn(direct_importers, 'package_importers').mockResolvedValue([importer])
+	})
+
+	it('answers the modules importing a moved package', async () => {
+		await expect(
+			whole_suite_narrowing.read_lockfile_importers(ROOT, [LOCK_FILE]),
+		).resolves.toStrictEqual([importer])
+		expect(git_command.show_file).toHaveBeenCalledWith(`${BASE}:${LOCK_FILE}`)
+		expect(direct_importers.package_importers).toHaveBeenCalledWith(
+			ROOT,
+			new Set(['leaf']),
+			expect.any(Function),
+		)
+	})
+
+	it('answers undefined when a file every test depends on imports a moved package', async () => {
+		vi.mocked(direct_importers.package_importers).mockResolvedValue([importer, 'vitest.config.ts'])
+
+		await expect(
+			whole_suite_narrowing.read_lockfile_importers(ROOT, [LOCK_FILE]),
+		).resolves.toBeUndefined()
+	})
+
+	it('answers undefined when the change base has no lockfile, or the lockfile did not change', async () => {
+		await expect(
+			whole_suite_narrowing.read_lockfile_importers(ROOT, [KEPT]),
+		).resolves.toBeUndefined()
+
+		vi.mocked(git_command.show_file).mockRejectedValue(NO_BASE)
+
+		await expect(
+			whole_suite_narrowing.read_lockfile_importers(ROOT, [LOCK_FILE]),
+		).resolves.toBeUndefined()
 	})
 })

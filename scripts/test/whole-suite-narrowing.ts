@@ -1,9 +1,12 @@
 import path from 'node:path'
 import { git_command } from '#scripts/git/git-command'
 import { file_reader } from '#scripts/lib/read-file'
+import { direct_importers } from './direct-importers'
+import { lockfile_changed_packages } from './lockfile-changed-packages'
 import { package_version_only } from './package-version-only'
 import { pure_files_entries } from './pure-files-entries'
-import type { ScopeRequest } from './test-related-scope'
+import { related_scope, type ScopeRequest } from './test-related-scope'
+import { whole_suite_files } from './whole-suite-files'
 
 // The readings that let a moved whole-suite file narrow — each compares the file at the change base
 // with the working tree — kept out of `test-related-scope.ts`, which stays pure.
@@ -13,7 +16,9 @@ interface Sides {
 	after: string
 }
 
-type Narrowing = Pick<ScopeRequest, 'pure_entries' | 'version_only'>
+type Narrowing = Pick<ScopeRequest, 'lockfile_importers' | 'pure_entries' | 'version_only'>
+
+const { WHOLE_SUITE_FILES } = whole_suite_files
 
 async function base_text(file: string): Promise<string | undefined> {
 	try {
@@ -65,13 +70,39 @@ async function read_version_only(
 	return new Set(is_only ? [PACKAGE_PATH] : [])
 }
 
+// The modules importing a package this branch's `pnpm-lock.yaml` change moved, or `undefined` when the
+// lockfile did not change, the change reaches every test (`lockfile-changed-packages.ts`), or a file
+// every test depends on imports one of them.
+async function read_lockfile_importers(
+	root: string,
+	changed: ReadonlyArray<string> | undefined,
+): Promise<ReadonlyArray<string> | undefined> {
+	const { LOCKFILE_PATH, affected_packages } = lockfile_changed_packages
+	const sides = await sides_of(root, changed, LOCKFILE_PATH)
+	const packages = sides === undefined ? undefined : affected_packages(sides.before, sides.after)
+
+	if (packages === undefined) return undefined
+
+	const importers = await direct_importers.package_importers(root, packages, (file) =>
+		related_scope.is_relatable(file),
+	)
+
+	return importers.some((file) => WHOLE_SUITE_FILES.has(file)) ? undefined : importers
+}
+
 async function read(root: string, changed: ReadonlyArray<string> | undefined): Promise<Narrowing> {
 	return {
 		pure_entries: await read_pure_entries(root, changed),
 		version_only: await read_version_only(root, changed),
+		lockfile_importers: await read_lockfile_importers(root, changed),
 	}
 }
 
-const whole_suite_narrowing = { read, read_pure_entries, read_version_only }
+const whole_suite_narrowing = {
+	read,
+	read_lockfile_importers,
+	read_pure_entries,
+	read_version_only,
+}
 
 export { whole_suite_narrowing }
