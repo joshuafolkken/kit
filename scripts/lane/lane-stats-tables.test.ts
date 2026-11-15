@@ -13,6 +13,7 @@ const FIRST_HEADER_CELLS = [
 	'followup critical path',
 	'implement sub-stage',
 	'implement read',
+	'implement read by call',
 	'stage turns',
 	'stop',
 	'failed check',

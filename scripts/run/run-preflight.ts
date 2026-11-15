@@ -6,6 +6,7 @@ import { session_cite } from '#scripts/issue/session-cite'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { error_text } from '#scripts/lib/error-message'
 import { json_value } from '#scripts/lib/json-value'
+import { shell_quote } from '#scripts/lib/shell-quote'
 import { run_hold } from '#scripts/run/hold/run-hold'
 import { z } from 'zod'
 
@@ -52,6 +53,9 @@ interface TreeState {
 
 interface ChildState {
 	branch_name: string | undefined
+	// The open lane's worktree when it has `branch_name` checked out — git refuses to switch another
+	// checkout onto that branch, so the resume happens in the lane's directory instead.
+	lane_directory?: string
 	pr_state: PrState
 }
 
@@ -94,8 +98,25 @@ const STASH_LABEL_PREFIX = 'run:hold reclaimed before #'
 const { require_issue_number } = issue_number_shape
 const UNREADABLE_PR_MESSAGE = 'The pull request could not be read for branch '
 
-function needs_reclaim(tree: TreeState): boolean {
-	return tree.is_dirty || tree.branch !== tree.default_branch
+const RESUME_IN_PLACE_REASON =
+	'HEAD is on this issue’s own branch over a clean tree, so the run resumes there.'
+
+const ISSUE_BRANCH_SEPARATOR = '-'
+
+// The same `<N>-` rule `read_branch_candidates` globs by, so `<N><digit>-…` is another issue's branch.
+function is_issue_branch(branch: string, issue: string): boolean {
+	return branch.startsWith(`${issue}${ISSUE_BRANCH_SEPARATOR}`)
+}
+
+function is_off_default(tree: TreeState): boolean {
+	return tree.branch !== tree.default_branch
+}
+
+// **The issue's own branch over a clean tree is where a resume belongs, not something to reclaim**
+// (joshuafolkken/kit#7543): reclaiming it sends the run to the default branch, where `resume` sends it
+// straight back, and neither answer takes the hold. Another issue's branch is still reclaimed.
+function needs_reclaim(tree: TreeState, issue: string): boolean {
+	return tree.is_dirty || (is_off_default(tree) && !is_issue_branch(tree.branch, issue))
 }
 
 // A pull request that was merged or closed is a decision somebody already made. Carrying on over a
@@ -114,17 +135,23 @@ function has_leftover_work(child: ChildState): boolean {
 	return child.branch_name !== undefined || child.pr_state === OPEN_PR
 }
 
+// A clean tree past `needs_reclaim` and off the default branch is on the issue's own branch; it has
+// followed `resume`'s advice only when the work found is on that same branch, not on a sibling one.
+function is_resuming_in_place(tree: TreeState, child: ChildState): boolean {
+	return is_off_default(tree) && (child.branch_name ?? tree.branch) === tree.branch
+}
+
 // The precedence is fixed, and the first row is why it has to be. A `resume` or a `park` decided over
 // a dirty tree hands the next child a checkout it cannot switch — so the tree is reclaimed first and
 // the question asked again on the clean tree, rather than two answers being merged into one.
-function to_verdict(tree: TreeState, child: ChildState): PreflightVerdict {
-	if (needs_reclaim(tree)) return RECLAIM_VERDICT
+function to_verdict(tree: TreeState, child: ChildState, issue: string): PreflightVerdict {
+	if (needs_reclaim(tree, issue)) return RECLAIM_VERDICT
 
 	if (is_pr_decided(child.pr_state)) return PARK_VERDICT
 
-	if (has_leftover_work(child)) return RESUME_VERDICT
+	if (is_resuming_in_place(tree, child)) return CLEAN_VERDICT
 
-	return CLEAN_VERDICT
+	return has_leftover_work(child) ? RESUME_VERDICT : CLEAN_VERDICT
 }
 
 function reclaim_reason(tree: TreeState): string {
@@ -154,7 +181,7 @@ function to_reason(verdict: PreflightVerdict, tree: TreeState, child: ChildState
 
 	if (verdict === RESUME_VERDICT) return resume_reason(child)
 
-	return CLEAN_REASON
+	return is_off_default(tree) ? RESUME_IN_PLACE_REASON : CLEAN_REASON
 }
 
 // **`-u` is not optional.** What an interrupted run leaves almost always includes a new `*.test.ts`,
@@ -183,21 +210,49 @@ function reclaim_advice(tree: TreeState, issue: string): string {
 	].join('\n')
 }
 
-function to_advice(verdict: PreflightVerdict, issue: string, tree: TreeState): string {
+// **`resume` names the one command that leads to a hold.** Switched onto the branch, the same ask
+// answers `clean` and takes the hold, so the caller never alternates between `resume` and `reclaim`.
+// A branch an open lane has checked out cannot be switched to here, so that lane's directory is named.
+function resume_steps(child: ChildState): Array<string> {
+	if (child.lane_directory !== undefined) {
+		return [
+			`cd ${shell_quote.word(child.lane_directory)}`,
+			'Resume in that lane worktree, where the branch is checked out; keep its directory.',
+		]
+	}
+
+	if (child.branch_name === undefined) return []
+
+	return [
+		`git switch ${shell_quote.word(child.branch_name)}`,
+		'Then ask this command again: it takes the hold there.',
+	]
+}
+
+function resume_advice(child: ChildState): string {
+	return [...resume_steps(child), RESUME_ADVICE].join('\n')
+}
+
+function to_advice(
+	verdict: PreflightVerdict,
+	issue: string,
+	tree: TreeState,
+	child: ChildState,
+): string {
 	if (verdict === RECLAIM_VERDICT) return reclaim_advice(tree, issue)
 
-	if (verdict === RESUME_VERDICT) return RESUME_ADVICE
+	if (verdict === RESUME_VERDICT) return resume_advice(child)
 
 	if (verdict === PARK_VERDICT) return PARK_ADVICE
 
-	return CLEAN_ADVICE
+	return is_off_default(tree) ? RESUME_ADVICE : CLEAN_ADVICE
 }
 
 function decide(tree: TreeState, child: ChildState, issue: string): PreflightDecision {
-	const verdict = to_verdict(tree, child)
+	const verdict = to_verdict(tree, child, issue)
 
 	return {
-		advice: to_advice(verdict, issue, tree),
+		advice: to_advice(verdict, issue, tree, child),
 		reason: to_reason(verdict, tree, child),
 		verdict,
 	}
@@ -260,8 +315,16 @@ function is_pr_open(state: PrState): boolean {
 	return state === OPEN_PR
 }
 
-async function read_pr_of_branch(branch_name: string): Promise<ChildState> {
-	return { branch_name, pr_state: await read_pr_state(branch_name) }
+async function read_pr_of_branch(
+	branch_name: string,
+	lane: LaneInfo | undefined,
+): Promise<ChildState> {
+	const pr_state = await read_pr_state(branch_name)
+	const is_lane_branch = lane?.branch === branch_name && !lane.is_stranded
+
+	return is_lane_branch
+		? { branch_name, lane_directory: lane.directory, pr_state }
+		: { branch_name, pr_state }
 }
 
 // **A decided pull request on any candidate branch outranks an open one on another.** An interrupted
@@ -273,7 +336,7 @@ function pick_child_state(reads: ReadonlyArray<ChildState>): ChildState {
 	const decided = reads.find((read) => is_pr_decided(read.pr_state))
 	const open = reads.find((read) => is_pr_open(read.pr_state))
 
-	return decided ?? open ?? { branch_name: reads[0]?.branch_name, pr_state: NO_PR }
+	return decided ?? open ?? reads[0] ?? NO_CHILD_WORK
 }
 
 // `git branch --list` takes a glob, so the branch is found without knowing its slug: `pnpm josh git`
@@ -356,7 +419,7 @@ async function read_candidate(
 	references: ReadonlyArray<string>,
 	context: CandidateContext,
 ): Promise<ChildState | undefined> {
-	const state = await read_pr_of_branch(name)
+	const state = await read_pr_of_branch(name, context.lane)
 
 	if (state.pr_state !== NO_PR || (await has_commits_beyond(context.base, references))) return state
 
@@ -389,7 +452,7 @@ async function check(issue: string): Promise<PreflightDecision> {
 
 	const tree = await read_tree_state()
 
-	if (needs_reclaim(tree)) return decide(tree, NO_CHILD_WORK, issue)
+	if (needs_reclaim(tree, issue)) return decide(tree, NO_CHILD_WORK, issue)
 
 	return decide(tree, await read_child_state(issue), issue)
 }
@@ -401,6 +464,7 @@ const run_preflight = {
 	STASH_LABEL_PREFIX,
 	check,
 	decide,
+	is_issue_branch,
 	read_child_state,
 	read_pr_state,
 	to_pr_state,

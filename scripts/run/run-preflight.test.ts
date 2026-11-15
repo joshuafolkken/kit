@@ -82,7 +82,7 @@ afterEach(() => {
 describe('the four states an interrupted run leaves behind', () => {
 	it.each([
 		['a dirty tree', { ...CLEAN_TREE, is_dirty: true }, NO_WORK, 'reclaim'],
-		['HEAD off the default branch', { ...CLEAN_TREE, branch: '926-x' }, NO_WORK, 'reclaim'],
+		['HEAD on another issue’s branch', { ...CLEAN_TREE, branch: '927-x' }, NO_WORK, 'reclaim'],
 		['a branch left for this issue', CLEAN_TREE, child('none', '926-x'), 'resume'],
 		['an open pull request', CLEAN_TREE, child('open'), 'resume'],
 		['a merged pull request', CLEAN_TREE, child('merged', '926-x'), 'park'],
@@ -279,7 +279,11 @@ describe('check counts the uncommitted work a lane holds on a branch with no com
 	it('resumes when the lane checked out on the branch has uncommitted changes', async () => {
 		arrange_lane_on(BRANCH, LANE_CHANGE)
 
-		expect(await verdict_from_check()).toBe('resume')
+		const decision = await run_preflight.check(ISSUE)
+
+		expect(decision.verdict).toBe('resume')
+		expect(decision.advice).toContain(`cd ${LANE_DIRECTORY}`)
+		expect(decision.advice).not.toContain('git switch')
 		expect(find_open_lane).toHaveBeenCalledWith(ISSUE)
 		expect(status).toHaveBeenCalledWith(LANE_DIRECTORY)
 	})
