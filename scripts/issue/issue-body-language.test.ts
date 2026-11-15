@@ -7,6 +7,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 const JAPANESE_NON_BUG = '- 種別: 非不具合'
 const ENGLISH_NON_BUG = '- Type: non-defect'
 const JAPANESE_BODY = [
+	'## 概要',
+	'',
+	'要約',
+	'',
 	'## 背景',
 	'',
 	JAPANESE_NON_BUG,
@@ -23,6 +27,10 @@ const JAPANESE_BODY = [
 	'',
 ].join('\n')
 const ENGLISH_BODY = [
+	'## Summary',
+	'',
+	'A summary.',
+	'',
 	'## Background',
 	'',
 	ENGLISH_NON_BUG,
@@ -54,8 +62,10 @@ async function verdict(lang: string, body: string): Promise<Verdict> {
 	const { issue_lint_cli } = await import('./issue-lint-cli')
 	const { issue_classification } = await import('./issue-classification')
 
+	const summary = issue_lint_cli.summary_problem(body)
+
 	return {
-		problems: issue_lint_cli.problems(body),
+		problems: [...(summary === undefined ? [] : [summary]), ...issue_lint_cli.problems(body)],
 		labels: issue_classification.required_labels(body),
 	}
 }

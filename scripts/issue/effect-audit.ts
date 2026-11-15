@@ -130,8 +130,15 @@ function draft_title(row: AuditRow): string {
 	return `Retire or shrink the mechanism of ${cite(row.origin)}, which fell short of its expected effect`
 }
 
+// The plain-language summary `issue:file` requires first, then the background.
 function background_lines(origin: string, measurements: string): ReadonlyArray<string> {
 	return [
+		issue_body_keys.heading('summary'),
+		'',
+		`**${origin} で足した仕組みが、期待した効果を出せていないという改善要望です。**`,
+		'',
+		`後から計測したところ、${origin} の仕組みは見込んだ効果に届きませんでした。効かない仕組みは実行時間や読む量、保守の手間を増やすだけなので、取り除くか、効く範囲に絞ります。`,
+		'',
 		issue_body_keys.heading('background'),
 		'',
 		issue_body_keys.line('kind', 'non_bug'),

@@ -62,6 +62,18 @@ function problems(body: string, labels?: ReadonlyArray<string>): ReadonlyArray<s
 		.map((problem) => with_template(problem))
 }
 
+// `issue:file`'s refusal of a body that does not open with the summary, followed by the template's
+// summary section; `undefined` when it does. Only filing checks it: `problems` also lints the bodies
+// `issue:body` rewrites, and Issues filed before the rule have none.
+function summary_problem(body: string): string | undefined {
+	if (issue_lint.starts_with_summary(body)) return undefined
+	const heading = issue_lint.summary_heading()
+	const problem = `the body must start with ${heading}: a plain-language summary for a person deciding on the Issue — how to write it: the ${heading} section of ${issue_template_section.document_name()}'s template`
+	const template = issue_template_section.section(heading)
+
+	return template === undefined ? problem : `${problem}\n${template}`
+}
+
 // The body's warnings, printed by every command that lints a body whichever way its verdict goes; they
 // never change an exit code.
 function warn(body: string): void {
@@ -91,10 +103,12 @@ async function run(body_path: string | undefined): Promise<number> {
 	}
 
 	const body = cli_body.read_file_or_stdin(body_path)
+	const summary = summary_problem(body)
 
-	return report(problems(body), body)
+	// A pre-filing check: it answers as `issue:file` will, the leading summary included.
+	return report(summary === undefined ? problems(body) : [summary, ...problems(body)], body)
 }
 
-const issue_lint_cli = { problems, run, warn }
+const issue_lint_cli = { problems, run, summary_problem, warn }
 
 export { issue_lint_cli }

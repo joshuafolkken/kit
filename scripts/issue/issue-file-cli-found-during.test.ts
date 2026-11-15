@@ -35,6 +35,10 @@ const body_path = path.join(work, 'body.md')
 writeFileSync(
 	body_path,
 	[
+		'## 概要',
+		'',
+		'要約',
+		'',
 		'## 背景',
 		'',
 		'- 種別: 非不具合',

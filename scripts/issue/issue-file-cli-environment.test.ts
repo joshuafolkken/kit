@@ -33,6 +33,7 @@ type Mode = (typeof MODES)[number]
 writeFileSync(
 	body_file,
 	[
+		'## 概要\n\n要約',
 		'## 背景',
 		'- 種別: 不具合',
 		'- 原因: #4201',

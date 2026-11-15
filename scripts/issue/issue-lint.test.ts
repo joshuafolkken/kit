@@ -19,6 +19,20 @@ const CONFORMING_BODY = [
 	'- [ ] 条件1',
 ].join('\n')
 
+describe('issue_lint.starts_with_summary', () => {
+	it('accepts a body whose first non-blank line is the summary heading', () => {
+		expect(issue_lint.starts_with_summary(`\n## 概要\n\n要約\n\n${CONFORMING_BODY}`)).toBe(true)
+	})
+
+	it('refuses a body that opens with another heading', () => {
+		expect(issue_lint.starts_with_summary(CONFORMING_BODY)).toBe(false)
+	})
+
+	it('refuses a summary that is present but not first', () => {
+		expect(issue_lint.starts_with_summary(`${CONFORMING_BODY}\n\n## 概要\n\n要約`)).toBe(false)
+	})
+})
+
 describe('issue_lint.missing_headings', () => {
 	it('accepts a body with every required heading', () => {
 		expect(issue_lint.missing_headings(CONFORMING_BODY)).toEqual([])

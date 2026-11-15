@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { effect_audit, type FollowUp } from './effect-audit'
 import { MEASURED_LABEL, MEASURED_UNMET_LABEL } from './issue-labels'
+import { issue_lint } from './issue-lint'
 import type { SearchIssue } from './issue-search'
 
 // joshuafolkken/kit#4958: each closed run-time-shortening issue is set beside the follow-up that cites
@@ -117,5 +118,16 @@ describe('effect_audit.draft_body — the retirement candidate', () => {
 		expect(body).toContain('- [ ] #4896 で足した機構を撤去するか縮小し')
 		expect(body).toContain('- 規模見積もり: 約 <N> ファイル / <M> 行（テスト除く）')
 		expect(row === undefined ? '' : effect_audit.draft_title(row)).toContain('#4896')
+	})
+
+	it('opens with the summary issue:file requires', () => {
+		const [row] = effect_audit.rows(
+			[issue(ORIGIN, ORIGIN_BODY)],
+			[follow_up([MEASURED_LABEL, MEASURED_UNMET_LABEL])],
+		)
+
+		expect(
+			issue_lint.starts_with_summary(row === undefined ? '' : effect_audit.draft_body(row)),
+		).toBe(true)
 	})
 })

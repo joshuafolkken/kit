@@ -54,6 +54,10 @@ const clear_path = path.join(work, 'locally-clear.md')
 writeFileSync(
 	clear_path,
 	[
+		'## 概要',
+		'',
+		'要約',
+		'',
 		'## 背景',
 		'',
 		'- 種別: 不具合',
