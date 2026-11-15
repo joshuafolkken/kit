@@ -85,9 +85,9 @@ These are the gate → review → PR → merge facts other documents cite; this 
   A lane child's resolution of ship's `conflict` stop: markers removed → the re-detach the stop
   prints (step 0), which records the merge commit and runs the scoped pair and the gate.
 - **One related-check command answers once per tree** — while implementing re-run one check per edit
-  (`lint:related` / `cspell:dot` / `test:related --touched`), one full-reach `test:related` once the
-  implementation is done (`docs/josh-commands.md` → "`josh test:related`"), then `pnpm josh check:related` once
-  before `run:review`; ship's scoped pair runs full reach after review fixes; `check:related` is those three plus `check`. In kit `lint:related` reports a metrics total past the
+  (`lint:related` / `cspell:dot` / `test:related`, `--touched` in a lane:
+  `docs/josh-commands.md` → "`josh test:related`"), then `pnpm josh check:related` once
+  before `run:review` (full reach); ship's scoped pair runs full reach after review fixes; `check:related` is those three plus `check`. In kit `lint:related` reports a metrics total past the
   merge-base; accept it with its reason before `run:review`, whose open stops on it (the ship's pre-detach check is the backstop).
 - **The pull request opens between the rounds, so CI runs beside round 2** — round 1 runs on the
   uncommitted tree and its High/Medium fixes land before the commit; the verification pass runs against

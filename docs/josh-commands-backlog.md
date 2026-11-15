@@ -1118,7 +1118,7 @@ pnpm josh review:brief --level-only --json   # level and reason, machine-readabl
 
 <!-- /usage -->
 
-Pass output to `/code-review` with its reviewer model and effort; line one is the level. If scoped checks are not green on this tree, run `pnpm josh lint:related && pnpm josh test:related` and reissue.
+Pass output to `/code-review` with its reviewer model and effort; line one is the level. If scoped checks are not green on this tree, run `pnpm josh check:related` and reissue.
 
 #### The review level
 

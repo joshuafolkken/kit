@@ -95,12 +95,7 @@ describe('issue_outcome — one-line English records', () => {
 		vi.spyOn(issue_read, 'parse_comments').mockResolvedValue([comment(marked())])
 
 		await expect(issue_outcome.read(1)).resolves.toStrictEqual({ summary: SUMMARY, url: URL })
-		expect(read).toHaveBeenCalledWith(
-			'1',
-			undefined,
-			undefined,
-			git_gh_issue_read.read_comments_conditionally,
-		)
+		expect(read).toHaveBeenCalledWith('1')
 	})
 })
 

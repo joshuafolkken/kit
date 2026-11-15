@@ -13,6 +13,16 @@ async function read_detail(path: string): Promise<ReadDetail> {
 	return { body: await read(path), is_unchanged: false }
 }
 
-const git_gh_etag_read_fixture = { through_exec: { read, read_detail } }
+// Every listing read paged, as a full first page is: the request these suites assert is the paged one.
+async function read_listing(
+	path: string,
+	_per_page: number,
+	_read_page?: unknown,
+	timeout_ms?: number,
+): Promise<string> {
+	return await git_gh_exec.exec_gh_api({ path, should_paginate: true, timeout_ms })
+}
+
+const git_gh_etag_read_fixture = { through_exec: { read, read_detail, read_listing } }
 
 export { git_gh_etag_read_fixture }

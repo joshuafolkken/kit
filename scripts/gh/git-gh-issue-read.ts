@@ -375,19 +375,25 @@ async function issue_get_labels_and_body(issue_number: string): Promise<string |
 // and the page size — is single-sourced in `git-gh-api-path.ts` and read from there by both.
 //
 // `repo` names the repository like the reads above do — `issue:read --repo` reads another repository's
-// thread (joshuafolkken/kit#5851); absent, it is the repository the command runs in. `read_path`
-// replaces the paged request, as `read_comments_conditionally` does for the run board.
+// thread (joshuafolkken/kit#5851); absent, it is the repository the command runs in.
+//
+// Sent with the previous process's ETag (joshuafolkken/kit#7617): `backlog:next` and `run:entry` re-read
+// the same threads, and an unchanged first page answers `304`, which costs nothing. A full first
+// page is read paged instead, by `read_listing`.
 async function issue_list_comments(
 	issue_number: string,
 	timeout_ms?: number,
 	repo?: string,
-	read_path?: PathRead,
 ): Promise<string | undefined> {
 	const path = `${git_gh_api_path.issue_comments_api_path(issue_number, repo)}${git_gh_api_path.FULL_PAGE_QUERY}`
 
 	try {
-		return await (read_path?.(path) ??
-			git_gh_exec.exec_gh_api({ path, should_paginate: true, timeout_ms }))
+		return await git_gh_etag_read.read_listing(
+			path,
+			git_gh_api_path.FULL_PAGE_SIZE,
+			git_gh_etag_read.read,
+			timeout_ms,
+		)
 	} catch {
 		return undefined
 	}
@@ -425,13 +431,6 @@ async function issue_read_with_comments(
 		read: { kind: 'read', json: JSON.stringify(issue) },
 		comments_json: graphql.comments_json,
 	}
-}
-
-// The comment listing sent with the previous process's ETag (joshuafolkken/kit#6700): the run board
-// re-reads a decision child's thread every two minutes, and an unchanged first page answers `304`.
-// A full first page is read paged instead, by `read_listing`.
-async function read_comments_conditionally(path: string): Promise<string> {
-	return await git_gh_etag_read.read_listing(path, git_gh_api_path.FULL_PAGE_SIZE)
 }
 
 // Whether the relations endpoint has nothing at that number at all. Probed for its status rather
@@ -509,7 +508,6 @@ const git_gh_issue_read = {
 	issue_get_labels_and_body,
 	issue_list_comments,
 	issue_read_with_comments,
-	read_comments_conditionally,
 }
 
 export type { IssueRead, IssueReadFailure, IssueReadReason, IssueWithComments }

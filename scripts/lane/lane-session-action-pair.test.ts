@@ -49,6 +49,7 @@ describe('lane_session_action.answer — the paired reviewer', () => {
 		expect(answer).toStrictEqual(lane_session_action.SUCCESS)
 		expect(pair_launch).toHaveBeenCalledWith(LANE.directory, {
 			...lane_child_marker.env_for(LANE.issue),
+			JOSH_OUTER_COMMAND: 'ship',
 			...core_priority.PRIORITY_ENVIRONMENT,
 		})
 	})

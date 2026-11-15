@@ -1,4 +1,5 @@
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
+import { outer_command } from '#scripts/josh/outer-command'
 import { lane_child_mark_keys } from './lane-child-mark-keys'
 import { lane_paths } from './lane-paths'
 
@@ -25,7 +26,8 @@ const { KEY, OVERRUN_KEY } = lane_child_mark_keys
 // the input rate against 1.25x for five minutes. A replay of 1,953 lane transcripts (about 57,000
 // requests) found 0.3% of request gaps over five minutes, so the shorter TTL — re-writing the prefix on
 // those few gaps — still costs 12-13% less. Every launcher of a child composes its environment here,
-// so this is the one place the choice is made.
+// so this is the one place the choice is made. The same place starts the child's josh calls blank of
+// the launcher's outer command (`outer-command.ts`), so they read as the child's own.
 const CACHE_TTL_KEY = 'CLAUDE_CODE_PROMPT_CACHE_TTL'
 const CACHE_TTL = '5m'
 
@@ -42,7 +44,7 @@ type MarkerSource = Readonly<Record<string, string | undefined>>
 function environment_for(issue: string): Record<string, string> {
 	issue_number_shape.require_issue_number(issue)
 
-	return { [KEY]: issue, [CACHE_TTL_KEY]: CACHE_TTL }
+	return { [KEY]: issue, [CACHE_TTL_KEY]: CACHE_TTL, [outer_command.KEY]: '' }
 }
 
 // The issue a child was dispatched for, or `undefined` when the mark is absent or malformed. A blank

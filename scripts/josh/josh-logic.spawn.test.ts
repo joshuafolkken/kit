@@ -208,6 +208,33 @@ describe('josh_logic.run_command — the memory a command claims', () => {
 	})
 })
 
+// joshuafolkken/kit#7593: the dispatch marks the outermost command, resolved from its alias, once.
+describe('josh_logic.run_command — the outer command mark', () => {
+	beforeEach(() => {
+		execa_sync_mock.mockReturnValue(SPAWN_SUCCESS)
+	})
+
+	afterEach(() => {
+		vi.unstubAllEnvs()
+	})
+
+	it('marks the resolved command from a blank start', async () => {
+		vi.stubEnv('JOSH_OUTER_COMMAND', '')
+
+		await josh_logic.run_command('t', [])
+
+		expect(process.env['JOSH_OUTER_COMMAND']).toBe(TEST_CMD)
+	})
+
+	it('keeps the mark an outer command already set', async () => {
+		vi.stubEnv('JOSH_OUTER_COMMAND', 'ship')
+
+		await josh_logic.run_command(TEST_CMD, [])
+
+		expect(process.env['JOSH_OUTER_COMMAND']).toBe('ship')
+	})
+})
+
 describe('josh_logic.run_shell_command — spawn error', () => {
 	it('returns SPAWN_ERROR_EXIT_CODE when executable fails to start', () => {
 		execa_sync_mock.mockReturnValue(SPAWN_FAILURE)

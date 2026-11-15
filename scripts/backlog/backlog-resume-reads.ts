@@ -1,8 +1,12 @@
 import { epic_audit_logic } from '#scripts/epic/epic-audit'
 import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
+import { git_gh_etag_read } from '#scripts/gh/git-gh-etag-read'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { GRAPHQL_PATH } from '#scripts/gh/git-gh-pr-graphql-state'
-import { parse_json_object_or_undefined } from '#scripts/git/parse-json-array'
+import {
+	parse_json_array_or_undefined,
+	parse_json_object_or_undefined,
+} from '#scripts/git/parse-json-array'
 import { run_pause_comment } from '#scripts/run/pause/run-pause-comment'
 import { z } from 'zod'
 
@@ -12,12 +16,11 @@ import { z } from 'zod'
 // answer, or GraphQL refused (403 in a cloud session) — falls back to its own paged comment read.
 
 const COMMENTS_WINDOW = 100
-const LINE_SEPARATOR = '\n'
-const OPEN_PULLS_QUERY = '/pulls?state=open&per_page=100'
-const PULL_FILTER = '.[] | {body: (.body // "")}'
+const OPEN_PULLS_QUERY = `/pulls?state=open&per_page=${String(git_gh_api_path.FULL_PAGE_SIZE)}`
 const ALIAS_PREFIX = 'i'
+const UNREADABLE_ROW_MESSAGE = 'the open pull request listing contains an unreadable row'
 
-const pull_schema = z.object({ body: z.string() })
+const pull_schema = z.looseObject({ body: z.string().nullable() })
 const comment_schema = z.looseObject({ body: z.string().nullish() })
 const page_info_schema = z.looseObject({ hasPreviousPage: z.boolean() })
 const comments_schema = z.looseObject({
@@ -31,31 +34,28 @@ const response_schema = z.looseObject({ data: z.looseObject({ repository: reposi
 type IssueNode = z.infer<typeof issue_node_schema>
 type CommentWindows = Partial<Record<string, IssueNode>>
 
-function referenced_issues_of(line: string, repo: string): Array<string> {
-	const pull = parse_json_object_or_undefined(line, pull_schema)
+function referenced_issues_of(row: unknown, repo: string): Array<string> {
+	const pull = pull_schema.safeParse(row)
 
-	if (pull === undefined) {
-		throw new Error('the open pull request listing contains an unreadable row')
-	}
+	if (!pull.success) throw new Error(UNREADABLE_ROW_MESSAGE)
 
-	return epic_audit_logic.parse_references(pull.body, repo).map(String)
+	return epic_audit_logic.parse_references(pull.data.body ?? '', repo).map(String)
 }
 
 // Any reference counts, not only `closes #N`: the per-child timeline read this replaces counted every
-// open pull request here that cross-referenced the child (#6440).
+// open pull request here that cross-referenced the child (#6440). The listing goes through the ETag
+// layer, so an unchanged one is a free 304; a full first page and the paged read that replaces it are
+// both one JSON array, parsed alike (joshuafolkken/kit#7620).
 async function open_pr_issues(repo: string): Promise<ReadonlySet<string>> {
-	const raw = await git_gh_exec.exec_gh_api({
-		path: `${git_gh_api_path.repo_api_path(repo)}${OPEN_PULLS_QUERY}`,
-		should_paginate: true,
-		jq_filter: PULL_FILTER,
-	})
-
-	return new Set(
-		raw
-			.split(LINE_SEPARATOR)
-			.filter((line) => line.trim() !== '')
-			.flatMap((line) => referenced_issues_of(line, repo)),
+	const raw = await git_gh_etag_read.read_listing(
+		`${git_gh_api_path.repo_api_path(repo)}${OPEN_PULLS_QUERY}`,
+		git_gh_api_path.FULL_PAGE_SIZE,
 	)
+	const rows = parse_json_array_or_undefined(raw, z.unknown())
+
+	if (rows === undefined) throw new Error(UNREADABLE_ROW_MESSAGE)
+
+	return new Set(rows.flatMap((row) => referenced_issues_of(row, repo)))
 }
 
 function alias_of(issue: string): string {

@@ -122,12 +122,7 @@ async function read_comments(
 ): Promise<ReadonlyArray<IssueComment>> {
 	const json =
 		answered.get(number) ??
-		(await git_gh_issue_read.issue_list_comments(
-			String(number),
-			undefined,
-			repo,
-			git_gh_issue_read.read_comments_conditionally,
-		))
+		(await git_gh_issue_read.issue_list_comments(String(number), undefined, repo))
 
 	return (await issue_read.parse_comments(json, repo)) ?? []
 }
