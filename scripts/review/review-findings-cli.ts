@@ -17,7 +17,7 @@ import {
 
 const NO_FINDINGS = 'no review findings recorded yet'
 const OPTIONS = { period: { type: 'string' } } as const
-const USAGE = 'usage: josh review:findings [--period <days>]'
+const USAGE = 'Usage: josh review:findings [--period <days>]'
 const MS_PER_DAY = 86_400_000
 // `process.argv` holds the runtime and the script before the command's own arguments.
 const FIRST_ARGUMENT = 2
@@ -87,12 +87,6 @@ function report_of(content: string, days: number, now_ms: number): string {
 	return format_period_report(counts, review_finding_ledger.zero_round_count(content, since), since)
 }
 
-function refuse(): number {
-	console.error(USAGE)
-
-	return 1
-}
-
 // Every issue's file of the ledger directory is counted: a recurring category
 // is one whichever issue recorded each sighting.
 async function print_report(root: string, days: number, now_ms: number): Promise<number> {
@@ -110,7 +104,9 @@ async function run(
 ): Promise<number> {
 	const days = period_of(argv)
 
-	return days === undefined ? refuse() : await print_report(root, days, now_ms)
+	return days === undefined
+		? cli_flags.answer_usage(argv, USAGE)
+		: await print_report(root, days, now_ms)
 }
 
 function command_arguments(): ReadonlyArray<string> {

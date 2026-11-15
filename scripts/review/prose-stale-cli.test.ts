@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { prose_stale_cli } from './prose-stale-cli'
 import { prose_stale_scan } from './prose-stale-scan'
 
+const USAGE_LINE = 'Usage: josh prose:stale'
+
 afterEach(() => {
 	vi.restoreAllMocks()
 })
@@ -12,8 +14,20 @@ describe('prose_stale_cli.run', () => {
 		const error = vi.spyOn(console, 'error').mockReturnValue(undefined)
 
 		expect(await prose_stale_cli.run(['--all'])).toBe(prose_stale_scan.FAILED_EXIT)
-		expect(error).toHaveBeenCalledWith('usage: josh prose:stale')
+		expect(error).toHaveBeenCalledWith(USAGE_LINE)
 	})
+
+	it.each(['--help', '-h'])(
+		'prints the usage and succeeds for %s, before reading git',
+		async (flag) => {
+			const info = vi.spyOn(console, 'info').mockReturnValue(undefined)
+			const resolved = vi.spyOn(change_base, 'resolved')
+
+			expect(await prose_stale_cli.run([flag])).toBe(0)
+			expect(info).toHaveBeenCalledWith(USAGE_LINE)
+			expect(resolved).not.toHaveBeenCalled()
+		},
+	)
 })
 
 describe('prose_stale_cli.guarded', () => {

@@ -88,4 +88,10 @@ describe('rule_value_cli.run_rule_value — --period leaves the cache alone', ()
 			expect(stderr).toHaveBeenCalledExactlyOnceWith(`${rule_value_cli.PERIOD_USAGE}\n`)
 		},
 	)
+
+	it('names the command in the shared Usage: form', () => {
+		expect(rule_value_cli.PERIOD_USAGE).toBe(
+			'Usage: josh rule:value --period <days> — a positive number of days',
+		)
+	})
 })

@@ -243,10 +243,9 @@ async function premise_stop(
 
 async function check_plan(plan: LanePlan, directory: string): Promise<number> {
 	await warn_near_cap(plan, directory)
-	const issues = await lane_plan_probe.opted_in()
+	const { issues, over } = await lane_plan_probe.sized_listing(plan, directory)
 	const refused =
-		(await refusal(plan, await lane_plan_probe.oversize_of(plan, issues, directory), directory)) ??
-		(await premise_stop(plan, issues, directory))
+		(await refusal(plan, over, directory)) ?? (await premise_stop(plan, issues, directory))
 
 	if (refused !== undefined) return refused
 	const sized = sized_of(plan, issues)
@@ -261,8 +260,7 @@ async function check_plan(plan: LanePlan, directory: string): Promise<number> {
 
 // `--probe`'s answer: the same tokens and exit codes as the plan's, with nothing written.
 async function probe_answer(plan: LanePlan, directory: string): Promise<number> {
-	const issues = await lane_plan_probe.opted_in()
-	const over = await lane_plan_probe.oversize_of(plan, issues, directory)
+	const { issues, over } = await lane_plan_probe.sized_listing(plan, directory)
 
 	if (is_split(plan, over)) return split(plan, over)
 	const found = lane_plan_probe.probe(plan, issues, directory)
