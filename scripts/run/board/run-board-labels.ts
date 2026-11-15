@@ -62,6 +62,7 @@ const WORDS = {
 	waiting: 'waiting',
 	queued: 'queued',
 	not_before: 'not before',
+	publication: 'publication pending',
 	decision: 'decision',
 	waits: 'waits on',
 	// What a waiting row waits on, where the legend names its icon.
@@ -272,9 +273,10 @@ const STAGE_ICONS: Readonly<Partial<Record<string, string>>> = {
 // running issue holds, 📋 the declared order, ✋ an unblocked issue held for its judgment, ❓ a
 // blocked issue nobody has judged, 🧍 a `run:solo` issue waiting for the running lanes, 🙅 a row behind it (#4294; 🚧 is a
 // held check's) and 🔒 a row a running `run:solo` issue holds (#4391), chosen on the same rule as
-// every row icon, and 🪫 the account's Claude usage limit until it resets (#4796). The rest are the
-// board's own, shared rather than copied.
+// every row icon, 🪫 the account's Claude usage limit until it resets (#4796), and 📰 an issue whose
+// filing has not published yet (#7572). The rest are the board's own, shared rather than copied.
 const WAIT_ICONS = {
+	publication: '📰',
 	human_merge: '🔏',
 	usage_limit: '🪫',
 	path: '📂',
@@ -310,6 +312,7 @@ const WAIT_WORDS: ReadonlyArray<readonly [icon: string, word: keyof Words]> = [
 	[WAIT_ICONS.blocker, 'waits'],
 	[STATE_ICONS.human, 'on_human'],
 	[WAIT_ICONS.not_before, 'not_before'],
+	[WAIT_ICONS.publication, 'publication'],
 ]
 
 // **The machine gauges' three colors, decided here alone**: Activity Monitor's green, yellow and red

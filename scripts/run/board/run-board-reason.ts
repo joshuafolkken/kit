@@ -6,6 +6,7 @@ import { epic_triage } from '#scripts/epic/epic-triage'
 import { has_label_name, has_parked_label, IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
 import { issue_not_before } from '#scripts/issue/issue-not-before'
 import { issue_observation_gate } from '#scripts/issue/issue-observation-gate'
+import { issue_publication_state } from '#scripts/issue/issue-publication-state'
 import { issue_sample_gate } from '#scripts/issue/issue-sample-gate'
 import { lane_state } from '#scripts/lane/lane-state'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
@@ -344,6 +345,14 @@ function wait_of(
 	return not_before_of(child, read.now_ms) ?? offer_wait(child, read, pool)
 }
 
+// `📰`: an issue whose filing has not published yet (`issue-publication-state.ts`), which no pickup
+// offers until it does, whatever else would keep it (joshuafolkken/kit#7572).
+function publication_of(child: EpicChild): RowReason | undefined {
+	return issue_publication_state.is_pending(child.body)
+		? { icon: WAIT_ICONS.publication }
+		: undefined
+}
+
 // What each waiting row of one layout says, the pool-wide facts read once for all of them.
 function reader(read: ReasonRead): ReasonOf {
 	const current = { ...read, ...run_board_human_merge.overlay_of(read.plan, read.statuses) }
@@ -354,6 +363,7 @@ function reader(read: ReasonRead): ReasonOf {
 			run_board_human_merge.reason_of(child, current.plan) ??
 			stage_of(child, current) ??
 			planned_of(child, pool) ??
+			publication_of(child) ??
 			wait_of(child, waits, current, pool)
 		)
 	}
