@@ -88,8 +88,19 @@ function sinks_of(records: SinkRecords, issues: ReadonlyArray<number>): Array<Si
 		.toSorted((left, right) => total_ms(right) - total_ms(left))
 }
 
+type FullReach = NonNullable<TestRelatedEntry['full_reach']>[number]
+
 function is_test_related(entry: LedgerEntry): entry is TestRelatedEntry {
 	return entry.kind === lane_ledger.KIND.TEST_RELATED
+}
+
+function related_runs(
+	entries: ReadonlyArray<LedgerEntry>,
+	issues: ReadonlyArray<number>,
+): Array<TestRelatedEntry> {
+	return entries
+		.filter((entry) => is_test_related(entry))
+		.filter((entry) => entry.issue !== undefined && issues.includes(entry.issue))
 }
 
 // Each distinct hub the `test:related` runs of `issues` named past the reach cap, the first named first.
@@ -97,13 +108,25 @@ function hubs_of(
 	entries: ReadonlyArray<LedgerEntry>,
 	issues: ReadonlyArray<number>,
 ): Array<string> {
-	const named = entries
-		.filter((entry) => is_test_related(entry))
-		.filter((entry) => entry.issue !== undefined && issues.includes(entry.issue))
+	const named = related_runs(entries, issues)
 		.map((entry) => entry.over_cap_hub)
 		.filter((hub) => hub !== undefined)
 
 	return [...new Set(named)]
+}
+
+// Each distinct file the `test:related` runs of `issues` left at its whole reach past the cap, with the
+// widest reach a run read for it, the first named first (joshuafolkken/kit#7639).
+function full_reach_of(
+	entries: ReadonlyArray<LedgerEntry>,
+	issues: ReadonlyArray<number>,
+): Array<FullReach> {
+	const widest = new Map<string, number>()
+	const kept = related_runs(entries, issues).flatMap((run) => run.full_reach ?? [])
+
+	for (const { file, reached } of kept) widest.set(file, Math.max(reached, widest.get(file) ?? 0))
+
+	return [...widest].map(([file, reached]) => ({ file, reached }))
 }
 
 // The open Issues that name stage `name`. The scoped pair stage is also known by the files that put
@@ -153,6 +176,7 @@ function table(
 const lane_sinks = {
 	DEFAULT_MINUTES,
 	base_name,
+	full_reach_of,
 	hubs_of,
 	issues_cell,
 	over_issues,

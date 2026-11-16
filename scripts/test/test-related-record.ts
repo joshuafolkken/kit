@@ -5,6 +5,7 @@ import type { ChangedParts } from '#scripts/git/changed-paths'
 import type { TestRelatedRecord } from '#scripts/lane/lane-ledger-schema'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { lane_paths } from '#scripts/lane/lane-paths'
+import type { ReachedCount } from './test-pinned-reach'
 import { test_related_cap } from './test-related-cap'
 import type { TestReuse } from './test-related-reuse'
 import { related_scope, type RelatedScope } from './test-related-scope'
@@ -38,6 +39,8 @@ interface RunInput {
 	// The changed files past the reach cap, narrowed to their direct importers, widest reach first
 	// (`test-related-cap.ts`).
 	over_cap?: ReadonlyArray<string>
+	// The files past the cap it left at their whole reach, each with that reach (joshuafolkken/kit#7639).
+	full_reach?: ReadonlyArray<ReachedCount> | undefined
 	// The branch change by half and base, read beside the run; `undefined` where git could not answer.
 	branch_parts?: ChangedParts | undefined
 	// How long selecting the tests took — the import graph and the importer index (joshuafolkken/kit#7248).
@@ -162,6 +165,16 @@ function over_cap_record(
 	return hub === undefined ? count : { ...count, over_cap_hub: hub }
 }
 
+// The files that kept their whole reach past the cap — what widened a run the cap narrowed little
+// (joshuafolkken/kit#7639) — none written when there were none.
+function full_reach_record(
+	full_reach: ReadonlyArray<ReachedCount> | undefined,
+): Pick<TestRelatedRecord, 'full_reach'> {
+	if (full_reach === undefined || full_reach.length === 0) return {}
+
+	return { full_reach: full_reach.map(({ file, count }) => ({ file, reached: count })) }
+}
+
 // joshuafolkken/kit#6982: a run whose `changed` swelled to ~1,500 left nothing that told an untracked
 // flood from a base that fell back to the default branch — nor (joshuafolkken/kit#7066) the branch
 // change from named files or moves since the last green.
@@ -194,6 +207,7 @@ function record_of(input: RunInput, result: RunResult): TestRelatedRecord {
 		readers: readers_of(input, new Set([...own, ...synced, ...since_map])),
 		...triggers_of(input),
 		...over_cap_record(input.over_cap, own),
+		...full_reach_record(input.full_reach),
 		...select_record(input.select_elapsed_ms),
 		elapsed_ms: Math.round(result.elapsed_ms),
 	}

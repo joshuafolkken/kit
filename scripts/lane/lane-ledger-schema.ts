@@ -4,6 +4,7 @@ import { lane_ledger_kind } from './lane-ledger-kind'
 import { lane_ledger_pinned_origin } from './lane-ledger-pinned-origin'
 import { lane_ledger_schema_load } from './lane-ledger-schema-load'
 import { lane_ledger_schema_offer } from './lane-ledger-schema-offer'
+import { lane_ledger_schema_related } from './lane-ledger-schema-related'
 import { lane_ledger_schema_ship } from './lane-ledger-schema-ship'
 
 // The shape of each line `lane-ledger.ts` appends and reads back — one schema per entry kind.
@@ -13,6 +14,7 @@ const { early_push_schema, ship_lap_schema, size_schema, stop_schema, unplanned_
 	lane_ledger_schema_ship
 const { pinned_origin_schema } = lane_ledger_pinned_origin
 const { load_schema } = lane_ledger_schema_load
+const { test_related_schema } = lane_ledger_schema_related
 
 const merge_schema = z.object({ kind: z.literal(KIND.MERGE), at: z.string(), issue: z.number() })
 const check_schema = z.object({
@@ -165,41 +167,6 @@ const unit_files_schema = z.object({
 	kind: z.literal(KIND.UNIT_FILES),
 	at: z.string(),
 	files: z.array(unit_file_schema),
-})
-// One `josh test:related` run (joshuafolkken/kit#4465): `scope` is `related`, `none` or the full-suite
-// fallback kind; the four counts are its input — the change itself, what a main sync brought into it,
-// what the change since the test-read map's tree joined to it and the map's readers — and `test_files`
-// how many vitest ran, absent where none reported. `trigger_files` are the changed files that sent a
-// full-suite run there, absent where none did and on rows written before it (joshuafolkken/kit#4510).
-const test_related_schema = z.object({
-	reused: z.number().optional(),
-	reuse_missed: z.number().optional(),
-	reuse_reason: z.string().optional(),
-	reuse_elapsed_ms: z.number().optional(),
-	select_elapsed_ms: z.number().optional(),
-	kind: z.literal(KIND.TEST_RELATED),
-	at: z.string(),
-	issue: z.number().optional(),
-	scope: z.string(),
-	changed: z.number(),
-	synced: z.number(),
-	since_map: z.number(),
-	readers: z.number(),
-	test_files: z.number().optional(),
-	trigger_files: z.array(z.string()).optional(),
-	// The changed files past the reach cap, run by their direct importers alone (joshuafolkken/kit#5532).
-	over_cap: z.number().optional(),
-	// The widest of them in the run's own change, the hub that put the run past the cap
-	// (joshuafolkken/kit#5699); absent when main or the map's tree brought them all (joshuafolkken/kit#5756).
-	over_cap_hub: z.string().optional(),
-	// The branch change read beside the run, by half and by base (joshuafolkken/kit#6982).
-	branch_tracked: z.number().optional(),
-	branch_untracked: z.number().optional(),
-	branch_base: z.enum(['merge_base', 'fallback']).optional(),
-	// `changed` split by whether that branch change holds the file (joshuafolkken/kit#7066).
-	changed_in_branch: z.number().optional(),
-	changed_off_branch: z.number().optional(),
-	elapsed_ms: z.number(),
 })
 // One `josh test:pinned` run that probed (joshuafolkken/kit#5078): `held` hunks the verdict cache
 // answered, and each probed hunk's `file`, the test files it ran (`tests`, absent where vitest wrote no

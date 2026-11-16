@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_pinned_logic } from './test-pinned-logic'
 import type { ReachedCount } from './test-pinned-reach'
 import { test_related_cap, type CappedImporters, type CountReader } from './test-related-cap'
+import { test_related_imports } from './test-related-imports'
 import { related_scope, type RelatedScope } from './test-related-scope'
 
 // These cases size an already-vouched import structure; real git changes are covered by
@@ -26,6 +27,7 @@ const MIDDLE_MODULE = 'scripts/middle.ts'
 const MIDDLE_TEST = 'scripts/middle.test.ts'
 const GONE_MODULE = 'scripts/gone.ts'
 const LONE_MODULE = 'scripts/lone.ts'
+const PAST_LONE: ReachedCount = { file: LONE_MODULE, count: MAX_TEST_FILES + 1 }
 const FIXTURE_FILES: Readonly<Record<string, string>> = {
 	[PACKAGE_FILE]: JSON.stringify({ imports: {} }),
 	[WIDE_MODULE]: 'export const wide = 1\n',
@@ -215,8 +217,46 @@ describe('test_related_cap.capped_importers with no direct importer', () => {
 			reader,
 		)
 
-		expect(capped).toEqual(test_related_cap.NO_CAP)
+		expect(capped).toEqual({ ...test_related_cap.NO_CAP, full_reach: [PAST_LONE] })
 		expect(reader).toHaveBeenCalledOnce()
+	})
+})
+
+// joshuafolkken/kit#7639: a file past the cap the cap left whole is kept with its reach, a narrowed one
+// is not.
+describe('test_related_cap.capped_importers keeping full reach', () => {
+	let fixture: FixtureWorkspace
+
+	beforeEach(async () => {
+		fixture = await open_fixture()
+	})
+
+	afterEach(async () => {
+		vi.restoreAllMocks()
+		await git_fixture_workspace.close_workspace(fixture)
+	})
+
+	it('keeps a file no test imports directly with its reach, beside a narrowed one', async () => {
+		const files = [WIDE_MODULE, LONE_MODULE]
+		const reader = reader_of(MAX_TEST_FILES + 1)
+		const capped = await test_related_cap.capped_importers(fixture.workspace, files, false, reader)
+
+		expect(capped.over_cap).toEqual([WIDE_MODULE])
+		expect(capped.full_reach).toEqual([PAST_LONE])
+	})
+
+	it('keeps a file whose imports changed with its reach', async () => {
+		vi.spyOn(test_related_imports, 'stable_files').mockResolvedValue([])
+		const reader = reader_of(MAX_TEST_FILES + 1)
+		const capped = await test_related_cap.capped_importers(
+			fixture.workspace,
+			[WIDE_MODULE],
+			false,
+			reader,
+		)
+
+		expect(capped.over_cap).toEqual([])
+		expect(capped.full_reach).toEqual([{ file: WIDE_MODULE, count: MAX_TEST_FILES + 1 }])
 	})
 })
 

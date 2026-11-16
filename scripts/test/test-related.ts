@@ -304,6 +304,14 @@ function owed_of(red: RedReading | undefined): ReadonlyArray<string> {
 	return red?.owed ?? []
 }
 
+// What the cap narrowed and what it left whole, for the ledger row (joshuafolkken/kit#7639).
+function cap_record({
+	over_cap,
+	full_reach,
+}: CappedImporters): Pick<RelatedInput, 'over_cap' | 'full_reach'> {
+	return { over_cap, full_reach }
+}
+
 async function read_run_input(
 	root: string,
 	command_arguments: ReadonlyArray<string>,
@@ -326,7 +334,7 @@ async function read_run_input(
 		branch,
 		owed: owed_of(red),
 		reuse,
-		over_cap: capped.over_cap,
+		...cap_record(capped),
 		select_elapsed_ms,
 	}
 }

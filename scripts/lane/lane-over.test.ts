@@ -44,6 +44,20 @@ function split_notice(clock: string): LedgerEntry {
 	return { kind: 'split-notice', at: at(clock), issue: YIELDER, files: 9, lines: 240 }
 }
 
+const RELATED: LedgerEntry = {
+	kind: 'test-related',
+	at: at('19:10'),
+	issue: YIELDER,
+	scope: 'related',
+	changed: 3,
+	synced: 0,
+	since_map: 0,
+	readers: 1,
+	over_cap: 2,
+	over_cap_hub: HUB,
+	elapsed_ms: 1000,
+}
+
 const ENTRIES: ReadonlyArray<LedgerEntry> = [
 	{ kind: 'dispatch', at: at('17:00'), issue: YIELDER },
 	...['17:10', '17:20', '17:30', '17:40'].map((clock) => split_notice(clock)),
@@ -51,19 +65,7 @@ const ENTRIES: ReadonlyArray<LedgerEntry> = [
 	{ kind: 'merge', at: at('18:19'), issue: HOLDER },
 	{ kind: 'dispatch', at: at('18:33'), issue: YIELDER },
 	{ kind: 'round-one', at: at('19:00'), issue: YIELDER, verdict: 'blocking' },
-	{
-		kind: 'test-related',
-		at: at('19:10'),
-		issue: YIELDER,
-		scope: 'related',
-		changed: 3,
-		synced: 0,
-		since_map: 0,
-		readers: 1,
-		over_cap: 2,
-		over_cap_hub: HUB,
-		elapsed_ms: 1000,
-	},
+	RELATED,
 	{ kind: 'merge', at: at('19:30'), issue: YIELDER },
 	{ kind: 'dispatch', at: at('20:00'), issue: SHORT },
 	{ kind: 'merge', at: at('20:10'), issue: SHORT },
@@ -115,6 +117,14 @@ describe('lane_over.chain_of', () => {
 
 	it('prints a dash for a lane the ledger explains nothing of', () => {
 		expect(lane_over.chain_of(RECORDS, SHORT)).toBe('-')
+	})
+
+	// joshuafolkken/kit#7639: a file the cap left at its whole reach is named after the hub.
+	it('names a file kept at full reach with its reach, the hub part unchanged', () => {
+		const kept = { ...RELATED, full_reach: [{ file: 'scripts/wide.ts', reached: 1777 }] }
+		const chain = lane_over.chain_of({ ...RECORDS, entries: [...ENTRIES, kept] }, YIELDER)
+
+		expect(chain).toContain(`hub over cap ${HUB} · full reach scripts/wide.ts (1777)`)
 	})
 })
 

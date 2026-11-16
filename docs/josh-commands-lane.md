@@ -253,6 +253,9 @@ holder and redispatch gap (`dispatched before holder end` when the lane came bac
 pending) and each `hub over cap <file>` of
 `test:related`.
 
+It also names each `full reach <file> (<n>)` of `test:related`: a file past the cap kept at its whole reach, at the
+widest reach a run read.
+
 `--pairs` prints one table instead: the period's scoped pair runs by named-file count (`<50`, `50-1000`, `>1000`), by
 the reason the import-graph split failed (its detail after `: ` dropped) and by the over-cap hub `test:related` logged,
 each with its runs and total minutes (`lane-pairs.ts`), from the `named` and `unsplit` fields of the ship lap and the
