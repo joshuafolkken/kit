@@ -2,6 +2,7 @@ import { pull_comment_schema } from '#scripts/git/git-schemas'
 import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
 import { git_gh_command } from './git-gh-command'
 import { has_ignore_reason } from './git-pr-ai-review'
+import { git_pr_review_prose } from './git-pr-review-prose'
 
 // cspell:words coderabbit coderabbitai
 
@@ -36,20 +37,6 @@ function read_unresolved_cr_urls(comments: ReadonlyArray<PullComment>): Array<st
 		.filter((url) => url.length > 0)
 }
 
-function build_ignore_reason_comment(reason: string, urls: ReadonlyArray<string>): string {
-	const lines = [
-		'Some CodeRabbit findings were intentionally left unresolved.',
-		`Reason: ${reason.trim()}`,
-		'Affected comments:',
-	]
-
-	for (const url of urls) {
-		lines.push(`- ${url}`)
-	}
-
-	return lines.join('\n')
-}
-
 function log_unresolved_coderabbit(urls: ReadonlyArray<string>): void {
 	console.warn('⚠ Unresolved CodeRabbit comments are non-blocking (temporary policy — kit#753):')
 
@@ -65,9 +52,7 @@ function log_unresolved_coderabbit(urls: ReadonlyArray<string>): void {
 // Unreadable is reported, never blocked — the opposite of the AI review gate's handling of the same
 // gap, and for the policy's own reason: CodeRabbit does not block the merge at all right now, so an
 // unreadable CodeRabbit listing cannot either. What it must not do is pass as "nothing unresolved",
-// which is what reading it as `'[]'` would make of it.
-const UNREADABLE_CR_NOTE =
-	'CodeRabbit line comments could not be read; unresolved findings were not checked (kit#753).'
+// which is what reading it as `'[]'` would make of it. The note is `git_pr_review_prose.unreadable_cr`.
 
 // An ignore reason is recorded on the pull request here for the same reason it is on the branch
 // below: it is the audit trail, not a way past a block — there is no block on this path. Dropping it
@@ -76,15 +61,17 @@ async function report_unreadable_cr(input: {
 	branch_name: string
 	ignore_reason: string | undefined
 }): Promise<Array<string>> {
-	console.warn(`⚠ ${UNREADABLE_CR_NOTE}`)
+	const note = git_pr_review_prose.unreadable_cr()
+
+	console.warn(`⚠ ${note}`)
 
 	if (has_ignore_reason(input.ignore_reason)) {
-		const body = `${UNREADABLE_CR_NOTE}\nReason: ${input.ignore_reason.trim()}`
+		const body = git_pr_review_prose.with_reason(note, input.ignore_reason)
 
 		await git_gh_command.pr_comment(input.branch_name, body)
 	}
 
-	return [UNREADABLE_CR_NOTE]
+	return [note]
 }
 
 // Documented on the pull request when a reason was given, logged when it was not. Either way the
@@ -101,7 +88,11 @@ async function record_unresolved_cr(input: {
 		return
 	}
 
-	const reason_comment = build_ignore_reason_comment(input.ignore_reason, input.unresolved_urls)
+	const reason_comment = git_pr_review_prose.ignore_comment(
+		'coderabbit',
+		input.ignore_reason,
+		input.unresolved_urls.map((url) => `- ${url}`),
+	)
 
 	await git_gh_command.pr_comment(input.branch_name, reason_comment)
 }
@@ -125,4 +116,4 @@ const git_pr_coderabbit = {
 	handle_coderabbit_findings,
 }
 
-export { git_pr_coderabbit, UNREADABLE_CR_NOTE }
+export { git_pr_coderabbit }
