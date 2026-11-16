@@ -14,6 +14,7 @@ import { execa } from 'execa'
 import { z } from 'zod'
 import { edited_cspell } from './edited-cspell'
 import { rewrite_notice } from './format-rewrite-notice'
+import { unplanned_edit } from './unplanned-edit'
 
 // Claude Code hands a `PostToolUse` hook the tool call as JSON on stdin; for `Edit` and `Write` the
 // edited path is `tool_input.file_path`. Everything else in the payload is ignored, and a payload
@@ -469,16 +470,22 @@ function report_no_payload(): void {
 // it was the hook's largest step (joshuafolkken/kit#4596), and a formatter rewrites layout, not words.
 // A hook killed at its 15s timeout is the one case this loses the density
 // line to — a run already gone pathologically wrong, per HOOK_PROCESS_TIMEOUT_MS.
-async function run_hook(payload: string): Promise<void> {
-	const notice = time_density_hook.density_notice(payload)
+// A lane child's unplanned file asks `lane:plan` beside the formatters (`unplanned-edit.ts`).
+async function edit_context(payload: string): Promise<string | undefined> {
 	const file_path = parse_edited_path(payload)
 	const before = rewrite_notice.read_text(file_path)
 	const pending_spelling = edited_cspell.spelling_diagnostics(file_path, process.cwd(), before)
+	const pending_unplanned = unplanned_edit.notice(file_path, process.cwd(), process.env)
 	const lint = await format_edited_payload(payload, process.cwd())
 	const rewrite = rewrite_notice.build(before, rewrite_notice.read_text(file_path))
-	const spelling = await pending_spelling
-	const parts = compose_context(rewrite, compose_context(lint, spelling))
-	const context = compose_context(notice, parts)
+	const parts = compose_context(rewrite, compose_context(lint, await pending_spelling))
+
+	return compose_context(parts, await pending_unplanned)
+}
+
+async function run_hook(payload: string): Promise<void> {
+	const notice = time_density_hook.density_notice(payload)
+	const context = compose_context(notice, await edit_context(payload))
 
 	if (context !== undefined) process.stdout.write(`${build_envelope(context)}\n`)
 }

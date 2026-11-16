@@ -19,11 +19,20 @@ const TELEGRAM_GUARD: ReadonlyArray<string> = ['./tools/test/test-telegram-guard
 // admits the same way on every platform and every load.
 const MACHINE_GUARD: ReadonlyArray<string> = ['./tools/test/test-machine-guard.ts']
 
+// Runs in every worker, per test file: it names the running test file in the environment, so a call
+// the network guard records says which file made it (joshuafolkken/kit#7638).
+const TEST_FILE_ENVIRONMENT: ReadonlyArray<string> = ['./tools/test/test-file-environment.ts']
+
 // The guards every run of the suite arms, whichever config starts it: the network guard once in the
 // main process, the stdout, Telegram and machine guards in every worker. Named here so `vitest.config.ts` and
 // `vitest.harness.config.ts` read one definition — the harness once ran with none of them.
 const NETWORK_GUARD: ReadonlyArray<string> = ['./tools/test/test-network-guard.ts']
-const WORKER_GUARDS: ReadonlyArray<string> = [...STDOUT_GUARD, ...TELEGRAM_GUARD, ...MACHINE_GUARD]
+const WORKER_GUARDS: ReadonlyArray<string> = [
+	...STDOUT_GUARD,
+	...TELEGRAM_GUARD,
+	...MACHINE_GUARD,
+	...TEST_FILE_ENVIRONMENT,
+]
 
 // Runs in every worker of the unit suite, idle unless a whole-suite `josh test:unit` asked it to
 // record which repository paths each test reads (`test-read-recorder.ts`). Not a guard, and not
@@ -45,6 +54,7 @@ const unit_setup_files = {
 	STDOUT_GUARD,
 	UNIT_FILE_REPORTER,
 	TELEGRAM_GUARD,
+	TEST_FILE_ENVIRONMENT,
 	WORKER_GUARDS,
 }
 
