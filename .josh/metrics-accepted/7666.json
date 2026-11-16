@@ -1,7 +1,0 @@
-{
-	"reason": "#7666 adds the Japanese/English word tables for the measure-close and triage comment prose",
-	"date": "2026-11-16",
-	"growth": {
-		"scripts.code_lines": 40
-	}
-}
