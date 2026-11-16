@@ -46,6 +46,7 @@ async function blocker_states(): Promise<Array<string>> {
 }
 
 beforeEach(() => {
+	vi.useRealTimers()
 	vi.restoreAllMocks()
 	shared_cache_fixture.keep_in_memory()
 	git_gh_issue_memo.forget()
@@ -133,6 +134,9 @@ describe('git_gh_issue_read.issue_list_comments — through the ETag layer', () 
 		const full = JSON.stringify(Array.from({ length: git_gh_api_path.FULL_PAGE_SIZE }, () => ({})))
 		const paged = vi.spyOn(git_gh_exec, 'exec_gh_api').mockResolvedValue(COMMENTS)
 
+		// The paged read gets what is left of one budget (`git-gh-etag-read.ts` → `remaining_ms`);
+		// a frozen clock keeps a clock tick between the reads from shrinking it.
+		vi.useFakeTimers({ toFake: ['Date'] })
 		serve({ kind: 'changed', etag: FIRST_ETAG, body: full })
 
 		expect(await git_gh_issue_read.issue_list_comments(READ_NUMBER, TIMEOUT_MS)).toBe(COMMENTS)

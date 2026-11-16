@@ -1,0 +1,7 @@
+{
+	"reason": "Seat locks record their owner pid, reclaim an abandoned lock and skip it in the in-flight count (#7651)",
+	"date": "2026-11-16",
+	"growth": {
+		"scripts.code_lines": 60
+	}
+}

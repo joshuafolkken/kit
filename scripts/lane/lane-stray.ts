@@ -111,7 +111,7 @@ function named_paths(foreign: ReadonlyArray<string>): string {
 const KEPT_REASONS: Record<Exclude<StrayVerdict, 'foreign' | 'removed'>, string> = {
 	'not-a-lane': 'not a name the lane machinery writes, so it was left alone',
 	opening:
-		'a `lane:open` holds a seat lock and this may be its lane; the next sweep reads it again — if no `lane:open` is running, the lock outlived a crash: remove the lanes root `.seat-locks` directory',
+		'a `lane:open` holds a seat lock and this may be its lane; the next sweep reads it again — a lock in the lanes root `.seat-locks` whose `lane:open` died is not counted here and is reclaimed by the next `lane:open`',
 	stuck: 'the removal did not finish; the next `pnpm josh lane:prune` tries again',
 	unreadable: 'it could not be read, so it was left in place',
 }
