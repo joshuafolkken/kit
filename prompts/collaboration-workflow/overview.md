@@ -12,6 +12,7 @@
   1. Issue／PR タイトル
   2. コード内コメント、テストタイトル（`describe` / `it` / `expect`）、コミットメッセージ
   3. スクリプトが出力する固定文字列: Telegram のヘッダーラベル（`Planning` / `Completion` など）、`Issue:` / `PR:` の URL ラベル、`--notify-message` 省略時の既定メッセージ
+- スクリプトが投稿するコメントは、照合に使う見出し・マーカー・台帳行・判断用の定型句を英語、人が読む説明文を設定言語で書く
 - Issue 本文の見出し・宣言キー・固定値 → josh は設定の言語で書き出し、読み取りは日英どちらも受け付ける（`scripts/issue/issue-body-keys.ts`）
 - 文書が日本語で名指すキー・固定値・見出し → `JOSH_SESSION_LANG` の列で書く（対応表は `issue-template.en.md`）
 
