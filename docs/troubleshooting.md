@@ -7,7 +7,7 @@ Common errors when installing or using `@joshuafolkken/kit`, and how to fix them
 Check which registry the install uses before changing `.npmrc`.
 
 - For a new kit-only install, public npm is the expected registry. Check `https://registry.npmjs.org/@joshuafolkken%2fkit/<version>` for the exact version requested — the package URL can return `200` while that version returns `404`. A GitHub Packages mapping does not fix it.
-- For an existing project still installing kit from GitHub Packages, a newer kit may need npm: [move the project to npm](./registry-migration.md) first. If the migration entry stops on the pnpm version or on a locked version missing from npm, follow [the path for those projects](./registry-migration.md#入口が停止する配布先).
+- For an existing project still installing kit from GitHub Packages, a newer kit may need npm: [move the project to npm](./registry-migration.md) first. If the migration entry stops on the pnpm version or on a locked version missing from npm, follow [the path for those projects](./registry-migration.md#when-the-entry-stops).
 - For an existing project intentionally using GitHub Packages, confirm its `.npmrc` still contains the mapping. See §3 of [authentication.md](./authentication.md) if it is missing:
   ```ini
   @joshuafolkken:registry=https://npm.pkg.github.com
@@ -161,7 +161,7 @@ pnpm ignores a credential line in a project `.npmrc` unless `npmrcAuthFile` decl
 
 ## Still stuck?
 
-- Moving off GitHub Packages? Follow [registry-migration.md](./registry-migration.md) in order. Entry stopped on the pnpm version or a version missing from npm? See [its section for that](./registry-migration.md#入口が停止する配布先).
+- Moving off GitHub Packages? Follow [registry-migration.md](./registry-migration.md) in order. Entry stopped on the pnpm version or a version missing from npm? See [its section for that](./registry-migration.md#when-the-entry-stops).
 - Installing from GitHub Packages? Re-read [authentication.md](./authentication.md) end to end — the ordering (token → env var → `~/.npmrc` credential → project registry mapping) matters.
 - Check installed vs. latest version: `josh version`.
 - Open an issue: <https://github.com/joshuafolkken/kit/issues>.
