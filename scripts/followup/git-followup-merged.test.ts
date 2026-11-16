@@ -5,7 +5,12 @@ vi.mock('#scripts/gh/git-gh-command', () => ({
 	git_gh_command: {
 		pr_get_merge_state: vi.fn(),
 		issue_list_comments: vi.fn(),
+		pr_merged_head_of_issue: vi.fn(),
 	},
+}))
+
+vi.mock('#scripts/git/git-command', () => ({
+	git_command: { get_default_branch: vi.fn(async () => 'main') },
 }))
 
 const { git_gh_command } = await import('#scripts/gh/git-gh-command')
@@ -144,5 +149,29 @@ describe('git_followup_merged.is_completion_recorded — asked only on a merged 
 		const input = { merged_at: MERGED_AT, issue_number: undefined, pr_url: PR_URL }
 
 		await expect(git_followup_merged.is_completion_recorded(input)).resolves.toBe(false)
+	})
+})
+
+// joshuafolkken/kit#7646 — a hand-merged pull request followed up from a main checkout, its branch gone.
+describe('git_followup_merged.resolve_merged_branch — the branch a main checkout runs on', () => {
+	it('runs a main checkout on the head branch of the issue’s merged pull request', async () => {
+		vi.mocked(git_gh_command.pr_merged_head_of_issue).mockResolvedValueOnce(BRANCH)
+
+		await expect(git_followup_merged.resolve_merged_branch('main', ISSUE)).resolves.toBe(BRANCH)
+		expect(git_gh_command.pr_merged_head_of_issue).toHaveBeenLastCalledWith(ISSUE)
+	})
+
+	it('keeps main when no merged pull request closes the issue', async () => {
+		vi.mocked(git_gh_command.pr_merged_head_of_issue).mockResolvedValueOnce(undefined)
+
+		await expect(git_followup_merged.resolve_merged_branch('main', ISSUE)).resolves.toBe('main')
+	})
+
+	it('asks nothing on a feature branch or without an issue', async () => {
+		vi.mocked(git_gh_command.pr_merged_head_of_issue).mockClear()
+
+		await expect(git_followup_merged.resolve_merged_branch(BRANCH, ISSUE)).resolves.toBe(BRANCH)
+		await expect(git_followup_merged.resolve_merged_branch('main', undefined)).resolves.toBe('main')
+		expect(git_gh_command.pr_merged_head_of_issue).not.toHaveBeenCalled()
 	})
 })

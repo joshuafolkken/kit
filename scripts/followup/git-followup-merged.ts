@@ -1,5 +1,6 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import type { PullMergeState } from '#scripts/gh/git-gh-pr-read'
+import { git_command } from '#scripts/git/git-command'
 import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
 
@@ -54,6 +55,21 @@ async function read_merge_plan(
 	return to_merge_plan(await git_gh_command.pr_get_merge_state(branch_name), is_merge_requested)
 }
 
+// **A hand-merged pull request is followed up from wherever the person stands** — often the default
+// branch, its head branch deleted (joshuafolkken/kit#7646). The default branch names no pull request,
+// so the merged one closing the issue names the branch the rest of the run reads; none found keeps the
+// branch, and the run goes on as before.
+async function resolve_merged_branch(
+	branch_name: string,
+	issue_number: string | undefined,
+): Promise<string> {
+	if (issue_number === undefined) return branch_name
+	const default_branch = await git_command.get_default_branch()
+	if (branch_name !== default_branch) return branch_name
+
+	return (await git_gh_command.pr_merged_head_of_issue(issue_number)) ?? branch_name
+}
+
 function is_completion_text(text: string | null | undefined, pr_url: string): boolean {
 	if (typeof text !== 'string' || !text.startsWith(COMPLETION_MARK)) return false
 
@@ -105,6 +121,7 @@ const git_followup_merged = {
 	has_completion_record,
 	is_completion_recorded,
 	read_merge_plan,
+	resolve_merged_branch,
 	to_merge_plan,
 }
 

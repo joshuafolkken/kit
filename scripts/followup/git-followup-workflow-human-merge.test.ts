@@ -38,6 +38,7 @@ vi.mock('#scripts/gh/git-gh-exec', () => ({
 vi.mock('./git-followup-merged', () => ({
 	git_followup_merged: {
 		read_merge_plan: vi.fn(async () => ({ is_merged: false, should_merge: true })),
+		resolve_merged_branch: vi.fn(async (branch: string) => branch),
 	},
 }))
 vi.mock('./followup-section')

@@ -1,0 +1,7 @@
+{
+	"reason": "New merged-PR lookup by issue number (GraphQL closing references, latest merge) plus wiring and tests for #7646",
+	"date": "2026-11-16",
+	"growth": {
+		"scripts.code_lines": 62
+	}
+}

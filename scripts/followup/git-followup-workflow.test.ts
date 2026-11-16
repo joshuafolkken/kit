@@ -178,6 +178,7 @@ vi.mock('./git-followup-merged', () => ({
 			should_merge: is_requested,
 			merged_at: undefined,
 		})),
+		resolve_merged_branch: vi.fn(async (branch: string) => branch),
 	},
 }))
 
@@ -185,6 +186,10 @@ const { git_followup_workflow } = await import('./git-followup-workflow')
 const { git_followup_flush } = await import('./git-followup-flush')
 const { lane_size_record } = await import('#scripts/lane/lane-size-record')
 const { git_pr_followup } = await import('./git-pr-followup')
+const { git_followup_merged } = await import('./git-followup-merged')
+const merged_lookups_at_import = [
+	...vi.mocked(git_followup_merged.resolve_merged_branch).mock.calls,
+]
 const before_merge_at_import = vi.mocked(git_pr_followup.run).mock.calls[0]?.[0]?.before_merge
 // Read at load, before the suite's per-test mock clearing can reset it.
 const prints_at_import = print_section_mock.mock.calls.length
@@ -411,5 +416,12 @@ describe('resolve_branch_name', () => {
 		const result = await git_followup_workflow.resolve_branch_name('')
 
 		expect(result).toBe(RESOLVED_BRANCH)
+	})
+
+	it('runs a main checkout on the issue’s hand-merged branch (#7646)', async () => {
+		vi.mocked(git_followup_merged.resolve_merged_branch).mockResolvedValueOnce('7646-lane')
+
+		expect(await git_followup_workflow.resolve_branch_name(undefined, '7646')).toBe('7646-lane')
+		expect(merged_lookups_at_import).toStrictEqual([['main', '6221']])
 	})
 })
