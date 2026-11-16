@@ -37,6 +37,45 @@ global CLI は `~/.npmrc` を変えずに npm から取得できる（[cli.md](.
 
 - GitHub Packages への publish 停止と、既存版の削除はこの移行に含まない。既存の GitHub 取得は引き続き動く。
 - 公開済み版を実際の consumer リポジトリと公開 tarball で通す最終実証は、公開後に #7447 で行う。それまでこの文書の確認済み範囲は、pack した候補 tarball による検証に限る。
+- 入口を使わない移行は [入口が停止する配布先](#入口が停止する配布先) の条件に当たる場合に限る。
+
+## 入口が停止する配布先
+
+入口は次の場合に変更前で停止する（[検証する条件](#検証する条件)）。
+
+- pnpm 版違い：プロジェクトが pnpm 12.17.0 以外を固定している（`ERR_PNPM_BAD_PM_VERSION` 等）。
+- 不足版：ロック済みの kit・app-kit 等が npm に無い。npm の最古は kit 1.872.0・app-kit 0.98.0。
+
+この場合は入口を使わず、npm にある版へ上げ直して新しいロックを作る。
+旧ロックの integrity は引き継がない。checksum 無効化や integrity の書き換えはしない。
+ロックの全 `@joshuafolkken` パッケージが npm にあることが前提。npm に無いパッケージ（`npm view <name> --registry https://registry.npmjs.org/` が 404）に依存する場合は、この手順でも移行できない。
+
+1. `package.json` の `packageManager` と `devEngines.packageManager` を、kit の `package.json` と同じ pnpm 12.17.0 の固定に手で書き換える。`pnpm --version` が `12.17.0` を返すことを確認する。
+2. プロジェクトの `.npmrc` を npm に向け、GitHub Packages のトークン行を消す。
+
+   ```sh
+   pnpm config set --location project "@joshuafolkken:registry" https://registry.npmjs.org/
+   pnpm config delete --location project "//npm.pkg.github.com/:_authToken"
+   ```
+
+3. プロジェクト独自の script が `fix-gh-packages` を呼ぶ場合は消す。新しい kit にその旧パスは無く、残すと `prepare` が `ERR_MODULE_NOT_FOUND` で失敗する。`prepare` から呼んでいる場合はその呼び出しも外す。
+
+   ```sh
+   pnpm pkg delete 'scripts["prepare:gh-packages"]'
+   ```
+
+4. npm の最新版を `pnpm view @joshuafolkken/kit version` で確かめ、依存している kit・app-kit を npm から直接上げる。`--ignore-scripts` で、sync 前の `prepare` を走らせない。
+
+   ```sh
+   pnpm add -D @joshuafolkken/kit@<kit-version> @joshuafolkken/app-kit@<app-kit-version> --ignore-scripts
+   pnpm exec josh sync
+   pnpm install
+   ```
+
+5. [移行の順序](#移行の順序)の手順 5 と同じ確認をする。`pnpm config get "@joshuafolkken:registry"` が `https://registry.npmjs.org/` を返し、`pnpm-lock.yaml` に `npm.pkg.github.com` が残らないこと。
+
+[移行後に残る作業](#移行後に残る作業)はこの経路でも同じ。
+kit 1.206.0・1.340.0 をロックした配布先の隔離コピーで、この手順を確認した（#7654）。
 
 ## 配布と境界
 
