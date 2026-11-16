@@ -116,7 +116,7 @@ The header is three lines — the first two in three columns, the third the repo
   kit          ⠦        4″  🔧 #<N> · Bash pnpm josh test:related
 ```
 
-The first column is the board's state mark and `josh-board` (linked to kit; a single run draws its own name), the kit version the run's supervisor recorded as it started (linked to kit's releases; `v<version>+<commits since the release>` in kit itself, `-` before a supervisor recorded one), then the repository's name. The other columns stay aligned however wide it grows.
+The first column is the board's state mark and `josh-board` (linked to kit; a single run draws its own name), the kit version the run's supervisor recorded as it started (linked to kit's releases; `v<version>+<commits since the release>` in kit itself, `-` with no supervisor record), then the repository's name. The other columns stay aligned however wide it grows.
 
 The first line is how far the run is: `⏰` elapsed in degree-minute-second form (`1°15′57″`, `26″` — every length on the board; a colon is a time of day), a progress bar, per-state counts, `📮` open/closed issues. `🛫`: start to first lane.
 

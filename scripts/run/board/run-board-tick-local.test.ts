@@ -161,6 +161,20 @@ describe('run_board_tick.tick before the plan is read', () => {
 	})
 })
 
+// joshuafolkken/kit#7672: the version the supervisor recorded in its wake record reaches the header.
+describe('run_board_tick.tick kit version', () => {
+	it('draws the kit version the local read carries under the board’s name', async () => {
+		const { ports, frames } = harness(
+			{ ...LOCAL, events: [LAUNCH], kit_version: 'v1.3153.0+3' },
+			[],
+		)
+
+		await tick(FRESH_STATE, { ...ports, read_plan: never }, 'background')
+
+		expect(lines_of(frames[0])[1]).toMatch(/^ {2}v1\.3153\.0\+3 /u)
+	})
+})
+
 // joshuafolkken/kit#3757: the operations the local read carries reach the header's third line.
 describe('run_board_tick.tick with a session’s operation', () => {
 	it('draws the running child’s newest operation on the third line', async () => {
