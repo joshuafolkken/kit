@@ -13,6 +13,7 @@ import { lane_reap } from './lane-reap'
 import { lane_registry, type LaneInfo } from './lane-registry'
 import { lane_residents } from './lane-residents'
 import { lane_state } from './lane-state'
+import { lane_withdraw_prose, type Withdrawer } from './lane-withdraw-prose'
 import { lane_yield } from './lane-yield'
 
 // `josh lane:withdraw <N> --reason <text>` — a person takes a running lane child's issue out of the
@@ -43,42 +44,25 @@ const UNREADABLE_KIND = 'unreadable'
 
 type Unsaved = Extract<KeptWork, { kind: 'unsaved' }>
 
-// Who withdrew the lane: a person with `lane:withdraw`, the supervisor's sweep of closed issues,
-// `run:merge` collecting a child whose issue closed without a merge (joshuafolkken/kit#4916), or the
-// child's own `lane:plan` giving its lane back (`lane-yield.ts`, joshuafolkken/kit#4926).
-type Withdrawer = 'person' | 'supervisor' | 'merge' | 'yield'
-
-const OPEN_TAIL =
-	'Its lane child was stopped and the lane closed. The Issue stays open: this run does not resume it, and the next run offers it again.'
 // What `describe` says of an open issue's place in the run once its lane is withdrawn.
 const STAYS_OPEN = 'The Issue stays open: this run does not offer it again, the next run does.'
 
-// How each withdrawer is named on the event stream, in the stash note and on the issue.
+// How each withdrawer is named on the event stream and in the stash note, and what `describe` says of
+// it; the issue comment's sentences are `lane-withdraw-prose.ts`'s.
 const WITHDRAWER_TEXT = {
 	person: {
 		name: 'a person',
 		cause: 'a person withdrew it with `lane:withdraw`',
-		closed_head:
-			'Its lane was withdrawn with `pnpm josh lane:withdraw` after the Issue was closed.',
-		open_head: 'Withdrawn from the current run by a person with `pnpm josh lane:withdraw`.',
-		open_tail: OPEN_TAIL,
 		stays: STAYS_OPEN,
 	},
 	supervisor: {
 		name: 'the run:wake supervisor',
 		cause: 'the `run:wake` supervisor withdrew it after its issue was closed',
-		closed_head: 'Its lane was withdrawn by the `run:wake` supervisor after the Issue was closed.',
-		open_head: 'Withdrawn from the current run by the `run:wake` supervisor.',
-		open_tail: OPEN_TAIL,
 		stays: STAYS_OPEN,
 	},
 	merge: {
 		name: 'the run:merge driver',
 		cause: '`run:merge` withdrew it after its issue was closed without a merge',
-		closed_head:
-			'Its lane was withdrawn by `pnpm josh run:merge` after the Issue was closed without a merge.',
-		open_head: 'Withdrawn from the current run by `pnpm josh run:merge`.',
-		open_tail: OPEN_TAIL,
 		stays: STAYS_OPEN,
 	},
 	yield: lane_yield.YIELD_TEXT,
@@ -108,15 +92,6 @@ interface Withdrawn {
 type Refused =
 	{ kind: typeof CLOSED_KIND } | { kind: typeof NO_LANE_KIND } | { kind: typeof UNREADABLE_KIND }
 type WithdrawOutcome = Withdrawn | Unsaved | Refused
-
-function withdraw_comment({ reason, by, is_closed }: Withdrawal): string {
-	const head = is_closed ? WITHDRAWER_TEXT[by].closed_head : WITHDRAWER_TEXT[by].open_head
-	const tail = is_closed
-		? 'Its lane child was stopped and the lane closed, so it no longer holds a lane and is not resumed.'
-		: WITHDRAWER_TEXT[by].open_tail
-
-	return [head, tail, `- Why: ${reason}`].join('\n')
-}
 
 async function record_withdraw(issue: string, { reason, by }: Withdrawal): Promise<void> {
 	await run_event_stream_emit.emit(
@@ -148,7 +123,11 @@ async function note_issue(
 	withdrawal: Withdrawal,
 	stash: string | undefined,
 ): Promise<boolean> {
-	const is_noted = await git_gh_issue_write.issue_try_comment(issue, withdraw_comment(withdrawal))
+	const { by, is_closed, reason } = withdrawal
+	const is_noted = await git_gh_issue_write.issue_try_comment(
+		issue,
+		lane_withdraw_prose.comment(by, is_closed, reason),
+	)
 
 	if (stash !== undefined) {
 		await lane_preserve.announce(issue, stash, WITHDRAWER_TEXT[withdrawal.by].cause)
@@ -267,5 +246,7 @@ const WITHDRAWER_NAMES: ReadonlyArray<string> = Object.values(WITHDRAWER_TEXT).m
 
 const lane_withdraw = { WITHDRAWER_NAMES, describe, withdraw }
 
-export type { Withdrawer, WithdrawOutcome }
+export type { WithdrawOutcome }
 export { lane_withdraw }
+
+export { type Withdrawer } from './lane-withdraw-prose'
