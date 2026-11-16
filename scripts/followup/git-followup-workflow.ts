@@ -94,10 +94,15 @@ function parse_cli_arguments(): CliArguments {
 	})
 }
 
-async function resolve_branch_name(raw_branch: string | undefined): Promise<string> {
+// A named `--branch` is taken as given; the checkout's own branch is first checked against the issue's
+// hand-merged pull request (`git_followup_merged.resolve_merged_branch`).
+async function resolve_branch_name(
+	raw_branch: string | undefined,
+	issue_number?: string,
+): Promise<string> {
 	if (raw_branch !== undefined && raw_branch.trim().length > 0) return raw_branch.trim()
 
-	return await git_branch.current()
+	return await git_followup_merged.resolve_merged_branch(await git_branch.current(), issue_number)
 }
 
 // The message is resolved here rather than inside `git_notify`, so the file form reaches the config
@@ -217,7 +222,7 @@ async function main(): Promise<void> {
 	if (answer_help_or_open(cli.values)) return
 	const issue_number =
 		cli.values['issue-number'] ?? parse_issue_number_from_text(cli.positionals[0] ?? undefined)
-	const branch_name = await resolve_branch_name(cli.values.branch)
+	const branch_name = await resolve_branch_name(cli.values.branch, issue_number)
 	const plan = await git_followup_merged.read_merge_plan(branch_name, is_merge_resolved(cli.values))
 
 	await prepare_merge(plan, issue_number, branch_name)

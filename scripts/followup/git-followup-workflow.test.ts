@@ -178,6 +178,7 @@ vi.mock('./git-followup-merged', () => ({
 			should_merge: is_requested,
 			merged_at: undefined,
 		})),
+		resolve_merged_branch: vi.fn(async (branch: string) => branch),
 	},
 }))
 
@@ -411,5 +412,17 @@ describe('resolve_branch_name', () => {
 		const result = await git_followup_workflow.resolve_branch_name('')
 
 		expect(result).toBe(RESOLVED_BRANCH)
+	})
+
+	it('runs a main checkout on the issue’s hand-merged branch (#7646)', async () => {
+		const { git_followup_merged } = await import('./git-followup-merged')
+
+		vi.mocked(git_followup_merged.resolve_merged_branch).mockResolvedValueOnce('7646-lane')
+
+		expect(await git_followup_workflow.resolve_branch_name(undefined, '7646')).toBe('7646-lane')
+		expect(git_followup_merged.resolve_merged_branch).toHaveBeenLastCalledWith(
+			RESOLVED_BRANCH,
+			'7646',
+		)
 	})
 })
