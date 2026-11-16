@@ -5,6 +5,7 @@ import { resolve_local_bin } from '#scripts/build/local-bin'
 import { init_ai_copy } from '#scripts/init/init-ai-copy'
 import { transform_copied_content } from '#scripts/init/init-copy-content'
 import { init_logic } from '#scripts/init/init-logic'
+import { npm_publish_files } from '#scripts/init/npm-publish-files'
 import { execaSync } from 'execa'
 import { describe, expect, it } from 'vitest'
 
@@ -37,11 +38,13 @@ const CSPELL_FLAGS: ReadonlyArray<string> = [
 // copy reads, not from its own name: a consumer's `SECURITY.md` is written from a template, and
 // kit's same-named file is not what reaches them. The gitignore template is deliberately
 // absent: the distributed `ignorePaths` drops `**/.gitignore`, so a consumer never spell-checks
-// the file it becomes.
+// the file it becomes. The publish workflow reaches only registry-published consumers, so it is
+// named by its constant rather than the registry-gated list (joshuafolkken/kit#7682).
 const DISTRIBUTED_FILES: ReadonlyArray<string> = [
 	...init_logic.get_ai_copy_files().map((filename) => init_ai_copy.ai_file_source(filename)),
 	...init_logic.get_ai_copy_file_mappings().map((mapping) => mapping.src),
 	init_logic.get_sonar_template_source(),
+	npm_publish_files.PUBLISH_WORKFLOW,
 ]
 
 // The skills are copied whole, so the guard has to walk them rather than name their files — and
