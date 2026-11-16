@@ -47,6 +47,15 @@ describe('git_gh_issue_merged_pull.pr_merged_head_of_issue', () => {
 		await expect(git_gh_issue_merged_pull.pr_merged_head_of_issue(ISSUE)).resolves.toBeUndefined()
 	})
 
+	it('answers the latest merge for an issue reopened and closed again', async () => {
+		const earlier = pull({ mergedAt: '2026-11-01T00:00:00Z', headRefName: 'first-try' })
+		const later = pull({ mergedAt: '2026-11-16T00:00:00Z' })
+
+		mocked_query.mockResolvedValueOnce(answer(earlier, later))
+
+		await expect(git_gh_issue_merged_pull.pr_merged_head_of_issue(ISSUE)).resolves.toBe(MERGED_HEAD)
+	})
+
 	it('answers nothing on a REST session or an answer it cannot read', async () => {
 		mocked_query.mockResolvedValueOnce(undefined).mockResolvedValueOnce('{"errors":[]}')
 
