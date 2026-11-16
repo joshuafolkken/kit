@@ -1,7 +1,0 @@
-{
-	"reason": "The session-language prose table holds each comment in Japanese and English, the same shape #7668 and #7670 added",
-	"date": "2026-11-16",
-	"growth": {
-		"scripts.code_lines": 73
-	}
-}

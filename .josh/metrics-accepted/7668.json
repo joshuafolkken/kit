@@ -1,7 +1,0 @@
-{
-	"reason": "#7668: the withdraw and breakdown comment sentences are held in both Japanese and English, so each sentence gains a second-language line",
-	"date": "2026-11-16",
-	"growth": {
-		"scripts.code_lines": 65
-	}
-}

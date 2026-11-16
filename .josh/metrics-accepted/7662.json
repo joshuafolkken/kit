@@ -1,7 +1,0 @@
-{
-	"reason": "One line: lane:launch reads a cut-session wait at lane:open as waiting (#7662)",
-	"date": "2026-11-16",
-	"growth": {
-		"scripts.code_lines": 1
-	}
-}
