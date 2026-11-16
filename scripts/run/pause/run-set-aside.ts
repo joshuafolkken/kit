@@ -1,6 +1,7 @@
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { git_stash } from '#scripts/git/stash/git-stash'
 import { stash_push_cli } from '#scripts/git/stash/stash-push-cli'
+import { session_language } from '#scripts/josh/session-language'
 import { error_text } from '#scripts/lib/error-message'
 import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
 import { run_pause_comment } from './run-pause-comment'
@@ -62,26 +63,43 @@ async function set_aside(request: AsideRequest): Promise<string> {
 	return await run_set_aside_commit.commit(request.stash_message)
 }
 
-const NOTHING_SET_ASIDE = '- The tree held no uncommitted work, so nothing was set aside.'
+// Only the work line is for a person to read, so only it follows the session language; the marker
+// `run-pause-comment.ts` matches and the commands a person runs stay English (joshuafolkken/kit#7667).
+function is_japanese(): boolean {
+	return session_language.is_japanese(session_language.resolve_session_lang().lang)
+}
+
+function nothing_line(): string {
+	return is_japanese()
+		? '- ツリーに未コミットの作業がなかったので、何も退避していない。'
+		: '- The tree held no uncommitted work, so nothing was set aside.'
+}
 
 function committed_line(request: AsideRequest): string {
-	const message = run_set_aside_commit.message_of(request.stash_message)
+	const message = `\`${run_set_aside_commit.message_of(request.stash_message)}\``
+	const merge = '`pnpm josh main:merge`'
 
-	return `- The work in progress was committed on the lane branch as \`${message}\`. To resume, run \`pnpm josh main:merge\` on the lane and continue.`
+	return is_japanese()
+		? `- 作業中の変更をレーンのブランチに ${message} としてコミットした。再開するには、レーンで ${merge} を実行して続ける。`
+		: `- The work in progress was committed on the lane branch as ${message}. To resume, run ${merge} on the lane and continue.`
 }
 
 function stashed_line(request: AsideRequest): string {
-	return `- The work in progress was stashed. After \`pnpm josh ms\`, recover it with \`pnpm josh stash:pop "${request.stash_message}"\`.`
+	const pop = `\`pnpm josh stash:pop "${request.stash_message}"\``
+
+	return is_japanese()
+		? `- 作業中の変更を stash した。\`pnpm josh ms\` の後、${pop} で取り戻す。`
+		: `- The work in progress was stashed. After \`pnpm josh ms\`, recover it with ${pop}.`
 }
 
 async function work_line(request: AsideRequest): Promise<string> {
 	if (await is_committed_aside(request)) {
 		const is_committed = await run_set_aside_commit.is_committed(request.stash_message)
 
-		return is_committed ? committed_line(request) : NOTHING_SET_ASIDE
+		return is_committed ? committed_line(request) : nothing_line()
 	}
 
-	return (await is_stashed(request)) ? stashed_line(request) : NOTHING_SET_ASIDE
+	return (await is_stashed(request)) ? stashed_line(request) : nothing_line()
 }
 
 async function comment(request: AsideRequest): Promise<string> {

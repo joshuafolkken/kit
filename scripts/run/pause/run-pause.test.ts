@@ -1,6 +1,7 @@
 import { epic_index } from '#scripts/epic/epic-index'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { git_stash } from '#scripts/git/stash/git-stash'
+import { session_language } from '#scripts/josh/session-language'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_pause } from './run-pause'
 import { run_pause_comment } from './run-pause-comment'
@@ -150,8 +151,10 @@ describe('run_pause.pause — the four steps in order', () => {
 
 	it('says nothing was set aside on a clean tree', async () => {
 		state.has_work = false
+		vi.stubEnv(session_language.ENV_KEY, 'en')
 
 		await run_pause.pause(REQUEST)
+		vi.unstubAllEnvs()
 
 		expect(state.comments[0]).toContain('nothing was set aside')
 		expect(state.comments[0]).not.toContain('stash:pop')
