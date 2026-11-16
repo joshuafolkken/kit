@@ -1,3 +1,4 @@
+import { git_directory } from '#scripts/discovery/git-directory'
 import { lane_paths } from '#scripts/lane/lane-paths'
 import { lane_state, type LaneStateRecord } from '#scripts/lane/lane-state'
 import { run_carry, type CarryRead } from '#scripts/run/carry/run-carry'
@@ -22,6 +23,7 @@ const CHILD_LAUNCH = 'child-launch'
 const HOLD: RunHold = { issue: String(ISSUE), taken_at: TAKEN_AT, pid: 1 }
 
 const FREE: HoldRead = { kind: 'free' }
+const LANE_GIT_DIRECTORY = '/repo/.git/worktrees/6597'
 
 function held(hold: Partial<RunHold> = {}): HoldRead {
 	return { kind: 'held', hold: { ...HOLD, ...hold } }
@@ -29,6 +31,20 @@ function held(hold: Partial<RunHold> = {}): HoldRead {
 
 function lane_record(issue: string): LaneStateRecord {
 	return { issue, state: 'running', changed_at: TAKEN_AT, changed_by: 'run:entry' }
+}
+
+// The root checkout's hold is read first and is free; the lane's, through its `.git` file, next.
+function arrange_lane(
+	record: LaneStateRecord,
+	own: string | undefined,
+	is_single_in_lane: boolean | undefined,
+): void {
+	arrange(NONE, undefined)
+	vi.spyOn(lane_state, 'read_records').mockResolvedValue([record])
+	vi.spyOn(git_directory, 'own_git_directory').mockReturnValue(own)
+	vi.spyOn(run_hold, 'read_hold')
+		.mockReturnValueOnce(FREE)
+		.mockReturnValueOnce(held({ is_fullrun: true, is_single_in_lane }))
 }
 
 afterEach(() => vi.restoreAllMocks())
@@ -136,19 +152,22 @@ describe('run_board_read.read_local for a single run', () => {
 		})
 	})
 
-	// joshuafolkken/kit#7653: a single run that resumed a leftover lane holds the lane's tree, not this one.
+	it('reads no run with neither a hold nor a carry record', async () => {
+		arrange(NONE, undefined)
+
+		await expect(run_board_read.read_local()).resolves.toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#7653: a single run that resumed a leftover lane holds the lane's tree, not this one.
+describe('run_board_read.read_local for a single run in a lane', () => {
 	it.each([
 		{ is_single_in_lane: true, run_name: FULLRUN },
 		{ is_single_in_lane: undefined, run_name: undefined },
 	])(
 		'reads a lane hold marked $is_single_in_lane as the run $run_name',
 		async ({ is_single_in_lane, run_name }) => {
-			arrange(NONE, undefined)
-			vi.spyOn(lane_state, 'read_records').mockResolvedValue([lane_record(String(ISSUE))])
-			// The root checkout's hold is read first and is free; the lane's is read next.
-			vi.spyOn(run_hold, 'read_hold')
-				.mockReturnValueOnce(FREE)
-				.mockReturnValueOnce(held({ is_fullrun: true, is_single_in_lane }))
+			arrange_lane(lane_record(String(ISSUE)), LANE_GIT_DIRECTORY, is_single_in_lane)
 
 			const local = await run_board_read.read_local()
 
@@ -156,10 +175,19 @@ describe('run_board_read.read_local for a single run', () => {
 		},
 	)
 
-	it('reads no run with neither a hold nor a carry record', async () => {
-		arrange(NONE, undefined)
+	it.each([
+		{
+			label: 'an ended lane',
+			record: { ...lane_record(String(ISSUE)), state: 'ended' as const },
+			own: LANE_GIT_DIRECTORY,
+		},
+		{ label: 'a lane with no .git file', record: lane_record(String(ISSUE)), own: undefined },
+	])('reads no lane hold for $label', async ({ record, own }) => {
+		arrange_lane(record, own, true)
 
-		await expect(run_board_read.read_local()).resolves.toBeUndefined()
+		const local = await run_board_read.read_local()
+
+		expect(local?.run_name).toBeUndefined()
 	})
 })
 

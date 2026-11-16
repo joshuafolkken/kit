@@ -1,5 +1,5 @@
-import path from 'node:path'
 import type { NamedPlan } from '#scripts/backlog/backlog-plan'
+import { git_directory } from '#scripts/discovery/git-directory'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { lane_paths } from '#scripts/lane/lane-paths'
@@ -21,8 +21,6 @@ const HALFRUN = 'halfrun'
 const SINGLE_INVOCATION = /^(?<command>fullrun|halfrun) #(?<issue>\d+)$/u
 // The launch the board reads a row's running state from, placed before every event of the run.
 const LAUNCH_POSITION = 0
-// The directory under the common git directory that holds each linked work tree's own.
-const WORKTREES = 'worktrees'
 const FREE_READ: HoldRead = { kind: 'free' }
 
 interface SingleRun {
@@ -84,19 +82,27 @@ async function directory_here(): Promise<string | undefined> {
 
 // A lane's hold when a single run that resumed the lane took it (`run_hold.lane_mark`); free for a
 // dispatched child's, whose row is its `backlogrun`'s. The hold sits in the lane's own git directory,
-// which git names after the lane's directory — the issue (`lane-paths.ts`).
-function lane_read(directory: string, issue: string): HoldRead {
-	const lane_directory = path.join(directory, WORKTREES, issue)
-	const read = run_hold.read_hold(run_hold.hold_path(lane_directory))
+// read through the lane's `.git` file: git suffixes its name on a collision, so the issue alone misses it.
+function lane_read(issue: string): HoldRead {
+	const lane = lane_paths.lane_directory(lane_paths.lanes_root_of(process.cwd()), issue)
+	const own = git_directory.own_git_directory(lane)
+
+	if (own === undefined) return FREE_READ
+
+	const read = run_hold.read_hold(run_hold.hold_path(own))
 
 	return read.kind === 'held' && read.hold.is_single_in_lane === true ? read : FREE_READ
 }
 
-// The single run a lane of this repository holds, read from the root checkout (joshuafolkken/kit#7653).
+// The single run a lane of this repository holds, read from the root checkout (joshuafolkken/kit#7653);
+// an ended lane holds none.
 async function lane_span(directory: string): Promise<BoardSpan | undefined> {
 	const records = await lane_state.read_records(directory)
 
-	return records.map((record) => span_of(lane_read(directory, record.issue))).find(Boolean)
+	return records
+		.filter((record) => record.state !== 'ended')
+		.map((record) => span_of(lane_read(record.issue)))
+		.find(Boolean)
 }
 
 // The single run held in this checkout, else one a lane holds; `undefined` where none is. A lane's hold

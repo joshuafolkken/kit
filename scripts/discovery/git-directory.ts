@@ -37,24 +37,32 @@ function follow_git_file(repository_path: string, git_file: string): string | un
 	return path.resolve(repository_path, pointer.slice(GITDIR_PREFIX.length).trim())
 }
 
-// The directory holding the `config` for a work tree: `.git` itself, or — through a `.git` file and
-// then through `commondir` — the shared git directory a linked worktree borrows its remotes from.
-function resolve_git_directory(repository_path: string): string | undefined {
+// A work tree's own git directory: `.git` itself, or the one its `.git` file points at — for a linked
+// worktree `<main>/.git/worktrees/<name>`, whose name git suffixes on a collision.
+function own_git_directory(repository_path: string): string | undefined {
 	const candidate = path.join(repository_path, GIT_DIRECTORY)
 	if (!existsSync(candidate)) return undefined
 
 	try {
 		if (statSync(candidate).isDirectory()) return candidate
-		const linked = follow_git_file(repository_path, candidate)
 
-		return linked === undefined ? undefined : resolve_common_directory(linked)
+		return follow_git_file(repository_path, candidate)
 	} catch {
 		return undefined
 	}
 }
 
+// The directory holding the `config` for a work tree: `.git` itself, or — through a `.git` file and
+// then through `commondir` — the shared git directory a linked worktree borrows its remotes from.
+function resolve_git_directory(repository_path: string): string | undefined {
+	const own = own_git_directory(repository_path)
+
+	return own === undefined ? undefined : resolve_common_directory(own)
+}
+
 const git_directory = {
 	GIT_DIRECTORY,
+	own_git_directory,
 	resolve_git_directory,
 }
 
