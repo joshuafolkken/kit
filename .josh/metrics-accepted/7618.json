@@ -1,7 +1,0 @@
-{
-	"reason": "read_pull_by_etag: the ETag-layer pull read for merged_at/body readers, kept apart from the merge-gate read_pull (#7618)",
-	"date": "2026-11-15",
-	"growth": {
-		"scripts.code_lines": 5
-	}
-}

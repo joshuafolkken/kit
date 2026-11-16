@@ -1,8 +1,0 @@
-{
-	"reason": "#7595 adds the recording command table to lane:stats (new lane-record-command-stats module)",
-	"date": "2026-11-15",
-	"growth": {
-		"scripts.code_lines": 91,
-		"prose.long_paragraphs": 1
-	}
-}

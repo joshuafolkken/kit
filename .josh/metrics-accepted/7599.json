@@ -1,8 +1,0 @@
-{
-	"reason": "run:chain --accept-metrics wiring (#7599): the open-args parser and the accept path add code lines; the chain-rule pointer and usage lines add on-demand bytes",
-	"date": "2026-11-15",
-	"growth": {
-		"scripts.code_lines": 72,
-		"ai_cost.on_demand_bytes": 26
-	}
-}

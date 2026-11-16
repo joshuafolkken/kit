@@ -1,7 +1,0 @@
-{
-	"reason": "Splitting run-review-cli.ts into run-review-briefs.ts and run-review-open-refusal.ts adds each new module's imports and export object (#7598)",
-	"date": "2026-11-15",
-	"growth": {
-		"scripts.code_lines": 16
-	}
-}

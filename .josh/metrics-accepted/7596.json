@@ -1,7 +1,0 @@
-{
-	"reason": "lane:plan reads its size signals beside the gh listing (sized_listing), keeping a failed unused read from rejecting #7596",
-	"date": "2026-11-15",
-	"growth": {
-		"scripts.code_lines": 15
-	}
-}

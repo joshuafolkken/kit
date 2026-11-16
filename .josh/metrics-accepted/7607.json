@@ -1,7 +1,0 @@
-{
-	"reason": "The Codex hook adapter now prices the payload's own session_id instead of an inherited CODEX_THREAD_ID (#7607)",
-	"date": "2026-11-15",
-	"growth": {
-		"scripts.code_lines": 12
-	}
-}

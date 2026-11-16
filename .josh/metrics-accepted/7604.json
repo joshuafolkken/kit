@@ -1,7 +1,0 @@
-{
-	"reason": "test:reach --count mode (#7604): count-only output a premise line reads",
-	"date": "2026-11-15",
-	"growth": {
-		"scripts.code_lines": 18
-	}
-}
