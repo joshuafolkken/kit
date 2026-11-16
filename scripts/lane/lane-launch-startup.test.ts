@@ -96,15 +96,22 @@ it.each([
 	)
 })
 
-it('records a dependency refusal as waiting without changing the launch outcome', async () => {
-	josh_run.mockImplementation(async (argv: ReadonlyArray<string>) => ({
-		code: argv[0] === DISPATCH_COMMAND ? lane_dispatch_dependency.WAIT_EXIT_CODE : 0,
-		out: '/lane',
-	}))
-	await expect(launch()).resolves.toEqual({ kind: 'waiting' })
-	expect(run_startup_store.summarize(rows).at(-1)).toMatchObject({
-		start: { phase: DISPATCH },
-		status: 'waiting',
-		elapsed_ms: expect.any(Number),
-	})
-})
+// joshuafolkken/kit#7662: a cut-session refusal at lane:open waits on the stream, as a dispatch wait does.
+it.each([
+	[DISPATCH_COMMAND, DISPATCH],
+	['lane:open', CREATION],
+])(
+	'records a %s wait refusal as waiting without changing the launch outcome',
+	async (command, phase) => {
+		josh_run.mockImplementation(async (argv: ReadonlyArray<string>) => ({
+			code: argv[0] === command ? lane_dispatch_dependency.WAIT_EXIT_CODE : 0,
+			out: '/lane',
+		}))
+		await expect(launch()).resolves.toEqual({ kind: 'waiting' })
+		expect(run_startup_store.summarize(rows).at(-1)).toMatchObject({
+			start: { phase },
+			status: 'waiting',
+			elapsed_ms: expect.any(Number),
+		})
+	},
+)
