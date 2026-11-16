@@ -4,12 +4,15 @@ import { repo_party } from '#scripts/discovery/repo-party'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { stash_push_cli } from '#scripts/git/stash/stash-push-cli'
 import { cli_body_repository } from '#scripts/josh/cli-body-repository-fixture'
+import { session_language } from '#scripts/josh/session-language'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { issue_cite } from './issue-cite'
 import { issue_file_cli } from './issue-file-cli'
 import { session_cite } from './session-cite'
 import { upstream_interrupt_cli } from './upstream-interrupt-cli'
+import { upstream_interrupt_prose } from './upstream-interrupt-prose'
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
@@ -165,6 +168,7 @@ describe('josh upstream:interrupt filing and backlink', () => {
 	})
 
 	it('backlinks the filed reference under ## Upstream issues on the finder', async () => {
+		vi.stubEnv(session_language.ENV_KEY, 'ja')
 		await upstream_interrupt_cli.run(argv_for(FIRST_PARTY_REPO))
 
 		expect(vi.mocked(git_gh_command.issue_comment)).toHaveBeenCalledWith(
@@ -173,7 +177,9 @@ describe('josh upstream:interrupt filing and backlink', () => {
 			FIRST_PARTY_REPO,
 		)
 		expect(posted_body()).toContain('## Upstream issues\n\n- joshuafolkken/kit#9001')
-		expect(posted_body()).toContain(`pnpm josh stash:pop "${STASH_MESSAGE}"`)
+		const stopped = upstream_interrupt_prose.stopped(issue_cite.plain_for('github', FINDER))
+
+		expect(posted_body()).toContain(`${stopped} ${upstream_interrupt_prose.resume(STASH_MESSAGE)}`)
 	})
 })
 
@@ -208,11 +214,14 @@ describe('josh upstream:interrupt body file', () => {
 
 describe('josh upstream:interrupt to a third-party repository', () => {
 	it('files nothing and leaves the draft under ## Upstream candidate on the finder', async () => {
+		vi.stubEnv(session_language.ENV_KEY, 'ja')
 		const code = await upstream_interrupt_cli.run(argv_for(THIRD_PARTY_REPO))
 
 		expect(code).toBe(SUCCESS_EXIT_CODE)
 		expect(vi.mocked(issue_file_cli.file_issue)).not.toHaveBeenCalled()
-		expect(posted_body()).toContain('## Upstream candidate')
+		expect(posted_body()).toContain(
+			`## Upstream candidate\n\n${upstream_interrupt_prose.not_filed(THIRD_PARTY_REPO)}`,
+		)
 		expect(posted_body()).not.toContain('## Upstream issues')
 		expect(posted_body()).toContain(DRAFT)
 		expect(vi.mocked(telegram_notify.confirm)).toHaveBeenCalledTimes(1)
