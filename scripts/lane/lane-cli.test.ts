@@ -338,8 +338,8 @@ describe('lane:open cut-session guard', () => {
 		vi.spyOn(run_carry, 'read_carry').mockReturnValue({ kind: 'carried', carry: HANDED_OFF_CARRY })
 	})
 
-	it('refuses and exits non-zero without calling open_lane', async () => {
-		expect(await lane_cli.run(['open', ISSUE])).toBe(FAILURE)
+	it('refuses with the wait code without calling open_lane', async () => {
+		expect(await lane_cli.run(['open', ISSUE])).toBe(DEPENDENCY_WAIT_EXIT_CODE)
 		expect(vi.mocked(lane_open.open_lane)).not.toHaveBeenCalled()
 	})
 
@@ -361,8 +361,8 @@ describe('lane:dispatch cut-session guard', () => {
 		vi.spyOn(run_carry, 'read_carry').mockReturnValue({ kind: 'carried', carry: HANDED_OFF_CARRY })
 	})
 
-	it('refuses and exits non-zero without calling dispatch_child', async () => {
-		expect(await lane_cli.run(['dispatch', ISSUE])).toBe(FAILURE)
+	it('refuses with the wait code without calling dispatch_child', async () => {
+		expect(await lane_cli.run(['dispatch', ISSUE])).toBe(DEPENDENCY_WAIT_EXIT_CODE)
 		expect(vi.mocked(lane_dispatch.dispatch_child)).not.toHaveBeenCalled()
 	})
 })
