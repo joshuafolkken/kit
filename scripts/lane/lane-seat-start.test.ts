@@ -1,10 +1,12 @@
 import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { deferred_answer } from '#scripts/git/deferred-answer-fixture'
+import { process_identity } from '#scripts/josh/process-identity'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_registry, type LaneInfo } from './lane-registry'
 import { lane_seat } from './lane-seat'
+import { lane_seat_lock } from './lane-seat-lock'
 import { lane_seat_ownership } from './lane-seat-ownership'
 import { lane_seat_start } from './lane-seat-start'
 
@@ -20,6 +22,7 @@ const CONTENT = 'saved changes'
 const PREVIOUS_LOG = path.join(ROOT, 'previous.log')
 const LOCKS = '.seat-locks'
 const FAILURE = 'launch failed'
+const DEAD_PID = '4242'
 
 function lane(): LaneInfo {
 	return {
@@ -123,6 +126,22 @@ describe('failed lane seat starts', () => {
 	it('refuses an unknown process reading and leaves no reservation', async () => {
 		vi.mocked(lane_seat_ownership.snapshot).mockResolvedValue(undefined)
 		await expect(lane_seat_start.start(lane(), async () => undefined)).rejects.toThrow('process')
+		expect(readdirSync(path.join(LANES, LOCKS))).toEqual([])
+	})
+})
+
+describe('abandoned lane seat locks', () => {
+	it('reclaims the issue and seat locks a dead lane:open left behind', async () => {
+		for (const name of [`lane-${ISSUE}`, 'seat-1']) {
+			mkdirSync(path.join(LANES, LOCKS, name), { recursive: true })
+			writeFileSync(path.join(LANES, LOCKS, name, lane_seat_lock.OWNER_FILE), DEAD_PID)
+		}
+
+		vi.spyOn(process_identity, 'is_present_pid').mockReturnValue(false)
+		const lease = await lane_seat.reserve(LANES, ISSUE)
+
+		expect(lease?.seat).toBe(1)
+		if (lease !== undefined) lane_seat.release(lease)
 		expect(readdirSync(path.join(LANES, LOCKS))).toEqual([])
 	})
 })

@@ -1,0 +1,7 @@
+{
+	"reason": "Seat locks record their owner pid and reclaim a dead owner's lock (#7651)",
+	"date": "2026-11-16",
+	"growth": {
+		"scripts.code_lines": 44
+	}
+}
