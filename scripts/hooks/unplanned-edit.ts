@@ -37,7 +37,9 @@ async function notice(
 ): Promise<string | undefined> {
 	if (file === undefined || !is_unplanned(file, directory, source)) return undefined
 	const lines: Array<string> = []
-	const refused = await run_review_unplanned.refusal_to(directory, (line) => lines.push(line))
+	const refused = await run_review_unplanned.refusal_to(directory, (line) => {
+		lines.push(line)
+	})
 
 	return refused ?? lines[0]
 }
