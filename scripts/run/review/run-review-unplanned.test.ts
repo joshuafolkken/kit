@@ -80,6 +80,7 @@ describe('run_review_unplanned.refusal', () => {
 		expect(claims).toEqual([PLANNED, FREE_FILE])
 		expect(run_ship_planned.unplanned_of(claims, [PLANNED, FREE_FILE])).toEqual([])
 		expect(String(info.mock.calls[0]?.[0])).toContain(FREE_FILE)
+		expect(lane_plan.read(LANE, directory)?.widened_paths).toEqual([FREE_FILE])
 	})
 
 	it('stops on a holder before the review, naming it and the ways out, recording nothing', async () => {
@@ -100,7 +101,16 @@ describe('run_review_unplanned.refusal', () => {
 		expect(lane_plan.read(LANE, directory)?.paths).toEqual([PLANNED])
 	})
 
-	// joshuafolkken/kit#7640: the edit hook's stdout carries one JSON envelope, so it takes the line.
+	it('asks nothing when no file is unplanned', async () => {
+		read_unplanned.mockResolvedValue(undefined)
+
+		expect(await run_review_unplanned.refusal(directory)).toBeUndefined()
+		expect(fetch_opted_in).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#7640: the edit hook's stdout carries one JSON envelope, so it takes the line.
+describe('run_review_unplanned.refusal_to', () => {
 	it('hands the widening line to the given inform instead of the console', async () => {
 		found(FREE_FILE)
 		const inform = vi.fn()
@@ -108,13 +118,6 @@ describe('run_review_unplanned.refusal', () => {
 		expect(await run_review_unplanned.refusal_to(directory, inform)).toBeUndefined()
 		expect(String(inform.mock.calls[0]?.[0])).toContain(FREE_FILE)
 		expect(info).not.toHaveBeenCalled()
-	})
-
-	it('asks nothing when no file is unplanned', async () => {
-		read_unplanned.mockResolvedValue(undefined)
-
-		expect(await run_review_unplanned.refusal(directory)).toBeUndefined()
-		expect(fetch_opted_in).not.toHaveBeenCalled()
 	})
 })
 

@@ -63,7 +63,11 @@ function widened_of(found: Unplanned, directory: string): LanePlan | undefined {
 
 	return recorded === undefined
 		? undefined
-		: { ...recorded, paths: [...recorded.paths, ...found.files] }
+		: {
+				...recorded,
+				paths: [...recorded.paths, ...found.files],
+				widened_paths: [...(recorded.widened_paths ?? []), ...found.files],
+			}
 }
 
 async function refusal_to(directory: string, inform: Inform): Promise<string | undefined> {

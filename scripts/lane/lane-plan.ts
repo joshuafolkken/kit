@@ -39,6 +39,9 @@ const lane_plan_schema = z.object({
 	// Every path an earlier cleared plan of this lane held (joshuafolkken/kit#5672), so a re-plan that
 	// narrows `paths` keeps the files the lane already cleared and edited planned for the hunks axis.
 	cleared_paths: z.array(z.string()).optional(),
+	// The paths a widening added to `paths` after the plan (`run-review-unplanned.ts`, from the edit hook
+	// or `run:review`'s open), so the implement signals still count them as unplanned (joshuafolkken/kit#7640).
+	widened_paths: z.array(z.string()).optional(),
 })
 
 type LanePlan = z.infer<typeof lane_plan_schema>

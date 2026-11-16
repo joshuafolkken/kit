@@ -11,7 +11,8 @@ import { run_ship_planned } from '#scripts/run/ship/run-ship-planned'
 // check runs here, from the edit hook; a clear one widens the record, so the next edit of the file is
 // planned and asks nothing. A clash, oversize or unread answer widens nothing, so each asked file is
 // also noted in the lane's scratch and not asked again. `run:review`'s open and the ship's
-// `unplanned` preflight still check.
+// `unplanned` preflight still check. A Codex lane child goes without it: its PostToolUse adapter
+// (`codex-hook-adapter.ts`) runs the formatters alone, not `format-edited-file.ts`'s hook.
 
 interface Lane {
 	issue: number
