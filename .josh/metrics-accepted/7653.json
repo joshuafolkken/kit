@@ -1,7 +1,0 @@
-{
-	"reason": "Review fixes read a lane's git directory through its .git file and skip ended lanes, with tests for both",
-	"date": "2026-11-16",
-	"growth": {
-		"scripts.code_lines": 33
-	}
-}
