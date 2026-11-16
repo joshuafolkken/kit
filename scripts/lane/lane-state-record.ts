@@ -10,6 +10,8 @@ import { z } from 'zod'
 
 const STATE_SUFFIX = '.json'
 const DEPENDENCY_WAIT_COMMAND = 'lane:dependency-wait'
+// The `changed_by` of a lane no child was ever started in — `lane:dispatch` moves it on (`run-preflight.ts`).
+const OPEN_COMMAND = 'lane:open'
 // `as const` so the literal type survives export on `lane_state_record` (a bare const widens there).
 const HUMAN_REVIEW = 'human-review' as const
 const LANE_STATES = ['open', 'running', 'paused', HUMAN_REVIEW, 'ended'] as const
@@ -66,6 +68,7 @@ const lane_state_record = {
 	DEPENDENCY_WAIT_COMMAND,
 	HUMAN_REVIEW,
 	LANE_STATES,
+	OPEN_COMMAND,
 	STATE_SUFFIX,
 	is_idle,
 	read_record_file,

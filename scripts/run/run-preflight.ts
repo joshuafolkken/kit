@@ -4,6 +4,8 @@ import { git_stash } from '#scripts/git/stash/git-stash'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { session_cite } from '#scripts/issue/session-cite'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
+import { lane_state } from '#scripts/lane/lane-state'
+import { lane_state_record } from '#scripts/lane/lane-state-record'
 import { error_text } from '#scripts/lib/error-message'
 import { json_value } from '#scripts/lib/json-value'
 import { shell_quote } from '#scripts/lib/shell-quote'
@@ -398,8 +400,20 @@ async function has_commits_beyond(
 // so the lane checked out on the candidate is asked whether its tree is dirty, read the way
 // `run_hold` reads this tree (an unreadable status is dirty). A lane on another branch, or whose
 // directory is gone, holds nothing for this candidate.
+//
+// **Nor does a lane no child was ever started in** (joshuafolkken/kit#7657): a `lane:launch` that
+// failed after `lane:open` leaves its lane behind, dirty only with the parent's popped stash, and
+// reading that as a partial implementation sent the next `fullrun #N` to a lane being closed.
+async function is_never_started(issue: string): Promise<boolean> {
+	const record = await lane_state.read_state(issue)
+
+	return record?.state === 'open' && record.changed_by === lane_state_record.OPEN_COMMAND
+}
+
 async function is_held_dirty(name: string, lane: LaneInfo | undefined): Promise<boolean> {
-	if (lane?.branch !== name || lane.is_stranded) return false
+	if (lane?.branch !== name || lane.is_stranded || (await is_never_started(lane.issue))) {
+		return false
+	}
 
 	return await run_hold.is_tree_dirty(lane.directory)
 }

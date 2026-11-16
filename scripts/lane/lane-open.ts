@@ -16,6 +16,7 @@ import { lane_seat, type SeatReservation } from './lane-seat'
 import { lane_setup } from './lane-setup'
 import { lane_start_point } from './lane-start-point'
 import { lane_state } from './lane-state'
+import { lane_state_record } from './lane-state-record'
 
 // Opening a lane: one linked work tree, one branch, one port seed, and the dependencies to run in it.
 //
@@ -174,7 +175,11 @@ async function clear_the_way(
 
 // The lane's state record starts here, so no lane opened from now on is without one.
 async function opened(lane: LaneInfo): Promise<OpenOutcome> {
-	await lane_state.record_change({ issue: lane.issue, state: 'open', command: 'lane:open' })
+	await lane_state.record_change({
+		issue: lane.issue,
+		state: 'open',
+		command: lane_state_record.OPEN_COMMAND,
+	})
 
 	return { kind: 'opened', lane }
 }
