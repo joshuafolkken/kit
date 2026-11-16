@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { process_identity } from '#scripts/josh/process-identity'
 import { temporary_directory } from '#tools/test/temporary-directory'
@@ -10,6 +10,7 @@ const make_directory = temporary_directory('suite')
 const ROOT = make_directory('lane-seat-lock-')
 const LOCK = path.join(ROOT, '.seat-locks', 'seat-1')
 const OTHER_PID = '4242'
+const LONG_AGO = new Date('2026-01-01T00:00:00Z')
 
 function owner(): string {
 	return readFileSync(path.join(LOCK, lane_seat_lock.OWNER_FILE), 'utf8')
@@ -56,6 +57,17 @@ describe('seat lock claim', () => {
 		expect(presence).not.toHaveBeenCalled()
 	})
 
+	it('reclaims a lock left ownerless past the grace', () => {
+		held_by(undefined)
+		utimesSync(LOCK, LONG_AGO, LONG_AGO)
+
+		expect(lane_seat_lock.is_abandoned(LOCK)).toBe(true)
+		expect(lane_seat_lock.claim(LOCK)).toBe(true)
+		expect(owner()).toBe(String(process.pid))
+	})
+})
+
+describe('seat lock release', () => {
 	it('releases the lock with its owner', () => {
 		lane_seat_lock.claim(LOCK)
 		lane_seat_lock.release(LOCK)

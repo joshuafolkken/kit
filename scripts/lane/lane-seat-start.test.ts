@@ -144,4 +144,18 @@ describe('abandoned lane seat locks', () => {
 		if (lease !== undefined) lane_seat.release(lease)
 		expect(readdirSync(path.join(LANES, LOCKS))).toEqual([])
 	})
+
+	it('counts a live seat lock as an open in flight, but not a dead one', () => {
+		for (const [name, pid] of [
+			['seat-1', DEAD_PID],
+			['seat-2', String(process.pid)],
+		] as const) {
+			mkdirSync(path.join(LANES, LOCKS, name), { recursive: true })
+			writeFileSync(path.join(LANES, LOCKS, name, lane_seat_lock.OWNER_FILE), pid)
+		}
+
+		vi.spyOn(process_identity, 'is_present_pid').mockImplementation((pid) => pid === process.pid)
+
+		expect(lane_seat.open_in_flight_count(LANES)).toBe(1)
+	})
 })

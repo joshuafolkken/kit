@@ -29,10 +29,13 @@ function release(reservation: SeatReservation): void {
 	release_lock(reservation.issue_lock)
 }
 
+// A seat lock whose `lane:open` died is not an open in flight: no later open may come to reclaim it,
+// and counted it would keep `lane:prune` reading every unregistered entry as mid-open forever.
 function open_in_flight_count(root: string): number {
 	try {
-		return readdirSync(path.join(root, lane_paths.SEAT_LOCK_DIR)).filter((entry) =>
-			entry.startsWith(SEAT_LOCK_PREFIX),
+		return readdirSync(path.join(root, lane_paths.SEAT_LOCK_DIR)).filter(
+			(entry) =>
+				entry.startsWith(SEAT_LOCK_PREFIX) && !lane_seat_lock.is_abandoned(lock_path(root, entry)),
 		).length
 	} catch {
 		return 0
