@@ -148,7 +148,8 @@ async function lane_directory(issue: string): Promise<JoshResult> {
 	return await josh_command.josh_run(['lane:open', issue], should_forward_stderr)
 }
 
-function dispatch_edge(value: JoshResult): 'done' | 'failed' | 'waiting' {
+// The wait code is a dependency wait or a cut-session refusal: neither is a failed launch.
+function wait_edge(value: JoshResult): 'done' | 'failed' | 'waiting' {
 	if (value.code === lane_dispatch_dependency.WAIT_EXIT_CODE) return 'waiting'
 
 	return value.code === SUCCESS_EXIT_CODE ? 'done' : 'failed'
@@ -161,7 +162,7 @@ async function dispatch(context: LaunchContext): Promise<LaunchOutcome> {
 		'worker dispatch',
 		async () =>
 			await josh_command.josh_run(['lane:dispatch', context.issue], should_forward_stderr),
-		{ edge_of: dispatch_edge },
+		{ edge_of: wait_edge },
 	)
 
 	if (dispatched.code === lane_dispatch_dependency.WAIT_EXIT_CODE) {
@@ -175,13 +176,14 @@ async function dispatch(context: LaunchContext): Promise<LaunchOutcome> {
 	return { kind: 'launched', pid: dispatched.out }
 }
 
-// The CLI and driver share this chain, including retryable dependency refusals.
+// The CLI and driver share this chain, including retryable dependency and cut-session refusals.
 async function launch_admitted(context: LaunchContext): Promise<LaunchOutcome> {
 	const opened = await run_startup.phase(
 		'lane creation',
 		async () => await lane_directory(context.issue),
-		{ edge_of: (value) => (value.code === SUCCESS_EXIT_CODE ? 'done' : 'failed') },
+		{ edge_of: wait_edge },
 	)
+	if (opened.code === lane_dispatch_dependency.WAIT_EXIT_CODE) return { kind: 'waiting' }
 	if (opened.code !== SUCCESS_EXIT_CODE) return refused('unopened', opened)
 	const prepared = await prepare(context, opened.out)
 	if (prepared.code !== SUCCESS_EXIT_CODE) return refused('failed', prepared)

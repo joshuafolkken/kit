@@ -58,6 +58,7 @@ function report_usage(): number {
 
 // Read the carry record and refuse if this session has already handed off its budget via `--cut`.
 // A cut session must not open new lanes or dispatch new children — the successor owns the budget.
+// The refusal exits with the wait code: the successor re-offers the issue, so it is not a failed launch.
 async function guard_cut_session(): Promise<string | undefined> {
 	const directory = await run_carry.repository_directory()
 
@@ -181,7 +182,7 @@ async function open_command(rest: ReadonlyArray<string>): Promise<number> {
 	if (refused !== undefined) {
 		console.error(refused)
 
-		return FAILURE_EXIT_CODE
+		return lane_dispatch_dependency.WAIT_EXIT_CODE
 	}
 
 	return report_open(await lane_open.open_lane(issue))
@@ -382,7 +383,7 @@ async function dispatch_command(rest: ReadonlyArray<string>): Promise<number> {
 	if (refused !== undefined) {
 		console.error(refused)
 
-		return FAILURE_EXIT_CODE
+		return lane_dispatch_dependency.WAIT_EXIT_CODE
 	}
 
 	return await report_dispatch(await lane_dispatch.dispatch_child(issue), issue)

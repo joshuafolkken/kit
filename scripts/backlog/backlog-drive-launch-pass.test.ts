@@ -180,3 +180,16 @@ describe('backlog_drive.run_pass — a refused launch is parked run:stalled', ()
 		expect(calls.filter((call) => call.startsWith('stall'))).toStrictEqual([])
 	})
 })
+
+// joshuafolkken/kit#7662: a cut-session refusal is a wait for the successor, not a failed launch.
+describe('backlog_drive.run_pass — a launch that waits', () => {
+	it('parks nothing for a launch that answers waiting', async () => {
+		const { ports, calls } = harness({ offers: [offer('run', [OFFERED])] })
+
+		vi.spyOn(ports, 'launch').mockResolvedValue('waiting')
+		const result = await backlog_drive.run_pass(state(), true, ports)
+
+		expect(result.kind).toBe('continue')
+		expect(calls.filter((call) => call.startsWith('stall'))).toStrictEqual([])
+	})
+})
