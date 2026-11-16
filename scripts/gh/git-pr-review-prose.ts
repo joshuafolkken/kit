@@ -13,6 +13,9 @@ interface Prose {
 	unreadable_ai: string
 	unreadable_cr: string
 	ignore_alternative: string
+	unresolved: string
+	fix_findings: string
+	reread: string
 }
 
 const IGNORE_COMMAND = '`pnpm josh followup --ai-review-ignore-reason "<reason>"`'
@@ -30,6 +33,9 @@ const EN: Prose = {
 	unreadable_cr:
 		'CodeRabbit line comments could not be read; unresolved findings were not checked (kit#753).',
 	ignore_alternative: `Re-run ${IGNORE_COMMAND} if the gate does not apply`,
+	unresolved: 'AI reviewer findings remain unresolved.',
+	fix_findings: 'Fix the findings and re-run `pnpm josh followup`',
+	reread: 'Re-run `pnpm josh followup` once the comments can be read',
 }
 
 const JA: Prose = {
@@ -45,6 +51,9 @@ const JA: Prose = {
 	unreadable_cr:
 		'CodeRabbit の行コメントを読めなかったので、未解決の指摘を確かめていない (kit#753)。',
 	ignore_alternative: `ゲートが当てはまらないなら ${IGNORE_COMMAND} を再実行する`,
+	unresolved: 'AI レビューの指摘が未解決のまま残っている。',
+	fix_findings: '指摘を直して `pnpm josh followup` を再実行する',
+	reread: 'コメントを読めるようになってから `pnpm josh followup` を再実行する',
 }
 
 function prose_of(): Prose {
@@ -81,12 +90,29 @@ function ignore_alternative(): string {
 	return prose_of().ignore_alternative
 }
 
+// The confirmation an AI-review stop sends: its heading and the recommended choice, in the language
+// of the body and the alternative beside them.
+function unresolved(): string {
+	return prose_of().unresolved
+}
+
+function fix_findings(): string {
+	return prose_of().fix_findings
+}
+
+function reread(): string {
+	return prose_of().reread
+}
+
 const git_pr_review_prose = {
 	ignore_comment,
 	with_reason,
 	unreadable_ai,
 	unreadable_cr,
 	ignore_alternative,
+	unresolved,
+	fix_findings,
+	reread,
 }
 
 export type { Reviewer }

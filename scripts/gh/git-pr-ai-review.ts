@@ -60,7 +60,7 @@ function log_info_findings(infos: ReadonlyArray<ClassifiedFinding>): Array<strin
 }
 
 function build_ai_review_blocker_body(blockers: ReadonlyArray<ClassifiedFinding>): string {
-	const lines = ['AI reviewer findings remain unresolved.', '']
+	const lines = [git_pr_review_prose.unresolved(), '']
 
 	for (const blocker of blockers) {
 		lines.push(format_ai_review_finding(blocker))
@@ -100,7 +100,7 @@ async function handle_blockers(input: {
 	await git_pr_confirmation.notify_confirmation({
 		context: input.context,
 		body,
-		recommended: 'Fix the findings and re-run `pnpm josh followup`',
+		recommended: git_pr_review_prose.fix_findings(),
 		alternatives: [git_pr_review_prose.ignore_alternative()],
 	})
 
@@ -125,7 +125,7 @@ async function confirm_unreadable_stop(context: TelegramContext): Promise<void> 
 	await git_pr_confirmation.notify_confirmation({
 		context,
 		body: git_pr_review_prose.unreadable_ai(),
-		recommended: 'Re-run `pnpm josh followup` once the comments can be read',
+		recommended: git_pr_review_prose.reread(),
 		alternatives: [git_pr_review_prose.ignore_alternative()],
 	})
 }

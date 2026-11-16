@@ -46,9 +46,15 @@ const AI_IGNORED = 'AI レビューの指摘の一部を、意図して未解決
 const AI_UNREADABLE = 'AI レビューのコメントを読めなかった'
 const CR_UNREADABLE = 'CodeRabbit の行コメントを読めなかった'
 const JA_REASON = `理由: ${REASON}`
+const AI_UNRESOLVED = 'AI レビューの指摘が未解決のまま残っている。'
+const IGNORE_ALTERNATIVE = 'ゲートが当てはまらないなら'
 
 function posted(): string {
 	return String(mocked_pr_comment.mock.calls[0]?.[1])
+}
+
+function notified(): string {
+	return JSON.stringify(vi.mocked(telegram_notify.send_or_report).mock.calls)
 }
 
 beforeEach(() => {
@@ -74,10 +80,10 @@ describe('the AI review gate in a ja session', () => {
 		vi.mocked(git_gh_command.pr_get_comments).mockResolvedValue(JSON.stringify([AI_BLOCKER]))
 		const input = { branch_name: BRANCH, ignore_reason: undefined, context: CONTEXT }
 
-		await expect(handle_ai_review_findings(input)).rejects.toThrow()
-		expect(JSON.stringify(vi.mocked(telegram_notify.send_or_report).mock.calls)).toContain(
-			'ゲートが当てはまらないなら',
-		)
+		await expect(handle_ai_review_findings(input)).rejects.toThrow(AI_UNRESOLVED)
+		expect(notified()).toContain(AI_UNRESOLVED)
+		expect(notified()).toContain('指摘を直して')
+		expect(notified()).toContain(IGNORE_ALTERNATIVE)
 	})
 })
 
@@ -87,9 +93,9 @@ describe('the AI review gate in a ja session — comments that cannot be read', 
 		const input = { branch_name: BRANCH, ignore_reason: undefined, context: CONTEXT }
 
 		await expect(handle_ai_review_findings(input)).rejects.toThrow(AI_UNREADABLE)
-		expect(JSON.stringify(vi.mocked(telegram_notify.send_or_report).mock.calls)).toContain(
-			AI_UNREADABLE,
-		)
+		expect(notified()).toContain(AI_UNREADABLE)
+		expect(notified()).toContain('コメントを読めるようになってから')
+		expect(notified()).toContain(IGNORE_ALTERNATIVE)
 	})
 
 	it('records an ignore reason in Japanese when the comments cannot be read', async () => {
