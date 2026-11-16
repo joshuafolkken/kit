@@ -1,0 +1,9 @@
+{
+	"reason": "#7665 adds the session-language note to the review-round comment and states the comment-language rule in overview.md, as the Issue asks",
+	"date": "2026-11-16",
+	"growth": {
+		"scripts.code_lines": 7,
+		"rules.lines": 1,
+		"ai_cost.on_demand_bytes": 183
+	}
+}
