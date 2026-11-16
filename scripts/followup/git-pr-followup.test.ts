@@ -1,4 +1,4 @@
-import { UNREADABLE_CR_NOTE } from '#scripts/gh/git-pr-coderabbit'
+import { session_language } from '#scripts/josh/session-language'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
 	build_issue_url,
@@ -135,7 +135,10 @@ function setup_run_mocks(): void {
 	vi.mocked(git_gh_command.pr_merge).mockResolvedValue()
 }
 
+const UNREADABLE_CR_NOTE = 'CodeRabbit line comments could not be read'
+
 function setup_skip_policy_mocks(): void {
+	vi.stubEnv(session_language.ENV_KEY, 'en')
 	silence_warnings()
 	setup_run_mocks()
 }
