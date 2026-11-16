@@ -5451,3 +5451,31 @@
 - rb:2026-11-15 | #7620
 - rf:comments | low | scripts/gh/git-gh-pr-auto-merge.test.ts:22 | 2026-11-15 | #7620 | fixed
 - rx:{"round":"d8fd7149-f76a-40de-8e19-3e6bbc392260","category":"comments","severity":"low","file":"scripts/gh/git-gh-pr-auto-merge.test.ts:22","disposition":"fixed","description":"The new mock comment runs into the #2497 paragraph with no blank line (also git-gh-pr-merge.test.ts:34).","status":"resolved"}
+- rf:none | none | - | 2026-11-16 | #7635
+- rf:none | none | - | 2026-11-16 | #7638
+- rb:2026-11-16 | #7638
+- rf:bug-risks | low | tools/test/test-network-guard.ts:311 | 2026-11-16 | #7638 | fixed
+- rx:{"round":"636dae55-9018-48e4-aff4-73be8050c940","category":"bug-risks","severity":"low","file":"tools/test/test-network-guard.ts:311","disposition":"fixed","description":"recorded_call splits on the first tab, so a tab inside a recorded command's arguments names the wrong test file; split on the last separator.","status":"resolved"}
+- rf:none | none | - | 2026-11-16 | #7639
+- rb:2026-11-16 | #7639
+- rf:project-conventions | low | scripts/lane/lane-sinks.ts:189 | 2026-11-16 | #7639 | fixed
+- rf:tests | low | scripts/lane/lane-sinks.test.ts:35 | 2026-11-16 | #7639 | fixed
+- rx:{"round":"8c6d8088-e419-447d-9b76-504ef6f6eb84","category":"project-conventions","severity":"low","file":"scripts/lane/lane-sinks.ts:189","disposition":"fixed","description":"FullReach is exported but no module imports it.","status":"resolved"}
+- rx:{"round":"8c6d8088-e419-447d-9b76-504ef6f6eb84","category":"tests","severity":"low","file":"scripts/lane/lane-sinks.test.ts:35","disposition":"fixed","description":"the widest-reach case lists the narrower reach first, so a last-write-wins mutation of Math.max still passes.","status":"resolved"}
+- ri:bug-risks | low | docs/josh-commands-lane.md:251 | 2026-11-16 | #7639 | fixed
+- rf:bug-risks | medium | scripts/lane/lane-implement-signals-record.ts:29 | 2026-11-16 | #7640
+- rf:comments | low | scripts/hooks/codex-hook-adapter.ts:136 | 2026-11-16 | #7640
+- ri:bug-risks | medium | scripts/hooks/format-edited-file.ts:478 | 2026-11-16 | #7640 | fixed
+- ri:bug-risks | medium | scripts/lane/lane-implement-signals-record.ts:29 | 2026-11-16 | #7640 | fixed
+- ri:performance | low | scripts/hooks/unplanned-edit.ts:40 | 2026-11-16 | #7640 | fixed
+- ri:comments | low | scripts/hooks/codex-hook-adapter.ts:136 | 2026-11-16 | #7640 | fixed
+- rb:2026-11-16 | #7640
+- rf:bug-risks | medium | scripts/hooks/format-edited-file.ts:478 | 2026-11-16 | #7640 | fixed
+- rf:performance | low | scripts/hooks/unplanned-edit.ts:38 | 2026-11-16 | #7640 | fixed
+- rx:{"round":"2f5c20a7-fb61-4a92-b216-f4fe83d5850e","category":"bug-risks","severity":"medium","file":"scripts/hooks/format-edited-file.ts:478","disposition":"fixed","description":"The unguarded unplanned_edit.notice promise can reject (extend/oversize_of rethrow) during the format await, crashing the hook and losing the lint, spelling and density context; catch inside notice and return undefined.","status":"resolved"}
+- rx:{"round":"2f5c20a7-fb61-4a92-b216-f4fe83d5850e","category":"performance","severity":"low","file":"scripts/hooks/unplanned-edit.ts:38","disposition":"fixed","description":"A clash, unread or oversize answer records no widening, so each later unplanned edit repeats the gh listing and signals walk.","status":"resolved"}
+- rb:2026-11-16 | #7640
+- rf:bug-risks | medium | scripts/lane/lane-implement-signals-record.ts:29 | 2026-11-16 | #7640 | fixed
+- rf:comments | low | scripts/hooks/codex-hook-adapter.ts:136 | 2026-11-16 | #7640 | fixed
+- rx:{"round":"c4fc1571-74bd-4a62-8a6e-765ff8458ec3","previous":"9b1b209b-0bd3-4eb3-9e23-1362350ef8e3","category":"bug-risks","severity":"medium","file":"scripts/lane/lane-implement-signals-record.ts:29","disposition":"fixed","description":"round 1 finding not closed (no change to this file or its readers in the fix delta): the edit hook still widens the recorded plan (run-review-unplanned.ts widened_of, then lane_plan_probe.extend → record_cleared) before the gate, so planned_paths reads the lane unplanned file as planned, counts_of reports unplanned=0 and lane:why never names plan divergence; keep the original paths apart from the widened ones and count the widened as unplanned — other sites: scripts/run/review/run-review-unplanned.ts:66, scripts/lane/lane-implement-signals.ts:98","status":"resolved"}
+- rx:{"round":"c4fc1571-74bd-4a62-8a6e-765ff8458ec3","previous":"9b1b209b-0bd3-4eb3-9e23-1362350ef8e3","category":"comments","severity":"low","file":"scripts/hooks/codex-hook-adapter.ts:136","disposition":"fixed","description":"round 1 finding not closed: Codex PostToolUse calls format_edited_payload and skips run_hook, so a Codex lane child never gets the edit-time lane:plan check, and no comment in format-edited-file.ts:473 or unplanned-edit.ts says so (no failure scenario beyond the missed early notice — ship-time and run:review-open checks still run); name the gap in the unplanned-edit.ts header comment","status":"resolved"}
