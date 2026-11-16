@@ -1,0 +1,7 @@
+{
+	"reason": "A single run that resumes a lane now takes a marked hold there and the board reads that lane hold from the root checkout (#7653)",
+	"date": "2026-11-16",
+	"growth": {
+		"scripts.code_lines": 25
+	}
+}

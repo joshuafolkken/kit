@@ -1,4 +1,5 @@
 import { lane_paths } from '#scripts/lane/lane-paths'
+import { lane_state, type LaneStateRecord } from '#scripts/lane/lane-state'
 import { run_carry, type CarryRead } from '#scripts/run/carry/run-carry'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_hold, type HoldRead, type RunHold } from '#scripts/run/hold/run-hold'
@@ -20,8 +21,14 @@ const FULLRUN_12 = 'fullrun #12'
 const CHILD_LAUNCH = 'child-launch'
 const HOLD: RunHold = { issue: String(ISSUE), taken_at: TAKEN_AT, pid: 1 }
 
+const FREE: HoldRead = { kind: 'free' }
+
 function held(hold: Partial<RunHold> = {}): HoldRead {
 	return { kind: 'held', hold: { ...HOLD, ...hold } }
+}
+
+function lane_record(issue: string): LaneStateRecord {
+	return { issue, state: 'running', changed_at: TAKEN_AT, changed_by: 'run:entry' }
 }
 
 afterEach(() => vi.restoreAllMocks())
@@ -128,6 +135,26 @@ describe('run_board_read.read_local for a single run', () => {
 			text: `#${String(ISSUE)} ${run_name}`,
 		})
 	})
+
+	// joshuafolkken/kit#7653: a single run that resumed a leftover lane holds the lane's tree, not this one.
+	it.each([
+		{ is_single_in_lane: true, run_name: FULLRUN },
+		{ is_single_in_lane: undefined, run_name: undefined },
+	])(
+		'reads a lane hold marked $is_single_in_lane as the run $run_name',
+		async ({ is_single_in_lane, run_name }) => {
+			arrange(NONE, undefined)
+			vi.spyOn(lane_state, 'read_records').mockResolvedValue([lane_record(String(ISSUE))])
+			// The root checkout's hold is read first and is free; the lane's is read next.
+			vi.spyOn(run_hold, 'read_hold')
+				.mockReturnValueOnce(FREE)
+				.mockReturnValueOnce(held({ is_fullrun: true, is_single_in_lane }))
+
+			const local = await run_board_read.read_local()
+
+			expect(local?.run_name).toBe(run_name)
+		},
+	)
 
 	it('reads no run with neither a hold nor a carry record', async () => {
 		arrange(NONE, undefined)
