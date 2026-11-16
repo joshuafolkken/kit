@@ -49,6 +49,15 @@ ignorePaths:
 words:
   - curlrc
   - mktemp
+  # The Linux stdout descriptor state and write error the publish pack step guards against
+  # (joshuafolkken/kit#7635), and the npm registry host and npm's registry-auth config option it
+  # names. Distributed, because `josh sync` copies `publish.yml` into a published consumer
+  # (joshuafolkken/kit#7682).
+  - fdinfo
+  - NONBLOCK
+  - EAGAIN
+  - npmjs
+  - userconfig
   # safe-chain's release asset name for its static Linux binary, which the distributed
   # `setup-pnpm` action fetches (joshuafolkken/kit#6849).
   - linuxstatic
