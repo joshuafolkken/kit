@@ -48,3 +48,19 @@ describe('lane_implement_signals_record.record', () => {
 		expect(emitted).toEqual([])
 	})
 })
+
+// joshuafolkken/kit#7640: the edit hook widens the plan before the gate; the widened files stay unplanned.
+describe('lane_implement_signals_record.declared_paths', () => {
+	it('holds the plan and its cleared history, less the files a widening added', () => {
+		const [planned, earlier, widened] = ['a.ts', 'earlier.ts', 'widened.ts']
+		const plan = {
+			issue: Number(ISSUE),
+			paths: [planned, widened],
+			cleared_paths: [earlier],
+			widened_paths: [widened],
+			planned_at: '2026-11-16T00:00:00Z',
+		}
+
+		expect(lane_implement_signals_record.declared_paths(plan)).toEqual([planned, earlier])
+	})
+})

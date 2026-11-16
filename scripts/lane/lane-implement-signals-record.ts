@@ -2,7 +2,7 @@ import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { lane_breakdown_implement } from './lane-breakdown-implement'
 import { lane_implement_signals } from './lane-implement-signals'
-import { lane_plan } from './lane-plan'
+import { lane_plan, type LanePlan } from './lane-plan'
 import type { ToolCall } from './lane-transcript-calls'
 import { lane_transcript_stats } from './lane-transcript-stats'
 
@@ -25,10 +25,18 @@ function lane_calls(issue: number): ReadonlyArray<ToolCall> {
 	return lane_transcript_stats.read_calls(directories, { since_ms: 0, until_ms: Date.now() })
 }
 
+// A widening runs from the edit hook before the gate (joshuafolkken/kit#7640), so the files it added
+// are left out: they stay unplanned for the signals.
+function declared_paths(plan: LanePlan): ReadonlyArray<string> {
+	const widened = new Set(plan.widened_paths)
+
+	return [...plan.paths, ...(plan.cleared_paths ?? [])].filter((file) => !widened.has(file))
+}
+
 function planned_paths(issue: number): ReadonlyArray<string> {
 	const plan = lane_plan.read(issue, process.cwd())
 
-	return [...(plan?.paths ?? []), ...(plan?.cleared_paths ?? [])]
+	return plan === undefined ? [] : declared_paths(plan)
 }
 
 const STREAM_IO: SignalsIo = {
@@ -50,7 +58,7 @@ async function record(issue: string, io: SignalsIo = STREAM_IO): Promise<void> {
 	await io.emit(lane_implement_signals.KIND, lane_implement_signals.text_of(issue, signals))
 }
 
-const lane_implement_signals_record = { record }
+const lane_implement_signals_record = { declared_paths, record }
 
 export { lane_implement_signals_record }
 export type { SignalsIo }

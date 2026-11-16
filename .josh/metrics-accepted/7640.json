@@ -1,0 +1,7 @@
+{
+	"reason": "Edit-time lane:plan probe hook (#7640): new unplanned-edit hook, its once-per-file asked record, the refusal sink seam, and widened_paths kept apart for the implement signals",
+	"date": "2026-11-16",
+	"growth": {
+		"scripts.code_lines": 85
+	}
+}
