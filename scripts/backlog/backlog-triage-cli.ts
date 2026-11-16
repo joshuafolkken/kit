@@ -7,6 +7,7 @@ import { NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { issue_run_verdict } from '#scripts/issue/issue-run-verdict'
 import { session_cite } from '#scripts/issue/session-cite'
+import { session_language } from '#scripts/josh/session-language'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { error_text } from '#scripts/lib/error-message'
 import { run_park } from '#scripts/run/park/run-park'
@@ -154,6 +155,17 @@ function verdict_of(request: TriageRequest, cite: (issue: string) => string): st
 	return [...label_part, ...blocker_part, ...unblock_part].join(' · ')
 }
 
+// The comment's lead follows the session language; the verdict and the answers line stay English,
+// since the session line and `issue:file` share them.
+const ENGLISH_TRIAGED_BY = 'triaged by backlogrun'
+const JAPANESE_TRIAGED_BY = 'backlogrun によるトリアージ'
+
+function triaged_by(): string {
+	const { lang } = session_language.resolve_session_lang()
+
+	return session_language.is_japanese(lang) ? JAPANESE_TRIAGED_BY : ENGLISH_TRIAGED_BY
+}
+
 function github_cite(issue: string): string {
 	return issue_cite.plain_for('github', issue)
 }
@@ -163,7 +175,7 @@ async function comment(request: TriageRequest): Promise<boolean> {
 		await git_gh_command.issue_comment(
 			request.issue,
 			issue_run_verdict.comment_with_answers(
-				`triaged by backlogrun: ${verdict_of(request, github_cite)}\n\n${request.reason}`,
+				`${triaged_by()}: ${verdict_of(request, github_cite)}\n\n${request.reason}`,
 				request.answers,
 			),
 		)

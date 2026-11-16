@@ -7,6 +7,7 @@ import {
 	type MeasureVerdict,
 } from '#scripts/issue/measure-declaration'
 import { trusted_measure, type CommandRun, type TrustedBody } from '#scripts/issue/trusted-measure'
+import { session_language } from '#scripts/josh/session-language'
 import { lane_value_missing } from '#scripts/lane/lane-value-missing'
 import { error_text } from '#scripts/lib/error-message'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
@@ -27,11 +28,48 @@ const FENCE = '```'
 // A drive's verdict: the declaration's own, or no sample to judge yet.
 type DriveVerdict = MeasureVerdict | { kind: 'unsampled' }
 
-const VERDICT_WORDS: Readonly<Record<DriveVerdict['kind'], string>> = {
-	pass: 'within the bound, so the issue is closed without a lane.',
-	fail: 'out of the bound, so the issue goes to a lane.',
-	unreadable: 'no value could be read from the output, so the issue goes to a lane.',
-	unsampled: 'sample condition not met — no sample to read yet, so the issue waits without a lane.',
+// The result comment's prose, one table per session language. `sample condition not met` stays in
+// English in both: the docs and the `sample-wait` event name the comment by it.
+interface ReportWords {
+	lead: string
+	declaration: string
+	value: string
+	verdict: string
+	verdicts: Readonly<Record<DriveVerdict['kind'], string>>
+}
+
+const ENGLISH_REPORT_WORDS: ReportWords = {
+	lead: '`backlog:drive` ran the measurement declaration.',
+	declaration: 'Declaration',
+	value: 'Value',
+	verdict: 'Verdict',
+	verdicts: {
+		pass: 'within the bound, so the issue is closed without a lane.',
+		fail: 'out of the bound, so the issue goes to a lane.',
+		unreadable: 'no value could be read from the output, so the issue goes to a lane.',
+		unsampled:
+			'sample condition not met — no sample to read yet, so the issue waits without a lane.',
+	},
+}
+
+const JAPANESE_REPORT_WORDS: ReportWords = {
+	lead: '`backlog:drive` が計測宣言を実行しました。',
+	declaration: '宣言',
+	value: '値',
+	verdict: '判定',
+	verdicts: {
+		pass: '範囲内のため、レーンを使わずに Issue を閉じます。',
+		fail: '範囲外のため、Issue をレーンに渡します。',
+		unreadable: '出力から値を読めなかったため、Issue をレーンに渡します。',
+		unsampled:
+			'sample condition not met — 読む標本がまだ無いため、レーンを使わずに Issue を待たせます。',
+	},
+}
+
+function report_words(): ReportWords {
+	const { lang } = session_language.resolve_session_lang()
+
+	return session_language.is_japanese(lang) ? JAPANESE_REPORT_WORDS : ENGLISH_REPORT_WORDS
 }
 
 // What the drive does with the issue: closed by its declaration, waiting for a sample, or its lane.
@@ -78,16 +116,17 @@ function value_words(verdict: DriveVerdict): string {
 }
 
 // The result comment: the declaration, the value read, what follows and the command's own output.
-// Script-emitted, so English (`run-merge.ts` → `park_comment`).
+// The prose follows the session language; the declaration, value and output are data.
 function report(measurement: Measurement): string {
 	const { declaration, run, verdict } = measurement
+	const words = report_words()
 
 	return [
-		'`backlog:drive` ran the measurement declaration.',
+		words.lead,
 		'',
-		`- Declaration: ${measure_declaration.format(declaration)}`,
-		`- Value: ${value_words(verdict)}`,
-		`- Verdict: ${VERDICT_WORDS[verdict.kind]}`,
+		`- ${words.declaration}: ${measure_declaration.format(declaration)}`,
+		`- ${words.value}: ${value_words(verdict)}`,
+		`- ${words.verdict}: ${words.verdicts[verdict.kind]}`,
 		'',
 		FENCE,
 		trusted_measure.text_of(run),

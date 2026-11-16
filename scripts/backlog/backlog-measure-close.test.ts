@@ -1,31 +1,37 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { issue_measured_close } from '#scripts/issue/issue-measured-close'
 import { trusted_measure, type CommandRun } from '#scripts/issue/trusted-measure'
+import { session_language } from '#scripts/josh/session-language'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_measure_close } from './backlog-measure-close'
 
 // joshuafolkken/kit#4621: the drive runs a due issue's measurement declaration before it opens a lane.
-// The body read, the command, the GitHub writes and the event stream are mocked.
+// The body read, the command, the GitHub writes and the event stream are mocked. The mocks are hoisted,
+// so a module graph reloaded under another session language (`reloaded_under`) shares them.
 
-vi.mock('#scripts/issue/trusted-measure', () => ({
+const mocked = vi.hoisted(() => ({
 	trusted_measure: { read_trusted_body: vi.fn(), run_command: vi.fn(), text_of: vi.fn() },
-}))
-vi.mock('#scripts/issue/issue-measured-close', () => ({
 	issue_measured_close: { close: vi.fn() },
-}))
-vi.mock('#scripts/gh/git-gh-command', () => ({
 	git_gh_command: { issue_comment: vi.fn(), issue_get_body: vi.fn() },
-}))
-vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
 	run_event_stream_emit: { emit: vi.fn() },
+}))
+
+vi.mock('#scripts/issue/trusted-measure', () => ({ trusted_measure: mocked.trusted_measure }))
+vi.mock('#scripts/issue/issue-measured-close', () => ({
+	issue_measured_close: mocked.issue_measured_close,
+}))
+vi.mock('#scripts/gh/git-gh-command', () => ({ git_gh_command: mocked.git_gh_command }))
+vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
+	run_event_stream_emit: mocked.run_event_stream_emit,
 }))
 
 const ISSUE = '4599'
 const COMMAND = 'pnpm josh count'
 const DECLARED = '## 背景\n\n- 計測宣言: `pnpm josh count` <= 5\n'
-const UNREADABLE = 'Value: unreadable'
+const ENGLISH_DECLARED = '## Background\n\n- Measure declaration: `pnpm josh count` <= 5\n'
+const UNREADABLE = '値: unreadable'
 const UNSAMPLED = 'sample condition not met'
 const SINCE = 'since 2026-11-01T00:00:00.000Z'
 
@@ -49,15 +55,64 @@ beforeEach(() => {
 	vi.mocked(run_event_stream_emit.emit).mockReset().mockResolvedValue()
 })
 
+afterEach(() => {
+	vi.unstubAllEnvs()
+})
+
+// joshuafolkken/kit#7666: the comment's prose follows the session language; the value, the output
+// and `sample condition not met` do not. The declaration's keys are read in the language the module
+// graph loaded under (`measure-declaration.ts`), so each case reloads it under its language.
+async function reloaded_under(lang: string | undefined): Promise<typeof backlog_measure_close> {
+	vi.stubEnv(session_language.ENV_KEY, lang)
+	vi.resetModules()
+	const reloaded = await import('./backlog-measure-close')
+
+	return reloaded.backlog_measure_close
+}
+
+describe('backlog_measure_close.outcome — the session language', () => {
+	it.each([
+		['unset', undefined, DECLARED, '`backlog:drive` が計測宣言を実行しました。\n\n- 宣言: '],
+		['ja', 'ja', DECLARED, '- 値: 3\n- 判定: 範囲内のため、レーンを使わずに Issue を閉じます。'],
+		[
+			'en',
+			'en',
+			ENGLISH_DECLARED,
+			'- Value: 3\n- Verdict: within the bound, so the issue is closed without a lane.',
+		],
+	])('writes the result comment in the language of %s', async (_case, lang, body, prose) => {
+		const close = await reloaded_under(lang)
+
+		given(body, { kind: 'ok', output: '3' })
+
+		await close.outcome(ISSUE)
+
+		expect(issue_measured_close.close).toHaveBeenCalledWith(ISSUE, expect.stringContaining(prose))
+	})
+
+	it.each([
+		['ja', DECLARED],
+		['en', ENGLISH_DECLARED],
+	])('keeps the unmet sample condition in English under %s', async (lang, body) => {
+		const close = await reloaded_under(lang)
+
+		given(body, { kind: 'failed', message: `josh lane:value merges: no sample ${SINCE}` })
+
+		await expect(close.outcome(ISSUE)).resolves.toBe('wait')
+
+		expect(git_gh_command.issue_comment).toHaveBeenCalledWith(
+			ISSUE,
+			expect.stringContaining(UNSAMPLED),
+		)
+	})
+})
+
 describe('backlog_measure_close.outcome — a value within the bound', () => {
 	it('closes the issue and puts a measured event on the stream', async () => {
 		given(DECLARED, { kind: 'ok', output: '3' })
 
 		await expect(backlog_measure_close.outcome(ISSUE)).resolves.toBe('closed')
-		expect(issue_measured_close.close).toHaveBeenCalledWith(
-			ISSUE,
-			expect.stringContaining('Value: 3'),
-		)
+		expect(issue_measured_close.close).toHaveBeenCalledWith(ISSUE, expect.stringContaining('値: 3'))
 		expect(run_event_stream_emit.emit).toHaveBeenCalledWith(
 			run_event_stream.EVENT_KIND.MEASURED,
 			`#${ISSUE} measured by backlog:drive: 3 <= 5`,
@@ -75,7 +130,7 @@ describe('backlog_measure_close.outcome — a value within the bound', () => {
 
 describe('backlog_measure_close.outcome — handed to the lane with the result', () => {
 	it.each([
-		['a value out of bound', { kind: 'ok', output: '9' }, 'Value: 9'],
+		['a value out of bound', { kind: 'ok', output: '9' }, '値: 9'],
 		['output that is not one number', { kind: 'ok', output: 'nine' }, UNREADABLE],
 		['a failed command', { kind: 'failed', message: 'exit 1' }, UNREADABLE],
 	] as const)('comments %s and launches', async (_case, run, value) => {
