@@ -185,9 +185,11 @@ describe('lane_stray.describe', () => {
 		expect(line).toMatch(/^Kept \/l\/x\.txt: not a name/u)
 	})
 
-	it('names the seat locks a crashed lane:open leaves, so a stale lock is not waited on forever', () => {
+	it('names the seat locks a crashed lane:open leaves, without asking a person to remove them', () => {
 		const line = lane_stray.describe({ path: '/l/3400', verdict: 'opening', foreign: [] })
 
 		expect(line).toContain(lane_paths.SEAT_LOCK_DIR)
+		expect(line).toContain('reclaimed by the next `lane:open`')
+		expect(line).not.toContain('remove')
 	})
 })

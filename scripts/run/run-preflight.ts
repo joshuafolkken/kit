@@ -4,6 +4,8 @@ import { git_stash } from '#scripts/git/stash/git-stash'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { session_cite } from '#scripts/issue/session-cite'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
+import { lane_state } from '#scripts/lane/lane-state'
+import { lane_state_record } from '#scripts/lane/lane-state-record'
 import { error_text } from '#scripts/lib/error-message'
 import { json_value } from '#scripts/lib/json-value'
 import { shell_quote } from '#scripts/lib/shell-quote'
@@ -82,6 +84,8 @@ const CLEAN_REASON =
 	'Nothing was left behind: the tree is clean, HEAD is on the default branch, and this issue has no pull request and no branch holding work.'
 
 const CLEAN_ADVICE = 'Start the child.'
+
+const ASK_AGAIN = 'Then ask this command again: it takes the hold there.'
 
 const RESUME_ADVICE =
 	'Reuse the branch and run the whole verification gate from the start — refactor, `pnpm josh gate`, `/code-review` — never only the part the interrupted run had not reached. Nobody verified what it already committed.'
@@ -213,20 +217,19 @@ function reclaim_advice(tree: TreeState, issue: string): string {
 // **`resume` names the one command that leads to a hold.** Switched onto the branch, the same ask
 // answers `clean` and takes the hold, so the caller never alternates between `resume` and `reclaim`.
 // A branch an open lane has checked out cannot be switched to here, so that lane's directory is named.
+// Either way the run asks again where the branch is: a run resumed without that ask holds nothing and
+// carries no `in-progress`, so neither the board nor `run:progress` sees it (joshuafolkken/kit#7653).
 function resume_steps(child: ChildState): Array<string> {
 	if (child.lane_directory !== undefined) {
 		return [
 			`cd ${shell_quote.word(child.lane_directory)}`,
-			'Resume in that lane worktree, where the branch is checked out; keep its directory.',
+			`Resume in that lane worktree, where the branch is checked out; keep its directory. ${ASK_AGAIN}`,
 		]
 	}
 
 	if (child.branch_name === undefined) return []
 
-	return [
-		`git switch ${shell_quote.word(child.branch_name)}`,
-		'Then ask this command again: it takes the hold there.',
-	]
+	return [`git switch ${shell_quote.word(child.branch_name)}`, ASK_AGAIN]
 }
 
 function resume_advice(child: ChildState): string {
@@ -397,8 +400,20 @@ async function has_commits_beyond(
 // so the lane checked out on the candidate is asked whether its tree is dirty, read the way
 // `run_hold` reads this tree (an unreadable status is dirty). A lane on another branch, or whose
 // directory is gone, holds nothing for this candidate.
+//
+// **Nor does a lane no child was ever started in** (joshuafolkken/kit#7657): a `lane:launch` that
+// failed after `lane:open` leaves its lane behind, dirty only with the parent's popped stash, and
+// reading that as a partial implementation sent the next `fullrun #N` to a lane being closed.
+async function is_never_started(issue: string): Promise<boolean> {
+	const record = await lane_state.read_state(issue)
+
+	return record?.state === 'open' && record.changed_by === lane_state_record.OPEN_COMMAND
+}
+
 async function is_held_dirty(name: string, lane: LaneInfo | undefined): Promise<boolean> {
-	if (lane?.branch !== name || lane.is_stranded) return false
+	if (lane?.branch !== name || lane.is_stranded || (await is_never_started(lane.issue))) {
+		return false
+	}
 
 	return await run_hold.is_tree_dirty(lane.directory)
 }

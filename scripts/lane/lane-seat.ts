@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs'
+import { existsSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import { ENV_FILE_NAME } from '#ports'
 import { session_cite } from '#scripts/issue/session-cite'
@@ -6,6 +6,7 @@ import { file_reader } from '#scripts/lib/read-file'
 import { lane_environment } from './lane-environment'
 import { lane_paths } from './lane-paths'
 import { lane_registry, type LaneInfo } from './lane-registry'
+import { lane_seat_lock } from './lane-seat-lock'
 import { lane_seat_ownership } from './lane-seat-ownership'
 import { lane_seed_policy } from './lane-seed'
 
@@ -21,34 +22,23 @@ function lock_path(root: string, name: string): string {
 	return path.join(root, lane_paths.SEAT_LOCK_DIR, name)
 }
 
-function release_lock(lock: string): void {
-	rmSync(lock, { recursive: true, force: true })
-}
+const { claim, release: release_lock } = lane_seat_lock
 
 function release(reservation: SeatReservation): void {
 	release_lock(reservation.lock)
 	release_lock(reservation.issue_lock)
 }
 
+// A seat lock whose `lane:open` died is not an open in flight: no later open may come to reclaim it,
+// and counted it would keep `lane:prune` reading every unregistered entry as mid-open forever.
 function open_in_flight_count(root: string): number {
 	try {
-		return readdirSync(path.join(root, lane_paths.SEAT_LOCK_DIR)).filter((entry) =>
-			entry.startsWith(SEAT_LOCK_PREFIX),
+		return readdirSync(path.join(root, lane_paths.SEAT_LOCK_DIR)).filter(
+			(entry) =>
+				entry.startsWith(SEAT_LOCK_PREFIX) && !lane_seat_lock.is_abandoned(lock_path(root, entry)),
 		).length
 	} catch {
 		return 0
-	}
-}
-
-function claim(lock: string): boolean {
-	mkdirSync(path.dirname(lock), { recursive: true })
-
-	try {
-		mkdirSync(lock)
-
-		return true
-	} catch {
-		return false
 	}
 }
 

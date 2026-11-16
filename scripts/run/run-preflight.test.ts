@@ -34,6 +34,8 @@ vi.mock('#scripts/lane/lane-registry', () => ({
 	lane_registry: { find_open_lane: vi.fn() },
 }))
 
+vi.mock('#scripts/lane/lane-state', () => ({ lane_state: { read_state: vi.fn() } }))
+
 const { git_command } = await import('#scripts/git/git-command')
 const { git_stash } = await import('#scripts/git/stash/git-stash')
 const { git_gh_pr_read } = await import('#scripts/gh/git-gh-pr-read')
@@ -50,6 +52,8 @@ const has_stashable_changes = vi.mocked(git_stash.has_stashable_changes)
 const pr_exists = vi.mocked(git_gh_pr_read.pr_exists)
 const pr_view = vi.mocked(git_gh_pr_read.pr_view)
 const find_open_lane = vi.mocked(lane_registry.find_open_lane)
+const { lane_state } = await import('#scripts/lane/lane-state')
+const read_state = vi.mocked(lane_state.read_state)
 
 const ISSUE = '926'
 const CLEAN_TREE: TreeState = { branch: 'main', default_branch: 'main', is_dirty: false }
@@ -307,6 +311,22 @@ describe('check counts the uncommitted work a lane holds on a branch with no com
 
 		expect(await verdict_from_check()).toBe('clean')
 		expect(status).not.toHaveBeenCalledWith(LANE_DIRECTORY)
+	})
+})
+
+// A `lane:launch` that failed after `lane:open` leaves a lane dirty with the parent's stash only, and
+// a lane record whose branch is gone leaves no candidate at all.
+describe('check counts no uncommitted work in a lane no child was started in', () => {
+	it.each([
+		['open', 'lane:open', [BRANCH], 'clean'],
+		['open', 'lane:adopt', [BRANCH], 'resume'],
+		['running', 'lane:dispatch', [], 'clean'],
+	] as const)('answers %s by %s on %j with %s', async (state, changed_by, branches, verdict) => {
+		arrange_lane_on(BRANCH, LANE_CHANGE)
+		branch_names.mockResolvedValue([...branches])
+		read_state.mockResolvedValue({ issue: ISSUE, state, changed_at: '', changed_by })
+
+		expect(await verdict_from_check()).toBe(verdict)
 	})
 })
 
