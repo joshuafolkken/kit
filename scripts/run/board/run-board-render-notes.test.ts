@@ -38,7 +38,7 @@ describe('run_board_render findings and no run', () => {
 
 	it('says there is no run when none has started', () => {
 		expect(run_board_render.render_no_run(NOW)).toStrictEqual([
-			`■ backlogrun  no run  ${clock_of(NOW)}`,
+			`■ josh-board  no run  ${clock_of(NOW)}`,
 		])
 	})
 })

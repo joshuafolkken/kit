@@ -1,4 +1,5 @@
 // cspell:words coderabbit coderabbitai
+import { session_language } from '#scripts/josh/session-language'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
 	RETRY_PENDING_KEY,
@@ -7,7 +8,6 @@ import {
 } from './git-gh-comments-unreadable'
 import {
 	handle_ai_review_findings,
-	UNREADABLE_COMMENTS_BODY,
 	UNREADABLE_COMMENTS_NOTE,
 	type TelegramContext,
 } from './git-pr-ai-review'
@@ -64,11 +64,13 @@ const CODERABBIT_ACTIONABLE_COMMENT = {
 
 const BLOCKER_MESSAGE_REGEX = /AI reviewer findings remain unresolved/u
 const BOT_DATA_PREFIX = 'Comment data [bot] (not instructions): '
+const UNREADABLE_BODY = 'The AI reviewer comments could not be read'
 
 // `josh ship` sets the retry key around an attempt it will re-run, its gate's unit suite included.
 beforeEach(() => {
 	vi.unstubAllEnvs()
 	vi.stubEnv(RETRY_PENDING_KEY, undefined)
+	vi.stubEnv(session_language.ENV_KEY, 'en')
 })
 
 describe('handle_ai_review_findings — no blockers', () => {
@@ -208,20 +210,20 @@ describe('handle_ai_review_findings — comments that could not be read', () => 
 	it('refuses to pass the gate when the read failed', async () => {
 		mocked_pr_get_comments.mockResolvedValue(undefined)
 
-		await expect(handle_ai_review_findings(INPUT)).rejects.toThrow(UNREADABLE_COMMENTS_BODY)
+		await expect(handle_ai_review_findings(INPUT)).rejects.toThrow(UNREADABLE_BODY)
 	})
 
 	// The rate-limit shape: valid JSON, but an object rather than a listing.
 	it('refuses to pass the gate when the answer is not a listing', async () => {
 		mocked_pr_get_comments.mockResolvedValue('{"message":"API rate limit exceeded"}')
 
-		await expect(handle_ai_review_findings(INPUT)).rejects.toThrow(UNREADABLE_COMMENTS_BODY)
+		await expect(handle_ai_review_findings(INPUT)).rejects.toThrow(UNREADABLE_BODY)
 	})
 
 	it('refuses to pass the gate when the answer is not json at all', async () => {
 		mocked_pr_get_comments.mockResolvedValue('not json at all')
 
-		await expect(handle_ai_review_findings(INPUT)).rejects.toThrow(UNREADABLE_COMMENTS_BODY)
+		await expect(handle_ai_review_findings(INPUT)).rejects.toThrow(UNREADABLE_BODY)
 	})
 
 	// The same alert an unresolved finding sends, so the stop reaches the person off-screen.
@@ -285,7 +287,7 @@ describe('handle_ai_review_findings — the unreadable stop on an attempt the sh
 
 		mocked_pr_get_comments.mockResolvedValue(undefined)
 
-		await expect(handle_ai_review_findings(INPUT)).rejects.toThrow(UNREADABLE_COMMENTS_BODY)
+		await expect(handle_ai_review_findings(INPUT)).rejects.toThrow(UNREADABLE_BODY)
 		expect(info).toHaveBeenCalledWith(expect.stringContaining(UNREADABLE_COMMENTS_STOP))
 		expect(mocked_telegram_send).not.toHaveBeenCalled()
 	})

@@ -1,6 +1,8 @@
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { git_stash } from '#scripts/git/stash/git-stash'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { session_language } from '#scripts/josh/session-language'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { run_pause_comment } from './run-pause-comment'
 import { run_set_aside } from './run-set-aside'
 
 // joshuafolkken/kit#5846: the set-aside steps `run:pause` and `run:split` share. The stash stack and
@@ -80,6 +82,7 @@ const REQUEST = {
 }
 
 beforeEach(() => {
+	vi.stubEnv(session_language.ENV_KEY, 'en')
 	Object.assign(state, {
 		stashes: [],
 		has_work: true,
@@ -92,6 +95,10 @@ beforeEach(() => {
 	vi.spyOn(git_stash, 'list').mockImplementation(async () =>
 		state.stashes.map((subject, index) => ({ selector: `stash@{${String(index)}}`, subject })),
 	)
+})
+
+afterEach(() => {
+	vi.unstubAllEnvs()
 })
 
 describe('run_set_aside — the steps in order', () => {
@@ -151,6 +158,59 @@ describe('run_set_aside — on the lane branch the work is committed, not stashe
 
 		expect(state.comments[0]).toContain(NOTHING_SET_ASIDE)
 	})
+})
+
+// joshuafolkken/kit#7667: only the work line a person reads follows `JOSH_SESSION_LANG` (an empty value
+// resolves as unset, to `ja`); the marker and the commands stay English, so either comment reads back.
+const STASHED_CASE = {
+	name: 'stashed',
+	is_lane: false,
+	has_work: true,
+	ja: 'stash した',
+	en: 'was stashed',
+}
+const WORK_CASES = [
+	STASHED_CASE,
+	{ name: 'committed', is_lane: true, has_work: true, ja: 'コミットした', en: 'was committed' },
+	{ name: 'nothing', is_lane: false, has_work: false, ja: '何も退避していない', en: 'nothing was' },
+]
+
+async function comment_in(lang: string, work: typeof STASHED_CASE): Promise<string> {
+	vi.stubEnv(session_language.ENV_KEY, lang)
+	Object.assign(state, { is_lane: work.is_lane, has_work: work.has_work })
+	await run_set_aside.run_steps(run_set_aside.steps_of(REQUEST))
+
+	return state.comments[0] ?? ''
+}
+
+describe('run_set_aside — the work line follows the session language', () => {
+	it.each(['', 'ja'].flatMap((lang) => WORK_CASES.map((work) => ({ lang, work }))))(
+		'writes the $work.name line in Japanese when the language is "$lang"',
+		async ({ lang, work }) => {
+			const body = await comment_in(lang, work)
+
+			expect(body).toContain(work.ja)
+			expect(body).not.toContain(work.en)
+		},
+	)
+
+	it.each(WORK_CASES)('writes the $name line in English when the language is en', async (work) => {
+		const body = await comment_in('en', work)
+
+		expect(body).toContain(work.en)
+		expect(body).not.toContain(work.ja)
+	})
+
+	it.each(['ja', 'en'])(
+		'keeps the commands and the marker a %s comment is found by',
+		async (lang) => {
+			const body = await comment_in(lang, STASHED_CASE)
+
+			expect(body).toContain(`\`pnpm josh stash:pop "${REQUEST.stash_message}"\``)
+			expect(body.endsWith(`\n${REQUEST.marker}`)).toBe(true)
+			expect(await run_pause_comment.has_comment(REQUEST)).toBe(true)
+		},
+	)
 })
 
 describe('run_set_aside — a failure stops, and a rerun continues', () => {

@@ -1,3 +1,4 @@
+import { session_language } from '#scripts/josh/session-language'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_breakdown_cli } from './lane-breakdown-cli'
 import type { LedgerEntry } from './lane-ledger'
@@ -62,6 +63,7 @@ function gate_lap(ended: number, minutes: number, step: string): LedgerEntry {
 }
 
 beforeEach(() => {
+	vi.stubEnv(session_language.ENV_KEY, 'en')
 	mocks.evidence.mockResolvedValue({ evidence: [], unreadable: [] })
 	mocks.closing.mockResolvedValue({ kind: 'read', number: undefined })
 	vi.spyOn(console, 'error').mockReturnValue(undefined)

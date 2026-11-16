@@ -1,18 +1,18 @@
-# 更新前に npm への取得経路を準備する
+# Prepare the npm install path before updating
 
-この入口は既存の kit を読み込まず、プロジェクトの `.npmrc` とロックだけを移行する。
-ユーザーの `~/.npmrc`、認証設定、インストール済み kit は変更しない。
+This entry does not load the existing kit; it migrates only the project's `.npmrc` and lockfile.
+It does not change the user's `~/.npmrc`, authentication settings or the installed kit.
 
-## 移行の順序
+## Migration order
 
-`@joshuafolkken` を GitHub Packages から取得している既存プロジェクトは、次の順で進める。
-新規導入は移行不要（[README → Quick start](../README.md#quick-start)）。
+An existing project that installs `@joshuafolkken` from GitHub Packages follows these steps in order.
+A new setup needs no migration ([README → Quick start](../README.md#quick-start)).
 
-1. 取得前の確認：プロジェクトのルートで `pnpm config get "@joshuafolkken:registry"` を実行する。
-   `https://npm.pkg.github.com` を指す場合が移行対象。ユーザーの `~/.npmrc` の設定もこの値に現れる。
-2. 入口を取得し（[配布と境界](#配布と境界)）、`--dry-run` で変更予定のファイル、または失敗した name@version と理由を確認する。
-3. dry-run が通ったら同じ版で本実行する。失敗時はファイルを変更しない。原因を直して同じコマンドを再実行する。
-4. npm から対象 kit を取得し、その kit の sync を実行する。
+1. Check before installing: run `pnpm config get "@joshuafolkken:registry"` at the project root.
+   The project is in scope when it points at `https://npm.pkg.github.com`. A setting in the user's `~/.npmrc` also shows up in this value.
+2. Get the entry ([Distribution and boundaries](#distribution-and-boundaries)) and run it with `--dry-run` to see the files it would change, or the failing name@version and the reason.
+3. Once the dry run passes, run it for real with the same version. On failure it changes no files; fix the cause and re-run the same command.
+4. Install the target kit from npm and run that kit's sync.
 
    ```sh
    pnpm add -D @joshuafolkken/kit@<target-version>
@@ -20,51 +20,53 @@
    pnpm install
    ```
 
-5. 認証なしの確認：`pnpm config get "@joshuafolkken:registry"` が `https://registry.npmjs.org/` を返し、`pnpm-lock.yaml` に `npm.pkg.github.com` が残らないこと。
+5. Check without authentication: `pnpm config get "@joshuafolkken:registry"` returns `https://registry.npmjs.org/`, and no `npm.pkg.github.com` remains in `pnpm-lock.yaml`.
 
-この入口を含む kit を導入済みのプロジェクトでは、`pnpm josh version --upgrade` が手順 3 の入口を先に実行してから npm の kit を追加する（[package-api.md → Version-command library](./package-api.md#version-command-library-joshuafolkkenkitversion)）。その後に手順 4 の `josh sync` と `pnpm install` を実行する。
-global CLI は `~/.npmrc` を変えずに npm から取得できる（[cli.md](./cli.md#1-install-globally)）。
+In a project that already has a kit containing this entry, `pnpm josh version --upgrade` runs the step 3 entry first and then adds the kit from npm ([package-api.md → Version-command library](./package-api.md#version-command-library-joshuafolkkenkitversion)). Then run step 4's `josh sync` and `pnpm install`.
 
-### 移行後に残る作業
+The global CLI installs from npm without changing `~/.npmrc` ([cli.md](./cli.md#1-install-globally)).
 
-- プロジェクトの `.npmrc` には `@joshuafolkken:registry=https://registry.npmjs.org/` が入る。commit する。秘密情報は含まない。
-- ユーザーの `~/.npmrc` は変更しない。`@joshuafolkken` の GitHub mapping とトークン行は、他のプロジェクトがまだ GitHub Packages から取得しているなら残す。不要になった時点で自分で削除する。
-- 他スコープを GitHub Packages から取得するプロジェクトは、そのスコープの mapping と認証を残す（[authentication.md](./authentication.md)）。
-- Cloudflare Workers Builds・Vercel・Netlify・Docker 等のビルダーに設定した `NODE_AUTH_TOKEN`、`npm_config_//npm.pkg.github.com/:_authToken`、`PNPM_CONFIG_NPMRC_AUTH_FILE` は、他に GitHub Packages の依存がなければ削除する。残す依存があれば維持する（[authentication.md §4](./authentication.md#4-build-platforms-with-no-user-level-npmrc)）。
-- kit の CI テンプレートは npm から取得する。独自の CI に GitHub Packages 用の認証手順を追加していれば、同じ基準で削除または維持する。
+### Work left after the migration
 
-### 対象外
+- The project's `.npmrc` gets `@joshuafolkken:registry=https://registry.npmjs.org/`. Commit it; it holds no secrets.
+- The user's `~/.npmrc` is not changed. Keep the `@joshuafolkken` GitHub mapping and token line while other projects still install from GitHub Packages; remove them yourself once they are no longer needed.
+- A project that installs other scopes from GitHub Packages keeps that scope's mapping and authentication ([authentication.md](./authentication.md)).
+- Remove `NODE_AUTH_TOKEN`, `npm_config_//npm.pkg.github.com/:_authToken` and `PNPM_CONFIG_NPMRC_AUTH_FILE` set on builders such as Cloudflare Workers Builds, Vercel, Netlify or Docker unless another dependency still comes from GitHub Packages; keep them if one does ([authentication.md §4](./authentication.md#4-build-platforms-with-no-user-level-npmrc)).
+- kit's CI templates install from npm. If your own CI added authentication steps for GitHub Packages, remove or keep them by the same rule.
 
-- GitHub Packages への publish 停止と、既存版の削除はこの移行に含まない。既存の GitHub 取得は引き続き動く。
-- 公開済み版を実際の consumer リポジトリと公開 tarball で通す最終実証は、公開後に #7447 で行う。それまでこの文書の確認済み範囲は、pack した候補 tarball による検証に限る。
-- 入口を使わない移行は [入口が停止する配布先](#入口が停止する配布先) の条件に当たる場合に限る。
+### Out of scope
 
-## 入口が停止する配布先
+- Stopping publishing to GitHub Packages and deleting existing versions are not part of this migration. Existing installs from GitHub keep working.
+- The final proof that runs a published version through real consumer repositories and the published tarball happens after publishing, in #7447. Until then, what this document confirms is limited to verification against a packed candidate tarball.
+- Migrating without the entry is only for projects that meet the conditions in [When the entry stops](#when-the-entry-stops).
 
-入口は次の場合に変更前で停止する（[検証する条件](#検証する条件)）。
+## When the entry stops
 
-- pnpm 版違い：プロジェクトが pnpm 12.17.0 以外を固定している（`ERR_PNPM_BAD_PM_VERSION` 等）。
-- 不足版：ロック済みの kit・app-kit 等が npm に無い。npm の最古は kit 1.872.0・app-kit 0.98.0。
+The entry stops before changing anything in these cases ([Verified conditions](#verified-conditions)).
 
-この場合は入口を使わず、npm にある版へ上げ直して新しいロックを作る。
-旧ロックの integrity は引き継がない。checksum 無効化や integrity の書き換えはしない。
-ロックの全 `@joshuafolkken` パッケージが npm にあることが前提。npm に無いパッケージ（`npm view <name> --registry https://registry.npmjs.org/` が 404）に依存する場合は、この手順でも移行できない。
+- pnpm version mismatch: the project pins a pnpm other than 12.17.0 (`ERR_PNPM_BAD_PM_VERSION` and similar).
+- Missing version: a locked kit, app-kit or similar is not on npm. The oldest versions on npm are kit 1.872.0 and app-kit 0.98.0.
 
-1. `package.json` の `packageManager` と `devEngines.packageManager` を、kit の `package.json` と同じ pnpm 12.17.0 の固定に手で書き換える。`pnpm --version` が `12.17.0` を返すことを確認する。
-2. プロジェクトの `.npmrc` を npm に向け、GitHub Packages のトークン行を消す。
+In these cases, skip the entry: move up to versions that are on npm and create a new lockfile.
+The old lockfile's integrity is not carried over. Never disable checksums or rewrite integrity.
+
+This assumes every `@joshuafolkken` package in the lockfile is on npm. A project that depends on a package not on npm (`npm view <name> --registry https://registry.npmjs.org/` returns 404) cannot migrate with these steps either.
+
+1. Edit `packageManager` and `devEngines.packageManager` in `package.json` by hand to the same pnpm 12.17.0 pin as kit's `package.json`. Check that `pnpm --version` returns `12.17.0`.
+2. Point the project's `.npmrc` at npm and remove the GitHub Packages token line.
 
    ```sh
    pnpm config set --location project "@joshuafolkken:registry" https://registry.npmjs.org/
    pnpm config delete --location project "//npm.pkg.github.com/:_authToken"
    ```
 
-3. プロジェクト独自の script が `fix-gh-packages` を呼ぶ場合は消す。新しい kit にその旧パスは無く、残すと `prepare` が `ERR_MODULE_NOT_FOUND` で失敗する。`prepare` から呼んでいる場合はその呼び出しも外す。
+3. Remove any project script that calls `fix-gh-packages`. It only repairs GitHub Packages lockfile entries, so an npm-sourced kit does not need it, and `josh sync` leaves a project's own script such as `prepare:gh-packages` in place. If `prepare` calls it, remove that call too.
 
    ```sh
    pnpm pkg delete 'scripts["prepare:gh-packages"]'
    ```
 
-4. npm の最新版を `pnpm view @joshuafolkken/kit version` で確かめ、依存している kit・app-kit を npm から直接上げる。`--ignore-scripts` で、sync 前の `prepare` を走らせない。
+4. Check the latest version on npm with `pnpm view @joshuafolkken/kit version`, and upgrade the kit and app-kit you depend on directly from npm. `--ignore-scripts` keeps `prepare` from running before the sync.
 
    ```sh
    pnpm add -D @joshuafolkken/kit@<kit-version> @joshuafolkken/app-kit@<app-kit-version> --ignore-scripts
@@ -72,51 +74,55 @@ global CLI は `~/.npmrc` を変えずに npm から取得できる（[cli.md](.
    pnpm install
    ```
 
-5. [移行の順序](#移行の順序)の手順 5 と同じ確認をする。`pnpm config get "@joshuafolkken:registry"` が `https://registry.npmjs.org/` を返し、`pnpm-lock.yaml` に `npm.pkg.github.com` が残らないこと。
+5. Run the same check as step 5 of [Migration order](#migration-order): `pnpm config get "@joshuafolkken:registry"` returns `https://registry.npmjs.org/`, and no `npm.pkg.github.com` remains in `pnpm-lock.yaml`.
 
-[移行後に残る作業](#移行後に残る作業)はこの経路でも同じ。
-kit 1.206.0・1.340.0 をロックした配布先の隔離コピーで、この手順を確認した（#7654）。
+[Work left after the migration](#work-left-after-the-migration) is the same on this path.
+These steps were confirmed on isolated copies of consumers that locked kit 1.206.0 and 1.340.0 (#7654).
 
-## 配布と境界
+## Distribution and boundaries
 
-公開する kit tarball の `package/dist/registry-migrate.mjs` が依存を内包する独立入口。
-npm の公開 metadata が示す tarball を HTTPS で直接取得し、metadata の sha512 と取得物を照合してから、このファイルを取り出す。
-照会先は `https://registry.npmjs.org/@joshuafolkken%2fkit/<published-entry-version>`。
-取得は Node の標準 fetch 等で直接行い、ユーザー設定を読む npm/pnpm の取得コマンドを介さない。
-ローカル候補の検証では `pnpm pack` の tarball から `tar -xzf <archive> package/dist/registry-migrate.mjs` で取り出し、kit のないディレクトリで実行する。
-パッケージマネージャーで入口をインストールしないため、プロジェクトやユーザーの scope mapping は入口取得に関与しない。
-`pnpm dlx --registry` だけで scope mapping を上書きできるとは扱わない。
+`package/dist/registry-migrate.mjs` in the published kit tarball is a standalone entry that bundles its dependencies.
+It fetches the tarball named by npm's public metadata directly over HTTPS, checks the download against the metadata's sha512, and then extracts this file.
+The metadata is queried at `https://registry.npmjs.org/@joshuafolkken%2fkit/<published-entry-version>`.
 
-本 Issue の検証対象は実際に pack した候補 tarball。公開済み版の取得実証は #7447 で行う。
-公開前の版を指定する完成済み取得手順は提供しない。
+The download goes directly through Node's standard fetch or similar, not through an npm/pnpm install command that reads user settings.
+To verify a local candidate, extract it from the `pnpm pack` tarball with `tar -xzf <archive> package/dist/registry-migrate.mjs` and run it in a directory without kit.
 
-取得・検証済みの入口を、移行対象プロジェクトのルートで実行する。
-`<target-version>` は npm から取得したい kit の完全なバージョン番号。
+Because no package manager installs the entry, neither the project's nor the user's scope mapping takes part in getting it.
+`pnpm dlx --registry` alone is not treated as able to override the scope mapping.
+
+This Issue verifies against an actually packed candidate tarball. Proof of fetching a published version happens in #7447.
+No finished fetch procedure that names an unpublished version is provided.
+
+Run the fetched and verified entry at the root of the project to migrate.
+`<target-version>` is the full version number of the kit to install from npm.
 
 ```sh
 node /path/to/registry-migrate.mjs <target-version> --dry-run
 node /path/to/registry-migrate.mjs <target-version>
 ```
 
-引数なしや不明なフラグでは使い方を表示し、ファイルを変更せず終了コード 1 で終わる。`--help` は使い方だけを表示する。
+With no arguments or an unknown flag, it prints usage, changes no files and exits with code 1. `--help` prints only the usage.
 
-移行成功後に通常の pnpm 操作で対象 kit を npm から取得し、その kit の `josh sync` を実行する（[移行の順序](#移行の順序)の手順 4）。
-入口自身は kit の更新・新規初期化・sync を実行しない。
-既存の `josh init` bootstrap と retired な `registry:migrate` は変更しない。
-npm へ移行したプロジェクトでは、`josh sync` が kit の書いた `prepare` から `fix-gh-packages` を外す（[sync.md](./sync.md#what-does-not-get-synced)）。
+After a successful migration, install the target kit from npm with ordinary pnpm commands and run that kit's `josh sync` (step 4 of [Migration order](#migration-order)).
 
-## 検証する条件
+The entry itself does not update kit, run a fresh init or sync.
+The existing `josh init` bootstrap and the retired `registry:migrate` are unchanged.
+In a project moved to npm, `josh sync` removes `fix-gh-packages` from the `prepare` kit wrote ([sync.md](./sync.md#what-does-not-get-synced)).
 
-- pnpm 12.17.0 で検証した。別の版はファイル変更前に停止する。
-- 直接・間接依存を含め、ロックの全同スコープ name@version と対象 kit の npm 公開情報・実配布物を確認する。
-- 配布物の sha512 を npm metadata と旧ロックの両方に照合する。同じ版でも bytes が異なる配布物は拒否する。圧縮や内容の差異を自動承認しない。両配布元の実物を独立に検証する必要がある。
-  差異の調査では両 tarball の sha512 を記録し、展開前のパス・種類・mode・リンク先と各ファイルの内容ハッシュを比較する。特に manifest、依存関係、実行コードを確認する。この調査を入口による旧 integrity の自動置換に結び付けない。
-- 旧ロックに integrity がない場合も停止する。checksum 無効化や無条件の integrity 置換はしない。
-- 一時コピーで `pnpm update --patches --lockfile-only --ignore-scripts --ignore-pnpmfile` を実行する。旧 kit の hooks は実行しない。独自 hooks が必要なプロジェクトで依存グラフが変わる場合は停止する。
-- 再解決後にも実配布物を検証する。依存グラフ・他スコープの metadata が変わった場合、GitHub tarball が残る場合も停止する。
-- 成功後にプロジェクト設定とロックを反映する。反映中の例外では元に戻す。並行変更を検出したら反映しない。プロセス強制終了・電源断にまたがる複数ファイルの原子性は保証しない。
-- dry-run は同じ検証を実行し、変更するファイル名または失敗した name@version と理由を表示する。
+## Verified conditions
 
-再解決は [pnpm update の registry revision 更新](https://github.com/pnpm/pnpm/blob/main/pnpm/docs/cli/update.md#--patches)を利用する。
-`--force`・`--fix-lockfile` で integrity 問題が解決するとは扱わない。
-pnpm の lockfile-only 更新は tarball をダウンロードしないため、入口自身の実配布物照合が必要になる。
+- Verified with pnpm 12.17.0. Any other version stops before changing files.
+- Every same-scope name@version in the lockfile, direct and transitive, is checked against the target kit's npm publication data and the actual artifacts.
+- Each artifact's sha512 is checked against both the npm metadata and the old lockfile. An artifact whose bytes differ under the same version is rejected. Compression or content differences are never approved automatically; the real artifacts from both sources need independent verification.
+- When investigating a difference, record both tarballs' sha512 and compare, before extraction, the paths, types, modes and link targets and each file's content hash.
+- Such an investigation checks the manifest, dependencies and executable code in particular. It is never tied to the entry automatically replacing the old integrity.
+- The entry also stops when the old lockfile has no integrity. It never disables checksums or replaces integrity unconditionally.
+- It runs `pnpm update --patches --lockfile-only --ignore-scripts --ignore-pnpmfile` in a temporary copy. The old kit's hooks are not run. A project that needs its own hooks stops when the dependency graph changes.
+- The actual artifacts are verified again after re-resolution. It also stops when the dependency graph or other scopes' metadata changes, or when a GitHub tarball remains.
+- On success it applies the project settings and lockfile. An exception while applying rolls them back. When a concurrent change is detected, nothing is applied. Atomicity across several files is not guaranteed through a forced process kill or power loss.
+- The dry run performs the same verification and prints the files it would change, or the failing name@version and the reason.
+
+Re-resolution uses [pnpm update's registry revision update](https://github.com/pnpm/pnpm/blob/main/pnpm/docs/cli/update.md#--patches).
+`--force` and `--fix-lockfile` are not treated as resolving integrity problems.
+pnpm's lockfile-only update does not download tarballs, so the entry's own check of the actual artifacts is needed.

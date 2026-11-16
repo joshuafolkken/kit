@@ -1,7 +1,8 @@
 import { epic_index } from '#scripts/epic/epic-index'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { git_stash } from '#scripts/git/stash/git-stash'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { session_language } from '#scripts/josh/session-language'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_pause } from './run-pause'
 import { run_pause_comment } from './run-pause-comment'
 
@@ -137,6 +138,10 @@ beforeEach(() => {
 	refusal_after.mockReset().mockResolvedValue(undefined)
 })
 
+afterEach(() => {
+	vi.unstubAllEnvs()
+})
+
 describe('run_pause.pause — the four steps in order', () => {
 	it('stashes, comments, records the relation directly and releases when no epic tracks it', async () => {
 		const result = await run_pause.pause(REQUEST)
@@ -150,6 +155,7 @@ describe('run_pause.pause — the four steps in order', () => {
 
 	it('says nothing was set aside on a clean tree', async () => {
 		state.has_work = false
+		vi.stubEnv(session_language.ENV_KEY, 'en')
 
 		await run_pause.pause(REQUEST)
 

@@ -1,5 +1,6 @@
 import { NEEDS_DECISION_LABEL, RUN_LANE_LABEL, RUN_SOLO_LABEL } from '#scripts/issue/issue-labels'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { session_language } from '#scripts/josh/session-language'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_triage_cli } from './backlog-triage-cli'
 
 const { order } = vi.hoisted(() => ({ order: [] as Array<string> }))
@@ -41,6 +42,7 @@ const UNBLOCK_FLAG = '--unblock'
 const UNBLOCK_ARGV = ['--apply', ISSUE, UNBLOCK_FLAG, BLOCKER, '--reason', REASON]
 const VERIFICATION_FLAG = '--verification'
 const EVERY_RUN_FLAG = '--every-run'
+const JAPANESE_LEAD = 'backlogrun によるトリアージ'
 const SOLO_ANSWERS = ['--defect', 'yes', VERIFICATION_FLAG, 'yes', EVERY_RUN_FLAG, 'yes']
 
 vi.spyOn(console, 'info').mockImplementation(() => undefined)
@@ -74,6 +76,11 @@ beforeEach(() => {
 	remove_blocked_by.mockImplementation(async (request) => {
 		order.push(`unblock ${request.prerequisite}`)
 	})
+})
+
+afterEach(() => {
+	vi.unstubAllEnvs()
+	post_comment.mockClear()
 })
 
 describe('josh backlog:triage — atomic solo refusal', () => {
@@ -172,7 +179,26 @@ describe('josh backlog:triage --decide', () => {
 	})
 })
 
+// joshuafolkken/kit#7666: the comment's lead follows the session language; the verdict does not.
+describe('josh backlog:triage --apply — the session language', () => {
+	it.each([
+		['unset', undefined, JAPANESE_LEAD],
+		['ja', 'ja', JAPANESE_LEAD],
+		['en', 'en', 'triaged by backlogrun'],
+	])('leads the comment in the language of %s', async (_case, lang, lead) => {
+		vi.stubEnv(session_language.ENV_KEY, lang)
+
+		await backlog_triage_cli.run(LANE_ARGV, DIRECTORY)
+
+		expect(post_comment).toHaveBeenCalledWith(ISSUE, `${lead}: \`${RUN_LANE_LABEL}\`\n\n${REASON}`)
+	})
+})
+
 describe('josh backlog:triage --apply', () => {
+	beforeEach(() => {
+		vi.stubEnv(session_language.ENV_KEY, 'en')
+	})
+
 	it('on --clear clears the park, comments the reason, then applies the run label', async () => {
 		expect(await backlog_triage_cli.run(CLEAR_ARGV, DIRECTORY)).toBe(SUCCESS_EXIT_CODE)
 		expect(order).toStrictEqual([

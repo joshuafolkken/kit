@@ -64,7 +64,7 @@ Commit that file — it holds no secret. The mapping routes every `@joshuafolkke
 
 A hosted builder — Cloudflare Workers Builds, Vercel, Netlify, a Docker image — is neither your machine nor a GitHub Actions runner. There is no `~/.npmrc` from §2 and no kit CI authentication step, so an existing project `.npmrc` from §3 routes `@joshuafolkken/*` to GitHub Packages with no credential behind it and the install fails with `401`. **A green CI run does not clear this**: the kit CI template supplies GitHub Packages credentials for existing projects, while another builder may not.
 
-After the project [moves to npm](./registry-migration.md#移行後に残る作業), remove these builder settings unless another dependency still comes from GitHub Packages.
+After the project [moves to npm](./registry-migration.md#work-left-after-the-migration), remove these builder settings unless another dependency still comes from GitHub Packages.
 
 Supply the credential from a source pnpm reads. Any one of the four below is enough — pick the one your platform allows. Each needs the token itself in the platform's secret store, never in a committed file.
 

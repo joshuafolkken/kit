@@ -4,6 +4,7 @@ import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { git_stash } from '#scripts/git/stash/git-stash'
 import { issue_state_cli, type StateRead } from '#scripts/issue/issue-state-cli'
+import { session_language } from '#scripts/josh/session-language'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_investigation_record } from '#scripts/run/run-investigation-record'
@@ -98,7 +99,9 @@ function arrange_writes(): void {
 	remove_investigation.mockResolvedValue()
 }
 
+// The comment's English sentences, which these cases read; `lane-withdraw-prose.test.ts` pins both languages.
 beforeEach(() => {
+	vi.stubEnv(session_language.ENV_KEY, 'en')
 	arrange_open_lane()
 	arrange_writes()
 })

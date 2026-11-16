@@ -10,6 +10,7 @@ import {
 import { git_gh_command } from './git-gh-command'
 import { is_retry_pending, note_unreadable_stop } from './git-gh-comments-unreadable'
 import { git_pr_confirmation, has_ignore_reason, type TelegramContext } from './git-pr-confirmation'
+import { git_pr_review_prose } from './git-pr-review-prose'
 
 interface AiReviewPullComment {
 	body?: string | undefined
@@ -59,24 +60,7 @@ function log_info_findings(infos: ReadonlyArray<ClassifiedFinding>): Array<strin
 }
 
 function build_ai_review_blocker_body(blockers: ReadonlyArray<ClassifiedFinding>): string {
-	const lines = ['AI reviewer findings remain unresolved.', '']
-
-	for (const blocker of blockers) {
-		lines.push(format_ai_review_finding(blocker))
-	}
-
-	return lines.join('\n')
-}
-
-function build_ai_review_ignore_comment(
-	reason: string,
-	blockers: ReadonlyArray<ClassifiedFinding>,
-): string {
-	const lines = [
-		'Some AI reviewer findings were intentionally left unresolved.',
-		`Reason: ${reason.trim()}`,
-		'Affected comments:',
-	]
+	const lines = [git_pr_review_prose.unresolved(), '']
 
 	for (const blocker of blockers) {
 		lines.push(format_ai_review_finding(blocker))
@@ -93,10 +77,6 @@ async function fetch_review_comments(
 	return parsed?.map((comment) => to_review_comment(comment))
 }
 
-// The other choice both AI-review stops offer: a person who has looked records why and moves on.
-const IGNORE_ALTERNATIVE =
-	'Re-run `pnpm josh followup --ai-review-ignore-reason "<reason>"` if the gate does not apply'
-
 async function handle_blockers(input: {
 	branch_name: string
 	ignore_reason: string | undefined
@@ -106,7 +86,11 @@ async function handle_blockers(input: {
 	const body = build_ai_review_blocker_body(input.blockers)
 
 	if (has_ignore_reason(input.ignore_reason)) {
-		const ignore_comment = build_ai_review_ignore_comment(input.ignore_reason, input.blockers)
+		const ignore_comment = git_pr_review_prose.ignore_comment(
+			'ai',
+			input.ignore_reason,
+			input.blockers.map((blocker) => format_ai_review_finding(blocker)),
+		)
 
 		await git_gh_command.pr_comment(input.branch_name, ignore_comment)
 
@@ -116,8 +100,8 @@ async function handle_blockers(input: {
 	await git_pr_confirmation.notify_confirmation({
 		context: input.context,
 		body,
-		recommended: 'Fix the findings and re-run `pnpm josh followup`',
-		alternatives: [IGNORE_ALTERNATIVE],
+		recommended: git_pr_review_prose.fix_findings(),
+		alternatives: [git_pr_review_prose.ignore_alternative()],
 	})
 
 	throw new Error(body)
@@ -127,10 +111,7 @@ async function handle_blockers(input: {
 // like an unresolved finding — the same `confirmation` Telegram, the same non-zero exit — because
 // what it means is the same: nobody has confirmed the reviewers had nothing to say.
 // An ignore reason still gets past it, for the same reason it gets past a
-// real finding: the person has looked.
-const UNREADABLE_COMMENTS_BODY =
-	'The AI reviewer comments could not be read, so no finding could be ruled out.\n' +
-	'Re-run `pnpm josh followup` once the read succeeds, or pass an ignore reason.'
+// real finding: the person has looked. The body is `git_pr_review_prose.unreadable_ai`.
 
 // The audit note a bypassed run carries into its completion notification. Without it a run that
 // never read the gate reports exactly like one that read it and found nothing.
@@ -143,9 +124,9 @@ async function confirm_unreadable_stop(context: TelegramContext): Promise<void> 
 
 	await git_pr_confirmation.notify_confirmation({
 		context,
-		body: UNREADABLE_COMMENTS_BODY,
-		recommended: 'Re-run `pnpm josh followup` once the comments can be read',
-		alternatives: [IGNORE_ALTERNATIVE],
+		body: git_pr_review_prose.unreadable_ai(),
+		recommended: git_pr_review_prose.reread(),
+		alternatives: [git_pr_review_prose.ignore_alternative()],
 	})
 }
 
@@ -157,7 +138,7 @@ async function handle_unreadable_comments(input: {
 	if (has_ignore_reason(input.ignore_reason)) {
 		await git_gh_command.pr_comment(
 			input.branch_name,
-			`${UNREADABLE_COMMENTS_BODY}\nReason: ${input.ignore_reason.trim()}`,
+			git_pr_review_prose.with_reason(git_pr_review_prose.unreadable_ai(), input.ignore_reason),
 		)
 
 		return [UNREADABLE_COMMENTS_NOTE]
@@ -165,7 +146,7 @@ async function handle_unreadable_comments(input: {
 
 	await confirm_unreadable_stop(input.context)
 
-	throw new Error(UNREADABLE_COMMENTS_BODY)
+	throw new Error(git_pr_review_prose.unreadable_ai())
 }
 
 async function handle_ai_review_findings(input: {
@@ -194,7 +175,6 @@ export {
 	handle_ai_review_findings,
 	parse_ai_review_comments,
 	to_review_comment,
-	UNREADABLE_COMMENTS_BODY,
 	UNREADABLE_COMMENTS_NOTE,
 }
 

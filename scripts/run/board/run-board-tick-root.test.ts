@@ -77,12 +77,12 @@ describe('run_board_tick.tick — a root single run beside a backlogrun', () => 
 	})
 
 	// The legend, the frame's last two lines, also names the root run's phase.
-	it('keeps the backlogrun header and lane rows', async () => {
+	it('keeps the board’s own header and lane rows', async () => {
 		const lines = await frame_of(ROOTED)
 		const plain = await frame_of(CARRIED)
 
 		expect(lines[0]).toBe(plain[0])
-		expect(lines[0]).toContain('backlogrun')
+		expect(lines[0]).toContain('josh-board')
 		expect(lines.slice(index_of(lines, `${LANES_ICON} lanes`), -2)).toStrictEqual(
 			plain.slice(index_of(plain, `${LANES_ICON} lanes`), -2),
 		)

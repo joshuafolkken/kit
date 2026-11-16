@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { session_language } from '#scripts/josh/session-language'
 import { lane_environment } from '#scripts/lane/lane-environment'
 import { lane_paths } from '#scripts/lane/lane-paths'
 import { lane_registry } from '#scripts/lane/lane-registry'
@@ -16,13 +17,30 @@ function seat_of(directory: string): string {
 	return seat === undefined ? UNKNOWN_SEAT : String(seat)
 }
 
-function lane_note(issue: string, directory: string): string {
+// The lines are for a person to read, so they follow the session language; the directory and the
+// `lane:close` command stay as they are (joshuafolkken/kit#7667).
+function note_lines(issue: string, directory: string): ReadonlyArray<string> {
+	const lane = `\`${directory}\``
+	const seat = seat_of(directory)
+	const close = `\`pnpm josh lane:close ${issue}\``
+
+	if (session_language.is_japanese(session_language.resolve_session_lang().lang)) {
+		return [
+			`- レーンのディレクトリ: ${lane}`,
+			`- レーンを残す間、席 ${seat} は確保したまま`,
+			`- 返却: ${close}`,
+		]
+	}
+
 	return [
-		'---',
-		`- Lane directory: \`${directory}\``,
-		`- Seat ${seat_of(directory)} stays held while the lane is kept`,
-		`- Give it back: \`pnpm josh lane:close ${issue}\``,
-	].join('\n')
+		`- Lane directory: ${lane}`,
+		`- Seat ${seat} stays held while the lane is kept`,
+		`- Give it back: ${close}`,
+	]
+}
+
+function lane_note(issue: string, directory: string): string {
+	return ['---', ...note_lines(issue, directory)].join('\n')
 }
 
 // `body` unchanged outside a lane.

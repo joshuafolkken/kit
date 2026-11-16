@@ -2,10 +2,6 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
-  # The Linux stdout descriptor state and write error the publish pack step guards against (#7635).
-  - fdinfo
-  - NONBLOCK
-  - EAGAIN
   # Git's system-config opt-out for isolated measurement processes (#7444).
   - NOSYSTEM
   # The remote dependency check and local spawn cannot form one atomic operation (#7427).
@@ -153,8 +149,6 @@ words:
   - rrexml
   # Python virtual-environment directory names excluded from project file discovery.
   - venv
-  # npm's CLI option for selecting the registry-auth configuration file.
-  - userconfig
   # git's `for-each-ref` modifier that removes leading path components (joshuafolkken/kit#2504).
   - lstrip
   # git's `for-each-ref` atom naming the work tree a branch is checked out in (joshuafolkken/kit#2504).
@@ -236,9 +230,6 @@ words:
   # mechanically to tell an API outage apart from a child that stalled (joshuafolkken/kit#2240). It is
   # the literal marker text `api-outage.ts` greps the exit record for.
   - connectionrefused
-  # The registry host `docs/cloud-session.md` lists among the outbound hosts a cloud container has to
-  # allow (joshuafolkken/kit#1565). It is the domain `registry.npmjs.org`, not a prose word.
-  - npmjs
   # The mount option that refuses to execute anything on a filesystem. `security-audit.ts` names it
   # as one of the reasons a provisioned osv-scanner can exist and still not be runnable
   # (joshuafolkken/kit#1563), which is why existence alone is not the check.

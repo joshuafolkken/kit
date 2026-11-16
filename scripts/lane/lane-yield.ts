@@ -26,11 +26,6 @@ const NAMED_ISSUE = /#([1-9]\d*)\b/gu
 const YIELD_TEXT = {
 	name: 'its own lane:plan',
 	cause: '`lane:plan` gave its lane back to an earlier lane holding one of its planned files',
-	closed_head: 'Its lane was given back by `pnpm josh lane:plan` after the Issue was closed.',
-	open_head:
-		'Gave its lane back: `pnpm josh lane:plan` found an earlier lane holding one of its planned files.',
-	open_tail:
-		'The lane closed before any implementation edit. The Issue stays in the run: it is offered again once the holding lane ends, keeping its place in line.',
 	stays: 'The Issue stays in the run: it is offered again once the holding lane ends.',
 } as const
 

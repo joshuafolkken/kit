@@ -3,6 +3,7 @@ import type { AnswerVerdict, Evidence } from '#scripts/agent/answer-verdict'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { issue_sources, type SourcesRead } from '#scripts/issue/issue-sources'
 import { session_cite } from '#scripts/issue/session-cite'
+import { session_language } from '#scripts/josh/session-language'
 import { run_hold } from '#scripts/run/hold/run-hold'
 
 // joshuafolkken/kit#6510: **a close `pkg:scout` verdict that the Issue has already decided.** When the
@@ -38,6 +39,26 @@ const UNKNOWN: ReuseOutcome = {
 }
 
 const AUTO_DECIDED_REUSE = 'Auto-decided: reuse existing code'
+
+// Only the reason after `because` and the evidence label are for a person to read, so only they follow
+// the session language; the `Auto-decided:` skeleton is `CLAUDE.md`'s decision-log format and the
+// scout mark is what a re-run matches, so both stay English (joshuafolkken/kit#7670).
+interface CommentProse {
+	decides: string
+	tail: string
+	evidence: string
+}
+
+const JAPANESE_PROSE: CommentProse = {
+	decides: 'この Issue が再利用を決めている —',
+	tail: '。依存は追加しない（Tier A）。',
+	evidence: '根拠:',
+}
+const ENGLISH_PROSE: CommentProse = {
+	decides: 'this Issue decides it —',
+	tail: ', so no dependency is added (Tier A).',
+	evidence: 'Evidence:',
+}
 
 type Answered = Extract<AnswerVerdict, { kind: 'answered' }>
 type ReadFailure = Exclude<SourcesRead, { kind: 'sources' }>
@@ -90,17 +111,23 @@ function scout_mark(keywords: string): string {
 	return `\`pkg:scout ${keywords}\` ranked a close pair`
 }
 
+function comment_prose(): CommentProse {
+	const { lang } = session_language.resolve_session_lang()
+
+	return session_language.is_japanese(lang) ? JAPANESE_PROSE : ENGLISH_PROSE
+}
+
 function comment_body(request: ReuseRequest, verdict: Answered): string {
+	const prose = comment_prose()
 	const decision = [
 		`${AUTO_DECIDED_REUSE} (${verdict.decision}) over adding ${request.rejected}`,
-		`because this Issue decides it — ${scout_mark(request.keywords)},`,
-		'so no dependency is added (Tier A).',
+		`because ${prose.decides} ${scout_mark(request.keywords)}${prose.tail}`,
 	].join(' ')
 
 	return [
 		decision,
 		'',
-		'Evidence:',
+		prose.evidence,
 		...verdict.evidence.map((evidence) => evidence_line(evidence)),
 	].join('\n')
 }

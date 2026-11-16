@@ -1,8 +1,9 @@
 import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import type { CarryRead, RunCarry } from '#scripts/run/carry/run-carry'
+import { kit_running_version } from '#scripts/version/kit-running-version'
 import { temporary_directory } from '#tools/test/temporary-directory'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_wake, type WakeDecisionInput } from './run-wake'
 
 const make_directory = temporary_directory()
@@ -150,6 +151,7 @@ describe('run_wake.decide — the session that cut is still running', () => {
 })
 
 const scratch = { directory: '', target: '' }
+const KIT_VERSION = 'v1.3153.0+12'
 
 beforeEach(() => {
 	scratch.directory = make_directory('josh-run-wake-test-')
@@ -171,6 +173,22 @@ describe('run_wake — the supervisor record', () => {
 
 	it('names the writing process, so a person can stop it', () => {
 		expect(run_wake.fresh_wake(INVOCATION, NOW).pid).toBe(process.pid)
+	})
+
+	it('records the kit version this supervisor runs, and keeps it through disk', () => {
+		vi.spyOn(kit_running_version, 'version_of').mockReturnValueOnce(KIT_VERSION)
+		const wake = run_wake.fresh_wake(INVOCATION, NOW)
+
+		run_wake.write_wake(scratch.target, wake)
+
+		expect(wake.kit_version).toBe(KIT_VERSION)
+		expect(run_wake.read_wake(scratch.target)?.kit_version).toBe(KIT_VERSION)
+	})
+
+	it('leaves the kit version out where it cannot be read', () => {
+		vi.spyOn(kit_running_version, 'version_of').mockReturnValueOnce(undefined)
+
+		expect(run_wake.fresh_wake(INVOCATION, NOW)).not.toHaveProperty('kit_version')
 	})
 })
 

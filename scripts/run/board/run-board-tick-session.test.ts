@@ -46,7 +46,7 @@ describe('run_board_tick retrospective activity', () => {
 		const { ports, frames } = harness(local, [waiting_plan()])
 
 		await tick(FRESH_STATE, ports)
-		expect(header(frames[0])).toMatch(/^▶ backlogrun.*\n.*\n.*⠋/u)
+		expect(header(frames[0])).toMatch(/^▶ josh-board.*\n.*\n.*⠋/u)
 		expect(header(frames[0])).toContain('🔍 retrospective')
 	})
 })
@@ -60,8 +60,8 @@ describe('run_board_tick judgment session activity', () => {
 		read_local.mockResolvedValue({ ...local, is_session_active: false })
 		clock.now_ms += run_board_gather.LOCAL_READ_MS
 		await tick(state, ports)
-		expect(header(frames[0])).toMatch(/^▶ backlogrun.*\n.*\n.*⠋/u)
-		expect(header(frames[1])).toMatch(/^⏸ backlogrun/u)
+		expect(header(frames[0])).toMatch(/^▶ josh-board.*\n.*\n.*⠋/u)
+		expect(header(frames[1])).toMatch(/^⏸ josh-board/u)
 		expect(header(frames[1])).toContain('🔄 0  ⏳ 5')
 		expect(header(frames[1])).not.toMatch(/[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/u)
 	})
@@ -73,8 +73,8 @@ describe('run_board_tick judgment session activity', () => {
 		read_local.mockResolvedValue({ ...local, is_session_active: true })
 		clock.now_ms += run_board_gather.LOCAL_READ_MS
 		await tick(state, ports)
-		expect(header(frames[0])).toMatch(/^⏸ backlogrun/u)
-		expect(header(frames[1])).toMatch(/^▶ backlogrun/u)
+		expect(header(frames[0])).toMatch(/^⏸ josh-board/u)
+		expect(header(frames[1])).toMatch(/^▶ josh-board/u)
 		expect(header(frames[1])).toMatch(/[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/u)
 	})
 })

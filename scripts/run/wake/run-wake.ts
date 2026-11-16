@@ -6,6 +6,7 @@ import { process_owner_schema } from '#scripts/josh/process-owner'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { json_value } from '#scripts/lib/json-value'
 import type { CarryRead } from '#scripts/run/carry/run-carry'
+import { kit_running_version } from '#scripts/version/kit-running-version'
 import { z } from 'zod'
 
 // The process outside the conversation that starts the next session after a `backlogrun` cut.
@@ -55,6 +56,9 @@ interface RunWake {
 	spawned?: ReadonlyArray<string> | undefined
 	// Start of one unbroken idle stretch: bounds the deferral.
 	idle_since?: string | undefined
+	// The kit version this supervisor runs, which `run:board` draws (`kit-running-version.ts`); none in a
+	// record an older supervisor wrote.
+	kit_version?: string | undefined
 }
 
 // `reload`: the supervisor's code changed on disk, so it hands the run to a successor on that code.
@@ -108,6 +112,7 @@ const run_wake_schema = process_owner_schema.extend({
 	woke_pid: z.number().optional(),
 	spawned: z.array(z.string()).optional(),
 	idle_since: z.string().optional(),
+	kit_version: z.string().optional(),
 	profile: agent_profile_schema.PROFILE_SCHEMA.optional(),
 })
 
@@ -179,12 +184,17 @@ function remove_wake(target: string): void {
 	stamp_file.remove_stamp(target)
 }
 
+// Made once as the supervisor claims the record, so the kit version is the one this process runs; a
+// successor after a `reload` claims anew on its own.
 function fresh_wake(invocation: string, now: Date, profile?: AgentProfile): RunWake {
+	const kit_version = kit_running_version.version_of()
+
 	return {
 		invocation,
 		...(profile && { profile }),
 		started_at: now.toISOString(),
 		woke: NO_WAKES,
+		...(kit_version !== undefined && { kit_version }),
 		...process_identity.own_fields(),
 	}
 }
