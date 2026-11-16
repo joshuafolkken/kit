@@ -9,4 +9,14 @@
 // spawn once per test file.
 const GUARD_LOG_KEY = 'JOSH_UNIT_GUARD_LOG'
 
-export { GUARD_LOG_KEY }
+// The test file a worker is running, relative to the checkout (`test-file-environment.ts` sets it
+// per file). A `PATH` shim cannot see which test spawned it, but it inherits the spawning worker's
+// environment, so this is how a recorded call names its test file (joshuafolkken/kit#7638).
+const TEST_FILE_KEY = 'JOSH_UNIT_TEST_FILE'
+// What separates a recorded command from its test file: a tab, which no command prose here carries.
+const TEST_FILE_SEPARATOR = '\t'
+// The tail every shim record line ends in, expanded by `sh` when the call is made. `${NAME-}` so a
+// call from outside any test file (`globalSetup`) records an empty file rather than failing.
+const TEST_FILE_SUFFIX = `${TEST_FILE_SEPARATOR}\${${TEST_FILE_KEY}-}`
+
+export { GUARD_LOG_KEY, TEST_FILE_KEY, TEST_FILE_SEPARATOR, TEST_FILE_SUFFIX }

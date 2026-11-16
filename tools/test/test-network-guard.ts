@@ -7,7 +7,7 @@ import { platform_temporary } from '#scripts/josh/platform-temporary'
 import { file_reader } from '#scripts/lib/read-file'
 import { shim_shell } from '#tools/build/shim-shell'
 import { test_repository_guard, type WriteGuard } from './test-repository-guard'
-import { GUARD_LOG_KEY } from './unit-guard-environment'
+import { GUARD_LOG_KEY, TEST_FILE_SEPARATOR, TEST_FILE_SUFFIX } from './unit-guard-environment'
 
 // The unit suite must not reach the network. A test that mocks one read but not the next calls
 // through to a live `gh api` against real issues — hundreds of milliseconds against its siblings'
@@ -137,15 +137,18 @@ const GIT_VALUE_OPTIONS: ReadonlyArray<string> = [
 const BLOCKED_MESSAGE = 'josh: the unit suite must not reach the network — mock the read instead'
 const VIOLATION_HEADING =
 	'The unit suite made a live network call. Mock the read in the test that made it:'
+// The mark vitest prints before a failing test file.
+const FILE_MARK = ' FAIL  '
 const UNREADABLE_LOG_HEADING =
 	'The unit-suite network guard could not read its own record, so the run proves nothing:'
 
 // The three lines a block writes, shared by both shims so a `git` violation is recorded, explained
 // and failed exactly as a `gh` one is. `$*` rather than `$@` because the record is a line of prose
-// for a person to read, not something re-executed.
+// for a person to read, not something re-executed. The line ends in the calling test file, which the
+// worker that spawned the shim left in its environment.
 function blocking_lines(log_file: string, name: string): Array<string> {
 	return [
-		shim_shell.record_line(log_file, `${name} $*`),
+		shim_shell.record_line(log_file, `${name} $*${TEST_FILE_SUFFIX}`),
 		`echo ${shim_shell.quoted(BLOCKED_MESSAGE)} >&2`,
 		'exit 1',
 	]
@@ -297,9 +300,52 @@ function counted_lines(calls: ReadonlyArray<string>): Array<string> {
 	return [...counts].map(([call, count]) => `  ${String(count)}x  ${call}`)
 }
 
+interface RecordedCall {
+	command: string
+	file: string
+}
+
+// A recorded line split back into its command and the test file that made it — empty where no test
+// file was running (`globalSetup`) or the guard writing the line records none (the Telegram one).
+// Split at the last separator: the file is the line's tail, and a command's own arguments may hold one.
+function recorded_call(call: string): RecordedCall {
+	const at = call.lastIndexOf(TEST_FILE_SEPARATOR)
+
+	if (at === -1) return { command: call.trim(), file: '' }
+
+	return { command: call.slice(0, at).trim(), file: call.slice(at + 1).trim() }
+}
+
+// Each test file's commands, keyed by the file in first-seen order.
+function commands_by_file(calls: ReadonlyArray<string>): Map<string, Array<string>> {
+	const by_file = new Map<string, Array<string>>()
+
+	for (const call of calls) {
+		const { command, file } = recorded_call(call)
+
+		by_file.set(file, [...(by_file.get(file) ?? []), command])
+	}
+
+	return by_file
+}
+
+// The calls no test file is known for first, in the shape they always had; then each test file under
+// vitest's own `FAIL` mark, so the run summary that collects failed files from vitest's lines
+// (`vitest-failure-summary.ts`) names the file to mock in too (joshuafolkken/kit#7638). Unnamed calls
+// go first because a line after a file's group would read as that file's.
+function grouped_lines(calls: ReadonlyArray<string>): Array<string> {
+	const by_file = commands_by_file(calls)
+	const named = [...by_file].filter(([file]) => file !== '')
+
+	return [
+		...counted_lines(by_file.get('') ?? []),
+		...named.flatMap(([file, commands]) => [`${FILE_MARK}${file}`, ...counted_lines(commands)]),
+	]
+}
+
 // A heading and its calls, or nothing at all when there are none.
 function section(heading: string, calls: ReadonlyArray<string>): Array<string> {
-	return calls.length === 0 ? [] : [heading, ...counted_lines(calls)]
+	return calls.length === 0 ? [] : [heading, ...grouped_lines(calls)]
 }
 
 // One section per kind. The two guards share one record, so a run that both reached the network and

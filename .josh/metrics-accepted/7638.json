@@ -1,0 +1,7 @@
+{
+	"reason": "Name the calling test file in the unit-suite network guard record and failure (#7638): a per-worker setup file and grouping by test file",
+	"date": "2026-11-16",
+	"growth": {
+		"scripts.code_lines": 47
+	}
+}
