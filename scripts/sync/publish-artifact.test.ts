@@ -16,7 +16,6 @@ const KIT_NAMES = [
 	'kit.tgz',
 	'kit-package',
 ] as const
-const UPLOAD_ACTION = 'actions/upload-artifact@'
 const DOWNLOAD_ACTION = 'actions/download-artifact@'
 const BUILDING_COMMANDS = ['pnpm pack', 'pnpm publish', 'pnpm build'] as const
 // How long GitHub lets a workflow run be re-run; a re-run of a failed publish job downloads the
@@ -38,19 +37,21 @@ function commands(target: WorkflowJob): string {
 	return (target.steps ?? []).map((step) => step.run ?? '').join('\n')
 }
 
+function steps_with_run(target: WorkflowJob, text: string): Array<WorkflowStep> {
+	return (target.steps ?? []).filter((step) => step.run?.includes(text) === true)
+}
+
 describe('publish.yml — one built artifact for both registries', () => {
 	it('packs the tarball once and uploads it under the shared artifact name', () => {
 		const pack = job(PACK_JOB)
-		const uploads = steps_using(pack, UPLOAD_ACTION)
+		const upload = ci_yml_fixture.find_upload(pack, ARTIFACT_NAME)
 
-		expect(commands(pack)).toContain('pnpm pack --out "$RUNNER_TEMP/$TARBALL"')
-		expect(uploads).toHaveLength(1)
-		expect(uploads[0]?.with?.['name']).toBe(ARTIFACT_NAME)
-		expect(uploads[0]?.with?.['path']).toBe(`\${{ runner.temp }}/${TARBALL_OUTPUT}`)
+		expect(steps_with_run(pack, 'pnpm pack --out "$RUNNER_TEMP/$TARBALL"')).toHaveLength(1)
+		expect(upload?.with?.['path']).toBe(`\${{ runner.temp }}/${TARBALL_OUTPUT}`)
 	})
 
 	it('keeps the tarball for as long as a failed publish job can be re-run', () => {
-		const [upload] = steps_using(job(PACK_JOB), UPLOAD_ACTION)
+		const upload = ci_yml_fixture.find_upload(job(PACK_JOB), ARTIFACT_NAME)
 
 		expect(upload?.with?.['retention-days']).toBe(RERUN_WINDOW_DAYS)
 	})
@@ -83,10 +84,6 @@ describe('publish.yml — one built artifact for both registries', () => {
 		for (const command of BUILDING_COMMANDS) expect(script).not.toContain(command)
 	})
 })
-
-function steps_with_run(target: WorkflowJob, text: string): Array<WorkflowStep> {
-	return (target.steps ?? []).filter((step) => step.run?.includes(text) === true)
-}
 
 function publish_step_environment(job_name: string): Record<string, string> {
 	return steps_with_run(job(job_name), 'npm publish').at(0)?.env ?? {}
