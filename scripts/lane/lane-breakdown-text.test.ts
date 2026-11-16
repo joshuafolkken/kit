@@ -1,3 +1,4 @@
+import { session_language } from '#scripts/josh/session-language'
 import { describe, expect, it, vi } from 'vitest'
 import { lane_breakdown } from './lane-breakdown'
 import { lane_breakdown_implement } from './lane-breakdown-implement'
@@ -43,6 +44,8 @@ const EXCLUDED_TEXT =
 
 describe('lane_breakdown_text.comment', () => {
 	it('heads the stages with the net minutes and the command that prints them', () => {
+		vi.stubEnv(session_language.ENV_KEY, 'en')
+
 		expect(lane_breakdown_text.comment(ISSUE, 62, REPORT).split('\n')).toStrictEqual([
 			'Net time by stage, longest first, 62 min of net time (`pnpm josh lane:breakdown 4970`):',
 			'',

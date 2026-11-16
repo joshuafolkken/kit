@@ -1,3 +1,4 @@
+import { session_language } from '#scripts/josh/session-language'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { lane_breakdown, type Breakdown, type Stage } from './lane-breakdown'
 import { lane_breakdown_calls, type CallGroup } from './lane-breakdown-calls'
@@ -240,13 +241,21 @@ function report_of(
 	}
 }
 
+// The comment's heading, in the session language; the stage lines under it and `line` stay English,
+// the labels `docs/josh-commands-lane.md` names and the investigation's prompt reads (joshuafolkken/kit#7668).
+function lead_of(issue: number, minutes: number): string {
+	const source = `(\`pnpm josh lane:breakdown ${String(issue)}\`):`
+	const is_japanese = session_language.is_japanese(session_language.resolve_session_lang().lang)
+
+	return is_japanese
+		? `工程別の正味時間（長い順）、正味 ${String(minutes)} 分 ${source}`
+		: `${HEADING}, ${String(minutes)} min of net time ${source}`
+}
+
 // The Issue comment and the printout: a heading, then one bullet per stage.
 function comment(issue: number, minutes: number, report: Report): string {
-	const lead = `${HEADING}, ${String(minutes)} min of net time`
-	const source = `(\`pnpm josh lane:breakdown ${String(issue)}\`):`
-
 	return [
-		`${lead} ${source}`,
+		lead_of(issue, minutes),
 		'',
 		...entries_of(report).flatMap((entry) => bullets_of(entry)),
 		...(report.elapsed === undefined ? [] : [report.elapsed]),
