@@ -1,15 +1,28 @@
+# `fail_text` is a per-command key in lefthook's schema; at the hook level `lefthook validate`
+# rejects it (kit#7655). Each hook's text is anchored on its first command and aliased on the rest.
 pre-commit:
   parallel: true
   commands:
     prevent-main-commit:
-      skip: git diff --cached --quiet
+      # `git diff --cached --quiet` exits 0 when nothing is staged, which skips the command.
+      skip:
+        - run: git diff --cached --quiet
       run: pnpm josh prevent-main-commit
+      fail_text: &commit-fail-text |
+        🚫 Commit blocked due to quality checks failure
+        Please fix the issues above and try again.
+
+        Quick fixes:
+        • Run `josh format` to auto-format code
+        • Run `josh lint` to check and fix linting issues
+        • Run `pnpm exec tsc --noEmit` to verify TypeScript types
 
     # cspell, prettier and eslint go through `josh pre-commit-lint`, which owns their flags so each
     # cache location comes from the constant its ignore rules are asserted against (kit#3948).
     cspell:
       glob: '*.{ts,tsx,js,jsx,md,mdx,html,css,scss,yml,yaml,json,properties}'
       run: pnpm josh pre-commit-lint cspell {staged_files}
+      fail_text: *commit-fail-text
 
     # Scans only staged files, so a secret is caught before it ever enters history —
     # GitHub push protection and the CodeRabbit gitleaks pass both fire after the fact,
@@ -21,14 +34,17 @@ pre-commit:
     # actionable notice instead, and owns the CLI flags (`--no-glob` and friends).
     secretlint:
       run: pnpm josh secretlint-scan {staged_files}
+      fail_text: *commit-fail-text
 
     prettier:
       glob: '*.{js,jsx,ts,tsx,mjs,cjs,html,css,scss,md,mdx,json,jsonc,yaml,yml}'
       run: pnpm josh pre-commit-lint prettier {staged_files}
+      fail_text: *commit-fail-text
 
     eslint:
       glob: '*.{js,jsx,ts,tsx,mjs,cjs}'
       run: pnpm josh pre-commit-lint eslint {staged_files}
+      fail_text: *commit-fail-text
 
     # Routed through `josh pre-commit-type-check` rather than a bare `pnpm exec tsc --noEmit` so the
     # hook can read the record `pnpm josh gate` leaves behind (kit#1381) — the same reader the
@@ -44,15 +60,7 @@ pre-commit:
     type-check:
       glob: '*.{ts,js,mjs,cjs}'
       run: pnpm josh pre-commit-type-check
-
-  fail_text: |
-    🚫 Commit blocked due to quality checks failure
-    Please fix the issues above and try again.
-
-    Quick fixes:
-    • Run `josh format` to auto-format code
-    • Run `josh lint` to check and fix linting issues
-    • Run `pnpm exec tsc --noEmit` to verify TypeScript types
+      fail_text: *commit-fail-text
 
 commit-msg:
   commands:
@@ -111,6 +119,13 @@ pre-push:
     # under a day old (`scripts/security/security-audit-cache.ts`).
     audit:
       run: pnpm josh audit
+      fail_text: &push-fail-text |
+        🚫 Push blocked due to test failures or audit issues
+        Please resolve the issues above before pushing.
+
+        Troubleshooting:
+        • Run tests locally: `josh test:unit`
+        • Run audit locally: `josh audit`
 
     # Routed through `josh pre-push-unit` rather than a bare `pnpm exec vitest run` so the hook can
     # read the record `pnpm josh gate` leaves behind (kit#1334). A green gate writes down the digest
@@ -124,11 +139,4 @@ pre-push:
     # `josh bump` rewrote package.json is one of those "anything else" cases, not a regression.
     test-unit:
       run: pnpm josh pre-push-unit
-
-  fail_text: |
-    🚫 Push blocked due to test failures or audit issues
-    Please resolve the issues above before pushing.
-
-    Troubleshooting:
-    • Run tests locally: `josh test:unit`
-    • Run audit locally: `josh audit`
+      fail_text: *push-fail-text
