@@ -76,9 +76,28 @@ jobs:
         env:
           LATEST: ${{ steps.registry-latest.outputs.latest }}
 
-      - run: pnpm pack --out "$RUNNER_TEMP/$TARBALL"
+      # pnpm pack prints its file listing to stdout, and a write to a non-blocking stdout
+      # pipe that the runner had not drained ended the job mid-listing with exit 1 and no message
+      # (joshuafolkken/kit#7635). The listing goes to a regular file, which never answers EAGAIN, and
+      # is uploaded below. The stdout flags around the pack (O_NONBLOCK is 04000) record who sets it.
+      - name: Pack
+        id: pack
+        run: |
+          sed -n 's/^flags:/stdout flags before pack:/p' /proc/self/fdinfo/1 2>/dev/null || true
+          pnpm pack --out "$RUNNER_TEMP/$TARBALL" > "$RUNNER_TEMP/pack-output.txt"
+          sed -n 's/^flags:/stdout flags after pack:/p' /proc/self/fdinfo/1 2>/dev/null || true
         env:
           TARBALL: ${{ steps.package.outputs.tarball }}
+
+      # The pack output holds the lifecycle scripts' lines and the tarball's file listing; it is
+      # uploaded even when the pack fails, so a failed pack can still be read.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: npm-package-contents
+          path: ${{ runner.temp }}/pack-output.txt
+          if-no-files-found: warn
+          retention-days: 30
 
       # Kept as long as GitHub lets a run be re-run, so re-running a failed publish job still finds
       # the tarball instead of forcing a full re-run that republishes an existing version.
