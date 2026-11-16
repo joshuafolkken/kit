@@ -12,7 +12,7 @@ describe('run_board_render_none.render_no_run', () => {
 	it('says no run on its one line when the reads did not fail', () => {
 		const [line = ''] = render_no_run(NOW)
 
-		expect(line.startsWith('■ backlogrun')).toBe(true)
+		expect(line.startsWith('■ josh-board')).toBe(true)
 		expect(line).toContain(WORDS.no_run)
 	})
 

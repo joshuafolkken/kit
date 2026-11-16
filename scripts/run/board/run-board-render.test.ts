@@ -249,7 +249,7 @@ describe('run_board_render.render phase icons and spinner', () => {
 
 		expect(text).not.toContain('\u{1B}')
 		expect(text).toContain(`\n${lane_of('👀', ZERO, ISSUE_1)}`)
-		expect(text).toContain('▶ backlogrun')
+		expect(text).toContain('▶ josh-board')
 	})
 })
 
