@@ -177,6 +177,20 @@ describe('test_related_record.record_of — the reach cap', () => {
 	})
 })
 
+// joshuafolkken/kit#7639: the files the cap left at their whole reach, each with that reach.
+describe('test_related_record.record_of — files kept at full reach', () => {
+	it('records the files kept at full reach, and leaves the field out when there are none', () => {
+		const kept = { ...related_input(), full_reach: [{ file: SYNCED_CHANGE, count: 2 }] }
+		const result = { elapsed_ms: 0, test_files: undefined }
+		const none = test_related_record.record_of({ ...related_input(), full_reach: [] }, result)
+
+		expect(test_related_record.record_of(kept, result).full_reach).toEqual([
+			{ file: SYNCED_CHANGE, reached: 2 },
+		])
+		expect(none).not.toHaveProperty('full_reach')
+	})
+})
+
 // joshuafolkken/kit#6187: the record carries the count and the hub the run's summary line printed.
 describe('test_related_record.record_of — the summary line of the same run', () => {
 	it('records the count and the hub the summary line of the same run names', () => {
