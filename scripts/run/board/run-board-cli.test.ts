@@ -13,7 +13,7 @@ const { LOCAL, SPINNING, START, STOPPED, harness, plan_titled } = run_board_fixt
 const ESCAPE = '\u{1B}'
 const ENTER = `${ESCAPE}[?1049h${ESCAPE}[?25l`
 const LEAVE = `${ESCAPE}[?25h${ESCAPE}[?1049l`
-const RUN_MARK = '■ backlogrun'
+const RUN_MARK = '■ josh-board'
 const LANE_ROW = '  🔍 1°00′00″ 1°00′00″ 1       a'
 const LAUNCH = { pos: 1, at: '2026-10-08T08:00:00.000Z', kind: 'child-launch', text: '#1 a' }
 
@@ -64,7 +64,7 @@ describe('run_board_cli.run', () => {
 
 		await run_board_cli.run(['--once'], { ...ports, is_tty: true })
 
-		expect(stripVTControlCharacters(frames[0] ?? '')).toMatch(/^▶ backlogrun/u)
+		expect(stripVTControlCharacters(frames[0] ?? '')).toMatch(/^▶ josh-board/u)
 		expect(frames[0]).toContain(LANE_ROW)
 	})
 
@@ -101,10 +101,10 @@ describe('run_board_cli.run --chat', () => {
 
 		await run_board_cli.run(['--chat'], { ...ports, link: hyperlink, read_issue_count })
 
-		const [first, second] = (frames[0] ?? '').split('\n', 2)
+		const [first, , third] = (frames[0] ?? '').split('\n', 3)
 
 		expect(first).toMatch(/📮 87\/6,912$/u)
-		expect(second).toMatch(/^ {2}kit /u)
+		expect(third).toMatch(/^ {2}kit\b/u)
 	})
 
 	it('records no report for a frame a person drew', async () => {

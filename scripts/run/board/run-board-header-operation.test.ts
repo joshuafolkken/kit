@@ -12,9 +12,12 @@ import { run_board_render_fixture } from './run-board-render-fixture'
 const { EMPTY_LAYOUT, MINUTE, NOW, header, lines_of } = run_board_render_fixture
 const SECOND = 1000
 const THIRD = 2
-// No repository is named, so the name column is blank past the first line.
-const NAME_BLANK = ' '.repeat('▶ backlogrun'.length)
-const BEAT_LINE = `${NAME_BLANK}  💓    1′00″  💪 -  🧠 -  💾 -`
+// No kit version and no repository are read, so the name column draws `-` under the board's name and
+// is blank on the third line.
+const NAME = '▶ josh-board'
+const NAME_BLANK = ' '.repeat(NAME.length)
+const VERSION_CELL = '  -'.padEnd(NAME.length)
+const BEAT_LINE = `${VERSION_CELL}  💓    1′00″  💪 -  🧠 -  💾 -`
 const GATE_TEXT = '🔧 #7 · Bash pnpm josh gate'
 // The third line with no spinner turning: its place blank, two columns wide as the `💓`.
 const STILL_LINE = `${NAME_BLANK}           4″  ${GATE_TEXT}`
@@ -49,7 +52,7 @@ describe('run_board_header.header_lines with a session’s operation', () => {
 
 	it('lines the spinner up under the ⏰ and 💓, the time under their digits, the icon under 💪', () => {
 		expect(header_lines_of({ operations: OPERATIONS, spinner: '⠙' })).toStrictEqual([
-			'▶ backlogrun  ⏰ 2°10′00″  ✅  1/2 ■■■■■─────  🔄 1  ⏳ 0  💤 0',
+			`${NAME}  ⏰ 2°10′00″  ✅  1/2 ■■■■■─────  🔄 1  ⏳ 0  💤 0`,
 			BEAT_LINE,
 			`${NAME_BLANK}  ⠙        4″  ${GATE_TEXT}`,
 		])

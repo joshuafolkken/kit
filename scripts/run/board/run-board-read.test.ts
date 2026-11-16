@@ -56,6 +56,7 @@ const UNRECORDED = {
 	closing: new Set(),
 	carry: undefined,
 	is_session_active: false,
+	kit_version: undefined,
 }
 const STUCK_PID = 20_611
 const STUCK_REASON = 'owned by root'
@@ -87,10 +88,8 @@ describe('run_board_read.read_local — the run’s record', () => {
 
 		await expect(run_board_read.read_local()).resolves.toMatchObject({ carry: CARRY })
 	})
-})
 
-// joshuafolkken/kit#3697: whether anything still drives the run is read beside it.
-describe('run_board_read.read_local — whether the run is stranded', () => {
+	// joshuafolkken/kit#3697: whether anything still drives the run is read beside it.
 	it('reads whether the run is stranded from the run’s own records', async () => {
 		arrange(NONE, { invocation: EPIC_RUN, started_at: STARTED_AT, ended_at: ENDED_AT })
 		const is_stranded_at = vi.spyOn(run_stranded_detect, 'is_stranded_at').mockReturnValue(true)

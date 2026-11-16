@@ -34,6 +34,16 @@ const UNEVEN_SPANS = [
 	},
 ]
 const BEATING = { last_event_ms: NOW - MINUTE, is_stopped: false }
+const BOARD_NAME = 'josh-board'
+const VERSION = 'v1.3153.0'
+const WIDE_VERSION = 'v1.3153.0+12'
+const SINGLE_NAME = 'fullrun'
+const SPINNER = '⠙'
+
+// A link drawn as markdown, so the test reads which text links where.
+function markdown_link(text: string, url: string): string {
+	return `[${text}](${url})`
+}
 
 function row(number: number, state: BoardRow['state']): BoardRow {
 	return { number, title: undefined, kind: undefined, state, status: undefined, waits: [] }
@@ -53,6 +63,14 @@ function plan(settled: number, total: number): BoardLayout {
 
 function header_of(extra: Partial<BoardHeader>): Array<string> {
 	return lines_of(header({ activity: BEATING, ...extra })).slice(0, 2)
+}
+
+// All three lines of a run with a child running and the spinner turning, so the third line draws its
+// time beside the repository.
+function moving_of(extra: Partial<BoardHeader>): Array<string> {
+	const layout = { ...EMPTY_LAYOUT, active: [row(1, 'running')] }
+
+	return lines_of(header({ activity: BEATING, layout, spinner: SPINNER, ...extra })).slice(0, 3)
 }
 
 // The column `text` starts in on `line`.
@@ -89,8 +107,8 @@ describe('run_board_header.header_lines — the time column', () => {
 	it('draws the run’s age after its name and the 💓 under it, in one column', () => {
 		const [first, second] = header_of({ repo: KIT })
 
-		expect(first).toMatch(/^⏸ backlogrun {2}⏰ 2°10′00″ {2}✅/u)
-		expect(second).toMatch(/^ {2}kit {9}💓 {4}1′00″ {2}💪/u)
+		expect(first).toMatch(/^⏸ josh-board {2}⏰ 2°10′00″ {2}✅/u)
+		expect(second).toMatch(/^ {2}- {11}💓 {4}1′00″ {2}💪/u)
 		expect(start_of(second, '💓')).toBe(start_of(first, '⏰'))
 	})
 
@@ -105,14 +123,14 @@ describe('run_board_header.header_lines — the time column', () => {
 })
 
 describe('run_board_header.header_lines — the time column once the run has ended', () => {
-	it('draws 🔚 under the ⏰ in the 💓’s place, the header still two lines', () => {
+	it('draws 🔚 under the ⏰ in the 💓’s place, the repository alone under them', () => {
 		const ended_ms = STARTED + 90 * MINUTE
 		const activity = { last_event_ms: ended_ms, is_stopped: true }
 		const lines = lines_of(header({ activity, ended_ms, repo: KIT }))
 
-		expect(lines[0]).toMatch(/^■ backlogrun {2}⏰ 1°30′00″ {2}✅/u)
-		expect(lines[1]).toMatch(/^ {2}kit {9}🔚 \d{2}:\d{2} {5}\S/u)
-		expect(lines[2]).toBe('')
+		expect(lines[0]).toMatch(/^■ josh-board {2}⏰ 1°30′00″ {2}✅/u)
+		expect(lines[1]).toMatch(/^ {2}- {11}🔚 \d{2}:\d{2} {5}\S/u)
+		expect(lines[2]).toBe('  kit')
 		expect(lines.join('\n')).not.toContain('💓')
 	})
 
@@ -127,29 +145,64 @@ describe('run_board_header.header_lines — the time column once the run has end
 
 describe('run_board_header.header_lines — the name column', () => {
 	it.each([
-		['shorter than the run’s', KIT, /^ {2}kit {9}💓/u],
-		['longer than the run’s', LONG, /^ {2}a-long-repository {2}💓/u],
-		['not read yet', undefined, /^ {14}💓/u],
-	])('keeps the times in one column with a repository name %s', (_case, repo, drawn) => {
-		const [first, second] = header_of({ repo })
+		['shorter than the board’s', KIT, /^ {2}- {11}💓/u, /^ {2}kit {9}⠙ /u],
+		['longer than the board’s', LONG, /^ {2}- {18}💓/u, /^ {2}a-long-repository {2}⠙ /u],
+		['not read yet', undefined, /^ {2}- {11}💓/u, /^ {14}⠙ /u],
+	])('keeps the times in one column with a repository name %s', (_case, repo, beat, now) => {
+		const [first, second, third] = moving_of({ repo })
 
-		expect(second).toMatch(drawn)
+		expect(second).toMatch(beat)
+		expect(third).toMatch(now)
 		expect(start_of(second, '💓')).toBe(start_of(first, '⏰'))
+		expect(start_of(third, SPINNER)).toBe(start_of(first, '⏰'))
 		expect(time_end_of(second, '💓')).toBe(time_end_of(first, '⏰'))
 	})
 
 	it('widens the first line’s name to a longer repository name', () => {
 		const [first] = header_of({ repo: LONG })
 
-		expect(first).toMatch(/^⏸ backlogrun {9}⏰ /u)
+		expect(first).toMatch(/^⏸ josh-board {9}⏰ /u)
 	})
 
-	it('starts the repository name under the run’s past a two-column mark', () => {
+	it('starts the version and the repository under the board’s name past a two-column mark', () => {
 		const layout = { ...EMPTY_LAYOUT, people: [row(2, 'human')] }
-		const [first, second] = header_of({ layout, repo: KIT })
+		const [first, second, third] = lines_of(header({ activity: BEATING, layout, repo: KIT }))
 
-		expect(start_of(second, 'kit')).toBe(start_of(first, 'backlogrun'))
+		expect(start_of(second, '-')).toBe(start_of(first, BOARD_NAME))
+		expect(start_of(third, 'kit')).toBe(start_of(first, BOARD_NAME))
 		expect(start_of(second, '💓')).toBe(start_of(first, '⏰'))
+	})
+})
+
+// joshuafolkken/kit#7672: the column draws the board's name linked to kit, the kit version the
+// supervisor runs linked to kit's releases, then the repository.
+describe('run_board_header.header_lines — the board’s name and the kit version', () => {
+	it('links the board’s name to kit and the version to its releases', () => {
+		const [first, second] = header_of({ kit_version: VERSION, comment_link: markdown_link })
+
+		expect(first?.startsWith('⏸ [josh-board](https://github.com/joshuafolkken/kit) ')).toBe(true)
+		expect(second).toContain(`[${VERSION}](https://github.com/joshuafolkken/kit/releases)`)
+	})
+
+	it('draws - where no version was recorded', () => {
+		const [, second] = header_of({ comment_link: markdown_link })
+
+		expect(second).toMatch(/^ {2}- +💓/u)
+	})
+
+	it('draws a single run’s name in the board’s place', () => {
+		const [first] = header_of({ run_name: SINGLE_NAME })
+
+		expect(first).toMatch(new RegExp(`^⏸ ${SINGLE_NAME} {2}⏰`, 'u'))
+	})
+
+	it('keeps the times in one column on all three lines past a version wider than the name', () => {
+		const [first, second, third] = moving_of({ kit_version: WIDE_VERSION, repo: KIT })
+
+		expect(second?.startsWith(`  ${WIDE_VERSION}  💓`)).toBe(true)
+		expect(start_of(second, '💓')).toBe(start_of(first, '⏰'))
+		expect(start_of(third, SPINNER)).toBe(start_of(first, '⏰'))
+		expect(time_end_of(second, '💓')).toBe(time_end_of(first, '⏰'))
 	})
 })
 

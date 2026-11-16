@@ -1,5 +1,6 @@
 import { run_board_fold, type FrameBounds } from './run-board-fold'
 import { run_board_header, type BoardHeader } from './run-board-header'
+import { run_board_header_names } from './run-board-header-names'
 import { run_board_labels } from './run-board-labels'
 
 // The frame drawn while no run is read: one line under the header's own mark, and the footer.
@@ -20,7 +21,7 @@ function render_no_run(
 	const { read_failed_ms, read_error } = failure
 	const warning = run_board_header.warning_of(WORDS.read, read_failed_ms, read_error)
 	const said = warning === undefined ? WORDS.no_run : undefined
-	const parts = ['■ backlogrun', said, clock_of(now_ms), warning]
+	const parts = [`■ ${run_board_header_names.BOARD_NAME}`, said, clock_of(now_ms), warning]
 	const above = [parts.filter((part) => part !== undefined).join(GAP)]
 	const notes = { head: [], lines: [], hidden: 0 }
 

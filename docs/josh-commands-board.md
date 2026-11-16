@@ -108,19 +108,21 @@ pnpm josh run:board --every 5   # the --chat frame as a 📊 Progress Telegram e
 
 `josh init`/`josh sync` ship it in `.vscode/tasks.json` as the `josh: run board` task, run from "Tasks: Run Task".
 
-The header is three lines — the first two in three columns, the third a spinner and time under the second column, then the kind's icon and words under the third:
+The header is three lines — the first two in three columns, the third the repository's name, a spinner and time under the second column, then the kind's icon and words under the third:
 
 ```
-▶ backlogrun  ⏰ 7°18′07″  ✅  1/2 ■■■■■───── (+1)  🔄 1  ⏳ 0  💤 0  📮 87/6,912
-  kit         💓      20″  💪  11% ■─────────  🧠  29% ■■■───────  💾 2.6M/s ■─────────
-              ⠦        4″  🔧 #<N> · Bash pnpm josh test:related
+▶ josh-board   ⏰ 7°18′07″  ✅  1/2 ■■■■■───── (+1)  🔄 1  ⏳ 0  💤 0  📮 87/6,912
+  v1.3153.0+1  💓      20″  💪  11% ■─────────  🧠  29% ■■■───────  💾 2.6M/s ■─────────
+  kit          ⠦        4″  🔧 #<N> · Bash pnpm josh test:related
 ```
 
-The first line is how far the run is: its state mark and name, `⏰` elapsed in degree-minute-second form (`1°15′57″`, `26″` — every length on the board; a colon is a time of day), a progress bar, per-state counts, `📮` open/closed issues. `🛫`: start to first lane.
+The first column is the board's state mark and `josh-board` (linked to kit; a single run draws its own name), the kit version the run's supervisor recorded as it started (linked to kit's releases; `v<version>+<commits since the release>` in kit itself, `-` with no supervisor record), then the repository's name. The other columns stay aligned however wide it grows.
 
-The second line is what the run is on: the repository's name, `💓` age of the newest event (yellow past 15 quiet minutes, red past 30), and machine gauges (`💪` CPU, `🧠` memory, `💾` swap rate). `⏰` and `💓` share a column, digits right-aligned; both lines' first bars start in one.
+The first line is how far the run is: `⏰` elapsed in degree-minute-second form (`1°15′57″`, `26″` — every length on the board; a colon is a time of day), a progress bar, per-state counts, `📮` open/closed issues. `🛫`: start to first lane.
 
-The third line is what the run is doing now: a spinner, its age, then the kind's icon and words.
+The second line is what the run is on: `💓` age of the newest event (yellow past 15 quiet minutes, red past 30), and machine gauges (`💪` CPU, `🧠` memory, `💾` swap rate). `⏰` and `💓` share a column, digits right-aligned; both lines' first bars start in one.
+
+The third line is what the run is doing now: a spinner, its age, then the kind's icon and words — the repository's name alone while the stream holds no event.
 
 - **At a stage** — the stage's words then why: `⠸  2′31″  🤔 waiting on judgment — 4 waiting`.
 - **At a stage a session works on** — that session's newest operation: `⠼  3″  📝 planning · Bash pnpm josh backlog:plan`.

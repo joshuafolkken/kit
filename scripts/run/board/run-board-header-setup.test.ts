@@ -21,9 +21,10 @@ const OPENING = run_event_setup.opening_lane('278')
 const EMPTY_LAYOUT: BoardLayout = { active: [], queued: [], people: [], unreached: [] }
 const STALE_MS = 40 * MS_PER_MINUTE
 const STAGE_AGE_MS = 151 * SECOND
-// The third line's blank under the run's mark and name, then the gap before its words.
-const NOW_INDENT = ' '.repeat('▶ backlogrun'.length + 2)
-const PROGRESS_0_OF_1 = /^▶ backlogrun {2}⏰ 10″ {2}✅ +0\/1 /u
+// The third line's repository under the board's name, padded to it, then the gap before its words.
+const NOW_INDENT = '  app-kit'.padEnd('▶ josh-board'.length + 2)
+const NOW_PREFIX = /^ +app-kit +/u
+const PROGRESS_0_OF_1 = /^▶ josh-board {2}⏰ 10″ {2}✅ +0\/1 /u
 const JUDGING_LINE = '⠋  2′31″  🤔 waiting on judgment — 1 waiting'
 
 function row(number: number, state: BoardRow['state']): BoardRow {
@@ -91,9 +92,9 @@ function title_of(board: BoardHeader): string {
 	return lines_of(board)[0] ?? ''
 }
 
-// The third line's words, past the blank under the name — as wide as the mark before it is drawn.
+// The third line's words, past the repository under the name.
 function now_of(board: BoardHeader): string {
-	return (lines_of(board)[2] ?? '').trimStart()
+	return (lines_of(board)[2] ?? '').replace(NOW_PREFIX, '')
 }
 
 function staged(...stages: ReadonlyArray<string>): RunActivity {
@@ -114,11 +115,11 @@ describe('run_board_header.header_lines idle before the drain flush', () => {
 		const next_window = planned(ONE_PLANNED, staged(...stages, STAGE.HANDING_OFF))
 		const opening = planned(ONE_PLANNED, staged(...stages, OPENING))
 
-		expect(title_of(idle)).toMatch(/^⏸ backlogrun /u)
+		expect(title_of(idle)).toMatch(/^⏸ josh-board /u)
 		expect(now_of(idle)).not.toContain(SPINNER)
-		expect(title_of(next_window)).toMatch(/^⏸ backlogrun /u)
+		expect(title_of(next_window)).toMatch(/^⏸ josh-board /u)
 		expect(now_of(next_window)).not.toContain(SPINNER)
-		expect(title_of(opening)).toMatch(/^▶ backlogrun /u)
+		expect(title_of(opening)).toMatch(/^▶ josh-board /u)
 		expect(now_of(opening)).toContain(SPINNER)
 	})
 })
@@ -131,14 +132,14 @@ describe('run_board_header.header_lines before the first child launches', () => 
 	it('draws the progress, and turns the spinner beside the stage on the third line', () => {
 		const [first, second, third] = lines_of(header())
 
-		expect(first).toMatch(/^▶ backlogrun {2}⏰ 10″ {2}✅ +0\/- /u)
+		expect(first).toMatch(/^▶ josh-board {2}⏰ 10″ {2}✅ +0\/- /u)
 		expect(first).not.toContain(STAGE.STARTING)
-		expect(second).toMatch(/^ {2}app-kit {5}💓 /u)
+		expect(second).toMatch(/^ {2}- {11}💓 /u)
 		expect(third).toBe(`${NOW_INDENT}⠋   0″  🚀 starting session`)
 	})
 
 	it('draws the still mark of a working run where the frame has no spinner', () => {
-		expect(title_of(header({ spinner: undefined }))).toMatch(/^▶ backlogrun /u)
+		expect(title_of(header({ spinner: undefined }))).toMatch(/^▶ josh-board /u)
 	})
 
 	it('draws the progress bar on the first line once the plan is read', () => {
@@ -205,21 +206,21 @@ describe('run_board_header.header_lines once a child has launched', () => {
 	it('turns the spinner and writes the stage while a lane opens for a later child', () => {
 		const board = planned(NEXT_OPENING, standing(OPENING, SECOND))
 
-		expect(title_of(board)).toMatch(/^▶ backlogrun {2}⏰ 10″ {2}✅ +1\/2 /u)
+		expect(title_of(board)).toMatch(/^▶ josh-board {2}⏰ 10″ {2}✅ +1\/2 /u)
 		expect(now_of(board)).toBe('⠋   1″  🚪 opening lane #278 — 1 waiting')
 	})
 
 	it('turns the spinner and writes the stage while a judgment session runs', () => {
 		const board = planned(NEXT_OPENING, standing(STAGE.SESSION, 72 * SECOND))
 
-		expect(title_of(board)).toMatch(/^▶ backlogrun /u)
+		expect(title_of(board)).toMatch(/^▶ josh-board /u)
 		expect(now_of(board)).toBe('⠋  1′12″  💭 judgment session running — 1 waiting')
 	})
 
 	it('stands idle between children, and writes how long it has watched and why', () => {
 		const board = planned(NEXT_OPENING, merged(STAGE_AGE_MS))
 
-		expect(title_of(board)).toMatch(/^⏸ backlogrun .*✅ +1\/2 /u)
+		expect(title_of(board)).toMatch(/^⏸ josh-board .*✅ +1\/2 /u)
 		expect(now_of(board)).toBe('2′31″  🔭 watching — 1 waiting')
 	})
 })
@@ -230,19 +231,19 @@ describe('run_board_header.header_lines retained session stages', () => {
 		const idle = planned(ONE_PLANNED, activity)
 		const running = planned(ONE_RUNNING, activity)
 
-		expect(title_of(idle)).toMatch(/^⏸ backlogrun/u)
+		expect(title_of(idle)).toMatch(/^⏸ josh-board/u)
 		expect(now_of(idle)).toContain(STAGE.SESSION)
 		expect(now_of(idle)).not.toContain(SPINNER)
-		expect(title_of(running)).toMatch(/^▶ backlogrun/u)
+		expect(title_of(running)).toMatch(/^▶ josh-board/u)
 		expect(now_of(running)).toContain(SPINNER)
 	})
 
 	it('keeps human and stopped marks despite a retained session description', () => {
 		const activity = { ...standing(STAGE.SESSION), is_setup_working: false }
 
-		expect(title_of(planned(PEOPLE, activity))).toMatch(/^✋ backlogrun/u)
+		expect(title_of(planned(PEOPLE, activity))).toMatch(/^✋ josh-board/u)
 		expect(title_of(planned(ONE_PLANNED, { ...activity, is_stopped: true }))).toMatch(
-			/^■ backlogrun/u,
+			/^■ josh-board/u,
 		)
 	})
 })
@@ -252,14 +253,14 @@ describe('run_board_header.header_lines marks a setup does not change', () => {
 		const activity = { ...standing(STAGE.PLANNING), ...merged(SECOND), is_stopped: true }
 		const board = planned(ONE_PLANNED, activity)
 
-		expect(title_of(board)).toMatch(/^■ backlogrun .*✅ +0\/1 /u)
+		expect(title_of(board)).toMatch(/^■ josh-board .*✅ +0\/1 /u)
 		expect(now_of(board)).toBe('1″  🔚 #278 merged')
 	})
 
 	it('draws a plan left only to people as waiting on a person', () => {
 		const board = planned(PEOPLE, merged(SECOND))
 
-		expect(title_of(board)).toMatch(/^✋ backlogrun/u)
+		expect(title_of(board)).toMatch(/^✋ josh-board/u)
 		expect(now_of(board)).toBe('1″  🔭 watching — 1 waiting on a person')
 	})
 
@@ -268,14 +269,14 @@ describe('run_board_header.header_lines marks a setup does not change', () => {
 		const asked: BoardLayout = { ...PEOPLE, active: [row(1, 'human')] }
 		const board = planned(asked, merged(SECOND))
 
-		expect(title_of(board)).toMatch(/^✋ backlogrun/u)
+		expect(title_of(board)).toMatch(/^✋ josh-board/u)
 		expect(now_of(board)).toBe('1″  🔭 watching — 2 waiting on a person')
 	})
 
 	it('draws a run at a stage as working, though all its plan has left waits on a person', () => {
 		const board = planned(PEOPLE, standing(STAGE.SESSION))
 
-		expect(title_of(board)).toMatch(/^▶ backlogrun .*✅ /u)
+		expect(title_of(board)).toMatch(/^▶ josh-board .*✅ /u)
 	})
 
 	it('colors the heartbeat of a setup that has gone quiet, as a running run’s', () => {
