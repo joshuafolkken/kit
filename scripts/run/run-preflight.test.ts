@@ -319,8 +319,8 @@ describe('check counts the uncommitted work a lane holds on a branch with no com
 describe('check counts no uncommitted work in a lane no child was started in', () => {
 	it.each([
 		['open', 'lane:open', [BRANCH], 'clean'],
-		['running', 'lane:dispatch', [BRANCH], 'resume'],
-		['running', 'lane:resume', [], 'clean'],
+		['open', 'lane:adopt', [BRANCH], 'resume'],
+		['running', 'lane:dispatch', [], 'clean'],
 	] as const)('answers %s by %s on %j with %s', async (state, changed_by, branches, verdict) => {
 		arrange_lane_on(BRANCH, LANE_CHANGE)
 		branch_names.mockResolvedValue([...branches])
