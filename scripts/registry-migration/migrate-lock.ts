@@ -106,11 +106,38 @@ function sort_peers(entry: Record<string, unknown>): void {
 		.toSorted((left, right) => left.localeCompare(right))
 }
 
+function edge_section(value: unknown): Record<string, unknown> | undefined {
+	const section = value ?? {}
+
+	return yaml_document.is_mapping_document(section) ? section : undefined
+}
+
+function merged_edges(entry: Record<string, unknown>): Record<string, unknown> | undefined {
+	const required = edge_section(entry['dependencies'])
+	const optional = edge_section(entry['optionalDependencies'])
+	if (required === undefined || optional === undefined) return undefined
+	const is_shared = Object.keys(optional).some((name) => Object.hasOwn(required, name))
+
+	return is_shared ? undefined : { ...required, ...optional }
+}
+
+// npm's optional peer metadata moves this scope's edges from dependencies to optionalDependencies.
+// Merge the two only while no name repeats, so every edge name and resolved version still compares.
+function merge_optional_edges(entry: Record<string, unknown>): void {
+	const merged = merged_edges(entry)
+	if (merged === undefined) return
+	entry['dependencies'] = merged
+	delete entry['optionalDependencies']
+}
+
 // That peer metadata reorders this scope's transitive peer lists; their members still compare.
-function sort_peer_lists(document: Record<string, unknown>): void {
+function normalize_scoped_snapshots(document: Record<string, unknown>): void {
 	const scoped = mapping_entries(document['snapshots']).filter(([key]) => key.startsWith(SCOPE))
 
-	for (const [, entry] of scoped) sort_peers(entry)
+	for (const [, entry] of scoped) {
+		sort_peers(entry)
+		merge_optional_edges(entry)
+	}
 }
 
 // Compare every document, importer, snapshot and resolution. The resolver may only replace this
@@ -120,7 +147,7 @@ function graph(content: string): Array<Record<string, unknown>> {
 
 	for (const document of documents) {
 		strip_resolutions(document)
-		sort_peer_lists(document)
+		normalize_scoped_snapshots(document)
 	}
 
 	return documents

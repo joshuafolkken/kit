@@ -1,0 +1,7 @@
+{
+	"reason": "#7684 normalizes this scope's dependencies/optionalDependencies split in the migration lock comparison",
+	"date": "2026-11-16",
+	"growth": {
+		"scripts.code_lines": 20
+	}
+}

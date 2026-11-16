@@ -122,6 +122,49 @@ describe('migration registry metadata (ac-b88de8f7)', () => {
 	})
 })
 
+const CHILD = { '@other/child': '1.0.0' }
+const PEER = { '@other/peer': '2.0.0' }
+const MERGED = { dependencies: { ...CHILD, ...PEER } }
+const SPLIT = { dependencies: CHILD, optionalDependencies: PEER }
+
+function edges_lock(key: string, snapshot: object): string {
+	return dump({ lockfileVersion: '9.0', snapshots: { [key]: snapshot } })
+}
+
+describe('migration optional edge split (ac-5177a68b, ac-4984c6e3, ac-760dde61)', () => {
+	it('accepts this scope moving the same edges to optionalDependencies', () => {
+		expect(() =>
+			migrate_lock.assert_preserved(edges_lock(KIT_KEY, MERGED), edges_lock(KIT_KEY, SPLIT)),
+		).not.toThrow()
+	})
+
+	it.each([
+		{ name: 'a changed version', optional: { '@other/peer': '2.0.1' } },
+		{ name: 'an added edge', optional: { ...PEER, '@other/extra': '1.0.0' } },
+		{ name: 'a removed edge', optional: {} },
+	])('still refuses the split with $name', ({ optional }) => {
+		const after = edges_lock(KIT_KEY, { dependencies: CHILD, optionalDependencies: optional })
+
+		expect(() => migrate_lock.assert_preserved(edges_lock(KIT_KEY, MERGED), after)).toThrow(
+			GRAPH_ERROR,
+		)
+	})
+
+	it('still refuses an edge name in both sections', () => {
+		const after = edges_lock(KIT_KEY, { ...MERGED, optionalDependencies: PEER })
+
+		expect(() => migrate_lock.assert_preserved(edges_lock(KIT_KEY, MERGED), after)).toThrow(
+			GRAPH_ERROR,
+		)
+	})
+
+	it('still refuses the split outside this scope', () => {
+		expect(() =>
+			migrate_lock.assert_preserved(edges_lock(OTHER_KEY, MERGED), edges_lock(OTHER_KEY, SPLIT)),
+		).toThrow(GRAPH_ERROR)
+	})
+})
+
 describe('migration source checks', () => {
 	it('rejects the same non-npm source for assertions and migration-state detection', () => {
 		const lock = PROJECT.replace(
