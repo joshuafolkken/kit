@@ -1,7 +1,9 @@
 import type { NamedPlan } from '#scripts/backlog/backlog-plan'
+import { git_directory } from '#scripts/discovery/git-directory'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { lane_paths } from '#scripts/lane/lane-paths'
+import { lane_state } from '#scripts/lane/lane-state'
 import { stamped_memo } from '#scripts/lib/stamped-memo'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
@@ -19,6 +21,7 @@ const HALFRUN = 'halfrun'
 const SINGLE_INVOCATION = /^(?<command>fullrun|halfrun) #(?<issue>\d+)$/u
 // The launch the board reads a row's running state from, placed before every event of the run.
 const LAUNCH_POSITION = 0
+const FREE_READ: HoldRead = { kind: 'free' }
 
 interface SingleRun {
 	command: string
@@ -77,9 +80,34 @@ async function directory_here(): Promise<string | undefined> {
 	}
 }
 
-// The single run held in this checkout; `undefined` where none is. A lane's hold is its `backlogrun`
-// child's, drawn as that run's row, so only outside a lane is a hold read beside the carry record — a
-// `fullrun` in the root checkout beside a running `backlogrun`.
+// A lane's hold when a single run that resumed the lane took it (`run_hold.lane_mark`); free for a
+// dispatched child's, whose row is its `backlogrun`'s. The hold sits in the lane's own git directory,
+// read through the lane's `.git` file: git suffixes its name on a collision, so the issue alone misses it.
+function lane_read(issue: string): HoldRead {
+	const lane = lane_paths.lane_directory(lane_paths.lanes_root_of(process.cwd()), issue)
+	const own = git_directory.own_git_directory(lane)
+
+	if (own === undefined) return FREE_READ
+
+	const read = run_hold.read_hold(run_hold.hold_path(own))
+
+	return read.kind === 'held' && read.hold.is_single_in_lane === true ? read : FREE_READ
+}
+
+// The single run a lane of this repository holds, read from the root checkout (joshuafolkken/kit#7653);
+// an ended lane holds none.
+async function lane_span(directory: string): Promise<BoardSpan | undefined> {
+	const records = await lane_state.read_records(directory)
+
+	return records
+		.filter((record) => record.state !== 'ended')
+		.map((record) => span_of(lane_read(record.issue)))
+		.find(Boolean)
+}
+
+// The single run held in this checkout, else one a lane holds; `undefined` where none is. A lane's hold
+// is its `backlogrun` child's, drawn as that run's row, so only outside a lane is a hold read beside the
+// carry record — a `fullrun` in the root checkout beside a running `backlogrun`.
 async function span_here(is_carried: boolean): Promise<BoardSpan | undefined> {
 	if (is_carried && lane_paths.lane_issue_of(process.cwd()) !== undefined) return undefined
 
@@ -87,7 +115,7 @@ async function span_here(is_carried: boolean): Promise<BoardSpan | undefined> {
 
 	if (directory === undefined) return undefined
 
-	return span_of(run_hold.read_hold(run_hold.hold_path(directory)))
+	return span_of(run_hold.read_hold(run_hold.hold_path(directory))) ?? (await lane_span(directory))
 }
 
 // A run the root checkout's merge released, as `run-hold-ended.ts` kept it; `undefined` where its

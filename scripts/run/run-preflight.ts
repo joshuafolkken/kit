@@ -83,6 +83,8 @@ const CLEAN_REASON =
 
 const CLEAN_ADVICE = 'Start the child.'
 
+const ASK_AGAIN = 'Then ask this command again: it takes the hold there.'
+
 const RESUME_ADVICE =
 	'Reuse the branch and run the whole verification gate from the start — refactor, `pnpm josh gate`, `/code-review` — never only the part the interrupted run had not reached. Nobody verified what it already committed.'
 
@@ -213,20 +215,19 @@ function reclaim_advice(tree: TreeState, issue: string): string {
 // **`resume` names the one command that leads to a hold.** Switched onto the branch, the same ask
 // answers `clean` and takes the hold, so the caller never alternates between `resume` and `reclaim`.
 // A branch an open lane has checked out cannot be switched to here, so that lane's directory is named.
+// Either way the run asks again where the branch is: a run resumed without that ask holds nothing and
+// carries no `in-progress`, so neither the board nor `run:progress` sees it (joshuafolkken/kit#7653).
 function resume_steps(child: ChildState): Array<string> {
 	if (child.lane_directory !== undefined) {
 		return [
 			`cd ${shell_quote.word(child.lane_directory)}`,
-			'Resume in that lane worktree, where the branch is checked out; keep its directory.',
+			`Resume in that lane worktree, where the branch is checked out; keep its directory. ${ASK_AGAIN}`,
 		]
 	}
 
 	if (child.branch_name === undefined) return []
 
-	return [
-		`git switch ${shell_quote.word(child.branch_name)}`,
-		'Then ask this command again: it takes the hold there.',
-	]
+	return [`git switch ${shell_quote.word(child.branch_name)}`, ASK_AGAIN]
 }
 
 function resume_advice(child: ChildState): string {

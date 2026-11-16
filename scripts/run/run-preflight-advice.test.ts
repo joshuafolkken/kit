@@ -52,3 +52,16 @@ describe('the advice names what the rule requires', () => {
 		)
 	})
 })
+
+// joshuafolkken/kit#7653: a run resumed in a lane without asking again held nothing and carried no
+// `in-progress`, so neither the board nor `run:progress` showed it.
+describe('a branch resumed in a lane', () => {
+	it('asks again in the lane the branch is checked out in, as after a switch', () => {
+		const lane_directory = '/work/.kit-lanes/926'
+		const in_lane = { ...child('none', '926-lane'), lane_directory }
+		const { advice } = run_preflight.decide(CLEAN_TREE, in_lane, ISSUE)
+
+		expect(advice).toContain(`cd ${lane_directory}`)
+		expect(advice).toContain('Then ask this command again: it takes the hold there.')
+	})
+})
