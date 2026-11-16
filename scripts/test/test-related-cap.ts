@@ -18,13 +18,15 @@ type CountReader = (files: ReadonlyArray<string>) => Promise<Array<ReachedCount>
 
 // The changed files that narrow to their direct importers, each with those importers, and the ones of
 // them the cap narrowed — widest reach first, so the first is the hub that put the run past the cap
-// (joshuafolkken/kit#5699).
+// (joshuafolkken/kit#5699). `full_reach` holds the files past the cap it left whole, each with its reach
+// — imports changed or unread, or no test importing them directly (joshuafolkken/kit#7639).
 interface CappedImporters {
 	importers: ReadonlyMap<string, ReadonlyArray<string>>
 	over_cap: ReadonlyArray<string>
+	full_reach?: ReadonlyArray<ReachedCount> | undefined
 }
 
-const NO_CAP: CappedImporters = { importers: new Map(), over_cap: [] }
+const NO_CAP: CappedImporters = { importers: new Map(), over_cap: [], full_reach: [] }
 
 function reach_sum(counts: ReadonlyArray<ReachedCount>): number {
 	return counts.reduce((sum, reached) => sum + reached.count, 0)
@@ -71,14 +73,6 @@ async function relative_counts(
 	return (counts ?? []).map((reached) => ({ ...reached, file: path.relative(root, reached.file) }))
 }
 
-async function read_over_cap(
-	root: string,
-	files: ReadonlyArray<string>,
-	read_counts: CountReader,
-): Promise<Array<string>> {
-	return over_cap_of(await relative_counts(root, files, read_counts))
-}
-
 // A file past the cap that no test imports directly keeps its whole reach: narrowed, it would run no
 // test at all. A registry file narrows to its direct importers and the pinned registry tests
 // (`test-related-pins.ts`).
@@ -91,6 +85,19 @@ async function direct_of(
 	const narrowed = [...importers].filter(([, tests]) => tests.length > 0)
 
 	return narrowed.map(([file, tests]) => [file, test_related_pins.with_pins(file, tests)])
+}
+
+// The files past the cap the run left at their whole reach, widest first — those of `counts` the cap
+// picked that `narrowed` does not hold.
+function full_reach_of(
+	counts: ReadonlyArray<ReachedCount>,
+	narrowed: ReadonlyArray<string>,
+): Array<ReachedCount> {
+	const picked = over_cap_of(counts)
+
+	return counts
+		.filter((reached) => picked.includes(reached.file) && !narrowed.includes(reached.file))
+		.toSorted((first, second) => second.count - first.count)
 }
 
 // The files every test imports, and the other code files of `files` whose reach is read.
@@ -115,10 +122,15 @@ async function capped_importers(
 ): Promise<CappedImporters> {
 	if (is_whole) return NO_CAP
 	const [every_test, candidates] = await split_of(root, files)
-	const over_cap = await read_over_cap(root, candidates, read_counts)
-	const capped = await direct_of(root, over_cap)
+	const counts = await relative_counts(root, candidates, read_counts)
+	const capped = await direct_of(root, over_cap_of(counts))
+	const narrowed = capped.map(([file]) => file)
 
-	return { importers: new Map([...every_test, ...capped]), over_cap: capped.map(([file]) => file) }
+	return {
+		importers: new Map([...every_test, ...capped]),
+		over_cap: narrowed,
+		full_reach: full_reach_of(counts, narrowed),
+	}
 }
 
 // The hubs among `files`, read before any edit so `lane:plan` can split them off

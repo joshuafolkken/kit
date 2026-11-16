@@ -5,7 +5,7 @@ import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_breakdown } from './lane-breakdown'
-import type { LedgerEntry } from './lane-ledger'
+import type { LedgerEntry, TestRelatedEntry } from './lane-ledger'
 import { lane_ledger_write } from './lane-ledger-write'
 import { lane_measure_cli } from './lane-measure-cli'
 import { lane_over } from './lane-over'
@@ -145,7 +145,7 @@ describe('lane_sinks.table', () => {
 	})
 })
 
-function test_related(issue: number, minute: number, over_cap_hub: string): LedgerEntry {
+function test_related(issue: number, minute: number, over_cap_hub: string): TestRelatedEntry {
 	return {
 		kind: 'test-related',
 		at: at(minute),
@@ -235,6 +235,29 @@ describe('lane_sinks.hubs_of', () => {
 		]
 
 		expect(lane_sinks.hubs_of(entries, [LONG, LONGER])).toStrictEqual(['b.ts', 'a.ts'])
+	})
+})
+
+function kept_whole(issue: number, minute: number, reached: number): LedgerEntry {
+	return { ...test_related(issue, minute, 'hub.ts'), full_reach: [{ file: 'wide.ts', reached }] }
+}
+
+// joshuafolkken/kit#7639: the files the named lanes' runs left at their whole reach past the cap.
+describe('lane_sinks.full_reach_of', () => {
+	it('lists each distinct file of the named lanes once, at the widest reach read', () => {
+		const entries = [
+			kept_whole(LONG, 1, 1500),
+			kept_whole(LONGER, 2, 1777),
+			kept_whole(SHORT, 3, 1900),
+		]
+
+		expect(lane_sinks.full_reach_of(entries, [LONG, LONGER])).toStrictEqual([
+			{ file: 'wide.ts', reached: 1777 },
+		])
+	})
+
+	it('lists none for runs that kept no file whole', () => {
+		expect(lane_sinks.full_reach_of([test_related(LONG, 1, 'b.ts')], [LONG])).toStrictEqual([])
 	})
 })
 

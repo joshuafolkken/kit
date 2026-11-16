@@ -16,7 +16,8 @@ import { lane_yield_split, type IssueYield } from './lane-yield-split'
 // `josh lane:stats --over` (joshuafolkken/kit#5988): one row per lane of the period over a threshold,
 // its net and waited minutes beside the ledger chain that explains it — the split notices and filed
 // children, a blocking round 1, the unplanned notices, each yield with its holder and redispatch gap,
-// and the hub that put `test:related` past its cap. Each `lane:breakdown` stage past its budget follows
+// the hub that put `test:related` past its cap and the files that kept their whole reach past it
+// (joshuafolkken/kit#7639). Each `lane:breakdown` stage past its budget follows
 // as `<stage> <minutes>/<budget>` (joshuafolkken/kit#7008). The open Issues are matched against the
 // lane's longest stage, as `--sinks` matches each of its rows.
 
@@ -85,12 +86,19 @@ function hub_part({ entries }: SinkRecords, issue: number): Array<string> {
 	return lane_sinks.hubs_of(entries, [issue]).map((hub) => `hub over cap ${hub}`)
 }
 
+function full_reach_part({ entries }: SinkRecords, issue: number): Array<string> {
+	return lane_sinks
+		.full_reach_of(entries, [issue])
+		.map(({ file, reached }) => `full reach ${file} (${String(reached)})`)
+}
+
 const CHAIN_PARTS: ReadonlyArray<ChainPart> = [
 	split_part,
 	round_part,
 	unplanned_part,
 	yield_part,
 	hub_part,
+	full_reach_part,
 ]
 
 // The lane's ledger chain in one cell, `-` when nothing in it explains the time.
