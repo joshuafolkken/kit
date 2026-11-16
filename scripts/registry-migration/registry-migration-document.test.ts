@@ -4,9 +4,13 @@ import { describe, expect, it } from 'vitest'
 
 // joshuafolkken/kit#7654: the path for consumers the migration entry stops on is documented,
 // reached from the other entry docs, and never weakens the integrity check.
+// joshuafolkken/kit#7680: the document is written in English, so its anchors are English too.
 const DOCS_DIR = path.join(import.meta.dirname, '..', '..', 'docs')
-const HEADING = '## 入口が停止する配布先'
-const ANCHOR = 'registry-migration.md#入口が停止する配布先'
+const DOCUMENT = 'registry-migration.md'
+const HEADING = '## When the entry stops'
+const ANCHOR = `${DOCUMENT}#when-the-entry-stops`
+const WORK_LEFT_ANCHOR = `${DOCUMENT}#work-left-after-the-migration`
+const JAPANESE = /[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}]/u
 const UTF8 = 'utf8'
 
 function read_document(relative: string): string {
@@ -14,7 +18,7 @@ function read_document(relative: string): string {
 }
 
 function stopped_entry_section(): string {
-	const document = read_document('registry-migration.md')
+	const document = read_document(DOCUMENT)
 	const start = document.indexOf(HEADING)
 	const end = document.indexOf('\n## ', start + HEADING.length)
 
@@ -25,8 +29,8 @@ describe('registry-migration.md stopped-entry section', () => {
 	it('covers both stop reasons', () => {
 		const section = stopped_entry_section()
 
-		expect(section).toContain('pnpm 版違い')
-		expect(section).toContain('不足版')
+		expect(section).toContain('pnpm version mismatch:')
+		expect(section).toContain('Missing version:')
 	})
 
 	it('points the scope at npm and ends with the unauthenticated checks', () => {
@@ -43,13 +47,20 @@ describe('registry-migration.md stopped-entry section', () => {
 		const section = stopped_entry_section()
 
 		expect(section).not.toMatch(/--no-verify|verify-store-integrity\s*=\s*false|--force/u)
-		expect(section).toContain('checksum 無効化や integrity の書き換えはしない')
+		expect(section).toContain('Never disable checksums or rewrite integrity.')
 	})
 
-	it.each(['troubleshooting.md', path.join('how-to', 'update-kit.md')])(
-		'is linked from %s',
-		(relative) => {
-			expect(read_document(relative)).toContain(ANCHOR)
-		},
-	)
+	it.each([
+		['troubleshooting.md', ANCHOR],
+		[path.join('how-to', 'update-kit.md'), ANCHOR],
+		['authentication.md', WORK_LEFT_ANCHOR],
+	])('is linked from %s at %s', (relative, anchor) => {
+		expect(read_document(relative)).toContain(anchor)
+	})
+})
+
+describe('registry-migration.md language', () => {
+	it('contains no Japanese text', () => {
+		expect(read_document(DOCUMENT)).not.toMatch(JAPANESE)
+	})
 })
