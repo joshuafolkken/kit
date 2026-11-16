@@ -246,8 +246,8 @@ function kept_whole(issue: number, minute: number, reached: number): LedgerEntry
 describe('lane_sinks.full_reach_of', () => {
 	it('lists each distinct file of the named lanes once, at the widest reach read', () => {
 		const entries = [
-			kept_whole(LONG, 1, 1500),
-			kept_whole(LONGER, 2, 1777),
+			kept_whole(LONGER, 1, 1777),
+			kept_whole(LONG, 2, 1500),
 			kept_whole(SHORT, 3, 1900),
 		]
 

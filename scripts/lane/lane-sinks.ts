@@ -186,4 +186,4 @@ const lane_sinks = {
 }
 
 export { lane_sinks }
-export type { FullReach, Sink, SinkRecords }
+export type { Sink, SinkRecords }
