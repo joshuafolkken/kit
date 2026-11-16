@@ -1,3 +1,4 @@
+import { rmSync } from 'node:fs'
 import path from 'node:path'
 import { check_related_unplanned } from '#scripts/gate/check-related-unplanned'
 import { git_common_directory } from '#scripts/git/git-common-directory'
@@ -28,6 +29,7 @@ function file_of(relative: string): string {
 }
 
 beforeEach(() => {
+	rmSync(path.join(LANE, '.josh'), { recursive: true, force: true })
 	vi.spyOn(git_common_directory, 'repository').mockReturnValue(make_directory('repository-'))
 	refusal_to.mockResolvedValue(YIELD_TEXT)
 	lane_plan.record(PLAN, LANE)
@@ -37,6 +39,19 @@ describe('unplanned_edit.notice', () => {
 	it("asks lane:plan at a lane child's first edit of an unplanned file, returning its yield", async () => {
 		expect(await unplanned_edit.notice(file_of(UNPLANNED), LANE, CHILD)).toBe(YIELD_TEXT)
 		expect(refusal_to).toHaveBeenCalledWith(LANE, expect.any(Function))
+	})
+
+	it('asks once per file, even when the yield widened nothing', async () => {
+		await unplanned_edit.notice(file_of(UNPLANNED), LANE, CHILD)
+
+		expect(await unplanned_edit.notice(file_of(UNPLANNED), LANE, CHILD)).toBeUndefined()
+		expect(refusal_to).toHaveBeenCalledTimes(1)
+	})
+
+	it('answers nothing when the ask fails, leaving the hook its other context', async () => {
+		refusal_to.mockRejectedValue(new Error('gh listing failed'))
+
+		expect(await unplanned_edit.notice(file_of(UNPLANNED), LANE, CHILD)).toBeUndefined()
 	})
 
 	it('asks nothing on a planned file, a document, or a missing path', async () => {
