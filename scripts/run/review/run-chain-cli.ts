@@ -10,16 +10,18 @@ import { run_chain_join } from './run-chain-join'
 
 // `josh run:chain <N>` — `main:merge` (none in a lane child), `review:selfcheck`, `check:related` and `run:review` in one call
 // (`run-chain.ts`); `--join [--fixing]` runs the half after the review instead (`run-chain-join.ts`).
-// `--from <stage>` resumes at a stage after a stop the run settled; `--unpinned-ok "<reason>"` goes to
-// `run:review` as given, so it opens a review and never rides on `--join`.
+// `--from <stage>` resumes at a stage after a stop the run settled; `--unpinned-ok "<reason>"` and
+// `--accept-metrics "<reason>"` go to `run:review` as given, so they open a review and never ride on
+// `--join`.
 
 const ARGV_OFFSET = 2
 const FAILURE_EXIT_CODE = 1
 const USAGE =
-	'Usage: josh run:chain <N> [--from <stage>] [--unpinned-ok "<reason>"] | <N> --join [--fixing] [--from <stage>] [--ship "<title> #<N>"]'
+	'Usage: josh run:chain <N> [--from <stage>] [--unpinned-ok "<reason>"] [--accept-metrics "<reason>"] | <N> --join [--fixing] [--from <stage>] [--ship "<title> #<N>"]'
 const OPTIONS = {
 	from: { type: 'string' },
 	'unpinned-ok': { type: 'string' },
+	'accept-metrics': { type: 'string' },
 	join: { type: 'boolean' },
 	fixing: { type: 'boolean' },
 	ship: { type: 'string' },
@@ -28,6 +30,7 @@ const OPTIONS = {
 interface ChainValues {
 	from: string | undefined
 	unpinned_ok: string | undefined
+	accept_metrics: string | undefined
 	is_join: boolean
 	is_fixing: boolean
 	ship: string | undefined
@@ -47,22 +50,28 @@ interface StopFields {
 
 // A lane child merges main in ship's sync, so its opening half is the review stages alone
 // (`chain-rule.md` → "A lane child").
-function opening_stages(unpinned_ok: ReadonlyArray<string>): ReadonlyArray<ChainStage> {
-	if (lane_child_marker.is_child_of(process.cwd())) return run_chain.review_stages(unpinned_ok)
+function opening_stages(review_args: ReadonlyArray<string>): ReadonlyArray<ChainStage> {
+	if (lane_child_marker.is_child_of(process.cwd())) return run_chain.review_stages(review_args)
 
-	return run_chain.main_line_stages(unpinned_ok)
+	return run_chain.main_line_stages(review_args)
+}
+
+function flag_pair(flag: string, value: string | undefined): ReadonlyArray<string> {
+	return value === undefined ? [] : [flag, value]
 }
 
 function stages_of(issue: string, values: ChainValues): ReadonlyArray<ChainStage> {
 	if (values.is_join) return run_chain_join.join_stages(issue, values.is_fixing, values.ship)
-	const reason = values.unpinned_ok
 
-	return opening_stages(reason === undefined ? [] : ['--unpinned-ok', reason])
+	return opening_stages([
+		...flag_pair('--unpinned-ok', values.unpinned_ok),
+		...flag_pair('--accept-metrics', values.accept_metrics),
+	])
 }
 
-// `--fixing` belongs to the join and `--unpinned-ok` to the opening half, so each refuses the other list.
+// `--fixing` belongs to the join and the reasons to the opening half, so each refuses the other list.
 function is_mixed(values: ChainValues): boolean {
-	if (values.is_join) return values.unpinned_ok !== undefined
+	if (values.is_join) return values.unpinned_ok !== undefined || values.accept_metrics !== undefined
 
 	return values.is_fixing || values.ship !== undefined
 }
@@ -97,6 +106,7 @@ function parse(argv: ReadonlyArray<string>): ChainArguments | undefined {
 	return arguments_from(issue_number_shape.single_of(positionals), {
 		from: values.from,
 		unpinned_ok: values['unpinned-ok'],
+		accept_metrics: values['accept-metrics'],
 		is_join: values.join === true,
 		is_fixing: values.fixing === true,
 		ship: values.ship,

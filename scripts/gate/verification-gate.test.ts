@@ -175,21 +175,29 @@ describe('run_gate_command', () => {
 	// `gate` forwards nothing to its four sub-commands, so an appended flag would vanish silently —
 	// the hole the composite-argument guard closes for `sh -c` entries.
 	it('refuses extra arguments and names where they belong', async () => {
-		const stderr: Array<string> = []
-		const spy = vi.spyOn(process.stderr, 'write').mockImplementation((chunk: unknown) => {
-			stderr.push(String(chunk))
-
-			return true
-		})
+		const error = vi.spyOn(console, 'error').mockReturnValue(undefined)
 
 		try {
 			const code = await verification_gate.run_gate_command([FORWARDED_FLAG])
 
 			expect(code).toBe(1)
-			expect(stderr.join('')).toContain(REFUSAL_MESSAGE)
+			expect(error).toHaveBeenCalledWith(expect.stringContaining(REFUSAL_MESSAGE))
 			expect(mocked_execa).not.toHaveBeenCalled()
 		} finally {
-			spy.mockRestore()
+			error.mockRestore()
+		}
+	})
+
+	// joshuafolkken/kit#7612: a help request is answered, not refused, and runs nothing.
+	it.each(['--help', '-h'])('prints the usage and exits 0 on %s', async (flag) => {
+		const info = vi.spyOn(console, 'info').mockReturnValue(undefined)
+
+		try {
+			expect(await verification_gate.run_gate_command([flag])).toBe(0)
+			expect(info).toHaveBeenCalledWith(expect.stringMatching(/^Usage: josh gate \[--verbose\]/u))
+			expect(mocked_execa).not.toHaveBeenCalled()
+		} finally {
+			info.mockRestore()
 		}
 	})
 
@@ -312,12 +320,7 @@ describe('run_gate_command — the verbose flag', () => {
 	// here must not stop the others being refused.
 	it('still refuses an argument it would have to forward', async () => {
 		mock_steps(ALL_PASS)
-		const stderr: Array<string> = []
-		const spy = vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
-			stderr.push(String(chunk))
-
-			return true
-		})
+		const error = vi.spyOn(console, 'error').mockReturnValue(undefined)
 
 		try {
 			const code = await verification_gate.run_gate_command([
@@ -326,9 +329,9 @@ describe('run_gate_command — the verbose flag', () => {
 			])
 
 			expect(code).toBe(1)
-			expect(stderr.join('')).toContain(REFUSAL_MESSAGE)
+			expect(error).toHaveBeenCalledWith(expect.stringContaining(REFUSAL_MESSAGE))
 		} finally {
-			spy.mockRestore()
+			error.mockRestore()
 		}
 	})
 })

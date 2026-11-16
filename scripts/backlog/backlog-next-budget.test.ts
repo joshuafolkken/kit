@@ -49,9 +49,9 @@ const RESUME_READS = 2
 // the scan read each listed child again, 32 calls.
 const SCAN_CALL_CAP = 21
 const PRE_FIX_SCAN_CALLS = 63
-// The second scan with nothing changed, measured: the epic listing and the three epic bodies come
-// back 304, so they are not billed.
-const SECOND_SCAN_CALL_CAP = 16
+// The second scan with nothing changed, measured: the epic listing, the three epic bodies and the open
+// pull request listing (#7620) come back 304, so they are not billed.
+const SECOND_SCAN_CALL_CAP = 15
 
 const streams = console_streams()
 
@@ -61,6 +61,8 @@ const FIRST_SCAN_LOGIN = 'first-scan-member'
 const SECOND_SCAN_LOGIN = 'second-scan-member'
 const WRITE_ROLE = JSON.stringify({ permission: 'write', role_name: 'write' })
 const PERMISSION_SEGMENT = '/permission'
+const PULLS_SEGMENT = '/pulls'
+const NO_OPEN_PULLS = '[]'
 
 type ChildRow = (child: number) => OpenIssueData
 
@@ -73,6 +75,7 @@ function comments_answer(): string {
 
 async function answer(request: GhApiRequest): Promise<string> {
 	if (request.path.endsWith(PERMISSION_SEGMENT)) return WRITE_ROLE
+	if (request.path.includes(PULLS_SEGMENT)) return NO_OPEN_PULLS
 
 	return request.path === GRAPHQL_PATH ? comments_answer() : ''
 }

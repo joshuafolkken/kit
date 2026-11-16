@@ -1,6 +1,6 @@
 import { gh_author_association } from '#scripts/gh/gh-author-association'
 import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
-import { git_gh_exec } from '#scripts/gh/git-gh-exec'
+import { git_gh_etag_read } from '#scripts/gh/git-gh-etag-read'
 import { parse_json } from '#scripts/git/parse-json-array'
 import { lane_early_push_count } from '#scripts/lane/lane-early-push-count'
 import { lane_ledger, type LedgerEntry } from '#scripts/lane/lane-ledger'
@@ -25,7 +25,7 @@ async function read_ledger(): Promise<ReadonlyArray<LedgerEntry>> {
 
 async function read(source: ObservationSource): Promise<string | undefined> {
 	const path = `${git_gh_api_path.issues_api_path(source.repo)}/comments/${source.comment}`
-	const raw = await git_gh_exec.exec_gh_api({ path })
+	const raw = await git_gh_etag_read.read(path)
 	const comment = parse_json.parse_json_object_or_undefined(raw, comment_schema)
 	if (comment?.html_url !== source.url) return undefined
 	const author = { ...gh_author_association.author_of(comment), repo: source.repo }

@@ -116,7 +116,7 @@ function declared_of(issue: number, issues: ReadonlyArray<OpenIssueData>): Decla
 	return size === undefined || size.files === 0 ? undefined : size
 }
 
-// Whether the bar applies at all — read before the signals, so an undeclared Issue measures nothing.
+// Whether the bar applies at all — an undeclared Issue's signals, read beside the listing, go unused.
 function declares(issue: number, issues: ReadonlyArray<OpenIssueData>): boolean {
 	return declared_of(issue, issues) !== undefined
 }

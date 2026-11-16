@@ -33,6 +33,13 @@ const OPEN_ISSUE: IssueState = { state: 'OPEN', labels: ['in-progress'], is_huma
 const NO_RECORDS: LaneRecords = new Map()
 const MERGED_AT = '2026-10-27T01:23:45Z'
 
+// The branch lookup reads through `exec_gh_api` here; its ETag is pinned in `git-gh-pr-read-etag.test.ts`.
+vi.mock('#scripts/gh/git-gh-etag-read', async () => {
+	const { git_gh_etag_read_fixture } = await import('#scripts/gh/git-gh-etag-read-fixture')
+
+	return { git_gh_etag_read: git_gh_etag_read_fixture.through_exec }
+})
+
 vi.mock('#scripts/gh/git-gh-exec', () => ({
 	git_gh_exec: { exec_gh_api: vi.fn() },
 }))

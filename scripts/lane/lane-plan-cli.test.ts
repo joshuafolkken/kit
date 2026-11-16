@@ -10,6 +10,7 @@ import { temporary_directory } from '#tools/test/temporary-directory'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_plan } from './lane-plan'
 import { lane_plan_cli } from './lane-plan-cli'
+import { lane_plan_signals } from './lane-plan-signals'
 import { lane_yield } from './lane-yield'
 
 const make_directory = temporary_directory('suite')
@@ -34,6 +35,9 @@ const FAILURE = 1
 const LISTING_LIMIT = 100
 
 const fetch_opted_in = vi.spyOn(auto_ok_cli, 'fetch_opted_in')
+// The size signals are read beside the listing for every plan (joshuafolkken/kit#7596); no bar here
+// reads them, so the repository's graph is never walked.
+const signals_of = vi.spyOn(lane_plan_signals, 'signals_of')
 const record_yield = vi.spyOn(lane_yield, 'record_yield')
 const release = vi.spyOn(run_hold_cli, 'run')
 const error = vi.spyOn(console, 'error')
@@ -66,6 +70,9 @@ const HOLDER_LEFT = listing([running(LATER, '')])
 beforeEach(() => {
 	error.mockImplementation(vi.fn())
 	info.mockImplementation(vi.fn())
+	signals_of.mockResolvedValue(
+		lane_plan_signals.signals_from(LATER, { hunk_files: [], committed_files: [] }, [], 0),
+	)
 	record_yield.mockResolvedValue(undefined)
 	release.mockResolvedValue(SUCCESS)
 	vi.spyOn(git_common_directory, 'repository').mockReturnValue(

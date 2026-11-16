@@ -1,3 +1,4 @@
+import { outer_command } from '#scripts/josh/outer-command'
 import { describe, expect, it } from 'vitest'
 import { lane_child_marker } from './lane-child-marker'
 
@@ -18,6 +19,7 @@ describe('env_for', () => {
 		expect(lane_child_marker.env_for(ISSUE)).toStrictEqual({
 			[lane_child_marker.KEY]: ISSUE,
 			CLAUDE_CODE_PROMPT_CACHE_TTL: '5m',
+			[outer_command.KEY]: '',
 		})
 	})
 

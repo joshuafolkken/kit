@@ -22,6 +22,13 @@ import {
 // joshuafolkken/kit#3263: a failed read answered exactly what a branch with no pull request did, and
 // one command read the same pull request's detail once per reader.
 
+// The branch lookup reads through `exec_gh_api` here; its ETag is pinned in `git-gh-pr-read-etag.test.ts`.
+vi.mock('./git-gh-etag-read', async () => {
+	const { git_gh_etag_read_fixture } = await import('./git-gh-etag-read-fixture')
+
+	return { git_gh_etag_read: git_gh_etag_read_fixture.through_exec }
+})
+
 vi.mock('./git-gh-exec', () => ({
 	git_gh_exec: { exec_gh_command: vi.fn(), exec_gh_api: vi.fn() },
 	has_stderr_field: (): boolean => false,

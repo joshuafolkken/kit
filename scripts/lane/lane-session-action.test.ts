@@ -1,6 +1,7 @@
 import { api_auth } from '#scripts/agent/api-auth'
 import { core_priority } from '#scripts/gate/core-priority'
 import { deferred_answer } from '#scripts/git/deferred-answer-fixture'
+import { outer_command } from '#scripts/josh/outer-command'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { run_ship_stop_cause } from '#scripts/run/ship/run-ship-stop-cause'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -93,8 +94,19 @@ describe('lane_session_action.answer — the reviewer environment', () => {
 
 		expect(launch_mock.mock.calls[0]?.[0]).toHaveProperty('env', {
 			...lane_child_marker.env_for(LANE.issue),
+			[outer_command.KEY]: 'ship',
 			...core_priority.PRIORITY_ENVIRONMENT,
 		})
+	})
+
+	// joshuafolkken/kit#7593: a fix the reviewer verifies runs the full reach, not the touched scope.
+	it('marks the reviewer as nested in the ship, so its bare test:related is not the outermost', async () => {
+		vi.spyOn(console, 'error').mockImplementation(vi.fn())
+
+		await lane_session_action.answer(LANE, ROUND_ONE)
+		const environment = launch_mock.mock.calls[0]?.[0].env ?? {}
+
+		expect(outer_command.is_outermost('test:related', environment)).toBe(false)
 	})
 })
 

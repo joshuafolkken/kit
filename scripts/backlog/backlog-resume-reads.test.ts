@@ -1,13 +1,22 @@
+import { git_gh_conditional } from '#scripts/gh/git-gh-conditional'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { GRAPHQL_PATH } from '#scripts/gh/git-gh-pr-graphql-state'
+import { shared_cache_fixture } from '#scripts/josh/shared-cache-fixture'
 import { run_pause_comment } from '#scripts/run/pause/run-pause-comment'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_resume_reads } from './backlog-resume-reads'
 
 vi.mock('#scripts/gh/git-gh-exec', () => ({ git_gh_exec: { exec_gh_api: vi.fn() } }))
+vi.mock('#scripts/gh/git-gh-conditional', () => ({
+	git_gh_conditional: { read_conditional: vi.fn() },
+}))
 
 const exec_gh_api = vi.mocked(git_gh_exec.exec_gh_api)
+const read_conditional = vi.mocked(git_gh_conditional.read_conditional)
 const REPO = 'joshuafolkken/kit'
+const OPEN_PULLS_PATH = `repos/${REPO}/pulls?state=open&per_page=100`
+const LISTING_ETAG = 'W/"pulls"'
+const FULL_PAGE = 100
 const FEW = 3
 const MANY = 30
 const FIRST_ISSUE = 900
@@ -15,6 +24,23 @@ const PAUSED = '901'
 const LONG = '902'
 const MISSING = '903'
 const QUIET = '904'
+// REST answers `null` for a pull request opened with no description.
+const NULL_BODY: unknown = JSON.parse('{"body":null}')
+const CITING_PULLS = [
+	{ body: `closes #${PAUSED}\n\ncloses #${MISSING}` },
+	{ body: `follows ${REPO}#${LONG}` },
+	{ body: `someone/other#${QUIET}` },
+	NULL_BODY,
+]
+const CITED = new Set([PAUSED, MISSING, LONG])
+
+function answer_listing(rows: ReadonlyArray<unknown>): void {
+	read_conditional.mockResolvedValue({
+		kind: 'changed',
+		etag: LISTING_ETAG,
+		body: JSON.stringify(rows),
+	})
+}
 
 interface Window {
 	bodies: ReadonlyArray<string>
@@ -50,35 +76,50 @@ function quiet(list: ReadonlyArray<string>): ReadonlyMap<string, Window> {
 beforeEach(() => {
 	vi.restoreAllMocks()
 	exec_gh_api.mockReset()
+	read_conditional.mockReset()
+	shared_cache_fixture.keep_in_memory()
 	vi.spyOn(run_pause_comment, 'is_paused').mockResolvedValue(true)
 })
 
 describe('backlog_resume_reads.open_pr_issues', () => {
 	it('answers every issue of this repository the open pull requests cite, from one listing', async () => {
-		exec_gh_api.mockResolvedValue(
-			[
-				{ body: `closes #${PAUSED}\n\ncloses #${MISSING}` },
-				{ body: `follows ${REPO}#${LONG}` },
-				{ body: `someone/other#${QUIET}` },
-				{ body: '' },
-			]
-				.map((row) => JSON.stringify(row))
-				.join('\n'),
-		)
+		answer_listing(CITING_PULLS)
 
-		expect(await backlog_resume_reads.open_pr_issues(REPO)).toEqual(
-			new Set([PAUSED, MISSING, LONG]),
-		)
-		expect(exec_gh_api).toHaveBeenCalledExactlyOnceWith(
-			expect.objectContaining({ path: `repos/${REPO}/pulls?state=open&per_page=100` }),
-		)
+		expect(await backlog_resume_reads.open_pr_issues(REPO)).toEqual(CITED)
+		expect(read_conditional).toHaveBeenCalledExactlyOnceWith(OPEN_PULLS_PATH, undefined, undefined)
+		expect(exec_gh_api).not.toHaveBeenCalled()
 	})
 
-	it('refuses an unreadable listing row instead of reading it as no pull request', async () => {
-		exec_gh_api.mockResolvedValue('invalid')
+	it('answers the same issues from the kept listing when the second read is a 304', async () => {
+		answer_listing(CITING_PULLS)
+		await backlog_resume_reads.open_pr_issues(REPO)
+		read_conditional.mockResolvedValue({ kind: 'unchanged' })
 
-		await expect(backlog_resume_reads.open_pr_issues(REPO)).rejects.toThrow('unreadable row')
+		expect(await backlog_resume_reads.open_pr_issues(REPO)).toEqual(CITED)
+		expect(read_conditional).toHaveBeenLastCalledWith(OPEN_PULLS_PATH, LISTING_ETAG, undefined)
 	})
+
+	it('falls back to the paged read on a full first page, parsed the same way', async () => {
+		const full_page = Array.from({ length: FULL_PAGE }, () => NULL_BODY)
+
+		answer_listing(full_page)
+		exec_gh_api.mockResolvedValue(JSON.stringify([...full_page, ...CITING_PULLS]))
+
+		expect(await backlog_resume_reads.open_pr_issues(REPO)).toEqual(CITED)
+		expect(exec_gh_api).toHaveBeenCalledExactlyOnceWith({
+			path: OPEN_PULLS_PATH,
+			should_paginate: true,
+		})
+	})
+
+	it.each(['invalid', JSON.stringify([{ title: 'no body' }])])(
+		'refuses an unreadable listing %s instead of reading it as no pull request',
+		async (body) => {
+			read_conditional.mockResolvedValue({ kind: 'changed', etag: LISTING_ETAG, body })
+
+			await expect(backlog_resume_reads.open_pr_issues(REPO)).rejects.toThrow('unreadable row')
+		},
+	)
 })
 
 describe('backlog_resume_reads.paused_issues — read count', () => {

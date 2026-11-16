@@ -22,6 +22,7 @@ const REASON = 'only logs'
 const ANSWER = { text: 'unpinned 0 · unchecked 0\n', unpinned: [] }
 const GIT_FAILED = new Error('git failed')
 const FIXING_TEXT = 'round 1 has fixes to make'
+const UNPINNED_SITE = 'scripts/a.ts:1'
 const EMPTY_REPORT: PinnedReport = {
 	unpinned: [],
 	stopped: [],
@@ -100,21 +101,26 @@ describe('run_review_pinned_join.wait_for_join on a tree a round-1 fix moved', (
 	})
 })
 
-// joshuafolkken/kit#5002: `--join` without `--fixing` started the check again on the moved tree, then
-// waited the grace on a probe that never ends within it.
+// joshuafolkken/kit#7553: `--join` without `--fixing` left the check it started again on the moved
+// tree for the ship's pre-detach, which then stopped on an unpinned hunk with no reason.
 describe('run_review_pinned_join.wait_for_join on a moved tree with no fixes to make', () => {
-	it('waits no grace on the check it started again and leaves it running', async () => {
+	it('waits the grace on the check it started again and returns its unpinned places', async () => {
 		run_review_pinned_steps.launch(ROOT, REASON, BRIEFED_TREE)
-		const now = vi.fn(() => 0)
+		const unpinned = { ...ANSWER, unpinned: [UNPINNED_SITE] }
 
-		const answer = await run_review_pinned_join.wait_for_join(ROOT, now)
+		vi.mocked(run_review_steps.launch_josh).mockImplementation(() => {
+			test_pinned_record.write(launched_token(), unpinned, ROOT)
 
-		expect(now).not.toHaveBeenCalled()
+			return { kind: 'launched', pid: FIXED_PID }
+		})
+
+		const waited = vi.spyOn(run_review_pinned_steps, 'wait_for_answer')
+		const answer = await run_review_pinned_join.wait_for_join(ROOT)
+
+		expect(waited).toHaveBeenCalledWith(ROOT, undefined)
 		expect(run_review_pinned_steps.launched_tree(ROOT)).toBe(FIXED_TREE)
 		expect(process.kill).not.toHaveBeenCalledWith(-FIXED_PID, 'SIGTERM')
-		expect(answer?.unpinned).toStrictEqual([])
-		expect(answer?.text).toContain('started again on the moved tree')
-		expect(answer?.text).not.toContain(FIXING_TEXT)
+		expect(answer?.unpinned).toStrictEqual([UNPINNED_SITE])
 	})
 
 	it('still waits the grace for the answer on an unmoved tree', async () => {

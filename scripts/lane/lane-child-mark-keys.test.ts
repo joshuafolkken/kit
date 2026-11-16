@@ -1,13 +1,15 @@
+import { outer_command } from '#scripts/josh/outer-command'
 import { lane_child_mark_keys } from '#scripts/lane/lane-child-mark-keys'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { describe, expect, it } from 'vitest'
 
 const ISSUE = '5029'
-// The prompt-cache TTL rides on a child's environment but is a provider setting, not a lane mark.
-const NOT_A_MARK = 'CLAUDE_CODE_PROMPT_CACHE_TTL'
+// The prompt-cache TTL rides on a child's environment but is a provider setting, not a lane mark; the
+// blanked outer command is a fresh start, not a mark (joshuafolkken/kit#7593).
+const NOT_MARKS: ReadonlySet<string> = new Set(['CLAUDE_CODE_PROMPT_CACHE_TTL', outer_command.KEY])
 
 function marks_set_by(environment: Record<string, string>): Array<string> {
-	return Object.keys(environment).filter((key) => key !== NOT_A_MARK)
+	return Object.keys(environment).filter((key) => !NOT_MARKS.has(key))
 }
 
 // joshuafolkken/kit#5029: the unit suite blanks exactly these keys, so a mark a launcher sets but this

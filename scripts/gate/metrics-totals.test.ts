@@ -91,6 +91,76 @@ describe('metrics_totals.totals_refusal', () => {
 
 		await expect(metrics_totals.totals_refusal(DIRECTORY)).resolves.toBeUndefined()
 	})
+
+	it('names the --accept-metrics rerun in its heading', () => {
+		expect(metrics_totals.REVIEW_REFUSAL_HEADING).toContain(
+			'pnpm josh run:chain <N> --from run:review --accept-metrics "<why>"',
+		)
+	})
+})
+
+// joshuafolkken/kit#7599: `--accept-metrics "<why>"` records a growth at run:review's open.
+const REASON = 'a new command'
+
+function spy_info(): ReturnType<typeof vi.spyOn> {
+	return vi.spyOn(console, 'info').mockImplementation(() => undefined)
+}
+
+describe('metrics_totals.totals_refusal with an accept reason — a grown total', () => {
+	const RECORDED =
+		'josh metrics: growth recorded in .josh/metrics-accepted/7599.json — a new command'
+
+	it('records a growth with `josh metrics --accept --reason` and goes on', async () => {
+		run_mock
+			.mockResolvedValueOnce({ exit_code: 1, output: GROWN })
+			.mockResolvedValueOnce({ exit_code: 0, output: `metrics table\n${RECORDED}\n` })
+		const info = spy_info()
+
+		await expect(metrics_totals.totals_refusal(DIRECTORY, REASON)).resolves.toBeUndefined()
+		expect(run_mock).toHaveBeenLastCalledWith(['josh', 'metrics', '--accept', '--reason', REASON], {
+			cwd: DIRECTORY,
+		})
+		expect(info).toHaveBeenCalledWith(RECORDED)
+	})
+
+	it('refuses with the accept output when the record fails', async () => {
+		run_mock
+			.mockResolvedValueOnce({ exit_code: 1, output: GROWN })
+			.mockResolvedValueOnce({ exit_code: 1, output: 'no issue to record under\n' })
+
+		await expect(metrics_totals.totals_refusal(DIRECTORY, REASON)).resolves.toBe(
+			`${metrics_totals.ACCEPT_REFUSAL_HEADING}\nno issue to record under`,
+		)
+	})
+})
+
+describe('metrics_totals.totals_refusal with an accept reason — no growth', () => {
+	it('records nothing and says the reason went unused when no total grew', async () => {
+		const info = spy_info()
+
+		await expect(metrics_totals.totals_refusal(DIRECTORY, REASON)).resolves.toBeUndefined()
+		expect(run_mock).toHaveBeenCalledOnce()
+		expect(run_mock).toHaveBeenCalledWith(metrics_totals.METRICS_RERECORD_COMMAND, {
+			cwd: DIRECTORY,
+		})
+		expect(info).toHaveBeenCalledWith(metrics_totals.ACCEPT_UNUSED_NOTE)
+	})
+
+	it('says nothing outside kit, where no metrics ran', async () => {
+		is_kit_mock.mockReturnValue(false)
+		const info = spy_info()
+
+		await expect(metrics_totals.totals_refusal(DIRECTORY, REASON)).resolves.toBeUndefined()
+		expect(info).not.toHaveBeenCalled()
+	})
+
+	it('says nothing when no reason was given and no total grew', async () => {
+		const info = spy_info()
+
+		await metrics_totals.totals_refusal(DIRECTORY)
+
+		expect(info).not.toHaveBeenCalled()
+	})
 })
 
 // joshuafolkken/kit#4716: the branch's approval re-recorded before a scoped pair reads the tree.

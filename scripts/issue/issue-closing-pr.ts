@@ -1,8 +1,8 @@
 import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
-import { git_gh_exec } from '#scripts/gh/git-gh-exec'
+import { git_gh_etag_read } from '#scripts/gh/git-gh-etag-read'
 import { git_gh_repo } from '#scripts/gh/git-gh-repo'
 import { git_closes_keyword } from '#scripts/git/git-closes-keyword'
-import { parse_json_object_or_undefined } from '#scripts/git/parse-json-array'
+import { read_json_listing } from '#scripts/git/parse-json-array'
 import { z } from 'zod'
 
 // **The merged pull request that closes an issue GitHub left open**. A
@@ -22,29 +22,39 @@ import { z } from 'zod'
 // **Only a pull request in this repository counts.** A bare `closes #N` names an issue in the pull
 // request's own repository, so a merged pull request elsewhere whose `closes #N` carries the same
 // number closes a different issue — its cross-reference here is a mention, not a close.
+//
+// **The first page goes through the ETag layer** (joshuafolkken/kit#7619), so a sweep re-reading an
+// unchanged timeline costs no rate limit; a full first page is read whole with `--paginate`, and both
+// answers are the same JSON array, parsed here rather than by a jq filter.
 
-const LINE_SEPARATOR = '\n'
-// One compact JSON object per pull request that cross-references the issue, and a
-// `{"reopened":true}` marker per reopen, in timeline order.
-const TIMELINE_FILTER = [
-	'.[]',
-	'| if .event == "cross-referenced" and .source.issue.pull_request != null',
-	'then {url: .source.issue.html_url, repo: .source.issue.repository.full_name, body: (.source.issue.body // ""), state: (if .source.issue.pull_request.merged_at != null then "merged" else .source.issue.state end)}',
-	'elif .event == "reopened" then {reopened: true}',
-	'else empty end',
-].join(' ')
+const CROSS_REFERENCED_EVENT = 'cross-referenced'
+const REOPENED_EVENT = 'reopened'
 
-const reference_schema = z.object({
-	url: z.string(),
-	repo: z.string(),
-	body: z.string(),
-	state: z.enum(['open', 'closed', 'merged']).default('merged'),
+// The fields of one timeline event this reader needs; GitHub's other fields are dropped.
+const source_issue_schema = z.object({
+	html_url: z.string(),
+	repository: z.object({ full_name: z.string() }),
+	body: z
+		.string()
+		.nullish()
+		.transform((body) => body ?? ''),
+	pull_request: z.object({ merged_at: z.string().nullish() }).nullish(),
 })
-const reopen_schema = z.object({ reopened: z.literal(true) })
-const row_schema = z.union([reference_schema, reopen_schema])
+const event_schema = z.object({
+	event: z.string().default(''),
+	source: z.object({ issue: source_issue_schema.optional() }).optional(),
+})
 
-type MergedReference = z.infer<typeof reference_schema>
-type TimelineRow = z.infer<typeof row_schema>
+type TimelineEvent = z.infer<typeof event_schema>
+type SourceIssue = z.infer<typeof source_issue_schema>
+
+interface MergedReference {
+	url: string
+	repo: string
+	body: string
+}
+
+type TimelineRow = MergedReference | { reopened: true }
 type ClosingRead = { kind: 'read'; url: string | undefined } | { kind: 'unreadable' }
 type ClosingNumberRead = { kind: 'read'; number: number | undefined } | { kind: 'unreadable' }
 
@@ -52,18 +62,25 @@ function is_reference(row: TimelineRow): row is MergedReference {
 	return 'url' in row
 }
 
-function parse_row(line: string): TimelineRow {
-	const row = parse_json_object_or_undefined(line, row_schema)
-	if (row === undefined) throw new Error('the issue timeline contains an unreadable row')
+// Only a merged pull request can close the issue; an open or closed one is no reference here.
+function merged_reference_of(issue: SourceIssue | undefined): Array<TimelineRow> {
+	if (typeof issue?.pull_request?.merged_at !== 'string') return []
 
-	return row
+	return [{ url: issue.html_url, repo: issue.repository.full_name, body: issue.body }]
+}
+
+// A merged pull request that cross-references the issue, or a reopen marker; every other event is
+// dropped.
+function row_of(entry: TimelineEvent): Array<TimelineRow> {
+	if (entry.event === REOPENED_EVENT) return [{ reopened: true }]
+
+	return entry.event === CROSS_REFERENCED_EVENT ? merged_reference_of(entry.source?.issue) : []
 }
 
 function parse_references(raw: string): Array<MergedReference> {
-	const rows = raw
-		.split(LINE_SEPARATOR)
-		.filter((line) => line.trim() !== '')
-		.map((line) => parse_row(line))
+	const page = read_json_listing(raw, event_schema)
+	if (page.kind !== 'read') throw new Error('the issue timeline is unreadable')
+	const rows = page.rows.flatMap((entry) => row_of(entry))
 	const last_reopen = rows.findLastIndex((row) => !is_reference(row))
 
 	return rows.slice(last_reopen + 1).filter((row) => is_reference(row))
@@ -77,7 +94,6 @@ function pick_closing_pr(
 	return references.find(
 		(reference) =>
 			reference.repo === repo &&
-			reference.state === 'merged' &&
 			git_closes_keyword.parse_closes_issue_number(reference.body) === issue,
 	)?.url
 }
@@ -87,11 +103,10 @@ async function read_closing_result(issue: string): Promise<ClosingRead> {
 		// The canonical name, not the remote as typed: the timeline names the repository GitHub's way
 		// (joshuafolkken/kit#6752).
 		const [raw, repo] = await Promise.all([
-			git_gh_exec.exec_gh_api({
-				path: `${git_gh_api_path.issue_api_path(issue)}/timeline?per_page=100`,
-				should_paginate: true,
-				jq_filter: TIMELINE_FILTER,
-			}),
+			git_gh_etag_read.read_listing(
+				`${git_gh_api_path.issue_api_path(issue)}/timeline${git_gh_api_path.FULL_PAGE_QUERY}`,
+				git_gh_api_path.FULL_PAGE_SIZE,
+			),
 			git_gh_repo.repo_get_canonical_name_with_owner(),
 		])
 

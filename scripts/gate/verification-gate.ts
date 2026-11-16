@@ -2,10 +2,11 @@
 import { fileURLToPath } from 'node:url'
 import type { FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { GATE_COMMAND } from '#scripts/josh/josh-command-types'
-import { composite_arguments, USAGE_ERROR_EXIT_CODE } from '#scripts/josh/josh-composite-arguments'
+import { composite_arguments } from '#scripts/josh/josh-composite-arguments'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { FAIL_EXIT_CODE } from '#scripts/lib/buffered-process'
+import { cli_flags } from '#scripts/lib/cli-flags'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { review_tree } from '#scripts/review/review-tree'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
@@ -458,17 +459,18 @@ function unknown_arguments(extra_arguments: ReadonlyArray<string>): ReadonlyArra
 	)
 }
 
-// The shared refusal, plus the arguments it is actually about. Some flags are accepted, so the bare
-// "takes no extra arguments" would send a reader to drop the ones that work. The list is interpolated
-// rather than spelled out here, so adding a flag cannot leave this line stale.
-function write_refusal(unknown: ReadonlyArray<string>): void {
+// The shared refusal, plus the arguments it is actually about — or, on `--help`, the usage. Some flags
+// are accepted, so the bare "takes no extra arguments" would send a reader to drop the ones that work.
+// The list is interpolated rather than spelled out here, so adding a flag cannot leave this line stale.
+function refuse(extra_arguments: ReadonlyArray<string>, unknown: ReadonlyArray<string>): number {
 	const groups = Object.keys(gate_static_group.STATIC_GROUPS).join('|')
-
-	process.stderr.write(
+	const accepted = [...ACCEPTED_FLAGS, `${gate_static_group.STATIC_GROUP_FLAG_PREFIX}<${groups}>`]
+	const refusal =
 		`${composite_arguments.format_rejection(GATE_COMMAND, GATE_TARGETS)}\n` +
-			`  refused: ${unknown.join(' ')}\n` +
-			`  accepted here: ${ACCEPTED_FLAGS.join(' ')} ${gate_static_group.STATIC_GROUP_FLAG_PREFIX}<${groups}>\n`,
-	)
+		`  refused: ${unknown.join(' ')}\n  accepted here: ${accepted.join(' ')}`
+	const usage = cli_flags.usage_line(accepted, GATE_COMMAND)
+
+	return cli_flags.answer_usage(extra_arguments, usage, refusal)
 }
 
 async function run_gate_command(
@@ -477,11 +479,7 @@ async function run_gate_command(
 ): Promise<number> {
 	const unknown = unknown_arguments(extra_arguments)
 
-	if (unknown.length > 0) {
-		write_refusal(unknown)
-
-		return USAGE_ERROR_EXIT_CODE
-	}
+	if (unknown.length > 0) return refuse(extra_arguments, unknown)
 
 	// A static group is a part of the static set, so it implies `--no-unit` and every withholding that flag carries.
 	const static_group = gate_static_group.find_group(extra_arguments)

@@ -1,9 +1,13 @@
 import { git_command } from '#scripts/git/git-command'
 import { issue_watch_diff } from '#scripts/issue/issue-watch-diff'
+import { shared_cache_fixture } from '#scripts/josh/shared-cache-fixture'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { FULL_PAGE_QUERY } from './git-gh-api-path'
+import { git_gh_conditional } from './git-gh-conditional'
 import { git_gh_exec, type GhApiRequest } from './git-gh-exec'
 import { git_gh_pr } from './git-gh-pr'
 import {
+	conditional_read_over,
 	EMPTY_LISTING,
 	find_request,
 	gh_api_routes,
@@ -20,6 +24,13 @@ import {
 	NO_PULL_REQUEST_MESSAGE,
 	UNREADABLE_PULL_REQUEST_MESSAGE,
 } from './git-gh-pr-read'
+
+// The branch lookup reads through `exec_gh_api` here; its ETag is pinned in `git-gh-pr-read-etag.test.ts`.
+vi.mock('./git-gh-etag-read', async () => {
+	const { git_gh_etag_read_fixture } = await import('./git-gh-etag-read-fixture')
+
+	return { git_gh_etag_read: git_gh_etag_read_fixture.through_exec }
+})
 
 vi.mock('./git-gh-exec', () => ({
 	git_gh_exec: {
@@ -57,10 +68,11 @@ const BODY = 'closes #1029\n\n- one\n- two'
 const BUGFIX = 'bugfix'
 const PR_LABELS_PATH = `${REPO_PATH}/issues/1045/labels`
 const EXISTING_PR_LABELS_PATH = `${REPO_PATH}/issues/${String(PR_NUMBER)}/labels`
+// The label read's first page, which goes through the ETag layer (joshuafolkken/kit#7619).
+const EXISTING_PR_LABELS_READ = `${EXISTING_PR_LABELS_PATH}${FULL_PAGE_QUERY}`
 const CHOOSE_ERROR = 'Choose one release classification'
 const RATE_LIMITED_MESSAGE = 'rate limited'
-const MALFORMED_ANSWER = 'jq: error: Cannot index string with "name"'
-const LABEL_NAMES_FILTER = '.[].name'
+const READ_FAILED = 'gh: timed out'
 const UNREADABLE_LABELS = 'Unreadable labels'
 
 // The duplicate-head answer, exactly as the live API gave it on the throwaway pull request: `gh`
@@ -106,8 +118,16 @@ function lookup_calls(): number {
 	return requests().filter((request) => request.path === pr_lookup_path()).length
 }
 
+function labels_json(...names: Array<string>): string {
+	return JSON.stringify(names.map((name) => ({ name })))
+}
+
 beforeEach(() => {
 	forget_pr_numbers()
+	shared_cache_fixture.keep_in_memory()
+	vi.spyOn(git_gh_conditional, 'read_conditional').mockImplementation(
+		conditional_read_over(mocked_api),
+	)
 	mocked_api.mockImplementation(gh_api_routes(write_routes()))
 	mocked_command.mockResolvedValue('')
 	mocked_git.get_default_branch.mockResolvedValue(DEFAULT_BRANCH)
@@ -139,11 +159,10 @@ describe('pr_create classification', () => {
 		mocked_api.mockImplementation(
 			gh_api_routes({
 				...write_routes(),
-				[PR_LABELS_PATH]: async (request) => {
-					if (request.body !== undefined) throw new Error(RATE_LIMITED_MESSAGE)
-
-					return BUGFIX
+				[PR_LABELS_PATH]: async () => {
+					throw new Error(RATE_LIMITED_MESSAGE)
 				},
+				[`${PR_LABELS_PATH}${FULL_PAGE_QUERY}`]: labels_json(BUGFIX),
 			}),
 		)
 
@@ -160,51 +179,37 @@ describe('pr_create classification', () => {
 describe('existing pull request classification', () => {
 	it('adds a missing classification to the existing pull request', async () => {
 		mocked_api.mockImplementation(
-			gh_api_routes({ ...write_routes(), [EXISTING_PR_LABELS_PATH]: '' }),
+			gh_api_routes({
+				...write_routes(),
+				[EXISTING_PR_LABELS_PATH]: EMPTY_LISTING,
+				[EXISTING_PR_LABELS_READ]: labels_json(),
+			}),
 		)
 
 		await git_gh_pr.pr_ensure_classification(PR_BRANCH, BUGFIX)
 
-		const write = requests().find(
-			(request) => request.path === EXISTING_PR_LABELS_PATH && request.body !== undefined,
-		)
-
-		expect(write?.body).toBe(JSON.stringify({ labels: [BUGFIX] }))
+		// The read goes to the `?per_page=` path, so the bare labels path is the write alone.
+		expect(parsed_body(EXISTING_PR_LABELS_PATH)).toStrictEqual({ labels: [BUGFIX] })
 	})
 
 	it('reuses an existing classification without writing another label', async () => {
 		mocked_api.mockImplementation(
-			gh_api_routes({ ...write_routes(), [EXISTING_PR_LABELS_PATH]: `bug\n${BUGFIX}` }),
+			gh_api_routes({ ...write_routes(), [EXISTING_PR_LABELS_READ]: labels_json('bug', BUGFIX) }),
 		)
 
 		await git_gh_pr.pr_ensure_classification(PR_BRANCH, BUGFIX)
 
-		expect(requests().filter((request) => request.path === EXISTING_PR_LABELS_PATH)).toHaveLength(1)
+		expect(requests().filter((request) => request.path === EXISTING_PR_LABELS_PATH)).toHaveLength(0)
 	})
 
 	it('recognizes an existing classification regardless of case', async () => {
 		const uppercase_label = BUGFIX.toUpperCase()
 
 		mocked_api.mockImplementation(
-			gh_api_routes({ ...write_routes(), [EXISTING_PR_LABELS_PATH]: uppercase_label }),
+			gh_api_routes({ ...write_routes(), [EXISTING_PR_LABELS_READ]: labels_json(uppercase_label) }),
 		)
 
 		await expect(git_gh_pr.pr_get_classification(PR_BRANCH)).resolves.toBe(BUGFIX)
-	})
-})
-
-describe('pull request label read', () => {
-	it('reads every page of the labels as names, never parsing the JSON itself', async () => {
-		mocked_api.mockImplementation(
-			gh_api_routes({ ...write_routes(), [EXISTING_PR_LABELS_PATH]: BUGFIX }),
-		)
-
-		await git_gh_pr.pr_get_classification(PR_BRANCH)
-
-		expect(request_to(EXISTING_PR_LABELS_PATH)).toMatchObject({
-			should_paginate: true,
-			jq_filter: LABEL_NAMES_FILTER,
-		})
 	})
 })
 
@@ -215,8 +220,8 @@ describe('unreadable pull request labels', () => {
 		mocked_api.mockImplementation(
 			gh_api_routes({
 				...write_routes(),
-				[EXISTING_PR_LABELS_PATH]: async () => {
-					throw new Error(MALFORMED_ANSWER)
+				[EXISTING_PR_LABELS_READ]: async () => {
+					throw new Error(READ_FAILED)
 				},
 			}),
 		)

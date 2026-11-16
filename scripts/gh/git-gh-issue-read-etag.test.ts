@@ -110,3 +110,47 @@ describe('git_gh_issue_read — the issue GET through the ETag layer', () => {
 		expect(await git_gh_issue_read.issue_get_title(READ_NUMBER)).toBeUndefined()
 	})
 })
+
+// joshuafolkken/kit#7617: every comment listing read is sent with the previous ETag, not only the run
+// board's and the outcome read's.
+const COMMENTS_PATH = `${git_gh_api_path.issue_comments_api_path(READ_NUMBER)}${git_gh_api_path.FULL_PAGE_QUERY}`
+const COMMENTS = JSON.stringify([{ body: 'first' }])
+const TIMEOUT_MS = 5000
+
+describe('git_gh_issue_read.issue_list_comments — through the ETag layer', () => {
+	it('sends the previous ETag and answers the previous comments on a 304', async () => {
+		const unconditional = vi.spyOn(git_gh_exec, 'exec_gh_api')
+
+		serve({ kind: 'changed', etag: FIRST_ETAG, body: COMMENTS }, { kind: 'unchanged' })
+
+		expect(await git_gh_issue_read.issue_list_comments(READ_NUMBER)).toBe(COMMENTS)
+		expect(await git_gh_issue_read.issue_list_comments(READ_NUMBER)).toBe(COMMENTS)
+		expect(sent_etags()).toStrictEqual([undefined, FIRST_ETAG])
+		expect(unconditional).not.toHaveBeenCalled()
+	})
+
+	it('reads a full first page paged, with the timeout on both reads', async () => {
+		const full = JSON.stringify(Array.from({ length: git_gh_api_path.FULL_PAGE_SIZE }, () => ({})))
+		const paged = vi.spyOn(git_gh_exec, 'exec_gh_api').mockResolvedValue(COMMENTS)
+
+		serve({ kind: 'changed', etag: FIRST_ETAG, body: full })
+
+		expect(await git_gh_issue_read.issue_list_comments(READ_NUMBER, TIMEOUT_MS)).toBe(COMMENTS)
+		expect(git_gh_conditional.read_conditional).toHaveBeenCalledWith(
+			COMMENTS_PATH,
+			undefined,
+			TIMEOUT_MS,
+		)
+		expect(paged).toHaveBeenCalledWith({
+			path: COMMENTS_PATH,
+			should_paginate: true,
+			timeout_ms: TIMEOUT_MS,
+		})
+	})
+
+	it('answers undefined for a listing that cannot be read', async () => {
+		serve({ kind: 'unreadable', cause: new Error('HTTP 502') })
+
+		expect(await git_gh_issue_read.issue_list_comments(READ_NUMBER)).toBeUndefined()
+	})
+})

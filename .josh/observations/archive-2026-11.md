@@ -5364,3 +5364,90 @@
 - rf:none | none | - | 2026-11-15 | #7583
 - rf:none | none | - | 2026-11-15 | #7589
 - rf:bug-risks | low | scripts/registry-migration/migrate.ts:180 | 2026-11-15 | #7589
+- ri:bug-risks | medium | prompts/review.md:26 | 2026-11-15 | #7553 | fixed
+- rb:2026-11-15 | #7553
+- rf:none | none | - | 2026-11-15 | #7553
+- rf:bug-risks | medium | prompts/collaboration-workflow/output-bounds.md:27 | 2026-11-15 | #7593
+- ri:bug-risks | medium | scripts/run/ship/run-ship-review.ts:186 | 2026-11-15 | #7593 | fixed
+- ri:bug-risks | medium | .claude/skills/workflow-commands/backlogrun-recovery.md:54 | 2026-11-15 | #7593 | fixed
+- ri:bug-risks | low | docs/josh-commands.md:43 | 2026-11-15 | #7593 | fixed
+- rb:2026-11-15 | #7593
+- rf:none | none | - | 2026-11-15 | #7593
+- rf:none | none | - | 2026-11-15 | #7595
+- ri:none | none | - | 2026-11-15 | #7595
+- rb:2026-11-15 | #7595
+- rf:bug-risks | medium | scripts/lane/lane-record-command-stats.ts:59 | 2026-11-15 | #7595 | fixed
+- rx:{"round":"ffa0cdf1-5eed-4b55-8d90-8c6c0c9f2954","category":"bug-risks","severity":"medium","file":"scripts/lane/lane-record-command-stats.ts:59","disposition":"fixed","description":"entry_step_sum also sums nested run:entry › <step> › <sub> laps (child startup/sweep) already inside their parent lap, overstating the ledger column.","status":"resolved"}
+- rf:none | none | - | 2026-11-15 | #7596
+- ri:comments | low | scripts/lane/lane-plan-size.ts:119 | 2026-11-15 | #7596 | fixed
+- ri:performance | low | scripts/lane/lane-plan-probe.ts:132 | 2026-11-15 | #7596 | fixed
+- rb:2026-11-15 | #7596
+- rf:none | none | - | 2026-11-15 | #7596
+- rf:none | none | - | 2026-11-15 | #7597
+- ri:project-conventions | low | .claude/skills/workflow-commands/chain-rule.md:13 | 2026-11-15 | #7598 | fixed
+- rb:2026-11-15 | #7598
+- rf:project-conventions | low | .claude/skills/workflow-commands/chain-rule.md:13 | 2026-11-15 | #7598
+- rx:{"round":"609931db-dd8d-40c4-9ffd-29ba338d7e35","category":"project-conventions","severity":"low","file":".claude/skills/workflow-commands/chain-rule.md:13","description":"The earlier round's finding is recorded as fixed in .josh/observations/7598.md, but the pointer still names run-review-cli.ts for run:review's brief paths and prompts while save_brief now lives in run-review-briefs.ts (the string is pinned by scripts/rules/review-self-check-document-rule.test.ts:133, which must change with it); no failure scenario — run-review-cli.ts still imports and invokes the brief writer, so a reader following the pointer reaches the right module in one hop.","status":"new"}
+- rf:bug-risks | low | scripts/run/review/run-chain-cli.ts:68 | 2026-11-15 | #7599
+- ri:none | none | - | 2026-11-15 | #7599
+- rb:2026-11-15 | #7599
+- rf:bug-risks | high | docs/josh-commands-board.md:266 | 2026-11-15 | #7599 | fixed
+- rf:tests | medium | scripts/run/review/run-review-cli.ts:72 | 2026-11-15 | #7599 | fixed
+- rf:bug-risks | low | scripts/run/review/run-chain.ts:26 | 2026-11-15 | #7599 | fixed
+- rf:bug-risks | low | scripts/gate/metrics-totals.ts:146 | 2026-11-15 | #7599 | fixed
+- rx:{"round":"50a461ac-0e10-412c-8cbd-0aabb9be4367","category":"bug-risks","severity":"high","file":"docs/josh-commands-board.md:266","disposition":"fixed","description":"The run:chain usage span was not regenerated after the --accept-metrics example was added, so generate-command-usage.test.ts fails and CI goes red; run pnpm josh command:derive.","status":"resolved"}
+- rx:{"round":"50a461ac-0e10-412c-8cbd-0aabb9be4367","category":"tests","severity":"medium","file":"scripts/run/review/run-review-cli.ts:72","disposition":"fixed","description":"No test pins that run:review --accept-metrics reaches the open refusal, so dropping open.accept_metrics leaves every test green.","status":"resolved"}
+- rx:{"round":"50a461ac-0e10-412c-8cbd-0aabb9be4367","category":"bug-risks","severity":"low","file":"scripts/run/review/run-chain.ts:26","disposition":"fixed","description":"The metrics hint also prints after a handover, unplanned or failed-accept refusal where the flag does not help.","status":"resolved"}
+- rx:{"round":"50a461ac-0e10-412c-8cbd-0aabb9be4367","category":"bug-risks","severity":"low","file":"scripts/gate/metrics-totals.ts:146","disposition":"fixed","description":"Outside kit the unused note claims no total grew though no metrics ran; guard it with result !== undefined.","status":"resolved"}
+- rb:2026-11-15 | #7599
+- rf:bug-risks | low | scripts/run/review/run-chain-cli.ts:106 | 2026-11-15 | #7599
+- rx:{"round":"6c26b397-0d03-408f-bb7a-3bd4e2c63390","previous":"50a461ac-0e10-412c-8cbd-0aabb9be4367","category":"bug-risks","severity":"low","file":"scripts/run/review/run-chain-cli.ts:106","description":"run:chain accepts a blank --accept-metrics \"\" (as it already does --unpinned-ok) and only run:review refuses it with its usage, after review:selfcheck and check:related have already run; a typo costs one scoped pair, never a wrong record.","status":"new"}
+- rx:{"round":"6c26b397-0d03-408f-bb7a-3bd4e2c63390","previous":"50a461ac-0e10-412c-8cbd-0aabb9be4367","category":"bug-risks","severity":"high","file":"docs/josh-commands-board.md:266","description":"The run:chain usage span was not regenerated after the --accept-metrics example was added, so generate-command-usage.test.ts fails and CI goes red; run pnpm josh command:derive.","disposition":"fixed","status":"resolved"}
+- rx:{"round":"6c26b397-0d03-408f-bb7a-3bd4e2c63390","previous":"50a461ac-0e10-412c-8cbd-0aabb9be4367","category":"tests","severity":"medium","file":"scripts/run/review/run-review-cli.ts:72","description":"No test pins that run:review --accept-metrics reaches the open refusal, so dropping open.accept_metrics leaves every test green.","disposition":"fixed","status":"resolved"}
+- rx:{"round":"6c26b397-0d03-408f-bb7a-3bd4e2c63390","previous":"50a461ac-0e10-412c-8cbd-0aabb9be4367","category":"bug-risks","severity":"low","file":"scripts/run/review/run-chain.ts:26","description":"The metrics hint also prints after a handover, unplanned or failed-accept refusal where the flag does not help.","disposition":"fixed","status":"resolved"}
+- rx:{"round":"6c26b397-0d03-408f-bb7a-3bd4e2c63390","previous":"50a461ac-0e10-412c-8cbd-0aabb9be4367","category":"bug-risks","severity":"low","file":"scripts/gate/metrics-totals.ts:146","description":"Outside kit the unused note claims no total grew though no metrics ran; guard it with result !== undefined.","disposition":"fixed","status":"resolved"}
+- rb:2026-11-15 | #7604
+- rf:comments | low | scripts/test/test-reach-cli.ts:26 | 2026-11-15 | #7604 | fixed
+- rx:{"round":"bd662463-2f86-47cc-9848-7a174980bbce","category":"comments","severity":"low","file":"scripts/test/test-reach-cli.ts:26","disposition":"fixed","description":"The refusal doc comment now sits above the inserted is_count_mode helper, detached from refusal.","status":"resolved"}
+- rf:none | none | - | 2026-11-15 | #7605
+- rf:none | none | - | 2026-11-15 | #7607
+- rf:none | none | - | 2026-11-15 | #7607
+- ri:none | none | - | 2026-11-15 | #7607
+- rf:bug-risks | low | scripts/lane/openai-lane-supervisor.ts:263 | 2026-11-15 | #7608
+- ri:bug-risks | low | scripts/lane/openai-lane-supervisor.ts:263 | 2026-11-15 | #7608 | fixed
+- rb:2026-11-15 | #7608
+- rf:bug-risks | medium | scripts/lane/openai-lane-progress.ts:21 | 2026-11-15 | #7608 | fixed
+- rf:bug-risks | low | scripts/lane/openai-lane-supervisor.ts:149 | 2026-11-15 | #7608 | fixed
+- rx:{"round":"9a4ac917-8db6-481a-b0f3-eb9abbc4a58b","category":"bug-risks","severity":"medium","file":"scripts/lane/openai-lane-progress.ts:21","disposition":"fixed","description":"the untracked listing was quoted and a path git could not hash silently dropped to an empty state, so an edit could read as no progress","status":"resolved"}
+- rx:{"round":"9a4ac917-8db6-481a-b0f3-eb9abbc4a58b","category":"bug-risks","severity":"low","file":"scripts/lane/openai-lane-supervisor.ts:149","disposition":"fixed","description":"a relaunch after a failed ship carried the previous no-progress count","status":"resolved"}
+- rf:none | none | - | 2026-11-15 | #7612
+- ri:none | none | - | 2026-11-15 | #7612
+- rb:2026-11-15 | #7612
+- rf:bug-risks | medium | scripts/review/prose-stale-cli.ts:26 | 2026-11-15 | #7612 | fixed
+- rx:{"round":"3e7406eb-56b4-41a3-9cf9-11810cc79a68","category":"bug-risks","severity":"medium","file":"scripts/review/prose-stale-cli.ts:26","disposition":"fixed","description":"prose:stale, review:selfcheck, ship:evidence and diff:summary got the Usage: rename but still fail (or misread --help as a base) on --help instead of answering through cli_flags.answer_usage.","status":"resolved"}
+- rf:none | none | - | 2026-11-15 | #7616
+- rf:none | none | - | 2026-11-15 | #7617
+- ri:bug-risks | low | scripts/gh/git-gh-etag-read.ts:104 | 2026-11-15 | #7617 | fixed
+- ri:performance | low | scripts/gh/git-gh-issue-read.ts:391 | 2026-11-15 | #7617 | fixed
+- rb:2026-11-15 | #7617
+- rf:bug-risks | low | scripts/gh/git-gh-etag-read.ts:103 | 2026-11-15 | #7617 | fixed
+- rx:{"round":"26391bb1-1036-4fb6-8e63-16ac804ce520","category":"bug-risks","severity":"low","file":"scripts/gh/git-gh-etag-read.ts:103","disposition":"fixed","description":"A full first page now costs two sequential reads each bounded by timeout_ms, so issue-watch's 5 s budget can stretch to about 10 s.","status":"resolved"}
+- ri:none | none | - | 2026-11-15 | #7618
+- rb:2026-11-15 | #7618
+- rf:none | none | - | 2026-11-15 | #7618
+- rf:project-conventions | low | scripts/issue/issue-closing-pr.ts:91 | 2026-11-15 | #7619
+- rf:assumptions | low | scripts/issue/issue-closing-pr.ts:95 | 2026-11-15 | #7619
+- rb:2026-11-15 | #7619
+- rf:comments | low | scripts/gh/git-gh-issue-write.ts:40 | 2026-11-15 | #7619 | fixed
+- rx:{"round":"fd8bc65e-e2ca-454d-8bc8-1fa88b12fff9","category":"comments","severity":"low","file":"scripts/gh/git-gh-issue-write.ts:40","disposition":"fixed","description":"label_schema sits under the comment about URL and id filters, so that comment now reads as covering it.","status":"resolved"}
+- rb:2026-11-15 | #7619
+- rf:project-conventions | low | scripts/issue/issue-closing-pr.ts:91 | 2026-11-15 | #7619
+- rf:assumptions | low | scripts/issue/issue-closing-pr.ts:95 | 2026-11-15 | #7619
+- rx:{"round":"8595a6f6-d08e-4baf-8ee1-ffe45a959130","previous":"fd8bc65e-e2ca-454d-8bc8-1fa88b12fff9","category":"project-conventions","severity":"low","file":"scripts/issue/issue-closing-pr.ts:91","description":"The timeline event schema, the CROSS_REFERENCED_EVENT/REOPENED_EVENT constants and the merged-reference predicate re-derive what issue-merged.ts:21-106 already defines, although the Issue asked to share the row parsing where possible; no failure scenario — tried a GitHub field change, which would need two edits but breaks neither reader today.","status":"new"}
+- rx:{"round":"8595a6f6-d08e-4baf-8ee1-ffe45a959130","previous":"fd8bc65e-e2ca-454d-8bc8-1fa88b12fff9","category":"assumptions","severity":"low","file":"scripts/issue/issue-closing-pr.ts:95","description":"source_issue_schema now requires html_url and repository.full_name on every cross-referenced source, including non-PR issues the old jq filter skipped, so one such event missing them would make the whole timeline unreadable; no failure scenario — GitHub's timeline includes both fields on every cross-referenced source issue I could find.","status":"new"}
+- rx:{"round":"8595a6f6-d08e-4baf-8ee1-ffe45a959130","previous":"fd8bc65e-e2ca-454d-8bc8-1fa88b12fff9","category":"comments","severity":"low","file":"scripts/gh/git-gh-issue-write.ts:40","description":"label_schema sits under the comment about URL and id filters, so that comment now reads as covering it.","disposition":"fixed","status":"resolved"}
+- rf:none | none | - | 2026-11-15 | #7620
+- ri:none | none | - | 2026-11-15 | #7620
+- rb:2026-11-15 | #7620
+- rf:comments | low | scripts/gh/git-gh-pr-auto-merge.test.ts:22 | 2026-11-15 | #7620 | fixed
+- rx:{"round":"d8fd7149-f76a-40de-8e19-3e6bbc392260","category":"comments","severity":"low","file":"scripts/gh/git-gh-pr-auto-merge.test.ts:22","disposition":"fixed","description":"The new mock comment runs into the #2497 paragraph with no blank line (also git-gh-pr-merge.test.ts:34).","status":"resolved"}

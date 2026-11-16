@@ -2,7 +2,7 @@ import { backlog_plan_comment } from '#scripts/backlog/backlog-plan-comment'
 import { FULL_PAGE_QUERY, git_gh_api_path } from '#scripts/gh/git-gh-api-path'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
-import { read_pull } from '#scripts/gh/git-gh-pr-read'
+import { read_pull_by_etag } from '#scripts/gh/git-gh-pr-read'
 import { git_closes_keyword } from '#scripts/git/git-closes-keyword'
 import { read_json_listing } from '#scripts/git/parse-json-array'
 import { issue_read, type IssueComment } from '#scripts/issue/issue-read'
@@ -93,7 +93,7 @@ async function commits(pr_number: number): Promise<ReadonlyArray<HistoricalEvide
 
 async function pull({ issue, pr_number }: EvidenceRequest): Promise<EvidenceRead> {
 	if (pr_number === undefined) return { evidence: [], unreadable: [] }
-	const detail = await read_pull(pr_number)
+	const detail = await read_pull_by_etag(pr_number)
 
 	if (git_closes_keyword.parse_closes_issue_number(detail.body ?? '') !== String(issue)) {
 		return { evidence: [], unreadable: ['pull does not close this issue'] }

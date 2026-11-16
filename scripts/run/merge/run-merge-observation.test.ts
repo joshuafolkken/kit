@@ -1,7 +1,7 @@
 import { auto_ok_fixture, CREATED_EARLIER } from '#scripts/auto-ok/auto-ok-fixture'
 import { backlog_pool } from '#scripts/backlog/backlog-pool'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
-import { git_gh_exec } from '#scripts/gh/git-gh-exec'
+import { git_gh_etag_read } from '#scripts/gh/git-gh-etag-read'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { issue_observation_fixture as fixture } from '#scripts/issue/issue-observation-fixture'
 import { issue_observation_gate } from '#scripts/issue/issue-observation-gate'
@@ -69,7 +69,7 @@ beforeEach(() => {
 		kind: 'state',
 		state: { state: 'OPEN', labels: [IN_PROGRESS], is_human_review: false },
 	})
-	vi.spyOn(git_gh_exec, 'exec_gh_api').mockResolvedValue(
+	vi.spyOn(git_gh_etag_read, 'read').mockResolvedValue(
 		JSON.stringify({
 			body: fixture.comment(),
 			html_url: fixture.URL,

@@ -20,6 +20,7 @@ import { composite_arguments, USAGE_ERROR_EXIT_CODE } from './josh-composite-arg
 import { josh_environment_file } from './josh-environment-file'
 import { josh_in_process } from './josh-in-process'
 import { kit_only } from './kit-only'
+import { outer_command } from './outer-command'
 import { find_package_directory } from './package-directory'
 import { run_github_prerequisite } from './run-github-prerequisite'
 
@@ -268,6 +269,7 @@ async function run_command(
 
 	const early_exit = pre_dispatch_exit(resolved, entry, subcommand_arguments, is_consumer)
 	if (early_exit !== undefined) return early_exit
+	outer_command.mark(resolved)
 
 	return await hook_lap.timed_command(
 		resolved,

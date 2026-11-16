@@ -215,3 +215,32 @@ describe('git_gh_etag_read.read_listing — the page size', () => {
 		expect(git_gh_exec.exec_gh_api).not.toHaveBeenCalled()
 	})
 })
+
+const TIMEOUT_MS = 5000
+
+// A full first page that took `first_page_ms` of a `TIMEOUT_MS` listing read.
+async function read_full_listing_taking(first_page_ms: number): Promise<void> {
+	vi.spyOn(Date, 'now').mockReturnValueOnce(0).mockReturnValue(first_page_ms)
+	answer_with({ kind: 'changed', etag: ETAG, body: TWO_ROWS })
+	await git_gh_etag_read.read_listing(LISTING_PATH, PER_PAGE, git_gh_etag_read.read, TIMEOUT_MS)
+}
+
+describe('git_gh_etag_read.read_listing — the timeout', () => {
+	beforeEach(isolate_listing)
+
+	it('gives the paged read only what the first page left of the timeout', async () => {
+		const first_page_ms = 3000
+
+		await read_full_listing_taking(first_page_ms)
+
+		expect(git_gh_exec.exec_gh_api).toHaveBeenCalledWith(
+			expect.objectContaining({ timeout_ms: TIMEOUT_MS - first_page_ms }),
+		)
+	})
+
+	it('still bounds the paged read once the first page spent the whole timeout', async () => {
+		await read_full_listing_taking(TIMEOUT_MS * 2)
+
+		expect(git_gh_exec.exec_gh_api).toHaveBeenCalledWith(expect.objectContaining({ timeout_ms: 1 }))
+	})
+})
