@@ -2,7 +2,8 @@ import { existsSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { unit_setup_files } from './unit-setup-files'
 
-const { MACHINE_GUARD, STDOUT_GUARD, TELEGRAM_GUARD, WORKER_GUARDS } = unit_setup_files
+const { MACHINE_GUARD, STDOUT_GUARD, TELEGRAM_GUARD, TEST_FILE_ENVIRONMENT, WORKER_GUARDS } =
+	unit_setup_files
 
 describe('unit_setup_files', () => {
 	it('names only setup files that exist in the repository', () => {
@@ -13,7 +14,12 @@ describe('unit_setup_files', () => {
 		expect(missing).toEqual([])
 	})
 
-	it('arms the stdout, Telegram and machine guards in every worker', () => {
-		expect(WORKER_GUARDS).toEqual([...STDOUT_GUARD, ...TELEGRAM_GUARD, ...MACHINE_GUARD])
+	it('arms the stdout, Telegram and machine guards and the test file name in every worker', () => {
+		expect(WORKER_GUARDS).toEqual([
+			...STDOUT_GUARD,
+			...TELEGRAM_GUARD,
+			...MACHINE_GUARD,
+			...TEST_FILE_ENVIRONMENT,
+		])
 	})
 })

@@ -4,6 +4,7 @@ import {
 	GIT_LOCATION_VARIABLES,
 } from '#scripts/git/git-location-environment'
 import { shim_shell } from '#tools/build/shim-shell'
+import { TEST_FILE_SUFFIX } from './unit-guard-environment'
 
 // **A unit test must not write into the repository the suite is running in.**
 //
@@ -47,8 +48,8 @@ import { shim_shell } from '#tools/build/shim-shell'
 // no repository for a test to damage and the second finding is left out of the generated shim. The
 // first finding is generated unconditionally, so an inherited environment is refused either way.
 //
-// **What it names.** The shim cannot see which test called it — it is a `PATH` shim, and vitest puts
-// no test identity in the environment. It does not need to: it refuses **at the call**, with `exit 1`
+// **What it names.** The shim sees only the test file that called it, which the worker left in its
+// environment (`test-file-environment.ts`), not the test. It does not need to: it refuses **at the call**, with `exit 1`
 // and the command and the finding on stderr, so `execa` throws inside the test and vitest names the
 // file and the test itself. The record read at teardown is the backstop for a test that swallows the
 // error, and it carries the command and the finding for the same reason — so nobody has to
@@ -123,8 +124,10 @@ const WRITE_VIOLATION_HEADING =
 
 // The record and the stderr detail both read as prose and both expand in `sh`: `$*` is the arguments
 // the shim stood in for, `$guard_via` the finding that refused them.
+// The record also carries the calling test file, the stderr detail does not: there vitest already
+// names the file.
 const REFUSED_COMMAND = 'git $* — via $guard_via'
-const RECORDED_WRITE = `${WRITE_MARKER} ${REFUSED_COMMAND}`
+const RECORDED_WRITE = `${WRITE_MARKER} ${REFUSED_COMMAND}${TEST_FILE_SUFFIX}`
 
 const GIT_DIRECTORY_ARGUMENTS = ['rev-parse', '--path-format=absolute', '--git-common-dir']
 
