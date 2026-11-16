@@ -18,6 +18,12 @@ const mocked = vi.hoisted(() => ({
 	run_event_stream_emit: { emit: vi.fn() },
 }))
 
+// The static import reads the declaration keys at load; load it under ja so an exported en does not
+// turn the Japanese `DECLARED` unreadable. `session_language.ENV_KEY` is not yet imported here.
+vi.hoisted(() => {
+	vi.stubEnv('JOSH_SESSION_LANG', 'ja')
+})
+
 vi.mock('#scripts/issue/trusted-measure', () => ({ trusted_measure: mocked.trusted_measure }))
 vi.mock('#scripts/issue/issue-measured-close', () => ({
 	issue_measured_close: mocked.issue_measured_close,
@@ -48,6 +54,8 @@ function given(body: string, run: CommandRun): void {
 }
 
 beforeEach(() => {
+	// The prose assertions below are Japanese; pin the language an exported en would flip.
+	vi.stubEnv(session_language.ENV_KEY, 'ja')
 	vi.mocked(git_gh_command.issue_get_body).mockReset().mockResolvedValue(DECLARED)
 	vi.mocked(trusted_measure.text_of).mockReturnValue('output')
 	vi.mocked(issue_measured_close.close).mockReset().mockResolvedValue(true)
