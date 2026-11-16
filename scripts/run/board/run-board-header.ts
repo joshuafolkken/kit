@@ -6,6 +6,7 @@ import { run_board_first_lane } from './run-board-first-lane'
 import { run_board_fit } from './run-board-fit'
 import type { FoundOf } from './run-board-found'
 import { run_board_fresh } from './run-board-fresh'
+import { run_board_header_names, type RunMark } from './run-board-header-names'
 import { run_board_issue_count, type IssueCount } from './run-board-issue-count'
 import { run_board_labels } from './run-board-labels'
 import { run_board_layout, type BoardLayout, type BoardRow } from './run-board-layout'
@@ -29,11 +30,12 @@ import type { UsualTimes } from './run-board-usual'
 // events); nothing here guesses one, but the estimated finish after the progress bar, which is drawn `~`
 // as the estimate it is (`run-board-estimate.ts`). Two lines of symbols rather than sentences: the `⏰` that moves
 // every second is the proof the board is live, so no `updated` line is drawn. **Always three lines,
-// the first two in three columns**: the run's mark and name over its repository's, the run's age over
-// the `💓`, then the progress over the machine the run is on — so the first line reads as how far the
-// run is and the second as what it runs on, a slow run apart from a stuck one. The third says what the
-// run is doing now (`run-board-now.ts`): the spinner, its time and its kind's icon under the second and
-// third columns' icons and digits, so the mark itself never turns. All three are written the
+// the first two in three columns**: the run's mark and the board's name over the kit version over the
+// repository (`run-board-header-names.ts`), the run's age over the `💓`, then the progress over the
+// machine the run is on — so the first line reads as how far the run is and the second as what it runs
+// on, a slow run apart from a stuck one. The third says what the run is doing now (`run-board-now.ts`):
+// the spinner, its time and its kind's icon under the second and third columns' icons and digits, so
+// the mark itself never turns. All three are written the
 // same while the run works and while it waits, so a wait is read off the mark, the `💓` and the third
 // line's words rather than off a line that changes shape. A value not read yet is drawn `-`, never
 // `0`, so a header still loading reads as unknown rather than as an empty run.
@@ -46,7 +48,6 @@ const REASON_LIMIT = 40
 const { padded } = run_board_fresh
 const aged_fresh = run_board_fresh.aged
 const UNKNOWN = '-'
-const BLANK = ' '
 const { GAP, PERCENT_WIDTH } = run_board_machine
 // A running run whose newest event is older than this is drawn as stale, so a hang stands out; past
 // twice that it is drawn as alarming.
@@ -54,7 +55,6 @@ const STALE_MINUTES = 15
 const STALE_MS = STALE_MINUTES * MS_PER_MINUTE
 const ALARM_FACTOR = 2
 const ALARM_MS = STALE_MS * ALARM_FACTOR
-const RUN_NAME = 'backlogrun'
 
 // Who reads the frame: a person on a screen, or a chat a session answers a progress question in, which
 // draws what the screen does but for the machine, its memory alone — a CPU or swap figure read once
@@ -74,8 +74,11 @@ interface BoardUsage {
 interface BoardHeader
 	extends Pick<QuotaView, 'quotas' | 'scheduler_provider' | 'rate_limit'>, BoardLinks {
 	now_ms: number
-	// A single run's name (`run-board-single.ts`); `undefined` draws `backlogrun`.
+	// A single run's name (`run-board-single.ts`); `undefined` draws the board's
+	// (`run-board-header-names.ts`).
 	run_name?: string | undefined
+	// The kit version the run's supervisor recorded; `undefined` draws `-`.
+	kit_version?: string | undefined
 	started_ms: number
 	// Set once the run has ended: the title then says when, and how long it took.
 	ended_ms: number | undefined
@@ -132,20 +135,6 @@ interface BoardCounts {
 	remaining: number
 }
 
-// `setup` is a run with no child running that is itself at work on a stage (`run-board-setup.ts`).
-type RunMark = 'running' | 'setup' | 'idle' | 'human' | 'stopped'
-
-type TextColor = Parameters<typeof styleText>[0]
-
-// The run's state as a colored glyph before its name.
-const RUN_MARKS: Readonly<Record<RunMark, { glyph: string; color: TextColor }>> = {
-	running: { glyph: '▶', color: 'green' },
-	setup: { glyph: '▶', color: 'green' },
-	idle: { glyph: '⏸', color: 'yellow' },
-	human: { glyph: '✋', color: 'magenta' },
-	stopped: { glyph: '■', color: 'gray' },
-}
-
 function count_state(rows: ReadonlyArray<BoardRow>, state: BoardRow['state']): number {
 	return rows.filter((row) => row.state === state).length
 }
@@ -178,22 +167,6 @@ function mark_of(header: BoardHeader, running: number): RunMark {
 	if (header.activity.is_stopped) return 'stopped'
 
 	return running > 0 ? 'running' : quiet_mark(header)
-}
-
-// The mark stands still in every state: the spinner turns on the third line.
-function run_part(mark: RunMark, name = RUN_NAME): string {
-	const { glyph, color } = RUN_MARKS[mark]
-
-	return styleText(color, `${glyph} ${name}`)
-}
-
-// The repository's own name — `kit` of `owner/kit` — under the run's, past the mark's columns, so a
-// board open beside another repository's is told apart. Blank before a plan names one.
-function repo_part(header: BoardHeader, mark: RunMark): string {
-	const name = header.repo?.split('/').at(-1) ?? ''
-	const indent = run_board_fit.width_of(RUN_MARKS[mark].glyph) + BLANK.length
-
-	return `${BLANK.repeat(indent)}${header.repo_link(name, 'home')}`
 }
 
 // A part aged as the `💓` is: yellow once stale, red once alarming — a row's newest activity too
@@ -433,18 +406,22 @@ function column_of(cells: ReadonlyArray<string>): Array<string> {
 	return cells.map((cell) => cell_of(cell, width))
 }
 
-// The run's name, age and progress, then its repository, heartbeat and machine under them, then what
-// it is doing now — its time under theirs, its kind's icon under the `💪`, the name's column left blank
-// and no label — in every state the board can be in. A stream with no event yet leaves it blank.
+// The board's name, the run's age and progress, then the kit version, heartbeat and machine under
+// them, then the repository and what the run is doing now — its time under theirs, its kind's icon
+// under the `💪`, no label — in every state the board can be in. A stream with no event yet leaves the
+// repository alone on the third line.
 function header_lines(header: BoardHeader): Array<string> {
 	const counts = counts_of(layout_of(header))
 	const mark = mark_of(header, counts.running)
 	const now = now_line(counts, header)
-	const names = column_of([run_part(mark, header.run_name), repo_part(header, mark), ''])
+	const name_cells = run_board_header_names.names_of(mark, header)
+	const names = column_of(name_cells)
 	const times = column_of(time_parts(header, mark, now))
 	const lasts = [progress_part(counts, header), machine_part(counts, header)]
 	const third =
-		now === undefined ? '' : [names.at(-1), times.at(-1), now_text(now, header)].join(GAP)
+		now === undefined
+			? (name_cells.at(-1) ?? '')
+			: [names.at(-1), times.at(-1), now_text(now, header)].join(GAP)
 
 	return [...lasts.map((last, line) => [names[line], times[line], last].join(GAP)), third]
 }

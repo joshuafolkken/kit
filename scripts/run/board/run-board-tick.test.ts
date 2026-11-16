@@ -107,7 +107,7 @@ describe('run_board_tick.tick machine', () => {
 
 		const [first_machine, second_machine] = frames.map((frame) => frame.split('\n', 2)[1] ?? '')
 
-		expect(first_machine).toMatch(/^ {2}kit +🧠 /u)
+		expect(first_machine).toMatch(/^ {2}- +🧠 /u)
 		expect(first_machine).not.toContain('💾')
 		expect(second_machine).toContain('💾')
 	})
@@ -149,7 +149,7 @@ describe('run_board_tick.tick reads', () => {
 
 		expect(state.local).toBeUndefined()
 		expect(read_plan).not.toHaveBeenCalled()
-		expect(frames.at(-1)).toContain(`■ backlogrun  ${WORDS.no_run}`)
+		expect(frames.at(-1)).toContain(`■ josh-board  ${WORDS.no_run}`)
 	})
 })
 
@@ -264,8 +264,8 @@ describe('run_board_tick.tick spinner', () => {
 		// joshuafolkken/kit#3767: the header's spinner turns on its third line, the mark standing still.
 		const nows = frames.map((frame) => stripVTControlCharacters(frame).split('\n', 3)[2] ?? '')
 
-		expect(nows[0]).toMatch(new RegExp(`^ +${spinner_of(START)} `, 'u'))
-		expect(nows[1]).toMatch(new RegExp(`^ +${spinner_of(START + REDRAW_MS)} `, 'u'))
+		expect(nows[0]).toMatch(new RegExp(String.raw`^ +\S+ +${spinner_of(START)} `, 'u'))
+		expect(nows[1]).toMatch(new RegExp(String.raw`^ +\S+ +${spinner_of(START + REDRAW_MS)} `, 'u'))
 		expect(nows[0]).not.toBe(nows[1])
 	})
 
@@ -291,7 +291,7 @@ describe('run_board_tick.tick spinner', () => {
 
 		const frame = stripVTControlCharacters(frames.at(-1) ?? '')
 
-		expect(frame).toMatch(/^▶ backlogrun/u)
+		expect(frame).toMatch(/^▶ josh-board/u)
 		expect(frame).toMatch(new RegExp(String.raw`\n {5}🔍 .*${String(SINGLE)}`, 'u'))
 	})
 })

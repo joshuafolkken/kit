@@ -39,6 +39,9 @@ interface LocalRead {
 	ended_ms: number | undefined
 	// The single run's name the header draws; `undefined` for a `backlogrun` (`run-board-single.ts`).
 	run_name?: string | undefined
+	// The kit version the run's supervisor recorded as it started (`run-wake.ts`); `undefined` where no
+	// supervisor runs or an older one recorded none.
+	kit_version?: string | undefined
 	// The root checkout's single run beside a carried run, drawn above its lanes.
 	root?: RootRun | undefined
 	// The root checkout's single runs a merge ended inside the run, drawn in `✅ done`.
@@ -231,6 +234,16 @@ function ledger_here(
 	}
 }
 
+// The repository's own records: its lane ledger, and the kit version its supervisor recorded.
+function records_here(
+	repository: string,
+): ReturnType<typeof ledger_here> & Pick<LocalRead, 'kit_version'> {
+	return {
+		...ledger_here(repository),
+		kit_version: run_wake.read_wake(run_wake.wake_path(repository))?.kit_version,
+	}
+}
+
 // The reset a usage limit holds the running run's launches until, read off the events `backlog:drive`
 // reads it off (`run_event_stream_emit.current_events`): the carried invocation's, so an ended run's
 // stop holds no row the driver would launch — and how many children it stopped.
@@ -329,7 +342,7 @@ async function read_local(table?: TableRead): Promise<LocalRead | undefined> {
 		is_session_active,
 		operations: run_board_operation_read.read(sources_of(repository, lanes, transcript)),
 		...(await lane_room_of(lanes, lane_read.lane_states, table)),
-		...ledger_here(repository),
+		...records_here(repository),
 	}
 }
 

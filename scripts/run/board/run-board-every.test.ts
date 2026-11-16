@@ -40,8 +40,8 @@ describe('run_board_cli.run --every', () => {
 
 		expect(pushes).toHaveLength(3)
 		expect(pushes.join('')).not.toContain(ESCAPE)
-		expect(pushes.slice(0, 2).join('')).not.toContain('■ backlogrun')
-		expect(pushes[2]).toMatch(/^■ backlogrun/u)
+		expect(pushes.slice(0, 2).join('')).not.toContain('■ josh-board')
+		expect(pushes[2]).toMatch(/^■ josh-board/u)
 		expect(sleep.mock.calls).toStrictEqual([[FIVE_MINUTES_MS], [FIVE_MINUTES_MS]])
 		expect(frames).toHaveLength(0)
 	})

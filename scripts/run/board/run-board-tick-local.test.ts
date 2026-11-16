@@ -144,8 +144,8 @@ describe('run_board_tick.tick before the plan is read', () => {
 	it('marks the run ⏸ and draws no wait on the second line when no child runs', async () => {
 		const lines = await loading([{ ...DRAIN, pos: 1 }])
 
-		expect(lines[0]).toMatch(/^⏸ backlogrun {2}⏰ (?:\d+′)?\d+″ {2}✅/u)
-		expect(lines[1]).toMatch(/^ +💓 (?:\d+′)?\d+″ {2}🧠/u)
+		expect(lines[0]).toMatch(/^⏸ josh-board {2}⏰ (?:\d+′)?\d+″ {2}✅/u)
+		expect(lines[1]).toMatch(/^ {2}- +💓 (?:\d+′)?\d+″ {2}🧠/u)
 		expect(lines[2]).toMatch(/^ +(?:\d+′)?\d+″ {2}🔭 watching/u)
 		expect(lines.slice(1).join('\n')).not.toMatch(/[⏸⌛]/u)
 	})
@@ -157,7 +157,21 @@ describe('run_board_tick.tick before the plan is read', () => {
 
 		await tick(FRESH_STATE, { ...ports, read_plan: never }, 'background')
 
-		expect(lines_of(frames[0])[0]).toMatch(/^■ backlogrun/u)
+		expect(lines_of(frames[0])[0]).toMatch(/^■ josh-board/u)
+	})
+})
+
+// joshuafolkken/kit#7672: the version the supervisor recorded in its wake record reaches the header.
+describe('run_board_tick.tick kit version', () => {
+	it('draws the kit version the local read carries under the board’s name', async () => {
+		const { ports, frames } = harness(
+			{ ...LOCAL, events: [LAUNCH], kit_version: 'v1.3153.0+3' },
+			[],
+		)
+
+		await tick(FRESH_STATE, { ...ports, read_plan: never }, 'background')
+
+		expect(lines_of(frames[0])[1]).toMatch(/^ {2}v1\.3153\.0\+3 /u)
 	})
 })
 
@@ -190,7 +204,7 @@ describe('run_board_tick.tick in a short terminal', () => {
 		const lines = lines_of(frames[0])
 		const rows = lines.reduce((sum, line) => sum + run_board_fit.height_of(line, SHORT.columns), 0)
 
-		expect(lines[0]).toMatch(/backlogrun/u)
+		expect(lines[0]).toMatch(/josh-board/u)
 		expect(rows).toBeLessThanOrEqual(SHORT.rows)
 		expect(lines).toContainEqual(expect.stringMatching(/^ {2}more \d+$/u))
 	})

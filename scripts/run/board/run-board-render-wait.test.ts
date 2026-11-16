@@ -15,9 +15,9 @@ const SECOND = 1000
 const MACHINE_UNKNOWN = '💪 -  🧠 -  💾 -'
 const EMPTY_BAR = '─'.repeat(10)
 const COUNTS = `✅  0/0 ${EMPTY_BAR}  🔄 0  ⏳ 0  💤 0`
-// The second line's name column with no repository to name.
-const NAME_BLANK = ' '.repeat('⏸ backlogrun'.length)
-const BEAT_LINE = `${NAME_BLANK}  💓 5°35′49″  ${MACHINE_UNKNOWN}`
+// The second line's name column with no kit version recorded: `-` under the board's name.
+const VERSION_CELL = '  -'.padEnd('⏸ josh-board'.length)
+const BEAT_LINE = `${VERSION_CELL}  💓 5°35′49″  ${MACHINE_UNKNOWN}`
 // The run's last event is 5°35′49″ old: the wait has gone on that long, and the `💓` says so.
 const WAITED_MINUTES = 335
 const WAITED_SECONDS = 49
@@ -39,7 +39,7 @@ function clock_of(layout: BoardLayout): string | undefined {
 describe('run_board_render.render — the header while the run waits', () => {
 	it('draws the wait as the mark and, under the run’s age, the age of the last event', () => {
 		expect(lines_of(header({ activity: WAITING })).slice(0, 2)).toStrictEqual([
-			`⏸ backlogrun  ⏰ 2°10′00″  ${COUNTS}`,
+			`⏸ josh-board  ⏰ 2°10′00″  ${COUNTS}`,
 			BEAT_LINE,
 		])
 	})
@@ -51,21 +51,21 @@ describe('run_board_render.render — the header while the run waits', () => {
 	])('draws the age as the ⏰ is drawn, padded to its width, %s', (_span, waited, drawn) => {
 		const activity = { last_event_ms: NOW - waited, is_stopped: false }
 
-		expect(lines_of(header({ activity }))[1]).toContain(`${NAME_BLANK}  ${drawn}  `)
+		expect(lines_of(header({ activity }))[1]).toContain(`${VERSION_CELL}  ${drawn}  `)
 	})
 
 	it('draws the second line of a waiting run as it draws a running run’s', () => {
 		const running = lines_of(header({ activity: WAITING, layout: RUNNING_LAYOUT }))
 
-		expect(running[0]).toMatch(/^▶ backlogrun/u)
+		expect(running[0]).toMatch(/^▶ josh-board/u)
 		expect(clock_of(EMPTY_LAYOUT)).toBe(running[1])
 	})
 
 	it('marks a run waiting on a person ✋ and changes nothing on the second line', () => {
 		const lines = lines_of(header({ activity: WAITING, layout: PEOPLE_LAYOUT }))
 
-		expect(lines[0]).toMatch(/^✋ backlogrun {2}⏰ 2°10′00″ {2}✅ {2}0\/1 /u)
-		expect(lines[1]?.trimStart()).toBe(BEAT_LINE.trimStart())
+		expect(lines[0]).toMatch(/^✋ josh-board {2}⏰ 2°10′00″ {2}✅ {2}0\/1 /u)
+		expect(lines[1]?.replace(/^ +- +/u, '')).toBe(BEAT_LINE.replace(/^ +- +/u, ''))
 	})
 
 	it.each([
@@ -84,8 +84,8 @@ describe('run_board_render.render — the header once the run has ended', () => 
 		const lines = lines_of(header({ activity, ended_ms }))
 
 		expect(lines.slice(0, 2)).toStrictEqual([
-			`■ backlogrun  ⏰ 3′25″  ${COUNTS}`,
-			`${NAME_BLANK}  🔚 ${minute_of(ended_ms)}  ${MACHINE_UNKNOWN}`,
+			`■ josh-board  ⏰ 3′25″  ${COUNTS}`,
+			`${VERSION_CELL}  🔚 ${minute_of(ended_ms)}  ${MACHINE_UNKNOWN}`,
 		])
 	})
 })

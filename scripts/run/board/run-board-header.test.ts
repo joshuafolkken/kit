@@ -15,13 +15,16 @@ import type { BoardLayout, BoardRow } from './run-board-layout'
 const { minute_of } = run_board_labels
 const { HEADER_ICONS, WORDS } = run_board_labels
 const MACHINE_UNKNOWN = '💪 -  🧠 -  💾 -'
-// The second line's first two columns where nothing is drawn in them: no repository, no heartbeat.
-const NAME_BLANK = ' '.repeat('⏸ backlogrun'.length)
+// The third line's name column where no repository is read, and the second line's where no kit
+// version is: `-` under the board's name.
+const NAME_BLANK = ' '.repeat('⏸ josh-board'.length)
+const VERSION_CELL = '  -'.padEnd(NAME_BLANK.length)
 const TIME_BLANK = ' '.repeat('⏰ 30′00″'.length + 1)
-const RUNNING_CLOCK = `${NAME_BLANK}  ${TIME_BLANK}  ${MACHINE_UNKNOWN}`
-// joshuafolkken/kit#3749: the third line — blank where the stream holds no event, else what the run is
-// doing now: its time under the second column, its icon and words under the third.
-const NOW_BLANK = ''
+const RUNNING_CLOCK = `${VERSION_CELL}  ${TIME_BLANK}  ${MACHINE_UNKNOWN}`
+// joshuafolkken/kit#3749: the third line — the repository's cell alone where the stream holds no
+// event (its indent where no repository is read), else what the run is doing now: its time under the
+// second column, its icon and words under the third.
+const NOW_BLANK = '  '
 const ONE_RUNNING = `${NAME_BLANK}  ${TIME_BLANK}  🔄 1 running`
 const STALE_BEAT = '💓 40′00″'
 const EMPTY_BAR = '─'.repeat(10)
@@ -87,15 +90,15 @@ describe('run_board_header.header_lines state', () => {
 	it('draws an ended run as ended even with a child still marked running', () => {
 		const activity = { last_event_ms: undefined, is_stopped: true }
 
-		expect(title_of(header({ layout: RUNNING_LAYOUT, activity }))).toMatch(/^■ backlogrun/u)
+		expect(title_of(header({ layout: RUNNING_LAYOUT, activity }))).toMatch(/^■ josh-board/u)
 	})
 
 	it('draws a running run as running and a plan left only to people as waiting on a person', () => {
 		const human = { ...EMPTY_LAYOUT, people: [row(2, 'human')] }
 
-		expect(title_of(header({ layout: RUNNING_LAYOUT }))).toMatch(/^▶ backlogrun/u)
-		expect(title_of(header({ layout: human }))).toMatch(/^✋ backlogrun/u)
-		expect(title_of(header())).toMatch(/^⏸ backlogrun/u)
+		expect(title_of(header({ layout: RUNNING_LAYOUT }))).toMatch(/^▶ josh-board/u)
+		expect(title_of(header({ layout: human }))).toMatch(/^✋ josh-board/u)
+		expect(title_of(header())).toMatch(/^⏸ josh-board/u)
 	})
 
 	// joshuafolkken/kit#3439, joshuafolkken/kit#3450
@@ -105,8 +108,8 @@ describe('run_board_header.header_lines state', () => {
 		const board = header({ activity, ended_ms, now_ms: ended_ms + 10 * MINUTE })
 
 		expect(lines_of(board)).toStrictEqual([
-			`■ backlogrun  ⏰ 1°30′00″  ✅  0/0 ${EMPTY_BAR}  🔄 0  ⏳ 0  💤 0`,
-			`${NAME_BLANK}  🔚 ${minute_of(ended_ms)}     ${MACHINE_UNKNOWN}`,
+			`■ josh-board  ⏰ 1°30′00″  ✅  0/0 ${EMPTY_BAR}  🔄 0  ⏳ 0  💤 0`,
+			`${VERSION_CELL}  🔚 ${minute_of(ended_ms)}     ${MACHINE_UNKNOWN}`,
 			NOW_BLANK,
 		])
 	})
@@ -122,8 +125,8 @@ describe('run_board_header.header_lines shape', () => {
 		const activity = { last_event_ms: NOW - MINUTE, is_stopped: false }
 
 		expect(lines_of(header({ activity }))).toStrictEqual([
-			`⏸ backlogrun  ⏰ 30′00″  ✅  0/0 ${EMPTY_BAR}  🔄 0  ⏳ 0  💤 0`,
-			`${NAME_BLANK}  💓  1′00″  ${MACHINE_UNKNOWN}`,
+			`⏸ josh-board  ⏰ 30′00″  ✅  0/0 ${EMPTY_BAR}  🔄 0  ⏳ 0  💤 0`,
+			`${VERSION_CELL}  💓  1′00″  ${MACHINE_UNKNOWN}`,
 			NOW_BLANK,
 		])
 	})
@@ -133,7 +136,7 @@ describe('run_board_header.header_lines shape', () => {
 		const layout = { ...RUNNING_LAYOUT, unreached: [row(2, 'waiting')] }
 
 		expect(lines_of(header({ layout }))).toStrictEqual([
-			`▶ backlogrun  ⏰ 30′00″  ✅  0/2 ${EMPTY_BAR}  🔄 1  ⏳ 1  💤 0`,
+			`▶ josh-board  ⏰ 30′00″  ✅  0/2 ${EMPTY_BAR}  🔄 1  ⏳ 1  💤 0`,
 			RUNNING_CLOCK,
 			ONE_RUNNING,
 		])
@@ -149,7 +152,7 @@ describe('run_board_header.header_lines shape', () => {
 		}
 
 		expect(clock_line_of(header({ machine }))).toBe(
-			`${NAME_BLANK}  ${TIME_BLANK}  💪  15% ■■────────  🧠  37% ■■■■──────  💾 3.1M/s ■■────────`,
+			`${VERSION_CELL}  ${TIME_BLANK}  💪  15% ■■────────  🧠  37% ■■■■──────  💾 3.1M/s ■■────────`,
 		)
 	})
 })
@@ -160,7 +163,7 @@ describe('run_board_header.header_lines spinner', () => {
 	it('turns the spinner on the third line of a running run, never in place of its mark', () => {
 		const board = header({ layout: RUNNING_LAYOUT, spinner: '⠙' })
 
-		expect(title_of(board)).toMatch(/^▶ backlogrun/u)
+		expect(title_of(board)).toMatch(/^▶ josh-board/u)
 		expect(lines_of(board)[2]).toBe(
 			`${NAME_BLANK}  ⠙${' '.repeat(TIME_BLANK.length - 1)}  🔄 1 running`,
 		)
@@ -174,7 +177,7 @@ describe('run_board_header.header_lines before the plan is read', () => {
 		const board = header({ layout: RUNNING_LAYOUT, plan_fetched_ms: undefined, baseline_total: 0 })
 
 		expect(lines_of(board)).toStrictEqual([
-			`▶ backlogrun  ⏰ 30′00″  ✅  0/- ${EMPTY_BAR}  🔄 1  ⏳ -  💤 0`,
+			`▶ josh-board  ⏰ 30′00″  ✅  0/- ${EMPTY_BAR}  🔄 1  ⏳ -  💤 0`,
 			RUNNING_CLOCK,
 			ONE_RUNNING,
 		])
@@ -196,7 +199,7 @@ describe('run_board_header.header_lines chat', () => {
 		}
 
 		expect(clock_line_of(header({ machine, form: 'chat' }))).toBe(
-			`${NAME_BLANK}  ${TIME_BLANK}  🧠  37% ■■■■──────`,
+			`${VERSION_CELL}  ${TIME_BLANK}  🧠  37% ■■■■──────`,
 		)
 	})
 })
@@ -259,7 +262,7 @@ function progress_of(settled: number, total: number): string {
 	const waiting = Array.from({ length: total - settled }, (_, index) => row(100 + index, 'waiting'))
 	const layout = { ...EMPTY_LAYOUT, active: merged, unreached: waiting }
 
-	return title_of(header({ layout })).replace(/^\S+ backlogrun {2}⏰ \S+ {2}/u, '')
+	return title_of(header({ layout })).replace(/^\S+ josh-board {2}⏰ \S+ {2}/u, '')
 }
 
 // joshuafolkken/kit#3473: icon, count, then bar, as the machine gauges; the done count drawn once.
