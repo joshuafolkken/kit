@@ -14,6 +14,7 @@ import { issue_cite } from './issue-cite'
 import { issue_file_cli } from './issue-file-cli'
 import { issue_number_shape } from './issue-number-shape'
 import { session_cite } from './session-cite'
+import { upstream_interrupt_prose } from './upstream-interrupt-prose'
 
 // `josh upstream:interrupt <finder> "<title>" --repo <owner/repo> --body-file <path> [--blocks-finder]`
 // — the stop `upstream-interrupt.md` prescribes for a defect in another package, in one call: the tree
@@ -148,17 +149,17 @@ async function file(interrupt: Interrupt): Promise<string | undefined> {
 }
 
 function resume_line(interrupt: Interrupt): string {
-	return `Resume with \`pnpm josh stash:pop "${stash_message(interrupt)}"\`.`
+	return upstream_interrupt_prose.resume(stash_message(interrupt))
 }
 
 function backlink_body(interrupt: Interrupt, reference: string): string {
-	const reason = `${issue_cite.plain_for('github', interrupt.finder)} stopped on this upstream defect; its work is stashed.`
+	const reason = upstream_interrupt_prose.stopped(issue_cite.plain_for('github', interrupt.finder))
 
 	return `## Upstream issues\n\n- ${reference}\n\n${reason} ${resume_line(interrupt)}`
 }
 
 function candidate_of(interrupt: Interrupt, draft: string): string {
-	const reason = `Not filed: \`${interrupt.repo}\` is third-party (Tier C) — a person posts the draft below.`
+	const reason = upstream_interrupt_prose.not_filed(interrupt.repo)
 
 	return `## Upstream candidate\n\n${reason} ${resume_line(interrupt)}\n\n### ${interrupt.title}\n\n${draft}`
 }

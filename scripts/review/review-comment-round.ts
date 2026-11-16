@@ -5,6 +5,7 @@ import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { parse_json, parse_json_array_safe } from '#scripts/git/parse-json-array'
 import { session_cite } from '#scripts/issue/session-cite'
+import { session_language } from '#scripts/josh/session-language'
 import { CARRIED_ROUNDS_SUFFIX } from '#scripts/observations/observation-ledger'
 import { observation_ledger_archive } from '#scripts/observations/observation-ledger-archive'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
@@ -35,7 +36,11 @@ const COMMENT_TITLE = 'Review round recorded after the pull request opened'
 const OBSERVATION_TITLE = 'Observation recorded while the pull request was open'
 const COMMENT_TITLES = [COMMENT_TITLE, OBSERVATION_TITLE]
 const COMMENT_HEADINGS = COMMENT_TITLES.map((title) => `${COMMENT_HEADING_MARK}${title}`)
-const COMMENT_NOTE =
+// Only the note is for a person to read, so only it follows the session language; the headings and
+// ledger lines are what the carry matches, and stay English (joshuafolkken/kit#7665).
+const JAPANESE_COMMENT_NOTE =
+	'観察台帳ではなくここに残す: コミットの後に追記した行は開いている pull request に push され、CI をやり直させるため。'
+const ENGLISH_COMMENT_NOTE =
 	'Kept here rather than in the observation ledger: a line appended after the commit would be pushed onto the open pull request and restart its CI.'
 const CODE_FENCE = '```'
 const OBSERVATION_LINE_MARK = '- k:'
@@ -58,10 +63,16 @@ const comment_schema = z.object({
 
 type IssueComment = z.infer<typeof comment_schema>
 
+function comment_note(): string {
+	const { lang } = session_language.resolve_session_lang()
+
+	return session_language.is_japanese(lang) ? JAPANESE_COMMENT_NOTE : ENGLISH_COMMENT_NOTE
+}
+
 function body_under(title: string, lines: ReadonlyArray<string>): string {
 	const heading = `${COMMENT_HEADING_MARK}${title}`
 
-	return [heading, '', COMMENT_NOTE, '', CODE_FENCE, ...lines, CODE_FENCE].join('\n')
+	return [heading, '', comment_note(), '', CODE_FENCE, ...lines, CODE_FENCE].join('\n')
 }
 
 function body_of(lines: ReadonlyArray<string>): string {
