@@ -1,7 +1,0 @@
-{
-	"reason": "#7639 records full-reach files on the test-related ledger row and names them in lane:stats --over; the test-related schema moved to its own module to stay under the file cap",
-	"date": "2026-11-16",
-	"growth": {
-		"scripts.code_lines": 55
-	}
-}
