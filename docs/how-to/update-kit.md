@@ -6,7 +6,7 @@ A new kit version is out and you want its updated AI rules, workflow templates a
 
 ## Steps
 
-Still installing kit from GitHub Packages (`pnpm config get "@joshuafolkken:registry"` prints `https://npm.pkg.github.com`)? Follow [registry-migration.md](../registry-migration.md) in order first; it ends with steps 2 and 4 below.
+Still installing kit from GitHub Packages (`pnpm config get "@joshuafolkken:registry"` prints `https://npm.pkg.github.com`)? Follow [registry-migration.md](../registry-migration.md) in order first; it ends with steps 2 and 4 below. If its entry stops on the pnpm version or on a locked version missing from npm, use [the path for those projects](../registry-migration.md#入口が停止する配布先) instead.
 
 1. Check what you have and what is available with [`josh version`](../josh-commands.md#josh-version); its upgrade option moves both the global install and the project dependency.
 2. Run [`josh sync`](../josh-commands.md#josh-sync) to pull in the managed files. It follows the recorded profile, so a `basic` project gets only its own file set and has its pre-rename paths moved. [sync.md](../sync.md#what-gets-synced) lists what it overwrites and what it merges.
