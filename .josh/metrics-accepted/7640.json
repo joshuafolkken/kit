@@ -1,0 +1,7 @@
+{
+	"reason": "#7640 adds the edit-time lane:plan overlap check for unplanned files (new unplanned-edit hook module)",
+	"date": "2026-11-16",
+	"growth": {
+		"scripts.code_lines": 38
+	}
+}

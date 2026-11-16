@@ -100,6 +100,16 @@ describe('run_review_unplanned.refusal', () => {
 		expect(lane_plan.read(LANE, directory)?.paths).toEqual([PLANNED])
 	})
 
+	// joshuafolkken/kit#7640: the edit hook's stdout carries one JSON envelope, so it takes the line.
+	it('hands the widening line to the given inform instead of the console', async () => {
+		found(FREE_FILE)
+		const inform = vi.fn()
+
+		expect(await run_review_unplanned.refusal_to(directory, inform)).toBeUndefined()
+		expect(String(inform.mock.calls[0]?.[0])).toContain(FREE_FILE)
+		expect(info).not.toHaveBeenCalled()
+	})
+
 	it('asks nothing when no file is unplanned', async () => {
 		read_unplanned.mockResolvedValue(undefined)
 

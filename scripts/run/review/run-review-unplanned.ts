@@ -29,10 +29,15 @@ async function ways_out(widened: LanePlan, clash: Clash, files: string): Promise
 	return `\`lane:plan\` waits on ${holder} at most ${String(minutes)} min (until ${until}): ${spill}, or run \`${replan}\` to wait`
 }
 
+// Where the clean widening's line goes: the console for `run:review`, the edit hook's context for
+// `unplanned-edit.ts`, whose stdout carries one JSON envelope and nothing else.
+type Inform = (line: string) => void
+
 async function answer(
 	found: Unplanned,
 	widened: LanePlan,
 	extended: Extended,
+	inform: Inform,
 ): Promise<string | undefined> {
 	if (lane_plan_probe.is_oversize(extended)) {
 		return `${session_cite.issue(found.issue)}'s plan widened by ${found.files.join(', ')} outgrows the Issue's declared size: run \`lane:plan\` (it answers \`split\`). ${found.text}`
@@ -46,7 +51,7 @@ async function answer(
 		return `${lane_plan_probe.overlap_text(found.issue, extended)}. ${ways}. ${found.text}`
 	}
 
-	console.info(
+	inform(
 		`lane:plan widened by ${found.files.join(', ')}: no running lane holds them; comment the reason for the widening on the Issue in one line`,
 	)
 
@@ -61,15 +66,20 @@ function widened_of(found: Unplanned, directory: string): LanePlan | undefined {
 		: { ...recorded, paths: [...recorded.paths, ...found.files] }
 }
 
-async function refusal(directory: string = process.cwd()): Promise<string | undefined> {
+async function refusal_to(directory: string, inform: Inform): Promise<string | undefined> {
 	const found = await check_related_unplanned.read_unplanned()
 	const widened = found === undefined ? undefined : widened_of(found, directory)
 
 	if (found === undefined || widened === undefined) return undefined
 
-	return await answer(found, widened, await lane_plan_probe.extend(widened, directory))
+	return await answer(found, widened, await lane_plan_probe.extend(widened, directory), inform)
 }
 
-const run_review_unplanned = { refusal }
+async function refusal(directory: string = process.cwd()): Promise<string | undefined> {
+	return await refusal_to(directory, console.info)
+}
+
+const run_review_unplanned = { refusal, refusal_to }
 
 export { run_review_unplanned }
+export type { Inform }
