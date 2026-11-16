@@ -121,3 +121,15 @@ describe('test_network_guard.describe_violations — read by the test run summar
 		).toStrictEqual([CALLER])
 	})
 })
+
+// Review round 1: the file is the line's tail, so a tab inside the command must not move it.
+describe('test_network_guard.describe_violations — a command holding the separator', () => {
+	it('takes the file from the end of the line', () => {
+		const command = `gh api one${TEST_FILE_SEPARATOR}two`
+
+		expect(failure_lines([from(CALLER, command)]).slice(1)).toStrictEqual([
+			` FAIL  ${CALLER}`,
+			`  1x  ${command}`,
+		])
+	})
+})

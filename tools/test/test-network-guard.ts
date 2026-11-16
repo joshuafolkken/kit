@@ -307,10 +307,13 @@ interface RecordedCall {
 
 // A recorded line split back into its command and the test file that made it — empty where no test
 // file was running (`globalSetup`) or the guard writing the line records none (the Telegram one).
+// Split at the last separator: the file is the line's tail, and a command's own arguments may hold one.
 function recorded_call(call: string): RecordedCall {
-	const [command = '', file = ''] = call.split(TEST_FILE_SEPARATOR)
+	const at = call.lastIndexOf(TEST_FILE_SEPARATOR)
 
-	return { command: command.trim(), file: file.trim() }
+	if (at === -1) return { command: call.trim(), file: '' }
+
+	return { command: call.slice(0, at).trim(), file: call.slice(at + 1).trim() }
 }
 
 // Each test file's commands, keyed by the file in first-seen order.
