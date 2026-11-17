@@ -69,7 +69,7 @@ The issue-driven flow: `prompts/collaboration-workflow/`.
 
 #### Explicit invocation required (MANDATORY)
 
-Never start a `kickoff` / `halfrun` / `prrun` / `fullrun` / `backlogrun` workflow (`#N` / `new` included) unless the user typed the keyword in the **current turn's prompt** — a conversational request ("implement X") is not one, and an earlier turn's authorization does not carry over. Never ask "Shall I run `fullrun`?"; say "Please run \`<command>\` to start this task." A resumed `backlogrun` inside its declared budget continues (`backlogrun-steps.md` → "The session cut is inside the invocation").
+Never start a `kickoff` / `halfrun` / `prrun` / `fullrun` / `backlogrun` workflow (`#N` / `new` included) unless the user typed the keyword in the **current turn's prompt** — a conversational request ("implement X") is not one, and an earlier turn's authorization does not carry over. Never ask "Shall I run `fullrun`?"; say "Please run \`<command>\` to start this task." Consultation main line: a current-turn instruction to file (「起票」, “file an issue”) is that turn's `kickoff new` → `pnpm josh run:handoff kickoff new`. A resumed `backlogrun` inside its declared budget continues (`backlogrun-steps.md` → "The session cut is inside the invocation").
 
 #### Mid-workflow stop notification (`confirmation`)
 

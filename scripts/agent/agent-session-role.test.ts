@@ -55,6 +55,13 @@ describe('agent_session_role.scope_line', () => {
 		expect(line).not.toContain('consultation, filing and operations')
 	})
 
+	// joshuafolkken/kit#7783: a filing instruction in consultation is kickoff new, handed off.
+	it('hands a filing instruction to run:handoff kickoff new outside a worker lane', () => {
+		const line = agent_session_role.scope_line({})
+
+		expect(line).toContain('hand it to `pnpm josh run:handoff kickoff new`')
+	})
+
 	// joshuafolkken/kit#7755: an imperative request goes through investigate, plan and filing plan.
 	it('answers an imperative request with a plan and a filing plan outside a worker lane', () => {
 		const line = agent_session_role.scope_line({})
