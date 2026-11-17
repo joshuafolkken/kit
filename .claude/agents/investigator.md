@@ -23,6 +23,9 @@ to find out **how the subject currently works**, not what to change.
   and overloads it needs), plus the existing test fixtures its tests will use (paths and setup or
   helper usage), each with `file:line` citations. If either does not apply or was not found, say so;
   do not invent an API or fixture, or paste whole implementations.
+- End with a `### Files to edit` section: one backticked path per bullet for every file the planned
+  change edits or adds, tests on their own bullets. The run judges the lane's size on it before the
+  first edit (`lane:plan`, `scripts/run/run-investigation-record.ts`).
 - Report what the code does, never a root cause or a fix: deciding that stays in the main line.
 - Keep the reply within 60 lines and 3,000 characters: one bullet per claim with its citations,
   grouped under the brief's questions, with no preamble, recap or list of the files you opened.

@@ -207,6 +207,8 @@ const split_notice_schema = z.object({
 	files: z.number(),
 	lines: z.number(),
 	reason: z.enum(['files', 'hunks', 'lines', 'hub', 'budget']).optional(),
+	// Why a `--single` plan cannot be merged in parts (joshuafolkken/kit#7729).
+	single_reason: z.string().optional(),
 })
 // One `josh issue:file --route split` filed from the lane of `issue`; `child` is its reference.
 const split_filed_schema = z.object({

@@ -2,6 +2,7 @@ import { SPLIT_ROUTE_LABEL } from '#scripts/issue/issue-labels'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_ledger, type LedgerEntry } from '#scripts/lane/lane-ledger'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
+import { lane_tree_edit } from '#scripts/lane/lane-tree-edit'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { split_resolution } from './split-resolution'
 
@@ -27,11 +28,15 @@ const SPLIT_CHILD: LedgerEntry = {
 	child: '#4700',
 }
 
+const OWN_SPLIT = { route: SPLIT_ROUTE_LABEL, found_during: undefined }
+
 const record_split_filed = vi.spyOn(lane_ledger_write, 'record_split_filed')
 const error = vi.spyOn(console, 'error')
+const is_edited = vi.spyOn(lane_tree_edit, 'is_edited')
 
 beforeEach(() => {
 	record_split_filed.mockResolvedValue()
+	is_edited.mockResolvedValue(true)
 	error.mockImplementation(vi.fn())
 	vi.stubEnv(lane_child_marker.KEY, String(OTHER_ISSUE))
 })
@@ -45,36 +50,43 @@ describe('split_resolution.notices and split_issues', () => {
 
 // joshuafolkken/kit#7183: a dispatched lane is never split, so its own split filing is refused.
 describe('split_resolution.is_split_clear', () => {
-	it('refuses a split filed from the dispatched lane it would split', () => {
+	it('refuses a split filed from the dispatched lane it would split', async () => {
 		const filing = { route: SPLIT_ROUTE_LABEL, found_during: String(OTHER_ISSUE) }
 
-		expect(split_resolution.is_split_clear(filing)).toBe(false)
+		expect(await split_resolution.is_split_clear(filing)).toBe(false)
 		expect(String(error.mock.calls.at(-1)?.[0])).toContain('never split')
 	})
 
-	it('refuses a split that omits --found-during in the dispatched lane', () => {
-		expect(
-			split_resolution.is_split_clear({ route: SPLIT_ROUTE_LABEL, found_during: undefined }),
-		).toBe(false)
+	it('refuses a split that omits --found-during in the dispatched lane', async () => {
+		expect(await split_resolution.is_split_clear(OWN_SPLIT)).toBe(false)
 		expect(String(error.mock.calls.at(-1)?.[0])).toContain(`#${String(OTHER_ISSUE)}`)
 	})
 
-	it('passes another route and another lane', () => {
+	it('passes another route and another lane', async () => {
 		const filings = [
 			{ route: 'route:bug', found_during: String(OTHER_ISSUE) },
 			{ route: SPLIT_ROUTE_LABEL, found_during: String(ISSUE) },
 		]
+		const answers = await Promise.all(
+			filings.map(async (filing) => await split_resolution.is_split_clear(filing)),
+		)
 
-		expect(filings.every((filing) => split_resolution.is_split_clear(filing))).toBe(true)
+		expect(answers).toStrictEqual([true, true])
 		expect(error).not.toHaveBeenCalled()
 	})
 
-	it('passes a split filed outside any dispatched lane', () => {
+	it('passes a split filed outside any dispatched lane', async () => {
 		vi.stubEnv(lane_child_marker.KEY, '')
 
-		expect(
-			split_resolution.is_split_clear({ route: SPLIT_ROUTE_LABEL, found_during: undefined }),
-		).toBe(true)
+		expect(await split_resolution.is_split_clear(OWN_SPLIT)).toBe(true)
+		expect(error).not.toHaveBeenCalled()
+	})
+
+	// joshuafolkken/kit#7729: the split `lane:plan` answers before the first edit is filed.
+	it("passes the dispatched lane's own split before its first edit", async () => {
+		is_edited.mockResolvedValue(false)
+
+		expect(await split_resolution.is_split_clear(OWN_SPLIT)).toBe(true)
 		expect(error).not.toHaveBeenCalled()
 	})
 })
