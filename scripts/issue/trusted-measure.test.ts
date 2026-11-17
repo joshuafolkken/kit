@@ -80,6 +80,15 @@ describe('trusted_measure execution refusal and failure', () => {
 		},
 	)
 
+	// joshuafolkken/kit#7769: filing runs a draft's premises before the body is on GitHub.
+	it('runs only the commands a drafted body declares', () => {
+		const source = trusted_measure.drafted(`## 背景\n- 前提: \`${COMMAND}\` >= 3`)
+
+		expect(trusted_measure.run_command(COMMAND, source).kind).toBe('ok')
+		expect(trusted_measure.run_command('echo evil', source).kind).toBe('failed')
+		expect(execSync).toHaveBeenCalledTimes(1)
+	})
+
 	it('retains the audit entry when a declared command fails or times out', () => {
 		vi.mocked(execSync).mockImplementation(() => {
 			throw new Error('timed out')
