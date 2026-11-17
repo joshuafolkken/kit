@@ -1,11 +1,10 @@
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { error_text } from '#scripts/lib/error-message'
-import type { LaunchResult } from '#scripts/run/detached-launch'
 import { test_pinned } from '#scripts/test/test-pinned'
 import { test_pinned_logic } from '#scripts/test/test-pinned-logic'
 import { test_pinned_record, type PinnedSummary } from '#scripts/test/test-pinned-record'
 import { run_review_pinned_join } from './run-review-pinned-join'
-import { run_review_pinned_steps } from './run-review-pinned-steps'
+import { run_review_pinned_steps, type RemainingStart } from './run-review-pinned-steps'
 import { run_review_pinned_tree } from './run-review-pinned-tree'
 
 const MOVED_NOTE = 'the tree moved while collecting remaining verdicts'
@@ -14,19 +13,17 @@ async function is_current(tree: string | undefined): Promise<boolean> {
 	return tree !== undefined && tree === (await run_review_pinned_tree.key())
 }
 
-function launched_on(tree: string, root: string): LaunchResult {
-	const running = run_review_pinned_steps.remaining_on(tree, root)
-
-	if (running !== undefined) return running
-	run_review_pinned_steps.clear(root)
-
-	return run_review_pinned_steps.launch_remaining(root, tree)
+function launched_on(tree: string, root: string): RemainingStart {
+	return (
+		run_review_pinned_steps.remaining_on(tree, root) ??
+		run_review_pinned_steps.relaunch_remaining(root, tree)
+	)
 }
 
 // Use the existing continuation's launch/record/cache. Ship keeps its first stop; the next join
 // or record collects the rest before fixes move the tree (joshuafolkken/kit#7438). **One already
 // launched on this tree is kept, not started again** (joshuafolkken/kit#7802).
-async function start(root: string = PROJECT_ROOT): Promise<LaunchResult> {
+async function start(root: string = PROJECT_ROOT): Promise<RemainingStart> {
 	try {
 		const tree = await run_review_pinned_tree.key()
 
@@ -75,9 +72,9 @@ async function current_answer(root: string): Promise<PinnedSummary | undefined> 
 async function relaunched_answer(root: string): Promise<PinnedSummary | undefined> {
 	const launched = await start(root)
 
-	return launched.kind === 'launched'
-		? await current_answer(root)
-		: test_pinned_record.not_run_summary(launched.note)
+	return launched.kind === 'failed'
+		? test_pinned_record.not_run_summary(launched.note)
+		: await current_answer(root)
 }
 
 // Settle an old tree into the cache first; only cache misses are probed on the current tree.
@@ -119,24 +116,14 @@ async function collect_current(summary: PinnedSummary, root: string): Promise<Pi
 		: test_pinned_record.not_run_summary(MOVED_NOTE)
 }
 
-async function start_carrying(reason: string, root: string): Promise<void> {
-	const launched = await start(root)
-
-	try {
-		if (launched.kind === 'launched') run_review_pinned_steps.carry_reason(reason, root)
-	} catch (error) {
-		error_text.trace_swallowed('run_review_pinned_remaining.start_carrying', error)
-	}
-}
-
 // **A cut answer under a carried reason starts the rest behind it** (joshuafolkken/kit#7802): a reason
 // never judges a cut, so the ship's pre-detach probed every hunk `run:review` left. Started here, those
-// verdicts reach the cache before the pre-detach reads them, and the reason stays on the new launch.
-// A launch that failed leaves the answer as it was.
+// verdicts reach the cache before the pre-detach reads them; `relaunch_remaining` keeps the reason on
+// the new launch, and a launch that failed leaves the answer and its reason as they were.
 async function started_behind(summary: PinnedSummary, root: string): Promise<PinnedSummary> {
-	const reason = summary.is_cut === true ? run_review_pinned_steps.launched_reason(root) : undefined
+	const is_reasoned = run_review_pinned_steps.launched_reason(root) !== undefined
 
-	if (reason !== undefined) await start_carrying(reason, root)
+	if (is_reasoned && summary.is_cut === true) await start(root)
 
 	return summary
 }

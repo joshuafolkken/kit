@@ -165,11 +165,13 @@ describe('run_review_pinned_remaining.collect behind a reason-bearing cut', () =
 		expect(run_review_pinned_steps.launched_reason(ROOT)).toBe(REASON)
 	})
 
-	it('keeps a reason-bearing cut when the rest cannot launch', async () => {
+	it('keeps a reason-bearing cut and its reason when the rest cannot launch', async () => {
 		run_review_pinned_steps.launch(ROOT, REASON, TREE)
 		vi.mocked(run_review_steps.launch_josh).mockReturnValue({ kind: 'failed', note: 'no spawn' })
 
 		expect(await run_review_pinned_remaining.collect(CUT, ROOT)).toBe(CUT)
+		expect(run_review_pinned_steps.launched_reason(ROOT)).toBe(REASON)
+		expect(run_review_pinned_steps.is_remaining(ROOT)).toBe(false)
 	})
 
 	it('starts nothing behind a reason-bearing answer that probed every hunk', async () => {
@@ -182,11 +184,21 @@ describe('run_review_pinned_remaining.collect behind a reason-bearing cut', () =
 })
 
 describe('run_review_pinned_remaining.start on a running continuation', () => {
-	it('does not launch the rest twice on the same tree', async () => {
+	it('does not launch the rest twice while it still runs on the same tree', async () => {
+		vi.mocked(process_identity.is_same_process).mockReturnValue(true)
+		vi.spyOn(process, 'kill').mockReturnValue(true)
 		await run_review_pinned_remaining.start(ROOT)
 		const again = await run_review_pinned_remaining.start(ROOT)
 
 		expect(again).toEqual({ kind: 'launched', pid: PID })
+		expect(run_review_steps.launch_josh).toHaveBeenCalledOnce()
+	})
+
+	it('reports the rest answered on the same tree as answered, not as probing', async () => {
+		await run_review_pinned_remaining.start(ROOT)
+		const again = await run_review_pinned_remaining.start(ROOT)
+
+		expect(again).toEqual({ kind: 'answered' })
 		expect(run_review_steps.launch_josh).toHaveBeenCalledOnce()
 	})
 

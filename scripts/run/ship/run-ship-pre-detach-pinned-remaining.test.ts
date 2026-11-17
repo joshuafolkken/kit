@@ -1,4 +1,5 @@
 import type { LaunchResult } from '#scripts/run/detached-launch'
+import type { RemainingStart } from '#scripts/run/review/run-review-pinned-steps'
 import type { PinnedSummary } from '#scripts/test/test-pinned-record'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -10,7 +11,7 @@ const { TREE, run_mock, read_mock, on_tree_mock, launch_mock, steps_clear_mock, 
 		on_tree_mock: vi.fn<() => Promise<PinnedSummary | undefined>>(),
 		launch_mock: vi.fn<(root: string, tree?: string) => LaunchResult>(),
 		steps_clear_mock: vi.fn<() => void>(),
-		running_mock: vi.fn<(tree: string, root?: string) => LaunchResult | undefined>(),
+		running_mock: vi.fn<(tree: string, root?: string) => RemainingStart | undefined>(),
 	}))
 
 vi.mock('#scripts/run/review/run-review-pinned-join', () => ({
@@ -19,7 +20,7 @@ vi.mock('#scripts/run/review/run-review-pinned-join', () => ({
 vi.mock('#scripts/run/review/run-review-pinned-steps', () => ({
 	run_review_pinned_steps: {
 		clear: steps_clear_mock,
-		launch_remaining: launch_mock,
+		relaunch_remaining: launch_mock,
 		remaining_on: running_mock,
 	},
 }))
@@ -73,7 +74,6 @@ beforeEach(() => {
 describe('run_ship_pre_detach_pinned.pinned_check on a cut answer', () => {
 	it('still stops, and launches the rest on this tree with their count printed', async () => {
 		expect(await stopped_out()).toContain(`probing 3 remaining hunks ${NOTE}`)
-		expect(steps_clear_mock).toHaveBeenCalledWith(expect.any(String))
 		expect(launch_mock).toHaveBeenCalledWith(expect.any(String), TREE)
 	})
 
@@ -121,7 +121,13 @@ describe('run_ship_pre_detach_pinned.pinned_check beside a running continuation'
 
 		expect(await stopped_out()).toContain(NOTE)
 		expect(running_mock).toHaveBeenCalledWith(TREE, expect.any(String))
-		expect(steps_clear_mock).not.toHaveBeenCalled()
+		expect(launch_mock).not.toHaveBeenCalled()
+	})
+
+	it('prints no probing note when the rest already answered on this tree', async () => {
+		running_mock.mockReturnValue({ kind: 'answered' })
+
+		expect(await stopped_out()).not.toContain(NOTE)
 		expect(launch_mock).not.toHaveBeenCalled()
 	})
 })
