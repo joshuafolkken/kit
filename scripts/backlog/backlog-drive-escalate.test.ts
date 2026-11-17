@@ -5,6 +5,7 @@ import type { EpicIssue } from '#scripts/epic/epic-issue'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { NEEDS_DECISION_LABEL, RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
 import { josh_command } from '#scripts/josh/josh-run'
+import { session_language } from '#scripts/josh/session-language'
 import { PACKAGE_JSON } from '#scripts/lib/package-manifest'
 import { run_add_issue } from '#scripts/run/add/run-add-issue'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
@@ -45,13 +46,16 @@ function posted_comment(): string {
 	return vi.mocked(git_gh_issue_write.issue_try_comment).mock.calls[0]?.[1] ?? ''
 }
 
+// The sentences follow the session language; `backlog-drive-escalate-language.test.ts` covers both.
 beforeEach(() => {
+	vi.stubEnv(session_language.ENV_KEY, 'en')
 	vi.spyOn(git_gh_issue_write, 'issue_add_label').mockResolvedValue(true)
 	vi.spyOn(git_gh_issue_write, 'issue_clear_label').mockResolvedValue(true)
 	vi.spyOn(git_gh_issue_write, 'issue_try_comment').mockResolvedValue(true)
 })
 
 afterEach(() => {
+	vi.unstubAllEnvs()
 	vi.restoreAllMocks()
 	rmSync(DIRECTORY, { recursive: true, force: true })
 })

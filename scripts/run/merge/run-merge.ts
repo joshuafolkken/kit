@@ -3,11 +3,9 @@ import {
 	has_label_name,
 	has_parked_label,
 	NEEDS_HUMAN_MERGE_LABEL,
-	RUN_STALLED_LABEL,
 } from '#scripts/issue/issue-labels'
 import type { IssueState } from '#scripts/issue/issue-state'
-import type { CarryChange, RunCarry } from '#scripts/run/carry/run-carry'
-import { run_stalled } from '#scripts/run/park/run-stalled'
+import type { CarryChange } from '#scripts/run/carry/run-carry'
 import type { ChildOutcome } from './run-merge-outcome'
 
 // The pure core of `run:merge`, the one composite command for a `backlogrun` merge event: the parent —
@@ -15,10 +13,10 @@ import type { ChildOutcome } from './run-merge-outcome'
 // child's return and reads back the next child number, or a control verdict.
 //
 // Everything here is pure — the classification of the returned child, the counter change that outcome
-// implies, the consecutive-failure guard, and the progress-comment text generated from the
-// single-source carry record. The side effects (`main:sync`, `lane:close`, the comment write, the
-// label edits, `epic:next` / `backlog:next`) are the CLI's, so the branches this file decides are
-// unit-tested without a network — `merged`, `parked`, `failed`, `human-review`, `unresolved`.
+// implies and the consecutive-failure guard; the comments it posts are `run-merge-prose.ts`'s. The
+// side effects (`main:sync`, `lane:close`, the comment write, the label edits, `epic:next` /
+// `backlog:next`) are the CLI's, so the branches this file decides are unit-tested
+// without a network — `merged`, `parked`, `failed`, `human-review`, `unresolved`.
 
 const CLOSED_STATE = 'CLOSED'
 // Every third failure in a row asks whether `main` itself is broken (`run-merge-health.ts`) — the
@@ -198,75 +196,17 @@ function outage_wait_ms(outages: number): number {
 	return Math.min(OUTAGE_WAIT_BASE_MS * DOUBLING ** doublings, OUTAGE_WAIT_CAP_MS)
 }
 
-// The progress comment, generated from the single-source carry record so the counters live in one
-// place and this text is derived rather than a second copy kept alongside it.
-// It is script-emitted, so it stays English while the run's session-facing prose follows
-// `JOSH_SESSION_LANG`.
-function counters_comment(carry: RunCarry): string {
-	return [
-		'Run progress (generated from the carry record):',
-		`- started: ${carry.started_at}`,
-		`- merged: ${String(carry.merged)}`,
-		`- filed: ${String(carry.filed)}`,
-		`- consecutive failures: ${String(carry.failures)}`,
-		`- consecutive outages: ${String(carry.outages)}`,
-		`- cuts crossed: ${String(carry.cuts)}`,
-	].join('\n')
-}
-
-// Why the run parked a child it judged failed. A child that stops itself leaves its own comment; one
-// the driver stops leaves none, so this tells a person why it carries `run:stalled`.
-// Script-emitted, so English.
-interface ParkReason {
-	child: string
-	cause: string
-	carry: RunCarry | undefined
-	output: string | undefined
-}
-
-function streak_line(carry: RunCarry | undefined): string {
-	if (carry === undefined) return '- Consecutive failures: not recorded (no carry record).'
-
-	return `- Consecutive failures: ${String(carry.failures)} of ${String(CONSECUTIVE_FAILURE_LIMIT)} (every ${String(CONSECUTIVE_FAILURE_LIMIT)} in a row checks \`main\`).`
-}
-
-function park_comment(reason: ParkReason): string {
-	const transcript = reason.output === undefined ? '' : ` (\`${reason.output}\`)`
-
-	return [
-		`Parked with \`${RUN_STALLED_LABEL}\` by \`pnpm josh run:merge\`, the \`backlogrun\` driver — a mechanical failure, with no decision to make.`,
-		`- Why: ${reason.cause}`,
-		'- Read: the issue is OPEN, carries no park label, `needs-human-review` or `epic`, no merged pull request’s `closes #N` names it, and it declares no open blocker, start date still ahead or sample condition not yet met.',
-		streak_line(reason.carry),
-		`- Next: read the child’s transcript${transcript}, ${run_stalled.next_step(reason.child, reason.cause)}.`,
-	].join('\n')
-}
-
-// Why the run released a child it would otherwise have parked: the child records open blockers or a
-// start date still ahead or samples still short, so when it runs is already decided and it waits rather than asking a person.
-// Script-emitted, so English.
-function waiting_comment(waits: ReadonlyArray<string>): string {
-	return [
-		'Released to wait by `pnpm josh run:merge`, the `backlogrun` driver — not parked, and not counted as a failure.',
-		`- Why: the child’s session ended unfinished while it waits on: ${waits.join(', ')}.`,
-		'- Next: when it runs is already recorded — it becomes runnable again once its blockers merge, its start date arrives and its sample condition is met; a blocker outside the backlog still needs a person to land it.',
-	].join('\n')
-}
-
 const run_merge = {
 	CONSECUTIVE_FAILURE_LIMIT,
 	CONSECUTIVE_OUTAGE_LIMIT,
 	change_of,
 	classify_child,
-	counters_comment,
-	park_comment,
-	waiting_comment,
 	is_guard_tripped,
 	is_outage_guard_tripped,
 	outage_wait_ms,
 }
 
-export type { EndingSignals, ParkReason }
+export type { EndingSignals }
 export { run_merge }
 
 export { type ChildOutcome } from './run-merge-outcome'

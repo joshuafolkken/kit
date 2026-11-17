@@ -15,8 +15,8 @@ import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
 import { time_josh_names } from '#scripts/time-runtime/time-josh-names'
 import { time_shell } from '#scripts/time-runtime/time-shell'
 import { z } from 'zod'
-import { run_merge, type ParkReason } from './run-merge'
-import { run_merge_prose } from './run-merge-prose'
+import { run_merge } from './run-merge'
+import { run_merge_prose, type ParkReason } from './run-merge-prose'
 
 const HOOK_CONFIRMATION = '📱 stop:guard sent the confirmation notify ('
 const INPUT_SCHEMA = z.object({ command: z.string() })
@@ -161,7 +161,7 @@ function park_options(
 ): { label: string; comment: string } {
 	return is_decision(judgment.short)
 		? { label: NEEDS_DECISION_LABEL, comment: run_merge_prose.decision_comment(judgment.why) }
-		: { label: RUN_STALLED_LABEL, comment: run_merge.park_comment(reason) }
+		: { label: RUN_STALLED_LABEL, comment: run_merge_prose.park_comment(reason) }
 }
 
 function is_guard_tripped(short: string, carry: RunCarry | undefined): boolean {

@@ -240,7 +240,7 @@ describe('run_merge_steps.do_failed — a child waiting on an open blocker', () 
 		expect(apply_spy).not.toHaveBeenCalled()
 		expect(comment_mock).toHaveBeenCalledWith(
 			CHILD,
-			expect.stringContaining(`waits on: ${KIT}#${String(BLOCKER)}`),
+			expect.stringContaining(`: ${KIT}#${String(BLOCKER)}`),
 		)
 		expect(remove_label_mock).toHaveBeenCalledWith(CHILD, IN_PROGRESS)
 	})
@@ -303,7 +303,7 @@ describe('run_merge_steps.do_failed — a child waiting on its declared start da
 		expect(apply_spy).not.toHaveBeenCalled()
 		expect(comment_mock).toHaveBeenCalledWith(
 			CHILD,
-			expect.stringContaining(`waits on: not before ${String(date)}`),
+			expect.stringContaining(`: not before ${String(date)}`),
 		)
 	})
 
