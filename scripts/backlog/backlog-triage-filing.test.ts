@@ -73,4 +73,9 @@ describe('backlog_triage_filing.block', () => {
 		expect(backlog_triage_filing.filed_of('filed #7780, see #12')).toBe(FILED)
 		expect(backlog_triage_filing.filed_of('nothing filed')).toBeUndefined()
 	})
+
+	it('skips an Issue of another repository', () => {
+		expect(backlog_triage_filing.filed_of('see owner/repo#12, filed #7780')).toBe(FILED)
+		expect(backlog_triage_filing.filed_of('filed owner/repo#12')).toBeUndefined()
+	})
 })

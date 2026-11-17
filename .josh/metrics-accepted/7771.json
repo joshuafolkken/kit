@@ -1,8 +1,8 @@
 {
-	"reason": "#7771 adds the filing check on park bodies and backlog:triage --adopt (new backlog-triage-filing.ts) and documents the --done \"filed #<M>\" form",
+	"reason": "Round-1 Low fixes: the --adopt line asks a filing option for the filed Issue, and --done skips another repository's Issue",
 	"date": "2026-11-17",
 	"growth": {
-		"scripts.code_lines": 70,
+		"scripts.code_lines": 74,
 		"ai_cost.on_demand_bytes": 113,
 		"prose.long_paragraphs": 1
 	}

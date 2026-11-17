@@ -8,7 +8,8 @@ import { session_cite } from '#scripts/issue/session-cite'
 // relation, idempotent) and not requeued — `#M`'s merge re-dispatches it
 // (`backlog_drive_retry.after_merge`, which reads the park's event and the blocked-by relation).
 
-const FILED = /#([1-9]\d*)/u
+// A bare `#M` only: `owner/repo#M` is another repository's Issue, which this one cannot be blocked by.
+const FILED = /(?<![\w/.-])#([1-9]\d*)/u
 const OPEN_STATE = 'OPEN'
 
 function filed_of(done: string): number | undefined {
