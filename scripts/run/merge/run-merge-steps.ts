@@ -25,6 +25,7 @@ import { run_merge_close } from './run-merge-close'
 import { run_merge_cut_release } from './run-merge-cut-release'
 import { run_merge_decision } from './run-merge-decision'
 import { run_merge_github_limit } from './run-merge-github-limit'
+import { run_merge_prose } from './run-merge-prose'
 import { run_merge_waits } from './run-merge-waits'
 
 // The result of attempting to apply a carry change. Distinguishing `refused` from `applied` lets
@@ -182,10 +183,6 @@ async function close_preserved_lane(child: string): Promise<void> {
 	if (await lane_preserve.preserve_lane(child, 'lane close', CLOSE_CAUSE)) await close_lane(child)
 }
 
-function kept_lane_comment(directory: string): string {
-	return `The split left this issue's lane open: it still holds a commit, an uncommitted change or a live process — ${directory}`
-}
-
 // A child that ended without a merge closes its lane only when the lane holds nothing — no commit, no
 // change, no live process (`lane_vacant`); any other lane is kept for whoever resumes the issue.
 // Returns the kept lane, `undefined` where there was none or it was closed. joshuafolkken/kit#4028:
@@ -208,7 +205,10 @@ async function close_split_lane(child: string): Promise<void> {
 	const kept = await close_vacant_lane(child)
 
 	if (kept !== undefined) {
-		await git_gh_issue_write.issue_try_comment(child, kept_lane_comment(kept.directory))
+		await git_gh_issue_write.issue_try_comment(
+			child,
+			run_merge_prose.kept_lane_comment(kept.directory),
+		)
 	}
 }
 

@@ -16,6 +16,7 @@ import { time_josh_names } from '#scripts/time-runtime/time-josh-names'
 import { time_shell } from '#scripts/time-runtime/time-shell'
 import { z } from 'zod'
 import { run_merge, type ParkReason } from './run-merge'
+import { run_merge_prose } from './run-merge-prose'
 
 const HOOK_CONFIRMATION = '📱 stop:guard sent the confirmation notify ('
 const INPUT_SCHEMA = z.object({ command: z.string() })
@@ -154,21 +155,12 @@ function park_event(child: string, short: string): string {
 		: run_stalled.park_event(child, short)
 }
 
-function park_comment(judgment: StallCause): string {
-	return [
-		`Parked with \`${NEEDS_DECISION_LABEL}\` by \`pnpm josh run:merge\`: the child waits for your answer.`,
-		`- Decision: ${judgment.why}`,
-		'- Consecutive failures: unchanged.',
-		'- Next: answer the question on this issue, then remove `needs-decision` to resume.',
-	].join('\n')
-}
-
 function park_options(
 	judgment: StallCause,
 	reason: ParkReason,
 ): { label: string; comment: string } {
 	return is_decision(judgment.short)
-		? { label: NEEDS_DECISION_LABEL, comment: park_comment(judgment) }
+		? { label: NEEDS_DECISION_LABEL, comment: run_merge_prose.decision_comment(judgment.why) }
 		: { label: RUN_STALLED_LABEL, comment: run_merge.park_comment(reason) }
 }
 
