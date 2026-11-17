@@ -15,6 +15,7 @@ const COMMAND = 'pnpm josh run:chain'
 const MAIN_MERGE = 'main:merge'
 const SELFCHECK = 'review:selfcheck'
 const CHECK_RELATED = 'check:related'
+const ACCEPTANCE_CHECK = 'acceptance:check'
 const RUN_REVIEW = 'run:review'
 
 type NextAction = (issue: string) => string
@@ -62,6 +63,15 @@ const MERGE_STAGE: ChainStage = {
 		`settle what \`${MAIN_MERGE}\` refused (\`chain-rule.md\` → "Orchestration facts single-sourced here"), ${rerun(issue)}`,
 }
 
+// Ship's acceptance-map refusal asked of the draft before the review, so a criterion with no row stops
+// here rather than at ship's preflight (joshuafolkken/kit#7727).
+const ACCEPTANCE_STAGE: ChainStage = {
+	name: ACCEPTANCE_CHECK,
+	argv: [ACCEPTANCE_CHECK],
+	next: (issue) =>
+		`write a row for each criterion it names in the ship body draft's \`## 受け入れ条件の対応\`, ${rerun(issue, ACCEPTANCE_CHECK)}`,
+}
+
 // `review_args` — `--unpinned-ok "<reason>"` and `--accept-metrics "<reason>"` as given — goes to
 // `run:review` alone; empty when absent.
 function review_stages(review_args: ReadonlyArray<string>): ReadonlyArray<ChainStage> {
@@ -77,6 +87,7 @@ function review_stages(review_args: ReadonlyArray<string>): ReadonlyArray<ChainS
 			argv: [CHECK_RELATED],
 			next: (issue) => `fix the red check, ${rerun(issue, CHECK_RELATED)}`,
 		},
+		ACCEPTANCE_STAGE,
 		{
 			name: RUN_REVIEW,
 			argv: [RUN_REVIEW, ...review_args],
