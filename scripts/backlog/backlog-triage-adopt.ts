@@ -11,6 +11,7 @@ import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_park } from '#scripts/run/park/run-park'
 import { run_park_body, type ApprovalRange } from '#scripts/run/park/run-park-body'
 import { backlog_triage_approval } from './backlog-triage-approval'
+import { backlog_triage_close } from './backlog-triage-close'
 import { backlog_triage_filing } from './backlog-triage-filing'
 import { backlog_triage_park } from './backlog-triage-park'
 
@@ -33,6 +34,10 @@ import { backlog_triage_park } from './backlog-triage-park'
 // parked and `run:board` keeps the park's row with its parent-action note; with it, the decision
 // records the action. An option that files an Issue is adopted only with `--done` naming the open
 // Issue filed, and the child is then blocked by it instead of requeued (joshuafolkken/kit#7771).
+//
+// **A closing option is the one parent action the adopt takes itself** (joshuafolkken/kit#7805): with
+// no `--done` (unless it also files), the child is closed as not planned with the reason and its lane
+// returned (`backlog-triage-close.ts`), neither requeued nor blocked.
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
@@ -63,6 +68,7 @@ interface ParkFound {
 	comments: ReadonlyArray<IssueComment>
 	range: ApprovalRange | undefined
 	is_filing: boolean
+	is_close: boolean
 }
 
 interface AdoptRead {
@@ -97,7 +103,7 @@ function request_of(values: Values): AdoptRequest | undefined {
 // records an action no option asked for.
 function action_problem(body: string, request: AdoptRequest): string | undefined {
 	const { option, done } = request
-	const is_needed = run_park_body.parent_action(body, option)
+	const is_needed = run_park_body.done_needed(body, option)
 	const is_given = done !== ''
 
 	if (is_needed === is_given) return undefined
@@ -136,7 +142,9 @@ async function park_of(request: AdoptRequest): Promise<ParkFound | { problem: st
 
 	if (problem !== undefined) return { problem }
 
-	return { comments, range: run_park_body.approval_range(body, request.option), is_filing }
+	const range = run_park_body.approval_range(body, request.option)
+
+	return { comments, range, is_filing, is_close: run_park_body.close_action(body, request.option) }
 }
 
 function epics_problem(count: number): string {
@@ -223,8 +231,15 @@ async function block(request: AdoptRequest): Promise<WriteResult> {
 	}
 }
 
-// The decision, the park, then the requeue or the block — what the run did next, or the problem
-// naming what was written before it.
+// What follows the decision: the close, the block, or the requeue.
+async function follow_up(request: AdoptRequest, park: ParkFound): Promise<WriteResult> {
+	if (park.is_close) return await backlog_triage_close.close(request.issue, request.reason)
+
+	return park.is_filing ? await block(request) : await requeue(request.issue)
+}
+
+// The decision, the park, then the follow-up — what the run did next, or the problem naming what was
+// written before it.
 async function write(
 	request: AdoptRequest,
 	read: AdoptRead,
@@ -241,7 +256,7 @@ async function write(
 
 	run_park.clear(issue, directory)
 
-	return read.park.is_filing ? await block(request) : await requeue(issue)
+	return await follow_up(request, read.park)
 }
 
 async function adopt(request: AdoptRequest, directory: string): Promise<number> {
