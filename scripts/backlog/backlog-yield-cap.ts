@@ -1,5 +1,6 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
+import { session_language } from '#scripts/josh/session-language'
 import { lane_yield } from '#scripts/lane/lane-yield'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
@@ -52,16 +53,35 @@ function times_of(events: ReadonlyArray<RunEvent>, issue: string): ReadonlyArray
 		.map((event) => event.at)
 }
 
-function trip_text(issue: string): string {
-	return `${issue_cite.plain_for('program', issue)} parked by backlog:drive: it gave its lane back ${String(YIELD_CAP)} times within ${String(WINDOW_MINUTES)} minutes`
+function english_lines(issue: string): ReadonlyArray<string> {
+	const cite = issue_cite.plain_for('program', issue)
+
+	return [
+		`Parked with \`${RUN_STALLED_LABEL}\`: ${cite} parked by backlog:drive: it gave its lane back ${String(YIELD_CAP)} times within ${String(WINDOW_MINUTES)} minutes, so the run stopped re-dispatching it.`,
+		`- Next: the drive re-offers it itself once ${String(WINDOW_MINUTES)} minutes pass, up to its auto-retry cap; past the cap, find why \`lane:plan\` keeps reading a holder, ${run_stalled.next_step(issue)}.`,
+	]
+}
+
+// The `Next:` label stays English, as the park and merge comments keep theirs (`run-park-escalate.ts`);
+// the resume commands come from `run_stalled.resume_of`, since its `next_step` clause is English prose.
+function japanese_lines(issue: string): ReadonlyArray<string> {
+	const cite = issue_cite.plain_for('program', issue)
+	const live = run_stalled.resume_of(issue, true)
+	const plain = run_stalled.resume_of(issue, false)
+
+	return [
+		`\`${RUN_STALLED_LABEL}\` で止めました: ${cite} は ${String(WINDOW_MINUTES)} 分以内に ${String(YIELD_CAP)} 回レーンを譲ったため、backlog:drive が park し、ランは再投入をやめました。`,
+		`- Next: ${String(WINDOW_MINUTES)} 分たつと、ドライブが自動再試行の上限まで自分で再提示します。上限を超えたら \`lane:plan\` が保持者を読み続ける理由を調べて直し、実行中の backlogrun では \`${live}\`、それ以外では \`${plain}\` で再開します。`,
+	]
 }
 
 // A mechanical stop's comment, as `run:merge` writes for one: why, and the next action.
 function body_of(issue: string): string {
-	return [
-		`Parked with \`${RUN_STALLED_LABEL}\`: ${trip_text(issue)}, so the run stopped re-dispatching it.`,
-		`- Next: the drive re-offers it itself once ${String(WINDOW_MINUTES)} minutes pass, up to its auto-retry cap; past the cap, find why \`lane:plan\` keeps reading a holder, ${run_stalled.next_step(issue)}.`,
-	].join('\n')
+	const lines = session_language.is_japanese(session_language.resolve_session_lang().lang)
+		? japanese_lines
+		: english_lines
+
+	return lines(issue).join('\n')
 }
 
 async function is_capped(issue: string, outcome: string, ports: YieldCapPorts): Promise<boolean> {

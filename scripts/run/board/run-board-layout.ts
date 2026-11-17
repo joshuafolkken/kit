@@ -237,7 +237,7 @@ function touched_row(number: number, status: ItemStatus, read: RowRead): BoardRo
 		priority: run_board_kind.priority_of(labels),
 		state: is_asked ? 'human' : status.state,
 		status,
-		waits: [],
+		waits: run_board_standing_waits.of_touched(number, status, read.waits),
 	}
 }
 

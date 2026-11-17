@@ -1,8 +1,9 @@
 import { listing_of, listing_outcome } from '#scripts/gh/git-gh-issue-list-fixture'
 import { RUN_SOLO_LABEL } from '#scripts/issue/issue-labels'
 import { session_cite } from '#scripts/issue/session-cite'
+import { session_language } from '#scripts/josh/session-language'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { auto_ok_fixture, FAILURE_EXIT_CODE, SUCCESS_EXIT_CODE } from './auto-ok-fixture'
 import { auto_ok_judge_cli } from './auto-ok-judge-cli'
 import {
@@ -49,6 +50,10 @@ beforeEach(() => {
 	streams.reset()
 })
 
+afterEach(() => {
+	vi.unstubAllEnvs()
+})
+
 describe('josh auto-ok:judge — the listing', () => {
 	it('prints each owed number on stdout and its citation on stderr', async () => {
 		list_open.mockResolvedValueOnce(listing_of([row(OWED_NUMBER), row(JUDGED_NUMBER)]))
@@ -86,6 +91,7 @@ describe('josh auto-ok:judge --apply / --decline', () => {
 	})
 
 	it('preserves the lane judgement comment (ac-ca28edeb)', async () => {
+		vi.stubEnv(session_language.ENV_KEY, 'en')
 		read_issue.mockResolvedValueOnce(labels_and_body([]))
 
 		await auto_ok_judge_cli.run(['--apply', String(OWED_NUMBER), '--lane'])
@@ -103,6 +109,36 @@ describe('josh auto-ok:judge --apply / --decline', () => {
 			await auto_ok_judge_cli.run(['--decline', String(OWED_NUMBER), '--reason', DECLINED.reason]),
 		).toBe(SUCCESS_EXIT_CODE)
 		expect(post_comment.mock.calls[0]?.[1]).toContain(DECLINED.reason)
+	})
+})
+
+// joshuafolkken/kit#7707: the comment's reason follows the session language; the verdict and stdout do not.
+const ENGLISH_APPLIED_LINE =
+	"auto-ok: applied — judged by backlogrun: no exclusion holds and no person's judgement is needed (run:lane)"
+
+describe('josh auto-ok:judge --apply — the session language', () => {
+	it.each(['ja', ''])(
+		'writes the comment reason in Japanese for %j, keeping the verdict and stdout English',
+		async (lang) => {
+			vi.stubEnv(session_language.ENV_KEY, lang)
+			read_issue.mockResolvedValueOnce(labels_and_body([]))
+
+			await auto_ok_judge_cli.run(['--apply', String(OWED_NUMBER), '--lane'])
+
+			expect(post_comment.mock.calls[0]?.[1]).toContain(
+				'auto-ok: applied — backlogrun が判定: 除外条件に当たらず、人の判断も要らない（run:lane）',
+			)
+			expect(stdout()).toBe(ENGLISH_APPLIED_LINE)
+		},
+	)
+
+	it('writes the comment reason in English for en', async () => {
+		vi.stubEnv(session_language.ENV_KEY, 'en')
+		read_issue.mockResolvedValueOnce(labels_and_body([]))
+
+		await auto_ok_judge_cli.run(['--apply', String(OWED_NUMBER), '--lane'])
+
+		expect(post_comment.mock.calls[0]?.[1]).toContain(ENGLISH_APPLIED_LINE)
 	})
 })
 

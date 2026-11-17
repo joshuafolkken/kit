@@ -277,6 +277,21 @@ describe('write_stop_decision — the ship hand-off is wired', () => {
 	it('falls back to demanding the notify when the send fails', async () => {
 		expect(await decide_held(false, true)).toContain('mid-workflow stop notification')
 	})
+
+	// joshuafolkken/kit#7749: the notice is enqueued, then the turn ends before it is delivered (#7703).
+	it('neither notifies nor releases over a completion notice queued but undelivered', async () => {
+		const content = '<task-notification>\n<task-id>b1</task-id>\n<status>completed</status>'
+		const timestamp = '2026-11-17T06:27:32.996Z'
+		const enqueue = JSON.stringify({
+			type: 'queue-operation',
+			operation: 'enqueue',
+			timestamp,
+			content,
+		})
+
+		expect(await decide_held(false, false, enqueue)).toBe('')
+		expect(telegram_test.send_values).not.toHaveBeenCalled()
+	})
 })
 
 // The cut tail is read from a typed prompt and a `run:cut` call whose result relaunched its successor.

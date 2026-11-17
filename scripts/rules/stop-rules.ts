@@ -94,6 +94,9 @@ interface StopContext {
 	// A backgrounded command this run launched has not finished — `lane_background.pending_command_ids`.
 	// Apart from `agent_pending`, since the two are waited on differently.
 	command_pending: boolean
+	// A background task's completion notice is queued on the tail but not yet delivered —
+	// `queued_notice.queued_notice_ids`. Its delivery resumes this session at once.
+	notice_queued: boolean
 	// This lane child handed its region to a running detached ship — `lane_handoff.is_handed_off`.
 	// The supervisor notifies on its own outcome, so nobody waits on this stop.
 	handed_off: boolean
@@ -261,10 +264,13 @@ function needs_filing(context: StopContext): boolean {
 // belongs to the supervisor driving the merge, and the person hears from that supervisor's own notify.
 //
 // **Another run's hold stands them down as well**: the pause and the claim are that run's.
+//
+// **So does a completion notice queued but not yet delivered** (joshuafolkken/kit#7749): its delivery
+// resumes the session a moment after this stop, which is no pause.
 function is_held_idle(context: StopContext): boolean {
 	if (context.hold_issue === undefined || !context.hold_owned) return false
 
-	return !context.agent_pending && !context.handed_off
+	return !context.agent_pending && !context.handed_off && !context.notice_queued
 }
 
 // **A stop that answers the person's question is no pause** (joshuafolkken/kit#3961): they are reading

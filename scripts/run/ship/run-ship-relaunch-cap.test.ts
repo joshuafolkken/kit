@@ -1,5 +1,6 @@
+import { session_language } from '#scripts/josh/session-language'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ParkedStop } from './run-ship-relaunch-cap'
 
 const events_mock = vi.hoisted(() => vi.fn())
@@ -27,6 +28,8 @@ const BLOCKED = 'BLOCKED: Checks missing'
 const RUN_STALLED = 'run:stalled'
 const CAP_EXCEEDED = 'stop cap was exceeded'
 const TIMEOUT_CAUSE = 'merge-wait timeout'
+const CAP_CAUSE = 'ship-stop cap'
+const JAPANESE_LEAD = '監督役が park しました'
 const { MAX_SHIP_STOP_RELAUNCHES, STOP_KIND } = run_ship_relaunch_cap
 const { MECHANICAL, REVIEW } = STOP_KIND
 
@@ -59,11 +62,16 @@ function expect_park_event(cause: string, stop: ParkedStop['stop']): void {
 }
 
 beforeEach(() => {
+	vi.stubEnv(session_language.ENV_KEY, 'en')
 	events_mock.mockReset().mockResolvedValue([])
 	emit_mock.mockReset()
 	add_label_mock.mockReset().mockResolvedValue(true)
 	comment_mock.mockReset().mockResolvedValue(true)
 	warn_mock.mockReset().mockResolvedValue(true)
+})
+
+afterEach(() => {
+	vi.unstubAllEnvs()
 })
 
 describe('run_ship_relaunch_cap.stops_since_dispatch', () => {
@@ -155,7 +163,7 @@ describe('run_ship_relaunch_cap.park', () => {
 		expect(add_label_mock).toHaveBeenCalledWith(ISSUE, RUN_STALLED)
 		expect(String(comment_mock.mock.calls[0]?.[1])).toContain(`pnpm josh ship --log ${ISSUE}`)
 		expect(String(comment_mock.mock.calls[0]?.[1])).toContain('the review stop cap was exceeded')
-		expect_park_event('ship-stop cap', { stage: 'round-2', cause: 'finding' })
+		expect_park_event(CAP_CAUSE, { stage: 'round-2', cause: 'finding' })
 		expect(warn_mock).toHaveBeenCalledWith(
 			expect.objectContaining({ body: expect.stringContaining('round-2') as unknown }),
 		)
@@ -251,5 +259,34 @@ describe('run_ship_relaunch_cap — CI-infrastructure reruns spent', () => {
 		await run_ship_relaunch_cap.park_at_once(ISSUE, parked('followup', 'timeout'))
 
 		expect_park_event(TIMEOUT_CAUSE, { stage: 'followup', cause: 'timeout' })
+	})
+})
+
+// joshuafolkken/kit#7709: the prose follows the session language; what `run:board` reads does not.
+describe('run_ship_relaunch_cap — session language', () => {
+	it.each([
+		['ja', JAPANESE_LEAD],
+		['', JAPANESE_LEAD],
+		['en', 'Parked by the `josh ship` supervisor'],
+	])('comments in the %j session language, keeping the cause', async (lang, prose) => {
+		vi.stubEnv(session_language.ENV_KEY, lang)
+		await run_ship_relaunch_cap.park_timed_out(ISSUE, parked('followup', 'timeout', BLOCKED))
+
+		const comment = String(comment_mock.mock.calls[0]?.[1])
+
+		expect(comment).toContain(prose)
+		expect(comment).toContain(`Cause: \`${BLOCKED}\``)
+		expect(comment).toContain(`pnpm josh ship --log ${ISSUE}`)
+		expect_park_event(BLOCKED, { stage: 'followup', cause: 'timeout' })
+		expect(warn_mock).toHaveBeenCalledWith(
+			expect.objectContaining({ issue_title: `Merge wait timed out #${ISSUE}` }),
+		)
+	})
+
+	it.each(['ja', 'en'])('records the cap park cause unchanged under %j', async (lang) => {
+		vi.stubEnv(session_language.ENV_KEY, lang)
+		await run_ship_relaunch_cap.park(ISSUE, parked('gate', 'check'))
+
+		expect_park_event(CAP_CAUSE, { stage: 'gate', cause: 'check' })
 	})
 })

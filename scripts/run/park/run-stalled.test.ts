@@ -115,3 +115,11 @@ describe('run_stalled.next_step', () => {
 		expect(step).toContain('pnpm josh run:add 4188 --retry')
 	})
 })
+
+describe('run_stalled.next_step_ja', () => {
+	it('names both resume commands in Japanese prose', () => {
+		expect(run_stalled.next_step_ja(CHILD)).toBe(
+			'原因を直してから、稼働中の backlogrun では `pnpm josh run:add 4188 --retry`、それ以外では `fullrun #4188` で再開してください。',
+		)
+	})
+})

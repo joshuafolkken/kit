@@ -90,6 +90,19 @@ describe('run_board_status.statuses_of a lane its record ended', () => {
 			stop_reason: closer,
 		})
 	})
+
+	// joshuafolkken/kit#7694: a fullrun handed off in the main tree after the lane closed, while the
+	// backlogrun span the record matches is still live, is drawn running.
+	it('keeps a run launched after the lane closed running', () => {
+		const records = new Map([[LANE, record]])
+		const read = { events: [], lanes: [], records, started_ms: Date.parse(T0) }
+		const lanes = run_board_lane_state.lanes_of(read)
+		const handed_off: RunEvent = { ...LAUNCH, at: T1, text: '#3409 fullrun' }
+		const status = run_board_status.statuses_of([handed_off], lanes).get(ISSUE)
+
+		expect(status).toMatchObject({ state: 'running', started_ms: Date.parse(T1) })
+		expect(status?.stop_reason).toBeUndefined()
+	})
 })
 
 describe('run_board_status.settle_closed a stopped lane', () => {

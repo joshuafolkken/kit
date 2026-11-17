@@ -6,6 +6,7 @@ import { AUTO_OK_LABEL, has_label_name } from '#scripts/issue/issue-labels'
 import { issue_publication_state } from '#scripts/issue/issue-publication-state'
 import { issue_run_verdict, type RunLabelFlags } from '#scripts/issue/issue-run-verdict'
 import { session_cite } from '#scripts/issue/session-cite'
+import { session_language } from '#scripts/josh/session-language'
 import { z } from 'zod'
 import { auto_ok_judge } from './auto-ok-judge'
 
@@ -64,9 +65,18 @@ function settled_of(read: IssueRead): string | undefined {
 		: undefined
 }
 
-async function record(issue: string, decision: AutoOkDecision, body: string): Promise<number> {
+// The comment carries `comment_reason`, which may be in the session language; standard output keeps
+// the English `decision` (joshuafolkken/kit#7707).
+async function record(
+	issue: string,
+	decision: AutoOkDecision,
+	body: string,
+	comment_reason: string,
+): Promise<number> {
+	const commented = { ...decision, reason: comment_reason }
+
 	try {
-		await git_gh_command.issue_comment(issue, auto_ok_judge.comment_of(decision, body))
+		await git_gh_command.issue_comment(issue, auto_ok_judge.comment_of(commented, body))
 	} catch {
 		console.error(`could not comment the judgement on ${session_cite.issue(issue)}`)
 
@@ -76,6 +86,15 @@ async function record(issue: string, decision: AutoOkDecision, body: string): Pr
 	console.info(issue_auto_ok.line_of(decision))
 
 	return SUCCESS_EXIT_CODE
+}
+
+// The applied judgement's reason; the `solo-run answers:` line `comment_with_answers` adds stays English.
+function applied_reason(run_label: string, answers: RunLabelFlags, is_japanese: boolean): string {
+	const reason = is_japanese
+		? `backlogrun が判定: 除外条件に当たらず、人の判断も要らない（${run_label}）`
+		: `judged by backlogrun: no exclusion holds and no person's judgement is needed (${run_label})`
+
+	return issue_run_verdict.comment_with_answers(reason, answers)
 }
 
 function refused(issue: string, problem: string): number {
@@ -95,14 +114,12 @@ async function apply_to(
 
 	if (exclusion !== undefined) return refused(issue, issue_auto_ok.line_of(exclusion))
 
-	const reason = issue_run_verdict.comment_with_answers(
-		`judged by backlogrun: no exclusion holds and no person's judgement is needed (${run_label})`,
-		answers,
-	)
+	const { lang } = session_language.resolve_session_lang()
+	const reason = applied_reason(run_label, answers, false)
+	const comment_reason = applied_reason(run_label, answers, session_language.is_japanese(lang))
+	const recorded = await record(issue, { is_applied: true, reason }, read.body, comment_reason)
 
-	if ((await record(issue, { is_applied: true, reason }, read.body)) !== SUCCESS_EXIT_CODE) {
-		return FAILURE_EXIT_CODE
-	}
+	if (recorded !== SUCCESS_EXIT_CODE) return FAILURE_EXIT_CODE
 
 	const problem = await issue_run_verdict.apply_labels(issue, [run_label, AUTO_OK_LABEL])
 
@@ -133,7 +150,7 @@ async function decline(issue: string, reason: string): Promise<number> {
 
 	if (read === undefined) return refused(issue, UNREADABLE)
 
-	return await record(issue, { is_applied: false, reason }, read.body)
+	return await record(issue, { is_applied: false, reason }, read.body, reason)
 }
 
 const auto_ok_judge_write = { apply, decline }

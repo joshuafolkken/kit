@@ -1,6 +1,7 @@
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_close } from '#scripts/lane/lane-close'
 import { run_carry } from '#scripts/run/carry/run-carry'
+import { run_hold } from '#scripts/run/hold/run-hold'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -48,6 +49,7 @@ describe('run_merge_steps.do_merged — an incomplete lane close', () => {
 			existing: undefined,
 			targets: { directory: LANE_DIRECTORY, branch: `${CONTEXT.child}-lane` },
 		})
+		vi.spyOn(run_hold, 'worktree_directory').mockResolvedValue(undefined)
 		vi.spyOn(josh_command, 'josh_run').mockImplementation(
 			async ([command]) => await run_with(command),
 		)

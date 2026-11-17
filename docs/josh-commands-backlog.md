@@ -198,7 +198,7 @@ Steps 1–2 stop on refusal. Steps 3–7 report problems, including duplicates w
    - A `ref` candidate the body only cites, with no matching title, is shown and holds nothing.
    - An open issue with the same normalized `- 計測宣言:` refuses the filing whatever `--distinct` names, printing its number; join it with `pnpm josh issue:comment <N>`. Another command or bound, a closed issue and `- 計測宣言なし:` pass.
 8. Create any missing workflow label with its color and description — the same set as [`josh sync`](josh-commands.md#josh-sync). A label that cannot be created warns, and the filing goes on.
-9. Create with all labels and print the URL. A local `--route interrupt --blocks-finder` filing records its finder as blocked by it; failures warn with the retry command, skipped records say why.
+9. Create with all labels and print the URL. A `--route interrupt --blocks-finder` filing, in any repository, records its finder as blocked by it; failures warn with the retry command, skipped records say why.
    Local `原因の park: #<N>` lines record stops through the shared epic recorder. Foreign filings skip them. Failures warn and continue; repair dependencies without refiling. Post-create failures leave exit 0.
 10. With `--release`, link the filed issue to the target's release issue, as [`josh issue:release`](#josh-issuerelease) does. A link that does not complete prints `⚠` with that command to re-run, prefixed with `GH_REPO=<target>` for a `--repo` filing.
 11. Run [`josh epic:bundle`](#josh-epicbundle) on the filed issue. When it gives no answer, print `⚠` with the command to re-run; the exit code stays 0.
@@ -343,6 +343,16 @@ pnpm josh issue:plan 4134 --body-file .josh/tmp/plan.md --title "Add issue:plan"
 <!-- /usage -->
 
 A plan without `### 影響を受ける既存の利用者` (entries, or `なし（<reason>）`) is refused.
+
+Before any write, the plan's files are counted against the estimate in force (the plan's `- 規模見積もり:` line, else the issue body's):
+
+- Counted: backticked paths outside `### 影響を受ける既存の利用者`, plus the files of its `— 直す` entries, each once; tests and directories are not (`scripts/issue/plan-named-files.ts`).
+- More files than the estimate declares writes nothing, prints the count, the files and the estimate, and exits `1`. Add the corrected `- 規模見積もり:` line to the plan and re-run.
+- A corrected estimate past the guide is no split by itself: split only when the parts merge separately (`.claude/skills/workflow-commands/split-assessment.md` → "The question"), else add `- 分割しない理由:`.
+- With no estimate, the count prints and the plan is recorded. A plan's estimate line replaces the issue body's when the plan is recorded.
+- Work a review finding adds later is outside this check.
+
+`--planned` judges the size estimate with `issue:file`'s guide, cap and size bar (`scripts/issue/plan-size-check.ts`). The plan's `- 規模見積もり:` and `- 分割しない理由:` lines win; otherwise the issue body's are used. An unexcused estimate past them leaves the plan posted without `run:planned`, prints the refusal and the split assessment's steps, and exits `1`.
 
 When a dispatched lane child plans its own issue, without `--repo`, the recorded plan then runs `lane:plan` on its backticked paths outside `### 影響を受ける既存の利用者`. It prints the command and the verdict, and exits with `lane:plan`'s code (`2` yield, `3` split, `4` premise). On `wait` (`1`), re-run the printed command, not `issue:plan`.
 
@@ -977,7 +987,7 @@ pnpm josh backlog:triage --apply 915 --adopt 1 --reason "<why>"
 - `--apply <N> --lane|--solo --reason <text>` — comments the reason, then applies the run label (`auto-ok:judge --apply`).
 - `--clear` — clears the park (`run:park <N> --clear`) only when the issue answers its decision question.
 - `--blocked-by <M>` — records the native `blocked-by` relation on `#M` before the comment and the run label, declared in the epic tracking `#N` as `run:pause` does; it stands in for the run label or goes with it.
-- `--unblock <M>` — removes it instead, with the tracking epic's `#M -> #N` declaration (`epic --remove`'s path); `--blocked-by` restores it. A failed write is named, exit 1.
+- `--unblock <M>` — removes it instead, with the tracking epic's `#M -> #N` declaration (`epic --remove`'s path); `owner/repo#M` names one elsewhere, no epic. `--blocked-by` restores it. A failed write is named, exit 1.
 - `--adopt <k>` — takes option `<k>` of the child's latest park in one call: records the decision in its one tracking epic (`epic --decide`'s path), clears the park, then `run:add <N> --retry`. A park with no recommendation, an unlisted or tier C option, no single tracking epic, or no backlogrun running here is refused before any write.
 - `--done <text>` — what the parent did for an option whose `必要な権限` starts with `親` (e.g. `親セッション`): the parent carries the option out first, then adopts it with `--done <what was done>`, recorded with the decision. Without it such an option is refused before any write, so the child stays parked; on any other option it is refused.
 
@@ -1173,6 +1183,20 @@ It drops the ones an added line still writes (an added `.md` heading, for a head
 It searches `.md` files and the comment lines under `prompts/`, `docs/`, `.claude/` and `scripts/` (`CHANGELOG.md` left out). A heading is searched quoted, the way a `→ "Heading"` pointer names it.
 
 Prints `file:line kind word` per reference, or `ok`. Exits 1 on a reference, 2 when the base or a search could not be read — a failed search is never `ok`.
+
+### `josh acceptance:check`
+
+<!-- usage: acceptance:check -->
+
+Check the ship body draft's acceptance map before the review: a criterion with no row stops it, a pending row passes.
+
+```bash
+pnpm josh acceptance:check   # → `acceptance:check: pass`, or ship's acceptance-map refusal naming each criterion with no row (exit 1)
+```
+
+<!-- /usage -->
+
+`josh ship`'s acceptance-map refusal (`acceptance_map_check.body_refusal`), asked of the body the next ship delivers — the ship body draft, else the open PR's — with a pending row counted as a row. `run:chain` runs it before `run:review`, so a criterion with no row stops there, not at ship's preflight. No body yet passes: ship writes every row.
 
 ### `josh review:selfcheck`
 

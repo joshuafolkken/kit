@@ -3,7 +3,7 @@ import { issue_read } from '#scripts/issue/issue-read'
 import { josh_command } from '#scripts/josh/josh-run'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
 import type { MergeResult } from '#scripts/run/merge/run-merge-cli'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_drive_after_merge, type ParkPorts } from './backlog-drive-after-merge'
 import { backlog_drive_named } from './backlog-drive-named'
 import { backlog_drive_retry } from './backlog-drive-retry'
@@ -19,6 +19,7 @@ vi.mock('./backlog-drive-named', () => ({
 const ISSUE = '6738'
 const OWNER = '4242'
 const CLEAR = ['run:park', ISSUE, '--clear']
+const LANG_KEY = 'JOSH_SESSION_LANG'
 const book = vi.mocked(backlog_drive_named.mark_done)
 
 function park_body(tier: string, permission: string): string {
@@ -83,6 +84,11 @@ async function after(outcome: MergeResult['outcome'], ports: ParkPorts): Promise
 beforeEach(() => {
 	vi.mocked(backlog_drive_retry.after_merge).mockClear()
 	book.mockClear()
+	vi.stubEnv(LANG_KEY, 'en')
+})
+
+afterEach(() => {
+	vi.unstubAllEnvs()
 })
 
 // joshuafolkken/kit#6738: a park whose recommendation needs no person is decided by the driver, with
@@ -230,6 +236,65 @@ describe('backlog_drive_after_merge — a park with no recommendation', () => {
 		await expect(backlog_drive_after_merge.resolve(ISSUE, ports)).resolves.toBe(false)
 		expect(notices).toStrictEqual([])
 	})
+})
+
+// joshuafolkken/kit#7702: the prose follows the session language; the heading and the `Auto-decided: `
+// prefix stay English, so the once-per-issue check and `run-cut-digest.ts` match either language.
+const JAPANESE_RECOMMENDED = '推奨案 1 を選ぶ。tier A で、人の許可は要らない。'
+const ENGLISH_RECOMMENDED = "Taking recommended option 1: tier A, no person's permission needed."
+const JAPANESE_DEFAULT = ['Auto-decided: 案 2 を選ぶ（案 1 より優先）', '。推奨案が無く'] as const
+
+describe('backlog_drive_after_merge — the session language', () => {
+	it.each([
+		['ja', JAPANESE_RECOMMENDED],
+		[undefined, JAPANESE_RECOMMENDED],
+		['en', ENGLISH_RECOMMENDED],
+	])('writes the taken recommendation in %s', async (lang, text) => {
+		vi.stubEnv(LANG_KEY, lang)
+		const { ports, runs } = recorded([park_body('A', 'なし')])
+
+		await backlog_drive_after_merge.resolve(ISSUE, ports)
+
+		expect(runs[0]?.[3]).toBe(`${backlog_drive_after_merge.DECISION_HEADING}\n\n${text}`)
+	})
+
+	it.each([
+		['ja', ...JAPANESE_DEFAULT],
+		[undefined, ...JAPANESE_DEFAULT],
+		['en', 'Auto-decided: option 2 over option 1', ' because the park had no recommendation'],
+	])('writes the default pick and its notice in %s', async (lang, choice, reason) => {
+		vi.stubEnv(LANG_KEY, lang)
+		const { ports, runs, notices } = recorded([unpicked_body(PERSON_THEN_B)])
+
+		await backlog_drive_after_merge.resolve(ISSUE, ports)
+
+		expect(runs[0]?.[3]).toContain(
+			`${backlog_drive_after_merge.DECISION_HEADING}\n\n${choice}${reason}`,
+		)
+		expect(notices).toStrictEqual([`#${ISSUE}: ${choice}`])
+	})
+})
+
+describe('backlog_drive_after_merge — the session language, matched', () => {
+	it.each(['ja', 'en'])('says a lone option has no other in %s', async (lang) => {
+		vi.stubEnv(LANG_KEY, lang)
+		const { ports, notices } = recorded([unpicked_body([['A', 'なし']])])
+
+		await backlog_drive_after_merge.resolve(ISSUE, ports)
+
+		expect(notices[0]).toMatch(lang === 'ja' ? /（ほかに案は無い）$/u : / over no other option$/u)
+	})
+
+	it.each([JAPANESE_RECOMMENDED, ENGLISH_RECOMMENDED])(
+		'decides once after a comment reading %s',
+		async (text) => {
+			const decided = `${backlog_drive_after_merge.DECISION_HEADING}\n\n${text}`
+			const { ports, runs } = recorded([park_body('A', 'なし'), decided, park_body('A', 'なし')])
+
+			await expect(backlog_drive_after_merge.resolve(ISSUE, ports)).resolves.toBe(false)
+			expect(runs).toStrictEqual([])
+		},
+	)
 })
 
 describe('backlog_drive_after_merge — other outcomes', () => {

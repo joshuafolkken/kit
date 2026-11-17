@@ -19,6 +19,12 @@ describe('run_board_link.issue_url', () => {
 	it('points a qualified reference at the repository it names', () => {
 		expect(issue_url('other/repo#12', REPO)).toBe('https://github.com/other/repo/issues/12')
 	})
+
+	it('points a reference without an owner at the run repository owner’s', () => {
+		expect(issue_url('kit#7691', 'joshuafolkken/app-kit')).toBe(
+			'https://github.com/joshuafolkken/kit/issues/7691',
+		)
+	})
 })
 
 describe('run_board_link.linker', () => {

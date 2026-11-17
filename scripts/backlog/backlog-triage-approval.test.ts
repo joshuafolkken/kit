@@ -1,6 +1,7 @@
 import { readFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import type { IssueComment } from '#scripts/issue/issue-read'
+import { session_language } from '#scripts/josh/session-language'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -63,6 +64,18 @@ function posted_body(): string {
 	return call?.[1] ?? ''
 }
 
+async function posted_in(lang: string): Promise<string> {
+	vi.stubEnv(session_language.ENV_KEY, lang)
+	comment_mock.mockClear()
+	await write()
+
+	return posted_body()
+}
+
+function range_of(body: string): string {
+	return body.split('\n- Reason:', 1)[0] ?? ''
+}
+
 describe('backlog_triage_approval.write', () => {
 	it('writes the approval comment, then a json citing it that the lane:plan reader accepts (ac-65c53234)', async () => {
 		const json = await write()
@@ -115,6 +128,29 @@ describe('backlog_triage_approval.write on a re-run', () => {
 
 		expect(await write([forged])).toMatchObject({ source: NEW_URL })
 		expect(comment_mock).toHaveBeenCalledOnce()
+	})
+})
+
+describe('backlog_triage_approval.write in each session language', () => {
+	afterEach(() => {
+		vi.unstubAllEnvs()
+	})
+
+	it('labels the reason line in the session language (ac-bc8ebf54)', async () => {
+		expect(await posted_in('ja')).toContain(`- 理由: ${REASON}`)
+		expect(await posted_in('')).toContain(`- 理由: ${REASON}`)
+		expect(await posted_in('en')).toContain(`- Reason: ${REASON}`)
+	})
+
+	it('keeps the range lines the same, so an en comment is reused under ja (ac-0611b2de)', async () => {
+		const english = await posted_in('en')
+		const japanese = await posted_in('ja')
+
+		expect(japanese.startsWith(range_of(english))).toBe(true)
+		comment_mock.mockClear()
+
+		expect(await write([comment(english, true)])).toMatchObject({ source: OLD_URL })
+		expect(comment_mock).not.toHaveBeenCalled()
 	})
 })
 

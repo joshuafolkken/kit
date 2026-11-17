@@ -12,8 +12,8 @@ const ENDED = new Date('2026-11-14T10:30:00.000Z')
 const PID = 4242
 const create_directory = temporary_directory()
 
-function held(issue: string, is_fullrun?: boolean): HoldRead {
-	const hold: RunHold = { issue, taken_at: TAKEN_AT, pid: PID, is_fullrun }
+function held(issue: string, mark: Partial<RunHold> = {}): HoldRead {
+	const hold: RunHold = { issue, taken_at: TAKEN_AT, pid: PID, ...mark }
 
 	return { kind: 'held', hold }
 }
@@ -26,7 +26,7 @@ describe('run_hold_ended', () => {
 	it('records a released hold’s issue, start and end, a fullrun marked', () => {
 		const target = target_of()
 
-		run_hold_ended.record_ended(target, held('7521', true), ENDED)
+		run_hold_ended.record_ended(target, held('7521', run_hold.FULLRUN_MARK), ENDED)
 		run_hold_ended.record_ended(target, held('7522'), ENDED)
 
 		expect(run_hold_ended.read_ended(target)).toStrictEqual([
@@ -69,5 +69,23 @@ describe('run_hold_ended', () => {
 		const git_directory = '/scratch/.git'
 
 		expect(run_hold_ended.ended_path(git_directory)).not.toBe(run_hold.hold_path(git_directory))
+	})
+})
+
+describe('run_hold_ended — a prrun', () => {
+	it('records a released prrun hold as both a fullrun and a prrun', () => {
+		const target = target_of()
+
+		run_hold_ended.record_ended(target, held('7724', run_hold.PRRUN_MARK), ENDED)
+
+		expect(run_hold_ended.read_ended(target)).toStrictEqual([
+			{
+				issue: '7724',
+				is_fullrun: true,
+				is_prrun: true,
+				taken_at: TAKEN_AT,
+				ended_at: ENDED.toISOString(),
+			},
+		])
 	})
 })

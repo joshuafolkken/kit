@@ -118,6 +118,36 @@ describe('unasked_filing.ROW.already_satisfied', () => {
 	)
 })
 
+describe('unasked_filing — a negated filing phrase', () => {
+	it.each([
+		'起票せずにREADMEを直して',
+		'起票しないで直して',
+		'起票なしで直して',
+		'Issue にせず直して',
+		'fix it without filing an issue',
+		'don’t file an issue, just fix it',
+		'do not file it',
+	])('holds when the person asked for no filing: %s', (content) => {
+		expect(is_satisfied(content)).toBe(false)
+		expect(unasked_filing.is_no_filing(content)).toBe(true)
+	})
+
+	it('stands down when a positive instruction remains beside the negated one', () => {
+		expect(is_satisfied('A は起票せず、B は起票して')).toBe(true)
+	})
+
+	it.each(['この不具合を起票して', 'ログの原因を調べて'])(
+		'finds no negated phrase in: %s',
+		(content) => {
+			expect(unasked_filing.is_no_filing(content)).toBe(false)
+		},
+	)
+
+	it('ignores a quoted negated phrase', () => {
+		expect(unasked_filing.is_no_filing('利用者の発言: 「起票せずに直して」')).toBe(false)
+	})
+})
+
 describe('unasked_filing — quoted instructions', () => {
 	it.each([
 		'> 起票してください',

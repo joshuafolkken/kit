@@ -1,0 +1,7 @@
+{
+	"reason": "The merge's primary-checkout sync now reads the tree's run hold and records a skip (#7716); the guard and its event are new code",
+	"date": "2026-11-17",
+	"growth": {
+		"scripts.code_lines": 28
+	}
+}

@@ -1,11 +1,16 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { session_cite } from '#scripts/issue/session-cite'
-import { acceptance_map, type Deferral } from './acceptance-map'
+import { acceptance_map, type Deferral, type MapRows } from './acceptance-map'
 
 // The reads behind `acceptance_map`: the Issue as it reads at the merge, the pull request body, and
 // whether each issue a deferral row names exists. Kept apart so the comparison stays pure.
 
 const ISSUE_SEPARATOR = '#'
+
+interface BodyRefusalOptions {
+	// A pending row counts as a row: the draft before the gate, not the body at the merge.
+	pending_present?: boolean
+}
 
 // `owner/repo#12` reads that repository's issue; a bare `#12` reads this one's.
 async function is_found(deferral: Deferral): Promise<boolean> {
@@ -28,6 +33,12 @@ async function absent_deferrals(
 		.map((deferral) => `- \`${deferral.id}\` names ${deferral.issue}`)
 }
 
+function rows_asked(pr_body: string | undefined, options: BodyRefusalOptions): MapRows {
+	if (options.pending_present === true) return acceptance_map.with_pending(pr_body)
+
+	return acceptance_map.rows_of(pr_body)
+}
+
 function unreadable_message(issue: string): string {
 	return `Issue ${session_cite.issue(issue)} could not be re-read to check its acceptance criteria, so the merge is refused; re-run once it can be.`
 }
@@ -35,16 +46,18 @@ function unreadable_message(issue: string): string {
 // **An Issue that cannot be re-read is a refusal, not a pass** — the criteria it would have named are
 // exactly what this gate exists to see. An Issue with no acceptance section merges as before.
 // `josh ship`'s preflight asks the body it is about to deliver, so a missing table stops it before the
-// review rather than at the merge.
+// review rather than at the merge; `acceptance:check` asks the draft with `pending_present`, so a row
+// still pending passes there and only a criterion with no row stops it (joshuafolkken/kit#7727).
 async function body_refusal(
 	issue: string,
 	pr_body: string | undefined,
+	options: BodyRefusalOptions = {},
 ): Promise<string | undefined> {
 	const issue_read = await git_gh_command.issue_get_body_classified(issue)
 
 	if (issue_read.kind !== 'read') return unreadable_message(issue)
 	const criteria = acceptance_map.criteria_of(issue_read.text)
-	const comparison = acceptance_map.compare(criteria, acceptance_map.rows_of(pr_body))
+	const comparison = acceptance_map.compare(criteria, rows_asked(pr_body, options))
 	const absent = await absent_deferrals(comparison.deferrals)
 
 	if (comparison.missing.length === 0 && absent.length === 0) return undefined

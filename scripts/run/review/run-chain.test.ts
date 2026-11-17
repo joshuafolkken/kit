@@ -1,15 +1,18 @@
-import { describe, expect, it } from 'vitest'
-import { run_chain, type ChainStage } from './run-chain'
+import { derive_check } from '#scripts/document/derive-check'
+import { describe, expect, it, vi } from 'vitest'
+import { run_chain, type ChainStage, type StageRunner } from './run-chain'
 
 const SELFCHECK = 'review:selfcheck'
 const CHECK_RELATED = 'check:related'
+const ACCEPTANCE_CHECK = 'acceptance:check'
 const RUN_REVIEW = 'run:review'
 const RUN_CUT = 'run:cut'
+const [DERIVE_CHECK] = derive_check.DERIVE_CHECK_ARGV
 const ISSUE = '5630'
 const STOP_EXIT = 2
 
 function stage_named(name: string): ChainStage {
-	const stage = run_chain.main_line_stages([]).find((candidate) => candidate.name === name)
+	const stage = run_chain.main_line_stages([], false).find((candidate) => candidate.name === name)
 
 	if (stage === undefined) throw new Error(`no stage ${name}`)
 
@@ -18,19 +21,41 @@ function stage_named(name: string): ChainStage {
 
 describe('run_chain', () => {
 	it('keeps main:merge out of the review stages a lane child runs', () => {
-		expect(run_chain.review_stages([]).map((stage) => stage.name)).toStrictEqual([
+		expect(run_chain.review_stages([], false).map((stage) => stage.name)).toStrictEqual([
 			SELFCHECK,
 			CHECK_RELATED,
+			ACCEPTANCE_CHECK,
 			RUN_REVIEW,
 		])
 	})
 
 	it('never carries run:cut, which is issued alone', () => {
-		expect(run_chain.main_line_stages([]).flatMap((stage) => stage.argv)).not.toContain(RUN_CUT)
+		const argv = run_chain.main_line_stages([], true).flatMap((stage) => stage.argv)
+
+		expect(argv).not.toContain(RUN_CUT)
 	})
 
 	it('answers undefined for a --from no stage carries', () => {
-		expect(run_chain.stages_from(run_chain.main_line_stages([]), RUN_CUT)).toBeUndefined()
+		expect(run_chain.stages_from(run_chain.main_line_stages([], false), RUN_CUT)).toBeUndefined()
+	})
+})
+
+describe('run_chain — a run', () => {
+	it('times each stage that ran in order, the stopped stage included', async () => {
+		const runner = vi.fn<StageRunner>(async (argv) => ({
+			code: argv[0] === CHECK_RELATED ? STOP_EXIT : 0,
+			out: '',
+		}))
+		const stages = run_chain.review_stages([], false)
+		const chain = await run_chain.run_stages(stages, ISSUE, vi.fn(), runner)
+
+		expect(chain.stop?.stage.name).toBe(CHECK_RELATED)
+		expect(chain.stages.map((stage) => stage.name)).toStrictEqual([SELFCHECK, CHECK_RELATED])
+		expect(chain.stages.every((stage) => stage.elapsed_ms >= 0)).toBe(true)
+		expect(chain.stages.map((stage) => Number.isNaN(Date.parse(stage.at)))).toStrictEqual([
+			false,
+			false,
+		])
 	})
 
 	it('opens the stop report with the invocation, not an Issue citation', () => {
@@ -38,5 +63,63 @@ describe('run_chain', () => {
 		const stop = { stage, code: STOP_EXIT, next: stage.next }
 
 		expect(run_chain.stop_report(stop, ISSUE)).toMatch(/^run:chain 5630 — stopped at run:review/u)
+	})
+})
+
+// joshuafolkken/kit#7728: a hand-edited generated page stops the chain before the review.
+describe('run_chain — the generated pages', () => {
+	const stages = run_chain.review_stages([], true)
+
+	it('checks them in kit just before run:review, with the argv the pre-detach runs', () => {
+		expect(stages.map((stage) => stage.name)).toStrictEqual([
+			SELFCHECK,
+			CHECK_RELATED,
+			DERIVE_CHECK,
+			ACCEPTANCE_CHECK,
+			RUN_REVIEW,
+		])
+		expect(stages.map((stage) => stage.argv)).toContainEqual(derive_check.DERIVE_CHECK_ARGV)
+	})
+
+	it('stops at the check without running run:review when a page drifted', async () => {
+		const runner = vi.fn<StageRunner>(async (argv) => ({
+			code: argv[0] === DERIVE_CHECK ? STOP_EXIT : 0,
+			out: '',
+		}))
+		const chain = await run_chain.run_stages(stages, ISSUE, vi.fn(), runner)
+
+		expect(chain.stop?.stage.name).toBe(DERIVE_CHECK)
+		expect(runner).not.toHaveBeenCalledWith([RUN_REVIEW])
+	})
+
+	it('runs through run:review when the pages match', async () => {
+		const runner = vi.fn<StageRunner>(async () => ({ code: 0, out: '' }))
+		const chain = await run_chain.run_stages(stages, ISSUE, vi.fn(), runner)
+
+		expect(chain.stop).toBeUndefined()
+		expect(runner).toHaveBeenCalledWith([RUN_REVIEW])
+	})
+})
+
+// joshuafolkken/kit#7727: ship's acceptance-map refusal asked before the review.
+describe('run_chain — acceptance:check', () => {
+	it('asks the acceptance map before run:review in the lane child and main line lists', () => {
+		for (const stages of [
+			run_chain.review_stages([], true),
+			run_chain.main_line_stages([], true),
+		]) {
+			const names = stages.map((stage) => stage.name)
+
+			expect(names.indexOf(ACCEPTANCE_CHECK)).toBe(names.indexOf(RUN_REVIEW) - 1)
+		}
+	})
+
+	it('resumes a stop at acceptance:check from that stage', () => {
+		const stage = stage_named(ACCEPTANCE_CHECK)
+		const stop = { stage, code: STOP_EXIT, next: stage.next }
+
+		expect(run_chain.stop_report(stop, ISSUE)).toContain(
+			'`pnpm josh run:chain 5630 --from acceptance:check`',
+		)
 	})
 })

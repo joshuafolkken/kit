@@ -1,4 +1,4 @@
-import type { CommandEntry } from './josh-command-types'
+import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types'
 import { ISSUE_WRITE_COMMANDS } from './josh-commands-issue-write'
 
 const REPO = '--repo <owner/repo>'
@@ -28,6 +28,8 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 	},
 	'issue:priority': {
 		script: 'scripts/issue/issue-priority-cli.ts',
+		// `.env` may hold `JOSH_SESSION_LANG`, which picks the instruction comment's language.
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		description:
 			'Raise an issue to the priority its body declares or reaches, or set the one a person instructs',
 		category: 'AI tools',

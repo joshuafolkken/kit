@@ -2,7 +2,8 @@ import type { EpicChild } from '#scripts/epic/epic-graph'
 import type { EpicNextResult } from '#scripts/epic/epic-report'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { BUG_LABEL, RUN_LANE_LABEL } from '#scripts/issue/issue-labels'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { session_language } from '#scripts/josh/session-language'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_auto_triage } from './backlog-auto-triage'
 
 // The mechanical triage (joshuafolkken/kit#5517): an untriaged candidate that is not a `bug` naming a
@@ -32,10 +33,16 @@ const apply_label = vi.spyOn(git_gh_command, 'issue_apply_label')
 const try_comment = vi.spyOn(git_gh_command, 'issue_try_comment')
 const read_labels = vi.spyOn(git_gh_command, 'read_label_names')
 
+// The reasons follow the session language; `backlog-auto-triage-language.test.ts` covers both.
 beforeEach(() => {
+	vi.stubEnv(session_language.ENV_KEY, 'en')
 	apply_label.mockResolvedValue({ is_applied: true })
 	try_comment.mockResolvedValue(true)
 	read_labels.mockResolvedValue([])
+})
+
+afterEach(() => {
+	vi.unstubAllEnvs()
 })
 
 describe('backlog_auto_triage.lane_reason', () => {

@@ -124,14 +124,20 @@ const MAINTENANCE_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			'Write every artifact the command map derives — usage spans and catalog — and print page bytes against their ceilings',
 		category: 'Maintenance',
-		reference: ['', 'maintainer', ['files']],
+		reference: ['[--check]', 'maintainer', ['files']],
 		// Kit-only: the pages it writes are kit's own documentation, and the script lives under the
 		// undistributed `tools/`.
 		is_kit_only: true,
 		// The command-map snapshot runs through one single-file vitest run.
 		core_weight: 1,
 		usage: {
-			examples: [{ arguments: '', note: 'after adding, renaming or describing a command' }],
+			examples: [
+				{ arguments: '', note: 'after adding, renaming or describing a command' },
+				{
+					arguments: '--check',
+					note: 'name each hand-edited generated page and exit non-zero, writing nothing',
+				},
+			],
 		},
 	},
 	'audit:provision': {

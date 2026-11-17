@@ -70,6 +70,28 @@ describe('stop_rules.stop_outcome — lane child stop', () => {
 
 		expect(action_kinds(held)).toEqual(['release'])
 	})
+
+	// joshuafolkken/kit#7749: the queued notice resumes the lane a moment after this stop.
+	it('keeps the hold while a completion notice is queued but undelivered', () => {
+		const held = { lane_child: true, hold_issue: '7', tree_clean: true, notice_queued: true }
+
+		expect(action_kinds(held)).toEqual([])
+	})
+})
+
+describe('stop_rules.stop_outcome — a queued notice outside a lane', () => {
+	it('neither notifies nor releases a held clean tree', () => {
+		const outcome = stop_rules.stop_outcome(
+			context({
+				hold_issue: '7',
+				tree_clean: true,
+				notice_queued: true,
+				message: DECISION_MESSAGE,
+			}),
+		)
+
+		expect(outcome.actions).toEqual([])
+	})
 })
 
 describe('stop_rules.stop_outcome — hold release', () => {

@@ -15,6 +15,7 @@ import { lane_background } from '#scripts/rules/lane-background'
 import { lane_park } from '#scripts/rules/lane-park'
 import { last_prompt } from '#scripts/rules/last-prompt'
 import { pre_gate_cut } from '#scripts/rules/pre-gate-cut'
+import { queued_notice } from '#scripts/rules/queued-notice'
 import { stop_decision } from '#scripts/rules/stop-decision'
 import { stop_rules, type StopContext, type StopOutcome } from '#scripts/rules/stop-rules'
 import { tail_commands } from '#scripts/rules/tail-commands'
@@ -145,6 +146,7 @@ async function build_context(
 		background_pending: lane_background.pending_background_ids(tail).length > 0,
 		agent_pending: lane_background.pending_agent_ids(tail).length > 0,
 		command_pending: lane_background.pending_command_ids(tail).length > 0,
+		notice_queued: queued_notice.queued_notice_ids(tail).length > 0,
 		handed_off: lane_handoff.is_handed_off(process.cwd()),
 		session_lang: session_lang(),
 	}
