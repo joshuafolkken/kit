@@ -6,6 +6,7 @@ import { lane_breakdown_text } from './lane-breakdown-text'
 import type { LedgerEntry } from './lane-ledger'
 import { lane_ledger_kind } from './lane-ledger-kind'
 import { lane_net_time } from './lane-net-time'
+import { lane_over_estimate, type EstimateScale, type LaneEstimate } from './lane-over-estimate'
 import { lane_sinks, type SinkRecords } from './lane-sinks'
 import { lane_sinks_issues, type OpenIssue } from './lane-sinks-issues'
 import { lane_stage_budget } from './lane-stage-budget'
@@ -18,10 +19,20 @@ import { lane_yield_split, type IssueYield } from './lane-yield-split'
 // children, a blocking round 1, the unplanned notices, each yield with its holder and redispatch gap,
 // the hub that put `test:related` past its cap and the files that kept their whole reach past it
 // (joshuafolkken/kit#7639). Each `lane:breakdown` stage past its budget follows
-// as `<stage> <minutes>/<budget>` (joshuafolkken/kit#7008). The open Issues are matched against the
+// as `<stage> <minutes>/<budget>` (joshuafolkken/kit#7008), then the implement time against its
+// pre-start estimate, the sides counted under the table (joshuafolkken/kit#7785). The open Issues are matched against the
 // lane's longest stage, as `--sinks` matches each of its rows.
 
-const COLUMNS = ['lane', 'net min', 'wait min', 'chain', 'over budget', 'top stage', 'open issues']
+const COLUMNS = [
+	'lane',
+	'net min',
+	'wait min',
+	'chain',
+	'over budget',
+	'estimate',
+	'top stage',
+	'open issues',
+]
 const SEPARATOR = ' · '
 const NO_CHAIN = '-'
 const GAP_OPEN = 'gap open'
@@ -121,11 +132,18 @@ function budget_text({ name, ms }: Stage): Array<string> {
 // The lane's net stages past their budget in one cell, `-` when none is — the breakdown `lane:breakdown`
 // prints, its implementation opened at the first edit where no event opened it; the driver followup
 // stands apart from the net stages and is left out.
-function over_budget_of({ entries, events }: SinkRecords, issue: number): string {
-	const stages = lane_breakdown_implement.breakdown_of(entries, events, issue)?.stages ?? []
+function stages_of({ entries, events }: SinkRecords, issue: number): ReadonlyArray<Stage> {
+	return lane_breakdown_implement.breakdown_of(entries, events, issue)?.stages ?? []
+}
+
+function budget_cell(stages: ReadonlyArray<Stage>): string {
 	const parts = stages.flatMap((stage) => budget_text(stage))
 
 	return parts.length === 0 ? NO_CHAIN : parts.join(SEPARATOR)
+}
+
+function over_budget_of(records: SinkRecords, issue: number): string {
+	return budget_cell(stages_of(records, issue))
 }
 
 // The lane's dispatch-to-merge time its net time leaves out.
@@ -139,44 +157,71 @@ function net_of(records: SinkRecords, issue: number): number {
 	return lane_net_time.net_ms(records.entries, records.events, issue) ?? 0
 }
 
-function lane_row(
+interface OverLane {
+	issue: number
+	stages: ReadonlyArray<Stage>
+	estimate: LaneEstimate
+}
+
+function issues_cell(
 	records: SinkRecords,
 	issue: number,
 	issues: ReadonlyArray<OpenIssue> | undefined,
-): string {
-	const net_ms = net_of(records, issue)
+): Array<string> {
 	const [top] = lane_sinks.sinks_of(records, [issue])
 	const stage = top?.name ?? NO_CHAIN
+	const hubs = lane_sinks.hubs_of(records.entries, [issue])
+
+	return [
+		stage,
+		top === undefined ? lane_sinks_issues.NONE : lane_sinks.issues_cell(stage, issues, hubs),
+	]
+}
+
+function lane_row(
+	records: SinkRecords,
+	{ issue, stages, estimate }: OverLane,
+	issues: ReadonlyArray<OpenIssue> | undefined,
+): string {
+	const net_ms = net_of(records, issue)
 
 	return lane_stats.to_row([
 		session_cite.issue(issue),
 		lane_stage_stats.cell(net_ms),
 		lane_stage_stats.cell(wait_ms(records, issue, net_ms)),
 		chain_of(records, issue),
-		over_budget_of(records, issue),
-		stage,
-		top === undefined
-			? lane_sinks_issues.NONE
-			: lane_sinks.issues_cell(stage, issues, lane_sinks.hubs_of(records.entries, [issue])),
+		budget_cell(stages),
+		lane_over_estimate.cell(estimate),
+		...issues_cell(records, issue, issues),
 	])
 }
 
-// The table of the lanes of `window` over `minutes`, the longest net time first; `issues` is
-// `undefined` when the open-Issue listing was unreadable.
+function over_lane(records: SinkRecords, scale: EstimateScale, issue: number): OverLane {
+	const stages = stages_of(records, issue)
+
+	return { issue, stages, estimate: lane_over_estimate.estimate_of(scale, issue, stages) }
+}
+
+// The table of the lanes of `window` over `minutes`, the longest net time first, then the count of
+// each estimate side; `issues` is `undefined` when the open-Issue listing was unreadable.
 function table(
 	records: SinkRecords,
 	window: StatsWindow,
 	minutes: number,
 	issues: ReadonlyArray<OpenIssue> | undefined,
 ): string {
+	const scale = lane_over_estimate.scale_of(records.entries, window)
 	const lanes = lane_sinks
 		.over_issues(records, window, minutes)
 		.toSorted((left, right) => net_of(records, right) - net_of(records, left))
+		.map((issue) => over_lane(records, scale, issue))
 
 	return [
 		lane_stats.to_row(COLUMNS),
 		lane_stats.to_row(COLUMNS.map(() => '---')),
-		...lanes.map((issue) => lane_row(records, issue, issues)),
+		...lanes.map((lane) => lane_row(records, lane, issues)),
+		'',
+		lane_over_estimate.counts_line(lanes.map((lane) => lane.estimate)),
 	].join('\n')
 }
 

@@ -1,6 +1,7 @@
 import type { TimingAnswer } from '#scripts/ci/ci-timing'
 import { size_estimate } from '#scripts/issue/size-estimate'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
+import type { SizeMeasurement } from '#scripts/split/split-assess'
 import { lane_breakdown, type Breakdown, type Stage } from './lane-breakdown'
 import { lane_breakdown_related } from './lane-breakdown-related'
 import { lane_breakdown_text } from './lane-breakdown-text'
@@ -62,17 +63,29 @@ interface OverStage {
 	budget: BudgetStage
 }
 
-// The implement minutes the Issue's declared size projects at `rate` — `issue:file`'s own projection.
+// The implement minutes a declared size projects at `rate` — `issue:file`'s own projection, shared with
+// `lane:stats --over`'s estimate column (joshuafolkken/kit#7785).
+function projection_of(
+	estimate: Pick<SizeMeasurement, 'lines'> | undefined,
+	rate: ImplementRate | undefined,
+	growth?: SizeRatios,
+): number | undefined {
+	if (estimate === undefined || rate === undefined) return undefined
+
+	return size_estimate.projected_minutes(estimate, rate, growth)
+}
+
+// The implement minutes the Issue's declared size projects at `rate`.
 function projected_of(
 	body: string | undefined,
 	rate: ImplementRate | undefined,
 	growth?: SizeRatios,
 ): number | undefined {
-	const estimate = body === undefined ? undefined : size_estimate.declared_size(body)
-
-	if (estimate === undefined || rate === undefined) return undefined
-
-	return size_estimate.projected_minutes(estimate, rate, growth)
+	return projection_of(
+		body === undefined ? undefined : size_estimate.declared_size(body),
+		rate,
+		growth,
+	)
 }
 
 function over_of(stage: Stage): OverStage | undefined {
@@ -186,7 +199,7 @@ function table(records: WhyRecords): string | undefined {
 	].join('\n')
 }
 
-const lane_why = { over_stages, projected_of, table }
+const lane_why = { over_stages, projected_of, projection_of, table }
 
 export { lane_why }
 export type { WhyRecords }
