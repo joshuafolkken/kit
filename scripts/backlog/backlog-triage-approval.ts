@@ -18,7 +18,8 @@ import type { ApprovalRange } from '#scripts/run/park/run-park-body'
 
 const HEADING = '## 規模承認（backlog:triage --adopt）'
 const JSON_INDENT = '\t'
-// Only the reason line follows the session language; `range_text` is what a re-run matches on.
+// Only the reason line follows the session language: the heading and range lines (`range_text`) are
+// the prefix a re-run matches a written comment on, so they stay fixed in every language.
 const JAPANESE_REASON_LABEL = '- 理由:'
 const ENGLISH_REASON_LABEL = '- Reason:'
 

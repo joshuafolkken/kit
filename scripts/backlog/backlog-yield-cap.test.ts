@@ -4,6 +4,7 @@ import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_park_release } from '#scripts/run/park/run-park-release'
+import { run_stalled } from '#scripts/run/park/run-stalled'
 import { run_stalled_park } from '#scripts/run/park/run-stalled-park'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { backlog_drive } from './backlog-drive'
@@ -123,7 +124,7 @@ describe('backlog_yield_cap.body_of', () => {
 
 		expect(body).toContain(`Parked with \`${RUN_STALLED_LABEL}\``)
 		expect(body).toContain(RE_OFFER)
-		expect(body).not.toContain('必要な権限')
+		expect(body).not.toContain('で止めました')
 	})
 
 	it.each(['ja', ''])(
@@ -134,7 +135,9 @@ describe('backlog_yield_cap.body_of', () => {
 
 			expect(body).toContain(`\`${RUN_STALLED_LABEL}\` で止めました`)
 			expect(body).toContain('自分で再提示します')
+			expect(body).toContain(`\`${run_stalled.resume_of(ISSUE, true)}\``)
 			expect(body).not.toContain(RE_OFFER)
+			expect(body).not.toContain('then use')
 		},
 	)
 })

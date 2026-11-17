@@ -1,7 +1,7 @@
 {
-	"reason": "Session-language comment prose: a Japanese body for the yield-cap park and a language-picked reason label for the triage approval (#7704)",
+	"reason": "Japanese yield-cap Next line names both resume commands from run_stalled.resume_of instead of embedding the English next_step clause (review i18n finding)",
 	"date": "2026-11-17",
 	"growth": {
-		"scripts.code_lines": 16
+		"scripts.code_lines": 20
 	}
 }

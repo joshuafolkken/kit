@@ -53,18 +53,25 @@ function times_of(events: ReadonlyArray<RunEvent>, issue: string): ReadonlyArray
 		.map((event) => event.at)
 }
 
-function english_lines(cite: string, next_step: string): ReadonlyArray<string> {
+function english_lines(issue: string): ReadonlyArray<string> {
+	const cite = issue_cite.plain_for('program', issue)
+
 	return [
 		`Parked with \`${RUN_STALLED_LABEL}\`: ${cite} parked by backlog:drive: it gave its lane back ${String(YIELD_CAP)} times within ${String(WINDOW_MINUTES)} minutes, so the run stopped re-dispatching it.`,
-		`- Next: the drive re-offers it itself once ${String(WINDOW_MINUTES)} minutes pass, up to its auto-retry cap; past the cap, find why \`lane:plan\` keeps reading a holder, ${next_step}.`,
+		`- Next: the drive re-offers it itself once ${String(WINDOW_MINUTES)} minutes pass, up to its auto-retry cap; past the cap, find why \`lane:plan\` keeps reading a holder, ${run_stalled.next_step(issue)}.`,
 	]
 }
 
-// The `Next:` label stays English, as the park and merge comments keep theirs (`run-park-escalate.ts`).
-function japanese_lines(cite: string, next_step: string): ReadonlyArray<string> {
+// The `Next:` label stays English, as the park and merge comments keep theirs (`run-park-escalate.ts`);
+// the resume commands come from `run_stalled.resume_of`, since its `next_step` clause is English prose.
+function japanese_lines(issue: string): ReadonlyArray<string> {
+	const cite = issue_cite.plain_for('program', issue)
+	const live = run_stalled.resume_of(issue, true)
+	const plain = run_stalled.resume_of(issue, false)
+
 	return [
 		`\`${RUN_STALLED_LABEL}\` で止めました: ${cite} は ${String(WINDOW_MINUTES)} 分以内に ${String(YIELD_CAP)} 回レーンを譲ったため、backlog:drive が park し、ランは再投入をやめました。`,
-		`- Next: ${String(WINDOW_MINUTES)} 分たつと、ドライブが自動再試行の上限まで自分で再提示します。上限を超えたら \`lane:plan\` が保持者を読み続ける理由を調べる（再開の手順: ${next_step}）。`,
+		`- Next: ${String(WINDOW_MINUTES)} 分たつと、ドライブが自動再試行の上限まで自分で再提示します。上限を超えたら \`lane:plan\` が保持者を読み続ける理由を調べて直し、実行中の backlogrun では \`${live}\`、それ以外では \`${plain}\` で再開します。`,
 	]
 }
 
@@ -74,7 +81,7 @@ function body_of(issue: string): string {
 		? japanese_lines
 		: english_lines
 
-	return lines(issue_cite.plain_for('program', issue), run_stalled.next_step(issue)).join('\n')
+	return lines(issue).join('\n')
 }
 
 async function is_capped(issue: string, outcome: string, ports: YieldCapPorts): Promise<boolean> {
