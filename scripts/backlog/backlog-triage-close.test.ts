@@ -50,8 +50,8 @@ vi.mock('#scripts/gh/git-gh-command', () => ({
 vi.mock('#scripts/epic/epic-close', () => ({
 	epic_close: { close_completed_epics: vi.fn(step('epics', () => undefined)) },
 }))
-vi.mock('#scripts/run/hold/run-hold-cli', () => ({
-	run_hold_cli: { run: vi.fn(step('release', () => released.code)) },
+vi.mock('#scripts/run/park/run-park-release', () => ({
+	run_park_release: { release: vi.fn(step('release', () => released.code)) },
 }))
 vi.mock('./backlog-triage-filing', () => ({
 	backlog_triage_filing: { problem_of: vi.fn(async () => undefined), block: vi.fn() },
@@ -59,7 +59,7 @@ vi.mock('./backlog-triage-filing', () => ({
 
 const { issue_read } = await import('#scripts/issue/issue-read')
 const { git_gh_command } = await import('#scripts/gh/git-gh-command')
-const { run_hold_cli } = await import('#scripts/run/hold/run-hold-cli')
+const { run_park_release } = await import('#scripts/run/park/run-park-release')
 const { backlog_triage_cli } = await import('./backlog-triage-cli')
 
 const ISSUE = '7732'
@@ -105,7 +105,7 @@ describe('backlog:triage --adopt a closing option', () => {
 			expect.stringContaining(REASON),
 			'not_planned',
 		)
-		expect(run_hold_cli.run).toHaveBeenCalledWith(['--release', ISSUE])
+		expect(run_park_release.release).toHaveBeenCalledWith(ISSUE)
 	})
 
 	it('still asks a filing-and-closing option for --done, writing nothing without it', async () => {
@@ -133,8 +133,6 @@ describe('backlog:triage --adopt a closing option', () => {
 
 		await expect(adopt(CLOSE)).resolves.toBe(1)
 
-		expect(console.error).toHaveBeenCalledWith(
-			expect.stringContaining(`run:hold --release ${ISSUE}`),
-		)
+		expect(console.error).toHaveBeenCalledWith(expect.stringContaining(`run:release ${ISSUE}`))
 	})
 })

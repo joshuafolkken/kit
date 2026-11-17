@@ -2,7 +2,7 @@
 	"reason": "#7805 adds the closing park option path (issue:close parse, backlog-triage-close, adopt follow-up) and its one-line doc in backlogrun-park.md",
 	"date": "2026-11-17",
 	"growth": {
-		"scripts.code_lines": 50,
+		"scripts.code_lines": 52,
 		"ai_cost.on_demand_bytes": 63,
 		"prose.long_paragraphs": 1
 	}
