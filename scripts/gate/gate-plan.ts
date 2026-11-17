@@ -31,15 +31,16 @@ const { GATE_CHECKS, LANE_GATE_CHECKS, STATIC_CHECKS, has_unit_check, select_gat
 const { selected_checks, whole_tree_labels } = gate_checks
 const { UNIT_LABEL } = gate_labels
 
-// What the lane gate's non-elastic checks hold between them: 2 + 2 + 1. Reduced over the lane gate's
+// What the lane gate's non-elastic checks hold between them, rounded up to whole cores: a ledger
+// weight is a tenth of a core (`core-weights.ts`), and the unit suite this leaves the rest to opens
+// whole workers, so lint's 1.7 + 2 + 1 still leaves it the cores 2 + 2 + 1 did. Reduced over the lane gate's
 // static checks rather than over every check: `resolve_unit_worker_cap` spends this as the cores the
 // unit suite must leave to its siblings, so summing the unit check into it would have the suite
 // subtract its own reservation from its own budget the day that reservation stops being zero. The
 // whole-tree checks are left out: the cap is sized for the lane's own gate, the one that runs beside
 // other lanes, and the ship's gate claims them through the core budget.
-const RESERVED_CORES: number = select_gate_checks(false, true, false).reduce(
-	(total, check) => total + check.reserved_cores,
-	0,
+const RESERVED_CORES: number = core_weights.whole_cores(
+	select_gate_checks(false, true, false).reduce((total, check) => total + check.reserved_cores, 0),
 )
 
 // The machine the table above was measured on, and the smallest one the cap is applied to.
@@ -204,8 +205,8 @@ function solo_unit_weight(available_cores: number): number {
 // once**: no second set of weights is introduced, so a change to the measured reservation moves the
 // admission with it.
 //
-// **A solo gate's four weights sum to exactly the core count** — `reserved(2 + 2 + 1) +
-// unit_cap(cores - 5)` is `cores` — which is what lets every check of a lone gate on a machine with room
+// **A solo gate's four weights sum to the core count in whole cores** — `reserved(1.7 + 2 + 1) +
+// unit_cap(cores - 5)` rounds up to `cores` — which is what lets every check of a lone gate on a machine with room
 // (its busy cores within what the ledger holds, `core-budget.ts`) be admitted at once,
 // its concurrency unchanged. A machine below the measured one leaves the unit suite uncapped and reads
 // its weight from the same identity, `cores - RESERVED_CORES` clamped at zero, so the sum is the core

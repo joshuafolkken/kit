@@ -1,6 +1,7 @@
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { describe, expect, it } from 'vitest'
 import { core_budget } from './core-budget'
+import { core_weights } from './core-weights'
 import { gate_labels } from './gate-labels'
 import { gate_plan, type GateCheck } from './gate-plan'
 
@@ -228,8 +229,10 @@ describe('gate_plan.GATE_CHECKS', () => {
 		expect(unit_check().reserved_cores).toBe(0)
 	})
 
-	it('reserves what the other three were measured to hold', () => {
+	// joshuafolkken/kit#7776: lint's 1.7 is rounded up with its siblings, so the unit suite opens whole workers.
+	it('reserves what the other three were measured to hold, in whole cores', () => {
 		expect(gate_plan.RESERVED_CORES).toBe(MEASURED_RESERVED_CORES)
+		expect(Number.isSafeInteger(gate_plan.resolve_unit_worker_cap(MEASURED_CORES))).toBe(true)
 	})
 
 	// joshuafolkken/kit#5140: the spell check's one-core weight leaves the solo unit suite six workers.
@@ -241,15 +244,17 @@ describe('gate_plan.GATE_CHECKS', () => {
 describe('gate_plan.check_weight — the cores a check reserves from the budget', () => {
 	// The regression the solo path rests on (joshuafolkken/kit#2351): a lone gate's four weights sum to
 	// exactly the core count, so every check is admitted at once and its concurrency and worker count are
-	// unchanged. If this sum ever moved off the core count a solo gate would start waiting on itself.
-	it('sums a solo gate to exactly the core count', () => {
+	// unchanged. If this sum ever moved past the core count a solo gate would start waiting on itself.
+	// joshuafolkken/kit#7776: a ledger weight is a tenth of a core, so the sum is the core count in whole cores.
+	it('sums a solo gate to exactly the core count, in whole cores', () => {
 		const plan = gate_plan.resolve_gate_plan(MEASURED_CORES)
 		const total = plan.checks.reduce(
 			(sum, check) => sum + gate_plan.check_weight(check, plan, MEASURED_CORES),
 			0,
 		)
 
-		expect(total).toBe(MEASURED_CORES)
+		expect(total).toBeLessThanOrEqual(MEASURED_CORES)
+		expect(core_weights.whole_cores(total)).toBe(MEASURED_CORES)
 	})
 
 	// The unit suite's weight is the pool it will open, which `unit_worker_cap` has already sized — not a
