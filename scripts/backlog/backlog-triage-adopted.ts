@@ -9,7 +9,7 @@ const ADOPT_COMMAND = '(backlog:triage --adopt)'
 const DONE_MARK = ' · parent action done: '
 const OPTION_SHAPE = /^[1-9]\d*$/u
 
-interface Adoption {
+interface AdoptDecision {
 	issue: string
 	option: number
 	reason: string
@@ -17,8 +17,8 @@ interface Adoption {
 	done: string
 }
 
-function text_of(adoption: Adoption): string {
-	const { issue, option, reason, done } = adoption
+function text_of(decision: AdoptDecision): string {
+	const { issue, option, reason, done } = decision
 	const adopted = `${ADOPT_MARK}${String(option)} ${ADOPT_COMMAND}`
 	const action = done === '' ? '' : `${DONE_MARK}${done}`
 
@@ -48,4 +48,4 @@ function option_of(comment: IssueComment): number | undefined {
 const backlog_triage_adopted = { is_adopt, is_lane_option, option_of, text_of }
 
 export { backlog_triage_adopted }
-export type { Adoption }
+export type { AdoptDecision }

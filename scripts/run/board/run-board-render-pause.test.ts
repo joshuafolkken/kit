@@ -1,6 +1,7 @@
 import { stripVTControlCharacters } from 'node:util'
 import { backlog_triage_adopted } from '#scripts/backlog/backlog-triage-adopted'
 import { issue_outcome } from '#scripts/issue/issue-outcome'
+import type { IssueComment } from '#scripts/issue/issue-read'
 import { describe, expect, it } from 'vitest'
 import { run_board_fit } from './run-board-fit'
 import { run_board_layout, type BoardPlan } from './run-board-layout'
@@ -87,32 +88,51 @@ describe('run_board_render pause reasons', () => {
 const ADOPT_URL = 'https://github.com/joshuafolkken/kit/issues/7780#issuecomment-2'
 const LAUNCHED = Date.parse('2026-11-17T13:58:06Z')
 
-// joshuafolkken/kit#7780's order: the stop, then the adopt, then the relaunch.
-function relaunch_line(adopt_body: string): string {
-	const stop = { author: 'owner', body: run_board_pause_fixture.parked.body, is_trusted: true }
-	const timed = { ...stop, html_url: run_board_pause_fixture.parked.url }
-	const adopt = { author: 'owner', body: adopt_body, is_trusted: true }
-	const comments = [
-		{ ...timed, created_at: '2026-11-17T13:55:07Z' },
-		{ ...adopt, html_url: ADOPT_URL, created_at: '2026-11-17T13:56:58Z' },
-	]
+const ADOPTED = backlog_triage_adopted.text_of({ issue: '7780', option: 2, reason: 'k', done: '' })
+const STOP = {
+	author: 'owner',
+	body: run_board_pause_fixture.parked.body,
+	html_url: run_board_pause_fixture.parked.url,
+	created_at: '2026-11-17T13:55:07Z',
+	is_trusted: true,
+}
+
+function adopt_of(body: string, created_at = '2026-11-17T13:56:58Z'): IssueComment {
+	return { author: 'owner', body, html_url: ADOPT_URL, created_at, is_trusted: true }
+}
+
+function relaunch_line(comments: ReadonlyArray<IssueComment>, launched_ms = LAUNCHED): string {
 	const record = run_board_pause.from_comments(comments)
 	const plan = { ...PLAN, pause_reasons: new Map([[ISSUE, record]]) }
 
-	return render_of(plan, { state: 'parked', launched_ms: LAUNCHED }, WIDTH, true)
+	return render_of(plan, { state: 'parked', launched_ms }, WIDTH, true)
 }
 
 describe('run_board_render relaunch after an adopt', () => {
+	// joshuafolkken/kit#7780's order: the stop, then the adopt, then the relaunch.
 	it('shows the adopted option relaunching, linked to the adopt comment', () => {
-		const adoption = { issue: '7780', option: 2, reason: 'keep', done: '' }
-		const line = relaunch_line(backlog_triage_adopted.text_of(adoption))
+		const line = relaunch_line([STOP, adopt_of(ADOPTED)])
 
 		expect(line).toContain(osc8('adopted option 2 · relaunching', ADOPT_URL))
 		expect(line).not.toContain(run_board_pause.FALLBACK)
 	})
 
 	it('keeps the fallback when no option was adopted after the stop', () => {
-		expect(relaunch_line('a later note')).toContain(run_board_pause.FALLBACK)
+		expect(relaunch_line([STOP, adopt_of('a later note')])).toContain(run_board_pause.FALLBACK)
+	})
+
+	it('keeps the fallback for an adopt before the latest stop', () => {
+		const line = relaunch_line([adopt_of(ADOPTED, '2026-11-17T13:50:00Z'), STOP])
+
+		expect(line).toContain(run_board_pause.FALLBACK)
+	})
+
+	it('keeps the fallback for an adopt after the launch', () => {
+		const launched_ms = Date.parse('2026-11-17T13:56:00Z')
+
+		expect(relaunch_line([STOP, adopt_of(ADOPTED)], launched_ms)).toContain(
+			run_board_pause.FALLBACK,
+		)
 	})
 })
 
