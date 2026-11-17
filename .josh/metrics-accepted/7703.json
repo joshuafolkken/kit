@@ -1,0 +1,7 @@
+{
+	"reason": "Bilingual escalate and auto-triage comment prose (#7703): each person-read sentence gains a Japanese and an English branch",
+	"date": "2026-11-17",
+	"growth": {
+		"scripts.code_lines": 27
+	}
+}
