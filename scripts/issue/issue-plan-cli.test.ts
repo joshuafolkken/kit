@@ -47,6 +47,14 @@ vi.mock('#scripts/lane/lane-child-marker', () => ({
 }))
 vi.mock('#scripts/lane/lane-plan-auto', () => ({ lane_plan_auto: { run_from_plan } }))
 
+const { problem_of } = vi.hoisted(() => ({
+	problem_of: vi.fn<() => Promise<string | undefined>>(async () => await undefined),
+}))
+
+vi.mock('#scripts/issue/plan-size-check', () => ({
+	plan_size_check: { problem_of, next_steps: (): string => 'split steps' },
+}))
+
 const ISSUE_URL = 'https://github.com/o/r/issues/7'
 const COMMENT_URL = 'https://github.com/o/r/issues/7#issuecomment-1'
 const CONSUMERS_SECTION = `${plan_consumers_section.HEADING}\n- なし（the plan adds no concept）\n`
@@ -184,6 +192,17 @@ describe('issue_plan_cli.run — --title and --planned act only when given', () 
 		expect(code).toBe(0)
 		expect(issue_edit_title).toHaveBeenCalledWith('7', TITLE, undefined)
 		expect(issue_add_label).toHaveBeenCalledWith('7', PLANNED_LABEL, undefined)
+	})
+
+	it('posts a plan over the guide without run:planned, prints the split steps and fails', async () => {
+		problem_of.mockResolvedValueOnce('over the guide')
+
+		const code = await issue_plan_cli.run(['7', BODY_FILE_FLAG, PLAN_FILE, PLANNED_FLAG])
+
+		expect(code).toBe(1)
+		expect(issue_edit_body).toHaveBeenCalledWith('7', PLAN, undefined)
+		expect(issue_add_label).not.toHaveBeenCalled()
+		expect(errors.join('\n')).toContain('over the guide\nsplit steps')
 	})
 
 	it('fails when run:planned could not be applied', async () => {

@@ -6,6 +6,7 @@ import { PLANNED_LABEL } from '#scripts/issue/issue-labels'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { issue_plan_notify } from '#scripts/issue/issue-plan-notify'
 import { plan_consumers_section } from '#scripts/issue/plan-consumers-section'
+import { plan_size_check } from '#scripts/issue/plan-size-check'
 import { cli_body } from '#scripts/josh/cli-body'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_plan_auto } from '#scripts/lane/lane-plan-auto'
@@ -112,6 +113,28 @@ async function apply_planned_label(issue_number: string, repo?: string): Promise
 	return is_applied
 }
 
+// joshuafolkken/kit#7734: a plan whose estimate the filing would refuse is posted but not labelled
+// `run:planned`; the refusal and the split assessment's steps print instead.
+async function is_oversize(request: PlanRequest): Promise<boolean> {
+	const { issue_number, plan, repo } = request
+	const problem = await plan_size_check.problem_of(issue_number, plan, repo)
+
+	if (problem === undefined) return false
+	console.error(`${problem}\n${plan_size_check.next_steps(issue_number)}`)
+
+	return true
+}
+
+// `--planned`'s label and notification, refused for a plan over the guide.
+async function mark_planned(request: PlanRequest): Promise<boolean> {
+	if (await is_oversize(request)) return false
+	const is_applied = await apply_planned_label(request.issue_number, request.repo)
+
+	if (is_applied && request.is_notified) await issue_plan_notify.send(request)
+
+	return is_applied
+}
+
 // `--repo` addresses every write — the title, the plan and the label — so `kickoff kit#<N>` run from
 // another checkout records the plan on the named repository's issue, never on this one's.
 async function record_plan(request: PlanRequest): Promise<boolean> {
@@ -124,12 +147,8 @@ async function record_plan(request: PlanRequest): Promise<boolean> {
 	const posted = await issue_body_or_comment.post(issue_number, request.plan, repo)
 
 	console.info(`${posted.destination}: ${posted.url}`)
-	if (!request.is_planned) return true
-	const is_applied = await apply_planned_label(issue_number, repo)
 
-	if (is_applied && request.is_notified) await issue_plan_notify.send(request)
-
-	return is_applied
+	return request.is_planned ? await mark_planned(request) : true
 }
 
 // A refused write prints as one line, like a file-read failure, rather than escaping as a stack trace.
