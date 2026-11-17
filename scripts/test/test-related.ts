@@ -112,6 +112,10 @@ async function is_green_narrowable(is_whole: boolean): Promise<boolean> {
 	return direct_importers.every_test_imports_of((await branch_change()) ?? []).length === 0
 }
 
+function red_marked(change: ChangeReading, failed: ReadonlyArray<string>): ChangeReading {
+	return failed.length === 0 ? change : { ...change, is_red_rerun: true }
+}
+
 // **What moved since this command's last green run** (`since-green.ts`), read as explicit arguments
 // are — or since its last red run, joined by the files that failed in it (`test-related-red.ts`). A
 // moved file — code or not — reaches the tests reading it as data through the map, whose
@@ -147,7 +151,7 @@ async function since_green_change(
 
 	process.stdout.write(`${test_related_red.describe(reading)}\n`)
 
-	return test_related_moved.moved_reading(change, parts, branch, split)
+	return red_marked(test_related_moved.moved_reading(change, parts, branch, split), failed)
 }
 
 async function whole_change(
@@ -300,8 +304,12 @@ async function resolve_change(
 	return await scope_of(root, change, capped)
 }
 
-function owed_of(red: RedReading | undefined): ReadonlyArray<string> {
-	return red?.owed ?? []
+// What the last red run left owed, and whether it narrowed this run (joshuafolkken/kit#7786).
+function red_fields(
+	red: RedReading | undefined,
+	change: ChangeReading,
+): Pick<RelatedInput, 'owed' | 'red_rerun'> {
+	return { owed: red?.owed ?? [], red_rerun: change.is_red_rerun === true }
 }
 
 // What the cap narrowed, what it left whole (joshuafolkken/kit#7639) and what each changed file added
@@ -334,7 +342,7 @@ async function read_run_input(
 		synced,
 		since_map,
 		branch,
-		owed: owed_of(red),
+		...red_fields(red, change),
 		reuse,
 		...cap_record(capped),
 		select_elapsed_ms,

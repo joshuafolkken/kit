@@ -100,7 +100,7 @@ async function run_checks(
 	execute: CheckExecutor = execute_check,
 	commands: ReadonlyArray<string> = CHECKS,
 ): Promise<Array<CheckResult>> {
-	const ordered = check_related_order.lint_first(execute, commands)
+	const ordered = check_related_order.checks_first(execute, commands)
 	const tasks = commands.map((command): run_parallel.Task<CheckResult> => {
 		return (complete): void => {
 			void start_check(command, ordered, complete)

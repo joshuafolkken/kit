@@ -227,7 +227,7 @@ pnpm josh check:related --touched   # mid-run: test:related --touched, no green 
 
 Each check runs through its own `pnpm josh` command, preserving its core-budget reservation, green record or cache. The command waits for every check it started, ends with one verdict line naming each failed check, and exits non-zero if any fails.
 
-`test:related` starts once `lint:related` passes (at once on a reused one); after a failed one its section reads `=== test:related: not run ===` and the verdict line adds `(not run: test:related)`.
+The other checks start once `lint:related` has finished (at once on a reused one), and `test:related` once every other check passes; after a failed one its section reads `=== test:related: not run ===` and the verdict line adds `(not run: test:related)`.
 
 A section prints its check's last 5 lines, 40 on a failure; the log keeps the whole output.
 

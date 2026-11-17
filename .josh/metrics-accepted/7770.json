@@ -1,0 +1,8 @@
+{
+	"reason": "#7770 adds run-board-lane-totals.ts (the estimate's measured-total source) and documents the finish-time estimate in the run rationale paragraph",
+	"date": "2026-11-17",
+	"growth": {
+		"scripts.code_lines": 56,
+		"prose.long_paragraphs": 1
+	}
+}

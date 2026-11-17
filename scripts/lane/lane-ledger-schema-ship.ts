@@ -95,6 +95,16 @@ const unplanned_notice_schema = z.object({
 // `named` counts the files the pair was narrowed to, and `unsplit` is the reason the import graph could
 // not split a merge (`test-related-synced.ts`), both absent where neither happened — read by
 // `lane:stats --pairs` (joshuafolkken/kit#6189), written by the ship (joshuafolkken/kit#6196).
+// `breakdown` counts what each condition added to a pair named after a merge, before duplicates are
+// dropped (`run-ship-synced-scope.ts`, joshuafolkken/kit#7788), absent on any other lap.
+const scope_breakdown_schema = z.object({
+	both: z.number(),
+	unsplit: z.number(),
+	read_by_tests: z.number(),
+	shared: z.number(),
+	lint_meeting: z.number(),
+})
+
 const ship_lap_schema = z.object({
 	kind: z.literal(KIND.SHIP_LAP),
 	at: z.string(),
@@ -109,6 +119,7 @@ const ship_lap_schema = z.object({
 	is_reused: z.boolean().optional(),
 	named: z.number().optional(),
 	unsplit: z.string().optional(),
+	breakdown: scope_breakdown_schema.optional(),
 })
 
 // A merging `josh followup`'s size of `issue`: the Issue's declared size estimate and the branch's

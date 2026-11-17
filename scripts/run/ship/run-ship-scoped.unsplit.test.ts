@@ -130,6 +130,31 @@ describe('run_ship_scoped.scoped_pair — the lap of a merge-scoped pair', () =>
 	})
 })
 
+// joshuafolkken/kit#7788: which condition named a pair of 901 files over a 25-file branch.
+describe('run_ship_scoped.scoped_pair — what each condition named', () => {
+	beforeEach(() => {
+		vi.mocked(lane_ledger_write.record_ship_lap).mockClear()
+	})
+
+	it('logs and laps what each condition named (ac-10542962, ac-490219c5)', async () => {
+		const breakdown = { both: 1, unsplit: 0, read_by_tests: 0, shared: 3, lint_meeting: 1 }
+
+		read_sync_mock.mockResolvedValue({
+			checks: [],
+			synced: [NAMED_FILE],
+			overlap: [NAMED_FILE],
+			breakdown,
+		})
+
+		await run_ship_lap.within('7788', 'sync', run_ship_scoped.scoped_pair)
+
+		expect(process.stdout.write).toHaveBeenCalledWith(
+			expect.stringContaining('both 1, unsplit 0, read_by_tests 0, shared 3, lint_meeting 1.'),
+		)
+		expect(lap()).toMatchObject({ step: PAIR_STEP, named: 1, breakdown })
+	})
+})
+
 // joshuafolkken/kit#7052: lint's meeting handed to test:related ran every importer of main's modules.
 describe('run_ship_scoped.scoped_pair — each check over its own part of a merge', () => {
 	it('names test:related over its own part and lint:related over the overlap alone', async () => {
@@ -145,6 +170,20 @@ describe('run_ship_scoped.scoped_pair — each check over its own part of a merg
 		await run_ship_scoped.scoped_pair()
 
 		expect(commands()).toStrictEqual([`${LINT} ${meeting}`, `${TEST} ${NAMED_FILE}`])
+	})
+
+	// joshuafolkken/kit#7788: a test reaching both sides through others is no file lint reads.
+	it('runs test:related alone when lint:related has no file where the two meet', async () => {
+		read_sync_mock.mockResolvedValue({
+			checks: [],
+			synced: [NAMED_FILE],
+			overlap: [],
+			test_overlap: [NAMED_FILE],
+		})
+
+		await run_ship_scoped.scoped_pair()
+
+		expect(commands()).toStrictEqual([`${TEST} ${NAMED_FILE}`])
 	})
 
 	it('runs the pair bare when test:related’s own part cannot be named', async () => {

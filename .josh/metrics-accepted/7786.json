@@ -1,0 +1,7 @@
+{
+	"reason": "#7786: check:related holds test:related behind every cheap check, and the test:related ledger row records whether it continued a red run (red_rerun)",
+	"date": "2026-11-17",
+	"growth": {
+		"scripts.code_lines": 31
+	}
+}
