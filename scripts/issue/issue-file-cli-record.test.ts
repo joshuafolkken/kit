@@ -213,8 +213,23 @@ describe('issue_file_cli.record — an interrupt', () => {
 			is_blocking_finder: true,
 			found_during: FINDER,
 			blocker: 3438,
-			is_here: true,
+			blocker_repo: undefined,
+			finder_repo: HERE,
 		})
+	})
+
+	// joshuafolkken/kit#7695: an upstream filing names its repository, so the relation resolves there.
+	// The finder's repository is named too, since that filing points `GH_REPO` at the target.
+	it('hands the filed Issue repository where it is not this one, and the finder one', async () => {
+		vi.stubEnv(lane_child_marker.KEY, FINDER)
+		const filing = filing_to(THERE)
+		const args = { ...filing.args, route: INTERRUPT_ROUTE_LABEL, is_blocking_finder: true }
+
+		await issue_file_cli.record(URL, { ...filing, args }, [])
+
+		expect(block_finder).toHaveBeenCalledWith(
+			expect.objectContaining({ blocker_repo: THERE, finder_repo: HERE }),
+		)
 	})
 })
 

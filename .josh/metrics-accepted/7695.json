@@ -1,0 +1,9 @@
+{
+	"reason": "#7695 documents --unblock owner/repo#N for the cross-repo relation upstream:interrupt records",
+	"date": "2026-11-17",
+	"growth": {
+		"scripts.code_lines": 120,
+		"ai_cost.on_demand_bytes": 123,
+		"prose.long_paragraphs": 1
+	}
+}

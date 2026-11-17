@@ -1,7 +1,8 @@
 // The issue numbers on `run:board` open their GitHub issue: each is wrapped in
 // an OSC 8 terminal hyperlink, so VSCode's terminal opens it on Cmd+click while the visible text stays
 // the number. A reference is drawn the way the plan names it — `3450` for this repository's issue,
-// `owner/repo#12` for one elsewhere — and links to the repository it names. A followup row's pull
+// `repo#12` for another of its owner's, `owner/repo#12` for one elsewhere — and links to the
+// repository it names. A followup row's pull
 // request number opens its pull request the same way (joshuafolkken/kit#4625).
 //
 // The columns are padded on the text before it is linked: the escape draws nothing, but `padEnd`
@@ -12,11 +13,25 @@ const QUALIFIED = /^(?<repo>[^#]+)#(?<number>\d+)$/u
 
 type Link = (text: string, url: string) => string
 
-// `owner/repo#12` names its own repository; a bare number names `repo`'s.
+// The `owner` of `owner/repo`.
+function owner_of(repo: string): string {
+	const [owner = ''] = repo.split('/', 1)
+
+	return owner
+}
+
+// A named repository without its owner is `repo`'s owner's, as `run-board-standing-waits.ts` shortens
+// it (joshuafolkken/kit#7695).
+function owned(target: string, repo: string): string {
+	return target.includes('/') ? target : `${owner_of(repo)}/${target}`
+}
+
+// `owner/repo#12` names its own repository, `repo#12` one of `repo`'s owner; a bare number names
+// `repo`'s.
 function issue_url(reference: string, repo: string): string {
 	const { repo: target = repo, number = reference } = QUALIFIED.exec(reference)?.groups ?? {}
 
-	return `${GITHUB_URL_PREFIX}${target}/issues/${number}`
+	return `${GITHUB_URL_PREFIX}${owned(target, repo)}/issues/${number}`
 }
 
 // A pull request of `repo` (joshuafolkken/kit#4625).
@@ -80,7 +95,16 @@ function links_of(repo: string | undefined, link: Link): BoardLinks {
 	}
 }
 
-const run_board_link = { issue_url, linker, links_of, pull_linker, pull_url, repo_linker, repo_url }
+const run_board_link = {
+	issue_url,
+	linker,
+	links_of,
+	owner_of,
+	pull_linker,
+	pull_url,
+	repo_linker,
+	repo_url,
+}
 
 export { run_board_link }
 export type { BoardLinks, Link, RepoLink, RepoPage }

@@ -39,8 +39,48 @@ describe('run_board_standing_waits.waits_of', () => {
 	it('names each blocker still open and not merged since the plan was read', () => {
 		expect(run_board_standing_waits.waits_of(CHILD_ROW, SOURCE)).toStrictEqual([
 			String(OPEN_BLOCKER),
-			`${OTHER}#${String(FOREIGN_BLOCKER)}`,
+			`other#${String(FOREIGN_BLOCKER)}`,
 		])
+	})
+
+	// A closed upstream Issue still holds the child until its release lands, so it stays named.
+	it('names another owner’s blocker with its owner, and keeps one its relation read closed', () => {
+		const row: EpicChild = {
+			...CHILD_ROW,
+			blocked_by: [
+				{ repo: 'someone/repo', number: FOREIGN_BLOCKER },
+				{ repo: OTHER, number: OPEN_BLOCKER, state: 'CLOSED' },
+			],
+		}
+
+		expect(run_board_standing_waits.waits_of(row, SOURCE)).toStrictEqual([
+			`someone/repo#${String(FOREIGN_BLOCKER)}`,
+			`other#${String(OPEN_BLOCKER)}`,
+		])
+	})
+})
+
+describe('run_board_standing_waits.of_touched', () => {
+	const waits = new Map([[CHILD, ['other#7']]])
+
+	it('draws a waiting lane row’s standing blockers, and none on any other state', () => {
+		expect(run_board_standing_waits.of_touched(CHILD, { state: 'waiting' }, waits)).toStrictEqual([
+			'other#7',
+		])
+		expect(run_board_standing_waits.of_touched(CHILD, { state: 'running' }, waits)).toStrictEqual(
+			[],
+		)
+	})
+})
+
+describe('run_board_standing_waits.is_upstream_held', () => {
+	const { context } = SOURCE.plan
+
+	it('holds a child on a standing blocker in another repository only', () => {
+		expect(run_board_standing_waits.is_upstream_held(CHILD_ROW, context)).toBe(true)
+		expect(
+			run_board_standing_waits.is_upstream_held({ ...CHILD_ROW, blocked_by: [] }, context),
+		).toBe(false)
 	})
 })
 

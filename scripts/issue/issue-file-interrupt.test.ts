@@ -14,6 +14,7 @@ import { issue_file_interrupt } from './issue-file-interrupt'
 
 const FINDER = '4711'
 const BLOCKER = 4738
+const FINDER_REPO = 'joshuafolkken/app-kit'
 
 const apply_relations = vi.spyOn(epic_relations, 'apply_relations')
 const read_label_names = vi.spyOn(git_gh_issue_write, 'read_label_names')
@@ -29,7 +30,8 @@ function interrupt_filing(): Parameters<typeof issue_file_interrupt.block_finder
 		is_blocking_finder: true,
 		found_during: FINDER,
 		blocker: BLOCKER,
-		is_here: true,
+		blocker_repo: undefined,
+		finder_repo: FINDER_REPO,
 	}
 }
 
@@ -85,8 +87,12 @@ describe('issue_file_interrupt.block_finder — a parked finder', () => {
 			[{ blocked: Number(FINDER), blocker: BLOCKER }],
 			'record',
 		)
-		expect(issue_try_comment).toHaveBeenCalledExactlyOnceWith(FINDER, DECISION)
-		expect(issue_clear_label).toHaveBeenCalledExactlyOnceWith(FINDER, NEEDS_DECISION_LABEL)
+		expect(issue_try_comment).toHaveBeenCalledExactlyOnceWith(FINDER, DECISION, FINDER_REPO)
+		expect(issue_clear_label).toHaveBeenCalledExactlyOnceWith(
+			FINDER,
+			NEEDS_DECISION_LABEL,
+			FINDER_REPO,
+		)
 		expect(issue_try_comment.mock.invocationCallOrder[0]).toBeLessThan(
 			Number(issue_clear_label.mock.invocationCallOrder[0]),
 		)
@@ -127,16 +133,51 @@ describe('issue_file_interrupt.block_finder — a parked finder left parked', ()
 			expect.stringContaining(`決定: #${String(BLOCKER)} の着地待ち（依存に変換）`),
 		)
 	})
+})
 
-	it('reads no label for a filing in another repository', async () => {
-		await issue_file_interrupt.block_finder({
-			...interrupt_filing(),
-			is_blocking_finder: false,
-			is_here: false,
-		})
+// joshuafolkken/kit#7695: an upstream interrupt filed in another repository blocks its parked finder
+// as one filed here does — the relation resolves the blocker there, and the park becomes the wait.
+describe('issue_file_interrupt.block_finder — a filing in another repository', () => {
+	const UPSTREAM = 'joshuafolkken/kit'
+	const DECISION = `決定: ${UPSTREAM}#${String(BLOCKER)} の着地待ち（依存に変換）`
+	const issue_add_blocked_by = vi.spyOn(git_gh_issue_write, 'issue_add_blocked_by')
 
-		expect(read_label_names).not.toHaveBeenCalled()
+	beforeEach(() => {
+		read_label_names.mockResolvedValue([NEEDS_DECISION_LABEL])
+		issue_add_blocked_by.mockResolvedValue(true)
+	})
+
+	// The filing points `GH_REPO` at the upstream target, so every finder-side call names the finder's
+	// repository rather than resolving the finder's number upstream.
+	it('records the blocker in its repository, writes the decision and clears the label', async () => {
+		await issue_file_interrupt.block_finder({ ...interrupt_filing(), blocker_repo: UPSTREAM })
+
+		expect(read_label_names).toHaveBeenCalledExactlyOnceWith(FINDER, FINDER_REPO)
+		expect(issue_add_blocked_by).toHaveBeenCalledExactlyOnceWith(
+			FINDER,
+			String(BLOCKER),
+			UPSTREAM,
+			FINDER_REPO,
+		)
 		expect(apply_relations).not.toHaveBeenCalled()
+		expect(issue_try_comment).toHaveBeenCalledExactlyOnceWith(FINDER, DECISION, FINDER_REPO)
+		expect(issue_clear_label).toHaveBeenCalledExactlyOnceWith(
+			FINDER,
+			NEEDS_DECISION_LABEL,
+			FINDER_REPO,
+		)
+	})
+
+	it('names both repositories on a failed write, and keeps the park', async () => {
+		issue_add_blocked_by.mockResolvedValue(false)
+
+		await issue_file_interrupt.block_finder({ ...interrupt_filing(), blocker_repo: UPSTREAM })
+
+		const line = String(error.mock.calls[0]?.[0])
+
+		expect(line).toContain(`repos/${UPSTREAM}/issues/${String(BLOCKER)}`)
+		expect(line).toContain(`repos/${FINDER_REPO}/issues/${FINDER}/dependencies/blocked_by`)
+		expect(issue_clear_label).not.toHaveBeenCalled()
 	})
 })
 
@@ -144,7 +185,7 @@ describe('issue_file_interrupt.block_finder — nothing to record', () => {
 	it('stays silent when --blocks-finder was not given and the finder is not parked', async () => {
 		await issue_file_interrupt.block_finder({ ...interrupt_filing(), is_blocking_finder: false })
 
-		expect(read_label_names).toHaveBeenCalledExactlyOnceWith(FINDER)
+		expect(read_label_names).toHaveBeenCalledExactlyOnceWith(FINDER, FINDER_REPO)
 		expect(apply_relations).not.toHaveBeenCalled()
 		expect(issue_try_comment).not.toHaveBeenCalled()
 		expect(issue_clear_label).not.toHaveBeenCalled()
@@ -159,7 +200,7 @@ describe('issue_file_interrupt.block_finder — nothing to record', () => {
 		expect(issue_clear_label).not.toHaveBeenCalled()
 	})
 
-	const finder_reason = 'no finder and filed Issue pair in this repository'
+	const finder_reason = 'no finder and filed Issue pair was read'
 	const route_reason = '`--route interrupt` only'
 
 	// An explicit `--blocks-finder` that records nothing says so, rather than leaving the caller to
@@ -170,7 +211,6 @@ describe('issue_file_interrupt.block_finder — nothing to record', () => {
 		['a filed number that is not a number', { blocker: NaN }, finder_reason],
 		['a route other than interrupt', { route: SPLIT_ROUTE_LABEL }, route_reason],
 		['no route', { route: undefined }, route_reason],
-		['a filing in another repository', { is_here: false }, finder_reason],
 	])('records no relation and says so for %s (ac-04fe7e7a)', async (_case, change, reason) => {
 		await issue_file_interrupt.block_finder({ ...interrupt_filing(), ...change })
 
