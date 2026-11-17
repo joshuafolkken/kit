@@ -3,6 +3,7 @@ import { NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
 import { issue_read } from '#scripts/issue/issue-read'
 import { session_cite } from '#scripts/issue/session-cite'
 import { size_estimate } from '#scripts/issue/size-estimate'
+import { size_restate } from '#scripts/issue/size-restate'
 import { epic_decision } from './epic-decision'
 import { epic_parse } from './epic-parse'
 import { epic_read } from './epic-read'
@@ -86,28 +87,15 @@ async function has_comment(child: number, decision: string): Promise<boolean | u
 	return comments?.some((comment) => comment.body.trim() === decision.trim())
 }
 
-async function try_edit_body(child: number, body: string): Promise<boolean> {
-	try {
-		await git_gh_command.issue_edit_body(String(child), body)
-
-		return true
-	} catch {
-		return false
-	}
-}
-
-// joshuafolkken/kit#5758: a record that states a size estimate line restates the child's own, so
-// `lane:plan` reads the widened scope rather than the estimate filed before the decision. `false` when
-// the child cannot be read or written, as a failed comment is, so a rerun finishes it.
+// joshuafolkken/kit#5758: a record that states a size estimate line restates the child's own
+// (`size-restate.ts`). `false` when the child cannot be read or written, as a failed comment is, so a
+// rerun finishes it.
 async function restate_size(child: number, decision: string): Promise<boolean> {
-	const line = size_estimate.stated_line(decision)
-	if (line === undefined) return true
+	if (size_estimate.stated_line(decision) === undefined) return true
 	const subject = await epic_read.read_subject(child)
 	if (subject === undefined) return false
-	const body = subject.body ?? ''
-	const restated = size_estimate.restated(body, line)
 
-	return restated === body || (await try_edit_body(child, restated))
+	return await size_restate.apply(String(child), subject.body ?? '', decision)
 }
 
 // The label goes only once the child carries the record, so a failed comment leaves it parked.
