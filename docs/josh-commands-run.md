@@ -14,13 +14,14 @@ Claim this working tree for a run, or say which run already holds it.
 
 ```bash
 pnpm josh run:hold 1091             # claim for issue 1091
-pnpm josh run:hold 1091 --fullrun   # claim as `fullrun #1091` (what `run:entry` runs)
+pnpm josh run:hold 1091 --fullrun   # claim as `fullrun #1091`
 pnpm josh run:hold --adopt 1091     # hand a `new` run's hold to the issue it filed
 ```
 
 **Options:**
 
 - `--fullrun` — marks the record as `fullrun #N`'s.
+- `--prrun` — marks it as `prrun #N`'s, also read as a `fullrun`.
 - `--adopt <issue>` — re-keys the unnumbered `new` run's record to the filed issue and applies `in-progress`; answers `none` (exit 1) when the tree holds no record.
 - `--halfrun-stop` — marks a `halfrun` stop for `run:entry` to adopt, and sends its `confirmation` Telegram; answers `e2e-owed` (exit 1) until `test:e2e` answered green on this tree.
 - `--halfrun-round` — starts a `halfrun` fix round: re-opens the issue's stopped `halfrun` record as running, owned by this session; answers `busy` (exit 1) when the tree holds no such stop.

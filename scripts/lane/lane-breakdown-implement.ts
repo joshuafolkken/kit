@@ -276,20 +276,30 @@ function first_edit_ms(calls: ReadonlyArray<ToolCall>, span: LaneSpan): number |
 }
 
 // The breakdown with its implementation opened at the lane's first edit where no event opened it
-// (joshuafolkken/kit#5835), the edit read off the lane's own transcripts.
-function breakdown_of(
+// (joshuafolkken/kit#5835), the edit read off the lane's own transcripts — and those transcripts'
+// calls from dispatch to merge, which `--timeline` reads its untimed steps off (joshuafolkken/kit#7737).
+function with_calls(
 	entries: ReadonlyArray<LedgerEntry>,
 	events: ReadonlyArray<RunEvent>,
 	issue: number,
-): Breakdown | undefined {
+): { breakdown: Breakdown; calls: ReadonlyArray<ToolCall> } | undefined {
 	const span = lane_net_time.span_of(entries, issue)
 
 	if (span === undefined) return undefined
 
 	const window = { since_ms: span.from_ms, until_ms: span.to_ms }
 	const calls = lane_transcript_stats.read_calls(transcript_directories(issue), window)
+	const breakdown = lane_breakdown.of(entries, events, issue, first_edit_ms(calls, span))
 
-	return lane_breakdown.of(entries, events, issue, first_edit_ms(calls, span))
+	return breakdown === undefined ? undefined : { breakdown, calls }
+}
+
+function breakdown_of(
+	entries: ReadonlyArray<LedgerEntry>,
+	events: ReadonlyArray<RunEvent>,
+	issue: number,
+): Breakdown | undefined {
+	return with_calls(entries, events, issue)?.breakdown
 }
 
 const lane_breakdown_implement = {
@@ -301,6 +311,7 @@ const lane_breakdown_implement = {
 	plan_outside,
 	read,
 	transcript_directories,
+	with_calls,
 }
 
 export { lane_breakdown_implement }

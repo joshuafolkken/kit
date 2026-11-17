@@ -8,7 +8,7 @@ import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_ship, type ShipSection } from './run-ship'
 import { run_ship_args } from './run-ship-args'
 import { run_ship_body_draft } from './run-ship-body-draft'
-import { run_ship_conflict_probe } from './run-ship-conflict-probe'
+import { run_ship_conflict_probe_timed } from './run-ship-conflict-probe-timed'
 import { run_ship_detach } from './run-ship-detach'
 import { run_ship_detach_wait } from './run-ship-detach-wait'
 import { run_ship_early_push } from './run-ship-early-push'
@@ -398,7 +398,7 @@ async function pre_detach_sections(args: ShipArguments): Promise<ReadonlyArray<S
 		return await pre_detach_stop(args, STAGE.PREFLIGHT, [preflight])
 	}
 
-	const conflict = await run_ship_conflict_probe.probe()
+	const conflict = await run_ship_conflict_probe_timed.probe(args.number)
 
 	if (conflict !== undefined) {
 		return await pre_detach_stop(args, STAGE.SYNC, [
