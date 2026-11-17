@@ -1,3 +1,4 @@
+import { derive_check } from '#scripts/document/derive-check'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
@@ -18,7 +19,15 @@ const RUN_REVIEW = 'run:review'
 const RUN_CUT = 'run:cut'
 const ISSUE = '5630'
 const FROM = '--from'
-const MAIN_LINE = [[MAIN_MERGE], [SELFCHECK], [CHECK_RELATED], [ACCEPTANCE_CHECK], [RUN_REVIEW]]
+// The test runs in kit, so the chain carries the generated-page check (joshuafolkken/kit#7728).
+const MAIN_LINE = [
+	[MAIN_MERGE],
+	[SELFCHECK],
+	[CHECK_RELATED],
+	derive_check.DERIVE_CHECK_ARGV,
+	[ACCEPTANCE_CHECK],
+	[RUN_REVIEW],
+]
 const STOP_EXIT = 2
 const UNPINNED_OK = ['--unpinned-ok', 'only logs']
 const ACCEPT_METRICS = ['--accept-metrics', 'a new command']
@@ -63,7 +72,7 @@ describe('run_chain_cli.run — the chain', () => {
 
 		expect(ran()).toStrictEqual(MAIN_LINE)
 		expect(info_lines).toContain(
-			'run:chain 5630 — ran main:merge → review:selfcheck → check:related → acceptance:check → run:review',
+			'run:chain 5630 — ran main:merge → review:selfcheck → check:related → command:derive → acceptance:check → run:review',
 		)
 	})
 
@@ -74,7 +83,7 @@ describe('run_chain_cli.run — the chain', () => {
 
 		expect(ran()).toStrictEqual(MAIN_LINE.slice(1))
 		expect(info_lines).toContain(
-			'run:chain 5630 — ran review:selfcheck → check:related → acceptance:check → run:review',
+			'run:chain 5630 — ran review:selfcheck → check:related → command:derive → acceptance:check → run:review',
 		)
 	})
 

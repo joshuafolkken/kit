@@ -202,7 +202,7 @@ describe('run_board_github.statuses_for with a lane an earlier run left', () => 
 	})
 
 	it('draws this run’s lane as its record says though the stream never saw it launched', () => {
-		expect(statuses_with([]).get(RESUMED)).toStrictEqual(RESUMED_STATUS)
+		expect(statuses_with([]).get(RESUMED)).toStrictEqual({ ...RESUMED_STATUS, is_live: true })
 	})
 })
 

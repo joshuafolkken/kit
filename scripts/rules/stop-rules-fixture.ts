@@ -21,6 +21,7 @@ const BASE: StopContext = {
 	background_pending: false,
 	agent_pending: false,
 	command_pending: false,
+	notice_queued: false,
 	handed_off: false,
 	session_lang: 'en',
 	headless_agent: false,
