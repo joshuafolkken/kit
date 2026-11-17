@@ -24,7 +24,7 @@ vi.mock('#scripts/backlog/backlog-plan-comment', () => ({
 
 const { run_stage_read } = await import('./run-stage-read')
 const { run_stage } = await import('./run-stage')
-const { PLANNED_LABEL } = await import('#scripts/issue/issue-labels')
+const { PLAN_UNVERIFIED_LABEL, PLANNED_LABEL } = await import('#scripts/issue/issue-labels')
 
 const ISSUE = '3042'
 
@@ -135,6 +135,17 @@ describe('run_stage_read.read_stage — the planned mark (joshuafolkken/kit#3042
 		const read = await run_stage_read.read_stage(ISSUE)
 
 		expect(read.state).toBe(run_stage.PLANNED)
+	})
+
+	// joshuafolkken/kit#7733: a plan from another repository's checkout is planned again here.
+	it('reads plan:unverified as fresh despite run:planned and a plan comment', async () => {
+		read_issue_mock.mockResolvedValue(open_with([PLANNED_LABEL, PLAN_UNVERIFIED_LABEL]))
+		read_plan_mock.mockResolvedValue('## 計画')
+
+		const read = await run_stage_read.read_stage(ISSUE)
+
+		expect(read.state).toBe(run_stage.FRESH)
+		expect(run_stage.decide(read.state, 'fullrun').start).toBe('plan')
 	})
 
 	it('reads a bare planned roadmap label as fresh, not as a posted plan', async () => {
