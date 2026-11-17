@@ -7,7 +7,6 @@ import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_relaunch } from '#scripts/lane/lane-relaunch'
 import { lane_seat_stop } from '#scripts/lane/lane-seat-stop'
 import { lane_vacant } from '#scripts/lane/lane-vacant'
-import { poll } from '#scripts/lib/poll'
 import { settled_together } from '#scripts/lib/settled-together'
 import {
 	run_carry,
@@ -26,6 +25,7 @@ import { run_merge_cut_release } from './run-merge-cut-release'
 import { run_merge_decision } from './run-merge-decision'
 import { run_merge_github_limit } from './run-merge-github-limit'
 import { run_merge_prose } from './run-merge-prose'
+import { run_merge_sync } from './run-merge-sync'
 import { run_merge_waits } from './run-merge-waits'
 
 // The result of attempting to apply a carry change. Distinguishing `refused` from `applied` lets
@@ -49,7 +49,6 @@ const LANES = '--lanes'
 const REPO_FLAG = '--repo'
 const CLOSE_CAUSE = '`run:merge` closed it'
 const STOPPED_CAUSE = 'the unit stopped and `run:merge --stash` classified it'
-const SYNC_RETRY = { attempts: 3, interval_ms: 5000 }
 
 // One returned child's context, gathered from the command line by the CLI, and the ending signals its
 // handlers act on — each one's meaning is `EndingSignals`'s.
@@ -143,28 +142,6 @@ async function refused_carry(ctx: MergeContext): Promise<RunCarry | undefined> {
 	return record.carry
 }
 
-// **A failed `main:sync` is retried before it ends the run**: a sync right after a merge can fail
-// transiently while several lanes merge at once. **The error carries the step's stderr, not its
-// stdout**: `main:sync` reports git's refusal on stderr, while stdout carries the wrapper's guard
-// statistics.
-async function sync_main(): Promise<void> {
-	// `poll_until` answers only whether it succeeded, so the last attempt's stderr is kept here.
-	let error_output = ''
-
-	const is_synced = await poll.poll_until(
-		async () => {
-			const result = await josh(['main:sync'])
-
-			error_output = result.err ?? ''
-
-			return result.code === 0
-		},
-		{ ...SYNC_RETRY, sleeper: poll.sleep },
-	)
-
-	if (!is_synced) throw new Error(`main:sync failed: ${error_output}`)
-}
-
 // `lane:close` says on stderr what it terminated — the child and whatever else ran from the checkout
 // (joshuafolkken/kit#4304) — so that stderr is passed on rather than dropped with the capture. An
 // `incomplete` close — a process that outlived even a SIGKILL — is logged and the run carries on: the
@@ -229,7 +206,8 @@ async function count_merged(ctx: MergeContext): Promise<ApplyCarryResult> {
 }
 
 // A merged child: closed if GitHub left it OPEN, with the epics it completed (`run-merge-close.ts`),
-// while the primary checkout returns to the default branch; then counted and put on record by `record`,
+// while the primary checkout returns to the default branch unless another run holds it
+// (`run-merge-sync.ts`); then counted and put on record by `record`,
 // dated to the moment the ownership check passed (joshuafolkken/kit#4734); then the lane — stashed of
 // any uncommitted work — is closed while the counters are mirrored onto the epic. **A failed sync
 // leaves neither the count nor the record**, so the run's next pass (a restored drive, `run:carry
@@ -248,7 +226,7 @@ async function do_merged(
 
 	const confirmed_at = new Date()
 
-	await settled_together(run_merge_close.close_merged(ctx), sync_main())
+	await settled_together(run_merge_close.close_merged(ctx), run_merge_sync.sync_main(ctx.child))
 	const result = await count_merged(ctx)
 
 	if (result.kind === 'refused') return result.carry
