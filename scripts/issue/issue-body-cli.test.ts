@@ -1,6 +1,7 @@
 import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { issue_publication_state } from '#scripts/issue/issue-publication-state'
+import { trusted_measure } from '#scripts/issue/trusted-measure'
 import { main_entry_fixture } from '#scripts/josh/main-entry-fixture'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -133,6 +134,20 @@ describe('issue_body_cli.run refusals', () => {
 		expect(await issue_body_cli.run([ISSUE, BODY_FILE, body_path])).toBe(1)
 		expect(issue_edit_body).not.toHaveBeenCalled()
 		expect(console.error).toHaveBeenCalledWith(expect.stringContaining('✖ missing heading: '))
+	})
+
+	it('refuses a premise whose last output line is not a number (ac-b6861606)', async () => {
+		const body = VALID_BODY.replace(
+			'## 現象',
+			'- 前提: `pnpm josh lane:stats --period 3` >= 3\n\n## 現象',
+		)
+		const body_path = await body_file(body)
+
+		vi.spyOn(trusted_measure, 'run_command').mockReturnValue({ kind: 'ok', output: '| 89 | 1.0 |' })
+
+		expect(await issue_body_cli.run([ISSUE, BODY_FILE, body_path])).toBe(1)
+		expect(issue_edit_body).not.toHaveBeenCalled()
+		expect(console.error).toHaveBeenCalledWith(expect.stringContaining('lane:value cell'))
 	})
 
 	it('refuses a body file it cannot read without writing', async () => {

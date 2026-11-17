@@ -3,6 +3,7 @@ import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { issue_lint_cli } from '#scripts/issue/issue-lint-cli'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { issue_publication_state } from '#scripts/issue/issue-publication-state'
+import { premise_judge } from '#scripts/issue/premise-judge'
 import { session_cite } from '#scripts/issue/session-cite'
 import { size_estimate } from '#scripts/issue/size-estimate'
 import { cli_body } from '#scripts/josh/cli-body'
@@ -53,7 +54,9 @@ async function current_body(issue: string): Promise<string | undefined> {
 
 async function apply(request: BodyRequest): Promise<number> {
 	const body = cli_body.read_file_or_stdin(request.body_path)
-	const problems = size_estimate.is_epic(body) ? [] : issue_lint_cli.problems(body)
+	const problems = size_estimate.is_epic(body)
+		? []
+		: [...issue_lint_cli.problems(body), ...premise_judge.draft_problems(body)]
 
 	issue_lint_cli.warn(body)
 

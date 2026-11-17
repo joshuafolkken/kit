@@ -24,6 +24,7 @@ const DECLARATION = `${PREFIX} ${SHAPE}`
 const VALUE_PATTERN =
 	/^`(?<command>[^`\s][^`]*)`\s*(?<operator><=|>=|<|>)\s*(?<threshold>-?\d+(?:\.\d+)?)$/u
 const NUMBER_PATTERN = /^-?\d+(?:\.\d+)?$/u
+const VALUE_CELL = 'pnpm josh lane:value cell --table <表> --column <列>'
 const EXAMPLE_VALUE = '`pnpm josh lane:net 5168` <= 40'
 // The refusal ends in a line ready to paste (joshuafolkken/kit#5225).
 const EXAMPLE = `${PREFIX} ${EXAMPLE_VALUE}`
@@ -136,13 +137,29 @@ function problems(body: string): ReadonlyArray<string> {
 	return [...declared, ...premised]
 }
 
-function value_of(output: string): number | undefined {
-	const last = output
+function format(declaration: MeasureDeclaration): string {
+	return `\`${declaration.command}\` ${declaration.operator} ${String(declaration.threshold)}`
+}
+
+function last_line(output: string): string | undefined {
+	return output
 		.split('\n')
 		.map((line) => line.trim())
 		.findLast((line) => line.length > 0)
+}
+
+function value_of(output: string): number | undefined {
+	const last = last_line(output)
 
 	return last !== undefined && NUMBER_PATTERN.test(last) ? Number(last) : undefined
+}
+
+// The refusal of a premise whose output `judge` cannot read: the last line it read, and the two ways to
+// write one it can — a command printing the number alone, or one table cell (joshuafolkken/kit#7769).
+function unreadable_problem(declaration: MeasureDeclaration, output: string): string {
+	const last = last_line(output) ?? '(no output)'
+
+	return `${PREMISE_PREFIX} ${format(declaration)} is unreadable: its last line \`${last}\` is not a number alone — write a command whose last line is only the number; one cell of a table is \`${VALUE_CELL}\` (measurement.md)`
 }
 
 function judge(declaration: MeasureDeclaration, output: string): MeasureVerdict {
@@ -153,10 +170,6 @@ function judge(declaration: MeasureDeclaration, output: string): MeasureVerdict 
 	const is_pass = COMPARE[declaration.operator](value, declaration.threshold)
 
 	return { kind: is_pass ? 'pass' : 'fail', value }
-}
-
-function format(declaration: MeasureDeclaration): string {
-	return `\`${declaration.command}\` ${declaration.operator} ${String(declaration.threshold)}`
 }
 
 const measure_declaration = {
@@ -172,6 +185,7 @@ const measure_declaration = {
 	parse,
 	premises,
 	problems,
+	unreadable_problem,
 }
 
 export type { MeasureDeclaration, MeasureVerdict }

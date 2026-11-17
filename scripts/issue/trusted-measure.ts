@@ -12,6 +12,8 @@ import { trusted_measure_source, type MeasureSource } from './trusted-measure-so
 // is a count or a digest that answers in seconds, so a command still running after a minute is stuck,
 // and without a bound it would hold the whole re-measurement open with nothing printed.
 const MEASURE_TIMEOUT_MS = 60_000
+const DRAFT = 'draft'
+const LOCAL_FILER = 'local filer'
 
 interface TrustedBody {
 	kind: 'trusted'
@@ -61,6 +63,13 @@ function run_command(command: string, source: TrustedBody): CommandRun {
 	} catch (error) {
 		return { kind: 'failed', message: error_text.message_of(error) }
 	}
+}
+
+// A body not yet on GitHub, written by the person filing it here: running its declared commands is
+// that person running them, so it is trusted without a read (joshuafolkken/kit#7769). `run_command`
+// still runs only what the body declares.
+function drafted(body: string): TrustedBody {
+	return { kind: 'trusted', body, issue: DRAFT, author: LOCAL_FILER, editor: LOCAL_FILER }
 }
 
 // The run as one printable value: a failure is spelled in place of the output.
@@ -122,7 +131,7 @@ async function read_trusted_body(issue_number: string): Promise<BodyRead> {
 		: { kind: 'trusted', body: issue.body, issue: issue_number, author, editor }
 }
 
-const trusted_measure = { read_trusted_body, run_command, text_of }
+const trusted_measure = { drafted, read_trusted_body, run_command, text_of }
 
 export type { BodyRead, CommandRun, TrustedBody }
 export { trusted_measure }
