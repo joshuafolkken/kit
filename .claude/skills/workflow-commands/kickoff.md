@@ -10,7 +10,8 @@
   4. **Record the plan** — written to a file in the session language (`JOSH_SESSION_LANG`, default
      `ja`), then `pnpm josh issue:plan <N> --body-file .josh/tmp/plan.md --title "<title>" --planned`, which
      records it, applies `run:planned` and sends the `planning` Telegram (`docs/josh-commands-backlog.md`
-     → "`josh issue:plan`"). A target named in front of the reference adds `--repo <owner/name>`.
+     → "`josh issue:plan`"). A target named in front of the reference adds `--repo <owner/name>`; from
+     another repository's checkout that applies `plan:unverified` instead, until re-planned in the target.
      Before writing the plan, run `pnpm josh plan:consumers <identifier...>` on what it adds or changes
      and finish the `### 影響を受ける既存の利用者` draft it prints. Refused for naming more files than the
      estimate → `docs/josh-commands-backlog.md` → "`josh issue:plan`".

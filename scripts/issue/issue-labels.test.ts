@@ -24,6 +24,7 @@ import {
 	NOT_DIRECTLY_RUNNABLE_LABELS,
 	parked_label_of,
 	PARKED_LABELS,
+	PLAN_UNVERIFIED_LABEL,
 	PLANNED_LABEL,
 	PRIORITY_CRITICAL_LABEL,
 	PRIORITY_HIGH_LABEL,
@@ -64,7 +65,7 @@ const RUN_STALLED_SPELLING = 'run:stalled'
 const RUN_STALLED_CREATED_CASING = 'Run:Stalled'
 // joshuafolkken/kit#4103: the exclusion `issue-auto-ok.ts` reads, now provisioned so a person can apply it.
 const DEFERRED_SPELLING = 'deferred'
-const NOT_DIRECTLY_RUNNABLE_COUNT = 6
+const NOT_DIRECTLY_RUNNABLE_COUNT = 7
 const PARKED_COUNT = 4
 // joshuafolkken/kit#1083: the route labels are the same GitHub contract, and the aggregation query
 // (`?labels=route:split`) fails silently on a drifted name exactly as the others do.
@@ -131,6 +132,7 @@ describe('WORKFLOW_LABELS', () => {
 			EPIC_LABEL,
 			IN_PROGRESS_LABEL,
 			PLANNED_LABEL,
+			PLAN_UNVERIFIED_LABEL,
 			RUN_SOLO_LABEL,
 			RUN_LANE_LABEL,
 			PRIORITY_CRITICAL_LABEL,

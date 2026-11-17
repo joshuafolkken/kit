@@ -54,4 +54,21 @@ describe('agent_session_role.scope_line', () => {
 		expect(line).toContain('filing only on the user’s explicit instruction')
 		expect(line).not.toContain('consultation, filing and operations')
 	})
+
+	// joshuafolkken/kit#7755: an imperative request goes through investigate, plan and filing plan.
+	it('answers an imperative request with a plan and a filing plan outside a worker lane', () => {
+		const line = agent_session_role.scope_line({})
+
+		expect(line).toContain('imperative request with investigation, a plan and a filing plan')
+	})
+
+	it('keeps the worker lane line free of the filing plan', () => {
+		const line = agent_session_role.scope_line(
+			agent_session_role.env_for(agent_role_profile.WORKER),
+		)
+
+		expect(line).toBe(
+			'Session scope: implementation lane; implementation is permitted by the launcher role.',
+		)
+	})
 })
