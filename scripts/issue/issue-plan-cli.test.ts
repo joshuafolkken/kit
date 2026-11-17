@@ -32,6 +32,17 @@ vi.mock('#scripts/gh/git-gh-command', () => ({
 	},
 }))
 
+// joshuafolkken/kit#7733: the target check, covered by `issue-plan-target.test.ts`.
+const { foreign_of, mark_unverified, clear_unverified } = vi.hoisted(() => ({
+	foreign_of: vi.fn<(repo?: string) => string | undefined>(),
+	mark_unverified: vi.fn<() => Promise<boolean>>(async () => true),
+	clear_unverified: vi.fn<() => Promise<void>>(),
+}))
+
+vi.mock('#scripts/issue/issue-plan-target', () => ({
+	issue_plan_target: { foreign_of, mark_unverified, clear_unverified },
+}))
+
 const { send_notice } = vi.hoisted(() => ({ send_notice: vi.fn<() => Promise<void>>() }))
 
 vi.mock('#scripts/issue/issue-plan-notify', () => ({ issue_plan_notify: { send: send_notice } }))
@@ -96,6 +107,7 @@ function default_session(): void {
 	issue_edit_title.mockResolvedValue(ISSUE_URL)
 	issue_comment.mockResolvedValue(COMMENT_URL)
 	issue_add_label.mockResolvedValue(true)
+	foreign_of.mockReturnValue(undefined)
 	is_child_of.mockReturnValue(false)
 	run_from_plan.mockResolvedValue(0)
 }
@@ -312,7 +324,22 @@ describe('issue_plan_cli.run — --repo addresses every write to the named repos
 		expect(issue_edit_title).toHaveBeenCalledWith('7', TITLE, OTHER_REPO)
 		expect(issue_view_json).toHaveBeenCalledWith('7', expect.any(String), OTHER_REPO)
 		expect(issue_comment).toHaveBeenCalledWith('7', PLAN, OTHER_REPO)
+		expect(clear_unverified).toHaveBeenCalledWith('7', OTHER_REPO)
 		expect(issue_add_label).toHaveBeenCalledWith('7', PLANNED_LABEL, OTHER_REPO)
+	})
+})
+
+describe('issue_plan_cli.run — a plan from another checkout is held as estimate-unverified', () => {
+	const planned_argv = ['7', BODY_FILE_FLAG, PLAN_FILE, PLANNED_FLAG, '--repo', OTHER_REPO]
+
+	it('marks plan:unverified without run:planned or the notification', async () => {
+		foreign_of.mockReturnValue(OTHER_REPO)
+
+		expect(await issue_plan_cli.run(planned_argv)).toBe(0)
+
+		expect(mark_unverified).toHaveBeenCalledWith('7', OTHER_REPO)
+		expect(issue_add_label).not.toHaveBeenCalled()
+		expect(send_notice).not.toHaveBeenCalled()
 	})
 })
 

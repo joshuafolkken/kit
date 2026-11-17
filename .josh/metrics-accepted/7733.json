@@ -1,0 +1,8 @@
+{
+	"reason": "new plan:unverified hold for issue:plan from another checkout (issue-plan-target.ts) and its doc lines",
+	"date": "2026-11-17",
+	"growth": {
+		"scripts.code_lines": 44,
+		"ai_cost.on_demand_bytes": 112
+	}
+}

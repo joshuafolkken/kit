@@ -142,7 +142,8 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 				},
 				{
 					names: ['--repo <owner/name>'],
-					description: "write to that repository's issue.",
+					description:
+						"write to that repository's issue; with `--planned` from another repository's checkout, apply `plan:unverified` instead of `run:planned`.",
 				},
 			],
 		},

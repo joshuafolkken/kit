@@ -338,7 +338,7 @@ pnpm josh issue:plan 4134 --body-file .josh/tmp/plan.md --title "Add issue:plan"
 - `--title <title>` — replace the issue title first.
 - `--planned` — apply `run:planned` once the plan is posted, so the next entry skips planning; send the `planning` Telegram (change items, `Next:`).
 - `--no-notify` — with `--planned`, skip the `planning` Telegram.
-- `--repo <owner/name>` — write to that repository's issue.
+- `--repo <owner/name>` — write to that repository's issue; with `--planned` from another repository's checkout, apply `plan:unverified` instead of `run:planned`.
 
 <!-- /usage -->
 
@@ -353,6 +353,12 @@ Before any write, the plan's files are counted against the estimate in force (th
 - Work a review finding adds later is outside this check.
 
 `--planned` judges the size estimate with `issue:file`'s guide, cap and size bar (`scripts/issue/plan-size-check.ts`). The plan's `- 規模見積もり:` and `- 分割しない理由:` lines win; otherwise the issue body's are used. An unexcused estimate past them leaves the plan posted without `run:planned`, prints the refusal and the split assessment's steps, and exits `1`.
+
+`--planned` with a `--repo` other than the working checkout's repository (`scripts/issue/issue-plan-target.ts`):
+
+- It applies `plan:unverified` instead of `run:planned`, sends no Telegram, and prints the re-plan command. An unreadable checkout counts as another repository.
+- `plan:unverified` withholds `auto-ok`; `backlog:next` / `backlogrun` skip the issue.
+- `--planned` from the target's checkout removes `plan:unverified` and applies `run:planned`.
 
 When a dispatched lane child plans its own issue, without `--repo`, the recorded plan then runs `lane:plan` on its backticked paths outside `### 影響を受ける既存の利用者`. It prints the command and the verdict, and exits with `lane:plan`'s code (`2` yield, `3` split, `4` premise). On `wait` (`1`), re-run the printed command, not `issue:plan`.
 

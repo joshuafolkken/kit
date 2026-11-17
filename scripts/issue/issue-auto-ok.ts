@@ -5,6 +5,7 @@ import {
 	EPIC_LABEL,
 	has_label_name,
 	NEEDS_HUMAN_REVIEW_LABEL,
+	PLAN_UNVERIFIED_LABEL,
 	RELEASE_LABEL,
 } from './issue-labels'
 import { markdown_section } from './markdown-section'
@@ -82,6 +83,7 @@ const EXCLUDED_LABELS: ReadonlyArray<readonly [string, string]> = [
 	[DEFERRED_LABEL, 'the Issue is deferred'],
 	[NEEDS_HUMAN_REVIEW_LABEL, 'a person reviews the change before it lands'],
 	[EPIC_LABEL, 'an epic is opted in by a person, and that opts in every descendant'],
+	[PLAN_UNVERIFIED_LABEL, "the plan's estimate was not read from the target's checkout"],
 ]
 
 // The first label that withholds `auto-ok`, or `undefined` when none of them is present.

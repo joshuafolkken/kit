@@ -5,6 +5,7 @@ import { issue_body_or_comment } from '#scripts/issue/issue-body-or-comment'
 import { PLANNED_LABEL } from '#scripts/issue/issue-labels'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { issue_plan_notify } from '#scripts/issue/issue-plan-notify'
+import { issue_plan_target } from '#scripts/issue/issue-plan-target'
 import { plan_consumers_section } from '#scripts/issue/plan-consumers-section'
 import { plan_size_check } from '#scripts/issue/plan-size-check'
 import { cli_body } from '#scripts/josh/cli-body'
@@ -125,14 +126,28 @@ async function is_oversize(request: PlanRequest): Promise<boolean> {
 	return true
 }
 
-// `--planned`'s label and notification, refused for a plan over the guide.
-async function mark_planned(request: PlanRequest): Promise<boolean> {
-	if (await is_oversize(request)) return false
-	const is_applied = await apply_planned_label(request.issue_number, request.repo)
+// A plan from the target's checkout drops an earlier `plan:unverified`, then takes `run:planned` and
+// the notification.
+async function mark_runnable(request: PlanRequest): Promise<boolean> {
+	const { issue_number, repo } = request
+
+	await issue_plan_target.clear_unverified(issue_number, repo)
+	const is_applied = await apply_planned_label(issue_number, repo)
 
 	if (is_applied && request.is_notified) await issue_plan_notify.send(request)
 
 	return is_applied
+}
+
+// `--planned`'s label and notification, refused for a plan over the guide; a plan from another
+// repository's checkout is held as `plan:unverified` instead (joshuafolkken/kit#7733).
+async function mark_planned(request: PlanRequest): Promise<boolean> {
+	if (await is_oversize(request)) return false
+	const foreign_target = issue_plan_target.foreign_of(request.repo)
+
+	if (foreign_target === undefined) return await mark_runnable(request)
+
+	return await issue_plan_target.mark_unverified(request.issue_number, foreign_target)
 }
 
 // `--repo` addresses every write — the title, the plan and the label — so `kickoff kit#<N>` run from
