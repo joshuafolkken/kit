@@ -1,7 +1,7 @@
 {
-	"reason": "#7775 adds the estimate ledger kind, its dispatch-time record and the lane:stats ratio columns",
+	"reason": "Review fix: injectable read_estimate with the ended-run guard and its tests (#7775)",
 	"date": "2026-11-17",
 	"growth": {
-		"scripts.code_lines": 152
+		"scripts.code_lines": 172
 	}
 }

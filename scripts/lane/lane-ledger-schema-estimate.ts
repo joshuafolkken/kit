@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { lane_ledger_kind } from './lane-ledger-kind'
 
 // The run board's finish estimate, written once per lane child dispatch (joshuafolkken/kit#7775):
-// `run` is the run's invocation (`run-carry.ts`), `issue` the child just dispatched and `finish_at`
+// `run` is the run's start instant as ISO (`run-board-estimate-record.ts`), `issue` the child just dispatched and `finish_at`
 // the instant the run was then expected to end — so `lane:stats` can set it against the actual end.
 
 const { KIND } = lane_ledger_kind

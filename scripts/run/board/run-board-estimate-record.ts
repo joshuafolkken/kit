@@ -1,6 +1,7 @@
 import type { EstimateRecord } from '#scripts/lane/lane-ledger-schema-estimate'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { run_board_estimate } from './run-board-estimate'
+import type { BoardPlan } from './run-board-layout'
 import { run_board_plan_shared } from './run-board-plan-shared'
 import { run_board_read, type LocalRead } from './run-board-read'
 import { run_board_tick } from './run-board-tick'
@@ -27,21 +28,48 @@ function run_of(local: LocalRead): string {
 	return new Date(local.started_ms).toISOString()
 }
 
-async function read_estimate(now_ms: number): Promise<Estimate | undefined> {
-	const local = await run_board_read.read_local()
+// What the estimate is read through: the local read, the run's plan and the time the board says is
+// left.
+interface EstimateReads {
+	read_local: () => Promise<LocalRead | undefined>
+	read_plan: (scope: LocalRead['scope']) => Promise<BoardPlan | undefined>
+	left_of: (local: LocalRead, plan: BoardPlan | undefined, now_ms: number) => number | undefined
+}
 
-	if (local === undefined) return undefined
-
-	const plan = await run_board_plan_shared.read(local.scope)
+function left_of(
+	local: LocalRead,
+	plan: BoardPlan | undefined,
+	now_ms: number,
+): number | undefined {
 	const state = { ...run_board_tick.FRESH_STATE, plan }
 	const layout = run_board_tick.layout_for(state, local, now_ms)
-	const left_ms = run_board_estimate.left_ms({ now_ms, ...local, layout })
 
-	return { run: run_of(local), left_ms }
+	return run_board_estimate.left_ms({ now_ms, ...local, layout })
+}
+
+const LIVE_READS: EstimateReads = {
+	read_local: async () => await run_board_read.read_local(),
+	read_plan: run_board_plan_shared.read,
+	left_of,
+}
+
+// An ended run is not estimated, as the board's header does not (`run-board-estimate.ts`), so a
+// dispatch after a run ended never attaches a row to it.
+async function read_estimate(
+	now_ms: number,
+	reads: EstimateReads = LIVE_READS,
+): Promise<Estimate | undefined> {
+	const local = await reads.read_local()
+
+	if (local === undefined || local.ended_ms !== undefined) return undefined
+
+	const plan = await reads.read_plan(local.scope)
+
+	return { run: run_of(local), left_ms: reads.left_of(local, plan, now_ms) }
 }
 
 const LIVE_PORTS: EstimatePorts = {
-	read: read_estimate,
+	read: async (now_ms) => await read_estimate(now_ms),
 	write: lane_ledger_write.record_estimate,
 }
 
@@ -61,7 +89,7 @@ async function record(issue: number, ports: EstimatePorts = LIVE_PORTS): Promise
 	}
 }
 
-const run_board_estimate_record = { record }
+const run_board_estimate_record = { left_of, read_estimate, record }
 
-export type { Estimate, EstimatePorts }
+export type { Estimate, EstimatePorts, EstimateReads }
 export { run_board_estimate_record }
