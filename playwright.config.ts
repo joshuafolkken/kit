@@ -1,3 +1,4 @@
+import path from 'node:path'
 import { environment_flags } from '@joshuafolkken/kit/env'
 import { ports } from '@joshuafolkken/kit/ports'
 import { web_server } from '@joshuafolkken/kit/web-server'
@@ -128,7 +129,9 @@ export default defineConfig({
 	testMatch: '**/*.e2e.{ts,js}',
 	// A retained observation-flush worktree (`.git/josh/observation-flush/tree`) carries its own
 	// E2E files and `@playwright/test`; loading them fails with "Requiring @playwright/test second time".
-	testIgnore: ['**/.git/**', '**/node_modules/**'],
+	// Anchored at this checkout: an unanchored `**/.git/**` would ignore every file when the run
+	// happens inside that worktree, whose own path passes through `.git`.
+	testIgnore: path.join(import.meta.dirname, '.git', '**'),
 	fullyParallel: true,
 	...(IS_CI ? { workers: CI_WORKERS, maxFailures: CI_MAX_FAILURES } : {}),
 	retries: env_config.retries,
