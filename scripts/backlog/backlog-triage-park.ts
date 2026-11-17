@@ -9,23 +9,27 @@ import { run_park_body } from '#scripts/run/park/run-park-body'
 
 type ParkRead = { comments: ReadonlyArray<IssueComment>; body: string } | { problem: string }
 
-// The latest trusted comment that meets the park body schema — what the child parked with.
+// The latest trusted comment that meets the park body schema's structure — what the child parked with.
 function park_body(comments: ReadonlyArray<IssueComment>): string | undefined {
-	return issue_read
-		.trusted_bodies(comments)
-		.findLast((body) => run_park_body.problem_of(body) === undefined)
+	return issue_read.trusted_bodies(comments).findLast((body) => run_park_body.is_park(body))
+}
+
+// The latest park, refused when its permission is off the vocabulary rather than read past to an
+// older park (joshuafolkken/kit#7818).
+function park_of(comments: ReadonlyArray<IssueComment>): ParkRead {
+	const body = park_body(comments)
+
+	if (body === undefined) return { problem: 'no trusted comment follows the park body schema' }
+	const problem = run_park_body.problem_of(body)
+
+	return problem === undefined ? { comments, body } : { problem: `its latest park: ${problem}` }
 }
 
 async function read(issue: string): Promise<ParkRead> {
 	const json = await git_gh_issue_read.issue_list_comments(issue)
 	const comments = await issue_read.parse_comments(json)
 
-	if (comments === undefined) return { problem: 'could not read its comments' }
-	const body = park_body(comments)
-
-	return body === undefined
-		? { problem: 'no trusted comment follows the park body schema' }
-		: { comments, body }
+	return comments === undefined ? { problem: 'could not read its comments' } : park_of(comments)
 }
 
 // An option needing the parent's own action is refused without `--done` (joshuafolkken/kit#7001);

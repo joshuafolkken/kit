@@ -246,11 +246,18 @@ function permission_problem(park: ParkBody): string | undefined {
 }
 
 // The first problem of a body, structure first, then a permission off the vocabulary
-// (joshuafolkken/kit#7818): what `run:park` refuses and an adopt reads past. `undefined` for none.
+// (joshuafolkken/kit#7818): what `run:park` refuses and an adopt refuses to take. `undefined` for none.
 function problem_of(body: string): string | undefined {
 	const park = parse(body)
 
 	return shape_problem(park) ?? permission_problem(park)
+}
+
+// Whether `body` meets the schema's structure — a park, even one whose permission `problem_of` names.
+// A reader picks the latest park by this, so a newer park off the vocabulary is refused, never read past
+// to an older one (joshuafolkken/kit#7818).
+function is_park(body: string): boolean {
+	return shape_problem(parse(body)) === undefined
 }
 
 // The option the recommendation names; `undefined` for no recommendation or a body off the schema.
@@ -265,7 +272,7 @@ function picked_option(body: string): ParkOption | undefined {
 // structure. A park written before the permission vocabulary (joshuafolkken/kit#7818) still reads as a
 // stop on the board, though `problem_of` names its permission.
 function summary_of(body: string): string | undefined {
-	if (shape_problem(parse(body)) !== undefined) return undefined
+	if (!is_park(body)) return undefined
 	const option = picked_option(body)
 
 	if (option === undefined) return NO_PICK_WORD
@@ -393,6 +400,7 @@ const run_park_body = {
 	default_pick,
 	done_needed,
 	filing_action,
+	is_park,
 	parent_action,
 	problem_of,
 	summary_of,
