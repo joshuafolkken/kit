@@ -140,6 +140,13 @@ it('makes no publication write when a later child cannot be read', async () => {
 	expect(issue_publication_state.is_pending(read(FIRST).body)).toBe(true)
 })
 
+it('withholds a child whose plan was written outside the target checkout', async () => {
+	ready()
+	rows.set(FIRST, { ...read(FIRST), labels: [PLANNED, 'plan:unverified'] })
+	await expect(issue_publication.publish(EPIC, REPO)).rejects.toThrow('needs its plan re-recorded')
+	expect(write).not.toHaveBeenCalled()
+})
+
 it('refuses a foreign tracker before reading or writing its issues', async () => {
 	await expect(issue_publication.publish(EPIC, 'another-owner/kit')).rejects.toThrow(
 		'known first-party',

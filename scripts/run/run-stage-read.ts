@@ -63,6 +63,14 @@ async function read_stop(
 	return { is_halfrun_stopped: false, prrun_token: await run_prrun_resume.resume_token(issue) }
 }
 
+// Planned by `run:planned` or a recorded plan comment — unless `plan:unverified` holds the plan as
+// written from another repository's checkout, so the run plans again here (joshuafolkken/kit#7733).
+function is_planned_read(issue_read: StateRead, plan: string | undefined): boolean {
+	if (issue_state.is_plan_unverified(issue_read)) return false
+
+	return issue_state.is_planned(issue_read) || plan !== undefined
+}
+
 // An unreadable issue reads as neither closed nor planned: the ordinary entry that follows reads it
 // again and answers `unknown` for it.
 async function read_stage(issue: string): Promise<StageRead> {
@@ -75,7 +83,7 @@ async function read_stage(issue: string): Promise<StageRead> {
 		is_closed: is_closed(issue_read),
 		is_prrun_stopped: stop.prrun_token !== undefined,
 		is_halfrun_stopped: stop.is_halfrun_stopped,
-		is_planned: issue_state.is_planned(issue_read) || plan !== undefined,
+		is_planned: is_planned_read(issue_read, plan),
 	})
 
 	const has_pr = state === run_stage.FRESH || state === run_stage.PLANNED
