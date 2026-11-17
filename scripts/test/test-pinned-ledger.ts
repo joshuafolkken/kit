@@ -39,9 +39,13 @@ function origin_of(raw: string | undefined): PinnedOrigin | undefined {
 }
 
 // The hunks a run did not probe: `held` the cache answered, `rewired` left out as a rewire, `over_cap`
-// over the test-file cap; and what started it, `manual` when unnamed.
+// over the test-file cap; and what started it, `manual` when unnamed. The probed ones split as the
+// cache knew them (joshuafolkken/kit#7803): `rechecked` against a few tests, `unregistered` with no
+// cached verdict.
 interface Skipped {
 	held: number
+	rechecked?: number
+	unregistered?: number
 	rewired: number
 	over_cap?: number
 	origin?: PinnedOrigin | undefined
@@ -55,6 +59,8 @@ async function record(
 	await lane_ledger_write.record_test_pinned({
 		issue: lane_paths.issue_here(PROJECT_ROOT),
 		held: skipped.held,
+		rechecked: skipped.rechecked ?? 0,
+		unregistered: skipped.unregistered ?? 0,
 		rewired: skipped.rewired,
 		over_cap: skipped.over_cap ?? 0,
 		probes: [...probes],

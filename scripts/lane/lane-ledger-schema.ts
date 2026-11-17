@@ -145,6 +145,8 @@ const test_pinned_schema = z.object({
 	at: z.string(),
 	issue: z.number().optional(),
 	held: z.number(),
+	rechecked: z.number().optional(),
+	unregistered: z.number().optional(),
 	rewired: z.number().optional(),
 	over_cap: z.number().optional(),
 	probes: z.array(test_pinned_probe_schema),

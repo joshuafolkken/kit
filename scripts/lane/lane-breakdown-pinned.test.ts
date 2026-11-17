@@ -114,3 +114,14 @@ describe('lane_breakdown_pinned.detail_text', () => {
 		expect(lane_breakdown_pinned.detail_text([])).toBe('')
 	})
 })
+
+// joshuafolkken/kit#7803: an older row, with neither count, reads as the first detail case above.
+describe('lane_breakdown_pinned.detail_text on rows that split the probed hunks', () => {
+	it('names the rechecked and the unregistered hunks, summed over the rows', () => {
+		const split: TestPinnedEntry = { ...row(INSIDE), rechecked: 1, unregistered: 1 }
+
+		expect(lane_breakdown_pinned.detail_text([split, { ...split, probes: [] }])).toBe(
+			' (test:pinned 6 hunks, 4 cached, 2 rechecked, 2 unregistered, 2 probed, scripts/b.ts 2.0 min, scripts/a.ts 3 test files 1.0 min)',
+		)
+	})
+})

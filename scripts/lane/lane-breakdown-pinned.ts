@@ -60,15 +60,34 @@ function probe_text(probe: PinnedProbe): string {
 	return `${probe.file}${tests} ${lane_breakdown.minutes_text(probe.elapsed_ms)}${pinned_by}`
 }
 
-// The skipped hunks' counts, each named only when non-zero: `rewired` (joshuafolkken/kit#5235) and
-// `over cap` (joshuafolkken/kit#5503).
-function skipped_counts(rewired: number, over_cap: number): Array<string> {
-	const named: Array<[number, string]> = [
-		[rewired, 'rewired'],
-		[over_cap, 'over cap'],
-	]
-
+// The counts, each named only when non-zero.
+function named_counts(named: ReadonlyArray<[number, string]>): Array<string> {
 	return named.filter(([count]) => count > 0).map(([count, label]) => `${String(count)} ${label}`)
+}
+
+// A field summed over the rows, an absent one (an older row's) counting 0.
+function sum_of(
+	rows: ReadonlyArray<TestPinnedEntry>,
+	read: (row: TestPinnedEntry) => number | undefined,
+): number {
+	return rows.reduce((sum, row) => sum + (read(row) ?? 0), 0)
+}
+
+// The probed hunks split as the cache knew them (joshuafolkken/kit#7803): `rechecked` against a few
+// tests, `unregistered` probed with no cached verdict.
+function probed_counts(rows: ReadonlyArray<TestPinnedEntry>): Array<string> {
+	return named_counts([
+		[sum_of(rows, (row) => row.rechecked), 'rechecked'],
+		[sum_of(rows, (row) => row.unregistered), 'unregistered'],
+	])
+}
+
+// The skipped hunks' counts: `rewired` (joshuafolkken/kit#5235) and `over cap` (joshuafolkken/kit#5503).
+function skipped_counts(rows: ReadonlyArray<TestPinnedEntry>): Array<string> {
+	return named_counts([
+		[sum_of(rows, (row) => row.rewired), 'rewired'],
+		[sum_of(rows, (row) => row.over_cap), 'over cap'],
+	])
 }
 
 // The detail the pre-detach line carries, or `''` when no probe ran inside it.
@@ -77,14 +96,13 @@ function detail_text(rows: ReadonlyArray<TestPinnedEntry>): string {
 	const probes = rows
 		.flatMap((row) => row.probes)
 		.toSorted((left, right) => right.elapsed_ms - left.elapsed_ms)
-	const held = rows.reduce((sum, row) => sum + row.held, 0)
-	const rewired = rows.reduce((sum, row) => sum + (row.rewired ?? 0), 0)
-	const over_cap = rows.reduce((sum, row) => sum + (row.over_cap ?? 0), 0)
-	const total = held + rewired + over_cap + probes.length
-	const head = `test:pinned ${String(total)} hunks, ${String(held)} cached, ${String(probes.length)} probed`
-	const counts = [head, ...skipped_counts(rewired, over_cap)]
+	const held = sum_of(rows, (row) => row.held)
+	const total =
+		held + sum_of(rows, (row) => row.rewired) + sum_of(rows, (row) => row.over_cap) + probes.length
+	const head = `test:pinned ${String(total)} hunks, ${String(held)} cached`
+	const counts = [head, ...probed_counts(rows), `${String(probes.length)} probed`]
 
-	return ` (${[...counts, ...probes.slice(0, MAX_SHOWN).map((probe) => probe_text(probe))].join(', ')})`
+	return ` (${[...counts, ...skipped_counts(rows), ...probes.slice(0, MAX_SHOWN).map((probe) => probe_text(probe))].join(', ')})`
 }
 
 const lane_breakdown_pinned = { detail_text, discarded_text, rows_of }
