@@ -1,0 +1,8 @@
+{
+	"reason": "#7695 adds cross-repo blocked-by for upstream interrupts and the board's upstream-wait display (new relation write, board width threading, tests)",
+	"date": "2026-11-17",
+	"growth": {
+		"scripts.code_lines": 71,
+		"prose.long_paragraphs": 1
+	}
+}

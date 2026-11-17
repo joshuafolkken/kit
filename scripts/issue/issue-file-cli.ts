@@ -183,6 +183,11 @@ async function record_parks(url: string, filing: Filing): Promise<void> {
 	}
 }
 
+// The filed Issue's repository where it is not this one — the blocker an interrupt filed upstream.
+function blocker_repo_of(filing: Filing): string | undefined {
+	return issue_file.is_same_repository(filing.target, filing.current) ? undefined : filing.target
+}
+
 async function record(url: string, filing: Filing, labels: ReadonlyArray<string>): Promise<void> {
 	const number = String(issue_number_of(url))
 	const reference = issue_cite.plain_for(
@@ -205,7 +210,7 @@ async function record(url: string, filing: Filing, labels: ReadonlyArray<string>
 		is_blocking_finder: filing.args.is_blocking_finder,
 		found_during,
 		blocker: issue_number_of(url),
-		is_here: issue_file.is_same_repository(filing.target, filing.current),
+		blocker_repo: blocker_repo_of(filing),
 	})
 	await record_parks(url, filing)
 }

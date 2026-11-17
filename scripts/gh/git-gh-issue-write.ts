@@ -376,9 +376,9 @@ async function issue_clear_label(issue_number: string, label: string): Promise<b
 // A resolution that does not produce a usable id throws rather than returning something to send:
 // `jq` prints an empty line for a field it cannot reach, and `Number('')` is `0`, which is a value
 // the endpoint would happily be given.
-async function read_issue_id(issue_number: string): Promise<number> {
+async function read_issue_id(issue_number: string, repo?: string): Promise<number> {
 	const raw = await git_gh_exec.exec_gh_api({
-		path: git_gh_api_path.issue_api_path(issue_number),
+		path: git_gh_api_path.issue_api_path(issue_number, repo),
 		jq_filter: ID_FILTER,
 	})
 	const issue_id = Number(raw.trim())
@@ -392,10 +392,15 @@ async function read_issue_id(issue_number: string): Promise<number> {
 
 // Applied after creation, never as part of it: the relation is a nicety and the Issue is not, so a
 // failure here costs only the relation. It does not depend on the gh CLI's version — the
-// dependencies endpoint is REST, which `gh api` proxies.
-async function issue_add_blocked_by(issue_number: string, blocker: string): Promise<boolean> {
+// dependencies endpoint is REST, which `gh api` proxies. `blocker_repo` (`owner/repo`) names a blocker
+// in another repository — an upstream Issue the interrupt filed there (joshuafolkken/kit#7695).
+async function issue_add_blocked_by(
+	issue_number: string,
+	blocker: string,
+	blocker_repo?: string,
+): Promise<boolean> {
 	return await did_write_succeed(async () => {
-		const issue_id = await read_issue_id(blocker)
+		const issue_id = await read_issue_id(blocker, blocker_repo)
 
 		await write_api({
 			path: git_gh_api_path.blocked_by_api_path(issue_number),

@@ -145,6 +145,16 @@ describe('josh upstream:interrupt to a first-party repository', () => {
 	})
 })
 
+describe('josh upstream:interrupt blocking the finder', () => {
+	it('passes --blocks-finder even where the caller left it off', async () => {
+		await upstream_interrupt_cli.run(argv_for(FIRST_PARTY_REPO))
+
+		expect(vi.mocked(issue_file_cli.file_issue)).toHaveBeenCalledWith(
+			expect.arrayContaining([BLOCKS_FINDER_FLAG]),
+		)
+	})
+})
+
 describe('josh upstream:interrupt filing and backlink', () => {
 	it('files on the interrupt route with --blocks-finder passed through', async () => {
 		await upstream_interrupt_cli.run(argv_for(FIRST_PARTY_REPO, [BLOCKS_FINDER_FLAG]))

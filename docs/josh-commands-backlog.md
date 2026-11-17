@@ -198,7 +198,7 @@ Steps 1–2 stop on refusal. Steps 3–7 report problems, including duplicates w
    - A `ref` candidate the body only cites, with no matching title, is shown and holds nothing.
    - An open issue with the same normalized `- 計測宣言:` refuses the filing whatever `--distinct` names, printing its number; join it with `pnpm josh issue:comment <N>`. Another command or bound, a closed issue and `- 計測宣言なし:` pass.
 8. Create any missing workflow label with its color and description — the same set as [`josh sync`](josh-commands.md#josh-sync). A label that cannot be created warns, and the filing goes on.
-9. Create with all labels and print the URL. A local `--route interrupt --blocks-finder` filing records its finder as blocked by it; failures warn with the retry command, skipped records say why.
+9. Create with all labels and print the URL. A `--route interrupt --blocks-finder` filing, in any repository, records its finder as blocked by it; failures warn with the retry command, skipped records say why.
    Local `原因の park: #<N>` lines record stops through the shared epic recorder. Foreign filings skip them. Failures warn and continue; repair dependencies without refiling. Post-create failures leave exit 0.
 10. With `--release`, link the filed issue to the target's release issue, as [`josh issue:release`](#josh-issuerelease) does. A link that does not complete prints `⚠` with that command to re-run, prefixed with `GH_REPO=<target>` for a `--repo` filing.
 11. Run [`josh epic:bundle`](#josh-epicbundle) on the filed issue. When it gives no answer, print `⚠` with the command to re-run; the exit code stays 0.
