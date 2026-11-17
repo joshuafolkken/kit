@@ -48,6 +48,35 @@ function row_of(entries: ReadonlyArray<LedgerEntry>, scope: string): Array<strin
 		?.slice(1)
 }
 
+// Runs, the four input counts and the test files; the rebuild, core wait, select and vitest seconds;
+// the duration.
+const RELATED_ROW = [
+	'3',
+	'4',
+	'30',
+	'8',
+	'1',
+	'30',
+	NOT_MEASURED,
+	NOT_MEASURED,
+	'2.0',
+	NOT_MEASURED,
+	'60.0',
+]
+const NO_MAP_ROW = [
+	'1',
+	'2',
+	'0',
+	'0',
+	'1',
+	'1790',
+	NOT_MEASURED,
+	NOT_MEASURED,
+	NOT_MEASURED,
+	NOT_MEASURED,
+	'20.0',
+]
+
 describe('lane_test_related_stats.table', () => {
 	it('reduces a scope to its runs and the medians of its input, test files, selection and seconds', () => {
 		const entries = [
@@ -56,22 +85,13 @@ describe('lane_test_related_stats.table', () => {
 			run({ ...WIDE, select_elapsed_ms: 3000 }),
 		]
 
-		expect(row_of(entries, RELATED)).toStrictEqual(['3', '4', '30', '8', '1', '30', '2.0', '60.0'])
+		expect(row_of(entries, RELATED)).toStrictEqual(RELATED_ROW)
 	})
 
 	it('keeps each scope on its own row', () => {
 		const full = { ...NARROW, scope: NO_MAP, test_files: 1790 }
 
-		expect(row_of([run(NARROW), run(full)], NO_MAP)).toStrictEqual([
-			'1',
-			'2',
-			'0',
-			'0',
-			'1',
-			'1790',
-			NOT_MEASURED,
-			'20.0',
-		])
+		expect(row_of([run(NARROW), run(full)], NO_MAP)).toStrictEqual(NO_MAP_ROW)
 	})
 
 	it('prints the test files as not measured where no run reported them', () => {
@@ -87,14 +107,34 @@ describe('lane_test_related_stats.table', () => {
 
 // joshuafolkken/kit#7248: the test selection's median, apart from vitest's.
 describe('lane_test_related_stats.table — the test selection', () => {
-	it('heads the selection column between the test files and the duration', () => {
+	it('heads the stage columns between the test files and the duration', () => {
 		const [header] = lane_test_related_stats.table([], WINDOW).split('\n', 1)
 
-		expect(header).toContain('| test files | select (s) | median (s) |')
+		expect(header).toContain(
+			'| test files | rebuild (s) | core wait (s) | select (s) | vitest (s) | median (s) |',
+		)
 	})
 
 	it('prints the selection as not measured where no run recorded it', () => {
-		expect(row_of([run(NARROW)], RELATED)?.[6]).toBe(NOT_MEASURED)
+		expect(row_of([run(NARROW)], RELATED)?.[8]).toBe(NOT_MEASURED)
+	})
+})
+
+// joshuafolkken/kit#7828: the medians of the launcher's rebuild, the core wait and vitest.
+describe('lane_test_related_stats.table — the timed stages', () => {
+	it('reduces each stage to the median of the runs that recorded it', () => {
+		const entries = [
+			run({ ...NARROW, rebuild_ms: 4000, core_wait_ms: 1000, vitest_ms: 10_000 }),
+			run({ ...NARROW, core_wait_ms: 3000, vitest_ms: 20_000 }),
+			run(NARROW),
+		]
+
+		expect(row_of(entries, RELATED)?.slice(6, -1)).toStrictEqual([
+			'4.0',
+			'2.0',
+			NOT_MEASURED,
+			'15.0',
+		])
 	})
 })
 
