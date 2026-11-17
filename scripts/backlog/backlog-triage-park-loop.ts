@@ -5,6 +5,7 @@ import { run_park_body } from '#scripts/run/park/run-park-body'
 import { run_park_lane } from '#scripts/run/park/run-park-lane'
 import { run_stalled } from '#scripts/run/park/run-stalled'
 import { run_stalled_park } from '#scripts/run/park/run-stalled-park'
+import { backlog_triage_adopted } from './backlog-triage-adopted'
 
 // The park loop `backlog:triage --adopt` stops (joshuafolkken/kit#7820): the child parked, an option
 // was adopted and the child requeued, and it parked again on the lane tree (HEAD and uncommitted
@@ -18,10 +19,6 @@ import { run_stalled_park } from '#scripts/run/park/run-stalled-park'
 // A re-park whose leading heading (its question) differs from the earlier park's is a new dead end,
 // not the same one, so it is no loop either.
 
-// The adopt's decision line, written by `backlog-triage-adopt.ts` and read here.
-const ADOPT_MARK = 'adopted park option '
-const ADOPT_COMMAND = '(backlog:triage --adopt)'
-const DONE_MARK = ' · parent action done: '
 const NOT_HELD =
 	'decision recorded and park cleared, but parking the unchanged re-park for a person failed; re-run this command'
 
@@ -35,17 +32,6 @@ type Kind = (comment: IssueComment) => boolean
 
 function is_park(comment: IssueComment): boolean {
 	return comment.is_trusted === true && run_park_body.is_park(comment.body)
-}
-
-function is_adopt(comment: IssueComment): boolean {
-	const { body } = comment
-
-	return comment.is_trusted === true && body.includes(ADOPT_MARK) && body.includes(ADOPT_COMMAND)
-}
-
-// An adopt the child itself was to carry out in the lane: one with no parent action done.
-function is_lane_option(comment: IssueComment | undefined): boolean {
-	return comment !== undefined && !comment.body.includes(DONE_MARK)
 }
 
 function last_before(comments: ReadonlyArray<IssueComment>, end: number, is_kind: Kind): number {
@@ -75,12 +61,14 @@ function is_same_question(
 // same tree and asking the same question — or `undefined`.
 function loop_of(comments: ReadonlyArray<IssueComment>): ParkLoop | undefined {
 	const park = last_before(comments, comments.length, is_park)
-	const adopt = last_before(comments, park, is_adopt)
+	const adopt = last_before(comments, park, backlog_triage_adopted.is_adopt)
 	const earlier = last_before(comments, adopt, is_park)
 	const tree = tree_at(comments, park)
 	const is_same = tree !== undefined && tree === tree_at(comments, earlier)
 
-	return is_same && is_same_question(comments, park, earlier) && is_lane_option(comments[adopt])
+	return is_same &&
+		is_same_question(comments, park, earlier) &&
+		backlog_triage_adopted.is_lane_option(comments[adopt])
 		? { adopted: first_line(comments[adopt]), tree }
 		: undefined
 }
@@ -114,7 +102,7 @@ async function hold(
 		: { problem: NOT_HELD }
 }
 
-const backlog_triage_park_loop = { ADOPT_COMMAND, ADOPT_MARK, DONE_MARK, hold, loop_of }
+const backlog_triage_park_loop = { hold, loop_of }
 
 export { backlog_triage_park_loop }
 export type { ParkLoop }

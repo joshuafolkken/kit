@@ -1,6 +1,5 @@
 import { epic_blocked_by } from '#scripts/epic/epic-blocked-by'
 import { epic_decide } from '#scripts/epic/epic-decide'
-import { issue_cite } from '#scripts/issue/issue-cite'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import type { IssueComment } from '#scripts/issue/issue-read'
 import { session_cite } from '#scripts/issue/session-cite'
@@ -10,6 +9,7 @@ import { error_text } from '#scripts/lib/error-message'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_park } from '#scripts/run/park/run-park'
 import { run_park_body, type ApprovalRange } from '#scripts/run/park/run-park-body'
+import { backlog_triage_adopted } from './backlog-triage-adopted'
 import { backlog_triage_approval } from './backlog-triage-approval'
 import { backlog_triage_close } from './backlog-triage-close'
 import { backlog_triage_filing } from './backlog-triage-filing'
@@ -197,15 +197,6 @@ async function approval_of(request: AdoptRequest, park: ParkFound): Promise<stri
 	return await backlog_triage_approval.write({ issue, reason, range, comments })
 }
 
-function decision_of(request: AdoptRequest): string {
-	const { issue, option, reason, done } = request
-	const { ADOPT_COMMAND, ADOPT_MARK, DONE_MARK } = backlog_triage_park_loop
-	const adopted = `${ADOPT_MARK}${String(option)} ${ADOPT_COMMAND}`
-	const action = done === '' ? '' : `${DONE_MARK}${done}`
-
-	return `${issue_cite.plain_for('github', issue)}: ${adopted} — ${reason}${action}`
-}
-
 async function requeue(issue: string): Promise<WriteResult> {
 	const result = await josh_command.josh_run(['run:add', issue, '--retry'], true)
 
@@ -262,7 +253,7 @@ async function write(
 	const decided = await epic_decide.decide({
 		epic_number: read.epic,
 		children: [Number(issue)],
-		decision: decision_of(request),
+		decision: backlog_triage_adopted.text_of(request),
 	})
 
 	if (decided !== SUCCESS_EXIT_CODE) return { problem: DECIDE_FAILED }
