@@ -115,6 +115,28 @@ describe('run_park_body.parent_action', () => {
 	})
 })
 
+// joshuafolkken/kit#7771: a child cannot file, so an option naming issue:file is the parent's filing.
+describe('run_park_body filing options', () => {
+	const FILING = '（`issue:file --route interrupt --blocks-finder`）'
+
+	it('refuses a filing option not written as the parent permission (ac-bd1ba775)', () => {
+		expect(run_park_body.problem_of(single_option('A', `なし${FILING}`))).toContain(
+			'option 1 names issue:file, which a child cannot run; write "- 必要な権限: 親（issue:file …）"',
+		)
+	})
+
+	it.each([
+		[`親${FILING}`, true],
+		['親セッション', false],
+		['なし', false],
+	])('accepts %j and answers filing_action %j', (permission, expected) => {
+		const body = single_option('A', permission)
+
+		expect(run_park_body.problem_of(body)).toBeUndefined()
+		expect(run_park_body.filing_action(body, 1)).toBe(expected)
+	})
+})
+
 // joshuafolkken/kit#6738: a park whose recommendation needs no person is the parent's to take.
 describe('run_park_body.auto_pick', () => {
 	it('picks the recommendation for tier A needing no permission', () => {

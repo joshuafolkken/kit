@@ -1,6 +1,7 @@
 import { derive_check } from '#scripts/document/derive-check'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import type { ChainStageEntry } from '#scripts/lane/lane-ledger-schema-ship'
+import { run_ship_pre_detach } from '#scripts/run/ship/run-ship-pre-detach'
 
 // The stage runner behind `josh run:chain` (joshuafolkken/kit#5630): the main line's chain up to the
 // review in one call, not one model round trip per command. Each stage runs as its own `josh` command,
@@ -18,6 +19,9 @@ const MAIN_MERGE = 'main:merge'
 const SELFCHECK = 'review:selfcheck'
 const CHECK_RELATED = 'check:related'
 const ACCEPTANCE_CHECK = 'acceptance:check'
+const PREFLIGHT_CHECK = 'preflight:check'
+const EXPORTS_UNUSED = 'exports:unused'
+const GUARD_TESTS = 'guard-tests'
 const RUN_REVIEW = 'run:review'
 const [DERIVE_CHECK = ''] = derive_check.DERIVE_CHECK_ARGV
 
@@ -90,6 +94,33 @@ const ACCEPTANCE_STAGE: ChainStage = {
 		`write a row for each criterion it names in the ship body draft's \`## 受け入れ条件の対応\`, ${rerun(issue, ACCEPTANCE_CHECK)}`,
 }
 
+// Ship's preflight judgments that need no PR, asked through the ship's own calls before the review, so
+// a classification, live-evidence, removed-tests or unplanned refusal stops here, named by its kind
+// (joshuafolkken/kit#7773). The type check, `cspell:dot` and the scoped pair are `check:related`'s.
+const PREFLIGHT_STAGE: ChainStage = {
+	name: PREFLIGHT_CHECK,
+	argv: [PREFLIGHT_CHECK],
+	next: (issue) =>
+		`settle each named precondition as ship's preflight would (an \`unplanned\` file: widen \`lane:plan\` or revert it), ${rerun(issue, PREFLIGHT_CHECK)}`,
+}
+
+// The pre-detach checks `check:related` does not run: `exports:unused` and the guard tests, with the
+// ship's own argv (`run-ship-pre-detach.ts`), so they stop here rather than at the pre-detach.
+function pre_detach_stages(): ReadonlyArray<ChainStage> {
+	return [
+		{
+			name: EXPORTS_UNUSED,
+			argv: run_ship_pre_detach.exports_argv(),
+			next: (issue) => `fix each unused export it names, ${rerun(issue, EXPORTS_UNUSED)}`,
+		},
+		{
+			name: GUARD_TESTS,
+			argv: run_ship_pre_detach.guard_test_argv(process.cwd()),
+			next: (issue) => `fix the red guard test, ${rerun(issue, GUARD_TESTS)}`,
+		},
+	]
+}
+
 const SELFCHECK_STAGE: ChainStage = {
 	name: SELFCHECK,
 	argv: [SELFCHECK],
@@ -112,6 +143,8 @@ function review_stages(
 		},
 		...(is_kit ? [DERIVE_CHECK_STAGE] : []),
 		ACCEPTANCE_STAGE,
+		PREFLIGHT_STAGE,
+		...pre_detach_stages(),
 		{
 			name: RUN_REVIEW,
 			argv: [RUN_REVIEW, ...review_args],
@@ -150,13 +183,15 @@ async function held(stage: ChainStage, issue: string): Promise<ChainStop | undef
 	return stop === undefined ? undefined : { stage, code: SUCCESS_EXIT_CODE, ...stop }
 }
 
-// The stage's stdout is printed as it ends; stderr is forwarded as it is written.
+// The stage's stdout is printed as it ends; stderr is forwarded as it is written. A stage with no argv
+// runs no command: its hold is the check.
 async function run_stage(
 	stage: ChainStage,
 	issue: string,
 	print: Print,
 	run: StageRunner,
 ): Promise<ChainStop | undefined> {
+	if (stage.argv.length === 0) return await held(stage, issue)
 	const result = await run(stage.argv)
 
 	if (result.out !== '') print(result.out)

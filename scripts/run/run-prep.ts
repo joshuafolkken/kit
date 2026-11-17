@@ -1,6 +1,6 @@
 import { delegation_policy } from '#scripts/delegation/delegation-policy'
 import { issue_state, type IssueState } from '#scripts/issue/issue-state'
-import type { InvestigationRecord } from './run-investigation-record'
+import { run_investigation_record, type InvestigationRecord } from './run-investigation-record'
 
 // `josh run:prep <N>` — the reads a `fullrun` makes before its first edit, assembled into one report.
 // This joins the issue body and comments, the state and `human_review` line, and the dependency-update
@@ -39,6 +39,8 @@ const INVESTIGATION_SAVED_LEAD =
 	'Skip the investigator — its conclusion is saved below; read in the main line only the files this run will edit, where main moved since re-read only the cited files its diff touches, and delegate only what it does not answer:'
 const INVESTIGATION_SAVE_STEP =
 	"Save the investigator's conclusion (its `file:line` citations) with the Write tool to"
+const INVESTIGATION_PLAN_STEP =
+	'Before the first edit, judge the size on its edit list (split-assessment.md → "Over the guide before the gate"):'
 const SHIP_HEADER = '=== ship preconditions ==='
 const SHIP_MET = 'met — nothing `josh ship` refuses on as the tree stands'
 const SHIP_UNMET =
@@ -65,6 +67,8 @@ interface PrepParts {
 	// Whether the entry's stage read the issue as planned (`run_stage.PLANNED`) — set by `run:entry`,
 	// which owns the stage; a bare `run:prep` leaves it unset.
 	is_planned?: boolean
+	// Whether the run is a dispatched lane child, the one run `lane:plan` judges (joshuafolkken/kit#7729).
+	is_lane_child?: boolean
 	// The investigation record — where it goes and what an earlier read saved; unset where no git
 	// directory answers.
 	investigation?: InvestigationRecord | undefined
@@ -105,18 +109,37 @@ function ship_body(problems: ReadonlyArray<string>): string {
 	return [SHIP_UNMET, ...problems.map((problem) => `  - ${problem}`)].join('\n')
 }
 
-function save_step(record: InvestigationRecord | undefined): string {
-	return record === undefined ? '' : ` ${INVESTIGATION_SAVE_STEP} \`${record.path}\`.`
+// The `lane:plan` tail is a lane child's alone: `fullrun-steps.md` asks no other run for one.
+function save_step(parts: PrepParts): string {
+	const record = parts.investigation
+	if (record === undefined) return ''
+	const plan =
+		parts.is_lane_child === true
+			? `, then run \`pnpm josh lane:plan ${parts.issue_number} <the paths under its ${run_investigation_record.EDIT_FILES_HEADING}>\` before the first edit`
+			: ''
+
+	return ` ${INVESTIGATION_SAVE_STEP} \`${record.path}\`${plan}.`
+}
+
+// The `lane:plan` a lane child's saved edit list is judged on before the first edit (joshuafolkken/kit#7729).
+function plan_step(findings: string, parts: PrepParts): string {
+	const files = run_investigation_record.edit_files(findings)
+	if (parts.is_lane_child !== true || files.length === 0) return ''
+
+	return `\n${INVESTIGATION_PLAN_STEP} \`pnpm josh lane:plan ${[parts.issue_number, ...files].join(' ')}\``
 }
 
 // Saved findings first, being this run's own; then a recorded plan; else delegate and save the answer.
 function investigation_body(parts: PrepParts): string {
 	const findings = parts.investigation?.findings
 
-	if (findings !== undefined) return `${INVESTIGATION_SAVED_LEAD}\n${findings}`
+	if (findings !== undefined) {
+		return `${INVESTIGATION_SAVED_LEAD}\n${findings}${plan_step(findings, parts)}`
+	}
+
 	if (parts.is_planned === true) return INVESTIGATION_PLANNED_BODY
 
-	return `${INVESTIGATION_BODY}${save_step(parts.investigation)}`
+	return `${INVESTIGATION_BODY}${save_step(parts)}`
 }
 
 function format_report(parts: PrepParts): string {

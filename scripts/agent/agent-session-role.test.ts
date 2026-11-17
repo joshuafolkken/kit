@@ -63,29 +63,18 @@ describe('agent_session_role.scope_line', () => {
 		expect(line).not.toContain('consultation, filing and operations')
 	})
 
+	// joshuafolkken/kit#7783: a filing instruction in consultation is kickoff new, handed off.
+	it('hands a filing instruction to run:handoff kickoff new outside a worker lane', () => {
+		const line = agent_session_role.scope_line({}, linked)
+
+		expect(line).toContain('hand it to `pnpm josh run:handoff kickoff new --brief-file <brief>`')
+	})
+
 	// joshuafolkken/kit#7755: an imperative request goes through investigate, plan and filing plan.
 	it('answers an imperative request with a plan and a filing plan outside a worker lane', () => {
 		const line = agent_session_role.scope_line({}, linked)
 
 		expect(line).toContain('imperative request with investigation, a plan and a filing plan')
-	})
-
-	// joshuafolkken/kit#7756: nothing can be filed without GitHub, so the line drops the filing plan.
-	it('answers an imperative request with a plan only when GitHub is not linked', () => {
-		const line = agent_session_role.scope_line({}, unlinked)
-
-		expect(line).toContain('GitHub is not linked')
-		expect(line).toContain('investigation and a plan only, without a filing plan')
-		expect(line).not.toContain('a plan and a filing plan')
-		expect(line).toContain('Model names and conversational requests do not grant')
-	})
-
-	it('reads the GitHub link only outside a worker lane', () => {
-		const is_linked = vi.fn(linked)
-
-		agent_session_role.scope_line(agent_session_role.env_for(agent_role_profile.WORKER), is_linked)
-
-		expect(is_linked).not.toHaveBeenCalled()
 	})
 
 	it('keeps the worker lane line free of the filing plan', () => {
@@ -97,5 +86,26 @@ describe('agent_session_role.scope_line', () => {
 		expect(line).toBe(
 			'Session scope: implementation lane; implementation is permitted by the launcher role.',
 		)
+	})
+})
+
+// joshuafolkken/kit#7756: nothing can be filed without GitHub, so the line drops the filing plan.
+describe('agent_session_role.scope_line without GitHub', () => {
+	it('answers an imperative request with a plan only when GitHub is not linked', () => {
+		const line = agent_session_role.scope_line({}, unlinked)
+
+		expect(line).toContain('GitHub is not linked')
+		expect(line).toContain('investigation and a plan only, without a filing plan')
+		expect(line).not.toContain('a plan and a filing plan')
+		expect(line).not.toContain('kickoff new')
+		expect(line).toContain('Model names and conversational requests do not grant')
+	})
+
+	it('reads the GitHub link only outside a worker lane', () => {
+		const is_linked = vi.fn(linked)
+
+		agent_session_role.scope_line(agent_session_role.env_for(agent_role_profile.WORKER), is_linked)
+
+		expect(is_linked).not.toHaveBeenCalled()
 	})
 })

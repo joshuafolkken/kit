@@ -1,0 +1,7 @@
+{
+	"reason": "Fractional core reservations: tenth-of-a-core rounding helpers, the ledger-p90 weight table for lint and metrics, and the small-claim threshold read off every static weight (#7776)",
+	"date": "2026-11-17",
+	"growth": {
+		"scripts.code_lines": 27
+	}
+}

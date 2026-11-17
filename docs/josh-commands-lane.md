@@ -456,7 +456,7 @@ A lane child runs it once its work summary settles, before the first edit, namin
 
 `plan:scaffold` prints the same input's size. `lane:plan` saves it for the split bar without lowering the body declaration.
 
-Tests and run records are excluded; docs, snapshots, fixtures and listings count. Generated pairs form one unit; both files' lines count. `--single` keeps an indivisible contract together.
+Tests and run records are excluded; docs, snapshots, fixtures and listings count. Generated pairs form one unit; both files' lines count. `--single "<reason>"` keeps an indivisible contract together.
 
 A lane whose plan was cleared, or else recorded first, holds the files, so two lanes never yield to each other; `backlog:next` reads the same record, so a candidate waits on a running lane's plan, read in place of its body. A file under `docs/` never clashes: the lane's sync with main resolves a shared document.
 
@@ -485,9 +485,11 @@ Hunks over twice declared files or declared lines × recent ratio over 200 also 
 
 A planned `test:related` hub (reach over the test-file cap, `scripts/test/test-related-cap.ts`) also splits, as `split (hub)` naming it; with no dependency graph none reads as a hub. Related: [#6180](https://github.com/joshuafolkken/kit/issues/6180) splits the hubs themselves.
 
-A `--single` plan, or a re-plan after the lane started (`sized`), past any axis is recorded with a `size warning` and logged, never refused; the clash and unread checks still apply.
+A `--single "<reason>"` plan, or a re-plan after the lane started (`sized`), past any axis is recorded with a `size warning` and logged, never refused; the clash and unread checks still apply. The reason goes on the ledger's split notice and as an Issue comment; a bare `--single` prints the usage, exit 1.
 
-A dispatched lane's plan (its child mark names the issue) never answers `split`: its first plan past any axis prints one `size warning`, notes nothing on the ledger, and its re-plans print none.
+A dispatched lane's plan (its child mark names the issue) before its first edit — its tree still at its base (`scripts/lane/lane-tree-edit.ts`) — is judged on each plan: past the cap (1.5 × the guide, `scripts/split/split-cap.ts`) it answers `split`, unless `--single`; past its declaration within the cap it prints a `size warning` and notes the measure on the ledger.
+
+After its first edit it never answers `split`: its first plan past any axis prints one `size warning`, notes nothing on the ledger, and its re-plans print none.
 
 A first plan re-runs each `- 前提:` line of its issue's trusted body (`scripts/lane/lane-plan-premise.ts`), printing `premise: <declaration> measured <value>` on stderr. One that does not hold, or an untrusted body, answers `premise`, exit 4, unrecorded: park the lane. No premise line runs nothing; a re-plan never re-runs them.
 

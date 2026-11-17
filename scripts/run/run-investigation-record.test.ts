@@ -83,3 +83,20 @@ describe('run_investigation_record.load — a lane dispatched again after a yiel
 		expect(path.basename(target)).toContain(durable_state.PREFIX.INVESTIGATION)
 	})
 })
+
+// joshuafolkken/kit#7729: the investigator's edit list is what the first `lane:plan` judges the size on.
+describe('run_investigation_record.edit_files', () => {
+	const LISTED = `${FINDINGS}\n\n### Files to edit\n- \`scripts/a.ts\`\n- \`scripts/b.ts\` — only if needed\n\n## Later\n- \`scripts/c.ts\``
+
+	it('reads the backticked paths under `### Files to edit` up to the next heading', () => {
+		expect(run_investigation_record.edit_files(LISTED)).toStrictEqual([
+			'scripts/a.ts',
+			'scripts/b.ts',
+		])
+	})
+
+	it('reads none without the section', () => {
+		expect(run_investigation_record.edit_files(FINDINGS)).toStrictEqual([])
+		expect(run_investigation_record.edit_files()).toStrictEqual([])
+	})
+})
