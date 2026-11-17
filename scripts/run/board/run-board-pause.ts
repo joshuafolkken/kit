@@ -1,3 +1,4 @@
+import { backlog_triage_adopted } from '#scripts/backlog/backlog-triage-adopted'
 import { issue_outcome } from '#scripts/issue/issue-outcome'
 import type { IssueComment } from '#scripts/issue/issue-read'
 import { run_park_body } from '#scripts/run/park/run-park-body'
@@ -5,14 +6,19 @@ import { z } from 'zod'
 import type { RowReason } from './run-board-layout'
 import type { ItemStatus } from './run-board-status'
 
+const url_schema = z
+	.string()
+	.regex(/^https:\/\/github\.com\/[^/]+\/[^/]+\/issues\/\d+(?:#issuecomment-\d+)?$(?![\s\S])/u)
+	.optional()
+// The latest `backlog:triage --adopt` decision after the stop: its option, comment and time.
+const adopted_schema = z.object({ option: z.number(), url: url_schema, at_ms: z.number() })
 const record_schema = z.object({
 	summary: issue_outcome.summary_schema,
-	url: z
-		.string()
-		.regex(/^https:\/\/github\.com\/[^/]+\/[^/]+\/issues\/\d+(?:#issuecomment-\d+)?$(?![\s\S])/u)
-		.optional(),
+	url: url_schema,
 	at_ms: z.number(),
+	adopted: adopted_schema.optional(),
 })
+type Adopted = z.infer<typeof adopted_schema>
 type PauseRecord = z.infer<typeof record_schema>
 
 interface PauseRead {
@@ -46,13 +52,29 @@ function at_of(comment?: IssueComment): number {
 	return Number.isFinite(at_ms) ? at_ms : 0
 }
 
+function url_of(comment?: IssueComment): string | undefined {
+	return issue_outcome.url_schema.safeParse(comment?.html_url).data
+}
+
+function adopted_after(
+	comments: ReadonlyArray<IssueComment>,
+	latest?: IssueComment,
+): Adopted | undefined {
+	const after = latest === undefined ? comments : comments.slice(comments.indexOf(latest) + 1)
+	const adopt = after.findLast((comment) => backlog_triage_adopted.option_of(comment) !== undefined)
+	const option = adopt === undefined ? undefined : backlog_triage_adopted.option_of(adopt)
+
+	return option === undefined ? undefined : { option, url: url_of(adopt), at_ms: at_of(adopt) }
+}
+
 // Only a stop comment can supply the reason; later administrative notes cannot replace it.
 function from_comments(comments: ReadonlyArray<IssueComment>, issue_url?: string): PauseRecord {
 	const latest = comments.findLast((comment) => is_stop(comment))
-	const url = issue_outcome.url_schema.safeParse(latest?.html_url).data
 	const outcome = outcome_for(comments, latest)
+	const adopted = adopted_after(comments, latest)
+	const record = { summary: FALLBACK, url: url_of(latest) ?? issue_url, ...outcome }
 
-	return { summary: FALLBACK, url: url ?? issue_url, ...outcome, at_ms: at_of(latest) }
+	return { ...record, at_ms: at_of(latest), ...(adopted !== undefined && { adopted }) }
 }
 
 // A new attempt cannot inherit the previous stop's evidence while the plan refreshes.
@@ -70,15 +92,29 @@ function record_of(number: number, read: PauseRead, status?: ItemStatus): PauseR
 	return status === undefined && is_unread(record) ? undefined : record
 }
 
+// A stop older than the launch: an option adopted since is relaunching, else the reason is unknown.
+function stale_of(record: PauseRecord, launch: number): RowReason {
+	const { adopted } = record
+
+	if (adopted !== undefined && adopted.at_ms <= launch) {
+		return {
+			tail: `adopted option ${String(adopted.option)} · relaunching`,
+			evidence_url: adopted.url,
+		}
+	}
+
+	return { tail: FALLBACK, evidence_url: record.url?.split('#', 1)[0] }
+}
+
 function reason_of(number: number, read: PauseRead, status?: ItemStatus): RowReason | undefined {
 	const record = record_of(number, read, status)
 	if (record === undefined) return undefined
 
-	if (record.at_ms < launch_of(status)) {
-		return { tail: FALLBACK, evidence_url: record.url?.split('#', 1)[0] }
-	}
+	const launch = launch_of(status)
 
-	return { tail: record.summary, evidence_url: record.url }
+	return record.at_ms < launch
+		? stale_of(record, launch)
+		: { tail: record.summary, evidence_url: record.url }
 }
 
 const run_board_pause = { FALLBACK, from_comments, reason_of, record_schema }
