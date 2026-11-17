@@ -5,6 +5,10 @@ import { run_chain, type ChainStage, type StageRunner } from './run-chain'
 const SELFCHECK = 'review:selfcheck'
 const CHECK_RELATED = 'check:related'
 const ACCEPTANCE_CHECK = 'acceptance:check'
+const PREFLIGHT_CHECK = 'preflight:check'
+const EXPORTS_UNUSED = 'exports:unused'
+const GUARD_TESTS = 'guard-tests'
+const BEFORE_REVIEW = [ACCEPTANCE_CHECK, PREFLIGHT_CHECK, EXPORTS_UNUSED, GUARD_TESTS]
 const RUN_REVIEW = 'run:review'
 const RUN_CUT = 'run:cut'
 const [DERIVE_CHECK] = derive_check.DERIVE_CHECK_ARGV
@@ -24,7 +28,7 @@ describe('run_chain', () => {
 		expect(run_chain.review_stages([], false).map((stage) => stage.name)).toStrictEqual([
 			SELFCHECK,
 			CHECK_RELATED,
-			ACCEPTANCE_CHECK,
+			...BEFORE_REVIEW,
 			RUN_REVIEW,
 		])
 	})
@@ -86,7 +90,7 @@ describe('run_chain — the generated pages', () => {
 			SELFCHECK,
 			CHECK_RELATED,
 			DERIVE_CHECK,
-			ACCEPTANCE_CHECK,
+			...BEFORE_REVIEW,
 			RUN_REVIEW,
 		])
 		expect(stages.map((stage) => stage.argv)).toContainEqual(derive_check.DERIVE_CHECK_ARGV)
@@ -121,7 +125,8 @@ describe('run_chain — acceptance:check', () => {
 		]) {
 			const names = stages.map((stage) => stage.name)
 
-			expect(names.indexOf(ACCEPTANCE_CHECK)).toBe(names.indexOf(RUN_REVIEW) - 1)
+			expect(names.indexOf(ACCEPTANCE_CHECK)).toBe(names.indexOf(PREFLIGHT_CHECK) - 1)
+			expect(names.indexOf(ACCEPTANCE_CHECK)).toBeLessThan(names.indexOf(RUN_REVIEW))
 		}
 	})
 
@@ -132,5 +137,46 @@ describe('run_chain — acceptance:check', () => {
 		expect(run_chain.stop_report(stop, ISSUE)).toContain(
 			'`pnpm josh run:chain 5630 --from acceptance:check`',
 		)
+	})
+})
+
+// joshuafolkken/kit#7773: ship's remaining preflight and pre-detach refusals asked before the review.
+describe('run_chain — the ship refusals before the review', () => {
+	const stages = run_chain.review_stages([], true)
+
+	it.each([PREFLIGHT_CHECK, EXPORTS_UNUSED, GUARD_TESTS])(
+		'stops at %s without running run:review, resuming from it',
+		async (name) => {
+			const stage = stage_named(name)
+			const [command] = stage.argv
+			const runner = vi.fn<StageRunner>(async (argv) => ({
+				code: argv[0] === command ? STOP_EXIT : 0,
+				out: '',
+			}))
+			const chain = await run_chain.run_stages(stages, ISSUE, vi.fn(), runner)
+
+			expect(chain.stop?.stage.name).toBe(name)
+			expect(runner).not.toHaveBeenCalledWith([RUN_REVIEW])
+			expect(run_chain.stop_report({ stage, code: STOP_EXIT, next: stage.next }, ISSUE)).toContain(
+				`--from ${name}\``,
+			)
+		},
+	)
+
+	it('runs the ship pre-detach argv for exports:unused and the guard tests', () => {
+		expect(stage_named(EXPORTS_UNUSED).argv).toStrictEqual([EXPORTS_UNUSED])
+		expect(stage_named(GUARD_TESTS).argv.slice(0, 2)).toStrictEqual([
+			'test:unit',
+			'--passWithNoTests',
+		])
+	})
+
+	it('runs through run:review when every refusal passes', async () => {
+		const runner = vi.fn<StageRunner>(async () => ({ code: 0, out: '' }))
+		const chain = await run_chain.run_stages(stages, ISSUE, vi.fn(), runner)
+
+		expect(chain.stop).toBeUndefined()
+		expect(runner).toHaveBeenCalledWith([PREFLIGHT_CHECK])
+		expect(runner).toHaveBeenLastCalledWith([RUN_REVIEW])
 	})
 })

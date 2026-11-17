@@ -25,14 +25,24 @@ describe('reserved_run.parse_arguments', () => {
 		).toEqual({ weight: AUDIT_WEIGHT, command: ['pnpm', 'josh', 'audit'] })
 	})
 
-	// A missing separator, a non-integer weight, and an empty command are each a usage error rather than
-	// a reservation of some default — a pre-push command that ran unguarded would be the bug this exists
-	// to remove. A zero or negative weight is rejected too: it would subtract from the ledger's cumulative
-	// sum and let a sibling admit past the budget.
+	// joshuafolkken/kit#7776: lint's ledger weight is a tenth of a core, and `lane-direct-tool` hands it here.
+	it('reads a fractional weight of at least one core', () => {
+		expect(reserved_run.parse_arguments(['1.7', '--', 'pnpm', 'exec', 'eslint'])).toEqual({
+			weight: 1.7,
+			command: ['pnpm', 'exec', 'eslint'],
+		})
+	})
+
+	// A missing separator, a weight that is not a number, and an empty command are each a usage error
+	// rather than a reservation of some default — a pre-push command that ran unguarded would be the bug
+	// this exists to remove. A weight below one core is rejected too: zero or negative would subtract from
+	// the ledger's cumulative sum and let a sibling admit past the budget.
 	it.each([
 		['no separator', ['1', 'pnpm', 'install']],
-		['a non-integer weight', ['heavy', '--', 'pnpm', 'install']],
+		['a weight that is not a number', ['heavy', '--', 'pnpm', 'install']],
+		['an infinite weight', ['Infinity', '--', 'pnpm', 'install']],
 		['a zero weight', ['0', '--', 'pnpm', 'install']],
+		['a fractional weight below one core', ['0.5', '--', 'pnpm', 'install']],
 		['a negative weight', ['-3', '--', 'pnpm', 'install']],
 		['nothing to run', ['1', '--']],
 		['a `--memory` with no value', ['1', '--memory', '--', 'pnpm', 'install']],

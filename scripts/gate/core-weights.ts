@@ -8,9 +8,9 @@ interface Measurement {
 }
 
 // **What each heavy tool was measured at, on the 11-core machine.** The whole-tree eslint scan behind
-// `josh lines` and `josh refactor:scan`, cold on 2026-10-06. eslint over 40 staged files
-// (`pre-commit-lint.ts`), which the gate's lint also runs beside its sibling linters, so it is the
-// lint's floor; whole runs were observed at 124–147% CPU. The type check with `/usr/bin/time -l` on
+// `josh lines` and `josh refactor:scan`, cold on 2026-10-06. Lint's hand measurement (16.9 s over
+// 14 s) gave way to its ledger p90, below in `LEDGER_P90` with its period, runs and p90
+// (joshuafolkken/kit#7776). The type check with `/usr/bin/time -l` on
 // 2026-10-21 under a load average of 14. `prettier --check` over 40 staged files, `josh retrospective`
 // and a fresh lane's `pnpm install --frozen-lockfile` with `/usr/bin/time -l` on 2026-10-17 under a
 // load average of 16. The gate ledger records each check's CPU beside its duration (`check-cpu.ts`),
@@ -20,7 +20,6 @@ interface Measurement {
 // and a p90 of 1.31 — one core rounded up, where the single 2026-10-21 run of 6.0s over 5.6s had
 // rounded up to two.
 const MEASURED = {
-	lint: { cpu_s: 16.9, wall_s: 14 },
 	type_check: { cpu_s: 31.2, wall_s: 27.3 },
 	spell_check: { cpu_s: 5.7, wall_s: 6.2 },
 	eslint_scan: { cpu_s: 113, wall_s: 98 },
@@ -29,11 +28,39 @@ const MEASURED = {
 	install: { cpu_s: 1.9, wall_s: 6.1 },
 } as const satisfies Readonly<Record<string, Measurement>>
 
-// **Rounded up, never down** (joshuafolkken/kit#4362): a weight is a whole number of cores, and the
-// floored table of joshuafolkken/kit#3354 let a 1.15-core eslint scan claim one, so the budget admitted
-// more than the machine had.
+// **What the gate's lint and metrics kept busy, read off the lane ledger** (joshuafolkken/kit#7776):
+// the 90th percentile of each measured run's cores (`cpu_ms ÷ elapsed_ms`, the `cores p90` column of
+// `josh lane:stats`' `check / claim` table) from 2026-11-10 to 2026-11-17: lint 1.675 over 667 runs
+// (maximum 1.889), metrics 1.706 over 337 runs (maximum 1.895). A sample this size bounds what one run
+// holds, so these round up to a tenth of a core rather than a whole one: the whole-core round left lint
+// at 2 against a median of 1.5, and lint claims queued for 13365 s that week. Metrics had borrowed the
+// eslint scan's two cores. The `check` row (the type check) stays a hand measurement rounded to a
+// whole core: its p90 was 1.734 but its maximum 4.621, past even the two it claims.
+const LEDGER_P90 = {
+	lint: 1.675,
+	metrics: 1.706,
+} as const satisfies Readonly<Record<string, number>>
+
+// A ledger weight's step: a tenth of a core, the precision `josh lane:stats` prints.
+const TENTHS = 10
+// Digits a sum of tenths keeps before rounding, so `0.1 + 0.2` reads as three tenths and not as four.
+const SUM_DIGITS = 6
+
+// **Rounded up, never down** (joshuafolkken/kit#4362): the floored table of joshuafolkken/kit#3354 let
+// a 1.15-core eslint scan claim one, so the budget admitted more than the machine had. A single hand
+// measurement rounds to a whole core; a ledger p90 rounds to a tenth (`tenth_rounded_up`).
 function rounded_up(measurement: Measurement): number {
 	return Math.ceil(measurement.cpu_s / measurement.wall_s)
+}
+
+// `cores` rounded up to a tenth of a core, past the float noise a sum of tenths carries.
+function tenth_rounded_up(cores: number): number {
+	return Math.ceil(Number((cores * TENTHS).toFixed(SUM_DIGITS))) / TENTHS
+}
+
+// The whole cores a sum of reservations covers, rounded up past the same float noise.
+function whole_cores(cores: number): number {
+	return Math.ceil(tenth_rounded_up(cores))
 }
 
 // **The cores each heavy tool occupies, declared once for both places that reserve them**
@@ -43,7 +70,8 @@ function rounded_up(measurement: Measurement): number {
 // two-worker run CI already sizes for its four-core runner — since kit has no e2e suite of its own to
 // time.
 const CORE_WEIGHTS = {
-	lint: rounded_up(MEASURED.lint),
+	lint: tenth_rounded_up(LEDGER_P90.lint),
+	metrics: tenth_rounded_up(LEDGER_P90.metrics),
 	type_check: rounded_up(MEASURED.type_check),
 	spell_check: rounded_up(MEASURED.spell_check),
 	eslint_scan: rounded_up(MEASURED.eslint_scan),
@@ -98,6 +126,15 @@ const TOOL_MEMORY: Readonly<Partial<Record<string, keyof typeof MEMORY_MB>>> = {
 	playwright: 'e2e',
 }
 
-const core_weights = { CORE_WEIGHTS, ESLINT_HEAP_MIB, MEASURED, MEMORY_MB, TOOL_MEMORY }
+const core_weights = {
+	CORE_WEIGHTS,
+	ESLINT_HEAP_MIB,
+	LEDGER_P90,
+	MEASURED,
+	MEMORY_MB,
+	TOOL_MEMORY,
+	tenth_rounded_up,
+	whole_cores,
+}
 
 export { core_weights }

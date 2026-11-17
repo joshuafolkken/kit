@@ -88,6 +88,21 @@ function guard_tests(directory: string): Array<PreDetachCheck> {
 	return targets.length === 0 ? [] : [{ list: [...GUARD_TEST_COMMAND, ...targets] }]
 }
 
+// The guard tests' `josh` arguments, for `run:chain`'s stage before the review; empty when none is
+// present (joshuafolkken/kit#7773).
+function guard_test_argv(directory: string): ReadonlyArray<string> {
+	const [check] = guard_tests(directory)
+
+	return check === undefined ? [] : check.list.slice(1)
+}
+
+// `exports:unused`'s `josh` arguments, the static check `check:related` does not run.
+function exports_argv(): ReadonlyArray<string> {
+	const [exports_check] = STATIC_CHECKS
+
+	return exports_check === undefined ? [] : exports_check.list.slice(1)
+}
+
 // The totals' judgment `josh run:review`'s open stops on (`metrics_totals.totals_check`), run again
 // here as the backstop; none outside kit.
 async function metrics_runs(directory: string): Promise<Array<PreDetachRun>> {
@@ -229,7 +244,9 @@ const run_ship_pre_detach = {
 	STATIC_CHECKS,
 	UNPINNED,
 	checks,
+	exports_argv,
 	failure_prefix,
+	guard_test_argv,
 	with_pinned,
 }
 

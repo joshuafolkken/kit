@@ -2,6 +2,7 @@ import { derive_check } from '#scripts/document/derive-check'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
+import { run_ship_pre_detach } from '#scripts/run/ship/run-ship-pre-detach'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_chain_cli } from './run-chain-cli'
 
@@ -19,6 +20,13 @@ const RUN_REVIEW = 'run:review'
 const RUN_CUT = 'run:cut'
 const ISSUE = '5630'
 const FROM = '--from'
+// The ship's refusals asked after the acceptance map (joshuafolkken/kit#7773).
+const BEFORE_REVIEW = [
+	['preflight:check'],
+	['exports:unused'],
+	run_ship_pre_detach.guard_test_argv(process.cwd()),
+]
+const BEFORE_REVIEW_NAMES = 'acceptance:check → preflight:check → exports:unused → guard-tests'
 // The test runs in kit, so the chain carries the generated-page check (joshuafolkken/kit#7728).
 const MAIN_LINE = [
 	[MAIN_MERGE],
@@ -26,6 +34,7 @@ const MAIN_LINE = [
 	[CHECK_RELATED],
 	derive_check.DERIVE_CHECK_ARGV,
 	[ACCEPTANCE_CHECK],
+	...BEFORE_REVIEW,
 	[RUN_REVIEW],
 ]
 const STOP_EXIT = 2
@@ -72,7 +81,7 @@ describe('run_chain_cli.run — the chain', () => {
 
 		expect(ran()).toStrictEqual(MAIN_LINE)
 		expect(info_lines).toContain(
-			'run:chain 5630 — ran main:merge → review:selfcheck → check:related → command:derive → acceptance:check → run:review',
+			`run:chain 5630 — ran main:merge → review:selfcheck → check:related → command:derive → ${BEFORE_REVIEW_NAMES} → run:review`,
 		)
 	})
 
@@ -83,7 +92,7 @@ describe('run_chain_cli.run — the chain', () => {
 
 		expect(ran()).toStrictEqual(MAIN_LINE.slice(1))
 		expect(info_lines).toContain(
-			'run:chain 5630 — ran review:selfcheck → check:related → command:derive → acceptance:check → run:review',
+			`run:chain 5630 — ran review:selfcheck → check:related → command:derive → ${BEFORE_REVIEW_NAMES} → run:review`,
 		)
 	})
 
@@ -155,10 +164,10 @@ describe('run_chain_cli.run — resume and forwarding', () => {
 		expect(ran()).toStrictEqual([[RUN_REVIEW]])
 	})
 
-	it('resumes at acceptance:check, then runs run:review', async () => {
+	it('resumes at acceptance:check, then runs the ship refusals and run:review', async () => {
 		await expect(run_chain_cli.run([ISSUE, FROM, ACCEPTANCE_CHECK])).resolves.toBe(0)
 
-		expect(ran()).toStrictEqual([[ACCEPTANCE_CHECK], [RUN_REVIEW]])
+		expect(ran()).toStrictEqual([[ACCEPTANCE_CHECK], ...BEFORE_REVIEW, [RUN_REVIEW]])
 	})
 
 	it('forwards --unpinned-ok to run:review alone', async () => {
