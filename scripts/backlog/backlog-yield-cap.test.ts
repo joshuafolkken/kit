@@ -1,4 +1,5 @@
 import { RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
+import { session_language } from '#scripts/josh/session-language'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
@@ -110,11 +111,30 @@ describe('backlog_yield_cap.PORTS', () => {
 })
 
 describe('backlog_yield_cap.body_of', () => {
-	it('names the label, the trip and the automatic re-offer, asking no person', () => {
+	const RE_OFFER = 're-offers it itself'
+
+	afterEach(() => {
+		vi.unstubAllEnvs()
+	})
+
+	it('names the label, the trip and the automatic re-offer in English under en, asking no person', () => {
+		vi.stubEnv(session_language.ENV_KEY, 'en')
 		const body = body_of(ISSUE)
 
 		expect(body).toContain(`Parked with \`${RUN_STALLED_LABEL}\``)
-		expect(body).toContain('re-offers it itself')
+		expect(body).toContain(RE_OFFER)
 		expect(body).not.toContain('必要な権限')
 	})
+
+	it.each(['ja', ''])(
+		'writes the prose in Japanese for the session language %j (ac-bc8ebf54)',
+		(lang) => {
+			vi.stubEnv(session_language.ENV_KEY, lang)
+			const body = body_of(ISSUE)
+
+			expect(body).toContain(`\`${RUN_STALLED_LABEL}\` で止めました`)
+			expect(body).toContain('自分で再提示します')
+			expect(body).not.toContain(RE_OFFER)
+		},
+	)
 })

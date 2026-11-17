@@ -2,6 +2,7 @@ import { mkdirSync } from 'node:fs'
 import path from 'node:path'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import type { IssueComment } from '#scripts/issue/issue-read'
+import { session_language } from '#scripts/josh/session-language'
 import { lane_registry } from '#scripts/lane/lane-registry'
 import { atomic_write } from '#scripts/lib/atomic-write'
 import { JOSH_TMP_DIRECTORY } from '#scripts/lib/josh-temporary-directory'
@@ -17,6 +18,9 @@ import type { ApprovalRange } from '#scripts/run/park/run-park-body'
 
 const HEADING = '## 規模承認（backlog:triage --adopt）'
 const JSON_INDENT = '\t'
+// Only the reason line follows the session language; `range_text` is what a re-run matches on.
+const JAPANESE_REASON_LABEL = '- 理由:'
+const ENGLISH_REASON_LABEL = '- Reason:'
 
 interface ApprovalGrant {
 	issue: string
@@ -48,17 +52,21 @@ function range_text({ range }: ApprovalGrant): string {
 	].join('\n')
 }
 
+function reason_label(): string {
+	return session_language.is_japanese(session_language.resolve_session_lang().lang)
+		? JAPANESE_REASON_LABEL
+		: ENGLISH_REASON_LABEL
+}
+
 async function source_of(grant: ApprovalGrant): Promise<string> {
 	const range = range_text(grant)
 	// The newline ends the last bound, so `max_files: 60` never stands in for `max_files: 6`.
 	const written = grant.comments.find(
 		(comment) => comment.is_trusted === true && comment.body.startsWith(`${range}\n`),
 	)?.html_url
+	const body = `${range}\n${reason_label()} ${grant.reason}`
 
-	return (
-		written ??
-		(await git_gh_issue_write.issue_comment(grant.issue, `${range}\n- 理由: ${grant.reason}`))
-	)
+	return written ?? (await git_gh_issue_write.issue_comment(grant.issue, body))
 }
 
 function json_of(grant: ApprovalGrant, source: string): string {
