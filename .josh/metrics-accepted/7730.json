@@ -1,0 +1,8 @@
+{
+	"reason": "run:chain --join gains the recheck stage that re-asks the metrics and pinned judgments after round-1 fixes (#7730)",
+	"date": "2026-11-17",
+	"growth": {
+		"scripts.code_lines": 80,
+		"ai_cost.on_demand_bytes": 136
+	}
+}

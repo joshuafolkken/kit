@@ -150,13 +150,15 @@ async function held(stage: ChainStage, issue: string): Promise<ChainStop | undef
 	return stop === undefined ? undefined : { stage, code: SUCCESS_EXIT_CODE, ...stop }
 }
 
-// The stage's stdout is printed as it ends; stderr is forwarded as it is written.
+// The stage's stdout is printed as it ends; stderr is forwarded as it is written. A stage with no argv
+// runs no command: its hold is the check.
 async function run_stage(
 	stage: ChainStage,
 	issue: string,
 	print: Print,
 	run: StageRunner,
 ): Promise<ChainStop | undefined> {
+	if (stage.argv.length === 0) return await held(stage, issue)
 	const result = await run(stage.argv)
 
 	if (result.out !== '') print(result.out)

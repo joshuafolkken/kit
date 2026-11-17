@@ -1,8 +1,11 @@
+import { metrics_totals } from '#scripts/gate/metrics-totals'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { review_record_slot } from '#scripts/review/review-record-slot'
+import { run_ship_pre_detach_pinned } from '#scripts/run/ship/run-ship-pre-detach-pinned'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_chain_cli } from './run-chain-cli'
 import { run_chain_review_fix } from './run-chain-review-fix'
+import { run_review_pinned_accepted } from './run-review-pinned-accepted'
 
 const josh_run_mock = vi.hoisted(() =>
 	vi.fn(async (_argv: ReadonlyArray<string>) => ({ code: 0, out: '' })),
@@ -52,6 +55,9 @@ beforeEach(() => {
 	josh_run_mock.mockReset()
 	josh_run_mock.mockResolvedValue({ code: 0, out: '' })
 	slot_holds('')
+	vi.spyOn(metrics_totals, 'totals_refusal').mockResolvedValue(undefined)
+	vi.spyOn(run_review_pinned_accepted, 'recorded_reason').mockResolvedValue(undefined)
+	vi.spyOn(run_ship_pre_detach_pinned, 'pinned_check').mockResolvedValue({ code: 0, out: '' })
 	error_lines.length = 0
 	vi.spyOn(console, 'info').mockReturnValue(undefined)
 	vi.spyOn(console, 'error').mockImplementation((line: string) => {
@@ -143,6 +149,14 @@ describe('run_chain_cli.run --join — findings held for the record', () => {
 
 		expect(errors()).toContain('2 finding(s)')
 		expect(errors()).toContain(SHIP_REVIEW)
+	})
+
+	it('asks for the recheck of the fixed tree before the ship', async () => {
+		slot_holds(LOW_FINDING)
+
+		await run_chain_cli.run(SHIPPING)
+
+		expect(errors()).toContain(`--join --ship '${TITLE}' --from recheck\`, then ship`)
 	})
 
 	it('routes the held round through the review-fix next action (ac-c38296ce)', async () => {
