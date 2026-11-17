@@ -82,10 +82,18 @@ function probed_counts(rows: ReadonlyArray<TestPinnedEntry>): Array<string> {
 	])
 }
 
+function miss_label(reason: string): string {
+	return reason === 'unregistered' ? 'no entry' : reason
+}
+
 // The probed hunks counted by why the cache did not hold their verdict (joshuafolkken/kit#7806), as
-// `miss: 3 change, 1 test_contents`; none where no row carries the counts (an older row's).
+// `miss: 3 change, 1 test_contents`; none where no row carries the counts (an older row's). The
+// `unregistered` reason reads `no entry`, apart from the `unregistered` count of hunks probed with no
+// recheck.
 function miss_counts(rows: ReadonlyArray<TestPinnedEntry>): Array<string> {
-	const pairs = rows.flatMap((row) => Object.entries(row.misses ?? {}))
+	const pairs = rows.flatMap((row) =>
+		Object.entries(row.misses ?? {}).map(([reason, count]) => [miss_label(reason), count] as const),
+	)
 	const reasons = [...new Set(pairs.map(([reason]) => reason))]
 	const named = named_counts(
 		reasons.map((reason) => [

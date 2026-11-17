@@ -206,6 +206,23 @@ function over_cap_of(over_cap: ReadonlyArray<Hunk>): Pick<HunkOutcome, 'over_cap
 	return over_cap.length === 0 ? {} : { over_cap }
 }
 
+// Why the cache did not hold each key, read only for the keys it did not hold: a held key's miss is
+// `undefined` without reading its basis again (joshuafolkken/kit#7806).
+async function open_misses(
+	cache: LoadedCache,
+	read: { keys: ReadonlyArray<string>; files: ReadonlyArray<string>; known: ReadonlyArray<Known> },
+): Promise<Array<MissReason | undefined>> {
+	const { keys, files, known } = read
+	const open = keys.flatMap((_key, index) => (held_of(known[index]) === undefined ? [index] : []))
+	const reasons = await test_pinned_cache.misses(
+		cache,
+		open.map((index) => keys[index] ?? ''),
+		open.map((index) => files[index] ?? ''),
+	)
+
+	return keys.map((_key, index) => reasons[open.indexOf(index)])
+}
+
 // A fresh cached verdict is reused without a run (`test-pinned-cache.ts`); every hunk's verdict is
 // stored again, so a rerun on the same tree starts no vitest. `is_cached_only` runs no probe: only the
 // verdicts the cache holds are read, and nothing is written.
@@ -226,7 +243,7 @@ async function checked_outcome(
 		)
 	}
 
-	const misses = await test_pinned_cache.misses(cache, keys, files)
+	const misses = await open_misses(cache, { keys, files, known })
 	const { verdicts, staged } = await verdicts_on(paths, { ...read, known, misses, keys, options })
 
 	return { ...outcome_of(hunks, verdicts), ...cut_of(hunks, verdicts), staged }

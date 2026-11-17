@@ -128,12 +128,16 @@ describe('lane_breakdown_pinned.detail_text on rows that split the probed hunks'
 
 // joshuafolkken/kit#7806: an older row, with no miss counts, names none (the cases above).
 describe('lane_breakdown_pinned.detail_text on rows that counted the cache misses', () => {
-	it('names the probed hunks by why the cache missed them, summed over the rows', () => {
+	it('names the probed hunks by why the cache missed them, summed over the rows, a missing entry as `no entry`', () => {
 		const counted: TestPinnedEntry = { ...row(INSIDE), misses: { change: 1, test_contents: 1 } }
-		const more: TestPinnedEntry = { ...counted, probes: [], misses: { change: 2 } }
+		const more: TestPinnedEntry = {
+			...counted,
+			probes: [],
+			misses: { change: 2, unregistered: 1 },
+		}
 
 		expect(lane_breakdown_pinned.detail_text([counted, more, row(INSIDE)])).toContain(
-			'6 cached, miss: 3 change, 1 test_contents, 4 probed,',
+			'6 cached, miss: 3 change, 1 test_contents, 1 no entry, 4 probed,',
 		)
 	})
 })
