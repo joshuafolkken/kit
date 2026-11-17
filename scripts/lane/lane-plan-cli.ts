@@ -9,27 +9,46 @@ import { lane_plan_imports } from './lane-plan-imports'
 // `josh lane:plan <issue> <path>... [--probe] [--imports <path>...]` — the command line over
 // `lane-plan-check.ts`, which holds the check and the yield so `run:entry` can import them without this
 // entry's main guard; `--imports` probes the modules the new code imports (`lane-plan-imports.ts`);
-// `--single` declares the plan one deliverable, past the files axis (`lane-plan-size.ts`).
+// `--single "<reason>"` declares the plan one deliverable, past the files axis (`lane-plan-size.ts`), and
+// says why it cannot be merged in parts — a bare `--single` is refused (joshuafolkken/kit#7729).
 
 const ARGV_OFFSET = 2
 const FAILURE_EXIT_CODE = 1
 const PROBE_FLAG = '--probe'
 const SINGLE_FLAG = '--single'
-const FLAGS = new Set([PROBE_FLAG, SINGLE_FLAG])
+const FLAG_PREFIX = '--'
+const FLAG_WIDTH = 1
+const FLAG_WITH_VALUE_WIDTH = 2
 const USAGE =
-	'Usage: josh lane:plan <issue-number> <path> [<path> ...] [--probe] [--single] [--estimate <json-file>] [--size-approval <json-file>] [--imports <path> ...]'
+	'Usage: josh lane:plan <issue-number> <path> [<path> ...] [--probe] [--single "<reason>"] [--estimate <json-file>] [--size-approval <json-file>] [--imports <path> ...]'
 const { YIELD_EXIT_CODE } = lane_plan_check
+
+interface Single {
+	tokens: ReadonlyArray<string>
+	// `undefined` with no `--single`; empty when `--single` names no reason.
+	reason: string | undefined
+}
+
+function single_of(argv: ReadonlyArray<string>): Single {
+	const at = argv.indexOf(SINGLE_FLAG)
+	if (at === -1) return { tokens: argv, reason: undefined }
+	const next = argv[at + 1] ?? ''
+	const reason = next.startsWith(FLAG_PREFIX) ? '' : next.trim()
+	const width = reason === '' ? FLAG_WIDTH : FLAG_WITH_VALUE_WIDTH
+
+	return { tokens: argv.toSpliced(at, width), reason }
+}
 
 async function planned(
 	tokens: ReadonlyArray<string>,
 	directory: string,
-	is_single: boolean,
+	reason: string | undefined,
 ): Promise<LanePlan | undefined> {
 	const estimate = lane_plan_estimate.split(tokens)
 	const input = lane_plan_approval.split(estimate.tokens)
 	const plan = lane_plan_check.plan_of(input.tokens, new Date())
 	if (plan === undefined) return undefined
-	const declared = is_single ? { ...plan, single: true } : plan
+	const declared = reason === undefined ? plan : { ...plan, single: true, single_reason: reason }
 
 	const scoped = await lane_plan_estimate.attach(declared, estimate.file)
 
@@ -40,10 +59,9 @@ async function run(
 	argv: ReadonlyArray<string>,
 	directory: string = process.cwd(),
 ): Promise<number> {
-	const { plan: tokens, imports } = lane_plan_imports.split(
-		argv.filter((token) => !FLAGS.has(token)),
-	)
-	const plan = await planned(tokens, directory, argv.includes(SINGLE_FLAG))
+	const single = single_of(argv.filter((token) => token !== PROBE_FLAG))
+	const { plan: tokens, imports } = lane_plan_imports.split(single.tokens)
+	const plan = single.reason === '' ? undefined : await planned(tokens, directory, single.reason)
 
 	if (plan === undefined) {
 		console.error(USAGE)

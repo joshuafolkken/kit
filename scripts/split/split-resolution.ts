@@ -9,12 +9,15 @@ import {
 	type SplitNoticeEntry,
 } from '#scripts/lane/lane-ledger'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
+import { lane_tree_edit } from '#scripts/lane/lane-tree-edit'
 import { error_text } from '#scripts/lib/error-message'
 import { split_assess } from './split-assess'
 
 // A split child answers a notice; the child is recorded as the filing lands (joshuafolkken/kit#6212).
-// A started lane is never split (joshuafolkken/kit#7183): its own `--route split --found-during` is
-// refused, and an overrun is recorded at its merge as a pre-split miss (`lane-size-record.ts`).
+// A started lane is never split (joshuafolkken/kit#7183): after its first edit its own `--route split
+// --found-during` is refused, and an overrun is recorded at its merge as a pre-split miss
+// (`lane-size-record.ts`). Before its first edit the split `lane:plan` answered passes
+// (joshuafolkken/kit#7729).
 
 const NOTICE_SECTION = `split-assessment.md → "${split_assess.NOTICE_SECTION}"`
 
@@ -23,16 +26,26 @@ interface SplitArguments {
 	found_during: string | undefined
 }
 
-// Whether the filing is not a split of the dispatched lane it is filed from; a refusal is printed. An
-// independent new requirement found in the lane is filed as an observation instead. An omitted
-// `--found-during` is the lane's own, as `issue_file_fold.finder` reads it.
-function is_split_clear({ route, found_during }: SplitArguments): boolean {
+// The dispatched lane a `--route split` filing splits from itself, else `undefined`.
+function own_split_finder(
+	route: string | undefined,
+	found_during: string | undefined,
+): string | undefined {
 	const marked = lane_child_marker.marked_issue()
 	const finder = found_during ?? marked
 
-	if (route !== SPLIT_ROUTE_LABEL || finder === undefined || finder !== marked) return true
+	return route === SPLIT_ROUTE_LABEL && finder === marked ? finder : undefined
+}
+
+// Whether the filing is not a split of the dispatched lane it is filed from after its first edit; a
+// refusal is printed. An independent new requirement found in the lane is filed as an observation
+// instead. An omitted `--found-during` is the lane's own, as `issue_file_fold.finder` reads it.
+async function is_split_clear({ route, found_during }: SplitArguments): Promise<boolean> {
+	const finder = own_split_finder(route, found_during)
+
+	if (finder === undefined || !(await lane_tree_edit.is_edited())) return true
 	console.error(
-		`refused: ${session_cite.issue(finder)} is a dispatched lane, which is never split — finish it; file an independent new requirement without \`--route split\` (${NOTICE_SECTION}).`,
+		`refused: ${session_cite.issue(finder)} is a dispatched lane past its first edit, which is never split — finish it; file an independent new requirement without \`--route split\` (${NOTICE_SECTION}).`,
 	)
 
 	return false

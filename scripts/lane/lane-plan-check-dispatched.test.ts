@@ -12,13 +12,15 @@ import { lane_plan } from './lane-plan'
 import { lane_plan_check } from './lane-plan-check'
 import { lane_plan_cli } from './lane-plan-cli'
 import { lane_plan_signals } from './lane-plan-signals'
+import { lane_tree_edit } from './lane-tree-edit'
 
 const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#7183: a dispatched lane is never split by its size — the overrun is warned once,
 // on its first plan, and the lane goes on to the end. No split notice is noted, since no split child
 // can answer it; the merge's size entry records an overrun past the cap as a pre-split miss
-// (joshuafolkken/kit#7579).
+// (joshuafolkken/kit#7579). These lanes are past their first edit (joshuafolkken/kit#7729); before it,
+// `lane-plan-check-entry.test.ts`.
 
 const ROOT = make_directory('lane-plan-check-dispatched-')
 const LANE = 5171
@@ -63,6 +65,7 @@ beforeEach(() => {
 		make_directory(path.join(ROOT, 'repository-')),
 	)
 	vi.stubEnv(lane_child_marker.KEY, String(LANE))
+	vi.spyOn(lane_tree_edit, 'is_edited').mockResolvedValue(true)
 })
 
 describe('lane:plan in a dispatched lane over its size bar', () => {

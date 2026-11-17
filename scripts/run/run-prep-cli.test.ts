@@ -45,9 +45,11 @@ vi.mock('#scripts/run/ship/run-ship-preflight', () => ({
 
 const load_mock = vi.hoisted(() => vi.fn())
 
-vi.mock('./run-investigation-record', () => ({
-	run_investigation_record: { load: load_mock },
-}))
+vi.mock(import('./run-investigation-record'), async (importOriginal) => {
+	const { run_investigation_record } = await importOriginal()
+
+	return { run_investigation_record: { ...run_investigation_record, load: load_mock } }
+})
 
 const { run_prep_cli } = await import('./run-prep-cli')
 
@@ -301,7 +303,24 @@ describe('run_prep.format_report', () => {
 		const report = run_prep.format_report({ ...PARTS, investigation })
 
 		expect(report).toContain(DELEGATE_STEP)
-		expect(report).toContain(`${run_prep.INVESTIGATION_SAVE_STEP} \`${RECORD_PATH}\`.`)
+		expect(report).toContain(`${run_prep.INVESTIGATION_SAVE_STEP} \`${RECORD_PATH}\`, then run`)
+	})
+})
+
+// joshuafolkken/kit#7729: the saved edit list is judged on before the first edit.
+describe('run_prep.format_report edit list', () => {
+	it('prints the `lane:plan` of the findings’ edit list', () => {
+		const findings = `${FINDINGS}\n\n### Files to edit\n- \`scripts/a.ts\`\n- \`scripts/b.ts\``
+		const investigation = { path: RECORD_PATH, findings }
+		const report = run_prep.format_report({ ...PARTS, investigation })
+
+		expect(report).toContain(`\`pnpm josh lane:plan ${ISSUE} scripts/a.ts scripts/b.ts\``)
+	})
+
+	it('prints no `lane:plan` for findings without an edit list', () => {
+		const investigation = { path: RECORD_PATH, findings: FINDINGS }
+
+		expect(run_prep.format_report({ ...PARTS, investigation })).not.toContain('lane:plan')
 	})
 })
 

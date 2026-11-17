@@ -2,11 +2,11 @@ import path from 'node:path'
 import { auto_ok_cli } from '#scripts/auto-ok/auto-ok-cli'
 import { backlog_overlap, type Clash } from '#scripts/backlog/backlog-overlap'
 import { backlog_plan_comment } from '#scripts/backlog/backlog-plan-comment'
+import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { line_budget } from '#scripts/lines/line-budget'
 import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
-import { test_declared_logic } from '#scripts/test/test-declared-logic'
 import { lane_child_marker } from './lane-child-marker'
 import { lane_ledger_write } from './lane-ledger-write'
 import { lane_plan, type LanePlan } from './lane-plan'
@@ -16,6 +16,7 @@ import { lane_plan_size, type Oversize } from './lane-plan-size'
 import { lane_plan_wait } from './lane-plan-wait'
 import { lane_plan_wait_event } from './lane-plan-wait-event'
 import { lane_plan_wait_until } from './lane-plan-wait-until'
+import { lane_tree_edit } from './lane-tree-edit'
 import { lane_yield, type YieldAt } from './lane-yield'
 
 // The check `josh lane:plan <issue> <path>...` runs (`lane-plan-cli.ts`) — record the files a lane child
@@ -44,9 +45,10 @@ import { lane_yield, type YieldAt } from './lane-yield'
 // (joshuafolkken/kit#5533, `lane-plan-size.ts`), ahead of the overlap check; so does one whose probed
 // hunks or projected lines outgrow it, the axis named in the refusal and noted on the ledger
 // (joshuafolkken/kit#5568). A plan declared one deliverable (`--single`) is recorded past the files axis,
-// its overrun noted on the ledger (joshuafolkken/kit#6647). **A dispatched lane never answers `split`**
-// (joshuafolkken/kit#7183): the size is judged before dispatch, so its overrun is warned once, on its
-// first plan, and the lane goes on to the end.
+// its overrun noted on the ledger (joshuafolkken/kit#6647). **A dispatched lane answers `split` only
+// before its first edit, and only past the cap** (joshuafolkken/kit#7729, `lane-tree-edit.ts`): the
+// investigation's edit list can still be split with nothing to throw away. After the first edit it never
+// does (joshuafolkken/kit#7183): its overrun is warned once and the lane goes on to the end.
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
@@ -115,18 +117,23 @@ function split(plan: LanePlan, over: Oversize): number {
 	return SPLIT_EXIT_CODE
 }
 
-// The refusal goes on the ledger with its axis, so `lane:stats` counts the notices by reason; the
-// lines are the projection the lines axis measured, else none.
+// The refusal goes on the ledger with its axis and measure, so `lane:stats` counts the notices by reason;
+// a `--single` plan's reason goes with it and on the Issue (joshuafolkken/kit#7729).
 async function note(plan: LanePlan, over: Oversize): Promise<void> {
-	const files = plan.paths.filter((file) => !test_declared_logic.is_test_file(file)).length
-	const lines = over.reason === 'lines' ? over.measured : 0
+	const { single_reason } = plan
+	const why = single_reason === undefined ? {} : { single_reason }
 
 	await lane_ledger_write.record_split_notice({
 		issue: plan.issue,
-		files,
-		lines,
+		...lane_plan_size.measured_of(plan, over),
 		reason: over.reason,
+		...why,
 	})
+	if (single_reason === undefined) return
+	await git_gh_issue_write.issue_try_comment(
+		String(plan.issue),
+		`Kept as one Issue past its declared size (\`lane:plan --single\`): ${single_reason}`,
+	)
 }
 
 // Whether `plan` is the dispatched lane's own: its child mark names the plan's issue (joshuafolkken/kit#7183).
@@ -134,31 +141,53 @@ function is_dispatched(plan: LanePlan): boolean {
 	return lane_child_marker.marked_issue() === String(plan.issue)
 }
 
-function is_split(plan: LanePlan, over: Oversize | undefined): over is Oversize {
-	return over !== undefined && !is_dispatched(plan) && !lane_plan_size.is_waived(plan, over)
+// Whether `plan` is a dispatched lane's after its first edit, which is never split (joshuafolkken/kit#7729).
+async function is_started(plan: LanePlan): Promise<boolean> {
+	return is_dispatched(plan) && (await lane_tree_edit.is_edited())
 }
 
-// A dispatched lane's re-plan is neither noted nor warned again: its first plan already was.
-function is_repeat(plan: LanePlan, directory: string): boolean {
-	return is_dispatched(plan) && lane_plan.read(plan.issue, directory) !== undefined
+// Before its first edit a dispatched lane splits past the cap alone, unless `--single` gives a reason;
+// any other plan splits past its declaration unless waived.
+function is_split(
+	plan: LanePlan,
+	over: Oversize | undefined,
+	is_lane_started: boolean,
+): over is Oversize {
+	if (over === undefined || is_lane_started) return false
+	if (!is_dispatched(plan)) return !lane_plan_size.is_waived(plan, over)
+
+	return plan.single !== true && lane_plan_size.is_past_cap(plan, over)
+}
+
+async function judged(
+	plan: LanePlan,
+	over: Oversize,
+	is_lane_started: boolean,
+): Promise<number | undefined> {
+	if (!is_lane_started) await note(plan, over)
+
+	if (is_split(plan, over, is_lane_started)) return split(plan, over)
+	console.error(lane_plan_size.waiver_text(plan.issue, over))
+
+	return undefined
 }
 
 // The split answer for `over`, else `undefined`. An overrun of a plan declared one deliverable or of a
-// re-plan after the lane started is noted and passes as a warning (joshuafolkken/kit#6602); a
-// dispatched lane's passes as a warning unnoted, since no split child can answer that notice and its
-// merge's size entry records the overrun (`lane-size-record.ts`).
+// re-plan after the lane started is noted and passes as a warning (joshuafolkken/kit#6602); a started
+// lane's passes as a warning unnoted, warned on its first plan only, since its merge's size entry records
+// the overrun (`lane-size-record.ts`). A dispatched lane before its first edit — `run:entry`'s plan or
+// the investigation's re-plan — is judged again each time (joshuafolkken/kit#7729).
 async function refusal(
 	plan: LanePlan,
 	over: Oversize | undefined,
 	directory: string,
 ): Promise<number | undefined> {
-	if (over === undefined || is_repeat(plan, directory)) return undefined
-	if (!is_dispatched(plan)) await note(plan, over)
+	if (over === undefined) return undefined
+	const is_lane_started = await is_started(plan)
 
-	if (is_split(plan, over)) return split(plan, over)
-	console.error(lane_plan_size.waiver_text(plan.issue, over))
+	if (is_lane_started && lane_plan.read(plan.issue, directory) !== undefined) return undefined
 
-	return undefined
+	return await judged(plan, over, is_lane_started)
 }
 
 async function warn_near_cap(plan: LanePlan, directory: string): Promise<void> {
@@ -262,7 +291,7 @@ async function check_plan(plan: LanePlan, directory: string): Promise<number> {
 async function probe_answer(plan: LanePlan, directory: string): Promise<number> {
 	const { issues, over } = await lane_plan_probe.sized_listing(plan, directory)
 
-	if (is_split(plan, over)) return split(plan, over)
+	if (is_split(plan, over, await is_started(plan))) return split(plan, over)
 	const found = lane_plan_probe.probe(plan, issues, directory)
 
 	if (lane_plan_probe.is_unread(found)) return unread()
@@ -286,6 +315,7 @@ function placed(plan: LanePlan, directory: string): LanePlan {
 		...plan,
 		size_approval: recorded.size_approval,
 		single: plan.single ?? recorded.single,
+		single_reason: plan.single_reason ?? recorded.single_reason,
 		planned_at: recorded.planned_at,
 		yielded: recorded.yielded,
 		waits_until: recorded.waits_until,
