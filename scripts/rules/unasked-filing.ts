@@ -1,6 +1,7 @@
 import { agent_headless } from '#scripts/agent/agent-headless'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import type { HookContext } from '#scripts/hooks/hook-context'
+import type { GuardRun } from '#scripts/josh/hook-decision'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { json_value } from '#scripts/lib/json-value'
 import { run_carry } from '#scripts/run/carry/run-carry'
@@ -132,11 +133,13 @@ function is_confirmed(prompt: string, tail: string): boolean {
 }
 
 // The person's last prompt asks for filing, or says yes to a proposed Issue — the stand-down that lets
-// an instructed filing through.
-function is_asked(tail: string): boolean {
-	const prompt = last_prompt.person_prompt(tail) ?? ''
+// an instructed filing through. A prompt a large read pushed off the tail is read further back
+// (`last_prompt.prompt_reach`).
+function is_asked(tail: string, _call: GuardedCall, run: GuardRun): boolean {
+	const text = last_prompt.prompt_reach(tail, run.transcript)
+	const prompt = last_prompt.person_prompt(text) ?? ''
 
-	return is_instructed(prompt) || is_confirmed(prompt, tail)
+	return is_instructed(prompt) || is_confirmed(prompt, text)
 }
 
 function is_run_parent(context: HookContext): boolean {

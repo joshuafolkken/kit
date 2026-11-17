@@ -6,12 +6,14 @@ import { since_green } from '#scripts/gate/since-green'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
 import type { FileMapStamp } from '#scripts/josh/file-map-stamp'
+import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_no_base } from './test-no-base'
 import { test_read_map } from './test-read-map'
 import { test_related } from './test-related'
 import { test_related_reuse } from './test-related-reuse'
+import { related_scope } from './test-related-scope'
 import { test_unit_guard } from './test-unit-guard'
 
 // joshuafolkken/kit#5386: the bare run after a red one re-ran the whole reach of the last green record,
@@ -56,11 +58,15 @@ const mocked_run = vi.mocked(test_unit_guard.run_guarded_vitest)
 
 const REPOSITORY_ROOT = process.cwd()
 const BASE = 'base-sha'
+// A base a main merge moved the branch onto since the red record.
+const MERGED_BASE = 'merged-main'
 const FIXED_SOURCE = path.join('scripts', 'test', 'test-related.ts')
 const UNTOUCHED_SOURCE = path.join('scripts', 'test', 'test-related-scope.ts')
 const FAILED_TEST = path.join('scripts', 'test', 'test-related-scope-triggers.test.ts')
 // A file the red run's no-base pass never reached, carried by its record.
 const OWED_SOURCE = path.join('scripts', 'test', 'test-related-moved.ts')
+// A non-code file no test reads.
+const NO_READER_FILE = path.join('notes', 'scratch.txt')
 const BEFORE: GateTree = { files: { [FIXED_SOURCE]: 'blob' }, base: BASE }
 const NOTHING_MOVED = { changed: [], synced: [] }
 const RED_MOVED = { changed: [FIXED_SOURCE], synced: [] }
@@ -157,12 +163,61 @@ describe('test_related.run_related_tests — after a red run', () => {
 	})
 
 	it('ignores a red record written on another base and narrows by the green one', async () => {
-		vi.mocked(review_stamps.test_related_red_stamp.read).mockReturnValue(red_record('merged-main'))
+		vi.mocked(review_stamps.test_related_red_stamp.read).mockReturnValue(red_record(MERGED_BASE))
 
 		await test_related.run_related_tests([])
 
 		expect(vitest_arguments()).toContain(absolute(UNTOUCHED_SOURCE))
 		expect(vitest_arguments()).not.toContain(absolute(FAILED_TEST))
+	})
+})
+
+// joshuafolkken/kit#7786: the re-run after a red check:related reads the failed files and the reach of
+// what moved, says how many, and its ledger row tells that continuation from a run of the whole reach.
+describe('test_related.run_related_tests — the continuation of a red run', () => {
+	it('names the failed and moved file counts it reads', async () => {
+		await test_related.run_related_tests([])
+
+		expect(vi.mocked(process.stdout.write)).toHaveBeenCalledWith(
+			`${related_scope.COMMAND_LABEL}: reading only the 1 test file(s) that failed in its last run ` +
+				'and the 1 file(s) changed since.\n',
+		)
+	})
+
+	it('still runs the failed files when what moved reaches no test', async () => {
+		mocked_red_moved.mockResolvedValue({ changed: [NO_READER_FILE], synced: [] })
+
+		await test_related.run_related_tests([])
+
+		expect(vitest_arguments()).toContain(absolute(FAILED_TEST))
+	})
+
+	it('records no green for a run named away from the failed files', async () => {
+		await test_related.run_related_tests([FIXED_SOURCE])
+
+		expect(vitest_arguments()).not.toContain(absolute(FAILED_TEST))
+		expect(scoped_green.record_if_green).toHaveBeenCalledWith(review_stamps.test_related_stamp, {
+			before: undefined,
+			exit_code: 0,
+		})
+		expect(review_stamps.test_related_red_stamp.remove).not.toHaveBeenCalled()
+	})
+
+	it('marks the ledger row of a red continuation', async () => {
+		const record = vi.spyOn(lane_ledger_write, 'record_test_related').mockResolvedValue()
+
+		await test_related.run_related_tests([])
+
+		expect(record.mock.calls[0]?.[0]).toMatchObject({ red_rerun: true })
+	})
+
+	it('marks the ledger row of a run the red record did not narrow', async () => {
+		const record = vi.spyOn(lane_ledger_write, 'record_test_related').mockResolvedValue()
+
+		vi.mocked(review_stamps.test_related_red_stamp.read).mockReturnValue(red_record(MERGED_BASE))
+		await test_related.run_related_tests([])
+
+		expect(record.mock.calls[0]?.[0]).toMatchObject({ red_rerun: false })
 	})
 })
 

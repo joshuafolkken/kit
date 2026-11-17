@@ -9,6 +9,7 @@ import { run_board_fresh } from './run-board-fresh'
 import { run_board_header_names, type RunMark } from './run-board-header-names'
 import { run_board_issue_count, type IssueCount } from './run-board-issue-count'
 import { run_board_labels } from './run-board-labels'
+import type { LaneTotals } from './run-board-lane-totals'
 import { run_board_layout, type BoardLayout, type BoardRow } from './run-board-layout'
 import type { BoardLinks } from './run-board-link'
 import { run_board_machine, type MachineGauges } from './run-board-machine'
@@ -106,6 +107,8 @@ interface BoardHeader
 	quota_hold?: QuotaHold | undefined
 	// How long each phase usually takes; a running row's phase time is colored against it.
 	usual?: UsualTimes | undefined
+	// How long lanes took from dispatch to merge, which the estimated finish is drawn from.
+	lane_totals?: LaneTotals | undefined
 	// How many lanes the run may hold at once, which the estimated finish stacks the waiting children on.
 	lane_limit?: number | undefined
 	// The slots occupied according to the same capacity read that supplies the limit.

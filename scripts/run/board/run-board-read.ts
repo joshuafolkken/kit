@@ -16,6 +16,7 @@ import { run_wake } from '#scripts/run/wake/run-wake'
 import { run_board_found, type FoundOf } from './run-board-found'
 import { run_board_lane_result } from './run-board-lane-result'
 import { run_board_lane_state, type BoardLanes } from './run-board-lane-state'
+import { run_board_lane_totals, type LaneTotals } from './run-board-lane-totals'
 import {
 	run_board_operation_read,
 	type OperationSources,
@@ -85,6 +86,8 @@ interface LocalRead {
 	occupied_lanes?: ReadonlyArray<string> | undefined
 	// How long each phase usually takes, from the repository's lane ledger.
 	usual?: UsualTimes | undefined
+	// How long lanes took from dispatch to merge, from the same ledger.
+	lane_totals?: LaneTotals | undefined
 	// The reset a Claude usage limit holds the running run's launches until (`run-merge-usage-limit.ts`);
 	// `undefined` once it has passed, where none was recorded, or where no run is carried.
 	usage_reset_ms?: number | undefined
@@ -221,16 +224,17 @@ async function lane_room_of(
 	}
 }
 
-// The repository's lane ledger, read once for the usual times and the driver's open hold.
+// The repository's lane ledger, read once for the usual times, the lane totals and the driver's open hold.
 function ledger_here(
 	repository: string,
-): Pick<LocalRead, 'usual' | 'is_memory_held' | 'launch_hold'> {
+): Pick<LocalRead, 'usual' | 'lane_totals' | 'is_memory_held' | 'launch_hold'> {
 	const entries = lane_ledger.read_entries(lane_ledger.target_of(repository))
 	const now_ms = Date.now()
 	const launch_hold = lane_held_stats.open_reason(entries, now_ms)
 
 	return {
 		usual: run_board_usual.usual_of(entries, now_ms),
+		lane_totals: run_board_lane_totals.totals_of(entries, now_ms),
 		is_memory_held: launch_hold === backlog_drive_memory.HOLD_REASON,
 		launch_hold,
 	}

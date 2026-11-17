@@ -12,9 +12,11 @@ import { whole_suite_files } from './whole-suite-files'
 // reading's positive fact that nothing moved since this command was last green on this checkout.
 // `synced` is the part of the change a main sync brought in, kept for the run's ledger record, and
 // `since_map` the part the change since the map's tree joined to what this change moved. `branch` is
-// this branch's own change from its merge base, where it was read.
+// this branch's own change from its merge base, where it was read. `is_red_rerun` marks a reading
+// narrowed by the last red run's failed files (`test-related-red.ts`).
 type ChangeReading = Pick<ScopeRequest, 'changed' | 'map' | 'since_map'> & {
 	is_unmoved?: true
+	is_red_rerun?: true
 	synced?: ReadonlyArray<string>
 	branch?: ReadonlyArray<string> | undefined
 }
