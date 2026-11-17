@@ -96,7 +96,7 @@ describe('run_board_lane_stop.label_stop', () => {
 		expect(run_board_lane_stop.label_stop([IN_PROGRESS_LABEL])).toBeUndefined()
 		expect(run_board_lane_stop.label_stop([])).toStrictEqual({
 			state: STOPPED,
-			reason: run_board_lane_stop.RELEASE_REASON,
+			reason: run_board_lane_stop.UNLABELLED_REASON,
 		})
 		expect(run_board_lane_stop.label_stop([IN_PROGRESS_LABEL, RUN_STALLED_LABEL])).toStrictEqual({
 			state: STOPPED,
@@ -118,14 +118,15 @@ describe('run_board_lane_stop.label_stop', () => {
 })
 
 describe('run_board_lane_stop.label_settled', () => {
-	const release = { state: STOPPED, reason: run_board_lane_stop.RELEASE_REASON } as const
+	const { UNLABELLED_REASON } = run_board_lane_stop
+	const release = { state: STOPPED, reason: UNLABELLED_REASON } as const
 
 	it('keeps a child its transcript reads running at work, its ship stopped', () => {
 		const working: ItemStatus = { ...RUNNING, result: 'running' }
 
 		expect(run_board_lane_stop.label_settled(working, release)).toStrictEqual({
 			...working,
-			stop_reason: run_board_lane_stop.RELEASE_REASON,
+			stop_reason: UNLABELLED_REASON,
 		})
 	})
 
@@ -135,7 +136,7 @@ describe('run_board_lane_stop.label_settled', () => {
 		for (const status of [RUNNING, finished]) {
 			expect(run_board_lane_stop.label_settled(status, release)).toMatchObject({
 				state: STOPPED,
-				stop_reason: run_board_lane_stop.RELEASE_REASON,
+				stop_reason: UNLABELLED_REASON,
 			})
 		}
 	})
@@ -144,5 +145,43 @@ describe('run_board_lane_stop.label_settled', () => {
 		const stopped: ItemStatus = { state: STOPPED, ended_ms: ENDED_MS, stop_reason: CLOSER }
 
 		expect(run_board_lane_stop.label_settled(stopped, release).stop_reason).toBe(CLOSER)
+	})
+})
+
+// joshuafolkken/kit#7750: a lane whose child or detached ship is alive only lost its label.
+describe('run_board_lane_stop — a live lane', () => {
+	const { UNLABELLED_REASON } = run_board_lane_stop
+	const release = { state: STOPPED, reason: UNLABELLED_REASON } as const
+
+	it('marks an open lane of this run read alive, and not one read idle', () => {
+		const own = new Map([[ISSUE, RUNNING]])
+		const lanes = { ...run_board_lane_state.NO_LANES, own }
+		const live = new Map([[ISSUE, RUNNING]])
+		const idle = new Map([[ISSUE, RUNNING]])
+
+		run_board_lane_stop.stop_lanes(live, lanes, new Map())
+		run_board_lane_stop.stop_lanes(idle, lanes, new Map([[String(ISSUE), IDLE_MS]]))
+
+		expect(live.get(ISSUE)).toStrictEqual({ ...RUNNING, is_live: true })
+		expect(idle.get(ISSUE)?.is_live).toBeUndefined()
+	})
+
+	it('keeps a live lane without in-progress running, noting the missing label', () => {
+		const live: ItemStatus = { ...RUNNING, result: 'completed', is_live: true }
+
+		expect(run_board_lane_stop.label_settled(live, release)).toStrictEqual({
+			...live,
+			stop_reason: UNLABELLED_REASON,
+		})
+	})
+
+	it('still stops a live lane a park label names', () => {
+		const live: ItemStatus = { ...RUNNING, is_live: true }
+		const parked = { state: STOPPED, reason: RUN_STALLED_LABEL } as const
+
+		expect(run_board_lane_stop.label_settled(live, parked)).toMatchObject({
+			state: STOPPED,
+			stop_reason: RUN_STALLED_LABEL,
+		})
 	})
 })

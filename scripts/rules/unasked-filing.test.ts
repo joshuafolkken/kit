@@ -1,9 +1,13 @@
+import { randomUUID } from 'node:crypto'
+import { writeFileSync } from 'node:fs'
+import path from 'node:path'
 import { agent_headless } from '#scripts/agent/agent-headless'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { run_board_read_fixture } from '#scripts/run/board/run-board-read-fixture'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_headless } from '#scripts/run/run-headless'
+import { transcript_tail } from '#scripts/time-runtime/transcript-tail'
 import { hook_context_fixture } from '#tools/hooks/hook-context-fixture'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -24,6 +28,8 @@ const WORK_DIRECTORY = make_directory('unasked-filing-')
 const INTERACTIVE = hook_context_fixture.of(WORK_DIRECTORY, {})
 
 const OWNER_PID = 4242
+const { TAIL_BYTES, read_tail } = transcript_tail
+const TIMESTAMP = '2026-11-11T00:00:00.000Z'
 
 const PROPOSAL_REPLY = 'この不具合を Issue として起票しますか？'
 const OTHER_REPLY = 'テストを追加しました。続けますか？'
@@ -43,14 +49,33 @@ function prompt_line(content: string, is_meta = false): string {
 	return JSON.stringify({
 		type: 'user',
 		isMeta: is_meta,
-		timestamp: '2026-11-11T00:00:00.000Z',
+		timestamp: TIMESTAMP,
 		message: { role: 'user', content },
 	})
 }
 
+// A `user` line with the `origin` the harness stamps (`human` for the person's own prompt).
+function origin_line(content: unknown, kind: string | undefined): string {
+	const origin = kind === undefined ? undefined : { kind }
+
+	return JSON.stringify({
+		type: 'user',
+		timestamp: TIMESTAMP,
+		origin,
+		message: { role: 'user', content },
+	})
+}
+
+// A run whose transcript is missing, so only the tail is read.
+const TAIL_ONLY = { transcript: '', now_ms: 0, context: INTERACTIVE }
+
+function is_tail_satisfied(tail: string): boolean {
+	return unasked_filing.ROW.already_satisfied(tail, FILING_CALL, TAIL_ONLY)
+}
+
 // A tail of the model's reply (when given) followed by the person's prompt.
 function is_satisfied(content: string, reply = ''): boolean {
-	return unasked_filing.ROW.already_satisfied([reply_line(reply), prompt_line(content)].join('\n'))
+	return is_tail_satisfied([reply_line(reply), prompt_line(content)].join('\n'))
 }
 
 afterEach(() => {
@@ -118,6 +143,36 @@ describe('unasked_filing.ROW.already_satisfied', () => {
 	)
 })
 
+describe('unasked_filing — a negated filing phrase', () => {
+	it.each([
+		'起票せずにREADMEを直して',
+		'起票しないで直して',
+		'起票なしで直して',
+		'Issue にせず直して',
+		'fix it without filing an issue',
+		'don’t file an issue, just fix it',
+		'do not file it',
+	])('holds when the person asked for no filing: %s', (content) => {
+		expect(is_satisfied(content)).toBe(false)
+		expect(unasked_filing.is_no_filing(content)).toBe(true)
+	})
+
+	it('stands down when a positive instruction remains beside the negated one', () => {
+		expect(is_satisfied('A は起票せず、B は起票して')).toBe(true)
+	})
+
+	it.each(['この不具合を起票して', 'ログの原因を調べて'])(
+		'finds no negated phrase in: %s',
+		(content) => {
+			expect(unasked_filing.is_no_filing(content)).toBe(false)
+		},
+	)
+
+	it('ignores a quoted negated phrase', () => {
+		expect(unasked_filing.is_no_filing('利用者の発言: 「起票せずに直して」')).toBe(false)
+	})
+})
+
 describe('unasked_filing — quoted instructions', () => {
 	it.each([
 		'> 起票してください',
@@ -137,7 +192,7 @@ describe('unasked_filing — quoted instructions', () => {
 	it('does not reuse an earlier authorization after a newer prompt', () => {
 		const tail = [prompt_line('起票してください'), prompt_line('調査だけ続けて')].join('\n')
 
-		expect(unasked_filing.ROW.already_satisfied(tail)).toBe(false)
+		expect(is_tail_satisfied(tail)).toBe(false)
 	})
 })
 
@@ -164,13 +219,61 @@ describe('unasked_filing.ROW.already_satisfied — a yes to a proposal', () => {
 			prompt_line('skill body', true),
 		].join('\n')
 
-		expect(unasked_filing.ROW.already_satisfied(tail)).toBe(true)
+		expect(is_tail_satisfied(tail)).toBe(true)
+	})
+})
+
+// joshuafolkken/kit#7781: a large read after the person's filing prompt pushed it off the hook's tail,
+// and the instructed filing was refused.
+describe('unasked_filing.ROW.already_satisfied — a prompt off the tail', () => {
+	const HUMAN_PROMPT = origin_line([{ type: 'text', text: '起票して' }], 'human')
+	const NOTICE = origin_line('<task-notification>done</task-notification>', 'task-notification')
+	const LARGE_READ = origin_line(
+		[{ type: 'tool_result', tool_use_id: 'toolu_1', content: 'x'.repeat(TAIL_BYTES) }],
+		undefined,
+	)
+
+	// The transcript on disk ends in the large read; the guard is handed its default tail.
+	function is_asked_after_read(lines: ReadonlyArray<string>): boolean {
+		const transcript = path.join(WORK_DIRECTORY, `${randomUUID()}.jsonl`)
+
+		writeFileSync(transcript, [...lines, LARGE_READ, reply_line('Filing it.')].join('\n'))
+		const run = { ...TAIL_ONLY, transcript }
+
+		return unasked_filing.ROW.already_satisfied(read_tail(transcript), FILING_CALL, run)
+	}
+
+	it('stands down on the person’s prompt a large read pushed off the tail', () => {
+		expect(is_asked_after_read([reply_line(OTHER_REPLY), HUMAN_PROMPT])).toBe(true)
+	})
+
+	it('stands down when a task notification sits just before the prompt', () => {
+		expect(is_asked_after_read([NOTICE, HUMAN_PROMPT])).toBe(true)
+	})
+
+	it('stands down on a yes to a proposal a large read pushed off the tail', () => {
+		const yes = origin_line('はい', 'human')
+
+		expect(is_asked_after_read([reply_line(PROPOSAL_REPLY), yes])).toBe(true)
+	})
+
+	it('holds when no prompt of the person’s is in the transcript', () => {
+		expect(is_asked_after_read([NOTICE, reply_line(OTHER_REPLY)])).toBe(false)
 	})
 })
 
 describe('unasked_filing.ROW.decide', () => {
 	it('refuses every occurrence', () => {
 		expect(unasked_filing.ROW.decide()).toBe(true)
+	})
+})
+
+// joshuafolkken/kit#7783: the refusal names the hand-off a confirmed filing takes.
+describe('unasked_filing.ROW.reason', () => {
+	it('names run:handoff kickoff new as the route after the confirmation', () => {
+		expect(unasked_filing.ROW.reason).toContain(
+			'`pnpm josh run:handoff kickoff new --brief-file <brief>`',
+		)
 	})
 })
 

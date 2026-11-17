@@ -14,13 +14,14 @@ Claim this working tree for a run, or say which run already holds it.
 
 ```bash
 pnpm josh run:hold 1091             # claim for issue 1091
-pnpm josh run:hold 1091 --fullrun   # claim as `fullrun #1091` (what `run:entry` runs)
+pnpm josh run:hold 1091 --fullrun   # claim as `fullrun #1091`
 pnpm josh run:hold --adopt 1091     # hand a `new` run's hold to the issue it filed
 ```
 
 **Options:**
 
 - `--fullrun` — marks the record as `fullrun #N`'s.
+- `--prrun` — marks it as `prrun #N`'s, also read as a `fullrun`.
 - `--adopt <issue>` — re-keys the unnumbered `new` run's record to the filed issue and applies `in-progress`; answers `none` (exit 1) when the tree holds no record.
 - `--halfrun-stop` — marks a `halfrun` stop for `run:entry` to adopt, and sends its `confirmation` Telegram; answers `e2e-owed` (exit 1) until `test:e2e` answered green on this tree.
 - `--halfrun-round` — starts a `halfrun` fix round: re-opens the issue's stopped `halfrun` record as running, owned by this session; answers `busy` (exit 1) when the tree holds no such stop.
@@ -409,7 +410,7 @@ pnpm josh upstream:interrupt 2304 "<root-cause title>" --repo joshuafolkken/kit 
 
 <!-- /usage -->
 
-`--blocks-finder` は呼び出し元と起票先が同じリポジトリの場合だけ finder の依存関係を記録する。別リポジトリ間の依存登録は未対応で、警告し、依存関係や finder のラベルを変更しない。
+`--blocks-finder` は省略しても渡す。別リポジトリでも finder を上流 Issue の blocked-by に記録し、`run:board` は ⏳ レーン行の行末に 🔗 で出す。
 
 finder のリポジトリは起票前に確定し、バックリンクとコメント失敗時の再実行先に明示する。起票で現在のリポジトリ設定が変わっても投稿先は変わらない。解決できなければ stash や書き込みの前に停止する。
 
@@ -608,7 +609,7 @@ pnpm josh run:merge <N>                                                  # backl
 <!-- /usage -->
 
 Confirms the child from GitHub and does its post-merge steps: a **merged**
-child (CLOSED by a merge, read off its timeline) closes epics beside `main:sync`, is counted (resets the failure streak) and its `merge`
+child (CLOSED by a merge, read off its timeline) closes epics beside `main:sync` (skipped while another run holds it), is counted (resets the failure streak) and its `merge`
 logged once at confirmation, then `lane:close <N>` and the epic counters; a merged lane over 40 minutes of net time
 (`lane:net`) comments its breakdown by stage (`lane:breakdown`) on the lane's Issue once and launches a detached session that searches the longest stages first and files its unfiled causes against the lane, recorded as a `note`
 event (the start note carrying the longest stage, which the board draws after 🔍) (`lane-overrun.ts`, its wording `run-event-overrun.ts`), its result `folded #A,#B` / `filed` / `recurred #M` / `none: <why>` — the causes one file or mechanism shares filed as one Issue, or folded into an open one touching the same files;

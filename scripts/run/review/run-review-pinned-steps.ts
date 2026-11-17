@@ -51,6 +51,8 @@ const ALONE_GRACE_MS = 900_000
 const ALONE_TIMED_OUT_NOTE = `no answer within ${String(ALONE_GRACE_MS / MS_PER_SECOND)}s of the read`
 
 type Clock = () => number
+// A start of the rest: launched, already answered on this tree, or failed.
+type RemainingStart = LaunchResult | { kind: 'answered' }
 
 // `start` is the launched pid's start time, so a pid the OS has since reissued is told apart from the
 // check (joshuafolkken/kit#4828). `tree` is the digest of the tree it checks (`run-review-pinned-tree.ts`),
@@ -116,12 +118,17 @@ function launch(root: string = PROJECT_ROOT, reason?: string, tree?: string): La
 // **A pre-detach that stopped at its first unpinned hunk goes on probing the rest here**
 // (joshuafolkken/kit#5327): every hunk, with no reason, on the stamp `launch` writes, so the next
 // pre-detach joins it (`run-review-pinned-join.ts`) and `clear` discards it as it does that one.
-function launch_remaining(root: string = PROJECT_ROOT, tree?: string): LaunchResult {
+// A `reason` goes on the record only, never on the probe's argv.
+function launch_remaining(
+	root: string = PROJECT_ROOT,
+	tree?: string,
+	reason?: string,
+): LaunchResult {
 	const token = randomUUID()
 	const origin = REMAINING_ORIGIN
 	const argv = test_pinned_record.launch_argv(token, undefined, origin, true)
 
-	return launch_with({ root, token, argv, origin, tree })
+	return launch_with({ root, token, argv, origin, reason, tree })
 }
 
 function optional_text(value: unknown): string | undefined {
@@ -211,15 +218,28 @@ function stop_current(launched: Launch): void {
 
 // Every start stops the last pair's check and clears its records first, so a join never reads an
 // earlier tree's answer and a reopened pair leaves no check running unowned (joshuafolkken/kit#4828).
+function retire(last: Launch, root: string): void {
+	stop_last(last)
+	test_pinned_record.clear(last.token, root)
+}
+
 function clear(root: string = PROJECT_ROOT): void {
 	const last = read_launch(root)
 
-	if (last !== undefined) {
-		stop_last(last)
-		test_pinned_record.clear(last.token, root)
-	}
-
+	if (last !== undefined) retire(last, root)
 	stamp_file.remove_stamp(launch_path(root))
+}
+
+// **The rest replaces the last launch only once it launched** (joshuafolkken/kit#7802): a failed
+// launch leaves the last record, and the `--unpinned-ok` reason it carries, as they were, and a
+// started rest carries that reason on its own record.
+function relaunch_remaining(root: string, tree: string): LaunchResult {
+	const last = read_launch(root)
+	const launched = launch_remaining(root, tree, last?.reason)
+
+	if (last !== undefined && launched.kind === 'launched') retire(last, root)
+
+	return launched
 }
 
 // The dispatcher's claim in the core ledger (`core-budget.ts`) carries `admitted_at` from the moment
@@ -360,6 +380,22 @@ function is_live(root: string = PROJECT_ROOT): boolean {
 	)
 }
 
+// **The remaining probe already launched on `tree`, still running or answered** (joshuafolkken/kit#7802):
+// the one judgment every launcher of the rest asks, so none starts it twice. `undefined` when none is;
+// an answered one is `answered`, so nothing reports it as still probing.
+function is_remaining_on(launched: Launch | undefined, tree: string): launched is Launch {
+	return launched?.origin === REMAINING_ORIGIN && launched.tree === tree
+}
+
+function remaining_on(tree: string, root: string = PROJECT_ROOT): RemainingStart | undefined {
+	const launched = read_launch(root)
+
+	if (!is_remaining_on(launched, tree)) return undefined
+	if (is_live(root)) return { kind: 'launched', pid: launched.pid }
+
+	return is_answered(root) ? { kind: 'answered' } : undefined
+}
+
 // The lone read's wait: a queued check is waited on, not stopped. `undefined` when no check was launched.
 async function wait_alone(
 	root: string = PROJECT_ROOT,
@@ -387,8 +423,11 @@ const run_review_pinned_steps = {
 	launched_reason,
 	launched_tree,
 	log_path,
+	relaunch_remaining,
+	remaining_on,
 	wait_alone,
 	wait_for_answer,
 }
 
 export { run_review_pinned_steps }
+export type { RemainingStart }

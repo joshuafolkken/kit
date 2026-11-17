@@ -56,7 +56,7 @@ const { ELLIPSIS, TITLE_LIMIT, WHOLE, fitted, fitted_limit, row_overrun, title_o
 	run_board_render_title
 const { width_of } = run_board_fit
 const { padded } = run_board_fresh
-const { condition_of, tail_of, waits_of } = run_board_render_condition
+const { condition_of, tail_of, waits_of, width_for } = run_board_render_condition
 const { legend_lines, resume_lines, thanks_part } = run_board_render_foot
 const { ROW_INDENT, done_section, kept_section, keyed, plan_section } = run_board_render_section
 const GAP = '  '
@@ -97,9 +97,9 @@ interface RowFrame {
 	filed: ReadonlySet<number>
 	// The columns a lane row that draws a tail gives up with every other such row.
 	shared?: number | undefined
-	// The queued, waiting and done sections draw a condition column after the icon
-	// (joshuafolkken/kit#4288, #4292).
-	is_conditioned?: boolean | undefined
+	// The queued, waiting and done sections draw a condition column this wide after the icon, one width
+	// in all three (joshuafolkken/kit#4288, #4292, #7695); `undefined` where a section draws none.
+	condition_width?: number | undefined
 	// The lanes section draws each row's lead — progress, phase and times — before its cells
 	// (`run-board-render-lead.ts`).
 	is_lane_row?: boolean | undefined
@@ -151,7 +151,9 @@ function icon_text(row: BoardRow, frame: RowFrame): string {
 
 	const icon = running_fresh(row, state_icon(row), row.status?.phase_ms, header)
 
-	return frame.is_conditioned === true ? `${icon} ${condition_of(row, header)}` : icon
+	const width = frame.condition_width
+
+	return width === undefined ? icon : `${icon} ${condition_of(row, header, width)}`
 }
 
 // The priority and the release kind's icons between the number — and its lane cells, where drawn —
@@ -203,7 +205,7 @@ function row_text(indent: string, row: BoardRow, frame: RowFrame): string {
 	const { header, reason_cut } = frame
 	const head = tailed_head(row, frame)
 	const found = run_board_render_found.found_fitted(room_after(indent, head, frame), row, header)
-	const notes = [waits_of(row, header, frame.is_conditioned), tail_of(row, reason_cut, header)]
+	const notes = [waits_of(row, header, frame.condition_width), tail_of(row, reason_cut, header)]
 
 	return `${indent}${joined([head, found, ...notes]).trimEnd()}`
 }
@@ -330,9 +332,7 @@ function frame_of(
 // The rows not yet started under one heading, in the order they are offered: a running batch starts
 // each once a lane and its paths are free, never wave by wave (joshuafolkken/kit#4137); kept at none.
 function queued_section(layout: BoardLayout, frame: RowFrame): Array<PlanSection> {
-	const lines = layout.queued.flatMap((entry) =>
-		entry_lines(entry, { ...frame, is_conditioned: true }),
-	)
+	const lines = layout.queued.flatMap((entry) => entry_lines(entry, frame))
 
 	return [kept_section(`${STATE_ICONS.waiting} ${WORDS.queued}`, lines)]
 }
@@ -389,14 +389,14 @@ function plan_parts(
 	if (layout === undefined) return { plan: [] }
 
 	const frame = frame_of(header, notes, size)
-	const conditioned = { ...frame, is_conditioned: true }
+	const conditioned = { ...frame, condition_width: width_for(layout.unreached) }
 	const done = layout.active.filter((row) => run_board_layout.is_finished(row.state))
 	const waiting = `${WAITS_ICON} ${WORDS.waiting}`
 
 	return {
 		...active_sections(layout, frame),
 		below: [
-			...keyed('queued', queued_section(layout, frame)),
+			...keyed('queued', queued_section(layout, conditioned)),
 			...keyed('waiting', rows_section(waiting, layout.unreached, conditioned, 'waiting')),
 			...done_section(done, (row) => row_line(ROW_INDENT, row, conditioned)),
 		],

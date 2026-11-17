@@ -222,8 +222,8 @@ async function record_merged(ctx: MergeContext): Promise<RunCarry | undefined> {
 	return await run_merge_steps.do_merged(ctx, run_merge_dated.put_on_record)
 }
 
-// A merge is the only outcome that asks the hand-off check, because it is the only one that returned
-// the tree to a clean default branch. `over` stops the offer; `under` asks for the next child.
+// A merge is the only outcome that asks the hand-off check, because it is the only one that returns
+// the tree to a clean default branch — unless another run holds it (`run-merge-sync.ts`). `over` stops the offer; `under` asks for the next child.
 async function on_merged(ctx: MergeContext): Promise<MergeVerdict> {
 	const refused = await record_merged(ctx)
 

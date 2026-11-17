@@ -96,11 +96,12 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 	// The main line's chain up to the review, folded into one call: `main:merge`, `review:selfcheck`,
-	// `check:related` and `run:review` were four round trips re-billing the run's full context each.
+	// `check:related` and `run:review` were four round trips re-billing the run's full context each. In
+	// kit `command:derive --check` runs before `run:review`, so a hand-edited generated page stops there.
 	'run:chain': {
 		script: 'scripts/run/review/run-chain-cli.ts',
 		description:
-			'Open the review, or --join to join, attest and record it; --ship starts ship --detach --review after a clean record. Stops at the first refusal with its next action',
+			'Open the review, or --join to join, attest, record and recheck it; --ship then ships a clean recheck. Stops at the first refusal with its next action',
 		category: 'AI tools',
 		reference: [
 			'<issue> [--from <stage>] [--unpinned-ok "<reason>"] [--accept-metrics "<reason>"] | <issue> --join [--fixing] [--from <stage>] [--ship "<title> #<N>"]',
@@ -111,7 +112,7 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 			examples: [
 				{
 					arguments: '<N>',
-					note: 'after `run:cut <N>` alone: merge main (not in a lane child), answer the self-check, run the scoped pair, open the review',
+					note: 'after `run:cut <N>` alone: merge main (not in a lane child), answer the self-check, run the scoped pair, check the generated pages (kit only) and the acceptance map, open the review',
 				},
 				{
 					arguments: '<N> --from check:related',
@@ -127,7 +128,7 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 				},
 				{
 					arguments: '<N> --join',
-					note: 'join the gate, attest and record; every finding holds for disposition',
+					note: 'join, attest, record, recheck metrics and unpinned; every finding holds for disposition',
 				},
 				{
 					arguments: '<N> --join --fixing',

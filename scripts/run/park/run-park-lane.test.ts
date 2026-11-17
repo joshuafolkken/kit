@@ -1,5 +1,6 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
 import { session_language } from '#scripts/josh/session-language'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -88,5 +89,39 @@ describe('run_park_lane.with_lane_note — the note follows the session language
 		expect(note).toContain(`\n---\n`)
 		expect(note).toContain(`\`${LANE_DIRECTORY}\``)
 		expect(note).toContain(`\`pnpm josh lane:close ${ISSUE}\``)
+	})
+})
+
+function commit_lane(): string {
+	const options = git_spawn_sync.located(LANE_DIRECTORY)
+	const identity = ['-c', 'user.name=test', '-c', 'user.email=test@example.com']
+
+	git_spawn_sync.run(['init', '--quiet'], options)
+	git_spawn_sync.run([...identity, 'commit', '--quiet', '--allow-empty', '-m', 'base'], options)
+
+	return git_spawn_sync.read(['rev-parse', '--short', 'HEAD'], options) ?? ''
+}
+
+// joshuafolkken/kit#7820: the note records the lane's tree, which `tree_of` reads back.
+describe('run_park_lane — the lane tree (ac-70294b59)', () => {
+	it.each(['ja', 'en'])('records HEAD and the uncommitted change count in %s', (lang) => {
+		const head = commit_lane()
+
+		expect(run_park_lane.tree_of(note_in(lang))).toBe(`${head} · 1`)
+	})
+
+	it('reads a moved tree as a different one', () => {
+		const head = commit_lane()
+
+		writeFileSync(path.join(LANE_DIRECTORY, 'work.ts'), 'export {}\n')
+
+		expect(run_park_lane.tree_of(note_in('en'))).toBe(`${head} · 2`)
+	})
+
+	it('writes no tree line where git reads none', () => {
+		const note = note_in('en')
+
+		expect(note).not.toContain('- Tree:')
+		expect(run_park_lane.tree_of(note)).toBeUndefined()
 	})
 })

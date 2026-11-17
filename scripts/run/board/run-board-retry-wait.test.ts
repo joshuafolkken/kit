@@ -85,3 +85,25 @@ describe('run_board_layout.layout_of — an issue queued by run:add --retry', ()
 		expect(numbers_of(layout.unreached)).toStrictEqual([])
 	})
 })
+
+// joshuafolkken/kit#7695: an upstream interrupt parks its lane on a blocker in another repository.
+describe('run_board_layout.layout_of — a lane held by an upstream interrupt', () => {
+	const UPSTREAM = { repo: 'joshuafolkken/app-kit', number: 7691 }
+
+	function held(state: 'OPEN' | 'CLOSED'): EpicChild {
+		return { ...child(WAITS), blocked_by: [{ ...UPSTREAM, state }] }
+	}
+
+	// A closed upstream Issue still holds the child until its release lands (`epic_outside_blocker`).
+	it.each(['OPEN', 'CLOSED'] as const)(
+		'keeps the ⏳ lane row and names the %s upstream Issue at its line end',
+		(state) => {
+			const layout = layout_of(plan_of([], [held(state)]), RETRIED)
+
+			expect(numbers_of(layout.active)).toStrictEqual([WAITS])
+			expect(numbers_of(layout.unreached)).toStrictEqual([])
+			expect(layout.active[0]?.waits).toStrictEqual(['app-kit#7691'])
+			expect(lines_of(header({ layout })).join('\n')).toContain('🔗 app-kit#7691')
+		},
+	)
+})

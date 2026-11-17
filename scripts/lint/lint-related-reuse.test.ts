@@ -1,4 +1,3 @@
-import { metrics_totals } from '#scripts/gate/metrics-totals'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { tree_verdict, type TreeVerdict } from '#scripts/gate/tree-verdict'
 import { changed_paths } from '#scripts/git/changed-paths'
@@ -43,11 +42,6 @@ vi.mock('#scripts/exports/unused-members-check', () => ({
 vi.mock('#scripts/gate/structural-checks', () => ({
 	structural_checks: { run_structural: vi.fn(async () => 0) },
 }))
-vi.mock('#scripts/gate/metrics-totals', () => ({
-	metrics_totals: { growth_notice: vi.fn() },
-}))
-
-const GROWTH_NOTICE = 'josh metrics: 1 total(s) grew past the merge-base'
 const SOURCE = 'scripts/a.ts'
 const BEFORE_TREE = { files: { [SOURCE]: 'digest' }, base: 'a22b3479' }
 const FAILED = 1
@@ -97,17 +91,16 @@ describe('lint_related.run_related_lint on a tree it already answered for', () =
 })
 
 describe('lint_related.run_related_lint on a tree it has not answered for', () => {
-	it('keeps the tail it printed, the growth notice in it, for a re-run on the same tree', async () => {
+	it('keeps the tail it printed for a re-run on the same tree', async () => {
 		vi.mocked(tree_verdict.read).mockReturnValue(undefined)
 		vi.mocked(lint_parallel.run_lint_parallel_checks).mockResolvedValue(0)
-		vi.mocked(metrics_totals.growth_notice).mockResolvedValue(GROWTH_NOTICE)
 
 		await expect(lint_related.run_related_lint([])).resolves.toBe(0)
 
 		const [entry] = vi.mocked(tree_verdict.record).mock.calls[0] ?? []
 
 		expect(entry).toMatchObject({ before: BEFORE_TREE, exit_code: 0 })
-		expect(entry?.tail).toContain(GROWTH_NOTICE)
+		expect(entry?.tail).toContain('lint:related passed')
 		expect(written_output()).toContain(entry?.tail)
 	})
 })

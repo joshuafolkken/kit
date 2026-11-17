@@ -85,14 +85,15 @@ async function resume_token(issue: string): Promise<PrrunToken | undefined> {
 	return stop_head === undefined ? undefined : decide(await read_facts(stop_head))
 }
 
-async function adopt(issue: string): Promise<boolean> {
+// `command` is the resuming run — `fullrun` or `prrun` — whose mark the new record carries.
+async function adopt(issue: string, command: string): Promise<boolean> {
 	const target = await run_halfrun_resume.hold_target()
 
 	if (target === undefined || stop_head_of(run_hold.read_hold(target), issue) === undefined) {
 		return false
 	}
 
-	return run_halfrun_resume.take_over(target, issue)
+	return run_halfrun_resume.take_over(target, issue, run_hold.resumed_mark(command))
 }
 
 // The `--prrun-stop` mark: the run's own record re-written with the commit the pull request is on.

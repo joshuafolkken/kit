@@ -159,19 +159,42 @@ async function planned_problems(): Promise<Array<Unmet>> {
 	return of_kind(PRECONDITION.UNPLANNED, await run_ship_planned.problems())
 }
 
+type TreeParts = [Array<Unmet>, Array<Unmet>, Array<Unmet>, Array<Unmet>]
+
+// The judgments read off the Issue, the body and the tree alone — the git preflight with its
+// classification, the evidence, the removed tests and the lane plan — so `josh preflight:check` asks
+// them before the review through these same calls (joshuafolkken/kit#7773).
+async function tree_parts(
+	cli_input: string | undefined,
+	body_path: string | undefined,
+	no_body_problem?: string,
+): Promise<TreeParts> {
+	return await Promise.all([
+		caught(git_preflight.problems_of({ cli_input, will_open_pr: true })),
+		caught(evidence_problems(body_path, no_body_problem)),
+		caught(removed_test_problems(body_path)),
+		caught(planned_problems()),
+	])
+}
+
 // The lock file is asked here too, so a drift stops the ship before the gate
 // rather than being rewritten by the pre-push hook's install under the push.
 async function asked_problems(request: PreflightRequest): Promise<Array<Unmet>> {
-	const [preflight, evidence, acceptance, removed, lock, planned] = await Promise.all([
-		caught(git_preflight.problems_of({ cli_input: request.title, will_open_pr: true })),
-		caught(evidence_problems(request.body_path)),
+	const [[preflight, evidence, removed, planned], acceptance, lock] = await Promise.all([
+		tree_parts(request.title, request.body_path),
 		caught(acceptance_problems(request.body_path)),
-		caught(removed_test_problems(request.body_path)),
 		caught(lock_problems()),
-		caught(planned_problems()),
 	])
 
 	return [...preflight, ...evidence, ...acceptance, ...removed, ...lock, ...planned]
+}
+
+// The tree judgments `run:chain` asks before the review, of the body the ship will read when
+// `--body-file` is omitted; before a PR exists the evidence is asked for as that draft, as `ahead` does.
+async function chain_problems(): Promise<Array<Unmet>> {
+	const parts = await tree_parts(undefined, undefined, EVIDENCE_PENDING)
+
+	return parts.flat()
 }
 
 async function asked_stage(request: PreflightRequest): Promise<PreflightResult> {
@@ -276,6 +299,8 @@ const run_ship_preflight = {
 	EVIDENCE_PROBLEM,
 	acceptance_pending_text,
 	ahead,
+	body_text,
+	chain_problems,
 	stage,
 }
 

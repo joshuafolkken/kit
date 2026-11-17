@@ -1,0 +1,8 @@
+{
+	"reason": "#7756 wires the GitHub-link check into the per-turn scope line (merged #7760); the unlinked line and its principles.md pointer are the new behavior",
+	"date": "2026-11-17",
+	"growth": {
+		"scripts.code_lines": 66,
+		"ai_cost.on_demand_bytes": 26
+	}
+}

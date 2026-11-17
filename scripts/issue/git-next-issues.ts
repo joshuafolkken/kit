@@ -21,8 +21,8 @@ const FETCH_LIMIT = 20
 const DISPLAY_LIMIT = 5
 const HEADER = '🗒 Next issues (oldest first on ties):'
 
-// Surfacing an `epic`, an `in-progress` or a `needs-decision` issue as "next" would suggest a run
-// the workflow rules forbid, duplicate, or cannot finish. The set itself is
+// Surfacing an `epic`, an `in-progress`, a `plan:unverified` or a parked issue as "next" would suggest
+// a run the workflow rules forbid, duplicate, or cannot finish. The set itself is
 // shared with the `auto-ok` pickup, which asks the same question of the same listing shape.
 function has_excluded_label(issue: OpenIssueData): boolean {
 	return has_any_label(issue.labels, NOT_DIRECTLY_RUNNABLE_LABELS)

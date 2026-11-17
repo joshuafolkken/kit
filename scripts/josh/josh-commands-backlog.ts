@@ -1,4 +1,4 @@
-import type { CommandEntry } from './josh-command-types'
+import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types'
 
 const EXCLUDE = '--exclude <N>'
 const JUST_MERGED = 'skip the issue just merged'
@@ -71,6 +71,9 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			"Run a parent triage pass, decide solo/lane from three conditions, or apply one issue's verdict",
 		category: 'AI tools',
+		// Adopting a closing park option releases the hold through `run:hold`, which reaches the stop
+		// confirmation.
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		reference: [
 			'--pass [--exclude <n>] | --decide --defect yes|no|unknown --verification yes|no|unknown --every-run yes|no|unknown | --apply <n> [--lane | --solo --defect yes --verification yes --every-run yes] [--blocked-by <m> | --unblock <m>] --reason <text> [--clear] | --apply <n> --adopt <k> --reason <text> [--done <text>]',
 			'automation',
@@ -123,7 +126,7 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: ['--unblock <M>'],
 					description:
-						"removes it instead, with the tracking epic's `#M -> #N` declaration (`epic --remove`'s path); `--blocked-by` restores it. A failed write is named, exit 1.",
+						"removes it instead, with the tracking epic's `#M -> #N` declaration (`epic --remove`'s path); `owner/repo#M` names one elsewhere, no epic. `--blocked-by` restores it. A failed write is named, exit 1.",
 				},
 				{
 					names: ['--adopt <k>'],
@@ -134,6 +137,11 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 					names: ['--done <text>'],
 					description:
 						'what the parent did for an option whose `必要な権限` starts with `親` (e.g. `親セッション`): the parent carries the option out first, then adopts it with `--done <what was done>`, recorded with the decision. Without it such an option is refused before any write, so the child stays parked; on any other option it is refused.',
+				},
+				{
+					names: ['--done "filed #<M>"'],
+					description:
+						"for a `親` option naming `issue:file`: the open Issue it filed (else refused with the `issue:file … --route interrupt --found-during <N> --blocks-finder` line). The child is blocked by `#M`, not requeued; `#M`'s merge re-dispatches it.",
 				},
 			],
 		},

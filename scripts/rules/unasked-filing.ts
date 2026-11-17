@@ -1,6 +1,7 @@
 import { agent_headless } from '#scripts/agent/agent-headless'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import type { HookContext } from '#scripts/hooks/hook-context'
+import type { GuardRun } from '#scripts/josh/hook-decision'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { json_value } from '#scripts/lib/json-value'
 import { run_carry } from '#scripts/run/carry/run-carry'
@@ -35,6 +36,15 @@ const FILING_WORDS: ReadonlyArray<RegExp> = [
 	/^\/?(?:kickoff|fullrun|halfrun|prrun|backlogrun)\b/iu,
 ]
 
+// A phrase that declines filing ("fix it without filing") is removed before FILING_WORDS is read,
+// so a positive instruction beside it still counts ("don't file A, file an issue for B").
+const NO_FILING_PHRASES: ReadonlyArray<RegExp> = [
+	/起票(?:は)?(?:せず|しないで|なしで|なしに)/gu,
+	/issue\s*に(?:せず|しないで)/giu,
+	/\bwithout filing\b/giu,
+	/\b(?:don['’]t|do not) file\b/giu,
+]
+
 // A short yes to the model's own proposal is the confirmation the refusal asks for.
 const AFFIRMATIVE = /^(?:はい|うん|お願い|どうぞ|進めて|yes|ok|okay|sure|please do|go ahead)/iu
 const SHORT_REPLY = 40
@@ -58,18 +68,38 @@ const QUOTED = /"[^"]*"|'[^']*'/gu
 const UNASKED_FILING_REASON =
 	'⛔ unasked filing: this interactive session files an Issue only on the person’s explicit ' +
 	'instruction (「起票」, “file an issue”, or a command whose procedure files, such as `kickoff new`). ' +
-	'Propose the Issue in the reply and file it once they confirm. It fires on every occurrence ' +
+	'Propose it in the reply; once confirmed, hand it to ' +
+	'`pnpm josh run:handoff kickoff new --brief-file <brief>`. It fires on every occurrence ' +
 	'(`.claude/skills/workflow-commands/observation-filing.md`).'
 
-function is_instructed(prompt: string): boolean {
-	const trimmed = issue_citation
+// The person's own words — quotes, code spans and fenced blocks removed.
+function own_words(prompt: string): string {
+	return issue_citation
 		.prose_lines(prompt)
 		.join('\n')
 		.replaceAll(/(?<!`)(`+)(?!`)[\s\S]*?(?<!`)\1(?!`)/gu, '')
 		.replaceAll(/「[^「」\n]*」|『[^『』\n]*』|"[^"\n]*"|'[^'\n]*'/gu, '')
 		.trim()
+}
 
-	return FILING_WORDS.some((pattern) => pattern.test(trimmed))
+function without_no_filing(text: string): string {
+	let rest = text
+	for (const pattern of NO_FILING_PHRASES) rest = rest.replaceAll(pattern, ' ')
+
+	return rest.trim()
+}
+
+// The person's own words decline filing — the reading a no-filing run takes its instruction from.
+function is_no_filing(prompt: string): boolean {
+	const words = own_words(prompt)
+
+	return without_no_filing(words) !== words
+}
+
+function is_instructed(prompt: string): boolean {
+	const rest = without_no_filing(own_words(prompt))
+
+	return FILING_WORDS.some((pattern) => pattern.test(rest))
 }
 
 function reply_text(line: string): string {
@@ -103,11 +133,13 @@ function is_confirmed(prompt: string, tail: string): boolean {
 }
 
 // The person's last prompt asks for filing, or says yes to a proposed Issue — the stand-down that lets
-// an instructed filing through.
-function is_asked(tail: string): boolean {
-	const prompt = last_prompt.person_prompt(tail) ?? ''
+// an instructed filing through. A prompt a large read pushed off the tail is read further back
+// (`last_prompt.prompt_reach`).
+function is_asked(tail: string, _call: GuardedCall, run: GuardRun): boolean {
+	const text = last_prompt.prompt_reach(tail, run.transcript)
+	const prompt = last_prompt.person_prompt(text) ?? ''
 
-	return is_instructed(prompt) || is_confirmed(prompt, tail)
+	return is_instructed(prompt) || is_confirmed(prompt, text)
 }
 
 function is_run_parent(context: HookContext): boolean {
@@ -161,6 +193,6 @@ const ROW = {
 	},
 }
 
-const unasked_filing = { ROW, is_unasked_filing }
+const unasked_filing = { ROW, is_unasked_filing, is_no_filing }
 
 export { unasked_filing }

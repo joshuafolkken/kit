@@ -59,19 +59,25 @@ async function files_writing(root: string, names: ReadonlyArray<string>): Promis
 	return [...files].filter((file) => existsSync(path.join(root, file)))
 }
 
-// A deleted file's reachable name a live module outside the change still declares names that module,
-// not the deleted one (joshuafolkken/kit#7048): a removed namespace's `record` beside `gate-ledger.ts`'s.
+// The names a code hunk's removed lines declare: a deleted file's reachable ones, a kept file's every one.
+function removed_names(hunk: Hunk, deleted: ReadonlyArray<string>): Array<string> {
+	const source = hunk.old_lines.join('\n')
+
+	if (deleted.includes(hunk.file)) return review_readers_scan.reachable_names(source)
+
+	return review_readers_scan.declarations(source).map(({ name }) => name)
+}
+
+// A removed name a live module outside the change still declares names that module, not the removed
+// one: a deleted namespace's `record` beside `gate-ledger.ts`'s (joshuafolkken/kit#7048), a renamed
+// private `is_running` beside `backlog-waves.ts`'s (joshuafolkken/kit#7725).
 async function declared_elsewhere(
 	root: string,
 	hunks: ReadonlyArray<Hunk>,
 	deleted: ReadonlyArray<string>,
 ): Promise<Array<string>> {
-	const gone = hunks.filter((hunk) => deleted.includes(hunk.file))
-	const names = [
-		...new Set(
-			gone.flatMap((hunk) => review_readers_scan.reachable_names(hunk.old_lines.join('\n'))),
-		),
-	]
+	const code = hunks.filter((hunk) => prose_stale_scan.CODE_FILE.test(hunk.file))
+	const names = [...new Set(code.flatMap((hunk) => removed_names(hunk, deleted)))]
 	const declared = new Set(await declared_in(root, await files_writing(root, names)))
 
 	return names.filter((name) => declared.has(name))

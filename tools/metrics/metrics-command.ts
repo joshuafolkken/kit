@@ -28,9 +28,9 @@ import { prose_density, type ProseTotals } from './prose-density'
 // **It is kit-only.** The rule documents and the guard commands it counts are kit's own; a consumer
 // has no root `prompts/` to read, and the gate leaves the step out there.
 //
-// `--totals-only` is the form `josh lint:related` reports in the loop (`scripts/gate/metrics-totals.ts`):
-// the totals alone, so a grown total stops the session that knows why it grew. `--totals-only
-// --rerecord` is the form a detached `josh ship` runs before the hand-off: it also re-records the
+// `--totals-only` is the totals alone (`scripts/gate/metrics-totals.ts`), so a grown total stops the
+// session that knows why it grew. `--totals-only --rerecord` is the form `josh run:review`'s open
+// and a detached `josh ship` before the hand-off run: it also re-records the
 // growth a recorded reason names at what it measures now (`check_totals_only`). The durations stay
 // with the supervised gate — before the detach the gate ledger they read is stale.
 //

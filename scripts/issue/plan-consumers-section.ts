@@ -14,6 +14,8 @@ const ANY_HEADING = /^#{1,6}\s/u
 const LIST_MARKER = /^(?:[-*+]|\d+\.)\s+/u
 const NONE_WORD = 'なし'
 const NONE_WITH_REASON = /^なし\s*[（(]\s*\S.*[）)]$/u
+const ACTION_SEPARATOR = ' — '
+const FIX_ACTION = '直す'
 const MISSING = `The plan has no \`${HEADING}\` section: list, for each state, command, label, file or process it adds or changes, the existing places that read or write it and what this issue does with each (\`pnpm josh plan:consumers <identifier...>\` drafts it), or write \`なし（<reason>）\`.`
 const EMPTY = `The plan's \`${HEADING}\` section is empty: list the existing consumers, or write \`なし（<reason>）\`.`
 const BARE_NONE = `The plan's \`${HEADING}\` section says \`なし\` without a reason: write \`なし（<reason>）\`.`
@@ -71,6 +73,17 @@ function without(plan: string): string {
 	return [...lines.slice(0, range[0]), ...lines.slice(range[1])].join('\n')
 }
 
-const plan_consumers_section = { HEADING, refusal_of, without }
+// The entries whose action — the text after the draft's ` — ` (`plan-consumers.ts`) — opens with
+// `FIX_ACTION`: the consumers this issue edits, so their files count toward its size
+// (joshuafolkken/kit#7726). An entry with no action, or a no-impact / separate-issue one, is left out.
+function fixed_rows(plan: string): ReadonlyArray<string> {
+	return (section_entries(plan) ?? []).filter((entry) => {
+		const [, action = ''] = entry.split(ACTION_SEPARATOR)
+
+		return action.trimStart().startsWith(FIX_ACTION)
+	})
+}
+
+const plan_consumers_section = { HEADING, fixed_rows, refusal_of, without }
 
 export { plan_consumers_section }

@@ -984,7 +984,6 @@ const PURE_FILES: ReadonlyArray<string> = [
 	'scripts/document/workflow-temporary-path-document.test.ts',
 	'scripts/epic/epic-add-cross-repo.test.ts',
 	'scripts/epic/epic-bundle-format.test.ts',
-	'scripts/epic/epic-bundle-recommend.test.ts',
 	'scripts/epic/epic-bundle-sections.test.ts',
 	'scripts/epic/epic-chains-before.test.ts',
 	'scripts/epic/epic-classify-not-before.test.ts',

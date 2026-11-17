@@ -162,6 +162,14 @@ describe('package.json files field', () => {
 	})
 })
 
+// The agents ship as a directory, so a new definition needs no list entry (joshuafolkken/kit#7757).
+describe('package.json files field agent definitions', () => {
+	it.each(['investigator', 'producer'])('ships the %s agent definition', (name) => {
+		expect(load_manifest().files).toContain('.claude/agents')
+		expect(existsSync(package_path(`.claude/agents/${name}.md`))).toBe(true)
+	})
+})
+
 describe('pnpm-workspace.yaml built-dependency lists', () => {
 	const workspace = load_workspace()
 	const allow_builds = workspace.allowBuilds ?? {}
@@ -351,6 +359,7 @@ describe('.prettierignore .claude coverage', () => {
 	it.each([
 		'.claude/skills/workflow-commands/SKILL.md',
 		'.claude/agents/investigator.md',
+		'.claude/agents/producer.md',
 		'.claude/tmp/handoff-3261.json',
 	])('leaves %s out', async (file_path) => {
 		expect(await is_prettier_ignored(file_path)).toBe(true)

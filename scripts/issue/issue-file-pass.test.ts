@@ -7,12 +7,14 @@ import { issue_file_lane_hint } from './issue-file-lane-hint'
 import { issue_file_pass, type Filing } from './issue-file-pass'
 import { issue_sample_source } from './issue-sample-source'
 import { issue_scout_cli } from './issue-scout-cli'
+import { trusted_measure } from './trusted-measure'
 
 // joshuafolkken/kit#5833: every step of the pass runs whatever the others answer, so one call prints
 // the body lint's refusal and the duplicate scout's together, and the scout's refusal names a
 // `--distinct` that keeps the candidates the call already declared.
 
 const HERE = 'joshuafolkken/kit'
+const ELSEWHERE = 'joshuafolkken/other'
 const DECLARED = 2795
 const DUPLICATE_A = 2801
 const DUPLICATE_B = 2802
@@ -165,7 +167,7 @@ describe('issue_file_pass.labels_in_one_pass — a named file near its cap', () 
 	})
 
 	it('does not weigh a filing into another repository', async () => {
-		const filing = { ...filing_of(CLEAR_BODY), target: 'joshuafolkken/other' }
+		const filing = { ...filing_of(CLEAR_BODY), target: ELSEWHERE }
 
 		await issue_file_pass.labels_in_one_pass(filing)
 
@@ -184,6 +186,35 @@ describe('issue_file_pass.labels_in_one_pass — a figure with no source', () =>
 		expect(console.warn).toHaveBeenCalledWith(
 			expect.stringMatching(/^⚠ number with no source .*約 35 分/u),
 		)
+	})
+})
+
+// joshuafolkken/kit#7769: a premise is run as `lane:plan` runs it, so one it cannot read is refused here.
+describe('issue_file_pass.labels_in_one_pass — a premise', () => {
+	const premised = CLEAR_BODY.replace(
+		'## 現象',
+		'- 前提: `pnpm josh lane:stats --period 3` >= 3\n\n## 現象',
+	)
+
+	it('refuses a premise whose last line is a table row (ac-6cec9c55)', async () => {
+		vi.spyOn(trusted_measure, 'run_command').mockReturnValue({ kind: 'ok', output: '| 89 | 3 |' })
+
+		expect(await issue_file_pass.labels_in_one_pass(filing_of(premised))).toBeUndefined()
+		expect(printed()).toContain('lane:value cell')
+	})
+
+	it('admits a premise whose last line is a number (ac-344f85d7)', async () => {
+		vi.spyOn(trusted_measure, 'run_command').mockReturnValue({ kind: 'ok', output: '89' })
+
+		expect(await issue_file_pass.labels_in_one_pass(filing_of(premised))).toBeDefined()
+	})
+
+	it('never runs the premise of a filing into another repository', async () => {
+		const run = vi.spyOn(trusted_measure, 'run_command')
+
+		await issue_file_pass.labels_in_one_pass({ ...filing_of(premised), target: ELSEWHERE })
+
+		expect(run).not.toHaveBeenCalled()
 	})
 })
 

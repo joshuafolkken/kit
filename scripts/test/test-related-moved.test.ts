@@ -7,8 +7,8 @@ const OWN_TEST = 'scripts/test/test-related.synced-whole-suite.test.ts'
 const MAIN_TEST = 'scripts/gate/gate-plan.test.ts'
 const SYNCED_DATA = 'docs/josh-commands.md'
 const LEFT_MODULE = 'scripts/gate/since-green.ts'
-const NO_SPLIT: SyncedSplit = { shared: [], left: [], meeting: [] }
-const LEFT_SPLIT: SyncedSplit = { shared: [], left: [LEFT_MODULE], meeting: [] }
+const NO_SPLIT: SyncedSplit = { shared: [], left: [], meeting: [], touching: [] }
+const LEFT_SPLIT: SyncedSplit = { shared: [], left: [LEFT_MODULE], meeting: [], touching: [] }
 
 describe('test_related_moved.is_whole_suite', () => {
 	it('answers for a file every test depends on, and not for any other', () => {

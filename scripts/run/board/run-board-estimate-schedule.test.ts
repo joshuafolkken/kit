@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { run_board_estimate, type EstimateRead } from './run-board-estimate'
 import type { BoardLayout, BoardRow, QueuedEntry, RowReason } from './run-board-layout'
-import type { Phase } from './run-board-phase'
-import type { UsualTimes } from './run-board-usual'
 
 // joshuafolkken/kit#4319: a waiting child starts no earlier than what it waits on ends — a running
 // `run:solo` child, a 🔗 blocker, the 📂 path holder, the 🧍 / 🙅 solo wait — and one waiting on an
@@ -11,10 +9,10 @@ import type { UsualTimes } from './run-board-usual'
 const MINUTE = 60_000
 const NOW = Date.parse('2026-10-21T09:00:00.000Z')
 const EMPTY_LAYOUT: BoardLayout = { active: [], queued: [], people: [], unreached: [] }
-// A shared child estimate isolates scheduling from differences in phase duration.
-const USUAL: UsualTimes = new Map<Phase, number>([['implement', 30 * MINUTE]])
+// One lane total isolates scheduling from the spread of the totals (joshuafolkken/kit#7770).
 const PER_CHILD = 30 * MINUTE
-// What the running child has left: 30′ usual, 5′ spent.
+const TOTALS = [PER_CHILD]
+// What the running child has left: the 30′ total, 5′ run.
 const RUNNING_LEFT = 25 * MINUTE
 
 function waiting(number: number, waits: Array<string> = [], reason?: RowReason): BoardRow {
@@ -36,6 +34,7 @@ function running(number: number, is_solo = false): BoardRow {
 		state: 'running' as const,
 		track: ['implement' as const],
 		phase_ms: NOW - 5 * MINUTE,
+		started_ms: NOW - 5 * MINUTE,
 	}
 
 	return { ...waiting(number), state: 'running', status, ...(is_solo && { is_solo }) }
@@ -51,7 +50,7 @@ function left(layout: Partial<BoardLayout>): number | undefined {
 		now_ms: NOW,
 		ended_ms: undefined,
 		layout: board,
-		usual: USUAL,
+		lane_totals: TOTALS,
 		lane_limit: 2,
 	}
 

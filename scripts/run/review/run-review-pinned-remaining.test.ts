@@ -22,6 +22,8 @@ const PID = 7438
 const EXISTING_LOST = 'existing lost process'
 const LOST = 'lost process'
 const MOVED_TEXT = 'tree moved'
+const REASON = 'dead code deletion'
+const WHOLE_ARGV = expect.not.arrayContaining(['--first-unpinned'])
 const CACHED: PinnedReport = {
 	unpinned: [
 		{
@@ -106,11 +108,7 @@ describe('run_review_pinned_remaining.collect', () => {
 			is_stop: true,
 			text: expect.stringContaining(LATER),
 		})
-		expect(run_review_steps.launch_josh).toHaveBeenCalledWith(
-			expect.not.arrayContaining(['--first-unpinned']),
-			expect.any(String),
-			ROOT,
-		)
+		expect(run_review_steps.launch_josh).toHaveBeenCalledWith(WHOLE_ARGV, expect.any(String), ROOT)
 	})
 
 	it('reuses the same complete answer on the same tree without another probe', async () => {
@@ -153,12 +151,64 @@ describe('run_review_pinned_remaining.collect incomplete answers and reasons', (
 			text: expect.stringContaining('timeout'),
 		})
 	})
+})
 
-	it('leaves reason-bearing cuts to the existing whole-probe judgment', async () => {
-		vi.spyOn(run_review_pinned_steps, 'launched_reason').mockReturnValue('dead code deletion')
+describe('run_review_pinned_remaining.collect behind a reason-bearing cut', () => {
+	it('starts the rest behind a reason-bearing cut, keeping the cut and the reason', async () => {
+		run_review_pinned_steps.launch(ROOT, REASON, TREE)
+		vi.mocked(run_review_steps.launch_josh).mockClear()
 
 		expect(await run_review_pinned_remaining.collect(CUT, ROOT)).toBe(CUT)
+		expect(run_review_steps.launch_josh).toHaveBeenCalledOnce()
+		expect(run_review_steps.launch_josh).toHaveBeenCalledWith(WHOLE_ARGV, expect.any(String), ROOT)
+		expect(run_review_pinned_steps.is_remaining(ROOT)).toBe(true)
+		expect(run_review_pinned_steps.launched_reason(ROOT)).toBe(REASON)
+	})
+
+	it('keeps a reason-bearing cut and its reason when the rest cannot launch', async () => {
+		run_review_pinned_steps.launch(ROOT, REASON, TREE)
+		vi.mocked(run_review_steps.launch_josh).mockReturnValue({ kind: 'failed', note: 'no spawn' })
+
+		expect(await run_review_pinned_remaining.collect(CUT, ROOT)).toBe(CUT)
+		expect(run_review_pinned_steps.launched_reason(ROOT)).toBe(REASON)
+		expect(run_review_pinned_steps.is_remaining(ROOT)).toBe(false)
+	})
+
+	it('starts nothing behind a reason-bearing answer that probed every hunk', async () => {
+		run_review_pinned_steps.launch(ROOT, REASON, TREE)
+		vi.mocked(run_review_steps.launch_josh).mockClear()
+
+		expect(await run_review_pinned_remaining.collect(WHOLE, ROOT)).toBe(WHOLE)
 		expect(run_review_steps.launch_josh).not.toHaveBeenCalled()
+	})
+})
+
+describe('run_review_pinned_remaining.start on a running continuation', () => {
+	it('does not launch the rest twice while it still runs on the same tree', async () => {
+		vi.mocked(process_identity.is_same_process).mockReturnValue(true)
+		vi.spyOn(process, 'kill').mockReturnValue(true)
+		await run_review_pinned_remaining.start(ROOT)
+		const again = await run_review_pinned_remaining.start(ROOT)
+
+		expect(again).toEqual({ kind: 'launched', pid: PID })
+		expect(run_review_steps.launch_josh).toHaveBeenCalledOnce()
+	})
+
+	it('reports the rest answered on the same tree as answered, not as probing', async () => {
+		await run_review_pinned_remaining.start(ROOT)
+		const again = await run_review_pinned_remaining.start(ROOT)
+
+		expect(again).toEqual({ kind: 'answered' })
+		expect(run_review_steps.launch_josh).toHaveBeenCalledOnce()
+	})
+
+	it('launches the rest again once the tree moved', async () => {
+		await run_review_pinned_remaining.start(ROOT)
+		vi.mocked(run_review_pinned_tree.key).mockResolvedValue(FIXED_TREE)
+		await run_review_pinned_remaining.start(ROOT)
+
+		expect(run_review_steps.launch_josh).toHaveBeenCalledTimes(2)
+		expect(run_review_pinned_steps.launched_tree(ROOT)).toBe(FIXED_TREE)
 	})
 })
 

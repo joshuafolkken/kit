@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { latest_regression } from './latest-regression'
 
 const TSX = 'tsx'
+const STYLISTIC = '@stylistic/eslint-plugin'
+const BETA_RANGE = '^6.0.0-beta.6'
 
 function manifest(
 	dependencies: Record<string, string>,
@@ -51,6 +53,27 @@ describe('latest_regression.find_regressions — the downgrade case', () => {
 		const after = manifest({ tsx: '^4.23.1' })
 
 		expect(latest_regression.find_regressions(before, after)).toHaveLength(1)
+	})
+})
+
+// A stable range moving onto a prerelease is kept back per entry (`latest-prerelease.ts`), not by
+// the whole-tree rollback a downgrade forces (joshuafolkken/kit#7693).
+describe('latest_regression.find_regressions — the prerelease case', () => {
+	it('does not report a stable range that moved onto a newer prerelease as a downgrade', () => {
+		const before = manifest({}, { [STYLISTIC]: '^5.10.0' })
+		const after = manifest({}, { [STYLISTIC]: BETA_RANGE })
+
+		expect(latest_regression.find_regressions(before, after)).toStrictEqual([])
+	})
+})
+
+describe('latest_regression.to_floor', () => {
+	it('reads the lowest version a range allows', () => {
+		expect(latest_regression.to_floor(BETA_RANGE)?.version).toBe('6.0.0-beta.6')
+	})
+
+	it('yields undefined for a range semver cannot read', () => {
+		expect(latest_regression.to_floor('git+ssh://host/repo')).toBeUndefined()
 	})
 })
 

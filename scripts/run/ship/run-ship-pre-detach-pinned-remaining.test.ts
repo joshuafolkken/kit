@@ -1,23 +1,28 @@
 import type { LaunchResult } from '#scripts/run/detached-launch'
+import type { RemainingStart } from '#scripts/run/review/run-review-pinned-steps'
 import type { PinnedSummary } from '#scripts/test/test-pinned-record'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { TREE, run_mock, read_mock, on_tree_mock, launch_mock, steps_clear_mock } = vi.hoisted(
-	() => ({
+const { TREE, run_mock, read_mock, on_tree_mock, launch_mock, steps_clear_mock, running_mock } =
+	vi.hoisted(() => ({
 		TREE: 'tree-digest',
 		run_mock: vi.fn<(list: ReadonlyArray<string>) => Promise<Record<string, unknown>>>(),
 		read_mock: vi.fn<(token: string) => PinnedSummary | undefined>(),
 		on_tree_mock: vi.fn<() => Promise<PinnedSummary | undefined>>(),
 		launch_mock: vi.fn<(root: string, tree?: string) => LaunchResult>(),
 		steps_clear_mock: vi.fn<() => void>(),
-	}),
-)
+		running_mock: vi.fn<(tree: string, root?: string) => RemainingStart | undefined>(),
+	}))
 
 vi.mock('#scripts/run/review/run-review-pinned-join', () => ({
 	run_review_pinned_join: { answer_on_tree: on_tree_mock },
 }))
 vi.mock('#scripts/run/review/run-review-pinned-steps', () => ({
-	run_review_pinned_steps: { clear: steps_clear_mock, launch_remaining: launch_mock },
+	run_review_pinned_steps: {
+		clear: steps_clear_mock,
+		relaunch_remaining: launch_mock,
+		remaining_on: running_mock,
+	},
 }))
 vi.mock('#scripts/run/review/run-review-pinned-tree', () => ({
 	run_review_pinned_tree: { key: async () => TREE },
@@ -63,12 +68,12 @@ beforeEach(() => {
 	on_tree_mock.mockReset().mockResolvedValue(undefined)
 	launch_mock.mockReset().mockReturnValue({ kind: 'launched', pid: 1 })
 	steps_clear_mock.mockReset()
+	running_mock.mockReset().mockReturnValue(undefined)
 })
 
 describe('run_ship_pre_detach_pinned.pinned_check on a cut answer', () => {
 	it('still stops, and launches the rest on this tree with their count printed', async () => {
 		expect(await stopped_out()).toContain(`probing 3 remaining hunks ${NOTE}`)
-		expect(steps_clear_mock).toHaveBeenCalledWith(expect.any(String))
 		expect(launch_mock).toHaveBeenCalledWith(expect.any(String), TREE)
 	})
 
@@ -107,6 +112,23 @@ describe('run_ship_pre_detach_pinned.pinned_check on a cut answer', () => {
 		expect(await stopped_out()).not.toContain(NOTE)
 		expect(launch_mock).not.toHaveBeenCalled()
 		expect(steps_clear_mock).not.toHaveBeenCalled()
+	})
+})
+
+describe('run_ship_pre_detach_pinned.pinned_check beside a running continuation', () => {
+	it('keeps the rest already probing on this tree rather than starting it again', async () => {
+		running_mock.mockReturnValue({ kind: 'launched', pid: 2 })
+
+		expect(await stopped_out()).toContain(NOTE)
+		expect(running_mock).toHaveBeenCalledWith(TREE, expect.any(String))
+		expect(launch_mock).not.toHaveBeenCalled()
+	})
+
+	it('prints no probing note when the rest already answered on this tree', async () => {
+		running_mock.mockReturnValue({ kind: 'answered' })
+
+		expect(await stopped_out()).not.toContain(NOTE)
+		expect(launch_mock).not.toHaveBeenCalled()
 	})
 })
 

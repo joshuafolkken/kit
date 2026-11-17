@@ -95,7 +95,7 @@ Before checking, applies ESLint fixes and then Prettier to the resolved scope, u
 - A bare run on a tree it already answered (same file contents and base) runs nothing and prints `reused: tree <hash> <green|red> at <time>` with the kept verdict; a red one names its record to remove (`tree-verdict.ts`).
 - A bare run whose green record cannot narrow, here and in `josh test:related`, first prints `whole branch — since-green fell back: <reason>`.
 - Falls back to the whole tree (naming the case) when no changed file is lintable.
-- In kit, a green bare run also reports a metrics total grown past the merge-base (`josh metrics --totals-only`) as a notice; it changes no exit code and writes no approval file.
+- Measures no metrics totals: in kit, `josh run:review`'s open and the gate's `metrics` check stop on a total grown past the merge-base.
 - Also runs the fast byte-ceiling check on any changed agent-read document, sharing `document-byte-budget.ts`: a documentation update over its ceiling fails here in seconds, and the green record is withheld until both lint and the byte check pass.
 
 ### `josh lint:rule`
@@ -227,15 +227,13 @@ pnpm josh check:related --touched   # mid-run: test:related --touched, no green 
 
 Each check runs through its own `pnpm josh` command, preserving its core-budget reservation, green record or cache. The command waits for every check it started, ends with one verdict line naming each failed check, and exits non-zero if any fails.
 
-`test:related` starts once `lint:related` passes (at once on a reused one); after a failed one its section reads `=== test:related: not run ===` and the verdict line adds `(not run: test:related)`.
+The other checks start once `lint:related` has finished (at once on a reused one), and `test:related` once every other check passes; after a failed one its section reads `=== test:related: not run ===` and the verdict line adds `(not run: test:related)`.
 
 A section prints its check's last 5 lines, 40 on a failure; the log keeps the whole output.
 
 A tree it already answered runs no check, as in `josh lint:related`. A check whose green record still describes the tree is not run: its section reads `=== <check>: reused ===` and the verdict lists it `(reused: …)`.
 
 `lint:related` and `test:related` read their own scoped records, the type check and `cspell:dot` the gate's per-check records (written here on a pass). A record holds only for the same changed files (`.josh/` records included), merge base, and tool and environment fingerprint; any moved file reruns `cspell:dot`.
-
-In kit, `lint:related`'s metrics growth notice prints again above the verdict line, which then says `josh run:review`'s open stops on it (the ship's pre-detach as the backstop) and names `josh metrics --accept`.
 
 Unpinned places a `josh test:pinned` already answered on the current tree, which the ship's pre-detach would stop on, print there too, with the `josh ship --review … --unpinned-ok "<reason>"` form for the first ship; one still running prints nothing and is not waited on.
 
@@ -335,6 +333,8 @@ pnpm josh test:related --silent           # flags are forwarded to vitest
 - `--keep-whole-suite` does nothing in a lane: its gate leaves the whole suite to CI's required `Checks` (`scripts/test/test-related-whole.ts`).
 - The hub is the capped file of the widest reach in the branch's own change, left off where a main merge or the map's tree brought every capped file.
 - The lane ledger row records `<N>` as `over_cap`, the hub as `over_cap_hub` and each file past the cap kept at its full reach as `full_reach` (`{ file, reached }`); `josh lane:breakdown` prints the widest run's count, the one its summary line printed. `--keep-whole-suite` lifts the cap outside a lane; `josh gate` there and CI run the rest.
+- Every run closes on `<N> test file(s) selected, widest <file> (reaches <M>)`; a run of no tests or a fallback says so on that line. `<M>` is the reach before exclusions, the direct importers where capped.
+  The ledger row keeps them as `test_files`, `widest_file` and `widest_tests` (`scripts/test/test-related-summary.ts`).
 - An entries-only edit of `tools/test/pure-files.ts` runs the moved entries and the list's own tests; a `.josh/` run record reaches only a test that read it by name.
 - A changed non-code file narrows to the tests that read it, per the test-read map a whole-suite `josh test:unit` records (`<git-common-dir>/josh/test-read-map.v<version>.json`, one file per map version so lanes on different kits keep their own; a write removes another version's file unwritten for a week); with no map the changed set is the branch diff.
 - A change of only non-code files the map's tree held and no test read runs no test: it says why and exits 0.

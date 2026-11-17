@@ -1,4 +1,5 @@
 import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
+import { JOSH_TMP_DIRECTORY } from '#scripts/lib/josh-temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_handoff_launch, type HandoffChild } from './run-handoff-launch'
 
@@ -18,6 +19,8 @@ const WORKER = 'worker'
 const SCHEDULER_MODEL = 'claude-opus-5-5'
 const LOG = '/repo/.git/handoff.log'
 const BRIEF = 'File the CSV export.'
+const SCRATCH = '.josh/tmp/handoff-kickoff-1'
+const GIT_DIRECTORY = '/repo/.git'
 
 beforeEach(() => {
 	vi.spyOn(agent_diagnostics, 'check').mockReturnValue({ kind: 'ready' })
@@ -44,7 +47,7 @@ describe('run_handoff_launch.role_of', () => {
 
 describe('run_handoff_launch.prompt_of', () => {
 	it('puts the keyword line first and the brief last', () => {
-		const prompt = run_handoff_launch.prompt_of(KICKOFF, `  ${BRIEF}\n`)
+		const prompt = run_handoff_launch.prompt_of(KICKOFF, `  ${BRIEF}\n`, SCRATCH)
 
 		expect(prompt.startsWith(`${KICKOFF_LINE}\n\n`)).toBe(true)
 		expect(prompt.endsWith(BRIEF)).toBe(true)
@@ -52,7 +55,32 @@ describe('run_handoff_launch.prompt_of', () => {
 
 	// joshuafolkken/kit#6898: `josh cost:audit` reads a handed-over run off this origin.
 	it('names the child’s origin', () => {
-		expect(run_handoff_launch.prompt_of(KICKOFF, BRIEF)).toContain(run_handoff_launch.ORIGIN_MARKER)
+		expect(run_handoff_launch.prompt_of(KICKOFF, BRIEF, SCRATCH)).toContain(
+			run_handoff_launch.ORIGIN_MARKER,
+		)
+	})
+
+	// joshuafolkken/kit#7811: two kickoff children started in one checkout never share a body file.
+	it('names a different scratch directory to two children of one keyword started apart', () => {
+		const prompts = [1, 2].map((now) =>
+			run_handoff_launch.prompt_of(
+				KICKOFF,
+				BRIEF,
+				run_handoff_launch.scratch_directory('kickoff', now),
+			),
+		)
+
+		expect(prompts[0]).toContain('.josh/tmp/handoff-kickoff-1/')
+		expect(prompts[1]).toContain('.josh/tmp/handoff-kickoff-2/')
+	})
+})
+
+describe('run_handoff_launch.scratch_directory', () => {
+	it('sits under the scratch directory, named for the keyword and the log’s start time', () => {
+		const scratch = run_handoff_launch.scratch_directory('fullrun', 7)
+
+		expect(scratch).toBe(`${JOSH_TMP_DIRECTORY}/handoff-fullrun-7`)
+		expect(run_handoff_launch.log_path(GIT_DIRECTORY, 'fullrun', 7)).toMatch(/-fullrun-7\.log$/u)
 	})
 })
 
@@ -116,7 +144,7 @@ describe('run_handoff_launch.request_of', () => {
 
 describe('run_handoff_launch.log_path / is_waited', () => {
 	it('names the log after the keyword and the start time', () => {
-		expect(run_handoff_launch.log_path('/repo/.git', 'fullrun', 7)).toMatch(/-fullrun-7\.log$/u)
+		expect(run_handoff_launch.log_path(GIT_DIRECTORY, 'fullrun', 7)).toMatch(/-fullrun-7\.log$/u)
 	})
 
 	it('waits for kickoff and retrospective only', () => {

@@ -290,6 +290,21 @@ function is_waived(plan: LanePlan, over: Oversize | undefined): boolean {
 	return over !== undefined && (plan.single === true || plan.sized === true)
 }
 
+// The size `over` measured: the plan's files (tests excluded) and the lines axis's projection, else none.
+function measured_of(plan: LanePlan, over: Oversize): { files: number; lines: number } {
+	const files = plan.paths.filter((file) => !test_declared_logic.is_test_file(file)).length
+
+	return { files, lines: over.reason === 'lines' ? over.measured : 0 }
+}
+
+// Whether `over` passes the cap (1.5 × the guide, `split-cap.ts`) — the line a lane splits on before its
+// first edit; past the declaration but within the cap it goes on (joshuafolkken/kit#7729).
+function is_past_cap(plan: LanePlan, over: Oversize): boolean {
+	const { files, lines } = measured_of(plan, over)
+
+	return split_assess.is_over_cap(files, lines, over.guide)
+}
+
 function hub_over(signals: PlanSignals): HubOver | undefined {
 	const hubs = signals.hubs ?? []
 
@@ -331,6 +346,8 @@ function bar_tail(): string {
 }
 
 const SIZE_PREFIX = issue_body_keys.prefix('size')
+const SINGLE_HINT =
+	'`--single "<why it cannot be merged in parts>"` — the reason goes on the Issue and the ledger'
 
 function files_text(issue: number, over: FilesOver): string {
 	const planned = [...over.kept, ...over.split_off]
@@ -338,7 +355,7 @@ function files_text(issue: number, over: FilesOver): string {
 	const bar = `${String(counted)} files (tests and generated artifacts excluded), over ${String(over.limit)} — ${String(over.limit / over.declared)} times the ${String(over.declared)} its \`${SIZE_PREFIX}\` declares`
 	const replan = ['pnpm josh lane:plan', String(issue), ...over.kept, ...over.tests].join(' ')
 
-	return `split (files): ${session_cite.issue(issue)}'s plan holds ${bar}, so it is not recorded. Keep in this Issue: ${over.kept.join(', ')}. Split off: ${over.split_off.join(', ')} — file them as a follow-up Issue with \`pnpm josh issue:file "<title>" --body-file <body.md> --route split\`, revert any edit to them here, run \`${replan}\`, and ship this Issue on the kept files. One deliverable with no separately-mergeable part instead → run this \`lane:plan\` again with \`--single\`. ${bar_tail()}`
+	return `split (files): ${session_cite.issue(issue)}'s plan holds ${bar}, so it is not recorded. Keep in this Issue: ${over.kept.join(', ')}. Split off: ${over.split_off.join(', ')} — file them as a follow-up Issue with \`pnpm josh issue:file "<title>" --body-file <body.md> --route split\`, revert any edit to them here, run \`${replan}\`, and ship this Issue on the kept files. One deliverable with no separately-mergeable part instead → run this \`lane:plan\` again with ${SINGLE_HINT}. ${bar_tail()}`
 }
 
 function waiver_text(issue: number, over: Oversize): string {
@@ -358,7 +375,7 @@ function measure_text(issue: number, over: MeasureOver): string {
 }
 
 function hub_text(issue: number, over: HubOver): string {
-	return `split (hub): ${session_cite.issue(issue)}'s plan edits ${over.hubs.join(', ')}, whose \`test:related\` reach passes the ${String(over.limit)}-test-file cap, so the plan is not recorded. Carve the hub edit off as a follow-up Issue with \`pnpm josh issue:file "<title>" --body-file <body.md> --route split\`, revert any edit to it here, and run \`pnpm josh lane:plan ${String(issue)} <paths>\` again on what stays. The hub edit is the one deliverable instead → run this \`lane:plan\` again with \`--single\`. ${bar_tail()}`
+	return `split (hub): ${session_cite.issue(issue)}'s plan edits ${over.hubs.join(', ')}, whose \`test:related\` reach passes the ${String(over.limit)}-test-file cap, so the plan is not recorded. Carve the hub edit off as a follow-up Issue with \`pnpm josh issue:file "<title>" --body-file <body.md> --route split\`, revert any edit to it here, and run \`pnpm josh lane:plan ${String(issue)} <paths>\` again on what stays. The hub edit is the one deliverable instead → run this \`lane:plan\` again with ${SINGLE_HINT}. ${bar_tail()}`
 }
 
 function over_text(issue: number, over: Oversize): string {
@@ -374,7 +391,15 @@ function refusal_text(issue: number, over: Oversize): string {
 	return `${text} ${split_assess.policy_text(guide)}`
 }
 
-const lane_plan_size = { declares, is_waived, oversize, refusal_text, waiver_text }
+const lane_plan_size = {
+	declares,
+	is_past_cap,
+	is_waived,
+	measured_of,
+	oversize,
+	refusal_text,
+	waiver_text,
+}
 
 export { lane_plan_size }
 export type { Oversize, PlanSignals, SplitReason }

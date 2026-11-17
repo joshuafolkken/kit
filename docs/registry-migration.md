@@ -60,7 +60,7 @@ This assumes every `@joshuafolkken` package in the lockfile is on npm. A project
    pnpm config delete --location project "//npm.pkg.github.com/:_authToken"
    ```
 
-3. Remove any project script that calls `fix-gh-packages`; it only serves the GitHub Packages path. If `prepare` calls it, remove that call too.
+3. Remove any project script that calls `fix-gh-packages`. It only repairs GitHub Packages lockfile entries, so an npm-sourced kit does not need it, and `josh sync` leaves a project's own script such as `prepare:gh-packages` in place. If `prepare` calls it, remove that call too.
 
    ```sh
    pnpm pkg delete 'scripts["prepare:gh-packages"]'

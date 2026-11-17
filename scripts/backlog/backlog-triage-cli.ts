@@ -2,7 +2,7 @@ import { fileURLToPath } from 'node:url'
 import { epic_blocked_by } from '#scripts/epic/epic-blocked-by'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
-import { issue_cite } from '#scripts/issue/issue-cite'
+import { issue_cite, type CiteTarget } from '#scripts/issue/issue-cite'
 import { NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { issue_run_verdict } from '#scripts/issue/issue-run-verdict'
@@ -68,13 +68,24 @@ function is_blocker_valid(issue: string, blocker: string | undefined): boolean {
 	return issue_number_shape.is_issue_number(blocker) && blocker !== issue
 }
 
+// `--unblock` also takes `owner/repo#N`, the upstream Issue an interrupt recorded (joshuafolkken/kit#7695).
+function target_of(issue: string): CiteTarget {
+	return issue_cite.parse_target(issue, undefined) ?? { number: issue, repo: undefined }
+}
+
+function is_unblock_valid(issue: string, unblock: string | undefined): boolean {
+	if (unblock === undefined) return true
+
+	return target_of(unblock).repo !== undefined || is_blocker_valid(issue, unblock)
+}
+
 // One relation change at most: recording and removing in one call is no answer.
 function is_relation_valid(issue: string, values: Values): boolean {
 	const { 'blocked-by': blocker, unblock } = values
 
 	if (blocker !== undefined && unblock !== undefined) return false
 
-	return is_blocker_valid(issue, blocker) && is_blocker_valid(issue, unblock)
+	return is_blocker_valid(issue, blocker) && is_unblock_valid(issue, unblock)
 }
 
 // `--lane` with `--solo` is no answer, even beside a valid relation.
@@ -167,7 +178,15 @@ function triaged_by(): string {
 }
 
 function github_cite(issue: string): string {
-	return issue_cite.plain_for('github', issue)
+	const { number, repo } = target_of(issue)
+
+	return issue_cite.plain_for('github', number, repo)
+}
+
+function session_issue(issue: string): string {
+	const { number, repo } = target_of(issue)
+
+	return session_cite.issue(number, undefined, repo)
 }
 
 async function comment(request: TriageRequest): Promise<boolean> {
@@ -215,7 +234,7 @@ async function change_relation(request: TriageRequest): Promise<string | undefin
 
 	return await relation_problem(
 		backlog_triage_unblock.remove({ issue, prerequisite: unblock }),
-		`could not remove blocked by ${session_cite.issue(unblock)}`,
+		`could not remove blocked by ${session_issue(unblock)}`,
 	)
 }
 
@@ -240,7 +259,7 @@ async function triage(request: TriageRequest, directory: string): Promise<number
 
 	if (problem !== undefined) return refused(issue, problem)
 
-	console.info(`triage ${session_cite.issue(issue)} — ${verdict_of(request, session_cite.issue)}`)
+	console.info(`triage ${session_cite.issue(issue)} — ${verdict_of(request, session_issue)}`)
 
 	return SUCCESS_EXIT_CODE
 }

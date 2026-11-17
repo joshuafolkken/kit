@@ -10,9 +10,11 @@
   4. **Record the plan** — written to a file in the session language (`JOSH_SESSION_LANG`, default
      `ja`), then `pnpm josh issue:plan <N> --body-file .josh/tmp/plan.md --title "<title>" --planned`, which
      records it, applies `run:planned` and sends the `planning` Telegram (`docs/josh-commands-backlog.md`
-     → "`josh issue:plan`"). A target named in front of the reference adds `--repo <owner/name>`.
+     → "`josh issue:plan`"). A target named in front of the reference adds `--repo <owner/name>`; from
+     another repository's checkout that applies `plan:unverified` instead, until re-planned in the target.
      Before writing the plan, run `pnpm josh plan:consumers <identifier...>` on what it adds or changes
-     and finish the `### 影響を受ける既存の利用者` draft it prints.
+     and finish the `### 影響を受ける既存の利用者` draft it prints. Refused for naming more files than the
+     estimate → `docs/josh-commands-backlog.md` → "`josh issue:plan`".
   5. Report the plan, the Telegram's last line `Next: halfrun #<N> | prrun #<N> | fullrun #<N>`, then **stop** (do not implement).
 
   **Two or more separately-mergeable deliverables** take the split path instead of a plan: create the
@@ -37,7 +39,8 @@ epic` writes only the repository it runs in, and the promote arm stops when that
 checked out here. A third-party owner is Tier C: stop rather than file.
 
 - `kickoff new` or `kickoff new "<title>"`: (0) **Scope assessment** per `split-assessment.md` — one
-  deliverable takes the **single-issue path**, several the **multi-issue split path**.
+  deliverable takes the **single-issue path**, several the **multi-issue split path**. A `run:handoff`
+  child → the directory its prompt names (`prompts/collaboration-workflow/shell-body.md` → "安全な書き方").
   - **Single-issue path**: (1) Derive an English title, or use the one given. (2) `pnpm josh issue:file
     "<title>" --body-file .josh/tmp/body.md --over-cap` plus the labels the words typed after `new` name
     ("Words typed after `new`", below; body per `prompts/collaboration-workflow/issue-template.md`) —

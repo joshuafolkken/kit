@@ -75,6 +75,7 @@ function board_of(): Array<string> {
 			activity: beating,
 			layout: LAYOUT,
 			usual: USUAL,
+			lane_totals: [40 * MINUTE],
 			lane_limit: 2,
 			operations: OPERATIONS,
 		}),

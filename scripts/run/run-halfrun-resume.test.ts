@@ -72,23 +72,53 @@ describe('run_halfrun_resume.mark_stop_at — the halfrun stop marks its own rec
 	})
 })
 
+// joshuafolkken/kit#7710: the stop keeps when the stopped run began, which `run:board` draws its fixed
+// time from; a stop already marked keeps its own.
+function started_at(): string | undefined {
+	return run_halfrun_resume.hold_of(run_hold.read_hold(TARGET))?.started_at
+}
+
+describe('run_halfrun_resume.mark_stop_at — the stop keeps the run’s start', () => {
+	const STARTED = new Date('2026-11-17T01:00:00.000Z')
+
+	it('keeps the claim’s moment as the start, through a second stop', () => {
+		run_hold.create_hold(TARGET, ISSUE, STARTED)
+
+		run_halfrun_resume.mark_stop_at(TARGET, ISSUE)
+		expect(started_at()).toBe(STARTED.toISOString())
+
+		run_halfrun_resume.mark_stop_at(TARGET, ISSUE)
+		expect(started_at()).toBe(STARTED.toISOString())
+	})
+
+	it('records no start over a free tree', () => {
+		run_halfrun_resume.mark_stop_at(TARGET, ISSUE)
+
+		expect(started_at()).toBeUndefined()
+	})
+})
+
 // joshuafolkken/kit#7494: a fix round re-opens the stop as a running `halfrun` owned by the round, and
-// its own stop marks it again; only #N's own stop is re-opened.
+// its own stop marks it again; only #N's own stop is re-opened. The stop is drawn stopped (#7710).
 function single_run(): string | undefined {
-	return run_board_single.span_of(run_hold.read_hold(TARGET))?.invocation
+	const span = run_board_single.span_of(run_hold.read_hold(TARGET))
+
+	if (span === undefined) return undefined
+
+	return span.ended_ms === undefined ? span.invocation : `${span.invocation} stopped`
 }
 
 describe('run_halfrun_resume.reopen_at — a fix round runs on its stopped halfrun', () => {
-	it('draws the round on the board until its own stop, and draws no bare stop', () => {
+	it('draws the round running on the board until its own stop, and the stop stopped', () => {
 		run_hold.create_halfrun_stop_hold(TARGET, ISSUE)
-		expect(single_run()).toBeUndefined()
+		expect(single_run()).toBe(`halfrun #${ISSUE} stopped`)
 
 		expect(run_halfrun_resume.reopen_at(TARGET, ISSUE)).toBe(run_halfrun_resume.MARKED)
 		expect(hold_record()).toStrictEqual(RUNNING_RECORD)
 		expect(single_run()).toBe(`halfrun #${ISSUE}`)
 
 		expect(run_halfrun_resume.mark_stop_at(TARGET, ISSUE)).toBe(run_halfrun_resume.MARKED)
-		expect(single_run()).toBeUndefined()
+		expect(single_run()).toBe(`halfrun #${ISSUE} stopped`)
 	})
 
 	it("names the round's own process on the tree:status hold line", () => {
@@ -132,14 +162,14 @@ describe('run_halfrun_resume.adopt_at — a marked halfrun stop is adopted as th
 			.spyOn(lane_state, 'record_change')
 			.mockResolvedValue({ kind: 'skipped', reason: 'test' })
 
-		expect(await run_halfrun_resume.adopt(ISSUE)).toBe(true)
+		expect(await run_halfrun_resume.adopt(ISSUE, 'fullrun')).toBe(true)
 		expect(record).toHaveBeenCalledWith({ issue: ISSUE, state: 'running', command: 'run:entry' })
 	})
 
 	it('re-writes the marked hold over a dirty tree with the fullrun mark', () => {
 		run_hold.create_halfrun_stop_hold(TARGET, ISSUE)
 
-		expect(run_halfrun_resume.adopt_at(TARGET, ISSUE, is_dirty)).toBe(true)
+		expect(run_halfrun_resume.adopt_at(TARGET, ISSUE, is_dirty, run_hold.FULLRUN_MARK)).toBe(true)
 		expect(hold_record()).toStrictEqual(ADOPTED_RECORD)
 	})
 
@@ -148,7 +178,21 @@ describe('run_halfrun_resume.adopt_at — a marked halfrun stop is adopted as th
 
 		run_hold.create_halfrun_stop_hold(TARGET, ISSUE, expired)
 
-		expect(run_halfrun_resume.adopt_at(TARGET, ISSUE, is_dirty)).toBe(true)
+		expect(run_halfrun_resume.adopt_at(TARGET, ISSUE, is_dirty, run_hold.FULLRUN_MARK)).toBe(true)
+	})
+})
+
+// joshuafolkken/kit#7724: a `prrun` that picks the stop up is drawn as one, not as a `fullrun`.
+describe('run_halfrun_resume.adopt — a prrun resume keeps its name', () => {
+	it('re-writes the marked hold with the prrun mark, drawn as prrun', async () => {
+		run_hold.create_halfrun_stop_hold(TARGET, ISSUE)
+		vi.spyOn(run_hold, 'worktree_directory').mockResolvedValue(path.join(scratch, '.git'))
+		vi.spyOn(run_hold, 'is_tree_dirty').mockResolvedValue(true)
+		vi.spyOn(lane_state, 'read_state').mockResolvedValue(undefined)
+
+		expect(await run_halfrun_resume.adopt(ISSUE, 'prrun')).toBe(true)
+		expect(hold_record()).toStrictEqual(ADOPTED_RECORD)
+		expect(single_run()).toBe(`prrun #${ISSUE}`)
 	})
 })
 
@@ -163,7 +207,9 @@ describe('run_halfrun_resume.adopt_at — anything else is left to the ordinary 
 
 		const before = hold_record()
 
-		expect(run_halfrun_resume.adopt_at(TARGET, ISSUE, is_tree_dirty)).toBe(false)
+		expect(run_halfrun_resume.adopt_at(TARGET, ISSUE, is_tree_dirty, run_hold.FULLRUN_MARK)).toBe(
+			false,
+		)
 		expect(hold_record()).toStrictEqual(before)
 	})
 
@@ -174,7 +220,7 @@ describe('run_halfrun_resume.adopt_at — anything else is left to the ordinary 
 	})
 
 	it('does not adopt a free tree, and writes no record', () => {
-		expect(run_halfrun_resume.adopt_at(TARGET, ISSUE, is_dirty)).toBe(false)
+		expect(run_halfrun_resume.adopt_at(TARGET, ISSUE, is_dirty, run_hold.FULLRUN_MARK)).toBe(false)
 		expect(run_hold.read_hold(TARGET).kind).toBe('free')
 	})
 })

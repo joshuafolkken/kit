@@ -8,6 +8,7 @@ import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_paths } from '#scripts/lane/lane-paths'
 import { error_text } from '#scripts/lib/error-message'
 import { json_value } from '#scripts/lib/json-value'
+import { run_stage } from '#scripts/run/run-stage'
 import { z } from 'zod'
 
 // One run at a time per working tree. The entry points a person types — `fullrun`, `halfrun`,
@@ -53,6 +54,10 @@ interface RunHold {
 	// hold the tree just the same — must not be read as one. Optional and `| undefined` because a record
 	// without this field is simply not a `fullrun`'s.
 	is_fullrun?: boolean | undefined
+	// Set only by `prrun #N`'s entry and resume, beside `is_fullrun`: a `prrun` runs `fullrun`'s steps,
+	// so every `is_fullrun` reader treats it as one, and only `run:board`'s heading names it `prrun`
+	// (joshuafolkken/kit#7724).
+	is_prrun?: boolean | undefined
 	// Set only at a `halfrun`'s stop before commit (`run:hold <N> --halfrun-stop`): the positive record
 	// that the run has *ended* over its verified diff, which is what lets `fullrun #N` adopt the hold. A
 	// running `halfrun` or a `backlogrun` child never carries it.
@@ -61,6 +66,9 @@ interface RunHold {
 	// request stood on, so `fullrun #N` can tell an untouched branch — merge it — from one that moved
 	// since and has to pass the gate and the review again.
 	prrun_stop_head?: string | undefined
+	// Set only on a stop's record: when the stopped run began, since the stop re-writes the record and its
+	// `taken_at` is the stop's moment. `run:board` draws the stopped run's time from it (joshuafolkken/kit#7710).
+	started_at?: string | undefined
 	// The agent session the claim ran under — `pid` is the short-lived `josh run:hold` itself, gone
 	// before anything reads it back, so it can never say whether the run is still there. The pair with
 	// its start time is the identity `process-identity.ts` defines. Optional for a record without these
@@ -113,8 +121,10 @@ const run_hold_schema = z.object({
 	taken_at: z.string(),
 	pid: z.number(),
 	is_fullrun: z.boolean().optional(),
+	is_prrun: z.boolean().optional(),
 	is_halfrun_stop: z.boolean().optional(),
 	prrun_stop_head: z.string().optional(),
+	started_at: z.string().optional(),
 	owner_pid: z.number().optional(),
 	owner_start: z.string().optional(),
 	notified_at: z.string().optional(),
@@ -196,10 +206,22 @@ function lane_mark(
 	return { is_single_in_lane: true }
 }
 
-function build_hold(issue: string, now: Date, is_fullrun?: boolean): RunHold {
+// The run a claim names: none for a `halfrun` or a `backlogrun` child, `is_fullrun` for a `fullrun`,
+// and both for a `prrun`, which runs `fullrun`'s steps.
+type HoldMark = Pick<RunHold, 'is_fullrun' | 'is_prrun'>
+
+const FULLRUN_MARK: HoldMark = { is_fullrun: true }
+const PRRUN_MARK: HoldMark = { is_fullrun: true, is_prrun: true }
+
+// The mark of a run resumed as `command` — only a `fullrun` or a `prrun` resumes a stopped run.
+function resumed_mark(command: string): HoldMark {
+	return command === run_stage.PRRUN ? PRRUN_MARK : FULLRUN_MARK
+}
+
+function build_hold(issue: string, now: Date, mark: HoldMark = {}): RunHold {
 	const owner = { ...session_owner(), ...lane_mark() }
 
-	return { issue, taken_at: now.toISOString(), pid: process.pid, is_fullrun, ...owner }
+	return { issue, taken_at: now.toISOString(), pid: process.pid, ...mark, ...owner }
 }
 
 function write_hold(target: string, issue: string, now: Date = new Date()): RunHold {
@@ -217,14 +239,14 @@ function create_hold(
 	target: string,
 	issue: string,
 	now: Date = new Date(),
-	is_fullrun?: boolean,
+	mark: HoldMark = {},
 ): boolean {
-	return stamp_file.create_stamp(target, build_hold(issue, now, is_fullrun))
+	return stamp_file.create_stamp(target, build_hold(issue, now, mark))
 }
 
 // What a stopped run's record carries on top of the claim: the `halfrun` stop's flag, or the commit a
-// `prrun` stop stood on.
-type StopMarkFields = Pick<RunHold, 'is_halfrun_stop' | 'prrun_stop_head'>
+// `prrun` stop stood on, and when the stopped run began.
+type StopMarkFields = Pick<RunHold, 'is_halfrun_stop' | 'prrun_stop_head' | 'started_at'>
 
 const HALFRUN_STOP_FIELDS: StopMarkFields = { is_halfrun_stop: true }
 
@@ -357,7 +379,10 @@ const run_hold = {
 	create_halfrun_stop_hold,
 	create_stop_hold,
 	HALFRUN_STOP_FIELDS,
+	FULLRUN_MARK,
+	PRRUN_MARK,
 	create_hold,
+	resumed_mark,
 	describe_holder,
 	foreign_release_message,
 	forced_release_message,
@@ -382,5 +407,5 @@ const run_hold = {
 	write_hold,
 }
 
-export type { HoldRead, RunHold, SessionOwner, StopMarkFields }
+export type { HoldRead, RunHold, HoldMark, SessionOwner, StopMarkFields }
 export { run_hold }

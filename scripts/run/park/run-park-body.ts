@@ -68,6 +68,14 @@ const AUTO_PERMISSION = 'なし'
 // taking it, so the lane must not resume before the parent has (joshuafolkken/kit#7001).
 const PARENT_PERMISSION = '親'
 const PARENT_ACTION_NOTE = ' · 親の操作'
+// A child cannot file an Issue, so an option naming `issue:file` is the parent's filing
+// (joshuafolkken/kit#7771): written with the parent permission, and adopted only once the Issue it
+// files exists.
+const FILING_COMMAND = 'issue:file'
+// An option closing the Issue without implementing names `issue:close` (joshuafolkken/kit#7805): the
+// parent's `backlog:triage --adopt` closes it as not planned and returns the lane instead of a requeue.
+const CLOSE_COMMAND = 'issue:close'
+const PARENT_COMMANDS = [FILING_COMMAND, CLOSE_COMMAND] as const
 
 const FORMAT = [
 	'Park body schema:',
@@ -78,6 +86,7 @@ const FORMAT = [
 	'2. <option>',
 	TIER_LINE,
 	'   - 必要な権限: …',
+	`   (closing without implementing: - 必要な権限: ${PARENT_PERMISSION}（${CLOSE_COMMAND}）)`,
 	'   (a size-approval option adds all three:)',
 	...APPROVAL_PARTS.map(([, line]) => `   ${line}`),
 	PICK_HEADING,
@@ -190,13 +199,32 @@ function approval_problem(approval: ParkApproval | undefined, name: string): str
 	return missing === undefined ? undefined : `${name} has no "${missing[1]}" line`
 }
 
+function is_parent_action(option: ParkOption | undefined): boolean {
+	return option?.permission?.startsWith(PARENT_PERMISSION) === true
+}
+
+function names_command(option: ParkOption | undefined, command: string): boolean {
+	return option?.permission?.includes(command) === true
+}
+
+// A filing or closing option written as anything but the parent's: adopting it would requeue with
+// nothing filed or closed.
+function command_problem(option: ParkOption, name: string): string | undefined {
+	if (is_parent_action(option)) return undefined
+	const command = PARENT_COMMANDS.find((candidate) => names_command(option, candidate))
+
+	if (command === undefined) return undefined
+
+	return `${name} names ${command}, which a child cannot run; write "- 必要な権限: ${PARENT_PERMISSION}（${command} …）"`
+}
+
 function option_problem(option: ParkOption): string | undefined {
 	const name = `option ${String(option.number)}`
 
 	if (option.tier === undefined) return `${name} has no "- 層: A|B|C" line`
 	if (option.permission === undefined) return `${name} has no "- 必要な権限: …" line`
 
-	return approval_problem(option.approval, name)
+	return command_problem(option, name) ?? approval_problem(option.approval, name)
 }
 
 function is_listed(park: ParkBody, number: number | undefined): boolean {
@@ -230,10 +258,6 @@ function picked_option(body: string): ParkOption | undefined {
 	return park.options.find((candidate) => candidate.number === number)
 }
 
-function is_parent_action(option: ParkOption | undefined): boolean {
-	return option?.permission?.startsWith(PARENT_PERMISSION) === true
-}
-
 // The recommended option and its tier, or no recommendation; `undefined` for a body off the schema.
 function summary_of(body: string): string | undefined {
 	if (problem_of(body) !== undefined) return undefined
@@ -248,6 +272,30 @@ function summary_of(body: string): string | undefined {
 // Whether option `number` needs the parent's own action before the lane may resume.
 function parent_action(body: string, number: number): boolean {
 	return is_parent_action(parse(body).options.find((candidate) => candidate.number === number))
+}
+
+function parent_command(body: string, number: number, command: string): boolean {
+	const option = parse(body).options.find((candidate) => candidate.number === number)
+
+	return is_parent_action(option) && names_command(option, command)
+}
+
+// Whether option `number` is the parent's filing of an Issue the child then waits on.
+function filing_action(body: string, number: number): boolean {
+	return parent_command(body, number, FILING_COMMAND)
+}
+
+// Whether option `number` closes the Issue without implementing (joshuafolkken/kit#7805).
+function close_action(body: string, number: number): boolean {
+	return parent_command(body, number, CLOSE_COMMAND)
+}
+
+// Whether adopting option `number` needs `--done`: a parent action the adopt does not take itself.
+// A closing option is taken by the adopt; one that also files still needs the filed Issue named.
+function done_needed(body: string, number: number): boolean {
+	if (filing_action(body, number)) return true
+
+	return parent_action(body, number) && !close_action(body, number)
 }
 
 function is_parents(option: ParkOption): boolean {
@@ -336,7 +384,10 @@ const run_park_body = {
 	adoptable_pick,
 	approval_range,
 	auto_pick,
+	close_action,
 	default_pick,
+	done_needed,
+	filing_action,
 	parent_action,
 	problem_of,
 	summary_of,

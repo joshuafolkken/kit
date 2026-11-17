@@ -172,7 +172,7 @@ describe('epic_bundle_apply.apply_decision — ask', () => {
 			children: [CANDIDATE_NUMBER, SUBJECT_NUMBER],
 		})
 		expect(added?.decision).toMatch(
-			/^Auto-decided \(\d{4}-\d{2}-\d{2}, `epic:bundle --apply`\): placed #894 in #893 over #880 because/u,
+			/^Auto-decided \(\d{4}-\d{2}-\d{2}, `epic:bundle --apply`\): placed #894 in #893 over #880/u,
 		)
 	})
 

@@ -70,6 +70,8 @@ still there for a reading outside a run.
 | `swapped peak` / `mean (GB/h)`  | the `swapped_mb` difference between consecutive `load` samples                          |
 | `free memory min` / `mean (GB)` | `load` samples' `available_mb`                                                          |
 | `load samples`                  | how many `load` samples the period holds                                                |
+| `estimate ratio first`          | median over the period's ended runs of their first `estimate` entry's actual ÷ estimate |
+| `estimate ratio median`         | median over the same runs of each run's median `estimate` ratio                         |
 
 **A column with no samples prints `—`, never `0`** — a period no `backlogrun` ran in has no load,
 which is not an idle machine. **The swap columns need two samples between half a minute and an hour apart** — a

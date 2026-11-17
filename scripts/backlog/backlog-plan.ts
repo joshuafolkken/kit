@@ -108,7 +108,8 @@ function row_of(child: EpicChild, context: PlanContext, note: string): string {
 // is the dependency the report has never shown — and the two label-free cases are told apart so
 // "waiting" does not read as "blocked" for an issue that is simply next in line.
 // A blocker is dropped only where it is *known* closed: this repository's, and absent from a listing
-// that was read to the end. Anything else is named.
+// that was read to the end. Anything else is named — another repository's Issue even once closed, since
+// `epic_outside_blocker` holds the child until its release lands (joshuafolkken/kit#7695).
 function is_standing(edge: IssueReference, context: PlanContext): boolean {
 	if (context.open_numbers === undefined) return true
 

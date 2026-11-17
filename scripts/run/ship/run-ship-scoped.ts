@@ -10,7 +10,7 @@ import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { run_ship_gate_runs } from './run-ship-gate-runs'
 import { run_ship_lap, type LapNote } from './run-ship-lap'
-import { run_ship_narrowed } from './run-ship-narrowed'
+import { run_ship_narrowed, type Moved } from './run-ship-narrowed'
 import { run_ship_pair_runs } from './run-ship-pair-runs'
 import { run_ship_synced_scope, type SyncedCheck, type SyncReading } from './run-ship-synced-scope'
 
@@ -21,7 +21,6 @@ import { run_ship_synced_scope, type SyncedCheck, type SyncReading } from './run
 
 const SUCCESS_EXIT_CODE = 0
 const should_forward_stderr = true
-const MOVED_SINCE_GREEN = 'moved since this ship last met the pair green on this base'
 const MERGE_MEETS_BRANCH = "where the merge with the default branch meets this branch's change"
 const REUSED_PAIR = 'scoped pair: reused — both checks are green on this tree'
 const RED_PAIR = 'scoped pair: red on this tree in this ship — not run again'
@@ -34,7 +33,10 @@ interface ScopedPhase {
 }
 
 // A pair's result with the files it was named over, or why a merge could not split, for its lap.
-type PairResult = JoshResult & { note?: Pick<LapNote, 'named' | 'unsplit'>; verified?: GateTree }
+type PairResult = JoshResult & {
+	note?: Pick<LapNote, 'named' | 'unsplit' | 'breakdown' | 'resumed_from'>
+	verified?: GateTree
+}
 
 async function run_phases(
 	phases: ReadonlyArray<Phase>,
@@ -99,19 +101,21 @@ async function bare_pair(scripts: ReadonlyArray<string>): Promise<PairResult> {
 	return { ...result, out: outs.filter((out) => out !== '').join('\n') }
 }
 
-// A merge the import graph could not split names nothing (joshuafolkken/kit#6185).
-async function nameable_files(
-	scripts: ReadonlyArray<string>,
+// The files the pair can be named over, with why, or `undefined`. A merge the import graph could not
+// split names nothing (joshuafolkken/kit#6185).
+async function named_files(
 	tree: GateTree,
+	scripts: ReadonlyArray<string>,
 	sync: SyncReading | undefined,
-): Promise<ReadonlyArray<string> | undefined> {
+): Promise<Moved | undefined> {
 	const checks = run_ship_synced_scope.checks_of(scripts)
 
 	if (sync === undefined) return await run_ship_narrowed.moved_since_green(checks, tree)
 
 	const named = run_ship_synced_scope.named_of(sync)
+	const files = named === undefined ? undefined : await run_ship_narrowed.nameable(checks, named)
 
-	return named === undefined ? undefined : await run_ship_narrowed.nameable(checks, named)
+	return files === undefined ? undefined : { files, why: MERGE_MEETS_BRANCH, resumed_from: 'none' }
 }
 
 // Each check over its own part of the named files (`run_ship_synced_scope.files_for`).
@@ -127,18 +131,6 @@ function check_phases(
 	)
 }
 
-// The files the pair can be named over, with why, or `undefined`.
-async function named_files(
-	tree: GateTree,
-	scripts: ReadonlyArray<string>,
-	sync: SyncReading | undefined,
-): Promise<{ files: ReadonlyArray<string>; why: string } | undefined> {
-	const files = await nameable_files(scripts, tree, sync)
-	const why = sync === undefined ? MOVED_SINCE_GREEN : MERGE_MEETS_BRANCH
-
-	return files === undefined ? undefined : { files, why }
-}
-
 // The pair over the branch's own scope, after the line saying why a merge named nothing.
 async function unnamed_pair(
 	scripts: ReadonlyArray<string>,
@@ -151,6 +143,16 @@ async function unnamed_pair(
 	printed(run_ship_synced_scope.unsplit_line(unsplit))
 
 	return { ...(await bare_pair(scripts)), note: { unsplit } }
+}
+
+// A named pair's lap: how many files, and what each condition named when a merge named them.
+function named_note(
+	files: ReadonlyArray<string>,
+	sync: SyncReading | undefined,
+): Pick<LapNote, 'named' | 'breakdown'> {
+	const named = files.length
+
+	return sync?.breakdown === undefined ? { named } : { named, breakdown: sync.breakdown }
 }
 
 // A tree that moved while the checks ran — a reviewer's edit beside the gate — was not the one they
@@ -168,7 +170,9 @@ async function narrowed_or_bare(
 
 	if (named === undefined) return await unnamed_pair(scripts, sync)
 
-	printed(run_ship_narrowed.describe(named.files, named.why))
+	printed(
+		run_ship_narrowed.describe(named.files, named.why, run_ship_synced_scope.breakdown_text(sync)),
+	)
 
 	const checks = run_ship_synced_scope.checks_of(scripts)
 	const result = await run_pair_phases(check_phases(checks, named.files, sync))
@@ -179,7 +183,10 @@ async function narrowed_or_bare(
 		run_ship_narrowed.record(checks, verified)
 	}
 
-	return { ...result, note: { named: named.files.length } }
+	return {
+		...result,
+		note: { ...named_note(named.files, sync), resumed_from: named.resumed_from },
+	}
 }
 
 // The red a pair ahead in the queue met, its output kept as it was, after the line saying so.
@@ -246,7 +253,7 @@ async function settled_pair(): Promise<PairResult> {
 
 function pair_note({ out, note }: PairResult): LapNote {
 	const reasons = since_green.fallbacks_of(out)
-	const run = { ...run_ship_pair_runs.current(), ...note }
+	const run: LapNote = { resumed_from: 'none', ...run_ship_pair_runs.current(), ...note }
 
 	return reasons.length === 0 ? run : { ...run, fallback: reasons.join(', ') }
 }

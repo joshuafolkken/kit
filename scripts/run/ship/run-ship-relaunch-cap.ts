@@ -4,8 +4,9 @@ import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
-import { run_stalled, type ParkStop } from '#scripts/run/park/run-stalled'
+import type { ParkStop } from '#scripts/run/park/run-stalled'
 import { run_stalled_park } from '#scripts/run/park/run-stalled-park'
+import { run_ship_park_prose } from './run-ship-park-prose'
 import { run_ship_stage } from './run-ship-stage'
 import { run_ship_stop_cause } from './run-ship-stop-cause'
 import { run_ship_stop_text } from './run-ship-stop-text'
@@ -102,7 +103,7 @@ function park_comment(issue: string, lead: string, blocked: string | undefined):
 		lead,
 		...(blocked === undefined ? [] : ['', `Cause: \`${blocked}\``]),
 		'',
-		`Read the stop with \`pnpm josh ship --log ${issue}\`, then ${run_stalled.next_step(issue)}.`,
+		run_ship_park_prose.next_step(issue),
 	].join('\n')
 }
 
@@ -128,17 +129,15 @@ async function park_with(issue: string, notice: ParkNotice, parked: ParkedStop):
 
 async function park(issue: string, parked: ParkedStop): Promise<boolean> {
 	const { reason } = parked
-	const kind = kind_of(reason)
-	const relaunches = String(MAX_SHIP_STOP_RELAUNCHES)
+	const prose = run_ship_park_prose.cap({
+		reason,
+		kind: kind_of(reason),
+		relaunches: String(MAX_SHIP_STOP_RELAUNCHES),
+	})
 
 	return await park_with(
 		issue,
-		{
-			lead: `Parked by the \`josh ship\` supervisor: the ship stopped at \`${reason}\` after ${relaunches} relaunches of the lane child for ${kind} stops since its dispatch — the ${kind} stop cap was exceeded.`,
-			cause: PARK_CAUSE,
-			title: 'Ship stop cap reached',
-			body: `The lane child's ${kind} stops passed their cap of ${relaunches} relaunches since its dispatch, the last at ${reason}, so it was not relaunched and the issue is parked.`,
-		},
+		{ ...prose, cause: PARK_CAUSE, title: 'Ship stop cap reached' },
 		parked,
 	)
 }
@@ -146,16 +145,11 @@ async function park(issue: string, parked: ParkedStop): Promise<boolean> {
 // A timed-out merge wait parks at once: a relaunch waits the same timeout on the same blocked merge
 // (joshuafolkken/kit#5775).
 async function park_timed_out(issue: string, parked: ParkedStop): Promise<boolean> {
-	const { reason } = parked
+	const prose = run_ship_park_prose.timed_out(parked.reason)
 
 	return await park_with(
 		issue,
-		{
-			lead: `Parked by the \`josh ship\` supervisor: the merge wait at \`${reason}\` timed out, which a relaunch of the lane child does not clear, so none was started.`,
-			cause: TIMEOUT_PARK_CAUSE,
-			title: 'Merge wait timed out',
-			body: `The merge wait at ${reason} timed out, so the lane child was not relaunched and the issue is parked.`,
-		},
+		{ ...prose, cause: TIMEOUT_PARK_CAUSE, title: 'Merge wait timed out' },
 		parked,
 	)
 }
@@ -163,16 +157,11 @@ async function park_timed_out(issue: string, parked: ParkedStop): Promise<boolea
 // A followup whose CI-infrastructure reruns ran out parks at once: a relaunch meets the same outage, and
 // a re-run once CI recovers resumes it (joshuafolkken/kit#6848).
 async function park_ci_infra(issue: string, parked: ParkedStop): Promise<boolean> {
-	const { reason } = parked
+	const prose = run_ship_park_prose.ci_infra(parked.reason)
 
 	return await park_with(
 		issue,
-		{
-			lead: `Parked by the \`josh ship\` supervisor: CI infrastructure failures outlasted every rerun at \`${reason}\`, which a relaunch of the lane child does not clear, so none was started. Resume it once CI recovers.`,
-			cause: CI_INFRA_PARK_CAUSE,
-			title: CI_INFRA_PARK_CAUSE,
-			body: `CI infrastructure failures outlasted every rerun at ${reason}, so the lane child was not relaunched and the issue is parked until CI recovers.`,
-		},
+		{ ...prose, cause: CI_INFRA_PARK_CAUSE, title: CI_INFRA_PARK_CAUSE },
 		parked,
 	)
 }

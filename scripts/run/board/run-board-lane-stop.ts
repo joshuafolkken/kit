@@ -23,9 +23,9 @@ interface LabelStop {
 	reason?: string | undefined
 }
 
-// `run:release` takes `in-progress` off as it ends the run's hold (`run-hold-cli.ts`), so a child
-// without it was released.
-const RELEASE_REASON = 'run:release'
+// joshuafolkken/kit#7750: a child without `in-progress` is drawn by that fact, not by a command
+// guessed to have taken it off — `run:release`, `run:merge`, `run:stale` and a person all do.
+const UNLABELLED_REASON = 'no in-progress label'
 
 // A running child stopped at `ended_ms`: its phase start stays, so its phase time freezes with it.
 function stopped(status: ItemStatus, ended_ms: number, reason?: string): ItemStatus {
@@ -40,6 +40,14 @@ function stopped(status: ItemStatus, ended_ms: number, reason?: string): ItemSta
 	}
 }
 
+// joshuafolkken/kit#7694: a lane closed before the row's run started is an earlier child's ending — a
+// run handed off in the main tree on the same issue is not stopped by it.
+function ending_of(end: LaneEnd | undefined, status: ItemStatus): LaneEnd | undefined {
+	if (end === undefined || status.started_ms === undefined) return end
+
+	return end.ended_ms < status.started_ms ? undefined : end
+}
+
 // A running lane no child is working in is stopped whatever the stream last said: a child that died or
 // was closed writes no ending. A record that ended the lane dates the stop and names who ended it;
 // otherwise the lane stopped by the time it was first read idle, or its transcript's last write if
@@ -50,20 +58,34 @@ function lane_status(
 	end: LaneEnd | undefined,
 ): ItemStatus {
 	if (status.state !== 'running') return status
-	if (end !== undefined) return stopped(status, end.ended_ms, end.by)
+	const ending = ending_of(end, status)
+	if (ending !== undefined) return stopped(status, ending.ended_ms, ending.by)
 
 	return idle_ms === undefined
 		? status
 		: stopped(status, Math.min(idle_ms, status.written_ms ?? idle_ms))
 }
 
+// joshuafolkken/kit#7750: an open lane of this run's not yet read idle for the re-confirm window is not
+// confirmed stopped (`lane-spent.ts`), so it stays running and says so — not a positive alive read.
+function own_status(
+	issue: number,
+	status: ItemStatus,
+	lanes: BoardLanes,
+	idle: IdleSince,
+): ItemStatus {
+	const end = lanes.ended?.get(issue)
+	if (!lanes.own.has(issue)) return lane_status(status, undefined, end)
+	const settled = lane_status(status, idle.get(String(issue)), end)
+
+	return settled.state === 'running' ? { ...settled, is_live: true } : settled
+}
+
 // Each running child of `statuses` whose lane stopped, stopped: an open lane of this run's once read
 // idle, or a lane this run's record ended — a closed lane is no longer open, so only its record says.
 function stop_lanes(statuses: Map<number, ItemStatus>, lanes: BoardLanes, idle: IdleSince): void {
 	for (const [issue, status] of statuses) {
-		const idle_ms = lanes.own.has(issue) ? idle.get(String(issue)) : undefined
-
-		statuses.set(issue, lane_status(status, idle_ms, lanes.ended?.get(issue)))
+		statuses.set(issue, own_status(issue, status, lanes, idle))
 	}
 }
 
@@ -77,14 +99,20 @@ function label_stop(labels: ReadonlyArray<string> | undefined): LabelStop | unde
 	const parked = parked_label_of(labels)
 	if (parked !== undefined) return { state: 'stopped', reason: parked }
 
-	return issue_run_hold.is_held(labels) ? undefined : { state: 'stopped', reason: RELEASE_REASON }
+	return issue_run_hold.is_held(labels)
+		? undefined
+		: { state: 'stopped', reason: UNLABELLED_REASON }
 }
 
 // A child whose transcript still reads running is working, so a label that says stopped stopped its
 // ship, not it: the row runs on, with the reason beside it. An unread or finished result is not taken
-// for a working child.
-function is_working(status: ItemStatus): boolean {
-	return status.state === 'running' && status.result === 'running'
+// for a working child; a lane not confirmed idle is, where only its `in-progress` is missing.
+function is_working(status: ItemStatus, stop: LabelStop): boolean {
+	if (status.state !== 'running') return false
+
+	return (
+		status.result === 'running' || (status.is_live === true && stop.reason === UNLABELLED_REASON)
+	)
 }
 
 // A lane already stopped keeps its stop time and the reason it recorded.
@@ -97,12 +125,26 @@ function label_stopped(status: ItemStatus, reason: string | undefined): ItemStat
 function label_settled(status: ItemStatus, stop: LabelStop): ItemStatus {
 	if (stop.state !== 'stopped') return run_board_settle.settled_as(status, stop.state)
 
-	return is_working(status)
+	return is_working(status, stop)
 		? { ...status, stop_reason: stop.reason }
 		: label_stopped(status, stop.reason)
 }
 
-const run_board_lane_stop = { RELEASE_REASON, label_settled, label_stop, lane_status, stop_lanes }
+// What the read labels of a child read after its launch settle it as; `undefined` labels leave it.
+function labels_settled(status: ItemStatus, labels: ReadonlyArray<string> | undefined): ItemStatus {
+	const stop = label_stop(labels)
+
+	return stop === undefined ? status : label_settled(status, stop)
+}
+
+const run_board_lane_stop = {
+	UNLABELLED_REASON,
+	label_settled,
+	label_stop,
+	labels_settled,
+	lane_status,
+	stop_lanes,
+}
 
 export { run_board_lane_stop }
 export type { LaneEnd }

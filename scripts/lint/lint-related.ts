@@ -6,7 +6,6 @@ import { document_checks } from '#scripts/document/document-checks'
 import { unused_members_check } from '#scripts/exports/unused-members-check'
 import { gate_labels } from '#scripts/gate/gate-labels'
 import { gate_tree, type GateTree } from '#scripts/gate/gate-tree'
-import { metrics_totals } from '#scripts/gate/metrics-totals'
 import { moved_paths } from '#scripts/gate/moved-paths'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { since_green } from '#scripts/gate/since-green'
@@ -74,7 +73,6 @@ function document_check_exit_code(scope: ChangedFileScope, root: string): number
 interface LintOutcome {
 	stage: string
 	exit_code: number
-	notice?: string | undefined
 }
 
 const UNMOVED: LintOutcome = { stage: 'unmoved', exit_code: 0 }
@@ -179,20 +177,6 @@ async function resolve_lint_scope(
 	})
 }
 
-// In kit, a metrics total grown past the merge-base is reported after the lint and changes no exit
-// code (`metrics-totals.ts`). The totals are a whole-repository pass, so only a green bare run pays
-// for it: a red lint is edited again anyway, and a run narrowed by file arguments is a spot check.
-async function outcome_with_notice(
-	command_arguments: ReadonlyArray<string>,
-	scope: ChangedFileScope,
-	root: string,
-): Promise<LintOutcome> {
-	const outcome = await scoped_outcome(scope, root)
-	if (is_failed(outcome) || command_arguments.length > 0) return outcome
-
-	return { ...outcome, notice: await metrics_totals.growth_notice(root) }
-}
-
 // **Nothing moved since the last green run lints nothing** (joshuafolkken/kit#4593), as
 // `josh test:related` runs no test.
 function report_unmoved(): LintOutcome {
@@ -201,6 +185,14 @@ function report_unmoved(): LintOutcome {
 	)
 
 	return UNMOVED
+}
+
+// A residual the typed fix pass reported fails a run whose untyped lint passed: the gate's whole-tree
+// lint is typed and reports it too (`lint-related-fix.ts`, joshuafolkken/kit#7825).
+function with_fix_pass(outcome: LintOutcome, fix_exit_code: number): LintOutcome {
+	if (fix_exit_code === 0 || is_failed(outcome)) return outcome
+
+	return { stage: 'autofix', exit_code: fix_exit_code }
 }
 
 async function checked_outcome(
@@ -212,25 +204,24 @@ async function checked_outcome(
 	if (moved?.length === 0) return { outcome: report_unmoved(), before }
 
 	const scope = await resolve_lint_scope(command_arguments, root, moved)
-	const verified = await lint_related_fix.prepare(command_arguments, scope, root)
-	const outcome = await outcome_with_notice(command_arguments, scope, root)
+	const { before: verified, fix_exit_code } = await lint_related_fix.prepare(
+		command_arguments,
+		scope,
+		root,
+	)
+	const outcome = await scoped_outcome(scope, root)
 
-	return {
-		outcome,
-		before: verified,
-	}
+	return { outcome: with_fix_pass(outcome, fix_exit_code), before: verified }
 }
 
 // The run's last line names the stage that failed, or says it passed; the console is the only copy of
-// the output, so there is no log notice (`verification-tail.ts`). The metrics notice, on a line of its
-// own as a linter's buffered output need not end with a newline, rides above it, so a reused verdict
-// (`tree-verdict.ts`) still carries what `josh check:related` repeats.
+// the output, so there is no log notice (`verification-tail.ts`). The metrics totals are not measured
+// here: `josh run:review`'s open and the gate stop on them (`metrics-totals.ts`, joshuafolkken/kit#7823).
 function verdict_tail(outcome: LintOutcome): string {
 	const failed = is_failed(outcome) ? [outcome.stage] : []
 	const verdict = verification_tail.format_verdict(lint_related_scope.COMMAND_LABEL, failed)
-	const notice = outcome.notice === undefined ? '' : `\n${outcome.notice}\n`
 
-	return `${notice}\n${verification_tail.format_tail({ failures: '', verdict })}`
+	return `\n${verification_tail.format_tail({ failures: '', verdict })}`
 }
 
 // **A green run leaves a record of the tree it was green on**, so

@@ -8,6 +8,7 @@ import {
 import { agent_safe_text } from '#scripts/agent/agent-safe-text'
 import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
 import { durable_state } from '#scripts/josh/durable-state'
+import { JOSH_TMP_DIRECTORY } from '#scripts/lib/josh-temporary-directory'
 import type { LaunchRequest } from '#scripts/run/detached-launch'
 import { run_headless } from '#scripts/run/run-headless'
 import type { WorkflowHandoff, WorkflowKeyword } from './run-handoff-args'
@@ -56,9 +57,22 @@ function role_of(keyword: WorkflowKeyword): AgentRole {
 	return ROLES[keyword]
 }
 
+// Every hand-off child shares the checkout it was started in, so a fixed name directly under the scratch
+// directory (`body.md`, `plan.md`) is one file concurrent children overwrite (joshuafolkken/kit#7811).
+// Each child is handed its own directory, named for the same start time as its log.
+function scratch_directory(keyword: WorkflowKeyword, now: number): string {
+	return `${JOSH_TMP_DIRECTORY}/handoff-${keyword}-${String(now)}`
+}
+
+function scratch_line(scratch: string): string {
+	return `Write every file a \`*-file\` argument reads (body, plan, rationale, brief) under \`${scratch}/\`, never under a fixed name directly in \`${JOSH_TMP_DIRECTORY}/\`: other sessions in this checkout write there.`
+}
+
 // The keyword line comes first, so the child reads it as the explicit invocation it is.
-function prompt_of(handoff: WorkflowHandoff, brief: string): string {
-	return agent_safe_text.printable(`${handoff.line}\n\n${PREAMBLE}\n\n${brief.trim()}`)
+function prompt_of(handoff: WorkflowHandoff, brief: string, scratch: string): string {
+	const parts = [handoff.line, PREAMBLE, scratch_line(scratch), brief.trim()]
+
+	return agent_safe_text.printable(parts.join('\n\n'))
 }
 
 function argv_of(
@@ -107,6 +121,7 @@ const run_handoff_launch = {
 	prompt_of,
 	request_of,
 	role_of,
+	scratch_directory,
 }
 
 export type { BuiltArgv, HandoffChild }

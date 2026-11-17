@@ -60,6 +60,16 @@ describe('run_stalled.class_of', () => {
 		expect(run_stalled.class_of(CAUSE)).toBe(CAUSE)
 		expect(run_stalled.class_of(run_stalled.SESSION_UNFINISHED.short)).toBe('session unfinished')
 	})
+
+	// joshuafolkken/kit#7820: the park loop's cause round-trips through the park event as its own class.
+	it('reads the park loop cause back from its park event', () => {
+		const { short, why } = run_stalled.PARK_LOOP
+		const cause = run_stalled.cause_in(run_stalled.park_event(7780, short))
+
+		expect(short).toBe('park loop')
+		expect(why).toContain('unchanged lane tree')
+		expect(cause).toBe('park loop')
+	})
 })
 
 // joshuafolkken/kit#6864: a park records the ship stop it was taken at, and an older park reads as none.
@@ -113,5 +123,13 @@ describe('run_stalled.next_step', () => {
 
 		expect(step).toContain(`\`${run_stalled.resume_of(CHILD)}\``)
 		expect(step).toContain('pnpm josh run:add 4188 --retry')
+	})
+})
+
+describe('run_stalled.next_step_ja', () => {
+	it('names both resume commands in Japanese prose', () => {
+		expect(run_stalled.next_step_ja(CHILD)).toBe(
+			'原因を直してから、稼働中の backlogrun では `pnpm josh run:add 4188 --retry`、それ以外では `fullrun #4188` で再開してください。',
+		)
 	})
 })

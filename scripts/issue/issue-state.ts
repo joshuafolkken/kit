@@ -4,6 +4,7 @@ import {
 	has_any_label,
 	has_label_name,
 	NEEDS_HUMAN_REVIEW_LABEL,
+	PLAN_UNVERIFIED_LABEL,
 	PLANNED_LABEL,
 } from './issue-labels'
 import type { StateRead } from './issue-state-cli'
@@ -104,8 +105,15 @@ function is_planned(read: StateRead): boolean {
 	return read.kind === 'state' && has_label_name(read.state.labels, PLANNED_LABEL)
 }
 
+// Whether a read issue carries `plan:unverified` — a plan written from another repository's
+// checkout, whose estimate `run:stage` must not start from (joshuafolkken/kit#7733).
+function is_plan_unverified(read: StateRead): boolean {
+	return read.kind === 'state' && has_label_name(read.state.labels, PLAN_UNVERIFIED_LABEL)
+}
+
 const issue_state = {
 	is_planned,
+	is_plan_unverified,
 	NO_LABELS,
 	parse_issue_state,
 	format_issue_state,

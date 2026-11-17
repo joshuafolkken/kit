@@ -1,10 +1,12 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
+import { derive_check } from '#scripts/document/derive-check'
 import { check_reuse, type CheckRecords } from '#scripts/gate/check-reuse'
 import { gate_labels } from '#scripts/gate/gate-labels'
 import type { GateStepResult } from '#scripts/gate/gate-report'
 import { gate_tree } from '#scripts/gate/gate-tree'
 import { metrics_totals } from '#scripts/gate/metrics-totals'
+import { project_checks } from '#scripts/gate/project-checks'
 import { structural_checks } from '#scripts/gate/structural-checks'
 import { type_check_step } from '#scripts/gate/type-check-step'
 import type { JoshResult } from '#scripts/josh/josh-run'
@@ -86,6 +88,21 @@ function guard_tests(directory: string): Array<PreDetachCheck> {
 	return targets.length === 0 ? [] : [{ list: [...GUARD_TEST_COMMAND, ...targets] }]
 }
 
+// The guard tests' `josh` arguments, for `run:chain`'s stage before the review; empty when none is
+// present (joshuafolkken/kit#7773).
+function guard_test_argv(directory: string): ReadonlyArray<string> {
+	const [check] = guard_tests(directory)
+
+	return check === undefined ? [] : check.list.slice(1)
+}
+
+// `exports:unused`'s `josh` arguments, the static check `check:related` does not run.
+function exports_argv(): ReadonlyArray<string> {
+	const [exports_check] = STATIC_CHECKS
+
+	return exports_check === undefined ? [] : exports_check.list.slice(1)
+}
+
 // The totals' judgment `josh run:review`'s open stops on (`metrics_totals.totals_check`), run again
 // here as the backstop; none outside kit.
 async function metrics_runs(directory: string): Promise<Array<PreDetachRun>> {
@@ -99,12 +116,21 @@ async function metrics_runs(directory: string): Promise<Array<PreDetachRun>> {
 	]
 }
 
+// The generated-page check `run:chain` runs before the review, run again here; none outside kit
+// (joshuafolkken/kit#7728).
+function generated_page_checks(directory: string): Array<PreDetachCheck> {
+	if (!project_checks.is_kit_repository(directory)) return []
+
+	return [{ list: ['josh', ...derive_check.DERIVE_CHECK_ARGV] }]
+}
+
 async function command_lists(directory: string): Promise<Array<PreDetachCheck>> {
 	const type_check = await type_check_step.resolve_type_check_args(directory)
 
 	return [
 		{ list: type_check, label: gate_labels.TYPE_CHECK_LABEL },
 		...STATIC_CHECKS,
+		...generated_page_checks(directory),
 		...guard_tests(directory),
 	]
 }
@@ -218,7 +244,9 @@ const run_ship_pre_detach = {
 	STATIC_CHECKS,
 	UNPINNED,
 	checks,
+	exports_argv,
 	failure_prefix,
+	guard_test_argv,
 	with_pinned,
 }
 

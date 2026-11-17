@@ -36,6 +36,10 @@ const test_related_schema = z.object({
 	// The files past the cap it left at their whole reach, each with that reach, widest first — absent
 	// where there were none and on rows written before it (joshuafolkken/kit#7639).
 	full_reach: z.array(full_reach_schema).optional(),
+	// The changed file that added the most test files to the run, and that number — absent where no
+	// reach was read and on rows written before it (joshuafolkken/kit#7735).
+	widest_file: z.string().optional(),
+	widest_tests: z.number().optional(),
 	// The branch change read beside the run, by half and by base (joshuafolkken/kit#6982).
 	branch_tracked: z.number().optional(),
 	branch_untracked: z.number().optional(),
@@ -43,6 +47,15 @@ const test_related_schema = z.object({
 	// `changed` split by whether that branch change holds the file (joshuafolkken/kit#7066).
 	changed_in_branch: z.number().optional(),
 	changed_off_branch: z.number().optional(),
+	// Whether the run read only the last red run's failed files and what moved since, rather than its
+	// whole reach — absent on a `--touched` run and on rows written before it (joshuafolkken/kit#7786).
+	red_rerun: z.boolean().optional(),
+	// The stages around the selection (joshuafolkken/kit#7828): the launcher's `dist` rebuild, the wait
+	// for the core claim and vitest from start to end — each absent where it did not run, and on rows
+	// written before it.
+	rebuild_ms: z.number().optional(),
+	core_wait_ms: z.number().optional(),
+	vitest_ms: z.number().optional(),
 	elapsed_ms: z.number(),
 })
 

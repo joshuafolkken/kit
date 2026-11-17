@@ -1,0 +1,7 @@
+{
+	"reason": "Review fixes: the rest replaces the last launch only once it launched, keeping the --unpinned-ok reason, and an answered rest is reported as answered rather than probing",
+	"date": "2026-11-17",
+	"growth": {
+		"scripts.code_lines": 34
+	}
+}

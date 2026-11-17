@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { auto_ok_cli } from '#scripts/auto-ok/auto-ok-cli'
+import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { cutoff_of } from '#scripts/git/listing-cutoff'
@@ -28,6 +29,8 @@ const ISSUE = 6558
 const SUCCESS = 0
 const LISTING_LIMIT = 100
 const SINGLE = '--single'
+const REASON = 'one gate rule and its test'
+const WHY = [SINGLE, REASON]
 const PROBE = '--probe'
 const DECLARED = '## 背景\n\n- 規模見積もり: 約 1 ファイル / 20 行（テスト除く）\n'
 const GROWN = ['scripts/lane/one.ts', 'scripts/lane/two.ts', 'scripts/lane/three.ts']
@@ -57,10 +60,15 @@ function last_error(): string {
 	return String(error.mock.calls.at(-1)?.[0])
 }
 
-beforeEach(() => {
-	vi.spyOn(line_budget, 'budgets_for').mockResolvedValue([])
+function stub_writes(): void {
 	vi.spyOn(lane_yield, 'record_yield').mockResolvedValue(undefined)
 	vi.spyOn(run_hold_cli, 'run').mockResolvedValue(SUCCESS)
+	vi.spyOn(git_gh_issue_write, 'issue_try_comment').mockResolvedValue(true)
+}
+
+beforeEach(() => {
+	vi.spyOn(line_budget, 'budgets_for').mockResolvedValue([])
+	stub_writes()
 	vi.spyOn(lane_plan_wait, 'deadline').mockResolvedValue(undefined)
 	vi.spyOn(git_common_directory, 'repository').mockReturnValue(
 		make_directory(path.join(ROOT, 'repository-')),
@@ -74,7 +82,7 @@ beforeEach(() => {
 
 describe('lane:plan --single on the files axis', () => {
 	it('records one deliverable past its declared files and notes the overrun for the pre-gate cut', async () => {
-		expect(await lane_plan_cli.run([...PLAN, SINGLE], directory)).toBe(SUCCESS)
+		expect(await lane_plan_cli.run([...PLAN, ...WHY], directory)).toBe(SUCCESS)
 		expect(info).toHaveBeenCalledWith('clear')
 		expect(lane_plan.read(ISSUE, directory)).toMatchObject({ paths: GROWN, single: true })
 		expect(record_split_notice).toHaveBeenCalledWith({
@@ -82,24 +90,25 @@ describe('lane:plan --single on the files axis', () => {
 			files: GROWN.length,
 			lines: 0,
 			reason: 'files',
+			single_reason: REASON,
 		})
 		expect(error).toHaveBeenCalledWith(expect.stringContaining(FILES_WARNING))
 	})
 
 	it('answers `clear` to `--probe --single`, noting and recording nothing', async () => {
-		expect(await lane_plan_cli.run([...PLAN, SINGLE, PROBE], directory)).toBe(SUCCESS)
+		expect(await lane_plan_cli.run([...PLAN, ...WHY, PROBE], directory)).toBe(SUCCESS)
 		expect(info).toHaveBeenCalledWith('clear')
 		expect(record_split_notice).not.toHaveBeenCalled()
 		expect(lane_plan.read(ISSUE, directory)).toBeUndefined()
 	})
 
 	it('reads `--single` ahead of the issue number as the flag, not the issue', async () => {
-		expect(await lane_plan_cli.run([SINGLE, ...PLAN], directory)).toBe(SUCCESS)
+		expect(await lane_plan_cli.run([...WHY, ...PLAN], directory)).toBe(SUCCESS)
 		expect(lane_plan.read(ISSUE, directory)).toMatchObject({ paths: GROWN, single: true })
 	})
 
 	it('keeps a recorded `--single` on a re-plan that omits the flag', async () => {
-		await lane_plan_cli.run([...PLAN, SINGLE], directory)
+		await lane_plan_cli.run([...PLAN, ...WHY], directory)
 
 		expect(await lane_plan_cli.run(PLAN, directory)).toBe(SUCCESS)
 		expect(lane_plan.read(ISSUE, directory)?.single).toBe(true)
@@ -131,7 +140,7 @@ describe('lane:plan size warning', () => {
 	it('records a `--single` plan whose probed hunks outgrow it, with a size warning', async () => {
 		signals_of.mockResolvedValue({ ...QUIET, hunk_files: [PROBED, PROBED, PROBED] })
 
-		expect(await lane_plan_cli.run([...PLAN, SINGLE], directory)).toBe(SUCCESS)
+		expect(await lane_plan_cli.run([...PLAN, ...WHY], directory)).toBe(SUCCESS)
 		expect(last_error()).toContain('size warning (hunks)')
 		expect(lane_plan.read(ISSUE, directory)).toMatchObject({ paths: GROWN, single: true })
 	})
@@ -145,7 +154,7 @@ describe('lane:plan size warning', () => {
 	})
 
 	it('names `--single` in the usage', () => {
-		expect(lane_plan_cli.USAGE).toContain(`[${SINGLE}]`)
+		expect(lane_plan_cli.USAGE).toContain(`[${SINGLE} "<reason>"]`)
 	})
 })
 

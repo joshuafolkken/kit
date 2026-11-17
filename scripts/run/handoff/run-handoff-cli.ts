@@ -1,4 +1,6 @@
 #!/usr/bin/env tsx
+import { mkdirSync } from 'node:fs'
+import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
 	agent_provider,
@@ -21,7 +23,7 @@ import { run_hold_block } from '#scripts/run/hold/run-hold-block'
 import { execa } from 'execa'
 import { run_handoff_args, type WorkflowHandoff } from './run-handoff-args'
 import { run_handoff_final } from './run-handoff-final'
-import { run_handoff_launch, type BuiltArgv } from './run-handoff-launch'
+import { run_handoff_launch, type BuiltArgv, type HandoffChild } from './run-handoff-launch'
 import { run_handoff_retrospective } from './run-handoff-retrospective'
 
 // `josh run:handoff <keyword> [N|new ...] --brief-file <path>` — hand a workflow keyword typed in a
@@ -53,6 +55,7 @@ interface HandoffPorts {
 	read_text: (target: string) => string | undefined
 	launch: (request: LaunchRequest) => LaunchResult
 	launch_attached: (request: LaunchRequest) => Promise<AttachedLaunchResult>
+	make_directory: (target: string) => void
 	backlogrun: (argv: ReadonlyArray<string>) => Promise<number>
 	// Whether the carry record under this git directory marks the retrospective as run.
 	is_retrospective_done: (git_directory: string) => boolean
@@ -71,6 +74,8 @@ interface Started {
 	built: BuiltArgv
 	request: LaunchRequest
 	log: string
+	// The child's own scratch directory, relative to the checkout, which its prompt names.
+	scratch: string
 	git_directory: string
 }
 
@@ -110,6 +115,9 @@ const LIVE_PORTS: HandoffPorts = {
 	launch: (request) => detached_launch.launch(request, note_to_stderr),
 	launch_attached: async (request) =>
 		await detached_launch.launch_attached(request, note_to_stderr),
+	make_directory: (target) => {
+		mkdirSync(target, { recursive: true })
+	},
 	backlogrun: josh_backlogrun,
 	is_retrospective_done: (git_directory) =>
 		run_carry.retrospective_done_of(run_carry.read_carry(run_carry.carry_path(git_directory))),
@@ -207,25 +215,33 @@ async function launched(started: Started, ports: HandoffPorts): Promise<number> 
 
 	if (note !== undefined) return refuse(note, ports)
 
+	ports.make_directory(path.join(ports.cwd, started.scratch))
 	ports.write(started_line(started))
 	ports.write(`log: ${started.log}`)
 
 	return is_waited ? await waited(started, ports) : detached(started, ports)
 }
 
+function child_of(input: StartInput, scratch: string, cwd: string): HandoffChild {
+	const { handoff, provider, brief } = input
+	const prompt = run_handoff_launch.prompt_of(handoff, brief, scratch)
+
+	return { prompt, role: run_handoff_launch.role_of(handoff.keyword), provider, cwd }
+}
+
+// One start time names both the log and the scratch directory, so each child's pair reads together.
 function started_of(input: StartInput, ports: HandoffPorts): StartResult {
-	const { handoff, provider, brief, git_directory } = input
-	const prompt = run_handoff_launch.prompt_of(handoff, brief)
-	const role = run_handoff_launch.role_of(handoff.keyword)
-	const child = { prompt, role, provider, cwd: ports.cwd }
-	const built = run_handoff_launch.argv_of(child, ports.environment)
+	const { handoff, git_directory } = input
+	const now = ports.now()
+	const scratch = run_handoff_launch.scratch_directory(handoff.keyword, now)
+	const built = run_handoff_launch.argv_of(child_of(input, scratch, ports.cwd), ports.environment)
 
 	if (built.kind === 'rejected') return { kind: 'refused', note: `could not start: ${built.note}` }
 
-	const log = run_handoff_launch.log_path(git_directory, handoff.keyword, ports.now())
+	const log = run_handoff_launch.log_path(git_directory, handoff.keyword, now)
 	const request = run_handoff_launch.request_of(built, ports.cwd, log)
 
-	return { kind: 'started', started: { handoff, built, request, log, git_directory } }
+	return { kind: 'started', started: { handoff, built, request, log, scratch, git_directory } }
 }
 
 // A brief file is read as written; none means the generated retrospective brief, whose close names

@@ -1,4 +1,5 @@
 import { josh_command } from '#scripts/josh/josh-run'
+import { session_language } from '#scripts/josh/session-language'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -61,6 +62,19 @@ describe('run_merge_steps.close_split_lane — the split child’s lane', () => 
 
 		expect(lane_close_calls()).toBe(0)
 		expect(comment_mock).toHaveBeenCalledWith(CHILD, expect.stringContaining(LANE.directory))
+	})
+
+	it('states the kept lane in the session language (ac-bc8ebf54)', async () => {
+		vi.stubEnv(session_language.ENV_KEY, 'ja')
+		is_vacant_mock.mockResolvedValue(false)
+
+		await run_merge_steps.close_split_lane(CHILD)
+
+		expect(comment_mock).toHaveBeenCalledWith(
+			CHILD,
+			expect.stringContaining('分割でこの Issue のレーンを開けたままにした'),
+		)
+		vi.unstubAllEnvs()
 	})
 
 	it('does nothing when the child has no open lane', async () => {

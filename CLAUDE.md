@@ -9,7 +9,7 @@
 - **No clones — single-source, even across package boundaries.** Duplicate non-trivial logic only after presenting the alternative and getting explicit approval. `prompts/collaboration-workflow/principles.md` → "no-clones".
 - **Design for elegance and simplicity first.** Before adding a hook, guard, rule or abstraction, ask whether fixing the cause makes it unnecessary. `prompts/collaboration-workflow/principles.md` → "elegant-design"; conflicting quality goals, or a remedy for defects → "quality-priority".
 - **Write concise prose: conditions and actions only.** `prompts/collaboration-workflow/principles.md` → "concise-prose".
-- **Distinguish consultation from execution.** Main-session scope and implementation handoff: `prompts/collaboration-workflow/principles.md` → "consult-vs-execute".
+- **Distinguish consultation from execution.** Imperative requests, main-line scope, handoff: `prompts/collaboration-workflow/principles.md` → "consult-vs-execute".
 - **Route distributed-doc / config changes upstream to kit.** In a consumer repo never edit kit-distributed docs/config; in kit you are the source. `prompts/collaboration-workflow/principles.md` → "upstream-to-kit".
 - **Latest-first, fix forward — pin back only as a last resort.** `prompts/collaboration-workflow/principles.md` → "latest-first".
 - **Output language follows `JOSH_SESSION_LANG`** (default `ja`) for session output and artifact prose; English for Issue/PR titles, code comments, test titles, commit messages and script strings. `prompts/collaboration-workflow/overview.md`.
@@ -69,7 +69,7 @@ The issue-driven flow: `prompts/collaboration-workflow/`.
 
 #### Explicit invocation required (MANDATORY)
 
-Never start a `kickoff` / `halfrun` / `prrun` / `fullrun` / `backlogrun` workflow (`#N` / `new` included) unless the user typed the keyword in the **current turn's prompt** — a conversational request ("implement X") is not one, and an earlier turn's authorization does not carry over. Never ask "Shall I run `fullrun`?"; say "Please run \`<command>\` to start this task." A resumed `backlogrun` inside its declared budget continues (`backlogrun-steps.md` → "The session cut is inside the invocation").
+Never start a `kickoff` / `halfrun` / `prrun` / `fullrun` / `backlogrun` workflow (`#N` / `new` included) unless the user typed the keyword in the **current turn's prompt** — a conversational request ("implement X") is not one, and an earlier turn's authorization does not carry over. Never ask "Shall I run `fullrun`?"; say "Please run \`<command>\` to start this task." Consultation main line: a current-turn instruction to file (「起票」, “file an issue”) is that turn's `kickoff new` → `pnpm josh run:handoff kickoff new --brief-file <brief>`. A resumed `backlogrun` inside its declared budget continues (`backlogrun-steps.md` → "The session cut is inside the invocation").
 
 #### Mid-workflow stop notification (`confirmation`)
 

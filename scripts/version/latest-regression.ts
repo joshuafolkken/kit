@@ -85,6 +85,7 @@ function format_kept_back_notice(regressions: ReadonlyArray<VersionRegression>):
 
 const latest_regression = {
 	read_direct_dependencies,
+	to_floor,
 	find_regressions,
 	format_kept_back_notice,
 }

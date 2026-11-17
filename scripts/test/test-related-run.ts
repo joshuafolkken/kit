@@ -1,14 +1,16 @@
 import type { GateTree } from '#scripts/gate/gate-tree'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { changed_file_scope } from '#scripts/git/changed-file-scope'
+import { launch_timing } from '#scripts/lane/launch-timing'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { related_heavy_tests } from './related-heavy-tests'
 import { test_no_base } from './test-no-base'
 import { test_related_claim } from './test-related-claim'
-import { test_related_record, type RunInput } from './test-related-record'
+import { test_related_record, type RunInput, type StageTimes } from './test-related-record'
 import { test_related_red, type RelatedInput } from './test-related-red'
-import { test_related_reuse, type TestReuse } from './test-related-reuse'
+import { test_related_reuse } from './test-related-reuse'
 import { related_scope, type RelatedScope } from './test-related-scope'
+import { test_related_summary } from './test-related-summary'
 import { test_unit_guard } from './test-unit-guard'
 
 function conclusive_tree(before: GateTree | undefined): GateTree | undefined {
@@ -17,28 +19,45 @@ function conclusive_tree(before: GateTree | undefined): GateTree | undefined {
 	return test_unit_guard.is_running(process.cwd()) ? before : undefined
 }
 
+// Times the claim's wait and vitest from start to end into `stages` (joshuafolkken/kit#7828).
+async function timed_vitest(
+	args: ReadonlyArray<string>,
+	description: string,
+	stages: StageTimes,
+	wait_ms: number | undefined,
+): Promise<number> {
+	const started = performance.now()
+
+	if (wait_ms !== undefined) stages.core_wait_ms = wait_ms
+
+	try {
+		return await test_unit_guard.run_guarded_vitest(
+			process.cwd(),
+			args,
+			related_scope.COMMAND_NAME,
+			description,
+		)
+	} finally {
+		stages.vitest_ms = performance.now() - started
+	}
+}
+
 async function run_vitest(
 	scope: RelatedScope,
 	args: ReadonlyArray<string>,
 	description: string,
+	stages: StageTimes,
 ): Promise<number> {
 	return await test_related_claim.with_unit_claim(
 		scope.mode === 'related' ? scope.files : undefined,
-		async () =>
-			await test_unit_guard.run_guarded_vitest(
-				process.cwd(),
-				args,
-				related_scope.COMMAND_NAME,
-				description,
-			),
+		async (wait_ms) => await timed_vitest(args, description, stages, wait_ms),
 	)
 }
 
 async function run_scope(
-	scope: RelatedScope,
-	root: string,
+	{ scope, root, reuse }: RunInput,
 	command_arguments: ReadonlyArray<string>,
-	reuse?: TestReuse,
+	stages: StageTimes,
 ): Promise<number> {
 	const description = related_scope.describe_scope(scope, root)
 
@@ -54,7 +73,7 @@ async function run_scope(
 		...test_related_reuse.flags(reuse),
 	])
 
-	return await run_vitest(scope, vitest_arguments, description)
+	return await run_vitest(scope, vitest_arguments, description, stages)
 }
 
 async function run_and_record(
@@ -62,15 +81,20 @@ async function run_and_record(
 	command_arguments: ReadonlyArray<string>,
 ): Promise<number> {
 	const started = performance.now()
+	const stages: StageTimes = { rebuild_ms: launch_timing.rebuild_ms() }
 	const { exit_code, test_files, passed } = await test_related_record.with_test_count(
-		async () => await run_scope(input.scope, input.root, command_arguments, input.reuse),
+		async () => await run_scope(input, command_arguments, stages),
 	)
 
 	input.passed = passed ?? []
+	process.stdout.write(
+		`${test_related_summary.summary_line(input.scope, test_files, input.reach)}\n`,
+	)
 
 	await test_related_record.record_run(input, {
 		elapsed_ms: performance.now() - started,
 		test_files,
+		stages,
 	})
 
 	return exit_code

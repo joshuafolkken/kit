@@ -122,8 +122,13 @@ interface MachineRoom {
 	now: number
 }
 
-// A claim no heavier than this counts as small: every static check's weight (`core-weights.ts`).
-const SMALL_CLAIM_CORES = core_weights.CORE_WEIGHTS.lint
+// A claim no heavier than this counts as small: every static check's weight (`core-weights.ts`) —
+// the heaviest of them, since lint's ledger weight fell below the type check's two (joshuafolkken/kit#7776).
+const SMALL_CLAIM_CORES = Math.max(
+	core_weights.CORE_WEIGHTS.lint,
+	core_weights.CORE_WEIGHTS.type_check,
+	core_weights.CORE_WEIGHTS.spell_check,
+)
 
 // Count earlier waiters as well as fresh admissions: concurrent polls can read the same snapshot
 // before any admitted marker is written, so claim order must allocate the measured room too.

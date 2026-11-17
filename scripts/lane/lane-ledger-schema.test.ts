@@ -92,6 +92,23 @@ describe('lane_ledger_schema.entry_schema on a test-pinned run', () => {
 	})
 })
 
+// joshuafolkken/kit#7803: a row written before the split (the cases above) parses without it.
+describe('lane_ledger_schema.entry_schema on a test-pinned run that split its probed hunks', () => {
+	it('keeps the counts of the rechecked and the unregistered hunks it probed', () => {
+		const run = {
+			kind: KIND.TEST_PINNED,
+			at: AT,
+			held: 1,
+			rechecked: 2,
+			unregistered: 3,
+			probes: [],
+			elapsed_ms: 9,
+		}
+
+		expect(entry_schema.safeParse(run).data).toStrictEqual(run)
+	})
+})
+
 // joshuafolkken/kit#5385
 describe('lane_ledger_schema.entry_schema on a test-pinned probe', () => {
 	it('keeps a probe the type check pinned, and rejects an unknown pinner', () => {

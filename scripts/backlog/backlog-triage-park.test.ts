@@ -101,4 +101,25 @@ describe("backlog_triage_park.lines_of — an option needing the parent's action
 			`${ADOPT_LINE} --done <the parent action taken>`,
 		])
 	})
+
+	// joshuafolkken/kit#7771: a filing option's `--done` names the open Issue the parent filed.
+	it('asks a filing option for the filed Issue', async () => {
+		const filing = park(PICK_ONE).replace('必要な権限: なし', '必要な権限: 親（`issue:file`）')
+
+		parked_with([filing])
+
+		expect(await backlog_triage_park.lines_of(ISSUE)).toStrictEqual([
+			`#${String(ISSUE)} 推奨: 1（層 A · 親の操作）`,
+			`${ADOPT_LINE} --done "filed #<M>"`,
+		])
+	})
+
+	// joshuafolkken/kit#7805: the adopt itself closes the Issue, so a closing option carries no --done.
+	it('prints a closing option with no --done', async () => {
+		parked_with([park(PICK_ONE).replace('必要な権限: なし', '必要な権限: 親（issue:close）')])
+
+		const lines = await backlog_triage_park.lines_of(ISSUE)
+
+		expect(lines.at(-1)).toBe(ADOPT_LINE)
+	})
 })

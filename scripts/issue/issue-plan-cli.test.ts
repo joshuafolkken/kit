@@ -32,6 +32,17 @@ vi.mock('#scripts/gh/git-gh-command', () => ({
 	},
 }))
 
+// joshuafolkken/kit#7733: the target check, covered by `issue-plan-target.test.ts`.
+const { foreign_of, mark_unverified, clear_unverified } = vi.hoisted(() => ({
+	foreign_of: vi.fn<(repo?: string) => string | undefined>(),
+	mark_unverified: vi.fn<() => Promise<boolean>>(async () => true),
+	clear_unverified: vi.fn<() => Promise<boolean>>(async () => true),
+}))
+
+vi.mock('#scripts/issue/issue-plan-target', () => ({
+	issue_plan_target: { foreign_of, mark_unverified, clear_unverified },
+}))
+
 const { send_notice } = vi.hoisted(() => ({ send_notice: vi.fn<() => Promise<void>>() }))
 
 vi.mock('#scripts/issue/issue-plan-notify', () => ({ issue_plan_notify: { send: send_notice } }))
@@ -46,6 +57,17 @@ vi.mock('#scripts/lane/lane-child-marker', () => ({
 	lane_child_marker: { is_child_of, marked_issue },
 }))
 vi.mock('#scripts/lane/lane-plan-auto', () => ({ lane_plan_auto: { run_from_plan } }))
+
+const { problem_of, settle } = vi.hoisted(() => ({
+	problem_of: vi.fn<() => Promise<string | undefined>>(async () => await undefined),
+	settle: vi.fn<(issue_number: string, plan: string, repo?: string) => Promise<boolean>>(
+		async () => true,
+	),
+}))
+
+vi.mock('#scripts/issue/plan-size-check', () => ({
+	plan_size_check: { problem_of, settle, next_steps: (): string => 'split steps' },
+}))
 
 const ISSUE_URL = 'https://github.com/o/r/issues/7'
 const COMMENT_URL = 'https://github.com/o/r/issues/7#issuecomment-1'
@@ -85,6 +107,7 @@ function default_session(): void {
 	issue_edit_title.mockResolvedValue(ISSUE_URL)
 	issue_comment.mockResolvedValue(COMMENT_URL)
 	issue_add_label.mockResolvedValue(true)
+	foreign_of.mockReturnValue(undefined)
 	is_child_of.mockReturnValue(false)
 	run_from_plan.mockResolvedValue(0)
 }
@@ -186,6 +209,17 @@ describe('issue_plan_cli.run — --title and --planned act only when given', () 
 		expect(issue_add_label).toHaveBeenCalledWith('7', PLANNED_LABEL, undefined)
 	})
 
+	it('posts a plan over the guide without run:planned, prints the split steps and fails', async () => {
+		problem_of.mockResolvedValueOnce('over the guide')
+
+		const code = await issue_plan_cli.run(['7', BODY_FILE_FLAG, PLAN_FILE, PLANNED_FLAG])
+
+		expect(code).toBe(1)
+		expect(issue_edit_body).toHaveBeenCalledWith('7', PLAN, undefined)
+		expect(issue_add_label).not.toHaveBeenCalled()
+		expect(errors.join('\n')).toContain('over the guide\nsplit steps')
+	})
+
 	it('fails when run:planned could not be applied', async () => {
 		issue_add_label.mockResolvedValue(false)
 
@@ -193,6 +227,29 @@ describe('issue_plan_cli.run — --title and --planned act only when given', () 
 
 		expect(code).toBe(1)
 		expect(errors.join('\n')).toContain(PLANNED_LABEL)
+	})
+})
+
+// joshuafolkken/kit#7726: a plan naming more files than its estimate writes nothing.
+describe('issue_plan_cli.run — the plan’s named files are settled before any write', () => {
+	it('writes nothing and fails when the plan’s named files are refused', async () => {
+		settle.mockResolvedValueOnce(false)
+
+		const code = await issue_plan_cli.run([
+			'7',
+			BODY_FILE_FLAG,
+			PLAN_FILE,
+			TITLE_FLAG,
+			TITLE,
+			PLANNED_FLAG,
+		])
+
+		expect(code).toBe(1)
+		expect(settle).toHaveBeenCalledWith('7', PLAN, undefined)
+		expect(issue_edit_title).not.toHaveBeenCalled()
+		expect(issue_edit_body).not.toHaveBeenCalled()
+		expect(issue_add_label).not.toHaveBeenCalled()
+		expect(run_from_plan).not.toHaveBeenCalled()
 	})
 })
 
@@ -267,7 +324,22 @@ describe('issue_plan_cli.run — --repo addresses every write to the named repos
 		expect(issue_edit_title).toHaveBeenCalledWith('7', TITLE, OTHER_REPO)
 		expect(issue_view_json).toHaveBeenCalledWith('7', expect.any(String), OTHER_REPO)
 		expect(issue_comment).toHaveBeenCalledWith('7', PLAN, OTHER_REPO)
+		expect(clear_unverified).toHaveBeenCalledWith('7', OTHER_REPO)
 		expect(issue_add_label).toHaveBeenCalledWith('7', PLANNED_LABEL, OTHER_REPO)
+	})
+})
+
+describe('issue_plan_cli.run — a plan from another checkout is held as estimate-unverified', () => {
+	const planned_argv = ['7', BODY_FILE_FLAG, PLAN_FILE, PLANNED_FLAG, '--repo', OTHER_REPO]
+
+	it('marks plan:unverified without run:planned or the notification', async () => {
+		foreign_of.mockReturnValue(OTHER_REPO)
+
+		expect(await issue_plan_cli.run(planned_argv)).toBe(0)
+
+		expect(mark_unverified).toHaveBeenCalledWith('7', OTHER_REPO)
+		expect(issue_add_label).not.toHaveBeenCalled()
+		expect(send_notice).not.toHaveBeenCalled()
 	})
 })
 

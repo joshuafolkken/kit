@@ -31,6 +31,7 @@ const KIND = {
 	SHIP_LAP: 'ship-lap',
 	SIZE: 'size',
 	LIMIT: 'limit',
+	ESTIMATE: 'estimate',
 } as const
 
 const lane_ledger_kind = { KIND }

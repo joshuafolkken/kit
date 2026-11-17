@@ -12,6 +12,7 @@ import {
 	type Basis,
 	type Freshness,
 	type Known,
+	type MissReason,
 	type StoredVerdict,
 	type VerdictCache,
 } from './test-pinned-cache-logic'
@@ -206,6 +207,15 @@ async function basis_of(
 	return digest === undefined ? undefined : { digest }
 }
 
+// What a stored entry's verdict rests on now.
+async function entry_basis(
+	cache: LoadedCache,
+	entry: StoredVerdict,
+	file: string,
+): Promise<Basis | undefined> {
+	return await basis_of(cache, { verdict: entry.verdict, failed: Object.keys(entry.tests) }, file)
+}
+
 // The tree-wide digests first; only an entry they drop has its basis read, so an unchanged tree builds
 // no import graph. Past the basis, it may still be rechecked against a few tests (`recheck_of`).
 async function known_by_basis(
@@ -214,8 +224,7 @@ async function known_by_basis(
 	file: string,
 ): Promise<Known> {
 	const { freshness, test_digests } = cache
-	const stored = { verdict: entry.verdict, failed: Object.keys(entry.tests) }
-	const basis = await basis_of(cache, stored, file)
+	const basis = await entry_basis(cache, entry, file)
 	const held = test_pinned_cache_logic.fresh_verdict(entry, freshness, test_digests, basis?.digest)
 
 	return held ?? test_pinned_cache_logic.recheck_of(entry, freshness, basis, test_digests)
@@ -245,6 +254,34 @@ async function known(
 ): Promise<Array<Known>> {
 	return await Promise.all(
 		keys.map(async (key, index) => await known_one(cache, key, files[index] ?? '')),
+	)
+}
+
+// Why the cache did not hold a key's verdict, read as `known_one` reads it: the tree-wide digests
+// first, then the basis an entry stored with one rests on now; `undefined` where it holds.
+async function miss_one(
+	cache: LoadedCache,
+	key: string,
+	file: string,
+): Promise<MissReason | undefined> {
+	const { freshness, test_digests } = cache
+	const entry = cache.entries[key]
+	const miss = test_pinned_cache_logic.miss_of(entry, freshness, test_digests)
+	if (miss === undefined || entry?.basis === undefined) return miss
+	const basis = await entry_basis(cache, entry, file)
+
+	return test_pinned_cache_logic.miss_of(entry, freshness, test_digests, basis?.digest)
+}
+
+// Each key's reason its verdict was not held, or `undefined` where it was; `files` names each key's hunk
+// file.
+async function misses(
+	cache: LoadedCache,
+	keys: ReadonlyArray<string>,
+	files: ReadonlyArray<string>,
+): Promise<Array<MissReason | undefined>> {
+	return await Promise.all(
+		keys.map(async (key, index) => await miss_one(cache, key, files[index] ?? '')),
 	)
 }
 
@@ -346,7 +383,7 @@ function writer(cache: LoadedCache, keys: ReadonlyArray<string>): CacheWriter {
 	return { record }
 }
 
-const test_pinned_cache = { known, load, writer }
+const test_pinned_cache = { known, load, misses, writer }
 
 export type { CacheWriter, LoadedCache, Reached }
 export { test_pinned_cache }

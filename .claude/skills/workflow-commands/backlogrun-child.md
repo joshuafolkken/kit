@@ -24,6 +24,8 @@ or more always means an epic", then
 **do not stop**, continue into the loop against `#<E>`; `needs-decision` → report.
 
 Over the size bar before dispatch → a split-only unit, not a lane (`scripts/backlog/backlog-drive-split-unit.ts`).
+`lane:plan` answers `split` before the first edit → **A split** above; never after it, nor for review-finding work
+(`split-assessment.md` → "Over the guide before the gate").
 
 - **Nothing found means no epic** — the run finishes at `#<N>`'s merge.
 - **Every guard applies unchanged** (`backlogrun.md` → "Guards").

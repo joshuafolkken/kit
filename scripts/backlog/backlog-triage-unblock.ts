@@ -2,7 +2,10 @@ import { epic_blocked_by, type BlockedByRequest } from '#scripts/epic/epic-block
 import { epic_parse } from '#scripts/epic/epic-parse'
 import { epic_read } from '#scripts/epic/epic-read'
 import { epic_remove } from '#scripts/epic/epic-remove'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
+import { issue_cite, type CiteTarget } from '#scripts/issue/issue-cite'
+import { issue_file } from '#scripts/issue/issue-file'
 import { session_cite } from '#scripts/issue/session-cite'
 
 // `backlog:triage --unblock`'s write (joshuafolkken/kit#5818): `#issue` no longer blocked by
@@ -55,10 +58,29 @@ async function drop_declarations(request: BlockedByRequest): Promise<void> {
 	)
 }
 
-async function remove(request: BlockedByRequest): Promise<void> {
-	await drop_declarations(request)
+// `owner/repo` of a blocker in another repository, or `undefined` for one here — qualified or not.
+async function other_repository(repo: string | undefined): Promise<string | undefined> {
+	if (repo === undefined) return undefined
 
-	if (await git_gh_issue_write.issue_remove_blocked_by(request.issue, request.prerequisite)) return
+	const current = await git_gh_command.repo_get_name_with_owner()
+
+	return current !== undefined && issue_file.is_same_repository(repo, current) ? undefined : repo
+}
+
+// The prerequisite is a bare number here, or `owner/repo#N` for the upstream Issue `upstream:interrupt`
+// records its finder as blocked by (joshuafolkken/kit#7695). An epic declares only this repository's
+// numbers, so a blocker in another repository has no declaration to drop.
+async function blocker_of(prerequisite: string): Promise<CiteTarget> {
+	const target = issue_cite.parse_target(prerequisite, undefined)
+
+	return { number: target?.number ?? prerequisite, repo: await other_repository(target?.repo) }
+}
+
+async function remove(request: BlockedByRequest): Promise<void> {
+	const { number, repo } = await blocker_of(request.prerequisite)
+
+	if (repo === undefined) await drop_declarations({ ...request, prerequisite: number })
+	if (await git_gh_issue_write.issue_remove_blocked_by(request.issue, number, repo)) return
 
 	throw new Error('the blocked-by relation was not removed')
 }
