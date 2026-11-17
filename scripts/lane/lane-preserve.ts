@@ -4,6 +4,7 @@ import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { repository_lock } from '#scripts/git/repository-lock'
 import { git_stash } from '#scripts/git/stash/git-stash'
 import { session_cite } from '#scripts/issue/session-cite'
+import { session_language } from '#scripts/josh/session-language'
 import { error_text } from '#scripts/lib/error-message'
 import { lane_close } from './lane-close'
 
@@ -12,11 +13,16 @@ import { lane_close } from './lane-close'
 // the copy, and the comment on the Issue is where a person finds it again. One writer, so the message
 // `stash:pop` matches on and the recovery line the comment names cannot drift between the callers.
 
+// The headline is prose in the session language; `cause` stays the caller's English clause, and the
+// recovery line keeps the stash message `stash:pop` matches on.
+function headline(cause: string): string {
+	return session_language.is_japanese(session_language.resolve_session_lang().lang)
+		? `レーンに未コミットの作業があったので stash した（${cause}）:`
+		: `The lane held uncommitted work when ${cause}, so it was stashed:`
+}
+
 function preserved_comment(message: string, cause: string): string {
-	return [
-		`The lane held uncommitted work when ${cause}, so it was stashed:`,
-		`- recover with \`pnpm josh stash:pop "${message}"\``,
-	].join('\n')
+	return [headline(cause), `- recover with \`pnpm josh stash:pop "${message}"\``].join('\n')
 }
 
 /**
