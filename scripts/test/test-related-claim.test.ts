@@ -75,3 +75,25 @@ describe('test_related_claim.with_unit_claim', () => {
 		expect(core_budget.with_command_reservation).not.toHaveBeenCalled()
 	})
 })
+
+// joshuafolkken/kit#7828: the wait for the cores is handed to the run, which records it.
+describe('test_related_claim.with_unit_claim — the core wait', () => {
+	it('hands the run how long the claim waited for its cores', async () => {
+		const timed = vi.fn<(wait_ms?: number) => Promise<number>>(run)
+
+		mocked_reach.mockResolvedValue(REACHED_TESTS)
+		await test_related_claim.with_unit_claim(FILES, timed)
+
+		expect(timed).toHaveBeenCalledWith(expect.any(Number))
+		expect(timed.mock.calls[0]?.[0]).toBeGreaterThanOrEqual(0)
+	})
+
+	it('hands the run no wait where a parent claim covers it', async () => {
+		const timed = vi.fn(run)
+
+		vi.mocked(core_budget.is_covered).mockReturnValueOnce(true)
+		await test_related_claim.with_unit_claim(FILES, timed)
+
+		expect(timed).toHaveBeenCalledWith()
+	})
+})
