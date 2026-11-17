@@ -7,7 +7,11 @@ vi.mock('#scripts/epic/epic-remove', () => ({ epic_remove: { remove_order: vi.fn
 vi.mock('#scripts/gh/git-gh-issue-write', () => ({
 	git_gh_issue_write: { issue_remove_blocked_by: vi.fn() },
 }))
+vi.mock('#scripts/gh/git-gh-command', () => ({
+	git_gh_command: { repo_get_name_with_owner: vi.fn() },
+}))
 
+const { git_gh_command } = await import('#scripts/gh/git-gh-command')
 const { epic_blocked_by } = await import('#scripts/epic/epic-blocked-by')
 const { epic_read } = await import('#scripts/epic/epic-read')
 const { epic_remove } = await import('#scripts/epic/epic-remove')
@@ -17,6 +21,7 @@ const read_epic = vi.mocked(epic_read.read_epic)
 const remove_order = vi.mocked(epic_remove.remove_order)
 const remove_relation = vi.mocked(git_gh_issue_write.issue_remove_blocked_by)
 
+const REPO = 'joshuafolkken/kit'
 const ISSUE = 5767
 const BLOCKER = 5562
 const EPIC = 5760
@@ -43,7 +48,7 @@ function reading_of(declaration: string): Awaited<ReturnType<typeof epic_read.re
 	return {
 		subject: { number: EPIC, labels: ['epic'], body: epic_body(declaration) },
 		recorded: [],
-		repo: 'joshuafolkken/kit',
+		repo: REPO,
 	}
 }
 
@@ -52,6 +57,7 @@ beforeEach(() => {
 	read_epic.mockResolvedValue(reading_of(DECLARED))
 	remove_order.mockResolvedValue(SUCCESS_EXIT_CODE)
 	remove_relation.mockResolvedValue(true)
+	vi.mocked(git_gh_command.repo_get_name_with_owner).mockResolvedValue(REPO)
 })
 
 describe('backlog_triage_unblock.remove', () => {
@@ -112,6 +118,16 @@ describe('backlog_triage_unblock.remove — a blocker in another repository', ()
 			String(BLOCKER),
 			UPSTREAM,
 		)
+	})
+
+	it('reads a blocker qualified with this repository as one here, dropping its declaration', async () => {
+		await backlog_triage_unblock.remove({
+			issue: String(ISSUE),
+			prerequisite: `JoshuaFolkken/Kit#${String(BLOCKER)}`,
+		})
+
+		expect(remove_order).toHaveBeenCalledWith({ epic_number: EPIC, path: [BLOCKER, ISSUE] })
+		expect(remove_relation).toHaveBeenCalledWith(String(ISSUE), String(BLOCKER), undefined)
 	})
 })
 
