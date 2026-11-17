@@ -164,6 +164,18 @@ describe('run_handoff_cli.run scratch directory', () => {
 		expect(directories).toEqual(['/repo/.josh/tmp/handoff-kickoff-9'])
 		expect(JSON.stringify(requests[0]?.argv)).toContain('.josh/tmp/handoff-kickoff-9/')
 	})
+
+	it('names the scratch directory and the log for one read of the start time', async () => {
+		const times = [3, 4]
+		const { ports, lines, directories } = fake({ now: () => times.shift() ?? 0 })
+
+		await run_handoff_cli.run(['kickoff', 'new', BRIEF_FLAG, BRIEF_FILE], ports)
+
+		expect(directories).toEqual(['/repo/.josh/tmp/handoff-kickoff-3'])
+		expect(lines).toEqual(
+			expect.arrayContaining([expect.stringMatching(/^log: .*-kickoff-3\.log$/u)]),
+		)
+	})
 })
 
 // The carry as read before the launch and then after the unit ends.
