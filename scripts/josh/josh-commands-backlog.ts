@@ -123,7 +123,7 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: ['--unblock <M>'],
 					description:
-						"removes it instead, with the tracking epic's `#M -> #N` declaration (`epic --remove`'s path); `--blocked-by` restores it. A failed write is named, exit 1.",
+						"removes it instead, with the tracking epic's `#M -> #N` declaration (`epic --remove`'s path); `owner/repo#M` names one elsewhere, no epic. `--blocked-by` restores it. A failed write is named, exit 1.",
 				},
 				{
 					names: ['--adopt <k>'],

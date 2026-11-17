@@ -188,6 +188,21 @@ function blocker_repo_of(filing: Filing): string | undefined {
 	return issue_file.is_same_repository(filing.target, filing.current) ? undefined : filing.target
 }
 
+async function block_finder(
+	url: string,
+	filing: Filing,
+	found_during: string | undefined,
+): Promise<void> {
+	await issue_file_interrupt.block_finder({
+		route: filing.args.route,
+		is_blocking_finder: filing.args.is_blocking_finder,
+		found_during,
+		blocker: issue_number_of(url),
+		blocker_repo: blocker_repo_of(filing),
+		finder_repo: filing.current,
+	})
+}
+
 async function record(url: string, filing: Filing, labels: ReadonlyArray<string>): Promise<void> {
 	const number = String(issue_number_of(url))
 	const reference = issue_cite.plain_for(
@@ -205,13 +220,7 @@ async function record(url: string, filing: Filing, labels: ReadonlyArray<string>
 		current: filing.current,
 	})
 	await split_resolution.record_child({ route: filing.args.route, found_during, child: url })
-	await issue_file_interrupt.block_finder({
-		route: filing.args.route,
-		is_blocking_finder: filing.args.is_blocking_finder,
-		found_during,
-		blocker: issue_number_of(url),
-		blocker_repo: blocker_repo_of(filing),
-	})
+	await block_finder(url, filing, found_during)
 	await record_parks(url, filing)
 }
 

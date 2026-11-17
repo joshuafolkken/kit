@@ -14,6 +14,7 @@ import { issue_file_interrupt } from './issue-file-interrupt'
 
 const FINDER = '4711'
 const BLOCKER = 4738
+const FINDER_REPO = 'joshuafolkken/app-kit'
 
 const apply_relations = vi.spyOn(epic_relations, 'apply_relations')
 const read_label_names = vi.spyOn(git_gh_issue_write, 'read_label_names')
@@ -30,6 +31,7 @@ function interrupt_filing(): Parameters<typeof issue_file_interrupt.block_finder
 		found_during: FINDER,
 		blocker: BLOCKER,
 		blocker_repo: undefined,
+		finder_repo: FINDER_REPO,
 	}
 }
 
@@ -85,8 +87,12 @@ describe('issue_file_interrupt.block_finder — a parked finder', () => {
 			[{ blocked: Number(FINDER), blocker: BLOCKER }],
 			'record',
 		)
-		expect(issue_try_comment).toHaveBeenCalledExactlyOnceWith(FINDER, DECISION)
-		expect(issue_clear_label).toHaveBeenCalledExactlyOnceWith(FINDER, NEEDS_DECISION_LABEL)
+		expect(issue_try_comment).toHaveBeenCalledExactlyOnceWith(FINDER, DECISION, FINDER_REPO)
+		expect(issue_clear_label).toHaveBeenCalledExactlyOnceWith(
+			FINDER,
+			NEEDS_DECISION_LABEL,
+			FINDER_REPO,
+		)
 		expect(issue_try_comment.mock.invocationCallOrder[0]).toBeLessThan(
 			Number(issue_clear_label.mock.invocationCallOrder[0]),
 		)
@@ -141,23 +147,36 @@ describe('issue_file_interrupt.block_finder — a filing in another repository',
 		issue_add_blocked_by.mockResolvedValue(true)
 	})
 
+	// The filing points `GH_REPO` at the upstream target, so every finder-side call names the finder's
+	// repository rather than resolving the finder's number upstream.
 	it('records the blocker in its repository, writes the decision and clears the label', async () => {
 		await issue_file_interrupt.block_finder({ ...interrupt_filing(), blocker_repo: UPSTREAM })
 
-		expect(issue_add_blocked_by).toHaveBeenCalledExactlyOnceWith(FINDER, String(BLOCKER), UPSTREAM)
+		expect(read_label_names).toHaveBeenCalledExactlyOnceWith(FINDER, FINDER_REPO)
+		expect(issue_add_blocked_by).toHaveBeenCalledExactlyOnceWith(
+			FINDER,
+			String(BLOCKER),
+			UPSTREAM,
+			FINDER_REPO,
+		)
 		expect(apply_relations).not.toHaveBeenCalled()
-		expect(issue_try_comment).toHaveBeenCalledExactlyOnceWith(FINDER, DECISION)
-		expect(issue_clear_label).toHaveBeenCalledExactlyOnceWith(FINDER, NEEDS_DECISION_LABEL)
+		expect(issue_try_comment).toHaveBeenCalledExactlyOnceWith(FINDER, DECISION, FINDER_REPO)
+		expect(issue_clear_label).toHaveBeenCalledExactlyOnceWith(
+			FINDER,
+			NEEDS_DECISION_LABEL,
+			FINDER_REPO,
+		)
 	})
 
-	it('names the blocker in its repository on a failed write, and keeps the park', async () => {
+	it('names both repositories on a failed write, and keeps the park', async () => {
 		issue_add_blocked_by.mockResolvedValue(false)
 
 		await issue_file_interrupt.block_finder({ ...interrupt_filing(), blocker_repo: UPSTREAM })
 
-		expect(String(error.mock.calls[0]?.[0])).toContain(
-			`repos/${UPSTREAM}/issues/${String(BLOCKER)}`,
-		)
+		const line = String(error.mock.calls[0]?.[0])
+
+		expect(line).toContain(`repos/${UPSTREAM}/issues/${String(BLOCKER)}`)
+		expect(line).toContain(`repos/${FINDER_REPO}/issues/${FINDER}/dependencies/blocked_by`)
 		expect(issue_clear_label).not.toHaveBeenCalled()
 	})
 })
@@ -166,7 +185,7 @@ describe('issue_file_interrupt.block_finder — nothing to record', () => {
 	it('stays silent when --blocks-finder was not given and the finder is not parked', async () => {
 		await issue_file_interrupt.block_finder({ ...interrupt_filing(), is_blocking_finder: false })
 
-		expect(read_label_names).toHaveBeenCalledExactlyOnceWith(FINDER)
+		expect(read_label_names).toHaveBeenCalledExactlyOnceWith(FINDER, FINDER_REPO)
 		expect(apply_relations).not.toHaveBeenCalled()
 		expect(issue_try_comment).not.toHaveBeenCalled()
 		expect(issue_clear_label).not.toHaveBeenCalled()

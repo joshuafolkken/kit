@@ -43,7 +43,8 @@ describe('run_board_standing_waits.waits_of', () => {
 		])
 	})
 
-	it('names another owner’s blocker with its owner, and drops one its relation read closed', () => {
+	// A closed upstream Issue still holds the child until its release lands, so it stays named.
+	it('names another owner’s blocker with its owner, and keeps one its relation read closed', () => {
 		const row: EpicChild = {
 			...CHILD_ROW,
 			blocked_by: [
@@ -54,6 +55,7 @@ describe('run_board_standing_waits.waits_of', () => {
 
 		expect(run_board_standing_waits.waits_of(row, SOURCE)).toStrictEqual([
 			`someone/repo#${String(FOREIGN_BLOCKER)}`,
+			`other#${String(OPEN_BLOCKER)}`,
 		])
 	})
 })

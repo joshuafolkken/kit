@@ -3,6 +3,7 @@ import { epic_parse } from '#scripts/epic/epic-parse'
 import { epic_read } from '#scripts/epic/epic-read'
 import { epic_remove } from '#scripts/epic/epic-remove'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
+import { issue_cite } from '#scripts/issue/issue-cite'
 import { session_cite } from '#scripts/issue/session-cite'
 
 // `backlog:triage --unblock`'s write (joshuafolkken/kit#5818): `#issue` no longer blocked by
@@ -55,10 +56,18 @@ async function drop_declarations(request: BlockedByRequest): Promise<void> {
 	)
 }
 
+// The prerequisite is a bare number here, or `owner/repo#N` for the upstream Issue `upstream:interrupt`
+// records its finder as blocked by (joshuafolkken/kit#7695). An epic declares only this repository's
+// numbers, so a blocker in another repository has no declaration to drop.
 async function remove(request: BlockedByRequest): Promise<void> {
-	await drop_declarations(request)
+	const { prerequisite } = request
+	const { number, repo } = issue_cite.parse_target(prerequisite, undefined) ?? {
+		number: prerequisite,
+		repo: undefined,
+	}
 
-	if (await git_gh_issue_write.issue_remove_blocked_by(request.issue, request.prerequisite)) return
+	if (repo === undefined) await drop_declarations(request)
+	if (await git_gh_issue_write.issue_remove_blocked_by(request.issue, number, repo)) return
 
 	throw new Error('the blocked-by relation was not removed')
 }

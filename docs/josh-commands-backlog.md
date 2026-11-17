@@ -977,7 +977,7 @@ pnpm josh backlog:triage --apply 915 --adopt 1 --reason "<why>"
 - `--apply <N> --lane|--solo --reason <text>` — comments the reason, then applies the run label (`auto-ok:judge --apply`).
 - `--clear` — clears the park (`run:park <N> --clear`) only when the issue answers its decision question.
 - `--blocked-by <M>` — records the native `blocked-by` relation on `#M` before the comment and the run label, declared in the epic tracking `#N` as `run:pause` does; it stands in for the run label or goes with it.
-- `--unblock <M>` — removes it instead, with the tracking epic's `#M -> #N` declaration (`epic --remove`'s path); `--blocked-by` restores it. A failed write is named, exit 1.
+- `--unblock <M>` — removes it instead, with the tracking epic's `#M -> #N` declaration (`epic --remove`'s path); `owner/repo#M` names one elsewhere, no epic. `--blocked-by` restores it. A failed write is named, exit 1.
 - `--adopt <k>` — takes option `<k>` of the child's latest park in one call: records the decision in its one tracking epic (`epic --decide`'s path), clears the park, then `run:add <N> --retry`. A park with no recommendation, an unlisted or tier C option, no single tracking epic, or no backlogrun running here is refused before any write.
 - `--done <text>` — what the parent did for an option whose `必要な権限` starts with `親` (e.g. `親セッション`): the parent carries the option out first, then adopts it with `--done <what was done>`, recorded with the decision. Without it such an option is refused before any write, so the child stays parked; on any other option it is refused.
 

@@ -59,7 +59,7 @@ describe('backlog_triage_unblock.remove', () => {
 		await backlog_triage_unblock.remove(REQUEST)
 
 		expect(remove_order).toHaveBeenCalledWith({ epic_number: EPIC, path: [BLOCKER, ISSUE] })
-		expect(remove_relation).toHaveBeenCalledWith(String(ISSUE), String(BLOCKER))
+		expect(remove_relation).toHaveBeenCalledWith(String(ISSUE), String(BLOCKER), undefined)
 	})
 
 	it('drops the declaration from every epic listing the issue', async () => {
@@ -79,7 +79,7 @@ describe('backlog_triage_unblock.remove', () => {
 
 		expect(read_epic).not.toHaveBeenCalled()
 		expect(remove_order).not.toHaveBeenCalled()
-		expect(remove_relation).toHaveBeenCalledWith(String(ISSUE), String(BLOCKER))
+		expect(remove_relation).toHaveBeenCalledWith(String(ISSUE), String(BLOCKER), undefined)
 	})
 
 	it.each([
@@ -92,6 +92,26 @@ describe('backlog_triage_unblock.remove', () => {
 
 		expect(remove_order).not.toHaveBeenCalled()
 		expect(remove_relation).toHaveBeenCalledOnce()
+	})
+})
+
+// joshuafolkken/kit#7695: the relation an upstream interrupt recorded names its blocker upstream.
+describe('backlog_triage_unblock.remove — a blocker in another repository', () => {
+	const UPSTREAM = 'joshuafolkken/app-kit'
+
+	it('deletes the relation with the blocker resolved there, and writes no epic', async () => {
+		await backlog_triage_unblock.remove({
+			issue: String(ISSUE),
+			prerequisite: `${UPSTREAM}#${String(BLOCKER)}`,
+		})
+
+		expect(listing_epics).not.toHaveBeenCalled()
+		expect(remove_order).not.toHaveBeenCalled()
+		expect(remove_relation).toHaveBeenCalledExactlyOnceWith(
+			String(ISSUE),
+			String(BLOCKER),
+			UPSTREAM,
+		)
 	})
 })
 

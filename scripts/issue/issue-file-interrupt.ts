@@ -26,10 +26,13 @@ const DECISION_PREFIX = '決定:'
 const CONVERTED_NOTE = 'の着地待ち（依存に変換）'
 
 // `blocker_repo` is the filed Issue's `owner/repo` where it is not this repository, else `undefined`.
+// `repo` is the finder's, named on every finder-side call: a filing in another repository points
+// `GH_REPO` at its target, so `{owner}/{repo}` would resolve the finder's number there.
 interface BlockedPair {
 	blocked: number
 	blocker: number
 	blocker_repo: string | undefined
+	repo: string
 }
 
 interface InterruptFiling {
@@ -38,6 +41,7 @@ interface InterruptFiling {
 	found_during: string | undefined
 	blocker: number
 	blocker_repo: string | undefined
+	finder_repo: string
 }
 
 function is_issue_number(value: number): boolean {
@@ -65,7 +69,7 @@ function ignored_line(filing: InterruptFiling): string {
 // The re-run writes the one relation and nothing else — no epic placement and no chain splice, which
 // would record dependencies the interrupt does not have.
 function failure_line(pair: BlockedPair): string {
-	const path = git_gh_api_path.blocked_by_api_path(String(pair.blocked))
+	const path = git_gh_api_path.blocked_by_api_path(String(pair.blocked), pair.repo)
 	const blocker_path = git_gh_api_path.issue_api_path(String(pair.blocker), pair.blocker_repo)
 	const id = `$(gh api ${blocker_path} --jq .id)`
 	const blocker = issue_cite.plain_for('linked', pair.blocker, pair.blocker_repo)
@@ -78,16 +82,19 @@ function failure_line(pair: BlockedPair): string {
 // since that path resolves both numbers in this repository.
 async function write_relation(pair: BlockedPair): Promise<boolean> {
 	if (pair.blocker_repo !== undefined) {
-		const { blocked, blocker, blocker_repo } = pair
+		const { blocked, blocker, blocker_repo, repo } = pair
 
 		return await git_gh_issue_write.issue_add_blocked_by(
 			String(blocked),
 			String(blocker),
 			blocker_repo,
+			repo,
 		)
 	}
 
-	return (await epic_relations.apply_relations([pair], 'record')) === 0
+	const { blocked, blocker } = pair
+
+	return (await epic_relations.apply_relations([{ blocked, blocker }], 'record')) === 0
 }
 
 function recorded_line(pair: BlockedPair): string {
@@ -111,16 +118,16 @@ async function record(pair: BlockedPair): Promise<boolean> {
 
 function pair_of(filing: InterruptFiling): BlockedPair | undefined {
 	const blocked = finder_of(filing)
-	const { blocker, blocker_repo } = filing
+	const { blocker, blocker_repo, finder_repo } = filing
 
 	return blocked !== undefined && is_issue_number(blocker)
-		? { blocked, blocker, blocker_repo }
+		? { blocked, blocker, blocker_repo, repo: finder_repo }
 		: undefined
 }
 
 async function is_parked(pair: BlockedPair | undefined): Promise<boolean> {
 	if (pair === undefined) return false
-	const names = await git_gh_issue_write.read_label_names(String(pair.blocked))
+	const names = await git_gh_issue_write.read_label_names(String(pair.blocked), pair.repo)
 
 	return names?.includes(NEEDS_DECISION_LABEL) === true
 }
@@ -136,8 +143,8 @@ async function convert_park(pair: BlockedPair): Promise<void> {
 	const blocker = issue_cite.plain_for('github', pair.blocker, pair.blocker_repo)
 	const decision = `${DECISION_PREFIX} ${blocker} ${CONVERTED_NOTE}`
 	const is_cleared =
-		(await git_gh_issue_write.issue_try_comment(finder, decision)) &&
-		(await git_gh_issue_write.issue_clear_label(finder, NEEDS_DECISION_LABEL))
+		(await git_gh_issue_write.issue_try_comment(finder, decision, pair.repo)) &&
+		(await git_gh_issue_write.issue_clear_label(finder, NEEDS_DECISION_LABEL, pair.repo))
 
 	if (!is_cleared) console.error(kept_line(finder, decision))
 }

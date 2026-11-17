@@ -81,10 +81,6 @@ function parse(argv: ReadonlyArray<string>): ParsedInterrupt | undefined {
 	return { ...named, repo, body_file, is_blocking_finder: is_blocking_finder === true }
 }
 
-// The filing always blocks the finder: this command stops it until the upstream fix lands, so the
-// relation is recorded even where the caller left `--blocks-finder` off (joshuafolkken/kit#7695).
-// The flag stays accepted, and the re-run line repeats it only where it was given.
-
 function stash_message(interrupt: Interrupt): string {
 	return `upstream-interrupt: paused ${issue_cite.plain_for('program', interrupt.finder)}`
 }
@@ -127,6 +123,9 @@ async function stash(interrupt: Interrupt): Promise<boolean> {
 
 // `--found-during` names the finder to `issue:file`, so `--blocks-finder` records it — not the lane or
 // branch Issue — as blocked, and the filing cap counts against it.
+// The filing always blocks the finder: this command stops it until the upstream fix lands, so the
+// relation is recorded even where the caller left `--blocks-finder` off (joshuafolkken/kit#7695).
+// The flag stays accepted, and the re-run line repeats it only where it was given.
 function filing_argv(interrupt: Interrupt): ReadonlyArray<string> {
 	const argv = [interrupt.title, '--body-file', interrupt.body_file, '--route', 'interrupt']
 	const finder = ['--found-during', interrupt.finder]

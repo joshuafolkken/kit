@@ -26,7 +26,7 @@
 2. **1 コマンドで止まる（確認なし）**: `pnpm josh upstream:interrupt <N> "<root-cause title>" --repo <owner>/<repo> --body-file .josh/tmp/issue.md`。退避・`issue:file --route interrupt` での起票・起票元への `## Upstream issues` バックリンク・`confirmation` Telegram をこの順に行う（`docs/josh-commands-run.md` → `josh upstream:interrupt`）
    - 失敗した手順で止まり、打ち直すコマンドを出す
    - third-party なら起票せず、本文を `## Upstream candidate` の下書きとして起票元に残す（→「第三者リポジトリへの書き込みは Tier C」）
-3. **元の作業を再開する**: 上流の修正がマージされた、またはユーザーが先送りを明示判断した後に、バックリンクにある `pnpm josh stash:pop "upstream-interrupt: paused #<N>"` で復元する（`operating-rules.md` → "no-self-staging"）。上流 Issue を割り込みで実装するかもユーザーが決める
+3. **元の作業を再開する**: 上流の修正がマージされた、またはユーザーが先送りを明示判断した後に、バックリンクにある `pnpm josh stash:pop "upstream-interrupt: paused #<N>"` で復元する（`operating-rules.md` → "no-self-staging"）。先送りなら、起票が記録した依存を `pnpm josh backlog:triage --apply <N> --unblock <owner/repo#M> --reason <text>` で外す。上流 Issue を割り込みで実装するかもユーザーが決める
 
 ### first-party の Issue・PR への書き込みは確認不要
 
