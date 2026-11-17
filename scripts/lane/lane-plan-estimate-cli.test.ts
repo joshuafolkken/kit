@@ -28,9 +28,9 @@ describe('lane:plan estimate integration', () => {
 		writeFileSync(file, JSON.stringify({ changes }))
 		const check = vi.spyOn(lane_plan_check, 'check_plan').mockResolvedValue(0)
 
-		await expect(lane_plan_cli.run(['7381', SOURCE, '--estimate', file, '--single'])).resolves.toBe(
-			0,
-		)
+		const argv = ['7381', SOURCE, '--estimate', file, '--single', 'one contract']
+
+		await expect(lane_plan_cli.run(argv)).resolves.toBe(0)
 		expect(check).toHaveBeenCalledWith(
 			expect.objectContaining({
 				paths: [SOURCE, DOC],

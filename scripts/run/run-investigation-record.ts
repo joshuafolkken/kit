@@ -1,4 +1,5 @@
 import { readFile, rm } from 'node:fs/promises'
+import { backlog_overlap } from '#scripts/backlog/backlog-overlap'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import { durable_state } from '#scripts/josh/durable-state'
 
@@ -12,6 +13,8 @@ import { durable_state } from '#scripts/josh/durable-state'
 
 const RECORD_SUFFIX = '.md'
 const NO_GIT_DIRECTORY = 'no git directory to hold the investigation record'
+const EDIT_FILES_HEADING = '### Files to edit'
+const HEADING_MARK = '#'
 
 function path_of(issue_number: string): string {
 	const repository = git_common_directory.repository()
@@ -53,6 +56,19 @@ async function load(issue_number: string): Promise<InvestigationRecord | undefin
 	}
 }
 
+// The paths under the findings' `### Files to edit` section — the edit list the investigator returns,
+// which the first `lane:plan` before the first edit judges the size on (joshuafolkken/kit#7729); empty
+// when the section is missing.
+function edit_files(findings = ''): ReadonlyArray<string> {
+	const lines = findings.split('\n')
+	const start = lines.findIndex((line) => line.trim() === EDIT_FILES_HEADING)
+	if (start === -1) return []
+	const rest = lines.slice(start + 1)
+	const end = rest.findIndex((line) => line.startsWith(HEADING_MARK))
+
+	return [...backlog_overlap.declared_paths((end === -1 ? rest : rest.slice(0, end)).join('\n'))]
+}
+
 // Removed once the pull request merged, as the ship body draft is, and once a closed issue's lane is
 // withdrawn: a record left behind would hand a reopened issue's run the old findings. One no path
 // removes is pruned after the durable state's retention (`durable-state-migrate.ts`).
@@ -60,7 +76,7 @@ async function remove(issue_number: string): Promise<void> {
 	await rm(path_of(issue_number), { force: true })
 }
 
-const run_investigation_record = { load, remove }
+const run_investigation_record = { EDIT_FILES_HEADING, edit_files, load, remove }
 
 export type { InvestigationRecord }
 export { run_investigation_record }
