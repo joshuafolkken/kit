@@ -3,8 +3,8 @@ import type { CheckResult } from './check-related-section'
 // **`test:related` starts only once every other check is green** (joshuafolkken/kit#5387,
 // joshuafolkken/kit#7786): a lint failure, a document over its budget or a type error, each found in
 // seconds, still let a full-reach `test:related` run its minutes out, and the fix paid that reach
-// again. The other checks are the cheap ones — the type check's median is under lint's — so a green
-// run waits about nothing for them. All readers also wait for lint's writers; a run whose
+// again. The other checks are the cheap ones — the type check's median is 8.1 s against the minutes
+// `test:related` takes — so a green run pays that much more. All readers also wait for lint's writers; a run whose
 // `lint:related` is reused starts them at once. A `test:related --touched` waits the same.
 
 const LINT_RELATED = 'lint:related'
