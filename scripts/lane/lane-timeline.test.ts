@@ -195,7 +195,7 @@ describe('lane_timeline.of — ship attempts and their steps', () => {
 		const row = attempt_timeline(events())?.rows.find((line) => line.name === SCOPED_LAP)
 
 		expect(row).toMatchObject({ at_ms: START + RESUME_MINUTE * MINUTE_MS, ms: MINUTE_MS })
-		expect(row?.kind).toBe(lane_timeline.ROW.STEP)
+		expect(row?.kind).toBe('step')
 	})
 
 	it('still prints the ledger steps of a lane whose events have rotated away', () => {
@@ -208,6 +208,8 @@ describe('lane_timeline.of — ship attempts and their steps', () => {
 		const timeline = attempt_timeline(events())
 		const text = timeline === undefined ? '' : lane_timeline.text(LANE, timeline)
 
+		expect(text).toContain('start (UTC), end, minutes since dispatch, duration, event')
+		expect(text).toContain('[step], [excluded], [driver] and [event] lines stand apart')
 		expect(text).toContain('2026-10-26 06:13:00Z  06:14:00')
 		expect(text).toMatch(/06:43:00Z +\+60\.0 +- {2}\[event\] ship launch/u)
 	})

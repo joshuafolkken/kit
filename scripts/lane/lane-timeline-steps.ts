@@ -125,6 +125,15 @@ function ship_mark(entry: LedgerEntry): Array<Step> {
 	return entry.kind === KIND.STOP ? [{ at_ms: Date.parse(entry.at), name: KIND.STOP }] : []
 }
 
+// Whether `name` opens an attempt after `previous`: a preflight the pre-detach checks did not run just
+// before, or the pre-detach checks no preflight ran just before — a `--review` re-ship on an unmoved
+// base passes over the foreground preflight (`run-ship-reship.ts`).
+function opens_attempt(name: string, previous: string | undefined): boolean {
+	if (name === STAGE.PREFLIGHT) return previous !== lane_ledger.PRE_DETACH_STAGE
+
+	return name === lane_ledger.PRE_DETACH_STAGE && previous !== STAGE.PREFLIGHT
+}
+
 // When each ship attempt started, read off the ledger's stage and stop lines, which outlive the event
 // stream: a stop between the pre-detach checks and the next preflight ends the attempt.
 function attempt_starts(entries: ReadonlyArray<LedgerEntry>, issue: number): Array<number> {
@@ -134,10 +143,7 @@ function attempt_starts(entries: ReadonlyArray<LedgerEntry>, issue: number): Arr
 		.toSorted((left, right) => left.at_ms - right.at_ms)
 
 	return stages
-		.filter(
-			(stage, index) =>
-				stage.name === STAGE.PREFLIGHT && stages[index - 1]?.name !== lane_ledger.PRE_DETACH_STAGE,
-		)
+		.filter((stage, index) => opens_attempt(stage.name, stages[index - 1]?.name))
 		.map((stage) => stage.at_ms)
 }
 

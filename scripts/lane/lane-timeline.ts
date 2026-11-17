@@ -286,7 +286,7 @@ function row_text(row: TimelineRow, from_ms: number): string {
 function text(lane: string, timeline: Timeline): string {
 	const head = `${lane} timeline — start (UTC), end, minutes since dispatch, duration, event`
 	const lines = timeline.rows.map((row) => row_text(row, timeline.from_ms))
-	const total = `net ${lane_breakdown.minutes_text(net_ms(timeline))} — the stage lines' sum; [excluded], [driver] and [event] lines stand apart`
+	const total = `net ${lane_breakdown.minutes_text(net_ms(timeline))} — the stage lines' sum; [step], [excluded], [driver] and [event] lines stand apart`
 
 	return [head, ...lines, total].join('\n')
 }

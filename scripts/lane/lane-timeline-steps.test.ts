@@ -120,7 +120,11 @@ describe('lane_timeline_steps.of — the transcripts', () => {
 	})
 })
 
-const STOP: LedgerEntry = { kind: 'stop', at: at(3), issue: ISSUE, reason: PREFLIGHT }
+function stopped(minute: number): LedgerEntry {
+	return { kind: 'stop', at: at(minute), issue: ISSUE, reason: PREFLIGHT }
+}
+
+const STOP = stopped(3)
 
 describe('lane_timeline_steps.attempt_starts', () => {
 	it('opens an attempt at each preflight a passed pre-detach did not run just before', () => {
@@ -136,6 +140,21 @@ describe('lane_timeline_steps.attempt_starts', () => {
 
 		expect(lane_timeline_steps.attempt_starts(entries, ISSUE)).toStrictEqual(
 			[0, 10, 30].map((minute) => START + minute * MINUTE_MS),
+		)
+	})
+
+	it('opens an attempt at the pre-detach checks of a re-ship that passed over the preflight', () => {
+		const entries = [
+			stage_line(1, PREFLIGHT),
+			stage_line(3, PRE_DETACH),
+			stage_line(5, PREFLIGHT),
+			stopped(6),
+			stage_line(11, PRE_DETACH),
+			stage_line(13, PREFLIGHT),
+		]
+
+		expect(lane_timeline_steps.attempt_starts(entries, ISSUE)).toStrictEqual(
+			[0, 10].map((minute) => START + minute * MINUTE_MS),
 		)
 	})
 })

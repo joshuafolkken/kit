@@ -382,7 +382,7 @@ Historical ship boundaries use completed ledger/archive intervals and surviving 
 
 `--timeline` prints the lane one line an event, oldest first: start (UTC, to the second), end (blank for a point), minutes since the dispatch, duration, name (`lane-timeline.ts`). Its stage lines are the same spans at their net minutes and add up to the net time.
 
-Ship lines carry their attempt: `ship #2 sync`. A ship preflight opens an attempt unless the pre-detach checks passed just before it; the count reads the ledger's stage and stop lines, so it survives the event stream's rotation (`lane-timeline-steps.ts`).
+Ship lines carry their attempt: `ship #2 sync`. A ship preflight opens an attempt unless the pre-detach checks ran just before it, and so do pre-detach checks no preflight ran just before (a `--review` re-ship's); the count reads the ledger's stage and stop lines, so it survives the event stream's rotation (`lane-timeline-steps.ts`).
 
 - `[excluded]` — a wait taken out, named by what opened it (park, outage, usage limit, split, yield, sleep).
 - `[driver]` — the followup's CI wait.
