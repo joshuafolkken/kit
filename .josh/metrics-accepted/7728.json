@@ -1,0 +1,7 @@
+{
+	"reason": "#7728 adds command:derive --check, its run:chain stage and pre-detach call",
+	"date": "2026-11-17",
+	"growth": {
+		"scripts.code_lines": 57
+	}
+}
