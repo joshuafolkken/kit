@@ -261,3 +261,19 @@ describe('acceptance_map.refusal_message', () => {
 		expect(message).toContain(STALE_ID)
 	})
 })
+
+// joshuafolkken/kit#7727
+describe('acceptance_map.with_pending', () => {
+	const skeleton = acceptance_map.skeleton(issue_with([FIRST])) ?? ''
+
+	it('counts a pending row as present', () => {
+		expect(acceptance_map.with_pending(skeleton).ids).toStrictEqual(new Set([id(FIRST)]))
+	})
+
+	it('leaves a pending row inside a code fence out', () => {
+		const [heading = '', ...rows] = skeleton.split('\n')
+		const fenced = [heading, '```', ...rows, '```'].join('\n')
+
+		expect(acceptance_map.with_pending(fenced).ids.size).toBe(0)
+	})
+})

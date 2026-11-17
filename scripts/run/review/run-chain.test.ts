@@ -3,6 +3,7 @@ import { run_chain, type ChainStage, type StageRunner } from './run-chain'
 
 const SELFCHECK = 'review:selfcheck'
 const CHECK_RELATED = 'check:related'
+const ACCEPTANCE_CHECK = 'acceptance:check'
 const RUN_REVIEW = 'run:review'
 const RUN_CUT = 'run:cut'
 const ISSUE = '5630'
@@ -21,6 +22,7 @@ describe('run_chain', () => {
 		expect(run_chain.review_stages([]).map((stage) => stage.name)).toStrictEqual([
 			SELFCHECK,
 			CHECK_RELATED,
+			ACCEPTANCE_CHECK,
 			RUN_REVIEW,
 		])
 	})
@@ -54,5 +56,25 @@ describe('run_chain', () => {
 		const stop = { stage, code: STOP_EXIT, next: stage.next }
 
 		expect(run_chain.stop_report(stop, ISSUE)).toMatch(/^run:chain 5630 — stopped at run:review/u)
+	})
+})
+
+// joshuafolkken/kit#7727: ship's acceptance-map refusal asked before the review.
+describe('run_chain — acceptance:check', () => {
+	it('asks the acceptance map before run:review in the lane child and main line lists', () => {
+		for (const stages of [run_chain.review_stages([]), run_chain.main_line_stages([])]) {
+			const names = stages.map((stage) => stage.name)
+
+			expect(names.indexOf(ACCEPTANCE_CHECK)).toBe(names.indexOf(RUN_REVIEW) - 1)
+		}
+	})
+
+	it('resumes a stop at acceptance:check from that stage', () => {
+		const stage = stage_named(ACCEPTANCE_CHECK)
+		const stop = { stage, code: STOP_EXIT, next: stage.next }
+
+		expect(run_chain.stop_report(stop, ISSUE)).toContain(
+			'`pnpm josh run:chain 5630 --from acceptance:check`',
+		)
 	})
 })

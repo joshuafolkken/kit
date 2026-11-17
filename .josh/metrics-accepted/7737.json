@@ -1,0 +1,7 @@
+{
+	"reason": "lane:breakdown --timeline gains timed ship-attempt and step rows (lane-timeline-steps.ts) and the timed conflict probe lap (#7737)",
+	"date": "2026-11-17",
+	"growth": {
+		"scripts.code_lines": 171
+	}
+}

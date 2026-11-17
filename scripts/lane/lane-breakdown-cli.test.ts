@@ -146,7 +146,7 @@ describe('lane_breakdown_cli.run — --timeline', () => {
 		await expect(lane_breakdown_cli.run(TIMELINE)).resolves.toBe(0)
 		expect(console.info).toHaveBeenCalledWith(
 			expect.stringMatching(
-				/^\[#4970\]\(.*\) timeline .*\n2026-10-26 05:43Z +\+0\.0 +10\.0 min {2}start to plan\n/u,
+				/^\[#4970\]\(.*\) timeline .*\n2026-10-26 05:43:00Z {2}05:53:00 +\+0\.0 +10\.0 min {2}start to plan\n/u,
 			),
 		)
 	})

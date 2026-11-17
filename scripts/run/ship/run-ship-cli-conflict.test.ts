@@ -103,6 +103,7 @@ describe('josh ship — the laps of a stage', () => {
 
 		expect(record_lap.mock.calls.map(([lap]) => [lap.stage, lap.step, lap.issue])).toStrictEqual([
 			['preflight', 'preconditions', 5018],
+			['sync', 'conflict probe', 5018],
 		])
 	})
 })

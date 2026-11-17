@@ -276,6 +276,7 @@ const run_ship_preflight = {
 	EVIDENCE_PROBLEM,
 	acceptance_pending_text,
 	ahead,
+	body_text,
 	stage,
 }
 
