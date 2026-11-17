@@ -25,7 +25,7 @@ import { whole_suite_files } from './whole-suite-files'
 
 // `left` are the synced modules no longer handed to vitest, `shared` the tests where they meet the change,
 // `meeting` every file whose imports reach both — `shared` and the code between — and `touching` the
-// part of it that is a file of each side or imports one directly, which `josh ship`'s lint reads
+// part of it that is a file of either side or imports a file of each directly, which `josh ship`'s lint reads
 // (joshuafolkken/kit#4985, joshuafolkken/kit#7788) — all repository-root-relative. `failure` says why
 // the graph left nothing out, which `josh ship` logs and names nothing over (joshuafolkken/kit#6185).
 interface SyncedSplit {
@@ -96,10 +96,17 @@ function relative_in(root: string, files: ReadonlyArray<string>): Array<string> 
 	return files.map((file) => path.relative(root, file))
 }
 
-// A file of `side` or one importing a file of it directly — where a type-aware rule reads that side's
-// change. The code between only passes its declared types on, which the repository writes out.
-function touches(graph: ImportGraph, file: string, side: ReadonlySet<string>): boolean {
-	return side.has(file) || graph.imports(file).some((dependency) => side.has(dependency))
+// A file of either side that reaches the other by any path — through a re-export or a declared type
+// too — or a file importing a file of each side directly: where a type-aware rule reads both changes.
+// A file of neither side reaching one only through the code between is left to CI's whole suite.
+function imports_from(graph: ImportGraph, file: string, side: ReadonlySet<string>): boolean {
+	return graph.imports(file).some((dependency) => side.has(dependency))
+}
+
+function is_touching(graph: ImportGraph, file: string, sides: ReadonlyArray<Set<string>>): boolean {
+	if (sides.some((side) => side.has(file))) return true
+
+	return sides.every((side) => imports_from(graph, file, side))
 }
 
 function touching_of(
@@ -107,10 +114,9 @@ function touching_of(
 	inputs: SplitInputs,
 	meeting: ReadonlyArray<string>,
 ): ReadonlyArray<string> {
-	const main_only = new Set(inputs.main_only)
-	const own = new Set(inputs.own)
+	const sides = [new Set(inputs.main_only), new Set(inputs.own)]
 
-	return meeting.filter((file) => touches(graph, file, main_only) && touches(graph, file, own))
+	return meeting.filter((file) => is_touching(graph, file, sides))
 }
 
 function split_with(graph: ImportGraph, inputs: SplitInputs): SyncedSplit {

@@ -145,6 +145,14 @@ describe('test_related_synced.split_with — where lint reads the meeting (touch
 		expect(result.touching).toEqual([])
 	})
 
+	it('keeps a branch file reaching the synced module only through an intermediate', () => {
+		expect(split_of([SYNCED_MODULE], [SHARED_TEST]).touching).toEqual([SHARED_TEST])
+	})
+
+	it('keeps a synced file reaching the branch module only through an intermediate', () => {
+		expect(split_of([SHARED_TEST], [SYNCED_MODULE]).touching).toEqual([SHARED_TEST])
+	})
+
 	it('keeps a file importing a file of each side directly', () => {
 		expect(split_of([DATA_READER], [BRANCH_MODULE]).touching).toEqual([SHARED_TEST])
 	})
