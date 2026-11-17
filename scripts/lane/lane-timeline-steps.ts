@@ -7,11 +7,13 @@ import type { ToolCall } from './lane-transcript-calls'
 // from the ledger, each ship stage's laps, each `run:chain`, `test:related` and `test:pinned`, the
 // followup's CI and CodeRabbit waits and each review round's verdict; from the transcripts, what the
 // ledger does not time — each `lint:related` and each review pass. The ship stages are numbered by
-// attempt: a ship preflight opens one, unless the pre-detach checks ran just before it, whose detached
-// ship it continues.
+// attempt: a ship preflight or the pre-detach checks open one, unless one of the two ran just before.
 
 const { KIND } = lane_ledger
-const { STAGE } = run_ship_stage
+const OPENING_STAGES: ReadonlySet<string> = new Set([
+	run_ship_stage.STAGE.PREFLIGHT,
+	lane_ledger.PRE_DETACH_STAGE,
+])
 
 const SHIP_LEAD = 'ship '
 const LAP_SEPARATOR = ' › '
@@ -125,13 +127,12 @@ function ship_mark(entry: LedgerEntry): Array<Step> {
 	return entry.kind === KIND.STOP ? [{ at_ms: Date.parse(entry.at), name: KIND.STOP }] : []
 }
 
-// Whether `name` opens an attempt after `previous`: a preflight the pre-detach checks did not run just
-// before, or the pre-detach checks no preflight ran just before — a `--review` re-ship on an unmoved
-// base passes over the foreground preflight (`run-ship-reship.ts`).
+// Whether `name` opens an attempt after `previous`: a preflight or the pre-detach checks, unless one
+// of the two ran just before. A `--review` re-ship on an unmoved base passes over the foreground
+// preflight (`run-ship-reship.ts`), the detached half's preflight follows the pre-detach checks, and an
+// infrastructure retry runs the preflight again in place (`run-ship-infra-retry.ts`).
 function opens_attempt(name: string, previous: string | undefined): boolean {
-	if (name === STAGE.PREFLIGHT) return previous !== lane_ledger.PRE_DETACH_STAGE
-
-	return name === lane_ledger.PRE_DETACH_STAGE && previous !== STAGE.PREFLIGHT
+	return OPENING_STAGES.has(name) && (previous === undefined || !OPENING_STAGES.has(previous))
 }
 
 // When each ship attempt started, read off the ledger's stage and stop lines, which outlive the event

@@ -135,6 +135,7 @@ describe('lane_timeline_steps.attempt_starts', () => {
 			stage_line(11, PREFLIGHT),
 			stage_line(13, PRE_DETACH),
 			stage_line(15, PREFLIGHT),
+			stopped(20),
 			stage_line(31, PREFLIGHT),
 		]
 
@@ -142,7 +143,9 @@ describe('lane_timeline_steps.attempt_starts', () => {
 			[0, 10, 30].map((minute) => START + minute * MINUTE_MS),
 		)
 	})
+})
 
+describe('lane_timeline_steps.attempt_starts — a re-ship and a retry', () => {
 	it('opens an attempt at the pre-detach checks of a re-ship that passed over the preflight', () => {
 		const entries = [
 			stage_line(1, PREFLIGHT),
@@ -156,6 +159,18 @@ describe('lane_timeline_steps.attempt_starts', () => {
 		expect(lane_timeline_steps.attempt_starts(entries, ISSUE)).toStrictEqual(
 			[0, 10].map((minute) => START + minute * MINUTE_MS),
 		)
+	})
+
+	it('keeps a preflight retried in place on the infrastructure in its attempt', () => {
+		const entries = [
+			stage_line(1, PREFLIGHT),
+			stage_line(3, PRE_DETACH),
+			stage_line(5, PREFLIGHT),
+			stage_line(7, PREFLIGHT),
+			stage_line(9, SYNC),
+		]
+
+		expect(lane_timeline_steps.attempt_starts(entries, ISSUE)).toStrictEqual([START])
 	})
 })
 
