@@ -19,12 +19,25 @@ EOF
 	exit 1
 }
 
+tool_dir() {
+	local tool
+	tool="$(type -P "$1")" || {
+		echo "$1 is not on PATH" >&2
+		exit 1
+	}
+	dirname "$tool"
+}
+
 isolated() {
 	local work="$1"
 	shift
+	# pnpm's directory comes first, so a pinned pnpm put first on PATH wins over one beside node.
+	local pnpm_dir node_dir
+	pnpm_dir="$(tool_dir pnpm)"
+	node_dir="$(tool_dir node)"
 	mkdir -p "$work/home" "$work/xdg/cache" "$work/xdg/config" "$work/xdg/data" "$work/xdg/state"
 	env -i \
-		PATH="$(dirname "$(command -v node)"):$(dirname "$(type -P pnpm)"):/usr/bin:/bin:/usr/sbin:/sbin" \
+		PATH="$pnpm_dir:$node_dir:/usr/bin:/bin:/usr/sbin:/sbin" \
 		HOME="$work/home" \
 		XDG_CACHE_HOME="$work/xdg/cache" \
 		XDG_CONFIG_HOME="$work/xdg/config" \
@@ -79,7 +92,11 @@ hash() {
 
 [ "$#" -ge 2 ] || usage
 command="$1"
-shift
+# The work directory is made absolute once, so `run` still finds it after `cd` into the copy.
+mkdir -p "$2"
+work_dir="$(cd "$2" && pwd -P)"
+shift 2
+set -- "$work_dir" "$@"
 case "$command" in
 	entry) [ "$#" -eq 2 ] || usage; entry "$@" ;;
 	copy) [ "$#" -eq 4 ] || usage; copy "$@" ;;

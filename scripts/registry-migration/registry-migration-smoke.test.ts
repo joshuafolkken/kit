@@ -1,6 +1,6 @@
 import { spawnSync, type SpawnSyncReturns } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { mkdirSync, realpathSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it } from 'vitest'
@@ -10,11 +10,38 @@ const SCRIPT = path.join(import.meta.dirname, SCRIPT_NAME)
 const COPY = 'consumer'
 const make_directory = temporary_directory()
 
-function smoke(arguments_: Array<string>): SpawnSyncReturns<string> {
+const EXECUTABLE_MODE = 0o755
+
+interface SmokeOptions {
+	cwd?: string
+	path_prefix?: string
+}
+
+function smoke(arguments_: Array<string>, options: SmokeOptions = {}): SpawnSyncReturns<string> {
+	const prefix = options.path_prefix === undefined ? '' : `${options.path_prefix}:`
+
 	return spawnSync('bash', [SCRIPT, ...arguments_], {
+		cwd: options.cwd,
 		encoding: 'utf8',
-		env: { ...process.env, SMOKE_LEAK_PROBE: 'leaked' },
+		env: {
+			...process.env,
+			PATH: `${prefix}${process.env['PATH'] ?? ''}`,
+			SMOKE_LEAK_PROBE: 'leaked',
+		},
 	})
+}
+
+// A directory holding a stand-in `pnpm` that prints its label, optionally with `node` beside it.
+function tool_directory(work: string, label: string, node?: string): string {
+	const directory = path.join(work, label)
+	const pnpm = path.join(directory, 'pnpm')
+
+	mkdirSync(directory)
+	writeFileSync(pnpm, `#!/bin/sh\necho ${label}\n`)
+	chmodSync(pnpm, EXECUTABLE_MODE)
+	if (node !== undefined) symlinkSync(node, path.join(directory, 'node'))
+
+	return directory
 }
 
 function work_with_copy(): string {
@@ -81,5 +108,29 @@ describe(`${SCRIPT_NAME} run`, () => {
 
 		expect(result.status).toBe(0)
 		expect(result.stdout).toContain('exit: 3 (sh -c exit 3)')
+	})
+})
+
+describe(`${SCRIPT_NAME} run paths`, () => {
+	it('keeps the isolated directories outside the copy for a relative work directory', () => {
+		const work = work_with_copy()
+
+		const result = smoke(['run', path.basename(work), COPY, 'sh', '-c', 'echo "$HOME"'], {
+			cwd: path.dirname(work),
+		})
+
+		expect(result.stdout.split('\n', 1)[0]).toBe(path.join(work, 'home'))
+	})
+
+	it('prefers the pinned pnpm first on PATH over a pnpm beside node', () => {
+		const work = work_with_copy()
+		const pinned = tool_directory(work, 'pinned')
+		const beside_node = tool_directory(work, 'beside-node', process.execPath)
+
+		const result = smoke(['run', work, COPY, 'pnpm'], {
+			path_prefix: `${pinned}:${beside_node}`,
+		})
+
+		expect(result.stdout.split('\n', 1)[0]).toBe('pinned')
 	})
 })
