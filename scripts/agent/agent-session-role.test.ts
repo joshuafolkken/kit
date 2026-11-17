@@ -59,7 +59,7 @@ describe('agent_session_role.scope_line', () => {
 	it('hands a filing instruction to run:handoff kickoff new outside a worker lane', () => {
 		const line = agent_session_role.scope_line({})
 
-		expect(line).toContain('hand it to `pnpm josh run:handoff kickoff new`')
+		expect(line).toContain('hand it to `pnpm josh run:handoff kickoff new --brief-file <brief>`')
 	})
 
 	// joshuafolkken/kit#7755: an imperative request goes through investigate, plan and filing plan.

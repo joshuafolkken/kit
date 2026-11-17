@@ -207,7 +207,9 @@ describe('unasked_filing.ROW.decide', () => {
 // joshuafolkken/kit#7783: the refusal names the hand-off a confirmed filing takes.
 describe('unasked_filing.ROW.reason', () => {
 	it('names run:handoff kickoff new as the route after the confirmation', () => {
-		expect(unasked_filing.ROW.reason).toContain('`pnpm josh run:handoff kickoff new`')
+		expect(unasked_filing.ROW.reason).toContain(
+			'`pnpm josh run:handoff kickoff new --brief-file <brief>`',
+		)
 	})
 })
 

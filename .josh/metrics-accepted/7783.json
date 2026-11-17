@@ -1,9 +1,9 @@
 {
-	"reason": "#7783 names the consultation filing hand-off (run:handoff kickoff new) in CLAUDE.md, SKILL.md, observation-filing.md and the delivered scope line, as its acceptance criteria require",
+	"reason": "#7783 names the consultation filing hand-off (run:handoff kickoff new --brief-file) in CLAUDE.md, SKILL.md and observation-filing.md, as its acceptance criteria require",
 	"date": "2026-11-17",
 	"growth": {
-		"scripts.code_lines": 1,
-		"ai_cost.resident_bytes": 165,
-		"ai_cost.on_demand_bytes": 295
+		"scripts.code_lines": 2,
+		"ai_cost.resident_bytes": 186,
+		"ai_cost.on_demand_bytes": 385
 	}
 }
