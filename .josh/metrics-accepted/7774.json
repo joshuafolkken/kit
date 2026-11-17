@@ -1,0 +1,7 @@
+{
+	"reason": "Moving inline ledger schemas into two sibling modules adds each module's imports and export object (#7774)",
+	"date": "2026-11-17",
+	"growth": {
+		"scripts.code_lines": 20
+	}
+}
