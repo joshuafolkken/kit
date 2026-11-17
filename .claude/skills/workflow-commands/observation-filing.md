@@ -10,6 +10,9 @@ parent; the `Stop` hook sends an offer to file back. Interactively, propose the 
 once the user confirms. A current-turn instruction to file, or a typed command whose procedure files (a
 split, a prerequisite, an upstream interrupt), is that confirmation already.
 
+Consultation main line, an instruction to file →
+`pnpm josh run:handoff kickoff new --brief-file .josh/tmp/brief.md` (`CLAUDE.md` → "Explicit invocation required (MANDATORY)").
+
 **The trigger is the judgement, not the run's progress** — an ended run, a `kickoff` and a mid-talk
 turn all file or propose.
 
