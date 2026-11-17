@@ -242,7 +242,13 @@ none does, `unread` when the listing failed (`lane-sinks-issues.ts`). The `scope
 name of each `over_cap_hub` those lanes' `test-related` runs recorded.
 
 `--over <minutes>`: per merged lane over that many net min, longest first, net/wait minutes, ledger chain,
-stages past budget (`implement 58.8/9`), top stage, its `--sinks` open Issues (`lane-over.ts`). A cause table follows
+stages past budget (`implement 58.8/9`), estimate, top stage, its `--sinks` open Issues (`lane-over.ts`).
+
+`estimate`: implement time against `lane:why`'s projection of the merge's recorded `- 規模見積もり:`, as
+`60.8 min ×0.71 to size`. Past 1 is `over estimate`; up to 1 is `to size`; no size or rate is `no estimate`, on
+neither side. The line under the rows counts each side (`lane-over-estimate.ts`).
+
+A cause table follows
 (`lane-over-causes.ts`): per over-cap `hub` and `ci job`, lanes, minutes over, open Issues; `filing candidates:`
 lists unnamed.
 

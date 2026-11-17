@@ -1,0 +1,7 @@
+{
+	"reason": "#7785 adds lane-over-estimate.ts and its test: the --over estimate column and side counts the Issue asks for",
+	"date": "2026-11-17",
+	"growth": {
+		"scripts.code_lines": 113
+	}
+}
