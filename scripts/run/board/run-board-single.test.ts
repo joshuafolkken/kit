@@ -142,6 +142,28 @@ describe('run_board_single.span_of — a stop', () => {
 	})
 })
 
+describe('run_board_single — a stopped run read back', () => {
+	it('reads a stopped root run beside a carried run back as stopped', () => {
+		const span = { invocation: FULLRUN_12, started_ms: TAKEN_MS, ended_ms: TAKEN_MS }
+
+		expect(run_board_single.root_of(span, [])?.stopped).toStrictEqual({
+			command: FULLRUN,
+			issue: 12,
+			started_ms: TAKEN_MS,
+			ended_ms: TAKEN_MS,
+		})
+	})
+
+	it('reads the stopped run this checkout holds as its stopped single run', async () => {
+		arrange(NONE, undefined)
+		vi.spyOn(run_hold, 'read_hold').mockReturnValue(held({ is_halfrun_stop: true }))
+
+		await expect(run_board_read.read_local()).resolves.toMatchObject({
+			stopped_single: { command: 'halfrun', issue: ISSUE, ended_ms: TAKEN_MS },
+		})
+	})
+})
+
 describe('run_board_single.scope_of / name_of', () => {
 	it('covers a single run its own issue alone, under its own name', () => {
 		expect(run_board_single.scope_of('halfrun #12')).toStrictEqual({ issues: [12], only: true })

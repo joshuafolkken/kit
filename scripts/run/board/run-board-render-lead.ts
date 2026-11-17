@@ -106,13 +106,13 @@ function indent_of(row: BoardRow): string {
 	return row.is_solo === true ? WAIT_ICONS.solo : LANE_INDENT
 }
 
-// A lane row's lead after its indent, ending where its usage cells start less one blank.
 // The icon a row leads with, which the legend names too: none on a stopped single run's, whose ✅ stands
 // in the progress column.
 function icon_of(row: BoardRow, header: BoardHeader): string {
 	return is_stopped_single(row, header) ? ICON_BLANK : state_icon(row)
 }
 
+// A lane row's lead after its indent, ending where its usage cells start less one blank.
 function lead_of(row: BoardRow, header: BoardHeader): string {
 	const icon = running_fresh(row, icon_of(row, header), row.status?.phase_ms, header)
 	const phase = phase_time(row, header, TIME_WIDTH)

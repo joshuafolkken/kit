@@ -1,7 +1,8 @@
 {
-	"reason": "New feature: draws a stopped halfrun/prrun row under its home heading on run:board and keeps the run start in the stop hold (#7710)",
+	"reason": "Round-1 fix: a stopped single run gives way to a later backlogrun, with regression tests pinning the stopped-single reads",
 	"date": "2026-11-17",
 	"growth": {
-		"scripts.code_lines": 54
+		"scripts.code_lines": 63,
+		"prose.long_paragraphs": 1
 	}
 }

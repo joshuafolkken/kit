@@ -183,7 +183,9 @@ On a terminal it draws on the alternate screen, so redraws never grow the scroll
 
 A running `fullrun #N`, `halfrun #N` or `prrun #N` this checkout's `run:hold` record holds is drawn as a one-row board under its own name, the row's phase read from #N's events — over a carry record too, outside a lane.
 
-A stop-marked hold — a `halfrun` stopped before its commit, a `prrun` before its merge — keeps its row under `halfrun` or `prrun`, leading with `✅` in the progress column and no phase icon or phase time; its time is fixed from the run's start to its stop. Resuming it with `fullrun #N`, `prrun #N` or a `halfrun` fix round draws it running again.
+A stop-marked hold — a `halfrun` stopped before its commit, a `prrun` before its merge — keeps its row under `halfrun` or `prrun`, leading with `✅` in the progress column and no phase icon or phase time; its time is fixed from the run's start to its stop.
+
+A backlogrun launched or ended after the stop is drawn instead. Resuming it with `fullrun #N`, `prrun #N` or a `halfrun` fix round draws it running again.
 
 The name is the one the record carries (`--fullrun`, `--prrun`, or none for a `halfrun`), so a running `prrun` is drawn as `🏠 prrun`; a `prrun` record written before the name was recorded reads as `fullrun`.
 
