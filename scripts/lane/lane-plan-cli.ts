@@ -17,6 +17,8 @@ const FAILURE_EXIT_CODE = 1
 const PROBE_FLAG = '--probe'
 const SINGLE_FLAG = '--single'
 const FLAG_PREFIX = '--'
+const PATH_SEPARATOR = '/'
+const WORD_SEPARATOR = ' '
 const FLAG_WIDTH = 1
 const FLAG_WITH_VALUE_WIDTH = 2
 const USAGE =
@@ -29,11 +31,19 @@ interface Single {
 	reason: string | undefined
 }
 
+// A flag or a path after `--single` names no reason: a path is one word holding a `/`, so it is refused,
+// not taken out of the plan as the reason.
+function is_reason(token: string): boolean {
+	const is_path = token.includes(PATH_SEPARATOR) && !token.includes(WORD_SEPARATOR)
+
+	return !token.startsWith(FLAG_PREFIX) && !is_path
+}
+
 function single_of(argv: ReadonlyArray<string>): Single {
 	const at = argv.indexOf(SINGLE_FLAG)
 	if (at === -1) return { tokens: argv, reason: undefined }
 	const next = argv[at + 1] ?? ''
-	const reason = next.startsWith(FLAG_PREFIX) ? '' : next.trim()
+	const reason = is_reason(next) ? next.trim() : ''
 	const width = reason === '' ? FLAG_WIDTH : FLAG_WITH_VALUE_WIDTH
 
 	return { tokens: argv.toSpliced(at, width), reason }

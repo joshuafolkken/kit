@@ -300,27 +300,48 @@ describe('run_prep.format_report', () => {
 
 	it('names where to save the conclusion when none is saved yet', () => {
 		const investigation = { path: RECORD_PATH, findings: undefined }
-		const report = run_prep.format_report({ ...PARTS, investigation })
+		const report = run_prep.format_report({ ...PARTS, investigation, is_lane_child: true })
 
 		expect(report).toContain(DELEGATE_STEP)
 		expect(report).toContain(`${run_prep.INVESTIGATION_SAVE_STEP} \`${RECORD_PATH}\`, then run`)
 	})
 })
 
-// joshuafolkken/kit#7729: the saved edit list is judged on before the first edit.
+// joshuafolkken/kit#7729: a lane child's saved edit list is judged on before the first edit; no other
+// run is asked for a `lane:plan`.
 describe('run_prep.format_report edit list', () => {
-	it('prints the `lane:plan` of the findings’ edit list', () => {
-		const findings = `${FINDINGS}\n\n### Files to edit\n- \`scripts/a.ts\`\n- \`scripts/b.ts\``
+	const findings = `${FINDINGS}\n\n### Files to edit\n- \`scripts/a.ts\`\n- \`scripts/b.ts\``
+
+	it('prints the `lane:plan` of the findings’ edit list in a lane child', () => {
 		const investigation = { path: RECORD_PATH, findings }
-		const report = run_prep.format_report({ ...PARTS, investigation })
+		const report = run_prep.format_report({ ...PARTS, investigation, is_lane_child: true })
 
 		expect(report).toContain(`\`pnpm josh lane:plan ${ISSUE} scripts/a.ts scripts/b.ts\``)
 	})
 
+	it('prints no `lane:plan` outside a lane child', () => {
+		const saved = { path: RECORD_PATH, findings }
+		const unsaved = { path: RECORD_PATH, findings: undefined }
+		const reports = [saved, unsaved].map((investigation) =>
+			run_prep.format_report({ ...PARTS, investigation, is_lane_child: false }),
+		)
+
+		expect(reports.join('\n')).not.toContain('lane:plan')
+		expect(reports[1]).toContain(`${run_prep.INVESTIGATION_SAVE_STEP} \`${RECORD_PATH}\`.`)
+	})
+
 	it('prints no `lane:plan` for findings without an edit list', () => {
 		const investigation = { path: RECORD_PATH, findings: FINDINGS }
+		const report = run_prep.format_report({ ...PARTS, investigation, is_lane_child: true })
 
-		expect(run_prep.format_report({ ...PARTS, investigation })).not.toContain('lane:plan')
+		expect(report).not.toContain('lane:plan')
+	})
+
+	it('reads the lane child mark into the parts', async () => {
+		stub_ok()
+		is_child_mock.mockReturnValue(true)
+
+		expect(run_prep_cli.to_parts(ISSUE, await run_prep_cli.gather(ISSUE)).is_lane_child).toBe(true)
 	})
 })
 

@@ -145,6 +145,38 @@ describe('lane:plan --single before the first edit', () => {
 		expect(error).toHaveBeenCalledWith(lane_plan_cli.USAGE)
 		expect(lane_plan.read(LANE, directory)).toBeUndefined()
 	})
+
+	it('refuses a path after `--single` rather than taking it as the reason', async () => {
+		const [issue = '', path_token = '', ...rest] = plan_of(PAST_CAP)
+		const argv = [issue, '--single', path_token, ...rest]
+
+		expect(await lane_plan_cli.run(argv, directory)).toBe(FAILURE)
+		expect(error).toHaveBeenCalledWith(lane_plan_cli.USAGE)
+		expect(lane_plan.read(LANE, directory)).toBeUndefined()
+	})
+})
+
+describe('lane:plan --single re-plans before the first edit', () => {
+	it('keeps the recorded reason on a re-plan without `--single`, posting it on the Issue once', async () => {
+		await lane_plan_cli.run([...plan_of(PAST_CAP), '--single', REASON], directory)
+
+		expect(await lane_plan_cli.run(plan_of(PAST_CAP), directory)).toBe(SUCCESS)
+		expect(lane_plan.read(LANE, directory)).toMatchObject({ single: true, single_reason: REASON })
+		expect(record_split_notice).toHaveBeenLastCalledWith(
+			expect.objectContaining({ single_reason: REASON }),
+		)
+		expect(issue_try_comment).toHaveBeenCalledOnce()
+	})
+
+	it('posts a new reason a re-plan gives', async () => {
+		const other = 'a migration whose halves cannot ship apart'
+
+		await lane_plan_cli.run([...plan_of(PAST_CAP), '--single', REASON], directory)
+		await lane_plan_cli.run([...plan_of(PAST_CAP), '--single', other], directory)
+
+		expect(issue_try_comment).toHaveBeenCalledTimes(2)
+		expect(issue_try_comment).toHaveBeenLastCalledWith(String(LANE), expect.stringContaining(other))
+	})
 })
 
 describe('lane:plan in a dispatched lane after its first edit', () => {

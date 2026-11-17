@@ -67,6 +67,8 @@ interface PrepParts {
 	// Whether the entry's stage read the issue as planned (`run_stage.PLANNED`) — set by `run:entry`,
 	// which owns the stage; a bare `run:prep` leaves it unset.
 	is_planned?: boolean
+	// Whether the run is a dispatched lane child, the one run `lane:plan` judges (joshuafolkken/kit#7729).
+	is_lane_child?: boolean
 	// The investigation record — where it goes and what an earlier read saved; unset where no git
 	// directory answers.
 	investigation?: InvestigationRecord | undefined
@@ -107,18 +109,24 @@ function ship_body(problems: ReadonlyArray<string>): string {
 	return [SHIP_UNMET, ...problems.map((problem) => `  - ${problem}`)].join('\n')
 }
 
-function save_step(record: InvestigationRecord | undefined, issue_number: string): string {
+// The `lane:plan` tail is a lane child's alone: `fullrun-steps.md` asks no other run for one.
+function save_step(parts: PrepParts): string {
+	const record = parts.investigation
 	if (record === undefined) return ''
+	const plan =
+		parts.is_lane_child === true
+			? `, then run \`pnpm josh lane:plan ${parts.issue_number} <the paths under its ${run_investigation_record.EDIT_FILES_HEADING}>\` before the first edit`
+			: ''
 
-	return ` ${INVESTIGATION_SAVE_STEP} \`${record.path}\`, then run \`pnpm josh lane:plan ${issue_number} <the paths under its ${run_investigation_record.EDIT_FILES_HEADING}>\` before the first edit.`
+	return ` ${INVESTIGATION_SAVE_STEP} \`${record.path}\`${plan}.`
 }
 
-// The `lane:plan` the saved edit list is judged on before the first edit (joshuafolkken/kit#7729).
-function plan_step(findings: string, issue_number: string): string {
+// The `lane:plan` a lane child's saved edit list is judged on before the first edit (joshuafolkken/kit#7729).
+function plan_step(findings: string, parts: PrepParts): string {
 	const files = run_investigation_record.edit_files(findings)
-	if (files.length === 0) return ''
+	if (parts.is_lane_child !== true || files.length === 0) return ''
 
-	return `\n${INVESTIGATION_PLAN_STEP} \`pnpm josh lane:plan ${[issue_number, ...files].join(' ')}\``
+	return `\n${INVESTIGATION_PLAN_STEP} \`pnpm josh lane:plan ${[parts.issue_number, ...files].join(' ')}\``
 }
 
 // Saved findings first, being this run's own; then a recorded plan; else delegate and save the answer.
@@ -126,12 +134,12 @@ function investigation_body(parts: PrepParts): string {
 	const findings = parts.investigation?.findings
 
 	if (findings !== undefined) {
-		return `${INVESTIGATION_SAVED_LEAD}\n${findings}${plan_step(findings, parts.issue_number)}`
+		return `${INVESTIGATION_SAVED_LEAD}\n${findings}${plan_step(findings, parts)}`
 	}
 
 	if (parts.is_planned === true) return INVESTIGATION_PLANNED_BODY
 
-	return `${INVESTIGATION_BODY}${save_step(parts.investigation, parts.issue_number)}`
+	return `${INVESTIGATION_BODY}${save_step(parts)}`
 }
 
 function format_report(parts: PrepParts): string {

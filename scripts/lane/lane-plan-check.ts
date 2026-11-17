@@ -118,10 +118,12 @@ function split(plan: LanePlan, over: Oversize): number {
 }
 
 // The refusal goes on the ledger with its axis and measure, so `lane:stats` counts the notices by reason;
-// a `--single` plan's reason goes with it and on the Issue (joshuafolkken/kit#7729).
-async function note(plan: LanePlan, over: Oversize): Promise<void> {
+// a `--single` plan's reason goes with it, and on the Issue once: a re-plan carries the recorded reason
+// forward (`placed`), so only a reason the recorded plan does not hold is posted (joshuafolkken/kit#7729).
+async function note(plan: LanePlan, over: Oversize, directory: string): Promise<void> {
 	const { single_reason } = plan
 	const why = single_reason === undefined ? {} : { single_reason }
+	const posted = lane_plan.read(plan.issue, directory)?.single_reason
 
 	await lane_ledger_write.record_split_notice({
 		issue: plan.issue,
@@ -129,7 +131,7 @@ async function note(plan: LanePlan, over: Oversize): Promise<void> {
 		reason: over.reason,
 		...why,
 	})
-	if (single_reason === undefined) return
+	if (single_reason === undefined || single_reason === posted) return
 	await git_gh_issue_write.issue_try_comment(
 		String(plan.issue),
 		`Kept as one Issue past its declared size (\`lane:plan --single\`): ${single_reason}`,
@@ -163,8 +165,9 @@ async function judged(
 	plan: LanePlan,
 	over: Oversize,
 	is_lane_started: boolean,
+	directory: string,
 ): Promise<number | undefined> {
-	if (!is_lane_started) await note(plan, over)
+	if (!is_lane_started) await note(plan, over, directory)
 
 	if (is_split(plan, over, is_lane_started)) return split(plan, over)
 	console.error(lane_plan_size.waiver_text(plan.issue, over))
@@ -187,7 +190,7 @@ async function refusal(
 
 	if (is_lane_started && lane_plan.read(plan.issue, directory) !== undefined) return undefined
 
-	return await judged(plan, over, is_lane_started)
+	return await judged(plan, over, is_lane_started, directory)
 }
 
 async function warn_near_cap(plan: LanePlan, directory: string): Promise<void> {
