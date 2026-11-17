@@ -68,6 +68,13 @@ const ESCALATION_REQUESTED: StallCause = {
 	why: 'the worker declared that its Issue needs a stronger josh.worker profile.',
 }
 
+// A child parked again on the lane tree it parked on before the last adopted option, so the option was
+// never taken (joshuafolkken/kit#7820). No retry check reads it: a requeue would hit the same wall.
+const PARK_LOOP: StallCause = {
+	short: 'park loop',
+	why: 'the child parked again on an unchanged lane tree after the adopted option, so the option was never taken.',
+}
+
 const CARRYING_CLASSES = [SESSION_UNFINISHED, ESCALATION_REQUESTED]
 
 function lead_of(cause: StallCause): string {
@@ -147,6 +154,7 @@ const run_stalled = {
 	escalation_requested,
 	next_step,
 	next_step_ja,
+	PARK_LOOP,
 	park_event,
 	resume_of,
 	row_text,

@@ -14,6 +14,7 @@ import { backlog_triage_approval } from './backlog-triage-approval'
 import { backlog_triage_close } from './backlog-triage-close'
 import { backlog_triage_filing } from './backlog-triage-filing'
 import { backlog_triage_park } from './backlog-triage-park'
+import { backlog_triage_park_loop } from './backlog-triage-park-loop'
 
 // `josh backlog:triage --apply <N> --adopt <k> --reason <text>` — a parent takes option `<k>` of a
 // parked child's park in one call (joshuafolkken/kit#6670): the decision recorded in the tracking
@@ -37,7 +38,8 @@ import { backlog_triage_park } from './backlog-triage-park'
 //
 // **A closing option is the one parent action the adopt takes itself** (joshuafolkken/kit#7805): with
 // no `--done` (unless it also files), the child is closed as not planned with the reason and its lane
-// returned (`backlog-triage-close.ts`), neither requeued nor blocked.
+// returned (`backlog-triage-close.ts`), neither requeued nor blocked. A re-park on the lane tree the
+// last adopted option left unchanged is parked `run:stalled` instead (`backlog-triage-park-loop.ts`).
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
@@ -231,11 +233,21 @@ async function block(request: AdoptRequest): Promise<WriteResult> {
 	}
 }
 
+// A re-park on the tree the last adopted option left unchanged is held for a person, not requeued.
+async function requeue_or_hold(request: AdoptRequest, park: ParkFound): Promise<WriteResult> {
+	const { issue, option } = request
+	const loop = backlog_triage_park_loop.loop_of(park.comments)
+
+	if (loop === undefined) return await requeue(issue)
+
+	return await backlog_triage_park_loop.hold(issue, option, loop)
+}
+
 // What follows the decision: the close, the block, or the requeue.
 async function follow_up(request: AdoptRequest, park: ParkFound): Promise<WriteResult> {
 	if (park.is_close) return await backlog_triage_close.close(request.issue, request.reason)
 
-	return park.is_filing ? await block(request) : await requeue(request.issue)
+	return park.is_filing ? await block(request) : await requeue_or_hold(request, park)
 }
 
 // The decision, the park, then the follow-up — what the run did next, or the problem naming what was
