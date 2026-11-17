@@ -1,5 +1,10 @@
-import { describe, expect, it, vi } from 'vitest'
-import { CLOSE_ANNOUNCEMENT, epic_close_comment } from './epic-close-comment'
+import { session_language } from '#scripts/josh/session-language'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import {
+	ENGLISH_CLOSE_ANNOUNCEMENT as CLOSE_ANNOUNCEMENT,
+	epic_close_comment,
+	JAPANESE_CLOSE_ANNOUNCEMENT,
+} from './epic-close-comment'
 
 const { build_close_comment, read_close_comment_state } = epic_close_comment
 
@@ -18,6 +23,7 @@ const PLAN_COMMENT = 'a plan comment'
 const NULL_BODY_LISTING = '[{"body":null}]'
 const EPIC = { children: LOCAL_CHILDREN, external_children: NO_EXTERNAL }
 const ENLARGED_EPIC = { children: [...LOCAL_CHILDREN, 103], external_children: NO_EXTERNAL }
+const LANG_KEY = session_language.ENV_KEY
 const LEGACY_ANNOUNCEMENT = `All child issues are closed (#101, #102). ${CLOSE_ANNOUNCEMENT}`
 
 function comment_listing(bodies: Array<string>): string {
@@ -43,10 +49,6 @@ describe('build_close_comment', () => {
 		expect(comment).toContain('#101, #102, joshuafolkken/app-kit#7')
 	})
 
-	it('still reads to a person as the announcement', () => {
-		expect(build_close_comment(EPIC)).toContain(CLOSE_ANNOUNCEMENT)
-	})
-
 	// The marker is an HTML comment, so GitHub renders nothing for it — which is what stops a quote of
 	// the visible sentence from answering "already announced" (joshuafolkken/kit#1068).
 	it('ends with a marker that renders as nothing and names the children', () => {
@@ -55,6 +57,48 @@ describe('build_close_comment', () => {
 		expect(last_line.startsWith('<!--')).toBe(true)
 		expect(last_line.endsWith('-->')).toBe(true)
 		expect(last_line).toContain('#101')
+	})
+})
+
+// Only the prose follows the session language; the marker the retry check matches stays English, so
+// an announcement in either language is read as the same one (joshuafolkken/kit#7705).
+describe('build_close_comment — the session language', () => {
+	afterEach(() => {
+		vi.unstubAllEnvs()
+	})
+
+	it('writes the prose in Japanese when the language is unset', () => {
+		vi.stubEnv(LANG_KEY, undefined)
+
+		expect(build_close_comment(EPIC)).toContain(`（#101, #102）。${JAPANESE_CLOSE_ANNOUNCEMENT}`)
+	})
+
+	it('writes the prose in Japanese under ja', () => {
+		vi.stubEnv(LANG_KEY, 'ja')
+
+		expect(build_close_comment(EPIC)).toContain(JAPANESE_CLOSE_ANNOUNCEMENT)
+	})
+
+	it('writes the prose in English under en', () => {
+		vi.stubEnv(LANG_KEY, 'en')
+
+		expect(build_close_comment(EPIC)).toContain(`(#101, #102). ${CLOSE_ANNOUNCEMENT}`)
+	})
+
+	it('ends with the same marker in either language', () => {
+		vi.stubEnv(LANG_KEY, 'en')
+		const english_marker = build_close_comment(EPIC).split('\n').at(-1)
+
+		vi.stubEnv(LANG_KEY, 'ja')
+
+		expect(build_close_comment(EPIC).split('\n').at(-1)).toBe(english_marker)
+	})
+
+	it('answers present after a Japanese announcement for the same children', async () => {
+		vi.stubEnv(LANG_KEY, 'ja')
+		mocked_comments.mockResolvedValue(comment_listing([build_close_comment(EPIC)]))
+
+		expect(await read_close_comment_state(EPIC_NUMBER, EPIC)).toBe('present')
 	})
 })
 
