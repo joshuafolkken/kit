@@ -1,4 +1,4 @@
-import type { CommandEntry } from './josh-command-types'
+import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types'
 
 const EXCLUDE = '--exclude <N>'
 const JUST_MERGED = 'skip the issue just merged'
@@ -71,6 +71,9 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			"Run a parent triage pass, decide solo/lane from three conditions, or apply one issue's verdict",
 		category: 'AI tools',
+		// Adopting a closing park option releases the hold through `run:hold`, which reaches the stop
+		// confirmation.
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		reference: [
 			'--pass [--exclude <n>] | --decide --defect yes|no|unknown --verification yes|no|unknown --every-run yes|no|unknown | --apply <n> [--lane | --solo --defect yes --verification yes --every-run yes] [--blocked-by <m> | --unblock <m>] --reason <text> [--clear] | --apply <n> --adopt <k> --reason <text> [--done <text>]',
 			'automation',

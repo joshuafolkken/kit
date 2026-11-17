@@ -1011,7 +1011,8 @@ Foreign-repository and excluded children are not read. With none left it prints 
 `--adopt` reads the latest trusted park comment on `run:park`'s schema; any listed option but tier C
 is adoptable. An option whose `必要な権限` starts with `親` is carried out first, then adopted with
 `--done <what was done>`; one naming `issue:file` is adopted with `--done "filed #<M>"` and waits on `#M`.
-A park body naming `issue:file` under any other permission is refused. Recovery guidance prints only when a read is due.
+`親（issue:close）` needs no `--done`; the adopt closes it, lane returned.
+A park body naming `issue:file` or `issue:close` under any other permission is refused. Recovery guidance prints only when a read is due.
 
 Run the pass at the initial plan and after each collection batch that parked a child. The driver
 hands back `triage` once per such batch before its next offer; a batch without parks adds no step,
