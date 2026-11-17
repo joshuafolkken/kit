@@ -1,7 +1,8 @@
 import { AUTO_OK_LABEL, DEFERRED_LABEL, RUN_LANE_LABEL } from '#scripts/issue/issue-labels'
 import { issue_publication_state } from '#scripts/issue/issue-publication-state'
+import { session_language } from '#scripts/josh/session-language'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { FAILURE_EXIT_CODE, SUCCESS_EXIT_CODE } from './auto-ok-fixture'
 import { auto_ok_judge_fixture, DECLINED, OWED_NUMBER } from './auto-ok-judge-fixture'
 import { auto_ok_judge_write } from './auto-ok-judge-write'
@@ -31,6 +32,10 @@ beforeEach(() => {
 	emit.mockResolvedValue()
 })
 
+afterEach(() => {
+	vi.unstubAllEnvs()
+})
+
 describe('auto_ok_judge_write.apply', () => {
 	it('refuses preparation discovered after the judgement listing without publishing approval', async () => {
 		const body = issue_publication_state.prepare('Child plan', [AUTO_OK_LABEL])
@@ -42,6 +47,7 @@ describe('auto_ok_judge_write.apply', () => {
 	})
 
 	it('applies the run label before auto-ok and records the judgement without a board note', async () => {
+		vi.stubEnv(session_language.ENV_KEY, 'en')
 		read_issue.mockResolvedValueOnce(labels_and_body([]))
 
 		expect(await auto_ok_judge_write.apply(ISSUE, RUN_LANE_LABEL)).toBe(SUCCESS_EXIT_CODE)
@@ -51,7 +57,7 @@ describe('auto_ok_judge_write.apply', () => {
 		])
 		expect(emit).not.toHaveBeenCalled()
 		expect(post_comment.mock.calls[0]?.[1]).toContain('<!-- josh:auto-ok-judged v=2 body=')
-		expect(post_comment.mock.calls[0]?.[1]).toContain(RUN_LANE_LABEL)
+		expect(post_comment.mock.calls[0]?.[1]).toContain(`(${RUN_LANE_LABEL})`)
 	})
 
 	it('refuses an issue that gained an excluded label since the listing', async () => {

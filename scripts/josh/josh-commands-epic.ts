@@ -161,6 +161,8 @@ const EPIC_COMMANDS: Record<string, CommandEntry> = {
 	},
 	'auto-ok:judge': {
 		script: 'scripts/auto-ok/auto-ok-judge-cli.ts',
+		// `.env` may hold `JOSH_SESSION_LANG`, which picks the judgement comment's language.
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		description:
 			'List the open issues backlogrun owes an auto-ok judgement, or record one (--apply / --decline)',
 		category: 'AI tools',
