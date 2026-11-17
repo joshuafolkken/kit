@@ -23,7 +23,7 @@ const ALL: RelatedScope = { mode: 'all', files: [], reason: 'package.json affect
 describe('test_related_summary.summary_line', () => {
 	it('names the selected count and the changed file adding the most test files', () => {
 		expect(test_related_summary.summary_line(RELATED, SELECTED, REACH)).toBe(
-			`${COMMAND_LABEL}: ${String(SELECTED)} test file(s) selected, widest ${WIDE_MODULE} (+${String(WIDE_TESTS)})`,
+			`${COMMAND_LABEL}: ${String(SELECTED)} test file(s) selected, widest ${WIDE_MODULE} (reaches ${String(WIDE_TESTS)})`,
 		)
 	})
 
@@ -64,7 +64,9 @@ describe('test_related_record.record_of — the widest changed file', () => {
 		const line = test_related_summary.summary_line(RELATED, record.test_files, REACH)
 
 		expect(record).toMatchObject({ widest_file: WIDE_MODULE, widest_tests: WIDE_TESTS })
-		expect(line).toContain(`widest ${String(record.widest_file)} (+${String(record.widest_tests)})`)
+		expect(line).toContain(
+			`widest ${String(record.widest_file)} (reaches ${String(record.widest_tests)})`,
+		)
 	})
 
 	it('writes no widest file where no reach was read', () => {

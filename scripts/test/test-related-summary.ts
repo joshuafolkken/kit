@@ -2,9 +2,10 @@ import type { ReachedCount } from './test-pinned-reach'
 import { related_scope, type RelatedScope } from './test-related-scope'
 
 // The closing line of a `josh test:related` run (joshuafolkken/kit#7735): how many test files it ran,
-// and the changed file that added the most of them with that number — so a run that widened to
-// hundreds of files names its cause, and the ledger row keeps the same values for a caller that cut
-// the output. A run of no tests and a full-suite run say so on the same line.
+// and the changed file that added the most of them with how many it reaches — so a run that widened
+// to hundreds of files names its cause, and the ledger row keeps the same values for a caller that cut
+// the output. The reach is read before the run's reuse and heavy-test exclusions, so it can exceed the
+// count the run ran. A run of no tests and a full-suite run say so on the same line.
 
 const UNKNOWN_COUNT = 'an unreported number of'
 
@@ -26,7 +27,7 @@ function widest_part(scope: RelatedScope, reach: ReadonlyArray<ReachedCount> | u
 
 	if (widest === undefined) return ''
 
-	return `, widest ${widest.file} (+${String(widest.count)})`
+	return `, widest ${widest.file} (reaches ${String(widest.count)})`
 }
 
 function summary_line(
