@@ -344,6 +344,8 @@ pnpm josh issue:plan 4134 --body-file .josh/tmp/plan.md --title "Add issue:plan"
 
 A plan without `### 影響を受ける既存の利用者` (entries, or `なし（<reason>）`) is refused.
 
+`--planned` judges the size estimate with `issue:file`'s guide, cap and size bar (`scripts/issue/plan-size-check.ts`). The plan's `- 規模見積もり:` and `- 分割しない理由:` lines win; otherwise the issue body's are used. An unexcused estimate past them leaves the plan posted without `run:planned`, prints the refusal and the split assessment's steps, and exits `1`.
+
 When a dispatched lane child plans its own issue, without `--repo`, the recorded plan then runs `lane:plan` on its backticked paths outside `### 影響を受ける既存の利用者`. It prints the command and the verdict, and exits with `lane:plan`'s code (`2` yield, `3` split, `4` premise). On `wait` (`1`), re-run the printed command, not `issue:plan`.
 
 Run both with Bash `timeout` 600000: a bounded wait blocks up to 9 minutes (`docs/josh-commands-lane.md` → "`josh lane:plan`").
