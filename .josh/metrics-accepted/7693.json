@@ -1,0 +1,7 @@
+{
+	"reason": "#7693: josh latest keeps back a stable range that --latest would move onto a prerelease (+4 lines in latest-regression.ts)",
+	"date": "2026-11-17",
+	"growth": {
+		"scripts.code_lines": 4
+	}
+}

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { latest_regression } from './latest-regression'
 
 const TSX = 'tsx'
+const STYLISTIC = '@stylistic/eslint-plugin'
+const BETA_RANGE = '^6.0.0-beta.6'
 
 function manifest(
 	dependencies: Record<string, string>,
@@ -51,6 +53,33 @@ describe('latest_regression.find_regressions — the downgrade case', () => {
 		const after = manifest({ tsx: '^4.23.1' })
 
 		expect(latest_regression.find_regressions(before, after)).toHaveLength(1)
+	})
+})
+
+describe('latest_regression.find_regressions — the prerelease case', () => {
+	// The defect this exists for: the stable major is inside the minimum release age while an older
+	// prerelease of it is not, and `--latest` moves a stable range onto that prerelease.
+	it('reports a stable range that moved onto a prerelease', () => {
+		const before = manifest({}, { [STYLISTIC]: '^5.10.0' })
+		const after = manifest({}, { [STYLISTIC]: BETA_RANGE })
+
+		expect(latest_regression.find_regressions(before, after)).toStrictEqual([
+			{ name: STYLISTIC, kept: '^5.10.0', offered: BETA_RANGE },
+		])
+	})
+
+	it('reports nothing when a prerelease range moves to a newer prerelease', () => {
+		const before = manifest({ [STYLISTIC]: '^6.0.0-beta.5' })
+		const after = manifest({ [STYLISTIC]: BETA_RANGE })
+
+		expect(latest_regression.find_regressions(before, after)).toStrictEqual([])
+	})
+
+	it('reports nothing when a prerelease range moves to the stable release', () => {
+		const before = manifest({ [STYLISTIC]: BETA_RANGE })
+		const after = manifest({ [STYLISTIC]: '^6.0.0' })
+
+		expect(latest_regression.find_regressions(before, after)).toStrictEqual([])
 	})
 })
 

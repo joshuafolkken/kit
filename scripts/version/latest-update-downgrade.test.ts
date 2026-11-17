@@ -10,6 +10,10 @@ const LOCKFILE_PATH = 'pnpm-lock.yaml'
 const INSTALLED = JSON.stringify({ dependencies: { tsx: '^4.23.5' }, devDependencies: {} })
 const DOWNGRADED = JSON.stringify({ dependencies: { tsx: '^4.23.1' }, devDependencies: {} })
 const UPGRADED = JSON.stringify({ dependencies: { tsx: '^4.24.0' }, devDependencies: {} })
+const ON_PRERELEASE = JSON.stringify({
+	dependencies: { tsx: '^5.0.0-beta.1' },
+	devDependencies: {},
+})
 const ORIGINAL_LOCK = 'lockfile: installed'
 const REWRITTEN_LOCK = 'lockfile: downgraded'
 
@@ -113,6 +117,38 @@ describe('latest_update.main — an update that would downgrade', () => {
 
 		expect(vi.mocked(console.info)).toHaveBeenCalledWith(
 			expect.stringContaining('rolled back and no dependency changed'),
+		)
+	})
+})
+
+// The minimum-age gate can also hide a fresh stable major while an older prerelease of it is
+// allowed; `--latest` then moves a stable range onto that prerelease (joshuafolkken/kit#7693).
+describe('latest_update.main — an update that would move a stable range onto a prerelease', () => {
+	beforeEach(() => {
+		execa_sync_mock.mockImplementation(() => {
+			rewrite_package_json(ON_PRERELEASE)
+
+			return { exitCode: 0 }
+		})
+	})
+
+	it('leaves the stable version in package.json', () => {
+		latest_update.main()
+
+		expect(tree.package_json).toBe(INSTALLED)
+	})
+
+	it('restores the lockfile the prerelease update rewrote', () => {
+		latest_update.main()
+
+		expect(tree.lockfile).toBe(ORIGINAL_LOCK)
+	})
+
+	it('reports the prerelease it was offered', () => {
+		latest_update.main()
+
+		expect(vi.mocked(console.info)).toHaveBeenCalledWith(
+			expect.stringContaining('newest allowed is ^5.0.0-beta.1'),
 		)
 	})
 })
