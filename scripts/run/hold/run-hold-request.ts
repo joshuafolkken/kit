@@ -1,5 +1,5 @@
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
-import { run_hold, type RunMark } from './run-hold'
+import { run_hold, type HoldMark } from './run-hold'
 
 // What `josh run:hold` / `josh run:release` asked for, read from its argv (`run-hold-cli.ts`).
 
@@ -45,7 +45,7 @@ interface TakeOverRequest {
 interface ClaimRequest {
 	kind: 'claim'
 	issue: string
-	mark?: RunMark
+	mark?: HoldMark
 }
 
 interface StopRequest {
@@ -88,7 +88,7 @@ const STOP_KIND_BY_FLAG: ReadonlyMap<string, StopKind> = new Map([
 	[PRRUN_STOP_FLAG, PRRUN_STOP_KIND],
 ])
 
-const CLAIM_MARK_BY_FLAG: ReadonlyMap<string, RunMark> = new Map([
+const CLAIM_MARK_BY_FLAG: ReadonlyMap<string, HoldMark> = new Map([
 	[FULLRUN_FLAG, run_hold.FULLRUN_MARK],
 	[PRRUN_FLAG, run_hold.PRRUN_MARK],
 ])

@@ -204,17 +204,17 @@ function lane_mark(
 
 // The run a claim names: none for a `halfrun` or a `backlogrun` child, `is_fullrun` for a `fullrun`,
 // and both for a `prrun`, which runs `fullrun`'s steps.
-type RunMark = Pick<RunHold, 'is_fullrun' | 'is_prrun'>
+type HoldMark = Pick<RunHold, 'is_fullrun' | 'is_prrun'>
 
-const FULLRUN_MARK: RunMark = { is_fullrun: true }
-const PRRUN_MARK: RunMark = { is_fullrun: true, is_prrun: true }
+const FULLRUN_MARK: HoldMark = { is_fullrun: true }
+const PRRUN_MARK: HoldMark = { is_fullrun: true, is_prrun: true }
 
 // The mark of a run resumed as `command` — only a `fullrun` or a `prrun` resumes a stopped run.
-function resumed_mark(command: string): RunMark {
+function resumed_mark(command: string): HoldMark {
 	return command === run_stage.PRRUN ? PRRUN_MARK : FULLRUN_MARK
 }
 
-function build_hold(issue: string, now: Date, mark: RunMark = {}): RunHold {
+function build_hold(issue: string, now: Date, mark: HoldMark = {}): RunHold {
 	const owner = { ...session_owner(), ...lane_mark() }
 
 	return { issue, taken_at: now.toISOString(), pid: process.pid, ...mark, ...owner }
@@ -235,7 +235,7 @@ function create_hold(
 	target: string,
 	issue: string,
 	now: Date = new Date(),
-	mark: RunMark = {},
+	mark: HoldMark = {},
 ): boolean {
 	return stamp_file.create_stamp(target, build_hold(issue, now, mark))
 }
@@ -403,5 +403,5 @@ const run_hold = {
 	write_hold,
 }
 
-export type { HoldRead, RunHold, RunMark, SessionOwner, StopMarkFields }
+export type { HoldRead, RunHold, HoldMark, SessionOwner, StopMarkFields }
 export { run_hold }

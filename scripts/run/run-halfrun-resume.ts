@@ -2,9 +2,9 @@ import { session_cite } from '#scripts/issue/session-cite'
 import { lane_state } from '#scripts/lane/lane-state'
 import {
 	run_hold,
+	type HoldMark,
 	type HoldRead,
 	type RunHold,
-	type RunMark,
 	type StopMarkFields,
 } from '#scripts/run/hold/run-hold'
 
@@ -69,7 +69,7 @@ function mark_stop_at(
 
 // The stopped run's record is replaced by the resuming `fullrun`'s or `prrun`'s (`mark`), shared with
 // the `prrun` resume.
-function take_over(target: string, issue: string, mark: RunMark): boolean {
+function take_over(target: string, issue: string, mark: HoldMark): boolean {
 	run_hold.release_hold(target)
 
 	return run_hold.create_hold(target, issue, new Date(), mark)
@@ -114,7 +114,7 @@ function no_stop_message(issue: string): string {
 }
 
 // `false` leaves the record untouched, so the ordinary claim that follows decides the tree.
-function adopt_at(target: string, issue: string, is_dirty: boolean, mark: RunMark): boolean {
+function adopt_at(target: string, issue: string, is_dirty: boolean, mark: HoldMark): boolean {
 	if (!is_halfrun_stop(run_hold.read_hold(target), issue, is_dirty)) return false
 
 	return take_over(target, issue, mark)

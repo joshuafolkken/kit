@@ -149,6 +149,17 @@ describe('run_prrun_resume.adopt — the stopped record becomes this fullrun', (
 		})
 	})
 
+	it('marks the adopted hold as a prrun when a prrun resumes it', async () => {
+		mark_stop()
+
+		await expect(run_prrun_resume.adopt(ISSUE, 'prrun')).resolves.toBe(true)
+		expect(run_hold.read_hold(TARGET)).toMatchObject({
+			kind: 'held',
+			hold: { issue: ISSUE, is_fullrun: true, is_prrun: true },
+		})
+		expect(hold_record()).toMatchObject({ prrun_stop_head: undefined })
+	})
+
 	it('adopts nothing over an unmarked hold', async () => {
 		run_hold.create_hold(TARGET, ISSUE)
 
