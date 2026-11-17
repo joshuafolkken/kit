@@ -63,7 +63,7 @@ async function seed(
 	const cut = run_cut.cut_path(directory)
 	const handoff = path.join(opened.root, 'handoff.json')
 
-	run_hold.create_hold(hold, ISSUE, new Date(), true)
+	run_hold.create_hold(hold, ISSUE, new Date(), run_hold.FULLRUN_MARK)
 	run_cut.begin_cut(cut, { issue: ISSUE, branch: BRANCH, phase: run_cut.PRE_GATE_PHASE })
 	writeFileSync(
 		handoff,

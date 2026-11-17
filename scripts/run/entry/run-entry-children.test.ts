@@ -1,3 +1,4 @@
+import type { StageCommand } from '#scripts/run/run-stage'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_entry_children } from './run-entry-children'
 
@@ -51,6 +52,25 @@ describe('run_entry_children.claim_hold', () => {
 				is_adopt: false,
 			}),
 		).toBe('unknown')
+	})
+})
+
+// joshuafolkken/kit#7724: the hold names the run the person typed, which `run:board` draws.
+describe('run_entry_children.claim_hold — the run mark', () => {
+	it.each<[StageCommand, ReadonlyArray<string>]>([
+		['fullrun', ['run:hold', ISSUE, '--fullrun']],
+		['prrun', ['run:hold', ISSUE, '--prrun']],
+		['halfrun', ['run:hold', ISSUE]],
+	])('claims a %s with %j', async (command, argv) => {
+		josh_run.mockResolvedValueOnce({ code: 0, out: 'hold' })
+
+		await run_entry_children.within(
+			ISSUE,
+			async () =>
+				await run_entry_children.claim_hold({ issue_number: ISSUE, command, is_adopt: false }),
+		)
+
+		expect(josh_run).toHaveBeenCalledWith(argv, true, undefined, expect.any(Object))
 	})
 })
 

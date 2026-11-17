@@ -22,7 +22,7 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 		// A `--halfrun-stop` / `--human-review-stop` / `--prrun-stop` sends the stop confirmation.
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		reference: [
-			'[<issue> [--fullrun | --halfrun-stop | --halfrun-round | --human-review-stop | --prrun-stop]] | --adopt <issue>',
+			'[<issue> [--fullrun | --prrun | --halfrun-stop | --halfrun-round | --human-review-stop | --prrun-stop]] | --adopt <issue>',
 			'automation',
 			['files'],
 		],

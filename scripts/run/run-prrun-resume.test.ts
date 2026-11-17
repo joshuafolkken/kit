@@ -141,7 +141,7 @@ describe('run_prrun_resume.adopt — the stopped record becomes this fullrun', (
 	it('replaces a marked record with a fullrun hold carrying no stop head', async () => {
 		mark_stop()
 
-		await expect(run_prrun_resume.adopt(ISSUE)).resolves.toBe(true)
+		await expect(run_prrun_resume.adopt(ISSUE, 'fullrun')).resolves.toBe(true)
 		expect(hold_record()).toStrictEqual({
 			issue: ISSUE,
 			is_fullrun: true,
@@ -152,7 +152,7 @@ describe('run_prrun_resume.adopt — the stopped record becomes this fullrun', (
 	it('adopts nothing over an unmarked hold', async () => {
 		run_hold.create_hold(TARGET, ISSUE)
 
-		await expect(run_prrun_resume.adopt(ISSUE)).resolves.toBe(false)
+		await expect(run_prrun_resume.adopt(ISSUE, 'fullrun')).resolves.toBe(false)
 		expect(hold_record()).toStrictEqual({
 			issue: ISSUE,
 			is_fullrun: undefined,
