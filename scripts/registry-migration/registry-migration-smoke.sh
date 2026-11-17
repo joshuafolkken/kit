@@ -29,15 +29,11 @@ tool_dir() {
 }
 
 isolated() {
-	local work="$1"
-	shift
-	# pnpm's directory comes first, so a pinned pnpm put first on PATH wins over one beside node.
-	local pnpm_dir node_dir
-	pnpm_dir="$(tool_dir pnpm)"
-	node_dir="$(tool_dir node)"
+	local work="$1" tool_path="$2"
+	shift 2
 	mkdir -p "$work/home" "$work/xdg/cache" "$work/xdg/config" "$work/xdg/data" "$work/xdg/state"
 	env -i \
-		PATH="$pnpm_dir:$node_dir:/usr/bin:/bin:/usr/sbin:/sbin" \
+		PATH="$tool_path:/usr/bin:/bin:/usr/sbin:/sbin" \
 		HOME="$work/home" \
 		XDG_CACHE_HOME="$work/xdg/cache" \
 		XDG_CONFIG_HOME="$work/xdg/config" \
@@ -80,8 +76,12 @@ copy() {
 run() {
 	local work="$1" name="$2"
 	shift 2
-	local status=0
-	(cd "$work/$name" && isolated "$work" "$@") || status=$?
+	# Resolved here, outside the `|| status=$?` below that turns off `set -e`, so a missing tool stops
+	# the run. pnpm's directory comes first, so a pinned pnpm put first on PATH wins over one beside node.
+	local pnpm_dir node_dir status=0
+	pnpm_dir="$(tool_dir pnpm)"
+	node_dir="$(tool_dir node)"
+	(cd "$work/$name" && isolated "$work" "$pnpm_dir:$node_dir" "$@") || status=$?
 	echo "exit: $status ($*)"
 }
 

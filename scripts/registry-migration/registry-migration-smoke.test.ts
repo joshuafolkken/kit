@@ -15,6 +15,7 @@ const EXECUTABLE_MODE = 0o755
 interface SmokeOptions {
 	cwd?: string
 	path_prefix?: string
+	path?: string
 }
 
 function smoke(arguments_: Array<string>, options: SmokeOptions = {}): SpawnSyncReturns<string> {
@@ -25,7 +26,7 @@ function smoke(arguments_: Array<string>, options: SmokeOptions = {}): SpawnSync
 		encoding: 'utf8',
 		env: {
 			...process.env,
-			PATH: `${prefix}${process.env['PATH'] ?? ''}`,
+			PATH: options.path ?? `${prefix}${process.env['PATH'] ?? ''}`,
 			SMOKE_LEAK_PROBE: 'leaked',
 		},
 	})
@@ -132,5 +133,21 @@ describe(`${SCRIPT_NAME} run paths`, () => {
 		})
 
 		expect(result.stdout.split('\n', 1)[0]).toBe('pinned')
+	})
+
+	it('stops before running the command when pnpm is not on PATH', () => {
+		const work = work_with_copy()
+		const node_only = path.join(work, 'node-only')
+
+		mkdirSync(node_only)
+		symlinkSync(process.execPath, path.join(node_only, 'node'))
+
+		const result = smoke(['run', work, COPY, 'sh', '-c', 'echo ran'], {
+			path: `${node_only}:/usr/bin:/bin`,
+		})
+
+		expect(result.status).toBe(1)
+		expect(result.stderr).toContain('pnpm is not on PATH')
+		expect(result.stdout).not.toContain('ran')
 	})
 })
