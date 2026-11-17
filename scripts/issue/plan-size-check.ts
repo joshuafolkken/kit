@@ -68,12 +68,23 @@ async function problem_of(
 	return size_estimate.guide_problem(judged_body(plan, issue.body), route, implement_rate, growth)
 }
 
-// The steps after a refusal: answer the split question, then split or declare why it stays one.
-function next_steps(issue_number: string): string {
+// `issue:body` has no `--repo`, so another repository's body is rewritten from its own checkout.
+function body_rewrite(issue_number: string, repo?: string): string {
+	const command = `\`pnpm josh issue:body ${issue_number} --body-file -\``
+
+	return repo === undefined ? command : `${command} in ${repo}'s checkout`
+}
+
+// The steps after a refusal: answer the split question, then split or declare why it stays one. A
+// `--repo` plan's steps address that repository's issue.
+function next_steps(issue_number: string, repo?: string): string {
+	const target = issue_cite.plain_for('program', issue_number, repo)
+	const rerun = repo === undefined ? '' : ` --repo ${repo}`
+
 	return [
-		`run:planned not applied to issue ${issue_number} — answer question 1 of \`pnpm josh doc:section .claude/skills/workflow-commands/split-assessment.md "${split_assess.QUESTION_SECTION}"\`:`,
-		`  separable → \`kickoff ${issue_cite.plain_for('program', issue_number)}\`'s split path (\`--route split\` children under an epic)`,
-		`  one deliverable → add \`${REASON_PREFIX} <理由>\` under ${BACKGROUND_HEADING} (\`pnpm josh issue:body ${issue_number} --body-file -\`) and re-run \`issue:plan --planned\``,
+		`run:planned not applied to ${target} — answer question 1 of \`pnpm josh doc:section .claude/skills/workflow-commands/split-assessment.md "${split_assess.QUESTION_SECTION}"\`:`,
+		`  separable → \`kickoff ${target}\`'s split path (\`--route split\` children under an epic)`,
+		`  one deliverable → add \`${REASON_PREFIX} <理由>\` under ${BACKGROUND_HEADING} (${body_rewrite(issue_number, repo)}) and re-run \`issue:plan --planned${rerun}\``,
 	].join('\n')
 }
 

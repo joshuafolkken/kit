@@ -120,7 +120,7 @@ async function is_oversize(request: PlanRequest): Promise<boolean> {
 	const problem = await plan_size_check.problem_of(issue_number, plan, repo)
 
 	if (problem === undefined) return false
-	console.error(`${problem}\n${plan_size_check.next_steps(issue_number)}`)
+	console.error(`${problem}\n${plan_size_check.next_steps(issue_number, repo)}`)
 
 	return true
 }

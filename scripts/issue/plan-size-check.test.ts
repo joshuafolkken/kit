@@ -65,6 +65,12 @@ describe('plan_size_check.problem_of — the plan’s estimate is judged by the 
 		expect(await plan_size_check.problem_of('7', plan_of(['- step one']))).toBeDefined()
 	})
 
+	it('keeps the issue body’s estimate when the plan’s line does not parse', async () => {
+		issue_view_json.mockResolvedValue(issue_json([OVER]))
+
+		expect(await plan_size_check.problem_of('7', plan_of([`${SIZE_PREFIX} many`]))).toBeDefined()
+	})
+
 	it('reads the issue from the named repository', async () => {
 		await plan_size_check.problem_of('7', plan_of([WITHIN]), OTHER_REPO)
 
@@ -85,5 +91,12 @@ describe('plan_size_check.next_steps — the split assessment’s steps', () => 
 		expect(steps).toContain(split_assess.QUESTION_SECTION)
 		expect(steps).toContain('kickoff #7')
 		expect(steps).toContain(split_assess.REASON_PREFIX)
+	})
+
+	it('addresses a --repo plan’s steps to that repository’s issue', () => {
+		const steps = plan_size_check.next_steps('7', OTHER_REPO)
+
+		expect(steps).toContain(`kickoff ${OTHER_REPO}#7`)
+		expect(steps).toContain(`issue:plan --planned --repo ${OTHER_REPO}`)
 	})
 })

@@ -2,6 +2,6 @@
 	"reason": "#7734 adds plan-size-check.ts so issue:plan --planned judges the plan's size estimate with the filing's guide",
 	"date": "2026-11-17",
 	"growth": {
-		"scripts.code_lines": 67
+		"scripts.code_lines": 73
 	}
 }
