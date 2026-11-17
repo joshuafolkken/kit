@@ -7,16 +7,14 @@ import type { SyncedCheck } from './run-ship-synced-scope'
 const josh_run_mock = vi.hoisted(() => vi.fn())
 const record_mock = vi.hoisted(() => vi.fn())
 const missing_mock = vi.hoisted(() => vi.fn())
-const issue_mock = vi.hoisted(() => vi.fn())
-const final_read_mock = vi.hoisted(() => vi.fn())
+const briefed_read_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 vi.mock('#scripts/gate/scoped-green', () => ({
 	scoped_green: { record_green: record_mock, missing_scripts: missing_mock },
 }))
-vi.mock('./run-ship-lap', () => ({ run_ship_lap: { current_issue: issue_mock } }))
-vi.mock('#scripts/review/review-final-record', () => ({
-	review_final_record: { stamp: () => ({ read: final_read_mock }) },
+vi.mock('#scripts/review/review-stamps', () => ({
+	review_stamps: { briefed_stamp: { read: briefed_read_mock } },
 }))
 
 // joshuafolkken/kit#5531: a scoped pair the ship can name the moved files of runs over them alone.
@@ -47,8 +45,7 @@ beforeEach(() => {
 	josh_run_mock.mockReset().mockResolvedValue({ code: 0, out: '' })
 	record_mock.mockReset()
 	missing_mock.mockReset().mockReturnValue([])
-	issue_mock.mockReset().mockReturnValue(undefined)
-	final_read_mock.mockReset().mockReturnValue(undefined)
+	briefed_read_mock.mockReset().mockReturnValue(undefined)
 })
 
 const FIXED = { files: { ...GREEN.files, [SOURCE]: 'a2', [RUN_RECORD]: 'c2' }, base: 'base' }
@@ -79,8 +76,7 @@ describe('run_ship_narrowed.moved_since_green', () => {
 // joshuafolkken/kit#7789: a ship relaunched after a round-2 stop starts from the tree that round read.
 describe('run_ship_narrowed.moved_since_green after a round-2 stop', () => {
 	beforeEach(() => {
-		issue_mock.mockReturnValue('7789')
-		final_read_mock.mockReturnValue({ taken_at: '', ...GREEN })
+		briefed_read_mock.mockReturnValue({ taken_at: '', ...GREEN })
 	})
 
 	it('narrows to the fix and says it resumed from the round-2 fix (ac-d355a259)', async () => {
@@ -104,8 +100,11 @@ describe('run_ship_narrowed.moved_since_green after a round-2 stop', () => {
 		).resolves.toBeUndefined()
 	})
 
-	it('starts over when the round-2 stamp carries no base', async () => {
-		final_read_mock.mockReturnValue({ taken_at: '', files: GREEN.files })
+	it.each([
+		['no briefed tree', undefined],
+		['a briefed tree with no base', { taken_at: '', files: GREEN.files }],
+	])('starts over with %s', async (_label, briefed) => {
+		briefed_read_mock.mockReturnValue(briefed)
 
 		await expect(run_ship_narrowed.moved_since_green(CHECKS, FIXED)).resolves.toBeUndefined()
 	})
@@ -116,7 +115,7 @@ describe('run_ship_narrowed.moved_since_green after a round-2 stop', () => {
 		await expect(run_ship_narrowed.moved_since_green(CHECKS, FIXED)).resolves.toMatchObject({
 			resumed_from: 'none',
 		})
-		expect(final_read_mock).not.toHaveBeenCalled()
+		expect(briefed_read_mock).not.toHaveBeenCalled()
 	})
 })
 

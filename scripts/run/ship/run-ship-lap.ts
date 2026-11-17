@@ -59,13 +59,6 @@ function current_scope(): LapScope | undefined {
 	return scope.current()
 }
 
-// The issue the running ship stage is on, `undefined` outside any stage.
-function current_issue(): string | undefined {
-	const current = current_scope()
-
-	return current === undefined ? undefined : String(current.issue)
-}
-
 // The environment that times a child process's steps under `parent`, `{}` outside any scope.
 function environment(parent: string): Record<string, string> {
 	const current = current_scope()
@@ -154,7 +147,6 @@ const run_ship_lap = {
 	PARENT_SEPARATOR,
 	STARTUP_STEP,
 	STEP,
-	current_issue,
 	environment,
 	timed,
 	within,

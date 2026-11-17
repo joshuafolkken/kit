@@ -7,8 +7,7 @@ import { changed_file_scope } from '#scripts/git/changed-file-scope'
 import { file_map_stamp } from '#scripts/josh/file-map-stamp'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { run_record_path } from '#scripts/josh/run-record-path'
-import { review_final_record } from '#scripts/review/review-final-record'
-import { run_ship_lap } from './run-ship-lap'
+import { review_stamps } from '#scripts/review/review-stamps'
 import type { SyncedCheck } from './run-ship-synced-scope'
 
 // **A scoped pair the ship can name the moved files of runs over them alone** (joshuafolkken/kit#5531).
@@ -25,8 +24,9 @@ import type { SyncedCheck } from './run-ship-synced-scope'
 
 // **A ship relaunched after a round-2 stop starts from the tree that round read** (joshuafolkken/kit#7789).
 // A new process has no tree it met the pair green on, so the fix of one file re-ran the pair bare over
-// the whole branch. The final-review stamp keeps the tree round 2 started on (`run-ship-final-review.ts`);
-// it stands in only when every scoped check's green record describes exactly that tree and base, so a
+// the whole branch. The briefed stamp keeps the tree the last review round was briefed on
+// (`review-stamps.ts`) — unlike the final-review stamp, which `review:record` removes on the very finding
+// that stops round 2 — and it stands in only when every scoped check's green record describes exactly that tree and base, so a
 // stamp the records do not vouch for — or a base a main merge moved — runs as before.
 
 const should_forward_stderr = true
@@ -88,8 +88,7 @@ function is_green(tree: GateTree): boolean {
 
 // The tree round 2 started on, when the pair's records still vouch for it.
 function round_two_tree(): GateTree | undefined {
-	const issue = run_ship_lap.current_issue()
-	const stamp = issue === undefined ? undefined : review_final_record.stamp(issue).read()
+	const stamp = review_stamps.briefed_stamp.read()
 
 	if (stamp === undefined) return undefined
 	const tree = { files: stamp.files, base: stamp.base }
