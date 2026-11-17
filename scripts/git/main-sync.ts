@@ -4,6 +4,7 @@ import { git_command } from './git-command'
 import { git_worktree } from './git-worktree'
 import { gone_branch, type PruneResult } from './gone-branch'
 import { lockfile_sync } from './lockfile-sync'
+import { repository_lock } from './repository-lock'
 
 // `josh main:sync` (`josh ms`) — return this checkout to the default branch and pull,
 // then prune the local branches whose merged remote branch is gone
@@ -27,6 +28,11 @@ import { lockfile_sync } from './lockfile-sync'
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const COMMAND_NAME = 'main:sync'
+const SYNC_LOCK_PREFIX = 'josh-main-sync-lock-'
+// A holder runs a fetch, a pull and possibly a frozen-lockfile install, so the wait bounds a hung sync
+// rather than a slow one.
+const SYNC_LOCK_MAX_WAIT_MS = 300_000
+const SYNC_LOCK_TIMEOUT = `josh ${COMMAND_NAME}: timed out waiting for another sync holding`
 const INSTALL_FAILURE =
 	'node_modules is behind pnpm-lock.yaml and `pnpm install --frozen-lockfile` failed; run `pnpm josh ms` again, or the install here by hand.'
 
@@ -100,6 +106,20 @@ async function synchronize(): Promise<number> {
 	return await reinstall(await git_command.repository_root())
 }
 
+// **One sync of a checkout at a time** (joshuafolkken/kit#7826). The ship's followup and the backlogrun
+// parent each run `main:sync` right after the same merge; the later `pull --ff-only` then fast-forwards
+// the work tree from a commit the earlier one has already left, reads the merged files as local changes
+// and exits 128. Queued behind the first, the second pull finds nothing to do.
+async function synchronize_exclusively(): Promise<number> {
+	const target = repository_lock.lock_path(SYNC_LOCK_PREFIX)
+	const exit_code = await repository_lock.with_lock(synchronize, target, SYNC_LOCK_MAX_WAIT_MS)
+
+	if (exit_code !== undefined) return exit_code
+	console.error(`${SYNC_LOCK_TIMEOUT} ${target}; run \`pnpm josh ms\` again once it finishes.`)
+
+	return FAILURE_EXIT_CODE
+}
+
 // The argument refusal is kept even though this is no longer an `sh -c` entry: the message is the
 // same one every composite prints, and silently discarding a flag is what it exists to prevent.
 async function dispatch(argv: ReadonlyArray<string>): Promise<number> {
@@ -115,7 +135,7 @@ async function dispatch(argv: ReadonlyArray<string>): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	return await synchronize()
+	return await synchronize_exclusively()
 }
 
 // A git failure — a dirty tree the checkout refuses to leave, a pull that cannot reach the remote —

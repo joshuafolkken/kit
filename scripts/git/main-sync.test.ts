@@ -1,3 +1,5 @@
+import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // joshuafolkken/kit#1535: what this pins is the refusal. `josh ms` run from a lane hijacked the
@@ -22,7 +24,15 @@ vi.mock('./lockfile-sync', () => ({
 	lockfile_sync: { reinstall_if_stale: vi.fn() },
 }))
 
+// The real lock at a path of each test's own, so a test never contends with a live `josh ms`.
+vi.mock('./repository-lock', async (import_original) => {
+	const { repository_lock: actual } = await import_original<Record<'repository_lock', object>>()
+
+	return { repository_lock: { ...actual, lock_path: vi.fn() } }
+})
+
 const { git_command } = await import('./git-command')
+const { repository_lock } = await import('./repository-lock')
 const { gone_branch } = await import('./gone-branch')
 const { lockfile_sync } = await import('./lockfile-sync')
 const { main_sync } = await import('./main-sync')
@@ -46,6 +56,7 @@ const reinstall = vi.mocked(lockfile_sync.reinstall_if_stale)
 
 const REPOSITORY_ROOT = '/repo'
 const INSTALL_OUTPUT = 'ERR_PNPM_OUTDATED_LOCKFILE'
+const create_directory = temporary_directory()
 
 function in_main_work_tree(): void {
 	git_directories.mockResolvedValue([MAIN_GIT_DIRECTORY, MAIN_GIT_DIRECTORY])
@@ -70,6 +81,9 @@ beforeEach(() => {
 	current_branch.mockResolvedValue(FEATURE_BRANCH)
 	fast_forward.mockResolvedValue('')
 	pull.mockResolvedValue()
+	vi.mocked(repository_lock.lock_path).mockReturnValue(
+		path.join(create_directory('main-sync-lock-'), 'lock'),
+	)
 	with_a_quiet_tail()
 	in_main_work_tree()
 })
@@ -195,6 +209,47 @@ describe('fast-forwarding the default branch before the checkout', () => {
 		expect(await main_sync.run(NO_ARGUMENTS)).toBe(SUCCESS_EXIT_CODE)
 		expect(checkout).toHaveBeenCalledWith('main')
 		expect(pull).toHaveBeenCalledOnce()
+	})
+})
+
+const PULL_DURATION_MS = 50
+
+// Counts the pulls running at once, and keeps each one open long enough for a second to start.
+function pulls_overlapping(): { readonly peak: () => number } {
+	let active = 0
+	let peak = 0
+
+	pull.mockImplementation(async () => {
+		active += 1
+		peak = Math.max(peak, active)
+		await new Promise((resolve) => setTimeout(resolve, PULL_DURATION_MS))
+		active -= 1
+	})
+
+	return { peak: () => peak }
+}
+
+// joshuafolkken/kit#7826: the ship's followup and the backlogrun parent each ran `main:sync` right
+// after the same merge. The later pull fast-forwarded the work tree from a commit the earlier one had
+// already left, read the merged files as local changes and exited 128.
+describe('serializing two syncs of one checkout', () => {
+	it('never runs two pulls at once', async () => {
+		const pulls = pulls_overlapping()
+
+		expect(await Promise.all([main_sync.run(NO_ARGUMENTS), main_sync.run(NO_ARGUMENTS)])).toEqual([
+			SUCCESS_EXIT_CODE,
+			SUCCESS_EXIT_CODE,
+		])
+		expect(pull).toHaveBeenCalledTimes(2)
+		expect(pulls.peak()).toBe(1)
+	})
+
+	it('fails without pulling when another sync holds the lock for the whole wait', async () => {
+		vi.spyOn(repository_lock, 'with_lock').mockResolvedValueOnce(undefined)
+
+		expect(await main_sync.run(NO_ARGUMENTS)).toBe(FAILURE_EXIT_CODE)
+		expect(pull).not.toHaveBeenCalled()
+		expect(console.error).toHaveBeenCalledWith(expect.stringContaining('josh ms'))
 	})
 })
 
