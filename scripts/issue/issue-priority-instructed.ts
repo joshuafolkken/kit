@@ -1,4 +1,5 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { session_language } from '#scripts/josh/session-language'
 import { issue_priority, type PriorityLevel } from './issue-priority'
 import { issue_priority_raise, type RaiseResult } from './issue-priority-raise'
 
@@ -9,11 +10,27 @@ import { issue_priority_raise, type RaiseResult } from './issue-priority-raise'
 
 type InstructedResult = Exclude<RaiseResult, 'below'>
 
-function comment_of(level: PriorityLevel, reason: string): string {
-	const label = issue_priority.LABELS[level]
+// The comment's sentence is in the session language; the label names, the command and the `Reason:`
+// label stay English (joshuafolkken/kit#7707).
+function english_sentence(label: string | undefined, command: string): string {
 	const change = label === undefined ? 'Removed the priority labels' : `Applied \`${label}\``
 
-	return `${change} on a person's instruction (\`josh issue:priority --${level}\`).\n\nReason: ${reason}`
+	return `${change} on a person's instruction (${command}).`
+}
+
+function japanese_sentence(label: string | undefined, command: string): string {
+	const change = label === undefined ? '優先度ラベルを外しました' : `\`${label}\` を付けました`
+
+	return `人の指示（${command}）で${change}。`
+}
+
+function comment_of(level: PriorityLevel, reason: string): string {
+	const sentence_of = session_language.is_japanese(session_language.resolve_session_lang().lang)
+		? japanese_sentence
+		: english_sentence
+	const sentence = sentence_of(issue_priority.LABELS[level], `\`josh issue:priority --${level}\``)
+
+	return `${sentence}\n\nReason: ${reason}`
 }
 
 // The comment goes first: a label change without it would answer `labelled` on the retry and never
