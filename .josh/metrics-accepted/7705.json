@@ -1,0 +1,7 @@
+{
+	"reason": "#7705: the epic auto-close announcement picks its prose by session language (two constants and one selector), as #7665 did",
+	"date": "2026-11-17",
+	"growth": {
+		"scripts.code_lines": 8
+	}
+}
