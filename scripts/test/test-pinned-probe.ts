@@ -263,9 +263,14 @@ interface Checked {
 	staged: Staged
 }
 
-function skipped_of(options: CheckOptions): Skipped {
+// The probes split as the cache knew them (joshuafolkken/kit#7803): a recheck, or none at all.
+function skipped_of(options: CheckOptions, probes: ReadonlyArray<Probe>): Skipped {
+	const rechecked = probes.filter((probe) => probe.recheck !== undefined).length
+
 	return {
 		held: options.held ?? 0,
+		rechecked,
+		unregistered: probes.length - rechecked,
 		rewired: options.rewired ?? 0,
 		over_cap: options.over_cap ?? 0,
 		origin: options.origin,
@@ -287,7 +292,7 @@ async function checked_on(
 	const halt = options.is_first_unpinned === true ? { is_set: false } : undefined
 	const verdicts = await pooled(paths, probes, { on_verdict, times, staged, halt })
 
-	await test_pinned_ledger.record(skipped_of(options), times, Date.now() - started)
+	await test_pinned_ledger.record(skipped_of(options, probes), times, Date.now() - started)
 
 	return { verdicts, staged }
 }

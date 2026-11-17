@@ -122,7 +122,16 @@ describe('test_pinned.run timed into the ledger', () => {
 			with_rewires(REWIRES)
 			await run_locations()
 			expect(row.mock.calls.map(([skipped, times]) => [skipped, times.length])).toEqual([
-				[{ held: 0, rewired: REWIRES, over_cap: 0 }, runs.mock.calls.length],
+				[
+					{
+						held: 0,
+						rechecked: 0,
+						unregistered: runs.mock.calls.length,
+						rewired: REWIRES,
+						over_cap: 0,
+					},
+					runs.mock.calls.length,
+				],
 			])
 			runs.mockClear()
 			expect(await held_locations()).toEqual([UNPINNED_HUNK])
@@ -177,6 +186,26 @@ describe('test_pinned.run after a test reaching an unpinned hunk is added', () =
 			runs.mockClear()
 			expect(await run_locations()).toEqual([UNPINNED_HUNK])
 			expect(runs).not.toHaveBeenCalled()
+		},
+		RUN_TIMEOUT,
+	)
+})
+
+// joshuafolkken/kit#7803: the ledger row counts the hunks as the cache knew them, a recheck apart.
+describe('test_pinned.run that rechecks one hunk and holds the other', () => {
+	it(
+		'counts the held, rechecked and unregistered hunks apart on each ledger row',
+		async () => {
+			await build_with_graph()
+			const row = vi.spyOn(test_pinned_ledger, 'record')
+
+			await run_locations()
+			await write(NEW_TEST, REACHING_TEST)
+			await run_locations()
+			expect(row.mock.calls.map(([skipped]) => skipped)).toEqual([
+				{ held: 0, rechecked: 0, unregistered: 2, rewired: 0, over_cap: 0 },
+				{ held: 1, rechecked: 1, unregistered: 0, rewired: 0, over_cap: 0 },
+			])
 		},
 		RUN_TIMEOUT,
 	)
