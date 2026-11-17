@@ -14,8 +14,9 @@ import type { ChildOutcome } from './run-merge-outcome'
 //
 // Everything here is pure — the classification of the returned child, the counter change that outcome
 // implies and the consecutive-failure guard; the comments it posts are `run-merge-prose.ts`'s. The
-// side effects (`main:sync`, `lane:close`, the comment write, the label edits, `epic:next` / `backlog:next`) are the CLI's, so the branches this file decides are
-// unit-tested without a network — `merged`, `parked`, `failed`, `human-review`, `unresolved`.
+// side effects (`main:sync`, `lane:close`, the comment write, the label edits, `epic:next` /
+// `backlog:next`) are the CLI's, so the branches this file decides are unit-tested
+// without a network — `merged`, `parked`, `failed`, `human-review`, `unresolved`.
 
 const CLOSED_STATE = 'CLOSED'
 // Every third failure in a row asks whether `main` itself is broken (`run-merge-health.ts`) — the
