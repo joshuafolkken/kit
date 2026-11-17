@@ -101,7 +101,7 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 	'run:chain': {
 		script: 'scripts/run/review/run-chain-cli.ts',
 		description:
-			"Open the review, or --join to join, attest and record it, then recheck the recorded tree's metrics and unpinned places; --ship starts ship --detach --review after a clean recheck. Stops at the first refusal with its next action",
+			'Open the review, or --join to join, attest, record and recheck it; --ship then ships a clean recheck. Stops at the first refusal with its next action',
 		category: 'AI tools',
 		reference: [
 			'<issue> [--from <stage>] [--unpinned-ok "<reason>"] [--accept-metrics "<reason>"] | <issue> --join [--fixing] [--from <stage>] [--ship "<title> #<N>"]',
@@ -128,7 +128,7 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 				},
 				{
 					arguments: '<N> --join',
-					note: 'join the gate, attest, record and recheck; every finding holds for disposition',
+					note: 'join, attest, record, recheck metrics and unpinned; every finding holds for disposition',
 				},
 				{
 					arguments: '<N> --join --fixing',
