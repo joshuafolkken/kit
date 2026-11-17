@@ -1,5 +1,7 @@
+import { existsSync } from 'node:fs'
 import { json_value } from '#scripts/lib/json-value'
 import { time_reported_failure } from '#scripts/time-runtime/time-reported-failure'
+import { transcript_tail } from '#scripts/time-runtime/transcript-tail'
 import { z } from 'zod'
 import { codex_prompt } from './codex-prompt'
 import { turn_filings } from './turn-filings'
@@ -14,6 +16,9 @@ import { turn_filings } from './turn-filings'
 
 const NO_PROMPT = ''
 const HUMAN_ORIGIN = 'human'
+// How far back a prompt off the tail is looked for — several times a long session's transcript
+// (joshuafolkken/kit#7781).
+const PROMPT_REACH_BYTES = 4_194_304
 
 const PROMPT_LINE_SCHEMA = z.object({
 	isMeta: z.boolean().nullish(),
@@ -73,6 +78,15 @@ function person_prompt(tail: string): string | undefined {
 		.findLast((text) => text !== undefined)
 }
 
+// **The transcript text the person's last prompt is read from** — the tail when it carries one, else a
+// wider read reaching `PROMPT_REACH_BYTES` back: a large read after the prompt (a skill, a template)
+// pushes it off the tail (joshuafolkken/kit#7781). A missing transcript leaves the tail as it is.
+function prompt_reach(tail: string, transcript_path: string): string {
+	if (person_prompt(tail) !== undefined || !existsSync(transcript_path)) return tail
+
+	return transcript_tail.read_tail(transcript_path, PROMPT_REACH_BYTES)
+}
+
 // When the person last prompted on the tail, or `undefined` when no prompt of theirs is on it.
 function prompt_time(tail: string): string | undefined {
 	return tail
@@ -97,6 +111,6 @@ function pause_start(tail: string): string | undefined {
 	return prompt_time(tail) ?? tail_time(tail)
 }
 
-const last_prompt = { pause_start, person_prompt, turn_prompt }
+const last_prompt = { pause_start, person_prompt, prompt_reach, turn_prompt }
 
 export { last_prompt }
