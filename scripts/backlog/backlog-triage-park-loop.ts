@@ -13,10 +13,13 @@ import { run_stalled_park } from '#scripts/run/park/run-stalled-park'
 //
 // It compares trees, not times: the yield cap (`backlog-yield-cap.ts`) counts a child's yields to a
 // held lane within a window, and a park → adopt → relaunch is no yield, so it counts none of them.
-// A park with no tree line (outside a lane, or written before the note carried it) is never a loop.
+// A park with no tree line (outside a lane, or written before the note carried it) is never a loop,
+// nor is one after an adopt with `--done`: the parent acted outside the lane, so its tree never moves.
 
+// The adopt's decision line, written by `backlog-triage-adopt.ts` and read here.
 const ADOPT_MARK = 'adopted park option '
 const ADOPT_COMMAND = '(backlog:triage --adopt)'
+const DONE_MARK = ' · parent action done: '
 const NOT_HELD =
 	'decision recorded and park cleared, but parking the unchanged re-park for a person failed; re-run this command'
 
@@ -38,6 +41,11 @@ function is_adopt(comment: IssueComment): boolean {
 	return comment.is_trusted === true && body.includes(ADOPT_MARK) && body.includes(ADOPT_COMMAND)
 }
 
+// An adopt the child itself was to carry out in the lane: one with no parent action done.
+function is_lane_option(comment: IssueComment | undefined): boolean {
+	return comment !== undefined && !comment.body.includes(DONE_MARK)
+}
+
 function last_before(comments: ReadonlyArray<IssueComment>, end: number, is_kind: Kind): number {
 	return comments.slice(0, Math.max(end, 0)).findLastIndex((comment) => is_kind(comment))
 }
@@ -52,17 +60,19 @@ function first_line(comment: IssueComment | undefined): string {
 	return comment?.body.split('\n', 1)[0]?.trim() ?? ''
 }
 
-// The loop the latest park closes — the adopt before it and the park before that, on the same tree —
-// or `undefined`.
+// The loop the latest park closes — a lane option adopted before it and the park before that, on the
+// same tree — or `undefined`.
 function loop_of(comments: ReadonlyArray<IssueComment>): ParkLoop | undefined {
 	const park = last_before(comments, comments.length, is_park)
 	const adopt = last_before(comments, park, is_adopt)
 	const earlier = last_before(comments, adopt, is_park)
 	const tree = tree_at(comments, park)
 
-	if (tree === undefined || tree !== tree_at(comments, earlier)) return undefined
+	const is_same = tree !== undefined && tree === tree_at(comments, earlier)
 
-	return { adopted: first_line(comments[adopt]), tree }
+	return is_same && is_lane_option(comments[adopt])
+		? { adopted: first_line(comments[adopt]), tree }
+		: undefined
 }
 
 function comment_of(issue: string, option: number, loop: ParkLoop): string {
@@ -94,7 +104,7 @@ async function hold(
 		: { problem: NOT_HELD }
 }
 
-const backlog_triage_park_loop = { hold, loop_of }
+const backlog_triage_park_loop = { ADOPT_COMMAND, ADOPT_MARK, DONE_MARK, hold, loop_of }
 
 export { backlog_triage_park_loop }
 export type { ParkLoop }

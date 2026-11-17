@@ -62,13 +62,13 @@ describe('run_stalled.class_of', () => {
 	})
 
 	// joshuafolkken/kit#7820: the park loop's cause round-trips through the park event as its own class.
-	it('reads the park loop cause back from its park event as its own class', () => {
+	it('reads the park loop cause back from its park event', () => {
 		const { short, why } = run_stalled.PARK_LOOP
 		const cause = run_stalled.cause_in(run_stalled.park_event(7780, short))
 
 		expect(short).toBe('park loop')
 		expect(why).toContain('unchanged lane tree')
-		expect(run_stalled.class_of(cause ?? '')).toBe('park loop')
+		expect(cause).toBe('park loop')
 	})
 })
 

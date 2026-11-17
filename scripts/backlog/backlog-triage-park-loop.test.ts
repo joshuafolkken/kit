@@ -60,7 +60,9 @@ const ISSUE = '7780'
 const TREE = 'abc1234 · 0'
 const MOVED_TREE = 'def5678 · 0'
 const FIRST_PARK_AT = '2026-11-17T13:50:58Z'
+const ADOPT_AT = '2026-11-17T13:53:02Z'
 const ADOPT = `#${ISSUE}: adopted park option 1 (backlog:triage --adopt) — the parent takes it`
+const DONE_ADOPT = `${ADOPT} · parent action done: rotated the token`
 const PARK = [
 	'## Which lane?',
 	'',
@@ -90,7 +92,7 @@ function loop_comments(
 ): Array<IssueComment> {
 	return [
 		comment(FIRST_PARK_AT, park_on(earlier)),
-		comment('2026-11-17T13:53:02Z', ADOPT),
+		comment(ADOPT_AT, ADOPT),
 		comment('2026-11-17T13:55:07Z', park_on(latest)),
 	]
 }
@@ -120,6 +122,10 @@ describe('backlog_triage_park_loop.loop_of', () => {
 		['the latest park has no tree line', loop_comments(TREE, undefined)],
 		['no adopt came between the parks', loop_comments(TREE, TREE).toSpliced(1, 1)],
 		['the adopt follows the latest park', loop_comments(TREE, TREE).toSpliced(2, 1)],
+		[
+			'the parent acted outside the lane (--done)',
+			loop_comments(TREE, TREE).with(1, comment(ADOPT_AT, DONE_ADOPT)),
+		],
 	])('finds no loop when %s', (_case, comments) => {
 		expect(backlog_triage_park_loop.loop_of(comments)).toBeUndefined()
 	})

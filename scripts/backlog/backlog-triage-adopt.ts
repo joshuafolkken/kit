@@ -199,8 +199,9 @@ async function approval_of(request: AdoptRequest, park: ParkFound): Promise<stri
 
 function decision_of(request: AdoptRequest): string {
 	const { issue, option, reason, done } = request
-	const adopted = `adopted park option ${String(option)} (backlog:triage --adopt)`
-	const action = done === '' ? '' : ` · parent action done: ${done}`
+	const { ADOPT_COMMAND, ADOPT_MARK, DONE_MARK } = backlog_triage_park_loop
+	const adopted = `${ADOPT_MARK}${String(option)} ${ADOPT_COMMAND}`
+	const action = done === '' ? '' : `${DONE_MARK}${done}`
 
 	return `${issue_cite.plain_for('github', issue)}: ${adopted} — ${reason}${action}`
 }

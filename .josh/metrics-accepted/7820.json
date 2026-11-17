@@ -1,7 +1,7 @@
 {
-	"reason": "the park-loop check and the lane tree line (#7820) add new behaviour",
+	"reason": "Round-1 review fixes: park loop excludes adopts with --done (shared adopt marks) and adds its test case",
 	"date": "2026-11-17",
 	"growth": {
-		"scripts.code_lines": 114
+		"scripts.code_lines": 121
 	}
 }
