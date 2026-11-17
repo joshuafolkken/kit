@@ -1,0 +1,7 @@
+{
+	"reason": "New github_link module (#7756): one local-only GitHub-link check for the no-filing branch of the plan flow",
+	"date": "2026-11-17",
+	"growth": {
+		"scripts.code_lines": 53
+	}
+}
