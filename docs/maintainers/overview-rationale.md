@@ -10,12 +10,15 @@ Rationale behind `prompts/collaboration-workflow/overview.md`.
   `pnpm josh git` derives from them ASCII.
 - Code comments, test titles and commit messages follow the repository's code conventions, an axis
   separate from a developer's personal language.
-- Script-emitted strings are not text the agent writes and have no translation mechanism.
+- A script's standard output and fixed Telegram labels are not text the agent writes, so they stay
+  English. A comment a script posts is read by the developer, so its prose follows
+  `JOSH_SESSION_LANG` through `session_language` (`scripts/josh/session-language.ts`); only the
+  headings, markers, ledger lines and decision phrases other code matches stay English.
 - `JOSH_SESSION_LANG` is a personal setting, so it lives in the gitignored `.env`; it differs per
   consumer and per developer, and `josh sync` never overwrites it.
 - The `UserPromptSubmit` hook injects the value once per turn whenever the variable is set — an
   explicit `ja` included — so the agent never has to read `.env`; it prints nothing only when the
   variable is unset, empty or has no `.env`, because the resident `CLAUDE.md` line already names the
   `ja` default (joshuafolkken/kit#3398). It was removed from `SessionStart` because the first turn
-  resolved it twice. The variable changes no script behavior — `session:lang` reads it only to
-  display it.
+  resolved it twice. Scripts read the variable only to choose the language of prose they write;
+  `session:lang` displays it.
