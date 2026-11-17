@@ -15,6 +15,7 @@ const KEPT_RUNS = 20
 const ended_hold_schema = z.object({
 	issue: z.string(),
 	is_fullrun: z.boolean().optional(),
+	is_prrun: z.boolean().optional(),
 	taken_at: z.string(),
 	ended_at: z.string(),
 })
@@ -37,10 +38,11 @@ function read_ended(target: string): ReadonlyArray<EndedHold> {
 function record_ended(target: string, read: HoldRead, now: Date = new Date()): void {
 	if (read.kind !== 'held') return
 
-	const { issue, is_fullrun, taken_at } = read.hold
+	const { issue, is_fullrun, is_prrun, taken_at } = read.hold
 	const ended: EndedHold = { issue, taken_at, ended_at: now.toISOString() }
 
 	if (is_fullrun === true) ended.is_fullrun = true
+	if (is_prrun === true) ended.is_prrun = true
 	stamp_file.replace_stamp(target, [...read_ended(target), ended].slice(-KEPT_RUNS))
 }
 
