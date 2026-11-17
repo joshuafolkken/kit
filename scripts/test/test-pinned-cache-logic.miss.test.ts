@@ -54,7 +54,7 @@ describe('test_pinned_cache_logic.miss_of', () => {
 		expect(miss({ ...GREEN, basis: 'then' }, NOTHING_SAME, DIGESTS, 'now')).toBe('basis')
 	})
 
-	it('answers nothing for a red and a green verdict their basis still holds', () => {
+	it('answers nothing for a red and a green verdict whose basis still holds', () => {
 		expect(miss({ ...RED, basis: 'same' }, NOTHING_SAME, DIGESTS, 'same')).toBeUndefined()
 		expect(miss({ ...GREEN, basis: 'same' }, NOTHING_SAME, DIGESTS, 'same')).toBeUndefined()
 	})
