@@ -27,23 +27,6 @@ describe('run_chain', () => {
 		])
 	})
 
-	it('asks the acceptance map before run:review in the lane child and main line lists', () => {
-		for (const stages of [run_chain.review_stages([]), run_chain.main_line_stages([])]) {
-			const names = stages.map((stage) => stage.name)
-
-			expect(names.indexOf(ACCEPTANCE_CHECK)).toBe(names.indexOf(RUN_REVIEW) - 1)
-		}
-	})
-
-	it('resumes a stop at acceptance:check from that stage', () => {
-		const stage = stage_named(ACCEPTANCE_CHECK)
-		const stop = { stage, code: STOP_EXIT, next: stage.next }
-
-		expect(run_chain.stop_report(stop, ISSUE)).toContain(
-			'`pnpm josh run:chain 5630 --from acceptance:check`',
-		)
-	})
-
 	it('never carries run:cut, which is issued alone', () => {
 		expect(run_chain.main_line_stages([]).flatMap((stage) => stage.argv)).not.toContain(RUN_CUT)
 	})
@@ -73,5 +56,25 @@ describe('run_chain', () => {
 		const stop = { stage, code: STOP_EXIT, next: stage.next }
 
 		expect(run_chain.stop_report(stop, ISSUE)).toMatch(/^run:chain 5630 — stopped at run:review/u)
+	})
+})
+
+// joshuafolkken/kit#7727: ship's acceptance-map refusal asked before the review.
+describe('run_chain — acceptance:check', () => {
+	it('asks the acceptance map before run:review in the lane child and main line lists', () => {
+		for (const stages of [run_chain.review_stages([]), run_chain.main_line_stages([])]) {
+			const names = stages.map((stage) => stage.name)
+
+			expect(names.indexOf(ACCEPTANCE_CHECK)).toBe(names.indexOf(RUN_REVIEW) - 1)
+		}
+	})
+
+	it('resumes a stop at acceptance:check from that stage', () => {
+		const stage = stage_named(ACCEPTANCE_CHECK)
+		const stop = { stage, code: STOP_EXIT, next: stage.next }
+
+		expect(run_chain.stop_report(stop, ISSUE)).toContain(
+			'`pnpm josh run:chain 5630 --from acceptance:check`',
+		)
 	})
 })
