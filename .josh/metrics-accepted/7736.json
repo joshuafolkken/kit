@@ -2,6 +2,6 @@
 	"reason": "Per-stage run:chain timing and its lane:breakdown lines are new behavior (#7736)",
 	"date": "2026-11-17",
 	"growth": {
-		"scripts.code_lines": 55
+		"scripts.code_lines": 56
 	}
 }

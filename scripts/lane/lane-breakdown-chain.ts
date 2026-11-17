@@ -4,9 +4,11 @@ import type { ChainEntry } from './lane-ledger-schema-ship'
 
 // Where a lane's `josh run:chain` runs spent their time (joshuafolkken/kit#7736): each stage's runs and
 // minutes over the lane's chain lines, read off the stages each line recorded. A line written before
-// the stages were recorded adds none.
+// the stages were recorded adds none. The join's `ship` stage is left out: its time is the ship's own
+// stages, which the breakdown already prints (`run-chain-join.ts`).
 
 const LABEL = 'run:chain'
+const SHIP_STAGE = 'ship'
 
 interface StageTotal extends Stage {
 	count: number
@@ -18,7 +20,7 @@ function is_lane_row(entry: LedgerEntry, issue: number): entry is ChainEntry {
 
 function totals_of(rows: ReadonlyArray<ChainEntry>): Array<StageTotal> {
 	const totals = new Map<string, StageTotal>()
-	const stages = rows.flatMap((row) => row.stages ?? [])
+	const stages = rows.flatMap((row) => row.stages ?? []).filter(({ name }) => name !== SHIP_STAGE)
 
 	for (const { name, elapsed_ms } of stages) {
 		const total = totals.get(name) ?? { name, ms: 0, count: 0 }

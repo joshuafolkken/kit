@@ -1,5 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { lane_breakdown } from './lane-breakdown'
 import { lane_breakdown_chain } from './lane-breakdown-chain'
+import { lane_breakdown_implement } from './lane-breakdown-implement'
+import { lane_breakdown_text } from './lane-breakdown-text'
 import { lane_ledger, type LedgerEntry } from './lane-ledger'
 import type { ChainStageEntry } from './lane-ledger-schema-ship'
 
@@ -37,9 +40,36 @@ describe('lane_breakdown_chain.lines_of', () => {
 		])
 	})
 
-	it('prints nothing for an older line without stages or another lane', () => {
-		const entries = [chain(ISSUE), chain(ISSUE + 1, [stage(RUN_REVIEW, 1)])]
+	it('prints nothing for an older line without stages, another lane or the join ship stage', () => {
+		const entries = [
+			chain(ISSUE),
+			chain(ISSUE + 1, [stage(RUN_REVIEW, 1)]),
+			chain(ISSUE, [stage('ship', 1)]),
+		]
 
 		expect(lane_breakdown_chain.lines_of(entries, ISSUE)).toStrictEqual([])
+	})
+})
+
+describe('lane_breakdown_text.report_of — the run:chain stages', () => {
+	it('prints each stage under the implement bullet', () => {
+		const read = vi.spyOn(lane_breakdown_implement, 'read').mockReturnValue([])
+		const breakdown = {
+			stages: [{ name: lane_breakdown.IMPLEMENT_STAGE, ms: 10 * MINUTE_MS }],
+			excluded_ms: 0,
+			slept_ms: 0,
+			yield_ms: 0,
+			waits: [],
+			implement: [],
+			pre_detach: [],
+			ship: [],
+		}
+		const entries = [chain(ISSUE, [stage(CHECK_RELATED, 2)])]
+		const report = lane_breakdown_text.report_of(ISSUE, breakdown, entries)
+
+		expect(lane_breakdown_text.comment(ISSUE, 10, report)).toMatch(
+			/\n- implement [^\n]*\n {2}- run:chain › check:related ×1 2\.0 min/u,
+		)
+		read.mockRestore()
 	})
 })
