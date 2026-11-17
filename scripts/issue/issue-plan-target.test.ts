@@ -79,8 +79,15 @@ describe('issue_plan_target.mark_unverified — the label and the re-plan comman
 
 describe('issue_plan_target.clear_unverified — a re-plan from the target', () => {
 	it('clears plan:unverified on the addressed repository', async () => {
-		await issue_plan_target.clear_unverified('7', TARGET)
+		expect(await issue_plan_target.clear_unverified('7', TARGET)).toBe(true)
 
 		expect(issue_clear_label).toHaveBeenCalledWith('7', PLAN_UNVERIFIED_LABEL, TARGET)
+	})
+
+	it('reports a label it could not remove', async () => {
+		issue_clear_label.mockResolvedValue(false)
+
+		expect(await issue_plan_target.clear_unverified('7', TARGET)).toBe(false)
+		expect(errors.join('\n')).toContain(`Could not remove ${PLAN_UNVERIFIED_LABEL}`)
 	})
 })

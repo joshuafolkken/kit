@@ -131,7 +131,7 @@ async function is_oversize(request: PlanRequest): Promise<boolean> {
 async function mark_runnable(request: PlanRequest): Promise<boolean> {
 	const { issue_number, repo } = request
 
-	await issue_plan_target.clear_unverified(issue_number, repo)
+	if (!(await issue_plan_target.clear_unverified(issue_number, repo))) return false
 	const is_applied = await apply_planned_label(issue_number, repo)
 
 	if (is_applied && request.is_notified) await issue_plan_notify.send(request)

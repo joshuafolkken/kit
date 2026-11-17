@@ -34,8 +34,19 @@ async function mark_unverified(issue_number: string, repo: string): Promise<bool
 }
 
 // A plan from the target's checkout drops an earlier `plan:unverified`; an absent label is no failure.
-async function clear_unverified(issue_number: string, repo: string | undefined): Promise<void> {
-	await git_gh_command.issue_clear_label(issue_number, PLAN_UNVERIFIED_LABEL, repo)
+// A label left on would keep the issue out of every pickup, so a failed removal is reported.
+async function clear_unverified(issue_number: string, repo: string | undefined): Promise<boolean> {
+	const is_cleared = await git_gh_command.issue_clear_label(
+		issue_number,
+		PLAN_UNVERIFIED_LABEL,
+		repo,
+	)
+
+	if (!is_cleared) {
+		console.error(`Could not remove ${PLAN_UNVERIFIED_LABEL} from issue ${issue_number}.`)
+	}
+
+	return is_cleared
 }
 
 const issue_plan_target = { foreign_of, mark_unverified, clear_unverified }

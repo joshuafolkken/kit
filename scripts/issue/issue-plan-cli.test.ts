@@ -36,7 +36,7 @@ vi.mock('#scripts/gh/git-gh-command', () => ({
 const { foreign_of, mark_unverified, clear_unverified } = vi.hoisted(() => ({
 	foreign_of: vi.fn<(repo?: string) => string | undefined>(),
 	mark_unverified: vi.fn<() => Promise<boolean>>(async () => true),
-	clear_unverified: vi.fn<() => Promise<void>>(),
+	clear_unverified: vi.fn<() => Promise<boolean>>(async () => true),
 }))
 
 vi.mock('#scripts/issue/issue-plan-target', () => ({
