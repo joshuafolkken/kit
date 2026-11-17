@@ -181,20 +181,27 @@ describe('lane_over.table', () => {
 	it('prints one row for #5953 alone, past the 40-minute threshold', () => {
 		const rows = lane_over.table(RECORDS, WINDOW, 40, []).split('\n')
 
-		expect(rows).toHaveLength(3)
+		expect(rows).toHaveLength(5)
 		expect(rows[0]).toBe(
-			'| lane | net min | wait min | chain | over budget | top stage | open issues |',
+			'| lane | net min | wait min | chain | over budget | estimate | top stage | open issues |',
 		)
 		expect(rows[2]).toMatch(
-			/\| 37\.0 \| split-notice ×4 · .*run-step-section\.ts \| start to plan 113\.0\/3 \|/u,
+			/\| 37\.0 \| split-notice ×4 · .*run-step-section\.ts \| start to plan 113\.0\/3 \| no estimate \|/u,
 		)
 		expect(rows[2]?.startsWith(`| ${session_cite.issue(YIELDER)} | `)).toBe(true)
 	})
 
-	it('reads the open issues unread when the listing failed', () => {
-		const row = lane_over.table(RECORDS, WINDOW, 40, undefined).split('\n').at(-1)
+	// joshuafolkken/kit#7785: the lanes are counted by their side of the pre-start estimate.
+	it('counts the lanes by estimate side under the rows', () => {
+		const rows = lane_over.table(RECORDS, WINDOW, 40, []).split('\n')
 
-		expect(row).toMatch(/\| unread \|$/u)
+		expect(rows.at(-1)).toBe('estimate: over estimate 0 · to size 0 · no estimate 1')
+	})
+
+	it('reads the open issues unread when the listing failed', () => {
+		const rows = lane_over.table(RECORDS, WINDOW, 40, undefined).split('\n')
+
+		expect(rows.at(2)).toMatch(/\| unread \|$/u)
 	})
 })
 

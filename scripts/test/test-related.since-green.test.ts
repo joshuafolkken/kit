@@ -10,7 +10,7 @@ import { test_read_map } from './test-read-map'
 import { test_read_trace } from './test-read-trace'
 import { test_related } from './test-related'
 import { test_related_record } from './test-related-record'
-import { test_related_synced } from './test-related-synced'
+import { test_related_synced, type SyncedSplit } from './test-related-synced'
 import { test_unit_guard } from './test-unit-guard'
 
 // joshuafolkken/kit#4393: a ship retry re-ran every test the whole branch diff reaches. A bare run now
@@ -338,8 +338,10 @@ describe('test_related.run_related_tests — a metrics approval file this branch
 
 // joshuafolkken/kit#4912: a sync brought in ~430 files, and every test importing a synced module ran
 // again, though main's CI had run them against it.
+const UNMET: Pick<SyncedSplit, 'meeting' | 'touching'> = { meeting: [], touching: [] }
+
 function split_into(left: Array<string>, shared: Array<string>): void {
-	vi.spyOn(test_related_synced, 'split').mockResolvedValue({ left, shared, meeting: [] })
+	vi.spyOn(test_related_synced, 'split').mockResolvedValue({ left, shared, ...UNMET })
 }
 
 describe('test_related.run_related_tests — a code module a main sync brought in', () => {

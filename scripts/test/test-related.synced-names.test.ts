@@ -67,6 +67,7 @@ function with_map(): void {
 		left: [],
 		shared: [SHARED_TEST],
 		meeting: [SHARED_TEST],
+		touching: [],
 	})
 	vi.spyOn(test_read_map, 'read_map').mockReturnValue({
 		version: test_read_map.MAP_VERSION,
