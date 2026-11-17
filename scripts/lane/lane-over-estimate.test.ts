@@ -91,6 +91,28 @@ describe('lane_over_estimate.estimate_of', () => {
 	})
 })
 
+describe('lane_over_estimate.estimate_of — the side at the printed ratio', () => {
+	const at_one = '30.0 min ×1.00 to size'
+
+	it('reads implement equal to the projection as to size', () => {
+		const estimate = lane_over_estimate.estimate_of(scale_at(30), TO_SIZE, implement(30))
+
+		expect(lane_over_estimate.cell(estimate)).toBe(at_one)
+	})
+
+	it('reads a ratio that prints as 1.00 as to size', () => {
+		const estimate = lane_over_estimate.estimate_of(scale_at(30), TO_SIZE, implement(30.1))
+
+		expect(lane_over_estimate.cell(estimate)).toBe(at_one)
+	})
+
+	it('reads a ratio that prints past 1.00 as over estimate', () => {
+		const estimate = lane_over_estimate.estimate_of(scale_at(30), OVER, implement(30.2))
+
+		expect(lane_over_estimate.cell(estimate)).toBe('30.0 min ×1.01 over estimate')
+	})
+})
+
 describe('lane_over_estimate.estimate_of — the measured window', () => {
 	it('measures the rate and growth over the days before the lane started', () => {
 		const scale = scale_at(60.8)

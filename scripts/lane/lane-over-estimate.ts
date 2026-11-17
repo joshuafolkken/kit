@@ -60,11 +60,17 @@ function implement_ms(stages: ReadonlyArray<Stage>): number {
 		.reduce((total, stage) => total + stage.ms, 0)
 }
 
+// The actual-to-projected ratio as the cell prints it; the side reads the same rounded ratio, so a
+// cell never prints `×1.00 over estimate`.
+function ratio_text(projected: number, ms: number): string {
+	return (ms / MS_PER_MINUTE / projected).toFixed(RATIO_DIGITS)
+}
+
 // A projection of no minutes (a declared size of no lines) has no ratio, so it is no estimate.
 function side_of(projected: number | undefined, ms: number): Side {
 	if (projected === undefined || projected <= 0) return SIDE.NONE
 
-	return ms / MS_PER_MINUTE > projected ? SIDE.OVER : SIDE.TO_SIZE
+	return Number(ratio_text(projected, ms)) > 1 ? SIDE.OVER : SIDE.TO_SIZE
 }
 
 // `issue`'s implement time against its projection; `stages` are its `lane:breakdown` stages.
@@ -85,9 +91,7 @@ function estimate_of(
 function cell({ side, projected, implement_ms: ms }: LaneEstimate): string {
 	if (projected === undefined || side === SIDE.NONE) return side
 
-	const ratio = (ms / MS_PER_MINUTE / projected).toFixed(RATIO_DIGITS)
-
-	return `${projected.toFixed(1)} min ×${ratio} ${side}`
+	return `${projected.toFixed(1)} min ×${ratio_text(projected, ms)} ${side}`
 }
 
 // `estimate: over estimate 1 · to size 2 · no estimate 0`.
