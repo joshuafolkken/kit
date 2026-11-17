@@ -1,4 +1,5 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
+import { session_language } from '#scripts/josh/session-language'
 import type { BacklogIssue } from './epic-bundle'
 
 // The epic an `ask` answer recommends, and the decision record `--apply` writes when it places the
@@ -39,6 +40,14 @@ function format_counts(epics: ReadonlyArray<number>, members: ReadonlyArray<Back
 		.join(', ')
 }
 
+// Only the reason follows the session language: the `Auto-decided` prefix is what `run-cut-digest.ts`
+// matches a written record on, so it stays fixed in every language.
+function reason_of(counts: string): string {
+	return session_language.is_japanese(session_language.resolve_session_lang().lang)
+		? ` — 関連する Issue を最も多く追っているため（${counts}）。同数なら古い epic を選ぶ。`
+		: ` because it tracks the most related issues (${counts}); a tie goes to the older epic.`
+}
+
 // Taken, rejected, why and the date — what `epic-commands` asks a placement record to carry.
 function placement_record(input: PlacementInput, date: string): string {
 	const rejected = input.epics
@@ -47,7 +56,7 @@ function placement_record(input: PlacementInput, date: string): string {
 	const placed = `placed ${issue_cite.plain_for('github', input.subject)} in ${issue_cite.plain_for('github', input.epic)}`
 	const counts = format_counts(input.epics, input.members)
 
-	return `Auto-decided (${date}, \`epic:bundle --apply\`): ${placed} over ${rejected.join(', ')} because it tracks the most related issues (${counts}); a tie goes to the older epic.`
+	return `Auto-decided (${date}, \`epic:bundle --apply\`): ${placed} over ${rejected.join(', ')}${reason_of(counts)}`
 }
 
 const epic_bundle_recommend = { recommend_epic, placement_record }
