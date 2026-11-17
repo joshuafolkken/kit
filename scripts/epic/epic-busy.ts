@@ -182,26 +182,27 @@ function is_holder(issue: OpenIssueData): boolean {
 // truncated answers `wait` on every ask, for a condition nothing resolves — one stalled repository
 // for every epic, traded against the second run one possibly-hidden holder would allow. The `wait`
 // this guard is built on is the kind a holder finishing clears, and that one is not it.
-function parse_listing(raw: string, is_capped: boolean): BusyRead {
+function parse_listing(raw: string, is_capped: boolean, is_kept = is_holder): BusyRead {
 	const read = read_json_listing(raw, open_issue_schema)
 	if (read.kind !== 'read') return { kind: 'unreadable' }
 
-	const holders = read.rows.filter((row) => is_holder(row))
+	const holders = read.rows.filter((row) => is_kept(row))
 	if (holders.length > 0) return { kind: 'busy', issues: holders }
 
 	return { kind: is_capped ? 'truncated' : 'idle' }
 }
 
 // The label filter is the query's job — membership is what makes the listing the running set, so
-// re-testing it here would be a second definition of "running".
-async function read_repository(repo: string): Promise<BusyRead> {
+// re-testing it here would be a second definition of "running". `is_kept` widens the holders for a
+// reader that knows more than the labels — `run:progress` keeps the issue holding its work tree.
+async function read_repository(repo: string, is_kept = is_holder): Promise<BusyRead> {
 	const { json, is_capped } = await git_gh_command.issue_list_by_label_in_repo(
 		IN_PROGRESS_LABEL,
 		LISTING_LIMIT,
 		repo,
 	)
 
-	return json === undefined ? { kind: 'unreadable' } : parse_listing(json, is_capped)
+	return json === undefined ? { kind: 'unreadable' } : parse_listing(json, is_capped, is_kept)
 }
 
 const epic_busy = {
