@@ -1,0 +1,7 @@
+{
+	"reason": "SyncedSplit.touching narrows the post-sync lint set and the scope breakdown is logged and recorded on the ship lap, with their tests (#7788)",
+	"date": "2026-11-17",
+	"growth": {
+		"scripts.code_lines": 93
+	}
+}

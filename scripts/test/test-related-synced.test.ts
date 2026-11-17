@@ -19,7 +19,7 @@ const SHARED_HELPER = path.join('scripts', 'gate', 'since-green.ts')
 const BRANCH_DATA = path.join('docs', 'guide.md')
 const DATA_READER = path.join('scripts', 'document', 'guide-reader.ts')
 const COMPONENT = path.join('src', 'lib', 'Card.svelte')
-const NOTHING_LEFT = { left: [], shared: [], meeting: [] }
+const NOTHING_LEFT = { left: [], shared: [], meeting: [], touching: [] }
 const { FAILURE } = test_related_synced
 
 function failed(failure: string): object {
@@ -34,8 +34,20 @@ const IMPORTERS: Record<string, Array<string>> = {
 	[DATA_READER]: [DATA_READER, SHARED_TEST],
 }
 
+// Each file's direct imports: the shared test reaches the synced module only through the helper.
+const IMPORTS: Record<string, Array<string>> = {
+	[SHARED_HELPER]: [SYNCED_MODULE],
+	[SHARED_TEST]: [SHARED_HELPER, BRANCH_MODULE, DATA_READER],
+	[MAIN_ONLY_TEST]: [SYNCED_MODULE],
+	[BRANCH_ONLY_TEST]: [BRANCH_MODULE],
+}
+
 function absolute(file: string): string {
 	return path.join(ROOT, file)
+}
+
+function imports_of(file: string): ReadonlyArray<string> {
+	return (IMPORTS[path.relative(ROOT, file)] ?? []).map((dependency) => absolute(dependency))
 }
 
 function importers_of(files: ReadonlyArray<string>): ReadonlySet<string> {
@@ -48,7 +60,7 @@ function importers_of(files: ReadonlyArray<string>): ReadonlySet<string> {
 const FAKE_GRAPH: ImportGraph = {
 	closure: () => [],
 	closure_hash: () => '',
-	imports: () => [],
+	imports: (file) => imports_of(file),
 	importers: () => new Set(),
 	runtime_importers: (files) => importers_of(files),
 	strings: () => [],
@@ -116,6 +128,28 @@ describe('test_related_synced.split_with', () => {
 	})
 })
 
+// joshuafolkken/kit#7788: lint read every file between the two, 882 of 885 named over a 25-file branch.
+describe('test_related_synced.split_with — where lint reads the meeting (touching)', () => {
+	it('keeps a branch module calling into the synced one directly, where their types meet', () => {
+		expect(split_of([SYNCED_MODULE], [SHARED_HELPER]).touching).toEqual([SHARED_HELPER])
+	})
+
+	it('keeps a synced module importing the branch module directly', () => {
+		expect(split_of([SHARED_HELPER], [SYNCED_MODULE]).touching).toEqual([SHARED_HELPER])
+	})
+
+	it('leaves out a test that reaches the synced module only through a helper', () => {
+		const result = split_of([SYNCED_MODULE], [BRANCH_MODULE])
+
+		expect(result.meeting).toEqual([SHARED_TEST])
+		expect(result.touching).toEqual([])
+	})
+
+	it('keeps a file importing a file of each side directly', () => {
+		expect(split_of([DATA_READER], [BRANCH_MODULE]).touching).toEqual([SHARED_TEST])
+	})
+})
+
 describe('test_related_synced.split — what it splits', () => {
 	it('splits over the work tree with repository-root-relative results', async () => {
 		with_graph()
@@ -124,6 +158,7 @@ describe('test_related_synced.split — what it splits', () => {
 			left: [SYNCED_MODULE],
 			shared: [SHARED_TEST],
 			meeting: [SHARED_TEST],
+			touching: [],
 		})
 	})
 
@@ -134,6 +169,7 @@ describe('test_related_synced.split — what it splits', () => {
 			left: [SYNCED_MODULE],
 			shared: [SHARED_TEST],
 			meeting: [SHARED_TEST],
+			touching: [],
 		})
 	})
 

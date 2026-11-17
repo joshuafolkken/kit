@@ -87,8 +87,9 @@ function named_phases(
 	)
 }
 
-function describe(files: ReadonlyArray<string>, why: string): string {
-	return `scoped pair: narrowed to the ${String(files.length)} file(s) ${why}.`
+// `detail` follows `why`: what each condition named, for a pair named after a merge.
+function describe(files: ReadonlyArray<string>, why: string, detail = ''): string {
+	return `scoped pair: narrowed to the ${String(files.length)} file(s) ${why}${detail}.`
 }
 
 const run_ship_narrowed = {

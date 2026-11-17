@@ -24,13 +24,15 @@ import { whole_suite_files } from './whole-suite-files'
 // on is not split either: `test-related.ts` leaves it to main's CI unless this branch changed it too.
 
 // `left` are the synced modules no longer handed to vitest, `shared` the tests where they meet the change,
-// `meeting` every file whose imports reach both — `shared` and the code between, which `josh ship`'s
-// lint settle reads (joshuafolkken/kit#4985) — all repository-root-relative. `failure` says why the
-// graph left nothing out, which `josh ship` logs and names nothing over (joshuafolkken/kit#6185).
+// `meeting` every file whose imports reach both — `shared` and the code between — and `touching` the
+// part of it that is a file of each side or imports one directly, which `josh ship`'s lint reads
+// (joshuafolkken/kit#4985, joshuafolkken/kit#7788) — all repository-root-relative. `failure` says why
+// the graph left nothing out, which `josh ship` logs and names nothing over (joshuafolkken/kit#6185).
 interface SyncedSplit {
 	left: ReadonlyArray<string>
 	shared: ReadonlyArray<string>
 	meeting: ReadonlyArray<string>
+	touching: ReadonlyArray<string>
 	failure?: string
 }
 
@@ -43,7 +45,7 @@ interface SplitInputs {
 	universe: ReadonlyArray<string>
 }
 
-const NOTHING_LEFT: SyncedSplit = { left: [], shared: [], meeting: [] }
+const NOTHING_LEFT: SyncedSplit = { left: [], shared: [], meeting: [], touching: [] }
 const UNRESOLVED_EXTENSION = '.svelte'
 const FAILURE = {
 	OWN_UNREAD: "the branch's change is not one the graph can vouch for",
@@ -90,15 +92,41 @@ function own_of(
 	return branch.some((file) => is_beyond_graph(file)) ? undefined : [...code, ...readers]
 }
 
+function relative_in(root: string, files: ReadonlyArray<string>): Array<string> {
+	return files.map((file) => path.relative(root, file))
+}
+
+// A file of `side` or one importing a file of it directly — where a type-aware rule reads that side's
+// change. The code between only passes its declared types on, which the repository writes out.
+function touches(graph: ImportGraph, file: string, side: ReadonlySet<string>): boolean {
+	return side.has(file) || graph.imports(file).some((dependency) => side.has(dependency))
+}
+
+function touching_of(
+	graph: ImportGraph,
+	inputs: SplitInputs,
+	meeting: ReadonlyArray<string>,
+): ReadonlyArray<string> {
+	const main_only = new Set(inputs.main_only)
+	const own = new Set(inputs.own)
+
+	return meeting.filter((file) => touches(graph, file, main_only) && touches(graph, file, own))
+}
+
 function split_with(graph: ImportGraph, inputs: SplitInputs): SyncedSplit {
 	const { root, main_only, own, universe } = inputs
 	const from_branch = graph.runtime_importers(own, universe)
-	const meeting = [...graph.runtime_importers(main_only, universe)]
-		.filter((file) => from_branch.has(file))
-		.map((file) => path.relative(root, file))
-	const shared = meeting.filter((file) => test_declared_logic.is_test_file(file))
+	const meeting = [...graph.runtime_importers(main_only, universe)].filter((file) =>
+		from_branch.has(file),
+	)
+	const shared = relative_in(root, meeting).filter((file) => test_declared_logic.is_test_file(file))
 
-	return { left: main_only.map((file) => path.relative(root, file)), shared, meeting }
+	return {
+		left: relative_in(root, main_only),
+		shared,
+		meeting: relative_in(root, meeting),
+		touching: relative_in(root, touching_of(graph, inputs, meeting)),
+	}
 }
 
 function absolute_in(root: string, files: ReadonlyArray<string>): Array<string> {
