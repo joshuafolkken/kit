@@ -96,6 +96,7 @@ function with_split_and_map(): void {
 		left: SYNCED,
 		shared: SHARED,
 		meeting: SHARED,
+		touching: [],
 	})
 	vi.spyOn(test_read_map, 'read_map').mockReturnValue({
 		version: test_read_map.MAP_VERSION,
@@ -173,6 +174,7 @@ describe('test_related.run_related_tests — a sync that alone moved the tree', 
 			left: SYNCED,
 			shared: [],
 			meeting: [],
+			touching: [],
 		})
 
 		await test_related.run_related_tests([])

@@ -65,6 +65,16 @@ describe('lane_ledger_schema_ship — the lines josh ship writes, read through t
 	})
 })
 
+// joshuafolkken/kit#7788: which condition named the scoped pair's files.
+describe('lane_ledger_schema_ship — the scoped pair breakdown', () => {
+	it('reads a ship lap with its scope breakdown back as written (ac-490219c5)', () => {
+		const breakdown = { both: 0, unsplit: 0, read_by_tests: 3, shared: 587, lint_meeting: 5 }
+		const scoped = { ...LAP, step: 'scoped pair', named: 5, breakdown }
+
+		expect(lane_ledger_schema.entry_schema.parse(scoped)).toEqual(scoped)
+	})
+})
+
 describe('lane_ledger_schema_ship — the early-push line', () => {
 	it.each([
 		['with its head and slot count', { head: 'a'.repeat(40), slots: 2 }],

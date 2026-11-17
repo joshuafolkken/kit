@@ -34,7 +34,10 @@ interface ScopedPhase {
 }
 
 // A pair's result with the files it was named over, or why a merge could not split, for its lap.
-type PairResult = JoshResult & { note?: Pick<LapNote, 'named' | 'unsplit'>; verified?: GateTree }
+type PairResult = JoshResult & {
+	note?: Pick<LapNote, 'named' | 'unsplit' | 'breakdown'>
+	verified?: GateTree
+}
 
 async function run_phases(
 	phases: ReadonlyArray<Phase>,
@@ -153,6 +156,16 @@ async function unnamed_pair(
 	return { ...(await bare_pair(scripts)), note: { unsplit } }
 }
 
+// A named pair's lap: how many files, and what each condition named when a merge named them.
+function named_note(
+	files: ReadonlyArray<string>,
+	sync: SyncReading | undefined,
+): Pick<LapNote, 'named' | 'breakdown'> {
+	const named = files.length
+
+	return sync?.breakdown === undefined ? { named } : { named, breakdown: sync.breakdown }
+}
+
 // A tree that moved while the checks ran — a reviewer's edit beside the gate — was not the one they
 // read, so it is neither recorded nor remembered green (`scoped_green.record_if_green` does the same).
 async function is_still(tree: GateTree): Promise<boolean> {
@@ -168,7 +181,9 @@ async function narrowed_or_bare(
 
 	if (named === undefined) return await unnamed_pair(scripts, sync)
 
-	printed(run_ship_narrowed.describe(named.files, named.why))
+	printed(
+		run_ship_narrowed.describe(named.files, named.why, run_ship_synced_scope.breakdown_text(sync)),
+	)
 
 	const checks = run_ship_synced_scope.checks_of(scripts)
 	const result = await run_pair_phases(check_phases(checks, named.files, sync))
@@ -179,7 +194,7 @@ async function narrowed_or_bare(
 		run_ship_narrowed.record(checks, verified)
 	}
 
-	return { ...result, note: { named: named.files.length } }
+	return { ...result, note: named_note(named.files, sync) }
 }
 
 // The red a pair ahead in the queue met, its output kept as it was, after the line saying so.

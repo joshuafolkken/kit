@@ -246,9 +246,10 @@ function cap_refusal(estimate: SizeMeasurement, rate?: ImplementRate, growth?: S
 	return `${capped(estimate, rate, growth)} — with separately-mergeable parts, file an ordered epic of \`--route split\` children (the mechanical changes first, the child that switches the setting on last); one deliverable, declare \`${REASON_PREFIX} <理由>\`; split-assessment.md → "${split_assess.QUESTION_SECTION}"`
 }
 
-// The implement minutes the grown declared lines take at the measured rate.
+// The implement minutes the grown declared lines take at the measured rate; only the lines are read,
+// so the ledger's recorded `declared` size projects as the body's does (joshuafolkken/kit#7785).
 function projected_minutes(
-	estimate: SizeMeasurement,
+	estimate: Pick<SizeMeasurement, 'lines'>,
 	rate: ImplementRate,
 	growth?: SizeRatios,
 ): number {

@@ -1,0 +1,7 @@
+{
+	"reason": "Narrowing the post-sync lint set adds the touching split, its scope breakdown and their tests; the review fix keeps each side's own files reaching the other through an intermediate",
+	"date": "2026-11-17",
+	"growth": {
+		"scripts.code_lines": 96
+	}
+}
