@@ -58,7 +58,14 @@ const stop_schema = z.object({
 // One `josh run:chain` on `issue`, done or stopped: `at` is its end and `elapsed_ms` its length, so the
 // next run's start ends the wait after a stop. `stage` names where it stopped and `reason` why — the
 // stage exited non-zero (`exit`) or exited 0 on a notice that holds the run (`hold`) — both absent on a
-// run that finished. `join` marks the half after the review (joshuafolkken/kit#7024).
+// run that finished. `join` marks the half after the review (joshuafolkken/kit#7024). `stages` is each
+// stage that ran, the stopped one included, with its start and length; absent on a line written before
+// it was recorded (joshuafolkken/kit#7736).
+const chain_stage_schema = z.object({
+	name: z.string(),
+	at: z.string(),
+	elapsed_ms: z.number(),
+})
 const chain_schema = z.object({
 	kind: z.literal(KIND.CHAIN),
 	at: z.string(),
@@ -67,6 +74,7 @@ const chain_schema = z.object({
 	join: z.boolean(),
 	stage: z.string().optional(),
 	reason: z.enum(['exit', 'hold']).optional(),
+	stages: z.array(chain_stage_schema).optional(),
 })
 // The ship's `unplanned` answer `josh check:related` printed to the lane of `issue` ahead of the ship,
 // so a preflight `unplanned` stop after it is told apart in `lane:stats` (joshuafolkken/kit#5203).
@@ -120,6 +128,7 @@ const size_schema = z.object({
 
 type ChainEntry = z.infer<typeof chain_schema>
 type ChainRecord = Omit<ChainEntry, 'kind' | 'at'>
+type ChainStageEntry = z.infer<typeof chain_stage_schema>
 type UnpinnedStop = z.infer<typeof unpinned_stop_schema>
 type UnpinnedPath = UnpinnedStop['path']
 
@@ -132,5 +141,5 @@ const lane_ledger_schema_ship = {
 	unplanned_notice_schema,
 }
 
-export type { ChainEntry, ChainRecord, UnpinnedPath, UnpinnedStop }
+export type { ChainEntry, ChainRecord, ChainStageEntry, UnpinnedPath, UnpinnedStop }
 export { lane_ledger_schema_ship }
