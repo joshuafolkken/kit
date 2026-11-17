@@ -14,8 +14,9 @@ import { run_cut_report } from './run-cut-report'
 // completed instead — but only on all three conditions: the body declares a 0-file estimate, every
 // acceptance criterion is checked, and the lane changed no file. Any one missing keeps today's
 // `unready` refusal, with the missing condition named. The close itself is `backlog-triage-close.ts`'s,
-// so the adopt's not-planned close and this completed one stay one path; the parent's `run:merge`
-// then collects the closed child as it collects a merged one.
+// so the adopt's not-planned close and this completed one stay one path. It labels the Issue
+// `measured` before closing it, so the parent's `run:merge` counts the child merged
+// (`issue-merged.ts` → `is_merged_close`).
 
 const CHECKBOX = /^\s*-\s*\[(?<mark>[ xX])\]/u
 const UNCHECKED_MARK = ' '
@@ -30,14 +31,14 @@ function unchecked_count(body: string): number {
 }
 
 // The first missing condition as one line, or `undefined` when the lane may close as completed.
-function missing_of(body: string, changed_files: number): string | undefined {
+function missing_of(body: string, changed: ReadonlyArray<string>): string | undefined {
 	const declared = size_estimate.declared_files(body)
 
 	if (declared !== 0) {
 		return `the body does not declare a 0-file size estimate (${String(declared)})`
 	}
 
-	if (changed_files > 0) return `the lane changed ${String(changed_files)} file(s)`
+	if (changed.length > 0) return `the lane changed ${changed.join(', ')}`
 
 	const unchecked = unchecked_count(body)
 
@@ -49,11 +50,11 @@ function names_of(listing: string): ReadonlyArray<string> {
 }
 
 // Every file the lane differs from main by: committed, uncommitted and untracked.
-async function changed_count(): Promise<number> {
+async function changed_names(): Promise<ReadonlyArray<string>> {
 	const changed = names_of(await git_diff_reads.diff_main_names())
 	const untracked = names_of(await git_diff_reads.untracked_names())
 
-	return new Set([...changed, ...untracked]).size
+	return [...new Set([...changed, ...untracked])]
 }
 
 async function missing(issue: string): Promise<string | undefined> {
@@ -61,7 +62,7 @@ async function missing(issue: string): Promise<string | undefined> {
 
 	if (body === undefined) return `the body of ${session_cite.issue(issue)} could not be read`
 
-	return missing_of(body, await changed_count())
+	return missing_of(body, await changed_names())
 }
 
 function report_closed(result: CloseResult): number {
@@ -72,25 +73,18 @@ function report_closed(result: CloseResult): number {
 	return run_cut_report.report(run_cut_report.CONCLUDED_VERDICT, run_cut_report.SUCCESS_EXIT_CODE)
 }
 
-function hint_of(issue: string, note: string | undefined): string {
-	if (note === undefined) {
-		return `This no-diff investigation lane may close as completed: pnpm josh run:cut ${issue} --deliverable <comment-url>`
-	}
-
-	return `Not closable as a no-diff investigation: ${note}.`
-}
-
-// The answer to a cut on a tree that is not an uncommitted lane branch. A lane branch is checked for
-// the no-diff close; the default branch keeps the bare refusal.
+// The answer to a cut that `--deliverable` asks to conclude, or that found no uncommitted lane branch.
+// Only `--deliverable` on a lane branch reads the body and the diff, so an ordinary lane — and the
+// default branch — keeps the bare refusal.
 async function unready(issue: string, state: CutState, deliverable?: string): Promise<number> {
-	if (state.branch === (await git_command.get_default_branch())) {
+	if (deliverable === undefined || state.branch === (await git_command.get_default_branch())) {
 		return run_cut_report.refuse_unready(state)
 	}
 
 	const note = await missing(issue)
 
-	if (note !== undefined || deliverable === undefined) {
-		return run_cut_report.refuse_unready(state, hint_of(issue, note))
+	if (note !== undefined) {
+		return run_cut_report.refuse_unready(state, `Not closable as a no-diff investigation: ${note}.`)
 	}
 
 	return report_closed(await backlog_triage_close.close_completed(issue, deliverable))

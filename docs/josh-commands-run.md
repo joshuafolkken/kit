@@ -333,7 +333,7 @@ remains and what was left alone — passed by path (`--handoff <path>`), never i
 or `$` in it is not executed. The resume prints it to stderr; one with no instruction is `incomplete`.
 
 `--deliverable <url>` closes a no-diff investigation lane (`約 0 ファイル`, all criteria checked, no
-diff) as completed, citing it; `run:merge` returns it. Else `unready` names the gap.
+diff) as completed, citing it; `run:merge` counts it. Else `unready` names the gap.
 
 **Output / exit codes:** stdout is one token, then its `pre-gate-cut.md` section unless `not-a-lane` / `fresh` / `concluded`. `run:cut <N>`: `cut`, `concluded`, `not-a-lane`, `unready`, `busy`, `failed` or `bad-handoff`. `run:cut --resume <N>`: `fresh`, `resume`, `resume-impl`, `stale`, `busy`, `handed-off`, `incomplete` or `over`.
 

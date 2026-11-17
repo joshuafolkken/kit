@@ -18,30 +18,34 @@ function body_of(files: number, criteria: ReadonlyArray<string>): string {
 	].join('\n')
 }
 
+const NONE: ReadonlyArray<string> = []
+
 describe('run_cut_conclude.missing_of', () => {
 	it('answers nothing missing for a #7780-shaped body with no changed file (ac-1b7874a6)', () => {
-		expect(run_cut_conclude.missing_of(body_of(0, CHECKED), 0)).toBeUndefined()
+		expect(run_cut_conclude.missing_of(body_of(0, CHECKED), NONE)).toBeUndefined()
 	})
 
 	it('names an unchecked acceptance criterion (ac-5424e7c4)', () => {
 		const criteria = [...CHECKED.slice(1), '- [ ] five']
 
-		expect(run_cut_conclude.missing_of(body_of(0, criteria), 0)).toBe(
+		expect(run_cut_conclude.missing_of(body_of(0, criteria), NONE)).toBe(
 			'1 acceptance criteria are unchecked',
 		)
 	})
 
 	it('names a non-zero file estimate (ac-5424e7c4)', () => {
-		expect(run_cut_conclude.missing_of(body_of(1, CHECKED), 0)).toContain('0-file size estimate')
+		expect(run_cut_conclude.missing_of(body_of(1, CHECKED), NONE)).toContain('0-file size estimate')
 	})
 
-	it('names a lane that changed a file (ac-5424e7c4)', () => {
-		expect(run_cut_conclude.missing_of(body_of(0, CHECKED), 1)).toBe('the lane changed 1 file(s)')
+	it('names the files the lane changed (ac-5424e7c4)', () => {
+		expect(run_cut_conclude.missing_of(body_of(0, CHECKED), ['a.ts', 'b.md'])).toBe(
+			'the lane changed a.ts, b.md',
+		)
 	})
 
 	it('ignores a checkbox outside the acceptance criteria section', () => {
 		const body = `${body_of(0, CHECKED)}\n\n## メモ\n\n- [ ] not a criterion`
 
-		expect(run_cut_conclude.missing_of(body, 0)).toBeUndefined()
+		expect(run_cut_conclude.missing_of(body, NONE)).toBeUndefined()
 	})
 })

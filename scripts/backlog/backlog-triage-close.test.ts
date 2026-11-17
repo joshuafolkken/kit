@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { order, closed, released } = vi.hoisted(() => ({
+const { order, closed, labelled, released } = vi.hoisted(() => ({
 	order: new Array<string>(),
 	closed: { ok: true },
+	labelled: { ok: true },
 	released: { code: 0 },
 }))
 
@@ -45,7 +46,12 @@ vi.mock('#scripts/josh/josh-run', () => ({
 	josh_command: { josh_run: vi.fn(step('run:add', () => ({ code: 0 }))) },
 }))
 vi.mock('#scripts/gh/git-gh-command', () => ({
-	git_gh_command: { issue_close: vi.fn(step('close', () => closed.ok)) },
+	git_gh_command: {
+		issue_close: vi.fn(step('close', () => closed.ok)),
+		issue_apply_label: vi.fn(
+			step('label', () => ({ is_applied: labelled.ok, reason: labelled.ok ? '' : 'denied' })),
+		),
+	},
 }))
 vi.mock('#scripts/epic/epic-close', () => ({
 	epic_close: { close_completed_epics: vi.fn(step('epics', () => undefined)) },
@@ -57,6 +63,7 @@ vi.mock('./backlog-triage-filing', () => ({
 	backlog_triage_filing: { problem_of: vi.fn(async () => undefined), block: vi.fn() },
 }))
 
+const { MEASURED_LABEL } = await import('#scripts/issue/issue-labels')
 const { issue_read } = await import('#scripts/issue/issue-read')
 const { git_gh_command } = await import('#scripts/gh/git-gh-command')
 const { run_park_release } = await import('#scripts/run/park/run-park-release')
@@ -90,6 +97,7 @@ async function adopt(permission: string, ...extra: ReadonlyArray<string>): Promi
 beforeEach(() => {
 	order.length = 0
 	closed.ok = true
+	labelled.ok = true
 	released.code = 0
 	vi.spyOn(console, 'info').mockReturnValue()
 	vi.spyOn(console, 'error').mockReturnValue()
@@ -138,16 +146,17 @@ describe('backlog:triage --adopt a closing option', () => {
 	})
 })
 
+const DELIVERABLE = 'https://github.com/joshuafolkken/kit/issues/7780#issuecomment-1'
+
 // joshuafolkken/kit#7821: a no-diff investigation lane closes through the same path, as completed.
 describe('backlog_triage_close.close_completed', () => {
-	const DELIVERABLE = 'https://github.com/joshuafolkken/kit/issues/7780#issuecomment-1'
-
-	it('closes as completed citing the deliverable, then closes epics and returns the lane (ac-54f096cd, ac-1b7874a6)', async () => {
+	it('labels measured, closes as completed citing the deliverable, then closes epics and returns the lane (ac-54f096cd, ac-1b7874a6)', async () => {
 		await expect(backlog_triage_close.close_completed(ISSUE, DELIVERABLE)).resolves.toStrictEqual({
 			next: 'closed as completed · lane returned, not requeued',
 		})
 
-		expect(order).toStrictEqual(['close', 'epics', 'release'])
+		expect(order).toStrictEqual(['label', 'close', 'epics', 'release'])
+		expect(git_gh_command.issue_apply_label).toHaveBeenCalledWith(ISSUE, MEASURED_LABEL)
 		expect(git_gh_command.issue_close).toHaveBeenCalledWith(
 			ISSUE,
 			expect.stringContaining(DELIVERABLE),
@@ -164,13 +173,28 @@ describe('backlog_triage_close.close_completed', () => {
 			'not_planned',
 		)
 	})
+})
 
+describe('backlog_triage_close.close_completed failures', () => {
 	it('names the failed close without releasing', async () => {
 		closed.ok = false
 
 		const result = await backlog_triage_close.close_completed(ISSUE, DELIVERABLE)
 
-		expect(result).toStrictEqual({ problem: expect.stringContaining('re-run this command') })
-		expect(order).toStrictEqual(['close'])
+		expect(result).toStrictEqual({
+			problem: expect.stringMatching(
+				/^measured labelled, but closing .*7732.* failed; re-run this command$/u,
+			),
+		})
+		expect(order).toStrictEqual(['label', 'close'])
+	})
+
+	it('closes nothing when the measured label does not go on', async () => {
+		labelled.ok = false
+
+		const result = await backlog_triage_close.close_completed(ISSUE, DELIVERABLE)
+
+		expect(result).toStrictEqual({ problem: expect.stringContaining('denied') })
+		expect(order).toStrictEqual(['label'])
 	})
 })

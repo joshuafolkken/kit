@@ -1,8 +1,8 @@
 {
-	"reason": "new run:cut --deliverable mode closes no-diff investigation lanes (#7821): run-cut-conclude module, close_completed, its docs line",
+	"reason": "no-diff investigation close: measured label so run:merge counts it, --deliverable on a dirty tree, empty-value refusal",
 	"date": "2026-11-17",
 	"growth": {
-		"scripts.code_lines": 106,
+		"scripts.code_lines": 117,
 		"ai_cost.on_demand_bytes": 176
 	}
 }

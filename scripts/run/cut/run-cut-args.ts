@@ -103,7 +103,8 @@ function issue_request(
 ): Request | undefined {
 	const issue = issue_of(positionals)
 
-	if (issue === undefined) return undefined
+	// An empty `--deliverable` would cite a blank deliverable in the close comment.
+	if (issue === undefined || extras.deliverable_url?.trim() === '') return undefined
 
 	return kind === 'resume' ? { kind: 'resume', issue } : { kind: 'cut', issue, ...extras }
 }

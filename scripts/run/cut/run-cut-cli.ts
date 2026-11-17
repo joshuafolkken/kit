@@ -255,8 +255,8 @@ async function cut_outside_lane(
 
 type CutCommand = Extract<Request, { kind: 'cut' }>
 
-// A lane tree with nothing uncommitted: refused `unready`, unless it is a no-diff investigation lane
-// that `--deliverable` closes as completed (`run-cut-conclude.ts`).
+// A lane tree with nothing uncommitted, or any tree under `--deliverable`: refused `unready`, unless it
+// is a no-diff investigation lane that `--deliverable` closes as completed (`run-cut-conclude.ts`).
 async function answer_unready(
 	request: CutCommand,
 	phase: string,
@@ -268,6 +268,12 @@ async function answer_unready(
 	return await declined({ issue, phase }, state, answered)
 }
 
+// `--deliverable` asks to conclude, never to cut: a dirty lane tree is refused with its changed files
+// named rather than taking a pre-gate cut.
+async function is_concluding(request: CutCommand, state: CutState): Promise<boolean> {
+	return request.deliverable_url !== undefined || !(await is_lane_branch(state))
+}
+
 async function cut(target: string, request: CutCommand, phase: string): Promise<number> {
 	const { issue, handoff_path } = request
 	const lane = await lane_registry.find_open_lane(issue)
@@ -276,7 +282,7 @@ async function cut(target: string, request: CutCommand, phase: string): Promise<
 
 	const state = await run_cut.current_state()
 
-	if (!(await is_lane_branch(state))) return await answer_unready(request, phase, state)
+	if (await is_concluding(request, state)) return await answer_unready(request, phase, state)
 
 	const answered = pre_gate_answer(phase)
 
