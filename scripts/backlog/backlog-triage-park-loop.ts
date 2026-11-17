@@ -15,6 +15,8 @@ import { run_stalled_park } from '#scripts/run/park/run-stalled-park'
 // held lane within a window, and a park → adopt → relaunch is no yield, so it counts none of them.
 // A park with no tree line (outside a lane, or written before the note carried it) is never a loop,
 // nor is one after an adopt with `--done`: the parent acted outside the lane, so its tree never moves.
+// A re-park whose leading heading (its question) differs from the earlier park's is a new dead end,
+// not the same one, so it is no loop either.
 
 // The adopt's decision line, written by `backlog-triage-adopt.ts` and read here.
 const ADOPT_MARK = 'adopted park option '
@@ -60,17 +62,25 @@ function first_line(comment: IssueComment | undefined): string {
 	return comment?.body.split('\n', 1)[0]?.trim() ?? ''
 }
 
+// Whether two parks ask the same question: the leading heading line a park body opens with.
+function is_same_question(
+	comments: ReadonlyArray<IssueComment>,
+	park: number,
+	earlier: number,
+): boolean {
+	return first_line(comments[park]) === first_line(comments[earlier])
+}
+
 // The loop the latest park closes — a lane option adopted before it and the park before that, on the
-// same tree — or `undefined`.
+// same tree and asking the same question — or `undefined`.
 function loop_of(comments: ReadonlyArray<IssueComment>): ParkLoop | undefined {
 	const park = last_before(comments, comments.length, is_park)
 	const adopt = last_before(comments, park, is_adopt)
 	const earlier = last_before(comments, adopt, is_park)
 	const tree = tree_at(comments, park)
-
 	const is_same = tree !== undefined && tree === tree_at(comments, earlier)
 
-	return is_same && is_lane_option(comments[adopt])
+	return is_same && is_same_question(comments, park, earlier) && is_lane_option(comments[adopt])
 		? { adopted: first_line(comments[adopt]), tree }
 		: undefined
 }

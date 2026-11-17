@@ -1,7 +1,7 @@
 {
-	"reason": "Round-1 review fixes: park loop excludes adopts with --done (shared adopt marks) and adds its test case",
+	"reason": "Round-2 review fix: a park loop also requires the re-park to ask the same question as the earlier park, with its test case",
 	"date": "2026-11-17",
 	"growth": {
-		"scripts.code_lines": 121
+		"scripts.code_lines": 128
 	}
 }

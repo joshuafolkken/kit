@@ -61,6 +61,7 @@ const TREE = 'abc1234 · 0'
 const MOVED_TREE = 'def5678 · 0'
 const FIRST_PARK_AT = '2026-11-17T13:50:58Z'
 const ADOPT_AT = '2026-11-17T13:53:02Z'
+const LATEST_PARK_AT = '2026-11-17T13:55:07Z'
 const ADOPT = `#${ISSUE}: adopted park option 1 (backlog:triage --adopt) — the parent takes it`
 const DONE_ADOPT = `${ADOPT} · parent action done: rotated the token`
 const PARK = [
@@ -93,9 +94,11 @@ function loop_comments(
 	return [
 		comment(FIRST_PARK_AT, park_on(earlier)),
 		comment(ADOPT_AT, ADOPT),
-		comment('2026-11-17T13:55:07Z', park_on(latest)),
+		comment(LATEST_PARK_AT, park_on(latest)),
 	]
 }
+
+const NEW_QUESTION = comment(LATEST_PARK_AT, park_on(TREE).replace('Which lane?', 'Which token?'))
 
 // joshuafolkken/kit#7820: a re-park on the tree the last adopted option left unchanged is a loop.
 describe('backlog_triage_park_loop.loop_of', () => {
@@ -125,6 +128,10 @@ describe('backlog_triage_park_loop.loop_of', () => {
 		[
 			'the parent acted outside the lane (--done)',
 			loop_comments(TREE, TREE).with(1, comment(ADOPT_AT, DONE_ADOPT)),
+		],
+		[
+			'the re-park asks a new question on the same tree',
+			loop_comments(TREE, TREE).with(2, NEW_QUESTION),
 		],
 	])('finds no loop when %s', (_case, comments) => {
 		expect(backlog_triage_park_loop.loop_of(comments)).toBeUndefined()
