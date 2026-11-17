@@ -53,9 +53,16 @@ interface RunInput {
 	red_rerun?: boolean
 }
 
+const STAGE_FIELDS = ['rebuild_ms', 'core_wait_ms', 'vitest_ms'] as const
+
+// How long each stage around the selection took (joshuafolkken/kit#7828) — a stage that did not run
+// is absent.
+type StageTimes = Partial<Record<(typeof STAGE_FIELDS)[number], number | undefined>>
+
 interface RunResult {
 	elapsed_ms: number
 	test_files: number | undefined
+	stages?: StageTimes
 }
 
 function set_count_target(target: string | undefined): void {
@@ -158,6 +165,18 @@ function select_record(select_elapsed_ms: number | undefined): Partial<TestRelat
 	return select_elapsed_ms === undefined ? {} : { select_elapsed_ms: Math.round(select_elapsed_ms) }
 }
 
+function stage_record(stages: StageTimes = {}): StageTimes {
+	const record: StageTimes = {}
+
+	for (const field of STAGE_FIELDS) {
+		const ms = stages[field]
+
+		if (ms !== undefined) record[field] = Math.round(ms)
+	}
+
+	return record
+}
+
 // How many files the cap narrowed, and the hub of them (joshuafolkken/kit#5699) — the one the run's
 // summary line names (`test_related_cap.hub_of`).
 function over_cap_record(
@@ -227,6 +246,7 @@ function record_of(input: RunInput, result: RunResult): TestRelatedRecord {
 		...widest_record(input.reach),
 		...select_record(input.select_elapsed_ms),
 		...(input.red_rerun !== undefined && { red_rerun: input.red_rerun }),
+		...stage_record(result.stages),
 		elapsed_ms: Math.round(result.elapsed_ms),
 	}
 
@@ -243,5 +263,5 @@ async function record_run(input: RunInput, result: RunResult, ledger?: string): 
 
 const test_related_record = { own_of, record_of, record_run, with_test_count }
 
-export type { RunInput, RunResult }
+export type { RunInput, RunResult, StageTimes }
 export { test_related_record }

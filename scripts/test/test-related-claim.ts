@@ -16,20 +16,26 @@ async function claim_weight(files: ReadonlyArray<string> | undefined): Promise<n
 // **Each vitest pass takes its claim here, not on the command entry**: the entry is reserved before
 // the scope resolves, so it could only ever claim the whole width. `vitest_share` reads this claim
 // back as the `--maxWorkers` bound. Under `josh gate` the gate's claim covers the run, so none is
-// sized.
+// sized. `run` is handed how long the claim waited for its cores (joshuafolkken/kit#7828), `undefined`
+// where none was taken.
 async function with_unit_claim(
 	files: ReadonlyArray<string> | undefined,
-	run: () => Promise<number>,
+	run: (wait_ms?: number) => Promise<number>,
 ): Promise<number> {
 	if (core_budget.is_covered()) return await run()
 
 	const weight = await claim_weight(files)
+	const asked = performance.now()
 
-	return await core_budget.with_command_reservation(weight, run, {
-		memory_mb: gate_plan.unit_memory(weight),
-		command: related_scope.COMMAND_NAME,
-		is_unit: true,
-	})
+	return await core_budget.with_command_reservation(
+		weight,
+		async () => await run(performance.now() - asked),
+		{
+			memory_mb: gate_plan.unit_memory(weight),
+			command: related_scope.COMMAND_NAME,
+			is_unit: true,
+		},
+	)
 }
 
 const test_related_claim = { with_unit_claim }

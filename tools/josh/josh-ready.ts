@@ -4,6 +4,7 @@ import path from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { hook_bundle_stamp } from '#scripts/build/hook-bundle-stamp'
+import { launch_timing } from '#scripts/lane/launch-timing'
 import { bundle_rebuild_lock } from '#tools/hooks/bundle-rebuild-lock'
 
 // kit's own `pnpm josh` (joshuafolkken/kit#6769): plain node shares the hook's freshness check and runs
@@ -78,7 +79,10 @@ async function launch_target(
 ): Promise<string> {
 	const bundle = path.join(package_directory, 'dist', 'josh.js')
 	if (is_fresh(package_directory)) return bundle
+	const rebuild_started = performance.now()
 	const is_built = await rebuild_once(package_directory, rebuild)
+
+	launch_timing.set_rebuild_ms(performance.now() - rebuild_started)
 	if (is_fresh(package_directory)) return bundle
 	console.error(is_built ? STILL_STALE_NOTICE : FAILED_NOTICE)
 
