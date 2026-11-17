@@ -105,6 +105,8 @@ const scope_breakdown_schema = z.object({
 	lint_meeting: z.number(),
 })
 
+// `resumed_from` says whether a scoped pair lap started from the tree a stopped round 2 read
+// (`round-2-fix`) or not (`none`) — `run-ship-narrowed.ts` (joshuafolkken/kit#7789).
 const ship_lap_schema = z.object({
 	kind: z.literal(KIND.SHIP_LAP),
 	at: z.string(),
@@ -120,6 +122,7 @@ const ship_lap_schema = z.object({
 	named: z.number().optional(),
 	unsplit: z.string().optional(),
 	breakdown: scope_breakdown_schema.optional(),
+	resumed_from: z.enum(['round-2-fix', 'none']).optional(),
 })
 
 // A merging `josh followup`'s size of `issue`: the Issue's declared size estimate and the branch's

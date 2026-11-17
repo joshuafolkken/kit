@@ -42,12 +42,15 @@ vi.mock(import('./run-ship-synced-scope'), async (import_original) => {
 const { run_ship_scoped } = await import('./run-ship-scoped')
 const { run_ship_narrowed } = await import('./run-ship-narrowed')
 const { run_ship_pair_runs } = await import('./run-ship-pair-runs')
+const { run_ship_lap } = await import('./run-ship-lap')
+const { lane_ledger_write } = await import('#scripts/lane/lane-ledger-write')
 
 // joshuafolkken/kit#7053: round 2 beside the gate stage queued behind the gate's red pair and ran both
 // checks again on the same tree before the ship stopped on the same red.
 
 const OK = 0
 const FAILED = 1
+const NAMED = ['scripts/a.ts']
 
 beforeEach(() => {
 	vi.spyOn(metrics_totals, 'rerecord').mockResolvedValue(false)
@@ -85,12 +88,41 @@ describe('run_ship_scoped.scoped_pair — after autofix', () => {
 		const record = vi.spyOn(run_ship_narrowed, 'record')
 		const remember = vi.spyOn(run_ship_narrowed, 'remember')
 
-		vi.spyOn(run_ship_narrowed, 'moved_since_green').mockResolvedValue(['scripts/a.ts'])
+		vi.spyOn(run_ship_narrowed, 'moved_since_green').mockResolvedValue({
+			files: NAMED,
+			why: 'moved since green',
+			resumed_from: 'none',
+		})
 		await run_ship_scoped.scoped_pair()
 		expect(record).toHaveBeenCalledWith(expect.any(Array), fixed)
 		expect(remember).toHaveBeenCalledWith(fixed)
 		expect(run_ship_pair_runs.current()).toMatchObject({ runs: 1 })
 		expect(commands()).toEqual([LINT, TEST].map((command) => `${command} scripts/a.ts`))
+	})
+})
+
+// joshuafolkken/kit#7789: the pair's lap says whether it resumed from the round-2 fix.
+describe('run_ship_scoped.scoped_pair — the lap names where it resumed from', () => {
+	it.each([
+		['the round-2 fix for a pair narrowed from its tree', 'round-2-fix'],
+		['none for a pair narrowed from this ship', 'none'],
+	] as const)('records %s (ac-2b9687b7)', async (_label, resumed_from) => {
+		vi.spyOn(run_ship_narrowed, 'moved_since_green').mockResolvedValue({
+			files: NAMED,
+			why: 'moved',
+			resumed_from,
+		})
+		await run_ship_lap.within('7789', 'gate', run_ship_scoped.scoped_pair)
+		expect(lane_ledger_write.record_ship_lap).toHaveBeenCalledWith(
+			expect.objectContaining({ step: run_ship_lap.STEP.SCOPED_PAIR, named: 1, resumed_from }),
+		)
+	})
+
+	it('records none for a bare pair', async () => {
+		await run_ship_lap.within('7789', 'gate', run_ship_scoped.scoped_pair)
+		expect(lane_ledger_write.record_ship_lap).toHaveBeenCalledWith(
+			expect.objectContaining({ step: run_ship_lap.STEP.SCOPED_PAIR, resumed_from: 'none' }),
+		)
 	})
 })
 

@@ -10,6 +10,7 @@ const LAP = {
 	step: 'josh gate',
 	elapsed_ms: 1200,
 }
+const SCOPED_PAIR = 'scoped pair'
 
 // joshuafolkken/kit#7736: a chain line with its stages, and an older one without them.
 describe('lane_ledger_schema_ship — the run:chain line', () => {
@@ -20,6 +21,26 @@ describe('lane_ledger_schema_ship — the run:chain line', () => {
 		const chain = { kind: 'chain', at: AT, issue: 7736, elapsed_ms: 1200, join: false, ...stages }
 
 		expect(lane_ledger_schema.entry_schema.parse(chain)).toEqual(chain)
+	})
+})
+
+// joshuafolkken/kit#7789: a scoped pair lap says whether it resumed from the round-2 fix.
+describe('lane_ledger_schema_ship — the scoped pair lap', () => {
+	const PAIR = { ...LAP, step: SCOPED_PAIR }
+
+	it.each(['round-2-fix', 'none'])(
+		'keeps a scoped pair lap resumed from %s (ac-2b9687b7)',
+		(resumed_from) => {
+			const pair = { ...PAIR, resumed_from }
+
+			expect(lane_ledger_schema.entry_schema.parse(pair)).toEqual(pair)
+		},
+	)
+
+	it('refuses an unknown resume origin', () => {
+		const pair = { ...PAIR, resumed_from: 'round-1' }
+
+		expect(lane_ledger_schema.entry_schema.safeParse(pair).success).toBe(false)
 	})
 })
 
@@ -69,7 +90,7 @@ describe('lane_ledger_schema_ship — the lines josh ship writes, read through t
 describe('lane_ledger_schema_ship — the scoped pair breakdown', () => {
 	it('reads a ship lap with its scope breakdown back as written (ac-490219c5)', () => {
 		const breakdown = { both: 0, unsplit: 0, read_by_tests: 3, shared: 587, lint_meeting: 5 }
-		const scoped = { ...LAP, step: 'scoped pair', named: 5, breakdown }
+		const scoped = { ...LAP, step: SCOPED_PAIR, named: 5, breakdown }
 
 		expect(lane_ledger_schema.entry_schema.parse(scoped)).toEqual(scoped)
 	})
