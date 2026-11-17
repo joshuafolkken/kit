@@ -39,7 +39,8 @@ epic` writes only the repository it runs in, and the promote arm stops when that
 checked out here. A third-party owner is Tier C: stop rather than file.
 
 - `kickoff new` or `kickoff new "<title>"`: (0) **Scope assessment** per `split-assessment.md` — one
-  deliverable takes the **single-issue path**, several the **multi-issue split path**.
+  deliverable takes the **single-issue path**, several the **multi-issue split path**. A `run:handoff`
+  child → the directory its prompt names (`prompts/collaboration-workflow/shell-body.md` → "安全な書き方").
   - **Single-issue path**: (1) Derive an English title, or use the one given. (2) `pnpm josh issue:file
     "<title>" --body-file .josh/tmp/body.md --over-cap` plus the labels the words typed after `new` name
     ("Words typed after `new`", below; body per `prompts/collaboration-workflow/issue-template.md`) —
