@@ -16,7 +16,10 @@ describe('lint_related_fix.prepare', () => {
 		vi.spyOn(process.stdout, 'write').mockReturnValue(true)
 		vi.mocked(format_steps.run_scoped).mockResolvedValue(1)
 		vi.mocked(scoped_green.read_before).mockResolvedValue(after)
-		expect(await lint_related_fix.prepare([], scope, '/project')).toEqual(after)
+		expect(await lint_related_fix.prepare([], scope, '/project')).toEqual({
+			before: after,
+			fix_exit_code: 1,
+		})
 		expect(format_steps.run_scoped).toHaveBeenCalledWith(scope, '/project')
 		expect(vi.mocked(format_steps.run_scoped).mock.invocationCallOrder[0]).toBeLessThan(
 			vi.mocked(scoped_green.read_before).mock.invocationCallOrder[0] ?? 0,
