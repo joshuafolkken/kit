@@ -1,0 +1,8 @@
+{
+	"reason": "issue:plan gains the named-files vs estimate check (#7726): new counting module, shared size restate, and the kickoff pointer to its refusal steps",
+	"date": "2026-11-17",
+	"growth": {
+		"scripts.code_lines": 77,
+		"ai_cost.on_demand_bytes": 114
+	}
+}

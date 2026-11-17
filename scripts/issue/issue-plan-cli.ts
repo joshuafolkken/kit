@@ -136,9 +136,12 @@ async function mark_planned(request: PlanRequest): Promise<boolean> {
 }
 
 // `--repo` addresses every write — the title, the plan and the label — so `kickoff kit#<N>` run from
-// another checkout records the plan on the named repository's issue, never on this one's.
+// another checkout records the plan on the named repository's issue, never on this one's. A plan
+// naming more files than its estimate writes nothing (joshuafolkken/kit#7726).
 async function record_plan(request: PlanRequest): Promise<boolean> {
 	const { issue_number, title, repo } = request
+
+	if (!(await plan_size_check.settle(issue_number, request.plan, repo))) return false
 
 	if (title !== undefined) {
 		console.info(`title: ${await git_gh_command.issue_edit_title(issue_number, title, repo)}`)
