@@ -2,6 +2,7 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { hook_bundle_stamp } from '#scripts/build/hook-bundle-stamp'
+import { launch_timing } from '#scripts/lane/launch-timing'
 import { bundle_rebuild_lock } from '#tools/hooks/bundle-rebuild-lock'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -47,6 +48,8 @@ beforeEach(() => {
 	writeFileSync(path.join(root, INPUT), SOURCE)
 	writeFileSync(path.join(root, MANIFEST), MANIFEST_CONTENT)
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
+	// Every stale-dist case sets the handed-over rebuild time; each case starts without one.
+	launch_timing.clear()
 })
 
 afterEach(() => {
@@ -107,6 +110,26 @@ describe('josh startup with a stale dist (ac-05c27eab, ac-d8bcc144)', () => {
 
 		expect(target).toBe(path.join(root, ENTRY))
 		expect(console.error).toHaveBeenCalledWith(STILL_STALE_NOTICE)
+	})
+})
+
+// joshuafolkken/kit#7828: the launcher times its rebuild for the command it launches.
+describe('josh startup — the rebuild time handed to the command', () => {
+	it('hands over how long the rebuild took', async () => {
+		ready_bundles()
+		writeFileSync(path.join(root, INPUT), EDITED_SOURCE)
+
+		await launch_target(root, edited_build)
+
+		expect(launch_timing.rebuild_ms()).toBeGreaterThanOrEqual(0)
+	})
+
+	it('hands over no rebuild time where the dist was fresh', async () => {
+		ready_bundles()
+
+		await launch_target(root, vi.fn<Rebuild>())
+
+		expect(launch_timing.rebuild_ms()).toBeUndefined()
 	})
 })
 
