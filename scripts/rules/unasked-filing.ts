@@ -67,7 +67,7 @@ const QUOTED = /"[^"]*"|'[^']*'/gu
 const UNASKED_FILING_REASON =
 	'⛔ unasked filing: this interactive session files an Issue only on the person’s explicit ' +
 	'instruction (「起票」, “file an issue”, or a command whose procedure files, such as `kickoff new`). ' +
-	'Propose the Issue in the reply; once they confirm, the consultation main line hands it to ' +
+	'Propose it in the reply; once confirmed, hand it to ' +
 	'`pnpm josh run:handoff kickoff new --brief-file <brief>`. It fires on every occurrence ' +
 	'(`.claude/skills/workflow-commands/observation-filing.md`).'
 
