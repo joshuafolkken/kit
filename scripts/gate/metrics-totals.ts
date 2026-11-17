@@ -4,20 +4,17 @@ import { gate_tree, type GateTree } from './gate-tree'
 import { project_checks } from './project-checks'
 
 // kit's metrics ratchet totals (`josh metrics --totals-only`), brought forward from the detached
-// `josh ship`'s pre-detach checks to the implementation loop: a feature grows a total almost every
-// time, and a growth first met at the pre-detach stop costs a ship re-run beside the
-// `josh metrics --accept` (joshuafolkken/kit#4594). `josh lint:related` reports it as a notice, never a
-// failure, so a total that grows again within the loop does not demand an accept per edit;
-// `josh run:review`'s open is the stop, the pre-detach check its backstop (`totals_check`). A
-// consumer's kit has no `josh metrics`, so it runs in kit alone.
+// `josh ship`'s pre-detach checks: a feature grows a total almost every time, and a growth first met
+// at the pre-detach stop costs a ship re-run beside the `josh metrics --accept`
+// (joshuafolkken/kit#4594). `josh run:review`'s open is the stop, the pre-detach check its backstop
+// (`totals_check`). `josh lint:related` does not measure them: a whole-repository pass per edit cost
+// more than the earlier notice saved (joshuafolkken/kit#7823). A consumer's kit has no
+// `josh metrics`, so it runs in kit alone.
 
 const METRICS_TOTALS_COMMAND: ReadonlyArray<string> = ['josh', 'metrics', '--totals-only']
 // The form ship runs before the detach and before each scoped pair: it also re-records a growth the
 // branch's approval names (joshuafolkken/kit#4716).
 const METRICS_RERECORD_COMMAND: ReadonlyArray<string> = [...METRICS_TOTALS_COMMAND, '--rerecord']
-// Neutral on the cause: a growth and a run that never finished both stop the pre-detach check.
-const NOTICE_HEADING =
-	'⚠ josh metrics --totals-only did not pass — settle it before `josh run:review`, whose open stops on it (a total the branch approval names is re-recorded there):'
 const REVIEW_REFUSAL_HEADING =
 	'run:review refused: josh metrics --totals-only did not pass — bring the totals back down, or record the reason they grew in the rerun: `pnpm josh run:chain <N> --from run:review --accept-metrics "<why>"`:'
 // `josh metrics --accept --reason`, run as is, so the open's record is the command's own.
@@ -26,18 +23,6 @@ const ACCEPT_REFUSAL_HEADING =
 	'run:review refused: --accept-metrics could not record the growth — `josh metrics --accept` answered:'
 const ACCEPT_UNUSED_NOTE =
 	'run:review: --accept-metrics unused — no metrics total grew, so nothing was recorded'
-
-async function growth_notice(directory: string): Promise<string | undefined> {
-	if (!project_checks.is_kit_repository(directory)) return undefined
-
-	const result = await buffered_process.run_buffered_process(METRICS_TOTALS_COMMAND, {
-		cwd: directory,
-	})
-
-	if (!buffered_process.is_process_failed(result)) return undefined
-
-	return `${NOTICE_HEADING}\n${result.output.trim()}`
-}
 
 // The totals' stop, one judgment for the two places that stop on it: `josh run:review`'s open, right
 // after the implementation and before the review's brief, and the ship's pre-detach, kept as the
@@ -122,9 +107,7 @@ const metrics_totals = {
 	ACCEPT_UNUSED_NOTE,
 	METRICS_RERECORD_COMMAND,
 	METRICS_TOTALS_COMMAND,
-	NOTICE_HEADING,
 	REVIEW_REFUSAL_HEADING,
-	growth_notice,
 	rerecord,
 	// Finish the existing approval writer before fixing the tree any verification will read.
 	async rerecorded_tree(
