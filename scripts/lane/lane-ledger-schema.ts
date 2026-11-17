@@ -2,6 +2,7 @@ import { run_startup_schema } from '#scripts/run/startup/run-startup-schema'
 import { z } from 'zod'
 import { lane_ledger_kind } from './lane-ledger-kind'
 import { lane_ledger_pinned_origin } from './lane-ledger-pinned-origin'
+import { lane_ledger_schema_estimate } from './lane-ledger-schema-estimate'
 import { lane_ledger_schema_load } from './lane-ledger-schema-load'
 import { lane_ledger_schema_offer } from './lane-ledger-schema-offer'
 import { lane_ledger_schema_related } from './lane-ledger-schema-related'
@@ -185,6 +186,7 @@ const entry_schema = z.discriminatedUnion('kind', [
 	ship_lap_schema,
 	size_schema,
 	limit_schema,
+	lane_ledger_schema_estimate.estimate_schema,
 ])
 
 type LedgerEntry = z.infer<typeof entry_schema>

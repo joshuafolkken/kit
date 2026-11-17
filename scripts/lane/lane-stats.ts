@@ -1,5 +1,6 @@
 import { machine_capacity } from '#scripts/gate/machine-capacity'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
+import { lane_estimate_ratio } from './lane-estimate-ratio'
 import type { DispatchEntry, GateEntry, LedgerEntry, LoadEntry, MergeEntry } from './lane-ledger'
 import { lane_sampler } from './lane-sampler'
 import { lane_tail_stats } from './lane-tail-stats'
@@ -54,6 +55,8 @@ const COLUMNS = [
 	'free memory min (GB)',
 	'free memory mean (GB)',
 	'load samples',
+	'estimate ratio first',
+	'estimate ratio median',
 ] as const
 
 interface StatsWindow {
@@ -307,6 +310,15 @@ function load_cells(samples: ReadonlyArray<LoadEntry>): Array<string> {
 	]
 }
 
+// The median over the runs that ended in the window of each run's first, and its median, estimate
+// ratio (`lane-estimate-ratio.ts`).
+function estimate_cells(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): Array<string> {
+	const runs = lane_estimate_ratio.ratios_of(entries, window)
+	const medians = runs.map((run) => median(run.all)).filter(is_number)
+
+	return [cell(median(runs.map((run) => run.first))), cell(median(medians))]
+}
+
 function to_row(cells: ReadonlyArray<string>): string {
 	return `| ${cells.join(CELL_SEPARATOR)} |`
 }
@@ -326,6 +338,7 @@ function row(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow, label: Ro
 		...lane_cells(entries, period),
 		...gate_cells(period),
 		...load_cells(period.filter(is_load)),
+		...estimate_cells(entries, window),
 	])
 }
 

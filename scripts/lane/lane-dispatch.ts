@@ -6,6 +6,7 @@ import { IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { session_cite } from '#scripts/issue/session-cite'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
+import { run_board_estimate_record } from '#scripts/run/board/run-board-estimate-record'
 import { detached_launch, type LaunchArgv } from '#scripts/run/detached-launch'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
@@ -316,6 +317,7 @@ async function record_started(issue: string, start: DispatchStart): Promise<void
 		},
 		{ now },
 	)
+	await run_board_estimate_record.record(Number(issue))
 }
 
 // How a dispatch begins. A `resumable` one claims the marker itself and resumes an `outage` session; a

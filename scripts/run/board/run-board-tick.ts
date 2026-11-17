@@ -379,6 +379,7 @@ const run_board_tick = {
 	FRESH_STATE,
 	PLAN_RETRY_MS,
 	REDRAW_MS,
+	layout_for,
 	tick,
 }
 

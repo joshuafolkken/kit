@@ -302,6 +302,14 @@ Under the size table, the implement-rate table (`lane-implement-rate.ts`) prints
 actual non-test lines over the period's merged lanes, and how many lanes it reads: the `implement` interval joined by
 issue to the last `size` measured before the merge, lanes with no size, no interval or zero lines left out.
 
+The row's last two columns, `estimate ratio first` and `estimate ratio median`, measure the run board's finish estimate
+(`lane-estimate-ratio.ts`). Each lane dispatch writes one `estimate` ledger row with the finish `run:board` then
+estimated, none when nothing is estimated (`run-board-estimate-record.ts`).
+
+A run ends at the last merge of the children its rows name. Each row's ratio is the time actually left over the time
+estimated left; the columns take the median over the period's ended runs of the first row's ratio and of each run's
+median. A run with an unmerged child (unfinished or stopped) is left out; no such run prints `—`.
+
 Procedure and columns for measuring a lane limit: [lane-limit-measurement.md](./maintainers/lane-limit-measurement.md).
 
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh lane:sample` / `josh lane:stats` in detail".
