@@ -61,6 +61,7 @@ const { issue_read } = await import('#scripts/issue/issue-read')
 const { git_gh_command } = await import('#scripts/gh/git-gh-command')
 const { run_park_release } = await import('#scripts/run/park/run-park-release')
 const { backlog_triage_cli } = await import('./backlog-triage-cli')
+const { backlog_triage_close } = await import('./backlog-triage-close')
 
 const ISSUE = '7732'
 const REASON = 'nothing left to improve'
@@ -134,5 +135,42 @@ describe('backlog:triage --adopt a closing option', () => {
 		await expect(adopt(CLOSE)).resolves.toBe(1)
 
 		expect(console.error).toHaveBeenCalledWith(expect.stringContaining(`run:release ${ISSUE}`))
+	})
+})
+
+// joshuafolkken/kit#7821: a no-diff investigation lane closes through the same path, as completed.
+describe('backlog_triage_close.close_completed', () => {
+	const DELIVERABLE = 'https://github.com/joshuafolkken/kit/issues/7780#issuecomment-1'
+
+	it('closes as completed citing the deliverable, then closes epics and returns the lane (ac-54f096cd, ac-1b7874a6)', async () => {
+		await expect(backlog_triage_close.close_completed(ISSUE, DELIVERABLE)).resolves.toStrictEqual({
+			next: 'closed as completed · lane returned, not requeued',
+		})
+
+		expect(order).toStrictEqual(['close', 'epics', 'release'])
+		expect(git_gh_command.issue_close).toHaveBeenCalledWith(
+			ISSUE,
+			expect.stringContaining(DELIVERABLE),
+			'completed',
+		)
+	})
+
+	it('keeps the adopt close not planned with its own comment', async () => {
+		await backlog_triage_close.close(ISSUE, REASON)
+
+		expect(git_gh_command.issue_close).toHaveBeenCalledWith(
+			ISSUE,
+			`Closed as not planned by an adopted park option (\`backlog:triage --adopt\`): ${REASON}`,
+			'not_planned',
+		)
+	})
+
+	it('names the failed close without releasing', async () => {
+		closed.ok = false
+
+		const result = await backlog_triage_close.close_completed(ISSUE, DELIVERABLE)
+
+		expect(result).toStrictEqual({ problem: expect.stringContaining('re-run this command') })
+		expect(order).toStrictEqual(['close'])
 	})
 })

@@ -34,6 +34,9 @@ const NOT_A_LANE_VERDICT = 'not-a-lane'
 const UNREADY_VERDICT = 'unready'
 const FAILED_VERDICT = 'failed'
 const ENDED_VERDICT = 'ended'
+// A no-diff investigation lane closed its Issue as completed with its deliverable comment
+// (joshuafolkken/kit#7821); nothing was cut, and the run is over.
+const CONCLUDED_VERDICT = 'concluded'
 const UNREADABLE_VERDICT = 'unreadable'
 const UNKNOWN_VERDICT = 'unknown'
 // The asking session is over the shared context-cut threshold, so an implementation cut was not
@@ -116,11 +119,14 @@ function report_unknown(): number {
 }
 
 // A cut is only meaningful on a lane branch whose implementation is uncommitted. On the default
-// branch, or with a clean tree, there is nothing to carry across the boundary.
-function refuse_unready(state: CutState): number {
+// branch, or with a clean tree, there is nothing to carry across the boundary. `note` is the no-diff
+// investigation close's word on this lane (joshuafolkken/kit#7821): the condition it misses, or how to
+// close it.
+function refuse_unready(state: CutState, note?: string): number {
 	console.error(
 		`Not ready to cut on ${state.branch} (dirty: ${String(state.is_dirty)}); a cut needs an uncommitted lane branch. Nothing was cut.`,
 	)
+	if (note !== undefined) console.error(note)
 
 	return report(UNREADY_VERDICT, FAILURE_EXIT_CODE)
 }
@@ -195,6 +201,7 @@ function report_missing_supervisor(issue: string): number {
 const run_cut_report = {
 	BAD_HANDOFF_VERDICT,
 	BUSY_VERDICT,
+	CONCLUDED_VERDICT,
 	CUT_VERDICT,
 	ENDED_VERDICT,
 	FAILED_VERDICT,

@@ -22,7 +22,20 @@ describe('the --handoff path on a cut', () => {
 			issue: ISSUE,
 			is_implementation: true,
 			handoff_path: HANDOFF_PATH,
+			deliverable_url: undefined,
 		})
+	})
+
+	// joshuafolkken/kit#7821: the no-diff investigation close carries its deliverable comment.
+	it('reaches a pre-gate cut with its --deliverable url, refused beside --resume', () => {
+		const deliverable = ['--deliverable', 'https://github.com/joshuafolkken/kit/issues/7780#c1']
+
+		expect(request_for([ISSUE, ...deliverable])).toMatchObject({
+			kind: 'cut',
+			is_implementation: false,
+			deliverable_url: deliverable[1],
+		})
+		expect(request_for(['--resume', ISSUE, ...deliverable])).toBeUndefined()
 	})
 
 	// joshuafolkken/kit#2489: the setup-phase cut is retired, so its flag is refused rather than read as

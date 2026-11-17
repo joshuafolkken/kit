@@ -7,9 +7,13 @@ import { cli_flags } from '#scripts/lib/cli-flags'
 // the wrong moment.
 
 const USAGE =
-	'Usage: josh run:cut <issue> [--impl] [--handoff <path>] | --resume <issue> | --json | --end'
+	'Usage: josh run:cut <issue> [--impl] [--handoff <path>] [--deliverable <comment-url>] | --resume <issue> | --json | --end'
 
 const OPTIONS = {
+	// The comment a no-diff investigation lane delivered (joshuafolkken/kit#7821): with it, a lane that
+	// changed nothing closes its Issue as completed instead of being refused `unready`. A cut modifier
+	// like `--impl`.
+	deliverable: { type: 'string' },
 	end: { type: 'boolean' },
 	// The path to the handoff file the cut carries — the run's instruction and work state. A value
 	// rather than a boolean: the body is passed by path, never inlined on the command line, so a
@@ -26,6 +30,7 @@ const OPTIONS = {
 
 interface ParsedValues {
 	values: {
+		deliverable?: string
 		end?: boolean
 		handoff?: string
 		impl?: boolean
@@ -41,6 +46,7 @@ type Request =
 			issue: string
 			is_implementation: boolean
 			handoff_path?: string | undefined
+			deliverable_url?: string | undefined
 	  }
 	| { kind: 'resume'; issue: string }
 	| { kind: 'read' }
@@ -75,7 +81,8 @@ function is_single_mode(values: ParsedValues['values']): boolean {
 
 	if (modes.length > 1) return false
 
-	const has_cut_modifier = values.impl === true || values.handoff !== undefined
+	const has_cut_modifier =
+		values.impl === true || values.handoff !== undefined || values.deliverable !== undefined
 
 	return !(has_cut_modifier && modes.length > 0)
 }
@@ -85,6 +92,7 @@ function is_single_mode(values: ParsedValues['values']): boolean {
 interface CutExtras {
 	is_implementation: boolean
 	handoff_path?: string | undefined
+	deliverable_url?: string | undefined
 }
 
 // The cut and the resume both take the sole positional issue; the cut also carries its extras.
@@ -112,6 +120,7 @@ function to_request(parsed: ParsedValues): Request | undefined {
 	return issue_request(kind, parsed.positionals, {
 		is_implementation: parsed.values.impl === true,
 		handoff_path: parsed.values.handoff,
+		deliverable_url: parsed.values.deliverable,
 	})
 }
 
