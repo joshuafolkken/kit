@@ -209,7 +209,22 @@ describe('run_chain_cli.run — the ledger line', () => {
 			issue: 5630,
 			join: false,
 			elapsed_ms: expect.any(Number) as number,
+			stages: expect.any(Array) as Array<unknown>,
 		})
+	})
+
+	// joshuafolkken/kit#7736: the line carries each stage that ran, the stopped one last.
+	it('records the stages that ran through the stopped one', async () => {
+		const record = recorded()
+
+		stop_at(CHECK_RELATED)
+		await run_chain_cli.run([ISSUE, FROM, CHECK_RELATED])
+
+		expect(record).toHaveBeenCalledWith(
+			expect.objectContaining({
+				stages: [expect.objectContaining({ name: CHECK_RELATED }) as unknown],
+			}),
+		)
 	})
 
 	it('records nothing when the arguments are refused', async () => {

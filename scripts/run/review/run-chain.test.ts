@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { run_chain, type ChainStage } from './run-chain'
+import { describe, expect, it, vi } from 'vitest'
+import { run_chain, type ChainStage, type StageRunner } from './run-chain'
 
 const SELFCHECK = 'review:selfcheck'
 const CHECK_RELATED = 'check:related'
@@ -31,6 +31,22 @@ describe('run_chain', () => {
 
 	it('answers undefined for a --from no stage carries', () => {
 		expect(run_chain.stages_from(run_chain.main_line_stages([]), RUN_CUT)).toBeUndefined()
+	})
+
+	it('times each stage that ran in order, the stopped stage included', async () => {
+		const runner = vi.fn<StageRunner>(async (argv) => ({
+			code: argv[0] === CHECK_RELATED ? STOP_EXIT : 0,
+			out: '',
+		}))
+		const chain = await run_chain.run_stages(run_chain.review_stages([]), ISSUE, vi.fn(), runner)
+
+		expect(chain.stop?.stage.name).toBe(CHECK_RELATED)
+		expect(chain.stages.map((stage) => stage.name)).toStrictEqual([SELFCHECK, CHECK_RELATED])
+		expect(chain.stages.every((stage) => stage.elapsed_ms >= 0)).toBe(true)
+		expect(chain.stages.map((stage) => Number.isNaN(Date.parse(stage.at)))).toStrictEqual([
+			false,
+			false,
+		])
 	})
 
 	it('opens the stop report with the invocation, not an Issue citation', () => {
