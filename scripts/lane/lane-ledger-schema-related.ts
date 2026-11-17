@@ -36,6 +36,10 @@ const test_related_schema = z.object({
 	// The files past the cap it left at their whole reach, each with that reach, widest first — absent
 	// where there were none and on rows written before it (joshuafolkken/kit#7639).
 	full_reach: z.array(full_reach_schema).optional(),
+	// The changed file that added the most test files to the run, and that number — absent where no
+	// reach was read and on rows written before it (joshuafolkken/kit#7735).
+	widest_file: z.string().optional(),
+	widest_tests: z.number().optional(),
 	// The branch change read beside the run, by half and by base (joshuafolkken/kit#6982).
 	branch_tracked: z.number().optional(),
 	branch_untracked: z.number().optional(),

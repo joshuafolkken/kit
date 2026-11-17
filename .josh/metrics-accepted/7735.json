@@ -1,0 +1,7 @@
+{
+	"reason": "test:related closing line and ledger widest fields (#7735): a new summary module and the cap's per-file reach",
+	"date": "2026-11-17",
+	"growth": {
+		"scripts.code_lines": 52
+	}
+}

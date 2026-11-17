@@ -3,6 +3,7 @@ import { epic_report, type EpicNextResult } from '#scripts/epic/epic-report'
 import { epic_triage } from '#scripts/epic/epic-triage'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { BUG_LABEL, has_label_name, RUN_LANE_LABEL } from '#scripts/issue/issue-labels'
+import { session_language } from '#scripts/josh/session-language'
 
 // The mechanical half of the triage gate (joshuafolkken/kit#5517).
 //
@@ -38,20 +39,44 @@ function names_gate_path(body: string): boolean {
 	return GATE_PATHS.some((path) => body.includes(path))
 }
 
+// Only the sentences are for a person to read, so only they follow the session language; the label
+// names stay English (joshuafolkken/kit#7703).
+function is_japanese(): boolean {
+	return session_language.is_japanese(session_language.resolve_session_lang().lang)
+}
+
+function no_bug_reason(): string {
+	return is_japanese()
+		? `\`${BUG_LABEL}\` ラベルが付いていない`
+		: `it carries no \`${BUG_LABEL}\` label`
+}
+
+function no_gate_path_reason(): string {
+	return is_japanese()
+		? `\`${BUG_LABEL}\` だが、本文が検証ゲートのパスを挙げていない`
+		: `it is a \`${BUG_LABEL}\`, but its body names no verification-gate path`
+}
+
 // The condition the candidate lacks, or `undefined` when only a judgment can answer.
 function lane_reason(child: EpicChild): string | undefined {
-	if (!has_label_name(child.labels, BUG_LABEL)) return `it carries no \`${BUG_LABEL}\` label`
+	if (!has_label_name(child.labels, BUG_LABEL)) return no_bug_reason()
 	if (child.body === undefined || names_gate_path(child.body)) return undefined
 
-	return `it is a \`${BUG_LABEL}\`, but its body names no verification-gate path`
+	return no_gate_path_reason()
 }
+
+const JAPANESE_SOLO_NOTE =
+	'`run:solo` には `backlogrun-lanes.md` →「A solo run」の 3 条件がすべて要るため、判断セッションは起動していない。'
+const ENGLISH_SOLO_NOTE =
+	'`run:solo` needs all three conditions of `backlogrun-lanes.md` → "A solo run", so no judgment session was woken.'
 
 // `issue_comment` appends the run marker itself.
 function comment_of(reason: string): string {
-	return [
-		`Triaged mechanically to \`${RUN_LANE_LABEL}\`: ${reason}.`,
-		'`run:solo` needs all three conditions of `backlogrun-lanes.md` → "A solo run", so no judgment session was woken.',
-	].join('\n')
+	return is_japanese()
+		? [`機械的に \`${RUN_LANE_LABEL}\` へトリアージした: ${reason}。`, JAPANESE_SOLO_NOTE].join(
+				'\n',
+			)
+		: [`Triaged mechanically to \`${RUN_LANE_LABEL}\`: ${reason}.`, ENGLISH_SOLO_NOTE].join('\n')
 }
 
 // The labels the candidate carries once decided, or `undefined` to leave it for the judgment. They are
