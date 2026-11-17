@@ -34,7 +34,7 @@ interface ParkLoop {
 type Kind = (comment: IssueComment) => boolean
 
 function is_park(comment: IssueComment): boolean {
-	return comment.is_trusted === true && run_park_body.problem_of(comment.body) === undefined
+	return comment.is_trusted === true && run_park_body.is_park(comment.body)
 }
 
 function is_adopt(comment: IssueComment): boolean {
