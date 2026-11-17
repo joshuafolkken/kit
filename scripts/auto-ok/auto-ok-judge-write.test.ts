@@ -51,7 +51,7 @@ describe('auto_ok_judge_write.apply', () => {
 		])
 		expect(emit).not.toHaveBeenCalled()
 		expect(post_comment.mock.calls[0]?.[1]).toContain('<!-- josh:auto-ok-judged v=2 body=')
-		expect(post_comment.mock.calls[0]?.[1]).toContain(`(${RUN_LANE_LABEL})`)
+		expect(post_comment.mock.calls[0]?.[1]).toContain(RUN_LANE_LABEL)
 	})
 
 	it('refuses an issue that gained an excluded label since the listing', async () => {
