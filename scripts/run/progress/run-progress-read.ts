@@ -81,8 +81,23 @@ async function to_child(issue: OpenIssueData): Promise<ChildObservation> {
 	return { issue: number, title: issue.title, labels: to_labels(issue), pr_state: child.pr_state }
 }
 
+// The issue whose run holds this work tree: a run handed off on a parked issue works here while its
+// `needs-decision` is still on, so the labels alone would not count it (joshuafolkken/kit#7694).
+async function held_issue(): Promise<string | undefined> {
+	const worktree = await worktree_git_directory()
+	if (worktree === undefined) return undefined
+
+	const read = run_hold.read_hold(run_hold.hold_path(worktree))
+
+	return read.kind === 'held' && !run_hold.is_stop_marked(read.hold) ? read.hold.issue : undefined
+}
+
 async function read_children(repo: string): Promise<ReadonlyArray<ChildObservation> | undefined> {
-	const read = await epic_busy.read_repository(repo)
+	const held = await held_issue()
+	const read = await epic_busy.read_repository(
+		repo,
+		(issue) => epic_busy.is_holder(issue) || String(issue.number) === held,
+	)
 
 	if (read.kind === 'idle') return []
 	if (read.kind !== 'busy') return undefined

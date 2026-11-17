@@ -40,6 +40,14 @@ function stopped(status: ItemStatus, ended_ms: number, reason?: string): ItemSta
 	}
 }
 
+// joshuafolkken/kit#7694: a lane closed before the row's run started is an earlier child's ending — a
+// run handed off in the main tree on the same issue is not stopped by it.
+function ending_of(end: LaneEnd | undefined, status: ItemStatus): LaneEnd | undefined {
+	if (end === undefined || status.started_ms === undefined) return end
+
+	return end.ended_ms < status.started_ms ? undefined : end
+}
+
 // A running lane no child is working in is stopped whatever the stream last said: a child that died or
 // was closed writes no ending. A record that ended the lane dates the stop and names who ended it;
 // otherwise the lane stopped by the time it was first read idle, or its transcript's last write if
@@ -50,7 +58,8 @@ function lane_status(
 	end: LaneEnd | undefined,
 ): ItemStatus {
 	if (status.state !== 'running') return status
-	if (end !== undefined) return stopped(status, end.ended_ms, end.by)
+	const ending = ending_of(end, status)
+	if (ending !== undefined) return stopped(status, ending.ended_ms, ending.by)
 
 	return idle_ms === undefined
 		? status
