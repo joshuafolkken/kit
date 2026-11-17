@@ -217,7 +217,11 @@ describe('test_related_cap.capped_importers with no direct importer', () => {
 			reader,
 		)
 
-		expect(capped).toEqual({ ...test_related_cap.NO_CAP, full_reach: [PAST_LONE] })
+		expect(capped).toEqual({
+			...test_related_cap.NO_CAP,
+			full_reach: [PAST_LONE],
+			reach: [PAST_LONE],
+		})
 		expect(reader).toHaveBeenCalledOnce()
 	})
 })
@@ -236,13 +240,16 @@ describe('test_related_cap.capped_importers keeping full reach', () => {
 		await git_fixture_workspace.close_workspace(fixture)
 	})
 
+	// joshuafolkken/kit#7735: `reach` reads what each file adds — a narrowed one its direct importers.
 	it('keeps a file no test imports directly with its reach, beside a narrowed one', async () => {
 		const files = [WIDE_MODULE, LONE_MODULE]
 		const reader = reader_of(MAX_TEST_FILES + 1)
 		const capped = await test_related_cap.capped_importers(fixture.workspace, files, false, reader)
+		const importers = capped.importers.get(WIDE_MODULE) ?? []
 
 		expect(capped.over_cap).toEqual([WIDE_MODULE])
 		expect(capped.full_reach).toEqual([PAST_LONE])
+		expect(capped.reach).toEqual([{ file: WIDE_MODULE, count: importers.length }, PAST_LONE])
 	})
 
 	it('keeps a file whose imports changed with its reach', async () => {

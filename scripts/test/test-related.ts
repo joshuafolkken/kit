@@ -304,12 +304,14 @@ function owed_of(red: RedReading | undefined): ReadonlyArray<string> {
 	return red?.owed ?? []
 }
 
-// What the cap narrowed and what it left whole, for the ledger row (joshuafolkken/kit#7639).
+// What the cap narrowed, what it left whole (joshuafolkken/kit#7639) and what each changed file added
+// (joshuafolkken/kit#7735), for the closing line and the ledger row.
 function cap_record({
 	over_cap,
 	full_reach,
-}: CappedImporters): Pick<RelatedInput, 'over_cap' | 'full_reach'> {
-	return { over_cap, full_reach }
+	reach,
+}: CappedImporters): Pick<RelatedInput, 'over_cap' | 'full_reach' | 'reach'> {
+	return { over_cap, full_reach, reach }
 }
 
 async function read_run_input(
