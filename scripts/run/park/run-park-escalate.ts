@@ -88,12 +88,9 @@ function english_prose(issue: string): CommentProse {
 }
 
 function japanese_prose(issue: string): CommentProse {
-	const live = run_stalled.resume_of(issue, true)
-	const plain = run_stalled.resume_of(issue, false)
-
 	return {
 		lead: `\`${RUN_STALLED_LABEL}\` で park しました: worker が、この Issue にはより強い josh.worker プロファイルが要ると宣言しました。`,
-		next: `backlogrun のドライブが \`worker:<name>\` プロファイルを一つ上げて再開し、最上位のプロファイルなら人に回します。ドライブが無いときは、より強いプロファイルを与え、原因を直してから、稼働中の backlogrun では \`${live}\`、それ以外では \`${plain}\` で再開してください。`,
+		next: `backlogrun のドライブが \`worker:<name>\` プロファイルを一つ上げて再開し、最上位のプロファイルなら人に回します。ドライブが無いときは、より強いプロファイルを与え、${run_stalled.next_step_ja(issue)}`,
 	}
 }
 
