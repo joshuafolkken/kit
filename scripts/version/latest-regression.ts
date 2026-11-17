@@ -34,26 +34,18 @@ function to_floor(range: string | undefined): semver.SemVer | undefined {
 	}
 }
 
-// The same minimum-age gate also hides a fresh stable major while an older prerelease of it has
-// aged past the gate; `--latest` then moves a stable range onto that prerelease. A range that was
-// never a prerelease must not become one, so that move is kept back like a downgrade.
-function is_new_prerelease(before: semver.SemVer, after: semver.SemVer): boolean {
-	return before.prerelease.length === 0 && after.prerelease.length > 0
-}
-
 function is_regression(before_range: string | undefined, after_range: string | undefined): boolean {
 	const before = to_floor(before_range)
 	const after = to_floor(after_range)
 
 	if (before === undefined || after === undefined) return false
 
-	return semver.lt(after, before) || is_new_prerelease(before, after)
+	return semver.lt(after, before)
 }
 
 /**
  * Compare the direct dependencies of two package.json revisions and report every entry whose
- * version floor moved down, or moved from a stable version onto a prerelease. Packages added or
- * removed between the two are not regressions.
+ * version floor moved down. Packages added or removed between the two are not regressions.
  */
 function find_regressions(before_content: string, after_content: string): Array<VersionRegression> {
 	const before = read_direct_dependencies(before_content)
@@ -85,7 +77,6 @@ function format_kept_back_notice(regressions: ReadonlyArray<VersionRegression>):
 
 	return [
 		`\n⏮ Keeping ${list} — the newest allowed version is older than the installed one.`,
-		'   (or is a prerelease the installed stable range never asked for).',
 		'   The update was rolled back and no dependency changed: while a pin sits above the newest',
 		'   allowed version, the whole tree cannot be resolved. Re-run once the newer release is',
 		'   no longer withheld.',
@@ -94,6 +85,7 @@ function format_kept_back_notice(regressions: ReadonlyArray<VersionRegression>):
 
 const latest_regression = {
 	read_direct_dependencies,
+	to_floor,
 	find_regressions,
 	format_kept_back_notice,
 }

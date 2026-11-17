@@ -13,6 +13,7 @@ import { overrides_files } from '#scripts/overrides/overrides-files'
 import { overrides_check } from '#scripts/overrides/overrides-logic'
 import { execaSync } from 'execa'
 import { fresh_metadata_cache } from './fresh-metadata-cache'
+import { latest_prerelease } from './latest-prerelease'
 import { latest_regression, type VersionRegression } from './latest-regression'
 import { playwright_browsers } from './playwright-browsers'
 import { safe_chain_version_update } from './safe-chain-version-update'
@@ -92,6 +93,19 @@ function find_regressions_after_update(snapshot: TreeSnapshot): Array<VersionReg
 	return latest_regression.find_regressions(snapshot.package_json, after)
 }
 
+// The installed stable version is still allowed, so the put-back range resolves and only those
+// entries are re-installed; the rest of the update stays (`latest-prerelease.ts`).
+function keep_stable_ranges(snapshot: TreeSnapshot): number {
+	const after = readFileSync(PACKAGE_JSON, 'utf8')
+	const kept = latest_prerelease.find_new_prereleases(snapshot.package_json, after)
+	if (kept.length === 0) return 0
+
+	writeFileSync(PACKAGE_JSON, latest_prerelease.with_stable_ranges(after, kept))
+	console.info(latest_prerelease.format_stable_kept_notice(kept))
+
+	return fresh_metadata_cache.run_in_fresh_cache([['pnpm', 'install']], run_update_stages)
+}
+
 // Rolling the whole update back rather than retrying without the offender: excluding a package from
 // the update targets does not exclude it from resolution, and while its installed version sits above
 // the newest allowed one that version is unresolvable, so a retry can only fail with
@@ -105,7 +119,10 @@ function update_without_downgrading(snapshot: TreeSnapshot): UpdateOutcome {
 	if (status !== 0) return { status, is_rolled_back: false }
 
 	const regressions = find_regressions_after_update(snapshot)
-	if (regressions.length === 0) return { status, is_rolled_back: false }
+
+	if (regressions.length === 0) {
+		return { status: keep_stable_ranges(snapshot), is_rolled_back: false }
+	}
 
 	restore_snapshot(snapshot)
 	report_kept_back(regressions)

@@ -56,30 +56,24 @@ describe('latest_regression.find_regressions — the downgrade case', () => {
 	})
 })
 
+// A stable range moving onto a prerelease is kept back per entry (`latest-prerelease.ts`), not by
+// the whole-tree rollback a downgrade forces (joshuafolkken/kit#7693).
 describe('latest_regression.find_regressions — the prerelease case', () => {
-	// The defect this exists for: the stable major is inside the minimum release age while an older
-	// prerelease of it is not, and `--latest` moves a stable range onto that prerelease.
-	it('reports a stable range that moved onto a prerelease', () => {
+	it('does not report a stable range that moved onto a newer prerelease as a downgrade', () => {
 		const before = manifest({}, { [STYLISTIC]: '^5.10.0' })
 		const after = manifest({}, { [STYLISTIC]: BETA_RANGE })
 
-		expect(latest_regression.find_regressions(before, after)).toStrictEqual([
-			{ name: STYLISTIC, kept: '^5.10.0', offered: BETA_RANGE },
-		])
-	})
-
-	it('reports nothing when a prerelease range moves to a newer prerelease', () => {
-		const before = manifest({ [STYLISTIC]: '^6.0.0-beta.5' })
-		const after = manifest({ [STYLISTIC]: BETA_RANGE })
-
 		expect(latest_regression.find_regressions(before, after)).toStrictEqual([])
 	})
+})
 
-	it('reports nothing when a prerelease range moves to the stable release', () => {
-		const before = manifest({ [STYLISTIC]: BETA_RANGE })
-		const after = manifest({ [STYLISTIC]: '^6.0.0' })
+describe('latest_regression.to_floor', () => {
+	it('reads the lowest version a range allows', () => {
+		expect(latest_regression.to_floor(BETA_RANGE)?.version).toBe('6.0.0-beta.6')
+	})
 
-		expect(latest_regression.find_regressions(before, after)).toStrictEqual([])
+	it('yields undefined for a range semver cannot read', () => {
+		expect(latest_regression.to_floor('git+ssh://host/repo')).toBeUndefined()
 	})
 })
 
