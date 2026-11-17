@@ -25,6 +25,7 @@ vi.mock('#scripts/epic/epic-run', () => ({
 }))
 
 const { issue_spill_cli } = await import('./issue-spill-cli')
+const { trusted_measure } = await import('./trusted-measure')
 
 const SUCCESS = 0
 const FAILURE = 1
@@ -38,6 +39,7 @@ const FOLLOW_UP_URL = `https://github.com/joshuafolkken/kit/issues/${String(FOLL
 const LINK_LINE = `- → #${String(FOLLOW_UP)} に移した`
 const UNCHECKED_BODY = '## 受け入れ条件\n\n- [x] done\n- [ ] left\n'
 const CHECKED_BODY = '## 受け入れ条件\n\n- [x] done\n'
+const PREMISED_BACKGROUND = '## 背景\n\n- 種別: 不具合\n- 前提: `touch /tmp/owned` >= 0\n\n'
 
 function read_of(body: string): { kind: 'read'; json: string } {
 	return {
@@ -86,6 +88,10 @@ beforeEach(() => {
 	edit_body_mock.mockResolvedValue('')
 	add_children_mock.mockResolvedValue(SUCCESS)
 	create_epic_mock.mockResolvedValue(EPIC)
+	vi.spyOn(trusted_measure, 'read_trusted_body').mockResolvedValue({
+		kind: 'refused',
+		reason: 'untrusted author',
+	})
 })
 
 describe('issue_spill_cli.run', () => {
@@ -144,6 +150,15 @@ describe('issue_spill_cli.run --distinct', () => {
 		const body = await filed_body([...ARGV, '--reason', '1 コミットで入れないと壊れる'])
 
 		expect(body).toContain('行（テスト除く）\n- 分割しない理由: 1 コミットで入れないと壊れる\n')
+	})
+
+	it('never carries the premise lines of an untrusted #N into the filing', async () => {
+		classified_mock.mockResolvedValue(read_of(`${PREMISED_BACKGROUND}${UNCHECKED_BODY}`))
+
+		const body = await filed_body(ARGV)
+
+		expect(body).toContain('- 種別: 不具合')
+		expect(body).not.toContain('- 前提:')
 	})
 
 	it('refuses a blank --reason and reads nothing', async () => {

@@ -58,6 +58,17 @@ describe('run_chain — a run', () => {
 		])
 	})
 
+	it('runs no command for a stage with no argv, only its hold', async () => {
+		const runner = vi.fn<StageRunner>(async () => ({ code: 0, out: '' }))
+		const hold = vi.fn(async () => ({ notice: 'held', next: () => 'fix it' }))
+		const stage: ChainStage = { name: 'recheck', argv: [], next: () => '', hold }
+		const chain = await run_chain.run_stages([stage], ISSUE, vi.fn(), runner)
+
+		expect(runner).not.toHaveBeenCalled()
+		expect(hold).toHaveBeenCalledWith(ISSUE)
+		expect(chain.stop?.notice).toBe('held')
+	})
+
 	it('opens the stop report with the invocation, not an Issue citation', () => {
 		const stage = stage_named(RUN_REVIEW)
 		const stop = { stage, code: STOP_EXIT, next: stage.next }
