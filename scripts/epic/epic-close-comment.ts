@@ -2,6 +2,7 @@ import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { rest_comment_schema, type RestCommentData } from '#scripts/git/git-schemas'
 import { read_json_listing } from '#scripts/git/parse-json-array'
 import { issue_cite } from '#scripts/issue/issue-cite'
+import { session_language } from '#scripts/josh/session-language'
 import { epic_parse, type ExternalChild } from './epic-parse'
 
 // The comment the epic auto-close announces itself with, and how a run recognizes the one a previous
@@ -25,7 +26,12 @@ interface EpicChildren {
 // auto-close output in ordinary issue comments, and matching prose made any such quote answer
 // "already announced" — the epic then closed with no comment, losing the record of which children it
 // closed against.
-const CLOSE_ANNOUNCEMENT = 'Closing this epic automatically.'
+//
+// Only the prose is for a person to read, so only it follows the session language; the marker below
+// and the frozen legacy pattern are what the retry check matches, and stay English
+// (joshuafolkken/kit#7705).
+const JAPANESE_CLOSE_ANNOUNCEMENT = 'この epic を自動で閉じます。'
+const ENGLISH_CLOSE_ANNOUNCEMENT = 'Closing this epic automatically.'
 
 // The marker, which GitHub renders as nothing at all. Quoting the sentence above therefore does not
 // suppress anything: what is quoted is the rendered text, and the marker is not in it.
@@ -87,9 +93,17 @@ function is_same_children(left: ReadonlyArray<string>, right: ReadonlyArray<stri
 	return left_set.size === right_set.size && [...left_set].every((one) => right_set.has(one))
 }
 
+function close_prose(references: string): string {
+	const { lang } = session_language.resolve_session_lang()
+
+	return session_language.is_japanese(lang)
+		? `子 Issue がすべて閉じました（${references}）。${JAPANESE_CLOSE_ANNOUNCEMENT}`
+		: `All child issues are closed (${references}). ${ENGLISH_CLOSE_ANNOUNCEMENT}`
+}
+
 // The prose the reader sees, then the marker the next run matches on.
 function build_close_comment(epic: EpicChildren): string {
-	return `All child issues are closed (${child_references(epic).join(', ')}). ${CLOSE_ANNOUNCEMENT}\n\n${build_marker(epic)}`
+	return `${close_prose(child_references(epic).join(', '))}\n\n${build_marker(epic)}`
 }
 
 // MIGRATION ONLY — remove together with `is_legacy_announcement`.
@@ -196,4 +210,4 @@ const epic_close_comment = {
 }
 
 export type { CloseCommentState, EpicChildren }
-export { epic_close_comment, CLOSE_ANNOUNCEMENT }
+export { epic_close_comment, ENGLISH_CLOSE_ANNOUNCEMENT, JAPANESE_CLOSE_ANNOUNCEMENT }
