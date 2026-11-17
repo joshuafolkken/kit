@@ -111,7 +111,7 @@ const STATIC_CHECKS: ReadonlyArray<GateCheck> = [
 		label: METRICS_LABEL,
 		target: METRICS_LABEL,
 		args: ['--no-startup'],
-		reserved_cores: core_weights.CORE_WEIGHTS.eslint_scan,
+		reserved_cores: core_weights.CORE_WEIGHTS.metrics,
 		memory_mb: core_weights.MEMORY_MB.metrics,
 		is_kit_only: true,
 		is_whole_tree: true,

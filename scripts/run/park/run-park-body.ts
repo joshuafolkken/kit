@@ -68,6 +68,10 @@ const AUTO_PERMISSION = 'なし'
 // taking it, so the lane must not resume before the parent has (joshuafolkken/kit#7001).
 const PARENT_PERMISSION = '親'
 const PARENT_ACTION_NOTE = ' · 親の操作'
+// A child cannot file an Issue, so an option naming `issue:file` is the parent's filing
+// (joshuafolkken/kit#7771): written with the parent permission, and adopted only once the Issue it
+// files exists.
+const FILING_COMMAND = 'issue:file'
 
 const FORMAT = [
 	'Park body schema:',
@@ -190,13 +194,28 @@ function approval_problem(approval: ParkApproval | undefined, name: string): str
 	return missing === undefined ? undefined : `${name} has no "${missing[1]}" line`
 }
 
+function is_parent_action(option: ParkOption | undefined): boolean {
+	return option?.permission?.startsWith(PARENT_PERMISSION) === true
+}
+
+function names_filing(option: ParkOption | undefined): boolean {
+	return option?.permission?.includes(FILING_COMMAND) === true
+}
+
+// A filing option written as anything but the parent's: adopting it would requeue with nothing filed.
+function filing_problem(option: ParkOption, name: string): string | undefined {
+	if (!names_filing(option) || is_parent_action(option)) return undefined
+
+	return `${name} names ${FILING_COMMAND}, which a child cannot run; write "- 必要な権限: ${PARENT_PERMISSION}（${FILING_COMMAND} …）"`
+}
+
 function option_problem(option: ParkOption): string | undefined {
 	const name = `option ${String(option.number)}`
 
 	if (option.tier === undefined) return `${name} has no "- 層: A|B|C" line`
 	if (option.permission === undefined) return `${name} has no "- 必要な権限: …" line`
 
-	return approval_problem(option.approval, name)
+	return filing_problem(option, name) ?? approval_problem(option.approval, name)
 }
 
 function is_listed(park: ParkBody, number: number | undefined): boolean {
@@ -230,10 +249,6 @@ function picked_option(body: string): ParkOption | undefined {
 	return park.options.find((candidate) => candidate.number === number)
 }
 
-function is_parent_action(option: ParkOption | undefined): boolean {
-	return option?.permission?.startsWith(PARENT_PERMISSION) === true
-}
-
 // The recommended option and its tier, or no recommendation; `undefined` for a body off the schema.
 function summary_of(body: string): string | undefined {
 	if (problem_of(body) !== undefined) return undefined
@@ -248,6 +263,13 @@ function summary_of(body: string): string | undefined {
 // Whether option `number` needs the parent's own action before the lane may resume.
 function parent_action(body: string, number: number): boolean {
 	return is_parent_action(parse(body).options.find((candidate) => candidate.number === number))
+}
+
+// Whether option `number` is the parent's filing of an Issue the child then waits on.
+function filing_action(body: string, number: number): boolean {
+	const option = parse(body).options.find((candidate) => candidate.number === number)
+
+	return is_parent_action(option) && names_filing(option)
 }
 
 function is_parents(option: ParkOption): boolean {
@@ -337,6 +359,7 @@ const run_park_body = {
 	approval_range,
 	auto_pick,
 	default_pick,
+	filing_action,
 	parent_action,
 	problem_of,
 	summary_of,

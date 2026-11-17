@@ -28,9 +28,16 @@ async function read(issue: string): Promise<ParkRead> {
 		: { comments, body }
 }
 
-// An option needing the parent's own action is refused without `--done` (joshuafolkken/kit#7001).
+// An option needing the parent's own action is refused without `--done` (joshuafolkken/kit#7001);
+// a filing option's `--done` names the open Issue filed (joshuafolkken/kit#7771).
+function done_of(option: number, body: string): string {
+	if (run_park_body.filing_action(body, option)) return ' --done "filed #<M>"'
+
+	return run_park_body.parent_action(body, option) ? ' --done <the parent action taken>' : ''
+}
+
 function adopt_line(issue: string, option: number, body: string): string {
-	const done = run_park_body.parent_action(body, option) ? ' --done <the parent action taken>' : ''
+	const done = done_of(option, body)
 
 	return `pnpm josh backlog:triage --apply ${issue} --adopt ${String(option)} --reason <text>${done}`
 }

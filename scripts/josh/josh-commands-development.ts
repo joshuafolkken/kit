@@ -93,7 +93,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 			'developer',
 			['files'],
 		],
-		core_weight: core_weights.CORE_WEIGHTS.eslint_scan,
+		core_weight: core_weights.CORE_WEIGHTS.metrics,
 		memory_mb: core_weights.MEMORY_MB.metrics,
 		is_kit_only: true,
 		usage: {
