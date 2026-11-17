@@ -1,0 +1,9 @@
+{
+	"reason": "#7771 adds the filing check on park bodies and backlog:triage --adopt (new backlog-triage-filing.ts) and documents the --done \"filed #<M>\" form",
+	"date": "2026-11-17",
+	"growth": {
+		"scripts.code_lines": 70,
+		"ai_cost.on_demand_bytes": 113,
+		"prose.long_paragraphs": 1
+	}
+}

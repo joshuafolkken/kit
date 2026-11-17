@@ -13,6 +13,9 @@ vi.mock('#scripts/run/carry/run-carry', () => ({
 		read_carry: vi.fn(() => carry),
 	},
 }))
+vi.mock('#scripts/issue/issue-state-cli', () => ({
+	issue_state_cli: { read_issue: vi.fn() },
+}))
 vi.mock('#scripts/gh/git-gh-issue-read', () => ({
 	git_gh_issue_read: { issue_list_comments: vi.fn(async () => '[]') },
 }))
@@ -20,7 +23,14 @@ vi.mock('#scripts/issue/issue-read', () => ({
 	issue_read: { parse_comments: vi.fn(), trusted_bodies: vi.fn() },
 }))
 vi.mock('#scripts/epic/epic-blocked-by', () => ({
-	epic_blocked_by: { listing_epics: vi.fn() },
+	epic_blocked_by: {
+		listing_epics: vi.fn(),
+		record: vi.fn(async () => {
+			order.push('block')
+
+			return 'recorded'
+		}),
+	},
 }))
 vi.mock('#scripts/epic/epic-decide', () => ({
 	epic_decide: {
@@ -63,6 +73,7 @@ const { epic_decide } = await import('#scripts/epic/epic-decide')
 const { josh_command } = await import('#scripts/josh/josh-run')
 const { backlog_triage_approval } = await import('./backlog-triage-approval')
 const { backlog_triage_cli } = await import('./backlog-triage-cli')
+const { issue_state_cli } = await import('#scripts/issue/issue-state-cli')
 
 const ISSUE = '6670'
 const EPIC = 6672
@@ -268,6 +279,80 @@ describe("backlog:triage --apply --adopt — an option needing the parent's acti
 
 		expect(order).toStrictEqual([])
 		expect(console.error).toHaveBeenCalledWith(expect.stringContaining('needs no parent action'))
+	})
+})
+
+// joshuafolkken/kit#7771: the #7729 park (06:27Z) with its filing option written as the parent's,
+// adopted at 06:30Z — the child waits on the filed Issue instead of a requeue.
+const FILED = '7780'
+const FILING_PARK = [
+	'### 選択肢',
+	'1. 親が割り込み Issue を起票して直す（premise の読み取りを `lane:stats` の表の形に合わせる）。',
+	'   - 層: A',
+	'   - 必要な権限: 親（`issue:file --route interrupt --label priority:high --blocks-finder`）',
+	'### 推奨',
+	'1 the premise reader is the defect',
+].join('\n')
+
+function adopt_filing(done: string): Promise<number> {
+	return backlog_triage_cli.run([...adopt_argv('1'), '--done', done], DIRECTORY)
+}
+
+function state_of(state: string): void {
+	vi.mocked(issue_state_cli.read_issue).mockResolvedValue({
+		kind: 'state',
+		state: { state, labels: [], is_human_review: false },
+	})
+}
+
+function filing_setup(): void {
+	vi.mocked(issue_read.trusted_bodies).mockReturnValue([FILING_PARK])
+	state_of('OPEN')
+}
+
+describe('backlog:triage --apply --adopt — a filing option refused', () => {
+	beforeEach(filing_setup)
+
+	it('refuses --done naming no filed Issue before any write (ac-f60137c3)', async () => {
+		await expect(adopt_filing('filed the interrupt')).resolves.toBe(1)
+
+		expect(order).toStrictEqual([])
+		expect(console.error).toHaveBeenCalledWith(
+			expect.stringContaining(`--route interrupt --found-during ${ISSUE} --blocks-finder`),
+		)
+	})
+
+	it('refuses a filed Issue that is not open before any write', async () => {
+		state_of('CLOSED')
+
+		await expect(adopt_filing(`filed #${FILED}`)).resolves.toBe(1)
+
+		expect(order).toStrictEqual([])
+		expect(console.error).toHaveBeenCalledWith(expect.stringContaining('is not open'))
+	})
+})
+
+describe('backlog:triage --apply --adopt — a filing option adopted', () => {
+	beforeEach(filing_setup)
+
+	it('blocks the child by the filed Issue and does not requeue it (ac-56f562fb, ac-1418c989)', async () => {
+		await expect(adopt_filing(`filed #${FILED}`)).resolves.toBe(0)
+
+		expect(order).toStrictEqual(['decide', 'clear', 'block'])
+		expect(josh_command.josh_run).not.toHaveBeenCalled()
+		expect(epic_blocked_by.record).toHaveBeenCalledWith(
+			expect.objectContaining({ issue: ISSUE, prerequisite: FILED }),
+		)
+		expect(console.info).toHaveBeenCalledWith(expect.stringContaining('not requeued'))
+	})
+
+	it('names what was written when the block fails', async () => {
+		vi.mocked(epic_blocked_by.record).mockRejectedValueOnce(new Error('gh down'))
+
+		await expect(adopt_filing(`filed #${FILED}`)).resolves.toBe(1)
+
+		expect(order).toStrictEqual(['decide', 'clear'])
+		expect(console.error).toHaveBeenCalledWith(expect.stringContaining('gh down'))
 	})
 })
 
