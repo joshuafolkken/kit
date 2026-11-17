@@ -95,7 +95,7 @@ Before checking, applies ESLint fixes and then Prettier to the resolved scope, u
 - A bare run on a tree it already answered (same file contents and base) runs nothing and prints `reused: tree <hash> <green|red> at <time>` with the kept verdict; a red one names its record to remove (`tree-verdict.ts`).
 - A bare run whose green record cannot narrow, here and in `josh test:related`, first prints `whole branch — since-green fell back: <reason>`.
 - Falls back to the whole tree (naming the case) when no changed file is lintable.
-- In kit, a green bare run also reports a metrics total grown past the merge-base (`josh metrics --totals-only`) as a notice; it changes no exit code and writes no approval file.
+- Measures no metrics totals: in kit, `josh run:review`'s open and the gate's `metrics` check stop on a total grown past the merge-base.
 - Also runs the fast byte-ceiling check on any changed agent-read document, sharing `document-byte-budget.ts`: a documentation update over its ceiling fails here in seconds, and the green record is withheld until both lint and the byte check pass.
 
 ### `josh lint:rule`
@@ -234,8 +234,6 @@ A section prints its check's last 5 lines, 40 on a failure; the log keeps the wh
 A tree it already answered runs no check, as in `josh lint:related`. A check whose green record still describes the tree is not run: its section reads `=== <check>: reused ===` and the verdict lists it `(reused: …)`.
 
 `lint:related` and `test:related` read their own scoped records, the type check and `cspell:dot` the gate's per-check records (written here on a pass). A record holds only for the same changed files (`.josh/` records included), merge base, and tool and environment fingerprint; any moved file reruns `cspell:dot`.
-
-In kit, `lint:related`'s metrics growth notice prints again above the verdict line, which then says `josh run:review`'s open stops on it (the ship's pre-detach as the backstop) and names `josh metrics --accept`.
 
 Unpinned places a `josh test:pinned` already answered on the current tree, which the ship's pre-detach would stop on, print there too, with the `josh ship --review … --unpinned-ok "<reason>"` form for the first ship; one still running prints nothing and is not waited on.
 

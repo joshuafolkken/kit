@@ -1014,6 +1014,11 @@ is adoptable. An option whose `必要な権限` starts with `親` is carried out
 `親（issue:close）` needs no `--done`; the adopt closes it, lane returned.
 A park body naming `issue:file` or `issue:close` under any other permission is refused. Recovery guidance prints only when a read is due.
 
+A lane park records its tree (`- Tree: <HEAD> · changes <n>`). If the latest park and the one before
+the last `--adopt` share it, the option was never taken: `--adopt` parks `run:stalled` (`park loop`, no
+auto-retry) instead of requeuing. A park with no tree line requeues. The yield cap misses this loop: it
+counts yields to a held lane in a time window, and park → adopt → relaunch is no yield.
+
 Run the pass at the initial plan and after each collection batch that parked a child. The driver
 hands back `triage` once per such batch before its next offer; a batch without parks adds no step,
 nor does a resume. Read each parked child's body and comments, then route:
