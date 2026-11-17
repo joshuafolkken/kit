@@ -13,12 +13,14 @@ import { run_board_span, type BoardSpan } from './run-board-span'
 
 // A single `fullrun #N` or `halfrun #N` has no carry record; the only record that says it is running
 // here is this checkout's hold (`run-hold.ts`), so the board draws it from there — no store of its own
-// (joshuafolkken/kit#6597). The hold marks a `fullrun` (`is_fullrun`); `run:entry` claims a `halfrun`
-// unmarked (`run-entry-children.ts`), so an unmarked numbered hold is one.
+// (joshuafolkken/kit#6597). The hold marks a `fullrun` (`is_fullrun`) and a `prrun` (`is_prrun` beside
+// it, joshuafolkken/kit#7724); `run:entry` claims a `halfrun` unmarked (`run-entry-children.ts`), so an
+// unmarked numbered hold is one. A `prrun`'s record written before `is_prrun` existed reads as a `fullrun`.
 
 const FULLRUN = 'fullrun'
 const HALFRUN = 'halfrun'
-const SINGLE_INVOCATION = /^(?<command>fullrun|halfrun) #(?<issue>\d+)$/u
+const PRRUN = 'prrun'
+const SINGLE_INVOCATION = /^(?<command>fullrun|halfrun|prrun) #(?<issue>\d+)$/u
 // The launch the board reads a row's running state from, placed before every event of the run.
 const LAUNCH_POSITION = 0
 const FREE_READ: HoldRead = { kind: 'free' }
@@ -41,6 +43,13 @@ interface EndedRoot extends SingleRun {
 // subprocess the redraw would wait on, as `run-board-read.ts`'s main work tree does.
 const directories = stamped_memo.create<Promise<string | undefined>>()
 
+// The command a hold's or an ended record's marks name.
+function command_of(mark: Pick<EndedHold, 'is_fullrun' | 'is_prrun'>): string {
+	if (mark.is_prrun === true) return PRRUN
+
+	return mark.is_fullrun === true ? FULLRUN : HALFRUN
+}
+
 // A held, numbered hold is a running run unless a stop marked it: a stopped `halfrun` or `prrun` keeps
 // its hold across a person's latency (`run_hold.is_stop_marked`), long after the run stopped.
 function is_running(read: HoldRead): read is Extract<HoldRead, { kind: 'held' }> {
@@ -56,10 +65,8 @@ function span_of(read: HoldRead): BoardSpan | undefined {
 
 	if (started_ms === undefined) return undefined
 
-	const command = read.hold.is_fullrun === true ? FULLRUN : HALFRUN
-
 	return {
-		invocation: `${command} ${issue_cite.plain_for('program', read.hold.issue)}`,
+		invocation: `${command_of(read.hold)} ${issue_cite.plain_for('program', read.hold.issue)}`,
 		started_ms,
 		ended_ms: undefined,
 	}
@@ -128,9 +135,7 @@ function ended_of(ended: EndedHold): EndedRoot | undefined {
 
 	if (started_ms === undefined || ended_ms === undefined) return undefined
 
-	const command = ended.is_fullrun === true ? FULLRUN : HALFRUN
-
-	return { command, issue: Number(ended.issue), started_ms, ended_ms }
+	return { command: command_of(ended), issue: Number(ended.issue), started_ms, ended_ms }
 }
 
 function is_inside(run: EndedRoot, span: BoardSpan): boolean {

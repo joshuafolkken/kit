@@ -25,6 +25,8 @@ const EXEMPT = new Set([
 	path.join('time-runtime', 'time-round-trips.ts'),
 	// A rank in a table.
 	path.join('package', 'package-scout-format.ts'),
+	// A ship attempt's number.
+	path.join('lane', 'lane-timeline-steps.ts'),
 	// A URL fragment.
 	path.join('safe-chain', 'preinstall-command.ts'),
 ])

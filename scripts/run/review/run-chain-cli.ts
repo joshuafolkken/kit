@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { project_checks } from '#scripts/gate/project-checks'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
@@ -8,7 +9,8 @@ import { run_ship_args } from '#scripts/run/ship/run-ship-args'
 import { run_chain, type ChainRun, type ChainStage, type ChainStop } from './run-chain'
 import { run_chain_join } from './run-chain-join'
 
-// `josh run:chain <N>` — `main:merge` (none in a lane child), `review:selfcheck`, `check:related` and `run:review` in one call
+// `josh run:chain <N>` — `main:merge` (none in a lane child), `review:selfcheck`, `check:related`,
+// `command:derive --check` (kit only) and `run:review` in one call
 // (`run-chain.ts`); `--join [--fixing]` runs the half after the review instead (`run-chain-join.ts`).
 // `--from <stage>` resumes at a stage after a stop the run settled; `--unpinned-ok "<reason>"` and
 // `--accept-metrics "<reason>"` go to `run:review` as given, so they open a review and never ride on
@@ -51,9 +53,13 @@ interface StopFields {
 // A lane child merges main in ship's sync, so its opening half is the review stages alone
 // (`chain-rule.md` → "A lane child").
 function opening_stages(review_args: ReadonlyArray<string>): ReadonlyArray<ChainStage> {
-	if (lane_child_marker.is_child_of(process.cwd())) return run_chain.review_stages(review_args)
+	const is_kit = project_checks.is_kit_repository(process.cwd())
 
-	return run_chain.main_line_stages(review_args)
+	if (lane_child_marker.is_child_of(process.cwd())) {
+		return run_chain.review_stages(review_args, is_kit)
+	}
+
+	return run_chain.main_line_stages(review_args, is_kit)
 }
 
 function flag_pair(flag: string, value: string | undefined): ReadonlyArray<string> {

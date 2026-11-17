@@ -1190,6 +1190,20 @@ It searches `.md` files and the comment lines under `prompts/`, `docs/`, `.claud
 
 Prints `file:line kind word` per reference, or `ok`. Exits 1 on a reference, 2 when the base or a search could not be read — a failed search is never `ok`.
 
+### `josh acceptance:check`
+
+<!-- usage: acceptance:check -->
+
+Check the ship body draft's acceptance map before the review: a criterion with no row stops it, a pending row passes.
+
+```bash
+pnpm josh acceptance:check   # → `acceptance:check: pass`, or ship's acceptance-map refusal naming each criterion with no row (exit 1)
+```
+
+<!-- /usage -->
+
+`josh ship`'s acceptance-map refusal (`acceptance_map_check.body_refusal`), asked of the body the next ship delivers — the ship body draft, else the open PR's — with a pending row counted as a row. `run:chain` runs it before `run:review`, so a criterion with no row stops there, not at ship's preflight. No body yet passes: ship writes every row.
+
 ### `josh review:selfcheck`
 
 <!-- usage: review:selfcheck -->

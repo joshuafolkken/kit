@@ -146,6 +146,21 @@ const REVIEW_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
+	'acceptance:check': {
+		script: 'scripts/review/acceptance-check-cli.ts',
+		description:
+			"Check the ship body draft's acceptance map before the review: a criterion with no row stops it, a pending row passes",
+		category: 'AI tools',
+		reference: ['', 'automation', ['none']],
+		usage: {
+			examples: [
+				{
+					arguments: '',
+					note: "→ `acceptance:check: pass`, or ship's acceptance-map refusal naming each criterion with no row (exit 1)",
+				},
+			],
+		},
+	},
 	'review:selfcheck': {
 		script: 'scripts/review/selfcheck-cli.ts',
 		description:
