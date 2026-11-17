@@ -1,3 +1,5 @@
+import { createRequire } from 'node:module'
+import path from 'node:path'
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { CI_KEY, playwright_config_fixture } from './playwright-config-fixture'
 
@@ -161,5 +163,63 @@ describe('playwright.config CI failure cap', () => {
 
 		expect(max_failures).toBeGreaterThanOrEqual(MIN_USEFUL_MAX_FAILURES)
 		expect(max_failures).toBeLessThanOrEqual(MAX_USEFUL_MAX_FAILURES)
+	})
+})
+
+// The config sits beside this file, so its directory is the checkout root the config anchors to.
+const CONFIG_ROOT = import.meta.dirname
+const FLUSH_TREE_E2E = path.join(
+	CONFIG_ROOT,
+	'.git/josh/observation-flush/tree/src/routes/security-headers.e2e.ts',
+)
+const PROJECT_E2E = path.join(CONFIG_ROOT, 'src/routes/security-headers.e2e.ts')
+
+async function load_test_ignore(): Promise<ReadonlyArray<string | RegExp>> {
+	const { testIgnore: test_ignore } = await playwright_config_fixture.import_config(
+		undefined,
+		undefined,
+	)
+
+	return [test_ignore ?? []].flat()
+}
+
+type FileMatcher = (file: string) => boolean
+
+// Playwright's own matcher (it prefixes `**/` to a string pattern before minimatch), reached through
+// `@playwright/test`'s resolution, so the assertion follows the matching Playwright actually does.
+function load_playwright_matcher(): (patterns: ReadonlyArray<string | RegExp>) => FileMatcher {
+	const playwright_require = createRequire(import.meta.resolve('@playwright/test'))
+	const { createFileMatcher: create_file_matcher } = playwright_require('playwright/lib/util') as {
+		createFileMatcher: (patterns: ReadonlyArray<string | RegExp>) => FileMatcher
+	}
+
+	return create_file_matcher
+}
+
+async function is_ignored(file: string): Promise<boolean> {
+	const patterns = await load_test_ignore()
+
+	return load_playwright_matcher()(patterns)(file)
+}
+
+// Regression guard for #7691: an interrupted observation flush retains its worktree under `.git`
+// with its own `node_modules`, and the bare `testMatch` glob loaded its E2E files, requiring a
+// second `@playwright/test` and failing every consumer's pre-push E2E.
+describe('playwright.config testIgnore', () => {
+	it('ignores E2E files inside a retained observation-flush worktree', async () => {
+		expect(await is_ignored(FLUSH_TREE_E2E)).toBe(true)
+	})
+
+	it('still collects the project E2E files', async () => {
+		expect(await is_ignored(PROJECT_E2E)).toBe(false)
+	})
+
+	// A run inside the flush worktree has `.git` in every path; only an anchored pattern leaves
+	// that worktree's own E2E files collectable.
+	it('anchors every pattern at the config directory', async () => {
+		const patterns = await load_test_ignore()
+
+		expect(patterns.length).toBeGreaterThan(0)
+		for (const pattern of patterns) expect(String(pattern).startsWith(CONFIG_ROOT)).toBe(true)
 	})
 })
