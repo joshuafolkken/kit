@@ -126,6 +126,14 @@ function premises(body: string): ReadonlyArray<MeasureDeclaration> {
 	return background_values(body, PREMISE_PREFIX).flatMap((value) => parsed(value) ?? [])
 }
 
+// The body with every premise line removed.
+function without_premises(body: string): string {
+	return markdown_section
+		.lines_of(body)
+		.filter((line) => !line.trim().startsWith(PREMISE_PREFIX))
+		.join('\n')
+}
+
 // The declaration's problems, then every premise line's, each read as the declaration is.
 function problems(body: string): ReadonlyArray<string> {
 	const value = declared_value(body)
@@ -186,6 +194,7 @@ const measure_declaration = {
 	premises,
 	problems,
 	unreadable_problem,
+	without_premises,
 }
 
 export type { MeasureDeclaration, MeasureVerdict }

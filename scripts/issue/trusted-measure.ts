@@ -65,9 +65,10 @@ function run_command(command: string, source: TrustedBody): CommandRun {
 	}
 }
 
-// A body not yet on GitHub, written by the person filing it here: running its declared commands is
-// that person running them, so it is trusted without a read (joshuafolkken/kit#7769). `run_command`
-// still runs only what the body declares.
+// A body not yet on GitHub, trusted without a read: running its declared commands is the filer running
+// them (joshuafolkken/kit#7769). Only the filer's own lines qualify — a caller whose draft is built
+// from another issue's body drops or skips that body's commands unless `read_trusted_body` trusts it
+// (`premise-judge.ts`). `run_command` still runs only what the body declares.
 function drafted(body: string): TrustedBody {
 	return { kind: 'trusted', body, issue: DRAFT, author: LOCAL_FILER, editor: LOCAL_FILER }
 }

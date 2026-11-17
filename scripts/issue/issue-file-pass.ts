@@ -209,11 +209,19 @@ async function cap_refusals(filing: Filing): Promise<ReadonlyArray<string>> {
 	return problem === undefined ? [] : [`✖ ${problem}`]
 }
 
+// The body's unreadable premises, run in this checkout — so, like `cap_refusals`, only for a filing
+// into this repository.
+function premise_refusals(filing: Filing): ReadonlyArray<string> {
+	if (!issue_file.is_same_repository(filing.target, filing.current)) return []
+
+	return premise_judge.draft_problems(filing.body).map((problem) => `✖ ${problem}`)
+}
+
 // The size estimate is judged at the ledger's recent implement rate (joshuafolkken/kit#6025).
 async function is_admitted(filing: Filing): Promise<boolean> {
 	const { implement_rate, growth } = await lane_net_read.measurements()
 	const capped = await cap_refusals(filing)
-	const premised = premise_judge.draft_problems(filing.body).map((problem) => `✖ ${problem}`)
+	const premised = premise_refusals(filing)
 	const refusals = [...refusals_of(filing, implement_rate, growth), ...capped, ...premised]
 
 	issue_lint_cli.warn(filing.body)

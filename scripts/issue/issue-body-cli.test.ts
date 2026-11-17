@@ -17,6 +17,10 @@ const { issue_edit_body, issue_get_body_classified } = vi.hoisted(() => ({
 vi.mock('#scripts/gh/git-gh-command', () => ({
 	git_gh_command: { issue_edit_body, issue_get_body_classified },
 }))
+// An unread issue is an untrusted one; a test that needs a trusted body spies `read_trusted_body`.
+vi.mock('#scripts/issue/trusted-measure-source', () => ({
+	trusted_measure_source: { read: vi.fn().mockResolvedValue(undefined) },
+}))
 
 const make_directory = temporary_directory()
 const ISSUE = '7002'
@@ -25,6 +29,9 @@ const URL = 'https://github.com/o/r/issues/7002'
 const VALID_BODY =
 	'## 背景\n\n- 種別: 不具合\n- 原因: #4201\n- 規模見積もり: 約 1 ファイル / 10 行（テスト除く）\n\n## 現象\n\n## 期待結果\n\n## 受け入れ条件\n'
 const INVALID_BODY = '## 背景\n\nno template\n'
+const PREMISED_BODY =
+	'## 背景\n\n- 種別: 不具合\n- 原因: #4201\n- 規模見積もり: 約 1 ファイル / 10 行（テスト除く）\n- 前提: `pnpm josh lane:stats --period 3` >= 3\n\n## 現象\n\n## 期待結果\n\n## 受け入れ条件\n'
+const TABLE_ROW = { kind: 'ok', output: '| 89 | 1.0 |' } as const
 const EPIC_BODY = '## Split rationale\n\nwhy\n\n## Progress\n\n- [ ] #1\n'
 
 async function body_file(body: string): Promise<string> {
@@ -136,20 +143,6 @@ describe('issue_body_cli.run refusals', () => {
 		expect(console.error).toHaveBeenCalledWith(expect.stringContaining('✖ missing heading: '))
 	})
 
-	it('refuses a premise whose last output line is not a number (ac-b6861606)', async () => {
-		const body = VALID_BODY.replace(
-			'## 現象',
-			'- 前提: `pnpm josh lane:stats --period 3` >= 3\n\n## 現象',
-		)
-		const body_path = await body_file(body)
-
-		vi.spyOn(trusted_measure, 'run_command').mockReturnValue({ kind: 'ok', output: '| 89 | 1.0 |' })
-
-		expect(await issue_body_cli.run([ISSUE, BODY_FILE, body_path])).toBe(1)
-		expect(issue_edit_body).not.toHaveBeenCalled()
-		expect(console.error).toHaveBeenCalledWith(expect.stringContaining('lane:value cell'))
-	})
-
 	it('refuses a body file it cannot read without writing', async () => {
 		const missing = path.join(make_directory('issue-body-missing-'), 'absent.md')
 
@@ -165,5 +158,42 @@ describe('issue_body_cli.run refusals', () => {
 		expect(await issue_body_cli.run(args)).toBe(1)
 		expect(issue_edit_body).not.toHaveBeenCalled()
 		expect(console.error).toHaveBeenCalledWith(expect.stringContaining('josh issue:body'))
+	})
+})
+
+// joshuafolkken/kit#7769: a body piped back from the current one carries its author's premises.
+describe('issue_body_cli.run premises', () => {
+	it('refuses a premise whose last output line is not a number (ac-b6861606)', async () => {
+		const body_path = await body_file(PREMISED_BODY)
+
+		vi.spyOn(trusted_measure, 'run_command').mockReturnValue(TABLE_ROW)
+
+		expect(await issue_body_cli.run([ISSUE, BODY_FILE, body_path])).toBe(1)
+		expect(issue_edit_body).not.toHaveBeenCalled()
+		expect(console.error).toHaveBeenCalledWith(expect.stringContaining('lane:value cell'))
+	})
+
+	it('never runs a premise an outside author already wrote in the current body', async () => {
+		const body_path = await body_file(PREMISED_BODY)
+		const run = vi.spyOn(trusted_measure, 'run_command')
+
+		issue_get_body_classified.mockResolvedValue({ kind: 'read', text: PREMISED_BODY })
+
+		expect(await issue_body_cli.run([ISSUE, BODY_FILE, body_path])).toBe(0)
+		expect(run).not.toHaveBeenCalled()
+		expect(issue_edit_body).toHaveBeenCalledExactlyOnceWith(ISSUE, PREMISED_BODY)
+	})
+
+	it('runs a premise already in the current body when its author and editor are trusted', async () => {
+		const body_path = await body_file(PREMISED_BODY)
+
+		issue_get_body_classified.mockResolvedValue({ kind: 'read', text: PREMISED_BODY })
+		vi.spyOn(trusted_measure, 'read_trusted_body').mockResolvedValue(
+			trusted_measure.drafted(PREMISED_BODY),
+		)
+		vi.spyOn(trusted_measure, 'run_command').mockReturnValue(TABLE_ROW)
+
+		expect(await issue_body_cli.run([ISSUE, BODY_FILE, body_path])).toBe(1)
+		expect(issue_edit_body).not.toHaveBeenCalled()
 	})
 })

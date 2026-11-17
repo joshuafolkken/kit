@@ -52,11 +52,27 @@ async function current_body(issue: string): Promise<string | undefined> {
 	return read.text
 }
 
+// A body often comes back from the current one, so the premises it already declares run only when its
+// author and last editor are trusted (joshuafolkken/kit#7769).
+async function inherited_of(issue: string, current = ''): Promise<string> {
+	return (await premise_judge.is_trusted(issue)) ? '' : current
+}
+
+async function problems_of(
+	request: BodyRequest,
+	body: string,
+	current: string | undefined,
+): Promise<ReadonlyArray<string>> {
+	if (size_estimate.is_epic(body)) return []
+	const inherited = await inherited_of(request.issue, current)
+
+	return [...issue_lint_cli.problems(body), ...premise_judge.draft_problems(body, inherited)]
+}
+
 async function apply(request: BodyRequest): Promise<number> {
 	const body = cli_body.read_file_or_stdin(request.body_path)
-	const problems = size_estimate.is_epic(body)
-		? []
-		: [...issue_lint_cli.problems(body), ...premise_judge.draft_problems(body)]
+	const current = await current_body(request.issue)
+	const problems = await problems_of(request, body, current)
 
 	issue_lint_cli.warn(body)
 
@@ -66,7 +82,7 @@ async function apply(request: BodyRequest): Promise<number> {
 		return FAILURE
 	}
 
-	const next = issue_publication_state.carried(await current_body(request.issue), body)
+	const next = issue_publication_state.carried(current, body)
 
 	console.info(await git_gh_command.issue_edit_body(request.issue, next))
 

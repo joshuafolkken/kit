@@ -14,6 +14,7 @@ import { trusted_measure } from './trusted-measure'
 // `--distinct` that keeps the candidates the call already declared.
 
 const HERE = 'joshuafolkken/kit'
+const ELSEWHERE = 'joshuafolkken/other'
 const DECLARED = 2795
 const DUPLICATE_A = 2801
 const DUPLICATE_B = 2802
@@ -166,7 +167,7 @@ describe('issue_file_pass.labels_in_one_pass — a named file near its cap', () 
 	})
 
 	it('does not weigh a filing into another repository', async () => {
-		const filing = { ...filing_of(CLEAR_BODY), target: 'joshuafolkken/other' }
+		const filing = { ...filing_of(CLEAR_BODY), target: ELSEWHERE }
 
 		await issue_file_pass.labels_in_one_pass(filing)
 
@@ -206,6 +207,14 @@ describe('issue_file_pass.labels_in_one_pass — a premise', () => {
 		vi.spyOn(trusted_measure, 'run_command').mockReturnValue({ kind: 'ok', output: '89' })
 
 		expect(await issue_file_pass.labels_in_one_pass(filing_of(premised))).toBeDefined()
+	})
+
+	it('never runs the premise of a filing into another repository', async () => {
+		const run = vi.spyOn(trusted_measure, 'run_command')
+
+		await issue_file_pass.labels_in_one_pass({ ...filing_of(premised), target: ELSEWHERE })
+
+		expect(run).not.toHaveBeenCalled()
 	})
 })
 

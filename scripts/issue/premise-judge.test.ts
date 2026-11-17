@@ -67,6 +67,34 @@ describe('premise_judge.draft_problems', () => {
 	})
 })
 
+// joshuafolkken/kit#7769: a draft built from an untrusted body never runs that body's premises.
+describe('premise_judge — inherited premises', () => {
+	const premised = body_of(`- 前提: \`${STATS_COMMAND}\` >= 3`)
+
+	it('skips a premise the inherited untrusted body declares', () => {
+		expect(premise_judge.draft_problems(premised, premised)).toStrictEqual([])
+		expect(trusted_measure.run_command).not.toHaveBeenCalled()
+	})
+
+	it('drops the premise lines of an untrusted issue it carries', async () => {
+		vi.spyOn(console, 'info').mockImplementation(() => undefined)
+		vi.spyOn(trusted_measure, 'read_trusted_body').mockResolvedValue({
+			kind: 'refused',
+			reason: 'untrusted author',
+		})
+
+		expect(await premise_judge.carried('1', premised)).toBe('## 背景\n\n')
+	})
+
+	it('carries a trusted issue body as is', async () => {
+		vi.spyOn(trusted_measure, 'read_trusted_body').mockResolvedValue(
+			trusted_measure.drafted(premised),
+		)
+
+		expect(await premise_judge.carried('1', premised)).toBe(premised)
+	})
+})
+
 describe('premise_judge.run_of', () => {
 	it('reads the output with the same judge the lane entry uses (ac-e98b16f9)', () => {
 		const [declaration] = measure_declaration.premises(body_of(`- 前提: \`${STATS_COMMAND}\` >= 3`))

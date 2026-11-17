@@ -1,8 +1,8 @@
 {
-	"reason": "Filing and body edits now run each premise the way lane:plan does (#7769): a shared premise-judge module and two short doc lines",
+	"reason": "#7769: run a drafted premise at filing and body edit, skipping premises inherited from an untrusted body (issue:body, issue:spill) and cross-repository filings",
 	"date": "2026-11-17",
 	"growth": {
-		"scripts.code_lines": 44,
+		"scripts.code_lines": 86,
 		"ai_cost.on_demand_bytes": 195
 	}
 }
