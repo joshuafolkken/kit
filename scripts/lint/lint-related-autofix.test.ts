@@ -44,29 +44,50 @@ vi.mock('#scripts/exports/unused-members-check', () => ({
 afterEach(() => vi.restoreAllMocks())
 
 describe('lint_related autofix verification boundary', () => {
+	// The fix pass is the scoped run's only typed eslint: the warm daemon's lint turns off the rules
+	// that guess without the type program, so a residual the fix pass reports fails the run (#7825).
 	it.each([
-		[0, 0],
-		[1, 1],
-		[1, 0],
-	])('records the verified post-fix verdict %s/%s (ac-0986ec74)', async (fix_code, code) => {
-		vi.spyOn(process.stdout, 'write').mockReturnValue(true)
-		vi.mocked(scoped_green.read_before).mockResolvedValueOnce(BEFORE).mockResolvedValueOnce(AFTER)
+		[0, 0, 0],
+		[1, 1, 1],
+		[1, 0, 1],
+	])(
+		'records the verified post-fix verdict %s/%s as %s (ac-0986ec74)',
+		async (fix_code, code, exit) => {
+			vi.spyOn(process.stdout, 'write').mockReturnValue(true)
+			vi.mocked(scoped_green.read_before).mockResolvedValueOnce(BEFORE).mockResolvedValueOnce(AFTER)
+			vi.mocked(format_steps.run_scoped).mockResolvedValue(fix_code)
+			vi.mocked(lint_parallel.run_lint_checks).mockResolvedValue(code)
+
+			expect(await lint_related.run_related_lint([])).toBe(exit)
+			expect(scoped_green.record_if_green).toHaveBeenCalledWith(
+				review_stamps.lint_related_stamp,
+				expect.objectContaining({ before: AFTER, exit_code: exit }),
+			)
+			expect(tree_verdict.record).toHaveBeenCalledWith(
+				expect.objectContaining({ before: AFTER, exit_code: exit }),
+				expect.any(Function),
+				expect.any(String),
+			)
+			expect(vi.mocked(format_steps.run_scoped).mock.invocationCallOrder[0]).toBeLessThan(
+				vi.mocked(structural_checks.run_structural).mock.invocationCallOrder[0] ?? 0,
+			)
+			if (code === 0) expect(document_checks.check_files).toHaveBeenCalled()
+		},
+	)
+})
+
+describe('lint_related autofix failed stage', () => {
+	it.each([
+		[1, 1, 'lint'],
+		[1, 0, 'autofix'],
+	])('names the failed stage for fix %s / lint %s as %s', async (fix_code, code, stage) => {
+		const write = vi.spyOn(process.stdout, 'write').mockReturnValue(true)
+
+		vi.mocked(scoped_green.read_before).mockResolvedValue(AFTER)
 		vi.mocked(format_steps.run_scoped).mockResolvedValue(fix_code)
 		vi.mocked(lint_parallel.run_lint_checks).mockResolvedValue(code)
 
-		expect(await lint_related.run_related_lint([])).toBe(code)
-		expect(scoped_green.record_if_green).toHaveBeenCalledWith(
-			review_stamps.lint_related_stamp,
-			expect.objectContaining({ before: AFTER, exit_code: code }),
-		)
-		expect(tree_verdict.record).toHaveBeenCalledWith(
-			expect.objectContaining({ before: AFTER, exit_code: code }),
-			expect.any(Function),
-			expect.any(String),
-		)
-		expect(vi.mocked(format_steps.run_scoped).mock.invocationCallOrder[0]).toBeLessThan(
-			vi.mocked(structural_checks.run_structural).mock.invocationCallOrder[0] ?? 0,
-		)
-		if (code === 0) expect(document_checks.check_files).toHaveBeenCalled()
+		await lint_related.run_related_lint([])
+		expect(write.mock.calls.join('\n')).toContain(`failed: ${stage}`)
 	})
 })

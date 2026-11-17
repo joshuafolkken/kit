@@ -1,0 +1,7 @@
+{
+	"reason": "Stage timings for test:related in the lane ledger (#7828): a launcher-to-command handoff module, three ledger fields and stats columns",
+	"date": "2026-11-17",
+	"growth": {
+		"scripts.code_lines": 61
+	}
+}
