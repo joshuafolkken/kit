@@ -6,6 +6,8 @@
 
 **本文をファイルに書いて、パスで渡す。** `*-file` に渡す本文や計画メモは `.josh/tmp/` に書く（ignore 済みなのでコミットに混ざらない）。作業ツリー内で git-ignore されていない本文ファイル（`scratchpad/` など）は、`cli_body` で読む `*-file` が拒否する（`scripts/josh/cli-body.ts`）。
 
+`run:handoff` の子 → プロンプトが名指す子ごとのディレクトリ（`scripts/run/handoff/run-handoff-launch.ts` → `scratch_directory`）。
+
 ```bash
 pnpm josh issue:comment <N> --body-file .josh/tmp/comment.md
 pnpm josh issue:body <N> --body-file .josh/tmp/body.md

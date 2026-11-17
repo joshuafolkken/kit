@@ -12,6 +12,7 @@ const BRIEF_FILE_PROMPT = run_ship_review.round_one_opening('/briefs/brief.md')
 const HANDOFF_PROMPT = run_handoff_launch.prompt_of(
 	{ kind: 'workflow', keyword: 'kickoff', line: 'kickoff new', brief_file: 'b' },
 	'File the CSV export.',
+	run_handoff_launch.scratch_directory('kickoff', 1),
 )
 const EARLIER_HANDOFF_PROMPT =
 	'kickoff new\n\nHanded over by a consultation session through `josh run:handoff`; the brief below is what was agreed there.'
