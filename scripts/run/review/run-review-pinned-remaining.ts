@@ -14,16 +14,25 @@ async function is_current(tree: string | undefined): Promise<boolean> {
 	return tree !== undefined && tree === (await run_review_pinned_tree.key())
 }
 
+function launched_on(tree: string, root: string): LaunchResult {
+	const running = run_review_pinned_steps.remaining_on(tree, root)
+
+	if (running !== undefined) return running
+	run_review_pinned_steps.clear(root)
+
+	return run_review_pinned_steps.launch_remaining(root, tree)
+}
+
 // Use the existing continuation's launch/record/cache. Ship keeps its first stop; the next join
-// or record collects the rest before fixes move the tree (joshuafolkken/kit#7438).
+// or record collects the rest before fixes move the tree (joshuafolkken/kit#7438). **One already
+// launched on this tree is kept, not started again** (joshuafolkken/kit#7802).
 async function start(root: string = PROJECT_ROOT): Promise<LaunchResult> {
 	try {
 		const tree = await run_review_pinned_tree.key()
 
 		if (tree === undefined) return { kind: 'failed', note: 'could not read the current tree' }
-		run_review_pinned_steps.clear(root)
 
-		return run_review_pinned_steps.launch_remaining(root, tree)
+		return launched_on(tree, root)
 	} catch (error) {
 		error_text.trace_swallowed('run_review_pinned_remaining.start', error)
 
@@ -110,13 +119,37 @@ async function collect_current(summary: PinnedSummary, root: string): Promise<Pi
 		: test_pinned_record.not_run_summary(MOVED_NOTE)
 }
 
+async function start_carrying(reason: string, root: string): Promise<void> {
+	const launched = await start(root)
+
+	try {
+		if (launched.kind === 'launched') run_review_pinned_steps.carry_reason(reason, root)
+	} catch (error) {
+		error_text.trace_swallowed('run_review_pinned_remaining.start_carrying', error)
+	}
+}
+
+// **A cut answer under a carried reason starts the rest behind it** (joshuafolkken/kit#7802): a reason
+// never judges a cut, so the ship's pre-detach probed every hunk `run:review` left. Started here, those
+// verdicts reach the cache before the pre-detach reads them, and the reason stays on the new launch.
+// A launch that failed leaves the answer as it was.
+async function started_behind(summary: PinnedSummary, root: string): Promise<PinnedSummary> {
+	const reason = summary.is_cut === true ? run_review_pinned_steps.launched_reason(root) : undefined
+
+	if (reason !== undefined) await start_carrying(reason, root)
+
+	return summary
+}
+
 async function collect(
 	summary: PinnedSummary | undefined,
 	root: string = PROJECT_ROOT,
 ): Promise<PinnedSummary | undefined> {
-	return summary !== undefined && is_collectable(summary, root)
+	if (summary === undefined) return undefined
+
+	return is_collectable(summary, root)
 		? await collect_current(summary, root)
-		: summary
+		: await started_behind(summary, root)
 }
 
 const run_review_pinned_remaining = { collect, read, start }

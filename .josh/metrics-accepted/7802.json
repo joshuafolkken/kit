@@ -1,0 +1,7 @@
+{
+	"reason": "#7802 adds the remaining-probe start behind a reason-bearing cut and its one dedupe judgment (remaining_on)",
+	"date": "2026-11-17",
+	"growth": {
+		"scripts.code_lines": 29
+	}
+}

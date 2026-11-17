@@ -360,6 +360,21 @@ function is_live(root: string = PROJECT_ROOT): boolean {
 	)
 }
 
+// **The remaining probe already launched on `tree`, still running or answered** (joshuafolkken/kit#7802):
+// the one judgment every launcher of the rest asks, so none starts it twice. `undefined` when none is.
+function is_remaining_on(launched: Launch | undefined, tree: string): launched is Launch {
+	return launched?.origin === REMAINING_ORIGIN && launched.tree === tree
+}
+
+function remaining_on(tree: string, root: string = PROJECT_ROOT): LaunchResult | undefined {
+	const launched = read_launch(root)
+
+	if (!is_remaining_on(launched, tree)) return undefined
+	const is_current = is_live(root) || is_answered(root)
+
+	return is_current ? { kind: 'launched', pid: launched.pid } : undefined
+}
+
 // The lone read's wait: a queued check is waited on, not stopped. `undefined` when no check was launched.
 async function wait_alone(
 	root: string = PROJECT_ROOT,
@@ -387,6 +402,7 @@ const run_review_pinned_steps = {
 	launched_reason,
 	launched_tree,
 	log_path,
+	remaining_on,
 	wait_alone,
 	wait_for_answer,
 }
