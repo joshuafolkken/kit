@@ -211,6 +211,29 @@ describe('test_pinned.run that rechecks one hunk and holds the other', () => {
 	)
 })
 
+describe('test_pinned.run halted at its first unpinned hunk', () => {
+	it(
+		'counts only the hunks it started on the ledger row',
+		async () => {
+			await build_with_graph()
+			vi.spyOn(test_pinned_pool, 'lane_plan').mockReturnValue({ lanes: 1, workers: 1 })
+			vi.spyOn(test_red, 'probe_in').mockResolvedValue({ verdict: 'green', failed: [], ran: 1 })
+			const row = vi.spyOn(test_pinned_ledger, 'record')
+			const report = await test_pinned.run(test_pinned_logic.DEFAULT_MAX_HUNKS, true)
+
+			expect(report.cut).toHaveLength(1)
+			expect(
+				row.mock.calls.map(([skipped, times]) => [
+					skipped.rechecked,
+					skipped.unregistered,
+					times.length,
+				]),
+			).toEqual([[0, 1, 1]])
+		},
+		RUN_TIMEOUT,
+	)
+})
+
 describe('test_pinned.run after a test reaching an unpinned hunk is edited', () => {
 	it(
 		'rechecks the unpinned hunk against the edited test only',

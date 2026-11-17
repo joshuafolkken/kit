@@ -2,6 +2,6 @@
 	"reason": "Ledger row and lane:breakdown split probed hunks into rechecked and unregistered (#7803)",
 	"date": "2026-11-17",
 	"growth": {
-		"scripts.code_lines": 22
+		"scripts.code_lines": 29
 	}
 }
