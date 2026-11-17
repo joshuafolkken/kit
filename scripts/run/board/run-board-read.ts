@@ -46,6 +46,8 @@ interface LocalRead {
 	root?: RootRun | undefined
 	// The root checkout's single runs a merge ended inside the run, drawn in `✅ done`.
 	ended_roots?: ReadonlyArray<EndedRoot> | undefined
+	// The board's own single run, where a stop ended it (joshuafolkken/kit#7710).
+	stopped_single?: EndedRoot | undefined
 	// What the run was asked to do, from its invocation.
 	scope: NamedPlan
 	events: ReadonlyArray<RunEvent>
@@ -283,18 +285,21 @@ async function span_events_here(
 }
 
 type RootFields = Pick<LocalRead, 'root' | 'ended_roots'>
+type SpanFields = Pick<
+	LocalRead,
+	'started_ms' | 'ended_ms' | 'scheduler_provider' | 'run_name' | 'stopped_single'
+>
 
 // The span's own fields, with the root checkout's single runs beside it.
-function span_fields(
-	span: BoardSpan,
-	root: RootFields,
-): Pick<LocalRead, 'started_ms' | 'ended_ms' | 'scheduler_provider' | 'run_name'> & RootFields {
+function span_fields(span: BoardSpan, root: RootFields): SpanFields & RootFields {
 	const run_name = run_board_single.name_of(span.invocation)
+	const stopped_single = run_board_single.stopped_of(span)
 	const times = {
 		...root,
 		started_ms: span.started_ms,
 		ended_ms: span.ended_ms,
 		...(run_name !== undefined && { run_name }),
+		...(stopped_single !== undefined && { stopped_single }),
 	}
 
 	if (span.scheduler_provider === undefined) return times
