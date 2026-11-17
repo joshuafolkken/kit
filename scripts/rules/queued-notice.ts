@@ -39,25 +39,29 @@ function delete_first(queued: Array<string>, id: string): void {
 	if (index !== -1) queued.splice(index, 1)
 }
 
+function enqueue(queued: Array<string>, id: string): void {
+	queued.push(id)
+}
+
+function dequeue(queued: Array<string>): void {
+	queued.shift()
+}
+
+// A `remove`, or any operation not named here, takes the item it names, as a delivery line does.
+const OPERATIONS = new Map([
+	[ENQUEUE, enqueue],
+	[DEQUEUE, dequeue],
+])
+
 function apply_line(queued: Array<string>, line: string): void {
 	const operation = queue_operation(line)
 	const id = notice_id(line)
 
-	switch (operation) {
-		case ENQUEUE: {
-			queued.push(id)
-			break
-		}
+	if (operation === undefined && id === NO_NOTICE) return
 
-		case DEQUEUE: {
-			queued.shift()
-			break
-		}
+	const apply = OPERATIONS.get(operation ?? NO_NOTICE) ?? delete_first
 
-		default: {
-			if (operation !== undefined || id !== NO_NOTICE) delete_first(queued, id)
-		}
-	}
+	apply(queued, id)
 }
 
 // The ids of the task notices queued on the transcript tail and not yet delivered.
