@@ -87,7 +87,7 @@ These are the gate → review → PR → merge facts other documents cite; this 
 - **One related-check command answers once per tree** — while implementing re-run one check per edit
   (`lint:related` / `cspell:dot` / `test:related`, `--touched` in a lane:
   `docs/josh-commands.md` → "`josh test:related`"), then `pnpm josh check:related` once
-  before `run:review` (full reach); ship's scoped pair runs full reach after review fixes; `check:related` is those three plus `check`. In kit `lint:related` reports a metrics total past the
+  before `run:review` (full reach); ship's scoped pair runs full reach after review fixes; `check:related` is those three plus `check`. In kit `run:review`'s open refuses a metrics total past the
   merge-base → `pnpm josh run:chain <N> --accept-metrics "<why>"` (`metrics-totals.ts` → `totals_refusal`; the ship's pre-detach check is the backstop).
 - **The pull request opens between the rounds, so CI runs beside round 2** — round 1 runs on the
   uncommitted tree and its High/Medium fixes land before the commit; the verification pass runs against
