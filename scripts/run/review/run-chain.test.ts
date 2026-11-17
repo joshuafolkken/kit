@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest'
-import { run_chain, type ChainStage } from './run-chain'
+import { describe, expect, it, vi } from 'vitest'
+import { run_chain, type ChainStage, type StageRunner } from './run-chain'
 
 const SELFCHECK = 'review:selfcheck'
 const CHECK_RELATED = 'check:related'
+const ACCEPTANCE_CHECK = 'acceptance:check'
 const RUN_REVIEW = 'run:review'
 const RUN_CUT = 'run:cut'
 const ISSUE = '5630'
@@ -21,6 +22,7 @@ describe('run_chain', () => {
 		expect(run_chain.review_stages([]).map((stage) => stage.name)).toStrictEqual([
 			SELFCHECK,
 			CHECK_RELATED,
+			ACCEPTANCE_CHECK,
 			RUN_REVIEW,
 		])
 	})
@@ -33,10 +35,46 @@ describe('run_chain', () => {
 		expect(run_chain.stages_from(run_chain.main_line_stages([]), RUN_CUT)).toBeUndefined()
 	})
 
+	it('times each stage that ran in order, the stopped stage included', async () => {
+		const runner = vi.fn<StageRunner>(async (argv) => ({
+			code: argv[0] === CHECK_RELATED ? STOP_EXIT : 0,
+			out: '',
+		}))
+		const chain = await run_chain.run_stages(run_chain.review_stages([]), ISSUE, vi.fn(), runner)
+
+		expect(chain.stop?.stage.name).toBe(CHECK_RELATED)
+		expect(chain.stages.map((stage) => stage.name)).toStrictEqual([SELFCHECK, CHECK_RELATED])
+		expect(chain.stages.every((stage) => stage.elapsed_ms >= 0)).toBe(true)
+		expect(chain.stages.map((stage) => Number.isNaN(Date.parse(stage.at)))).toStrictEqual([
+			false,
+			false,
+		])
+	})
+
 	it('opens the stop report with the invocation, not an Issue citation', () => {
 		const stage = stage_named(RUN_REVIEW)
 		const stop = { stage, code: STOP_EXIT, next: stage.next }
 
 		expect(run_chain.stop_report(stop, ISSUE)).toMatch(/^run:chain 5630 — stopped at run:review/u)
+	})
+})
+
+// joshuafolkken/kit#7727: ship's acceptance-map refusal asked before the review.
+describe('run_chain — acceptance:check', () => {
+	it('asks the acceptance map before run:review in the lane child and main line lists', () => {
+		for (const stages of [run_chain.review_stages([]), run_chain.main_line_stages([])]) {
+			const names = stages.map((stage) => stage.name)
+
+			expect(names.indexOf(ACCEPTANCE_CHECK)).toBe(names.indexOf(RUN_REVIEW) - 1)
+		}
+	})
+
+	it('resumes a stop at acceptance:check from that stage', () => {
+		const stage = stage_named(ACCEPTANCE_CHECK)
+		const stop = { stage, code: STOP_EXIT, next: stage.next }
+
+		expect(run_chain.stop_report(stop, ISSUE)).toContain(
+			'`pnpm josh run:chain 5630 --from acceptance:check`',
+		)
 	})
 })

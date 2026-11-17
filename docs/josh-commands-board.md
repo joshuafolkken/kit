@@ -181,9 +181,11 @@ On a terminal it draws on the alternate screen, so redraws never grow the scroll
 
 **Output / exit codes:** exits 0; an unknown argument or a bad `--every` exits 1; Ctrl+C exits 130 and SIGTERM 143. With no run, running or ended, and no held single run, running or stopped (below), it prints `no run`; while the reads fail it prints `❗ read HH:MM <reason>` instead.
 
-A running `fullrun #N` or `halfrun #N` this checkout's `run:hold` record holds is drawn as a one-row board under its own name, the row's phase read from #N's events — over a carry record too, outside a lane. A stop-marked hold — a `halfrun` stopped before its commit, a `prrun` before its merge — keeps its row under `halfrun` or `prrun`, leading with `✅` in the progress column and no phase icon or phase time; its time is fixed from the run's start to its stop. Resuming it with `fullrun #N`, `prrun #N` or a `halfrun` fix round draws it running again.
+A running `fullrun #N`, `halfrun #N` or `prrun #N` this checkout's `run:hold` record holds is drawn as a one-row board under its own name, the row's phase read from #N's events — over a carry record too, outside a lane. A stop-marked hold — a `halfrun` stopped before its commit, a `prrun` before its merge — keeps its row under `halfrun` or `prrun`, leading with `✅` in the progress column and no phase icon or phase time; its time is fixed from the run's start to its stop. Resuming it with `fullrun #N`, `prrun #N` or a `halfrun` fix round draws it running again.
 
-Beside a backlogrun, the root checkout's running or stopped single run is drawn under its own `🏠` heading above the `🧵` lanes; the header counts no lane and no `🔄` for it. The legend does not name a stopped single run's `✅`, which is not a merge. The merge that releases its hold keeps the run's issue, start and end, so a merge inside the backlogrun's span moves it out of `🏠` into `✅ done`, placed by its end like a lane's finished row.
+The name is the one the record carries (`--fullrun`, `--prrun`, or none for a `halfrun`), so a running `prrun` is drawn as `🏠 prrun`; a `prrun` record written before the name was recorded reads as `fullrun`.
+
+Beside a backlogrun, the root checkout's running or stopped single run is drawn under its own `🏠 <name>` heading above the `🧵` lanes; the header counts no lane and no `🔄` for it. The legend does not name a stopped single run's `✅`, which is not a merge. The merge that releases its hold keeps the run's issue, start and end, so a merge inside the backlogrun's span moves it out of `🏠` into `✅ done`, placed by its end like a lane's finished row.
 
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh run:board` in detail".
 

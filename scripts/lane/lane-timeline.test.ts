@@ -154,8 +154,64 @@ describe('lane_timeline.of — the waits taken out', () => {
 		const timeline = timeline_of()
 		const text = timeline === undefined ? '' : lane_timeline.text(LANE, timeline)
 
-		expect(text).toContain('2026-10-26 06:03Z      +20.0   10.0 min  [excluded] park')
+		expect(text).toContain('2026-10-26 06:03:00Z  06:13:00      +20.0   10.0 min  [excluded] park')
 		expect(text).toContain('[event] split notice (files)')
+	})
+})
+
+// joshuafolkken/kit#7737: the ship's stages by attempt, and the steps the ledger times inside them.
+const PREFLIGHT = 'preflight'
+const SCOPED_STEP = 'scoped pair'
+const SCOPED_LAP = `ship #1 ${PREFLIGHT} › ${SCOPED_STEP}`
+const ATTEMPT_ENTRIES: Array<LedgerEntry> = [
+	{ kind: 'stage', at: at(31), stage: PREFLIGHT, elapsed_ms: MINUTE_MS, issue: ISSUE },
+	{ kind: 'stage', at: at(66), stage: 'sync', elapsed_ms: 5 * MINUTE_MS, issue: ISSUE },
+	{
+		kind: 'ship-lap',
+		at: at(31),
+		issue: ISSUE,
+		stage: PREFLIGHT,
+		step: SCOPED_STEP,
+		elapsed_ms: MINUTE_MS,
+	},
+]
+
+function attempt_timeline(events_of: ReadonlyArray<RunEvent>): Timeline | undefined {
+	const records = { entries: [...entries(), ...ATTEMPT_ENTRIES], events: [...events_of] }
+	const breakdown = lane_breakdown.of(records.entries, records.events, ISSUE)
+
+	return breakdown === undefined ? undefined : lane_timeline.of(records, ISSUE, breakdown)
+}
+
+describe('lane_timeline.of — ship attempts and their steps', () => {
+	it('numbers the ship stages and their laps by attempt', () => {
+		const names = (attempt_timeline(events())?.rows ?? []).map((row) => row.name)
+
+		expect(names).toContain('ship #1 preflight')
+		expect(names).toContain(SCOPED_LAP)
+	})
+
+	it('tags a lap as a step apart from the stage lines', () => {
+		const row = attempt_timeline(events())?.rows.find((line) => line.name === SCOPED_LAP)
+
+		expect(row).toMatchObject({ at_ms: START + RESUME_MINUTE * MINUTE_MS, ms: MINUTE_MS })
+		expect(row?.kind).toBe('step')
+	})
+
+	it('still prints the ledger steps of a lane whose events have rotated away', () => {
+		const names = (attempt_timeline([])?.rows ?? []).map((row) => row.name)
+
+		expect(names).toContain(SCOPED_LAP)
+	})
+
+	it('prints a timed line with its end and a point without one', () => {
+		const timeline = attempt_timeline(events())
+		const text = timeline === undefined ? '' : lane_timeline.text(LANE, timeline)
+
+		expect(text).toContain('start (UTC), end, minutes since dispatch, duration, event')
+		expect(text).toContain('[step], [excluded], [driver] and [event] lines stand apart')
+		expect(text).toContain('2026-10-26 06:13:00Z  06:14:00')
+		expect(text).toMatch(/06:43:00Z +\+60\.0 +- {2}\[event\] ship launch/u)
 	})
 })
 

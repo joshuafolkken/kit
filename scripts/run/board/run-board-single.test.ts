@@ -56,11 +56,16 @@ describe('run_board_single.ended_in', () => {
 	const RECORD = { issue: String(ISSUE), taken_at: TAKEN_AT, ended_at: ENDED_AT }
 	const SPAN = { invocation: 'backlogrun', started_ms: TAKEN_MS, ended_ms: undefined }
 
-	it('reads a fullrun and a halfrun that ended inside the run', () => {
-		const records = [{ ...RECORD, is_fullrun: true }, RECORD]
+	it('reads a fullrun, a prrun and a halfrun that ended inside the run', () => {
+		const records = [
+			{ ...RECORD, is_fullrun: true },
+			{ ...RECORD, is_fullrun: true, is_prrun: true },
+			RECORD,
+		]
 
 		expect(run_board_single.ended_in(records, SPAN)).toStrictEqual([
 			{ command: FULLRUN, issue: ISSUE, started_ms: TAKEN_MS, ended_ms: ENDED_MS },
+			{ command: 'prrun', issue: ISSUE, started_ms: TAKEN_MS, ended_ms: ENDED_MS },
 			{ command: 'halfrun', issue: ISSUE, started_ms: TAKEN_MS, ended_ms: ENDED_MS },
 		])
 	})
@@ -78,6 +83,7 @@ describe('run_board_single.ended_in', () => {
 describe('run_board_single.span_of', () => {
 	it.each([
 		{ read: held({ is_fullrun: true }), invocation: `fullrun #${String(ISSUE)}` },
+		{ read: held({ is_fullrun: true, is_prrun: true }), invocation: `prrun #${String(ISSUE)}` },
 		{ read: held(), invocation: `halfrun #${String(ISSUE)}` },
 	])('draws $invocation from its hold from the hold on', ({ read, invocation }) => {
 		expect(run_board_single.span_of(read)).toStrictEqual({
@@ -140,6 +146,12 @@ describe('run_board_single.scope_of / name_of', () => {
 	it('covers a single run its own issue alone, under its own name', () => {
 		expect(run_board_single.scope_of('halfrun #12')).toStrictEqual({ issues: [12], only: true })
 		expect(run_board_single.name_of(FULLRUN_12)).toBe(FULLRUN)
+	})
+
+	// joshuafolkken/kit#7724: the `🏠` heading reads its name from here.
+	it('names a running prrun prrun', () => {
+		expect(run_board_single.scope_of('prrun #12')).toStrictEqual({ issues: [12], only: true })
+		expect(run_board_single.name_of('prrun #12')).toBe('prrun')
 	})
 
 	it('names nothing for a backlogrun', () => {

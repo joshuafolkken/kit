@@ -19,14 +19,17 @@ type CountReader = (files: ReadonlyArray<string>) => Promise<Array<ReachedCount>
 // The changed files that narrow to their direct importers, each with those importers, and the ones of
 // them the cap narrowed — widest reach first, so the first is the hub that put the run past the cap
 // (joshuafolkken/kit#5699). `full_reach` holds the files past the cap it left whole, each with its reach
-// — imports changed or unread, or no test importing them directly (joshuafolkken/kit#7639).
+// — imports changed or unread, or no test importing them directly (joshuafolkken/kit#7639). `reach`
+// holds every changed file read, each with the test files it adds to the run — its direct importers
+// where it narrowed, its whole reach otherwise — so the run names what widened it (joshuafolkken/kit#7735).
 interface CappedImporters {
 	importers: ReadonlyMap<string, ReadonlyArray<string>>
 	over_cap: ReadonlyArray<string>
 	full_reach?: ReadonlyArray<ReachedCount> | undefined
+	reach?: ReadonlyArray<ReachedCount> | undefined
 }
 
-const NO_CAP: CappedImporters = { importers: new Map(), over_cap: [], full_reach: [] }
+const NO_CAP: CappedImporters = { importers: new Map(), over_cap: [], full_reach: [], reach: [] }
 
 function reach_sum(counts: ReadonlyArray<ReachedCount>): number {
 	return counts.reduce((sum, reached) => sum + reached.count, 0)
@@ -100,6 +103,17 @@ function full_reach_of(
 		.toSorted((first, second) => second.count - first.count)
 }
 
+// The test files each changed file adds to the run: a narrowed one's direct importers, the rest their
+// whole reach.
+function added_of(
+	counts: ReadonlyArray<ReachedCount>,
+	importers: ReadonlyMap<string, ReadonlyArray<string>>,
+): Array<ReachedCount> {
+	const narrowed = [...importers].map(([file, tests]) => ({ file, count: tests.length }))
+
+	return [...narrowed, ...counts.filter((reached) => !importers.has(reached.file))]
+}
+
 // The files every test imports, and the other code files of `files` whose reach is read.
 async function split_of(
 	root: string,
@@ -125,11 +139,13 @@ async function capped_importers(
 	const counts = await relative_counts(root, candidates, read_counts)
 	const capped = await direct_of(root, over_cap_of(counts))
 	const narrowed = capped.map(([file]) => file)
+	const importers = new Map([...every_test, ...capped])
 
 	return {
-		importers: new Map([...every_test, ...capped]),
+		importers,
 		over_cap: narrowed,
 		full_reach: full_reach_of(counts, narrowed),
+		reach: added_of(counts, importers),
 	}
 }
 

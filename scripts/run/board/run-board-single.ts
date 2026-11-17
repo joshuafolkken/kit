@@ -13,10 +13,11 @@ import { run_board_span, type BoardSpan } from './run-board-span'
 
 // A single `fullrun #N` or `halfrun #N` has no carry record; the only record that says it is running
 // here is this checkout's hold (`run-hold.ts`), so the board draws it from there — no store of its own
-// (joshuafolkken/kit#6597). The hold marks a `fullrun` (`is_fullrun`); `run:entry` claims a `halfrun`
-// unmarked (`run-entry-children.ts`), so an unmarked numbered hold is one. A stopped `halfrun` or `prrun`
-// keeps its hold across a person's latency (`run_hold.is_stop_marked`), so the board draws it stopped
-// under its own command until the next run takes the hold (joshuafolkken/kit#7710).
+// (joshuafolkken/kit#6597). The hold marks a `fullrun` (`is_fullrun`) and a `prrun` (`is_prrun` beside
+// it, joshuafolkken/kit#7724); `run:entry` claims a `halfrun` unmarked (`run-entry-children.ts`), so an
+// unmarked numbered hold is one. A `prrun`'s record written before `is_prrun` existed reads as a `fullrun`.
+// A stopped `halfrun` or `prrun` keeps its hold across a person's latency (`run_hold.is_stop_marked`), so
+// the board draws it stopped under its own command until the next run takes the hold (joshuafolkken/kit#7710).
 
 const FULLRUN = 'fullrun'
 const HALFRUN = 'halfrun'
@@ -53,12 +54,14 @@ function held_of(read: HoldRead): RunHold | undefined {
 	return issue_number_shape.is_issue_number(read.hold.issue) ? read.hold : undefined
 }
 
-// The command a stop names, else the claim's.
-function command_of(hold: RunHold): string {
-	if (hold.is_halfrun_stop === true) return HALFRUN
-	if (hold.prrun_stop_head !== undefined) return PRRUN
+// The command a hold's or an ended record's marks name: a stop's own, else the claim's.
+function command_of(
+	mark: Pick<RunHold, 'is_fullrun' | 'is_prrun' | 'is_halfrun_stop' | 'prrun_stop_head'>,
+): string {
+	if (mark.is_halfrun_stop === true) return HALFRUN
+	if (mark.is_prrun === true || mark.prrun_stop_head !== undefined) return PRRUN
 
-	return hold.is_fullrun === true ? FULLRUN : HALFRUN
+	return mark.is_fullrun === true ? FULLRUN : HALFRUN
 }
 
 // A running run's span is open from its claim. A stopped run's ends at its stop, the record's
@@ -149,9 +152,7 @@ function ended_of(ended: EndedHold): EndedRoot | undefined {
 
 	if (started_ms === undefined || ended_ms === undefined) return undefined
 
-	const command = ended.is_fullrun === true ? FULLRUN : HALFRUN
-
-	return { command, issue: Number(ended.issue), started_ms, ended_ms }
+	return { command: command_of(ended), issue: Number(ended.issue), started_ms, ended_ms }
 }
 
 function is_inside(run: EndedRoot, span: BoardSpan): boolean {

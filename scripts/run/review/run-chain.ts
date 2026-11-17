@@ -1,4 +1,5 @@
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
+import type { ChainStageEntry } from '#scripts/lane/lane-ledger-schema-ship'
 
 // The stage runner behind `josh run:chain` (joshuafolkken/kit#5630): the main line's chain up to the
 // review in one call, not one model round trip per command. Each stage runs as its own `josh` command,
@@ -15,6 +16,7 @@ const COMMAND = 'pnpm josh run:chain'
 const MAIN_MERGE = 'main:merge'
 const SELFCHECK = 'review:selfcheck'
 const CHECK_RELATED = 'check:related'
+const ACCEPTANCE_CHECK = 'acceptance:check'
 const RUN_REVIEW = 'run:review'
 
 type NextAction = (issue: string) => string
@@ -43,6 +45,12 @@ interface ChainStop {
 	notice?: string
 }
 
+// A run's stop, absent when every stage ran, and each stage it ran with its start and length.
+interface ChainRun {
+	stop?: ChainStop
+	stages: ReadonlyArray<ChainStageEntry>
+}
+
 type StageRunner = (argv: ReadonlyArray<string>) => Promise<JoshResult>
 type Print = (text: string) => void
 
@@ -62,6 +70,15 @@ const MERGE_STAGE: ChainStage = {
 		`settle what \`${MAIN_MERGE}\` refused (\`chain-rule.md\` → "Orchestration facts single-sourced here"), ${rerun(issue)}`,
 }
 
+// Ship's acceptance-map refusal asked of the draft before the review, so a criterion with no row stops
+// here rather than at ship's preflight (joshuafolkken/kit#7727).
+const ACCEPTANCE_STAGE: ChainStage = {
+	name: ACCEPTANCE_CHECK,
+	argv: [ACCEPTANCE_CHECK],
+	next: (issue) =>
+		`write a row for each criterion it names in the ship body draft's \`## 受け入れ条件の対応\`, ${rerun(issue, ACCEPTANCE_CHECK)}`,
+}
+
 // `review_args` — `--unpinned-ok "<reason>"` and `--accept-metrics "<reason>"` as given — goes to
 // `run:review` alone; empty when absent.
 function review_stages(review_args: ReadonlyArray<string>): ReadonlyArray<ChainStage> {
@@ -77,6 +94,7 @@ function review_stages(review_args: ReadonlyArray<string>): ReadonlyArray<ChainS
 			argv: [CHECK_RELATED],
 			next: (issue) => `fix the red check, ${rerun(issue, CHECK_RELATED)}`,
 		},
+		ACCEPTANCE_STAGE,
 		{
 			name: RUN_REVIEW,
 			argv: [RUN_REVIEW, ...review_args],
@@ -127,20 +145,30 @@ async function run_stage(
 	return await held(stage, issue)
 }
 
+// Each stage that ran, the stopped one included, timed from its start through its hold, so the ledger
+// line shows where a long run spent its time (joshuafolkken/kit#7736).
 async function run_stages(
 	stages: ReadonlyArray<ChainStage>,
 	issue: string,
 	print: Print,
 	run: StageRunner = josh_stage,
-): Promise<ChainStop | undefined> {
+): Promise<ChainRun> {
+	const timed: Array<ChainStageEntry> = []
+
 	for (const stage of stages) {
+		const started_ms = Date.now()
 		// eslint-disable-next-line no-await-in-loop -- each stage runs on the tree the earlier ones left
 		const stop = await run_stage(stage, issue, print, run)
 
-		if (stop !== undefined) return stop
+		timed.push({
+			name: stage.name,
+			at: new Date(started_ms).toISOString(),
+			elapsed_ms: Date.now() - started_ms,
+		})
+		if (stop !== undefined) return { stop, stages: timed }
 	}
 
-	return undefined
+	return { stages: timed }
 }
 
 // The reports open with the invocation as typed (`run:chain <N>`), not an Issue citation.
@@ -166,4 +194,4 @@ const run_chain = {
 }
 
 export { run_chain }
-export type { ChainStage, ChainStop, HoldStop, StageHold, StageRunner }
+export type { ChainRun, ChainStage, ChainStop, HoldStop, StageHold, StageRunner }

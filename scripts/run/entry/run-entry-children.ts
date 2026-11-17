@@ -73,15 +73,16 @@ async function josh_line(step: string, argv: ReadonlyArray<string>): Promise<str
 // `run:hold <N>` prints one token — `hold`, `busy` or `unknown` — and forwards its explanation to
 // stderr, so the composite branches on the token and the reader still sees why. `--fullrun` marks the
 // hold as a run whose implementation cut resumes as `fullrun #N` — a
-// `fullrun`'s, and a `prrun`'s, which runs `fullrun`'s steps; a `halfrun`'s hold is never marked.
+// `fullrun`'s; `--prrun` marks a `prrun`'s, which runs `fullrun`'s steps, the same way and lets
+// `run:board` name it; a `halfrun`'s hold is never marked.
 // `--adopt` re-keys a `new` run's bare hold instead (`run:hold --adopt`), answering `none` or `busy`
 // when there is none to hand over — either stops the entry as a held tree does.
 function hold_argv({ issue_number, command, is_adopt }: EntryRequest): Array<string> {
 	if (is_adopt) return ['run:hold', ADOPT_FLAG, issue_number]
 
-	const mark = command === run_stage.HALFRUN ? [] : ['--fullrun']
+	if (command === run_stage.HALFRUN) return ['run:hold', issue_number]
 
-	return ['run:hold', issue_number, ...mark]
+	return ['run:hold', issue_number, command === run_stage.PRRUN ? '--prrun' : '--fullrun']
 }
 
 async function claim_hold(request: EntryRequest): Promise<string> {

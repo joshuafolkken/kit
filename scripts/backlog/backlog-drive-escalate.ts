@@ -7,6 +7,7 @@ import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
 import { issue_park } from '#scripts/issue/issue-park'
+import { session_language } from '#scripts/josh/session-language'
 
 // joshuafolkken/kit#7357: a worker's escalation park (joshuafolkken/kit#7356) resumes the same lane one
 // `josh.worker` profile up. The Issue's `worker:<name>` label moves to the next profile, so the
@@ -53,15 +54,24 @@ async function relabel(issue: string, move: Move): Promise<boolean> {
 	return await git_gh_issue_write.issue_clear_label(issue, label_of(move.from))
 }
 
-function agent_of(worker: WorkerProfile): string {
-	return `${worker.agent.model} / ${worker.agent.effort}`
+// Only the sentences are for a person to read, so only they follow the session language; the
+// `- Reason:` / `- Next:` labels, label names and profile names stay English (joshuafolkken/kit#7703).
+function is_japanese(): boolean {
+	return session_language.is_japanese(session_language.resolve_session_lang().lang)
+}
+
+function worker_of(worker: WorkerProfile): string {
+	return `\`${label_of(worker)}\` (${worker.agent.model} / ${worker.agent.effort})`
+}
+
+function step_sentence(from: string, to: string): string {
+	return is_japanese()
+		? `担当を ${from} から ${to} へ格上げした。レーンは同じ worktree で再開する。`
+		: `Escalated the worker from ${from} to ${to}; the lane resumes in the same worktree.`
 }
 
 function step_note(move: Move, reason: string): string {
-	return [
-		`Escalated the worker from \`${label_of(move.from)}\` (${agent_of(move.from)}) to \`${label_of(move.to)}\` (${agent_of(move.to)}); the lane resumes in the same worktree.`,
-		`- Reason: ${reason}`,
-	].join('\n')
+	return [step_sentence(worker_of(move.from), worker_of(move.to)), `- Reason: ${reason}`].join('\n')
 }
 
 async function step_up(
@@ -82,12 +92,16 @@ async function step_up(
 	await retry(issue)
 }
 
+function top_sentence(top: string): string {
+	return is_japanese()
+		? `\`${NEEDS_DECISION_LABEL}\` で park した: 担当がより強い profile を求めたが、${top} が josh.worker.profiles の最上位。`
+		: `Parked with \`${NEEDS_DECISION_LABEL}\`: the worker asked for a stronger profile, but ${top} is the top of josh.worker.profiles.`
+}
+
 function top_note(top: WorkerProfile, reason: string): string {
-	return [
-		`Parked with \`${NEEDS_DECISION_LABEL}\`: the worker asked for a stronger profile, but \`${label_of(top)}\` is the top of josh.worker.profiles.`,
-		`- Reason: ${reason}`,
-		'- Next: a person decides how to go on.',
-	].join('\n')
+	const next = is_japanese() ? '続け方は人が決める。' : 'a person decides how to go on.'
+
+	return [top_sentence(`\`${label_of(top)}\``), `- Reason: ${reason}`, `- Next: ${next}`].join('\n')
 }
 
 async function hand_over(issue: number, top: WorkerProfile, reason: string): Promise<void> {

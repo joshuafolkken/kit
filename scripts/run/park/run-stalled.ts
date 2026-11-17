@@ -55,6 +55,11 @@ function next_step(child: number | string, cause = ''): string {
 	return `${recovery}, then use \`${resume_of(child, true)}\` in the live backlogrun or resume it with \`${resume_of(child, false)}\``
 }
 
+// The Japanese counterpart of `next_step` for the ordinary cause, which a Japanese park comment ends with.
+function next_step_ja(child: number | string): string {
+	return `原因を直してから、稼働中の backlogrun では \`${resume_of(child, true)}\`、それ以外では \`${resume_of(child, false)}\` で再開してください。`
+}
+
 // The worker's own declaration that its Issue needs a stronger `josh.worker` profile
 // (joshuafolkken/kit#7356). No retry check reads it, so `run:stalled`'s auto-retry never re-offers it
 // on the same profile; the drive resumes it one profile up (joshuafolkken/kit#7357).
@@ -141,6 +146,7 @@ const run_stalled = {
 	class_of,
 	escalation_requested,
 	next_step,
+	next_step_ja,
 	park_event,
 	resume_of,
 	row_text,

@@ -1,6 +1,4 @@
 import type { IssueState } from '#scripts/issue/issue-state'
-import type { RunCarry } from '#scripts/run/carry/run-carry'
-import { run_stalled } from '#scripts/run/park/run-stalled'
 import { describe, expect, it } from 'vitest'
 import { run_merge } from './run-merge'
 
@@ -235,75 +233,6 @@ describe('classify_child — a child that yielded its lane', () => {
 	})
 })
 
-// joshuafolkken/kit#4076: a release to wait names what the child waits on, a start date included.
-describe('waiting_comment', () => {
-	it('names every wait and says the child is neither parked nor counted', () => {
-		const comment = run_merge.waiting_comment(['#3501', 'not before 2026-10-24T23:29Z'])
-
-		expect(comment).toContain('not parked, and not counted as a failure')
-		expect(comment).toContain('waits on: #3501, not before 2026-10-24T23:29Z.')
-		expect(comment).toContain('its sample condition is met')
-		expect(comment).not.toContain(NEEDS_DECISION)
-	})
-})
-
-// joshuafolkken/kit#2769: a park the driver makes is explained on the issue — why, what was read, and
-// what a person does next.
-describe('park_comment', () => {
-	const CARRY: RunCarry = {
-		invocation: 'backlogrun',
-		started_at: '2026-09-30T00:00:00.000Z',
-		merged: 0,
-		filed: 0,
-		cuts: 0,
-		failures: 2,
-		outages: 0,
-	}
-
-	it('states the cause, the state read, the streak and the next step', () => {
-		const comment = run_merge.park_comment({
-			child: '2761',
-			cause: 'the session ended unfinished.',
-			carry: CARRY,
-			output: 'lane.jsonl',
-		})
-
-		expect(comment).toContain(RUN_STALLED)
-		expect(comment).not.toContain(NEEDS_DECISION)
-		expect(comment).toContain('- Why: the session ended unfinished.')
-		expect(comment).toContain('no merged pull request')
-		expect(comment).toContain('- Consecutive failures: 2 of 3 (every 3 in a row checks `main`).')
-		expect(comment).toContain('`lane.jsonl`')
-		expect(comment).toContain('`fullrun #2761`')
-	})
-
-	it('says the streak was not recorded when there is no carry record', () => {
-		const comment = run_merge.park_comment({
-			child: '1',
-			cause: 'x',
-			carry: undefined,
-			output: undefined,
-		})
-
-		expect(comment).toContain('not recorded')
-	})
-})
-
-describe('stale hand-off park comment', () => {
-	it('requires record repair before retry (ac-438a3cb5)', () => {
-		const comment = run_merge.park_comment({
-			child: '1',
-			cause: run_stalled.STALE_HANDOFF.why,
-			carry: undefined,
-			output: undefined,
-		})
-
-		expect(comment).toContain(`- Why: ${run_stalled.STALE_HANDOFF.why}`)
-		expect(comment).toContain('repair the stale hand-off cut record with `pnpm josh run:cut --end`')
-		expect(comment).toContain('(retry alone does not clear it), then use')
-	})
-})
-
 describe('change_of', () => {
 	it('counts a merge, which resets the failure streak', () => {
 		expect(run_merge.change_of('merged')).toStrictEqual({ merged: 1 })
@@ -376,24 +305,5 @@ describe('is_outage_guard_tripped', () => {
 
 	it('holds below the outage limit', () => {
 		expect(run_merge.is_outage_guard_tripped(run_merge.CONSECUTIVE_OUTAGE_LIMIT - 1)).toBe(false)
-	})
-})
-
-describe('counters_comment', () => {
-	it('renders every counter from the carry record', () => {
-		const carry: RunCarry = {
-			invocation: 'backlogrun',
-			started_at: '2026-09-15T00:00:00.000Z',
-			merged: 4,
-			filed: 2,
-			cuts: 1,
-			failures: 1,
-			outages: 2,
-		}
-		const comment = run_merge.counters_comment(carry)
-
-		expect(comment).toContain('merged: 4')
-		expect(comment).toContain('consecutive failures: 1')
-		expect(comment).toContain('consecutive outages: 2')
 	})
 })

@@ -54,31 +54,33 @@ async function records_of(issue: string): ReturnType<typeof lane_breakdown_estim
 	)
 }
 
+type Records = NonNullable<Awaited<ReturnType<typeof records_of>>>
+
+// The lane's timeline and the elapsed line under it, or `undefined` when the ledger lacks the lane.
+function timeline_lines(records: Records, issue: string): Array<string> | undefined {
+	const { entries, events } = records
+	const read = lane_breakdown_implement.with_calls(entries, events, Number(issue))
+	if (read === undefined) return undefined
+	const timeline = lane_timeline.of(
+		{ ...records, calls: read.calls },
+		Number(issue),
+		read.breakdown,
+	)
+	if (timeline === undefined) return undefined
+	const report = lane_breakdown_text.report_of(Number(issue), read.breakdown, entries, events)
+
+	return [lane_timeline.text(session_cite.issue(issue), timeline), report.elapsed ?? '']
+}
+
 // `--timeline`: the lane in time order, one line an event (joshuafolkken/kit#7186).
 async function print_timeline(issue: string): Promise<number> {
 	const records = await records_of(issue)
 	if (records === undefined) return missing(issue)
-	const breakdown = lane_breakdown_implement.breakdown_of(
-		records.entries,
-		records.events,
-		Number(issue),
-	)
-	if (breakdown === undefined) return missing(issue)
-	const timeline = lane_timeline.of(records, Number(issue), breakdown)
+	const timeline = timeline_lines(records, issue)
 
 	if (timeline === undefined) return missing(issue)
 
-	const report = lane_breakdown_text.report_of(
-		Number(issue),
-		breakdown,
-		records.entries,
-		records.events,
-	)
-	const lines = [
-		records.notice,
-		lane_timeline.text(session_cite.issue(issue), timeline),
-		report.elapsed ?? '',
-	]
+	const lines = [records.notice, ...timeline]
 
 	console.info(lines.filter((line) => line !== '').join('\n'))
 

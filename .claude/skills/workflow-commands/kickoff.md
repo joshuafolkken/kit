@@ -12,7 +12,8 @@
      records it, applies `run:planned` and sends the `planning` Telegram (`docs/josh-commands-backlog.md`
      → "`josh issue:plan`"). A target named in front of the reference adds `--repo <owner/name>`.
      Before writing the plan, run `pnpm josh plan:consumers <identifier...>` on what it adds or changes
-     and finish the `### 影響を受ける既存の利用者` draft it prints.
+     and finish the `### 影響を受ける既存の利用者` draft it prints. Refused for naming more files than the
+     estimate → `docs/josh-commands-backlog.md` → "`josh issue:plan`".
   5. Report the plan, the Telegram's last line `Next: halfrun #<N> | prrun #<N> | fullrun #<N>`, then **stop** (do not implement).
 
   **Two or more separately-mergeable deliverables** take the split path instead of a plan: create the

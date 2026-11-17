@@ -22,18 +22,19 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 		// A `--halfrun-stop` / `--human-review-stop` / `--prrun-stop` sends the stop confirmation.
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		reference: [
-			'[<issue> [--fullrun | --halfrun-stop | --halfrun-round | --human-review-stop | --prrun-stop]] | --adopt <issue>',
+			'[<issue> [--fullrun | --prrun | --halfrun-stop | --halfrun-round | --human-review-stop | --prrun-stop]] | --adopt <issue>',
 			'automation',
 			['files'],
 		],
 		usage: {
 			examples: [
 				{ arguments: '1091', note: 'claim for issue 1091' },
-				{ arguments: '1091 --fullrun', note: 'claim as `fullrun #1091` (what `run:entry` runs)' },
+				{ arguments: '1091 --fullrun', note: 'claim as `fullrun #1091`' },
 				{ arguments: '--adopt 1091', note: "hand a `new` run's hold to the issue it filed" },
 			],
 			flags: [
 				{ names: ['--fullrun'], description: "marks the record as `fullrun #N`'s." },
+				{ names: ['--prrun'], description: "marks it as `prrun #N`'s, also read as a `fullrun`." },
 				{
 					names: ['--adopt <issue>'],
 					description:

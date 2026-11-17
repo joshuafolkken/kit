@@ -78,3 +78,37 @@ describe('acceptance_map_check.refusal', () => {
 		expect(body_read_mock).toHaveBeenCalledWith(SPLIT_OFF, 'owner/repo')
 	})
 })
+
+// joshuafolkken/kit#7727: the draft before the gate still carries pending rows.
+describe('acceptance_map_check.body_refusal — pending_present', () => {
+	const other = 'The chain stops before the review'
+	const issue_body = `## 受け入れ条件\n\n- [ ] ${CRITERION}\n- [ ] ${other}`
+	const skeleton = acceptance_map.skeleton(issue_body) ?? ''
+	const one_pending = acceptance_map.skeleton(`## 受け入れ条件\n\n- [ ] ${CRITERION}`) ?? ''
+
+	it('passes a draft whose every criterion has a pending row (ac-4eb82da8)', async () => {
+		answer({ [ISSUE]: { kind: 'read', text: issue_body } }, '')
+
+		await expect(
+			acceptance_map_check.body_refusal(ISSUE, skeleton, { pending_present: true }),
+		).resolves.toBeUndefined()
+	})
+
+	it('refuses a draft missing a row, naming only that criterion (ac-16637289)', async () => {
+		answer({ [ISSUE]: { kind: 'read', text: issue_body } }, '')
+		const refusal = await acceptance_map_check.body_refusal(ISSUE, one_pending, {
+			pending_present: true,
+		})
+
+		expect(refusal).toContain(acceptance_map.criterion_id(other))
+		expect(refusal).not.toContain(acceptance_map.criterion_id(CRITERION))
+	})
+
+	it('still refuses pending rows without the option, as ship and the merge ask', async () => {
+		answer({ [ISSUE]: { kind: 'read', text: issue_body } }, '')
+
+		await expect(acceptance_map_check.body_refusal(ISSUE, skeleton)).resolves.toContain(
+			acceptance_map.criterion_id(CRITERION),
+		)
+	})
+})

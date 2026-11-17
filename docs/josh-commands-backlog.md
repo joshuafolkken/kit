@@ -344,6 +344,16 @@ pnpm josh issue:plan 4134 --body-file .josh/tmp/plan.md --title "Add issue:plan"
 
 A plan without `### 影響を受ける既存の利用者` (entries, or `なし（<reason>）`) is refused.
 
+Before any write, the plan's files are counted against the estimate in force (the plan's `- 規模見積もり:` line, else the issue body's):
+
+- Counted: backticked paths outside `### 影響を受ける既存の利用者`, plus the files of its `— 直す` entries, each once; tests and directories are not (`scripts/issue/plan-named-files.ts`).
+- More files than the estimate declares writes nothing, prints the count, the files and the estimate, and exits `1`. Add the corrected `- 規模見積もり:` line to the plan and re-run.
+- A corrected estimate past the guide is no split by itself: split only when the parts merge separately (`.claude/skills/workflow-commands/split-assessment.md` → "The question"), else add `- 分割しない理由:`.
+- With no estimate, the count prints and the plan is recorded. A plan's estimate line replaces the issue body's when the plan is recorded.
+- Work a review finding adds later is outside this check.
+
+`--planned` judges the size estimate with `issue:file`'s guide, cap and size bar (`scripts/issue/plan-size-check.ts`). The plan's `- 規模見積もり:` and `- 分割しない理由:` lines win; otherwise the issue body's are used. An unexcused estimate past them leaves the plan posted without `run:planned`, prints the refusal and the split assessment's steps, and exits `1`.
+
 When a dispatched lane child plans its own issue, without `--repo`, the recorded plan then runs `lane:plan` on its backticked paths outside `### 影響を受ける既存の利用者`. It prints the command and the verdict, and exits with `lane:plan`'s code (`2` yield, `3` split, `4` premise). On `wait` (`1`), re-run the printed command, not `issue:plan`.
 
 Run both with Bash `timeout` 600000: a bounded wait blocks up to 9 minutes (`docs/josh-commands-lane.md` → "`josh lane:plan`").
@@ -1173,6 +1183,20 @@ It drops the ones an added line still writes (an added `.md` heading, for a head
 It searches `.md` files and the comment lines under `prompts/`, `docs/`, `.claude/` and `scripts/` (`CHANGELOG.md` left out). A heading is searched quoted, the way a `→ "Heading"` pointer names it.
 
 Prints `file:line kind word` per reference, or `ok`. Exits 1 on a reference, 2 when the base or a search could not be read — a failed search is never `ok`.
+
+### `josh acceptance:check`
+
+<!-- usage: acceptance:check -->
+
+Check the ship body draft's acceptance map before the review: a criterion with no row stops it, a pending row passes.
+
+```bash
+pnpm josh acceptance:check   # → `acceptance:check: pass`, or ship's acceptance-map refusal naming each criterion with no row (exit 1)
+```
+
+<!-- /usage -->
+
+`josh ship`'s acceptance-map refusal (`acceptance_map_check.body_refusal`), asked of the body the next ship delivers — the ship body draft, else the open PR's — with a pending row counted as a row. `run:chain` runs it before `run:review`, so a criterion with no row stops there, not at ship's preflight. No body yet passes: ship writes every row.
 
 ### `josh review:selfcheck`
 
