@@ -175,6 +175,24 @@ describe('run_board_tick.tick kit version', () => {
 	})
 })
 
+// joshuafolkken/kit#7770: the measured lane totals the local read carries reach the header's estimate.
+describe('run_board_tick.tick lane totals', () => {
+	it.each([
+		{ lane_totals: [30 * 60_000], is_drawn: true },
+		{ lane_totals: undefined, is_drawn: false },
+	])(
+		'draws the finish time $is_drawn with totals $lane_totals',
+		async ({ lane_totals, is_drawn }) => {
+			const local = { ...LOCAL, events: [LAUNCH], lane_totals, lane_limit: 2 }
+			const { ports, frames } = harness(local, [long_plan(1)])
+
+			await tick(FRESH_STATE, ports)
+
+			expect(lines_of(frames.at(-1))[0]?.includes('🎯')).toBe(is_drawn)
+		},
+	)
+})
+
 // joshuafolkken/kit#3757: the operations the local read carries reach the header's third line.
 describe('run_board_tick.tick with a session’s operation', () => {
 	it('draws the running child’s newest operation on the third line', async () => {

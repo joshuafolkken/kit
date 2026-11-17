@@ -216,6 +216,7 @@ type LocalHeader = Pick<
 	| 'activity'
 	| 'operations'
 	| 'usual'
+	| 'lane_totals'
 	| 'lane_limit'
 	| 'occupied_count'
 	| 'found'
@@ -232,6 +233,7 @@ function local_header(local: LocalRead): LocalHeader {
 		activity: activity_here(local),
 		operations: local.operations,
 		usual: local.usual,
+		lane_totals: local.lane_totals,
 		lane_limit: local.lane_limit,
 		occupied_count: local.occupied_count,
 		found: local.found,
