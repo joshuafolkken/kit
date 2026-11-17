@@ -85,7 +85,11 @@ describe('run_ship_scoped.scoped_pair — after autofix', () => {
 		const record = vi.spyOn(run_ship_narrowed, 'record')
 		const remember = vi.spyOn(run_ship_narrowed, 'remember')
 
-		vi.spyOn(run_ship_narrowed, 'moved_since_green').mockResolvedValue(['scripts/a.ts'])
+		vi.spyOn(run_ship_narrowed, 'moved_since_green').mockResolvedValue({
+			files: ['scripts/a.ts'],
+			why: 'moved since green',
+			resumed_from: 'none',
+		})
 		await run_ship_scoped.scoped_pair()
 		expect(record).toHaveBeenCalledWith(expect.any(Array), fixed)
 		expect(remember).toHaveBeenCalledWith(fixed)

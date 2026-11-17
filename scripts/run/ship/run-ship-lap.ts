@@ -59,6 +59,13 @@ function current_scope(): LapScope | undefined {
 	return scope.current()
 }
 
+// The issue the running ship stage is on, `undefined` outside any stage.
+function current_issue(): string | undefined {
+	const current = current_scope()
+
+	return current === undefined ? undefined : String(current.issue)
+}
+
 // The environment that times a child process's steps under `parent`, `{}` outside any scope.
 function environment(parent: string): Record<string, string> {
 	const current = current_scope()
@@ -74,7 +81,15 @@ function environment(parent: string): Record<string, string> {
 // split and what each condition added to it (`run-ship-scoped.ts`), and the tree a gate reused.
 type LapNote = Pick<
 	ShipLapRecord,
-	'fallback' | 'rerun' | 'reused_tree' | 'runs' | 'named' | 'unsplit' | 'breakdown' | 'is_reused'
+	| 'fallback'
+	| 'rerun'
+	| 'reused_tree'
+	| 'runs'
+	| 'named'
+	| 'unsplit'
+	| 'breakdown'
+	| 'is_reused'
+	| 'resumed_from'
 >
 
 function lap_of(current: LapScope, step: string, started_ms: number, note: LapNote): ShipLapRecord {
@@ -139,6 +154,7 @@ const run_ship_lap = {
 	PARENT_SEPARATOR,
 	STARTUP_STEP,
 	STEP,
+	current_issue,
 	environment,
 	timed,
 	within,
