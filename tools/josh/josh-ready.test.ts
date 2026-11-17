@@ -48,6 +48,8 @@ beforeEach(() => {
 	writeFileSync(path.join(root, INPUT), SOURCE)
 	writeFileSync(path.join(root, MANIFEST), MANIFEST_CONTENT)
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
+	// Every stale-dist case sets the handed-over rebuild time; each case starts without one.
+	launch_timing.clear()
 })
 
 afterEach(() => {
@@ -113,10 +115,6 @@ describe('josh startup with a stale dist (ac-05c27eab, ac-d8bcc144)', () => {
 
 // joshuafolkken/kit#7828: the launcher times its rebuild for the command it launches.
 describe('josh startup — the rebuild time handed to the command', () => {
-	afterEach(() => {
-		launch_timing.clear()
-	})
-
 	it('hands over how long the rebuild took', async () => {
 		ready_bundles()
 		writeFileSync(path.join(root, INPUT), EDITED_SOURCE)

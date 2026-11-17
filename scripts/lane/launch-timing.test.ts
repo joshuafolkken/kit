@@ -1,9 +1,9 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { launch_timing } from './launch-timing'
 
 const REBUILD_MS = 1234.5
 
-afterEach(() => {
+beforeEach(() => {
 	launch_timing.clear()
 })
 
