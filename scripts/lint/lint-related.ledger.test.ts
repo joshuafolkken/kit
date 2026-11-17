@@ -1,3 +1,4 @@
+import { document_checks } from '#scripts/document/document-checks'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -51,6 +52,7 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.mocked(lane_ledger_write.record_lint_related).mockReset()
+	vi.mocked(document_checks.check_files).mockClear()
 	vi.restoreAllMocks()
 })
 
@@ -70,6 +72,12 @@ describe('lint_related.run_related_lint — one ledger row per run', () => {
 
 		for (const stage of GREEN_STAGES) expect(row[stage], stage).toBeTypeOf('number')
 		expect(row).toMatchObject({ exit_code: 0, elapsed_ms: expect.any(Number) as number })
+	})
+
+	it('runs the document checks once on a green lint, inside their timed stage', async () => {
+		await lint_related.run_related_lint([SOURCE])
+
+		expect(document_checks.check_files).toHaveBeenCalledOnce()
 	})
 
 	it('leaves out the stages a red lint did not reach', async () => {

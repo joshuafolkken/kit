@@ -83,21 +83,6 @@ function is_failed(outcome: LintOutcome): boolean {
 	return outcome.exit_code !== 0
 }
 
-// The lint result folded together with the fast document checks: the
-// same checks the gate's `document-byte-budget.test.ts`, `command-reference.test.ts` and
-// `issue-citation-budget.test.ts` run, brought forward to this between-edits path so a mandated
-// documentation update over a ceiling surfaces in seconds. It reads no change
-// of its own — it takes the files this run already resolved, so the git contract is the lint
-// command's alone. A lint failure is reported as-is; only a green lint runs the document checks, so the
-// two never race to the exit code, and a green tree here is green on both — which is what the record
-// below then vouches for. The structural checks (`structural-checks.ts`) run beside the lint rather
-// than after it, so their whole-program scan costs no wall clock the lint has not already spent.
-//
-// The gate's `exports` check comes after them on the same terms: a namespace member nothing reads is
-// reported here for the namespaces the changed files declare or import directly
-// (joshuafolkken/kit#4645, joshuafolkken/kit#4649), rather than at ship's pre-detach gate. The
-// fallback scans the whole program, a superset as the lint's is.
-//
 // The document checks, then the unused members, once the lint and the structural checks are green.
 async function after_lint_outcome(
 	scope: ChangedFileScope,
@@ -121,6 +106,21 @@ async function after_lint_outcome(
 	return { stage: 'unused members', exit_code: unused }
 }
 
+// The lint result folded together with the fast document checks: the
+// same checks the gate's `document-byte-budget.test.ts`, `command-reference.test.ts` and
+// `issue-citation-budget.test.ts` run, brought forward to this between-edits path so a mandated
+// documentation update over a ceiling surfaces in seconds. It reads no change
+// of its own — it takes the files this run already resolved, so the git contract is the lint
+// command's alone. A lint failure is reported as-is; only a green lint runs the document checks, so the
+// two never race to the exit code, and a green tree here is green on both — which is what the record
+// below then vouches for. The structural checks (`structural-checks.ts`) run beside the lint rather
+// than after it, so their whole-program scan costs no wall clock the lint has not already spent.
+//
+// The gate's `exports` check comes after them on the same terms: a namespace member nothing reads is
+// reported here for the namespaces the changed files declare or import directly
+// (joshuafolkken/kit#4645, joshuafolkken/kit#4649), rather than at ship's pre-detach gate. The
+// fallback scans the whole program, a superset as the lint's is.
+//
 // The outcome names the stage that failed first, which the verdict line names (joshuafolkken/kit#5162).
 // Each stage's time goes to `stages` (`lint-related-record.ts`); the structural checks are timed on
 // their own promise, since they overlap the lint.
