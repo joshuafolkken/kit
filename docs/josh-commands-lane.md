@@ -380,11 +380,14 @@ Tool cumulative time is separate: parallel calls overlap and must not be added t
 
 Historical ship boundaries use completed ledger/archive intervals and surviving unfinished-stage events. The board stream has bounded retention. For parallel stages, latest start owns each instant; earlier stages resume when it ends. Without either record, a missing stage cannot be reconstructed.
 
-`--timeline` prints the lane one line an event, oldest first: start (UTC), minutes since the dispatch, duration, name (`lane-timeline.ts`). Its stage lines are the same spans at their net minutes and add up to the net time.
+`--timeline` prints the lane one line an event, oldest first: start (UTC, to the second), end (blank for a point), minutes since the dispatch, duration, name (`lane-timeline.ts`). Its stage lines are the same spans at their net minutes and add up to the net time.
+
+Ship lines carry their attempt: `ship #2 sync`. An attempt opens at a ship preflight or pre-detach checks that follow neither: the detached half's preflight and an infrastructure retry stay in their attempt; a `--review` re-ship, skipping the preflight, opens one at its pre-detach checks. The count reads the ledger, so it survives event-stream rotation (`lane-timeline-steps.ts`).
 
 - `[excluded]` — a wait taken out, named by what opened it (park, outage, usage limit, split, yield, sleep).
 - `[driver]` — the followup's CI wait.
-- `[event]` — a main merge-in (the ship's `merge` lap), a split or `unplanned` notice, a split, a ship launch, a review round.
+- `[event]` — a main merge-in (the ship's `merge` lap), a split or `unplanned` notice, a split, a ship launch, a review round, and the ledger's verdict of each review round (`review round 1 (reused)`).
+- `[step]` — a timed step inside a stage, outside the net sum. From the ledger: each ship stage's own laps (the foreground `sync › conflict probe` among them), each `run:chain`, `test:related` and `test:pinned`, and the CI and CodeRabbit waits. From the transcripts: each `lint:related` and each review pass (`round 1`, `interaction`).
 
 A ship stop closes the ship stage open at it. A blocking `lane:plan` wait on a holder is its own `lane:plan wait (#<M>)` row, cut out of the stage it fell in (`lane-plan-wait-event.ts`).
 
