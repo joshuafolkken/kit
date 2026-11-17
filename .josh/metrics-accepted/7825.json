@@ -1,0 +1,7 @@
+{
+	"reason": "lint:related now folds the typed autofix pass's exit code into its verdict (#7825); +9 lines carry that exit code and the fold",
+	"date": "2026-11-17",
+	"growth": {
+		"scripts.code_lines": 9
+	}
+}

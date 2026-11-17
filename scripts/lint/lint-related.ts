@@ -187,6 +187,14 @@ function report_unmoved(): LintOutcome {
 	return UNMOVED
 }
 
+// A residual the typed fix pass reported fails a run whose untyped lint passed: the gate's whole-tree
+// lint is typed and reports it too (`lint-related-fix.ts`, joshuafolkken/kit#7825).
+function with_fix_pass(outcome: LintOutcome, fix_exit_code: number): LintOutcome {
+	if (fix_exit_code === 0 || is_failed(outcome)) return outcome
+
+	return { stage: 'autofix', exit_code: fix_exit_code }
+}
+
 async function checked_outcome(
 	command_arguments: ReadonlyArray<string>,
 	root: string,
@@ -196,13 +204,14 @@ async function checked_outcome(
 	if (moved?.length === 0) return { outcome: report_unmoved(), before }
 
 	const scope = await resolve_lint_scope(command_arguments, root, moved)
-	const verified = await lint_related_fix.prepare(command_arguments, scope, root)
+	const { before: verified, fix_exit_code } = await lint_related_fix.prepare(
+		command_arguments,
+		scope,
+		root,
+	)
 	const outcome = await scoped_outcome(scope, root)
 
-	return {
-		outcome,
-		before: verified,
-	}
+	return { outcome: with_fix_pass(outcome, fix_exit_code), before: verified }
 }
 
 // The run's last line names the stage that failed, or says it passed; the console is the only copy of
