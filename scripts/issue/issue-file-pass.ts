@@ -14,6 +14,7 @@ import { issue_sample_source } from './issue-sample-source'
 import { issue_scout_cli, type ScoutOutcome } from './issue-scout-cli'
 import { issue_wip, type WipCap } from './issue-wip'
 import { measure_twin } from './measure-twin'
+import { premise_judge } from './premise-judge'
 import { size_estimate } from './size-estimate'
 
 // The one pass of `josh issue:file`: every check the body and the arguments are answered by — the
@@ -208,11 +209,20 @@ async function cap_refusals(filing: Filing): Promise<ReadonlyArray<string>> {
 	return problem === undefined ? [] : [`✖ ${problem}`]
 }
 
+// The body's unreadable premises, run in this checkout — so, like `cap_refusals`, only for a filing
+// into this repository.
+function premise_refusals(filing: Filing): ReadonlyArray<string> {
+	if (!issue_file.is_same_repository(filing.target, filing.current)) return []
+
+	return premise_judge.draft_problems(filing.body).map((problem) => `✖ ${problem}`)
+}
+
 // The size estimate is judged at the ledger's recent implement rate (joshuafolkken/kit#6025).
 async function is_admitted(filing: Filing): Promise<boolean> {
 	const { implement_rate, growth } = await lane_net_read.measurements()
 	const capped = await cap_refusals(filing)
-	const refusals = [...refusals_of(filing, implement_rate, growth), ...capped]
+	const premised = premise_refusals(filing)
+	const refusals = [...refusals_of(filing, implement_rate, growth), ...capped, ...premised]
 
 	issue_lint_cli.warn(filing.body)
 	if (refusals.length === 0) return true
