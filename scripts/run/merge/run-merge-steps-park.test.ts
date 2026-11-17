@@ -6,6 +6,7 @@ import { lane_close } from '#scripts/lane/lane-close'
 import { lane_registry } from '#scripts/lane/lane-registry'
 import { lane_seat_fixture } from '#scripts/lane/lane-seat-fixture'
 import { run_carry } from '#scripts/run/carry/run-carry'
+import { run_hold } from '#scripts/run/hold/run-hold'
 import { run_stalled } from '#scripts/run/park/run-stalled'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -363,6 +364,7 @@ describe('run_merge_steps.do_failed — a child carrying the not-before label', 
 
 describe('run_merge_steps.do_merged — a child merged while its issue stayed OPEN', () => {
 	beforeEach(() => {
+		vi.spyOn(run_hold, 'worktree_directory').mockResolvedValue(undefined)
 		vi.spyOn(josh_command, 'josh_run').mockResolvedValue({ code: 0, out: '' })
 		vi.spyOn(lane_close, 'resolve_lane').mockResolvedValue({
 			existing: undefined,

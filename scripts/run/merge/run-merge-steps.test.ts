@@ -12,6 +12,7 @@ import { lane_seat_fixture } from '#scripts/lane/lane-seat-fixture'
 import { poll } from '#scripts/lib/poll'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_cut } from '#scripts/run/cut/run-cut'
+import { run_hold } from '#scripts/run/hold/run-hold'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 
@@ -177,6 +178,7 @@ interface LaneCloseSpies {
 // `lane:close`), the stash push, and the lane directory the close would remove.
 function stub_lane_close(): LaneCloseSpies {
 	comment_mock.mockReset().mockResolvedValue(true)
+	vi.spyOn(run_hold, 'worktree_directory').mockResolvedValue(undefined)
 	vi.spyOn(lane_close, 'resolve_lane').mockResolvedValue({
 		existing: undefined,
 		targets: { directory: LANE_DIRECTORY, branch: `${CONTEXT.child}-lane` },

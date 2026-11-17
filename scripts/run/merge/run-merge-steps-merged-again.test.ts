@@ -3,6 +3,7 @@ import path from 'node:path'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_close } from '#scripts/lane/lane-close'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
+import { run_hold } from '#scripts/run/hold/run-hold'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -63,6 +64,7 @@ function write_carry(): string {
 }
 
 beforeEach(() => {
+	vi.spyOn(run_hold, 'worktree_directory').mockResolvedValue(undefined)
 	vi.spyOn(josh_command, 'josh_run').mockResolvedValue({ code: 0, out: '' })
 	vi.spyOn(lane_close, 'resolve_lane').mockResolvedValue({
 		existing: undefined,
