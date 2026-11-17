@@ -14,7 +14,7 @@ vi.mock('./project-checks', () => ({ project_checks: { is_kit_repository: is_kit
 
 const { metrics_totals } = await import('./metrics-totals')
 
-// joshuafolkken/kit#4594: the ratchet totals reported in the implementation loop, before the ship.
+// joshuafolkken/kit#4594: the ratchet totals stopped on before the ship.
 
 const DIRECTORY = '/repository'
 const GROWN =
@@ -25,35 +25,6 @@ beforeEach(() => {
 	run_mock.mockReset()
 	is_kit_mock.mockReturnValue(true)
 	run_mock.mockResolvedValue(PASSED)
-})
-
-describe('metrics_totals.growth_notice', () => {
-	it('runs no metrics outside kit', async () => {
-		is_kit_mock.mockReturnValue(false)
-
-		await expect(metrics_totals.growth_notice(DIRECTORY)).resolves.toBeUndefined()
-		expect(run_mock).not.toHaveBeenCalled()
-	})
-
-	it('runs the totals-only form in the given directory', async () => {
-		await metrics_totals.growth_notice(DIRECTORY)
-
-		expect(run_mock).toHaveBeenCalledWith(['josh', 'metrics', '--totals-only'], {
-			cwd: DIRECTORY,
-		})
-	})
-
-	it('answers nothing when no total grew', async () => {
-		await expect(metrics_totals.growth_notice(DIRECTORY)).resolves.toBeUndefined()
-	})
-
-	it('answers the notice with the accept hint when a total grew', async () => {
-		run_mock.mockResolvedValue({ exit_code: 1, output: `${GROWN}\n` })
-
-		await expect(metrics_totals.growth_notice(DIRECTORY)).resolves.toBe(
-			`${metrics_totals.NOTICE_HEADING}\n${GROWN}`,
-		)
-	})
 })
 
 // joshuafolkken/kit#6023: one judgment for run:review's open and the ship's pre-detach backstop.
