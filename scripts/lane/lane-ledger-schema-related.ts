@@ -47,6 +47,9 @@ const test_related_schema = z.object({
 	// `changed` split by whether that branch change holds the file (joshuafolkken/kit#7066).
 	changed_in_branch: z.number().optional(),
 	changed_off_branch: z.number().optional(),
+	// Whether the run read only the last red run's failed files and what moved since, rather than its
+	// whole reach — absent on a `--touched` run and on rows written before it (joshuafolkken/kit#7786).
+	red_rerun: z.boolean().optional(),
 	elapsed_ms: z.number(),
 })
 

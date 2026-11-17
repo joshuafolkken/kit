@@ -48,6 +48,9 @@ interface RunInput {
 	branch_parts?: ChangedParts | undefined
 	// How long selecting the tests took — the import graph and the importer index (joshuafolkken/kit#7248).
 	select_elapsed_ms?: number
+	// Whether a bare run read only its last red run's failed files and what moved since
+	// (`test-related-red.ts`, joshuafolkken/kit#7786); `undefined` for a `--touched` run.
+	red_rerun?: boolean
 }
 
 interface RunResult {
@@ -223,6 +226,7 @@ function record_of(input: RunInput, result: RunResult): TestRelatedRecord {
 		...full_reach_record(input.full_reach),
 		...widest_record(input.reach),
 		...select_record(input.select_elapsed_ms),
+		...(input.red_rerun !== undefined && { red_rerun: input.red_rerun }),
 		elapsed_ms: Math.round(result.elapsed_ms),
 	}
 
