@@ -194,7 +194,7 @@ async function close_split_lane(child: string): Promise<void> {
 async function post_counters(ctx: MergeContext, carry: RunCarry | undefined): Promise<void> {
 	if (carry === undefined || ctx.epic === undefined) return
 
-	await git_gh_issue_write.issue_try_comment(ctx.epic, run_merge.counters_comment(carry))
+	await git_gh_issue_write.issue_try_comment(ctx.epic, run_merge_prose.counters_comment(carry))
 }
 
 // Count the merge, which resets the failure streak.
@@ -266,7 +266,7 @@ async function do_waiting(ctx: MergeContext, waits: ReadonlyArray<string>): Prom
 	if (refused !== undefined) return refused_result(refused)
 
 	await release_child(ctx.child)
-	await git_gh_issue_write.issue_try_comment(ctx.child, run_merge.waiting_comment(waits))
+	await git_gh_issue_write.issue_try_comment(ctx.child, run_merge_prose.waiting_comment(waits))
 
 	return { carry: undefined, is_parked: false, is_refused: false, waits }
 }
