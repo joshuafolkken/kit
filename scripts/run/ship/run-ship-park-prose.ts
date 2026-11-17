@@ -76,10 +76,7 @@ function next_step(issue: string): string {
 
 	if (!is_japanese()) return `Read the stop with \`${log}\`, then ${run_stalled.next_step(issue)}.`
 
-	const live = run_stalled.resume_of(issue, true)
-	const plain = run_stalled.resume_of(issue, false)
-
-	return `\`${log}\` で停止を読み、原因を直してから、稼働中の backlogrun では \`${live}\`、それ以外では \`${plain}\` で再開してください。`
+	return `\`${log}\` で停止を読み、${run_stalled.next_step_ja(issue)}`
 }
 
 const run_ship_park_prose = { cap, ci_infra, next_step, timed_out }
