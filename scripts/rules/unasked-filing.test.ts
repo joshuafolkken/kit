@@ -251,6 +251,12 @@ describe('unasked_filing.ROW.already_satisfied — a prompt off the tail', () =>
 		expect(is_asked_after_read([NOTICE, HUMAN_PROMPT])).toBe(true)
 	})
 
+	it('stands down on a yes to a proposal a large read pushed off the tail', () => {
+		const yes = origin_line('はい', 'human')
+
+		expect(is_asked_after_read([reply_line(PROPOSAL_REPLY), yes])).toBe(true)
+	})
+
 	it('holds when no prompt of the person’s is in the transcript', () => {
 		expect(is_asked_after_read([NOTICE, reply_line(OTHER_REPLY)])).toBe(false)
 	})

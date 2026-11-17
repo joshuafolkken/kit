@@ -16,8 +16,8 @@ import { turn_filings } from './turn-filings'
 
 const NO_PROMPT = ''
 const HUMAN_ORIGIN = 'human'
-// How far back a prompt off the tail is looked for — several times a long session's transcript
-// (joshuafolkken/kit#7781).
+// How far back a prompt off the tail is looked for — a bound on one hook's read, not the whole of a
+// long run's transcript, which grows past it (`transcript-tail.ts`; joshuafolkken/kit#7781).
 const PROMPT_REACH_BYTES = 4_194_304
 
 const PROMPT_LINE_SCHEMA = z.object({

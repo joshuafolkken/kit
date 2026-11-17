@@ -26,15 +26,16 @@ const WORK_DIRECTORY = temporary_directory('suite')('last-prompt-reach-')
 const MISSING = path.join(WORK_DIRECTORY, 'missing.jsonl')
 
 describe('last_prompt.prompt_reach', () => {
-	it('keeps the tail when it carries the person’s prompt', () => {
-		expect(last_prompt.prompt_reach(PROMPT_LINE, MISSING)).toBe(PROMPT_LINE)
+	const TRANSCRIPT = path.join(WORK_DIRECTORY, 'transcript.jsonl')
+
+	writeFileSync(TRANSCRIPT, [PROMPT_LINE, TOOL_RESULT_LINE].join('\n'))
+
+	it('keeps the tail when it carries the person’s prompt, though the transcript is readable', () => {
+		expect(last_prompt.prompt_reach(PROMPT_LINE, TRANSCRIPT)).toBe(PROMPT_LINE)
 	})
 
 	it('reads further back when the tail carries no prompt', () => {
-		const transcript = path.join(WORK_DIRECTORY, 'transcript.jsonl')
-
-		writeFileSync(transcript, [PROMPT_LINE, TOOL_RESULT_LINE].join('\n'))
-		const text = last_prompt.prompt_reach(TOOL_RESULT_LINE, transcript)
+		const text = last_prompt.prompt_reach(TOOL_RESULT_LINE, TRANSCRIPT)
 
 		expect(last_prompt.person_prompt(text)).toBe(PROMPT)
 	})
