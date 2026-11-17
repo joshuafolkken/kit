@@ -40,8 +40,8 @@ function format_counts(epics: ReadonlyArray<number>, members: ReadonlyArray<Back
 		.join(', ')
 }
 
-// Only the reason follows the session language: the `Auto-decided` prefix is what `run-cut-digest.ts`
-// matches a written record on, so it stays fixed in every language.
+// Only the reason follows the session language: the `Auto-decided` prefix is the fixed decision
+// marker (`overview.md` → the output language), so it stays the same in every language.
 function reason_of(counts: string): string {
 	return session_language.is_japanese(session_language.resolve_session_lang().lang)
 		? ` — 関連する Issue を最も多く追っているため（${counts}）。同数なら古い epic を選ぶ。`

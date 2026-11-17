@@ -58,7 +58,7 @@ describe('epic_bundle_recommend.placement_record', () => {
 		)
 	})
 
-	// The prefix is what `run-cut-digest.ts` matches on, so only the reason changes (ac-8cca0653).
+	// The prefix is the fixed decision marker, so only the reason changes (ac-8cca0653).
 	it.each(['ja', ''])(
 		'writes the reason in Japanese for the session language %j, keeping the prefix (ac-bc8ebf54)',
 		(lang) => {
