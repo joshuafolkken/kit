@@ -55,7 +55,7 @@ beforeEach(() => {
 	josh_run_mock.mockReset()
 	josh_run_mock.mockResolvedValue({ code: 0, out: '' })
 	slot_holds('')
-	vi.spyOn(metrics_totals, 'totals_refusal').mockResolvedValue(undefined)
+	vi.spyOn(metrics_totals, 'totals_check').mockResolvedValue(undefined)
 	vi.spyOn(run_review_pinned_accepted, 'recorded_reason').mockResolvedValue(undefined)
 	vi.spyOn(run_ship_pre_detach_pinned, 'pinned_check').mockResolvedValue({ code: 0, out: '' })
 	error_lines.length = 0
@@ -150,15 +150,28 @@ describe('run_chain_cli.run --join — findings held for the record', () => {
 		expect(errors()).toContain('2 finding(s)')
 		expect(errors()).toContain(SHIP_REVIEW)
 	})
+})
 
-	it('asks for the recheck of the fixed tree before the ship', async () => {
-		slot_holds(LOW_FINDING)
+describe('run_chain_cli.run --join — the recheck the held round asks for', () => {
+	it('asks for the recheck of the fixed tree, which ships, naming no second ship', async () => {
+		slot_holds(MEDIUM_FINDING)
 
 		await run_chain_cli.run(SHIPPING)
 
-		expect(errors()).toContain(`--join --ship '${TITLE}' --from recheck\`, then ship`)
+		expect(errors()).toContain(`--join --ship '${TITLE}' --from recheck\`, which ships`)
+		expect(errors()).not.toContain(SHIP_REVIEW)
 	})
 
+	it('names the ship after the recheck when the chain was not given one', async () => {
+		slot_holds(MEDIUM_FINDING)
+
+		await run_chain_cli.run([ISSUE, JOIN])
+
+		expect(errors()).toContain(`--join --from recheck\`, ${SHIP_REVIEW}`)
+	})
+})
+
+describe('run_chain_cli.run --join — the held round routed for its fix', () => {
 	it('routes the held round through the review-fix next action (ac-c38296ce)', async () => {
 		const route = vi.spyOn(run_chain_review_fix, 'route').mockReturnValue(() => 'cut now')
 

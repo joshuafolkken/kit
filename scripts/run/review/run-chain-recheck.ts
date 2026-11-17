@@ -1,5 +1,6 @@
 import { metrics_totals } from '#scripts/gate/metrics-totals'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
+import { buffered_process } from '#scripts/lib/buffered-process'
 import { run_ship_pre_detach_pinned } from '#scripts/run/ship/run-ship-pre-detach-pinned'
 import { run_chain, type ChainStage, type HoldStop } from './run-chain'
 import { run_review_pinned_accepted } from './run-review-pinned-accepted'
@@ -28,18 +29,20 @@ function pinned_stop(mode: ReadonlyArray<string>): HoldStop {
 	return {
 		notice: 'a changed place no test pins',
 		next: (issue) =>
-			`pin each named place with a test that turns red without it, ${run_chain.rerun(issue, RECHECK, mode)}; for a change no test can pin, ship with \`--unpinned-ok "<reason>"\``,
+			`pin each named place with a test that turns red without it, ${run_chain.rerun(issue, RECHECK, mode)}; for a change no test can pin, ship on its own with \`pnpm josh ship --detach --review --unpinned-ok "<reason>" "<title>"\` — \`run:chain --join\` takes no \`--unpinned-ok\``,
 	}
 }
 
+// The totals' own output, not `totals_refusal`'s: that heading resumes `run:review`, which a reopen
+// after round 1 refuses.
 async function metrics_hold(
 	mode: ReadonlyArray<string>,
 	print: Print,
 ): Promise<HoldStop | undefined> {
-	const refusal = await metrics_totals.totals_refusal(PROJECT_ROOT)
+	const result = await metrics_totals.totals_check(PROJECT_ROOT)
 
-	if (refusal === undefined) return undefined
-	print(refusal)
+	if (result === undefined || !buffered_process.is_process_failed(result)) return undefined
+	print(result.output.trim())
 
 	return metrics_stop(mode)
 }

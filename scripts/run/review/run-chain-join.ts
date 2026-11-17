@@ -20,6 +20,7 @@ const ATTEST = 'review:attest'
 const RECORD = 'review:record'
 const JOIN = '--join'
 const FIXING = '--fixing'
+const SHIP = '--ship'
 const ROUND_TWO_SEVERITIES: ReadonlySet<string> = new Set(['high', 'medium'])
 // The code slot: the interaction pass is recorded beside round 1 on its own call.
 const is_interaction = false
@@ -32,19 +33,22 @@ function severity_of(spec: string): string {
 	return review_record_cli.parse_finding(review_record_slot.unmarked(spec))?.severity ?? ''
 }
 
-// The fixed tree is rechecked before the ship (`run-chain-recheck.ts`).
-function recheck_then(issue: string, mode: ReadonlyArray<string>): string {
-	return run_chain.rerun(issue, run_chain_recheck.RECHECK, mode)
+// The fixed tree is rechecked before the ship (`run-chain-recheck.ts`); under `--ship` the rerun ships
+// itself, so no second ship is named beside the detached one.
+function recheck_then(issue: string, mode: ReadonlyArray<string>, ship: string): string {
+	const rerun = run_chain.rerun(issue, run_chain_recheck.RECHECK, mode)
+
+	return mode.includes(SHIP) ? `${rerun}, which ships` : `${rerun}, then ${ship}`
 }
 
 function round_two_next(mode: ReadonlyArray<string>): (issue: string) => string {
 	return (issue) =>
-		`fix each finding, record each disposition with ${record_call(issue)} (\`<n>=<disposition>\`: its usage), ${recheck_then(issue, mode)}, then ship with \`--review\` — a High or a Medium makes round 2 due (\`chain-rule.md\` → "Run the review-to-merge chain", step 4)`
+		`fix each finding, record each disposition with ${record_call(issue)} (\`<n>=<disposition>\`: its usage), ${recheck_then(issue, mode, 'ship with `--review`')} — a High or a Medium makes round 2 due (\`chain-rule.md\` → "Run the review-to-merge chain", step 4)`
 }
 
 function low_only_next(mode: ReadonlyArray<string>): (issue: string) => string {
 	return (issue) =>
-		`fix, file or drop each Low with a one-line reason, record each disposition with ${record_call(issue)} (\`<n>=<disposition>\`: its usage), ${recheck_then(issue, mode)}, then ship — no round 2 is due`
+		`fix, file or drop each Low with a one-line reason, record each disposition with ${record_call(issue)} (\`<n>=<disposition>\`: its usage), ${recheck_then(issue, mode, 'ship')} — no round 2 is due`
 }
 
 // A lane child takes the fix to a fresh session (`run-chain-review-fix.ts`).
@@ -94,7 +98,7 @@ function join_mode(is_fixing: boolean, title: string | undefined): ReadonlyArray
 	return [
 		JOIN,
 		...(is_fixing ? [FIXING] : []),
-		...(title === undefined ? [] : ['--ship', shell_quote.word(title)]),
+		...(title === undefined ? [] : [SHIP, shell_quote.word(title)]),
 	]
 }
 

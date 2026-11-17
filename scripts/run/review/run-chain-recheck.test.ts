@@ -31,8 +31,11 @@ function output(): string {
 	return printed.join('\n')
 }
 
-function totals_refuse(refusal: string | undefined): ReturnType<typeof vi.spyOn> {
-	return vi.spyOn(metrics_totals, 'totals_refusal').mockResolvedValue(refusal)
+// `undefined` passes the totals; a string is the failed run's output.
+function totals_answer(failure: string | undefined): ReturnType<typeof vi.spyOn> {
+	const result = { output: failure ?? '', exit_code: failure === undefined ? 0 : 1, elapsed_ms: 0 }
+
+	return vi.spyOn(metrics_totals, 'totals_check').mockResolvedValue(result)
 }
 
 function pinned_answers(code: number, out: string): ReturnType<typeof vi.spyOn> {
@@ -44,7 +47,7 @@ beforeEach(() => {
 	josh_run_mock.mockResolvedValue({ code: 0, out: '' })
 	vi.spyOn(review_record_slot, 'slot_text').mockReturnValue('')
 	vi.spyOn(run_review_pinned_accepted, 'recorded_reason').mockResolvedValue(undefined)
-	totals_refuse(undefined)
+	totals_answer(undefined)
 	pinned_answers(0, '')
 	printed.length = 0
 
@@ -61,7 +64,7 @@ afterEach(() => {
 
 describe('run_chain_cli.run --join — the recheck before the ship', () => {
 	it('stops on a metrics growth the fix made, naming it, before the ship (ac-fce1718f)', async () => {
-		totals_refuse(`run:review refused: josh metrics --totals-only did not pass\n${GROWTH}`)
+		totals_answer(GROWTH)
 
 		await expect(run_chain_cli.run(SHIPPING)).resolves.toBe(STOPPED)
 
@@ -72,6 +75,15 @@ describe('run_chain_cli.run --join — the recheck before the ship', () => {
 		expect(output()).toContain(RESUME)
 	})
 
+	it('prints no run:review resume on a metrics growth, which a reopen after round 1 refuses', async () => {
+		totals_answer(GROWTH)
+
+		await run_chain_cli.run(SHIPPING)
+
+		expect(output()).not.toContain(metrics_totals.REVIEW_REFUSAL_HEADING)
+		expect(output()).not.toContain('--from run:review')
+	})
+
 	it('stops on an unpinned place the fix made, naming it, before the ship (ac-3a49fce5)', async () => {
 		pinned_answers(1, `${UNPINNED} — reverting it left every related test green\n`)
 
@@ -80,7 +92,9 @@ describe('run_chain_cli.run --join — the recheck before the ship', () => {
 		expect(ran()).not.toContain(SHIP)
 		expect(output()).toContain(UNPINNED)
 		expect(output()).toContain('stopped at recheck (a changed place no test pins)')
-		expect(output()).toContain('`--unpinned-ok "<reason>"`')
+		expect(output()).toContain(
+			'`pnpm josh ship --detach --review --unpinned-ok "<reason>" "<title>"`',
+		)
 	})
 
 	it('ships when both judgments pass, running no command of its own', async () => {
@@ -99,7 +113,7 @@ describe('run_chain_cli.run --join — the recheck before the ship', () => {
 // The same functions the ship's pre-detach asks, under what this branch already accepted.
 describe('run_chain_cli.run --join — the judgments the ship asks (ac-fd7735c5)', () => {
 	it('asks the totals the metrics refusal of run:review and the ship reads', async () => {
-		const totals = totals_refuse(undefined)
+		const totals = totals_answer(undefined)
 
 		await run_chain_cli.run(SHIPPING)
 
