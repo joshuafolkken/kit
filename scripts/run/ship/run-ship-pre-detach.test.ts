@@ -51,6 +51,7 @@ const TYPE_ERROR = 'scripts/a.test.ts(3,7): error TS4111: Property comes from an
 const ACCEPT_HINT = 'pnpm josh metrics --accept --reason "<why>"'
 const GUARD_FAILURE = 'FAIL scripts/document/document-byte-budget.test.ts > stays under budget'
 const STATIC_RED = ['pre-detach']
+const DERIVE_CHECK = 'josh command:derive --check'
 
 interface Answer {
 	exit_code: number | undefined
@@ -275,7 +276,7 @@ describe('run_ship_pre_detach.checks — the metrics totals', () => {
 			code: OK,
 			out: run_ship_pre_detach.PASSED,
 		})
-		expect(commands()).toStrictEqual([metrics, ...STATIC])
+		expect(commands()).toStrictEqual([metrics, ...STATIC, DERIVE_CHECK])
 	})
 
 	// joshuafolkken/kit#4716: the totals may re-record the approval file, so they finish before the tree
@@ -325,7 +326,7 @@ describe('run_ship_pre_detach.checks — an approval write still in progress', (
 			return { exit_code: OK, output: '' }
 		})
 		await run_ship_pre_detach.checks(tree.directory, undefined, pinned)
-		expect(commands()).toStrictEqual([metrics, ...STATIC])
+		expect(commands()).toStrictEqual([metrics, ...STATIC, DERIVE_CHECK])
 		expect(pinned).toHaveBeenCalledOnce()
 	})
 })

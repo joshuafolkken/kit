@@ -1,10 +1,11 @@
+import { derive_check } from '#scripts/document/derive-check'
 import { document_byte_budget } from '#scripts/document/document-byte-budget'
 
 // Adding a command moves every artifact derived from the command map at once: the usage spans and the
 // catalog. One command writes them all, and every
 // test that finds one stale names it, so a failure never fixes one artifact and hides the next (#4970).
 
-const DERIVE_COMMAND = 'pnpm josh command:derive'
+const { CHECK_FLAG, DERIVE_COMMAND } = derive_check
 
 interface PageSize {
 	path: string
@@ -29,6 +30,7 @@ function byte_line({ path, bytes }: PageSize): string {
 }
 
 const derived_artifacts = {
+	CHECK_FLAG,
 	DERIVE_COMMAND,
 	byte_line,
 	is_over,

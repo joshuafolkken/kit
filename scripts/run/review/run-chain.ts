@@ -1,3 +1,4 @@
+import { derive_check } from '#scripts/document/derive-check'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import type { ChainStageEntry } from '#scripts/lane/lane-ledger-schema-ship'
 
@@ -18,6 +19,7 @@ const SELFCHECK = 'review:selfcheck'
 const CHECK_RELATED = 'check:related'
 const ACCEPTANCE_CHECK = 'acceptance:check'
 const RUN_REVIEW = 'run:review'
+const [DERIVE_CHECK = ''] = derive_check.DERIVE_CHECK_ARGV
 
 type NextAction = (issue: string) => string
 
@@ -70,6 +72,15 @@ const MERGE_STAGE: ChainStage = {
 		`settle what \`${MAIN_MERGE}\` refused (\`chain-rule.md\` → "Orchestration facts single-sourced here"), ${rerun(issue)}`,
 }
 
+// A hand edit to a generated page stops here, before the review, rather than at the ship's pre-detach,
+// which runs the same check (joshuafolkken/kit#7728). Kit alone derives pages from its command map.
+const DERIVE_CHECK_STAGE: ChainStage = {
+	name: DERIVE_CHECK,
+	argv: derive_check.DERIVE_CHECK_ARGV,
+	next: (issue) =>
+		`move each named page's hand edit into its source, run \`${derive_check.DERIVE_COMMAND}\`, ${rerun(issue, DERIVE_CHECK)}`,
+}
+
 // Ship's acceptance-map refusal asked of the draft before the review, so a criterion with no row stops
 // here rather than at ship's preflight (joshuafolkken/kit#7727).
 const ACCEPTANCE_STAGE: ChainStage = {
@@ -79,21 +90,27 @@ const ACCEPTANCE_STAGE: ChainStage = {
 		`write a row for each criterion it names in the ship body draft's \`## 受け入れ条件の対応\`, ${rerun(issue, ACCEPTANCE_CHECK)}`,
 }
 
+const SELFCHECK_STAGE: ChainStage = {
+	name: SELFCHECK,
+	argv: [SELFCHECK],
+	next: (issue) =>
+		`fix each hit (\`prompts/review.md\` → "Before round 1 — the implementer's self-check"), ${rerun(issue)}; on a hit that is no defect, ${rerun(issue, CHECK_RELATED)}`,
+}
+
 // `review_args` — `--unpinned-ok "<reason>"` and `--accept-metrics "<reason>"` as given — goes to
-// `run:review` alone; empty when absent.
-function review_stages(review_args: ReadonlyArray<string>): ReadonlyArray<ChainStage> {
+// `run:review` alone; empty when absent. `is_kit` adds the generated-page check.
+function review_stages(
+	review_args: ReadonlyArray<string>,
+	is_kit: boolean,
+): ReadonlyArray<ChainStage> {
 	return [
-		{
-			name: SELFCHECK,
-			argv: [SELFCHECK],
-			next: (issue) =>
-				`fix each hit (\`prompts/review.md\` → "Before round 1 — the implementer's self-check"), ${rerun(issue)}; on a hit that is no defect, ${rerun(issue, CHECK_RELATED)}`,
-		},
+		SELFCHECK_STAGE,
 		{
 			name: CHECK_RELATED,
 			argv: [CHECK_RELATED],
 			next: (issue) => `fix the red check, ${rerun(issue, CHECK_RELATED)}`,
 		},
+		...(is_kit ? [DERIVE_CHECK_STAGE] : []),
 		ACCEPTANCE_STAGE,
 		{
 			name: RUN_REVIEW,
@@ -104,8 +121,11 @@ function review_stages(review_args: ReadonlyArray<string>): ReadonlyArray<ChainS
 	]
 }
 
-function main_line_stages(review_args: ReadonlyArray<string>): ReadonlyArray<ChainStage> {
-	return [MERGE_STAGE, ...review_stages(review_args)]
+function main_line_stages(
+	review_args: ReadonlyArray<string>,
+	is_kit: boolean,
+): ReadonlyArray<ChainStage> {
+	return [MERGE_STAGE, ...review_stages(review_args, is_kit)]
 }
 
 // The stages from `from` on; `undefined` when no stage has that name.
