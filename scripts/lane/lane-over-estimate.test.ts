@@ -1,31 +1,52 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { lane_breakdown } from './lane-breakdown'
+import { lane_implement_rate } from './lane-implement-rate'
+import { lane_implement_rate_read } from './lane-implement-rate-read'
 import type { LedgerEntry } from './lane-ledger'
 import { lane_over_estimate, type EstimateScale } from './lane-over-estimate'
+import { lane_size_stats } from './lane-size-stats'
 
 // joshuafolkken/kit#7785: the #7737 lane ran to size, the #7724 lane ran past its estimate (both
 // shapes as that Issue recorded them), and a lane with no recorded size has no estimate.
 
 const MINUTE_MS = 60_000
+const DAY_MS = 24 * 60 * MINUTE_MS
 const TO_SIZE = 7737
 const OVER = 7724
 const UNSIZED = 7790
 const START = Date.parse('2026-11-17T00:00:00.000Z')
-const WINDOW = { since_ms: START, until_ms: START + 24 * 60 * MINUTE_MS }
+const DISPATCH = '2026-11-17T01:00:00.000Z'
+const MERGE = '2026-11-17T02:00:00.000Z'
+const WINDOW = { since_ms: START, until_ms: START + DAY_MS }
 // One declared line per 1/100 of the rate's median minutes, at growth 1, projects the median.
 const DECLARED_LINES = 100
 
-function size(issue: number): Extract<LedgerEntry, { kind: 'size' }> {
-	const counts = { files: 4, lines: DECLARED_LINES }
+afterEach(() => {
+	vi.restoreAllMocks()
+})
 
-	return { kind: 'size', at: '2026-11-17T01:00:00.000Z', issue, declared: counts, actual: counts }
+function size(issue: number, lines = DECLARED_LINES): Extract<LedgerEntry, { kind: 'size' }> {
+	const counts = { files: 4, lines }
+
+	return { kind: 'size', at: MERGE, issue, declared: counts, actual: counts }
 }
 
-function scale_at(median: number): EstimateScale {
+function lane(issue: number): Array<LedgerEntry> {
+	return [
+		{ kind: 'dispatch', at: DISPATCH, issue },
+		{ kind: 'merge', at: MERGE, issue },
+	]
+}
+
+function scale_at(median: number | undefined, lines = DECLARED_LINES): EstimateScale {
+	vi.spyOn(lane_implement_rate, 'rate').mockReturnValue(
+		median === undefined ? undefined : { median, lanes: 9 },
+	)
+	vi.spyOn(lane_size_stats, 'ratios').mockReturnValue({ files: 1, lines: 1 })
+
 	return {
-		sizes: [size(TO_SIZE), size(OVER)],
-		rate: { median, lanes: 9 },
-		growth: { files: 1, lines: 1 },
+		entries: [...lane(TO_SIZE), ...lane(OVER), ...lane(UNSIZED)],
+		sizes: [size(TO_SIZE, lines), size(OVER, lines)],
 	}
 }
 
@@ -58,11 +79,30 @@ describe('lane_over_estimate.estimate_of', () => {
 	})
 
 	it('reads a lane as no estimate when no rate was measured', () => {
-		const scale = { ...scale_at(60.8), rate: undefined }
+		const estimate = lane_over_estimate.estimate_of(scale_at(undefined), TO_SIZE, implement(43.1))
 
-		expect(lane_over_estimate.estimate_of(scale, TO_SIZE, implement(43.1)).side).toBe(
-			lane_over_estimate.SIDE.NONE,
-		)
+		expect(estimate.side).toBe(lane_over_estimate.SIDE.NONE)
+	})
+
+	it('reads a declared size of no lines as no estimate, with no ratio', () => {
+		const estimate = lane_over_estimate.estimate_of(scale_at(60.8, 0), TO_SIZE, implement(43.1))
+
+		expect(lane_over_estimate.cell(estimate)).toBe(lane_over_estimate.SIDE.NONE)
+	})
+})
+
+describe('lane_over_estimate.estimate_of — the measured window', () => {
+	it('measures the rate and growth over the days before the lane started', () => {
+		const scale = scale_at(60.8)
+		const until_ms = Date.parse(DISPATCH)
+		const measured = {
+			since_ms: until_ms - lane_implement_rate_read.PERIOD_DAYS * DAY_MS,
+			until_ms,
+		}
+
+		lane_over_estimate.estimate_of(scale, TO_SIZE, implement(43.1))
+		expect(lane_implement_rate.rate).toHaveBeenCalledWith(scale.entries, measured)
+		expect(lane_size_stats.ratios).toHaveBeenCalledWith(scale.entries, measured)
 	})
 })
 
@@ -82,10 +122,7 @@ describe('lane_over_estimate.counts_line', () => {
 
 describe('lane_over_estimate.scale_of', () => {
 	it('takes the sizes merged in the window', () => {
-		const entries: Array<LedgerEntry> = [
-			size(TO_SIZE),
-			{ kind: 'merge', at: '2026-11-17T02:00:00.000Z', issue: TO_SIZE },
-		]
+		const entries: Array<LedgerEntry> = [size(TO_SIZE), ...lane(TO_SIZE)]
 
 		expect(
 			lane_over_estimate.scale_of(entries, WINDOW).sizes.map((entry) => entry.issue),

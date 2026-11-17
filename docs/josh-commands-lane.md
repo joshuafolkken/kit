@@ -244,7 +244,8 @@ name of each `over_cap_hub` those lanes' `test-related` runs recorded.
 `--over <minutes>`: per merged lane over that many net min, longest first, net/wait minutes, ledger chain,
 stages past budget (`implement 58.8/9`), estimate, top stage, its `--sinks` open Issues (`lane-over.ts`).
 
-`estimate`: implement time against `lane:why`'s projection of the merge's recorded `- 規模見積もり:`, as
+`estimate`: implement time against `lane:why`'s projection of the merge's recorded `- 規模見積もり:`, at the
+rate of the 3 days before the lane's first dispatch, as
 `60.8 min ×0.71 to size`. Past 1 is `over estimate`; up to 1 is `to size`; no size or rate is `no estimate`, on
 neither side. The line under the rows counts each side (`lane-over-estimate.ts`).
 
