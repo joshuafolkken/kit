@@ -348,7 +348,7 @@ Before any write, the plan's files are counted against the estimate in force (th
 
 - Counted: backticked paths outside `### 影響を受ける既存の利用者`, plus the files of its `— 直す` entries, each once; tests and directories are not (`scripts/issue/plan-named-files.ts`).
 - More files than the estimate declares writes nothing, prints the count, the files and the estimate, and exits `1`. Add the corrected `- 規模見積もり:` line to the plan and re-run.
-- A corrected estimate past the guide is no split by itself: split only when the parts merge separately (`split-assessment.md` → "The question"), else add `- 分割しない理由:`.
+- A corrected estimate past the guide is no split by itself: split only when the parts merge separately (`.claude/skills/workflow-commands/split-assessment.md` → "The question"), else add `- 分割しない理由:`.
 - With no estimate, the count prints and the plan is recorded. A plan's estimate line replaces the issue body's when the plan is recorded.
 - Work a review finding adds later is outside this check.
 

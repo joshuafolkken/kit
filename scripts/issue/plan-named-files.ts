@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import { backlog_overlap } from '#scripts/backlog/backlog-overlap'
 import { lane_plan_auto } from '#scripts/lane/lane-plan-auto'
 import { test_declared_logic } from '#scripts/test/test-declared-logic'
@@ -7,9 +8,12 @@ import { plan_consumers_section } from './plan-consumers-section'
 // estimate — the paths it names outside its existing-consumers section and those of the consumers it
 // marks for fixing, each once. Test files sit outside the estimate, and a directory is no one file.
 
-// A bare basename the plan also names by its full path is the same file.
+// A bare basename the plan also names by its full path is the same file — unless the repository root
+// holds that name, as `SECURITY.md` beside `templates/SECURITY.md`.
 function is_restated_basename(path: string, paths: ReadonlyArray<string>): boolean {
-	return !path.includes('/') && paths.some((other) => other.endsWith(`/${path}`))
+	if (path.includes('/') || existsSync(path)) return false
+
+	return paths.some((other) => other.endsWith(`/${path}`))
 }
 
 function named_files(plan: string): ReadonlyArray<string> {

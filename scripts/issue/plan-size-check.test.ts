@@ -176,6 +176,24 @@ describe('plan_size_check.settle — refused, or the issue’s estimate restated
 		expect(issue_edit_body).toHaveBeenCalledWith('7', body_of([EIGHT_FILES]), undefined)
 	})
 
+	it('passes without writing when the issue cannot be read', async () => {
+		issue_view_json.mockResolvedValue(undefined)
+
+		expect(await plan_size_check.settle('7', named_plan([EIGHT_FILES]))).toBe(true)
+		expect(issue_edit_body).not.toHaveBeenCalled()
+	})
+
+	it('refuses when the restated estimate cannot be written', async () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		issue_view_json.mockResolvedValue(issue_json([SIX_FILES]))
+		issue_edit_body.mockRejectedValue(new Error('gh failed'))
+
+		expect(await plan_size_check.settle('7', named_plan([EIGHT_FILES]))).toBe(false)
+		expect(error).toHaveBeenCalledWith(expect.stringContaining('Could not restate'))
+		error.mockRestore()
+	})
+
 	it('writes nothing when the plan states no estimate', async () => {
 		expect(await plan_size_check.settle('7', named_plan(['- step']))).toBe(true)
 		expect(issue_edit_body).not.toHaveBeenCalled()

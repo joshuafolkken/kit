@@ -7,6 +7,7 @@ import { plan_named_files } from './plan-named-files'
 const EDITED = 'scripts/issue/issue-plan-cli.ts'
 const FIXED = 'scripts/epic/epic-decide.ts'
 const UNTOUCHED = 'scripts/lane/lane-why.ts'
+const NO_CONSUMERS = ['- なし（no concept）']
 
 function plan_of(steps: ReadonlyArray<string>, consumers: ReadonlyArray<string>): string {
 	return ['## 計画', ...steps, '', plan_consumers_section.HEADING, ...consumers].join('\n')
@@ -44,7 +45,13 @@ describe('plan_named_files.named_files — the files a plan will edit', () => {
 		expect(plan_named_files.named_files(plan)).toEqual([EDITED])
 	})
 
+	it('keeps a bare name the repository root holds beside a nested one', () => {
+		const plan = plan_of(['- edit `README.md` and `templates/README.md`'], NO_CONSUMERS)
+
+		expect(plan_named_files.named_files(plan)).toEqual(['README.md', 'templates/README.md'])
+	})
+
 	it('counts nothing for a plan naming no file', () => {
-		expect(plan_named_files.named_files(plan_of(['- step'], ['- なし（no concept）']))).toEqual([])
+		expect(plan_named_files.named_files(plan_of(['- step'], NO_CONSUMERS))).toEqual([])
 	})
 })
