@@ -57,7 +57,7 @@ entry() {
 	actual="sha512-$(openssl dgst -sha512 -binary "$dir/kit.tgz" | base64 | tr -d '\n')"
 	echo "tarball: $tarball"
 	echo "integrity: $integrity"
-	if [ "$actual" != "$integrity" ]; then
+	if [[ "$actual" != "$integrity" ]]; then
 		echo "sha512 mismatch: $actual" >&2
 		exit 1
 	fi
@@ -90,7 +90,7 @@ hash() {
 	(cd "$work/$name" && shasum -a 256 "${TRACKED_FILES[@]}" 2>&1 || true)
 }
 
-[ "$#" -ge 2 ] || usage
+[[ "$#" -ge 2 ]] || usage
 command="$1"
 # The work directory is made absolute once, so `run` still finds it after `cd` into the copy.
 mkdir -p "$2"
@@ -98,9 +98,9 @@ work_dir="$(cd "$2" && pwd -P)"
 shift 2
 set -- "$work_dir" "$@"
 case "$command" in
-	entry) [ "$#" -eq 2 ] || usage; entry "$@" ;;
-	copy) [ "$#" -eq 4 ] || usage; copy "$@" ;;
-	run) [ "$#" -ge 3 ] || usage; run "$@" ;;
-	hash) [ "$#" -eq 2 ] || usage; hash "$@" ;;
+	entry) [[ "$#" -eq 2 ]] || usage; entry "$@" ;;
+	copy) [[ "$#" -eq 4 ]] || usage; copy "$@" ;;
+	run) [[ "$#" -ge 3 ]] || usage; run "$@" ;;
+	hash) [[ "$#" -eq 2 ]] || usage; hash "$@" ;;
 	*) usage ;;
 esac
