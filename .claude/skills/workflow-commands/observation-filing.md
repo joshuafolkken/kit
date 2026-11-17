@@ -31,6 +31,17 @@ labels, scans for duplicates and runs `epic:bundle` (an `auto-ok` epic adds it t
 question and holds a `fold` (`split-assessment.md` → "The same two questions decide the filing-time fold").
 A bug filing's origin line: `prompts/collaboration-workflow/issue-template.md` (`- 原因:`).
 
+### The filing plan
+
+**The format a consultation main line presents before filing more than one Issue** — the answer to an
+imperative request (`prompts/collaboration-workflow/principles.md` → "consult-vs-execute"). Nothing is
+filed until the user says to; then the Issues are filed as planned.
+
+- Per Issue: a proposed English title, what it covers, and the main files it changes.
+- Order and dependencies: which Issue goes first and which one waits on which.
+- Decide first: the choices the user has to make before filing.
+- Unconfirmed: what the investigation did not settle.
+
 ### The depth test — a discretionary filing cites the product work it blocked
 
 **Depth is read off the subject's path, never judged — `pnpm josh observation:depth <path>`.**
