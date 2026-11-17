@@ -1,6 +1,7 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { issue_park } from '#scripts/issue/issue-park'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
+import { session_language } from '#scripts/josh/session-language'
 import { lane_registry } from '#scripts/lane/lane-registry'
 import { lane_seat_fixture } from '#scripts/lane/lane-seat-fixture'
 import { run_carry } from '#scripts/run/carry/run-carry'
@@ -74,5 +75,23 @@ describe('run_merge_steps — questions park as decisions', () => {
 
 		expect(await run_merge_steps.do_failed(CONTEXT)).toMatchObject({ is_refused: true })
 		expect(issue_park.apply).not.toHaveBeenCalled()
+	})
+})
+
+describe('run_merge_steps — the decision park comment', () => {
+	it('posts the decision prose in the session language (ac-bc8ebf54)', async () => {
+		vi.stubEnv(session_language.ENV_KEY, 'ja')
+		vi.spyOn(run_ending, 'read_transcript').mockReturnValue(
+			run_merge_decision_fixture.transcript('Proceed?'),
+		)
+
+		await run_merge_steps.do_failed(CONTEXT)
+
+		expect(issue_park.apply).toHaveBeenCalledExactlyOnceWith(
+			CHILD,
+			NEEDS_DECISION,
+			expect.stringContaining('子があなたの回答を待っている'),
+		)
+		vi.unstubAllEnvs()
 	})
 })

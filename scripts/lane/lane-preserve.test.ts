@@ -1,8 +1,9 @@
 import { mkdirSync } from 'node:fs'
 import path from 'node:path'
 import { git_stash } from '#scripts/git/stash/git-stash'
+import { session_language } from '#scripts/josh/session-language'
 import { temporary_directory } from '#tools/test/temporary-directory'
-import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { lane_close } from './lane-close'
 
 const make_directory = temporary_directory('suite')
@@ -52,7 +53,7 @@ describe('lane_preserve.preserve_lane', () => {
 
 		expect(push).toHaveBeenCalledWith(message, LANE_DIRECTORY)
 		expect(issue).toBe(ISSUE)
-		expect(body).toContain(`uncommitted work when ${CAUSE}, so it was stashed`)
+		expect(body).toContain(CAUSE)
 		expect(body).toContain(`pnpm josh stash:pop "${message}"`)
 	})
 
@@ -73,6 +74,37 @@ describe('lane_preserve.preserve_lane', () => {
 		await expect(lane_preserve.preserve_lane(ISSUE, OCCASION, CAUSE)).resolves.toBe(false)
 		expect(error).toHaveBeenCalledWith(expect.stringContaining('could not be stashed'))
 		expect(comment_mock).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#7700: the headline follows the session language; the recovery line does not.
+describe('lane_preserve.preserve_lane — the comment in the session language', () => {
+	beforeEach(() => {
+		vi.restoreAllMocks()
+		comment_mock.mockReset()
+	})
+
+	afterEach(() => {
+		vi.unstubAllEnvs()
+	})
+
+	const japanese = `stash した（${CAUSE}）:`
+
+	it.each([
+		['ja', japanese],
+		['', japanese],
+		['en', `The lane held uncommitted work when ${CAUSE}, so it was stashed:`],
+	])('writes the headline in session language %j', async (lang, headline) => {
+		lane_with_changes(true)
+		vi.stubEnv(session_language.ENV_KEY, lang)
+
+		await lane_preserve.preserve_lane(ISSUE, OCCASION, CAUSE)
+
+		const [first, recover] = String(comment_mock.mock.calls[0]?.[1]).split('\n', 2)
+		const message = git_stash.work_message(ISSUE, OCCASION)
+
+		expect(first).toContain(headline)
+		expect(recover).toBe(`- recover with \`pnpm josh stash:pop "${message}"\``)
 	})
 })
 

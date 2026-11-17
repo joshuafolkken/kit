@@ -9,12 +9,14 @@ const make_directory = temporary_directory()
 // joshuafolkken/kit#1520. The readings behind the progress line: the silence record, and the three
 // answers a tick can produce — a child in flight, nothing in flight, and a listing nobody could read.
 
-vi.mock('#scripts/epic/epic-busy', () => ({ epic_busy: { read_repository: vi.fn() } }))
+vi.mock('#scripts/epic/epic-busy', () => ({
+	epic_busy: { read_repository: vi.fn(), is_holder: vi.fn() },
+}))
 vi.mock('#scripts/lane/lane-registry', () => ({ lane_registry: { list_lanes: vi.fn() } }))
 vi.mock('#scripts/run/run-preflight', () => ({ run_preflight: { read_child_state: vi.fn() } }))
 vi.mock('#scripts/git/git-command', () => ({ git_command: { git_directories: vi.fn() } }))
 vi.mock('#scripts/run/hold/run-hold', () => ({
-	run_hold: { read_hold: vi.fn(), hold_path: vi.fn() },
+	run_hold: { read_hold: vi.fn(), hold_path: vi.fn(), is_stop_marked: vi.fn() },
 }))
 vi.mock('#scripts/run/carry/run-carry', () => ({
 	run_carry: { read_carry: vi.fn(), carry_path: vi.fn() },
@@ -27,8 +29,12 @@ const { git_command } = await import('#scripts/git/git-command')
 const { run_hold } = await import('#scripts/run/hold/run-hold')
 const { run_carry } = await import('#scripts/run/carry/run-carry')
 const { run_progress_read } = await import('./run-progress-read')
+const { run_progress } = await import('./run-progress')
+
+const { issue_run_hold } = await import('#scripts/issue/issue-run-hold')
 
 const read_repository = vi.mocked(epic_busy.read_repository)
+const is_holder = vi.mocked(epic_busy.is_holder)
 const list_lanes = vi.mocked(lane_registry.list_lanes)
 const read_child_state = vi.mocked(run_preflight.read_child_state)
 const git_directories = vi.mocked(git_command.git_directories)
@@ -219,6 +225,36 @@ describe('read_children and read_lanes', () => {
 		await expect(run_progress_read.read_lanes()).resolves.toEqual([
 			{ issue: '1520', state: 'open' },
 		])
+	})
+})
+
+// joshuafolkken/kit#7694: a run handed off on a parked issue holds this work tree while its
+// `needs-decision` is still on — the progress line counts it all the same.
+describe('read_children — a parked issue whose run holds the work tree', () => {
+	const PARKED = issue_row(320, [IN_PROGRESS, 'needs-decision'])
+
+	beforeEach(() => {
+		is_holder.mockImplementation((issue) =>
+			issue_run_hold.is_held((issue.labels ?? []).map((label) => label.name)),
+		)
+		read_repository.mockImplementation(async (_repo, is_kept) => {
+			const issues = [PARKED].filter((issue) => is_kept?.(issue) ?? true)
+
+			return await (issues.length > 0 ? { kind: 'busy', issues } : { kind: 'idle' })
+		})
+	})
+
+	it('is printed as a child in flight', async () => {
+		read_hold.mockReturnValue({ kind: 'held', hold: { ...A_HOLD, issue: '320' } })
+		const children = (await run_progress_read.read_children(REPO)) ?? []
+
+		expect(run_progress.format_children(children, REPO)).toContain('320')
+	})
+
+	it('is not a child when no run holds the work tree', async () => {
+		const children = (await run_progress_read.read_children(REPO)) ?? []
+
+		expect(run_progress.format_children(children, REPO)).toBe(run_progress.NO_CHILD_YET)
 	})
 })
 
