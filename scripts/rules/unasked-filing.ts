@@ -35,6 +35,15 @@ const FILING_WORDS: ReadonlyArray<RegExp> = [
 	/^\/?(?:kickoff|fullrun|halfrun|prrun|backlogrun)\b/iu,
 ]
 
+// A phrase that declines filing ("fix it without filing") is removed before FILING_WORDS is read,
+// so a positive instruction beside it still counts ("don't file A, file an issue for B").
+const NO_FILING_PHRASES: ReadonlyArray<RegExp> = [
+	/起票(?:は)?(?:せず|しないで|なしで|なしに)/gu,
+	/issue\s*に(?:せず|しないで)/giu,
+	/\bwithout filing\b/giu,
+	/\b(?:don['’]t|do not) file\b/giu,
+]
+
 // A short yes to the model's own proposal is the confirmation the refusal asks for.
 const AFFIRMATIVE = /^(?:はい|うん|お願い|どうぞ|進めて|yes|ok|okay|sure|please do|go ahead)/iu
 const SHORT_REPLY = 40
@@ -61,15 +70,34 @@ const UNASKED_FILING_REASON =
 	'Propose the Issue in the reply and file it once they confirm. It fires on every occurrence ' +
 	'(`.claude/skills/workflow-commands/observation-filing.md`).'
 
-function is_instructed(prompt: string): boolean {
-	const trimmed = issue_citation
+// The person's own words — quotes, code spans and fenced blocks removed.
+function own_words(prompt: string): string {
+	return issue_citation
 		.prose_lines(prompt)
 		.join('\n')
 		.replaceAll(/(?<!`)(`+)(?!`)[\s\S]*?(?<!`)\1(?!`)/gu, '')
 		.replaceAll(/「[^「」\n]*」|『[^『』\n]*』|"[^"\n]*"|'[^'\n]*'/gu, '')
 		.trim()
+}
 
-	return FILING_WORDS.some((pattern) => pattern.test(trimmed))
+function without_no_filing(text: string): string {
+	let rest = text
+	for (const pattern of NO_FILING_PHRASES) rest = rest.replaceAll(pattern, ' ')
+
+	return rest.trim()
+}
+
+// The person's own words decline filing — the reading a no-filing run takes its instruction from.
+function is_no_filing(prompt: string): boolean {
+	const words = own_words(prompt)
+
+	return without_no_filing(words) !== words
+}
+
+function is_instructed(prompt: string): boolean {
+	const rest = without_no_filing(own_words(prompt))
+
+	return FILING_WORDS.some((pattern) => pattern.test(rest))
 }
 
 function reply_text(line: string): string {
@@ -161,6 +189,6 @@ const ROW = {
 	},
 }
 
-const unasked_filing = { ROW, is_unasked_filing }
+const unasked_filing = { ROW, is_unasked_filing, is_no_filing }
 
 export { unasked_filing }
