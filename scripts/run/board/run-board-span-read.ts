@@ -60,6 +60,21 @@ async function recorded_span_here(
 	}
 }
 
+// A stopped single run gives way to a `backlogrun` launched or ended after its stop
+// (joshuafolkken/kit#7710); a running single run, whose span is open, never does.
+function is_after(recorded: BoardSpan, single: BoardSpan): boolean {
+	return (recorded.ended_ms ?? Infinity) > (single.ended_ms ?? Infinity)
+}
+
+// The single run beside the recorded run: a row of a carried run, else the frame unless the recorded
+// run came after it. A recorded run that reads no span leaves the single run the one drawn.
+function beside(single: BoardSpan, recorded: SpanHere, is_carried: boolean): SpanHere {
+	if (recorded.span === undefined) return { ...NO_SPAN, span: single }
+	if (is_carried) return { ...recorded, root: single }
+
+	return is_after(recorded.span, single) ? recorded : { ...NO_SPAN, span: single }
+}
+
 // A single run this checkout holds is the one drawn (`run-board-single.ts`) before the ended run; it
 // names no process. Beside a carried run it is the root checkout's, drawn as a row above the carried
 // run's lanes, which stays the frame (joshuafolkken/kit#7524). No repository, no run.
@@ -73,10 +88,10 @@ async function span_here(
 	const single = await run_board_single.span_here(is_carried)
 
 	if (single === undefined) return await recorded_span_here(repository, table, read)
-	const recorded = is_carried ? await recorded_span_here(repository, table, read) : NO_SPAN
+	const is_read = is_carried || single.ended_ms !== undefined
+	const recorded = is_read ? await recorded_span_here(repository, table, read) : NO_SPAN
 
-	// A carried record that reads no span leaves the single run the one drawn.
-	return recorded.span === undefined ? { ...NO_SPAN, span: single } : { ...recorded, root: single }
+	return beside(single, recorded, is_carried)
 }
 
 const run_board_span_read = { span_here }

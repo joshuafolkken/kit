@@ -179,6 +179,11 @@ async function timed_checks(args: ShipArguments): Promise<PreDetachResult> {
 	return await run_ship_pre_detach_timed.checks(args.number, checks_for(args))
 }
 
+// The `--unpinned-ok` argv a reason makes; empty with none.
+function ok_argv(reason: string | undefined): ReadonlyArray<string> {
+	return reason === undefined ? [] : [run_review_pinned.UNPINNED_OK_FLAG, reason]
+}
+
 // **A reason an earlier run on this branch accepted is this ship's `--unpinned-ok`** when it gives
 // none (joshuafolkken/kit#4974): the pre-detach check skips its probe under it, and the supervisor's
 // round 1 and its relaunch carry it, so a place the record lacks is listed and recorded after the
@@ -191,9 +196,15 @@ async function with_recorded_reason(args: ShipArguments): Promise<ShipArguments>
 	if (reason === undefined) return args
 	console.info(`${CARRIED_NOTE}${reason}`)
 
-	return { ...args, unpinned_ok: [run_review_pinned.UNPINNED_OK_FLAG, reason] }
+	return { ...args, unpinned_ok: ok_argv(reason) }
 }
 
-const run_ship_pre_detach_pinned = { checks_for, pinned_check, timed_checks, with_recorded_reason }
+const run_ship_pre_detach_pinned = {
+	checks_for,
+	ok_argv,
+	pinned_check,
+	timed_checks,
+	with_recorded_reason,
+}
 
 export { run_ship_pre_detach_pinned }

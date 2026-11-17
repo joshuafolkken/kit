@@ -10,6 +10,15 @@ const LOCKFILE_PATH = 'pnpm-lock.yaml'
 const INSTALLED = JSON.stringify({ dependencies: { tsx: '^4.23.5' }, devDependencies: {} })
 const DOWNGRADED = JSON.stringify({ dependencies: { tsx: '^4.23.1' }, devDependencies: {} })
 const UPGRADED = JSON.stringify({ dependencies: { tsx: '^4.24.0' }, devDependencies: {} })
+
+// Laid out as pnpm writes package.json, since the keep-back edits the entry in place.
+function laid_out(tsx: string, vitest: string): string {
+	return JSON.stringify({ dependencies: { tsx }, devDependencies: { vitest } }, undefined, '\t')
+}
+
+const STABLE_BEFORE = laid_out('^4.23.5', '^4.1.10')
+const ON_PRERELEASE = laid_out('^5.0.0-beta.1', '^4.2.0')
+const STABLE_KEPT = laid_out('^4.23.5', '^4.2.0')
 const ORIGINAL_LOCK = 'lockfile: installed'
 const REWRITTEN_LOCK = 'lockfile: downgraded'
 
@@ -114,6 +123,53 @@ describe('latest_update.main — an update that would downgrade', () => {
 		expect(vi.mocked(console.info)).toHaveBeenCalledWith(
 			expect.stringContaining('rolled back and no dependency changed'),
 		)
+	})
+})
+
+// The minimum-age gate can also hide a fresh stable major while an older prerelease of it is
+// allowed; `--latest` then moves a stable range onto that prerelease (joshuafolkken/kit#7693). The
+// stable range stays resolvable, so only that entry is kept back and the rest of the update stands.
+describe('latest_update.main — an update that would move a stable range onto a prerelease', () => {
+	beforeEach(() => {
+		tree.package_json = STABLE_BEFORE
+		execa_sync_mock.mockImplementation((_cmd: string, arguments_: Array<string>) => {
+			if (arguments_[0] !== 'install') rewrite_package_json(ON_PRERELEASE)
+
+			return { exitCode: 0 }
+		})
+	})
+
+	it('keeps the stable range for that entry and every other upgrade', () => {
+		latest_update.main()
+
+		expect(tree.package_json).toBe(STABLE_KEPT)
+	})
+
+	it('re-installs so the lockfile resolves the kept stable range', () => {
+		latest_update.main()
+
+		expect(execa_sync_mock).toHaveBeenLastCalledWith(
+			'pnpm',
+			expect.arrayContaining(['install']),
+			expect.anything(),
+		)
+	})
+
+	it('reports the prerelease it was offered and that the rest went through', () => {
+		latest_update.main()
+
+		expect(vi.mocked(console.info)).toHaveBeenCalledWith(
+			expect.stringContaining('newest allowed is the prerelease ^5.0.0-beta.1'),
+		)
+		expect(vi.mocked(console.info)).toHaveBeenCalledWith(
+			expect.stringContaining('rest of the update went through'),
+		)
+	})
+
+	it('syncs the preinstall version, since the update was not rolled back', () => {
+		latest_update.main()
+
+		expect(sync_mock).toHaveBeenCalled()
 	})
 })
 
