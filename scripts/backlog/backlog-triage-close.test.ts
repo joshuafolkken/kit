@@ -35,7 +35,11 @@ vi.mock('#scripts/epic/epic-decide', () => ({
 	epic_decide: { decide: vi.fn(step('decide', () => 0)) },
 }))
 vi.mock('#scripts/run/park/run-park', () => ({
-	run_park: { clear: vi.fn(() => order.push('clear')) },
+	run_park: {
+		clear: vi.fn(() => {
+			order.push('clear')
+		}),
+	},
 }))
 vi.mock('#scripts/josh/josh-run', () => ({
 	josh_command: { josh_run: vi.fn(step('run:add', () => ({ code: 0 }))) },
