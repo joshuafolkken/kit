@@ -1,0 +1,7 @@
+{
+	"reason": "#7750: board reads lane liveness before drawing a missing in-progress label as stopped; new live-lane marker and fact-worded tail",
+	"date": "2026-11-17",
+	"growth": {
+		"scripts.code_lines": 32
+	}
+}

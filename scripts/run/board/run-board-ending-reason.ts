@@ -2,6 +2,7 @@ import { has_label_name, RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
 import { lane_withdraw } from '#scripts/lane/lane-withdraw'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_stalled } from '#scripts/run/park/run-stalled'
+import { run_board_lane_stop } from './run-board-lane-stop'
 import type { BoardRow, RowRead, RowReason } from './run-board-layout'
 import { run_board_pause } from './run-board-pause'
 import { run_board_render_title } from './run-board-render-title'
@@ -117,14 +118,23 @@ function tail_of(status: ItemStatus): string | undefined {
 	return status.outcome?.summary ?? ending
 }
 
+// joshuafolkken/kit#7750: a missing `in-progress` is named as the fact it is; a running row only notes it.
+function unlabelled_tail(status: ItemStatus): string {
+	const fact = run_board_lane_stop.UNLABELLED_REASON
+
+	return status.state === 'running' ? fact : `stopped · ${fact}`
+}
+
 // joshuafolkken/kit#6577: what stopped a lane, or the ship of a child still working, by the command its
 // record or labels name (`run-board-lane-stop.ts`).
 function stop_reason_of(status: ItemStatus): RowReason | undefined {
-	if (status.stop_reason === undefined) return undefined
+	const reason = status.stop_reason
+	if (reason === undefined) return undefined
+	if (reason === run_board_lane_stop.UNLABELLED_REASON) return { tail: unlabelled_tail(status) }
 
 	const subject = status.state === 'running' ? 'ship stopped' : 'stopped'
 
-	return { tail: `${subject} by ${status.stop_reason}` }
+	return { tail: `${subject} by ${reason}` }
 }
 
 function stop_row_reason(status: ItemStatus): Pick<BoardRow, 'reason'> {

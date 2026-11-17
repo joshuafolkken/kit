@@ -141,7 +141,9 @@ A missing or broken file opens every section; an unknown section name is dropped
 
 A child whose open lane has had no child process for `lane:await`'s 15-second re-confirm window is drawn stopped; an unanswered probe leaves it running. A single frame that finds an idle lane waits out the window and reads again. A lane this run's record ended (`lane:close`) is stopped too.
 
-A stopped row's times freeze at its stop — the record's end, else its first idle read or transcript's last write, if earlier — and its tail reads `stopped by <command>` if recorded. A child labelled stopped whose transcript reads running stays running: `ship stopped by <command>`.
+A stopped row's times freeze at its stop — the record's end, else its first idle read or transcript's last write, if earlier — and its tail reads `stopped by <command>` if recorded. A child labelled stopped whose transcript reads running stays running: `ship stopped by <label>`.
+
+A child without `in-progress` is named by that fact, not a guessed command. A lane whose child or detached ship is alive stays running, tail `no in-progress label`; any other reads `stopped · no in-progress label`.
 
 A finished row leads with `✅` merged, `🏁` done, `⏩` closed by `josh issue:already-done` or `🚫` withdrawn.
 

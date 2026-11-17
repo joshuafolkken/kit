@@ -72,6 +72,8 @@ interface ItemStatus {
 	result?: AgentResult | undefined
 	// When a running lane's transcript was last written — the latest an idle lane can have stopped.
 	written_ms?: number | undefined
+	// A running open lane of this run's not read idle: its child or detached ship is alive.
+	is_live?: boolean | undefined
 }
 
 interface LatestEvent {
@@ -331,11 +333,9 @@ function is_read_after_launch(status: ItemStatus, read: OpenRead): boolean {
 
 // A running child's labels, read after its launch, settle it (`run-board-lane-stop.ts`).
 function labelled(issue: number, status: ItemStatus, read: OpenRead): ItemStatus {
-	const stop = is_read_after_launch(status, read)
-		? run_board_lane_stop.label_stop(read.labels.get(issue))
-		: undefined
+	const labels = is_read_after_launch(status, read) ? read.labels.get(issue) : undefined
 
-	return stop === undefined ? status : run_board_lane_stop.label_settled(status, stop)
+	return run_board_lane_stop.labels_settled(status, labels)
 }
 
 // A close dated before the launch is an earlier life of the issue, not how this run's child ended.
