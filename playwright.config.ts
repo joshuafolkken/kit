@@ -126,6 +126,9 @@ const env_config: EnvConfig = IS_CI
 export default defineConfig({
 	webServer: web_server_config,
 	testMatch: '**/*.e2e.{ts,js}',
+	// A retained observation-flush worktree (`.git/josh/observation-flush/tree`) carries its own
+	// E2E files and `@playwright/test`; loading them fails with "Requiring @playwright/test second time".
+	testIgnore: ['**/.git/**', '**/node_modules/**'],
 	fullyParallel: true,
 	...(IS_CI ? { workers: CI_WORKERS, maxFailures: CI_MAX_FAILURES } : {}),
 	retries: env_config.retries,

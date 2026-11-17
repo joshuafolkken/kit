@@ -1,3 +1,4 @@
+import path from 'node:path'
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { CI_KEY, playwright_config_fixture } from './playwright-config-fixture'
 
@@ -161,5 +162,36 @@ describe('playwright.config CI failure cap', () => {
 
 		expect(max_failures).toBeGreaterThanOrEqual(MIN_USEFUL_MAX_FAILURES)
 		expect(max_failures).toBeLessThanOrEqual(MAX_USEFUL_MAX_FAILURES)
+	})
+})
+
+const FLUSH_TREE_E2E = '/repo/.git/josh/observation-flush/tree/src/routes/security-headers.e2e.ts'
+const DEPENDENCY_E2E = '/repo/node_modules/some-package/sample.e2e.ts'
+const PROJECT_E2E = '/repo/src/routes/security-headers.e2e.ts'
+
+async function is_ignored(file: string): Promise<boolean> {
+	const { testIgnore: test_ignore } = await playwright_config_fixture.import_config(
+		undefined,
+		undefined,
+	)
+	const patterns = [test_ignore ?? []].flat()
+
+	return patterns.some((pattern) => typeof pattern === 'string' && path.matchesGlob(file, pattern))
+}
+
+// Regression guard for #7691: an interrupted observation flush retains its worktree under `.git`
+// with its own `node_modules`, and the bare `testMatch` glob loaded its E2E files, requiring a
+// second `@playwright/test` and failing every consumer's pre-push E2E.
+describe('playwright.config testIgnore', () => {
+	it('ignores E2E files inside a retained observation-flush worktree', async () => {
+		expect(await is_ignored(FLUSH_TREE_E2E)).toBe(true)
+	})
+
+	it('ignores E2E files inside node_modules', async () => {
+		expect(await is_ignored(DEPENDENCY_E2E)).toBe(true)
+	})
+
+	it('still collects the project E2E files', async () => {
+		expect(await is_ignored(PROJECT_E2E)).toBe(false)
 	})
 })
