@@ -66,8 +66,8 @@ function lane_status(
 		: stopped(status, Math.min(idle_ms, status.written_ms ?? idle_ms))
 }
 
-// joshuafolkken/kit#7750: an open lane of this run's not read idle has its child or its detached ship
-// alive (`lane-spent.ts`), so it stays running and says so.
+// joshuafolkken/kit#7750: an open lane of this run's not yet read idle for the re-confirm window is not
+// confirmed stopped (`lane-spent.ts`), so it stays running and says so — not a positive alive read.
 function own_status(
 	issue: number,
 	status: ItemStatus,
@@ -106,7 +106,7 @@ function label_stop(labels: ReadonlyArray<string> | undefined): LabelStop | unde
 
 // A child whose transcript still reads running is working, so a label that says stopped stopped its
 // ship, not it: the row runs on, with the reason beside it. An unread or finished result is not taken
-// for a working child; a lane whose process is alive is, where only its `in-progress` is missing.
+// for a working child; a lane not confirmed idle is, where only its `in-progress` is missing.
 function is_working(status: ItemStatus, stop: LabelStop): boolean {
 	if (status.state !== 'running') return false
 

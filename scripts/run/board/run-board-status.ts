@@ -72,7 +72,7 @@ interface ItemStatus {
 	result?: AgentResult | undefined
 	// When a running lane's transcript was last written — the latest an idle lane can have stopped.
 	written_ms?: number | undefined
-	// A running open lane of this run's not read idle: its child or detached ship is alive.
+	// A running open lane of this run's not yet read idle for the re-confirm window: not confirmed stopped.
 	is_live?: boolean | undefined
 }
 

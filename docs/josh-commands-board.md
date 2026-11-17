@@ -143,7 +143,7 @@ A child whose open lane has had no child process for `lane:await`'s 15-second re
 
 A stopped row's times freeze at its stop — the record's end, else its first idle read or transcript's last write, if earlier — and its tail reads `stopped by <command>` if recorded. A child labelled stopped whose transcript reads running stays running: `ship stopped by <label>`.
 
-A child without `in-progress` is named by that fact, not a guessed command. A lane whose child or detached ship is alive stays running, tail `no in-progress label`; any other reads `stopped · no in-progress label`.
+A child without `in-progress` is named by that fact, not a guessed command. An open lane not yet confirmed idle stays running, tail `no in-progress label`, until the re-confirm window stops it; any other reads `stopped · no in-progress label`.
 
 A finished row leads with `✅` merged, `🏁` done, `⏩` closed by `josh issue:already-done` or `🚫` withdrawn.
 
