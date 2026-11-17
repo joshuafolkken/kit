@@ -80,6 +80,12 @@ describe('consultation-handoff — a Fable main line', () => {
 		expect(reason).toContain('pnpm josh run:handoff')
 	})
 
+	// joshuafolkken/kit#7783: filing has one route in the consultation main line, the hand-off.
+	it('sends a filing instruction to run:handoff kickoff new, not issue:file', () => {
+		expect(ROW.reason).toContain('a filing instruction goes to `run:handoff kickoff new`')
+		expect(ROW.reason).not.toContain('`issue:file`')
+	})
+
 	it.each([
 		'pnpm josh issue:file "Title" --body-file body.md',
 		'pnpm josh issue:plan 12 --body-file plan.md',
