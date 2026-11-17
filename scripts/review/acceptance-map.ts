@@ -185,9 +185,14 @@ function row_of(line: string): Row | undefined {
 }
 
 // A row inside a code fence is an example the body quotes, not a claim (joshuafolkken/kit#6574).
+function map_lines(pr_body: string): ReadonlyArray<string> {
+	return markdown_section.fence_free_lines(
+		markdown_section.section_lines(pr_body, MAP_HEADING).join('\n'),
+	)
+}
+
 function rows_of(pr_body = ''): MapRows {
-	const rows = markdown_section
-		.fence_free_lines(markdown_section.section_lines(pr_body, MAP_HEADING).join('\n'))
+	const rows = map_lines(pr_body)
 		.map((line) => row_of(line))
 		.filter((row): row is Row => row !== undefined)
 	const met = rows.filter((row) => row.kind === MET).map((row) => row.id)
@@ -197,6 +202,17 @@ function rows_of(pr_body = ''): MapRows {
 		.filter((deferral): deferral is Deferral => deferral !== undefined)
 
 	return { met: new Set(met), deferrals, ids: new Set([...met, ...deferrals.map((row) => row.id)]) }
+}
+
+// The rows with each pending row counted as present: before the gate a draft's rows are still pending,
+// so only a criterion with no row at all is missing (joshuafolkken/kit#7727).
+function with_pending(pr_body = ''): MapRows {
+	const rows = rows_of(pr_body)
+	const pending = map_lines(pr_body)
+		.map((line) => PENDING_ROW_PATTERN.exec(line.trim())?.groups?.['id'])
+		.filter((id): id is string => id !== undefined)
+
+	return { ...rows, ids: new Set([...rows.ids, ...pending]) }
 }
 
 function compare(criteria: ReadonlyArray<Criterion>, rows: MapRows): MapComparison {
@@ -277,9 +293,10 @@ const acceptance_map = {
 	ROW_FORMAT,
 	rows_of,
 	skeleton,
+	with_pending,
 	with_test_rows,
 	tick,
 }
 
-export type { Criterion, Deferral, MapComparison }
+export type { Criterion, Deferral, MapComparison, MapRows }
 export { acceptance_map }

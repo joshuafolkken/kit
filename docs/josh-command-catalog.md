@@ -130,6 +130,7 @@ Run `pnpm josh command:derive` to regenerate.
 
 | Command | Arguments | Audience | Side effects | Description |
 | --- | --- | --- | --- | --- |
+| `josh acceptance:check` | — | automation | none | Check the ship body draft's acceptance map before the review: a criterion with no row stops it, a pending row passes |
 | `josh auto-ok:judge` | `[--apply <n> (--lane \| --solo --defect yes --verification yes --every-run yes) \| --decline <n> --reason <text>]` | automation | network | List the open issues backlogrun owes an auto-ok judgement, or record one (--apply / --decline) |
 | `josh auto-ok:next` | `[--exclude <n>[,<n>...]] [--label <name>]` | automation | network | Print the next opted-in issue an unattended run may pick up outside an epic |
 | `josh backlog:budget` | `[options]` | automation | none | Say whether a backlogrun may start more work, keep watching, or finish |
