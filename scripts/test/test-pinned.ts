@@ -213,7 +213,9 @@ async function open_misses(
 	read: { keys: ReadonlyArray<string>; files: ReadonlyArray<string>; known: ReadonlyArray<Known> },
 ): Promise<Array<MissReason | undefined>> {
 	const { keys, files, known } = read
-	const open = keys.flatMap((_key, index) => (held_of(known[index]) === undefined ? [index] : []))
+	const open = keys
+		.map((_key, index) => index)
+		.filter((index) => held_of(known[index]) === undefined)
 	const reasons = await test_pinned_cache.misses(
 		cache,
 		open.map((index) => keys[index] ?? ''),
