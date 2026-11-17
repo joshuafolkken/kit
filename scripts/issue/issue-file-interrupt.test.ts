@@ -5,7 +5,8 @@ import {
 	NEEDS_DECISION_LABEL,
 	SPLIT_ROUTE_LABEL,
 } from '#scripts/issue/issue-labels'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { session_language } from '#scripts/josh/session-language'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_file_interrupt } from './issue-file-interrupt'
 
 // joshuafolkken/kit#4768: an interrupt a lane files with `--blocks-finder` records its finder as
@@ -35,7 +36,9 @@ function interrupt_filing(): Parameters<typeof issue_file_interrupt.block_finder
 	}
 }
 
+// The decision note follows the session language, so the cases below pin it.
 beforeEach(() => {
+	vi.stubEnv(session_language.ENV_KEY, 'ja')
 	apply_relations.mockResolvedValue(0)
 	read_label_names.mockResolvedValue([])
 	issue_try_comment.mockResolvedValue(true)
@@ -43,6 +46,10 @@ beforeEach(() => {
 	info.mockImplementation(() => undefined)
 	error.mockImplementation(() => undefined)
 	warn.mockImplementation(() => undefined)
+})
+
+afterEach(() => {
+	vi.unstubAllEnvs()
 })
 
 describe('issue_file_interrupt.block_finder — a blocking interrupt with a finder', () => {
@@ -105,6 +112,29 @@ describe('issue_file_interrupt.block_finder — a parked finder', () => {
 
 		expect(issue_try_comment).not.toHaveBeenCalled()
 		expect(issue_clear_label).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#7706: only the note follows the session language; the decision prefix stays
+// fixed in every language (ac-8cca0653).
+describe('issue_file_interrupt.block_finder — the decision note language', () => {
+	const JAPANESE = `決定: #${String(BLOCKER)} の着地待ち（依存に変換）`
+	const ENGLISH = `決定: waiting for #${String(BLOCKER)} to land (converted to a dependency)`
+
+	beforeEach(() => {
+		read_label_names.mockResolvedValue([NEEDS_DECISION_LABEL])
+	})
+
+	it.each([
+		['ja', JAPANESE],
+		['', JAPANESE],
+		['en', ENGLISH],
+	])('writes the note for the session language %j (ac-bc8ebf54)', async (lang, decision) => {
+		vi.stubEnv(session_language.ENV_KEY, lang)
+
+		await issue_file_interrupt.block_finder(interrupt_filing())
+
+		expect(issue_try_comment).toHaveBeenCalledExactlyOnceWith(FINDER, decision, FINDER_REPO)
 	})
 })
 

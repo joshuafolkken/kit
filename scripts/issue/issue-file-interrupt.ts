@@ -1,6 +1,7 @@
 import { epic_relations } from '#scripts/epic/epic-relations'
 import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
+import { session_language } from '#scripts/josh/session-language'
 import { issue_cite } from './issue-cite'
 import { INTERRUPT_ROUTE_LABEL, NEEDS_DECISION_LABEL } from './issue-labels'
 import { session_cite } from './session-cite'
@@ -22,8 +23,10 @@ import { session_cite } from './session-cite'
 // relation is recorded, the conversion is written as the decision, and the label goes — the merge of
 // the interrupt then relaunches the finder (`backlog_drive_retry.after_merge`, joshuafolkken/kit#6741).
 
+// Only the note follows the session language; `DECISION_PREFIX` stays fixed in every language.
 const DECISION_PREFIX = '決定:'
-const CONVERTED_NOTE = 'の着地待ち（依存に変換）'
+const JAPANESE_CONVERTED_NOTE = 'の着地待ち（依存に変換）'
+const ENGLISH_CONVERTED_NOTE = 'to land (converted to a dependency)'
 
 // `blocker_repo` is the filed Issue's `owner/repo` where it is not this repository, else `undefined`.
 // `repo` is the finder's, named on every finder-side call: a filing in another repository points
@@ -136,12 +139,18 @@ function kept_line(finder: string, decision: string): string {
 	return `⚠ ${session_cite.issue(finder)} kept ${NEEDS_DECISION_LABEL} — post "${decision}" if it is missing, then run \`pnpm josh run:park ${finder} --clear\`.`
 }
 
+function blocker_note(blocker: string): string {
+	return session_language.is_japanese(session_language.resolve_session_lang().lang)
+		? `${blocker} ${JAPANESE_CONVERTED_NOTE}`
+		: `waiting for ${blocker} ${ENGLISH_CONVERTED_NOTE}`
+}
+
 // The label goes only after the decision is written, so the relaunched finder never reads its park
 // question unanswered; either failure keeps the park and names the re-run.
 async function convert_park(pair: BlockedPair): Promise<void> {
 	const finder = String(pair.blocked)
 	const blocker = issue_cite.plain_for('github', pair.blocker, pair.blocker_repo)
-	const decision = `${DECISION_PREFIX} ${blocker} ${CONVERTED_NOTE}`
+	const decision = `${DECISION_PREFIX} ${blocker_note(blocker)}`
 	const is_cleared =
 		(await git_gh_issue_write.issue_try_comment(finder, decision, pair.repo)) &&
 		(await git_gh_issue_write.issue_clear_label(finder, NEEDS_DECISION_LABEL, pair.repo))
