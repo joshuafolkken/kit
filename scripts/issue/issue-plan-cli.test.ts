@@ -47,12 +47,15 @@ vi.mock('#scripts/lane/lane-child-marker', () => ({
 }))
 vi.mock('#scripts/lane/lane-plan-auto', () => ({ lane_plan_auto: { run_from_plan } }))
 
-const { problem_of } = vi.hoisted(() => ({
+const { problem_of, settle } = vi.hoisted(() => ({
 	problem_of: vi.fn<() => Promise<string | undefined>>(async () => await undefined),
+	settle: vi.fn<(issue_number: string, plan: string, repo?: string) => Promise<boolean>>(
+		async () => true,
+	),
 }))
 
 vi.mock('#scripts/issue/plan-size-check', () => ({
-	plan_size_check: { problem_of, next_steps: (): string => 'split steps' },
+	plan_size_check: { problem_of, settle, next_steps: (): string => 'split steps' },
 }))
 
 const ISSUE_URL = 'https://github.com/o/r/issues/7'
@@ -212,6 +215,29 @@ describe('issue_plan_cli.run — --title and --planned act only when given', () 
 
 		expect(code).toBe(1)
 		expect(errors.join('\n')).toContain(PLANNED_LABEL)
+	})
+})
+
+// joshuafolkken/kit#7726: a plan naming more files than its estimate writes nothing.
+describe('issue_plan_cli.run — the plan’s named files are settled before any write', () => {
+	it('writes nothing and fails when the plan’s named files are refused', async () => {
+		settle.mockResolvedValueOnce(false)
+
+		const code = await issue_plan_cli.run([
+			'7',
+			BODY_FILE_FLAG,
+			PLAN_FILE,
+			TITLE_FLAG,
+			TITLE,
+			PLANNED_FLAG,
+		])
+
+		expect(code).toBe(1)
+		expect(settle).toHaveBeenCalledWith('7', PLAN, undefined)
+		expect(issue_edit_title).not.toHaveBeenCalled()
+		expect(issue_edit_body).not.toHaveBeenCalled()
+		expect(issue_add_label).not.toHaveBeenCalled()
+		expect(run_from_plan).not.toHaveBeenCalled()
 	})
 })
 

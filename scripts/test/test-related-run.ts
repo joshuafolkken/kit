@@ -9,6 +9,7 @@ import { test_related_record, type RunInput } from './test-related-record'
 import { test_related_red, type RelatedInput } from './test-related-red'
 import { test_related_reuse, type TestReuse } from './test-related-reuse'
 import { related_scope, type RelatedScope } from './test-related-scope'
+import { test_related_summary } from './test-related-summary'
 import { test_unit_guard } from './test-unit-guard'
 
 function conclusive_tree(before: GateTree | undefined): GateTree | undefined {
@@ -67,6 +68,9 @@ async function run_and_record(
 	)
 
 	input.passed = passed ?? []
+	process.stdout.write(
+		`${test_related_summary.summary_line(input.scope, test_files, input.reach)}\n`,
+	)
 
 	await test_related_record.record_run(input, {
 		elapsed_ms: performance.now() - started,

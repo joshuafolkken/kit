@@ -129,7 +129,7 @@ describe('epic_decide.decide — size estimate', () => {
 		read_child(OLD_SIZE)
 
 		expect(await decide_widening()).toBe(SUCCESS_EXIT_CODE)
-		expect(mocked_edit).toHaveBeenCalledWith(String(CHILD), child_body(NEW_SIZE))
+		expect(mocked_edit).toHaveBeenCalledWith(String(CHILD), child_body(NEW_SIZE), undefined)
 		expect(mocked_clear).toHaveBeenCalledWith(String(CHILD), NEEDS_DECISION_LABEL)
 	})
 
@@ -137,7 +137,7 @@ describe('epic_decide.decide — size estimate', () => {
 		read_child(NEW_SIZE)
 
 		expect(await decide_widening()).toBe(SUCCESS_EXIT_CODE)
-		expect(mocked_edit).not.toHaveBeenCalledWith(String(CHILD), expect.anything())
+		expect(mocked_edit).not.toHaveBeenCalledWith(String(CHILD), expect.anything(), undefined)
 	})
 
 	it('reads no child body when the record states no estimate', async () => {
