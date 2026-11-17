@@ -7,7 +7,6 @@ import { check_related_pinned } from './check-related-pinned'
 import { check_related_reuse } from './check-related-reuse'
 import { check_related_unplanned } from './check-related-unplanned'
 import type { GateTree } from './gate-tree'
-import { metrics_totals } from './metrics-totals'
 import { tree_verdict } from './tree-verdict'
 
 // The live branch's lane:plan record never reaches these runs.
@@ -228,10 +227,9 @@ describe('check_related.report_results keeps what a replay on the same tree prin
 		vi.restoreAllMocks()
 	})
 
-	it('keeps the metrics notice with the tail, the pinned and unplanned ones printed above them', () => {
+	it('keeps the tail, the pinned and unplanned notices printed above it', () => {
 		const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
-		const output = `${metrics_totals.NOTICE_HEADING} grew`
-		const results = [{ command: LINT, exit_code: 0, output }]
+		const results = [{ command: LINT, exit_code: 0, output: 'lint output' }]
 		const pinned_notice = 'pinned notice'
 		const unplanned_notice = 'unplanned notice'
 		const kept = check_related.report_results(results, {
@@ -241,9 +239,10 @@ describe('check_related.report_results keeps what a replay on the same tree prin
 		})
 		const text = write.mock.calls.map(([chunk]) => String(chunk)).join('')
 
-		expect(
-			[output, unplanned_notice, pinned_notice].map((part) => kept.includes(part)),
-		).toStrictEqual([true, false, false])
+		expect([unplanned_notice, pinned_notice].map((part) => kept.includes(part))).toStrictEqual([
+			false,
+			false,
+		])
 		expect(text.endsWith(`\n${pinned_notice}\n\n${unplanned_notice}\n${kept}`)).toBe(true)
 	})
 })

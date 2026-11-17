@@ -40,9 +40,6 @@ vi.mock('#scripts/document/document-checks', () => ({
 vi.mock('#scripts/exports/unused-members-check', () => ({
 	unused_members_check: { run_unused_members: async () => 0 },
 }))
-vi.mock('#scripts/gate/metrics-totals', () => ({
-	metrics_totals: { growth_notice: async () => undefined },
-}))
 
 afterEach(() => vi.restoreAllMocks())
 

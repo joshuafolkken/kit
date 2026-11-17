@@ -2,7 +2,6 @@
 import { fileURLToPath } from 'node:url'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { stamp_file } from '#scripts/josh/stamp-file'
-import { lint_related_scope } from '#scripts/lint/lint-related-scope'
 import { review_record_pinned } from '#scripts/review/review-record-pinned'
 import { test_related_touched } from '#scripts/test/test-related-touched'
 import { execa } from 'execa'
@@ -28,8 +27,6 @@ const LOG_PATH = stamp_file.stamp_path(
 )
 const LINT_RELATED = gate_labels.LINT_TARGET
 const TEST_RELATED = 'test:related'
-// The verdict `lint:related` itself prints last, under its own label.
-const LINT_PASSED = verification_tail.format_verdict(lint_related_scope.COMMAND_LABEL, [])
 const CHECKS: ReadonlyArray<string> = [
 	LINT_RELATED,
 	TEST_RELATED,
@@ -41,8 +38,6 @@ const TOUCHED_CHECKS: ReadonlyArray<string> = CHECKS.map((command) =>
 )
 const REUSED = 'reused'
 const VERDICT_RECORD = tree_verdict.record_path('check-related')
-const METRICS_STOP =
-	'`josh run:review`\'s open (and the ship\'s pre-detach behind it) stops on the metrics notice above unless the branch approval already names the total; settle it first (`pnpm josh metrics --accept --reason "<why>"`); the accept needs no `check:related` re-run, as the notice changed no exit code'
 
 type CheckExecutor = (command: string) => Promise<CheckResult>
 type ProcessRunner = (
@@ -161,30 +156,8 @@ function reused_suffix(reused: ReadonlySet<string>): string {
 	return reused.size === 0 ? '' : ` (reused: ${[...reused].join(', ')})`
 }
 
-// A notice is never a failure, so a passing verdict line alone hid it from a reader of the last lines,
-// and `josh run:review`'s open (the ship's pre-detach as the backstop) stops on it
-// (joshuafolkken/kit#4987, joshuafolkken/kit#6023).
-function verdict_line(
-	results: ReadonlyArray<CheckResult>,
-	has_metrics_notice: boolean,
-	reused: ReadonlySet<string>,
-): string {
-	const line = `${checks_line(results)}${not_run_suffix(results)}${reused_suffix(reused)}`
-
-	return has_metrics_notice ? `${line} — ${METRICS_STOP}` : line
-}
-
-// `josh lint:related` ends its section with the metrics growth notice, which the sections after it
-// bury; it is repeated above the verdict so the tail still carries what `josh run:review`'s open
-// stops on, the ship's pre-detach as the backstop (joshuafolkken/kit#4939, joshuafolkken/kit#6023).
-function metrics_notice(results: ReadonlyArray<CheckResult>): string | undefined {
-	const output = results.find((result) => result.command === LINT_RELATED)?.output ?? ''
-	const start = output.indexOf(metrics_totals.NOTICE_HEADING)
-
-	if (start === -1) return undefined
-
-	// The lint's own verdict closes its section; it is not part of the notice.
-	return output.slice(start).replace(LINT_PASSED, '').trimEnd()
+function verdict_line(results: ReadonlyArray<CheckResult>, reused: ReadonlySet<string>): string {
+	return `${checks_line(results)}${not_run_suffix(results)}${reused_suffix(reused)}`
 }
 
 function report_reused(reused: ReadonlySet<string>): void {
@@ -213,9 +186,9 @@ function verdict_tail(
 	return `\n${verification_tail.format_tail({ failures: failure_lines(results), log, verdict })}`
 }
 
-// Returns what `tree-verdict.ts` keeps for a re-run on the same tree: the metrics notice and the tail.
-// The `test:pinned` and unplanned notices, printed first, read state outside the tree key, so a replay
-// asks them again above the kept text.
+// Returns what `tree-verdict.ts` keeps for a re-run on the same tree: the tail. The `test:pinned` and
+// unplanned notices, printed first, read state outside the tree key, so a replay asks them again above
+// the kept text.
 function report_results(results: ReadonlyArray<CheckResult>, options: ReportOptions = {}): string {
 	const { is_full, log_target = LOG_PATH, reused = new Set<string>() } = options
 
@@ -225,17 +198,14 @@ function report_results(results: ReadonlyArray<CheckResult>, options: ReportOpti
 		process.stdout.write(check_related_section.format_section(result, is_full))
 	}
 
-	const metrics = metrics_notice(results)
 	const log = { path: write_log(results, log_target) }
-	const tail = verdict_tail(results, log, verdict_line(results, metrics !== undefined, reused))
-
-	const kept = `${format_notices([metrics])}${tail}`
+	const tail = verdict_tail(results, log, verdict_line(results, reused))
 
 	process.stdout.write(
-		`${format_notices([options.pinned_notice, options.unplanned_notice])}${kept}`,
+		`${format_notices([options.pinned_notice, options.unplanned_notice])}${tail}`,
 	)
 
-	return kept
+	return tail
 }
 
 function exit_code(results: ReadonlyArray<CheckResult>): number {
@@ -342,7 +312,6 @@ async function run_cli(argv: ReadonlyArray<string>): Promise<number> {
 
 const check_related = {
 	CHECKS,
-	METRICS_STOP,
 	REUSED,
 	TOUCHED_CHECKS,
 	execute_check,
