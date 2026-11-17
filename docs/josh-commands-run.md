@@ -608,7 +608,7 @@ pnpm josh run:merge <N>                                                  # backl
 <!-- /usage -->
 
 Confirms the child from GitHub and does its post-merge steps: a **merged**
-child (CLOSED by a merge, read off its timeline) closes epics beside `main:sync`, is counted (resets the failure streak) and its `merge`
+child (CLOSED by a merge, read off its timeline) closes epics beside `main:sync` (skipped while another run holds it), is counted (resets the failure streak) and its `merge`
 logged once at confirmation, then `lane:close <N>` and the epic counters; a merged lane over 40 minutes of net time
 (`lane:net`) comments its breakdown by stage (`lane:breakdown`) on the lane's Issue once and launches a detached session that searches the longest stages first and files its unfiled causes against the lane, recorded as a `note`
 event (the start note carrying the longest stage, which the board draws after 🔍) (`lane-overrun.ts`, its wording `run-event-overrun.ts`), its result `folded #A,#B` / `filed` / `recurred #M` / `none: <why>` — the causes one file or mechanism shares filed as one Issue, or folded into an open one touching the same files;
