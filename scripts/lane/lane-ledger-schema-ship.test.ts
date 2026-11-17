@@ -11,6 +11,18 @@ const LAP = {
 	elapsed_ms: 1200,
 }
 
+// joshuafolkken/kit#7736: a chain line with its stages, and an older one without them.
+describe('lane_ledger_schema_ship — the run:chain line', () => {
+	it.each([
+		['with its stages', { stages: [{ name: 'check:related', at: AT, elapsed_ms: 900 }] }],
+		['without stages', {}],
+	])('reads a run:chain line %s back as written', (_label, stages) => {
+		const chain = { kind: 'chain', at: AT, issue: 7736, elapsed_ms: 1200, join: false, ...stages }
+
+		expect(lane_ledger_schema.entry_schema.parse(chain)).toEqual(chain)
+	})
+})
+
 describe('lane_ledger_schema_ship — the lines josh ship writes, read through the entry union', () => {
 	it('reads a size measurement back through the ledger union', () => {
 		const size = {

@@ -1,4 +1,5 @@
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
+import type { ChainStageEntry } from '#scripts/lane/lane-ledger-schema-ship'
 
 // The stage runner behind `josh run:chain` (joshuafolkken/kit#5630): the main line's chain up to the
 // review in one call, not one model round trip per command. Each stage runs as its own `josh` command,
@@ -41,6 +42,12 @@ interface ChainStop {
 	code: number
 	next: NextAction
 	notice?: string
+}
+
+// A run's stop, absent when every stage ran, and each stage it ran with its start and length.
+interface ChainRun {
+	stop?: ChainStop
+	stages: ReadonlyArray<ChainStageEntry>
 }
 
 type StageRunner = (argv: ReadonlyArray<string>) => Promise<JoshResult>
@@ -127,20 +134,30 @@ async function run_stage(
 	return await held(stage, issue)
 }
 
+// Each stage that ran, the stopped one included, timed from its start through its hold, so the ledger
+// line shows where a long run spent its time (joshuafolkken/kit#7736).
 async function run_stages(
 	stages: ReadonlyArray<ChainStage>,
 	issue: string,
 	print: Print,
 	run: StageRunner = josh_stage,
-): Promise<ChainStop | undefined> {
+): Promise<ChainRun> {
+	const timed: Array<ChainStageEntry> = []
+
 	for (const stage of stages) {
+		const started_ms = Date.now()
 		// eslint-disable-next-line no-await-in-loop -- each stage runs on the tree the earlier ones left
 		const stop = await run_stage(stage, issue, print, run)
 
-		if (stop !== undefined) return stop
+		timed.push({
+			name: stage.name,
+			at: new Date(started_ms).toISOString(),
+			elapsed_ms: Date.now() - started_ms,
+		})
+		if (stop !== undefined) return { stop, stages: timed }
 	}
 
-	return undefined
+	return { stages: timed }
 }
 
 // The reports open with the invocation as typed (`run:chain <N>`), not an Issue citation.
@@ -166,4 +183,4 @@ const run_chain = {
 }
 
 export { run_chain }
-export type { ChainStage, ChainStop, HoldStop, StageHold, StageRunner }
+export type { ChainRun, ChainStage, ChainStop, HoldStop, StageHold, StageRunner }
