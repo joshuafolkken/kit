@@ -209,6 +209,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh pkg:scout` | `<keywords> [--size <n>] [--issue <n>]` | automation | network | Rank package candidates by measured metrics so the Package-First tier decision is read, not judged |
 | `josh plan:consumers` | `<identifier...>` | automation | none | List every existing reference to each identifier a plan adds or changes, by kind, and draft the plan's existing-consumers section |
 | `josh plan:scaffold` | `<issue> [<path>...] [--estimate <json-file>]` | automation | network | Print a work summary's inputs in one call: the run:prep skeleton, planned files near the line limit, the test:declared verdict, the owed cases and the plan:consumers draft |
+| `josh preflight:check` | — | automation | none | Ask ship's preflight judgments that need no PR — classification, live-evidence, removed-tests, unplanned — before the review |
 | `josh prose:stale` | — | automation | none | List each removed declared or exported name, josh command, UPPER_CASE constant or .md heading that docs, prompts or comments still name |
 | `josh read:files` | `<path> [<path> ...]` | automation | none | Read several files in one call so edit targets fold into one turn |
 | `josh read:set` | `[<entry>] [--json \| --bytes]` | automation | none | Print what an entry point reads before it starts, and what that read costs |

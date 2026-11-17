@@ -1204,6 +1204,20 @@ pnpm josh acceptance:check   # → `acceptance:check: pass`, or ship's acceptanc
 
 `josh ship`'s acceptance-map refusal (`acceptance_map_check.body_refusal`), asked of the body the next ship delivers — the ship body draft, else the open PR's — with a pending row counted as a row. `run:chain` runs it before `run:review`, so a criterion with no row stops there, not at ship's preflight. No body yet passes: ship writes every row.
 
+### `josh preflight:check`
+
+<!-- usage: preflight:check -->
+
+Ask ship's preflight judgments that need no PR — classification, live-evidence, removed-tests, unplanned — before the review.
+
+```bash
+pnpm josh preflight:check   # → `preflight:check: pass`, or each unmet ship precondition named by its kind (exit 1)
+```
+
+<!-- /usage -->
+
+Ship's preflight judgments read off the Issue, the ship body draft and the tree (`run_ship_preflight.chain_problems`, the calls ship's preflight makes). `run:chain` runs it after `acceptance:check`, then `exports:unused` and the guard tests with the pre-detach's argv; the type check, `cspell:dot` and the scoped pair are `check:related`'s. An `unplanned` file passes once `lane:plan` lists it.
+
 ### `josh review:selfcheck`
 
 <!-- usage: review:selfcheck -->
