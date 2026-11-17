@@ -26,6 +26,9 @@ const LANE_INDENT = '  '
 const PROGRESS_WIDTH = 2
 const PROGRESS_BLANK = ' '.repeat(PROGRESS_WIDTH)
 const ICON_WIDTH = 2
+const ICON_BLANK = ' '.repeat(ICON_WIDTH)
+// A stopped single run's progress column: done as a finished row is, until its next step is typed.
+const STOPPED_SINGLE_ICON = run_board_labels.STATE_ICONS.merged
 const SPACE = 1
 // The column the run's time starts at, which the rule's ⏰ stands over.
 const ELAPSED_START =
@@ -65,7 +68,20 @@ function running_fresh(
 	return run_board_earlier.is_live(row) ? run_board_fresh.since(text, at_ms, header) : text
 }
 
+// A single run a stop ended before its next step (joshuafolkken/kit#7710): its 🏠 row beside a carried
+// run, or its own board's row, which only a stop ends. A lane's stopped row is drawn as before.
+function is_single_ended(header: BoardHeader): boolean {
+	return header.run_name !== undefined && header.ended_ms !== undefined
+}
+
+function is_stopped_single(row: BoardRow, header: BoardHeader): boolean {
+	if (row.state !== 'stopped') return false
+
+	return header.layout?.root?.row === row || is_single_ended(header)
+}
+
 function progress_of(row: BoardRow, header: BoardHeader): string {
+	if (is_stopped_single(row, header)) return STOPPED_SINGLE_ICON
 	if (held_of(row, header) !== undefined) return BUDGET_ICON
 	if (row.state !== 'running' || header.spinner === undefined) return PROGRESS_BLANK
 
@@ -91,8 +107,14 @@ function indent_of(row: BoardRow): string {
 }
 
 // A lane row's lead after its indent, ending where its usage cells start less one blank.
+// The icon a row leads with, which the legend names too: none on a stopped single run's, whose ✅ stands
+// in the progress column.
+function icon_of(row: BoardRow, header: BoardHeader): string {
+	return is_stopped_single(row, header) ? ICON_BLANK : state_icon(row)
+}
+
 function lead_of(row: BoardRow, header: BoardHeader): string {
-	const icon = running_fresh(row, state_icon(row), row.status?.phase_ms, header)
+	const icon = running_fresh(row, icon_of(row, header), row.status?.phase_ms, header)
 	const phase = phase_time(row, header, TIME_WIDTH)
 
 	const progress = `${progress_of(row, header)}${' '.repeat(column_offset(header))}`
@@ -107,6 +129,7 @@ const run_board_render_lead = {
 	TIME_WIDTH,
 	USAGE_START,
 	column_offset,
+	icon_of,
 	indent_of,
 	lead_of,
 	lane_label,

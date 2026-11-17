@@ -61,6 +61,9 @@ interface RunHold {
 	// request stood on, so `fullrun #N` can tell an untouched branch — merge it — from one that moved
 	// since and has to pass the gate and the review again.
 	prrun_stop_head?: string | undefined
+	// Set only on a stop's record: when the stopped run began, since the stop re-writes the record and its
+	// `taken_at` is the stop's moment. `run:board` draws the stopped run's time from it (joshuafolkken/kit#7710).
+	started_at?: string | undefined
 	// The agent session the claim ran under — `pid` is the short-lived `josh run:hold` itself, gone
 	// before anything reads it back, so it can never say whether the run is still there. The pair with
 	// its start time is the identity `process-identity.ts` defines. Optional for a record without these
@@ -115,6 +118,7 @@ const run_hold_schema = z.object({
 	is_fullrun: z.boolean().optional(),
 	is_halfrun_stop: z.boolean().optional(),
 	prrun_stop_head: z.string().optional(),
+	started_at: z.string().optional(),
 	owner_pid: z.number().optional(),
 	owner_start: z.string().optional(),
 	notified_at: z.string().optional(),
@@ -223,8 +227,8 @@ function create_hold(
 }
 
 // What a stopped run's record carries on top of the claim: the `halfrun` stop's flag, or the commit a
-// `prrun` stop stood on.
-type StopMarkFields = Pick<RunHold, 'is_halfrun_stop' | 'prrun_stop_head'>
+// `prrun` stop stood on, and when the stopped run began.
+type StopMarkFields = Pick<RunHold, 'is_halfrun_stop' | 'prrun_stop_head' | 'started_at'>
 
 const HALFRUN_STOP_FIELDS: StopMarkFields = { is_halfrun_stop: true }
 

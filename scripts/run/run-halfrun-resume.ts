@@ -48,6 +48,14 @@ function is_own_record(read: HoldRead, issue: string): boolean {
 	return hold === undefined || hold.issue === issue || hold.issue === run_hold.UNNUMBERED_ISSUE
 }
 
+// When the stopping run began: its own record's claim, or the start a stop already marked kept; none on
+// a free tree.
+function started_of(read: HoldRead): string | undefined {
+	const hold = hold_of(read)
+
+	return hold?.started_at ?? hold?.taken_at
+}
+
 // `mark` is the `halfrun` stop's by default; a `prrun` stop passes its own, so
 // the own-record check is one check whichever run is stopping.
 function mark_stop_at(
@@ -62,8 +70,9 @@ function mark_stop_at(
 	if (!is_own_record(read, issue)) return FOREIGN
 
 	run_hold.release_hold(target)
+	const started = { ...mark, started_at: started_of(read) }
 
-	return run_hold.create_stop_hold(target, issue, mark) ? MARKED : FOREIGN
+	return run_hold.create_stop_hold(target, issue, started) ? MARKED : FOREIGN
 }
 
 // The stopped run's record is replaced by this `fullrun`'s, shared with the `prrun` resume.
