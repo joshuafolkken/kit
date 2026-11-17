@@ -75,3 +75,19 @@ describe('lint_related autofix verification boundary', () => {
 		},
 	)
 })
+
+describe('lint_related autofix failed stage', () => {
+	it.each([
+		[1, 1, 'lint'],
+		[1, 0, 'autofix'],
+	])('names the failed stage for fix %s / lint %s as %s', async (fix_code, code, stage) => {
+		const write = vi.spyOn(process.stdout, 'write').mockReturnValue(true)
+
+		vi.mocked(scoped_green.read_before).mockResolvedValue(AFTER)
+		vi.mocked(format_steps.run_scoped).mockResolvedValue(fix_code)
+		vi.mocked(lint_parallel.run_lint_checks).mockResolvedValue(code)
+
+		await lint_related.run_related_lint([])
+		expect(write.mock.calls.join('\n')).toContain(`failed: ${stage}`)
+	})
+})
