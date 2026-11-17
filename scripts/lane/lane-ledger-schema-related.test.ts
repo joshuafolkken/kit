@@ -40,3 +40,36 @@ describe('lane_ledger_schema_related — the test:related row, read through the 
 		expect(lane_ledger_schema.entry_schema.parse(row)).toEqual(row)
 	})
 })
+
+// joshuafolkken/kit#7827: one `josh lint:related` run, each stage timed.
+describe('lane_ledger_schema_related — the lint:related row, read through the entry union', () => {
+	const LINT_ROW = { kind: 'lint-related', at: ROW.at, elapsed_ms: 5500, exit_code: 0 }
+
+	it('reads a row with every stage time back as written', () => {
+		const row = {
+			...LINT_ROW,
+			issue: 7827,
+			rebuild_ms: 4000,
+			core_wait_ms: 30,
+			fix_ms: 900,
+			structural_ms: 1500,
+			lint_ms: 2600,
+			documents_ms: 40,
+			unused_members_ms: 700,
+		}
+
+		expect(lane_ledger_schema.entry_schema.parse(row)).toEqual(row)
+	})
+
+	it('reads a row whose run stopped before the later stages', () => {
+		const row = { ...LINT_ROW, exit_code: 1, fix_ms: 900, lint_ms: 2600 }
+
+		expect(lane_ledger_schema.entry_schema.parse(row)).toEqual(row)
+	})
+
+	it('refuses a row without its exit code', () => {
+		expect(() =>
+			lane_ledger_schema.entry_schema.parse({ ...LINT_ROW, exit_code: undefined }),
+		).toThrow()
+	})
+})

@@ -17,7 +17,7 @@ const { early_push_schema, ship_lap_schema, size_schema, stop_schema, unplanned_
 	lane_ledger_schema_ship
 const { pinned_origin_schema } = lane_ledger_pinned_origin
 const { load_schema } = lane_ledger_schema_load
-const { test_related_schema } = lane_ledger_schema_related
+const { lint_related_schema, test_related_schema } = lane_ledger_schema_related
 const { round_one_schema, round_two_schema, offerable_schema, core_wait_schema } =
 	lane_ledger_schema_round
 const { split_notice_schema, split_filed_schema, push_miss_schema } = lane_ledger_schema_split
@@ -177,6 +177,7 @@ const entry_schema = z.discriminatedUnion('kind', [
 	core_wait_schema,
 	unit_files_schema,
 	test_related_schema,
+	lint_related_schema,
 	test_pinned_schema,
 	split_notice_schema,
 	split_filed_schema,
@@ -207,6 +208,8 @@ type UnitFilesEntry = z.infer<typeof unit_files_schema>
 type UnitFileRecord = z.infer<typeof unit_file_schema>
 type TestRelatedEntry = z.infer<typeof test_related_schema>
 type TestRelatedRecord = Omit<TestRelatedEntry, 'kind' | 'at'>
+type LintRelatedEntry = z.infer<typeof lint_related_schema>
+type LintRelatedRecord = Omit<LintRelatedEntry, 'kind' | 'at'>
 type TestPinnedEntry = z.infer<typeof test_pinned_schema>
 type TestPinnedRecord = Omit<TestPinnedEntry, 'kind' | 'at'>
 type SplitNoticeEntry = z.infer<typeof split_notice_schema>
@@ -251,6 +254,8 @@ export type {
 	LaneStateChangeRecord,
 	LedgerEntry,
 	LimitEntry,
+	LintRelatedEntry,
+	LintRelatedRecord,
 	LoadEntry,
 	MergeEntry,
 	OfferableEntry,
