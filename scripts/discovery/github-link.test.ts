@@ -88,6 +88,26 @@ describe('github_link.is_signed_in', () => {
 		expect(github_link.is_signed_in({ ...fixture.environment, GITHUB_TOKEN: '' })).toBe(false)
 	})
 
+	it('reads hosts.yml from XDG_CONFIG_HOME/gh', () => {
+		const xdg = make_directory('josh-github-link-xdg-')
+
+		mkdirSync(path.join(xdg, 'gh'))
+		writeFileSync(path.join(xdg, 'gh', 'hosts.yml'), SIGNED_IN_HOSTS)
+
+		expect(github_link.is_signed_in({ XDG_CONFIG_HOME: xdg })).toBe(true)
+	})
+
+	it('reads hosts.yml from APPDATA/GitHub CLI', () => {
+		const appdata = make_directory('josh-github-link-appdata-')
+
+		const config = path.join(appdata, 'GitHub CLI')
+
+		mkdirSync(config)
+		writeFileSync(path.join(config, 'hosts.yml'), SIGNED_IN_HOSTS)
+
+		expect(github_link.is_signed_in({ APPDATA: appdata })).toBe(true)
+	})
+
 	it('reads hosts.yml from HOME when no gh config directory variable is set', () => {
 		const home = make_directory('josh-github-link-home-')
 
