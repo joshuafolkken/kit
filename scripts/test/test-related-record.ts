@@ -9,6 +9,7 @@ import type { ReachedCount } from './test-pinned-reach'
 import { test_related_cap } from './test-related-cap'
 import type { TestReuse } from './test-related-reuse'
 import { related_scope, type RelatedScope } from './test-related-scope'
+import { test_related_summary } from './test-related-summary'
 import { unit_count_file } from './unit-count-file'
 
 // What one `josh test:related` run leaves in the lane ledger (joshuafolkken/kit#4465): how much of its
@@ -41,6 +42,8 @@ interface RunInput {
 	over_cap?: ReadonlyArray<string>
 	// The files past the cap it left at their whole reach, each with that reach (joshuafolkken/kit#7639).
 	full_reach?: ReadonlyArray<ReachedCount> | undefined
+	// Every changed file the cap read, each with the test files it adds to the run (joshuafolkken/kit#7735).
+	reach?: ReadonlyArray<ReachedCount> | undefined
 	// The branch change by half and base, read beside the run; `undefined` where git could not answer.
 	branch_parts?: ChangedParts | undefined
 	// How long selecting the tests took — the import graph and the importer index (joshuafolkken/kit#7248).
@@ -175,6 +178,16 @@ function full_reach_record(
 	return { full_reach: full_reach.map(({ file, count }) => ({ file, reached: count })) }
 }
 
+// The changed file that added the most test files and that number — the run's closing line names it
+// (`test-related-summary.ts`) — none written where no reach was read.
+function widest_record(
+	reach: ReadonlyArray<ReachedCount> | undefined,
+): Pick<TestRelatedRecord, 'widest_file' | 'widest_tests'> {
+	const widest = test_related_summary.widest_of(reach)
+
+	return widest === undefined ? {} : { widest_file: widest.file, widest_tests: widest.count }
+}
+
 // joshuafolkken/kit#6982: a run whose `changed` swelled to ~1,500 left nothing that told an untracked
 // flood from a base that fell back to the default branch — nor (joshuafolkken/kit#7066) the branch
 // change from named files or moves since the last green.
@@ -208,6 +221,7 @@ function record_of(input: RunInput, result: RunResult): TestRelatedRecord {
 		...triggers_of(input),
 		...over_cap_record(input.over_cap, own),
 		...full_reach_record(input.full_reach),
+		...widest_record(input.reach),
 		...select_record(input.select_elapsed_ms),
 		elapsed_ms: Math.round(result.elapsed_ms),
 	}

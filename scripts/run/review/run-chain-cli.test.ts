@@ -14,6 +14,7 @@ vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mo
 const MAIN_MERGE = 'main:merge'
 const SELFCHECK = 'review:selfcheck'
 const CHECK_RELATED = 'check:related'
+const ACCEPTANCE_CHECK = 'acceptance:check'
 const RUN_REVIEW = 'run:review'
 const RUN_CUT = 'run:cut'
 const ISSUE = '5630'
@@ -24,6 +25,7 @@ const MAIN_LINE = [
 	[SELFCHECK],
 	[CHECK_RELATED],
 	derive_check.DERIVE_CHECK_ARGV,
+	[ACCEPTANCE_CHECK],
 	[RUN_REVIEW],
 ]
 const STOP_EXIT = 2
@@ -65,12 +67,12 @@ afterEach(() => {
 })
 
 describe('run_chain_cli.run — the chain', () => {
-	it('runs main:merge, the self-check, the scoped pair and run:review in order', async () => {
+	it('runs main:merge, the self-check, the scoped pair, the acceptance map and run:review in order', async () => {
 		await expect(run_chain_cli.run([ISSUE])).resolves.toBe(0)
 
 		expect(ran()).toStrictEqual(MAIN_LINE)
 		expect(info_lines).toContain(
-			'run:chain 5630 — ran main:merge → review:selfcheck → check:related → command:derive → run:review',
+			'run:chain 5630 — ran main:merge → review:selfcheck → check:related → command:derive → acceptance:check → run:review',
 		)
 	})
 
@@ -81,7 +83,7 @@ describe('run_chain_cli.run — the chain', () => {
 
 		expect(ran()).toStrictEqual(MAIN_LINE.slice(1))
 		expect(info_lines).toContain(
-			'run:chain 5630 — ran review:selfcheck → check:related → command:derive → run:review',
+			'run:chain 5630 — ran review:selfcheck → check:related → command:derive → acceptance:check → run:review',
 		)
 	})
 
@@ -103,6 +105,22 @@ describe('run_chain_cli.run — the chain', () => {
 
 		expect(error_lines.join('\n')).toContain('rerun `pnpm josh run:chain 5630`;')
 		expect(error_lines.join('\n')).toContain(RESUME_PAST_SELFCHECK)
+	})
+})
+
+// joshuafolkken/kit#7727: ship's acceptance-map refusal asked before the review, not at ship's preflight.
+describe('run_chain_cli.run — acceptance:check', () => {
+	it('stops on a missing acceptance-map row before run:review, naming the resume at acceptance:check', async () => {
+		vi.mocked(lane_child_marker.is_child_of).mockReturnValue(true)
+		stop_at(ACCEPTANCE_CHECK)
+
+		await expect(run_chain_cli.run([ISSUE])).resolves.toBe(1)
+
+		expect(ran()).not.toContainEqual([RUN_REVIEW])
+		expect(error_lines.join('\n')).toContain(
+			'run:chain 5630 — stopped at acceptance:check (exit 2)',
+		)
+		expect(error_lines.join('\n')).toContain('`pnpm josh run:chain 5630 --from acceptance:check`')
 	})
 })
 
@@ -135,6 +153,12 @@ describe('run_chain_cli.run — resume and forwarding', () => {
 		await expect(run_chain_cli.run([ISSUE, FROM, RUN_REVIEW])).resolves.toBe(0)
 
 		expect(ran()).toStrictEqual([[RUN_REVIEW]])
+	})
+
+	it('resumes at acceptance:check, then runs run:review', async () => {
+		await expect(run_chain_cli.run([ISSUE, FROM, ACCEPTANCE_CHECK])).resolves.toBe(0)
+
+		expect(ran()).toStrictEqual([[ACCEPTANCE_CHECK], [RUN_REVIEW]])
 	})
 
 	it('forwards --unpinned-ok to run:review alone', async () => {

@@ -54,7 +54,7 @@ describe('lane_stage_events — compacted stage history (#7379)', () => {
 
 		assert(timeline)
 
-		expect(timeline.rows.map((row) => row.name)).toContain('ship preflight')
+		expect(timeline.rows.map((row) => row.name)).toContain('ship #1 preflight')
 		expect(timeline.rows.map((row) => row.name)).toContain('driver followup (CI wait)')
 		expect(breakdown.implement).toEqual([
 			{ stage: 'implement', from_ms: START + 3 * MINUTE, to_ms: START + 15 * MINUTE },

@@ -1103,7 +1103,8 @@ pnpm josh split:recover 6212 https://github.com/joshuafolkken/kit/issues/6326
 Write every artifact the command map derives — usage spans and catalog — and print page bytes against their ceilings.
 
 ```bash
-pnpm josh command:derive   # after adding, renaming or describing a command
+pnpm josh command:derive           # after adding, renaming or describing a command
+pnpm josh command:derive --check   # name each hand-edited generated page and exit non-zero, writing nothing
 ```
 
 <!-- /usage -->

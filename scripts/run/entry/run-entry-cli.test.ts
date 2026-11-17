@@ -160,7 +160,7 @@ describe('run_entry_cli.run — a halfrun stop is resumed rather than claimed (j
 		adopt_mock.mockResolvedValue(true)
 
 		expect(await run_entry_cli.run([ISSUE])).toBe(OK)
-		expect(adopt_mock).toHaveBeenCalledWith(ISSUE)
+		expect(adopt_mock).toHaveBeenCalledWith(ISSUE, 'fullrun')
 		expect(calls()).toStrictEqual([
 			['run:cut', '--resume', ISSUE],
 			['cost', '--cut'],
@@ -190,7 +190,7 @@ describe('run_entry_cli.run — a prrun stop is resumed rather than claimed (jos
 		prrun_adopt_mock.mockResolvedValue(true)
 
 		expect(await run_entry_cli.run([ISSUE])).toBe(OK)
-		expect(prrun_adopt_mock).toHaveBeenCalledWith(ISSUE)
+		expect(prrun_adopt_mock).toHaveBeenCalledWith(ISSUE, 'fullrun')
 		expect(josh_run_mock).toHaveBeenCalledTimes(2)
 		expect(gather_mock).not.toHaveBeenCalled()
 		expect(info_lines).toStrictEqual([
@@ -347,7 +347,7 @@ describe('run_entry_cli.run — a closed issue keeps its prrun hand-off (joshuaf
 			const code = await run_entry_cli.run([ISSUE, '--to', command])
 
 			expect(code).toBe(OK)
-			expect(prrun_adopt_mock).toHaveBeenCalledWith(ISSUE)
+			expect(prrun_adopt_mock).toHaveBeenCalledWith(ISSUE, command)
 			expect(calls()).toStrictEqual([
 				['run:cut', '--resume', ISSUE],
 				['cost', '--cut'],

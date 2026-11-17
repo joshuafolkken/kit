@@ -33,6 +33,7 @@ const STEP = {
 	SCOPED_PAIR: 'scoped pair',
 	GATE: 'josh gate',
 	OVERLAP_WAIT: 'overlap wait',
+	CONFLICT_PROBE: 'conflict probe',
 	LOCAL_COMMIT: 'local commit',
 	MERGE: 'merge',
 	PUSH: 'push',

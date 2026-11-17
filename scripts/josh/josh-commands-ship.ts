@@ -112,7 +112,7 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 			examples: [
 				{
 					arguments: '<N>',
-					note: 'after `run:cut <N>` alone: merge main (not in a lane child), answer the self-check, run the scoped pair, open the review',
+					note: 'after `run:cut <N>` alone: merge main (not in a lane child), answer the self-check, run the scoped pair, check the generated pages (kit only) and the acceptance map, open the review',
 				},
 				{
 					arguments: '<N> --from check:related',

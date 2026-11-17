@@ -17,6 +17,7 @@ const COMMAND = 'pnpm josh run:chain'
 const MAIN_MERGE = 'main:merge'
 const SELFCHECK = 'review:selfcheck'
 const CHECK_RELATED = 'check:related'
+const ACCEPTANCE_CHECK = 'acceptance:check'
 const RUN_REVIEW = 'run:review'
 const [DERIVE_CHECK = ''] = derive_check.DERIVE_CHECK_ARGV
 
@@ -80,6 +81,22 @@ const DERIVE_CHECK_STAGE: ChainStage = {
 		`move each named page's hand edit into its source, run \`${derive_check.DERIVE_COMMAND}\`, ${rerun(issue, DERIVE_CHECK)}`,
 }
 
+// Ship's acceptance-map refusal asked of the draft before the review, so a criterion with no row stops
+// here rather than at ship's preflight (joshuafolkken/kit#7727).
+const ACCEPTANCE_STAGE: ChainStage = {
+	name: ACCEPTANCE_CHECK,
+	argv: [ACCEPTANCE_CHECK],
+	next: (issue) =>
+		`write a row for each criterion it names in the ship body draft's \`## 受け入れ条件の対応\`, ${rerun(issue, ACCEPTANCE_CHECK)}`,
+}
+
+const SELFCHECK_STAGE: ChainStage = {
+	name: SELFCHECK,
+	argv: [SELFCHECK],
+	next: (issue) =>
+		`fix each hit (\`prompts/review.md\` → "Before round 1 — the implementer's self-check"), ${rerun(issue)}; on a hit that is no defect, ${rerun(issue, CHECK_RELATED)}`,
+}
+
 // `review_args` — `--unpinned-ok "<reason>"` and `--accept-metrics "<reason>"` as given — goes to
 // `run:review` alone; empty when absent. `is_kit` adds the generated-page check.
 function review_stages(
@@ -87,18 +104,14 @@ function review_stages(
 	is_kit: boolean,
 ): ReadonlyArray<ChainStage> {
 	return [
-		{
-			name: SELFCHECK,
-			argv: [SELFCHECK],
-			next: (issue) =>
-				`fix each hit (\`prompts/review.md\` → "Before round 1 — the implementer's self-check"), ${rerun(issue)}; on a hit that is no defect, ${rerun(issue, CHECK_RELATED)}`,
-		},
+		SELFCHECK_STAGE,
 		{
 			name: CHECK_RELATED,
 			argv: [CHECK_RELATED],
 			next: (issue) => `fix the red check, ${rerun(issue, CHECK_RELATED)}`,
 		},
 		...(is_kit ? [DERIVE_CHECK_STAGE] : []),
+		ACCEPTANCE_STAGE,
 		{
 			name: RUN_REVIEW,
 			argv: [RUN_REVIEW, ...review_args],
