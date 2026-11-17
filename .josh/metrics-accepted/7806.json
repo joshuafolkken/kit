@@ -1,0 +1,7 @@
+{
+	"reason": "The test:pinned ledger row records why the cache missed each probed hunk, and lane:breakdown shows the counts (#7806)",
+	"date": "2026-11-17",
+	"growth": {
+		"scripts.code_lines": 44
+	}
+}

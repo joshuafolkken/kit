@@ -5,7 +5,12 @@ import { changed_paths } from '#scripts/git/changed-paths'
 import { git_spawn } from '#scripts/git/git-spawn'
 import { review_code_tree } from '#scripts/review/review-code-tree'
 import { test_pinned_cache, type LoadedCache, type Reached } from './test-pinned-cache'
-import { test_pinned_cache_logic, type Known, type Recheck } from './test-pinned-cache-logic'
+import {
+	test_pinned_cache_logic,
+	type Known,
+	type MissReason,
+	type Recheck,
+} from './test-pinned-cache-logic'
 import { test_pinned_carry } from './test-pinned-carry'
 import { test_pinned_emit } from './test-pinned-emit'
 import { test_pinned_functions } from './test-pinned-functions'
@@ -58,6 +63,7 @@ interface RunOptions {
 interface ProbeRun {
 	hunks: ReadonlyArray<Hunk>
 	known: ReadonlyArray<Known>
+	misses: ReadonlyArray<MissReason | undefined>
 	counts: ReadonlyMap<string, number>
 	cache: LoadedCache
 	keys: ReadonlyArray<string>
@@ -96,10 +102,13 @@ function recheck_of(known: Known): Recheck | undefined {
 	return test_pinned_cache_logic.is_recheck(known) ? known : undefined
 }
 
-// The hunks no held verdict covers, each with its recheck where the cache named one.
-function probes_of(hunks: ReadonlyArray<Hunk>, known: ReadonlyArray<Known>): Array<Probe> {
-	return hunks
-		.map((hunk, index) => ({ hunk, index, recheck: recheck_of(known[index]) }))
+// The hunks no held verdict covers, each with its recheck where the cache named one and why the cache
+// did not hold it (joshuafolkken/kit#7806).
+function probes_of(probing: Pick<ProbeRun, 'hunks' | 'known' | 'misses'>): Array<Probe> {
+	const { known, misses } = probing
+
+	return probing.hunks
+		.map((hunk, index) => ({ hunk, index, recheck: recheck_of(known[index]), miss: misses[index] }))
 		.filter((probe) => held_of(known[probe.index]) === undefined)
 }
 
@@ -153,7 +162,7 @@ async function verdicts_on(paths: ReadonlyArray<string>, probing: ProbeRun): Pro
 	const verdicts = probing.known.map((entry) => held_of(entry))
 	const reached = reached_of(verdicts)
 	const probes = await with_spawned(
-		by_reach(probes_of(probing.hunks, probing.known), probing.counts),
+		by_reach(probes_of(probing), probing.counts),
 		probing.cache.reach,
 	)
 	const writer = test_pinned_cache.writer({ ...probing.cache, hunks: probing.hunks }, probing.keys)
@@ -207,11 +216,8 @@ async function checked_outcome(
 ): Promise<HunkOutcome> {
 	const { hunks, cache } = read
 	const keys = test_pinned_carry.keys(cache, hunks)
-	const known = await test_pinned_cache.known(
-		cache,
-		keys,
-		hunks.map((hunk) => hunk.file),
-	)
+	const files = hunks.map((hunk) => hunk.file)
+	const known = await test_pinned_cache.known(cache, keys, files)
 
 	if (options.is_cached_only) {
 		return outcome_of(
@@ -220,7 +226,8 @@ async function checked_outcome(
 		)
 	}
 
-	const { verdicts, staged } = await verdicts_on(paths, { ...read, known, keys, options })
+	const misses = await test_pinned_cache.misses(cache, keys, files)
+	const { verdicts, staged } = await verdicts_on(paths, { ...read, known, misses, keys, options })
 
 	return { ...outcome_of(hunks, verdicts), ...cut_of(hunks, verdicts), staged }
 }

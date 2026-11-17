@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } fr
 import { test_pinned } from './test-pinned'
 import { test_pinned_emit } from './test-pinned-emit'
 import { test_pinned_fixture } from './test-pinned-fixture'
-import { test_pinned_ledger } from './test-pinned-ledger'
+import { test_pinned_ledger, type Skipped } from './test-pinned-ledger'
 import { test_pinned_logic } from './test-pinned-logic'
 import { test_pinned_pool } from './test-pinned-pool'
 import { test_pinned_stage } from './test-pinned-stage'
@@ -86,6 +86,11 @@ function selections_of(runs: MockInstance<typeof test_red.probe_in>): Array<Arra
 	return runs.mock.calls.map(([, selection]) => selection.slice(0, 2))
 }
 
+// A ledger row's held, rechecked and unregistered counts, with no rewire and none over the cap.
+function counts(held: number, rechecked: number, unregistered: number): Skipped {
+	return { held, rechecked, unregistered, rewired: 0, over_cap: 0 }
+}
+
 describe('test_pinned.run stopped after its first verdict', () => {
 	it(
 		'keeps that verdict, so the next run probes only the hunk it had not reached',
@@ -127,6 +132,7 @@ describe('test_pinned.run timed into the ledger', () => {
 						held: 0,
 						rechecked: 0,
 						unregistered: runs.mock.calls.length,
+						misses: { unregistered: runs.mock.calls.length },
 						rewired: REWIRES,
 						over_cap: 0,
 					},
@@ -203,8 +209,8 @@ describe('test_pinned.run that rechecks one hunk and holds the other', () => {
 			await write(NEW_TEST, REACHING_TEST)
 			await run_locations()
 			expect(row.mock.calls.map(([skipped]) => skipped)).toEqual([
-				{ held: 0, rechecked: 0, unregistered: 2, rewired: 0, over_cap: 0 },
-				{ held: 1, rechecked: 1, unregistered: 0, rewired: 0, over_cap: 0 },
+				{ ...counts(0, 0, 2), misses: { unregistered: 2 } },
+				{ ...counts(1, 1, 0), misses: { basis: 1 } },
 			])
 		},
 		RUN_TIMEOUT,

@@ -54,6 +54,21 @@ describe('test_pinned_ledger.record', () => {
 	})
 })
 
+// joshuafolkken/kit#7806
+describe('test_pinned_ledger.record with the cache misses', () => {
+	it('writes the probed hunks counted by why the cache missed them', async () => {
+		vi.spyOn(lane_paths, 'issue_here').mockReturnValue(7806)
+		const write = vi.spyOn(lane_ledger_write, 'record_test_pinned').mockResolvedValue()
+		const misses = test_pinned_ledger.miss_counts(['change', undefined, 'change', 'basis'])
+
+		await test_pinned_ledger.record({ held: 0, rewired: 0, misses }, [], 10)
+
+		expect(write).toHaveBeenCalledWith(
+			expect.objectContaining({ issue: 7806, misses: { change: 2, basis: 1 } }),
+		)
+	})
+})
+
 describe('test_pinned_ledger.record outside a lane', () => {
 	it('leaves the lane out of a run outside a lane, and names an unnamed origin manual', async () => {
 		vi.spyOn(lane_paths, 'issue_here').mockReturnValue(undefined)

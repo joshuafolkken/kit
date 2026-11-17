@@ -82,6 +82,23 @@ function probed_counts(rows: ReadonlyArray<TestPinnedEntry>): Array<string> {
 	])
 }
 
+// The probed hunks counted by why the cache did not hold their verdict (joshuafolkken/kit#7806), as
+// `miss: 3 change, 1 test_contents`; none where no row carries the counts (an older row's).
+function miss_counts(rows: ReadonlyArray<TestPinnedEntry>): Array<string> {
+	const pairs = rows.flatMap((row) => Object.entries(row.misses ?? {}))
+	const reasons = [...new Set(pairs.map(([reason]) => reason))]
+	const named = named_counts(
+		reasons.map((reason) => [
+			pairs
+				.filter(([named_reason]) => named_reason === reason)
+				.reduce((sum, [, count]) => sum + count, 0),
+			reason,
+		]),
+	)
+
+	return named.length === 0 ? [] : [`miss: ${named.join(', ')}`]
+}
+
 // The skipped hunks' counts: `rewired` (joshuafolkken/kit#5235) and `over cap` (joshuafolkken/kit#5503).
 function skipped_counts(rows: ReadonlyArray<TestPinnedEntry>): Array<string> {
 	return named_counts([
@@ -100,7 +117,12 @@ function detail_text(rows: ReadonlyArray<TestPinnedEntry>): string {
 	const total =
 		held + sum_of(rows, (row) => row.rewired) + sum_of(rows, (row) => row.over_cap) + probes.length
 	const head = `test:pinned ${String(total)} hunks, ${String(held)} cached`
-	const counts = [head, ...probed_counts(rows), `${String(probes.length)} probed`]
+	const counts = [
+		head,
+		...probed_counts(rows),
+		...miss_counts(rows),
+		`${String(probes.length)} probed`,
+	]
 
 	return ` (${[...counts, ...skipped_counts(rows), ...probes.slice(0, MAX_SHOWN).map((probe) => probe_text(probe))].join(', ')})`
 }
