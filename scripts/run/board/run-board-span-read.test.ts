@@ -87,6 +87,34 @@ describe('run_board_span_read.span_here — a single run', () => {
 	})
 })
 
+// joshuafolkken/kit#7710: a stopped single run's hold stays, so it must not hide the backlogrun that
+// ended after its stop.
+describe('run_board_span_read.span_here — a stopped single run', () => {
+	it('draws the backlogrun that ended after a stopped single run', async () => {
+		arrange(NONE, STOPPED)
+		const stopped = { ...SINGLE, ended_ms: Date.parse(STARTED_AT) }
+
+		vi.spyOn(run_board_single, 'span_here').mockResolvedValue(stopped)
+
+		await expect(run_board_span_read.span_here(REPOSITORY, undefined)).resolves.toMatchObject({
+			span: { invocation: STOPPED.invocation, ended_ms: Date.parse(ENDED_AT) },
+			resume: 'abc',
+		})
+	})
+
+	it('draws a stopped single run over the backlogrun that ended before its stop', async () => {
+		arrange(NONE, STOPPED)
+		const stopped = { ...SINGLE, ended_ms: Date.parse(ENDED_AT) + 1 }
+
+		vi.spyOn(run_board_single, 'span_here').mockResolvedValue(stopped)
+
+		await expect(run_board_span_read.span_here(REPOSITORY, undefined)).resolves.toStrictEqual({
+			...NO_SPAN,
+			span: stopped,
+		})
+	})
+})
+
 describe('run_board_span_read.span_here — the run’s record', () => {
 	it('reads the stopped run with the session it resumes from', async () => {
 		arrange(NONE, STOPPED)
