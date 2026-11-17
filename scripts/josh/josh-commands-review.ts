@@ -161,6 +161,21 @@ const REVIEW_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
+	'preflight:check': {
+		script: 'scripts/review/preflight-check-cli.ts',
+		description:
+			"Ask ship's preflight judgments that need no PR — classification, live-evidence, removed-tests, unplanned — before the review",
+		category: 'AI tools',
+		reference: ['', 'automation', ['none']],
+		usage: {
+			examples: [
+				{
+					arguments: '',
+					note: '→ `preflight:check: pass`, or each unmet ship precondition named by its kind (exit 1)',
+				},
+			],
+		},
+	},
 	'review:selfcheck': {
 		script: 'scripts/review/selfcheck-cli.ts',
 		description:

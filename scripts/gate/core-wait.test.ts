@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { busy_average } from './busy-average'
 import type { LedgerEntry } from './core-admission'
 import { core_wait, type BudgetWait } from './core-wait'
+import { core_weights } from './core-weights'
 
 // joshuafolkken/kit#3943: a claim the budget held back waited in silence, so a lane stalled on memory
 // pressure read the same as a stuck one. What is pinned here is why a claim waits and which markers
@@ -152,6 +153,13 @@ describe('core_wait.is_held_in_vain — whether waiting on gains a claim nothing
 		const overloaded = { ...budget, is_overloaded: true }
 
 		expect(core_wait.is_held_in_vain('second', held(1), overloaded, idle)).toBe(false)
+	})
+
+	// joshuafolkken/kit#7776: lint's ledger weight fell below the type check's, which stays small.
+	it('answers yes for a claim of the type check weight', () => {
+		const weight = core_weights.CORE_WEIGHTS.type_check
+
+		expect(core_wait.is_held_in_vain('second', held(weight), budget, idle)).toBe(true)
 	})
 
 	it('answers no for a claim heavier than a static check', () => {
