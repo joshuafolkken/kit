@@ -20,12 +20,20 @@ const SPLIT_RATIONALE_HEADING = '## Split rationale'
 // One child declares no order, so there is nothing for the record below to name.
 const CHAIN_MINIMUM_LENGTH = 2
 
+// Why one declared chain runs in that order — what a later child takes from an earlier one, passed as
+// `--order-reason "<chain>: <reason>"`.
+interface OrderReason {
+	chain: Chain
+	reason: string
+}
+
 interface EpicBodyInput {
 	children: ReadonlyArray<number>
 	rationale: string
 	is_ordered: boolean
 	// The `--chain` lines a creation declared, each a chain of children in the order written.
 	chains?: ReadonlyArray<Chain> | undefined
+	order_reasons?: ReadonlyArray<OrderReason> | undefined
 	origin?: string | undefined
 	// Known when an existing issue is being promoted; absent while a new epic's body is built, since
 	// the number is only assigned on creation.
@@ -117,7 +125,46 @@ function format_order_line(chain: Chain, flag: string): string {
 	return `- Order: \`${format_chain(chain)}\`, ${declared}`
 }
 
-function format_decisions_section(chains: ReadonlyArray<Chain>, is_ordered: boolean): string {
+function is_same_chain(left: Chain, right: Chain): boolean {
+	return left.length === right.length && left.every((child, index) => child === right[index])
+}
+
+function find_reason(chain: Chain, reasons: ReadonlyArray<OrderReason>): string | undefined {
+	return reasons.find((entry) => is_same_chain(entry.chain, chain))?.reason
+}
+
+// A chain given a reason carries it on the line after its order.
+function format_chain_record(
+	chain: Chain,
+	flag: string,
+	reasons: ReadonlyArray<OrderReason>,
+): Array<string> {
+	const reason = find_reason(chain, reasons)
+	const order = format_order_line(chain, flag)
+
+	return reason === undefined ? [order] : [order, `- Reasoning: ${reason}`]
+}
+
+// The pointer to the split rationale stands for the chains given no reason, so it is left out once
+// every chain has its own.
+function format_reasoning(
+	chains: ReadonlyArray<Chain>,
+	flag: string,
+	reasons: ReadonlyArray<OrderReason>,
+): Array<string> {
+	const lines = chains.flatMap((chain) => format_chain_record(chain, flag, reasons))
+	const is_all_reasoned = chains.every((chain) => find_reason(chain, reasons) !== undefined)
+
+	return is_all_reasoned
+		? lines
+		: [...lines, `- Reasoning: see \`${SPLIT_RATIONALE_HEADING}\` above.`]
+}
+
+function format_decisions_section(
+	chains: ReadonlyArray<Chain>,
+	is_ordered: boolean,
+	reasons: ReadonlyArray<OrderReason> = [],
+): string {
 	if (chains.length === 0) return ''
 
 	const flag = is_ordered ? '--ordered' : '--chain'
@@ -128,8 +175,7 @@ function format_decisions_section(chains: ReadonlyArray<Chain>, is_ordered: bool
 		'',
 		'### Declared order',
 		'',
-		...chains.map((chain) => format_order_line(chain, flag)),
-		`- Reasoning: see \`${SPLIT_RATIONALE_HEADING}\` above.`,
+		...format_reasoning(chains, flag, reasons),
 		'',
 	].join('\n')
 }
@@ -153,7 +199,7 @@ function build_epic_body(input: EpicBodyInput): string {
 		'## Progress',
 		'',
 		format_progress(input.children),
-		format_decisions_section(chains, input.is_ordered),
+		format_decisions_section(chains, input.is_ordered, input.order_reasons),
 	].join('\n')
 }
 
@@ -178,8 +224,10 @@ const epic_body = {
 	EPIC_PLACEHOLDER,
 	build_epic_body,
 	build_dependency_pairs,
+	declared_chains,
 	format_run_command,
+	is_same_chain,
 }
 
 export { epic_body, SPLIT_RATIONALE_HEADING }
-export type { EpicBodyInput }
+export type { EpicBodyInput, OrderReason }

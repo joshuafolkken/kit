@@ -1,4 +1,5 @@
 import { session_cite } from '#scripts/issue/session-cite'
+import { epic_body, type OrderReason } from './epic-body'
 import { epic_cli_argv, type EpicArgv } from './epic-cli-argv'
 import {
 	chain_links,
@@ -18,10 +19,16 @@ import {
 // carries the reason, and the entry point prints it and exits without creating or editing an issue.
 
 const CHAIN_FLAG = '--chain'
+// `--order-reason "#A -> #B: <reason>"`, repeatable: why one declared chain runs in that order, written
+// under `### Declared order` in place of the pointer to the split rationale. Its refusals ride on
+// `chain_refusal`, so every entry point that stops on a refused `--chain` stops on these too.
+const ORDER_REASON_FLAG = '--order-reason'
+const REASON_SEPARATOR = ':'
 
 interface ChainRead {
 	chains: Array<Chain>
 	chain_refusal?: string | undefined
+	order_reasons?: Array<OrderReason> | undefined
 }
 
 // `children` is `undefined` where the epic's children are not known yet — `--add` reads them from the
@@ -122,16 +129,89 @@ function find_refusal(values: ReadonlyArray<string>, subject: ChainSubject): str
 	)
 }
 
-// The declared chains, or the reason they were refused; no chains when `--chain` was not given.
+// `<chain>: <reason>` — the chain first, read as `--chain` reads it, so which order the reason is for
+// cannot be mistaken. Whitespace is collapsed: the reason is written as one list item.
+function to_order_reason(value: string): OrderReason | undefined {
+	const separator = value.indexOf(REASON_SEPARATOR)
+	if (separator === -1) return undefined
+	const chain = to_chain(value.slice(0, separator))
+	const reason = value
+		.slice(separator + 1)
+		.replaceAll(/\s+/gu, ' ')
+		.trim()
+
+	return chain === undefined || reason.length === 0 ? undefined : { chain, reason }
+}
+
+function is_declared(entry: OrderReason, declared: ReadonlyArray<Chain>): boolean {
+	return declared.some((chain) => epic_body.is_same_chain(chain, entry.chain))
+}
+
+// Unreadable, naming a chain nobody declared, or naming one an earlier value already gave a reason —
+// a record of an order the epic does not hold, or two records disagreeing about one.
+function is_unusable(
+	read: ReadonlyArray<OrderReason | undefined>,
+	at: number,
+	declared: ReadonlyArray<Chain>,
+): boolean {
+	const entry = read[at]
+	if (entry === undefined) return true
+	const earlier = read.slice(0, at).flatMap((other) => other ?? [])
+
+	return (
+		!is_declared(entry, declared) ||
+		is_declared(
+			entry,
+			earlier.map((other) => other.chain),
+		)
+	)
+}
+
+function find_reason_refusal(
+	values: ReadonlyArray<string>,
+	declared: ReadonlyArray<Chain>,
+): string | undefined {
+	const read = values.map((value) => to_order_reason(value))
+	const index = read.findIndex((_entry, at) => is_unusable(read, at, declared))
+	if (index === -1) return undefined
+	const expected = `\`<chain>: <reason>\` for a chain \`${CHAIN_FLAG}\` or \`--ordered\` declared, once`
+
+	return `\`${ORDER_REASON_FLAG} ${values[index] ?? ''}\` is not ${expected}; nothing was written.`
+}
+
+// The reasons given for the declared chains, a refusal, or nothing when `--order-reason` was not given.
+function read_order_reasons(
+	parsed: EpicArgv,
+	subject: ChainSubject,
+	chains: ReadonlyArray<Chain>,
+): Omit<ChainRead, 'chains'> {
+	const values = epic_cli_argv.values_of_flag(parsed, ORDER_REASON_FLAG)
+	if (values.length === 0) return {}
+	const declared = epic_body.declared_chains(subject.children ?? [], subject.is_ordered, chains)
+	const chain_refusal = find_reason_refusal(values, declared)
+	if (chain_refusal !== undefined) return { chain_refusal }
+
+	return { order_reasons: values.flatMap((value) => to_order_reason(value) ?? []) }
+}
+
+// The declared chains and their reasons, or the reason they were refused; no chains when `--chain`
+// was not given.
 function read_chains(parsed: EpicArgv, subject: ChainSubject): ChainRead {
 	const values = epic_cli_argv.values_of_flag(parsed, CHAIN_FLAG)
 	const chain_refusal = find_refusal(values, subject)
 	if (chain_refusal !== undefined) return { chains: [], chain_refusal }
+	const chains = values.map((value) => to_chain(value) ?? [])
 
-	return { chains: values.map((value) => to_chain(value) ?? []) }
+	return { chains, ...read_order_reasons(parsed, subject, chains) }
 }
 
-const epic_cli_chain = { CHAIN_FLAG, find_cycle_refusal, find_outsider_refusal, read_chains }
+const epic_cli_chain = {
+	CHAIN_FLAG,
+	ORDER_REASON_FLAG,
+	find_cycle_refusal,
+	find_outsider_refusal,
+	read_chains,
+}
 
 export { epic_cli_chain }
 export type { ChainRead }

@@ -16,7 +16,7 @@ import { epic_split_reach } from './epic-split-reach'
 import { epic_untrack } from './epic-untrack'
 
 const FLAGS =
-	'[--ordered | --chain "#A -> #B" ...] [--rationale-file <path|->] [--origin <owner/repo#N>] [--notify]'
+	'[--ordered | --chain "#A -> #B" ...] [--order-reason "#A -> #B: <reason>" ...] [--rationale-file <path|->] [--origin <owner/repo#N>] [--notify]'
 const USAGE = [
 	`Usage: josh epic "<title>" <N1> <N2> ... ${FLAGS}`,
 	`       josh epic --promote <N> <N1> <N2> ... ${FLAGS} [--title <title>]`,
@@ -67,6 +67,7 @@ async function run_promotion(argv: ReadonlyArray<string>): Promise<number> {
 		rationale: epic_cli.read_rationale(parsed.rationale_path),
 		is_ordered: parsed.is_ordered,
 		chains: parsed.chains,
+		order_reasons: parsed.order_reasons,
 		origin: parsed.origin,
 		title: parsed.title,
 	})
@@ -231,6 +232,7 @@ async function create(argv: ReadonlyArray<string>): Promise<Creation> {
 		rationale: epic_cli.read_rationale(parsed.rationale_path),
 		is_ordered: parsed.is_ordered,
 		chains: parsed.chains,
+		order_reasons: parsed.order_reasons,
 		origin: parsed.origin,
 	})
 

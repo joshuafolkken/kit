@@ -70,3 +70,57 @@ describe('epic_cli_chain.read_chains — refusals', () => {
 		expect(read([A_TO_C], true).chain_refusal).toMatch(/--ordered/u)
 	})
 })
+
+const REASON = epic_cli_chain.ORDER_REASON_FLAG
+const ORDERED_CHAIN = '#7873 -> #7874 -> #7875'
+
+function read_reasons(
+	chains: ReadonlyArray<string>,
+	reasons: ReadonlyArray<string>,
+	is_ordered = false,
+): ChainRead {
+	const argv = [
+		...chains.flatMap((value) => [CHAIN, value]),
+		...reasons.flatMap((value) => [REASON, value]),
+	]
+	const parsed = epic_cli_argv.read_form(argv, { switches: [], list_flags: [CHAIN, REASON] })
+
+	return epic_cli_chain.read_chains(parsed ?? { positionals: [], values: {} }, {
+		children: CHILDREN,
+		is_ordered,
+	})
+}
+
+describe('epic_cli_chain.read_chains — order reasons', () => {
+	it('reads one reason per declared chain', () => {
+		const result = read_reasons([A_TO_C, B_TO_C], [`${B_TO_C}: uses the  reader\n#7874 adds`])
+
+		expect(result.order_reasons).toStrictEqual([
+			{ chain: [7874, 7875], reason: 'uses the reader #7874 adds' },
+		])
+		expect(result.chain_refusal).toBeUndefined()
+	})
+
+	it('reads a reason for the chain --ordered declares through every child', () => {
+		const result = read_reasons([], [`${ORDERED_CHAIN}: each one extends the last`], true)
+
+		expect(result.order_reasons).toStrictEqual([
+			{ chain: CHILDREN, reason: 'each one extends the last' },
+		])
+	})
+
+	it('refuses a reason for a chain that was not declared', () => {
+		const result = read_reasons([A_TO_C], [`${A_TO_B}: not declared`])
+
+		expect(result.chain_refusal).toMatch(/--order-reason.*nothing was written/u)
+		expect(result.order_reasons).toBeUndefined()
+	})
+
+	it('refuses a value without a reason, and a second reason for one chain', () => {
+		expect(read_reasons([A_TO_C], [`${A_TO_C}:  `]).chain_refusal).toMatch(NOTHING_WRITTEN)
+		expect(read_reasons([A_TO_C], [A_TO_C]).chain_refusal).toMatch(NOTHING_WRITTEN)
+		expect(read_reasons([A_TO_C], [`${A_TO_C}: one`, `${A_TO_C}: two`]).chain_refusal).toMatch(
+			NOTHING_WRITTEN,
+		)
+	})
+})
