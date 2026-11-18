@@ -88,6 +88,7 @@ describe("auto_ok_judge_write.apply on a body declaring a person's judgement is 
 		expect(await auto_ok_judge_write.apply(ISSUE, RUN_LANE_LABEL)).toBe(FAILURE_EXIT_CODE)
 		expect(apply_label).not.toHaveBeenCalled()
 		expect(post_comment).not.toHaveBeenCalled()
+		expect(vi.mocked(console.error).mock.lastCall?.[0]).toContain('`- 人の判断: 不要`')
 	})
 })
 
