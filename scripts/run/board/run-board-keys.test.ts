@@ -104,3 +104,34 @@ describe('run_board_keys.read_keys store', () => {
 		expect(calls).toStrictEqual([])
 	})
 })
+
+// joshuafolkken/kit#7927: the key that skips the intro is spent on it, neither folding nor saving.
+describe('run_board_keys.read_keys intercept', () => {
+	it('hands intercepted keys to the taker, not the folds, until released', () => {
+		const keys = fake_keys()
+		const saved: Array<Array<string>> = []
+		const taken: Array<string> = []
+		const reading = read_keys({
+			...keys.input,
+			store: {
+				load: () => new Set(),
+				save: (folded) => {
+					saved.push([...folded])
+				},
+			},
+		})
+		const release = reading.intercept?.(() => {
+			taken.push('key')
+		})
+
+		keys.type('q')
+		keys.type(CTRL_C)
+		release?.()
+		keys.type('q')
+		expect([taken, saved, keys.calls]).toStrictEqual([
+			['key'],
+			[['queued']],
+			['raw true', 'interrupt'],
+		])
+	})
+})

@@ -21,9 +21,12 @@ interface KeyInput {
 
 // The sections folded so far, read at every redraw — none where no key can be read — and what puts the
 // terminal back.
+// `intercept` hands every key, Ctrl-C aside, to `on_key` instead of the folds, until the returned
+// release is called.
 interface KeyReading {
 	folded: (() => ReadonlySet<SectionKey>) | undefined
 	stop?: (() => void) | undefined
+	intercept?: ((on_key: () => void) => () => void) | undefined
 }
 
 // What a chunk of keys leaves folded, each key in the order typed.
@@ -40,29 +43,47 @@ function same(left: ReadonlySet<SectionKey>, right: ReadonlySet<SectionKey>): bo
 }
 
 // A key saves only what it changed.
+function folding(input: KeyInput): {
+	fold: (chunk: string) => void
+	folded: () => ReadonlySet<SectionKey>
+} {
+	let folded: ReadonlySet<SectionKey> = input.store?.load() ?? new Set()
+
+	return {
+		fold: (chunk) => {
+			const next = folded_by(folded, chunk)
+			if (!same(next, folded)) input.store?.save(next)
+			folded = next
+		},
+		folded: () => folded,
+	}
+}
+
 function read_keys(input: KeyInput | undefined): KeyReading {
 	if (input?.is_tty !== true) return { folded: undefined }
 
-	let folded: ReadonlySet<SectionKey> = input.store?.load() ?? new Set()
+	const { fold, folded } = folding(input)
+	const held: { taker: (() => void) | undefined } = { taker: undefined }
 
 	input.raw(true)
 	input.listen((chunk) => {
-		if (chunk.includes(CTRL_C)) {
-			input.interrupt()
-
-			return
-		}
-
-		const next = folded_by(folded, chunk)
-		if (!same(next, folded)) input.store?.save(next)
-		folded = next
+		if (chunk.includes(CTRL_C)) input.interrupt()
+		else if (held.taker === undefined) fold(chunk)
+		else held.taker()
 	})
 
 	return {
-		folded: () => folded,
+		folded,
 		stop: () => {
 			input.raw(false)
 			input.close()
+		},
+		intercept: (on_key) => {
+			held.taker = on_key
+
+			return () => {
+				held.taker = undefined
+			}
 		},
 	}
 }
