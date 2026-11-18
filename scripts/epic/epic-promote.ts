@@ -1,5 +1,5 @@
 import { session_cite } from '#scripts/issue/session-cite'
-import { epic_body } from './epic-body'
+import { epic_body, type EpicBodyInput } from './epic-body'
 import { epic_parse } from './epic-parse'
 
 const PROMOTED_HEADING = '## Split into children'
@@ -9,6 +9,7 @@ interface PromoteInput {
 	children: ReadonlyArray<number>
 	rationale: string
 	is_ordered: boolean
+	chains?: EpicBodyInput['chains']
 	epic_number: number
 	origin?: string | undefined
 }
@@ -47,6 +48,7 @@ function build_promoted_body(input: PromoteInput): string {
 		children: input.children,
 		rationale: input.rationale,
 		is_ordered: input.is_ordered,
+		chains: input.chains,
 		origin: input.origin,
 		epic_number: input.epic_number,
 	})

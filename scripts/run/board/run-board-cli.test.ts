@@ -2,6 +2,7 @@ import { stripVTControlCharacters } from 'node:util'
 import { describe, expect, it, vi } from 'vitest'
 import { run_board_cli } from './run-board-cli'
 import { run_board_fixture, type Harness } from './run-board-fixture'
+import { run_board_intro } from './run-board-intro'
 import type { IssueCount } from './run-board-issue-count'
 import type { BoardPlan } from './run-board-layout'
 import type { BoardPorts } from './run-board-state'
@@ -14,6 +15,7 @@ const ESCAPE = '\u{1B}'
 const ENTER = `${ESCAPE}[?1049h${ESCAPE}[?25l`
 const LEAVE = `${ESCAPE}[?25h${ESCAPE}[?1049l`
 const RUN_MARK = '■ josh-board'
+const INTRO_LINE = run_board_intro.LINE
 const LANE_ROW = '  🔍 1°00′00″ 1°00′00″ 1       a'
 const LAUNCH = { pos: 1, at: '2026-10-08T08:00:00.000Z', kind: 'child-launch', text: '#1 a' }
 
@@ -139,6 +141,42 @@ describe('run_board_cli.run screen', () => {
 		expect(frames.at(-1)).toBe(LEAVE)
 		leaves[0]?.()
 		expect(frames.filter((frame) => frame === LEAVE)).toHaveLength(1)
+	})
+})
+
+// joshuafolkken/kit#7927: a live board types its line after entering the screen, before the first
+// frame; a single frame, the chat's or a pipe's, types none.
+async function no_pause(): Promise<void> {
+	await Promise.resolve()
+}
+
+describe('run_board_cli.run intro', () => {
+	it('types the line between entering the screen and the first frame', async () => {
+		const { ports, frames } = harness(undefined, [])
+
+		await expect(run_board_cli.run([], { ...ports, intro_sleep: no_pause })).rejects.toBe(STOPPED)
+		const first = frames.findIndex((frame) => frame.includes(RUN_MARK))
+
+		expect(frames[0]).toBe(ENTER)
+		expect(frames.slice(1, first).join('')).toBe(INTRO_LINE)
+	})
+
+	it('types no line for --once, --chat or a pipe', async () => {
+		const runs = [['--once'], ['--chat']].map(async (argv) => {
+			const { ports, frames } = harness(LOCAL, [plan_titled('a')])
+
+			await run_board_cli.run(argv, { ...ports, intro_sleep: ports.sleep })
+
+			return frames.join('')
+		})
+		const pipe = harness(LOCAL, [plan_titled('a')])
+
+		await run_board_cli.run([], { ...pipe.ports, is_tty: false, intro_sleep: pipe.ports.sleep })
+		expect([...(await Promise.all(runs)), pipe.frames.join('')].join('')).not.toContain(INTRO_LINE)
+	})
+
+	it('types the line on the live board the run and backlogrun draw', () => {
+		expect(run_board_cli.LIVE_PORTS.intro_sleep).toBeTypeOf('function')
 	})
 })
 
