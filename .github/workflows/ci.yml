@@ -38,7 +38,6 @@ jobs:
     permissions:
       contents: read
     outputs:
-      runtime: ${{ steps.scope.outputs.runtime }}
       publish: ${{ steps.scope.outputs.publish }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -598,7 +597,7 @@ jobs:
   # of tests read the docs and prompts, and `Checks` requires this result (joshuafolkken/kit#7975).
   unit:
     name: Unit Tests (${{ matrix.shard }}/6)
-    needs: [reuse-pr-checks, change-scope]
+    needs: [reuse-pr-checks]
     if: ${{ !cancelled() && needs.reuse-pr-checks.outputs.reuse != 'true' }}
     strategy:
       fail-fast: false
