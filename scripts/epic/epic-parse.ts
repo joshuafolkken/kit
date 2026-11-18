@@ -213,6 +213,9 @@ interface DependencyLink {
 	blocked: number
 }
 
+// One chain line's references in the order written; the shape `--chain` and the epic body share.
+type DependencyChain = ReadonlyArray<number>
+
 const REFERENCE_GROUP = 1
 
 // The issue numbers of one chain line, in order.
@@ -328,7 +331,7 @@ const epic_parse = {
 	is_state_closed,
 }
 
-export type { DeclarationState, DependencyLink, ExternalChild }
+export type { DeclarationState, DependencyChain, DependencyLink, ExternalChild }
 export {
 	epic_parse,
 	fence_mask,

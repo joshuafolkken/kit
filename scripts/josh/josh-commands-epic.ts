@@ -14,11 +14,15 @@ const EPIC_COMMANDS: Record<string, CommandEntry> = {
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		description: 'Create an epic issue from its child issue numbers',
 		category: 'AI tools',
-		reference: ['<title> <issue...> [--ordered]', 'automation', ['network']],
+		reference: ['<title> <issue...> [--ordered | --chain <chain>...]', 'automation', ['network']],
 		usage: {
 			examples: [
 				{ arguments: '"Epic: split the parser work" 101 102 103' },
 				{ arguments: '"Epic: staged rollout" 101 102 --ordered' },
+				{
+					arguments: '"Epic: ..." A B C --chain "#A -> #C" --chain "#B -> #C"',
+					note: 'a join: C waits on both',
+				},
 				{ arguments: '"Epic: ..." 101 102 --rationale-file .josh/tmp/rationale.md' },
 				{ arguments: '--promote 858 101 102 103', note: 'turn an existing issue into an epic' },
 				{ arguments: '--add 893 894', note: 'track #894, declaring no order for it' },
@@ -40,6 +44,11 @@ const EPIC_COMMANDS: Record<string, CommandEntry> = {
 					names: ['--ordered'],
 					description:
 						'argument order is the dependency order; writes the arrow chain, records the matching `blocked-by` relations, and adds a `### Declared order` entry under `## Decisions`.',
+				},
+				{
+					names: ['--chain "#A -> #B"'],
+					description:
+						'repeatable, on create or `--promote`: one dependency chain in the `## Dependencies` chain-line form; several give joins and branches. Each chain is written as a chain line with its `blocked-by` relations and a `### Declared order` entry. A value that is not a chain line, a number that is not a child, a cycle, or use with `--ordered` is refused before anything is written.',
 				},
 				{
 					names: ['--rationale-file <path|->'],

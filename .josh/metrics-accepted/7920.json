@@ -1,0 +1,7 @@
+{
+	"reason": "The board row's per-lane finish (row_finish, drift, is_finish_drawn) and its tests replace the smaller over-budget part; render.ts and header.ts stay untouched",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 44
+	}
+}

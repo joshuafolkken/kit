@@ -68,9 +68,10 @@ function rules_of(lines: ReadonlyArray<string>): Array<string> {
 	return lines.filter((line) => RULE_MARKS.some((mark) => line.startsWith(mark)))
 }
 
-// The column the lane row's cut title ends in, its ellipsis included.
+// The column the lane row's cut title ends in, its ellipsis included — found by what a title at its
+// floor keeps before the ellipsis.
 function title_end(lines: ReadonlyArray<string>): number {
-	const lane = lines.find((line) => line.includes(LONG_TITLE.slice(0, TITLE_FLOOR))) ?? ''
+	const lane = lines.find((line) => line.includes(LONG_TITLE.slice(0, TITLE_FLOOR - 1))) ?? ''
 
 	return width_of(lane.slice(0, lane.indexOf('…') + 1))
 }
