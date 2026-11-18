@@ -70,7 +70,7 @@ function frequency_of(pitch: string): number {
 	return A4_FREQUENCY * OCTAVE_RATIO ** ((midi_of(pitch) - A4_MIDI) / SEMITONES_PER_OCTAVE)
 }
 
-// One wave's value in [-1, 1] at a phase in [0, 1), each starting at 0 or rising from it.
+// One wave's value in [-1, 1] at a phase in [0, 1): sine and triangle start at 0, square starts at 1.
 function wave_value(wave: Wave, phase: number): number {
 	if (wave === 'sine') return Math.sin(RADIANS_PER_CYCLE * phase)
 	if (wave === 'square') return phase < HALF_CYCLE ? 1 : -1
@@ -111,7 +111,7 @@ function samples_of(notes: ReadonlyArray<Note>, sample_rate: number): Int16Array
 	return new Int16Array(parts.flatMap((part) => [...part]))
 }
 
-const run_board_sound_synth = { REST, VOLUME, FULL_SCALE, frequency_of, samples_of }
+const run_board_sound_synth = { REST, VOLUME, frequency_of, samples_of }
 
 export { run_board_sound_synth }
 export type { Note, Wave }

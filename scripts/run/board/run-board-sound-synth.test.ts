@@ -3,7 +3,7 @@ import { run_board_sound_synth, type Note } from './run-board-sound-synth'
 
 // joshuafolkken/kit#7943: note definitions synthesize 16-bit mono PCM with faded edges at 50% volume.
 
-const { REST, VOLUME, FULL_SCALE, frequency_of, samples_of } = run_board_sound_synth
+const { REST, VOLUME, frequency_of, samples_of } = run_board_sound_synth
 
 const SAMPLE_RATE = 44_100
 const SECOND_MS = 1000
@@ -12,6 +12,8 @@ const CROSSING_TOLERANCE = 2
 const EDGE_TOLERANCE = 1
 const NOTE_MS = 50
 const NOTE_SAMPLES = 2205
+const DEFAULT_VOLUME = 0.5
+const DEFAULT_PEAK = 16_384
 
 function zero_crossings(samples: Int16Array): number {
 	const signs = [...samples].map((sample) => Math.sign(sample)).filter((sign) => sign !== 0)
@@ -67,7 +69,8 @@ describe('run_board_sound_synth.samples_of volume', () => {
 		const tone = samples_of([{ pitch: 'A4', ms: NOTE_MS, wave: 'square' }], SAMPLE_RATE)
 		const rest = samples_of([{ pitch: REST, ms: NOTE_MS, wave: 'square' }], SAMPLE_RATE)
 
-		expect(peak_of(tone)).toBe(Math.round(VOLUME * FULL_SCALE))
+		expect(VOLUME).toBe(DEFAULT_VOLUME)
+		expect(peak_of(tone)).toBe(DEFAULT_PEAK)
 		expect(peak_of(rest)).toBe(0)
 	})
 })
