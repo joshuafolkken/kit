@@ -97,7 +97,7 @@ const ROW = {
 	},
 }
 
-const memory_durable_write = { ROW, is_feedback_memory_edit }
+const memory_durable_write = { ROW, is_feedback_memory_edit, read_existing }
 
 export type { MemorySeam }
 export { memory_durable_write }

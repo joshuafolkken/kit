@@ -1,3 +1,6 @@
+import { mkdirSync, writeFileSync } from 'node:fs'
+import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it } from 'vitest'
 import { memory_durable_write, type MemorySeam } from './memory-durable-write'
 
@@ -82,7 +85,31 @@ describe('memory_durable_write.is_feedback_memory_edit — Edit', () => {
 	})
 })
 
+describe('memory_durable_write.read_existing', () => {
+	const make_directory = temporary_directory()
+
+	it('judges an Edit by the file on disk, and reads a missing file as empty', () => {
+		const home = make_directory('memory-durable-write-')
+		const directory = path.join(home, '.claude', 'projects', '-work-app', 'memory')
+		const file = path.join(directory, 'note.md')
+		const seam = { home, read: memory_durable_write.read_existing }
+		const call = {
+			name: 'Edit',
+			input: { file_path: file, old_string: 'body', new_string: 'rule' },
+		}
+
+		expect(memory_durable_write.is_feedback_memory_edit(call, seam)).toBe(false)
+		mkdirSync(directory, { recursive: true })
+		writeFileSync(file, FEEDBACK)
+		expect(memory_durable_write.is_feedback_memory_edit(call, seam)).toBe(true)
+	})
+})
+
 describe('memory_durable_write.ROW', () => {
+	it('refuses on every occurrence', () => {
+		expect(memory_durable_write.ROW.decide()).toBe(true)
+	})
+
 	it('points the refusal at "durable-rules" and asks for a prompt/doc change', () => {
 		expect(memory_durable_write.ROW.reason).toContain('"durable-rules"')
 		expect(memory_durable_write.ROW.reason).toContain('Propose the prompt/doc change')
