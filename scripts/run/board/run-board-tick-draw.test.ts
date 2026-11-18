@@ -1,3 +1,4 @@
+import { stripVTControlCharacters } from 'node:util'
 import { describe, expect, it } from 'vitest'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_header } from './run-board-header'
@@ -13,6 +14,7 @@ const { bounds_of, draw_run } = run_board_tick_draw
 const SIZE = { rows: 15, columns: 80 }
 const FOOTER = ['footer']
 const BASELINE = 7
+const HEADER_LINES = 3
 
 function planned(): BoardState {
 	return { ...FRESH_STATE, plan: plan_titled('a'), run_started_ms: LOCAL.started_ms }
@@ -95,6 +97,36 @@ describe('run_board_tick_draw.draw_run cue', () => {
 
 		expect(before.sound_snapshot).toBeUndefined()
 		expect(cues).toStrictEqual([])
+	})
+})
+
+// The header's three lines a live redraw writes with the sound switch at `is_on`.
+function header_drawn(is_on: boolean): Array<string> {
+	const { ports, frames } = harness(LOCAL, [])
+	const state = planned()
+
+	draw_run(
+		state,
+		LOCAL,
+		{ ports: { ...ports, sound: () => is_on }, now_ms: START },
+		layout_for(state, LOCAL, START),
+	)
+
+	return stripVTControlCharacters(frames.join('')).split('\n').slice(0, HEADER_LINES)
+}
+
+// joshuafolkken/kit#7952: the live header says whether the board sounds its cues.
+describe('run_board_tick_draw.draw_run sound mark', () => {
+	it('draws 🔊 after josh-board while the sound is on, the lines under it aligned', () => {
+		expect(header_drawn(true)).toStrictEqual([
+			'⏸ josh-board 🔊  ⏰ 0″  ✅  0/- ──────────  🔄 0  ⏳ -  💤 0',
+			'  -                     💪 -  🧠 -  💾 -',
+			'  kit',
+		])
+	})
+
+	it('draws 🔇 after josh-board while the sound is off', () => {
+		expect(header_drawn(false)[0]).toMatch(/^⏸ josh-board 🔇 {2}⏰/u)
 	})
 })
 

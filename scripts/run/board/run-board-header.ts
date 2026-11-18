@@ -72,6 +72,8 @@ interface BoardHeader
 	run_name?: string | undefined
 	// The kit version the run's supervisor recorded; `undefined` draws `-`.
 	kit_version?: string | undefined
+	// The live board's sound switch, drawn after the name; `undefined` where no key is read.
+	is_sound_on?: boolean | undefined
 	started_ms: number
 	// Set once the run has ended: the title then says when, and how long it took.
 	ended_ms: number | undefined

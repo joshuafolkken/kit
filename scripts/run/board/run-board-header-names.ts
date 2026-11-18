@@ -12,6 +12,8 @@ const KIT_URL = 'https://github.com/joshuafolkken/kit'
 const RELEASES_URL = `${KIT_URL}/releases`
 const UNKNOWN = '-'
 const BLANK = ' '
+const SOUND_ON = '🔊'
+const SOUND_OFF = '🔇'
 
 // `setup` is a run with no child running that is itself at work on a stage (`run-board-setup.ts`).
 type RunMark = 'running' | 'setup' | 'idle' | 'human' | 'stopped'
@@ -35,6 +37,9 @@ interface NameFields extends Pick<BoardLinks, 'comment_link' | 'repo_link'> {
 	kit_version?: string | undefined
 	// The repository as `owner/repo`; `undefined` before a plan is read.
 	repo: string | undefined
+	// The live board's sound switch `s` flips (`run-board-keys.ts`); `undefined` where no key is read,
+	// so `--once`, `--chat` and Telegram draw no sound mark.
+	is_sound_on?: boolean | undefined
 }
 
 // `text` linked to `url` where the frame opens links, plain where it does not.
@@ -42,12 +47,21 @@ function linked(text: string, url: string, link: Link | undefined): string {
 	return link === undefined ? text : link(text, url)
 }
 
+// 🔊 or 🔇 after the name where the board reads the sound switch, nothing elsewhere.
+function sound_part(is_sound_on: boolean | undefined): string {
+	if (is_sound_on === undefined) return ''
+
+	return ` ${is_sound_on ? SOUND_ON : SOUND_OFF}`
+}
+
 // The mark stands still in every state: the spinner turns on the third line.
 function run_part(mark: RunMark, fields: NameFields): string {
 	const { glyph, color } = RUN_MARKS[mark]
 	const name = fields.run_name ?? linked(BOARD_NAME, KIT_URL, fields.comment_link)
 
-	return styleText(color, `${glyph} ${name}`)
+	const named = `${glyph} ${name}`
+
+	return styleText(color, named) + sound_part(fields.is_sound_on)
 }
 
 // A cell under the run's name, past the mark's columns.
