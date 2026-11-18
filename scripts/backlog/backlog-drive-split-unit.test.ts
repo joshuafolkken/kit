@@ -119,14 +119,25 @@ describe('backlog_drive_split_unit.run — the no-split reason it asks for', () 
 	})
 })
 
+async function brief_argv(): Promise<string> {
+	const { ports, requests } = fake([OVER, REASONED])
+
+	await backlog_drive_split_unit.run(ISSUE, ports)
+
+	return JSON.stringify(requests[0]?.argv)
+}
+
 // joshuafolkken/kit#7998: a declared order is refused without its reason, so the brief asks for both.
+// joshuafolkken/kit#7915: per-child chains are the default; --ordered is kept for a true series.
 describe('backlog_drive_split_unit.run — the order reason it asks for', () => {
 	it('asks for a reason beside any declared order', async () => {
-		const { ports, requests } = fake([OVER, REASONED])
+		expect(await brief_argv()).toContain(
+			'[--chain \\"#A -> #C\\" ... --order-reason \\"#A -> #C: <reason>\\"',
+		)
+	})
 
-		await backlog_drive_split_unit.run(ISSUE, ports)
-
-		expect(JSON.stringify(requests[0]?.argv)).toContain('[--ordered --order-reason')
+	it('keeps --ordered for a true series only', async () => {
+		expect(await brief_argv()).toContain('--ordered only when every child waits on the one before')
 	})
 })
 

@@ -171,7 +171,7 @@ but they are `gh` subcommands, which bypass the `scripts/gh/` exec layer
 (`prompts/collaboration-workflow/gh-rest.md`), so no procedure uses them — everything goes through
 `gh api`. Dependencies are adopted:
 a child shows what it waits for in the UI and API, though they only display and never block, so order
-is still enforced by `--ordered` and `backlogrun`. Sub-issues are not: they express containment, not
+is still enforced by the declared chains (`--chain`, or `--ordered` for a true series) and `backlogrun`. Sub-issues are not: they express containment, not
 order, and are limited to one repository owner — neither reason depends on CLI support.
 
 ## `epic:next` — why it answers as it does
