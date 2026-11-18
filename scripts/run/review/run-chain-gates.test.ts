@@ -24,6 +24,7 @@ const FROM_REVIEW = [ISSUE, FROM, RUN_REVIEW]
 const METRICS_TOTALS = 'metrics-totals'
 const FROM_METRICS = [FROM, METRICS_TOTALS]
 const STOPPED = 1
+const UNPINNED_OK = '--unpinned-ok'
 
 const printed: Array<string> = []
 
@@ -85,11 +86,19 @@ describe('run_chain_gates — the metrics growth', () => {
 	it('keeps a given --unpinned-ok reason, quoted, in the rerun it prints', async () => {
 		totals_answer(GROWTH)
 
-		await run_chain_cli.run([ISSUE, '--unpinned-ok', 'only logs'])
+		await run_chain_cli.run([ISSUE, UNPINNED_OK, 'only logs'])
 
 		expect(output()).toContain(
-			'`pnpm josh run:chain 7926 --unpinned-ok "only logs" --accept-metrics "<why>" --from metrics-totals`',
+			'`pnpm josh run:chain 7926 --unpinned-ok \'only logs\' --accept-metrics "<why>" --from metrics-totals`',
 		)
+	})
+
+	it('quotes a reason holding a $ and a backtick so a pasted rerun expands neither', async () => {
+		totals_answer(GROWTH)
+
+		await run_chain_cli.run([ISSUE, UNPINNED_OK, 'costs $HOME `id`'])
+
+		expect(output()).toContain("--unpinned-ok 'costs $HOME `id`' --accept-metrics")
 	})
 })
 
@@ -133,6 +142,20 @@ describe('run_chain_gates — the --from run:review entry', () => {
 	it('runs run:review on a green tree', async () => {
 		await expect(run_chain_cli.run(FROM_REVIEW)).resolves.toBe(0)
 
+		expect(ran()).toStrictEqual([RUN_REVIEW])
+	})
+
+	it.each([
+		['--join', ['--join']],
+		['--join --fixing', ['--join', '--fixing']],
+	])('asks nothing of the scoped checks on %s --from run:review', async (_label, join) => {
+		const scoped = vi.spyOn(review_brief_cli, 'scoped_refusal').mockResolvedValue(SCOPED_REFUSAL)
+
+		// The join's run:review fails, so the run stops there and no later stage writes to the repository.
+		josh_run_mock.mockResolvedValue({ code: STOPPED, out: '' })
+		await run_chain_cli.run([...FROM_REVIEW, ...join])
+
+		expect(scoped).not.toHaveBeenCalled()
 		expect(ran()).toStrictEqual([RUN_REVIEW])
 	})
 

@@ -61,8 +61,8 @@ const stop_schema = z.object({
 // run that finished. `join` marks the half after the review (joshuafolkken/kit#7024). `stages` is each
 // stage that ran, the stopped one included, with its start and length; absent on a line written before
 // it was recorded (joshuafolkken/kit#7736). `exit_code` is the stopped stage's exit code (0 on a hold) and
-// `refusal` the kind of a procedural stop the run named (`metrics-growth`, `scoped-not-green`), so
-// `lane:breakdown` tells those reruns from a real failure (joshuafolkken/kit#7926); both absent on a
+// `refusal` the kind of a procedural stop the run named (`metrics-growth`, `scoped-not-green`), which
+// tells those reruns from a real failure on the line (joshuafolkken/kit#7926); both absent on a
 // finished run and on a line written before they were recorded.
 const CHAIN_REFUSALS = ['metrics-growth', 'scoped-not-green'] as const
 const chain_stage_schema = z.object({

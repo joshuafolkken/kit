@@ -40,25 +40,30 @@ interface ChainValues {
 	ship: string | undefined
 }
 
+// `stages` is the list from `--from` on; `undefined` for a `--from` no stage carries.
 interface ChainArguments {
 	issue: string
 	from?: string
 	is_join: boolean
-	review_args: ReadonlyArray<string>
-	stages: ReadonlyArray<ChainStage>
+	stages: ReadonlyArray<ChainStage> | undefined
 }
 
 type StopFields = Pick<ChainRecord, 'stage' | 'reason' | 'exit_code' | 'refusal'>
 
 // A lane child merges main in ship's sync, so its opening half is the review stages alone
-// (`chain-rule.md` → "A lane child"); the metrics stage follows `check:related` in both.
-function opening_stages(review_args: ReadonlyArray<string>): ReadonlyArray<ChainStage> {
+// (`chain-rule.md` → "A lane child"); the metrics stage follows `check:related` in both. The opening
+// alone carries the entry's scoped-green ask: `run:review --join` never asked it.
+function opening_stages(
+	review_args: ReadonlyArray<string>,
+	from: string | undefined,
+): ReadonlyArray<ChainStage> | undefined {
 	const is_kit = project_checks.is_kit_repository(process.cwd())
 	const stages = lane_child_marker.is_child_of(process.cwd())
 		? run_chain.review_stages(review_args, is_kit)
 		: run_chain.main_line_stages(review_args, is_kit)
+	const resumed = run_chain.stages_from(run_chain_gates.opening(stages, review_args), from)
 
-	return run_chain_gates.opening(stages, review_args)
+	return resumed === undefined ? undefined : run_chain_gates.entry(resumed, from, review_args)
 }
 
 function flag_pair(flag: string, value: string | undefined): ReadonlyArray<string> {
@@ -72,10 +77,11 @@ function review_args_of(values: ChainValues): ReadonlyArray<string> {
 	]
 }
 
-function stages_of(issue: string, values: ChainValues): ReadonlyArray<ChainStage> {
-	if (values.is_join) return run_chain_join.join_stages(issue, values.is_fixing, values.ship)
+function stages_of(issue: string, values: ChainValues): ReadonlyArray<ChainStage> | undefined {
+	if (!values.is_join) return opening_stages(review_args_of(values), values.from)
+	const join = run_chain_join.join_stages(issue, values.is_fixing, values.ship)
 
-	return opening_stages(review_args_of(values))
+	return run_chain.stages_from(join, values.from)
 }
 
 // `--fixing` belongs to the join and the reasons to the opening half, so each refuses the other list.
@@ -102,7 +108,6 @@ function arguments_from(
 		issue,
 		...(values.from !== undefined && { from: values.from }),
 		is_join: values.is_join,
-		review_args: review_args_of(values),
 		stages: stages_of(issue, values),
 	}
 }
@@ -158,20 +163,11 @@ async function record_run(
 	})
 }
 
-// The stages from `--from` on, behind the entry's own scoped-green ask; `undefined` for an unknown stage.
-function entry_stages(parsed: ChainArguments): ReadonlyArray<ChainStage> | undefined {
-	const resumed = run_chain.stages_from(parsed.stages, parsed.from)
-
-	if (resumed === undefined) return undefined
-
-	return run_chain_gates.entry(resumed, parsed.from, parsed.review_args)
-}
-
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const parsed = parse(argv)
 
 	if (parsed === undefined) return refuse(USAGE)
-	const stages = entry_stages(parsed)
+	const { stages } = parsed
 
 	if (stages === undefined) return refuse(`no stage ${String(parsed.from)}\n${USAGE}`)
 	const started_ms = Date.now()

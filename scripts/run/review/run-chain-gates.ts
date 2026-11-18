@@ -1,6 +1,7 @@
 import { metrics_totals } from '#scripts/gate/metrics-totals'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { buffered_process } from '#scripts/lib/buffered-process'
+import { shell_quote } from '#scripts/lib/shell-quote'
 import { review_brief_cli } from '#scripts/review/review-brief-cli'
 import { run_chain, type ChainStage, type HoldStop } from './run-chain'
 
@@ -21,9 +22,10 @@ const FLAG_PREFIX = '--'
 
 type Print = (text: string) => void
 
-// The review arguments as a rerun line types them: each reason quoted.
+// The review arguments as a rerun line types them: each reason one shell word, so a pasted rerun
+// never expands a `$` or a backtick in it.
 function typed(review_args: ReadonlyArray<string>): ReadonlyArray<string> {
-	return review_args.map((part) => (part.startsWith(FLAG_PREFIX) ? part : JSON.stringify(part)))
+	return review_args.map((part) => (part.startsWith(FLAG_PREFIX) ? part : shell_quote.word(part)))
 }
 
 function metrics_stop(review_args: ReadonlyArray<string>): HoldStop {
