@@ -208,7 +208,8 @@ async function chain_problems(): Promise<Array<Unmet>> {
 }
 
 // Every evaluation, passed or stopped, writes the kinds it asked beside the ones it found unmet, so
-// the ledger reads each kind's stops against its evaluations (joshuafolkken/kit#7874).
+// the ledger reads each kind's stops against its evaluations (joshuafolkken/kit#7874). A kind found
+// unmet was evaluated, so a failed read's `unreadable` joins the kinds asked rather than stopping unasked.
 async function recorded(
 	result: PreflightResult,
 	evaluated: ReadonlyArray<string>,
@@ -219,7 +220,7 @@ async function recorded(
 	if (issue !== undefined) {
 		await lane_ledger_write.record_preflight({
 			issue: Number(issue),
-			evaluated: [...evaluated],
+			evaluated: [...new Set([...evaluated, ...unmet])],
 			unmet,
 		})
 	}

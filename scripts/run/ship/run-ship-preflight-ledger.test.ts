@@ -108,6 +108,20 @@ describe('run_ship_preflight.stage — the evaluation recorded in the lane ledge
 			unmet: ['scoped'],
 		})
 	})
+})
+
+describe('run_ship_preflight.stage — a failed read and a branch with no issue', () => {
+	it('records a failed read as both evaluated and unmet', async () => {
+		lock_mock.mockRejectedValue(new Error('lock read failed'))
+
+		await run_ship_preflight.stage(REQUEST)
+
+		expect(record_mock).toHaveBeenCalledExactlyOnceWith({
+			issue: ISSUE,
+			evaluated: [...ASKED, 'unreadable'],
+			unmet: ['unreadable'],
+		})
+	})
 
 	it('records nothing on a branch with no issue number', async () => {
 		branch_mock.mockResolvedValue('main')
