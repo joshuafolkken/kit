@@ -3,7 +3,7 @@ import path from 'node:path'
 import { base_tree, type BaseTree } from '#scripts/git/base-tree'
 import { direct_importers } from './direct-importers'
 import { related_heavy_tests } from './related-heavy-tests'
-import { test_pinned_cache_logic, type Recheck } from './test-pinned-cache-logic'
+import { test_pinned_cache_logic, type MissReason, type Recheck } from './test-pinned-cache-logic'
 import {
 	test_pinned_ledger,
 	type PinnedOrigin,
@@ -39,6 +39,7 @@ interface Probe {
 	hunk: Hunk
 	index: number
 	recheck?: Recheck | undefined
+	miss?: MissReason | undefined
 	reach?: number | undefined
 	spawned?: ReadonlyArray<string> | undefined
 }
@@ -267,7 +268,8 @@ interface Checked {
 }
 
 // The started probes split as the cache knew them (joshuafolkken/kit#7803): a recheck, or none at
-// all. A halted run's unstarted probes count in neither.
+// all — and by why the cache missed them (joshuafolkken/kit#7806). A halted run's unstarted probes
+// count in none.
 function skipped_of(options: CheckOptions, probes: ReadonlyArray<Probe>): Skipped {
 	const rechecked = probes.filter((probe) => probe.recheck !== undefined).length
 
@@ -275,6 +277,7 @@ function skipped_of(options: CheckOptions, probes: ReadonlyArray<Probe>): Skippe
 		held: options.held ?? 0,
 		rechecked,
 		unregistered: probes.length - rechecked,
+		misses: test_pinned_ledger.miss_counts(probes.map((probe) => probe.miss)),
 		rewired: options.rewired ?? 0,
 		over_cap: options.over_cap ?? 0,
 		origin: options.origin,
