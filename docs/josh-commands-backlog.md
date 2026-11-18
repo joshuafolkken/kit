@@ -736,6 +736,10 @@ Writes all three places an epic's order lives — the task list, the `## Depende
 
 Nothing is written unless all three places will agree. `#M` must be a child of the epic; a position naming an issue being placed, or a hub the declaration cannot position within, is refused. A cross-repository target is refused with the bare-number command to run.
 
+`--chain` declares joins and branches while adding: it may name the added issues and existing children, and is written beside the chains already declared.
+
+A number outside those, a cycle through any chain, or use with a positioning flag is refused before anything is written.
+
 #### `josh epic --reconcile` — bring the declaration and the recorded relations back into agreement
 
 When the `## Dependencies` declaration and the `blocked-by` relations disagree, `--reconcile` makes the declaration state exactly what is recorded, with no judgement.

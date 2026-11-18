@@ -20,7 +20,7 @@ const FLAGS =
 const USAGE = [
 	`Usage: josh epic "<title>" <N1> <N2> ... ${FLAGS}`,
 	`       josh epic --promote <N> <N1> <N2> ... ${FLAGS} [--title <title>]`,
-	'       josh epic --add <E> <N1> <N2> ... [--before <M> | --after <M>] [--decision-file <path|->]',
+	'       josh epic --add <E> <N1> <N2> ... [--before <M> | --after <M> | --chain "#A -> #B" ...] [--decision-file <path|->]',
 	'       josh epic --add <E> <N1> <N2> ... [--order-before <M> | --order-after <M>] [--decision-file <path|->]',
 	'       josh epic --remove <E> <M> <N> ... [--decision-file <path|->]',
 	'       josh epic --untrack <E> <N1> <N2> ...',
@@ -87,8 +87,16 @@ function to_add_input(parsed: AddArguments): AddChildrenInput {
 		children: parsed.children,
 		position: parsed.position,
 		is_order_only: parsed.is_order_only,
+		chains: parsed.chains,
 		decision: epic_cli.read_decision(parsed.decision_path),
 	}
+}
+
+// The insertion itself, on either path, once its `--chain` declarations have been read.
+async function add_parsed(parsed: AddArguments): Promise<number> {
+	if (is_chain_refused(parsed)) return FAILURE_EXIT_CODE
+
+	return await epic_add.add_children(to_add_input(parsed))
 }
 
 // A qualified target — `owner/repo#N`. Naming this repository it is the same insertion written
@@ -97,7 +105,7 @@ function to_add_input(parsed: AddArguments): AddChildrenInput {
 async function run_qualified_addition(found: CrossRepoAddTarget): Promise<number> {
 	const local = epic_cli.resolve_local_add(found, await git_gh_command.repo_get_name_with_owner())
 
-	if (local !== undefined) return await epic_add.add_children(to_add_input(local))
+	if (local !== undefined) return await add_parsed(local)
 
 	console.error(epic_cli.format_cross_repo_refusal(found))
 
@@ -139,7 +147,7 @@ async function run_addition(argv: ReadonlyArray<string>): Promise<number> {
 
 	if (parsed === undefined) return await refuse_addition(argv)
 
-	return await epic_add.add_children(to_add_input(parsed))
+	return await add_parsed(parsed)
 }
 
 // Deleting a declared order. No position and no `--ordered`: the path itself says which orders go,
