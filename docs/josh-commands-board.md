@@ -149,7 +149,7 @@ A finished row leads with `✅` merged, `🏁` done, `⏩` closed by `josh issue
 
 マージせず終了した行は、記録済みの短い英語の結論を右端に出し、文全体から根拠のIssueコメントを開く。結論（ASCII、1行、80文字以内）は `issue:comment`・`issue:already-done`・`issue:measured`・`issue:premise-unmet` の `--outcome <summary>` で記録する。過去の根拠には `issue:comment --evidence-url <comment URL>` を併用する。同じIssue内に実在する信頼済みコメントだけが根拠。管理用のwithdrawコメントは結論を上書きしない。根拠なし・取得失敗では英語の代替表示になる。狭い端末では文を省略してからリンクを付け、chat/plainでは同じ可視文字をリンク制御なしで表示する。
 
-停止中のparked/decision行も同じ短い英文と根拠リンクを使うが、狭い端末ではタイトルから縮める。markerのない過去の停止は `issue:comment --outcome <next action> --evidence-url <stop comment URL>` で補完する。描画時のAI要約はしない。補完は最新停止にだけ効き、承認・解除・再開を代行しない。
+停止中のparked/decision行も同じ短い英文と根拠リンクを使うが、parkedは狭い端末でタイトルから縮める。markerのない過去の停止は `issue:comment --outcome <next action> --evidence-url <stop comment URL>` で補完する。描画時のAI要約はしない。補完は最新停止にだけ効き、承認・解除・再開を代行しない。
 
 説明不明でも最新停止コメントへリンクする。取得失敗や起動前の停止は `Reason unavailable: inspect issue`（Issueへリンク）、停止後に `backlog:triage --adopt` の採用があれば `adopted option <n> · relaunching`（採用コメントへリンク）。リンク非対応やchat/plainは行頭のIssue番号から確認する（CLIは `pnpm josh issue:read <N>`）。
 
