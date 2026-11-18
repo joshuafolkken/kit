@@ -106,6 +106,8 @@ const SHIPPED_UNREACHABLE = new Set([
 	'scripts/agent/agent-worker-profile.ts',
 	// #7943 stages the PCM synth; remove this entry when #7951 wires sound cues into run:board.
 	'scripts/run/board/run-board-sound-synth.ts',
+	// #7946 stages the cue definitions; remove this entry when #7951 wires sound cues into run:board.
+	'scripts/run/board/run-board-sound-cues.ts',
 ])
 
 interface PackedEntry {
