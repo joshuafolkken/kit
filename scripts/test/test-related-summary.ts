@@ -21,8 +21,14 @@ function selected_part(scope: RelatedScope, test_files: number | undefined): str
 	return `${count} test file(s) selected`
 }
 
+// A full-suite scope the cap narrowed to its selected `tests` ran part of the suite, not all of it
+// (joshuafolkken/kit#7976); the cap's own line names how many it deferred to CI.
+function full_suite_part(scope: RelatedScope): string {
+	return 'tests' in scope ? ' — capped from the full unit suite' : ' — the full unit suite'
+}
+
 function widest_part(scope: RelatedScope, reach: ReadonlyArray<ReachedCount> | undefined): string {
-	if (scope.mode === 'all') return ' — the full unit suite'
+	if (scope.mode === 'all') return full_suite_part(scope)
 	const widest = scope.mode === 'related' ? widest_of(reach) : undefined
 
 	if (widest === undefined) return ''

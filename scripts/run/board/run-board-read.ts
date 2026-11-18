@@ -12,7 +12,7 @@ import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_event_tail } from '#scripts/run/event/run-event-tail'
-import { run_merge_usage_limit } from '#scripts/run/merge/run-merge-usage-limit'
+import { run_merge_usage_limit, type HoldCause } from '#scripts/run/merge/run-merge-usage-limit'
 import { run_wake } from '#scripts/run/wake/run-wake'
 import { run_board_found, type FoundOf } from './run-board-found'
 import { run_board_lane_result } from './run-board-lane-result'
@@ -94,6 +94,8 @@ interface LocalRead {
 	usage_reset_ms?: number | undefined
 	// How many children that limit stopped and still holds (joshuafolkken/kit#5395).
 	usage_parked?: number | undefined
+	// What the hold resuming last is for — an authentication failure or a limit (joshuafolkken/kit#8012).
+	usage_cause?: HoldCause | undefined
 	// The driver holds its offered issue until the machine has memory for one more lane — the ledger's
 	// open hold is `backlog-drive-memory.ts`'s.
 	is_memory_held?: boolean | undefined
@@ -260,7 +262,7 @@ function records_here(
 function usage_reset_here(
 	events: ReadonlyArray<RunEvent>,
 	carry: RunCarry | undefined,
-): Pick<LocalRead, 'usage_reset_ms' | 'usage_parked'> {
+): Pick<LocalRead, 'usage_reset_ms' | 'usage_parked' | 'usage_cause'> {
 	if (carry === undefined) return { usage_reset_ms: undefined }
 	const scope = run_event_scope.scope_of({ kind: 'carried', carry })
 	const scoped = run_event_scope.scoped_events(events, scope) ?? []
@@ -269,6 +271,7 @@ function usage_reset_here(
 	return {
 		usage_reset_ms: run_merge_usage_limit.held_until(scoped, now_ms),
 		usage_parked: run_merge_usage_limit.held_count(scoped, now_ms),
+		usage_cause: run_merge_usage_limit.held_cause(scoped, now_ms),
 	}
 }
 
@@ -279,7 +282,9 @@ async function span_events_here(
 	span: BoardSpan,
 	table: TableRead | undefined,
 	carry: RunCarry | undefined,
-): Promise<Pick<LocalRead, 'events' | 'found' | 'usage_reset_ms' | 'usage_parked'>> {
+): Promise<
+	Pick<LocalRead, 'events' | 'found' | 'usage_reset_ms' | 'usage_parked' | 'usage_cause'>
+> {
 	const spanned = run_board_single.events_of(span, run_board_span.events_of(events, span))
 	// An overrun session outlives the run that launched it, so its notes and filings are read past the
 	// run's end too (joshuafolkken/kit#4818); the next run starts a span of its own.

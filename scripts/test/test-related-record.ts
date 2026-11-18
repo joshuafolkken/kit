@@ -40,12 +40,10 @@ interface RunInput {
 	branch?: ReadonlyArray<string> | undefined
 	// The name the run is recorded under when it is not the scope's own — `touched` for a `--touched` run.
 	kind?: string
-	// The changed files past the reach cap, narrowed to their direct importers, widest reach first
-	// (`test-related-cap.ts`).
-	over_cap?: ReadonlyArray<string>
-	// The files past the cap it left at their whole reach, each with that reach (joshuafolkken/kit#7639).
-	full_reach?: ReadonlyArray<ReachedCount> | undefined
-	// Every changed file the cap read, each with the test files it adds to the run (joshuafolkken/kit#7735).
+	// How many test files the cap deferred to CI (`test-related-select.ts`, joshuafolkken/kit#7976);
+	// absent where the run kept the whole suite.
+	deferred?: number
+	// Every changed code file the selection read, each with the test files it reaches (joshuafolkken/kit#7735).
 	reach?: ReadonlyArray<ReachedCount> | undefined
 	// The branch change by half and base, read beside the run; `undefined` where git could not answer.
 	branch_parts?: ChangedParts | undefined
@@ -186,27 +184,17 @@ function stage_record(stages: StageTimes = {}): StageTimes {
 	return record
 }
 
-// How many files the cap narrowed, and the hub of them (joshuafolkken/kit#5699) — the one the run's
-// summary line names (`test_related_cap.hub_of`).
-function over_cap_record(
-	over_cap: ReadonlyArray<string> | undefined,
+// How many test files the cap deferred to CI, and the hub of the run's own change that put it there
+// (joshuafolkken/kit#5699) — the one the run's summary line names (`test_related_cap.hub_of`).
+function deferred_record(
+	input: Pick<RunInput, 'deferred' | 'reach'>,
 	own: ReadonlyArray<string>,
-): Pick<TestRelatedRecord, 'over_cap' | 'over_cap_hub'> {
-	if (over_cap === undefined) return {}
-	const hub = test_related_cap.hub_of(over_cap, own)
-	const count = { over_cap: over_cap.length }
+): Pick<TestRelatedRecord, 'deferred' | 'over_cap_hub'> {
+	const { deferred, reach = [] } = input
+	if (deferred === undefined) return {}
+	const hub = test_related_cap.hub_of({ deferred, reach }, own)
 
-	return hub === undefined ? count : { ...count, over_cap_hub: hub }
-}
-
-// The files that kept their whole reach past the cap — what widened a run the cap narrowed little
-// (joshuafolkken/kit#7639) — none written when there were none.
-function full_reach_record(
-	full_reach: ReadonlyArray<ReachedCount> | undefined,
-): Pick<TestRelatedRecord, 'full_reach'> {
-	if (full_reach === undefined || full_reach.length === 0) return {}
-
-	return { full_reach: full_reach.map(({ file, count }) => ({ file, reached: count })) }
+	return hub === undefined ? { deferred } : { deferred, over_cap_hub: hub }
 }
 
 // The changed file that added the most test files and that number — the run's closing line names it
@@ -269,8 +257,7 @@ function record_of(input: RunInput, result: RunResult): TestRelatedRecord {
 		since_map: since_map.length,
 		readers: readers_of(input, new Set([...own, ...synced, ...since_map])),
 		...triggers_of(input),
-		...over_cap_record(input.over_cap, own),
-		...full_reach_record(input.full_reach),
+		...deferred_record(input, own),
 		...widest_record(input.reach),
 		...select_record(input.select_elapsed_ms),
 		...(input.red_rerun !== undefined && { red_rerun: input.red_rerun }),
