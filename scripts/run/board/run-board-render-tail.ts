@@ -3,7 +3,8 @@ import { lane_stage_budget, type BudgetStage } from '#scripts/lane/lane-stage-bu
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import type { PrChecks } from '#scripts/run/event/run-event-checks'
 import { run_board_earlier } from './run-board-earlier'
-import { run_board_header, type BoardHeader } from './run-board-header'
+import type { BoardHeader } from './run-board-header'
+import { run_board_header_time } from './run-board-header-time'
 import { run_board_labels, type TextColor } from './run-board-labels'
 import { run_board_layout, type BoardRow } from './run-board-layout'
 import { run_board_now, type TimedLine } from './run-board-now'
@@ -165,7 +166,7 @@ function activity_part(row: BoardRow, header: BoardHeader): string {
 	const width = column_width(header, (other) => activity_age(other, header))
 	const age = header.now_ms - newest.since_ms
 
-	return run_board_header.aged(`${newest.icon} ${span_of(age).padStart(width)}`, age)
+	return run_board_header_time.aged(`${newest.icon} ${span_of(age).padStart(width)}`, age)
 }
 
 // Whether a row ends on a tail: a running row and an earlier run's lane only.

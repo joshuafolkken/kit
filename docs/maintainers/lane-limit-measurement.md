@@ -257,7 +257,8 @@ Under the stop table, `lane:stats` prints one row per round-2 verdict and reason
 first, with how many decisions fell there. A period with no decision prints a `none` row.
 
 `josh ship` reads `review:round2 --record <N> --json` and records the verdict and its `code` as a
-`round-two` entry before acting on it. The codes are one per branch of `review-round2.ts`: `open-finding`,
+`round-two` entry: a skip when it is decided, a required run once the run returns, with the kinds of
+its `findings` (absent when the run reached no verdict). The codes are one per branch of `review-round2.ts`: `open-finding`,
 `no-snapshot`, `base-moved`, `empty`, `inert` and `live`.
 
 **The decision the table is for**: what to change next. A frequent `live` shows how often round 1's

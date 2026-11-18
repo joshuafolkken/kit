@@ -17,12 +17,15 @@ const round_one_schema = z.object({
 })
 // One `review:round2` decision a `josh ship` acted on for `issue`: `verdict` and the stable reason
 // `code` it fell under, so the period's skips and runs are counted by why (joshuafolkken/kit#4064).
+// `findings` is a run's outcome — its `<category>:<severity>` kinds, empty when it found nothing — and
+// absent on a skip, a run that reached no verdict, or a record written before it (joshuafolkken/kit#7873).
 const round_two_schema = z.object({
 	kind: z.literal(KIND.ROUND_TWO),
 	at: z.string(),
 	issue: z.number(),
 	verdict: z.string(),
 	code: z.string(),
+	findings: z.array(z.string()).optional(),
 })
 // A stall detector observation, written only when it changes: whether offerable backlog work and a free
 // lane coexisted, so a stall is aged from when both first held rather than from the last launch

@@ -1,0 +1,7 @@
+{
+	"reason": "Splitting the header's time cells into run-board-header-time.ts adds that file's imports, its narrow TimeHeader interface and its export; no logic was added",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 21
+	}
+}
