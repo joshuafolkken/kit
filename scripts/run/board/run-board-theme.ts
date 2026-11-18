@@ -66,6 +66,13 @@ function choose(
 	return is_theme(name) ? { theme: name, argv: rest } : undefined
 }
 
+// The line that names `JOSH_BOARD_THEME` where it, not `--theme`, gave the name `choose` refused.
+function refusal(argv: ReadonlyArray<string>, environment: NodeJS.ProcessEnv): string {
+	if (argv.includes(THEME_FLAG)) return ''
+
+	return `${THEME_ENV}=${environment[THEME_ENV] ?? ''} names no theme (${THEMES.join(', ')})\n`
+}
+
 // The escape that opens the green, as `painted` draws it — `''` where stdout draws no color, so the
 // theme draws no escape where the board's own colors would not.
 function green_open(): string {
@@ -110,7 +117,7 @@ function themed<P extends Pick<BoardPorts, 'write'>>(ports: P, theme: Theme | un
 	}
 }
 
-const run_board_theme = { THEME_ENV, choose, restyle, themed }
+const run_board_theme = { THEME_ENV, choose, refusal, restyle, themed }
 
 export { run_board_theme }
 export type { Theme }

@@ -68,6 +68,34 @@ describe('run_board_cli.run --theme', () => {
 })
 
 describe('run_board_cli.run --theme refused', () => {
+	it('names the theme in the usage', () => {
+		expect(run_board_cli.USAGE).toContain('[--theme wargames]')
+	})
+
+	it('draws --chat and pushes --every whatever JOSH_BOARD_THEME holds', async () => {
+		vi.stubEnv('JOSH_BOARD_THEME', 'nope')
+		const plain = await frame_of(['--chat'])
+		const { ports } = harness(LOCAL, [])
+		const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true)
+
+		expect(plain).toContain('a')
+		await expect(run_board_cli.run(['--every', 'x'], ports)).resolves.toBe(1)
+		expect(stderr).toHaveBeenCalledWith(`${run_board_cli.USAGE}\n`)
+		stderr.mockRestore()
+	})
+
+	it('names JOSH_BOARD_THEME when it, not --theme, names no theme', async () => {
+		vi.stubEnv('JOSH_BOARD_THEME', 'nope')
+		const { ports } = harness(LOCAL, [])
+		const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true)
+
+		await expect(run_board_cli.run(['--once'], ports)).resolves.toBe(1)
+		expect(stderr).toHaveBeenCalledWith(
+			`JOSH_BOARD_THEME=nope names no theme (wargames)\n${run_board_cli.USAGE}\n`,
+		)
+		stderr.mockRestore()
+	})
+
 	it('refuses a name no theme has with the usage', async () => {
 		const { ports, frames } = harness(LOCAL, [])
 		const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true)

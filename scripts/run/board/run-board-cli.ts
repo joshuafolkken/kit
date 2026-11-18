@@ -41,6 +41,7 @@ const ONCE_FLAG = '--once'
 const CHAT_FLAG = '--chat'
 const EVERY_FLAG = '--every'
 const FLAGS: ReadonlySet<string> = new Set(['', ONCE_FLAG, CHAT_FLAG])
+const PASSED_ON_FLAGS: ReadonlySet<string> = new Set([CHAT_FLAG, EVERY_FLAG])
 const SIGINT_EXIT_CODE = 130
 const SIGTERM_EXIT_CODE = 143
 const USAGE = 'Usage: josh run:board [--once | --chat | --every <minutes>] [--theme wargames]'
@@ -201,8 +202,8 @@ async function answer(ports: BoardPorts): Promise<void> {
 	await ports.mark()
 }
 
-function refuse(): number {
-	process.stderr.write(`${USAGE}\n`)
+function refuse(note = ''): number {
+	process.stderr.write(`${note}${USAGE}\n`)
 
 	return FAILURE_EXIT_CODE
 }
@@ -262,10 +263,16 @@ function is_refused(flag: string, rest: ReadonlyArray<string>): boolean {
 	return rest.length > 0 || !FLAGS.has(flag)
 }
 
-async function run(argv: ReadonlyArray<string>, ports?: BoardPorts): Promise<number> {
-	const choice = run_board_theme.choose(argv, process.env)
+// `--chat` and `--every` never take the theme, so a `JOSH_BOARD_THEME` naming none never refuses them.
+function theme_environment(argv: ReadonlyArray<string>): NodeJS.ProcessEnv {
+	return argv.some((argument) => PASSED_ON_FLAGS.has(argument)) ? {} : process.env
+}
 
-	if (choice === undefined) return refuse()
+async function run(argv: ReadonlyArray<string>, ports?: BoardPorts): Promise<number> {
+	const environment = theme_environment(argv)
+	const choice = run_board_theme.choose(argv, environment)
+
+	if (choice === undefined) return refuse(run_board_theme.refusal(argv, environment))
 	const [flag = '', ...rest] = choice.argv
 
 	if (is_every(flag, rest)) return await push_every(rest[0], ports_for(ports, false))
