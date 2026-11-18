@@ -17,6 +17,11 @@ function board(): string {
 	return path.join(josh_directory(), 'board.json')
 }
 
-const usage_state_path = { board, claude }
+// The cached WAV files a live `run:board` sounds its cues from (`run-board-sound-wav.ts`).
+function sounds(): string {
+	return path.join(josh_directory(), 'sounds')
+}
+
+const usage_state_path = { board, claude, sounds }
 
 export { usage_state_path }
