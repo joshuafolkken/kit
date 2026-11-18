@@ -402,9 +402,10 @@ async function review_stage(
 // The round-2 verification pass, after sync and beside the gate: due only when the round-1 fix
 // delta says so, then scoped pair → brief → fresh reviewer → attest → record.
 //
-// **The decision is read as JSON and recorded in the lane ledger before it is acted on**, so
-// `josh lane:stats` can count the period's round-2 runs and skips by their reason code
-// (joshuafolkken/kit#4064). Output it cannot parse stops the ship rather than guessing a verdict.
+// **The decision is read as JSON and recorded in the lane ledger**, so `josh lane:stats` can count
+// the period's round-2 runs and skips by their reason code (joshuafolkken/kit#4064): a skip when
+// decided, a required run once it returns (`acted_round_two`). Output it cannot parse stops the
+// ship rather than guessing a verdict.
 async function reviewed_round_two(issue: string): Promise<StepResult> {
 	const provider = reviewed(ROUND_TWO_BRIEF, run_ship_review.verification_prompt, issue, ROUND_TWO)
 
