@@ -15,6 +15,31 @@ function request_for(argv: ReadonlyArray<string>): ReturnType<typeof run_cut_arg
 	return run_cut_args.to_request(parsed)
 }
 
+// joshuafolkken/kit#7821: the no-diff investigation close carries its deliverable comment.
+describe('the --deliverable url on a cut', () => {
+	const FLAG = '--deliverable'
+
+	it('reaches a pre-gate cut with its --deliverable url, refused beside --resume', () => {
+		const deliverable = [FLAG, 'https://github.com/joshuafolkken/kit/issues/7780#c1']
+
+		expect(request_for([ISSUE, ...deliverable])).toMatchObject({
+			kind: 'cut',
+			is_implementation: false,
+			deliverable_url: deliverable[1],
+		})
+		expect(request_for(['--resume', ISSUE, ...deliverable])).toBeUndefined()
+	})
+
+	it('names --deliverable in the usage line', () => {
+		expect(run_cut_args.USAGE).toContain('[--deliverable <comment-url>]')
+	})
+
+	it('refuses an empty --deliverable value', () => {
+		expect(request_for([ISSUE, FLAG, ''])).toBeUndefined()
+		expect(request_for([ISSUE, FLAG, ' '])).toBeUndefined()
+	})
+})
+
 describe('the --handoff path on a cut', () => {
 	it('reaches an implementation cut as a path', () => {
 		expect(request_for(['--impl', ISSUE, '--handoff', HANDOFF_PATH])).toStrictEqual({
@@ -22,6 +47,7 @@ describe('the --handoff path on a cut', () => {
 			issue: ISSUE,
 			is_implementation: true,
 			handoff_path: HANDOFF_PATH,
+			deliverable_url: undefined,
 		})
 	})
 

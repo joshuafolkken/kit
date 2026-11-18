@@ -14,6 +14,7 @@ afterAll(() => {
 describe('the pre-gate cut next action', () => {
 	it.each([
 		['cut', 'End the turn immediately.'],
+		['concluded', "End the turn; the parent's run:merge returns the lane."],
 		['under-threshold', GATE],
 		['not-a-lane', GATE],
 		['unready', GATE],

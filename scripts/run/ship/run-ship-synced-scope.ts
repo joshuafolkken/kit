@@ -178,6 +178,7 @@ function with_own_edits(overlap: Overlap, changed: ReadonlyArray<string>): Overl
 		...overlap,
 		overlap: joined(changed, overlap.overlap),
 		test_overlap: joined(changed, overlap.test_overlap ?? []),
+		breakdown: { ...overlap.breakdown, own_edits: changed.length },
 	}
 }
 
@@ -201,12 +202,12 @@ function files_for(
 }
 
 // The ` — <condition> <count>, …` a named pair's line ends with, as its lap records each count.
-function breakdown_text(reading: SyncReading | undefined): string {
-	if (reading?.breakdown === undefined) return ''
+function breakdown_text(breakdown: ScopeBreakdown | undefined): string {
+	if (breakdown === undefined) return ''
 
-	const counts = Object.entries(reading.breakdown).map(
-		([name, count]) => `${name} ${String(count)}`,
-	)
+	const counts = Object.entries(breakdown)
+		.filter(([, count]) => count !== undefined)
+		.map(([name, count]) => `${name} ${String(count)}`)
 
 	return ` — ${counts.join(', ')}`
 }
@@ -345,5 +346,5 @@ const run_ship_synced_scope = {
 	unsplit_line,
 }
 
-export type { SyncedCheck, SyncReading }
+export type { ScopeBreakdown, SyncedCheck, SyncReading }
 export { run_ship_synced_scope }

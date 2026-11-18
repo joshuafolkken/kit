@@ -287,6 +287,11 @@ words:
   # neither of which `josh sync` copies, so it stays in this local list.
   - heredocs
   - dedup
+  # The published-migration smoke script (joshuafolkken/kit#7447): `openssl dgst`, `git clone
+  # --no-hardlinks` and the encoded scope in `@joshuafolkken%2fkit`. Not copied by `josh sync`.
+  - dgst
+  - hardlinks
+  - fkit
   - keepalive
   - refspec
   - pathspec
