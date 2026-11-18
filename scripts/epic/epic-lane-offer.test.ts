@@ -1,5 +1,6 @@
 import { auto_ok_fixture, CREATED_EARLIER } from '#scripts/auto-ok/auto-ok-fixture'
 import { backlog_interrupt } from '#scripts/backlog/backlog-interrupt'
+import { epic_solo_parked } from '#scripts/epic/epic-solo-parked'
 import {
 	capped_listing_outcome,
 	listing_of,
@@ -85,6 +86,7 @@ beforeEach(() => {
 	vi.spyOn(lane_await, 'is_process_running_default').mockReturnValue(true)
 	vi.spyOn(epic_label_age, 'read_ages').mockResolvedValue(new Map())
 	vi.spyOn(backlog_interrupt, 'read').mockResolvedValue([])
+	vi.spyOn(epic_solo_parked, 'notice').mockResolvedValue(undefined)
 	merge_waiting_mock.mockResolvedValue(0)
 })
 

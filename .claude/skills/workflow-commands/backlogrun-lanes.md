@@ -11,7 +11,7 @@ dependency that crosses a repository are `docs/josh-commands-backlog.md` → "`j
 
 **One kind of child takes no lane beside anything: a defect in kit's own verification that makes
 unrelated PRs answer wrongly on `main` today.** It runs alone, and the batch resumes only once it has
-merged. **Ask `pnpm josh backlog:triage --decide --defect <answer> --verification <answer> --every-run <answer>`**
+merged. Closing it or removing `run:solo` also resumes it; parking it does not (`scripts/epic/epic-solo-parked.ts`). **Ask `pnpm josh backlog:triage --decide --defect <answer> --verification <answer> --every-run <answer>`**
 with `yes`, `no` or `unknown` for each condition below, never from how serious it looks. The command
 prints `run:solo`, `run:lane`, or `judge` when evidence is missing; `judge` keeps the issue untriaged.
 The reader answers the semantic questions; the command computes their conjunction — is

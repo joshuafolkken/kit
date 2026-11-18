@@ -154,8 +154,21 @@ describe('run_board_reason.reader while a run:solo issue runs', () => {
 		expect(held_reasons([child(AHEAD)], [], HOLDING, [])).toStrictEqual([HELD])
 	})
 
-	it('drops 🔒 for a parked run:solo issue, which backlog:next no longer reads as holding', () => {
+	// joshuafolkken/kit#7855: a parked `run:solo` issue still holds the gate, `in-progress` or not.
+	it('keeps 🔒 for a parked run:solo issue, which backlog:next still reads as holding', () => {
 		const [reason] = held_reasons([child(AHEAD)], [], [...HOLDING, NEEDS_DECISION_LABEL], [])
+
+		expect(reason).toStrictEqual(HELD)
+	})
+
+	it('keeps 🔒 for a parked run:solo issue whose in-progress label was stripped', () => {
+		const [reason] = held_reasons([child(AHEAD)], [], [RUN_SOLO_LABEL, NEEDS_DECISION_LABEL], [])
+
+		expect(reason).toStrictEqual(HELD)
+	})
+
+	it('drops 🔒 for a parked issue that does not carry run:solo', () => {
+		const [reason] = held_reasons([child(AHEAD)], [], [NEEDS_DECISION_LABEL], [])
 
 		expect(reason).toBeUndefined()
 	})
