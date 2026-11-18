@@ -11,7 +11,7 @@ const { FORCE_FLAG, RELEASE_FLAG } = run_hold_request
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	if (argv[0] === RELEASE_FLAG && argv[1] !== FORCE_FLAG && lane_park.is_unparked_child()) {
 		console.error(
-			`run:release: an unparked lane child must use pnpm josh run:park ${lane_child_marker.marked_issue() ?? '<N>'} --body-file <path> before stopping for a decision; the hold was kept.`,
+			`run:release: an unparked lane child must use pnpm josh run:park ${lane_child_marker.marked_issue() ?? '<N>'} --body-file <path> --outcome "<next action>" before stopping for a decision; the hold was kept.`,
 		)
 
 		return 1

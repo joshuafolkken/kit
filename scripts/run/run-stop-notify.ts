@@ -34,6 +34,7 @@ function plan(read: CarryRead, reason: string | undefined): StopNotice | undefin
 
 async function announce(notice: StopNotice): Promise<boolean> {
 	return await telegram_notify.confirm({
+		reason: 'run-stopped',
 		issue_title: STOP_TITLE,
 		body: notice.reason,
 		recovery: STOP_RECOVERY,

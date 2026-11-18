@@ -17,7 +17,7 @@ import { run_ship_body_draft } from './run-ship-body-draft'
 // identifier** (`acceptance_map.with_test_rows`, joshuafolkken/kit#5541), so neither list is copied
 // into the body by hand. Both only fill what is pending: a row the run wrote is never replaced.
 
-const NO_CHANGES: TitleChanges = { removed: [], added: [] }
+const NO_CHANGES: TitleChanges = { ...removed_tests.NONE, added: [] }
 
 async function draft_of_branch(): Promise<string | undefined> {
 	const issue_number = git_branch.issue_from_branch(await git_command.branch())
@@ -41,15 +41,16 @@ function is_unchanged(changes: TitleChanges): boolean {
 	return changes.removed.length === 0 && changes.added.length === 0
 }
 
+// A renamed test's row goes in filled with its new title (joshuafolkken/kit#7883).
 async function write_rows(
 	draft: string,
 	body: string,
 	removed: ReadonlyArray<string>,
-	added: ReadonlyArray<string>,
+	changes: TitleChanges,
 ): Promise<void> {
 	const filled = acceptance_map.with_test_rows(
-		removed_tests.with_pending_rows(body, removed),
-		added,
+		removed_tests.with_pending_rows(body, removed, changes.renamed),
+		changes.added,
 	)
 
 	if (filled !== body) await writeFile(draft, filled)
@@ -76,7 +77,7 @@ async function surface(): Promise<void> {
 	const body = await body_of(draft)
 	const titles = removed_tests.undisposed(changes.removed, body)
 
-	if (draft !== undefined) await write_rows(draft, body, titles, changes.added)
+	if (draft !== undefined) await write_rows(draft, body, titles, changes)
 	if (titles.length > 0) console.info(notice(titles, draft))
 }
 

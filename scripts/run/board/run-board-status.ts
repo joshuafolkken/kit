@@ -1,5 +1,7 @@
 import type { AgentResult } from '#scripts/agent/agent-event'
 import type { IssueOutcome } from '#scripts/issue/issue-outcome'
+import { lane_host_gaps } from '#scripts/lane/lane-host-gaps'
+import type { LaneSpan } from '#scripts/lane/lane-net-time'
 import type { Span } from '#scripts/lane/lane-spans'
 import type { PrChecks } from '#scripts/run/event/run-event-checks'
 import { run_event_retry } from '#scripts/run/event/run-event-retry'
@@ -52,8 +54,12 @@ interface ItemStatus {
 	// GitHub read is weighed against.
 	launched_ms?: number | undefined
 	ended_ms?: number | undefined
-	// The lane time the event that ended the child recorded (joshuafolkken/kit#4481), where it carries one.
+	// The lane time the event that ended the child recorded (joshuafolkken/kit#4481), where it carries one,
+	// and the host's stops it took out (joshuafolkken/kit#7866) — none on an ending written before that.
 	elapsed_ms?: number | undefined
+	excluded_ms?: number | undefined
+	// The host's stops on the stream (`lane-host-gaps.ts`), taken out of the row's time.
+	gaps?: ReadonlyArray<LaneSpan> | undefined
 	// The seat-free lane label (`lane <N>`) of a running child, when it holds one — the running test reads
 	// it; the board does not draw it.
 	lane?: string | undefined
@@ -261,15 +267,21 @@ function remembered<Value>(
 
 const FOLDED: EventsMemo<ReadonlyMap<number, ItemStatus>> = new WeakMap()
 const SPANS: EventsMemo<ReadonlyMap<number | undefined, ReadonlyArray<Span>>> = new WeakMap()
+const GAPS: EventsMemo<ReadonlyArray<LaneSpan>> = new WeakMap()
 
 // A child the stream never saw launched keeps no spans, so its row is timed from its lane record.
 function with_spans(statuses: Map<number, ItemStatus>, events: ReadonlyArray<RunEvent>): void {
 	const spans = remembered(SPANS, events, run_board_lane_time.spans_of)
+	const gaps = remembered(GAPS, events, lane_host_gaps.gaps_of)
 
 	for (const [issue, status] of statuses) {
 		const issue_spans = spans.get(issue)
 
-		if (issue_spans !== undefined) statuses.set(issue, { ...status, spans: issue_spans })
+		statuses.set(issue, {
+			...status,
+			...(gaps.length > 0 && { gaps }),
+			...(issue_spans !== undefined && { spans: issue_spans }),
+		})
 	}
 }
 

@@ -128,7 +128,7 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Send Telegram notification',
 		category: 'Workflow',
 		reference: [
-			'[--task-type <type>] [--body <text> | --body-file <path>] [--issue-url <url>] [--pr-url <url>] [--issue-title <text>] [--repo-name <name>] [--recommended <text>] [--alternative <text>]...',
+			'[--task-type <type>] [--body <text> | --body-file <path>] [--issue-url <url>] [--pr-url <url>] [--issue-title <text>] [--repo-name <name>] [--recommended <text>] [--alternative <text>]... [--reason <human-stop key>]',
 			'automation',
 			['notifications'],
 		],
@@ -146,7 +146,7 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: ['--task-type'],
 					description:
-						'one of `planning` 📋, `completion` ✅, `failure` ❌, `warning` ⚠️, `kickoff_retry` 🔄, `confirmation` ⏸️. Do not send `completion` or `warning` by hand — `josh followup` sends them.',
+						'one of `planning` 📋, `completion` ✅, `failure` ❌, `warning` ⚠️, `kickoff_retry` 🔄, `confirmation` ⏸️; only `josh followup` sends `completion` / `warning`.',
 				},
 				{
 					names: ['--body', "--body=$'…'"],
@@ -156,12 +156,16 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: ['--repo-name', '--issue-url', '--pr-url'],
 					description:
-						'header repository, resolved in that order, then the working directory. The issue title is read from `--issue-url`.',
+						'header repository in that order, else the cwd; `--issue-url` also gives the issue title.',
 				},
 				{
 					names: ['--recommended', '--alternative'],
 					description:
-						'the choices appended under `JOSH_SESSION_LANG` headings; `--recommended` is required for `confirmation`, `--alternative` is repeatable.',
+						'choices under `JOSH_SESSION_LANG` headings; `confirmation` requires `--recommended`; `--alternative` repeats.',
+				},
+				{
+					names: ['--reason'],
+					description: 'human-stop key for the confirmation ledger; default `needs-decision`.',
 				},
 			],
 		},

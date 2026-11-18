@@ -39,7 +39,7 @@ beforeEach(() => {
 	writeFileSync(DRAFT, ROWS)
 	branch_mock.mockResolvedValue('4563-lane')
 	existing_mock.mockResolvedValue(DRAFT)
-	changes_mock.mockResolvedValue({ removed: [TITLE], added: [] })
+	changes_mock.mockResolvedValue({ removed: [TITLE], added: [], renamed: [] })
 })
 
 describe('run_ship_removed_rows.surface — the removed tests before the ship', () => {
@@ -53,7 +53,7 @@ describe('run_ship_removed_rows.surface — the removed tests before the ship', 
 	})
 
 	it.each([
-		['no test removed or added', { removed: [], added: [] }],
+		['no test removed or added', { removed: [], added: [], renamed: [] }],
 		['an unreadable base, left to the preflight', undefined],
 	])('asks no branch and writes nothing on %s', async (_name, changes) => {
 		changes_mock.mockResolvedValue(changes)
@@ -92,11 +92,15 @@ describe('run_ship_removed_rows.surface — the acceptance rows before the ship'
 	it('meets the row an added test names, and keeps it on a second pass (ac-05552640)', async () => {
 		const naming = 'acceptance rows > meets the criterion (ac-12345678)'
 
-		changes_mock.mockResolvedValue({ removed: [], added: [naming] })
+		changes_mock.mockResolvedValue({ removed: [], added: [naming], renamed: [] })
 		await run_ship_removed_rows.surface()
 		const filled = draft_text()
 
-		changes_mock.mockResolvedValue({ removed: [], added: ['a later test (ac-12345678)'] })
+		changes_mock.mockResolvedValue({
+			removed: [],
+			added: ['a later test (ac-12345678)'],
+			renamed: [],
+		})
 		await run_ship_removed_rows.surface()
 
 		expect(filled).toContain(`- \`ac-12345678\` the criterion — 満たした: \`${naming}\``)

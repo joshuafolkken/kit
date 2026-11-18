@@ -35,6 +35,8 @@ async function notify(child: string): Promise<void> {
 	const text = `${cite} could not authenticate — run /login; the run resumes by itself`
 
 	await telegram_notify.confirm({
+		reason: 'unauthenticated',
+		issue: child,
 		issue_title: 'backlogrun waiting: Claude authentication failed',
 		body: `${text}. Launches are held and re-tried every ${RECHECK_TEXT}; the child was released, neither parked nor counted as a failure.`,
 		recovery: RECOVERY,

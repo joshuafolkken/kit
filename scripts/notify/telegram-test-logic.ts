@@ -1,3 +1,4 @@
+import { issue_human_stops, type HumanStopKey } from '#scripts/issue/issue-human-stops'
 import { cli_body } from '#scripts/josh/cli-body'
 import { confirmation_options } from './confirmation-options'
 import type { TelegramSendInput, TelegramTaskType } from './telegram-notify'
@@ -13,6 +14,7 @@ interface CliValues {
 	'pr-url'?: string
 	recommended?: string
 	alternative?: Array<string>
+	reason?: string
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 
@@ -95,6 +97,15 @@ function build_choices(values: CliValues, task_type: TelegramTaskType): string |
 	})
 }
 
+// A reason the registry does not hold is refused, so the ledger never counts a free-text class.
+function parse_reason(raw: string | undefined): HumanStopKey | undefined {
+	if (raw === undefined || issue_human_stops.is_key(raw)) return raw
+
+	const keys = [...issue_human_stops.HUMAN_STOP_KEYS].join(', ')
+
+	throw new Error(`Invalid --reason: ${raw}. Expected one of ${keys}.`)
+}
+
 function build_input(input: { values: CliValues; context: ResolvedContext }): TelegramSendInput {
 	const task_type = parse_task_type(input.values['task-type'])
 
@@ -104,6 +115,9 @@ function build_input(input: { values: CliValues; context: ResolvedContext }): Te
 		issue_title: coalesce(input.values['issue-title'], input.context.issue_title),
 		body: normalize_body(input.values),
 		choices: build_choices(input.values, task_type),
+		reason: parse_reason(input.values.reason),
+		// The confirmation ledger names the Issue by the URL the caller passed.
+		issue: input.values['issue-url'],
 		issue_url: input.values['issue-url'],
 		pr_url: input.values['pr-url'],
 	}

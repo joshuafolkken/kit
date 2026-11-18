@@ -38,7 +38,14 @@ const BOARD_AT_BASE =
 	"describe('board', () => {\n\tit('kept', () => {})\n\tit('dropped', () => {})\n})\n"
 const BOARD_NOW = "describe('board', () => {\n\tit('kept', () => {})\n})\n"
 const BOARD_GROWN = "describe('board', () => {\n\tit('kept', () => {})\n\tit('new', () => {})\n})\n"
-const REMOVED = ['board > dropped', 'whole file']
+const DROPPED_BODY = 'expect(board_rows.drop(board, 1)).toStrictEqual([ROW_A, ROW_C])'
+const BOARD_WITH_BODY = `describe('board', () => {\n\tit('kept', () => {})\n\tit('dropped', () => { ${DROPPED_BODY} })\n})\n`
+const RETITLED = `describe('board', () => {\n\tit('kept', () => {})\n\tit('drops a row', () => { ${DROPPED_BODY} })\n})\n`
+const REWRITTEN =
+	"describe('board', () => {\n\tit('kept', () => {})\n\tit('drops a row', () => { render(view); expect(screen.getByRole('row')).toBeVisible() })\n})\n"
+const DROPPED = 'board > dropped'
+const REMOVED = [DROPPED, 'whole file']
+const REMOVAL = { removed: REMOVED, renamed: [] }
 const GONE_AT_BASE = "it('whole file', () => {})\n"
 const AT_BASE: Readonly<Record<string, string>> = {
 	[`${BASE}:${KEPT_FILE}`]: BOARD_AT_BASE,
@@ -58,14 +65,14 @@ beforeEach(() => {
 
 describe('removed_tests_check.read — the tests the change removed', () => {
 	it('lists a test dropped from a kept file and every test of a deleted one', async () => {
-		await expect(removed_tests_check.read()).resolves.toStrictEqual(REMOVED)
+		await expect(removed_tests_check.read()).resolves.toMatchObject(REMOVAL)
 		expect(held_mock).toHaveBeenCalledWith(BASE, [KEPT_FILE, DELETED_FILE])
 	})
 
 	it('reads a test file the base did not hold as adding tests, not removing any', async () => {
 		held_mock.mockResolvedValue([])
 
-		await expect(removed_tests_check.read()).resolves.toStrictEqual([])
+		await expect(removed_tests_check.read()).resolves.toMatchObject({ removed: [], renamed: [] })
 		expect(show_mock).not.toHaveBeenCalled()
 	})
 
@@ -82,7 +89,7 @@ describe('removed_tests_check.changes — the titles the change removed and adde
 		writeFileSync(path.join(ROOT, KEPT_FILE), BOARD_GROWN)
 
 		await expect(removed_tests_check.changes()).resolves.toStrictEqual({
-			removed: REMOVED,
+			...REMOVAL,
 			added: ['board > new'],
 		})
 	})
@@ -116,7 +123,8 @@ describe('removed_tests_check.refusal — the merge gate', () => {
 
 	// joshuafolkken/kit#4563: the pending rows `josh test:related` writes into the draft are no disposition.
 	it('still refuses a body holding only the pending rows the draft was given', async () => {
-		const removed = (await removed_tests_check.read()) ?? []
+		const removal = await removed_tests_check.read()
+		const removed = removal?.removed ?? []
 		const body = removed_tests.with_pending_rows('', removed)
 
 		expect(removed).toHaveLength(2)
@@ -131,5 +139,30 @@ describe('removed_tests_check.refusal — the merge gate', () => {
 		await expect(removed_tests_check.body_refusal('')).resolves.toBe(
 			removed_tests_check.UNREADABLE_MESSAGE,
 		)
+	})
+})
+
+// joshuafolkken/kit#7883: a retitled test is reported with its replacement row already written.
+function retitle(now: string): void {
+	show_mock.mockImplementation(async (spec) => (spec.endsWith(KEPT_FILE) ? BOARD_WITH_BODY : ''))
+	writeFileSync(path.join(ROOT, KEPT_FILE), now)
+}
+
+describe('removed_tests_check — a retitled test', () => {
+	it('reports a retitled test with an unchanged body as renamed when its row is missing', async () => {
+		retitle(RETITLED)
+
+		await expect(removed_tests_check.body_refusal('')).resolves.toContain(
+			`- \`${DROPPED}\` — 置き換え: \`board > drops a row\``,
+		)
+	})
+
+	it('does not take a retitled test whose body was rewritten for a rename', async () => {
+		retitle(REWRITTEN)
+
+		await expect(removed_tests_check.read()).resolves.toMatchObject({
+			removed: [DROPPED],
+			renamed: [],
+		})
 	})
 })

@@ -30,7 +30,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh pretool:guard` | — | automation | none | Claude Code hook: the batch, investigation and rule guards in one process (reads the tool call on stdin) |
 | `josh refactor:scan` | — | automation | processes | List refactoring candidates in the changed scope by category and answer clear/candidates |
 | `josh rename` | `<old-identifier> <new-identifier> [--import <old-specifier> <new-specifier>] <file...>` | automation | files, processes | Rename an identifier, and the import specifier it moved with, across files through the TypeScript parse tree |
-| `josh session:lang` | — | automation | none | Claude Code hook: print a non-default JOSH_SESSION_LANG for the session context, the run:board reply rule while a backlogrun is live, and the run:handoff line for a workflow keyword on a consultation model (otherwise nothing) |
+| `josh session:lang` | — | automation | files | Claude Code hook: print a non-default JOSH_SESSION_LANG for the session context, the run:board reply rule while a backlogrun is live, and the run:handoff line for a workflow keyword on a consultation model (otherwise nothing) |
 | `josh stop:guard` | — | automation | none | Claude Code Stop hook: send the hold notify and release the hold itself; block on the rules that need the model (reads the Stop payload on stdin) |
 | `josh test` · `josh t` | — | developer | processes | Run unit and E2E tests |
 | `josh test:declared` · `josh td` | `[--match]` | developer | processes | Report whether the working-tree change needs a test (required/exempt/satisfied); --match checks Step 0 declarations on stdin |
@@ -72,7 +72,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh main:merge` · `josh mm` | — | developer | git, network | Merge origin default branch into the current branch |
 | `josh main:sync` · `josh ms` | — | developer | git, network | Checkout default branch, pull latest, and prune merged remote-gone branches (refuses inside a lane) |
 | `josh measure:rerun` | `<issue-number>` | automation | network, processes, files | Re-run a merged issue’s baseline command and print the before/after pair |
-| `josh notify` | `[--task-type <type>] [--body <text> \| --body-file <path>] [--issue-url <url>] [--pr-url <url>] [--issue-title <text>] [--repo-name <name>] [--recommended <text>] [--alternative <text>]...` | automation | notifications | Send Telegram notification |
+| `josh notify` | `[--task-type <type>] [--body <text> \| --body-file <path>] [--issue-url <url>] [--pr-url <url>] [--issue-title <text>] [--repo-name <name>] [--recommended <text>] [--alternative <text>]... [--reason <human-stop key>]` | automation | notifications | Send Telegram notification |
 | `josh observation:depth` | `<path>` | automation | none | Print the depth test's depth for a subject path |
 | `josh observation:record` | `<key> <depth> <where> <what> [--checkout <path>]` | automation | files | Record an observation sighting and answer whether it is now filed |
 | `josh observations:flush` | — | automation | git, network | Commit the observation ledger as a pull request of its own, and merge it |
@@ -239,7 +239,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh run:liveness` | `<issue> --output <path> [options]` | automation | processes | Say whether a delegated unit is still working, or stopped without reporting |
 | `josh run:merge` | `<issue> [options]` | automation | git, network | Collapse a backlogrun merge event into one call: confirm the child, do the post-merge steps, offer the next child |
 | `josh run:next` | `<issue>` | automation | network | Print the next step a fullrun takes, computed from the run’s state |
-| `josh run:park` | `<issue> --body-file <path> \| <issue> --clear \| <issue> --escalate <reason>` | automation | files, network | Park a lane child for a decision or an escalation, or clear the park |
+| `josh run:park` | `<issue> --body-file <path> --outcome <next action> \| <issue> --clear \| <issue> --escalate <reason>` | automation | files, network | Park a lane child for a decision or an escalation, or clear the park |
 | `josh run:pause` | `<issue> --for <prerequisite>` | automation | git, network, files | Set a run aside while its prerequisite lands first |
 | `josh run:pickup` | `[<epic>...]` | automation | processes | Pick the lanes up after a manual cut: launch what the epics offer, then each liveness and the watcher line |
 | `josh run:prep` | `<issue> [--summary]` | automation | network | Bundle a run’s pre-edit reads: body, comments, state, dependency scope |

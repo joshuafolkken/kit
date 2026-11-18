@@ -17,7 +17,7 @@ import { run_board_render_waits } from './run-board-render-waits'
 const { BUDGET_ICON, held_of, held_time } = run_board_render_waits
 const { phase_time } = run_board_render_tail
 const { state_icon } = run_board_render_icon
-const { time_of } = run_board_render_time
+const { net_of } = run_board_render_time
 const { WAIT_ICONS } = run_board_labels
 // The widest span a time column draws: `1°14′58″`.
 const TIME_WIDTH = 8
@@ -88,13 +88,14 @@ function progress_of(row: BoardRow, header: BoardHeader): string {
 	return `${header.spinner} `
 }
 
-// How long the row has run, or why and how long its lane is held while it is.
+// How long the row has run, or why and how long its lane is held while it is. The time is net of the
+// host's stops without the bracket that names them, so the cells after it stay under their columns.
 function whole_of(row: BoardRow, header: BoardHeader): string {
 	const held = held_of(row, header)
 
 	if (held !== undefined) return held_time(held, TIME_WIDTH)
 
-	const time = time_of(row, header.now_ms) ?? ''
+	const time = net_of(row, header.now_ms) ?? ''
 	const fresh = running_fresh(row, time, row.status?.started_ms, header)
 
 	return run_board_fresh.padded(time, TIME_WIDTH, fresh)

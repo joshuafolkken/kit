@@ -39,7 +39,7 @@ const OPTIONS = {
 } as const
 const RECOVERY = 'If this did not arrive, the finder issue carries the same record.'
 const RECOMMENDED = 'Wait for the upstream fix'
-const NOTIFY_COMMAND = 'pnpm josh notify --task-type confirmation'
+const NOTIFY_COMMAND = 'pnpm josh notify --task-type confirmation --reason upstream-interrupt'
 const ALTERNATIVES = ['Defer the upstream issue and resume the finder now']
 
 interface ParsedInterrupt {
@@ -219,6 +219,8 @@ async function comment(interrupt: Interrupt, body: string): Promise<boolean> {
 
 async function notify(interrupt: Interrupt, body: string): Promise<boolean> {
 	const is_sent = await telegram_notify.confirm({
+		reason: 'upstream-interrupt',
+		issue: interrupt.finder,
 		issue_title: interrupt.title,
 		body,
 		recovery: RECOVERY,

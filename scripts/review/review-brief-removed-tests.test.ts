@@ -1,5 +1,6 @@
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { describe, expect, it } from 'vitest'
+import type { Removal } from './removed-tests'
 import { review_brief } from './review-brief'
 import {
 	review_untouched_readers,
@@ -18,7 +19,7 @@ const TIDY_HIT = { path: 'scripts/run/tidy/run-tidy-cli.ts', line: '34', excerpt
 const MAX_HITS = 10
 
 interface Sections {
-	removed?: ReadonlyArray<string>
+	removed?: Removal
 	readers?: ReadersRead
 }
 
@@ -51,14 +52,23 @@ function readers_of(hits: Readers['hits'], has_failed = false): ReadersRead {
 
 describe('review_brief.compose — removed tests', () => {
 	it('lists each removed test as an undisposed row', () => {
-		const brief = compose({ removed: [TITLE] })
+		const brief = compose({ removed: { removed: [TITLE], renamed: [] } })
 
 		expect(brief).toContain(HEADING)
 		expect(brief).toContain(`- \`${TITLE}\` — 未記入`)
 	})
 
+	// joshuafolkken/kit#7883: the reviewer is not asked to find a renamed test's replacement.
+	it('writes a renamed test’s row with its new title, as no finding for the reviewer', () => {
+		const renamed = [{ from: TITLE, to: 'removed_tests > lists a test gone' }]
+		const brief = compose({ removed: { removed: [TITLE], renamed } })
+
+		expect(brief).toContain(`- \`${TITLE}\` — 置き換え: \`removed_tests > lists a test gone\``)
+		expect(brief).toContain('a rename the check matched by its body — not a finding')
+	})
+
 	it('omits the section when the change removed no test', () => {
-		expect(compose({ removed: [] })).not.toContain(HEADING)
+		expect(compose({ removed: { removed: [], renamed: [] } })).not.toContain(HEADING)
 	})
 
 	it('omits the section when the list is absent', () => {

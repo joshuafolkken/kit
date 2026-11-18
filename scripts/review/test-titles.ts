@@ -14,6 +14,9 @@ import type { TypeScriptApi } from './comment-ranges'
 //
 // **A `describe` is a name, never a test**: renaming one moves the tests under it, and removing it
 // removes them, so only the `it` / `test` calls are listed.
+//
+// **Each test carries its body** — the source text of every argument after its title — so a test whose
+// title changed and whose body did not can be told apart from one rewritten (joshuafolkken/kit#7883).
 
 const BLOCK_FUNCTION = 'describe'
 const STEP_FUNCTION = 'step'
@@ -23,15 +26,19 @@ const VIRTUAL_FILE_NAME = 'test-titles.ts'
 
 type Prefix = ReadonlyArray<string>
 
-interface NamedCall {
-	chain: ReadonlyArray<string>
+interface TestEntry {
 	title: string
+	body: string
+}
+
+interface NamedCall extends TestEntry {
+	chain: ReadonlyArray<string>
 }
 
 interface Walk {
 	api: TypeScriptApi
 	source: ts.SourceFile
-	into: Array<string>
+	into: Array<TestEntry>
 }
 
 function member_name(api: TypeScriptApi, expression: ts.Expression): ReadonlyArray<string> {
@@ -72,12 +79,21 @@ function title_of(walk: Walk, call: ts.CallExpression): string | undefined {
 	return walk.api.isTemplateExpression(first) ? first.getText(walk.source) : undefined
 }
 
+function body_of(walk: Walk, call: ts.CallExpression): string {
+	return call.arguments
+		.slice(1)
+		.map((argument) => argument.getText(walk.source))
+		.join(',')
+}
+
 function named_call(walk: Walk, node: ts.Node): NamedCall | undefined {
 	if (!walk.api.isCallExpression(node)) return undefined
 	const chain = callee_chain(walk.api, node.expression)
 	const title = chain === undefined ? undefined : title_of(walk, node)
 
-	return chain === undefined || title === undefined ? undefined : { chain, title }
+	return chain === undefined || title === undefined
+		? undefined
+		: { chain, title, body: body_of(walk, node) }
 }
 
 // The block titles a call adds to the name of everything inside it: a `describe` adds its own, a
@@ -86,7 +102,7 @@ function entered(walk: Walk, call: NamedCall | undefined, prefix: Prefix): Prefi
 	if (call === undefined) return prefix
 	const named = [...prefix, call.title]
 
-	if (is_test(call.chain)) walk.into.push(named.join(TITLE_SEPARATOR))
+	if (is_test(call.chain)) walk.into.push({ title: named.join(TITLE_SEPARATOR), body: call.body })
 
 	return is_block(call.chain) ? named : prefix
 }
@@ -99,13 +115,17 @@ function visit(walk: Walk, node: ts.Node, prefix: Prefix): void {
 	})
 }
 
-function titles_of(api: TypeScriptApi, text: string): ReadonlyArray<string> {
+function tests_of(api: TypeScriptApi, text: string): ReadonlyArray<TestEntry> {
 	const source = api.createSourceFile(VIRTUAL_FILE_NAME, text, api.ScriptTarget.Latest, true)
-	const into: Array<string> = []
+	const into: Array<TestEntry> = []
 
 	visit({ api, source, into }, source, [])
 
 	return into
+}
+
+function titles_of(api: TypeScriptApi, text: string): ReadonlyArray<string> {
+	return tests_of(api, text).map((entry) => entry.title)
 }
 
 // The title a test carries itself, without the blocks around it.
@@ -113,6 +133,7 @@ function leaf_of(full_name: string): string {
 	return full_name.split(TITLE_SEPARATOR).at(-1) ?? full_name
 }
 
-const test_titles = { leaf_of, titles_of }
+const test_titles = { leaf_of, tests_of, titles_of }
 
+export type { TestEntry }
 export { test_titles }

@@ -126,6 +126,10 @@ describe('stop_rules.stop_outcome — the wait a lane child is sent to', () => {
 	})
 
 	it('names a wait the completion notice can reach, not a loop over the output', () => {
-		expect(lane_background.LANE_AGENT_STOP_REASON).toContain('one short foreground call at a time')
+		expect(lane_background.LANE_AGENT_STOP_REASON).toContain('do the foreground work left')
+	})
+
+	it('prefers a foreground dispatch, which needs no wait', () => {
+		expect(lane_background.LANE_AGENT_STOP_REASON).toContain('`run_in_background: false`')
 	})
 })

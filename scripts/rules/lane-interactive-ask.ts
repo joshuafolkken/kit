@@ -42,7 +42,7 @@ function is_interactive_ask(call: GuardedCall, context: HookContext): boolean {
 const LANE_INTERACTIVE_ASK_REASON =
 	'⛔ lane child interactive ask: this session is a dispatched lane child and cannot ask a ' +
 	'person, so park instead: ' +
-	'`pnpm josh run:park <N> --body-file <path>` (it applies `needs-decision`), ' +
+	'`pnpm josh run:park <N> --body-file <path> --outcome "<next action>"` (it applies `needs-decision`), ' +
 	'the `confirmation` Telegram, stop. It fires on every occurrence ' +
 	'(`.claude/skills/workflow-commands/pre-gate-cut.md`, `backlogrun-park.md`).'
 
