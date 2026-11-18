@@ -1,4 +1,5 @@
 import type { LedgerEntry } from '#scripts/lane/lane-ledger'
+import { lane_stage_stats } from '#scripts/lane/lane-stage-stats'
 import { lane_stats } from '#scripts/lane/lane-stats'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 
@@ -13,12 +14,25 @@ type LaneTotals = ReadonlyArray<number>
 
 const PERIOD_DAYS = 3
 
+function recent_of(entries: ReadonlyArray<LedgerEntry>, now_ms: number): Array<LedgerEntry> {
+	return lane_stats.in_window(entries, lane_stats.window_of(PERIOD_DAYS, now_ms))
+}
+
 function compute_totals(entries: ReadonlyArray<LedgerEntry>, now_ms: number): LaneTotals {
-	const window = lane_stats.window_of(PERIOD_DAYS, now_ms)
-	const recent = lane_stats.merge_minutes(entries, lane_stats.in_window(entries, window))
+	const recent = lane_stats.merge_minutes(entries, recent_of(entries, now_ms))
 	const minutes = recent.length > 0 ? recent : lane_stats.merge_minutes(entries, entries)
 
 	return minutes.map((minute) => minute * MS_PER_MINUTE)
+}
+
+// Whether `entries`, read from at or before the window's start, give the whole ledger's totals
+// (joshuafolkken/kit#7932): the window has a merge, and each one's dispatch is found in them — a merge
+// dispatched before the read's start would need the older lines. A lane's dispatch is its latest one by
+// time, so one found in the read is the one the whole ledger would find.
+function covers(entries: ReadonlyArray<LedgerEntry>, now_ms: number): boolean {
+	const merges = recent_of(entries, now_ms).filter((entry) => lane_stage_stats.is_merge(entry))
+
+	return merges.length > 0 && lane_stats.merge_minutes(entries, merges).length === merges.length
 }
 
 // Memoized per ledger array, as `run_board_usual.usual_of` is (joshuafolkken/kit#7012).
@@ -49,7 +63,7 @@ function running_left_ms(totals: LaneTotals, elapsed_ms: number): number | undef
 	return lane_stats.median(longer.map((total) => total - elapsed_ms))
 }
 
-const run_board_lane_totals = { running_left_ms, totals_of, waiting_ms }
+const run_board_lane_totals = { PERIOD_DAYS, covers, running_left_ms, totals_of, waiting_ms }
 
 export { run_board_lane_totals }
 export type { LaneTotals }
