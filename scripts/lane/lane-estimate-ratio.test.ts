@@ -3,7 +3,7 @@ import { lane_estimate_ratio } from './lane-estimate-ratio'
 import type { LedgerEntry } from './lane-ledger'
 
 // joshuafolkken/kit#7775: each finished run's estimate set against its actual end — the last merge of
-// the children its records were written for.
+// the merged children its records were written for.
 
 const MS_PER_HOUR = 3_600_000
 const NOW = Date.parse('2026-11-17T12:00:00.000Z')
@@ -38,8 +38,18 @@ describe('lane_estimate_ratio.ratios_of', () => {
 		expect(lane_estimate_ratio.ratios_of(entries, WINDOW)).toEqual([{ first: 2, all: [2, 2] }])
 	})
 
-	it('leaves out a run with a child not merged', () => {
+	it('ends a run with an unmerged child at its merged children’s last merge', () => {
+		// The run ends at the first child's merge, 5 h ago. First: 4 h expected, 5 h taken → 1.25.
+		// Second: 2 h expected, 1 h taken → 0.5.
 		const entries = [estimate(FIRST, 10, 6), estimate(SECOND, 6, 4), merge(FIRST, 5)]
+
+		expect(lane_estimate_ratio.ratios_of(entries, WINDOW)).toEqual([
+			{ first: 1.25, all: [1.25, 0.5] },
+		])
+	})
+
+	it('leaves out a run with no child merged', () => {
+		const entries = [estimate(FIRST, 10, 6), estimate(SECOND, 6, 4)]
 
 		expect(lane_estimate_ratio.ratios_of(entries, WINDOW)).toEqual([])
 	})
