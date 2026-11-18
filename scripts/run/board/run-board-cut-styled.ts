@@ -8,7 +8,7 @@ const ESC = '\u{1B}'
 const BEL = '\u{7}'
 // A color escape, or a link's opening or closing escape ended by BEL or ST; captured, so a split keeps it.
 const ESCAPE = new RegExp(
-	`(${ESC}\\[[\\d;]*m|${ESC}\\]8;[^${BEL}${ESC}]*(?:${BEL}|${ESC}\\\\))`,
+	String.raw`(${ESC}\[[\d;]*m|${ESC}\]8;[^${BEL}${ESC}]*(?:${BEL}|${ESC}\\))`,
 	'u',
 )
 const LINK_START = `${ESC}]8;`
