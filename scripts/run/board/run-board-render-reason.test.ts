@@ -11,7 +11,8 @@ import { run_board_render_fixture } from './run-board-render-fixture'
 // joshuafolkken/kit#4288: a waiting row leads with its wait's icon and condition column; only what
 // is too long for the column follows its title.
 
-const { EMPTY_LAYOUT, MINUTE, NOW, STARTED, board_usage, header } = run_board_render_fixture
+const { EMPTY_LAYOUT, MINUTE, NOW, STARTED, board_usage, header, unfinished } =
+	run_board_render_fixture
 const SECOND = 1000
 const ISSUE = 3720
 const BLOCKER = '3409'
@@ -159,9 +160,11 @@ describe('run_board_render.render — why a parked row ended', () => {
 
 	it('draws the reason after the row’s padded columns, which stay as they were', () => {
 		const line = line_of({ ...parked, reason: ENDED_REASON })
+		// Each ends on `🎯 —` (joshuafolkken/kit#7920), the reason before it.
+		const bare = unfinished(line_of(parked))
 
-		expect(line.startsWith(line_of(parked))).toBe(true)
-		expect(line).toMatch(/ {2}superseded$/u)
+		expect(line.startsWith(bare)).toBe(true)
+		expect(line).toMatch(/ {2}superseded 🎯 —$/u)
 	})
 
 	it('cuts the padded title by just the columns the line runs over', () => {
@@ -169,7 +172,7 @@ describe('run_board_render.render — why a parked row ended', () => {
 		const columns = run_board_fit.width_of(line_of(reasoned)) - OVERRUN
 		const line = line_of(reasoned, columns)
 
-		expect(line).toMatch(/ {2}superseded$/u)
+		expect(line).toMatch(/ {2}superseded 🎯 —$/u)
 		expect(run_board_fit.width_of(line)).toBe(columns)
 	})
 })
@@ -203,7 +206,7 @@ function parked_line(): string {
 
 describe('run_board_render.render — a parked row’s reason, and a reason cut to the pane', () => {
 	it('draws a parked row’s reason two columns after its time', () => {
-		expect(parked_line()).toMatch(/\d″ {2}superseded$/u)
+		expect(parked_line()).toMatch(/\d″ {2}superseded 🎯 —$/u)
 	})
 
 	it('cuts a withdrawn row’s reason to an ellipsis once its title is at the floor', () => {
@@ -253,7 +256,7 @@ describe('run_board_render.render — a stalled row’s cause and resume action'
 			const line = line_of({ ...stalled, state }, NARROW)
 
 			expect(line).toContain(` ${TITLE_START.slice(0, -1)}… `)
-			expect(line.endsWith(STALLED.tail ?? '')).toBe(true)
+			expect(unfinished(line).endsWith(STALLED.tail ?? '')).toBe(true)
 			expect(run_board_fit.width_of(line)).toBeGreaterThan(NARROW)
 		},
 	)

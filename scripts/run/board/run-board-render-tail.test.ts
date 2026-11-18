@@ -28,8 +28,8 @@ const LONG_PHASE = 125 * MINUTE
 const LONG_TIME = '2°05′00″'
 // The columns the past-an-hour phase time takes beyond the usual one.
 const WIDER = LONG_TIME.length - PHASE_TIME.length
-// The long phase's row ends on its activity, then what it ran past the ship budget.
-const LONG_END = /Long {2,}👀 3′00″ {2}over budget \+117′$/u
+// The long phase's row ends on its activity, then its finish, unmeasured with no lane total.
+const LONG_END = /Long {2,}👀 3′00″ {2}🎯 —$/u
 const EVENT: LaneEvent = { phase: 'review', words: 'ship review', at_ms: NOW - 3 * MINUTE }
 
 function running(number: number, title = `Issue ${String(number)}`): BoardRow {
@@ -148,7 +148,7 @@ describe('run_board_render_tail.phase_time of a stopped row', () => {
 
 describe('run_board_render_tail.tail_of activity', () => {
 	it('draws the newest event’s phase icon and its age, and no phase time', () => {
-		expect(tail(running(1))).toStrictEqual([ACTIVITY])
+		expect(tail(running(1))).toStrictEqual([ACTIVITY, '🎯 —'])
 	})
 
 	it('draws 🔧 where the newest operation is newer than the newest event', () => {

@@ -11,8 +11,19 @@ import type { ItemStatus } from './run-board-status'
 // joshuafolkken/kit#3430: the board as a person reads it. joshuafolkken/kit#3444: a row carries its
 // number, title, elapsed span; sections are rules, symbols a legend.
 
-const { EMPTY_LAYOUT, MINUTE, NOW, STARTED, board_usage, header, lines_of, note, rule } =
-	run_board_render_fixture
+const {
+	EMPTY_LAYOUT,
+	MINUTE,
+	NOW,
+	STARTED,
+	UNKNOWN_FINISH,
+	board_usage,
+	header,
+	lines_of,
+	note,
+	rule,
+	unfinished,
+} = run_board_render_fixture
 const SECOND = 1000
 // A queued or waiting row's condition column where it names no condition (joshuafolkken/kit#4288).
 const BLANK_CONDITION = ' '.repeat(run_board_render_condition.CONDITION_WIDTH)
@@ -61,13 +72,15 @@ function padded(title: string): string {
 	return title.padEnd(run_board_render.TITLE_LIMIT)
 }
 
+const ESTIMATE = '🎯 estimated finish'
+
 describe('run_board_render.render rows', () => {
 	it('draws a running row with its phase icon, elapsed time, number and title, and no usage', () => {
 		const layout = { ...EMPTY_LAYOUT, active: [running(1, STARTED + 40 * MINUTE, 'implement')] }
 		const lines = lines_of(header({ layout }))
 		const row_line = lane_of('🔨', '1°30′00″', ISSUE_1)
 
-		expect(lines).toContain(row_line)
+		expect(lines.map((line) => unfinished(line))).toContain(row_line)
 		expect(row_line).not.toContain('■')
 		expect(lines.slice(0, -2).join('\n')).not.toContain('implement')
 		expect(lines.some((line) => /^── 🧵 lanes ─+ ⏰ ─+$/u.test(line))).toBe(true)
@@ -189,16 +202,16 @@ describe('run_board_render.render sections', () => {
 		expect(lines_of(header({ layout }))).toContain(lane_of('⏳', '', `7       ${title}`))
 	})
 
-	// joshuafolkken/kit#4173: the rule names 🙋, so no legend is drawn for it.
+	// joshuafolkken/kit#4173: the rule names 🙋, so the legend names only the 🎯 its end draws (#7920).
 	it('draws a decision row under the decision rule, which names 🙋 in place of the legend', () => {
 		const layout = { ...EMPTY_LAYOUT, people: [row(6, { state: 'human' })] }
 		const lines = lines_of(header({ layout }))
 		const decision_rule = rule('🙋 decision')
-		const decision_row = '    🙋 6       Issue 6'
+		const decision_row = `    🙋 6       ${padded('Issue 6')}  ${UNKNOWN_FINISH}`
 		const start = lines.indexOf(decision_rule)
 
 		expect(lines.slice(start, start + 2)).toStrictEqual([decision_rule, decision_row])
-		expect(lines.slice(-3)).toStrictEqual([decision_row, '', rule('⏳ queued 0')])
+		expect(lines.slice(-5)).toStrictEqual([decision_row, '', rule('⏳ queued 0'), '', ESTIMATE])
 	})
 })
 
@@ -219,7 +232,7 @@ describe('run_board_render.render chat', () => {
 
 		expect(lines).toStrictEqual(screen)
 		expect(lines.join('\n')).toMatch(
-			/── 📌 findings [^]*\n.*x… {2}2°09′00″\n\n👀 review {2}⏰ elapsed {2}💬 note$/u,
+			/── 📌 findings [^]*\n.*x… {2}2°09′00″\n\n👀 review {2}⏰ elapsed {2}🎯 estimated finish {2}💬 note$/u,
 		)
 	})
 
@@ -268,7 +281,9 @@ describe('run_board_render.render running row lead', () => {
 		const spun = lines.find((line) => line.includes('Issue 1')) ?? ''
 		const still = lines.find((line) => line.includes('Issue 2')) ?? ''
 
-		expect(spun).toBe(`  ⠋  👀 ${''.padStart(TIME_WIDTH)} ${ZERO.padStart(TIME_WIDTH)} ${ISSUE_1}`)
+		expect(unfinished(spun)).toBe(
+			`  ⠋  👀 ${''.padStart(TIME_WIDTH)} ${ZERO.padStart(TIME_WIDTH)} ${ISSUE_1}`,
+		)
 		expect(still).toBe(lane_of('⏳', '', ISSUE_2))
 		expect(column_of(spun, 'Issue 1')).toBe(column_of(still, 'Issue 2'))
 	})
@@ -284,7 +299,9 @@ describe('run_board_render.render running row lead', () => {
 
 	it('leads a running row with its newest phase’s icon, and 🔄 before it reaches one', () => {
 		const active = [running(1, NOW, 'commit'), running(2, NOW, undefined)]
-		const lines = lines_of(header({ layout: { ...EMPTY_LAYOUT, active } }))
+		const lines = lines_of(header({ layout: { ...EMPTY_LAYOUT, active } })).map((line) =>
+			unfinished(line),
+		)
 
 		expect(lines).toContain(lane_of('📦', ZERO, ISSUE_1))
 		expect(lines).toContain(lane_of('🔄', ZERO, ISSUE_2))
@@ -302,7 +319,7 @@ describe('run_board_render.render running row legend', () => {
 		)
 
 		expect(led.at(-1)).not.toContain('🔄')
-		expect(spun.at(-1)).toBe('🔄 running  ⏰ elapsed')
+		expect(spun.at(-1)).toBe(`🔄 running  ⏰ elapsed  ${ESTIMATE}`)
 	})
 })
 

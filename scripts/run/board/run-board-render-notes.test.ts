@@ -115,7 +115,7 @@ describe('run_board_render.render findings legend', () => {
 
 		expect(lines_of(header({ layout }), [park]).slice(-2)).toStrictEqual([
 			'',
-			'⏰ elapsed  💤 parked',
+			'⏰ elapsed  🎯 estimated finish  💤 parked',
 		])
 	})
 

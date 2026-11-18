@@ -73,7 +73,8 @@ describe('run_board_render.render usage cells', () => {
 		const lines = lines_of(board())
 
 		expect(row_line(lines, 'Issue 1')).toMatch(USAGE)
-		expect(row_line(lines, 'Issue 1')).toMatch(/Issue 1 +🔗 3$/u)
+		// The unmeasured finish ends the row's tail (joshuafolkken/kit#7920), what was filed after it.
+		expect(row_line(lines, 'Issue 1')).toMatch(/Issue 1 +🎯 — {2}🔗 3$/u)
 		expect(row_line(lines, 'Issue 1')).not.toContain('🧠')
 	})
 

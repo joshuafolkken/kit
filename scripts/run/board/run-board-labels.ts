@@ -40,7 +40,7 @@ const DEFAULT_FOREGROUND = `${ESC}[39m`
 // - a column heading in capitals — `ACTIVE`, `DONE`, `PEAK`, `NOW`, `CPU`, `MEM`, `CMPRS` — so the
 //   `✅ DONE` column reads apart from the `✅ done 18` section on the same rule;
 // - a section name, a state word or a legend entry in lower case — `throughput`, `usage`, `lanes`,
-//   `queued`, `over budget`;
+//   `queued`, `estimated finish`;
 // - a command, a repository, a unit or an OS process as it is spelled — `backlogrun`, `kit`, `24h`,
 //   `7d`, `/h`, `node`, the processes line's `claude`;
 // - a marker followed by one space — `▶ GraphQL`, as `▶ backlogrun`.

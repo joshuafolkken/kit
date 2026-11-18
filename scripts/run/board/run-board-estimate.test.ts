@@ -173,6 +173,59 @@ describe('run_board_estimate.left_ms with nothing to estimate', () => {
 	})
 })
 
+describe('run_board_estimate.row_finish', () => {
+	it('finishes a running child when the header reads it as finishing', () => {
+		const child = running(1, 'implement', 5)
+
+		expect(run_board_estimate.row_finish(child, read({}))?.finish_ms).toBe(NOW + 25 * MINUTE)
+	})
+
+	it('draws no drift for a child just launched', () => {
+		expect(run_board_estimate.row_finish(running(1, 'implement', 0), read({}))?.drift_ms).toBe(0)
+	})
+
+	it('draws a later finish for a child running past the median total', () => {
+		// Done in 10′, 5′ past the 30′ median from its launch 25′ ago.
+		const child = running(1, 'gate', 0, 25)
+
+		expect(run_board_estimate.row_finish(child, read({}))?.drift_ms).toBe(5 * MINUTE)
+	})
+
+	it('estimates nothing without a measured lane total', () => {
+		const finish = run_board_estimate.row_finish(
+			running(1, 'implement', 5),
+			read({}, { lane_totals: [] }),
+		)
+
+		expect(finish).toBeUndefined()
+	})
+})
+
+describe('run_board_estimate.is_finish_drawn', () => {
+	const MOVING = { ended_ms: undefined, activity: { is_stopped: false } }
+
+	it.each(['running', 'human', 'parked'] as const)('draws a finish on a %s row', (state) => {
+		expect(run_board_estimate.is_finish_drawn(row(1, state), MOVING)).toBe(true)
+	})
+
+	it('draws none on a done row', () => {
+		expect(run_board_estimate.is_finish_drawn(row(1, 'done'), MOVING)).toBe(false)
+	})
+
+	it('draws none on an earlier run’s lane', () => {
+		const earlier = { ...running(1, 'implement', 5), is_earlier: true }
+
+		expect(run_board_estimate.is_finish_drawn(earlier, MOVING)).toBe(false)
+	})
+
+	it.each([
+		['an ended', { ended_ms: NOW, activity: { is_stopped: false } }],
+		['a stopped', { ended_ms: undefined, activity: { is_stopped: true } }],
+	])('draws none while %s run', (_name, run) => {
+		expect(run_board_estimate.is_finish_drawn(running(1, 'implement', 5), run)).toBe(false)
+	})
+})
+
 describe('run_board_estimate.part_of', () => {
 	it('draws the local finish time after 🎯', () => {
 		const active = [running(1, 'implement', 5)]
