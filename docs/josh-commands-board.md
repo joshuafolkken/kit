@@ -93,16 +93,18 @@ pnpm josh run:progress --interval 20 --repo joshuafolkken/app-kit --hours 4
 Draw a live board of the running backlogrun, redrawn every second.
 
 ```bash
-pnpm josh run:board             # redraw until interrupted
-pnpm josh run:board --once      # one frame, then exit
-pnpm josh run:board --chat      # one frame for a chat, recorded as a progress report
-pnpm josh run:board --every 5   # the --chat frame as a 📊 Progress Telegram every 5 minutes, until the run ends
+pnpm josh run:board                    # redraw until interrupted
+pnpm josh run:board --once             # one frame, then exit
+pnpm josh run:board --chat             # one frame for a chat, recorded as a progress report
+pnpm josh run:board --every 5          # the --chat frame as a 📊 Progress Telegram every 5 minutes, until the run ends
+pnpm josh run:board --theme wargames   # green text and dashed rules
 ```
 
 **Options:**
 
 - `--chat` — answers a `backlogrun`, `fullrun` or `halfrun` progress question: the frame `--once` draws, with only `🧠` on the machine line and no escapes; it records the report as `run:progress --mark` does.
 - `--every <minutes>` — sends the `--chat` frame as a `📊 Progress` Telegram now and every `<minutes>` until the run ends — only when a person asks for it.
+- `--theme wargames` — draws the text no color is given in phosphor green and every rule as `-`; `JOSH_BOARD_THEME=wargames` sets it for every board, the one `backlogrun` opens included, and `--theme` wins over it. An unknown name is refused. `--chat` and `--every` never take it.
 
 <!-- /usage -->
 
@@ -121,6 +123,8 @@ The first column is the board's state mark and `josh-board` (linked to kit; a si
 The first line is how far the run is: `⏰` elapsed in degree-minute-second form (`1°15′57″`, `26″` — every length on the board; a colon is a time of day), a progress bar, per-state counts, `📮` open/closed issues. `🛫`: start to first lane.
 
 The second line is what the run is on: `💓` age of the newest event (yellow past 15 quiet minutes, red past 30), and machine gauges (`💪` CPU, `🧠` memory, `💾` swap rate). `⏰` and `💓` share a column, digits right-aligned; both lines' first bars start in one.
+
+While a running run's stream holds an outage with no `online` after it, last seen (`offline` or `offline-tick`) within two sampler ticks, `📴` (named in the legend) stands in the `💓`'s place with the time since the network went down, in yellow. The connection events never count as the `💓`'s newest event.
 
 The third line is what the run is doing now: a spinner, its age, then the kind's icon and words — the repository's name alone while the stream holds no event.
 
