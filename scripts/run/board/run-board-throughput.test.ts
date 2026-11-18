@@ -125,6 +125,17 @@ describe('run_board_throughput active figures', () => {
 		expect(day.per_hour).toBeCloseTo(2 / (70 / 60))
 		expect(day.done).toBe(3)
 	})
+
+	// joshuafolkken/kit#7905: a host sleep shorter than the quiet-stretch cut is not active time either.
+	it('keeps a host sleep inside an active stretch out of ACTIVE', () => {
+		const sleep = { ...event(local(9, 20), KIND.SLEEP), elapsed_ms: 5 * MINUTE }
+		const [awake] = rows(stream(...beats(EIGHT, NOW)))
+		const [slept] = rows(stream(...beats(EIGHT, NOW), sleep))
+
+		expect(active_at(awake, NINE)).toBe(HOUR)
+		expect(active_at(slept, NINE)).toBe(55 * MINUTE)
+		expect(slept.active_ms).toBe(awake.active_ms - 5 * MINUTE)
+	})
 })
 
 describe('run_board_throughput current cell and closes', () => {
