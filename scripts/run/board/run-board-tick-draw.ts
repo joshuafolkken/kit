@@ -164,8 +164,8 @@ function header_of(
 		read_error: state.read_error,
 		is_plan_loading: state.plan_fetch !== undefined,
 		...gauges_of(state, local),
-		...port_header(redraw.ports),
 		repo: state.plan?.context.repo,
+		...port_header(redraw.ports),
 		...run_board_link.links_of(state.plan?.context.repo, redraw.ports.link),
 	}
 }
