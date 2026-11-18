@@ -3,26 +3,22 @@ import type { IssueOutcome } from '#scripts/issue/issue-outcome'
 import { lane_host_gaps } from '#scripts/lane/lane-host-gaps'
 import type { LaneSpan } from '#scripts/lane/lane-net-time'
 import type { Span } from '#scripts/lane/lane-spans'
-import type { PrChecks } from '#scripts/run/event/run-event-checks'
 import { run_event_retry } from '#scripts/run/event/run-event-retry'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
-import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
-import { run_board_checks } from './run-board-checks'
 import { run_board_closed, type ClosedIssue, type ListingRead } from './run-board-closed'
 import { run_board_ending_reason } from './run-board-ending-reason'
 import { run_board_ending_states } from './run-board-ending-states'
+import { run_board_events_memo, type EventsMemo } from './run-board-events-memo'
 import { run_board_idle, type IdleSince } from './run-board-idle'
-import { run_board_lane_event, type LaneEvent } from './run-board-lane-event'
 import type { BoardLanes } from './run-board-lane-state'
 import { run_board_lane_stop } from './run-board-lane-stop'
 import { run_board_lane_time } from './run-board-lane-time'
 import { run_board_phase, type Phase } from './run-board-phase'
 import { run_board_settle } from './run-board-settle'
-import { run_board_setup, type SetupRead } from './run-board-setup'
 
 // What each issue of a run is doing now, read from the run's own event stream and what each open lane's
-// record says (`run-board-lane-state.ts`).
+// record says (`run-board-lane-state.ts`); the run as a whole is `run-board-activity.ts`'s.
 // Local reads only — no `gh` call — so `run:board` can redraw it every few seconds; the plan these
 // statuses are laid over is the slow GitHub half, and so is what a child that left the open listing,
 // or is drawn stopped, answers when read closed.
@@ -80,33 +76,6 @@ interface ItemStatus {
 	written_ms?: number | undefined
 	// A running open lane of this run's not yet read idle for the re-confirm window: not confirmed stopped.
 	is_live?: boolean | undefined
-}
-
-interface LatestEvent {
-	text: string
-	at_ms: number
-}
-
-// The run as a whole, read off the same stream. The setup half is `run-board-setup.ts`'s, absent
-// where a stream carries no stage.
-interface RunActivity extends Partial<SetupRead> {
-	// Runtime evidence for the stage, independent of its retained description.
-	is_setup_working?: boolean | undefined
-	last_event_ms: number | undefined
-	// The newest thing the run did — its newest position, or its newest event where it has none yet —
-	// in the event's own words, and when.
-	latest?: LatestEvent | undefined
-	// When the run last did anything of its own — its newest position or stage, whichever is newer. A
-	// stage that has ended still counts: what follows it is counted from its end, not from before it.
-	idle_ms?: number | undefined
-	// Each child's newest `lane-phase` or `ship-stage`, by issue (`run-board-lane-event.ts`).
-	lane_events?: ReadonlyMap<number, LaneEvent> | undefined
-	// Each child's newest `pr-checks`, by issue (`run-board-checks.ts`).
-	pr_checks?: ReadonlyMap<number, PrChecks> | undefined
-	// The newest session's start until its first lane opened (`run-board-first-lane.ts`).
-	first_lane_ms?: number | undefined
-	// The run's last position is a `stop` that names no child — the run itself ended.
-	is_stopped: boolean
 }
 
 const KIND = run_event_stream.EVENT_KIND
@@ -245,26 +214,7 @@ function fold_events(
 	return statuses
 }
 
-// joshuafolkken/kit#4267: the board redraws every second but rereads the stream every few, and a read
-// hands over a new `events` array, so a fold keyed on the array is folded once per read, not per redraw.
-type EventsMemo<Value> = WeakMap<ReadonlyArray<RunEvent>, Value>
-
-function remembered<Value>(
-	memo: EventsMemo<Value>,
-	events: ReadonlyArray<RunEvent>,
-	fold: (events: ReadonlyArray<RunEvent>) => Value,
-): Value {
-	const kept = memo.get(events)
-
-	if (kept !== undefined) return kept
-
-	const value = fold(events)
-
-	memo.set(events, value)
-
-	return value
-}
-
+const { remembered } = run_board_events_memo
 const FOLDED: EventsMemo<ReadonlyMap<number, ItemStatus>> = new WeakMap()
 const SPANS: EventsMemo<ReadonlyMap<number | undefined, ReadonlyArray<Span>>> = new WeakMap()
 const GAPS: EventsMemo<ReadonlyArray<LaneSpan>> = new WeakMap()
@@ -422,54 +372,8 @@ function settle_closed(
 	)
 }
 
-function is_run_stop(event: RunEvent | undefined): boolean {
-	return event?.kind === KIND.STOP && run_event_scope.issue_named(event) === undefined
-}
-
-function latest_of(event: RunEvent | undefined): LatestEvent | undefined {
-	return event === undefined ? undefined : { text: event.text, at_ms: moment(event) }
-}
-
-function is_own(event: RunEvent): boolean {
-	return event.kind === KIND.SETUP || !run_event_stream.TRACE_KINDS.has(event.kind)
-}
-
-// A stream of traces alone has done nothing of its own yet, so its newest event stands in.
-function idle_of(events: ReadonlyArray<RunEvent>): number | undefined {
-	const own = events.findLast((event) => is_own(event)) ?? events.at(-1)
-
-	return own === undefined ? undefined : moment(own)
-}
-
-function stream_activity(events: ReadonlyArray<RunEvent>): RunActivity {
-	const last = events.at(-1)
-	const position = events.findLast((event) => !run_event_stream.TRACE_KINDS.has(event.kind))
-
-	return {
-		...run_board_setup.read(events),
-		last_event_ms: last === undefined ? undefined : moment(last),
-		latest: latest_of(position ?? last),
-		idle_ms: idle_of(events),
-		lane_events: run_board_lane_event.newest_of(events),
-		pr_checks: run_board_checks.newest_of(events),
-		first_lane_ms: run_event_setup.first_lane_ms(events),
-		is_stopped: is_run_stop(position),
-	}
-}
-
-const ACTIVITIES: EventsMemo<RunActivity> = new WeakMap()
-
-// `is_ended` is a run `run:carry --end` closed: its record says it stopped, whatever its last event
-// was.
-function activity_of(events: ReadonlyArray<RunEvent>, is_ended = false): RunActivity {
-	const activity = remembered(ACTIVITIES, events, stream_activity)
-
-	return is_ended ? { ...activity, is_stopped: true } : activity
-}
-
 const run_board_status = {
 	WAITING_STATES,
-	activity_of,
 	fold_events,
 	settle_closed,
 	since_launch,
@@ -477,4 +381,4 @@ const run_board_status = {
 }
 
 export { run_board_status }
-export type { ItemState, ItemStatus, LatestEvent, OpenRead, RunActivity }
+export type { ItemState, ItemStatus, OpenRead }

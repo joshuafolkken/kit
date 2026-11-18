@@ -1,4 +1,5 @@
 import { lane_investigation_switch } from '#scripts/lane/lane-investigation-switch'
+import { run_board_activity, type RunActivity } from './run-board-activity'
 import type { ClosedIssue } from './run-board-closed'
 import type { EarlierLanes } from './run-board-earlier'
 import type { FrameBounds } from './run-board-fold'
@@ -19,7 +20,7 @@ import { run_board_setup } from './run-board-setup'
 import type { Known } from './run-board-snapshot'
 import { run_board_spin, type Spun } from './run-board-spin'
 import { run_board_state, type BoardPorts, type BoardState, type Pace } from './run-board-state'
-import { run_board_status, type ItemStatus, type RunActivity } from './run-board-status'
+import { run_board_status, type ItemStatus } from './run-board-status'
 import { run_board_thanks } from './run-board-thanks'
 
 // One `run:board` redraw. The frame is redrawn once a second, on the second, so every elapsed time
@@ -84,7 +85,7 @@ function titles_of(state: BoardState): Titles {
 
 // A run `run:carry --end` closed and one nobody drives any more are both drawn as stopped.
 function activity_here(local: LocalRead): RunActivity {
-	const activity = run_board_status.activity_of(
+	const activity = run_board_activity.activity_of(
 		local.events,
 		local.ended_ms !== undefined || local.is_stranded,
 	)

@@ -1,7 +1,7 @@
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { describe, expect, it } from 'vitest'
-import { run_board_status } from './run-board-status'
+import { run_board_activity } from './run-board-activity'
 
 // joshuafolkken/kit#3696: the run's activity carries the setup stage. A lane the run is still setting
 // up for draws no row of its own — its record is `open` (`run-board-lane-state.test.ts`).
@@ -27,9 +27,9 @@ function stream(...steps: ReadonlyArray<Step>): Array<RunEvent> {
 	return steps.map(([kind, text], index) => ({ pos: index + 1, at: AT, kind, text }))
 }
 
-describe('run_board_status.activity_of during setup', () => {
+describe('run_board_activity.activity_of during setup', () => {
 	it('carries the stage and its event’s time, so the heartbeat counts from it', () => {
-		const activity = run_board_status.activity_of(stream(setup(STAGE.STARTING)))
+		const activity = run_board_activity.activity_of(stream(setup(STAGE.STARTING)))
 
 		expect(activity).toStrictEqual({
 			setup: STAGE.STARTING,
@@ -46,7 +46,7 @@ describe('run_board_status.activity_of during setup', () => {
 	})
 
 	it('carries no stage once a child has launched', () => {
-		const activity = run_board_status.activity_of(stream(setup(STAGE.HANDING_OFF), LAUNCH_278))
+		const activity = run_board_activity.activity_of(stream(setup(STAGE.HANDING_OFF), LAUNCH_278))
 
 		expect(activity).toMatchObject({ setup: undefined, setup_ms: undefined })
 	})
@@ -55,18 +55,18 @@ describe('run_board_status.activity_of during setup', () => {
 	it('carries the newest position as the latest event, past a stage written after it', () => {
 		const events = stream(LAUNCH_278, [KIND.MERGE, MERGED_278], setup(STAGE.HANDING_OFF))
 
-		expect(run_board_status.activity_of(events).latest?.text).toBe(MERGED_278)
+		expect(run_board_activity.activity_of(events).latest?.text).toBe(MERGED_278)
 	})
 
 	it('carries no latest event off an empty stream', () => {
-		expect(run_board_status.activity_of([]).latest).toBeUndefined()
+		expect(run_board_activity.activity_of([]).latest).toBeUndefined()
 	})
 })
 
 // joshuafolkken/kit#3749: how long the run has watched is counted from the newest thing it did itself.
-describe('run_board_status.activity_of idle time', () => {
+describe('run_board_activity.activity_of idle time', () => {
 	it('carries no idle time off an empty stream', () => {
-		expect(run_board_status.activity_of([]).idle_ms).toBeUndefined()
+		expect(run_board_activity.activity_of([]).idle_ms).toBeUndefined()
 	})
 
 	// A judgment session's minutes are the run's own: the watch after it starts at the hand-off that
@@ -78,7 +78,7 @@ describe('run_board_status.activity_of idle time', () => {
 			{ pos: 3, at: HANDED_AT, kind: KIND.SETUP, text: STAGE.HANDING_OFF },
 			{ pos: 4, at: BEAT_AT, kind: KIND.HEARTBEAT, text: 'at #278' },
 		]
-		const activity = run_board_status.activity_of(events)
+		const activity = run_board_activity.activity_of(events)
 
 		expect(activity.idle_ms).toBe(Date.parse(HANDED_AT))
 		expect(activity.latest?.at_ms).toBe(Date.parse(AT))
@@ -92,6 +92,6 @@ describe('run_board_status.activity_of idle time', () => {
 			{ pos: 4, at: BEAT_AT, kind: KIND.HEARTBEAT, text: 'at #278' },
 		]
 
-		expect(run_board_status.activity_of(events).idle_ms).toBe(Date.parse(HANDED_AT))
+		expect(run_board_activity.activity_of(events).idle_ms).toBe(Date.parse(HANDED_AT))
 	})
 })

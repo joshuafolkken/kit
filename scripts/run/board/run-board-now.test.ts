@@ -1,9 +1,9 @@
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { describe, expect, it } from 'vitest'
+import type { RunActivity } from './run-board-activity'
 import { run_board_labels } from './run-board-labels'
 import { run_board_now, type NowRead } from './run-board-now'
 import { run_board_now_fixture } from './run-board-now-fixture'
-import type { RunActivity } from './run-board-status'
 
 // joshuafolkken/kit#3749: the header's third line — what the run is doing now, in English words with
 // no label, and never blank while the stream holds an event. joshuafolkken/kit#3767: its kind as an
