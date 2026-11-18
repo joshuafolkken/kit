@@ -70,7 +70,7 @@ describe('epic_cli.parse_add_arguments — --order-reason', () => {
 	})
 })
 
-function cross_repo_suggestion(): string | undefined {
+function cross_repo_suggestion(reason = JOIN_REASON): string | undefined {
 	const found = epic_cli.find_cross_repo_add_target([
 		'--add',
 		'joshuafolkken/kit#7916',
@@ -78,7 +78,7 @@ function cross_repo_suggestion(): string | undefined {
 		'--chain',
 		JOIN,
 		REASON,
-		JOIN_REASON,
+		reason,
 	])
 
 	return found && epic_cli.format_cross_repo_refusal(found)
@@ -90,6 +90,15 @@ describe('epic_cli.format_cross_repo_refusal — --chain', () => {
 	})
 
 	it('carries each chain reason into the suggested command', () => {
-		expect(cross_repo_suggestion()).toContain(`${REASON} "${JOIN_REASON}"`)
+		expect(cross_repo_suggestion()).toContain(`${REASON} '${JOIN_REASON}'`)
+	})
+
+	it('single-quotes a reason so its backtick and $ reach the other checkout unexpanded', () => {
+		const tail = `reads \`josh\` and $HOME, isn't run`
+		const quoted_tail = String.raw`reads ${'`'}josh${'`'} and $HOME, isn'\''t run'`
+
+		expect(cross_repo_suggestion(`${JOIN}: ${tail}`)).toContain(
+			`${REASON} '${JOIN}: ${quoted_tail}`,
+		)
 	})
 })

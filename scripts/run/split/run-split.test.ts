@@ -216,6 +216,19 @@ describe('run_split.split — no epic tracks the issue', () => {
 	})
 })
 
+describe('run_split.split — no epic tracks the issue, an order without its reason', () => {
+	it.each([
+		[{ ...ORDERED, order_reasons: [] }],
+		[{ ...JOINED, order_reasons: JOIN_REASONS.slice(1) }],
+	])('refuses %j before writing anything', async (request) => {
+		const result = await run_split.split(request)
+
+		expect(result).toMatchObject({ kind: 'failed', step: 'chain', done: [] })
+		expect(state.calls).toStrictEqual([])
+		expect(epic_create).not.toHaveBeenCalled()
+	})
+})
+
 describe('run_split.split — on the lane branch', () => {
 	it('stashes a split the children take over, never a WIP commit that strands the lane', async () => {
 		state.is_lane = true

@@ -1,6 +1,7 @@
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { session_cite } from '#scripts/issue/session-cite'
 import { cli_body } from '#scripts/josh/cli-body'
+import { shell_quote } from '#scripts/lib/shell-quote'
 import { epic_chains, type InsertKind, type InsertPosition } from './epic-chains'
 import { epic_cli_argv, type EpicArgv, type FormFlags } from './epic-cli-argv'
 import { epic_cli_chain, type ChainRead } from './epic-cli-chain'
@@ -329,7 +330,9 @@ function find_cross_repo_add_target(argv: ReadonlyArray<string>): CrossRepoAddTa
 function format_order_reasons(local: AddArguments): Array<string> {
 	return (local.order_reasons ?? []).flatMap((entry) => [
 		epic_cli_chain.ORDER_REASON_FLAG,
-		`"${epic_chains.render_chains([entry.chain]).join('')}: ${entry.reason}"`,
+		shell_quote.single_quoted(
+			`${epic_chains.render_chains([entry.chain]).join('')}: ${entry.reason}`,
+		),
 	])
 }
 

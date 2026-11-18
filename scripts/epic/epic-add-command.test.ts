@@ -62,11 +62,11 @@ describe('epic_command.run — --add --chain', () => {
 		expect(add_children).not.toHaveBeenCalled()
 	})
 
-	it('names --chain in the --add usage line', async () => {
+	it('names --chain and --order-reason in the --add usage line', async () => {
 		await epic_command.run(['--add'])
 
 		expect(printed()).toContain(
-			'josh epic --add <E> <N1> <N2> ... [--before <M> | --after <M> | --chain',
+			'josh epic --add <E> <N1> <N2> ... [--before <M> | --after <M> | --chain "#A -> #B" ...] [--order-reason "#A -> #B: <reason>" ...]',
 		)
 	})
 })
