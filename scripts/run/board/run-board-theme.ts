@@ -105,12 +105,16 @@ function restyle(theme: Theme | undefined, frame: string): string {
 		.join('\n')
 }
 
-// Ports whose every write is put through the theme.
-function themed<P extends Pick<BoardPorts, 'write'>>(ports: P, theme: Theme | undefined): P {
+// Ports whose every write is put through the theme, marked so the header draws the alert level.
+function themed<P extends Pick<BoardPorts, 'write' | 'is_themed'>>(
+	ports: P,
+	theme: Theme | undefined,
+): P {
 	if (theme === undefined) return ports
 
 	return {
 		...ports,
+		is_themed: true,
 		write: (frame: string) => {
 			ports.write(restyle(theme, frame))
 		},

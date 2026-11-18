@@ -41,6 +41,8 @@ interface BoardPorts {
 	is_tty: boolean
 	// Whether a live board types each issue row that appears, a letter at a time — only in a theme.
 	types_rows?: boolean | undefined
+	// Whether the frame is drawn in a theme (`run-board-theme.ts`), which adds the header's alert level.
+	is_themed?: boolean | undefined
 	// The terminal a live frame is kept within, read at every redraw so a resized pane is fitted on the
 	// next one; none where the frame is drawn whole — one frame, a pipe, a chat.
 	size?: (() => TerminalSize) | undefined
