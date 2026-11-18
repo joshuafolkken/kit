@@ -291,8 +291,8 @@ Between them, the followup critical path table (`lane-ci-path-stats.ts`) counts,
 its runs and the median and maximum seconds into the wait it settled at. A check is timed only once seen pending, and CodeRabbit is
 left to the `coderabbit-wait` row (`followup-ci-path.ts`).
 
-Under the stop table, the failed-check table (`lane-stop-check-stats.ts`) counts followup `check` stops per failed CI check
-(stops, wait total and maximum, not resumed), and the longest-stop table lists the ten longest stops with issue, `stopped at` and causes.
+Under the stop table: `human wait` per `issue-human-stops.ts` stop (`lane-human-wait-stats.ts`); failed-check, followup `check`
+stops per failed CI check (`lane-stop-check-stats.ts`); longest-stop, the ten longest stops with issue, `stopped at` and causes.
 
 Under the gate check table, the claim-versus-measured table (`lane-claim-stats.ts`) prints, per check, the median cores it
 claimed, the cores it used (`cpu_ms ÷ elapsed_ms`: median, p90, maximum) and the seconds its claims waited — reused runs and
