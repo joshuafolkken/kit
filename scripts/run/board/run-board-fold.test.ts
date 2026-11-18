@@ -300,6 +300,6 @@ describe('run_board_fold.bounded rule width', () => {
 
 describe('run_board_fold.KEYS_LINE', () => {
 	it('names every key once', () => {
-		expect(KEYS_LINE).toBe(' t u l p f q w d: fold · a: all · Ctrl-C: quit')
+		expect(KEYS_LINE).toBe(' t u l p f q w d: fold · a: all · s: sound · Ctrl-C: quit')
 	})
 })

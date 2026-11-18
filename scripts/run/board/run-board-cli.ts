@@ -235,7 +235,7 @@ async function redraw_forever(
 // its first frame a line at a time; one in none draws it whole.
 async function watch(ports: BoardPorts, theme: Theme | undefined): Promise<void> {
 	const screen = run_board_screen.screen_of('live')
-	const keys = run_board_keys.read_keys(ports.keys)
+	const keys = run_board_keys.read_keys(ports.keys, ports.cue)
 	const leave = leaver(ports, screen, keys)
 
 	const reveal: Reveal | undefined =
@@ -250,7 +250,11 @@ async function watch(ports: BoardPorts, theme: Theme | undefined): Promise<void>
 	const gather = run_board_intro.after(ports.gather, run_board_intro.play(ports, keys))
 
 	try {
-		await redraw_forever({ ...ports, gather, folded: keys.folded }, screen, reveal)
+		await redraw_forever(
+			{ ...ports, gather, folded: keys.folded, sound: keys.sound, cue: keys.cue ?? ports.cue },
+			screen,
+			reveal,
+		)
 	} finally {
 		leave()
 	}
