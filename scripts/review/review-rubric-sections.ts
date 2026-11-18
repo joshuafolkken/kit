@@ -11,9 +11,9 @@ import { review_round } from './review-round'
 type DiffKind = 'code' | 'config' | 'doc' | 'test' | 'ui'
 
 // First match wins, so a test file is `test` before its extension makes it `code`, and a `src/`
-// module is `ui` because it can carry a user-visible string.
+// module is `ui` because it can carry a user-visible string. Only the file name makes a test: a
+// `test/` directory also holds shipped commands (`scripts/test/`), which need every code category.
 const KIND_RULES: ReadonlyArray<{ kind: DiffKind; pattern: RegExp }> = [
-	{ kind: 'test', pattern: /(?:^|\/)(?:tests?|e2e)\//u },
 	{ kind: 'test', pattern: /\.(?:test|spec)\.[cm]?[jt]sx?$/u },
 	{ kind: 'ui', pattern: /\.svelte$/u },
 	{ kind: 'ui', pattern: /(?:^|\/)(?:messages|locales?|i18n)\//u },

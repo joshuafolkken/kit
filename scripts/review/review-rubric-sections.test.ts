@@ -11,13 +11,19 @@ const SECURITY = '### 2. Security'
 const PERFORMANCE = '### 3. Performance'
 const I18N = '### 5. i18n'
 const TESTS = '### 6. Tests'
+const AFTER = '## After'
 
 const OMISSION_CASES: ReadonlyArray<[string, Array<string>, Array<string>]> = [
 	['code only', ['scripts/a.ts'], [ROUND_TWO_SECTION, I18N]],
 	[
 		'tests only',
-		['scripts/a.test.ts', 'tests/b.ts'],
+		['scripts/a.test.ts', 'e2e/b.spec.ts'],
 		[ROUND_TWO_SECTION, SECURITY, PERFORMANCE, I18N],
+	],
+	[
+		'code under a test directory',
+		['scripts/test/a.ts', 'tools/test/b.ts'],
+		[ROUND_TWO_SECTION, I18N],
 	],
 	[
 		'docs only',
@@ -90,13 +96,23 @@ describe('trim around code fences', () => {
 			'kept',
 			SECURITY,
 			'gone',
-			'## After',
+			AFTER,
 			'',
 		].join('\n')
 		const trimmed = trim(text, ['a.md'], ROUND_TWO)
 
 		expect(trimmed).toContain(`\`\`\`md\n${SECURITY}\n\`\`\`\nkept`)
 		expect(trimmed).not.toContain('gone')
-		expect(trimmed).toContain('## After')
+		expect(trimmed).toContain(AFTER)
+	})
+
+	it('drops a deeper heading with the section it sits under', () => {
+		const nested = '### Nested'
+		const text = ['# R', ROUND_TWO_SECTION, nested, 'gone', AFTER, ''].join('\n')
+		const trimmed = trim(text, ['a.md'], ROUND_ONE)
+
+		expect(trimmed).not.toContain(nested)
+		expect(trimmed).not.toContain('gone')
+		expect(trimmed).toContain(AFTER)
 	})
 })
