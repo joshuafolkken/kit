@@ -1,12 +1,13 @@
 import { git_directory } from '#scripts/discovery/git-directory'
 import { lane_paths } from '#scripts/lane/lane-paths'
-import { lane_state, type LaneStateRecord } from '#scripts/lane/lane-state'
+import type { LaneStateRecord } from '#scripts/lane/lane-state'
 import { run_carry, type CarryRead } from '#scripts/run/carry/run-carry'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_hold, type HoldRead, type RunHold } from '#scripts/run/hold/run-hold'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_read } from './run-board-read'
 import { run_board_read_fixture } from './run-board-read-fixture'
+import { run_board_records } from './run-board-records'
 import { run_board_single } from './run-board-single'
 
 // joshuafolkken/kit#6597: a single `fullrun` or `halfrun` is drawn from this checkout's hold record
@@ -40,7 +41,7 @@ function arrange_lane(
 	is_single_in_lane: boolean | undefined,
 ): void {
 	arrange(NONE, undefined)
-	vi.spyOn(lane_state, 'read_records').mockResolvedValue([record])
+	vi.spyOn(run_board_records, 'read_records').mockReturnValue([record])
 	vi.spyOn(git_directory, 'own_git_directory').mockReturnValue(own)
 	vi.spyOn(run_hold, 'read_hold')
 		.mockReturnValueOnce(FREE)
