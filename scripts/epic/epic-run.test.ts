@@ -110,6 +110,33 @@ describe('epic_run.create_epic — declared order', () => {
 	})
 })
 
+describe('epic_run.create_epic — declared --chain', () => {
+	it('records a blocked-by relation per link of each declared --chain', async () => {
+		const join = [
+			[101, 103],
+			[102, 103],
+		]
+
+		await epic_run.create_epic({ ...create_input(false), chains: join })
+
+		expect(mocked_blocked_by).toHaveBeenCalledTimes(2)
+		expect(mocked_blocked_by).toHaveBeenCalledWith('103', '101')
+		expect(mocked_blocked_by).toHaveBeenCalledWith('103', '102')
+	})
+
+	it('writes each declared --chain as a chain line, before and after the number is known', async () => {
+		const chains = [[101, 103]]
+
+		await epic_run.create_epic({ ...create_input(false), chains })
+
+		const created = mocked_create.mock.lastCall?.[0].body
+		const edited = vi.mocked(git_gh_command.issue_edit_body).mock.lastCall?.[1]
+
+		expect(epic_parse.parse_dependency_chains(created)).toStrictEqual(chains)
+		expect(epic_parse.parse_dependency_chains(edited)).toStrictEqual(chains)
+	})
+})
+
 function view_json(input: { labels: Array<string>; body: string }): string {
 	return JSON.stringify({
 		number: 700,

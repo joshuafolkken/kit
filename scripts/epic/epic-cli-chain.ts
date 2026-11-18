@@ -1,6 +1,11 @@
 import { session_cite } from '#scripts/issue/session-cite'
 import { epic_cli_argv, type EpicArgv } from './epic-cli-argv'
-import { chain_links, parse_dependency_chains, type DependencyLink } from './epic-parse'
+import {
+	chain_links,
+	parse_dependency_chains,
+	type DependencyChain as Chain,
+	type DependencyLink,
+} from './epic-parse'
 
 // `--chain "#A -> #C"`, repeatable: a creation's per-child prerequisites, written in the very chain-line
 // form the epic body's `## Dependencies` section holds. Each value is read by the body parser itself,
@@ -13,8 +18,6 @@ import { chain_links, parse_dependency_chains, type DependencyLink } from './epi
 // carries the reason, and the entry point prints it and exits without creating or editing an issue.
 
 const CHAIN_FLAG = '--chain'
-
-type Chain = Array<number>
 
 interface ChainRead {
 	chains: Array<Chain>

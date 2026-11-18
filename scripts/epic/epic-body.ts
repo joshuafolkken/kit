@@ -1,4 +1,9 @@
-import { chain_links, UNORDERED_DEPENDENCIES, type DependencyLink } from './epic-parse'
+import {
+	chain_links,
+	UNORDERED_DEPENDENCIES,
+	type DependencyChain as Chain,
+	type DependencyLink,
+} from './epic-parse'
 import { DEPENDENCY_ARROW, to_issue_reference } from './epic-reference'
 
 // The epic body is the machine-readable half of the epic contract: `scripts/epic/epic-close.ts`
@@ -14,8 +19,6 @@ const RATIONALE_PLACEHOLDER = '<why the work was split this way>'
 const SPLIT_RATIONALE_HEADING = '## Split rationale'
 // One child declares no order, so there is nothing for the record below to name.
 const CHAIN_MINIMUM_LENGTH = 2
-
-type Chain = ReadonlyArray<number>
 
 interface EpicBodyInput {
 	children: ReadonlyArray<number>

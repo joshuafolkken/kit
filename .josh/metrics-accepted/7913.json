@@ -2,6 +2,6 @@
 	"reason": "New repeatable --chain flag on josh epic create/--promote: chain parsing and refusals (epic-cli-chain.ts), argv list flags, and body/blocked-by wiring",
 	"date": "2026-11-18",
 	"growth": {
-		"scripts.code_lines": 102
+		"scripts.code_lines": 111
 	}
 }
