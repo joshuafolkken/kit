@@ -320,6 +320,7 @@ const lane_state = {
 	record_adopted,
 	record_change,
 	record_stuck,
+	recorded_issues,
 	state_path,
 }
 

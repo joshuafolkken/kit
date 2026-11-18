@@ -13,10 +13,6 @@ const SPELL_CHECK_LABEL = 'cspell'
 const SPELL_CHECK_TARGET = 'cspell:dot'
 const UNIT_LABEL = 'test:unit'
 const UNIT_TARGET = 'test:related'
-// **The gate's unit leg runs the whole suite for a changed file every test imports**
-// (joshuafolkken/kit#5122), which every other `josh test:related` narrows to its direct importers.
-// Outside a lane only: a lane leaves the whole suite to CI (`test-related-whole.ts`, joshuafolkken/kit#7014).
-const KEEP_WHOLE_SUITE_FLAG = '--keep-whole-suite'
 const BEHAVIOR_LABEL = 'behavior'
 const METRICS_LABEL = 'metrics'
 const EXPORTS_LABEL = 'exports'
@@ -33,7 +29,6 @@ const WARNING_CHECKER_LABELS: ReadonlyArray<string> = [LINT_LABEL, TYPE_CHECK_LA
 const gate_labels = {
 	BEHAVIOR_LABEL,
 	EXPORTS_LABEL,
-	KEEP_WHOLE_SUITE_FLAG,
 	LINT_LABEL,
 	LINT_TARGET,
 	LOCKFILE_LABEL,

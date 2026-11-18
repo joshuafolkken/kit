@@ -46,7 +46,7 @@ function brief_of(issue: string): string {
 		`Read it with \`pnpm josh issue:read ${issue}\` and answer only question 1 of`,
 		`\`pnpm josh doc:section .claude/skills/workflow-commands/split-assessment.md "${split_assess.QUESTION_SECTION}"\`.`,
 		`Separately-mergeable parts → file each child k with \`pnpm josh issue:file "<title>" --body-file .josh/tmp/split-${issue}-<k>.md --route split\`, then`,
-		`\`pnpm josh epic --promote ${issue} <N1> <N2> ... [--ordered --order-reason "<chain>: <reason>"]\` (a declared order needs its reason).`,
+		`\`pnpm josh epic --promote ${issue} <N1> <N2> ... [--chain "#A -> #C" ... --order-reason "#A -> #C: <reason>" ...]\` — one --chain per child's real prerequisite, each with its reason; --ordered only when every child waits on the one before.`,
 		'Before publishing, record every child plan with `issue:plan --planned --no-notify`, then `pnpm josh issue:file --publish <E>`; retry the same epic on failure.',
 		`One deliverable → add ${size_estimate.reason_hint()} under 背景 with \`pnpm josh issue:body ${issue} --body-file -\`.`,
 		'Nobody answers this session: end it once either is written.',

@@ -9,7 +9,6 @@ import {
 import { git_command } from '#scripts/git/git-command'
 import { main_merge, type MergeOutcome } from '#scripts/git/main-merge'
 import { pre_commit_lint_switch } from '#scripts/hooks/pre-commit-lint-switch'
-import { pre_push_related_switch } from '#scripts/hooks/pre-push-related-switch'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { error_text } from '#scripts/lib/error-message'
 import { run_ship_conflict_probe } from './run-ship-conflict-probe'
@@ -129,8 +128,8 @@ async function commit_locally(title: string, is_dirty: boolean): Promise<JoshRes
 // (joshuafolkken/kit#5067): CI and SonarQube start from this push, and pushed after the gate they ran
 // behind it, leaving the followup minutes of waiting. Only the pull request's own branch moves; the
 // merge still needs the gate, the review attest and a green CI, and a red gate stops the ship before
-// the followup as before, the next push replacing the commit. Its pre-push hook runs the related tests
-// (`pre-push-related-switch.ts`), since the gate over this same tree runs the whole suite next. A
+// the followup as before, the next push replacing the commit. Its pre-push hook runs the related tests,
+// as every push the gate record does not cover does (`pre-push-unit.ts`, joshuafolkken/kit#7977). A
 // branch with no open pull request pushes nothing here: CI runs on pull requests only. An unmoved
 // default branch pushes nothing either, so the commit stage stays the one push; a merged one makes it
 // two, and CI and the review bots run again on the second. A failed push stops nothing: the commit
@@ -147,10 +146,7 @@ async function push_ahead(title: string): Promise<string> {
 
 	const push = await timed(
 		STEP.PUSH,
-		async () =>
-			await josh_command.josh_run(push_argv(title), should_forward_stderr, undefined, {
-				[pre_push_related_switch.SWITCH_ENV_KEY]: pre_push_related_switch.SWITCH_ON,
-			}),
+		async () => await josh_command.josh_run(push_argv(title), should_forward_stderr),
 	)
 
 	return push.code === SUCCESS_EXIT_CODE ? PUSHED_NOTE : [PUSH_FAILED_NOTE, push.out].join('\n')

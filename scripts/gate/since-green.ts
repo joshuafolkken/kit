@@ -11,9 +11,7 @@ import { verification_inputs } from './verification-inputs'
 // **The check is no weaker.** The green record (`scoped-green.ts`) vouches that the check passed over
 // the branch diff of the tree it names; what moved since is every path whose content can differ from
 // that tree (`moved-paths.ts`), a main sync's own changes included. A record written by a narrowed run
-// vouches for the same thing, by the same argument one run earlier — except a bare `josh test:related`
-// over a file every test imports, which ran only its direct importers, so the gate's unit leg never
-// narrows by it while the branch changes one (`is_green_narrowable` in `test-related.ts`, #5122).
+// vouches for the same thing, by the same argument one run earlier.
 //
 // **Whatever cannot be narrowed answers its fallback reason**, and the caller reads the whole branch
 // change as before: no record, one that cannot be compared, one written under other tools or environment, or a
@@ -39,7 +37,7 @@ function is_narrowed(out: string): boolean {
 
 // **Why a check read the whole branch change, in one word** (joshuafolkken/kit#5531): printed on the
 // check's summary line and carried into the ship's `scoped pair` lap, so `josh lane:breakdown` tells a
-// minutes-long pair's cause apart. The last three are the test side's own (`test-related.ts`).
+// minutes-long pair's cause apart. The last two are the test side's own (`test-related.ts`).
 const FALLBACK = {
 	NO_RECORD: 'no-record',
 	INPUT_MISMATCH: 'input-mismatch',
@@ -47,7 +45,6 @@ const FALLBACK = {
 	CONFIG_FILE: 'config-file',
 	AFTER_RED: 'after-red',
 	NO_READ_MAP: 'no-read-map',
-	HUB: 'hub',
 } as const
 
 type FallbackReason = (typeof FALLBACK)[keyof typeof FALLBACK]

@@ -652,7 +652,6 @@
 	"scripts/hooks/no-global-shim-write.test.ts": 234,
 	"scripts/hooks/pre-commit-lint-switch.test.ts": 84,
 	"scripts/hooks/pre-commit-lint.test.ts": 108,
-	"scripts/hooks/pre-push-related-switch.test.ts": 169,
 	"scripts/hooks/pre-push-unit.test.ts": 260,
 	"scripts/hooks/pretool-guard-foreground.test.ts": 245,
 	"scripts/hooks/pretool-guard-investigation.test.ts": 381,
