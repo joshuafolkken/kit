@@ -34,6 +34,8 @@ const HOLD_TEXT = 'every queued issue is blocked'
 const USAGE_LIMIT_CODE = 'usage-limit'
 const LIMIT = 3
 const NARROW = 40
+const PANE = 80
+const RE_LOGIN = 'claude auth login'
 // A pane short enough that the seat lines give way.
 const SHORT = 6
 const SEAT = '💺'
@@ -65,10 +67,23 @@ describe('run_board_render an authentication-failure hold on the empty seats', (
 	it('says the lane failed to authenticate and how to log in again, never the usage limit', () => {
 		const seats = seats_of({ seats: read_of([], USAGE_LIMIT_CODE, 'auth'), layout: queued([]) })
 
-		expect(seats).toStrictEqual(
-			Array.from({ length: 2 }, () => expect.stringContaining('claude auth login')),
-		)
+		expect(seats).toStrictEqual(Array.from({ length: 2 }, () => expect.stringContaining(RE_LOGIN)))
 		expect(seats.join('\n')).not.toContain('usage limit')
+	})
+
+	it('keeps the re-login visible on a seat line cut to an 80-column pane', () => {
+		const board = header({
+			lane_limit: LIMIT,
+			occupied_count: 1,
+			seats: read_of([], USAGE_LIMIT_CODE, 'auth'),
+			layout: queued([]),
+		})
+		const seats = run_board_render
+			.render({ header: board, notes: [], size: { columns: PANE, rows: 50 } })
+			.map((line) => stripVTControlCharacters(line))
+			.filter((line) => line.includes(SEAT))
+
+		expect(seats).toStrictEqual(Array.from({ length: 2 }, () => expect.stringContaining(RE_LOGIN)))
 	})
 
 	it('keeps the usage-limit sentence for a hold a limit caused', () => {

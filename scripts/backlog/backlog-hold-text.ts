@@ -57,8 +57,9 @@ const MEMORY_TEXT = 'memory pressure is high; lanes resume when it eases'
 const USAGE_LIMIT_TEXT = 'the usage limit is reached; lanes resume when it resets'
 // A `usage-limit` hold an authentication failure caused (joshuafolkken/kit#8014): the recheck may clear
 // it, and only a person's re-login ends one that keeps failing — the remedies Claude's own error names.
+// The remedy leads, so a seat line cut to an 80-column pane still shows it.
 const AUTH_FAILURE_TEXT =
-	'a lane failed to authenticate; lanes retry at the next recheck. If it keeps failing, run `claude auth login`, or set CLAUDE_CODE_OAUTH_TOKEN from `claude setup-token`'
+	'a lane failed to authenticate; run `claude auth login` (or set CLAUDE_CODE_OAUTH_TOKEN from `claude setup-token`) if the recheck does not clear it'
 const DRIVERLESS_TEXT = 'no driver is running'
 
 // What follows `<prefix>:` in the code, or `undefined` when the code does not start with it.
