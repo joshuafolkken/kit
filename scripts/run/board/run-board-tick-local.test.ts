@@ -120,6 +120,24 @@ describe('run_board_tick.tick empty lane seats', () => {
 	})
 })
 
+// joshuafolkken/kit#8014: the local read's usage-limit cause reaches the seat line.
+describe('run_board_tick.tick an authentication-failure hold on the empty seats', () => {
+	it('names the re-login for a usage-limit hold an authentication failure caused', async () => {
+		const local = {
+			...SEATED,
+			events: [],
+			launch_hold: 'usage-limit',
+			usage_cause: 'auth' as const,
+		}
+		const { ports, frames } = harness(local, [long_plan(0)])
+
+		await tick(FRESH_STATE, ports)
+
+		expect(frames.at(-1)).toContain('claude auth login')
+		expect(frames.at(-1)).not.toContain('usage limit')
+	})
+})
+
 describe('run_board_tick.tick before the plan is read', () => {
 	it('draws three header lines and a blank, the run’s own child, and - for what it does not know', async () => {
 		const lines = await loading([LAUNCH])
