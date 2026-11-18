@@ -250,6 +250,7 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	...file_edit_rows.SHELL_ROWS,
 	...permission_guards.ROWS,
 	poll_loop.ROW,
+	poll_loop.STARTED_CHILD_ROW,
 	// After the safety rows: a harmless read is steered only once nothing on the line is refused.
 	direct_git_status.ROW,
 	// Before `rule-body`, its one overlap: the cut is the right first act, and `rule-body` delivers on

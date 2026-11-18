@@ -85,6 +85,9 @@ interface StopContext {
 	headless_refusals: number
 	// This session is a dispatched lane child for this checkout — `lane_child_marker.is_child_of`.
 	lane_child: boolean
+	// This session is a child kit started headless — a lane, hand-off or beside child —
+	// `run_headless.is_started_child`. Nothing re-invokes it once its turn ends.
+	started_child: boolean
 	// A background task this run launched — a command or a subagent — has not finished —
 	// `lane_background.pending_background_ids` over the transcript tail.
 	background_pending: boolean
@@ -327,9 +330,11 @@ function count_headless_refusals(tail: string): number {
 
 // **A lane child with a task still running is sent back to wait, not to notify**.
 // Its turn-end kills the task, so the notify the hold rules would ask for announces a stop that loses
-// the work; the #2606 child obeyed exactly that and its gate died at `exit code 143`.
+// the work; the #2606 child obeyed exactly that and its gate died at `exit code 143`. **Any started
+// child is held the same way** (joshuafolkken/kit#7858): a `run:handoff` child is no lane child, yet
+// nothing re-invokes it either, so its turn-end leaves the work unfinished.
 function needs_background_wait(context: StopContext): boolean {
-	return context.lane_child && context.background_pending
+	return (context.lane_child || context.started_child) && context.background_pending
 }
 
 // **Only subagents left take their own wait**: their notice comes in when a tool call ends, while a

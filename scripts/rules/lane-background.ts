@@ -201,15 +201,16 @@ const LANE_BACKGROUND_REASON =
 	'(`.claude/skills/workflow-commands/chain-rule.md` step 0).'
 
 const LANE_BACKGROUND_STOP_REASON =
-	'⛔ lane background stop: this is a dispatched lane child (`JOSH_LANE_CHILD`) and a background task ' +
+	'⛔ lane background stop: this is a started child (lane, hand-off or beside) and a background task ' +
 	'it launched has not finished, and ending this turn kills it. Wait for it in the foreground, or ' +
-	're-issue the work through `pnpm josh ship --detach` — do not notify, stop or repeat your reply.'
+	'(lane child) re-issue the work through `pnpm josh ship --detach` — do not notify, stop or repeat ' +
+	'your reply.'
 
 // **Only subagents left: the wait that receives their answer** (joshuafolkken/kit#4803). Their completion
 // notice is delivered only when a tool call ends, so one long hand-written loop holds it back until the
 // loop itself gives up; short foreground calls, one at a time, let it in at the first one to end.
 const LANE_AGENT_STOP_REASON =
-	'⛔ lane agent stop: this is a dispatched lane child (`JOSH_LANE_CHILD`) and a subagent it launched ' +
+	'⛔ lane agent stop: this is a started child (lane, hand-off or beside) and a subagent it launched ' +
 	'has not finished; ending this turn kills it. Its completion notice arrives only when a tool call ' +
 	'ends: wait with one short foreground call at a time (`sleep 20`) until it arrives — never a loop ' +
 	'over its `.output`. Do not notify, stop or repeat your reply.'

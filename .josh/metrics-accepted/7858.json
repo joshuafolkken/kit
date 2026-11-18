@@ -1,0 +1,7 @@
+{
+	"reason": "#7858 adds the started-child poll-loop row and the started_child stop field; the fix needs both",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 41
+	}
+}

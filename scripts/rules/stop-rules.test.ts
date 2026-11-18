@@ -8,6 +8,30 @@ const { DECISION, DECISION_MESSAGE, action_kinds, context } = stop_rules_fixture
 const NO_REPRINT = 'do not repeat your previous reply'
 const BARE_MESSAGE = 'done in #7'
 
+// joshuafolkken/kit#7858: a `run:handoff` child is no lane child, yet nothing re-invokes it after its
+// turn, so a stop with a task still running ends its run unfinished.
+describe('stop_rules.stop_outcome — started child background wait', () => {
+	const RUNNING = { background_pending: true, command_pending: true }
+
+	it('refuses a hand-off child stopping with a background task running', () => {
+		expect(
+			stop_rules.stop_outcome(context({ ...RUNNING, started_child: true })).reason,
+		).toBeDefined()
+	})
+
+	it('still refuses a lane child stopping with a background task running', () => {
+		expect(stop_rules.stop_outcome(context({ ...RUNNING, lane_child: true })).reason).toBeDefined()
+	})
+
+	it('lets an interactive session stop with a background task running', () => {
+		expect(stop_rules.stop_outcome(context(RUNNING)).reason).toBeUndefined()
+	})
+
+	it('lets a hand-off child stop once nothing runs', () => {
+		expect(stop_rules.stop_outcome(context({ started_child: true })).reason).toBeUndefined()
+	})
+})
+
 describe('stop_rules.stop_outcome — stop notification', () => {
 	// joshuafolkken/kit#3919: the hook sends it itself rather than refusing the stop.
 	it('sends the notify for a held tree that stopped without notifying', () => {
