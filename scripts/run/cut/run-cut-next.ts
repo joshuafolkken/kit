@@ -3,6 +3,7 @@ function print_next(verdict: string, issue: string): void {
 	const gate = `pnpm josh run:chain ${issue}`
 	const actions: ReadonlyMap<string, string> = new Map([
 		['cut', 'End the turn immediately.'],
+		['concluded', "End the turn; the parent's run:merge returns the lane."],
 		['under-threshold', gate],
 		['not-a-lane', gate],
 		['unready', gate],
