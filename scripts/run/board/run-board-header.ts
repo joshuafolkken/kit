@@ -115,6 +115,9 @@ interface BoardHeader
 	// The spinner's frame a running run and a running row turn, `undefined` where the output is not a
 	// terminal and they draw their still icons.
 	spinner: string | undefined
+	// Whether each issue row leads its text with its key (`run-board-row-key.ts`) — only where the board
+	// types the rows that appear, so every other frame is drawn as it was.
+	is_keyed?: boolean | undefined
 	form: BoardForm
 	// The repository the plan was read for, as `owner/repo`; `undefined` before a plan is read.
 	repo: string | undefined

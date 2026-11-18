@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { BoardRow } from './run-board-layout'
 import { run_board_render } from './run-board-render'
 import { run_board_render_fixture } from './run-board-render-fixture'
+import { run_board_row_key } from './run-board-row-key'
 
 const { EMPTY_LAYOUT, header, unfinished } = run_board_render_fixture
 const ISSUE = 6253
@@ -27,7 +28,7 @@ function row_of(is_waiting: boolean): BoardRow {
 	}
 }
 
-function line_of(is_waiting: boolean, form: 'screen' | 'chat'): string {
+function drawn_line(is_waiting: boolean, form: 'screen' | 'chat', is_keyed = false): string {
 	const row = row_of(is_waiting)
 	const layout = {
 		...EMPTY_LAYOUT,
@@ -35,16 +36,16 @@ function line_of(is_waiting: boolean, form: 'screen' | 'chat'): string {
 		unreached: is_waiting ? [row] : [],
 	}
 	const lines = run_board_render.render({
-		header: header({ layout, form }),
+		header: header({ layout, form, is_keyed }),
 		notes: [],
 		size: { rows: ROWS, columns: COLUMNS },
 	})
 
-	return (
-		lines
-			.map((line) => stripVTControlCharacters(line))
-			.find((line) => line.includes(String(ISSUE))) ?? ''
-	)
+	return lines.find((line) => stripVTControlCharacters(line).includes(String(ISSUE))) ?? ''
+}
+
+function line_of(is_waiting: boolean, form: 'screen' | 'chat'): string {
+	return stripVTControlCharacters(drawn_line(is_waiting, form))
 }
 
 describe('run board decision tails', () => {
@@ -64,6 +65,18 @@ describe('run board decision tails', () => {
 			expect(line).toContain('…')
 			expect(line).not.toContain(TITLE)
 			expect(unfinished(line).endsWith(is_waiting ? WAITING : QUESTION)).toBe(true)
+		},
+	)
+
+	it.each([
+		[false, 'decision'],
+		[true, 'waiting'],
+	])(
+		'keys the row by its section, so a theme types it once there: waiting=%s',
+		(is_waiting, section) => {
+			const { key } = run_board_row_key.split_key(drawn_line(is_waiting, 'screen', true))
+
+			expect(key).toBe(`${section}:${String(ISSUE)}`)
 		},
 	)
 })

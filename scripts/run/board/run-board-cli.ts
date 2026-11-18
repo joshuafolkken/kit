@@ -222,7 +222,7 @@ async function redraw_forever(
 		{
 			interval_ms: run_board_spin.REDRAW_MS,
 			sleeper: async () => {
-				await run_board_spin.spin_to_second(state.spots, ports)
+				await run_board_spin.spin_to_second(state, ports)
 			},
 		},
 	)
@@ -230,7 +230,8 @@ async function redraw_forever(
 
 // A signal leaves through `on_exit`; a failed redraw leaves before its error is printed, so the error
 // lands on the normal screen rather than vanishing with the alternate one. Only a board in a theme types
-// its opening line and reveals its first frame a line at a time; one in none draws it whole at once.
+// its opening line, reveals its first frame a line at a time and types each row that appears after it;
+// one in none draws it whole at once.
 async function watch(ports: BoardPorts, theme: Theme | undefined): Promise<void> {
 	const screen = run_board_screen.screen_of('live')
 	const keys = run_board_keys.read_keys(ports.keys, ports.cue)
@@ -242,7 +243,14 @@ async function watch(ports: BoardPorts, theme: Theme | undefined): Promise<void>
 
 	try {
 		await redraw_forever(
-			{ ...ports, gather, folded: keys.folded, sound: keys.sound, cue: keys.cue ?? ports.cue },
+			{
+				...ports,
+				gather,
+				folded: keys.folded,
+				sound: keys.sound,
+				cue: keys.cue ?? ports.cue,
+				types_rows: theme !== undefined,
+			},
 			screen,
 			reveal,
 		)

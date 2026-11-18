@@ -17,6 +17,7 @@ import type { Pending } from './run-board-sound-repeat'
 import type { SoundSnapshot } from './run-board-sound-transition'
 import type { Spot } from './run-board-spin'
 import type { Thanks } from './run-board-thanks-csv'
+import { run_board_type_rows, type Typing } from './run-board-type-rows'
 
 // What a `run:board` redraw reads through and folds forward, shared by the
 // redraw (`run-board-tick.ts`) and its GitHub reads (`run-board-github.ts`).
@@ -38,6 +39,8 @@ interface BoardPorts {
 	link: Link
 	// Whether stdout is a terminal — only a terminal gets the alternate screen and the spinner.
 	is_tty: boolean
+	// Whether a live board types each issue row that appears, a letter at a time — only in a theme.
+	types_rows?: boolean | undefined
 	// The terminal a live frame is kept within, read at every redraw so a resized pane is fitted on the
 	// next one; none where the frame is drawn whole — one frame, a pipe, a chat.
 	size?: (() => TerminalSize) | undefined
@@ -99,6 +102,8 @@ interface BoardState extends GatherRead {
 	closed_answered_ms: number | undefined
 	// Where the last frame drew its spinners, turned between redraws.
 	spots: ReadonlyArray<Spot>
+	// The rows the last frame drew and the ones typing, typed on between redraws (`run-board-type-rows.ts`).
+	typing: Typing
 	// The reviewers drawn above the legend, the read of them in flight, and when it was last launched.
 	thanks: Thanks
 	thanks_fetch: Fetch<Thanks> | undefined
@@ -138,6 +143,7 @@ const FRESH_STATE: BoardState = {
 	closed_answered_ms: undefined,
 	gauges: undefined,
 	spots: [],
+	typing: run_board_type_rows.NO_TYPING,
 	usages: undefined,
 	budget_waits: [],
 	thanks: [],

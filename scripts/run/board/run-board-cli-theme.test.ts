@@ -7,7 +7,7 @@ import { run_board_typing } from './run-board-typing'
 // joshuafolkken/kit#7934: a board a person watches takes the theme; the chat's frame never does. How
 // the theme draws a frame is `run-board-theme.test.ts`'s.
 
-const { LOCAL, STOPPED, harness, plan_titled } = run_board_fixture
+const { LOCAL, START, STOPPED, harness, plan_titled } = run_board_fixture
 const LAUNCH = { pos: 1, at: '2026-10-08T08:00:00.000Z', kind: 'child-launch', text: '#1 a' }
 const THEMED = ['--theme', 'wargames']
 const RULE = '─'
@@ -144,6 +144,61 @@ describe('run_board_cli.run --theme intro', () => {
 
 		expect(text).toContain(run_board_typing.CURSOR)
 		expect(beats).toBeGreaterThan(run_board_intro.LINE.length)
+	})
+})
+
+// joshuafolkken/kit#8003: a live board in the theme types a row that appears after its first frame a
+// letter at a time at the row's place; the key it finds the row by never reaches a frame.
+const KEY_OPEN = '\u{E001}'
+const PAST_LOCAL_READ_MS = 7000
+// The tail of the move to a row's first column a typed row is written after.
+const AT_ROW = ';1H'
+
+// What a live board writes when `#1` is launched on its second local read, or on none.
+async function launched_writes(argv: Array<string>, is_launched: boolean): Promise<Array<string>> {
+	const board = harness(LOCAL, [plan_titled('a')])
+	let reads = 0
+
+	board.read_local.mockImplementation(async () => {
+		reads += 1
+
+		return { ...LOCAL, events: is_launched && reads > 1 ? [LAUNCH] : [] }
+	})
+
+	async function sleep(ms: number): Promise<void> {
+		if (board.clock.now_ms >= START + PAST_LOCAL_READ_MS) throw STOPPED
+		board.clock.now_ms += ms
+	}
+
+	await expect(
+		run_board_cli.run(argv, { ...board.ports, sleep, intro_sleep: no_pause }),
+	).rejects.toBe(STOPPED)
+
+	return board.frames
+}
+
+function typed_writes(frames: ReadonlyArray<string>): Array<string> {
+	return frames.filter((frame) => frame.includes(run_board_typing.CURSOR) && frame.includes(AT_ROW))
+}
+
+describe('run_board_cli.run --theme rows', () => {
+	it('types a row that appears after the first frame, with the block at its place', async () => {
+		const frames = await launched_writes(THEMED, true)
+
+		expect(typed_writes(frames).length).toBeGreaterThan(0)
+		expect(frames.join('')).not.toContain(KEY_OPEN)
+	})
+
+	it('types no row where none appears', async () => {
+		expect(typed_writes(await launched_writes(THEMED, false))).toStrictEqual([])
+	})
+
+	it('types no row and writes no key on a board in no theme or drawn once', async () => {
+		const frames = await launched_writes([], true)
+
+		expect(typed_writes(frames)).toStrictEqual([])
+		expect(frames.join('')).not.toContain(KEY_OPEN)
+		expect(await frame_of([...THEMED, '--once'])).not.toContain(KEY_OPEN)
 	})
 })
 

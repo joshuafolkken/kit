@@ -30,6 +30,7 @@ import { run_board_render_section } from './run-board-render-section'
 import { run_board_render_throughput } from './run-board-render-throughput'
 import { run_board_render_time } from './run-board-render-time'
 import { run_board_render_title } from './run-board-render-title'
+import { run_board_row_sections } from './run-board-row-sections'
 import type { Thanks } from './run-board-thanks-csv'
 import type { ThroughputRow } from './run-board-throughput'
 
@@ -165,13 +166,13 @@ function active_sections(
 	const lane_frame = { ...frame, cells, is_lane_row: true }
 	const shared = shared_overrun(lead, lane_frame)
 	const lanes = lanes_section(
-		lead.map((row) => row_line(indent_of(row), row, { ...lane_frame, shared })),
+		lead.map((row) => row_line(indent_of(row), row, { ...lane_frame, shared, section: 'lanes' })),
 		cells,
 		frame.header,
 		frame.columns,
 	)
 
-	const plan = [...lanes, ...rows_section(decision, people, frame)]
+	const plan = [...lanes, ...rows_section(decision, people, { ...frame, section: 'decision' })]
 
 	return { plan, rule_width: rule_width(lead, { ...lane_frame, shared }) }
 }
@@ -188,15 +189,20 @@ function plan_parts(
 
 	const frame = frame_of(header, notes, size)
 	const conditioned = { ...frame, condition_width: width_for(layout.unreached) }
-	const done = layout.active.filter((row) => run_board_layout.is_finished(row.state))
+	const done = run_board_row_sections.done_rows(layout)
 	const waiting = `${WAITS_ICON} ${WORDS.waiting}`
 
 	return {
 		...active_sections(layout, frame),
 		below: [
-			...keyed('queued', queued_section(layout, conditioned)),
-			...keyed('waiting', rows_section(waiting, layout.unreached, conditioned, 'waiting')),
-			...done_section(done, (row) => row_line(ROW_INDENT, row, conditioned)),
+			...keyed('queued', queued_section(layout, { ...conditioned, section: 'queued' })),
+			...keyed(
+				'waiting',
+				rows_section(waiting, layout.unreached, { ...conditioned, section: 'waiting' }, 'waiting'),
+			),
+			...done_section(done, (row) =>
+				row_line(ROW_INDENT, row, { ...conditioned, section: 'done' }),
+			),
 		],
 	}
 }

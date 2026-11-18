@@ -1,6 +1,7 @@
 import { stripVTControlCharacters } from 'node:util'
 import string_width from 'string-width'
 import { run_board_labels } from './run-board-labels'
+import { run_board_row_key } from './run-board-row-key'
 
 // A live `run:board` frame kept within the terminal. A frame taller than the pane scrolls the
 // alternate screen as it is written, and the header — the lines that say whether the run moves and
@@ -135,14 +136,14 @@ function measured(plain: string): number {
 	return PRINTABLE_ASCII.test(plain) ? plain.length : string_width(plain)
 }
 
-// The columns a line takes on screen: its color escapes take none, an emoji two.
+// The columns a line takes on screen: its color escapes and its row's key take none, an emoji two.
 function width_of(line: string): number {
 	const known = widths.get(line)
 
 	if (known !== undefined) return known
 	if (widths.size >= WIDTHS_KEPT) widths.clear()
 
-	const width = measured(stripVTControlCharacters(line))
+	const width = measured(stripVTControlCharacters(run_board_row_key.without_key(line)))
 
 	widths.set(line, width)
 
