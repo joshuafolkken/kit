@@ -88,8 +88,14 @@ function keyed_of(
 	return { lines: drawn.map((line) => line.text), keyed }
 }
 
-// The frame with each placeholder drawn as `frame` and each key taken out, and every placeholder's spot
-// and keyed row that is on screen.
+// A keyed row types only on screen and within one screen row: a row typed shorter than it wraps would
+// take fewer rows and move every line below it off the spots recorded for them.
+function can_type(line: KeyedLine, rows: number, columns: number): boolean {
+	return line.row <= rows && run_board_fit.height_of(line.text, columns) === 1
+}
+
+// The frame with each placeholder drawn as `frame` and each key taken out, every placeholder's spot on
+// screen and the keyed rows that can type.
 function spun(lines: ReadonlyArray<string>, frame: string, size?: TerminalSize): Spun {
 	const columns = Math.max(1, size?.columns ?? Infinity)
 	const rows = size?.rows ?? Infinity
@@ -100,7 +106,7 @@ function spun(lines: ReadonlyArray<string>, frame: string, size?: TerminalSize):
 	return {
 		lines: drawn.lines,
 		spots: spots.filter((spot) => spot.row <= rows),
-		keyed: drawn.keyed.filter((line) => line.row <= rows),
+		keyed: drawn.keyed.filter((line) => can_type(line, rows, columns)),
 	}
 }
 

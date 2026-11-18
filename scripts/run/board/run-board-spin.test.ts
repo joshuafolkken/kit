@@ -149,6 +149,13 @@ describe('run_board_spin — the rows a theme types (joshuafolkken/kit#8003)', (
 		expect(rows).toStrictEqual([{ key: 'done:7', index: 1, row: 4, text: '⠋ ✅ 7' }])
 	})
 
+	it('records no keyed row that wraps, so a row typed shorter never moves the lines below it', () => {
+		const lines = [keyed('done', 7, 'x'.repeat(25)), keyed('lanes', 8, 'short')]
+		const { keyed: rows } = spun(lines, '⠋', { rows: 24, columns: 10 })
+
+		expect(rows).toStrictEqual([{ key: 'lanes:8', index: 1, row: 4, text: 'short' }])
+	})
+
 	it('writes a typing row on every letter after the turns, at its row, until the next second', async () => {
 		const { ports, writes } = spin_ports(START)
 		const spots = SPOTS

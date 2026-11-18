@@ -7,7 +7,8 @@ import { run_board_typing } from './run-board-typing'
 // a letter at a time, at the opening line's pace, a block after the last letter until the row is out.
 // A row is known by its key — its section and number (`run-board-row-key.ts`) — so a row that moves from
 // the lanes to done types again in done, and one whose times alone change types once. Each redraw draws a
-// typing row as typed by then, and between redraws the row is rewritten where it is on screen.
+// typing row as typed by then, and between redraws the row is rewritten where it is on screen. Only a
+// row within one screen row types (`run-board-spin.ts`); a wider one is drawn whole.
 
 const CSI = '\u{1B}['
 const { ERASE_LINE_END, LETTER_MS } = run_board_intro

@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest'
+import { run_board_fit } from './run-board-fit'
 import { run_board_row_key } from './run-board-row-key'
 
 // joshuafolkken/kit#8003: a row's key rides its text from where it is drawn to where its place is
-// recorded, and comes out whole.
+// recorded, comes out whole and takes no column.
 
 const { keyed, split_key, without_key } = run_board_row_key
 const INDENT = '  '
 const ROW = '#7 a title'
+const GREEN = '\u{1B}[32m'
+const WRAP_COLUMNS = 22
 
 describe('run_board_row_key', () => {
 	it('gives back the key and the row it led, the indent before it kept', () => {
@@ -19,5 +22,15 @@ describe('run_board_row_key', () => {
 	it('leaves a row whose section names no key as it is', () => {
 		expect(keyed(undefined, 7, ROW)).toBe(ROW)
 		expect(split_key(ROW)).toStrictEqual({ key: undefined, text: ROW })
+	})
+
+	it('takes no column, so a keyed row wraps where the row alone does', () => {
+		const line = `${GREEN}✅ ${'x'.repeat(20)}`
+		const key = keyed('lanes', 8003, line)
+
+		expect(run_board_fit.width_of(key)).toBe(run_board_fit.width_of(line))
+		expect(run_board_fit.height_of(key, WRAP_COLUMNS)).toBe(
+			run_board_fit.height_of(line, WRAP_COLUMNS),
+		)
 	})
 })

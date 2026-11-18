@@ -2,6 +2,6 @@
 	"reason": "#8003 adds the wargames theme's typing of new board rows (row key, styled cut, type-rows state)",
 	"date": "2026-11-18",
 	"growth": {
-		"scripts.code_lines": 199
+		"scripts.code_lines": 202
 	}
 }
