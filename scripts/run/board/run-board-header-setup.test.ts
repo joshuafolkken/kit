@@ -3,9 +3,9 @@ import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { run_board_activity, type RunActivity } from './run-board-activity'
 import { run_board_header, type BoardHeader } from './run-board-header'
 import type { BoardLayout, BoardRow } from './run-board-layout'
-import { run_board_status, type RunActivity } from './run-board-status'
 
 // joshuafolkken/kit#3696: the header while the run is at a stage of its own. joshuafolkken/kit#3767:
 // the mark stands still; the spinner turns on the third line, before the stage's time and icon.
@@ -105,7 +105,7 @@ function staged(...stages: ReadonlyArray<string>): RunActivity {
 		at: new Date(STARTED + index * SECOND).toISOString(),
 	}))
 
-	return run_board_status.activity_of(events, false)
+	return run_board_activity.activity_of(events, false)
 }
 
 describe('run_board_header.header_lines idle before the drain flush', () => {

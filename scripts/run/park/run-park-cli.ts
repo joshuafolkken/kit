@@ -4,6 +4,7 @@ import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { issue_comment_cli, type CommentRequest } from '#scripts/issue/issue-comment-cli'
 import { NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
+import { issue_outcome } from '#scripts/issue/issue-outcome'
 import { session_cite } from '#scripts/issue/session-cite'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_step_section } from '#scripts/run/run-step-section'
@@ -38,7 +39,7 @@ const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
 const CLEAR_FLAG = '--clear'
-const USAGE = `Usage: josh run:park <issue-number> --body-file <path> | <issue-number> ${CLEAR_FLAG} | <issue-number> ${run_park_escalate.ESCALATE_FLAG} "<reason>"\n\n${run_park_body.FORMAT}`
+const USAGE = `Usage: josh run:park <issue-number> --body-file <path> --outcome "<next action>" | <issue-number> ${CLEAR_FLAG} | <issue-number> ${run_park_escalate.ESCALATE_FLAG} "<reason>"\n\n${run_park_body.FORMAT}\n\n${issue_outcome.NEXT_FORMAT}`
 const CLEAR_OPTIONS = { clear: { type: 'boolean' } } as const
 
 function clear_issue(argv: ReadonlyArray<string>): string | undefined {
@@ -58,10 +59,23 @@ async function release(issue_number: string, directory: string): Promise<number>
 	return run_step_section.print_once(run_step_section.PARK, directory)
 }
 
+// **A park names its next action** (joshuafolkken/kit#7850): `--outcome` becomes the
+// `josh:outcome` marker the board's 💤 row reads, so a park without one in the next-action shape is
+// refused before any write.
+function is_next_missing(body: string): boolean {
+	if (issue_outcome.next_of(body) !== undefined) return false
+
+	console.error(`Park refused: --outcome needs the next action.\n${issue_outcome.NEXT_FORMAT}`)
+
+	return true
+}
+
 // **A park asks only what the Issue has not answered** (joshuafolkken/kit#6531): after the schema,
 // `run_park_answered` judges the question against the Issue before any write.
 async function stop_of(request: CommentRequest, directory: string): Promise<number | undefined> {
-	if (run_park_write.is_refused(request.body)) return FAILURE_EXIT_CODE
+	const { body } = request
+
+	if (run_park_write.is_refused(body) || is_next_missing(body)) return FAILURE_EXIT_CODE
 
 	return await run_park_answered.refusal_of(request.issue_number, request.body, directory)
 }

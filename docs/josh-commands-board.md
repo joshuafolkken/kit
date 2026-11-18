@@ -149,7 +149,11 @@ A finished row leads with `✅` merged, `🏁` done, `⏩` closed by `josh issue
 
 マージせず終了した行は、記録済みの短い英語の結論を右端に出し、文全体から根拠のIssueコメントを開く。結論（ASCII、1行、80文字以内）は `issue:comment`・`issue:already-done`・`issue:measured`・`issue:premise-unmet` の `--outcome <summary>` で記録する。過去の根拠には `issue:comment --evidence-url <comment URL>` を併用する。同じIssue内に実在する信頼済みコメントだけが根拠。管理用のwithdrawコメントは結論を上書きしない。根拠なし・取得失敗では英語の代替表示になる。狭い端末では文を省略してからリンクを付け、chat/plainでは同じ可視文字をリンク制御なしで表示する。
 
-停止中のparked/decision行も同じ短い英文と根拠リンクを使うが、parkedは狭い端末でタイトルから縮める。markerのない過去の停止は `issue:comment --outcome <next action> --evidence-url <stop comment URL>` で補完する。描画時のAI要約はしない。補完は最新停止にだけ効き、承認・解除・再開を代行しない。
+停止中のparked/decision行も同じ短い英文と根拠リンクを使うが、parkedは狭い端末でタイトルから縮める。
+`run:park` は推奨の選択肢から作った次の一手（`--outcome`、上限 `issue_outcome.NEXT_LIMIT`）を必須にし marker として書く。コマンドを文章より優先し、引数を埋めた `pnpm josh …` をそのまま書く（例 `pnpm josh backlog:triage --apply 7447 --blocked-by 7839`、複数なら最初の一つ）。コマンドの無い作業だけ `parent:` / `person:` で始まる文章にする。markerのない過去の停止は `issue:comment --outcome <next action> --evidence-url <stop comment URL>` で補完する。描画時のAI要約はしない。補完は最新停止にだけ効き、承認・解除・再開を代行しない。
+`run:stalled` の park コメント（`run:merge` の park と `run:park --escalate`）は、`run_stalled.next_action` の一手を同じ marker で書く。一手は `Next:` の回復手順と同じ出どころで、最初に打つコマンドを出す。再開コマンドは `Next:` に残る。
+一手は、通常 `pnpm josh ship --log <N>`、古い hand-off・handed-off の cut は `pnpm josh run:cut --end`、escalation は `parent:` の文章。
+自身を根拠とする次の一手の marker を持つ信頼済みコメントは停止として読み、それより古い park に代わって理由になる。他のコメントを根拠にする補完と、markerのない過去の `run:stalled` コメントは停止として読まない。
 
 説明不明でも最新停止コメントへリンクする。取得失敗や起動前の停止は `Reason unavailable: inspect issue`（Issueへリンク）、停止後に `backlog:triage --adopt` の採用があれば `adopted option <n> · relaunching`（採用コメントへリンク）。リンク非対応やchat/plainは行頭のIssue番号から確認する（CLIは `pnpm josh issue:read <N>`）。
 
@@ -164,7 +168,7 @@ A queued or waiting row draws `<icon> <condition> <number> <kind> <title>  <tail
   The issue form, `#<issue> を閉じる PR のマージ後 <K> マージ`, shows `<issue>` and counts after the merged pull request that closed it.
 - `📋 <N>` — a named run's declared issue `<N>` is ahead of it, in flight or not yet started. Never on a `run:add` issue.
 - `✋` — neither `run:lane` nor `run:solo`, due, and nothing blocks it; `backlog:next` holds it alone for its judgment and offers the triaged rows.
-- `🔒 <N>` — the running issue `<N>` carries `run:solo`, so nothing starts until it merges or is parked; a waiting `run:solo` row leads with it too. `epic_solo`'s reading, as `backlog:next`'s "carries `run:solo` and is running …".
+- `🔒 <N>` — running or parked `run:solo` issue `<N>`: nothing starts until it merges, closes or loses the label; a waiting `run:solo` row leads with it too. `epic_solo`'s reading, the parked half `epic_solo_parked`'s.
 - `🧍 <N>` — a `run:solo` issue, the first among the judged, due and unblocked rows, waits for the running lane `<N>` to finish; with more, `<N>+<rest>`, the rest after the title. `epic_solo`'s reading, as `backlog:next`'s "carries `run:solo` and waits …".
 - `🙅 <N>` — ranked behind the waiting `run:solo` issue `<N>`, which nothing is offered past.
 - `📂 <N>` — a path it declares — its recorded plan, else its plan comment, else its body — overlaps one the running issue `<N>` declares, the path after the title; `backlog:next` answers "waits: its `<file>` overlaps …".

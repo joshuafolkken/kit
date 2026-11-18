@@ -9,6 +9,7 @@ import {
 	BUG_LABEL,
 	IN_PROGRESS_LABEL,
 	RUN_SOLO_LABEL,
+	RUN_STALLED_LABEL,
 } from '#scripts/issue/issue-labels'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_fixture } from './backlog-fixture'
@@ -119,6 +120,45 @@ describe('backlog:next with run:solo while a lane runs', () => {
 		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
 		expect(stdout()).toBe(`${String(CHILD)}\n${String(SECOND_CHILD)}`)
 		expect(stderr()).toContain(`#${String(HOLDER)}`)
+		expect(stderr()).toContain('stale')
+	})
+})
+
+// The open `run:solo` listing names the holder with `labels`; `in_progress` lists it as a holder too.
+function solo_listed(labels: ReadonlyArray<string>, in_progress: ReadonlyArray<string> = []): void {
+	backlog_fixture.stub_backlog({
+		opted_in: [opted_in_epic()],
+		epics: [{ number: EPIC_NUMBER, children: [CHILD, SECOND_CHILD] }],
+		children: [{ number: CHILD }, { number: SECOND_CHILD }],
+		in_progress: in_progress.length === 0 ? [] : [issue(HOLDER, CREATED_EARLIER, in_progress)],
+		solo: labels.length === 0 ? [] : [issue(HOLDER, CREATED_EARLIER, labels)],
+		stale: [HOLDER],
+	})
+}
+
+// joshuafolkken/kit#7855: parking a `run:solo` issue strips `in-progress`, and the gate still holds.
+describe('backlog:next with a parked run:solo issue', () => {
+	it('prints wait and names the parked issue and how it resumes', async () => {
+		solo_listed([RUN_SOLO_LABEL, RUN_STALLED_LABEL])
+
+		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
+		expect(stdout()).toBe(backlog_next.VERDICT_TOKENS.wait)
+		expect(stderr()).toContain(`#${String(HOLDER)}`)
+		expect(stderr()).toContain('has `run:solo` removed')
+	})
+
+	it('offers the children again once the issue no longer carries run:solo', async () => {
+		solo_listed([RUN_STALLED_LABEL])
+
+		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
+		expect(stdout()).toBe(`${String(CHILD)}\n${String(SECOND_CHILD)}`)
+	})
+
+	it('still releases a stale run:solo holder that carries no park label', async () => {
+		solo_listed([IN_PROGRESS_LABEL, RUN_SOLO_LABEL], [IN_PROGRESS_LABEL, RUN_SOLO_LABEL])
+
+		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
+		expect(stdout()).toBe(`${String(CHILD)}\n${String(SECOND_CHILD)}`)
 		expect(stderr()).toContain('stale')
 	})
 })

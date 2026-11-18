@@ -21,6 +21,7 @@ const THIRD = 13
 const HOLDER = 20
 const CREATED = '2026-09-01T00:00:00Z'
 const IDLE: BusyRead = { kind: 'idle' }
+const RESUMES = 'merges, is closed, or has `run:solo` removed'
 
 function child(number: number, labels: ReadonlyArray<string> = [], repo = REPO): EpicChild {
 	return { number, repo, state: 'OPEN', labels, blocked_by: [] }
@@ -200,6 +201,22 @@ describe('epic_solo.is_solo_wait', () => {
 
 		expect(epic_solo.is_solo_wait(waiting_notice)).toBe(true)
 		expect(epic_solo.is_solo_wait(held_notice ?? '')).toBe(true)
+	})
+
+	// joshuafolkken/kit#7855: a parked `run:solo` issue's hold is a run:solo wait too.
+	it('reads the parked-holder notice as a run:solo wait naming the issue and how it resumes', () => {
+		const parked = epic_solo.parked_message([HOLDER], REPO)
+
+		expect(epic_solo.is_solo_wait(parked)).toBe(true)
+		expect(parked).toContain(`#${String(HOLDER)}`)
+		expect(parked).toContain(RESUMES)
+	})
+
+	it('names how a running holder releases the gate, without parking', () => {
+		const held = epic_solo.gate(result([child(FIRST)]), busy([RUN_SOLO_LABEL]), REPO).notice
+
+		expect(held).toContain(RESUMES)
+		expect(held).not.toContain('is parked')
 	})
 
 	it('reads a triage notice that names run:solo as no run:solo wait', () => {

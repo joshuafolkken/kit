@@ -82,8 +82,10 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	// joshuafolkken/kit#6540), so joshuafolkken/kit#6676 split its board, lane and session commands
 	// into pages of their own, each at its smallest block.
 	// The drive's own `run:stalled` retry under `run:add --retry` (joshuafolkken/kit#7076) crossed the 53248 block.
-	{ path: 'docs/josh-commands-run.md', bytes: 57_344 },
-	// The time column's network outages beside the sleeps (joshuafolkken/kit#7867) crossed the 24576 block.
+	// `run:park`'s required `--outcome` in its example (joshuafolkken/kit#7850) crossed the 57344 block.
+	{ path: 'docs/josh-commands-run.md', bytes: 61_440 },
+	// The finished rows' icons, `⏩` already done among them (joshuafolkken/kit#7095), crossed the 20480 block.
+	// The parked row's next action from `run:park --outcome` (joshuafolkken/kit#7850) crossed the 24576 block.
 	{ path: 'docs/josh-commands-board.md', bytes: 28_672 },
 	// The `concurrent lanes` table's core-wait columns (joshuafolkken/kit#7550) crossed the 32768 block.
 	{ path: 'docs/josh-commands-lane.md', bytes: 36_864 },

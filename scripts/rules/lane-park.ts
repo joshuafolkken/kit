@@ -142,8 +142,8 @@ function records_the_park(command: string): boolean {
 // single source is `backlogrun-park.md` → "park and continue", and a second copy here would be the
 // clone `CLAUDE.md` prohibits.
 const LANE_PARK_REASON =
-	'⛔ lane child park: this session is a dispatched lane child, so a stop for a person parks first: ' +
-	'`pnpm josh run:park <N> --body-file <path>` (options, tiers, recommendation, stash — it applies ' +
+	'⛔ lane child park: a dispatched lane child parks first when it stops for a person: ' +
+	'`pnpm josh run:park <N> --body-file <path> --outcome "<next action>"` (options, tiers, recommendation, stash — it applies ' +
 	'`needs-decision`); a ' +
 	'`needs-human-review` / `already-done` stop already is. The park is the stop: no notify ' +
 	'after it. Refused once per run ' +

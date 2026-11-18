@@ -1,4 +1,5 @@
 import { NEEDS_DECISION_LABEL, RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
+import { issue_outcome } from '#scripts/issue/issue-outcome'
 import { session_language } from '#scripts/josh/session-language'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
 import { run_stalled } from '#scripts/run/park/run-stalled'
@@ -147,13 +148,18 @@ function park_comment(reason: ParkReason): string {
 	const prose = prose_of()
 	const transcript = reason.output === undefined ? '' : `\`${reason.output}\``
 
-	return [
+	const body = [
 		prose.park_head,
 		`- Why: ${reason.cause}`,
 		`- Read: ${prose.park_read}`,
 		streak_line(prose, reason.carry),
 		`- Next: ${prose.park_next(transcript, next_step_of(reason))}`,
 	].join('\n')
+
+	return issue_outcome.body_of({
+		body,
+		summary: run_stalled.next_action(reason.child, reason.cause),
+	})
 }
 
 // The progress comment, generated from the single-source carry record so the counters live in one

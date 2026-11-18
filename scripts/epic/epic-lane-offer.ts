@@ -13,6 +13,7 @@ import { epic_lane_occupancy, type OccupancyRead } from './epic-lane-occupancy'
 import { epic_rank } from './epic-rank'
 import type { EpicVerdict } from './epic-report'
 import { epic_solo } from './epic-solo'
+import { epic_solo_parked } from './epic-solo-parked'
 import { epic_solo_stale } from './epic-solo-stale'
 import { epic_triage, type TriageVerdict } from './epic-triage'
 
@@ -290,6 +291,14 @@ async function interrupt_offer(request: LaneRequest): Promise<LaneOffer | undefi
 	}
 }
 
+// A parked `run:solo` issue still open holds every offer, whatever the occupancy
+// (`epic-solo-parked.ts`).
+async function parked_offer(request: LaneRequest): Promise<LaneOffer | undefined> {
+	const notice = await epic_solo_parked.notice(request.repo)
+
+	return notice === undefined ? undefined : { children: [], verdict: WAIT_VERDICT, notice }
+}
+
 function full_notice(
 	occupancy: OccupancyRead,
 	request: LaneRequest,
@@ -338,6 +347,7 @@ async function offer_for_repo(
 	return (
 		triage_offer(pools, request) ??
 		(await interrupt_offer(request)) ??
+		(await parked_offer(request)) ??
 		(await offer_after_triage(pools, request))
 	)
 }

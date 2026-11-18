@@ -1,11 +1,11 @@
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { describe, expect, it } from 'vitest'
+import type { RunActivity } from './run-board-activity'
 import type { LaneEvent } from './run-board-lane-event'
 import { run_board_now, type NowRead } from './run-board-now'
 import { run_board_now_fixture } from './run-board-now-fixture'
 import type { Operation } from './run-board-operation'
 import type { SessionOperations } from './run-board-operation-read'
-import type { RunActivity } from './run-board-status'
 
 // joshuafolkken/kit#3757: the third line writes the newest operation of the session at work — a
 // running child's, or the session a stage is the work of — and what it wrote before where there is

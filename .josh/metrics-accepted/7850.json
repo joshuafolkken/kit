@@ -1,0 +1,9 @@
+{
+	"reason": "run:park now requires a next action: the next-action schema and refusal in code, and the board/park docs explaining the command-first format the acceptance criteria require",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 30,
+		"ai_cost.on_demand_bytes": 244,
+		"prose.long_paragraphs": 1
+	}
+}
