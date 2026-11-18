@@ -43,10 +43,20 @@ async function read_hunks(root: string, base: string): Promise<Array<Hunk>> {
 	return test_pinned_logic.all_hunks(diff)
 }
 
-async function lines_of(root: string, file: string): Promise<[string, Array<string>]> {
-	const source = await readFile(path.join(root, file), 'utf8')
+// `git grep` still C-quotes a path holding `"`, `\` or a control character, which names no file to
+// read; such a hit keeps its excerpt.
+async function source_of(root: string, file: string): Promise<string | undefined> {
+	try {
+		return await readFile(path.join(root, file), 'utf8')
+	} catch {
+		return undefined
+	}
+}
 
-	return [file, source.split('\n')]
+async function lines_of(root: string, file: string): Promise<[string, Array<string>]> {
+	const source = await source_of(root, file)
+
+	return [file, source?.split('\n') ?? []]
 }
 
 // A hit's excerpt is cut short; a value or flag is judged by its whole line, where the constant's
@@ -114,17 +124,21 @@ async function declared_elsewhere(
 }
 
 // A removed flag a code line of the working tree still writes is live — another command's, or the
-// same one moved (joshuafolkken/kit#7881); a comment line writing it is prose, not a use.
+// same one moved (joshuafolkken/kit#7881); a comment line writing it is prose, not a use, and a longer
+// flag it begins (`--period-days` for `--period`) is another flag, which `git grep -w` would match.
+async function is_live(root: string, flag: string): Promise<boolean> {
+	const { hits } = await git_grep_hits.search(flag, ['-F'], CODE_PATHSPECS, root)
+	const read = await whole_lines(root, hits)
+
+	return read.some(
+		(hit) => !prose_stale_scan.is_prose(hit) && prose_stale_values.is_use({ word: flag }, hit),
+	)
+}
+
 async function live_flags(root: string, hunks: ReadonlyArray<Hunk>): Promise<Array<string>> {
 	const code = hunks.filter((hunk) => prose_stale_scan.is_code_hunk(hunk))
 	const flags = [...new Set(code.flatMap((hunk) => prose_stale_values.flags(hunk.old_lines)))]
-	const live = await Promise.all(
-		flags.map(async (flag) => {
-			const { hits } = await git_grep_hits.search(flag, ['-F', '-w'], CODE_PATHSPECS, root)
-
-			return hits.some((hit) => !prose_stale_scan.is_prose(hit))
-		}),
-	)
+	const live = await Promise.all(flags.map(async (flag) => await is_live(root, flag)))
 
 	return flags.filter((_flag, index) => live[index] === true)
 }

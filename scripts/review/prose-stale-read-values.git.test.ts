@@ -11,6 +11,11 @@ import { prose_stale_scan } from './prose-stale-scan'
 const TIMEOUT_MS = 30_000
 const CODE = 'scripts/a.ts'
 const DOC = 'docs/a.md'
+const NON_ASCII_DOC = 'docs/日.md'
+// `git grep` prints this path C-quoted, which names no file `readFile` can open.
+const QUOTED_DOC = 'docs/say "x".md'
+// The value changed and `--period` removed from CODE's base.
+const CHANGED_CODE = "export const FILE_GUIDE = 10\nconst DAYS = args.includes('--days')\n"
 const BASE = 'HEAD'
 // Puts the value and its constant's words past the 80-character cut of a grep hit's excerpt.
 const LONG_PREAMBLE =
@@ -71,11 +76,34 @@ describe('prose_stale_read.references (values and flags)', () => {
 	it(
 		'reports the old value and the removed flag, and keeps a flag other code still parses',
 		async () => {
-			await write(CODE, "export const FILE_GUIDE = 10\nconst DAYS = args.includes('--days')\n")
+			await write(CODE, CHANGED_CODE)
 			await write(CODE.replace('a.ts', 'c.ts'), 'const FAST = false\n')
 
 			await expect(report_text()).resolves.toBe(
 				[`${DOC}:2 flag --period`, `${DOC}:1 value 8 (FILE_GUIDE now 10)`].join('\n'),
+			)
+		},
+		TIMEOUT_MS,
+	)
+
+	it(
+		'reads a non-ASCII or quoted path, and keeps no removed flag a longer live flag begins',
+		async () => {
+			await write(CODE, CHANGED_CODE)
+			await write(CODE.replace('a.ts', 'd.ts'), "const DAYS = args.includes('--period-days')\n")
+			await write(NON_ASCII_DOC, 'The FILE_GUIDE is 8.\n')
+			await write(QUOTED_DOC, '# The FILE_GUIDE is 8.\n')
+			await git(fixture.root, ['add', '--all'])
+
+			const text = await report_text()
+
+			// The quoted path's hit keeps its excerpt and, not a `.md` path, reports nothing.
+			expect(text).toBe(
+				[
+					`${DOC}:2 flag --period`,
+					`${DOC}:1 value 8 (FILE_GUIDE now 10)`,
+					`${NON_ASCII_DOC}:1 value 8 (FILE_GUIDE now 10)`,
+				].join('\n'),
 			)
 		},
 		TIMEOUT_MS,

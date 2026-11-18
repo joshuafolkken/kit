@@ -10,6 +10,8 @@ const MAX_EXCERPT_LENGTH = 80
 const ELLIPSIS = '…'
 // `git grep` exits 1 for no match; any other exit is a search that never ran.
 const GREP_NO_MATCH_EXIT = 1
+// A non-ASCII path printed as is, not C-quoted, so a hit names a file a reader can open.
+const UNQUOTED_PATHS = ['-c', 'core.quotePath=false']
 
 interface Hit {
 	path: string
@@ -58,7 +60,7 @@ async function search(
 	pathspecs: ReadonlyArray<string>,
 	root?: string,
 ): Promise<GrepResult> {
-	const location = root === undefined ? [] : ['-C', root]
+	const location = root === undefined ? UNQUOTED_PATHS : ['-C', root, ...UNQUOTED_PATHS]
 	const grep_arguments = [
 		...location,
 		'grep',
