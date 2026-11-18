@@ -11,6 +11,18 @@ const summary_schema = z
 	.max(SUMMARY_LIMIT)
 	.regex(/^[\u{20}-\u{7E}]+$/u)
 	.refine((value) => value === value.trim())
+// **A stop's next action is what to run, not prose** (joshuafolkken/kit#7850): a command starts
+// `pnpm josh` with its arguments filled in, ready to paste and run; prose is kept for work no command does,
+// led by who does it. One cap for every stop that writes a next action (`run:park`, the epic's
+// followers), sized to hold a real command such as `pnpm josh backlog:triage --apply 7447 --blocked-by 7839`.
+const NEXT_LIMIT = 64
+const NEXT_PREFIX = /^(?:pnpm josh|parent:|person:) \S/u
+const next_schema = z.string().max(NEXT_LIMIT).regex(NEXT_PREFIX).pipe(summary_schema)
+const NEXT_FORMAT = [
+	`Next action (--outcome, ASCII, at most ${String(NEXT_LIMIT)} characters) — a command before prose:`,
+	'  pnpm josh backlog:triage --apply 7447 --blocked-by 7839   (a command: arguments filled in, no leading word)',
+	'  parent: <action>   or   person: <action>                 (prose: only where no command does the work)',
+].join('\n')
 const MARKER = /^<!-- josh:outcome (?<json>[^\n]+) -->$/gmu
 const COMMENT_URL = /^https:\/\/github\.com\/[^/]+\/[^/]+\/issues\/\d+#issuecomment-\d+$(?![\s\S])/u
 const url_schema = z.string().regex(COMMENT_URL)
@@ -44,6 +56,11 @@ function record_of(body: string): z.infer<typeof outcome_schema> | undefined {
 	const json = [...body.matchAll(MARKER)].at(-1)?.groups?.['json']
 
 	return json_value.parse_with(json ?? '', outcome_schema)
+}
+
+// The body's next action, when its marker holds one in the next-action shape.
+function next_of(body: string): string | undefined {
+	return next_schema.safeParse(record_of(body)?.summary).data
 }
 
 function cited_outcome(
@@ -96,7 +113,18 @@ async function recorded(issue: number, is_merged: boolean): Promise<{ outcome?: 
 	return outcome === undefined ? {} : { outcome }
 }
 
-const issue_outcome = { body_of, from_comments, read, recorded, summary_schema, url_schema }
+const issue_outcome = {
+	NEXT_FORMAT,
+	NEXT_LIMIT,
+	body_of,
+	from_comments,
+	next_of,
+	next_schema,
+	read,
+	recorded,
+	summary_schema,
+	url_schema,
+}
 
 export { issue_outcome }
 export type { IssueOutcome }

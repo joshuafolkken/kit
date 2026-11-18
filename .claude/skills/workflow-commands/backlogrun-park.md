@@ -29,8 +29,10 @@ When a child hits something only a person can decide (→ "Only a person's judge
 child and keep going**:
 
 ```bash
-pnpm josh run:park <N> --body-file .josh/tmp/park.md   # body schema: docs/josh-commands-run.md → "josh run:park"; applies needs-decision, then releases
+pnpm josh run:park <N> --body-file .josh/tmp/park.md --outcome "<next action>"   # body schema: docs/josh-commands-run.md → "josh run:park"; applies needs-decision, then releases
 ```
+
+`--outcome` — the recommended option's next action, a filled-in `pnpm josh` command before `parent:` / `person:` prose: `issue_outcome.NEXT_FORMAT` (`scripts/issue/issue-outcome.ts`), `docs/josh-commands-board.md`.
 
 Return to step 1.
 

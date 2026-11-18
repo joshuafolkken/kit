@@ -84,7 +84,8 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	// The drive's own `run:stalled` retry under `run:add --retry` (joshuafolkken/kit#7076) crossed the 53248 block.
 	{ path: 'docs/josh-commands-run.md', bytes: 57_344 },
 	// The finished rows' icons, `⏩` already done among them (joshuafolkken/kit#7095), crossed the 20480 block.
-	{ path: 'docs/josh-commands-board.md', bytes: 24_576 },
+	// The parked row's next action from `run:park --outcome` (joshuafolkken/kit#7850) crossed the 24576 block.
+	{ path: 'docs/josh-commands-board.md', bytes: 28_672 },
 	// The `concurrent lanes` table's core-wait columns (joshuafolkken/kit#7550) crossed the 32768 block.
 	{ path: 'docs/josh-commands-lane.md', bytes: 36_864 },
 	// `cost:audit`'s dated period and usage breakdown (joshuafolkken/kit#7042) crossed the 16384 block.

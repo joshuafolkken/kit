@@ -1,5 +1,6 @@
 import { writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { issue_outcome } from '#scripts/issue/issue-outcome'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_park_cli } from './run-park-cli'
@@ -64,7 +65,10 @@ const OPTIONS = [
 const PICK = '### 推奨\n1 cheaper and reversible'
 const BODY = `## ${QUESTION}\n\n${OPTIONS}\n\n${PICK}\n`
 const BODY_FILE_FLAG = '--body-file'
-const PARK_ARGV = [ISSUE, BODY_FILE_FLAG, BODY_FILE]
+const NEXT = 'pnpm josh backlog:triage --apply 7447 --blocked-by 7839'
+const OUTCOME_FLAG = '--outcome'
+const PARK_ARGV = [ISSUE, BODY_FILE_FLAG, BODY_FILE, OUTCOME_FLAG, NEXT]
+const MARKED_BODY = issue_outcome.body_of({ body: BODY, summary: NEXT })
 const LANE_BODY = `${QUESTION}\n\n---\n- Lane directory: \`${DIRECTORY}\`\n`
 
 writeFileSync(BODY_FILE, BODY)
@@ -118,11 +122,38 @@ describe('run:park body schema', () => {
 	})
 })
 
+// joshuafolkken/kit#7850: the park writes its next action as the board's outcome marker.
+describe('run:park next action', () => {
+	it('writes the next action as the josh:outcome marker', async () => {
+		await expect(run_park_cli.run(PARK_ARGV, DIRECTORY)).resolves.toBe(0)
+		expect(apply_mock).toHaveBeenCalledWith(ISSUE, LABEL, MARKED_BODY)
+		expect(issue_outcome.next_of(MARKED_BODY)).toBe(NEXT)
+	})
+
+	it.each([
+		['no next action', []],
+		['prose with no leading word', [OUTCOME_FLAG, 'close the lane']],
+		['an overlong command', [OUTCOME_FLAG, `pnpm josh ${'x'.repeat(issue_outcome.NEXT_LIMIT)}`]],
+	])('refuses a park with %s before any write', async (_case, outcome) => {
+		await expect(
+			run_park_cli.run([ISSUE, BODY_FILE_FLAG, BODY_FILE, ...outcome], DIRECTORY),
+		).resolves.toBe(1)
+		expect(apply_mock).not.toHaveBeenCalled()
+		expect(refusal_mock).not.toHaveBeenCalled()
+	})
+
+	it('shows the next-action format on a refusal', async () => {
+		await run_park_cli.run([ISSUE, BODY_FILE_FLAG, BODY_FILE], DIRECTORY)
+
+		expect(console.error).toHaveBeenCalledWith(expect.stringContaining(issue_outcome.NEXT_FORMAT))
+	})
+})
+
 // joshuafolkken/kit#6531: the question is judged against the Issue before any write.
 describe('run:park answered question', () => {
 	it('judges the question as written, before the lane note and any write', async () => {
 		await expect(run_park_cli.run(PARK_ARGV, DIRECTORY)).resolves.toBe(0)
-		expect(refusal_mock).toHaveBeenCalledWith(ISSUE, BODY, DIRECTORY)
+		expect(refusal_mock).toHaveBeenCalledWith(ISSUE, MARKED_BODY, DIRECTORY)
 		expect(refusal_mock.mock.invocationCallOrder[0]).toBeLessThan(
 			apply_mock.mock.invocationCallOrder[0] ?? 0,
 		)
@@ -186,7 +217,7 @@ describe('run:park lane note', () => {
 		lane_note_mock.mockReturnValue(LANE_BODY)
 
 		await expect(run_park_cli.run(PARK_ARGV, DIRECTORY)).resolves.toBe(0)
-		expect(lane_note_mock).toHaveBeenCalledWith(BODY, DIRECTORY)
+		expect(lane_note_mock).toHaveBeenCalledWith(MARKED_BODY, DIRECTORY)
 		expect(apply_mock).toHaveBeenCalledWith(ISSUE, LABEL, LANE_BODY)
 	})
 })
