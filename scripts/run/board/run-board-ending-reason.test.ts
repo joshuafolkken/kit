@@ -107,6 +107,47 @@ describe('run_board_ending_reason.row_reason — a stop reason', () => {
 	})
 })
 
+// joshuafolkken/kit#7901: a ⏳ lane row says why it waits and what starts it.
+describe('run_board_ending_reason.row_reason — a waiting lane', () => {
+	const { WAITING_TAILS } = run_board_ending_reason
+	const waiting: ItemStatus = { state: 'waiting' }
+
+	it.each<[string, ReadonlyArray<string> | undefined, string]>([
+		['no blocker', undefined, WAITING_TAILS.free],
+		['a blocker in this repository', ['7228'], WAITING_TAILS.blocker],
+		['an upstream Issue', ['joshuafolkken/kit#7691'], WAITING_TAILS.upstream],
+		['an upstream Issue beside a local blocker', ['7228', 'owner/repo#3'], WAITING_TAILS.upstream],
+	])('names the next move of a retry held by %s', (_case, waits, tail) => {
+		const read = {
+			titles: new Map(),
+			labels: new Map(),
+			...(waits !== undefined && { waits: new Map([[13, waits]]) }),
+		}
+
+		expect(run_board_ending_reason.row_reason(13, waiting, read)).toStrictEqual({
+			reason: { tail },
+		})
+	})
+
+	it('keeps a recorded waiting reason', () => {
+		const read = { titles: new Map(), labels: new Map() }
+		const reason = 'held by the parent'
+		const status: ItemStatus = { state: 'waiting', reason }
+
+		expect(run_board_ending_reason.row_reason(13, status, read)).toStrictEqual({
+			reason: { tail: reason },
+		})
+	})
+
+	it('fits each tail within a running row tail width', () => {
+		const RUNNING_TAIL_WIDTH = 26
+
+		for (const tail of Object.values(WAITING_TAILS)) {
+			expect(tail.length).toBeLessThanOrEqual(RUNNING_TAIL_WIDTH)
+		}
+	})
+})
+
 // joshuafolkken/kit#7750: a missing `in-progress` is a fact, not a guessed `run:release`.
 describe('run_board_ending_reason.row_reason — no in-progress label', () => {
 	const read = { titles: new Map(), labels: new Map() }

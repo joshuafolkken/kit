@@ -1,0 +1,7 @@
+{
+	"reason": "New feature: waiting-lane tail for ⏳ rows (#7901), +18 code lines",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 18
+	}
+}

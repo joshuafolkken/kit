@@ -146,6 +146,37 @@ function stop_row_reason(status: ItemStatus): Pick<BoardRow, 'reason'> {
 	return reason === undefined ? {} : { reason }
 }
 
+// joshuafolkken/kit#7901: a ⏳ lane row no ending reason names says why it waits and what starts it.
+// Its blockers follow its title (`🔗`), so the tail names only the move that clears them: an upstream
+// Issue's close (`owner/repo#N`), a blocker's merge here, else the next free lane a retry starts in.
+const WAITING_TAILS = {
+	free: 'retry · → next free lane',
+	blocker: '→ starts on blocker merge',
+	upstream: '→ starts on upstream close',
+}
+
+function waiting_reason(waits: ReadonlyArray<string> = []): RowReason {
+	if (waits.length === 0) return { tail: WAITING_TAILS.free }
+
+	const is_upstream = waits.some((wait) => wait.includes('#'))
+
+	return { tail: is_upstream ? WAITING_TAILS.upstream : WAITING_TAILS.blocker }
+}
+
+// A row no reason was recorded for: a ⏳ wait's next move, a stall's resume, else what stopped it.
+function unrecorded_reason(
+	number: number,
+	status: ItemStatus,
+	read: RowRead,
+	waits: ReadonlyArray<string> | undefined,
+): Pick<BoardRow, 'reason'> {
+	if (status.state === 'waiting') return { reason: waiting_reason(waits) }
+
+	return is_stalled(status, read.labels.get(number))
+		? { reason: stalled_reason(number, read, waits) }
+		: stop_row_reason(status)
+}
+
 // Raw event reasons remain cacheable; only drawing selects an action from the current live state.
 function ending_row_reason(
 	number: number,
@@ -155,17 +186,13 @@ function ending_row_reason(
 	const reason = tail_of(status)
 	const waits = read.waits?.get(number)
 
-	if (reason !== undefined) {
-		const tail = park_row_reason(number, reason, read.is_backlog_live === true, waits)
+	if (reason === undefined) return unrecorded_reason(number, status, read, waits)
 
-		return {
-			reason: { tail, ...(status.outcome !== undefined && { evidence_url: status.outcome.url }) },
-		}
+	const tail = park_row_reason(number, reason, read.is_backlog_live === true, waits)
+
+	return {
+		reason: { tail, ...(status.outcome !== undefined && { evidence_url: status.outcome.url }) },
 	}
-
-	return is_stalled(status, read.labels.get(number))
-		? { reason: stalled_reason(number, read, waits) }
-		: stop_row_reason(status)
 }
 
 function row_reason(number: number, status: ItemStatus, read: RowRead): Pick<BoardRow, 'reason'> {
@@ -176,6 +203,7 @@ function row_reason(number: number, status: ItemStatus, read: RowRead): Pick<Boa
 }
 
 const run_board_ending_reason = {
+	WAITING_TAILS,
 	park_reason,
 	park_row_reason,
 	reason_of,
