@@ -12,6 +12,7 @@ const LAUNCH = { pos: 1, at: '2026-10-08T08:00:00.000Z', kind: 'child-launch', t
 const THEMED = ['--theme', 'wargames']
 const RULE = '─'
 const NAMED_CYAN = '\u{1B}[36m'
+const DEFCON_FIELD = / {2}DEFCON [\d [\]]+/u
 
 async function frame_of(argv: Array<string>): Promise<string> {
 	const { ports, frames } = harness({ ...LOCAL, events: [LAUNCH] }, [plan_titled('a')])
@@ -42,7 +43,7 @@ describe('run_board_cli.run --theme', () => {
 
 		expect(plain).toContain(RULE)
 		expect(frame).not.toContain(RULE)
-		expect(frame).toBe(plain.replaceAll(RULE, '-'))
+		expect(frame.replace(DEFCON_FIELD, '')).toBe(plain.replaceAll(RULE, '-'))
 	})
 
 	it('draws the theme JOSH_BOARD_THEME names, and --theme over it', async () => {
@@ -239,5 +240,18 @@ describe('run_board_cli.run --theme refused', () => {
 		expect(stderr).toHaveBeenCalledWith(`${run_board_cli.USAGE}\n`)
 		expect(frames).toHaveLength(0)
 		stderr.mockRestore()
+	})
+})
+
+// joshuafolkken/kit#7989: the themed header's second line ends on the alert level; no other frame has it.
+describe('run_board_cli.run --theme alert level', () => {
+	it('ends the --once header second line on DEFCON in the theme alone', async () => {
+		vi.stubEnv('FORCE_COLOR', '0')
+		const frame = await frame_of([...THEMED, '--once'])
+		const [, second] = frame.split('\n', 2)
+
+		expect(second).toMatch(/ {2}DEFCON(?: \d){0,4} \[\d\](?: \d){0,4}$/u)
+		expect(await frame_of(['--once'])).not.toContain('DEFCON')
+		expect(await frame_of([...THEMED, '--chat'])).not.toContain('DEFCON')
 	})
 })

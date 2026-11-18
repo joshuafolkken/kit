@@ -5,6 +5,7 @@ import { run_board_estimate } from './run-board-estimate'
 import { run_board_first_lane } from './run-board-first-lane'
 import { run_board_fit } from './run-board-fit'
 import type { FoundOf } from './run-board-found'
+import { run_board_header_defcon } from './run-board-header-defcon'
 import { run_board_header_names, type RunMark } from './run-board-header-names'
 import { run_board_header_time } from './run-board-header-time'
 import { run_board_issue_count, type IssueCount } from './run-board-issue-count'
@@ -120,6 +121,8 @@ interface BoardHeader
 	// Whether each issue row leads its text with its key (`run-board-row-key.ts`) — only where the board
 	// types the rows that appear, so every other frame is drawn as it was.
 	is_keyed?: boolean | undefined
+	// Whether the frame is drawn in a theme, which ends the second line on the alert level.
+	is_themed?: boolean | undefined
 	form: BoardForm
 	// The repository the plan was read for, as `owner/repo`; `undefined` before a plan is read.
 	repo: string | undefined
@@ -302,11 +305,19 @@ const MACHINE_UNKNOWN = [HEADER_ICONS.cpu, HEADER_ICONS.memory, HEADER_ICONS.swa
 	.map((icon) => `${icon} ${UNKNOWN}`)
 	.join(GAP)
 
+// The alert level a themed screen ends the machine's line on (`run-board-header-defcon.ts`).
+function defcon_part(header: BoardHeader): Array<string> {
+	if (header.is_themed !== true || header.form !== 'screen') return []
+
+	return [run_board_header_defcon.field_of(run_board_header_defcon.level_of(header))]
+}
+
 // The machine the run is on, its first figure as wide as the tally over it.
 function machine_part(counts: BoardCounts, header: BoardHeader): string {
 	const width = figure_width(total_of(counts, header))
+	const machine = run_board_machine.line_of(machine_of(header), width) ?? MACHINE_UNKNOWN
 
-	return run_board_machine.line_of(machine_of(header), width) ?? MACHINE_UNKNOWN
+	return [machine, ...defcon_part(header)].join(GAP)
 }
 
 // The lines' cells of one column, the narrower padded to the wider as the terminal counts them.
