@@ -166,8 +166,10 @@ switching `no-restricted-syntax` off.
 
 - Every code change has a corresponding test (unit or E2E) per `CLAUDE.md` Code Change Rules Step 0
 - Test titles describe behavior, not implementation
-- **Mutation check**: for the most critical test added or changed — if the key assertion/condition in
-  the implementation were inverted or removed, would it fail? If no or uncertain, rewrite it.
+- **Mutation check**: for the most critical test added or changed — would it fail on an inverted
+  condition or a changed value, an `if` with no `else` dropped, or an `&&` / `||` operand removed? If
+  no or uncertain, rewrite it. A reverted hunk or a changed branch arm no test takes is
+  `josh test:pinned`'s (`docs/josh-commands.md` → "`josh test:pinned`").
 - **Requirement check**: does the test verify the behavior the issue/task describes, or only that code
   runs without error?
 - A `Removed tests` row already written as `置き換え` → a rename the check matched, not a finding

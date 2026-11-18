@@ -46,6 +46,18 @@ describe('run_board_header_names.names_of', () => {
 		expect(names().at(-1)).toBe('  [kit](home)')
 	})
 
+	it('draws 🔊 after the name while the sound is on', () => {
+		expect(names({ is_sound_on: true })[0]).toBe(`▶ [josh-board](${KIT_URL}) 🔊`)
+	})
+
+	it('draws 🔇 after the name while the sound is off', () => {
+		expect(names({ is_sound_on: false })[0]).toBe(`▶ [josh-board](${KIT_URL}) 🔇`)
+	})
+
+	it('draws no sound mark where the board reads no sound switch', () => {
+		expect(names()[0]).not.toMatch(/[🔊🔇]/u)
+	})
+
 	it('draws the names plain where the frame opens no links', () => {
 		expect(names({ kit_version: VERSION, comment_link: undefined }).slice(0, -1)).toStrictEqual([
 			'▶ josh-board',

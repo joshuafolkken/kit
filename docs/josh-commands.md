@@ -399,7 +399,7 @@ pnpm josh test:pinned --reasoned            # mark the run on its lane ledger ro
 
 <!-- /usage -->
 
-Exits non-zero when any checked hunk is unpinned; an unchecked hunk alone does not fail the run.
+Exits non-zero when any checked hunk is unpinned; an unchecked hunk alone does not fail the run. An arm no test takes: `unpinned <file>:<line> <arm>`.
 
 Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh test:pinned` in detail".
 
