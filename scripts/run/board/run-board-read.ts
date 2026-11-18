@@ -7,6 +7,7 @@ import { lane_ledger } from '#scripts/lane/lane-ledger'
 import type { TableRead } from '#scripts/lane/lane-process-table'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import type { LaneStateRecord } from '#scripts/lane/lane-state'
+import { launch_timing } from '#scripts/lane/launch-timing'
 import { stamped_memo } from '#scripts/lib/stamped-memo'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
@@ -120,6 +121,7 @@ interface LocalRead {
 // `git` subprocess the redraw would wait on (joshuafolkken/kit#4263). A failed resolve is forgotten,
 // so a `git` that timed out once is asked again on the next redraw rather than failing every one.
 const main_roots = stamped_memo.create<Promise<string>>()
+const { timing } = launch_timing
 
 async function main_root(): Promise<string> {
 	try {
@@ -334,23 +336,43 @@ async function roots_here(
 		: { root: run_board_single.root_of(root, events), ended_roots }
 }
 
+async function main_lanes(): Promise<Array<LaneInfo>> {
+	return await lane_registry.list_lanes(await main_root())
+}
+
+// Each read `read_local` awaits, timed for `run:board --timing`; a module's read is looked up at the
+// call, so a test's spy on it is the one called.
+const read_repository = timing(
+	'local: repository',
+	async () => await run_carry.repository_directory(),
+)
+const read_span = timing(
+	'local: span',
+	async (repository: string | undefined, table?: TableRead) =>
+		await run_board_span_read.span_here(repository, table),
+)
+const read_lanes = timing('local: lanes', main_lanes)
+const read_roots = timing('local: roots', roots_here)
+const read_span_events = timing('local: events', span_events_here)
+const read_room = timing('local: room', lane_room_of)
+
 // `undefined` when no run has started here. The lane count reads `table`, the redraw's process
 // snapshot, so it agrees with the usage columns.
 async function read_local(table?: TableRead): Promise<LocalRead | undefined> {
-	const repository = await run_carry.repository_directory()
+	const repository = await read_repository()
 	const { span, root, resume, transcript, roots, carry, is_stranded, is_session_active } =
-		await run_board_span_read.span_here(repository, table)
+		await read_span(repository, table)
 
 	if (repository === undefined || span === undefined) return undefined
 
 	const events = run_event_tail.read_events(run_event_stream.target_of(repository))
-	const lanes = await lane_registry.list_lanes(await main_root())
+	const lanes = await read_lanes()
 	const lane_read = lanes_here(lanes, repository, events, span.started_ms)
 
 	return {
-		...span_fields(span, await roots_here(span, root, events)),
+		...span_fields(span, await read_roots(span, root, events)),
 		scope: run_board_scope.scope_of(span.invocation, carry?.added),
-		...(await span_events_here(events, span, table, carry)),
+		...(await read_span_events(events, span, table, carry)),
 		throughput: run_board_throughput.rows_of(events, Date.now()),
 		lanes: lanes.map((lane) => lane.issue),
 		...lane_read,
@@ -360,7 +382,7 @@ async function read_local(table?: TableRead): Promise<LocalRead | undefined> {
 		is_stranded,
 		is_session_active,
 		operations: run_board_operation_read.read(sources_of(repository, lanes, transcript)),
-		...(await lane_room_of(lanes, lane_read.lane_states, table)),
+		...(await read_room(lanes, lane_read.lane_states, table)),
 		...records_here(repository, events),
 	}
 }

@@ -58,7 +58,7 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Draw a live board of the running backlogrun, redrawn every second',
 		category: 'AI tools',
 		reference: [
-			`[--once | --chat [--fresh] | --every <minutes>] [${BOARD_THEME}]`,
+			`[--once | --chat [--fresh] | --every <minutes>] [${BOARD_THEME}] [--timing]`,
 			'automation',
 			['files', 'network'],
 		],
@@ -76,6 +76,7 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 					note: 'the --chat frame as a 📊 Progress Telegram every 5 minutes, until the run ends',
 				},
 				{ arguments: BOARD_THEME, note: 'cyan phosphor text and dashed rules' },
+				{ arguments: '--once --timing', note: 'one frame, then how long each phase of it took' },
 			],
 			flags: [
 				{
@@ -102,6 +103,11 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 					names: [BOARD_THEME],
 					description:
 						'draws uncolored text in phosphor cyan, rules as `-`; `JOSH_BOARD_THEME=wargames` sets it for every board (`backlogrun` too), `--theme` wins. A live board types its opening line, reveals its first frame line by line (a key skips it), then types each new issue row, `█` after it. Unknown names are refused; `--chat` and `--every` never take it.',
+				},
+				{
+					names: ['--timing'],
+					description:
+						'after the `--once` frame, or once a live board leaves its screen, writes how long each phase of the first frame took (ms). `--chat` and `--every` ignore it.',
 				},
 			],
 		},
