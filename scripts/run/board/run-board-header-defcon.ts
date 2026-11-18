@@ -1,6 +1,6 @@
 import type { RunActivity } from './run-board-activity'
 import { run_board_labels, type Paint } from './run-board-labels'
-import { run_board_layout, type BoardLayout } from './run-board-layout'
+import { run_board_layout, type BoardLayout, type BoardRow } from './run-board-layout'
 import type { QuotaHold } from './run-board-render-quota'
 
 // The alert level a themed board draws at the end of the header's second line, `DEFCON 5 4 [3] 2 1`:
@@ -19,17 +19,26 @@ interface DefconRead {
 	read_failed_ms?: number | undefined
 	layout: BoardLayout | undefined
 	lane_limit?: number | undefined
+	// Lanes holding a place under the limit, an earlier run's included.
+	occupied_count?: number | undefined
 }
 
 function layout_of(read: DefconRead): BoardLayout {
 	return read.layout ?? run_board_layout.EMPTY_LAYOUT
 }
 
+// Lanes holding a place: the read count where there is one, else the rows running here.
+function occupied_of(read: DefconRead): number {
+	return (
+		read.occupied_count ?? layout_of(read).active.filter((row) => row.state === 'running').length
+	)
+}
+
 // Lanes the limit leaves free: negative past it, none where no limit was read.
 function spare_lanes(read: DefconRead): number {
-	const running = layout_of(read).active.filter((row) => row.state === 'running').length
+	const occupied = occupied_of(read)
 
-	return (read.lane_limit ?? running) - running
+	return (read.lane_limit ?? occupied) - occupied
 }
 
 // 1: the whole run is held — stopped, out of its usage, or blind to its own reads.
@@ -44,11 +53,16 @@ function is_asking(read: DefconRead): boolean {
 	return run_board_layout.people_of(layout_of(read)).length > 0
 }
 
-// 3: a `P1` waits while a lane is free.
+// A `P1` a free lane could take: none of its blockers left standing.
+function is_ready_critical(row: BoardRow): boolean {
+	return row.priority === 'critical' && row.waits.length === 0
+}
+
+// 3: a `P1` a lane could take waits while one is free.
 function is_critical_idle(read: DefconRead): boolean {
 	const queued = run_board_layout.queued_rows(layout_of(read))
 
-	return spare_lanes(read) > 0 && queued.some((row) => row.priority === 'critical')
+	return spare_lanes(read) > 0 && queued.some((row) => is_ready_critical(row))
 }
 
 // 4: more lanes run than the limit allows.

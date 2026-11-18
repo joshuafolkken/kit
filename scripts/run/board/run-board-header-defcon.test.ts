@@ -102,6 +102,19 @@ describe('run_board_header_defcon.level_of', () => {
 	})
 })
 
+describe('run_board_header_defcon.level_of on held seats and blocked P1s', () => {
+	it('counts an earlier run lane as a held seat', () => {
+		expect(level({ active: ONE, queued: P1_QUEUED }, { occupied_count: LANES })).toBe(CALM)
+		expect(level({ active: ONE }, { occupied_count: LANES + 1 })).toBe(OVER_LIMIT)
+	})
+
+	it('raises nothing on a P1 with standing blockers beside a free lane', () => {
+		const blocked = { ...row(91, 'waiting', 'critical'), waits: ['#5'] }
+
+		expect(level({ active: ONE, queued: [{ kind: 'row', row: blocked }] })).toBe(CALM)
+	})
+})
+
 describe('run_board_header_defcon.field_of', () => {
 	it('brackets the current level alone, from 5 down', () => {
 		expect(stripVTControlCharacters(field_of(CRITICAL_IDLE))).toBe('DEFCON 5 4 [3] 2 1')
