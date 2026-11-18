@@ -38,6 +38,8 @@ const FAILURE_EXIT_CODE = 1
 const AGENT_FLAG = '--agent'
 const LONE_FLAGS: ReadonlySet<string> = new Set(['--stop', '--restart'])
 const ISSUE_TOKEN = /#(\d+)/u
+// The line `kickoff new …` — `kickoff #N` plans an existing Issue instead.
+const KICKOFF_NEW_LINE = /^kickoff\s+new(?:\s|$)/u
 const USAGE =
 	'Usage: josh run:handoff kickoff|fullrun|halfrun|prrun [N|new ...] --brief-file <path> | retrospective | backlogrun [...]'
 // `josh backlogrun --agent` names a provider by its CLI.
@@ -143,9 +145,7 @@ function started_line({ handoff, built }: Started): string {
 	return `run:handoff: \`${handoff.line}\` → ${provider} ${model} / ${effort} (${built.profile.role})`
 }
 
-function result_lines(log: string): ReadonlyArray<string> {
-	const message = run_handoff_final.final_message(log)
-
+function result_lines(message: string | undefined): ReadonlyArray<string> {
 	if (message === undefined) return ['final message: none — read the log']
 
 	const urls = run_handoff_final.github_urls(message)
@@ -161,12 +161,37 @@ function closed_retrospective(started: Started, ports: HandoffPorts): number {
 	return refuse('the retrospective unit ended without run:carry --retrospective', ports)
 }
 
-function waited_exit(started: Started, exit_code: number | null, ports: HandoffPorts): number {
+// A `kickoff new` child can end cleanly without filing — a cut-off `issue:file` — so its success is the
+// created Issue's URL in its final message, which its prompt asks for (`run-handoff-launch.ts`).
+function filed_kickoff(started: Started, message: string | undefined, ports: HandoffPorts): number {
+	if (run_handoff_final.names_issue(message)) return SUCCESS_EXIT_CODE
+
+	return refuse(
+		[
+			'kickoff new ended without a created Issue URL — nothing is confirmed filed;',
+			`read the log: ${started.log}`,
+			'A cut-off issue:file may still have created it: before filing again, search for it with',
+			'`gh issue list --search "<title>" --state all`.',
+		].join('\n'),
+		ports,
+	)
+}
+
+function waited_exit(
+	started: Started,
+	exit_code: number | null,
+	message: string | undefined,
+	ports: HandoffPorts,
+): number {
 	if (started.handoff.keyword === run_handoff_args.RETROSPECTIVE_KEYWORD) {
 		return closed_retrospective(started, ports)
 	}
 
-	return exit_code === SUCCESS_EXIT_CODE ? SUCCESS_EXIT_CODE : FAILURE_EXIT_CODE
+	if (exit_code !== SUCCESS_EXIT_CODE) return FAILURE_EXIT_CODE
+
+	return KICKOFF_NEW_LINE.test(started.handoff.line)
+		? filed_kickoff(started, message, ports)
+		: SUCCESS_EXIT_CODE
 }
 
 async function waited(started: Started, ports: HandoffPorts): Promise<number> {
@@ -174,13 +199,13 @@ async function waited(started: Started, ports: HandoffPorts): Promise<number> {
 
 	if (result.kind === 'failed') return refuse(`could not start: ${result.note}`, ports)
 
-	const lines = result_lines(ports.read_text(started.log) ?? '')
+	const message = run_handoff_final.final_message(ports.read_text(started.log) ?? '')
 
-	for (const line of lines) ports.write(line)
+	for (const line of result_lines(message)) ports.write(line)
 
 	ports.write(`exit: ${String(result.exit_code)}`)
 
-	return waited_exit(started, result.exit_code, ports)
+	return waited_exit(started, result.exit_code, message, ports)
 }
 
 // The issue the child's `run:entry` claims under: the line's first `#N`, else an unnumbered run.

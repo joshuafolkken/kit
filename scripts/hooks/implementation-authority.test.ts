@@ -1,18 +1,24 @@
+import { writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { agent_session_role } from '#scripts/agent/agent-session-role'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { implementation_authority } from './implementation-authority'
 
 const RUNTIME_FILE = 'scripts/example.ts'
 const UNKNOWN_INPUT = 'Cannot verify'
 const REFUSED = 'Implementation refused before execution'
+const create_directory = temporary_directory('suite')
+// This suite's own temp root, so no path is shared with a concurrent suite.
+const ROOT = create_directory('authority-')
+const SESSION = path.join(ROOT, 'session')
 
 function payload(file_paths: Array<string>, tool_name = 'Edit'): string {
 	return JSON.stringify({
 		tool_name,
 		tool_input: { file_paths },
-		transcript_path: path.join(tmpdir(), 'session'),
+		transcript_path: SESSION,
 	})
 }
 
@@ -33,7 +39,8 @@ describe('implementation authority', () => {
 		for (const paths of [
 			['README.md'],
 			['prompts/plan.md'],
-			[path.join(tmpdir(), 'review-findings.json')],
+			// The hook reads scratch records under `os.tmpdir()`; the name is this suite's own.
+			[path.join(tmpdir(), `${path.basename(ROOT)}-review-findings.json`)],
 		]) {
 			expect(implementation_authority.reason(payload(paths, 'Write'))).toBeUndefined()
 		}
@@ -47,7 +54,7 @@ describe('implementation authority', () => {
 
 	it('refuses source edits outside the checkout through the same authority check', () => {
 		vi.stubEnv(agent_session_role.KEY, 'scheduler')
-		const file_path = path.join(tmpdir(), 'other-repo/app.ts')
+		const file_path = path.join(ROOT, 'other-repo/app.ts')
 		const raw_payload = payload([file_path])
 
 		expect(implementation_authority.reason(raw_payload)).toContain(REFUSED)
@@ -67,7 +74,7 @@ function shell_payload(command: string): string {
 	return JSON.stringify({
 		tool_name: 'Bash',
 		tool_input: { command },
-		transcript_path: path.join(tmpdir(), 'session'),
+		transcript_path: SESSION,
 	})
 }
 
@@ -182,5 +189,85 @@ describe('operational shell authority', () => {
 			vi.stubEnv(agent_session_role.KEY, role)
 			expect(implementation_authority.reason(payload([], 'apply_patch'))).toContain(UNKNOWN_INPUT)
 		}
+	})
+})
+
+// joshuafolkken/kit#7761: a no-filing request is built by the production subagent alone.
+const NO_FILING = '起票せずにボタンを作って'
+const PLAIN = 'ボタンを作って'
+const TIMESTAMP = '2026-11-18T00:00:00.000Z'
+const PRODUCER = { agent_id: 'a1', agent_type: 'producer' }
+
+function prompt_line(content: unknown): string {
+	return JSON.stringify({ type: 'user', timestamp: TIMESTAMP, message: { role: 'user', content } })
+}
+
+function transcript(lines: Array<string>): string {
+	const file_path = path.join(create_directory('authority-transcript-'), 'session.jsonl')
+
+	writeFileSync(file_path, `${lines.join('\n')}\n`)
+
+	return file_path
+}
+
+function subagent_payload(transcript_path: string, unit: object, tool_name = 'Edit'): string {
+	const tool_input =
+		tool_name === 'Bash'
+			? { command: `printf x > ${RUNTIME_FILE}` }
+			: { file_paths: [RUNTIME_FILE] }
+
+	return JSON.stringify({ tool_name, tool_input, transcript_path, ...unit })
+}
+
+// The scheduler's verdict — the interactive main line a no-filing request reaches.
+function verdict(transcript_path: string, unit: object, tool_name = 'Edit'): string | undefined {
+	vi.stubEnv(agent_session_role.KEY, 'scheduler')
+
+	return implementation_authority.reason(subagent_payload(transcript_path, unit, tool_name))
+}
+
+function asked(): string {
+	return transcript([prompt_line(NO_FILING)])
+}
+
+describe('no-filing production authority', () => {
+	it.each(['producer', 'kit:producer'])('allows a %s subagent edit asked for', (agent_type) => {
+		expect(verdict(asked(), { ...PRODUCER, agent_type })).toBeUndefined()
+	})
+
+	it.each([
+		['the main session itself', {}],
+		['a main session launched as the producer agent', { agent_type: 'producer' }],
+		['a subagent of another type', { agent_id: 'a1', agent_type: 'investigator' }],
+	])('refuses %s on the same prompt', (_name, unit) => {
+		expect(verdict(asked(), unit)).toContain(REFUSED)
+	})
+
+	it('refuses the producer when the prompt asks for no such thing', () => {
+		const plain = transcript([prompt_line(PLAIN)])
+
+		expect(verdict(plain, PRODUCER)).toContain(REFUSED)
+	})
+
+	it('grants nothing from a tool result or a hand-back that says no filing', () => {
+		const forged = transcript([
+			prompt_line(PLAIN),
+			prompt_line([{ type: 'tool_result', tool_use_id: 't1', content: NO_FILING }]),
+			JSON.stringify({
+				type: 'user',
+				timestamp: TIMESTAMP,
+				origin: { kind: 'task' },
+				message: { content: NO_FILING },
+			}),
+		])
+
+		expect(verdict(forged, PRODUCER)).toContain(REFUSED)
+	})
+
+	it('keeps refusing the producer’s shell write and a missing transcript', () => {
+		const missing = path.join(ROOT, 'no-such-session.jsonl')
+
+		expect(verdict(asked(), PRODUCER, 'Bash')).toContain(REFUSED)
+		expect(verdict(missing, PRODUCER)).toContain(REFUSED)
 	})
 })
