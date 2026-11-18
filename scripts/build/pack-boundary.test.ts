@@ -104,12 +104,13 @@ const SHIPPED_UNREACHABLE = new Set([
 	'scripts/issue/issue-sources.ts',
 	// #7351 stages the josh.worker resolver; remove this entry when #7353 launches lanes through it.
 	'scripts/agent/agent-worker-profile.ts',
-	// #7943, #7944, #7946 and #7949 stage the PCM synth, its WAV cache, the cue definitions and the
-	// transition picker; remove these entries when #7951 wires sound cues into run:board.
+	// #7943, #7944, #7946, #7949 and #7947 stage the PCM synth, its WAV cache, the cue definitions, the
+	// transition picker and the replay rule; remove these entries when #7951 wires sound cues into run:board.
 	'scripts/run/board/run-board-sound-synth.ts',
 	'scripts/run/board/run-board-sound-wav.ts',
 	'scripts/run/board/run-board-sound-cues.ts',
 	'scripts/run/board/run-board-sound-transition.ts',
+	'scripts/run/board/run-board-sound-repeat.ts',
 ])
 
 interface PackedEntry {

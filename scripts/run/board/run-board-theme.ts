@@ -2,16 +2,16 @@ import { run_board_labels, type Paint } from './run-board-labels'
 import type { BoardPorts } from './run-board-state'
 
 // joshuafolkken/kit#7934: a theme for the board a person watches — `wargames` draws the text no color
-// is given in phosphor green and every rule as a run of `-`, so each character of a line shows. It is
-// put on the frame as it is written, once, so no render module carries it; a color a render module
-// gives (red, yellow, …) is kept, the green resumed after it.
+// is given in the cyan glow of the film's terminal phosphor and every rule as a run of `-`, so each
+// character of a line shows. It is put on the frame as it is written, once, so no render module carries
+// it; a color a render module gives (red, yellow, …) is kept, the cyan resumed after it.
 
 const THEME_FLAG = '--theme'
 const THEME_ENV = 'JOSH_BOARD_THEME'
 const THEMES = ['wargames'] as const
 const THEME_NAMES: ReadonlySet<string> = new Set(THEMES)
-// The green of a NORAD console's phosphor in 24-bit color, else the palette's own green.
-const PHOSPHOR: Paint = { rgb: '51;255;51', named: 'green' }
+// The cyan of the film terminal's phosphor glyph core in 24-bit color, else the palette's own cyan.
+const PHOSPHOR: Paint = { rgb: '62;236;225', named: 'cyan' }
 const RULE = '─'
 const DASH = '-'
 // The escapes that end a color and fall back to the terminal's default foreground: the default
@@ -73,15 +73,15 @@ function refusal(argv: ReadonlyArray<string>, environment: NodeJS.ProcessEnv): s
 	return `${THEME_ENV}=${environment[THEME_ENV] ?? ''} names no theme (${THEMES.join(', ')})\n`
 }
 
-// The escape that opens the green, as `painted` draws it — `''` where stdout draws no color, so the
-// theme draws no escape where the board's own colors would not.
-function green_open(): string {
+// The escape that opens the phosphor color, as `painted` draws it — `''` where stdout draws no color,
+// so the theme draws no escape where the board's own colors would not.
+function phosphor_open(): string {
 	const sample = run_board_labels.painted(PHOSPHOR, DASH)
 
 	return sample.slice(0, sample.indexOf(DASH))
 }
 
-function greened(open: string, line: string): string {
+function lit(open: string, line: string): string {
 	if (open === '' || line === '') return line
 
 	const resumed = line
@@ -95,13 +95,13 @@ function greened(open: string, line: string): string {
 
 function restyle(theme: Theme | undefined, frame: string): string {
 	if (theme === undefined) return frame
-	const open = green_open()
+	const open = phosphor_open()
 
 	return frame
 		.split(RULE)
 		.join(DASH)
 		.split('\n')
-		.map((line) => greened(open, line))
+		.map((line) => lit(open, line))
 		.join('\n')
 }
 
