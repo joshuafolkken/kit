@@ -111,7 +111,24 @@ describe('run_board_status.statuses_of withdrawn', () => {
 			reason: 'superseded',
 		})
 	})
+})
 
+// joshuafolkken/kit#7983: the #7945 order — a park, then the person's withdrawal of it.
+describe('run_board_status.statuses_of withdrawn after a park', () => {
+	it('reads a parked child a person then withdrew as withdrawn, without the park outcome', () => {
+		const events = [
+			event_at(1, T0, KIND.CHILD_LAUNCH, LAUNCH_3409),
+			event_at(2, T1, KIND.PARK, '#3409 parked (needs-decision)'),
+			event_at(3, T2, KIND.WITHDRAW, '#3409 withdrawn by a person: ships with #3415'),
+		]
+		const status = run_board_status.statuses_of(events, NO_LANES).get(3409)
+
+		expect(status).toMatchObject({ state: 'withdrawn', reason: 'ships with #3415' })
+		expect(status).not.toHaveProperty('outcome')
+	})
+})
+
+describe('run_board_status.statuses_of park reasons', () => {
 	// joshuafolkken/kit#4045: the park that ended a child keeps its reason; a bare one keeps none.
 	it('keeps the reason of the park that ended a child, and none for a bare park', () => {
 		const events = [

@@ -1,11 +1,22 @@
 import { describe, expect, it } from 'vitest'
 import { run_board_intro, type IntroPorts } from './run-board-intro'
 import type { KeyReading } from './run-board-keys'
+import { run_board_typing } from './run-board-typing'
 
 // joshuafolkken/kit#7927: a live board types its line a letter at a time and holds it before the first
 // frame, which a key skips; the first read runs meanwhile and is handed over only once the line is done.
 
-const { HOLD_MS, LETTER_MS, LINE, after, play } = run_board_intro
+const { ERASE_LINE_END, HOLD_MS, LETTER_MS, LINE, LINE_START, after, play } = run_board_intro
+const { CURSOR } = run_board_typing
+
+function line_of(shown: string): string {
+	return `${LINE_START}${shown}${ERASE_LINE_END}`
+}
+
+async function instant(): Promise<void> {
+	await Promise.resolve()
+}
+
 const READ = 'read'
 const NO_KEYS: KeyReading = { folded: undefined }
 
@@ -98,8 +109,7 @@ describe('run_board_intro.play', () => {
 		})
 
 		await play(ports, NO_KEYS)
-		expect(written.join('')).toBe(LINE)
-		expect(written.slice(0, LINE.length).every((text) => text.length === 1)).toBe(true)
+		expect(written).toHaveLength(LINE.length + 1)
 		expect(slept).toStrictEqual([...Array.from(LINE, () => LETTER_MS), HOLD_MS])
 	})
 
@@ -117,8 +127,31 @@ describe('run_board_intro.play', () => {
 
 		press()
 		await pending
-		expect(written).toStrictEqual([LINE[0]])
+		expect(written).toStrictEqual([line_of(`${LINE.slice(0, 1)}${CURSOR}`)])
 		expect(released()).toBe(true)
+	})
+})
+
+// joshuafolkken/kit#8000: each beat rewrites the line with a block cursor after the letters typed so far;
+// the last letter drops it, and the hold shows none.
+describe('run_board_intro.play cursor', () => {
+	it('rewrites the line with a cursor after each letter, and drops it on the last letter', async () => {
+		const { written, ports } = recorded(instant)
+
+		await play(ports, NO_KEYS)
+		const typing = Array.from(LINE.slice(0, -1), (_letter, index) =>
+			line_of(`${LINE.slice(0, index + 1)}${CURSOR}`),
+		)
+
+		expect(written.slice(0, LINE.length)).toStrictEqual([...typing, line_of(LINE)])
+	})
+
+	it('shows no cursor while it holds the line', async () => {
+		const { written, ports } = recorded(instant)
+
+		await play(ports, NO_KEYS)
+		expect(written.at(-1)).toBe('')
+		expect(written.at(-2)?.includes(CURSOR)).toBe(false)
 	})
 })
 

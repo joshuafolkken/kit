@@ -300,3 +300,18 @@ describe('epic_add.add_children — the relation a position replaces', () => {
 		expect(mocked_comment.mock.calls[0]?.[1]).toBe(RECORD)
 	})
 })
+
+describe('epic_add.add_children — --chain', () => {
+	it('writes the declared join into the epic body', async () => {
+		vi.spyOn(console, 'info').mockImplementation(() => undefined)
+		stub_ordered_epic()
+
+		await epic_add.add_children({
+			epic_number: EPIC_NUMBER,
+			children: [CHILD],
+			chains: [[894, 891]],
+		})
+
+		expect(mocked_edit.mock.calls[0]?.[1]).toContain('#894 -> #891')
+	})
+})

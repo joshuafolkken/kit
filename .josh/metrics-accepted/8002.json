@@ -1,0 +1,7 @@
+{
+	"reason": "Moving the row-drawing functions into run-board-render-row.ts adds that module's own imports and constant bindings (+28 code lines); behavior unchanged",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 28
+	}
+}

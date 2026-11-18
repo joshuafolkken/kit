@@ -1,7 +1,7 @@
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { session_cite } from '#scripts/issue/session-cite'
 import { cli_body } from '#scripts/josh/cli-body'
-import type { InsertKind, InsertPosition } from './epic-chains'
+import { epic_chains, type InsertKind, type InsertPosition } from './epic-chains'
 import { epic_cli_argv, type EpicArgv, type FormFlags } from './epic-cli-argv'
 import { epic_cli_chain, type ChainRead } from './epic-cli-chain'
 import { epic_cli_decide } from './epic-cli-decide'
@@ -54,6 +54,7 @@ const CHECK_FORM: FormFlags = { switches: [] }
 const ADD_FORM: FormFlags = {
 	switches: [ADD_FLAG],
 	value_flags: [BEFORE_FLAG, AFTER_FLAG, ORDER_BEFORE_FLAG, ORDER_AFTER_FLAG, DECISION_FLAG],
+	list_flags: [epic_cli_chain.CHAIN_FLAG],
 }
 
 const { count_flag, is_switch_set, is_value_unusable, positionals_of, read_flag_value, read_form } =
@@ -159,10 +160,11 @@ function parse_promote_arguments(argv: ReadonlyArray<string>): PromoteArguments 
 	return parsed === undefined ? undefined : to_promote_arguments(parsed)
 }
 
-// `--add <E> <N...> [--before <M> | --after <M> | --order-before <M> | --order-after <M>]`: the epic
-// to insert into, then the children. The epic comes first for the same reason it does under
-// `--promote`, so the children stay a bare list of numbers.
-interface AddArguments {
+// `--add <E> <N...> [--before <M> | --after <M> | --order-before <M> | --order-after <M> |
+// --chain "#A -> #B" ...]`: the epic to insert into, then the children. The epic comes first for the
+// same reason it does under `--promote`, so the children stay a bare list of numbers. `--chain` beside
+// a positioning flag is refused: both would decide where the dependency goes.
+interface AddArguments extends ChainRead {
 	epic_number: number
 	children: Array<number>
 	position?: InsertPosition | undefined
@@ -248,6 +250,20 @@ function parse_position(parsed: EpicArgv): PositionOutcome {
 	}
 }
 
+interface PlacedPosition {
+	position?: InsertPosition | undefined
+	is_order_only?: boolean | undefined
+}
+
+// The positioning flag that names `position` — `--before`, `--order-after`, … — or `undefined` with
+// no position. Read back from the parsed value, so the refusal beside `--chain` and the cross-repository
+// suggestion both name the flag the person typed.
+function to_position_flag(placed: PlacedPosition): string | undefined {
+	if (placed.position === undefined) return undefined
+
+	return `${placed.is_order_only === true ? '--order-' : '--'}${placed.position.kind}`
+}
+
 // Whether *this* is why the insertion could not be read, so the refusal can say so. Without it the
 // caller prints the generic requirements line, and a shell that expanded `--decision-file $REC` to
 // nothing is answered with "an epic number and at least one child issue number are required" — advice
@@ -262,11 +278,14 @@ function to_add_arguments(parsed: EpicArgv): AddArguments | undefined {
 	const outcome = parse_position(parsed)
 	if (outcome.is_refused) return undefined
 
+	const chain_subject = { is_ordered: false, rival_flag: to_position_flag(outcome) }
+
 	return {
 		...subject,
 		position: outcome.position,
 		is_order_only: outcome.is_order_only,
 		decision_path: read_flag_value(parsed, DECISION_FLAG),
+		...epic_cli_chain.read_chains(parsed, chain_subject),
 	}
 }
 
@@ -308,15 +327,18 @@ function find_cross_repo_add_target(argv: ReadonlyArray<string>): CrossRepoAddTa
 // Rebuilt from the parsed values rather than echoed from `argv`, so the suggested command is exactly
 // what the other checkout would read — and carries the position, which is the one part of the
 // instruction the epic itself does not record.
+// The order-only prefix rides along, since it is what decides whether the other checkout writes a
+// dependency — a suggestion that dropped it would be a different instruction. So do the `--chain`
+// declarations, for the same reason.
 function format_add_arguments(local: AddArguments): string {
-	const { position } = local
-	// The order-only prefix rides along, since it is what decides whether the other checkout writes a
-	// dependency — a suggestion that dropped it would be a different instruction.
-	const prefix = local.is_order_only === true ? '--order-' : '--'
-	const suffix =
-		position === undefined ? '' : ` ${prefix}${position.kind} ${String(position.target)}`
+	const flag = to_position_flag(local)
+	const position =
+		flag === undefined || local.position === undefined ? [] : [flag, String(local.position.target)]
+	const chains = epic_chains
+		.render_chains(local.chains)
+		.flatMap((line) => [epic_cli_chain.CHAIN_FLAG, `"${line}"`])
 
-	return `${[local.epic_number, ...local.children].map(String).join(' ')}${suffix}`
+	return [local.epic_number, ...local.children, ...position, ...chains].map(String).join(' ')
 }
 
 // **`--decision-file` is named rather than relayed**. The suggestion is a

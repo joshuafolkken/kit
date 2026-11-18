@@ -6,6 +6,7 @@ import { run_board_intro } from './run-board-intro'
 import type { IssueCount } from './run-board-issue-count'
 import type { BoardPlan } from './run-board-layout'
 import type { BoardPorts } from './run-board-state'
+import { run_board_typing } from './run-board-typing'
 
 // joshuafolkken/kit#3430: the command's arguments and its terminal. What one redraw reads and draws is
 // `run-board-tick.test.ts`'s (joshuafolkken/kit#3444).
@@ -16,6 +17,7 @@ const ENTER = `${ESCAPE}[?1049h${ESCAPE}[?25l`
 const LEAVE = `${ESCAPE}[?25h${ESCAPE}[?1049l`
 const RUN_MARK = '■ josh-board'
 const INTRO_LINE = run_board_intro.LINE
+const TYPING_CURSOR = run_board_typing.CURSOR
 const LANE_ROW = '  🔍 1°00′00″ 1°00′00″ 1       a'
 const LAUNCH = { pos: 1, at: '2026-10-08T08:00:00.000Z', kind: 'child-launch', text: '#1 a' }
 
@@ -158,7 +160,19 @@ describe('run_board_cli.run intro', () => {
 		const first = frames.findIndex((frame) => frame.includes(RUN_MARK))
 
 		expect(frames[0]).toBe(ENTER)
-		expect(frames.slice(1, first).join('')).toBe(INTRO_LINE)
+		expect(stripVTControlCharacters(frames[first - 2] ?? '')).toBe(`\r${INTRO_LINE}`)
+	})
+
+	// joshuafolkken/kit#8000: whatever beat the intro last wrote — a cursor left by a skipped line too —
+	// the first frame wipes from the top before it draws.
+	it('wipes the typed line, cursor and all, before the first frame draws', async () => {
+		const { ports, frames } = harness(undefined, [])
+
+		await expect(run_board_cli.run([], { ...ports, intro_sleep: no_pause })).rejects.toBe(STOPPED)
+		const first = frames.findIndex((frame) => frame.includes(RUN_MARK))
+
+		expect(frames.slice(1, first).some((frame) => frame.includes(TYPING_CURSOR))).toBe(true)
+		expect(frames[first]?.startsWith(`${ESCAPE}[H${ESCAPE}[J`)).toBe(true)
 	})
 
 	it('types no line for --once, --chat or a pipe', async () => {
