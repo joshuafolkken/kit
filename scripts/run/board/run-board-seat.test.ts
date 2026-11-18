@@ -71,6 +71,17 @@ describe('run_board_render an authentication-failure hold on the empty seats', (
 		expect(seats.join('\n')).not.toContain('usage limit')
 	})
 
+	// joshuafolkken/kit#8015: a row waiting on the auth recheck could run in the seat, as a 🪫 row could.
+	it('counts a queued row waiting on the auth recheck as a candidate, never “no issue ready”', () => {
+		const layout = queued([queued_row({ reason: { icon: WAIT_ICONS.auth_failure } })])
+		const seats = seats_of({ seats: read_of([], USAGE_LIMIT_CODE, 'auth'), layout })
+
+		expect(seats).toStrictEqual(
+			Array.from({ length: 2 }, () => expect.stringContaining(`${HELD_LEAD}auth failed`)),
+		)
+		expect(seats.join('\n')).not.toContain(NO_CANDIDATE)
+	})
+
 	it('keeps the re-login visible on a seat line cut to an 80-column pane', () => {
 		const board = header({
 			lane_limit: LIMIT,

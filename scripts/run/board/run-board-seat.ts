@@ -24,6 +24,7 @@ const ROOM_ICONS: ReadonlySet<string> = new Set([
 	WAIT_ICONS.lane,
 	WAIT_ICONS.memory,
 	WAIT_ICONS.usage_limit,
+	WAIT_ICONS.auth_failure,
 ])
 
 interface SeatRead {
