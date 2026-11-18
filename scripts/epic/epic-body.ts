@@ -133,31 +133,16 @@ function find_reason(chain: Chain, reasons: ReadonlyArray<OrderReason>): string 
 	return reasons.find((entry) => is_same_chain(entry.chain, chain))?.reason
 }
 
-// A chain given a reason carries it on the line after its order.
+// Each chain's order line, then its reasoning: the reason given for it, else a pointer to the split
+// rationale — on the chain's own line, so which chains a pointer covers is never in doubt.
 function format_chain_record(
 	chain: Chain,
 	flag: string,
 	reasons: ReadonlyArray<OrderReason>,
 ): Array<string> {
-	const reason = find_reason(chain, reasons)
-	const order = format_order_line(chain, flag)
+	const reasoning = find_reason(chain, reasons) ?? `see \`${SPLIT_RATIONALE_HEADING}\` above.`
 
-	return reason === undefined ? [order] : [order, `- Reasoning: ${reason}`]
-}
-
-// The pointer to the split rationale stands for the chains given no reason, so it is left out once
-// every chain has its own.
-function format_reasoning(
-	chains: ReadonlyArray<Chain>,
-	flag: string,
-	reasons: ReadonlyArray<OrderReason>,
-): Array<string> {
-	const lines = chains.flatMap((chain) => format_chain_record(chain, flag, reasons))
-	const is_all_reasoned = chains.every((chain) => find_reason(chain, reasons) !== undefined)
-
-	return is_all_reasoned
-		? lines
-		: [...lines, `- Reasoning: see \`${SPLIT_RATIONALE_HEADING}\` above.`]
+	return [format_order_line(chain, flag), `- Reasoning: ${reasoning}`]
 }
 
 function format_decisions_section(
@@ -175,7 +160,7 @@ function format_decisions_section(
 		'',
 		'### Declared order',
 		'',
-		...format_reasoning(chains, flag, reasons),
+		...chains.flatMap((chain) => format_chain_record(chain, flag, reasons)),
 		'',
 	].join('\n')
 }

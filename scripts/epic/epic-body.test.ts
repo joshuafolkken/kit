@@ -188,11 +188,13 @@ describe('epic_body — per-chain order reasons', () => {
 		expect(body).not.toContain(SPLIT_POINTER)
 	})
 
-	it('keeps the pointer for the chains given no reason', () => {
+	it('keeps the pointer on the line after each chain given no reason', () => {
 		const body = build_reasoned([[101, 103]])
 
 		expect(body).toContain('- Reasoning: uses #101')
-		expect(body).toContain(SPLIT_POINTER)
+		expect(body).toContain(
+			`\`#102 -> #103\`, declared by \`josh epic --chain\` when this epic was created.\n- Reasoning: ${SPLIT_POINTER}`,
+		)
 	})
 
 	it('declares no extra order from a reason line', () => {
