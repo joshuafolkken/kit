@@ -110,6 +110,16 @@ describe('test_pinned_main.main --help', () => {
 			`\n  over the ${String(test_pinned_logic.MAX_TEST_FILES)}-test-file cap,\n`,
 		)
 	})
+
+	// joshuafolkken/kit#7809: the usage names the `--reasoned` flag and what it marks.
+	it('names --reasoned in the synopsis and says what it marks', async () => {
+		await test_pinned_main.main(['--help'])
+
+		const usage = output.stderr.join('')
+
+		expect(usage).toContain('[--first-unpinned] [--reasoned] [--help]')
+		expect(usage).toContain('--reasoned marks there a launch under an --unpinned-ok reason')
+	})
 })
 
 // joshuafolkken/kit#4770: `--record` leaves the answer `josh run:review --join` waits on.
