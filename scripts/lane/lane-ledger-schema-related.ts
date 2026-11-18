@@ -28,7 +28,8 @@ const test_related_schema = z.object({
 	readers: z.number(),
 	test_files: z.number().optional(),
 	trigger_files: z.array(z.string()).optional(),
-	// The changed files past the reach cap, run by their direct importers alone (joshuafolkken/kit#5532).
+	// The changed files past the reach cap, run by their direct importers alone (joshuafolkken/kit#5532) —
+	// on rows written before `deferred` replaced it (joshuafolkken/kit#7976), as `full_reach` is.
 	over_cap: z.number().optional(),
 	// The widest of them in the run's own change, the hub that put the run past the cap
 	// (joshuafolkken/kit#5699); absent when main or the map's tree brought them all (joshuafolkken/kit#5756).
@@ -36,6 +37,9 @@ const test_related_schema = z.object({
 	// The files past the cap it left at their whole reach, each with that reach, widest first — absent
 	// where there were none and on rows written before it (joshuafolkken/kit#7639).
 	full_reach: z.array(full_reach_schema).optional(),
+	// How many test files the cap left out of the run for CI to run — absent on a run that kept the whole
+	// suite and on rows written before it (joshuafolkken/kit#7976), which read `over_cap` instead.
+	deferred: z.number().optional(),
 	// The changed file that added the most test files to the run, and that number — absent where no
 	// reach was read and on rows written before it (joshuafolkken/kit#7735).
 	widest_file: z.string().optional(),

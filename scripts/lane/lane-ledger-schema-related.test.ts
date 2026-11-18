@@ -16,6 +16,15 @@ const ROW = {
 	elapsed_ms: 1000,
 }
 
+// joshuafolkken/kit#7976: a row counts what the cap deferred to CI; an older one, read above, has none.
+describe('lane_ledger_schema_related — the deferred count', () => {
+	it('reads a row with its deferred count back as written', () => {
+		const row = { ...ROW, deferred: 12 }
+
+		expect(lane_ledger_schema.entry_schema.parse(row)).toEqual(row)
+	})
+})
+
 describe('lane_ledger_schema_related — the test:related row, read through the entry union', () => {
 	it('reads a row with its full-reach files back as written', () => {
 		const row = { ...ROW, full_reach: [{ file: 'scripts/wide.ts', reached: 1777 }] }

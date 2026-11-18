@@ -37,7 +37,9 @@ interface NoTestScope {
 	reason: string
 }
 
-type RelatedScope = ChangedFileScope | NoTestScope
+// `tests` are the test files `test-related-select.ts` picked for a run that narrows, absolute — handed
+// to vitest in place of the scope's own reading (joshuafolkken/kit#7976).
+type RelatedScope = (ChangedFileScope & { tests?: ReadonlyArray<string> }) | NoTestScope
 
 // The extensions vitest can walk a module graph back from. Every other changed file is resolved
 // through the test-read map instead.
@@ -120,9 +122,6 @@ interface ScopeRequest {
 	// package (`lockfile-changed-packages.ts`) — handed to vitest, and the lockfile resolved through the
 	// map, rather than the whole suite.
 	lockfile_importers?: ReadonlyArray<string> | undefined
-	// The changed files every test imports, each with the test files importing it directly
-	// (`direct-importers.ts`) — the run narrows to those rather than the whole suite.
-	every_test_importers?: ReadonlyMap<string, ReadonlyArray<string>>
 	// The changed non-code files, each with the test files naming its path (`test-document-readers.ts`)
 	// — added to the map's readers.
 	searched_readers?: ReadonlyMap<string, ReadonlyArray<string>>
@@ -249,20 +248,6 @@ function without_pure_entries(
 	return { files: pure_files_entries.tests_of(entries), unread: rest }
 }
 
-function is_narrowed(request: ScopeRequest, file: string): boolean {
-	return request.every_test_importers?.has(file) === true
-}
-
-// **A moved file every test imports reaches only the test files importing it directly**
-// (joshuafolkken/kit#5122): handed to vitest it would run the whole suite, which the gate's `test:unit`
-// and CI run once regardless. One no test imports directly reaches no test here.
-function direct_selection(request: ScopeRequest, changed: ReadonlyArray<string>): Selection {
-	const moved = changed.filter((file) => is_narrowed(request, file) && is_moved(request, file))
-	const tests = moved.map((file) => request.every_test_importers?.get(file) ?? [])
-
-	return { files: tests.flat(), unread: moved.filter((_file, index) => tests[index]?.length === 0) }
-}
-
 function is_resolved_elsewhere(request: ScopeRequest, file: string): boolean {
 	if (file === LOCKFILE_PATH) return request.lockfile_importers !== undefined
 
@@ -272,7 +257,7 @@ function is_resolved_elsewhere(request: ScopeRequest, file: string): boolean {
 function is_whole_suite_trigger(request: ScopeRequest, file: string): boolean {
 	if (is_resolved_elsewhere(request, file)) return false
 
-	return WHOLE_SUITE_FILES.has(file) && !is_narrowed(request, file) && is_moved(request, file)
+	return WHOLE_SUITE_FILES.has(file) && is_moved(request, file)
 }
 
 // **A `package.json` moved in `version` alone is no trigger** (joshuafolkken/kit#7538), **nor a
@@ -295,8 +280,7 @@ function resolve_read(
 
 	if (whole.length > 0) return all_scope(`${String(whole[0])} ${WHOLE_SUITE_SUFFIX}`, whole, root)
 
-	const direct = direct_selection(request, changed)
-	const code = changed.filter((file) => !is_narrowed(request, file) && is_code_input(request, file))
+	const code = changed.filter((file) => is_code_input(request, file))
 	const resolution = resolve_through_map(
 		changed.filter((file) => !is_relatable(file) && is_moved(request, file)),
 		request,
@@ -304,14 +288,8 @@ function resolve_read(
 
 	if ('reason' in resolution) return all_scope(resolution.reason, resolution.triggers, root)
 
-	const files = [
-		...code,
-		...code_readers(code, request.map),
-		...resolution.files,
-		...entry_tests,
-		...direct.files,
-	]
-	const unread = [...resolution.unread, ...left_out(request, code), ...direct.unread]
+	const files = [...code, ...code_readers(code, request.map), ...resolution.files, ...entry_tests]
+	const unread = [...resolution.unread, ...left_out(request, code)]
 
 	return narrowed_scope({ files, unread }, request)
 }
@@ -369,11 +347,16 @@ function is_unmoved(output: string): boolean {
 }
 
 // `--run` is what keeps `vitest related` out of watch mode; the `run` sub-command already implies it
-// on the full-suite side, which is why only one of the two branches carries the flag.
+// on the full-suite side, which is why only one of the two branches carries the flag. A scope's
+// selected `tests` are handed to `vitest run` as they are, absolute so each matches itself.
 function vitest_arguments(
 	scope: RelatedScope,
 	extra_flags: ReadonlyArray<string> = [],
 ): ReadonlyArray<string> {
+	if (scope.mode !== 'none' && scope.tests !== undefined) {
+		return [RUN_SUBCOMMAND, ...scope.tests, ...extra_flags]
+	}
+
 	if (scope.mode !== 'related') return [RUN_SUBCOMMAND, ...extra_flags]
 
 	return [RELATED_SUBCOMMAND, ...scope.files, RUN_FLAG, ...extra_flags]

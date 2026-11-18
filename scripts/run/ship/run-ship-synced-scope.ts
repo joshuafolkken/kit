@@ -36,6 +36,9 @@ import { run_ship_narrowed } from './run-ship-narrowed'
 // **Whatever cannot be read settles nothing**: a record that is absent or cannot be compared,
 // a merge that changed a check's configuration, or a branch change
 // git cannot read.
+//
+// **Kept beside the cap** (joshuafolkken/kit#7976): a settled merge re-runs no test at all, where the
+// cap would still run up to 150 test files over main's files.
 
 type ScopeBreakdown = NonNullable<ShipLapRecord['breakdown']>
 
