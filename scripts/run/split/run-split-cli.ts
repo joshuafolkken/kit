@@ -6,7 +6,8 @@ import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_split, type SplitRequest, type SplitResult } from './run-split'
 import { run_split_prerequisite, type PrerequisiteRequest } from './run-split-prerequisite'
 
-// `josh run:split <N> --children <N1,N2,...> [--ordered | --chain <chain>...] [--title <title>]` and
+// `josh run:split <N> --children <N1,N2,...> [--ordered | --chain <chain>...] [--order-reason
+// "<chain>: <reason>"...] [--title <title>]` and
 // `josh run:split <N> --prerequisite <P> [--title <title>]` — the argument parsing and the report
 // around `run-split.ts` and `run-split-prerequisite.ts`. One line per step that landed, then the
 // verdict line a run branches on: `epic #E` to continue against, or `needs-decision` to report. A
@@ -16,7 +17,7 @@ const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
 const USAGE = [
-	'Usage: josh run:split <issue> --children <N1,N2,...> [--ordered | --chain "<chain>"...] [--title <title>]',
+	'Usage: josh run:split <issue> --children <N1,N2,...> [--ordered | --chain "<chain>"...] [--order-reason "<chain>: <reason>"...] [--title <title>]',
 	'       josh run:split <issue> --prerequisite <P> [--title <title>]',
 ].join('\n')
 const OPTIONS = {
@@ -24,6 +25,7 @@ const OPTIONS = {
 	prerequisite: { type: 'string' },
 	ordered: { type: 'boolean' },
 	chain: { type: 'string', multiple: true },
+	'order-reason': { type: 'string', multiple: true },
 	title: { type: 'string' },
 } as const
 
@@ -44,21 +46,33 @@ interface Values {
 	prerequisite?: string | undefined
 	ordered?: boolean | undefined
 	chain?: Array<string> | undefined
+	order_reason?: Array<string> | undefined
 	title?: string | undefined
 }
 
-// `epic` reads and refuses the `--chain` values; they are carried as given.
+// `epic` reads and refuses the `--chain` and `--order-reason` values; they are carried as given.
 function children_request(issue: string, values: Values): Request | undefined {
 	const children = children_of(values.children, issue)
 	if (children === undefined) return undefined
 	const is_ordered = values.ordered === true
+	const order_reasons = values.order_reason ?? []
 
-	return { issue, children, is_ordered, chains: values.chain ?? [], title: values.title }
+	return {
+		issue,
+		children,
+		is_ordered,
+		chains: values.chain ?? [],
+		order_reasons,
+		title: values.title,
+	}
 }
 
-// `--prerequisite` takes none of `--children`, `--ordered` and `--chain`: the order is always `#P` first.
+// `--prerequisite` takes none of `--children`, `--ordered`, `--chain` and `--order-reason`: the order
+// is always `#P` first, and its reason is written for it.
 function is_prerequisite_alone(values: Values): boolean {
-	return values.children === undefined && values.ordered !== true && values.chain === undefined
+	const lists = [values.children, values.chain, values.order_reason]
+
+	return values.ordered !== true && lists.every((value) => value === undefined)
 }
 
 function prerequisite_request(
@@ -78,7 +92,7 @@ function parse_request(argv: ReadonlyArray<string>): Request | undefined {
 	if (parsed === undefined) return undefined
 	const issue = issue_number_shape.single_of(parsed.positionals)
 	if (issue === undefined) return undefined
-	const { values } = parsed
+	const values: Values = { ...parsed.values, order_reason: parsed.values['order-reason'] }
 	if (values.prerequisite === undefined) return children_request(issue, values)
 
 	return prerequisite_request(issue, values.prerequisite, values)
@@ -94,7 +108,7 @@ async function result_of(request: Request): Promise<SplitResult> {
 // only refuse again.
 function rerun_hint(step: string): string {
 	if (step === 'title') return 'Rerun with `--title <title>`.'
-	if (step === 'chain') return 'Rerun with the `--chain` values fixed.'
+	if (step === 'chain') return 'Rerun with the `--chain` / `--order-reason` values fixed.'
 
 	return `Rerun the same \`pnpm josh run:split\` to continue from ${step}.`
 }

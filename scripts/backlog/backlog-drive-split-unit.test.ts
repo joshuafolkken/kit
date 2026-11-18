@@ -119,6 +119,17 @@ describe('backlog_drive_split_unit.run — the no-split reason it asks for', () 
 	})
 })
 
+// joshuafolkken/kit#7998: a declared order is refused without its reason, so the brief asks for both.
+describe('backlog_drive_split_unit.run — the order reason it asks for', () => {
+	it('asks for a reason beside any declared order', async () => {
+		const { ports, requests } = fake([OVER, REASONED])
+
+		await backlog_drive_split_unit.run(ISSUE, ports)
+
+		expect(JSON.stringify(requests[0]?.argv)).toContain('[--ordered --order-reason')
+	})
+})
+
 function raw_of(labels: ReadonlyArray<string>): string {
 	const body = body_of(OVER_LINES)
 

@@ -179,19 +179,35 @@ function find_reason_refusal(
 	return `\`${ORDER_REASON_FLAG} ${values[index] ?? ''}\` is not ${expected}; nothing was written.`
 }
 
-// The reasons given for the declared chains, a refusal, or nothing when `--order-reason` was not given.
+// A declared chain no `--order-reason` explains: an order nobody said why it holds.
+function find_missing_reason_refusal(
+	reasons: ReadonlyArray<OrderReason>,
+	declared: ReadonlyArray<Chain>,
+): string | undefined {
+	const missing = declared.find((chain) =>
+		reasons.every((entry) => !epic_body.is_same_chain(entry.chain, chain)),
+	)
+	if (missing === undefined) return undefined
+	const chain = epic_body.format_chain(missing)
+
+	return `The declared order \`${chain}\` has no \`${ORDER_REASON_FLAG} "${chain}: <reason>"\`; every declared chain needs its reason. Nothing was written.`
+}
+
+// The reasons given for the declared chains, or a refusal — a value that does not fit, or a declared
+// chain left without its reason.
 function read_order_reasons(
 	parsed: EpicArgv,
 	subject: ChainSubject,
 	chains: ReadonlyArray<Chain>,
 ): Omit<ChainRead, 'chains'> {
 	const values = epic_cli_argv.values_of_flag(parsed, ORDER_REASON_FLAG)
-	if (values.length === 0) return {}
 	const declared = epic_body.declared_chains(subject.children ?? [], subject.is_ordered, chains)
-	const chain_refusal = find_reason_refusal(values, declared)
+	const order_reasons = values.flatMap((value) => to_order_reason(value) ?? [])
+	const chain_refusal =
+		find_reason_refusal(values, declared) ?? find_missing_reason_refusal(order_reasons, declared)
 	if (chain_refusal !== undefined) return { chain_refusal }
 
-	return { order_reasons: values.flatMap((value) => to_order_reason(value) ?? []) }
+	return { order_reasons }
 }
 
 // The declared chains and their reasons, or the reason they were refused; no chains when `--chain`

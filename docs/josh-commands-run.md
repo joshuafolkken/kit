@@ -83,9 +83,9 @@ Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh run:pause` 
 Set a run aside and place its split or prerequisite into an epic in one call.
 
 ```bash
-pnpm josh run:split 1091 --children 1102,1103 --title "Split 1091"      # independent split
-pnpm josh run:split 1091 --children 1102 --ordered                      # 1102 after 1091
-pnpm josh run:split 1091 --prerequisite 1104 --title "1104 then 1091"   # 1104 first
+pnpm josh run:split 1091 --children 1102,1103 --title "Split 1091"                                  # independent split
+pnpm josh run:split A --children B --ordered --order-reason "#A -> #B: B calls the parser A adds"   # B after A
+pnpm josh run:split 1091 --prerequisite 1104 --title "1104 then 1091"                               # 1104 first
 ```
 
 **Options:**
@@ -93,6 +93,7 @@ pnpm josh run:split 1091 --prerequisite 1104 --title "1104 then 1091"   # 1104 f
 - `--children <N1,N2,...>` — the filed split issues, comma-separated.
 - `--ordered` — `<issue>` first, then the children in that order.
 - `--chain <chain>` — repeatable; one chain line (`#A -> #B`) among `<issue>` and the children, passed to `epic` as given — joins and branches without `--ordered`.
+- `--order-reason "<chain>: <reason>"` — repeatable; required once for each declared chain (the `--ordered` chain, or each `--chain`): what the later issue takes from the earlier one, passed to `epic` as given. A declared chain without one is refused before anything is set aside.
 - `--prerequisite <P>` — the filed issue that has to land first; `<issue>` is paused on it.
 - `--title <title>` — the new epic’s title; required when no epic tracks `<issue>` yet.
 
@@ -101,18 +102,19 @@ pnpm josh run:split 1091 --prerequisite 1104 --title "1104 then 1091"   # 1104 f
 A split found mid-run in one call: the run set aside as `run:pause` sets it aside (stash, comment,
 release, each step skipped on a rerun once done), the children placed — `epic --add` into the epic
 already tracking `<issue>` (`--after <issue>` when `--ordered`), or a new epic `<issue>` heads — and
-that epic audited with `epic:audit`. Each `--chain` goes to `epic` (creation or `--add`) as given. The
-last line is `epic #<E>`. An epic listing that cannot tell
+that epic audited with `epic:audit`. Each `--chain` and `--order-reason` goes to `epic` (creation or
+`--add`) as given; under `--after <issue>` no chain is declared, so the `--ordered` reason is read but not
+passed. The last line is `epic #<E>`. An epic listing that cannot tell
 whether an epic tracks `<issue>` parks it with `needs-decision` instead, and the last line is
 `needs-decision`. Without `--title` and with no tracking epic, or with a `--chain` `epic` refuses
 (`--chain` beside `--ordered`, a malformed line, a number outside `<issue>` and the children, a cycle
-among the given chains), it refuses before writing anything; a
+among the given chains, a declared chain without its `--order-reason`), it refuses before writing anything; a
 failed step keeps the hold. A rerun whose tracking epic already lists every child places nothing
 again and goes on to the audit.
 
 `--prerequisite <P>` is `run:pause <issue> --for <P>` with the placement: the relation's own
 `epic --add --before` places `<P>` in the epic tracking `<issue>`; with none, `epic "<title>" <P>
-<issue> --ordered` is created before the relation, which is then recorded inside it. The audit, the
+<issue> --ordered` (its `--order-reason` cites `<P>`) is created and the relation recorded inside it. The audit, the
 `needs-decision` park and the `--title` refusal are as above.
 
 ### `josh run:tidy`

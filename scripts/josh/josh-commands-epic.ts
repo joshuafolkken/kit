@@ -14,14 +14,22 @@ const EPIC_COMMANDS: Record<string, CommandEntry> = {
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		description: 'Create an epic issue from its child issue numbers',
 		category: 'AI tools',
-		reference: ['<title> <issue...> [--ordered | --chain <chain>...]', 'automation', ['network']],
+		reference: [
+			'<title> <issue...> [--ordered | --chain <chain>...] [--order-reason "<chain>: <reason>"...]',
+			'automation',
+			['network'],
+		],
 		usage: {
 			examples: [
 				{ arguments: '"Epic: split the parser work" 101 102 103' },
-				{ arguments: '"Epic: staged rollout" 101 102 --ordered' },
 				{
-					arguments: '"Epic: ..." A B C --chain "#A -> #C" --chain "#B -> #C"',
-					note: 'a join: C waits on both',
+					arguments:
+						'"Epic: staged rollout" A B --ordered --order-reason "#A -> #B: B ships the flag A adds"',
+				},
+				{
+					arguments:
+						'"Epic: ..." A B C --chain "#A -> #C" --chain "#B -> #C" --order-reason "#A -> #C: …" --order-reason "#B -> #C: …"',
+					note: 'a join',
 				},
 				{
 					arguments:
@@ -58,7 +66,7 @@ const EPIC_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: ['--order-reason "#A -> #B: <reason>"'],
 					description:
-						"repeatable, on create or `--promote`: what the later child of one declared chain (a `--chain` value, or the `--ordered` chain) takes from the earlier one. Written under that chain's `### Declared order` entry instead of the `## Split rationale` pointer. An undeclared, repeated or reasonless chain is refused before anything is written.",
+						'repeatable, on create, `--promote` and `--add`: what the later child of one declared chain (`--chain` or `--ordered`) takes from the earlier one. Required for every declared chain; written under its `### Declared order` entry. A missing, undeclared, repeated or reasonless one is refused before anything is written.',
 				},
 				{
 					names: ['--rationale-file <path|->'],

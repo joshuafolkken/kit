@@ -154,7 +154,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh doc:section` | `<file> <heading>` | automation | none | Print one section of a markdown document, for a `file.md` → "Heading" reference |
 | `josh edit:files` | `<plan-path \| ->` | automation | none | Apply several content-addressed edits from a plan in one call |
 | `josh effect:audit` | `[--days <N>] [--draft <issue>]` | automation | network, files | List closed run-time-shortening issues with their expected effect, follow-up measurement and result |
-| `josh epic` | `<title> <issue...> [--ordered \| --chain <chain>...]` | automation | network | Create an epic issue from its child issue numbers |
+| `josh epic` | `<title> <issue...> [--ordered \| --chain <chain>...] [--order-reason "<chain>: <reason>"...]` | automation | network | Create an epic issue from its child issue numbers |
 | `josh epic:audit` | `<epic>` | automation | network | Audit an epic's children against each other for contradictions |
 | `josh epic:bundle` | `<issue> [--apply]` | automation | network | Say whether a newly filed issue belongs with ones already in the backlog |
 | `josh epic:check` | `<epic>` | automation | network | Check an epic issue against the tracking requirements |
@@ -249,7 +249,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh run:release` | `[issue\|--force]` | automation | files | Release this working tree's run record |
 | `josh run:report` | `[--handoff \| --end [--stopped "<reason>"]]` | automation | files, network, processes | Generate the session-facing report for this invocation from the run’s event stream (merges, parks, cuts) with the release tail — the same text josh notify sends |
 | `josh run:review` | `[--code-only] [--unpinned-ok "<reason>"] [--accept-metrics "<reason>"] \| --join [--fixing] \| --pinned \| --push [<slots>]` | automation | processes, files, git, network | Start test:pinned in the background, run the gate and, once it is green, write the /code-review brief to a file, printing its path (--join to join them; it stops on an unpinned change) |
-| `josh run:split` | `<issue> (--children <N1,N2,...> [--ordered \| --chain <chain>...] \| --prerequisite <P>) [--title <title>]` | automation | git, network, files | Set a run aside and place its split or prerequisite into an epic in one call |
+| `josh run:split` | `<issue> (--children <N1,N2,...> [--ordered \| --chain <chain>...] [--order-reason "<chain>: <reason>"...] \| --prerequisite <P>) [--title <title>]` | automation | git, network, files | Set a run aside and place its split or prerequisite into an epic in one call |
 | `josh run:stale` | — | automation | git, network, files | Remove a stale `in-progress` label no checkout still holds |
 | `josh run:status` | `<issue> [--repo <owner/repo>]` | automation | network | Bundle a run’s read-only status: issue state, cost verdict, carry counters |
 | `josh run:step` | `[<issue>]` | automation | network, files | Print the run’s next single action, computed from the event stream, carry record and issue state |

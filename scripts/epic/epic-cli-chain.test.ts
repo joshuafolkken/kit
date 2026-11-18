@@ -3,15 +3,25 @@ import { epic_cli_argv } from './epic-cli-argv'
 import { epic_cli_chain, type ChainRead } from './epic-cli-chain'
 
 const CHAIN = epic_cli_chain.CHAIN_FLAG
+const REASON = epic_cli_chain.ORDER_REASON_FLAG
 const CHILDREN = [7873, 7874, 7875]
 const NOTHING_WRITTEN = /nothing was written/iu
+const MISSING_REASON = /has no `--order-reason[\s\S]*Nothing was written/u
 const A_TO_B = '#7873 -> #7874'
 const A_TO_C = '#7873 -> #7875'
 const B_TO_C = '#7874 -> #7875'
+const ORDERED_CHAIN = '#7873 -> #7874 -> #7875'
 
-function read(values: ReadonlyArray<string>, is_ordered = false): ChainRead {
-	const argv = values.flatMap((value) => [CHAIN, value])
-	const parsed = epic_cli_argv.read_form(argv, { switches: [], list_flags: [CHAIN] })
+function read_reasons(
+	chains: ReadonlyArray<string>,
+	reasons: ReadonlyArray<string>,
+	is_ordered = false,
+): ChainRead {
+	const argv = [
+		...chains.flatMap((value) => [CHAIN, value]),
+		...reasons.flatMap((value) => [REASON, value]),
+	]
+	const parsed = epic_cli_argv.read_form(argv, { switches: [], list_flags: [CHAIN, REASON] })
 
 	return epic_cli_chain.read_chains(parsed ?? { positionals: [], values: {} }, {
 		children: CHILDREN,
@@ -19,18 +29,28 @@ function read(values: ReadonlyArray<string>, is_ordered = false): ChainRead {
 	})
 }
 
+// Each chain given with a reason of its own, so these tests read the chains rather than the reasons.
+function read(values: ReadonlyArray<string>, is_ordered = false): ChainRead {
+	return read_reasons(
+		values,
+		values.map((value) => `${value}: a reason`),
+		is_ordered,
+	)
+}
+
 describe('epic_cli_chain.read_chains — declared chains', () => {
-	it('declares nothing when the flag is absent', () => {
-		expect(read([])).toStrictEqual({ chains: [] })
+	it('declares nothing and asks no reason when the flag is absent', () => {
+		expect(read([])).toStrictEqual({ chains: [], order_reasons: [] })
 	})
 
 	it('reads a join: one child waiting on two independent ones', () => {
-		expect(read([A_TO_C, B_TO_C])).toStrictEqual({
-			chains: [
-				[7873, 7875],
-				[7874, 7875],
-			],
-		})
+		const result = read([A_TO_C, B_TO_C])
+
+		expect(result.chains).toStrictEqual([
+			[7873, 7875],
+			[7874, 7875],
+		])
+		expect(result.chain_refusal).toBeUndefined()
 	})
 
 	it('reads a branch: two children waiting on one', () => {
@@ -71,31 +91,15 @@ describe('epic_cli_chain.read_chains — refusals', () => {
 	})
 })
 
-const REASON = epic_cli_chain.ORDER_REASON_FLAG
-const ORDERED_CHAIN = '#7873 -> #7874 -> #7875'
-
-function read_reasons(
-	chains: ReadonlyArray<string>,
-	reasons: ReadonlyArray<string>,
-	is_ordered = false,
-): ChainRead {
-	const argv = [
-		...chains.flatMap((value) => [CHAIN, value]),
-		...reasons.flatMap((value) => [REASON, value]),
-	]
-	const parsed = epic_cli_argv.read_form(argv, { switches: [], list_flags: [CHAIN, REASON] })
-
-	return epic_cli_chain.read_chains(parsed ?? { positionals: [], values: {} }, {
-		children: CHILDREN,
-		is_ordered,
-	})
-}
-
 describe('epic_cli_chain.read_chains — order reasons', () => {
 	it('reads one reason per declared chain', () => {
-		const result = read_reasons([A_TO_C, B_TO_C], [`${B_TO_C}: uses the  reader\n#7874 adds`])
+		const result = read_reasons(
+			[A_TO_C, B_TO_C],
+			[`${A_TO_C}: shares the schema`, `${B_TO_C}: uses the  reader\n#7874 adds`],
+		)
 
 		expect(result.order_reasons).toStrictEqual([
+			{ chain: [7873, 7875], reason: 'shares the schema' },
 			{ chain: [7874, 7875], reason: 'uses the reader #7874 adds' },
 		])
 		expect(result.chain_refusal).toBeUndefined()
@@ -122,5 +126,22 @@ describe('epic_cli_chain.read_chains — order reasons', () => {
 		expect(read_reasons([A_TO_C], [`${A_TO_C}: one`, `${A_TO_C}: two`]).chain_refusal).toMatch(
 			NOTHING_WRITTEN,
 		)
+	})
+})
+
+describe('epic_cli_chain.read_chains — a declared chain without its reason', () => {
+	it('refuses the --ordered chain given no reason, naming the chain', () => {
+		const result = read_reasons([], [], true)
+
+		expect(result.chain_refusal).toMatch(MISSING_REASON)
+		expect(result.chain_refusal).toContain(ORDERED_CHAIN)
+		expect(result.order_reasons).toBeUndefined()
+	})
+
+	it('refuses a --chain left without a reason beside one that has its own', () => {
+		const result = read_reasons([A_TO_C, B_TO_C], [`${A_TO_C}: shares the schema`])
+
+		expect(result.chain_refusal).toMatch(MISSING_REASON)
+		expect(result.chain_refusal).toContain(B_TO_C)
 	})
 })

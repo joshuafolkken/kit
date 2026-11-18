@@ -80,6 +80,8 @@ For each finding:
 - On a `high` or `medium`, cite every other site of the same pattern in the change's files and their
   callers as `file_path:line_number`, so one fix pass closes them all
 - On a test-1 finding rated `low`, write `no failure scenario — <what you tried>`
+- On its submitted finding line → prefix `kind=<kind> `, e.g. `kind=stale-docs comments:low:a.md:3 — …`;
+  values (`other` when none fits): `scripts/review/review-finding-kind.ts` → `KINDS`
 
 A category with no findings needs a proof statement, e.g. `No issues — checked null returns on X,
 verified Y edge case, Z is guarded by type.` A bare `No issues` is allowed only for Security,

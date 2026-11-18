@@ -19,6 +19,7 @@ const RATIONALE_PLACEHOLDER = '<why the work was split this way>'
 const SPLIT_RATIONALE_HEADING = '## Split rationale'
 // One child declares no order, so there is nothing for the record below to name.
 const CHAIN_MINIMUM_LENGTH = 2
+const CREATION_OCCASION = 'when this epic was created'
 
 // Why one declared chain runs in that order — what a later child takes from an earlier one, passed as
 // `--order-reason "<chain>: <reason>"`.
@@ -119,8 +120,8 @@ function to_rationale(rationale: string): string {
 //
 // **The chain goes inside backticks.** A line that is *nothing but* a chain is read as part of the
 // declaration wherever it sits in the body, so an unquoted one here would declare the order twice.
-function format_order_line(chain: Chain, flag: string): string {
-	const declared = `declared by \`josh epic ${flag}\` when this epic was created.`
+function format_order_line(chain: Chain, flag: string, occasion: string): string {
+	const declared = `declared by \`josh epic ${flag}\` ${occasion}.`
 
 	return `- Order: \`${format_chain(chain)}\`, ${declared}`
 }
@@ -133,16 +134,32 @@ function find_reason(chain: Chain, reasons: ReadonlyArray<OrderReason>): string 
 	return reasons.find((entry) => is_same_chain(entry.chain, chain))?.reason
 }
 
-// Each chain's order line, then its reasoning: the reason given for it, else a pointer to the split
-// rationale — on the chain's own line, so which chains a pointer covers is never in doubt.
+// Each chain's order line, then the reason given for it. Every entry point refuses a declared chain
+// without its reason (`epic-cli-chain.ts`), so no stand-in is ever written: a chain reaching here
+// without one gets no reasoning line.
 function format_chain_record(
 	chain: Chain,
 	flag: string,
 	reasons: ReadonlyArray<OrderReason>,
+	occasion = CREATION_OCCASION,
 ): Array<string> {
-	const reasoning = find_reason(chain, reasons) ?? `see \`${SPLIT_RATIONALE_HEADING}\` above.`
+	const reasoning = find_reason(chain, reasons)
+	const order = format_order_line(chain, flag, occasion)
 
-	return [format_order_line(chain, flag), `- Reasoning: ${reasoning}`]
+	return reasoning === undefined ? [order] : [order, `- Reasoning: ${reasoning}`]
+}
+
+// The record `epic --add` folds into its decision for the chains its `--chain` declared, so an order
+// added later carries its reason as one declared at creation does; `undefined` with no chain.
+function format_added_order(
+	chains: ReadonlyArray<Chain>,
+	reasons: ReadonlyArray<OrderReason>,
+): string | undefined {
+	const records = chains.flatMap((chain) =>
+		format_chain_record(chain, '--add --chain', reasons, 'when these children were added'),
+	)
+
+	return records.length === 0 ? undefined : records.join('\n')
 }
 
 function format_decisions_section(
@@ -210,6 +227,8 @@ const epic_body = {
 	build_epic_body,
 	build_dependency_pairs,
 	declared_chains,
+	format_added_order,
+	format_chain,
 	format_run_command,
 	is_same_chain,
 }

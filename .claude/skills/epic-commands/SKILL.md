@@ -53,7 +53,8 @@ created with the command, never by hand:
 
 ```bash
 pnpm josh epic "<epic-title>" <N1> <N2> ...            # order-free batch
-pnpm josh epic "<epic-title>" <N1> <N2> ... --ordered  # argument order is the dependency order
+pnpm josh epic "<epic-title>" <N1> <N2> ... --ordered --order-reason "<chain>: <reason>"
+# argument order is the dependency order; one --order-reason per chain
 # --rationale-file <path|-> fills Split rationale; --origin <owner/repo#N> adds the backlink
 ```
 
