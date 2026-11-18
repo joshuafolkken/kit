@@ -117,7 +117,7 @@ describe('run_board_reason.reader — a row an authentication failure keeps wait
 		const held = reason({ usage_reset_ms: RESET_MS, usage_cause: 'auth' })
 
 		expect(held).toStrictEqual({
-			icon: run_board_reason.AUTH_FAILURE_ICON,
+			icon: WAIT_ICONS.auth_failure,
 			value: run_board_labels.day_minute_of(RESET_MS),
 		})
 		expect(held?.icon).not.toBe(WAIT_ICONS.usage_limit)

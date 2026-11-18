@@ -37,9 +37,6 @@ import type { ItemStatus } from './run-board-status'
 const { LANE_STAGE } = run_event_setup
 const { HEADER_ICONS, STAGE_ICONS, STATE_ICONS, WAIT_ICONS } = run_board_labels
 const NO_FREE_LANES = 0
-// The mark of a hold an authentication failure raised, waiting on its recheck rather than a usage-limit
-// reset (joshuafolkken/kit#8015).
-const AUTH_FAILURE_ICON = '🔑'
 const FIRST_ONLY = 1
 
 // The stages a lane's launch passes, each leading its row with its own icon.
@@ -215,7 +212,7 @@ function no_memory_of(gauges: MachineGauges | undefined): RowReason {
 // `🪫 10-25 16:30`: the reset a usage limit holds every launch until, in the board's local time;
 // `🔑 10-25 16:30` where the hold is an authentication failure's recheck instead.
 function usage_limit_of(reset_ms: number, cause: HoldCause | undefined): RowReason {
-	const icon = cause === 'auth' ? AUTH_FAILURE_ICON : WAIT_ICONS.usage_limit
+	const icon = cause === 'auth' ? WAIT_ICONS.auth_failure : WAIT_ICONS.usage_limit
 
 	return { icon, value: run_board_labels.day_minute_of(reset_ms) }
 }
@@ -390,7 +387,7 @@ function reader(read: ReasonRead): ReasonOf {
 	}
 }
 
-const run_board_reason = { AUTH_FAILURE_ICON, reader }
+const run_board_reason = { reader }
 
 export { run_board_reason }
 export type { ReasonRead }
