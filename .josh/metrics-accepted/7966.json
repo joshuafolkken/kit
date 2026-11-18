@@ -1,0 +1,7 @@
+{
+	"reason": "Red runs now carry their passed files' input digests into the next green record (#7966): new carried/unchanged helpers and the red record's digest entries",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 23
+	}
+}

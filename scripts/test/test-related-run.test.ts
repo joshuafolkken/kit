@@ -2,7 +2,7 @@ import { scoped_green } from '#scripts/gate/scoped-green'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_no_base } from './test-no-base'
 import { test_related_record } from './test-related-record'
-import type { RelatedInput } from './test-related-red'
+import { test_related_red, type RelatedInput } from './test-related-red'
 import { test_related_reuse } from './test-related-reuse'
 import { test_related_run } from './test-related-run'
 
@@ -10,7 +10,12 @@ vi.mock('./test-related-record', () => ({
 	test_related_record: { with_test_count: vi.fn(), record_run: vi.fn() },
 }))
 vi.mock('./test-related-reuse', () => ({
-	test_related_reuse: { flags: vi.fn(() => []), blobs: vi.fn(), retained: vi.fn(async () => []) },
+	test_related_reuse: {
+		flags: vi.fn(() => []),
+		blobs: vi.fn(),
+		retained: vi.fn(async () => []),
+		carried: vi.fn(async () => []),
+	},
 }))
 vi.mock('./test-related-red', () => ({
 	test_related_red: {
@@ -27,6 +32,7 @@ const SOURCE = 'source.ts'
 const TEST = 'unit.test.ts'
 const TREE = { files: { [SOURCE]: 'digest' }, base: 'base' }
 const BLOBS = { [TEST]: 'unit-inputs' }
+const CARRIED = 'carried.test.ts'
 
 function input(): RelatedInput {
 	return {
@@ -67,7 +73,35 @@ describe('test_related_run.run_and_vouch', () => {
 		})
 		expect(await test_related_run.run_and_vouch(input(), [], TREE)).toBe(exit_code)
 		expect(test_related_reuse.blobs).not.toHaveBeenCalled()
+		expect(scoped_green.record_if_green).toHaveBeenCalledWith(expect.anything(), {
+			before: TREE,
+			exit_code,
+		})
 	})
+})
+
+// joshuafolkken/kit#7966: a red run hands its passed files to the red record, not the green one.
+describe('test_related_run.run_and_vouch — red carry', () => {
+	it("hands a red run's passed files to the red record", async () => {
+		vi.mocked(test_related_record.with_test_count).mockResolvedValue({
+			exit_code: 1,
+			test_files: 1,
+			passed: [TEST],
+		})
+		await test_related_run.run_and_vouch(input(), [], TREE)
+		expect(test_related_red.record_red).toHaveBeenCalledWith(
+			expect.objectContaining({ before: TREE, first_exit: 1, passed: [TEST] }),
+		)
+	})
+	it('records the files carried from a red run beside the ones this run proved', async () => {
+		vi.mocked(test_related_reuse.carried).mockResolvedValue([CARRIED])
+		await test_related_run.run_and_vouch(input(), [], TREE)
+		expect(test_related_reuse.carried).toHaveBeenCalledWith(process.cwd(), TREE)
+		expect(test_related_reuse.blobs).toHaveBeenCalledWith(process.cwd(), [TEST, CARRIED])
+	})
+})
+
+describe('test_related_run.run_and_vouch — no-base pass', () => {
 	it('withholds individual evidence when the no-base pass fails', async () => {
 		vi.mocked(test_no_base.run_if_touched).mockResolvedValue(1)
 		expect(await test_related_run.run_and_vouch(input(), [], TREE)).toBe(1)
