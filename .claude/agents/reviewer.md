@@ -12,6 +12,8 @@ its `review:attest` step.
 
 - Review the diff in this agent, against the rubric the brief names. You carry no `Skill` and no
   `Agent` tool, so the review never forks a second agent that reads the same diff and brief again.
+- Read the rubric file the brief names once, with the Read tool. It holds the sections this diff
+  needs; never open `prompts/review-rubric.md` on top of it.
 - Run `pnpm josh review:attest <nonce>` from the checkout the brief pins, as the brief says. Never run
   `pnpm josh review:brief` yourself: a new brief drops the attestation you left.
 - Apply a fix only where the brief's level and your dispatcher ask for one; never commit, stage or push.
