@@ -83,8 +83,13 @@ vi.mock('#scripts/issue/issue-park', () => ({ issue_park: { apply: park_apply } 
 
 const TITLE = 'Split work'
 const CHILDREN = ['11', '12']
-const INDEPENDENT = { issue: '10', children: CHILDREN, is_ordered: false, title: TITLE }
+const INDEPENDENT = { issue: '10', children: CHILDREN, is_ordered: false, chains: [], title: TITLE }
 const ORDERED = { ...INDEPENDENT, is_ordered: true }
+const SECOND_INTO_LAST = '#11 -> #12'
+const OUTSIDER = '#11 -> #99'
+const JOIN = ['#10 -> #12', SECOND_INTO_LAST]
+const JOINED = { ...INDEPENDENT, chains: JOIN }
+const JOIN_ARGV = JOIN.flatMap((chain) => ['--chain', chain])
 const NEEDS_DECISION = 'needs-decision'
 const SET_ASIDE_AND_PLACE = ['stash', 'comment', 'epic', 'audit', 'release']
 const TRACKED = { epic: 20, lists_children: false }
@@ -136,6 +141,26 @@ describe('run_split.split — an epic already tracks the issue', () => {
 
 		expect(epic_run).toHaveBeenCalledWith(['--add', '20', '11', '12', '--after', '10'])
 	})
+
+	it('passes each `--chain` to `epic --add` as given', async () => {
+		tracking_with.mockResolvedValue(TRACKED)
+
+		await run_split.split(JOINED)
+
+		expect(epic_run).toHaveBeenCalledWith(['--add', '20', '11', '12', ...JOIN_ARGV])
+	})
+
+	it.each([[{ ...JOINED, is_ordered: true }], [{ ...INDEPENDENT, chains: [OUTSIDER] }]])(
+		'refuses `--chain` in %j before writing anything',
+		async (request) => {
+			tracking_with.mockResolvedValue(TRACKED)
+
+			const result = await run_split.split(request)
+
+			expect(result).toMatchObject({ kind: 'failed', step: 'chain', done: [] })
+			expect(state.calls).toStrictEqual([])
+		},
+	)
 })
 
 describe('run_split.split — no epic tracks the issue', () => {
@@ -161,6 +186,22 @@ describe('run_split.split — no epic tracks the issue', () => {
 		expect(result).toMatchObject({ kind: 'failed', step: 'title', done: [] })
 		expect(state.calls).toStrictEqual([])
 	})
+
+	it('creates a joined epic with each `--chain` as given', async () => {
+		await run_split.split(JOINED)
+
+		expect(epic_create).toHaveBeenCalledWith([TITLE, '10', '11', '12', ...JOIN_ARGV])
+	})
+
+	it.each([[[SECOND_INTO_LAST, '#12 -> #11']], [[OUTSIDER]], [['not a chain']]])(
+		'refuses `--chain` %j before writing anything',
+		async (chains) => {
+			const result = await run_split.split({ ...INDEPENDENT, chains })
+
+			expect(result).toMatchObject({ kind: 'failed', step: 'chain', done: [] })
+			expect(state.calls).toStrictEqual([])
+		},
+	)
 })
 
 describe('run_split.split — on the lane branch', () => {

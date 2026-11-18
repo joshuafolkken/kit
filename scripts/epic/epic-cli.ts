@@ -39,15 +39,16 @@ const DECISION_FLAG = '--decision-file'
 const NOTIFY_FLAG = '--notify'
 // Which flags each form knows, and which of them consume the argument after them — per form, for the
 // reason `epic-cli-argv.ts` gives.
+const BATCH_LIST_FLAGS = [epic_cli_chain.CHAIN_FLAG, epic_cli_chain.ORDER_REASON_FLAG]
 const CREATE_FORM: FormFlags = {
 	switches: [ORDERED_FLAG, NOTIFY_FLAG],
 	value_flags: [RATIONALE_FLAG, ORIGIN_FLAG],
-	list_flags: [epic_cli_chain.CHAIN_FLAG],
+	list_flags: BATCH_LIST_FLAGS,
 }
 const PROMOTE_FORM: FormFlags = {
 	switches: [PROMOTE_FLAG, ORDERED_FLAG, NOTIFY_FLAG],
 	value_flags: [RATIONALE_FLAG, ORIGIN_FLAG, TITLE_FLAG],
-	list_flags: [epic_cli_chain.CHAIN_FLAG],
+	list_flags: BATCH_LIST_FLAGS,
 }
 const RECONCILE_FORM: FormFlags = { switches: [RECONCILE_FLAG] }
 const CHECK_FORM: FormFlags = { switches: [] }

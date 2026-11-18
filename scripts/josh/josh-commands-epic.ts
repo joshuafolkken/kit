@@ -23,6 +23,11 @@ const EPIC_COMMANDS: Record<string, CommandEntry> = {
 					arguments: '"Epic: ..." A B C --chain "#A -> #C" --chain "#B -> #C"',
 					note: 'a join: C waits on both',
 				},
+				{
+					arguments:
+						'"Epic: ..." A B --chain "#A -> #B" --order-reason "#A -> #B: #B calls the parser #A adds"',
+					note: 'why B waits on A',
+				},
 				{ arguments: '"Epic: ..." 101 102 --rationale-file .josh/tmp/rationale.md' },
 				{ arguments: '--promote 858 101 102 103', note: 'turn an existing issue into an epic' },
 				{ arguments: '--add 893 894', note: 'track #894, declaring no order for it' },
@@ -49,6 +54,11 @@ const EPIC_COMMANDS: Record<string, CommandEntry> = {
 					names: ['--chain "#A -> #B"'],
 					description:
 						'repeatable, on create or `--promote`: one dependency chain in the `## Dependencies` chain-line form; several give joins and branches. Each chain is written as a chain line with its `blocked-by` relations and a `### Declared order` entry. A value that is not a chain line, a number that is not a child, a cycle, or use with `--ordered` is refused before anything is written.',
+				},
+				{
+					names: ['--order-reason "#A -> #B: <reason>"'],
+					description:
+						"repeatable, on create or `--promote`: what the later child of one declared chain (a `--chain` value, or the `--ordered` chain) takes from the earlier one. Written under that chain's `### Declared order` entry instead of the `## Split rationale` pointer. An undeclared, repeated or reasonless chain is refused before anything is written.",
 				},
 				{
 					names: ['--rationale-file <path|->'],
