@@ -2,6 +2,7 @@ import { derive_check } from '#scripts/document/derive-check'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import type { ChainStageEntry } from '#scripts/lane/lane-ledger-schema-ship'
 import { run_ship_pre_detach } from '#scripts/run/ship/run-ship-pre-detach'
+import { test_related_caller } from '#scripts/test/test-related-caller'
 
 // The stage runner behind `josh run:chain` (joshuafolkken/kit#5630): the main line's chain up to the
 // review in one call, not one model round trip per command. Each stage runs as its own `josh` command,
@@ -172,8 +173,13 @@ function stages_from(
 	return index === -1 ? undefined : stages.slice(index)
 }
 
+// The stage names its command to a `test:related` it starts, for the ledger row
+// (joshuafolkken/kit#7965) — the command alone, not its arguments.
 async function josh_stage(argv: ReadonlyArray<string>): Promise<JoshResult> {
-	return await josh_command.josh_run(argv, true)
+	const [command = ''] = argv
+	const caller = test_related_caller.environment(`run:chain ${command}`)
+
+	return await josh_command.josh_run(argv, true, undefined, caller)
 }
 
 async function held(stage: ChainStage, issue: string): Promise<ChainStop | undefined> {

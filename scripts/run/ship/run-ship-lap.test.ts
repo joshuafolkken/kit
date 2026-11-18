@@ -1,4 +1,5 @@
 import type { ShipLapRecord } from '#scripts/lane/lane-ledger-schema'
+import { test_related_caller } from '#scripts/test/test-related-caller'
 import { describe, expect, it, vi } from 'vitest'
 import { run_ship_lap } from './run-ship-lap'
 
@@ -212,5 +213,30 @@ describe('run_ship_lap.timed — the startup of a child process', () => {
 		)
 
 		expect(laps.map((record) => record.step)).toEqual([`${PARENT} › ${CHILD_STEP}`])
+	})
+})
+
+// joshuafolkken/kit#7965: a `test:related` a ship stage starts names that stage as its caller.
+describe('run_ship_lap.caller_environment', () => {
+	const { CALLER_ENVIRONMENT } = test_related_caller
+
+	it('names the stage it runs within, each of two side by side its own', async () => {
+		const [gate, round_two] = await Promise.all(
+			['gate', 'round-two'].map(
+				async (stage) =>
+					await run_ship_lap.within(ISSUE, stage, async () => {
+						await Promise.resolve()
+
+						return run_ship_lap.caller_environment()
+					}),
+			),
+		)
+
+		expect(gate).toStrictEqual({ [CALLER_ENVIRONMENT]: 'ship gate' })
+		expect(round_two).toStrictEqual({ [CALLER_ENVIRONMENT]: 'ship round-two' })
+	})
+
+	it('names nothing outside a ship stage', () => {
+		expect(run_ship_lap.caller_environment()).toStrictEqual({})
 	})
 })

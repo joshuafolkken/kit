@@ -1,11 +1,14 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import type { GateTree } from '#scripts/gate/gate-tree'
+import { input_fingerprint } from '#scripts/gate/input-fingerprint'
 import type { ChangedParts } from '#scripts/git/changed-paths'
 import type { TestRelatedRecord } from '#scripts/lane/lane-ledger-schema'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { lane_paths } from '#scripts/lane/lane-paths'
 import type { ReachedCount } from './test-pinned-reach'
+import { test_related_caller } from './test-related-caller'
 import { test_related_cap } from './test-related-cap'
 import type { TestReuse } from './test-related-reuse'
 import { related_scope, type RelatedScope } from './test-related-scope'
@@ -51,6 +54,9 @@ interface RunInput {
 	// Whether a bare run read only its last red run's failed files and what moved since
 	// (`test-related-red.ts`, joshuafolkken/kit#7786); `undefined` for a `--touched` run.
 	red_rerun?: boolean
+	// The changed-file map a bare run started on and its base — the reading the green record is written
+	// from (`gate-tree.ts`) — for the ledger's tree key; `undefined` where the run read none.
+	tree?: GateTree | undefined
 }
 
 const STAGE_FIELDS = ['rebuild_ms', 'core_wait_ms', 'vitest_ms'] as const
@@ -63,6 +69,9 @@ interface RunResult {
 	elapsed_ms: number
 	test_files: number | undefined
 	stages?: StageTimes
+	exit_code?: number
+	// The test files a red run failed on, where its log named them all (`test-related-red.ts`).
+	failed?: ReadonlyArray<string>
 }
 
 function set_count_target(target: string | undefined): void {
@@ -230,6 +239,25 @@ function branch_parts_record(
 	}
 }
 
+// One key per changed-file map, so two rows tell whether they ran on the same tree (joshuafolkken/kit#7965).
+function tree_record(tree: GateTree | undefined): Pick<TestRelatedRecord, 'tree' | 'base'> {
+	if (tree === undefined) return {}
+	const key = input_fingerprint.of_entries(
+		Object.entries(tree.files).map(([file, digest]) => `${file}\0${digest}`),
+	)
+
+	return tree.base === undefined ? { tree: key } : { tree: key, base: tree.base }
+}
+
+function outcome_record(result: RunResult): Pick<TestRelatedRecord, 'exit_code' | 'failed'> {
+	const { exit_code, failed = [] } = result
+
+	return {
+		...(exit_code !== undefined && { exit_code }),
+		...(failed.length > 0 && { failed: [...failed] }),
+	}
+}
+
 function record_of(input: RunInput, result: RunResult): TestRelatedRecord {
 	const { own, synced, since_map } = parts_of(input)
 	const record = {
@@ -247,6 +275,9 @@ function record_of(input: RunInput, result: RunResult): TestRelatedRecord {
 		...select_record(input.select_elapsed_ms),
 		...(input.red_rerun !== undefined && { red_rerun: input.red_rerun }),
 		...stage_record(result.stages),
+		...tree_record(input.tree),
+		...outcome_record(result),
+		caller: test_related_caller.read(),
 		elapsed_ms: Math.round(result.elapsed_ms),
 	}
 

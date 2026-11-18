@@ -12,6 +12,7 @@ import { run_board_closed } from './run-board-closed'
 import { run_board_every } from './run-board-every'
 import { run_board_fold } from './run-board-fold'
 import { run_board_fold_store } from './run-board-fold-store'
+import { run_board_frame_store } from './run-board-frame-store'
 import { run_board_gather } from './run-board-gather'
 import { run_board_gather_live } from './run-board-gather-live'
 import { run_board_gather_thread } from './run-board-gather-thread'
@@ -40,14 +41,17 @@ const FAILURE_EXIT_CODE = 1
 const ONCE_FLAG = '--once'
 const CHAT_FLAG = '--chat'
 const EVERY_FLAG = '--every'
+const FRESH_FLAG = '--fresh'
 const FLAGS: ReadonlySet<string> = new Set(['', ONCE_FLAG, CHAT_FLAG])
 const PASSED_ON_FLAGS: ReadonlySet<string> = new Set([CHAT_FLAG, EVERY_FLAG])
 const SIGINT_EXIT_CODE = 130
 const SIGTERM_EXIT_CODE = 143
-const USAGE = 'Usage: josh run:board [--once | --chat | --every <minutes>] [--theme wargames]'
+const USAGE =
+	'Usage: josh run:board [--once | --chat [--fresh] | --every <minutes>] [--theme wargames]'
 const DISABLED_NOTICE = `\`${run_progress.DISABLED_KEY}=${run_progress.DISABLED_VALUE}\` is set, so no progress is pushed.`
 const TRAILING_NEWLINE = /\n$/u
 const { FRESH_STATE, tick } = run_board_tick
+const { CHAT_KEY, fresh } = run_board_frame_store
 const { WORDS } = run_board_labels
 
 // A signal exits with its conventional code, so the `exit` handler restores the screen on every path.
@@ -119,7 +123,8 @@ function live_ports(is_live: boolean): BoardPorts {
 		? run_board_gather_thread.worker_gatherer()
 		: run_board_gather.frame_gatherer(run_board_gather_live.ports_of(false))
 
-	return { ...LIVE_PORTS, gather }
+	// Kept off `LIVE_PORTS`, so the profile that spreads them always reads from scratch.
+	return { ...LIVE_PORTS, gather, frames: run_board_frame_store.file_store() }
 }
 
 // Every frame starts from the top of the alternate screen, erasing what the last one left below it, and
@@ -192,14 +197,44 @@ async function watch(ports: BoardPorts): Promise<void> {
 	}
 }
 
+// A chat frame read from scratch, kept so the next question within a minute is answered from it; dated
+// when the read began, so its age is never understated.
+async function read_chat(ports: BoardPorts): Promise<string> {
+	const saved_ms = ports.now()
+	const { text } = await run_board_every.chat_frame(ports)
+
+	ports.frames?.save(CHAT_KEY, { text, saved_ms })
+
+	return text
+}
+
 // The answer to a progress question asked during a `backlogrun`, `fullrun` or `halfrun`: one frame in the chat's form,
 // recorded as the report it is, so the next scheduled one waits a full interval — as
-// `run:progress --once` does.
+// `run:progress --once` does. A frame recorded within the minute is the answer, read nothing.
 async function answer(ports: BoardPorts): Promise<void> {
-	const { text } = await run_board_every.chat_frame(ports)
+	const text = fresh(ports.frames, CHAT_KEY, ports.now()) ?? (await read_chat(ports))
 
 	ports.write(text)
 	await ports.mark()
+}
+
+// One plain frame stays on the terminal after the command, so it draws the still icons rather than a
+// spinner frame frozen mid-turn; a frame recorded within the minute is the answer, read nothing.
+async function still(ports: BoardPorts, theme: Theme | undefined): Promise<void> {
+	const key = run_board_frame_store.once_key(theme, ports.is_tty)
+	const now_ms = ports.now()
+	const recorded = fresh(ports.frames, key, now_ms)
+
+	if (recorded !== undefined) {
+		ports.write(recorded)
+
+		return
+	}
+
+	const write = run_board_frame_store.recording(ports.write, ports.frames, key, now_ms)
+	const themed = run_board_theme.themed({ ...ports, write }, theme)
+
+	await tick(FRESH_STATE, { ...themed, is_tty: false, size: undefined })
 }
 
 function refuse(note = ''): number {
@@ -242,25 +277,40 @@ async function draw(flag: string, ports: BoardPorts | undefined, theme?: Theme):
 
 	const { is_tty } = ports ?? LIVE_PORTS
 	const mode = run_board_screen.mode_of({ is_tty, is_once: flag === ONCE_FLAG })
-	const watched = run_board_theme.themed(ports_for(ports, mode === 'live'), theme)
+	const board = ports_for(ports, mode === 'live')
 
 	if (mode === 'live') {
-		await watch(watched)
+		await watch(run_board_theme.themed(board, theme))
 
 		return
 	}
 
-	// One plain frame stays on the terminal after the command, so it draws the still icons rather than a
-	// spinner frame frozen mid-turn.
-	await tick(FRESH_STATE, { ...watched, is_tty: false, size: undefined })
+	await still(board, theme)
 }
 
 function is_every(flag: string, rest: ReadonlyArray<string>): boolean {
 	return flag === EVERY_FLAG && rest.length === 1
 }
 
+function is_fresh_chat(flag: string, rest: ReadonlyArray<string>): boolean {
+	return flag === CHAT_FLAG && rest.length === 1 && rest[0] === FRESH_FLAG
+}
+
+// `--chat --fresh` reads from scratch past the record and still records — as the hand-off asks right
+// after a merge, when a record up to a minute old could still show the merged child in flight.
+function chat_ports(
+	flag: string,
+	rest: ReadonlyArray<string>,
+	ports: BoardPorts | undefined,
+): BoardPorts | undefined {
+	if (!is_fresh_chat(flag, rest)) return ports
+	const board = ports_for(ports, false)
+
+	return { ...board, frames: run_board_frame_store.save_only(board.frames) }
+}
+
 function is_refused(flag: string, rest: ReadonlyArray<string>): boolean {
-	return rest.length > 0 || !FLAGS.has(flag)
+	return (rest.length > 0 && !is_fresh_chat(flag, rest)) || !FLAGS.has(flag)
 }
 
 // `--chat` and `--every` never take the theme, so a `JOSH_BOARD_THEME` naming none never refuses them.
@@ -278,7 +328,7 @@ async function run(argv: ReadonlyArray<string>, ports?: BoardPorts): Promise<num
 	if (is_every(flag, rest)) return await push_every(rest[0], ports_for(ports, false))
 	if (is_refused(flag, rest)) return refuse()
 
-	await draw(flag, ports, choice.theme)
+	await draw(flag, chat_ports(flag, rest, ports), choice.theme)
 
 	return SUCCESS_EXIT_CODE
 }
