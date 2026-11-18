@@ -167,12 +167,12 @@ describe('backlog_defect_priority.prioritize (ac-1462bc0e)', () => {
 })
 
 describe('backlog:next defect-rate note', () => {
-	it('says new mechanisms are offered last', async () => {
+	it('says new mechanisms are offered last only among ranking ties', async () => {
 		stub({ defect_rate: ABOVE_BASELINE })
 
 		await backlog_next.run([])
 
-		expect(stderr()).toContain('new mechanisms are offered last')
+		expect(stderr()).toContain('among issues the ranking keys tie, new mechanisms are offered last')
 	})
 })
 

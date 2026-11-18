@@ -21,7 +21,7 @@ const DEFERRED_KIND_RANK: Readonly<Record<IssueKind, number>> = {
 }
 
 function above_message(measured: DefectRate): string {
-	return `The defect rate ${defect_rate.rate_text(measured)} is above its baseline ${String(defect_rate.BASELINE_RATE)}, so new mechanisms are offered last.`
+	return `The defect rate ${defect_rate.rate_text(measured)} is above its baseline ${String(defect_rate.BASELINE_RATE)}, so among issues the ranking keys tie, new mechanisms are offered last.`
 }
 
 function should_defer_mechanisms(measured: DefectRate | undefined): boolean {
