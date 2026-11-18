@@ -58,6 +58,15 @@ describe('run_board_pause.from_comments', () => {
 	})
 })
 
+// joshuafolkken/kit#7850: a park's next action reaches the 💤 row as a command to paste.
+describe('run_board_pause park next action', () => {
+	it('shows the parked command as the row reason', () => {
+		const command = 'pnpm josh backlog:triage --apply 7447 --blocked-by 7839'
+
+		expect(run_board_pause.from_comments([note(SIZE_REASON), note(command)]).summary).toBe(command)
+	})
+})
+
 describe('run_board_pause evidence validation', () => {
 	it('falls back for a missing URL or invalid summary', () => {
 		const missing = { ...note(APPROVAL_REASON), html_url: undefined }

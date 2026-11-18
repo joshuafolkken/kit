@@ -14,7 +14,7 @@ const NO_WRITE = 'Nothing was labelled, commented, recorded or released.'
 type Answered = Extract<AnswerVerdict, { kind: 'answered' }>
 
 function park_command(issue_number: string): string {
-	return `pnpm josh run:park ${issue_number} --body-file <path>`
+	return `pnpm josh run:park ${issue_number} --body-file <path> --outcome "<next action>"`
 }
 
 function refused(lines: ReadonlyArray<string>): number {

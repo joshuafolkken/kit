@@ -2,6 +2,7 @@ import path from 'node:path'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it } from 'vitest'
+import { lane_host_gaps } from './lane-host-gaps'
 import { lane_sleep } from './lane-sleep'
 
 const make_directory = temporary_directory('suite')
@@ -37,6 +38,6 @@ describe('lane_sleep.record', () => {
 		const events = run_event_stream.read_events(events_path)
 
 		expect(events.map((event) => event.text)).toStrictEqual(['host slept 29.0 min'])
-		expect(lane_sleep.spans(events)).toStrictEqual([span])
+		expect(lane_host_gaps.sleeps(events)).toStrictEqual([span])
 	})
 })

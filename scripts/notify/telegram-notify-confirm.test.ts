@@ -1,11 +1,22 @@
 import { gh_spawn } from '#scripts/gh/gh-spawn'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { telegram_notify } from './telegram-notify'
+import { confirmation_ledger } from './confirmation-ledger'
+import { telegram_notify, type ConfirmInput } from './telegram-notify'
 
 const OK_STATUS = 200
 const BODY = 'The run stopped.'
 const RECOMMENDED = 'Resume it'
 const ALTERNATIVE = 'Leave it'
+
+const ISSUE = '7889'
+const CONFIRM: ConfirmInput = {
+	reason: 'run-stopped',
+	issue_title: 'backlogrun paused',
+	body: BODY,
+	recovery: 'none',
+	recommended: RECOMMENDED,
+	alternatives: [],
+}
 
 type FetchSpy = ReturnType<typeof vi.fn<typeof fetch>>
 
@@ -36,6 +47,33 @@ function sent_body(fetch_spy: FetchSpy): string {
 	return typeof body === 'string' ? body : ''
 }
 
+// joshuafolkken/kit#7889: every confirmation is recorded, whether or not it is sent.
+describe('telegram_notify.confirm — the confirmation ledger', () => {
+	it('records the reason and the Issue even when notifications are disabled', async () => {
+		const fetch_spy = stub_send()
+		const record = vi.spyOn(confirmation_ledger, 'record_sent').mockResolvedValue()
+
+		vi.stubEnv('JOSH_NOTIFY', 'off')
+		await telegram_notify.confirm({ ...CONFIRM, issue: ISSUE })
+
+		expect(record).toHaveBeenCalledWith(
+			expect.objectContaining({ task_type: 'confirmation', reason: CONFIRM.reason, issue: ISSUE }),
+		)
+		expect(fetch_spy).not.toHaveBeenCalled()
+	})
+
+	it('records the confirmation when the send fails', async () => {
+		const fetch_spy = stub_send()
+		const record = vi.spyOn(confirmation_ledger, 'record_sent').mockResolvedValue()
+
+		fetch_spy.mockRejectedValue(new Error('gateway timeout'))
+		vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		expect(await telegram_notify.confirm(CONFIRM)).toBe(false)
+		expect(record).toHaveBeenCalledWith(expect.objectContaining({ reason: CONFIRM.reason }))
+	})
+})
+
 afterEach(() => {
 	vi.unstubAllEnvs()
 	vi.unstubAllGlobals()
@@ -47,13 +85,7 @@ describe('telegram_notify.confirm — the choices reach the message', () => {
 	it('sends the recommended choice and the alternatives after the body', async () => {
 		const fetch_spy = stub_send()
 
-		await telegram_notify.confirm({
-			issue_title: 'backlogrun stopped',
-			body: BODY,
-			recovery: 'none',
-			recommended: RECOMMENDED,
-			alternatives: [ALTERNATIVE],
-		})
+		await telegram_notify.confirm({ ...CONFIRM, alternatives: [ALTERNATIVE] })
 
 		const expected = `${BODY}\n\nRecommended: ${RECOMMENDED}\nAlternatives:\n- ${ALTERNATIVE}`
 

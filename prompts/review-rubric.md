@@ -168,6 +168,8 @@ switching `no-restricted-syntax` off.
   the implementation were inverted or removed, would it fail? If no or uncertain, rewrite it.
 - **Requirement check**: does the test verify the behavior the issue/task describes, or only that code
   runs without error?
+- A `Removed tests` row already written as `置き換え` → a rename the check matched, not a finding
+  (`scripts/review/renamed-tests.ts`).
 
 ### 7. Comments & content
 
