@@ -1,0 +1,7 @@
+{
+	"reason": "the kickoff new filing check (#7857): names_issue plus filed_kickoff, the bug fix itself",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 25
+	}
+}

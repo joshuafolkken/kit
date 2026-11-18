@@ -44,3 +44,15 @@ describe('run_handoff_final.github_urls', () => {
 		expect(run_handoff_final.github_urls('nothing created')).toEqual([])
 	})
 })
+
+// joshuafolkken/kit#7857: only an Issue URL confirms a `kickoff new` filed one.
+describe('run_handoff_final.names_issue', () => {
+	it.each([
+		{ message: `Filed ${ISSUE_URL}`, expected: true },
+		{ message: `Opened ${PR_URL}`, expected: false },
+		{ message: 'Waiting for the background check.', expected: false },
+		{ message: undefined, expected: false },
+	])('answers $expected for $message', ({ message, expected }) => {
+		expect(run_handoff_final.names_issue(message)).toBe(expected)
+	})
+})
