@@ -3,10 +3,10 @@ import path from 'node:path'
 import { atomic_write } from '#scripts/lib/atomic-write'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Note } from './run-board-sound-synth'
+import { run_board_sound_synth, type Note } from './run-board-sound-synth'
 import { run_board_sound_wav } from './run-board-sound-wav'
 
-// joshuafolkken/kit#7944: synthesized PCM is saved once as a WAV file named by its definition.
+// joshuafolkken/kit#7944: synthesized PCM is saved once as a WAV file named by a digest of its bytes.
 
 const { SAMPLE_RATE, HEADER_BYTES, cached_wav, wav_of } = run_board_sound_wav
 
@@ -36,6 +36,7 @@ function tag_at(wav: Buffer, offset: number): string {
 	return wav.toString('ascii', offset, offset + TAG_BYTES)
 }
 
+const DIRECTORY_PREFIX = 'run-board-sound-wav-'
 const create_directory = temporary_directory()
 
 afterEach(() => {
@@ -79,7 +80,7 @@ describe('run_board_sound_wav.cached_wav', () => {
 	let directory = ''
 
 	beforeEach(() => {
-		directory = create_directory('run-board-sound-wav-')
+		directory = create_directory(DIRECTORY_PREFIX)
 	})
 
 	it('writes the WAV file into the directory and returns its path', () => {
@@ -107,11 +108,36 @@ describe('run_board_sound_wav.cached_wav', () => {
 		expect(changed).not.toBe(original)
 	})
 
+	it('names the same notes differently when the synthesized samples change', () => {
+		const original = cached_wav('chime', NOTES, directory)
+
+		vi.spyOn(run_board_sound_synth, 'samples_of').mockReturnValue(SAMPLES)
+
+		const reshaped = cached_wav('chime', NOTES, directory)
+
+		expect(reshaped).toBeDefined()
+		expect(reshaped).not.toBe(original)
+	})
+})
+
+describe('run_board_sound_wav.cached_wav on failure', () => {
+	let directory = ''
+
+	beforeEach(() => {
+		directory = create_directory(DIRECTORY_PREFIX)
+	})
+
 	it('returns undefined instead of throwing when the write fails (ac-fc55c10f)', () => {
 		const blocked = path.join(directory, 'not-a-directory')
 
 		writeFileSync(blocked, '')
 
 		expect(cached_wav('chime', NOTES, blocked)).toBeUndefined()
+	})
+
+	it('returns undefined instead of throwing when a note cannot be synthesized', () => {
+		const unknown: ReadonlyArray<Note> = [{ pitch: 'H9', ms: 10, wave: 'sine' }]
+
+		expect(cached_wav('chime', unknown, directory)).toBeUndefined()
 	})
 })

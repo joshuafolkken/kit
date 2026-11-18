@@ -6,8 +6,8 @@ import { usage_state_path } from '#scripts/usage/usage-state-path'
 import { run_board_sound_synth, type Note } from './run-board-sound-synth'
 
 // Synthesized cues saved as WAV files an OS player can open (joshuafolkken/kit#7944). Each sound is
-// written once into the josh state directory under a name carrying a digest of its definition, so a
-// changed definition gets a new file and an unchanged one reuses the file already there.
+// written once into the josh state directory under a name carrying a digest of its bytes, so a
+// changed sound gets a new file and an unchanged one reuses the file already there.
 
 const SAMPLE_RATE = 44_100
 const HEADER_BYTES = 44
@@ -76,34 +76,32 @@ function wav_of(samples: Int16Array, sample_rate: number): Buffer {
 	])
 }
 
-// The fields are listed explicitly so the digest does not depend on an object's key order.
-function file_name_of(name: string, notes: ReadonlyArray<Note>): string {
-	const definition = JSON.stringify([
-		SAMPLE_RATE,
-		notes.map((note) => [note.pitch, note.ms, note.wave]),
-	])
-	const digest = createHash('sha256').update(definition).digest('hex').slice(0, DIGEST_LENGTH)
+// The digest is of the rendered bytes, so any change to the notes or to the synth's shaping (volume,
+// fade, waveform) names a new file.
+function file_name_of(name: string, wav: Buffer): string {
+	const digest = createHash('sha256').update(wav).digest('hex').slice(0, DIGEST_LENGTH)
 
 	return `${name}-${digest}.wav`
 }
 
-// The sound's WAV path, written on the first call only; `undefined` when the write fails, so a
-// failing disk silences the cue rather than taking the board down.
+function written_wav(name: string, notes: ReadonlyArray<Note>, directory: string): string {
+	const wav = wav_of(run_board_sound_synth.samples_of(notes, SAMPLE_RATE), SAMPLE_RATE)
+	const target = path.join(directory, file_name_of(name, wav))
+
+	if (!existsSync(target)) atomic_write.replace_file(target, wav)
+
+	return target
+}
+
+// The sound's WAV path, written on the first call only; `undefined` when synthesis or the write
+// fails, so a bad note or a failing disk silences the cue rather than taking the board down.
 function cached_wav(
 	name: string,
 	notes: ReadonlyArray<Note>,
 	directory = usage_state_path.sounds(),
 ): string | undefined {
-	const target = path.join(directory, file_name_of(name, notes))
-
-	if (existsSync(target)) return target
-
-	const wav = wav_of(run_board_sound_synth.samples_of(notes, SAMPLE_RATE), SAMPLE_RATE)
-
 	try {
-		atomic_write.replace_file(target, wav)
-
-		return target
+		return written_wav(name, notes, directory)
 	} catch {
 		return undefined
 	}
