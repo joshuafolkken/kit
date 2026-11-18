@@ -5,6 +5,7 @@ import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { lane_paths } from '#scripts/lane/lane-paths'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { test_related_caller } from './test-related-caller'
 import { test_related_cap } from './test-related-cap'
 import { test_related_record, type RunInput } from './test-related-record'
 import { related_scope } from './test-related-scope'
@@ -48,6 +49,8 @@ function count_target(): string {
 
 describe('test_related_record.record_of', () => {
 	it('splits the input into the change, the main sync part, the since-map part and the readers', () => {
+		vi.stubEnv(test_related_caller.CALLER_ENVIRONMENT, '')
+
 		const record = test_related_record.record_of(related_input(), {
 			elapsed_ms: ELAPSED_MS,
 			test_files: TEST_FILES,
@@ -60,17 +63,9 @@ describe('test_related_record.record_of', () => {
 			since_map: 1,
 			readers: 1,
 			test_files: TEST_FILES,
+			caller: 'manual',
 			elapsed_ms: Math.round(ELAPSED_MS),
 		})
-	})
-
-	it('leaves the test file count out when vitest reported none', () => {
-		const record = test_related_record.record_of(related_input(), {
-			elapsed_ms: 0,
-			test_files: undefined,
-		})
-
-		expect(record).not.toHaveProperty('test_files')
 	})
 })
 

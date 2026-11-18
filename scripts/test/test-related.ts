@@ -410,7 +410,11 @@ async function run_fresh(
 
 	report_unhanded(root, command_arguments, input)
 
-	return await test_related_run.run_and_vouch({ ...input, branch_parts }, command_arguments, before)
+	return await test_related_run.run_and_vouch(
+		{ ...input, branch_parts, tree: before },
+		command_arguments,
+		before,
+	)
 }
 
 async function run_related_tests(given: ReadonlyArray<string>): Promise<number> {

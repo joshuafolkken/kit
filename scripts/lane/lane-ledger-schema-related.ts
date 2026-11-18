@@ -56,6 +56,14 @@ const test_related_schema = z.object({
 	rebuild_ms: z.number().optional(),
 	core_wait_ms: z.number().optional(),
 	vitest_ms: z.number().optional(),
+	// What the run read and how it ended (joshuafolkken/kit#7965): the digest of the changed-file map it
+	// started on and that map's base, its exit code, the test files a red run failed on and who started
+	// it — each absent where it was not read, and on rows written before it.
+	tree: z.string().optional(),
+	base: z.string().optional(),
+	exit_code: z.number().optional(),
+	failed: z.array(z.string()).optional(),
+	caller: z.string().optional(),
 	elapsed_ms: z.number(),
 })
 

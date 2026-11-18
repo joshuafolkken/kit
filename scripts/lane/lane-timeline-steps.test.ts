@@ -96,6 +96,29 @@ describe('lane_timeline_steps.of — the checks, waits and rounds', () => {
 	})
 })
 
+// joshuafolkken/kit#7965: a row written since carries how it ended, its caller and its tree.
+describe('lane_timeline_steps.of — a test:related row with its outcome', () => {
+	it('names a test:related run with its exit code, caller, tree head and failed files', () => {
+		const entry = {
+			...test_related(2, 1, RELATED),
+			exit_code: 1,
+			caller: 'ship gate',
+			tree: '0123456789abcdef',
+			failed: ['a.test.ts', 'b.test.ts'],
+		}
+
+		expect(step_names([entry])).toStrictEqual([
+			`test:related (${RELATED}; exit 1; caller ship gate; tree 01234567; failed a.test.ts, b.test.ts)`,
+		])
+	})
+
+	it('names a green run with no failed files', () => {
+		const entry = { ...test_related(2, 1, RELATED), exit_code: 0, caller: 'manual' }
+
+		expect(step_names([entry])).toStrictEqual([`test:related (${RELATED}; exit 0; caller manual)`])
+	})
+})
+
 function call(command: string): ToolCall {
 	return {
 		session_id: 'session',

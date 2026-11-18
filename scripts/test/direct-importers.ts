@@ -222,6 +222,7 @@ const direct_importers = {
 	resolve_specifier,
 	source_reader,
 	specifiers_of,
+	work_tree_files,
 }
 
 export type { ImportMap, SourceReader }
