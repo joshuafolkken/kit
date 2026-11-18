@@ -98,6 +98,17 @@ describe('run_board_render_lead.lead_of — columns', () => {
 		])
 	})
 
+	// joshuafolkken/kit#7866: a lane row draws its time net of the host's sleep, without the bracket,
+	// so its usage cells still start where the processes rows' do.
+	it('draws a lane row’s time net of a sleep, in the same columns', () => {
+		const row = lane()
+		const gaps = [{ from_ms: NOW - 15 * MINUTE, to_ms: NOW - 5 * MINUTE }]
+		const text = lead({ ...row, status: { ...row.status, state: row.state, gaps } })
+
+		expect(text).toBe(`${SPINNER}  🚦    2′00″   10′00″`)
+		expect(width(text)).toBe(USAGE_START - 1)
+	})
+
 	it('starts the run’s time at the column the rule’s ⏰ stands over', () => {
 		const before = lead(lane()).slice(0, -TIME_WIDTH)
 
