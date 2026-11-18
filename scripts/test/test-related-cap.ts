@@ -3,9 +3,10 @@ import path from 'node:path'
 import { direct_importers } from './direct-importers'
 import { test_declared_logic } from './test-declared-logic'
 import { test_pinned_logic } from './test-pinned-logic'
-import { test_pinned_reach, type ReachedCount } from './test-pinned-reach'
+import type { ReachedCount } from './test-pinned-reach'
 import { related_scope } from './test-related-scope'
 import type { Selection } from './test-related-select'
+import { test_symbol_read } from './test-symbol-read'
 
 // **A run never hands vitest more than `test_pinned_logic.MAX_TEST_FILES` test files**
 // (`test-related-select.ts`, joshuafolkken/kit#7976): the rest are deferred to CI. This module names
@@ -42,11 +43,12 @@ async function relative_counts(
 
 // The hubs among `files`, read before any edit so `lane:plan` can split them off
 // (joshuafolkken/kit#6543): each file whose own reach passes the cap, not the widest of a spread that
-// only sums past it. None without a graph.
+// only sums past it — the tests a whole-file change selects by symbol (joshuafolkken/kit#7980). None
+// without a graph.
 async function hubs_of(
 	root: string,
 	files: ReadonlyArray<string>,
-	read_counts: CountReader = test_pinned_reach.reached_test_counts,
+	read_counts: CountReader = test_symbol_read.reached_counts,
 ): Promise<ReadonlyArray<string>> {
 	const counts = await relative_counts(root, candidates_of(root, files), read_counts)
 

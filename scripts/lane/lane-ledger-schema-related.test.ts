@@ -25,6 +25,21 @@ describe('lane_ledger_schema_related — the deferred count', () => {
 	})
 })
 
+// joshuafolkken/kit#7980: a row names how its tests were chosen; an older one, read above, does not.
+describe('lane_ledger_schema_related — the selection method', () => {
+	it('reads a row with its selection method back as written', () => {
+		const row = { ...ROW, select_method: 'symbol' }
+
+		expect(lane_ledger_schema.entry_schema.parse(row)).toEqual(row)
+	})
+
+	it('refuses a selection method it does not know', () => {
+		const row = { ...ROW, select_method: 'guess' }
+
+		expect(lane_ledger_schema.entry_schema.safeParse(row).success).toBe(false)
+	})
+})
+
 describe('lane_ledger_schema_related — the test:related row, read through the entry union', () => {
 	it('reads a row with its full-reach files back as written', () => {
 		const row = { ...ROW, full_reach: [{ file: 'scripts/wide.ts', reached: 1777 }] }

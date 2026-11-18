@@ -50,6 +50,7 @@ function selection_of(deferred: number): Selection {
 	return {
 		tests: [DIRECT_TEST],
 		deferred,
+		method: 'import',
 		reach: [
 			{ file: MERGED_HUB, count: MAX_TEST_FILES + 2 },
 			{ file: MIDDLE_MODULE, count: 1 },

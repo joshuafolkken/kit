@@ -1,21 +1,19 @@
-import {
-	test_symbol_facts,
-	type Binding,
-	type FileFacts,
-	type Resolve,
-	type TypeScript,
-} from './test-symbol-facts'
+import { test_declared_logic } from './test-declared-logic'
+import type { Binding, BindingSpan, Reexport, Resolve, TypeScript } from './test-symbol-bindings'
+import { test_symbol_facts, type FileFacts } from './test-symbol-facts'
+import { test_symbol_whole } from './test-symbol-whole'
 
-// A prototype of related-test selection by the users of changed functions and constants, rather than
-// by every file a changed file's imports reach (joshuafolkken/kit#7979, measured for #7980). A changed
-// line marks the declaration it falls in; the change travels to every declaration referencing it —
-// freely inside one file, one hop per file boundary — and selects each test file it reaches. `a.b`
-// on an object bundling functions reads the member `b` alone; a load-time statement reaches only the
-// direct readers of its module; a namespace or dynamic import uses every export.
+// **Related-test selection by the users of changed functions and constants**, rather than by every
+// file a changed file's imports reach (joshuafolkken/kit#7980, measured in #7979). A changed line marks
+// the declaration it falls in; the change travels to every declaration referencing it — freely inside
+// one file, one hop per file boundary — and selects each test file it reaches. `a.b` on an object
+// literal reads the member `b` alone; a load-time statement reaches only the direct test readers of
+// its module; a namespace or dynamic import uses every export. A `stops` key — a hub most of the code
+// reads, such as the command map — passes the change to its direct test users alone.
 
 const { EVERY, LOAD, SEPARATOR, key_of, file_of, name_of } = test_symbol_facts
 const MAX_REEXPORT_DEPTH = 16
-const TEST_FILE = /\.(?:test|spec)\.ts$/u
+const { is_test_file } = test_declared_logic
 
 interface Source {
 	file: string
@@ -28,9 +26,21 @@ interface SymbolIndex {
 	readers: Map<string, Set<string>>
 }
 
-interface Walk {
-	index: SymbolIndex
+// How far a change travels: `max_hops` file boundaries, and no further than the direct test users of a
+// `stops` key.
+interface Reach {
 	max_hops: number
+	stops: ReadonlySet<string>
+}
+
+// A run of lines: a declaration's or a binding statement's.
+interface Span {
+	start: number
+	end: number
+}
+
+interface Walk extends Reach {
+	index: SymbolIndex
 	selected: Set<string>
 	seen: Set<string>
 	layer: Array<string>
@@ -44,10 +54,21 @@ function add_to(map: Map<string, Set<string>>, key: string, value: string): void
 	else known.add(value)
 }
 
-function reexport_of(facts: FileFacts, name: string): Binding | undefined {
+// Whether `module` declares or re-exports `name` by name, so a star barrel's name is found in the
+// module that has it rather than in its first star.
+function names_export(index: SymbolIndex, module: string, name: string): boolean {
+	const facts = index.facts.get(module)
+
+	return (
+		facts?.exports.has(name) === true || facts?.reexports.some((item) => item.as === name) === true
+	)
+}
+
+function reexport_of(index: SymbolIndex, facts: FileFacts, name: string): Binding | undefined {
 	const direct = facts.reexports.find((item) => item.as === name)
 	if (direct !== undefined) return direct
-	const star = facts.reexports.find((item) => item.as === EVERY)
+	const stars = facts.reexports.filter((item) => item.as === EVERY)
+	const star = stars.find((item) => names_export(index, item.module, name)) ?? stars[0]
 
 	return star === undefined ? undefined : { module: star.module, name }
 }
@@ -61,7 +82,7 @@ function export_step(index: SymbolIndex, binding: Binding): Binding | undefined 
 		return undefined
 	}
 
-	return reexport_of(facts, binding.name) ?? { module: binding.module, name: EVERY }
+	return reexport_of(index, facts, binding.name) ?? { module: binding.module, name: EVERY }
 }
 
 function declaration_key(index: SymbolIndex, binding: Binding): string {
@@ -120,9 +141,28 @@ function link(index: SymbolIndex, user: string, references: ReadonlySet<string>)
 	}
 }
 
+// The declaration a re-export passes on — every export of its module for `export *`.
+function reexport_target(index: SymbolIndex, binding: Binding): string {
+	return binding.name === EVERY ? key_of(binding.module, EVERY) : resolve_export(index, binding)
+}
+
+// A barrel's whole-module readers — `import('./barrel')`, `import * as` — use what it re-exports.
 function index_file(index: SymbolIndex, file: string, facts: FileFacts): void {
 	for (const module of facts.modules) add_to(index.readers, module, file)
 	for (const [name, item] of facts.declarations) link(index, key_of(file, name), item.references)
+
+	for (const item of facts.reexports) {
+		add_to(index.users, reexport_target(index, item), key_of(file, EVERY))
+	}
+}
+
+// A `.svelte` component read whole, any other source by its syntax.
+function facts_of(typescript: TypeScript, resolve: Resolve, source: Source): FileFacts {
+	const { file, text } = source
+
+	return test_symbol_whole.is_whole(file)
+		? test_symbol_whole.read_whole(resolve, file, text)
+		: test_symbol_facts.read_file(typescript, resolve, file, text)
 }
 
 function build(
@@ -133,12 +173,39 @@ function build(
 	const index: SymbolIndex = { facts: new Map(), users: new Map(), readers: new Map() }
 
 	for (const { file, text } of sources) {
-		index.facts.set(file, test_symbol_facts.read_file(typescript, resolve, file, text))
+		index.facts.set(file, facts_of(typescript, resolve, { file, text }))
 	}
 
 	for (const [file, facts] of index.facts) index_file(index, file, facts)
 
 	return index
+}
+
+function is_hit(span: Span, lines: ReadonlyArray<number>): boolean {
+	return lines.some((line) => line >= span.start && line <= span.end)
+}
+
+function uses_name(references: ReadonlySet<string>, name: string): boolean {
+	return [...references].some((reference) => reference === name || reference.startsWith(`${name}.`))
+}
+
+// What a re-export passes on: the declaration it names, or every export of a `export *` module.
+function passed_on(index: SymbolIndex, item: Reexport): Array<string> {
+	if (item.name !== EVERY) return [resolve_export(index, item)]
+	const exports = index.facts.get(item.module)?.exports.values() ?? []
+
+	return [...exports].map((name) => key_of(item.module, name))
+}
+
+// A changed import seeds its file's declarations using a name it binds; a changed re-export, what it
+// passes on — so a swapped module or binding selects the users of the code it now reaches.
+function binding_keys(index: SymbolIndex, file: string, span: BindingSpan): Array<string> {
+	const declarations = [...(index.facts.get(file)?.declarations ?? [])]
+	const users = declarations
+		.filter(([, item]) => span.imports.some((name) => uses_name(item.references, name)))
+		.map(([name]) => key_of(file, name))
+
+	return [...users, ...span.reexports.flatMap((item) => passed_on(index, item))]
 }
 
 // The declarations a changed line falls in, a changed test file standing for itself.
@@ -150,10 +217,14 @@ function changed_keys(
 	const facts = index.facts.get(file)
 	if (facts === undefined) return []
 	const keys = [...facts.declarations]
-		.filter(([, item]) => lines.some((line) => line >= item.start && line <= item.end))
+		.filter(([, item]) => is_hit(item, lines))
 		.map(([name]) => key_of(file, name))
+	const bound = facts.spans
+		.filter((span) => is_hit(span, lines))
+		.flatMap((span) => binding_keys(index, file, span))
+	const all = [...keys, ...bound]
 
-	return TEST_FILE.test(file) ? [...keys, key_of(file, LOAD)] : keys
+	return is_test_file(file) ? [...all, key_of(file, LOAD)] : all
 }
 
 function is_exported(index: SymbolIndex, key: string): boolean {
@@ -180,18 +251,24 @@ function load_readers(walk: Walk, key: string, hops: number): Array<string> {
 	const file = file_of(key)
 	if (hops >= walk.max_hops || !name_of(key).startsWith(LOAD)) return []
 
-	return [...(walk.index.readers.get(file) ?? [])].filter((reader) => TEST_FILE.test(reader))
+	return [...(walk.index.readers.get(file) ?? [])].filter((reader) => is_test_file(reader))
+}
+
+// The users a change to `key` travels on to: a stop passes it to its test users alone.
+function next_users(walk: Walk, key: string): Array<string> {
+	const unseen = users_of(walk.index, key).filter((user) => !walk.seen.has(user))
+	if (!walk.stops.has(key)) return unseen
+
+	return unseen.filter((user) => is_test_file(file_of(user)))
 }
 
 function visit(walk: Walk, key: string, hops: number): void {
 	const file = file_of(key)
 
 	walk.seen.add(key)
-	if (TEST_FILE.test(file)) walk.selected.add(file)
+	if (is_test_file(file)) walk.selected.add(file)
 	for (const reader of load_readers(walk, key, hops)) walk.selected.add(reader)
-	const unseen = users_of(walk.index, key).filter((user) => !walk.seen.has(user))
-
-	for (const user of unseen) queue(walk, user, file)
+	for (const user of next_users(walk, key)) queue(walk, user, file)
 }
 
 function drain(walk: Walk, hops: number): void {
@@ -203,41 +280,26 @@ function drain(walk: Walk, hops: number): void {
 	walk.next = []
 }
 
-// The test files a change to `seeds` reaches within `max_hops` file boundaries, walked in rounds of
-// one hop so that each key is visited at the fewest hops it can be reached in.
-function select(index: SymbolIndex, seeds: ReadonlyArray<string>, max_hops: number): Set<string> {
+// The test files a change to `seeds` reaches, walked in rounds of one hop so that each key is visited
+// at the fewest hops it can be reached in.
+function select(index: SymbolIndex, seeds: ReadonlyArray<string>, reach: Reach): Set<string> {
 	const walk: Walk = {
+		...reach,
 		index,
-		max_hops,
 		selected: new Set(),
 		seen: new Set(),
 		layer: [...seeds],
 		next: [],
 	}
 
-	for (let hops = 0; hops <= max_hops && walk.layer.length > 0; hops += 1) {
+	for (let hops = 0; hops <= reach.max_hops && walk.layer.length > 0; hops += 1) {
 		drain(walk, hops)
 	}
 
 	return walk.selected
 }
 
-// Today's selection, for comparison: every test file whose runtime imports reach a changed file.
-function import_reach(index: SymbolIndex, files: ReadonlyArray<string>): Set<string> {
-	const reached = new Set(files)
-	const pending = [...files]
+const test_symbol_users = { build, changed_keys, select }
 
-	for (let file = pending.pop(); file !== undefined; file = pending.pop()) {
-		const readers = [...(index.readers.get(file) ?? [])].filter((reader) => !reached.has(reader))
-
-		for (const reader of readers) reached.add(reader)
-		pending.push(...readers)
-	}
-
-	return new Set([...reached].filter((file) => TEST_FILE.test(file)))
-}
-
-const test_symbol_users = { build, changed_keys, select, import_reach }
-
-export type { Source, SymbolIndex }
+export type { Reach, Source, SymbolIndex }
 export { test_symbol_users }

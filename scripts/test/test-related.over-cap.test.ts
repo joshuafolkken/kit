@@ -82,6 +82,7 @@ beforeEach(() => {
 		tests: [SELECTED_TEST],
 		deferred: DEFERRED,
 		reach: [{ file: CHANGED_SOURCE, count: OVER_CAP }],
+		method: 'import',
 	})
 })
 

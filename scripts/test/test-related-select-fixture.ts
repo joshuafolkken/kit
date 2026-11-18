@@ -12,7 +12,7 @@ interface SelectModule {
 	test_related_select: typeof SelectApi
 }
 
-const NOTHING_SELECTED: Selection = { tests: [], deferred: 0, reach: [] }
+const NOTHING_SELECTED: Selection = { tests: [], deferred: 0, reach: [], method: 'import' }
 
 const actual = await vi.importActual<SelectModule>('./test-related-select')
 
