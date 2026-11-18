@@ -12,7 +12,7 @@ const removed_mock = vi.hoisted(() =>
 )
 
 vi.mock('#scripts/git/git-preflight', () => ({
-	git_preflight: { problems_of: problems_mock },
+	git_preflight: { PRECONDITION: {}, problems_of: problems_mock },
 }))
 vi.mock('#scripts/git/changed-paths', () => ({
 	changed_paths: { read_changed_paths: paths_mock },

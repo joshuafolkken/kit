@@ -12,7 +12,7 @@ const EN_LEAD =
 	'Net time by stage, longest first, 62 min of net time (`pnpm josh lane:breakdown 4970`):'
 const STAGE_TEXT = 'implement 62.0 min, over budget +53 min ()'
 const EXCLUDED_TEXT =
-	'waits taken out (park, outage, usage limit, yield, split run, host sleep) 0.0 min, of which yield wait 0.0 min, of which host sleep 0.0 min'
+	'waits taken out (park, outage, usage limit, yield, split run, host stop) 0.0 min, of which yield wait 0.0 min, of which host stop (sleep or network down) 0.0 min'
 
 const REPORT: Report = {
 	breakdown: {

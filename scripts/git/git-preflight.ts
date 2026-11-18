@@ -172,7 +172,7 @@ async function check(input: PreflightInput): Promise<void> {
 	if (pr_target !== undefined) await announce_evidence(pr_target.branch_name)
 }
 
-const git_preflight = { check, problems_of }
+const git_preflight = { PRECONDITION, check, problems_of }
 
 export type { PreflightInput, Unmet }
 export { git_preflight }

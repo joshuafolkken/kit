@@ -55,7 +55,8 @@ interface Mark {
 
 const MERGE_STEP = 'merge'
 const NO_KIND = 'wait'
-const SLEEP_KIND = 'sleep'
+// A host sleep or network outage (joshuafolkken/kit#7867), joined in `lane-host-gaps.ts`.
+const SLEEP_KIND = 'host stop'
 const CLOCK_LENGTH = 19
 // `HH:MM:SS` in an ISO time, and its width.
 const TIME_START = 11

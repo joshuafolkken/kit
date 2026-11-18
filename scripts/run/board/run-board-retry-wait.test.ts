@@ -13,6 +13,7 @@ import type { ItemStatus } from './run-board-status'
 
 const { header, lines_of } = run_board_render_fixture
 const REPO = 'joshuafolkken/kit'
+const UPSTREAM_REPO = 'joshuafolkken/app-kit'
 const WAITS = 7400
 const NEXT = 7401
 const NOW_MS = Date.parse('2026-11-14T06:00:00.000Z')
@@ -24,14 +25,18 @@ function child(number: number, body?: string): EpicChild {
 	return { number, repo: REPO, state: 'OPEN', labels: [RUN_LANE_LABEL], blocked_by: [], body }
 }
 
-function plan_of(waves: Array<EpicChild>, unreached: Array<EpicChild>): BoardPlan {
+function plan_of(
+	waves: Array<EpicChild>,
+	unreached: Array<EpicChild>,
+	open_blockers: Array<number> = [],
+): BoardPlan {
 	const numbers = [...waves, ...unreached].map((item) => item.number)
 	const titles = new Map(numbers.map((number) => [number, `Issue ${String(number)}`]))
 
 	return {
 		waves: { waves: waves.length > 0 ? [waves] : [], unreached },
 		tracked: new Map(),
-		context: { repo: REPO, titles, open_numbers: new Set(numbers) },
+		context: { repo: REPO, titles, open_numbers: new Set([...numbers, ...open_blockers]) },
 		labels: new Map(),
 	}
 }
@@ -88,7 +93,7 @@ describe('run_board_layout.layout_of — an issue queued by run:add --retry', ()
 
 // joshuafolkken/kit#7695: an upstream interrupt parks its lane on a blocker in another repository.
 describe('run_board_layout.layout_of — a lane held by an upstream interrupt', () => {
-	const UPSTREAM = { repo: 'joshuafolkken/app-kit', number: 7691 }
+	const UPSTREAM = { repo: UPSTREAM_REPO, number: 7691 }
 
 	function held(state: 'OPEN' | 'CLOSED'): EpicChild {
 		return { ...child(WAITS), blocked_by: [{ ...UPSTREAM, state }] }
@@ -106,4 +111,33 @@ describe('run_board_layout.layout_of — a lane held by an upstream interrupt', 
 			expect(lines_of(header({ layout })).join('\n')).toContain('🔗 app-kit#7691')
 		},
 	)
+})
+
+// joshuafolkken/kit#7901: each ⏳ lane row's line end says why it waits and what starts it.
+// The lane rows alone: a ⏳ row opens with its indent, the header and section rules do not.
+const LANE_ROW = /^\s+⏳/u
+
+function hourglass_lines(layout: BoardLayout): Array<string> {
+	return lines_of(header({ layout })).filter((line) => LANE_ROW.test(line))
+}
+
+function blocked_layout(blocker: EpicChild['blocked_by'][number], status: ItemStatus): BoardLayout {
+	const plan = plan_of([], [{ ...child(WAITS), blocked_by: [blocker] }], [blocker.number])
+
+	return layout_of(plan, status)
+}
+
+describe('run_board_layout.layout_of — a ⏳ lane row line end', () => {
+	it('draws a retry, a blocker here and an upstream Issue with their next moves', () => {
+		const upstream = { repo: UPSTREAM_REPO, number: 7691, state: 'OPEN' } as const
+		const local = { repo: REPO, number: 7228, state: 'OPEN' } as const
+		const free = layout_of(plan_of([child(NEXT)], []), RETRIED, NEXT)
+		const lines = [
+			...hourglass_lines(free),
+			...hourglass_lines(blocked_layout(local, RELAUNCHED)),
+			...hourglass_lines(blocked_layout(upstream, RETRIED)),
+		]
+
+		expect(lines).toMatchSnapshot()
+	})
 })
