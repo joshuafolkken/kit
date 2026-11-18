@@ -15,6 +15,7 @@ import { lane_implement_read } from './lane-implement-read'
 import { lane_implement_read_calls } from './lane-implement-read-calls'
 import { lane_implement_stats } from './lane-implement-stats'
 import type { lane_ledger } from './lane-ledger'
+import { lane_lint_related_stats } from './lane-lint-related-stats'
 import { lane_paused_spans } from './lane-paused-spans'
 import { lane_process_stats } from './lane-process-stats'
 import { lane_record_command_stats } from './lane-record-command-stats'
@@ -115,6 +116,7 @@ function tables_of(
 		lane_claim_stats.table(entries, window),
 		lane_test_related_stats.table(entries, window),
 		lane_test_related_stats.trigger_table(entries, window),
+		lane_lint_related_stats.table(entries, window),
 		lane_transcript_stats.table(calls, window),
 		lane_record_command_stats.table(entries, calls, window),
 		lane_concurrency_stats.table(entries, calls, window),

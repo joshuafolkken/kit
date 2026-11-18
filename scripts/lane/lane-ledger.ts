@@ -49,6 +49,8 @@ export type {
 	HeldEntry,
 	LaneStateChangeEntry,
 	LedgerEntry,
+	LintRelatedEntry,
+	LintRelatedRecord,
 	LoadEntry,
 	MergeEntry,
 	OfferableEntry,

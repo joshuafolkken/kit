@@ -77,6 +77,13 @@ describe('agent_session_role.scope_line', () => {
 		expect(line).toContain('imperative request with investigation, a plan and a filing plan')
 	})
 
+	it('hands a no-filing request to the investigator and producer subagents outside a worker lane', () => {
+		const line = agent_session_role.scope_line({}, linked)
+
+		expect(line).toContain('「起票せずに」')
+		expect(line).toContain('investigator and producer subagents, never edited by this session')
+	})
+
 	it('keeps the worker lane line free of the filing plan', () => {
 		const line = agent_session_role.scope_line(
 			agent_session_role.env_for(agent_role_profile.WORKER),
