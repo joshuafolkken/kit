@@ -25,8 +25,9 @@ vi.mock('#scripts/git/changed-paths', () => ({
 	},
 }))
 vi.mock('./related-heavy-tests', () => ({ related_heavy_tests: { exclude_flags: () => [] } }))
-// The reach cap walks no import graph here; what it caps is `test-related-cap.test.ts`.
+// The selection walks no import graph here; what it selects is `test-related-select.test.ts`.
 vi.mock('./test-pinned-reach')
+vi.mock('./test-related-select', async () => await import('./test-related-select-fixture'))
 vi.mock('./test-unit-guard', () => ({
 	test_unit_guard: { is_running: vi.fn(), run_guarded_vitest: vi.fn() },
 }))
@@ -66,9 +67,9 @@ const APPROVALS = path.join('.josh', 'metrics-accepted')
 const PRUNED_TREE = new Error('bad object')
 const NOT_A_REPOSITORY = new Error('not a git repository')
 
-function map_with(
-	readers: Record<string, Array<string>>,
-): ReturnType<typeof test_read_map.read_map> {
+type ReadMap = ReturnType<typeof test_read_map.read_map>
+
+function map_with(readers: Record<string, Array<string>>): ReadMap {
 	return {
 		version: test_read_map.MAP_VERSION,
 		commit: MAP_TREE,

@@ -33,8 +33,8 @@ async function read(issue: string): Promise<ParkRead> {
 }
 
 // An option needing the parent's own action is refused without `--done` (joshuafolkken/kit#7001);
-// a filing option's `--done` names the open Issue filed (joshuafolkken/kit#7771); a closing option
-// is taken by the adopt itself, so it carries none (joshuafolkken/kit#7805).
+// a filing option's `--done` names the open Issue filed (joshuafolkken/kit#7771); a closing or folding
+// option is taken by the adopt itself, so it carries none (joshuafolkken/kit#7805, #7985).
 function done_of(option: number, body: string): string {
 	if (run_park_body.filing_action(body, option)) return ' --done "filed #<M>"'
 

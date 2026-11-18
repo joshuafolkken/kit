@@ -4,8 +4,8 @@ import { git_fixture_workspace, type FixtureWorkspace } from '#scripts/git/git-f
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { direct_importers } from './direct-importers'
 
-// joshuafolkken/kit#5122: a file every test imports narrows to the test files importing it directly,
-// read off their text, rather than sending `vitest related` to the whole suite.
+// joshuafolkken/kit#5122, #7976: a file's direct test importers, read off their text — the near layer
+// `test-related-select.ts` takes before the cap.
 
 const BASE_MODULE_KEY = 'scripts/git/base'
 const IMPORTER = 'tools/x.ts'
@@ -97,32 +97,34 @@ function use_fixture(): () => string {
 	return () => fixture.workspace
 }
 
-describe('direct_importers.every_test_importers', () => {
+describe('direct_importers.importers_of', () => {
 	const workspace = use_fixture()
 
-	it('maps a file every test imports to the test files importing it directly', async () => {
-		const importers = await direct_importers.every_test_importers(workspace(), [EVERY_TEST_MODULE])
+	it('maps a file to the test files importing it directly, by alias or relative path', async () => {
+		const importers = await direct_importers.importers_of(workspace(), [EVERY_TEST_MODULE])
 
 		expect(importers.get(EVERY_TEST_MODULE)).toEqual([RELATIVE_IMPORTER, ALIASED_IMPORTER])
 	})
 
 	// joshuafolkken/kit#5292: `importers_of` reads any file, not only the ones every test imports.
-	it('maps any file to the test files importing it directly through importers_of', async () => {
+	it('maps a file not every test imports to its direct test importers', async () => {
 		const importers = await direct_importers.importers_of(workspace(), [OTHER_MODULE])
 
 		expect(importers.get(OTHER_MODULE)).toEqual([OTHER_TEST])
 	})
 
 	it('maps one only a non-test file imports to no test file', async () => {
-		const importers = await direct_importers.every_test_importers(workspace(), [UNIMPORTED_MODULE])
+		const importers = await direct_importers.importers_of(workspace(), [UNIMPORTED_MODULE])
 
 		expect(importers.get(UNIMPORTED_MODULE)).toEqual([])
 	})
+})
 
-	it('leaves out a file not every test imports', async () => {
-		const importers = await direct_importers.every_test_importers(workspace(), [OTHER_MODULE])
-
-		expect(importers.has(OTHER_MODULE)).toBe(false)
+describe('direct_importers.every_test_imports_of', () => {
+	it('keeps only the files every test imports', () => {
+		expect(direct_importers.every_test_imports_of([OTHER_MODULE, EVERY_TEST_MODULE])).toEqual([
+			EVERY_TEST_MODULE,
+		])
 	})
 })
 

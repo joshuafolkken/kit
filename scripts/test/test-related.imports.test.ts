@@ -3,10 +3,9 @@ import path from 'node:path'
 import { git_fixture_workspace, type FixtureWorkspace } from '#scripts/git/git-fixture-workspace'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_pinned_fixture } from './test-pinned-fixture'
-import { test_pinned_logic } from './test-pinned-logic'
 import { test_read_map } from './test-read-map'
-import { test_related_cap } from './test-related-cap'
 import { related_scope, type RelatedScope } from './test-related-scope'
+import { test_related_select } from './test-related-select'
 import { test_unit_guard } from './test-unit-guard'
 import { vitest_failure_summary } from './vitest-failure-summary'
 
@@ -14,6 +13,7 @@ import { vitest_failure_summary } from './vitest-failure-summary'
 // from a test whose filesystem mock omitted constants, until CI ran it.
 const WIDE = 'wide.ts'
 const STARTUP = 'startup.ts'
+const INDIRECT_TEST = 'sync.test.ts'
 const FILES: Readonly<Record<string, string>> = {
 	'package.json': '{"type":"module"}',
 	'.gitignore': 'node_modules\n',
@@ -23,13 +23,12 @@ const FILES: Readonly<Record<string, string>> = {
 	'entry.ts': "export { value } from './wide'\n",
 	'wide.test.ts':
 		"import { it, expect } from 'vitest'\nimport { value } from './wide'\nit('reads', () => expect(value).toBe(1))\n",
-	'sync.test.ts':
+	[INDIRECT_TEST]:
 		"import { it, expect, vi } from 'vitest'\nvi.mock('node:fs', () => ({ readFileSync: vi.fn() }))\nit('imports', async () => expect((await import('./entry')).value).toBe(1))\n",
 }
 const ADDED_STARTUP =
 	"import { constants } from 'node:fs'\nexport const permission = constants.F_OK\n"
 const CHANGED_WIDE = "import { permission } from './startup'\nexport const value = permission + 1\n"
-const OVER_CAP = test_pinned_logic.MAX_TEST_FILES + 1
 const VITEST_FLAGS = ['--config', 'vitest.config.ts', '--maxWorkers=1']
 const RUN_TIMEOUT = 120_000
 const fixture: { current?: FixtureWorkspace } = {}
@@ -70,18 +69,14 @@ afterEach(async () => {
 	if (fixture.current !== undefined) await git_fixture_workspace.close_workspace(fixture.current)
 })
 
+// The scope as `josh test:related` hands it to vitest: resolved, then its test files selected over the
+// real import graph (joshuafolkken/kit#7976).
 async function selected(warm: boolean): Promise<RelatedScope> {
 	const root = process.cwd()
-	const capped = await test_related_cap.capped_importers(
+	const changed = [WIDE, STARTUP]
+	const scope = related_scope.resolve_scope({
 		root,
-		[WIDE, STARTUP],
-		false,
-		async (files) => files.map((file) => ({ file, count: OVER_CAP })),
-	)
-
-	return related_scope.resolve_scope({
-		root,
-		changed: [WIDE, STARTUP],
+		changed,
 		recorded: new Set(),
 		is_present: () => true,
 		map: warm
@@ -94,16 +89,19 @@ async function selected(warm: boolean): Promise<RelatedScope> {
 					readers: {},
 				}
 			: undefined,
-		every_test_importers: capped.importers,
 	})
+	const selection = await test_related_select.select(root, scope, changed)
+
+	return test_related_select.scope_of(root, scope, selection)
 }
 
 describe('related selection after importing new startup code', () => {
 	it.each([false, true])('keeps indirect importers with warm map %s', async (warm) => {
 		const scope = await selected(warm)
+		const tests = scope.mode === 'none' ? [] : (scope.tests ?? [])
 
-		expect(scope.files).toContain(path.join(process.cwd(), WIDE))
-		expect(scope.files).toContain(path.join(process.cwd(), STARTUP))
+		expect(tests).toContain(path.join(process.cwd(), INDIRECT_TEST))
+		expect(tests).toContain(path.join(process.cwd(), 'wide.test.ts'))
 	})
 
 	it(

@@ -9,13 +9,14 @@ import { changed_paths } from '#scripts/git/changed-paths'
 import { direct_importers } from './direct-importers'
 import { test_no_base } from './test-no-base'
 import { test_read_map, type ReadMap } from './test-read-map'
-import { test_related_cap, type CappedImporters } from './test-related-cap'
+import { test_related_cap } from './test-related-cap'
 import { test_related_moved, type ChangeReading } from './test-related-moved'
 import { test_related_record } from './test-related-record'
 import { test_related_red, type RedReading, type RelatedInput } from './test-related-red'
 import { test_related_reuse } from './test-related-reuse'
 import { test_related_run } from './test-related-run'
 import { related_scope, type RelatedScope } from './test-related-scope'
+import { test_related_select } from './test-related-select'
 import { test_related_synced } from './test-related-synced'
 import { test_related_touched } from './test-related-touched'
 import { test_related_verdict } from './test-related-verdict'
@@ -104,8 +105,8 @@ async function explicit_change(
 }
 
 // **The whole-suite leg never narrows by a green a bare run recorded past a file every test imports**:
-// that green vouches only for the file's direct importers (joshuafolkken/kit#5122), so while this
-// branch changes one, the gate's unit leg reads the whole branch change.
+// that green vouches only for the test files the cap selected (joshuafolkken/kit#5122, #7976), so
+// while this branch changes one, the gate's unit leg reads the whole branch change.
 async function is_green_narrowable(is_whole: boolean): Promise<boolean> {
 	if (!is_whole) return true
 
@@ -230,14 +231,8 @@ function naming_moved(root: string, change: ChangeReading): ReadonlySet<string> 
 	)
 }
 
-// A file every test imports, or one past the reach cap, narrows to its direct importers (`capped`)
-// unless the run keeps the whole suite: the gate's unit leg outside a lane, and the gate's reuse of
-// it, pass `test_related_cap.NO_CAP` (`test_related_whole.is_whole_suite_kept`).
-async function scope_of(
-	root: string,
-	change: ChangeReading,
-	capped: CappedImporters,
-): Promise<RelatedScope> {
+// What the change reaches; `test-related-select.ts` then caps the test files it runs.
+async function scope_of(root: string, change: ChangeReading): Promise<RelatedScope> {
 	const recorded = await recorded_files(change)
 	const naming = naming_moved(root, change)
 	const narrowing = await whole_suite_narrowing.read(root, change.changed)
@@ -248,31 +243,36 @@ async function scope_of(
 		...narrowing,
 		recorded,
 		naming_moved: naming,
-		every_test_importers: capped.importers,
 		is_present: existsSync,
 	})
 }
 
-// The summary line names the hub the ledger records: the widest capped file of the run's own change.
-function report_capped(capped: CappedImporters, change: ChangeReading): void {
-	test_related_cap.report_over_cap(capped, test_related_record.own_of(change))
-}
+type Selected = Pick<RelatedInput, 'scope' | 'deferred' | 'reach' | 'select_elapsed_ms'>
 
-// The test selection's own time — the import graph and the importer index (joshuafolkken/kit#7248) —
-// recorded apart from vitest's so the ledger shows what selecting costs.
-async function capped_of(
+// **The run's test files, capped** (joshuafolkken/kit#7976) — unless it keeps the whole suite: the
+// gate's unit leg outside a lane (`test_related_whole.is_whole_suite_kept`). The selection's own time
+// — the import graph and the importer index (joshuafolkken/kit#7248) — is recorded apart from vitest's.
+// The summary line names the hub the ledger records: the widest file of the run's own change.
+async function selected_of(
 	root: string,
 	change: ChangeReading,
+	scope: RelatedScope,
 	is_whole: boolean,
-): Promise<{ capped: CappedImporters; select_elapsed_ms: number }> {
-	const files = change.is_unmoved === true ? [] : (change.changed ?? [])
+): Promise<Selected> {
+	if (is_whole || scope.mode === 'none') return { scope }
 	const started_ms = performance.now()
-	const capped = await test_related_cap.capped_importers(root, files, is_whole)
+	const selection = await test_related_select.select(root, scope, change.changed)
 	const select_elapsed_ms = performance.now() - started_ms
+	const { deferred, reach } = selection
 
-	report_capped(capped, change)
+	test_related_cap.report_deferred(selection, test_related_record.own_of(change))
 
-	return { capped, select_elapsed_ms }
+	return {
+		scope: test_related_select.scope_of(root, scope, selection),
+		deferred,
+		reach,
+		select_elapsed_ms,
+	}
 }
 
 // **Whether a set of changed files can reach any test**, answered by the decision this command
@@ -287,21 +287,17 @@ async function reaches_tests(root: string, paths: ReadonlyArray<string>): Promis
 
 	if (change.map === undefined) return true
 
-	const scope = await scope_of(root, change, test_related_cap.NO_CAP)
+	const scope = await scope_of(root, change)
 
 	return scope.mode !== 'none'
 }
 
-async function resolve_change(
-	root: string,
-	change: ChangeReading,
-	capped: CappedImporters,
-): Promise<RelatedScope> {
+async function resolve_change(root: string, change: ChangeReading): Promise<RelatedScope> {
 	const { UNMOVED_REASON } = related_scope
 
 	if (change.is_unmoved === true) return { mode: 'none', files: [], reason: UNMOVED_REASON }
 
-	return await scope_of(root, change, capped)
+	return await scope_of(root, change)
 }
 
 // What the last red run left owed, and whether it narrowed this run (joshuafolkken/kit#7786).
@@ -312,16 +308,6 @@ function red_fields(
 	return { owed: red?.owed ?? [], red_rerun: change.is_red_rerun === true }
 }
 
-// What the cap narrowed, what it left whole (joshuafolkken/kit#7639) and what each changed file added
-// (joshuafolkken/kit#7735), for the closing line and the ledger row.
-function cap_record({
-	over_cap,
-	full_reach,
-	reach,
-}: CappedImporters): Pick<RelatedInput, 'over_cap' | 'full_reach' | 'reach'> {
-	return { over_cap, full_reach, reach }
-}
-
 async function read_run_input(
 	root: string,
 	command_arguments: ReadonlyArray<string>,
@@ -330,13 +316,13 @@ async function read_run_input(
 ): Promise<RelatedInput> {
 	const red = await test_related_red.read_red(before)
 	const change = await read_change(root, command_arguments, is_whole, red)
-	const { capped, select_elapsed_ms } = await capped_of(root, change, is_whole)
 	const { changed, synced = [], since_map = [], branch } = change
-	const scope = await resolve_change(root, change, capped)
-	const reuse = await test_related_reuse.read(root, scope, red === undefined ? before : undefined)
+	const resolved = await resolve_change(root, change)
+	const selected = await selected_of(root, change, resolved, is_whole)
+	const green = red === undefined ? before : undefined
+	const reuse = await test_related_reuse.read(root, resolved, green)
 
 	return {
-		scope,
 		root,
 		changed,
 		synced,
@@ -344,35 +330,23 @@ async function read_run_input(
 		branch,
 		...red_fields(red, change),
 		reuse,
-		...cap_record(capped),
-		select_elapsed_ms,
+		...selected,
 	}
 }
 
-function is_narrowed_argument(
-	root: string,
-	argument: string,
-	over_cap: ReadonlyArray<string>,
-): boolean {
-	if (direct_importers.is_every_test_import(root, argument)) return true
-
-	return over_cap.includes(path.relative(root, path.resolve(argument)))
-}
-
-// A non-code argument is resolved through the map, and a file every test imports or one past the reach
-// cap through its importers, rather than handed to vitest, so only the other code arguments can be
-// ones vitest was not given.
+// A non-code argument is resolved through the map, and a file every test imports through the whole
+// suite's selection, rather than handed to vitest, so only the other code arguments can be ones vitest
+// was not given.
 function report_unhanded(
 	root: string,
 	command_arguments: ReadonlyArray<string>,
 	input: RelatedInput,
 ): void {
-	const over_cap = input.over_cap ?? []
-
 	changed_file_scope.report_unusable_arguments(
 		command_arguments.filter(
 			(argument) =>
-				related_scope.is_relatable(argument) && !is_narrowed_argument(root, argument, over_cap),
+				related_scope.is_relatable(argument) &&
+				!direct_importers.is_every_test_import(root, argument),
 		),
 		input.scope,
 		related_scope.COMMAND_LABEL,

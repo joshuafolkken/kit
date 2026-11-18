@@ -2,7 +2,7 @@ import path from 'node:path'
 import { gate_labels } from '#scripts/gate/gate-labels'
 import type { GateTree } from '#scripts/gate/gate-tree'
 import { input_fingerprint } from '#scripts/gate/input-fingerprint'
-import { moved_paths } from '#scripts/gate/moved-paths'
+import { moved_paths, type MovedParts } from '#scripts/gate/moved-paths'
 import { since_green } from '#scripts/gate/since-green'
 import { import_graph, type ImportGraph } from '#scripts/lint/import-graph'
 import { review_stamps } from '#scripts/review/review-stamps'
@@ -76,6 +76,15 @@ async function select_scope(
 	return select(graph, tests, green)
 }
 
+function moves_whole_suite(moved: ReadonlyArray<string>): boolean {
+	return moved.some((file) => whole_suite_files.WHOLE_SUITE_FILES.has(file))
+}
+
+// Base unmoved and no whole-suite input changed since the record.
+function carries_over(parts: MovedParts | undefined): boolean {
+	return parts?.synced.length === 0 && !moves_whole_suite(parts.changed)
+}
+
 async function compare(
 	root: string,
 	scope: RelatedScope,
@@ -89,11 +98,7 @@ async function compare(
 	)
 	if (parts === undefined || parts.synced.length === 0) return empty(NO_RECORD)
 
-	const moved = moved_paths.union_of(parts)
-
-	if (moved.some((file) => whole_suite_files.WHOLE_SUITE_FILES.has(file))) {
-		return empty('whole-suite-input')
-	}
+	if (moves_whole_suite(moved_paths.union_of(parts))) return empty('whole-suite-input')
 
 	return await select_scope(root, scope)
 }
@@ -139,6 +144,16 @@ async function read(
 	}
 }
 
+// The recorded files whose closed inputs still hash as recorded; a mark that is no digest never matches.
+async function unchanged(
+	root: string,
+	recorded: Readonly<Record<string, string>>,
+): Promise<ReadonlyArray<string>> {
+	const current = await blobs(root, Object.keys(recorded))
+
+	return Object.keys(recorded).filter((file) => current[file] === recorded[file])
+}
+
 // No-op scoped runs preserve evidence only on exactly the same tree, base and check inputs.
 async function retained(root: string, tree: GateTree): Promise<ReadonlyArray<string>> {
 	const parts = await since_green.read_moved_parts(
@@ -149,10 +164,18 @@ async function retained(root: string, tree: GateTree): Promise<ReadonlyArray<str
 	)
 	if (parts === undefined || moved_paths.union_of(parts).length > 0) return []
 
-	const recorded = review_stamps.test_related_stamp.read()?.blobs ?? {}
-	const current = await blobs(root, Object.keys(recorded))
+	return await unchanged(root, review_stamps.test_related_stamp.read()?.blobs ?? {})
+}
 
-	return Object.keys(recorded).filter((file) => current[file] === recorded[file])
+// **A red run's passed files join the next green record** (joshuafolkken/kit#7966): on the red
+// record's own base and check inputs, with no whole-suite input moved since, each file whose closed
+// inputs still hash as they did when it passed.
+async function carried(root: string, tree: GateTree): Promise<ReadonlyArray<string>> {
+	const stamp = review_stamps.test_related_red_stamp
+	const parts = await since_green.read_moved_parts(stamp, gate_labels.UNIT_LABEL, undefined, tree)
+	if (!carries_over(parts)) return []
+
+	return await unchanged(root, stamp.read()?.blobs ?? {})
 }
 
 function flags(reuse: TestReuse | undefined): ReadonlyArray<string> {
@@ -161,7 +184,7 @@ function flags(reuse: TestReuse | undefined): ReadonlyArray<string> {
 	return ['--passWithNoTests', ...reuse.excluded.flatMap((file) => ['--exclude', file])]
 }
 
-const test_related_reuse = { blobs, flags, read, retained }
+const test_related_reuse = { blobs, carried, flags, read, retained }
 
 export type { TestReuse }
 export { test_related_reuse }

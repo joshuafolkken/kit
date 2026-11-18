@@ -374,7 +374,7 @@ pnpm josh run:park 1839 --escalate "needs a stronger model"                     
 
 <!-- /usage -->
 
-The body follows one schema (`scripts/run/park/run-park-body.ts`): numbered options under `### 選択肢`, each with `- 層: A|B|C` and `- 必要な権限:` (a `run-park-permission.ts` word, e.g. `親（issue:close）`), then one `### 推奨` line — `<option number> <reason>`, or `推奨なし <reason>`.
+The body follows one schema (`scripts/run/park/run-park-body.ts`): numbered options under `### 選択肢`, each with `- 層: A|B|C` and `- 必要な権限:` (a `run-park-permission.ts` word, e.g. `親（issue:close）`, `親（lane:fold <N> --into #<M>）`), then one `### 推奨` line — `<option number> <reason>`, or `推奨なし <reason>`.
 
 A body off the schema is refused before any write, naming the missing piece, printing the schema as the usage does.
 
