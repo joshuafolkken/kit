@@ -81,3 +81,23 @@ describe('run_board_sound_repeat.next_cue — one replay of a standing human or 
 		})
 	})
 })
+
+describe('run_board_sound_repeat.next_cue — a second instance of the same cue', () => {
+	it('counts ten minutes from a second lane entering the same wait while the first still stands', () => {
+		const first: SoundSnapshot = { rows: new Map([[1, 'human']]), run: new Set() }
+		const both: SoundSnapshot = {
+			rows: new Map([
+				[1, 'human'],
+				[2, 'human'],
+			]),
+			run: new Set(),
+		}
+		const late = REPLAY_AFTER_MS * 2
+		const opened = next_cue(frame(), first, undefined, 0)
+		const replayed = next_cue(first, first, opened.pending, REPLAY_AFTER_MS)
+		const entered = next_cue(first, both, replayed.pending, late)
+		const heard = [entered.cue, next_cue(both, both, entered.pending, late + REPLAY_AFTER_MS).cue]
+
+		expect(heard).toStrictEqual(['human', 'human'])
+	})
+})

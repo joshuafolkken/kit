@@ -31,14 +31,16 @@ function standing_cue(current: SoundSnapshot | undefined): CueName | undefined {
 	return run_board_sound_cues.loudest(held)
 }
 
-// The pending cue carried into this frame: dropped once resolved, restarted when another cue stands.
+// The pending cue carried into this frame: dropped once resolved, restarted when another cue stands or
+// this frame's transition sounds it afresh — a second lane entering the same wait counts from its own start.
 function carried(
 	pending: Pending | undefined,
 	standing: CueName | undefined,
+	transition: CueName | undefined,
 	now_ms: number,
 ): Pending | undefined {
 	if (standing === undefined) return undefined
-	if (pending?.cue === standing) return pending
+	if (transition !== standing && pending?.cue === standing) return pending
 
 	return { cue: standing, since_ms: now_ms, is_replayed: false }
 }
@@ -56,8 +58,8 @@ function next_cue(
 	pending: Pending | undefined,
 	now_ms: number,
 ): NextCue {
-	const next = carried(pending, standing_cue(current), now_ms)
 	const transition = run_board_sound_transition.cue_of(previous, current)
+	const next = carried(pending, standing_cue(current), transition, now_ms)
 	if (transition !== undefined || !is_due(next, now_ms)) return { cue: transition, pending: next }
 
 	return { cue: next.cue, pending: { ...next, is_replayed: true } }
