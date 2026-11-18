@@ -8,6 +8,21 @@ import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { backlog_drive_restore } from './backlog-drive-restore'
 
+function is_unblocked(issue: Pick<EpicIssue, 'blockedBy'>): boolean {
+	return (issue.blockedBy?.nodes ?? []).every(
+		(blocker) => epic_issue.normalize_state(blocker.state ?? '') === epic_issue.CLOSED,
+	)
+}
+
+// Every native blocker closed, one of them at or after `since` — the blocker triage recorded on a park
+// (`backlog:triage --blocked-by`), not one already closed when the issue was dispatched.
+function is_unblocked_since(issue: Pick<EpicIssue, 'blockedBy'>, since: string): boolean {
+	const since_ms = Date.parse(since)
+	const nodes = issue.blockedBy?.nodes ?? []
+
+	return is_unblocked(issue) && nodes.some((node) => Date.parse(node.closed_at ?? '') >= since_ms)
+}
+
 function is_ready(issue: EpicIssue, cause: number, repo: string): boolean {
 	const references = epic_issue.blocker_references_of(issue, repo)
 	const is_dependent = references.some(
@@ -15,13 +30,7 @@ function is_ready(issue: EpicIssue, cause: number, repo: string): boolean {
 			reference.number === cause && reference.repo.toLowerCase() === repo.toLowerCase(),
 	)
 
-	return (
-		epic_issue.is_open(issue.state) &&
-		is_dependent &&
-		(issue.blockedBy?.nodes ?? []).every(
-			(blocker) => epic_issue.normalize_state(blocker.state ?? '') === epic_issue.CLOSED,
-		)
-	)
+	return epic_issue.is_open(issue.state) && is_dependent && is_unblocked(issue)
 }
 
 // A child still carrying a protected label stays parked: `run:add` would refuse it, so the park is
@@ -82,4 +91,4 @@ async function after_merge(cause: number): Promise<void> {
 	await retry_all([...parked], cause, repo)
 }
 
-export const backlog_drive_retry = { add_retry, after_merge }
+export const backlog_drive_retry = { add_retry, after_merge, is_unblocked_since }

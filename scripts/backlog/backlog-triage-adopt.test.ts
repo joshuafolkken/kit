@@ -246,7 +246,7 @@ describe('backlog:triage --apply --adopt — a size-approval option', () => {
 })
 
 // joshuafolkken/kit#7001: an option needing the parent's own action is taken before the child resumes.
-const PARENT_PARK = PARK.replace('必要な権限: なし', '必要な権限: 親セッション')
+const PARENT_PARK = PARK.replace('必要な権限: なし', '必要な権限: 親（Issue 本文の編集）')
 const DONE = 'filed #7010 and closed the child'
 
 describe("backlog:triage --apply --adopt — an option needing the parent's action", () => {

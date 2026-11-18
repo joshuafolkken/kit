@@ -1,4 +1,5 @@
 import { markdown_section } from '#scripts/issue/markdown-section'
+import { run_park_permission } from './run-park-permission'
 
 // The `run:park` body schema (joshuafolkken/kit#6669): numbered options under the options heading,
 // each with its tier and the permission taking it needs, and one recommendation line naming the
@@ -62,19 +63,8 @@ const NO_PICK = /^推奨なし[\s:：—-]+\S/u
 const AUTO_TIER = 'A'
 // The tier no parent takes, even on a person's behalf: trust settings, third parties, destructive acts.
 const PERSON_TIER = 'C'
-// The permission a parent adopts with no person and no action of its own.
-const AUTO_PERMISSION = 'なし'
-// An option needing the parent's own action (filing, closing, editing an Issue): adopting it is not
-// taking it, so the lane must not resume before the parent has (joshuafolkken/kit#7001).
-const PARENT_PERMISSION = '親'
+const { AUTO_PERMISSION, PARENT_PERMISSION, FILING_COMMAND, CLOSE_COMMAND } = run_park_permission
 const PARENT_ACTION_NOTE = ' · 親の操作'
-// A child cannot file an Issue, so an option naming `issue:file` is the parent's filing
-// (joshuafolkken/kit#7771): written with the parent permission, and adopted only once the Issue it
-// files exists.
-const FILING_COMMAND = 'issue:file'
-// An option closing the Issue without implementing names `issue:close` (joshuafolkken/kit#7805): the
-// parent's `backlog:triage --adopt` closes it as not planned and returns the lane instead of a requeue.
-const CLOSE_COMMAND = 'issue:close'
 const PARENT_COMMANDS = [FILING_COMMAND, CLOSE_COMMAND] as const
 
 const FORMAT = [
@@ -82,11 +72,10 @@ const FORMAT = [
 	OPTIONS_HEADING,
 	'1. <option>',
 	TIER_LINE,
-	'   - 必要な権限: なし | 親 | owner コメント | epic 編集 | 信頼設定 | 人',
+	...run_park_permission.schema_lines(),
 	'2. <option>',
 	TIER_LINE,
 	'   - 必要な権限: …',
-	`   (closing without implementing: - 必要な権限: ${PARENT_PERMISSION}（${CLOSE_COMMAND}）)`,
 	'   (a size-approval option adds all three:)',
 	...APPROVAL_PARTS.map(([, line]) => `   ${line}`),
 	PICK_HEADING,
@@ -241,13 +230,34 @@ function pick_problem(park: ParkBody): string | undefined {
 	return `${PICK_HEADING} names option ${String(park.pick.number)}, which ${OPTIONS_HEADING} does not list`
 }
 
-// The first missing piece of the schema, in one line; `undefined` for a body that meets it.
-function problem_of(body: string): string | undefined {
-	const park = parse(body)
-
+// The first missing piece of the schema's structure, in one line; `undefined` for a body that meets it.
+function shape_problem(park: ParkBody): string | undefined {
 	if (park.options.length === 0) return `${OPTIONS_HEADING} lists no numbered option`
 
 	return park.options.map((option) => option_problem(option)).find(Boolean) ?? pick_problem(park)
+}
+
+function permission_problem(park: ParkBody): string | undefined {
+	return park.options
+		.map((option) =>
+			run_park_permission.problem_of(`option ${String(option.number)}`, option.permission ?? ''),
+		)
+		.find(Boolean)
+}
+
+// The first problem of a body, structure first, then a permission off the vocabulary
+// (joshuafolkken/kit#7818): what `run:park` refuses and an adopt refuses to take. `undefined` for none.
+function problem_of(body: string): string | undefined {
+	const park = parse(body)
+
+	return shape_problem(park) ?? permission_problem(park)
+}
+
+// Whether `body` meets the schema's structure — a park, even one whose permission `problem_of` names.
+// A reader picks the latest park by this, so a newer park off the vocabulary is refused, never read past
+// to an older one (joshuafolkken/kit#7818).
+function is_park(body: string): boolean {
+	return shape_problem(parse(body)) === undefined
 }
 
 // The option the recommendation names; `undefined` for no recommendation or a body off the schema.
@@ -258,9 +268,11 @@ function picked_option(body: string): ParkOption | undefined {
 	return park.options.find((candidate) => candidate.number === number)
 }
 
-// The recommended option and its tier, or no recommendation; `undefined` for a body off the schema.
+// The recommended option and its tier, or no recommendation; `undefined` for a body off the schema's
+// structure. A park written before the permission vocabulary (joshuafolkken/kit#7818) still reads as a
+// stop on the board, though `problem_of` names its permission.
 function summary_of(body: string): string | undefined {
-	if (problem_of(body) !== undefined) return undefined
+	if (!is_park(body)) return undefined
 	const option = picked_option(body)
 
 	if (option === undefined) return NO_PICK_WORD
@@ -388,6 +400,7 @@ const run_park_body = {
 	default_pick,
 	done_needed,
 	filing_action,
+	is_park,
 	parent_action,
 	problem_of,
 	summary_of,

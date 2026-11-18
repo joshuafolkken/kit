@@ -26,6 +26,14 @@ authorship; `[automated]` identifies the existing bot/run-marker classification.
 plan and an earlier `auto-ok: not applied` are agent decisions, never original user instructions.
 Verify any prohibition against its original user source; record that source and quotation in the
 decline reason. Preserve a real user prohibition, including a later human comment, even without the
-structured body section. If none exists and no existing exclusion holds, apply `auto-ok` despite
-an earlier inferred opt-out. A new judgement records this reading rather than inheriting the old
-decline as authority. An unreadable source is not permission to apply: report it for clarification.
+structured body section. If none exists, no existing exclusion holds and the body does not declare
+`- 人の判断: 要`, apply `auto-ok` despite an earlier inferred opt-out. A new judgement records this
+reading rather than inheriting the old decline as authority. An unreadable source is not permission
+to apply: report it for clarification.
+
+A body declaring `- 人の判断: 要` is never a candidate, and `--apply` refuses it, writing nothing —
+the same reading `issue:file` withholds `auto-ok` by. `backlog:triage --adopt` settles a park; it
+does not opt the issue in.
+
+To move such an issue, record the judgement, then rewrite the declaration to `- 人の判断: 不要`; the
+changed body is read again at the next judgement.

@@ -2,6 +2,7 @@ import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { issue_label_schema } from '#scripts/git/git-schemas'
 import { parse_json_object_or_undefined } from '#scripts/git/parse-json-array'
 import { issue_auto_ok, type AutoOkDecision } from '#scripts/issue/issue-auto-ok'
+import { issue_body_keys } from '#scripts/issue/issue-body-keys'
 import { AUTO_OK_LABEL, has_label_name } from '#scripts/issue/issue-labels'
 import { issue_publication_state } from '#scripts/issue/issue-publication-state'
 import { issue_run_verdict, type RunLabelFlags } from '#scripts/issue/issue-run-verdict'
@@ -29,6 +30,7 @@ const UNREADABLE = 'the issue could not be read'
 const CLOSED_STATE = 'CLOSED'
 // The judgement comment is already posted, so the listing will not offer the issue again.
 const RETRY_HINT = 're-run `pnpm josh auto-ok:judge --apply <N>` to finish it'
+const JUDGEMENT_NEEDED_PROBLEM = `the body declares a person's judgement is needed; once the judgement is recorded, rewrite the declaration to \`${issue_body_keys.line('judgement', 'not_needed')}\` and the next listing reads the issue again`
 
 const issue_schema = z.object({
 	state: z.string().nullish(),
@@ -103,16 +105,27 @@ function refused(issue: string, problem: string): number {
 	return FAILURE_EXIT_CODE
 }
 
+// Why the issue cannot be opted in as it reads now: the mechanical exclusions, then the body's
+// declaration that a person's judgement is needed — the reading a filing is judged by
+// (joshuafolkken/kit#7856).
+function refusal_of(read: IssueRead): string | undefined {
+	const exclusion =
+		issue_auto_ok.exclusion_of(read.labels) ?? issue_auto_ok.user_constraint_of(read.body)
+
+	if (exclusion !== undefined) return issue_auto_ok.line_of(exclusion)
+
+	return issue_auto_ok.declares_judgement_needed(read.body) ? JUDGEMENT_NEEDED_PROBLEM : undefined
+}
+
 async function apply_to(
 	issue: string,
 	run_label: string,
 	read: IssueRead,
 	answers: RunLabelFlags,
 ): Promise<number> {
-	const exclusion =
-		issue_auto_ok.exclusion_of(read.labels) ?? issue_auto_ok.user_constraint_of(read.body)
+	const refusal = refusal_of(read)
 
-	if (exclusion !== undefined) return refused(issue, issue_auto_ok.line_of(exclusion))
+	if (refusal !== undefined) return refused(issue, refusal)
 
 	const { lang } = session_language.resolve_session_lang()
 	const reason = applied_reason(run_label, answers, false)
