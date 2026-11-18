@@ -1,0 +1,7 @@
+{
+	"reason": "new lane:fold command (#7982): fold CLI, prose and orchestration modules wiring existing withdraw/unblock parts",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 195
+	}
+}

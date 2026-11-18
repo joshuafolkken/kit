@@ -420,6 +420,22 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 			examples: [{ arguments: '3769 --reason "folded into a broader issue"' }],
 		},
 	},
+	// The same `.env` read as `lane:withdraw`, whose withdrawal it runs first.
+	'lane:fold': {
+		script: 'scripts/lane/lane-fold-cli.ts',
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
+		description:
+			'Hand a component issue over to the issue that wires it: withdraw its lane with the work stashed, tell the taker how to bring the stash in and to close it, and remove the taker’s blocked-by on it — a re-run finishes only the steps left',
+		category: 'AI tools',
+		reference: [
+			'<issue> --into <issue> --reason <text>',
+			'developer',
+			['files', 'git', 'processes', 'network'],
+		],
+		usage: {
+			examples: [{ arguments: '7945 --into 7951 --reason "ships with the wiring"' }],
+		},
+	},
 	'lane:resolve': {
 		script: 'scripts/lane/lane-resolve-cli.ts',
 		description:

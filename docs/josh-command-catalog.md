@@ -187,6 +187,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh lane:breakdown` · `josh lbd` | `<issue> [--timeline]` | maintainer | none | Print a merged lane's net time by stage, longest first, the implementation split by its tool calls |
 | `josh lane:close` | `<issue>` | automation | files, git | Close a lane, leaving no work tree, branch or directory behind |
 | `josh lane:dispatch` | `<issue> <prompt>` | automation | processes | Start a lane’s child as a detached process that outlives this session |
+| `josh lane:fold` · `josh lfd` | `<issue> --into <issue> --reason <text>` | developer | files, git, processes, network | Hand a component issue over to the issue that wires it: withdraw its lane with the work stashed, tell the taker how to bring the stash in and to close it, and remove the taker’s blocked-by on it — a re-run finishes only the steps left |
 | `josh lane:launch` | `<issue> [--stash <message>]` | automation | files, git, processes | Collapse a backlogrun lane-start event into one call: open the lane, pop and re-install on the first, dispatch the child |
 | `josh lane:limit` · `josh lli` | `[<limit>] [--reset]` | developer | files | Change a live backlogrun’s lane limit without stopping it, or print the limit, lanes in use and free lanes |
 | `josh lane:list` | — | automation | none | List the open lanes: which issue, which ports, and where each one is |
