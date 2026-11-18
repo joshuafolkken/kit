@@ -316,8 +316,9 @@ function run_fields(
 	}
 }
 
-// The run's reads past its span. The roots, the run's events, the lane room and the ledger read none
-// of each other's results, so they run together (joshuafolkken/kit#7931).
+// The run's reads past its span. The roots, the run's events and the lane room read none of each
+// other's results, so their subprocesses run together; the synchronous ledger read runs while they
+// are in flight (joshuafolkken/kit#7931).
 async function run_read(
 	repository: string,
 	read: RunSpan,
