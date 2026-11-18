@@ -1,6 +1,5 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { gate_labels } from '#scripts/gate/gate-labels'
 import { since_green } from '#scripts/gate/since-green'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
@@ -160,30 +159,33 @@ describe('test_related.run_related_tests — an entries-only edit of the pure-fi
 	})
 })
 
-// joshuafolkken/kit#5122: the gate's unit leg keeps the whole suite for a file every test imports,
-// and the flag never reaches vitest. Outside a lane, wherever this suite runs (joshuafolkken/kit#7014).
-describe('test_related.run_related_tests — the gate’s whole-suite flag', () => {
+// joshuafolkken/kit#7977: a main checkout's gate runs the same bare `test:related` a lane's does —
+// capped, the rest deferred to CI — and the whole suite is left to CI and the commands a person types.
+describe('test_related.run_related_tests — a main checkout’s gate', () => {
 	beforeEach(() => {
 		vi.spyOn(lane_paths, 'lane_issue_of').mockReturnValue(undefined)
 		mocked_changed.mockResolvedValue([pure_files_entries.PURE_FILES_PATH, FIXED_SOURCE])
 		vi.mocked(git_command.show_file).mockRejectedValue(NOT_A_REPOSITORY)
 	})
 
-	it('runs the whole suite for a file every test imports', async () => {
+	afterEach(() => {
+		vi.mocked(test_related_select.select).mockReset()
+	})
+
+	it('caps a file every test imports to the selection and records the rest as deferred', async () => {
 		mocked_moved.mockResolvedValue({
 			parts: { changed: [pure_files_entries.PURE_FILES_PATH], synced: [] },
 		})
+		vi.mocked(test_related_select.select).mockResolvedValueOnce({
+			tests: [FIXED_SOURCE],
+			deferred: 1,
+			reach: [],
+		})
 
-		await test_related.run_related_tests([gate_labels.KEEP_WHOLE_SUITE_FLAG])
+		await test_related.run_related_tests([])
 
-		expect(vitest_arguments()).toEqual(WHOLE_SUITE)
-	})
-
-	// A bare run's green vouches only for that file's direct importers.
-	it('never narrows by a green past a file every test imports the branch changed', async () => {
-		await test_related.run_related_tests([gate_labels.KEEP_WHOLE_SUITE_FLAG])
-
-		expect(vitest_arguments()).toEqual(WHOLE_SUITE)
+		expect(vitest_arguments()).not.toEqual(WHOLE_SUITE)
+		expect(vi.mocked(process.stdout.write).mock.calls.join('\n')).toContain('deferred')
 	})
 
 	it('never reports a file every test imports as ignored when it names one', async () => {
@@ -192,53 +194,9 @@ describe('test_related.run_related_tests — the gate’s whole-suite flag', () 
 		expect(vi.mocked(process.stdout.write).mock.calls.join('\n')).not.toContain('ignored')
 	})
 
-	it('narrows by that green without the flag', async () => {
+	// The whole branch reading a file every test imports no longer forces (the old `hub` fallback).
+	it('narrows by a green past a file every test imports the branch changed', async () => {
 		await test_related.run_related_tests([])
-
-		expect(vitest_arguments()).toEqual([
-			'related',
-			path.join(REPOSITORY_ROOT, FIXED_SOURCE),
-			'--run',
-		])
-	})
-})
-
-// joshuafolkken/kit#7976: the kept whole suite bypasses the cap, whatever it would select.
-describe('test_related.run_related_tests — the kept whole suite and the cap', () => {
-	// The bypass leaves the selection unread, so it is reset rather than left to a later case.
-	afterEach(() => {
-		vi.mocked(test_related_select.select).mockReset()
-	})
-
-	it('never caps the kept whole suite to a selection', async () => {
-		vi.spyOn(lane_paths, 'lane_issue_of').mockReturnValue(undefined)
-		mocked_changed.mockResolvedValue([pure_files_entries.PURE_FILES_PATH])
-		mocked_moved.mockResolvedValue({
-			parts: { changed: [pure_files_entries.PURE_FILES_PATH], synced: [] },
-		})
-		vi.mocked(git_command.show_file).mockRejectedValue(NOT_A_REPOSITORY)
-		vi.mocked(test_related_select.select).mockResolvedValueOnce({
-			tests: [FIXED_SOURCE],
-			deferred: 1,
-			reach: [],
-		})
-
-		await test_related.run_related_tests([gate_labels.KEEP_WHOLE_SUITE_FLAG])
-
-		expect(vitest_arguments()).toEqual(WHOLE_SUITE)
-	})
-})
-
-// joshuafolkken/kit#7014: a lane's gate leaves the whole suite to CI.
-describe('test_related.run_related_tests — the gate’s whole-suite flag in a lane', () => {
-	beforeEach(() => {
-		mocked_changed.mockResolvedValue([pure_files_entries.PURE_FILES_PATH, FIXED_SOURCE])
-		vi.mocked(git_command.show_file).mockRejectedValue(NOT_A_REPOSITORY)
-		vi.spyOn(lane_paths, 'lane_issue_of').mockReturnValue('7014')
-	})
-
-	it('narrows by that green with the flag', async () => {
-		await test_related.run_related_tests([gate_labels.KEEP_WHOLE_SUITE_FLAG])
 
 		expect(vitest_arguments()).toEqual([
 			'related',

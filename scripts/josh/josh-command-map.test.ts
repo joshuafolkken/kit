@@ -208,6 +208,15 @@ describe('COMMAND_MAP — new dev commands', () => {
 		expect(entry?.shell).toBeUndefined()
 		expect(entry?.category).toBe(DEVELOPMENT_CATEGORY)
 	})
+
+	// joshuafolkken/kit#7977: the gate and pre-push take the capped selection; the command a person
+	// types keeps the whole unit suite.
+	it('runs the whole unit suite from a bare josh test, never test:related', () => {
+		const shell = get_command('test')?.shell?.join(' ')
+
+		expect(shell).toContain(`pnpm josh ${TEST_UNIT_COMMAND} `)
+		expect(shell).not.toContain('test:related')
+	})
 })
 
 describe('COMMAND_MAP — tsx_arguments', () => {

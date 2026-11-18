@@ -190,6 +190,57 @@ The live board gathers in a `worker_threads` worker (`run-board-gather-worker.ts
 
 What stays on the board's thread — the layout, the frame and its fit — is held to a frame budget by `run-board-frame-budget.test.ts`: each of three redraws over eight lanes, a thousand processes and six thousand events, right after the worker read the same stream again, must read fewer events than one fold of the stream. The budget counts the events a redraw reads — the calls to `run_event_scope.issue_named`, which every fold makes once per event — not its time (#5161): a 40ms wall-clock budget failed unrelated pull requests on a loaded CI runner, and on a fast machine passed a redraw that folded the stream again. The folds over the whole stream (the activity and the statuses) are kept for the `events` array the board holds, so a redraw does not fold the stream again until the stream changes: a redraw that keeps them reads one event, and one that folds again reads 18,294 events, about three folds of the six thousand. The second test pins that each redraw draws the array the first frame folded; the third hands the stream over afresh on every read and shows the count catches that miss.
 
+### Sound cues
+
+The live redraw sounds a cue as the run moves (joshuafolkken/kit#7949, `run-board-sound-transition.ts`). Each frame is read against the one before, and only what is new sounds. The rules:
+
+- The loudest one alone: `alert` wins over `human`, and `human` wins over the information cues `launch`, `lane-end` and `drain`. Within one tier the first named wins (`run-board-sound-cues.ts`).
+- The opening frame is the base: the first frame sounds nothing, whatever it shows, even a run that is stopped or waiting on a person. A frame drawn before the plan's layout is read counts as the first frame too.
+- Live only: `--once`, `--chat` and `--every` never sound.
+- One replay after 10 minutes: a `human` or `alert` cue still standing 10 minutes after it sounded replays once. Where several stand, only the loudest replays. A cue sounded afresh, or a different cue starting to stand, starts the count again. An information cue never replays, and a frame's own cue takes precedence over a replay (`run-board-sound-repeat.ts`).
+
+The scenes, in the order the module's tests list them (`run-board-sound-transition.test.ts` checks this table against them):
+
+| Scene                                      | Cue        |
+| ------------------------------------------ | ---------- |
+| a launch                                   | `launch`   |
+| a restart from waiting                     | `launch`   |
+| a merge                                    | `lane-end` |
+| a done lane                                | `lane-end` |
+| a drain                                    | `drain`    |
+| a human review beside a running lane       | `human`    |
+| a park                                     | `human`    |
+| a stopped lane                             | `alert`    |
+| a failed ship                              | `alert`    |
+| a usage-limit hold                         | `alert`    |
+| an outage                                  | `alert`    |
+| the run stopping                           | `alert`    |
+| the run left waiting on a person           | `alert`    |
+| an outage opening under a usage-limit hold | `alert`    |
+| a red CI                                   | —          |
+| a withdrawal                               | —          |
+| a pause                                    | —          |
+| a phase moving on                          | —          |
+| an unchanged frame                         | —          |
+
+What each cue sounds like:
+
+- Rising sine notes mean a start or a success: `launch` is two notes, `lane-end` three and `drain` four.
+- `human` is two triangle-wave A5 tones.
+- `alert` is a falling square-wave figure, played three times.
+
+`s` turns the cues on or off. The default is on, and turning them on plays `launch` once. The setting is saved as `sound` in `~/.claude/josh/board.json` (under `$CLAUDE_CONFIG_DIR` if set). A missing or non-boolean value reads as on.
+
+Each cue is synthesized to a WAV once and cached in `~/.claude/josh/sounds`. A detached player plays it:
+
+| OS      | Player                                       |
+| ------- | -------------------------------------------- |
+| macOS   | `afplay`                                     |
+| Linux   | `paplay`, else `pw-play`, else `aplay`       |
+| Windows | `powershell` with `System.Media.SoundPlayer` |
+
+The board writes the terminal BEL instead in three cases: the platform has no row in this table, every player for it fails, or the WAV cannot be written (`run-board-sound-player.ts`).
+
 ## The strand report in detail
 
 The `Stop` hook reports whether the run has been left stranded: the session that owned the budget has died — at a cut it handed off, or with no hand-off at all — no successor holds it, and no `run:wake` supervisor is watching. Three facts are read and never weighed — the driver the carry record names, the owner's liveness, and the supervisor's — so a strand is detected without any judgement. It runs at each loop boundary beside the stall report; a strand emits one marker on the run's event stream and sends one 🚨 Telegram naming the recovery. It reports, it never stops: a false positive costs one notification, never a halted run or a torn-down lane.

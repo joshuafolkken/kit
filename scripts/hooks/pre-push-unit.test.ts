@@ -4,7 +4,6 @@ import path from 'node:path'
 import { core_budget } from '#scripts/gate/core-budget'
 import { gate_skip } from '#scripts/gate/gate-skip'
 import { gate_test_fixture } from '#scripts/gate/gate-test-fixture'
-import { pre_push_related_switch } from '#scripts/hooks/pre-push-related-switch'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { review_stamps } from '#scripts/review/review-stamps'
@@ -93,8 +92,6 @@ const UNCOMMITTED = ` M ${SCRIPT_PATH}`
 const NOTHING_RAN = 0
 const SUITE_RAN = 1
 const FORCE_ENV = 'JOSH_PRE_PUSH_FORCE'
-const RELATED_ENV = pre_push_related_switch.SWITCH_ENV_KEY
-const RELATED_ON = pre_push_related_switch.SWITCH_ON
 const SPEC_FILTER = '--project=unit'
 const COMMAND_NAME = 'pre-push-unit'
 
@@ -120,8 +117,13 @@ async function run_hook(extra_arguments: ReadonlyArray<string> = []): Promise<[n
 
 const record_push_miss = vi.spyOn(lane_ledger_write, 'record_push_miss')
 
+function related_miss(reason: string): { scope: 'related'; reason: string } {
+	return { scope: 'related', reason }
+}
+
+// Either run counts: a miss runs the related tests, a person's explicit ask the whole suite.
 function suite_run_count(): number {
-	return run_guarded_unit.mock.calls.length
+	return run_guarded_unit.mock.calls.length + run_related_tests.mock.calls.length
 }
 
 beforeEach(() => {
@@ -131,9 +133,6 @@ beforeEach(() => {
 	repository.status = CLEAN
 	repository.unreadable = READS_FINE
 	vi.stubEnv(FORCE_ENV, '')
-	// joshuafolkken/kit#5187: `josh ship`'s push ahead of the gate runs this file under the switch it
-	// tests, so every test pins it off and only the ones about it switch it on.
-	vi.stubEnv(RELATED_ENV, '')
 })
 
 afterEach(() => {
@@ -167,22 +166,24 @@ describe('a green record that covers the tree this push carries', () => {
 		expect(text).toContain(FORCE_ENV)
 	})
 
-	it('runs the suite anyway when the escape hatch is set', async () => {
+	// joshuafolkken/kit#7977: a person's explicit ask is the one push that keeps the whole suite.
+	it('runs the whole suite anyway when the escape hatch is set', async () => {
 		vi.stubEnv(FORCE_ENV, '1')
 
 		const [code] = await run_hook()
 
 		expect(code).toBe(0)
-		expect(suite_run_count()).toBe(SUITE_RAN)
+		expect(run_guarded_unit).toHaveBeenCalledWith(expect.any(String), [])
+		expect(run_related_tests).not.toHaveBeenCalled()
 	})
 
 	// The same instruction typed the other way round, at a command line rather than in front of a
 	// push. A flag that was read as "nothing to do here" would be the one spelling that silently does
 	// nothing.
-	it('runs the suite anyway when the gate flag is passed', async () => {
+	it('runs the whole suite anyway when the gate flag is passed', async () => {
 		await run_hook([gate_skip.FORCE_FLAG])
 
-		expect(suite_run_count()).toBe(SUITE_RAN)
+		expect(run_guarded_unit).toHaveBeenCalledTimes(SUITE_RAN)
 	})
 
 	// A caller who narrowed the run to one spec asked for that run, not for a record about a tree.
@@ -275,9 +276,10 @@ describe('a record that cannot speak for this tree', () => {
 	})
 })
 
-// joshuafolkken/kit#3307: a push that fell back to the whole suite said nothing about why, so a moved
-// merge base, a dirty tree and a mismatched record could not be told apart from the log.
-describe('a fall back to the whole suite names its reason in one line', () => {
+// joshuafolkken/kit#3307: a push the record missed said nothing about why, so a moved merge base, a
+// dirty tree and a mismatched record could not be told apart from the log. joshuafolkken/kit#7977: the
+// miss runs the related tests, capped, rather than the whole suite.
+describe('a miss names its reason in one line and runs the related tests', () => {
 	const MISS_LEAD = 'the green gate record does not cover this push: '
 
 	it('names the moved merge base', async () => {
@@ -289,7 +291,7 @@ describe('a fall back to the whole suite names its reason in one line', () => {
 			`${MISS_LEAD}the merge base moved since the green gate (${ADVANCED_BASE} → ${BASE}).`,
 		)
 		// joshuafolkken/kit#5234: the miss's kind reaches the lane ledger, for `lane:stats` to count.
-		expect(record_push_miss).toHaveBeenCalledWith({ scope: 'whole', reason: 'base-moved' })
+		expect(record_push_miss).toHaveBeenCalledWith(related_miss('base-moved'))
 	})
 
 	it('names the paths that leave the working tree dirty', async () => {
@@ -299,7 +301,7 @@ describe('a fall back to the whole suite names its reason in one line', () => {
 		const [, text] = await run_hook()
 
 		expect(text).toContain(`${MISS_LEAD}the working tree differs from HEAD ( M pnpm-lock.yaml).`)
-		expect(record_push_miss).toHaveBeenCalledWith({ scope: 'whole', reason: 'tree-not-carried' })
+		expect(record_push_miss).toHaveBeenCalledWith(related_miss('tree-not-carried'))
 	})
 
 	it('names a missing record', async () => {
@@ -324,6 +326,33 @@ describe('a fall back to the whole suite names its reason in one line', () => {
 
 		expect(text).not.toContain(MISS_LEAD)
 		expect(record_push_miss).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#7977: only an explicit ask runs the whole suite on a miss, and its line says so.
+describe('a forced miss', () => {
+	it('says it runs the whole suite, as asked', async () => {
+		vi.stubEnv(FORCE_ENV, '1')
+
+		const [, text] = await run_hook()
+
+		expect(text).toContain(
+			'↻ running the whole unit suite, as asked — the green gate record does not cover this push: ' +
+				`${FORCE_ENV} is set.`,
+		)
+	})
+})
+
+// joshuafolkken/kit#7977: the whole suite is CI's, so a miss hands `test:related` the run, whose cap
+// records the test files past it as deferred to CI.
+describe('a miss with no explicit ask', () => {
+	it('runs the capped related tests, never the whole suite', async () => {
+		record_green(CHANGED_TREE, ADVANCED_BASE)
+
+		await run_hook()
+
+		expect(run_related_tests).toHaveBeenCalledWith([])
+		expect(run_guarded_unit).not.toHaveBeenCalled()
 	})
 })
 
@@ -356,16 +385,17 @@ describe('a catch-up merge gated green before its push', () => {
 // every repository the config reaches.
 // joshuafolkken/kit#3874: a push's whole suite ran beside other lanes' gates without a place in the core
 // budget, so their admission read its workers as load from outside the ledger.
-describe('the whole suite holds a place in the core budget', () => {
+describe('a push’s unit run holds a place in the core budget', () => {
 	afterEach(() => {
 		vi.restoreAllMocks()
 	})
 
-	it('reserves the direct unit weight before it runs the suite', async () => {
+	it('reserves the direct unit weight before it runs the whole suite', async () => {
 		const reservation = vi
 			.spyOn(core_budget, 'with_command_reservation')
 			.mockImplementation(async (_weight, run) => await run())
 
+		vi.stubEnv(FORCE_ENV, '1')
 		await run_hook()
 
 		expect(reservation).toHaveBeenCalledTimes(1)
@@ -384,12 +414,11 @@ describe('the whole suite holds a place in the core budget', () => {
 		expect(reservation).not.toHaveBeenCalled()
 	})
 
-	it('reserves the same weight before it runs the related tests ahead of the gate', async () => {
+	it('reserves the same weight before it runs the related tests on a miss', async () => {
 		const reservation = vi
 			.spyOn(core_budget, 'with_command_reservation')
 			.mockImplementation(async (_weight, run) => await run())
 
-		vi.stubEnv(RELATED_ENV, RELATED_ON)
 		await run_hook()
 
 		expect(reservation).toHaveBeenCalledTimes(1)

@@ -3,12 +3,12 @@ import { git_directory } from '#scripts/discovery/git-directory'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { lane_paths } from '#scripts/lane/lane-paths'
-import { lane_state } from '#scripts/lane/lane-state'
 import { stamped_memo } from '#scripts/lib/stamped-memo'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_hold, type HoldRead, type RunHold } from '#scripts/run/hold/run-hold'
 import { run_hold_ended, type EndedHold } from '#scripts/run/hold/run-hold-ended'
+import { run_board_records } from './run-board-records'
 import { run_board_span, type BoardSpan } from './run-board-span'
 
 // A single `fullrun #N` or `halfrun #N` has no carry record; the only record that says it is running
@@ -120,10 +120,9 @@ function lane_read(issue: string): HoldRead {
 
 // The single run a lane of this repository holds, read from the root checkout (joshuafolkken/kit#7653);
 // an ended lane holds none.
-async function lane_span(directory: string): Promise<BoardSpan | undefined> {
-	const records = await lane_state.read_records(directory)
-
-	return records
+function lane_span(directory: string): BoardSpan | undefined {
+	return run_board_records
+		.read_records(directory)
 		.filter((record) => record.state !== 'ended')
 		.map((record) => span_of(lane_read(record.issue)))
 		.find(Boolean)
@@ -139,7 +138,7 @@ async function span_here(is_carried: boolean): Promise<BoardSpan | undefined> {
 
 	if (directory === undefined) return undefined
 
-	return span_of(run_hold.read_hold(run_hold.hold_path(directory))) ?? (await lane_span(directory))
+	return span_of(run_hold.read_hold(run_hold.hold_path(directory))) ?? lane_span(directory)
 }
 
 // A run the root checkout's merge released, as `run-hold-ended.ts` kept it; `undefined` where its

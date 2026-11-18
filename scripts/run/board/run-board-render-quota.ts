@@ -1,6 +1,8 @@
 import { styleText } from 'node:util'
 import { figure_format } from '#scripts/lib/figure-format'
+import type { HoldCause } from '#scripts/run/merge/run-merge-usage-limit'
 import { run_board_fit, type DetailPart } from './run-board-fit'
+import { run_board_labels } from './run-board-labels'
 import type { QuotaProvider, QuotaReading, Quotas, QuotaWindow } from './run-board-quota-read'
 import { run_board_render_quota_cell, type Cell } from './run-board-render-quota-cell'
 import {
@@ -41,6 +43,12 @@ const PACE_MARK = '┊'
 const RESET_MARK = '↻'
 const LABEL = '⛽ usage'
 const LIMIT_MARK = '🛑'
+// The held row's lead and the word before its time, by what holds the launches.
+const LIMIT_HOLD_WORDS = { head: `${LIMIT_MARK} limit`, time: 'resumes' }
+const AUTH_HOLD_WORDS = {
+	head: `${run_board_labels.WAIT_ICONS.auth_failure} auth failed`,
+	time: 'recheck',
+}
 const SEPARATOR = ' · '
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const PROVIDERS: ReadonlyArray<QuotaProvider> = ['claude', 'codex']
@@ -57,10 +65,13 @@ const LEGEND = [
 	run_board_render_quota_github.LEGEND_ENTRY,
 ]
 
-// The reset a usage limit holds the run's launches until, and how many children it stopped.
+// The reset a usage limit holds the run's launches until, and how many children it stopped. An
+// authentication failure holds them too (`cause: 'auth'`), its time the next recheck, not a reset
+// (joshuafolkken/kit#8013).
 interface QuotaHold {
 	reset_ms: number
 	parked: number
+	cause?: HoldCause | undefined
 }
 
 interface QuotaView {
@@ -175,10 +186,11 @@ function reading_text(reading: QuotaReading | undefined, now_ms: number): string
 }
 
 function hold_text(hold: QuotaHold, now_ms: number): string {
-	const resumes = `resumes ${RESET_MARK} ${reset_text(hold.reset_ms, now_ms)}`
+	const words = hold.cause === 'auth' ? AUTH_HOLD_WORDS : LIMIT_HOLD_WORDS
+	const time = `${words.time} ${RESET_MARK} ${reset_text(hold.reset_ms, now_ms)}`
 	const parked = hold.parked > 0 ? [`${String(hold.parked)} parked`] : []
 
-	return [`${LIMIT_MARK} limit`, resumes, ...parked].join(SEPARATOR)
+	return [words.head, time, ...parked].join(SEPARATOR)
 }
 
 function providers_of(view: QuotaView): ReadonlyArray<QuotaProvider> {
@@ -202,7 +214,7 @@ function name_cell(name: string): string {
 	return padded(name, NAME_WIDTH)
 }
 
-// Claude's row reads its hold while a usage limit stops the run's launches.
+// Claude's row reads its hold while a usage limit or an authentication failure stops the run's launches.
 function row_of(provider: QuotaProvider, view: QuotaView): string {
 	const { hold, now_ms } = view
 	const body =

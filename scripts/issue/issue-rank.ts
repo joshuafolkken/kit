@@ -14,9 +14,11 @@ import {
 // undeclared one, so a wide-reach upgrade queues behind the rest of its pool (joshuafolkken/kit#5310);
 // declared ones rank among themselves by the keys below.
 //
-// Then, in order: `priority:critical`, then `priority:high`, then resumable work (an owned
-// stash, a pause comment or a linked open PR), then a defect on the verification path (`bug` with `run:solo`, or
-// `route:interrupt`), then the minutes its cause lost (`issue_priority.lost_minutes`: the body's
+// Then, in order: `priority:critical`, then `priority:high`, then a defect on the verification path
+// (`bug` with `run:solo`, or `route:interrupt`), then any defect (`is_defect`, which the caller reads
+// from `defect_rate.is_defect`, so a defect waits behind no feature of its priority
+// (joshuafolkken/kit#7912)), then resumable work (an owned stash, a pause comment or a linked open PR),
+// then the minutes its cause lost (`issue_priority.lost_minutes`: the body's
 // cause-loss lines summed over its recurrences (joshuafolkken/kit#4928), else its causing-lane line,
 // so causes of one lane are told apart (joshuafolkken/kit#4861); `0` when neither is declared, so an
 // undeclared issue follows every declared one of its priority), then how many other open issues wait
@@ -25,7 +27,7 @@ import {
 // then the minutes a week its declared speed-up saves
 // (`expected_effect_lint.weekly_minutes`, on the same minute scale; `0` when undeclared, so a measured
 // time-saver runs ahead of an unmeasured feature (joshuafolkken/kit#5302)). Below those, the caller's
-// own order stands — the sort is stable, so oldest-first ties and the defect-rate adjustment survive.
+// own order stands — the sort is stable, so oldest-first ties and the defect-rate deferral survive.
 //
 // **`run:solo` alone is not a key.** It means "runs alone", not "runs first": tidying that only touches
 // the verification path carries it too, and a low-priority one is not owed a place ahead of the queue.
@@ -33,6 +35,7 @@ import {
 
 interface RankRow {
 	is_resumable?: boolean | undefined
+	is_defect: boolean
 	is_last: boolean
 	labels: ReadonlyArray<string>
 	lost_minutes: number
@@ -74,8 +77,9 @@ function keys_of(row: RankRow): ReadonlyArray<number> {
 		flag(row.is_last),
 		-flag(is_critical(row.labels)),
 		-flag(is_priority(row.labels)),
-		-flag(row.is_resumable === true),
 		-flag(is_verification_defect(row.labels)),
+		-flag(row.is_defect),
+		-flag(row.is_resumable === true),
 		-row.lost_minutes,
 		-row.dependents,
 		row.estimated_lines ?? Number.MAX_SAFE_INTEGER,

@@ -404,7 +404,7 @@ describe('run_verification_gate — how long each check took', () => {
 
 // joshuafolkken/kit#1258: the plan decides how many checks run at once and how wide the unit suite
 // fans out. `gate-plan.test.ts` owns the numbers; what is asserted here is that the gate obeys them.
-const UNIT_COMMAND = ['josh', gate_labels.UNIT_TARGET, gate_labels.KEEP_WHOLE_SUITE_FLAG]
+const UNIT_COMMAND = ['josh', gate_labels.UNIT_TARGET]
 const UNIT_CAP = 7
 const NARROWEST_CONCURRENCY = 1
 const CAPPED_PLAN: GatePlan = gate_plan.plan_of(GATE_STEPS.length, UNIT_CAP)
