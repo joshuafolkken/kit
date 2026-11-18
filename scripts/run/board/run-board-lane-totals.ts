@@ -25,10 +25,10 @@ function compute_totals(entries: ReadonlyArray<LedgerEntry>, now_ms: number): La
 	return minutes.map((minute) => minute * MS_PER_MINUTE)
 }
 
-// Whether `entries`, read from the window's start, give the whole ledger's totals
+// Whether `entries`, read from at or before the window's start, give the whole ledger's totals
 // (joshuafolkken/kit#7932): the window has a merge, and each one's dispatch is found in them — a merge
-// dispatched before the window would need the older lines. A lane's dispatch is its latest one by time,
-// so one found in the window is the one the whole ledger would find.
+// dispatched before the read's start would need the older lines. A lane's dispatch is its latest one by
+// time, so one found in the read is the one the whole ledger would find.
 function covers(entries: ReadonlyArray<LedgerEntry>, now_ms: number): boolean {
 	const merges = recent_of(entries, now_ms).filter((entry) => lane_stage_stats.is_merge(entry))
 

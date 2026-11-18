@@ -110,6 +110,17 @@ describe('run_board_ledger_window.entries_of', () => {
 		expect(window).toStrictEqual(whole)
 		expect(whole).toHaveProperty('hold', undefined)
 	})
+
+	it('reads only the window when a merge in it was dispatched shortly before it', () => {
+		const file = ledger_of('margin-dispatch', [
+			...lane(1, NOW - 3 * DAY - HOUR, SHIP_STAGES, 2 * HOUR),
+			...lane(2, NOW - DAY),
+		])
+		const { window, whole, fell_back } = compare(file)
+
+		expect(window).toStrictEqual(whole)
+		expect(fell_back).toBe(false)
+	})
 })
 
 describe('run_board_ledger_window.entries_of falling back', () => {
@@ -135,11 +146,28 @@ describe('run_board_ledger_window.entries_of falling back', () => {
 		expect(window).toStrictEqual(whole)
 		expect(fell_back).toBe(true)
 	})
+})
 
-	it('falls back to the whole ledger when a merge in the window was dispatched before it', () => {
+describe('run_board_ledger_window.entries_of falling back on lane totals', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('falls back to the whole ledger when a merge in the window was dispatched before the margin', () => {
 		const file = ledger_of('early-dispatch', [
-			...lane(1, NOW - 3 * DAY - HOUR, SHIP_STAGES, 2 * HOUR),
+			...lane(1, NOW - 5 * DAY, SHIP_STAGES, 2 * DAY + HOUR),
 			...lane(2, NOW - DAY),
+		])
+		const { window, whole, fell_back } = compare(file)
+
+		expect(window).toStrictEqual(whole)
+		expect(fell_back).toBe(true)
+	})
+
+	it('falls back to the whole ledger when the window measures every stage but no merge', () => {
+		const file = ledger_of('no-merge', [
+			...lane(1, NOW - 10 * DAY),
+			...lane(2, NOW - DAY, SHIP_STAGES, 2 * DAY),
 		])
 		const { window, whole, fell_back } = compare(file)
 

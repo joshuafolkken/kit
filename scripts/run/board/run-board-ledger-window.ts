@@ -11,9 +11,13 @@ import { run_board_usual } from './run-board-usual'
 // driver's open hold needs no fallback: it ends within the hour, so a hold-end line older than the
 // window is never open (`lane_held_stats.open_reason`).
 //
+// The read starts `MARGIN_DAYS` before the window, so a merge in the window whose lane was dispatched
+// shortly before it still finds its dispatch; only a lane running longer than the margin falls back.
+//
 // Remembered per ledger stamp, so a redraw over an unchanged ledger hands back the same array and the
 // readers' own memos aggregate nothing again (joshuafolkken/kit#7012).
 
+const MARGIN_DAYS = 1
 const PERIOD_DAYS = Math.max(run_board_usual.PERIOD_DAYS, run_board_lane_totals.PERIOD_DAYS)
 const windows = stamped_memo.create<ReadonlyArray<LedgerEntry>>()
 
@@ -22,7 +26,7 @@ function covers(entries: ReadonlyArray<LedgerEntry>, now_ms: number): boolean {
 }
 
 function read_window(path: string, now_ms: number): ReadonlyArray<LedgerEntry> {
-	const { since_ms } = lane_stats.window_of(PERIOD_DAYS, now_ms)
+	const { since_ms } = lane_stats.window_of(PERIOD_DAYS + MARGIN_DAYS, now_ms)
 	const { entries } = lane_ledger.read_since(path, since_ms)
 
 	return covers(entries, now_ms) ? entries : lane_ledger.read_entries(path)
