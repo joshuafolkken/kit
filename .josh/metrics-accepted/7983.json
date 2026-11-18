@@ -1,0 +1,7 @@
+{
+	"reason": "the withdrawal guard on adopt is a new behavior: a shared withdrawal helper and one branch, +13 code lines",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 13
+	}
+}
