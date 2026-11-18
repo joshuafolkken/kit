@@ -19,6 +19,19 @@ describe('stop_rules.stop_outcome — started child background wait', () => {
 		).toBeDefined()
 	})
 
+	it('addresses a hand-off child, keeping the ship re-issue to the lane child', () => {
+		const { reason } = stop_rules.stop_outcome(context({ ...RUNNING, started_child: true }))
+
+		expect(reason).toContain('started child (lane, hand-off or beside)')
+		expect(reason).toContain('(lane child) re-issue the work')
+	})
+
+	it('addresses a hand-off child waiting on a subagent alone', () => {
+		const only_agent = context({ ...RUNNING, command_pending: false, started_child: true })
+
+		expect(stop_rules.stop_outcome(only_agent).reason).toContain('started child (lane, hand-off')
+	})
+
 	it('still refuses a lane child stopping with a background task running', () => {
 		expect(stop_rules.stop_outcome(context({ ...RUNNING, lane_child: true })).reason).toBeDefined()
 	})

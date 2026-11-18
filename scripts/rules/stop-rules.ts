@@ -260,8 +260,8 @@ function needs_filing(context: StopContext): boolean {
 // **A running background subagent stands both hold rules down**. Its completion
 // notice re-invokes the session, so the turn-end is a wait on the run's own work, not on a person — a
 // notify there says "nothing needed" and dilutes the ones that do. A backgrounded command does not
-// count: a dev server never ends, and a stop behind it would leave a person silently waiting. A lane
-// child never reaches this with a task running: `needs_background_wait` answers it first.
+// count: a dev server never ends, and a stop behind it would leave a person silently waiting. A started
+// child (lane, hand-off or beside) never reaches this with a task running: `needs_background_wait` answers it first.
 //
 // **A lane handed to the detached ship stands them down too**: the hold now
 // belongs to the supervisor driving the merge, and the person hears from that supervisor's own notify.
