@@ -10,6 +10,7 @@ import type { EpicRead } from '#scripts/epic/epic-next-read'
 import type { EpicView } from '#scripts/epic/epic-next-views'
 import { epic_report, type EpicNextResult } from '#scripts/epic/epic-report'
 import type { SoloGate } from '#scripts/epic/epic-solo'
+import { epic_solo_parked } from '#scripts/epic/epic-solo-parked'
 import { epic_solo_stale } from '#scripts/epic/epic-solo-stale'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
@@ -195,8 +196,8 @@ function is_transport_failure(result: EpicNextResult): boolean {
 	return result.anomalies.some((anomaly) => anomaly.is_unreachable === true)
 }
 
-// A pending interrupt outside the pool holds every candidate (`backlog-interrupt.ts`); else the
-// ranked `run:solo` gate decides.
+// A pending interrupt outside the pool holds every candidate (`backlog-interrupt.ts`), and so does a
+// parked `run:solo` issue still open (`epic-solo-parked.ts`); else the ranked `run:solo` gate decides.
 async function gate_of(
 	result: EpicNextResult,
 	read: BusyRead,
@@ -206,6 +207,10 @@ async function gate_of(
 	const held = backlog_interrupt.hold(result, read, context.interrupts ?? [], repo)
 
 	if (held !== undefined) return held
+
+	const parked = await epic_solo_parked.hold(result, repo)
+
+	if (parked !== undefined) return parked
 
 	return backlog_rank.gate(result, read, repo, await backlog_gate_scope.gate_scope(context, read))
 }

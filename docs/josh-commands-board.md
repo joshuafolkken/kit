@@ -174,7 +174,7 @@ A queued or waiting row draws `<icon> <condition> <number> <kind> <title>  <tail
   The issue form, `#<issue> を閉じる PR のマージ後 <K> マージ`, shows `<issue>` and counts after the merged pull request that closed it.
 - `📋 <N>` — a named run's declared issue `<N>` is ahead of it, in flight or not yet started. Never on a `run:add` issue.
 - `✋` — neither `run:lane` nor `run:solo`, due, and nothing blocks it; `backlog:next` holds it alone for its judgment and offers the triaged rows.
-- `🔒 <N>` — the running issue `<N>` carries `run:solo`, so nothing starts until it merges or is parked; a waiting `run:solo` row leads with it too. `epic_solo`'s reading, as `backlog:next`'s "carries `run:solo` and is running …".
+- `🔒 <N>` — running or parked `run:solo` issue `<N>`: nothing starts until it merges, closes or loses the label; a waiting `run:solo` row leads with it too. `epic_solo`'s reading, the parked half `epic_solo_parked`'s.
 - `🧍 <N>` — a `run:solo` issue, the first among the judged, due and unblocked rows, waits for the running lane `<N>` to finish; with more, `<N>+<rest>`, the rest after the title. `epic_solo`'s reading, as `backlog:next`'s "carries `run:solo` and waits …".
 - `🙅 <N>` — ranked behind the waiting `run:solo` issue `<N>`, which nothing is offered past.
 - `📂 <N>` — a path it declares — its recorded plan, else its plan comment, else its body — overlaps one the running issue `<N>` declares, the path after the title; `backlog:next` answers "waits: its `<file>` overlaps …".
