@@ -1,0 +1,8 @@
+{
+	"reason": "chain-rule.md now names the metrics-totals stage and its --from rerun, replacing the run:review stop text that no longer holds",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 104,
+		"ai_cost.on_demand_bytes": 50
+	}
+}
