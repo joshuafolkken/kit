@@ -2,6 +2,6 @@
 	"reason": "run:stalled next action: per-cause Recovery table plus marker write/read in park comments and board (#7852)",
 	"date": "2026-11-18",
 	"growth": {
-		"scripts.code_lines": 35
+		"scripts.code_lines": 36
 	}
 }

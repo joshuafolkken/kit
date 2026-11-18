@@ -27,15 +27,18 @@ interface PauseRead {
 
 const FALLBACK = 'Reason unavailable: inspect issue'
 
-// A park body, or a comment whose marker holds a next action — the shape only a stop writes, such as
-// a `run:stalled` park's (joshuafolkken/kit#7852).
+// A next action the comment records about itself, as a `run:stalled` park does (joshuafolkken/kit#7852);
+// a backfill citing another comment is that stop's reason, never a stop of its own.
+function is_own_next(comment: IssueComment): boolean {
+	if (issue_outcome.next_of(comment.body) === undefined) return false
+
+	return issue_outcome.from_comments([comment])?.url === comment.html_url
+}
+
 function is_stop(comment: IssueComment): boolean {
 	if (comment.is_trusted !== true) return false
 
-	return (
-		run_park_body.summary_of(comment.body) !== undefined ||
-		issue_outcome.next_of(comment.body) !== undefined
-	)
+	return run_park_body.summary_of(comment.body) !== undefined || is_own_next(comment)
 }
 
 // A backfill can describe this stop, never an older decision or a later administrative note.

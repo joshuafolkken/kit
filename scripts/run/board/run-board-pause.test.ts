@@ -68,14 +68,14 @@ describe('run_board_pause park next action', () => {
 })
 
 // joshuafolkken/kit#7852: a `run:stalled` park comment carries no options, only its marked next action.
+const STALLED = 'Parked with `run:stalled`\n- Next: fix the cause'
+const COMMAND = 'pnpm josh ship --log 7387'
+
+function stalled(summary?: string): IssueComment {
+	return { ...note(summary, STALLED), html_url: `${note().html_url}9` }
+}
+
 describe('run_board_pause run:stalled next action', () => {
-	const STALLED = 'Parked with `run:stalled`\n- Next: fix the cause'
-	const COMMAND = 'pnpm josh ship --log 7387'
-
-	function stalled(summary?: string): IssueComment {
-		return { ...note(summary, STALLED), html_url: `${note().html_url}9` }
-	}
-
 	it('reads a marked run:stalled park over an older park', () => {
 		expect(run_board_pause.from_comments([note(SIZE_REASON), stalled(COMMAND)])).toMatchObject({
 			summary: COMMAND,
@@ -91,6 +91,26 @@ describe('run_board_pause run:stalled next action', () => {
 		expect(run_board_pause.from_comments([stalled('Merged cleanly')]).summary).toBe(
 			run_board_pause.FALLBACK,
 		)
+	})
+})
+
+describe('run_board_pause run:stalled next action and backfills', () => {
+	it('does not read a next-shaped backfill of an older stop as a stop', () => {
+		const older = note()
+		const late = {
+			...note(),
+			body: issue_outcome.body_of({
+				body: 'Backfill',
+				summary: 'pnpm josh run:cut --end',
+				url: older.html_url,
+			}),
+			html_url: `${note().html_url}8`,
+		}
+
+		expect(run_board_pause.from_comments([older, stalled(COMMAND), late])).toMatchObject({
+			summary: COMMAND,
+			url: stalled().html_url,
+		})
 	})
 })
 
