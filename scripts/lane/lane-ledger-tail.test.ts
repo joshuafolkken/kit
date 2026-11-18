@@ -117,6 +117,19 @@ describe('lane_ledger_tail.read_since on the window', () => {
 		})
 	})
 
+	it('reads past a backdated line to the window lines written before it', () => {
+		const backdated = { kind: 'merge', at: '2026-10-02T23:50:00.000Z', issue: 9 }
+		const lines = [merge_on(0), merge_on(2), backdated, merge_on(3)].map((line) =>
+			JSON.stringify(line),
+		)
+		const target = ledger_of('backdated', [...lines, ''])
+
+		expect(lane_ledger_tail.read_since(target, since(2), SMALL_CHUNK_BYTES)).toStrictEqual({
+			entries: [merge_on(2), merge_on(3)],
+			reached_start: false,
+		})
+	})
+
 	it('returns nothing when no line is in the window', () => {
 		const after_last = since(3) + 1
 

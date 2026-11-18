@@ -126,14 +126,17 @@ function read(path: string): ReadonlyArray<LedgerEntry> {
 }
 
 // The recent window read backward from the end (joshuafolkken/kit#7930): a fresh process reads only the
-// chunks covering the window, not the whole ledger. `reached_start` — no line older than the window
-// was met, so the ledger's start was read and the window may reach past it.
+// chunks covering the window, not the whole ledger. `reached_start` — the ledger's start was read with
+// no line older than the window by the margin met, so the window may reach past it.
 interface RecentWindow {
 	readonly entries: ReadonlyArray<LedgerEntry>
 	readonly reached_start: boolean
 }
 
 const CHUNK_BYTES = 65_536
+// The ledger is not strictly in time order: a merge line is dated back to its ship's report, minutes
+// before it lands (`run-merge-dated.ts`), so the scan stops only past this margin.
+const BACKDATE_MARGIN_MS = 3_600_000
 const NONE: RecentWindow = { entries: EMPTY, reached_start: true }
 
 function read_range(descriptor: number, start: number, end: number): Buffer {
@@ -152,14 +155,20 @@ function first_line_at(bytes: Buffer, is_file_start: boolean): number {
 	return index === -1 ? bytes.length : index + 1
 }
 
-// Adds the text's entries newest first to `found`; true once one older than `since_ms` is met.
+function is_since(entry: LedgerEntry, since_ms: number): boolean {
+	return Date.parse(entry.at) >= since_ms
+}
+
+// Adds the text's entries in the window to `found`, newest first; true once a line older than the
+// window by more than the backdate margin is met — no line before it can still fall in the window.
 function take_newest(found: Array<LedgerEntry>, text: string, since_ms: number): boolean {
 	const newest_first = parse_text(text).toReversed()
-	const older = newest_first.findIndex((entry) => Date.parse(entry.at) < since_ms)
+	const stop = newest_first.findIndex((entry) => !is_since(entry, since_ms - BACKDATE_MARGIN_MS))
+	const scanned = stop === -1 ? newest_first : newest_first.slice(0, stop)
 
-	found.push(...(older === -1 ? newest_first : newest_first.slice(0, older)))
+	found.push(...scanned.filter((entry) => is_since(entry, since_ms)))
 
-	return older !== -1
+	return stop !== -1
 }
 
 interface Scan {

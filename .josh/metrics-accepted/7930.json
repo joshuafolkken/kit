@@ -2,6 +2,6 @@
 	"reason": "New recent-window reader for the lane ledger (#7930): backward chunk scan and its entry point, the planned feature itself",
 	"date": "2026-11-18",
 	"growth": {
-		"scripts.code_lines": 58
+		"scripts.code_lines": 63
 	}
 }
