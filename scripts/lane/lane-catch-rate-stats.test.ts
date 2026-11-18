@@ -53,8 +53,8 @@ describe('lane_catch_rate_stats.table', () => {
 		const checks = [
 			check('lint', { is_passed: false }),
 			check('lint'),
-			check('lint', { is_reused: true }),
-			check('lint', { is_unmoved: true }),
+			check('lint', { is_passed: false, is_reused: true }),
+			check('lint', { is_passed: false, is_unmoved: true }),
 		]
 
 		expect(rows_of([gate(checks)])).toStrictEqual(['| lint | 2 | 1 | 50.0 | 2.0 | 0 |'])
