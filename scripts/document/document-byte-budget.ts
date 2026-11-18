@@ -86,7 +86,8 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: 'docs/josh-commands-run.md', bytes: 61_440 },
 	// The finished rows' icons, `⏩` already done among them (joshuafolkken/kit#7095), crossed the 20480 block.
 	// The parked row's next action from `run:park --outcome` (joshuafolkken/kit#7850) crossed the 24576 block.
-	{ path: 'docs/josh-commands-board.md', bytes: 28_672 },
+	// `run:board --timing` (joshuafolkken/kit#7929) crossed the 28672 block.
+	{ path: 'docs/josh-commands-board.md', bytes: 32_768 },
 	// The `concurrent lanes` table's core-wait columns (joshuafolkken/kit#7550) crossed the 32768 block.
 	{ path: 'docs/josh-commands-lane.md', bytes: 36_864 },
 	// `cost:audit`'s dated period and usage breakdown (joshuafolkken/kit#7042) crossed the 16384 block.

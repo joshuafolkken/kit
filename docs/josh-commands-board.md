@@ -99,6 +99,7 @@ pnpm josh run:board --chat             # one frame for a chat, recorded as a pro
 pnpm josh run:board --chat --fresh     # the same, read from scratch past the one-minute record
 pnpm josh run:board --every 5          # the --chat frame as a 📊 Progress Telegram every 5 minutes, until the run ends
 pnpm josh run:board --theme wargames   # cyan phosphor text and dashed rules
+pnpm josh run:board --once --timing    # one frame, then how long each phase of it took
 ```
 
 **Options:**
@@ -108,6 +109,7 @@ pnpm josh run:board --theme wargames   # cyan phosphor text and dashed rules
 - `--fresh` — with `--chat`: reads from scratch past the record, and records what it drew; the `run:handoff-lanes` chain passes it right after a merge.
 - `--every <minutes>` — sends the `--chat` frame as a `📊 Progress` Telegram now and every `<minutes>` until the run ends — only when a person asks for it.
 - `--theme wargames` — draws uncolored text in phosphor cyan, rules as `-`; `JOSH_BOARD_THEME=wargames` sets it for every board (`backlogrun` too), `--theme` wins. A live board types its opening line, reveals its first frame line by line (a key skips it), then types each new issue row, `█` after it. Unknown names are refused; `--chat` and `--every` never take it.
+- `--timing` — after the `--once` frame, or once a live board leaves its screen, writes how long each phase of the first frame took (ms). `--chat` and `--every` ignore it.
 
 <!-- /usage -->
 

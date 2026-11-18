@@ -1,7 +1,9 @@
 import { launch_timing } from '#scripts/lane/launch-timing'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_board_cli } from './run-board-cli'
 import { run_board_fixture } from './run-board-fixture'
+import { run_board_read } from './run-board-read'
+import { run_board_read_fixture } from './run-board-read-fixture'
 import { run_board_timing } from './run-board-timing'
 
 // joshuafolkken/kit#7929: `run:board --timing` says what the first board waited on, phase by phase.
@@ -11,8 +13,34 @@ const { FIRST_FRAME_PHASE, FIRST_READ_PHASE, TIMING_FLAG, report, split } = run_
 const HEADING = 'run:board timing (ms):'
 const REBUILD_MS = 812.4
 
+const LANES_PHASE = 'local: lanes'
+const LOCAL_PHASES = ['local: span', LANES_PHASE, 'local: roots', 'local: events', 'local: room']
+
 beforeEach(() => {
 	launch_timing.clear()
+})
+
+afterEach(() => {
+	vi.restoreAllMocks()
+})
+
+describe('run_board_cli.USAGE', () => {
+	it('names the timing flag', () => {
+		expect(run_board_cli.USAGE).toContain(`[${TIMING_FLAG}]`)
+	})
+})
+
+describe('run_board_read.read_local timing', () => {
+	it('records each local read the first board waits on by name', async () => {
+		const { CARRY, arrange } = run_board_read_fixture
+
+		arrange({ kind: 'carried', carry: CARRY }, undefined)
+		await run_board_read.read_local()
+
+		expect(launch_timing.phases().map(({ name }) => name)).toStrictEqual(
+			expect.arrayContaining(LOCAL_PHASES),
+		)
+	})
 })
 
 describe('run_board_timing.split', () => {
@@ -28,7 +56,7 @@ describe('run_board_timing.split', () => {
 describe('run_board_timing.report', () => {
 	it('says the launcher rebuild and each phase by name, in whole ms', () => {
 		launch_timing.set_rebuild_ms(REBUILD_MS)
-		launch_timing.mark('local: lanes', 2.6)
+		launch_timing.mark(LANES_PHASE, 2.6)
 
 		expect(report()).toBe(`${HEADING}\n  rebuild       812\n  local: lanes  3\n`)
 	})
