@@ -124,6 +124,8 @@ The first line is how far the run is: `⏰` elapsed in degree-minute-second form
 
 The second line is what the run is on: `💓` age of the newest event (yellow past 15 quiet minutes, red past 30), and machine gauges (`💪` CPU, `🧠` memory, `💾` swap rate). `⏰` and `💓` share a column, digits right-aligned; both lines' first bars start in one.
 
+While a running run's stream holds an outage with no `online` after it, last seen (`offline` or `offline-tick`) within two sampler ticks, `📴` (named in the legend) stands in the `💓`'s place with the time since the network went down, in yellow. The connection events never count as the `💓`'s newest event.
+
 The third line is what the run is doing now: a spinner, its age, then the kind's icon and words — the repository's name alone while the stream holds no event.
 
 - **At a stage** — the stage's words then why: `⠸  2′31″  🤔 waiting on judgment — 4 waiting`.

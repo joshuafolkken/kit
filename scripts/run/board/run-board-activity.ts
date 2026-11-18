@@ -1,3 +1,4 @@
+import { lane_offline_spans, type Outage } from '#scripts/lane/lane-offline-spans'
 import type { PrChecks } from '#scripts/run/event/run-event-checks'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
@@ -20,7 +21,11 @@ interface LatestEvent {
 interface RunActivity extends Partial<SetupRead> {
 	// Runtime evidence for the stage, independent of its retained description.
 	is_setup_working?: boolean | undefined
+	// The newest event's time, the connection turns aside (`lane-offline-spans.ts`): a recovery is no
+	// sign of the run's own life, so counting it would hide a hang behind an outage.
 	last_event_ms: number | undefined
+	// The outage the stream leaves with no recovery (joshuafolkken/kit#7895); absent while online.
+	outage?: Outage | undefined
 	// The newest thing the run did — its newest position, or its newest event where it has none yet —
 	// in the event's own words, and when.
 	latest?: LatestEvent | undefined
@@ -63,12 +68,13 @@ function idle_of(events: ReadonlyArray<RunEvent>): number | undefined {
 }
 
 function stream_activity(events: ReadonlyArray<RunEvent>): RunActivity {
-	const last = events.at(-1)
+	const last = events.findLast((event) => !lane_offline_spans.is_turn(event.kind))
 	const position = events.findLast((event) => !run_event_stream.TRACE_KINDS.has(event.kind))
 
 	return {
 		...run_board_setup.read(events),
 		last_event_ms: last === undefined ? undefined : moment(last),
+		outage: lane_offline_spans.open_outage(events),
 		latest: latest_of(position ?? last),
 		idle_ms: idle_of(events),
 		lane_events: run_board_lane_event.newest_of(events),
