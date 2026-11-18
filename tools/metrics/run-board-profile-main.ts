@@ -3,16 +3,19 @@ import { fileURLToPath } from 'node:url'
 import { machine_capacity } from '#scripts/gate/machine-capacity'
 import { git_worktree } from '#scripts/git/git-worktree'
 import { lane_process_table } from '#scripts/lane/lane-process-table'
+import { lane_state } from '#scripts/lane/lane-state'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_board_cli } from '#scripts/run/board/run-board-cli'
 import { run_board_gather } from '#scripts/run/board/run-board-gather'
 import { run_board_gather_live } from '#scripts/run/board/run-board-gather-live'
 import { run_board_read } from '#scripts/run/board/run-board-read'
+import { run_board_throughput } from '#scripts/run/board/run-board-throughput'
 import { run_board_tick } from '#scripts/run/board/run-board-tick'
 import { run_board_usage_read } from '#scripts/run/board/run-board-usage-read'
 import { run_board_usage_top } from '#scripts/run/board/run-board-usage-top'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
+import { run_event_tail } from '#scripts/run/event/run-event-tail'
 import { run_board_profile, type Piece } from './run-board-profile'
 
 // The measurement #7257 asks for, run by hand in a checkout whose run has started:
@@ -86,10 +89,30 @@ function machine_pieces(): Array<Piece> {
 	]
 }
 
+// The two shares of `read_local` #7257 found heaviest, each called as `read_local` calls it; the
+// throughput fold is given one stream read taken beforehand, so the fold alone is measured.
+function local_share_pieces(repository: string): Array<Piece> {
+	const events = run_event_tail.read_events(run_event_stream.target_of(repository))
+
+	return [
+		{
+			label: 'lane records read',
+			per_minute: PER_LOCAL_READ,
+			run: async () => await lane_state.read_records(repository),
+		},
+		{
+			label: 'throughput fold',
+			per_minute: PER_LOCAL_READ,
+			run: async () => run_board_throughput.rows_of(events, Date.now()),
+		},
+	]
+}
+
 function local_pieces(repository: string): Array<Piece> {
 	const target = run_event_stream.target_of(repository)
 
 	return [
+		...local_share_pieces(repository),
 		{
 			label: 'stream re-parse',
 			per_minute: PER_LOCAL_READ,
@@ -117,3 +140,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
+
+const run_board_profile_main = { local_pieces }
+
+export { run_board_profile_main }
