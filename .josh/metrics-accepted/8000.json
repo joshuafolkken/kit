@@ -1,0 +1,7 @@
+{
+	"reason": "New run-board-typing module (CURSOR and typed) and the intro's per-beat line rewrite add the block cursor #8000 asks for",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 13
+	}
+}
