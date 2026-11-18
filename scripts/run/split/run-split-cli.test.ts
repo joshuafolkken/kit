@@ -57,10 +57,13 @@ describe('run_split_cli.run — arguments', () => {
 			issue: '10',
 			children: ['11', '12'],
 			is_ordered: true,
+			chains: [],
 			title: 'T',
 		})
 	})
+})
 
+describe('run_split_cli.run — the order', () => {
 	it('leaves the order off and the title unset when neither is given', async () => {
 		await run_split_cli.run(ONE_CHILD)
 
@@ -68,8 +71,17 @@ describe('run_split_cli.run — arguments', () => {
 			issue: '10',
 			children: ['11'],
 			is_ordered: false,
+			chains: [],
 			title: undefined,
 		})
+	})
+
+	it('reads each `--chain` as given, leaving their reading to `epic`', async () => {
+		const chains = ['#10 -> #12', '#11 -> #12']
+		const argv = ['10', CHILDREN, '11,12', ...chains.flatMap((chain) => ['--chain', chain])]
+
+		expect(await run_split_cli.run(argv)).toBe(0)
+		expect(split).toHaveBeenCalledWith(expect.objectContaining({ chains, is_ordered: false }))
 	})
 })
 
@@ -87,6 +99,7 @@ describe('run_split_cli.run — `--prerequisite`', () => {
 		[['10', PREREQUISITE, '10']],
 		[['10', PREREQUISITE, '11', CHILDREN, '12']],
 		[['10', PREREQUISITE, '11', '--ordered']],
+		[['10', PREREQUISITE, '11', '--chain', '#10 -> #11']],
 	])('refuses %j, which no prerequisite form reads, and writes nothing', async (argv) => {
 		expect(await run_split_cli.run(argv)).toBe(1)
 		expect(prerequisite).not.toHaveBeenCalled()
@@ -145,5 +158,12 @@ describe('run_split_cli.run — a failure', () => {
 			'Done: nothing.',
 			'Rerun with `--title <title>`.',
 		])
+	})
+
+	it('asks for fixed `--chain` values when the chain refusal wrote nothing', async () => {
+		split.mockResolvedValue({ kind: 'failed', step: 'chain', reason: 'a cycle', done: [] })
+
+		expect(await run_split_cli.run(ONE_CHILD)).toBe(1)
+		expect(errors.at(-1)).toBe('Rerun with the `--chain` values fixed.')
 	})
 })

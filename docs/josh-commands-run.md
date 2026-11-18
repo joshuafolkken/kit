@@ -92,6 +92,7 @@ pnpm josh run:split 1091 --prerequisite 1104 --title "1104 then 1091"   # 1104 f
 
 - `--children <N1,N2,...>` — the filed split issues, comma-separated.
 - `--ordered` — `<issue>` first, then the children in that order.
+- `--chain <chain>` — repeatable; one chain line (`#A -> #B`) among `<issue>` and the children, passed to `epic` as given — joins and branches without `--ordered`.
 - `--prerequisite <P>` — the filed issue that has to land first; `<issue>` is paused on it.
 - `--title <title>` — the new epic’s title; required when no epic tracks `<issue>` yet.
 
@@ -100,9 +101,11 @@ pnpm josh run:split 1091 --prerequisite 1104 --title "1104 then 1091"   # 1104 f
 A split found mid-run in one call: the run set aside as `run:pause` sets it aside (stash, comment,
 release, each step skipped on a rerun once done), the children placed — `epic --add` into the epic
 already tracking `<issue>` (`--after <issue>` when `--ordered`), or a new epic `<issue>` heads — and
-that epic audited with `epic:audit`. The last line is `epic #<E>`. An epic listing that cannot tell
+that epic audited with `epic:audit`. Each `--chain` goes to `epic` (creation or `--add`) as given. The
+last line is `epic #<E>`. An epic listing that cannot tell
 whether an epic tracks `<issue>` parks it with `needs-decision` instead, and the last line is
-`needs-decision`. Without `--title` and with no tracking epic it refuses before writing anything; a
+`needs-decision`. Without `--title` and with no tracking epic, or with a `--chain` `epic` refuses
+(`--chain` beside `--ordered`, a malformed line, a cycle), it refuses before writing anything; a
 failed step keeps the hold. A rerun whose tracking epic already lists every child places nothing
 again and goes on to the audit.
 
