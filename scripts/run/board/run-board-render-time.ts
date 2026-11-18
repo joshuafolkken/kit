@@ -78,16 +78,34 @@ function time_of(row: BoardRow, now_ms: number): string | undefined {
 	return time.excluded_ms > 0 ? `${net} (+${span_of(time.excluded_ms)})` : net
 }
 
-// The time column's width: the widest time any active row or earlier run's lane draws in this frame.
-function time_width(header: BoardHeader): number {
-	const rows = run_board_layout.lane_rows(header.layout ?? run_board_layout.EMPTY_LAYOUT, [])
-	const times = rows.map((row) => time_of(row, header.now_ms) ?? '')
+// The columns a row's bracketed stops take after its net time: ` (+2′30″)`, or none.
+function stops_length(row: BoardRow, now_ms: number): number {
+	return (time_of(row, now_ms) ?? '').length - (net_of(row, now_ms) ?? '').length
+}
 
-	return Math.max(0, ...times.map((time) => time.length))
+// The most columns `measure` gives any active row or earlier run's lane in this frame.
+function widest(header: BoardHeader, measure: (row: BoardRow) => number): number {
+	const rows = run_board_layout.lane_rows(header.layout ?? run_board_layout.EMPTY_LAYOUT, [])
+
+	return Math.max(0, ...rows.map((row) => measure(row)))
+}
+
+// The time column's width: the widest net time in this frame. The bracketed stops follow it, so every
+// net time ends in one column (joshuafolkken/kit#7992).
+function time_width(header: BoardHeader): number {
+	return widest(header, (row) => (net_of(row, header.now_ms) ?? '').length)
+}
+
+// The stops column's width after the time column: the widest bracketed stops in this frame, so what
+// follows the time starts in one column whether or not a row has stops.
+function stops_width(header: BoardHeader): number {
+	return widest(header, (row) => stops_length(row, header.now_ms))
 }
 
 const run_board_render_time = {
 	net_of,
+	stops_length,
+	stops_width,
 	time_of,
 	time_width,
 }

@@ -28,7 +28,7 @@ const PAUSE_COMMANDS: Record<string, CommandEntry> = {
 		// `run:release` underneath can send the stop confirmation.
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		reference: [
-			'<issue> (--children <N1,N2,...> [--ordered] | --prerequisite <P>) [--title <title>]',
+			'<issue> (--children <N1,N2,...> [--ordered | --chain <chain>...] | --prerequisite <P>) [--title <title>]',
 			'automation',
 			['git', 'network', 'files'],
 		],
@@ -44,6 +44,11 @@ const PAUSE_COMMANDS: Record<string, CommandEntry> = {
 					description: 'the filed split issues, comma-separated.',
 				},
 				{ names: ['--ordered'], description: '`<issue>` first, then the children in that order.' },
+				{
+					names: ['--chain <chain>'],
+					description:
+						'repeatable; one chain line (`#A -> #B`) among `<issue>` and the children, passed to `epic` as given — joins and branches without `--ordered`.',
+				},
 				{
 					names: ['--prerequisite <P>'],
 					description: 'the filed issue that has to land first; `<issue>` is paused on it.',

@@ -1,6 +1,8 @@
 import { epic_command } from '#scripts/epic/epic'
 import { epic_audit_cli } from '#scripts/epic/epic-audit-cli'
 import { epic_blocked_by, type ChildrenTracking } from '#scripts/epic/epic-blocked-by'
+import { epic_cli } from '#scripts/epic/epic-cli'
+import { epic_cli_chain } from '#scripts/epic/epic-cli-chain'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
 import { issue_park } from '#scripts/issue/issue-park'
@@ -14,13 +16,14 @@ import {
 	type StepsResult,
 } from '#scripts/run/pause/run-set-aside'
 
-// `josh run:split <N> --children <N1,N2,...> [--ordered] [--title <title>]` — a split found mid-run
+// `josh run:split <N> --children <N1,N2,...> [--ordered | --chain <chain>...] [--title <title>]` — a split found mid-run
 // (`backlogrun-child.md` → "When `#N` is not an epic") in one call: the run set aside (stash, comment,
 // release), its children placed — into the epic already tracking `#N`, or a new epic `#N` heads — and
 // that epic audited. A tracking epic the listing cannot rule out parks `#N` with `needs-decision`
 // instead: "could not tell" is not "no epic".
 //
-// The placement is asked before anything is written, so a missing `--title` refuses on a clean slate.
+// The placement is asked before anything is written, so a missing `--title` or a `--chain` `epic`
+// refuses is refused on a clean slate.
 
 const SUCCESS_EXIT_CODE = 0
 
@@ -28,6 +31,7 @@ interface SplitRequest {
 	issue: string
 	children: ReadonlyArray<string>
 	is_ordered: boolean
+	chains: ReadonlyArray<string>
 	title: string | undefined
 }
 
@@ -67,26 +71,38 @@ function aside_of(request: SplitRequest, is_handed_off = false): AsideRequest {
 	}
 }
 
+// Each `--chain` value goes to `epic` as given; `epic` alone reads and refuses it.
+function chain_argv(request: SplitRequest): Array<string> {
+	return request.chains.flatMap((chain) => [epic_cli_chain.CHAIN_FLAG, chain])
+}
+
 // `--after <N>` makes `#N` the head of an ordered split's chain inside an existing epic too.
 function add_argv(request: SplitRequest, epic: number): Array<string> {
 	const order = request.is_ordered ? ['--after', request.issue] : []
 
-	return ['--add', String(epic), ...request.children, ...order]
+	return ['--add', String(epic), ...request.children, ...order, ...chain_argv(request)]
 }
 
 function create_argv(request: SplitRequest, title: string): Array<string> {
 	const order = request.is_ordered ? ['--ordered'] : []
 
-	return [title, request.issue, ...request.children, ...order]
+	return [title, request.issue, ...request.children, ...order, ...chain_argv(request)]
+}
+
+// `epic`'s own reading of the `--chain` values, asked before the set-aside so a refusal writes nothing.
+function chain_refused(refusal: string | undefined): SplitResult | undefined {
+	if (refusal === undefined) return undefined
+
+	return { kind: 'failed', step: 'chain', reason: refusal, done: [] }
 }
 
 // An epic already listing every child is a rerun past a later failed step — the first run's own epic,
 // whether it added the children or created it — so `epic --add`, which refuses an add with nothing
 // new, is not asked again.
-async function add_to(request: SplitRequest, tracking: ChildrenTracking): Promise<number> {
+async function add_to(argv: ReadonlyArray<string>, tracking: ChildrenTracking): Promise<number> {
 	const { epic } = tracking
 	if (tracking.lists_children) return epic
-	const code = await epic_command.run(add_argv(request, epic))
+	const code = await epic_command.run(argv)
 
 	if (code !== SUCCESS_EXIT_CODE) {
 		throw new Error(`\`epic --add\` into ${session_cite.issue(epic)} failed`)
@@ -180,6 +196,34 @@ const UNTITLED: SplitResult = {
 	done: [],
 }
 
+// `epic --add` checks a chain's numbers against the epic only in its plan, after the set-aside, so the
+// numbers a split may chain — `#issue` and its children — are checked here first.
+function add_refusal(argv: ReadonlyArray<string>, request: SplitRequest): string | undefined {
+	const parsed = epic_cli.parse_add_arguments(argv)
+	if (parsed === undefined) return undefined
+	const members = [request.issue, ...request.children].map(Number)
+
+	return parsed.chain_refusal ?? epic_cli_chain.find_outsider_refusal(parsed.chains, members)
+}
+
+async function add_split(request: SplitRequest, tracking: ChildrenTracking): Promise<SplitResult> {
+	const argv = add_argv(request, tracking.epic)
+	const refused = chain_refused(add_refusal(argv, request))
+	if (refused !== undefined) return refused
+
+	return await place_and_audit(request, async () => await add_to(argv, tracking))
+}
+
+async function create_split(request: SplitRequest): Promise<SplitResult> {
+	const { title } = request
+	if (title === undefined) return UNTITLED
+	const argv = create_argv(request, title)
+	const refused = chain_refused(epic_cli.parse_create_arguments(argv)?.chain_refusal)
+	if (refused !== undefined) return refused
+
+	return await place_and_audit(request, async () => await create_epic(argv))
+}
+
 async function split(request: SplitRequest): Promise<SplitResult> {
 	const placement = await placement_of(request.issue, request.children)
 
@@ -187,14 +231,9 @@ async function split(request: SplitRequest): Promise<SplitResult> {
 		return await park_after(aside_of(request), park_body(request, placement.reason))
 	}
 
-	if (placement.kind === 'tracked') {
-		return await place_and_audit(request, async () => await add_to(request, placement))
-	}
+	if (placement.kind === 'tracked') return await add_split(request, placement)
 
-	const { title } = request
-	if (title === undefined) return UNTITLED
-
-	return await place_and_audit(request, async () => await create_epic(create_argv(request, title)))
+	return await create_split(request)
 }
 
 // The steps `run-split-prerequisite.ts` shares, so both forms place, audit and park alike.
