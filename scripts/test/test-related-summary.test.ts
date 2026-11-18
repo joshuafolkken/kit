@@ -45,6 +45,15 @@ describe('test_related_summary.summary_line', () => {
 		)
 	})
 
+	// joshuafolkken/kit#7976: the cap ran only the selected tests of a full-suite scope.
+	it('does not claim the full unit suite where the cap narrowed it', () => {
+		const capped: RelatedScope = { ...ALL, tests: ['/a.test.ts'] }
+		const line = test_related_summary.summary_line(capped, 1, REACH)
+
+		expect(line).toContain('capped from the full unit suite')
+		expect(line).not.toContain('— the full unit suite')
+	})
+
 	it('says the count went unreported where vitest wrote none', () => {
 		expect(test_related_summary.summary_line(RELATED, undefined, [])).toContain(
 			'an unreported number of test file(s) selected',

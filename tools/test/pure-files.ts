@@ -885,7 +885,6 @@ const PURE_FILES: ReadonlyArray<string> = [
 	'scripts/test/test-pinned-stage.test.ts',
 	'scripts/test/test-read-trace.test.ts',
 	'scripts/test/test-related-moved.test.ts',
-	'scripts/test/test-related-scope-direct.test.ts',
 	'scripts/test/test-related-scope-kind.test.ts',
 	'scripts/test/test-related-scope-triggers.test.ts',
 	'scripts/test/test-related-touched.test.ts',

@@ -58,6 +58,16 @@ describe('lane_breakdown_related.over_cap_text', () => {
 		expect(lane_breakdown_related.over_cap_text(entries, ISSUE)).toContain(`hub ${FIRST_HUB}`)
 	})
 
+	// joshuafolkken/kit#7976: new rows record the test files deferred to CI as `deferred`, old rows
+	// `over_cap`; both count.
+	it('counts the deferred test files of new rows beside old over cap rows', () => {
+		const entries = [{ ...row(ISSUE), deferred: 3 }, row(ISSUE, 1), row(ISSUE)]
+
+		expect(lane_breakdown_related.over_cap_text(entries, ISSUE)).toBe(
+			'test:related 3 over cap, in 2 of 3 runs',
+		)
+	})
+
 	it('prints nothing where no run capped a file', () => {
 		expect(lane_breakdown_related.over_cap_text([row(ISSUE, 0), row(ISSUE)], ISSUE)).toBe('')
 	})
