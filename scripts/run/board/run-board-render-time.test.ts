@@ -149,10 +149,11 @@ describe('run_board_render_time.time_of -- an ending recorded before the exclusi
 })
 
 describe('run_board_render_time.time_width', () => {
-	it('is as wide as a bracketed time', () => {
+	// joshuafolkken/kit#7992: the bracketed stops follow the column, so it is as wide as the net time.
+	it('is as wide as a bracketed row’s net time, not its brackets', () => {
 		const active = [row('running', { started_ms: NOW - HOUR, gaps: [SLEEP] })]
 
-		expect(time_width(header({ layout: { ...EMPTY_LAYOUT, active } }))).toBe(NET_OF_SLEEP.length)
+		expect(time_width(header({ layout: { ...EMPTY_LAYOUT, active } }))).toBe('30′00″'.length)
 	})
 
 	it('is the widest time among the run’s own rows', () => {

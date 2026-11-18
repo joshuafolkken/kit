@@ -78,10 +78,11 @@ function time_of(row: BoardRow, now_ms: number): string | undefined {
 	return time.excluded_ms > 0 ? `${net} (+${span_of(time.excluded_ms)})` : net
 }
 
-// The time column's width: the widest time any active row or earlier run's lane draws in this frame.
+// The time column's width: the widest net time any active row or earlier run's lane draws in this
+// frame. The bracketed stops follow it, so every net time ends in one column (joshuafolkken/kit#7992).
 function time_width(header: BoardHeader): number {
 	const rows = run_board_layout.lane_rows(header.layout ?? run_board_layout.EMPTY_LAYOUT, [])
-	const times = rows.map((row) => time_of(row, header.now_ms) ?? '')
+	const times = rows.map((row) => net_of(row, header.now_ms) ?? '')
 
 	return Math.max(0, ...times.map((time) => time.length))
 }
