@@ -147,7 +147,10 @@ describe('run_board_cli.run screen', () => {
 })
 
 // joshuafolkken/kit#7927: a live board types its line after entering the screen, before the first
-// frame; a single frame, the chat's or a pipe's, types none.
+// frame; a single frame, the chat's or a pipe's, types none. joshuafolkken/kit#8029: only a board in a
+// theme types it — `run-board-cli-theme.test.ts` holds the board in none.
+const THEMED = ['--theme', 'wargames']
+
 async function no_pause(): Promise<void> {
 	await Promise.resolve()
 }
@@ -156,7 +159,9 @@ describe('run_board_cli.run intro', () => {
 	it('types the line between entering the screen and the first frame', async () => {
 		const { ports, frames } = harness(undefined, [])
 
-		await expect(run_board_cli.run([], { ...ports, intro_sleep: no_pause })).rejects.toBe(STOPPED)
+		await expect(run_board_cli.run(THEMED, { ...ports, intro_sleep: no_pause })).rejects.toBe(
+			STOPPED,
+		)
 		const first = frames.findIndex((frame) => frame.includes(RUN_MARK))
 
 		expect(frames[0]).toBe(ENTER)
@@ -168,7 +173,9 @@ describe('run_board_cli.run intro', () => {
 	it('wipes the typed line, cursor and all, before the first frame draws', async () => {
 		const { ports, frames } = harness(undefined, [])
 
-		await expect(run_board_cli.run([], { ...ports, intro_sleep: no_pause })).rejects.toBe(STOPPED)
+		await expect(run_board_cli.run(THEMED, { ...ports, intro_sleep: no_pause })).rejects.toBe(
+			STOPPED,
+		)
 		const first = frames.findIndex((frame) => frame.includes(RUN_MARK))
 
 		expect(frames.slice(1, first).some((frame) => frame.includes(TYPING_CURSOR))).toBe(true)
