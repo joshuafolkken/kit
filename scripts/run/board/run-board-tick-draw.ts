@@ -14,6 +14,8 @@ import { run_board_root_layout } from './run-board-root-layout'
 import { run_board_seat, type SeatRead } from './run-board-seat'
 import { run_board_setup } from './run-board-setup'
 import type { Known } from './run-board-snapshot'
+import { run_board_sound_repeat } from './run-board-sound-repeat'
+import { run_board_sound_transition } from './run-board-sound-transition'
 import { run_board_spin, type Spun } from './run-board-spin'
 import type { BoardPorts, BoardState } from './run-board-state'
 
@@ -125,12 +127,15 @@ function seats_of(state: BoardState, local: LocalRead): SeatRead | undefined {
 	return run_board_seat.read_of(local.events, local.launch_hold, local.usage_cause)
 }
 
+// A run's header, always over its laid-out rows.
+type LaidHeader = BoardHeader & { layout: BoardLayout }
+
 function header_of(
 	state: BoardState,
 	local: LocalRead,
 	layout: BoardLayout,
 	redraw: Redraw,
-): BoardHeader {
+): LaidHeader {
 	return {
 		now_ms: redraw.now_ms,
 		...local_header(local),
@@ -155,15 +160,15 @@ function bounds_of(ports: BoardPorts): FrameBounds {
 	return { size: ports.size?.(), footer: ports.footer, folded: ports.folded?.() }
 }
 
-// The frame with its spinners drawn at this moment's frame, and where they are on screen.
-function frame_of(state: BoardState, local: LocalRead, layout: BoardLayout, redraw: Redraw): Spun {
+// The frame under `header` with its spinners drawn at this moment's frame, and where they are on screen.
+function frame_of(state: BoardState, local: LocalRead, header: LaidHeader, redraw: Redraw): Spun {
 	const bounds = bounds_of(redraw.ports)
 	const lines = run_board_render.render({
-		header: header_of(state, local, layout, redraw),
+		header,
 		notes: run_board_notes.notes_of(
 			local.events,
 			titles_of(state),
-			run_board_layout.listed_parks(layout),
+			run_board_layout.listed_parks(header.layout),
 		),
 		resume: local.resume,
 		throughput: local.throughput,
@@ -177,6 +182,31 @@ function frame_of(state: BoardState, local: LocalRead, layout: BoardLayout, redr
 
 function draw(ports: BoardPorts, lines: ReadonlyArray<string>): void {
 	ports.write(`${lines.join('\n')}\n`)
+}
+
+// The cue this frame picked over the last one's, sounded through `cue` where the board passes one,
+// and what the next frame weighs its own against. A frame before the plan is read is no base — the rows
+// the plan brings were already there — so the frame the plan arrives on is the first base, silent.
+function sounded(
+	state: BoardState,
+	header: BoardHeader,
+	local: LocalRead,
+	redraw: Redraw,
+): Pick<BoardState, 'sound_snapshot' | 'sound_pending'> {
+	const snapshot =
+		state.plan === undefined
+			? undefined
+			: run_board_sound_transition.snapshot_of(header, local.events)
+	const { cue, pending } = run_board_sound_repeat.next_cue(
+		state.sound_snapshot,
+		snapshot,
+		state.sound_pending,
+		redraw.now_ms,
+	)
+
+	if (cue !== undefined) redraw.ports.cue?.(cue)
+
+	return { sound_snapshot: snapshot, sound_pending: pending }
 }
 
 // The run's frame over `run_layout`, the run's own rows. The first total the plan gives is the baseline
@@ -198,11 +228,12 @@ function draw_run(
 		run_layout,
 		layout,
 	)
-	const { lines, spots } = frame_of({ ...settled, baseline_total }, local, layout, redraw)
+	const header = header_of({ ...settled, baseline_total }, local, layout, redraw)
+	const { lines, spots } = frame_of(settled, local, header, redraw)
 
 	draw(redraw.ports, lines)
 
-	return { ...settled, spots }
+	return { ...settled, spots, ...sounded(state, header, local, redraw) }
 }
 
 const run_board_tick_draw = { activity_here, bounds_of, closed_under, draw, draw_run }

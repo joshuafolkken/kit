@@ -102,4 +102,24 @@ describe('run_board_reason.reader — a row a usage limit keeps waiting', () => 
 	it('says nothing of a limit once no reset is held', () => {
 		expect(reason({ usage_reset_ms: undefined })).toBeUndefined()
 	})
+
+	it('leads with 🪫 as before where the hold names a limit', () => {
+		expect(reason({ usage_reset_ms: RESET_MS, usage_cause: 'limit' })).toStrictEqual({
+			icon: WAIT_ICONS.usage_limit,
+			value: run_board_labels.day_minute_of(RESET_MS),
+		})
+	})
+})
+
+// joshuafolkken/kit#8015: a row an authentication failure keeps waiting is not drawn as a usage limit.
+describe('run_board_reason.reader — a row an authentication failure keeps waiting', () => {
+	it('leads with the authentication-failure mark and its recheck, never 🪫', () => {
+		const held = reason({ usage_reset_ms: RESET_MS, usage_cause: 'auth' })
+
+		expect(held).toStrictEqual({
+			icon: WAIT_ICONS.auth_failure,
+			value: run_board_labels.day_minute_of(RESET_MS),
+		})
+		expect(held?.icon).not.toBe(WAIT_ICONS.usage_limit)
+	})
 })
