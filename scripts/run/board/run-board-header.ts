@@ -95,7 +95,7 @@ interface BoardHeader
 	usages?: BoardUsage | undefined
 	// The claims waiting in the machine-wide core budget (`run-board-render-waits.ts`).
 	budget_waits?: ReadonlyArray<BudgetWait> | undefined
-	// The usage limit holding the run's launches; `undefined` where none holds.
+	// The usage limit or authentication failure holding the run's launches; `undefined` where none holds.
 	quota_hold?: QuotaHold | undefined
 	// How long each phase usually takes; a running row's phase time is colored against it.
 	usual?: UsualTimes | undefined
