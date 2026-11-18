@@ -89,6 +89,8 @@ interface BacklogInput {
 	in_progress?: ReadonlyArray<OpenIssueData>
 	// The open `route:interrupt` issues, opted in or not. Left out, none is open.
 	interrupts?: ReadonlyArray<OpenIssueData>
+	// The open `run:solo` issues, which hold the gate while one carries a park label (#7855).
+	solo?: ReadonlyArray<OpenIssueData>
 	// The open issues carrying `not-before`, whether opted in or not. Left out, none does.
 	not_before?: ReadonlyArray<{ number: number; body?: string }>
 	// The `in-progress` holders no process is running for, each with a lane on this machine — a stale
@@ -249,9 +251,16 @@ function stub_defect_priority(input: BacklogInput): void {
 	)
 }
 
-// The per-repository listing: the open interrupts, or the `in-progress` holders.
+// The per-repository listing: the open interrupts, the open `run:solo` issues, or the `in-progress`
+// holders.
 function in_repo_rows(input: BacklogInput, label: string): ReadonlyArray<OpenIssueData> {
-	return label === INTERRUPT_ROUTE_LABEL ? (input.interrupts ?? []) : (input.in_progress ?? [])
+	const listed = new Map([
+		[INTERRUPT_ROUTE_LABEL, input.interrupts],
+		[RUN_SOLO_LABEL, input.solo],
+	])
+	const rows = listed.has(label) ? listed.get(label) : input.in_progress
+
+	return rows ?? []
 }
 
 // The three label listings: the opted-in rows, the epics, and the `in-progress` holders the

@@ -35,6 +35,34 @@ describe('lane_host_gaps.gaps_of', () => {
 	})
 })
 
+// joshuafolkken/kit#7867: an outage is a stop beside the sleeps.
+function turn(kind: 'offline' | 'offline-tick' | 'online', minute: number): RunEvent {
+	return { pos: minute, at: new Date(at(minute)).toISOString(), kind, text: kind }
+}
+
+// The sampler's `offline` turn at `from`, then an `offline-tick` each minute to `to`.
+function down(from: number, to: number): Array<RunEvent> {
+	const ticks = Array.from({ length: to - from }, (_, index) =>
+		turn('offline-tick', from + index + 1),
+	)
+
+	return [turn('offline', from), ...ticks]
+}
+
+describe('lane_host_gaps.gaps_of — network outages', () => {
+	it('joins an outage with a sleep it overlaps, counting the overlap once', () => {
+		const gaps = lane_host_gaps.gaps_of([...down(5, 9), sleep(8, 20), turn('online', 20)])
+
+		expect(lane_host_gaps.excluded_ms(gaps, [span(0, 60)])).toBe(15 * MINUTE_MS)
+	})
+
+	it('cuts an outage still open at the end of the span asked for', () => {
+		const gaps = lane_host_gaps.gaps_of(down(50, 59))
+
+		expect(lane_host_gaps.excluded_ms(gaps, [span(0, 60)])).toBe(10 * MINUTE_MS)
+	})
+})
+
 describe('lane_host_gaps.excluded_ms', () => {
 	const gaps = lane_host_gaps.gaps_of([sleep(10, 20), sleep(15, 30)])
 

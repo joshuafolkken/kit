@@ -7,6 +7,7 @@ import { git_issue } from '#scripts/git/git-issue'
 import { git_preflight, type Unmet } from '#scripts/git/git-preflight'
 import { cli_body } from '#scripts/josh/cli-body'
 import type { JoshResult } from '#scripts/josh/josh-run'
+import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { error_text } from '#scripts/lib/error-message'
 import { report_format_reference } from '#scripts/report/report-format-reference'
 import { acceptance_map } from '#scripts/review/acceptance-map'
@@ -47,6 +48,15 @@ const PRECONDITION = {
 	UNPLANNED: run_ship_planned.PRECONDITION,
 	UNREADABLE: 'unreadable',
 } as const
+// The kinds `asked_problems` asks; `unreadable` is a failed read, not a precondition asked.
+const ASKED_KINDS = [
+	...Object.values(git_preflight.PRECONDITION),
+	PRECONDITION.LIVE_EVIDENCE,
+	PRECONDITION.ACCEPTANCE_MAP,
+	PRECONDITION.REMOVED_TESTS,
+	PRECONDITION.LOCK,
+	PRECONDITION.UNPLANNED,
+]
 const EVIDENCE_PROBLEM = `This change touches runtime code, but the body this ship delivers has no ${live_evidence.EVIDENCE_HEADING} section: run the acceptance criteria for real and write it into the ship body draft run:prep wrote (josh ship reads it when --body-file is omitted), or pass the body with --body-file <path>. Write it ${live_evidence.EVIDENCE_FORMAT}`
 const EVIDENCE_PENDING = `This change touches runtime code and no PR is open yet: write the ${live_evidence.EVIDENCE_HEADING} section into the ship body draft run:prep wrote (or a file handed to josh ship with --body-file <path>), or the ship refuses. Write it ${live_evidence.EVIDENCE_FORMAT}`
 
@@ -197,19 +207,44 @@ async function chain_problems(): Promise<Array<Unmet>> {
 	return parts.flat()
 }
 
+// Every evaluation, passed or stopped, writes the kinds it asked beside the ones it found unmet, so
+// the ledger reads each kind's stops against its evaluations (joshuafolkken/kit#7874). A kind found
+// unmet was evaluated, so a failed read's `unreadable` joins the kinds asked rather than stopping unasked.
+async function recorded(
+	result: PreflightResult,
+	evaluated: ReadonlyArray<string>,
+): Promise<PreflightResult> {
+	const issue = git_issue.branch_number(await git_branch.current())
+	const unmet = [...(result.preconditions ?? [])]
+
+	if (issue !== undefined) {
+		await lane_ledger_write.record_preflight({
+			issue: Number(issue),
+			evaluated: [...new Set([...evaluated, ...unmet])],
+			unmet,
+		})
+	}
+
+	return result
+}
+
+async function scoped_stage(): Promise<PreflightResult> {
+	const scoped = await run_ship_scoped.scoped_pair()
+
+	if (scoped.code === SUCCESS_EXIT_CODE) return { code: SUCCESS_EXIT_CODE, out: 'ready' }
+
+	return { ...scoped, preconditions: [PRECONDITION.SCOPED] }
+}
+
 async function asked_stage(request: PreflightRequest): Promise<PreflightResult> {
 	const problems = await run_ship_lap.timed(
 		run_ship_lap.STEP.PRECONDITIONS,
 		async () => await asked_problems(request),
 	)
 
-	if (problems.length > 0) return refusal(problems)
+	if (problems.length > 0) return await recorded(refusal(problems), ASKED_KINDS)
 
-	const scoped = await run_ship_scoped.scoped_pair()
-
-	if (scoped.code === SUCCESS_EXIT_CODE) return { code: SUCCESS_EXIT_CODE, out: 'ready' }
-
-	return { ...scoped, preconditions: [PRECONDITION.SCOPED] }
+	return await recorded(await scoped_stage(), [...ASKED_KINDS, PRECONDITION.SCOPED])
 }
 
 // The title and the body this ship delivers key the reuse; an unreadable body is asked every time.

@@ -96,6 +96,32 @@ describe('lane_ledger_schema_ship — the scoped pair breakdown', () => {
 	})
 })
 
+// joshuafolkken/kit#7874: each preflight evaluation, passed or stopped, beside the older stop lines.
+describe('lane_ledger_schema_ship — the preflight evaluation line', () => {
+	const EVALUATED = ['classification', 'lock', 'scoped']
+
+	it.each([
+		['a pass', []],
+		['a stop', ['lock']],
+	])('reads the evaluation of %s back as written', (_name, unmet) => {
+		const preflight = { kind: 'preflight', at: AT, issue: 7874, evaluated: EVALUATED, unmet }
+
+		expect(lane_ledger_schema.entry_schema.parse(preflight)).toEqual(preflight)
+	})
+
+	it('reads a stop written before evaluations were recorded, its kinds unchanged', () => {
+		const stop = { kind: 'stop', at: AT, issue: 4166, reason: 'preflight', preconditions: ['lock'] }
+
+		expect(lane_ledger_schema.entry_schema.parse(stop)).toEqual(stop)
+	})
+
+	it('refuses an evaluation with no unmet list', () => {
+		const partial = { kind: 'preflight', at: AT, issue: 7874, evaluated: EVALUATED }
+
+		expect(lane_ledger_schema.entry_schema.safeParse(partial).success).toBe(false)
+	})
+})
+
 describe('lane_ledger_schema_ship — the early-push line', () => {
 	it.each([
 		['with its head and slot count', { head: 'a'.repeat(40), slots: 2 }],

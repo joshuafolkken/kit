@@ -1,0 +1,7 @@
+{
+	"reason": "New per-tick reachability probe and offline-interval reader (#7867) add the code the feature needs",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 119
+	}
+}

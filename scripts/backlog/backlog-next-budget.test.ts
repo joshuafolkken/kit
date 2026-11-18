@@ -47,12 +47,13 @@ const PRE_FIX_READS_PER_CHILD = 4
 const RESUME_READS = 2
 // The listed children are candidates, so each one's body is read too (11 of the 22); without #6611
 // the scan read each listed child again, 32 calls. One more is the `route:interrupt` listing (#7860),
-// a single read however large the backlog.
-const SCAN_CALL_CAP = 22
-const PRE_FIX_SCAN_CALLS = 64
+// a single read however large the backlog, and one more the open `run:solo` listing (#7855).
+const SCAN_CALL_CAP = 23
+const PRE_FIX_SCAN_CALLS = 65
 // The second scan with nothing changed, measured: the epic listing, the three epic bodies and the open
-// pull request listing (#7620) come back 304, so they are not billed.
-const SECOND_SCAN_CALL_CAP = 16
+// pull request listing (#7620) come back 304, so they are not billed. The open `run:solo` listing
+// (#7855) is read again each scan.
+const SECOND_SCAN_CALL_CAP = 17
 
 const streams = console_streams()
 

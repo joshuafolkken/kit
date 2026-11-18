@@ -27,7 +27,7 @@ import type {
 } from './lane-ledger-schema'
 import type { EstimateRecord } from './lane-ledger-schema-estimate'
 import type { OfferRecord } from './lane-ledger-schema-offer'
-import type { ChainRecord } from './lane-ledger-schema-ship'
+import type { ChainRecord, PreflightLedgerRecord } from './lane-ledger-schema-ship'
 
 // The measurement ledger the lane limit is tuned against: one JSON line per
 // lane merge, per finished `josh gate`, per machine-load sample, per lane dispatch, per finished
@@ -260,6 +260,10 @@ async function record_unplanned_notice(
 	await record({ kind: KIND.UNPLANNED_NOTICE, at: now_iso(), ...notice }, path)
 }
 
+async function record_preflight(preflight: PreflightLedgerRecord, path?: string): Promise<void> {
+	await record({ kind: KIND.PREFLIGHT, at: now_iso(), ...preflight }, path)
+}
+
 const lane_ledger_write = {
 	CI_WAIT_STAGE,
 	CODERABBIT_RATE_LIMIT_STAGE,
@@ -281,6 +285,7 @@ const lane_ledger_write = {
 	record_released,
 	record_merge,
 	record_overlap,
+	record_preflight,
 	record_offer,
 	record_offerable,
 	record_push_miss,
