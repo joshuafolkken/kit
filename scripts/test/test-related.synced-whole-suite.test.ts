@@ -5,10 +5,11 @@ import { since_green } from '#scripts/gate/since-green'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
 import { lane_paths } from '#scripts/lane/lane-paths'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { pure_files_entries } from './pure-files-entries'
 import { test_read_map } from './test-read-map'
 import { test_related } from './test-related'
+import { test_related_select } from './test-related-select'
 import { test_unit_guard } from './test-unit-guard'
 
 // joshuafolkken/kit#4993: a main sync brought in `tools/test/test-state-guard.ts`, which every test
@@ -199,6 +200,32 @@ describe('test_related.run_related_tests — the gate’s whole-suite flag', () 
 			path.join(REPOSITORY_ROOT, FIXED_SOURCE),
 			'--run',
 		])
+	})
+})
+
+// joshuafolkken/kit#7976: the kept whole suite bypasses the cap, whatever it would select.
+describe('test_related.run_related_tests — the kept whole suite and the cap', () => {
+	// The bypass leaves the selection unread, so it is reset rather than left to a later case.
+	afterEach(() => {
+		vi.mocked(test_related_select.select).mockReset()
+	})
+
+	it('never caps the kept whole suite to a selection', async () => {
+		vi.spyOn(lane_paths, 'lane_issue_of').mockReturnValue(undefined)
+		mocked_changed.mockResolvedValue([pure_files_entries.PURE_FILES_PATH])
+		mocked_moved.mockResolvedValue({
+			parts: { changed: [pure_files_entries.PURE_FILES_PATH], synced: [] },
+		})
+		vi.mocked(git_command.show_file).mockRejectedValue(NOT_A_REPOSITORY)
+		vi.mocked(test_related_select.select).mockResolvedValueOnce({
+			tests: [FIXED_SOURCE],
+			deferred: 1,
+			reach: [],
+		})
+
+		await test_related.run_related_tests([gate_labels.KEEP_WHOLE_SUITE_FLAG])
+
+		expect(vitest_arguments()).toEqual(WHOLE_SUITE)
 	})
 })
 
