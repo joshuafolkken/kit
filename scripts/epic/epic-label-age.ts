@@ -55,10 +55,17 @@ function is_in_progress_labeling(event: TimelineEvent): boolean {
 	return event.event === LABELED_EVENT && event.label?.name.toLowerCase() === IN_PROGRESS_LABEL
 }
 
+// The issue's whole timeline, oldest first; `lane:stats` reads its label waits from it too
+// (joshuafolkken/kit#7890). Throws when it cannot be read or parsed.
+async function read_events(issue: number, repo: string): Promise<Array<TimelineEvent>> {
+	const path = `${git_gh_api_path.issue_api_path(String(issue), repo)}/timeline?per_page=${String(TIMELINE_PAGE)}`
+
+	return timeline_schema.parse(await read_timeline(path))
+}
+
 async function read_labeled_at(issue: number, repo: string): Promise<LabeledAt> {
 	try {
-		const path = `${git_gh_api_path.issue_api_path(String(issue), repo)}/timeline?per_page=${String(TIMELINE_PAGE)}`
-		const events = timeline_schema.parse(await read_timeline(path))
+		const events = await read_events(issue, repo)
 		const at = events.findLast((event) => is_in_progress_labeling(event))?.created_at
 
 		return typeof at === 'string' ? { kind: 'at', at } : { kind: 'absent' }
@@ -106,11 +113,12 @@ async function read_ages(
 
 const epic_label_age = {
 	STALE_MINUTES,
+	read_events,
 	read_labeled_at,
 	is_stale,
 	age_text,
 	read_ages,
 }
 
-export type { LabeledAt }
+export type { LabeledAt, TimelineEvent }
 export { epic_label_age }

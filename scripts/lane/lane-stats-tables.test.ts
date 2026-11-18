@@ -17,6 +17,7 @@ const FIRST_HEADER_CELLS = [
 	'implement read by call',
 	'stage turns',
 	'stop',
+	'human wait',
 	'failed check',
 	'longest stop',
 	'stopped at',
