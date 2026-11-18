@@ -6,6 +6,7 @@ import { related_heavy_tests } from './related-heavy-tests'
 import { test_pinned_cache_logic, type MissReason, type Recheck } from './test-pinned-cache-logic'
 import {
 	test_pinned_ledger,
+	type PinnedLaunch,
 	type PinnedOrigin,
 	type ProbeTime,
 	type Skipped,
@@ -252,12 +253,15 @@ async function pooled(
 
 // `held` counts the hunks the cache answered, `rewired` the ones left out as a rewire
 // (`test-pinned-rewire.ts`), `over_cap` the ones over the test-file cap; `is_first_unpinned` starts
-// no probe once one is unpinned.
+// no probe once one is unpinned; `is_reasoned` marks a run under an `--unpinned-ok` reason and
+// `tree_hash` the work tree it read, both for its ledger row only.
 interface CheckOptions {
 	held?: number
 	rewired?: number
 	over_cap?: number
 	is_first_unpinned?: boolean
+	is_reasoned?: boolean
+	tree_hash?: string | undefined
 	origin?: PinnedOrigin | undefined
 }
 
@@ -267,10 +271,21 @@ interface Checked {
 	staged: Staged
 }
 
+// How the run was started and the probes its stop never started (joshuafolkken/kit#7809), each key
+// only where it applies.
+function launch_of(options: CheckOptions, cut: number): PinnedLaunch {
+	return {
+		...(options.is_first_unpinned === true && { first_unpinned: true }),
+		...(options.is_reasoned === true && { reasoned: true }),
+		...(cut > 0 && { cut }),
+		...(options.tree_hash !== undefined && { tree_hash: options.tree_hash }),
+	}
+}
+
 // The started probes split as the cache knew them (joshuafolkken/kit#7803): a recheck, or none at
 // all — and by why the cache missed them (joshuafolkken/kit#7806). A halted run's unstarted probes
-// count in none.
-function skipped_of(options: CheckOptions, probes: ReadonlyArray<Probe>): Skipped {
+// count in none; `cut` counts them.
+function skipped_of(options: CheckOptions, probes: ReadonlyArray<Probe>, cut: number): Skipped {
 	const rechecked = probes.filter((probe) => probe.recheck !== undefined).length
 
 	return {
@@ -281,6 +296,7 @@ function skipped_of(options: CheckOptions, probes: ReadonlyArray<Probe>): Skippe
 		rewired: options.rewired ?? 0,
 		over_cap: options.over_cap ?? 0,
 		origin: options.origin,
+		launch: launch_of(options, cut),
 	}
 }
 
@@ -302,7 +318,7 @@ async function checked_on(
 		halt: options.is_first_unpinned === true ? { is_set: false } : undefined,
 	}
 	const verdicts = await pooled(paths, probes, lane)
-	const skipped = skipped_of(options, lane.started)
+	const skipped = skipped_of(options, lane.started, probes.length - lane.started.length)
 
 	await test_pinned_ledger.record(skipped, lane.times, Date.now() - began)
 

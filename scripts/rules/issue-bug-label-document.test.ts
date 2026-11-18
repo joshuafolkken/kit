@@ -55,3 +55,24 @@ describe('bug labels at issue filing', () => {
 		expect(read_repo_file(document_)).toContain(ISSUE_FILE)
 	})
 })
+
+// joshuafolkken/kit#7963: performance and diagnostic-figure problems had no line between bug and
+// time reduction, so a shipped fix that did not take (joshuafolkken/kit#7924) was filed as the
+// time-reduction purpose and labelled enhancement instead of bug. The line must not read a lane
+// merely missing its target time (joshuafolkken/kit#7926) as a bug, so the "intended level" and
+// "over budget" phrasings are kept out.
+describe('bug classification of performance and diagnostic figures', () => {
+	it('splits them into bug and time reduction by whether the shipped behavior works as intended (ac-b2aa442a)', () => {
+		const template = read_repo_file(ISSUE_TEMPLATE)
+
+		expect(template).toContain('出荷済みの動作が意図どおりに働いていない')
+		expect(template).toContain('出荷した対応が効いていない')
+		expect(template).toContain('記録や集計の数字が実際と違う')
+		expect(template).toContain('仕組みが止めるはずの上限超えを通す')
+		expect(template).toContain(
+			'意図どおり動くものを今より速くするなら、目標の時間に届いていなくても `- 種別: 非不具合` と `- 目的: 時間短縮`',
+		)
+		expect(template).not.toContain('意図した水準に届かない')
+		expect(template).not.toContain('予算を超えて走る')
+	})
+})

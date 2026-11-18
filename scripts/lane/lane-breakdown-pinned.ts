@@ -107,11 +107,13 @@ function miss_counts(rows: ReadonlyArray<TestPinnedEntry>): Array<string> {
 	return named.length === 0 ? [] : [`miss: ${named.join(', ')}`]
 }
 
-// The skipped hunks' counts: `rewired` (joshuafolkken/kit#5235) and `over cap` (joshuafolkken/kit#5503).
+// The skipped hunks' counts: `rewired` (joshuafolkken/kit#5235), `over cap` (joshuafolkken/kit#5503)
+// and `cut`, the probes a stop at the first unpinned hunk never started (joshuafolkken/kit#7809).
 function skipped_counts(rows: ReadonlyArray<TestPinnedEntry>): Array<string> {
 	return named_counts([
 		[sum_of(rows, (row) => row.rewired), 'rewired'],
 		[sum_of(rows, (row) => row.over_cap), 'over cap'],
+		[sum_of(rows, (row) => row.cut), 'cut'],
 	])
 }
 
@@ -122,8 +124,8 @@ function detail_text(rows: ReadonlyArray<TestPinnedEntry>): string {
 		.flatMap((row) => row.probes)
 		.toSorted((left, right) => right.elapsed_ms - left.elapsed_ms)
 	const held = sum_of(rows, (row) => row.held)
-	const total =
-		held + sum_of(rows, (row) => row.rewired) + sum_of(rows, (row) => row.over_cap) + probes.length
+	const skipped = sum_of(rows, (row) => (row.rewired ?? 0) + (row.over_cap ?? 0) + (row.cut ?? 0))
+	const total = held + skipped + probes.length
 	const head = `test:pinned ${String(total)} hunks, ${String(held)} cached`
 	const counts = [
 		head,

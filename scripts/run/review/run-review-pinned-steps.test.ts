@@ -76,11 +76,11 @@ describe('run_review_pinned_steps.launch', () => {
 	})
 
 	// joshuafolkken/kit#5153: a reason accepts the list as the whole answer, so every hunk is probed.
-	it('probes every hunk under a reason', () => {
+	it('probes every hunk under a reason, marked reasoned', () => {
 		run_review_pinned_steps.launch(ROOT, REASON)
 
 		expect(run_review_steps.launch_josh).toHaveBeenCalledWith(
-			[PINNED_COMMAND, ...ORIGIN_ARGS, '--record', expect.any(String)],
+			[PINNED_COMMAND, '--reasoned', ...ORIGIN_ARGS, '--record', expect.any(String)],
 			run_review_pinned_steps.log_path(ROOT),
 			ROOT,
 		)
