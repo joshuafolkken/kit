@@ -59,7 +59,8 @@ async function play(ports: IntroPorts, keys: KeyReading): Promise<void> {
 	}
 }
 
-// The first read starts at once, but returns only once the intro is over; every later read is untouched.
+// The first read starts at once, but returns or throws only once the intro is over, so a failed read
+// never leaves the line typing over the board's exit; every later read is untouched.
 function after<Read>(
 	gather: (pace: Pace) => Promise<Read>,
 	intro: Promise<void>,
@@ -69,9 +70,12 @@ function after<Read>(
 	return async (pace) => {
 		if (!is_first) return await gather(pace)
 		is_first = false
-		const [read] = await Promise.all([gather(pace), intro])
+		const read = gather(pace)
 
-		return read
+		await Promise.allSettled([read, intro])
+		await intro
+
+		return await read
 	}
 }
 

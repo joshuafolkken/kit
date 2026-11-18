@@ -78,6 +78,18 @@ async function settled_flag(read: Promise<string>, flag: { is_done: boolean }): 
 	return value
 }
 
+async function caught_flag(read: Promise<string>, flag: { is_done: boolean }): Promise<unknown> {
+	try {
+		await read
+	} catch (error: unknown) {
+		flag.is_done = true
+
+		return error
+	}
+
+	return undefined
+}
+
 describe('run_board_intro.play', () => {
 	it('types the line a letter at a time, pausing after each, then holds it', async () => {
 		const slept: Array<number> = []
@@ -145,5 +157,25 @@ describe('run_board_intro.after', () => {
 		await expect(gather('settled')).resolves.toBe(READ)
 		intro.resolve(undefined)
 		await expect(first).resolves.toBe(READ)
+	})
+})
+
+describe('run_board_intro.after on a failed first read', () => {
+	it('throws it only once the intro is over', async () => {
+		const intro = deferred<undefined>()
+		const failure = new Error(READ)
+		const flag = { is_done: false }
+		const first = caught_flag(
+			after(async () => {
+				throw failure
+			}, intro.promise)('background'),
+			flag,
+		)
+
+		await Promise.resolve()
+		await Promise.resolve()
+		expect(flag.is_done).toBe(false)
+		intro.resolve(undefined)
+		await expect(first).resolves.toBe(failure)
 	})
 })
