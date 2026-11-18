@@ -17,6 +17,7 @@ import { defect_rate_cli } from '#scripts/issue/defect-rate-cli'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import {
 	BUG_LABEL,
+	INTERRUPT_ROUTE_LABEL,
 	NOT_BEFORE_LABEL,
 	RUN_LANE_LABEL,
 	RUN_SOLO_LABEL,
@@ -86,6 +87,8 @@ interface BacklogInput {
 	// The repository's open `in-progress` issues, which the `run:solo` gate reads on a `run` answer.
 	// Left out, nothing is running.
 	in_progress?: ReadonlyArray<OpenIssueData>
+	// The open `route:interrupt` issues, opted in or not. Left out, none is open.
+	interrupts?: ReadonlyArray<OpenIssueData>
 	// The open issues carrying `not-before`, whether opted in or not. Left out, none does.
 	not_before?: ReadonlyArray<{ number: number; body?: string }>
 	// The `in-progress` holders no process is running for, each with a lane on this machine — a stale
@@ -246,6 +249,11 @@ function stub_defect_priority(input: BacklogInput): void {
 	)
 }
 
+// The per-repository listing: the open interrupts, or the `in-progress` holders.
+function in_repo_rows(input: BacklogInput, label: string): ReadonlyArray<OpenIssueData> {
+	return label === INTERRUPT_ROUTE_LABEL ? (input.interrupts ?? []) : (input.in_progress ?? [])
+}
+
 // The three label listings: the opted-in rows, the epics, and the `in-progress` holders the
 // `run:solo` gate reads.
 function stub_listings(input: BacklogInput, epics: ReadonlyArray<EpicInput>): void {
@@ -262,8 +270,8 @@ function stub_listings(input: BacklogInput, epics: ReadonlyArray<EpicInput>): vo
 				: auto_ok_fixture.epic_listing(epics),
 		),
 	)
-	vi.spyOn(git_gh_command, 'issue_list_by_label_in_repo').mockResolvedValue(
-		listing_outcome(JSON.stringify(input.in_progress ?? [])),
+	vi.spyOn(git_gh_command, 'issue_list_by_label_in_repo').mockImplementation(async (label) =>
+		listing_outcome(JSON.stringify(in_repo_rows(input, label))),
 	)
 
 	const stale = new Set((input.stale ?? []).map(String))

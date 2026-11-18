@@ -35,6 +35,7 @@ const PERSON_HAND_BACKS: ReadonlySet<string> = new Set(['judge', 'triage'])
 // `offer:<verdict>:<detail>`: the offer started nothing, for its cause or its answer.
 const OFFER_TEXT: ReadonlyMap<string, string> = new Map([
 	['solo', 'a run:solo issue must finish first'],
+	['decision', 'an interrupt defect awaits your decision'],
 	['blocked', 'every queued issue is blocked'],
 	['exhausted', 'the backlog has nothing left to start'],
 	['untriaged', AWAIT_TRIAGE],

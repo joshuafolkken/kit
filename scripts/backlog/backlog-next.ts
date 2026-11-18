@@ -1,7 +1,7 @@
 import { auto_ok_author } from '#scripts/auto-ok/auto-ok-author'
 import { auto_ok_cli, type OptedInRead } from '#scripts/auto-ok/auto-ok-cli'
 import { repo_discovery } from '#scripts/discovery/repo-discovery'
-import { epic_busy } from '#scripts/epic/epic-busy'
+import { epic_busy, type BusyRead } from '#scripts/epic/epic-busy'
 import type { Classification } from '#scripts/epic/epic-classify'
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import { epic_index } from '#scripts/epic/epic-index'
@@ -9,6 +9,7 @@ import { epic_next } from '#scripts/epic/epic-next'
 import type { EpicRead } from '#scripts/epic/epic-next-read'
 import type { EpicView } from '#scripts/epic/epic-next-views'
 import { epic_report, type EpicNextResult } from '#scripts/epic/epic-report'
+import type { SoloGate } from '#scripts/epic/epic-solo'
 import { epic_solo_stale } from '#scripts/epic/epic-solo-stale'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
@@ -18,6 +19,7 @@ import { run_startup } from '#scripts/run/startup/run-startup'
 import { backlog_auto_triage } from './backlog-auto-triage'
 import { backlog_defect_priority } from './backlog-defect-priority'
 import { backlog_gate_scope, type OptedIn, type PoolContext } from './backlog-gate-scope'
+import { backlog_interrupt } from './backlog-interrupt'
 import { backlog_next_offer } from './backlog-next-offer'
 import { backlog_next_report } from './backlog-next-report'
 import { backlog_pool } from './backlog-pool'
@@ -193,6 +195,21 @@ function is_transport_failure(result: EpicNextResult): boolean {
 	return result.anomalies.some((anomaly) => anomaly.is_unreachable === true)
 }
 
+// A pending interrupt outside the pool holds every candidate (`backlog-interrupt.ts`); else the
+// ranked `run:solo` gate decides.
+async function gate_of(
+	result: EpicNextResult,
+	read: BusyRead,
+	context: PoolContext,
+): Promise<SoloGate> {
+	const { repo } = context
+	const held = backlog_interrupt.hold(result, read, context.interrupts ?? [], repo)
+
+	if (held !== undefined) return held
+
+	return backlog_rank.gate(result, read, repo, await backlog_gate_scope.gate_scope(context, read))
+}
+
 // The `run:solo` gate is applied here rather than in `resolve`, because `backlog:plan` shares
 // `resolve` and a plan made before the run lists everything. The holders are
 // read only on a `run` answer — the one answer the gate can change. The cap follows the gate
@@ -201,15 +218,11 @@ async function gate_ready(result: EpicNextResult, context: PoolContext): Promise
 	if (result.verdict !== 'run') return result
 
 	const { repo } = context
-	const { read, notice } = await epic_solo_stale.release(
-		await epic_busy.read_repository(repo),
-		repo,
-	)
+	const released = await epic_solo_stale.release(await epic_busy.read_repository(repo), repo)
 
-	if (notice !== undefined) console.error(notice)
+	if (released.notice !== undefined) console.error(released.notice)
 
-	const scope = await backlog_gate_scope.gate_scope(context, read)
-	const gated = backlog_rank.gate(result, read, repo, scope)
+	const gated = await gate_of(result, released.read, context)
 
 	if (gated.notice !== undefined) console.error(gated.notice)
 
@@ -243,6 +256,17 @@ async function answer_held(
 	return await backlog_next_report.report_held(gated, context, untriaged)
 }
 
+// The pool's untriaged candidates and the pending interrupts outside it (`backlog-interrupt.ts`).
+async function untriaged_of(
+	resolved: EpicNextResult,
+	context: PoolContext,
+): Promise<{ result: EpicNextResult; untriaged: ReadonlyArray<EpicChild> }> {
+	const settled = await backlog_auto_triage.untriaged_of(resolved, context.repo)
+	const interrupts = backlog_interrupt.untriaged(context.interrupts ?? [], context.repo)
+
+	return { result: settled.result, untriaged: [...settled.untriaged, ...interrupts] }
+}
+
 // Each answer is recorded once in the lane ledger before it is printed (`backlog-next-offer.ts`).
 async function answer_pool(context: PoolContext): Promise<number> {
 	const resolved = await run_startup.phase(
@@ -261,7 +285,7 @@ async function answer_pool(context: PoolContext): Promise<number> {
 		return backlog_next_report.report_retry(context)
 	}
 
-	const { result, untriaged } = await backlog_auto_triage.untriaged_of(resolved, context.repo)
+	const { result, untriaged } = await untriaged_of(resolved, context)
 
 	if (untriaged.length > 0) return await answer_held(result, context, untriaged)
 
@@ -315,7 +339,7 @@ async function answer(opted_in: OptedIn, exclude: ReadonlyArray<number>): Promis
 
 	if (context === undefined) return FAILURE_EXIT_CODE
 
-	return await answer_pool(context)
+	return await answer_pool({ ...context, interrupts: await backlog_interrupt.read(context.repo) })
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {

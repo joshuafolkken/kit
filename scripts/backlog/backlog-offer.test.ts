@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { backlog_interrupt } from './backlog-interrupt'
 import { backlog_next } from './backlog-next'
 import { backlog_offer } from './backlog-offer'
 
@@ -100,6 +101,14 @@ describe('backlog_offer.answer_of — the run:solo cause', () => {
 
 	it('marks an exhausted wait the run:solo notice explains as solo', () => {
 		expect(wait_with(SOLO_NOTICE, NO_RUNNING).cause).toBe('solo')
+	})
+
+	// joshuafolkken/kit#7860: an interrupt awaiting a decision is its own cause, not a running solo lane.
+	it('marks a wait the interrupt hold explains as decision', () => {
+		const pending = [{ number: 839, title: 'Red', createdAt: '2026-11-18T00:00:00Z' }]
+		const notice = backlog_interrupt.decision_message(pending, 'o/r')
+
+		expect(wait_with(notice, NO_RUNNING).cause).toBe(backlog_interrupt.DECISION_CAUSE)
 	})
 
 	it('leaves a retry unmarked whatever its stderr says', () => {
