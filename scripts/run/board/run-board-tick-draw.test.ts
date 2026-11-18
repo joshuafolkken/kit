@@ -86,6 +86,16 @@ describe('run_board_tick_draw.draw_run cue', () => {
 		expect(cues).toStrictEqual([])
 		expect(drawn.sound_snapshot).toBeDefined()
 	})
+
+	it('sounds nothing on the redraw the plan arrives on with a wait already there', () => {
+		const cues: Array<CueName> = []
+		const before = drawn_over({ ...planned(), plan: undefined }, [], cues)
+
+		drawn_over({ ...before, plan: plan_titled('a') }, [row(1, 'human')], cues)
+
+		expect(before.sound_snapshot).toBeUndefined()
+		expect(cues).toStrictEqual([])
+	})
 })
 
 describe('run_board_tick_draw.bounds_of', () => {

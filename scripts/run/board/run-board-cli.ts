@@ -392,6 +392,6 @@ async function run(argv: ReadonlyArray<string>, ports?: BoardPorts): Promise<num
 	return SUCCESS_EXIT_CODE
 }
 
-const run_board_cli = { DISABLED_NOTICE, LIVE_PORTS, USAGE, run }
+const run_board_cli = { DISABLED_NOTICE, LIVE_PORTS, USAGE, live_ports, run }
 
 export { run_board_cli }

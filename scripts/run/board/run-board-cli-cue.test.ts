@@ -3,6 +3,7 @@ import { run_board_cli } from './run-board-cli'
 import { run_board_fixture } from './run-board-fixture'
 import type { GatherRead } from './run-board-gather'
 import type { CueName } from './run-board-sound-cues'
+import { run_board_sound_player } from './run-board-sound-player'
 import type { BoardPorts } from './run-board-state'
 
 // joshuafolkken/kit#7951: the live board alone sounds a lane's launch; a single frame — `--once`,
@@ -12,8 +13,10 @@ const { LOCAL, STOPPED, harness, plan_titled } = run_board_fixture
 const LAUNCH = { pos: 1, at: '2026-10-08T08:00:00.000Z', kind: 'child-launch', text: '#1 a' }
 // Enough waits for a few live frames, their spinners turned between them.
 const SLEEPS = 40
+// The reads before the launch: the plan arrives on one of them, and a frame before it sounds nothing.
+const QUIET_READS = 3
 
-// Ports whose first read finds no lane and every later one finds lane 1 launched, each cue recorded;
+// Ports whose first reads find no lane and every later one finds lane 1 launched, each cue recorded;
 // the live board stops once its waits run out. The harness's read is taken once — its own reads stop
 // on their second wait.
 function launching(cues: Array<CueName>): BoardPorts {
@@ -26,12 +29,12 @@ function launching(cues: Array<CueName>): BoardPorts {
 		...ports,
 		gather: async (pace) => {
 			reads += 1
-			const is_first = reads === 1
+			const is_quiet = reads <= QUIET_READS
 
 			launched ??= ports.gather(pace)
 			const read = await launched
 
-			return is_first ? { ...read, local: LOCAL } : read
+			return is_quiet ? { ...read, local: LOCAL } : read
 		},
 		sleep: async (ms) => {
 			sleeps += 1
@@ -73,4 +76,11 @@ describe('run_board_cli.run cue', () => {
 			expect(cues).toStrictEqual([])
 		},
 	)
+})
+
+describe('run_board_cli.live_ports cue', () => {
+	it('passes the sound player to the live board alone', () => {
+		expect(run_board_cli.live_ports(true).cue).toBe(run_board_sound_player.play_cue)
+		expect(run_board_cli.live_ports(false).cue).toBeUndefined()
+	})
 })

@@ -7,7 +7,7 @@ import { run_board_sound_player, type SoundPorts } from './run-board-sound-playe
 
 const WAV = 'sounds/chime.wav'
 const QUOTED_WAV = "C:\\o'clock.wav"
-const DETACHED = { detached: true, stdio: 'ignore' }
+const DETACHED = { detached: true, stdio: 'ignore', windowsHide: true }
 const DIRECTORY_PREFIX = 'run-board-sound-player-'
 const create_directory = temporary_directory()
 
@@ -134,6 +134,17 @@ describe('run_board_sound_player.play fallbacks', () => {
 
 		expect(test.spawner).toHaveBeenCalledTimes(3)
 		expect(test.write).toHaveBeenCalledExactlyOnceWith(run_board_sound_player.BEL)
+	})
+})
+
+describe('run_board_sound_player.play default ports', () => {
+	it('rings the bell on the terminal', () => {
+		const write = vi.spyOn(process.stdout, 'write').mockReturnValue(true)
+
+		run_board_sound_player.play(WAV, 'aix')
+
+		expect(write).toHaveBeenCalledExactlyOnceWith(run_board_sound_player.BEL)
+		write.mockRestore()
 	})
 })
 

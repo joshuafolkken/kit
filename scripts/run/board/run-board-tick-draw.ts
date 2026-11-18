@@ -185,14 +185,18 @@ function draw(ports: BoardPorts, lines: ReadonlyArray<string>): void {
 }
 
 // The cue this frame picked over the last one's, sounded through `cue` where the board passes one,
-// and what the next frame weighs its own against.
+// and what the next frame weighs its own against. A frame before the plan is read is no base — the rows
+// the plan brings were already there — so the frame the plan arrives on is the first base, silent.
 function sounded(
 	state: BoardState,
 	header: BoardHeader,
 	local: LocalRead,
 	redraw: Redraw,
 ): Pick<BoardState, 'sound_snapshot' | 'sound_pending'> {
-	const snapshot = run_board_sound_transition.snapshot_of(header, local.events)
+	const snapshot =
+		state.plan === undefined
+			? undefined
+			: run_board_sound_transition.snapshot_of(header, local.events)
 	const { cue, pending } = run_board_sound_repeat.next_cue(
 		state.sound_snapshot,
 		snapshot,

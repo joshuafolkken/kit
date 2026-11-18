@@ -8,8 +8,9 @@ import { run_board_sound_wav } from './run-board-sound-wav'
 // Each platform lists its candidates in order; a candidate that is missing or fails to start emits
 // `error` (ENOENT included) and the next one is tried, so "absent" and "broken" share one path and no
 // PATH scan is needed. A platform with no row, or with every candidate failed, rings BEL instead.
+// `windowsHide` keeps the detached PowerShell from opening a console window over the board.
 const BEL = '\u{7}'
-const SPAWN_OPTIONS = { detached: true, stdio: 'ignore' } as const
+const SPAWN_OPTIONS = { detached: true, stdio: 'ignore', windowsHide: true } as const
 
 interface Player {
 	command: string
