@@ -122,7 +122,10 @@ function table(waits: ReadonlyArray<HumanWait>, window: StatsWindow): string {
 	].join('\n')
 }
 
-const lane_human_wait_stats = { confirmation_waits, label_waits, table }
+// The table's first header cell, the name a `lane:value cell` address gives it.
+const [TABLE] = COLUMNS
+
+const lane_human_wait_stats = { TABLE, confirmation_waits, label_waits, table }
 
 export type { HumanWait }
 export { lane_human_wait_stats }
