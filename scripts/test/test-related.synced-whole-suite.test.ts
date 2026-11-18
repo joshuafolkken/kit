@@ -176,11 +176,9 @@ describe('test_related.run_related_tests — a main checkout’s gate', () => {
 		mocked_moved.mockResolvedValue({
 			parts: { changed: [pure_files_entries.PURE_FILES_PATH], synced: [] },
 		})
-		vi.mocked(test_related_select.select).mockResolvedValueOnce({
-			tests: [FIXED_SOURCE],
-			deferred: 1,
-			reach: [],
-		})
+		const selection = { tests: [FIXED_SOURCE], deferred: 1, reach: [], method: 'import' } as const
+
+		vi.mocked(test_related_select.select).mockResolvedValueOnce(selection)
 
 		await test_related.run_related_tests([])
 

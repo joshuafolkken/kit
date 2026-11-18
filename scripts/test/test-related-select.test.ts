@@ -6,6 +6,7 @@ import { test_pinned_logic } from './test-pinned-logic'
 import type { ReachedTests } from './test-pinned-reach'
 import type { RelatedScope } from './test-related-scope'
 import { test_related_select, type Selection, type SelectReaders } from './test-related-select'
+import type { SymbolSelection } from './test-symbol-select'
 
 // joshuafolkken/kit#7976: whatever the change, `josh test:related` hands vitest at most the cap's test
 // files — the changed tests, then the scope's own and direct importers, then the outer reach — and
@@ -26,6 +27,7 @@ const PRESENT = [CODE, DIRECT_TEST, CHANGED_TEST, E2E_SPEC, ...OUTER_TESTS]
 // Sorted by code point already: `outer-` before `zz-direct` before `zzz-changed`.
 const ALL_TESTS = [...OUTER_TESTS, DIRECT_TEST, CHANGED_TEST]
 const DEFERRED = ALL_TESTS.length - MAX_TEST_FILES
+const NOTHING: Selection = { tests: [], deferred: 0, reach: [], method: 'import' }
 
 function write_files(root: string): void {
 	for (const file of PRESENT) {
@@ -38,9 +40,14 @@ function absolute_of(root: string, files: ReadonlyArray<string>): Array<string> 
 	return files.map((file) => path.join(root, file))
 }
 
-// `reached` is root-relative; undefined reads as no graph.
-function readers_of(root: string, reached: ReadonlyArray<string> | undefined): SelectReaders {
+// `reached` is root-relative; undefined reads as no graph, and no `symbol` as no symbol reading.
+function readers_of(
+	root: string,
+	reached: ReadonlyArray<string> | undefined,
+	symbol?: SymbolSelection,
+): SelectReaders {
 	return {
+		symbols: async () => symbol,
 		reach: async (files): Promise<Array<ReachedTests> | undefined> =>
 			reached === undefined
 				? undefined
@@ -61,6 +68,17 @@ async function select_in(
 	reached: ReadonlyArray<string> | undefined,
 ): Promise<Selection> {
 	return await test_related_select.select(root, scope, changed, readers_of(root, reached))
+}
+
+// `CODE` changed, every test reached by its imports, and `symbol` the declaration users' reading.
+async function select_by_users(
+	root: string,
+	scope: RelatedScope,
+	symbol: SymbolSelection,
+): Promise<Selection> {
+	const readers = readers_of(root, ALL_TESTS, symbol)
+
+	return await test_related_select.select(root, scope, [CODE], readers)
 }
 
 function open_fixture(): FixtureWorkspace {
@@ -171,7 +189,45 @@ describe('test_related_select.select reaching every test', () => {
 			tests: [],
 			deferred: 0,
 			reach: [],
+			method: 'import',
 		})
+	})
+})
+
+describe('test_related_select.select by declaration users', () => {
+	let fixture: FixtureWorkspace
+
+	beforeEach(() => {
+		fixture = open_fixture()
+	})
+
+	afterEach(async () => {
+		await git_fixture_workspace.close_workspace(fixture)
+	})
+
+	it('runs the users of the changed declarations in place of the import layers', async () => {
+		const root = fixture.workspace
+		const symbol = { tests: [OUTER_TESTS[1] ?? ''], reach: [{ file: CODE, count: 1 }] }
+		const selection = await select_by_users(root, related_of(root, [CODE]), symbol)
+
+		expect(selection).toEqual({ ...symbol, deferred: 0, method: 'symbol' })
+	})
+
+	it('still defers what the users select past the cap', async () => {
+		const root = fixture.workspace
+		const symbol = { tests: ALL_TESTS, reach: [{ file: CODE, count: ALL_TESTS.length }] }
+		const selection = await select_by_users(root, related_of(root, [CODE]), symbol)
+
+		expect(selection).toMatchObject({ deferred: DEFERRED, method: 'symbol' })
+	})
+
+	it('reads the import layers for a scope fallen to the whole suite', async () => {
+		const scope: RelatedScope = { mode: 'all', files: [], reason: '' }
+		const symbol = { tests: [], reach: [] }
+		const selection = await select_by_users(fixture.workspace, scope, symbol)
+
+		expect(selection.method).toBe('import')
+		expect(selection.tests).toHaveLength(MAX_TEST_FILES)
 	})
 })
 
@@ -180,7 +236,7 @@ describe('test_related_select.scope_of', () => {
 	const scope = related_of(root, [CODE])
 
 	it('carries the selected tests, absolute', () => {
-		const selection = { tests: [DIRECT_TEST], deferred: 0, reach: [] }
+		const selection: Selection = { ...NOTHING, tests: [DIRECT_TEST] }
 
 		expect(test_related_select.scope_of(root, scope, selection)).toEqual({
 			...scope,
@@ -189,9 +245,7 @@ describe('test_related_select.scope_of', () => {
 	})
 
 	it('reaches no test where nothing was selected', () => {
-		const selection = { tests: [], deferred: 0, reach: [] }
-
-		expect(test_related_select.scope_of(root, scope, selection)).toEqual({
+		expect(test_related_select.scope_of(root, scope, NOTHING)).toEqual({
 			mode: 'none',
 			files: scope.files,
 			reason: test_related_select.NO_TEST_REASON,
@@ -201,8 +255,6 @@ describe('test_related_select.scope_of', () => {
 	it('keeps a scope reaching no test as it is', () => {
 		const none: RelatedScope = { mode: 'none', files: [], reason: 'unmoved' }
 
-		expect(test_related_select.scope_of(root, none, { tests: [], deferred: 0, reach: [] })).toBe(
-			none,
-		)
+		expect(test_related_select.scope_of(root, none, NOTHING)).toBe(none)
 	})
 })

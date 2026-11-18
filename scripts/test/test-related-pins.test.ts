@@ -114,6 +114,7 @@ describe('test_related_select.select with a registry file reaching past the cap'
 			reason: '',
 		}
 		const selection = await test_related_select.select(root, scope, [COMMAND_TABLE], {
+			symbols: async () => undefined,
 			reach: past_the_cap(root),
 			importers: direct_importers.importers_of,
 			all_tests: async () => [],
