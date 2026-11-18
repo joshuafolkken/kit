@@ -57,6 +57,8 @@ interface BoardPorts {
 	// Runs `leave` however the process ends: a normal exit, Ctrl+C or SIGTERM.
 	on_exit: (leave: () => void) => void
 	sleep: (ms: number) => Promise<void>
+	// The pauses of the line typed before a live board's first frame (`run-board-intro.ts`); none types no line.
+	intro_sleep?: ((ms: number) => Promise<void>) | undefined
 }
 
 // `background` launches the GitHub reads and draws without them; `settled` waits for them before

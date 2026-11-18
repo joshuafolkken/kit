@@ -78,18 +78,29 @@ function note(at_ms: number, text: string): BoardNote {
 	return { kind: 'note', at_ms, issue: '3415', text }
 }
 
+// The `🎯 —` an unmeasured running row, a decision row and a parked row end on
+// (joshuafolkken/kit#7920).
+const UNKNOWN_FINISH = '🎯 —'
+
+// A line without the `🎯 —` it ends on, its gap trimmed.
+function unfinished(line: string): string {
+	return line.endsWith(UNKNOWN_FINISH) ? line.slice(0, -UNKNOWN_FINISH.length).trimEnd() : line
+}
+
 const run_board_render_fixture = {
 	EMPTY_LAYOUT,
 	GB,
 	MINUTE,
 	NOW,
 	STARTED,
+	UNKNOWN_FINISH,
 	WORDS,
 	board_usage,
 	header,
 	lines_of,
 	note,
 	rule,
+	unfinished,
 }
 
 export { run_board_render_fixture }

@@ -118,6 +118,53 @@ describe('epic_body.build_dependency_pairs', () => {
 	})
 })
 
+// #103 waits on #101 and #102, which are independent — the join `--ordered` cannot spell.
+const JOIN = [
+	[101, 103],
+	[102, 103],
+]
+
+function build_join(): string {
+	return epic_body.build_epic_body({
+		children: CHILDREN,
+		rationale: RATIONALE,
+		is_ordered: false,
+		chains: JOIN,
+	})
+}
+
+describe('epic_body — declared chains', () => {
+	it('writes one chain line per declared chain', () => {
+		expect(epic_parse.parse_dependency_chains(build_join())).toStrictEqual(JOIN)
+	})
+
+	it('records the same links as blocked-by pairs that the body declares', () => {
+		const pairs = epic_body.build_dependency_pairs(CHILDREN, false, JOIN)
+
+		expect(pairs).toStrictEqual(epic_parse.parse_dependency_links(build_join()))
+	})
+
+	it('records a link two chains share once', () => {
+		const pairs = epic_body.build_dependency_pairs(CHILDREN, false, [
+			[101, 102],
+			[101, 102, 103],
+		])
+
+		expect(pairs).toStrictEqual([
+			{ blocker: 101, blocked: 102 },
+			{ blocker: 102, blocked: 103 },
+		])
+	})
+
+	it('names each chain under the declared order, attributed to --chain', () => {
+		const body = build_join()
+
+		expect(body).toContain('`#101 -> #103`, declared by `josh epic --chain`')
+		expect(body).toContain('`#102 -> #103`, declared by `josh epic --chain`')
+		expect(body).not.toContain(UNORDERED_DEPENDENCIES)
+	})
+})
+
 describe('epic_body.format_run_command', () => {
 	it('names the epic once its number is known', () => {
 		expect(epic_body.format_run_command(EPIC_NUMBER)).toBe(

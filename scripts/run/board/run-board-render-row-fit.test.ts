@@ -74,7 +74,8 @@ describe('run_board_render.render — a running lane row on a narrow pane', () =
 		for (const line of lines) {
 			expect(run_board_fit.width_of(line)).toBeLessThanOrEqual(NARROW)
 			expect(line).toContain(ELAPSED)
-			expect(line).toMatch(/…$/u)
+			// The title's cut, then the unmeasured finish (joshuafolkken/kit#7920).
+			expect(line).toMatch(/… {2}🎯 —$/u)
 		}
 	})
 

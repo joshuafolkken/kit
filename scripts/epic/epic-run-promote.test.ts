@@ -13,6 +13,7 @@ vi.mock('#scripts/gh/git-gh-command', () => ({
 
 const { git_gh_command } = await import('#scripts/gh/git-gh-command')
 const { epic_run } = await import('./epic-run')
+const { epic_parse } = await import('./epic-parse')
 
 const EPIC_NUMBER = 858
 const TITLE = 'Split the request into its deliverables'
@@ -45,5 +46,23 @@ describe('epic_run.promote_epic — the --title rename', () => {
 		expect(await epic_run.promote_epic(promote_input())).toBe(SUCCESS_EXIT_CODE)
 
 		expect(git_gh_command.issue_edit_title).not.toHaveBeenCalled()
+	})
+})
+
+describe('epic_run.promote_epic — declared --chain', () => {
+	it('records a blocked-by relation per link of each declared chain', async () => {
+		expect(await epic_run.promote_epic({ ...promote_input(), chains: [[101, 102]] })).toBe(
+			SUCCESS_EXIT_CODE,
+		)
+
+		expect(git_gh_command.issue_add_blocked_by).toHaveBeenCalledExactlyOnceWith('102', '101')
+	})
+
+	it('writes the declared chain as a chain line in the promoted body', async () => {
+		await epic_run.promote_epic({ ...promote_input(), chains: [[101, 102]] })
+
+		const body = vi.mocked(git_gh_command.issue_edit_body).mock.lastCall?.[1]
+
+		expect(epic_parse.parse_dependency_chains(body)).toStrictEqual([[101, 102]])
 	})
 })

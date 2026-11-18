@@ -97,12 +97,12 @@ describe('run_board_render.render an earlier run’s lane row', () => {
 
 // joshuafolkken/kit#7098: 🧳 follows the title, where the phase's icon was hidden behind it.
 describe('run_board_earlier.earlier_marked', () => {
-	const OVER = 'over budget +3′'
+	const FINISH = '🎯 ~09:30'
 
 	it.each([
 		[
-			['🚦 0″', OVER],
-			['🧳 🚦 0″', OVER],
+			['🚦 0″', FINISH],
+			['🧳 🚦 0″', FINISH],
 		],
 		[[''], ['🧳']],
 		[[], ['🧳']],
@@ -142,6 +142,7 @@ describe('run_board_render.render an earlier run’s lane row on a narrow pane',
 		const lines = drawn.map((line) => stripVTControlCharacters(line))
 		const earlier_line = line_of(lines, EARLIER)
 
+		// This run's lane totals foretell no earlier run's lane, so its row draws no 🎯 (joshuafolkken/kit#7920).
 		expect(earlier_line.trimEnd()).toMatch(/… {2}🧳$/u)
 		expect(cut_end(earlier_line)).toBe(cut_end(line_of(lines, OWN)))
 	})
