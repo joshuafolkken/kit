@@ -1,0 +1,7 @@
+{
+	"reason": "test:related selects by the users of changed declarations (symbol walk, mocks, registry readers, resolver) per #7979; the import layers stay as the fallback",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 497
+	}
+}

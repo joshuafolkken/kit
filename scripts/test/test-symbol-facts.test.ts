@@ -75,6 +75,55 @@ describe('test_symbol_facts.read_file — imports and exports', () => {
 	})
 })
 
+const TABLE_TEST = 'table.test.ts'
+const TABLE_TEXT = `const KIND = {
+	start: 'start',
+	stop: 'stop',
+}
+export default function greet() { return KIND.start }
+vi.mock('./whole')
+vi.mock('./part', async (importOriginal) => ({ ...(await importOriginal()) }))
+export { KIND }
+`
+
+function table_facts(): FileFacts {
+	return test_symbol_facts.read_file(ts, resolve, TABLE_TEST, TABLE_TEXT)
+}
+
+// joshuafolkken/kit#7980: what the walk over declaration users reads past functions and imports.
+describe('test_symbol_facts.read_file — literal tables and default exports', () => {
+	it('declares each literal-valued property as a member of its own line', () => {
+		const { declarations, members } = table_facts()
+
+		expect(declarations.get('KIND.stop')).toEqual({ start: 3, end: 3, references: new Set() })
+		expect(members.get('KIND')).toEqual(
+			new Map([
+				['start', 'KIND.start'],
+				['stop', 'KIND.stop'],
+			]),
+		)
+	})
+
+	it('exports a default function by its name and a default expression as itself', () => {
+		const expression = test_symbol_facts.read_file(ts, resolve, 'e.ts', 'export default 1 + 2\n')
+		const { DEFAULT_EXPORT } = test_symbol_facts
+
+		expect(table_facts().exports.get(DEFAULT_EXPORT)).toBe('greet')
+		expect(expression.exports.get(DEFAULT_EXPORT)).toBe(DEFAULT_EXPORT)
+		expect(expression.declarations.get(DEFAULT_EXPORT)?.start).toBe(1)
+	})
+})
+
+describe('test_symbol_facts.read_file — mocks', () => {
+	it('records a module mocked whole and reads a partial mock as using every export', () => {
+		const { declarations, mocks } = table_facts()
+		const every = test_symbol_facts.key_of('part.ts', test_symbol_facts.EVERY)
+
+		expect(mocks).toEqual(new Set(['whole.ts']))
+		expect(declarations.get(`${test_symbol_facts.LOAD}7`)?.references).toContain(every)
+	})
+})
+
 describe('test_symbol_facts keys', () => {
 	it('splits a key back into its file and name', () => {
 		const key = test_symbol_facts.key_of('a/b.ts', 'name')

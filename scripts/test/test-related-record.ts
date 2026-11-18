@@ -12,6 +12,7 @@ import { test_related_caller } from './test-related-caller'
 import { test_related_cap } from './test-related-cap'
 import type { TestReuse } from './test-related-reuse'
 import { related_scope, type RelatedScope } from './test-related-scope'
+import type { SelectMethod } from './test-related-select'
 import { test_related_summary } from './test-related-summary'
 import { unit_count_file } from './unit-count-file'
 
@@ -49,6 +50,8 @@ interface RunInput {
 	branch_parts?: ChangedParts | undefined
 	// How long selecting the tests took — the import graph and the importer index (joshuafolkken/kit#7248).
 	select_elapsed_ms?: number
+	// How the tests past the changed ones were chosen (`test-related-select.ts`, joshuafolkken/kit#7980).
+	select_method?: SelectMethod
 	// Whether a bare run read only its last red run's failed files and what moved since
 	// (`test-related-red.ts`, joshuafolkken/kit#7786); `undefined` for a `--touched` run.
 	red_rerun?: boolean
@@ -260,6 +263,7 @@ function record_of(input: RunInput, result: RunResult): TestRelatedRecord {
 		...deferred_record(input, own),
 		...widest_record(input.reach),
 		...select_record(input.select_elapsed_ms),
+		...(input.select_method !== undefined && { select_method: input.select_method }),
 		...(input.red_rerun !== undefined && { red_rerun: input.red_rerun }),
 		...stage_record(result.stages),
 		...tree_record(input.tree),

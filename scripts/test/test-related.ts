@@ -232,7 +232,10 @@ async function scope_of(root: string, change: ChangeReading): Promise<RelatedSco
 	})
 }
 
-type Selected = Pick<RelatedInput, 'scope' | 'deferred' | 'reach' | 'select_elapsed_ms'>
+type Selected = Pick<
+	RelatedInput,
+	'scope' | 'deferred' | 'reach' | 'select_elapsed_ms' | 'select_method'
+>
 
 // **The run's test files, capped** (joshuafolkken/kit#7976) — in every checkout, the gate's unit leg
 // on main included: the whole suite is CI's (joshuafolkken/kit#7977). The selection's own time
@@ -247,7 +250,7 @@ async function selected_of(
 	const started_ms = performance.now()
 	const selection = await test_related_select.select(root, scope, change.changed)
 	const select_elapsed_ms = performance.now() - started_ms
-	const { deferred, reach } = selection
+	const { deferred, reach, method } = selection
 
 	test_related_cap.report_deferred(selection, test_related_record.own_of(change))
 
@@ -256,6 +259,7 @@ async function selected_of(
 		deferred,
 		reach,
 		select_elapsed_ms,
+		select_method: method,
 	}
 }
 

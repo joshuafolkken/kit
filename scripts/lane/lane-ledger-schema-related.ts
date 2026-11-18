@@ -18,6 +18,9 @@ const test_related_schema = z.object({
 	reuse_reason: z.string().optional(),
 	reuse_elapsed_ms: z.number().optional(),
 	select_elapsed_ms: z.number().optional(),
+	// How the tests past the changed ones were chosen: by declaration users, or by the import graph
+	// where no symbol reading could be made — absent on rows written before it (joshuafolkken/kit#7980).
+	select_method: z.enum(['symbol', 'import']).optional(),
 	kind: z.literal(KIND.TEST_RELATED),
 	at: z.string(),
 	issue: z.number().optional(),

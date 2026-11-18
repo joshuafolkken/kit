@@ -1,5 +1,3 @@
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
 import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { bash_output_cap_reader } from '#scripts/document/bash-output-cap'
@@ -10,7 +8,6 @@ import { git_command } from '#scripts/git/git-command'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { issue_watch_gate } from '#scripts/issue/issue-watch-gate'
 import type { FileMapStamp } from '#scripts/josh/file-map-stamp'
-import { find_package_directory } from '#scripts/josh/josh-logic'
 import { path_decision } from '#scripts/josh/path-decision'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { lane_session_broker } from '#scripts/lane/lane-session-broker'
@@ -30,6 +27,7 @@ import { review_reviewed_tree } from './review-reviewed-tree'
 import { review_round } from './review-round'
 import { review_round_one_blobs } from './review-round-one-blobs'
 import { review_round_one_skip } from './review-round-one-skip'
+import { review_rubric_file } from './review-rubric-file'
 import { review_size } from './review-size'
 import { review_stamps } from './review-stamps'
 import { review_tree } from './review-tree'
@@ -47,16 +45,6 @@ import { review_untouched_readers, type ReadersRead } from './review-untouched-r
 const USAGE =
 	'Usage: josh review:brief [--round <1|2> | --full-change] | --interaction | --level-only [--staged] [--json]'
 
-// The rubric's absolute path, resolved against the kit package rather than the review checkout root.
-// The rubric ships inside the package, so a consumer that keeps no
-// `prompts/` of its own still receives it at `node_modules/@joshuafolkken/kit/prompts/`.
-// `find_package_directory` ascends to the nearest package.json, so this resolves from both the tsx
-// source and the bundled `dist/josh.js`.
-const MODULE_DIRECTORY = path.dirname(fileURLToPath(import.meta.url))
-const RUBRIC_PATH = path.join(
-	find_package_directory(MODULE_DIRECTORY),
-	review_brief.RUBRIC_RELATIVE_PATH,
-)
 // `review:level` folded in here: it was a second command deciding the same
 // thing `review:brief` already prints on its first line, so it is now a mode of this one. `--level-only`
 // answers the level alone — for a pre-commit review run outside any workflow — and, unlike the full
@@ -280,7 +268,7 @@ async function compose_brief(request: ComposeRequest): Promise<string> {
 		// One reading is shared with the record written below, so the commit
 		// the map is stored against is the same one the brief printed.
 		base,
-		rubric_path: RUBRIC_PATH,
+		rubric_path: review_rubric_file.path_for(contract.checkout.root, paths, round),
 		...contract,
 		diff: await read_diff(contract.checkout.root, base, paths),
 		readers: await read_readers(contract.checkout.root, base, paths),
