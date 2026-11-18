@@ -137,6 +137,6 @@ function trigger_table(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow)
 	)
 }
 
-const lane_test_related_stats = { table, trigger_table }
+const lane_test_related_stats = { rows_under, seconds_cell, table, trigger_table }
 
 export { lane_test_related_stats }

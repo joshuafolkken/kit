@@ -1,0 +1,7 @@
+{
+	"reason": "New lint-related ledger kind, per-stage timing in lint:related and its lane:stats table (#7827): new feature code, not duplicated logic",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 167
+	}
+}

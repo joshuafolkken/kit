@@ -9,6 +9,7 @@ import type {
 	HeldRecord,
 	LaneStateChangeRecord,
 	LedgerEntry,
+	LintRelatedRecord,
 	OverlapRecord,
 	PushMissRecord,
 	RoundOneRecord,
@@ -214,6 +215,10 @@ async function record_test_related(run: TestRelatedRecord, path?: string): Promi
 	await record({ kind: KIND.TEST_RELATED, at: now_iso(), ...run }, path)
 }
 
+async function record_lint_related(run: LintRelatedRecord, path?: string): Promise<void> {
+	await record({ kind: KIND.LINT_RELATED, at: now_iso(), ...run }, path)
+}
+
 async function record_test_pinned(run: TestPinnedRecord, path?: string): Promise<void> {
 	await record({ kind: KIND.TEST_PINNED, at: now_iso(), ...run }, path)
 }
@@ -286,6 +291,7 @@ const lane_ledger_write = {
 	record_size,
 	record_split_filed,
 	record_split_notice,
+	record_lint_related,
 	record_stage,
 	record_stop,
 	record_test_pinned,
