@@ -30,6 +30,7 @@ afterEach(() => {
 
 describe('run_board_cli.run --theme', () => {
 	it('draws --once with dashed rules and no rule character', async () => {
+		vi.stubEnv('FORCE_COLOR', '0')
 		const plain = await frame_of(['--once'])
 		const frame = await frame_of([...THEMED, '--once'])
 
