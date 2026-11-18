@@ -12,7 +12,12 @@ import { run_ship_gate_runs } from './run-ship-gate-runs'
 import { run_ship_lap, type LapNote } from './run-ship-lap'
 import { run_ship_narrowed, type Moved } from './run-ship-narrowed'
 import { run_ship_pair_runs } from './run-ship-pair-runs'
-import { run_ship_synced_scope, type SyncedCheck, type SyncReading } from './run-ship-synced-scope'
+import {
+	run_ship_synced_scope,
+	type ScopeBreakdown,
+	type SyncedCheck,
+	type SyncReading,
+} from './run-ship-synced-scope'
 
 // The scoped pair `josh ship` meets itself rather than stops on, shared by every stage that needs a
 // green record for this tree: the preflight stage at the start, the review rounds, and the gate
@@ -145,14 +150,45 @@ async function unnamed_pair(
 	return { ...(await bare_pair(scripts)), note: { unsplit } }
 }
 
-// A named pair's lap: how many files, and what each condition named when a merge named them.
-function named_note(
+// The files one check of the pair was handed, absent where the check is not stale.
+function named_count(
+	phases: ReadonlyArray<ScopedPhase>,
+	script: string,
 	files: ReadonlyArray<string>,
 	sync: SyncReading | undefined,
-): Pick<LapNote, 'named' | 'breakdown'> {
-	const named = files.length
+): number | undefined {
+	if (phases.every((phase) => phase.script !== script)) return undefined
 
-	return sync?.breakdown === undefined ? { named } : { named, breakdown: sync.breakdown }
+	return run_ship_synced_scope.files_for(sync, script, files).length
+}
+
+// What each condition named when a merge named the pair, and on every named pair the files each check
+// was handed — read apart, since `named` is their union (joshuafolkken/kit#7846).
+function named_breakdown(
+	phases: ReadonlyArray<ScopedPhase>,
+	files: ReadonlyArray<string>,
+	sync: SyncReading | undefined,
+): ScopeBreakdown {
+	return {
+		...sync?.breakdown,
+		lint_named: named_count(phases, scoped_green.LINT_SCRIPT, files, sync),
+		test_named: named_count(phases, scoped_green.TEST_SCRIPT, files, sync),
+	}
+}
+
+// The named pair's phases, after the line saying what they were named over and what each check holds.
+function described_phases(
+	checks: ReadonlyArray<SyncedCheck>,
+	named: Moved,
+	sync: SyncReading | undefined,
+): { phases: ReadonlyArray<ScopedPhase>; breakdown: ScopeBreakdown } {
+	const phases = check_phases(checks, named.files, sync)
+	const breakdown = named_breakdown(phases, named.files, sync)
+	const text = run_ship_synced_scope.breakdown_text(breakdown)
+
+	printed(run_ship_narrowed.describe(named.files, named.why, text))
+
+	return { phases, breakdown }
 }
 
 // A tree that moved while the checks ran — a reviewer's edit beside the gate — was not the one they
@@ -170,12 +206,9 @@ async function narrowed_or_bare(
 
 	if (named === undefined) return await unnamed_pair(scripts, sync)
 
-	printed(
-		run_ship_narrowed.describe(named.files, named.why, run_ship_synced_scope.breakdown_text(sync)),
-	)
-
 	const checks = run_ship_synced_scope.checks_of(scripts)
-	const result = await run_pair_phases(check_phases(checks, named.files, sync))
+	const { phases, breakdown } = described_phases(checks, named, sync)
+	const result = await run_pair_phases(phases)
 
 	const verified = result.verified ?? tree
 
@@ -185,7 +218,7 @@ async function narrowed_or_bare(
 
 	return {
 		...result,
-		note: { ...named_note(named.files, sync), resumed_from: named.resumed_from },
+		note: { named: named.files.length, breakdown, resumed_from: named.resumed_from },
 	}
 }
 
