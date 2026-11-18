@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_board_cli } from './run-board-cli'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_frame_store, type FrameStore } from './run-board-frame-store'
@@ -17,6 +17,15 @@ function board(store: FrameStore): ReturnType<typeof harness> & { ports: BoardPo
 
 	return { ...made, ports: { ...made.ports, is_tty: false, frames: store } }
 }
+
+// A theme set in the environment running the tests would key --once under that theme.
+beforeEach(() => {
+	vi.stubEnv('JOSH_BOARD_THEME', undefined)
+})
+
+afterEach(() => {
+	vi.unstubAllEnvs()
+})
 
 describe('run_board_cli.run answered from the recorded frame', () => {
 	it.each([

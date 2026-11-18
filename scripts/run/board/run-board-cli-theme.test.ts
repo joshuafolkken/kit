@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_board_cli } from './run-board-cli'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_intro } from './run-board-intro'
@@ -23,6 +23,11 @@ async function frame_of(argv: Array<string>): Promise<string> {
 async function no_pause(): Promise<void> {
 	await Promise.resolve()
 }
+
+// A theme set in the environment running the tests must not reach a board drawn without one.
+beforeEach(() => {
+	vi.stubEnv('JOSH_BOARD_THEME', undefined)
+})
 
 afterEach(() => {
 	vi.unstubAllEnvs()
