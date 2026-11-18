@@ -68,6 +68,8 @@ interface BoardPorts {
 	// Sounds the cue a redraw picked (`run-board-sound-player.ts`), without waiting; the live board alone
 	// passes one, so `--once`, `--chat` and `--every` stay silent.
 	cue?: ((name: CueName) => void) | undefined
+	// Whether the sound switch a person flips with `s` is on (`run-board-keys.ts`); none where no key is read.
+	sound?: (() => boolean) | undefined
 }
 
 // `background` launches the GitHub reads and draws without them; `settled` waits for them before

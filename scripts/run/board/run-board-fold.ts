@@ -27,8 +27,10 @@ const SECTION_KEYS: ReadonlyMap<string, SectionKey> = new Map([
 	['d', 'done'],
 ])
 const ALL_KEY = 'a'
+// Flips the board's sound on and off (`run-board-keys.ts`); named here so the key line lists it.
+const SOUND_KEY = 's'
 const SECTIONS: ReadonlyArray<SectionKey> = [...SECTION_KEYS.values()]
-const KEYS_LINE = ` ${[...SECTION_KEYS.keys()].join(' ')}: fold · ${ALL_KEY}: all · Ctrl-C: quit`
+const KEYS_LINE = ` ${[...SECTION_KEYS.keys()].join(' ')}: fold · ${ALL_KEY}: all · ${SOUND_KEY}: sound · Ctrl-C: quit`
 
 // The live terminal a frame is kept within, the footer the frame ends on and gives way first, and the
 // sections a person folded; none for a frame that is not redrawn in place, which is drawn as it was.
@@ -149,7 +151,7 @@ function bounded(parts: FrameParts, bounds: FrameBounds): Array<string> {
 	return size === undefined ? run_board_fit.whole(shown) : run_board_fit.fit(shown, size)
 }
 
-const run_board_fold = { KEYS_LINE, SECTIONS, bounded, fold_parts, toggled }
+const run_board_fold = { KEYS_LINE, SECTIONS, SOUND_KEY, bounded, fold_parts, toggled }
 
 export { run_board_fold }
 export type { FrameBounds }
