@@ -173,9 +173,11 @@ function stages_from(
 	return index === -1 ? undefined : stages.slice(index)
 }
 
-// The stage names itself to a `test:related` it starts, for the ledger row (joshuafolkken/kit#7965).
+// The stage names its command to a `test:related` it starts, for the ledger row
+// (joshuafolkken/kit#7965) — the command alone, not its arguments.
 async function josh_stage(argv: ReadonlyArray<string>): Promise<JoshResult> {
-	const caller = test_related_caller.environment(`run:chain ${argv.join(' ')}`)
+	const [command = ''] = argv
+	const caller = test_related_caller.environment(`run:chain ${command}`)
 
 	return await josh_command.josh_run(argv, true, undefined, caller)
 }

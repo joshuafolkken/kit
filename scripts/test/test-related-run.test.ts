@@ -73,4 +73,13 @@ describe('test_related_run.run_and_vouch', () => {
 		expect(await test_related_run.run_and_vouch(input(), [], TREE)).toBe(1)
 		expect(test_related_reuse.blobs).not.toHaveBeenCalled()
 	})
+	// joshuafolkken/kit#7965: the row names how the run ended, not how its first pass did.
+	it('records the no-base pass red exit on the ledger row after a green first pass', async () => {
+		vi.mocked(test_no_base.run_if_touched).mockResolvedValue(1)
+		await test_related_run.run_and_vouch(input(), [], TREE)
+		expect(test_related_record.record_run).toHaveBeenLastCalledWith(
+			expect.anything(),
+			expect.objectContaining({ exit_code: 1 }),
+		)
+	})
 })

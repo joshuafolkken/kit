@@ -92,10 +92,19 @@ function outcome_of(
 	return { exit_code, failed: test_related_red.failed_of(scope, started_ms) }
 }
 
-async function run_and_record(
+// What a run left for its ledger row, the row written once the run's last pass is known.
+interface Measured {
+	exit_code: number
+	started_ms: number
+	started: number
+	test_files: number | undefined
+	stages: StageTimes
+}
+
+async function run_measured(
 	input: RunInput,
 	command_arguments: ReadonlyArray<string>,
-): Promise<number> {
+): Promise<Measured> {
 	const started_ms = Date.now()
 	const started = performance.now()
 	const stages: StageTimes = { rebuild_ms: launch_timing.rebuild_ms() }
@@ -108,14 +117,32 @@ async function run_and_record(
 		`${test_related_summary.summary_line(input.scope, test_files, input.reach)}\n`,
 	)
 
-	await test_related_record.record_run(input, {
-		elapsed_ms: performance.now() - started,
-		test_files,
-		stages,
-		...outcome_of(input.scope, exit_code, started_ms),
-	})
+	return { exit_code, started_ms, started, test_files, stages }
+}
 
-	return exit_code
+// `exit_code` is the run's final one — after the no-base pass where one ran (joshuafolkken/kit#7965).
+async function record_measured(
+	input: RunInput,
+	measured: Measured,
+	exit_code: number,
+): Promise<void> {
+	await test_related_record.record_run(input, {
+		elapsed_ms: performance.now() - measured.started,
+		test_files: measured.test_files,
+		stages: measured.stages,
+		...outcome_of(input.scope, exit_code, measured.started_ms),
+	})
+}
+
+async function run_and_record(
+	input: RunInput,
+	command_arguments: ReadonlyArray<string>,
+): Promise<number> {
+	const measured = await run_measured(input, command_arguments)
+
+	await record_measured(input, measured, measured.exit_code)
+
+	return measured.exit_code
 }
 
 async function with_no_base_pass(
@@ -163,18 +190,19 @@ async function run_and_vouch(
 	command_arguments: ReadonlyArray<string>,
 	before: GateTree | undefined,
 ): Promise<number> {
-	const started_ms = Date.now()
-	const first_exit = await run_and_record(input, command_arguments)
+	const measured = await run_measured(input, command_arguments)
+	const first_exit = measured.exit_code
 	const exit_code = await with_no_base_pass(input, command_arguments, first_exit)
 	const tree = conclusive_tree(before)
 
+	await record_measured(input, measured, exit_code)
 	await record_green(input, tree, exit_code)
 
 	await test_related_red.record_red({
 		before: tree,
 		scope: input.scope,
 		first_exit,
-		started_ms,
+		started_ms: measured.started_ms,
 		owed: test_related_red.no_base_files(input),
 	})
 

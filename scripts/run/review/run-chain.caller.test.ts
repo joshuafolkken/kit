@@ -7,6 +7,7 @@ import { run_chain, type ChainStage } from './run-chain'
 // from `run-chain.test.ts` because spying on `josh_run` needs an isolated worker.
 
 const CHECK_RELATED = 'check:related'
+const RUN_REVIEW = 'run:review'
 const ISSUE = '5630'
 
 function stage_named(name: string): ChainStage {
@@ -25,6 +26,18 @@ describe('run_chain — the caller a stage names', () => {
 
 		expect(josh_run).toHaveBeenCalledWith([CHECK_RELATED], true, undefined, {
 			[test_related_caller.CALLER_ENVIRONMENT]: `run:chain ${CHECK_RELATED}`,
+		})
+		josh_run.mockRestore()
+	})
+
+	it('names the command alone, not the arguments after it', async () => {
+		const josh_run = vi.spyOn(josh_command, 'josh_run').mockResolvedValue({ code: 0, out: '' })
+		const review = { ...stage_named(RUN_REVIEW), argv: [RUN_REVIEW, ISSUE, '--join'] }
+
+		await run_chain.run_stages([review], ISSUE, vi.fn())
+
+		expect(josh_run).toHaveBeenCalledWith(review.argv, true, undefined, {
+			[test_related_caller.CALLER_ENVIRONMENT]: `run:chain ${RUN_REVIEW}`,
 		})
 		josh_run.mockRestore()
 	})
