@@ -1,0 +1,7 @@
+{
+	"reason": "Two new test files cover the parallel reads; the source split moved span reads out of run-board-read.ts to stay under the 300-line cap",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 82
+	}
+}
