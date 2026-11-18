@@ -48,6 +48,9 @@ const HOME_DIRECTORY_READERS: ReadonlyArray<string> = [
 	// `home-tilde` reads the home directory only to write it as `~` in a drawn string
 	// (joshuafolkken/kit#7342).
 	path.join('lib', 'home-tilde.ts'),
+	// `memory-durable-write` locates Claude Code's auto MEMORY under `~/.claude/projects` to refuse a
+	// `feedback` memory; it reads the file an `Edit` changes and never writes (joshuafolkken/kit#7854).
+	path.join('rules', 'memory-durable-write.ts'),
 ]
 // Every way a Node script can put bytes on disk — sync, async and `fs/promises` alike — plus the
 // low-level primitives the named calls are built on. Each entry is written so it can only match a
