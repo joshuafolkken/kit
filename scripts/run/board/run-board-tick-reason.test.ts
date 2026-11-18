@@ -114,4 +114,13 @@ describe('run_board_tick.tick — a usage-limit hold', () => {
 		expect(await row_of(HELD, held, plan)).toMatch(/^ {4}🪫 \d{2}-\d{2} \d{2}:\d{2} +3714$/u)
 		expect(await row_of(HELD, LOCAL, plan)).not.toMatch(/🪫/u)
 	})
+
+	// joshuafolkken/kit#8015: the hold's cause reaches the row, so an authentication failure is not 🪫.
+	it('draws the authentication-failure mark where the hold the local read carries is one', async () => {
+		const held = { ...LOCAL, usage_reset_ms: START + HOUR_MS, usage_cause: 'auth' as const }
+		const row = await row_of(HELD, held, plan_of([child(HELD)]))
+
+		expect(row).toMatch(/^ {4}🔑 \d{2}-\d{2} \d{2}:\d{2} +3714$/u)
+		expect(row).not.toMatch(/🪫/u)
+	})
 })

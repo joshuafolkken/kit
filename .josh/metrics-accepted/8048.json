@@ -1,0 +1,7 @@
+{
+	"reason": "Exclude the observation ledgers from the q2 search; prettier splits the longer SEARCH_PATHS array onto one entry per line",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 8
+	}
+}

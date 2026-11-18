@@ -260,7 +260,7 @@ The `full` profile adds the packages below to `devDependencies`. The `basic` pro
 | ESLint, TypeScript, `@playwright/test`, Prettier and its three preset plugins (kit's peers) | versions from kit's own development dependencies                                                                |
 | `cspell`, `@types/node`                                                                     | versions from kit's own development dependencies                                                                |
 | `lefthook`                                                                                  | version from kit's own development dependencies; only when Git exists (the only case `lefthook.yml` is written) |
-| `secretlint`, `@secretlint/secretlint-rule-preset-recommend`                                | versions from kit's own development dependencies; see [Secret scanning](#secret-scanning-pre-commit)            |
+| `secretlint`                                                                                | versions from kit's own development dependencies; see [Secret scanning](#secret-scanning-pre-commit)            |
 
 Every generated config has its tool in this list, so `josh init` → `josh gate` passes in a new project with no manual install. These packages live in the project because Prettier, ESLint and the other tools resolve their plugins from it, not through kit. The generated `tsconfig.json` names `"types": ["node"]`. Under `--no-install`, a new project has no lefthook yet; your own install's `prepare` adds the hooks.
 
@@ -342,7 +342,7 @@ The pre-push hook runs one `pnpm install` as a `setup` step before its parallel 
 
 ### Secret scanning (pre-commit)
 
-The pre-commit hook runs [secretlint](https://github.com/secretlint/secretlint) over the staged files, so a credential is caught before it enters git history. `josh init` provisions `.secretlintrc.json` (recommend preset) and the `secretlint` and `@secretlint/secretlint-rule-preset-recommend` devDependencies. The hook runs through [`josh secretlint-scan`](./josh-commands-automation.md#josh-secretlint-scan), which skips with a notice when the binary is absent.
+The pre-commit hook runs [secretlint](https://github.com/secretlint/secretlint) over the staged files, so a credential is caught before it enters git history. `josh init` provisions `.secretlintrc.json` (recommend preset) and the `secretlint` devDependency; secretlint v14 and later carry the recommend preset, so its rule id needs no package of its own. `josh sync` removes the retired `@secretlint/secretlint-rule-preset-recommend` devDependency from an existing project and raises `secretlint` to kit's version with it. The hook runs through [`josh secretlint-scan`](./josh-commands-automation.md#josh-secretlint-scan), which skips with a notice when the binary is absent.
 
 > **Upgrading an existing project:** `josh sync` adds the same config and devDependencies, but the secret scan does **not** run until you run `pnpm install`.
 

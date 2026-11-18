@@ -24,6 +24,7 @@ import { run_board_plan_shared } from './run-board-plan-shared'
 import type { GithubRateLimit } from './run-board-render-quota-github'
 import { run_board_screen, type Screen } from './run-board-screen'
 import { run_board_snapshot } from './run-board-snapshot'
+import { run_board_sound_player } from './run-board-sound-player'
 import { run_board_spin } from './run-board-spin'
 import type { BoardPorts, BoardState } from './run-board-state'
 import { run_board_thanks_read } from './run-board-thanks-read'
@@ -118,15 +119,16 @@ const LIVE_PORTS: Omit<BoardPorts, 'gather'> = {
 	},
 }
 
-// A live board reads on its worker thread, so no read stops its spinner; a single frame has no spinner
-// to stop, and reads where it draws.
+// A live board reads on its worker thread, so no read stops its spinner, and sounds its cues; a single
+// frame has no spinner to stop, reads where it draws, and stays silent.
 function live_ports(is_live: boolean): BoardPorts {
 	const gather = is_live
 		? run_board_gather_thread.worker_gatherer()
 		: run_board_gather.frame_gatherer(run_board_gather_live.ports_of(false))
+	const cue = is_live ? run_board_sound_player.play_cue : undefined
 
 	// Kept off `LIVE_PORTS`, so the profile that spreads them always reads from scratch.
-	return { ...LIVE_PORTS, gather, frames: run_board_frame_store.file_store() }
+	return { ...LIVE_PORTS, gather, cue, frames: run_board_frame_store.file_store() }
 }
 
 // Every frame starts from the top of the alternate screen, erasing what the last one left below it, and
@@ -233,7 +235,7 @@ async function redraw_forever(
 // its first frame a line at a time; one in none draws it whole.
 async function watch(ports: BoardPorts, theme: Theme | undefined): Promise<void> {
 	const screen = run_board_screen.screen_of('live')
-	const keys = run_board_keys.read_keys(ports.keys)
+	const keys = run_board_keys.read_keys(ports.keys, ports.cue)
 	const leave = leaver(ports, screen, keys)
 
 	const reveal: Reveal | undefined =
@@ -248,7 +250,11 @@ async function watch(ports: BoardPorts, theme: Theme | undefined): Promise<void>
 	const gather = run_board_intro.after(ports.gather, run_board_intro.play(ports, keys))
 
 	try {
-		await redraw_forever({ ...ports, gather, folded: keys.folded }, screen, reveal)
+		await redraw_forever(
+			{ ...ports, gather, folded: keys.folded, sound: keys.sound, cue: keys.cue ?? ports.cue },
+			screen,
+			reveal,
+		)
 	} finally {
 		leave()
 	}
@@ -390,6 +396,6 @@ async function run(argv: ReadonlyArray<string>, ports?: BoardPorts): Promise<num
 	return SUCCESS_EXIT_CODE
 }
 
-const run_board_cli = { DISABLED_NOTICE, LIVE_PORTS, USAGE, run }
+const run_board_cli = { DISABLED_NOTICE, LIVE_PORTS, USAGE, live_ports, run }
 
 export { run_board_cli }

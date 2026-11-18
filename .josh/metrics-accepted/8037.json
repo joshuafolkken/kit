@@ -1,0 +1,7 @@
+{
+	"reason": "Two measurement pieces #8037 asks for: the lane records read and the throughput fold measured apart in the hand-run run:board profile tool",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 21
+	}
+}

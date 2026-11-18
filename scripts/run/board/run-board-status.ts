@@ -6,6 +6,7 @@ import type { Span } from '#scripts/lane/lane-spans'
 import { run_event_retry } from '#scripts/run/event/run-event-retry'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
+import { run_merge_usage_limit } from '#scripts/run/merge/run-merge-usage-limit'
 import { run_board_closed, type ClosedIssue, type ListingRead } from './run-board-closed'
 import { run_board_ending_reason } from './run-board-ending-reason'
 import { run_board_ending_states } from './run-board-ending-states'
@@ -183,9 +184,20 @@ function advanced(previous: ItemStatus | undefined, event: RunEvent): ItemStatus
 	return attempt === undefined ? phased(previous, event) : replayed(previous, attempt, event)
 }
 
+// A child handed back to the queue waits for its next launch: a retry, a child released on an
+// authentication failure, and one a person re-added once it left the lanes — a re-add of a running child
+// leaves it running, and one the stream never launched draws no row. Waiting, it takes no lane ending
+// from before its next launch (joshuafolkken/kit#8028).
+function is_requeue(previous: ItemStatus | undefined, event: RunEvent): boolean {
+	if (run_event_retry.is_retry(event)) return true
+	if (event.kind === KIND.USAGE_LIMIT) return run_merge_usage_limit.cause_of(event) === 'auth'
+
+	return event.kind === KIND.ADD && previous !== undefined && previous.state !== 'running'
+}
+
 // One event folded into the status of the child it names; an event the board does not track keeps it.
 function next_status(previous: ItemStatus | undefined, event: RunEvent): ItemStatus | undefined {
-	if (run_event_retry.is_retry(event)) return settled_as(previous, 'waiting')
+	if (is_requeue(previous, event)) return settled_as(previous, 'waiting')
 	if (LAUNCH_KINDS.has(event.kind)) return launched(previous, event)
 
 	const ending = run_board_ending_states.STATES[event.kind]

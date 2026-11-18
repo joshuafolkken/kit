@@ -1,0 +1,7 @@
+{
+	"reason": "secretlint v14 migration: josh sync must drop the retired preset package and raise the CLI together for existing consumers",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 17
+	}
+}
