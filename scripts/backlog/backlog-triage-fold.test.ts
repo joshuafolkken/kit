@@ -147,6 +147,13 @@ describe('backlog:triage --adopt — a folding option', () => {
 		expect(console.error).toHaveBeenCalledWith(expect.stringContaining('no "--into #<M>"'))
 	})
 
+	it('refuses a fold option whose --into names the parked Issue itself, writing nothing', async () => {
+		await expect(adopt(`親（lane:fold ${ISSUE} --into #${ISSUE}）`)).resolves.toBe(1)
+
+		expect(order).toStrictEqual([])
+		expect(console.error).toHaveBeenCalledWith(expect.stringContaining('into itself'))
+	})
+
 	it('folds a re-park on an unchanged tree instead of holding it (ac-e723514b)', async () => {
 		await expect(
 			adopt_with(loop_comments(`親（lane:fold ${ISSUE} --into #${INTO}）`)),

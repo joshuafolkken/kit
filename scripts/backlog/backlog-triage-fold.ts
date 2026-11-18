@@ -9,6 +9,8 @@ import { run_park_body } from '#scripts/run/park/run-park-body'
 
 const NO_INTO =
 	'names lane:fold with no "--into #<M>"; the park must name the Issue to ship in — nothing was written and the child stays parked'
+const SELF_INTO =
+	'folds the Issue into itself; the park must name another Issue to ship in — nothing was written and the child stays parked'
 
 type FoldResult = { next: string } | { problem: string }
 
@@ -18,12 +20,16 @@ interface FoldRequest {
 	reason: string
 }
 
-// Why option `option` cannot be adopted as a fold: one naming `lane:fold` with no `--into #M`.
-function problem_of(body: string, option: number): string | undefined {
-	const is_unnamed =
-		run_park_body.fold_action(body, option) && run_park_body.fold_target(body, option) === undefined
+// Why option `option` of `issue`'s park cannot be adopted as a fold: one naming `lane:fold` with no
+// `--into #M`, or one folding the Issue into itself, which would withdraw its lane and block it on itself.
+function problem_of(body: string, option: number, issue: string): string | undefined {
+	if (!run_park_body.fold_action(body, option)) return undefined
+	const into = run_park_body.fold_target(body, option)
 
-	return is_unnamed ? `option ${String(option)} ${NO_INTO}` : undefined
+	if (into === undefined) return `option ${String(option)} ${NO_INTO}`
+	if (into === issue) return `option ${String(option)} ${SELF_INTO}`
+
+	return undefined
 }
 
 // The fold, then what the run did next, or the problem naming the command that finishes it.

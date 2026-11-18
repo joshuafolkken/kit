@@ -143,7 +143,7 @@ function body_problem(body: string, request: AdoptRequest): string | undefined {
 	return (
 		run_park_body.adopt_problem(body, request.option) ??
 		action_problem(body, request) ??
-		backlog_triage_fold.problem_of(body, request.option)
+		backlog_triage_fold.problem_of(body, request.option, request.issue)
 	)
 }
 
