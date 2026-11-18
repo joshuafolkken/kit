@@ -2,6 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
+import { review_finding_kind, type KindCount, type KindReport } from './review-finding-kind'
 import {
 	review_finding_ledger,
 	type CategoryCount,
@@ -13,6 +14,7 @@ import {
 // zero findings — the denominator that tells a genuinely quiet category apart from one nobody looked
 // at. `--period` narrows both to the last `<days>` and splits each category by severity, since an
 // all-time count dominated by low findings hides what starts a fix round (joshuafolkken/kit#7130).
+// Both end with the findings by kind, when any finding in the window was recorded.
 // The write half is `pnpm josh review:record`; both read one grammar from `review-finding-ledger`.
 
 const NO_FINDINGS = 'no review findings recorded yet'
@@ -73,18 +75,42 @@ function since_of(days: number, now_ms: number): string {
 	return observation_ledger_home.ledger_date(new Date(Math.max(now_ms - days * MS_PER_DAY, 0)))
 }
 
-function report_of(content: string, days: number, now_ms: number): string {
-	if (days === ALL_TIME) {
-		return format_report(
-			review_finding_ledger.category_counts(content),
-			review_finding_ledger.zero_round_count(content),
-		)
+function kind_line(entry: KindCount): string {
+	return `  ${entry.kind}: ${String(entry.count)}`
+}
+
+// The kind split under the same window, with the share of findings that carry one — empty when the
+// window has no real finding (joshuafolkken/kit#7886).
+function format_kinds(report: KindReport): string {
+	if (report.total === 0) return ''
+
+	const share = `${String(report.with_kind)} of ${String(report.total)} findings carry a kind`
+
+	return [`findings by kind (${share}):`, ...report.counts.map((entry) => kind_line(entry))].join(
+		'\n',
+	)
+}
+
+function base_report(content: string, since: string): string {
+	const zero_rounds = review_finding_ledger.zero_round_count(content, since)
+
+	if (since === '') {
+		return format_report(review_finding_ledger.category_counts(content), zero_rounds)
 	}
 
-	const since = since_of(days, now_ms)
-	const counts = review_finding_ledger.severity_counts(content, since)
+	return format_period_report(
+		review_finding_ledger.severity_counts(content, since),
+		zero_rounds,
+		since,
+	)
+}
 
-	return format_period_report(counts, review_finding_ledger.zero_round_count(content, since), since)
+function report_of(content: string, days: number, now_ms: number): string {
+	const since = days === ALL_TIME ? '' : since_of(days, now_ms)
+	const kinds = format_kinds(review_finding_kind.kind_report(content, since))
+	const base = base_report(content, since)
+
+	return kinds === '' ? base : `${base}\n${kinds}`
 }
 
 // Every issue's file of the ledger directory is counted: a recurring category
