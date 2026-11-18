@@ -4,7 +4,7 @@ import { run_board_fixture } from './run-board-fixture'
 import { run_board_frame_store, type FrameStore } from './run-board-frame-store'
 import type { BoardPorts } from './run-board-state'
 
-const { LOCAL, harness, plan_titled } = run_board_fixture
+const { LOCAL, START, STOPPED, WORDS, harness, plan_titled } = run_board_fixture
 const { CHAT_KEY, FRESH_MS, memory_store, once_key } = run_board_frame_store
 const RECORDED = 'recorded board\n'
 const AGE_SECONDS = 12
@@ -107,6 +107,89 @@ describe('run_board_cli.run --fresh and the record date', () => {
 
 		expect(made.clock.now_ms).toBeGreaterThan(began_ms)
 		expect(store.load(flag === '--chat' ? CHAT_KEY : PIPED_ONCE)?.saved_ms).toBe(began_ms)
+	})
+})
+
+// joshuafolkken/kit#7938: a live board records the frames `--chat` and `--once` answer from, drawn
+// from what it already read.
+const ESCAPE = '\u{1B}'
+const HOME = `${ESCAPE}[H${ESCAPE}[J`
+const LIVE_MS = 11_000
+const TERMINAL_ONCE = once_key(undefined, true)
+
+// A live board run for `LIVE_MS`, its saves counted, its writes kept.
+async function watched(store: FrameStore): Promise<{
+	made: ReturnType<typeof harness>
+	saves: Array<string>
+	writes: Array<string>
+}> {
+	const made = harness({ ...LOCAL, events: [LAUNCH] }, [plan_titled('a')])
+	const saves: Array<string> = []
+	const writes: Array<string> = []
+	const counted: FrameStore = {
+		load: store.load,
+		save: (key, frame) => {
+			saves.push(key)
+			store.save(key, frame)
+		},
+	}
+	const live: BoardPorts = {
+		...made.ports,
+		frames: counted,
+		sleep: async (ms) => {
+			if (made.clock.now_ms >= START + LIVE_MS) throw STOPPED
+			made.clock.now_ms += ms
+		},
+		write: (text) => {
+			writes.push(text)
+		},
+	}
+
+	await expect(run_board_cli.run([], live)).rejects.toBe(STOPPED)
+
+	return { made, saves, writes }
+}
+
+describe('run_board_cli.run live board record', () => {
+	it('records both frames once every five seconds, reading nothing more for them', async () => {
+		const { made, saves, writes } = await watched(memory_store())
+		const frames = writes.filter((text) => text.startsWith(HOME))
+
+		expect(saves).toStrictEqual([
+			CHAT_KEY,
+			TERMINAL_ONCE,
+			CHAT_KEY,
+			TERMINAL_ONCE,
+			CHAT_KEY,
+			TERMINAL_ONCE,
+		])
+		expect(made.read_machine).toHaveBeenCalledTimes(frames.length)
+		expect(made.read_local).toHaveBeenCalledOnce()
+	})
+
+	it('records a chat frame with no escape and a once frame that ends on no footer', async () => {
+		const store = memory_store()
+
+		await watched(store)
+
+		expect(store.load(CHAT_KEY)?.text).toContain('#1')
+		expect(store.load(CHAT_KEY)?.text).not.toContain(ESCAPE)
+		expect(store.load(TERMINAL_ONCE)?.text).not.toContain(HOME)
+		expect(store.load(TERMINAL_ONCE)?.text).not.toContain(WORDS.keeps_running)
+	})
+
+	it('answers --chat from the live board record, reading nothing', async () => {
+		const store = memory_store()
+		const { made } = await watched(store)
+		const recorded = store.load(CHAT_KEY)
+		const chat = board(store)
+
+		chat.clock.now_ms = made.clock.now_ms
+		await run_board_cli.run(['--chat'], chat.ports)
+
+		expect(recorded?.text).toBeDefined()
+		expect(chat.frames).toStrictEqual([`${String(recorded?.text)}recorded 1s ago\n`])
+		expect(chat.read_local).not.toHaveBeenCalled()
 	})
 })
 

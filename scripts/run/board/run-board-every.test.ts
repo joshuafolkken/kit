@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_cli } from './run-board-cli'
 import { run_board_fixture } from './run-board-fixture'
+import { run_board_frame_store } from './run-board-frame-store'
 import type { LocalRead } from './run-board-read'
 
 // joshuafolkken/kit#3569: `run:board --every <minutes>` pushes the chat frame off-screen each interval,
@@ -64,6 +65,27 @@ describe('run_board_cli.run --every', () => {
 
 		expect(pushes).toHaveLength(0)
 		expect(stderr).toHaveBeenCalledWith(`${run_board_cli.DISABLED_NOTICE}\n`)
+	})
+})
+
+// joshuafolkken/kit#7938: each pushed frame is the record `--chat` answers from, with no report marked.
+describe('run_board_cli.run --every record', () => {
+	it('records the last pushed frame under the chat key, dated when its read began', async () => {
+		const { ports, pushes, marks, clock, read_local } = harness(LOCAL, PLANS)
+		const store = run_board_frame_store.memory_store()
+		const sleep = vi.fn(async (ms: number) => {
+			clock.now_ms += ms
+		})
+
+		read_local.mockImplementation(ending_after(1))
+		await run_board_cli.run(['--every', '5'], { ...ports, sleep, frames: store })
+
+		expect(pushes).toHaveLength(2)
+		expect(store.load(run_board_frame_store.CHAT_KEY)).toStrictEqual({
+			text: pushes[1],
+			saved_ms: START + FIVE_MINUTES_MS,
+		})
+		expect(marks).toHaveLength(0)
 	})
 })
 

@@ -1,14 +1,23 @@
 import { stripVTControlCharacters } from 'node:util'
 import { poll } from '#scripts/lib/poll'
+import { MS_PER_SECOND } from '#scripts/lib/timeouts'
+import { run_board_frame_store } from './run-board-frame-store'
 import type { LocalRead } from './run-board-read'
-import type { BoardPorts } from './run-board-state'
+import type { BoardPorts, BoardState } from './run-board-state'
+import { run_board_theme, type Theme } from './run-board-theme'
 import { run_board_tick } from './run-board-tick'
+import { run_board_tick_draw } from './run-board-tick-draw'
 
 // The chat frame `run:board --chat` answers with, and `--every <minutes>`, which pushes that same frame
 // off-screen on a schedule with no model in between. The frame needs no model, so a plain background
 // process sends it and ends with the run, rather than a scheduled session re-reading its whole context.
+// The live board and `--every` record the frames they hold, so `--chat` and `--once` answer from them.
 
-const { FRESH_STATE, tick } = run_board_tick
+const { FRESH_STATE, layout_for, tick } = run_board_tick
+const { draw_run } = run_board_tick_draw
+const { CHAT_KEY, once_key } = run_board_frame_store
+const RECORD_EVERY_SECONDS = 5
+const RECORD_EVERY_MS = RECORD_EVERY_SECONDS * MS_PER_SECOND
 
 interface ChatFrame {
 	text: string
@@ -43,7 +52,9 @@ interface Followed {
 // Pushes one frame, answering whether the run is still going: no run sends nothing, and an ended run's
 // frame is the last one sent. A frame drawing another run than the first — an older run's end screen
 // once a single run's hold is released — sends nothing and ends the pushes too.
+// The pushed frame is recorded, dated when its read began, as `--chat` records its own.
 async function push_one(ports: BoardPorts, followed: Followed): Promise<boolean> {
+	const saved_ms = ports.now()
 	const { text, local } = await chat_frame(ports)
 
 	if (local === undefined) return false
@@ -53,6 +64,7 @@ async function push_one(ports: BoardPorts, followed: Followed): Promise<boolean>
 	if (local.started_ms !== followed.started_ms) return false
 
 	await ports.push(text)
+	ports.frames?.save(CHAT_KEY, { text, saved_ms })
 
 	return local.ended_ms === undefined
 }
@@ -67,6 +79,61 @@ async function push_until_ended(ports: BoardPorts, interval_ms: number): Promise
 	})
 }
 
-const run_board_every = { chat_frame, push_until_ended }
+// The text of the run a live board already read, drawn in the ports' form as a single frame is: nothing
+// read, sounded or typed, and nothing fitted to the terminal.
+function redrawn(state: BoardState, local: LocalRead, ports: BoardPorts, now_ms: number): string {
+	let text = ''
+	const quiet: BoardPorts = {
+		...ports,
+		is_tty: false,
+		size: undefined,
+		footer: undefined,
+		folded: undefined,
+		cue: undefined,
+		types_rows: false,
+		write: (frame) => {
+			text += frame
+		},
+	}
+
+	draw_run(state, local, { ports: quiet, now_ms }, layout_for(state, local, now_ms))
+
+	return text
+}
+
+// Records the chat's frame and the single frame `--once` draws on this terminal in the theme, both
+// from the live board's last state; the chat thanks nobody.
+function record(
+	state: BoardState,
+	ports: BoardPorts,
+	theme: Theme | undefined,
+	now_ms: number,
+): void {
+	const { local } = state
+
+	if (local === undefined) return
+	const chat = redrawn({ ...state, thanks: [] }, local, { ...ports, form: 'chat' }, now_ms)
+	const once = run_board_theme.restyle(theme, redrawn(state, local, ports, now_ms))
+
+	ports.frames?.save(CHAT_KEY, { text: stripVTControlCharacters(chat), saved_ms: now_ms })
+	ports.frames?.save(once_key(theme, ports.is_tty), { text: once, saved_ms: now_ms })
+}
+
+// What a live board calls after each redraw: records its frames at most once every
+// `RECORD_EVERY_MS`. Drawn and saved in place, they take no read, so the redraw on the second is
+// never held up waiting on one.
+function recorder(ports: BoardPorts, theme: Theme | undefined): (state: BoardState) => void {
+	let next_ms = -Infinity
+
+	return (state) => {
+		const now_ms = ports.now()
+
+		if (ports.frames === undefined || now_ms < next_ms) return
+		next_ms = now_ms + RECORD_EVERY_MS
+		record(state, ports, theme, now_ms)
+	}
+}
+
+const run_board_every = { chat_frame, push_until_ended, recorder }
 
 export { run_board_every }

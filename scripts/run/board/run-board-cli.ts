@@ -205,11 +205,13 @@ function ticker(
 }
 
 // A frame on the second, its spinners turned until the next: the turns are
-// written past the frame's own control bytes, each to its spot on the screen the frame drew.
+// written past the frame's own control bytes, each to its spot on the screen the frame drew. Each
+// state is handed to `record`, which keeps the frames `--chat` and `--once` answer from.
 async function redraw_forever(
 	ports: BoardPorts,
 	screen: Screen,
 	reveal: Reveal | undefined,
+	record: (state: BoardState) => void,
 ): Promise<void> {
 	const step = ticker(ports, screen, reveal)
 	let state = FRESH_STATE
@@ -218,6 +220,7 @@ async function redraw_forever(
 		async () => {
 			// eslint-disable-next-line require-atomic-updates -- poll awaits each callback before starting the next tick
 			state = await step(state)
+			record(state)
 		},
 		{
 			interval_ms: run_board_spin.REDRAW_MS,
@@ -253,6 +256,7 @@ async function watch(ports: BoardPorts, theme: Theme | undefined): Promise<void>
 			},
 			screen,
 			reveal,
+			run_board_every.recorder(ports, theme),
 		)
 	} finally {
 		leave()
