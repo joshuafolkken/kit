@@ -227,6 +227,15 @@ Under its `yield → redispatch` row, four rows split each yield by where its wa
 
 A part nothing ended is counted as not ended, and the parts after it are absent.
 
+The `catch rate` table (`lane-catch-rate-stats.ts`, joshuafolkken/kit#7875) has one row per round 2 `required` code, gate check and ship preflight kind:
+
+- runs, catches (non-empty `findings`, a failed check, an unmet kind) and rate %
+- minutes: gate checks only; round 2 and the preflight record no time
+- reused and unmoved checks are left out of the runs
+- a round 2 with no recorded `findings` counts under `no outcome`, outside the rate
+
+`candidates:` lists the rows at or below a 5% rate over at least 20 runs. It only lists: each candidate is retired, sampled or moved to a lighter path in its own Issue.
+
 ## `josh lane:net` in detail
 
 Each wait runs from the park, outage or usage-limit stop to the issue's next ship stage, re-dispatch or next of the two — the wait `josh lane:stats` derives for a stop — and a wait nothing ended stops at the merge. A ship stop's wait stays in: the relaunched child spends it on the fix. The minutes are the whole number an Issue's `- 原因のレーン: <分> 分（#<N>）` line declares (`prompts/collaboration-workflow/issue-template.md`). A usage-limit stop is read off its `usage-limit` event on the run's stream (joshuafolkken/kit#4745), as an outage is. The host's sleep is taken out of every lane it falls in, whatever the issue (joshuafolkken/kit#5032): `backlog:drive`'s load sampler records a `sleep` event when the gap between its once-a-minute ticks exceeds three intervals, spanning from the tick that was due to the late one (`lane-sleep.ts`). A network outage is taken out the same way (joshuafolkken/kit#7867): each tick probes reachability and records `offline` while it fails and `online` when it answers again, and an outage ends at its recovery or one tick past its last `offline`, so a drive that stopped mid-outage never stretches it over later lanes (`lane-offline.ts`, `lane-offline-spans.ts`); the sleeps and outages are joined as host stops (`lane-host-gaps.ts`). A yield — `lane:plan` gave the seat back — waits from the child's yield note until the issue's next dispatch, no seat held, and is taken out too (joshuafolkken/kit#5216); the note, not the withdrawal `run:merge` closes the lane with, starts it, since that withdrawal can be missing (joshuafolkken/kit#5755); `josh lane:stats` times it as its `yield → redispatch` gap. Overlapping waits — a park the host slept through, or an outage and a park — are joined and taken out once. The ship's followup — each `followup start` ship stage to the issue's next ship stage or the merge — is the driver's CI, CodeRabbit and merge wait, no seat held, and is joined with the waits and taken out too (joshuafolkken/kit#6541); `lane:breakdown` shows it as the `driver followup` line, apart from the waits.
