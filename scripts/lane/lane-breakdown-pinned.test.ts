@@ -126,6 +126,15 @@ describe('lane_breakdown_pinned.detail_text on rows that split the probed hunks'
 	})
 })
 
+// joshuafolkken/kit#7809: an older row, with no cut, names none (the cases above).
+describe('lane_breakdown_pinned.detail_text on a row that stopped at the first unpinned hunk', () => {
+	it('counts the hunks the stop never probed', () => {
+		expect(lane_breakdown_pinned.detail_text([{ ...row(INSIDE), cut: 5 }])).toBe(
+			' (test:pinned 9 hunks, 2 cached, 2 probed, 5 cut, scripts/b.ts 2.0 min, scripts/a.ts 3 test files 1.0 min)',
+		)
+	})
+})
+
 // joshuafolkken/kit#7806: an older row, with no miss counts, names none (the cases above).
 describe('lane_breakdown_pinned.detail_text on rows that counted the cache misses', () => {
 	it('names the probed hunks by why the cache missed them, summed over the rows, a missing entry as `no entry`', () => {

@@ -21,6 +21,7 @@ const TOKEN_KEY_LENGTH = 16
 const SITE_KEY_LENGTH = 16
 const NOT_RUN_NOTE = '`josh test:pinned` could not run, so nothing was checked: '
 const FIRST_UNPINNED_FLAG = '--first-unpinned'
+const REASONED_FLAG = '--reasoned'
 const LIST_PREFIX = 'josh-test-pinned-list-'
 const LIST_SUFFIX = '.log'
 const LIST_HEADER = 'josh test:pinned — every unpinned and unchecked place'
@@ -199,6 +200,8 @@ function clear(token: string, root: string = PROJECT_ROOT): void {
 // rest say. Under a reason every hunk is probed, since a reason accepts the list as the whole answer.
 // `origin` names the launcher on the run's ledger row (joshuafolkken/kit#5262). `is_whole` probes every
 // hunk with no reason: the background probe that goes on past a cut check's stop (joshuafolkken/kit#5327).
+// A reason's launch carries `--reasoned`, so its ledger row tells it from an `is_whole` one
+// (joshuafolkken/kit#7809).
 function launch_argv(
 	token: string,
 	reason: string | undefined,
@@ -206,8 +209,9 @@ function launch_argv(
 	is_whole = false,
 ): Array<string> {
 	const cut = reason === undefined && !is_whole ? [FIRST_UNPINNED_FLAG] : []
+	const reasoned = reason === undefined ? [] : [REASONED_FLAG]
 
-	return ['test:pinned', ...cut, '--origin', origin, '--record', token]
+	return ['test:pinned', ...cut, ...reasoned, '--origin', origin, '--record', token]
 }
 
 const test_pinned_record = {
