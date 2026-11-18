@@ -8,6 +8,7 @@ import { since_green, type FallbackReason } from '#scripts/gate/since-green'
 import { file_map_stamp } from '#scripts/josh/file-map-stamp'
 import { review_stamps } from '#scripts/review/review-stamps'
 import type { RunInput } from './test-related-record'
+import { test_related_reuse } from './test-related-reuse'
 import { related_scope, type RelatedScope } from './test-related-scope'
 import { vitest_failure_summary } from './vitest-failure-summary'
 
@@ -41,13 +42,15 @@ interface RelatedInput extends RunInput {
 }
 
 // `before` is `undefined` when the run could vouch for no tree — arguments narrowed it, or vitest never
-// ran — and the record is then left as it is.
+// ran — and the record is then left as it is. `passed`: the test files the run proved, from `root`.
 interface RedRun {
 	before: GateTree | undefined
 	scope: RelatedScope
 	first_exit: number
 	started_ms: number
 	owed: ReadonlyArray<string>
+	root: string
+	passed: ReadonlyArray<string>
 }
 
 function marked(blobs: Record<string, string>, mark: string): Array<string> {
@@ -140,11 +143,15 @@ function failed_of(scope: RelatedScope, started_ms: number): ReadonlyArray<strin
 	return is_accounted(output, failed) ? failed : []
 }
 
+// The passed files' input digests sit beside the marks, which override them; no digest equals a mark,
+// so `marked` reads the marks alone (joshuafolkken/kit#7966).
 function blobs_of(
 	failed: ReadonlyArray<string>,
 	owed: ReadonlyArray<string>,
+	passed: Readonly<Record<string, string>>,
 ): Record<string, string> {
 	const entries: Array<[string, string]> = [
+		...Object.entries(passed),
 		...owed.map((file): [string, string] => [file, OWED_MARK]),
 		...failed.map((file): [string, string] => [file, FAILED_MARK]),
 	]
@@ -160,13 +167,15 @@ function clear(): void {
 	}
 }
 
-function write(before: GateTree, failed: ReadonlyArray<string>, owed: ReadonlyArray<string>): void {
+async function write(before: GateTree, failed: ReadonlyArray<string>, run: RedRun): Promise<void> {
+	const passed = await test_related_reuse.blobs(run.root, run.passed)
+
 	try {
 		review_stamps.test_related_red_stamp.write(
 			before.files,
 			undefined,
 			before.base,
-			blobs_of(failed, owed),
+			blobs_of(failed, run.owed, passed),
 		)
 	} catch {
 		clear()
@@ -187,7 +196,7 @@ async function record_red(run: RedRun): Promise<void> {
 	const is_vouched =
 		failed.length > 0 && scoped_green.is_unmoved(before, await gate_tree.read_gate_tree())
 
-	if (is_vouched) write(before, failed, run.owed)
+	if (is_vouched) await write(before, failed, run)
 	else clear()
 }
 

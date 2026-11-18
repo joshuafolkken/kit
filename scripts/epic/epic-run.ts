@@ -17,6 +17,7 @@ interface CreateEpicInput {
 	rationale: string
 	is_ordered: boolean
 	chains?: EpicBodyInput['chains']
+	order_reasons?: EpicBodyInput['order_reasons']
 	origin?: string | undefined
 }
 
@@ -116,6 +117,7 @@ interface PromoteEpicInput {
 	rationale: string
 	is_ordered: boolean
 	chains?: EpicBodyInput['chains']
+	order_reasons?: EpicBodyInput['order_reasons']
 	origin?: string | undefined
 	title?: string | undefined
 }

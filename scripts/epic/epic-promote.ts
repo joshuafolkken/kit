@@ -10,6 +10,7 @@ interface PromoteInput {
 	rationale: string
 	is_ordered: boolean
 	chains?: EpicBodyInput['chains']
+	order_reasons?: EpicBodyInput['order_reasons']
 	epic_number: number
 	origin?: string | undefined
 }
@@ -49,6 +50,7 @@ function build_promoted_body(input: PromoteInput): string {
 		rationale: input.rationale,
 		is_ordered: input.is_ordered,
 		chains: input.chains,
+		order_reasons: input.order_reasons,
 		origin: input.origin,
 		epic_number: input.epic_number,
 	})
