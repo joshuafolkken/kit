@@ -11,6 +11,10 @@ import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 
 const KIND = run_event_stream.EVENT_KIND.USAGE_LIMIT
 const RESUMES_AT = /resumes at (\S+)$/u
+// The limit name an authentication failure's stop carries (`run-merge-auth.ts`).
+const AUTH_LIMIT = 'authentication failure'
+
+type HoldCause = 'auth' | 'limit'
 
 function stop_text(child: string, reset_ms: number, limit: string): string {
 	return `${issue_cite.plain_for('program', child)} ${limit} — resumes at ${new Date(reset_ms).toISOString()}`
@@ -37,15 +41,17 @@ function resume_ms(events: ReadonlyArray<RunEvent>): number | undefined {
 	return newest === undefined ? undefined : time_of(newest.text)
 }
 
+// The stops whose reset is still ahead at `now_ms`.
+function ahead_of(events: ReadonlyArray<RunEvent>, now_ms: number): Array<RunEvent> {
+	return events.filter((event) => event.kind === KIND && (time_of(event.text) ?? 0) > now_ms)
+}
+
 // The reset a usage limit still holds launches until at `now_ms`, or `undefined` once it has passed —
 // what `run:board` names a waiting row's hold by (joshuafolkken/kit#4796). The latest reset still ahead
 // wins, not the newest stop: a GitHub rate limit's reset is another account's, and an earlier one
 // recorded after a Claude limit must not end that limit's hold (joshuafolkken/kit#6502).
 function held_until(events: ReadonlyArray<RunEvent>, now_ms: number): number | undefined {
-	const ahead = events
-		.filter((event) => event.kind === KIND)
-		.map((event) => time_of(event.text) ?? 0)
-		.filter((reset_ms) => reset_ms > now_ms)
+	const ahead = ahead_of(events, now_ms).map((event) => time_of(event.text) ?? 0)
 
 	return ahead.length === 0 ? undefined : Math.max(...ahead)
 }
@@ -53,7 +59,21 @@ function held_until(events: ReadonlyArray<RunEvent>, now_ms: number): number | u
 // How many children a usage limit stopped whose reset is still ahead at `now_ms` — the children the
 // `⛽ usage` section counts as parked behind it (joshuafolkken/kit#5395).
 function held_count(events: ReadonlyArray<RunEvent>, now_ms: number): number {
-	return events.filter((event) => event.kind === KIND && (time_of(event.text) ?? 0) > now_ms).length
+	return ahead_of(events, now_ms).length
+}
+
+// What a stop holds launches for: a session that could not authenticate (`run-merge-auth.ts`) or a
+// limit — the kind stays one, so the stop's limit name tells them apart (joshuafolkken/kit#8012).
+function cause_of(event: RunEvent): HoldCause {
+	return event.text.includes(AUTH_LIMIT) ? 'auth' : 'limit'
+}
+
+// The cause of the hold that resumes last at `now_ms`, or `undefined` when none is ahead.
+function held_cause(events: ReadonlyArray<RunEvent>, now_ms: number): HoldCause | undefined {
+	const until = held_until(events, now_ms)
+	const latest = ahead_of(events, now_ms).findLast((event) => time_of(event.text) === until)
+
+	return latest === undefined ? undefined : cause_of(latest)
 }
 
 // Whether a usage limit still holds launches at `now_ms` — the production `usage_limited` port.
@@ -61,6 +81,16 @@ async function is_held(now_ms: number): Promise<boolean> {
 	return held_until(await run_event_stream_emit.current_events(), now_ms) !== undefined
 }
 
-const run_merge_usage_limit = { held_count, held_until, is_held, record, resume_ms }
+const run_merge_usage_limit = {
+	AUTH_LIMIT,
+	cause_of,
+	held_cause,
+	held_count,
+	held_until,
+	is_held,
+	record,
+	resume_ms,
+}
 
 export { run_merge_usage_limit }
+export type { HoldCause }

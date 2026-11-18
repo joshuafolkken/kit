@@ -160,6 +160,45 @@ describe('run_merge_usage_limit.held_count', () => {
 	})
 })
 
+// joshuafolkken/kit#8012: an authentication failure's hold shares the kind, told apart by its limit name.
+describe('run_merge_usage_limit.cause_of', () => {
+	it('tells an authentication failure from a usage limit and a GitHub rate limit', () => {
+		const auth = event(1, `#1 authentication failure — resumes at ${RESET_ISO}`)
+		const usage = event(2, `#2 usage limit — resumes at ${RESET_ISO}`)
+		const github = event(3, `#3 GitHub rate limit — resumes at ${RESET_ISO}`)
+
+		expect(run_merge_usage_limit.cause_of(auth as never)).toBe('auth')
+		expect(run_merge_usage_limit.cause_of(usage as never)).toBe('limit')
+		expect(run_merge_usage_limit.cause_of(github as never)).toBe('limit')
+	})
+})
+
+describe('run_merge_usage_limit.held_cause', () => {
+	const LATER_ISO = '2026-10-24T02:00:00.000Z'
+	const auth = event(1, `#1 authentication failure — resumes at ${RESET_ISO}`)
+	const usage = event(2, `#2 usage limit — resumes at ${LATER_ISO}`)
+
+	it('names the cause of the only hold ahead', () => {
+		expect(run_merge_usage_limit.held_cause([auth] as never, STOPPED_MS)).toBe('auth')
+		expect(run_merge_usage_limit.held_cause([usage] as never, STOPPED_MS)).toBe('limit')
+	})
+
+	it('names the cause of the hold that resumes last, in either order', () => {
+		const later_auth = event(3, `#3 authentication failure — resumes at ${LATER_ISO}`)
+		const earlier_usage = event(4, `#4 usage limit — resumes at ${RESET_ISO}`)
+
+		expect(run_merge_usage_limit.held_cause([usage, auth] as never, STOPPED_MS)).toBe('limit')
+		expect(run_merge_usage_limit.held_cause([later_auth, earlier_usage] as never, STOPPED_MS)).toBe(
+			'auth',
+		)
+	})
+
+	it('skips a hold that has passed, and names none once all have', () => {
+		expect(run_merge_usage_limit.held_cause([usage, auth] as never, RESET_MS)).toBe('limit')
+		expect(run_merge_usage_limit.held_cause([auth] as never, RESET_MS)).toBeUndefined()
+	})
+})
+
 describe('run_merge_usage_limit.is_held', () => {
 	beforeEach(() => {
 		events_mock.mockResolvedValue([event(1, `#1 usage limit — resumes at ${RESET_ISO}`)])
