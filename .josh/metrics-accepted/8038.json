@@ -1,0 +1,7 @@
+{
+	"reason": "New board-side lane-record cache module (run-board-records.ts) that skips re-reading unchanged records each tick, per #8038's plan",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 49
+	}
+}

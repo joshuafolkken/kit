@@ -883,7 +883,7 @@ pnpm josh auto-ok:next --exclude 906   # skip the issue just merged
 
 <!-- /usage -->
 
-Read-only. Uses **Ranking** below: priority, resumable work, verification-path defects, then blockers.
+Read-only. Uses **Ranking** below: priority, verification-path defects, defects, resumable work, then blockers.
 Ties use creation time ascending, then number ascending. Skips `epic`, `in-progress`, `needs-decision` and candidates whose `blockedBy` is open or whose `- 実施可能日:` (`YYYY-MM-DDTHH:MMZ`) has not arrived,
 or whose `- 実施可能条件: #<PR> のマージ後 <K> マージ` (or `#<issue> を閉じる PR のマージ後 <K> マージ`) is not yet met; `backlog:next` prints `#N not before <time>`, or for the condition `until #<PR> merges`, `<n>/<K> merges after #<PR>` or `until the merge of #<PR> is read` — `the pull request closing #<issue>` in place of `#<PR>` for the issue form.
 
@@ -941,9 +941,9 @@ Read-only, except for the mechanical triage of the triage gate below. stdout is 
 
 Any other untriaged candidate is held alone, named on stderr. The triaged candidates pass the `run:solo` gate without it and print as usual, then a trailing `triage` line asks for the judgment; with none of them left to offer, it prints `triage` alone. A judgment recording `run:solo` stops the next offer by that gate.
 
-**Defect priority**: defects always go to the front of the runnable numbers among ranking ties. New mechanisms go to the back only while the defect rate is above its baseline.
+**Mechanism deferral**: new mechanisms go to the back among ranking ties only while the defect rate is above its baseline. Defects lead by a ranking key below.
 
-**Ranking**: `- 実施順: 最後` goes last; otherwise `priority:critical`, `priority:high`, resumable work (owned stash, pause comment or linked open PR), verification-path defect, lost minutes, transitive dependents, estimated lines (smallest first, undeclared last), then weekly gain (`## 期待効果`). Standalone numbers are cut to five.
+**Ranking**: `- 実施順: 最後` goes last; otherwise `priority:critical`, `priority:high`, verification-path defect, defect, resumable work (stash, pause comment or open PR), lost minutes, transitive dependents, estimated lines (smallest first, undeclared last), then weekly gain (`## 期待効果`). Standalone numbers are cut to five.
 Lost minutes sum `- 原因の損失:` lines, falling back to `- 原因のレーン:`.
 
 **`run:solo` gate**: a `run:solo` issue runs alone — `wait` while it or other lanes run, and a `run:solo` candidate further down cuts the list.

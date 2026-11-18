@@ -171,9 +171,9 @@ async function resolve(context: PoolContext): Promise<EpicNextResult | undefined
 
 	const children = reads.flatMap((read) => read.snapshot.children)
 	const untrusted = await auto_ok_author.untrusted_child_keys(children, context.repo)
-	// The defect priority and the ranking keys are applied here rather than when printing, so
-	// `backlog:plan` shows the order the run takes. The
-	// ranking goes last: its sort is stable, so the defect order survives as its final key.
+	// The new-mechanism deferral and the ranking keys are applied here rather than when printing, so
+	// `backlog:plan` shows the order the run takes. A defect goes first by a ranking key; the
+	// ranking goes last: its sort is stable, so the deferral survives as its final key.
 	const ordered = await backlog_defect_priority.prioritize(
 		combine(views_from(reads, context, untrusted), context, untrusted),
 		context.repo,
