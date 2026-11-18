@@ -17,6 +17,7 @@ import { review_stamps } from '#scripts/review/review-stamps'
 import { eslint_daemon_calls } from './eslint-daemon-calls'
 import { lint_parallel, type LintRunTiming } from './lint-parallel'
 import { lint_related_fix } from './lint-related-fix'
+import { lint_related_record, type LintStages } from './lint-related-record'
 import { lint_related_scope } from './lint-related-scope'
 
 // `josh lint:related` — the lint check an implementation loop runs between edits.
@@ -86,12 +87,31 @@ function is_failed(outcome: LintOutcome): boolean {
 async function failed_ahead(
 	scope: ChangedFileScope,
 	structural: Promise<number>,
+	stages: LintStages,
 ): Promise<LintOutcome | undefined> {
-	const lint = { stage: 'lint', exit_code: await lint_exit_code(scope) }
+	const lint = {
+		stage: 'lint',
+		exit_code: await lint_related_record.timed(stages, 'lint_ms', async () => {
+			return await lint_exit_code(scope)
+		}),
+	}
 
 	return [lint, { stage: 'structural', exit_code: await structural }].find((outcome) =>
 		is_failed(outcome),
 	)
+}
+
+async function documents_outcome(
+	scope: ChangedFileScope,
+	root: string,
+	stages: LintStages,
+): Promise<LintOutcome> {
+	return {
+		stage: 'documents',
+		exit_code: await lint_related_record.timed(stages, 'documents_ms', async () =>
+			document_check_exit_code(scope, root),
+		),
+	}
 }
 
 // The lint result folded together with the fast document checks: the
@@ -112,19 +132,29 @@ async function failed_ahead(
 // (joshuafolkken/kit#7829).
 //
 // The outcome names the stage that failed first, which the verdict line names (joshuafolkken/kit#5162).
-async function scoped_outcome(scope: ChangedFileScope, root: string): Promise<LintOutcome> {
-	const structural = structural_checks.run_structural(scope, root)
-	const unused = unused_members_check.spawn_unused_members(
-		root,
-		scope.mode === 'all' ? undefined : scope.files,
-	)
-	const failed = await failed_ahead(scope, structural)
+// Each stage's time goes to `stages` (`lint-related-record.ts`); the structural checks and the unused
+// members child are timed on their own promises, since they overlap the lint.
+async function scoped_outcome(
+	scope: ChangedFileScope,
+	root: string,
+	stages: LintStages,
+): Promise<LintOutcome> {
+	const structural = lint_related_record.timed(stages, 'structural_ms', async () => {
+		return await structural_checks.run_structural(scope, root)
+	})
+	const unused = lint_related_record.timed(stages, 'unused_members_ms', async () => {
+		return await unused_members_check.spawn_unused_members(
+			root,
+			scope.mode === 'all' ? undefined : scope.files,
+		)
+	})
+	const failed = await failed_ahead(scope, structural, stages)
 	const unused_run = await unused
 
 	if (failed !== undefined) return failed
 	// The linters' buffered output ends without a newline; keep the checks' own lines apart from it.
 	process.stdout.write('\n')
-	const documents = { stage: 'documents', exit_code: document_check_exit_code(scope, root) }
+	const documents = await documents_outcome(scope, root, stages)
 	if (is_failed(documents)) return documents
 	process.stdout.write(`${unused_run.output}\n`)
 
@@ -207,21 +237,28 @@ function with_fix_pass(outcome: LintOutcome, fix_exit_code: number): LintOutcome
 	return { stage: 'autofix', exit_code: fix_exit_code }
 }
 
+// One run's root, the gate tree it read before it ran and the stage times it collects.
+interface LintRun {
+	root: string
+	before: GateTree | undefined
+	stages: LintStages
+}
+
 async function checked_outcome(
 	command_arguments: ReadonlyArray<string>,
-	root: string,
 	moved: ReadonlyArray<string> | undefined,
-	before: GateTree | undefined,
+	run: LintRun,
 ): Promise<{ outcome: LintOutcome; before: GateTree | undefined }> {
+	const { root, before, stages } = run
 	if (moved?.length === 0) return { outcome: report_unmoved(), before }
 
 	const scope = await resolve_lint_scope(command_arguments, root, moved)
-	const { before: verified, fix_exit_code } = await lint_related_fix.prepare(
-		command_arguments,
-		scope,
-		root,
+	const { before: verified, fix_exit_code } = await lint_related_record.timed(
+		stages,
+		'fix_ms',
+		async () => await lint_related_fix.prepare(command_arguments, scope, root),
 	)
-	const outcome = await scoped_outcome(scope, root)
+	const outcome = await scoped_outcome(scope, root, stages)
 
 	return { outcome: with_fix_pass(outcome, fix_exit_code), before: verified }
 }
@@ -243,16 +280,10 @@ function verdict_tail(outcome: LintOutcome): string {
 // the old base would refuse `josh gate` while every re-run kept linting nothing.
 async function fresh_exit_code(
 	command_arguments: ReadonlyArray<string>,
-	root: string,
-	before: GateTree | undefined,
+	run: LintRun,
 ): Promise<number> {
-	const moved = await read_since_green(before)
-	const { outcome, before: verified } = await checked_outcome(
-		command_arguments,
-		root,
-		moved,
-		before,
-	)
+	const moved = await read_since_green(run.before)
+	const { outcome, before: verified } = await checked_outcome(command_arguments, moved, run)
 	const { exit_code } = outcome
 	const tail = verdict_tail(outcome)
 	const entry = { before: verified, exit_code, tail }
@@ -268,14 +299,28 @@ async function fresh_exit_code(
 }
 
 // A bare run on a tree this check already answered for prints that answer and runs nothing.
-async function run_related_lint(command_arguments: ReadonlyArray<string>): Promise<number> {
+async function verdict_exit_code(
+	command_arguments: ReadonlyArray<string>,
+	stages: LintStages,
+): Promise<number> {
 	const root = await changed_file_scope.repository_root_or_cwd()
 	const before = await scoped_green.read_before(command_arguments)
 	const kept = tree_verdict.read(before, VERDICT_RECORD)
 
 	if (kept !== undefined) return tree_verdict.replay(kept, VERDICT_RECORD)
 
-	return await fresh_exit_code(command_arguments, root, before)
+	return await fresh_exit_code(command_arguments, { root, before, stages })
+}
+
+// Every run, a replayed one included, leaves one ledger row (`lint-related-record.ts`).
+async function run_related_lint(command_arguments: ReadonlyArray<string>): Promise<number> {
+	const started = performance.now()
+	const stages: LintStages = {}
+	const exit_code = await verdict_exit_code(command_arguments, stages)
+
+	await lint_related_record.record_run(stages, { started, exit_code })
+
+	return exit_code
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

@@ -18,6 +18,14 @@ describe('launch_timing', () => {
 		expect(launch_timing.rebuild_ms()).toBe(REBUILD_MS)
 	})
 
+	it('reads back the core wait the dispatcher set, and clears it beside the rebuild time', () => {
+		launch_timing.set_core_wait_ms(REBUILD_MS)
+
+		expect(launch_timing.core_wait_ms()).toBe(REBUILD_MS)
+		launch_timing.clear()
+		expect(launch_timing.core_wait_ms()).toBeUndefined()
+	})
+
 	it('shares the value through the global registry, which a second copy of the module resolves to', () => {
 		Reflect.set(globalThis, Symbol.for('josh.launch.rebuild_ms'), REBUILD_MS)
 

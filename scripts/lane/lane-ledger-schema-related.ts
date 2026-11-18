@@ -59,6 +59,25 @@ const test_related_schema = z.object({
 	elapsed_ms: z.number(),
 })
 
-const lane_ledger_schema_related = { test_related_schema }
+// One `josh lint:related` run (joshuafolkken/kit#7827): the launcher's `dist` rebuild, the wait for the
+// command's core reservation, the scoped `--fix` / `--write` pass, the structural checks, the
+// prettier / ESLint pair, the document checks and the unused-members check — each absent where it did
+// not run — beside the whole run and its exit code.
+const lint_related_schema = z.object({
+	kind: z.literal(KIND.LINT_RELATED),
+	at: z.string(),
+	issue: z.number().optional(),
+	rebuild_ms: z.number().optional(),
+	core_wait_ms: z.number().optional(),
+	fix_ms: z.number().optional(),
+	structural_ms: z.number().optional(),
+	lint_ms: z.number().optional(),
+	documents_ms: z.number().optional(),
+	unused_members_ms: z.number().optional(),
+	elapsed_ms: z.number(),
+	exit_code: z.number(),
+})
+
+const lane_ledger_schema_related = { lint_related_schema, test_related_schema }
 
 export { lane_ledger_schema_related }
