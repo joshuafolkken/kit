@@ -2,6 +2,7 @@ import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
 import type { EpicSubject } from '#scripts/epic/epic-validate'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { EPIC_LABEL } from '#scripts/issue/issue-labels'
+import { size_estimate } from '#scripts/issue/size-estimate'
 import { lane_implement_rate_read } from '#scripts/lane/lane-implement-rate-read'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import type { AttachedLaunchResult, LaunchRequest } from '#scripts/run/detached-launch'
@@ -104,6 +105,17 @@ describe('backlog_drive_split_unit.run — over the size bar', () => {
 
 		await expect(backlog_drive_split_unit.run(ISSUE, ports)).resolves.toBe('launch')
 		expect(requests).toHaveLength(0)
+	})
+})
+
+// joshuafolkken/kit#7925: the unit asks for the same kind-led no-split reason as every size refusal.
+describe('backlog_drive_split_unit.run — the no-split reason it asks for', () => {
+	it('asks for the reason with its kind', async () => {
+		const { ports, requests } = fake([OVER, REASONED])
+
+		await backlog_drive_split_unit.run(ISSUE, ports)
+
+		expect(JSON.stringify(requests[0]?.argv)).toContain(size_estimate.reason_hint())
 	})
 })
 
