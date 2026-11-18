@@ -1,0 +1,7 @@
+{
+	"reason": "run:chain gains the metrics-totals stage, the run:review entry scoped-green guard and the chain ledger exit_code/refusal fields (#7926)",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 105
+	}
+}

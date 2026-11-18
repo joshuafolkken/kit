@@ -60,7 +60,11 @@ const stop_schema = z.object({
 // stage exited non-zero (`exit`) or exited 0 on a notice that holds the run (`hold`) — both absent on a
 // run that finished. `join` marks the half after the review (joshuafolkken/kit#7024). `stages` is each
 // stage that ran, the stopped one included, with its start and length; absent on a line written before
-// it was recorded (joshuafolkken/kit#7736).
+// it was recorded (joshuafolkken/kit#7736). `exit_code` is the stopped stage's exit code (0 on a hold) and
+// `refusal` the kind of a procedural stop the run named (`metrics-growth`, `scoped-not-green`), so
+// `lane:breakdown` tells those reruns from a real failure (joshuafolkken/kit#7926); both absent on a
+// finished run and on a line written before they were recorded.
+const CHAIN_REFUSALS = ['metrics-growth', 'scoped-not-green'] as const
 const chain_stage_schema = z.object({
 	name: z.string(),
 	at: z.string(),
@@ -74,6 +78,8 @@ const chain_schema = z.object({
 	join: z.boolean(),
 	stage: z.string().optional(),
 	reason: z.enum(['exit', 'hold']).optional(),
+	exit_code: z.number().optional(),
+	refusal: z.enum(CHAIN_REFUSALS).optional(),
 	stages: z.array(chain_stage_schema).optional(),
 })
 // The ship's `unplanned` answer `josh check:related` printed to the lane of `issue` ahead of the ship,
@@ -161,6 +167,7 @@ const size_schema = z.object({
 type ChainEntry = z.infer<typeof chain_schema>
 type ChainRecord = Omit<ChainEntry, 'kind' | 'at'>
 type ChainStageEntry = z.infer<typeof chain_stage_schema>
+type ChainRefusal = NonNullable<ChainEntry['refusal']>
 type PreflightEntry = z.infer<typeof preflight_schema>
 type PreflightLedgerRecord = Omit<PreflightEntry, 'kind' | 'at'>
 type UnpinnedStop = z.infer<typeof unpinned_stop_schema>
@@ -179,6 +186,7 @@ const lane_ledger_schema_ship = {
 export type {
 	ChainEntry,
 	ChainRecord,
+	ChainRefusal,
 	ChainStageEntry,
 	PreflightEntry,
 	PreflightLedgerRecord,

@@ -3,10 +3,12 @@ import { fileURLToPath } from 'node:url'
 import { project_checks } from '#scripts/gate/project-checks'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import type { ChainRecord } from '#scripts/lane/lane-ledger-schema-ship'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_ship_args } from '#scripts/run/ship/run-ship-args'
 import { run_chain, type ChainRun, type ChainStage, type ChainStop } from './run-chain'
+import { run_chain_gates } from './run-chain-gates'
 import { run_chain_join } from './run-chain-join'
 
 // `josh run:chain <N>` — `main:merge` (none in a lane child), `review:selfcheck`, `check:related`,
@@ -42,37 +44,38 @@ interface ChainArguments {
 	issue: string
 	from?: string
 	is_join: boolean
+	review_args: ReadonlyArray<string>
 	stages: ReadonlyArray<ChainStage>
 }
 
-interface StopFields {
-	stage?: string
-	reason?: 'exit' | 'hold'
-}
+type StopFields = Pick<ChainRecord, 'stage' | 'reason' | 'exit_code' | 'refusal'>
 
 // A lane child merges main in ship's sync, so its opening half is the review stages alone
-// (`chain-rule.md` → "A lane child").
+// (`chain-rule.md` → "A lane child"); the metrics stage follows `check:related` in both.
 function opening_stages(review_args: ReadonlyArray<string>): ReadonlyArray<ChainStage> {
 	const is_kit = project_checks.is_kit_repository(process.cwd())
+	const stages = lane_child_marker.is_child_of(process.cwd())
+		? run_chain.review_stages(review_args, is_kit)
+		: run_chain.main_line_stages(review_args, is_kit)
 
-	if (lane_child_marker.is_child_of(process.cwd())) {
-		return run_chain.review_stages(review_args, is_kit)
-	}
-
-	return run_chain.main_line_stages(review_args, is_kit)
+	return run_chain_gates.opening(stages, review_args)
 }
 
 function flag_pair(flag: string, value: string | undefined): ReadonlyArray<string> {
 	return value === undefined ? [] : [flag, value]
 }
 
+function review_args_of(values: ChainValues): ReadonlyArray<string> {
+	return [
+		...flag_pair('--unpinned-ok', values.unpinned_ok),
+		...flag_pair('--accept-metrics', values.accept_metrics),
+	]
+}
+
 function stages_of(issue: string, values: ChainValues): ReadonlyArray<ChainStage> {
 	if (values.is_join) return run_chain_join.join_stages(issue, values.is_fixing, values.ship)
 
-	return opening_stages([
-		...flag_pair('--unpinned-ok', values.unpinned_ok),
-		...flag_pair('--accept-metrics', values.accept_metrics),
-	])
+	return opening_stages(review_args_of(values))
 }
 
 // `--fixing` belongs to the join and the reasons to the opening half, so each refuses the other list.
@@ -99,6 +102,7 @@ function arguments_from(
 		issue,
 		...(values.from !== undefined && { from: values.from }),
 		is_join: values.is_join,
+		review_args: review_args_of(values),
 		stages: stages_of(issue, values),
 	}
 }
@@ -125,13 +129,15 @@ function refuse(message: string): number {
 	return FAILURE_EXIT_CODE
 }
 
-// A stage that exited 0 stops the run only on its hold notice.
+// A stage that exited 0 stops the run only on its hold notice; a procedural stop names its kind.
 function stop_fields(stop: ChainStop | undefined): StopFields {
 	if (stop === undefined) return {}
 
 	return {
 		stage: stop.stage.name,
 		reason: stop.code === run_chain.SUCCESS_EXIT_CODE ? 'hold' : 'exit',
+		exit_code: stop.code,
+		...(stop.refusal !== undefined && { refusal: stop.refusal }),
 	}
 }
 
@@ -152,11 +158,20 @@ async function record_run(
 	})
 }
 
+// The stages from `--from` on, behind the entry's own scoped-green ask; `undefined` for an unknown stage.
+function entry_stages(parsed: ChainArguments): ReadonlyArray<ChainStage> | undefined {
+	const resumed = run_chain.stages_from(parsed.stages, parsed.from)
+
+	if (resumed === undefined) return undefined
+
+	return run_chain_gates.entry(resumed, parsed.from, parsed.review_args)
+}
+
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const parsed = parse(argv)
 
 	if (parsed === undefined) return refuse(USAGE)
-	const stages = run_chain.stages_from(parsed.stages, parsed.from)
+	const stages = entry_stages(parsed)
 
 	if (stages === undefined) return refuse(`no stage ${String(parsed.from)}\n${USAGE}`)
 	const started_ms = Date.now()

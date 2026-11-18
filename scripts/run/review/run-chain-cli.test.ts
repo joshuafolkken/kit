@@ -1,7 +1,9 @@
 import { derive_check } from '#scripts/document/derive-check'
+import { metrics_totals } from '#scripts/gate/metrics-totals'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
+import { review_brief_cli } from '#scripts/review/review-brief-cli'
 import { run_ship_pre_detach } from '#scripts/run/ship/run-ship-pre-detach'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_chain_cli } from './run-chain-cli'
@@ -57,7 +59,10 @@ function stop_at(name: string): void {
 	}))
 }
 
+// The metrics and scoped-green asks (`run-chain-gates.ts`) answer green unless a test says otherwise.
 beforeEach(() => {
+	vi.spyOn(metrics_totals, 'totals_check').mockResolvedValue(undefined)
+	vi.spyOn(review_brief_cli, 'scoped_refusal').mockResolvedValue(undefined)
 	vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(false)
 	josh_run_mock.mockReset()
 	josh_run_mock.mockResolvedValue({ code: 0, out: '' })
@@ -81,7 +86,7 @@ describe('run_chain_cli.run — the chain', () => {
 
 		expect(ran()).toStrictEqual(MAIN_LINE)
 		expect(info_lines).toContain(
-			`run:chain 5630 — ran main:merge → review:selfcheck → check:related → command:derive → ${BEFORE_REVIEW_NAMES} → run:review`,
+			`run:chain 5630 — ran main:merge → review:selfcheck → check:related → metrics-totals → command:derive → ${BEFORE_REVIEW_NAMES} → run:review`,
 		)
 	})
 
@@ -92,7 +97,7 @@ describe('run_chain_cli.run — the chain', () => {
 
 		expect(ran()).toStrictEqual(MAIN_LINE.slice(1))
 		expect(info_lines).toContain(
-			`run:chain 5630 — ran review:selfcheck → check:related → command:derive → ${BEFORE_REVIEW_NAMES} → run:review`,
+			`run:chain 5630 — ran review:selfcheck → check:related → metrics-totals → command:derive → ${BEFORE_REVIEW_NAMES} → run:review`,
 		)
 	})
 
