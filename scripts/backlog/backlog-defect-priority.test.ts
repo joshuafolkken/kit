@@ -16,8 +16,8 @@ import { backlog_fixture, type BacklogInput, type ChildInput } from './backlog-f
 import { backlog_next } from './backlog-next'
 import { backlog_plan_cli } from './backlog-plan-cli'
 
-// joshuafolkken/kit#6410: defects always lead ranking ties; only mechanism deferral needs a rate
-// above the baseline. Other kinds keep their relative graph order below that threshold.
+// joshuafolkken/kit#7912: a defect leads by a ranking key of `issue-rank.ts`, so this module only
+// defers new mechanisms while the rate is above the baseline, and leaves the order alone otherwise.
 
 const { console_streams, issue, opted_in_epic } = auto_ok_fixture
 
@@ -87,6 +87,20 @@ function offered(): string {
 	return stdout()
 }
 
+// A mechanism row built without a body, ahead of a defect that carries one.
+const UNREAD_MECHANISM_THEN_DEFECT: ReadonlyArray<EpicChild> = [
+	{ ...ROW, number: MECHANISM },
+	{ ...ROW, number: DEFECT, body: defect_rate.DEFECT_DECLARATION_LINE },
+]
+
+// The numbers `prioritize` offers for one bundle of this repository's children.
+async function prioritized(children: ReadonlyArray<EpicChild>): Promise<Array<number>> {
+	const result = { ...EMPTY_RESULT, candidates: [{ repo: ROW.repo, children: [...children] }] }
+	const ordered = await backlog_defect_priority.prioritize(result, ROW.repo)
+
+	return ordered.candidates[0]?.children.map((child) => child.number) ?? []
+}
+
 function joined(numbers: ReadonlyArray<number>): string {
 	return numbers.map(String).join('\n')
 }
@@ -121,33 +135,44 @@ describe('backlog:next while the defect rate is above its baseline', () => {
 
 	it('reads a body only for a row built without one', async () => {
 		stub({ defect_rate: ABOVE_BASELINE })
-		const children = [
-			{ ...ROW, number: MECHANISM },
-			{ ...ROW, number: DEFECT, body: defect_rate.DEFECT_DECLARATION_LINE },
-		]
-		const result = { ...EMPTY_RESULT, candidates: [{ repo: ROW.repo, children }] }
-
-		const ordered = await backlog_defect_priority.prioritize(result, ROW.repo)
+		const ordered = await prioritized(UNREAD_MECHANISM_THEN_DEFECT)
 
 		expect(git_gh_command.issue_get_body).toHaveBeenCalledExactlyOnceWith(
 			String(MECHANISM),
 			ROW.repo,
 		)
-		expect(ordered.candidates[0]?.children.map((child) => child.number)).toEqual([
-			DEFECT,
-			MECHANISM,
-		])
+		expect(ordered).toEqual([DEFECT, MECHANISM])
 	})
 })
 
-// joshuafolkken/kit#4859: the causing-lane key ranks above this order, so the note says it orders ties.
-describe('backlog:next defect-priority note', () => {
-	it('says the order applies among ranking ties', async () => {
+describe('backlog_defect_priority.prioritize (ac-1462bc0e)', () => {
+	it('moves only new mechanisms above the baseline, keeping a non-defect ahead of a defect', async () => {
+		stub({ defect_rate: ABOVE_BASELINE })
+
+		const ordered = await prioritized([
+			{ ...ROW, number: MECHANISM, body: behavior_change_lint.DECLARATION_LINE },
+			{ ...ROW, number: CODE_ONLY, body: '' },
+			{ ...ROW, number: DEFECT, body: defect_rate.DEFECT_DECLARATION_LINE },
+		])
+
+		expect(ordered).toEqual([CODE_ONLY, DEFECT, MECHANISM])
+	})
+
+	it('leaves the order alone at the baseline and reads no body', async () => {
+		stub({ defect_rate: backlog_fixture.AT_BASELINE })
+
+		expect(await prioritized(UNREAD_MECHANISM_THEN_DEFECT)).toEqual([MECHANISM, DEFECT])
+		expect(git_gh_command.issue_get_body).not.toHaveBeenCalled()
+	})
+})
+
+describe('backlog:next defect-rate note', () => {
+	it('says new mechanisms are offered last', async () => {
 		stub({ defect_rate: ABOVE_BASELINE })
 
 		await backlog_next.run([])
 
-		expect(stderr()).toContain('among issues the ranking keys tie')
+		expect(stderr()).toContain('new mechanisms are offered last')
 	})
 })
 
@@ -195,7 +220,7 @@ describe('backlog:next at or below the baseline', () => {
 		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
 		expect(offered()).toBe(joined(RANKED_GRAPH_ORDER))
 		expect(stderr()).toContain(backlog_defect_priority.UNMEASURED_MESSAGE)
-		expect(stderr()).toContain('defects are offered first without deferring new mechanisms')
+		expect(stderr()).toContain('new mechanisms are not deferred')
 	})
 
 	it.each([ABOVE_BASELINE, { ...ABOVE_BASELINE, defects: 0 }])(

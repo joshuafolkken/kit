@@ -1,3 +1,4 @@
+import { defect_rate } from '#scripts/issue/defect-rate'
 import { describe, expect, it } from 'vitest'
 import type { EpicChild } from './epic-graph'
 import { epic_rank } from './epic-rank'
@@ -43,5 +44,12 @@ describe('epic_rank.rank', () => {
 		const children = [child(1, '## 背景\n\n- 実施順: 最後\n'), child(2), child(3)]
 
 		expect(epic_rank.rank(children, children).map((entry) => entry.number)).toStrictEqual([2, 3, 1])
+	})
+
+	// joshuafolkken/kit#7912: the body's defect declaration reaches the defect key, with no label.
+	it('puts the child whose body declares a defect ahead of an older one (ac-ac7a05a2)', () => {
+		const children = [child(1), child(2, defect_rate.DEFECT_DECLARATION_LINE)]
+
+		expect(epic_rank.rank(children, children).map((entry) => entry.number)).toStrictEqual([2, 1])
 	})
 })

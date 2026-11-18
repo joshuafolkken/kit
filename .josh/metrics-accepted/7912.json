@@ -1,0 +1,7 @@
+{
+	"reason": "The defect ranking key and the rank_row helper git-next-issues needs to pass it add 7 lines; the defect-first sort they replace was already removed",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 7
+	}
+}
