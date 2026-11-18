@@ -12,13 +12,7 @@ const AGE_MS = AGE_SECONDS * 1000
 const PIPED_ONCE = once_key(undefined, false)
 const LAUNCH = { pos: 1, at: '2026-10-08T08:00:00.000Z', kind: 'child-launch', text: '#1 a' }
 
-function board(store: FrameStore): ReturnType<typeof harness> & { ports: BoardPorts } {
-	const made = harness({ ...LOCAL, events: [LAUNCH] }, [plan_titled('a')])
-
-	return { ...made, ports: { ...made.ports, is_tty: false, frames: store } }
-}
-
-// A theme set in the environment running the tests would key --once under that theme.
+// joshuafolkken/kit#8027: a shell that names a theme must not redraw the recorded frames these tests read.
 beforeEach(() => {
 	vi.stubEnv('JOSH_BOARD_THEME', undefined)
 })
@@ -26,6 +20,12 @@ beforeEach(() => {
 afterEach(() => {
 	vi.unstubAllEnvs()
 })
+
+function board(store: FrameStore): ReturnType<typeof harness> & { ports: BoardPorts } {
+	const made = harness({ ...LOCAL, events: [LAUNCH] }, [plan_titled('a')])
+
+	return { ...made, ports: { ...made.ports, is_tty: false, frames: store } }
+}
 
 describe('run_board_cli.run answered from the recorded frame', () => {
 	it.each([

@@ -24,7 +24,7 @@ async function no_pause(): Promise<void> {
 	await Promise.resolve()
 }
 
-// A theme set in the environment running the tests must not reach a board drawn without one.
+// joshuafolkken/kit#8027: a shell that names a theme must not draw the frames these tests take as plain.
 beforeEach(() => {
 	vi.stubEnv('JOSH_BOARD_THEME', undefined)
 })
@@ -105,7 +105,6 @@ describe('run_board_cli.run --theme reveal', () => {
 	})
 
 	it('writes the first frame whole on a board in no theme', async () => {
-		vi.stubEnv('JOSH_BOARD_THEME', undefined)
 		const frames = await live_writes([])
 
 		expect(line_writes(frames)).toStrictEqual([])
