@@ -185,6 +185,13 @@ const EVENT_KIND = {
 	// ran late by more than a few intervals. `at` is the wake and `elapsed_ms` how long the sleep
 	// lasted; every lane's net time takes it out (`lane-sleep.ts`). A trace.
 	SLEEP: 'sleep',
+	// The host's network went down or came back (joshuafolkken/kit#7867): the load sampler's per-tick
+	// reachability probe changed its answer, each written once. Every later tick still down writes an
+	// `offline-tick`, so an outage reads back (`lane-offline-spans.ts`) ending at its `online` or a tick
+	// past its last sighting, the interval every lane's net time takes out. Traces.
+	OFFLINE: 'offline',
+	OFFLINE_TICK: 'offline-tick',
+	ONLINE: 'online',
 	// A lane's `lane:plan` blocking on a holder of its files (joshuafolkken/kit#6140): `#<N> start #<M>`
 	// as one ask begins to wait, `#<N> end #<M>` as it ends, so `lane:breakdown` counts
 	// the wait under its own row rather than the stage it fell in (`lane-plan-wait-event.ts`). A trace.
@@ -220,6 +227,9 @@ const TRACE_KINDS: ReadonlySet<string> = new Set([
 	EVENT_KIND.SAMPLE_WAIT,
 	EVENT_KIND.RELAUNCH_FAILED,
 	EVENT_KIND.SLEEP,
+	EVENT_KIND.OFFLINE,
+	EVENT_KIND.OFFLINE_TICK,
+	EVENT_KIND.ONLINE,
 	EVENT_KIND.PLAN_WAIT,
 	EVENT_KIND.RATE_LIMIT,
 ])

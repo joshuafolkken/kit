@@ -558,7 +558,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 	'lane:net': {
 		...MEASURE_ARGUMENTS,
 		description:
-			"Print a lane's net minutes: its issue's first dispatch to its merge, less the waits its parks, outages, usage-limit stops and yields stood, the host's sleeps and the ship's followup",
+			"Print a lane's net minutes: its issue's first dispatch to its merge, less the waits its parks, outages, usage-limit stops and yields stood, the host's stops (sleeps and network outages) and the ship's followup",
 		category: 'AI tools',
 		reference: ['<issue>', 'maintainer', ['none']],
 		default_script_arguments: ['net'],

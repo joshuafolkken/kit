@@ -107,7 +107,7 @@ describe('lane_breakdown_cli.run', () => {
 				'',
 				'- implement 51.0 min, over budget +42 min (editing & thinking 51.0 min)',
 				'- start to plan 10.0 min, over budget +7 min',
-				'- waits taken out (park, outage, usage limit, yield, split run, host sleep) 0.0 min, of which yield wait 0.0 min, of which host sleep 0.0 min',
+				'- waits taken out (park, outage, usage limit, yield, split run, host stop) 0.0 min, of which yield wait 0.0 min, of which host stop (sleep or network down) 0.0 min',
 				'End-to-end 61.0 min (over target); target 30 min dispatch to merge (human wait reported separately, included); internal stage budgets 25 min (plan 3 + implement 9 + ship 8 + followup 5)',
 				'Exclusive wall clock: off-tool work 0.0 min; automatic wait 0.0 min; human wait 0.0 min; unclassified (missing transcripts) 61.0 min',
 				'Tool cumulative 0.0 min (parallel calls overlap; not additive to wall clock). Off-tool work includes unrecorded activity; automatic wait includes tool responses, gate, CI, yield, outage and sleep. Legacy net excludes more than human wait.',
