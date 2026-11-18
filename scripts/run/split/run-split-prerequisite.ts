@@ -1,3 +1,4 @@
+import { epic_cli_chain } from '#scripts/epic/epic-cli-chain'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
 import { run_pause, type AroundRelation } from '#scripts/run/pause/run-pause'
@@ -25,8 +26,14 @@ function park_body(request: PrerequisiteRequest, reason: string): string {
 	return `${NEEDS_DECISION_LABEL}: could not tell whether an epic already tracks ${issue} (${reason}), so ${issue_cite.plain_for('github', request.prerequisite)} was neither placed ahead of it nor recorded as its blocker. Rerun \`${rerun}\` once the epic listing reads in full, then clear this park with \`pnpm josh run:park ${request.issue} --clear\`.`
 }
 
+// The order's reason is the prerequisite itself: the caller named `#P` as what `#N` needs first.
 function create_argv(request: PrerequisiteRequest, title: string): Array<string> {
-	return [title, request.prerequisite, request.issue, '--ordered']
+	const first = issue_cite.plain_for('program', request.prerequisite)
+	const issue = issue_cite.plain_for('program', request.issue)
+	const reason = `${first} -> ${issue}: ${issue} needs ${first} first, named by \`run:split --prerequisite\`.`
+	const order = ['--ordered', epic_cli_chain.ORDER_REASON_FLAG, reason]
+
+	return [title, request.prerequisite, request.issue, ...order]
 }
 
 async function pause_and_audit(

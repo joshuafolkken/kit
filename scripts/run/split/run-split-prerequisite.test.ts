@@ -106,7 +106,14 @@ describe('run_split_prerequisite.prerequisite — no epic tracks the issue', () 
 
 		expect(result).toMatchObject({ kind: 'epic', epic: 30 })
 		expect(tracking_with).toHaveBeenCalledWith('10', ['11'])
-		expect(epic_create).toHaveBeenCalledWith([TITLE, '11', '10', '--ordered'])
+		expect(epic_create).toHaveBeenCalledWith([
+			TITLE,
+			'11',
+			'10',
+			'--ordered',
+			'--order-reason',
+			'#11 -> #10: #10 needs #11 first, named by `run:split --prerequisite`.',
+		])
 		expect(record).toHaveBeenCalledWith(REQUEST)
 		expect(audit_run).toHaveBeenCalledWith(['30'])
 		expect(state.calls).toStrictEqual(['stash', 'comment', 'epic', BLOCKED_BY, 'audit', 'release'])

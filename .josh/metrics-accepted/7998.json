@@ -1,0 +1,8 @@
+{
+	"reason": "#7998 makes --order-reason required at every order-declaring entry (create, --promote, --add --chain, run:split), carries it in the cross-repo --add suggestion, and documents it in the command map",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 67,
+		"ai_cost.on_demand_bytes": 73
+	}
+}
