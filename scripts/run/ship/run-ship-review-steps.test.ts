@@ -353,14 +353,14 @@ describe('run_ship_review_steps.round_two_stage — due or not', () => {
 	})
 
 	it.each([
-		['skip', 'empty'],
-		['required', 'live'],
-	] as const)('records a %s decision with its code in the lane ledger', async (verdict, code) => {
+		['skip', 'empty', undefined],
+		['required', 'live', []],
+	] as const)('records a %s decision with its outcome', async (verdict, code, findings) => {
 		answer_round_two(verdict)
 
 		await run_ship_review_steps.round_two_stage(ISSUE)
 
-		expect(record_round_two_mock).toHaveBeenCalledWith({ issue: Number(ISSUE), verdict, code })
+		expect(record_round_two_mock).toHaveBeenCalledWith({ issue: 2427, verdict, code, findings })
 	})
 
 	it('stops on a decision it cannot parse, recording nothing and launching no reviewer', async () => {
