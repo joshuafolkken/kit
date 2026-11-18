@@ -182,6 +182,11 @@ function layout_of(header: BoardHeader): BoardLayout {
 	return header.layout ?? run_board_layout.EMPTY_LAYOUT
 }
 
+// The run's state as the header's first line draws it, for a reader outside the frame.
+function run_mark_of(header: BoardHeader): RunMark {
+	return mark_of(header, counts_of(layout_of(header)).running)
+}
+
 // Whether the plan has been read: until it has, the board draws the run's own children alone, and the
 // counts only the plan knows — the total and what waits — are unknown.
 function is_plan_read(header: BoardHeader): boolean {
@@ -350,6 +355,7 @@ const run_board_header = {
 	is_plan_read,
 	now_icon,
 	now_legend,
+	run_mark_of,
 	warning_of,
 }
 
