@@ -1,21 +1,14 @@
 import { lane_host_gaps } from '#scripts/lane/lane-host-gaps'
-import type { LaneSpan } from '#scripts/lane/lane-net-time'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
-import { run_event_scope } from '#scripts/run/event/run-event-scope'
-import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
-import { run_progress } from '#scripts/run/progress/run-progress'
-import { run_board_ending_states } from './run-board-ending-states'
+import type { RunEvent } from '#scripts/run/event/run-event-stream'
+import { run_board_throughput_fold, type FoldRead, type Span } from './run-board-throughput-fold'
 
 // The `📈 throughput` cells of `run:board` (joshuafolkken/kit#5705), read from the run's event stream:
 // when the run was alive, when each child closed, and per row the figures drawn beside its bar of cells.
-// Local reads only, so the board redraws them with the rest; drawing them is the renderer's.
+// Local reads only, so the board redraws them with the rest; drawing them is the renderer's. The stream
+// is folded on as it grows (`run-board-throughput-fold.ts`); the cells are drawn from the fold each read.
 
 type RowLabel = '24h' | '7d'
-
-interface Span {
-	start_ms: number
-	end_ms: number
-}
 
 // A cell with no `active_ms` was stopped throughout.
 interface ThroughputCell extends Span {
@@ -43,11 +36,7 @@ interface ThroughputRow {
 	now: number | undefined
 }
 
-interface StreamRead {
-	spans: ReadonlyArray<Span>
-	closes: ReadonlyArray<number>
-	// The host's stops, never active (joshuafolkken/kit#7905).
-	gaps: ReadonlyArray<LaneSpan>
+interface StreamRead extends FoldRead {
 	now_ms: number
 }
 
@@ -58,18 +47,12 @@ interface RowShape {
 	has_now: boolean
 }
 
-const KIND = run_event_stream.EVENT_KIND
 const MINUTES_PER_HOUR = 60
 const MS_PER_HOUR = MINUTES_PER_HOUR * MS_PER_MINUTE
 const HOURS_PER_DAY = 24
 const HALF_DAY_HOURS = 12
 const DAYS_PER_WEEK = 7
 const HALVES_PER_DAY = 2
-// A run beats every progress interval, so a quiet stretch longer than two of them is a stopped one.
-const BEATS_PER_GAP = 2
-const MAX_GAP_MS = BEATS_PER_GAP * run_progress.DEFAULT_INTERVAL_MS
-// The run's own ending: a stop or a stranding that names no child.
-const HALT_KINDS: ReadonlySet<string> = new Set([KIND.STOP, KIND.STRANDED])
 const ROWS: ReadonlyArray<RowShape> = [
 	{ label: '24h', cell_count: HOURS_PER_DAY, cell_hours: 1, has_now: true },
 	{
@@ -80,50 +63,8 @@ const ROWS: ReadonlyArray<RowShape> = [
 	},
 ]
 
-function moment(event: RunEvent): number {
-	return Date.parse(event.at)
-}
-
 function sum(values: ReadonlyArray<number>): number {
 	return values.reduce((total, value) => total + value, 0)
-}
-
-function is_halt(event: RunEvent): boolean {
-	return HALT_KINDS.has(event.kind) && run_event_scope.issue_named(event) === undefined
-}
-
-function next_ms(events: ReadonlyArray<RunEvent>, index: number, now_ms: number): number {
-	const next = events[index + 1]
-
-	return next === undefined ? now_ms : moment(next)
-}
-
-// The stretch from one event to the next (or to now) the run was alive through.
-function span_after(event: RunEvent, end_ms: number): ReadonlyArray<Span> {
-	const start_ms = moment(event)
-
-	return is_halt(event) || end_ms - start_ms > MAX_GAP_MS ? [] : [{ start_ms, end_ms }]
-}
-
-// In time order, not stream order: a merge is dated back to its ship's report (`run-merge-dated.ts`), so
-// it lands after lines newer than itself (joshuafolkken/kit#6677).
-function active_spans(events: ReadonlyArray<RunEvent>, now_ms: number): ReadonlyArray<Span> {
-	const timed = events.toSorted((left, right) => moment(left) - moment(right))
-
-	return timed.flatMap((event, index) => span_after(event, next_ms(timed, index, now_ms)))
-}
-
-function close_entry(event: RunEvent): ReadonlyArray<[string, number]> {
-	const issue = run_event_scope.issue_named(event)
-
-	return issue === undefined ? [] : [[issue, moment(event)]]
-}
-
-// Each child's close, where the `✅ done` section draws it merged; a later close of the same child wins.
-function close_times(events: ReadonlyArray<RunEvent>): ReadonlyArray<number> {
-	const closes = events.filter((event) => run_board_ending_states.is_close(event))
-
-	return [...new Map(closes.flatMap((event) => close_entry(event))).values()]
 }
 
 // Cells start on the local clock: the hour for `24h`, 00:00 and 12:00 for `7d`.
@@ -212,12 +153,7 @@ function row_of(shape: RowShape, read: StreamRead): ThroughputRow {
 }
 
 function rows_of(events: ReadonlyArray<RunEvent>, now_ms: number): ReadonlyArray<ThroughputRow> {
-	const read = {
-		spans: active_spans(events, now_ms),
-		closes: close_times(events),
-		gaps: lane_host_gaps.gaps_of(events),
-		now_ms,
-	}
+	const read = { ...run_board_throughput_fold.read_of(events, now_ms), now_ms }
 
 	return ROWS.map((shape) => row_of(shape, read))
 }
