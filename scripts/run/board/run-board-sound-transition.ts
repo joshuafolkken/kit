@@ -11,7 +11,7 @@ import type { ItemState } from './run-board-status'
 // phase moving on are left out of the reading, so they never sound.
 
 // What the run as a whole is in, each sounding once on the frame it starts.
-type RunCondition = 'drained' | 'stopped' | 'human' | 'held'
+type RunCondition = 'drained' | 'stopped' | 'human' | 'held' | 'offline'
 
 interface SoundSnapshot {
 	// Each row's cue, by issue number; a row that would sound nothing is left out.
@@ -40,19 +40,20 @@ const ROW_CUES: Readonly<Partial<Record<ItemState, CueName>>> = {
 const RUN_CUES: Readonly<Record<RunCondition, CueName>> = {
 	drained: 'drain',
 	stopped: 'alert',
-	human: 'human',
+	// A run with nothing left but what waits on a person has stopped as surely as a stopped one.
+	human: 'alert',
 	held: 'alert',
+	offline: 'alert',
 }
 
-// A drained run is no stopped one: it ran out of work, so its stop never sounds as a fault.
+// A drained run is no stopped one: it ran out of work, so its stop never sounds as a fault. A usage
+// limit and an outage are apart, so one opening while the other holds still sounds.
 const RUN_CHECKS: ReadonlyArray<readonly [RunCondition, (read: RunRead) => boolean]> = [
 	['drained', (read) => read.is_drained],
 	['stopped', (read) => !read.is_drained && read.mark === 'stopped'],
 	['human', (read) => read.mark === 'human'],
-	[
-		'held',
-		(read) => read.header.quota_hold !== undefined || read.header.activity.outage !== undefined,
-	],
+	['held', (read) => read.header.quota_hold !== undefined],
+	['offline', (read) => read.header.activity.outage !== undefined],
 ]
 
 // A ship that failed is a fault whatever state its row is drawn in.

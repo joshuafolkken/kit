@@ -40,6 +40,8 @@ function cue_between(before: Frame, after: Frame): CueName | undefined {
 }
 
 const RUNNING = row(1, 'running', ['implement'])
+// A second lane still running, so a row waiting on a person does not leave the run waiting on one.
+const OTHER_RUNNING = row(2, 'running', ['implement'])
 const STOPPED_RUN: Partial<BoardHeader> = { activity: { last_event_ms: NOW, is_stopped: true } }
 const DRAINED: Frame = { rows: [row(1, 'merged')], extra: STOPPED_RUN, events: [{ kind: 'drain' }] }
 const HOLD = { reset_ms: NOW, parked: 1 }
@@ -67,9 +69,9 @@ const SOUNDING: ReadonlyArray<Case> = [
 	},
 	{ name: 'a drain', before: { rows: [row(1, 'merged')] }, after: DRAINED, cue: 'drain' },
 	{
-		name: 'a human review',
-		before: { rows: [RUNNING] },
-		after: { rows: [row(1, 'human')] },
+		name: 'a human review beside a running lane',
+		before: { rows: [RUNNING, OTHER_RUNNING] },
+		after: { rows: [row(1, 'human'), OTHER_RUNNING] },
 		cue: 'human',
 	},
 	{
@@ -115,7 +117,19 @@ const SOUNDING: ReadonlyArray<Case> = [
 		name: 'the run left waiting on a person',
 		before: { rows: [row(1, 'parked'), row(2, 'running')] },
 		after: { rows: [row(1, 'human'), row(2, 'merged')] },
-		cue: 'human',
+		cue: 'alert',
+	},
+	{
+		name: 'an outage opening under a usage-limit hold',
+		before: { rows: [RUNNING], extra: { quota_hold: HOLD } },
+		after: {
+			rows: [RUNNING],
+			extra: {
+				quota_hold: HOLD,
+				activity: { last_event_ms: NOW, is_stopped: false, outage: OUTAGE },
+			},
+		},
+		cue: 'alert',
 	},
 ]
 
