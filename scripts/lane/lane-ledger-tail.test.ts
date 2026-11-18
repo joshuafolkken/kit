@@ -77,6 +77,98 @@ describe('lane_ledger_tail.read on a replaced ledger', () => {
 	})
 })
 
+// joshuafolkken/kit#7930: the recent window read backward from the end.
+
+const DAYS = ['2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04']
+const SMALL_CHUNK_BYTES = 16
+
+function merge_on(day_index: number): object {
+	return { kind: 'merge', at: `${DAYS[day_index] ?? ''}T00:00:00.000Z`, issue: day_index }
+}
+
+function since(day_index: number): number {
+	return Date.parse(`${DAYS[day_index] ?? ''}T00:00:00.000Z`)
+}
+
+function ledger_of(name: string, lines: ReadonlyArray<string>): string {
+	const target = ledger(name)
+
+	appendFileSync(target, lines.join('\n'))
+
+	return target
+}
+
+function days_ledger(name: string): string {
+	return ledger_of(name, [...DAYS.map((_, index) => JSON.stringify(merge_on(index))), ''])
+}
+
+describe('lane_ledger_tail.read_since on the window', () => {
+	it('returns only the window, oldest first, without reaching the start', () => {
+		expect(lane_ledger_tail.read_since(days_ledger('window'), since(2))).toStrictEqual({
+			entries: [merge_on(2), merge_on(3)],
+			reached_start: false,
+		})
+	})
+
+	it('reaches the start when every line is in the window', () => {
+		expect(lane_ledger_tail.read_since(days_ledger('all'), since(0))).toStrictEqual({
+			entries: [merge_on(0), merge_on(1), merge_on(2), merge_on(3)],
+			reached_start: true,
+		})
+	})
+
+	it('reads past a backdated line to the window lines written before it', () => {
+		const backdated = { kind: 'merge', at: '2026-10-02T23:50:00.000Z', issue: 9 }
+		const lines = [merge_on(0), merge_on(2), backdated, merge_on(3)].map((line) =>
+			JSON.stringify(line),
+		)
+		const target = ledger_of('backdated', [...lines, ''])
+
+		expect(lane_ledger_tail.read_since(target, since(2), SMALL_CHUNK_BYTES)).toStrictEqual({
+			entries: [merge_on(2), merge_on(3)],
+			reached_start: false,
+		})
+	})
+
+	it('returns nothing when no line is in the window', () => {
+		const after_last = since(3) + 1
+
+		expect(lane_ledger_tail.read_since(days_ledger('none'), after_last)).toStrictEqual({
+			entries: [],
+			reached_start: false,
+		})
+	})
+})
+
+describe('lane_ledger_tail.read_since on the bytes it reads', () => {
+	it('joins lines cut by a chunk boundary', () => {
+		const target = days_ledger('chunks')
+
+		expect(lane_ledger_tail.read_since(target, since(1), SMALL_CHUNK_BYTES)).toStrictEqual({
+			entries: [merge_on(1), merge_on(2), merge_on(3)],
+			reached_start: false,
+		})
+	})
+
+	it('skips a malformed line as read does', () => {
+		const lines = [JSON.stringify(merge_on(1)), '{"kind":', JSON.stringify(merge_on(2)), '']
+		const target = ledger_of('malformed', lines)
+
+		expect(lane_ledger_tail.read_since(target, since(1), SMALL_CHUNK_BYTES)).toStrictEqual({
+			entries: [merge_on(1), merge_on(2)],
+			reached_start: true,
+		})
+		expect(lane_ledger_tail.read(target)).toStrictEqual([merge_on(1), merge_on(2)])
+	})
+
+	it('reads an absent ledger as an empty window at its start', () => {
+		expect(lane_ledger_tail.read_since(ledger('absent'), since(0))).toStrictEqual({
+			entries: [],
+			reached_start: true,
+		})
+	})
+})
+
 describe('lane_ledger_tail.read on a line still landing', () => {
 	it('counts it once it is complete, never twice', () => {
 		const target = ledger('fragment')
