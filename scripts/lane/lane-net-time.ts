@@ -1,8 +1,8 @@
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
+import { lane_host_gaps } from './lane-host-gaps'
 import type { LedgerEntry } from './lane-ledger'
-import { lane_sleep } from './lane-sleep'
 import { lane_spans, type IssueAt, type Span } from './lane-spans'
 import { lane_stage_events } from './lane-stage-events'
 import { lane_stage_stats } from './lane-stage-stats'
@@ -85,31 +85,13 @@ function hold_waits(
 	})
 }
 
-// `spans` oldest first with every overlap joined, so a park the host slept through is taken out once.
-function joined(spans: ReadonlyArray<LaneSpan>): Array<LaneSpan> {
-	const sorted = spans.toSorted((left, right) => left.from_ms - right.from_ms)
+// Overlaps joined, so a park the host slept through is taken out once.
+const { joined } = lane_host_gaps
 
-	const kept: Array<LaneSpan> = []
-
-	for (const next of sorted) {
-		const last = kept.at(-1)
-
-		if (last === undefined || next.from_ms > last.to_ms) kept.push({ ...next })
-		else last.to_ms = Math.max(last.to_ms, next.to_ms)
-	}
-
-	return kept
-}
-
-// The host's sleeps (joshuafolkken/kit#5032) cut to `span` and joined: a sleep stops every lane,
-// whatever its issue.
+// The host's stops cut to `span` and joined (`lane-host-gaps.ts`): a sleep stops every lane, whatever
+// its issue.
 function slept(events: ReadonlyArray<RunEvent>, span: LaneSpan): Array<LaneSpan> {
-	const cut = lane_sleep.spans(events).map((sleep) => ({
-		from_ms: Math.max(sleep.from_ms, span.from_ms),
-		to_ms: Math.min(sleep.to_ms, span.to_ms),
-	}))
-
-	return joined(cut.filter((sleep) => sleep.to_ms > sleep.from_ms))
+	return lane_host_gaps.within(lane_host_gaps.gaps_of(events), span)
 }
 
 // Each yield (`lane:plan` gave the seat back) until its issue's next dispatch, every issue's — the

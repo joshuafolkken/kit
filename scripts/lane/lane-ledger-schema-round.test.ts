@@ -12,6 +12,22 @@ describe('lane_ledger_schema_round — the round and pacing kinds, read through 
 		expect(lane_ledger_schema.entry_schema.parse(entry)).toEqual(entry)
 	})
 
+	it.each([[['bug-risks:medium']], [[]]])(
+		'reads a round-two run with its findings %j back as written',
+		(findings: Array<string>) => {
+			const entry = {
+				kind: 'round-two',
+				at: AT,
+				issue: 7873,
+				verdict: 'required',
+				code: 'live',
+				findings,
+			}
+
+			expect(lane_ledger_schema.entry_schema.parse(entry)).toEqual(entry)
+		},
+	)
+
 	it('reads a core admission under the core-wait shape back as written', () => {
 		const entry = { kind: 'core-admission', at: AT, command: 'gate', waited_ms: 0, overflow: true }
 

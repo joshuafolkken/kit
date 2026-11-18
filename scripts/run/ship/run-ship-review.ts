@@ -279,6 +279,11 @@ function kinds_of(findings: ReadonlyArray<Finding>): ReadonlyArray<string> {
 	return [...new Set(findings.map((finding) => kind_of(finding)))]
 }
 
+// Every kind a scored round found, fixed or not — empty for a round that found nothing.
+function finding_kinds(verdict: ScoredVerdict): ReadonlyArray<string> {
+	return kinds_of(verdict.specs.map((spec) => finding_of(spec)))
+}
+
 function stop_finding_of(finding: Finding): StopFinding {
 	const location = review_record_cli.parse_finding(finding.spec)?.file ?? ''
 
@@ -401,6 +406,7 @@ const run_ship_review = {
 	VERDICT,
 	blocking_details,
 	blocking_kinds,
+	finding_kinds,
 	has_fixes,
 	is_clean_round_one,
 	passing_fixes,

@@ -53,6 +53,8 @@ describe('telegram_test_logic.build_input — explicit flags win', () => {
 			issue_title: OVERRIDE_TITLE,
 			body: OVERRIDE_BODY,
 			choices: undefined,
+			reason: undefined,
+			issue: OVERRIDE_ISSUE_URL,
 			issue_url: OVERRIDE_ISSUE_URL,
 			pr_url: OVERRIDE_PR_URL,
 		})
@@ -118,6 +120,37 @@ describe('telegram_test_logic.build_input — confirmation choices', () => {
 
 		expect(result.body).toBe(OVERRIDE_BODY)
 		expect(result.choices).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#7889: the reason the confirmation ledger counts is a registered key.
+function reason_of(reason: string | undefined): unknown {
+	const given = reason === undefined ? {} : { reason }
+	const values = { 'task-type': 'confirmation', recommended: 'Resume', ...given }
+
+	return telegram_test_logic.build_input({ values, context: EMPTY_CONTEXT }).reason
+}
+
+describe('telegram_test_logic.build_input — --reason', () => {
+	it('passes a registered human-stop key through', () => {
+		const key = 'merge-approval'
+
+		expect(reason_of(key)).toBe(key)
+	})
+
+	it('leaves the reason unset when the flag is absent', () => {
+		expect(reason_of(undefined)).toBeUndefined()
+	})
+
+	it('refuses a reason the registry does not hold', () => {
+		expect(() => reason_of('just-curious')).toThrow(/Invalid --reason: just-curious/u)
+	})
+
+	it('names the Issue for the ledger by the --issue-url it was given', () => {
+		const url = 'https://github.com/joshuafolkken/kit/issues/7889'
+		const values = { 'task-type': 'confirmation', recommended: 'Resume', 'issue-url': url }
+
+		expect(telegram_test_logic.build_input({ values, context: EMPTY_CONTEXT }).issue).toBe(url)
 	})
 })
 

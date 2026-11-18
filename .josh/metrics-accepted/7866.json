@@ -1,0 +1,7 @@
+{
+	"reason": "New shared host-gap module and the board's net (+excluded) time cell for #7866; the exclusion moved out of lane-net-time rather than being duplicated",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 67
+	}
+}

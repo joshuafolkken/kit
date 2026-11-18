@@ -664,11 +664,12 @@ pnpm josh notify --task-type confirmation --issue-url "https://..." --body-file 
 
 **Options:**
 
-- `--task-type` — one of `planning` 📋, `completion` ✅, `failure` ❌, `warning` ⚠️, `kickoff_retry` 🔄, `confirmation` ⏸️. Do not send `completion` or `warning` by hand — `josh followup` sends them.
+- `--task-type` — one of `planning` 📋, `completion` ✅, `failure` ❌, `warning` ⚠️, `kickoff_retry` 🔄, `confirmation` ⏸️; only `josh followup` sends `completion` / `warning`.
 - `--body` / `--body=$'…'` — inline body; use `--body=$'…'` when it starts with `-`.
 - `--body-file` — read the body from a file written under `.josh/tmp/` (`-` reads stdin); use this whenever the body carries a backtick or `$`. Passing both forms is refused.
-- `--repo-name` / `--issue-url` / `--pr-url` — header repository, resolved in that order, then the working directory. The issue title is read from `--issue-url`.
-- `--recommended` / `--alternative` — the choices appended under `JOSH_SESSION_LANG` headings; `--recommended` is required for `confirmation`, `--alternative` is repeatable.
+- `--repo-name` / `--issue-url` / `--pr-url` — header repository in that order, else the cwd; `--issue-url` also gives the issue title.
+- `--recommended` / `--alternative` — choices under `JOSH_SESSION_LANG` headings; `confirmation` requires `--recommended`; `--alternative` repeats.
+- `--reason` — human-stop key for the confirmation ledger; default `needs-decision`.
 
 <!-- /usage -->
 
