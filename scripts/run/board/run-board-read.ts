@@ -6,7 +6,7 @@ import { lane_host_gaps } from '#scripts/lane/lane-host-gaps'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
 import type { TableRead } from '#scripts/lane/lane-process-table'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
-import { lane_state, type LaneStateRecord } from '#scripts/lane/lane-state'
+import type { LaneStateRecord } from '#scripts/lane/lane-state'
 import { stamped_memo } from '#scripts/lib/stamped-memo'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
@@ -25,6 +25,7 @@ import {
 } from './run-board-operation-read'
 import type { ProcessRoots } from './run-board-process-groups'
 import type { QuotaProvider } from './run-board-quota-read'
+import { run_board_records } from './run-board-records'
 import { run_board_scope } from './run-board-scope'
 import { run_board_single, type EndedRoot, type RootRun } from './run-board-single'
 import { run_board_span, type BoardSpan } from './run-board-span'
@@ -182,13 +183,13 @@ function unfinished_here(
 }
 
 // Every lane record, read once for the lanes' states and the closes still unfinished.
-async function lanes_here(
+function lanes_here(
 	lanes: ReadonlyArray<LaneInfo>,
 	repository: string,
 	events: ReadonlyArray<RunEvent>,
 	started_ms: number,
-): Promise<Pick<LocalRead, 'lane_states' | 'closing' | 'stuck'>> {
-	const records = await lane_state.read_records(repository)
+): Pick<LocalRead, 'lane_states' | 'closing' | 'stuck'> {
+	const records = run_board_records.read_records(repository)
 
 	return {
 		lane_states: sorted_here(lanes, records, events, started_ms),
@@ -344,7 +345,7 @@ async function read_local(table?: TableRead): Promise<LocalRead | undefined> {
 
 	const events = run_event_tail.read_events(run_event_stream.target_of(repository))
 	const lanes = await lane_registry.list_lanes(await main_root())
-	const lane_read = await lanes_here(lanes, repository, events, span.started_ms)
+	const lane_read = lanes_here(lanes, repository, events, span.started_ms)
 
 	return {
 		...span_fields(span, await roots_here(span, root, events)),
