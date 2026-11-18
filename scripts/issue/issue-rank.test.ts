@@ -10,14 +10,26 @@ import { issue_priority } from './issue-priority'
 import { issue_rank, type RankRow } from './issue-rank'
 
 // joshuafolkken/kit#2928: priority:high, then a verification-path defect, then dependents, then the
-// order the caller gave.
+// order the caller gave. joshuafolkken/kit#7912: any defect follows the verification-path defect.
 
 interface Row extends RankRow {
 	name: string
 }
 
 function row(name: string, labels: ReadonlyArray<string> = [], dependents = 0): Row {
-	return { name, is_last: false, labels, lost_minutes: 0, gain_minutes: 0, dependents }
+	return {
+		name,
+		is_defect: false,
+		is_last: false,
+		labels,
+		lost_minutes: 0,
+		gain_minutes: 0,
+		dependents,
+	}
+}
+
+function defect(name: string, labels: ReadonlyArray<string> = []): Row {
+	return { ...row(name, labels), is_defect: true }
 }
 
 function last(name: string, labels: ReadonlyArray<string> = [], dependents = 0): Row {
@@ -90,6 +102,59 @@ describe('issue_rank.rank priority:critical', () => {
 		]
 
 		expect(names_of(rows)).toStrictEqual([CRITICAL, URGENT, DEFECT])
+	})
+})
+
+// joshuafolkken/kit#7912: within one priority, a defect goes ahead of every other key but the
+// verification-path defect; a priority difference still wins over it.
+const SMALL_FEATURE = 'small-feature'
+const LARGE_DEFECT = 'large-defect'
+const SMALL_LINES = 10
+const LARGE_LINES = 400
+const INTERRUPT = 'interrupt-defect'
+const RESUMABLE = 'resumable'
+const RESUMABLE_DEFECT = 'resumable-defect'
+const LOSSY = 'lossy'
+
+describe('issue_rank.rank defect key', () => {
+	it('puts a large defect ahead of a small non-defect of its priority (ac-74aaebd6)', () => {
+		const rows = [
+			{ ...row(SMALL_FEATURE), estimated_lines: SMALL_LINES },
+			{ ...defect(LARGE_DEFECT), estimated_lines: LARGE_LINES },
+		]
+
+		expect(names_of(rows)).toStrictEqual([LARGE_DEFECT, SMALL_FEATURE])
+	})
+
+	it('puts a defect with no priority label behind a priority:high non-defect (ac-0234d03e)', () => {
+		expect(names_of([defect(DEFECT), row(URGENT, [PRIORITY_HIGH_LABEL])])).toStrictEqual([
+			URGENT,
+			DEFECT,
+		])
+	})
+
+	it('puts a verification-path defect ahead of a plain defect (ac-f79995d3)', () => {
+		const rows = [defect(DEFECT, [BUG_LABEL]), defect(INTERRUPT, [INTERRUPT_ROUTE_LABEL])]
+
+		expect(names_of(rows)).toStrictEqual([INTERRUPT, DEFECT])
+	})
+})
+
+describe('issue_rank.rank defect key over resumable work and later keys', () => {
+	it('puts a defect ahead of resumable non-defect work, a resumable defect first (ac-17edd19c)', () => {
+		const rows = [
+			{ ...row(RESUMABLE), is_resumable: true },
+			defect(DEFECT),
+			{ ...defect(RESUMABLE_DEFECT), is_resumable: true },
+		]
+
+		expect(names_of(rows)).toStrictEqual([RESUMABLE_DEFECT, DEFECT, RESUMABLE])
+	})
+
+	it('keeps a defect ahead of more dependents and a larger causing lane', () => {
+		const rows = [row(WAITED_ON, [], MANY), lost(LOSSY, MANY), defect(DEFECT)]
+
+		expect(names_of(rows)).toStrictEqual([DEFECT, LOSSY, WAITED_ON])
 	})
 })
 
