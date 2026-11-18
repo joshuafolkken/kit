@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_body_keys } from './issue-body-keys'
 import { plan_consumers_section } from './plan-consumers-section'
 import { plan_size_check } from './plan-size-check'
+import { size_estimate } from './size-estimate'
 
 // joshuafolkken/kit#7734: `issue:plan --planned` judges the plan's estimate by the filing's guide. The
 // issue read and the lane measurements are mocked; unmeasured, the guide is its floor.
@@ -96,6 +97,10 @@ describe('plan_size_check.next_steps — the split assessment’s steps', () => 
 		expect(steps).toContain(split_assess.QUESTION_SECTION)
 		expect(steps).toContain('kickoff #7')
 		expect(steps).toContain(split_assess.REASON_PREFIX)
+	})
+
+	it('asks for the no-split reason with its kind, as every size refusal does', () => {
+		expect(plan_size_check.next_steps('7')).toContain(size_estimate.reason_hint())
 	})
 
 	it('addresses a --repo plan’s steps to that repository’s issue', () => {
