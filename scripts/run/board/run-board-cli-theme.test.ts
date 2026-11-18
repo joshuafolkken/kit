@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_board_cli } from './run-board-cli'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_intro } from './run-board-intro'
@@ -23,6 +23,11 @@ async function frame_of(argv: Array<string>): Promise<string> {
 async function no_pause(): Promise<void> {
 	await Promise.resolve()
 }
+
+// joshuafolkken/kit#8027: a shell that names a theme must not draw the frames these tests take as plain.
+beforeEach(() => {
+	vi.stubEnv('JOSH_BOARD_THEME', undefined)
+})
 
 afterEach(() => {
 	vi.unstubAllEnvs()
@@ -100,7 +105,6 @@ describe('run_board_cli.run --theme reveal', () => {
 	})
 
 	it('writes the first frame whole on a board in no theme', async () => {
-		vi.stubEnv('JOSH_BOARD_THEME', undefined)
 		const frames = await live_writes([])
 
 		expect(line_writes(frames)).toStrictEqual([])
