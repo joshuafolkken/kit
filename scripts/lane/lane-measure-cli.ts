@@ -6,6 +6,7 @@ import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { session_cite } from '#scripts/issue/session-cite'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
+import { lane_human_wait_read } from './lane-human-wait-read'
 import { lane_ledger_archive } from './lane-ledger-archive'
 import { lane_limit_history } from './lane-limit-history'
 import { lane_net_read } from './lane-net-read'
@@ -121,16 +122,19 @@ function transcript_directories(context: MeasureContext): ReadonlyArray<string> 
 	return cost_transcript.lane_transcript_directories(main_cwd, cost_transcript.home_directory())
 }
 
-// The whole ledger with its archive, every run event and the window's lane calls — what the
-// `lane:stats` tables read.
+// The whole ledger with its archive, every run event, the window's lane calls and its waits on a
+// person — what the `lane:stats` tables read.
 async function period_records(
 	context: MeasureContext,
 	window: StatsWindow,
 ): Promise<PeriodRecords> {
+	const events = await lane_net_read.read_events(context)
+
 	return {
 		entries: await lane_ledger_archive.read_history(context),
-		events: await lane_net_read.read_events(context),
+		events,
 		calls: lane_transcript_stats.read_calls(transcript_directories(context), window),
+		human_waits: await lane_human_wait_read.read_for(context, events, window),
 	}
 }
 

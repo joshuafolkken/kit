@@ -150,6 +150,7 @@ async function answer(
 
 const confirmation_ledger = {
 	answer,
+	ledger_directory,
 	read,
 	record,
 	record_sent,
