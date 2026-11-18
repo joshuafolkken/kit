@@ -17,10 +17,20 @@ import { backlog_triage_adopted } from './backlog-triage-adopted'
 // A park with no tree line (outside a lane, or written before the note carried it) is never a loop,
 // nor is one after an adopt with `--done`: the parent acted outside the lane, so its tree never moves.
 // A re-park whose leading heading (its question) differs from the earlier park's is a new dead end,
-// not the same one, so it is no loop either.
+// not the same one, so it is no loop either. The hold quotes the adopted option's permission line, naming
+// the action a person takes (joshuafolkken/kit#7985); a folding option never reaches it, for its adopt
+// runs `lane:fold` instead of a requeue.
 
+const PERMISSION_LINE = '- 必要な権限: '
 const NOT_HELD =
 	'decision recorded and park cleared, but parking the unchanged re-park for a person failed; re-run this command'
+
+// The option adopted now, and its permission line, which the hold quotes as the action a person takes.
+interface AdoptedOption {
+	issue: string
+	option: number
+	permission: string
+}
 
 interface ParkLoop {
 	// The earlier adopt's decision line, which names the option adopted before.
@@ -73,27 +83,28 @@ function loop_of(comments: ReadonlyArray<IssueComment>): ParkLoop | undefined {
 		: undefined
 }
 
-function comment_of(issue: string, option: number, loop: ParkLoop): string {
+function comment_of(adopted: AdoptedOption, loop: ParkLoop): string {
+	const { issue, option, permission } = adopted
 	const child = issue_cite.plain_for('github', issue)
 	const k = String(option)
 	const retry = `\`${run_stalled.resume_of(issue, true)}\``
+	const line = `\`${PERMISSION_LINE}${permission}\``
 
 	if (session_language.is_japanese(session_language.resolve_session_lang().lang)) {
-		return `${child}: 選択肢 ${k} を採用しましたが、再キューしていません（${run_stalled.PARK_LOOP.short}）。前の採用（${loop.adopted}）の後、子はレーンのツリー（${loop.tree}）が変わらないまま再び park しました。採用した選択肢は実行されていません。\n\n次: 選択肢を人が実行してから、${retry} で再開してください。`
+		return `${child}: 選択肢 ${k} を採用しましたが、再キューしていません（${run_stalled.PARK_LOOP.short}）。前の採用（${loop.adopted}）の後、子はレーンのツリー（${loop.tree}）が変わらないまま再び park しました。採用した選択肢は実行されていません。\n\n次: 選択肢 ${k} の ${line} の操作を人が実行してから、${retry} で再開してください。`
 	}
 
-	return `${child}: option ${k} adopted but not requeued (${run_stalled.PARK_LOOP.short}): after the earlier adopt (${loop.adopted}) ${run_stalled.PARK_LOOP.why} Lane tree: ${loop.tree}.\n\nNext: take the option by hand, then resume with ${retry}.`
+	return `${child}: option ${k} adopted but not requeued (${run_stalled.PARK_LOOP.short}): after the earlier adopt (${loop.adopted}) ${run_stalled.PARK_LOOP.why} Lane tree: ${loop.tree}.\n\nNext: take option ${k}'s ${line} action by hand, then resume with ${retry}.`
 }
 
 // Parks the child `run:stalled` with the loop's reason instead of requeuing it.
 async function hold(
-	issue: string,
-	option: number,
+	adopted: AdoptedOption,
 	loop: ParkLoop,
 ): Promise<{ next: string } | { problem: string }> {
 	const is_parked = await run_stalled_park.apply(
-		issue,
-		comment_of(issue, option, loop),
+		adopted.issue,
+		comment_of(adopted, loop),
 		run_stalled.PARK_LOOP.short,
 	)
 
@@ -105,4 +116,4 @@ async function hold(
 const backlog_triage_park_loop = { hold, loop_of }
 
 export { backlog_triage_park_loop }
-export type { ParkLoop }
+export type { AdoptedOption, ParkLoop }

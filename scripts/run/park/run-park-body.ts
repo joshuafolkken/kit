@@ -1,4 +1,5 @@
 import { markdown_section } from '#scripts/issue/markdown-section'
+import { run_park_fold } from './run-park-fold'
 import { run_park_permission } from './run-park-permission'
 
 // The `run:park` body schema (joshuafolkken/kit#6669): numbered options under the options heading,
@@ -63,9 +64,10 @@ const NO_PICK = /^推奨なし[\s:：—-]+\S/u
 const AUTO_TIER = 'A'
 // The tier no parent takes, even on a person's behalf: trust settings, third parties, destructive acts.
 const PERSON_TIER = 'C'
-const { AUTO_PERMISSION, PARENT_PERMISSION, FILING_COMMAND, CLOSE_COMMAND } = run_park_permission
+const { AUTO_PERMISSION, PARENT_PERMISSION, FILING_COMMAND, CLOSE_COMMAND, FOLD_COMMAND } =
+	run_park_permission
 const PARENT_ACTION_NOTE = ' · 親の操作'
-const PARENT_COMMANDS = [FILING_COMMAND, CLOSE_COMMAND] as const
+const PARENT_COMMANDS = [FILING_COMMAND, CLOSE_COMMAND, FOLD_COMMAND] as const
 
 const FORMAT = [
 	'Park body schema:',
@@ -286,10 +288,19 @@ function parent_action(body: string, number: number): boolean {
 	return is_parent_action(parse(body).options.find((candidate) => candidate.number === number))
 }
 
+function option_at(body: string, number: number): ParkOption | undefined {
+	return parse(body).options.find((candidate) => candidate.number === number)
+}
+
 function parent_command(body: string, number: number, command: string): boolean {
-	const option = parse(body).options.find((candidate) => candidate.number === number)
+	const option = option_at(body, number)
 
 	return is_parent_action(option) && names_command(option, command)
+}
+
+// The permission option `number` carries, as written on its permission line; `undefined` for none.
+function permission_of_option(body: string, number: number): string | undefined {
+	return option_at(body, number)?.permission
 }
 
 // Whether option `number` is the parent's filing of an Issue the child then waits on.
@@ -302,12 +313,25 @@ function close_action(body: string, number: number): boolean {
 	return parent_command(body, number, CLOSE_COMMAND)
 }
 
+// Whether option `number` ships this Issue in another Issue's pull request (joshuafolkken/kit#7985).
+function fold_action(body: string, number: number): boolean {
+	return parent_command(body, number, FOLD_COMMAND)
+}
+
+// The Issue a fold option names after `--into`; `undefined` for no fold option or one naming none.
+function fold_target(body: string, number: number): string | undefined {
+	if (!fold_action(body, number)) return undefined
+
+	return run_park_fold.into_of(permission_of_option(body, number))
+}
+
 // Whether adopting option `number` needs `--done`: a parent action the adopt does not take itself.
-// A closing option is taken by the adopt; one that also files still needs the filed Issue named.
+// A closing or folding option is taken by the adopt; one that also files still needs the filed Issue named.
 function done_needed(body: string, number: number): boolean {
 	if (filing_action(body, number)) return true
+	const is_taken = close_action(body, number) || fold_action(body, number)
 
-	return parent_action(body, number) && !close_action(body, number)
+	return parent_action(body, number) && !is_taken
 }
 
 function is_parents(option: ParkOption): boolean {
@@ -400,8 +424,11 @@ const run_park_body = {
 	default_pick,
 	done_needed,
 	filing_action,
+	fold_action,
+	fold_target,
 	is_park,
 	parent_action,
+	permission_of: permission_of_option,
 	problem_of,
 	summary_of,
 }
