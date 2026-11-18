@@ -13,6 +13,8 @@ const ESCAPE = new RegExp(
 )
 const LINK_START = `${ESC}]8;`
 const LINK_CLOSE = `${ESC}]8;;${BEL}`
+// A link's closing escape: one with no URI, ended by BEL or ST.
+const LINK_CLOSE_ENDS = [`;${BEL}`, `;${ESC}\\`]
 const RESET = `${ESC}[0m`
 const SEGMENTER = new Intl.Segmenter()
 
@@ -35,6 +37,15 @@ function pieces_of(line: string): Array<Piece> {
 		.flatMap((part) => (part.startsWith(ESC) ? { text: part, width: 0 } : graphemes(part)))
 }
 
+// Whether the last link escape kept opens a link — one the cut leaves open.
+function is_link_open(kept: ReadonlyArray<Piece>): boolean {
+	const last = kept.findLast((piece) => piece.text.startsWith(LINK_START))
+
+	if (last === undefined) return false
+
+	return LINK_CLOSE_ENDS.every((end) => !last.text.endsWith(end))
+}
+
 // `line` cut to its first `columns` columns; a character two columns wide the cut would split is left
 // out whole. A link the cut leaves open is closed, and the colors reset.
 function cut_styled(line: string, columns: number): string {
@@ -45,7 +56,7 @@ function cut_styled(line: string, columns: number): string {
 		return used <= columns
 	})
 	const text = kept.map((piece) => piece.text).join('')
-	const close = text.includes(LINK_START) ? LINK_CLOSE : ''
+	const close = is_link_open(kept) ? LINK_CLOSE : ''
 
 	return `${text}${close}${RESET}`
 }

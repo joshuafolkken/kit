@@ -14,11 +14,16 @@ interface Split {
 	text: string
 }
 
+// The key of the row numbered `number` in `section`.
+function key_of(section: KeySection, number: number): string {
+	return `${section}:${String(number)}`
+}
+
 // `text` led by the key of the row it draws; no key where the row's section names none.
 function keyed(section: KeySection | undefined, number: number, text: string): string {
 	if (section === undefined) return text
 
-	return `${OPEN}${section}:${String(number)}${CLOSE}${text}`
+	return `${OPEN}${key_of(section, number)}${CLOSE}${text}`
 }
 
 // A line's key and the line without it.
@@ -38,7 +43,7 @@ function without_key(line: string): string {
 	return split_key(line).text
 }
 
-const run_board_row_key = { keyed, split_key, without_key }
+const run_board_row_key = { key_of, keyed, split_key, without_key }
 
 export { run_board_row_key }
 export type { KeySection }

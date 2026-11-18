@@ -30,6 +30,7 @@ import { run_board_render_section } from './run-board-render-section'
 import { run_board_render_throughput } from './run-board-render-throughput'
 import { run_board_render_time } from './run-board-render-time'
 import { run_board_render_title } from './run-board-render-title'
+import { run_board_row_sections } from './run-board-row-sections'
 import type { Thanks } from './run-board-thanks-csv'
 import type { ThroughputRow } from './run-board-throughput'
 
@@ -188,7 +189,7 @@ function plan_parts(
 
 	const frame = frame_of(header, notes, size)
 	const conditioned = { ...frame, condition_width: width_for(layout.unreached) }
-	const done = layout.active.filter((row) => run_board_layout.is_finished(row.state))
+	const done = run_board_row_sections.done_rows(layout)
 	const waiting = `${WAITS_ICON} ${WORDS.waiting}`
 
 	return {

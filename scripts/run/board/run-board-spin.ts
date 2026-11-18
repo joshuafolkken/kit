@@ -4,6 +4,7 @@ import { run_board_fit, type TerminalSize } from './run-board-fit'
 import { run_board_intro } from './run-board-intro'
 import { run_board_labels } from './run-board-labels'
 import { run_board_row_key } from './run-board-row-key'
+import { run_board_spot } from './run-board-spot'
 import type { BoardPorts } from './run-board-state'
 import { run_board_type_rows, type KeyedLine, type Typing } from './run-board-type-rows'
 
@@ -14,8 +15,7 @@ import { run_board_type_rows, type KeyedLine, type Typing } from './run-board-ty
 // after the lines above it wrap, its column by display width — is recorded as the frame is written. A
 // row the frame was cut to the terminal's rows without is not on screen, so it records nothing.
 
-// A private-use character one column wide, as a spinner frame is, so the frame is fitted the same.
-const SPOT = '\u{E000}'
+const { SPOT } = run_board_spot
 const REDRAW_MS = MS_PER_SECOND
 const CSI = '\u{1B}['
 const RESET = `${CSI}0m`
@@ -74,18 +74,19 @@ function starts_of(lines: ReadonlyArray<string>, columns: number): Array<number>
 	})
 }
 
-// Each line with its placeholders drawn as `frame` and its key taken out, and the keyed ones.
+// Each line with its placeholders drawn as `frame` and its key taken out, and the keyed ones — their
+// placeholders kept, so a typing row draws the spinner's frame of the moment it is written.
 function keyed_of(
 	lines: ReadonlyArray<string>,
 	frame: string,
 	starts: ReadonlyArray<number>,
 ): Pick<Spun, 'lines' | 'keyed'> {
-	const drawn = lines.map((line) => run_board_row_key.split_key(line.split(SPOT).join(frame)))
-	const keyed = drawn.flatMap(({ key, text }, index) =>
+	const split = lines.map((line) => run_board_row_key.split_key(line))
+	const keyed = split.flatMap(({ key, text }, index) =>
 		key === undefined ? [] : { key, index, row: starts[index] ?? 1, text },
 	)
 
-	return { lines: drawn.map((line) => line.text), keyed }
+	return { lines: split.map((line) => run_board_spot.drawn(line.text, frame)), keyed }
 }
 
 // A keyed row types only on screen and within one screen row: a row typed shorter than it wraps would

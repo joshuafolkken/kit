@@ -141,12 +141,12 @@ describe('run_board_spin.spin_to_second', () => {
 })
 
 describe('run_board_spin — the rows a theme types (joshuafolkken/kit#8003)', () => {
-	it('takes each row’s key out of the frame and records the row it starts on, its text as written', () => {
+	it('takes each row’s key out of the frame and records the row it starts on, its spinner kept a placeholder', () => {
 		const lines = ['x'.repeat(25), keyed('done', 7, `${SPOT} ✅ 7`), keyed('lanes', 8, 'off')]
 		const { lines: written, keyed: rows } = spun(lines, '⠋', { rows: 4, columns: 10 })
 
 		expect(written).toStrictEqual(['x'.repeat(25), '⠋ ✅ 7', 'off'])
-		expect(rows).toStrictEqual([{ key: 'done:7', index: 1, row: 4, text: '⠋ ✅ 7' }])
+		expect(rows).toStrictEqual([{ key: 'done:7', index: 1, row: 4, text: `${SPOT} ✅ 7` }])
 	})
 
 	it('records no keyed row that wraps, so a row typed shorter never moves the lines below it', () => {
@@ -173,5 +173,21 @@ describe('run_board_spin — the rows a theme types (joshuafolkken/kit#8003)', (
 			`${spin_bytes(spots, spinner_of(first_ms))}${type_bytes(typing, first_ms)}`,
 		)
 		expect(writes[0]?.text).toContain(`${ESCAPE}[3;1Hxx${ESCAPE}[0m█`)
+	})
+})
+
+describe('run_board_spin — a typing row’s spinner (joshuafolkken/kit#8003)', () => {
+	it('turns on each write, as the turns between redraws do', () => {
+		const text = `${SPOT} ${'x'.repeat(40)}`
+		const typing = {
+			seen: new Set<string>(),
+			lines: [{ key: 'lanes:8', index: 0, row: 1, text, start_ms: START - 5 * LETTER_MS }],
+		}
+		const first_ms = START + SPINNER_INTERVAL_MS
+		const second_ms = first_ms + SPINNER_INTERVAL_MS
+
+		expect(type_bytes(typing, first_ms)).toContain(`H${spinner_of(first_ms)} x`)
+		expect(type_bytes(typing, second_ms)).toContain(`H${spinner_of(second_ms)} x`)
+		expect(spinner_of(first_ms)).not.toBe(spinner_of(second_ms))
 	})
 })

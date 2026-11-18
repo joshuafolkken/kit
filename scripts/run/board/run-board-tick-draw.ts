@@ -11,6 +11,7 @@ import { run_board_notes, type Titles } from './run-board-notes'
 import type { LocalRead } from './run-board-read'
 import { run_board_render } from './run-board-render'
 import { run_board_root_layout } from './run-board-root-layout'
+import { run_board_row_sections } from './run-board-row-sections'
 import { run_board_seat, type SeatRead } from './run-board-seat'
 import { run_board_setup } from './run-board-setup'
 import type { Known } from './run-board-snapshot'
@@ -186,10 +187,16 @@ function frame_of(state: BoardState, local: LocalRead, header: LaidHeader, redra
 
 // The rows this frame types where the board types them; a frame before the plan is read is no base — the
 // rows the plan brings were already there — so the frame the plan arrives on is the first base.
-function typing_of(state: BoardState, keyed: ReadonlyArray<KeyedLine>, redraw: Redraw): Typing {
+function typing_of(
+	state: BoardState,
+	keyed: ReadonlyArray<KeyedLine>,
+	layout: BoardLayout,
+	redraw: Redraw,
+): Typing {
 	const is_on = redraw.ports.types_rows === true && state.plan !== undefined
+	const frame = { keyed, known: run_board_row_sections.keys_of(layout) }
 
-	return run_board_type_rows.next(state.typing, keyed, redraw.now_ms, is_on)
+	return run_board_type_rows.next(state.typing, frame, redraw.now_ms, is_on)
 }
 
 function draw(ports: BoardPorts, lines: ReadonlyArray<string>): void {
@@ -242,7 +249,7 @@ function draw_run(
 	)
 	const header = header_of({ ...settled, baseline_total }, local, layout, redraw)
 	const { lines, spots, keyed } = frame_of(settled, local, header, redraw)
-	const typing = typing_of(state, keyed, redraw)
+	const typing = typing_of(state, keyed, layout, redraw)
 
 	draw(redraw.ports, run_board_type_rows.typed_lines(lines, typing, redraw.now_ms))
 

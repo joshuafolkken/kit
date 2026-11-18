@@ -1,6 +1,8 @@
 import { run_board_cut_styled } from './run-board-cut-styled'
 import { run_board_fit } from './run-board-fit'
 import { run_board_intro } from './run-board-intro'
+import { run_board_labels } from './run-board-labels'
+import { run_board_spot } from './run-board-spot'
 import { run_board_typing } from './run-board-typing'
 
 // joshuafolkken/kit#8003: a live board in a theme types each issue row that appears after its base frame
@@ -26,10 +28,16 @@ interface TypingLine extends KeyedLine {
 	start_ms: number
 }
 
-// The keys the last frame drew — none before the base frame — and the rows typing.
+// The keys the last frame's layout held — none before the base frame — and the rows typing.
 interface Typing {
 	seen: ReadonlySet<string> | undefined
 	lines: ReadonlyArray<TypingLine>
+}
+
+// A frame's keyed rows that can type and the key of every row its layout holds.
+interface TypingFrame {
+	keyed: ReadonlyArray<KeyedLine>
+	known: ReadonlySet<string>
 }
 
 const NO_TYPING: Typing = { seen: undefined, lines: [] }
@@ -43,17 +51,21 @@ function is_typed(line: TypingLine, now_ms: number): boolean {
 	return columns_at(line, now_ms) >= run_board_fit.width_of(line.text)
 }
 
-// The row as typed by `now_ms`, its colors kept; whole, without the block, once typed through.
+// The row as typed by `now_ms`, its colors kept and its spinners at their frame of that moment; whole,
+// without the block, once typed through.
 function shown(line: TypingLine, now_ms: number): string {
 	const part = is_typed(line, now_ms)
 		? line.text
 		: run_board_cut_styled.cut_styled(line.text, columns_at(line, now_ms))
 
-	return run_board_typing.typed(line.text, part)
+	return run_board_spot.drawn(
+		run_board_typing.typed(line.text, part),
+		run_board_labels.spinner_of(now_ms),
+	)
 }
 
-// The row as it types on this frame: from now for a key the last frame did not draw, else from where it
-// started; none for a row not typing or typed through.
+// The row as it types on this frame: from now for a key the last frame's layout did not hold, else from
+// where it started; none for a row not typing or typed through.
 function typing_of(
 	line: KeyedLine,
 	seen: ReadonlySet<string>,
@@ -72,25 +84,20 @@ function typing_of(
 }
 
 // The rows typing on this frame; the first frame where typing is on is the base and types none, and
-// with it off none types and no base is kept.
-function next(
-	typing: Typing,
-	keyed: ReadonlyArray<KeyedLine>,
-	now_ms: number,
-	is_on: boolean,
-): Typing {
+// with it off none types and no base is kept. A row is new by `known` — every key the layout holds,
+// drawn or not — so one a fold or the pane's fit hid types not when it shows again.
+function next(typing: Typing, frame: TypingFrame, now_ms: number, is_on: boolean): Typing {
 	if (!is_on) return NO_TYPING
 
-	const seen = new Set(keyed.map((line) => line.key))
 	const last = typing.seen
 
-	if (last === undefined) return { seen, lines: [] }
+	if (last === undefined) return { seen: frame.known, lines: [] }
 
-	const lines = keyed
+	const lines = frame.keyed
 		.map((line) => typing_of(line, last, typing.lines, now_ms))
 		.filter((line) => line !== undefined)
 
-	return { seen, lines }
+	return { seen: frame.known, lines }
 }
 
 // The frame's lines, each typing row as typed by `now_ms`.
@@ -114,4 +121,4 @@ function type_bytes(typing: Typing, now_ms: number): string {
 const run_board_type_rows = { NO_TYPING, next, type_bytes, typed_lines }
 
 export { run_board_type_rows }
-export type { KeyedLine, Typing }
+export type { KeyedLine, Typing, TypingFrame }

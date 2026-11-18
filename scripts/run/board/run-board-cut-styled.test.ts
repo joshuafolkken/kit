@@ -36,6 +36,12 @@ describe('run_board_cut_styled.cut_styled', () => {
 		)
 	})
 
+	it('adds no close after a link the cut kept whole', () => {
+		const line = `${linked('79')} title`
+
+		expect(cut_styled(line, 4)).toBe(`${linked('79')} t${RESET}`)
+	})
+
 	it('leaves out a character two columns wide that the cut would split', () => {
 		expect(cut_styled('a✅b', 2)).toBe(`a${RESET}`)
 		expect(cut_styled('a✅b', 3)).toBe(`a✅${RESET}`)
