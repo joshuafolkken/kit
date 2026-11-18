@@ -115,6 +115,35 @@ afterEach(() => {
 	vi.restoreAllMocks()
 })
 
+// joshuafolkken/kit#7857: a `kickoff new` child that ends cleanly without filing is a failed hand-off.
+describe('run_handoff_cli.run kickoff filing check', () => {
+	it.each([
+		{ why: 'no URL', result: 'Waiting for the background check.' },
+		{ why: 'only a pull request URL', result: 'See https://github.com/o/r/pull/9' },
+	])('fails a kickoff new whose final message names $why', async ({ result }) => {
+		const { ports, lines } = fake({
+			read_text: () => JSON.stringify({ type: 'result', result }),
+		})
+		const code = await run_handoff_cli.run(['kickoff', 'new', BRIEF_FLAG, BRIEF_FILE], ports)
+		const refusal = lines.find((line) => line.startsWith('run:handoff: kickoff new'))
+		const log = lines.find((line) => line.startsWith('log: '))?.slice('log: '.length)
+
+		expect(code).toBe(1)
+		expect(refusal).toContain(`read the log: ${String(log)}`)
+		expect(refusal).toContain('gh issue list --search')
+	})
+
+	it('keeps a kickoff #N that names no URL a success', async () => {
+		const { ports } = fake({
+			read_text: () => JSON.stringify({ type: 'result', result: 'Planned.' }),
+		})
+
+		await expect(
+			run_handoff_cli.run(['kickoff', '5', BRIEF_FLAG, BRIEF_FILE], ports),
+		).resolves.toBe(0)
+	})
+})
+
 describe('run_handoff_cli.run', () => {
 	it('waits for kickoff and prints its final message and the URLs it created', async () => {
 		const { ports, lines, requests } = fake()
