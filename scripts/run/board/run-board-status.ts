@@ -333,7 +333,7 @@ function unsettled(issue: number, status: ItemStatus, read: OpenRead): ItemStatu
 	return from_closed ?? labelled(issue, status, read)
 }
 
-// The closed read is kept for the run, so a waiting child (parked or human) a person reopened since is
+// The closed read is kept for the run, so a waiting child (parked, human or retry) a person reopened since is
 // told apart by a listing read after the close holding it again. Once a listing has landed, that — not
 // the launch — dates the close, so a closed child never waits in 🙋 decision (joshuafolkken/kit#6535,
 // joshuafolkken/kit#6891).
