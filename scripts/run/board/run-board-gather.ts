@@ -142,34 +142,59 @@ async function reread(
 	return { read: await read_at(read, ports, { now_ms: ports.now(), ...later }), snapshot: later }
 }
 
-// The sample is timed when it is taken, not when the reads began: it is due by the reads' clock, so a
-// sample taken a few milliseconds in does not slip to the read after the second.
+// The machine and the quotas, which read no process snapshot, so they are taken beside the lane read
+// (joshuafolkken/kit#7931); `undefined` when no sample is due.
+interface Sampled {
+	machine: MachineMark
+	quotas: Quotas | undefined
+}
+
+// The sample is timed when it is taken, and due by the same clock the round's sample is stamped with.
+async function sample(
+	state: GatherState,
+	ports: GatherPorts,
+	now_ms: number,
+): Promise<Sampled | undefined> {
+	if (!is_due(state.sampled_ms, MACHINE_SAMPLE_MS, now_ms)) return undefined
+
+	const at_ms = ports.now()
+	const [machine_sample, quotas] = await Promise.all([
+		timed('machine', ports.read_machine),
+		timed('quotas', async () => await ports.read_quotas?.()),
+	])
+
+	return { machine: { sample: machine_sample, at_ms }, quotas }
+}
+
+// The usages read the lane read's snapshot, so they follow it.
 async function resample(
 	state: GatherState,
 	ports: GatherPorts,
 	at: SnapshotAt,
+	sampled: Sampled | undefined,
 ): Promise<GatherState> {
-	if (!is_due(state.sampled_ms, MACHINE_SAMPLE_MS, at.now_ms)) return state
+	if (sampled === undefined) return state
 
-	const at_ms = ports.now()
-	const machine = { sample: await timed('machine', ports.read_machine), at_ms }
-	const gauges = run_board_machine.gauges_of(state.machine, machine)
+	const gauges = run_board_machine.gauges_of(state.machine, sampled.machine)
 	const budget_waits = ports.read_waits?.() ?? []
 	const usages = await timed(
 		'usages',
 		async () => await run_board_usage_board.read_usages(state, ports, at.table),
 	)
-	const quotas = await timed('quotas', async () => await ports.read_quotas?.())
 
-	return { ...state, ...usages, machine, gauges, budget_waits, quotas, sampled_ms: at.now_ms }
+	return { ...state, ...usages, ...sampled, gauges, budget_waits, sampled_ms: at.now_ms }
 }
 
 // One round of the reads. The process snapshot is read once, by whichever of the lane read and the
-// sample asks first.
+// usages asks first.
 async function gather(state: GatherState, ports: GatherPorts, pace: Pace): Promise<GatherState> {
-	const { read, snapshot } = await reread(state, ports, fresh_snapshot(ports, pace))
+	const now_ms = ports.now()
+	const [{ read, snapshot }, sampled] = await Promise.all([
+		reread(state, ports, fresh_snapshot(ports, pace)),
+		sample(state, ports, now_ms),
+	])
 
-	return await resample(read, ports, { now_ms: ports.now(), ...snapshot })
+	return await resample(read, ports, { now_ms, ...snapshot }, sampled)
 }
 
 // What a frame draws, without the marks the next reads compare against.
