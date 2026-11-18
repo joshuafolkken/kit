@@ -1,6 +1,6 @@
 import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
 import { lane_breakdown_calls } from './lane-breakdown-calls'
-import { lane_ledger, type LedgerEntry } from './lane-ledger'
+import { lane_ledger, type LedgerEntry, type TestRelatedEntry } from './lane-ledger'
 import type { ToolCall } from './lane-transcript-calls'
 
 // The timed steps inside `josh lane:breakdown <issue> --timeline`'s stages (joshuafolkken/kit#7737):
@@ -19,6 +19,8 @@ const SHIP_LEAD = 'ship '
 const LAP_SEPARATOR = ' › '
 const MERGE_STEP = 'merge'
 const NO_SCOPE = 'none'
+const TREE_KEY_LENGTH = 8
+const DETAIL_SEPARATOR = '; '
 const EVENT_LEAD_MS = 1000
 const LINT_RELATED = 'lint:related'
 const REVIEW_PASSES = ['round ', 'interaction']
@@ -60,11 +62,29 @@ function chain_step(entry: LedgerEntry): Array<Step> {
 	return [timed(entry, `run:chain${join}${stage}`)]
 }
 
+function labelled(label: string, value: string | undefined): Array<string> {
+	return value === undefined ? [] : [`${label} ${value}`]
+}
+
+// The run's scope, then what a row written since joshuafolkken/kit#7965 adds: how it ended, who
+// started it, the head of its tree key and the files it failed on.
+function related_details(entry: TestRelatedEntry): string {
+	const exit = entry.exit_code === undefined ? undefined : String(entry.exit_code)
+
+	return [
+		entry.scope,
+		...labelled('exit', exit),
+		...labelled('caller', entry.caller),
+		...labelled('tree', entry.tree?.slice(0, TREE_KEY_LENGTH)),
+		...labelled('failed', entry.failed?.join(', ')),
+	].join(DETAIL_SEPARATOR)
+}
+
 function check_step(entry: LedgerEntry): Array<Step> {
 	if (entry.kind === KIND.TEST_PINNED) return [timed(entry, 'test:pinned')]
 	if (entry.kind !== KIND.TEST_RELATED || entry.scope === NO_SCOPE) return []
 
-	return [timed(entry, `test:related (${entry.scope})`)]
+	return [timed(entry, `test:related (${related_details(entry)})`)]
 }
 
 function wait_step(entry: LedgerEntry): Array<Step> {

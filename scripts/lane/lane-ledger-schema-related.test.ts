@@ -39,6 +39,27 @@ describe('lane_ledger_schema_related — the test:related row, read through the 
 
 		expect(lane_ledger_schema.entry_schema.parse(row)).toEqual(row)
 	})
+
+	// joshuafolkken/kit#7965: the tree key, the exit code, the failed files and the caller.
+	it('reads a row with its tree, outcome and caller back as written', () => {
+		const row = {
+			...ROW,
+			tree: 'f00dfeed',
+			base: 'abc123',
+			exit_code: 1,
+			failed: ['scripts/own.test.ts'],
+			caller: 'run:chain check:related',
+		}
+
+		expect(lane_ledger_schema.entry_schema.parse(row)).toEqual(row)
+	})
+
+	it('reads a row written before the tree, outcome and caller were recorded', () => {
+		const parsed = lane_ledger_schema.entry_schema.parse(ROW)
+
+		expect(parsed).toEqual(ROW)
+		expect(parsed).not.toHaveProperty('caller')
+	})
 })
 
 // joshuafolkken/kit#7827: one `josh lint:related` run, each stage timed.

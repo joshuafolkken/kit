@@ -8,6 +8,7 @@ import { file_map_stamp } from '#scripts/josh/file-map-stamp'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { run_record_path } from '#scripts/josh/run-record-path'
 import { review_stamps } from '#scripts/review/review-stamps'
+import { run_ship_lap } from './run-ship-lap'
 import type { SyncedCheck } from './run-ship-synced-scope'
 
 // **A scoped pair the ship can name the moved files of runs over them alone** (joshuafolkken/kit#5531).
@@ -139,7 +140,12 @@ function named_phases(
 
 	return checks.map(
 		(check) => async () =>
-			await josh_command.josh_run([check.script, ...files], should_forward_stderr),
+			await josh_command.josh_run(
+				[check.script, ...files],
+				should_forward_stderr,
+				undefined,
+				run_ship_lap.caller_environment(),
+			),
 	)
 }
 

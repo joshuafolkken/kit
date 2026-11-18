@@ -13,7 +13,11 @@ vi.mock('./test-related-reuse', () => ({
 	test_related_reuse: { flags: vi.fn(() => []), blobs: vi.fn(), retained: vi.fn(async () => []) },
 }))
 vi.mock('./test-related-red', () => ({
-	test_related_red: { record_red: vi.fn(), no_base_files: vi.fn(() => []) },
+	test_related_red: {
+		record_red: vi.fn(),
+		no_base_files: vi.fn(() => []),
+		failed_of: vi.fn(() => []),
+	},
 }))
 vi.mock('./test-no-base', () => ({ test_no_base: { run_if_touched: vi.fn() } }))
 vi.mock('./test-unit-guard', () => ({ test_unit_guard: { is_running: vi.fn(() => true) } }))

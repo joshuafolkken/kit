@@ -145,8 +145,8 @@ describe('run_ship_narrowed.named_phases', () => {
 		}
 
 		expect(josh_run_mock.mock.calls).toStrictEqual([
-			[[LINT, SOURCE], true],
-			[[TEST, SOURCE], true],
+			[[LINT, SOURCE], true, undefined, {}],
+			[[TEST, SOURCE], true, undefined, {}],
 		])
 	})
 

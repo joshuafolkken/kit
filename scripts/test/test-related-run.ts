@@ -6,7 +6,12 @@ import { review_stamps } from '#scripts/review/review-stamps'
 import { related_heavy_tests } from './related-heavy-tests'
 import { test_no_base } from './test-no-base'
 import { test_related_claim } from './test-related-claim'
-import { test_related_record, type RunInput, type StageTimes } from './test-related-record'
+import {
+	test_related_record,
+	type RunInput,
+	type RunResult,
+	type StageTimes,
+} from './test-related-record'
 import { test_related_red, type RelatedInput } from './test-related-red'
 import { test_related_reuse } from './test-related-reuse'
 import { related_scope, type RelatedScope } from './test-related-scope'
@@ -76,10 +81,22 @@ async function run_scope(
 	return await run_vitest(scope, vitest_arguments, description, stages)
 }
 
+// How the run ended, for its ledger row: a red one with the test files its log named (joshuafolkken/kit#7965).
+function outcome_of(
+	scope: RelatedScope,
+	exit_code: number,
+	started_ms: number,
+): Pick<RunResult, 'exit_code' | 'failed'> {
+	if (exit_code === 0) return { exit_code }
+
+	return { exit_code, failed: test_related_red.failed_of(scope, started_ms) }
+}
+
 async function run_and_record(
 	input: RunInput,
 	command_arguments: ReadonlyArray<string>,
 ): Promise<number> {
+	const started_ms = Date.now()
 	const started = performance.now()
 	const stages: StageTimes = { rebuild_ms: launch_timing.rebuild_ms() }
 	const { exit_code, test_files, passed } = await test_related_record.with_test_count(
@@ -95,6 +112,7 @@ async function run_and_record(
 		elapsed_ms: performance.now() - started,
 		test_files,
 		stages,
+		...outcome_of(input.scope, exit_code, started_ms),
 	})
 
 	return exit_code
