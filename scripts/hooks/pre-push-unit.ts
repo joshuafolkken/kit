@@ -9,7 +9,6 @@ import { scoped_green, type ScopedSources } from '#scripts/gate/scoped-green'
 import type { PushMissRecord } from '#scripts/lane/lane-ledger-schema'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { test_unit_guard } from '#scripts/test/test-unit-guard'
-import { pre_push_related_switch } from './pre-push-related-switch'
 
 // The pre-push hook's unit run, which does not re-run a suite a green gate already covers: the gate
 // writes its record down, and re-running `vitest run` on a tree it just printed green is the bulk of
@@ -32,7 +31,8 @@ import { pre_push_related_switch } from './pre-push-related-switch'
 // a push carries **HEAD** — the same thing only while nothing is uncommitted. Commit half of a green
 // tree and the map still matches while the commit being pushed is a tree no check ever read. So the
 // reuse also requires a clean working tree, which is exactly what `josh git` leaves behind when it
-// commits before pushing, and any doubt whatever sends the hook back to the full suite.
+// commits before pushing, and any doubt whatever sends the hook to the related tests — capped, the
+// rest deferred to CI's whole suite (joshuafolkken/kit#7977).
 //
 // **`audit` is untouched.** The gate does not run it, so it is not a duplicate of anything.
 
@@ -122,11 +122,12 @@ function format_skip(taken_at: string): string {
 // other commands already have. **A project that has vitest and no test file at all fails the push
 // instead**: the guard treats that half as a broken state rather than a
 // young project, and the hook returns what the guard returns.
-// **A fall back to the whole suite says why, in one line**: under a crowded
-// machine the suite costs minutes, and a silent miss left a moved merge base, a dirty tree and a
-// mismatched record indistinguishable from one another.
+// **A miss says why, in one line**: a silent miss left a moved merge base, a dirty tree and a
+// mismatched record indistinguishable from one another (joshuafolkken/kit#3307).
+const MISS_LEAD = 'the green gate record does not cover this push'
+
 function format_miss(reason: string): string {
-	return `↻ running the whole unit suite — the green gate record does not cover this push: ${reason}.`
+	return `↻ running the whole unit suite, as asked — ${MISS_LEAD}: ${reason}.`
 }
 
 // **A unit run claims its place in the core budget, the one `josh test:unit` claims.** Without it a
@@ -150,24 +151,17 @@ async function run_reserved_suite(vitest_arguments: ReadonlyArray<string>): Prom
 	)
 }
 
-// **A push its caller makes ahead of the gate runs the related tests, not the whole suite**
-// (joshuafolkken/kit#5067). `josh ship` pushes the tree its sync merged with the default branch onto an
-// open pull request so CI starts beside the gate, and the gate that follows runs the whole suite over
-// that same tree; the push itself only needs what this branch's change reaches. `josh release` pushes
-// its release commit from a fresh worktree no gate record covers, and the release pull request's CI
-// runs the whole suite over it before the merge (joshuafolkken/kit#7539). Only the caller sets
-// it, `--force` and the escape hatch still win, and a narrowed run asked for its own arguments rather
-// than this scope.
-function is_related_requested(extra_arguments: ReadonlyArray<string>): boolean {
-	const { SWITCH_ENV_KEY, SWITCH_ON } = pre_push_related_switch
-
-	if (process.env[SWITCH_ENV_KEY] !== SWITCH_ON || extra_arguments.length > 0) return false
+// **A miss runs the related tests, capped, not the whole suite** (joshuafolkken/kit#5067, #7977): the
+// whole suite is CI's, so `test:related` records what its cap left as deferred there. The whole suite
+// stays only a person's explicit ask — `--force`, the escape hatch, or arguments narrowing vitest.
+function is_related_run(extra_arguments: ReadonlyArray<string>): boolean {
+	if (extra_arguments.length > 0) return false
 
 	return !hook_gate_reuse.is_force_requested(FORCE_ENV)
 }
 
 function format_related(reason: string): string {
-	return `↻ running the related unit tests — the push runs ahead of its gate, and the green gate record does not cover it: ${reason}.`
+	return `↻ running the related unit tests, the rest deferred to CI — ${MISS_LEAD}: ${reason}.`
 }
 
 // Imported only on this path, so every other push leaves the import graph `test-related.ts` loads alone.
@@ -230,7 +224,7 @@ async function run_related_miss(miss: PushMiss): Promise<number> {
 }
 
 async function run_miss(miss: PushMiss): Promise<number> {
-	if (is_related_requested(miss.extra_arguments)) return await run_related_miss(miss)
+	if (is_related_run(miss.extra_arguments)) return await run_related_miss(miss)
 
 	process.stdout.write(`${format_miss(miss.reason)}\n`)
 	await record_miss('whole', miss.kind)

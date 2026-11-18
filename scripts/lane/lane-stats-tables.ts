@@ -1,4 +1,5 @@
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
+import { lane_catch_rate_stats } from './lane-catch-rate-stats'
 import { lane_chain_stop_stats } from './lane-chain-stop-stats'
 import { lane_check_stats } from './lane-check-stats'
 import { lane_ci_path_stats } from './lane-ci-path-stats'
@@ -113,6 +114,7 @@ function tables_of(
 		...plan_tables(records, window, options),
 		lane_process_stats.table(entries, window),
 		lane_check_stats.table(entries, window),
+		lane_catch_rate_stats.table(entries, window),
 		lane_claim_stats.table(entries, window),
 		lane_test_related_stats.table(entries, window),
 		lane_test_related_stats.trigger_table(entries, window),

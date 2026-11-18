@@ -1116,7 +1116,6 @@ const PURE_FILES: ReadonlyArray<string> = [
 	'scripts/hooks/implementation-shell-nested.test.ts',
 	'scripts/hooks/implementation-shell.test.ts',
 	'scripts/hooks/pre-commit-lint-switch.test.ts',
-	'scripts/hooks/pre-push-related-switch.test.ts',
 	'scripts/lane/lane-plan-size-generated.test.ts',
 	'scripts/lane/lane-why-causes.test.ts',
 	'scripts/lib/ancestor-directories.test.ts',

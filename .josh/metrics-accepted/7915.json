@@ -1,0 +1,7 @@
+{
+	"reason": "#7915 adds the --chain/--order-reason examples that replace --ordered-only guidance in eight on-demand docs",
+	"date": "2026-11-18",
+	"growth": {
+		"ai_cost.on_demand_bytes": 494
+	}
+}

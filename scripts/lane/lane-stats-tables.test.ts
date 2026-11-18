@@ -33,6 +33,7 @@ const FIRST_HEADER_CELLS = [
 	'lane',
 	'process',
 	'check',
+	'catch rate',
 	'check',
 	'test:related scope',
 	'test:related whole-suite trigger',

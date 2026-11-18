@@ -26,6 +26,13 @@ describe('gate_checks.select_gate_checks', () => {
 		expect(labels(gate_checks.select_gate_checks(false))).toContain(EXPORTS_LABEL)
 		expect(labels(gate_checks.select_gate_checks(true))).not.toContain(EXPORTS_LABEL)
 	})
+
+	// joshuafolkken/kit#7977: a main checkout's gate takes the capped selection a lane's does.
+	it('runs the unit check as a bare test:related, in every checkout', () => {
+		const unit = gate_checks.select_gate_checks(true, true, true).at(-1)
+
+		expect(unit).toMatchObject({ target: gate_labels.UNIT_TARGET, args: [] })
+	})
 })
 
 describe('gate_checks.selected_checks', () => {
