@@ -1,6 +1,7 @@
 import { run_board_estimate } from './run-board-estimate'
 import { run_board_first_lane } from './run-board-first-lane'
 import { run_board_header, type BoardHeader } from './run-board-header'
+import { run_board_header_time } from './run-board-header-time'
 import { run_board_labels } from './run-board-labels'
 import { run_board_layout, type BoardRow } from './run-board-layout'
 import { run_board_render_checks } from './run-board-render-checks'
@@ -44,8 +45,15 @@ function estimate_of(header: BoardHeader, rows: ReadonlyArray<BoardRow>): string
 	return run_board_header.estimate_legend(header) ?? row_legend
 }
 
+// 📴 where it stands in the 💓's place, the network down (joshuafolkken/kit#7895).
+function offline_of(header: BoardHeader): string | undefined {
+	return run_board_header_time.is_offline(header)
+		? `${HEADER_ICONS.offline} ${WORDS.offline}`
+		: undefined
+}
+
 // The third line's kinds, ⏰ where the lanes rule stands it over the lanes' times, then the estimated
-// finish and the time to the first lane.
+// finish, the time to the first lane and the outage.
 function named_of(
 	header: BoardHeader,
 	icons: ReadonlySet<string>,
@@ -60,6 +68,7 @@ function named_of(
 		elapsed,
 		estimate_of(header, rows),
 		run_board_first_lane.legend(header.activity),
+		offline_of(header),
 	]
 
 	return legends.filter((legend) => legend !== undefined)

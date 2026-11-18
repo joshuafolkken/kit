@@ -110,6 +110,7 @@ const WORDS = {
 	note: 'note',
 	found_during: ' (found during {n})',
 	overrun: 'overrun investigation',
+	offline: 'offline',
 	// What the run is doing now, where no stage of its own says it.
 	watching: 'watching',
 	pool_empty: 'pool empty',
@@ -241,6 +242,7 @@ const HEADER_ICONS = {
 	loading: '⏳',
 	elapsed: '⏰',
 	heartbeat: '💓',
+	offline: '📴',
 	// A failed plan read: ❗ rather than ⚠, a text symbol drawn two columns wide over the blank after it.
 	warning: '❗',
 	// The estimated finish: 🎯 rather than 🏁, a done row's state icon, so the legend names each once
