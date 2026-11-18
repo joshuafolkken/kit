@@ -48,6 +48,12 @@ describe('run_board_status.statuses_of requeued children', () => {
 		expect(row_after([LAUNCH, hold('usage limit')])).toBe('stopped')
 	})
 
+	it('draws a parked child a person re-added as waiting', () => {
+		const park: RunEvent = { pos: 2, at: RELEASED_AT, kind: KIND.PARK, text: '#7930 parked' }
+
+		expect(row_after([LAUNCH, park, ADDED])).toBe('waiting')
+	})
+
 	it('keeps a running child running when it is added again', () => {
 		const statuses = run_board_status.statuses_of([LAUNCH, ADDED], run_board_lane_state.NO_LANES)
 
