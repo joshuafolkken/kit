@@ -41,7 +41,7 @@ import type { ThroughputRow } from './run-board-throughput'
 // English whatever the session language: one set of words reads the same on every board.
 
 const { STATE_ICONS, WAITS_ICON, WORDS } = run_board_labels
-const { time_width } = run_board_render_time
+const { stops_width, time_width } = run_board_render_time
 const { NOTE_LIMIT } = run_board_render_notes
 const { lane_cells_of, lanes_section } = run_board_render_lanes
 const { indent_of } = run_board_render_lead
@@ -120,6 +120,7 @@ function frame_of(
 	return {
 		header,
 		time_width: time_width(header),
+		stops_width: stops_width(header),
 		...WHOLE,
 		columns: size?.columns,
 		filed: run_board_notes.filed_numbers(notes),

@@ -19,7 +19,7 @@ import { run_board_row_yield } from './run-board-row-yield'
 // filed during it, fitted to the pane. The sections that place the rows are `run-board-render.ts`.
 
 const { FILED_KIND_ICONS, KIND_BLANK } = run_board_labels
-const { time_of } = run_board_render_time
+const { net_of, stops_length, time_of } = run_board_render_time
 const { state_icon } = run_board_render_icon
 const { number_text } = run_board_render_lanes
 const { indent_of, lead_of: lane_lead_of, running_fresh } = run_board_render_lead
@@ -34,11 +34,12 @@ const FOUND_FLOOR = 8
 const FILED_LEAD = `${run_board_labels.FILED_RUN_MARK} `
 
 // What every row of one frame is drawn with: the header, how wide the time column is, so a
-// `2°05′30″` and a `42″` end in the same column, and the lane cells after a row's lead where its
-// section draws them.
+// `2°05′30″` and a `42″` end in the same column, how wide the bracketed stops after it are, and the
+// lane cells after a row's lead where its section draws them.
 interface RowFrame {
 	header: BoardHeader
 	time_width: number
+	stops_width: number
 	cells?: LaneCells | undefined
 	// The columns a row's title is cut to: the title column's, or fewer where a row gives some up.
 	title_limit: number
@@ -77,19 +78,27 @@ function title_text(row: BoardRow, frame: RowFrame): string {
 	return `${FILED_LEAD}${title_of(title, frame.title_limit - FILED_LEAD.length)}`
 }
 
-// The title padded to the title column and the time to the time column — blanks where a row has none —
-// so the times form one column, and what follows them starts in one column on every row but a waiting
-// one, whose title is not padded. A lane row draws its time in its lead.
+// The time padded by its net time to the time column — blanks where a row has none — so the net times
+// end in one column, and its bracketed stops padded to the stops column, so what follows starts in one
+// (joshuafolkken/kit#7992). A row with nothing after it is trimmed at its end (`row_text`).
+function time_text(row: BoardRow, frame: RowFrame): string {
+	const { header } = frame
+	const time = time_of(row, header.now_ms) ?? ''
+	const fresh = running_fresh(row, time, row.status?.started_ms, header)
+	const after = Math.max(0, frame.stops_width - stops_length(row, header.now_ms))
+
+	return `${padded(net_of(row, header.now_ms) ?? '', frame.time_width, fresh)}${' '.repeat(after)}`
+}
+
+// The title padded to the title column, then the time; a waiting row's title is not padded. A lane row
+// draws its time in its lead.
 function timed_parts(row: BoardRow, frame: RowFrame): Array<string> {
 	const title = title_text(row, frame)
 
 	if (row.state === 'waiting') return [title]
 	if (frame.is_lane_row === true) return [title.padEnd(frame.title_limit)]
 
-	const time = time_of(row, frame.header.now_ms) ?? ''
-	const fresh = running_fresh(row, time, row.status?.started_ms, frame.header)
-
-	return [title.padEnd(frame.title_limit), padded(time, frame.time_width, fresh)]
+	return [title.padEnd(frame.title_limit), time_text(row, frame)]
 }
 
 function joined(parts: ReadonlyArray<string | undefined>): string {
