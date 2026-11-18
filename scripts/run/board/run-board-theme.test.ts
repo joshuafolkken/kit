@@ -1,5 +1,6 @@
 import { stripVTControlCharacters } from 'node:util'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { run_board_fit } from './run-board-fit'
 import { run_board_theme } from './run-board-theme'
 
 // joshuafolkken/kit#7934: the WarGames theme — which one a board takes, and how it draws a frame.
@@ -11,6 +12,13 @@ const DEFAULT_FOREGROUND = `${ESCAPE}[39m`
 const RED = `${ESCAPE}[31m`
 const RULED = '── LANES ─────\n  ■■■──── 3/7 ── 2 CPU'
 const ENV = { [run_board_theme.THEME_ENV]: 'wargames' }
+const LINK_OPEN = `${ESCAPE}]8;;https://github.com/joshuafolkken/kit/issues/1\u{7}`
+const LINK_CLOSE = `${ESCAPE}]8;;\u{7}`
+const PICTOGRAPHIC = /\p{Extended_Pictographic}/u
+
+function widths_of(frame: string): Array<number> {
+	return frame.split('\n').map((line) => run_board_fit.width_of(line))
+}
 
 afterEach(() => {
 	vi.unstubAllEnvs()
@@ -57,27 +65,45 @@ describe('run_board_theme.restyle', () => {
 	it('opens every line in the 24-bit phosphor cyan and ends it on the default foreground', () => {
 		vi.stubEnv('FORCE_COLOR', '3')
 
-		expect(run_board_theme.restyle('wargames', 'a\n\nb')).toBe(
-			`${RGB_PHOSPHOR}a${DEFAULT_FOREGROUND}\n\n${RGB_PHOSPHOR}b${DEFAULT_FOREGROUND}`,
+		expect(run_board_theme.restyle('wargames', 'A\n\nB')).toBe(
+			`${RGB_PHOSPHOR}A${DEFAULT_FOREGROUND}\n\n${RGB_PHOSPHOR}B${DEFAULT_FOREGROUND}`,
 		)
 	})
 
 	it('draws the palette cyan where stdout has no 24-bit color', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 
-		expect(run_board_theme.restyle('wargames', 'a')).toBe(`${NAMED_CYAN}a${DEFAULT_FOREGROUND}`)
+		expect(run_board_theme.restyle('wargames', 'A')).toBe(`${NAMED_CYAN}A${DEFAULT_FOREGROUND}`)
 	})
 
 	it('keeps a color a line gives and resumes the phosphor cyan after it and after a reset', () => {
 		vi.stubEnv('FORCE_COLOR', '3')
-		const line = `a ${RED}🚨${DEFAULT_FOREGROUND} b ${RED}c${ESCAPE}[0m d`
+		const line = `A ${RED}P1${DEFAULT_FOREGROUND} B ${RED}C${ESCAPE}[0m D`
 
 		expect(run_board_theme.restyle('wargames', line)).toBe(
-			`${RGB_PHOSPHOR}a ${RED}🚨${RGB_PHOSPHOR} b ${RED}c${ESCAPE}[0m${RGB_PHOSPHOR} d${DEFAULT_FOREGROUND}`,
+			`${RGB_PHOSPHOR}A ${RED}P1${RGB_PHOSPHOR} B ${RED}C${ESCAPE}[0m${RGB_PHOSPHOR} D${DEFAULT_FOREGROUND}`,
 		)
-		expect(stripVTControlCharacters(run_board_theme.restyle('wargames', line))).toBe(
-			stripVTControlCharacters(line),
+	})
+})
+
+// joshuafolkken/kit#7988: the theme draws icons as text and the text in capitals.
+describe('run_board_theme.restyle as text', () => {
+	it('draws each icon as text of its width and the text in capitals, its colors and links as written', () => {
+		vi.stubEnv('FORCE_COLOR', '0')
+		const line = `🚨 ${RED}fix${DEFAULT_FOREGROUND} ⚠️ the ${LINK_OPEN}board${LINK_CLOSE} → 🔨 ⠋`
+
+		expect(run_board_theme.restyle('wargames', line)).toBe(
+			`P1 ${RED}FIX${DEFAULT_FOREGROUND} !  THE ${LINK_OPEN}BOARD${LINK_CLOSE} > BD │`,
 		)
+	})
+
+	it('keeps the width of every line of a frame with icons', () => {
+		vi.stubEnv('FORCE_COLOR', '3')
+		const frame = `⏰ 12m · 🎯 3h ${RED}🔄 2${DEFAULT_FOREGROUND}\n  🔨 #1 a title 💤 ✅ ✓ ✗\n📈 throughput`
+		const themed = run_board_theme.restyle('wargames', frame)
+
+		expect(stripVTControlCharacters(themed)).not.toMatch(PICTOGRAPHIC)
+		expect(widths_of(themed)).toStrictEqual(widths_of(frame))
 	})
 })
 

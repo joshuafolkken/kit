@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_board_cli } from './run-board-cli'
+import { run_board_fit } from './run-board-fit'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_intro } from './run-board-intro'
 import { run_board_typing } from './run-board-typing'
@@ -13,6 +14,12 @@ const THEMED = ['--theme', 'wargames']
 const RULE = '─'
 const NAMED_CYAN = '\u{1B}[36m'
 const DEFCON_FIELD = / {2}DEFCON [\d [\]]+/u
+const PICTOGRAPHIC = /\p{Extended_Pictographic}/u
+const BRAILLE = /[\u{2800}-\u{28FF}]/u
+
+function widths_of(frame: string): Array<number> {
+	return frame.split('\n').map((line) => run_board_fit.width_of(line))
+}
 
 async function frame_of(argv: Array<string>): Promise<string> {
 	const { ports, frames } = harness({ ...LOCAL, events: [LAUNCH] }, [plan_titled('a')])
@@ -43,7 +50,21 @@ describe('run_board_cli.run --theme', () => {
 
 		expect(plain).toContain(RULE)
 		expect(frame).not.toContain(RULE)
-		expect(frame.replace(DEFCON_FIELD, '')).toBe(plain.replaceAll(RULE, '-'))
+		expect(widths_of(frame.replace(DEFCON_FIELD, ''))).toStrictEqual(widths_of(plain))
+	})
+})
+
+// joshuafolkken/kit#7988: the theme's --once frame is text a text terminal draws.
+describe('run_board_cli.run --theme as text', () => {
+	it('draws --once with no emoji, spinner dots or lowercase letter', async () => {
+		vi.stubEnv('FORCE_COLOR', '0')
+		const plain = await frame_of(['--once'])
+		const frame = await frame_of([...THEMED, '--once'])
+
+		expect(plain).toMatch(PICTOGRAPHIC)
+		expect(frame).not.toMatch(PICTOGRAPHIC)
+		expect(frame).not.toMatch(BRAILLE)
+		expect(frame).not.toMatch(/[a-z]/u)
 	})
 
 	it('draws the theme JOSH_BOARD_THEME names, and --theme over it', async () => {

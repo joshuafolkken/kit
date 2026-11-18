@@ -1,9 +1,12 @@
 import { run_board_labels, type Paint } from './run-board-labels'
 import type { BoardPorts } from './run-board-state'
+import { run_board_theme_case } from './run-board-theme-case'
+import { run_board_theme_glyphs } from './run-board-theme-glyphs'
 
 // joshuafolkken/kit#7934: a theme for the board a person watches — `wargames` draws the text no color
 // is given in the cyan glow of the film's terminal phosphor and every rule as a run of `-`, so each
-// character of a line shows. It is put on the frame as it is written, once, so no render module carries
+// character of a line shows; joshuafolkken/kit#7988: each icon as text of its width
+// (`run-board-theme-glyphs.ts`) and the text uppercase, as a text terminal draws it. It is put on the frame as it is written, once, so no render module carries
 // it; a color a render module gives (red, yellow, …) is kept, the cyan resumed after it.
 
 const THEME_FLAG = '--theme'
@@ -96,10 +99,10 @@ function lit(open: string, line: string): string {
 function restyle(theme: Theme | undefined, frame: string): string {
 	if (theme === undefined) return frame
 	const open = phosphor_open()
+	const ruled = frame.split(RULE).join(DASH)
 
-	return frame
-		.split(RULE)
-		.join(DASH)
+	return run_board_theme_case
+		.capitals(run_board_theme_glyphs.textual(ruled))
 		.split('\n')
 		.map((line) => lit(open, line))
 		.join('\n')
