@@ -135,3 +135,62 @@ describe('run_board_keys.read_keys intercept', () => {
 		])
 	})
 })
+
+// joshuafolkken/kit#7953: `s` flips the sound, saving each flip; switching it on plays launch once, and
+// while it is off the board's cue plays nothing.
+interface SoundRig {
+	keys: FakeKeys
+	saved: Array<boolean>
+	played: Array<string>
+	reading: ReturnType<typeof read_keys>
+}
+
+function sound_rig(is_on: boolean): SoundRig {
+	const keys = fake_keys()
+	const saved: Array<boolean> = []
+	const played: Array<string> = []
+	const store = {
+		load: (): ReadonlySet<never> => new Set(),
+		save: () => undefined,
+		load_sound: () => is_on,
+		save_sound: (next: boolean) => {
+			saved.push(next)
+		},
+	}
+	const reading = read_keys({ ...keys.input, store }, (name) => {
+		played.push(name)
+	})
+
+	return { keys, saved, played, reading }
+}
+
+describe('run_board_keys.read_keys sound', () => {
+	it('flips on → off → on with s, saving each flip and folding nothing', () => {
+		const { keys, saved, reading } = sound_rig(true)
+
+		keys.type('s')
+		expect(reading.sound?.()).toBe(false)
+		keys.type('s')
+		expect([reading.sound?.(), saved, reading.folded?.().size]).toStrictEqual([
+			true,
+			[false, true],
+			0,
+		])
+	})
+
+	it('plays launch once at the moment the sound is switched on', () => {
+		const { keys, played } = sound_rig(false)
+
+		keys.type('s')
+		expect(played).toStrictEqual(['launch'])
+	})
+
+	it('plays no cue while the sound is off, and the cue passed on while it is on', () => {
+		const { keys, played, reading } = sound_rig(true)
+
+		reading.cue?.('drain')
+		keys.type('s')
+		reading.cue?.('alert')
+		expect(played).toStrictEqual(['drain'])
+	})
+})
