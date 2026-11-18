@@ -15,6 +15,10 @@ vi.mock('#scripts/git/changed-paths', () => ({
 		read_held_at: vi.fn(),
 	},
 }))
+// Only the map answers for a document here; the readers found by path are `test-document-readers.test.ts`.
+vi.mock('./test-document-readers', () => ({
+	test_document_readers: { readers_of: vi.fn(async () => new Map()) },
+}))
 
 const mocked_since = vi.mocked(changed_paths.read_changed_since)
 const mocked_held = vi.mocked(changed_paths.read_held_at)
