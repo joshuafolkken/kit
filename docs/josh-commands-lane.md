@@ -307,7 +307,8 @@ The row's last two columns, `estimate ratio first` and `estimate ratio median`, 
 estimated, none when nothing is estimated (`run-board-estimate-record.ts`).
 
 A run ends at the last merge of the merged children its rows name; an unmerged child (parked, closed or skipped) does
-not hold the end back.
+not hold the end back. The ledger does not tell a child still in a lane from one that left the run, so a run counts
+only once a later run has written an `estimate` row after the run's last row.
 
 Each row's ratio is the time actually left over the time estimated left; the columns take the
 median over the period's ended runs of the first row's ratio and of each run's median. A run with no merged child is

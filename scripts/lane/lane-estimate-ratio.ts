@@ -6,7 +6,8 @@ import type { StatsWindow } from './lane-stats'
 // record, the time the run actually had left over the time it was expected to have left. A run ends
 // at the last merge of the children its records were written for; a child left unmerged (parked,
 // closed or skipped) does not hold the end back, and a run with no merged child has no actual end and
-// is left out. Only runs that ended in the window count.
+// is left out. A run counts only once a later run has written an estimate, and only if it ended in
+// the window.
 
 interface RunRatios {
 	first: number
@@ -65,6 +66,18 @@ function end_of(
 	return ends.length === 0 ? undefined : Math.max(...ends)
 }
 
+// The ledger does not tell a child still in a lane from one that left the run (parked, closed or
+// skipped), so a run counts as over only once a later run wrote an estimate after its last record.
+function is_superseded(
+	records: ReadonlyArray<EstimateEntry>,
+	estimates: ReadonlyArray<EstimateEntry>,
+): boolean {
+	const run = records[0]?.run
+	const last_ms = Date.parse(records.at(-1)?.at ?? '')
+
+	return estimates.some((estimate) => estimate.run !== run && Date.parse(estimate.at) > last_ms)
+}
+
 // Actual time left over the expected time left; `undefined` where nothing was expected to be left.
 function ratio_of(record: EstimateEntry, end_ms: number): number | undefined {
 	const at_ms = Date.parse(record.at)
@@ -95,8 +108,10 @@ function run_ratios(
 // The ratios of every run that ended in `window`; `entries` is the whole ledger.
 function ratios_of(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): Array<RunRatios> {
 	const merges = entries.filter(is_merge)
+	const estimates = entries.filter(is_estimate)
 
-	return runs_of(entries.filter(is_estimate))
+	return runs_of(estimates)
+		.filter((records) => is_superseded(records, estimates))
 		.map((records) => run_ratios(records, merges, window))
 		.filter((ratios) => ratios !== undefined)
 }
