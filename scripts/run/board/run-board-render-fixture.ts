@@ -78,11 +78,11 @@ function note(at_ms: number, text: string): BoardNote {
 	return { kind: 'note', at_ms, issue: '3415', text }
 }
 
-// The `🎯 —` an unmeasured running row, a decision row and a parked row end on
-// (joshuafolkken/kit#7920).
+// The `🎯 —` a decision row and a parked row end on, and an unmeasured running row draws before its
+// activity (joshuafolkken/kit#7920, #7994).
 const UNKNOWN_FINISH = '🎯 —'
 
-// A line without the `🎯 —` it ends on, its gap trimmed.
+// A decision or parked row's line without the `🎯 —` it ends on, its gap trimmed.
 function unfinished(line: string): string {
 	return line.endsWith(UNKNOWN_FINISH) ? line.slice(0, -UNKNOWN_FINISH.length).trimEnd() : line
 }

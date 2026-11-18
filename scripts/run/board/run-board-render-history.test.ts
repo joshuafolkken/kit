@@ -105,7 +105,7 @@ describe('run_board_render.render running rows', () => {
 		const title = 'Sample 2'.padEnd(TITLE_WIDTH)
 
 		expect(row_line(board_lines(), 2)).toBe(
-			`     🚦    2′00″    5′00″ ${CELLS} 2       ${title}  🚦 1′00″  ${UNKNOWN_FINISH}`,
+			`     🚦    2′00″    5′00″ ${CELLS} 2       ${title}  ${UNKNOWN_FINISH}  🚦 1′00″`,
 		)
 	})
 })
