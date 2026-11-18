@@ -2,7 +2,7 @@ import { auto_ok_fixture, CREATED_EARLIER } from '#scripts/auto-ok/auto-ok-fixtu
 import { backlog_interrupt } from '#scripts/backlog/backlog-interrupt'
 import { epic_solo_parked } from '#scripts/epic/epic-solo-parked'
 import { listing_outcome } from '#scripts/gh/git-gh-issue-list-fixture'
-import { IN_PROGRESS_LABEL, RUN_LANE_LABEL } from '#scripts/issue/issue-labels'
+import { IN_PROGRESS_LABEL, RUN_LANE_LABEL, RUN_SOLO_LABEL } from '#scripts/issue/issue-labels'
 import { lane_await } from '#scripts/lane/lane-await'
 import { lane_seed_policy } from '#scripts/lane/lane-seed'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -132,12 +132,15 @@ describe('epic_lane_offer.offer_for_repo — a parked run:solo issue', () => {
 		expect(issue_list).not.toHaveBeenCalled()
 	})
 
+	// The real `notice` reads the `run:solo` listing, so the lift is proven through the parked read.
 	it('offers again once nothing parked holds the gate', async () => {
-		issue_list.mockResolvedValueOnce(listing_outcome('[]'))
+		vi.mocked(epic_solo_parked.notice).mockRestore()
+		issue_list.mockResolvedValue(listing_outcome('[]'))
 
 		const offer = await epic_lane_offer.offer_for_repo([pool([child(FIRST, REPO)])], request(REPO))
 
 		expect(numbers_of(offer.children)).toEqual([FIRST])
+		expect(issue_list).toHaveBeenCalledWith(RUN_SOLO_LABEL, expect.any(Number), REPO)
 	})
 })
 

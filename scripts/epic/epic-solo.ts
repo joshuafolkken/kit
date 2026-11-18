@@ -17,7 +17,8 @@ import { epic_report, type EpicNextResult } from './epic-report'
 // disagree about what may start beside what.
 //
 // Three rules, all against the repository's `in-progress` holders (`epic_busy.read_repository`, with
-// a stale `run:solo` holder taken out by `epic_solo_stale.release`):
+// a stale `run:solo` holder taken out by `epic_solo_stale.release`; a parked `run:solo` issue, which
+// carries no `in-progress`, holds through `epic_solo_parked` instead):
 // a running `run:solo` issue lets nothing new start; a `run:solo` candidate starts only into an idle
 // repository and then alone; and nothing ranked below a waiting `run:solo` candidate is offered past
 // it, so it is not starved by the lanes it is waiting on. A listing that could not be read is not an
