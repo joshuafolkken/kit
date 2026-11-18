@@ -28,14 +28,18 @@ const PAUSE_COMMANDS: Record<string, CommandEntry> = {
 		// `run:release` underneath can send the stop confirmation.
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		reference: [
-			'<issue> (--children <N1,N2,...> [--ordered | --chain <chain>...] | --prerequisite <P>) [--title <title>]',
+			'<issue> (--children <N1,N2,...> [--ordered | --chain <chain>...] [--order-reason "<chain>: <reason>"...] | --prerequisite <P>) [--title <title>]',
 			'automation',
 			['git', 'network', 'files'],
 		],
 		usage: {
 			examples: [
 				{ arguments: '1091 --children 1102,1103 --title "Split 1091"', note: 'independent split' },
-				{ arguments: '1091 --children 1102 --ordered', note: '1102 after 1091' },
+				{
+					arguments:
+						'A --children B --ordered --order-reason "#A -> #B: B calls the parser A adds"',
+					note: 'B after A',
+				},
 				{ arguments: '1091 --prerequisite 1104 --title "1104 then 1091"', note: '1104 first' },
 			],
 			flags: [
@@ -48,6 +52,11 @@ const PAUSE_COMMANDS: Record<string, CommandEntry> = {
 					names: ['--chain <chain>'],
 					description:
 						'repeatable; one chain line (`#A -> #B`) among `<issue>` and the children, passed to `epic` as given — joins and branches without `--ordered`.',
+				},
+				{
+					names: ['--order-reason "<chain>: <reason>"'],
+					description:
+						'repeatable; required once for each declared chain (the `--ordered` chain, or each `--chain`): what the later issue takes from the earlier one, passed to `epic` as given. A declared chain without one is refused before anything is set aside.',
 				},
 				{
 					names: ['--prerequisite <P>'],

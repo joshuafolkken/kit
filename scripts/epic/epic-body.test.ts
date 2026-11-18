@@ -188,17 +188,33 @@ describe('epic_body — per-chain order reasons', () => {
 		expect(body).not.toContain(SPLIT_POINTER)
 	})
 
-	it('keeps the pointer on the line after each chain given no reason', () => {
+	it('writes no pointer in place of a missing reason — only the chain order line', () => {
 		const body = build_reasoned([[101, 103]])
 
 		expect(body).toContain('- Reasoning: uses #101')
-		expect(body).toContain(
-			`\`#102 -> #103\`, declared by \`josh epic --chain\` when this epic was created.\n- Reasoning: ${SPLIT_POINTER}`,
+		expect(body).toMatch(
+			/`#102 -> #103`, declared by `josh epic --chain` when this epic was created\.\n(?!- Reasoning)/u,
 		)
+		expect(body).not.toContain(SPLIT_POINTER)
+		expect(body.match(/- Reasoning:/gu)).toHaveLength(1)
 	})
 
 	it('declares no extra order from a reason line', () => {
 		expect(epic_parse.parse_dependency_chains(build_reasoned(JOIN))).toStrictEqual(JOIN)
+	})
+})
+
+describe('epic_body.format_added_order', () => {
+	it('records each chain an insertion declared with its reason', () => {
+		const reasons = [{ chain: [101, 103], reason: 'uses #101' }]
+
+		expect(epic_body.format_added_order([[101, 103]], reasons)).toBe(
+			'- Order: `#101 -> #103`, declared by `josh epic --add --chain` when these children were added.\n- Reasoning: uses #101',
+		)
+	})
+
+	it('records nothing when the insertion declared no chain', () => {
+		expect(epic_body.format_added_order([], [])).toBeUndefined()
 	})
 })
 

@@ -123,7 +123,11 @@ describe('epic_cli.is_promotion', () => {
 })
 
 describe('epic_cli — --chain', () => {
-	const JOIN_ARGS = ['--chain', '#101 -> #103', '--chain', '#102 -> #103']
+	const JOIN_LINES = ['#101 -> #103', '#102 -> #103']
+	const JOIN_ARGS = [
+		...JOIN_LINES.flatMap((line) => ['--chain', line]),
+		...JOIN_LINES.flatMap((line) => ['--order-reason', `${line}: a reason`]),
+	]
 	const JOIN = [
 		[101, 103],
 		[102, 103],
