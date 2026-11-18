@@ -44,13 +44,44 @@ describe('backlog_drive_collect.merge', () => {
 		await expect(backlog_drive_collect.merge(ISSUE, OWNER)).resolves.toStrictEqual(MERGED)
 		expect(emitted()).toStrictEqual([`#${ISSUE} collect start`, `#${ISSUE} collect done`])
 	})
+})
 
-	it('closes the trace as failed when the collection throws', async () => {
+// joshuafolkken/kit#7859: a failed collection names the stage that threw and its reason on the stream.
+describe('backlog_drive_collect.merge failures', () => {
+	it('closes the trace as failed with the stage and reason when run:merge throws (ac-78ae82e4)', async () => {
 		const failure = new Error('spawn failed')
 
 		vi.spyOn(josh_command, 'josh_run').mockRejectedValue(failure)
 
-		await expect(backlog_drive_collect.merge(ISSUE, OWNER)).rejects.toBe(failure)
-		expect(emitted()).toStrictEqual([`#${ISSUE} collect start`, `#${ISSUE} collect failed`])
+		await expect(backlog_drive_collect.merge(ISSUE, OWNER)).rejects.toMatchObject({
+			message: 'run:merge: spawn failed',
+			cause: failure,
+		})
+		expect(emitted()).toStrictEqual([
+			`#${ISSUE} collect start`,
+			`#${ISSUE} collect failed: run:merge: spawn failed`,
+		])
+	})
+
+	it('names the after-merge stage when the post-merge work throws (ac-78ae82e4)', async () => {
+		vi.spyOn(josh_command, 'josh_run').mockResolvedValue({
+			code: 0,
+			out: run_merge_driver.print(MERGED),
+		})
+		vi.spyOn(backlog_drive_after_merge, 'after_merge').mockRejectedValue(
+			new Error('Could not retry #2400'),
+		)
+
+		await expect(backlog_drive_collect.merge(ISSUE, OWNER)).rejects.toThrow(
+			'after-merge: Could not retry #2400',
+		)
+		expect(emitted()).toContain(`#${ISSUE} collect failed: after-merge: Could not retry #2400`)
+	})
+
+	it('names the owner stage when the run changed hands (ac-78ae82e4)', async () => {
+		vi.spyOn(backlog_drive_owner, 'assert_current').mockRejectedValue(new Error('no longer owns'))
+
+		await expect(backlog_drive_collect.merge(ISSUE, OWNER)).rejects.toThrow('owner: no longer owns')
+		expect(emitted()).toContain(`#${ISSUE} collect failed: owner: no longer owns`)
 	})
 })
