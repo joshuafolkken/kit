@@ -68,6 +68,7 @@ function describe(outcome: FoldOutcome, request: FoldRequest): string {
 		`withdraw: ${outcome.is_withdrawn ? 'done' : 'already done'} (stash: ${outcome.stash ?? 'none'})`,
 		`note on ${into}: ${outcome.is_noted ? 'written' : 'already written'}`,
 		`unblock ${into} from ${issue}: done`,
+		`block ${issue} on ${into}: ${outcome.blocked}`,
 	].join('\n')
 }
 

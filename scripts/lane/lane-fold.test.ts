@@ -1,6 +1,8 @@
 import { backlog_triage_unblock } from '#scripts/backlog/backlog-triage-unblock'
+import { epic_blocked_by } from '#scripts/epic/epic-blocked-by'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
+import { git_stash } from '#scripts/git/stash/git-stash'
 import { issue_read } from '#scripts/issue/issue-read'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_fold } from './lane-fold'
@@ -32,6 +34,8 @@ const parse_comments = vi.spyOn(issue_read, 'parse_comments')
 const trusted_bodies = vi.spyOn(issue_read, 'trusted_bodies')
 const comment = vi.spyOn(git_gh_issue_write, 'issue_comment')
 const remove = vi.spyOn(backlog_triage_unblock, 'remove')
+const record = vi.spyOn(epic_blocked_by, 'record')
+const stash_list = vi.spyOn(git_stash, 'list')
 
 // Each issue's trusted comment bodies, read through the spied listing.
 function bodies(by_issue: Record<string, ReadonlyArray<string>>): void {
@@ -53,28 +57,60 @@ beforeEach(() => {
 	withdraw.mockResolvedValue(WITHDRAWN)
 	comment.mockResolvedValue('url')
 	remove.mockResolvedValue()
+	record.mockResolvedValue('recorded')
+	stash_list.mockResolvedValue([])
 	bodies({})
 })
 
 describe('lane_fold.fold — every step', () => {
-	it('withdraws, notes the taker with the stash and unblocks it', async () => {
+	it('withdraws, notes the taker with the stash, unblocks it and blocks the folded issue on it', async () => {
 		const outcome = await lane_fold.fold(REQUEST)
 
-		expect(outcome).toEqual({ kind: 'folded', is_withdrawn: true, stash: STASH, is_noted: true })
+		expect(outcome).toEqual({
+			kind: 'folded',
+			is_withdrawn: true,
+			stash: STASH,
+			is_noted: true,
+			blocked: 'recorded',
+		})
 		expect(withdraw).toHaveBeenCalledWith(ISSUE, `ships with #${INTO}: ${REASON}`)
 		expect(comment).toHaveBeenCalledWith(INTO, expect.stringContaining(`stash:pop "${STASH}"`))
 		expect(remove).toHaveBeenCalledWith({ issue: INTO, prerequisite: ISSUE })
+		expect(record).toHaveBeenCalledWith({ issue: ISSUE, prerequisite: INTO })
 	})
 
-	it('reads the stash back from the withdrawal comment when the lane is already withdrawn', async () => {
+	it('reads the stash back from the stash stack when the lane is already withdrawn', async () => {
 		withdraw.mockResolvedValue({ kind: 'no-lane' })
-		bodies({ [ISSUE]: [`- recover with \`pnpm josh stash:pop "${STASH}"\``] })
+		stash_list.mockResolvedValue([{ selector: 'stash@{2}', subject: `On ${ISSUE}-lane: ${STASH}` }])
 
 		const outcome = await lane_fold.fold(REQUEST)
 
 		expect(outcome).toMatchObject({ kind: 'folded', is_withdrawn: false, stash: STASH })
 		expect(comment).toHaveBeenCalledWith(INTO, expect.stringContaining(STASH))
 		expect(remove).toHaveBeenCalled()
+	})
+})
+
+describe('lane_fold.fold — a re-run', () => {
+	it('names no stash when the stack holds none for the folded issue', async () => {
+		withdraw.mockResolvedValue({ kind: 'no-lane' })
+		bodies({ [ISSUE]: [`- recover with \`pnpm josh stash:pop "${STASH}"\``] })
+
+		expect(await lane_fold.fold(REQUEST)).toMatchObject({ kind: 'folded', stash: undefined })
+	})
+
+	it('goes on past an already-closed issue with no lane', async () => {
+		withdraw.mockResolvedValue({ kind: 'closed' })
+
+		expect(await lane_fold.fold(REQUEST)).toMatchObject({ kind: 'folded', is_withdrawn: false })
+		expect(remove).toHaveBeenCalled()
+		expect(record).toHaveBeenCalled()
+	})
+
+	it('reports a block an earlier run recorded as already', async () => {
+		record.mockResolvedValue('already')
+
+		expect(await lane_fold.fold(REQUEST)).toMatchObject({ kind: 'folded', blocked: 'already' })
 	})
 
 	it('writes no note when the taker already carries it', async () => {
@@ -107,5 +143,12 @@ describe('lane_fold.fold — a failed step', () => {
 		remove.mockRejectedValue(new Error('not removed'))
 
 		expect(await lane_fold.fold(REQUEST)).toMatchObject({ kind: 'failed', step: 'unblock' })
+		expect(record).not.toHaveBeenCalled()
+	})
+
+	it('names the block step when recording the blocked-by throws', async () => {
+		record.mockRejectedValue(new Error('not recorded'))
+
+		expect(await lane_fold.fold(REQUEST)).toMatchObject({ kind: 'failed', step: 'block' })
 	})
 })

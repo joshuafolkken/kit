@@ -1,4 +1,5 @@
 import { backlog_triage_unblock } from '#scripts/backlog/backlog-triage-unblock'
+import { epic_blocked_by } from '#scripts/epic/epic-blocked-by'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { git_stash } from '#scripts/git/stash/git-stash'
@@ -10,17 +11,18 @@ import { lane_withdraw } from './lane-withdraw'
 
 // `josh lane:fold <N> --into <M> --reason <text>` — a component Issue `N` ships in the pull request of
 // the Issue `M` that wires it (joshuafolkken/kit#7982). Three existing operations run in order: `N`'s
-// lane is withdrawn with its work stashed, `M` is told how to bring the stash in and to close `N`, and
+// lane is withdrawn with its work stashed, `M` is told how to bring the stash in and to close `N`,
 // `M`'s blocked-by on `N` (with the epic's `N -> M` declaration) is removed — left in place, `M` would
-// wait forever on an Issue only its own pull request closes.
+// wait forever on an Issue only its own pull request closes — and `N` is recorded as blocked by `M`.
 //
 // No state of its own: a re-run reads each step back and does only what is left. A lane already
-// withdrawn reads `no-lane`, its stash name is read from `N`'s withdrawal comment, a note already on `M`
-// carries the fold's marker, and the unblock is itself a no-op on an absent relation or declaration.
-// `N` stays open: withdrawn, it leaves the run's candidates (`backlog-drive-restore.ts`), and `M`'s
-// pull request closes it.
+// withdrawn (or an `N` already closed) reads `no-lane` or `closed`, its stash is found on the stash
+// stack by its message, a note already on `M` carries the fold's marker, the unblock is a no-op on an
+// absent relation or declaration, and the block answers `already` once recorded. `N` stays open: a
+// withdrawal keeps it out of the current run only, so the blocked-by on `M` is what keeps a later run
+// from building it apart until `M`'s pull request closes it.
 
-type FoldStep = 'withdraw' | 'note' | 'unblock'
+type FoldStep = 'withdraw' | 'note' | 'unblock' | 'block'
 
 interface FoldRequest {
 	issue: string
@@ -35,6 +37,8 @@ interface Folded {
 	stash: string | undefined
 	// `false` when `M` already carried the note.
 	is_noted: boolean
+	// `epic_blocked_by.record`'s answer for `N` blocked by `M`.
+	blocked: string
 }
 
 interface FoldFailed {
@@ -66,12 +70,18 @@ async function trusted_bodies_of(issue: string): Promise<ReadonlyArray<string>> 
 	return issue_read.trusted_bodies(comments)
 }
 
-// The stash an earlier run's withdrawal recorded on `N`, or `undefined` when its lane held no work.
+// The stash an earlier run's withdrawal pushed for `N`, read from the stack itself rather than from the
+// comment announcing it, which a failed post leaves missing; `undefined` when its lane held no work.
 async function recorded_stash(issue: string): Promise<string | undefined> {
 	const stash = git_stash.work_message(issue, lane_withdraw.WITHDRAW_OCCASION)
-	const bodies = await trusted_bodies_of(issue)
+	const selection = git_stash.select(await git_stash.list(), stash)
 
-	return bodies.some((body) => body.includes(`stash:pop "${stash}"`)) ? stash : undefined
+	return selection.kind === 'none' ? undefined : stash
+}
+
+// Nothing left to withdraw: a lane an earlier run withdrew, or an `N` closed with no lane.
+function is_without_lane(kind: string): boolean {
+	return kind === 'no-lane' || kind === 'closed'
 }
 
 async function withdraw_lane({ issue, into, reason }: FoldRequest): Promise<Withdrawal> {
@@ -81,7 +91,7 @@ async function withdraw_lane({ issue, into, reason }: FoldRequest): Promise<With
 	)
 
 	if (outcome.kind === 'withdrawn') return { is_withdrawn: true, stash: outcome.stash }
-	if (outcome.kind !== 'no-lane') throw new Error(lane_withdraw.describe(outcome, issue))
+	if (!is_without_lane(outcome.kind)) throw new Error(lane_withdraw.describe(outcome, issue))
 
 	return { is_withdrawn: false, stash: await recorded_stash(issue) }
 }
@@ -106,7 +116,10 @@ async function run_steps(request: FoldRequest, progress: Progress): Promise<Fold
 	progress.step = 'unblock'
 	await backlog_triage_unblock.remove({ issue: request.into, prerequisite: request.issue })
 
-	return { kind: 'folded', ...withdrawal, is_noted }
+	progress.step = 'block'
+	const blocked = await epic_blocked_by.record({ issue: request.issue, prerequisite: request.into })
+
+	return { kind: 'folded', ...withdrawal, is_noted, blocked }
 }
 
 /** Fold `issue` into `into`, naming the step that failed so a re-run finishes the rest. */
