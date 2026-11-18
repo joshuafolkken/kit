@@ -2,6 +2,7 @@ import type { NamedPlan } from '#scripts/backlog/backlog-plan'
 import type { ClosedAnswer, ClosedIssue } from './run-board-closed'
 import type { Fetch } from './run-board-fetch'
 import type { SectionKey, TerminalSize } from './run-board-fit'
+import type { FrameStore } from './run-board-frame-store'
 import type { Gatherer, GatherRead } from './run-board-gather'
 import type { BoardForm } from './run-board-header'
 import { run_board_idle } from './run-board-idle'
@@ -26,6 +27,8 @@ interface BoardPorts {
 	read_closed: (issues: ReadonlyArray<number>) => Promise<ClosedAnswer>
 	// Where the last GitHub reads are kept between boards (`run-board-snapshot.ts`); none keeps nothing.
 	snapshot?: SnapshotStore | undefined
+	// Where `--chat` and `--once` keep the frame they drew (`run-board-frame-store.ts`); none keeps nothing.
+	frames?: FrameStore | undefined
 	now: () => number
 	write: (frame: string) => void
 	// Wraps an issue number in a hyperlink where the terminal opens one, and leaves it plain elsewhere.
