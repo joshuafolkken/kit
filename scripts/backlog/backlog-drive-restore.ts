@@ -1,8 +1,8 @@
 import { lane_yield } from '#scripts/lane/lane-yield'
 import { run_event_retry } from '#scripts/run/event/run-event-retry'
-import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { backlog_offer_exclude } from './backlog-offer-exclude'
+import { backlog_triage_withdrawn } from './backlog-triage-withdrawn'
 
 // The `DriveState` lists a seeded drive starts from.
 interface LeftOut {
@@ -75,9 +75,7 @@ function issues_of_kind(events: ReadonlyArray<RunEvent>, kind: string): Readonly
 function withdrawn_issues(events: ReadonlyArray<RunEvent>): ReadonlyArray<string> {
 	const named = issues_of_kind(events, run_event_stream.EVENT_KIND.WITHDRAW)
 
-	return named.filter(
-		(issue) => run_event_scope.is_withdrawn(events, issue) && !lane_yield.is_yielded(events, issue),
-	)
+	return named.filter((issue) => backlog_triage_withdrawn.is_withdrawn(events, issue))
 }
 
 // The issues this run found waiting for their measurement sample (joshuafolkken/kit#6503): a drive
