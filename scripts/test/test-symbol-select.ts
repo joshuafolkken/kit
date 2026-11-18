@@ -3,7 +3,7 @@ import { test_declared_logic } from './test-declared-logic'
 import { test_pinned_logic, type Hunk } from './test-pinned-logic'
 import type { ReachedCount } from './test-pinned-reach'
 import { test_registry_readers } from './test-registry-readers'
-import type { TypeScript } from './test-symbol-facts'
+import type { TypeScript } from './test-symbol-bindings'
 import { test_symbol_resolve } from './test-symbol-resolve'
 import { test_symbol_users, type Reach, type Source, type SymbolIndex } from './test-symbol-users'
 
@@ -94,18 +94,38 @@ function selection_at(selecting: Selecting, reach: Reach): SymbolSelection {
 	}
 }
 
-// Every user followed, or one file boundary where that selects more than the cap.
-function select_from(input: SymbolInput): SymbolSelection {
+function selecting_of(input: SymbolInput): Selecting {
 	const { build } = test_symbol_users
 	const resolve = test_symbol_resolve.resolver(input.sources, input.imports)
 	const index = build(input.typescript, resolve, input.sources)
 	const tests = input.sources.filter((source) => test_declared_logic.is_test_file(source.file))
-	const selecting: Selecting = { input, index, tests }
+
+	return { input, index, tests }
+}
+
+// Every user followed, or one file boundary where that selects more than the cap.
+function select_within(selecting: Selecting): SymbolSelection {
 	const full = selection_at(selecting, FULL)
 
 	return full.tests.length > test_pinned_logic.MAX_TEST_FILES
 		? selection_at(selecting, ONE_HOP)
 		: full
+}
+
+function select_from(input: SymbolInput): SymbolSelection {
+	return select_within(selecting_of(input))
+}
+
+// Each changed file's count as though it changed alone, over one index — so one wide file does not
+// send the others to the one-hop fallback.
+function counts_from(input: SymbolInput): Array<ReachedCount> {
+	const selecting = selecting_of(input)
+
+	return input.changed.map((file) => {
+		const alone = { ...selecting, input: { ...input, changed: [file] } }
+
+		return { file, count: select_within(alone).tests.length }
+	})
 }
 
 // A hunk's lines in the new file; a pure deletion, after its `new_start`, marks the lines either side.
@@ -126,7 +146,7 @@ function changed_lines(diff: string): Map<string, Array<number>> {
 	return lines
 }
 
-const test_symbol_select = { changed_lines, select_from }
+const test_symbol_select = { changed_lines, counts_from, select_from }
 
 export type { ChangedLines, SymbolInput, SymbolSelection }
 export { test_symbol_select }

@@ -1,11 +1,6 @@
 import { test_declared_logic } from './test-declared-logic'
-import {
-	test_symbol_facts,
-	type Binding,
-	type FileFacts,
-	type Resolve,
-	type TypeScript,
-} from './test-symbol-facts'
+import type { Binding, BindingSpan, Reexport, Resolve, TypeScript } from './test-symbol-bindings'
+import { test_symbol_facts, type FileFacts } from './test-symbol-facts'
 import { test_symbol_whole } from './test-symbol-whole'
 
 // **Related-test selection by the users of changed functions and constants**, rather than by every
@@ -36,6 +31,12 @@ interface SymbolIndex {
 interface Reach {
 	max_hops: number
 	stops: ReadonlySet<string>
+}
+
+// A run of lines: a declaration's or a binding statement's.
+interface Span {
+	start: number
+	end: number
 }
 
 interface Walk extends Reach {
@@ -180,6 +181,33 @@ function build(
 	return index
 }
 
+function is_hit(span: Span, lines: ReadonlyArray<number>): boolean {
+	return lines.some((line) => line >= span.start && line <= span.end)
+}
+
+function uses_name(references: ReadonlySet<string>, name: string): boolean {
+	return [...references].some((reference) => reference === name || reference.startsWith(`${name}.`))
+}
+
+// What a re-export passes on: the declaration it names, or every export of a `export *` module.
+function passed_on(index: SymbolIndex, item: Reexport): Array<string> {
+	if (item.name !== EVERY) return [resolve_export(index, item)]
+	const exports = index.facts.get(item.module)?.exports.values() ?? []
+
+	return [...exports].map((name) => key_of(item.module, name))
+}
+
+// A changed import seeds its file's declarations using a name it binds; a changed re-export, what it
+// passes on — so a swapped module or binding selects the users of the code it now reaches.
+function binding_keys(index: SymbolIndex, file: string, span: BindingSpan): Array<string> {
+	const declarations = [...(index.facts.get(file)?.declarations ?? [])]
+	const users = declarations
+		.filter(([, item]) => span.imports.some((name) => uses_name(item.references, name)))
+		.map(([name]) => key_of(file, name))
+
+	return [...users, ...span.reexports.flatMap((item) => passed_on(index, item))]
+}
+
 // The declarations a changed line falls in, a changed test file standing for itself.
 function changed_keys(
 	index: SymbolIndex,
@@ -189,10 +217,14 @@ function changed_keys(
 	const facts = index.facts.get(file)
 	if (facts === undefined) return []
 	const keys = [...facts.declarations]
-		.filter(([, item]) => lines.some((line) => line >= item.start && line <= item.end))
+		.filter(([, item]) => is_hit(item, lines))
 		.map(([name]) => key_of(file, name))
+	const bound = facts.spans
+		.filter((span) => is_hit(span, lines))
+		.flatMap((span) => binding_keys(index, file, span))
+	const all = [...keys, ...bound]
 
-	return is_test_file(file) ? [...keys, key_of(file, LOAD)] : keys
+	return is_test_file(file) ? [...all, key_of(file, LOAD)] : all
 }
 
 function is_exported(index: SymbolIndex, key: string): boolean {

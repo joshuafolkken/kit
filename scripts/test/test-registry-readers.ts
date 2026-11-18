@@ -1,4 +1,5 @@
 import type ts from 'typescript'
+import type { TypeScript } from './test-symbol-bindings'
 import type { Source } from './test-symbol-users'
 
 // **The tests calling a changed `josh` command by its name** (joshuafolkken/kit#7980): a command
@@ -6,8 +7,6 @@ import type { Source } from './test-symbol-users'
 // change to an entry no further than that table's own tests. The entry's key is the name tests run the
 // command by, so the test files naming a changed key — as a string or a word of a command line — are
 // its readers.
-
-type TypeScript = typeof ts
 
 const REGISTRY = /(?:^|\/)josh-commands-[^/]+\.ts$/u
 // A command name needs no escaping in a pattern; any other key is never a command a test runs.

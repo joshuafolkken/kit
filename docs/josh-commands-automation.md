@@ -352,7 +352,7 @@ Run by the distributed `ci.yml` between its E2E attempts.
 
 <!-- usage: test:reach -->
 
-Print how many test files each file's imports reach — the count test:related sizes its claim by — one '<count> <file>' line per file, or with --count one file's count alone.
+Print how many test files a change to each file selects — the count test:related sizes its claim by — one '<count> <file>' line per file, or with --count one file's count alone.
 
 ```bash
 pnpm josh test:reach scripts/lane/lane-ledger.ts           # a reach count to measure before and after a change

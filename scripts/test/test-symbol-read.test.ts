@@ -4,6 +4,7 @@ import { git_fixture_workspace, type FixtureWorkspace } from '#scripts/git/git-f
 import { review_code_tree } from '#scripts/review/review-code-tree'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_pinned_fixture } from './test-pinned-fixture'
+import { test_pinned_reach } from './test-pinned-reach'
 import { test_symbol_read } from './test-symbol-read'
 
 // joshuafolkken/kit#7980: the work tree and the diff since the change base, read for the symbol walk.
@@ -62,5 +63,24 @@ describe('test_symbol_read.symbols', () => {
 		vi.spyOn(review_code_tree, 'load_typescript').mockReturnValue(undefined)
 
 		expect(await test_symbol_read.symbols(process.cwd(), [LIB])).toBeUndefined()
+	})
+})
+
+describe('test_symbol_read.reached_counts', () => {
+	it('counts the tests a change to the whole file selects, each file as given', async () => {
+		const absolute = path.join(process.cwd(), LIB)
+
+		expect(await test_symbol_read.reached_counts([absolute, 'gone.ts'])).toEqual([
+			{ file: absolute, count: 2 },
+			{ file: 'gone.ts', count: 0 },
+		])
+	})
+
+	it('reads the import graph where typescript cannot be loaded', async () => {
+		vi.spyOn(review_code_tree, 'load_typescript').mockReturnValue(undefined)
+		const read = vi.spyOn(test_pinned_reach, 'reached_test_counts').mockResolvedValue(undefined)
+
+		expect(await test_symbol_read.reached_counts([LIB])).toBeUndefined()
+		expect(read).toHaveBeenCalledWith([LIB])
 	})
 })

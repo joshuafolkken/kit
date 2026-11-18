@@ -1,10 +1,9 @@
 import type ts from 'typescript'
+import type { TypeScript } from './test-symbol-bindings'
 
 // **A top-level `vi.mock('<specifier>', …)` read for the symbol-level test selection**
 // (joshuafolkken/kit#7980): a mock replacing the module whole keeps its test from running on a change to
 // it, while one built on the original (`importOriginal` / `vi.importActual`) still runs that code.
-
-type TypeScript = typeof ts
 
 const MOCKER = 'vi'
 const MOCK_CALL = 'mock'

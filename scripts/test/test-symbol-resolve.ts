@@ -1,6 +1,6 @@
 import path from 'node:path'
 import { direct_importers, type ImportMap } from './direct-importers'
-import type { Resolve } from './test-symbol-facts'
+import type { Resolve } from './test-symbol-bindings'
 
 // **The source file a module specifier names**, for the symbol-level test selection
 // (`test-symbol-select.ts`): a relative, `$lib` or `package.json` `imports` specifier, tried as

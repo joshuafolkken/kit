@@ -1,4 +1,10 @@
 import type ts from 'typescript'
+import {
+	test_symbol_bindings,
+	type BindingFacts,
+	type Resolve,
+	type TypeScript,
+} from './test-symbol-bindings'
 import { test_symbol_mocks } from './test-symbol-mocks'
 
 // One file read syntactically for the symbol-level test selection (`test-symbol-users.ts`): its
@@ -7,13 +13,9 @@ import { test_symbol_mocks } from './test-symbol-mocks'
 // `vi.mock` calls replace whole. A load-time statement is one more declaration, named `<load>` and its
 // first line.
 
-type TypeScript = typeof ts
-type Resolve = (specifier: string, file: string) => string | undefined
-
 const LOAD = '<load>'
-const EVERY = '*'
-const DEFAULT_EXPORT = 'default'
 const SEPARATOR = '::'
+const { EVERY, DEFAULT_EXPORT } = test_symbol_bindings
 
 interface Declaration {
 	start: number
@@ -21,22 +23,9 @@ interface Declaration {
 	references: Set<string>
 }
 
-interface Binding {
-	module: string
-	name: string
-}
-
-interface Reexport extends Binding {
-	as: string
-}
-
-interface FileFacts {
+interface FileFacts extends BindingFacts {
 	declarations: Map<string, Declaration>
 	members: Map<string, Map<string, string>>
-	exports: Map<string, string>
-	imports: Map<string, Binding>
-	reexports: Array<Reexport>
-	modules: Set<string>
 	mocks: Set<string>
 }
 
@@ -225,83 +214,6 @@ function read_declaration(reader: Reader, statement: ts.Statement, names: Array<
 	if (reader.typescript.isVariableStatement(statement)) read_members(reader, statement)
 }
 
-function import_module(reader: Reader, statement: ts.ImportDeclaration): string | undefined {
-	const { typescript } = reader
-	if (statement.importClause?.phaseModifier === typescript.SyntaxKind.TypeKeyword) return undefined
-	const specifier = statement.moduleSpecifier
-
-	return reader.typescript.isStringLiteral(specifier)
-		? reader.resolve(specifier.text, reader.file)
-		: undefined
-}
-
-function import_elements(reader: Reader, bindings: ts.NamedImports, module: string): void {
-	const elements = bindings.elements.filter((element) => !element.isTypeOnly)
-
-	for (const element of elements) {
-		const name = (element.propertyName ?? element.name).text
-
-		reader.facts.imports.set(element.name.text, { module, name })
-	}
-}
-
-function import_bindings(reader: Reader, clause: ts.ImportClause, module: string): void {
-	const { typescript, facts } = reader
-	const named_bindings = clause.namedBindings
-
-	if (clause.name !== undefined) {
-		facts.imports.set(clause.name.text, { module, name: DEFAULT_EXPORT })
-	}
-
-	if (named_bindings === undefined) return
-	if (typescript.isNamespaceImport(named_bindings)) {
-		facts.imports.set(named_bindings.name.text, { module, name: EVERY })
-	} else import_elements(reader, named_bindings, module)
-}
-
-function read_import(reader: Reader, statement: ts.ImportDeclaration): void {
-	const module = import_module(reader, statement)
-	if (module === undefined) return
-	const clause = statement.importClause
-
-	reader.facts.modules.add(module)
-	if (clause !== undefined) import_bindings(reader, clause, module)
-}
-
-function export_module(reader: Reader, statement: ts.ExportDeclaration): string | undefined {
-	const specifier = statement.moduleSpecifier
-	if (specifier === undefined || !reader.typescript.isStringLiteral(specifier)) return undefined
-	const module = reader.resolve(specifier.text, reader.file)
-
-	if (module !== undefined) reader.facts.modules.add(module)
-
-	return module
-}
-
-function export_element(reader: Reader, element: ts.ExportSpecifier, module?: string): void {
-	const name = (element.propertyName ?? element.name).text
-
-	if (module === undefined) reader.facts.exports.set(element.name.text, name)
-	else reader.facts.reexports.push({ module, name, as: element.name.text })
-}
-
-function export_elements(reader: Reader, clause: ts.NamedExportBindings, module?: string): void {
-	if (!reader.typescript.isNamedExports(clause)) return
-	const elements = clause.elements.filter((element) => !element.isTypeOnly)
-
-	for (const element of elements) export_element(reader, element, module)
-}
-
-// `export * from './x'` re-exports every name of `x`.
-function read_export(reader: Reader, statement: ts.ExportDeclaration): void {
-	if (statement.isTypeOnly) return
-	const module = export_module(reader, statement)
-	const clause = statement.exportClause
-
-	if (clause !== undefined) export_elements(reader, clause, module)
-	else if (module !== undefined) reader.facts.reexports.push({ module, name: EVERY, as: EVERY })
-}
-
 function is_type_only(typescript: TypeScript, statement: ts.Statement): boolean {
 	return (
 		typescript.isInterfaceDeclaration(statement) || typescript.isTypeAliasDeclaration(statement)
@@ -335,9 +247,9 @@ function read_statement(reader: Reader, statement: ts.Statement): void {
 	const { typescript } = reader
 	const names = declared_names(typescript, statement)
 
-	if (typescript.isImportDeclaration(statement)) read_import(reader, statement)
-	else if (typescript.isExportDeclaration(statement)) read_export(reader, statement)
-	else if (names.length > 0) read_declaration(reader, statement, names)
+	if (typescript.isImportDeclaration(statement) || typescript.isExportDeclaration(statement)) {
+		test_symbol_bindings.read_binding(reader, statement)
+	} else if (names.length > 0) read_declaration(reader, statement, names)
 	else if (!is_type_only(typescript, statement)) read_load(reader, statement)
 }
 
@@ -348,6 +260,7 @@ function empty_facts(): FileFacts {
 		exports: new Map(),
 		imports: new Map(),
 		reexports: [],
+		spans: [],
 		modules: new Set(),
 		mocks: new Set(),
 	}
@@ -379,5 +292,5 @@ const test_symbol_facts = {
 	read_file,
 }
 
-export type { Binding, FileFacts, Resolve, TypeScript }
+export type { FileFacts }
 export { test_symbol_facts }

@@ -4,8 +4,15 @@ import { change_base } from '#scripts/git/change-base'
 import { git_spawn } from '#scripts/git/git-spawn'
 import { review_code_tree } from '#scripts/review/review-code-tree'
 import { direct_importers } from './direct-importers'
+import { test_pinned_reach, type ReachedCount } from './test-pinned-reach'
 import { related_scope } from './test-related-scope'
-import { test_symbol_select, type SymbolSelection } from './test-symbol-select'
+import type { TypeScript } from './test-symbol-bindings'
+import {
+	test_symbol_select,
+	type ChangedLines,
+	type SymbolInput,
+	type SymbolSelection,
+} from './test-symbol-select'
 import type { Source } from './test-symbol-users'
 
 // **The work tree read for the symbol-level test selection** (joshuafolkken/kit#7980): every relatable
@@ -38,6 +45,21 @@ async function diff_of(root: string, base: string, code: ReadonlyArray<string>):
 	return await git_spawn.read(['-C', root, ...DIFF_ARGS, base, '--', ...code])
 }
 
+async function input_of(
+	root: string,
+	typescript: TypeScript,
+	code: ReadonlyArray<string>,
+	lines: ChangedLines,
+): Promise<SymbolInput> {
+	return {
+		typescript,
+		sources: await sources_of(root),
+		changed: code,
+		lines,
+		imports: direct_importers.source_reader(root).imports,
+	}
+}
+
 // The tests `code`, root-relative changed code files, select by symbol; `undefined` where typescript or
 // the change base is missing.
 async function symbols(
@@ -49,15 +71,33 @@ async function symbols(
 	if (typescript === undefined || base === undefined) return undefined
 	const diff = await diff_of(root, base, code)
 
-	return test_symbol_select.select_from({
-		typescript,
-		sources: await sources_of(root),
-		changed: code,
-		lines: test_symbol_select.changed_lines(diff),
-		imports: direct_importers.source_reader(root).imports,
-	})
+	const lines = test_symbol_select.changed_lines(diff)
+
+	return test_symbol_select.select_from(await input_of(root, typescript, code, lines))
 }
 
-const test_symbol_read = { symbols }
+function relative_of(root: string, file: string): string {
+	return path.relative(root, path.resolve(root, file))
+}
+
+// Each of `files`' count of the tests a change to the whole file selects, `files` as given — what
+// `josh test:related` would run for it, read before an edit (`lane:plan`'s hubs, `josh test:reach`).
+// The import graph's count where typescript is missing.
+async function reached_counts(
+	files: ReadonlyArray<string>,
+): Promise<Array<ReachedCount> | undefined> {
+	const root = process.cwd()
+	const typescript = review_code_tree.load_typescript(root)
+	if (typescript === undefined) return await test_pinned_reach.reached_test_counts(files)
+	const code = files.map((file) => relative_of(root, file))
+	const input = await input_of(root, typescript, code, new Map())
+	const counts = new Map(
+		test_symbol_select.counts_from(input).map(({ file, count }) => [file, count]),
+	)
+
+	return files.map((file) => ({ file, count: counts.get(relative_of(root, file)) ?? 0 }))
+}
+
+const test_symbol_read = { reached_counts, symbols }
 
 export { test_symbol_read }

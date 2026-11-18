@@ -12,6 +12,13 @@ const DEV_TEST = 'dev.test.ts'
 const TABLE_TEST = 'table.test.ts'
 const STOP_TEST = 'stop.test.ts'
 const HUB_TEST = 'hub.test.ts'
+const LIB = 'lib.ts'
+const LIB_TEST = 'lib.test.ts'
+const NAMED = 'named.ts'
+const STARRED = 'starred.ts'
+const RUN_EXPORT = 'export { run }'
+const NAMED_TEST = 'named.test.ts'
+const STARRED_TEST = 'starred.test.ts'
 const CLI_TEST = 'cli.test.ts'
 const REGISTRY = 'registry.ts'
 const DIRECT_TEST = 'direct.test.ts'
@@ -197,8 +204,33 @@ describe('test_symbol_users.select — default exports', () => {
 	})
 })
 
+const SWAPPED: Array<Source> = [
+	source('v2.ts', 'function pick() { return 2 }', 'export { pick }'),
+	source(LIB, import_of('pick', 'v2'), 'function run() { return pick() }', RUN_EXPORT),
+	source(LIB_TEST, import_of('run', 'lib'), 'it("l", () => run())'),
+	source(NAMED, `export { pick } from './v2'`),
+	source(STARRED, `export * from './v2'`),
+	source(NAMED_TEST, import_of('pick', 'named'), 'it("n", () => pick())'),
+	source(STARRED_TEST, import_of('pick', 'starred'), 'it("s", () => pick())'),
+]
+
+// joshuafolkken/kit#7980 round 1: a changed binding statement falls in no declaration.
+describe('test_symbol_users.select — changed binding statements', () => {
+	it('reaches the users of a name a changed import binds', () => {
+		expect(selected_in(SWAPPED, LIB, [1])).toEqual([LIB_TEST])
+	})
+
+	it('reaches the readers of what a changed named re-export passes on', () => {
+		expect(selected_in(SWAPPED, NAMED, [1])).toContain(NAMED_TEST)
+	})
+
+	it('reaches the readers of what a changed star re-export passes on', () => {
+		expect(selected_in(SWAPPED, STARRED, [1])).toContain(STARRED_TEST)
+	})
+})
+
 const HUB: Array<Source> = [
-	source('run.ts', 'function run() { return 1 }', 'export { run }'),
+	source('run.ts', 'function run() { return 1 }', RUN_EXPORT),
 	source('hub.ts', import_of('run', 'run'), 'const HUB = { run }', 'export { HUB }'),
 	source(HUB_TEST, import_of('HUB', 'hub'), 'it("h", () => HUB[k])'),
 	source('cli.ts', import_of('HUB', 'hub'), 'function main() { return HUB[k] }', 'export { main }'),

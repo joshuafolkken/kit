@@ -1,5 +1,6 @@
 import { direct_importers } from './direct-importers'
-import { test_symbol_facts, type FileFacts, type Resolve } from './test-symbol-facts'
+import type { Resolve } from './test-symbol-bindings'
+import { test_symbol_facts, type FileFacts } from './test-symbol-facts'
 
 // **A file the syntax reader cannot parse, read whole** (joshuafolkken/kit#7980) — a `.svelte`
 // component: one declaration, its default export, spanning every line and using every export of each

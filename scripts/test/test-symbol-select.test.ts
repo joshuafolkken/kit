@@ -10,6 +10,7 @@ const ONE_TEST = 'src/one.test.ts'
 const TWO_TEST = 'src/two.test.ts'
 const MOCKING_TEST = 'src/mocking.test.ts'
 const REGISTRY = 'scripts/josh/josh-commands-thing.ts'
+const SOLO = 'src/solo.ts'
 
 const LIB_SOURCE: Source = {
 	file: LIB,
@@ -92,6 +93,27 @@ describe('test_symbol_select.select_from — a command registry', () => {
 		const input = input_of([registry, naming], [REGISTRY], new Map([[REGISTRY, [2]]]))
 
 		expect(test_symbol_select.select_from(input).tests).toEqual([naming.file])
+	})
+})
+
+describe('test_symbol_select.counts_from', () => {
+	it('counts each file as though it changed alone, unswayed by a wide neighbor', () => {
+		const solo: Array<Source> = [
+			{ file: SOLO, text: 'function s() { return 1 }\nexport { s }\n' },
+			{
+				file: 'src/relay.ts',
+				text: `import { s } from './solo'\nexport function r() { return s() }\n`,
+			},
+			{ file: 'src/relay.test.ts', text: `import { r } from './relay'\nit('r', r)\n` },
+		]
+		const far = far_tests(test_pinned_logic.MAX_TEST_FILES)
+		const sources = [...LIB_SOURCES, MID_SOURCE, ...far, ...solo]
+		const input = input_of(sources, [LIB, SOLO])
+
+		expect(test_symbol_select.counts_from(input)).toEqual([
+			{ file: LIB, count: 2 },
+			{ file: SOLO, count: 1 },
+		])
 	})
 })
 
