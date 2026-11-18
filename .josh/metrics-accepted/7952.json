@@ -1,0 +1,7 @@
+{
+	"reason": "New sound mark in the live run:board header (#7952): the 🔊/🔇 cell and the header field read off the live port",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 16
+	}
+}

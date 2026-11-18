@@ -134,6 +134,18 @@ function seats_of(state: BoardState, local: LocalRead): SeatRead | undefined {
 // A run's header, always over its laid-out rows.
 type LaidHeader = BoardHeader & { layout: BoardLayout }
 
+type PortHeader = Pick<BoardHeader, 'form' | 'spinner' | 'is_keyed' | 'is_sound_on'>
+
+// What the header reads off the board's own ports: only a live board reads the sound switch.
+function port_header(ports: BoardPorts): PortHeader {
+	return {
+		form: ports.form,
+		spinner: ports.is_tty ? SPOT : undefined,
+		is_keyed: ports.types_rows,
+		is_sound_on: ports.sound?.(),
+	}
+}
+
 function header_of(
 	state: BoardState,
 	local: LocalRead,
@@ -152,10 +164,8 @@ function header_of(
 		read_error: state.read_error,
 		is_plan_loading: state.plan_fetch !== undefined,
 		...gauges_of(state, local),
-		form: redraw.ports.form,
+		...port_header(redraw.ports),
 		repo: state.plan?.context.repo,
-		spinner: redraw.ports.is_tty ? SPOT : undefined,
-		is_keyed: redraw.ports.types_rows,
 		...run_board_link.links_of(state.plan?.context.repo, redraw.ports.link),
 	}
 }
