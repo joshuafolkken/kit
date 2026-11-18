@@ -137,6 +137,8 @@ describe('issue_outcome.recorded', () => {
 	it.each([
 		{ comments: [], expected: {} },
 		{ comments: [comment(marked())], expected: { outcome: { summary: SUMMARY, url: URL } } },
+		// joshuafolkken/kit#7850: a park's next action is not the closed Issue's conclusion.
+		{ comments: [comment(marked()), comment(marked('person: decide the owner'))], expected: {} },
 	])('records only available evidence: $expected', async ({ comments, expected }) => {
 		vi.spyOn(git_gh_issue_read, 'issue_list_comments').mockResolvedValue('[]')
 		vi.spyOn(issue_read, 'parse_comments').mockResolvedValue(comments)

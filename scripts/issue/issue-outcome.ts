@@ -106,11 +106,13 @@ async function read(issue: number): Promise<IssueOutcome | undefined> {
 	}
 }
 
+// A closed row's conclusion: a park's next action left as the latest record names no conclusion.
 async function recorded(issue: number, is_merged: boolean): Promise<{ outcome?: IssueOutcome }> {
 	if (is_merged) return {}
 	const outcome = await read(issue)
+	const is_next = next_schema.safeParse(outcome?.summary).success
 
-	return outcome === undefined ? {} : { outcome }
+	return outcome === undefined || is_next ? {} : { outcome }
 }
 
 const issue_outcome = {

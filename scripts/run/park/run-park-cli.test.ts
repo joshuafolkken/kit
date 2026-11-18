@@ -130,6 +130,11 @@ describe('run:park next action', () => {
 		expect(issue_outcome.next_of(MARKED_BODY)).toBe(NEXT)
 	})
 
+	it('names --outcome and its format in the usage', () => {
+		expect(run_park_cli.USAGE).toContain('--body-file <path> --outcome "<next action>"')
+		expect(run_park_cli.USAGE).toContain(issue_outcome.NEXT_FORMAT)
+	})
+
 	it.each([
 		['no next action', []],
 		['prose with no leading word', [OUTCOME_FLAG, 'close the lane']],
