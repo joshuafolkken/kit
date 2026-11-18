@@ -1018,7 +1018,8 @@ Foreign-repository and excluded children are not read. With none left it prints 
 is adoptable. An option whose `必要な権限` starts with `親` is carried out first, then adopted with
 `--done <what was done>`; one naming `issue:file` is adopted with `--done "filed #<M>"` and waits on `#M`.
 `親（issue:close）` needs no `--done`; the adopt closes it, lane returned.
-A park body naming `issue:file` or `issue:close` under any other permission is refused. Recovery guidance prints only when a read is due.
+`親（lane:fold <N> --into #<M>）` needs no `--done`; the adopt runs `lane:fold` into `#M`, not requeued — one naming no `--into` is refused before any write.
+A park body naming `issue:file`, `issue:close` or `lane:fold` under any other permission is refused. Recovery guidance prints only when a read is due.
 
 A lane park records its tree (`- Tree: <HEAD> · changes <n>`). If the latest park and the one before
 the last `--adopt` share it, the option was never taken: `--adopt` parks `run:stalled` (`park loop`, no
