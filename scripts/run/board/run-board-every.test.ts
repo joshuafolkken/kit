@@ -1,12 +1,17 @@
+import type { EpicChild } from '#scripts/epic/epic-graph'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_cli } from './run-board-cli'
+import { run_board_every } from './run-board-every'
 import { run_board_fixture } from './run-board-fixture'
+import { run_board_frame_store } from './run-board-frame-store'
 import type { LocalRead } from './run-board-read'
+import { run_board_tick } from './run-board-tick'
 
 // joshuafolkken/kit#3569: `run:board --every <minutes>` pushes the chat frame off-screen each interval,
 // with no model in between, and ends with the run.
 
 const { LOCAL, START, harness, plan_titled } = run_board_fixture
+const { FRESH_STATE } = run_board_tick
 const ESCAPE = '\u{1B}'
 const FIVE_MINUTES_MS = 300_000
 const ENDED: LocalRead = { ...LOCAL, ended_ms: START + FIVE_MINUTES_MS }
@@ -64,6 +69,73 @@ describe('run_board_cli.run --every', () => {
 
 		expect(pushes).toHaveLength(0)
 		expect(stderr).toHaveBeenCalledWith(`${run_board_cli.DISABLED_NOTICE}\n`)
+	})
+})
+
+// joshuafolkken/kit#7938: each pushed frame is the record `--chat` answers from, with no report marked.
+describe('run_board_cli.run --every record', () => {
+	it('records the last pushed frame under the chat key, dated when its read began', async () => {
+		const { ports, pushes, marks, clock, read_local } = harness(LOCAL, PLANS)
+		const store = run_board_frame_store.memory_store()
+		const sleep = vi.fn(async (ms: number) => {
+			clock.now_ms += ms
+		})
+
+		read_local.mockImplementation(ending_after(1))
+		await run_board_cli.run(['--every', '5'], { ...ports, sleep, frames: store })
+
+		expect(pushes).toHaveLength(2)
+		expect(store.load(run_board_frame_store.CHAT_KEY)).toStrictEqual({
+			text: pushes[1],
+			saved_ms: START + FIVE_MINUTES_MS,
+		})
+		expect(marks).toHaveLength(0)
+	})
+})
+
+// joshuafolkken/kit#7938: a live board records nothing before its first plan read settles, and dates
+// what it records when that read was asked.
+describe('run_board_every.recorder', () => {
+	it('records nothing before the plan read has settled', () => {
+		const { ports } = harness(LOCAL, PLANS)
+		const store = run_board_frame_store.memory_store()
+
+		run_board_every.recorder(
+			{ ...ports, frames: store },
+			undefined,
+		)({ ...FRESH_STATE, local: LOCAL })
+
+		expect(store.load(run_board_frame_store.CHAT_KEY)).toBeUndefined()
+	})
+
+	it('dates the record when the plan was read, not when it was drawn', () => {
+		const { ports } = harness(LOCAL, PLANS)
+		const store = run_board_frame_store.memory_store()
+		const fetched_ms = START - FIVE_MINUTES_MS
+		const state = { ...FRESH_STATE, local: LOCAL, fetched_ms }
+
+		run_board_every.recorder({ ...ports, frames: store }, undefined)(state)
+
+		expect(store.load(run_board_frame_store.CHAT_KEY)?.saved_ms).toBe(fetched_ms)
+	})
+
+	it('records no arrivals counted from the live board’s first total', () => {
+		const { ports } = harness(LOCAL, PLANS)
+		const store = run_board_frame_store.memory_store()
+		const titled = plan_titled('a')
+		const child: EpicChild = {
+			number: 1,
+			repo: titled.context.repo,
+			state: 'OPEN',
+			labels: [],
+			blocked_by: [],
+		}
+		const plan = { ...titled, waves: { waves: [[child]], unreached: [] } }
+		const state = { ...FRESH_STATE, local: LOCAL, plan, fetched_ms: START, baseline_total: 0 }
+
+		run_board_every.recorder({ ...ports, frames: store }, undefined)(state)
+
+		expect(store.load(run_board_frame_store.CHAT_KEY)?.text).not.toMatch(/\(\+\d+\)/u)
 	})
 })
 
