@@ -130,19 +130,21 @@ function hunk_lines(hunk: Hunk): Array<number> {
 	return Array.from({ length: hunk.new_count }, (_unused, index) => hunk.new_start + index)
 }
 
-// Each changed file's 1-based changed lines; a pure deletion changes none.
+// Each changed file's 1-based changed lines, a grouped hunk's read off its parts; a pure deletion
+// changes none.
 function changed_lines(hunks: ReadonlyArray<Hunk>): Map<string, Set<number>> {
 	const by_file = new Map<string, Set<number>>()
+	const parts = hunks.flatMap((grouped) => grouped.parts ?? [grouped])
 
-	for (const hunk of hunks) {
+	for (const hunk of parts) {
 		by_file.set(hunk.file, new Set([...(by_file.get(hunk.file) ?? []), ...hunk_lines(hunk)]))
 	}
 
 	return by_file
 }
 
-// The branch probes of the changed files' `hunks` (a `-U0` diff's, before any grouping) and of the
-// `added` files; none without `typescript`.
+// The branch probes of the changed files' `hunks` (the ones left to probe, a moved block's grouped with
+// its `parts`) and of the `added` files; none without `typescript`.
 async function read(
 	hunks: ReadonlyArray<Hunk>,
 	added: ReadonlyArray<string>,
@@ -151,11 +153,11 @@ async function read(
 	if (api === undefined) return []
 	const changed = changed_lines(hunks)
 	const files = [...changed.keys(), ...added]
-	const contents = await Promise.all(files.map(async (file) => await readFile(file, 'utf8')))
-
-	return files.flatMap((file, index) =>
-		branch_hunks(api, file, contents[index] ?? '', changed.get(file)),
+	const sources = await Promise.all(
+		files.map(async (file) => ({ file, content: await readFile(file, 'utf8') })),
 	)
+
+	return sources.flatMap(({ file, content }) => branch_hunks(api, file, content, changed.get(file)))
 }
 
 const test_pinned_branches = { branch_hunks, changed_lines, read }

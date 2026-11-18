@@ -322,7 +322,7 @@ async function read_probes(base: string, targets: ReadonlyArray<string>): Promis
 	const stubs = await stub_hunks_of(added)
 	const diffed = await read_hunks(base, targets)
 	const changed = await runtime_hunks(diffed)
-	const branches = await test_pinned_branches.read(diffed, added)
+	const branches = await test_pinned_branches.read(changed.hunks, added)
 	const hunks = [...changed.hunks, ...stubs.hunks, ...branches]
 
 	return { hunks, unparsed: stubs.unparsed, rewired: changed.rewired }

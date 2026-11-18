@@ -139,6 +139,19 @@ describe('test_pinned_branches.changed_lines', () => {
 			['b.ts', []],
 		])
 	})
+
+	it('reads a grouped hunk’s lines off its parts, each in its own file', () => {
+		const grouped = {
+			...hunk_at('a.ts', 9, 1),
+			parts: [hunk_at('a.ts', 9, 1), hunk_at('c.ts', 5, 1)],
+		}
+		const lines = test_pinned_branches.changed_lines([grouped])
+
+		expect([...lines].map(([file, set]) => [file, [...set]])).toStrictEqual([
+			['a.ts', [9]],
+			['c.ts', [5]],
+		])
+	})
 })
 
 describe('test_pinned_branches.read', () => {
