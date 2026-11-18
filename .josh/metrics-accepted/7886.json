@@ -1,0 +1,10 @@
+{
+	"reason": "#7886 adds the review finding kind: a new kind module and its ledger, record and report wiring (code lines), the rubric and reviewer-agent line telling reviewers to write it (rules lines, on-demand bytes), and the review:findings kind-share sentence (one long paragraph)",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 100,
+		"rules.lines": 2,
+		"ai_cost.on_demand_bytes": 198,
+		"prose.long_paragraphs": 1
+	}
+}
