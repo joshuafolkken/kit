@@ -186,13 +186,14 @@ describe('run_board_cli.run intro', () => {
 		const runs = [['--once'], ['--chat']].map(async (argv) => {
 			const { ports, frames } = harness(LOCAL, [plan_titled('a')])
 
-			await run_board_cli.run(argv, { ...ports, intro_sleep: ports.sleep })
+			await run_board_cli.run([...THEMED, ...argv], { ...ports, intro_sleep: ports.sleep })
 
 			return frames.join('')
 		})
 		const pipe = harness(LOCAL, [plan_titled('a')])
+		const piped = { ...pipe.ports, is_tty: false, intro_sleep: pipe.ports.sleep }
 
-		await run_board_cli.run([], { ...pipe.ports, is_tty: false, intro_sleep: pipe.ports.sleep })
+		await run_board_cli.run(THEMED, piped)
 		expect([...(await Promise.all(runs)), pipe.frames.join('')].join('')).not.toContain(INTRO_LINE)
 	})
 
