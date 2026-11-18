@@ -134,9 +134,10 @@ pre-push:
     # are the same thing — the suite is not run again. Measured: 15.9s of a 40s `josh git -y`, spent
     # 40 seconds after the same tree went green. Since kit#4065 the gate's unit check runs only the
     # tests the change can reach, so such a push runs no local whole suite at all; CI's sharded whole
-    # suite is what covers the rest before the merge. Anything else runs the whole suite exactly as before,
-    # and `JOSH_PRE_PUSH_FORCE=1 git push` runs it regardless. A push whose last gate ran before
-    # `josh bump` rewrote package.json is one of those "anything else" cases, not a regression.
+    # suite is what covers the rest before the merge. Anything else runs the capped related tests
+    # (`josh test:related`, the rest deferred to CI, kit#7977); only `JOSH_PRE_PUSH_FORCE=1 git push`
+    # runs the whole suite. A push whose last gate ran before `josh bump` rewrote package.json is one
+    # of those "anything else" cases, not a regression.
     test-unit:
       run: pnpm josh pre-push-unit
       fail_text: *push-fail-text
