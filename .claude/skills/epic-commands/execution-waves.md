@@ -25,11 +25,12 @@ wave 2 `{#D}` → wave 3 `{#X, #Y, #Z}` in the epic's `## Dependencies`:
 **The block above is an illustration, not something to paste**: chains inside a fence read as no
 declaration at all. Write the lines unfenced, with real numbers.
 
-**Write the boundary with `pnpm josh epic --add`, not by hand** — a declared link with no recorded
-`blocked-by` is a `declaration_mismatch` that stops `epic:next` and the run. **`--before <hub>` and
-`--after <hub>` are both refused while the hub sits in more than one chain with nothing after it**, so
-**the first child of the next wave goes into the declaration by hand**, with its `blocked-by` recorded
-to match; after that, `--after <hub>` branches the rest.
+**Declare the chains with `--chain`, never by hand** — a declared link with no recorded `blocked-by`
+is a `declaration_mismatch` that stops `epic:next` and the run.
+
+At creation (or `--promote`) pass one `--chain` per line above; children added later take `pnpm josh epic --add <E> <N…> --chain "#D -> #X"`,
+which may name existing children, so joins and branches through a hub need no hand edit. Each chain
+needs its `--order-reason "<chain>: <reason>"` (`SKILL.md` → "Creating an epic").
 
 **Delete a declared order with `pnpm josh epic --remove <E> <M> <N> [<N2> …]`, never a hand edit.**
 Each consecutive pair is one order. **The ends are never reconnected** (`#A -> #B -> #C` minus

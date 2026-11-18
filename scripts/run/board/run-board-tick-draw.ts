@@ -108,7 +108,9 @@ type Gauges = Pick<
 function gauges_of(state: BoardState, local: LocalRead): Gauges {
 	const reset_ms = local.usage_reset_ms
 	const quota_hold =
-		reset_ms === undefined ? undefined : { reset_ms, parked: local.usage_parked ?? 0 }
+		reset_ms === undefined
+			? undefined
+			: { reset_ms, parked: local.usage_parked ?? 0, cause: local.usage_cause }
 
 	return {
 		machine: state.gauges,

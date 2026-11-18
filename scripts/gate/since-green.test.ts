@@ -228,13 +228,13 @@ describe('since_green.read_verdict — the fallback reason', () => {
 describe('since_green.fallbacks_of', () => {
 	it('reads each reason a fallback line printed, once, in order', () => {
 		const out = [
-			since_green.fallback_line(LABEL, since_green.FALLBACK.HUB),
+			since_green.fallback_line(LABEL, since_green.FALLBACK.NO_READ_MAP),
 			'other output',
 			since_green.fallback_line(LINT_LABEL, since_green.FALLBACK.NO_RECORD),
-			since_green.fallback_line(UNIT_LABEL, since_green.FALLBACK.HUB),
+			since_green.fallback_line(UNIT_LABEL, since_green.FALLBACK.NO_READ_MAP),
 		].join('\n')
 
-		expect(since_green.fallbacks_of(out)).toStrictEqual(['hub', 'no-record'])
+		expect(since_green.fallbacks_of(out)).toStrictEqual(['no-read-map', 'no-record'])
 	})
 
 	it('reads nothing from output with no fallback line', () => {

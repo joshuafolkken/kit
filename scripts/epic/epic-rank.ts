@@ -1,3 +1,4 @@
+import { defect_rate } from '#scripts/issue/defect-rate'
 import { expected_effect_lint } from '#scripts/issue/expected-effect-lint'
 import { issue_priority } from '#scripts/issue/issue-priority'
 import { issue_rank } from '#scripts/issue/issue-rank'
@@ -32,6 +33,7 @@ function rank(
 
 	return issue_rank.rank(children, (child) => ({
 		is_resumable: child.is_resumable,
+		is_defect: defect_rate.is_defect({ body: child.body ?? '', labels: child.labels }),
 		is_last: issue_priority.is_last(child.body),
 		labels: child.labels,
 		lost_minutes: issue_priority.lost_minutes(child.body),

@@ -228,7 +228,7 @@ async function push_with_upstream(
 //
 // `hook_environment` reaches the hook run ahead and nothing else (joshuafolkken/kit#7539). The
 // transfers do not carry it: where the push itself runs the hook, the hook runs without the caller's
-// setting — for `pre_push_related_switch`, the whole suite, which is the safe side.
+// setting.
 async function push(hook_environment: HookEnvironment = {}): Promise<void> {
 	const verify_flags = (await git_pre_push_hook.run(hook_environment)) ? [NO_VERIFY_FLAG] : []
 
