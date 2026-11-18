@@ -37,7 +37,7 @@ The global CLI installs from npm without changing `~/.npmrc` ([cli.md](./cli.md#
 ### Out of scope
 
 - Stopping publishing to GitHub Packages and deleting existing versions are not part of this migration. Existing installs from GitHub keep working.
-- The final proof that runs a published version through real consumer repositories and the published tarball happens after publishing, in #7447. Until then, what this document confirms is limited to verification against a packed candidate tarball.
+- The published entry (kit 1.3164.0) was run through isolated copies of real consumers and a fresh project, up to install, check and build ([maintainers/registry-migration-smoke.md](./maintainers/registry-migration-smoke.md), #7447).
 - Migrating without the entry is only for projects that meet the conditions in [When the entry stops](#when-the-entry-stops).
 
 ## When the entry stops
@@ -91,7 +91,7 @@ To verify a local candidate, extract it from the `pnpm pack` tarball with `tar -
 Because no package manager installs the entry, neither the project's nor the user's scope mapping takes part in getting it.
 `pnpm dlx --registry` alone is not treated as able to override the scope mapping.
 
-This Issue verifies against an actually packed candidate tarball. Proof of fetching a published version happens in #7447.
+Fetching the published entry this way is proven in [maintainers/registry-migration-smoke.md](./maintainers/registry-migration-smoke.md).
 No finished fetch procedure that names an unpublished version is provided.
 
 Run the fetched and verified entry at the root of the project to migrate.
