@@ -196,9 +196,19 @@ const UNTITLED: SplitResult = {
 	done: [],
 }
 
+// `epic --add` checks a chain's numbers against the epic only in its plan, after the set-aside, so the
+// numbers a split may chain — `#issue` and its children — are checked here first.
+function add_refusal(argv: ReadonlyArray<string>, request: SplitRequest): string | undefined {
+	const parsed = epic_cli.parse_add_arguments(argv)
+	if (parsed === undefined) return undefined
+	const members = [request.issue, ...request.children].map(Number)
+
+	return parsed.chain_refusal ?? epic_cli_chain.find_outsider_refusal(parsed.chains, members)
+}
+
 async function add_split(request: SplitRequest, tracking: ChildrenTracking): Promise<SplitResult> {
 	const argv = add_argv(request, tracking.epic)
-	const refused = chain_refused(epic_cli.parse_add_arguments(argv)?.chain_refusal)
+	const refused = chain_refused(add_refusal(argv, request))
 	if (refused !== undefined) return refused
 
 	return await place_and_audit(request, async () => await add_to(argv, tracking))

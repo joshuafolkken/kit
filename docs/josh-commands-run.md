@@ -105,7 +105,8 @@ that epic audited with `epic:audit`. Each `--chain` goes to `epic` (creation or 
 last line is `epic #<E>`. An epic listing that cannot tell
 whether an epic tracks `<issue>` parks it with `needs-decision` instead, and the last line is
 `needs-decision`. Without `--title` and with no tracking epic, or with a `--chain` `epic` refuses
-(`--chain` beside `--ordered`, a malformed line, a cycle), it refuses before writing anything; a
+(`--chain` beside `--ordered`, a malformed line, a number outside `<issue>` and the children, a cycle
+among the given chains), it refuses before writing anything; a
 failed step keeps the hold. A rerun whose tracking epic already lists every child places nothing
 again and goes on to the audit.
 

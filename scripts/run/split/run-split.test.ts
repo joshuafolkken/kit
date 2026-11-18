@@ -86,6 +86,7 @@ const CHILDREN = ['11', '12']
 const INDEPENDENT = { issue: '10', children: CHILDREN, is_ordered: false, chains: [], title: TITLE }
 const ORDERED = { ...INDEPENDENT, is_ordered: true }
 const SECOND_INTO_LAST = '#11 -> #12'
+const OUTSIDER = '#11 -> #99'
 const JOIN = ['#10 -> #12', SECOND_INTO_LAST]
 const JOINED = { ...INDEPENDENT, chains: JOIN }
 const JOIN_ARGV = JOIN.flatMap((chain) => ['--chain', chain])
@@ -149,14 +150,17 @@ describe('run_split.split — an epic already tracks the issue', () => {
 		expect(epic_run).toHaveBeenCalledWith(['--add', '20', '11', '12', ...JOIN_ARGV])
 	})
 
-	it('refuses a `--chain` beside `--ordered` before writing anything', async () => {
-		tracking_with.mockResolvedValue(TRACKED)
+	it.each([[{ ...JOINED, is_ordered: true }], [{ ...INDEPENDENT, chains: [OUTSIDER] }]])(
+		'refuses `--chain` in %j before writing anything',
+		async (request) => {
+			tracking_with.mockResolvedValue(TRACKED)
 
-		const result = await run_split.split({ ...JOINED, is_ordered: true })
+			const result = await run_split.split(request)
 
-		expect(result).toMatchObject({ kind: 'failed', step: 'chain', done: [] })
-		expect(state.calls).toStrictEqual([])
-	})
+			expect(result).toMatchObject({ kind: 'failed', step: 'chain', done: [] })
+			expect(state.calls).toStrictEqual([])
+		},
+	)
 })
 
 describe('run_split.split — no epic tracks the issue', () => {
@@ -189,7 +193,7 @@ describe('run_split.split — no epic tracks the issue', () => {
 		expect(epic_create).toHaveBeenCalledWith([TITLE, '10', '11', '12', ...JOIN_ARGV])
 	})
 
-	it.each([[[SECOND_INTO_LAST, '#12 -> #11']], [['#11 -> #99']], [['not a chain']]])(
+	it.each([[[SECOND_INTO_LAST, '#12 -> #11']], [[OUTSIDER]], [['not a chain']]])(
 		'refuses `--chain` %j before writing anything',
 		async (chains) => {
 			const result = await run_split.split({ ...INDEPENDENT, chains })

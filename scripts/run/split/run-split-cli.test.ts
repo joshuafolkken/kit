@@ -88,6 +88,7 @@ describe('run_split_cli.run — the order', () => {
 describe('run_split_cli.USAGE', () => {
 	it('names both forms', () => {
 		expect(run_split_cli.USAGE).toContain('--children <N1,N2,...>')
+		expect(run_split_cli.USAGE).toContain('[--ordered | --chain "<chain>"...]')
 		expect(run_split_cli.USAGE).toContain('--prerequisite <P>')
 	})
 })
