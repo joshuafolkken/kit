@@ -34,6 +34,12 @@ describe('size_estimate_target.problem', () => {
 		)
 	})
 
+	it('refuses a reason that merely starts with a kind word', () => {
+		expect(size_estimate_target.problem(OVER, '分けられないので 1 件にする')).toEqual(
+			expect.stringContaining(TARGET_HINT),
+		)
+	})
+
 	it('refuses a kind with no reason after it', () => {
 		expect(size_estimate_target.problem(OVER, '分けられない —')).toEqual(
 			expect.stringContaining(TARGET_HINT),

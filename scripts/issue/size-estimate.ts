@@ -170,7 +170,7 @@ function exceeded(estimate: SizeMeasurement, rate?: ImplementRate, growth?: Size
 }
 
 function refusal(estimate: SizeMeasurement, rate?: ImplementRate, growth?: SizeRatios): string {
-	return `${exceeded(estimate, rate, growth)} — file it split (\`--route split\`) or declare \`${REASON_PREFIX} <理由>\`; split-assessment.md → "${split_assess.QUESTION_SECTION}"`
+	return `${exceeded(estimate, rate, growth)} — file it split (\`--route split\`) or declare ${size_estimate_target.reason_hint()}; split-assessment.md → "${split_assess.QUESTION_SECTION}"`
 }
 
 // The declared estimate when it is over the guide, whatever excuses it; `undefined` under it or with
@@ -244,7 +244,7 @@ function capped(estimate: SizeMeasurement, rate?: ImplementRate, growth?: SizeRa
 }
 
 function cap_refusal(estimate: SizeMeasurement, rate?: ImplementRate, growth?: SizeRatios): string {
-	return `${capped(estimate, rate, growth)} — with separately-mergeable parts, file an ordered epic of \`--route split\` children (the mechanical changes first, the child that switches the setting on last); one deliverable, declare \`${REASON_PREFIX} <理由>\`; split-assessment.md → "${split_assess.QUESTION_SECTION}"`
+	return `${capped(estimate, rate, growth)} — with separately-mergeable parts, file an ordered epic of \`--route split\` children (the mechanical changes first, the child that switches the setting on last); one deliverable, declare ${size_estimate_target.reason_hint()}; split-assessment.md → "${split_assess.QUESTION_SECTION}"`
 }
 
 // The implement minutes the grown declared lines take at the measured rate; only the lines are read,
@@ -338,7 +338,7 @@ function budget_problem(
 
 	return note === undefined
 		? undefined
-		: `${note} — split it into children each within the bar or declare \`${REASON_PREFIX} <理由>\`; split-assessment.md → "${split_assess.QUESTION_SECTION}"`
+		: `${note} — split it into children each within the bar or declare ${size_estimate_target.reason_hint()}; split-assessment.md → "${split_assess.QUESTION_SECTION}"`
 }
 
 // The refusal for an estimate projecting past the lane's end-to-end target without a reason naming
@@ -394,6 +394,7 @@ const size_estimate = {
 	over_guide,
 	problems,
 	projected_minutes,
+	reason_hint: size_estimate_target.reason_hint,
 	restated,
 	route_of,
 	split_over_guide,

@@ -29,7 +29,7 @@ const BUDGET_REFUSAL_PARTS = [
 	'at most 45 declared line(s)',
 	'20.0 implement min',
 	'4 lane(s)',
-	'or declare `- 分割しない理由: <理由>`',
+	'or declare `- 分割しない理由: <kind> — <理由>`',
 ]
 
 function body_with(...lines: ReadonlyArray<string>): string {
