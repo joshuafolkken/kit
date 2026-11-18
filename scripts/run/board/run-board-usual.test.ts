@@ -84,20 +84,29 @@ describe('run_board_usual.usual_of over an unchanged ledger', () => {
 describe('run_board_usual.usual_of net of the host stops', () => {
 	const SLEEP = [
 		{
-			from_ms: Date.parse('2026-10-10T11:52:00.000Z'),
-			to_ms: Date.parse('2026-10-10T11:55:00.000Z'),
+			from_ms: Date.parse('2026-10-10T11:40:00.000Z'),
+			to_ms: Date.parse('2026-10-10T11:43:00.000Z'),
 		},
 	]
+	const dispatch: LedgerEntry = { kind: 'dispatch', at: DISPATCHED, issue: 1 }
 
-	it('takes a host stop inside a stage out of its usual time', () => {
-		expect(run_board_usual.usual_of([stage('gate', 10)], NOW, SLEEP).get('gate')).toBe(7 * MINUTE)
+	it('takes a host stop inside the implementation out of its usual time', () => {
+		const usual = run_board_usual.usual_of([dispatch, stage('preflight', 10)], NOW, SLEEP)
+
+		expect(usual.get('implement')).toBe(17 * MINUTE)
+	})
+
+	it('keeps a recorded stage as recorded, its time already monotonic', () => {
+		const usual = run_board_usual.usual_of([dispatch, stage('preflight', 10)], NOW, SLEEP)
+
+		expect(usual.get('ship')).toBe(10 * MINUTE)
 	})
 
 	it('aggregates the same entries again once a new host stop is known', () => {
-		const ledger = [stage('gate', 10)]
+		const ledger = [dispatch, stage('preflight', 10)]
 
-		expect(run_board_usual.usual_of(ledger, NOW).get('gate')).toBe(10 * MINUTE)
-		expect(run_board_usual.usual_of(ledger, NOW, SLEEP).get('gate')).toBe(7 * MINUTE)
+		expect(run_board_usual.usual_of(ledger, NOW).get('implement')).toBe(20 * MINUTE)
+		expect(run_board_usual.usual_of(ledger, NOW, SLEEP).get('implement')).toBe(17 * MINUTE)
 		expect(run_board_usual.usual_of(ledger, NOW, [...SLEEP])).toBe(
 			run_board_usual.usual_of(ledger, NOW, SLEEP),
 		)

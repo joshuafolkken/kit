@@ -154,17 +154,24 @@ function implement_spans(entries: ReadonlyArray<LedgerEntry>): Array<ImplementSp
 	})
 }
 
-// Each dispatch's implementation in dispatch order, a dispatch no ship stage followed left out.
-function implements_of(entries: ReadonlyArray<LedgerEntry>): Array<Implement> {
+// Each dispatch's implementation in dispatch order, a dispatch no ship stage followed left out, less
+// the host's stops `gaps` inside it (joshuafolkken/kit#7905).
+function implements_of(
+	entries: ReadonlyArray<LedgerEntry>,
+	gaps: ReadonlyArray<LaneSpan>,
+): Array<Implement> {
 	return implement_spans(entries)
 		.filter((span) => !span.is_open)
-		.map(({ issue, from_ms, to_ms }) => ({ issue, ms: to_ms - from_ms }))
+		.map((span) => ({
+			issue: span.issue,
+			ms: span.to_ms - span.from_ms - lane_host_gaps.excluded_ms(gaps, [span]),
+		}))
 }
 
 // Each issue's implementation over every entry given — the latest dispatch's, so a reissued lane
 // reads as the run that shipped (joshuafolkken/kit#6021).
 function implement_by_issue(entries: ReadonlyArray<LedgerEntry>): ReadonlyMap<number, number> {
-	return new Map(implements_of(entries).map(({ issue, ms }) => [issue, ms] as const))
+	return new Map(implements_of(entries, []).map(({ issue, ms }) => [issue, ms] as const))
 }
 
 function durations_of(stage: string, measured: Measured): ReadonlyArray<number> {
@@ -196,24 +203,13 @@ function stage_row(stage: string, measured: Measured): string {
 	])
 }
 
-// `span`'s length net of the host's stops inside it (joshuafolkken/kit#7905).
-function net_ms(span: LaneSpan, gaps: ReadonlyArray<LaneSpan>): number {
-	return span.to_ms - span.from_ms - lane_host_gaps.excluded_ms(gaps, [span])
-}
-
-function net_stage(stage: StageEntry, gaps: ReadonlyArray<LaneSpan>): StageEntry {
-	const span = { from_ms: started_ms(stage), to_ms: Date.parse(stage.at) }
-
-	return { ...stage, elapsed_ms: net_ms(span, gaps) }
-}
-
-// Every duration net of `gaps`, the host's stops; none leaves each as recorded.
+// Every duration net of `gaps`, the host's stops (joshuafolkken/kit#7905). Only the implementation is
+// netted: it is two wall-clock stamps apart, while a recorded stage's `elapsed_ms` is `performance.now()`
+// time, a monotonic clock that already stops while the host sleeps.
 function measured_of(entries: ReadonlyArray<LedgerEntry>, gaps: ReadonlyArray<LaneSpan>): Measured {
-	const spans = implement_spans(entries).filter((span) => !span.is_open)
-
 	return {
-		implement: spans.map((span) => net_ms(span, gaps)),
-		stages: entries.filter(is_stage).map((stage) => net_stage(stage, gaps)),
+		implement: implements_of(entries, gaps).map(({ ms }) => ms),
+		stages: entries.filter(is_stage),
 	}
 }
 

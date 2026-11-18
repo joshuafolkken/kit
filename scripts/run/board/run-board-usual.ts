@@ -71,7 +71,8 @@ function gaps_key_of(gaps: ReadonlyArray<LaneSpan>): string {
 	return gaps.map((gap) => `${String(gap.from_ms)}-${String(gap.to_ms)}`).join(',')
 }
 
-// Each phase's usual time, every duration net of `gaps`, the host's stops (joshuafolkken/kit#7905).
+// Each phase's usual time, the wall-clock implementation net of `gaps`, the host's stops; a recorded
+// stage is monotonic time that already pauses through them (joshuafolkken/kit#7905).
 function usual_of(
 	entries: ReadonlyArray<LedgerEntry>,
 	now_ms: number,

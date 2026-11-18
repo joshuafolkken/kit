@@ -212,7 +212,7 @@ describe('lane_stage_stats.medians', () => {
 	})
 
 	// joshuafolkken/kit#7905: a host sleep inside a stage is not time the stage took.
-	it('takes the host stops inside each stage and implementation out of its duration', () => {
+	it('takes the host stops inside the implementation out of it, a recorded stage kept as recorded', () => {
 		const entries = [stage(REVIEW, 10, 1), dispatch(30), stage('preflight', 1, 19)]
 		const gaps = [
 			{ from_ms: at(6), to_ms: at(4) },
@@ -220,7 +220,7 @@ describe('lane_stage_stats.medians', () => {
 		]
 		const medians = lane_stage_stats.medians(entries, gaps)
 
-		expect(medians.get(REVIEW)).toBe(8 * MS_PER_MINUTE)
+		expect(medians.get(REVIEW)).toBe(10 * MS_PER_MINUTE)
 		expect(medians.get(lane_stage_stats.IMPLEMENT)).toBe(7 * MS_PER_MINUTE)
 	})
 
