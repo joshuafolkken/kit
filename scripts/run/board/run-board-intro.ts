@@ -10,6 +10,7 @@ import { run_board_typing } from './run-board-typing'
 const LINE = 'SHALL WE PLAY A GAME?'
 const LETTER_MS = 50
 const HOLD_MS = 2000
+const REVEAL_LINE_MS = 50
 const LINE_START = '\r'
 const ERASE_LINE_END = '\u{1B}[K'
 
@@ -28,24 +29,31 @@ const BEATS: ReadonlyArray<Beat> = [
 	{ text: '', ms: HOLD_MS },
 ]
 
-// Each beat written, then its pause raced against the skip; a skip writes no further beat.
+// Each beat written, then its pause raced against the skip; a skip writes no further beat, and the
+// beats left unwritten are handed back.
 async function beat_through(
 	beats: ReadonlyArray<Beat>,
 	ports: IntroPorts & { intro_sleep: (ms: number) => Promise<void> },
 	skip: { pressed: Promise<undefined>; is_pressed: () => boolean },
-): Promise<void> {
+): Promise<ReadonlyArray<Beat>> {
 	const [beat, ...rest] = beats
-	if (beat === undefined || skip.is_pressed()) return
+	if (beat === undefined || skip.is_pressed()) return beats
 
 	ports.write(beat.text)
 	await Promise.race([ports.intro_sleep(beat.ms), skip.pressed])
-	await beat_through(rest, ports, skip)
+
+	return await beat_through(rest, ports, skip)
 }
 
-// Played only where the ports carry its pauses; the key it listens for goes back to folding once it ends.
-async function play(ports: IntroPorts, keys: KeyReading): Promise<void> {
+// Beats played only where the ports carry their pauses, the beats left unwritten handed back; the key
+// listened for goes back to folding once they end.
+async function listen(
+	beats: ReadonlyArray<Beat>,
+	ports: IntroPorts,
+	keys: KeyReading,
+): Promise<ReadonlyArray<Beat>> {
 	const { intro_sleep } = ports
-	if (intro_sleep === undefined) return
+	if (intro_sleep === undefined) return beats
 
 	const held: { is_pressed: boolean; release: (() => void) | undefined } = {
 		is_pressed: false,
@@ -60,10 +68,26 @@ async function play(ports: IntroPorts, keys: KeyReading): Promise<void> {
 	const skip = { pressed, is_pressed: (): boolean => held.is_pressed }
 
 	try {
-		await beat_through(BEATS, { ...ports, intro_sleep }, skip)
+		return await beat_through(beats, { ...ports, intro_sleep }, skip)
 	} finally {
 		held.release?.()
 	}
+}
+
+async function play(ports: IntroPorts, keys: KeyReading): Promise<void> {
+	await listen(BEATS, ports, keys)
+}
+
+// The first frame written a line at a time from the top, each line a beat; the lines a key leaves
+// unwritten are written at once, as is the whole frame where the ports carry no pauses.
+async function reveal(frame: string, ports: IntroPorts, keys: KeyReading): Promise<void> {
+	const beats = frame.split('\n').map((line, index) => ({
+		text: index === 0 ? line : `\n${line}`,
+		ms: REVEAL_LINE_MS,
+	}))
+	const rest = await listen(beats, ports, keys)
+
+	if (rest.length > 0) ports.write(rest.map((beat) => beat.text).join(''))
 }
 
 // The first read starts at once, but returns or throws only once the intro is over, so a failed read
@@ -86,7 +110,17 @@ function after<Read>(
 	}
 }
 
-const run_board_intro = { ERASE_LINE_END, HOLD_MS, LETTER_MS, LINE, LINE_START, after, play }
+const run_board_intro = {
+	ERASE_LINE_END,
+	HOLD_MS,
+	LETTER_MS,
+	LINE,
+	LINE_START,
+	REVEAL_LINE_MS,
+	after,
+	play,
+	reveal,
+}
 
 export { run_board_intro }
 export type { IntroPorts }
