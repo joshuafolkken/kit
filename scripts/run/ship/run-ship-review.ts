@@ -1,5 +1,6 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { review_attest, type ReviewSlot } from '#scripts/review/review-attest'
+import { review_finding_kind } from '#scripts/review/review-finding-kind'
 import { review_finding_ledger } from '#scripts/review/review-finding-ledger'
 import { review_finding_text } from '#scripts/review/review-finding-text'
 import { review_prior_findings } from '#scripts/review/review-prior-findings'
@@ -137,8 +138,8 @@ function findings_instruction(
 	return [
 		opening,
 		'one per line as',
-		`<category>:<severity>:<file>[:<line>]${review_finding_text.DESCRIPTION_SEPARATOR}<one sentence: what is wrong and why>`,
-		`(category one of ${categories}; severity high, medium or low)${fixed_clause},`,
+		`[kind=<kind> ]<category>:<severity>:<file>[:<line>]${review_finding_text.DESCRIPTION_SEPARATOR}<one sentence: what is wrong and why>`,
+		`(category one of ${categories}; severity high, medium or low; kind one of ${review_finding_kind.KINDS.join(', ')})${fixed_clause},`,
 		`a high or medium line ending with ${OTHER_SITES_CLAUSE},`,
 		closing,
 	].join(' ')
@@ -247,8 +248,10 @@ function finding_of(line: string): Finding {
 	const is_fixed = line.startsWith(FIXED_PREFIX)
 
 	const unmarked = is_fixed ? line.slice(FIXED_PREFIX.length) : line
+	// The kind stays in `line` for the record; an unknown one stays in the spec, so the line is refused.
+	const spec_text = review_finding_kind.split_kind(unmarked)?.spec ?? unmarked
 
-	return { ...review_finding_text.split_description(unmarked), is_fixed, line }
+	return { ...review_finding_text.split_description(spec_text), is_fixed, line }
 }
 
 function spec_findings(text: string): ReadonlyArray<Finding> {
