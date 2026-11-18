@@ -22,6 +22,9 @@ import { whole_suite_files } from './whole-suite-files'
 // component TypeScript does not resolve; a synced module that is gone or is such a component stays a
 // moved file. Each of those runs the tests importing it, as before. A synced module every test depends
 // on is not split either: `test-related.ts` leaves it to main's CI unless this branch changed it too.
+//
+// **Kept beside the cap** (joshuafolkken/kit#7976): leaving main's modules out of the seeds keeps the
+// cap's 150 test files for what this branch's own change reaches.
 
 // `left` are the synced modules no longer handed to vitest, `shared` the tests where they meet the change,
 // `meeting` every file whose imports reach both — `shared` and the code between — and `touching` the
