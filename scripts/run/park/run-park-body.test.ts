@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { run_park_body } from './run-park-body'
 
 const OWNER_PERMISSION = '   - 必要な権限: owner コメント'
-const PARENT_PERMISSION = '   - 必要な権限: 親セッション'
+const PARENT_EDIT = '親（Issue 本文の編集）'
+const PARENT_PERMISSION = `   - 必要な権限: ${PARENT_EDIT}`
 const TIER_C = '   - 層: C'
 const OPTION_ONE = ['1. Keep the account', '   - 層: A', OWNER_PERMISSION]
 const OPTION_TWO = ['2. Rotate the account', TIER_C, '   - 必要な権限: 人']
@@ -107,7 +108,7 @@ function single_option(tier: string, permission: string): string {
 describe('run_park_body.parent_action', () => {
 	it.each([
 		['親', true],
-		['親セッション', true],
+		[PARENT_EDIT, true],
 		['なし', false],
 		['人', false],
 	])('answers %j as %j', (permission, expected) => {
@@ -127,7 +128,7 @@ describe('run_park_body filing options', () => {
 
 	it.each([
 		[`親${FILING}`, true],
-		['親セッション', false],
+		[PARENT_EDIT, false],
 		['なし', false],
 	])('accepts %j and answers filing_action %j', (permission, expected) => {
 		const body = single_option('A', permission)

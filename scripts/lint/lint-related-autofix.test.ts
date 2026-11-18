@@ -38,7 +38,7 @@ vi.mock('#scripts/document/document-checks', () => ({
 	document_checks: { check_files: vi.fn(() => 0) },
 }))
 vi.mock('#scripts/exports/unused-members-check', () => ({
-	unused_members_check: { run_unused_members: async () => 0 },
+	unused_members_check: { spawn_unused_members: async () => ({ exit_code: 0, output: '' }) },
 }))
 
 afterEach(() => vi.restoreAllMocks())

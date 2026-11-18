@@ -57,4 +57,10 @@ describe('run_park_write.is_refused', () => {
 		expect(run_park_write.is_refused(BODY)).toBe(false)
 		expect(run_park_write.is_refused('## Yield loop')).toBe(true)
 	})
+
+	it('refuses a permission written in free text (ac-4435f76d)', () => {
+		expect(
+			run_park_write.is_refused(BODY.replace('必要な権限: 人', '必要な権限: Issue のクローズ')),
+		).toBe(true)
+	})
 })

@@ -1,3 +1,4 @@
+import { issue_body_keys } from '#scripts/issue/issue-body-keys'
 import { auto_ok_judge } from './auto-ok-judge'
 
 // The issues and comments the `josh auto-ok:judge` tests read: a listing row, the `labels,body` read
@@ -12,6 +13,9 @@ const UPDATED_AT = '2026-10-15T00:00:00Z'
 const TRUSTED = 'OWNER'
 const UNTRUSTED = 'NONE'
 const DECLINED = { is_applied: false, reason: 'a policy decision is needed' }
+// The shape joshuafolkken/kit#7824 carried: a person's judgement declared needed, with its reason in
+// full-width parentheses (joshuafolkken/kit#7856).
+const NEEDS_JUDGEMENT_BODY = `Move the check.\n\n${issue_body_keys.heading('background')}\n\n${issue_body_keys.line('judgement', 'needed')}（方針の判断: マージ後のツリーの検証をローカルから CI に移すか）\n`
 
 function judgement_comments(): string {
 	return JSON.stringify([
@@ -53,6 +57,7 @@ export {
 	auto_ok_judge_fixture,
 	DECLINED,
 	JUDGED_NUMBER,
+	NEEDS_JUDGEMENT_BODY,
 	OPTED_IN_NUMBER,
 	OWED_NUMBER,
 	TRUSTED,

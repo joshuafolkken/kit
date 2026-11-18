@@ -2,6 +2,7 @@ import { AUTO_OK_LABEL, DEFERRED_LABEL } from '#scripts/issue/issue-labels'
 import type { WatchComment } from '#scripts/issue/issue-watch-diff'
 import { describe, expect, it } from 'vitest'
 import { auto_ok_judge, type JudgeIssue } from './auto-ok-judge'
+import { NEEDS_JUDGEMENT_BODY } from './auto-ok-judge-fixture'
 
 const ISSUE_NUMBER = 42
 const BODY = 'Fix the thing.\n\nMore detail.'
@@ -43,6 +44,16 @@ describe('auto_ok_judge.is_candidate', () => {
 
 	it('skips an issue filed by an author without write access', () => {
 		expect(auto_ok_judge.is_candidate(issue(['bug'], false))).toBe(false)
+	})
+
+	it("skips an issue whose body declares a person's judgement is needed", () => {
+		expect(auto_ok_judge.is_candidate({ ...issue([]), body: NEEDS_JUDGEMENT_BODY })).toBe(false)
+	})
+
+	it('takes an issue whose body declares no judgement is needed', () => {
+		const body = NEEDS_JUDGEMENT_BODY.replace('人の判断: 要', '人の判断: 不要')
+
+		expect(auto_ok_judge.is_candidate({ ...issue([]), body })).toBe(true)
 	})
 })
 

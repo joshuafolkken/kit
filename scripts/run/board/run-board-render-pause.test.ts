@@ -18,6 +18,8 @@ const URL = 'https://github.com/joshuafolkken/kit/issues/7387#issuecomment-68188
 const SUMMARY = 'Approval needed: defer impact study'
 const DECISION = 'needs-decision'
 const WIDTH = 120
+// A pane too narrow for the parked row's whole line.
+const NARROW = 65
 const PLAN: BoardPlan = {
 	pause_reasons: new Map([[ISSUE, { summary: SUMMARY, url: URL, at_ms: NOW }]]),
 	waves: { waves: [], unreached: [] },
@@ -57,17 +59,29 @@ function line_of(status: ItemStatus, columns = WIDTH, is_linked = true): string 
 }
 
 describe('run_board_render pause reasons', () => {
-	it.each([WIDTH, 65])('fits then links the visible pause reason at %s columns', (columns) => {
+	it('fits then links the visible pause reason on a wide pane', () => {
 		const status: ItemStatus = { state: 'parked', started_ms: STARTED }
-		const linked = line_of(status, columns)
-		const plain = line_of(status, columns, false)
+		const linked = line_of(status)
+		const plain = line_of(status, WIDTH, false)
 		const visible = stripVTControlCharacters(linked)
 		const tail = visible.split('  ').at(-1)?.trim() ?? ''
 
 		expect(linked).toContain(osc8(tail, URL))
 		expect(visible).toBe(stripVTControlCharacters(plain))
-		expect(run_board_fit.width_of(visible)).toBeLessThanOrEqual(columns)
+		expect(run_board_fit.width_of(visible)).toBeLessThanOrEqual(WIDTH)
 		expect(plain).not.toContain(URL)
+		expect(visible.split('\n')).toHaveLength(1)
+	})
+
+	// joshuafolkken/kit#7849: a parked row cuts its title to the floor and keeps its whole reason.
+	it('keeps and links the whole pause reason on a narrow pane, cutting the title', () => {
+		const status: ItemStatus = { state: 'parked', started_ms: STARTED }
+		const linked = line_of(status, NARROW)
+		const visible = stripVTControlCharacters(linked)
+
+		expect(linked).toContain(osc8(SUMMARY, URL))
+		expect(visible).toBe(stripVTControlCharacters(line_of(status, NARROW, false)))
+		expect(visible).toContain('Overlap…')
 		expect(visible.split('\n')).toHaveLength(1)
 	})
 

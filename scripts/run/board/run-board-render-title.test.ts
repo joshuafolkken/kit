@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { run_board_fit } from './run-board-fit'
 import type { BoardRow, RowReason } from './run-board-layout'
+import { run_board_pause } from './run-board-pause'
 import { run_board_render_title, type RowCut } from './run-board-render-title'
 
 const { ELLIPSIS, TITLE_LIMIT, WHOLE, fitted, reason_text, title_of } = run_board_render_title
@@ -22,6 +23,10 @@ const FLOOR_PANE = 14
 const REASON_CUT = 4
 // Six characters taking two columns each.
 const WIDE_REASON = '理由を書いた'
+const PAUSE_TAIL = 'answer the decision, then run pnpm josh backlog:triage --adopt 2'
+const EVIDENCE_URL = 'https://github.com/joshuafolkken/kit/issues/1#issuecomment-2'
+// A pane every row's whole line fits in.
+const WIDE_PANE = 400
 
 function row_of(extra: Partial<BoardRow> = {}): BoardRow {
 	return {
@@ -146,5 +151,45 @@ describe('run_board_render_title.fitted', () => {
 		const row = row_of({ reason: UNTRIAGED })
 
 		expect(fitted_in(row, undefined)).toBe(draw_of(row)(WHOLE))
+	})
+})
+
+// joshuafolkken/kit#7849: a parked row's recorded reason names its next action, so its title gives way.
+describe('run_board_render_title.fitted on a parked row with a linked reason', () => {
+	const linked: RowReason = { tail: PAUSE_TAIL, evidence_url: EVIDENCE_URL }
+
+	it('cuts the title first and keeps the whole reason on a narrow pane', () => {
+		const row = row_of({ state: 'parked', reason: linked })
+		const line = fitted_in(row, pane_of(row))
+
+		expect(line).toBe(`${title_of(LONG_TITLE, TITLE_LIMIT - OVERRUN)} ${PAUSE_TAIL}`)
+	})
+
+	it('keeps the whole reason past the title floor, leaving the line to wrap', () => {
+		const row = row_of({ state: 'parked', reason: linked })
+
+		expect(fitted_in(row, FLOOR_PANE)).toBe(`${title_of(LONG_TITLE, TITLE_FLOOR)} ${PAUSE_TAIL}`)
+	})
+
+	it('draws the whole line on a wide pane', () => {
+		const row = row_of({ state: 'parked', reason: linked })
+
+		expect(fitted_in(row, WIDE_PANE)).toBe(draw_of(row)(WHOLE))
+	})
+
+	it('still cuts the fallback reason at its end', () => {
+		const row = row_of({ state: 'parked', reason: { ...linked, tail: run_board_pause.FALLBACK } })
+		const line = fitted_in(row, FLOOR_PANE)
+
+		expect(line.startsWith(`${title_of(LONG_TITLE, TITLE_FLOOR)} `)).toBe(true)
+		expect(line.endsWith(ELLIPSIS)).toBe(true)
+	})
+
+	it('still cuts a linked reason at its end on a row that is not parked', () => {
+		const row = row_of({ state: 'stopped', reason: linked })
+		const line = fitted_in(row, FLOOR_PANE)
+
+		expect(line.endsWith(ELLIPSIS)).toBe(true)
+		expect(run_board_fit.width_of(line)).toBe(FLOOR_PANE)
 	})
 })

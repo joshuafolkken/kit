@@ -157,8 +157,12 @@ describe('backlog_drive_after_merge — a park left to a person', () => {
 		expect(runs).toStrictEqual([])
 	})
 
-	it('reads the latest park, not an earlier one', async () => {
-		const { ports, runs } = recorded([park_body('A', 'なし'), park_body('A', '人')])
+	it.each([
+		['a person', '人'],
+		// joshuafolkken/kit#7818: a newer park off the permission vocabulary is not read past.
+		['a permission off the vocabulary', '親セッション'],
+	])('reads the latest park, needing %s, not an earlier one', async (_case, permission) => {
+		const { ports, runs } = recorded([park_body('A', 'なし'), park_body('A', permission)])
 
 		await expect(backlog_drive_after_merge.resolve(ISSUE, ports)).resolves.toBe(false)
 		expect(runs).toStrictEqual([])
