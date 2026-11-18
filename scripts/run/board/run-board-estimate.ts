@@ -1,3 +1,4 @@
+import { lane_host_gaps } from '#scripts/lane/lane-host-gaps'
 import { run_board_estimate_schedule, type Lanes } from './run-board-estimate-schedule'
 import { run_board_labels } from './run-board-labels'
 import { run_board_lane_totals, type LaneTotals } from './run-board-lane-totals'
@@ -61,12 +62,29 @@ function phase_of(status: ItemStatus | undefined): Phase {
 	return phase === FAILED_PHASE ? RESUMED_PHASE : phase
 }
 
+/**
+ * How long a child has stood at its phase up to `end_ms`, the host's stops in its `gaps` left out as
+ * the usual times leave them out (joshuafolkken/kit#7905); `undefined` where no event said when it got
+ * there.
+ */
+function phase_spent(status: ItemStatus | undefined, end_ms: number): number | undefined {
+	const phase_ms = status?.phase_ms
+
+	if (phase_ms === undefined) return undefined
+
+	const stopped_ms = lane_host_gaps.excluded_ms(status?.gaps ?? [], [
+		{ from_ms: phase_ms, to_ms: end_ms },
+	])
+
+	return end_ms - phase_ms - stopped_ms
+}
+
 // What a child longer than every measured lane has left: its phase's usual time less what it has spent
 // there, then every phase after it — more than zero short of its last phase.
 function phase_left(row: BoardRow, read: EstimateRead): number {
 	const usual = read.usual ?? NO_USUAL
 	const phase = phase_of(row.status)
-	const spent = read.now_ms - (row.status?.phase_ms ?? read.now_ms)
+	const spent = phase_spent(row.status, read.now_ms) ?? 0
 	const current = Math.max(0, (usual.get(phase) ?? 0) - spent)
 
 	return current + usual_sum(PATH.slice(PATH.indexOf(phase) + 1), usual)
@@ -170,6 +188,7 @@ const run_board_estimate = {
 	is_finish_drawn,
 	left_ms,
 	part_of,
+	phase_spent,
 	row_finish,
 	stamp_of,
 }

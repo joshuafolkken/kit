@@ -383,6 +383,7 @@ words:
   # the file-body guard refuses shell forms that write a file's body — `f.writelines(...)`,
   # `shutil.copy`/`shutil.move` into an existing path. They appear only in that module's patterns and tests.
   - writelines
+  - wargames
   - shutil
   # npm package name weighed in `docs/maintainers/shell-tokenizer.md` (joshuafolkken/kit#7334).
   - shlex

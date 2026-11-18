@@ -110,6 +110,10 @@ Which steps run at a lowered effort:
 `local`. Only `local` lets a lane within its size guide skip round one of the review; `ci` keeps
 round one for every lane.
 
+| Variable           | Required | Default | Used when                                                                                                                                                                                                                                                  |
+| ------------------ | -------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `JOSH_BOARD_THEME` | No       | none    | `wargames` draws every `run:board` a person watches — the one `backlogrun` opens included — in green text and dashed rules; `run:board --theme` wins over it, and an unknown name is refused ([`josh run:board`](./josh-commands-board.md#josh-runboard)). |
+
 #### Package settings
 
 The `josh.*` settings in `package.json`, their defaults and examples are on

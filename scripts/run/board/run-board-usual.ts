@@ -1,4 +1,5 @@
 import type { LedgerEntry } from '#scripts/lane/lane-ledger'
+import type { LaneSpan } from '#scripts/lane/lane-net-time'
 import { lane_stage_stats } from '#scripts/lane/lane-stage-stats'
 import { lane_stats } from '#scripts/lane/lane-stats'
 import { run_board_phase, type Phase } from './run-board-phase'
@@ -31,14 +32,22 @@ const PHASE_STAGES: ReadonlyArray<readonly [string, Phase | undefined]> = [
 function medians_of(
 	entries: ReadonlyArray<LedgerEntry>,
 	now_ms: number,
+	gaps: ReadonlyArray<LaneSpan>,
 ): ReadonlyMap<string, number> {
 	const recent = lane_stats.in_window(entries, lane_stats.window_of(PERIOD_DAYS, now_ms))
 
-	return new Map([...lane_stage_stats.medians(entries), ...lane_stage_stats.medians(recent)])
+	return new Map([
+		...lane_stage_stats.medians(entries, gaps),
+		...lane_stage_stats.medians(recent, gaps),
+	])
 }
 
-function compute_usual(entries: ReadonlyArray<LedgerEntry>, now_ms: number): UsualTimes {
-	const medians = medians_of(entries, now_ms)
+function compute_usual(
+	entries: ReadonlyArray<LedgerEntry>,
+	now_ms: number,
+	gaps: ReadonlyArray<LaneSpan>,
+): UsualTimes {
+	const medians = medians_of(entries, now_ms, gaps)
 
 	return new Map(
 		PHASE_STAGES.flatMap(([stage, phase]) => {
@@ -51,17 +60,32 @@ function compute_usual(entries: ReadonlyArray<LedgerEntry>, now_ms: number): Usu
 
 // The last ledger's usual times: `lane_ledger.read_entries` hands back the same array while the file
 // is unchanged, so a board round over it aggregates nothing again (joshuafolkken/kit#7012). The recent
-// window then trails `now_ms` only until the next append — the sampler's, within a minute.
-const usual_memo = new WeakMap<ReadonlyArray<LedgerEntry>, UsualTimes>()
+// window then trails `now_ms` only until the next append — the sampler's, within a minute. A new host
+// stop in `gaps` aggregates again too.
+const usual_memo = new WeakMap<
+	ReadonlyArray<LedgerEntry>,
+	{ gaps_key: string; usual: UsualTimes }
+>()
 
-function usual_of(entries: ReadonlyArray<LedgerEntry>, now_ms: number): UsualTimes {
+function gaps_key_of(gaps: ReadonlyArray<LaneSpan>): string {
+	return gaps.map((gap) => `${String(gap.from_ms)}-${String(gap.to_ms)}`).join(',')
+}
+
+// Each phase's usual time, the wall-clock implementation net of `gaps`, the host's stops; a recorded
+// stage is monotonic time that already pauses through them (joshuafolkken/kit#7905).
+function usual_of(
+	entries: ReadonlyArray<LedgerEntry>,
+	now_ms: number,
+	gaps: ReadonlyArray<LaneSpan> = [],
+): UsualTimes {
+	const gaps_key = gaps_key_of(gaps)
 	const known = usual_memo.get(entries)
 
-	if (known !== undefined) return known
+	if (known?.gaps_key === gaps_key) return known.usual
 
-	const usual = compute_usual(entries, now_ms)
+	const usual = compute_usual(entries, now_ms, gaps)
 
-	usual_memo.set(entries, usual)
+	usual_memo.set(entries, { gaps_key, usual })
 
 	return usual
 }

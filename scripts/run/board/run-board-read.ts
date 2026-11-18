@@ -2,6 +2,7 @@ import { backlog_drive_memory } from '#scripts/backlog/backlog-drive-memory'
 import type { NamedPlan } from '#scripts/backlog/backlog-plan'
 import { backlog_ready } from '#scripts/backlog/backlog-ready'
 import { lane_held_stats } from '#scripts/lane/lane-held-stats'
+import { lane_host_gaps } from '#scripts/lane/lane-host-gaps'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
 import type { TableRead } from '#scripts/lane/lane-process-table'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
@@ -224,16 +225,18 @@ async function lane_room_of(
 	}
 }
 
-// The repository's lane ledger, read once for the usual times, the lane totals and the driver's open hold.
+// The repository's lane ledger, read once for the usual times, the lane totals and the driver's open
+// hold — the usual times net of the host's stops on `events` (joshuafolkken/kit#7905).
 function ledger_here(
 	repository: string,
+	events: ReadonlyArray<RunEvent>,
 ): Pick<LocalRead, 'usual' | 'lane_totals' | 'is_memory_held' | 'launch_hold'> {
 	const entries = lane_ledger.read_entries(lane_ledger.target_of(repository))
 	const now_ms = Date.now()
 	const launch_hold = lane_held_stats.open_reason(entries, now_ms)
 
 	return {
-		usual: run_board_usual.usual_of(entries, now_ms),
+		usual: run_board_usual.usual_of(entries, now_ms, lane_host_gaps.gaps_of(events)),
 		lane_totals: run_board_lane_totals.totals_of(entries, now_ms),
 		is_memory_held: launch_hold === backlog_drive_memory.HOLD_REASON,
 		launch_hold,
@@ -243,9 +246,10 @@ function ledger_here(
 // The repository's own records: its lane ledger, and the kit version its supervisor recorded.
 function records_here(
 	repository: string,
+	events: ReadonlyArray<RunEvent>,
 ): ReturnType<typeof ledger_here> & Pick<LocalRead, 'kit_version'> {
 	return {
-		...ledger_here(repository),
+		...ledger_here(repository, events),
 		kit_version: run_wake.read_wake(run_wake.wake_path(repository))?.kit_version,
 	}
 }
@@ -351,7 +355,7 @@ async function read_local(table?: TableRead): Promise<LocalRead | undefined> {
 		is_session_active,
 		operations: run_board_operation_read.read(sources_of(repository, lanes, transcript)),
 		...(await lane_room_of(lanes, lane_read.lane_states, table)),
-		...records_here(repository),
+		...records_here(repository, events),
 	}
 }
 

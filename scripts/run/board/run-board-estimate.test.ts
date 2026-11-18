@@ -120,6 +120,38 @@ describe('run_board_estimate.left_ms for a child longer than every lane', () => 
 	})
 })
 
+// joshuafolkken/kit#7905: time the host stopped is no time spent at the phase.
+describe('run_board_estimate.phase_spent', () => {
+	const GAPS = [{ from_ms: NOW - 4 * MINUTE, to_ms: NOW - MINUTE }]
+
+	function slept(phase: Phase, spent: number): BoardRow {
+		const base = running(1, phase, spent, 50)
+
+		return { ...base, status: { ...base.status, state: 'running', gaps: GAPS } }
+	}
+
+	it('leaves the host stops inside the phase out of the time spent there', () => {
+		const awake = run_board_estimate.phase_spent(running(1, 'gate', 5).status, NOW)
+		const asleep = run_board_estimate.phase_spent(slept('gate', 5).status, NOW)
+
+		expect(awake).toBe(5 * MINUTE)
+		expect(asleep).toBe(2 * MINUTE)
+	})
+
+	it('is undefined where no event said when the child got to its phase', () => {
+		expect(run_board_estimate.phase_spent(undefined, NOW)).toBeUndefined()
+	})
+
+	it('leaves the stopped time on the phase’s usual time in the fallback', () => {
+		const asleep = read({ active: [slept('gate', 5)] })
+		const awake = read({ active: [running(1, 'gate', 5, 50)] })
+
+		// 6′ − 2′ net of the gate, then the followup’s 4′.
+		expect(run_board_estimate.left_ms(asleep)).toBe(8 * MINUTE)
+		expect(run_board_estimate.left_ms(awake)).toBe(5 * MINUTE)
+	})
+})
+
 describe('run_board_estimate.left_ms for the queue', () => {
 	it('stacks each waiting child onto the lane that frees first', () => {
 		const active = [running(1, 'gate', 0, 25)]

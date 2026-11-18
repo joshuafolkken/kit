@@ -1,3 +1,5 @@
+import { lane_host_gaps } from '#scripts/lane/lane-host-gaps'
+import type { LaneSpan } from '#scripts/lane/lane-net-time'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
@@ -39,6 +41,14 @@ interface ThroughputRow {
 	peak: Peak | undefined
 	// The closes in the current cell — the `24h` row's alone.
 	now: number | undefined
+}
+
+interface StreamRead {
+	spans: ReadonlyArray<Span>
+	closes: ReadonlyArray<number>
+	// The host's stops, never active (joshuafolkken/kit#7905).
+	gaps: ReadonlyArray<LaneSpan>
+	now_ms: number
 }
 
 interface RowShape {
@@ -148,18 +158,22 @@ function cell_spans(shape: RowShape, now_ms: number): ReadonlyArray<Span> {
 	}))
 }
 
-function overlap_ms(span: Span, cell: Span): number {
-	return Math.max(0, Math.min(span.end_ms, cell.end_ms) - Math.max(span.start_ms, cell.start_ms))
+// How long `span` was alive inside `cell`, the host's stops in `read.gaps` left out
+// (joshuafolkken/kit#7905).
+function active_in(span: Span, cell: Span, read: StreamRead): number {
+	const overlap = {
+		from_ms: Math.max(span.start_ms, cell.start_ms),
+		to_ms: Math.min(span.end_ms, cell.end_ms),
+	}
+	const stopped_ms = lane_host_gaps.excluded_ms(read.gaps, [overlap])
+
+	return Math.max(0, overlap.to_ms - overlap.from_ms) - stopped_ms
 }
 
-function cell_of(
-	cell: Span,
-	spans: ReadonlyArray<Span>,
-	closes: ReadonlyArray<number>,
-): ThroughputCell {
-	const done = closes.filter((ms) => ms >= cell.start_ms && ms < cell.end_ms).length
+function cell_of(cell: Span, read: StreamRead): ThroughputCell {
+	const done = read.closes.filter((ms) => ms >= cell.start_ms && ms < cell.end_ms).length
 
-	return { ...cell, done, active_ms: sum(spans.map((span) => overlap_ms(span, cell))) }
+	return { ...cell, done, active_ms: sum(read.spans.map((span) => active_in(span, cell, read))) }
 }
 
 function per_hour_of(cells: ReadonlyArray<ThroughputCell>): number | undefined {
@@ -180,15 +194,9 @@ function peak_of(cells: ReadonlyArray<ThroughputCell>, cell_hours: number): Peak
 	return { done: top.done, per_hour: top.done / cell_hours, start_ms: top.start_ms }
 }
 
-interface StreamRead {
-	spans: ReadonlyArray<Span>
-	closes: ReadonlyArray<number>
-	now_ms: number
-}
-
 // The current cell is drawn and counted in the window, but kept out of the average and the peak.
 function row_of(shape: RowShape, read: StreamRead): ThroughputRow {
-	const cells = cell_spans(shape, read.now_ms).map((cell) => cell_of(cell, read.spans, read.closes))
+	const cells = cell_spans(shape, read.now_ms).map((cell) => cell_of(cell, read))
 	const complete = cells.slice(0, -1)
 
 	return {
@@ -204,7 +212,12 @@ function row_of(shape: RowShape, read: StreamRead): ThroughputRow {
 }
 
 function rows_of(events: ReadonlyArray<RunEvent>, now_ms: number): ReadonlyArray<ThroughputRow> {
-	const read = { spans: active_spans(events, now_ms), closes: close_times(events), now_ms }
+	const read = {
+		spans: active_spans(events, now_ms),
+		closes: close_times(events),
+		gaps: lane_host_gaps.gaps_of(events),
+		now_ms,
+	}
 
 	return ROWS.map((shape) => row_of(shape, read))
 }

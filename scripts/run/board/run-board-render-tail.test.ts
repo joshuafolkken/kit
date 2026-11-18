@@ -133,6 +133,20 @@ describe('run_board_render_tail.tail_of phase time', () => {
 	})
 })
 
+// joshuafolkken/kit#7905: the host's stops are no time spent at the phase, nor against its usual time.
+describe('run_board_render_tail.phase_time net of the host stops', () => {
+	it('draws and colors the phase time net of the host stops inside it', () => {
+		vi.stubEnv('FORCE_COLOR', '1')
+		const row = running(2)
+		const gaps = [{ from_ms: NOW - 6 * MINUTE, to_ms: NOW - 3 * MINUTE }]
+		const slept: BoardRow = { ...row, status: { ...row.status, state: 'running', gaps } }
+		const net = '5′00″'.padStart(TIME_WIDTH)
+
+		expect(time_of(row, { usual: usual(2) })).toBe(styleText('red', PHASE_PART))
+		expect(time_of(slept, { usual: usual(2) })).toBe(styleText('yellow', net))
+	})
+})
+
 // joshuafolkken/kit#6577: a stopped row's phase time stops where its lane stopped.
 describe('run_board_render_tail.phase_time of a stopped row', () => {
 	it('freezes a stopped row at its stop, however far now has moved', () => {
