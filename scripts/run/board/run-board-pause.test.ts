@@ -2,6 +2,7 @@ import { backlog_triage_adopted } from '#scripts/backlog/backlog-triage-adopted'
 import { issue_outcome } from '#scripts/issue/issue-outcome'
 import type { IssueComment } from '#scripts/issue/issue-read'
 import { describe, expect, it } from 'vitest'
+import type { RowReason } from './run-board-layout'
 import { run_board_pause } from './run-board-pause'
 import run_board_pause_fixture from './run-board-pause-fixture.json' with { type: 'json' }
 
@@ -255,17 +256,37 @@ function adopt_of(option: number, done = ''): IssueComment {
 const DECIDED = { ...note(undefined, 'Auto-decided: x'), created_at: '2026-11-17T13:59:22Z' }
 const LATE_STALL = { ...stalled(COMMAND), created_at: '2026-11-17T14:00:20Z' }
 
-function tail_of(comments: ReadonlyArray<IssueComment>): string | undefined {
+function row_of(comments: ReadonlyArray<IssueComment>): RowReason | undefined {
 	const read = { pause_reasons: new Map([[ISSUE, run_board_pause.from_comments(comments)]]) }
 	const launched_ms = Date.parse('2026-11-17T14:01:00Z')
 
-	return run_board_pause.reason_of(ISSUE, read, { state: 'parked', launched_ms })?.tail
+	return run_board_pause.reason_of(ISSUE, read, { state: 'parked', launched_ms })
+}
+
+function tail_of(comments: ReadonlyArray<IssueComment>): string | undefined {
+	return row_of(comments)?.tail
 }
 
 describe('run_board_pause adopted parent action', () => {
 	it('shows the parked command over relaunching and a later run:stalled', () => {
-		expect(tail_of([park_of(2), adopt_of(2), DECIDED])).toBe(PARENT_NEXT)
-		expect(tail_of([park_of(2), adopt_of(2), DECIDED, LATE_STALL])).toBe(PARENT_NEXT)
+		const expected = { tail: PARENT_NEXT, evidence_url: park_of(2).html_url }
+
+		expect(row_of([park_of(2), adopt_of(2), DECIDED])).toEqual(expected)
+		expect(row_of([park_of(2), adopt_of(2), DECIDED, LATE_STALL])).toEqual(expected)
+	})
+
+	it('lets a newer park replace the adopted parent action', () => {
+		const newer = {
+			...park_of(2),
+			body: issue_outcome.body_of({ body: BODY, summary: COMMAND }),
+			html_url: `${note().html_url}3`,
+			created_at: '2026-11-17T14:02:00Z',
+		}
+
+		expect(row_of([park_of(2), adopt_of(2), newer])).toEqual({
+			tail: COMMAND,
+			evidence_url: newer.html_url,
+		})
 	})
 
 	it.each([
