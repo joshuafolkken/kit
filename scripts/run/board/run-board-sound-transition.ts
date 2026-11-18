@@ -119,7 +119,12 @@ function cue_of(
 	])
 }
 
-const run_board_sound_transition = { cue_of, snapshot_of }
+// Every cue a frame holds, its rows' and the run's alike — what stays true across frames, not what is new.
+function held_cues(snapshot: SoundSnapshot): Array<CueName> {
+	return [...snapshot.rows.values(), ...[...snapshot.run].map((condition) => RUN_CUES[condition])]
+}
+
+const run_board_sound_transition = { cue_of, held_cues, snapshot_of }
 
 export { run_board_sound_transition }
 export type { SoundSnapshot }

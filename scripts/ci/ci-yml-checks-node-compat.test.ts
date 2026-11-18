@@ -26,7 +26,6 @@ function aggregate_exit_status(results: Readonly<Record<string, string>>): numbe
 		env: {
 			PATH: process.env['PATH'],
 			SCOPE_RESULT: 'success',
-			RUNTIME_CHANGED: 'true',
 			...results,
 		},
 		encoding: 'utf8',
@@ -36,23 +35,15 @@ function aggregate_exit_status(results: Readonly<Record<string, string>>): numbe
 }
 
 describe('the Checks job fails unless the Node build matrix passed', () => {
-	it('rejects failed static checks even when documentation unit shards are skipped', () => {
+	it('rejects failed static checks even when the unit shards are skipped', () => {
 		expect(
 			aggregate_exit_status({
 				...FRESH_RUN,
 				NODE_RESULT: 'success',
 				STATIC_RESULT: 'failure',
 				UNIT_RESULT: 'skipped',
-				RUNTIME_CHANGED: 'false',
 			}),
 		).not.toBe(0)
-	})
-
-	it('accepts skipped unit shards only for proven documentation changes', () => {
-		const skipped = { ...FRESH_RUN, NODE_RESULT: 'success', UNIT_RESULT: 'skipped' }
-
-		expect(aggregate_exit_status({ ...skipped, RUNTIME_CHANGED: 'false' })).toBe(0)
-		expect(aggregate_exit_status(skipped)).not.toBe(0)
 	})
 
 	it.each(['failure', 'cancelled', 'skipped', ''])(
@@ -74,4 +65,17 @@ describe('the Checks job fails unless the Node build matrix passed', () => {
 	it.each(UNFINISHED_NODE_RESULTS)('fails a reused run whose Node builds are %j', (node_result) => {
 		expect(aggregate_exit_status({ ...REUSED_RUN, NODE_RESULT: node_result })).not.toBe(0)
 	})
+})
+
+// joshuafolkken/kit#7975: a documentation-only change once let `unit` skip and `Checks` pass, so no
+// test reading the changed docs ran. Only the reuse path may skip the unit shards now.
+describe('the Checks job requires the unit shards on a fresh run', () => {
+	it.each(['false', 'true'])(
+		'rejects skipped unit shards whatever the runtime classification (%s)',
+		(runtime_changed) => {
+			const skipped = { ...FRESH_RUN, NODE_RESULT: 'success', UNIT_RESULT: 'skipped' }
+
+			expect(aggregate_exit_status({ ...skipped, RUNTIME_CHANGED: runtime_changed })).not.toBe(0)
+		},
+	)
 })

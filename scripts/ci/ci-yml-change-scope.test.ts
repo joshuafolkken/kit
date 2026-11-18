@@ -36,8 +36,8 @@ function enabled(job: string, runtime: string): boolean {
 }
 
 describe('shared change classification wiring', () => {
-	it('skips the unit matrix for documentation and runs it for code', () => {
-		expect(enabled('unit', 'false')).toBe(false)
+	it('runs the unit matrix for documentation-only changes as well as for code', () => {
+		expect(enabled('unit', 'false')).toBe(true)
 		expect(enabled('unit', 'true')).toBe(true)
 	})
 

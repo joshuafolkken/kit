@@ -6,10 +6,10 @@ import { run_board_render_fixture } from './run-board-render-fixture'
 import { run_board_render_tail } from './run-board-render-tail'
 import type { ItemState } from './run-board-status'
 
-// joshuafolkken/kit#7920: a running row ends on its finish, `🎯 ~HH:MM`, read from the lane totals the
-// header's 🎯 reads, with `+N′` / `−N′` where it moved past a minute from its launch's; `🎯 —` where no
-// lane total is measured, and after the reason of a row waiting on a person or parked. No row draws
-// `over budget`.
+// joshuafolkken/kit#7920: a running row's tail leads with its finish (#7994), `🎯 ~HH:MM`, read from the
+// lane totals the header's 🎯 reads, with `+N′` / `−N′` where it moved past a minute from its launch's;
+// `🎯 —` where no lane total is measured, and after the reason of a row waiting on a person or parked.
+// No row draws `over budget`.
 
 const { MINUTE, NOW, header } = run_board_render_fixture
 const HOUR = 60 * MINUTE
@@ -28,8 +28,8 @@ function launched(elapsed: number): BoardRow {
 	return { number: 2, title: 'Issue 2', kind: undefined, state: 'running', status, waits: [] }
 }
 
-function end_of(row: BoardRow, lane_totals: ReadonlyArray<number> = TOTALS): string | undefined {
-	return run_board_render_tail.tail_of(row, header({ lane_totals })).at(-1)
+function finish_of(row: BoardRow, lane_totals: ReadonlyArray<number> = TOTALS): string | undefined {
+	return run_board_render_tail.tail_of(row, header({ lane_totals })).at(0)
 }
 
 function held(state: ItemState, tail?: string): BoardRow {
@@ -49,22 +49,22 @@ function held(state: ItemState, tail?: string): BoardRow {
 describe('run_board_render_tail.tail_of finish', () => {
 	it('ends a running row on its finish time, with no drift on the usual pace', () => {
 		// 15′, 25′ and 35′ beyond 5′: the median 25′ is what its launch foretold.
-		expect(end_of(launched(5))).toBe(`🎯 ~${run_board_labels.minute_of(NOW + 25 * MINUTE)}`)
+		expect(finish_of(launched(5))).toBe(`🎯 ~${run_board_labels.minute_of(NOW + 25 * MINUTE)}`)
 	})
 
 	it('draws how much later than its launch foretold a long lane finishes', () => {
 		// 5′ and 15′ beyond 25′ end it in 10′, 5′ past the 30′ median from its launch.
-		expect(end_of(launched(25))).toBe(`🎯 ~${run_board_labels.minute_of(NOW + 10 * MINUTE)} +5′`)
+		expect(finish_of(launched(25))).toBe(`🎯 ~${run_board_labels.minute_of(NOW + 10 * MINUTE)} +5′`)
 	})
 
 	it('draws the day too for a finish on another day', () => {
 		const finish = run_board_labels.day_minute_of(NOW + 30 * HOUR)
 
-		expect(end_of(launched(0), [30 * HOUR])).toBe(`🎯 ~${finish}`)
+		expect(finish_of(launched(0), [30 * HOUR])).toBe(`🎯 ~${finish}`)
 	})
 
 	it('draws 🎯 — where no lane total is measured', () => {
-		expect(end_of(launched(5), [])).toBe(UNKNOWN)
+		expect(finish_of(launched(5), [])).toBe(UNKNOWN)
 	})
 
 	it('draws no over budget', () => {
@@ -76,8 +76,8 @@ describe('run_board_render_tail.tail_of finish', () => {
 
 describe('run_board_render_tail.drift_of', () => {
 	it('draws a later finish as +N′ and a sooner one as −N′', () => {
-		expect(run_board_render_tail.drift_of(21 * MINUTE)).toBe(' +21′')
-		expect(run_board_render_tail.drift_of(-3 * MINUTE)).toBe(' −3′')
+		expect(run_board_render_tail.drift_of(21 * MINUTE)).toBe('+21′')
+		expect(run_board_render_tail.drift_of(-3 * MINUTE)).toBe('−3′')
 	})
 
 	it('draws nothing within a minute either way', () => {
