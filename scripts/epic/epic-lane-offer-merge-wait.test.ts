@@ -1,5 +1,6 @@
 import { auto_ok_fixture, CREATED_EARLIER } from '#scripts/auto-ok/auto-ok-fixture'
 import { backlog_interrupt } from '#scripts/backlog/backlog-interrupt'
+import { epic_solo_parked } from '#scripts/epic/epic-solo-parked'
 import { listing_outcome } from '#scripts/gh/git-gh-issue-list-fixture'
 import { IN_PROGRESS_LABEL, RUN_LANE_LABEL } from '#scripts/issue/issue-labels'
 import { lane_await } from '#scripts/lane/lane-await'
@@ -70,6 +71,7 @@ beforeEach(() => {
 	vi.spyOn(lane_await, 'is_process_running_default').mockReturnValue(true)
 	vi.spyOn(epic_label_age, 'read_ages').mockResolvedValue(new Map())
 	vi.spyOn(backlog_interrupt, 'read').mockResolvedValue([])
+	vi.spyOn(epic_solo_parked, 'notice').mockResolvedValue(undefined)
 	merge_waiting_mock.mockResolvedValue(ONE_LANE)
 })
 
@@ -115,6 +117,27 @@ describe('epic_lane_offer.offer_for_repo — a holder waiting on its merge', () 
 		const offer = await epic_lane_offer.offer_for_repo([pool(children)], all_seats)
 
 		expect(offer.children).toEqual([])
+	})
+})
+
+// joshuafolkken/kit#7855: a parked `run:solo` issue still open holds every lane, and lifts with it.
+describe('epic_lane_offer.offer_for_repo — a parked run:solo issue', () => {
+	it('offers nothing and names the parked issue while it is open', async () => {
+		vi.spyOn(epic_solo_parked, 'notice').mockResolvedValue(`#${String(HOLDER)} is parked`)
+
+		const offer = await epic_lane_offer.offer_for_repo([pool([child(FIRST, REPO)])], request(REPO))
+
+		expect(offer.children).toEqual([])
+		expect(offer.notice).toContain(`#${String(HOLDER)}`)
+		expect(issue_list).not.toHaveBeenCalled()
+	})
+
+	it('offers again once nothing parked holds the gate', async () => {
+		issue_list.mockResolvedValueOnce(listing_outcome('[]'))
+
+		const offer = await epic_lane_offer.offer_for_repo([pool([child(FIRST, REPO)])], request(REPO))
+
+		expect(numbers_of(offer.children)).toEqual([FIRST])
 	})
 })
 

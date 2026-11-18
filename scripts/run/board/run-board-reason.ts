@@ -77,7 +77,7 @@ interface Pool {
 	planning: Planning | undefined
 	// The first `run:solo` candidate and the candidates behind it (`epic-solo.ts`), if any.
 	solo: SoloQueue | undefined
-	// The running `run:solo` issue that lets nothing new start (`epic_solo.holder_of`), if any.
+	// The running or parked `run:solo` issue that lets nothing new start (`epic_solo.holder_of`), if any.
 	solo_holder: number | undefined
 }
 
@@ -131,6 +131,13 @@ function running_labelled(read: ReasonRead): Array<Labelled> {
 		.map(([number, labels]) => ({ number, labels }))
 }
 
+// Every open parked issue: a parked `run:solo` issue still holds the gate (`epic-solo-parked.ts`).
+function parked_labelled(read: ReasonRead): Array<Labelled> {
+	return [...read.plan.labels]
+		.filter(([, labels]) => has_parked_label(labels))
+		.map(([number, labels]) => ({ number, labels }))
+}
+
 function pool_of(read: ReasonRead): Pool {
 	const waiting = run_board_layout.waiting_children(read)
 	const running = running_of(read)
@@ -141,7 +148,8 @@ function pool_of(read: ReasonRead): Pool {
 		withheld: read.plan.withheld ?? new Set(),
 		planning: run_board_planning.planning_of(read, running),
 		solo: epic_solo.queue_of(candidates),
-		solo_holder: epic_solo.holder_of(running_labelled(read)),
+		solo_holder:
+			epic_solo.holder_of(running_labelled(read)) ?? epic_solo.holder_of(parked_labelled(read)),
 	}
 }
 
@@ -222,7 +230,8 @@ function named_of(child: EpicChild, read: ReasonRead, pool: Pool): RowReason | u
 	return holder === undefined ? undefined : { icon: WAIT_ICONS.named, issues: [String(holder)] }
 }
 
-// `🔒 4374`: the running `run:solo` issue nothing new starts beside until it merges or is parked.
+// `🔒 4374`: the running or parked `run:solo` issue nothing new starts beside until it merges, is
+// closed, or has `run:solo` removed.
 function held_solo_of(pool: Pool): RowReason | undefined {
 	if (pool.solo_holder === undefined) return undefined
 
