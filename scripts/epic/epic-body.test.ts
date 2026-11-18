@@ -165,6 +165,43 @@ describe('epic_body — declared chains', () => {
 	})
 })
 
+const SPLIT_POINTER = 'see `## Split rationale` above'
+
+function build_reasoned(reasoned: ReadonlyArray<ReadonlyArray<number>>): string {
+	return epic_body.build_epic_body({
+		children: CHILDREN,
+		rationale: RATIONALE,
+		is_ordered: false,
+		chains: JOIN,
+		order_reasons: reasoned.map((chain) => ({ chain, reason: `uses #${String(chain[0])}` })),
+	})
+}
+
+describe('epic_body — per-chain order reasons', () => {
+	it('writes each given reason under its chain and no pointer when every chain has one', () => {
+		const body = build_reasoned(JOIN)
+
+		expect(body).toContain(
+			'`#101 -> #103`, declared by `josh epic --chain` when this epic was created.\n- Reasoning: uses #101',
+		)
+		expect(body).toContain('- Reasoning: uses #102')
+		expect(body).not.toContain(SPLIT_POINTER)
+	})
+
+	it('keeps the pointer on the line after each chain given no reason', () => {
+		const body = build_reasoned([[101, 103]])
+
+		expect(body).toContain('- Reasoning: uses #101')
+		expect(body).toContain(
+			`\`#102 -> #103\`, declared by \`josh epic --chain\` when this epic was created.\n- Reasoning: ${SPLIT_POINTER}`,
+		)
+	})
+
+	it('declares no extra order from a reason line', () => {
+		expect(epic_parse.parse_dependency_chains(build_reasoned(JOIN))).toStrictEqual(JOIN)
+	})
+})
+
 describe('epic_body.format_run_command', () => {
 	it('names the epic once its number is known', () => {
 		expect(epic_body.format_run_command(EPIC_NUMBER)).toBe(

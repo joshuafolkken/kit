@@ -95,3 +95,31 @@ describe('epic_command.run — --promote with --chain', () => {
 		expect(promote_epic).not.toHaveBeenCalled()
 	})
 })
+
+describe('epic_command — --order-reason', () => {
+	const REASON = '--order-reason'
+	const REASONS = [{ chain: [10, 11], reason: '#11 reads what #10 writes' }]
+	const REASON_ARGS = [CHAIN, TEN_TO_ELEVEN, REASON, `${TEN_TO_ELEVEN}: #11 reads what #10 writes`]
+
+	it('passes the per-chain reasons to the creation', async () => {
+		await epic_command.create([...ARGV, ...REASON_ARGS])
+
+		expect(create_epic_number).toHaveBeenCalledWith(
+			expect.objectContaining({ order_reasons: REASONS }),
+		)
+	})
+
+	it('passes the per-chain reasons to the promotion', async () => {
+		expect(await epic_command.run(['--promote', '9', '10', '11', ...REASON_ARGS])).toBe(0)
+
+		expect(promote_epic).toHaveBeenCalledWith(expect.objectContaining({ order_reasons: REASONS }))
+	})
+
+	it('names --order-reason in the usage it prints on a refusal', async () => {
+		await epic_command.create([TITLE])
+
+		expect(vi.mocked(console.error)).toHaveBeenCalledWith(
+			expect.stringContaining('--order-reason "#A -> #B: <reason>"'),
+		)
+	})
+})
