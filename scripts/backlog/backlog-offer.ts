@@ -1,6 +1,7 @@
 import { epic_solo } from '#scripts/epic/epic-solo'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import type { BacklogAnswer } from './backlog-budget'
+import { backlog_interrupt } from './backlog-interrupt'
 import { backlog_next } from './backlog-next'
 import { backlog_wait_cause } from './backlog-wait-cause'
 
@@ -100,6 +101,7 @@ function without_triage(tokens: ReadonlyArray<string>): ReadonlyArray<string> {
 // the waiting issues' causes, or nothing when it names neither.
 function blocked_cause(error: string): Pick<OfferAnswer, 'cause' | 'waiting' | 'not_before_ms'> {
 	if (epic_solo.is_solo_wait(error)) return { cause: SOLO_CAUSE }
+	if (backlog_interrupt.is_decision_wait(error)) return { cause: backlog_interrupt.DECISION_CAUSE }
 
 	const causes = backlog_wait_cause.parse(error)
 	const tag = backlog_wait_cause.tag_of(causes)

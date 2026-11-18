@@ -2,6 +2,6 @@
 	"reason": "New backlog-interrupt module holds lanes for an out-of-pool interrupt defect (#7860); no existing module reads that listing",
 	"date": "2026-11-18",
 	"growth": {
-		"scripts.code_lines": 65
+		"scripts.code_lines": 127
 	}
 }

@@ -3,6 +3,7 @@ import {
 	CREATED_EARLIER,
 	SUCCESS_EXIT_CODE,
 } from '#scripts/auto-ok/auto-ok-fixture'
+import { epic_solo } from '#scripts/epic/epic-solo'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import {
 	AUTO_OK_LABEL,
@@ -13,6 +14,7 @@ import {
 } from '#scripts/issue/issue-labels'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_fixture } from './backlog-fixture'
+import { backlog_interrupt } from './backlog-interrupt'
 import { backlog_next } from './backlog-next'
 
 // joshuafolkken/kit#7860: an interrupt defect filed as needing a person carries no `auto-ok`, so it
@@ -67,6 +69,7 @@ describe('backlog:next with an interrupt defect outside the pool', () => {
 		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
 		expect(stdout()).toBe(backlog_next.VERDICT_TOKENS.triage)
 		expect(stderr()).toContain(String(INTERRUPT))
+		expect(backlog_interrupt.is_decision_wait(stderr())).toBe(true)
 	})
 
 	it('offers no lane while a run:solo interrupt without auto-ok waits for a person', async () => {
@@ -74,6 +77,15 @@ describe('backlog:next with an interrupt defect outside the pool', () => {
 
 		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
 		expect(stdout()).toBe(backlog_next.VERDICT_TOKENS.wait)
+		expect(backlog_interrupt.is_decision_wait(stderr())).toBe(true)
+	})
+
+	it('never says a pending interrupt is running or releases when parked', async () => {
+		stub([interrupt([RUN_SOLO_LABEL])])
+		await backlog_next.run([])
+
+		expect(epic_solo.is_solo_wait(stderr())).toBe(false)
+		expect(stderr()).not.toContain('parked')
 	})
 
 	it.each([

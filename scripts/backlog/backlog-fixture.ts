@@ -249,16 +249,19 @@ function stub_defect_priority(input: BacklogInput): void {
 	)
 }
 
+// The per-repository listing: the open interrupts, or the `in-progress` holders.
+function in_repo_rows(input: BacklogInput, label: string): ReadonlyArray<OpenIssueData> {
+	return label === INTERRUPT_ROUTE_LABEL ? (input.interrupts ?? []) : (input.in_progress ?? [])
+}
+
 // The three label listings: the opted-in rows, the epics, and the `in-progress` holders the
 // `run:solo` gate reads.
 function stub_listings(input: BacklogInput, epics: ReadonlyArray<EpicInput>): void {
 	const untriaged = input.untriaged ?? []
 	const rows = (input.opted_in ?? []).map((row) => triaged_row(row, untriaged))
 
-	vi.spyOn(git_gh_command, 'issue_list_by_label_summary').mockImplementation(async (label) =>
-		listing_outcome(
-			JSON.stringify(label === INTERRUPT_ROUTE_LABEL ? (input.interrupts ?? []) : rows),
-		),
+	vi.spyOn(git_gh_command, 'issue_list_by_label_summary').mockResolvedValue(
+		listing_outcome(JSON.stringify(rows)),
 	)
 	vi.spyOn(git_gh_command, 'issue_list_by_label').mockImplementation(async (label) =>
 		listing_outcome(
@@ -267,8 +270,8 @@ function stub_listings(input: BacklogInput, epics: ReadonlyArray<EpicInput>): vo
 				: auto_ok_fixture.epic_listing(epics),
 		),
 	)
-	vi.spyOn(git_gh_command, 'issue_list_by_label_in_repo').mockResolvedValue(
-		listing_outcome(JSON.stringify(input.in_progress ?? [])),
+	vi.spyOn(git_gh_command, 'issue_list_by_label_in_repo').mockImplementation(async (label) =>
+		listing_outcome(JSON.stringify(in_repo_rows(input, label))),
 	)
 
 	const stale = new Set((input.stale ?? []).map(String))

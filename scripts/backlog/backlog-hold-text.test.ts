@@ -45,6 +45,7 @@ describe('backlog_hold_text.is_driver_restart', () => {
 describe('backlog_hold_text.text_of — offer holds', () => {
 	it.each([
 		['offer:watch:solo', 'a run:solo issue must finish first'],
+		['offer:watch:decision', 'an interrupt defect awaits your decision'],
 		['offer:wait:chain', 'queued issues wait on other issues'],
 		['offer:wait:gate', 'queued issues wait on a start condition'],
 		['offer:watch:chain+gate', 'queued issues wait on other issues or a start condition'],

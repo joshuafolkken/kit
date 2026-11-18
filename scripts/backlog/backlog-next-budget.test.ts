@@ -321,12 +321,11 @@ function pool_reads(): Array<string> {
 		.map(([request]) => request.path)
 }
 
-// The second query is the `route:interrupt` listing (#7860), read the same way.
 it('reads the pool in one GraphQL query and no REST core request', async () => {
 	serve_pool_query()
 
 	expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
-	expect(pool_reads()).toStrictEqual([GRAPHQL_PATH, GRAPHQL_PATH])
+	expect(pool_reads()).toStrictEqual([GRAPHQL_PATH])
 	expect(scan_calls()).toBeLessThanOrEqual(SCAN_CALL_CAP)
 })
 

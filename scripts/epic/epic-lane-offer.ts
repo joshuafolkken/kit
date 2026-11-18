@@ -1,3 +1,4 @@
+import { backlog_interrupt } from '#scripts/backlog/backlog-interrupt'
 import { lane_capacity } from '#scripts/lane/lane-capacity'
 import { lane_snapshot_trace } from '#scripts/lane/lane-snapshot-trace'
 import { epic_busy, type BusyRead } from './epic-busy'
@@ -273,6 +274,22 @@ function triage_offer(pools: ReadonlyArray<RepoPool>, request: LaneRequest): Lan
 	}
 }
 
+// An interrupt defect outside every pool that awaits a person's decision holds a `--lanes` ask the
+// way it holds `backlog:next` (joshuafolkken/kit#7860).
+async function interrupt_offer(request: LaneRequest): Promise<LaneOffer | undefined> {
+	if (!request.is_all_lanes) return undefined
+
+	const pending = await backlog_interrupt.read(request.repo)
+
+	if (pending.length === NO_LANES) return undefined
+
+	return {
+		children: [],
+		verdict: WAIT_VERDICT,
+		notice: backlog_interrupt.decision_message(pending, request.repo),
+	}
+}
+
 function full_notice(
 	occupancy: OccupancyRead,
 	request: LaneRequest,
@@ -318,7 +335,11 @@ async function offer_for_repo(
 	pools: ReadonlyArray<RepoPool>,
 	request: LaneRequest,
 ): Promise<LaneOffer> {
-	return triage_offer(pools, request) ?? (await offer_after_triage(pools, request))
+	return (
+		triage_offer(pools, request) ??
+		(await interrupt_offer(request)) ??
+		(await offer_after_triage(pools, request))
+	)
 }
 
 // A `--repo` compared against the repository this command runs in, case-insensitively as GitHub

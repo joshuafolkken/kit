@@ -1,7 +1,7 @@
 import { auto_ok_author } from '#scripts/auto-ok/auto-ok-author'
 import { auto_ok_cli, type OptedInRead } from '#scripts/auto-ok/auto-ok-cli'
 import { repo_discovery } from '#scripts/discovery/repo-discovery'
-import { epic_busy } from '#scripts/epic/epic-busy'
+import { epic_busy, type BusyRead } from '#scripts/epic/epic-busy'
 import type { Classification } from '#scripts/epic/epic-classify'
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import { epic_index } from '#scripts/epic/epic-index'
@@ -9,6 +9,7 @@ import { epic_next } from '#scripts/epic/epic-next'
 import type { EpicRead } from '#scripts/epic/epic-next-read'
 import type { EpicView } from '#scripts/epic/epic-next-views'
 import { epic_report, type EpicNextResult } from '#scripts/epic/epic-report'
+import type { SoloGate } from '#scripts/epic/epic-solo'
 import { epic_solo_stale } from '#scripts/epic/epic-solo-stale'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
@@ -194,6 +195,21 @@ function is_transport_failure(result: EpicNextResult): boolean {
 	return result.anomalies.some((anomaly) => anomaly.is_unreachable === true)
 }
 
+// A pending interrupt outside the pool holds every candidate (`backlog-interrupt.ts`); else the
+// ranked `run:solo` gate decides.
+async function gate_of(
+	result: EpicNextResult,
+	read: BusyRead,
+	context: PoolContext,
+): Promise<SoloGate> {
+	const { repo } = context
+	const held = backlog_interrupt.hold(result, read, context.interrupts ?? [], repo)
+
+	if (held !== undefined) return held
+
+	return backlog_rank.gate(result, read, repo, await backlog_gate_scope.gate_scope(context, read))
+}
+
 // The `run:solo` gate is applied here rather than in `resolve`, because `backlog:plan` shares
 // `resolve` and a plan made before the run lists everything. The holders are
 // read only on a `run` answer — the one answer the gate can change. The cap follows the gate
@@ -206,10 +222,7 @@ async function gate_ready(result: EpicNextResult, context: PoolContext): Promise
 
 	if (released.notice !== undefined) console.error(released.notice)
 
-	const read = backlog_interrupt.with_holders(released.read, context.interrupts ?? [])
-
-	const scope = await backlog_gate_scope.gate_scope(context, read)
-	const gated = backlog_rank.gate(result, read, repo, scope)
+	const gated = await gate_of(result, released.read, context)
 
 	if (gated.notice !== undefined) console.error(gated.notice)
 

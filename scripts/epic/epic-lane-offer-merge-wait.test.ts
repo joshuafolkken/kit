@@ -1,4 +1,5 @@
 import { auto_ok_fixture, CREATED_EARLIER } from '#scripts/auto-ok/auto-ok-fixture'
+import { backlog_interrupt } from '#scripts/backlog/backlog-interrupt'
 import { listing_outcome } from '#scripts/gh/git-gh-issue-list-fixture'
 import { IN_PROGRESS_LABEL, RUN_LANE_LABEL } from '#scripts/issue/issue-labels'
 import { lane_await } from '#scripts/lane/lane-await'
@@ -68,6 +69,7 @@ function numbers_of(children: ReadonlyArray<EpicChild>): Array<number> {
 beforeEach(() => {
 	vi.spyOn(lane_await, 'is_process_running_default').mockReturnValue(true)
 	vi.spyOn(epic_label_age, 'read_ages').mockResolvedValue(new Map())
+	vi.spyOn(backlog_interrupt, 'read').mockResolvedValue([])
 	merge_waiting_mock.mockResolvedValue(ONE_LANE)
 })
 
