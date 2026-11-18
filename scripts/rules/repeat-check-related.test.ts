@@ -124,6 +124,33 @@ describe('repeat_check_related.repeats_before_brief — calls that did not run',
 
 		expect(repeat_check_related.repeats_before_brief(`${refused}\n${PENDING_LINE}`)).toBe(false)
 	})
+
+	// joshuafolkken/kit#7961: a run cut short never reached its verdict, so it is not the one run.
+	it.each([
+		['timed out', 'Exit code 143\nCommand timed out after 2m 0s'],
+		['killed', 'Exit code 137\n$ tsx scripts/josh/josh.ts lint:related'],
+		['interrupted', '[Request interrupted by user for tool use]'],
+	])('does not count a check:related that was %s before it finished', (_label, content) => {
+		const cut_short = [
+			time_transcript_fixture.josh_call_line(1, BRANCH, CHECK, CHECK_ID),
+			time_transcript_fixture.error_result_line(2, BRANCH, CHECK_ID, content),
+		].join('\n')
+
+		expect(repeat_check_related.repeats_before_brief(`${cut_short}\n${FIX_LINE}`)).toBe(false)
+	})
+
+	it.each([
+		['red', 'Exit code 1\n$ tsx scripts/josh/josh.ts check:related'],
+		['green', undefined],
+	])('still counts a %s check:related that finished', (_label, content) => {
+		const result =
+			content === undefined
+				? time_transcript_fixture.result_line(2, BRANCH, CHECK_ID)
+				: time_transcript_fixture.error_result_line(2, BRANCH, CHECK_ID, content)
+		const finished = [time_transcript_fixture.josh_call_line(1, BRANCH, CHECK, CHECK_ID), result]
+
+		expect(repeat_check_related.repeats_before_brief([...finished, FIX_LINE].join('\n'))).toBe(true)
+	})
 })
 
 describe('the repeat-check-related delivery in a lane child', () => {
