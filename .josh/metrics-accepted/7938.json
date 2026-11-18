@@ -2,6 +2,6 @@
 	"reason": "#7938 adds the live board and --every as frame record writers (new feature code)",
 	"date": "2026-11-18",
 	"growth": {
-		"scripts.code_lines": 56
+		"scripts.code_lines": 57
 	}
 }

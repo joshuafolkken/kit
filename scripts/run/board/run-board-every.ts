@@ -96,7 +96,10 @@ function redrawn(state: BoardState, local: LocalRead, ports: BoardPorts, now_ms:
 		},
 	}
 
-	draw_run(state, local, { ports: quiet, now_ms }, layout_for(state, local, now_ms))
+	// A single frame counts arrivals from its own total, never from the live board's first one.
+	const single = { ...state, baseline_total: undefined }
+
+	draw_run(single, local, { ports: quiet, now_ms }, layout_for(single, local, now_ms))
 
 	return text
 }
