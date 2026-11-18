@@ -9,6 +9,7 @@ import { test_related_caller } from './test-related-caller'
 import { test_related_cap } from './test-related-cap'
 import { test_related_record, type RunInput } from './test-related-record'
 import { related_scope } from './test-related-scope'
+import type { Selection } from './test-related-select'
 import { unit_count_file } from './unit-count-file'
 
 // joshuafolkken/kit#4465: what one `josh test:related` run leaves in the lane ledger.
@@ -137,6 +138,23 @@ describe('test_related_record.record_of — the test selection time', () => {
 	})
 })
 
+// joshuafolkken/kit#7980: whether the tests were chosen by declaration users or by the import graph.
+describe('test_related_record.record_of — the selection method', () => {
+	const result = { elapsed_ms: 0, test_files: undefined }
+
+	it('records the method the selection used', () => {
+		const input = { ...related_input(), select_method: 'symbol' as const }
+
+		expect(test_related_record.record_of(input, result).select_method).toBe('symbol')
+	})
+
+	it('leaves the method out where the run selected nothing', () => {
+		expect(test_related_record.record_of(related_input(), result)).not.toHaveProperty(
+			'select_method',
+		)
+	})
+})
+
 // joshuafolkken/kit#7976: what the cap deferred to CI is counted, a run that kept the whole suite is not.
 describe('test_related_record.record_of — the tests deferred past the cap', () => {
 	const result = { elapsed_ms: 0, test_files: undefined }
@@ -172,7 +190,12 @@ describe('test_related_record.record_of — the summary line of the same run', (
 	it('records the count and the hub the summary line of the same run names', () => {
 		const input: RunInput = { ...related_input(), branch: [OWN_CHANGE], ...WIDE_SYNC }
 		const record = test_related_record.record_of(input, { elapsed_ms: 0, test_files: undefined })
-		const selection = { tests: [READER_TEST], deferred: DEFERRED, reach: WIDE_SYNC.reach }
+		const selection: Selection = {
+			tests: [READER_TEST],
+			deferred: DEFERRED,
+			reach: WIDE_SYNC.reach,
+			method: 'import',
+		}
 		const line = test_related_cap.deferred_line(selection, test_related_record.own_of(input))
 
 		expect(line).toContain(`${String(record.deferred)} deferred to CI`)

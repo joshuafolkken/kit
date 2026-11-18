@@ -31,7 +31,7 @@ const TEST_CHECK_COMMANDS: Record<string, CommandEntry> = {
 	'test:reach': {
 		script: 'scripts/test/test-reach-cli.ts',
 		description:
-			"Print how many test files each file's imports reach — the count test:related sizes its claim by — one '<count> <file>' line per file, or with --count one file's count alone",
+			"Print how many test files a change to each file selects — the count test:related sizes its claim by — one '<count> <file>' line per file, or with --count one file's count alone",
 		category: 'Development',
 		reference: ['<files...> | --count <file>', 'automation', ['none']],
 		usage: {

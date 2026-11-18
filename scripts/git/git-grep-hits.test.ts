@@ -33,12 +33,14 @@ describe('git_grep_hits.parse', () => {
 })
 
 describe('git_grep_hits.search', () => {
-	it('runs a fixed-string grep with the flags before the pattern and the pathspec after', async () => {
+	it('runs an unquoted-path, fixed-string grep with the flags before the pattern and the pathspec after', async () => {
 		read_mock.mockResolvedValue('a.ts:1:x')
 
 		const result = await git_grep_hits.search('run:prep', ['-m', '1'], ['*.ts'])
 
 		expect(read_mock).toHaveBeenCalledWith([
+			'-c',
+			'core.quotePath=false',
 			'grep',
 			'-n',
 			'-I',

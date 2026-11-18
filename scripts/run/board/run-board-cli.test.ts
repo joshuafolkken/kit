@@ -83,6 +83,18 @@ describe('run_board_cli.run', () => {
 	})
 })
 
+// joshuafolkken/kit#7952: only the live board, which reads the `s` key, says its sound state.
+describe('run_board_cli.run sound mark', () => {
+	it.each([['--once'], ['--chat']])('draws no sound mark for %s', async (argv) => {
+		const { ports, frames } = harness(LOCAL, [plan_titled('a')])
+
+		await run_board_cli.run([argv], ports)
+
+		expect(frames[0]).toContain('josh-board')
+		expect(frames[0]).not.toMatch(/[🔊🔇]/u)
+	})
+})
+
 // joshuafolkken/kit#3456: the answer to a progress question in a `backlogrun` — one frame a chat shows
 // as it is, recorded as the report it is.
 describe('run_board_cli.run --chat', () => {

@@ -1229,6 +1229,8 @@ The self-check's "Prose matches the code" (`prompts/review.md`) as a search. Fro
 
 It drops the ones an added line still writes (an added `.md` heading, for a heading) and the commands the registry still holds.
 
+From code it also takes a `const`'s changed literal (`value`) and a removed `--flag` no code still writes (`flag`): `scripts/review/prose-stale-values.ts`.
+
 It searches `.md` files and the comment lines under `prompts/`, `docs/`, `.claude/` and `scripts/` (`CHANGELOG.md` left out). A heading is searched quoted, the way a `→ "Heading"` pointer names it.
 
 Prints `file:line kind word` per reference, or `ok`. Exits 1 on a reference, 2 when the base or a search could not be read — a failed search is never `ok`.

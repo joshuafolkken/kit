@@ -128,7 +128,8 @@ Actively try to break the changed code.
 - Boundary values and concurrency: empty / zero / max inputs, unawaited promises, shared state,
   re-entrancy
 - Impact outside the diff: open the callers of every changed export or signature and verify they still
-  hold; flag duplication the change introduces
+  hold; flag duplication the change introduces. Prose keeping an old name, value or `--flag`: already
+  searched by self-check 2 (`docs/josh-commands-backlog.md` → "`josh prose:stale`")
 - Regressions in existing behavior covered elsewhere
 - Commands the changed prose tells a reader to run, run from a cwd other than the root with absolute,
   relative and empty inputs, in a scratch copy when they write: `prompts/review.md` → "Before round 1

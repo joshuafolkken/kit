@@ -111,7 +111,9 @@ pnpm josh run:board --theme wargames   # cyan phosphor text and dashed rules
 
 <!-- /usage -->
 
-`josh init`/`josh sync` ship it in `.vscode/tasks.json` as the `josh: run board` task, run from "Tasks: Run Task".
+A live board and `--every` record too; a board's age counts from its plan read.
+
+`josh init`/`josh sync` ship it in `.vscode/tasks.json` as the `josh: run board` task.
 
 The header is three lines — the first two in three columns, the third the repository's name, a spinner and time under the second column, then the kind's icon and words under the third:
 

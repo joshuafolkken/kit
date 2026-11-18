@@ -1,10 +1,11 @@
 #!/usr/bin/env tsx
 import { existsSync, statSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { test_pinned_reach } from './test-pinned-reach'
+import { test_symbol_read } from './test-symbol-read'
 
-// `josh test:reach <file...>` — how many test files each file's imports reach, the count
-// `josh test:related` sizes its core claim by, one `<count> <file>` line per file
+// `josh test:reach <file...>` — how many test files a change to each whole file selects by the users
+// of its declarations (joshuafolkken/kit#7980; the import graph's reach without typescript), the
+// count `josh test:related` sizes its core claim by, one `<count> <file>` line per file
 // (joshuafolkken/kit#5238): an overrun filing or a baseline measures it without a hand-written probe.
 // `--count <file>` prints that one file's count alone, the number-only last line an Issue's premise
 // or measure declaration reads (joshuafolkken/kit#7604).
@@ -64,7 +65,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	const counts = await test_pinned_reach.reached_test_counts(file_arguments(argv))
+	const counts = await test_symbol_read.reached_counts(file_arguments(argv))
 
 	if (counts === undefined) {
 		console.error(NO_GRAPH)
