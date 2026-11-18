@@ -176,7 +176,8 @@ function is_tailed(row: BoardRow): boolean {
 }
 
 // How far a row's finish moved from its launch's, in whole minutes: `+N′` later, `−N′` sooner, none
-// within a minute.
+// within a minute. `row_finish` reads the longer lanes' median against the median of all, so a row
+// only draws `+N′`; `−N′` is kept for a drift read otherwise.
 function drift_of(drift_ms: number): string {
 	const minutes = Math.round(drift_ms / MS_PER_MINUTE)
 
