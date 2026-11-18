@@ -83,4 +83,18 @@ describe('run_board_closed_pace.ended_asked_states', () => {
 		expect(states?.has('parked')).toBe(true)
 		expect(states?.has('human')).toBe(true)
 	})
+
+	// joshuafolkken/kit#7900 (ac-ed549dbc): a person may close a child waiting on its retry.
+	it.each([
+		['within', 0],
+		['past', 1],
+	])('asks about a child waiting on its retry %s the limit', (_label, past_ms) => {
+		const states = ended_asked_states(ANSWERED, ENDED, START + STOPPED_ASK_LIMIT_MS + past_ms)
+
+		expect(states?.has('waiting')).toBe(true)
+	})
+
+	it('asks about a child waiting on its retry while the run is going', () => {
+		expect(run_board_closed_pace.ALWAYS_ASKED_STATES.has('waiting')).toBe(true)
+	})
 })
