@@ -101,6 +101,7 @@ async function send_handoff(handoff: Handoff): Promise<void> {
 	}
 
 	await telegram_notify.confirm({
+		reason: 'run-handoff',
 		issue_title: HANDOFF_TITLE,
 		body: handoff.body,
 		recovery: HANDOFF_RECOVERY,

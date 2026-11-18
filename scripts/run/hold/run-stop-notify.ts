@@ -62,6 +62,7 @@ function halfrun_values(facts: StopFacts): CliValues {
 	].join('\n')
 	const values: CliValues = {
 		'task-type': 'confirmation',
+		reason: 'manual-verification',
 		body,
 		recommended: `Verify by hand, then prrun ${reference_of(facts)}`,
 		alternative: [`fullrun ${reference_of(facts)}`],
@@ -80,6 +81,7 @@ function human_review_values(facts: StopFacts, directory: string): CliValues {
 	].join('\n')
 	const values: CliValues = {
 		'task-type': 'confirmation',
+		reason: 'needs-human-review',
 		body,
 		recommended: `Review the working tree, then prrun ${reference_of(facts)}`,
 		alternative: [`fullrun ${reference_of(facts)}`],
@@ -96,6 +98,7 @@ function prrun_values(facts: StopFacts): CliValues {
 	].join('\n')
 	const values: CliValues = {
 		'task-type': 'confirmation',
+		reason: 'merge-approval',
 		body,
 		recommended: `fullrun ${reference_of(facts)}`,
 		alternative: ['Merge by hand, then pnpm josh followup'],

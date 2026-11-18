@@ -1,5 +1,6 @@
 import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
+import { confirmation_ledger } from '#scripts/notify/confirmation-ledger'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { session_handoff_line } from './session-handoff-line'
 import { session_language, type Resolution } from './session-language'
@@ -77,9 +78,13 @@ function prompt_lines(resolution: Resolution, is_live: boolean, handoff = ''): A
 	].filter((line) => line !== '')
 }
 
+// A person's prompt is the answer to every confirmation this checkout left open
+// (`confirmation-ledger.ts`).
 async function print_prompt_lines(
 	read_payload: () => Promise<string> = session_handoff_line.read_stdin,
+	answer_open: () => Promise<void> = confirmation_ledger.answer,
 ): Promise<void> {
+	await answer_open()
 	const handoff = session_handoff_line.handoff_line(await read_payload())
 	const lines = prompt_lines(resolve_session_lang(), await is_run_live(), handoff)
 
