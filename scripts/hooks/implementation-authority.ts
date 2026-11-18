@@ -1,6 +1,12 @@
+import { existsSync } from 'node:fs'
 import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { hook_tool_payload } from '#scripts/josh/hook-tool-payload'
+import { json_value } from '#scripts/lib/json-value'
+import { last_prompt } from '#scripts/rules/last-prompt'
+import { unasked_filing } from '#scripts/rules/unasked-filing'
 import { time_shell } from '#scripts/time-runtime/time-shell'
+import { transcript_tail } from '#scripts/time-runtime/transcript-tail'
+import { z } from 'zod'
 import { hook_context, type HookContext } from './hook-context'
 import { implementation_shell } from './implementation-shell'
 import { step_zero_notice } from './step-zero-notice'
@@ -27,6 +33,42 @@ function unverified_write(raw_payload: string): string | undefined {
 	return implementation_shell.refusal(time_shell.bash_command(payload.tool_input))
 }
 
+// **A no-filing request is built by the production subagent** (joshuafolkken/kit#7761). The harness
+// stamps `agent_id` and `agent_type` on a call made inside a subagent, and `transcript_path` names the
+// parent's transcript, where the person's last prompt sits. Only those harness fields and the person's
+// own prompt line grant it — a tool result or a subagent's hand-back is not a person prompt
+// (`last_prompt.person_prompt`). Shell writes keep their refusal (`implementation-shell.ts`).
+const PRODUCERS: ReadonlySet<string> = new Set(['producer', 'kit:producer'])
+
+const SUBAGENT_CALL_SCHEMA = z.object({
+	tool_name: z.enum(['Edit', 'Write']),
+	agent_id: z.string().min(1),
+	agent_type: z.string(),
+	transcript_path: z.string().min(1),
+})
+
+function person_asks_no_filing(transcript_path: string): boolean {
+	if (!existsSync(transcript_path)) return false
+	const text = last_prompt.prompt_reach(transcript_tail.read_tail(transcript_path), transcript_path)
+	const prompt = last_prompt.person_prompt(text)
+
+	return prompt !== undefined && unasked_filing.is_no_filing(prompt)
+}
+
+function is_no_filing_production(raw_payload: string): boolean {
+	const call = SUBAGENT_CALL_SCHEMA.safeParse(json_value.parse_or_undefined(raw_payload))
+	if (!call.success || !PRODUCERS.has(call.data.agent_type)) return false
+
+	return person_asks_no_filing(call.data.transcript_path)
+}
+
+// A granted edit names its paths, so it passes `unverified_write` too.
+function is_refused_runtime_edit(raw_payload: string, cwd: string): boolean {
+	if (!step_zero_notice.is_runtime_edit(raw_payload, cwd, true)) return false
+
+	return !is_no_filing_production(raw_payload)
+}
+
 function reason(
 	raw_payload: string,
 	context: HookContext = hook_context.from_process(),
@@ -35,7 +77,7 @@ function reason(
 
 	const scope = agent_session_role.scope_line(context.env)
 
-	if (step_zero_notice.is_runtime_edit(raw_payload, context.cwd, true)) return scope + HANDOFF
+	if (is_refused_runtime_edit(raw_payload, context.cwd)) return scope + HANDOFF
 
 	const rule = unverified_write(raw_payload)
 	if (rule === undefined) return undefined
