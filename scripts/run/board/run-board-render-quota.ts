@@ -214,7 +214,7 @@ function name_cell(name: string): string {
 	return padded(name, NAME_WIDTH)
 }
 
-// Claude's row reads its hold while a usage limit stops the run's launches.
+// Claude's row reads its hold while a usage limit or an authentication failure stops the run's launches.
 function row_of(provider: QuotaProvider, view: QuotaView): string {
 	const { hold, now_ms } = view
 	const body =
