@@ -41,7 +41,7 @@ describe('review_record_cli.parse_positional — the disposition', () => {
 describe('review_record_cli.usage_text — the disposition', () => {
 	it('names the optional leading disposition in the grammar line', () => {
 		expect(review_record_cli.usage_text()).toContain(
-			'[[<disposition> ]<category>:<severity>:<file>[ — <reason>] ...]',
+			'[[<disposition> ][kind=<kind> ]<category>:<severity>:<file>[ — <reason>] ...]',
 		)
 	})
 })

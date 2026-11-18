@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { describe, expect, it } from 'vitest'
 import type { BoardHeader } from './run-board-header'
@@ -169,7 +170,41 @@ const SILENT: ReadonlyArray<Case> = [
 	},
 ]
 
+const RATIONALE = new URL(
+	'../../../docs/maintainers/josh-commands-run-rationale.md',
+	import.meta.url,
+)
+const SCENE_HEADER = ['Scene', 'Cue']
+const SILENT_CELL = '—'
+
+function cells_of(line: string): Array<string> {
+	return line
+		.split('|')
+		.slice(1, -1)
+		.map((cell) => cell.trim())
+}
+
+// The rationale's scene table, header and separator left out.
+function scene_table(): Array<Array<string>> {
+	const rows = readFileSync(RATIONALE, 'utf8')
+		.split('\n')
+		.map((line) => (line.startsWith('|') ? cells_of(line) : undefined))
+	const start = rows.findIndex((cells) => cells?.join('|') === SCENE_HEADER.join('|'))
+	const body = rows.slice(start + 1)
+	const end = body.indexOf(undefined)
+
+	return body.slice(0, end).filter((cells) => !cells?.[0]?.startsWith('-')) as Array<Array<string>>
+}
+
+function scene_row({ name, cue }: Case): Array<string> {
+	return [name, cue === undefined ? SILENT_CELL : `\`${cue}\``]
+}
+
 describe('run_board_sound_transition.cue_of — the cue a frame sounds against the one before', () => {
+	it('matches the scene table the run:board rationale documents (ac-997f4ab4)', () => {
+		expect(scene_table()).toEqual([...SOUNDING, ...SILENT].map((entry) => scene_row(entry)))
+	})
+
 	it.each(SOUNDING)('sounds $cue for $name (ac-7c8a71a4)', ({ before, after, cue }) => {
 		expect(cue_between(before, after)).toBe(cue)
 	})

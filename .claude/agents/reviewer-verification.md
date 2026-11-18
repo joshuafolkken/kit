@@ -18,7 +18,8 @@ its `review:attest` step.
 - Write the review in the rubric's output format to a file outside the checkout (under `/tmp`), then
   submit it with the findings in one call: `pnpm josh review:submit --review <absolute-path>` (round 2:
   `--round 2`; a relative path is refused), the findings one per line
-  on stdin as `[fixed ]<category>:<severity>:<file>[:<line>] — <one sentence>` (`--interaction` for
+  on stdin as `[fixed ][kind=<kind> ]<category>:<severity>:<file>[:<line>] — <one sentence>` (the
+  kind as the rubric's "Review output format" says; `--interaction` for
   the interaction brief, the one whose file name carries `interaction-`; `--none` and no stdin when
   there is none). It lints the review and checks the lines together; fix everything it reports and
   run it again. The dispatcher records that slot with `pnpm josh review:record --from-slot` and
