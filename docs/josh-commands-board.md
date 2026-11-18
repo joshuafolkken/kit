@@ -107,7 +107,7 @@ pnpm josh run:board --theme wargames   # green text and dashed rules
 - `--once` / `--chat` — each keeps the frame it drew for one minute, per checkout (`--once` per theme and per terminal or pipe); asked again within the minute, it writes that frame with a `recorded <N>s ago` line, read nothing. The age counts from when the read began.
 - `--fresh` — with `--chat`: reads from scratch past the record, and records what it drew; the `run:handoff-lanes` chain passes it right after a merge.
 - `--every <minutes>` — sends the `--chat` frame as a `📊 Progress` Telegram now and every `<minutes>` until the run ends — only when a person asks for it.
-- `--theme wargames` — draws the text no color is given in phosphor green and every rule as `-`; `JOSH_BOARD_THEME=wargames` sets it for every board, the one `backlogrun` opens included, and `--theme` wins over it. An unknown name is refused. `--chat` and `--every` never take it.
+- `--theme wargames` — draws the text no color is given in phosphor green and every rule as `-`; `JOSH_BOARD_THEME=wargames` sets it for every board, the one `backlogrun` opens included, and `--theme` wins over it. A live board in it writes its first frame a line at a time from the top, 50ms apart, and a key writes the rest at once. An unknown name is refused. `--chat` and `--every` never take it.
 
 <!-- /usage -->
 
