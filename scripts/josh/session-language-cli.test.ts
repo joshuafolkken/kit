@@ -110,7 +110,7 @@ describe('prompt_lines', () => {
 describe('print_prompt_lines — confirmation answers', () => {
 	it('closes the open confirmations before printing the lines', async () => {
 		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
-		const answer_open = vi.fn<() => Promise<number>>().mockResolvedValue(1)
+		const answer_open = vi.fn<() => Promise<void>>().mockResolvedValue(undefined)
 
 		try {
 			await print_prompt_lines(async () => '{}', answer_open)

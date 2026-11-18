@@ -116,6 +116,8 @@ function build_input(input: { values: CliValues; context: ResolvedContext }): Te
 		body: normalize_body(input.values),
 		choices: build_choices(input.values, task_type),
 		reason: parse_reason(input.values.reason),
+		// The confirmation ledger names the Issue by the URL the caller passed.
+		issue: input.values['issue-url'],
 		issue_url: input.values['issue-url'],
 		pr_url: input.values['pr-url'],
 	}

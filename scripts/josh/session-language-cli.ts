@@ -82,7 +82,7 @@ function prompt_lines(resolution: Resolution, is_live: boolean, handoff = ''): A
 // (`confirmation-ledger.ts`).
 async function print_prompt_lines(
 	read_payload: () => Promise<string> = session_handoff_line.read_stdin,
-	answer_open: () => Promise<number> = confirmation_ledger.answer,
+	answer_open: () => Promise<void> = confirmation_ledger.answer,
 ): Promise<void> {
 	await answer_open()
 	const handoff = session_handoff_line.handoff_line(await read_payload())

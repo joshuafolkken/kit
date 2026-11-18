@@ -102,7 +102,11 @@ describe('josh run:report --handoff', () => {
 		expect(await run_report_cli.run([HANDOFF])).toBe(SUCCESS)
 		expect(stdout.join('')).toContain(`- **次に打つコマンド**: \`${RESUME}\``)
 		expect(confirm_mock).toHaveBeenCalledWith(
-			expect.objectContaining({ body: stdout.join('').trimEnd(), recommended: RESUME }),
+			expect.objectContaining({
+				reason: 'run-handoff',
+				body: stdout.join('').trimEnd(),
+				recommended: RESUME,
+			}),
 		)
 	})
 

@@ -143,6 +143,14 @@ describe('josh upstream:interrupt to a first-party repository', () => {
 			'notify: confirmation sent',
 		])
 	})
+
+	it('records the confirmation as an upstream interrupt of the finder (#7889)', async () => {
+		await upstream_interrupt_cli.run(argv_for(FIRST_PARTY_REPO))
+
+		expect(vi.mocked(telegram_notify.confirm)).toHaveBeenCalledWith(
+			expect.objectContaining({ reason: 'upstream-interrupt', issue: FINDER }),
+		)
+	})
 })
 
 describe('josh upstream:interrupt blocking the finder', () => {

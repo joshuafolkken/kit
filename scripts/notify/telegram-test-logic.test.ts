@@ -54,6 +54,7 @@ describe('telegram_test_logic.build_input — explicit flags win', () => {
 			body: OVERRIDE_BODY,
 			choices: undefined,
 			reason: undefined,
+			issue: OVERRIDE_ISSUE_URL,
 			issue_url: OVERRIDE_ISSUE_URL,
 			pr_url: OVERRIDE_PR_URL,
 		})
@@ -143,6 +144,13 @@ describe('telegram_test_logic.build_input — --reason', () => {
 
 	it('refuses a reason the registry does not hold', () => {
 		expect(() => reason_of('just-curious')).toThrow(/Invalid --reason: just-curious/u)
+	})
+
+	it('names the Issue for the ledger by the --issue-url it was given', () => {
+		const url = 'https://github.com/joshuafolkken/kit/issues/7889'
+		const values = { 'task-type': 'confirmation', recommended: 'Resume', 'issue-url': url }
+
+		expect(telegram_test_logic.build_input({ values, context: EMPTY_CONTEXT }).issue).toBe(url)
 	})
 })
 

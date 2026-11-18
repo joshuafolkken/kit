@@ -1,4 +1,4 @@
-import { appendFileSync, readFileSync } from 'node:fs'
+import { appendFileSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import type { HumanStopKey } from '#scripts/issue/issue-human-stops'
 import { hook_context_fixture } from '#tools/hooks/hook-context-fixture'
@@ -13,6 +13,7 @@ const ELSEWHERE = '/lanes/7890'
 const ISSUE = '7889'
 const STOPPED: HumanStopKey = 'run-stopped'
 const ANSWERED_AT = new Date('2099-01-01T00:00:00.000Z')
+const LATER = new Date('2099-06-01T00:00:00.000Z')
 const EPOCH = new Date(0)
 
 function context_of(cwd: string): ReturnType<typeof hook_context_fixture.of> {
@@ -69,37 +70,66 @@ describe('confirmation_ledger.record_sent', () => {
 })
 
 describe('confirmation_ledger.answer', () => {
-	it("closes only this checkout's open lines and leaves answered ones as they were", async () => {
+	it("closes only this checkout's confirmations, at the first answer after each", async () => {
 		const directory = path.join(scratch, 'answer')
 
 		await confirmation_ledger.record({ reason: STOPPED }, directory, context_of(HERE))
 		await confirmation_ledger.record({ reason: 'run-handoff' }, directory, context_of(ELSEWHERE))
-		const closed = await confirmation_ledger.answer(directory, context_of(HERE), ANSWERED_AT)
-		const again = await confirmation_ledger.answer(directory, context_of(HERE), new Date())
+		await confirmation_ledger.answer(directory, context_of(HERE), LATER)
+		await confirmation_ledger.answer(directory, context_of(HERE), ANSWERED_AT)
 		const entries = await read_all(directory)
 
-		expect([closed, again]).toEqual([1, 0])
 		expect(entries.find((entry) => entry.checkout === HERE)?.answered_at).toBe(
 			ANSWERED_AT.toISOString(),
 		)
 		expect(entries.find((entry) => entry.checkout === ELSEWHERE)?.answered_at).toBeUndefined()
 	})
 
+	it('leaves a confirmation asked after the answer open', async () => {
+		const directory = path.join(scratch, 'answer-before')
+
+		await confirmation_ledger.answer(directory, context_of(HERE), EPOCH)
+		await confirmation_ledger.record({ reason: STOPPED }, directory, context_of(HERE))
+
+		const [entry] = await read_all(directory)
+
+		expect(entry?.answered_at).toBeUndefined()
+	})
+
+	it('appends its line and never rewrites the lines already there', async () => {
+		const directory = path.join(scratch, 'append-only')
+
+		await confirmation_ledger.record({ reason: STOPPED }, directory, context_of(HERE))
+		const before = readFileSync(day_path(directory), 'utf8')
+
+		await confirmation_ledger.answer(directory, context_of(HERE))
+
+		expect(readFileSync(day_path(directory), 'utf8').startsWith(before)).toBe(true)
+	})
+})
+
+describe('confirmation_ledger.answer — without a writable ledger', () => {
 	it('answers nothing when there is no ledger directory', async () => {
-		await expect(confirmation_ledger.answer(undefined, context_of(HERE))).resolves.toBe(0)
+		await expect(confirmation_ledger.answer(undefined, context_of(HERE))).resolves.toBeUndefined()
+	})
+
+	it('does not throw when the ledger cannot be written', async () => {
+		const blocked = path.join(scratch, 'blocked-file')
+
+		writeFileSync(blocked, '')
+
+		await expect(confirmation_ledger.answer(blocked, context_of(HERE))).resolves.toBeUndefined()
 	})
 })
 
 describe('confirmation_ledger.read', () => {
-	it('skips a broken line and keeps it through an answer', async () => {
+	it('skips a broken line', async () => {
 		const directory = path.join(scratch, 'broken')
 
 		await confirmation_ledger.record({ reason: STOPPED }, directory, context_of(HERE))
 		appendFileSync(day_path(directory), '{"torn\n')
-		await confirmation_ledger.answer(directory, context_of(HERE), ANSWERED_AT)
 
 		expect(await read_all(directory)).toHaveLength(1)
-		expect(readFileSync(day_path(directory), 'utf8')).toContain('{"torn')
 	})
 
 	it('returns only the lines asked at or after the start of the period', async () => {
