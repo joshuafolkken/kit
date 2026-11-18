@@ -1,0 +1,7 @@
+{
+	"reason": "New run:board theme feature (#7934): a theme module and its CLI wiring, no duplicated logic",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 82
+	}
+}

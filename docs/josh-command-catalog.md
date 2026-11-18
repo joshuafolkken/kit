@@ -226,7 +226,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh rule:list` | — | automation | none | Print the trigger-delivered rules — each one's source, firing call and silent turn — from the guard rows |
 | `josh rule:value` · `josh ruv` | `[--fresh \| --refresh \| --period <days> \| --weekly <rule-id>... \| --prose]` | developer | files | Print each delivered rule's unaided compliance — runs reached, kept rate, refusals |
 | `josh run:add` | `<issue...> [--no-priority] [--retry]` | automation | network, files | Add issues to a live backlogrun, ahead of the queue unless --no-priority; epics become roots |
-| `josh run:board` | `[--once \| --chat \| --every <minutes>]` | automation | files, network | Draw a live board of the running backlogrun, redrawn every second |
+| `josh run:board` | `[--once \| --chat \| --every <minutes>] [--theme wargames]` | automation | files, network | Draw a live board of the running backlogrun, redrawn every second |
 | `josh run:carry` | `<operation> [arguments...]` | automation | files | Carry one invocation’s budget across its own session cuts |
 | `josh run:chain` | `<issue> [--from <stage>] [--unpinned-ok "<reason>"] [--accept-metrics "<reason>"] \| <issue> --join [--fixing] [--from <stage>] [--ship "<title> #<N>"]` | automation | processes, files, git, network | Open the review, or --join to join, attest, record and recheck it; --ship then ships a clean recheck. Stops at the first refusal with its next action |
 | `josh run:cut` | `[--resume] <issue> [--impl] [--handoff <path>]` | automation | files | Cut a lane child before the gate and resume a fresh process |

@@ -26,6 +26,7 @@ import { run_board_snapshot } from './run-board-snapshot'
 import { run_board_spin } from './run-board-spin'
 import type { BoardPorts } from './run-board-state'
 import { run_board_thanks_read } from './run-board-thanks-read'
+import { run_board_theme, type Theme } from './run-board-theme'
 import { run_board_tick } from './run-board-tick'
 
 // `josh run:board` — a full-screen board of the running `backlogrun`, redrawn once a second, its
@@ -42,7 +43,7 @@ const EVERY_FLAG = '--every'
 const FLAGS: ReadonlySet<string> = new Set(['', ONCE_FLAG, CHAT_FLAG])
 const SIGINT_EXIT_CODE = 130
 const SIGTERM_EXIT_CODE = 143
-const USAGE = 'Usage: josh run:board [--once | --chat | --every <minutes>]'
+const USAGE = 'Usage: josh run:board [--once | --chat | --every <minutes>] [--theme wargames]'
 const DISABLED_NOTICE = `\`${run_progress.DISABLED_KEY}=${run_progress.DISABLED_VALUE}\` is set, so no progress is pushed.`
 const TRAILING_NEWLINE = /\n$/u
 const { FRESH_STATE, tick } = run_board_tick
@@ -229,7 +230,9 @@ function ports_for(ports: BoardPorts | undefined, is_live: boolean): BoardPorts 
 	return ports ?? live_ports(is_live)
 }
 
-async function draw(flag: string, ports: BoardPorts | undefined): Promise<void> {
+// A board a person watches, in the theme; the chat's frame and `--every`'s are passed on as they are,
+// so they never take it.
+async function draw(flag: string, ports: BoardPorts | undefined, theme?: Theme): Promise<void> {
 	if (flag === CHAT_FLAG) {
 		await answer(ports_for(ports, false))
 
@@ -238,16 +241,17 @@ async function draw(flag: string, ports: BoardPorts | undefined): Promise<void> 
 
 	const { is_tty } = ports ?? LIVE_PORTS
 	const mode = run_board_screen.mode_of({ is_tty, is_once: flag === ONCE_FLAG })
+	const watched = run_board_theme.themed(ports_for(ports, mode === 'live'), theme)
 
 	if (mode === 'live') {
-		await watch(ports_for(ports, true))
+		await watch(watched)
 
 		return
 	}
 
 	// One plain frame stays on the terminal after the command, so it draws the still icons rather than a
 	// spinner frame frozen mid-turn.
-	await tick(FRESH_STATE, { ...ports_for(ports, false), is_tty: false, size: undefined })
+	await tick(FRESH_STATE, { ...watched, is_tty: false, size: undefined })
 }
 
 function is_every(flag: string, rest: ReadonlyArray<string>): boolean {
@@ -259,12 +263,15 @@ function is_refused(flag: string, rest: ReadonlyArray<string>): boolean {
 }
 
 async function run(argv: ReadonlyArray<string>, ports?: BoardPorts): Promise<number> {
-	const [flag = '', ...rest] = argv
+	const choice = run_board_theme.choose(argv, process.env)
+
+	if (choice === undefined) return refuse()
+	const [flag = '', ...rest] = choice.argv
 
 	if (is_every(flag, rest)) return await push_every(rest[0], ports_for(ports, false))
 	if (is_refused(flag, rest)) return refuse()
 
-	await draw(flag, ports)
+	await draw(flag, ports, choice.theme)
 
 	return SUCCESS_EXIT_CODE
 }
