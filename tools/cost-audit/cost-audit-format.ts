@@ -1,5 +1,6 @@
 import { figure_format } from '#scripts/lib/figure-format'
 import type { Audit, AuditRow } from './cost-audit'
+import { cost_audit_cause, type CauseRow } from './cost-audit-cause'
 import { cost_audit_density, type Density } from './cost-audit-density'
 import type { PhaseRow } from './cost-audit-phase'
 import { cost_audit_result } from './cost-audit-result'
@@ -121,6 +122,31 @@ function rewrite_lines(audit: Audit): Array<string> {
 	]
 }
 
+function tokens_usd(tokens: number, usd: number): string {
+	return `${figure_format.format_tokens(tokens)} tokens (${figure_format.format_usd(usd)})`
+}
+
+const CAUSE_TITLE =
+	'Cache write by cause (this period against the one before: dollars · writes, tokens · 1h tokens, also at the 5m rate)'
+
+function cause_line({ cause, current, previous }: CauseRow): string {
+	const usd = {
+		current: cost_audit_cause.usd_of(current),
+		previous: cost_audit_cause.usd_of(previous),
+	}
+	const dollars = row_line({ key: cause, ...usd, is_regression: false })
+	const tokens = figure_format.format_tokens(current.write.tokens_5m + current.write.tokens_1h)
+	const writes = `${String(current.writes)} writes (prev ${String(previous.writes)}), ${tokens} tokens`
+	const one_hour = `1h ${tokens_usd(current.write.tokens_1h, current.write.usd_1h)}, ${figure_format.format_usd(current.usd_1h_at_5m)} at 5m`
+
+	return `${dollars} · ${writes} · ${one_hour}`
+}
+
+// The cache write split by what caused it (joshuafolkken/kit#7877); the rows add up to the cache write.
+function cause_lines(audit: Audit): Array<string> {
+	return ['', CAUSE_TITLE, ...audit.write_causes.map((row) => cause_line(row))]
+}
+
 function phase_line(row: PhaseRow): string {
 	const { input, cache_read, cache_write, output } = row.tokens
 	const tokens = [input, cache_read, cache_write, output].map((count) =>
@@ -160,10 +186,6 @@ function phase_lines(audit: Audit): Array<string> {
 		...token_table_lines(PHASE_TITLE, audit.phases),
 		...token_table_lines(AGENT_TITLE, audit.agents),
 	]
-}
-
-function tokens_usd(tokens: number, usd: number): string {
-	return `${figure_format.format_tokens(tokens)} tokens (${figure_format.format_usd(usd)})`
 }
 
 function first_text(first: FirstContext, unit: string): string {
@@ -244,6 +266,7 @@ function report_lines(audit: Audit): Array<string> {
 		density_line(audit),
 		...sections_of(audit).flatMap((section) => section_lines(section)),
 		...rewrite_lines(audit),
+		...cause_lines(audit),
 		...phase_lines(audit),
 		...usage_lines(audit.usage),
 		...cost_audit_result.result_lines(audit.results),
