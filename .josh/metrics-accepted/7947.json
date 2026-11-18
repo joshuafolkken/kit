@@ -1,0 +1,7 @@
+{
+	"reason": "New replay-rule module for run:board sound cues (#7947): the feature's own code, no duplicate to remove",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 53
+	}
+}
