@@ -120,11 +120,12 @@ describe('removed_tests.with_pending_rows — the rows a draft gets before the s
 
 describe('removed_tests — what the brief and the refusal print', () => {
 	it('adds no brief section when no test was removed', () => {
-		expect(removed_tests.brief_block([])).toStrictEqual([])
+		expect(removed_tests.brief_block(removed_tests.NONE)).toStrictEqual([])
+		expect(removed_tests.brief_block()).toStrictEqual([])
 	})
 
 	it('lists each removed test in the brief as a row to dispose of', () => {
-		const block = removed_tests.brief_block([THRESHOLDS]).join('\n')
+		const block = removed_tests.brief_block({ removed: [THRESHOLDS], renamed: [] }).join('\n')
 
 		expect(block).toContain('Removed tests')
 		expect(block).toContain(PENDING_THRESHOLDS)
@@ -137,5 +138,25 @@ describe('removed_tests — what the brief and the refusal print', () => {
 		expect(message).toContain(removed_tests.DISPOSITION_HEADING)
 		expect(message).toContain(PENDING_THRESHOLDS)
 		expect(message).toContain('PR 本文の消えたテストの処置')
+	})
+})
+
+// joshuafolkken/kit#7883: a renamed test's replacement is known, so its row is written filled.
+describe('removed_tests — the row of a renamed test', () => {
+	const RENAMED = [{ from: THRESHOLDS, to: KEPT }]
+	const FILLED = `- \`${THRESHOLDS}\` — 置き換え: \`${KEPT}\``
+
+	it('writes the replacement row into a draft, which then disposes of the test', () => {
+		const body = removed_tests.with_pending_rows(SUMMARY, [THRESHOLDS, LANES], RENAMED)
+
+		expect(body).toContain(FILLED)
+		expect(removed_tests.undisposed([THRESHOLDS, LANES], body)).toStrictEqual([LANES])
+	})
+
+	it('names the replacement row in the refusal of a body that lacks it', () => {
+		const message = removed_tests.refusal_message([THRESHOLDS, LANES], RENAMED)
+
+		expect(message).toContain(FILLED)
+		expect(message).toContain(`- \`${LANES}\` — 未記入`)
 	})
 })
