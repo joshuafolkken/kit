@@ -4,9 +4,10 @@ import type { StatsWindow } from './lane-stats'
 
 // How far each run's finish estimate (`estimate` ledger rows, joshuafolkken/kit#7775) was off: per
 // record, the time the run actually had left over the time it was expected to have left. A run ends
-// at the last merge of the children its records were written for; a run with any of them unmerged
-// had not finished or was stopped, so it has no actual end and is left out. Only runs that ended in
-// the window count.
+// at the last merge of the children its records were written for; a child left unmerged (parked,
+// closed or skipped) does not hold the end back, and a run with no merged child has no actual end and
+// is left out. A run counts only once a later run has written an estimate, and only if it ended in
+// the window.
 
 interface RunRatios {
 	first: number
@@ -52,17 +53,29 @@ function merged_ms(
 	return instants.length === 0 ? undefined : Math.min(...instants)
 }
 
-// The run's end: the last merge of its children, `undefined` while any of them is unmerged.
+// The run's end: the last merge of its merged children, `undefined` while none of them is merged.
 function end_of(
 	records: ReadonlyArray<EstimateEntry>,
 	merges: ReadonlyArray<MergeEntry>,
 ): number | undefined {
 	const since_ms = Date.parse(records[0]?.at ?? '')
-	const ends = [...new Set(records.map((record) => record.issue))].map((issue) =>
-		merged_ms(issue, since_ms, merges),
-	)
+	const ends = [...new Set(records.map((record) => record.issue))]
+		.map((issue) => merged_ms(issue, since_ms, merges))
+		.filter(is_number)
 
-	return ends.length === 0 || !ends.every(is_number) ? undefined : Math.max(...ends)
+	return ends.length === 0 ? undefined : Math.max(...ends)
+}
+
+// The ledger does not tell a child still in a lane from one that left the run (parked, closed or
+// skipped), so a run counts as over only once a later run wrote an estimate after its last record.
+function is_superseded(
+	records: ReadonlyArray<EstimateEntry>,
+	estimates: ReadonlyArray<EstimateEntry>,
+): boolean {
+	const run = records[0]?.run
+	const last_ms = Date.parse(records.at(-1)?.at ?? '')
+
+	return estimates.some((estimate) => estimate.run !== run && Date.parse(estimate.at) > last_ms)
 }
 
 // Actual time left over the expected time left; `undefined` where nothing was expected to be left.
@@ -95,8 +108,10 @@ function run_ratios(
 // The ratios of every run that ended in `window`; `entries` is the whole ledger.
 function ratios_of(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): Array<RunRatios> {
 	const merges = entries.filter(is_merge)
+	const estimates = entries.filter(is_estimate)
 
-	return runs_of(entries.filter(is_estimate))
+	return runs_of(estimates)
+		.filter((records) => is_superseded(records, estimates))
 		.map((records) => run_ratios(records, merges, window))
 		.filter((ratios) => ratios !== undefined)
 }

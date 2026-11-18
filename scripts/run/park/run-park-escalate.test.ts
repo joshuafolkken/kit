@@ -1,5 +1,6 @@
 import { agent_worker_profile, type SettingsResult } from '#scripts/agent/agent-worker-profile'
 import { RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
+import { issue_outcome } from '#scripts/issue/issue-outcome'
 import { session_language } from '#scripts/josh/session-language'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_park_escalate } from './run-park-escalate'
@@ -112,5 +113,13 @@ describe('run_park_escalate.park comment language', () => {
 		expect(comment).toContain(`pnpm josh run:add ${ISSUE} --retry`)
 		expect(cause).toBe(`escalation requested: ${REASON}`)
 		expect(run_stalled.class_of(String(cause))).toBe(run_stalled.ESCALATION_REQUESTED.short)
+	})
+
+	it.each(['ja', 'en'])('marks the first action for the board under %j (#7852)', async (lang) => {
+		const [, comment] = await parked_with(lang)
+
+		expect(issue_outcome.next_of(String(comment))).toBe(
+			run_stalled.next_action(ISSUE, run_stalled.ESCALATION_REQUESTED.why),
+		)
 	})
 })

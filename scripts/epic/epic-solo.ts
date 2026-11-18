@@ -17,7 +17,8 @@ import { epic_report, type EpicNextResult } from './epic-report'
 // disagree about what may start beside what.
 //
 // Three rules, all against the repository's `in-progress` holders (`epic_busy.read_repository`, with
-// a stale `run:solo` holder taken out by `epic_solo_stale.release`):
+// a stale `run:solo` holder taken out by `epic_solo_stale.release`; a parked `run:solo` issue, which
+// carries no `in-progress`, holds through `epic_solo_parked` instead):
 // a running `run:solo` issue lets nothing new start; a `run:solo` candidate starts only into an idle
 // repository and then alone; and nothing ranked below a waiting `run:solo` candidate is offered past
 // it, so it is not starved by the lanes it is waiting on. A listing that could not be read is not an
@@ -75,10 +76,24 @@ function solo_holder(read: BusyRead): number | undefined {
 // `epic_solo_stale`'s release notice also opens "carries `run:solo` and", and is no wait.
 const HELD_MARK = `carries \`${RUN_SOLO_LABEL}\` and is running in`
 const WAITING_MARK = `carries \`${RUN_SOLO_LABEL}\` and waits for`
+const PARKED_MARK = `carries \`${RUN_SOLO_LABEL}\` and is parked unmerged in`
+
+// Parking does not release the hold: a parked `run:solo` fix is still unmerged, so the verification
+// path it repairs is still broken (joshuafolkken/kit#7855).
+const RESUME_HINT = `nothing else starts until it merges, is closed, or has \`${RUN_SOLO_LABEL}\` removed`
 
 function held_message(holder: number, repo: string): string {
 	return issue_citation.linkify(
-		`${issue_cite.plain_for('linked', holder)} ${HELD_MARK} ${repo}; nothing else starts until it merges or is parked.`,
+		`${issue_cite.plain_for('linked', holder)} ${HELD_MARK} ${repo}; ${RESUME_HINT}.`,
+		repo,
+	)
+}
+
+function parked_message(parked: ReadonlyArray<number>, repo: string): string {
+	const named = parked.map((number) => issue_cite.plain_for('linked', number)).join(', ')
+
+	return issue_citation.linkify(
+		`${named} ${PARKED_MARK} ${repo}; ${RESUME_HINT} — or lift its park label so it runs again.`,
 		repo,
 	)
 }
@@ -92,7 +107,7 @@ function waiting_message(solo: number, repo: string): string {
 
 // Whether `text` — what an offer printed on stderr — says the `run:solo` gate held the candidates.
 function is_solo_wait(text: string): boolean {
-	return text.includes(HELD_MARK) || text.includes(WAITING_MARK)
+	return [HELD_MARK, WAITING_MARK, PARKED_MARK].some((mark) => text.includes(mark))
 }
 
 function first_of(children: ReadonlyArray<EpicChild>, keep: number): SoloSelection {
@@ -185,7 +200,16 @@ function gate(
 		: { result: gated, notice: selection.notice }
 }
 
-const epic_solo = { gate, holder_of, is_solo, is_solo_wait, queue_of, select }
+const epic_solo = {
+	gate,
+	holder_of,
+	is_solo,
+	is_solo_wait,
+	none_of,
+	parked_message,
+	queue_of,
+	select,
+}
 
 export type { Labelled, SoloGate, SoloQueue, SoloSelection, SoloSelector }
 export { epic_solo }
