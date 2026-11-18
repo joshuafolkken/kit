@@ -3,6 +3,7 @@ import { session_cite } from '#scripts/issue/session-cite'
 import { cli_body } from '#scripts/josh/cli-body'
 import type { InsertKind, InsertPosition } from './epic-chains'
 import { epic_cli_argv, type EpicArgv, type FormFlags } from './epic-cli-argv'
+import { epic_cli_chain, type ChainRead } from './epic-cli-chain'
 import { epic_cli_decide } from './epic-cli-decide'
 import { epic_cli_remove } from './epic-cli-remove'
 import { epic_parse, type ExternalChild } from './epic-parse'
@@ -41,10 +42,12 @@ const NOTIFY_FLAG = '--notify'
 const CREATE_FORM: FormFlags = {
 	switches: [ORDERED_FLAG, NOTIFY_FLAG],
 	value_flags: [RATIONALE_FLAG, ORIGIN_FLAG],
+	list_flags: [epic_cli_chain.CHAIN_FLAG],
 }
 const PROMOTE_FORM: FormFlags = {
 	switches: [PROMOTE_FLAG, ORDERED_FLAG, NOTIFY_FLAG],
 	value_flags: [RATIONALE_FLAG, ORIGIN_FLAG, TITLE_FLAG],
+	list_flags: [epic_cli_chain.CHAIN_FLAG],
 }
 const RECONCILE_FORM: FormFlags = { switches: [RECONCILE_FLAG] }
 const CHECK_FORM: FormFlags = { switches: [] }
@@ -56,7 +59,7 @@ const ADD_FORM: FormFlags = {
 const { count_flag, is_switch_set, is_value_unusable, positionals_of, read_flag_value, read_form } =
 	epic_cli_argv
 
-interface CreateArguments {
+interface CreateArguments extends ChainRead {
 	title: string
 	children: Array<number>
 	is_ordered: boolean
@@ -67,7 +70,7 @@ interface CreateArguments {
 
 // `--promote <N> <N1> <N2> …`: the issue to promote, then its children. The title is optional — the
 // issue already has one, and `--title` renames it; the discussion in it is usually the split rationale.
-interface PromoteArguments {
+interface PromoteArguments extends ChainRead {
 	epic_number: number
 	children: Array<number>
 	is_ordered: boolean
@@ -96,7 +99,9 @@ function to_create_arguments(parsed: EpicArgv): CreateArguments | undefined {
 	const children = epic_cli_argv.to_child_numbers(raw_children)
 	if (children.length === 0) return undefined
 
-	return { title, children, ...read_batch_flags(parsed) }
+	const batch = { children, ...read_batch_flags(parsed) }
+
+	return { title, ...batch, ...epic_cli_chain.read_chains(parsed, batch) }
 }
 
 // The title comes first so the children can stay a bare list of numbers, which is how they are
@@ -143,7 +148,9 @@ function to_promote_arguments(parsed: EpicArgv): PromoteArguments | undefined {
 
 	if (subject === undefined || title === '') return undefined
 
-	return { ...subject, ...read_batch_flags(parsed), title }
+	const batch = { ...subject, ...read_batch_flags(parsed) }
+
+	return { ...batch, ...epic_cli_chain.read_chains(parsed, batch), title }
 }
 
 function parse_promote_arguments(argv: ReadonlyArray<string>): PromoteArguments | undefined {
