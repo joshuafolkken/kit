@@ -1,0 +1,7 @@
+{
+	"reason": "Incremental throughput fold (new module) replaces the per-tick whole-stream re-fold; rows_of CPU 205ms to 2.5ms per read",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 79
+	}
+}
