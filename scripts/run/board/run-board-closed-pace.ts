@@ -5,10 +5,10 @@ import { run_board_status, type ItemState } from './run-board-status'
 
 // Which children a `run:board` closed read asks about once its run has ended.
 
-// A child waiting on a person, drawn in 🙋 decision until a closed read settles it.
-const { WAITING_STATES } = run_board_status
-const STOPPED_STATE: ItemState = 'stopped'
-const ALWAYS_ASKED_STATES: ReadonlySet<ItemState> = new Set([STOPPED_STATE, ...WAITING_STATES])
+// A child waiting on a person, drawn in 🙋 decision until a closed read settles it, or waiting on its
+// retry, which a person may close before it runs again (joshuafolkken/kit#7900).
+const { CLOSE_WAITING_STATES } = run_board_status
+const ALWAYS_ASKED_STATES: ReadonlySet<ItemState> = new Set(['stopped', ...CLOSE_WAITING_STATES])
 // A child that merged itself is drawn stopped until GitHub answers it closed, and the answer can lag
 // the merge by minutes (joshuafolkken/kit#7556). The board stays open between runs, so a stopped child
 // that never closes stops being asked about this long after the run ended — several retry intervals,
@@ -34,8 +34,9 @@ function has_asked_since_end(state: BoardState, ended_ms: number | undefined): b
 }
 
 // An ended run asks as a going run does until one ask after it ended has answered whole. After that it
-// asks only about a child drawn stopped, until the limit, or waiting on a person — the person closing
-// it is what the board waits to draw. `undefined` while the run still asks as a going run does.
+// asks only about a child drawn stopped, until the limit, or waiting on a person or its retry — a
+// person closing it is what the board waits to draw. `undefined` while the run still asks as a going
+// run does.
 function ended_asked_states(
 	state: BoardState,
 	local: LocalRead,
@@ -44,7 +45,7 @@ function ended_asked_states(
 	const { ended_ms } = local
 	if (ended_ms === undefined || !has_asked_since_end(state, ended_ms)) return undefined
 
-	return now_ms - ended_ms <= STOPPED_ASK_LIMIT_MS ? ALWAYS_ASKED_STATES : WAITING_STATES
+	return now_ms - ended_ms <= STOPPED_ASK_LIMIT_MS ? ALWAYS_ASKED_STATES : CLOSE_WAITING_STATES
 }
 
 function is_fresh_end(local: LocalRead, issue: number, now_ms: number): boolean {
