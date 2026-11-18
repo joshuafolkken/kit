@@ -242,7 +242,7 @@ describe('run_board_tick.tick park titles', () => {
 		const lines = await loading([PARK])
 
 		expect(park_reason_lines(lines)).toStrictEqual([
-			expect.stringMatching(/💤 +1 .* {2}waiting on #7$/u),
+			expect.stringMatching(/💤 +1 .* {2}waiting on #7 🎯 —$/u),
 		])
 	})
 
@@ -256,7 +256,7 @@ describe('run_board_tick.tick park titles', () => {
 		const lines = lines_of(frames.at(-1))
 
 		expect(park_reason_lines(lines)).toStrictEqual([
-			expect.stringMatching(/💤 +1 {7}Lead the lanes {2,}waiting on #7$/u),
+			expect.stringMatching(/💤 +1 {7}Lead the lanes {2,}waiting on #7 🎯 —$/u),
 		])
 	})
 })

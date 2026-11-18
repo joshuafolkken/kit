@@ -6,6 +6,7 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { epic_add, type AddChildrenInput } from './epic-add'
 import { epic_cli, epic_cli_untrack, type AddArguments, type CrossRepoAddTarget } from './epic-cli'
+import type { ChainRead } from './epic-cli-chain'
 import { epic_decide } from './epic-decide'
 import { epic_notify } from './epic-notify'
 import { epic_reconcile } from './epic-reconcile'
@@ -14,7 +15,8 @@ import { epic_run } from './epic-run'
 import { epic_split_reach } from './epic-split-reach'
 import { epic_untrack } from './epic-untrack'
 
-const FLAGS = '[--ordered] [--rationale-file <path|->] [--origin <owner/repo#N>] [--notify]'
+const FLAGS =
+	'[--ordered | --chain "#A -> #B" ...] [--rationale-file <path|->] [--origin <owner/repo#N>] [--notify]'
 const USAGE = [
 	`Usage: josh epic "<title>" <N1> <N2> ... ${FLAGS}`,
 	`       josh epic --promote <N> <N1> <N2> ... ${FLAGS} [--title <title>]`,
@@ -39,6 +41,13 @@ async function is_split_stranded(children: ReadonlyArray<number>): Promise<boole
 	return refusal !== undefined
 }
 
+// Whether the `--chain` declarations were refused, the reason printed — before anything is written.
+function is_chain_refused(parsed: ChainRead): boolean {
+	if (parsed.chain_refusal !== undefined) console.error(`✖ ${parsed.chain_refusal}`)
+
+	return parsed.chain_refusal !== undefined
+}
+
 async function run_promotion(argv: ReadonlyArray<string>): Promise<number> {
 	const parsed = epic_cli.parse_promote_arguments(argv)
 
@@ -48,13 +57,16 @@ async function run_promotion(argv: ReadonlyArray<string>): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	if (await is_split_stranded(parsed.children)) return FAILURE_EXIT_CODE
+	if (is_chain_refused(parsed) || (await is_split_stranded(parsed.children))) {
+		return FAILURE_EXIT_CODE
+	}
 
 	const exit_code = await epic_run.promote_epic({
 		epic_number: parsed.epic_number,
 		children: parsed.children,
 		rationale: epic_cli.read_rationale(parsed.rationale_path),
 		is_ordered: parsed.is_ordered,
+		chains: parsed.chains,
 		origin: parsed.origin,
 		title: parsed.title,
 	})
@@ -197,13 +209,16 @@ async function create(argv: ReadonlyArray<string>): Promise<Creation> {
 		return { kind: 'refused' }
 	}
 
-	if (await is_split_stranded(parsed.children)) return { kind: 'refused' }
+	if (is_chain_refused(parsed) || (await is_split_stranded(parsed.children))) {
+		return { kind: 'refused' }
+	}
 
 	const epic_number = await epic_run.create_epic_number({
 		title: parsed.title,
 		children: parsed.children,
 		rationale: epic_cli.read_rationale(parsed.rationale_path),
 		is_ordered: parsed.is_ordered,
+		chains: parsed.chains,
 		origin: parsed.origin,
 	})
 

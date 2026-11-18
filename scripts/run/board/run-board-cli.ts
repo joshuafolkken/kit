@@ -15,6 +15,7 @@ import { run_board_fold_store } from './run-board-fold-store'
 import { run_board_gather } from './run-board-gather'
 import { run_board_gather_live } from './run-board-gather-live'
 import { run_board_gather_thread } from './run-board-gather-thread'
+import { run_board_intro } from './run-board-intro'
 import { run_board_issue_count } from './run-board-issue-count'
 import { run_board_keys, type KeyReading } from './run-board-keys'
 import { run_board_labels } from './run-board-labels'
@@ -25,6 +26,7 @@ import { run_board_snapshot } from './run-board-snapshot'
 import { run_board_spin } from './run-board-spin'
 import type { BoardPorts } from './run-board-state'
 import { run_board_thanks_read } from './run-board-thanks-read'
+import { run_board_theme, type Theme } from './run-board-theme'
 import { run_board_tick } from './run-board-tick'
 
 // `josh run:board` — a full-screen board of the running `backlogrun`, redrawn once a second, its
@@ -39,9 +41,10 @@ const ONCE_FLAG = '--once'
 const CHAT_FLAG = '--chat'
 const EVERY_FLAG = '--every'
 const FLAGS: ReadonlySet<string> = new Set(['', ONCE_FLAG, CHAT_FLAG])
+const PASSED_ON_FLAGS: ReadonlySet<string> = new Set([CHAT_FLAG, EVERY_FLAG])
 const SIGINT_EXIT_CODE = 130
 const SIGTERM_EXIT_CODE = 143
-const USAGE = 'Usage: josh run:board [--once | --chat | --every <minutes>]'
+const USAGE = 'Usage: josh run:board [--once | --chat | --every <minutes>] [--theme wargames]'
 const DISABLED_NOTICE = `\`${run_progress.DISABLED_KEY}=${run_progress.DISABLED_VALUE}\` is set, so no progress is pushed.`
 const TRAILING_NEWLINE = /\n$/u
 const { FRESH_STATE, tick } = run_board_tick
@@ -102,6 +105,9 @@ const LIVE_PORTS: Omit<BoardPorts, 'gather'> = {
 	},
 	on_exit,
 	sleep: async (ms) => {
+		await sleep(ms)
+	},
+	intro_sleep: async (ms) => {
 		await sleep(ms)
 	},
 }
@@ -177,9 +183,10 @@ async function watch(ports: BoardPorts): Promise<void> {
 
 	ports.write(screen.enter)
 	ports.on_exit(leave)
+	const gather = run_board_intro.after(ports.gather, run_board_intro.play(ports, keys))
 
 	try {
-		await redraw_forever({ ...ports, folded: keys.folded }, screen)
+		await redraw_forever({ ...ports, gather, folded: keys.folded }, screen)
 	} finally {
 		leave()
 	}
@@ -195,8 +202,8 @@ async function answer(ports: BoardPorts): Promise<void> {
 	await ports.mark()
 }
 
-function refuse(): number {
-	process.stderr.write(`${USAGE}\n`)
+function refuse(note = ''): number {
+	process.stderr.write(`${note}${USAGE}\n`)
 
 	return FAILURE_EXIT_CODE
 }
@@ -224,7 +231,9 @@ function ports_for(ports: BoardPorts | undefined, is_live: boolean): BoardPorts 
 	return ports ?? live_ports(is_live)
 }
 
-async function draw(flag: string, ports: BoardPorts | undefined): Promise<void> {
+// A board a person watches, in the theme; the chat's frame and `--every`'s are passed on as they are,
+// so they never take it.
+async function draw(flag: string, ports: BoardPorts | undefined, theme?: Theme): Promise<void> {
 	if (flag === CHAT_FLAG) {
 		await answer(ports_for(ports, false))
 
@@ -233,16 +242,17 @@ async function draw(flag: string, ports: BoardPorts | undefined): Promise<void> 
 
 	const { is_tty } = ports ?? LIVE_PORTS
 	const mode = run_board_screen.mode_of({ is_tty, is_once: flag === ONCE_FLAG })
+	const watched = run_board_theme.themed(ports_for(ports, mode === 'live'), theme)
 
 	if (mode === 'live') {
-		await watch(ports_for(ports, true))
+		await watch(watched)
 
 		return
 	}
 
 	// One plain frame stays on the terminal after the command, so it draws the still icons rather than a
 	// spinner frame frozen mid-turn.
-	await tick(FRESH_STATE, { ...ports_for(ports, false), is_tty: false, size: undefined })
+	await tick(FRESH_STATE, { ...watched, is_tty: false, size: undefined })
 }
 
 function is_every(flag: string, rest: ReadonlyArray<string>): boolean {
@@ -253,13 +263,22 @@ function is_refused(flag: string, rest: ReadonlyArray<string>): boolean {
 	return rest.length > 0 || !FLAGS.has(flag)
 }
 
+// `--chat` and `--every` never take the theme, so a `JOSH_BOARD_THEME` naming none never refuses them.
+function theme_environment(argv: ReadonlyArray<string>): NodeJS.ProcessEnv {
+	return argv.some((argument) => PASSED_ON_FLAGS.has(argument)) ? {} : process.env
+}
+
 async function run(argv: ReadonlyArray<string>, ports?: BoardPorts): Promise<number> {
-	const [flag = '', ...rest] = argv
+	const environment = theme_environment(argv)
+	const choice = run_board_theme.choose(argv, environment)
+
+	if (choice === undefined) return refuse(run_board_theme.refusal(argv, environment))
+	const [flag = '', ...rest] = choice.argv
 
 	if (is_every(flag, rest)) return await push_every(rest[0], ports_for(ports, false))
 	if (is_refused(flag, rest)) return refuse()
 
-	await draw(flag, ports)
+	await draw(flag, ports, choice.theme)
 
 	return SUCCESS_EXIT_CODE
 }

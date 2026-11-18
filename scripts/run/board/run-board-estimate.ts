@@ -1,9 +1,10 @@
+import { lane_host_gaps } from '#scripts/lane/lane-host-gaps'
 import { run_board_estimate_schedule, type Lanes } from './run-board-estimate-schedule'
 import { run_board_labels } from './run-board-labels'
 import { run_board_lane_totals, type LaneTotals } from './run-board-lane-totals'
 import { run_board_layout, type BoardLayout, type BoardRow } from './run-board-layout'
 import { run_board_phase, type Phase } from './run-board-phase'
-import type { ItemStatus } from './run-board-status'
+import type { ItemState, ItemStatus } from './run-board-status'
 import type { UsualTimes } from './run-board-usual'
 
 // When the run should finish, from how long lanes took from dispatch to merge
@@ -19,6 +20,9 @@ import type { UsualTimes } from './run-board-usual'
 const { HEADER_ICONS, WORDS, day_minute_of, minute_of } = run_board_labels
 const LEGEND = `${HEADER_ICONS.estimate} ${WORDS.estimate}`
 const ESTIMATE_MARK = '~'
+// A row whose finish nothing measures.
+const UNKNOWN = `${HEADER_ICONS.estimate} —`
+const FINISH_STATES: ReadonlySet<ItemState> = new Set(['running', 'human', 'parked'])
 // A failed ship sends its child back to implement, so it has that phase and every later one left.
 const FAILED_PHASE: Phase = 'failed'
 const RESUMED_PHASE: Phase = 'implement'
@@ -36,6 +40,17 @@ interface EstimateRead {
 	lane_limit?: number | undefined
 }
 
+// What says the run still moves, as the board's header carries it.
+interface RunMotion {
+	ended_ms: number | undefined
+	activity: { is_stopped: boolean }
+}
+
+interface RowFinish {
+	finish_ms: number
+	drift_ms: number
+}
+
 function usual_sum(phases: ReadonlyArray<Phase>, usual: UsualTimes): number {
 	return phases.reduce((sum, phase) => sum + (usual.get(phase) ?? 0), 0)
 }
@@ -47,12 +62,29 @@ function phase_of(status: ItemStatus | undefined): Phase {
 	return phase === FAILED_PHASE ? RESUMED_PHASE : phase
 }
 
+/**
+ * How long a child has stood at its phase up to `end_ms`, the host's stops in its `gaps` left out as
+ * the usual times leave them out (joshuafolkken/kit#7905); `undefined` where no event said when it got
+ * there.
+ */
+function phase_spent(status: ItemStatus | undefined, end_ms: number): number | undefined {
+	const phase_ms = status?.phase_ms
+
+	if (phase_ms === undefined) return undefined
+
+	const stopped_ms = lane_host_gaps.excluded_ms(status?.gaps ?? [], [
+		{ from_ms: phase_ms, to_ms: end_ms },
+	])
+
+	return end_ms - phase_ms - stopped_ms
+}
+
 // What a child longer than every measured lane has left: its phase's usual time less what it has spent
 // there, then every phase after it — more than zero short of its last phase.
 function phase_left(row: BoardRow, read: EstimateRead): number {
 	const usual = read.usual ?? NO_USUAL
 	const phase = phase_of(row.status)
-	const spent = read.now_ms - (row.status?.phase_ms ?? read.now_ms)
+	const spent = phase_spent(row.status, read.now_ms) ?? 0
 	const current = Math.max(0, (usual.get(phase) ?? 0) - spent)
 
 	return current + usual_sum(PATH.slice(PATH.indexOf(phase) + 1), usual)
@@ -107,6 +139,30 @@ function left_ms(read: EstimateRead): number | undefined {
 	return run_board_estimate_schedule.end_of(waiting, lanes_of(running, read, totals))
 }
 
+// When one running child should finish, from the same lane totals the run's finish reads
+// (joshuafolkken/kit#7920), and how far that has moved from what its launch alone foretold — the median
+// lane total after it. `undefined` where no lane total is measured.
+function row_finish(row: BoardRow, read: EstimateRead): RowFinish | undefined {
+	const totals = read.lane_totals ?? []
+
+	if (totals.length === 0) return undefined
+
+	const finish_ms = read.now_ms + running_left(row, read, totals)
+	const foretold_ms =
+		launch_of(row.status, read.now_ms) + (run_board_lane_totals.waiting_ms(totals) ?? 0)
+
+	return { finish_ms, drift_ms: finish_ms - foretold_ms }
+}
+
+// Whether a row ends on its finish (joshuafolkken/kit#7920): a running row, and one waiting on a person
+// or parked, while the run goes on — a stopped or ended run's header draws no 🎯, nor do its rows. An
+// earlier run's lane (🧳) draws none: this run's lane totals do not foretell it.
+function is_finish_drawn(row: BoardRow, run: RunMotion): boolean {
+	const is_moving = run.ended_ms === undefined && !run.activity.is_stopped
+
+	return is_moving && row.is_earlier !== true && FINISH_STATES.has(row.state)
+}
+
 // The local finish time, with its `MM-DD` when it falls on another day than now.
 function finish_of(now_ms: number, finish_ms: number): string {
 	const is_today = new Date(now_ms).toDateString() === new Date(finish_ms).toDateString()
@@ -114,16 +170,28 @@ function finish_of(now_ms: number, finish_ms: number): string {
 	return is_today ? minute_of(finish_ms) : day_minute_of(finish_ms)
 }
 
-// `🎯 ~14:32`, `🎯 ~10-19 02:05` on another day; `undefined` for an ended run or nothing to estimate.
+// `🎯 ~14:32`, `🎯 ~10-19 02:05` on another day.
+function stamp_of(now_ms: number, finish_ms: number): string {
+	return `${HEADER_ICONS.estimate} ${ESTIMATE_MARK}${finish_of(now_ms, finish_ms)}`
+}
+
+// The run's finish stamp, `undefined` for an ended run or nothing to estimate.
 function part_of(read: EstimateRead): string | undefined {
 	const left = read.ended_ms === undefined ? left_ms(read) : undefined
 
-	return left === undefined
-		? undefined
-		: `${HEADER_ICONS.estimate} ${ESTIMATE_MARK}${finish_of(read.now_ms, read.now_ms + left)}`
+	return left === undefined ? undefined : stamp_of(read.now_ms, read.now_ms + left)
 }
 
-const run_board_estimate = { LEGEND, left_ms, part_of }
+const run_board_estimate = {
+	LEGEND,
+	UNKNOWN,
+	is_finish_drawn,
+	left_ms,
+	part_of,
+	phase_spent,
+	row_finish,
+	stamp_of,
+}
 
 export { run_board_estimate }
-export type { EstimateRead }
+export type { EstimateRead, RowFinish }

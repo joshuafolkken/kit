@@ -31,6 +31,9 @@ interface EpicArgv {
 interface FormFlags {
 	switches: ReadonlyArray<string>
 	value_flags?: ReadonlyArray<string>
+	// Value flags whose repeats are the point — each `--chain` names one more chain — so a repeat is
+	// read as a list rather than refused.
+	list_flags?: ReadonlyArray<string>
 }
 
 function options_of(form: FormFlags): ParseArgsOptionsConfig {
@@ -38,7 +41,7 @@ function options_of(form: FormFlags): ParseArgsOptionsConfig {
 
 	const entries: Array<OptionEntry> = [
 		...form.switches.map((flag): OptionEntry => [cli_flags.option_name(flag), SWITCH_OPTION]),
-		...(form.value_flags ?? []).map((flag): OptionEntry => [
+		...[...(form.value_flags ?? []), ...(form.list_flags ?? [])].map((flag): OptionEntry => [
 			cli_flags.option_name(flag),
 			VALUE_OPTION,
 		]),
@@ -129,6 +132,7 @@ const epic_cli_argv = {
 	read_form,
 	positionals_of,
 	read_flag_value,
+	values_of_flag,
 	is_switch_set,
 	count_flag,
 	is_value_unusable,

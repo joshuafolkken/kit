@@ -1,0 +1,123 @@
+import { run_board_labels, type Paint } from './run-board-labels'
+import type { BoardPorts } from './run-board-state'
+
+// joshuafolkken/kit#7934: a theme for the board a person watches — `wargames` draws the text no color
+// is given in phosphor green and every rule as a run of `-`, so each character of a line shows. It is
+// put on the frame as it is written, once, so no render module carries it; a color a render module
+// gives (red, yellow, …) is kept, the green resumed after it.
+
+const THEME_FLAG = '--theme'
+const THEME_ENV = 'JOSH_BOARD_THEME'
+const THEMES = ['wargames'] as const
+const THEME_NAMES: ReadonlySet<string> = new Set(THEMES)
+// The green of a NORAD console's phosphor in 24-bit color, else the palette's own green.
+const PHOSPHOR: Paint = { rgb: '51;255;51', named: 'green' }
+const RULE = '─'
+const DASH = '-'
+// The escapes that end a color and fall back to the terminal's default foreground: the default
+// foreground itself, and a reset.
+const DEFAULT_FOREGROUND = '\u{1B}[39m'
+const RESET = '\u{1B}[0m'
+
+type Theme = (typeof THEMES)[number]
+
+interface Named {
+	name: string | undefined
+	argv: Array<string>
+}
+
+interface ThemeChoice {
+	theme: Theme | undefined
+	argv: Array<string>
+}
+
+function is_theme(name: string): name is Theme {
+	return THEME_NAMES.has(name)
+}
+
+// `--theme <name>` and the arguments left without it; a flag with no name names `''`, which no theme is.
+function from_flag(argv: ReadonlyArray<string>): Named | undefined {
+	const at = argv.indexOf(THEME_FLAG)
+
+	if (at === -1) return undefined
+
+	return {
+		name: argv[at + 1] ?? '',
+		argv: argv.filter((_, index) => index !== at && index !== at + 1),
+	}
+}
+
+function from_environment(argv: ReadonlyArray<string>, environment: NodeJS.ProcessEnv): Named {
+	const name = environment[THEME_ENV]
+
+	return { name: name === '' ? undefined : name, argv: [...argv] }
+}
+
+// The theme `--theme` names, else `JOSH_BOARD_THEME`, with the arguments left; `undefined` for a name
+// no theme has.
+function choose(
+	argv: ReadonlyArray<string>,
+	environment: NodeJS.ProcessEnv,
+): ThemeChoice | undefined {
+	const { name, argv: rest } = from_flag(argv) ?? from_environment(argv, environment)
+
+	if (name === undefined) return { theme: undefined, argv: rest }
+
+	return is_theme(name) ? { theme: name, argv: rest } : undefined
+}
+
+// The line that names `JOSH_BOARD_THEME` where it, not `--theme`, gave the name `choose` refused.
+function refusal(argv: ReadonlyArray<string>, environment: NodeJS.ProcessEnv): string {
+	if (argv.includes(THEME_FLAG)) return ''
+
+	return `${THEME_ENV}=${environment[THEME_ENV] ?? ''} names no theme (${THEMES.join(', ')})\n`
+}
+
+// The escape that opens the green, as `painted` draws it — `''` where stdout draws no color, so the
+// theme draws no escape where the board's own colors would not.
+function green_open(): string {
+	const sample = run_board_labels.painted(PHOSPHOR, DASH)
+
+	return sample.slice(0, sample.indexOf(DASH))
+}
+
+function greened(open: string, line: string): string {
+	if (open === '' || line === '') return line
+
+	const resumed = line
+		.split(DEFAULT_FOREGROUND)
+		.join(open)
+		.split(RESET)
+		.join(RESET + open)
+
+	return open + resumed + DEFAULT_FOREGROUND
+}
+
+function restyle(theme: Theme | undefined, frame: string): string {
+	if (theme === undefined) return frame
+	const open = green_open()
+
+	return frame
+		.split(RULE)
+		.join(DASH)
+		.split('\n')
+		.map((line) => greened(open, line))
+		.join('\n')
+}
+
+// Ports whose every write is put through the theme.
+function themed<P extends Pick<BoardPorts, 'write'>>(ports: P, theme: Theme | undefined): P {
+	if (theme === undefined) return ports
+
+	return {
+		...ports,
+		write: (frame: string) => {
+			ports.write(restyle(theme, frame))
+		},
+	}
+}
+
+const run_board_theme = { THEME_ENV, choose, refusal, restyle, themed }
+
+export { run_board_theme }
+export type { Theme }

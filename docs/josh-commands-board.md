@@ -93,16 +93,18 @@ pnpm josh run:progress --interval 20 --repo joshuafolkken/app-kit --hours 4
 Draw a live board of the running backlogrun, redrawn every second.
 
 ```bash
-pnpm josh run:board             # redraw until interrupted
-pnpm josh run:board --once      # one frame, then exit
-pnpm josh run:board --chat      # one frame for a chat, recorded as a progress report
-pnpm josh run:board --every 5   # the --chat frame as a 📊 Progress Telegram every 5 minutes, until the run ends
+pnpm josh run:board                    # redraw until interrupted
+pnpm josh run:board --once             # one frame, then exit
+pnpm josh run:board --chat             # one frame for a chat, recorded as a progress report
+pnpm josh run:board --every 5          # the --chat frame as a 📊 Progress Telegram every 5 minutes, until the run ends
+pnpm josh run:board --theme wargames   # green text and dashed rules
 ```
 
 **Options:**
 
 - `--chat` — answers a `backlogrun`, `fullrun` or `halfrun` progress question: the frame `--once` draws, with only `🧠` on the machine line and no escapes; it records the report as `run:progress --mark` does.
 - `--every <minutes>` — sends the `--chat` frame as a `📊 Progress` Telegram now and every `<minutes>` until the run ends — only when a person asks for it.
+- `--theme wargames` — draws the text no color is given in phosphor green and every rule as `-`; `JOSH_BOARD_THEME=wargames` sets it for every board, the one `backlogrun` opens included, and `--theme` wins over it. An unknown name is refused. `--chat` and `--every` never take it.
 
 <!-- /usage -->
 
@@ -122,6 +124,8 @@ The first line is how far the run is: `⏰` elapsed in degree-minute-second form
 
 The second line is what the run is on: `💓` age of the newest event (yellow past 15 quiet minutes, red past 30), and machine gauges (`💪` CPU, `🧠` memory, `💾` swap rate). `⏰` and `💓` share a column, digits right-aligned; both lines' first bars start in one.
 
+While a running run's stream holds an outage with no `online` after it, last seen (`offline` or `offline-tick`) within two sampler ticks, `📴` (named in the legend) stands in the `💓`'s place with the time since the network went down, in yellow. The connection events never count as the `💓`'s newest event.
+
 The third line is what the run is doing now: a spinner, its age, then the kind's icon and words — the repository's name alone while the stream holds no event.
 
 - **At a stage** — the stage's words then why: `⠸  2′31″  🤔 waiting on judgment — 4 waiting`.
@@ -131,7 +135,7 @@ The third line is what the run is doing now: a spinner, its age, then the kind's
 - **Watching** — nothing running and no stage: `24′10″  🔭 watching — pool empty`, counted from the newest thing the run did (a merge, a park, the drain, or the stage it last stood at).
 - **Ended** — the newest thing the run did, in that event's words, timed up to the end: `42″  🔚 backlog drained`.
 
-Below the header: the `📈 throughput` section, `24h` in hourly cells and `7d` in 12-hour cells (a sparkline of closes per cell scaled to the row's peak, `┊` a stopped cell; `⚡` closes per active hour over complete cells, `🟢` active hours, `✅` closes, `🏔` the peak cell's rate and start, `🔄` closes this hour; folded with `t`); then the `⛽ usage` section, Claude's and Codex's 5h and 7d gauges (window label, percent, `┊` at even pace, `≈N` tasks left at the spend per task of the last ten done logs (its derivation: the rationale's "`josh run:board` in detail"), the reset time, and `N′` the reading's age once it is over ten minutes old; read off lane logs and Codex rollout files, no API asked; folded with `u`), and GitHub's `rest` and `graphql` allowances in the same columns, the calls left in place of `≈N`, then a row per touched child (phase icon, time net of host sleeps per `lane:net`, `(+2′30″)` the sleeps, CPU and memory), then an earlier run's lane holding a place (drawn alike, `🧳` after its title, never counted as the run's) and `❔` a lane with no lane state record (counted in use, its state unknown), the children not yet started under one `⏳ queued` heading, waiting and parked children, and the newest filings, parks and notes, with a legend at the foot.
+Below the header: the `📈 throughput` section, `24h` in hourly cells and `7d` in 12-hour cells (a sparkline of closes per cell scaled to the row's peak, `┊` a stopped cell; `⚡` closes per active hour over complete cells, `🟢` active hours, `✅` closes, `🏔` the peak cell's rate and start, `🔄` closes this hour; folded with `t`); then the `⛽ usage` section, Claude's and Codex's 5h and 7d gauges (window label, percent, `┊` at even pace, `≈N` tasks left at the spend per task of the last ten done logs (its derivation: the rationale's "`josh run:board` in detail"), the reset time, and `N′` the reading's age once it is over ten minutes old; read off lane logs and Codex rollout files, no API asked; folded with `u`), and GitHub's `rest` and `graphql` allowances in the same columns, the calls left in place of `≈N`, then a row per touched child (phase icon, time net of host stops per `lane:net`, `(+2′30″)` the sleeps and network outages joined (an outage to a tick, only since the probe began), CPU and memory, ending on `🎯 ~HH:MM` its finish from the lane totals the header's 🎯 reads, `MM-DD HH:MM` on another day, with `+N′` past a minute later than the finish its launch foretold (the median lane total — a lane running longer only moves it later); `🎯 —` where no lane total is measured, and after a decision or parked row's reason), then an earlier run's lane holding a place (drawn alike, `🧳` after its title, never counted as the run's) and `❔` a lane with no lane state record (counted in use, its state unknown), the children not yet started under one `⏳ queued` heading, waiting and parked children, and the newest filings, parks and notes, with a legend at the foot.
 
 A fold persists across launches, saved to `~/.claude/josh/board.json` (under `$CLAUDE_CONFIG_DIR` if set), shared by every repository; the next live board starts from it. Several boards open at once leave the last fold.
 

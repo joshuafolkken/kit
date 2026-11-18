@@ -1,4 +1,5 @@
 import { git_fixture_workspace, type FixtureWorkspace } from '#scripts/git/git-fixture-workspace'
+import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { test_pinned } from './test-pinned'
 import { test_pinned_fixture } from './test-pinned-fixture'
@@ -76,6 +77,30 @@ describe('test_pinned.run real remaining verdicts', () => {
 
 			expect(pinned.unpinned).toEqual([])
 			expect(test_pinned_logic.has_unchecked(pinned)).toBe(false)
+		},
+		RUN_TIMEOUT,
+	)
+})
+
+// joshuafolkken/kit#7809: the run's ledger row says it ran cut, where it stopped and on which tree.
+describe('test_pinned.run ledger row', () => {
+	it(
+		'writes the cut run, its stop and its work tree, and none of them on a whole run',
+		async () => {
+			await build_green()
+			const rows = vi.spyOn(lane_ledger_write, 'record_test_pinned').mockResolvedValue()
+			const first = await test_pinned.run(test_pinned_logic.DEFAULT_MAX_HUNKS, true)
+
+			expect(rows).toHaveBeenLastCalledWith(
+				expect.objectContaining({ first_unpinned: true, cut: 1, tree_hash: first.tree_hash }),
+			)
+			await test_pinned.run(test_pinned_logic.DEFAULT_MAX_HUNKS, false, 'pre-detach', true)
+
+			const whole = rows.mock.lastCall?.[0]
+
+			expect(whole).toMatchObject({ reasoned: true, tree_hash: expect.any(String) })
+			expect(whole).not.toHaveProperty('first_unpinned')
+			expect(whole).not.toHaveProperty('cut')
 		},
 		RUN_TIMEOUT,
 	)

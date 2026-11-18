@@ -40,7 +40,7 @@ const DEFAULT_FOREGROUND = `${ESC}[39m`
 // - a column heading in capitals — `ACTIVE`, `DONE`, `PEAK`, `NOW`, `CPU`, `MEM`, `CMPRS` — so the
 //   `✅ DONE` column reads apart from the `✅ done 18` section on the same rule;
 // - a section name, a state word or a legend entry in lower case — `throughput`, `usage`, `lanes`,
-//   `queued`, `over budget`;
+//   `queued`, `estimated finish`;
 // - a command, a repository, a unit or an OS process as it is spelled — `backlogrun`, `kit`, `24h`,
 //   `7d`, `/h`, `node`, the processes line's `claude`;
 // - a marker followed by one space — `▶ GraphQL`, as `▶ backlogrun`.
@@ -110,6 +110,7 @@ const WORDS = {
 	note: 'note',
 	found_during: ' (found during {n})',
 	overrun: 'overrun investigation',
+	offline: 'offline',
 	// What the run is doing now, where no stage of its own says it.
 	watching: 'watching',
 	pool_empty: 'pool empty',
@@ -241,6 +242,7 @@ const HEADER_ICONS = {
 	loading: '⏳',
 	elapsed: '⏰',
 	heartbeat: '💓',
+	offline: '📴',
 	// A failed plan read: ❗ rather than ⚠, a text symbol drawn two columns wide over the blank after it.
 	warning: '❗',
 	// The estimated finish: 🎯 rather than 🏁, a done row's state icon, so the legend names each once

@@ -1,0 +1,7 @@
+{
+	"reason": "#7961 adds the cut-short result predicate so a killed or timed-out check:related is not counted as run",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 6
+	}
+}

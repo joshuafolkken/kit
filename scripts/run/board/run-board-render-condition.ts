@@ -1,3 +1,4 @@
+import { run_board_estimate } from './run-board-estimate'
 import { run_board_fit } from './run-board-fit'
 import { run_board_fresh } from './run-board-fresh'
 import type { BoardHeader } from './run-board-header'
@@ -74,13 +75,23 @@ function evidence_linked(text: string, url: string, header: BoardHeader): string
 	return header.comment_link?.(text, url) ?? text
 }
 
-function tail_of(row: BoardRow, cut: number, header: BoardHeader): string {
+function reason_of(row: BoardRow, cut: number, header: BoardHeader): string {
 	const text = run_board_render_title.reason_text(row, cut) ?? ''
 	const url = row.reason?.evidence_url
 
 	return url === undefined
 		? pr_linked(text, row.reason?.pr, header)
 		: evidence_linked(text, url, header)
+}
+
+// The reason, then `🎯 —` for a row waiting on a person or parked, whose finish nothing measures
+// (joshuafolkken/kit#7920).
+function tail_of(row: BoardRow, cut: number, header: BoardHeader): string {
+	// A running row's finish ends its own tail (`run-board-render-tail.ts`).
+	const is_held = row.state !== 'running' && run_board_estimate.is_finish_drawn(row, header)
+	const parts = [reason_of(row, cut, header), is_held ? run_board_estimate.UNKNOWN : '']
+
+	return parts.filter((part) => part !== '').join(' ')
 }
 
 // A finished row's end, `MM-DD HH:MM`, emphasized while fresh (joshuafolkken/kit#4292); blank where

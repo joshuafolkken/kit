@@ -4,7 +4,7 @@ import type { BoardRow } from './run-board-layout'
 import { run_board_render } from './run-board-render'
 import { run_board_render_fixture } from './run-board-render-fixture'
 
-const { EMPTY_LAYOUT, header } = run_board_render_fixture
+const { EMPTY_LAYOUT, header, unfinished } = run_board_render_fixture
 const ISSUE = 6253
 const COLUMNS = 65
 const ROWS = 100
@@ -63,7 +63,7 @@ describe('run board decision tails', () => {
 
 			expect(line).toContain('…')
 			expect(line).not.toContain(TITLE)
-			expect(line.endsWith(is_waiting ? WAITING : QUESTION)).toBe(true)
+			expect(unfinished(line).endsWith(is_waiting ? WAITING : QUESTION)).toBe(true)
 		},
 	)
 })

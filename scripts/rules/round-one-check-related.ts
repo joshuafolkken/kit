@@ -73,10 +73,22 @@ function block_events(block: Block): ReadonlyArray<RoundEvent> {
 	return is_edit ? ['edit'] : []
 }
 
-// The calls that ran: a result came back and no guard refused it. The call a hook is deciding is
-// already in the transcript, with no result yet.
+// A call cut short before it finished (joshuafolkken/kit#7961): the harness writes a timeout as
+// `Exit code 143` over `Command timed out after …`, an outside kill as `Exit code 137`, and a stop
+// as `[Request interrupted …`. A red run that finished exits 1–3 and still counts as run.
+const CUT_SHORT_RESULT =
+	/^(?:Exit code (?:137|143)$|Command timed out after |\[Request interrupted)/mu
+
+function is_ran_result(block: Block): boolean {
+	if (block.result_id === '' || block.refusal_guard !== '') return false
+
+	return !CUT_SHORT_RESULT.test(block.error_text)
+}
+
+// The calls that ran: a result came back, no guard refused it and it was not cut short. The call
+// a hook is deciding is already in the transcript, with no result yet.
 function ran_call_ids(blocks: ReadonlyArray<Block>): ReadonlySet<string> {
-	const results = blocks.filter((block) => block.result_id !== '' && block.refusal_guard === '')
+	const results = blocks.filter((block) => is_ran_result(block))
 
 	return new Set(results.map((block) => block.result_id))
 }

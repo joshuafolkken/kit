@@ -392,6 +392,7 @@ pnpm josh test:pinned --max 5               # check at most 5 hunks; the rest co
 pnpm josh test:pinned --record <token>      # also leave the answer, under the launch token, for run:review --join
 pnpm josh test:pinned --origin pre-detach   # name what started the run on its lane ledger row (default manual)
 pnpm josh test:pinned --first-unpinned      # start no probe once one hunk is unpinned; the rest count as unchecked
+pnpm josh test:pinned --reasoned            # mark the run on its lane ledger row as launched under an --unpinned-ok reason
 ```
 
 <!-- /usage -->

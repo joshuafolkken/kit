@@ -120,6 +120,38 @@ describe('run_board_estimate.left_ms for a child longer than every lane', () => 
 	})
 })
 
+// joshuafolkken/kit#7905: time the host stopped is no time spent at the phase.
+describe('run_board_estimate.phase_spent', () => {
+	const GAPS = [{ from_ms: NOW - 4 * MINUTE, to_ms: NOW - MINUTE }]
+
+	function slept(phase: Phase, spent: number): BoardRow {
+		const base = running(1, phase, spent, 50)
+
+		return { ...base, status: { ...base.status, state: 'running', gaps: GAPS } }
+	}
+
+	it('leaves the host stops inside the phase out of the time spent there', () => {
+		const awake = run_board_estimate.phase_spent(running(1, 'gate', 5).status, NOW)
+		const asleep = run_board_estimate.phase_spent(slept('gate', 5).status, NOW)
+
+		expect(awake).toBe(5 * MINUTE)
+		expect(asleep).toBe(2 * MINUTE)
+	})
+
+	it('is undefined where no event said when the child got to its phase', () => {
+		expect(run_board_estimate.phase_spent(undefined, NOW)).toBeUndefined()
+	})
+
+	it('leaves the stopped time on the phase’s usual time in the fallback', () => {
+		const asleep = read({ active: [slept('gate', 5)] })
+		const awake = read({ active: [running(1, 'gate', 5, 50)] })
+
+		// 6′ − 2′ net of the gate, then the followup’s 4′.
+		expect(run_board_estimate.left_ms(asleep)).toBe(8 * MINUTE)
+		expect(run_board_estimate.left_ms(awake)).toBe(5 * MINUTE)
+	})
+})
+
 describe('run_board_estimate.left_ms for the queue', () => {
 	it('stacks each waiting child onto the lane that frees first', () => {
 		const active = [running(1, 'gate', 0, 25)]
@@ -170,6 +202,59 @@ describe('run_board_estimate.left_ms with nothing to estimate', () => {
 		const unread = read({}, { layout: undefined })
 
 		expect(run_board_estimate.left_ms(unread)).toBeUndefined()
+	})
+})
+
+describe('run_board_estimate.row_finish', () => {
+	it('finishes a running child when the header reads it as finishing', () => {
+		const child = running(1, 'implement', 5)
+
+		expect(run_board_estimate.row_finish(child, read({}))?.finish_ms).toBe(NOW + 25 * MINUTE)
+	})
+
+	it('draws no drift for a child just launched', () => {
+		expect(run_board_estimate.row_finish(running(1, 'implement', 0), read({}))?.drift_ms).toBe(0)
+	})
+
+	it('draws a later finish for a child running past the median total', () => {
+		// Done in 10′, 5′ past the 30′ median from its launch 25′ ago.
+		const child = running(1, 'gate', 0, 25)
+
+		expect(run_board_estimate.row_finish(child, read({}))?.drift_ms).toBe(5 * MINUTE)
+	})
+
+	it('estimates nothing without a measured lane total', () => {
+		const finish = run_board_estimate.row_finish(
+			running(1, 'implement', 5),
+			read({}, { lane_totals: [] }),
+		)
+
+		expect(finish).toBeUndefined()
+	})
+})
+
+describe('run_board_estimate.is_finish_drawn', () => {
+	const MOVING = { ended_ms: undefined, activity: { is_stopped: false } }
+
+	it.each(['running', 'human', 'parked'] as const)('draws a finish on a %s row', (state) => {
+		expect(run_board_estimate.is_finish_drawn(row(1, state), MOVING)).toBe(true)
+	})
+
+	it('draws none on a done row', () => {
+		expect(run_board_estimate.is_finish_drawn(row(1, 'done'), MOVING)).toBe(false)
+	})
+
+	it('draws none on an earlier run’s lane', () => {
+		const earlier = { ...running(1, 'implement', 5), is_earlier: true }
+
+		expect(run_board_estimate.is_finish_drawn(earlier, MOVING)).toBe(false)
+	})
+
+	it.each([
+		['an ended', { ended_ms: NOW, activity: { is_stopped: false } }],
+		['a stopped', { ended_ms: undefined, activity: { is_stopped: true } }],
+	])('draws none while %s run', (_name, run) => {
+		expect(run_board_estimate.is_finish_drawn(running(1, 'implement', 5), run)).toBe(false)
 	})
 })
 
