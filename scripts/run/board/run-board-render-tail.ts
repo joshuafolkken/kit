@@ -1,8 +1,8 @@
 import { styleText } from 'node:util'
-import { lane_stage_budget, type BudgetStage } from '#scripts/lane/lane-stage-budget'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import type { PrChecks } from '#scripts/run/event/run-event-checks'
 import { run_board_earlier } from './run-board-earlier'
+import { run_board_estimate } from './run-board-estimate'
 import type { BoardHeader } from './run-board-header'
 import { run_board_header_time } from './run-board-header-time'
 import { run_board_labels, type TextColor } from './run-board-labels'
@@ -29,7 +29,8 @@ const ALARM_FACTOR = 3
 // report) is near zero, and scaled as it is it would draw a healthy few-second stage as alarming.
 const USUAL_FLOOR_MINUTES = 2
 const USUAL_FLOOR_MS = USUAL_FLOOR_MINUTES * MS_PER_MINUTE
-const OVER_WORDS = 'over budget'
+// A finish moved by no more than this many minutes draws no drift.
+const DRIFT_FLOOR_MINUTES = 1
 
 interface TimedActivity {
 	icon: string
@@ -174,39 +175,27 @@ function is_tailed(row: BoardRow): boolean {
 	return is_live(row)
 }
 
-// The lane budget each phase counts against (`lane-stage-budget.ts`); the report and a failure none.
-const PHASE_BUDGETS: Partial<Record<Phase, BudgetStage>> = {
-	investigate: 'plan',
-	plan: 'plan',
-	implement: 'implement',
-	ship: 'ship',
-	sync: 'ship',
-	review: 'ship',
-	gate: 'ship',
-	commit: 'ship',
-	round_two: 'ship',
-	followup: 'followup',
+// How far a row's finish moved from its launch's, in whole minutes: `+N′` later, `−N′` sooner, none
+// within a minute.
+function drift_of(drift_ms: number): string {
+	const minutes = Math.round(drift_ms / MS_PER_MINUTE)
+
+	if (Math.abs(minutes) <= DRIFT_FLOOR_MINUTES) return ''
+
+	return minutes > 0 ? ` +${String(minutes)}′` : ` −${String(-minutes)}′`
 }
 
-function over_of(phase: Phase, elapsed_ms: number): number | undefined {
-	const budget = PHASE_BUDGETS[phase]
+// A running row's finish, `🎯 ~14:52 +21′` (joshuafolkken/kit#7920) — the run's finish read for this
+// lane alone, so it moves as the lane does; `🎯 —` where no lane total is measured.
+function finish_part(row: BoardRow, header: BoardHeader): string {
+	const finish = run_board_estimate.row_finish(row, header)
 
-	return budget === undefined ? undefined : lane_stage_budget.over_minutes(budget, elapsed_ms)
+	if (finish === undefined) return run_board_estimate.UNKNOWN
+
+	return `${run_board_estimate.stamp_of(header.now_ms, finish.finish_ms)}${drift_of(finish.drift_ms)}`
 }
 
-// What the running phase has run past its share of the lane budget, as `over budget +N′`
-// (joshuafolkken/kit#5563) — words, not a glyph, since 🔺 is the priority cell's; none within it. The
-// phase's own time is a lower bound of its stage's, and counts host sleep as the phase time beside it
-// does, which `lane:breakdown` takes out.
-function over_part(row: BoardRow, header: BoardHeader): Array<string> {
-	const current = is_live(row) ? current_of(row) : undefined
-	const over =
-		current === undefined ? undefined : over_of(current.phase, header.now_ms - current.since_ms)
-
-	return over === undefined ? [] : [`${OVER_WORDS} +${String(over)}′`]
-}
-
-// A running row's end before its budget part — the check its held lane waits to run, its pull
+// A running row's end before its finish — the check its held lane waits to run, its pull
 // request's checks in followup, or its newest activity.
 function end_of(row: BoardRow, header: BoardHeader): Array<string> {
 	const held = held_of(row, header)
@@ -220,9 +209,13 @@ function end_of(row: BoardRow, header: BoardHeader): Array<string> {
 	return [activity_part(row, header)]
 }
 
-// A running row's end, then what its phase ran past its budget; nothing for any other row.
+// A running row's end, then its finish while the run goes on; nothing for any other row.
 function tail_of(row: BoardRow, header: BoardHeader): Array<string> {
-	return is_tailed(row) ? [...end_of(row, header), ...over_part(row, header)] : []
+	if (!is_tailed(row)) return []
+
+	const finish = run_board_estimate.is_finish_drawn(row, header) ? [finish_part(row, header)] : []
+
+	return [...end_of(row, header), ...finish]
 }
 
 // The icon a row's end draws for its newest activity, so the legend names it — none where the row
@@ -234,6 +227,7 @@ function activity_icon(row: BoardRow, header: BoardHeader): string | undefined {
 const run_board_render_tail = {
 	activity_icon,
 	checks_of,
+	drift_of,
 	phase_icon,
 	phase_time,
 	tail_of,

@@ -684,7 +684,7 @@ const PURE_FILES: ReadonlyArray<string> = [
 	'scripts/run/board/run-board-render-slot.test.ts',
 	'scripts/run/board/run-board-render-solo.test.ts',
 	'scripts/run/board/run-board-render-stress.test.ts',
-	'scripts/run/board/run-board-render-tail-budget.test.ts',
+	'scripts/run/board/run-board-render-tail-finish.test.ts',
 	'scripts/run/board/run-board-render-thanks.test.ts',
 	'scripts/run/board/run-board-render-throughput.test.ts',
 	'scripts/run/board/run-board-render-time.test.ts',

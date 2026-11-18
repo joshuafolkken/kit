@@ -12,7 +12,7 @@ import { run_board_render } from './run-board-render'
 import { run_board_render_fixture } from './run-board-render-fixture'
 import type { ItemStatus } from './run-board-status'
 
-const { NOW, STARTED, header } = run_board_render_fixture
+const { NOW, STARTED, header, unfinished } = run_board_render_fixture
 const ISSUE = 7387
 const URL = 'https://github.com/joshuafolkken/kit/issues/7387#issuecomment-6818874860'
 const SUMMARY = 'Approval needed: defer impact study'
@@ -64,7 +64,8 @@ describe('run_board_render pause reasons', () => {
 		const linked = line_of(status)
 		const plain = line_of(status, WIDTH, false)
 		const visible = stripVTControlCharacters(linked)
-		const tail = visible.split('  ').at(-1)?.trim() ?? ''
+		// The reason before the `🎯 —` a parked row ends on (joshuafolkken/kit#7920).
+		const tail = unfinished(visible).split('  ').at(-1)?.trim() ?? ''
 
 		expect(linked).toContain(osc8(tail, URL))
 		expect(visible).toBe(stripVTControlCharacters(plain))
