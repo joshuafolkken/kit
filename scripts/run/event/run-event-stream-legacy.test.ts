@@ -51,7 +51,7 @@ describe('run_event_stream — a line of the retired idle kind', () => {
 			setup: undefined,
 			setup_ms: undefined,
 			last_event_ms: Date.parse(LAUNCHED_AT),
-			offline_since_ms: undefined,
+			outage: undefined,
 			latest: { text: LAUNCH, at_ms: Date.parse(LAUNCHED_AT) },
 			idle_ms: Date.parse(LAUNCHED_AT),
 			is_stopped: false,

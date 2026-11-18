@@ -1,4 +1,5 @@
 import { styleText } from 'node:util'
+import { lane_offline_spans, type Outage } from '#scripts/lane/lane-offline-spans'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import type { RunActivity } from './run-board-activity'
 import { run_board_fit } from './run-board-fit'
@@ -28,7 +29,7 @@ interface TimeHeader {
 	now_ms: number
 	started_ms: number
 	ended_ms: number | undefined
-	activity: Pick<RunActivity, 'last_event_ms' | 'offline_since_ms'>
+	activity: Pick<RunActivity, 'last_event_ms' | 'outage' | 'is_stopped'>
 	spinner: string | undefined
 	form: 'screen' | 'chat'
 }
@@ -54,20 +55,28 @@ function age_of(header: TimeHeader): number | undefined {
 	return header.now_ms - last
 }
 
-// How long the network has been down, while the run's stream leaves an outage open
-// (joshuafolkken/kit#7895). An ended run keeps its end mark, so its outage is not drawn.
-function offline_age(
-	header: Pick<TimeHeader, 'now_ms' | 'ended_ms' | 'activity'>,
-): number | undefined {
-	const since = header.activity.offline_since_ms
+type OutageHeader = Pick<TimeHeader, 'now_ms' | 'ended_ms' | 'activity'>
 
-	if (since === undefined || header.ended_ms !== undefined) return undefined
+// The outage the run's stream leaves open (joshuafolkken/kit#7895), while it says the network is down
+// now. An ended or stopped run keeps its own mark, and an outage its sampler no longer sees stands for
+// nothing now — either drawn on would hide a hang behind an ever-growing `📴`.
+function open_outage(header: OutageHeader): Outage | undefined {
+	const { outage, is_stopped } = header.activity
 
-	return header.now_ms - since
+	if (outage === undefined || is_stopped || header.ended_ms !== undefined) return undefined
+
+	return lane_offline_spans.is_current(outage, header.now_ms) ? outage : undefined
+}
+
+// How long the network has been down, while an outage is drawn.
+function offline_age(header: OutageHeader): number | undefined {
+	const outage = open_outage(header)
+
+	return outage === undefined ? undefined : header.now_ms - outage.from_ms
 }
 
 // Whether the `💓` gives way to the `📴` — the legend names it only then.
-function is_offline(header: Pick<TimeHeader, 'now_ms' | 'ended_ms' | 'activity'>): boolean {
+function is_offline(header: OutageHeader): boolean {
 	return offline_age(header) !== undefined
 }
 

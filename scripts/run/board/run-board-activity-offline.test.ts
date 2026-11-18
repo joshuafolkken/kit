@@ -20,17 +20,20 @@ function event_of(kind: string, minute: number): RunEvent {
 const LAUNCH = event_of(KIND.CHILD_LAUNCH, 0)
 
 describe('run_board_activity.activity_of -- offline', () => {
-	it('reads when the open outage began', () => {
+	it('reads the open outage: when it began and when it was last seen', () => {
 		const events = [LAUNCH, event_of(KIND.OFFLINE, 1), event_of(KIND.OFFLINE_TICK, 2)]
 
-		expect(run_board_activity.activity_of(events).offline_since_ms).toBe(at(1))
+		expect(run_board_activity.activity_of(events).outage).toStrictEqual({
+			from_ms: at(1),
+			down_ms: at(2),
+		})
 	})
 
 	it('reads no outage after the recovery, nor where no turn was written', () => {
 		const recovered = [LAUNCH, event_of(KIND.OFFLINE, 1), event_of(KIND.ONLINE, 2)]
 
-		expect(run_board_activity.activity_of(recovered).offline_since_ms).toBeUndefined()
-		expect(run_board_activity.activity_of([LAUNCH]).offline_since_ms).toBeUndefined()
+		expect(run_board_activity.activity_of(recovered).outage).toBeUndefined()
+		expect(run_board_activity.activity_of([LAUNCH]).outage).toBeUndefined()
 	})
 
 	it('leaves the connection turns out of the newest event', () => {

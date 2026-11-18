@@ -74,9 +74,17 @@ function spans(events: ReadonlyArray<RunEvent>): Array<LaneSpan> {
 	return outages_of(events).map((outage) => span_of(outage))
 }
 
-/** When the outage `events` still leave open began; `undefined` while the network is up. */
-function open_since(events: ReadonlyArray<RunEvent>): number | undefined {
-	return open_of(outages_of(events))?.from_ms
+/** The outage `events` leave with no recovery; `undefined` while the network is up. */
+function open_outage(events: ReadonlyArray<RunEvent>): Outage | undefined {
+	return open_of(outages_of(events))
+}
+
+/**
+ * Whether `outage` is still being seen at `now_ms`: past two ticks with no sighting, the drive that saw
+ * it stopped, so it says nothing about the network now.
+ */
+function is_current(outage: Outage, now_ms: number): boolean {
+	return continues(outage, now_ms)
 }
 
 /** Whether `kind` is one of the connection turns, which are not the run's own activity. */
@@ -93,6 +101,14 @@ function ends_online(events: ReadonlyArray<RunEvent>): boolean {
 	return turn?.kind !== EVENT_KIND.OFFLINE
 }
 
-const lane_offline_spans = { SAMPLE_INTERVAL_MS, ends_online, is_turn, open_since, spans }
+const lane_offline_spans = {
+	SAMPLE_INTERVAL_MS,
+	ends_online,
+	is_current,
+	is_turn,
+	open_outage,
+	spans,
+}
 
 export { lane_offline_spans }
+export type { Outage }

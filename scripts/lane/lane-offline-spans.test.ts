@@ -57,20 +57,28 @@ describe('lane_offline_spans.spans', () => {
 	})
 })
 
-// joshuafolkken/kit#7895: the board reads when the outage still open began, and which kinds are turns.
-describe('lane_offline_spans.open_since', () => {
-	it('reads the start of an outage with no recovery, and none once recovered', () => {
+// joshuafolkken/kit#7895: the board reads the outage still open, whether its sampler still sees it, and
+// which kinds are turns.
+describe('lane_offline_spans.open_outage', () => {
+	it('reads an outage with no recovery, and none once recovered', () => {
 		const down = [turn(OFFLINE, 1), turn(STILL_OFFLINE, 2)]
 
-		expect(lane_offline_spans.open_since(down)).toBe(at(1))
-		expect(lane_offline_spans.open_since([...down, turn(ONLINE, 3)])).toBeUndefined()
-		expect(lane_offline_spans.open_since([])).toBeUndefined()
+		expect(lane_offline_spans.open_outage(down)).toStrictEqual({ from_ms: at(1), down_ms: at(2) })
+		expect(lane_offline_spans.open_outage([...down, turn(ONLINE, 3)])).toBeUndefined()
+		expect(lane_offline_spans.open_outage([])).toBeUndefined()
 	})
 
 	it('reads the first sighting left when the offline turn itself is gone', () => {
-		expect(lane_offline_spans.open_since([turn(STILL_OFFLINE, 5), turn(STILL_OFFLINE, 6)])).toBe(
-			at(5),
-		)
+		const ticks = [turn(STILL_OFFLINE, 5), turn(STILL_OFFLINE, 6)]
+
+		expect(lane_offline_spans.open_outage(ticks)?.from_ms).toBe(at(5))
+	})
+
+	it('reads an outage as current only within two ticks of its last sighting', () => {
+		const outage = { from_ms: at(1), down_ms: at(3) }
+
+		expect(lane_offline_spans.is_current(outage, at(4))).toBe(true)
+		expect(lane_offline_spans.is_current(outage, at(5))).toBe(false)
 	})
 
 	it('names the connection turns alone', () => {

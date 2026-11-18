@@ -1,4 +1,5 @@
 import { stripVTControlCharacters } from 'node:util'
+import type { Outage } from '#scripts/lane/lane-offline-spans'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_header, type BoardHeader } from './run-board-header'
 import type { BoardRow } from './run-board-layout'
@@ -22,12 +23,13 @@ const ROW: BoardRow = {
 }
 const LAYOUT = { ...EMPTY_LAYOUT, active: [ROW] }
 const OFFLINE_LEGEND = '📴 offline'
+const OFFLINE_MARK = '📴'
+const HOUR = 60 * MINUTE
+// An outage its sampler saw half a minute ago.
+const SEEN: Outage = { from_ms: NOW - OUTAGE_MS, down_ms: NOW - 30 * SECOND }
 
-function board(
-	offline_since_ms: number | undefined,
-	extra: Partial<BoardHeader> = {},
-): BoardHeader {
-	const activity = { last_event_ms: NOW - MINUTE, offline_since_ms, is_stopped: false }
+function board(outage: Outage | undefined, extra: Partial<BoardHeader> = {}): BoardHeader {
+	const activity = { last_event_ms: NOW - MINUTE, outage, is_stopped: false }
 
 	return header({ layout: LAYOUT, activity, ...extra })
 }
@@ -38,6 +40,10 @@ function raw_lines(board_header: BoardHeader): Array<string> {
 
 function plain_lines(board_header: BoardHeader): Array<string> {
 	return raw_lines(board_header).map((line) => stripVTControlCharacters(line))
+}
+
+function beat_line(board_header: BoardHeader): string {
+	return plain_lines(board_header)[1] ?? ''
 }
 
 function named(board_header: BoardHeader): ReadonlyArray<string> {
@@ -51,39 +57,55 @@ describe('run_board_header.header_lines -- offline', () => {
 
 	it('draws 📴 and the outage’s age in yellow in place of the 💓', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
-		const offline = board(NOW - OUTAGE_MS)
-		const line = plain_lines(offline)[1] ?? ''
+		const offline = board(SEEN)
 
 		// Right-aligned under the run's age, as the 💓's digits are.
-		expect(line).toMatch(/📴 +12′34″/u)
-		expect(line).not.toContain('💓')
-		expect(raw_lines(offline)[1]).toContain(`${YELLOW}📴`)
+		expect(beat_line(offline)).toMatch(/📴 +12′34″/u)
+		expect(beat_line(offline)).not.toContain('💓')
+		expect(raw_lines(offline)[1]).toContain(`${YELLOW}${OFFLINE_MARK}`)
 	})
 
 	it('draws the 💓 and the newest event’s age while online', () => {
-		const line = plain_lines(board(undefined))[1] ?? ''
-
-		expect(line).toContain('💓')
-		expect(line).not.toContain('📴')
+		expect(beat_line(board(undefined))).toContain('💓')
+		expect(beat_line(board(undefined))).not.toContain(OFFLINE_MARK)
 	})
 
-	it('keeps an ended run’s end mark over an outage left open', () => {
-		const offline = board(NOW - OUTAGE_MS, { ended_ms: NOW - SECOND })
-		const line = plain_lines(offline)[1] ?? ''
+	it('right-aligns the run’s age to an outage longer than the run', () => {
+		const long = { from_ms: NOW - 10 * HOUR, down_ms: SEEN.down_ms }
 
-		expect(line).toContain('🔚')
-		expect(line).not.toContain('📴')
+		expect(plain_lines(board(long))[0]).toContain('⏰  2°10′00″')
 	})
 
 	it('leaves the third line as it is online', () => {
-		expect(plain_lines(board(NOW - OUTAGE_MS))[2]).toBe(plain_lines(board(undefined))[2])
+		expect(plain_lines(board(SEEN))[2]).toBe(plain_lines(board(undefined))[2])
+	})
+})
+
+describe('run_board_header.header_lines -- an outage not drawn', () => {
+	it('keeps an ended run’s end mark over an outage left open', () => {
+		const line = beat_line(board(SEEN, { ended_ms: NOW - SECOND }))
+
+		expect(line).toContain('🔚')
+		expect(line).not.toContain(OFFLINE_MARK)
+	})
+
+	it('draws the 💓 over an outage its sampler no longer sees, or a stopped run', () => {
+		const stale = board({ ...SEEN, down_ms: NOW - 3 * MINUTE })
+		const stopped = header({
+			layout: LAYOUT,
+			activity: { last_event_ms: NOW - MINUTE, outage: SEEN, is_stopped: true },
+		})
+
+		expect(beat_line(stale)).toContain('💓')
+		expect(beat_line(stale)).not.toContain(OFFLINE_MARK)
+		expect(beat_line(stopped)).not.toContain(OFFLINE_MARK)
 	})
 })
 
 describe('run_board_render_drawn.drawn_of -- offline', () => {
 	it('names 📴 only while it is drawn', () => {
-		expect(named(board(NOW - OUTAGE_MS))).toContain(OFFLINE_LEGEND)
+		expect(named(board(SEEN))).toContain(OFFLINE_LEGEND)
 		expect(named(board(undefined))).not.toContain(OFFLINE_LEGEND)
-		expect(named(board(NOW - OUTAGE_MS, { ended_ms: NOW - SECOND }))).not.toContain(OFFLINE_LEGEND)
+		expect(named(board(SEEN, { ended_ms: NOW - SECOND }))).not.toContain(OFFLINE_LEGEND)
 	})
 })
