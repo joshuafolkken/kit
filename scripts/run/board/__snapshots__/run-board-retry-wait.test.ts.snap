@@ -1,0 +1,9 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`run_board_layout.layout_of — a ⏳ lane row line end > draws a retry, a blocker here and an upstream Issue with their next moves 1`] = `
+[
+  "     ⏳                   7401       Issue 7401  retry · → next free lane",
+  "     ⏳                   7400       Issue 7400  🔗 7228  → starts on blocker merge",
+  "     ⏳                   7400       Issue 7400  🔗 app-kit#7691  → starts on upstream close",
+]
+`;
