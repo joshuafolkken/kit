@@ -1,0 +1,7 @@
+{
+	"reason": "A queued row now tells an authentication-failure hold from a usage limit (#8015): one icon constant, the cause field and its pass-through",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 15
+	}
+}
