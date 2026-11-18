@@ -55,6 +55,8 @@ interface AddChildrenInput {
 	// `--order-before` / `--order-after`: place the row at `position` and write nothing else — no
 	// declaration, no `blocked-by`.
 	is_order_only?: boolean | undefined
+	// The `--chain` declarations, added to the epic's `## Dependencies` beside the insertion.
+	chains?: ReadonlyArray<ReadonlyArray<number>> | undefined
 	// The decision record to write, from `--decision-file`. It goes to two places, neither of them a
 	// separate call a run makes afterwards: the epic's `## Decisions` section — folded into the body
 	// edit below, so it costs no round trip — and a comment on each child added.
@@ -232,6 +234,7 @@ async function add_children(input: AddChildrenInput): Promise<number> {
 		children: input.children,
 		position: input.position,
 		is_order_only: input.is_order_only,
+		chains: input.chains,
 		recorded: epic.recorded,
 		repo: epic.repo,
 		decision: input.decision,
