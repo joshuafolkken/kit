@@ -14,14 +14,15 @@ const CLEAN_EXIT = 0
 const FAILED_EXIT = 1
 const ARGV_OFFSET = 2
 const USAGE = [
-	'Usage: josh test:pinned [--max <n>] [--record <token>] [--origin <run-review|pre-detach|manual>] [--first-unpinned] [--help]',
+	'Usage: josh test:pinned [--max <n>] [--record <token>] [--origin <run-review|pre-detach|manual>] [--first-unpinned] [--reasoned] [--help]',
 	'  revert each changed code hunk outside tests and fixtures only they reach, and run its related tests;',
 	'  prints `unpinned <file>:<line>` for a hunk no test went red on, and',
 	`  \`unchecked <n> — <reason>\` for the hunks past the --max cap (default ${String(test_pinned_logic.DEFAULT_MAX_HUNKS)}),`,
 	`  over the ${String(test_pinned_logic.MAX_TEST_FILES)}-test-file cap,`,
 	'  or whose revert stopped vitest before any test ran, each place listed in the `full output:` log;',
 	'  --record also leaves the answer, under <token>, for `josh run:review --join`;',
-	'  --origin names what started the run on its lane ledger row (default manual);',
+	'  --origin names what started the run on its lane ledger row (default manual),',
+	'  and --reasoned marks there a launch under an --unpinned-ok reason;',
 	'  hunks run fewest reached tests first, and --first-unpinned starts no probe once one is unpinned',
 ].join('\n')
 
@@ -30,6 +31,7 @@ const PARSE_ARGS_OPTIONS = {
 	'first-unpinned': { type: 'boolean', default: false },
 	max: { type: 'string' },
 	origin: { type: 'string' },
+	reasoned: { type: 'boolean', default: false },
 	record: { type: 'string' },
 } as const
 
@@ -39,6 +41,7 @@ interface PinnedOptions {
 	max_hunks: number
 	record_token: string | undefined
 	is_first_unpinned: boolean
+	is_reasoned: boolean
 	origin: PinnedOrigin
 }
 
@@ -63,6 +66,7 @@ function options_of(argv: ReadonlyArray<string>): PinnedOptions | undefined {
 			max_hunks,
 			record_token: values.record,
 			is_first_unpinned: values['first-unpinned'],
+			is_reasoned: values.reasoned,
 			origin,
 		}
 	} catch {
@@ -77,13 +81,19 @@ function print_usage(argv: ReadonlyArray<string>): number {
 	return argv.some((argument) => HELP_FLAGS.has(argument)) ? CLEAN_EXIT : FAILED_EXIT
 }
 
+async function run_summary(options: PinnedOptions): Promise<PinnedSummary> {
+	const { max_hunks, is_first_unpinned, origin, is_reasoned } = options
+
+	return test_pinned_record.summary_of(
+		await test_pinned.run(max_hunks, is_first_unpinned, origin, is_reasoned),
+	)
+}
+
 // `--record` leaves an answer however the run ends — a check that could not run included — so the
 // join waiting on it never waits on a check that died.
 async function recorded_run(options: PinnedOptions, token: string): Promise<PinnedSummary> {
 	try {
-		const summary = test_pinned_record.summary_of(
-			await test_pinned.run(options.max_hunks, options.is_first_unpinned, options.origin),
-		)
+		const summary = await run_summary(options)
 
 		test_pinned_record.write(token, summary)
 
@@ -101,9 +111,7 @@ async function main(argv: ReadonlyArray<string>): Promise<number> {
 
 	const summary =
 		options.record_token === undefined
-			? test_pinned_record.summary_of(
-					await test_pinned.run(options.max_hunks, options.is_first_unpinned, options.origin),
-				)
+			? await run_summary(options)
 			: await recorded_run(options, options.record_token)
 
 	process.stdout.write(test_pinned_logic.report_text(summary))

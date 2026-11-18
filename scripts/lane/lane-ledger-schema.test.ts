@@ -125,6 +125,16 @@ describe('lane_ledger_schema.entry_schema on a test-pinned run that counted its 
 	})
 })
 
+// joshuafolkken/kit#7809: a row written before the launch keys (the cases above) parses without them.
+describe('lane_ledger_schema.entry_schema on a test-pinned run that kept its launch', () => {
+	it('keeps the cut, the reason mark and the work tree it read', () => {
+		const launch = { first_unpinned: true, reasoned: false, cut: 2, tree_hash: 'abc' }
+		const run = { kind: KIND.TEST_PINNED, at: AT, held: 1, probes: [], elapsed_ms: 9, ...launch }
+
+		expect(entry_schema.safeParse(run).data).toStrictEqual(run)
+	})
+})
+
 // joshuafolkken/kit#5385
 describe('lane_ledger_schema.entry_schema on a test-pinned probe', () => {
 	it('keeps a probe the type check pinned, and rejects an unknown pinner', () => {

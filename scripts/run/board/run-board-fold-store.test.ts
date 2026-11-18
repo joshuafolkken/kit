@@ -11,6 +11,7 @@ const { file_store } = run_board_fold_store
 const make_directory = temporary_directory()
 const FILE_NAME = 'board.json'
 const PREFIX = 'run-board-fold-store-'
+const BROKEN_FILES = ['{ not json', '["usage"]']
 
 afterEach(() => {
 	vi.unstubAllEnvs()
@@ -42,7 +43,7 @@ describe('run_board_fold_store.file_store', () => {
 		expect(file_store(board_file()).load().size).toBe(0)
 	})
 
-	it.each(['{ not json', '["usage"]', '{ "folded": "usage" }'])(
+	it.each([...BROKEN_FILES, '{ "folded": "usage" }'])(
 		'loads every section open from a broken or misshapen file: %s',
 		(content) => {
 			expect(file_store(written(content)).load().size).toBe(0)
@@ -69,5 +70,58 @@ describe('run_board_fold_store.file_store', () => {
 		vi.stubEnv('CLAUDE_CONFIG_DIR', directory)
 		file_store().save(new Set(['queued']))
 		expect([...file_store(board_file(directory)).load()]).toStrictEqual(['queued'])
+	})
+})
+
+// joshuafolkken/kit#7950: the sound cue switch shares the file, defaults on, and neither save drops
+// the other's field.
+describe('run_board_fold_store.file_store sound', () => {
+	it('loads the sound setting it saved', () => {
+		const file = board_file()
+
+		file_store(file).save_sound(false)
+		expect(JSON.parse(readFileSync(file, 'utf8'))).toStrictEqual({ sound: false })
+		expect(file_store(file).load_sound()).toBe(false)
+		file_store(file).save_sound(true)
+		expect(file_store(file).load_sound()).toBe(true)
+	})
+
+	it('loads the sound on when no file is there', () => {
+		expect(file_store(board_file()).load_sound()).toBe(true)
+	})
+
+	it.each([...BROKEN_FILES, '{ "sound": "off" }', '{ "folded": [] }'])(
+		'loads the sound on from a broken or misshapen file: %s',
+		(content) => {
+			expect(file_store(written(content)).load_sound()).toBe(true)
+		},
+	)
+
+	it('keeps the board drawing when the sound setting cannot be written', () => {
+		const blocked = path.join(written(''), FILE_NAME)
+
+		expect(() => {
+			file_store(blocked).save_sound(false)
+		}).not.toThrow()
+	})
+})
+
+describe('run_board_fold_store.file_store shared file', () => {
+	it('keeps the sound setting when the folds are saved', () => {
+		const file = written(JSON.stringify({ folded: ['usage'], sound: false }))
+
+		file_store(file).save(new Set(['done']))
+		expect(JSON.parse(readFileSync(file, 'utf8'))).toStrictEqual({ folded: ['done'], sound: false })
+	})
+
+	it('keeps the folds when the sound setting is saved', () => {
+		const file = written(JSON.stringify({ folded: ['usage'], sound: true }))
+
+		file_store(file).save_sound(false)
+		expect(JSON.parse(readFileSync(file, 'utf8'))).toStrictEqual({
+			folded: ['usage'],
+			sound: false,
+		})
+		expect([...file_store(file).load()]).toStrictEqual(['usage'])
 	})
 })
