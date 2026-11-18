@@ -84,6 +84,17 @@ const unplanned_notice_schema = z.object({
 	issue: z.number(),
 	files: z.array(z.string()),
 })
+// One evaluation of `josh ship`'s preflight on `issue`, passed or stopped (`run-ship-preflight.ts`):
+// `evaluated` names the precondition kinds it asked and `unmet` the ones it found unmet, empty on a
+// pass, so each kind's stops are read against its evaluations (joshuafolkken/kit#7874). A reused
+// verdict asked nothing and writes none; a stop's `preconditions` stays as it was.
+const preflight_schema = z.object({
+	kind: z.literal(KIND.PREFLIGHT),
+	at: z.string(),
+	issue: z.number(),
+	evaluated: z.array(z.string()),
+	unmet: z.array(z.string()),
+})
 // One inner step of a `josh ship` stage on `issue` — the overlap wait inside `sync`, the scoped pair
 // inside `gate` — so `lane:breakdown` names what a stage spent its time on (joshuafolkken/kit#5294).
 // `at` is its end and `elapsed_ms` its length, as on a stage row. `fallback` names why a scoped pair's
@@ -150,17 +161,28 @@ const size_schema = z.object({
 type ChainEntry = z.infer<typeof chain_schema>
 type ChainRecord = Omit<ChainEntry, 'kind' | 'at'>
 type ChainStageEntry = z.infer<typeof chain_stage_schema>
+type PreflightEntry = z.infer<typeof preflight_schema>
+type PreflightLedgerRecord = Omit<PreflightEntry, 'kind' | 'at'>
 type UnpinnedStop = z.infer<typeof unpinned_stop_schema>
 type UnpinnedPath = UnpinnedStop['path']
 
 const lane_ledger_schema_ship = {
 	chain_schema,
 	early_push_schema,
+	preflight_schema,
 	ship_lap_schema,
 	size_schema,
 	stop_schema,
 	unplanned_notice_schema,
 }
 
-export type { ChainEntry, ChainRecord, ChainStageEntry, UnpinnedPath, UnpinnedStop }
+export type {
+	ChainEntry,
+	ChainRecord,
+	ChainStageEntry,
+	PreflightEntry,
+	PreflightLedgerRecord,
+	UnpinnedPath,
+	UnpinnedStop,
+}
 export { lane_ledger_schema_ship }

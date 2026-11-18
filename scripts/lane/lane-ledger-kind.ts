@@ -26,6 +26,7 @@ const KIND = {
 	SPLIT_NOTICE: 'split-notice',
 	SPLIT_FILED: 'split-filed',
 	UNPLANNED_NOTICE: 'unplanned-notice',
+	PREFLIGHT: 'preflight',
 	LANE_STATE: 'lane-state',
 	PUSH_MISS: 'push-miss',
 	EARLY_PUSH: 'early-push',
