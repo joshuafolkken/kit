@@ -95,6 +95,20 @@ describe('cost_audit_cause.causes_in — which cause a cache write goes to', () 
 		expect(row_of(rows, OTHER)?.current.writes).toBe(1)
 	})
 
+	it('puts a delegated unit with no agent type on its subagent start', () => {
+		expect(writes_of([session('subagent', [OPENING])], SUBAGENT_START)).toBe(1)
+	})
+
+	it('puts an append after a wait of the TTL on other, not on the wait rewrite', () => {
+		const records = [OPENING, request(10, { read: CONTEXT, write_5m: APPENDED })]
+		const rows = rows_of([session('fullrun', records)])
+
+		expect(row_of(rows, OTHER)?.current.writes).toBe(1)
+		expect(row_of(rows, AFTER_WAIT)?.current.writes).toBe(0)
+	})
+})
+
+describe('cost_audit_cause.causes_in — which writes a period counts', () => {
 	it('counts no write for a request that wrote nothing', () => {
 		const records = [OPENING, request(1, { read: CONTEXT })]
 

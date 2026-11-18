@@ -2,6 +2,6 @@
 	"reason": "New cost:audit section: cache write by cause (#7877), a new aggregation module and its tests",
 	"date": "2026-11-18",
 	"growth": {
-		"scripts.code_lines": 130
+		"scripts.code_lines": 135
 	}
 }

@@ -1,5 +1,6 @@
 import { cost_pricing } from '#scripts/cost-runtime/cost-pricing'
 import { cost_usage, type UsageRecord } from '#scripts/cost-runtime/cost-usage'
+import { cost_audit_kind } from './cost-audit-kind'
 import type { AuditSession } from './cost-audit-read'
 import { cost_audit_rewrite } from './cost-audit-rewrite'
 import { cost_audit_usage, type CacheWrite } from './cost-audit-usage'
@@ -49,8 +50,13 @@ interface CauseWindows {
 	previous: IsCounted
 }
 
+// A delegated unit whose `meta.json` names no agent type still reads as the `subagent` kind.
+function is_subagent(session: CausedSession): boolean {
+	return session.agent_type !== undefined || session.kind === cost_audit_kind.SUBAGENT
+}
+
 function first_cause(session: CausedSession): Cause {
-	if (session.agent_type !== undefined) return SUBAGENT_START
+	if (is_subagent(session)) return SUBAGENT_START
 
 	return session.kind === RESUME_KIND ? RESUME_AFTER_CUT : SESSION_START
 }
