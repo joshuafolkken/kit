@@ -58,6 +58,11 @@ function event(pos: number, kind: string, text: string): RunEvent {
 }
 
 const LAUNCH = event(1, 'child-launch', '#7945 dispatched')
+const YIELDED = [
+	LAUNCH,
+	event(2, 'note', '#7945 yielded its lane: overlaps #7951'),
+	event(3, 'withdraw', '#7945 withdrawn by its own lane:plan: overlaps #7951'),
+]
 
 async function adopt(): Promise<number> {
 	const argv = ['--apply', ISSUE, '--adopt', '1', '--reason', 'the parent takes it']
@@ -90,11 +95,7 @@ describe('backlog:triage --apply --adopt — a lane a person withdrew', () => {
 	})
 
 	it('holds the park loop as before after a yield withdrew the lane (ac-d72149a7)', async () => {
-		stream.events = [
-			LAUNCH,
-			event(2, 'note', '#7945 yielded its lane: overlaps #7951'),
-			event(3, 'withdraw', '#7945 withdrawn by its own lane:plan: overlaps #7951'),
-		]
+		stream.events = YIELDED
 
 		await expect(adopt()).resolves.toBe(0)
 
@@ -102,6 +103,7 @@ describe('backlog:triage --apply --adopt — a lane a person withdrew', () => {
 	})
 
 	it('requeues as before after a yield when no park loop closes (ac-d72149a7)', async () => {
+		stream.events = YIELDED
 		vi.mocked(backlog_triage_park_loop.loop_of).mockReturnValueOnce(undefined)
 
 		await expect(adopt()).resolves.toBe(0)
