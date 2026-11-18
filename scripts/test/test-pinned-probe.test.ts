@@ -88,8 +88,11 @@ function selections_of(runs: MockInstance<typeof test_red.probe_in>): Array<Arra
 }
 
 // A ledger row's held, rechecked and unregistered counts, with no rewire and none over the cap.
+// A whole run's launch: the work tree it read, and no cut or reason (joshuafolkken/kit#7809).
+const WHOLE_LAUNCH = { tree_hash: expect.any(String) as unknown as string }
+
 function counts(held: number, rechecked: number, unregistered: number): Skipped {
-	return { held, rechecked, unregistered, rewired: 0, over_cap: 0 }
+	return { held, rechecked, unregistered, rewired: 0, over_cap: 0, launch: WHOLE_LAUNCH }
 }
 
 describe('test_pinned.run stopped after its first verdict', () => {
@@ -136,6 +139,7 @@ describe('test_pinned.run timed into the ledger', () => {
 						misses: { unregistered: runs.mock.calls.length },
 						rewired: REWIRES,
 						over_cap: 0,
+						launch: WHOLE_LAUNCH,
 					},
 					runs.mock.calls.length,
 				],

@@ -135,7 +135,10 @@ const unit_files_schema = z.object({
 // its answer, written by the stop with its wall time so far (joshuafolkken/kit#5262); both absent on
 // older rows. A probe's `pinned_by` names a red the type check reached before the whole reach ran
 // (joshuafolkken/kit#5385), absent on a test's verdict. `misses` counts the probed hunks by why the
-// cache did not hold their verdict (joshuafolkken/kit#7806), absent on older rows. Origin values live
+// cache did not hold their verdict (joshuafolkken/kit#7806), absent on older rows. `first_unpinned`
+// marks a run under `--first-unpinned`, `reasoned` one under an `--unpinned-ok` reason, `cut` counts
+// the probes its stop never started, and `tree_hash` names the work tree it read
+// (joshuafolkken/kit#7809); each absent where it does not apply and on older rows. Origin values live
 // in the constants leaf.
 const test_pinned_probe_schema = z.object({
 	file: z.string(),
@@ -157,6 +160,10 @@ const test_pinned_schema = z.object({
 	elapsed_ms: z.number(),
 	origin: pinned_origin_schema.optional(),
 	discarded: z.boolean().optional(),
+	first_unpinned: z.boolean().optional(),
+	reasoned: z.boolean().optional(),
+	cut: z.number().optional(),
+	tree_hash: z.string().optional(),
 })
 // The lane limit a run started under or `lane:limit` set it to (`lane-limit-history.ts`, joshuafolkken/kit#6139).
 const limit_schema = z.object({ kind: z.literal(KIND.LIMIT), at: z.string(), limit: z.number() })

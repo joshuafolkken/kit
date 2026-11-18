@@ -45,7 +45,8 @@ function origin_of(raw: string | undefined): PinnedOrigin | undefined {
 // over the test-file cap; and what started it, `manual` when unnamed. The probed ones split as the
 // cache knew them (joshuafolkken/kit#7803): `rechecked` against a few tests, `unregistered` with no
 // cached verdict. `misses` counts the probed hunks by why the cache did not hold their verdict
-// (joshuafolkken/kit#7806).
+// (joshuafolkken/kit#7806). `launch` is how the run was started and where it stopped
+// (joshuafolkken/kit#7809).
 interface Skipped {
 	held: number
 	rechecked?: number
@@ -54,7 +55,13 @@ interface Skipped {
 	rewired: number
 	over_cap?: number
 	origin?: PinnedOrigin | undefined
+	launch?: PinnedLaunch
 }
+
+// `first_unpinned` under `--first-unpinned`, `reasoned` under an `--unpinned-ok` reason, `cut` the
+// probes a stop at the first unpinned hunk never started, `tree_hash` the work tree the run read; each
+// absent where it does not apply.
+type PinnedLaunch = Pick<TestPinnedRecord, 'cut' | 'first_unpinned' | 'reasoned' | 'tree_hash'>
 
 // Each reason the cache missed a hunk (`test_pinned_cache.misses`) with its hunk count; a hunk it held
 // counts in none.
@@ -84,6 +91,7 @@ async function record(
 		probes: [...probes],
 		elapsed_ms,
 		origin: skipped.origin ?? MANUAL_ORIGIN,
+		...skipped.launch,
 	})
 }
 
@@ -113,5 +121,5 @@ const test_pinned_ledger = {
 	time_of,
 }
 
-export type { MissCounts, PinnedOrigin, ProbeTime, Skipped }
+export type { MissCounts, PinnedLaunch, PinnedOrigin, ProbeTime, Skipped }
 export { test_pinned_ledger }

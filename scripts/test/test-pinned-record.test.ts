@@ -171,10 +171,15 @@ describe('test_pinned_record — the record', () => {
 	})
 })
 
+const ORIGIN = 'pre-detach'
+const REASONED = '--reasoned'
+
+function launched_argv(flags: ReadonlyArray<string>): Array<string> {
+	return ['test:pinned', ...flags, '--origin', ORIGIN, '--record', TOKEN]
+}
+
 // joshuafolkken/kit#5327: a cut check's stop leaves the rest probing in the background.
 describe('test_pinned_record — the hunks a cut answer left', () => {
-	const ORIGIN = 'pre-detach'
-
 	it('reads back how many hunks a cut answer did not probe', () => {
 		const summary = test_pinned_record.summary_of({ ...REPORT, cut: [HUNK, HUNK] }, ROOT)
 
@@ -185,13 +190,17 @@ describe('test_pinned_record — the hunks a cut answer left', () => {
 	})
 
 	it('probes every hunk with no reason when the launch is whole, and stops at the first otherwise', () => {
-		expect(test_pinned_record.launch_argv(TOKEN, undefined, ORIGIN, true)).toStrictEqual([
-			'test:pinned',
-			'--origin',
-			ORIGIN,
-			'--record',
-			TOKEN,
-		])
+		expect(test_pinned_record.launch_argv(TOKEN, undefined, ORIGIN, true)).toStrictEqual(
+			launched_argv([]),
+		)
 		expect(test_pinned_record.launch_argv(TOKEN, undefined, ORIGIN)).toContain('--first-unpinned')
+	})
+
+	// joshuafolkken/kit#7809
+	it('marks a launch under a reason, and only that one, as reasoned', () => {
+		expect(test_pinned_record.launch_argv(TOKEN, 'accepted', ORIGIN)).toStrictEqual(
+			launched_argv([REASONED]),
+		)
+		expect(test_pinned_record.launch_argv(TOKEN, undefined, ORIGIN)).not.toContain(REASONED)
 	})
 })
