@@ -188,3 +188,14 @@ describe('epic_promote.find_tracking_error', () => {
 		expect(epic_promote.find_tracking_error(body, CHILDREN)).toContain('Reword that line first')
 	})
 })
+
+describe('epic_promote.build_promoted_body — order reasons', () => {
+	it('writes a given per-chain reason under the declared order', () => {
+		const body = promote({
+			is_ordered: true,
+			order_reasons: [{ chain: CHILDREN, reason: 'each child extends the last' }],
+		})
+
+		expect(body).toContain('- Reasoning: each child extends the last')
+	})
+})
