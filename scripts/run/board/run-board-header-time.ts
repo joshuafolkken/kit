@@ -28,7 +28,7 @@ interface TimeHeader {
 	now_ms: number
 	started_ms: number
 	ended_ms: number | undefined
-	activity: Pick<RunActivity, 'last_event_ms'>
+	activity: Pick<RunActivity, 'last_event_ms' | 'offline_since_ms'>
 	spinner: string | undefined
 	form: 'screen' | 'chat'
 }
@@ -54,6 +54,28 @@ function age_of(header: TimeHeader): number | undefined {
 	return header.now_ms - last
 }
 
+// How long the network has been down, while the run's stream leaves an outage open
+// (joshuafolkken/kit#7895). An ended run keeps its end mark, so its outage is not drawn.
+function offline_age(
+	header: Pick<TimeHeader, 'now_ms' | 'ended_ms' | 'activity'>,
+): number | undefined {
+	const since = header.activity.offline_since_ms
+
+	if (since === undefined || header.ended_ms !== undefined) return undefined
+
+	return header.now_ms - since
+}
+
+// Whether the `💓` gives way to the `📴` — the legend names it only then.
+function is_offline(header: Pick<TimeHeader, 'now_ms' | 'ended_ms' | 'activity'>): boolean {
+	return offline_age(header) !== undefined
+}
+
+// The age the `💓`'s cell draws: the outage's while one is open, else the newest event's.
+function beat_age(header: TimeHeader): number | undefined {
+	return offline_age(header) ?? age_of(header)
+}
+
 // The minute an ended run ended, standing where its heartbeat did. Blank while the run has none to draw.
 function ended_part(header: TimeHeader): string {
 	const { ended_ms } = header
@@ -64,8 +86,15 @@ function ended_part(header: TimeHeader): string {
 // The `💓` under the run's age, in the `⏰`'s own format with its digits right-aligned to `width` —
 // only a working run can be stale, so only it is colored. Only an ended run draws anything else there:
 // the minute it ended. Its digits are emphasized for a few seconds after a new event resets them
-// (`run-board-fresh.ts`).
+// (`run-board-fresh.ts`). While the network is down, the `📴` and the outage's age stand there instead,
+// yellow throughout: the newest event's age would read an outage as a hang.
 function beat_part(header: TimeHeader, mark: RunMark, width: number): string {
+	const offline = offline_age(header)
+
+	if (offline !== undefined) {
+		return styleText('yellow', `${HEADER_ICONS.offline} ${span_of(offline).padStart(width)}`)
+	}
+
 	const age = age_of(header)
 
 	if (age === undefined) return ended_part(header)
@@ -118,7 +147,7 @@ function time_parts(header: TimeHeader, mark: RunMark, now: NowLine | undefined)
 	const elapsed = span_of((header.ended_ms ?? header.now_ms) - header.started_ms)
 	const age = span_or_blank(now?.age_ms)
 	const width = Math.max(
-		...[elapsed, span_or_blank(age_of(header)), age].map((span) => span.length),
+		...[elapsed, span_or_blank(beat_age(header)), age].map((span) => span.length),
 	)
 
 	return [
@@ -128,6 +157,6 @@ function time_parts(header: TimeHeader, mark: RunMark, now: NowLine | undefined)
 	]
 }
 
-const run_board_header_time = { aged, now_text, time_parts }
+const run_board_header_time = { aged, is_offline, now_text, time_parts }
 
 export { run_board_header_time }

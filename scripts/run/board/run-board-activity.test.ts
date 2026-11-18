@@ -29,6 +29,7 @@ describe('run_board_activity.activity_of', () => {
 			setup: undefined,
 			setup_ms: undefined,
 			last_event_ms: Date.parse(T2),
+			offline_since_ms: undefined,
 			latest: { text: MERGE_3409, at_ms: Date.parse(T2) },
 			idle_ms: Date.parse(T2),
 			is_stopped: false,

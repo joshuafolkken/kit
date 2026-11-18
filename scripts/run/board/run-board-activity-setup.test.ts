@@ -35,6 +35,7 @@ describe('run_board_activity.activity_of during setup', () => {
 			setup: STAGE.STARTING,
 			setup_ms: Date.parse(AT),
 			last_event_ms: Date.parse(AT),
+			offline_since_ms: undefined,
 			latest: { text: STAGE.STARTING, at_ms: Date.parse(AT) },
 			idle_ms: Date.parse(AT),
 			is_stopped: false,
