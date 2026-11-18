@@ -1025,6 +1025,9 @@ the last `--adopt` share it, the option was never taken: `--adopt` parks `run:st
 auto-retry) instead of requeuing. A park with no tree line requeues. The yield cap misses this loop: it
 counts yields to a held lane in a time window, and park → adopt → relaunch is no yield.
 
+A lane a person already withdrew (`lane:withdraw`, not a yield) is neither requeued nor parked:
+`--adopt` records the decision, clears the park and prints `lane withdrawn · not requeued`.
+
 Run the pass at the initial plan and after each collection batch that parked a child. The driver
 hands back `triage` once per such batch before its next offer; a batch without parks adds no step,
 nor does a resume. Read each parked child's body and comments, then route:

@@ -1,13 +1,17 @@
 import type { KeyReading } from './run-board-keys'
 import type { BoardPorts, Pace } from './run-board-state'
+import { run_board_typing } from './run-board-typing'
 
-// The line a live board types before its first frame, a letter at a time, then holds — the first
-// frame's read runs meanwhile, and the frame is drawn over the line once both are done. A key skips
-// the rest; the key is spent on the skip, not on a fold.
+// The line a live board types before its first frame, a letter at a time with a block cursor after
+// the last letter typed, then holds without the cursor — the first frame's read runs meanwhile, and the
+// frame is drawn over the line once both are done. A key skips the rest; the key is spent on the skip,
+// not on a fold. Each beat rewrites the whole line, so the screen always matches the beat last written.
 
 const LINE = 'SHALL WE PLAY A GAME?'
 const LETTER_MS = 50
 const HOLD_MS = 2000
+const LINE_START = '\r'
+const ERASE_LINE_END = '\u{1B}[K'
 
 interface Beat {
 	text: string
@@ -17,7 +21,10 @@ interface Beat {
 type IntroPorts = Pick<BoardPorts, 'intro_sleep' | 'write'>
 
 const BEATS: ReadonlyArray<Beat> = [
-	...Array.from(LINE, (letter) => ({ text: letter, ms: LETTER_MS })),
+	...Array.from(LINE, (_letter, index) => ({
+		text: `${LINE_START}${run_board_typing.typed(LINE, LINE.slice(0, index + 1))}${ERASE_LINE_END}`,
+		ms: LETTER_MS,
+	})),
 	{ text: '', ms: HOLD_MS },
 ]
 
@@ -79,7 +86,7 @@ function after<Read>(
 	}
 }
 
-const run_board_intro = { HOLD_MS, LETTER_MS, LINE, after, play }
+const run_board_intro = { ERASE_LINE_END, HOLD_MS, LETTER_MS, LINE, LINE_START, after, play }
 
 export { run_board_intro }
 export type { IntroPorts }

@@ -14,7 +14,8 @@ import { whole_suite_files } from './whole-suite-files'
 // which is safe only because it reaches every test a change can break. A changed module reaches
 // the tests importing it through `vitest related`, and the tests reading it as data through the
 // test-read map a whole-suite run records (`test-read-map.ts`). A changed document, config or
-// snapshot — which no module graph holds — reaches the modules that read it through that map alone. **Whatever neither can answer runs the whole suite**: no map, a
+// snapshot — which no module graph holds — reaches the modules that read it through that map and the
+// test files naming its path (`test-document-readers.ts`). **Whatever none can answer runs the whole suite**: no map, a
 // non-code file added since the recorded tree that no recorded test read, where a test read inside its
 // directory, or a file every test
 // depends on — `package.json` only when more than its `version` moved (joshuafolkken/kit#7538),
@@ -122,6 +123,9 @@ interface ScopeRequest {
 	// The changed files every test imports, each with the test files importing it directly
 	// (`direct-importers.ts`) — the run narrows to those rather than the whole suite.
 	every_test_importers?: ReadonlyMap<string, ReadonlyArray<string>>
+	// The changed non-code files, each with the test files naming its path (`test-document-readers.ts`)
+	// — added to the map's readers.
+	searched_readers?: ReadonlyMap<string, ReadonlyArray<string>>
 }
 
 // What the decision narrows to: the files to hand vitest, and the changed files known to reach no
@@ -164,16 +168,23 @@ function all_scope(reason: string, triggers: ReadonlyArray<string> = [], root = 
 	return { mode: 'all', files: triggers.map((file) => path.join(root, file)), reason }
 }
 
-// A file no recorded test read narrows only when the recorded tree held it, or no recorded test read
-// inside its directory: any other file added since is one the recorder never saw, so its having no
-// reader says nothing.
+// **A changed non-code file's readers are the recorded ones and the test files naming its path**
+// (joshuafolkken/kit#7978): the map misses a test added or changed since its run, the search one that
+// reads through a listing or an assembled path. A file neither reaches narrows only when the recorded
+// tree held it, or no recorded test read inside its directory: any other file added since is one the
+// recorder never saw, so its having no reader says nothing.
+function readers_in(request: ScopeRequest, map: ReadMap, file: string): Array<string> {
+	return [...test_read_map.readers_of(map, file), ...(request.searched_readers?.get(file) ?? [])]
+}
+
 function resolve_through_map(others: ReadonlyArray<string>, request: ScopeRequest): MapResolution {
 	const { map, recorded } = request
 
 	if (others.length === 0) return { files: [], unread: [] }
 	if (map === undefined) return { reason: `${NO_MAP_REASON} ${String(others[0])}` }
 
-	const unread = others.filter((file) => test_read_map.readers_of(map, file).length === 0)
+	const readers = others.map((file) => readers_in(request, map, file))
+	const unread = others.filter((_file, index) => readers[index]?.length === 0)
 	const unknown = unread.filter(
 		(file) =>
 			is_moved(request, file) &&
@@ -185,7 +196,7 @@ function resolve_through_map(others: ReadonlyArray<string>, request: ScopeReques
 		return { reason: `${String(unknown[0])} ${UNRECORDED_SUFFIX}`, triggers: unknown }
 	}
 
-	return { files: others.flatMap((file) => test_read_map.readers_of(map, file)), unread }
+	return { files: readers.flat(), unread }
 }
 
 // A changed module is also data to a test that reads it through `fs` rather than importing it, and

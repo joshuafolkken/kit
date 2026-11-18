@@ -111,14 +111,16 @@ describe('whole_suite_narrowing.read_version_only', () => {
 })
 
 describe('whole_suite_narrowing.read', () => {
-	it('answers both readings at once', async () => {
+	it('answers every reading at once, the changed non-code files searched for by path', async () => {
 		vi.mocked(git_command.show_file).mockResolvedValue(manifest_of('1.0.0'))
 		vi.spyOn(file_reader, 'read_if_readable').mockReturnValue(manifest_of('1.1.0'))
+		vi.spyOn(direct_importers, 'work_tree_files').mockResolvedValue([])
 
-		await expect(whole_suite_narrowing.read(ROOT, [PACKAGE_FILE])).resolves.toStrictEqual({
+		await expect(whole_suite_narrowing.read(ROOT, [PACKAGE_FILE, KEPT])).resolves.toStrictEqual({
 			pure_entries: undefined,
 			version_only: new Set([PACKAGE_FILE]),
 			lockfile_importers: undefined,
+			searched_readers: new Map([[PACKAGE_FILE, []]]),
 		})
 	})
 })
