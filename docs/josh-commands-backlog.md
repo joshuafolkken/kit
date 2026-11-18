@@ -531,6 +531,25 @@ Writes `- リリース分類: <label>` at the end of the `## 背景` declaration
 
 Run it when `josh ship` or `josh git` stops for a missing release classification. A lane with a non-defect Issue (`種別: 非不具合`) and no `enhancement`, `bug` or `breaking-change` label writes `other-change` as a Tier A choice and goes on without parking.
 
+### `josh issue:kind`
+
+<!-- usage: issue:kind -->
+
+Switch an issue between bug and non-bug: the body's kind declarations, then its bug/enhancement labels.
+
+```bash
+pnpm josh issue:kind 6636 bug --origin "#<PR>"
+pnpm josh issue:kind 6636 non-bug --purpose improvement
+pnpm josh issue:kind 6636 non-bug --release-class other-change
+```
+
+<!-- /usage -->
+
+- `bug` writes `- 種別: 不具合` and `- 原因: <value>`, dropping `目的:` / `リリース分類:`; `non-bug` writes `- 種別: 非不具合` with `目的:` or `リリース分類: other-change`, dropping `原因:`.
+- Old lines in either language go; the new ones close the `## 背景` block, as in `josh issue:release-class`. Then `bug` / `enhancement` follow the body; `breaking-change` is left alone.
+- The new body is checked as `josh issue:lint` does; on a problem nothing is written — add the section (`## 再現` for `原因: 不明（…）`) with `josh issue:body`, then re-run.
+- A repeat writes nothing; a run that failed on a label write is finished by re-running it. On an `in-progress` Issue it warns that the commit-time regression-test requirement changed.
+
 ### `josh defect:origin`
 
 <!-- usage: defect:origin -->
@@ -883,7 +902,7 @@ pnpm josh auto-ok:next --exclude 906   # skip the issue just merged
 
 <!-- /usage -->
 
-Read-only. Uses **Ranking** below: priority, resumable work, verification-path defects, then blockers.
+Read-only. Uses **Ranking** below: priority, verification-path defects, defects, resumable work, then blockers.
 Ties use creation time ascending, then number ascending. Skips `epic`, `in-progress`, `needs-decision` and candidates whose `blockedBy` is open or whose `- 実施可能日:` (`YYYY-MM-DDTHH:MMZ`) has not arrived,
 or whose `- 実施可能条件: #<PR> のマージ後 <K> マージ` (or `#<issue> を閉じる PR のマージ後 <K> マージ`) is not yet met; `backlog:next` prints `#N not before <time>`, or for the condition `until #<PR> merges`, `<n>/<K> merges after #<PR>` or `until the merge of #<PR> is read` — `the pull request closing #<issue>` in place of `#<PR>` for the issue form.
 
@@ -941,9 +960,9 @@ Read-only, except for the mechanical triage of the triage gate below. stdout is 
 
 Any other untriaged candidate is held alone, named on stderr. The triaged candidates pass the `run:solo` gate without it and print as usual, then a trailing `triage` line asks for the judgment; with none of them left to offer, it prints `triage` alone. A judgment recording `run:solo` stops the next offer by that gate.
 
-**Defect priority**: defects always go to the front of the runnable numbers among ranking ties. New mechanisms go to the back only while the defect rate is above its baseline.
+**Mechanism deferral**: new mechanisms go to the back among ranking ties only while the defect rate is above its baseline. Defects lead by a ranking key below.
 
-**Ranking**: `- 実施順: 最後` goes last; otherwise `priority:critical`, `priority:high`, resumable work (owned stash, pause comment or linked open PR), verification-path defect, lost minutes, transitive dependents, estimated lines (smallest first, undeclared last), then weekly gain (`## 期待効果`). Standalone numbers are cut to five.
+**Ranking**: `- 実施順: 最後` goes last; otherwise `priority:critical`, `priority:high`, verification-path defect, defect, resumable work (stash, pause comment or open PR), lost minutes, transitive dependents, estimated lines (smallest first, undeclared last), then weekly gain (`## 期待効果`). Standalone numbers are cut to five.
 Lost minutes sum `- 原因の損失:` lines, falling back to `- 原因のレーン:`.
 
 **`run:solo` gate**: a `run:solo` issue runs alone — `wait` while it or other lanes run, and a `run:solo` candidate further down cuts the list.

@@ -52,7 +52,7 @@ interface ChildInput {
 	state?: string
 	labels?: ReadonlyArray<string>
 	blocked_by?: ReadonlyArray<number>
-	// The body the defect priority classifies the child by.
+	// The body the ranking's defect key and the mechanism deferral classify the child by.
 	body?: string
 	// Who filed the child. Left out, the owner did, so the author-trust check asks no network.
 	author_association?: string
@@ -234,7 +234,8 @@ function stub_environment(): void {
 	)
 }
 
-// The two reads the defect priority adds: the rate, and each candidate's body — beside the implement
+// The two reads the mechanism deferral adds: the rate, and, above the baseline, each candidate's body
+// the listing did not carry — beside the implement
 // rate the size note projects by.
 function stub_defect_priority(input: BacklogInput): void {
 	const bodies = new Map((input.children ?? []).map((child) => [String(child.number), child.body]))

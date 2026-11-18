@@ -4,8 +4,11 @@ import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_core_wait_stats } from './lane-core-wait-stats'
+import { lane_human_wait_read } from './lane-human-wait-read'
+import { lane_human_wait_stats } from './lane-human-wait-stats'
 import { lane_ledger_write } from './lane-ledger-write'
 import { lane_measure_cli } from './lane-measure-cli'
+import { lane_net_read } from './lane-net-read'
 
 const make_directory = temporary_directory('suite')
 
@@ -144,5 +147,52 @@ describe('lane_measure_cli.run — value cell past the row cap', () => {
 		expect(lane_measure_cli.USAGE).toContain(
 			'josh lane:stats --period <days> [--limit <lane-limit>] [--all]',
 		)
+	})
+})
+
+// joshuafolkken/kit#7890: the human waits need GitHub reads, so only a read of their table runs them.
+describe('lane_measure_cli.run — human wait reads', () => {
+	const REASON = 'irreversible-op'
+	const wait = { reason: REASON, at: '2026-10-06T11:00:00.000Z', answered_at: AT }
+
+	function spy_waits(): ReturnType<typeof vi.spyOn> {
+		return vi.spyOn(lane_human_wait_read, 'read_for').mockResolvedValue([wait])
+	}
+
+	it('skips the human waits for a cell of another table', async () => {
+		const read_for = spy_waits()
+		const address = ['--table', 'stage', '--row', STAGE, '--column', MEDIAN]
+
+		await lane_measure_cli.run(['value', 'cell', '--since', SINCE, ...address], staged_context())
+		expect(read_for).not.toHaveBeenCalled()
+	})
+
+	it('reads the human waits for a cell of their table', async () => {
+		const read_for = spy_waits()
+		const address = ['--table', lane_human_wait_stats.TABLE, '--row', REASON, '--column', 'waits']
+
+		await expect(
+			lane_measure_cli.run(['value', 'cell', '--since', SINCE, ...address], fresh_context()),
+		).resolves.toBe(0)
+		expect(read_for).toHaveBeenCalledOnce()
+		expect(console.info).toHaveBeenCalledWith('1.00')
+	})
+
+	it('prints the waits lane:stats reads in the human wait table', async () => {
+		spy_waits()
+
+		await lane_measure_cli.run(['stats', '--since', SINCE], fresh_context())
+
+		const printed = String(vi.mocked(console.info).mock.calls[0]?.[0])
+
+		expect(printed).toContain(`| ${REASON} | 1 | 60`)
+	})
+
+	it('reads the run events once for the tables and the waits', async () => {
+		spy_waits()
+		const read_events = vi.spyOn(lane_net_read, 'read_events')
+
+		await lane_measure_cli.run(['stats', '--since', SINCE], fresh_context())
+		expect(read_events).toHaveBeenCalledOnce()
 	})
 })

@@ -1,4 +1,5 @@
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
+import { lane_catch_rate_stats } from './lane-catch-rate-stats'
 import { lane_chain_stop_stats } from './lane-chain-stop-stats'
 import { lane_check_stats } from './lane-check-stats'
 import { lane_ci_path_stats } from './lane-ci-path-stats'
@@ -10,6 +11,7 @@ import { lane_dispatch_wait_stats } from './lane-dispatch-wait-stats'
 import { lane_early_push_stats } from './lane-early-push-stats'
 import { lane_gap_stats } from './lane-gap-stats'
 import { lane_held_stats } from './lane-held-stats'
+import { lane_human_wait_stats, type HumanWait } from './lane-human-wait-stats'
 import { lane_implement_rate } from './lane-implement-rate'
 import { lane_implement_read } from './lane-implement-read'
 import { lane_implement_read_calls } from './lane-implement-read-calls'
@@ -41,6 +43,8 @@ interface PeriodRecords {
 	entries: ReturnType<typeof lane_ledger.read_entries>
 	events: ReadonlyArray<RunEvent>
 	calls: ReadonlyArray<ToolCall>
+	// The waits on a person (`lane-human-wait-read.ts`); absent, none were read.
+	human_waits?: ReadonlyArray<HumanWait>
 }
 
 // The tables read from the lane transcripts, under the followup critical path table.
@@ -59,15 +63,17 @@ function call_tables(
 	]
 }
 
-// The tables of where a lane stopped and waited — `josh ship`'s stops, `run:chain`'s, and the gaps and
-// cuts between a lane's runs.
+// The tables of where a lane stopped and waited — `josh ship`'s stops, the waits on a person,
+// `run:chain`'s stops, and the gaps and cuts between a lane's runs.
 function stop_tables(
 	entries: PeriodRecords['entries'],
 	events: ReadonlyArray<RunEvent>,
 	window: StatsWindow,
+	human_waits: ReadonlyArray<HumanWait>,
 ): Array<string> {
 	return [
 		lane_stop_stats.table(entries, window, events),
+		lane_human_wait_stats.table(human_waits, window),
 		lane_stop_check_stats.check_table(entries, window, events),
 		lane_stop_check_stats.longest_table(entries, window, events),
 		lane_chain_stop_stats.table(entries, window),
@@ -102,17 +108,18 @@ function tables_of(
 	window: StatsWindow,
 	options: TableOptions,
 ): Array<string> {
-	const { entries, events, calls } = records
+	const { entries, events, calls, human_waits = [] } = records
 
 	return [
 		lane_stage_stats.table(entries, window),
 		lane_ship_lap_stats.table(entries, window),
 		lane_ci_path_stats.table(entries, window),
 		...call_tables(entries, calls, window),
-		...stop_tables(entries, events, window),
+		...stop_tables(entries, events, window, human_waits),
 		...plan_tables(records, window, options),
 		lane_process_stats.table(entries, window),
 		lane_check_stats.table(entries, window),
+		lane_catch_rate_stats.table(entries, window),
 		lane_claim_stats.table(entries, window),
 		lane_test_related_stats.table(entries, window),
 		lane_test_related_stats.trigger_table(entries, window),

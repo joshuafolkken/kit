@@ -53,8 +53,11 @@ created with the command, never by hand:
 
 ```bash
 pnpm josh epic "<epic-title>" <N1> <N2> ...            # order-free batch
-pnpm josh epic "<epic-title>" <N1> <N2> ... --ordered --order-reason "<chain>: <reason>"
-# argument order is the dependency order; one --order-reason per chain
+pnpm josh epic "<epic-title>" A B C --chain "#A -> #C" --chain "#B -> #C" \
+  --order-reason "#A -> #C: <reason>" --order-reason "#B -> #C: <reason>"   # a join
+pnpm josh epic --add <E> D --chain "#C -> #D" --order-reason "#C -> #D: <reason>"
+pnpm josh epic "<epic-title>" A B C --ordered --order-reason "#A -> #B -> #C: <reason>"
+# --ordered: a true series only; one --order-reason per chain (docs/josh-commands-backlog.md → "josh epic")
 # --rationale-file <path|-> fills Split rationale; --origin <owner/repo#N> adds the backlink
 ```
 

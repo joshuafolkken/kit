@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { defect_origin_line } from './defect-origin-line'
 import { issue_classification } from './issue-classification'
-import { BREAKING_CHANGE_LABEL, ENHANCEMENT_LABEL } from './issue-labels'
+import { BREAKING_CHANGE_LABEL, BUG_LABEL, ENHANCEMENT_LABEL } from './issue-labels'
 
 const BODY = '## 背景\n\n'
 const EXISTING = ['route:split', 'run:lane']
@@ -202,5 +202,42 @@ describe('issue classification with existing labels', () => {
 			'Enhancement',
 			BREAKING_CHANGE_LABEL,
 		])
+	})
+})
+
+describe('issue_classification.kind_label_changes', () => {
+	const bug = `${BODY}- 種別: 不具合\n- 原因: #12\n`
+	const feature = `${BODY}${NON_BUG}\n- 目的: 機能追加\n- 互換性: 破壊的変更\n`
+
+	it('adds bug and removes enhancement for a defect body', () => {
+		expect(issue_classification.kind_label_changes(bug, [...EXISTING, 'Enhancement'])).toEqual({
+			add: [BUG_LABEL],
+			remove: ['Enhancement'],
+		})
+	})
+
+	it('adds enhancement and removes bug, never touching breaking-change', () => {
+		const existing = [BUG_LABEL, BREAKING_CHANGE_LABEL]
+
+		expect(issue_classification.kind_label_changes(feature, existing)).toEqual({
+			add: [ENHANCEMENT_LABEL],
+			remove: [BUG_LABEL],
+		})
+	})
+
+	it('removes both kind labels for a non-defect with no purpose', () => {
+		const other = `${BODY}${NON_BUG}\n- リリース分類: other-change\n`
+
+		expect(issue_classification.kind_label_changes(other, ['BUG', BREAKING_CHANGE_LABEL])).toEqual({
+			add: [],
+			remove: ['BUG'],
+		})
+	})
+
+	it('changes nothing when the labels already match', () => {
+		expect(issue_classification.kind_label_changes(bug, [BUG_LABEL])).toEqual({
+			add: [],
+			remove: [],
+		})
 	})
 })

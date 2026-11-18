@@ -131,6 +131,19 @@ describe('git_next_issues.order - estimated size', () => {
 	})
 })
 
+// joshuafolkken/kit#7912: a `bug` label reaches the defect key, above a smaller estimate.
+describe('git_next_issues.order - defect key (ac-ac7a05a2)', () => {
+	it('puts a bug ahead of a smaller estimate of its priority', () => {
+		const small = {
+			...issue(1, CREATED_EARLIER),
+			body: '## 背景\n\n- 規模見積もり: 約 1 ファイル / 10 行（テスト除く）',
+		}
+		const bug = issue(2, CREATED_LATER, ['bug'])
+
+		expect(git_next_issues.order([small, bug]).map((entry) => entry.number)).toEqual([2, 1])
+	})
+})
+
 // joshuafolkken/kit#5302: the 2026-10-28 queue — one measured time-saver behind newer undeclared
 // issues of its priority — puts the time-saver first.
 describe('git_next_issues.prioritize - expected effect', () => {

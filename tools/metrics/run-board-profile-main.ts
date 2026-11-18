@@ -3,12 +3,12 @@ import { fileURLToPath } from 'node:url'
 import { machine_capacity } from '#scripts/gate/machine-capacity'
 import { git_worktree } from '#scripts/git/git-worktree'
 import { lane_process_table } from '#scripts/lane/lane-process-table'
-import { lane_state } from '#scripts/lane/lane-state'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_board_cli } from '#scripts/run/board/run-board-cli'
 import { run_board_gather } from '#scripts/run/board/run-board-gather'
 import { run_board_gather_live } from '#scripts/run/board/run-board-gather-live'
 import { run_board_read } from '#scripts/run/board/run-board-read'
+import { run_board_records } from '#scripts/run/board/run-board-records'
 import { run_board_throughput } from '#scripts/run/board/run-board-throughput'
 import { run_board_tick } from '#scripts/run/board/run-board-tick'
 import { run_board_usage_read } from '#scripts/run/board/run-board-usage-read'
@@ -98,7 +98,7 @@ function local_share_pieces(repository: string): Array<Piece> {
 		{
 			label: 'lane records read',
 			per_minute: PER_LOCAL_READ,
-			run: async () => await lane_state.read_records(repository),
+			run: async () => run_board_records.read_records(repository),
 		},
 		{
 			label: 'throughput fold',
