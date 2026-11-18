@@ -188,3 +188,34 @@ describe('run_board_status.settle_closed with a child stopped for human review',
 		expect(settle_human(read)).toMatchObject({ state: 'human' })
 	})
 })
+
+// joshuafolkken/kit#7900 (ac-b5849952): as joshuafolkken/kit#7790 ran — launched, stopped, retried,
+// then closed by a person before it ran again. A child's stop is read from its labels, not the stream.
+const RETRIED = run_board_status.fold_events([
+	event_of(1, T0, KIND.CHILD_LAUNCH),
+	{ pos: 2, at: new Date(T1).toISOString(), kind: KIND.ADD, text: `retry #${String(ISSUE)}` },
+])
+
+function settle_retried(read: OpenRead): ItemStatus | undefined {
+	return run_board_status.settle_closed(RETRIED, read).get(ISSUE)
+}
+
+describe('run_board_status.settle_closed with a child waiting on its retry', () => {
+	it('folds the retry into a waiting child', () => {
+		expect(RETRIED.get(ISSUE)).toMatchObject({ state: 'waiting', started_ms: T0 })
+	})
+
+	it('draws one a person closed as withdrawn, timed to its close', () => {
+		const read = read_closed(closed_issue({ is_not_planned: true }))
+
+		expect(settle_retried(read)).toMatchObject({ state: 'withdrawn', ended_ms: T2 })
+	})
+
+	it('keeps one waiting once a listing read after its close holds it again', () => {
+		const read = read_closed(closed_issue({ is_not_planned: true }))
+
+		expect(
+			settle_retried({ ...read, open_numbers: new Set([ISSUE]), read_ms: T2 + 1 }),
+		).toMatchObject({ state: 'waiting' })
+	})
+})

@@ -3,6 +3,8 @@ import type { LoadEntry } from './lane-ledger-schema'
 import { lane_ledger_write } from './lane-ledger-write'
 import { lane_load } from './lane-load'
 import type { LaneSpan } from './lane-net-time'
+import { lane_offline } from './lane-offline'
+import { lane_offline_spans } from './lane-offline-spans'
 import { lane_sleep } from './lane-sleep'
 
 // The machine-load sampler: one `load` entry appended to the lane ledger, once or on a timer.
@@ -13,7 +15,8 @@ import { lane_sleep } from './lane-sleep'
 // the drive's own process and is unreferenced: it ends with the drive, never holds it open, and leaves
 // no process or pid file behind to stop.
 
-const SAMPLE_INTERVAL_MS = 60_000
+// The outage bound counts in this tick, so it has one owner (`lane-offline-spans.ts`).
+const { SAMPLE_INTERVAL_MS } = lane_offline_spans
 
 // Where the ledger is and what "now" is, overridable so a test reads a fixed ledger at a fixed instant.
 interface MeasureContext {
@@ -99,9 +102,13 @@ async function take_first(context: MeasureContext): Promise<void> {
 	}
 }
 
-/** Sample now and then every minute, recording a tick the host slept through; the returned function stops it. */
+/**
+ * Sample now and then every minute, recording a tick the host slept through and a change in whether the
+ * network answers (`lane-offline.ts`); the returned function stops it.
+ */
 function start(context: MeasureContext = {}): () => void {
 	let last_ms = Date.now()
+	const watch_network = lane_offline.watcher(context.events_path)
 
 	void take_first(context)
 	const timer = setInterval(() => {
@@ -111,6 +118,7 @@ function start(context: MeasureContext = {}): () => void {
 		last_ms = now_ms
 		if (slept !== undefined) void record_quietly(slept, context)
 		void take_quietly(context)
+		void watch_network()
 	}, SAMPLE_INTERVAL_MS).unref()
 
 	return () => {
