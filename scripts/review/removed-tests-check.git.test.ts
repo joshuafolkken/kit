@@ -81,7 +81,7 @@ describe('removed_tests_check.read — a merge of the default branch still in pr
 		async () => {
 			await stop_merge_on_conflict(SUITE_AT_BASE)
 
-			await expect(removed_tests_check.read()).resolves.toStrictEqual([])
+			await expect(removed_tests_check.read()).resolves.toMatchObject({ removed: [] })
 		},
 		TIMEOUT_MS,
 	)
@@ -92,7 +92,7 @@ describe('removed_tests_check.read — a merge of the default branch still in pr
 			await stop_merge_on_conflict(SUITE_ON_LANE)
 			await write_file(SUITE, SUITE_MERGED)
 
-			await expect(removed_tests_check.read()).resolves.toStrictEqual([LANE_DROPS])
+			await expect(removed_tests_check.read()).resolves.toMatchObject({ removed: [LANE_DROPS] })
 		},
 		TIMEOUT_MS,
 	)
@@ -105,7 +105,7 @@ describe('removed_tests_check.read — no merge in progress', () => {
 			await git(fixture.repository_root, ['checkout', '-b', LANE_BRANCH])
 			await commit({ [SUITE]: SUITE_ON_LANE }, 'lane')
 
-			await expect(removed_tests_check.read()).resolves.toStrictEqual([LANE_DROPS])
+			await expect(removed_tests_check.read()).resolves.toMatchObject({ removed: [LANE_DROPS] })
 		},
 		TIMEOUT_MS,
 	)

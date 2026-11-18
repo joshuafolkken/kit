@@ -68,6 +68,33 @@ describe('issue_outcome — evidence selection', () => {
 	})
 })
 
+function next_in(next: string): string | undefined {
+	return issue_outcome.next_of(issue_outcome.body_of({ body: NOTE, summary: next }))
+}
+
+// joshuafolkken/kit#7850: a stop's next action is a command, or prose led by who does it.
+describe('issue_outcome — next action', () => {
+	it.each([
+		'pnpm josh backlog:triage --apply 7447 --blocked-by 7839',
+		`pnpm josh ${'x'.repeat(issue_outcome.NEXT_LIMIT - 'pnpm josh '.length)}`,
+		'parent: file the follow-up Issue',
+		'person: decide the account owner',
+	])('accepts the next action %s', (next) => {
+		expect(next_in(next)).toBe(next)
+	})
+
+	it.each([`pnpm josh ${'x'.repeat(issue_outcome.NEXT_LIMIT)}`, 'close the lane', 'parent close'])(
+		'refuses the next action %s',
+		(next) => {
+			expect(next_in(next)).toBeUndefined()
+		},
+	)
+
+	it('reads no next action from an unmarked body', () => {
+		expect(issue_outcome.next_of(NOTE)).toBeUndefined()
+	})
+})
+
 describe('issue_outcome — one-line English records', () => {
 	it.each(['line\nbreak', 'escape\u{1B}]8;;url\u{7}', '日本語', 'x'.repeat(81), ''])(
 		'refuses an unsafe or overlong summary: %s',
@@ -110,6 +137,8 @@ describe('issue_outcome.recorded', () => {
 	it.each([
 		{ comments: [], expected: {} },
 		{ comments: [comment(marked())], expected: { outcome: { summary: SUMMARY, url: URL } } },
+		// joshuafolkken/kit#7850: a park's next action is not the closed Issue's conclusion.
+		{ comments: [comment(marked()), comment(marked('person: decide the owner'))], expected: {} },
 	])('records only available evidence: $expected', async ({ comments, expected }) => {
 		vi.spyOn(git_gh_issue_read, 'issue_list_comments').mockResolvedValue('[]')
 		vi.spyOn(issue_read, 'parse_comments').mockResolvedValue(comments)
