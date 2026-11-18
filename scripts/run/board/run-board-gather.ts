@@ -2,6 +2,7 @@ import type { BudgetWait } from '#scripts/gate/core-wait'
 import type { MachineSample } from '#scripts/gate/machine-capacity'
 import { lane_await } from '#scripts/lane/lane-await'
 import { lane_process_table, type TableRead } from '#scripts/lane/lane-process-table'
+import { launch_timing } from '#scripts/lane/launch-timing'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import type { BoardUsage } from './run-board-header'
 import { run_board_idle, type IdleSince } from './run-board-idle'
@@ -24,6 +25,7 @@ const MACHINE_SAMPLE_MS = MS_PER_SECOND
 const LOCAL_READ_SECONDS = 5
 const LOCAL_READ_MS = LOCAL_READ_SECONDS * MS_PER_SECOND
 const { is_due } = run_board_state
+const { timed } = launch_timing
 
 interface GatherPorts {
 	// Every process on the machine, one `ps` (`lane-process-table.ts`); a read takes it at most once
@@ -150,11 +152,14 @@ async function resample(
 	if (!is_due(state.sampled_ms, MACHINE_SAMPLE_MS, at.now_ms)) return state
 
 	const at_ms = ports.now()
-	const machine = { sample: await ports.read_machine(), at_ms }
+	const machine = { sample: await timed('machine', ports.read_machine), at_ms }
 	const gauges = run_board_machine.gauges_of(state.machine, machine)
 	const budget_waits = ports.read_waits?.() ?? []
-	const usages = await run_board_usage_board.read_usages(state, ports, at.table)
-	const quotas = await ports.read_quotas?.()
+	const usages = await timed(
+		'usages',
+		async () => await run_board_usage_board.read_usages(state, ports, at.table),
+	)
+	const quotas = await timed('quotas', async () => await ports.read_quotas?.())
 
 	return { ...state, ...usages, machine, gauges, budget_waits, quotas, sampled_ms: at.now_ms }
 }

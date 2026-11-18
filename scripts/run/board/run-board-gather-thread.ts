@@ -1,5 +1,6 @@
 import { isDeepStrictEqual } from 'node:util'
 import { Worker, type WorkerOptions } from 'node:worker_threads'
+import { launch_timing, type TimedPhase } from '#scripts/lane/launch-timing'
 import { ts_entry_loader } from '#scripts/run/ts-entry-loader'
 import {
 	run_board_gather,
@@ -18,6 +19,7 @@ import type { LocalRead } from './run-board-read'
 
 const WORKER_URL = new URL('run-board-gather-worker.ts', import.meta.url)
 const EMPTY_READ = run_board_gather.read_of(run_board_gather.FRESH_GATHER)
+const WORKER_PHASE = 'worker: first round'
 
 // The run's read as the worker hands it over. A stream read again unchanged is not handed over — the
 // board keeps its own array, so the folds it keyed on that array are not folded again.
@@ -27,10 +29,12 @@ interface LocalPost {
 }
 
 // One round as the worker hands it over: the run's read only when it was read again, so the board
-// does not copy the whole stream every second.
+// does not copy the whole stream every second. The phases the worker timed ride along, so
+// `run:board --timing` reads them on the board's own thread.
 interface GatherPost {
 	read: Omit<GatherRead, 'local'>
 	local?: LocalPost | undefined
+	phases?: ReadonlyArray<TimedPhase> | undefined
 }
 
 // A round whose reads threw, handed over with why; the worker reads again next round.
@@ -90,7 +94,7 @@ async function gather_round(
 	try {
 		const next = await run_board_gather.gather(state, ports, 'background')
 
-		post(post_of(state, next))
+		post({ ...post_of(state, next), phases: launch_timing.phases() })
 
 		return next
 	} catch (error) {
@@ -120,6 +124,9 @@ function local_of(thread: Thread, post: LocalPost): LocalRead | undefined {
 }
 
 function receive(thread: Thread, post: GatherPost): void {
+	const { phases = [] } = post
+
+	for (const phase of phases) launch_timing.mark(phase.name, phase.ms)
 	const local = post.local === undefined ? thread.latest?.local : local_of(thread, post.local)
 
 	settle(thread, { ...post.read, local, read_failed_ms: undefined, read_error: undefined })
@@ -138,8 +145,12 @@ function fail(thread: Thread, worker: GatherWorker, reason: string, now: () => n
 	said_failed(thread, reason, now)
 }
 
+// The first answer is timed from the spawn: the worker's start, its module load and its first round.
 function listen(thread: Thread, worker: GatherWorker, now: () => number): void {
+	const spawned_ms = now()
+
 	worker.on('message', (value) => {
+		launch_timing.mark(WORKER_PHASE, now() - spawned_ms)
 		if (is_post(value)) receive(thread, value)
 		else if (is_failed(value)) said_failed(thread, value.failed, now)
 	})

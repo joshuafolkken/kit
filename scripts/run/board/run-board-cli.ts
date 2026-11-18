@@ -30,6 +30,7 @@ import type { BoardPorts, BoardState } from './run-board-state'
 import { run_board_thanks_read } from './run-board-thanks-read'
 import { run_board_theme, type Theme } from './run-board-theme'
 import { run_board_tick } from './run-board-tick'
+import { run_board_timing } from './run-board-timing'
 
 // `josh run:board` — a full-screen board of the running `backlogrun`, redrawn once a second, its
 // spinners turned between redraws, for a person to keep open beside the run. What one redraw reads,
@@ -48,7 +49,7 @@ const PASSED_ON_FLAGS: ReadonlySet<string> = new Set([CHAT_FLAG, EVERY_FLAG])
 const SIGINT_EXIT_CODE = 130
 const SIGTERM_EXIT_CODE = 143
 const USAGE =
-	'Usage: josh run:board [--once | --chat [--fresh] | --every <minutes>] [--theme wargames]'
+	'Usage: josh run:board [--once | --chat [--fresh] | --every <minutes>] [--theme wargames] [--timing]'
 const DISABLED_NOTICE = `\`${run_progress.DISABLED_KEY}=${run_progress.DISABLED_VALUE}\` is set, so no progress is pushed.`
 const TRAILING_NEWLINE = /\n$/u
 const { FRESH_STATE, tick } = run_board_tick
@@ -333,8 +334,14 @@ function ports_for(ports: BoardPorts | undefined, is_live: boolean): BoardPorts 
 }
 
 // A board a person watches, in the theme; the chat's frame and `--every`'s are passed on as they are,
-// so they never take it.
-async function draw(flag: string, ports: BoardPorts | undefined, theme?: Theme): Promise<void> {
+// so they never take it. With `--timing`, the phases are said once the board is done
+// (`run-board-timing.ts`).
+async function draw(
+	flag: string,
+	ports: BoardPorts | undefined,
+	theme: Theme | undefined,
+	is_timing: boolean,
+): Promise<void> {
 	if (flag === CHAT_FLAG) {
 		await answer(ports_for(ports, false))
 
@@ -343,15 +350,12 @@ async function draw(flag: string, ports: BoardPorts | undefined, theme?: Theme):
 
 	const { is_tty } = ports ?? LIVE_PORTS
 	const mode = run_board_screen.mode_of({ is_tty, is_once: flag === ONCE_FLAG })
-	const board = ports_for(ports, mode === 'live')
+	const board = run_board_timing.timed(ports_for(ports, mode === 'live'), is_timing)
 
-	if (mode === 'live') {
-		await watch(run_board_theme.themed(board, theme), theme)
-
-		return
-	}
-
-	await still(board, theme)
+	// A live board says it as it leaves its screen: `watch` only ever returns by throwing.
+	if (mode === 'live') await watch(run_board_theme.themed(board, theme), theme)
+	else await still(board, theme)
+	run_board_timing.say(board, is_timing)
 }
 
 function is_every(flag: string, rest: ReadonlyArray<string>): boolean {
@@ -384,7 +388,8 @@ function theme_environment(argv: ReadonlyArray<string>): NodeJS.ProcessEnv {
 	return argv.some((argument) => PASSED_ON_FLAGS.has(argument)) ? {} : process.env
 }
 
-async function run(argv: ReadonlyArray<string>, ports?: BoardPorts): Promise<number> {
+async function run(given: ReadonlyArray<string>, ports?: BoardPorts): Promise<number> {
+	const { argv, is_timing } = run_board_timing.split(given)
 	const environment = theme_environment(argv)
 	const choice = run_board_theme.choose(argv, environment)
 
@@ -394,7 +399,7 @@ async function run(argv: ReadonlyArray<string>, ports?: BoardPorts): Promise<num
 	if (is_every(flag, rest)) return await push_every(rest[0], ports_for(ports, false))
 	if (is_refused(flag, rest)) return refuse()
 
-	await draw(flag, chat_ports(flag, rest, ports), choice.theme)
+	await draw(flag, chat_ports(flag, rest, ports), choice.theme, is_timing)
 
 	return SUCCESS_EXIT_CODE
 }

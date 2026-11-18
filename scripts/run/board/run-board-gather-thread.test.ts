@@ -1,4 +1,5 @@
 import { stripVTControlCharacters } from 'node:util'
+import { launch_timing } from '#scripts/lane/launch-timing'
 import { ts_entry_loader } from '#scripts/run/ts-entry-loader'
 import { describe, expect, it, vi } from 'vitest'
 import { run_board_fixture } from './run-board-fixture'
@@ -11,7 +12,8 @@ import { run_board_tick } from './run-board-tick'
 
 const { LOCAL, START, WORDS, harness, plan_titled } = run_board_fixture
 const { FRESH_GATHER, read_of } = run_board_gather
-const { post_of, worker_gatherer, worker_options } = run_board_gather_thread
+const { gather_round, post_of, worker_gatherer, worker_options } = run_board_gather_thread
+const WORKER_PHASE = { name: 'machine', ms: 7 }
 const { FRESH_STATE, tick } = run_board_tick
 const FAILED_MS = START + 1000
 const READ: GatherState = { ...FRESH_GATHER, local: LOCAL, read_ms: START }
@@ -177,6 +179,34 @@ describe('run_board_gather_thread.worker_gatherer over a stream read again', () 
 		spawned[0]?.emit('message', structuredClone(post_of(STREAM, GROWN)))
 
 		await expect(gather('background')).resolves.toMatchObject({ local: GROWN.local })
+	})
+})
+
+describe('run_board_gather_thread phases', () => {
+	it("marks the worker's first answer and the phases its round carried on the board's thread", async () => {
+		launch_timing.clear()
+		const { gather, spawned } = faked()
+		const first = gather('background')
+
+		spawned[0]?.emit('message', { ...post_of(FRESH_GATHER, READ), phases: [WORKER_PHASE] })
+		await first
+
+		expect(launch_timing.phases()).toStrictEqual([
+			{ name: 'worker: first round', ms: 0 },
+			WORKER_PHASE,
+		])
+	})
+
+	it('hands the phases the worker timed over with its round', async () => {
+		launch_timing.clear()
+		launch_timing.mark(WORKER_PHASE.name, WORKER_PHASE.ms)
+		const posts: Array<unknown> = []
+
+		await gather_round(FRESH_GATHER, harness(LOCAL, []).gathering, (value) => {
+			posts.push(value)
+		})
+
+		expect(posts[0]).toHaveProperty('phases', expect.arrayContaining([WORKER_PHASE]))
 	})
 })
 

@@ -1,0 +1,7 @@
+{
+	"reason": "run:board --timing adds the per-phase first-frame timing module (run-board-timing.ts) and phase recording in launch-timing (#7929)",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 153
+	}
+}

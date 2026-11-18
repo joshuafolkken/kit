@@ -32,3 +32,29 @@ describe('launch_timing', () => {
 		expect(launch_timing.rebuild_ms()).toBe(REBUILD_MS)
 	})
 })
+
+describe('launch_timing phases', () => {
+	it('keeps the first value each phase name was given, in the order first marked', () => {
+		launch_timing.mark('worker', REBUILD_MS)
+		launch_timing.mark('quotas', 1)
+		launch_timing.mark('worker', 0)
+
+		expect(launch_timing.phases()).toStrictEqual([
+			{ name: 'worker', ms: REBUILD_MS },
+			{ name: 'quotas', ms: 1 },
+		])
+	})
+
+	it('records how long a timed read took, even one that throws, and clears the phases', async () => {
+		await expect(launch_timing.timed('machine', async () => 'read')).resolves.toBe('read')
+		await expect(
+			launch_timing.timed('quotas', async () => {
+				throw new Error('failed')
+			}),
+		).rejects.toThrow('failed')
+
+		expect(launch_timing.phases().map((phase) => phase.name)).toStrictEqual(['machine', 'quotas'])
+		launch_timing.clear()
+		expect(launch_timing.phases()).toStrictEqual([])
+	})
+})
