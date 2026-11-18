@@ -116,7 +116,7 @@ it('uses starting hunks, cache inputs and probe copies after the source moves, w
 		test_pinned_fixture.DEFAULT_PATH_TEST,
 	])
 	expect(report).toMatchObject({ tree_hash: hash, is_stale: true })
-	expect(report.unpinned[0]?.new_lines).toContain("\treturn code === 0 ? 'merged' : 'busy'")
+	expect(report.unpinned[0]?.new_lines).toContain("\treturn ['merged', 'busy'][Number(code !== 0)]")
 	expect(await readFile(path.join(root, DRIVER_FILE), 'utf8')).toBe(LATER)
 })
 

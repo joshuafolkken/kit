@@ -271,7 +271,7 @@ describe('test_pinned.run after lines of the unpinned hunk were removed', () => 
 		'probes only what is left of the unpinned hunk once one of its lines is removed',
 		async () => {
 			await after_first_run()
-			await write(DRIVER_FILE, CHANGED_DRIVER.replace(/^\treturn argv.*\n/mu, ''))
+			await write(DRIVER_FILE, CHANGED_DRIVER.replace(/^\treturn \[result.*\n/mu, ''))
 			const runs = vi.spyOn(test_red, 'probe_in')
 
 			await run_report()

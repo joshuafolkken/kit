@@ -6,7 +6,8 @@ import { git_fixture_workspace, type FixtureWorkspace } from '#scripts/git/git-f
 // `run()` gained a driver-flag output beside `result.token`, and the tests only covered the default
 // path, so reverting that hunk to `result.token` left every test green. The hunk at line 3 is pinned —
 // reverting it turns its test red — and the one at line 6 is not. A committed new module with no
-// function adds no probe.
+// function adds no probe. The driver picks its values by index, not by `?:`, so no branch adds an arm
+// probe (joshuafolkken/kit#7882) to the hunks these tests count.
 
 const DRIVER_FILE = 'driver.js'
 const TEST_FILE = 'driver.test.ts'
@@ -16,7 +17,7 @@ const PROJECT_NODE_MODULES = path.resolve(NODE_MODULES)
 const PORCELAIN = '--porcelain'
 const BASE_DRIVER = `// A driver.
 export function label(code) {
-	return code === 0 ? 'ok' : 'busy'
+	return ['ok', 'busy'][Number(code !== 0)]
 }
 
 export function token_of(result) {
@@ -25,11 +26,11 @@ export function token_of(result) {
 `
 const CHANGED_DRIVER = `// The driver, whose comment edit no test can pin and the run drops.
 export function label(code) {
-	return code === 0 ? 'merged' : 'busy'
+	return ['merged', 'busy'][Number(code !== 0)]
 }
 
 export function token_of(result, argv) {
-	return argv.includes('--driver') ? String(result.code) : result.token
+	return [result.token, String(result.code)][Number(argv.includes('--driver'))]
 }
 `
 const DEFAULT_PATH_TEST = `import { expect, it } from 'vitest'
