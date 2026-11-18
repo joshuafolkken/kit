@@ -1,0 +1,7 @@
+{
+	"reason": "scripts.code_lines +31: the board row's adopted-parent-action reading (#7851) is new logic with no existing home to fold into",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 31
+	}
+}

@@ -157,6 +157,12 @@ A finished row leads with `✅` merged, `🏁` done, `⏩` closed by `josh issue
 
 説明不明でも最新停止コメントへリンクする。取得失敗や起動前の停止は `Reason unavailable: inspect issue`（Issueへリンク）、停止後に `backlog:triage --adopt` の採用があれば `adopted option <n> · relaunching`（採用コメントへリンク）。リンク非対応やchat/plainは行頭のIssue番号から確認する（CLIは `pnpm josh issue:read <N>`）。
 
+親の操作待ちの行は park の一手を出す（park へリンク）。条件は、最新 park の推奨が親の操作（`必要な権限: 親…`）で、その後の採用が推奨を `parent action done:` なしで取ったこと。
+
+- この一手は、起動時刻や後の `run:stalled` に関わらず、`relaunching` と停止の理由より優先する。
+- 一手は上のコマンド優先の規則のとおり、引数を埋めた `pnpm josh …` で出る。
+- 子の再起動で済む選択肢、推奨と違う選択肢、`parent action done:` 付きの採用は `relaunching` のまま。
+
 A queued or waiting row draws `<icon> <condition> <number> <kind> <title>  <tail>`: the icon says what it waits on, in place of `⏳`, and the condition column — 11 columns in both sections, the width of `MM-DD HH:MM` — holds its figure, so every row's number starts in one column. The legend names each wait icon the frame draws. A row leads with one icon only, the first of these that holds:
 
 - `🚪` / `📥` / `📤` `<time>` — how long its lane has been opening, installing or dispatching.
