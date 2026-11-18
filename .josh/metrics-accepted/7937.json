@@ -1,0 +1,7 @@
+{
+	"reason": "New frame record store and its CLI wiring for run:board --chat/--once (#7937); feature code, no duplicate to remove",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 110
+	}
+}
