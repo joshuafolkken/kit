@@ -51,9 +51,17 @@ function write_cost(record: UsageRecord): number {
 	return cost_pricing.cost_of([{ model: record.model, totals }])
 }
 
+function is_after_wait(record: UsageRecord, before: UsageRecord): boolean {
+	return (record.at_ms ?? 0) - (before.at_ms ?? 0) >= CACHE_TTL_MS
+}
+
+// A full rewrite after a wait of the TTL or more — the cache write cause `cost-audit-cause.ts` reads.
+function is_wait_rewrite(record: UsageRecord, before: UsageRecord): boolean {
+	return is_rewrite(record, before) && is_after_wait(record, before)
+}
+
 function add_rewrite(rewrites: Rewrites, record: UsageRecord, before: UsageRecord): void {
-	const gap_ms = (record.at_ms ?? 0) - (before.at_ms ?? 0)
-	const bucket = gap_ms >= CACHE_TTL_MS ? rewrites.after_wait : rewrites.within_ttl
+	const bucket = is_after_wait(record, before) ? rewrites.after_wait : rewrites.within_ttl
 
 	bucket.count += 1
 	bucket.usd += write_cost(record)
@@ -88,7 +96,7 @@ function rewrites_in(sessions: ReadonlyArray<RecordedSession>, is_counted: IsCou
 	return rewrites
 }
 
-const cost_audit_rewrite = { REWRITE_FLOOR_TOKENS, rewrites_in }
+const cost_audit_rewrite = { REWRITE_FLOOR_TOKENS, is_wait_rewrite, pairs_of, rewrites_in }
 
 export type { RewriteCount, Rewrites }
 export { cost_audit_rewrite }
