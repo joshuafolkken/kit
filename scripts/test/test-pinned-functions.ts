@@ -82,16 +82,22 @@ function statement_sites(api: TypeScriptApi, statement: ts.Statement): Array<Fun
 	)
 }
 
-// The whole lines the function spans, with its body swapped for the throw: the hunk replaces lines,
-// so a signature sharing a line with other code keeps that code.
-function stub_hunk(file: string, source: ts.SourceFile, site: FunctionSite): Hunk {
+// The whole lines the site spans, with its body swapped for `replacement` (the throw by default): the
+// hunk replaces lines, so a signature sharing a line with other code keeps that code. A changed
+// branch's arm is stubbed the same way (`test-pinned-branches.ts`).
+function stub_hunk(
+	file: string,
+	source: ts.SourceFile,
+	site: FunctionSite,
+	replacement = STUB_BODY,
+): Hunk {
 	const start = site.extent.getStart(source)
 	const first = source.getLineAndCharacterOfPosition(start).line
 	const last = source.getLineAndCharacterOfPosition(site.extent.getEnd()).line
 	const offset = start - source.getLineAndCharacterOfPosition(start).character
 	const lines = source.text.slice(offset, source.getLineEndOfPosition(site.extent.getEnd()))
 	const before = lines.slice(0, site.body.getStart(source) - offset)
-	const stubbed = `${before}${STUB_BODY}${lines.slice(site.body.getEnd() - offset)}`
+	const stubbed = `${before}${replacement}${lines.slice(site.body.getEnd() - offset)}`
 
 	return {
 		file,
@@ -111,6 +117,7 @@ function stub_hunks(api: TypeScriptApi, file: string, content: string): Array<Hu
 		.map((site) => stub_hunk(file, source, site))
 }
 
-const test_pinned_functions = { STUB_BODY, is_script, stub_hunks }
+const test_pinned_functions = { STUB_BODY, is_script, stub_hunk, stub_hunks }
 
+export type { FunctionSite }
 export { test_pinned_functions }

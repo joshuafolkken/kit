@@ -4,6 +4,7 @@ import { change_base } from '#scripts/git/change-base'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_spawn } from '#scripts/git/git-spawn'
 import { review_code_tree } from '#scripts/review/review-code-tree'
+import { test_pinned_branches } from './test-pinned-branches'
 import { test_pinned_cache, type LoadedCache, type Reached } from './test-pinned-cache'
 import {
 	test_pinned_cache_logic,
@@ -315,10 +316,14 @@ async function runtime_hunks(hunks: ReadonlyArray<Hunk>): Promise<ProbeRead> {
 	return { ...test_pinned_emit.probed_of(api, grouped, contents), unparsed: [] }
 }
 
+// The changed branches' arm probes come last, so a cap leaves them unchecked before a revert.
 async function read_probes(base: string, targets: ReadonlyArray<string>): Promise<ProbeRead> {
-	const stubs = await stub_hunks_of(await added_scripts(base, targets))
-	const changed = await runtime_hunks(await read_hunks(base, targets))
-	const hunks = [...changed.hunks, ...stubs.hunks]
+	const added = await added_scripts(base, targets)
+	const stubs = await stub_hunks_of(added)
+	const diffed = await read_hunks(base, targets)
+	const changed = await runtime_hunks(diffed)
+	const branches = await test_pinned_branches.read(diffed, added)
+	const hunks = [...changed.hunks, ...stubs.hunks, ...branches]
 
 	return { hunks, unparsed: stubs.unparsed, rewired: changed.rewired }
 }

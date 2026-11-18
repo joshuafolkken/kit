@@ -128,6 +128,12 @@ Order (joshuafolkken/kit#5153): a run probes the hunks whose file reaches the fe
 
 A cut answer is recorded as cut, and no reason accepts it as the whole list: `run:review --unpinned-ok` after a join on it checks the whole change again, and the ship's pre-detach under a reason probes the hunks the cut left.
 
+Branch arms (joshuafolkken/kit#7882): each arm of a changed branch is probed too. An `if`'s then and explicit `else`, both arms of `?:`, the right side of `??`, and a `case` / `default` clause's first statement are replaced by a throw one at a time; an arm no related test goes red on prints as `unpinned <file>:<line> <arm>` — no test takes it.
+
+A branch counts as changed when its first line, or its arm's first line, is a changed line (every line of an added file). Arm probes come after the hunks, so the `--max` cap leaves them unchecked first.
+
+Not probed, each still covered by its hunk's revert: an `if` with no `else` (the false path has no node to throw in), `&&` / `||` operands, a non-script file such as a Svelte component, and every file when `typescript` is not installed.
+
 ## `josh start` in detail
 
 **Prerequisites:** the [gh CLI](https://cli.github.com/), installed and signed in (`gh auth login`). Without it `josh start` stops before changing anything. A run that creates a commit (the first commit, or the setup pull request) also needs a Git author identity — [Tell Git who you are](../setup/prerequisites.md#4-tell-git-who-you-are); without one it stops before changing anything and prints the two `git config` commands that set it.
