@@ -16,7 +16,7 @@ import { run_board_frame_store } from './run-board-frame-store'
 import { run_board_gather } from './run-board-gather'
 import { run_board_gather_live } from './run-board-gather-live'
 import { run_board_gather_thread } from './run-board-gather-thread'
-import { run_board_intro } from './run-board-intro'
+import { run_board_intro, type Reveal } from './run-board-intro'
 import { run_board_issue_count } from './run-board-issue-count'
 import { run_board_keys, type KeyReading } from './run-board-keys'
 import { run_board_labels } from './run-board-labels'
@@ -52,8 +52,6 @@ const USAGE =
 const DISABLED_NOTICE = `\`${run_progress.DISABLED_KEY}=${run_progress.DISABLED_VALUE}\` is set, so no progress is pushed.`
 const TRAILING_NEWLINE = /\n$/u
 const { FRESH_STATE, tick } = run_board_tick
-
-type Reveal = (frame: string) => Promise<void>
 const { CHAT_KEY, fresh } = run_board_frame_store
 const { WORDS } = run_board_labels
 
@@ -231,26 +229,23 @@ async function redraw_forever(
 }
 
 // A signal leaves through `on_exit`; a failed redraw leaves before its error is printed, so the error
-// lands on the normal screen rather than vanishing with the alternate one. A board in a theme reveals
-// its first frame a line at a time; one in none draws it whole.
+// lands on the normal screen rather than vanishing with the alternate one. Only a board in a theme types
+// its opening line and reveals its first frame a line at a time; one in none draws it whole at once.
 async function watch(ports: BoardPorts, theme: Theme | undefined): Promise<void> {
 	const screen = run_board_screen.screen_of('live')
-	const keys = run_board_keys.read_keys(ports.keys)
+	const keys = run_board_keys.read_keys(ports.keys, ports.cue)
 	const leave = leaver(ports, screen, keys)
-
-	const reveal: Reveal | undefined =
-		theme === undefined
-			? undefined
-			: async (frame) => {
-					await run_board_intro.reveal(frame, ports, keys)
-				}
 
 	ports.write(screen.enter)
 	ports.on_exit(leave)
-	const gather = run_board_intro.after(ports.gather, run_board_intro.play(ports, keys))
+	const { gather, reveal } = run_board_intro.opening(ports.gather, ports, keys, theme)
 
 	try {
-		await redraw_forever({ ...ports, gather, folded: keys.folded }, screen, reveal)
+		await redraw_forever(
+			{ ...ports, gather, folded: keys.folded, sound: keys.sound, cue: keys.cue ?? ports.cue },
+			screen,
+			reveal,
+		)
 	} finally {
 		leave()
 	}

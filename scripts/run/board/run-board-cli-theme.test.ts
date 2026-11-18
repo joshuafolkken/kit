@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_board_cli } from './run-board-cli'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_intro } from './run-board-intro'
+import { run_board_typing } from './run-board-typing'
 
 // joshuafolkken/kit#7934: a board a person watches takes the theme; the chat's frame never does. How
 // the theme draws a frame is `run-board-theme.test.ts`'s.
@@ -109,6 +110,40 @@ describe('run_board_cli.run --theme reveal', () => {
 
 		expect(line_writes(frames)).toStrictEqual([])
 		expect(frames).toContain(SLEPT)
+	})
+})
+
+// joshuafolkken/kit#8029: the typed line is the theme's — a board in none types nothing and waits on no
+// beat before its first frame; one JOSH_BOARD_THEME names types it as `--theme` does.
+async function intro_run(argv: Array<string>): Promise<{ text: string; beats: number }> {
+	const { ports, frames } = harness(undefined, [])
+	let beats = 0
+
+	async function intro_sleep(): Promise<void> {
+		beats += 1
+		await Promise.resolve()
+	}
+
+	await expect(run_board_cli.run(argv, { ...ports, intro_sleep })).rejects.toBe(STOPPED)
+
+	return { text: frames.join(''), beats }
+}
+
+describe('run_board_cli.run --theme intro', () => {
+	it('types no line and waits on no beat on a board in no theme', async () => {
+		const { text, beats } = await intro_run([])
+
+		expect(text).not.toContain(run_board_intro.LINE)
+		expect(text).not.toContain(run_board_typing.CURSOR)
+		expect(beats).toBe(0)
+	})
+
+	it('types the line on a board JOSH_BOARD_THEME names', async () => {
+		vi.stubEnv('JOSH_BOARD_THEME', 'wargames')
+		const { text, beats } = await intro_run([])
+
+		expect(text).toContain(run_board_typing.CURSOR)
+		expect(beats).toBeGreaterThan(run_board_intro.LINE.length)
 	})
 })
 

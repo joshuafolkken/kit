@@ -1,3 +1,6 @@
+import { writeFileSync } from 'node:fs'
+import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { epic_command } from './epic'
 
@@ -12,6 +15,7 @@ vi.mock('#scripts/gh/git-gh-command', () => ({ git_gh_command: { repo_get_name_w
 
 const CHAIN = '--chain'
 const JOIN = '#894 -> #891'
+const JOIN_REASON = ['--order-reason', `${JOIN}: #891 reads what #894 writes`]
 const FAILURE = 1
 const TARGET_REPO = 'someone/other'
 const QUALIFIED_EPIC = `${TARGET_REPO}#893`
@@ -32,9 +36,15 @@ beforeEach(() => {
 
 describe('epic_command.run — --add --chain', () => {
 	it('hands the declared chains to the writer', async () => {
-		await epic_command.run(['--add', '893', '894', CHAIN, JOIN])
+		await epic_command.run(['--add', '893', '894', CHAIN, JOIN, ...JOIN_REASON])
 
 		expect(add_children).toHaveBeenCalledWith(expect.objectContaining({ chains: [[894, 891]] }))
+	})
+
+	it('refuses a chain without its --order-reason without writing', async () => {
+		expect(await epic_command.run(['--add', '893', '894', CHAIN, JOIN])).toBe(FAILURE)
+		expect(printed()).toContain('has no `--order-reason')
+		expect(add_children).not.toHaveBeenCalled()
 	})
 
 	it('refuses a chain beside --before without writing', async () => {
@@ -52,12 +62,48 @@ describe('epic_command.run — --add --chain', () => {
 		expect(add_children).not.toHaveBeenCalled()
 	})
 
-	it('names --chain in the --add usage line', async () => {
+	it('names --chain and --order-reason in the --add usage line', async () => {
 		await epic_command.run(['--add'])
 
 		expect(printed()).toContain(
-			'josh epic --add <E> <N1> <N2> ... [--before <M> | --after <M> | --chain',
+			'josh epic --add <E> <N1> <N2> ... [--before <M> | --after <M> | --chain "#A -> #B" ...] [--order-reason "#A -> #B: <reason>" ...]',
 		)
+	})
+})
+
+describe('epic_command.run — --add --chain records its reasons', () => {
+	const RECORD = '- Reasoning: #891 reads what #894 writes'
+	const make_directory = temporary_directory()
+
+	it('folds each chain and its reason into the decision the writer records', async () => {
+		await epic_command.run(['--add', '893', '894', CHAIN, JOIN, ...JOIN_REASON])
+
+		const decision = String(add_children.mock.calls[0]?.[0]?.decision)
+
+		expect(decision).toContain('- Order: `#894 -> #891`, declared by `josh epic --add --chain`')
+		expect(decision).toContain(RECORD)
+	})
+
+	it('writes the --decision-file text first, then the order record', async () => {
+		const directory = make_directory('epic-add-reason-')
+		const decision_file = path.join(directory, 'why.md')
+
+		writeFileSync(decision_file, 'Placed after the parser work.')
+		await epic_command.run([
+			'--add',
+			'893',
+			'894',
+			CHAIN,
+			JOIN,
+			...JOIN_REASON,
+			'--decision-file',
+			decision_file,
+		])
+
+		const decision = String(add_children.mock.calls[0]?.[0]?.decision)
+
+		expect(decision).toMatch(/^Placed after the parser work\.\n\n- Order: /u)
+		expect(decision).toContain(RECORD)
 	})
 })
 
@@ -73,7 +119,7 @@ describe('epic_command.run — --add --chain into owner/repo#N', () => {
 	it('writes a target naming this repository, chains included', async () => {
 		repo_get_name_with_owner.mockResolvedValue(TARGET_REPO)
 
-		await epic_command.run(['--add', QUALIFIED_EPIC, '894', CHAIN, JOIN])
+		await epic_command.run(['--add', QUALIFIED_EPIC, '894', CHAIN, JOIN, ...JOIN_REASON])
 
 		expect(add_children).toHaveBeenCalledWith(expect.objectContaining({ chains: [[894, 891]] }))
 	})

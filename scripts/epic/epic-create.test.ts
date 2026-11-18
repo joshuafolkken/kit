@@ -17,6 +17,7 @@ vi.mock('./epic-notify', () => ({
 const TITLE = 'Split work'
 const ARGV = [TITLE, '10', '11']
 const CHAIN = '--chain'
+const REASON = '--order-reason'
 const TEN_TO_ELEVEN = '#10 -> #11'
 
 beforeEach(() => {
@@ -50,7 +51,15 @@ describe('epic_command.create', () => {
 
 describe('epic_command.create — --chain', () => {
 	it('passes the declared --chain lines to the creation', async () => {
-		await epic_command.create([...ARGV, '12', CHAIN, '#10 -> #12', CHAIN, '#11 -> #12'])
+		const joins = ['#10 -> #12', '#11 -> #12']
+		const reasons = joins.flatMap((join) => [REASON, `${join}: a reason`])
+
+		await epic_command.create([
+			...ARGV,
+			'12',
+			...joins.flatMap((join) => [CHAIN, join]),
+			...reasons,
+		])
 
 		expect(create_epic_number).toHaveBeenCalledWith(
 			expect.objectContaining({
@@ -83,7 +92,9 @@ describe('epic_command.run — --promote with --chain', () => {
 	const PROMOTE = ['--promote', '9', '10', '11']
 
 	it('passes the declared --chain lines to the promotion', async () => {
-		expect(await epic_command.run([...PROMOTE, CHAIN, TEN_TO_ELEVEN])).toBe(0)
+		const reason = [REASON, `${TEN_TO_ELEVEN}: #11 reads #10`]
+
+		expect(await epic_command.run([...PROMOTE, CHAIN, TEN_TO_ELEVEN, ...reason])).toBe(0)
 
 		expect(promote_epic).toHaveBeenCalledWith(expect.objectContaining({ chains: [[10, 11]] }))
 	})
@@ -97,7 +108,6 @@ describe('epic_command.run — --promote with --chain', () => {
 })
 
 describe('epic_command — --order-reason', () => {
-	const REASON = '--order-reason'
 	const REASONS = [{ chain: [10, 11], reason: '#11 reads what #10 writes' }]
 	const REASON_ARGS = [CHAIN, TEN_TO_ELEVEN, REASON, `${TEN_TO_ELEVEN}: #11 reads what #10 writes`]
 
@@ -113,6 +123,14 @@ describe('epic_command — --order-reason', () => {
 		expect(await epic_command.run(['--promote', '9', '10', '11', ...REASON_ARGS])).toBe(0)
 
 		expect(promote_epic).toHaveBeenCalledWith(expect.objectContaining({ order_reasons: REASONS }))
+	})
+
+	it('refuses a declared chain without its reason before the reach check, creating nothing', async () => {
+		expect(await epic_command.create([...ARGV, CHAIN, TEN_TO_ELEVEN])).toStrictEqual({
+			kind: 'refused',
+		})
+		expect(refusal_of).not.toHaveBeenCalled()
+		expect(create_epic_number).not.toHaveBeenCalled()
 	})
 
 	it('names --order-reason in the usage it prints on a refusal', async () => {

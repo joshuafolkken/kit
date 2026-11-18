@@ -714,6 +714,8 @@ The reader over what `josh review:record` wrote.
 
 `--period <days>` counts only lines dated from `<days>` days ago on, by category and severity, medium-and-up first. A value that is not a positive whole number prints the usage and exits non-zero.
 
+Both end with each finding kind's count and how many findings carry one (`prompts/review-rubric.md` → "Review output format").
+
 Related: [`josh review:record`](josh-commands-automation.md#josh-reviewrecord).
 
 ### `josh review:stops`

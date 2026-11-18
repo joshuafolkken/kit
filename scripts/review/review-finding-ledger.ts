@@ -16,6 +16,10 @@ const FIELD_COUNT = 5
 // **The disposition is a sixth field, written only when given** (joshuafolkken/kit#5286): a line
 // written before it existed keeps its five and reads as a finding with no disposition.
 const DISPOSED_FIELD_COUNT = FIELD_COUNT + 1
+// **The finding's kind is a seventh, written only when given** (joshuafolkken/kit#7886); a line with a
+// kind but no disposition holds the sixth with `NO_DISPOSITION`, which reads as no disposition.
+const KIND_FIELD_COUNT = DISPOSED_FIELD_COUNT + 1
+const NO_DISPOSITION = '-'
 const ISSUE_FIELD_INDEX = FIELD_COUNT - 1
 const SEVERITY_FIELD_INDEX = 1
 const DATE_FIELD_INDEX = 3
@@ -61,6 +65,7 @@ interface Finding {
 	severity: Severity
 	file: string
 	disposition?: string
+	kind?: string
 }
 
 interface DisposedSpec {
@@ -117,6 +122,13 @@ function line_of(fields: ReadonlyArray<string>, kind: LineKind): string {
 	return `${PREFIX[kind]}${fields.join(FIELD_SEPARATOR)}`
 }
 
+// The optional trailing fields: none, the disposition, or the disposition (or its placeholder) and kind.
+function trailing_fields(finding: Finding): ReadonlyArray<string> {
+	if (finding.kind !== undefined) return [finding.disposition ?? NO_DISPOSITION, finding.kind]
+
+	return finding.disposition === undefined ? [] : [finding.disposition]
+}
+
 function finding_line(
 	finding: Finding,
 	date: string,
@@ -125,10 +137,7 @@ function finding_line(
 ): string {
 	const fields = [finding.category, finding.severity, finding.file, date, issue_field(issue)]
 
-	return line_of(
-		finding.disposition === undefined ? fields : [...fields, finding.disposition],
-		kind,
-	)
+	return line_of([...fields, ...trailing_fields(finding)], kind)
 }
 
 // **A zero-finding round records `none`, not nothing.** Reading its absence as "no findings" would
@@ -146,16 +155,15 @@ function fields_of(line: string, kind: LineKind = 'code'): ReadonlyArray<string>
 	return line.trimStart().slice(PREFIX[kind].length).split(FIELD_SEPARATOR)
 }
 
-// The line's fields, or `undefined` for a malformed one — five, or six with a disposition.
+// The line's fields, or `undefined` for a malformed one — five, six with a disposition, seven with a
+// kind.
 function well_formed_fields(
 	line: string,
 	kind: LineKind = 'code',
 ): ReadonlyArray<string> | undefined {
 	const fields = fields_of(line, kind)
 
-	return fields.length === FIELD_COUNT || fields.length === DISPOSED_FIELD_COUNT
-		? fields
-		: undefined
+	return fields.length >= FIELD_COUNT && fields.length <= KIND_FIELD_COUNT ? fields : undefined
 }
 
 function category_of(line: string): string | undefined {
@@ -258,6 +266,16 @@ function zero_round_count(content: string, since = ''): number {
 	return content.split('\n').filter((line) => dated_fields(line, since)?.[0] === NONE).length
 }
 
+// Each real finding's kind dated on or after `since`, `undefined` for one written without — one entry
+// per finding, so the share with a kind is countable (`review-finding-kind.ts`).
+function dated_kinds(content: string, since = ''): ReadonlyArray<string | undefined> {
+	return content
+		.split('\n')
+		.map((line) => dated_fields(line, since))
+		.filter((fields) => fields !== undefined && fields[0] !== NONE)
+		.map((fields) => fields?.[DISPOSED_FIELD_COUNT])
+}
+
 // The issue a finding line is keyed to — its fifth field, the `#<N>` token — or `undefined` for a
 // non-finding or malformed line. The record check reads this to ask whether a given issue's round was
 // recorded at all.
@@ -285,7 +303,7 @@ function issue_dispositions(
 		.map((line) => well_formed_fields(line, kind) ?? [])
 		.map((fields) => ({
 			severity: fields[SEVERITY_FIELD_INDEX] ?? NONE,
-			disposition: fields[FIELD_COUNT],
+			disposition: fields[FIELD_COUNT] === NO_DISPOSITION ? undefined : fields[FIELD_COUNT],
 		}))
 }
 
@@ -327,6 +345,7 @@ function has_issue_record(content: string, issue: number, kind: LineKind = 'code
 const review_finding_ledger = {
 	CATEGORIES,
 	category_counts,
+	dated_kinds,
 	finding_line,
 	has_issue_record,
 	is_category,

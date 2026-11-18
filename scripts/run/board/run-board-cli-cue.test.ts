@@ -78,6 +78,47 @@ describe('run_board_cli.run cue', () => {
 	)
 })
 
+// joshuafolkken/kit#7953: a keyboard whose store keeps the sound off silences the live board's cues,
+// and `s` typed at once switches it on, playing launch then and every cue after.
+function silenced(cues: Array<CueName>, typed: string): BoardPorts {
+	const ports = launching(cues)
+
+	return {
+		...ports,
+		keys: {
+			is_tty: true,
+			raw: () => undefined,
+			listen: (on_data) => {
+				on_data(typed)
+			},
+			close: () => undefined,
+			interrupt: () => undefined,
+			store: {
+				load: () => new Set(),
+				save: () => undefined,
+				load_sound: () => false,
+				save_sound: () => undefined,
+			},
+		},
+	}
+}
+
+describe('run_board_cli.run sound switch', () => {
+	it('sounds nothing on the live board while the sound is off', async () => {
+		const cues: Array<CueName> = []
+
+		await expect(run_board_cli.run([], silenced(cues, ''))).rejects.toBe(STOPPED)
+		expect(cues).toStrictEqual([])
+	})
+
+	it('plays launch as s switches the sound on, then the launch the board sees', async () => {
+		const cues: Array<CueName> = []
+
+		await expect(run_board_cli.run([], silenced(cues, 's'))).rejects.toBe(STOPPED)
+		expect(cues).toStrictEqual(['launch', 'launch'])
+	})
+})
+
 describe('run_board_cli.live_ports cue', () => {
 	it('passes the sound player to the live board alone', () => {
 		expect(run_board_cli.live_ports(true).cue).toBe(run_board_sound_player.play_cue)

@@ -101,7 +101,7 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: [BOARD_THEME],
 					description:
-						'draws the text no color is given in the cyan of the film terminal phosphor and every rule as `-`; `JOSH_BOARD_THEME=wargames` sets it for every board, the one `backlogrun` opens included, and `--theme` wins over it. A live board writes its first frame a line at a time; a key writes the rest. An unknown name is refused. `--chat` and `--every` never take it.',
+						'draws uncolored text in film phosphor cyan and every rule as `-`; `JOSH_BOARD_THEME=wargames` sets it for every board, the `backlogrun` one included, and `--theme` wins. A live board types its opening line, then its first frame a line at a time; a key skips the rest. No theme plays neither. An unknown name is refused; `--chat` and `--every` never take it.',
 				},
 			],
 		},

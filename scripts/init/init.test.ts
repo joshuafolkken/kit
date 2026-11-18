@@ -150,13 +150,13 @@ describe('apply_package_json_merges', () => {
 		expect(merge_development_dependencies(existing)['eslint']).toBe('^10.0.0')
 	})
 
-	// The pre-commit secretlint rule shipped in lefthook/base.yml resolves both packages
-	// from the consumer, so init must provision them alongside the config file.
-	it('adds the secretlint CLI and rule preset', () => {
+	// The pre-commit secretlint rule shipped in lefthook/base.yml resolves the CLI from the
+	// consumer; since secretlint v14 the CLI carries the recommend preset, whose package is retired.
+	it('adds the secretlint CLI without the retired rule preset package', () => {
 		const deps = merge_development_dependencies('{}\n')
 
 		expect(deps['secretlint']).toBeDefined()
-		expect(deps['@secretlint/secretlint-rule-preset-recommend']).toBeDefined()
+		expect(deps['@secretlint/secretlint-rule-preset-recommend']).toBeUndefined()
 	})
 })
 

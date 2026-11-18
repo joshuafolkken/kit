@@ -1,6 +1,7 @@
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { session_cite } from '#scripts/issue/session-cite'
 import { cli_body } from '#scripts/josh/cli-body'
+import { shell_quote } from '#scripts/lib/shell-quote'
 import { epic_chains, type InsertKind, type InsertPosition } from './epic-chains'
 import { epic_cli_argv, type EpicArgv, type FormFlags } from './epic-cli-argv'
 import { epic_cli_chain, type ChainRead } from './epic-cli-chain'
@@ -55,7 +56,7 @@ const CHECK_FORM: FormFlags = { switches: [] }
 const ADD_FORM: FormFlags = {
 	switches: [ADD_FLAG],
 	value_flags: [BEFORE_FLAG, AFTER_FLAG, ORDER_BEFORE_FLAG, ORDER_AFTER_FLAG, DECISION_FLAG],
-	list_flags: [epic_cli_chain.CHAIN_FLAG],
+	list_flags: BATCH_LIST_FLAGS,
 }
 
 const { count_flag, is_switch_set, is_value_unusable, positionals_of, read_flag_value, read_form } =
@@ -325,12 +326,22 @@ function find_cross_repo_add_target(argv: ReadonlyArray<string>): CrossRepoAddTa
 	return local === undefined ? undefined : { epic, local }
 }
 
+// Each `--order-reason` as the other checkout reads it back: the chain line, then its reason.
+function format_order_reasons(local: AddArguments): Array<string> {
+	return (local.order_reasons ?? []).flatMap((entry) => [
+		epic_cli_chain.ORDER_REASON_FLAG,
+		shell_quote.single_quoted(
+			`${epic_chains.render_chains([entry.chain]).join('')}: ${entry.reason}`,
+		),
+	])
+}
+
 // Rebuilt from the parsed values rather than echoed from `argv`, so the suggested command is exactly
 // what the other checkout would read — and carries the position, which is the one part of the
 // instruction the epic itself does not record.
 // The order-only prefix rides along, since it is what decides whether the other checkout writes a
 // dependency — a suggestion that dropped it would be a different instruction. So do the `--chain`
-// declarations, for the same reason.
+// declarations, for the same reason — and their reasons, without which the other checkout refuses them.
 function format_add_arguments(local: AddArguments): string {
 	const flag = to_position_flag(local)
 	const position =
@@ -338,8 +349,11 @@ function format_add_arguments(local: AddArguments): string {
 	const chains = epic_chains
 		.render_chains(local.chains)
 		.flatMap((line) => [epic_cli_chain.CHAIN_FLAG, `"${line}"`])
+	const reasons = format_order_reasons(local)
 
-	return [local.epic_number, ...local.children, ...position, ...chains].map(String).join(' ')
+	return [local.epic_number, ...local.children, ...position, ...chains, ...reasons]
+		.map(String)
+		.join(' ')
 }
 
 // **`--decision-file` is named rather than relayed**. The suggestion is a
