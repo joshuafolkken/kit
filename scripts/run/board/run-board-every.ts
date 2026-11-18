@@ -101,8 +101,15 @@ function redrawn(state: BoardState, local: LocalRead, ports: BoardPorts, now_ms:
 	return text
 }
 
+// When the run's plan the state draws was asked for — the oldest read in the frame, so its record is
+// dated then. `undefined` until this run's first plan read has settled: before it, the frame holds
+// only the run's own children, which `--chat` and `--once` wait past.
+function read_ms(state: BoardState): number | undefined {
+	return state.fetched_ms ?? state.failed_ms
+}
+
 // Records the chat's frame and the single frame `--once` draws on this terminal in the theme, both
-// from the live board's last state; the chat thanks nobody.
+// from the live board's last state and dated when its plan was read; the chat thanks nobody.
 function record(
 	state: BoardState,
 	ports: BoardPorts,
@@ -110,25 +117,26 @@ function record(
 	now_ms: number,
 ): void {
 	const { local } = state
+	const saved_ms = read_ms(state)
 
-	if (local === undefined) return
+	if (local === undefined || saved_ms === undefined) return
 	const chat = redrawn({ ...state, thanks: [] }, local, { ...ports, form: 'chat' }, now_ms)
 	const once = run_board_theme.restyle(theme, redrawn(state, local, ports, now_ms))
 
-	ports.frames?.save(CHAT_KEY, { text: stripVTControlCharacters(chat), saved_ms: now_ms })
-	ports.frames?.save(once_key(theme, ports.is_tty), { text: once, saved_ms: now_ms })
+	ports.frames?.save(CHAT_KEY, { text: stripVTControlCharacters(chat), saved_ms })
+	ports.frames?.save(once_key(theme, ports.is_tty), { text: once, saved_ms })
 }
 
 // What a live board calls after each redraw: records its frames at most once every
-// `RECORD_EVERY_MS`. Drawn and saved in place, they take no read, so the redraw on the second is
-// never held up waiting on one.
+// `RECORD_EVERY_MS`, from the first state whose plan read has settled. Drawn and saved in place, they
+// take no read, so the redraw on the second is never held up waiting on one.
 function recorder(ports: BoardPorts, theme: Theme | undefined): (state: BoardState) => void {
 	let next_ms = -Infinity
 
 	return (state) => {
 		const now_ms = ports.now()
 
-		if (ports.frames === undefined || now_ms < next_ms) return
+		if (ports.frames === undefined || read_ms(state) === undefined || now_ms < next_ms) return
 		next_ms = now_ms + RECORD_EVERY_MS
 		record(state, ports, theme, now_ms)
 	}

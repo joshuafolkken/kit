@@ -1,13 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_cli } from './run-board-cli'
+import { run_board_every } from './run-board-every'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_frame_store } from './run-board-frame-store'
 import type { LocalRead } from './run-board-read'
+import { run_board_tick } from './run-board-tick'
 
 // joshuafolkken/kit#3569: `run:board --every <minutes>` pushes the chat frame off-screen each interval,
 // with no model in between, and ends with the run.
 
 const { LOCAL, START, harness, plan_titled } = run_board_fixture
+const { FRESH_STATE } = run_board_tick
 const ESCAPE = '\u{1B}'
 const FIVE_MINUTES_MS = 300_000
 const ENDED: LocalRead = { ...LOCAL, ended_ms: START + FIVE_MINUTES_MS }
@@ -86,6 +89,33 @@ describe('run_board_cli.run --every record', () => {
 			saved_ms: START + FIVE_MINUTES_MS,
 		})
 		expect(marks).toHaveLength(0)
+	})
+})
+
+// joshuafolkken/kit#7938: a live board records nothing before its first plan read settles, and dates
+// what it records when that read was asked.
+describe('run_board_every.recorder', () => {
+	it('records nothing before the plan read has settled', () => {
+		const { ports } = harness(LOCAL, PLANS)
+		const store = run_board_frame_store.memory_store()
+
+		run_board_every.recorder(
+			{ ...ports, frames: store },
+			undefined,
+		)({ ...FRESH_STATE, local: LOCAL })
+
+		expect(store.load(run_board_frame_store.CHAT_KEY)).toBeUndefined()
+	})
+
+	it('dates the record when the plan was read, not when it was drawn', () => {
+		const { ports } = harness(LOCAL, PLANS)
+		const store = run_board_frame_store.memory_store()
+		const fetched_ms = START - FIVE_MINUTES_MS
+		const state = { ...FRESH_STATE, local: LOCAL, fetched_ms }
+
+		run_board_every.recorder({ ...ports, frames: store }, undefined)(state)
+
+		expect(store.load(run_board_frame_store.CHAT_KEY)?.saved_ms).toBe(fetched_ms)
 	})
 })
 
