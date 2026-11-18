@@ -2,6 +2,7 @@ import { cost_pricing } from '#scripts/cost-runtime/cost-pricing'
 import type { UsageRecord } from '#scripts/cost-runtime/cost-usage'
 import type { Breakdown } from '#scripts/lane/lane-breakdown'
 import { guard_friction } from '#tools/retrospective/guard-friction'
+import { cost_audit_cause, type CauseRow } from './cost-audit-cause'
 import { cost_audit_density, type Density } from './cost-audit-density'
 import { cost_audit_phase, type PhaseRow } from './cost-audit-phase'
 import type { AuditSession } from './cost-audit-read'
@@ -63,6 +64,8 @@ interface Audit {
 	tools: ReadonlyArray<AuditRow>
 	guards: ReadonlyArray<AuditRow>
 	rewrites: { current: Rewrites; previous: Rewrites }
+	// The cache write by cause, each row set beside the period before (joshuafolkken/kit#7877).
+	write_causes: ReadonlyArray<CauseRow>
 	// The current period's lane requests by phase (joshuafolkken/kit#5936).
 	phases: ReadonlyArray<PhaseRow>
 	// The current period's lane delegated units by agent type (joshuafolkken/kit#5971).
@@ -181,6 +184,17 @@ function rewrites_inside(sessions: ReadonlyArray<AuditSession>, window: AuditWin
 	return cost_audit_rewrite.rewrites_in(sessions, (at_ms) => is_inside(at_ms, window))
 }
 
+function write_causes(
+	sessions: ReadonlyArray<AuditSession>,
+	current: AuditWindow,
+	previous: AuditWindow,
+): Array<CauseRow> {
+	return cost_audit_cause.causes_in(sessions, {
+		current: (at_ms) => is_inside(at_ms, current),
+		previous: (at_ms) => is_inside(at_ms, previous),
+	})
+}
+
 function records_by_kind(sessions: ReadonlyArray<AuditSession>): Map<string, Array<UsageRecord>> {
 	const records = new Map<string, Array<UsageRecord>>()
 
@@ -261,6 +275,7 @@ function audit(input: AuditInput): Audit {
 			current: rewrites_inside(input.sessions, current_window),
 			previous: rewrites_inside(input.sessions, previous_window),
 		},
+		write_causes: write_causes(input.sessions, current_window, previous_window),
 	}
 }
 

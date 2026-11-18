@@ -1,0 +1,133 @@
+import { styleText } from 'node:util'
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
+import { run_board_fit } from './run-board-fit'
+import { run_board_fresh } from './run-board-fresh'
+import type { RunMark } from './run-board-header-names'
+import { run_board_labels } from './run-board-labels'
+import type { NowLine } from './run-board-now'
+import { run_board_render_slot } from './run-board-render-slot'
+import type { RunActivity } from './run-board-status'
+
+// The header's time cells (`run-board-header.ts`): the run's age over the `💓` — or over the minute an
+// ended run ended — over the third line's spinner and age, and the `💓`'s stale coloring a row's newest
+// activity shares (`run-board-render-tail.ts`).
+
+const { HEADER_ICONS, minute_of, span_of } = run_board_labels
+const { cell_of } = run_board_render_slot
+const { padded } = run_board_fresh
+const aged_fresh = run_board_fresh.aged
+// A running run whose newest event is older than this is drawn as stale, so a hang stands out; past
+// twice that it is drawn as alarming.
+const STALE_MINUTES = 15
+const STALE_MS = STALE_MINUTES * MS_PER_MINUTE
+const ALARM_FACTOR = 2
+const ALARM_MS = STALE_MS * ALARM_FACTOR
+
+// What the time cells read off the header (`BoardHeader`).
+interface TimeHeader {
+	now_ms: number
+	started_ms: number
+	ended_ms: number | undefined
+	activity: Pick<RunActivity, 'last_event_ms'>
+	spinner: string | undefined
+	form: 'screen' | 'chat'
+}
+
+// The marks of a run that is working: they turn the spinner, and only they can go stale.
+const WORKING_MARKS: ReadonlySet<RunMark> = new Set<RunMark>(['running', 'setup'])
+
+// A part aged as the `💓` is: yellow once stale, red once alarming — a row's newest activity too
+// (`run-board-render-tail.ts`).
+function aged(part: string, age_ms: number): string {
+	if (age_ms > ALARM_MS) return styleText('red', part)
+
+	return age_ms > STALE_MS ? styleText('yellow', part) : part
+}
+
+// How long ago the stream last moved. An ended run has no heartbeat to keep: one counting on would
+// read as a hang.
+function age_of(header: TimeHeader): number | undefined {
+	const last = header.activity.last_event_ms
+
+	if (last === undefined || header.ended_ms !== undefined) return undefined
+
+	return header.now_ms - last
+}
+
+// The minute an ended run ended, standing where its heartbeat did. Blank while the run has none to draw.
+function ended_part(header: TimeHeader): string {
+	const { ended_ms } = header
+
+	return ended_ms === undefined ? '' : `${HEADER_ICONS.ended} ${minute_of(ended_ms)}`
+}
+
+// The `💓` under the run's age, in the `⏰`'s own format with its digits right-aligned to `width` —
+// only a working run can be stale, so only it is colored. Only an ended run draws anything else there:
+// the minute it ended. Its digits are emphasized for a few seconds after a new event resets them
+// (`run-board-fresh.ts`).
+function beat_part(header: TimeHeader, mark: RunMark, width: number): string {
+	const age = age_of(header)
+
+	if (age === undefined) return ended_part(header)
+
+	const span = span_of(age)
+	const part = `${HEADER_ICONS.heartbeat} ${padded(span, width, aged_fresh(span, age, header))}`
+
+	return WORKING_MARKS.has(mark) ? aged(part, age) : part
+}
+
+// An age in the `⏰`'s format, blank where there is none to draw — no event gave it a time, or the
+// `💓` draws none.
+function span_or_blank(age: number | undefined): string {
+	return age === undefined ? '' : span_of(age)
+}
+
+// How long ago what the third line says happened, counted to now: an ended run's age stops at its end,
+// so its last words would otherwise stay fresh on every frame after it.
+function fresh_age(now: NowLine | undefined, header: TimeHeader): number | undefined {
+	const age = now?.age_ms
+
+	return age === undefined ? undefined : age + header.now_ms - (header.ended_ms ?? header.now_ms)
+}
+
+// The third line's time: the spinner in the `⏰`'s and `💓`'s column — turning only while the run
+// works, so a watch or an end stands blank — then its age, digits under theirs, emphasized while what
+// the line says is fresh.
+function now_time(
+	header: TimeHeader,
+	mark: RunMark,
+	now: NowLine | undefined,
+	width: number,
+): string {
+	const spinner = WORKING_MARKS.has(mark) ? header.spinner : undefined
+	const icon = cell_of(spinner, run_board_fit.width_of(HEADER_ICONS.heartbeat))
+	const age = span_or_blank(now?.age_ms)
+
+	return `${icon} ${padded(age, width, aged_fresh(age, fresh_age(now, header), header))}`
+}
+
+// What the third line says, emphasized while it is fresh.
+function now_text(now: NowLine, header: TimeHeader): string {
+	return `${now.icon} ${aged_fresh(now.text, fresh_age(now, header), header)}`
+}
+
+// A run's age over the `💓` — or over the minute an ended run ended — over the third line's age: the
+// shorter lengths are right-aligned to the longest, so the digits stand in one column when only one has
+// passed ten hours.
+function time_parts(header: TimeHeader, mark: RunMark, now: NowLine | undefined): Array<string> {
+	const elapsed = span_of((header.ended_ms ?? header.now_ms) - header.started_ms)
+	const age = span_or_blank(now?.age_ms)
+	const width = Math.max(
+		...[elapsed, span_or_blank(age_of(header)), age].map((span) => span.length),
+	)
+
+	return [
+		`${HEADER_ICONS.elapsed} ${elapsed.padStart(width)}`,
+		beat_part(header, mark, width),
+		now_time(header, mark, now, width),
+	]
+}
+
+const run_board_header_time = { aged, now_text, time_parts }
+
+export { run_board_header_time }
