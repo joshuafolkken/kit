@@ -26,9 +26,15 @@ const NON_BUG_LINE = new RegExp(
 	'mu',
 )
 const CLASSIFICATION_LABELS = [BUG_LABEL, ENHANCEMENT_LABEL, BREAKING_CHANGE_LABEL]
+const KIND_LABELS: ReadonlyArray<string> = [BUG_LABEL, ENHANCEMENT_LABEL]
 const CONFLICT = 'bug and enhancement declarations cannot be combined'
 const MISSING_BUG_CLASSIFICATION = 'missing bug classification'
 const CONFLICTING_BUG_CLASSIFICATIONS = 'conflicting bug classifications'
+
+interface KindLabelChanges {
+	add: ReadonlyArray<string>
+	remove: ReadonlyArray<string>
+}
 
 function required_labels(body: string): ReadonlyArray<string> {
 	const labels: Array<string> = []
@@ -47,10 +53,24 @@ function required_labels(body: string): ReadonlyArray<string> {
 	return labels
 }
 
-function labels_for(body: string, existing: ReadonlyArray<string>): ReadonlyArray<string> {
-	const missing = required_labels(body).filter((label) => !has_label_name(existing, label))
+function missing_labels(body: string, existing: ReadonlyArray<string>): ReadonlyArray<string> {
+	return required_labels(body).filter((label) => !has_label_name(existing, label))
+}
 
-	return [...existing, ...missing]
+function labels_for(body: string, existing: ReadonlyArray<string>): ReadonlyArray<string> {
+	return [...existing, ...missing_labels(body, existing)]
+}
+
+// The kind labels (`bug` / `enhancement`) to add and remove so `existing` matches what `body`
+// declares. `breaking-change` follows the compatibility line, not the kind, so it is left alone.
+function kind_label_changes(body: string, existing: ReadonlyArray<string>): KindLabelChanges {
+	const required = required_labels(body)
+	const add = missing_labels(body, existing).filter((label) => KIND_LABELS.includes(label))
+	const remove = existing.filter((name) =>
+		KIND_LABELS.some((label) => has_label_name([name], label) && !required.includes(label)),
+	)
+
+	return { add, remove }
 }
 
 function bug_classification_problem(body: string): string | undefined {
@@ -122,6 +142,7 @@ function problems(
 
 const issue_classification = {
 	CLASSIFICATION_LABELS,
+	kind_label_changes,
 	labels_for,
 	problems,
 	required_labels,
