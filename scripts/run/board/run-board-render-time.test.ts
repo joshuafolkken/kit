@@ -53,6 +53,7 @@ describe('run_board_render_time.time_of', () => {
 // joshuafolkken/kit#7866: the host's stops come out of a row's time and are drawn beside it.
 const SLEEP = { from_ms: NOW - 40 * MINUTE, to_ms: NOW - 10 * MINUTE }
 const NET_OF_SLEEP = '30′00″ (+30′00″)'
+const AN_HOUR = '1°00′00″'
 
 describe('run_board_render_time.time_of -- the host slept inside the lane', () => {
 	it('draws a running row net of the sleep, the sleep in brackets', () => {
@@ -73,6 +74,15 @@ describe('run_board_render_time.time_of -- the host slept inside the lane', () =
 		expect(time_of(merged, NOW + HOUR)).toBe(time_of(running, NOW))
 	})
 
+	it('draws a sleep outside the lane as no exclusion', () => {
+		const before = { from_ms: NOW - 3 * HOUR, to_ms: NOW - 2 * HOUR }
+		const running = row('running', { started_ms: NOW - HOUR, gaps: [before] })
+
+		expect(time_of(running, NOW)).toBe(AN_HOUR)
+	})
+})
+
+describe('run_board_render_time.time_of -- an ending recorded before the exclusion', () => {
 	it('takes the sleep out of an ending recorded before the exclusion', () => {
 		const merged = row('merged', {
 			started_ms: NOW - HOUR,
@@ -84,11 +94,21 @@ describe('run_board_render_time.time_of -- the host slept inside the lane', () =
 		expect(time_of(merged, NOW)).toBe(NET_OF_SLEEP)
 	})
 
-	it('draws a sleep outside the lane as no exclusion', () => {
-		const before = { from_ms: NOW - 3 * HOUR, to_ms: NOW - 2 * HOUR }
-		const running = row('running', { started_ms: NOW - HOUR, gaps: [before] })
+	it('leaves in an older ending a sleep that fell while the child was off its lane', () => {
+		const launches = [
+			{ from_ms: NOW - HOUR, end_ms: NOW - 45 * MINUTE },
+			{ from_ms: NOW - 30 * MINUTE, end_ms: undefined },
+		]
+		const off_lane = { from_ms: NOW - 40 * MINUTE, to_ms: NOW - 35 * MINUTE }
+		const merged = row('merged', {
+			started_ms: NOW - HOUR,
+			ended_ms: NOW,
+			spans: launches,
+			elapsed_ms: 45 * MINUTE,
+			gaps: [off_lane],
+		})
 
-		expect(time_of(running, NOW)).toBe('1°00′00″')
+		expect(time_of(merged, NOW)).toBe('45′00″')
 	})
 })
 
@@ -106,7 +126,7 @@ describe('run_board_render_time.time_width', () => {
 			row('parked'),
 		]
 
-		expect(time_width(header({ layout: { ...EMPTY_LAYOUT, active } }))).toBe('1°00′00″'.length)
+		expect(time_width(header({ layout: { ...EMPTY_LAYOUT, active } }))).toBe(AN_HOUR.length)
 	})
 
 	it('is zero with no layout or no timed row', () => {

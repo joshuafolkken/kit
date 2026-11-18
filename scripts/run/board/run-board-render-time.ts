@@ -23,15 +23,23 @@ function counted(status: ItemStatus | undefined, ended: number | undefined): Lan
 	return run_board_lane_time.elapsed_of(status.spans ?? [], status.started_ms, ended, status.gaps)
 }
 
-// An ending written before joshuafolkken/kit#7866 recorded its time with the host's stops in it: the
-// stops in the stretch that time reaches back from the end are taken out. Its launch may lie outside
-// the run's span, so its spans are not read.
-function legacy(status: ItemStatus, recorded_ms: number): LaneTime {
+// The stretch a recorded time reaches back from the row's end, for a row whose launch lies outside the
+// run's span and left it no spans.
+function reached_back(status: ItemStatus, recorded_ms: number): LaneTime | undefined {
 	const { ended_ms, gaps } = status
 
-	if (ended_ms === undefined) return { elapsed_ms: recorded_ms, excluded_ms: 0 }
+	if (ended_ms === undefined) return undefined
 
 	return run_board_lane_time.elapsed_of([], ended_ms - recorded_ms, ended_ms, gaps)
+}
+
+// An ending written before joshuafolkken/kit#7866 recorded its time with the host's stops in it: they
+// are counted again over its spans, as the running row counted them, and taken out.
+function legacy(status: ItemStatus, recorded_ms: number): LaneTime {
+	const again = counted(status, status.ended_ms) ?? reached_back(status, recorded_ms)
+	const excluded_ms = again?.excluded_ms ?? 0
+
+	return { elapsed_ms: Math.max(0, recorded_ms - excluded_ms), excluded_ms }
 }
 
 // The time the event that settled the row recorded (joshuafolkken/kit#4481): a settled row draws it
@@ -49,6 +57,13 @@ function recorded(row: BoardRow): LaneTime | undefined {
 // How long a row has run: a running one until now, a settled one until its end.
 function lane_time_of(row: BoardRow, now_ms: number): LaneTime | undefined {
 	return recorded(row) ?? counted(row.status, end_of(row, now_ms))
+}
+
+// The net time alone, for a column of a fixed width — a lane row's (`run-board-render-lead.ts`).
+function net_of(row: BoardRow, now_ms: number): string | undefined {
+	const time = lane_time_of(row, now_ms)
+
+	return time === undefined ? undefined : span_of(time.elapsed_ms)
 }
 
 // The net time, with the host's stops it left out beside it where there were any:
@@ -72,6 +87,7 @@ function time_width(header: BoardHeader): number {
 }
 
 const run_board_render_time = {
+	net_of,
 	time_of,
 	time_width,
 }
