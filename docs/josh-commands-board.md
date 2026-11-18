@@ -290,13 +290,14 @@ The watcher is fresh when `run:progress` has pinged its life record within three
 Open the review, or --join to join, attest, record and recheck it; --ship then ships a clean recheck. Stops at the first refusal with its next action.
 
 ```bash
-pnpm josh run:chain <N>                                # after `run:cut <N>` alone: merge main (not in a lane child), answer the self-check, run the scoped pair, check the generated pages (kit only) and the acceptance map, open the review
-pnpm josh run:chain <N> --from check:related           # resume at the stage a stop named, once the run settled it
-pnpm josh run:chain <N> --unpinned-ok "only logs"      # forwarded to run:review as given
-pnpm josh run:chain <N> --accept-metrics "<why>"       # forwarded to run:review, whose open records a grown metrics total as `metrics --accept` does
-pnpm josh run:chain <N> --join                         # join, attest, record, recheck metrics and unpinned; every finding holds for disposition
-pnpm josh run:chain <N> --join --fixing                # the same, when round 1 has fixes to make
-pnpm josh run:chain <N> --join --ship "<title> #<N>"   # ship a clean round; title must match the issue. Record interaction review first.
+pnpm josh run:chain <N>                                                  # after `run:cut <N>` alone: merge main (not in a lane child), answer the self-check, run the scoped pair, check the generated pages (kit only) and the acceptance map, open the review
+pnpm josh run:chain <N> --from check:related                             # resume at the stage a stop named, once the run settled it
+pnpm josh run:chain <N> --unpinned-ok "only logs"                        # forwarded to run:review as given
+pnpm josh run:chain <N> --accept-metrics "<why>" --from metrics-totals   # after a metrics-totals stop (a total grew, asked right after check:related): run:review records the growth as `metrics --accept` does
+pnpm josh run:chain <N> --from run:review                                # refused before run:review when the scoped checks are not green, naming `--from check:related`
+pnpm josh run:chain <N> --join                                           # join, attest, record, recheck metrics and unpinned; every finding holds for disposition
+pnpm josh run:chain <N> --join --fixing                                  # the same, when round 1 has fixes to make
+pnpm josh run:chain <N> --join --ship "<title> #<N>"                     # ship a clean round; title must match the issue. Record interaction review first.
 ```
 
 <!-- /usage -->

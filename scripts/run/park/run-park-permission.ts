@@ -16,6 +16,9 @@ const FILING_COMMAND = 'issue:file'
 // An option closing the Issue without implementing names `issue:close` (joshuafolkken/kit#7805): the
 // parent's `backlog:triage --adopt` closes it as not planned and returns the lane instead of a requeue.
 const CLOSE_COMMAND = 'issue:close'
+// An option shipping this Issue in another Issue's pull request names `lane:fold` (joshuafolkken/kit#7985):
+// a child cannot fold its own lane, so the parent's adopt runs the fold instead of a requeue.
+const FOLD_COMMAND = 'lane:fold'
 const PERMISSION_VALUES: ReadonlyArray<string> = [
 	AUTO_PERMISSION,
 	PARENT_PERMISSION,
@@ -27,6 +30,7 @@ const PERMISSION_VALUES: ReadonlyArray<string> = [
 const NOTE_START = /[（(]/u
 const PARENT_CLOSE = `${PARENT_PERMISSION}（${CLOSE_COMMAND}）`
 const PARENT_FILING = `${PARENT_PERMISSION}（${FILING_COMMAND} …）`
+const PARENT_FOLD = `${PARENT_PERMISSION}（${FOLD_COMMAND} <N> --into #<M>）`
 
 function value_of(permission: string): string {
 	return permission.split(NOTE_START, 1)[0]?.trim() ?? ''
@@ -39,7 +43,7 @@ function problem_of(name: string, permission: string): string | undefined {
 	if (PERMISSION_VALUES.includes(value)) return undefined
 	const words = PERMISSION_VALUES.join(' | ')
 
-	return `${name} names "${value}" as its permission; write one of: ${words} — a parent close is "${PARENT_CLOSE}", a parent filing "${PARENT_FILING}"`
+	return `${name} names "${value}" as its permission; write one of: ${words} — a parent close is "${PARENT_CLOSE}", a parent filing "${PARENT_FILING}", a parent fold "${PARENT_FOLD}"`
 }
 
 function schema_lines(): ReadonlyArray<string> {
@@ -47,6 +51,7 @@ function schema_lines(): ReadonlyArray<string> {
 		`   - 必要な権限: ${PERMISSION_VALUES.join(' | ')}`,
 		`   (closing without implementing: - 必要な権限: ${PARENT_CLOSE})`,
 		`   (filing an Issue: - 必要な権限: ${PARENT_FILING})`,
+		`   (shipping in another Issue's pull request: - 必要な権限: ${PARENT_FOLD})`,
 	]
 }
 
@@ -54,6 +59,7 @@ const run_park_permission = {
 	AUTO_PERMISSION,
 	CLOSE_COMMAND,
 	FILING_COMMAND,
+	FOLD_COMMAND,
 	PARENT_PERMISSION,
 	problem_of,
 	schema_lines,

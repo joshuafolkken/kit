@@ -84,7 +84,13 @@ function plan_here(plan: BoardPlan, state: BoardState, local: LocalRead): BoardP
 
 type RoomRead = Pick<
 	ReasonRead,
-	'free_lanes' | 'occupied_count' | 'lane_limit' | 'usage_reset_ms' | 'is_memory_held' | 'gauges'
+	| 'free_lanes'
+	| 'occupied_count'
+	| 'lane_limit'
+	| 'usage_reset_ms'
+	| 'usage_cause'
+	| 'is_memory_held'
+	| 'gauges'
 >
 
 // The room a waiting row is weighed against: the lanes under the limit, the account's usage limit and
@@ -95,6 +101,7 @@ function room_of(state: BoardState, local: LocalRead): RoomRead {
 		occupied_count: local.occupied_count,
 		lane_limit: local.lane_limit,
 		usage_reset_ms: local.usage_reset_ms,
+		usage_cause: local.usage_cause,
 		is_memory_held: local.is_memory_held,
 		gauges: state.gauges,
 	}

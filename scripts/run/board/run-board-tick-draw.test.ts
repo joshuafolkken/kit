@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_header } from './run-board-header'
+import type { BoardRow } from './run-board-layout'
+import type { CueName } from './run-board-sound-cues'
 import type { BoardState } from './run-board-state'
 import { run_board_tick } from './run-board-tick'
 import { run_board_tick_draw } from './run-board-tick-draw'
@@ -42,6 +44,57 @@ describe('run_board_tick_draw.draw_run', () => {
 		const drawn = draw_run(FRESH_STATE, LOCAL, { ports, now_ms: START }, run_layout)
 
 		expect(drawn.baseline_total).toBeUndefined()
+	})
+})
+
+function row(number: number, state: BoardRow['state']): BoardRow {
+	return { number, title: undefined, kind: undefined, state, status: undefined, waits: [] }
+}
+
+// A redraw over `rows`, its cues recorded in `cues`.
+function drawn_over(
+	state: BoardState,
+	rows: ReadonlyArray<BoardRow>,
+	cues: Array<CueName>,
+): BoardState {
+	const { ports } = harness(LOCAL, [])
+	const run_layout = { ...layout_for(state, LOCAL, START), active: rows }
+
+	function cue(name: CueName): void {
+		cues.push(name)
+	}
+
+	return draw_run(state, LOCAL, { ports: { ...ports, cue }, now_ms: START }, run_layout)
+}
+
+// joshuafolkken/kit#7951: the live board sounds the cue a redraw picks over the last frame's.
+describe('run_board_tick_draw.draw_run cue', () => {
+	it('sounds a launch once on the redraw a lane starts on, and not again while it runs', () => {
+		const cues: Array<CueName> = []
+		const before = drawn_over(planned(), [], cues)
+		const launched = drawn_over(before, [row(1, 'running')], cues)
+
+		drawn_over(launched, [row(1, 'running')], cues)
+
+		expect(cues).toStrictEqual(['launch'])
+	})
+
+	it('sounds nothing on the first redraw over a wait on a person and a stopped lane', () => {
+		const cues: Array<CueName> = []
+		const drawn = drawn_over(planned(), [row(1, 'human'), row(2, 'stopped')], cues)
+
+		expect(cues).toStrictEqual([])
+		expect(drawn.sound_snapshot).toBeDefined()
+	})
+
+	it('sounds nothing on the redraw the plan arrives on with a wait already there', () => {
+		const cues: Array<CueName> = []
+		const before = drawn_over({ ...planned(), plan: undefined }, [], cues)
+
+		drawn_over({ ...before, plan: plan_titled('a') }, [row(1, 'human')], cues)
+
+		expect(before.sound_snapshot).toBeUndefined()
+		expect(cues).toStrictEqual([])
 	})
 })
 

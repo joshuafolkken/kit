@@ -209,3 +209,25 @@ describe('backlog:triage --adopt — a re-park on an unchanged tree', () => {
 		expect(console.error).toHaveBeenCalledWith(expect.stringContaining('re-run this command'))
 	})
 })
+
+// joshuafolkken/kit#7985: the hold names the action a person takes by the adopted option's permission.
+describe('backlog:triage --adopt — the hold names the adopted option action', () => {
+	it.each([
+		['en', "Next: take option 1's `- 必要な権限: owner コメント` action by hand"],
+		['ja', '次: 選択肢 1 の `- 必要な権限: owner コメント` の操作を人が実行してから'],
+	])('quotes the permission line in the %s reason (ac-e723514b)', async (lang, next) => {
+		vi.stubEnv(session_language.ENV_KEY, lang)
+		const comments = loop_comments(TREE, TREE).map((entry) => ({
+			...entry,
+			body: entry.body.replace('必要な権限: なし', '必要な権限: owner コメント'),
+		}))
+
+		await adopt_with(comments)
+
+		expect(run_stalled_park.apply).toHaveBeenCalledWith(
+			ISSUE,
+			expect.stringContaining(next),
+			'park loop',
+		)
+	})
+})

@@ -1090,7 +1090,7 @@ The run keeps the environment it started with, so this writes an override onto t
 - A live or suspended lane child or listener keeps its seat; idle shells and portless helpers do not. Unreadable process ownership or ports block allocation with a reason. A saved `.env` seat alone is no reservation, so older stopped trees need no manual cleanup.
 - A lane whose child and every process under it are stopped (`lane:pause`, `kill -STOP`) is not counted either; `lane:resume` continues it in place, and it is counted again.
 - `run:board` leads the waiting row with `🧵 <used>/<limit>`; it counts the lanes in use, some of which (an earlier run's) may have no board row.
-- The limit counts lanes, not memory or usage: the driver opens no lane under memory pressure or a Claude usage limit, and `run:board` leads the waiting row with `🧠` or `🪫 <reset>`.
+- The limit counts lanes, not memory or usage: the driver opens no lane under memory pressure or a Claude usage limit, and `run:board` leads the waiting row with `🧠` or `🪫 <reset>` (`🔑 <recheck>` where an authentication failure holds it).
 - A limit above the nine port seats is counted at the seats, as `JOSH_LANE_LIMIT` is; a value that is not a positive integer is refused.
 - With no run in progress, the command refuses and points at `JOSH_LANE_LIMIT`.
 - `--reset` returns to the run's start `JOSH_LANE_LIMIT`, even if `.env` changed. A crashed run's start limit is ignored.

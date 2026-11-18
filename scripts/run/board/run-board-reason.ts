@@ -12,6 +12,7 @@ import { lane_state } from '#scripts/lane/lane-state'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
+import type { HoldCause } from '#scripts/run/merge/run-merge-usage-limit'
 import { run_board_human_merge } from './run-board-human-merge'
 import { run_board_labels } from './run-board-labels'
 import { run_board_layout, type Overlay, type ReasonOf, type RowReason } from './run-board-layout'
@@ -56,6 +57,8 @@ interface ReasonRead extends Overlay {
 	lane_limit?: number | undefined
 	// The reset a Claude usage limit holds launches until (`run-merge-usage-limit.ts`), if one does.
 	usage_reset_ms?: number | undefined
+	// What that hold is for — an authentication failure's recheck or a usage limit's reset.
+	usage_cause?: HoldCause | undefined
 	// The driver holds its offered issue for memory (`backlog-drive-memory.ts`).
 	is_memory_held?: boolean | undefined
 	// The machine's latest gauges, the figures a memory hold names.
@@ -206,16 +209,22 @@ function no_memory_of(gauges: MachineGauges | undefined): RowReason {
 	}
 }
 
-// `🪫 10-25 16:30`: the reset a usage limit holds every launch until, in the board's local time.
-function usage_limit_of(reset_ms: number): RowReason {
-	return { icon: WAIT_ICONS.usage_limit, value: run_board_labels.day_minute_of(reset_ms) }
+// `🪫 10-25 16:30`: the reset a usage limit holds every launch until, in the board's local time;
+// `🔑 10-25 16:30` where the hold is an authentication failure's recheck instead.
+function usage_limit_of(reset_ms: number, cause: HoldCause | undefined): RowReason {
+	const icon = cause === 'auth' ? WAIT_ICONS.auth_failure : WAIT_ICONS.usage_limit
+
+	return { icon, value: run_board_labels.day_minute_of(reset_ms) }
 }
 
 // The machine's room: no lane left under the limit, else a usage limit not yet reset, else no memory
 // for one more — the order `backlog:drive` asks them in.
 function room_wait(read: ReasonRead): RowReason | undefined {
 	if (read.free_lanes === NO_FREE_LANES) return no_lane_of(read)
-	if (read.usage_reset_ms !== undefined) return usage_limit_of(read.usage_reset_ms)
+
+	if (read.usage_reset_ms !== undefined) {
+		return usage_limit_of(read.usage_reset_ms, read.usage_cause)
+	}
 
 	return read.is_memory_held === true ? no_memory_of(read.gauges) : undefined
 }

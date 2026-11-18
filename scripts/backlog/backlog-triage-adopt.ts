@@ -13,6 +13,7 @@ import { backlog_triage_adopted } from './backlog-triage-adopted'
 import { backlog_triage_approval } from './backlog-triage-approval'
 import { backlog_triage_close } from './backlog-triage-close'
 import { backlog_triage_filing } from './backlog-triage-filing'
+import { backlog_triage_fold } from './backlog-triage-fold'
 import { backlog_triage_park } from './backlog-triage-park'
 import { backlog_triage_park_loop } from './backlog-triage-park-loop'
 import { backlog_triage_withdrawn } from './backlog-triage-withdrawn'
@@ -39,7 +40,8 @@ import { backlog_triage_withdrawn } from './backlog-triage-withdrawn'
 //
 // **A closing option is the one parent action the adopt takes itself** (joshuafolkken/kit#7805): with
 // no `--done` (unless it also files), the child is closed as not planned with the reason and its lane
-// returned (`backlog-triage-close.ts`), neither requeued nor blocked. A re-park on the lane tree the
+// returned (`backlog-triage-close.ts`), neither requeued nor blocked; a folding option runs `lane:fold`
+// into the Issue it names (`backlog-triage-fold.ts`, joshuafolkken/kit#7985). A re-park on the lane tree the
 // last adopted option left unchanged is parked `run:stalled` instead (`backlog-triage-park-loop.ts`).
 
 const SUCCESS_EXIT_CODE = 0
@@ -73,6 +75,9 @@ interface ParkFound {
 	range: ApprovalRange | undefined
 	is_filing: boolean
 	is_close: boolean
+	// The Issue a folding option ships this one in (joshuafolkken/kit#7985); `undefined` for no fold.
+	fold_into: string | undefined
+	permission: string
 }
 
 interface AdoptRead {
@@ -133,22 +138,38 @@ async function filing_problem(
 	return await backlog_triage_filing.problem_of(request.issue, request.done)
 }
 
+// Why the park's option cannot be adopted as written, read from its body alone.
+function body_problem(body: string, request: AdoptRequest): string | undefined {
+	return (
+		run_park_body.adopt_problem(body, request.option) ??
+		action_problem(body, request) ??
+		backlog_triage_fold.problem_of(body, request.option, request.issue)
+	)
+}
+
+function option_of_park(
+	body: string,
+	option: number,
+): Pick<ParkFound, 'range' | 'is_close' | 'fold_into' | 'permission'> {
+	return {
+		range: run_park_body.approval_range(body, option),
+		is_close: run_park_body.close_action(body, option),
+		fold_into: backlog_triage_fold.target_of(body, option),
+		permission: run_park_body.permission_of(body, option) ?? '',
+	}
+}
+
 async function park_of(request: AdoptRequest): Promise<ParkFound | { problem: string }> {
 	const park = await backlog_triage_park.read(request.issue)
 
 	if ('problem' in park) return park
 	const { body, comments } = park
 	const is_filing = run_park_body.filing_action(body, request.option)
-	const problem =
-		run_park_body.adopt_problem(body, request.option) ??
-		action_problem(body, request) ??
-		(await filing_problem(request, is_filing))
+	const problem = body_problem(body, request) ?? (await filing_problem(request, is_filing))
 
 	if (problem !== undefined) return { problem }
 
-	const range = run_park_body.approval_range(body, request.option)
-
-	return { comments, range, is_filing, is_close: run_park_body.close_action(body, request.option) }
+	return { comments, is_filing, ...option_of_park(body, request.option) }
 }
 
 function epics_problem(count: number): string {
@@ -237,12 +258,18 @@ async function requeue_or_hold(request: AdoptRequest, park: ParkFound): Promise<
 
 	if (loop === undefined) return await requeue(issue)
 
-	return await backlog_triage_park_loop.hold(issue, option, loop)
+	return await backlog_triage_park_loop.hold({ issue, option, permission: park.permission }, loop)
 }
 
-// What follows the decision: the close, the block, or the requeue.
+// What follows the decision: the close, the fold, the block, or the requeue.
 async function follow_up(request: AdoptRequest, park: ParkFound): Promise<WriteResult> {
-	if (park.is_close) return await backlog_triage_close.close(request.issue, request.reason)
+	const { issue, reason } = request
+
+	if (park.is_close) return await backlog_triage_close.close(issue, reason)
+
+	if (park.fold_into !== undefined) {
+		return await backlog_triage_fold.fold({ issue, into: park.fold_into, reason })
+	}
 
 	return park.is_filing ? await block(request) : await requeue_or_hold(request, park)
 }

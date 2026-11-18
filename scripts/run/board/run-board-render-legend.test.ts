@@ -204,6 +204,16 @@ describe('run_board_render_legend.legend_of run:solo icons', () => {
 		expect(legend_of([row(1), waiting], { solo: true })).toStrictEqual(named)
 	})
 
+	// joshuafolkken/kit#8015: 🔑, a row an authentication failure's recheck holds.
+	it('names 🔑 apart from 🪫 where a row leads with it', () => {
+		const value = '10-25 16:30'
+		const auth = row(1, { reason: { icon: WAIT_ICONS.auth_failure, value } })
+		const limit = row(2, { reason: { icon: WAIT_ICONS.usage_limit, value } })
+
+		expect(legend_of([auth])).toStrictEqual(['🔑 auth recheck'])
+		expect(legend_of([limit, auth])).toStrictEqual(['🪫 usage limit  🔑 auth recheck'])
+	})
+
 	it('names neither where no row leads with them', () => {
 		expect(legend_of([row(1, { reason: { icon: WAIT_ICONS.lane } })])).toStrictEqual([
 			'🧵 free lane',
