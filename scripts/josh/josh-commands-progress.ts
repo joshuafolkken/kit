@@ -58,7 +58,7 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Draw a live board of the running backlogrun, redrawn every second',
 		category: 'AI tools',
 		reference: [
-			`[--once | --chat | --every <minutes>] [${BOARD_THEME}]`,
+			`[--once | --chat [--fresh] | --every <minutes>] [${BOARD_THEME}]`,
 			'automation',
 			['files', 'network'],
 		],
@@ -67,6 +67,10 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 				{ arguments: '', note: 'redraw until interrupted' },
 				{ arguments: '--once', note: 'one frame, then exit' },
 				{ arguments: '--chat', note: 'one frame for a chat, recorded as a progress report' },
+				{
+					arguments: '--chat --fresh',
+					note: 'the same, read from scratch past the one-minute record',
+				},
 				{
 					arguments: '--every 5',
 					note: 'the --chat frame as a 📊 Progress Telegram every 5 minutes, until the run ends',
@@ -78,6 +82,16 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 					names: ['--chat'],
 					description:
 						'answers a `backlogrun`, `fullrun` or `halfrun` progress question: the frame `--once` draws, with only `🧠` on the machine line and no escapes; it records the report as `run:progress --mark` does.',
+				},
+				{
+					names: ['--once', '--chat'],
+					description:
+						'each keeps the frame it drew for one minute, per checkout (`--once` per theme and per terminal or pipe); asked again within the minute, it writes that frame with a `recorded <N>s ago` line, read nothing. The age counts from when the read began.',
+				},
+				{
+					names: ['--fresh'],
+					description:
+						'with `--chat`: reads from scratch past the record, and records what it drew; the `run:handoff-lanes` chain passes it right after a merge.',
 				},
 				{
 					names: ['--every <minutes>'],

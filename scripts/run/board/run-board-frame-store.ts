@@ -72,9 +72,23 @@ function memory_store(): FrameStore {
 	}
 }
 
-// A still frame in a theme is drawn in its own colors, so each theme keeps its own record.
-function once_key(theme: string | undefined): string {
-	return theme === undefined ? ONCE_KEY : `${ONCE_KEY}-${theme}`
+function no_record(): RecordedFrame | undefined {
+	return undefined
+}
+
+// The store that saves but loads nothing, so the next answer reads from scratch and is still recorded.
+function save_only(store: FrameStore | undefined): FrameStore | undefined {
+	if (store === undefined) return undefined
+
+	return { load: no_record, save: store.save }
+}
+
+// A still frame in a theme is drawn in its own colors, and one on a terminal carries its links, so each
+// theme and each output keeps its own record.
+function once_key(theme: string | undefined, is_tty: boolean): string {
+	const output = is_tty ? 'tty' : 'pipe'
+
+	return theme === undefined ? `${ONCE_KEY}-${output}` : `${ONCE_KEY}-${theme}-${output}`
 }
 
 function is_fresh(age_ms: number): boolean {
@@ -91,16 +105,16 @@ function fresh(store: FrameStore | undefined, key: string, now_ms: number): stri
 	return `${frame.text}recorded ${String(seconds)}s ago\n`
 }
 
-// A write that also records what it wrote.
+// A write that also records what it wrote, dated when its read began so the age is never understated.
 function recording(
 	write: (frame: string) => void,
 	store: FrameStore | undefined,
 	key: string,
-	now: () => number,
+	saved_ms: number,
 ): (frame: string) => void {
 	return (frame) => {
 		write(frame)
-		store?.save(key, { text: frame, saved_ms: now() })
+		store?.save(key, { text: frame, saved_ms })
 	}
 }
 
@@ -113,6 +127,7 @@ const run_board_frame_store = {
 	once_key,
 	path_of,
 	recording,
+	save_only,
 }
 
 export { run_board_frame_store }

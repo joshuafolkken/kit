@@ -20,7 +20,7 @@ describe('run_board_frame_store.file_store', () => {
 		store.save(CHAT_KEY, FRAME)
 
 		expect(store.load(CHAT_KEY)).toStrictEqual(FRAME)
-		expect(store.load(once_key(undefined))).toBeUndefined()
+		expect(store.load(once_key(undefined, false))).toBeUndefined()
 	})
 
 	it('reads a broken record as no record', () => {
@@ -51,11 +51,27 @@ describe('run_board_frame_store.fresh', () => {
 		store.save(CHAT_KEY, FRAME)
 
 		expect(fresh(store, CHAT_KEY, SAVED_MS + FRESH_MS + 1)).toBeUndefined()
-		expect(fresh(store, once_key(undefined), SAVED_MS)).toBeUndefined()
+		expect(fresh(store, once_key(undefined, false), SAVED_MS)).toBeUndefined()
 		expect(fresh(undefined, CHAT_KEY, SAVED_MS)).toBeUndefined()
 	})
 
 	it('keeps a themed still frame apart from a plain one', () => {
-		expect(once_key('wargames')).not.toBe(once_key(undefined))
+		expect(once_key('wargames', false)).not.toBe(once_key(undefined, false))
+	})
+
+	it('save_only saves through to the store but loads nothing', () => {
+		const store = memory_store()
+		const only = run_board_frame_store.save_only(store)
+
+		only?.save(CHAT_KEY, FRAME)
+
+		expect(only?.load(CHAT_KEY)).toBeUndefined()
+		expect(store.load(CHAT_KEY)).toStrictEqual(FRAME)
+		expect(run_board_frame_store.save_only(undefined)).toBeUndefined()
+	})
+
+	it('keeps a still frame drawn on a terminal apart from a piped one', () => {
+		expect(once_key(undefined, true)).not.toBe(once_key(undefined, false))
+		expect(once_key('wargames', true)).not.toBe(once_key('wargames', false))
 	})
 })

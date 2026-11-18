@@ -41,11 +41,13 @@ const FAILURE_EXIT_CODE = 1
 const ONCE_FLAG = '--once'
 const CHAT_FLAG = '--chat'
 const EVERY_FLAG = '--every'
+const FRESH_FLAG = '--fresh'
 const FLAGS: ReadonlySet<string> = new Set(['', ONCE_FLAG, CHAT_FLAG])
 const PASSED_ON_FLAGS: ReadonlySet<string> = new Set([CHAT_FLAG, EVERY_FLAG])
 const SIGINT_EXIT_CODE = 130
 const SIGTERM_EXIT_CODE = 143
-const USAGE = 'Usage: josh run:board [--once | --chat | --every <minutes>] [--theme wargames]'
+const USAGE =
+	'Usage: josh run:board [--once | --chat [--fresh] | --every <minutes>] [--theme wargames]'
 const DISABLED_NOTICE = `\`${run_progress.DISABLED_KEY}=${run_progress.DISABLED_VALUE}\` is set, so no progress is pushed.`
 const TRAILING_NEWLINE = /\n$/u
 const { FRESH_STATE, tick } = run_board_tick
@@ -195,11 +197,13 @@ async function watch(ports: BoardPorts): Promise<void> {
 	}
 }
 
-// A chat frame read from scratch, kept so the next question within a minute is answered from it.
+// A chat frame read from scratch, kept so the next question within a minute is answered from it; dated
+// when the read began, so its age is never understated.
 async function read_chat(ports: BoardPorts): Promise<string> {
+	const saved_ms = ports.now()
 	const { text } = await run_board_every.chat_frame(ports)
 
-	ports.frames?.save(CHAT_KEY, { text, saved_ms: ports.now() })
+	ports.frames?.save(CHAT_KEY, { text, saved_ms })
 
 	return text
 }
@@ -217,8 +221,9 @@ async function answer(ports: BoardPorts): Promise<void> {
 // One plain frame stays on the terminal after the command, so it draws the still icons rather than a
 // spinner frame frozen mid-turn; a frame recorded within the minute is the answer, read nothing.
 async function still(ports: BoardPorts, theme: Theme | undefined): Promise<void> {
-	const key = run_board_frame_store.once_key(theme)
-	const recorded = fresh(ports.frames, key, ports.now())
+	const key = run_board_frame_store.once_key(theme, ports.is_tty)
+	const now_ms = ports.now()
+	const recorded = fresh(ports.frames, key, now_ms)
 
 	if (recorded !== undefined) {
 		ports.write(recorded)
@@ -226,7 +231,7 @@ async function still(ports: BoardPorts, theme: Theme | undefined): Promise<void>
 		return
 	}
 
-	const write = run_board_frame_store.recording(ports.write, ports.frames, key, ports.now)
+	const write = run_board_frame_store.recording(ports.write, ports.frames, key, now_ms)
 	const themed = run_board_theme.themed({ ...ports, write }, theme)
 
 	await tick(FRESH_STATE, { ...themed, is_tty: false, size: undefined })
@@ -287,8 +292,25 @@ function is_every(flag: string, rest: ReadonlyArray<string>): boolean {
 	return flag === EVERY_FLAG && rest.length === 1
 }
 
+function is_fresh_chat(flag: string, rest: ReadonlyArray<string>): boolean {
+	return flag === CHAT_FLAG && rest.length === 1 && rest[0] === FRESH_FLAG
+}
+
+// `--chat --fresh` reads from scratch past the record and still records — as the hand-off asks right
+// after a merge, when a record up to a minute old could still show the merged child in flight.
+function chat_ports(
+	flag: string,
+	rest: ReadonlyArray<string>,
+	ports: BoardPorts | undefined,
+): BoardPorts | undefined {
+	if (!is_fresh_chat(flag, rest)) return ports
+	const board = ports_for(ports, false)
+
+	return { ...board, frames: run_board_frame_store.save_only(board.frames) }
+}
+
 function is_refused(flag: string, rest: ReadonlyArray<string>): boolean {
-	return rest.length > 0 || !FLAGS.has(flag)
+	return (rest.length > 0 && !is_fresh_chat(flag, rest)) || !FLAGS.has(flag)
 }
 
 // `--chat` and `--every` never take the theme, so a `JOSH_BOARD_THEME` naming none never refuses them.
@@ -306,7 +328,7 @@ async function run(argv: ReadonlyArray<string>, ports?: BoardPorts): Promise<num
 	if (is_every(flag, rest)) return await push_every(rest[0], ports_for(ports, false))
 	if (is_refused(flag, rest)) return refuse()
 
-	await draw(flag, ports, choice.theme)
+	await draw(flag, chat_ports(flag, rest, ports), choice.theme)
 
 	return SUCCESS_EXIT_CODE
 }
