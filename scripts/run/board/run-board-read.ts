@@ -19,6 +19,7 @@ import { run_board_found, type FoundOf } from './run-board-found'
 import { run_board_lane_result } from './run-board-lane-result'
 import { run_board_lane_state, type BoardLanes } from './run-board-lane-state'
 import { run_board_lane_totals, type LaneTotals } from './run-board-lane-totals'
+import { run_board_ledger_window } from './run-board-ledger-window'
 import {
 	run_board_operation_read,
 	type OperationSources,
@@ -230,14 +231,15 @@ async function lane_room_of(
 	}
 }
 
-// The repository's lane ledger, read once for the usual times, the lane totals and the driver's open
-// hold — the usual times net of the host's stops on `events` (joshuafolkken/kit#7905).
+// The repository's lane ledger, read once — its recent window (joshuafolkken/kit#7932) — for the usual
+// times, the lane totals and the driver's open hold — the usual times net of the host's stops on
+// `events` (joshuafolkken/kit#7905).
 function ledger_here(
 	repository: string,
 	events: ReadonlyArray<RunEvent>,
 ): Pick<LocalRead, 'usual' | 'lane_totals' | 'is_memory_held' | 'launch_hold'> {
-	const entries = lane_ledger.read_entries(lane_ledger.target_of(repository))
 	const now_ms = Date.now()
+	const entries = run_board_ledger_window.entries_of(lane_ledger.target_of(repository), now_ms)
 	const launch_hold = lane_held_stats.open_reason(entries, now_ms)
 
 	return {

@@ -28,18 +28,29 @@ const PHASE_STAGES: ReadonlyArray<readonly [string, Phase | undefined]> = [
 	...Object.entries(run_board_phase.SHIP_PHASES),
 ]
 
+function recent_of(entries: ReadonlyArray<LedgerEntry>, now_ms: number): Array<LedgerEntry> {
+	return lane_stats.in_window(entries, lane_stats.window_of(PERIOD_DAYS, now_ms))
+}
+
 // Per stage, so a run's first lanes — dispatched, no stage recorded yet — still draw every phase.
 function medians_of(
 	entries: ReadonlyArray<LedgerEntry>,
 	now_ms: number,
 	gaps: ReadonlyArray<LaneSpan>,
 ): ReadonlyMap<string, number> {
-	const recent = lane_stats.in_window(entries, lane_stats.window_of(PERIOD_DAYS, now_ms))
-
 	return new Map([
 		...lane_stage_stats.medians(entries, gaps),
-		...lane_stage_stats.medians(recent, gaps),
+		...lane_stage_stats.medians(recent_of(entries, now_ms), gaps),
 	])
+}
+
+// Whether the window alone measures every phase's stage, so none falls back to the whole ledger and
+// `entries` need cover only the window (joshuafolkken/kit#7932). The host's stops only shorten a span,
+// never drop one, so they cannot change which stages are measured.
+function covers(entries: ReadonlyArray<LedgerEntry>, now_ms: number): boolean {
+	const recent = lane_stage_stats.medians(recent_of(entries, now_ms))
+
+	return PHASE_STAGES.every(([stage, phase]) => phase === undefined || recent.has(stage))
 }
 
 function compute_usual(
@@ -90,7 +101,7 @@ function usual_of(
 	return usual
 }
 
-const run_board_usual = { usual_of }
+const run_board_usual = { PERIOD_DAYS, covers, usual_of }
 
 export { run_board_usual }
 export type { UsualTimes }

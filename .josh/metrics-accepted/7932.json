@@ -1,0 +1,7 @@
+{
+	"reason": "New recent-window ledger reader for run:board with coverage checks in usual/totals (#7932)",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 36
+	}
+}
