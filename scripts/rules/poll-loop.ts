@@ -1,3 +1,5 @@
+import type { HookContext } from '#scripts/hooks/hook-context'
+import { run_headless } from '#scripts/run/run-headless'
 import { time_shell } from '#scripts/time-runtime/time-shell'
 import { bash_triggers } from './bash-triggers'
 import { early_heartbeat } from './early-heartbeat'
@@ -152,31 +154,72 @@ function is_poll_loop(command: string): boolean {
 const POLL_LOOP_REASON =
 	'⛔ output poll loop: a `while`/`until` or counted `for` loop, or a `sleep` chain before a read, ' +
 	'does not know when the task finished. `run_in_background` and end the turn — its exit ' +
-	're-invokes you; a background `Agent` is waited on by its completion notification (lane child: ' +
-	'bare `sleep 20`, `pnpm josh run:liveness`); CI by `pnpm josh followup` ' +
+	're-invokes you; a background `Agent` is waited on by its completion notification; CI by ' +
+	'`pnpm josh followup` (`background-commands.md`). Fires on every occurrence.'
+
+// **A started child has no turn-end to wait across** (joshuafolkken/kit#7858): nothing re-invokes a
+// `claude -p` child once its turn ends, so the interactive advice ends its run with the work unfinished.
+// It waits in the foreground instead.
+const STARTED_CHILD_POLL_LOOP_REASON =
+	'⛔ output poll loop (started child): a loop or `sleep` chain before a read does not know when ' +
+	'the task finished, and nothing re-invokes a started child after its turn. Wait in the ' +
+	'foreground: a bare `sleep 20`, then re-read; `pnpm josh run:liveness`; or re-run the ' +
+	'command in the foreground with a timeout that fits; CI by `pnpm josh followup` ' +
 	'(`background-commands.md`). Fires on every occurrence.'
 
-// The row itself, so `delivered-rules.ts` spreads one entry. `decide` returns true so it refuses every
-// occurrence; it declares no `keeps` — waiting on the task exit is the *absence* of a loop, not a
-// call, so the row is reported unmeasured rather than scored on an act that does not exist
+const FIRES =
+	"a hand-written `while` / `until` wait loop over a command's output, a marker file or a process, a counted `for` that sleeps, or a `sleep` chain of 10 s or more before a read of a file or process. Every occurrence"
+
+// A poll loop run by the side `is_started_child` names — the two rows below split on it, so exactly one
+// of them refuses a given loop.
+function poll_loop_trigger(
+	is_started: boolean,
+): ReturnType<typeof bash_triggers.on_bash_command<[HookContext]>> {
+	return bash_triggers.on_bash_command(function is_runner_poll_loop(
+		command: string,
+		context: HookContext,
+	): boolean {
+		return run_headless.is_started_child(context.env) === is_started && is_poll_loop(command)
+	})
+}
+
+const TOPIC = '`.claude/skills/workflow-commands/background-commands.md`'
+
+// The rows themselves, so `delivered-rules.ts` spreads them. `decide` returns true so each refuses
+// every occurrence; neither declares `keeps` — waiting on the task exit is the *absence* of a loop,
+// not a call, so the rows are reported unmeasured rather than scored on an act that does not exist
 // (`git-force.ts`).
 const ROW = {
 	id: 'poll-loop',
-	is_trigger: bash_triggers.on_bash_command(is_poll_loop),
+	is_trigger: poll_loop_trigger(false),
 	reason: POLL_LOOP_REASON,
 	decide: (): boolean => true,
 	about: {
 		title: 'Output poll loop',
-		topic: '`.claude/skills/workflow-commands/background-commands.md`',
-		fires:
-			"a hand-written `while` / `until` wait loop over a command's output, a marker file or a process, a counted `for` that sleeps, or a `sleep` chain of 10 s or more before a read of a file or process. Every occurrence",
+		topic: TOPIC,
+		fires: `${FIRES}, outside a started child`,
 		quiet: 'the command started with `run_in_background` — its exit ends the wait',
+	},
+}
+
+const STARTED_CHILD_ROW = {
+	id: 'poll-loop-child',
+	is_trigger: poll_loop_trigger(true),
+	reason: STARTED_CHILD_POLL_LOOP_REASON,
+	decide: (): boolean => true,
+	about: {
+		title: 'Output poll loop in a started child',
+		topic: TOPIC,
+		fires: `${FIRES}, in a started lane, hand-off or beside child`,
+		quiet: 'a bare `sleep 20` between reads, or the command run in the foreground',
 	},
 }
 
 const poll_loop = {
 	POLL_LOOP_REASON,
+	STARTED_CHILD_POLL_LOOP_REASON,
 	ROW,
+	STARTED_CHILD_ROW,
 	is_poll_loop,
 }
 

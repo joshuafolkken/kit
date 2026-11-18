@@ -205,6 +205,12 @@ function no_command_pending(): void {
 	vi.spyOn(lane_background, 'pending_command_ids').mockReturnValue([])
 }
 
+// A started headless child that is not a lane child: the hand-off case.
+function as_started_child(): void {
+	vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(false)
+	vi.spyOn(run_headless, 'is_started_child').mockReturnValue(true)
+}
+
 // A carried run whose strand check prints its skipped-notify line on stdout, as the #4091 one did.
 function strand_prints_skip_line(): void {
 	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(process.cwd())
@@ -367,10 +373,14 @@ describe('write_stop_decision — only this session’s unannounced pause is sen
 
 // joshuafolkken/kit#2704: the lane mark and the transcript's pending tasks both reach the stop rule.
 describe('write_stop_decision — the lane background wait is wired', () => {
-	it('sends a lane child with a task still running back to wait', async () => {
-		expect(await decide_in_lane(['bxj18z032'])).toContain(
-			lane_background.LANE_BACKGROUND_STOP_REASON,
-		)
+	// joshuafolkken/kit#7858: a run:handoff / beside child is not re-invoked by a finishing task either.
+	it.each([
+		['a lane child', (): void => undefined],
+		['a hand-off child', as_started_child],
+	])('sends %s with a task still running back to wait', async (_label, arrange) => {
+		const written = await decide_in_lane(['bxj18z032'], arrange)
+
+		expect(written).toContain(lane_background.LANE_BACKGROUND_STOP_REASON)
 	})
 
 	// joshuafolkken/kit#4803: with no command left, the refusal names the wait that receives the answer.

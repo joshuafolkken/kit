@@ -1,0 +1,8 @@
+{
+	"reason": "Review round 1 fix: background-commands.md now names the started-child (hand-off/beside) wait alongside the lane child, so the poll-loop-child row cites a doc that matches it",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 41,
+		"ai_cost.on_demand_bytes": 101
+	}
+}

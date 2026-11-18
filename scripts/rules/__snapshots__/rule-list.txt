@@ -181,8 +181,12 @@
   - silent: the `user`, `project` and `reference` types, the `MEMORY.md` index, or a path outside `~/.claude/projects`
   - not automated: the prompt/doc change that replaces the memory is prose only the model can write
 - **Output poll loop** (`poll-loop`, `.claude/skills/workflow-commands/background-commands.md`)
-  - fires: `pnpm josh pretool:guard` — a hand-written `while` / `until` wait loop over a command's output, a marker file or a process, a counted `for` that sleeps, or a `sleep` chain of 10 s or more before a read of a file or process. Every occurrence
+  - fires: `pnpm josh pretool:guard` — a hand-written `while` / `until` wait loop over a command's output, a marker file or a process, a counted `for` that sleeps, or a `sleep` chain of 10 s or more before a read of a file or process. Every occurrence, outside a started child
   - silent: the command started with `run_in_background` — its exit ends the wait
+  - not automated: the right act is another command, whose arguments the call does not carry
+- **Output poll loop in a started child** (`poll-loop-child`, `.claude/skills/workflow-commands/background-commands.md`)
+  - fires: `pnpm josh pretool:guard` — a hand-written `while` / `until` wait loop over a command's output, a marker file or a process, a counted `for` that sleeps, or a `sleep` chain of 10 s or more before a read of a file or process. Every occurrence, in a started lane, hand-off or beside child
+  - silent: a bare `sleep 20` between reads, or the command run in the foreground
   - not automated: the right act is another command, whose arguments the call does not carry
 - **Direct git status** (`direct-git-status`, `docs/josh-commands-backlog.md` → "`josh tree:status`")
   - fires: `pnpm josh pretool:guard` — a `git status` with no flag or only `-s` / `--short` / `-b` / `--branch` / `--porcelain` (bare, wrapped or inside `sh -c`); it points at `pnpm josh tree:status`. Once per run
