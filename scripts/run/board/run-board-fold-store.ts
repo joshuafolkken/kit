@@ -9,10 +9,17 @@ import { run_board_fold } from './run-board-fold'
 // loses nothing. Several boards open at once leave the last one folded. A file that is missing, broken
 // or names a section this board does not know restores what it can — none of it, the unknown names
 // dropped — and a write that fails leaves the board drawing.
+// The same file keeps the sound cue switch as `"sound": true|false` (joshuafolkken/kit#7950), on unless
+// the file says a boolean otherwise. Each save rewrites only its own field and keeps the other.
 
 interface FoldStore {
 	load: () => ReadonlySet<SectionKey>
 	save: (folded: ReadonlySet<SectionKey>) => void
+}
+
+interface BoardStore extends FoldStore {
+	load_sound: () => boolean
+	save_sound: (is_on: boolean) => void
 }
 
 function parsed(file: string): unknown {
@@ -23,10 +30,18 @@ function parsed(file: string): unknown {
 	}
 }
 
-function folded_names(value: unknown): ReadonlyArray<unknown> {
-	if (typeof value !== 'object' || value === null || !('folded' in value)) return []
+function fields(file: string): Readonly<Record<string, unknown>> {
+	const value = parsed(file)
 
-	return Array.isArray(value.folded) ? value.folded : []
+	if (typeof value !== 'object' || value === null || Array.isArray(value)) return {}
+
+	return { ...value }
+}
+
+function folded_names(file: string): ReadonlyArray<unknown> {
+	const { folded } = fields(file)
+
+	return Array.isArray(folded) ? folded : []
 }
 
 function known(name: unknown): SectionKey | undefined {
@@ -34,24 +49,34 @@ function known(name: unknown): SectionKey | undefined {
 }
 
 function load(file: string): ReadonlySet<SectionKey> {
-	const sections = folded_names(parsed(file)).map((name) => known(name))
+	const sections = folded_names(file).map((name) => known(name))
 
 	return new Set(sections.filter((section) => section !== undefined))
 }
 
-function save(file: string, folded: ReadonlySet<SectionKey>): void {
+function load_sound(file: string): boolean {
+	const { sound } = fields(file)
+
+	return typeof sound !== 'boolean' || sound
+}
+
+function save_field(file: string, field: Readonly<Record<string, unknown>>): void {
 	try {
-		atomic_write.replace_file(file, `${JSON.stringify({ folded: [...folded] })}\n`)
+		atomic_write.replace_file(file, `${JSON.stringify({ ...fields(file), ...field })}\n`)
 	} catch {
-		// The board keeps drawing; the fold is lost at the next launch only.
+		// The board keeps drawing; the setting is lost at the next launch only.
 	}
 }
 
-function file_store(file = usage_state_path.board()): FoldStore {
+function file_store(file = usage_state_path.board()): BoardStore {
 	return {
 		load: () => load(file),
 		save: (folded) => {
-			save(file, folded)
+			save_field(file, { folded: [...folded] })
+		},
+		load_sound: () => load_sound(file),
+		save_sound: (is_on) => {
+			save_field(file, { sound: is_on })
 		},
 	}
 }
@@ -59,4 +84,4 @@ function file_store(file = usage_state_path.board()): FoldStore {
 const run_board_fold_store = { file_store }
 
 export { run_board_fold_store }
-export type { FoldStore }
+export type { BoardStore, FoldStore }
