@@ -17,6 +17,7 @@ import { defect_rate_cli } from '#scripts/issue/defect-rate-cli'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import {
 	BUG_LABEL,
+	INTERRUPT_ROUTE_LABEL,
 	NOT_BEFORE_LABEL,
 	RUN_LANE_LABEL,
 	RUN_SOLO_LABEL,
@@ -86,6 +87,8 @@ interface BacklogInput {
 	// The repository's open `in-progress` issues, which the `run:solo` gate reads on a `run` answer.
 	// Left out, nothing is running.
 	in_progress?: ReadonlyArray<OpenIssueData>
+	// The open `route:interrupt` issues, opted in or not. Left out, none is open.
+	interrupts?: ReadonlyArray<OpenIssueData>
 	// The open issues carrying `not-before`, whether opted in or not. Left out, none does.
 	not_before?: ReadonlyArray<{ number: number; body?: string }>
 	// The `in-progress` holders no process is running for, each with a lane on this machine — a stale
@@ -252,8 +255,10 @@ function stub_listings(input: BacklogInput, epics: ReadonlyArray<EpicInput>): vo
 	const untriaged = input.untriaged ?? []
 	const rows = (input.opted_in ?? []).map((row) => triaged_row(row, untriaged))
 
-	vi.spyOn(git_gh_command, 'issue_list_by_label_summary').mockResolvedValue(
-		listing_outcome(JSON.stringify(rows)),
+	vi.spyOn(git_gh_command, 'issue_list_by_label_summary').mockImplementation(async (label) =>
+		listing_outcome(
+			JSON.stringify(label === INTERRUPT_ROUTE_LABEL ? (input.interrupts ?? []) : rows),
+		),
 	)
 	vi.spyOn(git_gh_command, 'issue_list_by_label').mockImplementation(async (label) =>
 		listing_outcome(

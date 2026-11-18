@@ -2,6 +2,7 @@ import type { OptedInRead, TrackingRead } from '#scripts/auto-ok/auto-ok-cli'
 import type { BusyRead } from '#scripts/epic/epic-busy'
 import { epic_graph } from '#scripts/epic/epic-graph'
 import { epic_index } from '#scripts/epic/epic-index'
+import type { OpenIssueData } from '#scripts/git/git-schemas'
 import type { ImplementRate } from '#scripts/lane/lane-implement-rate'
 import { lane_plan } from '#scripts/lane/lane-plan'
 import type { SizeRatios } from '#scripts/lane/lane-size-stats'
@@ -25,6 +26,8 @@ interface PoolContext {
 	exclude: ReadonlyArray<number>
 	implement_rate: ImplementRate | undefined
 	growth?: SizeRatios | undefined
+	// The interrupt defects outside the pool that hold the backlog (`backlog-interrupt.ts`).
+	interrupts?: ReadonlyArray<OpenIssueData>
 }
 
 // The rows the offer's cap bounds — the standalone half.
