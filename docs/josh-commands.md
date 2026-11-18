@@ -1147,10 +1147,10 @@ pnpm josh lane:fold 7945 --into 7951 --reason "ships with the wiring"
 
 <!-- /usage -->
 
-- In order: `lane:withdraw <N>`; a marked comment on `<M>` (`JOSH_SESSION_LANG`) with the `stash:pop` line and `closes #<N>`; `backlog:triage --unblock`'s removal of `<M>`'s blocked-by on `<N>`; `<N>` blocked by `<M>`, so no run builds it apart.
-- A re-run does only what is left: a `no-lane` or `closed` withdrawal goes on with the stash found on the stack, and the note and block are not written twice. `<N>` stays open until `<M>`'s pull request closes it.
+- In order: `lane:withdraw <N>`; a marked note on `<M>` (`JOSH_SESSION_LANG`) with the `stash:pop` line and `closes #<N>`; `<M>`'s blocked-by on `<N>` removed (`backlog:triage --unblock`); `<N>` blocked by `<M>`, so no run builds it apart.
+- A re-run goes on past a `no-lane` or `closed` withdrawal with the stash found on the stack, and writes no note or block twice.
 
-**Output / exit codes:** one line per step on stderr, exit 0. A failed step is named with the re-run hint, exit 1; a bad argument prints the usage, exit 1.
+**Output / exit codes:** one line per step on stderr, exit 0; a failed step or bad argument, exit 1.
 
 ### `josh lane:resolve`
 
