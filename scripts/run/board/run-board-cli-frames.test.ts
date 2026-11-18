@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_board_cli } from './run-board-cli'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_frame_store, type FrameStore } from './run-board-frame-store'
+import { run_board_gather } from './run-board-gather'
 import type { BoardPorts } from './run-board-state'
 
 const { LOCAL, START, STOPPED, WORDS, harness, plan_titled } = run_board_fixture
@@ -114,8 +115,13 @@ describe('run_board_cli.run --fresh and the record date', () => {
 // from what it already read.
 const ESCAPE = '\u{1B}'
 const HOME = `${ESCAPE}[H${ESCAPE}[J`
-const LIVE_MS = 11_000
+const LIVE_SECONDS = 11
+const LIVE_MS = LIVE_SECONDS * 1000
+const LIVE_AGE = String(LIVE_SECONDS)
 const TERMINAL_ONCE = once_key(undefined, true)
+// The run's own reads the live board takes on its own cadence over `LIVE_MS`: one at the start, then
+// one each `LOCAL_READ_MS`.
+const LOCAL_READS = Math.floor(LIVE_MS / run_board_gather.LOCAL_READ_MS) + 1
 
 // A live board run for `LIVE_MS`, its saves counted, its writes kept.
 async function watched(store: FrameStore): Promise<{
@@ -164,7 +170,7 @@ describe('run_board_cli.run live board record', () => {
 			TERMINAL_ONCE,
 		])
 		expect(made.read_machine).toHaveBeenCalledTimes(frames.length)
-		expect(made.read_local).toHaveBeenCalledOnce()
+		expect(made.read_local).toHaveBeenCalledTimes(LOCAL_READS)
 	})
 
 	it('records a chat frame with no escape and a once frame that ends on no footer', async () => {
@@ -172,7 +178,7 @@ describe('run_board_cli.run live board record', () => {
 
 		await watched(store)
 
-		expect(store.load(CHAT_KEY)?.text).toContain('#1')
+		expect(store.load(CHAT_KEY)?.text).toContain('🧵 lanes')
 		expect(store.load(CHAT_KEY)?.text).not.toContain(ESCAPE)
 		expect(store.load(TERMINAL_ONCE)?.text).not.toContain(HOME)
 		expect(store.load(TERMINAL_ONCE)?.text).not.toContain(WORDS.keeps_running)
@@ -188,7 +194,8 @@ describe('run_board_cli.run live board record', () => {
 		await run_board_cli.run(['--chat'], chat.ports)
 
 		expect(recorded?.text).toBeDefined()
-		expect(chat.frames).toStrictEqual([`${String(recorded?.text)}recorded 1s ago\n`])
+		// Dated when the plan was read, at the board's start, so it is as old as the board.
+		expect(chat.frames).toStrictEqual([`${String(recorded?.text)}recorded ${LIVE_AGE}s ago\n`])
 		expect(chat.read_local).not.toHaveBeenCalled()
 	})
 })
