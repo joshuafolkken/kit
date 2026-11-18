@@ -23,7 +23,7 @@ describe('osv-scanner.toml', () => {
 		expect(read_entries()).toHaveLength(1)
 	})
 
-	it('ignores only the picomatch advisory with no patched version', () => {
+	it('ignores only the picomatch advisory GHSA-fc5q-39xc-vjpf', () => {
 		const [entry = ''] = read_entries()
 
 		expect(read_value(entry, 'id')).toBe(`"${ADVISORY_ID}"`)
