@@ -45,8 +45,11 @@ const LINKED_REQUEST =
 // joshuafolkken/kit#7756: without GitHub nothing can be filed, so a filing plan could not be carried out.
 const UNLINKED_REQUEST =
 	'GitHub is not linked (gh, its sign-in or a GitHub origin is missing), so answer an imperative request with investigation and a plan only, without a filing plan; '
+// joshuafolkken/kit#7759: a no-filing request is carried out, but through subagents, never by this session.
+const NO_FILING_REQUEST =
+	'a no-filing request (「起票せずに」) is carried out through the investigator and producer subagents, never edited by this session; '
 const CONSULTATION_SUFFIX =
-	'hand implementation to a launcher-assigned worker lane. Model names and conversational requests do not grant implementation authority.'
+	'otherwise hand implementation to a launcher-assigned worker lane. Model names and conversational requests do not grant implementation authority.'
 
 // `is_linked` is read only outside a worker lane, the one scope whose line depends on it.
 function scope_line(
@@ -57,7 +60,7 @@ function scope_line(
 
 	const request = is_linked() ? LINKED_REQUEST : UNLINKED_REQUEST
 
-	return `${CONSULTATION_PREFIX}${request}${CONSULTATION_SUFFIX}`
+	return `${CONSULTATION_PREFIX}${request}${NO_FILING_REQUEST}${CONSULTATION_SUFFIX}`
 }
 
 const agent_session_role = {
