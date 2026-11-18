@@ -1,0 +1,11 @@
+# osv-scanner reads this file from the repository root (CI and `pnpm josh audit`).
+# Each ignore is a single advisory with an expiry; past `ignoreUntil` the advisory fails the audit again.
+
+# picomatch ReDoS: no patched version exists (first_patched_version is null, npm latest is 4.0.7).
+# picomatch reaches kit only through devDependencies (`pnpm why picomatch --prod` is empty), and the
+# globs it matches come from repository config, not attacker input. Decision: #7839.
+# When a patched picomatch is published, update the dependency and delete this entry.
+[[IgnoredVulns]]
+id = "GHSA-fc5q-39xc-vjpf"
+ignoreUntil = 2026-12-02
+reason = "No patched picomatch exists; dev-only dependency with repository-controlled globs (#7839)"

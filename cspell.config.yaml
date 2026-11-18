@@ -2,6 +2,10 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # osv-scanner's config table for ignored advisories and the picomatch advisory id it ignores (#7839).
+  - Vulns
+  - vjpf
+  - picomatch
   # Git's system-config opt-out for isolated measurement processes (#7444).
   - NOSYSTEM
   # The remote dependency check and local spawn cannot form one atomic operation (#7427).
