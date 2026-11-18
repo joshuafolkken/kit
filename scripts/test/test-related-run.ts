@@ -175,8 +175,9 @@ async function record_green(
 		return
 	}
 
-	const files = [...proven_files(input), ...(await test_related_reuse.retained(input.root, tree))]
-	const blobs = await test_related_reuse.blobs(input.root, files)
+	const { retained, carried } = test_related_reuse
+	const kept = [...(await retained(input.root, tree)), ...(await carried(input.root, tree))]
+	const blobs = await test_related_reuse.blobs(input.root, [...proven_files(input), ...kept])
 
 	await scoped_green.record_if_green(review_stamps.test_related_stamp, {
 		before: tree,
@@ -204,6 +205,8 @@ async function run_and_vouch(
 		first_exit,
 		started_ms: measured.started_ms,
 		owed: test_related_red.no_base_files(input),
+		root: input.root,
+		passed: proven_files(input),
 	})
 
 	return exit_code
