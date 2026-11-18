@@ -23,12 +23,16 @@ interface RowCut {
 const WHOLE: RowCut = { title_limit: TITLE_LIMIT, reason_cut: 0 }
 const WHOLE_TAIL_STATES: ReadonlySet<string> = new Set(['stopped', 'parked', 'human'])
 
-function has_short_reason(reason: BoardRow['reason']): boolean {
-	return reason?.evidence_url !== undefined || reason?.tail === run_board_pause.FALLBACK
+// A reason whose end a narrow pane may cut: the fallback, and a linked reason on any row but a parked
+// one, whose recorded reason names its next action and so keeps its end (joshuafolkken/kit#7849).
+function has_short_reason(row: BoardRow): boolean {
+	const is_linked = row.state !== 'parked' && row.reason?.evidence_url !== undefined
+
+	return is_linked || row.reason?.tail === run_board_pause.FALLBACK
 }
 
 function keeps_tail(row: BoardRow): boolean {
-	if (has_short_reason(row.reason)) return false
+	if (has_short_reason(row)) return false
 
 	return WHOLE_TAIL_STATES.has(row.state) || row.reason?.icon === run_board_labels.STATE_ICONS.human
 }

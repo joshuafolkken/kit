@@ -10,6 +10,7 @@ const CAUSE = 6428
 const PARKED = 6429
 const OTHER = 6400
 const SIBLING = 6430
+const SINCE = '2026-11-05T00:00Z'
 const LATER = '2026-11-05T00:01Z'
 const REPO = 'joshuafolkken/kit'
 const HISTORY_ERROR = 'history failed'
@@ -28,7 +29,7 @@ function mock_issue(nodes = [relation()], total_count = nodes.length, state = 'O
 
 beforeEach(() => {
 	vi.spyOn(run_event_stream_emit, 'current_events').mockResolvedValue([
-		{ pos: 1, kind: 'park', text: `#${String(PARKED)} stopped`, at: '2026-11-05T00:00Z' },
+		{ pos: 1, kind: 'park', text: `#${String(PARKED)} stopped`, at: SINCE },
 	])
 	vi.spyOn(git_gh_command, 'repo_get_name_with_owner').mockResolvedValue(REPO)
 	vi.spyOn(git_gh_command, 'issue_get_state_and_relations_classified')
@@ -182,6 +183,19 @@ it('goes on retrying the round after a protected dependent (ac-a55c13d2)', async
 		['run:add', String(SIBLING), '--retry'],
 		true,
 	)
+})
+
+it.each([
+	{ nodes: [{ ...relation(), closed_at: LATER }], expected: true },
+	{ nodes: [{ ...relation(), closed_at: SINCE }], expected: true },
+	{ nodes: [{ ...relation(), closed_at: '2026-11-04T23:59Z' }], expected: false },
+	{ nodes: [{ ...relation(), closed_at: LATER }, relation('OPEN', OTHER)], expected: false },
+	{ nodes: [relation()], expected: false },
+	{ nodes: [], expected: false },
+])('is_unblocked_since $nodes → $expected', ({ nodes, expected }) => {
+	const issue = { blockedBy: { nodes, totalCount: nodes.length } }
+
+	expect(backlog_drive_retry.is_unblocked_since(issue, SINCE)).toBe(expected)
 })
 
 it('propagates retry command failure (ac-e6cfefaf)', async () => {
