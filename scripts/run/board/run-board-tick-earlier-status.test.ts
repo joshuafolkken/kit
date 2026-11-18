@@ -121,7 +121,8 @@ describe('run_board_tick.tick — what an earlier run’s lane is doing', () => 
 		const stage = event_of(1, 'ship-stage', `#${String(EARLIER)} gate start`)
 		const row = row_of(await frame_of({ ...HELD, events: [stage] }), EARLIER)
 
-		expect(row).toMatch(new RegExp(`${EARLIER_ICON} ${PHASE_ICONS.gate} 0″$`, 'u'))
+		// 🧳 stands in the finish column it draws none of (joshuafolkken/kit#7994).
+		expect(row).toMatch(new RegExp(`${EARLIER_ICON} +${PHASE_ICONS.gate} 0″$`, 'u'))
 	})
 
 	it('starts its issue in the column this run’s own row does', async () => {

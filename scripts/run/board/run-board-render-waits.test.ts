@@ -108,7 +108,7 @@ describe('run_board_render_waits.held_time', () => {
 describe('run_board_render.render — a held lane on its row', () => {
 	it('leads the row with 🚧, keeps the phase’s icon, holds the elapsed column and ends on the check', () => {
 		expect(lane_line([wait()])).toMatch(
-			/^ {2}🚧 🔨 +8′00″ 🧠 +9″ 4039 {7}Issue 4039 +lint {2}🎯 —$/u,
+			/^ {2}🚧 🔨 +8′00″ 🧠 +9″ 4039 {7}Issue 4039 +🎯 — {2}lint$/u,
 		)
 	})
 
@@ -172,7 +172,7 @@ describe('run_board_render.render — the held check’s legend', () => {
 		const waits = [wait({ waited_ms: 2000 }), wait({ reason: 'cores', command: 'gate test' })]
 		const lines = plain_lines(waits)
 
-		expect(lane_line(waits)).toMatch(/💪 +9″ 4039 .*test {2}🎯 —$/u)
+		expect(lane_line(waits)).toMatch(/💪 +9″ 4039 .*🎯 — {2}\S*test$/u)
 		expect(lines.join('\n')).toContain(CPU_LEGEND)
 		expect(lines.join('\n')).not.toContain('🧠 waits for memory')
 	})
