@@ -16,7 +16,7 @@ import { stamp_file } from '#scripts/josh/stamp-file'
 import { lane_session_broker } from '#scripts/lane/lane-session-broker'
 import { run_ship_review } from '#scripts/run/ship/run-ship-review'
 import { test_related_verdict } from '#scripts/test/test-related-verdict'
-import { removed_tests_check } from './removed-tests-check'
+import { removed_tests_check, type Removal } from './removed-tests-check'
 import { review_attest, type ReviewSlot } from './review-attest'
 import { review_brief } from './review-brief'
 import { review_checkout, type ReviewCheckout } from './review-checkout'
@@ -235,11 +235,11 @@ async function read_diff(
 
 // **Swallowed, and the brief omits the list**: `josh ship` and `followup` read the same list again
 // and refuse on a failure, so the merge never rests on this reading.
-async function read_removed_tests(): Promise<ReadonlyArray<string>> {
+async function read_removed_tests(): Promise<Removal | undefined> {
 	try {
-		return (await removed_tests_check.read()) ?? []
+		return await removed_tests_check.read()
 	} catch {
-		return []
+		return undefined
 	}
 }
 

@@ -1,6 +1,6 @@
 import { agent_profile_schema, type AgentProfile } from '#scripts/agent/agent-profile-schema'
 import { file_map_stamp, type FileMapStamp } from '#scripts/josh/file-map-stamp'
-import { removed_tests } from './removed-tests'
+import { removed_tests, type Removal } from './removed-tests'
 import { review_brief_paths } from './review-brief-paths'
 import { review_checkout, type ReviewCheckout } from './review-checkout'
 import { review_diff_parts, type DiffParts } from './review-diff-parts'
@@ -398,7 +398,7 @@ interface BriefInput {
 	// write failed, and the target line alone then names the change.
 	diff?: { parts: DiffParts; cap: number } | undefined
 	// The tests the change removes, listed for the reviewer to account for. Absent or empty, no section.
-	removed_tests?: ReadonlyArray<string> | undefined
+	removed_tests?: Removal | undefined
 	// The run-tooling paths an interaction review is briefed on (joshuafolkken/kit#4276). Absent, the
 	// brief is `/code-review`'s alone.
 	interaction?: ReadonlyArray<string> | undefined
@@ -493,7 +493,7 @@ function compose(input: BriefInput): string {
 		target,
 		...diff_block(input, target),
 		...readers_block(input, target),
-		...removed_tests.brief_block(input.removed_tests ?? []),
+		...removed_tests.brief_block(input.removed_tests),
 		...interaction_block(input.interaction),
 	].join('\n')
 }
