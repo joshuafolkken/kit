@@ -67,6 +67,33 @@ describe('run_board_pause park next action', () => {
 	})
 })
 
+// joshuafolkken/kit#7852: a `run:stalled` park comment carries no options, only its marked next action.
+describe('run_board_pause run:stalled next action', () => {
+	const STALLED = 'Parked with `run:stalled`\n- Next: fix the cause'
+	const COMMAND = 'pnpm josh ship --log 7387'
+
+	function stalled(summary?: string): IssueComment {
+		return { ...note(summary, STALLED), html_url: `${note().html_url}9` }
+	}
+
+	it('reads a marked run:stalled park over an older park', () => {
+		expect(run_board_pause.from_comments([note(SIZE_REASON), stalled(COMMAND)])).toMatchObject({
+			summary: COMMAND,
+			url: stalled().html_url,
+		})
+	})
+
+	it('does not read an unmarked run:stalled comment as a stop', () => {
+		expect(run_board_pause.from_comments([note(SIZE_REASON), stalled()]).summary).toBe(SIZE_REASON)
+	})
+
+	it('does not read a marker holding no next action as a stop', () => {
+		expect(run_board_pause.from_comments([stalled('Merged cleanly')]).summary).toBe(
+			run_board_pause.FALLBACK,
+		)
+	})
+})
+
 describe('run_board_pause evidence validation', () => {
 	it('falls back for a missing URL or invalid summary', () => {
 		const missing = { ...note(APPROVAL_REASON), html_url: undefined }

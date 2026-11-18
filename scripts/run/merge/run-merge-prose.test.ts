@@ -1,3 +1,4 @@
+import { issue_outcome } from '#scripts/issue/issue-outcome'
 import { session_language } from '#scripts/josh/session-language'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
 import { run_stalled } from '#scripts/run/park/run-stalled'
@@ -186,6 +187,13 @@ describe('run_merge_prose.park_comment — the streak and the recovery step', ()
 		expect(comment).toContain(`- Why: ${run_stalled.STALE_HANDOFF.why}`)
 		expect(comment).toContain(step)
 		expect(comment).toContain('(retry alone does not clear it), then use')
+	})
+
+	it.each(['ja', 'en'])('marks the first action for the board under %j (#7852)', (lang) => {
+		const comment = park_in(lang, { cause: run_stalled.STALE_HANDOFF.why })
+
+		expect(issue_outcome.next_of(comment)).toBe('pnpm josh run:cut --end')
+		expect(comment).toContain('- Next: ')
 	})
 })
 

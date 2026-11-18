@@ -1,4 +1,5 @@
 import { RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
+import { issue_outcome } from '#scripts/issue/issue-outcome'
 import { describe, expect, it } from 'vitest'
 import { run_stalled } from './run-stalled'
 
@@ -123,6 +124,39 @@ describe('run_stalled.next_step', () => {
 
 		expect(step).toContain(`\`${run_stalled.resume_of(CHILD)}\``)
 		expect(step).toContain('pnpm josh run:add 4188 --retry')
+	})
+})
+
+// joshuafolkken/kit#7852: the one action a `run:stalled` park's marker carries for the board's row.
+describe('run_stalled.next_action', () => {
+	const CUT_END = 'pnpm josh run:cut --end'
+
+	it.each([
+		['an ordinary cause', CAUSE, 'pnpm josh ship --log 4188'],
+		['a stale hand-off', run_stalled.STALE_HANDOFF.why, CUT_END],
+		['a handed-off cut', 'its cut was already handed off', CUT_END],
+		[
+			'an escalation',
+			run_stalled.ESCALATION_REQUESTED.why,
+			'parent: resume it one josh.worker profile up',
+		],
+	])('names the first action for %s', (_label, cause, action) => {
+		expect(run_stalled.next_action(CHILD, cause)).toBe(action)
+	})
+
+	it.each([CAUSE, run_stalled.STALE_HANDOFF.why, run_stalled.ESCALATION_REQUESTED.why])(
+		'fits the next-action shape for %j',
+		(cause) => {
+			expect(
+				issue_outcome.next_schema.safeParse(run_stalled.next_action(CHILD, cause)).success,
+			).toBe(true)
+		},
+	)
+
+	it('takes its command from the step the Next line names', () => {
+		const cause = run_stalled.STALE_HANDOFF.why
+
+		expect(run_stalled.next_step(CHILD, cause)).toContain(run_stalled.next_action(CHILD, cause))
 	})
 })
 
