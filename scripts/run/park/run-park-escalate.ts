@@ -1,6 +1,7 @@
 import { agent_worker_profile } from '#scripts/agent/agent-worker-profile'
 import { RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
+import { issue_outcome } from '#scripts/issue/issue-outcome'
 import { session_cite } from '#scripts/issue/session-cite'
 import { session_language } from '#scripts/josh/session-language'
 import { cli_flags } from '#scripts/lib/cli-flags'
@@ -98,8 +99,10 @@ function japanese_prose(issue: string): CommentProse {
 function comment_of(escalation: Escalation): string {
 	const { issue, reason } = escalation
 	const { lead, next } = is_japanese() ? japanese_prose(issue) : english_prose(issue)
+	const body = [lead, `- Reason: ${reason}`, `- Next: ${next}`].join('\n')
+	const summary = run_stalled.next_action(issue, run_stalled.ESCALATION_REQUESTED.why)
 
-	return [lead, `- Reason: ${reason}`, `- Next: ${next}`].join('\n')
+	return issue_outcome.body_of({ body, summary })
 }
 
 // The parked Issue, or `undefined` when the declaration is refused or the park could not be written.

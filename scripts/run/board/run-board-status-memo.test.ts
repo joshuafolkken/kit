@@ -16,29 +16,6 @@ const OWN: BoardLanes = {
 	...run_board_lane_state.NO_LANES,
 	own: new Map([[ISSUE, { state: 'running', started_ms: Date.parse(T0), lane: 'lane 4267' }]]),
 }
-const STOP: RunEvent = { pos: 2, at: T1, kind: KIND.STOP, text: 'run stopped' }
-
-describe('run_board_status.activity_of the same stream twice', () => {
-	it('hands back the activity it folded the first time', () => {
-		const events = [LAUNCH]
-
-		expect(run_board_status.activity_of(events)).toBe(run_board_status.activity_of(events))
-	})
-
-	it('draws an ended run stopped without changing the activity it keeps', () => {
-		const events = [LAUNCH]
-
-		expect(run_board_status.activity_of(events, true).is_stopped).toBe(true)
-		expect(run_board_status.activity_of(events).is_stopped).toBe(false)
-	})
-
-	it('folds a stream read again afresh', () => {
-		const events = [LAUNCH]
-
-		expect(run_board_status.activity_of(events).is_stopped).toBe(false)
-		expect(run_board_status.activity_of([...events, STOP]).is_stopped).toBe(true)
-	})
-})
 
 describe('run_board_status.statuses_of the same stream twice', () => {
 	it('lays each call its own lanes over the fold', () => {

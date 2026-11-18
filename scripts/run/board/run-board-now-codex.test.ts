@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
+import type { RunActivity } from './run-board-activity'
 import { run_board_now } from './run-board-now'
 import { run_board_now_fixture } from './run-board-now-fixture'
 import { run_board_operation_codex_fixture } from './run-board-operation-codex-fixture'
 import { run_board_operation_read } from './run-board-operation-read'
-import type { RunActivity } from './run-board-status'
 
 const { AT, ROOT, command, file } = run_board_operation_codex_fixture
 const SECOND = 1000

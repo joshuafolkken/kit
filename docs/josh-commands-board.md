@@ -151,6 +151,9 @@ A finished row leads with `✅` merged, `🏁` done, `⏩` closed by `josh issue
 
 停止中のparked/decision行も同じ短い英文と根拠リンクを使うが、parkedは狭い端末でタイトルから縮める。
 `run:park` は推奨の選択肢から作った次の一手（`--outcome`、上限 `issue_outcome.NEXT_LIMIT`）を必須にし marker として書く。コマンドを文章より優先し、引数を埋めた `pnpm josh …` をそのまま書く（例 `pnpm josh backlog:triage --apply 7447 --blocked-by 7839`、複数なら最初の一つ）。コマンドの無い作業だけ `parent:` / `person:` で始まる文章にする。markerのない過去の停止は `issue:comment --outcome <next action> --evidence-url <stop comment URL>` で補完する。描画時のAI要約はしない。補完は最新停止にだけ効き、承認・解除・再開を代行しない。
+`run:stalled` の park コメント（`run:merge` の park と `run:park --escalate`）は、`run_stalled.next_action` の一手を同じ marker で書く。一手は `Next:` の回復手順と同じ出どころで、最初に打つコマンドを出す。再開コマンドは `Next:` に残る。
+一手は、通常 `pnpm josh ship --log <N>`、古い hand-off・handed-off の cut は `pnpm josh run:cut --end`、escalation は `parent:` の文章。
+自身を根拠とする次の一手の marker を持つ信頼済みコメントは停止として読み、それより古い park に代わって理由になる。他のコメントを根拠にする補完と、markerのない過去の `run:stalled` コメントは停止として読まない。
 
 説明不明でも最新停止コメントへリンクする。取得失敗や起動前の停止は `Reason unavailable: inspect issue`（Issueへリンク）、停止後に `backlog:triage --adopt` の採用があれば `adopted option <n> · relaunching`（採用コメントへリンク）。リンク非対応やchat/plainは行頭のIssue番号から確認する（CLIは `pnpm josh issue:read <N>`）。
 
