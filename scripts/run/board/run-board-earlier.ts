@@ -26,14 +26,22 @@ const UNKNOWN_TAIL = lane_state.NO_STATE_HINT
 // out of it by its size).
 const EARLIER_ICON = '🧳'
 
-// An earlier run's row's tail led by 🧳, one blank before what it draws, or 🧳 alone where it draws
-// nothing; any other row's tail as it is.
+// 🧳 over the blanks a tail leads with in place of the finish it draws none of (joshuafolkken/kit#7994),
+// so what follows keeps its column; else one blank before what it leads with, or 🧳 alone.
+function marked_first(first: string): string {
+	if (first === '') return EARLIER_ICON
+	if (first.trim() === '') return `${EARLIER_ICON}${first.slice(EARLIER_ICON.length)}`
+
+	return `${EARLIER_ICON} ${first}`
+}
+
+// An earlier run's row's tail led by 🧳 (`marked_first`); any other row's tail as it is.
 function earlier_marked(row: BoardRow, tail: ReadonlyArray<string>): Array<string> {
 	if (row.is_earlier !== true) return [...tail]
 
 	const [first = '', ...rest] = tail
 
-	return [first === '' ? EARLIER_ICON : `${EARLIER_ICON} ${first}`, ...rest]
+	return [marked_first(first), ...rest]
 }
 
 // The marks the legend names beside the row leads: 🧳 where an earlier run's lane is drawn.

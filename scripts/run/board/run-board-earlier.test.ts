@@ -110,6 +110,15 @@ describe('run_board_earlier.earlier_marked', () => {
 		expect(earlier_marked(EARLIER_ROW, tail)).toStrictEqual(marked)
 	})
 
+	// joshuafolkken/kit#7994: the blanks of the finish column it draws none of hold 🧳, so its activity
+	// starts where every running row's does.
+	it('draws 🧳 over the blank finish column, keeping its width', () => {
+		expect(earlier_marked(EARLIER_ROW, [' '.repeat(9), '🚦 0″'])).toStrictEqual([
+			'🧳       ',
+			'🚦 0″',
+		])
+	})
+
 	it('leaves this run’s own row’s tail as it is', () => {
 		expect(earlier_marked({ ...EARLIER_ROW, is_earlier: undefined }, ['lint'])).toStrictEqual([
 			'lint',
