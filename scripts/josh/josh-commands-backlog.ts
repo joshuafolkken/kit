@@ -136,7 +136,7 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: ['--done <text>'],
 					description:
-						'what the parent did for an option whose `必要な権限` starts with `親` (e.g. `親セッション`): the parent carries the option out first, then adopts it with `--done <what was done>`, recorded with the decision. Without it such an option is refused before any write, so the child stays parked; on any other option it is refused.',
+						'what the parent did for an option whose `必要な権限` is `親` (e.g. `親（Issue 本文の編集）`): the parent carries the option out first, then adopts it with `--done <what was done>`, recorded with the decision. Without it such an option is refused before any write, so the child stays parked; on any other option it is refused.',
 				},
 				{
 					names: ['--done "filed #<M>"'],

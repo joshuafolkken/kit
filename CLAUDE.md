@@ -9,6 +9,7 @@
 - **No clones — single-source, even across package boundaries.** Duplicate non-trivial logic only after presenting the alternative and getting explicit approval. `prompts/collaboration-workflow/principles.md` → "no-clones".
 - **Design for elegance and simplicity first.** Before adding a hook, guard, rule or abstraction, ask whether fixing the cause makes it unnecessary. `prompts/collaboration-workflow/principles.md` → "elegant-design"; conflicting quality goals, or a remedy for defects → "quality-priority".
 - **Write concise prose: conditions and actions only.** `prompts/collaboration-workflow/principles.md` → "concise-prose".
+- **Never hand remaining steps back to the user.** Run them or leave them to the run; asking for a decision, give your recommendation and why. `prompts/collaboration-workflow/principles.md` → "concise-reply".
 - **Distinguish consultation from execution.** Imperative requests, main-line scope, handoff: `prompts/collaboration-workflow/principles.md` → "consult-vs-execute".
 - **Route distributed-doc / config changes upstream to kit.** In a consumer repo never edit kit-distributed docs/config; in kit you are the source. `prompts/collaboration-workflow/principles.md` → "upstream-to-kit".
 - **Latest-first, fix forward — pin back only as a last resort.** `prompts/collaboration-workflow/principles.md` → "latest-first".

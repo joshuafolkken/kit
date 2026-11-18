@@ -44,7 +44,7 @@ vi.mock('#scripts/document/document-checks', () => ({
 }))
 // Mocked so no case scans this checkout's real program; the scan is `unused-members-check.test.ts`.
 vi.mock('#scripts/exports/unused-members-check', () => ({
-	unused_members_check: { run_unused_members: vi.fn() },
+	unused_members_check: { spawn_unused_members: vi.fn() },
 }))
 // Mocked so no case spawns this checkout's real guard tests; what they report is
 // `structural-checks.test.ts`.
@@ -64,7 +64,7 @@ const mocked_record = vi.mocked(scoped_green.record_if_green)
 const mocked_before = vi.mocked(scoped_green.read_before)
 const mocked_byte_all = vi.mocked(document_checks.check_all)
 const mocked_byte_files = vi.mocked(document_checks.check_files)
-const mocked_unused = vi.mocked(unused_members_check.run_unused_members)
+const mocked_unused = vi.mocked(unused_members_check.spawn_unused_members)
 const mocked_structural = vi.mocked(structural_checks.run_structural)
 
 // joshuafolkken/kit#1298: the narrowed run is only worth having if the fallbacks reach the whole
@@ -109,7 +109,7 @@ function eslint_arguments(): ReadonlyArray<string> {
 function green_checks_after_lint(): void {
 	mocked_byte_all.mockReturnValue(0)
 	mocked_byte_files.mockReturnValue(0)
-	mocked_unused.mockResolvedValue(0)
+	mocked_unused.mockResolvedValue({ exit_code: 0, output: '' })
 }
 
 beforeEach(() => {
@@ -245,11 +245,12 @@ describe('lint_related.run_related_lint — the document checks', () => {
 		expect(mocked_byte_files).not.toHaveBeenCalled()
 	})
 
-	it('returns and records a byte-check failure after a green lint, skipping the unused member check', async () => {
+	it('returns and records a byte-check failure after a green lint, before the unused member check', async () => {
 		mocked_byte_files.mockReturnValue(FAILED)
+		mocked_unused.mockResolvedValue({ exit_code: FAILED, output: '' })
 
 		await expect(lint_related.run_related_lint([])).resolves.toBe(FAILED)
-		expect(mocked_unused).not.toHaveBeenCalled()
+		expect(last_line()).toBe(`${status_icons.FAIL_ICON} josh lint:related failed: documents`)
 		expect_recorded(FAILED)
 	})
 })
@@ -265,7 +266,7 @@ describe('lint_related.run_related_lint — the unused namespace member check', 
 	})
 
 	it('returns an unused member it found as the run’s failure', async () => {
-		mocked_unused.mockResolvedValue(FAILED)
+		mocked_unused.mockResolvedValue({ exit_code: FAILED, output: '' })
 
 		await expect(lint_related.run_related_lint([])).resolves.toBe(FAILED)
 		expect(last_line()).toBe(`${status_icons.FAIL_ICON} josh lint:related failed: unused members`)

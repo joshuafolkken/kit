@@ -138,6 +138,16 @@ describe('backlog_triage_park_loop.loop_of', () => {
 	})
 })
 
+// joshuafolkken/kit#7818: the #7780 earlier park wrote its permission in free text; it is still a park.
+describe('backlog_triage_park_loop.loop_of — a park off the permission vocabulary', () => {
+	it('finds the loop when the earlier park names a permission off the vocabulary', () => {
+		const prose = park_on(TREE).replace('必要な権限: なし', '必要な権限: Issue のクローズ')
+		const comments = loop_comments(TREE, TREE).with(0, comment(FIRST_PARK_AT, prose))
+
+		expect(backlog_triage_park_loop.loop_of(comments)?.tree).toBe(TREE)
+	})
+})
+
 function adopt_with(comments: Array<IssueComment>): Promise<number> {
 	vi.mocked(issue_read.parse_comments).mockResolvedValue(comments)
 	vi.mocked(issue_read.trusted_bodies).mockReturnValue(comments.map((entry) => entry.body))
