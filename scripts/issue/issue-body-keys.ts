@@ -64,6 +64,10 @@ const VALUES = {
 	last: { ja: '最後', en: 'last' },
 	unknown: { ja: '不明', en: 'unknown' },
 	none: { ja: 'なし', en: 'none' },
+	// The kinds a no-split reason opens with past the lane target (joshuafolkken/kit#7925).
+	cannot_split: { ja: '分けられない', en: 'cannot split' },
+	better_unsplit: { ja: '分けない方が良い', en: 'better not split' },
+	slower_overall: { ja: '全体が遅くなる', en: 'slower overall' },
 } as const satisfies Record<string, Row>
 
 const HEADINGS = {
@@ -139,6 +143,11 @@ function prefix_variants(name: IssueBodyKey): ReadonlyArray<string> {
 // The declaration line in every column, for a match on the body as the filer wrote it.
 function line_variants(name: IssueBodyKey, value_name: IssueBodyValue): ReadonlyArray<string> {
 	return COLUMNS.map((at) => `- ${KEYS[name][at]}: ${VALUES[value_name][at]}`)
+}
+
+// A fixed value in every column, for a match on the body as the filer wrote it.
+function value_variants(name: IssueBodyValue): ReadonlyArray<string> {
+	return COLUMNS.map((at) => VALUES[name][at])
 }
 
 // A template heading as the body writes it: `## <heading>`.
@@ -222,6 +231,7 @@ const issue_body_keys = {
 	size_value,
 	TABLES,
 	value,
+	value_variants,
 }
 
 export type { Column, IssueBodyHeading, IssueBodyKey, IssueBodyValue }

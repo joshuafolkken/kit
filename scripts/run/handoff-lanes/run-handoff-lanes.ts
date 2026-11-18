@@ -18,7 +18,8 @@ const CAPPED_VERDICT = 'capped'
 const COST_STEP = ['cost', '--cut']
 const CARRY_STEP = ['run:carry', '--cut']
 const AFTER_CARRY: ReadonlyArray<ReadonlyArray<string>> = [
-	['run:board', '--chat'],
+	// Read from scratch: right after a merge, a chat record up to a minute old can show the merged child in flight.
+	['run:board', '--chat', '--fresh'],
 	['run:report', '--handoff'],
 ]
 

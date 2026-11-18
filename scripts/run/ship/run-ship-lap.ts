@@ -1,6 +1,7 @@
 import type { ShipLapRecord } from '#scripts/lane/lane-ledger-schema'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { inherited_scope } from '#scripts/lib/inherited-scope'
+import { test_related_caller } from '#scripts/test/test-related-caller'
 import { z } from 'zod'
 
 // The inner steps of a `josh ship` stage, each timed into the lane ledger as a lap, so `lane:breakdown`
@@ -57,6 +58,15 @@ async function within<T>(
 
 function current_scope(): LapScope | undefined {
 	return scope.current()
+}
+
+// The stage a `test:related` this stage starts names as its caller (joshuafolkken/kit#7965), `{}`
+// outside any scope. Read off the stage's own scope, so two stages running side by side keep theirs.
+function caller_environment(): Record<string, string> {
+	const current = current_scope()
+	if (current === undefined) return {}
+
+	return test_related_caller.environment(`ship ${current.stage}`)
 }
 
 // The environment that times a child process's steps under `parent`, `{}` outside any scope.
@@ -147,6 +157,7 @@ const run_ship_lap = {
 	PARENT_SEPARATOR,
 	STARTUP_STEP,
 	STEP,
+	caller_environment,
 	environment,
 	timed,
 	within,

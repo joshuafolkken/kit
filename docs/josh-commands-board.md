@@ -96,6 +96,7 @@ Draw a live board of the running backlogrun, redrawn every second.
 pnpm josh run:board                    # redraw until interrupted
 pnpm josh run:board --once             # one frame, then exit
 pnpm josh run:board --chat             # one frame for a chat, recorded as a progress report
+pnpm josh run:board --chat --fresh     # the same, read from scratch past the one-minute record
 pnpm josh run:board --every 5          # the --chat frame as a 📊 Progress Telegram every 5 minutes, until the run ends
 pnpm josh run:board --theme wargames   # green text and dashed rules
 ```
@@ -103,6 +104,8 @@ pnpm josh run:board --theme wargames   # green text and dashed rules
 **Options:**
 
 - `--chat` — answers a `backlogrun`, `fullrun` or `halfrun` progress question: the frame `--once` draws, with only `🧠` on the machine line and no escapes; it records the report as `run:progress --mark` does.
+- `--once` / `--chat` — each keeps the frame it drew for one minute, per checkout (`--once` per theme and per terminal or pipe); asked again within the minute, it writes that frame with a `recorded <N>s ago` line, read nothing. The age counts from when the read began.
+- `--fresh` — with `--chat`: reads from scratch past the record, and records what it drew; the `run:handoff-lanes` chain passes it right after a merge.
 - `--every <minutes>` — sends the `--chat` frame as a `📊 Progress` Telegram now and every `<minutes>` until the run ends — only when a person asks for it.
 - `--theme wargames` — draws the text no color is given in phosphor green and every rule as `-`; `JOSH_BOARD_THEME=wargames` sets it for every board, the one `backlogrun` opens included, and `--theme` wins over it. An unknown name is refused. `--chat` and `--every` never take it.
 

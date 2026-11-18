@@ -210,7 +210,7 @@ describe('size_estimate cap', () => {
 		expect(problem).toContain('7 file(s) / 150 line(s) × 2 = 14 file(s) / 300 line(s)')
 		expect(problem).toContain('exceeds the cap (more than 12 files or 300 lines) with no')
 		expect(problem).toContain('--route split')
-		expect(problem).toContain('- 分割しない理由: <理由>')
+		expect(problem).toContain('- 分割しない理由: <kind> — <理由>')
 	})
 
 	it('refuses 151 lines with no reason declared', () => {

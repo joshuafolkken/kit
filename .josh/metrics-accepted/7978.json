@@ -1,0 +1,7 @@
+{
+	"reason": "New test-document-readers module finds tests that name a changed document by path, so test:related no longer falls back to the whole suite for documents (#7978)",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 89
+	}
+}
