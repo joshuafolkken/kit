@@ -244,7 +244,7 @@ const WITHDRAWER_NAMES: ReadonlyArray<string> = Object.values(WITHDRAWER_TEXT).m
 	(text) => text.name,
 )
 
-const lane_withdraw = { WITHDRAWER_NAMES, describe, withdraw }
+const lane_withdraw = { WITHDRAW_OCCASION, WITHDRAWER_NAMES, describe, withdraw }
 
 export type { WithdrawOutcome }
 export { lane_withdraw }
