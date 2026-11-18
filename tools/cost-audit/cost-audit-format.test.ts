@@ -41,6 +41,7 @@ function audit_with(overrides: Partial<Audit> = {}): Audit {
 		tools: [],
 		guards: [],
 		rewrites: { current: NO_REWRITES, previous: NO_REWRITES },
+		write_causes: [],
 		phases: [],
 		agents: [],
 		usage: NO_USAGE,
@@ -87,6 +88,20 @@ describe('cost_audit_format.report_lines — the usage breakdown', () => {
 		expect(empty).toContain('    none')
 		expect(empty).toContain(
 			'  first request context p50: main none (0 sessions) / subagent none (0 runs)',
+		)
+	})
+})
+
+// joshuafolkken/kit#7877: the cache write by cause, each row beside the period before.
+describe('cost_audit_format.report_lines — the cache write by cause', () => {
+	it('prints a cause dollars, writes and tokens, and its 1h write at the 5m rate', () => {
+		const write = { tokens_5m: 1_000_000, tokens_1h: 1_000_000, usd_5m: 5, usd_1h: 8 }
+		const current = { writes: 3, write, usd_1h_at_5m: 5 }
+		const previous = { writes: 2, write: { ...write, usd_1h: 0 }, usd_1h_at_5m: 0 }
+		const write_causes = [{ cause: 'session start' as const, current, previous }]
+
+		expect(cost_audit_format.report_lines(audit_with({ write_causes }))).toContain(
+			'  session start: $13.0000 (prev $5.0000, +160.0%) · 3 writes (prev 2), 2,000,000 tokens · 1h 1,000,000 tokens ($8.0000), $5.0000 at 5m',
 		)
 	})
 })
