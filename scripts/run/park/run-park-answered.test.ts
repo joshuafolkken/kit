@@ -82,7 +82,7 @@ describe('run_park_answered.refusal_of failures', () => {
 		await expect(run_park_answered.refusal_of(ISSUE, QUESTION, DIRECTORY)).resolves.toBe(1)
 		expect(printed()).toContain(`Park failed: the judgment exited 2. ${NO_WRITE}`)
 		expect(printed()).toContain(
-			`Retry: Re-run (\`pnpm josh run:park ${ISSUE} --body-file <path>\`)`,
+			`Retry: Re-run (\`pnpm josh run:park ${ISSUE} --body-file <path> --outcome "<next action>"\`)`,
 		)
 	})
 

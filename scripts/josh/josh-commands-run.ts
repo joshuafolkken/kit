@@ -201,14 +201,15 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		reference: [
-			'<issue> --body-file <path> | <issue> --clear | <issue> --escalate <reason>',
+			'<issue> --body-file <path> --outcome <next action> | <issue> --clear | <issue> --escalate <reason>',
 			'automation',
 			['files', 'network'],
 		],
 		usage: {
 			examples: [
 				{
-					arguments: '1839 --body-file .josh/tmp/park-1839.md',
+					arguments:
+						'1839 --body-file .josh/tmp/park-1839.md --outcome "pnpm josh lane:launch 1839"',
 					note: 'options, tiers and a recommendation; then needs-decision, the record, run:release',
 				},
 				{ arguments: '1839 --clear', note: 'remove needs-decision and the record' },

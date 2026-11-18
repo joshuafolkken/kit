@@ -75,6 +75,8 @@
 - `<describe> > <テスト名>` — 廃止: #<振る舞いの廃止を決めた Issue> <理由>
 ```
 
+題名だけ変えたテスト → `置き換え` 行が書き込まれた状態で出る（`scripts/review/renamed-tests.ts`）。
+
 **`run:carry` の実行証跡は `JOSH_TEMP_ROOT` を新しい一時ディレクトリに向けて取る（必須）。** 状態レコードは本物の run と共有なので、`JOSH_TEMP_ROOT="$(mktemp -d)" pnpm josh run:carry --begin …` のように各コマンドの頭に付ける（`docs/environment-variables.md` → "Runs"）。`run:merge` は main の同期・lane の close・GitHub への書き込みを行うため、これでは切り離せない。
 
 ### 区切りの報告（完了報告と区別する・必須）
