@@ -1,0 +1,7 @@
+{
+	"reason": "New lane:stats catch-rate table module (#7875)",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 133
+	}
+}
