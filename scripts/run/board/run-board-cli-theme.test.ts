@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_board_cli } from './run-board-cli'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_intro } from './run-board-intro'
@@ -23,6 +23,11 @@ async function frame_of(argv: Array<string>): Promise<string> {
 async function no_pause(): Promise<void> {
 	await Promise.resolve()
 }
+
+// joshuafolkken/kit#8027: a shell that names a theme must not draw the frames these tests take as plain.
+beforeEach(() => {
+	vi.stubEnv('JOSH_BOARD_THEME', undefined)
+})
 
 afterEach(() => {
 	vi.unstubAllEnvs()
@@ -64,6 +69,46 @@ describe('run_board_cli.run --theme', () => {
 		)
 		expect(frames[1]?.startsWith(NAMED_CYAN)).toBe(true)
 		expect(frames.join('')).toContain(run_board_intro.LINE.at(0))
+	})
+})
+
+// joshuafolkken/kit#8006: a live board in the theme reveals its first frame a line at a time before any
+// redraw sleeps; one in no theme draws it whole.
+const SLEPT = '<sleep>'
+
+async function live_writes(argv: Array<string>): Promise<Array<string>> {
+	const { ports, frames } = harness(undefined, [])
+
+	async function sleep(ms: number): Promise<void> {
+		frames.push(SLEPT)
+		await ports.sleep(ms)
+	}
+
+	await expect(run_board_cli.run(argv, { ...ports, sleep, intro_sleep: no_pause })).rejects.toBe(
+		STOPPED,
+	)
+
+	return frames
+}
+
+function line_writes(frames: ReadonlyArray<string>): Array<number> {
+	return [...frames.keys()].filter((index) => frames[index]?.startsWith('\n') === true)
+}
+
+describe('run_board_cli.run --theme reveal', () => {
+	it('writes the first frame a line at a time before the redraw sleeps', async () => {
+		const frames = await live_writes(THEMED)
+		const lines = line_writes(frames)
+
+		expect(lines.length).toBeGreaterThan(1)
+		expect(frames.indexOf(SLEPT)).toBeGreaterThan(lines.at(-1) ?? frames.length)
+	})
+
+	it('writes the first frame whole on a board in no theme', async () => {
+		const frames = await live_writes([])
+
+		expect(line_writes(frames)).toStrictEqual([])
+		expect(frames).toContain(SLEPT)
 	})
 })
 

@@ -6,7 +6,17 @@ import { run_board_typing } from './run-board-typing'
 // joshuafolkken/kit#7927: a live board types its line a letter at a time and holds it before the first
 // frame, which a key skips; the first read runs meanwhile and is handed over only once the line is done.
 
-const { ERASE_LINE_END, HOLD_MS, LETTER_MS, LINE, LINE_START, after, play } = run_board_intro
+const {
+	ERASE_LINE_END,
+	HOLD_MS,
+	LETTER_MS,
+	LINE,
+	LINE_START,
+	REVEAL_LINE_MS,
+	after,
+	play,
+	reveal,
+} = run_board_intro
 const { CURSOR } = run_board_typing
 
 function line_of(shown: string): string {
@@ -152,6 +162,42 @@ describe('run_board_intro.play cursor', () => {
 		await play(ports, NO_KEYS)
 		expect(written.at(-1)).toBe('')
 		expect(written.at(-2)?.includes(CURSOR)).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#8006: the first frame is written a line at a time from the top, a pause after each;
+// a key writes the rest at once, and ports without pauses get the frame whole.
+const FRAME = 'one\ntwo\nthree'
+
+describe('run_board_intro.reveal', () => {
+	it('writes the frame a line at a time from the top, pausing after each line', async () => {
+		const slept: Array<number> = []
+		const { written, ports } = recorded(async (ms) => {
+			slept.push(ms)
+		})
+
+		await reveal(FRAME, ports, NO_KEYS)
+		expect(written).toStrictEqual(['one', '\ntwo', '\nthree'])
+		expect(slept).toStrictEqual([REVEAL_LINE_MS, REVEAL_LINE_MS, REVEAL_LINE_MS])
+	})
+
+	it('writes the lines left at once on a key, and gives the keys back', async () => {
+		const { keys, press, released } = skippable()
+		const { written, ports } = recorded(never)
+		const pending = reveal(FRAME, ports, keys)
+
+		press()
+		await pending
+		expect(written).toStrictEqual(['one', '\ntwo\nthree'])
+		expect(written.join('')).toBe(FRAME)
+		expect(released()).toBe(true)
+	})
+
+	it('writes the frame whole where the ports carry no pauses', async () => {
+		const { written, ports } = recorded(never)
+
+		await reveal(FRAME, { write: ports.write }, NO_KEYS)
+		expect(written).toStrictEqual([FRAME])
 	})
 })
 

@@ -25,7 +25,7 @@ import type { GithubRateLimit } from './run-board-render-quota-github'
 import { run_board_screen, type Screen } from './run-board-screen'
 import { run_board_snapshot } from './run-board-snapshot'
 import { run_board_spin } from './run-board-spin'
-import type { BoardPorts } from './run-board-state'
+import type { BoardPorts, BoardState } from './run-board-state'
 import { run_board_thanks_read } from './run-board-thanks-read'
 import { run_board_theme, type Theme } from './run-board-theme'
 import { run_board_tick } from './run-board-tick'
@@ -51,6 +51,8 @@ const USAGE =
 const DISABLED_NOTICE = `\`${run_progress.DISABLED_KEY}=${run_progress.DISABLED_VALUE}\` is set, so no progress is pushed.`
 const TRAILING_NEWLINE = /\n$/u
 const { FRESH_STATE, tick } = run_board_tick
+
+type Reveal = (frame: string) => Promise<void>
 const { CHAT_KEY, fresh } = run_board_frame_store
 const { WORDS } = run_board_labels
 
@@ -158,17 +160,64 @@ function leaver(ports: BoardPorts, screen: Screen, keys: KeyReading): () => void
 	}
 }
 
+// A tick whose frame is held off the screen, then revealed before it returns, so no spinner turns until
+// every line is out.
+async function revealed_tick(
+	state: BoardState,
+	ports: BoardPorts,
+	screen: Screen,
+	reveal: Reveal,
+): Promise<BoardState> {
+	const held: Array<string> = []
+	const holding = framed(
+		{
+			...ports,
+			write: (frame) => {
+				held.push(frame)
+			},
+		},
+		screen,
+	)
+	const next = await tick(state, holding, 'background')
+
+	await reveal(held.join(''))
+
+	return next
+}
+
+// A tick drawing each frame, the plan read in the background so the first is drawn without waiting on
+// GitHub. Where the board reveals, the first frame is revealed; every later one is written as drawn.
+function ticker(
+	ports: BoardPorts,
+	screen: Screen,
+	reveal: Reveal | undefined,
+): (state: BoardState) => Promise<BoardState> {
+	let opening = reveal
+
+	return async (state) => {
+		const revealing = opening
+
+		opening = undefined
+		if (revealing === undefined) return await tick(state, framed(ports, screen), 'background')
+
+		return await revealed_tick(state, ports, screen, revealing)
+	}
+}
+
 // A frame on the second, its spinners turned until the next: the turns are
 // written past the frame's own control bytes, each to its spot on the screen the frame drew.
-async function redraw_forever(ports: BoardPorts, screen: Screen): Promise<void> {
-	const drawn = framed(ports, screen)
-	// The plan is read in the background, so the first frame is drawn without waiting on GitHub.
+async function redraw_forever(
+	ports: BoardPorts,
+	screen: Screen,
+	reveal: Reveal | undefined,
+): Promise<void> {
+	const step = ticker(ports, screen, reveal)
 	let state = FRESH_STATE
 
 	await poll.wait_for(
 		async () => {
 			// eslint-disable-next-line require-atomic-updates -- poll awaits each callback before starting the next tick
-			state = await tick(state, drawn, 'background')
+			state = await step(state)
 		},
 		{
 			interval_ms: run_board_spin.REDRAW_MS,
@@ -180,18 +229,26 @@ async function redraw_forever(ports: BoardPorts, screen: Screen): Promise<void> 
 }
 
 // A signal leaves through `on_exit`; a failed redraw leaves before its error is printed, so the error
-// lands on the normal screen rather than vanishing with the alternate one.
-async function watch(ports: BoardPorts): Promise<void> {
+// lands on the normal screen rather than vanishing with the alternate one. A board in a theme reveals
+// its first frame a line at a time; one in none draws it whole.
+async function watch(ports: BoardPorts, theme: Theme | undefined): Promise<void> {
 	const screen = run_board_screen.screen_of('live')
 	const keys = run_board_keys.read_keys(ports.keys)
 	const leave = leaver(ports, screen, keys)
+
+	const reveal: Reveal | undefined =
+		theme === undefined
+			? undefined
+			: async (frame) => {
+					await run_board_intro.reveal(frame, ports, keys)
+				}
 
 	ports.write(screen.enter)
 	ports.on_exit(leave)
 	const gather = run_board_intro.after(ports.gather, run_board_intro.play(ports, keys))
 
 	try {
-		await redraw_forever({ ...ports, gather, folded: keys.folded }, screen)
+		await redraw_forever({ ...ports, gather, folded: keys.folded }, screen, reveal)
 	} finally {
 		leave()
 	}
@@ -280,7 +337,7 @@ async function draw(flag: string, ports: BoardPorts | undefined, theme?: Theme):
 	const board = ports_for(ports, mode === 'live')
 
 	if (mode === 'live') {
-		await watch(run_board_theme.themed(board, theme))
+		await watch(run_board_theme.themed(board, theme), theme)
 
 		return
 	}

@@ -410,7 +410,7 @@ pnpm josh issue:premise-unmet 7249 --evidence-file .josh/tmp/premise-unmet.md   
 
 <!-- /usage -->
 
-See `issue-comments.md` → "When a declared close condition holds".
+A body declaring `- 人の判断: 要` is refused with nothing written: park it for a person to close. See `issue-comments.md` → "When a declared close condition holds".
 
 ### `josh issue:already-done`
 
