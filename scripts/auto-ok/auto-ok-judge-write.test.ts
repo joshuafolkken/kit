@@ -4,7 +4,12 @@ import { session_language } from '#scripts/josh/session-language'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { FAILURE_EXIT_CODE, SUCCESS_EXIT_CODE } from './auto-ok-fixture'
-import { auto_ok_judge_fixture, DECLINED, OWED_NUMBER } from './auto-ok-judge-fixture'
+import {
+	auto_ok_judge_fixture,
+	DECLINED,
+	NEEDS_JUDGEMENT_BODY,
+	OWED_NUMBER,
+} from './auto-ok-judge-fixture'
 import { auto_ok_judge_write } from './auto-ok-judge-write'
 
 vi.mock('#scripts/gh/git-gh-command', () => ({
@@ -73,6 +78,16 @@ describe('auto_ok_judge_write.apply', () => {
 
 		expect(await auto_ok_judge_write.apply(ISSUE, RUN_LANE_LABEL)).toBe(FAILURE_EXIT_CODE)
 		expect(apply_label).not.toHaveBeenCalled()
+	})
+})
+
+describe("auto_ok_judge_write.apply on a body declaring a person's judgement is needed", () => {
+	it('refuses with exit code 1 and writes neither a label nor a comment', async () => {
+		read_issue.mockResolvedValueOnce(JSON.stringify({ labels: [], body: NEEDS_JUDGEMENT_BODY }))
+
+		expect(await auto_ok_judge_write.apply(ISSUE, RUN_LANE_LABEL)).toBe(FAILURE_EXIT_CODE)
+		expect(apply_label).not.toHaveBeenCalled()
+		expect(post_comment).not.toHaveBeenCalled()
 	})
 })
 
