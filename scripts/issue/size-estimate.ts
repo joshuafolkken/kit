@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { issue_body_keys } from './issue-body-keys'
 import { SPLIT_ROUTE_LABEL } from './issue-labels'
 import { markdown_section } from './markdown-section'
+import { size_estimate_target } from './size-estimate-target'
 
 // joshuafolkken/kit#4675: a request clearly over the split guide reached a lane as one Issue because
 // nothing asked for its size when it was filed, and a split is cheapest at filing time. Every filing
@@ -340,8 +341,24 @@ function budget_problem(
 		: `${note} — split it into children each within the bar or declare \`${REASON_PREFIX} <理由>\`; split-assessment.md → "${split_assess.QUESTION_SECTION}"`
 }
 
-// The filing refusal for an estimate over the cap, else over the size bar at `rate`, else over
-// the guide. A missing or malformed estimate is `problems`' refusal, not this one.
+// The refusal for an estimate projecting past the lane's end-to-end target without a reason naming
+// its kind (joshuafolkken/kit#7925); `undefined` with no estimate or no measured rate.
+function target_problem(
+	body: string,
+	rate: ImplementRate | undefined,
+	growth?: SizeRatios,
+): string | undefined {
+	const estimate = parse(body)
+	const minutes =
+		estimate === undefined || rate === undefined
+			? undefined
+			: projected_minutes(estimate, rate, growth)
+
+	return size_estimate_target.problem(minutes, declared(body, REASON_PREFIX))
+}
+
+// The filing refusal for an estimate over the cap, else over the size bar at `rate`, else over the
+// guide, else over the lane target. A missing or malformed estimate is `problems`' refusal, not this one.
 function guide_problem(
 	body: string,
 	route: string | undefined,
@@ -354,7 +371,7 @@ function guide_problem(
 	const estimate = over_guide(body, route, rate, growth)
 	const guide_refusal = estimate === undefined ? undefined : refusal(estimate, rate, growth)
 
-	return budget_problem(body, rate, growth) ?? guide_refusal
+	return budget_problem(body, rate, growth) ?? guide_refusal ?? target_problem(body, rate, growth)
 }
 
 // The declared file count, or `undefined` when there is no estimate or it does not parse.

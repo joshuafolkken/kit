@@ -22,6 +22,8 @@ Merged lanes' median actual / declared ratios per axis, apart from speed; unmeas
 First `lane:plan` answers `split` past declared files × files ratio (files, hunks), bar (lines);
 a lane child past the cap; `--single`, a re-plan or an edited lane → `size warning`.
 
+Past the lane target (judged last): reason kind `分けられない` / `分けない方が良い` / `全体が遅くなる` — `scripts/issue/size-estimate-target.ts`.
+
 ## The same two questions decide the filing-time fold
 
 **The entry's split decision and the filing-time fold decision are the same two conditions, stated
