@@ -7,6 +7,9 @@ const AS_SENTENCE = 'reads %s as a sentence'
 const JUDGE = 'hand-back:judge'
 const WINDOW = 'hand-back:window'
 const DRAINED = 'hand-back:drained'
+const USAGE_LIMIT = 'the usage limit is reached; lanes resume when it resets'
+const USAGE_LIMIT_CODE = 'usage-limit'
+const RE_LOGIN = 'claude auth login'
 
 describe('backlog_hold_text.text_of — hand-back holds', () => {
 	it.each([
@@ -67,9 +70,23 @@ describe('backlog_hold_text.text_of — offer holds', () => {
 describe('backlog_hold_text.text_of — whole-code holds', () => {
 	it.each([
 		['memory', 'memory pressure is high; lanes resume when it eases'],
-		['usage-limit', 'the usage limit is reached; lanes resume when it resets'],
+		[USAGE_LIMIT_CODE, USAGE_LIMIT],
 	])(AS_SENTENCE, (code, text) => {
 		expect(text_of(code)).toBe(text)
+	})
+
+	// joshuafolkken/kit#8014: an authentication failure holds under the usage-limit code.
+	it('reads a usage-limit hold an authentication failure caused as that failure and its re-login', () => {
+		const text = text_of(USAGE_LIMIT_CODE, 'auth')
+
+		expect(text).not.toContain('usage limit')
+		expect(text).toContain(RE_LOGIN)
+		expect(text).toContain('CLAUDE_CODE_OAUTH_TOKEN')
+	})
+
+	it('keeps the usage-limit sentence for a limit, and for a driverless mark the cause reaches', () => {
+		expect(text_of(USAGE_LIMIT_CODE, 'limit')).toBe(USAGE_LIMIT)
+		expect(text_of(`driverless:${USAGE_LIMIT_CODE}`, 'auth')).toContain(RE_LOGIN)
 	})
 
 	it.each(['pause:other', 'offer', 'hand-back'])('shows the unknown code %s as is', (code) => {

@@ -122,7 +122,7 @@ function gauges_of(state: BoardState, local: LocalRead): Gauges {
 function seats_of(state: BoardState, local: LocalRead): SeatRead | undefined {
 	if (state.plan === undefined || activity_here(local).is_stopped) return undefined
 
-	return run_board_seat.read_of(local.events, local.launch_hold)
+	return run_board_seat.read_of(local.events, local.launch_hold, local.usage_cause)
 }
 
 function header_of(

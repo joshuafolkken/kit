@@ -1,6 +1,7 @@
 import { backlog_hold_text } from '#scripts/backlog/backlog-hold-text'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
+import type { HoldCause } from '#scripts/run/merge/run-merge-usage-limit'
 import { run_board_labels } from './run-board-labels'
 import { run_board_layout, type BoardLayout, type BoardRow } from './run-board-layout'
 import { run_board_setup } from './run-board-setup'
@@ -30,6 +31,9 @@ interface SeatRead {
 	refusal?: string | undefined
 	// The ledger's open hold (`lane-held-stats.ts`); `undefined` once released.
 	hold?: string | undefined
+	// What a usage-limit hold stops for (`run-merge-usage-limit.ts` → `held_cause`), so an
+	// authentication failure reads as one, with its remedy (joshuafolkken/kit#8014).
+	cause?: HoldCause | undefined
 }
 
 // What the seat lines are drawn from: the room the lanes heading counts and the rows waiting for it.
@@ -44,14 +48,18 @@ function is_launch_result(event: RunEvent): boolean {
 	return event.kind === KIND.CHILD_LAUNCH || run_board_setup.is_refusal(event)
 }
 
-function read_of(events: ReadonlyArray<RunEvent>, hold: string | undefined): SeatRead {
+function read_of(
+	events: ReadonlyArray<RunEvent>,
+	hold: string | undefined,
+	cause?: HoldCause,
+): SeatRead {
 	const last = events.findLast((event) => is_launch_result(event))
 	const refusal =
 		last !== undefined && run_board_setup.is_refusal(last)
 			? last.text.slice(STAGE.NO_CHILD.length).trim()
 			: undefined
 
-	return { refusal, hold }
+	return { refusal, hold, cause }
 }
 
 function free_count(room: SeatRoom): number {
@@ -75,8 +83,10 @@ function has_candidate(layout: BoardLayout | undefined): boolean {
 	)
 }
 
-function with_hold(lead: string, hold: string | undefined): string {
-	return hold === undefined ? lead : `${lead} — ${backlog_hold_text.text_of(hold)}`
+function with_hold(lead: string, seats: SeatRead | undefined): string {
+	const hold = seats?.hold
+
+	return hold === undefined ? lead : `${lead} — ${backlog_hold_text.text_of(hold, seats?.cause)}`
 }
 
 // What keeps a runnable row out: the driver's absence a session restart ends, or a hold.
@@ -87,11 +97,12 @@ function held_lead(hold: string): string {
 // What a seat no refusal explains says: no runnable row, or the hold that keeps a runnable one out —
 // the hold as a sentence, never its ledger code (`backlog-hold-text.ts`).
 function idle_reason(room: SeatRoom): string | undefined {
-	const hold = room.seats?.hold
+	const { seats } = room
+	const hold = seats?.hold
 
-	if (!has_candidate(room.layout)) return with_hold(NO_CANDIDATE, hold)
+	if (!has_candidate(room.layout)) return with_hold(NO_CANDIDATE, seats)
 
-	return hold === undefined ? undefined : with_hold(held_lead(hold), hold)
+	return hold === undefined ? undefined : with_hold(held_lead(hold), seats)
 }
 
 // No seat line where the seats are unread — before the plan is read, or once the run stopped.
