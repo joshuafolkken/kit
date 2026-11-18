@@ -12,7 +12,7 @@ const REPO_NAME_SEPARATOR = '/'
 const ARGV_OFFSET = 2
 const FAILURE_EXIT_CODE = 1
 const USAGE =
-	'Usage: josh notify [--task-type <type>] [--body <text> | --body-file <path>] [--issue-url <url>] [--pr-url <url>] [--issue-title <text>] [--repo-name <name>] [--recommended <text>] [--alternative <text>]...'
+	'Usage: josh notify [--task-type <type>] [--body <text> | --body-file <path>] [--issue-url <url>] [--pr-url <url>] [--issue-title <text>] [--repo-name <name>] [--recommended <text>] [--alternative <text>]... [--reason <human-stop key>]'
 
 // The free-text values a caller writes, often opening with a Markdown `-` bullet.
 const FREE_TEXT_FLAGS = ['--body', '--issue-title', '--recommended', '--alternative']
@@ -27,6 +27,7 @@ const OPTIONS = {
 	'pr-url': { type: 'string' },
 	recommended: { type: 'string' },
 	alternative: { type: 'string', multiple: true },
+	reason: { type: 'string' },
 } as const
 
 // `undefined` for a line nobody can read — an unknown flag, or a flag given no value.

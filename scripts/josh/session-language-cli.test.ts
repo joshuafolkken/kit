@@ -106,6 +106,22 @@ describe('prompt_lines', () => {
 	})
 })
 
+// joshuafolkken/kit#7889: a person's prompt answers the confirmations this checkout left open.
+describe('print_prompt_lines — confirmation answers', () => {
+	it('closes the open confirmations before printing the lines', async () => {
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+		const answer_open = vi.fn<() => Promise<number>>().mockResolvedValue(1)
+
+		try {
+			await print_prompt_lines(async () => '{}', answer_open)
+
+			expect(answer_open).toHaveBeenCalledOnce()
+		} finally {
+			info.mockRestore()
+		}
+	})
+})
+
 describe('lane child prompt guidance', () => {
 	it.each(['claude-fable-5-1', 'gpt-6.1-astra'])(
 		'omits consultation handoff guidance for a lane child on %s',

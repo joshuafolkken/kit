@@ -1,7 +1,9 @@
 import { gh_spawn } from '#scripts/gh/gh-spawn'
+import type { HumanStopKey } from '#scripts/issue/issue-human-stops'
 import { timed_fetch } from '#scripts/lib/timed-fetch'
 import { token_shape } from '#scripts/lib/token-shape'
 import { z } from 'zod'
+import { confirmation_ledger } from './confirmation-ledger'
 import { confirmation_options, type ConfirmationOptions } from './confirmation-options'
 import { notify_opt_in } from './notify-opt-in'
 
@@ -49,6 +51,9 @@ interface TelegramSendInput {
 	// A confirmation's recommended choice and the others — set beside the body rather than inside it
 	// so a body cut to the length limit never takes the choices with it.
 	choices?: string | undefined
+	// A confirmation's registered reason and Issue, for `confirmation-ledger.ts`.
+	reason?: HumanStopKey | undefined
+	issue?: string | undefined
 	issue_url: string | undefined
 	pr_url: string | undefined
 }
@@ -264,6 +269,17 @@ function build_send_failure(error: unknown, config: TelegramConfig): Error {
 	return new Error(`${SEND_FAILED_PREFIX}: ${reason}`, { cause: new Error(reason) })
 }
 
+// Records a confirmation, then answers whether the send goes out, printing the skip line when not.
+async function is_going_out(input: TelegramSendInput): Promise<boolean> {
+	await confirmation_ledger.record_sent(input)
+	const skipped = skip_line(input.task_type)
+	if (skipped === undefined) return true
+
+	console.info(skipped)
+
+	return false
+}
+
 // **The strict form.** A caller whose whole job is the notification has nothing left to report when
 // this fails, so it throws and `pnpm josh notify` exits non-zero — a warning and exit 0 would make a
 // message that reached nobody look exactly like one that arrived.
@@ -272,14 +288,9 @@ function build_send_failure(error: unknown, config: TelegramConfig): Error {
 //
 // The opt-out and the per-type opt-in are checked here, before `load_config`, so every caller — the
 // tolerant form included — skips the same way and none has to repeat the check.
+// A confirmation is recorded before them, so one that reached nobody is still counted.
 async function send(input: TelegramSendInput): Promise<void> {
-	const skipped = skip_line(input.task_type)
-
-	if (skipped !== undefined) {
-		console.info(skipped)
-
-		return
-	}
+	if (!(await is_going_out(input))) return
 
 	const config = load_config()
 	const text = outbound_text(input)
@@ -369,6 +380,8 @@ async function warn(input: WarningInput): Promise<boolean> {
 }
 
 interface ConfirmInput extends ConfirmationOptions {
+	reason: HumanStopKey
+	issue?: string | undefined
 	issue_title: string
 	body: string
 	recovery: string
@@ -393,6 +406,8 @@ async function confirm(input: ConfirmInput): Promise<boolean> {
 			issue_title: input.issue_title,
 			body: input.body,
 			choices: confirmation_options.block(input),
+			reason: input.reason,
+			issue: input.issue,
 			issue_url: undefined,
 			pr_url: undefined,
 		},

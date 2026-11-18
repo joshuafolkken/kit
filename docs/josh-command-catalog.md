@@ -72,7 +72,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh main:merge` · `josh mm` | — | developer | git, network | Merge origin default branch into the current branch |
 | `josh main:sync` · `josh ms` | — | developer | git, network | Checkout default branch, pull latest, and prune merged remote-gone branches (refuses inside a lane) |
 | `josh measure:rerun` | `<issue-number>` | automation | network, processes, files | Re-run a merged issue’s baseline command and print the before/after pair |
-| `josh notify` | `[--task-type <type>] [--body <text> \| --body-file <path>] [--issue-url <url>] [--pr-url <url>] [--issue-title <text>] [--repo-name <name>] [--recommended <text>] [--alternative <text>]...` | automation | notifications | Send Telegram notification |
+| `josh notify` | `[--task-type <type>] [--body <text> \| --body-file <path>] [--issue-url <url>] [--pr-url <url>] [--issue-title <text>] [--repo-name <name>] [--recommended <text>] [--alternative <text>]... [--reason <human-stop key>]` | automation | notifications | Send Telegram notification |
 | `josh observation:depth` | `<path>` | automation | none | Print the depth test's depth for a subject path |
 | `josh observation:record` | `<key> <depth> <where> <what> [--checkout <path>]` | automation | files | Record an observation sighting and answer whether it is now filed |
 | `josh observations:flush` | — | automation | git, network | Commit the observation ledger as a pull request of its own, and merge it |

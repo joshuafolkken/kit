@@ -1,0 +1,7 @@
+{
+	"reason": "#7889 adds the confirmation ledger (scripts/notify/confirmation-ledger.ts) and a human-stop reason key at every confirm caller; the growth is the new feature itself",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 190
+	}
+}

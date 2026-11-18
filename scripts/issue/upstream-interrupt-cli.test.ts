@@ -285,7 +285,9 @@ describe('josh upstream:interrupt on a confirmation that is not sent', () => {
 
 		expect(code).toBe(FAILURE_EXIT_CODE)
 		expect(stderr_text()).toContain('stopped at notify')
-		expect(stderr_text()).toContain('pnpm josh notify --task-type confirmation --body-file')
+		expect(stderr_text()).toContain(
+			'pnpm josh notify --task-type confirmation --reason upstream-interrupt --body-file',
+		)
 	})
 })
 

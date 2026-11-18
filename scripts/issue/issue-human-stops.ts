@@ -22,7 +22,9 @@ interface HumanStop {
 
 const UNTRUSTED_AUTHOR_KEY = 'untrusted-author'
 
-const HUMAN_STOPS: ReadonlyArray<HumanStop> = [
+// `satisfies` rather than an annotation, so each `key` stays a literal and `HumanStopKey` can refuse
+// a reason this list does not hold (joshuafolkken/kit#7889).
+const HUMAN_STOPS = [
 	{
 		key: NEEDS_DECISION_LABEL,
 		label: NEEDS_DECISION_LABEL,
@@ -75,28 +77,62 @@ const HUMAN_STOPS: ReadonlyArray<HumanStop> = [
 		key: 'filing-exclusion',
 		reason: `\`release\`, \`breaking-change\`, \`deferred\`, \`epic\` and \`${issue_body_keys.line('judgement', 'needed')}\` keep an issue out of the pool by a person's choice (\`issue-auto-ok.ts\`).`,
 	},
-]
+	{
+		key: 'run-stopped',
+		reason: 'A run stopped or paused on a cause it cannot settle itself; a person restarts it.',
+	},
+	{
+		key: 'run-handoff',
+		reason: 'A run handed off at its budget cut; a person resumes it with the printed command.',
+	},
+	{
+		key: 'manual-verification',
+		reason: 'A halfrun stops for the verification only a person can run on the real device.',
+	},
+	{
+		key: 'merge-approval',
+		reason: 'A prrun stops at a mergeable pull request; merging is Tier C.',
+	},
+	{
+		key: 'upstream-interrupt',
+		reason: 'A defect in another package is filed and the work stops until it is fixed upstream.',
+	},
+] as const satisfies ReadonlyArray<HumanStop>
+
+type HumanStopKey = (typeof HUMAN_STOPS)[number]['key']
+
+const HUMAN_STOP_KEYS: ReadonlySet<HumanStopKey> = new Set(HUMAN_STOPS.map((stop) => stop.key))
+
+function is_key(value: string): value is HumanStopKey {
+	const keys: ReadonlySet<string> = HUMAN_STOP_KEYS
+
+	return keys.has(value)
+}
 
 // The park labels a run lifts by itself, with the path that lifts them.
 const AUTO_RESOLVED_PARK_LABELS: ReadonlyMap<string, string> = new Map([
 	[RUN_STALLED_LABEL, 'backlog-drive-stalled-retry.ts'],
 ])
 
+const STOPS: ReadonlyArray<HumanStop> = HUMAN_STOPS
+
 function labels(): ReadonlySet<string> {
-	return new Set(HUMAN_STOPS.flatMap((stop) => stop.label ?? []))
+	return new Set(STOPS.flatMap((stop) => stop.label ?? []))
 }
 
 function idle_stops(): ReadonlyArray<HumanStop> {
-	return HUMAN_STOPS.filter((stop) => stop.idle_heading !== undefined)
+	return STOPS.filter((stop) => stop.idle_heading !== undefined)
 }
 
 const issue_human_stops = {
 	AUTO_RESOLVED_PARK_LABELS,
-	HUMAN_STOPS,
+	HUMAN_STOP_KEYS,
+	HUMAN_STOPS: STOPS,
 	UNTRUSTED_AUTHOR_KEY,
 	idle_stops,
+	is_key,
 	labels,
 }
 
 export { issue_human_stops }
-export type { HumanStop }
+export type { HumanStop, HumanStopKey }
