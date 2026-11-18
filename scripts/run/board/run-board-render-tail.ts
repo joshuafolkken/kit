@@ -12,7 +12,8 @@ import type { Phase } from './run-board-phase'
 import { run_board_render_checks } from './run-board-render-checks'
 import { run_board_render_waits } from './run-board-render-waits'
 
-// The end of a running row (joshuafolkken/kit#3769, #4043, #4292): the kind and the age of the newest
+// The end of a running row (joshuafolkken/kit#3769, #4043, #4292): its finish in aligned columns
+// (#7994), then the kind and the age of the newest
 // thing the child did, the board's own length (`1°01′05″`), right-aligned to the widest any running
 // row draws, so a `2°05′30″` and a `40″` end in one column. The phase's icon and how long the child has
 // stood at it lead the row (`run-board-render-lead.ts`), so the event that entered the phase is not
@@ -37,6 +38,11 @@ interface TimedActivity {
 	since_ms: number
 }
 
+interface Finish {
+	stamp: string
+	drift: string
+}
+
 function phase_color(elapsed_ms: number, usual_ms: number | undefined): TextColor | undefined {
 	if (usual_ms === undefined) return undefined
 	const usual = Math.max(usual_ms, USUAL_FLOOR_MS)
@@ -58,17 +64,17 @@ function current_of(row: BoardRow): { phase: Phase; since_ms: number } | undefin
 	return phase === undefined || phase_ms === undefined ? undefined : { phase, since_ms: phase_ms }
 }
 
-// A column's width: the widest span `age_of` gives any running row or earlier run's lane in this
-// frame, and `0″`'s at the least, so a row with none still blanks a column's width.
-function column_width(header: BoardHeader, age_of: (row: BoardRow) => number | undefined): number {
+// A column's width: the widest text `text_of` gives `row` or any running row in this frame, `0` where
+// none gives one.
+function column_width(
+	row: BoardRow,
+	header: BoardHeader,
+	text_of: (other: BoardRow) => string | undefined,
+): number {
 	const rows = run_board_layout.lane_rows(header.layout ?? run_board_layout.EMPTY_LAYOUT, [])
-	const spans = rows.map((row) => {
-		const age = is_live(row) ? age_of(row) : undefined
+	const widths = [row, ...rows].map((other) => (is_live(other) ? (text_of(other)?.length ?? 0) : 0))
 
-		return age === undefined ? 0 : span_of(age).length
-	})
-
-	return Math.max(span_of(0).length, ...spans)
+	return Math.max(0, ...widths)
 }
 
 // What a phase is timed up to: now for a running row, the stop for a stopped lane's — so its phase time
@@ -152,20 +158,21 @@ function drawn_activity(row: BoardRow, header: BoardHeader): TimedActivity | und
 	return newest
 }
 
-function activity_age(row: BoardRow, header: BoardHeader): number | undefined {
+function activity_span(row: BoardRow, header: BoardHeader): string | undefined {
 	const newest = drawn_activity(row, header)
 
-	return newest === undefined ? undefined : header.now_ms - newest.since_ms
+	return newest === undefined ? undefined : span_of(header.now_ms - newest.since_ms)
 }
 
-// The newest activity as its kind's icon and its age, aged as the `💓` is; nothing where the row draws
-// none.
+// The newest activity as its kind's icon and its age, right-aligned to the widest any running row
+// draws and `0″`'s at the least, aged as the `💓` is; nothing where the row draws none.
 function activity_part(row: BoardRow, header: BoardHeader): string {
 	const newest = drawn_activity(row, header)
 
 	if (newest === undefined) return ''
 
-	const width = column_width(header, (other) => activity_age(other, header))
+	const widest = column_width(row, header, (other) => activity_span(other, header))
+	const width = Math.max(span_of(0).length, widest)
 	const age = header.now_ms - newest.since_ms
 
 	return run_board_header_time.aged(`${newest.icon} ${span_of(age).padStart(width)}`, age)
@@ -184,20 +191,38 @@ function drift_of(drift_ms: number): string {
 
 	if (Math.abs(minutes) <= DRIFT_FLOOR_MINUTES) return ''
 
-	return minutes > 0 ? ` +${String(minutes)}′` : ` −${String(-minutes)}′`
+	return minutes > 0 ? `+${String(minutes)}′` : `−${String(-minutes)}′`
 }
 
-// A running row's finish, `🎯 ~14:52 +21′` (joshuafolkken/kit#7920) — the run's finish read for this
-// lane alone, so it moves as the lane does; `🎯 —` where no lane total is measured.
-function finish_part(row: BoardRow, header: BoardHeader): string {
+// A running row's finish as its stamp and its drift, `🎯 ~14:52` and `+21′` (joshuafolkken/kit#7920)
+// — the run's finish read for this lane alone, so it moves as the lane does; `🎯 —` and no drift where
+// no lane total is measured; `undefined` where the row draws no finish.
+function finish_of(row: BoardRow, header: BoardHeader): Finish | undefined {
+	if (!run_board_estimate.is_finish_drawn(row, header)) return undefined
+
 	const finish = run_board_estimate.row_finish(row, header)
 
-	if (finish === undefined) return run_board_estimate.UNKNOWN
+	if (finish === undefined) return { stamp: run_board_estimate.UNKNOWN, drift: '' }
 
-	return `${run_board_estimate.stamp_of(header.now_ms, finish.finish_ms)}${drift_of(finish.drift_ms)}`
+	return {
+		stamp: run_board_estimate.stamp_of(header.now_ms, finish.finish_ms),
+		drift: drift_of(finish.drift_ms),
+	}
 }
 
-// A running row's end before its finish — the check its held lane waits to run, its pull
+// A running row's finish in two columns aligned across the frame (joshuafolkken/kit#7994): the stamp
+// left-aligned, the drift right-aligned, so the activity after it starts in one column; blanks of that
+// width where the row draws none; nothing where no running row draws one.
+function finish_part(row: BoardRow, header: BoardHeader): string {
+	const stamp_width = column_width(row, header, (other) => finish_of(other, header)?.stamp)
+	const drift_width = column_width(row, header, (other) => finish_of(other, header)?.drift)
+	const finish = finish_of(row, header) ?? { stamp: '', drift: '' }
+	const drift = drift_width === 0 ? '' : ` ${finish.drift.padStart(drift_width)}`
+
+	return stamp_width === 0 ? '' : `${finish.stamp.padEnd(stamp_width)}${drift}`
+}
+
+// What a running row draws after its finish — the check its held lane waits to run, its pull
 // request's checks in followup, or its newest activity.
 function end_of(row: BoardRow, header: BoardHeader): Array<string> {
 	const held = held_of(row, header)
@@ -211,13 +236,11 @@ function end_of(row: BoardRow, header: BoardHeader): Array<string> {
 	return [activity_part(row, header)]
 }
 
-// A running row's end, then its finish while the run goes on; nothing for any other row.
+// A running row's finish while the run goes on, then its end; nothing for any other row.
 function tail_of(row: BoardRow, header: BoardHeader): Array<string> {
 	if (!is_tailed(row)) return []
 
-	const finish = run_board_estimate.is_finish_drawn(row, header) ? [finish_part(row, header)] : []
-
-	return [...end_of(row, header), ...finish]
+	return [finish_part(row, header), ...end_of(row, header)]
 }
 
 // The icon a row's end draws for its newest activity, so the legend names it — none where the row
