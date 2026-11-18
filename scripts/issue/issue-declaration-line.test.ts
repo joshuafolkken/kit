@@ -3,6 +3,7 @@ import { issue_declaration_line } from './issue-declaration-line'
 
 const KIND = issue_declaration_line.declaration_lines(['kind', 'purpose'])
 const LINES = ['- 種別: 不具合', '- 原因: #12']
+const NON_DEFECT = '- 種別: 非不具合'
 
 describe('issue_declaration_line.with_declaration_lines', () => {
 	it('drops the declarations in either language and closes the declaration block', () => {
@@ -11,6 +12,16 @@ describe('issue_declaration_line.with_declaration_lines', () => {
 		expect(issue_declaration_line.with_declaration_lines(body, KIND, LINES)).toBe(
 			'## 背景\n\n- 優先度: 通常\n- 種別: 不具合\n- 原因: #12\n\n本文\n',
 		)
+	})
+
+	it('keeps fenced and indented examples of a declaration', () => {
+		const body =
+			'## 背景\n\n- 種別: 非不具合\n\n```md\n- 種別: 非不具合\n```\n\n    - 目的: 機能追加\n'
+
+		expect(issue_declaration_line.with_declaration_lines(body, KIND, LINES)).toBe(
+			'## 背景\n- 種別: 不具合\n- 原因: #12\n\n\n```md\n- 種別: 非不具合\n```\n\n    - 目的: 機能追加\n',
+		)
+		expect(issue_declaration_line.declared(body, KIND)).toStrictEqual([NON_DEFECT])
 	})
 
 	it('appends the lines to a body with no background section', () => {
@@ -31,7 +42,7 @@ describe('issue_declaration_line.declared', () => {
 		const body = '## 背景\n\n- 種別: 非不具合\n- 優先度: 通常\n- 目的: 機能追加\n'
 
 		expect(issue_declaration_line.declared(body, KIND)).toStrictEqual([
-			'- 種別: 非不具合',
+			NON_DEFECT,
 			'- 目的: 機能追加',
 		])
 	})
