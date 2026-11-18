@@ -53,6 +53,8 @@ interface RunOptions {
 	max_hunks: number
 	is_cached_only: boolean
 	is_first_unpinned?: boolean
+	is_reasoned?: boolean
+	tree_hash?: string | undefined
 	rewired?: number
 	over_cap?: number
 	origin?: PinnedOrigin | undefined
@@ -143,6 +145,8 @@ function check_options(held: number, options: RunOptions): CheckOptions {
 		rewired: options.rewired ?? 0,
 		over_cap: options.over_cap ?? 0,
 		is_first_unpinned: options.is_first_unpinned === true,
+		is_reasoned: options.is_reasoned === true,
+		tree_hash: options.tree_hash,
 		origin: options.origin,
 	}
 }
@@ -355,7 +359,11 @@ async function report(options: RunOptions): Promise<PinnedReport> {
 
 	const root = process.cwd()
 	const result = await test_pinned_snapshot.with_snapshot(async (snapshot) => ({
-		...(await report_on(base, { ...options, cache_file: snapshot.cache_file }, has_runner)),
+		...(await report_on(
+			base,
+			{ ...options, cache_file: snapshot.cache_file, tree_hash: snapshot.tree_hash },
+			has_runner,
+		)),
 		tree_hash: snapshot.tree_hash,
 	}))
 
@@ -366,13 +374,14 @@ async function report(options: RunOptions): Promise<PinnedReport> {
 // is shared: changed hunks first, then the added files' functions. Without Vitest (a consumer that has
 // none) no probe runs, so every one is unchecked rather than unpinned. `is_first_unpinned` starts no
 // probe once one is unpinned (joshuafolkken/kit#5153): the hunks left are reported `cut`. `origin` is
-// what started the run, for its ledger row.
+// what started the run and `is_reasoned` whether an `--unpinned-ok` reason did, for its ledger row.
 async function run(
 	max_hunks: number,
 	is_first_unpinned = false,
 	origin?: PinnedOrigin,
+	is_reasoned = false,
 ): Promise<PinnedReport> {
-	return await report({ max_hunks, is_cached_only: false, is_first_unpinned, origin })
+	return await report({ max_hunks, is_cached_only: false, is_first_unpinned, is_reasoned, origin })
 }
 
 // The unpinned hunks the cache already answers for this tree, probing nothing (joshuafolkken/kit#4936):
