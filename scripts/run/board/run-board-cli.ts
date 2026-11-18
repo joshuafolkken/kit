@@ -15,6 +15,7 @@ import { run_board_fold_store } from './run-board-fold-store'
 import { run_board_gather } from './run-board-gather'
 import { run_board_gather_live } from './run-board-gather-live'
 import { run_board_gather_thread } from './run-board-gather-thread'
+import { run_board_intro } from './run-board-intro'
 import { run_board_issue_count } from './run-board-issue-count'
 import { run_board_keys, type KeyReading } from './run-board-keys'
 import { run_board_labels } from './run-board-labels'
@@ -104,6 +105,9 @@ const LIVE_PORTS: Omit<BoardPorts, 'gather'> = {
 	sleep: async (ms) => {
 		await sleep(ms)
 	},
+	intro_sleep: async (ms) => {
+		await sleep(ms)
+	},
 }
 
 // A live board reads on its worker thread, so no read stops its spinner; a single frame has no spinner
@@ -177,9 +181,10 @@ async function watch(ports: BoardPorts): Promise<void> {
 
 	ports.write(screen.enter)
 	ports.on_exit(leave)
+	const gather = run_board_intro.after(ports.gather, run_board_intro.play(ports, keys))
 
 	try {
-		await redraw_forever({ ...ports, folded: keys.folded }, screen)
+		await redraw_forever({ ...ports, gather, folded: keys.folded }, screen)
 	} finally {
 		leave()
 	}
