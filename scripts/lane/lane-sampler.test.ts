@@ -13,6 +13,11 @@ const sample_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('./lane-load', () => ({ lane_load: { sample: sample_mock } }))
 
+// joshuafolkken/kit#7867: the tick's reachability probe, answered here so no test reaches the network.
+const fetch_mock = vi.hoisted(() => vi.fn())
+
+vi.mock('#scripts/lib/timed-fetch', () => ({ timed_fetch: fetch_mock }))
+
 const { lane_ledger } = await import('./lane-ledger')
 const { lane_ledger_write } = await import('./lane-ledger-write')
 const { lane_sampler } = await import('./lane-sampler')
@@ -30,6 +35,7 @@ function fresh_ledger(): string {
 beforeEach(() => {
 	vi.useFakeTimers()
 	sample_mock.mockReset().mockImplementation((at: string) => ({ kind: 'load', at, load: 3 }))
+	fetch_mock.mockReset().mockResolvedValue(new Response())
 })
 
 afterEach(() => {
@@ -97,6 +103,36 @@ describe('lane_sampler.start — host sleep', () => {
 		stop()
 
 		expect(run_event_stream.read_events(events_path)).toStrictEqual([])
+	})
+})
+
+const DROPPED = new TypeError('fetch failed')
+
+describe('lane_sampler.start — network outage', () => {
+	it('writes an event only on the ticks the network went down and came back', async () => {
+		const events_path = fresh_ledger()
+
+		fetch_mock.mockRejectedValueOnce(DROPPED).mockRejectedValueOnce(DROPPED)
+		const stop = lane_sampler.start({ ledger_path: fresh_ledger(), events_path })
+
+		await vi.advanceTimersByTimeAsync(lane_sampler.SAMPLE_INTERVAL_MS * TICKS)
+		stop()
+
+		const kinds = run_event_stream.read_events(events_path).map((event) => event.kind)
+
+		expect(kinds).toStrictEqual(['offline', 'online'])
+	})
+
+	it('keeps sampling every tick while the probe fails', async () => {
+		const ledger_path = fresh_ledger()
+
+		fetch_mock.mockRejectedValue(DROPPED)
+		const stop = lane_sampler.start({ ledger_path, events_path: fresh_ledger() })
+
+		await vi.advanceTimersByTimeAsync(lane_sampler.SAMPLE_INTERVAL_MS * TICKS)
+		stop()
+
+		expect(lane_ledger.read_entries(ledger_path)).toHaveLength(TICKS + 1)
 	})
 })
 

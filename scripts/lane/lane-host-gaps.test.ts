@@ -35,6 +35,25 @@ describe('lane_host_gaps.gaps_of', () => {
 	})
 })
 
+// joshuafolkken/kit#7867: an outage is a stop beside the sleeps.
+function turn(kind: 'offline' | 'online', minute: number): RunEvent {
+	return { pos: minute, at: new Date(at(minute)).toISOString(), kind, text: kind }
+}
+
+describe('lane_host_gaps.gaps_of — network outages', () => {
+	it('joins an outage with a sleep it overlaps, counting the overlap once', () => {
+		const gaps = lane_host_gaps.gaps_of([turn('offline', 5), sleep(10, 20), turn('online', 15)])
+
+		expect(lane_host_gaps.excluded_ms(gaps, [span(0, 60)])).toBe(15 * MINUTE_MS)
+	})
+
+	it('cuts an outage still open at the end of the span asked for', () => {
+		const gaps = lane_host_gaps.gaps_of([turn('offline', 50)])
+
+		expect(lane_host_gaps.excluded_ms(gaps, [span(0, 60)])).toBe(10 * MINUTE_MS)
+	})
+})
+
 describe('lane_host_gaps.excluded_ms', () => {
 	const gaps = lane_host_gaps.gaps_of([sleep(10, 20), sleep(15, 30)])
 
