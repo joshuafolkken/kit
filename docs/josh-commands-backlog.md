@@ -693,6 +693,7 @@ Create an epic issue from its child issue numbers.
 ```bash
 pnpm josh epic "Epic: split the parser work" 101 102 103
 pnpm josh epic "Epic: staged rollout" 101 102 --ordered
+pnpm josh epic "Epic: ..." A B C --chain "#A -> #C" --chain "#B -> #C"       # a join: C waits on both
 pnpm josh epic "Epic: ..." 101 102 --rationale-file .josh/tmp/rationale.md
 pnpm josh epic --promote 858 101 102 103                                     # turn an existing issue into an epic
 pnpm josh epic --add 893 894                                                 # track #894, declaring no order for it
@@ -707,6 +708,7 @@ pnpm josh epic --untrack 893 894                                             # r
 **Options:**
 
 - `--ordered` — argument order is the dependency order; writes the arrow chain, records the matching `blocked-by` relations, and adds a `### Declared order` entry under `## Decisions`.
+- `--chain "#A -> #B"` — repeatable, on create or `--promote`: one dependency chain in the `## Dependencies` chain-line form; several give joins and branches. Each chain is written as a chain line with its `blocked-by` relations and a `### Declared order` entry. A value that is not a chain line, a number that is not a child, a cycle, or use with `--ordered` is refused before anything is written.
 - `--rationale-file <path|->` — split rationale prose, written under `.josh/tmp/` (`-` reads stdin).
 - `--origin <owner/repo#N>` — backlink when the split originated in another repository.
 - `--notify` — on create or `--promote`: send the split path's `planning` Telegram (the epic URL, child URLs and `Next: pnpm josh backlogrun <E> --only`), as `issue:plan --planned` sends; a failed send only warns.
@@ -726,7 +728,7 @@ It satisfies all four mechanical requirements by construction: `epic` label, tas
 
 #### `josh epic --promote` — turn an existing issue into an epic
 
-Appends the epic's sections to the issue's body, taking the same `--ordered` / `--rationale-file` / `--origin` options; `--title` renames it. Re-running is refused. Promote a request, discussion or container; when the issue is itself a deliverable, keep it as a child and create a new epic.
+Appends the epic's sections to the issue's body, taking the same `--ordered` / `--chain` / `--rationale-file` / `--origin` options; `--title` renames it. Re-running is refused. Promote a request, discussion or container; when the issue is itself a deliverable, keep it as a child and create a new epic.
 
 #### `josh epic --add` — insert children into an existing epic
 
