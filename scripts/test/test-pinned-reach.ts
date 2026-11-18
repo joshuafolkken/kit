@@ -35,10 +35,12 @@ interface ReachInputs {
 	test_digests: ReadonlyMap<string, string>
 }
 
-// One file and how many test files its imports reach.
+// One file and how many test files its imports reach — and, where the graph read them, which
+// (joshuafolkken/kit#7924).
 interface ReachedCount {
 	file: string
 	count: number
+	tests?: ReadonlyArray<string> | undefined
 }
 
 interface GraphView {
@@ -141,7 +143,11 @@ async function reached_test_counts(
 	const view = await view_of()
 	if (view === undefined) return undefined
 
-	return files.map((file) => ({ file, count: related_of(view, file).length }))
+	return files.map((file) => {
+		const tests = related_of(view, file)
+
+		return { file, count: tests.length, tests }
+	})
 }
 
 // None where no failed test is named or one is gone: what such a red rests on, no graph names. Past

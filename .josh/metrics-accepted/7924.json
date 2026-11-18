@@ -1,0 +1,8 @@
+{
+	"reason": "New mocking-test narrowing for moved-import hubs past the test:related cap (#7924): test-related-mocking.ts and its wiring add the code lines, and its header comment states the #7453 safety argument",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 59,
+		"prose.long_paragraphs": 1
+	}
+}

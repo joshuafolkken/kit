@@ -5,11 +5,13 @@ import { test_declared_logic } from './test-declared-logic'
 import { test_pinned_logic } from './test-pinned-logic'
 import { test_pinned_reach, type ReachedCount } from './test-pinned-reach'
 import { test_related_imports } from './test-related-imports'
+import { test_related_mocking } from './test-related-mocking'
 import { test_related_pins } from './test-related-pins'
 import { related_scope } from './test-related-scope'
 
 // **A change whose imports reach more than `test_pinned_logic.MAX_TEST_FILES` test files runs only the
-// tests importing its widest files directly when their imports are unchanged** (#7453, #5532, #5702), as a file every test imports does
+// tests importing its widest files directly** — and, for one whose imports moved, the tests of its reach
+// that mock a module (#7453, #5532, #5702, #7924), as a file every test imports does
 // (`direct-importers.ts`): the tests past them stay unchecked here, for `josh gate`'s whole suite and
 // CI to run. `--keep-whole-suite` (the gate's unit leg) lifts the cap outside a lane
 // (`test-related-whole.ts`), and so does a missing graph.
@@ -76,18 +78,43 @@ async function relative_counts(
 	return (counts ?? []).map((reached) => ({ ...reached, file: path.relative(root, reached.file) }))
 }
 
-// A file past the cap that no test imports directly keeps its whole reach: narrowed, it would run no
-// test at all. A registry file narrows to its direct importers and the pinned registry tests
+// A file past the cap whose imports moved runs its direct importers and the tests of its reach that
+// mock a module — the ones a new import can break (#7453, joshuafolkken/kit#7924); one whose reach the
+// graph did not list keeps its whole reach.
+function moved_tests(
+	root: string,
+	direct: ReadonlyArray<string>,
+	reached: ReadonlyArray<string> | undefined,
+): Array<string> | undefined {
+	if (reached === undefined) return undefined
+
+	return [...new Set([...direct, ...test_related_mocking.mocking_tests(root, reached)])]
+}
+
+// A file past the cap that no test runs in place of its reach keeps it: narrowed, it would run no test
+// at all. A registry file narrows to its direct importers and the pinned registry tests
 // (`test-related-pins.ts`).
 async function direct_of(
 	root: string,
 	over_cap: ReadonlyArray<string>,
+	counts: ReadonlyArray<ReachedCount>,
 ): Promise<Array<[string, Array<string>]>> {
 	const stable = await test_related_imports.stable_files(root, over_cap)
-	const importers = await direct_importers.importers_of(root, stable)
-	const narrowed = [...importers].filter(([, tests]) => tests.length > 0)
+	const importers = await direct_importers.importers_of(root, over_cap)
 
-	return narrowed.map(([file, tests]) => [file, test_related_pins.with_pins(file, tests)])
+	return [...importers].flatMap(([file, direct]): Array<[string, Array<string>]> => {
+		const reached = counts.find((count) => count.file === file)?.tests
+		const tests = stable.includes(file) ? direct : moved_tests(root, direct, reached)
+
+		return tests === undefined || tests.length === 0
+			? []
+			: [[file, test_related_pins.with_pins(file, tests)]]
+	})
+}
+
+// The counts a run records, without the test lists the graph read (joshuafolkken/kit#7924).
+function bare_counts(counts: ReadonlyArray<ReachedCount>): Array<ReachedCount> {
+	return counts.map(({ file, count }) => ({ file, count }))
 }
 
 // The files past the cap the run left at their whole reach, widest first — those of `counts` the cap
@@ -136,10 +163,11 @@ async function capped_importers(
 ): Promise<CappedImporters> {
 	if (is_whole) return NO_CAP
 	const [every_test, candidates] = await split_of(root, files)
-	const counts = await relative_counts(root, candidates, read_counts)
-	const capped = await direct_of(root, over_cap_of(counts))
+	const listed = await relative_counts(root, candidates, read_counts)
+	const capped = await direct_of(root, over_cap_of(listed), listed)
 	const narrowed = capped.map(([file]) => file)
 	const importers = new Map([...every_test, ...capped])
+	const counts = bare_counts(listed)
 
 	return {
 		importers,

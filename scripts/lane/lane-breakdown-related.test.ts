@@ -62,3 +62,17 @@ describe('lane_breakdown_related.over_cap_text', () => {
 		expect(lane_breakdown_related.over_cap_text([row(ISSUE, 0), row(ISSUE)], ISSUE)).toBe('')
 	})
 })
+
+describe('lane_breakdown_related.over_cap_text widest file', () => {
+	// joshuafolkken/kit#7924: the hub is the lane's own capped file; the row also names what ran wide.
+	it('names the widest file of the widest-reaching run beside the hub', () => {
+		const entries = [
+			{ ...row(ISSUE, 1), over_cap_hub: FIRST_HUB, widest_file: FIRST_HUB, widest_tests: 3 },
+			{ ...row(ISSUE, 1), over_cap_hub: FIRST_HUB, widest_file: SECOND_HUB, widest_tests: 1259 },
+		]
+
+		expect(lane_breakdown_related.over_cap_text(entries, ISSUE)).toBe(
+			`test:related 1 over cap, in 2 of 2 runs, hub ${FIRST_HUB}, widest ${SECOND_HUB} (1259)`,
+		)
+	})
+})

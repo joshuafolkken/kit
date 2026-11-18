@@ -14,6 +14,10 @@ import { vitest_failure_summary } from './vitest-failure-summary'
 // from a test whose filesystem mock omitted constants, until CI ran it.
 const WIDE = 'wide.ts'
 const STARTUP = 'startup.ts'
+const SYNC_TEST = 'sync.test.ts'
+const WIDE_TEST = 'wide.test.ts'
+const STARTUP_TEST = 'startup.test.ts'
+const LISTED_REACH = [WIDE_TEST, SYNC_TEST, STARTUP_TEST]
 const FILES: Readonly<Record<string, string>> = {
 	'package.json': '{"type":"module"}',
 	'.gitignore': 'node_modules\n',
@@ -21,9 +25,9 @@ const FILES: Readonly<Record<string, string>> = {
 	'vitest.config.ts': 'export default { test: { include: ["*.test.ts"] } }',
 	[WIDE]: 'export const value = 1\n',
 	'entry.ts': "export { value } from './wide'\n",
-	'wide.test.ts':
+	[WIDE_TEST]:
 		"import { it, expect } from 'vitest'\nimport { value } from './wide'\nit('reads', () => expect(value).toBe(1))\n",
-	'sync.test.ts':
+	[SYNC_TEST]:
 		"import { it, expect, vi } from 'vitest'\nvi.mock('node:fs', () => ({ readFileSync: vi.fn() }))\nit('imports', async () => expect((await import('./entry')).value).toBe(1))\n",
 }
 const ADDED_STARTUP =
@@ -61,7 +65,7 @@ beforeEach(async () => {
 	write(WIDE, CHANGED_WIDE)
 	write(STARTUP, ADDED_STARTUP)
 	write(
-		'startup.test.ts',
+		STARTUP_TEST,
 		"import { it, expect } from 'vitest'\nimport { permission } from './startup'\nit('reads', () => expect(permission).toBe(0))\n",
 	)
 })
@@ -70,13 +74,15 @@ afterEach(async () => {
 	if (fixture.current !== undefined) await git_fixture_workspace.close_workspace(fixture.current)
 })
 
-async function selected(warm: boolean): Promise<RelatedScope> {
+// The reach the graph lists for each changed file (joshuafolkken/kit#7924), none for a reader that
+// counts alone.
+async function selected(warm: boolean, reach?: ReadonlyArray<string>): Promise<RelatedScope> {
 	const root = process.cwd()
 	const capped = await test_related_cap.capped_importers(
 		root,
 		[WIDE, STARTUP],
 		false,
-		async (files) => files.map((file) => ({ file, count: OVER_CAP })),
+		async (files) => files.map((file) => ({ file, count: OVER_CAP, tests: reach })),
 	)
 
 	return related_scope.resolve_scope({
@@ -106,10 +112,19 @@ describe('related selection after importing new startup code', () => {
 		expect(scope.files).toContain(path.join(process.cwd(), STARTUP))
 	})
 
-	it(
-		'detects the actual indirect mock import failure before shipping',
-		async () => {
-			const scope = await selected(false)
+	// joshuafolkken/kit#7924: narrowed to its direct importers and the tests that mock a module, the
+	// moved hub still runs the indirect test the new import breaks.
+	it('keeps the indirect test that mocks a module, not the whole reach', async () => {
+		const scope = await selected(false, LISTED_REACH)
+
+		expect(scope.files).toContain(path.join(process.cwd(), SYNC_TEST))
+		expect(scope.files).not.toContain(path.join(process.cwd(), WIDE))
+	})
+
+	it.each([undefined, LISTED_REACH])(
+		'detects the actual indirect mock import failure before shipping, listed reach %j',
+		async (reach) => {
+			const scope = await selected(false, reach)
 			const report = vi.spyOn(vitest_failure_summary, 'report')
 			const exit = await test_unit_guard.run_vitest_in(
 				process.cwd(),

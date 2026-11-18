@@ -80,7 +80,7 @@ async function stable_files(root: string, files: ReadonlyArray<string>): Promise
 
 	if (retained.length > 0) {
 		process.stdout.write(
-			`josh test:related: keeping full reach (imports changed or unknown): ${retained.join(', ')}\n`,
+			`josh test:related: imports changed or unknown, keeping the tests that mock a module: ${retained.join(', ')}\n`,
 		)
 	}
 
