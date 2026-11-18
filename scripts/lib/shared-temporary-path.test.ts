@@ -32,18 +32,19 @@ const SKIPPED_ROOTS: ReadonlySet<string> = new Set(['node_modules', 'dist'])
 // skips. Nothing else may be exempted: an exemption list is what the qualification below replaces.
 const SELF_NAME = path.basename(fileURLToPath(import.meta.url))
 // Prettier wraps a long `mkdtempSync(path.join(tmpdir(), '…'))` onto three lines, so the whitespace
-// after the call is closed up before the scan runs. That keeps the lookbehind below fixed-length,
-// and it is what stops the guard failing on the very code it exists to require.
-const WRAPPED_UNIQUE_CALL = /mkdtempSync\(\s+/gu
+// after the call is closed up before the scan runs. That keeps the lookbehind below anchored on the
+// call's open paren, and it is what stops the guard failing on the very code it exists to require.
+// `fs/promises`' `mkdtemp` makes the directory unique the same way, so both spellings are the fix.
+const WRAPPED_UNIQUE_CALL = /(mkdtemp(?:Sync)?)\(\s+/gu
 // `path.join(tmpdir(), 'name')` — a plain string literal, so the path is identical in every
 // concurrent run. An argument written as a template literal is left alone: the stamp files keyed on
 // `process.pid` are already unique, and that is the escape the interpolation buys. The lookbehind is
 // what lets the fix itself through, and the optional comma is what keeps a *wrapped* offender from
 // escaping: prettier puts a trailing comma where the close paren would otherwise be.
 const FIXED_JOIN =
-	/(?<!mkdtempSync\()path\.join\(\s*(?:os\.)?tmpdir\(\)\s*,\s*(['"])[^'"\n]*\1(?:\s*,)?\s*\)/gu
+	/(?<!mkdtemp(?:Sync)?\()path\.join\(\s*(?:os\.)?tmpdir\(\)\s*,\s*(['"])[^'"\n]*\1(?:\s*,)?\s*\)/gu
 // The same path spelled by interpolation instead, with nothing inside it that varies per run.
-const FIXED_TEMPLATE = /(?<!mkdtempSync\()`\$\{\s*(?:os\.)?tmpdir\(\)\s*\}\/[^`$\n]*`/gu
+const FIXED_TEMPLATE = /(?<!mkdtemp(?:Sync)?\()`\$\{\s*(?:os\.)?tmpdir\(\)\s*\}\/[^`$\n]*`/gu
 const FIXED_PATTERNS: ReadonlyArray<RegExp> = [FIXED_JOIN, FIXED_TEMPLATE]
 // A suite that never opens the filesystem cannot race on a path — it compares strings, and
 // `check-commit-message.test.ts` asserting that a temp-dir path is accepted is exactly that.
@@ -91,7 +92,7 @@ function matches_in(content: string, pattern: RegExp): Array<string> {
 }
 
 function fixed_temporary_paths(content: string): Array<string> {
-	const closed_up = content.replaceAll(WRAPPED_UNIQUE_CALL, 'mkdtempSync(')
+	const closed_up = content.replaceAll(WRAPPED_UNIQUE_CALL, '$1(')
 
 	return FIXED_PATTERNS.flatMap((pattern) => matches_in(closed_up, pattern))
 }
@@ -105,6 +106,29 @@ function offenders_in(file: string): Array<string> {
 		(match) => `${path.relative(REPO_ROOT, file)}: ${match}`,
 	)
 }
+
+// The wrapped cases are what prettier does to `mkdtempSync(path.join(tmpdir(), '…'))` once the
+// prefix outgrows the print width: read a line at a time, its argument is indistinguishable from a
+// fixed name, which would fail the suite on the very code this guard exists to require.
+const ACCEPTED_SAMPLES: ReadonlyArray<readonly [string, string]> = [
+	['the literal that names a mkdtemp prefix', 'const d = mkdtempSync(path.join(tmpdir(), "u-"))'],
+	[
+		'a mkdtemp call prettier has wrapped across lines',
+		"const d = mkdtempSync(\n\tpath.join(tmpdir(), 'a-very-long-prefix-'),\n)",
+	],
+	[
+		'the prefix of an awaited fs/promises mkdtemp',
+		"const d = await mkdtemp(path.join(tmpdir(), 'u-'))",
+	],
+	[
+		'an awaited mkdtemp call prettier has wrapped across lines',
+		"const d = await mkdtemp(\n\tpath.join(tmpdir(), 'a-very-long-prefix-'),\n)",
+	],
+	[
+		'a path made unique by an interpolation',
+		'const stamp = path.join(tmpdir(), `stamp-${String(process.pid)}.json`)',
+	],
+]
 
 describe('temp directories in test suites', () => {
 	// The acceptance condition of joshuafolkken/kit#1517, stated as a property of the tree rather than
@@ -127,20 +151,7 @@ describe('temp directories in test suites', () => {
 		expect(fixed_temporary_paths(sample)).toHaveLength(1)
 	})
 
-	// The second case is what prettier does to `mkdtempSync(path.join(tmpdir(), '…'))` once the prefix
-	// outgrows the print width: read a line at a time, its argument is indistinguishable from a fixed
-	// name, which would fail the suite on the very code this guard exists to require.
-	it.each([
-		['the literal that names a mkdtemp prefix', 'const d = mkdtempSync(path.join(tmpdir(), "u-"))'],
-		[
-			'a mkdtemp call prettier has wrapped across lines',
-			"const d = mkdtempSync(\n\tpath.join(tmpdir(), 'a-very-long-prefix-'),\n)",
-		],
-		[
-			'a path made unique by an interpolation',
-			'const stamp = path.join(tmpdir(), `stamp-${String(process.pid)}.json`)',
-		],
-	])('accepts %s', (_label, sample) => {
+	it.each(ACCEPTED_SAMPLES)('accepts %s', (_label, sample) => {
 		expect(fixed_temporary_paths(sample)).toStrictEqual([])
 	})
 })
