@@ -212,7 +212,7 @@ function describe(reading: RedReading): string {
 	)
 }
 
-const test_related_red = { describe, narrowing, no_base_files, read_red, record_red }
+const test_related_red = { describe, failed_of, narrowing, no_base_files, read_red, record_red }
 
 export type { RedReading, RedRun, RelatedInput }
 export { test_related_red }
