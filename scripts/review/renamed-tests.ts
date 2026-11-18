@@ -3,14 +3,15 @@ import type { TestEntry } from './test-titles'
 
 // **A removed test whose body arrived under another title was renamed** (joshuafolkken/kit#7883): its
 // replacement is that title, read from the change rather than searched for by the reviewer. Bodies are
-// compared by the tokens they share (the Dice coefficient), so reformatting or a changed literal still
-// matches while a rewritten body does not. Each arrived test answers for one removed test only, the
+// compared by the tokens they share (the Dice coefficient), so reformatting still matches while a
+// rewritten body, or one with a changed string or number literal, does not. Each arrived test answers for one removed test only, the
 // closest one first.
 
 const SAME_BODY_SHARE = 0.8
 const BOTH_SIDES = 2
 const TOKEN_PATTERN = /\w+|[^\s\w]/gu
 const WORD_PATTERN = /\w/u
+const LITERAL_PATTERN = /'[^']*'|"[^"]*"|`[^`]*`|\b\d+\b/gu
 
 interface Rename {
 	from: string
@@ -26,9 +27,19 @@ function tokens(body: string): ReadonlyArray<string> {
 	return body.match(TOKEN_PATTERN) ?? []
 }
 
-// A body with no word in it — an empty callback, or none — has nothing to compare, so it never matches.
+function literals(body: string): string {
+	return (body.match(LITERAL_PATTERN) ?? [])
+		.toSorted((left, right) => left.localeCompare(right))
+		.join('\n')
+}
+
+// A body with no word in it — an empty callback, or none — has nothing to compare, so it never matches;
+// nor does one whose string or number literals differ, since a changed argument is a changed test.
 function similarity(left: string, right: string): number {
-	if (!WORD_PATTERN.test(left) || !WORD_PATTERN.test(right)) return 0
+	if (!WORD_PATTERN.test(left) || !WORD_PATTERN.test(right) || literals(left) !== literals(right)) {
+		return 0
+	}
+
 	const left_tokens = tokens(left)
 	const right_tokens = tokens(right)
 	const total = left_tokens.length + right_tokens.length

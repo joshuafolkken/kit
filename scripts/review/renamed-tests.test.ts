@@ -24,6 +24,14 @@ describe('renamed_tests.renamed — removed tests whose body arrived under a new
 		expect(renamed_tests.renamed([{ title: OLD, body: BODY }], after, [OLD])).toStrictEqual([])
 	})
 
+	it('does not take a test whose asserted literal changed for a rename', () => {
+		const changed = BODY.replace('board, 1', 'board, 2')
+
+		const before = [{ title: OLD, body: BODY }]
+
+		expect(renamed_tests.renamed(before, [{ title: NEW, body: changed }], [OLD])).toStrictEqual([])
+	})
+
 	it('lets one arrived test answer for one removed test only', () => {
 		const before = [
 			{ title: OLD, body: BODY },
