@@ -30,7 +30,7 @@ const prepare_mock = vi.hoisted(() => vi.fn<(issue: string, rows: string) => Pro
 const reuse_mock = vi.hoisted(() => vi.fn(async (_k: unknown, ask: () => unknown) => await ask()))
 
 vi.mock('#scripts/git/git-preflight', () => ({
-	git_preflight: { problems_of: problems_mock },
+	git_preflight: { PRECONDITION: {}, problems_of: problems_mock },
 }))
 vi.mock('#scripts/git/changed-paths', () => ({
 	changed_paths: { read_changed_paths: paths_mock },
