@@ -2,6 +2,10 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # The macOS and Linux audio players the board's sound player starts (#7945).
+  - afplay
+  - paplay
+  - aplay
   # osv-scanner's config table for ignored advisories and the picomatch advisory id it ignores (#7839).
   - Vulns
   - vjpf
