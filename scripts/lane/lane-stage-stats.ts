@@ -1,5 +1,6 @@
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
+import { lane_host_gaps } from './lane-host-gaps'
 import {
 	lane_ledger,
 	type DispatchEntry,
@@ -7,6 +8,7 @@ import {
 	type MergeEntry,
 	type StageEntry,
 } from './lane-ledger'
+import type { LaneSpan } from './lane-net-time'
 import { lane_stats, type StatsWindow } from './lane-stats'
 
 // Where a lane's time goes: the ledger's `stage` and `dispatch` entries of one period reduced to one
@@ -152,17 +154,24 @@ function implement_spans(entries: ReadonlyArray<LedgerEntry>): Array<ImplementSp
 	})
 }
 
-// Each dispatch's implementation in dispatch order, a dispatch no ship stage followed left out.
-function implements_of(entries: ReadonlyArray<LedgerEntry>): Array<Implement> {
+// Each dispatch's implementation in dispatch order, a dispatch no ship stage followed left out, less
+// the host's stops `gaps` inside it (joshuafolkken/kit#7905).
+function implements_of(
+	entries: ReadonlyArray<LedgerEntry>,
+	gaps: ReadonlyArray<LaneSpan>,
+): Array<Implement> {
 	return implement_spans(entries)
 		.filter((span) => !span.is_open)
-		.map(({ issue, from_ms, to_ms }) => ({ issue, ms: to_ms - from_ms }))
+		.map((span) => ({
+			issue: span.issue,
+			ms: span.to_ms - span.from_ms - lane_host_gaps.excluded_ms(gaps, [span]),
+		}))
 }
 
 // Each issue's implementation over every entry given — the latest dispatch's, so a reissued lane
 // reads as the run that shipped (joshuafolkken/kit#6021).
 function implement_by_issue(entries: ReadonlyArray<LedgerEntry>): ReadonlyMap<number, number> {
-	return new Map(implements_of(entries).map(({ issue, ms }) => [issue, ms] as const))
+	return new Map(implements_of(entries, []).map(({ issue, ms }) => [issue, ms] as const))
 }
 
 function durations_of(stage: string, measured: Measured): ReadonlyArray<number> {
@@ -194,16 +203,19 @@ function stage_row(stage: string, measured: Measured): string {
 	])
 }
 
-function measured_of(entries: ReadonlyArray<LedgerEntry>): Measured {
+// Every duration net of `gaps`, the host's stops (joshuafolkken/kit#7905). Only the implementation is
+// netted: it is two wall-clock stamps apart, while a recorded stage's `elapsed_ms` is `performance.now()`
+// time, a monotonic clock that already stops while the host sleeps.
+function measured_of(entries: ReadonlyArray<LedgerEntry>, gaps: ReadonlyArray<LaneSpan>): Measured {
 	return {
-		implement: implements_of(entries).map(({ ms }) => ms),
+		implement: implements_of(entries, gaps).map(({ ms }) => ms),
 		stages: entries.filter(is_stage),
 	}
 }
 
 // The period's table: `entries` is the whole ledger, filtered here to `window`.
 function table(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): string {
-	const measured = measured_of(lane_stats.in_window(entries, window))
+	const measured = measured_of(lane_stats.in_window(entries, window), [])
 
 	return [
 		lane_stats.to_row(COLUMNS),
@@ -213,9 +225,13 @@ function table(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): string
 }
 
 // Each stage's median over every entry given, a stage nothing recorded left out rather than read as
-// `0` — how long a stage usually takes, which `run:board` measures a running child's phase against.
-function medians(entries: ReadonlyArray<LedgerEntry>): ReadonlyMap<string, number> {
-	const measured = measured_of(entries)
+// `0` — how long a stage usually takes, which `run:board` measures a running child's phase against —
+// each duration net of `gaps`, the host's stops (joshuafolkken/kit#7905).
+function medians(
+	entries: ReadonlyArray<LedgerEntry>,
+	gaps: ReadonlyArray<LaneSpan> = [],
+): ReadonlyMap<string, number> {
+	const measured = measured_of(entries, gaps)
 
 	return new Map(
 		STAGES.flatMap((stage) => {

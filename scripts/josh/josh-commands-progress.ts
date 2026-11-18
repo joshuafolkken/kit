@@ -4,6 +4,8 @@ import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types
 // command's usage moved onto its entry (#4185). `RUN_COMMANDS` spreads this in at the same place, so
 // the map keeps its order.
 
+const BOARD_THEME = '--theme wargames'
+
 const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 	'run:progress': {
 		script: 'scripts/run/progress/run-progress-main.ts',
@@ -55,7 +57,11 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		description: 'Draw a live board of the running backlogrun, redrawn every second',
 		category: 'AI tools',
-		reference: ['[--once | --chat | --every <minutes>]', 'automation', ['files', 'network']],
+		reference: [
+			`[--once | --chat | --every <minutes>] [${BOARD_THEME}]`,
+			'automation',
+			['files', 'network'],
+		],
 		usage: {
 			examples: [
 				{ arguments: '', note: 'redraw until interrupted' },
@@ -65,6 +71,7 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 					arguments: '--every 5',
 					note: 'the --chat frame as a 📊 Progress Telegram every 5 minutes, until the run ends',
 				},
+				{ arguments: BOARD_THEME, note: 'green text and dashed rules' },
 			],
 			flags: [
 				{
@@ -76,6 +83,11 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 					names: ['--every <minutes>'],
 					description:
 						'sends the `--chat` frame as a `📊 Progress` Telegram now and every `<minutes>` until the run ends — only when a person asks for it.',
+				},
+				{
+					names: [BOARD_THEME],
+					description:
+						'draws the text no color is given in phosphor green and every rule as `-`; `JOSH_BOARD_THEME=wargames` sets it for every board, the one `backlogrun` opens included, and `--theme` wins over it. An unknown name is refused. `--chat` and `--every` never take it.',
 				},
 			],
 		},
