@@ -1,0 +1,7 @@
+{
+	"reason": "Issue #7873 adds the round-2 outcome record: a new run-ship-round-two-ledger module and the finding_kinds helper",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 35
+	}
+}

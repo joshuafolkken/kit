@@ -6,7 +6,7 @@ import { review_interaction } from '#scripts/review/review-interaction'
 import { review_reviewed_tree } from '#scripts/review/review-reviewed-tree'
 import { review_round } from '#scripts/review/review-round'
 import { review_round_reuse, type ReuseAnswer } from '#scripts/review/review-round-reuse'
-import { review_round2 } from '#scripts/review/review-round2'
+import { review_round2, type RoundTwoAnswer } from '#scripts/review/review-round2'
 import { review_stop_log } from '#scripts/review/review-stop-log'
 import { run_review } from '#scripts/run/review/run-review'
 import { run_ship_final_review } from './run-ship-final-review'
@@ -14,6 +14,7 @@ import { run_ship_review, type RoundOutcome, type ScoredVerdict } from './run-sh
 import { run_ship_review_checkpoint } from './run-ship-review-checkpoint'
 import { run_ship_review_reason } from './run-ship-review-reason'
 import { run_ship_reviewer, type Round } from './run-ship-reviewer'
+import { run_ship_round_two_ledger } from './run-ship-round-two-ledger'
 import { run_ship_scoped } from './run-ship-scoped'
 import { run_ship_stage } from './run-ship-stage'
 import { run_ship_stop_cause } from './run-ship-stop-cause'
@@ -423,6 +424,21 @@ async function reviewed_round_two(issue: string): Promise<StepResult> {
 	)
 }
 
+// A skip is recorded as decided; a run once it has an outcome (`run-ship-round-two-ledger.ts`).
+async function acted_round_two(issue: string, answer: RoundTwoAnswer): Promise<StepResult> {
+	if (answer.verdict !== review_round2.REQUIRED_VERDICT) {
+		await run_ship_round_two_ledger.record(issue, answer)
+
+		return skipped(`${answer.verdict}\n${ROUND_TWO_SKIPPED_NOTE}`)
+	}
+
+	const result = await reviewed_round_two(issue)
+
+	await run_ship_round_two_ledger.record(issue, answer, result)
+
+	return result
+}
+
 async function execute_round_two_stage(issue: string): Promise<StepResult> {
 	const decision = await josh(round_two_decision(issue))
 
@@ -435,17 +451,8 @@ async function execute_round_two_stage(issue: string): Promise<StepResult> {
 	}
 
 	note(answer.reason)
-	await lane_ledger_write.record_round_two({
-		issue: Number(issue),
-		verdict: answer.verdict,
-		code: answer.code,
-	})
 
-	if (answer.verdict !== review_round2.REQUIRED_VERDICT) {
-		return skipped(`${answer.verdict}\n${ROUND_TWO_SKIPPED_NOTE}`)
-	}
-
-	return await reviewed_round_two(issue)
+	return await acted_round_two(issue, answer)
 }
 
 async function round_two_stage(issue: string): Promise<StepResult> {
