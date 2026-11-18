@@ -13,6 +13,7 @@ import { run_board_render_lead } from './run-board-render-lead'
 import { run_board_render_tail } from './run-board-render-tail'
 import { run_board_render_time } from './run-board-render-time'
 import { run_board_render_title, type RowCut, type RowFit } from './run-board-render-title'
+import { run_board_row_key, type KeySection } from './run-board-row-key'
 import { run_board_row_yield } from './run-board-row-yield'
 
 // One issue row of the `run:board` screen as a plan line — its lead, title, time, tail and what was
@@ -59,6 +60,9 @@ interface RowFrame {
 	is_lane_row?: boolean | undefined
 	// A done row whose title gives up the columns draws what was filed during it whole.
 	is_end_kept?: boolean | undefined
+	// The section whose key leads each row's text (`run-board-row-key.ts`); none where a section types
+	// no row.
+	section?: KeySection | undefined
 }
 
 // A row drawn before the plan is read has no title yet, and says so.
@@ -211,11 +215,16 @@ function row_fit(indent: string, row: BoardRow, frame: RowFrame): RowFit {
 }
 
 // A plan line that draws one issue row, and one that draws none — a blank, a rule, an epic's own line.
+// The row's text is led by its key where the frame keys its rows and its section names one.
 function row_line(indent: string, row: BoardRow, frame: RowFrame, stage?: YieldStage): PlanLine {
 	const fit = row_fit(indent, row, frame)
 	const text = fitted(row, frame.columns, row_draw(indent, row, frame, fit), fit)
+	const section = frame.header.is_keyed === true ? frame.section : undefined
 
-	return { text, row: run_board_row_yield.yield_of(row, stage) }
+	return {
+		text: run_board_row_key.keyed(section, row.number, text),
+		row: run_board_row_yield.yield_of(row, stage),
+	}
 }
 
 // The most columns a lane row that draws a tail runs past the pane, which every such row gives up, so

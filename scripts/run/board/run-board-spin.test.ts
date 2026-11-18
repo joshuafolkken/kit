@@ -1,12 +1,18 @@
 import { describe, expect, it } from 'vitest'
+import { run_board_intro } from './run-board-intro'
 import { run_board_labels } from './run-board-labels'
+import { run_board_row_key } from './run-board-row-key'
 import { run_board_spin, type Spot } from './run-board-spin'
+import { run_board_type_rows } from './run-board-type-rows'
 
 // joshuafolkken/kit#3495: where a frame's spinners are on screen, and the turns written between
 // redraws — a cursor move and one frame each, on the package's interval, until the next second.
 
 const { REDRAW_MS, SPOT, spin_bytes, spin_to_second, spun } = run_board_spin
 const { SPINNER_INTERVAL_MS, spinner_of } = run_board_labels
+const { NO_TYPING, type_bytes } = run_board_type_rows
+const { LETTER_MS } = run_board_intro
+const { keyed } = run_board_row_key
 const ESCAPE = '\u{1B}'
 const GREEN = `${ESCAPE}[32m`
 const START = Date.parse('2026-10-08T09:00:00.000Z')
@@ -58,7 +64,7 @@ describe('run_board_spin.spun', () => {
 		const lines = [`${SPOT} run`, 'still']
 
 		expect(spun(lines, '⠙', WIDE).lines).toStrictEqual(['⠙ run', 'still'])
-		expect(spun(['▶ run'], '⠙', WIDE)).toStrictEqual({ lines: ['▶ run'], spots: [] })
+		expect(spun(['▶ run'], '⠙', WIDE)).toStrictEqual({ lines: ['▶ run'], spots: [], keyed: [] })
 	})
 
 	it('counts the rows a wrapped line takes and keeps the colors in effect at the spot', () => {
@@ -95,13 +101,14 @@ describe('run_board_spin.spin_bytes', () => {
 	})
 })
 
-describe('run_board_spin.spin_to_second', () => {
-	const SPOTS = [{ row: 1, column: 1, style: '' }]
+const SPOTS = [{ row: 1, column: 1, style: '' }]
+const SPINNING = { spots: SPOTS, typing: NO_TYPING }
 
+describe('run_board_spin.spin_to_second', () => {
 	it('turns the spinners on every interval until the next second, writing nothing but the turns', async () => {
 		const { ports, writes } = spin_ports(START)
 
-		await spin_to_second(SPOTS, ports)
+		await spin_to_second(SPINNING, ports)
 
 		const turns = Math.ceil(REDRAW_MS / SPINNER_INTERVAL_MS) - 1
 
@@ -117,7 +124,7 @@ describe('run_board_spin.spin_to_second', () => {
 		const late = START + 937
 		const { ports, writes } = spin_ports(late)
 
-		await spin_to_second(SPOTS, ports)
+		await spin_to_second(SPINNING, ports)
 
 		expect(ports.now()).toBe(START + REDRAW_MS)
 		expect(writes.map(({ at_ms }) => at_ms - START)).toStrictEqual([960])
@@ -126,9 +133,38 @@ describe('run_board_spin.spin_to_second', () => {
 	it('writes nothing and sleeps once to the second when no spinner is drawn', async () => {
 		const { ports, writes, sleeps } = spin_ports(START + 300)
 
-		await spin_to_second([], ports)
+		await spin_to_second({ spots: [], typing: NO_TYPING }, ports)
 
 		expect(writes).toHaveLength(0)
 		expect(sleeps).toStrictEqual([REDRAW_MS - 300])
+	})
+})
+
+describe('run_board_spin — the rows a theme types (joshuafolkken/kit#8003)', () => {
+	it('takes each row’s key out of the frame and records the row it starts on, its text as written', () => {
+		const lines = ['x'.repeat(25), keyed('done', 7, `${SPOT} ✅ 7`), keyed('lanes', 8, 'off')]
+		const { lines: written, keyed: rows } = spun(lines, '⠋', { rows: 4, columns: 10 })
+
+		expect(written).toStrictEqual(['x'.repeat(25), '⠋ ✅ 7', 'off'])
+		expect(rows).toStrictEqual([{ key: 'done:7', index: 1, row: 4, text: '⠋ ✅ 7' }])
+	})
+
+	it('writes a typing row on every letter after the turns, at its row, until the next second', async () => {
+		const { ports, writes } = spin_ports(START)
+		const spots = SPOTS
+		const typing = {
+			seen: new Set<string>(),
+			lines: [{ key: 'done:7', index: 2, row: 3, text: 'x'.repeat(40), start_ms: START }],
+		}
+
+		await spin_to_second({ spots, typing }, ports)
+
+		const first_ms = START + LETTER_MS
+
+		expect(writes).toHaveLength(REDRAW_MS / LETTER_MS - 1)
+		expect(writes[0]?.text).toBe(
+			`${spin_bytes(spots, spinner_of(first_ms))}${type_bytes(typing, first_ms)}`,
+		)
+		expect(writes[0]?.text).toContain(`${ESCAPE}[3;1Hxx${ESCAPE}[0m█`)
 	})
 })

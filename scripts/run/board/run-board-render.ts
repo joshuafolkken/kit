@@ -165,13 +165,13 @@ function active_sections(
 	const lane_frame = { ...frame, cells, is_lane_row: true }
 	const shared = shared_overrun(lead, lane_frame)
 	const lanes = lanes_section(
-		lead.map((row) => row_line(indent_of(row), row, { ...lane_frame, shared })),
+		lead.map((row) => row_line(indent_of(row), row, { ...lane_frame, shared, section: 'lanes' })),
 		cells,
 		frame.header,
 		frame.columns,
 	)
 
-	const plan = [...lanes, ...rows_section(decision, people, frame)]
+	const plan = [...lanes, ...rows_section(decision, people, { ...frame, section: 'decision' })]
 
 	return { plan, rule_width: rule_width(lead, { ...lane_frame, shared }) }
 }
@@ -194,9 +194,14 @@ function plan_parts(
 	return {
 		...active_sections(layout, frame),
 		below: [
-			...keyed('queued', queued_section(layout, conditioned)),
-			...keyed('waiting', rows_section(waiting, layout.unreached, conditioned, 'waiting')),
-			...done_section(done, (row) => row_line(ROW_INDENT, row, conditioned)),
+			...keyed('queued', queued_section(layout, { ...conditioned, section: 'queued' })),
+			...keyed(
+				'waiting',
+				rows_section(waiting, layout.unreached, { ...conditioned, section: 'waiting' }, 'waiting'),
+			),
+			...done_section(done, (row) =>
+				row_line(ROW_INDENT, row, { ...conditioned, section: 'done' }),
+			),
 		],
 	}
 }
