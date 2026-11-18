@@ -12,7 +12,17 @@ import { review_readers_scan } from './review-readers-scan'
 // search for each word it removed. Its own module, without a main guard, so `josh review:selfcheck`
 // (joshuafolkken/kit#5540) imports it as well as `prose-stale-cli.ts`.
 
-const SEARCH_PATHS = ['*.md', 'prompts', 'docs', '.claude', 'scripts', ':(exclude)CHANGELOG.md']
+// The history files — `CHANGELOG.md` and the observation ledgers — keep the names they recorded, so
+// neither is prose to update (joshuafolkken/kit#8048).
+const SEARCH_PATHS = [
+	'*.md',
+	'prompts',
+	'docs',
+	'.claude',
+	'scripts',
+	':(exclude)CHANGELOG.md',
+	':(exclude).josh/observations',
+]
 // The code files a live declaration is looked for in, at any depth; a test file names nothing.
 const CODE_PATHSPECS = ['*.ts', '*.js', ':(exclude)*.test.ts', ':(exclude)*.test.js']
 
