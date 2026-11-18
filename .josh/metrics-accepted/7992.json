@@ -2,6 +2,6 @@
 	"reason": "time_text split out of timed_parts to stay under the complexity limit after padding by the net time (#7992)",
 	"date": "2026-11-18",
 	"growth": {
-		"scripts.code_lines": 4
+		"scripts.code_lines": 17
 	}
 }

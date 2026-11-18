@@ -10,7 +10,7 @@ import type { ItemState, ItemStatus } from './run-board-status'
 // width the column takes across the run's own rows.
 
 const { EMPTY_LAYOUT, MINUTE, NOW, STARTED, header } = run_board_render_fixture
-const { time_of, time_width } = run_board_render_time
+const { stops_width, time_of, time_width } = run_board_render_time
 const HOUR = 60 * MINUTE
 
 function row(state: ItemState, status?: Omit<ItemStatus, 'state'>): BoardRow {
@@ -169,5 +169,23 @@ describe('run_board_render_time.time_width', () => {
 	it('is zero with no layout or no timed row', () => {
 		expect(time_width(header({ layout: undefined }))).toBe(0)
 		expect(time_width(header())).toBe(0)
+	})
+})
+
+describe('run_board_render_time.stops_width', () => {
+	it('is as wide as the widest bracketed stops, one blank before them', () => {
+		const active = [
+			row('running', { started_ms: NOW - HOUR, gaps: [SLEEP] }),
+			row('merged', { started_ms: STARTED, ended_ms: STARTED + HOUR }),
+		]
+
+		expect(stops_width(header({ layout: { ...EMPTY_LAYOUT, active } }))).toBe(' (+30′00″)'.length)
+	})
+
+	it('is zero where no row has stops', () => {
+		const active = [row('merged', { started_ms: STARTED, ended_ms: STARTED + HOUR })]
+
+		expect(stops_width(header({ layout: { ...EMPTY_LAYOUT, active } }))).toBe(0)
+		expect(stops_width(header())).toBe(0)
 	})
 })

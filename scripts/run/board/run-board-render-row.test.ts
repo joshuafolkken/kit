@@ -36,6 +36,7 @@ function frame_of(board: BoardHeader): RowFrame {
 	return {
 		header: board,
 		time_width: run_board_render_time.time_width(board),
+		stops_width: run_board_render_time.stops_width(board),
 		...run_board_render_title.WHOLE,
 		columns: undefined,
 		filed: new Set(),
@@ -99,6 +100,12 @@ const TIMED = [
 	{ row: done_in(8204, 5892, 0), time: '1°38′12″' },
 ]
 
+function head_width(row: BoardRow, frame: RowFrame): number {
+	return run_board_fit.width_of(
+		stripVTControlCharacters(run_board_render_row.head_text(row, frame)),
+	)
+}
+
 describe('run_board_render_row.row_line -- net times in one column', () => {
 	const board = header({ layout: { ...EMPTY_LAYOUT, active: TIMED.map(({ row }) => row) } })
 	const texts = TIMED.map(({ row }) => drawn(row, board))
@@ -116,6 +123,13 @@ describe('run_board_render_row.row_line -- net times in one column', () => {
 	it('ends a row with no stops at its net time', () => {
 		expect(texts[2]?.endsWith(' 8′06″')).toBe(true)
 		expect(texts[3]?.endsWith(' 1°38′12″')).toBe(true)
+	})
+
+	it('starts what follows the time in one column, stops or none', () => {
+		const frame = frame_of(board)
+		const heads = TIMED.map(({ row }) => head_width(row, frame))
+
+		expect(new Set(heads).size).toBe(1)
 	})
 
 	it('keeps every row within a pane its title is cut to', () => {
