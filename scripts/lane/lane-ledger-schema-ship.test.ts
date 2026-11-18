@@ -11,6 +11,7 @@ const LAP = {
 	elapsed_ms: 1200,
 }
 const SCOPED_PAIR = 'scoped pair'
+const CHAIN = { kind: 'chain', at: AT, issue: 7926, elapsed_ms: 1200, join: false }
 
 // joshuafolkken/kit#7736: a chain line with its stages, and an older one without them.
 describe('lane_ledger_schema_ship — the run:chain line', () => {
@@ -21,6 +22,22 @@ describe('lane_ledger_schema_ship — the run:chain line', () => {
 		const chain = { kind: 'chain', at: AT, issue: 7736, elapsed_ms: 1200, join: false, ...stages }
 
 		expect(lane_ledger_schema.entry_schema.parse(chain)).toEqual(chain)
+	})
+
+	// joshuafolkken/kit#7926: a stop's exit code and procedural kind (ac-306555cd).
+	it.each(['metrics-growth', 'scoped-not-green'])(
+		'reads a %s stop back with its exit code',
+		(refusal) => {
+			const chain = { ...CHAIN, stage: 'run:review', reason: 'hold', exit_code: 0, refusal }
+
+			expect(lane_ledger_schema.entry_schema.parse(chain)).toEqual(chain)
+		},
+	)
+
+	it('refuses an unknown refusal kind', () => {
+		const chain = { ...CHAIN, refusal: 'attest-mismatch' }
+
+		expect(lane_ledger_schema.entry_schema.safeParse(chain).success).toBe(false)
 	})
 })
 

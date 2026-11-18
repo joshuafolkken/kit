@@ -123,8 +123,12 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 					note: 'forwarded to run:review as given',
 				},
 				{
-					arguments: '<N> --accept-metrics "<why>"',
-					note: 'forwarded to run:review, whose open records a grown metrics total as `metrics --accept` does',
+					arguments: '<N> --accept-metrics "<why>" --from metrics-totals',
+					note: 'after a metrics-totals stop (a total grew, asked right after check:related): run:review records the growth as `metrics --accept` does',
+				},
+				{
+					arguments: '<N> --from run:review',
+					note: 'refused before run:review when the scoped checks are not green, naming `--from check:related`',
 				},
 				{
 					arguments: '<N> --join',

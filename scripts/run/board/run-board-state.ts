@@ -12,6 +12,9 @@ import type { BoardPlan } from './run-board-layout'
 import type { Link } from './run-board-link'
 import type { GithubRateLimit } from './run-board-render-quota-github'
 import { run_board_snapshot, type Known, type SnapshotStore } from './run-board-snapshot'
+import type { CueName } from './run-board-sound-cues'
+import type { Pending } from './run-board-sound-repeat'
+import type { SoundSnapshot } from './run-board-sound-transition'
 import type { Spot } from './run-board-spin'
 import type { Thanks } from './run-board-thanks-csv'
 
@@ -62,6 +65,9 @@ interface BoardPorts {
 	sleep: (ms: number) => Promise<void>
 	// The pauses of the line typed before a live board's first frame (`run-board-intro.ts`); none types no line.
 	intro_sleep?: ((ms: number) => Promise<void>) | undefined
+	// Sounds the cue a redraw picked (`run-board-sound-player.ts`), without waiting; the live board alone
+	// passes one, so `--once`, `--chat` and `--every` stay silent.
+	cue?: ((name: CueName) => void) | undefined
 }
 
 // `background` launches the GitHub reads and draws without them; `settled` waits for them before
@@ -105,6 +111,10 @@ interface BoardState extends GatherRead {
 	issue_count: IssueCount | undefined
 	issue_count_fetch: Fetch<IssueCount | undefined> | undefined
 	issue_count_attempted_ms: number | undefined
+	// The rows and run conditions the last frame sounded over, and the standing cue waiting to replay
+	// (`run-board-sound-repeat.ts`); none before a run's first frame, so it sounds nothing already there.
+	sound_snapshot?: SoundSnapshot | undefined
+	sound_pending?: Pending | undefined
 }
 
 const FRESH_STATE: BoardState = {

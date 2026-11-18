@@ -1,6 +1,6 @@
 import { derive_check } from '#scripts/document/derive-check'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
-import type { ChainStageEntry } from '#scripts/lane/lane-ledger-schema-ship'
+import type { ChainRefusal, ChainStageEntry } from '#scripts/lane/lane-ledger-schema-ship'
 import { run_ship_pre_detach } from '#scripts/run/ship/run-ship-pre-detach'
 import { test_related_caller } from '#scripts/test/test-related-caller'
 
@@ -29,10 +29,12 @@ const [DERIVE_CHECK = ''] = derive_check.DERIVE_CHECK_ARGV
 type NextAction = (issue: string) => string
 
 // A notice a stage that exited 0 still stops on, with the action after it, read after the stage ends
-// for the issue the run is on; `undefined` lets the run go on.
+// for the issue the run is on; `undefined` lets the run go on. `refusal` names a procedural stop's
+// kind for the ledger line (joshuafolkken/kit#7926).
 interface HoldStop {
 	notice: string
 	next: NextAction
+	refusal?: ChainRefusal
 }
 
 type StageHold = (issue: string) => Promise<HoldStop | undefined>
@@ -50,6 +52,7 @@ interface ChainStop {
 	code: number
 	next: NextAction
 	notice?: string
+	refusal?: ChainRefusal
 }
 
 // A run's stop, absent when every stage ran, and each stage it ran with its start and length.
