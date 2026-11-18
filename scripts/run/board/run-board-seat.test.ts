@@ -31,8 +31,11 @@ const REFUSAL = {
 const LAUNCH = { pos: 3, at: AT, kind: 'child-launch', text: '#6243 a' }
 const HOLD = 'offer:wait:blocked'
 const HOLD_TEXT = 'every queued issue is blocked'
+const USAGE_LIMIT_CODE = 'usage-limit'
 const LIMIT = 3
 const NARROW = 40
+const PANE = 80
+const RE_LOGIN = 'claude auth login'
 // A pane short enough that the seat lines give way.
 const SHORT = 6
 const SEAT = '💺'
@@ -59,11 +62,54 @@ function seats_of(extra: Partial<BoardHeader>): Array<string> {
 	)
 }
 
+// joshuafolkken/kit#8014: a usage-limit hold an authentication failure caused names the re-login.
+describe('run_board_render an authentication-failure hold on the empty seats', () => {
+	it('says the lane failed to authenticate and how to log in again, never the usage limit', () => {
+		const seats = seats_of({ seats: read_of([], USAGE_LIMIT_CODE, 'auth'), layout: queued([]) })
+
+		expect(seats).toStrictEqual(Array.from({ length: 2 }, () => expect.stringContaining(RE_LOGIN)))
+		expect(seats.join('\n')).not.toContain('usage limit')
+	})
+
+	// joshuafolkken/kit#8015: a row waiting on the auth recheck could run in the seat, as a 🪫 row could.
+	it('counts a queued row waiting on the auth recheck as a candidate, never “no issue ready”', () => {
+		const layout = queued([queued_row({ reason: { icon: WAIT_ICONS.auth_failure } })])
+		const seats = seats_of({ seats: read_of([], USAGE_LIMIT_CODE, 'auth'), layout })
+
+		expect(seats).toStrictEqual(
+			Array.from({ length: 2 }, () => expect.stringContaining(`${HELD_LEAD}auth failed`)),
+		)
+		expect(seats.join('\n')).not.toContain(NO_CANDIDATE)
+	})
+
+	it('keeps the re-login visible on a seat line cut to an 80-column pane', () => {
+		const board = header({
+			lane_limit: LIMIT,
+			occupied_count: 1,
+			seats: read_of([], USAGE_LIMIT_CODE, 'auth'),
+			layout: queued([]),
+		})
+		const seats = run_board_render
+			.render({ header: board, notes: [], size: { columns: PANE, rows: 50 } })
+			.map((line) => stripVTControlCharacters(line))
+			.filter((line) => line.includes(SEAT))
+
+		expect(seats).toStrictEqual(Array.from({ length: 2 }, () => expect.stringContaining(RE_LOGIN)))
+	})
+
+	it('keeps the usage-limit sentence for a hold a limit caused', () => {
+		const seats = seats_of({ seats: read_of([], USAGE_LIMIT_CODE, 'limit'), layout: queued([]) })
+
+		expect(seats[0]).toContain('the usage limit is reached')
+	})
+})
+
 describe('run_board_seat.read_of', () => {
 	it('names the newest launch’s refusal, its issue and the failing step’s words', () => {
-		expect(read_of([LAUNCH, { ...REFUSAL, pos: 4 }], HOLD)).toStrictEqual({
+		expect(read_of([LAUNCH, { ...REFUSAL, pos: 4 }], HOLD, 'auth')).toStrictEqual({
 			refusal: `#${String(FAILED)}: ${DETAIL}`,
 			hold: HOLD,
+			cause: 'auth',
 		})
 	})
 
@@ -71,6 +117,7 @@ describe('run_board_seat.read_of', () => {
 		expect(read_of([REFUSAL, LAUNCH], undefined)).toStrictEqual({
 			refusal: undefined,
 			hold: undefined,
+			cause: undefined,
 		})
 	})
 })
