@@ -223,7 +223,7 @@ describe('backlog_drive_stalled_retry.sweep — the cap (ac-bc44aff6, ac-328f94e
 		await next_sweep()
 
 		expect(run_event_stream_emit.emit).not.toHaveBeenCalled()
-		expect(run_add_issue.read).not.toHaveBeenCalled()
+		expect(josh_command.josh_run).not.toHaveBeenCalled()
 	})
 })
 

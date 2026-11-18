@@ -233,7 +233,22 @@ describe('lane_ledger_write.record_unit_files', () => {
 	})
 })
 
+// joshuafolkken/kit#7827: one `josh lint:related` run's stage times read back.
+describe('lane_ledger_write.record_lint_related', () => {
+	it('writes the stage times, the whole run and its exit code, read back as one entry', async () => {
+		const target = ledger(lane_ledger_write.KIND.LINT_RELATED)
+		const run = { lint_ms: 2600, elapsed_ms: 5500, exit_code: 0 }
+
+		await lane_ledger_write.record_lint_related(run, target)
+
+		expect(lane_ledger.read_entries(target)).toMatchObject([
+			{ kind: lane_ledger_write.KIND.LINT_RELATED, ...run },
+		])
+	})
+})
+
 // joshuafolkken/kit#4465: one `josh test:related` run's input counts and test files read back.
+
 describe('lane_ledger_write.record_test_related', () => {
 	it('writes the scope, the input counts, the test files and the time, read back as one entry', async () => {
 		const target = ledger(lane_ledger_write.KIND.TEST_RELATED)

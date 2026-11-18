@@ -1,4 +1,5 @@
 import { read_unwrapped } from '#scripts/document/ai-document-fixture'
+import type { HookContext } from '#scripts/hooks/hook-context'
 import { describe, expect, it } from 'vitest'
 import { early_heartbeat } from './early-heartbeat'
 import { poll_loop } from './poll-loop'
@@ -134,6 +135,40 @@ describe('poll_loop and early_heartbeat claim disjoint commands', () => {
 	})
 })
 
+// joshuafolkken/kit#7858: a `run:handoff` child told to end its turn ended its run, since nothing
+// re-invokes a `claude -p` child. The two rows split on the runner, so exactly one refuses a loop.
+const OUTPUT_POLL = 'until [ -s out.txt ]; do sleep 5; done; cat out.txt'
+const HANDOFF_ENV = { JOSH_HANDOFF_CHILD: '1' }
+
+function claiming_ids(environment: HookContext['env']): ReadonlyArray<string> {
+	const context: HookContext = { cwd: '/tmp', env: environment, ancestry: () => new Set<number>() }
+	const call = { name: 'Bash', input: { command: OUTPUT_POLL } }
+
+	return [poll_loop.ROW, poll_loop.STARTED_CHILD_ROW]
+		.filter((row) => row.is_trigger(call, context))
+		.map((row) => row.id)
+}
+
+describe('poll_loop rows — the refusal fits the runner', () => {
+	it('refuses a hand-off child with the started-child row only', () => {
+		expect(claiming_ids(HANDOFF_ENV)).toStrictEqual(['poll-loop-child'])
+	})
+
+	it('refuses an interactive session with the interactive row only', () => {
+		expect(claiming_ids({})).toStrictEqual(['poll-loop'])
+	})
+
+	it('tells a started child to wait in the foreground, never to end the turn', () => {
+		expect(poll_loop.STARTED_CHILD_POLL_LOOP_REASON).not.toContain('end the turn')
+		expect(poll_loop.STARTED_CHILD_POLL_LOOP_REASON).toContain('a bare `sleep 20`')
+		expect(poll_loop.STARTED_CHILD_POLL_LOOP_REASON).toContain('pnpm josh run:liveness')
+	})
+
+	it('keeps the interactive advice to background the task and end the turn', () => {
+		expect(poll_loop.POLL_LOOP_REASON).toContain('`run_in_background` and end the turn')
+	})
+})
+
 describe('poll_loop.POLL_LOOP_REASON', () => {
 	it.each([
 		'output poll loop',
@@ -141,7 +176,6 @@ describe('poll_loop.POLL_LOOP_REASON', () => {
 		'its exit re-invokes you',
 		'counted `for`',
 		'a `sleep` chain before a read',
-		'pnpm josh run:liveness',
 		'a background `Agent` is waited on by its completion notification',
 		'background-commands.md',
 		'Fires on every occurrence',

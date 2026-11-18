@@ -9,6 +9,7 @@
 - **No clones — single-source, even across package boundaries.** Duplicate non-trivial logic only after presenting the alternative and getting explicit approval. `prompts/collaboration-workflow/principles.md` → "no-clones".
 - **Design for elegance and simplicity first.** Before adding a hook, guard, rule or abstraction, ask whether fixing the cause makes it unnecessary. `prompts/collaboration-workflow/principles.md` → "elegant-design"; conflicting quality goals, or a remedy for defects → "quality-priority".
 - **Write concise prose: conditions and actions only.** `prompts/collaboration-workflow/principles.md` → "concise-prose".
+- **Never hand remaining steps back to the user.** Run them or leave them to the run; asking for a decision, give your recommendation and why. `prompts/collaboration-workflow/principles.md` → "concise-reply".
 - **Distinguish consultation from execution.** Imperative requests, main-line scope, handoff: `prompts/collaboration-workflow/principles.md` → "consult-vs-execute".
 - **Route distributed-doc / config changes upstream to kit.** In a consumer repo never edit kit-distributed docs/config; in kit you are the source. `prompts/collaboration-workflow/principles.md` → "upstream-to-kit".
 - **Latest-first, fix forward — pin back only as a last resort.** `prompts/collaboration-workflow/principles.md` → "latest-first".
@@ -24,7 +25,7 @@ Classify each decision point and act; stop **only** where the user's judgment is
 - **Tier B — genuine toss-up.** The only tier that stops — ask with the candidates and trade-offs.
 - **Tier C — irreversible / shared-state / out-of-scope actions** (merge, branch delete, force push, destructive ops, repo settings, out-of-scope work, bypassing a check, `devEngines` / overrides edits): explicit user instruction only, never auto-decided. Deleting a git-tracked file is reversible, so it is not a destructive op — inspect the target first and surface any contradiction. After a dependency-update command, load the `dependency-update` skill before reporting on the pins.
 
-Log auto-decisions: an Issue comment in an Issue workflow, else a one-line "Auto-decided: `<choice>` over `<alt>` because `<reason>`" in the reply.
+Log auto-decisions: an Issue comment in an Issue workflow, else (no-filing work included) a one-line "Auto-decided: `<choice>` over `<alt>` because `<reason>`" in the reply.
 
 ## Critical Conventions (non-standard — always apply)
 
@@ -41,7 +42,7 @@ Before building a feature, run `pnpm josh pkg:scout <keywords>` and act on its `
 
 ## Code Change Rules
 
-0. **Work summary + test declaration** — before writing any implementation code, once per Issue: Now / Change / Check, then every change with its test (`prompts/collaboration-workflow/report-format.md` → "作業前サマリはいつ・どう出すか"). **Tests are required for ALL changes** — zero tests without explicit approval is a violation.
+0. **Work summary + test declaration** — before writing any implementation code, once per Issue (no-filing work: in the reply, `principles.md` → "consult-vs-execute"): Now / Change / Check, then every change with its test (`prompts/collaboration-workflow/report-format.md` → "作業前サマリはいつ・どう出すか"). **Tests are required for ALL changes** — zero tests without explicit approval is a violation.
 1. **Refactor first** — `prompts/refactoring.md`; no high/medium refactoring left on new/modified code.
 2. **Tests** — those declared in Step 0 (`prompts/testing-guide.md`).
 3. **Verification gate** — `pnpm josh gate`, never piped: `| tail` reports a red gate as green, and its last lines carry the verdict (`prompts/collaboration-workflow/output-bounds.md`); while implementing re-run one check (`pnpm josh lint:related` / `pnpm josh cspell:dot` / `pnpm josh test:related`). Add legitimate flagged terms to `cspell.config.yaml`.

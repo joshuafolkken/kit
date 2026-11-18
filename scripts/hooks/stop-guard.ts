@@ -114,10 +114,11 @@ function session_lang(): string {
 // Which session this is — a headless parent, a lane child, a kit-launched agent, the `backlogrun`
 // parent — the facts that say whether a person is there to answer.
 async function session_role_facts(): Promise<
-	Pick<StopContext, 'backlog_parent' | 'headless_agent' | 'lane_child'>
+	Pick<StopContext, 'backlog_parent' | 'headless_agent' | 'lane_child' | 'started_child'>
 > {
 	return {
 		lane_child: lane_child_marker.is_child_of(process.cwd()),
+		started_child: run_headless.is_started_child(process.env),
 		headless_agent: agent_headless.is_headless(),
 		backlog_parent: await run_headless.is_backlog_parent(),
 	}

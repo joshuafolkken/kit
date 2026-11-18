@@ -21,6 +21,7 @@ const KIND = {
 	CORE_ADMISSION: 'core-admission',
 	UNIT_FILES: 'unit-files',
 	TEST_RELATED: 'test-related',
+	LINT_RELATED: 'lint-related',
 	TEST_PINNED: 'test-pinned',
 	SPLIT_NOTICE: 'split-notice',
 	SPLIT_FILED: 'split-filed',

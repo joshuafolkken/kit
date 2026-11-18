@@ -132,7 +132,7 @@ function defaulted(issue: string, park: string): Decision | undefined {
 
 function decision_of(issue: string, bodies: ReadonlyArray<string>): Decision | undefined {
 	if (bodies.some((body) => body.startsWith(DECISION_HEADING))) return undefined
-	const park = bodies.findLast((body) => run_park_body.problem_of(body) === undefined)
+	const park = bodies.findLast((body) => run_park_body.is_park(body))
 
 	if (park === undefined) return undefined
 	const pick = run_park_body.auto_pick(park)

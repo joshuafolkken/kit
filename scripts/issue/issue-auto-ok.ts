@@ -110,6 +110,12 @@ function judgement_of(body: string): boolean | undefined {
 	return is_not_needed === is_needed ? undefined : is_needed
 }
 
+// Whether the body declares a person's judgement is needed — the reading `body_decision` withholds
+// `auto-ok` by, so `backlogrun`'s judgement of an open Issue refuses the same bodies (joshuafolkken/kit#7856).
+function declares_judgement_needed(body: string): boolean {
+	return judgement_of(body) === true
+}
+
 // Why the filing is refused for its declaration, or `undefined` when it declares exactly one answer.
 function declaration_problem(body: string): string | undefined {
 	return judgement_of(body) === undefined ? DECLARATION_PROBLEM : undefined
@@ -148,6 +154,7 @@ function line_of(decision: AutoOkDecision): string {
 
 const issue_auto_ok = {
 	declaration_problem,
+	declares_judgement_needed,
 	decide,
 	decision_problem,
 	exclusion_of,

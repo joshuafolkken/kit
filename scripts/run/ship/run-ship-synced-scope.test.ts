@@ -264,14 +264,33 @@ describe('run_ship_synced_scope.read_sync — what each condition names', () => 
 			read_by_tests: 1,
 			shared: 1,
 			lint_meeting: 1,
+			own_edits: 0,
 		})
-		expect(run_ship_synced_scope.breakdown_text(reading)).toBe(
-			' — both 1, unsplit 1, read_by_tests 1, shared 1, lint_meeting 1',
+		expect(run_ship_synced_scope.breakdown_text(reading?.breakdown)).toBe(
+			' — both 1, unsplit 1, read_by_tests 1, shared 1, lint_meeting 1, own_edits 0',
 		)
 	})
+})
 
+// joshuafolkken/kit#7846: own edits joined into the names left `named` above the conditions' sum.
+describe('run_ship_synced_scope — the counts beside the conditions', () => {
 	it('adds nothing to the line of a pair no merge named', () => {
 		expect(run_ship_synced_scope.breakdown_text(undefined)).toBe('')
+	})
+
+	it('counts the unchecked own edits the names took in (ac-c5893692)', async () => {
+		read_parts.mockResolvedValue(synced_parts([SYNCED_CODE], [OWN, SYNCED_DOC]))
+
+		const reading = await run_ship_synced_scope.read_sync(TREE, PAIR)
+
+		expect(reading?.breakdown).toMatchObject({ own_edits: 2 })
+		expect(reading?.overlap).toStrictEqual([OWN, SYNCED_DOC])
+	})
+
+	it('leaves out a count no check was handed', () => {
+		expect(run_ship_synced_scope.breakdown_text({ shared: 2, lint_named: undefined })).toBe(
+			' — shared 2',
+		)
 	})
 })
 

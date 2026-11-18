@@ -36,8 +36,14 @@ const DIGEST_LENGTH = 16
 const CRLF = '\r\n'
 const LF = '\n'
 
+// A body declaring a person's judgement is needed is never offered: the write half refuses it, and
+// rewriting the declaration changes the body digest, so the next listing reads it again.
+function is_body_excluded(body: string): boolean {
+	return issue_publication_state.is_pending(body) || issue_auto_ok.declares_judgement_needed(body)
+}
+
 function is_candidate(issue: JudgeIssue): boolean {
-	const is_excluded = issue_publication_state.is_pending(issue.body) || !issue.is_trusted
+	const is_excluded = is_body_excluded(issue.body) || !issue.is_trusted
 	if (is_excluded || has_label_name(issue.labels, AUTO_OK_LABEL)) return false
 
 	return issue_auto_ok.exclusion_of(issue.labels) === undefined

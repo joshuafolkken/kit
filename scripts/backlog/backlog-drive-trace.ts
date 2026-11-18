@@ -1,4 +1,5 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
+import { error_text } from '#scripts/lib/error-message'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 
@@ -17,11 +18,19 @@ function text_of(issue: string, step: Step, edge: Edge): string {
 	return `${issue_cite.plain_for('program', issue)} ${step} ${edge}`
 }
 
-async function mark(issue: string, step: Step, edge: Edge): Promise<void> {
+async function mark(issue: string, step: Step, edge: Edge, reason = ''): Promise<void> {
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.LANE_PHASE,
-		text_of(issue, step, edge),
+		`${text_of(issue, step, edge)}${reason}`,
 	)
+}
+
+// A failed step carries the first line of its error after the edge (joshuafolkken/kit#7859), so the
+// stream says why without a log the driver's caller may never have kept.
+function reason_of(error: unknown): string {
+	const [first_line = ''] = error_text.message_of(error).split('\n', 1)
+
+	return `: ${first_line}`
 }
 
 async function traced<T>(issue: string, step: Step, run: () => Promise<T>): Promise<T> {
@@ -34,7 +43,7 @@ async function traced<T>(issue: string, step: Step, run: () => Promise<T>): Prom
 
 		return value
 	} catch (error) {
-		await mark(issue, step, EDGE.FAILED)
+		await mark(issue, step, EDGE.FAILED, reason_of(error))
 
 		throw error
 	}

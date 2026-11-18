@@ -34,6 +34,7 @@ const UNMEASURABLE_ROWS: ReadonlyArray<string> = [
 	// The permission guards declare no compliance call either, and enumerate in their own order.
 	...permission_guards.ROWS.map((row) => row.id),
 	'poll-loop',
+	'poll-loop-child',
 	// A budget guard: it fires on a context threshold the child cannot observe, so taking the cut
 	// before the crossing is no act a run could make unaided (joshuafolkken/kit#5267).
 	IMPLEMENTATION_CUT,

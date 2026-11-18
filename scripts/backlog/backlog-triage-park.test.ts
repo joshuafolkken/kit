@@ -89,6 +89,17 @@ describe('backlog_triage_park.read', () => {
 
 		expect(await backlog_triage_park.read(String(ISSUE))).toStrictEqual({ problem })
 	})
+
+	// joshuafolkken/kit#7818: a newer park off the permission vocabulary is refused, not read past.
+	it('refuses the latest park whose permission is off the vocabulary over an older park', async () => {
+		const prose = park(PICK_ONE).replace('必要な権限: なし', '必要な権限: 親セッション')
+
+		parked_with([park(PICK_ONE), prose])
+
+		const read = await backlog_triage_park.read(String(ISSUE))
+
+		expect(read).toStrictEqual({ problem: expect.stringContaining('its latest park: option 1') })
+	})
 })
 
 // joshuafolkken/kit#7001: `--adopt` refuses an option needing the parent's action without `--done`.

@@ -319,6 +319,7 @@ Cut a lane child before the gate and resume a fresh process.
 ```bash
 pnpm josh run:cut 1839                                                # take the cut and hand it to a fresh process
 pnpm josh run:cut --impl 1839 --handoff .josh/tmp/handoff-1839.json   # cut mid-implementation, carrying the instruction
+pnpm josh run:cut 1839 --deliverable <comment-url>                    # close a no-diff investigation lane as completed
 pnpm josh run:cut --resume 1839                                       # a fresh process's entry check
 pnpm josh run:cut --end                                               # clear the record
 ```
@@ -327,30 +328,29 @@ pnpm josh run:cut --end                                               # clear th
 
 OpenAI relaunches through its lane supervisor (`failed` before writing the cut if none matches); Anthropic relaunches directly. Outside a lane only an `--impl` cut on a tree `run:hold <N> --fullrun` holds is taken: the record is written, nothing is relaunched, the session ends its turn and a fresh `fullrun #<N>` resumes it; any other cut there answers `not-a-lane`.
 
-A cut that resumes into implementation (`--impl`) carries a **handoff** — the run's
-instruction verbatim and a curated list of what is done, what remains, and what was deliberately left
-alone. It is passed by path with `--handoff <path>`, never inlined, so a
-backtick or `$` in the instruction is not executed. The record stays small; the resume prints the handoff to stderr, and a resume that finds no instruction is refused `incomplete`.
+An `--impl` cut carries a **handoff** — the run's instruction verbatim plus what is done, what
+remains and what was left alone — passed by path (`--handoff <path>`), never inlined, so a backtick
+or `$` in it is not executed. The resume prints it to stderr; one with no instruction is `incomplete`.
 
-**Output / exit codes:** stdout is one token, then its `pre-gate-cut.md` section unless `not-a-lane` / `fresh`. `run:cut <N>`: `cut`, `not-a-lane`, `unready`, `busy`, `failed` or `bad-handoff`. `run:cut --resume <N>`: `fresh`, `resume`, `resume-impl`, `stale`, `busy`, `handed-off`, `incomplete` or `over`.
+`--deliverable <url>` closes a no-diff investigation lane (`約 0 ファイル`, all criteria checked, no
+diff) as completed, citing it; `run:merge` counts it. Else `unready` names the gap.
+
+**Output / exit codes:** stdout is one token, then its `pre-gate-cut.md` section unless `not-a-lane` / `fresh` / `concluded`. `run:cut <N>`: `cut`, `concluded`, `not-a-lane`, `unready`, `busy`, `failed` or `bad-handoff`. `run:cut --resume <N>`: `fresh`, `resume`, `resume-impl`, `stale`, `busy`, `handed-off`, `incomplete` or `over`.
 
 **The dispatch mark:** `lane:dispatch` starts each child generation with `JOSH_LANE_CHILD` set to
 the lane's issue number (`scripts/lane/lane-child-marker.ts`).
 
-- It means "this session was launched for issue `<N>`, not typed by a person"; it lives as long as the
-  child process, set at launch and never written by the run.
-- It is trusted only where its value equals the lane's own issue — a mark naming another issue,
-  or none, is read as a person. An interactive `fullrun` carries no mark.
-- `run:cut` itself looks for an open lane for the issue instead (`not-a-lane` otherwise).
+- It means "launched for issue `<N>`, not typed by a person"; set at launch, never written by the run.
+- It is trusted only where it equals the lane's issue; otherwise, or with none (an interactive
+  `fullrun`), the session is read as a person.
+- `run:cut` looks up the open lane instead (`not-a-lane` otherwise).
 
 **The gate guard:** the `pre-gate-cut` row of `pnpm josh rule:list` refuses `josh gate` in a lane with no cut record carried.
 
-- It fires for a marked child and nowhere else — the working directory is `<lane root>/<issue number>`
-  **and** `JOSH_LANE_CHILD` names that issue (`run:cut`'s open-lane lookup need not agree byte for
-  byte).
-- It fires only when the current context warrants a cut (`cost_cli.session_verdict`, as `run:cut`), and
-  once per run; it is silent once the cut is carried. `--resume`, `--end` and `--json` do not count as
-  taking the cut.
+- It fires only for a marked child: the working directory is `<lane root>/<issue number>` and
+  `JOSH_LANE_CHILD` names that issue (`run:cut`'s lookup need not agree byte for byte).
+- It fires once per run, when the context warrants a cut (`cost_cli.session_verdict`), and is silent
+  once the cut is carried; `--resume`, `--end` and `--json` do not count as taking the cut.
 
 `--setup` is a usage error (`docs/maintainers/josh-commands-run-rationale.md` → "`josh run:cut` lost its setup-phase cut").
 
@@ -370,9 +370,9 @@ pnpm josh run:park 1839 --escalate "needs a stronger model"   # josh.worker.esca
 
 <!-- /usage -->
 
-The body follows one schema (`scripts/run/park/run-park-body.ts`): numbered options under `### 選択肢`, each with `- 層: A|B|C` and `- 必要な権限: …`, then one `### 推奨` line — `<option number> <reason>`, or `推奨なし <reason>`.
+The body follows one schema (`scripts/run/park/run-park-body.ts`): numbered options under `### 選択肢`, each with `- 層: A|B|C` and `- 必要な権限:` (a `run-park-permission.ts` word, e.g. `親（issue:close）`), then one `### 推奨` line — `<option number> <reason>`, or `推奨なし <reason>`.
 
-A body off the schema is refused before any write, naming the missing piece and printing the schema; the usage prints it too.
+A body off the schema is refused before any write, naming the missing piece, printing the schema as the usage does.
 
 A body on the schema is then judged against the Issue's trusted sources before any write (`scripts/run/park/run-park-answered.ts`); `--clear` is not judged, and the `backlog:drive` yield-cap park is a `run:stalled` stop, not a `run:park`.
 
@@ -384,9 +384,9 @@ The parent reads the tiers and the recommendation with `backlog:triage --apply <
 
 `backlog:drive` decides a `推奨なし` park over a reversible option needing no permission or size approval (`backlogrun-park.md` → "A park the driver decides"); any other `推奨なし` park or a tier C option stays a person's (`backlogrun-park.md` → "A park left for a person").
 
-The local park record is what the `lane-park` guard reads, so a child that parked is not asked to again. `--clear` succeeds when the label is already off and releases nothing. A park that lands runs `run:release <N>`'s own implementation next, so the hold and `in-progress` come off in the same call; a tree whose hold names another run releases nothing — that run's own ending does.
+The `lane-park` guard reads the local park record, so a parked child is not asked again. `--clear` succeeds with the label already off, releasing nothing. A landed park then runs `run:release <N>`'s implementation, so the hold and `in-progress` come off in one call; a tree whose hold names another run releases nothing — that run's ending does.
 
-A park from inside a lane appends the lane directory, its held seat and `pnpm josh lane:close <N>` to the comment.
+A park inside a lane appends the lane directory, its seat and `pnpm josh lane:close <N>` to the comment.
 
 A released park prints `backlogrun-park.md` → "park and continue" after the release's line — a lane child `pre-gate-cut.md` → "A lane child records its park before it stops" — or one line naming it once this session printed it. A section that does not resolve exits `1` with the park landed; do not re-run the park.
 

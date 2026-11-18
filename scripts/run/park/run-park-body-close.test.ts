@@ -52,3 +52,32 @@ describe('run_park_body closing options', () => {
 		expect(run_park_body.default_pick(park_of('推奨なし both close', CLOSE))).toBeUndefined()
 	})
 })
+
+// joshuafolkken/kit#7818: the #7780 parks named the parent's close and filing in free text, so each
+// adopt requeued the lane into the same dead end.
+describe('run_park_body free-text parent actions', () => {
+	const PICK_TWO = '2 file the follow-up'
+	const CLOSE_AND_FILE = 'Issue のクローズと起票'
+
+	it.each([
+		['the 13:50:58 park', PICK_TWO, ['Issue のクローズ', 'Issue の起票']],
+		['the 13:55:07 park', PICK, [CLOSE_AND_FILE]],
+	])('refuses %s, showing the close and filing forms (ac-f4dcd316)', (_case, pick, permissions) => {
+		const problem = run_park_body.problem_of(park_of(pick, ...permissions))
+
+		expect(problem).toContain(`option 1 names "${permissions[0] ?? ''}" as its permission`)
+		expect(problem).toContain(`"${CLOSE}"`)
+		expect(problem).toContain('"親（issue:file …）"')
+	})
+
+	it('still summarizes such a park already written, so the board shows the stop', () => {
+		expect(run_park_body.summary_of(park_of(PICK, CLOSE_AND_FILE))).toBe('推奨: 1（層 A）')
+	})
+
+	it('accepts the park rewritten with the parent close, adopted as a close (ac-f4dcd316)', () => {
+		const body = park_of(PICK, CLOSE, '親（issue:file --route interrupt --blocks-finder）')
+
+		expect(run_park_body.problem_of(body)).toBeUndefined()
+		expect(run_park_body.close_action(body, 1)).toBe(true)
+	})
+})

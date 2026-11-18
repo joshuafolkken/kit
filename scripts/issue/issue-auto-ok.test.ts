@@ -151,6 +151,19 @@ describe('issue_auto_ok.declaration_problem', () => {
 	)
 })
 
+describe('issue_auto_ok.declares_judgement_needed', () => {
+	it.each([NEEDED_BODY, '## 背景\n\n- 人の判断: 要\n'])(
+		'reads a needed declaration, with or without its reason: %s',
+		(body) => {
+			expect(issue_auto_ok.declares_judgement_needed(body)).toBe(true)
+		},
+	)
+
+	it.each([NOT_NEEDED_BODY, UNDECLARED_BODY])('reads no need otherwise: %s', (body) => {
+		expect(issue_auto_ok.declares_judgement_needed(body)).toBe(false)
+	})
+})
+
 describe('issue_auto_ok.decision_problem', () => {
 	it.each([
 		`${NEEDED_BODY}${DECISION_RULE}`,

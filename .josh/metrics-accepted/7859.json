@@ -1,0 +1,7 @@
+{
+	"reason": "Collect failures now name the failing stage and reason (#7859); the stage wrapper adds the lines",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 25
+	}
+}

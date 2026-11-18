@@ -45,13 +45,14 @@ const CHILDREN = EPICS.flatMap((epic) => epic.children)
 const PRE_FIX_READS_PER_CHILD = 4
 // One open pull request listing and one GraphQL query, however many children there are.
 const RESUME_READS = 2
-// The listed children are candidates, so each one's body is read too (11 of the 21); without #6611
-// the scan read each listed child again, 32 calls.
-const SCAN_CALL_CAP = 21
-const PRE_FIX_SCAN_CALLS = 63
+// The listed children are candidates, so each one's body is read too (11 of the 22); without #6611
+// the scan read each listed child again, 32 calls. One more is the `route:interrupt` listing (#7860),
+// a single read however large the backlog.
+const SCAN_CALL_CAP = 22
+const PRE_FIX_SCAN_CALLS = 64
 // The second scan with nothing changed, measured: the epic listing, the three epic bodies and the open
 // pull request listing (#7620) come back 304, so they are not billed.
-const SECOND_SCAN_CALL_CAP = 15
+const SECOND_SCAN_CALL_CAP = 16
 
 const streams = console_streams()
 

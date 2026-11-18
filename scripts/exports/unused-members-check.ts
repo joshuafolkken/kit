@@ -1,10 +1,13 @@
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { doctor_consumer } from '#scripts/doctor/doctor-consumer'
+import { buffered_process } from '#scripts/lib/buffered-process'
 import { NOTHING_TO_CHECK_MARKER } from '#scripts/test/skip-marker'
 import type { NamespaceMember } from '#tools/exports/namespace-members'
 
 const CHECK = 'exports'
 const FAIL_EXIT_CODE = 1
+const CLI = '#scripts/exports/unused-members-cli'
 // A consumer's namespaces are read from `.svelte` files and routes a TypeScript program over its
 // `tsconfig.json` does not see, so every member they use would read as unused. The check is kit's own.
 //
@@ -57,6 +60,36 @@ async function run_unused_members(root: string, files?: ReadonlyArray<string>): 
 	return members.length === 0 ? 0 : FAIL_EXIT_CODE
 }
 
-const unused_members_check = { run_unused_members, CONSUMER_NOTICE }
+interface UnusedMembersRun {
+	exit_code: number
+	output: string
+}
+
+// The child runs the CLI script, not `josh exports:unused`, which would claim the cores the
+// in-process check never did. No file list scans the whole program, as the CLI does with no argument.
+// The script is resolved from this package, not the root: the root under check need not be kit.
+async function run_child(root: string, files: ReadonlyArray<string>): Promise<UnusedMembersRun> {
+	const list = ['exec', 'tsx', fileURLToPath(import.meta.resolve(CLI)), ...files]
+	const result = await buffered_process.run_buffered_direct(list, { cwd: root })
+
+	return { exit_code: result.exit_code ?? FAIL_EXIT_CODE, output: result.output }
+}
+
+// The check in a child process, its report held back: `josh lint:related` starts it beside its lint,
+// where the scan's synchronous seconds in process would hold back the lint's own spawns
+// (joshuafolkken/kit#7829). A consumer gets the notice and an empty narrowed list the empty report,
+// as in process, without a child.
+async function spawn_unused_members(
+	root: string,
+	files?: ReadonlyArray<string>,
+): Promise<UnusedMembersRun> {
+	if (doctor_consumer.is_kit_consumer(root)) return { exit_code: 0, output: CONSUMER_NOTICE }
+	if (files === undefined) return await run_child(root, [])
+	if (files.length === 0) return { exit_code: 0, output: report(root, []) }
+
+	return await run_child(root, files)
+}
+
+const unused_members_check = { run_unused_members, spawn_unused_members, CONSUMER_NOTICE }
 
 export { unused_members_check }

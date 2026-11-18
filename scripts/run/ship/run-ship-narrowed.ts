@@ -143,7 +143,8 @@ function named_phases(
 	)
 }
 
-// `detail` follows `why`: what each condition named, for a pair named after a merge.
+// `detail` follows `why`: the files each check was handed, and what each condition named for a pair
+// named after a merge.
 function describe(files: ReadonlyArray<string>, why: string, detail = ''): string {
 	return `scoped pair: narrowed to the ${String(files.length)} file(s) ${why}${detail}.`
 }

@@ -17,7 +17,7 @@ const { early_push_schema, ship_lap_schema, size_schema, stop_schema, unplanned_
 	lane_ledger_schema_ship
 const { pinned_origin_schema } = lane_ledger_pinned_origin
 const { load_schema } = lane_ledger_schema_load
-const { test_related_schema } = lane_ledger_schema_related
+const { lint_related_schema, test_related_schema } = lane_ledger_schema_related
 const { round_one_schema, round_two_schema, offerable_schema, core_wait_schema } =
 	lane_ledger_schema_round
 const { split_notice_schema, split_filed_schema, push_miss_schema } = lane_ledger_schema_split
@@ -134,7 +134,9 @@ const unit_files_schema = z.object({
 // `origin` is what started the run, and `discarded` marks a `run:review` background run stopped before
 // its answer, written by the stop with its wall time so far (joshuafolkken/kit#5262); both absent on
 // older rows. A probe's `pinned_by` names a red the type check reached before the whole reach ran
-// (joshuafolkken/kit#5385), absent on a test's verdict. Origin values live in the constants leaf.
+// (joshuafolkken/kit#5385), absent on a test's verdict. `misses` counts the probed hunks by why the
+// cache did not hold their verdict (joshuafolkken/kit#7806), absent on older rows. Origin values live
+// in the constants leaf.
 const test_pinned_probe_schema = z.object({
 	file: z.string(),
 	tests: z.number().optional(),
@@ -148,6 +150,7 @@ const test_pinned_schema = z.object({
 	held: z.number(),
 	rechecked: z.number().optional(),
 	unregistered: z.number().optional(),
+	misses: z.record(z.string(), z.number()).optional(),
 	rewired: z.number().optional(),
 	over_cap: z.number().optional(),
 	probes: z.array(test_pinned_probe_schema),
@@ -177,6 +180,7 @@ const entry_schema = z.discriminatedUnion('kind', [
 	core_wait_schema,
 	unit_files_schema,
 	test_related_schema,
+	lint_related_schema,
 	test_pinned_schema,
 	split_notice_schema,
 	split_filed_schema,
@@ -207,6 +211,8 @@ type UnitFilesEntry = z.infer<typeof unit_files_schema>
 type UnitFileRecord = z.infer<typeof unit_file_schema>
 type TestRelatedEntry = z.infer<typeof test_related_schema>
 type TestRelatedRecord = Omit<TestRelatedEntry, 'kind' | 'at'>
+type LintRelatedEntry = z.infer<typeof lint_related_schema>
+type LintRelatedRecord = Omit<LintRelatedEntry, 'kind' | 'at'>
 type TestPinnedEntry = z.infer<typeof test_pinned_schema>
 type TestPinnedRecord = Omit<TestPinnedEntry, 'kind' | 'at'>
 type SplitNoticeEntry = z.infer<typeof split_notice_schema>
@@ -251,6 +257,8 @@ export type {
 	LaneStateChangeRecord,
 	LedgerEntry,
 	LimitEntry,
+	LintRelatedEntry,
+	LintRelatedRecord,
 	LoadEntry,
 	MergeEntry,
 	OfferableEntry,

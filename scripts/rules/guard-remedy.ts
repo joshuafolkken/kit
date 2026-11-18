@@ -79,6 +79,7 @@ const GUARD_REMEDIES: Readonly<Record<string, GuardRemedy>> = {
 	'repeat-check-related': judgment(ANOTHER_COMMAND),
 	'early-heartbeat': judgment(ANOTHER_COMMAND),
 	'poll-loop': judgment(ANOTHER_COMMAND),
+	'poll-loop-child': judgment(ANOTHER_COMMAND),
 	'lane-park': judgment(ANOTHER_COMMAND),
 	'lane-split-park': judgment(ANOTHER_COMMAND),
 	'lane-interactive-ask': judgment(ANOTHER_COMMAND),
@@ -108,6 +109,9 @@ const GUARD_REMEDIES: Readonly<Record<string, GuardRemedy>> = {
 	'repo-admin': judgment(NO_RUN),
 	'protected-file': judgment(NO_RUN),
 	egress: judgment(NO_RUN),
+	'memory-durable-write': judgment(
+		'the prompt/doc change that replaces the memory is prose only the model can write',
+	),
 	// The `Stop` rows: the hook judges a finished reply, so it has no call to rewrite.
 	'stop-notify': judgment(STOP_NOTIFY),
 	'filing-offer': judgment(FILING_OFFER),
