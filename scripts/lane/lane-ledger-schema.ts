@@ -185,6 +185,7 @@ const entry_schema = z.discriminatedUnion('kind', [
 	split_notice_schema,
 	split_filed_schema,
 	unplanned_notice_schema,
+	lane_ledger_schema_ship.preflight_schema,
 	lane_state_schema,
 	push_miss_schema,
 	ship_lap_schema,

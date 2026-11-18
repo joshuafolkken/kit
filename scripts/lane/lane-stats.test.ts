@@ -136,26 +136,36 @@ describe('lane_stats.row — the lane median', () => {
 
 // joshuafolkken/kit#7775: the estimate rows add the two ratio columns and leave every other column
 // where it was.
-describe('lane_stats.row — the estimate ratios', () => {
-	const RUN = '2026-10-06T00:00:00.000Z'
-	const ESTIMATES: ReadonlyArray<LedgerEntry> = [
-		{ kind: 'dispatch', at: hours_before_now(5), issue: MERGE_ISSUE },
-		{
-			kind: 'estimate',
-			at: hours_before_now(5),
-			issue: MERGE_ISSUE,
-			run: RUN,
-			finish_at: hours_before_now(4),
-		},
-		{
-			kind: 'estimate',
-			at: hours_before_now(3),
-			issue: MERGE_ISSUE,
-			run: RUN,
-			finish_at: hours_before_now(1),
-		},
-	]
+const RUN = '2026-10-06T00:00:00.000Z'
+const NEXT_RUN = '2026-10-07T00:00:00.000Z'
+const NEXT_RUN_ISSUE = 9
+const ESTIMATES: ReadonlyArray<LedgerEntry> = [
+	{ kind: 'dispatch', at: hours_before_now(5), issue: MERGE_ISSUE },
+	{
+		kind: 'estimate',
+		at: hours_before_now(5),
+		issue: MERGE_ISSUE,
+		run: RUN,
+		finish_at: hours_before_now(4),
+	},
+	{
+		kind: 'estimate',
+		at: hours_before_now(3),
+		issue: MERGE_ISSUE,
+		run: RUN,
+		finish_at: hours_before_now(1),
+	},
+	// The next run's first row, which marks the run above as over.
+	{
+		kind: 'estimate',
+		at: hours_before_now(1),
+		issue: NEXT_RUN_ISSUE,
+		run: NEXT_RUN,
+		finish_at: hours_before_now(0),
+	},
+]
 
+describe('lane_stats.row — the estimate ratios', () => {
 	it('prints the first and the median ratio of a finished run', () => {
 		const entries = [...ESTIMATES, ...MERGES]
 
