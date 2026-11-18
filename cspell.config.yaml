@@ -2,6 +2,10 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # osv-scanner's config table for ignored advisories and the picomatch advisory id it ignores (#7839).
+  - Vulns
+  - vjpf
+  - picomatch
   # Git's system-config opt-out for isolated measurement processes (#7444).
   - NOSYSTEM
   # The remote dependency check and local spawn cannot form one atomic operation (#7427).
@@ -283,6 +287,11 @@ words:
   # neither of which `josh sync` copies, so it stays in this local list.
   - heredocs
   - dedup
+  # The published-migration smoke script (joshuafolkken/kit#7447): `openssl dgst`, `git clone
+  # --no-hardlinks` and the encoded scope in `@joshuafolkken%2fkit`. Not copied by `josh sync`.
+  - dgst
+  - hardlinks
+  - fkit
   - keepalive
   - refspec
   - pathspec

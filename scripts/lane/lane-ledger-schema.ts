@@ -134,7 +134,9 @@ const unit_files_schema = z.object({
 // `origin` is what started the run, and `discarded` marks a `run:review` background run stopped before
 // its answer, written by the stop with its wall time so far (joshuafolkken/kit#5262); both absent on
 // older rows. A probe's `pinned_by` names a red the type check reached before the whole reach ran
-// (joshuafolkken/kit#5385), absent on a test's verdict. Origin values live in the constants leaf.
+// (joshuafolkken/kit#5385), absent on a test's verdict. `misses` counts the probed hunks by why the
+// cache did not hold their verdict (joshuafolkken/kit#7806), absent on older rows. Origin values live
+// in the constants leaf.
 const test_pinned_probe_schema = z.object({
 	file: z.string(),
 	tests: z.number().optional(),
@@ -148,6 +150,7 @@ const test_pinned_schema = z.object({
 	held: z.number(),
 	rechecked: z.number().optional(),
 	unregistered: z.number().optional(),
+	misses: z.record(z.string(), z.number()).optional(),
 	rewired: z.number().optional(),
 	over_cap: z.number().optional(),
 	probes: z.array(test_pinned_probe_schema),

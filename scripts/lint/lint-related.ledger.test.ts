@@ -37,7 +37,9 @@ vi.mock('#scripts/document/document-checks', () => ({
 	document_checks: { check_files: vi.fn(() => 0) },
 }))
 vi.mock('#scripts/exports/unused-members-check', () => ({
-	unused_members_check: { run_unused_members: vi.fn(async () => 0) },
+	unused_members_check: {
+		spawn_unused_members: vi.fn(async () => ({ exit_code: 0, output: '' })),
+	},
 }))
 vi.mock('#scripts/lane/lane-ledger-write', () => ({
 	lane_ledger_write: { record_lint_related: vi.fn() },
@@ -90,7 +92,14 @@ describe('lint_related.run_related_lint — one ledger row per run', () => {
 		expect(row).toMatchObject({ exit_code: FAILED })
 		expect(row['lint_ms']).toBeTypeOf('number')
 		expect(row).not.toHaveProperty('documents_ms')
-		expect(row).not.toHaveProperty('unused_members_ms')
+	})
+
+	it('times the unused members child even on a red lint, since it starts beside the lint', async () => {
+		vi.mocked(lint_parallel.run_lint_checks).mockResolvedValue(FAILED)
+
+		await lint_related.run_related_lint([SOURCE])
+
+		expect(written_row()['unused_members_ms']).toBeTypeOf('number')
 	})
 
 	it('keeps the exit code when the ledger write throws', async () => {

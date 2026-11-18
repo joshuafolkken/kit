@@ -83,27 +83,35 @@ function is_failed(outcome: LintOutcome): boolean {
 	return outcome.exit_code !== 0
 }
 
-// The document checks, then the unused members, once the lint and the structural checks are green.
-async function after_lint_outcome(
+// The first of the lint and the structural checks to fail, or undefined when both are green.
+async function failed_ahead(
+	scope: ChangedFileScope,
+	structural: Promise<number>,
+	stages: LintStages,
+): Promise<LintOutcome | undefined> {
+	const lint = {
+		stage: 'lint',
+		exit_code: await lint_related_record.timed(stages, 'lint_ms', async () => {
+			return await lint_exit_code(scope)
+		}),
+	}
+
+	return [lint, { stage: 'structural', exit_code: await structural }].find((outcome) =>
+		is_failed(outcome),
+	)
+}
+
+async function documents_outcome(
 	scope: ChangedFileScope,
 	root: string,
 	stages: LintStages,
 ): Promise<LintOutcome> {
-	const { timed } = lint_related_record
-	const documents = {
+	return {
 		stage: 'documents',
-		exit_code: await timed(stages, 'documents_ms', async () =>
+		exit_code: await lint_related_record.timed(stages, 'documents_ms', async () =>
 			document_check_exit_code(scope, root),
 		),
 	}
-	if (is_failed(documents)) return documents
-
-	const files = scope.mode === 'all' ? undefined : scope.files
-	const unused = await timed(stages, 'unused_members_ms', async () => {
-		return await unused_members_check.run_unused_members(root, files)
-	})
-
-	return { stage: 'unused members', exit_code: unused }
 }
 
 // The lint result folded together with the fast document checks: the
@@ -116,36 +124,41 @@ async function after_lint_outcome(
 // below then vouches for. The structural checks (`structural-checks.ts`) run beside the lint rather
 // than after it, so their whole-program scan costs no wall clock the lint has not already spent.
 //
-// The gate's `exports` check comes after them on the same terms: a namespace member nothing reads is
-// reported here for the namespaces the changed files declare or import directly
+// The gate's `exports` check is reported after them on the same terms: a namespace member nothing
+// reads is reported here for the namespaces the changed files declare or import directly
 // (joshuafolkken/kit#4645, joshuafolkken/kit#4649), rather than at ship's pre-detach gate. The
-// fallback scans the whole program, a superset as the lint's is.
+// fallback scans the whole program, a superset as the lint's is. It starts beside the lint, as the
+// structural checks do, in a child whose report is printed only once everything before it is green
+// (joshuafolkken/kit#7829).
 //
 // The outcome names the stage that failed first, which the verdict line names (joshuafolkken/kit#5162).
-// Each stage's time goes to `stages` (`lint-related-record.ts`); the structural checks are timed on
-// their own promise, since they overlap the lint.
+// Each stage's time goes to `stages` (`lint-related-record.ts`); the structural checks and the unused
+// members child are timed on their own promises, since they overlap the lint.
 async function scoped_outcome(
 	scope: ChangedFileScope,
 	root: string,
 	stages: LintStages,
 ): Promise<LintOutcome> {
-	const { timed } = lint_related_record
-	const structural = timed(stages, 'structural_ms', async () => {
+	const structural = lint_related_record.timed(stages, 'structural_ms', async () => {
 		return await structural_checks.run_structural(scope, root)
 	})
-	const lint = {
-		stage: 'lint',
-		exit_code: await timed(stages, 'lint_ms', async () => await lint_exit_code(scope)),
-	}
-	const failed = [lint, { stage: 'structural', exit_code: await structural }].find((outcome) =>
-		is_failed(outcome),
-	)
+	const unused = lint_related_record.timed(stages, 'unused_members_ms', async () => {
+		return await unused_members_check.spawn_unused_members(
+			root,
+			scope.mode === 'all' ? undefined : scope.files,
+		)
+	})
+	const failed = await failed_ahead(scope, structural, stages)
+	const unused_run = await unused
 
 	if (failed !== undefined) return failed
 	// The linters' buffered output ends without a newline; keep the checks' own lines apart from it.
 	process.stdout.write('\n')
+	const documents = await documents_outcome(scope, root, stages)
+	if (is_failed(documents)) return documents
+	process.stdout.write(`${unused_run.output}\n`)
 
-	return await after_lint_outcome(scope, root, stages)
+	return { stage: 'unused members', exit_code: unused_run.exit_code }
 }
 
 // **A bare run reads only what moved since its last green run** (`since-green.ts`), against the tree
