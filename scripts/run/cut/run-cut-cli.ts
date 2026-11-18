@@ -12,8 +12,9 @@ import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_cli_fault } from '#scripts/run/run-cli-fault'
 import { run_step_section } from '#scripts/run/run-step-section'
-import { run_cut } from './run-cut'
+import { run_cut, type CutState } from './run-cut'
 import { run_cut_args, type Request } from './run-cut-args'
+import { run_cut_conclude } from './run-cut-conclude'
 import { run_cut_decline } from './run-cut-decline'
 import { run_cut_digest } from './run-cut-digest'
 import { run_cut_handoff } from './run-cut-handoff'
@@ -252,21 +253,36 @@ async function cut_outside_lane(
 	return refused ?? report_held_cut(request.issue)
 }
 
-async function cut(
-	target: string,
-	issue: string,
+type CutCommand = Extract<Request, { kind: 'cut' }>
+
+// A lane tree with nothing uncommitted, or any tree under `--deliverable`: refused `unready`, unless it
+// is a no-diff investigation lane that `--deliverable` closes as completed (`run-cut-conclude.ts`).
+async function answer_unready(
+	request: CutCommand,
 	phase: string,
-	handoff_path?: string,
+	state: CutState,
 ): Promise<number> {
+	const { issue } = request
+	const answered = await run_cut_conclude.unready(issue, state, request.deliverable_url)
+
+	return await declined({ issue, phase }, state, answered)
+}
+
+// `--deliverable` asks to conclude, never to cut: a dirty lane tree is refused with its changed files
+// named rather than taking a pre-gate cut.
+async function is_concluding(request: CutCommand, state: CutState): Promise<boolean> {
+	return request.deliverable_url !== undefined || !(await is_lane_branch(state))
+}
+
+async function cut(target: string, request: CutCommand, phase: string): Promise<number> {
+	const { issue, handoff_path } = request
 	const lane = await lane_registry.find_open_lane(issue)
 
 	if (lane === undefined) return await cut_outside_lane(target, { issue, phase, handoff_path })
 
 	const state = await run_cut.current_state()
 
-	if (!(await is_lane_branch(state))) {
-		return await declined({ issue, phase }, state, refuse_unready(state))
-	}
+	if (await is_concluding(request, state)) return await answer_unready(request, phase, state)
 
 	const answered = pre_gate_answer(phase)
 
@@ -293,8 +309,6 @@ function end(target: string): number {
 	return report(ENDED_VERDICT, SUCCESS_EXIT_CODE)
 }
 
-type CutCommand = Extract<Request, { kind: 'cut' }>
-
 // A bare cut is the pre-gate boundary and `--impl` the implementation-phase one.
 function cut_phase(request: { is_implementation: boolean }): string {
 	return request.is_implementation ? run_cut.IMPLEMENTATION_PHASE : run_cut.PRE_GATE_PHASE
@@ -307,11 +321,12 @@ function cut_phase(request: { is_implementation: boolean }): string {
 async function take_cut(target: string, request: CutCommand): Promise<number> {
 	if (agent_session_role.is_reviewer()) return report_reviewer()
 
-	return await cut(target, request.issue, cut_phase(request), request.handoff_path)
+	return await cut(target, request, cut_phase(request))
 }
 
 // The verdicts that leave nothing to act on beyond carrying on, so no section follows them.
 const TRIVIAL_VERDICTS: ReadonlySet<string> = new Set([
+	run_cut_report.CONCLUDED_VERDICT,
 	NOT_A_LANE_VERDICT,
 	UNDER_THRESHOLD_VERDICT,
 	FRESH_VERDICT,

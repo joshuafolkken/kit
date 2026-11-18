@@ -96,14 +96,21 @@ const unplanned_notice_schema = z.object({
 // not split a merge (`test-related-synced.ts`), both absent where neither happened — read by
 // `lane:stats --pairs` (joshuafolkken/kit#6189), written by the ship (joshuafolkken/kit#6196).
 // `breakdown` counts what each condition added to a pair named after a merge, before duplicates are
-// dropped (`run-ship-synced-scope.ts`, joshuafolkken/kit#7788), absent on any other lap.
-const scope_breakdown_schema = z.object({
-	both: z.number(),
-	unsplit: z.number(),
-	read_by_tests: z.number(),
-	shared: z.number(),
-	lint_meeting: z.number(),
-})
+// dropped (`run-ship-synced-scope.ts`, joshuafolkken/kit#7788), and on every named pair the files each
+// check was handed and the unchecked own edits a merge's names took in (joshuafolkken/kit#7846) —
+// absent on a pair that named nothing.
+const scope_breakdown_schema = z
+	.object({
+		both: z.number(),
+		unsplit: z.number(),
+		read_by_tests: z.number(),
+		shared: z.number(),
+		lint_meeting: z.number(),
+		own_edits: z.number(),
+		lint_named: z.number(),
+		test_named: z.number(),
+	})
+	.partial()
 
 // `resumed_from` says whether a scoped pair lap started from the tree a stopped round 2 read
 // (`round-2-fix`) or not (`none`) — `run-ship-narrowed.ts` (joshuafolkken/kit#7789).

@@ -189,6 +189,16 @@ describe('run_cut_report.refuse_unready', () => {
 			],
 		])
 	})
+
+	// joshuafolkken/kit#7821: the no-diff investigation close names the condition the lane misses.
+	it('adds the missing no-diff close condition after the refusal (ac-5424e7c4)', () => {
+		const state = { branch: '7780-lane', is_dirty: false, is_held: true }
+		const note = 'Not closable as a no-diff investigation: 1 acceptance criteria are unchecked.'
+
+		expect(run_cut_report.refuse_unready(state, note)).toBe(FAILURE_EXIT_CODE)
+		expect_verdict(run_cut_report.UNREADY_VERDICT)
+		expect(error_spy.mock.calls.at(-1)).toStrictEqual([note])
+	})
 })
 
 // joshuafolkken/kit#4799: a reviewer on `review:submit` must never be told to write a findings file.

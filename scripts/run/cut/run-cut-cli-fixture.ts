@@ -4,7 +4,9 @@ import { agent_argv, type AgentArgvResult } from '#scripts/agent/agent-argv'
 import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
 import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { cost_cli, type CostVerdict } from '#scripts/cost-runtime/cost-cli'
+import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { git_command } from '#scripts/git/git-command'
+import { git_diff_reads } from '#scripts/git/git-diff-reads'
 import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { lane_dispatch_log } from '#scripts/lane/lane-dispatch-log'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
@@ -102,6 +104,14 @@ function attach_run_spies(): void {
 	vi.spyOn(run_event_stream_emit, 'all_events').mockResolvedValue([])
 }
 
+// A clean lane branch reads its Issue body and diff for the no-diff close (joshuafolkken/kit#7821);
+// no case reaches the network or the real tree for it unless it says so.
+function attach_conclude_spies(): void {
+	vi.spyOn(git_gh_issue_read, 'issue_get_body').mockResolvedValue(undefined)
+	vi.spyOn(git_diff_reads, 'diff_main_names').mockResolvedValue('')
+	vi.spyOn(git_diff_reads, 'untracked_names').mockResolvedValue('')
+}
+
 function attach_review_spies(): void {
 	vi.spyOn(review_attest, 'is_attested_on').mockImplementation(is_attested_on)
 	vi.spyOn(review_record, 'check').mockImplementation(record_check)
@@ -172,6 +182,7 @@ function install(): void {
 	// The CLI version probe is the diagnostics' own test; here it would depend on the machine's CLI.
 	vi.spyOn(agent_diagnostics, 'check').mockReturnValue({ kind: 'ready' })
 	attach_run_spies()
+	attach_conclude_spies()
 	attach_review_spies()
 	write_handoffs()
 
