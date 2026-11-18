@@ -16,6 +16,7 @@ const CHANGED = path.join(ROOT, 'changed.test.ts')
 const UNCHANGED = path.join(ROOT, 'unchanged.test.ts')
 const UNKNOWN = path.join(ROOT, 'unknown.test.ts')
 const TESTS = [CHANGED, UNCHANGED, UNKNOWN]
+const VITEST_CONFIG = 'vitest.config.ts'
 const TREE = { files: Object.fromEntries([['source.ts', 'digest']]), base: 'base' }
 const SCOPE = { mode: 'related' as const, files: [SOURCE], reason: 'fixture' }
 const GRAPH: ImportGraph = {
@@ -76,7 +77,7 @@ describe('test_related_reuse fallbacks', () => {
 
 		expect(result.excluded).toEqual([])
 	})
-	it.each(['pnpm-lock.yaml', 'package.json', 'vitest.config.ts', 'tools/test/unit-projects.ts'])(
+	it.each(['pnpm-lock.yaml', 'package.json', VITEST_CONFIG, 'tools/test/unit-projects.ts'])(
 		'invalidates on %s',
 		async (file) => {
 			vi.mocked(since_green.read_moved_parts).mockResolvedValue({ changed: [], synced: [file] })
@@ -127,5 +128,53 @@ describe('test_related_reuse.retained', () => {
 	})
 	it('does not carry evidence across a moved base or file', async () => {
 		expect(await test_related_reuse.retained(ROOT, TREE)).toEqual([])
+	})
+})
+
+// joshuafolkken/kit#7966: a red run's passed files join the next green record.
+async function red_record(): Promise<void> {
+	const blobs = await test_related_reuse.blobs(ROOT, [CHANGED, UNCHANGED])
+
+	vi.spyOn(review_stamps.test_related_red_stamp, 'read').mockReturnValue({
+		taken_at: '',
+		files: {},
+		blobs: { ...blobs, [path.relative(ROOT, UNKNOWN)]: 'failed' },
+	})
+}
+
+describe('test_related_reuse.carried', () => {
+	beforeEach(() => {
+		vi.mocked(since_green.read_moved_parts).mockResolvedValue({
+			changed: ['source.ts'],
+			synced: [],
+		})
+	})
+	it('carries the passed files whose inputs are unchanged, never a changed or failed one', async () => {
+		await red_record()
+		writeFileSync(CHANGED, 'after')
+
+		expect(await test_related_reuse.carried(ROOT, TREE)).toEqual([path.relative(ROOT, UNCHANGED)])
+		expect(since_green.read_moved_parts).toHaveBeenCalledWith(
+			review_stamps.test_related_red_stamp,
+			gate_labels.UNIT_LABEL,
+			undefined,
+			TREE,
+		)
+	})
+	it('carries nothing once a shared source the tests reach changed', async () => {
+		await red_record()
+		writeFileSync(SOURCE, 'after')
+
+		expect(await test_related_reuse.carried(ROOT, TREE)).toEqual([])
+	})
+	it.each([
+		['a main merge moved the base', { changed: [], synced: ['main.ts'] }],
+		['a whole-suite input changed', { changed: [VITEST_CONFIG], synced: [] }],
+		['no comparable red record stands', undefined],
+	])('carries nothing when %s', async (_case, parts) => {
+		await red_record()
+		vi.mocked(since_green.read_moved_parts).mockResolvedValue(parts)
+
+		expect(await test_related_reuse.carried(ROOT, TREE)).toEqual([])
 	})
 })

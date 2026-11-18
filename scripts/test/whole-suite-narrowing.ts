@@ -11,7 +11,9 @@ import { whole_suite_files } from './whole-suite-files'
 
 // The readings that let a moved whole-suite file narrow — each compares the file at the change base
 // with the working tree — and the test files naming a changed non-code file's path
-// (`test-document-readers.ts`), kept out of `test-related-scope.ts`, which stays pure.
+// (`test-document-readers.ts`), kept out of `test-related-scope.ts`, which stays pure. Kept beside the
+// cap (joshuafolkken/kit#7976): a narrowed seed set leaves the cap's near layers its own tests rather
+// than the whole suite's.
 
 interface Sides {
 	before: string

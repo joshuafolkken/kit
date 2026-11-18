@@ -35,6 +35,12 @@ interface ReachInputs {
 	test_digests: ReadonlyMap<string, string>
 }
 
+// One file and the test files its imports reach.
+interface ReachedTests {
+	file: string
+	tests: ReadonlyArray<string>
+}
+
 // One file and how many test files its imports reach.
 interface ReachedCount {
 	file: string
@@ -133,15 +139,25 @@ async function reached_test_count(files: ReadonlyArray<string>): Promise<number 
 	return new Set(files.flatMap((file) => related_of(view, file))).size
 }
 
+// Each file's reached tests, cwd-relative, over one graph — what `josh test:related` layers and caps
+// its run by (joshuafolkken/kit#7976). Undefined where no graph can be built.
+async function reached_tests(
+	files: ReadonlyArray<string>,
+): Promise<Array<ReachedTests> | undefined> {
+	const view = await view_of()
+	if (view === undefined) return undefined
+
+	return files.map((file) => ({ file, tests: related_of(view, file) }))
+}
+
 // Each file's own `reached_test_count`, over one graph — what `josh test:reach` prints
 // (joshuafolkken/kit#5238). Undefined where no graph can be built.
 async function reached_test_counts(
 	files: ReadonlyArray<string>,
 ): Promise<Array<ReachedCount> | undefined> {
-	const view = await view_of()
-	if (view === undefined) return undefined
+	const reached = await reached_tests(files)
 
-	return files.map((file) => ({ file, count: related_of(view, file).length }))
+	return reached?.map(({ file, tests }) => ({ file, count: tests.length }))
 }
 
 // None where no failed test is named or one is gone: what such a red rests on, no graph names. Past
@@ -195,8 +211,9 @@ const test_pinned_reach = {
 	probed_files,
 	reached_test_count,
 	reached_test_counts,
+	reached_tests,
 	work_tree_files,
 }
 
-export type { Reach, ReachedCount, ReachInputs }
+export type { Reach, ReachedCount, ReachedTests, ReachInputs }
 export { test_pinned_reach }

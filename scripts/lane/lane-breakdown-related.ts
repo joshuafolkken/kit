@@ -21,14 +21,20 @@ function top_hub(rows: ReadonlyArray<TestRelatedEntry>): string | undefined {
 	return [...tally].toSorted((first, second) => second[1] - first[1])[0]?.[0]
 }
 
+// What one run left past the cap: the test files it deferred to CI, or on rows written before
+// `deferred` (joshuafolkken/kit#7976) the changed files it ran by their direct importers.
+function capped_of(row: TestRelatedEntry): number {
+	return row.deferred ?? row.over_cap ?? 0
+}
+
 // The line `josh lane:breakdown` prints, `''` when no run of `issue` capped a file. The count is the
 // widest run's, the number its own summary line printed: a sum over runs counts one capped file once a
 // run (joshuafolkken/kit#6187).
 function over_cap_text(entries: ReadonlyArray<LedgerEntry>, issue: number): string {
 	const rows = entries.filter((entry) => is_lane_row(entry, issue))
-	const over_cap = Math.max(0, ...rows.map((row) => row.over_cap ?? 0))
+	const over_cap = Math.max(0, ...rows.map((row) => capped_of(row)))
 	if (over_cap === 0) return ''
-	const capped = rows.filter((row) => (row.over_cap ?? 0) > 0).length
+	const capped = rows.filter((row) => capped_of(row) > 0).length
 	const hub = top_hub(rows)
 	const text = `${LABEL} ${String(over_cap)} over cap, in ${String(capped)} of ${String(rows.length)} runs`
 

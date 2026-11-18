@@ -40,9 +40,10 @@ vi.mock(import('#scripts/gate/since-green'), async (import_original) => {
 
 	return { since_green: { ...since_green, read_verdict: vi.fn(async () => no_record) } }
 })
-// The claim and the reach cap walk no import graph here; what they claim and cap is
-// `test-related.claim.test.ts` and `test-related-cap.test.ts`.
+// The claim and the selection walk no import graph here; what they claim and select is
+// `test-related.claim.test.ts` and `test-related-select.test.ts`.
 vi.mock('./test-pinned-reach')
+vi.mock('./test-related-select', async () => await import('./test-related-select-fixture'))
 vi.mock('./test-document-readers', () => ({
 	test_document_readers: { readers_of: vi.fn(async () => new Map()) },
 }))
