@@ -176,6 +176,8 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/run/cut/run-cut-cli.ts',
 		description: 'Cut a lane child before the gate and resume a fresh process',
 		category: 'AI tools',
+		// `--deliverable` closes the Issue through `backlog_triage_close`, whose lane release notifies.
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		reference: ['[--resume] <issue> [--impl] [--handoff <path>]', 'automation', ['files']],
 		usage: {
 			examples: [
@@ -183,6 +185,10 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 				{
 					arguments: '--impl 1839 --handoff .josh/tmp/handoff-1839.json',
 					note: 'cut mid-implementation, carrying the instruction',
+				},
+				{
+					arguments: '1839 --deliverable <comment-url>',
+					note: 'close a no-diff investigation lane as completed',
 				},
 				{ arguments: '--resume 1839', note: "a fresh process's entry check" },
 				{ arguments: '--end', note: 'clear the record' },
