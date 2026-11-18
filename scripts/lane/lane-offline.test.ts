@@ -53,7 +53,7 @@ describe('lane_offline.reachable', () => {
 })
 
 describe('lane_offline.watcher', () => {
-	it('writes one event at each change of the answer', async () => {
+	it('writes each change once and a sighting for each tick still down', async () => {
 		const events_path = fresh_stream()
 		const check = lane_offline.watcher(events_path)
 
@@ -64,7 +64,7 @@ describe('lane_offline.watcher', () => {
 		await check()
 		await check()
 
-		expect(kinds(events_path)).toStrictEqual(['offline', 'online'])
+		expect(kinds(events_path)).toStrictEqual(['offline', 'offline-tick', 'online'])
 	})
 
 	it('closes an outage a previous drive left open', async () => {

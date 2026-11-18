@@ -45,7 +45,7 @@ afterEach(() => {
 describe('lane_sampler.start', () => {
 	it('samples at once and then once a minute', async () => {
 		const ledger_path = fresh_ledger()
-		const stop = lane_sampler.start({ ledger_path })
+		const stop = lane_sampler.start({ ledger_path, events_path: fresh_ledger() })
 
 		await vi.advanceTimersByTimeAsync(lane_sampler.SAMPLE_INTERVAL_MS * TICKS)
 		stop()
@@ -55,7 +55,7 @@ describe('lane_sampler.start', () => {
 
 	it('records nothing more once it is stopped', async () => {
 		const ledger_path = fresh_ledger()
-		const stop = lane_sampler.start({ ledger_path })
+		const stop = lane_sampler.start({ ledger_path, events_path: fresh_ledger() })
 
 		await vi.advanceTimersByTimeAsync(0)
 		stop()
@@ -68,7 +68,7 @@ describe('lane_sampler.start', () => {
 		const ledger_path = fresh_ledger()
 
 		sample_mock.mockRejectedValueOnce(new Error('sysctl did not answer'))
-		const stop = lane_sampler.start({ ledger_path })
+		const stop = lane_sampler.start({ ledger_path, events_path: fresh_ledger() })
 
 		await vi.advanceTimersByTimeAsync(lane_sampler.SAMPLE_INTERVAL_MS)
 		stop()
@@ -109,7 +109,7 @@ describe('lane_sampler.start — host sleep', () => {
 const DROPPED = new TypeError('fetch failed')
 
 describe('lane_sampler.start — network outage', () => {
-	it('writes an event only on the ticks the network went down and came back', async () => {
+	it('writes the ticks the network went down and came back, and a sighting between', async () => {
 		const events_path = fresh_ledger()
 
 		fetch_mock.mockRejectedValueOnce(DROPPED).mockRejectedValueOnce(DROPPED)
@@ -120,7 +120,7 @@ describe('lane_sampler.start — network outage', () => {
 
 		const kinds = run_event_stream.read_events(events_path).map((event) => event.kind)
 
-		expect(kinds).toStrictEqual(['offline', 'online'])
+		expect(kinds).toStrictEqual(['offline', 'offline-tick', 'online'])
 	})
 
 	it('keeps sampling every tick while the probe fails', async () => {

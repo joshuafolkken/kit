@@ -4,54 +4,81 @@ import type { LaneSpan } from './lane-net-time'
 // The network outages `lane-offline.ts` records (joshuafolkken/kit#7867), read back from its `offline` /
 // `online` turns. Apart from the recorder, so `lane-host-gaps.ts` reads them without reaching the
 // stream's writer.
+//
+// Every tick still offline writes an `offline-tick`, so an outage ends at its recovery or one tick past
+// the last tick that saw it, whichever is first: a drive that stopped (or crashed) mid-outage leaves it
+// closed where its sampler last looked, never open across the lanes that came after.
 
 const { EVENT_KIND } = run_event_stream
 
-const TURNS_PER_SPAN = 2
+// The load sampler's tick (`lane-sampler.ts`), owned here so an outage's bound and the probe's period
+// cannot drift apart.
+const SAMPLE_INTERVAL_MS = 60_000
+const STALE_TICKS = 2
+const STALE_MS = SAMPLE_INTERVAL_MS * STALE_TICKS
 
-// An outage still open when the events end; `lane_host_gaps.within` cuts it at the span it is asked for.
-const OPEN_MS = Infinity
-
-function is_turn(event: RunEvent): boolean {
-	return event.kind === EVENT_KIND.OFFLINE || event.kind === EVENT_KIND.ONLINE
+interface Outage {
+	from_ms: number
+	// The last tick that saw the network down.
+	down_ms: number
+	up_ms?: number
 }
 
-function state_of(turns: ReadonlyArray<RunEvent>): string {
-	return turns.at(-1)?.kind ?? EVENT_KIND.ONLINE
+function open_of(kept: ReadonlyArray<Outage>): Outage | undefined {
+	const last = kept.at(-1)
+
+	return last?.up_ms === undefined ? last : undefined
 }
 
-// The turns that changed the state, starting from online: a repeat (two drives' samplers) is dropped.
-function changes(events: ReadonlyArray<RunEvent>): Array<RunEvent> {
-	const kept: Array<RunEvent> = []
-
-	for (const event of events) {
-		if (is_turn(event) && event.kind !== state_of(kept)) kept.push(event)
-	}
-
-	return kept
+// A sighting two ticks or more after the open outage's last one is a new outage: the drive that saw the
+// old one stopped, and the old one stays bounded at its own last sighting.
+function continues(open: Outage | undefined, ms: number): open is Outage {
+	return open !== undefined && ms - open.down_ms < STALE_MS
 }
 
-function time_of(event: RunEvent | undefined): number {
-	return event === undefined ? OPEN_MS : Date.parse(event.at)
+function on_down(kept: Array<Outage>, ms: number): void {
+	const open = open_of(kept)
+
+	if (continues(open, ms)) open.down_ms = ms
+	else kept.push({ from_ms: ms, down_ms: ms })
 }
 
-/** Every outage on `events`, oldest first; one still open ends at `Infinity`. */
+function on_up(kept: Array<Outage>, ms: number): void {
+	const open = open_of(kept)
+
+	if (open !== undefined) open.up_ms = ms
+}
+
+const ON_TURN: ReadonlyMap<string, (kept: Array<Outage>, ms: number) => void> = new Map([
+	[EVENT_KIND.OFFLINE, on_down],
+	[EVENT_KIND.OFFLINE_TICK, on_down],
+	[EVENT_KIND.ONLINE, on_up],
+])
+
+function span_of(outage: Outage): LaneSpan {
+	const bound_ms = outage.down_ms + SAMPLE_INTERVAL_MS
+
+	return { from_ms: outage.from_ms, to_ms: Math.min(outage.up_ms ?? bound_ms, bound_ms) }
+}
+
+/** Every outage on `events`, oldest first, each ending at its recovery or a tick past its last sighting. */
 function spans(events: ReadonlyArray<RunEvent>): Array<LaneSpan> {
-	const turns = changes(events)
+	const kept: Array<Outage> = []
 
-	return turns
-		.filter((_, index) => index % TURNS_PER_SPAN === 0)
-		.map((down, index) => ({
-			from_ms: Date.parse(down.at),
-			to_ms: time_of(turns[index * TURNS_PER_SPAN + 1]),
-		}))
+	for (const event of events) ON_TURN.get(event.kind)?.(kept, Date.parse(event.at))
+
+	return kept.map((outage) => span_of(outage))
 }
 
 /** Whether `events` last left the network up; no turn at all reads as up. */
 function ends_online(events: ReadonlyArray<RunEvent>): boolean {
-	return state_of(changes(events)) === EVENT_KIND.ONLINE
+	const turn = events.findLast(
+		(event) => event.kind === EVENT_KIND.OFFLINE || event.kind === EVENT_KIND.ONLINE,
+	)
+
+	return turn?.kind !== EVENT_KIND.OFFLINE
 }
 
-const lane_offline_spans = { ends_online, spans }
+const lane_offline_spans = { SAMPLE_INTERVAL_MS, ends_online, spans }
 
 export { lane_offline_spans }

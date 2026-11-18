@@ -5,8 +5,8 @@ import { lane_offline_spans } from './lane-offline-spans'
 
 // The host's network outages (joshuafolkken/kit#7867): a lane stalled on a dropped connection retries
 // until it ends in an OUTAGE, and the stall read as work. The load sampler asks once a tick whether the
-// network answers, and writes an `offline` or `online` event only when the answer changes; the pairs
-// read back as intervals (`lane-offline-spans.ts`) every lane's time takes out beside the sleeps
+// network answers, and writes an `offline` or `online` event when the answer changes and an
+// `offline-tick` each later tick it stays down; they read back as intervals (`lane-offline-spans.ts`) every lane's time takes out beside the sleeps
 // (`lane-host-gaps.ts`). The precision is a tick, and only outages since this recording began are known.
 
 const { EVENT_KIND } = run_event_stream
@@ -42,19 +42,32 @@ async function recorded_online(events_path?: string): Promise<boolean> {
 	return lane_offline_spans.ends_online(run_event_stream.read_events(target))
 }
 
-async function record(is_online: boolean, events_path?: string): Promise<void> {
+interface Turn {
+	kind: string
+	text: string
+}
+
+const DOWN: Turn = { kind: EVENT_KIND.OFFLINE, text: 'network unreachable' }
+const STILL_DOWN: Turn = { kind: EVENT_KIND.OFFLINE_TICK, text: 'network still unreachable' }
+const UP: Turn = { kind: EVENT_KIND.ONLINE, text: 'network reachable again' }
+
+// A change writes its turn once; a tick still down writes a sighting, so the outage's bound follows the
+// last tick that saw it (`lane-offline-spans.ts`); a tick still up writes nothing.
+function turn_of(is_online: boolean, did_answer: boolean): Turn | undefined {
+	if (is_online) return did_answer ? undefined : UP
+
+	return did_answer ? DOWN : STILL_DOWN
+}
+
+async function record(turn: Turn, events_path?: string): Promise<void> {
 	const target = await target_of(events_path)
 
 	if (target === undefined) return
 
-	run_event_stream.append_event(target, {
-		at: new Date().toISOString(),
-		kind: is_online ? EVENT_KIND.ONLINE : EVENT_KIND.OFFLINE,
-		text: is_online ? 'network reachable again' : 'network unreachable',
-	})
+	run_event_stream.append_event(target, { at: new Date().toISOString(), ...turn })
 }
 
-/** A per-tick check that probes and records only a change of state; it never throws. */
+/** A per-tick check that probes and records a change or a tick still down; it never throws. */
 function watcher(events_path?: string): () => Promise<void> {
 	// The last answer, held in place so overlapping ticks never write back a stale one.
 	const seen: Array<boolean> = []
@@ -64,8 +77,10 @@ function watcher(events_path?: string): () => Promise<void> {
 			const is_online = await reachable()
 			const did_answer = seen.at(-1) ?? (await recorded_online(events_path))
 
+			const turn = turn_of(is_online, did_answer)
+
 			seen.splice(0, seen.length, is_online)
-			if (is_online !== did_answer) await record(is_online, events_path)
+			if (turn !== undefined) await record(turn, events_path)
 		} catch {
 			// Best-effort: an unrecorded outage counts as lane time, never as a failure of the run.
 		}

@@ -352,7 +352,7 @@ pnpm josh lane:value cell --table "measured lanes" --column "measured lanes" --s
 
 <!-- usage: lane:net -->
 
-Print a lane's net minutes: its issue's first dispatch to its merge, less the waits its parks, outages, usage-limit stops and yields stood, the host's sleeps and the ship's followup.
+Print a lane's net minutes: its issue's first dispatch to its merge, less the waits its parks, outages, usage-limit stops and yields stood, the host's stops (sleeps and network outages) and the ship's followup.
 
 ```bash
 pnpm josh lane:net 4695   # the net minutes a causing-lane line declares
@@ -401,7 +401,7 @@ Historical ship boundaries use completed ledger/archive intervals and surviving 
 
 Ship lines carry their attempt: `ship #2 sync`. An attempt opens at a ship preflight or pre-detach checks that follow neither: the detached half's preflight and an infrastructure retry stay in their attempt; a `--review` re-ship, skipping the preflight, opens one at its pre-detach checks. The count reads the ledger, so it survives event-stream rotation (`lane-timeline-steps.ts`).
 
-- `[excluded]` — a wait taken out, named by what opened it (park, outage, usage limit, split, yield, sleep).
+- `[excluded]` — a wait taken out, named by what opened it (park, outage, usage limit, split, yield, host stop — a sleep or network outage).
 - `[driver]` — the followup's CI wait.
 - `[event]` — a main merge-in (the ship's `merge` lap), a split or `unplanned` notice, a split, a ship launch, a review round, and the ledger's verdict of each review round (`review round 1 (reused)`).
 - `[step]` — a timed step inside a stage, outside the net sum. From the ledger: each ship stage's own laps (the foreground `sync › conflict probe` among them), each `run:chain`, `test:related` and `test:pinned`, and the CI and CodeRabbit waits. From the transcripts: each `lint:related` and each review pass (`round 1`, `interaction`).

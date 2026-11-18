@@ -37,7 +37,7 @@ function joined(spans: ReadonlyArray<LaneSpan>): Array<LaneSpan> {
 	return kept
 }
 
-/** Every interval the host stopped on `events`, joined; an outage still open ends at `Infinity`. */
+/** Every interval the host stopped on `events`, joined; an open outage ends a tick past its last sighting. */
 function gaps_of(events: ReadonlyArray<RunEvent>): Array<LaneSpan> {
 	return joined([...sleeps(events), ...lane_offline_spans.spans(events)])
 }

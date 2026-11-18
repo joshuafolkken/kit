@@ -84,13 +84,19 @@ describe('run_board_render_time.time_of -- the host slept inside the lane', () =
 	})
 })
 
-// joshuafolkken/kit#7867: an outage joins the sleeps, one still open closing at the row's end.
+// joshuafolkken/kit#7867: an outage joins the sleeps, one still open closing at the row's end. Its
+// `offline-tick` sightings each minute to a minute ago keep it open to now.
 function event_at(kind: string, ms: number, elapsed_ms?: number): RunEvent {
 	return { pos: ms, at: new Date(ms).toISOString(), kind, text: kind, elapsed_ms }
 }
 
+const DOWN_MINUTES = 35
+
 const STOPS = lane_host_gaps.gaps_of([
-	event_at('offline', NOW - 35 * MINUTE),
+	event_at('offline', NOW - DOWN_MINUTES * MINUTE),
+	...Array.from({ length: DOWN_MINUTES - 1 }, (_, index) =>
+		event_at('offline-tick', NOW - (DOWN_MINUTES - 1 - index) * MINUTE),
+	),
 	event_at('sleep', NOW - 30 * MINUTE, 10 * MINUTE),
 ])
 

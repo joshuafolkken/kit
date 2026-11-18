@@ -21,8 +21,9 @@ import { lane_stage_budget, type BudgetStage } from './lane-stage-budget'
 // investigation comments it on the lane's Issue and leads its prompt with it (`lane-overrun.ts`).
 
 const HEADING = 'Net time by stage, longest first'
-const EXCLUDED = 'waits taken out (park, outage, usage limit, yield, split run, host sleep)'
-const SLEPT = 'of which host sleep'
+const EXCLUDED = 'waits taken out (park, outage, usage limit, yield, split run, host stop)'
+// A host stop is a sleep or a network outage (joshuafolkken/kit#7867), joined in `lane-host-gaps.ts`.
+const SLEPT = 'of which host stop (sleep or network down)'
 const YIELDED = 'of which yield wait'
 const HOLDER = 'yield wait: holder remaining'
 const GAP = 'yield wait: redispatch gap (offer + launch)'
