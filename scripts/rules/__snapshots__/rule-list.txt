@@ -176,6 +176,10 @@
   - fires: `pnpm josh pretool:guard` — network sends, inline interpreter execution, direct `gh` writes, `git push` without explicit `origin`, credential, keychain or environment prints — in each shell segment and nested command. Every occurrence
   - silent: ordinary reads, `gh` reads against github.com, `git fetch`, `git push origin`, named scripts and `pnpm josh` routes. A plain `curl` / `wget` is still refused by the deny list; the hook allows local or GitHub destinations with known flags
   - not automated: the call must not run at all, or only on a person's word — refusing is the remedy
+- **Durable rule in MEMORY** (`memory-durable-write`, `principles.md`)
+  - fires: `pnpm josh pretool:guard` — a `Write` or `Edit` under `~/.claude/projects/<slug>/memory/` that leaves a `type: feedback` frontmatter. Every occurrence
+  - silent: the `user`, `project` and `reference` types, the `MEMORY.md` index, or a path outside `~/.claude/projects`
+  - not automated: the prompt/doc change that replaces the memory is prose only the model can write
 - **Output poll loop** (`poll-loop`, `.claude/skills/workflow-commands/background-commands.md`)
   - fires: `pnpm josh pretool:guard` — a hand-written `while` / `until` wait loop over a command's output, a marker file or a process, a counted `for` that sleeps, or a `sleep` chain of 10 s or more before a read of a file or process. Every occurrence
   - silent: the command started with `run_in_background` — its exit ends the wait
