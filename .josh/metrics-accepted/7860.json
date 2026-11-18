@@ -1,5 +1,5 @@
 {
-	"reason": "New backlog-interrupt module holds lanes for an out-of-pool interrupt defect (#7860); no existing module reads that listing",
+	"reason": "unit baseline was 0ms from a run that selected no tests; 1.1s is the incremental related-test run, not a slowdown",
 	"date": "2026-11-18",
 	"growth": {
 		"scripts.code_lines": 127
