@@ -103,9 +103,13 @@ async function add_parsed(parsed: AddArguments): Promise<number> {
 // longer, so it is performed; naming another it is refused with the command to run there, because
 // this command reads and writes only the repository it runs from.
 async function run_qualified_addition(found: CrossRepoAddTarget): Promise<number> {
+	// A refused `--chain` is reported here, before either answer: a suggestion built without it would be
+	// a different instruction from the one typed.
+	if (is_chain_refused(found.local)) return FAILURE_EXIT_CODE
+
 	const local = epic_cli.resolve_local_add(found, await git_gh_command.repo_get_name_with_owner())
 
-	if (local !== undefined) return await add_parsed(local)
+	if (local !== undefined) return await epic_add.add_children(to_add_input(local))
 
 	console.error(epic_cli.format_cross_repo_refusal(found))
 

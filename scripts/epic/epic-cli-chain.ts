@@ -135,5 +135,3 @@ const epic_cli_chain = { CHAIN_FLAG, find_cycle_refusal, find_outsider_refusal, 
 
 export { epic_cli_chain }
 export type { ChainRead }
-
-export { type DependencyChain as Chain } from './epic-parse'
