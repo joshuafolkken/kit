@@ -3,8 +3,9 @@ import { cli_flags } from '#scripts/lib/cli-flags'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { review_comment_carry } from './review-comment-carry'
 import { review_final_record } from './review-final-record'
+import { review_finding_kind } from './review-finding-kind'
 import { review_finding_ledger, type Finding, type LineKind } from './review-finding-ledger'
-import { review_finding_text } from './review-finding-text'
+import { review_finding_spec } from './review-finding-spec'
 import { review_fix_round, type DescribedFinding, type RecordedRound } from './review-fix-round'
 import { review_interaction } from './review-interaction'
 import { review_lane_handover } from './review-lane-handover'
@@ -42,7 +43,7 @@ import type { ReuseAnswer } from './review-round-reuse'
 
 const FAILURE_EXIT_CODE = 1
 const USAGE =
-	'Usage: josh review:record --issue <N> [--comment | --interaction] [[<disposition> ]<category>:<severity>:<file>[ — <reason>] ...] | josh review:record --check [--interaction] --issue <N>'
+	'Usage: josh review:record --issue <N> [--comment | --interaction] [[<disposition> ][kind=<kind> ]<category>:<severity>:<file>[ — <reason>] ...] | josh review:record --check [--interaction] --issue <N>'
 const FILE_HINT = '  <file>: the cited path, optionally with :line'
 const DISPOSITION_HINT =
 	'  <disposition>: optional — fixed | false-positive | filed:#<M> | deferred:#<M>; josh review:round2 skips only when every High/Medium is fixed or false-positive'
@@ -101,49 +102,12 @@ interface Parsed {
 	positionals: ReadonlyArray<string>
 }
 
-// A finding spec is `<category>:<severity>:<file>`; the file field keeps any `:line` a citation
-// carries, so only the first two colons separate fields.
-function to_finding(category: string, severity: string, file: string): Finding | undefined {
-	if (
-		!review_finding_ledger.is_category(category) ||
-		!review_finding_ledger.is_severity(severity)
-	) {
-		return undefined
-	}
-
-	return review_finding_ledger.is_valid_file(file) ? { category, severity, file } : undefined
-}
-
-function parse_finding(spec: string): Finding | undefined {
-	const first = spec.indexOf(':')
-	const second = spec.indexOf(':', first + 1)
-
-	if (first === -1 || second === -1) return undefined
-
-	return to_finding(spec.slice(0, first), spec.slice(first + 1, second), spec.slice(second + 1))
-}
-
-interface Positional {
-	finding: Finding
-	description: string
-}
-
-// A positional is `[<disposition> ]<spec>[ — <reason>]`; the disposition rides into the ledger line.
-function parse_positional(positional: string): Positional | undefined {
-	const { spec: marked, description } = review_finding_text.split_description(positional)
-	const { disposition, spec } = review_finding_ledger.split_disposition(marked)
-	const finding = parse_finding(spec)
-
-	if (finding === undefined) return undefined
-
-	return { finding: disposition === undefined ? finding : { ...finding, disposition }, description }
-}
-
+// A positional's grammar is `review-finding-spec.ts`'s.
 function parse_findings(positionals: ReadonlyArray<string>): ReadonlyArray<Finding> | undefined {
 	const findings: Array<DescribedFinding> = []
 
 	for (const positional of positionals) {
-		const parsed = parse_positional(positional)
+		const parsed = review_finding_spec.parse_positional(positional)
 
 		if (parsed === undefined) return undefined
 
@@ -188,6 +152,7 @@ function usage_text(): string {
 		USAGE,
 		accepted_values('<category>', review_finding_ledger.CATEGORIES),
 		accepted_values('<severity>', review_finding_ledger.SEVERITIES),
+		accepted_values('<kind> (optional)', review_finding_kind.KINDS),
 		FILE_HINT,
 		DISPOSITION_HINT,
 		REASON_HINT,
@@ -414,8 +379,8 @@ async function run(
 const review_record_cli = {
 	accepted_values,
 	build_lines,
-	parse_finding,
-	parse_positional,
+	parse_finding: review_finding_spec.parse_finding,
+	parse_positional: review_finding_spec.parse_positional,
 	run,
 	usage_text,
 }

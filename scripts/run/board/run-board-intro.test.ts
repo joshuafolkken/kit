@@ -28,6 +28,16 @@ async function instant(): Promise<void> {
 }
 
 const READ = 'read'
+
+function recording(written: Array<string>): IntroPorts {
+	return {
+		intro_sleep: instant,
+		write: (text) => {
+			written.push(text)
+		},
+	}
+}
+
 const NO_KEYS: KeyReading = { folded: undefined }
 
 interface Deferred<Value> {
@@ -256,5 +266,32 @@ describe('run_board_intro.after on a failed first read', () => {
 		expect(flag.is_done).toBe(false)
 		intro.resolve(undefined)
 		await expect(first).resolves.toBe(failure)
+	})
+})
+
+// joshuafolkken/kit#8029: the opening is the theme's — a board in none reads at once and reveals nothing.
+async function read_at_once(): Promise<string> {
+	return await READ
+}
+
+describe('run_board_intro.opening', () => {
+	it('plays nothing and hands the read back as it is with no theme', async () => {
+		const written: Array<string> = []
+		const opened = run_board_intro.opening(read_at_once, recording(written), NO_KEYS, undefined)
+
+		expect(opened.gather).toBe(read_at_once)
+		expect(opened.reveal).toBeUndefined()
+		await expect(opened.gather('background')).resolves.toBe(READ)
+		expect(written).toStrictEqual([])
+	})
+
+	it('types the line before the first read lands and reveals in a theme', async () => {
+		const written: Array<string> = []
+		const opened = run_board_intro.opening(read_at_once, recording(written), NO_KEYS, 'wargames')
+
+		await expect(opened.gather('background')).resolves.toBe(READ)
+		expect(written).toContain(line_of(`${LINE.slice(0, -1)}${CURSOR}`))
+		await opened.reveal?.('a\nb')
+		expect(written.slice(-2)).toStrictEqual(['a', '\nb'])
 	})
 })

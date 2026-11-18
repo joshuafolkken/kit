@@ -1,8 +1,9 @@
 import type { KeyReading } from './run-board-keys'
 import type { BoardPorts, Pace } from './run-board-state'
+import type { Theme } from './run-board-theme'
 import { run_board_typing } from './run-board-typing'
 
-// The line a live board types before its first frame, a letter at a time with a block cursor after
+// The line a live board in a theme types before its first frame, a letter at a time with a block cursor after
 // the last letter typed, then holds without the cursor — the first frame's read runs meanwhile, and the
 // frame is drawn over the line once both are done. A key skips the rest; the key is spent on the skip,
 // not on a fold. Each beat rewrites the whole line, so the screen always matches the beat last written.
@@ -20,6 +21,7 @@ interface Beat {
 }
 
 type IntroPorts = Pick<BoardPorts, 'intro_sleep' | 'write'>
+type Reveal = (frame: string) => Promise<void>
 
 const BEATS: ReadonlyArray<Beat> = [
 	...Array.from(LINE, (_letter, index) => ({
@@ -110,6 +112,25 @@ function after<Read>(
 	}
 }
 
+// A board in a theme types its line, its first read held behind it, and reveals its first frame a line at
+// a time; one in none plays nothing, reads at once and draws the frame whole. Called once the screen is
+// entered, since the line starts typing here.
+function opening<Read>(
+	gather: (pace: Pace) => Promise<Read>,
+	ports: IntroPorts,
+	keys: KeyReading,
+	theme: Theme | undefined,
+): { gather: (pace: Pace) => Promise<Read>; reveal: Reveal | undefined } {
+	if (theme === undefined) return { gather, reveal: undefined }
+
+	return {
+		gather: after(gather, play(ports, keys)),
+		reveal: async (frame) => {
+			await reveal(frame, ports, keys)
+		},
+	}
+}
+
 const run_board_intro = {
 	ERASE_LINE_END,
 	HOLD_MS,
@@ -118,9 +139,10 @@ const run_board_intro = {
 	LINE_START,
 	REVEAL_LINE_MS,
 	after,
+	opening,
 	play,
 	reveal,
 }
 
 export { run_board_intro }
-export type { IntroPorts }
+export type { IntroPorts, Reveal }
