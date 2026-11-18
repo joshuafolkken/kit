@@ -81,7 +81,8 @@ The body's `## 背景` declares `- 中止条件:` and the run's finding meets it
 `pnpm josh issue:premise-unmet <N> --evidence-file .josh/tmp/premise-unmet.md` with the measured
 values and the reason (refusals: `scripts/issue/issue-premise-unmet-cli.ts`).
 
-With no declared line, a judgement that the work is not worth doing still parks.
+With no declared line, a judgement that the work is not worth doing still parks. `- 人の判断: 要` →
+refused; park with the findings, options and recommendation (`backlogrun-park.md` → "park and continue").
 
 ## A measurement-only Issue
 

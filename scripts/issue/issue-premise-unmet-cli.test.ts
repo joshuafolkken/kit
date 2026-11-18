@@ -56,6 +56,8 @@ const BACKGROUND = issue_body_keys.heading('background')
 const DECLARED_BODY = `${BACKGROUND}\n\n${issue_body_keys.prefix('close_condition')} load time < persist time\n`
 const UNDECLARED_BODY = `${BACKGROUND}\n\n${issue_body_keys.prefix('premise')} load time > persist time\n`
 const EMPTY_DECLARATION_BODY = `${BACKGROUND}\n\n${issue_body_keys.prefix('close_condition')}\n`
+const JUDGEMENT_NEEDED_BODY = `${DECLARED_BODY}${issue_body_keys.line('judgement', 'needed')}（方針の判断: 引き継ぐか）\n`
+const JUDGEMENT_NOT_NEEDED_BODY = `${DECLARED_BODY}${issue_body_keys.line('judgement', 'not_needed')}\n`
 
 writeFileSync(EVIDENCE_FILE, 'load 40 ms, persist 120 ms: the declared close condition holds\n')
 
@@ -141,6 +143,27 @@ describe('issue_premise_unmet_cli.run — refused with nothing written', () => {
 		expect(code).toBe(1)
 		expect(calls).toStrictEqual([])
 		expect(console.error).toHaveBeenCalledWith(expect.stringContaining('nothing written'))
+	})
+
+	it('refuses a body declaring a person judgement is needed and points at the park', async () => {
+		mocks.issue_get_body.mockResolvedValue(JUDGEMENT_NEEDED_BODY)
+
+		const code = await issue_premise_unmet_cli.run([ISSUE, FLAG, EVIDENCE_FILE])
+
+		expect(code).toBe(1)
+		expect(calls).toStrictEqual([])
+		expect(console.error).toHaveBeenCalledWith(expect.stringContaining('park it'))
+	})
+})
+
+describe('issue_premise_unmet_cli.run — a declared person judgement', () => {
+	it('closes a body declaring no person judgement is needed', async () => {
+		mocks.issue_get_body.mockResolvedValue(JUDGEMENT_NOT_NEEDED_BODY)
+
+		const code = await issue_premise_unmet_cli.run([ISSUE, FLAG, EVIDENCE_FILE])
+
+		expect(code).toBe(0)
+		expect(calls).toStrictEqual(['comment', 'close', 'release'])
 	})
 })
 

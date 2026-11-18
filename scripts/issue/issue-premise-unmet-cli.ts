@@ -4,6 +4,7 @@ import { epic_close } from '#scripts/epic/epic-close'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_pr_read } from '#scripts/gh/git-gh-pr-read'
 import { git_command } from '#scripts/git/git-command'
+import { issue_auto_ok } from '#scripts/issue/issue-auto-ok'
 import { issue_body_keys } from '#scripts/issue/issue-body-keys'
 import { issue_evidence_exit } from '#scripts/issue/issue-evidence-exit'
 import { measure_declaration } from '#scripts/issue/measure-declaration'
@@ -20,13 +21,16 @@ import { error_text } from '#scripts/lib/error-message'
 // **It closes only what loses nothing** (joshuafolkken/kit#7286): the body declares the condition, so
 // the close is the filer's decision, not the lane's; the lane branch carries no commit beyond
 // `origin/main` and no uncommitted change, and has no pull request. Any of those missing or unreadable
-// refuses with nothing written — a lane that only judges the work not worth doing still parks. A
+// refuses with nothing written — a lane that only judges the work not worth doing still parks, and so
+// does a body declaring a person's judgement is needed (joshuafolkken/kit#7969). A
 // reopen undoes the close and the comment records why, so it is Tier A. The lane itself is cleared by
 // the wake loop's sweep of not-planned closes (`lane-withdraw-closed.ts`), not here.
 
 const ARGV_OFFSET = 2
 const COMMAND = 'issue:premise-unmet'
 const BASE = 'origin/main'
+// joshuafolkken/kit#7969: a body that leaves a decision to a person is never closed by the lane.
+const JUDGEMENT_NEEDED_REFUSAL = `its body declares \`${issue_body_keys.line('judgement', 'needed')}\` — park it with the findings, the options and a recommendation for a person to close`
 
 function is_declared(body: string): boolean {
 	return issue_body_keys
@@ -37,9 +41,14 @@ function is_declared(body: string): boolean {
 async function declaration_refusal(issue_number: string): Promise<string | undefined> {
 	const body = await git_gh_command.issue_get_body(issue_number)
 	if (body === undefined) return 'its body was not read'
-	if (is_declared(body)) return undefined
 
-	return `its body declares no \`${issue_body_keys.prefix('close_condition')}\` line under \`${issue_body_keys.heading('background')}\``
+	if (!is_declared(body)) {
+		return `its body declares no \`${issue_body_keys.prefix('close_condition')}\` line under \`${issue_body_keys.heading('background')}\``
+	}
+
+	if (issue_auto_ok.declares_judgement_needed(body)) return JUDGEMENT_NEEDED_REFUSAL
+
+	return undefined
 }
 
 async function lane_directory(issue_number: string): Promise<string> {
