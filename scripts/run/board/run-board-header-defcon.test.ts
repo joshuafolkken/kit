@@ -113,6 +113,13 @@ describe('run_board_header_defcon.level_of on held seats and blocked P1s', () =>
 
 		expect(level({ active: ONE, queued: [{ kind: 'row', row: blocked }] })).toBe(CALM)
 	})
+
+	it('raises nothing on a P1 held by a start time beside a free lane', () => {
+		const reason = { icon: '⏳', not_before_ms: NOW + 1 }
+		const later = { ...row(92, 'waiting', 'critical'), reason }
+
+		expect(level({ active: ONE, queued: [{ kind: 'row', row: later }] })).toBe(CALM)
+	})
 })
 
 describe('run_board_header_defcon.field_of', () => {

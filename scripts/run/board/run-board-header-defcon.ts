@@ -53,9 +53,12 @@ function is_asking(read: DefconRead): boolean {
 	return run_board_layout.people_of(layout_of(read)).length > 0
 }
 
-// A `P1` a free lane could take: none of its blockers left standing.
+// A `P1` a free lane could take: no blocker left standing and no other wait — a start time, a path
+// overlap, a solo hold — named in its reason (`run-board-reason.ts`).
 function is_ready_critical(row: BoardRow): boolean {
-	return row.priority === 'critical' && row.waits.length === 0
+	const is_free = row.waits.length === 0 && row.reason === undefined
+
+	return row.priority === 'critical' && is_free
 }
 
 // 3: a `P1` a lane could take waits while one is free.
