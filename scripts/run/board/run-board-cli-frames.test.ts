@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_board_cli } from './run-board-cli'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_frame_store, type FrameStore } from './run-board-frame-store'
@@ -11,6 +11,15 @@ const AGE_SECONDS = 12
 const AGE_MS = AGE_SECONDS * 1000
 const PIPED_ONCE = once_key(undefined, false)
 const LAUNCH = { pos: 1, at: '2026-10-08T08:00:00.000Z', kind: 'child-launch', text: '#1 a' }
+
+// joshuafolkken/kit#8027: a shell that names a theme must not redraw the recorded frames these tests read.
+beforeEach(() => {
+	vi.stubEnv('JOSH_BOARD_THEME', undefined)
+})
+
+afterEach(() => {
+	vi.unstubAllEnvs()
+})
 
 function board(store: FrameStore): ReturnType<typeof harness> & { ports: BoardPorts } {
 	const made = harness({ ...LOCAL, events: [LAUNCH] }, [plan_titled('a')])
