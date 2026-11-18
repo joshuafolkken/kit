@@ -14,6 +14,10 @@ interface PackageJson {
 	devDependencies: Record<string, string>
 }
 
+function read_kit_manifest(): PackageJson {
+	return JSON.parse(readFileSync(package_file('package.json'), 'utf8')) as PackageJson
+}
+
 function parse_generated_config(): SecretlintConfig {
 	return JSON.parse(init_logic_secretlint.generate_secretlint_config()) as SecretlintConfig
 }
@@ -39,24 +43,17 @@ describe('init_logic_secretlint.generate_secretlint_config', () => {
 })
 
 describe('init_logic_secretlint.merge_secretlint_development_deps', () => {
-	// The CLI and the rule preset are resolved from the consumer project, so a partial
-	// install leaves the pre-commit hook failing with "Cannot find module".
-	it('adds both the CLI and the rule preset when neither is present', () => {
+	// The CLI is resolved from the consumer project; since secretlint v14 it carries the recommend
+	// preset itself, so the deprecated preset package is never added.
+	it('adds only the CLI when it is absent', () => {
 		const deps = parse_merged_deps('{"devDependencies":{}}')
 
-		expect(Object.keys(deps)).toHaveLength(2)
-		expect(deps[SECRETLINT_KEY]).toBeDefined()
-		expect(deps[PRESET_ID]).toBeDefined()
+		expect(Object.keys(deps)).toStrictEqual([SECRETLINT_KEY])
+		expect(deps[PRESET_ID]).toBeUndefined()
 	})
 
 	it('adds the dependencies when devDependencies is absent entirely', () => {
 		expect(parse_merged_deps('{"name":"consumer"}')[SECRETLINT_KEY]).toBeDefined()
-	})
-
-	it('pins the preset to the same major as the CLI', () => {
-		const deps = parse_merged_deps('{}')
-
-		expect(deps[PRESET_ID]).toBe(deps[SECRETLINT_KEY])
 	})
 
 	it('preserves a version the consumer already pinned', () => {
@@ -65,18 +62,27 @@ describe('init_logic_secretlint.merge_secretlint_development_deps', () => {
 		expect(parse_merged_deps(content)[SECRETLINT_KEY]).toBe('^12.0.0')
 	})
 
-	it('returns content untouched when both entries already exist', () => {
-		const content = `{"devDependencies":{"${SECRETLINT_KEY}":"^13.0.2","${PRESET_ID}":"^13.0.2"}}`
+	it('returns content untouched when the CLI already exists', () => {
+		const content = `{"devDependencies":{"${SECRETLINT_KEY}":"^14.0.0"}}`
 
 		expect(init_logic_secretlint.merge_secretlint_development_deps(content)).toBe(content)
 	})
 
-	it("adds the versions kit's own devDependencies carry", () => {
-		const kit = JSON.parse(readFileSync(package_file('package.json'), 'utf8')) as PackageJson
+	it('drops the retired preset package and moves the CLI to the version kit carries', () => {
+		const kit = read_kit_manifest()
+		const content = `{"devDependencies":{"${SECRETLINT_KEY}":"^13.1.0","${PRESET_ID}":"^13.1.0"}}`
+		const deps = parse_merged_deps(content)
+
+		expect(deps[PRESET_ID]).toBeUndefined()
+		expect(deps[SECRETLINT_KEY]).toBe(kit.devDependencies[SECRETLINT_KEY])
+	})
+
+	it("adds the version kit's own devDependencies carry", () => {
+		const kit = read_kit_manifest()
 		const deps = parse_merged_deps('{}')
 
 		expect(deps[SECRETLINT_KEY]).toBe(kit.devDependencies[SECRETLINT_KEY])
-		expect(deps[PRESET_ID]).toBe(kit.devDependencies[PRESET_ID])
+		expect(kit.devDependencies[PRESET_ID]).toBeUndefined()
 	})
 
 	it('keeps unrelated devDependencies intact', () => {
