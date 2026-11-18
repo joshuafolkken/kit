@@ -489,8 +489,8 @@ On a clash the child gives its lane back instead of polling with its seat taken:
 A lane dispatched before its holder, with commits, waits instead, keeping its seat (`scripts/lane/lane-plan-wait.ts`):
 
 - It waits when the holder's estimated time left (3-day median lane less its elapsed time) is at most its own worked time, capped at 30 minutes.
-- The first such ask records that deadline on the plan; `lane:plan` then blocks, re-reading holders each minute, up to 9 minutes per ask.
-- It answers `clear` once the holder's lane ends, `yield` past the deadline, or `wait` when the 9 minutes run out first: ask again.
+- The first such ask records that deadline on the plan; `lane:plan` then blocks, re-reading holders each minute, up to 4.5 minutes per ask — the ship wait's chunk, under the five-minute prompt-cache TTL.
+- It answers `clear` once the holder's lane ends, `yield` past the deadline, or `wait` when the ask's time runs out first: ask again.
 
 `--probe` answers the same check and writes nothing. A lane child's `run:entry` runs it once, before the issue report, on the paths dispatch gated on; on a clash it gives the lane back as above and exits 2.
 

@@ -1,4 +1,5 @@
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
+import { run_ship_wait_cli } from '#scripts/run/ship/run-ship-wait-cli'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_ledger, type LedgerEntry } from './lane-ledger'
 import { lane_plan_signals } from './lane-plan-signals'
@@ -18,6 +19,7 @@ const CAP_MINUTES = 30
 const SHORT_WORK_MINUTES = 5
 const EARLIER_MS = Date.parse('2026-11-02T10:00:00Z')
 const HOUR_MINUTES = 60
+const CACHE_TTL_MINUTES = 5
 // A holder listing as slow as the one round 2 measured.
 const SLOW_READ_MS = 7000
 
@@ -143,8 +145,15 @@ describe('lane_plan_wait.deadline', () => {
 	)
 })
 
+describe('lane_plan_wait.ASK_MS', () => {
+	it('is the ship wait chunk, under the five-minute prompt-cache TTL (#7879)', () => {
+		expect(lane_plan_wait.ASK_MS).toBe(run_ship_wait_cli.CHUNK_MS)
+		expect(lane_plan_wait.ASK_MS).toBeLessThan(CACHE_TTL_MINUTES * MS_PER_MINUTE)
+	})
+})
+
 describe('lane_plan_wait.hold', () => {
-	const ASK_MS = 9 * MS_PER_MINUTE
+	const { ASK_MS } = lane_plan_wait
 
 	beforeEach(() => {
 		vi.useFakeTimers({ toFake: ['Date'], now: NOW_MS })

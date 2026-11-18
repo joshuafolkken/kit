@@ -207,13 +207,16 @@ const LANE_BACKGROUND_STOP_REASON =
 	'your reply.'
 
 // **Only subagents left: the wait that receives their answer** (joshuafolkken/kit#4803). Their completion
-// notice is delivered only when a tool call ends, so one long hand-written loop holds it back until the
-// loop itself gives up; short foreground calls, one at a time, let it in at the first one to end.
+// notice is delivered only when a tool call ends, so a hand-written loop holds it back until the loop
+// itself gives up. **A foreground dispatch needs no wait at all**, so the reason leads with it: a
+// `sleep 20` repeated rereads the context on every call (joshuafolkken/kit#7879). The harness refuses a
+// longer standalone `sleep`, so one already in the background is waited on by the foreground work left,
+// then short calls.
 const LANE_AGENT_STOP_REASON =
-	'⛔ lane agent stop: this is a started child (lane, hand-off or beside) and a subagent it launched ' +
-	'has not finished; ending this turn kills it. Its completion notice arrives only when a tool call ' +
-	'ends: wait with one short foreground call at a time (`sleep 20`) until it arrives — never a loop ' +
-	'over its `.output`. Do not notify, stop or repeat your reply.'
+	'⛔ lane agent stop: a subagent this started child (lane, hand-off or beside) launched has not ' +
+	'finished; ending this turn kills it. Dispatch subagents with `run_in_background: false`: no wait. Its notice arrives only ' +
+	'when a tool call ends: do the foreground work left, then one short call at a time (`sleep 20`) — ' +
+	'never a loop over `.output`. Do not notify, stop or repeat your reply.'
 
 // The row itself, so `delivered-rules.ts` spreads one entry. It fires on every occurrence (`decide`
 // returns true): a child must never background these, so the route is always the detached ship, never

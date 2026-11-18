@@ -1,5 +1,6 @@
 import { poll } from '#scripts/lib/poll'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
+import { run_ship_wait_cli } from '#scripts/run/ship/run-ship-wait-cli'
 import { lane_ledger, type LedgerEntry } from './lane-ledger'
 import { lane_ledger_archive } from './lane-ledger-archive'
 import { lane_plan_signals } from './lane-plan-signals'
@@ -14,14 +15,15 @@ import { lane_stats } from './lane-stats'
 // yielded to at the deadline. Anything else yields as before (joshuafolkken/kit#4926).
 //
 // **The wait blocks inside `lane:plan`** (`hold`), re-reading the holders once a minute, since a
-// headless lane child has no way to wait between asks; one ask blocks at most `ASK_MINUTES`, under
-// the Bash timeout, and answers `wait` for the child to ask again.
+// headless lane child has no way to wait between asks; one ask blocks at most `ASK_MS`, and answers
+// `wait` for the child to ask again. **`ASK_MS` is the ship wait's chunk** (`run-ship-wait-cli.ts`),
+// below the five-minute prompt-cache TTL, so the next ask reads cached context instead of rewriting
+// it (joshuafolkken/kit#7879).
 
 const WAIT_CAP_MINUTES = 30
 const WAIT_CAP_MS = WAIT_CAP_MINUTES * MS_PER_MINUTE
 const MEDIAN_PERIOD_DAYS = 3
-const ASK_MINUTES = 9
-const ASK_MS = ASK_MINUTES * MS_PER_MINUTE
+const ASK_MS = run_ship_wait_cli.CHUNK_MS
 
 // How one blocking ask ended: the holder let go, the deadline passed, or the ask's own time ran out.
 type HoldEnd = 'free' | 'expired' | 'again'
@@ -119,7 +121,7 @@ async function hold(
 	)
 }
 
-const lane_plan_wait = { deadline, deadline_of, facts_from, hold }
+const lane_plan_wait = { ASK_MS, deadline, deadline_of, facts_from, hold }
 
 export type { HoldEnd, WaitFacts }
 export { lane_plan_wait }
