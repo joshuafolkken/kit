@@ -115,7 +115,10 @@ describe('run_board_render legend for the estimated finish', () => {
 		expect(lines_with().join('\n')).toContain(LEGEND)
 	})
 
+	// A running row ends on 🎯 (joshuafolkken/kit#7920), so only a frame with none draws no 🎯.
 	it('leaves 🎯 out of a frame that draws none', () => {
-		expect(lines_with({ lane_totals: undefined }).join('\n')).not.toContain(LEGEND)
+		const layout = { ...EMPTY_LAYOUT, queued: LAYOUT.queued }
+
+		expect(lines_with({ lane_totals: undefined, layout }).join('\n')).not.toContain(LEGEND)
 	})
 })
