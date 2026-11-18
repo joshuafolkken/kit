@@ -384,7 +384,7 @@ The parent reads the tiers and the recommendation with `backlog:triage --apply <
 
 `backlog:drive` decides a `推奨なし` park over a reversible option needing no permission or size approval (`backlogrun-park.md` → "A park the driver decides"); any other `推奨なし` park or a tier C option stays a person's (`backlogrun-park.md` → "A park left for a person").
 
-The `lane-park` guard reads the local park record, so a child that parked is not asked to again. `--clear` succeeds with the label already off, releasing nothing. A park that lands runs `run:release <N>`'s own implementation next, so the hold and `in-progress` come off in the same call; a tree whose hold names another run releases nothing — that run's own ending does.
+The `lane-park` guard reads the local park record, so a parked child is not asked again. `--clear` succeeds with the label already off, releasing nothing. A landed park then runs `run:release <N>`'s implementation, so the hold and `in-progress` come off in one call; a tree whose hold names another run releases nothing — that run's ending does.
 
 A park inside a lane appends the lane directory, its seat and `pnpm josh lane:close <N>` to the comment.
 
