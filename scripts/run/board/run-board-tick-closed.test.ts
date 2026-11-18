@@ -190,6 +190,52 @@ describe('run_board_tick.tick — children of an ended run', () => {
 	})
 })
 
+// joshuafolkken/kit#7900 (ac-a46d0c02): as joshuafolkken/kit#7790 ran — launched, stopped, retried by
+// `run:add --retry`, then closed by a person before it ran again — the child left an empty ⏳ lane row.
+const RETRIED_CHILD = CHILDREN[0] ?? 0
+const RETRIED_AT = '2026-10-08T08:30:00.000Z'
+const LOCAL_RETRIED = {
+	...LOCAL,
+	events: [
+		launch(RETRIED_CHILD, 1),
+		{ pos: 2, at: RETRIED_AT, kind: 'add', text: `retry #${String(RETRIED_CHILD)}` },
+	],
+}
+const OPEN_ANSWER: ClosedAnswer = { closed: new Map(), is_whole: true }
+const WAITING_ROW = new RegExp(`⏳.* ${String(RETRIED_CHILD)} `, 'u')
+const CLOSED_ROW = new RegExp(`✅ ${TIME_PATTERN} ${String(RETRIED_CHILD)} `, 'u')
+
+function expect_drawn_closed(frame: string | undefined): void {
+	expect(frame).not.toMatch(WAITING_ROW)
+	expect(frame).toMatch(CLOSED_ROW)
+}
+
+describe('run_board_tick.tick — a child closed while waiting on its retry', () => {
+	it('draws it closed, not waiting, while the run is going', async () => {
+		const { ports, frames, read_closed } = harness(LOCAL_RETRIED, [PLAN])
+
+		read_closed.mockImplementation(async (issues) => merged_closed(issues))
+		await tick(FRESH_STATE, ports)
+
+		expect_drawn_closed(frames.at(-1))
+	})
+
+	it('asks again and draws it closed after the run ended', async () => {
+		const ended = { ...LOCAL_RETRIED, ended_ms: START }
+		const { ports, frames, read_closed, clock } = harness(ended, [PLAN])
+
+		read_closed.mockResolvedValueOnce(OPEN_ANSWER)
+		const first = await tick(FRESH_STATE, ports)
+
+		read_closed.mockImplementation(async (issues) => merged_closed(issues))
+		clock.now_ms += PLAN_RETRY_MS
+		await tick(first, ports)
+
+		expect(read_closed).toHaveBeenCalledTimes(2)
+		expect_drawn_closed(frames.at(-1))
+	})
+})
+
 // A failed read answers the same nothing as a child still open, so it must not count as the ended run's
 // one ask: a merged child would otherwise stay drawn 🏁 until the next run.
 describe('run_board_tick.tick — an ended run whose read failed', () => {

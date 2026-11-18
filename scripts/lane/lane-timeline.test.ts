@@ -227,12 +227,25 @@ describe('lane_timeline.of — a host sleep', () => {
 	it('names a wait nothing else opened by the sleep across it', () => {
 		const rows = timeline_of([slept_until(50, 5)])?.rows ?? []
 
-		expect(rows.find((row) => row.at_ms === START + 45 * MINUTE_MS)?.name).toBe('sleep')
+		expect(rows.find((row) => row.at_ms === START + 45 * MINUTE_MS)?.name).toBe('host stop')
 	})
 
 	it('adds the sleep to the park it fell inside', () => {
 		const rows = timeline_of([slept_until(25, 2)])?.rows ?? []
 
-		expect(rows.find((row) => row.kind === lane_timeline.ROW.EXCLUDED)?.name).toBe('park + sleep')
+		expect(rows.find((row) => row.kind === lane_timeline.ROW.EXCLUDED)?.name).toBe(
+			'park + host stop',
+		)
+	})
+})
+
+// joshuafolkken/kit#7867: a network outage is a host stop too, never named a sleep.
+describe('lane_timeline.of — a network outage', () => {
+	it('names a wait nothing else opened by the outage across it', () => {
+		const ticks = [46, 47, 48, 49].map((minute) => event(minute, 'offline-tick', 'still down'))
+		const outage = [event(45, 'offline', 'down'), ...ticks, event(50, 'online', 'back')]
+		const rows = timeline_of(outage)?.rows ?? []
+
+		expect(rows.find((row) => row.at_ms === START + 45 * MINUTE_MS)?.name).toBe('host stop')
 	})
 })

@@ -1,9 +1,11 @@
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import type { LaneSpan } from './lane-net-time'
+import { lane_offline_spans } from './lane-offline-spans'
 
 // The intervals the whole host stopped (joshuafolkken/kit#7866): every lane stood still through them,
-// whatever its issue, so no lane's time counts them. Today the host's sleeps (joshuafolkken/kit#5032,
-// recorded by `lane-sleep.ts`). `josh lane:net` (`lane-net-time.ts`) and the board's time column
+// whatever its issue, so no lane's time counts them: the host's sleeps (joshuafolkken/kit#5032,
+// recorded by `lane-sleep.ts`) and its network outages (joshuafolkken/kit#7867, `lane-offline.ts`),
+// joined so a sleep while offline counts once. `josh lane:net` (`lane-net-time.ts`) and the board's time column
 // (`run-board-lane-time.ts`) both take them out through here.
 
 const { EVENT_KIND } = run_event_stream
@@ -35,9 +37,9 @@ function joined(spans: ReadonlyArray<LaneSpan>): Array<LaneSpan> {
 	return kept
 }
 
-/** Every interval the host stopped on `events`, joined. */
+/** Every interval the host stopped on `events`, joined; an open outage ends a tick past its last sighting. */
 function gaps_of(events: ReadonlyArray<RunEvent>): Array<LaneSpan> {
-	return joined(sleeps(events))
+	return joined([...sleeps(events), ...lane_offline_spans.spans(events)])
 }
 
 /** `gaps` cut to `span` and joined. */

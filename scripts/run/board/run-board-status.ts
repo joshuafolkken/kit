@@ -91,6 +91,9 @@ const UNSETTLED_STATES: ReadonlySet<ItemState> = new Set(['running', 'paused', '
 // person may close its issue after the stop; only a closed read settles it again, so one still open
 // keeps waiting whatever its labels say (joshuafolkken/kit#3958).
 const WAITING_STATES: ReadonlySet<ItemState> = new Set(['parked', 'human'])
+// What only a closed read settles: those, and a child waiting on its retry, which a person may close
+// before it runs again — kept off the lanes once closed (joshuafolkken/kit#7900).
+const CLOSE_WAITING_STATES: ReadonlySet<ItemState> = new Set([...WAITING_STATES, 'waiting'])
 
 const { relaunch_of, settled_as } = run_board_settle
 
@@ -330,7 +333,7 @@ function unsettled(issue: number, status: ItemStatus, read: OpenRead): ItemStatu
 	return from_closed ?? labelled(issue, status, read)
 }
 
-// The closed read is kept for the run, so a waiting child (parked or human) a person reopened since is
+// The closed read is kept for the run, so a waiting child (parked, human or retry) a person reopened since is
 // told apart by a listing read after the close holding it again. Once a listing has landed, that — not
 // the launch — dates the close, so a closed child never waits in 🙋 decision (joshuafolkken/kit#6535,
 // joshuafolkken/kit#6891).
@@ -345,7 +348,7 @@ function waiting_settled(issue: number, status: ItemStatus, read: OpenRead): Ite
 }
 
 function settled(issue: number, status: ItemStatus, read: OpenRead): ItemStatus {
-	if (WAITING_STATES.has(status.state)) return waiting_settled(issue, status, read)
+	if (CLOSE_WAITING_STATES.has(status.state)) return waiting_settled(issue, status, read)
 
 	return UNSETTLED_STATES.has(status.state) ? unsettled(issue, status, read) : status
 }
@@ -373,7 +376,7 @@ function settle_closed(
 }
 
 const run_board_status = {
-	WAITING_STATES,
+	CLOSE_WAITING_STATES,
 	fold_events,
 	settle_closed,
 	since_launch,
