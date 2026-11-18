@@ -101,8 +101,7 @@ function latest_parks(events: ReadonlyArray<RunEvent>): ReadonlyMap<number, RunE
 	return parks
 }
 
-// The labels of an issue still open, still `run:stalled` and free of a protected label `run:add` would
-// refuse, else `undefined`. An issue that cannot be read is not re-offered.
+// Still open, still `run:stalled` and free of a protected label `run:add` would refuse.
 function is_stalled(read: EpicIssue): boolean {
 	const labels = epic_issue.label_names(read)
 
@@ -113,6 +112,7 @@ function is_stalled(read: EpicIssue): boolean {
 	)
 }
 
+// The labels of a stalled issue, else `undefined`. An issue that cannot be read is not re-offered.
 async function stalled_labels(issue: number): Promise<ReadonlyArray<string> | undefined> {
 	const read = await run_add_issue.read(issue)
 
@@ -139,13 +139,16 @@ function cap_cause(park: RunEvent): string {
 	return cause === '' ? CAP_NOTE : `${CAP_NOTE} — ${cause}`
 }
 
-// The park restated with the cap note and its cause, its stop kept, so the board row hands it to a
-// person.
-async function note_cap(issue: number, park: RunEvent): Promise<void> {
-	const text = run_stalled.park_event(issue, cap_cause(park))
+// The park restated as `text` now, its stop kept.
+async function restate(park: RunEvent, text: string): Promise<void> {
 	const { stop } = park
 
 	await run_event_stream_emit.emit(PARK, text, new Date(), { ...(stop && { stop }) })
+}
+
+// The park restated with the cap note and its cause, so the board row hands it to a person.
+async function note_cap(issue: number, park: RunEvent): Promise<void> {
+	await restate(park, run_stalled.park_event(issue, cap_cause(park)))
 }
 
 // A refused `run:add` (a settled or withdrawn issue, an unreadable lane, a failed label write) leaves the
@@ -177,12 +180,20 @@ async function is_due(
 	return await is_still_stalled(issue)
 }
 
-// The retry's own park postdates the blocker's close, so one close re-offers once, past the cap too.
+// The retry's own park postdates the blocker's close, so one close re-offers once, past the cap too; a
+// refused retry restates the park, which then postdates the close too, so no sweep asks again.
 async function retry_unblocked(issue: number, park: RunEvent): Promise<void> {
 	const read = await run_add_issue.read(issue)
 
-	if (read === undefined || !is_stalled(read)) return
-	if (backlog_drive_retry.is_unblocked_since(read, park.at)) await retry_cleared(issue)
+	if (
+		read === undefined ||
+		!is_stalled(read) ||
+		!backlog_drive_retry.is_unblocked_since(read, park.at)
+	) {
+		return
+	}
+
+	if (!(await retry_cleared(issue))) await restate(park, park.text)
 }
 
 async function retry_park(issue: number, park: RunEvent, context: SweepContext): Promise<void> {
