@@ -148,19 +148,25 @@ function stop_row_reason(status: ItemStatus): Pick<BoardRow, 'reason'> {
 
 // joshuafolkken/kit#7901: a ⏳ lane row no ending reason names says why it waits and what starts it.
 // Its blockers follow its title (`🔗`), so the tail names only the move that clears them: an upstream
-// Issue's close (`owner/repo#N`), a blocker's merge here, else the next free lane a retry starts in.
+// Issue's close (`owner/repo#N`), a blocker's merge here, both where both hold it, else the next free
+// lane a retry starts in.
 const WAITING_TAILS = {
 	free: 'retry · → next free lane',
 	blocker: '→ starts on blocker merge',
 	upstream: '→ starts on upstream close',
+	both: '→ starts on merge + close',
+}
+
+function blocked_tail(waits: ReadonlyArray<string>): string {
+	const upstream_count = waits.filter((wait) => wait.includes('#')).length
+
+	if (upstream_count === 0) return WAITING_TAILS.blocker
+
+	return upstream_count === waits.length ? WAITING_TAILS.upstream : WAITING_TAILS.both
 }
 
 function waiting_reason(waits: ReadonlyArray<string> = []): RowReason {
-	if (waits.length === 0) return { tail: WAITING_TAILS.free }
-
-	const is_upstream = waits.some((wait) => wait.includes('#'))
-
-	return { tail: is_upstream ? WAITING_TAILS.upstream : WAITING_TAILS.blocker }
+	return { tail: waits.length === 0 ? WAITING_TAILS.free : blocked_tail(waits) }
 }
 
 // A row no reason was recorded for: a ⏳ wait's next move, a stall's resume, else what stopped it.

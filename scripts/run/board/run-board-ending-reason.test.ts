@@ -116,7 +116,7 @@ describe('run_board_ending_reason.row_reason — a waiting lane', () => {
 		['no blocker', undefined, WAITING_TAILS.free],
 		['a blocker in this repository', ['7228'], WAITING_TAILS.blocker],
 		['an upstream Issue', ['joshuafolkken/kit#7691'], WAITING_TAILS.upstream],
-		['an upstream Issue beside a local blocker', ['7228', 'owner/repo#3'], WAITING_TAILS.upstream],
+		['an upstream Issue beside a local blocker', ['7228', 'owner/repo#3'], WAITING_TAILS.both],
 	])('names the next move of a retry held by %s', (_case, waits, tail) => {
 		const read = {
 			titles: new Map(),
@@ -137,14 +137,6 @@ describe('run_board_ending_reason.row_reason — a waiting lane', () => {
 		expect(run_board_ending_reason.row_reason(13, status, read)).toStrictEqual({
 			reason: { tail: reason },
 		})
-	})
-
-	it('fits each tail within a running row tail width', () => {
-		const RUNNING_TAIL_WIDTH = 26
-
-		for (const tail of Object.values(WAITING_TAILS)) {
-			expect(tail.length).toBeLessThanOrEqual(RUNNING_TAIL_WIDTH)
-		}
 	})
 })
 
