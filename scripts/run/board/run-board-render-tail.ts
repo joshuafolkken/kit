@@ -79,15 +79,16 @@ function phase_end(row: BoardRow, header: BoardHeader): number | undefined {
 	return row.state === 'stopped' ? row.status?.ended_ms : undefined
 }
 
-// How long the child has stood at its phase, right-aligned to `width` and colored against the phase's
-// usual time; blanks where no event said when it got there, so what follows still starts in its column.
+// How long the child has stood at its phase, the host's stops left out (joshuafolkken/kit#7905),
+// right-aligned to `width` and colored against the phase's usual time; blanks where no event said when
+// it got there, so what follows still starts in its column.
 function phase_time(row: BoardRow, header: BoardHeader, width: number): string {
 	const current = current_of(row)
 	const end = phase_end(row, header)
 
 	if (current === undefined || end === undefined) return ' '.repeat(width)
 
-	const elapsed = end - current.since_ms
+	const elapsed = run_board_estimate.phase_spent(row.status, end) ?? 0
 	const text = span_of(elapsed).padStart(width)
 
 	return tinted(text, phase_color(elapsed, header.usual?.get(current.phase)))

@@ -210,4 +210,26 @@ describe('lane_stage_stats.medians', () => {
 	it('leaves out a stage nothing recorded rather than reading it as zero', () => {
 		expect(lane_stage_stats.medians([stage(REVIEW, 2, 1)]).has(CI_WAIT)).toBe(false)
 	})
+
+	// joshuafolkken/kit#7905: a host sleep inside a stage is not time the stage took.
+	it('takes the host stops inside each stage and implementation out of its duration', () => {
+		const entries = [stage(REVIEW, 10, 1), dispatch(30), stage('preflight', 1, 19)]
+		const gaps = [
+			{ from_ms: at(6), to_ms: at(4) },
+			{ from_ms: at(27), to_ms: at(24) },
+		]
+		const medians = lane_stage_stats.medians(entries, gaps)
+
+		expect(medians.get(REVIEW)).toBe(8 * MS_PER_MINUTE)
+		expect(medians.get(lane_stage_stats.IMPLEMENT)).toBe(7 * MS_PER_MINUTE)
+	})
+
+	it('leaves every median as recorded when no stop falls inside a stage', () => {
+		const entries = [stage(REVIEW, 10, 1), dispatch(30), stage('preflight', 1, 19)]
+		const outside = [{ from_ms: at(60), to_ms: at(40) }]
+
+		expect(lane_stage_stats.medians(entries, outside)).toStrictEqual(
+			lane_stage_stats.medians(entries),
+		)
+	})
 })

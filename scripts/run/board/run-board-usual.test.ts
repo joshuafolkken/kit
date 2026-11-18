@@ -79,3 +79,27 @@ describe('run_board_usual.usual_of over an unchanged ledger', () => {
 		expect(run_board_usual.usual_of([...ledger], LATER).get('gate')).toBe(MINUTE)
 	})
 })
+
+// joshuafolkken/kit#7905: the usual times are net of the host's stops.
+describe('run_board_usual.usual_of net of the host stops', () => {
+	const SLEEP = [
+		{
+			from_ms: Date.parse('2026-10-10T11:52:00.000Z'),
+			to_ms: Date.parse('2026-10-10T11:55:00.000Z'),
+		},
+	]
+
+	it('takes a host stop inside a stage out of its usual time', () => {
+		expect(run_board_usual.usual_of([stage('gate', 10)], NOW, SLEEP).get('gate')).toBe(7 * MINUTE)
+	})
+
+	it('aggregates the same entries again once a new host stop is known', () => {
+		const ledger = [stage('gate', 10)]
+
+		expect(run_board_usual.usual_of(ledger, NOW).get('gate')).toBe(10 * MINUTE)
+		expect(run_board_usual.usual_of(ledger, NOW, SLEEP).get('gate')).toBe(7 * MINUTE)
+		expect(run_board_usual.usual_of(ledger, NOW, [...SLEEP])).toBe(
+			run_board_usual.usual_of(ledger, NOW, SLEEP),
+		)
+	})
+})

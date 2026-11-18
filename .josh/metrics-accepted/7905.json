@@ -1,0 +1,7 @@
+{
+	"reason": "Board estimates now net host stops out of stage medians, throughput active hours and phase time (#7905); the new lines are that netting and its tests' plumbing",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 55
+	}
+}
