@@ -1,0 +1,7 @@
+{
+	"reason": "new issue:kind command (#7974): CLI, shared declaration-line module and kind-label changes",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 224
+	}
+}

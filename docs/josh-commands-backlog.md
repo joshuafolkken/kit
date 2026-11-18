@@ -531,6 +531,25 @@ Writes `- リリース分類: <label>` at the end of the `## 背景` declaration
 
 Run it when `josh ship` or `josh git` stops for a missing release classification. A lane with a non-defect Issue (`種別: 非不具合`) and no `enhancement`, `bug` or `breaking-change` label writes `other-change` as a Tier A choice and goes on without parking.
 
+### `josh issue:kind`
+
+<!-- usage: issue:kind -->
+
+Switch an issue between bug and non-bug: the body's kind declarations, then its bug/enhancement labels.
+
+```bash
+pnpm josh issue:kind 6636 bug --origin "#<PR>"
+pnpm josh issue:kind 6636 non-bug --purpose improvement
+pnpm josh issue:kind 6636 non-bug --release-class other-change
+```
+
+<!-- /usage -->
+
+- `bug` writes `- 種別: 不具合` and `- 原因: <value>`, dropping `目的:` / `リリース分類:`; `non-bug` writes `- 種別: 非不具合` with `目的:` or `リリース分類: other-change`, dropping `原因:`.
+- Old lines in either language go; the new ones close the `## 背景` block, as in `josh issue:release-class`. Then `bug` / `enhancement` follow the body; `breaking-change` is left alone.
+- The new body is checked as `josh issue:lint` does; on a problem nothing is written — add the section (`## 再現` for `原因: 不明（…）`) with `josh issue:body`, then re-run.
+- A repeat writes nothing; a run that failed on a label write is finished by re-running it. On an `in-progress` Issue it warns that the commit-time regression-test requirement changed.
+
 ### `josh defect:origin`
 
 <!-- usage: defect:origin -->

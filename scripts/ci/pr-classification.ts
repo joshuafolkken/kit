@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { issue_body_keys } from '#scripts/issue/issue-body-keys'
+import { issue_declaration_line } from '#scripts/issue/issue-declaration-line'
 import {
 	BREAKING_CHANGE_LABEL as BREAKING,
 	BUG_LABEL,
@@ -21,13 +22,7 @@ const CLASSIFICATION_SET: ReadonlySet<string> = new Set(CLASSIFICATION_LABELS)
 // one format.
 const DECLARATION_PREFIX = `${issue_body_keys.prefix('release')} `
 const DECLARATION = new RegExp(`^${DECLARATION_PREFIX}(.+)$`, 'gmu')
-// Either language's declaration, so a rewrite never leaves the filer's own behind (joshuafolkken/kit#7210).
-const DECLARATION_LINE = new RegExp(
-	String.raw`^(?:${issue_body_keys.prefix_variants('release').join('|')}) .*(?:\n|$)`,
-	'gmu',
-)
-const BACKGROUND_HEADING = issue_body_keys.heading('background')
-const BULLET = '- '
+const DECLARATION_LINE = issue_declaration_line.declaration_lines(['release'])
 const NEWLINE = '\n'
 // The command a lane runs to write the declaration, since it cannot edit the Issue body by hand.
 const DECLARE_COMMAND = 'pnpm josh issue:release-class <issue> <label>'
@@ -62,44 +57,10 @@ function declaration(label: ReleaseClassification): string {
 	return `${DECLARATION_PREFIX}${label}`
 }
 
-// Where the declaration goes in the background section: after its first run of `- ` lines, else first.
-function block_end(lines: ReadonlyArray<string>): number {
-	const first = lines.findIndex((line) => line.startsWith(BULLET))
-
-	if (first === -1) return 0
-	const run = lines.slice(first).findIndex((line) => !line.startsWith(BULLET))
-
-	return run === -1 ? lines.length : first + run
-}
-
-function append_line(before: string, line: string): string {
-	const separator = before === '' || before.endsWith(NEWLINE) ? '' : NEWLINE
-
-	return `${before}${separator}${line}${NEWLINE}`
-}
-
-function insert_line(section: string, line: string): string {
-	const lines = section.split(/(?<=\n)/u)
-	const at = block_end(lines)
-
-	return `${append_line(lines.slice(0, at).join(''), line)}${lines.slice(at).join('')}`
-}
-
 // The body with exactly one declaration of `label`: every earlier declaration line is dropped and the
-// new one closes the background section's declaration block, or the body when it has no such section.
-// The body is newline-terminated first, so a heading on its last line keeps the line off its own.
+// new one closes the background section's declaration block.
 function with_declaration(body: string, label: ReleaseClassification): string {
-	const stripped = body.replaceAll(DECLARATION_LINE, '')
-
-	if (!markdown_section.has_line(stripped, BACKGROUND_HEADING)) {
-		return append_line(stripped, declaration(label))
-	}
-
-	return markdown_section.map_section(
-		stripped.endsWith(NEWLINE) ? stripped : `${stripped}${NEWLINE}`,
-		(line) => line.trim() === BACKGROUND_HEADING,
-		(section) => insert_line(section, declaration(label)),
-	)
+	return issue_declaration_line.with_declaration_lines(body, DECLARATION_LINE, [declaration(label)])
 }
 
 function is_classification(value: string): value is ReleaseClassification {
