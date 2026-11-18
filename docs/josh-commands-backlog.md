@@ -736,6 +736,10 @@ Writes all three places an epic's order lives — the task list, the `## Depende
 
 Nothing is written unless all three places will agree. `#M` must be a child of the epic; a position naming an issue being placed, or a hub the declaration cannot position within, is refused. A cross-repository target is refused with the bare-number command to run.
 
+`--chain` declares joins and branches while adding: it may name the added issues and existing children, and is written beside the chains already declared.
+
+A number outside those, a cycle through any chain, or use with a positioning flag is refused before anything is written.
+
 #### `josh epic --reconcile` — bring the declaration and the recorded relations back into agreement
 
 When the `## Dependencies` declaration and the `blocked-by` relations disagree, `--reconcile` makes the declaration state exactly what is recorded, with no judgement.
@@ -1020,6 +1024,9 @@ A lane park records its tree (`- Tree: <HEAD> · changes <n>`). If the latest pa
 the last `--adopt` share it, the option was never taken: `--adopt` parks `run:stalled` (`park loop`, no
 auto-retry) instead of requeuing. A park with no tree line requeues. The yield cap misses this loop: it
 counts yields to a held lane in a time window, and park → adopt → relaunch is no yield.
+
+A lane a person already withdrew (`lane:withdraw`, not a yield) is neither requeued nor parked:
+`--adopt` records the decision, clears the park and prints `lane withdrawn · not requeued`.
 
 Run the pass at the initial plan and after each collection batch that parked a child. The driver
 hands back `triage` once per such batch before its next offer; a batch without parks adds no step,

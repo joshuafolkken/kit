@@ -1135,6 +1135,23 @@ pnpm josh lane:withdraw 3769 --reason "folded into a broader issue"
 
 **Output / exit codes:** every explanation on stderr; exit 0 once the withdrawal finished. No open lane or an unreadable state: nothing written, exit 1. Work that cannot be stashed leaves the lane in place, exit 1.
 
+### `josh lane:fold`
+
+<!-- usage: lane:fold -->
+
+Hand a component issue over to the issue that wires it: withdraw its lane with the work stashed, tell the taker how to bring the stash in and to close it, and remove the taker’s blocked-by on it — a re-run finishes only the steps left.
+
+```bash
+pnpm josh lane:fold 7945 --into 7951 --reason "ships with the wiring"
+```
+
+<!-- /usage -->
+
+- In order: `lane:withdraw <N>`; a marked note on `<M>` (`JOSH_SESSION_LANG`) with the `stash:pop` line and `closes #<N>`; `<M>`'s blocked-by on `<N>` removed (`backlog:triage --unblock`); `<N>` blocked by `<M>`, so no run builds it apart.
+- A re-run goes on past a `no-lane` or `closed` withdrawal with the stash found on the stack, and writes no note or block twice.
+
+**Output / exit codes:** one line per step on stderr, exit 0; a failed step or bad argument, exit 1.
+
 ### `josh lane:resolve`
 
 <!-- usage: lane:resolve -->

@@ -1,5 +1,6 @@
 import { epic_add_body, type RewriteInput } from './epic-add-body'
 import { epic_chains, type InsertOutcome, type InsertPosition } from './epic-chains'
+import { epic_cli_chain } from './epic-cli-chain'
 import { epic_decision } from './epic-decision'
 import { epic_graph, type EpicChild } from './epic-graph'
 import { epic_parse, type DependencyLink } from './epic-parse'
@@ -24,6 +25,9 @@ interface PlanInput {
 	// above rather than in one of its own, because where the row goes is the same question either way;
 	// what this flag decides is whether a dependency is recorded behind it.
 	is_order_only?: boolean | undefined
+	// The `--chain` declarations: per-child prerequisites among the issues being added and the children
+	// the epic already tracks, written beside the insertion. The CLI refuses them beside a position.
+	chains?: ReadonlyArray<ReadonlyArray<number>> | undefined
 	// The epic's current children with their native relations, as `epic:next` reads them.
 	recorded: ReadonlyArray<EpicChild>
 	// The epic's own repository — what a declared bare number names. Needed because a recorded
@@ -341,6 +345,15 @@ function find_placement_error(
 	)
 }
 
+// A `--chain` may name the issues being added and the children the epic already tracks — the half the
+// CLI could not check, since only the epic body says which children it has.
+function find_chain_error(input: PlanInput, tracked: ReadonlyArray<number>): string | undefined {
+	const added = input.children.filter((child) => child !== input.epic_number)
+	const children = [...tracked, ...added]
+
+	return epic_cli_chain.find_outsider_refusal(input.chains ?? [], children)
+}
+
 // Every refusal, in the order a reader needs them: is this an epic, is there something to place and
 // somewhere to put it, do the body and the relations already agree, and can the decision record be
 // written.
@@ -353,8 +366,27 @@ function find_input_error(
 		epic_shape.find_subject_error(input, tracked) ??
 		find_placement_error(input, tracked, chains_before) ??
 		find_relation_error(epic_chains.links_of(chains_before), input.recorded, input.repo) ??
-		find_decision_error(input.decision)
+		find_decision_error(input.decision) ??
+		find_chain_error(input, tracked)
 	)
+}
+
+// The `--chain` declarations folded into the declaration the insertion produced. A declared chain
+// whose every link is already declared is dropped rather than written twice; the whole result is
+// then asked for a cycle, since a declared chain can close a loop through one the epic already has.
+function with_declared_chains(
+	outcome: InsertOutcome,
+	declared: ReadonlyArray<ReadonlyArray<number>>,
+): InsertOutcome {
+	if ('error' in outcome || declared.length === 0) return outcome
+
+	const fresh = declared.filter(
+		(chain) => epic_chains.diff_links(outcome.chains, [chain]).added.length > 0,
+	)
+	const chains = [...outcome.chains, ...fresh.map((chain) => [...chain])]
+	const cycle = epic_cli_chain.find_cycle_refusal(chains)
+
+	return cycle === undefined ? { chains } : { error: cycle }
 }
 
 // The declaration the body will carry. A relocation is a removal followed by the ordinary insertion,
@@ -374,12 +406,14 @@ function to_chains_after(
 ): InsertOutcome {
 	if (input.is_order_only === true) return epic_chains.keep_declaration(chains_before)
 
-	return epic_chains.insert_children(
+	const inserted = epic_chains.insert_children(
 		epic_chains.remove_children(chains_before, moves.relocations),
 		moves.placed,
 		input.position,
 		tracked,
 	)
+
+	return with_declared_chains(inserted, input.chains ?? [])
 }
 
 function build_plan(input: PlanInput): PlanOutcome {
