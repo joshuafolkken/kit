@@ -1,0 +1,7 @@
+{
+	"reason": "the finish splits into an aligned stamp and drift column, and 🧳 takes the blank finish column of an earlier run's row (#7994)",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 21
+	}
+}

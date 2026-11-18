@@ -15,6 +15,7 @@ import { backlog_triage_close } from './backlog-triage-close'
 import { backlog_triage_filing } from './backlog-triage-filing'
 import { backlog_triage_park } from './backlog-triage-park'
 import { backlog_triage_park_loop } from './backlog-triage-park-loop'
+import { backlog_triage_withdrawn } from './backlog-triage-withdrawn'
 
 // `josh backlog:triage --apply <N> --adopt <k> --reason <text>` — a parent takes option `<k>` of a
 // parked child's park in one call (joshuafolkken/kit#6670): the decision recorded in the tracking
@@ -49,6 +50,7 @@ const USAGE =
 const DECIDE_FAILED = 'could not record the decision; nothing after it was written'
 const REQUEUE_FAILED_HEAD = 'decision recorded and park cleared, but'
 const NO_RUN = 'no backlogrun is running here to requeue it; nothing was written'
+const WITHDRAWN_NEXT = 'lane withdrawn · not requeued'
 
 const OPTIONS = {
 	apply: { type: 'string' },
@@ -225,9 +227,12 @@ async function block(request: AdoptRequest): Promise<WriteResult> {
 	}
 }
 
-// A re-park on the tree the last adopted option left unchanged is held for a person, not requeued.
+// A lane a person already withdrew is neither requeued nor held (joshuafolkken/kit#7983); a re-park on
+// the tree the last adopted option left unchanged is held for a person, not requeued.
 async function requeue_or_hold(request: AdoptRequest, park: ParkFound): Promise<WriteResult> {
 	const { issue, option } = request
+
+	if (await backlog_triage_withdrawn.read_is_withdrawn(issue)) return { next: WITHDRAWN_NEXT }
 	const loop = backlog_triage_park_loop.loop_of(park.comments)
 
 	if (loop === undefined) return await requeue(issue)

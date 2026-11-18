@@ -10,9 +10,9 @@ import { run_board_render_tail } from './run-board-render-tail'
 import type { UsualTimes } from './run-board-usual'
 
 // joshuafolkken/kit#3769, #4043, #4292: how long a child has stood at its phase is drawn in the row's
-// lead — right-aligned, colored against the phase's usual time — and a running row ends on the kind and
-// the age of its newest activity, right-aligned in one column on every row; the event that entered the
-// phase is not drawn twice.
+// lead — right-aligned, colored against the phase's usual time — and a running row ends, after its
+// finish (#7994), on the kind and the age of its newest activity, right-aligned in one column on every
+// row; the event that entered the phase is not drawn twice.
 
 const { EMPTY_LAYOUT, MINUTE, NOW, header, lines_of } = run_board_render_fixture
 const PHASE_TIME = '8′00″'
@@ -28,8 +28,8 @@ const LONG_PHASE = 125 * MINUTE
 const LONG_TIME = '2°05′00″'
 // The columns the past-an-hour phase time takes beyond the usual one.
 const WIDER = LONG_TIME.length - PHASE_TIME.length
-// The long phase's row ends on its activity, then its finish, unmeasured with no lane total.
-const LONG_END = /Long {2,}👀 3′00″ {2}🎯 —$/u
+// The long phase's row ends on its finish, unmeasured with no lane total, then its activity.
+const LONG_END = /Long {2,}🎯 — {2}👀 3′00″$/u
 const EVENT: LaneEvent = { phase: 'review', words: 'ship review', at_ms: NOW - 3 * MINUTE }
 
 function running(number: number, title = `Issue ${String(number)}`): BoardRow {
@@ -72,9 +72,9 @@ function tail(row: BoardRow, extra: Partial<BoardHeader> = {}): Array<string | u
 	return run_board_render_tail.tail_of(row, board(extra))
 }
 
-// A running row's whole end outside followup: one part.
+// A running row's end outside followup: the one part after its finish.
 function quiet_tail(row: BoardRow, extra: Partial<BoardHeader> = {}): string | undefined {
-	return tail(row, extra)[0]
+	return tail(row, extra)[1]
 }
 
 // How long a row has stood at its phase, as the lead draws it.
@@ -162,7 +162,7 @@ describe('run_board_render_tail.phase_time of a stopped row', () => {
 
 describe('run_board_render_tail.tail_of activity', () => {
 	it('draws the newest event’s phase icon and its age, and no phase time', () => {
-		expect(tail(running(1))).toStrictEqual([ACTIVITY, '🎯 —'])
+		expect(tail(running(1))).toStrictEqual(['🎯 —', ACTIVITY])
 	})
 
 	it('draws 🔧 where the newest operation is newer than the newest event', () => {

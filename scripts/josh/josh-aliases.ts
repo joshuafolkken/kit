@@ -74,6 +74,7 @@ const ALIASES: Record<string, string> = {
 	lli: 'lane:limit',
 	lrs: 'lane:restart',
 	lwd: 'lane:withdraw',
+	lfd: 'lane:fold',
 	lrv: 'lane:resolve',
 	lps: 'lane:pause',
 	lru: 'lane:resume',

@@ -75,7 +75,7 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 					arguments: '--every 5',
 					note: 'the --chat frame as a 📊 Progress Telegram every 5 minutes, until the run ends',
 				},
-				{ arguments: BOARD_THEME, note: 'green text and dashed rules' },
+				{ arguments: BOARD_THEME, note: 'cyan phosphor text and dashed rules' },
 			],
 			flags: [
 				{
@@ -101,7 +101,7 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: [BOARD_THEME],
 					description:
-						'draws the text no color is given in phosphor green and every rule as `-`; `JOSH_BOARD_THEME=wargames` sets it for every board, the one `backlogrun` opens included, and `--theme` wins over it. A live board in it writes its first frame a line at a time from the top, 50ms apart, and a key writes the rest at once. An unknown name is refused. `--chat` and `--every` never take it.',
+						'draws the text no color is given in the cyan of the film terminal phosphor and every rule as `-`; `JOSH_BOARD_THEME=wargames` sets it for every board, the one `backlogrun` opens included, and `--theme` wins over it. A live board in it writes its first frame a line at a time from the top, 50ms apart, and a key writes the rest at once. An unknown name is refused. `--chat` and `--every` never take it.',
 				},
 			],
 		},

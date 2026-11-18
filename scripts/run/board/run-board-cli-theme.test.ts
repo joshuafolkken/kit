@@ -10,7 +10,7 @@ const { LOCAL, STOPPED, harness, plan_titled } = run_board_fixture
 const LAUNCH = { pos: 1, at: '2026-10-08T08:00:00.000Z', kind: 'child-launch', text: '#1 a' }
 const THEMED = ['--theme', 'wargames']
 const RULE = '─'
-const NAMED_GREEN = '\u{1B}[32m'
+const NAMED_CYAN = '\u{1B}[36m'
 
 async function frame_of(argv: Array<string>): Promise<string> {
 	const { ports, frames } = harness({ ...LOCAL, events: [LAUNCH] }, [plan_titled('a')])
@@ -55,14 +55,14 @@ describe('run_board_cli.run --theme', () => {
 		expect(await frame_of([...THEMED, '--chat'])).toBe(plain)
 	})
 
-	it('types the intro line in green on a live board', async () => {
+	it('types the intro line in cyan on a live board', async () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 		const { ports, frames } = harness(undefined, [])
 
 		await expect(run_board_cli.run(THEMED, { ...ports, intro_sleep: no_pause })).rejects.toBe(
 			STOPPED,
 		)
-		expect(frames[1]?.startsWith(NAMED_GREEN)).toBe(true)
+		expect(frames[1]?.startsWith(NAMED_CYAN)).toBe(true)
 		expect(frames.join('')).toContain(run_board_intro.LINE.at(0))
 	})
 })

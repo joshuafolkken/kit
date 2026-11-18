@@ -24,9 +24,13 @@ interface ChainRead {
 	chain_refusal?: string | undefined
 }
 
+// `children` is `undefined` where the epic's children are not known yet — `--add` reads them from the
+// epic, so its outsider check runs in the plan (`find_outsider_refusal`). `rival_flag` names another flag
+// given beside `--chain` that also decides the order (`--before` and its kin under `--add`).
 interface ChainSubject {
-	children: ReadonlyArray<number>
+	children?: ReadonlyArray<number> | undefined
 	is_ordered: boolean
+	rival_flag?: string | undefined
 }
 
 // The value as one chain, or `undefined` when the body parser would not read it as a chain line.
@@ -69,24 +73,44 @@ function find_shape_refusal(values: ReadonlyArray<string>): string | undefined {
 	return `\`${CHAIN_FLAG} ${malformed}\` is not a chain line ${expected}`
 }
 
-function find_graph_refusal(
-	chains: ReadonlyArray<Chain>,
-	subject: ChainSubject,
+// A declared number that is none of `children`; `undefined` when every number is one.
+function find_outsider_refusal(
+	chains: ReadonlyArray<ReadonlyArray<number>>,
+	children: ReadonlyArray<number>,
 ): string | undefined {
-	const outsider = find_outsider(chains, subject.children)
+	const outsider = find_outsider(chains, children)
+	if (outsider === undefined) return undefined
 
-	if (outsider !== undefined) {
-		return `\`${CHAIN_FLAG}\` names ${session_cite.issue(outsider)}, which is not a child of this epic; nothing was written.`
-	}
+	return `\`${CHAIN_FLAG}\` names ${session_cite.issue(outsider)}, which is not a child of this epic; nothing was written.`
+}
 
+// Asked of the whole declaration `--add` would write, so a `--chain` closing a loop through chains
+// the epic already declares is refused too.
+function find_cycle_refusal(chains: ReadonlyArray<ReadonlyArray<number>>): string | undefined {
 	return is_cyclic(chains)
 		? `The \`${CHAIN_FLAG}\` declarations form a cycle; nothing was written.`
 		: undefined
 }
 
+function find_graph_refusal(
+	chains: ReadonlyArray<Chain>,
+	subject: ChainSubject,
+): string | undefined {
+	const outsider =
+		subject.children === undefined ? undefined : find_outsider_refusal(chains, subject.children)
+
+	return outsider ?? find_cycle_refusal(chains)
+}
+
+function find_rival_flag(subject: ChainSubject): string | undefined {
+	return subject.is_ordered ? '--ordered' : subject.rival_flag
+}
+
 function find_refusal(values: ReadonlyArray<string>, subject: ChainSubject): string | undefined {
-	if (values.length > 0 && subject.is_ordered) {
-		return `\`${CHAIN_FLAG}\` and \`--ordered\` both declare the order; give one of them. Nothing was written.`
+	const rival = find_rival_flag(subject)
+
+	if (rival !== undefined && values.length > 0) {
+		return `\`${CHAIN_FLAG}\` and \`${rival}\` both declare the order; give one of them. Nothing was written.`
 	}
 
 	const shape = find_shape_refusal(values)
@@ -107,7 +131,7 @@ function read_chains(parsed: EpicArgv, subject: ChainSubject): ChainRead {
 	return { chains: values.map((value) => to_chain(value) ?? []) }
 }
 
-const epic_cli_chain = { CHAIN_FLAG, read_chains }
+const epic_cli_chain = { CHAIN_FLAG, find_cycle_refusal, find_outsider_refusal, read_chains }
 
 export { epic_cli_chain }
 export type { ChainRead }
