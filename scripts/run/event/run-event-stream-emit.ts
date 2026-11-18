@@ -46,19 +46,19 @@ async function lane_record(issue: string): Promise<LaneStateRecord | undefined> 
 async function ending_fields(
 	target: string,
 	event: Omit<RunEvent, 'pos'>,
-): Promise<Pick<RunEvent, 'elapsed_ms'>> {
+): Promise<Pick<RunEvent, 'elapsed_ms' | 'excluded_ms'>> {
 	const issue = run_event_scope.issue_named(event)
 
 	if (issue === undefined || !run_board_lane_time.OFF_LANE_KINDS.has(event.kind)) return {}
 
-	const elapsed_ms = run_board_lane_time.ending_elapsed({
+	const time = run_board_lane_time.ending_elapsed({
 		events: run_event_stream.read_events(target),
 		issue: Number(issue),
 		record: await lane_record(issue),
 		ended_ms: Date.parse(event.at),
 	})
 
-	return elapsed_ms === undefined ? {} : { elapsed_ms }
+	return time ?? {}
 }
 
 /**
@@ -68,7 +68,7 @@ async function ending_fields(
  */
 async function append_with(
 	target: string,
-	event: Omit<RunEvent, 'pos' | 'elapsed_ms'>,
+	event: Omit<RunEvent, 'pos' | 'elapsed_ms' | 'excluded_ms'>,
 ): Promise<AppendResult> {
 	return run_event_stream.append_event(target, {
 		...event,

@@ -1,3 +1,5 @@
+import { lane_host_gaps } from '#scripts/lane/lane-host-gaps'
+import type { LaneSpan } from '#scripts/lane/lane-net-time'
 import { lane_spans, type IssueAt, type Span } from '#scripts/lane/lane-spans'
 import type { LaneStateRecord } from '#scripts/lane/lane-state'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
@@ -46,23 +48,45 @@ function spans_of(events: ReadonlyArray<RunEvent>): ReadonlyMap<number | undefin
 	)
 }
 
-function span_ms(span: Span, until_ms: number, end_ms: number): number {
-	return Math.max(0, Math.min(span.end_ms ?? until_ms, end_ms) - span.from_ms)
+// A lane time net of the host's stops, and the stops it took out (joshuafolkken/kit#7866).
+interface LaneTime {
+	elapsed_ms: number
+	excluded_ms: number
 }
 
-// The time `spans` ran up to the row's end: a span nothing took off the lanes runs until the next
-// launch, the last one until `end_ms` — now, a pause, or the issue's close.
+function stretch_of(span: Span, until_ms: number, end_ms: number): LaneSpan {
+	const to_ms = Math.min(span.end_ms ?? until_ms, end_ms)
+
+	return { from_ms: span.from_ms, to_ms: Math.max(span.from_ms, to_ms) }
+}
+
+// Where `spans` ran up to the row's end: a span nothing took off the lanes runs until the next launch,
+// the last one until `end_ms` — now, a pause, or the issue's close.
+function stretches_of(spans: ReadonlyArray<Span>, end_ms: number): Array<LaneSpan> {
+	return spans.map((span, index) => stretch_of(span, spans[index + 1]?.from_ms ?? end_ms, end_ms))
+}
+
+// The time `spans` ran up to the row's end, the host's stops included.
 function in_lane_ms(spans: ReadonlyArray<Span>, end_ms: number): number {
-	return spans.reduce(
-		(total, span, index) => total + span_ms(span, spans[index + 1]?.from_ms ?? end_ms, end_ms),
-		0,
-	)
+	return lane_host_gaps.length_ms(stretches_of(spans, end_ms))
 }
 
-// The time a child ran on a lane up to `ended_ms`: its spans summed, or from `started_ms` where its
-// launch rolled off the stream and left none.
-function elapsed_of(spans: ReadonlyArray<Span>, started_ms: number, ended_ms: number): number {
-	return spans.length === 0 ? ended_ms - started_ms : in_lane_ms(spans, ended_ms)
+/**
+ * The time a child ran on a lane up to `ended_ms` — its spans, or from `started_ms` where its launch
+ * rolled off the stream and left none — less the host's stops `gaps` inside them, as `josh lane:net`
+ * takes them out (`lane-host-gaps.ts`).
+ */
+function elapsed_of(
+	spans: ReadonlyArray<Span>,
+	started_ms: number,
+	ended_ms: number,
+	gaps: ReadonlyArray<LaneSpan> = [],
+): LaneTime {
+	const stretches =
+		spans.length === 0 ? [{ from_ms: started_ms, to_ms: ended_ms }] : stretches_of(spans, ended_ms)
+	const excluded_ms = lane_host_gaps.excluded_ms(gaps, stretches)
+
+	return { elapsed_ms: lane_host_gaps.length_ms(stretches) - excluded_ms, excluded_ms }
 }
 
 interface EndingRead {
@@ -96,9 +120,9 @@ function is_ended(spans: ReadonlyArray<Span>): boolean {
  * from the spans the run that last launched it holds — what the board sums for an open lane
  * (`run-board-lane-state.ts`), so the row keeps the time it drew while running. A child with no
  * recorded launch, or whose newest span already ended, is not on a lane this ending takes it off, so it
- * records none.
+ * records none. The time is net of the host's stops, which it records beside it.
  */
-function ending_elapsed(read: EndingRead): number | undefined {
+function ending_elapsed(read: EndingRead): LaneTime | undefined {
 	const started_ms = launched_ms(read.record)
 
 	if (started_ms === undefined) return undefined
@@ -108,7 +132,9 @@ function ending_elapsed(read: EndingRead): number | undefined {
 		(span) => span.from_ms >= from_ms,
 	)
 
-	return is_ended(spans) ? undefined : elapsed_of(spans, started_ms, read.ended_ms)
+	if (is_ended(spans)) return undefined
+
+	return elapsed_of(spans, started_ms, read.ended_ms, lane_host_gaps.gaps_of(read.events))
 }
 
 const run_board_lane_time = {
@@ -121,4 +147,4 @@ const run_board_lane_time = {
 }
 
 export { run_board_lane_time }
-export type { EndingRead }
+export type { EndingRead, LaneTime }

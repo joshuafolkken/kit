@@ -245,8 +245,11 @@ const event_schema = z.object({
 	text: z.string(),
 	// The child's time on a lane, recorded once by the writer of an ending (joshuafolkken/kit#4481), so a
 	// reader never has to find its launch again. An event written before it has none. A `sleep` event
-	// carries the sleep's length here.
+	// carries the sleep's length here. An ending's time is net of the host's stops (`lane-host-gaps.ts`).
 	elapsed_ms: z.number().optional(),
+	// The host's stops an ending took out of `elapsed_ms` (joshuafolkken/kit#7866); none on an ending
+	// written before it, whose `elapsed_ms` still holds them.
+	excluded_ms: z.number().optional(),
 	// The ship stop a park was taken at — its stage and `Cause` class (joshuafolkken/kit#6864) — so a
 	// reader re-dispatching the park reads them without parsing text. Free strings: an event a later
 	// version wrote with a new class still parses. A park written before it, or no ship's, has none —

@@ -69,17 +69,20 @@ function reason_of(event: RunEvent): string | undefined {
 interface EndingRecord {
 	reason?: string
 	elapsed_ms?: number
+	excluded_ms?: number
 }
 
 // What an ending event records for its row: the reason it gives and the lane time its writer recorded
-// (joshuafolkken/kit#4481), each only where the event carries it.
+// (joshuafolkken/kit#4481) with the host's stops it took out (joshuafolkken/kit#7866), each only where
+// the event carries it.
 function recorded_of(event: RunEvent): EndingRecord {
 	const reason = reason_of(event)
-	const { elapsed_ms } = event
+	const { elapsed_ms, excluded_ms } = event
 
 	return {
 		...(reason !== undefined && { reason }),
 		...(elapsed_ms !== undefined && { elapsed_ms }),
+		...(excluded_ms !== undefined && { excluded_ms }),
 	}
 }
 
