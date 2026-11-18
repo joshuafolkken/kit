@@ -1,0 +1,7 @@
+{
+	"reason": "the blocker-cleared re-offer for stalled parks (is_unblocked_since, retry_unblocked, closed_at) is the fix itself",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 15
+	}
+}

@@ -185,6 +185,16 @@ describe('to_blocked_by — the connection gh answered with', () => {
 		])
 	})
 
+	// joshuafolkken/kit#7861: the stalled sweep tells a blocker closed after a park by this field.
+	it('keeps when a closed blocker closed', () => {
+		const closed_at = '2026-11-18T03:23:47Z'
+		const listing = JSON.stringify([{ number: BLOCKER_NUMBER, state: 'closed', closed_at }])
+
+		expect(git_gh_issue_rest.to_blocked_by(listing).nodes).toEqual([
+			{ number: BLOCKER_NUMBER, state: 'CLOSED', closed_at },
+		])
+	})
+
 	it('answers an empty connection for an issue with no blockers', () => {
 		expect(git_gh_issue_rest.to_blocked_by(EMPTY_LISTING)).toEqual({ nodes: [], totalCount: 0 })
 	})

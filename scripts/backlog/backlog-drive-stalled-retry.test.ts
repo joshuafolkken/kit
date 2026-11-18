@@ -223,7 +223,68 @@ describe('backlog_drive_stalled_retry.sweep — the cap (ac-bc44aff6, ac-328f94e
 		await next_sweep()
 
 		expect(run_event_stream_emit.emit).not.toHaveBeenCalled()
-		expect(run_add_issue.read).not.toHaveBeenCalled()
+		expect(josh_command.josh_run).not.toHaveBeenCalled()
+	})
+})
+
+const BLOCKER = 7839
+const OTHER_BLOCKER = 7840
+const BEFORE_PARK = '2026-11-09T09:00:00Z'
+const CLOSED_AFTER_PARK = '2026-11-09T11:00:00Z'
+const AFTER_CLOSE = '2026-11-09T12:00:00Z'
+// The cause #7841 parked with: a `run:merge` followup stop, recorded with no stop.
+const FOLLOWUP_FAILED = 'followup failed'
+
+type Blocker = NonNullable<EpicIssue['blockedBy']>['nodes'][number]
+
+function blocker(state = 'CLOSED', closed_at = CLOSED_AFTER_PARK, number = BLOCKER): Blocker {
+	return { number, state, closed_at: state === 'CLOSED' ? closed_at : undefined }
+}
+
+function mock_blockers(nodes: ReadonlyArray<Blocker>): void {
+	vi.mocked(run_add_issue.read).mockResolvedValue({
+		...issue(),
+		blockedBy: { nodes: [...nodes], totalCount: nodes.length },
+	})
+}
+
+// joshuafolkken/kit#7861: #7841 stayed stalled after the blocker its triage recorded merged.
+describe('backlog_drive_stalled_retry.sweep — a blocker triage recorded on the park', () => {
+	beforeEach(() => mock_stream([park({}, FOLLOWUP_FAILED)]))
+
+	it('retries once the recorded blocker closed, whichever drive merged it (ac-430e3c48, ac-d6c462db)', async () => {
+		mock_blockers([blocker(), blocker('CLOSED', BEFORE_PARK, OTHER_BLOCKER)])
+		await next_sweep()
+
+		expect(josh_command.josh_run).toHaveBeenCalledExactlyOnceWith(RETRY_ARGV, true)
+	})
+
+	it('retries a park restated at the cap once its blocker closed (ac-430e3c48)', async () => {
+		mock_stream([park({}, `${CAP_NOTE} — ${FOLLOWUP_FAILED}`)], [retry_event(0), retry_event(0)])
+		mock_blockers([blocker()])
+		await next_sweep()
+
+		expect(josh_command.josh_run).toHaveBeenCalledExactlyOnceWith(RETRY_ARGV, true)
+	})
+
+	it.each([
+		['the recorded blocker still open', [blocker('OPEN')]],
+		['another blocker still open', [blocker(), blocker('OPEN', '', OTHER_BLOCKER)]],
+		['only a blocker closed before the park', [blocker('CLOSED', BEFORE_PARK)]],
+		['no blocker recorded', []],
+	])('does not retry with %s (ac-e9e53a64)', async (_case, nodes) => {
+		mock_blockers(nodes)
+		await next_sweep()
+
+		expect(josh_command.josh_run).not.toHaveBeenCalled()
+	})
+
+	it("does not retry the retry's own park a second time for the same close (ac-430e3c48)", async () => {
+		mock_stream([{ ...park({}, FOLLOWUP_FAILED), at: AFTER_CLOSE }])
+		mock_blockers([blocker()])
+		await next_sweep()
+
+		expect(josh_command.josh_run).not.toHaveBeenCalled()
 	})
 })
 

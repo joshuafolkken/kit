@@ -66,10 +66,14 @@ const epic_issue_schema = z.object({
 // cross a repository, and a reader that keeps only the number resolves it
 // against the blocked child's own repository — a different issue, or none. Optional because a
 // caller that only wants numbers must not be made to fail on a response shape it never reads.
+//
+// `closed_at` is when a closed blocker closed, so a park can tell the blocker triage recorded on it,
+// closed after the park, from one long closed (`backlog-drive-stalled-retry.ts`).
 const blocking_issue_schema = z.object({
 	number: z.number(),
 	state: z.string().optional(),
 	repository_url: z.string().optional(),
+	closed_at: z.string().nullish(),
 })
 
 // The blocker relations arrive as a connection — `{ nodes, totalCount }` — not a bare array.

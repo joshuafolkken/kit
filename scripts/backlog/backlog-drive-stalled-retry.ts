@@ -1,4 +1,4 @@
-import { epic_issue } from '#scripts/epic/epic-issue'
+import { epic_issue, type EpicIssue } from '#scripts/epic/epic-issue'
 import { git_gh_pr_snapshot } from '#scripts/gh/git-gh-pr-snapshot'
 import {
 	collect_blocking_failures,
@@ -28,8 +28,11 @@ import { backlog_yield_cap } from './backlog-yield-cap'
 // issue, counted off the whole stream so a restarted drive counts the retries before it. A recorded
 // ship stop is checked by its stage; a park with no stop by its cause: `run:merge`'s three wait for the
 // next sweep, a yield-cap park for its window. A worker's escalation park is resumed one `josh.worker`
-// profile up (`backlog-drive-escalate.ts`). Any other park, or a protected label, stays for a person;
-// one at the cap is restated once with `CAP_NOTE` and its cause, which its board row shows.
+// profile up (`backlog-drive-escalate.ts`). A park with no check of its own, or one restated at the cap,
+// is re-offered once a native blocker closed after it — the one triage recorded — and every other
+// blocker is closed, whichever drive merged it (joshuafolkken/kit#7861). Any other park, or a protected
+// label, stays for a person; one at the cap is restated once with `CAP_NOTE` and its cause, which its
+// board row shows.
 
 const RETRY_CAP = 2
 const CAP_NOTE = `auto-retry cap ${String(RETRY_CAP)} reached`
@@ -100,17 +103,20 @@ function latest_parks(events: ReadonlyArray<RunEvent>): ReadonlyMap<number, RunE
 
 // The labels of an issue still open, still `run:stalled` and free of a protected label `run:add` would
 // refuse, else `undefined`. An issue that cannot be read is not re-offered.
-async function stalled_labels(issue: number): Promise<ReadonlyArray<string> | undefined> {
-	const read = await run_add_issue.read(issue)
-
-	if (read === undefined) return undefined
+function is_stalled(read: EpicIssue): boolean {
 	const labels = epic_issue.label_names(read)
-	const is_stalled =
+
+	return (
 		epic_issue.is_open(read.state) &&
 		has_label_name(labels, RUN_STALLED_LABEL) &&
 		run_add.protected_label(labels) === undefined
+	)
+}
 
-	return is_stalled ? labels : undefined
+async function stalled_labels(issue: number): Promise<ReadonlyArray<string> | undefined> {
+	const read = await run_add_issue.read(issue)
+
+	return read !== undefined && is_stalled(read) ? epic_issue.label_names(read) : undefined
 }
 
 async function is_still_stalled(issue: number): Promise<boolean> {
@@ -171,10 +177,23 @@ async function is_due(
 	return await is_still_stalled(issue)
 }
 
+// The retry's own park postdates the blocker's close, so one close re-offers once, past the cap too.
+async function retry_unblocked(issue: number, park: RunEvent): Promise<void> {
+	const read = await run_add_issue.read(issue)
+
+	if (read === undefined || !is_stalled(read)) return
+	if (backlog_drive_retry.is_unblocked_since(read, park.at)) await retry_cleared(issue)
+}
+
 async function retry_park(issue: number, park: RunEvent, context: SweepContext): Promise<void> {
 	const cause_check = check_of(park)
 
-	if (cause_check === undefined) return
+	if (cause_check === undefined) {
+		await retry_unblocked(issue, park)
+
+		return
+	}
+
 	const is_capped = run_event_retry.count_of(context.history, issue) >= RETRY_CAP
 
 	if (!(await is_due(issue, park, cause_check, { is_capped, now: context.now }))) return
