@@ -25,7 +25,7 @@ function mock_git(grep: () => Promise<string>, files = ''): void {
 }
 
 function grep_calls(): Array<[ReadonlyArray<string>]> {
-	return read_mock.mock.calls.filter((call) => call[0][0] === 'grep')
+	return read_mock.mock.calls.filter((call) => call[0].includes('grep'))
 }
 
 beforeEach(() => {

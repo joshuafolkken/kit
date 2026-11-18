@@ -54,6 +54,8 @@ describe('plan_consumers.report — references grouped by kind', () => {
 		await plan_consumers.report([IDENTIFIER])
 
 		expect(read_mock).toHaveBeenCalledWith([
+			'-c',
+			'core.quotePath=false',
 			'grep',
 			'-n',
 			'-I',

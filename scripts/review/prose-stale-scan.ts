@@ -1,5 +1,6 @@
 import type { Hit } from '#scripts/git/git-grep-hits'
 import type { Hunk } from '#scripts/test/test-pinned-logic'
+import { prose_stale_values } from './prose-stale-values'
 import { review_readers_scan } from './review-readers-scan'
 
 // The words a diff removed that prose may still name (joshuafolkken/kit#5287) — the self-check's
@@ -18,15 +19,24 @@ import { review_readers_scan } from './review-readers-scan'
 // token is stale all the same. **A test file names nothing**: its declarations are its own
 // (joshuafolkken/kit#6737). **A plain name counts only where prose writes it as code** — in backticks, as
 // a call or a member, or with an identifier's `_`, digit or camelCase — so an English word that spells it
-// is not stale (joshuafolkken/kit#6737).
+// is not stale (joshuafolkken/kit#6737). **A changed value and a removed `--flag`** are
+// `prose-stale-values.ts`'s (joshuafolkken/kit#7881): a value's old literal, beside its constant and
+// what it now holds, and a flag a code file's removed line writes that neither an added line nor live
+// code still writes.
 
-type TermKind = 'name' | 'constant' | 'command' | 'heading'
+type TermKind = 'name' | 'constant' | 'command' | 'heading' | 'value' | 'flag'
 
 interface Term {
 	kind: TermKind
 	word: string
 	renamed_to?: string
+	// A changed value's constant and the file declaring it; `renamed_to` is then the literal it now holds.
+	constant?: string
+	file?: string
 }
+
+// The kinds `prose-stale-values.ts` reads, searched as fixed text and bounded by its `is_use`.
+const VALUE_KINDS: ReadonlySet<TermKind> = new Set(['value', 'flag'])
 
 interface Reference {
 	term: Term
@@ -114,12 +124,19 @@ function renamed_terms(hunk: Hunk): Array<Term> {
 	})
 }
 
+function is_code_hunk(hunk: Hunk): boolean {
+	return CODE_FILE.test(hunk.file) && !TEST_FILE.test(hunk.file)
+}
+
 function hunk_terms(hunk: Hunk, deleted: ReadonlySet<string>): Array<Term> {
 	const lines = hunk.old_lines
-	const is_code = CODE_FILE.test(hunk.file) && !TEST_FILE.test(hunk.file)
 	const source = lines.join('\n')
-	const code = is_code
-		? [...code_terms(source, deleted.has(hunk.file)), ...renamed_terms(hunk)]
+	const code = is_code_hunk(hunk)
+		? [
+				...code_terms(source, deleted.has(hunk.file)),
+				...renamed_terms(hunk),
+				...to_terms('flag', prose_stale_values.flags(lines)),
+			]
 		: []
 	const titled = hunk.file.endsWith(MARKDOWN_EXTENSION) ? to_terms('heading', headings(lines)) : []
 
@@ -168,7 +185,20 @@ interface Tree {
 
 const EMPTY_TREE: Tree = { surviving: new Set(), deleted: new Set() }
 
-// Each removed word once, in diff order; `registered` is the command registry's names.
+function value_terms(hunks: ReadonlyArray<Hunk>): Array<Term> {
+	return prose_stale_values
+		.changed(hunks.filter((hunk) => is_code_hunk(hunk)))
+		.map(({ file, constant, before, after }) => ({
+			kind: 'value',
+			word: before,
+			renamed_to: after,
+			constant,
+			file,
+		}))
+}
+
+// Each removed word once, in diff order, then each changed value; `registered` is the command
+// registry's names.
 function stale_terms(
 	hunks: ReadonlyArray<Hunk>,
 	registered: ReadonlySet<string>,
@@ -180,12 +210,18 @@ function stale_terms(
 	const unique = new Map(terms.map((term) => [term.word, term]))
 
 	// A name a file still declares is kept, whatever a hunk did to it: renamed, moved or left unchanged.
-	return [...unique.values()].filter((term) => !surviving.has(term.word) && is_removed(term, kept))
+	const removed = [...unique.values()].filter(
+		(term) => !surviving.has(term.word) && is_removed(term, kept),
+	)
+
+	return [...removed, ...value_terms(hunks)]
 }
 
-// A heading is searched quoted, the way a `→ "Heading"` pointer names it; any other word as a whole word.
+// A heading is searched quoted, the way a `→ "Heading"` pointer names it; a value or flag as fixed
+// text `is_code_use` then bounds; any other word as a whole word.
 function pattern(term: Term): { target: string; flags: ReadonlyArray<string> } {
 	if (term.kind === 'heading') return { target: `"${term.word}"`, flags: [] }
+	if (VALUE_KINDS.has(term.kind)) return { target: term.word, flags: ['-F'] }
 
 	return { target: term.word, flags: ['-w'] }
 }
@@ -214,7 +250,7 @@ function code_shape(word: string): RegExp {
 }
 
 // A plain name is written as code: inside a backtick span, or in one of `code_shape`'s shapes.
-function is_code_use(term: Term, excerpt: string): boolean {
+function is_name_use(term: Term, excerpt: string): boolean {
 	if (term.kind !== 'name' || IDENTIFIER_SHAPE.test(term.word)) return true
 
 	const word = term.word.replaceAll(REGEXP_SPECIAL, String.raw`\$&`)
@@ -223,14 +259,27 @@ function is_code_use(term: Term, excerpt: string): boolean {
 	return code_spans(excerpt).some((span) => whole.test(span)) || code_shape(word).test(excerpt)
 }
 
+function is_code_use(term: Term, hit: Hit): boolean {
+	if (VALUE_KINDS.has(term.kind)) return prose_stale_values.is_use(term, hit)
+
+	return is_name_use(term, hit.excerpt)
+}
+
+function label_of({ word, renamed_to, constant }: Term): string {
+	if (renamed_to === undefined) return word
+	if (constant === undefined) return `${word} (renamed to ${renamed_to})`
+
+	return `${word} (${constant} now ${renamed_to})`
+}
+
 function reference_lines(reference: Reference): Array<string> {
-	const { kind, word, renamed_to } = reference.term
-	const label = renamed_to === undefined ? word : `${word} (renamed to ${renamed_to})`
+	const { kind } = reference.term
+	const label = label_of(reference.term)
 
 	if (reference.has_failed) return [`search failed: ${kind} ${label}`]
 
 	return reference.hits
-		.filter((hit) => is_prose(hit) && is_code_use(reference.term, hit.excerpt))
+		.filter((hit) => is_prose(hit) && is_code_use(reference.term, hit))
 		.map((hit) => `${hit.path}:${hit.line} ${kind} ${label}`)
 }
 
@@ -250,7 +299,16 @@ function report(references: ReadonlyArray<Reference>): Report {
 	}
 }
 
-const prose_stale_scan = { CODE_FILE, FAILED_EXIT, pattern, report, stale_terms }
+const prose_stale_scan = {
+	CODE_FILE,
+	FAILED_EXIT,
+	is_code_hunk,
+	is_prose,
+	VALUE_KINDS,
+	pattern,
+	report,
+	stale_terms,
+}
 
 export type { Reference, Term, Tree }
 export { prose_stale_scan }
