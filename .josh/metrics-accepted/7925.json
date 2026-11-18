@@ -1,0 +1,9 @@
+{
+	"reason": "#7925 adds the lane-target split check (new size-estimate-target module), three no-split reason kinds in the body-key table, and one pointer line each in the templates and split-assessment.md",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 49,
+		"rules.lines": 3,
+		"ai_cost.on_demand_bytes": 738
+	}
+}

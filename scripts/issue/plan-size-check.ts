@@ -91,7 +91,7 @@ function next_steps(issue_number: string, repo?: string): string {
 	return [
 		`run:planned not applied to ${target} — answer question 1 of \`pnpm josh doc:section .claude/skills/workflow-commands/split-assessment.md "${split_assess.QUESTION_SECTION}"\`:`,
 		`  separable → \`kickoff ${target}\`'s split path (\`--route split\` children under an epic)`,
-		`  one deliverable → add \`${REASON_PREFIX} <理由>\` under ${BACKGROUND_HEADING} (${body_rewrite(issue_number, repo)}) and re-run \`issue:plan --planned${rerun}\``,
+		`  one deliverable → add ${size_estimate.reason_hint()} under ${BACKGROUND_HEADING} (${body_rewrite(issue_number, repo)}) and re-run \`issue:plan --planned${rerun}\``,
 	].join('\n')
 }
 

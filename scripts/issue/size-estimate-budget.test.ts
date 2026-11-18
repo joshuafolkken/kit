@@ -9,7 +9,8 @@ import { size_estimate } from './size-estimate'
 // it (joshuafolkken/kit#6602) — a split filing is excused the guide, not the bar (joshuafolkken/kit#7005).
 
 const SPLIT_ROUTE = 'route:split'
-const REASON = '- 分割しない理由: 1 コミットで入れないと壊れる'
+// joshuafolkken/kit#7925: past the lane target only a reason naming its kind excuses the estimate.
+const REASON = '- 分割しない理由: 分けられない — 1 コミットで入れないと壊れる'
 const EXCEEDS_GUIDE = 'exceeds the guide'
 // The over-guide estimate below projects past the size bar at the slow rate, within it at the fast.
 const SLOW: ImplementRate = { median: 20, lanes: 4 }
@@ -28,7 +29,7 @@ const BUDGET_REFUSAL_PARTS = [
 	'at most 45 declared line(s)',
 	'20.0 implement min',
 	'4 lane(s)',
-	'or declare `- 分割しない理由: <理由>`',
+	'or declare `- 分割しない理由: <kind> — <理由>`',
 ]
 
 function body_with(...lines: ReadonlyArray<string>): string {
