@@ -329,6 +329,20 @@ describe('a miss names its reason in one line and runs the related tests', () =>
 	})
 })
 
+// joshuafolkken/kit#7977: only an explicit ask runs the whole suite on a miss, and its line says so.
+describe('a forced miss', () => {
+	it('says it runs the whole suite, as asked', async () => {
+		vi.stubEnv(FORCE_ENV, '1')
+
+		const [, text] = await run_hook()
+
+		expect(text).toContain(
+			'↻ running the whole unit suite, as asked — the green gate record does not cover this push: ' +
+				`${FORCE_ENV} is set.`,
+		)
+	})
+})
+
 // joshuafolkken/kit#7977: the whole suite is CI's, so a miss hands `test:related` the run, whose cap
 // records the test files past it as deferred to CI.
 describe('a miss with no explicit ask', () => {

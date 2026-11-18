@@ -11,7 +11,9 @@ import { test_read_trace } from './test-read-trace'
 // When a unit run records the test-read map, and how the records become one. **Only a run of the
 // whole suite records**: a map is read as "nothing else reads this file", which a narrowed, sharded
 // or filtered run cannot vouch for. **Only a green run replaces the map**: a failed test may have
-// stopped before the read it would have made.
+// stopped before the read it would have made. Since joshuafolkken/kit#7977 no gate or push runs the
+// whole suite unasked, so the writers are the explicit ones — `pnpm test`, a bare `josh test:unit`
+// and a forced push; with no map, `test:related` narrows by imports alone, less but never wrongly.
 
 type RecordingEnvironment = Record<string, string>
 

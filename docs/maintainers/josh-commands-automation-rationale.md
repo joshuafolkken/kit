@@ -190,7 +190,7 @@ Prints `required` or `skip` on stdout (reason on stderr) — whether this checko
 
 ## `josh pre-push-unit` in detail
 
-Runs the unit suite for the pre-push hook, reusing the result when [`josh gate`](../josh-commands.md#josh-gate) already recorded that exact tree green. Wired in by `lefthook/base.yml` as the pre-push `test-unit` command. Reuse requires the gate's file map, base commit and non-empty record to match, plus an empty `git status --porcelain` so the pushed HEAD equals the verified tree; otherwise the whole suite runs. A project with no vitest prints a skip notice; one with vitest but no test file fails.
+Runs the unit suite for the pre-push hook, reusing the result when [`josh gate`](../josh-commands.md#josh-gate) already recorded that exact tree green. Wired in by `lefthook/base.yml` as the pre-push `test-unit` command. Reuse requires the gate's file map, base commit and non-empty record to match, plus an empty `git status --porcelain` so the pushed HEAD equals the verified tree; otherwise the capped related tests run, the rest deferred to CI's whole suite. Only `JOSH_PRE_PUSH_FORCE=1`, `--force` or arguments forwarded to vitest run the whole suite. A project with no vitest prints a skip notice; one with vitest but no test file fails.
 
 ## `josh reserved-run` in detail
 
