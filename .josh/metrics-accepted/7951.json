@@ -1,0 +1,7 @@
+{
+	"reason": "New feature: the sound cue player (#7945) and its live run:board wiring with tests (#7951)",
+	"date": "2026-11-18",
+	"growth": {
+		"scripts.code_lines": 112
+	}
+}
