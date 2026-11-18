@@ -1,12 +1,12 @@
 import { styleText } from 'node:util'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
+import type { RunActivity } from './run-board-activity'
 import { run_board_fit } from './run-board-fit'
 import { run_board_fresh } from './run-board-fresh'
 import type { RunMark } from './run-board-header-names'
 import { run_board_labels } from './run-board-labels'
 import type { NowLine } from './run-board-now'
 import { run_board_render_slot } from './run-board-render-slot'
-import type { RunActivity } from './run-board-status'
 
 // The header's time cells (`run-board-header.ts`): the run's age over the `💓` — or over the minute an
 // ended run ended — over the third line's spinner and age, and the `💓`'s stale coloring a row's newest

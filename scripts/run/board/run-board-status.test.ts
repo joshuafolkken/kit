@@ -12,7 +12,7 @@ import type { Phase } from './run-board-phase'
 import { run_board_status, type ItemStatus, type OpenRead } from './run-board-status'
 
 // joshuafolkken/kit#3430: what each child of a run is doing, read off the event stream and the open
-// lanes — no GitHub read. The run's own activity is `run-board-status-activity.test.ts`.
+// lanes — no GitHub read. The run's own activity is `run-board-activity.test.ts`.
 
 const KIND = run_event_stream.EVENT_KIND
 const T0 = '2026-10-08T09:00:00.000Z'

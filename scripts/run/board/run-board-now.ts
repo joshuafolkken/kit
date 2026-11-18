@@ -1,10 +1,10 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
+import type { RunActivity } from './run-board-activity'
 import { run_board_labels } from './run-board-labels'
 import type { LaneEvent } from './run-board-lane-event'
 import { run_board_operation, type Operation } from './run-board-operation'
 import type { SessionOperations } from './run-board-operation-read'
-import type { RunActivity } from './run-board-status'
 
 // The header's third line: what the run is doing now, as its kind, when it happened and its words.
 // Always one line while the stream holds an event — the newer of a running child's newest operation and

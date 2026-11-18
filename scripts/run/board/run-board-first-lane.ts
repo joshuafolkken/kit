@@ -1,5 +1,5 @@
+import type { RunActivity } from './run-board-activity'
 import { run_board_labels } from './run-board-labels'
-import type { RunActivity } from './run-board-status'
 
 // How long the run's newest session took from its start to its first `opening lane` stage
 // (`run_event_setup.first_lane_ms`, joshuafolkken/kit#5519), drawn on the header's first line once that
