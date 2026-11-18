@@ -106,7 +106,8 @@ describe('test_related_verdict.run — scoped stamp refresh', () => {
 
 		vi.mocked(scoped_green.read_before).mockResolvedValue(moved)
 		vi.mocked(gate_tree.read_gate_tree).mockResolvedValue(moved)
-		await test_related_verdict.run(['--keep-whole-suite'], fresh)
+		// A run with arguments keeps its own cache entry.
+		await test_related_verdict.run(['--bail=1'], fresh)
 		vi.mocked(scoped_green.read_before).mockResolvedValue(TREE)
 		vi.mocked(gate_tree.read_gate_tree).mockResolvedValue(TREE)
 		await test_related_verdict.run([], fresh)

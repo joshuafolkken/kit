@@ -3,7 +3,6 @@ import { git_pr_checks } from '#scripts/gh/git-pr-checks'
 import { git_command } from '#scripts/git/git-command'
 import { git_remote_branch, type RemoteAnswer } from '#scripts/git/git-remote-branch'
 import { repository_lock } from '#scripts/git/repository-lock'
-import { pre_push_related_switch } from '#scripts/hooks/pre-push-related-switch'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { release_approval_prune } from './release-approval-prune'
 import { release_issue_close } from './release-issue-close'
@@ -174,19 +173,6 @@ describe('release_publish.publish', () => {
 		expect(code).toBe(release_publish.SUCCESS_EXIT_CODE)
 		expect(release_worktree.remove).toHaveBeenCalledTimes(1)
 		expect(release_worktree.remove).toHaveBeenCalledWith(WORKTREE_DIR, BRANCH)
-	})
-})
-
-// joshuafolkken/kit#7539: the release PR's CI runs the whole suite, so the push runs the related tests.
-describe('release_publish.publish and the pre-push hook', () => {
-	it('pushes with the related-tests switch the hook reads', async () => {
-		arrange_publish()
-
-		await release_publish.publish(PUBLISH_PLAN)
-
-		expect(git_command.push).toHaveBeenCalledWith({
-			[pre_push_related_switch.SWITCH_ENV_KEY]: pre_push_related_switch.SWITCH_ON,
-		})
 	})
 })
 

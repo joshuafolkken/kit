@@ -16,7 +16,7 @@ Only these load `.env` themselves, and only when it exists:
 
 Every other command — `josh gate`, `josh review:brief`, `josh clone:scan`, `josh release`, `josh eval`, `josh run:progress` and the git hooks among them — reads only the real environment. Set the variables they read in the shell that runs them — the two `*_FORCE` switches and these:
 
-- Gate and git hooks — `JOSH_SCOPED_GREEN`, `JOSH_PRE_PUSH_RELATED`, `JOSH_PRE_COMMIT_LINT`, `JOSH_SECRETLINT_REQUIRE`.
+- Gate and git hooks — `JOSH_SCOPED_GREEN`, `JOSH_PRE_COMMIT_LINT`, `JOSH_SECRETLINT_REQUIRE`.
 - Release and metrics — `JOSH_RELEASE_TAG_TIMEOUT_SECONDS`, `JOSH_RELEASE_NPM_TIMEOUT_SECONDS`, `JOSH_RELEASE_GITHUB_RELEASE_TIMEOUT_SECONDS`, `JOSH_METRICS_BASE`.
 - Unit suite — `JOSH_UNIT_DURATIONS`, `JOSH_VITEST_CACHE_DIR`.
 - Evaluation and progress — `JOSH_EVAL_MODEL`, `JOSH_EVAL_CONCURRENCY`, `JOSH_PROGRESS`.
@@ -153,7 +153,6 @@ The `josh.*` settings in `package.json`, their defaults and examples are on
 | Variable                  | Required | Default | Used when                                                                                                                                                                                                                          |
 | ------------------------- | -------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `JOSH_PRE_PUSH_FORCE`     | No       | off     | `1` runs the pre-push unit suite even on a tree already recorded green ([`josh pre-push-unit`](./josh-commands-automation.md#josh-pre-push-unit)).                                                                                 |
-| `JOSH_PRE_PUSH_RELATED`   | No       | off     | `1` runs the related unit tests instead of the whole suite when no green gate record covers the push; set by `josh ship`'s push ahead of the gate ([`josh pre-push-unit`](./josh-commands-automation.md#josh-pre-push-unit)).      |
 | `JOSH_PRE_COMMIT_FORCE`   | No       | off     | `1` runs the pre-commit type check even on a tree already recorded green ([`josh pre-commit-type-check`](./josh-commands-automation.md#josh-pre-commit-type-check)).                                                               |
 | `JOSH_PRE_COMMIT_LINT`    | No       | on      | `off` skips the pre-commit prettier, cspell and eslint hooks; `josh ship` sets it for its local commit, whose tree the gate checks before the push ([`josh pre-commit-lint`](./josh-commands-automation.md#josh-pre-commit-lint)). |
 | `JOSH_SECRETLINT_REQUIRE` | No       | off     | `1` makes `josh secretlint-scan` fail rather than skip when secretlint is not installed; the CI `Secret Scan` job sets it.                                                                                                         |

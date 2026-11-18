@@ -1193,10 +1193,10 @@ pnpm josh pre-push-unit
 The result is reused when [`josh gate`](josh-commands.md#josh-gate) recorded that exact, clean tree green.
 
 ```bash
-JOSH_PRE_PUSH_FORCE=1 git push   # run the suite even on a tree recorded green
+JOSH_PRE_PUSH_FORCE=1 git push   # run the whole suite, even on a tree recorded green
 ```
 
-With `JOSH_PRE_PUSH_RELATED=1`, a push the record does not cover runs `josh test:related` instead of the whole suite — `josh ship` sets it when it pushes its sync merge onto an open pull request ahead of the gate. That push reuses the `test:related` green record when it covers the same clean tree and base.
+A push the record does not cover runs `josh test:related` — capped, the rest deferred to CI's whole suite — or reuses its green record when that covers the same clean tree and base. Only `JOSH_PRE_PUSH_FORCE=1`, `--force` or arguments forwarded to vitest run the whole suite.
 
 **Output:** on reuse, prints that the tree is already green.
 
