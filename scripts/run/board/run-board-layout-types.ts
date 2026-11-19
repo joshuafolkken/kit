@@ -36,6 +36,8 @@ interface BoardPlan extends PauseRead, RetryClock {
 	waves: WavePlan
 	// Which opted-in epic tracks which child (`Plan.tracked`).
 	tracked: ReadonlyMap<number, number>
+	// The first open epic, opted in or not, that lists each child (`Plan.epics`).
+	epics?: ReadonlyMap<number, number> | undefined
 	context: PlanContext
 	// Each issue's label names as the open listing read them, so a running row is drawn as its labels
 	// say it stopped.

@@ -324,3 +324,38 @@ describe('run_board_plan.read_plan declared paths', () => {
 		)
 	})
 })
+
+// joshuafolkken/kit#8174: the first open epic listing each child, which a pending row's publish step
+// names.
+describe('run_board_plan.read_plan first epics', () => {
+	const NAMED_EPICS = new Map([[SINGLE, EPIC]])
+	const POOL_EPICS = new Map([
+		[SINGLE, POOL_ONLY],
+		[EPIC, SINGLE],
+	])
+
+	async function listing(opted_in: OptedIn, exclude: ReadonlyArray<number>): Promise<Plan> {
+		const epics = opted_in.issues.length === POOL.length ? POOL_EPICS : NAMED_EPICS
+
+		return { ...plan_of(opted_in, exclude), epics }
+	}
+
+	it('carries the epics the classification read', async () => {
+		const read = { ...ports(), classify: vi.fn(listing) }
+		const plan = await run_board_plan.read_plan({ issues: [], only: false }, read)
+
+		expect(plan?.epics).toBe(POOL_EPICS)
+	})
+
+	it('joins the named plan’s epics to the pool’s, the named plan’s own winning', async () => {
+		const read = { ...ports(), classify: vi.fn(listing) }
+		const plan = await run_board_plan.read_plan({ issues: [EPIC], only: false }, read)
+
+		expect(plan?.epics).toStrictEqual(
+			new Map([
+				[SINGLE, EPIC],
+				[EPIC, SINGLE],
+			]),
+		)
+	})
+})

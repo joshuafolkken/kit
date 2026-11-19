@@ -67,6 +67,7 @@ async function board_of(
 	return {
 		waves: backlog_waves.build(plan.result, plan.repo, plan.scope),
 		tracked: plan.tracked,
+		epics: plan.epics,
 		context: backlog_plan_read.context_of(plan, read.listing),
 		labels: labels_of(read.listing.rows),
 		declared: plan.scope.declared,
@@ -129,6 +130,14 @@ function withheld_of(lead: BoardPlan, pool: BoardPlan, held: ReadonlySet<number>
 	return new Set([...lead_withheld(lead, pool), ...from_pool])
 }
 
+// One map from the pool's and the named plan's, the named plan's entry winning a shared key.
+function merged<Value>(
+	pool: ReadonlyMap<number, Value> | undefined,
+	lead: ReadonlyMap<number, Value> | undefined,
+): Map<number, Value> {
+	return new Map([...(pool ?? []), ...(lead ?? [])])
+}
+
 // The named waves lead and the pool's follow, a child the named plan already holds left out of the pool
 // so a named epic's children are not drawn twice.
 function joined(lead: BoardPlan, pool: BoardPlan): BoardPlan {
@@ -140,10 +149,11 @@ function joined(lead: BoardPlan, pool: BoardPlan): BoardPlan {
 			unreached: [...lead.waves.unreached, ...not_held(pool.waves.unreached, held)],
 			running: [...(lead.waves.running ?? []), ...not_held(pool.waves.running ?? [], held)],
 		},
-		tracked: new Map([...pool.tracked, ...lead.tracked]),
+		tracked: merged(pool.tracked, lead.tracked),
+		epics: merged(pool.epics, lead.epics),
 		context: pool.context,
 		labels: pool.labels,
-		declared: new Map([...(pool.declared ?? []), ...(lead.declared ?? [])]),
+		declared: merged(pool.declared, lead.declared),
 		withheld: withheld_of(lead, pool, held),
 	}
 }
