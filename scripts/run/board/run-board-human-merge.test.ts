@@ -22,7 +22,6 @@ const ISSUE = 6221
 const PR = 6225
 const READ_FAILED = 'read failed'
 const MERGE_TAIL = '→ merge PR #6225'
-const ESTIMATED_TAIL = `${MERGE_TAIL} 🎯 —`
 const FIND_TAIL = '→ find its PR for #6221'
 const REPO = 'joshuafolkken/kit'
 const LABELS = [IN_PROGRESS_LABEL, NEEDS_HUMAN_MERGE_LABEL]
@@ -213,14 +212,14 @@ describe('run board human merge pull request links', () => {
 		const linked = osc_link(String(PR), PULL_URL)
 
 		expect(run_board_render_condition.condition_of(row, LINKED)).toContain(`PR ${linked}`)
-		expect(run_board_render_condition.tail_of(row, 0, LINKED)).toBe(`→ merge PR #${linked} 🎯 —`)
+		expect(run_board_render_condition.tail_of(row, 0, LINKED)).toBe(`→ merge PR #${linked}`)
 	})
 
 	it('keeps the plain text where the header knows no repository', () => {
 		const row = waiting_row()
 
 		expect(run_board_render_condition.condition_of(row, PLAIN).trimEnd()).toBe('PR 6225')
-		expect(run_board_render_condition.tail_of(row, 0, PLAIN)).toBe(ESTIMATED_TAIL)
+		expect(run_board_render_condition.tail_of(row, 0, PLAIN)).toBe(MERGE_TAIL)
 	})
 
 	it('draws the linked PR number in the rendered decision row', async () => {
@@ -239,7 +238,7 @@ describe('run board human merge pull request links', () => {
 
 		expect(cut).toBe(run_board_render_condition.tail_of(row, NARROW_CUT, PLAIN))
 		expect(stripVTControlCharacters(cut)).toBe(cut)
-		expect(run_board_fit.width_of(cut)).toBe(run_board_fit.width_of(ESTIMATED_TAIL) - NARROW_CUT)
+		expect(run_board_fit.width_of(cut)).toBe(run_board_fit.width_of(MERGE_TAIL) - NARROW_CUT)
 	})
 })
 

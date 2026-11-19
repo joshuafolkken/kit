@@ -1,0 +1,7 @@
+{
+	"reason": "Splitting BoardState into BoardData and BoardView adds the second interface, the composite alias and the FRESH_VIEW object (#8164)",
+	"date": "2026-11-19",
+	"growth": {
+		"scripts.code_lines": 6
+	}
+}

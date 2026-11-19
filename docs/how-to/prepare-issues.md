@@ -26,7 +26,7 @@ releasing the hold. Without the plan, `run:pause` refuses before setting anythin
 the `issue:plan` command. A publication withheld for another reason leaves the child prepared;
 follow the command `run:pause` comments on both Issues.
 
-`pnpm josh backlog:plan --pending-publication` lists each pending issue that blocks an open issue, beside the issue it blocks.
+`pnpm josh backlog:plan --pending-publication` lists each pending issue that blocks an open issue, beside the issue it blocks, then every pending issue with the steps it still lacks: epic placement, plan record, publish.
 
 Pending children are excluded from approval judgement, standalone and epic selection, and direct
 worker spawn. Even manually applying `auto-ok` cannot make a pending child a candidate.

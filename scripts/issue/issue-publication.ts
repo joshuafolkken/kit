@@ -9,7 +9,7 @@ import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_memo } from '#scripts/gh/git-gh-issue-memo'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { error_text } from '#scripts/lib/error-message'
-import { has_label_name, PLAN_UNVERIFIED_LABEL, PLANNED_LABEL } from './issue-labels'
+import { has_label_name, PLAN_UNVERIFIED_LABEL } from './issue-labels'
 import { issue_number_shape } from './issue-number-shape'
 import { issue_publication_state } from './issue-publication-state'
 import { session_cite } from './session-cite'
@@ -45,7 +45,7 @@ function missing_plan_of(child: PreparedChild['child']): string | undefined {
 		return `needs its plan re-recorded from a ${child.repo} checkout`
 	}
 
-	const is_planned = child.state === 'OPEN' && has_label_name(child.labels, PLANNED_LABEL)
+	const is_planned = child.state === 'OPEN' && issue_publication_state.has_plan_record(child.labels)
 
 	return is_planned ? undefined : 'needs its recorded plan'
 }

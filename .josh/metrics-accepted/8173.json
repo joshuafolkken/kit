@@ -1,0 +1,7 @@
+{
+	"reason": "#8173 lists every unpublished issue with its missing publication steps (new shared missing_steps and pending_of)",
+	"date": "2026-11-19",
+	"growth": {
+		"scripts.code_lines": 74
+	}
+}
