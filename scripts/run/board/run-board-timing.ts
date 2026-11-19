@@ -52,20 +52,19 @@ function longest(samples: ReadonlyArray<number>): number {
 }
 
 // How many draws of a kind, the longest and the median, in ms to a tenth.
-function summary(samples: ReadonlyArray<number>): string {
-	const max = longest(samples)
-	const median = lane_stats.median(samples) ?? 0
-
-	return `max ${max.toFixed(1)} · median ${median.toFixed(1)} (n ${String(samples.length)})`
+function summary(samples: ReadonlyArray<number>, median: number): string {
+	return `max ${longest(samples).toFixed(1)} · median ${median.toFixed(1)} (n ${String(samples.length)})`
 }
 
+// A row per kind drawn; a kind never drawn has no median and no row.
 function draw_rows(draws: Draws | undefined): Array<[string, string]> {
 	if (draws === undefined) return []
 
-	return DRAW_KINDS.filter((kind) => draws[kind].length > 0).map((kind) => [
-		`${kind} draw`,
-		summary(draws[kind]),
-	])
+	return DRAW_KINDS.flatMap((kind): Array<[string, string]> => {
+		const median = lane_stats.median(draws[kind])
+
+		return median === undefined ? [] : [[`${kind} draw`, summary(draws[kind], median)]]
+	})
 }
 
 // The launch phases, then — on a live board under `--timing` — each kind of draw it timed.

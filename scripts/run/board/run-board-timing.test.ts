@@ -4,12 +4,17 @@ import { run_board_cli } from './run-board-cli'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_read } from './run-board-read'
 import { run_board_read_fixture } from './run-board-read-fixture'
+import { run_board_spin } from './run-board-spin'
+import type { DrawKind, DrawTimer } from './run-board-state'
+import { run_board_tick } from './run-board-tick'
 import { run_board_timing } from './run-board-timing'
+import { run_board_type_rows } from './run-board-type-rows'
 
 // joshuafolkken/kit#7929: `run:board --timing` says what the first board waited on, phase by phase.
 
-const { STOPPED, harness } = run_board_fixture
+const { LOCAL, STOPPED, harness } = run_board_fixture
 const { FIRST_FRAME_PHASE, FIRST_READ_PHASE, TIMING_FLAG, report, split } = run_board_timing
+const { NO_TYPING } = run_board_type_rows
 const HEADING = 'run:board timing (ms):'
 const REBUILD_MS = 812.4
 
@@ -103,6 +108,64 @@ describe('run_board_timing.timed draws', () => {
 		leaves[0]?.()
 
 		expect(frames.at(-1)).toContain('tick draw')
+	})
+})
+
+// A draw timer that keeps the kind of every draw it times.
+function recording(kinds: Array<DrawKind>): DrawTimer {
+	return function time<T>(kind: DrawKind, draw: () => T): T {
+		kinds.push(kind)
+
+		return draw()
+	}
+}
+
+// Spinner ports on a clock each sleep moves, with every write and every kind of draw timed.
+function spin_ports(): {
+	ports: Parameters<typeof run_board_spin.spin_to_second>[1]
+	kinds: Array<DrawKind>
+	writes: Array<string>
+} {
+	const clock = { now_ms: 0 }
+	const kinds: Array<DrawKind> = []
+	const writes: Array<string> = []
+	const ports = {
+		now: () => clock.now_ms,
+		write: (frame: string) => {
+			writes.push(frame)
+		},
+		sleep: async (ms: number) => {
+			clock.now_ms += ms
+		},
+		time_draw: recording(kinds),
+	}
+
+	return { ports, kinds, writes }
+}
+
+describe('run_board_tick.tick timing', () => {
+	it('times a tick that draws a run, from its layout to its write, as a tick', async () => {
+		const { ports } = harness(LOCAL, [])
+		const kinds: Array<DrawKind> = []
+
+		await run_board_tick.tick(run_board_tick.FRESH_STATE, {
+			...ports,
+			time_draw: recording(kinds),
+		})
+
+		expect(kinds).toStrictEqual(['tick'])
+	})
+})
+
+describe('run_board_spin.spin_to_second timing', () => {
+	it('times each turn written between redraws as a turn', async () => {
+		const { ports, kinds, writes } = spin_ports()
+		const turning = { spots: [{ row: 1, column: 1, style: '' }], typing: NO_TYPING }
+
+		await run_board_spin.spin_to_second(turning, ports)
+
+		expect(writes.length).toBeGreaterThan(0)
+		expect(kinds).toStrictEqual(writes.map(() => 'turn'))
 	})
 })
 
