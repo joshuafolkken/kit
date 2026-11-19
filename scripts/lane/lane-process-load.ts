@@ -40,6 +40,7 @@ const BYTES_PER_MB = KB_PER_MB * KB_PER_MB
 // Enough to name what dominates and the runner-up behind it, short enough for one ledger line a minute.
 const TOP_KINDS = 5
 const OTHER_KIND = 'other'
+const JOSH_KIND = 'josh'
 // The apps a person keeps open beside a run, matched as command-line substrings: every Chrome and VS Code
 // helper runs out of its `.app` bundle, so the bundle name catches them all — and only them: Playwright's
 // `Google Chrome for Testing.app` is not the person's browser.
@@ -58,9 +59,12 @@ const KIND_PATTERNS: ReadonlyArray<readonly [string, RegExp]> = [
 	['chrome', /Google Chrome/u],
 	['chromium', /chromium|headless_shell/iu],
 	['claude', /(?:^|\/)claude(?:\s|$)|@anthropic-ai\/claude-code\//u],
-	['josh', /josh(?:-ready)?\.[jt]s|\btsx\b|(?<!\.)\bpnpm\b/u],
+	[JOSH_KIND, /josh(?:-ready)?\.[jt]s|\btsx\b|(?<!\.)\bpnpm\b/u],
 	['node', /\bnode\b/u],
 ]
+// The token right after a josh entry — `dist/josh.js`, `scripts/josh/josh.ts`, `tools/josh/josh-ready.ts`
+// or `pnpm josh` — is the subcommand.
+const JOSH_COMMAND = /(?:josh(?:-ready)?\.[jt]s|(?<!\.)\bpnpm\s+josh)\s+([a-z][\w:-]*)/u
 
 // `footprint_mb` sums the processes whose footprint could be read — none off macOS or before Node's
 // `node:ffi`, so the field is left out, and not another user's process, whose call is refused.
@@ -86,8 +90,19 @@ interface LineReading {
 
 type ProcessReading = Omit<ProcessKind, 'count'>
 
+// The josh subcommand a josh process runs — `josh run:board`, `josh ship` — so a sample says which command
+// holds the CPU rather than josh as a whole (joshuafolkken/kit#8170); a line with no subcommand after its
+// josh entry (`pnpm install`, a bare `tsx`) stays plain `josh`.
+function josh_kind(command_line: string): string {
+	const command = JOSH_COMMAND.exec(command_line)?.[1]
+
+	return command === undefined ? JOSH_KIND : `${JOSH_KIND} ${command}`
+}
+
 function kind_of(command_line: string): string {
-	return KIND_PATTERNS.find(([, pattern]) => pattern.test(command_line))?.[0] ?? OTHER_KIND
+	const kind = KIND_PATTERNS.find(([, pattern]) => pattern.test(command_line))?.[0] ?? OTHER_KIND
+
+	return kind === JOSH_KIND ? josh_kind(command_line) : kind
 }
 
 // One line of `ps`'s listing as its command line and readings; a header or a cut-short line reads as nothing.
@@ -152,14 +167,31 @@ function resident_mb(listing: string, names: ReadonlyArray<string>): number | un
 	return Math.round(resident.reduce((total, reading) => total + reading.rss_mb, 0))
 }
 
-function add_reading(total: ProcessKind, reading: ProcessReading): void {
-	total.cpu_percent += reading.cpu_percent
-	total.rss_mb += reading.rss_mb
-	total.count += 1
+function add_total(total: ProcessKind, part: ProcessKind): void {
+	total.cpu_percent += part.cpu_percent
+	total.rss_mb += part.rss_mb
+	total.count += part.count
 
-	if (reading.footprint_mb !== undefined) {
-		total.footprint_mb = (total.footprint_mb ?? 0) + reading.footprint_mb
+	if (part.footprint_mb !== undefined) {
+		total.footprint_mb = (total.footprint_mb ?? 0) + part.footprint_mb
 	}
+}
+
+function add_reading(total: ProcessKind, reading: ProcessReading): void {
+	add_total(total, { ...reading, count: 1 })
+}
+
+// The josh parts summed into one plain `josh` row.
+function josh_total(parts: ReadonlyArray<ProcessKind>): ProcessKind {
+	const total: ProcessKind = { kind: JOSH_KIND, cpu_percent: 0, rss_mb: 0, count: 0 }
+
+	for (const part of parts) add_total(total, part)
+
+	return total
+}
+
+function is_josh(total: ProcessKind): boolean {
+	return total.kind === JOSH_KIND || total.kind.startsWith(`${JOSH_KIND} `)
 }
 
 function add_line(
@@ -194,15 +226,34 @@ function by_weight(left: ProcessKind, right: ProcessKind): number {
 	return right.cpu_percent - left.cpu_percent || right.rss_mb - left.rss_mb
 }
 
+// The josh slot's rows: its heaviest subcommands by name, the rest — and any line with no subcommand —
+// folded into one plain `josh` row, so the rows still sum to josh's whole.
+function josh_breakdown(parts: ReadonlyArray<ProcessKind>): Array<ProcessKind> {
+	const named = parts
+		.filter((part) => part.kind !== JOSH_KIND)
+		.toSorted(by_weight)
+		.slice(0, TOP_KINDS)
+	const rest = parts.filter((part) => !named.includes(part))
+	const folded = rest.length === 0 ? [] : [josh_total(rest)]
+
+	return [...named, ...folded].map((total) => rounded(total))
+}
+
+// The top kinds are ranked with josh as one kind, so its subcommands share josh's slot rather than push
+// vitest, eslint or claude out of the sample; the josh slot then expands into `josh_breakdown`'s rows.
 function summarize(listing: string, footprint?: RusageReader): Array<ProcessKind> {
 	const totals = new Map<string, ProcessKind>()
 
 	for (const line of listing.split('\n')) add_line(totals, line, footprint)
 
-	return [...totals.values()]
+	const josh = [...totals.values()].filter((total) => is_josh(total))
+	const coarse = [...totals.values()].filter((total) => !is_josh(total))
+	const ranked = [...coarse, ...(josh.length === 0 ? [] : [josh_total(josh)])]
 		.map((total) => rounded(total))
 		.toSorted(by_weight)
 		.slice(0, TOP_KINDS)
+
+	return ranked.flatMap((total) => (total.kind === JOSH_KIND ? josh_breakdown(josh) : [total]))
 }
 
 // `undefined` where `ps` did not answer, so the sample records no breakdown rather than an empty one.
