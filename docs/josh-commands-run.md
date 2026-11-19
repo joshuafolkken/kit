@@ -56,6 +56,32 @@ A clean tree on the issue's own `<N>-*` branch answers `hold`.
 
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh run:hold` / `josh run:release` in detail".
 
+### `josh run:observe`
+
+<!-- usage: run:observe -->
+
+Sample a process at times hours apart without holding a lane.
+
+```bash
+pnpm josh run:observe start 8035 --at 30m --at 2h --sample 'ps -o rss= -p "$OBSERVE_PID"' -- pnpm josh run:board   # sample the board’s memory after 30 minutes and 2 hours
+pnpm josh run:observe sample 8035                                                                                  # the resumed child takes the due sample
+```
+
+**Options:**
+
+- `--at <offset>` — repeatable; a sample time after the start, as `<N>m` or `<N>h`.
+- `--sample "<command>"` — the shell command whose output is one sample; `$OBSERVE_PID` names the process.
+
+<!-- /usage -->
+
+A lane child whose work samples a process hours apart runs `start` and ends its session — it never waits in the session and never parks for the wait.
+
+`start` launches the command in a new session from the main checkout, without the lane mark, so lane reaping leaves it running. It posts the record (pid, process start time, offsets) as a marked Issue comment and writes the first sample time to the body's `- 実施可能日:`. `run:merge` returns the seat with the Issue unparked; the driver hands it back once that time passes.
+
+A resumed Issue with a `run:observe` record → run `sample <issue>` first and follow its `next:` line.
+
+A due sample posts the next record and moves `- 実施可能日:` to the next time; the last sample stops the process, drops the line and prints `run:cut … --deliverable <comment>`. A recorded pid that no longer names the started process starts the command again once; a second loss records a failure.
+
 ### `josh run:pause`
 
 <!-- usage: run:pause -->

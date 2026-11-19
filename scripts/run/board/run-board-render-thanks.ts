@@ -1,4 +1,5 @@
 import { run_board_fit } from './run-board-fit'
+import { run_board_label_pair } from './run-board-label-pair'
 import type { Link } from './run-board-link'
 import type { Thanks } from './run-board-thanks-csv'
 
@@ -10,9 +11,19 @@ import type { Thanks } from './run-board-thanks-csv'
 const GAP = '  '
 const INDENT = '  '
 const MARK = '🙏 '
+// A name the roster leads with an icon, `📦 What's new`: the icon beside its label (joshuafolkken/kit#8154).
+const ICON_LED = /^(\p{Extended_Pictographic}\u{FE0F}?) (.+)$/u
+
+function labeled(name: string): string {
+	const [, icon, word] = ICON_LED.exec(name) ?? []
+
+	return icon === undefined || word === undefined ? name : run_board_label_pair.pair(icon, word)
+}
 
 function named(thanker: Thanks[number], link: Link): string {
-	return thanker.url === undefined ? thanker.name : link(thanker.name, thanker.url)
+	const name = labeled(thanker.name)
+
+	return thanker.url === undefined ? name : link(name, thanker.url)
 }
 
 // The lines with `name` added to the last where it still fits, and on a line of its own where it does not.

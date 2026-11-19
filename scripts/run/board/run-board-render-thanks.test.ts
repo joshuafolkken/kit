@@ -1,5 +1,6 @@
 import { stripVTControlCharacters } from 'node:util'
 import { describe, expect, it } from 'vitest'
+import { run_board_label_pair } from './run-board-label-pair'
 import { run_board_render_thanks } from './run-board-render-thanks'
 import type { Thanks } from './run-board-thanks-csv'
 
@@ -51,5 +52,20 @@ describe('run_board_render_thanks.thanks_lines', () => {
 		]
 
 		expect(thanks_lines(names, osc8, 10)).toStrictEqual(['', '  🙏 a', `  ${'x'.repeat(20)}`])
+	})
+})
+
+// joshuafolkken/kit#8154: an icon leading a name is the icon beside its label; one after it is not.
+describe('run_board_render_thanks.thanks_lines with icons', () => {
+	it('marks the icon that leads a name as its label pair alone', () => {
+		const names: Thanks = [
+			{ name: 'unicorn🦄', url: undefined },
+			{ name: "📦 What's new", url: KITTEN_URL },
+		]
+		const [, line = ''] = thanks_lines(names, osc8, undefined)
+
+		expect(line).toBe(
+			`  🙏 unicorn🦄  ${osc8(run_board_label_pair.pair('📦', "What's new"), KITTEN_URL)}`,
+		)
 	})
 })

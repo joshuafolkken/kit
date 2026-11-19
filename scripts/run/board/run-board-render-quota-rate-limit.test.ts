@@ -2,6 +2,7 @@ import { stripVTControlCharacters } from 'node:util'
 import type { CoreRateLimit } from '#scripts/gh/gh-core-rate-limit'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_fit } from './run-board-fit'
+import { run_board_label_pair } from './run-board-label-pair'
 import type { Quotas } from './run-board-quota-read'
 import { run_board_render_quota, type QuotaView } from './run-board-render-quota'
 import type { GithubRateLimit } from './run-board-render-quota-github'
@@ -36,7 +37,9 @@ afterEach(() => {
 
 function part_of(view: Partial<QuotaView>): { rows: Array<string>; summary: string } {
 	const part = usage_part({ quotas: QUOTAS, now_ms: NOW_MS, ...view })
-	const rows = (part?.lines ?? []).map((line) => stripVTControlCharacters(line.text))
+	const rows = (part?.lines ?? []).map((line) =>
+		run_board_label_pair.bare(stripVTControlCharacters(line.text)),
+	)
 
 	return { rows, summary: part?.summary ?? '' }
 }

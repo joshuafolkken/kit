@@ -1,4 +1,5 @@
 import { run_board_fit, type PlanLine, type PlanSection, type SectionKey } from './run-board-fit'
+import { run_board_label_pair } from './run-board-label-pair'
 import { run_board_labels } from './run-board-labels'
 import type { BoardRow } from './run-board-layout'
 
@@ -6,6 +7,7 @@ import type { BoardRow } from './run-board-layout'
 // rows into one count when the pane is short.
 
 const { STATE_ICONS, WORDS } = run_board_labels
+const { pair } = run_board_label_pair
 const GAP = '  '
 // A row's indent under a rule whose icon stands in the second column, so the row's icon stands clear of
 // it (joshuafolkken/kit#4292); a lane row leads with its progress column two columns further left.
@@ -16,8 +18,15 @@ const RULE_WIDTH = 50
 const OPEN_MARK = '▾'
 const FOLDED_MARK = '▸'
 
+// A heading run on as a rule to `RULE_WIDTH` characters, a label's zero-width marks not counted.
+function rule_to_width(heading: string): string {
+	const marks = heading.length - run_board_label_pair.bare(heading).length
+
+	return heading.padEnd(RULE_WIDTH + marks, RULE)
+}
+
 function rule_of(label: string): string {
-	return `${RULE_LEAD} ${label} `.padEnd(RULE_WIDTH, RULE)
+	return rule_to_width(`${RULE_LEAD} ${label} `)
 }
 
 // A column's label and the terminal column its cells start at.
@@ -99,7 +108,7 @@ function open_head(head: ReadonlyArray<string>, label: string): Array<string> {
 	const rule = head.at(-1) ?? ''
 	const lead = `${RULE_LEAD} ${label} `
 
-	if (!rule.startsWith(lead)) return ['', `${OPEN_MARK} ${label} `.padEnd(RULE_WIDTH, RULE)]
+	if (!rule.startsWith(lead)) return ['', rule_to_width(`${OPEN_MARK} ${label} `)]
 
 	const rest = rule.slice(lead.length)
 	const at = Math.max(0, rest.indexOf(RULE))
@@ -112,10 +121,7 @@ function open_head(head: ReadonlyArray<string>, label: string): Array<string> {
 
 // A folded section's one line: `▸ ⏳ queued ── 3 ───`, ending on a rule however long its summary.
 function folded_head(label: string, summary: string): Array<string> {
-	return [
-		'',
-		`${FOLDED_MARK} ${label} ${RULE_LEAD} ${summary} ${RULE_LEAD}`.padEnd(RULE_WIDTH, RULE),
-	]
+	return ['', rule_to_width(`${FOLDED_MARK} ${label} ${RULE_LEAD} ${summary} ${RULE_LEAD}`)]
 }
 
 // The finished rows' cut ones counted on one line, the withdrawn among them beside it.
@@ -136,7 +142,7 @@ function done_section(
 ): Array<PlanSection> {
 	const lines = rows.map((row) => line_of(row))
 	const withdrawn = new Set(lines.filter((_, index) => rows[index]?.state === 'withdrawn'))
-	const heading = `${STATE_ICONS.merged} ${WORDS.done}`
+	const heading = pair(STATE_ICONS.merged, WORDS.done)
 
 	return keyed('done', plan_section(heading, lines)).map((section) => ({
 		...section,
