@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
+import { run_board_sound_cues } from './run-board-sound-cues'
 import { run_board_sound_synth, type Note } from './run-board-sound-synth'
 
-// joshuafolkken/kit#7943: note definitions synthesize 16-bit mono PCM with faded edges at 50% volume.
+// joshuafolkken/kit#7943: note definitions synthesize 16-bit mono PCM with faded edges.
+// joshuafolkken/kit#8190: every note sounds at the same target RMS whatever its wave.
 
-const { REST, VOLUME, frequency_of, samples_of } = run_board_sound_synth
+const { REST, TARGET_RMS, FULL_SCALE, frequency_of, samples_of } = run_board_sound_synth
 
 const SAMPLE_RATE = 44_100
 const SECOND_MS = 1000
@@ -12,8 +14,19 @@ const CROSSING_TOLERANCE = 2
 const EDGE_TOLERANCE = 1
 const NOTE_MS = 50
 const NOTE_SAMPLES = 2205
-const DEFAULT_VOLUME = 0.5
-const DEFAULT_PEAK = 16_384
+const DEFAULT_TARGET_RMS = 0.1
+const RMS_TOLERANCE = 0.1
+// The synth's edge fade in samples at the sample rate, left out of a note's RMS.
+const FADE_SAMPLES = 221
+const WAVES = ['sine', 'square', 'triangle'] as const
+
+// A note's RMS past its edge fades, as a ratio of the target RMS.
+function rms_ratio(samples: Int16Array): number {
+	const body = [...samples.subarray(FADE_SAMPLES, samples.length - FADE_SAMPLES)]
+	const mean_square = body.reduce((sum, sample) => sum + sample * sample, 0) / body.length
+
+	return Math.sqrt(mean_square) / (TARGET_RMS * FULL_SCALE)
+}
 
 function zero_crossings(samples: Int16Array): number {
 	const signs = [...samples].map((sample) => Math.sign(sample)).filter((sign) => sign !== 0)
@@ -64,13 +77,32 @@ describe('run_board_sound_synth.samples_of', () => {
 	})
 })
 
-describe('run_board_sound_synth.samples_of volume', () => {
-	it('peaks at the default volume of full scale and stays silent on a rest', () => {
-		const tone = samples_of([{ pitch: 'A4', ms: NOTE_MS, wave: 'square' }], SAMPLE_RATE)
+describe('run_board_sound_synth.samples_of loudness', () => {
+	it('sounds the same note at the target RMS on all three waves, never clipping', () => {
+		const tones = WAVES.map((wave) =>
+			samples_of([{ pitch: 'A4', ms: SECOND_MS, wave }], SAMPLE_RATE),
+		)
+
+		expect(TARGET_RMS).toBe(DEFAULT_TARGET_RMS)
+
+		for (const tone of tones) {
+			expect(Math.abs(rms_ratio(tone) - 1)).toBeLessThanOrEqual(RMS_TOLERANCE)
+			expect(peak_of(tone)).toBeLessThan(FULL_SCALE)
+		}
+	})
+
+	it('sounds every cue note at the target RMS and stays silent on a rest', () => {
+		const notes = Object.values(run_board_sound_cues.CUES)
+			.flatMap((cue) => cue.notes)
+			.filter((cue_note) => cue_note.pitch !== REST)
 		const rest = samples_of([{ pitch: REST, ms: NOTE_MS, wave: 'square' }], SAMPLE_RATE)
 
-		expect(VOLUME).toBe(DEFAULT_VOLUME)
-		expect(peak_of(tone)).toBe(DEFAULT_PEAK)
+		for (const note of notes) {
+			const ratio = rms_ratio(samples_of([note], SAMPLE_RATE))
+
+			expect(Math.abs(ratio - 1), `${note.pitch} ${note.wave}`).toBeLessThanOrEqual(RMS_TOLERANCE)
+		}
+
 		expect(peak_of(rest)).toBe(0)
 	})
 })

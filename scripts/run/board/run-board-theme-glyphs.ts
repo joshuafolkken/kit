@@ -11,13 +11,14 @@ type Glyph = readonly [text: string, tone: Tone]
 type Glyphs = ReadonlyMap<string, Glyph>
 
 // Each emoji the board's sources draw, by what it marks; a text-presentation symbol one column wide
-// gets one character. A section heading's icon reads as blanks, so only its word is left.
+// gets one character. A section heading's icon reads as its rule, so every heading reads
+// `V -- NAME` as one whose icon is dropped beside its label does (joshuafolkken/kit#8154).
 const EMOJI: Glyphs = new Map<string, Glyph>([
-	['💻', ['  ', 'info']],
-	['📈', ['  ', 'info']],
-	['⛽', ['  ', 'info']],
-	['🧵', ['  ', 'info']],
-	['📌', ['  ', 'info']],
+	['💻', ['--', 'info']],
+	['📈', ['--', 'info']],
+	['⛽', ['--', 'info']],
+	['🧵', ['--', 'info']],
+	['📌', ['--', 'info']],
 	['🚨', ['P1', 'alert']],
 	['🔺', ['P2', 'caution']],
 	['✨', ['FT', 'info']],

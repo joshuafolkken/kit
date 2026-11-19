@@ -1,4 +1,5 @@
 import { run_board_header, type BoardHeader } from './run-board-header'
+import { run_board_header_notice } from './run-board-header-notice'
 import { run_board_layout, type BoardLayout, type BoardRow } from './run-board-layout'
 import type { BoardNote } from './run-board-notes'
 import { run_board_render_notes } from './run-board-render-notes'
@@ -56,15 +57,15 @@ function note_keys_of(notes: ReadonlyArray<BoardNote>): Array<string> {
 }
 
 // Every key the board knows this frame — its rows', its epics', its seats', its notes' and the header's
-// now line's — so a line is typed only when its key is new. A keyed line a later Issue adds puts its keys
-// here.
+// now line's and last notice's — so a line is typed only when its key is new. A keyed line a later Issue
+// adds puts its keys here.
 function known_of(header: BoardHeader, notes: ReadonlyArray<BoardNote>): Set<string> {
 	const known = keys_of(header.layout)
-	const now_key = run_board_header.now_key(header)
+	const header_keys = [run_board_header.now_key(header), run_board_header_notice.key_of(header)]
 	const keys = [...epic_keys_of(header.layout), ...seat_keys_of(header), ...note_keys_of(notes)]
 
 	for (const key of keys) known.add(key)
-	if (now_key !== undefined) known.add(now_key)
+	for (const key of header_keys) if (key !== undefined) known.add(key)
 
 	return known
 }

@@ -7,6 +7,7 @@ import {
 import { issue_citation } from '#scripts/rules/issue-citation'
 import { describe, expect, it, vi, type MockInstance } from 'vitest'
 import { epic_bundle, type BacklogIssue, type BundleDecision } from './epic-bundle'
+import { epic_bundle_apply } from './epic-bundle-apply'
 import { epic_bundle_cli } from './epic-bundle-cli'
 import { epic_bundle_fixture } from './epic-bundle-fixture'
 
@@ -411,5 +412,27 @@ describe('epic_bundle_cli.run — --apply', () => {
 		expect(await epic_bundle_cli.run(['--apply'])).toBe(FAILURE_EXIT_CODE)
 		expect(error).toHaveBeenCalledWith(epic_bundle_cli.USAGE)
 		error.mockRestore()
+	})
+})
+
+// joshuafolkken/kit#8172: the command applies only on the flag, and never requires a placement —
+// that is `issue:file`'s, for the split child it files.
+describe('epic_bundle_cli.run — the placement mode', () => {
+	it.each([
+		[['1'], 0],
+		[['1', '--apply'], 1],
+	])('applies the placement only with the flag (%j)', async (argv, applied) => {
+		vi.spyOn(console, 'info').mockImplementation(() => undefined)
+		vi.spyOn(git_gh_command, 'repo_get_name_with_owner').mockResolvedValue(REPO)
+		vi.spyOn(git_gh_command, 'issue_list_by_label').mockResolvedValue(listing_of([]))
+		vi.spyOn(git_gh_command, 'issue_list_open_relations').mockResolvedValue(
+			listing_of([{ number: 1, title: 'A title', body: '', labels: [] }]),
+		)
+		const apply = vi.spyOn(epic_bundle_apply, 'apply_decision').mockResolvedValue(0)
+
+		expect(await epic_bundle_cli.run(argv)).toBe(0)
+		expect(apply).toHaveBeenCalledTimes(applied)
+		expect(apply.mock.calls[0]?.[0].is_placement_required ?? false).toBe(false)
+		vi.restoreAllMocks()
 	})
 })

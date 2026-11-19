@@ -82,6 +82,25 @@ afterEach(() => {
 	vi.restoreAllMocks()
 })
 
+// joshuafolkken/kit#8171: publishing an epic's prepared children creates no Issue.
+describe('unasked_filing.is_unasked_filing — --publish', () => {
+	it('stays silent on --publish, which files nothing', () => {
+		const call = bash_call('pnpm josh issue:file --publish 8169')
+
+		expect(unasked_filing.is_unasked_filing(call, INTERACTIVE)).toBe(false)
+	})
+
+	it.each([
+		['a title spelling --publish', 'pnpm josh issue:file "Fix --publish" --body-file b.md'],
+		[
+			'a publish chained before a real filing',
+			'pnpm josh issue:file --publish 8169 && pnpm josh issue:file "T" --body-file b.md',
+		],
+	])('still fires on %s', (_name, command) => {
+		expect(unasked_filing.is_unasked_filing(bash_call(command), INTERACTIVE)).toBe(true)
+	})
+})
+
 describe('unasked_filing.is_unasked_filing', () => {
 	it('fires on an interactive session’s issue:file', () => {
 		expect(unasked_filing.is_unasked_filing(FILING_CALL, INTERACTIVE)).toBe(true)

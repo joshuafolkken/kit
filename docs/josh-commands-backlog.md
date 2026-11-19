@@ -204,6 +204,7 @@ Steps 1–2 stop on refusal. Steps 3–7 report problems, including duplicates w
    Local `原因の park: #<N>` lines record stops through the shared epic recorder. Foreign filings skip them. Failures warn and continue; repair dependencies without refiling. Post-create failures leave exit 0.
 10. With `--release`, link the filed issue to the target's release issue, as [`josh issue:release`](#josh-issuerelease) does. A link that does not complete prints `⚠` with that command to re-run, prefixed with `GH_REPO=<target>` for a `--repo` filing.
 11. Run [`josh epic:bundle`](#josh-epicbundle) on the filed issue. When it gives no answer, print `⚠` with the command to re-run; the exit code stays 0.
+    A directly filed, unpublished `--route split` child runs it with `--apply`; left unplaced, it prints `✖` with how to create and publish its epic, and exits 1 — already filed, so do not refile. `issue:spill` and `--batch` place their own.
 
 A refusal in steps 1–7 files nothing and exits 1, and a filing that files nothing is never counted toward the cap. No delivered rule refuses the call ahead of the filing cap, WIP cap and fold steps.
 
@@ -985,7 +986,7 @@ pnpm josh backlog:plan --waves          # the run order, wave by wave
 
 - `--exclude <N>` — same exclusion as `backlog:next`.
 - `--waves` — print the order the run takes, wave by wave, assuming each wave merges before the next. Read-only.
-- `--pending-publication` — list each pending-publication issue that blocks an open issue, instead of the plan. Read-only.
+- `--pending-publication` — list each pending-publication issue that blocks an open issue, then every pending issue with its missing steps (epic placement, plan record, publish), instead of the plan. Read-only.
 
 <!-- /usage -->
 

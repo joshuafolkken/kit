@@ -1,8 +1,10 @@
+import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { stamp_file } from '#scripts/josh/stamp-file'
-import { effective_limit } from '#scripts/lines/effective-limit'
+import { effective_limit, type LineRuleOptions } from '#scripts/lines/effective-limit'
 import { line_budget } from '#scripts/lines/line-budget'
 import { ESLint } from 'eslint'
+import { metrics_line_cache, type LineStore } from './metrics-line-cache'
 
 // The code-line count `josh metrics` totals, asked of eslint's own `max-lines` exactly as
 // `line_budget` asks it, but **in process and with every other rule filtered out**.
@@ -38,6 +40,8 @@ const CACHE_PREFIX = 'josh-metrics-eslint-cache-'
 // counts. The file is found beside this module because `josh metrics` is kit-only, so the checkout
 // that runs it is the one whose configuration it is.
 const CONFIG_FILE = fileURLToPath(new URL('../../eslint.config.js', import.meta.url))
+// That checkout's ruler keys the stored counts (`metrics-line-cache.ts`), whatever tree is counted.
+const RULER_ROOT = path.dirname(CONFIG_FILE)
 
 function is_max_lines(rule: { ruleId: string }): boolean {
 	return rule.ruleId === MAX_LINES_RULE
@@ -70,20 +74,80 @@ function unread_config(file_count: number, root: string): Error {
 	)
 }
 
+async function eslint_counts(
+	options: ReadonlyMap<string, LineRuleOptions>,
+	root: string,
+): Promise<ReadonlyMap<string, number>> {
+	const groups = [...line_budget.grouped(options).values()]
+	const counted = await Promise.all(groups.map(async (group) => await group_counts(root, group)))
+
+	return new Map(counted.flatMap((counts) => [...counts]))
+}
+
+function keyed(options: ReadonlyMap<string, LineRuleOptions>): ReadonlyMap<string, string> {
+	const keys = [...options].map(([file, rule]) => [file, metrics_line_cache.entry_key(file, rule)])
+
+	return new Map(keys.filter((pair): pair is [string, string] => pair[1] !== undefined))
+}
+
+// The entries a fresh count adds to the store, by the key each counted file was read under.
+function fresh_entries(
+	keys: ReadonlyMap<string, string>,
+	counted: ReadonlyMap<string, number>,
+): ReadonlyMap<string, number> {
+	return new Map(
+		[...counted].flatMap(([file, count]) => {
+			const key = keys.get(file)
+
+			return key === undefined ? [] : [[key, count] as const]
+		}),
+	)
+}
+
+// Only the files the store holds no count for go to eslint; the answer keeps the order eslint was
+// asked in, whichever side each count came from.
+async function stored_counts(
+	options: ReadonlyMap<string, LineRuleOptions>,
+	root: string,
+	store: LineStore,
+): Promise<ReadonlyMap<string, number>> {
+	const keys = keyed(options)
+	const stored = store.load()
+	const cached = new Map(
+		[...keys].flatMap(([file, key]) => {
+			const count = stored.get(key)
+
+			return count === undefined ? [] : [[file, count] as const]
+		}),
+	)
+	const counted = await eslint_counts(
+		new Map([...options].filter(([file]) => !cached.has(file))),
+		root,
+	)
+
+	store.save(fresh_entries(keys, counted))
+
+	return new Map(
+		[...options.keys()].flatMap((file) => {
+			const count = cached.get(file) ?? counted.get(file)
+
+			return count === undefined ? [] : [[file, count] as const]
+		}),
+	)
+}
+
 // Keyed by absolute path, as `line_budget.counts_from` keys it. A file eslint sets no `max-lines` on
 // is absent, so it is left out of every total rather than counted as zero code lines.
 async function code_line_counts(
 	file_paths: ReadonlyArray<string>,
 	root: string,
+	store: LineStore = metrics_line_cache.ruler_store(RULER_ROOT),
 ): Promise<ReadonlyMap<string, number>> {
 	const options = await effective_limit.options_for(file_paths, root, CONFIG_FILE)
 
 	if (file_paths.length > 0 && options.size === 0) throw unread_config(file_paths.length, root)
 
-	const groups = [...line_budget.grouped(options).values()]
-	const counted = await Promise.all(groups.map(async (group) => await group_counts(root, group)))
-
-	return new Map(counted.flatMap((counts) => [...counts]))
+	return await stored_counts(options, root, store)
 }
 
 const metrics_code_lines = { code_line_counts }
