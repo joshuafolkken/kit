@@ -1,6 +1,5 @@
 import { styleText } from 'node:util'
 import { poll } from '#scripts/lib/poll'
-import { run_board_every } from './run-board-every'
 import { run_board_fold } from './run-board-fold'
 import { run_board_intro, type Reveal } from './run-board-intro'
 import { run_board_keys, type KeyReading } from './run-board-keys'
@@ -95,14 +94,13 @@ function ticker(
 }
 
 // A frame on the second, its spinners turned until the next: the turns are
-// written past the frame's own control bytes, each to its spot on the screen the frame drew. Each
-// state is handed to `record`, which keeps the frames `--chat` and `--once` answer from. Each stage is
-// marked as it is entered, for `--timing`'s stalls.
+// written past the frame's own control bytes, each to its spot on the screen the frame drew. The frames
+// `--chat` and `--once` answer from are recorded on the worker thread (`run-board-gather-record.ts`),
+// so this thread only draws. Each stage is marked as it is entered, for `--timing`'s stalls.
 async function redraw_forever(
 	ports: BoardPorts,
 	screen: Screen,
 	reveal: Reveal | undefined,
-	record: (state: BoardState) => void,
 ): Promise<void> {
 	const step = ticker(ports, screen, reveal)
 	let state = FRESH_STATE
@@ -112,8 +110,6 @@ async function redraw_forever(
 			ports.enter_stage?.('redraw')
 			// eslint-disable-next-line require-atomic-updates -- poll awaits each callback before starting the next tick
 			state = await step(state)
-			ports.enter_stage?.('record')
-			record(state)
 		},
 		{
 			interval_ms: run_board_spin.REDRAW_MS,
@@ -150,7 +146,6 @@ async function watch(ports: BoardPorts, theme: Theme | undefined): Promise<void>
 			},
 			screen,
 			reveal,
-			run_board_every.recorder(ports, theme),
 		)
 	} finally {
 		leave()

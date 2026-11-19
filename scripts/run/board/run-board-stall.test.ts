@@ -71,7 +71,7 @@ function held_in_turn(): FakeProbes & { watch: ReturnType<typeof run_board_stall
 	return { ...fake, watch }
 }
 
-// A timed live board that took its screen, was held through its record stage with a GC within, and
+// A timed live board that took its screen, was held through its turn stage with a GC within, and
 // left — its last frame and the stops its watch made.
 function left_after_stall(): { frame: string | undefined; stops: Array<string> } {
 	const fake = fake_probes()
@@ -79,7 +79,7 @@ function left_after_stall(): { frame: string | undefined; stops: Array<string> }
 	const board = run_board_timing.timed(ports, true, () => 0, fake.probes)
 
 	board.on_exit(() => 0)
-	hold(fake, (stage) => board.enter_stage?.(stage), 'record')
+	hold(fake, (stage) => board.enter_stage?.(stage), 'turn')
 	fake.gc(GC_SPAN)
 	fake.fire()
 	leaves.at(-1)?.()
@@ -124,12 +124,12 @@ describe('run_board_stall.watch stage and threshold', () => {
 		const fake = fake_probes()
 		const watch = run_board_stall.watch(fake.probes)
 
-		hold(fake, watch.enter, 'record')
-		watch.enter('turn')
+		hold(fake, watch.enter, 'turn')
+		watch.enter('redraw')
 		fake.clock.now_ms += PROBE_MS
 		fake.fire()
 
-		expect(watch.stalls()).toStrictEqual([expect.objectContaining({ stage: 'record' })])
+		expect(watch.stalls()).toStrictEqual([expect.objectContaining({ stage: 'turn' })])
 	})
 
 	it('records a probe that ran late by exactly the threshold', () => {
@@ -168,7 +168,7 @@ describe('run_board_timing.timed stalls', () => {
 		const { frame, stops } = left_after_stall()
 
 		expect(frame).toContain(`stalls   n 1 over ${String(STALL_MS)}`)
-		expect(frame).toContain(`stall 1  ${STALL_LENGTH.toFixed(1)} record · gc 30.0`)
+		expect(frame).toContain(`stall 1  ${STALL_LENGTH.toFixed(1)} turn · gc 30.0`)
 		expect(stops).toStrictEqual(['probe', 'gc'])
 	})
 
@@ -198,13 +198,13 @@ describe('run_board_timing.timed stalls', () => {
 })
 
 describe('run_board_live.watch stages', () => {
-	it('marks the redraw, the record and the turns between in order', async () => {
+	it('marks the redraws and the turns between in order', async () => {
 		const { ports } = harness(undefined, [])
 		const stages: Array<StallStage> = []
 		const enter_stage = marker(stages)
 
 		await expect(run_board_live.watch({ ...ports, enter_stage }, undefined)).rejects.toBe(STOPPED)
 
-		expect(stages).toStrictEqual(['redraw', 'record', 'turn', 'redraw', 'record', 'turn'])
+		expect(stages).toStrictEqual(['redraw', 'turn', 'redraw', 'turn'])
 	})
 })

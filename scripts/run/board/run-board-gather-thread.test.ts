@@ -4,12 +4,14 @@ import { ts_entry_loader } from '#scripts/run/ts-entry-loader'
 import { describe, expect, it, vi } from 'vitest'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_gather, type GatherState } from './run-board-gather'
+import { run_board_gather_record, type RecordSetup } from './run-board-gather-record'
 import {
 	run_board_gather_thread,
 	type FailedPost,
 	type GatherPost,
 	type GatherWorker,
 	type RoundState,
+	type WorkerSeed,
 } from './run-board-gather-thread'
 import { run_board_tick } from './run-board-tick'
 
@@ -83,20 +85,24 @@ function faked(): { gather: ReturnType<typeof worker_gatherer>; spawned: Array<F
 	return { gather: worker_gatherer(spawn, () => FAILED_MS), spawned }
 }
 
-describe('run_board_gather_thread.worker_gatherer with its default spawn', () => {
-	it('passes the parent loader options to the default Worker constructor', async () => {
+// joshuafolkken/kit#8161: the worker is started with what it records its frames with.
+describe('run_board_gather_thread.worker_gatherer over spawner', () => {
+	it('passes the loader options, the record setup and its link environment to the Worker', async () => {
 		const worker = fake_worker()
+		const setup: RecordSetup = { theme: 'wargames', is_tty: true, is_linked: true }
+		const worker_data: WorkerSeed = { seed: undefined, setup }
 
 		worker_spawn.mockImplementationOnce(function create_worker() {
 			return worker
 		})
-		const first = worker_gatherer()('background')
+		const first = worker_gatherer(run_board_gather_thread.spawner(setup))('background')
 
 		worker.emit('message', post_of(FRESH_GATHER, READ))
 		await first
 		expect(worker_spawn).toHaveBeenCalledWith(run_board_gather_thread.WORKER_URL, {
 			execArgv: ts_entry_loader.loader_argv(process.execArgv),
-			workerData: undefined,
+			env: run_board_gather_record.worker_environment(setup),
+			workerData: worker_data,
 		})
 	})
 })

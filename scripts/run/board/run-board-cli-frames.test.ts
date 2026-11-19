@@ -5,7 +5,7 @@ import { run_board_frame_store, type FrameStore } from './run-board-frame-store'
 import { run_board_gather } from './run-board-gather'
 import type { BoardPorts } from './run-board-state'
 
-const { LOCAL, START, STOPPED, WORDS, harness, plan_titled } = run_board_fixture
+const { LOCAL, START, STOPPED, harness, plan_titled } = run_board_fixture
 const { CHAT_KEY, FRESH_MS, memory_store, once_key } = run_board_frame_store
 const RECORDED = 'recorded board\n'
 const AGE_SECONDS = 12
@@ -118,8 +118,6 @@ const ESCAPE = '\u{1B}'
 const HOME = `${ESCAPE}[?2026h${ESCAPE}[H`
 const LIVE_SECONDS = 11
 const LIVE_MS = LIVE_SECONDS * 1000
-const LIVE_AGE = String(LIVE_SECONDS)
-const TERMINAL_ONCE = once_key(undefined, true)
 // The run's own reads the live board takes on its own cadence over `LIVE_MS`: one at the start, then
 // one each `LOCAL_READ_MS`.
 const LOCAL_READS = Math.floor(LIVE_MS / run_board_gather.LOCAL_READ_MS) + 1
@@ -157,47 +155,17 @@ async function watched(store: FrameStore): Promise<{
 	return { made, saves, writes }
 }
 
+// joshuafolkken/kit#8161: the frames are recorded on the worker thread (`run-board-gather-record.ts`),
+// so the board's own redraws record nothing.
 describe('run_board_cli.run live board record', () => {
-	it('records both frames once every five seconds, reading nothing more for them', async () => {
+	it('records nothing on the board’s own thread while it draws', async () => {
 		const { made, saves, writes } = await watched(memory_store())
 		const frames = writes.filter((text) => text.startsWith(HOME))
 
-		expect(saves).toStrictEqual([
-			CHAT_KEY,
-			TERMINAL_ONCE,
-			CHAT_KEY,
-			TERMINAL_ONCE,
-			CHAT_KEY,
-			TERMINAL_ONCE,
-		])
+		expect(frames.length).toBeGreaterThan(LIVE_SECONDS - 1)
+		expect(saves).toStrictEqual([])
 		expect(made.read_machine).toHaveBeenCalledTimes(frames.length)
 		expect(made.read_local).toHaveBeenCalledTimes(LOCAL_READS)
-	})
-
-	it('records a chat frame with no escape and a once frame that ends on no footer', async () => {
-		const store = memory_store()
-
-		await watched(store)
-
-		expect(store.load(CHAT_KEY)?.text).toContain('🧵 lanes')
-		expect(store.load(CHAT_KEY)?.text).not.toContain(ESCAPE)
-		expect(store.load(TERMINAL_ONCE)?.text).not.toContain(HOME)
-		expect(store.load(TERMINAL_ONCE)?.text).not.toContain(WORDS.keeps_running)
-	})
-
-	it('answers --chat from the live board record, reading nothing', async () => {
-		const store = memory_store()
-		const { made } = await watched(store)
-		const recorded = store.load(CHAT_KEY)
-		const chat = board(store)
-
-		chat.clock.now_ms = made.clock.now_ms
-		await run_board_cli.run(['--chat'], chat.ports)
-
-		expect(recorded?.text).toBeDefined()
-		// Dated when the plan was read, at the board's start, so it is as old as the board.
-		expect(chat.frames).toStrictEqual([`${String(recorded?.text)}recorded ${LIVE_AGE}s ago\n`])
-		expect(chat.read_local).not.toHaveBeenCalled()
 	})
 })
 
