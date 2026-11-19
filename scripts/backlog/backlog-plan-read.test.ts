@@ -126,6 +126,7 @@ describe('backlog_plan_read.classify timing', () => {
 			scope: { ...stub.scope, wave_limit: lane_capacity.seated_limit(WAVE_LIMIT) },
 		})
 		expect(launch_timing.phases().map(({ name }) => name)).toStrictEqual(STEPS)
+		expect(backlog_gate_scope.gate_scope).toHaveBeenCalledOnce()
 	})
 
 	// joshuafolkken/kit#8220: the gate scope runs beside the resolution, never in place of its failure.
@@ -133,6 +134,7 @@ describe('backlog_plan_read.classify timing', () => {
 		stub_classification(undefined)
 
 		await expect(backlog_plan_read.classify(OPTED_IN, [])).resolves.toBeUndefined()
+		expect(backlog_gate_scope.gate_scope).toHaveBeenCalledOnce()
 	})
 })
 
@@ -173,5 +175,16 @@ describe('backlog_plan_read.read_plan', () => {
 		expect(backlog_next.context_of).toHaveBeenCalledWith(OPTED_IN, [], read?.listing)
 		expect(read?.listing.rows.map((row) => row.number)).toStrictEqual([1, 2])
 		expect(read?.plan.result).toStrictEqual(stub.result)
+	})
+})
+
+describe('backlog_plan_read.read_plan — a failed classification', () => {
+	it('answers nothing when the classification fails after both reads', async () => {
+		fetch_opted_in_mock.mockResolvedValue(OPTED_IN)
+		stub_listing()
+		stub_classification(undefined)
+
+		await expect(backlog_plan_read.read_plan()).resolves.toBeUndefined()
+		expect(backlog_next.resolve).toHaveBeenCalledOnce()
 	})
 })
