@@ -19,11 +19,11 @@ const TARGET_RMS = 0.1
 // Each wave's RMS at amplitude 1; a note's amplitude is `TARGET_RMS` over it, so no wave sounds
 // louder than another (joshuafolkken/kit#8190). A triangle's RMS is 1/√3.
 const TRIANGLE_MEAN_SQUARE_DIVISOR = 3
-const WAVE_RMS: ReadonlyMap<Wave, number> = new Map([
-	['sine', Math.SQRT1_2],
-	['square', 1],
-	['triangle', 1 / Math.sqrt(TRIANGLE_MEAN_SQUARE_DIVISOR)],
-])
+const WAVE_RMS: Readonly<Record<Wave, number>> = {
+	sine: Math.SQRT1_2,
+	square: 1,
+	triangle: 1 / Math.sqrt(TRIANGLE_MEAN_SQUARE_DIVISOR),
+}
 const FADE_MS = 5
 const MS_PER_SECOND = 1000
 const FULL_SCALE = 32_767
@@ -104,7 +104,7 @@ function note_samples(note: Note, sample_rate: number): Int16Array {
 
 	const frequency = frequency_of(note.pitch)
 	const fade_count = Math.max(1, sample_count_of(FADE_MS, sample_rate))
-	const amplitude = (TARGET_RMS / (WAVE_RMS.get(note.wave) ?? 1)) * FULL_SCALE
+	const amplitude = (TARGET_RMS / WAVE_RMS[note.wave]) * FULL_SCALE
 
 	return Int16Array.from({ length: count }, (_, index) => {
 		const phase = ((index * frequency) / sample_rate) % 1
