@@ -145,6 +145,6 @@ function recorder(ports: BoardPorts, theme: Theme | undefined): (state: BoardSta
 	}
 }
 
-const run_board_every = { chat_frame, push_until_ended, recorder }
+const run_board_every = { RECORD_EVERY_MS, chat_frame, push_until_ended, record, recorder }
 
 export { run_board_every }
