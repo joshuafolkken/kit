@@ -1,5 +1,5 @@
 import { run_board_fetch, type Fetch } from './run-board-fetch'
-import { run_board_state, type BoardPorts, type BoardState, type Pace } from './run-board-state'
+import { run_board_state, type BoardData, type DataPorts, type Pace } from './run-board-state'
 import type { Thanks } from './run-board-thanks-csv'
 import { run_board_thanks_read } from './run-board-thanks-read'
 
@@ -12,9 +12,9 @@ import { run_board_thanks_read } from './run-board-thanks-read'
 const { TTL_MS } = run_board_thanks_read
 const { is_due } = run_board_state
 
-type ThanksState = Pick<BoardState, 'thanks' | 'thanks_fetch' | 'thanks_attempted_ms'>
+type ThanksState = Pick<BoardData, 'thanks' | 'thanks_fetch' | 'thanks_attempted_ms'>
 
-function launch_thanks(state: BoardState, ports: BoardPorts, now_ms: number): BoardState {
+function launch_thanks<S extends ThanksState>(state: S, ports: DataPorts, now_ms: number): S {
 	const { read_thanks } = ports
 
 	if (
@@ -30,7 +30,7 @@ function launch_thanks(state: BoardState, ports: BoardPorts, now_ms: number): Bo
 	return { ...state, thanks_fetch, thanks_attempted_ms: now_ms }
 }
 
-function fold_thanks(state: BoardState): BoardState {
+function fold_thanks<S extends ThanksState>(state: S): S {
 	const answer = state.thanks_fetch?.answer()
 
 	if (answer === undefined) return state
@@ -39,12 +39,12 @@ function fold_thanks(state: BoardState): BoardState {
 }
 
 // Folds what landed and launches what is due; at the `settled` pace, waits for it to land.
-async function gather_thanks(
-	state: BoardState,
-	ports: BoardPorts,
+async function gather_thanks<S extends ThanksState>(
+	state: S,
+	ports: DataPorts,
 	now_ms: number,
 	pace: Pace,
-): Promise<BoardState> {
+): Promise<S> {
 	const launched = launch_thanks(fold_thanks(state), ports, now_ms)
 
 	if (pace === 'settled' && launched.thanks_fetch !== undefined) await launched.thanks_fetch.landed

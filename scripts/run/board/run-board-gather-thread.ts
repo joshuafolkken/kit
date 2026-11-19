@@ -3,14 +3,15 @@ import { Worker, type WorkerOptions } from 'node:worker_threads'
 import { launch_timing, type TimedPhase } from '#scripts/lane/launch-timing'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { ts_entry_loader } from '#scripts/run/ts-entry-loader'
+import { run_board_data } from './run-board-data'
 import {
 	run_board_gather,
-	type Gatherer,
 	type GatherPorts,
 	type GatherRead,
 	type GatherState,
 } from './run-board-gather'
 import type { LocalRead } from './run-board-read'
+import type { BoardData, BoardGather, BoardPorts, DataPorts, DataPost } from './run-board-state'
 
 // The live board's side of its worker thread (`run-board-gather-worker.ts`): the worker takes the
 // reads off this machine and hands each round over; a redraw draws the last one it handed, so no read
@@ -30,12 +31,34 @@ interface LocalPost {
 }
 
 // One round as the worker hands it over: the run's read only when it was read again, so the board
-// does not copy the whole stream every second. The phases the worker timed ride along, so
-// `run:board --timing` reads them on the board's own thread.
+// does not copy the whole stream every second, and the GitHub, roster and snapshot data folded over
+// it (`run-board-data.ts`). The phases the worker timed ride along, so `run:board --timing` reads them
+// on the board's own thread.
 interface GatherPost {
 	read: Omit<GatherRead, 'local'>
 	local?: LocalPost | undefined
+	data?: DataPost | undefined
 	phases?: ReadonlyArray<TimedPhase> | undefined
+}
+
+// What the worker keeps between rounds: its reads off this machine and the data folded over them.
+interface RoundState {
+	gather: GatherState
+	data: BoardData
+}
+
+// What a round reads with, and where it hands its posts.
+interface RoundIo {
+	ports: GatherPorts & DataPorts
+	post: (value: GatherPost | FailedPost) => void
+}
+
+type RoundPorts = RoundIo['ports']
+
+// Within a round: the read last handed over, and the data the early hand-overs stepped.
+interface RoundKept {
+	before: GatherState
+	early: Promise<BoardData>
 }
 
 // A round whose reads threw, handed over with why; the worker reads again next round.
@@ -53,8 +76,8 @@ type Spawn = () => GatherWorker
 
 interface Thread {
 	worker: GatherWorker | undefined
-	latest: GatherRead | undefined
-	waiting: Array<(read: GatherRead) => void>
+	latest: BoardGather | undefined
+	waiting: Array<(read: BoardGather) => void>
 }
 
 // joshuafolkken/kit#8135: the stream is read by its appended tail, so a reread holds the events it
@@ -96,32 +119,67 @@ function failed_of(error: unknown): FailedPost {
 	return { failed: reason_of(error) }
 }
 
+// The data stepped over a read at the worker's `background` pace: the GitHub reads it launches are
+// folded in on a later step, after they land.
+async function step_over(
+	data: BoardData,
+	read: GatherState,
+	ports: RoundPorts,
+): Promise<BoardData> {
+	return await run_board_data.step(data, run_board_gather.read_of(read), {
+		ports,
+		now_ms: ports.now(),
+		pace: 'background',
+	})
+}
+
+// The run's read handed over as soon as it lands, with the data stepped over it, so the board's first
+// frame draws the plan the last board kept; a step that throws is said failed, and the round goes on.
+async function post_early(
+	early: Promise<BoardData>,
+	before: GatherState,
+	read: GatherState,
+	io: RoundIo,
+): Promise<BoardData> {
+	const data = await early
+
+	try {
+		const stepped = await step_over(data, read, io.ports)
+
+		io.post({ ...post_of(before, read), data: run_board_data.posted(stepped) })
+
+		return stepped
+	} catch (error) {
+		io.post(failed_of(error))
+
+		return data
+	}
+}
+
 // The run's read is handed over as soon as it lands (joshuafolkken/kit#8134); the round's end hands
 // the rest over against it, so neither the run's read nor the phases go twice.
-async function posted_round(
-	state: GatherState,
-	ports: GatherPorts,
-	post: (value: GatherPost) => void,
-): Promise<GatherState> {
-	const posted = { before: state }
-	const next = await run_board_gather.gather(state, ports, 'background', (read) => {
-		post(post_of(posted.before, read))
-		posted.before = read
+async function posted_round(state: RoundState, io: RoundIo): Promise<RoundState> {
+	const kept: RoundKept = { before: state.gather, early: Promise.resolve(state.data) }
+	const next = await run_board_gather.gather(state.gather, io.ports, 'background', (read) => {
+		kept.early = post_early(kept.early, kept.before, read, io)
+		kept.before = read
 	})
+	const data = await step_over(await kept.early, next, io.ports)
+	const phases = launch_timing.phases()
 
-	post({ ...post_of(posted.before, next), phases: launch_timing.phases() })
+	io.post({ ...post_of(kept.before, next), data: run_board_data.posted(data), phases })
 
-	return next
+	return { gather: next, data }
 }
 
 // One round on the worker: the reads handed over, or why they threw — the state kept for the next.
 async function gather_round(
-	state: GatherState,
-	ports: GatherPorts,
-	post: (value: GatherPost | FailedPost) => void,
-): Promise<GatherState> {
+	state: RoundState,
+	ports: RoundPorts,
+	post: RoundIo['post'],
+): Promise<RoundState> {
 	try {
-		return await posted_round(state, ports, post)
+		return await posted_round(state, { ports, post })
 	} catch (error) {
 		post(failed_of(error))
 
@@ -133,7 +191,7 @@ function is_failed(value: unknown): value is FailedPost {
 	return typeof value === 'object' && value !== null && 'failed' in value
 }
 
-function settle(thread: Thread, read: GatherRead): void {
+function settle(thread: Thread, read: BoardGather): void {
 	thread.latest = read
 
 	for (const resolve of thread.waiting.splice(0)) resolve(read)
@@ -148,13 +206,19 @@ function local_of(thread: Thread, post: LocalPost): LocalRead | undefined {
 	return { ...value, events: kept.events }
 }
 
+// A post with no data — none stepped yet this round — keeps the last data handed over.
+function data_of(thread: Thread, post: GatherPost): DataPost | undefined {
+	return post.data ?? thread.latest?.data
+}
+
 function receive(thread: Thread, post: GatherPost): void {
 	const { phases = [] } = post
 
 	for (const phase of phases) launch_timing.mark(phase.name, phase.ms)
 	const local = post.local === undefined ? thread.latest?.local : local_of(thread, post.local)
+	const data = data_of(thread, post)
 
-	settle(thread, { ...post.read, local, read_failed_ms: undefined, read_error: undefined })
+	settle(thread, { ...post.read, local, data, read_failed_ms: undefined, read_error: undefined })
 }
 
 // A failed read keeps the last round on screen, said failed and why until the next answers.
@@ -198,7 +262,7 @@ function start(thread: Thread, spawn: Spawn, now: () => number): GatherWorker {
 	return worker
 }
 
-async function latest_of(thread: Thread): Promise<GatherRead> {
+async function latest_of(thread: Thread): Promise<BoardGather> {
 	if (thread.latest !== undefined) return thread.latest
 
 	return await new Promise((resolve) => {
@@ -215,7 +279,10 @@ function spawn_worker(): GatherWorker {
 }
 
 // The first redraw waits for the worker's first round; every later one draws the last round handed.
-function worker_gatherer(spawn: Spawn = spawn_worker, now: () => number = Date.now): Gatherer {
+function worker_gatherer(
+	spawn: Spawn = spawn_worker,
+	now: () => number = Date.now,
+): BoardPorts['gather'] {
 	const thread: Thread = { worker: undefined, latest: undefined, waiting: [] }
 
 	return async () => {
@@ -234,4 +301,4 @@ const run_board_gather_thread = {
 }
 
 export { run_board_gather_thread }
-export type { FailedPost, GatherPost, GatherWorker }
+export type { FailedPost, GatherPost, GatherWorker, RoundState }

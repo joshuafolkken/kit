@@ -1,21 +1,24 @@
 import { setTimeout as sleep } from 'node:timers/promises'
 import { parentPort, type MessagePort } from 'node:worker_threads'
 import { poll } from '#scripts/lib/poll'
+import { run_board_data_ports } from './run-board-data-ports'
 import { run_board_gather } from './run-board-gather'
 import { run_board_gather_live } from './run-board-gather-live'
-import { run_board_gather_thread } from './run-board-gather-thread'
+import { run_board_gather_thread, type RoundState } from './run-board-gather-thread'
 import { run_board_spin } from './run-board-spin'
+import { run_board_state } from './run-board-state'
 
 // The live board's worker thread: one round of the reads off this machine a redraw apart, each handed
 // to the board as it lands (`run-board-gather-thread.ts`). A round that throws is handed over as
 // failed, and the next round reads again.
 
 const { FRESH_GATHER } = run_board_gather
+const { FRESH_DATA } = run_board_state
 const { gather_round } = run_board_gather_thread
 
 async function gather_forever(port: MessagePort): Promise<void> {
-	const ports = run_board_gather_live.ports_of(true)
-	let state = FRESH_GATHER
+	const ports = { ...run_board_gather_live.ports_of(true), ...run_board_data_ports.live() }
+	let state: RoundState = { gather: FRESH_GATHER, data: FRESH_DATA }
 
 	await poll.wait_for(
 		async () => {

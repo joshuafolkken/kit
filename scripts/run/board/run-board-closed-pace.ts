@@ -1,6 +1,6 @@
 import { MS_PER_MINUTE, MS_PER_SECOND } from '#scripts/lib/timeouts'
 import type { LocalRead } from './run-board-read'
-import type { BoardState } from './run-board-state'
+import type { BoardData } from './run-board-state'
 import { run_board_status, type ItemState } from './run-board-status'
 
 // Which children a `run:board` closed read asks about once its run has ended.
@@ -26,7 +26,7 @@ const FRESH_RETRY_MS = FRESH_RETRY_SECONDS * MS_PER_SECOND
 // Only a closed lane is about to merge; a withdrawn one never closes its Issue.
 const CLOSING_END = 'lane:close'
 
-function has_asked_since_end(state: BoardState, ended_ms: number | undefined): boolean {
+function has_asked_since_end(state: BoardData, ended_ms: number | undefined): boolean {
 	const { closed_answered_ms } = state
 	if (closed_answered_ms === undefined || ended_ms === undefined) return false
 
@@ -38,7 +38,7 @@ function has_asked_since_end(state: BoardState, ended_ms: number | undefined): b
 // person closing it is what the board waits to draw. `undefined` while the run still asks as a going
 // run does.
 function ended_asked_states(
-	state: BoardState,
+	state: BoardData,
 	local: LocalRead,
 	now_ms: number,
 ): ReadonlySet<ItemState> | undefined {
