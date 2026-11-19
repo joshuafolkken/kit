@@ -1,5 +1,6 @@
 import { lane_stats } from '#scripts/lane/lane-stats'
 import { launch_timing } from '#scripts/lane/launch-timing'
+import { run_board_stall, type Stall, type StallProbes, type StallWatch } from './run-board-stall'
 import type { BoardPorts, DrawKind, DrawTimer } from './run-board-state'
 
 // `josh run:board --timing` (joshuafolkken/kit#7929): what the first board waited on, said once the
@@ -67,19 +68,27 @@ function draw_rows(draws: Draws | undefined): Array<[string, string]> {
 	})
 }
 
-// The launch phases, then — on a live board under `--timing` — each kind of draw it timed.
-function report(draws?: Draws): string {
-	const rows = [...phase_rows(), ...draw_rows(draws)]
+// The launch phases, then — on a live board under `--timing` — each kind of draw it timed and the
+// main-thread stalls it watched (joshuafolkken/kit#8148).
+function report(draws?: Draws, stalls?: ReadonlyArray<Stall>): string {
+	const stall_rows = stalls === undefined ? [] : run_board_stall.rows(stalls)
+	const rows = [...phase_rows(), ...draw_rows(draws), ...stall_rows]
 	const width = Math.max(0, ...rows.map(([name]) => name.length))
 	const lines = rows.map(([name, value]) => `  ${name.padEnd(width)}  ${value}`)
 
 	return `${[HEADING, ...lines].join('\n')}\n`
 }
 
-function reporting(ports: BoardPorts, leave: () => void, draws: Draws): () => void {
+function reporting(
+	ports: BoardPorts,
+	leave: () => void,
+	draws: Draws,
+	watching: StallWatch,
+): () => void {
 	return () => {
 		leave()
-		ports.write(report(draws))
+		watching.stop()
+		ports.write(report(draws, watching.stalls()))
 	}
 }
 
@@ -95,16 +104,25 @@ function draw_timer(draws: Draws, now: () => number): DrawTimer {
 	}
 }
 
-// Each draw timed from here on, and the report said with them after the screen is left.
+// Each draw timed from here on, the stalls watched from when a live board takes its screen — `--once`
+// never does — and the report said with them after the screen is left.
 function draw_ports(
 	ports: BoardPorts,
 	now: () => number,
-): Pick<BoardPorts, 'on_exit' | 'time_draw'> {
+	probes: StallProbes,
+): Pick<BoardPorts, 'enter_stage' | 'on_exit' | 'time_draw'> {
 	const draws: Draws = { tick: [], turn: [] }
+	const watched: { watching?: StallWatch } = {}
 
 	return {
+		enter_stage: (stage) => {
+			watched.watching?.enter(stage)
+		},
 		on_exit: (leave) => {
-			ports.on_exit(reporting(ports, leave, draws))
+			const watching = run_board_stall.watch(probes)
+
+			watched.watching = watching
+			ports.on_exit(reporting(ports, leave, draws, watching))
 		},
 		time_draw: draw_timer(draws, now),
 	}
@@ -121,13 +139,14 @@ function timed(
 	ports: BoardPorts,
 	is_timing: boolean,
 	now: () => number = performance.now.bind(performance),
+	probes: StallProbes = run_board_stall.PROCESS_PROBES,
 ): BoardPorts {
 	if (!is_timing) return ports
 	let has_read = false
 
 	return {
 		...ports,
-		...draw_ports(ports, now),
+		...draw_ports(ports, now, probes),
 		gather: async (pace) => {
 			const read = await ports.gather(pace)
 

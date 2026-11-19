@@ -96,7 +96,8 @@ function ticker(
 
 // A frame on the second, its spinners turned until the next: the turns are
 // written past the frame's own control bytes, each to its spot on the screen the frame drew. Each
-// state is handed to `record`, which keeps the frames `--chat` and `--once` answer from.
+// state is handed to `record`, which keeps the frames `--chat` and `--once` answer from. Each stage is
+// marked as it is entered, for `--timing`'s stalls.
 async function redraw_forever(
 	ports: BoardPorts,
 	screen: Screen,
@@ -108,13 +109,16 @@ async function redraw_forever(
 
 	await poll.wait_for(
 		async () => {
+			ports.enter_stage?.('redraw')
 			// eslint-disable-next-line require-atomic-updates -- poll awaits each callback before starting the next tick
 			state = await step(state)
+			ports.enter_stage?.('record')
 			record(state)
 		},
 		{
 			interval_ms: run_board_spin.REDRAW_MS,
 			sleeper: async () => {
+				ports.enter_stage?.('turn')
 				await run_board_spin.spin_to_second(state, ports)
 			},
 		},
