@@ -1,0 +1,7 @@
+{
+	"reason": "New opt-in --timing stall recorder for the live run:board (#8148): stall detection, stage attribution, GC overlap and report rows",
+	"date": "2026-11-19",
+	"growth": {
+		"scripts.code_lines": 169
+	}
+}

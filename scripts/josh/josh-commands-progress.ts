@@ -124,6 +124,11 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 					description:
 						'after the `--once` frame, or once a live board leaves its screen, writes how long each phase of the first frame took (ms). `--chat` and `--every` ignore it.',
 				},
+				{
+					names: ['--timing'],
+					description:
+						"on a live board, adds each kind of draw's max and median, then its main-thread stalls of 200 ms or more: their count, and the longest ten each with its length, the loop's stage that held it (`redraw`, `record` or `turn`) and the GC within it (`run-board-stall.ts`).",
+				},
 			],
 		},
 	},
