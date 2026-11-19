@@ -175,7 +175,8 @@ async function read_plan(
 	const plan =
 		named.issues.length === 0 ? await pool_board([], read) : await scoped_board(named, read)
 
-	return await run_board_decision_read.with_decisions(await run_board_human_merge.with_prs(plan))
+	// The pull requests are paired after the decisions, so a blocker the 🙋 section draws is paired too.
+	return await run_board_human_merge.with_prs(await run_board_decision_read.with_decisions(plan))
 }
 
 const run_board_plan = { read_plan }
