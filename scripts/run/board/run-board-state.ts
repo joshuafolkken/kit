@@ -5,6 +5,7 @@ import type { SectionKey, TerminalSize } from './run-board-fit'
 import type { FrameStore } from './run-board-frame-store'
 import type { Gatherer, GatherRead } from './run-board-gather'
 import type { BoardForm } from './run-board-header'
+import type { Notice } from './run-board-header-notice'
 import { run_board_idle } from './run-board-idle'
 import type { IssueCount } from './run-board-issue-count'
 import type { KeyInput } from './run-board-keys'
@@ -124,6 +125,8 @@ interface BoardState extends GatherRead {
 	// (`run-board-sound-repeat.ts`); none before a run's first frame, so it sounds nothing already there.
 	sound_snapshot?: SoundSnapshot | undefined
 	sound_pending?: Pending | undefined
+	// The last notice picked, kept while the sound is off too (`run-board-header-notice.ts`).
+	notice?: Notice | undefined
 }
 
 const FRESH_STATE: BoardState = {

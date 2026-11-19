@@ -46,15 +46,8 @@ describe('run_board_header_names.names_of', () => {
 		expect(names().at(-1)).toBe('  [kit](home)')
 	})
 
-	it('draws 🔊 after the name while the sound is on', () => {
-		expect(names({ is_sound_on: true })[0]).toBe(`▶ [josh-board](${KIT_URL}) 🔊`)
-	})
-
-	it('draws 🔇 after the name while the sound is off', () => {
-		expect(names({ is_sound_on: false })[0]).toBe(`▶ [josh-board](${KIT_URL}) 🔇`)
-	})
-
-	it('draws no sound mark where the board reads no sound switch', () => {
+	// joshuafolkken/kit#8107: the speaker moved to the end of the second line.
+	it('draws no sound mark after the name', () => {
 		expect(names()[0]).not.toMatch(/[🔊🔇]/u)
 	})
 

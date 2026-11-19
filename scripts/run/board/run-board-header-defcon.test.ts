@@ -49,8 +49,8 @@ function level(layout: Partial<BoardLayout>, extra: Partial<BoardHeader> = {}): 
 	return level_of(board(layout, extra))
 }
 
-function second_line(extra: Partial<BoardHeader>): string {
-	return stripVTControlCharacters(run_board_header.header_lines(board({}, extra))[1] ?? '')
+function header_line(index: number, extra: Partial<BoardHeader>): string {
+	return stripVTControlCharacters(run_board_header.header_lines(board({}, extra))[index] ?? '')
 }
 
 afterEach(() => {
@@ -147,16 +147,20 @@ describe('run_board_header_defcon.field_of', () => {
 	})
 })
 
+// joshuafolkken/kit#8107: the level ends the first line, leaving the second's end to the notice.
 describe('run_board_header.header_lines with the alert level', () => {
-	it('ends a themed screen header second line on the level', () => {
-		expect(second_line({ is_themed: true })).toMatch(/ {2}DEFCON \[5\] 4 3 2 1$/u)
+	it('ends a themed screen header first line on the level, and draws none on the second', () => {
+		const themed = { is_themed: true }
+
+		expect(header_line(0, themed)).toMatch(/ {2}DEFCON \[5\] 4 3 2 1$/u)
+		expect(header_line(1, themed)).not.toContain('DEFCON')
 	})
 
 	it('leaves a header with no theme, and a chat frame, as it was', () => {
-		const plain = second_line({})
+		const plain = header_line(0, {})
 
 		expect(plain).not.toContain('DEFCON')
-		expect(second_line({ is_themed: true, form: 'chat' })).toBe(plain)
-		expect(second_line({ is_themed: true }).startsWith(plain)).toBe(true)
+		expect(header_line(0, { is_themed: true, form: 'chat' })).toBe(plain)
+		expect(header_line(0, { is_themed: true }).startsWith(plain)).toBe(true)
 	})
 })

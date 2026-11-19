@@ -103,33 +103,50 @@ describe('run_board_tick_draw.draw_run cue', () => {
 	})
 })
 
-// The header's three lines a live redraw writes with the sound switch at `is_on`.
-function header_drawn(is_on: boolean): Array<string> {
-	const { ports, frames } = harness(LOCAL, [])
-	const state = planned()
-
-	draw_run(
-		state,
-		LOCAL,
-		{ ports: { ...ports, sound: () => is_on }, now_ms: START },
-		layout_for(state, LOCAL, START),
-	)
-
-	return stripVTControlCharacters(frames.join('')).split('\n').slice(0, HEADER_LINES)
+interface SoundDraw {
+	is_on: boolean
+	state?: BoardState
+	rows?: ReadonlyArray<BoardRow>
 }
 
-// joshuafolkken/kit#7952: the live header says whether the board sounds its cues.
+interface SoundDrawn {
+	lines: Array<string>
+	state: BoardState
+}
+
+// The header's three lines a live redraw over `rows` writes with the sound switch at `is_on`.
+function header_drawn({ is_on, state = planned(), rows }: SoundDraw): SoundDrawn {
+	const { ports, frames } = harness(LOCAL, [])
+	const run_layout = layout_for(state, LOCAL, START)
+	const sound_ports = { ...ports, sound: (): boolean => is_on }
+	const drawn = draw_run(
+		state,
+		LOCAL,
+		{ ports: sound_ports, now_ms: START },
+		{ ...run_layout, active: rows ?? run_layout.active },
+	)
+	const lines = stripVTControlCharacters(frames.join('')).split('\n').slice(0, HEADER_LINES)
+
+	return { lines, state: drawn }
+}
+
+// joshuafolkken/kit#7952, #8107: the live header ends its second line on the sound switch and the
+// last notice.
 describe('run_board_tick_draw.draw_run sound mark', () => {
-	it('draws 🔊 after josh-board while the sound is on, the lines under it aligned', () => {
-		expect(header_drawn(true)).toStrictEqual([
-			'⏸ josh-board 🔊  ⏰ 0″  ✅  0/- ──────────  🔄 0  ⏳ -  💤 0',
-			'  -                     💪 -  🧠 -  💾 -',
+	it('draws 🔊 and — at the end of the second line while the sound is on, none on the first', () => {
+		expect(header_drawn({ is_on: true }).lines).toStrictEqual([
+			'⏸ josh-board  ⏰ 0″  ✅  0/- ──────────  🔄 0  ⏳ -  💤 0',
+			'  -                  💪 -  🧠 -  💾 -  🔊 —',
 			'  kit',
 		])
 	})
 
-	it('draws 🔇 after josh-board while the sound is off', () => {
-		expect(header_drawn(false)[0]).toMatch(/^⏸ josh-board 🔇 {2}⏰/u)
+	it('records a notice the muted board keeps quiet, and draws it on the frame it is picked on', () => {
+		const before = header_drawn({ is_on: false, rows: [] }).state
+		const launched = header_drawn({ is_on: false, state: before, rows: [row(1, 'running')] })
+
+		expect(launched.state.notice?.cause).toStrictEqual({ cue: 'launch', word: 'running', issue: 1 })
+		expect(launched.lines[1]).toMatch(/🔇 \d{2}:\d{2} launch · #1 running$/u)
 	})
 })
 
