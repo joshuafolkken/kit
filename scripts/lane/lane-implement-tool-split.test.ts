@@ -40,6 +40,14 @@ const LANE_CALLS = [
 	call(18, { command: SHIP }),
 ]
 
+// A plan-stage run the lane stood paused inside.
+const PAUSED_CALLS = [
+	call(0, { command: 'ls' }),
+	call(2, { tool: 'Read', duration_ms: 10 * MINUTE_MS }),
+	call(14, { command: SHIP }),
+]
+const PAUSED: PausedSpans = new Map([[8093, [{ from_ms: 4 * MINUTE_MS, to_ms: 9 * MINUTE_MS }]]])
+
 function expected_row(stage: string, model_min: number, tool_min: number): string {
 	return lane_stats.to_row([
 		stage,
@@ -77,6 +85,12 @@ describe('lane_implement_tool_split.table', () => {
 		]
 
 		expect(stage_rows(calls)[0]).toBe(expected_row('plan', 2, 1))
+	})
+
+	it('takes a pause inside a run out of the tool time', () => {
+		const rows = lane_implement_tool_split.table(PAUSED_CALLS, WINDOW, PAUSED).split('\n')
+
+		expect(rows[HEADER_ROWS]).toBe(expected_row('plan', 1, 6))
 	})
 
 	it('prints the turn split columns', () => {
