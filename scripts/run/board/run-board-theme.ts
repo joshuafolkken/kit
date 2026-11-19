@@ -166,8 +166,9 @@ function remembered(open: string, line: string): string {
 
 // A frame is drawn a line at a time: the transforms change only text within a line, and a render
 // module closes every color on the line it opens it (`styleText`), so the color `textual` reads
-// across a line's end is the default it reads at a line's start.
-function restyle(theme: Theme | undefined, frame: string): string {
+// across a line's end is the default it reads at a line's start. Its titles keep their marks, for
+// the reveal that writes a title as one block (joshuafolkken/kit#8224).
+function marked(theme: Theme | undefined, frame: string): string {
 	if (theme === undefined) return frame
 	const open = phosphor()
 
@@ -177,13 +178,19 @@ function restyle(theme: Theme | undefined, frame: string): string {
 		.join('\n')
 }
 
+// The frame as the theme draws it, its title marks dropped.
+function restyle(theme: Theme | undefined, frame: string): string {
+	return run_board_label_pair.untitled(marked(theme, frame))
+}
+
 // The lines the cache holds, never past `LINE_LIMIT`.
 function kept_lines(): number {
 	return memo.lines.size
 }
 
-// Ports whose every write is put through the theme, marked so the header draws the alert level.
-function themed<P extends Pick<BoardPorts, 'write' | 'is_themed'>>(
+// Ports whose every write is put through the theme, marked so the header draws the alert level; what
+// the theme already drew goes past it.
+function themed<P extends Pick<BoardPorts, 'write' | 'is_themed' | 'write_drawn'>>(
 	ports: P,
 	theme: Theme | undefined,
 ): P {
@@ -195,6 +202,7 @@ function themed<P extends Pick<BoardPorts, 'write' | 'is_themed'>>(
 		write: (frame: string) => {
 			ports.write(restyle(theme, frame))
 		},
+		write_drawn: ports.write,
 	}
 }
 
@@ -204,6 +212,7 @@ const run_board_theme = {
 	THEMES,
 	choose,
 	kept_lines,
+	marked,
 	refusal,
 	restyle,
 	themed,

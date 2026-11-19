@@ -44,6 +44,9 @@ interface BoardPorts {
 	frames?: FrameStore | undefined
 	now: () => number
 	write: (frame: string) => void
+	// Writes text a theme already drew, past the theme `write` puts it through; none where no theme
+	// draws, so `write` takes it.
+	write_drawn?: ((text: string) => void) | undefined
 	// Wraps an issue number in a hyperlink where the terminal opens one, and leaves it plain elsewhere.
 	link: Link
 	// Whether stdout is a terminal — only a terminal gets the alternate screen and the spinner.

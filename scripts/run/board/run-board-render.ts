@@ -45,7 +45,7 @@ import type { ThroughputRow } from './run-board-throughput'
 // English whatever the session language: one set of words reads the same on every board.
 
 const { STATE_ICONS, WAITS_ICON, WORDS } = run_board_labels
-const { pair } = run_board_label_pair
+const { pair, titled } = run_board_label_pair
 const { stops_width, time_width } = run_board_render_time
 const { NOTE_LIMIT } = run_board_render_notes
 const { lane_cells_of, lanes_section } = run_board_render_lanes
@@ -94,7 +94,7 @@ function epic_lines(
 	)
 	const title = title_of(entry.title)
 	const number = frame.header.link(String(entry.epic))
-	const epic = title === '' ? `📁 ${number}` : `📁 ${number}${GAP}${title}`
+	const epic = title === '' ? `📁 ${number}` : `📁 ${number}${GAP}${titled(title)}`
 	const section = frame.header.is_keyed === true ? 'epic' : undefined
 
 	return [bare(`${ROW_INDENT}${run_board_row_key.keyed(section, entry.epic, epic)}`), ...children]

@@ -1,0 +1,7 @@
+{
+	"reason": "#8224 adds run-board-reveal-blocks.ts (cutting a themed line into blocks) and the block-at-a-time reveal; new behavior, no duplicate",
+	"date": "2026-11-19",
+	"growth": {
+		"scripts.code_lines": 99
+	}
+}

@@ -2,6 +2,7 @@ import { stripVTControlCharacters } from 'node:util'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_fit } from './run-board-fit'
 import { run_board_label_pair } from './run-board-label-pair'
+import type { BoardPorts } from './run-board-state'
 import { run_board_theme } from './run-board-theme'
 import { run_board_theme_case } from './run-board-theme-case'
 import { run_board_theme_glyphs } from './run-board-theme-glyphs'
@@ -18,6 +19,7 @@ const ENV = { [run_board_theme.THEME_ENV]: 'wargames' }
 const LINK_OPEN = `${ESCAPE}]8;;https://github.com/joshuafolkken/kit/issues/1\u{7}`
 const LINK_CLOSE = `${ESCAPE}]8;;\u{7}`
 const PICTOGRAPHIC = /\p{Extended_Pictographic}/u
+const { TITLE_MARK } = run_board_label_pair
 
 function widths_of(frame: string): Array<number> {
 	return frame.split('\n').map((line) => run_board_fit.width_of(line))
@@ -254,5 +256,49 @@ describe('run_board_theme.themed', () => {
 
 		expect(frames).toStrictEqual(['-'])
 		expect(run_board_theme.themed(ports, undefined)).toBe(ports)
+	})
+
+	// joshuafolkken/kit#8224: the reveal writes a line it drew already, past the theme.
+	it('writes a drawn line as it is', () => {
+		const frames: Array<string> = []
+		const ports: Pick<BoardPorts, 'write' | 'write_drawn'> = {
+			write: (frame: string) => {
+				frames.push(frame)
+			},
+		}
+
+		run_board_theme.themed(ports, 'wargames').write_drawn?.('─ a')
+
+		expect(frames).toStrictEqual(['─ a'])
+	})
+})
+
+// joshuafolkken/kit#8224: a title mark reaches the reveal alone; every write drops it.
+describe('run_board_theme title marks', () => {
+	const TITLED = `  7400 P1 ${run_board_label_pair.titled('a title')}  ET`
+
+	it.each(['0', '3'])('draws no title mark, FORCE_COLOR=%s', (force) => {
+		vi.stubEnv('FORCE_COLOR', force)
+		const frames: Array<string> = []
+		const ports = {
+			write: (frame: string) => {
+				frames.push(frame)
+			},
+		}
+
+		run_board_theme.themed(ports, 'wargames').write(TITLED)
+
+		expect(run_board_theme.restyle('wargames', TITLED)).not.toContain(TITLE_MARK)
+		expect(frames.join('')).not.toContain(TITLE_MARK)
+	})
+
+	it('keeps the title mark for the reveal, in no columns', () => {
+		vi.stubEnv('FORCE_COLOR', '0')
+		const marked = run_board_theme.marked('wargames', TITLED)
+
+		expect(marked).toBe(`  7400 P1 ${TITLE_MARK}A TITLE  ET`)
+		expect(run_board_fit.width_of(marked)).toBe(
+			run_board_fit.width_of(run_board_theme.restyle('wargames', TITLED)),
+		)
 	})
 })

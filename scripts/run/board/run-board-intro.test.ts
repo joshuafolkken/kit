@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_board_intro, type IntroPorts } from './run-board-intro'
 import type { KeyReading } from './run-board-keys'
+import { run_board_label_pair } from './run-board-label-pair'
 import { run_board_typing } from './run-board-typing'
 
 // joshuafolkken/kit#7927: a live board types its line a letter at a time and holds it before the first
@@ -18,6 +19,7 @@ const {
 	reveal,
 } = run_board_intro
 const { CURSOR } = run_board_typing
+const { TITLE_MARK, untitled } = run_board_label_pair
 
 function line_of(shown: string): string {
 	return `${LINE_START}${shown}${ERASE_LINE_END}`
@@ -175,39 +177,62 @@ describe('run_board_intro.play cursor', () => {
 	})
 })
 
-// joshuafolkken/kit#8006: the first frame is written a line at a time from the top, a pause after each;
-// a key writes the rest at once, and ports without pauses get the frame whole.
-const FRAME = 'one\ntwo\nthree'
+// joshuafolkken/kit#8006, joshuafolkken/kit#8224: the first frame, as the theme draws it, is written
+// from the top a line at a time and each line a block at a time, the line's beat shared out between
+// its blocks; a key writes the rest at once, and ports without pauses get the frame whole. The frame
+// here is drawn in no color, already in capitals, so the theme leaves its text as it is.
+const FRAME = `ONE  TWO\n\nA ${TITLE_MARK}TITLE  B  C`
+const SHOWN = untitled(FRAME)
+const THEME = 'wargames'
+
+beforeEach(() => {
+	vi.stubEnv('FORCE_COLOR', '0')
+})
+
+afterEach(() => {
+	vi.unstubAllEnvs()
+})
 
 describe('run_board_intro.reveal', () => {
-	it('writes the frame a line at a time from the top, pausing after each line', async () => {
+	it('writes the frame a block at a time from the top, a line in 75 ms', async () => {
 		const slept: Array<number> = []
 		const { written, ports } = recorded(async (ms) => {
 			slept.push(ms)
 		})
+		const third = REVEAL_LINE_MS / 4
 
-		await reveal(FRAME, ports, NO_KEYS)
-		expect(written).toStrictEqual(['one', '\ntwo', '\nthree'])
-		expect(slept).toStrictEqual([REVEAL_LINE_MS, REVEAL_LINE_MS, REVEAL_LINE_MS])
+		await reveal(FRAME, ports, NO_KEYS, THEME)
+		expect(written).toStrictEqual(['ONE', '  TWO', '\n', '\nA', ' TITLE', '  B', '  C'])
+		expect(slept).toStrictEqual([37.5, 37.5, REVEAL_LINE_MS, third, third, third, third])
+		expect(REVEAL_LINE_MS).toBe(75)
 	})
 
-	it('writes the lines left at once on a key, and gives the keys back', async () => {
+	it('writes the blocks left at once on a key, and gives the keys back', async () => {
 		const { keys, press, released } = skippable()
 		const { written, ports } = recorded(never)
-		const pending = reveal(FRAME, ports, keys)
+		const pending = reveal(FRAME, ports, keys, THEME)
 
 		press()
 		await pending
-		expect(written).toStrictEqual(['one', '\ntwo\nthree'])
-		expect(written.join('')).toBe(FRAME)
+		expect(written).toStrictEqual(['ONE', '  TWO\n\nA TITLE  B  C'])
+		expect(written.join('')).toBe(SHOWN)
 		expect(released()).toBe(true)
 	})
 
-	it('writes the frame whole where the ports carry no pauses', async () => {
+	it('writes the frame whole, unmarked, where the ports carry no pauses', async () => {
 		const { written, ports } = recorded(never)
 
-		await reveal(FRAME, { write: ports.write }, NO_KEYS)
-		expect(written).toStrictEqual([FRAME])
+		await reveal(FRAME, { write: ports.write }, NO_KEYS, THEME)
+		expect(written).toStrictEqual([SHOWN])
+	})
+
+	it('draws the frame in the theme and writes it past the theme where the ports can', async () => {
+		const write_drawn = vi.fn<(text: string) => void>()
+		const { written, ports } = recorded(instant)
+
+		await reveal('one', { ...ports, write_drawn }, NO_KEYS, THEME)
+		expect(write_drawn.mock.calls).toStrictEqual([['ONE']])
+		expect(written).toStrictEqual([])
 	})
 })
 
@@ -292,6 +317,6 @@ describe('run_board_intro.opening', () => {
 		await expect(opened.gather('background')).resolves.toBe(READ)
 		expect(written).toContain(line_of(`${LINE.slice(0, -1)}${CURSOR}`))
 		await opened.reveal?.('a\nb')
-		expect(written.slice(-2)).toStrictEqual(['a', '\nb'])
+		expect(written.slice(-2)).toStrictEqual(['A', '\nB'])
 	})
 })

@@ -11,7 +11,7 @@ import { run_board_typing } from './run-board-typing'
 // joshuafolkken/kit#3430: the command's arguments and its terminal. What one redraw reads and draws is
 // `run-board-tick.test.ts`'s (joshuafolkken/kit#3444).
 
-const { LOCAL, SPINNING, START, STOPPED, harness, plan_titled } = run_board_fixture
+const { LOCAL, SPINNING, START, STOPPED, first_frame, harness, plan_titled } = run_board_fixture
 
 // A theme colors every write where color is on (`FORCE_COLOR` in the gate's environment), so the
 // screen's control bytes are compared with color off.
@@ -186,7 +186,7 @@ describe('run_board_cli.run intro', () => {
 		await expect(run_board_cli.run(THEMED, { ...ports, intro_sleep: no_pause })).rejects.toBe(
 			STOPPED,
 		)
-		const first = frames.findIndex((frame) => frame.includes(THEMED_RUN_MARK))
+		const first = first_frame(frames)
 
 		expect(frames[0]).toBe(ENTER)
 		expect(stripVTControlCharacters(frames[first - 2] ?? '')).toBe(`\r${INTRO_LINE}`)
@@ -200,10 +200,10 @@ describe('run_board_cli.run intro', () => {
 		await expect(run_board_cli.run(THEMED, { ...ports, intro_sleep: no_pause })).rejects.toBe(
 			STOPPED,
 		)
-		const first = frames.findIndex((frame) => frame.includes(THEMED_RUN_MARK))
+		const typed = frames.slice(1, first_frame(frames))
 
-		expect(frames.slice(1, first).some((frame) => frame.includes(TYPING_CURSOR))).toBe(true)
-		expect(frames[first]?.startsWith(`${ESCAPE}[H${ESCAPE}[J`)).toBe(true)
+		expect(typed.some((frame) => frame.includes(TYPING_CURSOR))).toBe(true)
+		expect(typed.join('')).not.toContain(THEMED_RUN_MARK)
 	})
 
 	it('types no line for --once, --chat or a pipe', async () => {
