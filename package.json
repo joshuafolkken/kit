@@ -255,6 +255,7 @@
 		"vitest": "^5.1.0"
 	},
 	"dependencies": {
+		"@cacheable/memory": "^2.2.0",
 		"cli-spinners": "^3.4.0",
 		"csv-parse": "^7.0.3",
 		"execa": "^10.2.1",

@@ -1,0 +1,7 @@
+{
+	"reason": "Per-line cache for the themed run:board restyle and its tests (#8207)",
+	"date": "2026-11-19",
+	"growth": {
+		"scripts.code_lines": 43
+	}
+}

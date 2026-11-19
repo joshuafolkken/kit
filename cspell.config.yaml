@@ -101,6 +101,8 @@ words:
   - waketime
   - usec
   - conttime
+  # The environment variable a terminal sets for its color depth (#8207).
+  - colorterm
   # British spellings review findings record verbatim (#6577).
   - memoising
   - behaviour
