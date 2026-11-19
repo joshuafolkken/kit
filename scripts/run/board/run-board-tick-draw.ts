@@ -2,6 +2,7 @@ import type { BoardDisplay } from './run-board-display'
 import type { FrameBounds } from './run-board-fold'
 import type { BoardHeader } from './run-board-header'
 import { run_board_labels } from './run-board-labels'
+import { run_board_lamps } from './run-board-lamps'
 import type { BoardLayout } from './run-board-layout'
 import { run_board_link } from './run-board-link'
 import type { BoardNote } from './run-board-notes'
@@ -94,6 +95,12 @@ function bounds_of(ports: DrawPorts): FrameBounds {
 // A drawn frame and every note it was drawn from — shown or not (joshuafolkken/kit#8117).
 type Drawn = Spun & { notes: ReadonlyArray<BoardNote> }
 
+// The lamp panel shows where the rows type — a live board in a theme — on a terminal drawing color
+// (joshuafolkken/kit#8236).
+function has_lamps(ports: Pick<DrawPorts, 'types_rows' | 'is_tty'>): boolean {
+	return ports.types_rows === true && ports.is_tty && run_board_lamps.is_colored()
+}
+
 // The frame under `header` with its spinners drawn at this moment's frame, and where they are on screen.
 function frame_of(display: BoardDisplay, header: LaidHeader, redraw: Redraw): Drawn {
 	const bounds = bounds_of(redraw.ports)
@@ -103,6 +110,7 @@ function frame_of(display: BoardDisplay, header: LaidHeader, redraw: Redraw): Dr
 		notes,
 		resume: display.resume,
 		throughput: display.throughput,
+		has_lamps: has_lamps(redraw.ports),
 		thanks: display.thanks,
 		link: redraw.ports.link,
 		...bounds,
@@ -144,10 +152,12 @@ function draw_display(state: BoardState, display: BoardDisplay, redraw: Redraw):
 	draw(redraw.ports, run_board_type_rows.typed_lines(drawn.lines, typing, redraw.now_ms))
 	redraw.ports.typing_sound?.set(run_board_type_rows.is_typing(typing, redraw.now_ms))
 
-	return { ...state, ...display.carried, spots: drawn.spots, sweep: drawn.sweep, typing }
+	const { spots, sweep, lamps } = drawn
+
+	return { ...state, ...display.carried, spots, sweep, lamps, typing }
 }
 
-const run_board_tick_draw = { bounds_of, draw, draw_display }
+const run_board_tick_draw = { bounds_of, draw, draw_display, has_lamps }
 
 export { run_board_tick_draw }
 export type { DrawPorts, Redraw }

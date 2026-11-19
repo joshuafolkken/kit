@@ -1,6 +1,7 @@
 import { figure_format } from '#scripts/lib/figure-format'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_board_fit, type DetailPart } from './run-board-fit'
+import { run_board_lamps } from './run-board-lamps'
 import { run_board_render_section } from './run-board-render-section'
 import type { Peak, ThroughputCell, ThroughputRow } from './run-board-throughput'
 
@@ -121,10 +122,13 @@ function lead_of(row: ThroughputRow): string {
 	return `${ROW_INDENT}${row.label.padStart(ROW_LABEL_WIDTH)}${COLUMN_GAP}${sparkline(row.cells)}`
 }
 
-function line_of(row: ThroughputRow, widths: ReadonlyArray<number>): string {
+// A row with a lamp panel starts it two columns past its NOW column, the same column on both rows
+// (joshuafolkken/kit#8236).
+function line_of(row: ThroughputRow, widths: ReadonlyArray<number>, panel?: string): string {
 	const cells = COLUMNS.map((column, index) => column.text(row).padStart(widths[index] ?? 0))
+	const line = [lead_of(row), ...cells].join(COLUMN_GAP)
 
-	return [lead_of(row), ...cells].join(COLUMN_GAP).trimEnd()
+	return panel === undefined ? line.trimEnd() : `${line}${COLUMN_GAP}${panel}`
 }
 
 // The blanks before a column's figures in a `width`-wide column, its fewest across the rows; a label
@@ -161,17 +165,24 @@ function summary_of(rows: ReadonlyArray<ThroughputRow>): string {
 	return rows.map((row) => `${row.label} ${rate_of(row.per_hour).trim()}/h`).join(' · ')
 }
 
-function rows_part(rows: ReadonlyArray<ThroughputRow>): DetailPart {
+// Where the frame `has_lamps`, each row ends on where its lamp panel starts (`run-board-lamps.ts`).
+function rows_part(rows: ReadonlyArray<ThroughputRow>, has_lamps = false): DetailPart {
 	const widths = widths_of(rows)
-	const lines = rows.map((row) => ({ text: line_of(row, widths), is_detail: false }))
+	const lines = rows.map((row, index) => ({
+		text: line_of(row, widths, has_lamps ? run_board_lamps.start_of(index) : undefined),
+		is_detail: false,
+	}))
 	const rule = run_board_render_section.columns_rule(LABEL, rule_columns(widths, rows))
 
 	return { head: ['', rule], lines, label: LABEL, summary: summary_of(rows) }
 }
 
 // None where no rows were read — a frame drawn with no throughput.
-function throughput_part(rows: ReadonlyArray<ThroughputRow> | undefined): DetailPart | undefined {
-	return rows === undefined ? undefined : rows_part(rows)
+function throughput_part(
+	rows: ReadonlyArray<ThroughputRow> | undefined,
+	has_lamps = false,
+): DetailPart | undefined {
+	return rows === undefined ? undefined : rows_part(rows, has_lamps)
 }
 
 const run_board_render_throughput = { rows_part, throughput_part }

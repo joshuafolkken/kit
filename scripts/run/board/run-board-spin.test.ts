@@ -64,7 +64,7 @@ function typing_with(line: Pick<TypingLine, 'key' | 'row' | 'text' | 'start_ms'>
 	return { seen: new Set(), lines: [{ index: line.row - 1, prefix_columns: 0, ...line }] }
 }
 
-const UNMARKED = { lines: ['▶ run'], spots: [], keyed: [], sweep: undefined }
+const UNMARKED = { lines: ['▶ run'], spots: [], keyed: [], sweep: undefined, lamps: [] }
 
 describe('run_board_spin.spun', () => {
 	it('records the title’s, a running row’s and a loading spinner’s spots by display width', () => {

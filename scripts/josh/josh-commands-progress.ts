@@ -125,6 +125,11 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 						'ends the header’s first line on the alert level, `DEFCON 5 4 [3] 2 1`: the current level bracketed, green (5), amber (4, 3) or red (2, 1). The lowest level whose condition holds wins — 1 the run is stopped, out of its usage or failing its reads · 2 a person is asked to decide · 3 a `P1` waits while a lane is free · 4 more lanes run than the limit · 5 none of these.',
 				},
 				{
+					names: [BOARD_THEME],
+					description:
+						'a live board runs a WOPR lamp panel on its throughput rows: two columns past `NOW`, a `■` every other column to the section’s rule end, yellow on `24h`, red on `7d`, dim when out (`run-board-lamps.ts`). None with no theme, `--once`, `--chat`, `--every`, no TTY or color, or under 8 lamps.',
+				},
+				{
 					names: ['--timing'],
 					description:
 						'after the `--once` frame, or once a live board leaves its screen, writes how long each phase of the first frame took (ms). `--chat` and `--every` ignore it.',

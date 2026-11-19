@@ -63,6 +63,8 @@ interface BoardView extends FrameBounds {
 	link?: Link | undefined
 	// The 📈 throughput rows; none draws no section.
 	throughput?: ReadonlyArray<ThroughputRow> | undefined
+	// Whether the throughput rows end on the lamp panel (`run-board-lamps.ts`).
+	has_lamps?: boolean | undefined
 }
 
 function bare(text: string): PlanLine {
@@ -207,7 +209,7 @@ function render(view: BoardView): Array<string> {
 	const above = [...run_board_header.header_lines(header), ...resume_lines(view.resume)]
 	const parts = {
 		above,
-		throughput: run_board_render_throughput.throughput_part(view.throughput),
+		throughput: run_board_render_throughput.throughput_part(view.throughput, view.has_lamps),
 		usage: run_board_render_quota.usage_part({ ...header, hold: header.quota_hold }),
 		...plan_parts(header, notes, view.size),
 		processes: run_board_render_processes.processes_part(header),
