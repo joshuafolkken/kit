@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { order, requeue, carry } = vi.hoisted(() => ({
+const { order, requeue, carry, prepared } = vi.hoisted(() => ({
 	order: new Array<string>(),
 	requeue: { code: 0 },
 	carry: { kind: 'carried' },
+	prepared: { refusal: async () => undefined, publish: async () => 'n', NOT_PREPARED: 'n' },
 }))
 
 vi.mock('#scripts/run/carry/run-carry', () => ({
@@ -41,6 +42,7 @@ vi.mock('#scripts/epic/epic-decide', () => ({
 		}),
 	},
 }))
+vi.mock('#scripts/issue/prepared-prerequisite', () => ({ prepared_prerequisite: prepared }))
 vi.mock('#scripts/run/park/run-park', () => ({
 	run_park: {
 		clear: vi.fn(() => {
