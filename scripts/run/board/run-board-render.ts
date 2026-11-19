@@ -8,6 +8,7 @@ import {
 } from './run-board-fit'
 import { run_board_fold, type FrameBounds } from './run-board-fold'
 import { run_board_header, type BoardHeader } from './run-board-header'
+import { run_board_label_pair } from './run-board-label-pair'
 import { run_board_labels } from './run-board-labels'
 import {
 	run_board_layout,
@@ -43,6 +44,7 @@ import type { ThroughputRow } from './run-board-throughput'
 // English whatever the session language: one set of words reads the same on every board.
 
 const { STATE_ICONS, WAITS_ICON, WORDS } = run_board_labels
+const { pair } = run_board_label_pair
 const { stops_width, time_width } = run_board_render_time
 const { NOTE_LIMIT } = run_board_render_notes
 const { lane_cells_of, lanes_section } = run_board_render_lanes
@@ -135,7 +137,7 @@ function frame_of(
 function queued_section(layout: BoardLayout, frame: RowFrame): Array<PlanSection> {
 	const lines = layout.queued.flatMap((entry) => entry_lines(entry, frame))
 
-	return [kept_section(`${STATE_ICONS.waiting} ${WORDS.queued}`, lines)]
+	return [kept_section(pair(STATE_ICONS.waiting, WORDS.queued), lines)]
 }
 
 // The column the lane rows' titles end in as drawn, cut as `fitted` cuts them, where every rule ends
@@ -163,7 +165,7 @@ function active_sections(
 ): Pick<FrameParts, 'plan' | 'rule_width'> {
 	const people = run_board_layout.people_of(layout)
 	const lead = run_board_layout.lanes_drawn(layout)
-	const decision = `${STATE_ICONS.human} ${WORDS.decision}`
+	const decision = pair(STATE_ICONS.human, WORDS.decision)
 	const cells = lane_cells_of(frame.header, lead)
 	const lane_frame = { ...frame, cells, is_lane_row: true }
 	const shared = shared_overrun(lead, lane_frame)
@@ -192,7 +194,7 @@ function plan_parts(
 	const frame = frame_of(header, notes, size)
 	const conditioned = { ...frame, condition_width: width_for(layout.unreached) }
 	const done = run_board_row_sections.done_rows(layout)
-	const waiting = `${WAITS_ICON} ${WORDS.waiting}`
+	const waiting = pair(WAITS_ICON, WORDS.waiting)
 
 	return {
 		...active_sections(layout, frame),
@@ -224,7 +226,7 @@ function render(view: BoardView): Array<string> {
 		footer: view.footer ?? [],
 	}
 
-	return bounded(parts, view)
+	return run_board_label_pair.settled(bounded(parts, view), header)
 }
 
 const run_board_render = {

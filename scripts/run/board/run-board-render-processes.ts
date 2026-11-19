@@ -1,5 +1,6 @@
 import { run_board_fit, type DetailPart } from './run-board-fit'
 import type { BoardHeader, BoardUsage } from './run-board-header'
+import { run_board_label_pair } from './run-board-label-pair'
 import type { NamedFigure, ProcessGroups } from './run-board-process-groups'
 import { run_board_render_lanes } from './run-board-render-lanes'
 import { run_board_render_lead } from './run-board-render-lead'
@@ -16,6 +17,7 @@ import { run_board_usage_text } from './run-board-usage-text'
 // cut to fit before them.
 
 const { LANES_LABEL, column_cells, label_columns } = run_board_render_lanes
+const { pair } = run_board_label_pair
 const { USAGE_START, column_offset } = run_board_render_lead
 const { columns_rule, heading_lines } = run_board_render_section
 const { title_of } = run_board_render_title
@@ -39,12 +41,12 @@ const PART_GAP = ' · '
 const SUMMARY_GAP = ' ── '
 const ICONS = { backlogrun: '▶', apps: '🌐', leftover: '👻' }
 const LABELS = {
-	backlogrun: `${ICONS.backlogrun} backlogrun`,
-	supervisor: '🧭 supervisor',
-	parent: '🎬 parent',
+	backlogrun: pair(ICONS.backlogrun, 'backlogrun'),
+	supervisor: pair('🧭', 'supervisor'),
+	parent: pair('🎬', 'parent'),
 	lanes: LANES_LABEL,
-	apps: `${ICONS.apps} apps`,
-	leftover: `${ICONS.leftover} leftover`,
+	apps: pair(ICONS.apps, 'apps'),
+	leftover: pair(ICONS.leftover, 'leftover'),
 }
 
 interface Labeled {

@@ -1,3 +1,4 @@
+import { run_board_label_pair } from './run-board-label-pair'
 import { run_board_labels, type Paint } from './run-board-labels'
 import type { BoardPorts } from './run-board-state'
 import { run_board_theme_case } from './run-board-theme-case'
@@ -98,10 +99,11 @@ function lit(open: string, line: string): string {
 	return open + resumed + DEFAULT_FOREGROUND
 }
 
+// joshuafolkken/kit#8154: an icon beside its label is dropped (`run-board-label-pair.ts`).
 function restyle(theme: Theme | undefined, frame: string): string {
 	if (theme === undefined) return frame
 	const open = phosphor_open()
-	const ruled = frame.split(RULE).join(DASH)
+	const ruled = run_board_label_pair.dropped(frame).split(RULE).join(DASH)
 
 	return run_board_theme_case
 		.capitals(run_board_theme_glyphs.textual(ruled))

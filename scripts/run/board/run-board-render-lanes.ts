@@ -1,6 +1,7 @@
 import { run_board_earlier } from './run-board-earlier'
 import { run_board_fit, type PlanLine, type PlanSection, type RowYield } from './run-board-fit'
 import type { BoardHeader } from './run-board-header'
+import { run_board_label_pair } from './run-board-label-pair'
 import { run_board_labels } from './run-board-labels'
 import type { BoardRow } from './run-board-layout'
 import { run_board_render_lead } from './run-board-render-lead'
@@ -40,7 +41,11 @@ const CELL_GAP = ' '
 const LABEL_TAIL = 2
 // Icons Unicode draws as emoji by default, which `string-width` counts two columns wide as a
 // terminal draws them: 🛤 and 🗜, text symbols drawn as emoji, overlapped the blank after them.
-const COLUMN_LABELS = [`${HEADER_ICONS.cpu} CPU`, `${HEADER_ICONS.memory} MEM`, '🤏 CMPRS']
+const COLUMN_LABELS = [
+	run_board_label_pair.pair(HEADER_ICONS.cpu, 'CPU'),
+	run_board_label_pair.pair(HEADER_ICONS.memory, 'MEM'),
+	run_board_label_pair.pair('🤏', 'CMPRS'),
+]
 
 // What one frame's lane cells are drawn with.
 interface LaneCells {
