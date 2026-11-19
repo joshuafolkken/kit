@@ -1,0 +1,7 @@
+{
+	"reason": "Read the no-filing grant from the producer's dispatching prompt via its launch record (#8248)",
+	"date": "2026-11-19",
+	"growth": {
+		"scripts.code_lines": 39
+	}
+}

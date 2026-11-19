@@ -28,9 +28,19 @@ const setup_schema = z.object({
 	is_linked: z.boolean(),
 })
 
+// joshuafolkken/kit#8242: every link opens with the same `id=`. A terminal keying links by id and URL
+// (xterm.js, VSCode's) then keeps one record per URL however many frames redraw it; an id-less link is
+// a new record each frame, piled up on the alternate screen and dropped at once on leaving it — seconds
+// of a frozen terminal after a long-running board. `terminal-link` takes no id, so it is put into the
+// opening `8;;<url>` that `terminal-link` writes, tmux's wrapping included.
+const LINK_OPEN = '8;;'
+const LINK_OPEN_WITH_ID = '8;id=josh-run-board;'
+
 // No fallback: a terminal that opens no link, or a pipe, gets the bare number rather than a URL.
 function link(text: string, url: string): string {
-	return terminalLink(text, url, { fallback: false })
+	const linked = terminalLink(text, url, { fallback: false })
+
+	return linked.replace(`${LINK_OPEN}${url}`, () => `${LINK_OPEN_WITH_ID}${url}`)
 }
 
 function setup_of(theme: Theme | undefined): RecordSetup {
