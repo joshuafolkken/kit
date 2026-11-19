@@ -21,7 +21,8 @@ import { run_board_tick } from './run-board-tick'
 // joshuafolkken/kit#4267: a live board's reads come from a worker thread; a redraw draws the last round
 // it handed over, and a worker that dies is said on the board and started again on the next redraw.
 
-const { FIRST_ROUND, LOCAL, START, WORDS, harness, plan_titled, round_ports } = run_board_fixture
+const { FIRST_ROUND, LOCAL, START, WORDS, harness, plan_titled, round_ports, ticks } =
+	run_board_fixture
 const { FRESH_GATHER, read_of } = run_board_gather
 const { gather_round, post_of, worker_gatherer, worker_options } = run_board_gather_thread
 
@@ -154,10 +155,7 @@ const MANY_EVENTS = 15_000
 
 // READ over a stream of `count` events that draw no row of their own.
 function streamed(count: number): GatherState {
-	const at = new Date(START).toISOString()
-	const events = Array.from({ length: count }, (_, pos) => ({ pos, at, kind: 'tick', text: 'x' }))
-
-	return { ...READ, local: { ...LOCAL, events } }
+	return { ...READ, local: { ...LOCAL, events: ticks(count) } }
 }
 
 // joshuafolkken/kit#8160: the run's read stays on the worker; the board receives only the frame.

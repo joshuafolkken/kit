@@ -3,11 +3,9 @@ import { run_board_fixture } from './run-board-fixture'
 import type { BoardRow } from './run-board-layout'
 import type { BoardState } from './run-board-state'
 import { run_board_tick } from './run-board-tick'
-import { run_board_tick_draw } from './run-board-tick-draw'
 
-const { LOCAL, START, harness, plan_titled } = run_board_fixture
+const { LOCAL, START, drawn_from, harness, plan_titled } = run_board_fixture
 const { FRESH_STATE, layout_for } = run_board_tick
-const { draw_run } = run_board_tick_draw
 const SECOND = 1000
 // Past the time the header's notice takes to type through.
 const TYPED_MS = 10 * SECOND
@@ -27,7 +25,7 @@ function typed_over(state: BoardState, { is_on, rows, now_ms }: Typed): BoardSta
 	const typing = { ...ports, types_rows: true, sound: (): boolean => is_on }
 	const run_layout = { ...layout_for(state, LOCAL, START), active: rows }
 
-	return draw_run(state, LOCAL, { ports: typing, now_ms }, run_layout)
+	return drawn_from(state, LOCAL, { ports: typing, now_ms }, run_layout)
 }
 
 function notice_keys(state: BoardState): Array<string> {
@@ -36,7 +34,7 @@ function notice_keys(state: BoardState): Array<string> {
 
 // joshuafolkken/kit#8114: the header's last notice types when it changes, and not again while it stays,
 // nor when only the sound switch flips.
-describe('run_board_tick_draw.draw_run notice typing', () => {
+describe('run_board_tick_draw.draw_display notice typing', () => {
 	const planned = { ...FRESH_STATE, plan: plan_titled('a'), run_started_ms: LOCAL.started_ms }
 	const base = typed_over(planned, { is_on: true, rows: [], now_ms: START })
 	const launched = typed_over(base, { is_on: true, rows: RUNNING, now_ms: START + SECOND })

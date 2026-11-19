@@ -8,9 +8,9 @@ import type { BoardState } from './run-board-state'
 import { run_board_tick } from './run-board-tick'
 import { run_board_tick_draw } from './run-board-tick-draw'
 
-const { LOCAL, START, harness, plan_titled } = run_board_fixture
+const { LOCAL, START, drawn_from, harness, plan_titled } = run_board_fixture
 const { FRESH_STATE, layout_for } = run_board_tick
-const { bounds_of, draw_run } = run_board_tick_draw
+const { bounds_of } = run_board_tick_draw
 const SIZE = { rows: 15, columns: 80 }
 const FOOTER = ['footer']
 const BASELINE = 7
@@ -24,12 +24,12 @@ function planned(): BoardState {
 	return { ...FRESH_STATE, plan: plan_titled('a'), run_started_ms: LOCAL.started_ms }
 }
 
-describe('run_board_tick_draw.draw_run', () => {
+describe('run_board_tick_draw.draw_display', () => {
 	it('pins the baseline total to the first count the plan gives and writes one frame', () => {
 		const { ports, frames } = harness(LOCAL, [])
 		const state = planned()
 		const run_layout = layout_for(state, LOCAL, START)
-		const drawn = draw_run(state, LOCAL, { ports, now_ms: START }, run_layout)
+		const drawn = drawn_from(state, LOCAL, { ports, now_ms: START }, run_layout)
 
 		expect(drawn.baseline_total).toBe(run_board_header.counts_of(run_layout).total)
 		expect(frames).toHaveLength(1)
@@ -39,7 +39,7 @@ describe('run_board_tick_draw.draw_run', () => {
 		const { ports } = harness(LOCAL, [])
 		const state = { ...planned(), baseline_total: BASELINE }
 		const run_layout = layout_for(state, LOCAL, START)
-		const drawn = draw_run(state, LOCAL, { ports, now_ms: START }, run_layout)
+		const drawn = drawn_from(state, LOCAL, { ports, now_ms: START }, run_layout)
 
 		expect(drawn.baseline_total).toBe(BASELINE)
 	})
@@ -47,7 +47,7 @@ describe('run_board_tick_draw.draw_run', () => {
 	it('pins no baseline before the plan is read', () => {
 		const { ports } = harness(LOCAL, [])
 		const run_layout = layout_for(FRESH_STATE, LOCAL, START)
-		const drawn = draw_run(FRESH_STATE, LOCAL, { ports, now_ms: START }, run_layout)
+		const drawn = drawn_from(FRESH_STATE, LOCAL, { ports, now_ms: START }, run_layout)
 
 		expect(drawn.baseline_total).toBeUndefined()
 	})
@@ -70,11 +70,11 @@ function drawn_over(
 		cues.push(name)
 	}
 
-	return draw_run(state, LOCAL, { ports: { ...ports, cue }, now_ms: START }, run_layout)
+	return drawn_from(state, LOCAL, { ports: { ...ports, cue }, now_ms: START }, run_layout)
 }
 
 // joshuafolkken/kit#7951: the live board sounds the cue a redraw picks over the last frame's.
-describe('run_board_tick_draw.draw_run cue', () => {
+describe('run_board_tick_draw.draw_display cue', () => {
 	it('sounds a launch once on the redraw a lane starts on, and not again while it runs', () => {
 		const cues: Array<CueName> = []
 		const before = drawn_over(planned(), [], cues)
@@ -120,7 +120,7 @@ function header_drawn({ is_on, state = planned(), rows }: SoundDraw): SoundDrawn
 	const { ports, frames } = harness(LOCAL, [])
 	const run_layout = layout_for(state, LOCAL, START)
 	const sound_ports = { ...ports, sound: (): boolean => is_on }
-	const drawn = draw_run(
+	const drawn = drawn_from(
 		state,
 		LOCAL,
 		{ ports: sound_ports, now_ms: START },
@@ -133,7 +133,7 @@ function header_drawn({ is_on, state = planned(), rows }: SoundDraw): SoundDrawn
 
 // joshuafolkken/kit#7952, #8107: the live header ends its second line on the sound switch and the
 // last notice.
-describe('run_board_tick_draw.draw_run sound mark', () => {
+describe('run_board_tick_draw.draw_display sound mark', () => {
 	it('draws 🔊 and — at the end of the second line while the sound is on, none on the first', () => {
 		expect(header_drawn({ is_on: true }).lines).toStrictEqual([
 			'⏸ josh-board  ⏰ 0″  ✅  0/- ──────────  🔄 0  ⏳ -  💤 0',
@@ -163,7 +163,7 @@ function typed_over(
 	const laid = layout_for(state, LOCAL, START)
 	const run_layout = { ...laid, active: rows, queued: queued ?? laid.queued }
 
-	return draw_run(state, LOCAL, { ports: { ...ports, types_rows: true }, now_ms }, run_layout)
+	return drawn_from(state, LOCAL, { ports: { ...ports, types_rows: true }, now_ms }, run_layout)
 }
 
 function typing_keys(state: BoardState): Array<string> {
@@ -172,7 +172,7 @@ function typing_keys(state: BoardState): Array<string> {
 
 // joshuafolkken/kit#8103: the header's now line types when its words change, and not again while they
 // stay — its key is known to the next frame.
-describe('run_board_tick_draw.draw_run now line typing', () => {
+describe('run_board_tick_draw.draw_display now line typing', () => {
 	it('types the now line once its words appear, and not again on a later redraw', () => {
 		const now_key = 'now:1 running'
 		const running = [row(1, 'running')]
@@ -191,7 +191,7 @@ function epic_of(title: string): BoardLayout['queued'] {
 
 // joshuafolkken/kit#8115: a queued epic's 📁 line types when it appears, and not again while it stays or
 // when only its title changes — its key is the epic's number.
-describe('run_board_tick_draw.draw_run epic line typing', () => {
+describe('run_board_tick_draw.draw_display epic line typing', () => {
 	const epic_key = `epic:${String(EPIC)}`
 	const base = typed_over(planned(), [], START, [])
 	const appeared = typed_over(base, [], START + SECOND, epic_of('an epic'))
@@ -223,7 +223,7 @@ function seated_over(state: BoardState, now_ms: number, seated: Seated): BoardSt
 	const pane = { ...SIZE, columns: seated.columns ?? SIZE.columns }
 	const typing = { ...ports, types_rows: true, size: (): typeof SIZE => pane }
 
-	return draw_run(state, local, { ports: typing, now_ms }, layout_for(state, local, START))
+	return drawn_from(state, local, { ports: typing, now_ms }, layout_for(state, local, START))
 }
 
 function seat_keys(state: BoardState): Array<string> {
@@ -232,7 +232,7 @@ function seat_keys(state: BoardState): Array<string> {
 
 // joshuafolkken/kit#8116: an empty seat's 💺 line types when its reason appears or changes, and not
 // again while the reason stays, whatever the pane's width.
-describe('run_board_tick_draw.draw_run seat line typing', () => {
+describe('run_board_tick_draw.draw_display seat line typing', () => {
 	const HELD = { free: 1, hold: 'hold-a' }
 	const base = typed_over(planned(), [], START)
 	const appeared = seated_over(base, START + SECOND, HELD)

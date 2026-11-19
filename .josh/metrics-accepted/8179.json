@@ -1,0 +1,7 @@
+{
+	"reason": "Shared test fixture gains drawn_from and ticks (used by four test files instead of clones); draw_run removed from production code",
+	"date": "2026-11-19",
+	"growth": {
+		"scripts.code_lines": 11
+	}
+}

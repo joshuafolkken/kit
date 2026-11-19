@@ -1,6 +1,7 @@
 import { stripVTControlCharacters } from 'node:util'
 import { poll } from '#scripts/lib/poll'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
+import { run_board_display } from './run-board-display'
 import { run_board_frame_store } from './run-board-frame-store'
 import type { LocalRead } from './run-board-read'
 import type { BoardPorts, BoardState } from './run-board-state'
@@ -15,7 +16,8 @@ import { run_board_tick_draw, type DrawPorts } from './run-board-tick-draw'
 // answer from them.
 
 const { FRESH_STATE, layout_for, tick } = run_board_tick
-const { draw_run } = run_board_tick_draw
+const { assemble_display } = run_board_display
+const { draw_display } = run_board_tick_draw
 const { CHAT_KEY, once_key } = run_board_frame_store
 const RECORD_EVERY_SECONDS = 5
 const RECORD_EVERY_MS = RECORD_EVERY_SECONDS * MS_PER_SECOND
@@ -108,7 +110,9 @@ function redrawn(
 	// A single frame counts arrivals from its own total, never from the live board's first one.
 	const single = { ...state, baseline_total: undefined }
 
-	draw_run(single, local, { ports: quiet, now_ms }, layout_for(single, local, now_ms))
+	const display = assemble_display(single, local, now_ms, layout_for(single, local, now_ms))
+
+	draw_display(single, display, { ports: quiet, now_ms })
 
 	return text
 }

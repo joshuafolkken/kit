@@ -5,14 +5,12 @@ import type { BoardRow } from './run-board-layout'
 import type { LocalRead } from './run-board-read'
 import type { BoardState } from './run-board-state'
 import { run_board_tick } from './run-board-tick'
-import { run_board_tick_draw } from './run-board-tick-draw'
 
 // joshuafolkken/kit#8117: a themed board types a findings / notes line the frame it first shows in, park
 // reasons included, and not again — on a later frame, nor when it shows again after the pane hid it.
 
-const { LOCAL, START, harness, plan_titled } = run_board_fixture
+const { LOCAL, START, drawn_from, harness, plan_titled } = run_board_fixture
 const { FRESH_STATE, layout_for } = run_board_tick
-const { draw_run } = run_board_tick_draw
 const KIND = run_event_stream.EVENT_KIND
 const SECOND = 1000
 // Past the time a line takes to type through.
@@ -54,14 +52,14 @@ function drawn_over(
 	const run_layout = { ...layout_for(state, local, START), active: [parked_row()] }
 	const typing = { ...ports, types_rows: true, size: (): typeof TALL => size }
 
-	return draw_run(state, local, { ports: typing, now_ms }, run_layout)
+	return drawn_from(state, local, { ports: typing, now_ms }, run_layout)
 }
 
 function note_keys(state: BoardState): Array<string> {
 	return state.typing.lines.map((line) => line.key).filter((key) => key.startsWith('note:'))
 }
 
-describe('run_board_tick_draw.draw_run note line typing', () => {
+describe('run_board_tick_draw.draw_display note line typing', () => {
 	const base = drawn_over(planned(), [], START, TALL)
 	const appeared = drawn_over(base, EVENTS, START + SECOND, TALL)
 
