@@ -1,5 +1,4 @@
-import { spawn } from 'node:child_process'
-import type { Spawner } from '#scripts/run/wake/run-wake-caffeinate'
+import { spawn, type SpawnOptions } from 'node:child_process'
 import { run_board_sound_cues, type CueName } from './run-board-sound-cues'
 import { run_board_sound_wav } from './run-board-sound-wav'
 
@@ -17,9 +16,26 @@ interface Player {
 	args: (file: string) => Array<string>
 }
 
+// A started player: `exit` and `kill` let a sound that plays while something lasts be ended
+// (joshuafolkken/kit#8250).
+interface Playing {
+	on: (event: 'error' | 'exit', listener: (code?: number | null) => void) => unknown
+	unref: () => unknown
+	kill: () => unknown
+}
+
+type SoundSpawner = (command: string, args: Array<string>, options: SpawnOptions) => Playing
+
 interface SoundPorts {
-	spawner: Spawner
+	spawner: SoundSpawner
 	write: (text: string) => unknown
+}
+
+// What a start is told: each candidate as it starts — the one that ends up playing last — and that
+// every candidate failed.
+interface StartHandlers {
+	started: (child: Playing) => void
+	failed: () => void
 }
 
 function powershell_literal(file: string): string {
@@ -57,21 +73,37 @@ function players_for(platform: NodeJS.Platform): Array<Player> {
 	return PLAYERS[platform] ?? []
 }
 
-function start_first(file: string, players: Array<Player>, ports: SoundPorts): void {
+function start_first(
+	file: string,
+	players: Array<Player>,
+	launch: { ports: SoundPorts; handlers: StartHandlers },
+): void {
 	const [player, ...rest] = players
 
 	if (player === undefined) {
-		ports.write(BEL)
+		launch.handlers.failed()
 
 		return
 	}
 
-	const child = ports.spawner(player.command, player.args(file), SPAWN_OPTIONS)
+	const child = launch.ports.spawner(player.command, player.args(file), SPAWN_OPTIONS)
 
 	child.on('error', () => {
-		start_first(file, rest, ports)
+		start_first(file, rest, launch)
 	})
+	launch.handlers.started(child)
 	child.unref()
+}
+
+// The file started on the platform's first working candidate, each start and the failure of every
+// candidate told to `handlers`; nothing is written, so a caller chooses its own fallback.
+function start(
+	file: string,
+	handlers: StartHandlers,
+	platform: NodeJS.Platform = process.platform,
+	ports: SoundPorts = DEFAULT_PORTS,
+): void {
+	start_first(file, players_for(platform), { ports, handlers })
 }
 
 function play(
@@ -79,7 +111,14 @@ function play(
 	platform: NodeJS.Platform = process.platform,
 	ports: SoundPorts = DEFAULT_PORTS,
 ): void {
-	start_first(file, players_for(platform), ports)
+	const handlers: StartHandlers = {
+		started: () => {
+			// a one-shot sound is let go, never ended
+		},
+		failed: () => ports.write(BEL),
+	}
+
+	start(file, handlers, platform, ports)
 }
 
 // A cue's WAV, synthesized once into the cache (`run-board-sound-wav.ts`), then played; a cue whose
@@ -105,7 +144,8 @@ const run_board_sound_player = {
 	players_for,
 	play,
 	play_cue,
+	start,
 }
 
-export type { Player, SoundPorts }
+export type { Player, Playing, SoundPorts, SoundSpawner, StartHandlers }
 export { run_board_sound_player }

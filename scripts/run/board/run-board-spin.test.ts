@@ -64,6 +64,8 @@ function typing_with(line: Pick<TypingLine, 'key' | 'row' | 'text' | 'start_ms'>
 	return { seen: new Set(), lines: [{ index: line.row - 1, prefix_columns: 0, ...line }] }
 }
 
+const UNMARKED = { lines: ['▶ run'], spots: [], keyed: [], sweep: undefined }
+
 describe('run_board_spin.spun', () => {
 	it('records the title’s, a running row’s and a loading spinner’s spots by display width', () => {
 		const lines = [`${SPOT} backlogrun  ✅ 0/1  ⏳ ${SPOT}`, '', `${SPOT} 🔍 1  a`]
@@ -81,7 +83,7 @@ describe('run_board_spin.spun', () => {
 		const lines = [`${SPOT} run`, 'still']
 
 		expect(spun(lines, '⠙', WIDE).lines).toStrictEqual(['⠙ run', 'still'])
-		expect(spun(['▶ run'], '⠙', WIDE)).toStrictEqual({ lines: ['▶ run'], spots: [], keyed: [] })
+		expect(spun(['▶ run'], '⠙', WIDE)).toStrictEqual(UNMARKED)
 	})
 
 	it('counts the rows a wrapped line takes and keeps the colors in effect at the spot', () => {

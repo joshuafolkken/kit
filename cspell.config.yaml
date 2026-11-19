@@ -146,6 +146,7 @@ words:
   - lockfiles
   - iwasakishinya
   - rescanning
+  - respawned
   # VS Code extension publisher and extension identifiers in the static profile.
   - pkief
   - usernamehw

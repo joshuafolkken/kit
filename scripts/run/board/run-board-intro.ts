@@ -16,16 +16,14 @@ const { LINE_MS: REVEAL_LINE_MS, beats_of } = run_board_reveal_blocks
 const LINE_START = '\r'
 const ERASE_LINE_END = '\u{1B}[K'
 
-type IntroPorts = Pick<BoardPorts, 'intro_sleep' | 'write' | 'write_drawn'>
+type IntroPorts = Pick<BoardPorts, 'intro_sleep' | 'write' | 'write_drawn' | 'typing_sound'>
 type Reveal = (frame: string) => Promise<void>
 
-const BEATS: ReadonlyArray<Beat> = [
-	...Array.from(LINE, (_letter, index) => ({
-		text: `${LINE_START}${run_board_typing.typed(LINE, LINE.slice(0, index + 1))}${ERASE_LINE_END}`,
-		ms: LETTER_MS,
-	})),
-	{ text: '', ms: HOLD_MS },
-]
+const LETTER_BEATS: ReadonlyArray<Beat> = Array.from(LINE, (_letter, index) => ({
+	text: `${LINE_START}${run_board_typing.typed(LINE, LINE.slice(0, index + 1))}${ERASE_LINE_END}`,
+	ms: LETTER_MS,
+}))
+const HOLD_BEAT: Beat = { text: '', ms: HOLD_MS }
 
 // Each beat written, then its pause raced against the skip; a skip writes no further beat, and the
 // beats left unwritten are handed back.
@@ -72,8 +70,25 @@ async function listen(
 	}
 }
 
+// The letters typed with the trill sounding (joshuafolkken/kit#8250), which stops however they end —
+// typed through or skipped by a key. Where the ports carry no pauses nothing types, so no trill starts.
+async function letters(ports: IntroPorts, keys: KeyReading): Promise<ReadonlyArray<Beat>> {
+	const trill = ports.intro_sleep === undefined ? undefined : ports.typing_sound
+
+	trill?.set(true)
+
+	try {
+		return await listen(LETTER_BEATS, ports, keys)
+	} finally {
+		trill?.set(false)
+	}
+}
+
+// The letters, then the hold, silent, unless a key skipped the letters.
 async function play(ports: IntroPorts, keys: KeyReading): Promise<void> {
-	await listen(BEATS, ports, keys)
+	const rest = await letters(ports, keys)
+
+	if (rest.length === 0) await listen([HOLD_BEAT], ports, keys)
 }
 
 // A line's beats, each line after the first led by the line break before it.

@@ -2,6 +2,7 @@ import type { SectionKey } from './run-board-fit'
 import { run_board_fold } from './run-board-fold'
 import type { BoardStore, FoldStore } from './run-board-fold-store'
 import type { CueName } from './run-board-sound-cues'
+import type { TypingSound } from './run-board-sound-typing'
 
 // The keys a live `run:board` reads: one per section, folding it or unfolding it (`run-board-fold.ts`),
 // and `s`, flipping the sound on and off (joshuafolkken/kit#7953).
@@ -12,6 +13,7 @@ const CTRL_C = '\u{3}'
 const SWITCHED_ON_CUE: CueName = 'launch'
 
 type Cue = (name: CueName) => void
+type Trill = Pick<TypingSound, 'set'>
 
 // The keyboard as the board uses it; `interrupt` is what Ctrl-C does once raw mode reads it as a key,
 // and `store` where the folds and the sound switch are kept across launches — none keeps them until
@@ -68,19 +70,28 @@ function folding(input: KeyInput): {
 	}
 }
 
+// The sound switch's new setting, saved where the keyboard keeps it.
+function saved(input: KeyInput, is_on: boolean): boolean {
+	input.store?.save_sound?.(is_on)
+
+	return is_on
+}
+
 // The sound switch, on as the store last left it, saved on every flip; switching it on plays the launch
-// cue once, so a person hears at once that it works.
+// cue once, so a person hears at once that it works, and switching it off silences the trill sounding
+// then (joshuafolkken/kit#8250).
 function sounding(
 	input: KeyInput,
 	cue: Cue | undefined,
+	trill: Trill | undefined,
 ): { flip: () => void; sound: () => boolean } {
 	let is_on = input.store?.load_sound?.() ?? true
 
 	return {
 		flip: () => {
-			is_on = !is_on
-			input.store?.save_sound?.(is_on)
+			is_on = saved(input, !is_on)
 			if (is_on) cue?.(SWITCHED_ON_CUE)
+			else trill?.set(false)
 		},
 		sound: () => is_on,
 	}
@@ -90,11 +101,12 @@ function sounding(
 function pressing(
 	input: KeyInput,
 	cue: Cue | undefined,
+	trill: Trill | undefined,
 ): Omit<KeyReading, 'intercept' | 'stop'> & {
 	press: (chunk: string) => void
 } {
 	const { fold, folded } = folding(input)
-	const { flip, sound } = sounding(input, cue)
+	const { flip, sound } = sounding(input, cue, trill)
 
 	return {
 		folded,
@@ -109,10 +121,10 @@ function pressing(
 	}
 }
 
-function read_keys(input: KeyInput | undefined, cue?: Cue): KeyReading {
+function read_keys(input: KeyInput | undefined, cue?: Cue, trill?: Trill): KeyReading {
 	if (input?.is_tty !== true) return { folded: undefined }
 
-	const { press, ...reading } = pressing(input, cue)
+	const { press, ...reading } = pressing(input, cue, trill)
 	const held: { taker: (() => void) | undefined } = { taker: undefined }
 
 	input.raw(true)

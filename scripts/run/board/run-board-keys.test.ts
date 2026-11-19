@@ -194,3 +194,22 @@ describe('run_board_keys.read_keys sound', () => {
 		expect(played).toStrictEqual(['drain'])
 	})
 })
+
+// joshuafolkken/kit#8250: switching the sound off silences the trill sounding then; switching it on
+// leaves the trill to the next typing.
+describe('run_board_keys.read_keys trill', () => {
+	it('switches the trill off with the sound, and not on with it', () => {
+		const keys = fake_keys()
+		const switched: Array<boolean> = []
+		const store = { load: (): ReadonlySet<never> => new Set(), save: () => undefined }
+
+		read_keys({ ...keys.input, store }, undefined, {
+			set: (is_on) => {
+				switched.push(is_on)
+			},
+		})
+		keys.type('s')
+		keys.type('s')
+		expect(switched).toStrictEqual([false])
+	})
+})
