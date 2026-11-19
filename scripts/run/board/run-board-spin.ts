@@ -7,6 +7,7 @@ import { run_board_row_key } from './run-board-row-key'
 import { run_board_screen } from './run-board-screen'
 import { run_board_spot } from './run-board-spot'
 import type { BoardPorts } from './run-board-state'
+import { run_board_timing } from './run-board-timing'
 import { run_board_type_rows, type KeyedLine, type Typing } from './run-board-type-rows'
 
 // The spinners of a live `run:board` frame turned between redraws. The frame
@@ -45,7 +46,7 @@ interface Turning {
 	typing: Typing
 }
 
-type SpinPorts = Pick<BoardPorts, 'now' | 'sleep' | 'write'>
+type SpinPorts = Pick<BoardPorts, 'now' | 'sleep' | 'write' | 'time_draw'>
 
 // The spot of the placeholder at `index` in a line that starts `row` rows down the screen.
 function spot_at(line: string, index: number, row: number, columns: number): Spot {
@@ -149,6 +150,13 @@ function turn_bytes(turning: Turning, at_ms: number, is_turned: boolean): string
 	return run_board_screen.synced(`${spin}${run_board_type_rows.type_bytes(turning.typing, at_ms)}`)
 }
 
+// The turn built and written, timed as a turn where `--timing` times draws.
+function write_turn(turning: Turning, ports: SpinPorts, at_ms: number, is_turned: boolean): void {
+	run_board_timing.drawn(ports, 'turn', () => {
+		ports.write(turn_bytes(turning, at_ms, is_turned))
+	})
+}
+
 // joshuafolkken/kit#8123: a wake for a letter between frame boundaries writes no spinner, so each frame
 // is written once, on its boundary.
 async function turn_until(turning: Turning, ports: SpinPorts, until_ms: number): Promise<void> {
@@ -164,7 +172,7 @@ async function turn_until(turning: Turning, ports: SpinPorts, until_ms: number):
 			const at_ms = ports.now()
 			const at_frame = spinner_of(at_ms)
 
-			if (at_ms < until_ms) ports.write(turn_bytes(turning, at_ms, at_frame !== frame))
+			if (at_ms < until_ms) write_turn(turning, ports, at_ms, at_frame !== frame)
 			frame = at_frame
 		},
 	})
