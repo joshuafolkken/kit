@@ -6,10 +6,14 @@ import type { BoardRow } from './run-board-layout'
 import type { Phase } from './run-board-phase'
 import { run_board_render_fixture } from './run-board-render-fixture'
 import type { CueName } from './run-board-sound-cues'
-import { run_board_sound_transition, type SoundSnapshot } from './run-board-sound-transition'
+import {
+	run_board_sound_transition,
+	type Cause,
+	type SoundSnapshot,
+} from './run-board-sound-transition'
 
 const { EMPTY_LAYOUT, NOW, header } = run_board_render_fixture
-const { cue_of, snapshot_of } = run_board_sound_transition
+const { cause_of, snapshot_of } = run_board_sound_transition
 
 interface Frame {
 	rows: ReadonlyArray<BoardRow>
@@ -22,6 +26,8 @@ interface Case {
 	before: Frame
 	after: Frame
 	cue: CueName | undefined
+	// What the cue says sounded it, for the header's notice (joshuafolkken/kit#8107).
+	word?: string
 }
 
 function row(number: number, state: BoardRow['state'], track?: ReadonlyArray<Phase>): BoardRow {
@@ -36,8 +42,12 @@ function snapshot(frame: Frame): SoundSnapshot | undefined {
 	return snapshot_of(header({ layout, ...frame.extra }), frame.events ?? [])
 }
 
+function cause_between(before: Frame, after: Frame): Cause | undefined {
+	return cause_of(snapshot(before), snapshot(after))
+}
+
 function cue_between(before: Frame, after: Frame): CueName | undefined {
-	return cue_of(snapshot(before), snapshot(after))
+	return cause_between(before, after)?.cue
 }
 
 const RUNNING = row(1, 'running', ['implement'])
@@ -47,60 +57,85 @@ const STOPPED_RUN: Partial<BoardHeader> = { activity: { last_event_ms: NOW, is_s
 const DRAINED: Frame = { rows: [row(1, 'merged')], extra: STOPPED_RUN, events: [{ kind: 'drain' }] }
 const HOLD = { reset_ms: NOW, parked: 1 }
 const OUTAGE = { from_ms: NOW, down_ms: NOW }
+const PERSON_WORD = 'needs a person'
+// A launch, a wait on a person and a stopped lane arriving on one frame.
+const AT_ONCE_BEFORE: Frame = { rows: [row(1, 'waiting'), row(2, 'running'), row(3, 'running')] }
+const AT_ONCE_AFTER: Frame = { rows: [row(1, 'running'), row(2, 'human'), row(3, 'stopped')] }
 
 const SOUNDING: ReadonlyArray<Case> = [
-	{ name: 'a launch', before: { rows: [] }, after: { rows: [RUNNING] }, cue: 'launch' },
+	{
+		name: 'a launch',
+		word: 'running',
+		before: { rows: [] },
+		after: { rows: [RUNNING] },
+		cue: 'launch',
+	},
 	{
 		name: 'a restart from waiting',
+		word: 'running',
 		before: { rows: [row(1, 'waiting')] },
 		after: { rows: [RUNNING] },
 		cue: 'launch',
 	},
 	{
 		name: 'a merge',
+		word: 'merged',
 		before: { rows: [RUNNING] },
 		after: { rows: [row(1, 'merged')] },
 		cue: 'lane-end',
 	},
 	{
 		name: 'a done lane',
+		word: 'done',
 		before: { rows: [RUNNING] },
 		after: { rows: [row(1, 'done')] },
 		cue: 'lane-end',
 	},
-	{ name: 'a drain', before: { rows: [row(1, 'merged')] }, after: DRAINED, cue: 'drain' },
+	{
+		name: 'a drain',
+		word: 'run drained',
+		before: { rows: [row(1, 'merged')] },
+		after: DRAINED,
+		cue: 'drain',
+	},
 	{
 		name: 'a human review beside a running lane',
+		word: PERSON_WORD,
 		before: { rows: [RUNNING, OTHER_RUNNING] },
 		after: { rows: [row(1, 'human'), OTHER_RUNNING] },
 		cue: 'human',
 	},
 	{
 		name: 'a park',
+		word: PERSON_WORD,
 		before: { rows: [RUNNING] },
 		after: { rows: [row(1, 'parked')] },
 		cue: 'human',
 	},
 	{
 		name: 'a stopped lane',
+		word: 'stopped',
 		before: { rows: [RUNNING] },
 		after: { rows: [row(1, 'stopped')] },
 		cue: 'alert',
 	},
 	{
 		name: 'a failed ship',
+		word: 'failed',
 		before: { rows: [RUNNING] },
 		after: { rows: [row(1, 'running', ['implement', 'ship', 'failed'])] },
 		cue: 'alert',
 	},
 	{
 		name: 'a usage-limit hold',
+		word: 'usage held',
 		before: { rows: [RUNNING] },
 		after: { rows: [RUNNING], extra: { quota_hold: HOLD } },
 		cue: 'alert',
 	},
 	{
 		name: 'an outage',
+		word: 'offline',
 		before: { rows: [RUNNING] },
 		after: {
 			rows: [RUNNING],
@@ -110,18 +145,21 @@ const SOUNDING: ReadonlyArray<Case> = [
 	},
 	{
 		name: 'the run stopping',
+		word: 'run stopped',
 		before: { rows: [row(1, 'merged')] },
 		after: { rows: [row(1, 'merged')], extra: STOPPED_RUN },
 		cue: 'alert',
 	},
 	{
 		name: 'the run left waiting on a person',
+		word: 'run needs a person',
 		before: { rows: [row(1, 'parked'), row(2, 'running')] },
 		after: { rows: [row(1, 'human'), row(2, 'merged')] },
 		cue: 'alert',
 	},
 	{
 		name: 'an outage opening under a usage-limit hold',
+		word: 'offline',
 		before: { rows: [RUNNING], extra: { quota_hold: HOLD } },
 		after: {
 			rows: [RUNNING],
@@ -200,7 +238,7 @@ function scene_row({ name, cue }: Case): Array<string> {
 	return [name, cue === undefined ? SILENT_CELL : `\`${cue}\``]
 }
 
-describe('run_board_sound_transition.cue_of — the cue a frame sounds against the one before', () => {
+describe('run_board_sound_transition.cause_of — the cue a frame sounds against the one before', () => {
 	it('matches the scene table the run:board rationale documents (ac-997f4ab4)', () => {
 		expect(scene_table()).toEqual([...SOUNDING, ...SILENT].map((entry) => scene_row(entry)))
 	})
@@ -214,21 +252,45 @@ describe('run_board_sound_transition.cue_of — the cue a frame sounds against t
 	})
 
 	it('sounds the alert alone when information, a person and a fault arrive at once (ac-2dd62ce1)', () => {
-		const before = { rows: [row(1, 'waiting'), row(2, 'running'), row(3, 'running')] }
-		const after = { rows: [row(1, 'running'), row(2, 'human'), row(3, 'stopped')] }
-
-		expect(cue_between(before, after)).toBe('alert')
+		expect(cue_between(AT_ONCE_BEFORE, AT_ONCE_AFTER)).toBe('alert')
 	})
 
 	it('sounds nothing on the first frame, even one waiting on a person and stopped (ac-b6e7301d)', () => {
 		const current = snapshot({ rows: [row(1, 'human'), row(2, 'stopped')], extra: STOPPED_RUN })
 
-		expect(cue_of(undefined, current)).toBeUndefined()
+		expect(cause_of(undefined, current)).toBeUndefined()
 	})
 
 	it('sounds nothing against a frame read before the layout', () => {
 		const unread = snapshot_of(header({ layout: undefined }), [])
 
-		expect(cue_of(unread, snapshot({ rows: [RUNNING] }))).toBeUndefined()
+		expect(cause_of(unread, snapshot({ rows: [RUNNING] }))).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#8107: the cue carries what sounded it, for the header's notice.
+describe('run_board_sound_transition.cause_of — the cause a cue carries', () => {
+	it.each(SOUNDING)('names $word for $name', ({ before, after, cue, word }) => {
+		expect(cause_between(before, after)).toMatchObject({ cue, word })
+	})
+
+	it('names the lane a row sounds for, and none for the run as a whole', () => {
+		const stopped = { rows: [row(1, 'stopped')] }
+		const issues = [
+			cause_between({ rows: [RUNNING] }, stopped)?.issue,
+			cause_between(stopped, { ...stopped, extra: STOPPED_RUN })?.issue,
+		]
+
+		expect(issues).toStrictEqual([1, undefined])
+	})
+
+	it('names the stopped lane, the loudest, when a launch, a wait and a stop arrive at once', () => {
+		const loudest = { cue: 'alert', word: 'stopped', issue: 3 }
+
+		expect(cause_between(AT_ONCE_BEFORE, AT_ONCE_AFTER)).toStrictEqual(loudest)
+	})
+
+	it('stays silent for a lane moving between two states of one cue', () => {
+		expect(cue_between({ rows: [row(1, 'merged')] }, { rows: [row(1, 'done')] })).toBeUndefined()
 	})
 })

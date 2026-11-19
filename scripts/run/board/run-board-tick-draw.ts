@@ -4,6 +4,7 @@ import type { ClosedIssue } from './run-board-closed'
 import type { FrameBounds } from './run-board-fold'
 import { run_board_github } from './run-board-github'
 import { run_board_header, type BoardHeader } from './run-board-header'
+import { run_board_header_notice } from './run-board-header-notice'
 import { run_board_labels } from './run-board-labels'
 import { run_board_layout, type BoardLayout } from './run-board-layout'
 import { run_board_link } from './run-board-link'
@@ -220,42 +221,43 @@ function draw(ports: BoardPorts, lines: ReadonlyArray<string>): void {
 	ports.write(`${lines.join('\n')}\n`)
 }
 
-// The cue this frame picked over the last one's, sounded through `cue` where the board passes one,
-// and what the next frame weighs its own against. A frame before the plan is read is no base — the rows
-// the plan brings were already there — so the frame the plan arrives on is the first base, silent.
+type Sounded = Pick<BoardState, 'sound_snapshot' | 'sound_pending' | 'notice'>
+
+// The cue this frame picked over the last one's, sounded through `cue` where the board passes one, kept
+// as the notice the header draws whether it sounded or not, and what the next frame weighs its own
+// against. A frame before the plan is read is no base — the rows the plan brings were already there — so
+// the frame the plan arrives on is the first base, silent. It runs before the frame is drawn, so the
+// notice shows on the frame it sounds on.
 function sounded(
 	state: BoardState,
 	header: BoardHeader,
 	local: LocalRead,
 	redraw: Redraw,
-): Pick<BoardState, 'sound_snapshot' | 'sound_pending'> {
+): Sounded {
 	const snapshot =
 		state.plan === undefined
 			? undefined
 			: run_board_sound_transition.snapshot_of(header, local.events)
-	const { cue, pending } = run_board_sound_repeat.next_cue(
+	const { sounding, pending } = run_board_sound_repeat.next_cue(
 		state.sound_snapshot,
 		snapshot,
 		state.sound_pending,
 		redraw.now_ms,
 	)
 
-	if (cue !== undefined) redraw.ports.cue?.(cue)
+	if (sounding !== undefined) redraw.ports.cue?.(sounding.cause.cue)
+	const notice = run_board_header_notice.next(state.notice, sounding, redraw.now_ms)
 
-	return { sound_snapshot: snapshot, sound_pending: pending }
+	return { sound_snapshot: snapshot, sound_pending: pending, notice }
 }
 
-// The run's frame over `run_layout`, the run's own rows. The first total the plan gives is the baseline
-// every later arrival is counted against; the run's own children before it are no total. The root
-// checkout's single runs are laid over the run's.
-function draw_run(
+// The first total the plan gives is the baseline every later arrival is counted against; the run's own
+// children before it are no total. The header counts the root checkout's single runs on top of it.
+function baselines_of(
 	state: BoardState,
-	local: LocalRead,
-	redraw: Redraw,
 	run_layout: BoardLayout,
-): BoardState {
-	const read = closed_under(known_of(state), state.closed)
-	const layout = run_board_root_layout.layout_of(run_layout, local, read)
+	layout: BoardLayout,
+): { settled: BoardState; baseline_total: number | undefined } {
 	const first_total =
 		state.plan === undefined ? undefined : run_board_header.counts_of(run_layout).total
 	const settled = { ...state, baseline_total: state.baseline_total ?? first_total }
@@ -264,13 +266,29 @@ function draw_run(
 		run_layout,
 		layout,
 	)
-	const header = header_of({ ...settled, baseline_total }, local, layout, redraw)
+
+	return { settled, baseline_total }
+}
+
+// The run's frame over `run_layout`, the run's own rows, the root checkout's single runs laid over them.
+function draw_run(
+	state: BoardState,
+	local: LocalRead,
+	redraw: Redraw,
+	run_layout: BoardLayout,
+): BoardState {
+	const read = closed_under(known_of(state), state.closed)
+	const layout = run_board_root_layout.layout_of(run_layout, local, read)
+	const { settled, baseline_total } = baselines_of(state, run_layout, layout)
+	const laid = header_of({ ...settled, baseline_total }, local, layout, redraw)
+	const sound = sounded(state, laid, local, redraw)
+	const header = { ...laid, notice: sound.notice }
 	const { lines, spots, keyed } = frame_of(settled, local, header, redraw)
 	const typing = typing_of(state, keyed, header, redraw)
 
 	draw(redraw.ports, run_board_type_rows.typed_lines(lines, typing, redraw.now_ms))
 
-	return { ...settled, spots, typing, ...sounded(state, header, local, redraw) }
+	return { ...settled, spots, typing, ...sound }
 }
 
 const run_board_tick_draw = { activity_here, bounds_of, closed_under, draw, draw_run }
