@@ -26,7 +26,7 @@ const RUNNING = 3701
 const SHARED = 'package.json'
 const NO_LANE_LEFT = 0
 const ONE_LANE_LEFT = 1
-const { STAGE_ICONS, STATE_ICONS, WAIT_ICONS } = run_board_labels
+const { STAGE_ICONS, WAIT_ICONS } = run_board_labels
 const { LANE_STAGE } = run_event_setup
 const UNTRIAGED_REASON: RowReason = { icon: WAIT_ICONS.untriaged, issues: [] }
 // joshuafolkken/kit#5518: ✋ marks the untriaged row held alone for its judgment.
@@ -162,12 +162,12 @@ describe('run_board_reason.reader — a row a blocker keeps waiting', () => {
 		])
 	})
 
-	it('leads a row with 🙋 where the classifier withholds it for a person', () => {
+	it('leads a row the classifier withholds for a person with plain 🔗 (joshuafolkken/kit#8026)', () => {
 		const blocked = child(HELD, [BLOCKER, OTHER_BLOCKER])
 		const issues = [String(BLOCKER), String(OTHER_BLOCKER)]
 		const plan = { ...plan_of([blocked, child(BLOCKER)]), withheld: new Set([HELD]) }
 
-		expect(reasons([blocked], { plan })).toStrictEqual([{ icon: STATE_ICONS.human, issues }])
+		expect(reasons([blocked], { plan })).toStrictEqual([{ icon: WAIT_ICONS.blocker, issues }])
 	})
 
 	it('leads a row with 🔗 where its blocker is outside the plan but the classifier waits on time', () => {

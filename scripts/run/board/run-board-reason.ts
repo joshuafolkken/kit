@@ -35,7 +35,7 @@ import type { ItemStatus } from './run-board-status'
 // judging it is what a person can do meanwhile.
 
 const { LANE_STAGE } = run_event_setup
-const { HEADER_ICONS, STAGE_ICONS, STATE_ICONS, WAIT_ICONS } = run_board_labels
+const { HEADER_ICONS, STAGE_ICONS, WAIT_ICONS } = run_board_labels
 const NO_FREE_LANES = 0
 const FIRST_ONLY = 1
 
@@ -319,25 +319,11 @@ function not_before_of(child: EpicChild, now_ms: number): RowReason | undefined 
 	}
 }
 
-// `🔗 4183` for a blocker the run finishes, `🙋 4183` where the classifier withholds the row for a
-// person: the run will not finish a blocker it waits on (joshuafolkken/kit#4292).
-function blocker_icon(child: EpicChild, pool: Pool): string {
-	return pool.withheld.has(child.number) ? STATE_ICONS.human : WAIT_ICONS.blocker
-}
-
-// The decision a withheld row waits on, followed through its blockers as the plan was read — kept even
-// where no blocker still stands at this frame, so the row itself says what a person decides.
-function decision_tail(child: EpicChild, read: ReasonRead, pool: Pool): string | undefined {
-	return pool.withheld.has(child.number) ? read.plan.decision_waits?.get(child.number) : undefined
-}
-
-function blocker_reason(
-	child: EpicChild,
-	waits: ReadonlyArray<string>,
-	tail: string | undefined,
-	pool: Pool,
-): RowReason {
-	return { icon: blocker_icon(child, pool), issues: waits, ...(tail !== undefined && { tail }) }
+// `🔗 4183`: the blockers still standing. A row the classifier withholds for a person is drawn the
+// same way — the blocker a person acts on leads the 🙋 decision section with the action
+// (`run-board-decision-rows.ts`, joshuafolkken/kit#8026), so the row it holds says no more.
+function blocker_reason(waits: ReadonlyArray<string>): RowReason {
+	return { icon: WAIT_ICONS.blocker, issues: waits }
 }
 
 // `✋`: an issue nobody has judged, due and unblocked, held alone for its judgment while `backlog:next`
@@ -356,9 +342,7 @@ function wait_of(
 	pool: Pool,
 ): RowReason | undefined {
 	if (!epic_triage.is_triaged(child)) return untriaged_of(child, waits, read)
-	const tail = decision_tail(child, read, pool)
-
-	if (tail !== undefined || waits.length > 0) return blocker_reason(child, waits, tail, pool)
+	if (waits.length > 0) return blocker_reason(waits)
 
 	return not_before_of(child, read.now_ms) ?? offer_wait(child, read, pool)
 }

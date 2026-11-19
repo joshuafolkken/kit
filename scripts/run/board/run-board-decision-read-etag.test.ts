@@ -18,7 +18,6 @@ const WAITING = 6108
 const PERSON = 6113
 const ASKING = 6114
 const TITLE = 'Confirm the promotional credits'
-const TAIL = `→ decide #${String(PERSON)}: ${TITLE}`
 const QUESTION = 'Which account should run the probe?'
 const NEW_QUESTION = 'Which region should run the probe?'
 const FIRST_ETAG = 'W/"first"'
@@ -117,7 +116,7 @@ describe('run_board_decision_read.with_decisions — the ETag read', () => {
 		const plan = await run_board_decision_read.with_decisions(plan_of())
 
 		expect(plan?.decision_questions?.get(ASKING)).toBe(QUESTION)
-		expect(plan?.decision_waits?.get(WAITING)).toBe(TAIL)
+		expect(plan?.decision_blockers).toMatchObject([{ number: PERSON, blocks: [WAITING] }])
 		expect(sent_etags().slice(2)).toStrictEqual([FIRST_ETAG, FIRST_ETAG])
 		expect(unconditional).not.toHaveBeenCalled()
 	})

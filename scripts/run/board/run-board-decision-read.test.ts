@@ -2,13 +2,18 @@ import type { EpicChild } from '#scripts/epic/epic-graph'
 import { git_gh_etag_read } from '#scripts/gh/git-gh-etag-read'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { TRANSPORT_ENV_VAR } from '#scripts/gh/git-gh-transport'
-import { NEEDS_DECISION_LABEL, PARKED_LABELS, RUN_LANE_LABEL } from '#scripts/issue/issue-labels'
+import {
+	NEEDS_DECISION_LABEL,
+	NEEDS_HUMAN_MERGE_LABEL,
+	PARKED_LABELS,
+	RUN_LANE_LABEL,
+} from '#scripts/issue/issue-labels'
 import { issue_outcome } from '#scripts/issue/issue-outcome'
 import { issue_read } from '#scripts/issue/issue-read'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_board_decision } from './run-board-decision'
 import { run_board_decision_read } from './run-board-decision-read'
-import { run_board_layout, type BoardPlan } from './run-board-layout'
+import { run_board_layout, type BoardPlan, type DecisionBlocker } from './run-board-layout'
 import { run_board_pause } from './run-board-pause'
 import { run_board_reason } from './run-board-reason'
 
@@ -19,7 +24,15 @@ const PERSON = 6113
 const TITLE = 'Confirm the promotional credits'
 const QUESTION = 'Which account should run the probe?'
 const DETAIL = '外部アカウント'
-const TAIL = `→ decide #${String(PERSON)}: ${TITLE} (${DETAIL})`
+const TAIL = `→ decide (${DETAIL}) (blocks #${String(WAITING)})`
+const BLOCKER: DecisionBlocker = {
+	number: PERSON,
+	title: TITLE,
+	labels: [NEEDS_DECISION_LABEL],
+	need: 'decide',
+	detail: DETAIL,
+	blocks: [],
+}
 const MISSING_PLAN = 'Missing plan'
 const PAUSE_SUMMARY = 'Approval needed'
 
@@ -178,26 +191,12 @@ describe('run_board_decision park round (ac-80f5c282)', () => {
 	})
 })
 
-describe('run_board_decision waiting detail', () => {
-	it.each(['', '- 人の判断: 不要'])(
-		'omits the detail when the body has no human detail: %s',
-		(body) => {
-			expect(run_board_decision.waiting_tail('#6113', TITLE, body)).toBe(`→ decide #6113: ${TITLE}`)
-		},
-	)
-})
-
 describe('run_board_decision_read.with_decisions', () => {
 	it('follows a withheld intermediate issue to the outside human blocker once (ac-ab804afc)', async () => {
 		const children = [child(WAITING, [MIDDLE]), child(MIDDLE, [PERSON])]
 		const plan = await run_board_decision_read.with_decisions(plan_of(children))
 
-		expect(plan?.decision_waits).toEqual(
-			new Map([
-				[WAITING, TAIL],
-				[MIDDLE, TAIL],
-			]),
-		)
+		expect(plan?.decision_blockers).toStrictEqual([{ ...BLOCKER, blocks: [WAITING, MIDDLE] }])
 		expect(git_gh_issue_read.issue_view_json).toHaveBeenCalledTimes(1)
 		expect(git_gh_issue_read.issue_view_json).toHaveBeenCalledWith(
 			String(PERSON),
@@ -235,7 +234,7 @@ describe('run_board_decision_read question comments', () => {
 })
 
 describe('run_board_decision_read row integration', () => {
-	it('puts the waiting decision on the row through the normal reason reader (ac-9dd9ea00)', async () => {
+	it('draws the blocker in the decision section and the row it holds as plain blocked (ac-f3d8ec3b)', async () => {
 		const waiting = child(WAITING, [PERSON])
 		const plan = await run_board_decision_read.with_decisions(plan_of([waiting]))
 
@@ -250,11 +249,10 @@ describe('run_board_decision_read row integration', () => {
 		})
 		const layout = run_board_layout.layout_of(plan, new Map(), reader)
 
-		expect(layout.unreached[0]?.reason).toEqual({
-			icon: '🙋',
-			issues: [String(PERSON)],
-			tail: TAIL,
-		})
+		expect(layout.unreached[0]?.reason).toStrictEqual({ icon: '🔗', issues: [String(PERSON)] })
+		expect(run_board_layout.people_of(layout)).toMatchObject([
+			{ number: PERSON, state: 'human', reason: { tail: TAIL } },
+		])
 	})
 })
 
@@ -263,7 +261,7 @@ describe('run_board_decision_read cyclic blockers', () => {
 		const cycle = [child(WAITING, [MIDDLE]), child(MIDDLE, [WAITING])]
 		const plan = await run_board_decision_read.with_decisions(plan_of(cycle))
 
-		expect(plan?.decision_waits?.size).toBe(0)
+		expect(plan?.decision_blockers).toStrictEqual([])
 		expect(git_gh_issue_read.issue_view_json).not.toHaveBeenCalled()
 	})
 })
@@ -283,7 +281,7 @@ describe('run_board_decision_read standing blockers', () => {
 			plan_of([child(WAITING, [PERSON])]),
 		)
 
-		expect(enriched?.decision_waits?.get(WAITING)).toBe(TAIL)
+		expect(enriched?.decision_blockers).toMatchObject([{ number: PERSON, blocks: [WAITING] }])
 		expect(git_gh_issue_read.issue_view_json).toHaveBeenCalledTimes(1)
 	})
 
@@ -293,10 +291,12 @@ describe('run_board_decision_read standing blockers', () => {
 			plan_of([child(WAITING, [PERSON]), blocker]),
 		)
 
-		expect(plan?.decision_waits?.size).toBe(0)
+		expect(plan?.decision_blockers).toStrictEqual([])
 	})
+})
 
-	it('keeps outside human blockers even when they appear in the open listing', async () => {
+describe('run_board_decision_read blocker needs', () => {
+	it('keeps outside blockers with no label to say so, as the run takes them in (ac-fd16f6c9)', async () => {
 		const plan = plan_of([child(WAITING, [PERSON])])
 		const labels = new Map([...plan.labels, [PERSON, []]])
 
@@ -305,6 +305,29 @@ describe('run_board_decision_read standing blockers', () => {
 		)
 		const enriched = await run_board_decision_read.with_decisions({ ...plan, labels })
 
-		expect(enriched?.decision_waits?.get(WAITING)).toBe(`→ decide #6113: ${TITLE}`)
+		expect(enriched?.decision_blockers).toMatchObject([
+			{ number: PERSON, need: 'take', blocks: [WAITING] },
+		])
+	})
+
+	it('stops at a merge wait the run holds, as the one predicate says (ac-58c9bd8d)', async () => {
+		const merge = { ...child(PERSON, [MIDDLE]), labels: [NEEDS_HUMAN_MERGE_LABEL] }
+		const plan = await run_board_decision_read.with_decisions(
+			plan_of([child(WAITING, [PERSON]), merge, child(MIDDLE)]),
+		)
+
+		expect(plan?.decision_blockers).toMatchObject([
+			{ number: PERSON, need: 'merge', blocks: [WAITING] },
+		])
+	})
+
+	it('leaves out a blocker in another repository, which no row can draw by its number', async () => {
+		const waiting = {
+			...child(WAITING),
+			blocked_by: [{ repo: 'other/repo', number: PERSON, state: 'OPEN' as const }],
+		}
+		const plan = await run_board_decision_read.with_decisions(plan_of([waiting]))
+
+		expect(plan?.decision_blockers).toStrictEqual([])
 	})
 })

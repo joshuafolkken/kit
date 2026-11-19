@@ -1,14 +1,11 @@
 import type { EpicChild } from '#scripts/epic/epic-graph'
-import {
-	has_label_name,
-	NEEDS_HUMAN_MERGE_LABEL,
-	RUN_SOLO_LABEL,
-	RUN_STALLED_LABEL,
-} from '#scripts/issue/issue-labels'
+import { has_label_name, RUN_SOLO_LABEL, RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
 import { run_board_decision } from './run-board-decision'
+import { run_board_decision_rows } from './run-board-decision-rows'
 import { run_board_earlier, type EarlierLanes } from './run-board-earlier'
 import { run_board_ending_reason } from './run-board-ending-reason'
 import { run_board_human } from './run-board-human'
+import { run_board_human_merge } from './run-board-human-merge'
 import { run_board_kind } from './run-board-kind'
 import { run_board_layout_order } from './run-board-layout-order'
 import type {
@@ -48,6 +45,14 @@ function is_blocked(child: EpicChild, overlay: Overlay): boolean {
 	return child.blocked_by.some((edge) => run_board_standing_waits.is_waiting_on(edge, overlay))
 }
 
+// What a person does for a row waiting on one: merge its pull request (🔏), or decide.
+function human_reason(child: EpicChild, plan: BoardPlan): RowReason | undefined {
+	return (
+		run_board_human_merge.reason_of(child, plan) ??
+		run_board_decision.plan_reason(child.number, plan)
+	)
+}
+
 // Why a waiting row waits, or what resumes a stalled one.
 function plan_reason(
 	child: EpicChild,
@@ -55,7 +60,7 @@ function plan_reason(
 	overlay: Drawn,
 	waits: ReadonlyArray<string>,
 ): RowReason | undefined {
-	if (state === 'human') return run_board_decision.plan_reason(child.number, overlay.plan)
+	if (state === 'human') return human_reason(child, overlay.plan)
 
 	if (state === 'stopped') {
 		return run_board_ending_reason.stalled_reason(child.number, overlay.plan, waits)
@@ -133,10 +138,9 @@ function is_untouched(child: EpicChild, overlay: Overlay): boolean {
 	return !overlay.statuses.has(child.number)
 }
 
-// A plan row waits, unless it waits on a person's decision — the one wait the board marks — or the run
+// A plan row waits, unless it waits on a person — a decision, or a merge drawn with 🔏 — or the run
 // stalled on it mechanically (`run:stalled`), which is drawn as the stop it is, never as a decision.
 function plan_state(child: EpicChild): ItemState {
-	if (has_label_name(child.labels, NEEDS_HUMAN_MERGE_LABEL)) return 'waiting'
 	if (run_board_human.is_human(child.labels)) return 'human'
 
 	return has_label_name(child.labels, RUN_STALLED_LABEL) ? 'stopped' : 'waiting'
@@ -179,6 +183,33 @@ function waiting_children(overlay: Overlay): Array<EpicChild> {
 	)
 }
 
+// The run's scope a lane is checked against — its running issues too, which no wave holds.
+function numbers_of(plan: BoardPlan): ReadonlySet<number> {
+	const running = plan.waves.running ?? []
+
+	return new Set([...children_of(plan), ...running].map((child) => child.number))
+}
+
+// The blockers a person acts on that no row of the board draws — the run's own rows and an earlier
+// run's lane working the blocker (`run-board-decision-rows.ts`).
+function blocker_rows(overlay: Overlay, earlier: ReadonlyArray<BoardRow>): Array<BoardRow> {
+	const { plan, statuses } = overlay
+	const drawn = new Set([
+		...numbers_of(plan),
+		...statuses.keys(),
+		...earlier.map((row) => row.number),
+	])
+
+	return run_board_decision_rows.rows_of(plan, drawn)
+}
+
+function row_read(overlay: Overlay): RowRead {
+	const { plan } = overlay
+	const waits = run_board_standing_waits.by_number(children_of(plan), overlay)
+
+	return { ...plan, titles: plan.context.titles, waits }
+}
+
 function layout_of(
 	input_plan: BoardPlan,
 	input_statuses: ReadonlyMap<number, ItemStatus>,
@@ -189,20 +220,18 @@ function layout_of(
 	const { plan, statuses } = current
 	const overlay = { plan, statuses, reason_of }
 	const queue = plan.waves.waves.flat().filter((child) => is_untouched(child, overlay))
-	const read = {
-		...plan,
-		titles: plan.context.titles,
-		waits: run_board_standing_waits.by_number(children_of(plan), overlay),
-	}
+	const read = row_read(overlay)
+	const earlier_rows = run_board_earlier
+		.rows_of(earlier, statuses, read)
+		.filter((row) => !current.waiting_numbers.has(row.number))
 
 	return {
-		active: active_rows(statuses, read),
+		active: run_board_decision_rows.held(active_rows(statuses, read), plan),
 		queued: queued_entries(queue, overlay),
-		people: unreached_rows(overlay, true),
+		people: run_board_decision_rows.held(unreached_rows(overlay, true), plan),
 		unreached: unreached_rows(overlay, false),
-		earlier: run_board_earlier
-			.rows_of(earlier, statuses, read)
-			.filter((row) => !current.waiting_numbers.has(row.number)),
+		blockers: blocker_rows(overlay, earlier_rows),
+		earlier: earlier_rows,
 	}
 }
 
@@ -223,13 +252,6 @@ function local_layout_of(
 	}
 }
 
-// The run's scope a lane is checked against — its running issues too, which no wave holds.
-function numbers_of(plan: BoardPlan): ReadonlySet<number> {
-	const running = plan.waves.running ?? []
-
-	return new Set([...children_of(plan), ...running].map((child) => child.number))
-}
-
 // The queued rows, an epic's children among them.
 function queued_rows(layout: BoardLayout): Array<BoardRow> {
 	return layout.queued.flatMap((entry) => (entry.kind === 'row' ? [entry.row] : entry.rows))
@@ -243,15 +265,21 @@ function rows_of(layout: BoardLayout): Array<BoardRow> {
 // Every row the frame draws — the root checkout's single run's, the counted ones and the earlier run's
 // lanes — what the legend reads.
 function drawn_rows(layout: BoardLayout): Array<BoardRow> {
-	return [layout.root?.row ?? [], rows_of(layout), layout.earlier ?? []].flat()
+	return [
+		layout.root?.row ?? [],
+		rows_of(layout),
+		layout.blockers ?? [],
+		layout.earlier ?? [],
+	].flat()
 }
 
-// Every row waiting on a person's decision: the touched children parked on one, then the untouched
-// `needs-decision` children — what the 🙋 section draws and the header counts as a person's.
+// Every row waiting on a person: the touched children parked on a decision, the untouched children a
+// stop names, then the blockers outside the run a person acts on — what the 🙋 section draws and the
+// header and the now line count as a person's.
 function people_of(layout: BoardLayout): Array<BoardRow> {
 	const asked = layout.active.filter((row) => row.state === 'human')
 
-	return [...asked, ...layout.people]
+	return [...asked, ...layout.people, ...(layout.blockers ?? [])]
 }
 
 // The root checkout's single run's row, the run's own rows `apart` does not name, then the earlier
@@ -304,6 +332,7 @@ export {
 	type BoardLayout,
 	type BoardPlan,
 	type BoardRow,
+	type DecisionBlocker,
 	type Overlay,
 	type QueuedEntry,
 	type ReasonOf,

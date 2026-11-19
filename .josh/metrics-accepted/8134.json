@@ -1,0 +1,7 @@
+{
+	"reason": "#8134 posts the run:board local read early: an optional on_local hook in gather and a posted_round helper in the worker thread",
+	"date": "2026-11-19",
+	"growth": {
+		"scripts.code_lines": 27
+	}
+}

@@ -82,7 +82,7 @@ describe('human merge workers sharing the board occupancy snapshot', () => {
 		},
 	)
 
-	it('moves a worker that released its seat into waiting only (ac-5e685f6f)', async () => {
+	it('moves a worker that released its seat into the decision section only (ac-5e685f6f)', async () => {
 		arrange_lane('current')
 		vi.mocked(lane_spent.idle_lanes).mockReturnValue([WORKING])
 		const frame = await frame_of()
@@ -90,7 +90,7 @@ describe('human merge workers sharing the board occupancy snapshot', () => {
 
 		expect(rows).toHaveLength(1)
 		expect(rows[0]).toContain('🔏')
-		expect(rows[0]).toContain('PR 1')
+		expect(rows[0]).toContain('→ merge PR #1')
 		expect(lane_section(frame)).not.toContain(TITLE)
 	})
 })
