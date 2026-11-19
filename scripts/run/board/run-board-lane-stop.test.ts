@@ -106,15 +106,19 @@ describe('run_board_lane_stop.label_stop', () => {
 		expect(run_board_lane_stop.label_stop(undefined)).toBeUndefined()
 	})
 
-	it.each([NEEDS_HUMAN_MERGE_LABEL, ALREADY_DONE_LABEL])(
-		'names %s, not run:release, for a child still holding in-progress',
-		(parked) => {
-			expect(run_board_lane_stop.label_stop([IN_PROGRESS_LABEL, parked])).toStrictEqual({
-				state: STOPPED,
-				reason: parked,
-			})
-		},
-	)
+	it('names already-done, not run:release, for a child still holding in-progress', () => {
+		expect(run_board_lane_stop.label_stop([IN_PROGRESS_LABEL, ALREADY_DONE_LABEL])).toStrictEqual({
+			state: STOPPED,
+			reason: ALREADY_DONE_LABEL,
+		})
+	})
+
+	// joshuafolkken/kit#8026: a merge wait is a person's to act on, so it reads as the 🙋 human stop.
+	it('reads needs-human-merge as a human stop for a child still holding in-progress', () => {
+		expect(
+			run_board_lane_stop.label_stop([IN_PROGRESS_LABEL, NEEDS_HUMAN_MERGE_LABEL]),
+		).toStrictEqual({ state: 'human' })
+	})
 })
 
 describe('run_board_lane_stop.label_settled', () => {
