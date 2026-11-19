@@ -1,0 +1,7 @@
+{
+	"reason": "The gather worker now assembles BoardDisplay and posts it (Seed/Handed types, carried display) and tests pin the post size and cue, so the board main thread draws only the last display",
+	"date": "2026-11-19",
+	"growth": {
+		"scripts.code_lines": 63
+	}
+}

@@ -206,4 +206,4 @@ function assemble_display(
 const run_board_display = { activity_here, assemble_display, closed_under }
 
 export { run_board_display }
-export type { BoardDisplay, DisplayHeader }
+export type { BoardDisplay, Carried, DisplayHeader }

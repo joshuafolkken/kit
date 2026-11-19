@@ -1,4 +1,5 @@
 import { stripVTControlCharacters } from 'node:util'
+import { serialize } from 'node:v8'
 import { launch_timing } from '#scripts/lane/launch-timing'
 import { ts_entry_loader } from '#scripts/run/ts-entry-loader'
 import { describe, expect, it, vi } from 'vitest'
@@ -13,6 +14,8 @@ import {
 	type RoundState,
 	type WorkerSeed,
 } from './run-board-gather-thread'
+import type { CueName } from './run-board-sound-cues'
+import type { BoardGather } from './run-board-state'
 import { run_board_tick } from './run-board-tick'
 
 // joshuafolkken/kit#4267: a live board's reads come from a worker thread; a redraw draws the last round
@@ -24,14 +27,25 @@ const { gather_round, post_of, worker_gatherer, worker_options } = run_board_gat
 
 const WORKER_PHASE = { name: 'machine', ms: 7 }
 const { FRESH_STATE, tick } = run_board_tick
-const FAILED_MS = START + 1000
+const SECOND_MS = 1000
+const FAILED_MS = START + SECOND_MS
 const READ: GatherState = { ...FRESH_GATHER, local: LOCAL, read_ms: START }
-// READ as the board receives it from a round that posted no data.
-const RECEIVED = {
-	...read_of(READ),
-	data: undefined,
-	read_failed_ms: undefined,
-	read_error: undefined,
+
+// What the worker hands over for `read` on a fresh board: its frame assembled, the run's read kept.
+function handed(read: GatherState): GatherPost {
+	const data = { ...FIRST_ROUND.data, ...read_of(read) }
+
+	return post_of(FIRST_ROUND.board, read, data, START).post
+}
+
+const POST = handed(READ)
+const FRAME = { header: expect.objectContaining({ layout: expect.anything() }) }
+
+// POST with the frame sounding `cue`.
+function cued(cue: CueName | undefined): GatherPost {
+	if (POST.display === undefined) throw new Error('no frame')
+
+	return { ...POST, display: { ...POST.display, cue } }
 }
 
 const FAILED_READ = new RegExp(String.raw`❗ ${WORDS.read} \d{2}:\d{2}`, 'u')
@@ -97,7 +111,7 @@ describe('run_board_gather_thread.worker_gatherer over spawner', () => {
 		})
 		const first = worker_gatherer(run_board_gather_thread.spawner(setup))('background')
 
-		worker.emit('message', post_of(FRESH_GATHER, READ))
+		worker.emit('message', POST)
 		await first
 		expect(worker_spawn).toHaveBeenCalledWith(run_board_gather_thread.WORKER_URL, {
 			execArgv: ts_entry_loader.loader_argv(process.execArgv),
@@ -108,42 +122,85 @@ describe('run_board_gather_thread.worker_gatherer over spawner', () => {
 })
 
 describe('run_board_gather_thread.worker_gatherer', () => {
-	it('waits for the worker’s first round, then draws the last one handed over', async () => {
+	it('waits for the worker’s first round, then draws the frame it handed over', async () => {
 		const { gather, spawned } = faked()
 		const first = gather('background')
 
-		spawned[0]?.emit('message', post_of(FRESH_GATHER, READ))
+		spawned[0]?.emit('message', POST)
 
-		await expect(first).resolves.toStrictEqual(RECEIVED)
+		await expect(first).resolves.toMatchObject({ local: undefined, display: FRAME })
 		expect(spawned[0]?.unref).toHaveBeenCalledOnce()
 	})
 
-	it('keeps the last run read when a round hands over no new one', async () => {
+	it('keeps the last frame, said failed, when the worker throws, and starts another next redraw', async () => {
 		const { gather, spawned } = faked()
 		const first = gather('background')
 
-		spawned[0]?.emit('message', post_of(FRESH_GATHER, READ))
-		await first
-		spawned[0]?.emit('message', post_of(READ, { ...READ, budget_waits: [] }))
-
-		expect(post_of(READ, READ).local).toBeUndefined()
-		await expect(gather('background')).resolves.toMatchObject({ local: LOCAL })
-	})
-
-	it('keeps the last round, said failed, when the worker throws, and starts another next redraw', async () => {
-		const { gather, spawned } = faked()
-		const first = gather('background')
-
-		spawned[0]?.emit('message', post_of(FRESH_GATHER, READ))
+		spawned[0]?.emit('message', POST)
 		await first
 		spawned[0]?.emit('error', new Error('read failed\n    at stack'))
 
 		await expect(gather('background')).resolves.toMatchObject({
-			local: LOCAL,
+			display: FRAME,
 			read_failed_ms: FAILED_MS,
 			read_error: 'read failed',
 		})
 		expect(spawned).toHaveLength(2)
+	})
+})
+
+const FEW_EVENTS = 10
+const MANY_EVENTS = 15_000
+
+// READ over a stream of `count` events that draw no row of their own.
+function streamed(count: number): GatherState {
+	const at = new Date(START).toISOString()
+	const events = Array.from({ length: count }, (_, pos) => ({ pos, at, kind: 'tick', text: 'x' }))
+
+	return { ...READ, local: { ...LOCAL, events } }
+}
+
+// joshuafolkken/kit#8160: the run's read stays on the worker; the board receives only the frame.
+describe('run_board_gather_thread.post_of', () => {
+	it('hands the frame over without the run read or its events', () => {
+		expect(POST).toMatchObject({ read: { local: undefined }, display: FRAME })
+		expect(JSON.stringify(POST)).not.toContain('"events"')
+	})
+
+	it('hands over the same size for 10 events as for 15,000 drawing the same rows', () => {
+		const sizes = [FEW_EVENTS, MANY_EVENTS].map(
+			(count) => serialize(handed(streamed(count))).length,
+		)
+
+		expect(sizes[1]).toBe(sizes[0])
+	})
+
+	it('hands no frame over before a run starts', () => {
+		expect(handed(FRESH_GATHER).display).toBeUndefined()
+	})
+})
+
+describe('run_board_gather_thread.worker_gatherer, the frame’s cue', () => {
+	it('sounds a frame’s cue on one redraw only', async () => {
+		const { gather, spawned } = faked()
+		const first = gather('background')
+
+		spawned[0]?.emit('message', cued('launch'))
+
+		await expect(first).resolves.toMatchObject({ display: { cue: 'launch' } })
+		await expect(gather('background')).resolves.toMatchObject({ display: { cue: undefined } })
+	})
+
+	it('keeps a cue no redraw has sounded when the round’s end hands over none', async () => {
+		const { gather, spawned } = faked()
+		const first = gather('background')
+
+		spawned[0]?.emit('message', cued(undefined))
+		await first
+		spawned[0]?.emit('message', cued('launch'))
+		spawned[0]?.emit('message', cued(undefined))
+
+		await expect(gather('background')).resolves.toMatchObject({ display: { cue: 'launch' } })
 	})
 })
 
@@ -162,74 +219,13 @@ describe('run_board_gather_thread.worker_gatherer before a first round', () => {
 	})
 })
 
-// The same stream as the worker reads it again: an equal array, cloned across the thread.
-const EVENTS = [{ pos: 0, at: new Date(START).toISOString(), kind: 'setup', text: 'go' }]
-const STREAM: GatherState = { ...READ, local: { ...LOCAL, events: EVENTS } }
-const AGAIN: GatherState = {
-	...STREAM,
-	local: { ...LOCAL, events: [...EVENTS] },
-	read_ms: FAILED_MS,
-}
-const GROWN: GatherState = { ...AGAIN, local: { ...LOCAL, events: [...EVENTS, ...EVENTS] } }
-
-describe('run_board_gather_thread.worker_gatherer over a stream read again', () => {
-	it('keeps its own stream array when the worker reads the same stream again', async () => {
-		const { gather, spawned } = faked()
-		const first = gather('background')
-
-		spawned[0]?.emit('message', structuredClone(post_of(FRESH_GATHER, STREAM)))
-		const { local } = await first
-
-		spawned[0]?.emit('message', structuredClone(post_of(STREAM, AGAIN)))
-		const again = await gather('background')
-
-		expect(again.local?.events).toBe(local?.events)
-		expect(again.read_ms).toBe(FAILED_MS)
-	})
-
-	it('takes a stream read again with more events', async () => {
-		const { gather, spawned } = faked()
-		const first = gather('background')
-
-		spawned[0]?.emit('message', structuredClone(post_of(FRESH_GATHER, STREAM)))
-		await first
-		spawned[0]?.emit('message', structuredClone(post_of(STREAM, GROWN)))
-
-		await expect(gather('background')).resolves.toMatchObject({ local: GROWN.local })
-	})
-})
-
-// joshuafolkken/kit#8135: a reread is told apart by its length and its last event, not a whole walk.
-const RETOLD = { pos: 0, at: new Date(START).toISOString(), kind: 'setup', text: 'went' }
-const SAME_COUNT: GatherState = { ...AGAIN, local: { ...LOCAL, events: [RETOLD] } }
-
-describe('run_board_gather_thread.post_of over a stream read again', () => {
-	it('hands over a stream of the same length whose last event differs', () => {
-		expect(post_of(STREAM, SAME_COUNT).local).toStrictEqual({ value: SAME_COUNT.local })
-	})
-
-	it('says an equal stream read afresh past a line without its newline is the same', () => {
-		expect(post_of(STREAM, AGAIN).local?.is_same_events).toBe(true)
-	})
-
-	it('says the same stream array read again is the same', () => {
-		expect(post_of(STREAM, { ...STREAM, read_ms: FAILED_MS }).local?.is_same_events).toBe(true)
-	})
-
-	it('hands over a longer stream that ends on the same event', () => {
-		const LONGER: GatherState = { ...AGAIN, local: { ...LOCAL, events: [RETOLD, ...EVENTS] } }
-
-		expect(post_of(STREAM, LONGER).local).toStrictEqual({ value: LONGER.local })
-	})
-})
-
 describe('run_board_gather_thread phases', () => {
 	it("marks the worker's first answer and the phases its round carried on the board's thread", async () => {
 		launch_timing.clear()
 		const { gather, spawned } = faked()
 		const first = gather('background')
 
-		spawned[0]?.emit('message', { ...post_of(FRESH_GATHER, READ), phases: [WORKER_PHASE] })
+		spawned[0]?.emit('message', { ...POST, phases: [WORKER_PHASE] })
 		await first
 
 		expect(launch_timing.phases()).toStrictEqual([
@@ -276,19 +272,19 @@ function held_round(): HeldRound {
 
 // joshuafolkken/kit#8134: the run's read is handed over as it lands, not after the round's usages.
 describe('run_board_gather_thread.gather_round, the run read handed early', () => {
-	it('hands the run read over before the usages answer', async () => {
+	it('hands the run read’s frame over before the usages answer', async () => {
 		const { posts, release, round } = held_round()
 
 		await vi.waitFor(() => {
 			expect(posts).toHaveLength(1)
 		})
-		expect(posts[0]).toMatchObject({ local: { value: LOCAL } })
+		expect(posts[0]).toMatchObject({ read: { local: undefined }, display: FRAME })
 		expect(posts[0]).not.toHaveProperty('phases')
 		release()
 		await round
 	})
 
-	it('hands the round’s end over without the run read or the phases twice', async () => {
+	it('hands the round’s end over with its frame, the phases once', async () => {
 		launch_timing.clear()
 		const { posts, release, round } = held_round()
 
@@ -296,11 +292,11 @@ describe('run_board_gather_thread.gather_round, the run read handed early', () =
 		await round
 
 		expect(posts).toHaveLength(2)
-		expect(posts[1]).toMatchObject({ local: undefined })
+		expect(posts[1]).toMatchObject({ read: { local: undefined }, display: FRAME })
 		expect(posts.filter((post) => 'phases' in post)).toHaveLength(1)
 	})
 
-	it('keeps the run read handed early once the round’s end arrives', async () => {
+	it('draws the round’s frame once the round’s end arrives', async () => {
 		const { posts, release, round } = held_round()
 		const { gather, spawned } = faked()
 		const first = gather('background')
@@ -310,7 +306,37 @@ describe('run_board_gather_thread.gather_round, the run read handed early', () =
 		for (const post of posts) spawned[0]?.emit('message', post)
 		await first
 
-		await expect(gather('background')).resolves.toMatchObject({ local: LOCAL })
+		await expect(gather('background')).resolves.toMatchObject({ local: undefined, display: FRAME })
+	})
+})
+
+// The board's read of POST, handed over again on each redraw with no new frame.
+async function handed_again(): Promise<BoardGather> {
+	return await { ...POST.read, ...POST }
+}
+
+// joshuafolkken/kit#8160: the board draws the frame the worker handed over, its clock its own.
+describe('run_board_tick.tick over a frame the worker handed over', () => {
+	it('moves the elapsed time and the spinner each redraw with no new frame handed over', async () => {
+		const { ports, frames, clock } = harness(undefined, [])
+		const live = { ...ports, gather: handed_again }
+		const drawn = await tick(FRESH_STATE, live)
+
+		clock.now_ms += SECOND_MS
+		await tick(drawn, live)
+
+		expect(frames).toHaveLength(2)
+		expect(frames[1]).not.toBe(frames[0])
+	})
+
+	it('draws the handed frame, not the no-run frame its own empty read would', async () => {
+		const empty = harness(undefined, [])
+		const { ports, frames } = harness(undefined, [])
+
+		await tick(FRESH_STATE, empty.ports)
+		await tick(FRESH_STATE, { ...ports, gather: handed_again })
+
+		expect(frames[0]).not.toBe(empty.frames[0])
 	})
 })
 
