@@ -1,5 +1,5 @@
 import { stripVTControlCharacters } from 'node:util'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_board_cli } from './run-board-cli'
 import { run_board_fixture, type Harness } from './run-board-fixture'
 import { run_board_intro } from './run-board-intro'
@@ -12,6 +12,16 @@ import { run_board_typing } from './run-board-typing'
 // `run-board-tick.test.ts`'s (joshuafolkken/kit#3444).
 
 const { LOCAL, SPINNING, START, STOPPED, harness, plan_titled } = run_board_fixture
+
+// A theme colors every write where color is on (`FORCE_COLOR` in the gate's environment), so the
+// screen's control bytes are compared with color off.
+beforeEach(() => {
+	vi.stubEnv('FORCE_COLOR', '0')
+})
+
+afterEach(() => {
+	vi.unstubAllEnvs()
+})
 const ESCAPE = '\u{1B}'
 const ENTER = `${ESCAPE}[?1049h${ESCAPE}[?25l`
 const LEAVE = `${ESCAPE}[?25h${ESCAPE}[?1049l`
@@ -149,8 +159,8 @@ describe('run_board_cli.run screen', () => {
 		await expect(run_board_cli.run([], ports)).rejects.toBe(STOPPED)
 		expect(frames[0]).toBe(ENTER)
 		expect(frames.slice(1, -1).map((frame) => frame.split(RUN_MARK, 1)[0])).toStrictEqual([
-			`${ESCAPE}[H${ESCAPE}[J`,
-			`${ESCAPE}[H${ESCAPE}[J`,
+			`${ESCAPE}[?2026h${ESCAPE}[H${ESCAPE}[K`,
+			`${ESCAPE}[?2026h${ESCAPE}[H${ESCAPE}[K`,
 		])
 		expect(frames.at(-1)).toBe(LEAVE)
 		leaves[0]?.()
@@ -276,9 +286,11 @@ describe('run_board_cli.run plan read', () => {
 })
 
 // joshuafolkken/kit#3495: a live board redraws on each second and only turns its spinners in between.
-const HOME = `${ESCAPE}[H${ESCAPE}[J`
-// eslint-disable-next-line no-control-regex -- a turn is made of control characters
-const TURN = /^(?:\u{1B}\[\d+;\d+H(?:\u{1B}\[[\d;]*m)*.\u{1B}\[0m)+$/u
+// joshuafolkken/kit#8125: each frame and each turn in synchronized output.
+const HOME = `${ESCAPE}[?2026h${ESCAPE}[H`
+const TURN =
+	// eslint-disable-next-line no-control-regex -- a turn is made of control characters
+	/^\u{1B}\[\?2026h(?:\u{1B}\[\d+;\d+H(?:\u{1B}\[[\d;]*m)*.\u{1B}\[0m)+\u{1B}\[\?2026l$/u
 const PACED_MS = 2000
 
 // Ports whose sleeps move the clock, stopping the board once `PACED_MS` have passed, and every write
