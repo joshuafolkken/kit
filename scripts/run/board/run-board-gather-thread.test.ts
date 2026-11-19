@@ -9,19 +9,28 @@ import {
 	type FailedPost,
 	type GatherPost,
 	type GatherWorker,
+	type RoundState,
 } from './run-board-gather-thread'
 import { run_board_tick } from './run-board-tick'
 
 // joshuafolkken/kit#4267: a live board's reads come from a worker thread; a redraw draws the last round
 // it handed over, and a worker that dies is said on the board and started again on the next redraw.
 
-const { LOCAL, START, WORDS, harness, plan_titled } = run_board_fixture
+const { FIRST_ROUND, LOCAL, START, WORDS, harness, plan_titled, round_ports } = run_board_fixture
 const { FRESH_GATHER, read_of } = run_board_gather
 const { gather_round, post_of, worker_gatherer, worker_options } = run_board_gather_thread
+
 const WORKER_PHASE = { name: 'machine', ms: 7 }
 const { FRESH_STATE, tick } = run_board_tick
 const FAILED_MS = START + 1000
 const READ: GatherState = { ...FRESH_GATHER, local: LOCAL, read_ms: START }
+// READ as the board receives it from a round that posted no data.
+const RECEIVED = {
+	...read_of(READ),
+	data: undefined,
+	read_failed_ms: undefined,
+	read_error: undefined,
+}
 
 const FAILED_READ = new RegExp(String.raw`❗ ${WORDS.read} \d{2}:\d{2}`, 'u')
 
@@ -87,6 +96,7 @@ describe('run_board_gather_thread.worker_gatherer with its default spawn', () =>
 		await first
 		expect(worker_spawn).toHaveBeenCalledWith(run_board_gather_thread.WORKER_URL, {
 			execArgv: ts_entry_loader.loader_argv(process.execArgv),
+			workerData: undefined,
 		})
 	})
 })
@@ -98,11 +108,7 @@ describe('run_board_gather_thread.worker_gatherer', () => {
 
 		spawned[0]?.emit('message', post_of(FRESH_GATHER, READ))
 
-		await expect(first).resolves.toStrictEqual({
-			...read_of(READ),
-			read_failed_ms: undefined,
-			read_error: undefined,
-		})
+		await expect(first).resolves.toStrictEqual(RECEIVED)
 		expect(spawned[0]?.unref).toHaveBeenCalledOnce()
 	})
 
@@ -231,7 +237,7 @@ describe('run_board_gather_thread phases', () => {
 		launch_timing.mark(WORKER_PHASE.name, WORKER_PHASE.ms)
 		const posts: Array<unknown> = []
 
-		await gather_round(FRESH_GATHER, harness(LOCAL, []).gathering, (value) => {
+		await gather_round(FIRST_ROUND, round_ports(harness(LOCAL, [])), (value) => {
 			posts.push(value)
 		})
 
@@ -242,7 +248,7 @@ describe('run_board_gather_thread phases', () => {
 interface HeldRound {
 	posts: Array<GatherPost | FailedPost>
 	release: () => void
-	round: Promise<GatherState>
+	round: Promise<RoundState>
 }
 
 // A round whose usages hold until `release`, each post kept in `posts`.
@@ -253,9 +259,9 @@ function held_round(): HeldRound {
 			resolve(undefined)
 		}
 	})
-	const ports = { ...harness(LOCAL, []).gathering, read_usage: async () => await held }
+	const ports = { ...round_ports(harness(LOCAL, [])), read_usage: async () => await held }
 	const posts: Array<GatherPost | FailedPost> = []
-	const round = gather_round(FRESH_GATHER, ports, (value) => {
+	const round = gather_round(FIRST_ROUND, ports, (value) => {
 		posts.push(value)
 	})
 

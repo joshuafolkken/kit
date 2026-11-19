@@ -1,0 +1,7 @@
+{
+	"reason": "The child resolves the built CLI bundle from this package and the CLI's guard accepts that bundle path, replacing the tsx source launch (#8203)",
+	"date": "2026-11-19",
+	"growth": {
+		"scripts.code_lines": 31
+	}
+}

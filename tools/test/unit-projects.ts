@@ -82,6 +82,12 @@ const MAIN_EXCLUDE: ReadonlyArray<string> = ['scripts/build/packed-consumer.test
 // the scope sets it itself. The key is `run_startup.ENVIRONMENT_KEY`, which the suite pins; importing
 // it here would pull the startup store into the config's import graph.
 const STARTUP_SCOPE_KEY = 'JOSH_STARTUP_SCOPE'
+//
+// **The board theme is blanked as well** (joshuafolkken/kit#8214): a session exporting
+// `JOSH_BOARD_THEME=wargames` restyled every `run:board` frame the CLI suites compare, so the gate failed
+// there alone. A suite about the theme sets it itself. The key is `run_board_theme.THEME_ENV`, which the
+// suite pins, kept a string for the same import-graph reason.
+const BOARD_THEME_KEY = 'JOSH_BOARD_THEME'
 const SHIP_MARK = /^JOSH_SHIP_[A-Z0-9_]+$/u
 const PROFILE_KEY = /^JOSH_[A-Z0-9_]+_(?:MODEL|EFFORT)$/u
 
@@ -115,6 +121,7 @@ function unit_environment(source: EnvironmentSource): Record<string, string> {
 		JOSH_REVIEWER_PAIRED: '',
 		JOSH_SHIP_SUPERVISED: '',
 		[STARTUP_SCOPE_KEY]: '',
+		[BOARD_THEME_KEY]: '',
 	}
 }
 

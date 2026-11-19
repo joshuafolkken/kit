@@ -3,7 +3,7 @@ import type { ClosedAnswer, ClosedIssue } from './run-board-closed'
 import type { Fetch } from './run-board-fetch'
 import type { SectionKey, TerminalSize } from './run-board-fit'
 import type { FrameStore } from './run-board-frame-store'
-import type { Gatherer, GatherRead } from './run-board-gather'
+import type { GatherRead } from './run-board-gather'
 import type { BoardForm } from './run-board-header'
 import type { Notice } from './run-board-header-notice'
 import { run_board_idle } from './run-board-idle'
@@ -33,8 +33,8 @@ type StallStage = 'redraw' | 'record' | 'turn'
 interface BoardPorts {
 	read_plan: (scope: NamedPlan) => Promise<BoardPlan | undefined>
 	// The reads off this machine a redraw draws from (`run-board-gather.ts`): a live board's come from
-	// a worker thread, so no read stops its spinner.
-	gather: Gatherer
+	// a worker thread, so no read stops its spinner, with the GitHub reads it folded over them.
+	gather: (pace: Pace) => Promise<BoardGather>
 	// The issues that answered as closed, and whether every issue answered (`run-board-closed.ts`).
 	read_closed: (issues: ReadonlyArray<number>) => Promise<ClosedAnswer>
 	// Where the last GitHub reads are kept between boards (`run-board-snapshot.ts`); none keeps nothing.
@@ -149,6 +149,26 @@ interface BoardView {
 
 type BoardState = BoardData & BoardView
 
+// The reads a step of `BoardData` takes off GitHub and the disk (`run-board-data.ts`): a live board's
+// on its worker thread, a single frame's where it draws.
+type DataPorts = Pick<
+	BoardPorts,
+	'read_plan' | 'read_closed' | 'snapshot' | 'read_thanks' | 'read_rate_limit' | 'read_issue_count'
+>
+
+// The reads a board folds in on a later step, which hold a promise and so stay on the thread that launched them.
+type FetchKey =
+	'plan_fetch' | 'closed_fetch' | 'thanks_fetch' | 'rate_limit_fetch' | 'issue_count_fetch'
+
+// `BoardData` as the worker thread posts it beside its reads off this machine: each read in flight
+// named rather than held.
+type DataPost = Omit<BoardData, keyof GatherRead | FetchKey> & {
+	in_flight: ReadonlyArray<FetchKey>
+}
+
+// What a redraw gathers: the reads off this machine, and on a live board the data its worker folded over them.
+type BoardGather = GatherRead & { data?: DataPost | undefined }
+
 const FRESH_DATA: BoardData = {
 	local: undefined,
 	read_ms: undefined,
@@ -194,4 +214,17 @@ function is_due(last_ms: number | undefined, interval_ms: number, now_ms: number
 const run_board_state = { FRESH_DATA, FRESH_STATE, FRESH_VIEW, is_due }
 
 export { run_board_state }
-export type { BoardData, BoardPorts, BoardState, BoardView, DrawKind, DrawTimer, Pace, StallStage }
+export type {
+	BoardData,
+	BoardGather,
+	BoardPorts,
+	BoardState,
+	BoardView,
+	DataPorts,
+	DataPost,
+	DrawKind,
+	DrawTimer,
+	FetchKey,
+	Pace,
+	StallStage,
+}

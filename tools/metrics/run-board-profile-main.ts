@@ -7,10 +7,13 @@ import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { lane_process_table } from '#scripts/lane/lane-process-table'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_board_cli } from '#scripts/run/board/run-board-cli'
+import { run_board_data } from '#scripts/run/board/run-board-data'
+import { run_board_data_ports } from '#scripts/run/board/run-board-data-ports'
 import { run_board_every } from '#scripts/run/board/run-board-every'
 import { run_board_frame_store } from '#scripts/run/board/run-board-frame-store'
 import { run_board_gather, type GatherRead } from '#scripts/run/board/run-board-gather'
 import { run_board_gather_live } from '#scripts/run/board/run-board-gather-live'
+import { run_board_gather_thread } from '#scripts/run/board/run-board-gather-thread'
 import { run_board_ledger_window } from '#scripts/run/board/run-board-ledger-window'
 import { run_board_read } from '#scripts/run/board/run-board-read'
 import { run_board_records } from '#scripts/run/board/run-board-records'
@@ -57,8 +60,10 @@ async function settled(): Promise<Settled> {
 		snapshot: undefined,
 	}
 	const state = await run_board_tick.tick(run_board_tick.FRESH_STATE, ports, 'settled')
+	// Each redraw after it draws the data as the worker posts it, so no redraw steps it again.
+	const posted = { ...read, data: run_board_data.posted(state) }
 
-	return { read, ports, state }
+	return { read: posted, ports: { ...ports, gather: async () => posted }, state }
 }
 
 function redraw_piece(ports: BoardPorts, first: BoardState): Piece {
@@ -106,17 +111,21 @@ function redraw_pieces(from: Settled): Array<Piece> {
 	return [redraw_piece(from.ports, from.state), new_events_piece(from), record_piece(from)]
 }
 
-// One worker round, the whole of what the live board reads each second. The rounds run back to back,
+// One worker round, the whole of what the live board reads each second, with the GitHub, roster and
+// snapshot data stepped over it as the worker steps it. The rounds run back to back,
 // so the round's clock is moved a second per round: the local read then falls due on every fifth
 // round, as on the live board, rather than once in the whole measurement.
 function round_piece(): Piece {
 	const clock = { ms: Date.now() }
-	const ports = { ...run_board_gather_live.ports_of(true), now: () => clock.ms }
-	let state = run_board_gather.FRESH_GATHER
+	const live = { ...run_board_gather_live.ports_of(true), ...run_board_data_ports.live() }
+	const ports = { ...live, now: () => clock.ms }
+	let state = run_board_gather_thread.first_round()
 
 	async function run(): Promise<void> {
 		// eslint-disable-next-line require-atomic-updates -- measure_all awaits each run before the next
-		state = await run_board_gather.gather(state, ports, 'background')
+		state = await run_board_gather_thread.gather_round(state, ports, () => {
+			// The round is measured, not handed to a board.
+		})
 		clock.ms += MACHINE_SAMPLE_MS
 	}
 
