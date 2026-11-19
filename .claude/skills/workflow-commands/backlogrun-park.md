@@ -79,6 +79,7 @@ It never carries:
   (`prompts/collaboration-workflow/upstream-interrupt.md` → "実行中のリポジトリ自身のラン機構の不具合"),
   its filing carrying the `- 原因の park:` line when it parked or stopped an Issue (`issue-template.md` → I);
 - a wait on an open blocker or a start date — `run:merge` releases it (`run-merge-steps.ts`);
+- sampling a process hours apart — `docs/josh-commands-run.md` → "`josh run:observe`";
 - a mechanical failure — the driver applies `run:stalled` (`RUN_STALLED_LABEL` in `issue-labels.ts`)
   and re-offers the causes it can itself up to its auto-retry cap; any other or capped row →
   `run:add <N> --retry`
