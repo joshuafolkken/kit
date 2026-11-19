@@ -84,8 +84,8 @@ function reason_of(row: BoardRow, cut: number, header: BoardHeader): string {
 		: evidence_linked(text, url, header)
 }
 
-// The reason, then `🎯 —` for a row waiting on a person or parked, whose finish nothing measures
-// (joshuafolkken/kit#7920).
+// The reason, then `🎯 —` for a parked row, whose finish nothing measures (joshuafolkken/kit#7920); a
+// row waiting on a person ends on its reason (joshuafolkken/kit#8166).
 function tail_of(row: BoardRow, cut: number, header: BoardHeader): string {
 	// A running row's finish ends its own tail (`run-board-render-tail.ts`).
 	const is_held = row.state !== 'running' && run_board_estimate.is_finish_drawn(row, header)

@@ -20,6 +20,7 @@ import { test_related_select } from './test-related-select'
 import { test_related_synced } from './test-related-synced'
 import { test_related_touched } from './test-related-touched'
 import { test_related_verdict } from './test-related-verdict'
+import { unit_worker_share } from './unit-worker-share'
 import { whole_suite_narrowing } from './whole-suite-narrowing'
 
 // `josh test:related` — the unit check an implementation loop runs between edits.
@@ -362,7 +363,8 @@ async function run_fresh(
 	tree: GateTree | undefined,
 ): Promise<number> {
 	const root = await changed_file_scope.repository_root_or_cwd()
-	const before = command_arguments.length === 0 ? tree : undefined
+	const scoping = unit_worker_share.without_worker_flags(command_arguments)
+	const before = scoping.length === 0 ? tree : undefined
 	const input = await read_run_input(root, command_arguments, before)
 	// The branch change by half and base, for the ledger alone (joshuafolkken/kit#6982).
 	const branch_parts = await read_or_undefined(changed_paths.read_changed_parts)
@@ -377,10 +379,12 @@ async function run_fresh(
 }
 
 async function run_related_tests(given: ReadonlyArray<string>): Promise<number> {
-	return await test_related_verdict.run(given, async (before) =>
-		given.includes(test_related_touched.TOUCHED_FLAG)
-			? await run_touched(given)
-			: await run_fresh(given, before),
+	return await test_related_verdict.run(
+		unit_worker_share.without_worker_flags(given),
+		async (before) =>
+			given.includes(test_related_touched.TOUCHED_FLAG)
+				? await run_touched(given)
+				: await run_fresh(given, before),
 	)
 }
 
