@@ -616,7 +616,6 @@ const PURE_FILES: ReadonlyArray<string> = [
 	'scripts/run/board/run-board-fit.test.ts',
 	'scripts/run/board/run-board-fold.test.ts',
 	'scripts/run/board/run-board-found.test.ts',
-	'scripts/run/board/run-board-gather-live.test.ts',
 	'scripts/run/board/run-board-github.test.ts',
 	'scripts/run/board/run-board-header-columns.test.ts',
 	'scripts/run/board/run-board-header-estimate.test.ts',

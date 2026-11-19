@@ -93,6 +93,24 @@ describe('run_board_gather.gather, its result', () => {
 	})
 })
 
+// joshuafolkken/kit#8131: the waits read each claim's start off the round's snapshot.
+describe('run_board_gather.gather, the budget waits', () => {
+	it('hands the round’s process snapshot to the waits reader', async () => {
+		const { ports, release } = gated_ports()
+		const read_waits = vi.fn<NonNullable<GatherPorts['read_waits']>>(() => [])
+
+		release(run_board_fixture.LOCAL)
+		await run_board_gather.gather(
+			run_board_gather.FRESH_GATHER,
+			{ ...ports, read_waits },
+			'background',
+		)
+
+		expect(read_waits).toHaveBeenCalledExactlyOnceWith(TABLE)
+		expect(ports.read_table).toHaveBeenCalledOnce()
+	})
+})
+
 describe('run_board_gather.gather, a round after a sample', () => {
 	it('takes no sample before the machine is due again', async () => {
 		const { ports, release } = gated_ports()
