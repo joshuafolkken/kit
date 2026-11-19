@@ -112,6 +112,11 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: [BOARD_THEME],
 					description:
+						'colors each icon’s text by the state it marks, then resumes the cyan: red fault (`FL`), amber caution (`JG`), magenta a person’s turn (`DC`), green done (`OK`), bold white in progress (`RN`), dim cyan idle (`ZZ`), the rest cyan (tones in the glyph table, colors in `run-board-theme-tones.ts`). Text inside a color already drawn keeps it; no escapes without color.',
+				},
+				{
+					names: [BOARD_THEME],
+					description:
 						'ends the header’s first line on the alert level, `DEFCON 5 4 [3] 2 1`: the current level bracketed, green (5), amber (4, 3) or red (2, 1). The lowest level whose condition holds wins — 1 the run is stopped, out of its usage or failing its reads · 2 a person is asked to decide · 3 a `P1` waits while a lane is free · 4 more lanes run than the limit · 5 none of these.',
 				},
 				{
