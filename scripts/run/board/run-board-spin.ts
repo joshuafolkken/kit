@@ -7,6 +7,7 @@ import { run_board_row_key } from './run-board-row-key'
 import { run_board_screen } from './run-board-screen'
 import { run_board_spot } from './run-board-spot'
 import type { BoardPorts } from './run-board-state'
+import { run_board_sweep, type Sweep } from './run-board-sweep'
 import { run_board_timing } from './run-board-timing'
 import { run_board_type_rows, type KeyedLine, type Typing } from './run-board-type-rows'
 
@@ -15,9 +16,11 @@ import { run_board_type_rows, type KeyedLine, type Typing } from './run-board-ty
 // at the package's interval: a cursor move and one character each, with no read, layout or render. The
 // renderer draws a placeholder where a spinner goes, and each placeholder's place on screen — its row
 // after the lines above it wrap, its column by display width — is recorded as the frame is written. A
-// row the frame was cut to the terminal's rows without is not on screen, so it records nothing.
+// row the frame was cut to the terminal's rows without is not on screen, so it records nothing. The
+// sweep under the elapsed time (`run-board-sweep.ts`) is placed the same way, by its own placeholder.
 
-const { SPOT } = run_board_spot
+const { SPOT, TICK } = run_board_spot
+const { SWEEP_MS, sweep_bytes, sweep_index } = run_board_sweep
 const REDRAW_MS = MS_PER_SECOND
 const CSI = '\u{1B}['
 const RESET = `${CSI}0m`
@@ -33,17 +36,32 @@ interface Spot {
 	style: string
 }
 
-// The frame's lines as written, its spinners' spots and its keyed rows on screen, without their keys.
+// The frame's lines as written, its spinners' spots, its keyed rows on screen, without their keys, and
+// the sweep where the frame has room for one.
 interface Spun {
 	lines: Array<string>
 	spots: Array<Spot>
 	keyed: Array<KeyedLine>
+	sweep: Sweep | undefined
 }
 
-// What is written between redraws: the spinners turned and the rows typing.
+// What is written between redraws: the spinners turned, the sweep moved and the rows typing.
 interface Turning {
 	spots: ReadonlyArray<Spot>
 	typing: Typing
+	sweep?: Sweep | undefined
+}
+
+// What changed since the last turn was written: the spinner's frame, the sweep's cell.
+interface Turned {
+	is_turned: boolean
+	is_swept: boolean
+}
+
+// The spinner's frame and the sweep's cell at a moment, compared turn to turn.
+interface Moment {
+	frame: string
+	cell: number
 }
 
 type SpinPorts = Pick<BoardPorts, 'now' | 'sleep' | 'write' | 'time_draw'>
@@ -105,8 +123,24 @@ function can_type(line: KeyedLine, rows: number, columns: number): boolean {
 	return line.row <= rows && run_board_fit.height_of(line.text, columns) === 1
 }
 
+// The sweep under the line the `″` placeholder is drawn in, where the line below it has room for one.
+function sweep_in(
+	lines: ReadonlyArray<string>,
+	starts: ReadonlyArray<number>,
+	size: { rows: number; columns: number },
+): Sweep | undefined {
+	const index = lines.findIndex((line) => line.includes(TICK))
+	const line = lines[index]
+
+	if (line === undefined) return undefined
+	const { column } = spot_at(line, line.indexOf(TICK), starts[index] ?? 1, size.columns)
+	const row_below = starts[index + 1] ?? Infinity
+
+	return run_board_sweep.sweep_of({ row_below, column, line_below: lines[index + 1] }, size)
+}
+
 // The frame with each placeholder drawn as `frame` and each key taken out, every placeholder's spot on
-// screen and the keyed rows that can type.
+// screen, the keyed rows that can type and the sweep.
 function spun(lines: ReadonlyArray<string>, frame: string, size?: TerminalSize): Spun {
 	const columns = Math.max(1, size?.columns ?? Infinity)
 	const rows = size?.rows ?? Infinity
@@ -118,6 +152,7 @@ function spun(lines: ReadonlyArray<string>, frame: string, size?: TerminalSize):
 		lines: drawn.lines,
 		spots: spots.filter((spot) => spot.row <= rows),
 		keyed: drawn.keyed.filter((line) => can_type(line, rows, columns)),
+		sweep: sweep_in(lines, starts, { rows, columns }),
 	}
 }
 
@@ -133,35 +168,56 @@ function boundary_after(now_ms: number, interval_ms: number): number {
 	return now_ms - (now_ms % interval_ms) + interval_ms
 }
 
-// The next moment the spinner turns or, while a row types, its next letter is due — whichever comes
-// first, so neither paces the other — but never past `until_ms`.
+// The next moment the spinner turns, the sweep moves or, while a row types, its next letter is due —
+// whichever comes first, so none paces the others — but never past `until_ms`.
 function next_turn(now_ms: number, until_ms: number, turning: Turning): number {
 	const turn_ms = boundary_after(now_ms, SPINNER_INTERVAL_MS)
 	const letter_ms = turning.typing.lines.length > 0 ? boundary_after(now_ms, LETTER_MS) : Infinity
+	const sweep_ms = turning.sweep === undefined ? Infinity : boundary_after(now_ms, SWEEP_MS)
 
-	return Math.min(turn_ms, letter_ms, until_ms)
+	return Math.min(turn_ms, letter_ms, sweep_ms, until_ms)
 }
 
-// The spinners turned when their frame changed, then the rows typing written over them, in one
-// synchronized write (joshuafolkken/kit#8125).
-function turn_bytes(turning: Turning, at_ms: number, is_turned: boolean): string {
-	const spin = is_turned ? spin_bytes(turning.spots, spinner_of(at_ms)) : ''
+// The spinners turned when their frame changed, the sweep when its cell did, then the rows typing
+// written over them, in one synchronized write (joshuafolkken/kit#8125).
+function turn_bytes(turning: Turning, at_ms: number, turned: Turned): string {
+	const spin = turned.is_turned ? spin_bytes(turning.spots, spinner_of(at_ms)) : ''
+	const { sweep } = turning
+	const swept = sweep !== undefined && turned.is_swept ? sweep_bytes(sweep, at_ms) : ''
 
-	return run_board_screen.synced(`${spin}${run_board_type_rows.type_bytes(turning.typing, at_ms)}`)
+	return run_board_screen.synced(
+		`${spin}${swept}${run_board_type_rows.type_bytes(turning.typing, at_ms)}`,
+	)
 }
 
 // The turn built and written, timed as a turn where `--timing` times draws.
-function write_turn(turning: Turning, ports: SpinPorts, at_ms: number, is_turned: boolean): void {
+function write_turn(turning: Turning, ports: SpinPorts, at_ms: number, turned: Turned): void {
 	run_board_timing.drawn(ports, 'turn', () => {
-		ports.write(turn_bytes(turning, at_ms, is_turned))
+		ports.write(turn_bytes(turning, at_ms, turned))
 	})
 }
 
-// joshuafolkken/kit#8123: a wake for a letter between frame boundaries writes no spinner, so each frame
-// is written once, on its boundary.
-async function turn_until(turning: Turning, ports: SpinPorts, until_ms: number): Promise<void> {
-	let frame = spinner_of(ports.now())
+function moment_of(at_ms: number): Moment {
+	return { frame: spinner_of(at_ms), cell: sweep_index(at_ms) }
+}
 
+function turned_since(last: Moment, at: Moment): Turned {
+	return { is_turned: at.frame !== last.frame, is_swept: at.cell !== last.cell }
+}
+
+// The sweep written where the frame has one, so its cell on the second shows before its first wake.
+function start_sweep(turning: Turning, ports: SpinPorts): void {
+	if (turning.sweep === undefined) return
+
+	write_turn(turning, ports, ports.now(), { is_turned: false, is_swept: true })
+}
+
+// joshuafolkken/kit#8123: a wake for a letter or the sweep between frame boundaries writes no spinner,
+// so each frame is written once, on its boundary; the sweep is written likewise once per cell.
+async function turn_until(turning: Turning, ports: SpinPorts, until_ms: number): Promise<void> {
+	let last = moment_of(ports.now())
+
+	start_sweep(turning, ports)
 	await poll.poll_until(() => ports.now() >= until_ms, {
 		attempts: Infinity,
 		interval_ms: 0,
@@ -170,21 +226,28 @@ async function turn_until(turning: Turning, ports: SpinPorts, until_ms: number):
 
 			await ports.sleep(next_turn(now_ms, until_ms, turning) - now_ms)
 			const at_ms = ports.now()
-			const at_frame = spinner_of(at_ms)
+			const at = moment_of(at_ms)
 
-			if (at_ms < until_ms) write_turn(turning, ports, at_ms, at_frame !== frame)
-			frame = at_frame
+			if (at_ms < until_ms) write_turn(turning, ports, at_ms, turned_since(last, at))
+			last = at
 		},
 	})
 }
 
-// Waits for the next second, turning the spinners and typing the rows until then; a frame with neither
-// just waits.
+// A frame with no spinner, sweep or typing row writes nothing between redraws.
+function is_still(turning: Turning): boolean {
+	return (
+		turning.spots.length === 0 && turning.typing.lines.length === 0 && turning.sweep === undefined
+	)
+}
+
+// Waits for the next second, turning the spinners, moving the sweep and typing the rows until then; a
+// still frame just waits.
 async function spin_to_second(turning: Turning, ports: SpinPorts): Promise<void> {
 	const now_ms = ports.now()
 	const second_ms = now_ms - (now_ms % REDRAW_MS) + REDRAW_MS
 
-	if (turning.spots.length === 0 && turning.typing.lines.length === 0) {
+	if (is_still(turning)) {
 		await ports.sleep(second_ms - now_ms)
 
 		return

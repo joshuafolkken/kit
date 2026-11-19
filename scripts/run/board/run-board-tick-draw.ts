@@ -141,7 +141,7 @@ function draw_display(state: BoardState, display: BoardDisplay, redraw: Redraw):
 
 	draw(redraw.ports, run_board_type_rows.typed_lines(drawn.lines, typing, redraw.now_ms))
 
-	return { ...state, ...display.carried, spots: drawn.spots, typing }
+	return { ...state, ...display.carried, spots: drawn.spots, sweep: drawn.sweep, typing }
 }
 
 const run_board_tick_draw = { bounds_of, draw, draw_display }

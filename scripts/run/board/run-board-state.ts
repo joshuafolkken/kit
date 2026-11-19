@@ -18,6 +18,7 @@ import type { CueName } from './run-board-sound-cues'
 import type { Pending } from './run-board-sound-repeat'
 import type { SoundSnapshot } from './run-board-sound-transition'
 import type { Spot } from './run-board-spin'
+import type { Sweep } from './run-board-sweep'
 import type { Thanks } from './run-board-thanks-csv'
 import { run_board_type_rows, type Typing } from './run-board-type-rows'
 
@@ -143,6 +144,8 @@ interface BoardView {
 	baseline_total: number | undefined
 	// Where the last frame drew its spinners, turned between redraws.
 	spots: ReadonlyArray<Spot>
+	// Where the last frame has room for the sweep under its elapsed time (`run-board-sweep.ts`), if anywhere.
+	sweep?: Sweep | undefined
 	// The rows the last frame drew and the ones typing, typed on between redraws (`run-board-type-rows.ts`).
 	typing: Typing
 	// The rows and run conditions the last frame sounded over, and the standing cue waiting to replay

@@ -4,6 +4,7 @@ import type { BoardLayout, BoardRow } from './run-board-layout'
 import type { SessionOperations } from './run-board-operation-read'
 import { run_board_render_fixture } from './run-board-render-fixture'
 import { run_board_row_key } from './run-board-row-key'
+import { run_board_spot } from './run-board-spot'
 
 // joshuafolkken/kit#3757: the header's third line draws the newest operation of a child the board
 // draws as running, the same on a screen and in a chat. joshuafolkken/kit#3767: its spinner under the
@@ -38,8 +39,11 @@ function row(number: number, state: BoardRow['state']): BoardRow {
 // Issue 7 running; issue 9 merged, its lane not yet collected.
 const LAYOUT: BoardLayout = { ...EMPTY_LAYOUT, active: [row(7, 'running'), row(9, 'merged')] }
 
+// The header's first three lines as written, the sweep's placeholder (joshuafolkken/kit#8240) drawn back.
 function header_lines_of(extra: Partial<BoardHeader>): Array<string> {
-	return lines_of(header({ layout: LAYOUT, ...extra })).slice(0, THIRD + 1)
+	return lines_of(header({ layout: LAYOUT, ...extra }))
+		.slice(0, THIRD + 1)
+		.map((line) => run_board_spot.drawn(line, extra.spinner ?? ''))
 }
 
 function third_of(extra: Partial<BoardHeader>): string {
