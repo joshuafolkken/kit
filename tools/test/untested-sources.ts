@@ -113,6 +113,7 @@ const UNTESTED_SOURCES: ReadonlyArray<string> = [
 	'scripts/rules/oracle-list-cli.ts',
 	'scripts/rules/permission-guards.ts',
 	'scripts/rules/test-declared-commit.ts',
+	'scripts/run/board/run-board-layout-types.ts',
 	'scripts/run/run-watcher-guard-cli.ts',
 	'scripts/self-sync-guard/index.ts',
 	'scripts/sonar/sonar-project.ts',

@@ -9,6 +9,7 @@ const PENDING_BODY = 'Body\n\n<!-- josh:publication {"labels":["run:lane"]} -->'
 
 const state = vi.hoisted(() => ({
 	body: '',
+	labels: [] as Array<string>,
 	repo: 'o/r' as string | undefined,
 	epics: [] as Array<number>,
 	withheld: undefined as string | undefined,
@@ -26,7 +27,7 @@ vi.mock('#scripts/epic/epic-live', () => ({
 			number,
 			repo,
 			state: 'OPEN',
-			labels: [],
+			labels: state.labels,
 			blocked_by: [],
 			body: state.body,
 		}),
@@ -37,14 +38,19 @@ vi.mock('#scripts/epic/epic-blocked-by', () => ({
 	epic_blocked_by: { listing_epics: async () => state.epics },
 }))
 
-vi.mock('#scripts/issue/issue-publication', () => ({
-	issue_publication: {
-		publish: async (epic: number) => {
-			if (state.withheld !== undefined) throw new Error(state.withheld)
-			state.published.push(epic)
+vi.mock('#scripts/issue/issue-publication', async (import_original) => {
+	const { issue_publication }: { issue_publication: object } = await import_original()
+
+	return {
+		issue_publication: {
+			...issue_publication,
+			publish: async (epic: number) => {
+				if (state.withheld !== undefined) throw new Error(state.withheld)
+				state.published.push(epic)
+			},
 		},
-	},
-}))
+	}
+})
 
 vi.mock('#scripts/gh/git-gh-issue-read', () => ({
 	git_gh_issue_read: {
@@ -65,6 +71,7 @@ vi.mock('#scripts/gh/git-gh-issue-write', () => ({
 
 const REQUEST = { issue: '10', prerequisite: '11' }
 const WITHHELD = 'Publication withheld: #11 needs its recorded plan'
+const PLANNED = 'run:planned'
 
 function comments_on(issue: string): ReadonlyArray<string> {
 	return state.comments.get(issue) ?? []
@@ -73,6 +80,7 @@ function comments_on(issue: string): ReadonlyArray<string> {
 beforeEach(() => {
 	Object.assign(state, {
 		body: PENDING_BODY,
+		labels: [],
 		repo: 'o/r',
 		epics: [7],
 		withheld: undefined,
@@ -152,5 +160,33 @@ describe('run_pause_publish.publish_prepared — nothing to publish or already n
 
 		expect(comments_on('10')).toHaveLength(1)
 		expect(comments_on('11')).toHaveLength(1)
+	})
+})
+
+// joshuafolkken/kit#8105: the check `run:pause` makes before its first step.
+describe('run_pause_publish.unplanned', () => {
+	it('names the missing plan and the plan command for a prepared prerequisite', async () => {
+		const reason = await run_pause_publish.unplanned(REQUEST)
+
+		expect(reason).toContain('Prepared #11 needs its recorded plan')
+		expect(reason).toContain('pnpm josh issue:plan 11 --body-file … --planned --no-notify')
+		expect(state.comments.size).toBe(0)
+	})
+
+	it('names a plan held as `plan:unverified`', async () => {
+		state.labels = [PLANNED, 'plan:unverified']
+
+		expect(await run_pause_publish.unplanned(REQUEST)).toContain('re-recorded from a o/r checkout')
+	})
+
+	it('passes a planned, an unprepared and a cross-repository prerequisite', async () => {
+		state.labels = [PLANNED]
+		expect(await run_pause_publish.unplanned(REQUEST)).toBeUndefined()
+		state.labels = []
+		state.body = 'Body'
+		expect(await run_pause_publish.unplanned(REQUEST)).toBeUndefined()
+		expect(
+			await run_pause_publish.unplanned({ issue: '10', prerequisite: 'o/x#3' }),
+		).toBeUndefined()
 	})
 })

@@ -1,4 +1,5 @@
 import { epic_blocked_by } from '#scripts/epic/epic-blocked-by'
+import type { EpicChild } from '#scripts/epic/epic-graph'
 import { epic_live } from '#scripts/epic/epic-live'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
@@ -67,20 +68,48 @@ async function leave_note(request: PublishRequest, note: string): Promise<void> 
 	}
 }
 
-// The repository a pending `#N` is published in, or `undefined` when `#N` is not prepared here (a
-// cross-repository prerequisite is published from its own checkout).
-async function prepared_repo(prerequisite: string): Promise<string | undefined> {
+// A pending open `#N` and the repository it is published in, or `undefined` when `#N` is not prepared
+// here (a cross-repository prerequisite is published from its own checkout) or already closed.
+async function prepared_of(
+	prerequisite: string,
+): Promise<{ repo: string; child: EpicChild } | undefined> {
 	if (!issue_number_shape.ISSUE_NUMBER_PATTERN.test(prerequisite)) return undefined
 	const repo = await git_gh_command.repo_get_name_with_owner()
 	if (repo === undefined) throw new Error('Cannot resolve the publication repository')
 	const child = await epic_live.child(Number(prerequisite), repo)
 
-	return issue_publication_state.is_pending(child.body) ? repo : undefined
+	const is_prepared = child.state === 'OPEN' && issue_publication_state.is_pending(child.body)
+
+	return is_prepared ? { repo, child } : undefined
+}
+
+// Why `run:pause` refuses before any step (joshuafolkken/kit#8105): a prepared `#N` with no recorded
+// plan would wait unpublished until a person planned it, so the lane that filed it records the plan
+// first. The plan is judged by publication's own predicate; other withholding reasons stay notes.
+async function plan_refusal(request: PublishRequest): Promise<string | undefined> {
+	const prepared = await prepared_of(request.prerequisite)
+	const missing = prepared && issue_publication.missing_plan_of(prepared.child)
+	if (missing === undefined) return undefined
+
+	return [
+		`Prepared ${cite(request.prerequisite)} ${missing}: nothing was set aside.`,
+		`Next: \`pnpm josh issue:plan ${request.prerequisite} --body-file … --planned --no-notify\`, then rerun this pause`,
+	].join('\n')
+}
+
+// A read that fails refuses too, as a reason, so the caller reports it like any failed step.
+async function unplanned(request: PublishRequest): Promise<string | undefined> {
+	try {
+		return await plan_refusal(request)
+	} catch (error) {
+		return `Cannot check the plan of ${cite(request.prerequisite)}: ${error_text.message_of(error)}`
+	}
 }
 
 async function publish_prepared(request: PublishRequest): Promise<string> {
-	const repo = await prepared_repo(request.prerequisite)
-	if (repo === undefined) return NOT_PREPARED
+	const prepared = await prepared_of(request.prerequisite)
+	if (prepared === undefined) return NOT_PREPARED
+	const { repo } = prepared
 
 	const { epic, reason } = await publish_first(
 		await epic_blocked_by.listing_epics(request.prerequisite),
@@ -96,6 +125,6 @@ async function publish_prepared(request: PublishRequest): Promise<string> {
 	return `withheld: ${reason}`
 }
 
-const run_pause_publish = { publish_prepared, NOT_PREPARED }
+const run_pause_publish = { publish_prepared, unplanned, NOT_PREPARED }
 
 export { run_pause_publish }

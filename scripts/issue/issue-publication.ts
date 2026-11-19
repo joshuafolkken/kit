@@ -150,6 +150,6 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	}
 }
 
-const issue_publication = { publish, run }
+const issue_publication = { publish, run, missing_plan_of }
 
 export { issue_publication }

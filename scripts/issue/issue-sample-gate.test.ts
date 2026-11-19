@@ -4,7 +4,7 @@ import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_lint_cli } from './issue-lint-cli'
 import { issue_not_before } from './issue-not-before'
-import { issue_sample_gate } from './issue-sample-gate'
+import { issue_sample_gate, type MergesSince } from './issue-sample-gate'
 import { issue_sample_prime, type PrimePorts } from './issue-sample-prime'
 
 // joshuafolkken/kit#4414: a follow-up measurement waits on the merges the lane ledger records after the
@@ -93,6 +93,22 @@ describe('issue_sample_gate.wait_of', () => {
 		await issue_sample_prime.prime([GATED_BODY], ports_of(MERGED_AT, ledger))
 
 		expect(issue_sample_gate.wait_of(GATED_BODY)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#8057: the gate asks the ledger only for the window after the merge it counts from.
+describe('issue_sample_gate.wait_of on the merges port', () => {
+	it('asks from the merge time and counts what the port returns after it', async () => {
+		const merges = vi.fn<MergesSince>(() => [
+			{ at: MERGED_AT, issue: 1 },
+			{ at: AFTER, issue: 2 },
+		])
+
+		await issue_sample_prime.prime([GATED_BODY], ports_of(MERGED_AT, undefined))
+		issue_sample_gate.use_merges(merges)
+
+		expect(issue_sample_gate.wait_of(GATED_BODY)).toMatchObject({ counted: 1 })
+		expect(merges).toHaveBeenCalledWith(Date.parse(MERGED_AT))
 	})
 })
 

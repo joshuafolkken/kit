@@ -61,6 +61,28 @@ describe('test_symbol_read.symbols', () => {
 		})
 	})
 
+	// joshuafolkken/kit#8090: a file read whole selected every user of every declaration in it.
+	it('selects no user of a tracked file the diff lists no line for', async () => {
+		write(LIB, FILES[LIB] ?? '')
+
+		expect(await test_symbol_read.symbols(process.cwd(), [LIB])).toEqual({
+			tests: [],
+			reach: [],
+			direct: [],
+		})
+	})
+
+	it('reads an untracked file whole', async () => {
+		const [code, test] = ['three.ts', 'three.test.ts']
+
+		write(code, 'export function three() { return 3 }\n')
+		write(test, "import { three } from './three'\nit('3', three)\n")
+
+		const selection = await test_symbol_read.symbols(process.cwd(), [code])
+
+		expect(selection?.tests).toEqual([test])
+	})
+
 	it('reads nothing where typescript cannot be loaded', async () => {
 		vi.spyOn(review_code_tree, 'load_typescript').mockReturnValue(undefined)
 
