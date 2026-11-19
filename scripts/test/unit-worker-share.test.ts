@@ -82,6 +82,8 @@ describe('unit_worker_share.current_share — dividing by the live lanes', () =>
 	})
 })
 
+const CALLER_WORKERS = '--maxWorkers=4'
+
 describe('unit_worker_share.worker_arguments — what reaches vitest', () => {
 	it('passes the share as the flag vitest reads', () => {
 		expect(unit_worker_share.worker_arguments(RUN_ARGUMENTS, 3)).toEqual(['--maxWorkers=3'])
@@ -95,12 +97,29 @@ describe('unit_worker_share.worker_arguments — what reaches vitest', () => {
 	// they want, and `josh gate` passes its own cap for a reason this module cannot see. `--max-workers`
 	// is here because vitest accepts it as the same option: recognizing only one spelling would let the
 	// share be appended after the caller's number and win.
-	it.each([['--maxWorkers=4'], ['--maxWorkers'], ['--max-workers=4'], ['--max-workers']])(
+	it.each([[CALLER_WORKERS], ['--maxWorkers'], ['--max-workers=4'], ['--max-workers']])(
 		'leaves a caller-supplied %s alone',
 		(supplied: string) => {
 			expect(unit_worker_share.worker_arguments([...RUN_ARGUMENTS, supplied], 3)).toEqual([])
 		},
 	)
+})
+
+describe('unit_worker_share.without_worker_flags — the arguments that choose the tests', () => {
+	it('drops both spellings of the worker flag and keeps files and other flags', () => {
+		expect(
+			unit_worker_share.without_worker_flags([
+				CALLER_WORKERS,
+				'source.ts',
+				'--max-workers=2',
+				'--touched',
+			]),
+		).toEqual(['source.ts', '--touched'])
+	})
+
+	it('leaves nothing when the worker flag was the only argument', () => {
+		expect(unit_worker_share.without_worker_flags([CALLER_WORKERS])).toEqual([])
+	})
 })
 
 // What the marker is for: it has to be readable while the suite is running, and gone the moment it is
