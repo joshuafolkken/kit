@@ -3,7 +3,7 @@ import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { run_board_fit, type TerminalSize } from './run-board-fit'
 import { run_board_intro } from './run-board-intro'
 import { run_board_labels } from './run-board-labels'
-import { run_board_lamp_spots, type Lamp } from './run-board-lamp-spots'
+import { run_board_lamp_spots, type Lamp, type LampMoment } from './run-board-lamp-spots'
 import { run_board_row_key } from './run-board-row-key'
 import { run_board_screen } from './run-board-screen'
 import { run_board_spot, type Spot } from './run-board-spot'
@@ -52,14 +52,14 @@ interface Turning {
 interface Turned {
 	is_turned: boolean
 	is_swept: boolean
-	since_ms: number | undefined
+	since: LampMoment | undefined
 }
 
-// The spinner's frame and the sweep's cell at a moment, compared turn to turn.
+// The spinner's frame, the sweep's cell and the lamps' moment, compared turn to turn.
 interface Moment {
 	frame: string
 	cell: number
-	ms: number
+	lamps: LampMoment
 }
 
 type SpinPorts = Pick<
@@ -188,23 +188,37 @@ function blinking(turning: Turning): ReadonlyArray<Lamp> {
 	return turning.typing.seen === undefined ? [] : (turning.lamps ?? [])
 }
 
+// The lamps' moment at `at_ms`: they burst on a step a row is still typing at the start of — the
+// header's now line or a section's new row — and blink apart from the step after the last is typed
+// through, so they change only on the spinner's step (joshuafolkken/kit#8237).
+function lamp_moment(turning: Turning, at_ms: number): LampMoment {
+	const step_ms = at_ms - (at_ms % SPINNER_INTERVAL_MS)
+
+	return { ms: at_ms, is_burst: run_board_type_rows.is_typing(turning.typing, step_ms) }
+}
+
 // The turn built and written, timed as a turn where `--timing` times draws, then the lamps that changed;
 // the trill sounds on while a row is still typing, off once every row is typed through
 // (joshuafolkken/kit#8250).
 function write_turn(turning: Turning, ports: SpinPorts, at_ms: number, turned: Turned): void {
 	run_board_timing.drawn(ports, 'turn', () => {
 		ports.write(turn_bytes(turning, at_ms, turned))
-		run_board_lamp_spots.write_lamps(blinking(turning), ports, at_ms, turned.since_ms)
+		run_board_lamp_spots.write_lamps(
+			blinking(turning),
+			ports,
+			lamp_moment(turning, at_ms),
+			turned.since,
+		)
 	})
 	ports.typing_sound?.set(run_board_type_rows.is_typing(turning.typing, at_ms))
 }
 
-function moment_of(at_ms: number): Moment {
-	return { frame: spinner_of(at_ms), cell: sweep_index(at_ms), ms: at_ms }
+function moment_of(turning: Turning, at_ms: number): Moment {
+	return { frame: spinner_of(at_ms), cell: sweep_index(at_ms), lamps: lamp_moment(turning, at_ms) }
 }
 
 function turned_since(last: Moment, at: Moment): Turned {
-	return { is_turned: at.frame !== last.frame, is_swept: at.cell !== last.cell, since_ms: last.ms }
+	return { is_turned: at.frame !== last.frame, is_swept: at.cell !== last.cell, since: last.lamps }
 }
 
 // The sweep and every lamp written where the frame has them, so they show on the second before the first
@@ -212,13 +226,13 @@ function turned_since(last: Moment, at: Moment): Turned {
 function start_sweep(turning: Turning, ports: SpinPorts): void {
 	if (turning.sweep === undefined && blinking(turning).length === 0) return
 
-	write_turn(turning, ports, ports.now(), { is_turned: false, is_swept: true, since_ms: undefined })
+	write_turn(turning, ports, ports.now(), { is_turned: false, is_swept: true, since: undefined })
 }
 
 // joshuafolkken/kit#8123: a wake for a letter or the sweep between frame boundaries writes no spinner,
 // so each frame is written once, on its boundary; the sweep is written likewise once per cell.
 async function turn_until(turning: Turning, ports: SpinPorts, until_ms: number): Promise<void> {
-	let last = moment_of(ports.now())
+	let last = moment_of(turning, ports.now())
 
 	start_sweep(turning, ports)
 	await poll.poll_until(() => ports.now() >= until_ms, {
@@ -229,7 +243,7 @@ async function turn_until(turning: Turning, ports: SpinPorts, until_ms: number):
 
 			await ports.sleep(next_turn(now_ms, until_ms, turning) - now_ms)
 			const at_ms = ports.now()
-			const at = moment_of(at_ms)
+			const at = moment_of(turning, at_ms)
 
 			if (at_ms < until_ms) write_turn(turning, ports, at_ms, turned_since(last, at))
 			last = at

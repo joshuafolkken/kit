@@ -130,6 +130,11 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 						'a live board runs a WOPR lamp panel on its throughput rows: two columns past `NOW`, a `■` every other column to the section’s rule end, yellow on `24h`, red on `7d`, dim when out (`run-board-lamps.ts`). None with no theme, `--once`, `--chat`, `--every`, no TTY or color, or under 8 lamps.',
 				},
 				{
+					names: [BOARD_THEME],
+					description:
+						'bursts the lamp panel while a row types (the header’s third line, a section’s new row): the groups of four, each on its own period, all change every 80ms step, back to their periods from the step after typing ends (`run-board-spin.ts`).',
+				},
+				{
 					names: ['--timing'],
 					description:
 						'after the `--once` frame, or once a live board leaves its screen, writes how long each phase of the first frame took (ms). `--chat` and `--every` ignore it.',

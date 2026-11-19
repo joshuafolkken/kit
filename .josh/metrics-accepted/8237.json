@@ -1,0 +1,7 @@
+{
+	"reason": "Feature #8237: lamp burst while typing needs a burst-aware lamp moment (+12 code lines)",
+	"date": "2026-11-19",
+	"growth": {
+		"scripts.code_lines": 12
+	}
+}
