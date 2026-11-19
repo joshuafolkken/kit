@@ -8,7 +8,8 @@ import type { ItemState } from './run-board-status'
 
 // joshuafolkken/kit#7920: a running row's tail leads with its finish (#7994), `🎯 ~HH:MM`, read from the
 // lane totals the header's 🎯 reads, with `+N′` / `−N′` where it moved past a minute from its launch's;
-// `🎯 —` where no lane total is measured, and after the reason of a row waiting on a person or parked.
+// `🎯 —` where no lane total is measured, and after the reason of a parked row; a row waiting on a person
+// ends on its reason alone (#8166).
 // No row draws `over budget`.
 
 const { MINUTE, NOW, header } = run_board_render_fixture
@@ -88,10 +89,8 @@ describe('run_board_render_tail.drift_of', () => {
 })
 
 describe('run_board_render_condition.tail_of finish', () => {
-	it('ends a row waiting on a person on 🎯 — after its reason', () => {
-		expect(run_board_render_condition.tail_of(held('human', 'decide'), 0, header())).toBe(
-			`decide ${UNKNOWN}`,
-		)
+	it('ends a row waiting on a person on its reason, with no 🎯 (joshuafolkken/kit#8166)', () => {
+		expect(run_board_render_condition.tail_of(held('human', 'decide'), 0, header())).toBe('decide')
 	})
 
 	it('ends a parked row on 🎯 —, with or without a reason', () => {

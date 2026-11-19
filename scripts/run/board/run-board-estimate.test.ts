@@ -236,12 +236,12 @@ describe('run_board_estimate.row_finish', () => {
 describe('run_board_estimate.is_finish_drawn', () => {
 	const MOVING = { ended_ms: undefined, activity: { is_stopped: false } }
 
-	it.each(['running', 'human', 'parked'] as const)('draws a finish on a %s row', (state) => {
+	it.each(['running', 'parked'] as const)('draws a finish on a %s row', (state) => {
 		expect(run_board_estimate.is_finish_drawn(row(1, state), MOVING)).toBe(true)
 	})
 
-	it('draws none on a done row', () => {
-		expect(run_board_estimate.is_finish_drawn(row(1, 'done'), MOVING)).toBe(false)
+	it.each(['done', 'human'] as const)('draws none on a %s row', (state) => {
+		expect(run_board_estimate.is_finish_drawn(row(1, state), MOVING)).toBe(false)
 	})
 
 	it('draws none on an earlier run’s lane', () => {
