@@ -1,10 +1,10 @@
 import { lane_investigation_switch } from '#scripts/lane/lane-investigation-switch'
 import { run_board_activity, type RunActivity } from './run-board-activity'
 import type { ClosedIssue } from './run-board-closed'
+import { run_board_cue_decision } from './run-board-cue-decision'
 import type { FrameBounds } from './run-board-fold'
 import { run_board_github } from './run-board-github'
 import { run_board_header, type BoardHeader } from './run-board-header'
-import { run_board_header_notice } from './run-board-header-notice'
 import { run_board_labels } from './run-board-labels'
 import { run_board_layout, type BoardLayout } from './run-board-layout'
 import { run_board_link } from './run-board-link'
@@ -16,8 +16,6 @@ import { run_board_row_sections } from './run-board-row-sections'
 import { run_board_seat, type SeatRead } from './run-board-seat'
 import { run_board_setup } from './run-board-setup'
 import type { Known } from './run-board-snapshot'
-import { run_board_sound_repeat } from './run-board-sound-repeat'
-import { run_board_sound_transition } from './run-board-sound-transition'
 import { run_board_spin, type Spun } from './run-board-spin'
 import type { BoardPorts, BoardState } from './run-board-state'
 import { run_board_type_rows, type Typing } from './run-board-type-rows'
@@ -223,32 +221,24 @@ function draw(ports: BoardPorts, lines: ReadonlyArray<string>): void {
 
 type Sounded = Pick<BoardState, 'sound_snapshot' | 'sound_pending' | 'notice'>
 
-// The cue this frame picked over the last one's, sounded through `cue` where the board passes one, kept
-// as the notice the header draws whether it sounded or not, and what the next frame weighs its own
-// against. A frame before the plan is read is no base — the rows the plan brings were already there — so
-// the frame the plan arrives on is the first base, silent. It runs before the frame is drawn, so the
-// notice shows on the frame it sounds on.
+// The cue `run_board_cue_decision.decided` picks for this frame, sounded through `cue` where the board
+// passes one.
 function sounded(
 	state: BoardState,
 	header: BoardHeader,
 	local: LocalRead,
 	redraw: Redraw,
 ): Sounded {
-	const snapshot =
-		state.plan === undefined
-			? undefined
-			: run_board_sound_transition.snapshot_of(header, local.events)
-	const { sounding, pending } = run_board_sound_repeat.next_cue(
-		state.sound_snapshot,
-		snapshot,
-		state.sound_pending,
+	const { cue, ...sound } = run_board_cue_decision.decided(
+		state,
+		header,
+		local.events,
 		redraw.now_ms,
 	)
 
-	if (sounding !== undefined) redraw.ports.cue?.(sounding.cause.cue)
-	const notice = run_board_header_notice.next(state.notice, sounding, redraw.now_ms)
+	if (cue !== undefined) redraw.ports.cue?.(cue)
 
-	return { sound_snapshot: snapshot, sound_pending: pending, notice }
+	return sound
 }
 
 // The first total the plan gives is the baseline every later arrival is counted against; the run's own
