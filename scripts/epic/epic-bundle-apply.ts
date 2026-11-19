@@ -30,6 +30,8 @@ interface ApplyInput {
 	// The backlog rows of `decision.candidates`, as `format_order` reads them.
 	members: ReadonlyArray<BacklogIssue>
 	is_membership_established: boolean
+	// An unpublished split child, which publishing reaches only through an epic: no placement fails.
+	is_placement_required?: boolean
 }
 
 const UNAPPLIED_LINES: Readonly<Partial<Record<BundleAction, string>>> = {
@@ -132,11 +134,25 @@ async function create_epic(input: ApplyInput): Promise<number> {
 	return await reconcile_order(epic_number, input)
 }
 
-function report_unapplied(action: BundleAction): number {
-	const line = UNAPPLIED_LINES[action]
+function unplaced_line(issue_number: number): string {
+	return `✖ ${issue_cite.plain_for('github', issue_number)} is unpublished and in no confirmed epic, so publishing cannot reach it and no run picks it up. It is filed — do not file it again: create its epic with \`pnpm josh epic "<title>" ${String(issue_number)}\`, record the epic's plan, then publish it with \`pnpm josh issue:file --publish <E>\`.`
+}
+
+// `none` on a subject an epic already tracks is a placement made before; anything else wrote none.
+function unapplied_exit(input: ApplyInput): number {
+	const is_placed = input.subject.epic !== undefined && input.decision.action === 'none'
+
+	if (is_placed || input.is_placement_required !== true) return SUCCESS_EXIT_CODE
+	console.error(unplaced_line(input.subject.number))
+
+	return FAILURE_EXIT_CODE
+}
+
+function report_unapplied(input: ApplyInput): number {
+	const line = UNAPPLIED_LINES[input.decision.action]
 	if (line !== undefined) console.info(line)
 
-	return SUCCESS_EXIT_CODE
+	return unapplied_exit(input)
 }
 
 async function apply_decision(input: ApplyInput): Promise<number> {
@@ -145,13 +161,13 @@ async function apply_decision(input: ApplyInput): Promise<number> {
 	if (!input.is_membership_established) {
 		console.info(WITHHELD_LINE)
 
-		return SUCCESS_EXIT_CODE
+		return unapplied_exit(input)
 	}
 
 	if (decision.action === 'create_epic') return await create_epic(input)
 
 	const epic_number = target_of(decision)
-	if (epic_number === undefined) return report_unapplied(decision.action)
+	if (epic_number === undefined) return report_unapplied(input)
 
 	return await add_to_epic(epic_number, input, record_of(input, epic_number))
 }
@@ -161,6 +177,7 @@ const epic_bundle_apply = {
 	WITHHELD_LINE,
 	UNREAD_EPIC_LINE,
 	title_of,
+	unplaced_line,
 	apply_decision,
 }
 

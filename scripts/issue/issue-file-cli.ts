@@ -1,6 +1,6 @@
 import { repo_party } from '#scripts/discovery/repo-party'
 import { epic_blocked_by } from '#scripts/epic/epic-blocked-by'
-import { epic_bundle_cli } from '#scripts/epic/epic-bundle-cli'
+import { epic_bundle_cli, type BundleMode } from '#scripts/epic/epic-bundle-cli'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
@@ -24,7 +24,7 @@ import { issue_file_fold } from './issue-file-fold'
 import { issue_file_interrupt } from './issue-file-interrupt'
 import { issue_file_pass, type Filing } from './issue-file-pass'
 import { issue_file_worker } from './issue-file-worker'
-import { has_label_name, has_parked_label, RUN_SOLO_LABEL } from './issue-labels'
+import { has_label_name, has_parked_label, RUN_SOLO_LABEL, SPLIT_ROUTE_LABEL } from './issue-labels'
 import { issue_priority } from './issue-priority'
 import { issue_publication_state } from './issue-publication-state'
 import { issue_release_cli } from './issue-release-cli'
@@ -83,7 +83,7 @@ async function create(filing: Filing, labels: ReadonlyArray<string>): Promise<st
 		...issue_publication_state.creation(
 			filing.body,
 			labels,
-			filing.args.is_prepared === true || has_label_name(labels, 'route:split'),
+			filing.args.is_prepared === true || has_label_name(labels, SPLIT_ROUTE_LABEL),
 		),
 		repo: filing.target,
 	})
@@ -120,18 +120,21 @@ async function link_release(url: string, filing: Filing): Promise<void> {
 }
 
 // The Issue exists once `create` returns, so a failed placement is reported rather than failed: a
-// non-zero exit would read as "not filed" and invite the second filing the scout exists to stop.
+// non-zero exit would read as "not filed" and invite the second filing the scout exists to stop —
+// except an unpublished split child, which publishing reaches only through an epic: its placement is
+// applied, and one that places nothing fails the filing with the next steps (`epic-bundle-apply.ts`).
 // The open listing trails the create call; `report_for` reads the new issue on its own when the
 // listing does not show it yet.
-async function place(url: string, target: string): Promise<void> {
+async function place(url: string, target: string, mode: BundleMode): Promise<boolean> {
 	const issue_number = issue_number_of(url)
 	const exit_code = Number.isSafeInteger(issue_number)
-		? await epic_bundle_cli.report_for(issue_number, target)
+		? await epic_bundle_cli.report_for(issue_number, target, mode)
 		: FAILURE_EXIT_CODE
 
-	if (exit_code !== SUCCESS_EXIT_CODE) {
-		console.error(`⚠ epic:bundle did not answer for ${url} — run \`pnpm josh epic:bundle <N>\`.`)
-	}
+	if (exit_code === SUCCESS_EXIT_CODE) return true
+	console.error(`⚠ epic:bundle did not place ${url} — run \`pnpm josh epic:bundle <N>\`.`)
+
+	return mode !== 'place'
 }
 
 // Every filing lands on the run's event stream: this is the one filing path, so
@@ -251,9 +254,9 @@ async function send(filing: Filing, labels: ReadonlyArray<string>): Promise<stri
 	await record_solo(url, filing, labels)
 	await record(url, filing, labels)
 	await link_release(url, filing)
-	await place(url, filing.target)
+	const mode = has_label_name(labels, SPLIT_ROUTE_LABEL) ? 'place' : 'report'
 
-	return url
+	return (await place(url, filing.target, mode)) ? url : undefined
 }
 
 // The holds that end the filing before the one pass, read first: the filing cap reads the local event
