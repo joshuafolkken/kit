@@ -190,12 +190,34 @@ async function resample(
 	return { ...state, ...usages, ...sampled, gauges, budget_waits, sampled_ms: at.now_ms }
 }
 
+// Handed the round's state as soon as its lane read lands, ahead of the usages (joshuafolkken/kit#8134).
+type OnLocal = (read: GatherState) => void
+
+// A round whose lane read was not due hands nothing early.
+async function reread_handed(
+	state: GatherState,
+	ports: GatherPorts,
+	snapshot: Snapshot,
+	on_local: OnLocal | undefined,
+): Promise<{ read: GatherState; snapshot: Snapshot }> {
+	const reread_result = await reread(state, ports, snapshot)
+
+	if (reread_result.read.read_ms !== state.read_ms) on_local?.(reread_result.read)
+
+	return reread_result
+}
+
 // One round of the reads. The process snapshot is read once, by whichever of the lane read and the
 // usages asks first.
-async function gather(state: GatherState, ports: GatherPorts, pace: Pace): Promise<GatherState> {
+async function gather(
+	state: GatherState,
+	ports: GatherPorts,
+	pace: Pace,
+	on_local?: OnLocal,
+): Promise<GatherState> {
 	const now_ms = ports.now()
 	const [{ read, snapshot }, sampled] = await Promise.all([
-		reread(state, ports, fresh_snapshot(ports, pace)),
+		reread_handed(state, ports, fresh_snapshot(ports, pace), on_local),
 		sample(state, ports, now_ms),
 	])
 

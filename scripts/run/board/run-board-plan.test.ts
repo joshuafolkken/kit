@@ -13,7 +13,8 @@ import {
 	NEEDS_HUMAN_MERGE_LABEL,
 } from '#scripts/issue/issue-labels'
 import { issue_read } from '#scripts/issue/issue-read'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { run_board_decision_read } from './run-board-decision-read'
 import { run_board_plan, type PlanPorts } from './run-board-plan'
 import { run_board_scope } from './run-board-scope'
 
@@ -92,6 +93,10 @@ beforeEach(() => {
 	// its GraphQL read (joshuafolkken/kit#6819) is not sent.
 	vi.stubEnv(TRANSPORT_ENV_VAR, 'rest')
 	vi.spyOn(git_gh_conditional, 'read_conditional').mockResolvedValue({ kind: 'unreadable' })
+})
+
+afterEach(() => {
+	vi.restoreAllMocks()
 })
 
 describe('run_board_plan.read_plan', () => {
@@ -195,6 +200,21 @@ describe('run_board_plan.read_plan human merge pull requests', () => {
 			JSON.stringify([{ number: EPIC, body: `closes #${String(SINGLE)}` }]),
 		)
 		const plan = await run_board_plan.read_plan({ issues: only ? [SINGLE] : [], only }, read)
+
+		expect(plan?.human_merge_prs).toEqual(new Map([[SINGLE, EPIC]]))
+	})
+
+	// joshuafolkken/kit#8026: the decisions are read first, so a blocker the 🙋 section draws is paired.
+	it('pairs the PR of a decision blocker the plan names', async () => {
+		const blocker = { number: SINGLE, title: '', labels: [], need: 'take' as const, blocks: [] }
+
+		vi.spyOn(run_board_decision_read, 'with_decisions').mockImplementation(async (plan) =>
+			plan === undefined ? undefined : { ...plan, decision_blockers: [blocker] },
+		)
+		vi.spyOn(git_gh_etag_read, 'read_listing').mockResolvedValue(
+			JSON.stringify([{ number: EPIC, body: `closes #${String(SINGLE)}` }]),
+		)
+		const plan = await run_board_plan.read_plan({ issues: [SINGLE], only: true }, ports())
 
 		expect(plan?.human_merge_prs).toEqual(new Map([[SINGLE, EPIC]]))
 	})

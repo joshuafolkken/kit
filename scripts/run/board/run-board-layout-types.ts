@@ -10,9 +10,25 @@ import type { ItemState, ItemStatus } from './run-board-status'
 
 // The board layout's row types (`run-board-layout.ts`), which every board module reads.
 
+// What a person does for a blocker that waits on one (joshuafolkken/kit#8026): decide it, merge its pull
+// request, publish its prepared filing, or take it into a run.
+type BlockerNeed = 'decide' | 'merge' | 'publish' | 'take'
+
+// A blocker the run's withheld children stop at, followed through their blockers as the plan was
+// read — the issue a person acts on, with the children it holds.
+interface DecisionBlocker {
+	number: number
+	title: string
+	labels: ReadonlyArray<string>
+	need: BlockerNeed
+	// The detail the body's human-judgment line names, for a decision (`run-board-decision.ts`).
+	detail?: string | undefined
+	blocks: ReadonlyArray<number>
+}
+
 interface BoardPlan extends PauseRead, RetryClock {
 	decision_questions?: ReadonlyMap<number, string> | undefined
-	decision_waits?: ReadonlyMap<number, string> | undefined
+	decision_blockers?: ReadonlyArray<DecisionBlocker> | undefined
 	is_backlog_live?: boolean | undefined
 	human_merge_prs?: ReadonlyMap<number, number> | undefined
 	// The same snapshot's worker identities that the header counts as occupied seats.
@@ -86,6 +102,9 @@ interface BoardLayout {
 	queued: ReadonlyArray<QueuedEntry>
 	people: ReadonlyArray<BoardRow>
 	unreached: ReadonlyArray<BoardRow>
+	// The blockers a person acts on that no other row draws — outside the run's scope, so drawn in the
+	// 🙋 decision section and counted as a person's, and no row the header's progress counts.
+	blockers?: ReadonlyArray<BoardRow> | undefined
 	// The earlier run's lanes that still hold a place under the limit, and the lanes with no record —
 	// drawn after the run's own lanes, and no row the header counts.
 	earlier?: ReadonlyArray<BoardRow> | undefined
@@ -108,4 +127,15 @@ interface Overlay {
 	statuses: ReadonlyMap<number, ItemStatus>
 }
 
-export type { BoardLayout, BoardPlan, BoardRow, Overlay, QueuedEntry, ReasonOf, RowRead, RowReason }
+export type {
+	BlockerNeed,
+	BoardLayout,
+	BoardPlan,
+	BoardRow,
+	DecisionBlocker,
+	Overlay,
+	QueuedEntry,
+	ReasonOf,
+	RowRead,
+	RowReason,
+}

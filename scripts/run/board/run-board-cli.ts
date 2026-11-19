@@ -1,8 +1,6 @@
 import { setTimeout as sleep } from 'node:timers/promises'
-import { styleText } from 'node:util'
 import { gh_core_rate_limit } from '#scripts/gh/gh-core-rate-limit'
 import { git_gh_transport } from '#scripts/gh/git-gh-transport'
-import { poll } from '#scripts/lib/poll'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { run_progress } from '#scripts/run/progress/run-progress'
@@ -10,23 +8,19 @@ import { run_progress_read } from '#scripts/run/progress/run-progress-read'
 import terminalLink from 'terminal-link'
 import { run_board_closed } from './run-board-closed'
 import { run_board_every } from './run-board-every'
-import { run_board_fold } from './run-board-fold'
 import { run_board_fold_store } from './run-board-fold-store'
 import { run_board_frame_store } from './run-board-frame-store'
 import { run_board_gather } from './run-board-gather'
 import { run_board_gather_live } from './run-board-gather-live'
 import { run_board_gather_thread } from './run-board-gather-thread'
-import { run_board_intro, type Reveal } from './run-board-intro'
 import { run_board_issue_count } from './run-board-issue-count'
-import { run_board_keys, type KeyReading } from './run-board-keys'
-import { run_board_labels } from './run-board-labels'
+import { run_board_live } from './run-board-live'
 import { run_board_plan_shared } from './run-board-plan-shared'
 import type { GithubRateLimit } from './run-board-render-quota-github'
-import { run_board_screen, type Screen } from './run-board-screen'
+import { run_board_screen } from './run-board-screen'
 import { run_board_snapshot } from './run-board-snapshot'
 import { run_board_sound_player } from './run-board-sound-player'
-import { run_board_spin } from './run-board-spin'
-import type { BoardPorts, BoardState } from './run-board-state'
+import type { BoardPorts } from './run-board-state'
 import { run_board_thanks_read } from './run-board-thanks-read'
 import { run_board_theme, type Theme } from './run-board-theme'
 import { run_board_tick } from './run-board-tick'
@@ -51,10 +45,8 @@ const SIGTERM_EXIT_CODE = 143
 const USAGE =
 	'Usage: josh run:board [--once | --chat [--fresh] | --every <minutes>] [--theme wargames] [--timing]'
 const DISABLED_NOTICE = `\`${run_progress.DISABLED_KEY}=${run_progress.DISABLED_VALUE}\` is set, so no progress is pushed.`
-const TRAILING_NEWLINE = /\n$/u
 const { FRESH_STATE, tick } = run_board_tick
 const { CHAT_KEY, fresh } = run_board_frame_store
-const { WORDS } = run_board_labels
 
 // A signal exits with its conventional code, so the `exit` handler restores the screen on every path.
 function on_exit(leave: () => void): void {
@@ -128,140 +120,6 @@ function live_ports(is_live: boolean): BoardPorts {
 
 	// Kept off `LIVE_PORTS`, so the profile that spreads them always reads from scratch.
 	return { ...LIVE_PORTS, gather, cue, frames: run_board_frame_store.file_store() }
-}
-
-// Every frame starts from the top of the alternate screen, erasing what the last one left below it, and
-// ends on the line that says closing the screen leaves the run going — only a screen a person can
-// close says it, and it is the first line to give way to a short pane. Nothing follows the last line,
-// so a frame that fills the pane never scrolls the header off the top.
-// The keys are named under it where a person can type them.
-function framed(ports: BoardPorts, screen: Screen): BoardPorts {
-	const keys = ports.folded === undefined ? [] : [run_board_fold.KEYS_LINE]
-
-	return {
-		...ports,
-		footer: ['', ...[WORDS.keeps_running, ...keys].map((line) => styleText('dim', line))],
-		write: (frame) => {
-			ports.write(screen.frame(frame.replace(TRAILING_NEWLINE, '')))
-		},
-	}
-}
-
-// Leaves the alternate screen once, whichever path gets there first: a second leave would restore the
-// cursor saved on entering and draw over whatever was printed after the first. The terminal leaves raw
-// mode with it.
-function leaver(ports: BoardPorts, screen: Screen, keys: KeyReading): () => void {
-	let has_left = false
-
-	return () => {
-		if (has_left) return
-		has_left = true
-		keys.stop?.()
-		ports.write(screen.leave)
-	}
-}
-
-// A tick whose frame is held off the screen, then revealed before it returns, so no spinner turns until
-// every line is out.
-async function revealed_tick(
-	state: BoardState,
-	ports: BoardPorts,
-	screen: Screen,
-	reveal: Reveal,
-): Promise<BoardState> {
-	const held: Array<string> = []
-	const holding = framed(
-		{
-			...ports,
-			write: (frame) => {
-				held.push(frame)
-			},
-		},
-		{ ...screen, frame: screen.held },
-	)
-	const next = await tick(state, holding, 'background')
-
-	await reveal(held.join(''))
-
-	return next
-}
-
-// A tick drawing each frame, the plan read in the background so the first is drawn without waiting on
-// GitHub. Where the board reveals, the first frame is revealed; every later one is written as drawn.
-function ticker(
-	ports: BoardPorts,
-	screen: Screen,
-	reveal: Reveal | undefined,
-): (state: BoardState) => Promise<BoardState> {
-	let opening = reveal
-
-	return async (state) => {
-		const revealing = opening
-
-		opening = undefined
-		if (revealing === undefined) return await tick(state, framed(ports, screen), 'background')
-
-		return await revealed_tick(state, ports, screen, revealing)
-	}
-}
-
-// A frame on the second, its spinners turned until the next: the turns are
-// written past the frame's own control bytes, each to its spot on the screen the frame drew. Each
-// state is handed to `record`, which keeps the frames `--chat` and `--once` answer from.
-async function redraw_forever(
-	ports: BoardPorts,
-	screen: Screen,
-	reveal: Reveal | undefined,
-	record: (state: BoardState) => void,
-): Promise<void> {
-	const step = ticker(ports, screen, reveal)
-	let state = FRESH_STATE
-
-	await poll.wait_for(
-		async () => {
-			// eslint-disable-next-line require-atomic-updates -- poll awaits each callback before starting the next tick
-			state = await step(state)
-			record(state)
-		},
-		{
-			interval_ms: run_board_spin.REDRAW_MS,
-			sleeper: async () => {
-				await run_board_spin.spin_to_second(state, ports)
-			},
-		},
-	)
-}
-
-// A signal leaves through `on_exit`; a failed redraw leaves before its error is printed, so the error
-// lands on the normal screen rather than vanishing with the alternate one. Only a board in a theme types
-// its opening line, reveals its first frame a line at a time and types each row that appears after it;
-// one in none draws it whole at once.
-async function watch(ports: BoardPorts, theme: Theme | undefined): Promise<void> {
-	const screen = run_board_screen.screen_of('live')
-	const keys = run_board_keys.read_keys(ports.keys, ports.cue)
-	const leave = leaver(ports, screen, keys)
-
-	ports.write(screen.enter)
-	ports.on_exit(leave)
-	const { gather, reveal } = run_board_intro.opening(ports.gather, ports, keys, theme)
-
-	try {
-		await redraw_forever(
-			{
-				...ports,
-				gather,
-				folded: keys.folded,
-				sound: keys.sound,
-				cue: keys.cue ?? ports.cue,
-				types_rows: theme !== undefined,
-			},
-			screen,
-			reveal,
-			run_board_every.recorder(ports, theme),
-		)
-	} finally {
-		leave()
-	}
 }
 
 // A chat frame read from scratch, kept so the next question within a minute is answered from it; dated
@@ -353,7 +211,7 @@ async function draw(
 	const board = run_board_timing.timed(ports_for(ports, mode === 'live'), is_timing)
 
 	// A live board says it as it leaves its screen: `watch` only ever returns by throwing.
-	if (mode === 'live') await watch(run_board_theme.themed(board, theme), theme)
+	if (mode === 'live') await run_board_live.watch(run_board_theme.themed(board, theme), theme)
 	else await still(board, theme)
 	run_board_timing.say(board, is_timing)
 }
