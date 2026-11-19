@@ -47,6 +47,7 @@ const PLAN: BoardPlan = {
 		running: [],
 	},
 	tracked: new Map([[2, 1]]),
+	epics: new Map([[3, 5]]),
 	context: { repo: REPO, titles: new Map([[2, 'Two']]), open_numbers: new Set([2, 3]) },
 	labels: new Map([[2, [AUTO_OK]]]),
 	declared: new Map([[2, new Set(['scripts/a.ts'])]]),

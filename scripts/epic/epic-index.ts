@@ -64,6 +64,20 @@ function build_epic_index(
 	return index
 }
 
+// Which *one* open epic, opted in or not, lists each child: the first in listing order, so the
+// sentence naming it is deterministic. A pending child's publication step asks whether any epic's task
+// list reaches it, which `withheld_children` cannot answer (joshuafolkken/kit#8174).
+function first_epics(index: ReadonlyMap<number, ReadonlyArray<number>>): Map<number, number> {
+	const first = new Map<number, number>()
+
+	for (const [child, tracked_by] of index) {
+		const [epic] = tracked_by
+		if (epic !== undefined) first.set(child, epic)
+	}
+
+	return first
+}
+
 const EPIC_LABELS: ReadonlySet<string> = new Set([EPIC_LABEL])
 
 // Which epics in the opted-in listing stand for their children. An epic that carries `auto-ok` is a
@@ -198,6 +212,7 @@ const epic_index = {
 	build_epic_index,
 	build_tracking_index,
 	fetch_epics,
+	first_epics,
 	reachable_epic_numbers,
 	withheld_children,
 }

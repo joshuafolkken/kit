@@ -73,6 +73,23 @@ describe('epic_index.build_epic_index', () => {
 	})
 })
 
+// joshuafolkken/kit#8174: a pending child's publication step asks for any epic listing it.
+describe('epic_index.first_epics', () => {
+	it('keeps the first epic in listing order that names the child', () => {
+		expect(epic_index.first_epics(both_epics_tracking_the_child()).get(CHILD)).toBe(OPTED_IN_EPIC)
+	})
+
+	it('maps a child whatever epic lists it, opted in or not', () => {
+		const first = epic_index.first_epics(tracking_of([[OTHER_EPIC, GRANDCHILD]]))
+
+		expect(first.get(GRANDCHILD)).toBe(OTHER_EPIC)
+	})
+
+	it('leaves an issue no epic lists out of the first epics', () => {
+		expect(epic_index.first_epics(both_epics_tracking_the_child()).has(UNTRACKED_CHILD)).toBe(false)
+	})
+})
+
 describe('epic_index.withheld_children', () => {
 	// The regression: the opted-in epic came first, so collapsing to one winner dropped it, the child
 	// read as tracked by nobody who would offer it, and the standalone half offered it as well.
