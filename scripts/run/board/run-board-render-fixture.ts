@@ -1,11 +1,14 @@
 import { stripVTControlCharacters } from 'node:util'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
+import { run_board_fit } from './run-board-fit'
 import type { BoardHeader, BoardUsage } from './run-board-header'
 import { run_board_labels } from './run-board-labels'
 import type { BoardLayout } from './run-board-layout'
 import type { BoardNote } from './run-board-notes'
 import type { ProcessGroups } from './run-board-process-groups'
 import { run_board_render } from './run-board-render'
+import { run_board_render_title } from './run-board-render-title'
+import { run_board_rule_width } from './run-board-rule-width'
 import type { LaneUsages, UsageFigure } from './run-board-usage'
 
 // What the `run_board_render` suites share: a header at a fixed moment, and the
@@ -18,7 +21,7 @@ const STARTED = Date.parse('2026-10-08T09:00:00.000Z')
 const RUN_MINUTES = 130
 const NOW = STARTED + RUN_MINUTES * MINUTE
 const EMPTY_LAYOUT: BoardLayout = { active: [], queued: [], people: [], unreached: [] }
-const RULE_WIDTH = 50
+const { WHOLE } = run_board_render_title
 const GB = 1_073_741_824
 const CORES = 10
 const MEMORY_GB = 16
@@ -70,8 +73,14 @@ function board_usage(lanes: LaneUsages, processes: Partial<ProcessGroups> = {}):
 	}
 }
 
+// A rule of a whole frame drawn from the default header: every rule runs on to where a lane row's full
+// title ends, lane row or none (joshuafolkken/kit#8247).
 function rule(label: string): string {
-	return `── ${label} `.padEnd(RULE_WIDTH, '─')
+	const frame = { header: header(), time_width: 0, stops_width: 0, columns: undefined }
+	const width = run_board_rule_width.rule_width({ ...frame, ...WHOLE, filed: new Set() })
+	const head = `── ${label} `
+
+	return head.padEnd(width - run_board_fit.width_of(head) + head.length, '─')
 }
 
 function note(at_ms: number, text: string): BoardNote {
