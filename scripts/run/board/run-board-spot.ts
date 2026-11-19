@@ -1,6 +1,6 @@
 // The placeholder a live `run:board` frame is rendered with where a spinner goes, and a line drawn with
 // a spinner frame in each. A private-use character one column wide, as a spinner frame is, so the frame
-// is fitted the same. `TICK` marks the elapsed time's `″` the sweep is placed under (joshuafolkken/kit#8240)
+// is fitted the same. `TICK` marks the third line's age `″` the sweep is placed under (joshuafolkken/kit#8240)
 // and is drawn back as `″`, one column wide too.
 
 const SPOT = '\u{E000}'

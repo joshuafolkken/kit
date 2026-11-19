@@ -17,7 +17,7 @@ import { run_board_type_rows, type KeyedLine, type Typing } from './run-board-ty
 // renderer draws a placeholder where a spinner goes, and each placeholder's place on screen — its row
 // after the lines above it wrap, its column by display width — is recorded as the frame is written. A
 // row the frame was cut to the terminal's rows without is not on screen, so it records nothing. The
-// sweep under the elapsed time (`run-board-sweep.ts`) is placed the same way, by its own placeholder.
+// sweep under the third line's age (`run-board-sweep.ts`) is placed the same way, by its own placeholder.
 
 const { SPOT, TICK } = run_board_spot
 const { SWEEP_MS, sweep_bytes, sweep_index } = run_board_sweep

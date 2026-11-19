@@ -2,7 +2,7 @@ import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 
 // The dot a live `run:board` sweeps across the header's fourth row once a second, under the time column
 // (joshuafolkken/kit#8240). It runs twenty cells, one every `SWEEP_MS`, so it reaches the end on the second
-// and starts again from the left. Its right end sits five cells past the elapsed time's `″`, whose place
+// and starts again from the left. Its right end sits five cells past the third line's age `″`, whose place
 // the renderer marks with a placeholder; it is drawn only on the empty line below that, on screen.
 
 const SWEEP_MS = 50

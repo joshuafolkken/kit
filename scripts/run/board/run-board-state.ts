@@ -144,7 +144,7 @@ interface BoardView {
 	baseline_total: number | undefined
 	// Where the last frame drew its spinners, turned between redraws.
 	spots: ReadonlyArray<Spot>
-	// Where the last frame has room for the sweep under its elapsed time (`run-board-sweep.ts`), if anywhere.
+	// Where the last frame has room for the sweep under its third line's age (`run-board-sweep.ts`), if anywhere.
 	sweep?: Sweep | undefined
 	// The rows the last frame drew and the ones typing, typed on between redraws (`run-board-type-rows.ts`).
 	typing: Typing

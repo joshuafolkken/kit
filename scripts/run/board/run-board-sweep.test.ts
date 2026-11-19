@@ -77,6 +77,10 @@ describe('run_board_spin.spun — the sweep (joshuafolkken/kit#8240)', () => {
 		expect(spun(['▶ run', '', ''], '⠋', WIDE).sweep).toBeUndefined()
 		expect(spun(LINES, '⠋', { rows: 3, columns: 80 }).sweep).toBeUndefined()
 	})
+
+	it('records no sweep when the placeholder is on the last line, with none below it', () => {
+		expect(spun(['▶ run', `16${TICK}`], '⠋', WIDE).sweep).toBeUndefined()
+	})
 })
 
 // A clock each sleep moves forward and every write it saw.
@@ -119,6 +123,14 @@ describe('run_board_spin.spin_to_second — the sweep (joshuafolkken/kit#8240)',
 
 		expect(dot_cells(writes)).toStrictEqual(Array.from({ length: CELLS }, (_, cell) => cell))
 		expect(ports.now()).toBe(START + REDRAW_MS)
+	})
+
+	it('moves the sweep where the frame has no spinner or typing row to keep it turning', async () => {
+		const { ports, writes } = clocked(START)
+
+		await spin_to_second({ spots: [], typing: run_board_type_rows.NO_TYPING, sweep: SWEEP }, ports)
+
+		expect(dot_cells(writes)).toStrictEqual(Array.from({ length: CELLS }, (_, cell) => cell))
 	})
 
 	it('turns the spinner on its own interval alone, as without a sweep', async () => {
