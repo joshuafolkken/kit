@@ -41,10 +41,14 @@ async function relative_counts(
 	return (counts ?? []).map((reached) => ({ ...reached, file: path.relative(root, reached.file) }))
 }
 
+// **A hub is a file whose own reach passes the cap**, not the widest of a spread that only sums past
+// it — the tests a whole-file change selects by symbol (joshuafolkken/kit#7980, joshuafolkken/kit#8092).
+function over_cap(counts: ReadonlyArray<ReachedCount>): Array<ReachedCount> {
+	return counts.filter((reached) => reached.count > test_pinned_logic.MAX_TEST_FILES)
+}
+
 // The hubs among `files`, read before any edit so `lane:plan` can split them off
-// (joshuafolkken/kit#6543): each file whose own reach passes the cap, not the widest of a spread that
-// only sums past it — the tests a whole-file change selects by symbol (joshuafolkken/kit#7980). None
-// without a graph.
+// (joshuafolkken/kit#6543). None without a graph.
 async function hubs_of(
 	root: string,
 	files: ReadonlyArray<string>,
@@ -52,23 +56,20 @@ async function hubs_of(
 ): Promise<ReadonlyArray<string>> {
 	const counts = await relative_counts(root, candidates_of(root, files), read_counts)
 
-	return counts
-		.filter((reached) => reached.count > test_pinned_logic.MAX_TEST_FILES)
-		.map((reached) => reached.file)
+	return over_cap(counts).map((reached) => reached.file)
 }
 
-// **The hub is the widest file of the run's own change** (joshuafolkken/kit#5756): a main merge and
+// **The hub is the widest hub of the run's own change** (joshuafolkken/kit#5756): a main merge and
 // the map's tree are in the reach too, and a file the lane never edited is no hub of its run. The
 // summary line and the lane ledger both name it, so `josh lane:why` reads the hub the run printed
-// (joshuafolkken/kit#6187). None where the cap cut nothing.
+// (joshuafolkken/kit#6187). None where the cap cut nothing or no own file passes it alone.
 function hub_of(
 	selection: Pick<Selection, 'deferred' | 'reach'>,
 	own: ReadonlyArray<string>,
 ): string | undefined {
 	if (selection.deferred === 0) return undefined
 
-	return selection.reach
-		.filter((reached) => own.includes(reached.file))
+	return over_cap(selection.reach.filter((reached) => own.includes(reached.file)))
 		.toSorted((first, second) => second.count - first.count)
 		.at(0)?.file
 }

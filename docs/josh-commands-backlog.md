@@ -985,6 +985,7 @@ pnpm josh backlog:plan --waves          # the run order, wave by wave
 
 - `--exclude <N>` — same exclusion as `backlog:next`.
 - `--waves` — print the order the run takes, wave by wave, assuming each wave merges before the next. Read-only.
+- `--pending-publication` — list each pending-publication issue that blocks an open issue, instead of the plan. Read-only.
 
 <!-- /usage -->
 

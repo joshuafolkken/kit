@@ -3,6 +3,7 @@ import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types
 const EXCLUDE = '--exclude <N>'
 const JUST_MERGED = 'skip the issue just merged'
 const EXCLUDE_1630 = '--exclude 1630'
+const PENDING_PUBLICATION = '--pending-publication'
 const BUDGET = '--answer candidates --started "$started" --active "$active"'
 
 // The `backlog:*` command registry. It is spread into `AI_COMMANDS` so the commands stay grouped
@@ -152,7 +153,7 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 			'Print the whole backlog as a plan: ready now, waiting on what, waiting on a person, out of scope',
 		category: 'AI tools',
 		reference: [
-			'[issue...] [--only] [--waves] [--exclude <n>[,<n>...]]',
+			'[issue...] [--only] [--waves] [--pending-publication] [--exclude <n>[,<n>...]]',
 			'automation',
 			['network'],
 		],
@@ -168,6 +169,11 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 					names: ['--waves'],
 					description:
 						'print the order the run takes, wave by wave, assuming each wave merges before the next. Read-only.',
+				},
+				{
+					names: [PENDING_PUBLICATION],
+					description:
+						'list each pending-publication issue that blocks an open issue, instead of the plan. Read-only.',
 				},
 			],
 		},

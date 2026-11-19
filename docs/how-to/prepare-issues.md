@@ -24,6 +24,8 @@ A prepared Issue filed mid-run is published by the lane that records the wait: r
 before `pnpm josh run:pause <M> --for <N>`, which publishes the epic listing it before releasing the
 hold. A failed publication leaves the child prepared; follow the command `run:pause` comments on both Issues.
 
+`pnpm josh backlog:plan --pending-publication` lists each pending issue that blocks an open issue, beside the issue it blocks.
+
 Pending children are excluded from approval judgement, standalone and epic selection, and direct
 worker spawn. Even manually applying `auto-ok` cannot make a pending child a candidate.
 

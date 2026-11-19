@@ -270,20 +270,22 @@ the reason the import-graph split failed (its detail after `: ` dropped) and by 
 each with its runs and total minutes (`lane-pairs.ts`), from the `named` and `unsplit` fields of the ship lap and the
 hub of the `test:related` record.
 
-A lap overlaps its stage, so those rows do not add up to the lanes' time. The time between ship stages is split by park
+Laps overlap their stages; rows do not add up. The time between ship stages is split by park
 only, not by Bash kind, since a transcript call names no lane.
 
-Under the stage table, the implement stage is broken down from the lane transcripts up to each lane's first `josh ship`
+The implement stage is broken down from lane transcripts up to each lane's first `josh ship`
 (`lane-implement-stats.ts`): `plan` before the first edit, then `read`, `edit`, `check` (a scoped check, gate or open
 `run:chain`) and `review-fix` from a review on, each call's span from the prior call's end, less `lane:pause` time.
 
+`implement turn split` (`lane-implement-tool-split.ts`): sub-stage medians of `tool` (overlaps once) and `model turn`.
+
 `implement read` (`lane-implement-read.ts`) splits `read` by lane medians: `tool` run time, `thinking` before calls,
-distinct `files read`, and those an investigator cited by `path:line`. `implement read by call`
-(`lane-implement-read-calls.ts`) splits its tool time by kind, the ten largest totals first.
+`files read`, and those an investigator cited. `implement read by call`
+(`lane-implement-read-calls.ts`) splits its tool time by kind, ten largest first.
 
 The `stage turns` table (`lane-turn-stats.ts`) groups period-dispatched lanes' calls by ledger interval:
 `implement` until the first ship stage (open until then), the shortest stage holding a call, or `between stages`.
-Rows show median calls and measured lanes; lanes without calls appear under `no transcript`, outside the calls median.
+Rows show median calls and measured lanes; lanes without calls show as `no transcript`, outside the median.
 `stops per lane (median)` counts in-period stops by `reason` (`conflict` as `sync`) over all dispatched lanes,
 including zero-stop and transcript-missing lanes; no dispatched lanes means `not measured`.
 
