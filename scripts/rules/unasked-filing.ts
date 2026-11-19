@@ -61,7 +61,8 @@ const ASSISTANT_LINE_SCHEMA = z.object({
 	message: z.object({ content: z.unknown() }),
 })
 
-const CHECK_FLAG = /\s--check\b/u
+// `--check` validates and `--publish` finishes Issues already filed — neither creates one.
+const NO_CREATE_FLAG = /\s--(?:check|publish)\b/u
 // A quoted argument (a title) never carries the flag, whatever it spells.
 const QUOTED = /"[^"]*"|'[^']*'/gu
 
@@ -160,11 +161,11 @@ function is_unattended(context: HookContext): boolean {
 function is_writing_segment(segment: string): boolean {
 	if (!bash_triggers.is_issue_filing_segment(segment)) return false
 
-	return !CHECK_FLAG.test(segment.replaceAll(QUOTED, ''))
+	return !NO_CREATE_FLAG.test(segment.replaceAll(QUOTED, ''))
 }
 
-// `--check` creates nothing, so only a filing that writes is gated — read per segment, so a checked
-// filing chained before a real one does not let the real one through.
+// `--check` and `--publish` create nothing, so only a filing that writes is gated — read per segment,
+// so a checked or publishing call chained before a real filing does not let the real one through.
 function is_writing_filing(command: string): boolean {
 	return shell_segments.segments_of(command).some((segment) => is_writing_segment(segment))
 }
@@ -189,7 +190,7 @@ const ROW = {
 		fires:
 			'an interactive session’s `pnpm josh issue:file` when the person’s last prompt asks for no filing; it hands over propose-then-file. Every occurrence',
 		quiet:
-			'an unattended run (a kit-launched or headless session, a lane child, the `backlogrun` parent), `--check`, or a prompt that asks for filing',
+			'an unattended run (a kit-launched or headless session, a lane child, the `backlogrun` parent), `--check`, `--publish`, or a prompt that asks for filing',
 	},
 }
 
