@@ -11,13 +11,21 @@ import {
 	type GatherState,
 } from './run-board-gather'
 import type { LocalRead } from './run-board-read'
-import type { BoardData, BoardGather, BoardPorts, DataPorts, DataPost } from './run-board-state'
+import {
+	run_board_state,
+	type BoardData,
+	type BoardGather,
+	type BoardPorts,
+	type DataPorts,
+	type DataPost,
+} from './run-board-state'
 
 // The live board's side of its worker thread (`run-board-gather-worker.ts`): the worker takes the
-// reads off this machine and hands each round over; a redraw draws the last one it handed, so no read
-// stops the board's spinner. A round that throws is handed over as failed, and the worker reads again
-// next round; a worker that dies is said on the board, and started again on the next redraw — there is
-// no other place the reads are taken.
+// reads off this machine, steps the GitHub, roster and snapshot data over them, and hands each round
+// over; a redraw draws the last one it handed, so no read stops the board's spinner. A round that
+// throws is handed over as failed, and the worker reads again next round; a worker that dies is said on
+// the board, and started again on the next redraw from the data it last handed — there is no other
+// place the reads are taken.
 
 const WORKER_URL = new URL('run-board-gather-worker.ts', import.meta.url)
 const EMPTY_READ = run_board_gather.read_of(run_board_gather.FRESH_GATHER)
@@ -72,7 +80,8 @@ interface GatherWorker {
 	unref: () => void
 }
 
-type Spawn = () => GatherWorker
+// Starts a worker from the data the last one handed over, if any.
+type Spawn = (seed: DataPost | undefined) => GatherWorker
 
 interface Thread {
 	worker: GatherWorker | undefined
@@ -172,6 +181,22 @@ async function posted_round(state: RoundState, io: RoundIo): Promise<RoundState>
 	return { gather: next, data }
 }
 
+function is_data_post(value: unknown): value is DataPost {
+	return typeof value === 'object' && value !== null && 'in_flight' in value
+}
+
+// A worker's state before its first round: the data the last worker handed over, when it is started
+// again, so the board keeps its plan rows, thanks and allowances. The reads that worker had in flight
+// died with it, so none is held.
+function first_round(seed?: unknown): RoundState {
+	const { FRESH_GATHER } = run_board_gather
+	const data = is_data_post(seed)
+		? run_board_data.received({ ...seed, in_flight: [] }, EMPTY_READ)
+		: run_board_state.FRESH_DATA
+
+	return { gather: FRESH_GATHER, data }
+}
+
 // One round on the worker: the reads handed over, or why they threw — the state kept for the next.
 async function gather_round(
 	state: RoundState,
@@ -253,7 +278,7 @@ function listen(thread: Thread, worker: GatherWorker, now: () => number): void {
 }
 
 function start(thread: Thread, spawn: Spawn, now: () => number): GatherWorker {
-	const worker = spawn()
+	const worker = spawn(thread.latest?.data)
 
 	listen(thread, worker, now)
 	// The board's own loop keeps the process; the worker never holds it open past the board.
@@ -274,8 +299,8 @@ function worker_options(exec_argv: ReadonlyArray<string>): WorkerOptions {
 	return { execArgv: ts_entry_loader.loader_argv(exec_argv) }
 }
 
-function spawn_worker(): GatherWorker {
-	return new Worker(WORKER_URL, worker_options(process.execArgv))
+function spawn_worker(seed: DataPost | undefined): GatherWorker {
+	return new Worker(WORKER_URL, { ...worker_options(process.execArgv), workerData: seed })
 }
 
 // The first redraw waits for the worker's first round; every later one draws the last round handed.
@@ -294,6 +319,7 @@ function worker_gatherer(
 
 const run_board_gather_thread = {
 	WORKER_URL,
+	first_round,
 	gather_round,
 	post_of,
 	worker_gatherer,

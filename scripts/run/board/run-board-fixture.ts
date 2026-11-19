@@ -10,18 +10,17 @@ import {
 	type GatherRead,
 	type GatherState,
 } from './run-board-gather'
-import type { RoundState } from './run-board-gather-thread'
+import { run_board_gather_thread, type RoundState } from './run-board-gather-thread'
 import { run_board_labels } from './run-board-labels'
 import { run_board_lane_state } from './run-board-lane-state'
 import type { BoardPlan } from './run-board-layout'
 import type { LocalRead } from './run-board-read'
-import { run_board_state, type BoardPorts, type DataPorts } from './run-board-state'
+import type { BoardPorts, DataPorts } from './run-board-state'
 
 // What the `run:board` redraw suites share: the ports a test drives the board
 // through — a clock it moves by hand, the frames it wrote, and counted reads.
 
 const { WORDS } = run_board_labels
-const { FRESH_DATA } = run_board_state
 const START = Date.parse('2026-10-08T09:00:00.000Z')
 const ALL: NamedPlan = { issues: [], only: false }
 const LOCAL: LocalRead = {
@@ -188,7 +187,7 @@ function harness(local: LocalRead | undefined, plans: Array<BoardPlan | undefine
 // ⏳.
 const SPINNING = /⏳ [^\d-]/u
 // A worker's state before its first round (`run-board-gather-thread.ts`).
-const FIRST_ROUND: RoundState = { gather: run_board_gather.FRESH_GATHER, data: FRESH_DATA }
+const FIRST_ROUND: RoundState = run_board_gather_thread.first_round()
 
 // The ports a worker round reads through: the harness's reads off this machine and off GitHub.
 function round_ports(board: Harness): GatherPorts & DataPorts {

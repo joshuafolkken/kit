@@ -96,6 +96,7 @@ describe('run_board_gather_thread.worker_gatherer with its default spawn', () =>
 		await first
 		expect(worker_spawn).toHaveBeenCalledWith(run_board_gather_thread.WORKER_URL, {
 			execArgv: ts_entry_loader.loader_argv(process.execArgv),
+			workerData: undefined,
 		})
 	})
 })
