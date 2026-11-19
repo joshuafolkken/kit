@@ -234,9 +234,14 @@ function step_back(scan: Scan, cursor: Cursor): Cursor | undefined {
 	return { end: start, carry: bytes.subarray(0, cut) }
 }
 
-function scan_back(descriptor: number, since_ms: number, chunk_bytes: number): RecentWindow {
+function scan_back(
+	descriptor: number,
+	since_ms: number,
+	chunk_bytes: number,
+	end = fstatSync(descriptor).size,
+): RecentWindow {
 	const scan: Scan = { descriptor, since_ms, chunk_bytes, found: [] }
-	let cursor: Cursor | undefined = { end: fstatSync(descriptor).size, carry: Buffer.alloc(0) }
+	let cursor: Cursor | undefined = { end, carry: Buffer.alloc(0) }
 
 	while (cursor !== undefined && cursor.end > 0) cursor = step_back(scan, cursor)
 
@@ -248,7 +253,84 @@ function read_since(path: string, since_ms: number, chunk_bytes = CHUNK_BYTES): 
 	return with_ledger(path, (descriptor) => scan_back(descriptor, since_ms, chunk_bytes)) ?? NONE
 }
 
-const lane_ledger_tail = { read: every_entry.read, read_since, tail_store }
+// joshuafolkken/kit#8133: a window a long-lived reader asks for again and again, while the ledger is
+// appended every few seconds — read backward once from its oldest start, then grown by the appended
+// bytes alone, as a tail is. An earlier start, another inode, a shrink or a change that kept the size
+// reads the window backward again.
+interface Window {
+	readonly since_ms: number
+	readonly tail: Tail
+}
 
-export type { RecentWindow, TailStore }
+// Bytes through the last line separator of the file's final chunk: the window read backward ends on a
+// complete line, and the line still landing after it is parsed as a tail's fragment is.
+function line_end(descriptor: number, size: number): number {
+	const start = Math.max(0, size - CHUNK_BYTES)
+
+	return start + read_range(descriptor, start, size).lastIndexOf(LINE_SEPARATOR) + 1
+}
+
+function seed(descriptor: number, snapshot: Snapshot, since_ms: number, is_kept: Keep): Window {
+	const offset = line_end(descriptor, snapshot.size)
+	const { entries } = scan_back(descriptor, since_ms, CHUNK_BYTES, offset)
+	const lines = entries.filter((entry) => is_kept(entry))
+	const read: Tail = { ...snapshot, size: offset, offset, lines, entries: lines }
+
+	return { since_ms, tail: next_tail(descriptor, snapshot, read, is_kept) }
+}
+
+function is_growable(window: Window, snapshot: Snapshot, since_ms: number): boolean {
+	if (since_ms < window.since_ms) return false
+
+	return is_unchanged(window.tail, snapshot) || base_of(window.tail, snapshot) !== undefined
+}
+
+function next_window(
+	descriptor: number,
+	previous: Window | undefined,
+	since_ms: number,
+	is_kept: Keep,
+): Window {
+	const snapshot = snapshot_of(fstatSync(descriptor))
+
+	if (previous === undefined || !is_growable(previous, snapshot, since_ms)) {
+		return seed(descriptor, snapshot, since_ms, is_kept)
+	}
+
+	return {
+		since_ms: previous.since_ms,
+		tail: next_tail(descriptor, snapshot, previous.tail, is_kept),
+	}
+}
+
+interface WindowStore {
+	// The kept entries at or after `since_ms`, oldest first; an absent or unreadable file has none.
+	readonly read: (path: string, since_ms: number) => ReadonlyArray<LedgerEntry>
+}
+
+function window_store(is_kept: Keep = is_any): WindowStore {
+	const windows = new Map<string, Window>()
+
+	function read(path: string, since_ms: number): ReadonlyArray<LedgerEntry> {
+		const window = with_ledger(path, (descriptor) =>
+			next_window(descriptor, windows.get(path), since_ms, is_kept),
+		)
+
+		if (window === undefined) {
+			windows.delete(path)
+
+			return EMPTY
+		}
+
+		windows.set(path, window)
+
+		return window.tail.entries.filter((entry) => is_since(entry, since_ms))
+	}
+
+	return { read }
+}
+
+const lane_ledger_tail = { read: every_entry.read, read_since, tail_store, window_store }
+
+export type { RecentWindow, TailStore, WindowStore }
 export { lane_ledger_tail }

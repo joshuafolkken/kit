@@ -1,0 +1,7 @@
+{
+	"reason": "window_store replaces the per-stamp window cache so run:board redraw parses only appended ledger bytes (#8133)",
+	"date": "2026-11-19",
+	"growth": {
+		"scripts.code_lines": 29
+	}
+}
