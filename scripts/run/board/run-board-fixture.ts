@@ -216,6 +216,15 @@ function round_ports(board: Harness): GatherPorts & DataPorts {
 	return { ...board.gathering, read_plan: board.read_plan, read_closed: board.read_closed }
 }
 
+// joshuafolkken/kit#8224: the first frame is revealed a block at a time, its first write the wipe
+// from the top.
+const WIPE = '\u{1B}[H\u{1B}[J'
+
+// The index of the first frame's first write.
+function first_frame(frames: ReadonlyArray<string>): number {
+	return frames.findIndex((frame) => frame.startsWith(WIPE))
+}
+
 const run_board_fixture = {
 	FIRST_ROUND,
 	LOCAL,
@@ -224,6 +233,7 @@ const run_board_fixture = {
 	STOPPED,
 	WORDS,
 	drawn_from,
+	first_frame,
 	harness,
 	plan_titled,
 	round_ports,

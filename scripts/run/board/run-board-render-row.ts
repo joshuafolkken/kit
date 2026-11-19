@@ -2,6 +2,7 @@ import { run_board_earlier } from './run-board-earlier'
 import { run_board_fit, type PlanLine, type YieldStage } from './run-board-fit'
 import { run_board_fresh } from './run-board-fresh'
 import { run_board_header, type BoardHeader } from './run-board-header'
+import { run_board_label_pair } from './run-board-label-pair'
 import { run_board_labels } from './run-board-labels'
 import type { BoardRow } from './run-board-layout'
 import { run_board_priority } from './run-board-priority'
@@ -124,14 +125,14 @@ function icon_text(row: BoardRow, frame: RowFrame): string {
 
 // The priority and the release kind's icons between the number — and its lane cells, where drawn —
 // and the title, one space either side; a row with no title ends at its kind, so what follows keeps
-// its usual gap.
+// its usual gap. The title is marked once cut and padded, so the mark takes no column it is cut to.
 function lead_of(row: BoardRow, frame: RowFrame, title: string): string {
 	const { header } = frame
 	const kind = row.kind === undefined ? KIND_BLANK : FILED_KIND_ICONS[row.kind]
 	const number = number_text(row, frame.cells, header.link)
 	const lead = `${icon_text(row, frame)} ${number} ${run_board_priority.cell_of(row)} ${kind}`
 
-	return title === '' ? lead : `${lead} ${title}`
+	return title === '' ? lead : `${lead} ${run_board_label_pair.titled(title)}`
 }
 
 // A row up to its tail — the columns that stay where they are on every row. A waiting row has no time

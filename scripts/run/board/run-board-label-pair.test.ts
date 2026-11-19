@@ -5,7 +5,7 @@ import { run_board_label_pair } from './run-board-label-pair'
 // joshuafolkken/kit#8154: an icon beside its label is marked so the WarGames theme can drop it, while
 // every other frame is drawn as it was.
 
-const { MARK, bare, dropped, pair, settled } = run_board_label_pair
+const { MARK, TITLE_MARK, bare, dropped, pair, settled, titled, untitled } = run_board_label_pair
 const VALUES = '  💪 67%  ✅ 264/283'
 
 function column_of(line: string, text: string): number {
@@ -68,5 +68,30 @@ describe('run_board_label_pair.dropped', () => {
 
 	it('leaves an unmarked icon before a value as it is', () => {
 		expect(dropped(VALUES)).toBe(VALUES)
+	})
+})
+
+// joshuafolkken/kit#8224: a row's title is marked for the WarGames reveal, in no columns.
+describe('run_board_label_pair title marks', () => {
+	const titled_line = `  ${pair('▶', 'backlogrun')}      ${titled('A TITLE')}  46.6`
+
+	it('keeps the title mark for a themed screen alone', () => {
+		expect(settled([titled_line], { form: 'screen', is_themed: true })).toStrictEqual([titled_line])
+	})
+
+	it.each([
+		{ form: 'screen', is_themed: false },
+		{ form: 'chat', is_themed: true },
+	] as const)('drops the title mark for $form (themed: $is_themed)', (drawn) => {
+		expect(settled([titled_line], drawn)).toStrictEqual(['  ▶ backlogrun      A TITLE  46.6'])
+	})
+
+	it('draws a titled title in the columns of the title alone', () => {
+		expect(titled('A TITLE')).toBe(`${TITLE_MARK}A TITLE`)
+		expect(run_board_fit.width_of(titled('A TITLE'))).toBe(run_board_fit.width_of('A TITLE'))
+	})
+
+	it('moves a row label past a title mark as it does without one', () => {
+		expect(untitled(dropped(titled_line))).toBe(dropped(untitled(titled_line)))
 	})
 })
