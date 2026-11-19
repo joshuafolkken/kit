@@ -18,7 +18,7 @@ import { markdown_section } from './markdown-section'
 // The order: `--no-auto-ok`, a filing to another repository (whose own `backlogrun` would implement
 // and merge it though nobody opted that repository in), a label that keeps a person in the loop, and
 // last the body's recorded user prohibition or judgement declaration (`JUDGEMENT_NEEDED` / `JUDGEMENT_NOT_NEEDED`): whether a
-// policy decision, an external account or a human visual check is needed.
+// policy decision, an external account or a human visual check is needed before merge.
 
 interface AutoOkFiling {
 	// `--no-auto-ok`: an existing exclusion or a verified original user prohibition.
