@@ -119,6 +119,16 @@ async function link_release(url: string, filing: Filing): Promise<void> {
 	)
 }
 
+// A failed applied placement exits 1 whether or not `apply_decision` was reached (an unreadable backlog,
+// an unread subject, a failed write), so its line itself says the Issue exists.
+function unplaced_message(url: string, mode: BundleMode): string {
+	if (mode !== 'place') {
+		return `⚠ epic:bundle did not place ${url} — run \`pnpm josh epic:bundle <N>\`.`
+	}
+
+	return `✖ ${url} is filed but in no epic — do not file it again: run \`pnpm josh epic:bundle <N> --apply\`.`
+}
+
 // The Issue exists once `create` returns, so a failed placement is reported rather than failed: a
 // non-zero exit would read as "not filed" and invite the second filing the scout exists to stop —
 // except an unpublished split child filed directly (`is_placing_split`), which publishing reaches only
@@ -133,7 +143,7 @@ async function place(url: string, target: string, mode: BundleMode): Promise<boo
 		: FAILURE_EXIT_CODE
 
 	if (exit_code === SUCCESS_EXIT_CODE) return true
-	console.error(`⚠ epic:bundle did not place ${url} — run \`pnpm josh epic:bundle <N>\`.`)
+	console.error(unplaced_message(url, mode))
 
 	return mode !== 'place'
 }

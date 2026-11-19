@@ -100,6 +100,18 @@ describe('issue_file_cli.run — the epic placement a filing applies', () => {
 		},
 	)
 
+	// A placement that fails before `apply_decision` (unreadable backlog, unread subject, failed write)
+	// prints none of its lines, so the filing's own line carries the do-not-refile guidance.
+	it.each<{ route: string; line: string }>([
+		{ route: SPLIT, line: 'do not file it again: run `pnpm josh epic:bundle <N> --apply`' },
+		{ route: INTERRUPT, line: `⚠ epic:bundle did not place ${ISSUE_URL}` },
+	])('--route $route prints its own unplaced line', async ({ route, line }) => {
+		report_for.mockResolvedValue(FAILURE_EXIT_CODE)
+		await issue_file_cli.run(argv_of(route))
+
+		expect(vi.mocked(console.error).mock.calls.join('\n')).toContain(line)
+	})
+
 	// `issue:spill` and `--batch` file through `file_issue` and place their split children themselves,
 	// so the filing only reports and still answers with the URL of an Issue that exists.
 	it('leaves a split child filed through file_issue to its caller to place', async () => {
