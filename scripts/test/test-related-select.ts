@@ -143,11 +143,12 @@ async function import_layers(seeded: Seeded, readers: SelectReaders): Promise<La
 	return { layers: [near, outer], reach: reach_of(root, reached), method: 'import' }
 }
 
+// The declaration users' layers: the direct users with the seeds and pins, then the users past them.
 function symbol_layers(seeded: Seeded, symbol: SymbolSelection): Layered {
 	const pins = seeded.code.flatMap((file) => pinned(file, []))
 
 	return {
-		layers: [[...seeded.seeds, ...pins, ...symbol.tests]],
+		layers: [[...seeded.seeds, ...pins, ...symbol.direct], symbol.tests],
 		reach: symbol.reach,
 		method: 'symbol',
 	}
