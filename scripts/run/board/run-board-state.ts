@@ -23,6 +23,10 @@ import { run_board_type_rows, type Typing } from './run-board-type-rows'
 // What a `run:board` redraw reads through and folds forward, shared by the
 // redraw (`run-board-tick.ts`) and its GitHub reads (`run-board-github.ts`).
 
+// A redraw's whole frame (`tick`) or the spinners and typing written between redraws (`turn`).
+type DrawKind = 'tick' | 'turn'
+type DrawTimer = <T>(kind: DrawKind, draw: () => T) => T
+
 interface BoardPorts {
 	read_plan: (scope: NamedPlan) => Promise<BoardPlan | undefined>
 	// The reads off this machine a redraw draws from (`run-board-gather.ts`): a live board's come from
@@ -76,6 +80,8 @@ interface BoardPorts {
 	cue?: ((name: CueName) => void) | undefined
 	// Whether the sound switch a person flips with `s` is on (`run-board-keys.ts`); none where no key is read.
 	sound?: (() => boolean) | undefined
+	// Times each draw for `--timing`'s report (`run-board-timing.ts`); none times nothing.
+	time_draw?: DrawTimer | undefined
 }
 
 // `background` launches the GitHub reads and draws without them; `settled` waits for them before
@@ -169,4 +175,4 @@ function is_due(last_ms: number | undefined, interval_ms: number, now_ms: number
 const run_board_state = { FRESH_STATE, is_due }
 
 export { run_board_state }
-export type { BoardPorts, BoardState, Pace }
+export type { BoardPorts, BoardState, DrawKind, DrawTimer, Pace }

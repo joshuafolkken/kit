@@ -1,4 +1,5 @@
 import type { EpicChild } from '#scripts/epic/epic-graph'
+import { lane_stats } from '#scripts/lane/lane-stats'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import string_width from 'string-width'
@@ -10,8 +11,11 @@ import {
 	type GatherPost,
 	type GatherWorker,
 } from './run-board-gather-thread'
+import { run_board_labels } from './run-board-labels'
 import type { BoardPlan } from './run-board-layout'
 import type { LocalRead } from './run-board-read'
+import { run_board_render_stress_fixture } from './run-board-render-stress-fixture'
+import { run_board_spin } from './run-board-spin'
 import type { BoardPorts, BoardState } from './run-board-state'
 import { run_board_tick } from './run-board-tick'
 import type { UsageMark } from './run-board-usage'
@@ -267,5 +271,27 @@ describe('run_board_tick.tick frame budget', () => {
 
 		expect(lines).toBeGreaterThanOrEqual(PANE.rows)
 		expect(measured).toBeLessThanOrEqual(lines)
+	})
+})
+
+// joshuafolkken/kit#8126: a tick drawn on the board's thread longer than a spinner interval stalls the
+// spinner, so the stress frame's draw, from its render to `spun`, is held under one; the median of a
+// few draws keeps one slow draw on a loaded runner from failing it.
+const DRAWS = 5
+
+function draw_ms(): number {
+	const started = performance.now()
+	const lines = run_board_render_stress_fixture.lines_on(PANE.columns, PANE.rows)
+
+	run_board_spin.spun(lines, run_board_labels.spinner_of(0), PANE)
+
+	return performance.now() - started
+}
+
+describe('run_board_spin.spun draw budget', () => {
+	it('draws the stress frame from its render to its spun lines within a spinner interval', () => {
+		const spent = Array.from({ length: DRAWS }, () => draw_ms())
+
+		expect(lane_stats.median(spent)).toBeLessThan(run_board_labels.SPINNER_INTERVAL_MS)
 	})
 })

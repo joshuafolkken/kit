@@ -62,6 +62,50 @@ describe('run_board_timing.report', () => {
 	})
 })
 
+// joshuafolkken/kit#8126: each tick and turn drawn is timed, and the report says their max and median.
+describe('run_board_timing.timed draws', () => {
+	const TICK_DRAW = /tick draw {2}max 4\.0 · median 2\.5 \(n 2\)/u
+	const TURN_DRAW = /turn draw {2}max 2\.0 · median 2\.0 \(n 1\)/u
+
+	it('says the max and median of each kind it timed as the board leaves', () => {
+		const { ports, frames, leaves } = harness(undefined, [])
+		const clock = [0, 4, 10, 11, 20, 22]
+		const board = run_board_timing.timed(ports, true, () => clock.shift() ?? 0)
+
+		expect(board.time_draw?.('tick', () => 'drawn')).toBe('drawn')
+		board.time_draw?.('tick', () => 0)
+		board.time_draw?.('turn', () => 0)
+		board.on_exit(() => 0)
+		leaves.at(-1)?.()
+
+		expect(frames.at(-1)).toMatch(TICK_DRAW)
+		expect(frames.at(-1)).toMatch(TURN_DRAW)
+	})
+
+	it('names no kind it never timed', () => {
+		expect(report({ tick: [1], turn: [] })).not.toContain('turn draw')
+	})
+
+	it('times nothing without the flag, drawing straight through', () => {
+		const { ports } = harness(undefined, [])
+		const board = run_board_timing.timed(ports, false)
+		const draw = vi.fn(() => 'drawn')
+
+		expect(board.time_draw).toBeUndefined()
+		expect(run_board_timing.drawn(board, 'tick', draw)).toBe('drawn')
+		expect(draw).toHaveBeenCalledOnce()
+	})
+
+	it('reports the ticks a live board drew under the flag', async () => {
+		const { ports, frames, leaves } = harness(undefined, [])
+
+		await expect(run_board_cli.run([TIMING_FLAG], ports)).rejects.toBe(STOPPED)
+		leaves[0]?.()
+
+		expect(frames.at(-1)).toContain('tick draw')
+	})
+})
+
 describe('run_board_cli.run --timing', () => {
 	it('says the first read and the first frame after a single frame', async () => {
 		const { ports, frames } = harness(undefined, [])

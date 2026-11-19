@@ -11,6 +11,7 @@ import { run_board_state, type BoardPorts, type BoardState, type Pace } from './
 import { run_board_status, type ItemStatus } from './run-board-status'
 import { run_board_thanks } from './run-board-thanks'
 import { run_board_tick_draw } from './run-board-tick-draw'
+import { run_board_timing } from './run-board-timing'
 
 // One `run:board` redraw. The frame is redrawn once a second, on the second, so every elapsed time
 // moves by one, its spinners turned between redraws by `run-board-spin.ts`. It draws the last reads
@@ -24,6 +25,7 @@ const { FRESH_STATE } = run_board_state
 const { PLAN_RETRY_MS, gather_github, open_read_of, statuses_for } = run_board_github
 const { gather_thanks } = run_board_thanks
 const { activity_here, bounds_of, closed_under, draw, draw_run } = run_board_tick_draw
+const { drawn } = run_board_timing
 
 // What the last board on this run kept (`run-board-snapshot.ts`); one written on another run is
 // discarded.
@@ -167,6 +169,18 @@ function layout_for(state: BoardState, local: LocalRead, now_ms: number): BoardL
 	})
 }
 
+// The frame with no run, which keeps no spinner.
+function draw_no_run(
+	state: BoardState,
+	read: GatherRead,
+	ports: BoardPorts,
+	now_ms: number,
+): BoardState {
+	draw(ports, run_board_render.render_no_run(now_ms, bounds_of(ports), read))
+
+	return { ...state, ...read, spots: [] }
+}
+
 // One redraw. No run reads nothing from GitHub and keeps the plan it had for when one starts. A live
 // board redraws at the `background` pace; one plain frame waits for the GitHub reads.
 async function tick(
@@ -180,9 +194,7 @@ async function tick(
 	const { local } = read
 
 	if (local === undefined) {
-		draw(ports, run_board_render.render_no_run(now_ms, bounds_of(ports), read))
-
-		return { ...state, ...read, spots: [] }
+		return drawn(ports, 'tick', () => draw_no_run(state, read, ports, now_ms))
 	}
 
 	const gathered = await gather_github(state_for(state, read, local, ports), {
@@ -193,7 +205,10 @@ async function tick(
 	})
 	const thanked = await gather_thanks(gathered, ports, now_ms, pace)
 
-	return draw_run(thanked, local, { ports, now_ms }, layout_for(thanked, local, now_ms))
+	// joshuafolkken/kit#8126: `--timing` times the draw from the layout to the write.
+	return drawn(ports, 'tick', () =>
+		draw_run(thanked, local, { ports, now_ms }, layout_for(thanked, local, now_ms)),
+	)
 }
 
 const run_board_tick = {
