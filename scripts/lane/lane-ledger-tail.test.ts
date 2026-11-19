@@ -226,3 +226,96 @@ describe('lane_ledger_tail.tail_store', () => {
 		expect(store.read(target)).toStrictEqual([merge(1)])
 	})
 })
+
+// Past one chunk of the backward read (`CHUNK_BYTES` in `lane-ledger-tail.ts`).
+const LONGER_THAN_A_CHUNK = 70_000
+
+function issue_of(entry: object): unknown {
+	return 'issue' in entry ? entry.issue : undefined
+}
+
+function appended_lines(parse: { mock: { calls: Array<Array<unknown>> } }): Array<unknown> {
+	return parse.mock.calls.map(([line]) => line).filter(Boolean)
+}
+
+// joshuafolkken/kit#8133: a window asked for again and again while the ledger grows.
+describe('lane_ledger_tail.window_store on a growing ledger', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('returns the kept entries of the window, oldest first', () => {
+		const store = lane_ledger_tail.window_store(is_odd)
+
+		expect(store.read(days_ledger('window-store'), since(1))).toStrictEqual([
+			merge_on(1),
+			merge_on(3),
+		])
+	})
+
+	it('parses only the appended line, and nothing for a later start', () => {
+		const target = days_ledger('window-grow')
+		const store = lane_ledger_tail.window_store()
+
+		store.read(target, since(2))
+		appendFileSync(target, `${JSON.stringify(merge_on(3))}\n`)
+		const parse = vi.spyOn(json_value, 'parse_or_undefined')
+
+		expect(store.read(target, since(2))).toStrictEqual([merge_on(2), merge_on(3), merge_on(3)])
+		expect(store.read(target, since(3))).toStrictEqual([merge_on(3), merge_on(3)])
+		expect(appended_lines(parse)).toStrictEqual([JSON.stringify(merge_on(3))])
+	})
+
+	it('reads backward again for an earlier start', () => {
+		const target = days_ledger('window-earlier')
+		const store = lane_ledger_tail.window_store()
+
+		store.read(target, since(2))
+
+		expect(store.read(target, since(1))).toStrictEqual([merge_on(1), merge_on(2), merge_on(3)])
+	})
+})
+
+describe('lane_ledger_tail.window_store on a replaced or landing ledger', () => {
+	it('reads a replaced ledger backward again', () => {
+		const target = days_ledger('window-replaced')
+		const replacement = ledger_of('window-replacement', [JSON.stringify(merge_on(2)), ''])
+		const store = lane_ledger_tail.window_store()
+
+		store.read(target, since(0))
+		renameSync(replacement, target)
+
+		expect(store.read(target, since(0))).toStrictEqual([merge_on(2)])
+	})
+
+	it('counts a line still landing once it is complete, never twice', () => {
+		const target = days_ledger('window-fragment')
+		const store = lane_ledger_tail.window_store()
+
+		appendFileSync(target, JSON.stringify(merge_on(3)))
+
+		expect(store.read(target, since(3))).toStrictEqual([merge_on(3), merge_on(3)])
+
+		appendFileSync(target, '\n')
+
+		expect(store.read(target, since(3))).toStrictEqual([merge_on(3), merge_on(3)])
+	})
+
+	it('counts a landing line longer than a chunk once it is complete', () => {
+		const target = days_ledger('window-long-fragment')
+		const store = lane_ledger_tail.window_store()
+		const long = { ...merge_on(3), note: 'x'.repeat(LONGER_THAN_A_CHUNK) }
+
+		appendFileSync(target, JSON.stringify(long))
+		store.read(target, since(3))
+		appendFileSync(target, '\n')
+
+		expect(store.read(target, since(3)).map((entry) => issue_of(entry))).toStrictEqual([3, 3])
+	})
+
+	it('reads an absent ledger as no entries', () => {
+		expect(lane_ledger_tail.window_store().read(ledger('window-absent'), since(0))).toStrictEqual(
+			[],
+		)
+	})
+})
