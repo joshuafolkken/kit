@@ -20,7 +20,7 @@ import type { LocalRead } from './run-board-read'
 
 const WORKER_URL = new URL('run-board-gather-worker.ts', import.meta.url)
 const EMPTY_READ = run_board_gather.read_of(run_board_gather.FRESH_GATHER)
-const WORKER_PHASE = 'worker: first round'
+const WORKER_PHASE = 'worker: first answer'
 
 // The run's read as the worker hands it over. A stream read again unchanged is not handed over — the
 // board keeps its own array, so the folds it keyed on that array are not folded again.
@@ -170,7 +170,8 @@ function fail(thread: Thread, worker: GatherWorker, reason: string, now: () => n
 	said_failed(thread, reason, now)
 }
 
-// The first answer is timed from the spawn: the worker's start, its module load and its first round.
+// The first answer is timed from the spawn: the worker's start, its module load and its first read
+// handed over — the early lane read when it lands first, else the round's end.
 function listen(thread: Thread, worker: GatherWorker, now: () => number): void {
 	const spawned_ms = now()
 

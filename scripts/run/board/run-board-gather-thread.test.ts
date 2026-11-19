@@ -221,7 +221,7 @@ describe('run_board_gather_thread phases', () => {
 		await first
 
 		expect(launch_timing.phases()).toStrictEqual([
-			{ name: 'worker: first round', ms: 0 },
+			{ name: 'worker: first answer', ms: 0 },
 			WORKER_PHASE,
 		])
 	})
