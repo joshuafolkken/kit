@@ -1,6 +1,8 @@
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { change_base } from '#scripts/git/change-base'
+import { changed_paths } from '#scripts/git/changed-paths'
+import { git_command } from '#scripts/git/git-command'
 import { git_spawn } from '#scripts/git/git-spawn'
 import { review_code_tree } from '#scripts/review/review-code-tree'
 import { direct_importers } from './direct-importers'
@@ -70,10 +72,11 @@ async function symbols(
 	const base = await change_base.resolved_through_merge()
 	if (typescript === undefined || base === undefined) return undefined
 	const diff = await diff_of(root, base, code)
-
 	const lines = test_symbol_select.changed_lines(diff)
+	const untracked = new Set(changed_paths.to_paths(await git_command.untracked_names()))
+	const changed = test_symbol_select.with_lines(code, lines, untracked)
 
-	return test_symbol_select.select_from(await input_of(root, typescript, code, lines))
+	return test_symbol_select.select_from(await input_of(root, typescript, changed, lines))
 }
 
 function relative_of(root: string, file: string): string {

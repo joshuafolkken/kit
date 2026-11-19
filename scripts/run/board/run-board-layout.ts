@@ -1,6 +1,3 @@
-import type { Declared } from '#scripts/backlog/backlog-overlap'
-import type { PlanContext } from '#scripts/backlog/backlog-plan'
-import type { WavePlan } from '#scripts/backlog/backlog-waves'
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import {
 	has_label_name,
@@ -8,14 +5,23 @@ import {
 	RUN_SOLO_LABEL,
 	RUN_STALLED_LABEL,
 } from '#scripts/issue/issue-labels'
-import type { FiledKind } from '#scripts/run/event/run-event-filed'
 import { run_board_decision } from './run-board-decision'
 import { run_board_earlier, type EarlierLanes } from './run-board-earlier'
 import { run_board_ending_reason } from './run-board-ending-reason'
 import { run_board_human } from './run-board-human'
-import { run_board_kind, type BoardPriority } from './run-board-kind'
-import type { PauseRead } from './run-board-pause'
-import { run_board_retry_wait, type RetryClock } from './run-board-retry-wait'
+import { run_board_kind } from './run-board-kind'
+import { run_board_layout_order } from './run-board-layout-order'
+import type {
+	BoardLayout,
+	BoardPlan,
+	BoardRow,
+	Overlay,
+	QueuedEntry,
+	ReasonOf,
+	RowRead,
+	RowReason,
+} from './run-board-layout-types'
+import { run_board_retry_wait } from './run-board-retry-wait'
 import { run_board_standing_waits } from './run-board-standing-waits'
 import type { ItemState, ItemStatus } from './run-board-status'
 
@@ -30,123 +36,11 @@ import type { ItemState, ItemStatus } from './run-board-status'
 // **An epic and its children are a tree; every other dependency is not.** A child an opted-in epic
 // tracks is drawn under its epic; a `blocked_by` edge is a DAG, so it stays a waiting-on note at the end of the row.
 
-interface BoardPlan extends PauseRead, RetryClock {
-	decision_questions?: ReadonlyMap<number, string> | undefined
-	decision_waits?: ReadonlyMap<number, string> | undefined
-	is_backlog_live?: boolean | undefined
-	human_merge_prs?: ReadonlyMap<number, number> | undefined
-	// The same snapshot's worker identities that the header counts as occupied seats.
-	occupied_lanes?: ReadonlyArray<string> | undefined
-	waves: WavePlan
-	// Which opted-in epic tracks which child (`Plan.tracked`).
-	tracked: ReadonlyMap<number, number>
-	context: PlanContext
-	// Each issue's label names as the open listing read them, so a running row is drawn as its labels
-	// say it stopped.
-	labels: ReadonlyMap<number, ReadonlyArray<string>>
-	// The paths each issue's body declares (`Plan.scope.declared`), which a waiting row is checked
-	// against a running one by; a plan read without them checks none.
-	declared?: Declared | undefined
-	// The issues the classifier withholds for a person (`EpicNextResult.blocked_on_people`) — a blocker
-	// this run will not finish among them — whose waiting row leads with 🙋.
-	withheld?: ReadonlySet<number> | undefined
-}
-
-// Why a waiting row waits, or the stage its lane's launch is at, as one value its row only draws
-// (joshuafolkken/kit#4288): the icon it leads with in place of ⏳, the condition column's value, and
-// what follows its title. A parked, withdrawn or stalled row draws its tail alone.
-interface RowReason {
-	evidence_url?: string | undefined
-	icon?: string | undefined
-	// The condition column's figure — a lane count, a memory reading, a start time.
-	value?: string | undefined
-	// The issues the wait names, in place of a figure: the first in the condition column, with
-	// `+<rest>` where the rest follow its title.
-	issues?: ReadonlyArray<string> | undefined
-	tail?: string | undefined
-	// The pull request the value and tail end on, which the board links where it draws the number
-	// whole (joshuafolkken/kit#7181).
-	pr?: number | undefined
-	// When the row entered a stage, where the reason is one — the condition column counts how long it
-	// has stood there from it.
-	since_ms?: number | undefined
-	// The start time its body declares and the row waits on, which orders the 📅 rows.
-	not_before_ms?: number | undefined
-}
-
-// What a waiting child's row says, given the blockers still standing for it; `undefined` says nothing.
-type ReasonOf = (child: EpicChild, waits: ReadonlyArray<string>) => RowReason | undefined
-
-interface BoardRow {
-	number: number
-	title: string | undefined
-	// The release category its labels place it in (joshuafolkken/kit#3577), none for an Other Change.
-	kind: FiledKind | undefined
-	// The priority label it carries (joshuafolkken/kit#4383), none for a normal one.
-	priority?: BoardPriority | undefined
-	state: ItemState
-	status: ItemStatus | undefined
-	// The standing blockers this row still waits on, as the plan names them.
-	waits: ReadonlyArray<string>
-	// Why the row waits beyond its blockers (`run-board-reason.ts`), or why a parked or withdrawn row
-	// ended; any other row the run has touched has none.
-	reason?: RowReason | undefined
-	// An earlier run's lane (`run-board-earlier.ts`): drawn as its status says, marked 🧳 after its title.
-	is_earlier?: boolean | undefined
-	// A touched child carrying `run:solo`, which nothing else starts beside while it runs.
-	is_solo?: boolean | undefined
-}
-
-type QueuedEntry =
-	| { kind: 'row'; row: BoardRow }
-	| { kind: 'epic'; epic: number; title: string | undefined; rows: Array<BoardRow> }
-
-interface BoardLayout {
-	active: ReadonlyArray<BoardRow>
-	queued: ReadonlyArray<QueuedEntry>
-	people: ReadonlyArray<BoardRow>
-	unreached: ReadonlyArray<BoardRow>
-	// The earlier run's lanes that still hold a place under the limit, and the lanes with no record —
-	// drawn after the run's own lanes, and no row the header counts.
-	earlier?: ReadonlyArray<BoardRow> | undefined
-	// The root checkout's single run beside the run, drawn above its lanes and no row the header counts.
-	root?: { name: string; row: BoardRow } | undefined
-}
-
-// What an active row is named and classified by — each issue's title and labels.
-interface RowRead extends PauseRead {
-	decision_questions?: ReadonlyMap<number, string> | undefined
-	is_backlog_live?: boolean | undefined
-	titles: ReadonlyMap<number, string>
-	labels: ReadonlyMap<number, ReadonlyArray<string>>
-	// Each planned child's standing blockers, which a touched stalled row waits on in place of its retry.
-	waits?: ReadonlyMap<number, ReadonlyArray<string>> | undefined
-}
-
 const NO_READ: RowRead = { titles: new Map(), labels: new Map() }
-
-interface Overlay {
-	plan: BoardPlan
-	statuses: ReadonlyMap<number, ItemStatus>
-}
 
 // The overlay a layout is drawn from: the plan under the statuses, and what each waiting row says.
 interface Drawn extends Overlay {
 	reason_of: ReasonOf | undefined
-}
-
-// A child that has ended for good — drawn in the done section rather than the leading one.
-const FINISHED_STATES: ReadonlySet<ItemState> = new Set([
-	'merged',
-	'done',
-	'already_done',
-	'withdrawn',
-])
-// The finished ones and a parked one: what has stopped moving.
-const SETTLED_STATES: ReadonlySet<ItemState> = new Set([...FINISHED_STATES, 'parked'])
-
-function is_settled(state: ItemState): boolean {
-	return SETTLED_STATES.has(state)
 }
 
 // Whether a blocker the plan names still stands for `child` — the wait its row draws as 🔗.
@@ -187,35 +81,6 @@ function plan_row(child: EpicChild, state: ItemState, overlay: Drawn): BoardRow 
 	}
 }
 
-function is_finished(state: ItemState): boolean {
-	return FINISHED_STATES.has(state)
-}
-
-// Running rows first, then the parked and stopped ones, then the finished ones. A row parked on a
-// decision ranks among the parked, though the render draws it in its own 🙋 section.
-function rank_of(row: BoardRow): number {
-	if (row.state === 'running') return 0
-
-	return is_finished(row.state) ? Infinity : 1
-}
-
-// A finished row sorts by its end, the newest first and one with none last; any other by its start.
-function key_of(row: BoardRow): number {
-	const { started_ms = Infinity, ended_ms = -Infinity } = row.status ?? {}
-
-	return is_finished(row.state) ? -ended_ms : started_ms
-}
-
-function compared(left: number, right: number): number {
-	if (left === right) return 0
-
-	return left < right ? -1 : 1
-}
-
-function active_order(left: BoardRow, right: BoardRow): number {
-	return compared(rank_of(left), rank_of(right)) || compared(key_of(left), key_of(right))
-}
-
 function solo_flag(labels: ReadonlyArray<string> = []): Pick<BoardRow, 'is_solo'> {
 	return has_label_name(labels, RUN_SOLO_LABEL) ? { is_solo: true } : {}
 }
@@ -246,7 +111,7 @@ function touched_row(number: number, status: ItemStatus, read: RowRead): BoardRo
 function active_rows(statuses: ReadonlyMap<number, ItemStatus>, read: RowRead): Array<BoardRow> {
 	const rows = [...statuses].map(([number, status]) => touched_row(number, status, read))
 
-	return rows.toSorted(active_order)
+	return rows.toSorted(run_board_layout_order.active_order)
 }
 
 // The epic row carries its own title, read from the same open listing as its children's — an opted-in
@@ -293,21 +158,12 @@ function queued_entries(queue: ReadonlyArray<EpicChild>, overlay: Drawn): Array<
 	return entries
 }
 
-// A row waiting on no start time keeps its plan place ahead of every 📅 row, which follow from the
-// earliest start (joshuafolkken/kit#4104).
-function start_order(left: BoardRow, right: BoardRow): number {
-	const { not_before_ms: left_ms = -Infinity } = left.reason ?? {}
-	const { not_before_ms: right_ms = -Infinity } = right.reason ?? {}
-
-	return compared(left_ms, right_ms)
-}
-
 function unreached_rows(overlay: Drawn, is_people: boolean): Array<BoardRow> {
 	return overlay.plan.waves.unreached
 		.filter((child) => is_untouched(child, overlay))
 		.map((child) => plan_row(child, plan_state(child), overlay))
 		.filter((row) => (row.state === 'human') === is_people)
-		.toSorted(start_order)
+		.toSorted(run_board_layout_order.start_order)
 }
 
 // Every issue the plan holds, wave or unreached.
@@ -408,7 +264,7 @@ function lane_rows(layout: BoardLayout, apart: ReadonlyArray<BoardRow>): Array<B
 
 // The lanes section's rows: those neither finished nor waiting on a person's decision.
 function lanes_drawn(layout: BoardLayout): Array<BoardRow> {
-	const finished = layout.active.filter((row) => is_finished(row.state))
+	const finished = layout.active.filter((row) => run_board_layout_order.is_finished(row.state))
 
 	return lane_rows(layout, [...finished, ...people_of(layout)])
 }
@@ -424,12 +280,12 @@ function listed_parks(layout: BoardLayout): ReadonlySet<number> {
 
 const run_board_layout = {
 	EMPTY_LAYOUT,
-	active_order,
+	active_order: run_board_layout_order.active_order,
 	drawn_rows,
 	is_blocked,
 	is_decision: run_board_human.is_decision,
-	is_finished,
-	is_settled,
+	is_finished: run_board_layout_order.is_finished,
+	is_settled: run_board_layout_order.is_settled,
 	lane_rows,
 	lanes_drawn,
 	layout_of,
@@ -443,4 +299,14 @@ const run_board_layout = {
 }
 
 export { run_board_layout }
-export type { BoardLayout, BoardPlan, BoardRow, Overlay, QueuedEntry, ReasonOf, RowRead, RowReason }
+
+export {
+	type BoardLayout,
+	type BoardPlan,
+	type BoardRow,
+	type Overlay,
+	type QueuedEntry,
+	type ReasonOf,
+	type RowRead,
+	type RowReason,
+} from './run-board-layout-types'
