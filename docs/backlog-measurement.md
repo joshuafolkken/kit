@@ -1,11 +1,11 @@
-# Backlog 起動の隔離計測
+# Isolated measurement of backlog startup
 
-kit checkout で `pnpm exec tsx tools/backlog/backlog-measure.ts <input.json>` を実行する。
-入口は本番の候補取得・候補cache・driverを呼び、計測専用の Git repository、状態、cache、worker記録先を試行ごとに作る。現行ランの停止・再起動は行わない。
+In a kit checkout, run `pnpm exec tsx tools/backlog/backlog-measure.ts <input.json>`.
+The entry calls the production candidate fetch, candidate cache and driver, and creates a measurement-only Git repository, state, cache and worker record destination for each trial. It does not stop or restart the current run.
 
-## 固定入力
+## Fixed input
 
-次は候補1件、依存待機5件の完全なオフライン入力。候補複数の条件では各行の `blockedBy` を取り除く。実行回数は `repetitions`、空き枠・メモリー待機・使用量待機は `free_lanes`、`memory_held`、`usage_limited`、起動済みは `in_flight` で指定する。
+The following is a complete offline input with one candidate and five dependency waits. For the multiple-candidate condition, remove `blockedBy` from each row. Set the number of runs with `repetitions`; free slots, memory waits and usage waits with `free_lanes`, `memory_held` and `usage_limited`; and the already-launched Issues with `in_flight`.
 
 ```json
 {
@@ -105,111 +105,111 @@ kit checkout で `pnpm exec tsx tools/backlog/backlog-measure.ts <input.json>` �
 }
 ```
 
-`reads` は指定した読取だけを固定応答に置換する。`args` がある行は引数完全一致、ない行はその読取の全呼出しが対象。`json` は通常のJSON値、`listing` はIssue一覧のJSON応答、`set` はIssue番号文字列の集合に復元する。未指定の読取は本番の読取実装を通る。
+`reads` replaces only the listed reads with fixed responses. A row with `args` matches only on exactly those arguments; a row without them covers every call of that read. `json` restores a plain JSON value, `listing` an Issue-list JSON response, and `set` a set of Issue-number strings. A read that is not listed goes through the production read implementation.
 
-未来の開始条件は Issue body の `## 背景` 内に `- 実施可能日: 2999-01-01T00:00Z` と書き、既存labelに `not-before` を含める。label同期が必要な入力はtracker変更の拒否として失敗する。`outcomes` に `{"901":"failed"}` 等を渡すと代替起動の失敗・待機も照合できる。
+For a future start condition, write `- 実施可能日: 2999-01-01T00:00Z` inside `## 背景` of the Issue body and include `not-before` in the existing labels. An input that needs a label sync fails as a refused tracker change. Passing `outcomes` such as `{"901":"failed"}` also checks a failed or waiting replacement launch.
 
-## warm / cold と実通信
+## warm / cold and live requests
 
-- `cold`: 各反復で新しいプロセス、Git作業領域、状態、cacheを作る。
-- `warm`: 一つの隔離プロセスで事前に1回実行し、同じ入力・状態・cacheを保ったまま指定回数を反復する。事前実行は `warmup: true` で集計から除外する。worker記録先は反復ごとに分ける。cacheの期限・入力keyが変わった場合は既存実装どおりmissになるため、生記録のhit/missを併せて読む。
+- `cold`: each repetition creates a new process, Git work area, state and cache.
+- `warm`: runs once beforehand in one isolated process, then repeats the given number of times keeping the same input, state and cache. The pre-run is excluded from aggregation as `warmup: true`. Each repetition gets its own worker record destination. When the cache expiry or the input key changes, the read misses as in the existing implementation, so read the hit/miss in the raw records alongside.
 
-必要なREST読取は `live_get` にGitHub APIの完全な相対endpoint（query stringを含む）を列挙し、対応する固定応答を取り除く。許可endpointへの `gh api` GETだけを通し、pagination、include、jq等の読取用フラグを許可する。GraphQL・tracker書込み・任意のコマンド・実worker起動は拒否する。GraphQLからの読取を集合などの固定応答に置換した場合、その境界は実通信の計測対象に含めない。
+For a REST read that has to be live, list the full relative GitHub API endpoint (query string included) in `live_get` and remove the matching fixed response. Only `gh api` GETs to an allowed endpoint pass, with read flags such as pagination, include and jq allowed. GraphQL, tracker writes, arbitrary commands and real worker launches are refused. When a read from GraphQL is replaced with a fixed response such as a set, that boundary is not part of the live-request measurement.
 
-## 生記録と比較
+## Raw records and comparison
 
-標準出力の `root` が成果物の場所。各試行の `input.json`、`status.json`、`startup.jsonl`、`boundaries.json`、`result-N.json` を保存する。`timeout_ms`（既定60秒）を超えた子プロセスは失敗とし、親プロセス自体の中断では開始時の `incomplete` が残る。
+The `root` on standard output is where the artifacts are. Each trial saves `input.json`, `status.json`, `startup.jsonl`, `boundaries.json` and `result-N.json`. A child process that exceeds `timeout_ms` (60 seconds by default) fails; when the parent process itself is interrupted, the `incomplete` written at the start remains.
 
-`startup.jsonl` は既存startup scope・保存APIの生記録で、run・attempt・Issueに紐付く。`result-N.json` は既存集計APIの結果、候補順、待機理由、driverの状態・拒否結果、境界のsourceを含む。`live` は実プロセス読取、`replay` は固定応答、`replacement` は代替worker動作、`denied` は拒否。API計数は実際の通信経路の計数とし、固定応答の呼出し回数は境界記録で別に数える。Gitの読取も `live` に含まれるため、API回数を境界行数で代用しない。
+`startup.jsonl` is the raw record of the existing startup scope and storage API, tied to the run, attempt and Issue. `result-N.json` holds the result of the existing aggregation API, the candidate order, the wait reasons, the driver's state and refusal results, and the source of each boundary. `live` is a real process read, `replay` a fixed response, `replacement` the replacement worker's behaviour, and `denied` a refusal. The API count counts the actual request path; calls to fixed responses are counted separately in the boundary record. Git reads are also counted as `live`, so do not use the number of boundary rows in place of the API count.
 
-計測範囲は候補取得・cache・driverの開始判断。予算回答・資源条件は入力で固定し、レーン準備・実workerは代替する。代替workerのphaseは明示して記録する。**この範囲の時間を本番全体の起動時間として扱わない。** root以下にしかNodeのファイル書込みを許可せず、外部プロセスの読取も隔離cwdと許可commandに制限する。失敗、拒否、中断、計測記録欠落の試行を成功サンプルに混ぜない。
+The measured range is the candidate fetch, the cache and the driver's start decision. Budget answers and resource conditions are fixed by the input, and lane preparation and the real worker are replaced. The replacement worker's phase is recorded explicitly. **Do not treat the time of this range as the startup time of the whole production run.** Node file writes are allowed only under root, and reads by external processes are limited to the isolated cwd and the allowed commands. A trial that failed, was refused, was interrupted or lacks measurement records is not mixed into the successful samples.
 
-## 完全性と warm の由来
+## Completeness and warm origin
 
-`status.json.status` の `completed` は子プロセスの終了状態だけを表す。`measurement_complete` と各 `result-N.json.completeness` を併せて読む。入口の `succeeded` は、予定した全結果が存在し、全試行が `normal` または意図した `waiting` の場合だけtrueになる。
+`completed` in `status.json.status` reflects only the exit state of the child process. Read `measurement_complete` and each `result-N.json.completeness` alongside it. The entry's `succeeded` is true only when every planned result exists and every trial is `normal` or an intended `waiting`.
 
-- `normal`: 必要な工程が終了し、読取欠測・検索上限・不完全なwarmupの継承がない。`normal_sample: true`。
-- `degraded`: 外側の選定は継続したが、子工程failed、必要な不具合率の欠測、または読取結果の `is_capped: true` がある。
-- `failed`: 外側の選定または代替起動が失敗した。
-- `waiting`: 正常な選定の後、入力で指定した資源・開始条件により起動を待つ。正常起動時間の標本には数えない。
-- `incomplete`: 工程の終了記録がない、またはstartup記録自体がない。親の中断では従来どおり開始時のstatusが残る。
+- `normal`: the required steps finished, with no missing read, no search cap and no inherited incomplete warmup. `normal_sample: true`.
+- `degraded`: the outer selection continued, but a child step failed, a required defect rate is missing, or a read result has `is_capped: true`.
+- `failed`: the outer selection or the replacement launch failed.
+- `waiting`: after a normal selection, the launch waits on the resource or start condition given in the input. Not counted as a normal startup-time sample.
+- `incomplete`: a step has no end record, or there is no startup record at all. When the parent is interrupted, the status written at the start remains, as before.
 
-`reasons` は子工程・読取の不完全性を示す。`observation` 境界は読取結果の検査であり、通信回数でも固定応答の追加呼出しでもない。warmの後続結果は `warmup_origin` に事前実行のattemptを保存する。不完全なwarmupの理由は、後続がcache hit・API0でも継承する。この群全体を保守的に除外し、途中のcache失効・再取得だけでは独立した正常群へ昇格させない。本番cacheの保存条件やフォールバックは既存実装のまま。
+`reasons` shows the incompleteness of child steps and reads. An `observation` boundary is a check of a read result — neither a request count nor an extra call to a fixed response. Later warm results save the pre-run's attempt in `warmup_origin`. The reason for an incomplete warmup is inherited even when the later results are a cache hit with zero API calls. The whole group is excluded conservatively; a cache expiry and refetch partway through does not on its own promote it to an independent normal group. The production cache's storage conditions and fallbacks stay as in the existing implementation.
 
-許可した実GETの失敗は境界の `failure`、`http_status`、`response_reason` に保存する。`endpoint_index` は入力の `live_get` の0始まりの位置（未登録は-1）。応答本文・エラー文・アカウント情報は保存せず、既知の応答理由だけを固定文言へ分類する。`unreported` は理由または状態が取得できなかったことを示し、403だけでレート制限と推測しない。startupのAPI計数はretryを含む実呼出しの試行回数であり、HTTP失敗境界数、検索欠測、取得成功数とは別である。
+A failure of an allowed live GET is saved in the boundary's `failure`, `http_status` and `response_reason`. `endpoint_index` is the zero-based position in the input's `live_get` (-1 when not listed). Response bodies, error text and account information are not saved; only known response reasons are classified into fixed wording. `unreported` means the reason or status could not be obtained; a 403 alone is not presumed to be a rate limit. The startup API count is the number of actual call attempts, retries included, and is separate from the number of HTTP failure boundaries, missing searches and successful fetches.
 
-## 同じ条件での実通信標本
+## Live-request samples under the same conditions
 
-不具合率の検索は、1000件超のときだけ元の `created:>=` / `closed:>=` 期間を秒単位の互いに重ならない区間へ分割する。最後の区間には上限を設けず、元の母集団を保つ。各区間は100件/page、最大1000件を取得し、一つの元検索あたり最大15区間（分割前の検索を含む）を読む。1000件超の区間では最初のpageだけを読み、再試行はしない。HTTP失敗は欠測、不完全応答・件数不一致・重複・分割予算切れ・秒単位でも上限超過は `is_capped: true` のまま正常群から除外する。
+The defect-rate search splits the original `created:>=` / `closed:>=` period into non-overlapping intervals at one-second granularity only when it exceeds 1000 results. The last interval has no upper bound, keeping the original population. Each interval is fetched at 100 per page, up to 1000 results, and up to 15 intervals (the pre-split search included) are read per original search. For an interval over 1000 results only the first page is read, with no retry. An HTTP failure is a missing value; an incomplete response, a count mismatch, a duplicate, an exhausted split budget, or exceeding the cap even at one-second granularity stays `is_capped: true` and is excluded from the normal group.
 
-再測定には保存済み入力のコピーを新しい隔離入口で使い、候補・依存・資源条件・元query・開始日を保持する。分割の基準日は集計時刻のUTC日付で、同じUTC日内は固定される。cold/warm間で基準日を揃え、各区間の完全一致endpointとpageを `live_get` に追加する。許可リストにない区間は従来どおり拒否されるため、その試行を正常標本には採用しない。必要な検索API予算が回復し、全区間・全pageが成功し、元検索の件数と重複のない和集合が一致した場合だけ正常な実通信反復へ戻れる。現行live runの入力・状態・起動には触れず、正常判定と外部書込み拒否は維持する。性能比較と削減秒数の認定は #7423 で行う。秒単位の期間指定は [GitHubの検索仕様](https://docs.github.com/en/search-github/searching-on-github/searching-issues-and-pull-requests#search-by-when-an-issue-or-pull-request-was-created-or-last-updated) に従う。
+A re-measurement runs a copy of the saved input through a new isolated entry, keeping the candidates, dependencies, resource conditions, original query and start date. The split's reference date is the UTC date at aggregation time and stays fixed within the same UTC day. Align the reference date between cold and warm, and add each interval's exact-match endpoint and page to `live_get`. An interval missing from the allowlist is refused as before, so such a trial is not adopted as a normal sample. Only when the required search API budget has recovered, every interval and every page succeeded, and the original search's count matches the duplicate-free union can the run return to normal live-request repetitions. The current live run's input, state and launches are not touched, and the normal-sample judgement and the external-write refusal are kept. The performance comparison and the certification of seconds saved happen in #7423. The second-granularity period follows [GitHub's search syntax](https://docs.github.com/en/search-github/searching-on-github/searching-issues-and-pull-requests#search-by-when-an-issue-or-pull-request-was-created-or-last-updated).
 
-候補901〜906とその依存、開始条件、空き枠、検索query・日付・pageを固定した元入力を保持する。候補一覧・依存などをreplayし、計測対象の不具合率GETだけを実通信にすれば、候補集合を変えずに対象読取を測れる。ただしGitHub上の検索母集団は固定できず、同じqueryでも後続の更新や取得上限で不完全になり得る。正常系を採用するには対象の全検索が成功し、`is_capped: false` であり、coldの独立試行とwarmの事前実行・全反復が完全であることを毎回確認する。全replay群は実通信baselineへ混ぜない。
+Keep the original input that fixes candidates 901–906 and their dependencies, the start condition, the free slots, and the search query, date and page. Replaying the candidate list, the dependencies and the like, and making only the measured defect-rate GETs live, measures the target reads without changing the candidate set. The search population on GitHub cannot be fixed, though, and even the same query can come back incomplete through later updates or the fetch cap. To adopt a normal sample, confirm each time that every target search succeeded, that `is_capped: false`, and that the independent cold trials and the warm pre-run and all its repetitions are complete. All-replay groups are not mixed into the live-request baseline.
 
-2026-11-13、#7423 の保存済み `live-one-cold` / `live-one-warm` / `live-multiple-cold` / `live-multiple-warm` 入力をそのまま隔離入口で再実行した。coldは各3回、warmは事前実行と各5回。検索上限またはHTTP403による欠測と、そのwarm由来の継承により、4群とも正常系 **n=0**。実GETが成功した試行も検索上限を理由に除外した。許可したGETの取得条件を満たせる証拠は得られておらず、性能比較は未成立である。元入力と成果物はローカルのgit共通ディレクトリ配下 `josh/measurements/7460-completeness/` に保持する。本番ラン操作や検索範囲の変更で代用しない。
+On 2026-11-13, the saved `live-one-cold` / `live-one-warm` / `live-multiple-cold` / `live-multiple-warm` inputs of #7423 were re-run unchanged through the isolated entry. Cold ran 3 times each; warm ran a pre-run and 5 times each. Missing values from the search cap or HTTP 403, and their inheritance from the warm origin, left all four groups with **n=0** normal samples. Trials whose live GETs succeeded were also excluded for the search cap. No evidence was obtained that the fetch conditions of the allowed GETs can be met, and the performance comparison is not established. The original inputs and artifacts are kept locally under `josh/measurements/7460-completeness/` in the git common directory. Production run operations or a change of search range are not a substitute.
 
-## 分割取得後の再計測手順（#7423）
+## Re-measurement procedure after split fetching (#7423)
 
-対象は commit `928d1f7813d774b141cf56e30229beaa63bf5d57`。既存の4群の入力を保持し、分割先の完全一致GET許可だけを追加する。候補・依存・開始条件・資源条件・元query・sinceは変更しない。2026-11-13 UTCの最初の分割は2026-11-06T12:00:00Zで、左の終端はその1秒前、右は開区間のまま。各元queryの深さ3まで（15区間）の許可を事前生成する。これより深い分割が必要な試行は許可外として除外する。
+The target is commit `928d1f7813d774b141cf56e30229beaa63bf5d57`. Keep the inputs of the existing four groups and add only exact-match GET permissions for the split intervals. Do not change the candidates, dependencies, start condition, resource conditions, original query or since. The first split on 2026-11-13 UTC was at 2026-11-06T12:00:00Z; the left interval ends one second before it, and the right stays open. Permissions down to depth 3 (15 intervals) of each original query are generated in advance. A trial that needs a deeper split is excluded as outside the permissions.
 
-coldは群ごとに独立試行3回、warmは正常な事前実行1回と同一プロセス内5回。coldの各呼出しは反復数1とし、群を交互に実行する。検索枠の回復待ちは試行の外側に置き、工程時間へ加算しない。各試行の完全性とwarmの由来を確認してから正常群へ採用する。逐次試行のため同時missの共有効果は測れない。
+Cold runs 3 independent trials per group; warm runs one normal pre-run and 5 repetitions in the same process. Each cold call uses a repetition count of 1, and the groups run alternately. Waiting for the search quota to recover happens outside the trial and is not added to the step time. Each trial is adopted into the normal group only after its completeness and warm origin are confirmed. Because the trials are sequential, the shared effect of concurrent misses cannot be measured.
 
-生記録と元一時rootの対応はgit共通ディレクトリ配下 `josh/measurements/7423-baseline-928d1f7/` に保存する。各群・試行の `scenario.json`、`run.json` と `raw/0/` 以下のinput/status/startup/boundaries/resultを保持する。これはローカル成果物で、公開添付ではない。APIはgh spawn単位、工程時間は親が子を含むため加算しない。固定応答の候補一覧・依存照会と、代替workerは実通信・実起動の性能標本に含めない。
+The mapping between the raw records and their original temporary roots is saved under `josh/measurements/7423-baseline-928d1f7/` in the git common directory. For each group and trial, `scenario.json`, `run.json` and the input/status/startup/boundaries/result under `raw/0/` are kept. These are local artifacts, not public attachments. The API is counted per gh spawn; step times are not summed, because the parent includes its children. The fixed-response candidate list and dependency lookups, and the replacement worker, are not part of the performance samples of live requests and real launches.
 
-### coldの正常標本
+### Normal cold samples
 
-次は中央値 / 最大値（ms）。各群n=3、全試行normal。候補cache・不具合率cacheは各群hit0/miss3/fill3、REST各60回（毎試行filed13 / completed7）。同時missは各0だが逐次条件に限る。
+The figures are median / maximum (ms). n=3 per group, every trial normal. The candidate cache and the defect-rate cache were hit0/miss3/fill3 per group, with 60 REST calls per group (filed13 / completed7 per trial). Concurrent misses were 0 per group, but only under the sequential condition.
 
-- 単一候補: 親11500.791 / 11722.064、候補cache fill10906.588 / 11214.388、候補一覧1.314 / 1.357、候補適格性10863.676 / 11178.841、不具合率10846.395 / 11165.119、不具合率cache fill10844.781 / 11164.041、eligibility23.695 / 26.633、代替worker（n=3）0.408 / 0.429。
-- 複数候補: 親11082.591 / 13858.114、候補cache fill10319.084 / 13276.682、候補一覧1.097 / 1.115、候補適格性10275.970 / 13243.541、不具合率10261.921 / 13230.863、不具合率cache fill10260.335 / 13229.687、eligibility25.698 / 34.130、代替worker（n=6）0.550 / 1.074。
+- Single candidate: parent 11500.791 / 11722.064, candidate cache fill 10906.588 / 11214.388, candidate list 1.314 / 1.357, candidate eligibility 10863.676 / 11178.841, defect rate 10846.395 / 11165.119, defect-rate cache fill 10844.781 / 11164.041, eligibility 23.695 / 26.633, replacement worker (n=3) 0.408 / 0.429.
+- Multiple candidates: parent 11082.591 / 13858.114, candidate cache fill 10319.084 / 13276.682, candidate list 1.097 / 1.115, candidate eligibility 10275.970 / 13243.541, defect rate 10261.921 / 13230.863, defect-rate cache fill 10260.335 / 13229.687, eligibility 25.698 / 34.130, replacement worker (n=6) 0.550 / 1.074.
 
-coldの不具合率読取がこの範囲の支配工程。completedの件数化は等価性を検証する後続候補とする。既存の候補共有cacheと重なるcacheの追加は不採用。同時照会共有、待機Issue照会絞込み、起動前Issue情報共有、実レーン準備は、この逐次・固定応答・代替起動の計測から効果を判定できないため採用を保留する。候補数による中央値の差を因果効果とは扱わず、削減秒数は約束しない。
+The cold defect-rate read dominates this range. Fetching completed as a count is a follow-up candidate whose equivalence is to be verified. A cache overlapping the existing shared candidate cache is not adopted. Sharing concurrent lookups, narrowing the waiting-Issue lookup, sharing Issue information before launch, and real lane preparation are held back, because this sequential, fixed-response, replacement-launch measurement cannot judge their effect. The difference in medians by candidate count is not treated as a causal effect, and no seconds saved are promised.
 
-### warm・選定・対照の照合
+### Checking warm, selection and controls
 
-warmは各n=5、正常な事前実行1回ずつを除外。単一候補の親は中央値12.516 / 最大14.108ms、代替worker（n=5）は0.352 / 0.514ms。複数候補の親は12.009 / 14.132ms、代替worker（n=10）は0.471 / 0.563ms。各群candidate cache hit5/miss0/fill0、REST0、同時miss0。候補cache hitで不具合率等の子工程は実行されず、その時間を0msとは扱わない。事前実行は各REST20回、coldと同じfiled13 / completed7。正常標本16件のREST計120回、事前実行を含む採取全体では160回。
+Warm had n=5 per group, excluding one normal pre-run each. The single-candidate parent had a median of 12.516 / maximum of 14.108 ms, and the replacement worker (n=5) 0.352 / 0.514 ms. The multiple-candidate parent had 12.009 / 14.132 ms, and the replacement worker (n=10) 0.471 / 0.563 ms. Every group had candidate cache hit5/miss0/fill0, REST0 and 0 concurrent misses. On a candidate cache hit, child steps such as the defect rate do not run, and their time is not treated as 0 ms. Each pre-run made 20 REST calls, filed13 / completed7 as in cold. The 16 normal samples made 120 REST calls in total, and the whole collection, pre-runs included, 160.
 
-単一候補は901選定・代替起動、902～906は901への依存待機。複数候補は901～905選定、空き枠2で901・902を代替起動。入力6件と出力上限5件を区別する。正常標本はすべてin_flightに重複なし、拒否境界なし。実資源待ち・実レーン準備・実worker起動の標本は0。
+Single candidate: 901 is selected and launched by the replacement, and 902–906 wait on their dependency on 901. Multiple candidates: 901–905 are selected, and with 2 free slots 901 and 902 are launched by the replacement. The input of 6 is told apart from the output cap of 5. Every normal sample had no duplicate in in_flight and no refusal boundary. There were 0 samples of real resource waits, real lane preparation and real worker launches.
 
-保存済み対照入力も各1回再実行した。failed-workerはfailedで起動呼出し1回・stall記録1回、waiting-workerはwaitingで起動呼出し1回、どちらもin_flightは空。memory/capacity/usage待機と未来開始条件はwaitingで起動なし。already-runningは901のみを保持し追加起動なし。1ms timeoutは結果なし・timed_out。これら8件と以前の不完全試行は正常時間の分母に含めない。
+The saved control inputs were also re-run once each. failed-worker was failed, with one launch call and one stall record; waiting-worker was waiting, with one launch call; in_flight was empty for both. The memory/capacity/usage waits and the future start condition were waiting, with no launch. already-running kept only 901, with no additional launch. A 1 ms timeout gave no result and timed_out. These 8 and the earlier incomplete trials are not part of the denominator of normal times.
 
-元run `f660a273f2e9309a` の開始03:05:33.536Z→offer03:05:51.982Zは18.446秒、child-launch03:06:12.776Zまでは39.240秒。seenは7419/7400/7384/7228/5510/5272/5085、startedは7419で今回の固定入力と異なる。launch start03:05:54.015Z以降をinstall時間とは扱わず、ledger dispatch03:06:12.826Zも別の観測点。今回の親区間とは始終点・分母が異なり、差を改善秒数にしない。元のAPI/cache/install内訳は復元不能。
+The original run `f660a273f2e9309a` took 18.446 seconds from start 03:05:33.536Z to offer 03:05:51.982Z, and 39.240 seconds to child-launch 03:06:12.776Z. seen was 7419/7400/7384/7228/5510/5272/5085 and started was 7419, which differ from this fixed input. The time after launch start 03:05:54.015Z is not treated as install time, and ledger dispatch 03:06:12.826Z is a separate observation point. Its start and end points and its denominator differ from this parent interval, so the difference is not counted as seconds improved. The original API/cache/install breakdown cannot be recovered.
 
-`summary.json` に全工程の中央値・最大値、標本別API数と選定結果を保存する。中央値は偶数なら中央2値の平均。検証scriptは固定入力との等価性、完全性、warm由来、API計数と通信境界の一致、順序と一意性、8対照の状態を照合する。`manifest.json` に再実行・集計scriptと生記録のSHA-256を保持する。同じqueryでもGitHub母集団とホスト負荷は変化するため、各cold n=3の結果を本番全体の保証には使わない。
+`summary.json` saves the median and maximum of every step, the API count per sample and the selection results. The median of an even count is the mean of the middle two values. The verification script checks equivalence with the fixed input, completeness, warm origin, agreement of the API counts with the request boundaries, order and uniqueness, and the states of the 8 controls. `manifest.json` keeps the SHA-256 of the re-run and aggregation scripts and of the raw records. Even with the same query the GitHub population and the host load vary, so the cold n=3 results are not used as a guarantee for the whole production run.
 
-## 分母の件数取得（#7424）
+## Fetching the denominator as a count (#7424)
 
-分母は同じ `is:issue is:closed reason:completed label:enhancement closed:>=<since>` queryの `total_count` を `per_page=1` で読む。下限日と開いた上限を保持し、1000件の一覧取得上限による期間分割は分母に不要となる。件数は非負整数かつ `incomplete_results: false` の応答だけを採用する。不完全応答・不正な件数は再検索せず欠測とし、cacheにも残さない。HTTP一時障害は既存通信層で再試行し、最終的に失敗した場合は欠測としてcacheに残さない。[検索APIの不完全応答の仕様](https://docs.github.com/en/rest/search/search#timeouts-and-incomplete-results)に従う。
+The denominator reads the `total_count` of the same `is:issue is:closed reason:completed label:enhancement closed:>=<since>` query with `per_page=1`. The lower-bound date and the open upper bound are kept, and the denominator needs no period split for the 1000-result list cap. A count is adopted only from a response with a non-negative integer and `incomplete_results: false`. An incomplete response or an invalid count is not searched again; it is a missing value and is not kept in the cache. A transient HTTP failure is retried by the existing transport layer; if it still fails, it is a missing value and is not kept in the cache. This follows [the search API's specification for incomplete results](https://docs.github.com/en/rest/search/search#timeouts-and-incomplete-results).
 
-分子は従来どおり本文・ラベルの全件取得と期間分割を使う。本文だけの厳密な不具合宣言、`bug` / `bugfix` / `route:interrupt` のいずれも数え、候補1件でも不具合率を計算する。既存cacheのキーと15分の鮮度、候補の60秒cacheは維持する。同時miss共有と待機Issue・計画コメント照会の絞込みは、#7423 の逐次計測では効果を判断できないため採用しない。
+The numerator keeps the full fetch of bodies and labels and the period split, as before. A strict defect declaration in the body alone and any of `bug` / `bugfix` / `route:interrupt` are counted, and the defect rate is computed even with one candidate. The existing cache key and its 15-minute freshness, and the 60-second candidate cache, are kept. Sharing concurrent misses and narrowing the waiting-Issue and plan-comment lookups are not adopted, because the sequential measurement of #7423 cannot judge their effect.
 
-### 件数取得への切替後の比較
+### Comparison after switching to the count fetch
 
-2026-11-13、保存済み4群の候補・依存・開始条件・資源条件・query・sinceを保持し、新しい `per_page=1` の完全一致GET許可だけを追加して再実行した。coldは各3独立プロセス、warmは各1事前実行＋5反復で、正常標本は16件。全標本の選定・代替起動・一意性と拒否境界なしを照合した。別の実通信照合では、同じ分母queryの全件取得632件と `total_count` 632件が一致した。
+On 2026-11-13, the four saved groups were re-run keeping their candidates, dependencies, start conditions, resource conditions, query and since, adding only the exact-match GET permission for the new `per_page=1`. Cold ran 3 independent processes each and warm 1 pre-run + 5 repetitions each, for 16 normal samples. The selection, replacement launch, uniqueness and the absence of refusal boundaries were checked for every sample. In a separate live-request check, a full fetch of the same denominator query (632) matched the `total_count` (632).
 
-- coldは全6試行ともREST14回（filed13 / completed1）。ベースライン20回から6回、30%減った。warmは全10反復とも既存候補cache hitでREST0、事前実行は各14回。本文を読む分子の通信は削減していない。
-- 親区間の中央値 / 最大値（ms）は単一cold 11124.008 / 11576.022、複数cold 11202.478 / 11867.702、単一warm 18.100 / 21.508、複数warm 49.808 / 64.403。coldの中央値は一方向に改善しておらず、warmもベースラインより遅い。ホスト負荷を固定した対照比較ではなく、warmは変更した不具合率処理自体を実行しないため、差を切替の因果効果とは認定しない。採用根拠は同じ選定結果でのAPI回数削減であり、起動時間の改善秒数は約束しない。
-- 保存済み8対照も再実行し、失敗・待機・既起動・開始日・timeoutの状態と起動番号が一致した。別の隔離プロセス試験で完成cacheの他プロセス再利用、TTL失効、失敗後の再試行、計算途中のプロセス終了後の再計算を確認した。同時missは従来どおり2プロセスがそれぞれ2検索し、計算を統合しない。人工的な同時missは実運用での重複頻度の実測とは区別する。
+- Cold made 14 REST calls in all 6 trials (filed13 / completed1), 6 fewer than the baseline's 20, a 30% reduction. Warm hit the existing candidate cache with REST0 in all 10 repetitions, and each pre-run made 14. The requests of the numerator, which reads bodies, were not reduced.
+- The parent interval's median / maximum (ms) was single cold 11124.008 / 11576.022, multiple cold 11202.478 / 11867.702, single warm 18.100 / 21.508, multiple warm 49.808 / 64.403. The cold medians did not improve in one direction, and warm is slower than the baseline too. This is not a controlled comparison with fixed host load, and warm does not run the changed defect-rate processing at all, so the difference is not certified as a causal effect of the switch. The basis for adoption is the reduced API count with the same selection results; no seconds of startup improvement are promised.
+- The 8 saved controls were also re-run, and the states and launch numbers for failure, waiting, already running, start date and timeout matched. A separate isolated-process test confirmed reuse of a completed cache by another process, TTL expiry, retry after a failure, and recalculation after a process ended mid-calculation. Concurrent misses still had two processes each run two searches, without merging the calculation. Artificial concurrent misses are kept apart from a measurement of how often duplicates occur in real operation.
 
-生記録、集計と再実行script、完全一致GET許可、SHA-256 manifestはgit共通ディレクトリ配下 `josh/measurements/7424-count-1794567921838/`、8対照は `josh/measurements/7424-controls-1794568032073/` に保存した。実レーン準備・実worker起動の性能標本は含まない。
+The raw records, the aggregation and re-run scripts, the exact-match GET permissions and the SHA-256 manifest are saved under `josh/measurements/7424-count-1794567921838/` in the git common directory, and the 8 controls under `josh/measurements/7424-controls-1794568032073/`. Performance samples of real lane preparation and real worker launches are not included.
 
-## 宣言なしの起動前読取（#7425）
+## Pre-launch reads without a declaration (#7425)
 
-#7423・#7424 の正常標本は実起動前の来歴確認を測っていないため、選定後の読取だけを追加計測した。実レーン準備・install・setupは変更しない。独立した起動は既存の並列処理を維持し、close・標本待ちの後にsplitや起動を先行させる並列化は採用しない。
+The normal samples of #7423 and #7424 did not measure the provenance check before a real launch, so only the reads after selection were measured in addition. Real lane preparation, install and setup are unchanged. Independent launches keep the existing parallel processing, and a parallelization that runs a split or a launch ahead of close or a sample wait is not adopted.
 
-2026-11-13、無宣言の実Issue #7425（単一）と #7425/#7424（複数）を使用した。現行の来歴読取→labels/bodyと、REST本文の宣言判定→labels/bodyを比較した。各条件coldは3独立process、warmは各process内5反復（計15）。coldはprocess/memo coldで、disk ETagは保持した。全cold RESTは304だった。
+On 2026-11-13, the real Issue #7425 with no declaration (single) and #7425/#7424 (multiple) were used. The current provenance read → labels/body was compared with the REST body's declaration check → labels/body. For each condition, cold ran 3 independent processes and warm 5 repetitions within each process (15 in total). Cold was process/memo cold, with the disk ETag kept. Every cold REST call returned 304.
 
-次は中央値 / 最大値（ms）、API回数は群内のgh spawn計数（HTTP課金数ではない）。
+The figures are median / maximum (ms); API counts are gh spawn counts within the group (not HTTP billing counts).
 
-- 単一cold: 現行1326.024 / 1736.971、REST3＋GraphQL3。先行判定657.012 / 709.033、REST3。
-- 単一warm: 現行621.943 / 1086.528、GraphQL15。先行判定0.134 / 0.153、API0。
-- 複数cold: 現行2730.527 / 3060.829、REST6＋GraphQL6。先行判定1313.060 / 1457.185、REST6。
-- 複数warm: 現行1285.576 / 2207.028、GraphQL30。先行判定0.194 / 0.274、API0。
+- Single cold: current 1326.024 / 1736.971, REST3 + GraphQL3. Early check 657.012 / 709.033, REST3.
+- Single warm: current 621.943 / 1086.528, GraphQL15. Early check 0.134 / 0.153, API0.
+- Multiple cold: current 2730.527 / 3060.829, REST6 + GraphQL6. Early check 1313.060 / 1457.185, REST6.
+- Multiple warm: current 1285.576 / 2207.028, GraphQL30. Early check 0.194 / 0.274, API0.
 
-現行の来歴読取後のlabels/bodyは追加REST0で、既存memoが共有していた。削減対象は無宣言でも毎回発生するGraphQLであり、RESTの重複ではない。変更は無宣言時の来歴照会省略だけとする。宣言あり・本文不足では元の来歴読取へ進み、author/editorを検証したsnapshotの宣言を再parseして実行する。未検証本文のcommandは実行しない。
+After the current provenance read, labels/body took 0 extra REST calls, shared through the existing memo. What the change removes is the GraphQL call made every time even with no declaration, not a duplicate REST call. The change only skips the provenance lookup when there is no declaration. With a declaration, or an insufficient body, it goes on to the original provenance read, and re-parses and runs the declaration from the snapshot whose author/editor were verified. A command from an unverified body is not run.
 
-共有するのは既存REST memoの本文だけで、実行許可には使わない。取得開始時刻をmemoが保持し、10秒TTL、Issue書込時の全失効、失敗時削除を維持する。期限切れは再取得する。古い無宣言のヒントは計測を省略することがあるが、commandを許可しない。古い宣言・不足・未信頼snapshotからの実行は既存検証に従う。新しいcacheや起動プロセス間の実行許可共有は追加しない。
+Only the body in the existing REST memo is shared, and it is never used as execution permission. The memo holds the fetch start time and keeps the 10-second TTL, the full invalidation on an Issue write and the deletion on failure. An expired entry is fetched again. A stale no-declaration hint may skip the measurement, but never permits a command. Running from a stale declaration, an insufficient body or an untrusted snapshot follows the existing verification. No new cache and no sharing of execution permission across launch processes is added.
 
-単一条件の待機5件は選定後なので読取・起動対象に含めず、複数2件の局所probeは逐次実行した。候補選定・資源待ち・実レーン準備・実workerは測っていない。候補1＋依存待機5件／複数の選定同値・対照は前節の記録を維持する。固定順序、小標本、ホスト負荷の影響があり、上記の差を本番起動全体の短縮秒数とは認定しない。
+The 5 waits of the single condition come after selection, so they are outside the reads and launches, and the local probe of the 2 multiple Issues ran sequentially. Candidate selection, resource waits, real lane preparation and real workers were not measured. The records of the previous sections — the selection equivalence for 1 candidate + 5 dependency waits and for multiple candidates, and the controls — stand. Because of the fixed order, the small samples and the host load, the differences above are not certified as seconds saved in the whole production startup.
 
-生記録6件、probe・集計・副作用禁止smokeのscript、summaryとSHA-256 manifestはgit共通ディレクトリ配下 `josh/measurements/7425-prelaunch-1794570480/` に保存した。probeは本番の来歴読取・REST読取・宣言parserだけを使い、計測command、close/comment、split unit、lane/workerを呼ばない。smokeはcommand実行・tracker書込を拒否した上で変更後の本番判定を呼び、`launch`・REST1・GraphQL0を確認した。
+The 6 raw records, the probe, aggregation and no-side-effect smoke scripts, the summary and the SHA-256 manifest are saved under `josh/measurements/7425-prelaunch-1794570480/` in the git common directory. The probe uses only the production provenance read, REST read and declaration parser, and calls no measurement command, close/comment, split unit or lane/worker. The smoke called the changed production decision with command execution and tracker writes refused, and confirmed `launch`, REST1 and GraphQL0.

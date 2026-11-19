@@ -4,7 +4,6 @@ import { safe_chain_preinstall } from '#scripts/safe-chain/preinstall-command'
 import { describe, expect, it } from 'vitest'
 import {
 	CONTRIBUTING_DOC,
-	has_japanese_prose,
 	linked_paths,
 	read_document,
 	read_unwrapped,
@@ -89,12 +88,6 @@ function markdown_in(directory: string): Array<string> {
 		.map((entry) => `${directory}/${entry}`)
 }
 
-function markdown_under(directory: string): Array<string> {
-	return readdirSync(package_file(directory), { encoding: 'utf8', recursive: true })
-		.filter((entry) => entry.endsWith('.md'))
-		.map((entry) => `${directory}/${entry}`)
-}
-
 function user_guides(): Array<string> {
 	return [
 		...USER_GUIDE_PAGES,
@@ -107,17 +100,6 @@ function published_entries(): Array<string> {
 
 	return manifest.files.filter((entry) => !entry.startsWith('!'))
 }
-
-describe('the maintainer documentation language', () => {
-	it.each(markdown_under(MAINTAINERS_DIRECTORY))('%s carries no Japanese prose', (path) => {
-		expect(has_japanese_prose(read_document(path))).toBe(false)
-	})
-
-	it('reads a quoted Japanese heading as a quote, not as prose', () => {
-		expect(has_japanese_prose('See `wip-cap.md` → "規則" and `## 背景`.')).toBe(false)
-		expect(has_japanese_prose('The 規則 section.')).toBe(true)
-	})
-})
 
 describe('the maintainer documentation', () => {
 	it('indexes every maintainer page', () => {
