@@ -114,7 +114,8 @@ describe('run_board_cli.run --fresh and the record date', () => {
 // joshuafolkken/kit#7938: a live board records the frames `--chat` and `--once` answer from, drawn
 // from what it already read.
 const ESCAPE = '\u{1B}'
-const HOME = `${ESCAPE}[H${ESCAPE}[J`
+// joshuafolkken/kit#8125: a live frame starts its synchronized output at the top of the screen.
+const HOME = `${ESCAPE}[?2026h${ESCAPE}[H`
 const LIVE_SECONDS = 11
 const LIVE_MS = LIVE_SECONDS * 1000
 const LIVE_AGE = String(LIVE_SECONDS)
