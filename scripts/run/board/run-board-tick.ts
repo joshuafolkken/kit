@@ -1,4 +1,5 @@
 import { run_board_data, type DataStep } from './run-board-data'
+import { run_board_display } from './run-board-display'
 import type { EarlierLanes } from './run-board-earlier'
 import { run_board_github } from './run-board-github'
 import { run_board_layout, type BoardLayout, type BoardPlan } from './run-board-layout'
@@ -30,7 +31,8 @@ import { run_board_timing } from './run-board-timing'
 const { REDRAW_MS } = run_board_spin
 const { FRESH_STATE } = run_board_state
 const { PLAN_RETRY_MS, open_read_of, statuses_for } = run_board_github
-const { activity_here, bounds_of, closed_under, draw, draw_run } = run_board_tick_draw
+const { activity_here, assemble_display, closed_under } = run_board_display
+const { bounds_of, draw, draw_display } = run_board_tick_draw
 const { drawn } = run_board_timing
 
 // The data the redraw draws: what a live board's worker posted beside the reads, or a step taken here.
@@ -177,9 +179,11 @@ async function tick(
 	if (local === undefined) return drawn(ports, 'tick', () => draw_no_run(next, ports, now_ms))
 
 	// joshuafolkken/kit#8126: `--timing` times the draw from the layout to the write.
-	return drawn(ports, 'tick', () =>
-		draw_run(next, local, { ports, now_ms }, layout_for(next, local, now_ms)),
-	)
+	return drawn(ports, 'tick', () => {
+		const display = assemble_display(next, local, now_ms, layout_for(next, local, now_ms))
+
+		return draw_display(next, display, { ports, now_ms })
+	})
 }
 
 const run_board_tick = {

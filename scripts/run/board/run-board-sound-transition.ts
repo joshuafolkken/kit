@@ -1,5 +1,5 @@
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
-import { run_board_header, type BoardHeader } from './run-board-header'
+import { run_board_header, type BoardHeader, type MarkHeader } from './run-board-header'
 import type { RunMark } from './run-board-header-names'
 import { run_board_layout, type BoardRow } from './run-board-layout'
 import { run_board_sound_cues, type CueName } from './run-board-sound-cues'
@@ -32,8 +32,11 @@ interface SoundSnapshot {
 	readonly run: ReadonlySet<RunCondition>
 }
 
+// What a frame's sound is read off: no port, so it is decided before the frame is drawn.
+type SoundHeader = MarkHeader & Pick<BoardHeader, 'quota_hold'>
+
 interface RunRead {
-	readonly header: BoardHeader
+	readonly header: SoundHeader
 	readonly mark: RunMark
 	readonly is_drained: boolean
 }
@@ -86,7 +89,7 @@ function row_entries(row: BoardRow): Array<[number, Cause]> {
 }
 
 function conditions_of(
-	header: BoardHeader,
+	header: SoundHeader,
 	events: ReadonlyArray<Pick<RunEvent, 'kind'>>,
 ): Set<RunCondition> {
 	const read = {
@@ -101,7 +104,7 @@ function conditions_of(
 // What a frame would sound, `undefined` before the plan's layout is read — a frame with no rows yet is no
 // base to hear every running lane as launched against.
 function snapshot_of(
-	header: BoardHeader,
+	header: SoundHeader,
 	events: ReadonlyArray<Pick<RunEvent, 'kind'>>,
 ): SoundSnapshot | undefined {
 	if (header.layout === undefined) return undefined
@@ -148,4 +151,4 @@ function held_causes(snapshot: SoundSnapshot): Array<Cause> {
 const run_board_sound_transition = { cause_of, held_causes, loudest_cause, snapshot_of }
 
 export { run_board_sound_transition }
-export type { Cause, SoundSnapshot }
+export type { Cause, SoundHeader, SoundSnapshot }

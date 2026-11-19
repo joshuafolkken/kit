@@ -134,6 +134,9 @@ interface BoardHeader
 	issue_count?: IssueCount | undefined
 }
 
+// What the run's mark is read off: no port, so a frame's data decides it before it is drawn.
+type MarkHeader = Pick<BoardHeader, 'activity' | 'layout'>
+
 interface BoardCounts {
 	total: number
 	settled: number
@@ -157,7 +160,7 @@ function counts_of(layout: BoardLayout): BoardCounts {
 
 // Nothing running: the run is at work on a stage of its own; else it is waiting on a person when all
 // the plan has left is what `needs-decision` holds, or idle.
-function quiet_mark(header: BoardHeader): RunMark {
+function quiet_mark(header: MarkHeader): RunMark {
 	const { activity, layout } = header
 	if (run_board_setup.is_working(activity.setup, activity.is_setup_working)) return 'setup'
 
@@ -167,7 +170,7 @@ function quiet_mark(header: BoardHeader): RunMark {
 }
 
 // The run's state, each state overriding the ones below it.
-function mark_of(header: BoardHeader, running: number): RunMark {
+function mark_of(header: MarkHeader, running: number): RunMark {
 	if (header.activity.is_stopped) return 'stopped'
 
 	return running > 0 ? 'running' : quiet_mark(header)
@@ -190,12 +193,12 @@ function loading_part(header: BoardHeader): string | undefined {
 	return is_plan_loading && spinner !== undefined ? `${HEADER_ICONS.loading} ${spinner}` : undefined
 }
 
-function layout_of(header: BoardHeader): BoardLayout {
+function layout_of(header: MarkHeader): BoardLayout {
 	return header.layout ?? run_board_layout.EMPTY_LAYOUT
 }
 
 // The run's state as the header's first line draws it, for a reader outside the frame.
-function run_mark_of(header: BoardHeader): RunMark {
+function run_mark_of(header: MarkHeader): RunMark {
 	return mark_of(header, counts_of(layout_of(header)).running)
 }
 
@@ -392,4 +395,4 @@ const run_board_header = {
 }
 
 export { run_board_header }
-export type { BoardCounts, BoardForm, BoardHeader, BoardUsage }
+export type { BoardCounts, BoardForm, BoardHeader, BoardUsage, MarkHeader }
