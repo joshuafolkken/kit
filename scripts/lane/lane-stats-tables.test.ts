@@ -13,6 +13,7 @@ const FIRST_HEADER_CELLS = [
 	'ship step',
 	'followup critical path',
 	'implement sub-stage',
+	'implement turn split',
 	'implement read',
 	'implement read by call',
 	'stage turns',

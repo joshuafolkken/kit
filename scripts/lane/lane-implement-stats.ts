@@ -138,10 +138,12 @@ function active_ms(call: ToolCall, reach: Reach, paused: ReadonlyArray<PausedSpa
 	return span - lane_paused_spans.overlap_ms(paused, end - span, end)
 }
 
-// One implement call with the sub-stage its span went to and that span less its paused overlap.
+// One implement call with the sub-stage its span went to, where that span starts and the span
+// less its paused overlap.
 interface StagedCall {
 	call: ToolCall
 	stage: SubStage
+	from_ms: number
 	active_ms: number
 }
 
@@ -159,6 +161,7 @@ function staged(
 		result.push({
 			call,
 			stage: sub_stage_of(call, phase),
+			from_ms: end_ms(call) - span_ms(call, reach),
 			active_ms: active_ms(call, reach, paused),
 		})
 		reach = next_reach(call, reach)
