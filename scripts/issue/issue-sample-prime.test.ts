@@ -111,6 +111,12 @@ describe('issue_sample_prime.prime on the lane ledger', () => {
 		expect(counted()).toBe(2)
 	})
 
+	it('records no merges for a ledger path it cannot read', async () => {
+		await prime_on(path.join(ledger_file(), 'not-a-directory'))
+
+		expect(counted()).toBe(0)
+	})
+
 	it('reads the window once while the ledger is unchanged', async () => {
 		const window = vi.spyOn(lane_ledger, 'read_since')
 

@@ -2,6 +2,6 @@
 	"reason": "The sample gate reads a windowed ledger tail with a per-stamp cache instead of the whole ledger (#8057); the cache and window reader are the added lines",
 	"date": "2026-11-19",
 	"growth": {
-		"scripts.code_lines": 32
+		"scripts.code_lines": 34
 	}
 }

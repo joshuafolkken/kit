@@ -86,13 +86,16 @@ interface WindowCache {
 	readonly by_since: Map<number, ReadonlyArray<MergeSample>>
 }
 
-// The ledger file's identity and size; `undefined` when it is absent.
+// The ledger file's identity, size and modification time; `undefined` when it cannot be read, which
+// records no merges as the ledger's own reader does for an unreadable file.
 function stamp_of(path: string): string | undefined {
-	const stat = statSync(path, { throwIfNoEntry: false })
+	try {
+		const stat = statSync(path)
 
-	return stat === undefined
-		? undefined
-		: `${String(stat.ino)}:${String(stat.size)}:${String(stat.mtimeMs)}`
+		return `${String(stat.ino)}:${String(stat.size)}:${String(stat.mtimeMs)}`
+	} catch {
+		return undefined
+	}
 }
 
 function read_window(path: string, since_ms: number): ReadonlyArray<MergeSample> {
