@@ -1,27 +1,20 @@
 import { setTimeout as sleep } from 'node:timers/promises'
-import { gh_core_rate_limit } from '#scripts/gh/gh-core-rate-limit'
-import { git_gh_transport } from '#scripts/gh/git-gh-transport'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { run_progress } from '#scripts/run/progress/run-progress'
 import { run_progress_read } from '#scripts/run/progress/run-progress-read'
 import terminalLink from 'terminal-link'
-import { run_board_closed } from './run-board-closed'
+import { run_board_data_ports } from './run-board-data-ports'
 import { run_board_every } from './run-board-every'
 import { run_board_fold_store } from './run-board-fold-store'
 import { run_board_frame_store } from './run-board-frame-store'
 import { run_board_gather } from './run-board-gather'
 import { run_board_gather_live } from './run-board-gather-live'
 import { run_board_gather_thread } from './run-board-gather-thread'
-import { run_board_issue_count } from './run-board-issue-count'
 import { run_board_live } from './run-board-live'
-import { run_board_plan_shared } from './run-board-plan-shared'
-import type { GithubRateLimit } from './run-board-render-quota-github'
 import { run_board_screen } from './run-board-screen'
-import { run_board_snapshot } from './run-board-snapshot'
 import { run_board_sound_player } from './run-board-sound-player'
 import type { BoardPorts } from './run-board-state'
-import { run_board_thanks_read } from './run-board-thanks-read'
 import { run_board_theme, type Theme } from './run-board-theme'
 import { run_board_tick } from './run-board-tick'
 import { run_board_timing } from './run-board-timing'
@@ -55,23 +48,10 @@ function on_exit(leave: () => void): void {
 	process.once('SIGTERM', () => process.exit(SIGTERM_EXIT_CODE))
 }
 
-// The allowances with the session's transport, which the github row marks with ▶. The transport is
-// read without a probe, so the board spends none of the GraphQL allowance it draws; one not known
-// yet (or an invalid setting) leaves the allowances unmarked.
-async function read_rate_limit_with_transport(): Promise<GithubRateLimit | undefined> {
-	const resources = await gh_core_rate_limit.read_resources()
-	if (resources === undefined) return undefined
-
-	return { ...resources, transport: await git_gh_transport.known() }
-}
-
+// A live board's worker thread takes the GitHub, roster and snapshot reads with its own copy of these
+// (`run-board-gather-worker.ts`); a single frame takes them through these.
 const LIVE_PORTS: Omit<BoardPorts, 'gather'> = {
-	read_plan: async (scope) => await run_board_plan_shared.read(scope),
-	read_closed: async (issues) => await run_board_closed.read_all(issues),
-	snapshot: run_board_snapshot.file_store(),
-	read_thanks: async () => await run_board_thanks_read.read_thanks(),
-	read_rate_limit: read_rate_limit_with_transport,
-	read_issue_count: async (repo) => await run_board_issue_count.read_issue_count(repo),
+	...run_board_data_ports.live(),
 	now: () => Date.now(),
 	write: (frame) => process.stdout.write(frame),
 	// No fallback: a terminal that opens no link, or a pipe, gets the bare number rather than a URL.

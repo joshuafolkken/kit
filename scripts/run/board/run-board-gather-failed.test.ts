@@ -1,7 +1,6 @@
 import { stripVTControlCharacters } from 'node:util'
 import { describe, expect, it, vi } from 'vitest'
 import { run_board_fixture } from './run-board-fixture'
-import { run_board_gather } from './run-board-gather'
 import { run_board_gather_thread, type GatherWorker } from './run-board-gather-thread'
 import { run_board_render } from './run-board-render'
 import { run_board_tick } from './run-board-tick'
@@ -10,8 +9,7 @@ import { run_board_tick } from './run-board-tick'
 // as failed, with why, and the next round reads again. A board that has read nothing yet says the
 // reads failed rather than `no run`.
 
-const { START, LOCAL, WORDS, harness } = run_board_fixture
-const { FRESH_GATHER } = run_board_gather
+const { FIRST_ROUND, START, LOCAL, WORDS, harness, plan_titled, round_ports } = run_board_fixture
 const { gather_round, worker_gatherer } = run_board_gather_thread
 const { FRESH_STATE, tick } = run_board_tick
 const { render_no_run } = run_board_render
@@ -56,7 +54,8 @@ function failing_board(): {
 	live: Parameters<typeof tick>[1]
 	post: Listener
 } {
-	const board = harness(LOCAL, [])
+	// The worker folds its plan read within the round, so a plan answers, not a failed read.
+	const board = harness(LOCAL, [plan_titled('a')])
 	const { worker, post } = fake_worker()
 
 	board.read_local.mockRejectedValueOnce(new Error(REASON))
@@ -76,16 +75,17 @@ function failing_board(): {
 
 describe('run_board_gather_thread.gather_round', () => {
 	it('hands a throwing round over as failed, keeps its state, and reads again next round', async () => {
-		const { gathering, read_local } = harness(LOCAL, [])
+		const board = harness(LOCAL, [])
+		const ports = round_ports(board)
 		const { posts, post } = collector()
 
-		read_local.mockRejectedValueOnce(new Error(`${REASON}\n    at spawn`))
-		const kept = await gather_round(FRESH_GATHER, gathering, post)
-		const next = await gather_round(kept, gathering, post)
+		board.read_local.mockRejectedValueOnce(new Error(`${REASON}\n    at spawn`))
+		const kept = await gather_round(FIRST_ROUND, ports, post)
+		const next = await gather_round(kept, ports, post)
 
-		expect(kept).toBe(FRESH_GATHER)
+		expect(kept).toBe(FIRST_ROUND)
 		expect(posts[0]).toStrictEqual({ failed: REASON })
-		expect(next.local).toStrictEqual(LOCAL)
+		expect(next.gather.local).toStrictEqual(LOCAL)
 		expect(posts[1]).toHaveProperty('read')
 	})
 })
@@ -94,13 +94,13 @@ describe('run_board_tick.tick over a worker round that threw', () => {
 	it('says the reads failed and why, not no run, then draws the board once the next round reads', async () => {
 		const { board, live, post } = failing_board()
 		const failed_frame = tick(FRESH_STATE, live, 'background')
-		const kept = await gather_round(FRESH_GATHER, board.gathering, post)
+		const kept = await gather_round(FIRST_ROUND, round_ports(board), post)
 		const failed = await failed_frame
 
 		expect(last_frame(board.frames)).toMatch(FAILED)
 		expect(last_frame(board.frames)).not.toContain(WORDS.no_run)
 
-		await gather_round(kept, board.gathering, post)
+		await gather_round(kept, round_ports(board), post)
 		await tick(failed, live, 'background')
 
 		expect(last_frame(board.frames)).not.toContain('❗')
