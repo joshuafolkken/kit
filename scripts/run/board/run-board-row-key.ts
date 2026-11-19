@@ -9,8 +9,10 @@ const CLOSE = '\u{E002}'
 // The sections whose rows a theme types as they appear (`run-board-type-rows.ts`), and the header's
 // now line (joshuafolkken/kit#8103), keyed by its text rather than a number, and a queued epic's 📁 line
 // (joshuafolkken/kit#8115), keyed by the epic's number, and an empty seat's 💺 line
-// (joshuafolkken/kit#8116), keyed by its reason.
-type KeySection = 'lanes' | 'decision' | 'queued' | 'waiting' | 'done' | 'now' | 'epic' | 'seat'
+// (joshuafolkken/kit#8116), keyed by its reason, and a findings / notes line (joshuafolkken/kit#8117),
+// keyed by the event it came from.
+type KeySection =
+	'lanes' | 'decision' | 'queued' | 'waiting' | 'done' | 'now' | 'epic' | 'seat' | 'note'
 
 // A line's key, the line without it, and the part of the line before the key — drawn whole, never typed.
 interface Split {

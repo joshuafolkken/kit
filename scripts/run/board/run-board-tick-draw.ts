@@ -8,7 +8,7 @@ import { run_board_header_notice } from './run-board-header-notice'
 import { run_board_labels } from './run-board-labels'
 import { run_board_layout, type BoardLayout } from './run-board-layout'
 import { run_board_link } from './run-board-link'
-import { run_board_notes, type Titles } from './run-board-notes'
+import { run_board_notes, type BoardNote, type Titles } from './run-board-notes'
 import type { LocalRead } from './run-board-read'
 import { run_board_render } from './run-board-render'
 import { run_board_root_layout } from './run-board-root-layout'
@@ -20,7 +20,7 @@ import { run_board_sound_repeat } from './run-board-sound-repeat'
 import { run_board_sound_transition } from './run-board-sound-transition'
 import { run_board_spin, type Spun } from './run-board-spin'
 import type { BoardPorts, BoardState } from './run-board-state'
-import { run_board_type_rows, type KeyedLine, type Typing } from './run-board-type-rows'
+import { run_board_type_rows, type Typing } from './run-board-type-rows'
 
 // The frame one `run:board` redraw draws (`run-board-tick.ts`): the header over the laid-out rows, the
 // notes under them, written with its spinners at this moment's frame.
@@ -177,37 +177,42 @@ function bounds_of(ports: BoardPorts): FrameBounds {
 	return { size: ports.size?.(), footer: ports.footer, folded: ports.folded?.() }
 }
 
+// A drawn frame and every note it was drawn from — shown or not (joshuafolkken/kit#8117).
+type Drawn = Spun & { notes: ReadonlyArray<BoardNote> }
+
 // The frame under `header` with its spinners drawn at this moment's frame, and where they are on screen.
-function frame_of(state: BoardState, local: LocalRead, header: LaidHeader, redraw: Redraw): Spun {
+function frame_of(state: BoardState, local: LocalRead, header: LaidHeader, redraw: Redraw): Drawn {
 	const bounds = bounds_of(redraw.ports)
+	const notes = run_board_notes.notes_of(
+		local.events,
+		titles_of(state),
+		run_board_layout.listed_parks(header.layout),
+	)
 	const lines = run_board_render.render({
 		header,
-		notes: run_board_notes.notes_of(
-			local.events,
-			titles_of(state),
-			run_board_layout.listed_parks(header.layout),
-		),
+		notes,
 		resume: local.resume,
 		throughput: local.throughput,
 		thanks: state.thanks,
 		link: redraw.ports.link,
 		...bounds,
 	})
+	const spun = run_board_spin.spun(lines, run_board_labels.spinner_of(redraw.now_ms), bounds.size)
 
-	return run_board_spin.spun(lines, run_board_labels.spinner_of(redraw.now_ms), bounds.size)
+	return { ...spun, notes }
 }
 
 // The rows this frame types where the board types them; a frame before the plan is read is no base — the
 // rows the plan brings were already there — so the frame the plan arrives on is the first base. What
-// counts as known is `run_board_row_sections.known_of`'s.
+// counts as known is `run_board_row_sections.known_of`'s, over the notes the frame was drawn from.
 function typing_of(
 	state: BoardState,
-	keyed: ReadonlyArray<KeyedLine>,
+	drawn: Pick<Drawn, 'keyed' | 'notes'>,
 	header: LaidHeader,
 	redraw: Redraw,
 ): Typing {
 	const is_on = redraw.ports.types_rows === true && state.plan !== undefined
-	const frame = { keyed, known: run_board_row_sections.known_of(header) }
+	const frame = { keyed: drawn.keyed, known: run_board_row_sections.known_of(header, drawn.notes) }
 
 	return run_board_type_rows.next(state.typing, frame, redraw.now_ms, is_on)
 }
@@ -278,12 +283,12 @@ function draw_run(
 	const laid = header_of({ ...settled, baseline_total }, local, layout, redraw)
 	const sound = sounded(state, laid, local, redraw)
 	const header = { ...laid, notice: sound.notice }
-	const { lines, spots, keyed } = frame_of(settled, local, header, redraw)
-	const typing = typing_of(state, keyed, header, redraw)
+	const drawn = frame_of(settled, local, header, redraw)
+	const typing = typing_of(state, drawn, header, redraw)
 
-	draw(redraw.ports, run_board_type_rows.typed_lines(lines, typing, redraw.now_ms))
+	draw(redraw.ports, run_board_type_rows.typed_lines(drawn.lines, typing, redraw.now_ms))
 
-	return { ...settled, spots, typing, ...sound }
+	return { ...settled, spots: drawn.spots, typing, ...sound }
 }
 
 const run_board_tick_draw = { activity_here, bounds_of, closed_under, draw, draw_run }
