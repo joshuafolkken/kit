@@ -30,6 +30,7 @@ import { run_board_render_section } from './run-board-render-section'
 import { run_board_render_throughput } from './run-board-render-throughput'
 import { run_board_render_time } from './run-board-render-time'
 import { run_board_render_title } from './run-board-render-title'
+import { run_board_row_key } from './run-board-row-key'
 import { run_board_row_sections } from './run-board-row-sections'
 import type { Thanks } from './run-board-thanks-csv'
 import type { ThroughputRow } from './run-board-throughput'
@@ -90,9 +91,10 @@ function epic_lines(
 	)
 	const title = title_of(entry.title)
 	const number = frame.header.link(String(entry.epic))
-	const epic = title === '' ? number : `${number}${GAP}${title}`
+	const epic = title === '' ? `📁 ${number}` : `📁 ${number}${GAP}${title}`
+	const section = frame.header.is_keyed === true ? 'epic' : undefined
 
-	return [bare(`${ROW_INDENT}📁 ${epic}`), ...children]
+	return [bare(`${ROW_INDENT}${run_board_row_key.keyed(section, entry.epic, epic)}`), ...children]
 }
 
 function entry_lines(entry: QueuedEntry, frame: RowFrame): Array<PlanLine> {

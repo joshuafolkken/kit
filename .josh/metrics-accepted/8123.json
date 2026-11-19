@@ -1,0 +1,7 @@
+{
+	"reason": "The spinner pacing fix needs the earlier-of-two wake and the last-frame tracking (+8 code lines)",
+	"date": "2026-11-19",
+	"growth": {
+		"scripts.code_lines": 8
+	}
+}
