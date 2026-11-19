@@ -90,14 +90,25 @@ interface Handle {
 	admission: Admission
 }
 
+type StartReader = (pid: number) => string | undefined
+
+interface WaitsOptions {
+	directory?: string
+	now?: number
+	home?: string
+	read?: StartReader | undefined
+}
+
 function marker_name(key: string): string {
 	return `${RESERVED_PREFIX}${key}${RESERVED_SUFFIX}`
 }
 
 // **"Cannot tell" counts as live**, the same direction `unit-run-marker.ts` takes: being wrong that
 // way costs a reservation a slower admission, while the other way admits past a run that is still there.
-function is_running(reservation: Reservation): boolean {
-	return process_identity.is_same_process(reservation.pid, reservation.process_start) !== false
+function is_running(reservation: Reservation, read: StartReader): boolean {
+	const { pid, process_start } = reservation
+
+	return process_identity.is_same_process(pid, process_start, read) !== false
 }
 
 // **A dead marker is removed, not merely skipped** — otherwise a reissued pid turns a leaked place into
@@ -111,11 +122,11 @@ function sweep_marker(source: string): void {
 	}
 }
 
-function live_reservation(source: string): Reservation | undefined {
+function live_reservation(source: string, read: StartReader): Reservation | undefined {
 	const reservation = read_reservation(source)
 
 	if (reservation === undefined) return undefined
-	if (is_running(reservation)) return reservation
+	if (is_running(reservation, read)) return reservation
 
 	sweep_marker(source)
 
@@ -135,9 +146,14 @@ function marker_files(directory: string): Array<string> {
 	}
 }
 
-function live_reservations(directory: string = PLATFORM_TEMP_ROOT): Array<LiveReservation> {
+// `read` answers each reservation's process start; a caller holding a fresh process snapshot passes a
+// reader over it (`lane_process_table.start_reader`) so the check spawns no `ps` per reservation.
+function live_reservations(
+	directory: string = PLATFORM_TEMP_ROOT,
+	read: StartReader = process_identity.read_start,
+): Array<LiveReservation> {
 	return marker_files(directory).flatMap((name) => {
-		const reservation = live_reservation(path.join(directory, name))
+		const reservation = live_reservation(path.join(directory, name), read)
 
 		return reservation === undefined ? [] : { key: name, reservation }
 	})
@@ -261,12 +277,10 @@ async function poll_claim(context: WaitContext): Promise<Handle | undefined> {
 }
 
 // The claims waiting in the ledger now, for a `run:board` running in `home`.
-function budget_waits(
-	directory: string = PLATFORM_TEMP_ROOT,
-	now: number = Date.now(),
-	home: string = process.cwd(),
-): Array<BudgetWait> {
-	return core_wait.waits_of(live_reservations(directory), now, home)
+function budget_waits(options: WaitsOptions = {}): Array<BudgetWait> {
+	const { directory = PLATFORM_TEMP_ROOT, now = Date.now(), home = process.cwd() } = options
+
+	return core_wait.waits_of(live_reservations(directory, options.read), now, home)
 }
 
 function release(handle: { target: string }): void {

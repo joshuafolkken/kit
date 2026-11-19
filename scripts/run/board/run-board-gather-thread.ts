@@ -1,6 +1,7 @@
 import { isDeepStrictEqual } from 'node:util'
 import { Worker, type WorkerOptions } from 'node:worker_threads'
 import { launch_timing, type TimedPhase } from '#scripts/lane/launch-timing'
+import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { ts_entry_loader } from '#scripts/run/ts-entry-loader'
 import {
 	run_board_gather,
@@ -56,9 +57,19 @@ interface Thread {
 	waiting: Array<(read: GatherRead) => void>
 }
 
+// joshuafolkken/kit#8135: the stream is read by its appended tail, so a reread holds the events it
+// held — the same array, or (past a line without its newline) an equal one; its length and its last
+// event say which, without walking the whole stream.
+function is_reread_alike(before: ReadonlyArray<RunEvent>, after: ReadonlyArray<RunEvent>): boolean {
+	if (before === after) return true
+	if (before.length !== after.length) return false
+
+	return isDeepStrictEqual(before.at(-1), after.at(-1))
+}
+
 function local_post(before: LocalRead | undefined, after: LocalRead | undefined): LocalPost {
 	if (before === undefined || after === undefined) return { value: after }
-	if (!isDeepStrictEqual(before.events, after.events)) return { value: after }
+	if (!is_reread_alike(before.events, after.events)) return { value: after }
 
 	return { value: { ...after, events: [] }, is_same_events: true }
 }
