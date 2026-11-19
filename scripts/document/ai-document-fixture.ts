@@ -29,8 +29,10 @@ const README_DOC = 'README.md'
 const CONTRIBUTING_DOC = 'CONTRIBUTING.md'
 
 // A verbatim quote of a Japanese prompt heading or literal sits in a code span, a fence or double
-// quotes (`docs/maintainers/README.md` → "Language"); everything else is English.
-const QUOTED_SPANS = /```[\s\S]*?```|`[^`\n]*`|"[^"\n]*"/gu
+// quotes (`docs/maintainers/README.md` → "Language"); everything else is English. A link target
+// counts as a quote too: an anchor into a Japanese heading spells that heading, while the link's
+// visible text stays prose.
+const QUOTED_SPANS = /```[\s\S]*?```|`[^`\n]*`|"[^"\n]*"|\]\([^)\n]*\)/gu
 const JAPANESE = /[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}]/u
 
 // The document the pointers name. Written once so the pointer suite and the pointers agree.
@@ -78,6 +80,11 @@ function distributed_skill_markdown(): ReadonlyArray<string> {
 	return PLUGIN_SKILL_DIRECTORIES.flatMap((directory) => markdown_under(directory))
 }
 
+// Every markdown file under `docs/`, the published documentation a consumer reads.
+function documentation_pages(): ReadonlyArray<string> {
+	return markdown_under(DOCS_ROOT)
+}
+
 // Every file that can route a reader somewhere — the rule document, every distributed skill, and
 // every markdown file under `prompts/` and `docs/`. Two suites check citations against this set and
 // each excludes a different handful from it; the *set* is what must not drift between them, since a
@@ -87,7 +94,7 @@ function routing_documents(): ReadonlyArray<string> {
 		...AI_DOCS,
 		...distributed_skill_markdown(),
 		...markdown_under(PROMPT_ROOT),
-		...markdown_under(DOCS_ROOT),
+		...documentation_pages(),
 	]
 }
 
@@ -221,6 +228,7 @@ export {
 	CLAUDE_SETTINGS,
 	COMMAND_REFERENCE_DOCS,
 	CONTRIBUTING_DOC,
+	documentation_pages,
 	ENV_EXAMPLE,
 	has_japanese_prose,
 	linked_paths,

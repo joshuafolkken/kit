@@ -10,7 +10,6 @@ const DOCUMENT = 'registry-migration.md'
 const HEADING = '## When the entry stops'
 const ANCHOR = `${DOCUMENT}#when-the-entry-stops`
 const WORK_LEFT_ANCHOR = `${DOCUMENT}#work-left-after-the-migration`
-const JAPANESE = /[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}]/u
 const UTF8 = 'utf8'
 
 function read_document(relative: string): string {
@@ -56,11 +55,5 @@ describe('registry-migration.md stopped-entry section', () => {
 		['authentication.md', WORK_LEFT_ANCHOR],
 	])('is linked from %s at %s', (relative, anchor) => {
 		expect(read_document(relative)).toContain(anchor)
-	})
-})
-
-describe('registry-migration.md language', () => {
-	it('contains no Japanese text', () => {
-		expect(read_document(DOCUMENT)).not.toMatch(JAPANESE)
 	})
 })
