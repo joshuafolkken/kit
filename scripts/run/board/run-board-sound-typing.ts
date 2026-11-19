@@ -45,14 +45,16 @@ const DEFAULT_PORTS: TypingPorts = {
 	},
 }
 
-// The player now sounding the trill; when it ends while the trill is on, it is started again. A
-// candidate that failed or was killed is no longer held, so its end starts nothing.
+// The player now sounding the trill; when it plays its file through (exit code 0) while the trill is
+// on, it is started again. A candidate that failed or was killed is no longer held, so its end starts
+// nothing, and a player that exits with a failure — a player with no audio server, say — is not
+// started again, so it is never started over and over while rows type.
 function hold(held: Held, child: Playing, restart: () => void): void {
 	held.child = child
-	child.on('exit', () => {
+	child.on('exit', (code) => {
 		if (held.child !== child) return
 		held.child = undefined
-		if (held.is_on) restart()
+		if (code === 0 && held.is_on) restart()
 	})
 }
 

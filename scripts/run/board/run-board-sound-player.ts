@@ -19,7 +19,7 @@ interface Player {
 // A started player: `exit` and `kill` let a sound that plays while something lasts be ended
 // (joshuafolkken/kit#8250).
 interface Playing {
-	on: (event: 'error' | 'exit', listener: () => void) => unknown
+	on: (event: 'error' | 'exit', listener: (code?: number | null) => void) => unknown
 	unref: () => unknown
 	kill: () => unknown
 }

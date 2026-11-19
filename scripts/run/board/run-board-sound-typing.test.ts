@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it, vi, type Mock } from 'vitest'
-import type { Playing } from './run-board-sound-player'
+import { run_board_sound_player, type Playing } from './run-board-sound-player'
 import { run_board_sound_synth, type Note } from './run-board-sound-synth'
 import { run_board_sound_typing, type TypingPorts } from './run-board-sound-typing'
 import { run_board_sound_wav } from './run-board-sound-wav'
@@ -18,7 +18,7 @@ const D_6 = 1174.66
 const create_directory = temporary_directory()
 
 interface FakePlayer extends Playing {
-	exit: () => void
+	exit: (code?: number | null) => void
 	kill: Mock<() => unknown>
 }
 
@@ -30,7 +30,7 @@ interface Harness {
 }
 
 function fake_player(): FakePlayer {
-	const exits: Array<() => void> = []
+	const exits: Array<(code?: number | null) => void> = []
 
 	return {
 		on: (event, listener) => {
@@ -38,8 +38,8 @@ function fake_player(): FakePlayer {
 		},
 		unref: vi.fn<() => unknown>(),
 		kill: vi.fn<() => unknown>(),
-		exit: () => {
-			for (const listener of exits) listener()
+		exit: (code = 0) => {
+			for (const listener of exits) listener(code)
 		},
 	}
 }
@@ -168,6 +168,31 @@ describe('run_board_sound_typing.typing_sound player ends', () => {
 
 		expect(test.start).toHaveBeenCalledTimes(2)
 		expect(test.file).toHaveBeenCalledOnce()
+	})
+})
+
+describe('run_board_sound_typing.typing_sound default ports', () => {
+	it('plays the cached teletype WAV through the sound player by default', () => {
+		const cached = vi.spyOn(run_board_sound_wav, 'cached_wav').mockReturnValue(WAV)
+		const start = vi.spyOn(run_board_sound_player, 'start').mockReturnValue(undefined)
+
+		typing_sound().set(true)
+
+		expect(cached).toHaveBeenCalledWith(NAME, NOTES)
+		expect(start).toHaveBeenCalledWith(WAV, expect.anything())
+		vi.restoreAllMocks()
+	})
+})
+
+describe('run_board_sound_typing.typing_sound player fails', () => {
+	it('starts nothing again when the player exits with a failure while on', () => {
+		const test = harness()
+		const sound = typing_sound(test.ports)
+
+		sound.set(true)
+		first_player(test)?.exit(1)
+
+		expect(test.start).toHaveBeenCalledOnce()
 	})
 
 	it('starts nothing when a killed player ends', () => {
