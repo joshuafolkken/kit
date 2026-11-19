@@ -106,6 +106,12 @@ describe('backlog_pending_publication.lines_of', () => {
 	})
 })
 
+const BACKLOG_JSON = JSON.stringify(BACKLOG.map((spec) => row(spec)))
+
+function stub_listing(json: string | undefined, is_capped: boolean): void {
+	vi.spyOn(git_gh_command, 'issue_list_open_relations').mockResolvedValue({ json, is_capped })
+}
+
 describe('backlog:plan --pending-publication', () => {
 	beforeEach(() => {
 		vi.restoreAllMocks()
@@ -116,30 +122,33 @@ describe('backlog:plan --pending-publication', () => {
 	})
 
 	it('lists the pairs from the open relations listing', async () => {
-		vi.spyOn(git_gh_command, 'issue_list_open_relations').mockResolvedValue({
-			json: JSON.stringify(BACKLOG.map((spec) => row(spec))),
-			is_capped: false,
-		})
+		stub_listing(BACKLOG_JSON, false)
 
 		await expect(backlog_plan_cli.run([FLAG])).resolves.toBe(SUCCESS_EXIT_CODE)
 		expect(streams.stdout()).toContain(PAIR_LINE)
 	})
 
 	it('fails on an unreadable listing rather than reporting no pair', async () => {
-		vi.spyOn(git_gh_command, 'issue_list_open_relations').mockResolvedValue({
-			json: undefined,
-			is_capped: false,
-		})
+		stub_listing(undefined, false)
 
 		await expect(backlog_plan_cli.run([FLAG])).resolves.toBe(FAILURE_EXIT_CODE)
 		expect(streams.stderr()).toContain(backlog_pending_publication.UNREADABLE_MESSAGE)
 	})
 
+	it('fails when the repository name cannot be read', async () => {
+		vi.spyOn(git_gh_command, 'repo_get_name_with_owner').mockResolvedValue(undefined)
+
+		await expect(backlog_plan_cli.run([FLAG])).resolves.toBe(FAILURE_EXIT_CODE)
+		expect(streams.stderr()).toContain(backlog_pending_publication.UNREADABLE_MESSAGE)
+	})
+
+	it('names the flag in the usage line', async () => {
+		await expect(backlog_plan_cli.run(['--unknown-option'])).resolves.toBe(FAILURE_EXIT_CODE)
+		expect(streams.stderr()).toContain(FLAG)
+	})
+
 	it('warns that a cut listing can miss pairs', async () => {
-		vi.spyOn(git_gh_command, 'issue_list_open_relations').mockResolvedValue({
-			json: JSON.stringify(BACKLOG.map((spec) => row(spec))),
-			is_capped: true,
-		})
+		stub_listing(BACKLOG_JSON, true)
 
 		await expect(backlog_plan_cli.run([FLAG])).resolves.toBe(SUCCESS_EXIT_CODE)
 		expect(streams.stderr()).toContain(backlog_pending_publication.TRUNCATED_MESSAGE)
