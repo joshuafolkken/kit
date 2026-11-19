@@ -162,6 +162,8 @@ describe('run_board_cli.run screen', () => {
 // frame; a single frame, the chat's or a pipe's, types none. joshuafolkken/kit#8029: only a board in a
 // theme types it — `run-board-cli-theme.test.ts` holds the board in none.
 const THEMED = ['--theme', 'wargames']
+// joshuafolkken/kit#7988: the theme draws the board's text in capitals.
+const THEMED_RUN_MARK = RUN_MARK.toUpperCase()
 
 async function no_pause(): Promise<void> {
 	await Promise.resolve()
@@ -174,7 +176,7 @@ describe('run_board_cli.run intro', () => {
 		await expect(run_board_cli.run(THEMED, { ...ports, intro_sleep: no_pause })).rejects.toBe(
 			STOPPED,
 		)
-		const first = frames.findIndex((frame) => frame.includes(RUN_MARK))
+		const first = frames.findIndex((frame) => frame.includes(THEMED_RUN_MARK))
 
 		expect(frames[0]).toBe(ENTER)
 		expect(stripVTControlCharacters(frames[first - 2] ?? '')).toBe(`\r${INTRO_LINE}`)
@@ -188,7 +190,7 @@ describe('run_board_cli.run intro', () => {
 		await expect(run_board_cli.run(THEMED, { ...ports, intro_sleep: no_pause })).rejects.toBe(
 			STOPPED,
 		)
-		const first = frames.findIndex((frame) => frame.includes(RUN_MARK))
+		const first = frames.findIndex((frame) => frame.includes(THEMED_RUN_MARK))
 
 		expect(frames.slice(1, first).some((frame) => frame.includes(TYPING_CURSOR))).toBe(true)
 		expect(frames[first]?.startsWith(`${ESCAPE}[H${ESCAPE}[J`)).toBe(true)
