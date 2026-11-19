@@ -1,0 +1,7 @@
+{
+	"reason": "josh subcommand breakdown in load samples needs a pattern and a small helper (#8170)",
+	"date": "2026-11-19",
+	"growth": {
+		"scripts.code_lines": 7
+	}
+}

@@ -40,6 +40,7 @@ const BYTES_PER_MB = KB_PER_MB * KB_PER_MB
 // Enough to name what dominates and the runner-up behind it, short enough for one ledger line a minute.
 const TOP_KINDS = 5
 const OTHER_KIND = 'other'
+const JOSH_KIND = 'josh'
 // The apps a person keeps open beside a run, matched as command-line substrings: every Chrome and VS Code
 // helper runs out of its `.app` bundle, so the bundle name catches them all — and only them: Playwright's
 // `Google Chrome for Testing.app` is not the person's browser.
@@ -58,9 +59,12 @@ const KIND_PATTERNS: ReadonlyArray<readonly [string, RegExp]> = [
 	['chrome', /Google Chrome/u],
 	['chromium', /chromium|headless_shell/iu],
 	['claude', /(?:^|\/)claude(?:\s|$)|@anthropic-ai\/claude-code\//u],
-	['josh', /josh(?:-ready)?\.[jt]s|\btsx\b|(?<!\.)\bpnpm\b/u],
+	[JOSH_KIND, /josh(?:-ready)?\.[jt]s|\btsx\b|(?<!\.)\bpnpm\b/u],
 	['node', /\bnode\b/u],
 ]
+// The token right after a josh entry — `dist/josh.js`, `scripts/josh/josh.ts`, `tools/josh/josh-ready.ts`
+// or `pnpm josh` — is the subcommand.
+const JOSH_COMMAND = /(?:josh(?:-ready)?\.[jt]s|(?<!\.)\bpnpm\s+josh)\s+([a-z][\w:-]*)/u
 
 // `footprint_mb` sums the processes whose footprint could be read — none off macOS or before Node's
 // `node:ffi`, so the field is left out, and not another user's process, whose call is refused.
@@ -86,8 +90,19 @@ interface LineReading {
 
 type ProcessReading = Omit<ProcessKind, 'count'>
 
+// The josh subcommand a josh process runs — `josh run:board`, `josh ship` — so a sample says which command
+// holds the CPU rather than josh as a whole (joshuafolkken/kit#8170); a line with no subcommand after its
+// josh entry (`pnpm install`, a bare `tsx`) stays plain `josh`.
+function josh_kind(command_line: string): string {
+	const command = JOSH_COMMAND.exec(command_line)?.[1]
+
+	return command === undefined ? JOSH_KIND : `${JOSH_KIND} ${command}`
+}
+
 function kind_of(command_line: string): string {
-	return KIND_PATTERNS.find(([, pattern]) => pattern.test(command_line))?.[0] ?? OTHER_KIND
+	const kind = KIND_PATTERNS.find(([, pattern]) => pattern.test(command_line))?.[0] ?? OTHER_KIND
+
+	return kind === JOSH_KIND ? josh_kind(command_line) : kind
 }
 
 // One line of `ps`'s listing as its command line and readings; a header or a cut-short line reads as nothing.

@@ -59,9 +59,16 @@ const KIND_CASES: Array<[string, string]> = [
 	['/cache/ms-playwright/chromium-1200/chrome-mac/Chromium --headless', 'playwright'],
 	['/cache/chromium_headless_shell-1200/headless_shell --type=renderer', 'chromium'],
 	['/Users/me/.local/bin/claude -p', 'claude'],
-	['node --import tsx scripts/josh/josh.ts ship', 'josh'],
-	['node --disable-warning=ExperimentalWarning tools/josh/josh-ready.ts gate', 'josh'],
-	['node /repo/node_modules/@joshuafolkken/kit/dist/josh.js gate', 'josh'],
+	['node --import tsx scripts/josh/josh.ts ship', 'josh ship'],
+	['node --disable-warning=ExperimentalWarning tools/josh/josh-ready.ts gate', 'josh gate'],
+	[
+		'node --disable-warning=ExperimentalWarning tools/josh/josh-ready.ts test:related --maxWorkers=2',
+		'josh test:related',
+	],
+	['node /repo/node_modules/@joshuafolkken/kit/dist/josh.js run:board', 'josh run:board'],
+	['/repo/node_modules/.bin/pnpm josh backlog:drive --owner me', 'josh backlog:drive'],
+	['node /repo/node_modules/tsx/dist/cli.mjs watch', 'josh'],
+	['pnpm install', 'josh'],
 	['/Applications/Visual Studio Code.app/Contents/MacOS/Code Helper', 'vscode'],
 	[
 		'/Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper (Plugin).app/Contents/MacOS/Code Helper (Plugin) /extensions/node_modules/typescript/lib/tsserver.js',
@@ -79,7 +86,7 @@ const KIND_CASES: Array<[string, string]> = [
 		'/repo/node_modules/.pnpm/@esbuild+darwin-arm64@0.25.0/node_modules/@esbuild/darwin-arm64/bin/esbuild --service=0.25.0',
 		'other',
 	],
-	['node /opt/homebrew/bin/pnpm josh gate', 'josh'],
+	['node /opt/homebrew/bin/pnpm josh gate', 'josh gate'],
 	['node server.js', 'node'],
 	['/usr/sbin/mDNSResponder', 'other'],
 ]
@@ -95,7 +102,7 @@ describe('lane_process_load.summarize', () => {
 		expect(lane_process_load.summarize(LISTING)).toStrictEqual([
 			{ kind: 'vitest', cpu_percent: 210, rss_mb: 768, count: 2 },
 			{ kind: 'eslint', cpu_percent: 90, rss_mb: 1024, count: 1 },
-			{ kind: 'josh', cpu_percent: 2, rss_mb: 64, count: 1 },
+			{ kind: 'josh gate', cpu_percent: 2, rss_mb: 64, count: 1 },
 			{ kind: 'chrome', cpu_percent: 1, rss_mb: 2048, count: 1 },
 			{ kind: 'other', cpu_percent: 1, rss_mb: 16, count: 1 },
 		])
@@ -121,7 +128,7 @@ describe('lane_process_load.summarize footprint', () => {
 
 	it('leaves the footprint out of a kind none of whose processes could be read', () => {
 		expect(lane_process_load.summarize(LISTING, fake_footprint)[2]).toStrictEqual({
-			kind: 'josh',
+			kind: 'josh gate',
 			cpu_percent: 2,
 			rss_mb: 64,
 			count: 1,
