@@ -61,6 +61,8 @@ interface BoardPorts {
 	keys?: KeyInput | undefined
 	// The sections a person folded, read at every redraw; none where the frame folds nothing.
 	folded?: (() => ReadonlySet<SectionKey>) | undefined
+	// When a live board opened: a plan read before it is a saved one, drawn faint (joshuafolkken/kit#8219).
+	opened_ms?: number | undefined
 	form: BoardForm
 	// Records that a progress report was just given, as `run:progress --mark` does, so the next scheduled
 	// one waits a full interval from here.

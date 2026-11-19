@@ -141,7 +141,8 @@ function refuse_foreign(target: string): void {
 	}
 }
 
-function replace_text_stamp(target: string, text: string): string {
+// Text, or bytes for a record that is not JSON — the live board's saved round (`run-board-saved-state.ts`).
+function replace_text_stamp(target: string, text: string | Uint8Array): string {
 	refuse_foreign(target)
 	atomic_write.replace_file(target, text, { mode: STAMP_FILE_MODE })
 

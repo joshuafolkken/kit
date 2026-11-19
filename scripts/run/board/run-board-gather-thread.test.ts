@@ -150,6 +150,37 @@ describe('run_board_gather_thread.worker_gatherer', () => {
 	})
 })
 
+// joshuafolkken/kit#8219: the round the last board on this run saved is drawn before the worker posts.
+describe('run_board_gather_thread.worker_gatherer with a saved round', () => {
+	const SAVED: BoardGather = { ...POST.read, data: POST.data, display: POST.display }
+
+	it('answers the saved round before the worker posts and seeds the worker from its data', async () => {
+		const worker = fake_worker()
+		const spawn = vi.fn(() => worker)
+		const gather = worker_gatherer(
+			spawn,
+			() => FAILED_MS,
+			async () => await SAVED,
+		)
+
+		await expect(gather('background')).resolves.toMatchObject({ display: FRAME })
+		expect(spawn).toHaveBeenCalledWith(expect.objectContaining({ data: SAVED.data }))
+	})
+
+	it('reads the saved round once', async () => {
+		const saved = vi.fn(async () => await SAVED)
+		const gather = worker_gatherer(
+			() => fake_worker(),
+			() => FAILED_MS,
+			saved,
+		)
+
+		await gather('background')
+		await gather('background')
+		expect(saved).toHaveBeenCalledOnce()
+	})
+})
+
 const FEW_EVENTS = 10
 const MANY_EVENTS = 15_000
 

@@ -49,6 +49,7 @@ const EMOJI: Glyphs = new Map<string, Glyph>([
 	['🔭', ['WT', 'idle']],
 	['🔚', ['EN', 'info']],
 	['⏰', ['T+', 'caution']],
+	['🕘', ['AG', 'idle']],
 	['🎯', ['ET', 'info']],
 	['💓', ['HB', 'info']],
 	['🧠', ['MM', 'info']],
