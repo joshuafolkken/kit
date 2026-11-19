@@ -107,6 +107,11 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: [BOARD_THEME],
 					description:
+						'draws the board as a text terminal does: every icon as ASCII text of its width (`🚨` → `P1`, `🔨` → `BD`, a section heading’s icon as blanks; one table, `run-board-theme-glyphs.ts`), the text in capitals (escapes and link URLs as written), and the spinner as `│ ╱ ─ ╲`; the columns line up as without it.',
+				},
+				{
+					names: [BOARD_THEME],
+					description:
 						'ends the header’s second line on the alert level, `DEFCON 5 4 [3] 2 1`: the current level bracketed, green (5), amber (4, 3) or red (2, 1). The lowest level whose condition holds wins — 1 the run is stopped, out of its usage or failing its reads · 2 a person is asked to decide · 3 a `P1` waits while a lane is free · 4 more lanes run than the limit · 5 none of these.',
 				},
 				{
