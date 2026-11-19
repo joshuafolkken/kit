@@ -366,11 +366,31 @@ function spawner(setup: RecordSetup): Spawn {
 	}
 }
 
-// The first redraw waits for the worker's first round; every later one draws the last round handed.
-function worker_gatherer(spawn: Spawn, now: () => number = Date.now): BoardPorts['gather'] {
+// The last round a board on this run handed over (`run-board-saved-state.ts`), none on another run.
+type SavedRead = () => Promise<BoardGather | undefined>
+
+function keep(thread: Thread, read: BoardGather | undefined): void {
+	thread.latest ??= read
+}
+
+// The first redraw draws the round the last board on this run saved, and the worker starts from its
+// data (joshuafolkken/kit#8219); with none saved, the first redraw waits for the worker's first round.
+// Every later redraw draws the last round handed.
+function worker_gatherer(
+	spawn: Spawn,
+	now: () => number = Date.now,
+	saved?: SavedRead,
+): BoardPorts['gather'] {
 	const thread: Thread = { worker: undefined, latest: undefined, waiting: [] }
+	let unread = saved
 
 	return async () => {
+		const first = unread
+
+		unread = undefined
+		// Read before the first worker starts, so the worker starts from its data; with none there is no
+		// wait, so the worker is started at once.
+		if (first !== undefined) keep(thread, await first())
 		thread.worker ??= start(thread, spawn, now)
 		const read = await latest_of(thread)
 
@@ -391,4 +411,13 @@ const run_board_gather_thread = {
 }
 
 export { run_board_gather_thread }
-export type { FailedPost, GatherPost, GatherWorker, Handed, RoundState, Seed, WorkerSeed }
+export type {
+	FailedPost,
+	GatherPost,
+	GatherWorker,
+	Handed,
+	RoundState,
+	SavedRead,
+	Seed,
+	WorkerSeed,
+}

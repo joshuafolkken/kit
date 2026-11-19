@@ -140,6 +140,7 @@ async function watch(ports: BoardPorts, theme: Theme | undefined): Promise<void>
 				...ports,
 				gather,
 				folded: keys.folded,
+				opened_ms: ports.now(),
 				sound: keys.sound,
 				cue: keys.cue ?? ports.cue,
 				types_rows: theme !== undefined,

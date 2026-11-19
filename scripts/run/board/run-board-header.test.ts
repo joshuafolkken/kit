@@ -284,6 +284,22 @@ describe('run_board_header.header_lines progress', () => {
 	})
 })
 
+// joshuafolkken/kit#8219: a saved plan's age ends the progress line until a fresh plan lands.
+describe('run_board_header.header_lines saved plan', () => {
+	const saved = header({ plan_saved_ms: NOW - 2 * MINUTE })
+
+	it('ends the progress line on 🕘 and the saved plan’s age, the text before it unchanged', () => {
+		const plain = title_of(header())
+
+		expect(title_of(saved)).toMatch(/ {2}🕘 \S+$/u)
+		expect(title_of(saved).startsWith(plain)).toBe(true)
+	})
+
+	it('draws no 🕘 for a fresh plan', () => {
+		expect(title_of(header())).not.toContain('🕘')
+	})
+})
+
 describe('run_board_header.counts_of', () => {
 	it('counts the active rows by state and every planned row toward the total', () => {
 		const active = [row(1, 'merged'), row(2, 'parked'), row(3, 'done'), row(4, 'running')]

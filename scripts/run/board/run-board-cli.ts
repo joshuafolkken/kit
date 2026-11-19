@@ -12,6 +12,7 @@ import { run_board_gather_live } from './run-board-gather-live'
 import { run_board_gather_record } from './run-board-gather-record'
 import { run_board_gather_thread } from './run-board-gather-thread'
 import { run_board_live } from './run-board-live'
+import { run_board_saved_state } from './run-board-saved-state'
 import { run_board_screen } from './run-board-screen'
 import { run_board_sound_player } from './run-board-sound-player'
 import type { BoardPorts } from './run-board-state'
@@ -94,7 +95,11 @@ const LIVE_PORTS: Omit<BoardPorts, 'gather'> = {
 function live_ports(is_live: boolean, theme?: Theme): BoardPorts {
 	const setup = run_board_gather_record.setup_of(theme)
 	const gather = is_live
-		? run_board_gather_thread.worker_gatherer(run_board_gather_thread.spawner(setup))
+		? run_board_gather_thread.worker_gatherer(
+				run_board_gather_thread.spawner(setup),
+				Date.now,
+				async () => await run_board_saved_state.for_run(run_board_saved_state.file_store()),
+			)
 		: run_board_gather.frame_gatherer(run_board_gather_live.ports_of(false))
 	const cue = is_live ? run_board_sound_player.play_cue : undefined
 
