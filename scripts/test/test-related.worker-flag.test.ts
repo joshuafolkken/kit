@@ -1,5 +1,6 @@
 import type { GateTree } from '#scripts/gate/gate-tree'
 import { scoped_green } from '#scripts/gate/scoped-green'
+import { tree_verdict } from '#scripts/gate/tree-verdict'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_related } from './test-related'
 import { test_related_red } from './test-related-red'
@@ -58,6 +59,15 @@ describe('test_related.run_related_tests — a worker flag (joshuafolkken/kit#81
 			expect(vouched_tree()).toBe(TREE)
 		},
 	)
+
+	it('answers to the same verdict record as the bare run', async () => {
+		await test_related.run_related_tests([WORKER_FLAG])
+		await test_related.run_related_tests([])
+
+		const [flagged, bare] = vi.mocked(tree_verdict.record_path).mock.calls
+
+		expect(flagged).toEqual(bare)
+	})
 
 	it('a narrowing file argument vouches for no tree', async () => {
 		expect(await test_related.run_related_tests([SOURCE, WORKER_FLAG])).toBe(0)
