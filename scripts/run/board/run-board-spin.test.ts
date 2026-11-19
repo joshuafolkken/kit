@@ -20,19 +20,31 @@ const WIDE = { rows: 24, columns: 80 }
 // eslint-disable-next-line no-control-regex -- a turn is made of control characters
 const TURN = /^(?:\u{1B}\[\d+;\d+H(?:\u{1B}\[[\d;]*m)*.\u{1B}\[0m)+$/u
 
-// A clock that each sleep moves forward, and every write and sleep it saw.
+const SYNC_ON = `${ESCAPE}[?2026h`
+const SYNC_OFF = `${ESCAPE}[?2026l`
+
+// A write's bytes inside its synchronized output (joshuafolkken/kit#8125); a write outside it is kept
+// whole, so it matches none of the turns it should have been.
+function unsynced(text: string): string {
+	if (!text.startsWith(SYNC_ON) || !text.endsWith(SYNC_OFF)) return text
+
+	return text.slice(SYNC_ON.length, -SYNC_OFF.length)
+}
+
+// A clock that each sleep moves forward, and every write and sleep it saw, each write's `text` the
+// bytes inside its synchronized output and `raw` the write as it was.
 function spin_ports(now_ms: number): {
 	ports: Parameters<typeof spin_to_second>[1]
-	writes: Array<{ at_ms: number; text: string }>
+	writes: Array<{ at_ms: number; text: string; raw: string }>
 	sleeps: Array<number>
 } {
 	const clock = { now_ms }
-	const writes: Array<{ at_ms: number; text: string }> = []
+	const writes: Array<{ at_ms: number; text: string; raw: string }> = []
 	const sleeps: Array<number> = []
 	const ports = {
 		now: () => clock.now_ms,
-		write: (text: string) => {
-			writes.push({ at_ms: clock.now_ms, text })
+		write: (raw: string) => {
+			writes.push({ at_ms: clock.now_ms, text: unsynced(raw), raw })
 		},
 		sleep: async (ms: number) => {
 			sleeps.push(ms)
@@ -186,7 +198,7 @@ describe('run_board_spin — the spinner while rows type (joshuafolkken/kit#8123
 	const SPOT_ROW = [{ row: 1, column: 5, style: '' }]
 	const ROW_TYPING = typing_with({ key: 'done:7', row: 3, text: 'x'.repeat(40), start_ms: START })
 
-	async function written(): Promise<Array<{ at_ms: number; text: string }>> {
+	async function written(): Promise<Array<{ at_ms: number; text: string; raw: string }>> {
 		const { ports, writes } = spin_ports(START)
 
 		await spin_to_second({ spots: SPOT_ROW, typing: ROW_TYPING }, ports)
@@ -216,6 +228,14 @@ describe('run_board_spin — the spinner while rows type (joshuafolkken/kit#8123
 		expect(writes.filter(({ at_ms }) => (at_ms - START) % LETTER_MS === 0)).toHaveLength(
 			REDRAW_MS / LETTER_MS - 1,
 		)
+	})
+
+	// joshuafolkken/kit#8125: a terminal draws each write's turns and letters at once, never half of one.
+	it('writes each wake’s spinner and letters in synchronized output', async () => {
+		const writes = await written()
+
+		expect(writes.length).toBeGreaterThan(0)
+		expect(writes.every(({ raw, text }) => raw === `${SYNC_ON}${text}${SYNC_OFF}`)).toBe(true)
 	})
 })
 

@@ -5,6 +5,8 @@ import type { BoardRow } from './run-board-layout'
 import { run_board_render_fixture } from './run-board-render-fixture'
 import { run_board_render_lanes, type LaneCells } from './run-board-render-lanes'
 import { run_board_render_lead } from './run-board-render-lead'
+import { run_board_row_key } from './run-board-row-key'
+import { run_board_seat } from './run-board-seat'
 import type { UsageFigure } from './run-board-usage'
 import { run_board_usage_text } from './run-board-usage-text'
 
@@ -134,6 +136,40 @@ describe('run_board_render_lanes.lanes_section', () => {
 		const icons = [LANES_LABEL, ...COLUMN_LABELS].map((label) => label.split(' ', 1)[0] ?? '')
 
 		expect(icons.map((icon) => run_board_fit.width_of(icon))).toStrictEqual([2, 2, 2, 2])
+	})
+})
+
+function without_keys(texts: ReadonlyArray<string>): Array<string> {
+	return texts.map((text) => run_board_row_key.without_key(text))
+}
+
+// joshuafolkken/kit#8116: a themed frame keys each empty seat's reason after its lead, by the uncut words.
+describe('run_board_render_lanes.lanes_section seat keys', () => {
+	const SEATED = { lane_limit: 2, occupied_count: 0, seats: {} }
+	const SEAT_KEY = `seat:${run_board_seat.NO_CANDIDATE}`
+	const NARROW = 20
+
+	function seat_texts(keyed: boolean, columns?: number): Array<string> {
+		const [section] = lanes_section([], undefined, header({ ...SEATED, is_keyed: keyed }), columns)
+
+		return (section?.lines ?? []).filter((line) => line.is_seat === true).map((line) => line.text)
+	}
+
+	it('keys each seat line after its lead only where the frame is keyed', () => {
+		const splits = seat_texts(true).map((text) => run_board_row_key.split_key(text))
+
+		expect(splits.map((split) => split.key)).toStrictEqual([SEAT_KEY, SEAT_KEY])
+		expect(splits.every((split) => split.prefix.endsWith('💺 '))).toBe(true)
+		expect(seat_texts(false).map((text) => run_board_row_key.split_key(text).key)).toStrictEqual([
+			undefined,
+			undefined,
+		])
+	})
+
+	it('draws the same seat lines with the key taken out, cut at the pane’s edge or not', () => {
+		expect(without_keys(seat_texts(true))).toStrictEqual(seat_texts(false))
+		expect(without_keys(seat_texts(true, NARROW))).toStrictEqual(seat_texts(false, NARROW))
+		expect(run_board_row_key.split_key(seat_texts(true, NARROW)[0] ?? '').key).toBe(SEAT_KEY)
 	})
 })
 

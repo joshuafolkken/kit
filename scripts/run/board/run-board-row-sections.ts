@@ -1,6 +1,7 @@
 import { run_board_header, type BoardHeader } from './run-board-header'
 import { run_board_layout, type BoardLayout, type BoardRow } from './run-board-layout'
 import { run_board_row_key, type KeySection } from './run-board-row-key'
+import { run_board_seat } from './run-board-seat'
 
 // joshuafolkken/kit#8003: the issue rows of each keyed section, as the frame draws them
 // (`run-board-render.ts`), and every one of their keys — drawn or not, so a row a fold or the pane's fit
@@ -41,13 +42,18 @@ function epic_keys_of(layout: BoardLayout | undefined): Array<string> {
 		.map((entry) => run_board_row_key.key_of('epic', entry.epic))
 }
 
-// Every key the board knows this frame — its rows', its epics' and the header's now line's — so a line is
-// typed only when its key is new. A keyed line a later Issue adds puts its keys here.
+// joshuafolkken/kit#8116: the key of every empty seat's 💺 line, by its uncut reason.
+function seat_keys_of(header: BoardHeader): Array<string> {
+	return run_board_seat.reasons_of(header).map((reason) => run_board_row_key.key_of('seat', reason))
+}
+
+// Every key the board knows this frame — its rows', its epics', its seats' and the header's now line's —
+// so a line is typed only when its key is new. A keyed line a later Issue adds puts its keys here.
 function known_of(header: BoardHeader): Set<string> {
 	const known = keys_of(header.layout)
 	const now_key = run_board_header.now_key(header)
 
-	for (const key of epic_keys_of(header.layout)) known.add(key)
+	for (const key of [...epic_keys_of(header.layout), ...seat_keys_of(header)]) known.add(key)
 	if (now_key !== undefined) known.add(now_key)
 
 	return known

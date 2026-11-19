@@ -142,7 +142,7 @@ function framed(ports: BoardPorts, screen: Screen): BoardPorts {
 		...ports,
 		footer: ['', ...[WORDS.keeps_running, ...keys].map((line) => styleText('dim', line))],
 		write: (frame) => {
-			ports.write(`${screen.frame}${frame.replace(TRAILING_NEWLINE, '')}`)
+			ports.write(screen.frame(frame.replace(TRAILING_NEWLINE, '')))
 		},
 	}
 }
@@ -177,7 +177,7 @@ async function revealed_tick(
 				held.push(frame)
 			},
 		},
-		screen,
+		{ ...screen, frame: screen.held },
 	)
 	const next = await tick(state, holding, 'background')
 
