@@ -20,9 +20,26 @@ import { run_board_type_rows, type Typing } from './run-board-type-rows'
 const { SPOT } = run_board_spin
 const { assemble_display } = run_board_display
 
+// The ports a frame is drawn through — no read among them, so the worker thread draws the frames it
+// records through the same ones (`run-board-gather-record.ts`).
+type DrawPorts = Pick<
+	BoardPorts,
+	| 'write'
+	| 'link'
+	| 'is_tty'
+	| 'form'
+	| 'types_rows'
+	| 'is_themed'
+	| 'size'
+	| 'footer'
+	| 'folded'
+	| 'cue'
+	| 'sound'
+>
+
 // What one redraw draws with.
 interface Redraw {
-	ports: BoardPorts
+	ports: DrawPorts
 	now_ms: number
 }
 
@@ -32,7 +49,7 @@ type LaidHeader = BoardHeader & { layout: BoardLayout }
 type PortHeader = Pick<BoardHeader, 'form' | 'spinner' | 'is_keyed' | 'is_themed' | 'is_sound_on'>
 
 // What the header reads off the board's own ports: only a live board reads the sound switch.
-function port_header(ports: BoardPorts): PortHeader {
+function port_header(ports: DrawPorts): PortHeader {
 	return {
 		form: ports.form,
 		spinner: ports.is_tty ? SPOT : undefined,
@@ -43,7 +60,7 @@ function port_header(ports: BoardPorts): PortHeader {
 }
 
 // The assembled header with what the ports add: the terminal's form, the sound switch and the links.
-function header_of(display: BoardDisplay, ports: BoardPorts): LaidHeader {
+function header_of(display: BoardDisplay, ports: DrawPorts): LaidHeader {
 	return {
 		...display.header,
 		...port_header(ports),
@@ -52,7 +69,7 @@ function header_of(display: BoardDisplay, ports: BoardPorts): LaidHeader {
 }
 
 // The pane a live frame is kept within and the footer it ends on, read at every redraw.
-function bounds_of(ports: BoardPorts): FrameBounds {
+function bounds_of(ports: DrawPorts): FrameBounds {
 	return { size: ports.size?.(), footer: ports.footer, folded: ports.folded?.() }
 }
 
@@ -92,7 +109,7 @@ function typing_of(
 	return run_board_type_rows.next(state.typing, frame, redraw.now_ms, is_on)
 }
 
-function draw(ports: BoardPorts, lines: ReadonlyArray<string>): void {
+function draw(ports: Pick<DrawPorts, 'write'>, lines: ReadonlyArray<string>): void {
 	ports.write(`${lines.join('\n')}\n`)
 }
 
@@ -123,3 +140,4 @@ function draw_run(
 const run_board_tick_draw = { bounds_of, draw, draw_display, draw_run }
 
 export { run_board_tick_draw }
+export type { DrawPorts }

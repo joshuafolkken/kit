@@ -6,18 +6,22 @@ import type { LocalRead } from './run-board-read'
 import type { BoardPorts, BoardState } from './run-board-state'
 import { run_board_theme, type Theme } from './run-board-theme'
 import { run_board_tick } from './run-board-tick'
-import { run_board_tick_draw } from './run-board-tick-draw'
+import { run_board_tick_draw, type DrawPorts } from './run-board-tick-draw'
 
 // The chat frame `run:board --chat` answers with, and `--every <minutes>`, which pushes that same frame
 // off-screen on a schedule with no model in between. The frame needs no model, so a plain background
 // process sends it and ends with the run, rather than a scheduled session re-reading its whole context.
-// The live board and `--every` record the frames they hold, so `--chat` and `--once` answer from them.
+// The live board's worker thread and `--every` record the frames they hold, so `--chat` and `--once`
+// answer from them.
 
 const { FRESH_STATE, layout_for, tick } = run_board_tick
 const { draw_run } = run_board_tick_draw
 const { CHAT_KEY, once_key } = run_board_frame_store
 const RECORD_EVERY_SECONDS = 5
 const RECORD_EVERY_MS = RECORD_EVERY_SECONDS * MS_PER_SECOND
+
+// What a frame is recorded through: the draw's ports, the clock and the store — no read.
+type RecordPorts = Omit<DrawPorts, 'write'> & Pick<BoardPorts, 'now' | 'frames'>
 
 interface ChatFrame {
 	text: string
@@ -81,9 +85,14 @@ async function push_until_ended(ports: BoardPorts, interval_ms: number): Promise
 
 // The text of the run a live board already read, drawn in the ports' form as a single frame is: nothing
 // read, sounded or typed, and nothing fitted to the terminal.
-function redrawn(state: BoardState, local: LocalRead, ports: BoardPorts, now_ms: number): string {
+function redrawn(
+	state: BoardState,
+	local: LocalRead,
+	ports: Omit<DrawPorts, 'write'>,
+	now_ms: number,
+): string {
 	let text = ''
-	const quiet: BoardPorts = {
+	const quiet: DrawPorts = {
 		...ports,
 		is_tty: false,
 		size: undefined,
@@ -115,7 +124,7 @@ function read_ms(state: BoardState): number | undefined {
 // from the live board's last state and dated when its plan was read; the chat thanks nobody.
 function record(
 	state: BoardState,
-	ports: BoardPorts,
+	ports: RecordPorts,
 	theme: Theme | undefined,
 	now_ms: number,
 ): void {
@@ -130,10 +139,11 @@ function record(
 	ports.frames?.save(once_key(theme, ports.is_tty), { text: once, saved_ms })
 }
 
-// What a live board calls after each redraw: records its frames at most once every
-// `RECORD_EVERY_MS`, from the first state whose plan read has settled. Drawn in place, they take no
-// read, and the store writes them without being awaited, so the redraw on the second waits on neither.
-function recorder(ports: BoardPorts, theme: Theme | undefined): (state: BoardState) => void {
+// What a live board's worker thread calls after each round (`run-board-gather-record.ts`): records its
+// frames at most once every `RECORD_EVERY_MS`, from the first state whose plan read has settled. Drawn
+// in place, they take no read, and the store writes them without being awaited, so the next round waits
+// on neither.
+function recorder(ports: RecordPorts, theme: Theme | undefined): (state: BoardState) => void {
 	let next_ms = -Infinity
 
 	return (state) => {
@@ -148,3 +158,4 @@ function recorder(ports: BoardPorts, theme: Theme | undefined): (state: BoardSta
 const run_board_every = { RECORD_EVERY_MS, chat_frame, push_until_ended, record, recorder }
 
 export { run_board_every }
+export type { RecordPorts }

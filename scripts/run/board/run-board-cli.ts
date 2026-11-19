@@ -3,13 +3,13 @@ import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { run_progress } from '#scripts/run/progress/run-progress'
 import { run_progress_read } from '#scripts/run/progress/run-progress-read'
-import terminalLink from 'terminal-link'
 import { run_board_data_ports } from './run-board-data-ports'
 import { run_board_every } from './run-board-every'
 import { run_board_fold_store } from './run-board-fold-store'
 import { run_board_frame_store } from './run-board-frame-store'
 import { run_board_gather } from './run-board-gather'
 import { run_board_gather_live } from './run-board-gather-live'
+import { run_board_gather_record } from './run-board-gather-record'
 import { run_board_gather_thread } from './run-board-gather-thread'
 import { run_board_live } from './run-board-live'
 import { run_board_screen } from './run-board-screen'
@@ -54,8 +54,7 @@ const LIVE_PORTS: Omit<BoardPorts, 'gather'> = {
 	...run_board_data_ports.live(),
 	now: () => Date.now(),
 	write: (frame) => process.stdout.write(frame),
-	// No fallback: a terminal that opens no link, or a pipe, gets the bare number rather than a URL.
-	link: (text, url) => terminalLink(text, url, { fallback: false }),
+	link: run_board_gather_record.link,
 	is_tty: process.stdout.isTTY,
 	// Read on every redraw, so a resized pane is fitted on the next one.
 	size: () => ({ rows: process.stdout.rows, columns: process.stdout.columns }),
@@ -90,11 +89,12 @@ const LIVE_PORTS: Omit<BoardPorts, 'gather'> = {
 	},
 }
 
-// A live board reads on its worker thread, so no read stops its spinner, and sounds its cues; a single
-// frame has no spinner to stop, reads where it draws, and stays silent.
-function live_ports(is_live: boolean): BoardPorts {
+// A live board reads and records its frames on its worker thread, so neither stops its spinner, and
+// sounds its cues; a single frame has no spinner to stop, reads where it draws, and stays silent.
+function live_ports(is_live: boolean, theme?: Theme): BoardPorts {
+	const setup = run_board_gather_record.setup_of(theme)
 	const gather = is_live
-		? run_board_gather_thread.worker_gatherer()
+		? run_board_gather_thread.worker_gatherer(run_board_gather_thread.spawner(setup))
 		: run_board_gather.frame_gatherer(run_board_gather_live.ports_of(false))
 	const cue = is_live ? run_board_sound_player.play_cue : undefined
 
@@ -167,8 +167,8 @@ async function push_every(minutes: string | undefined, ports: BoardPorts): Promi
 }
 
 // The ports a test hands in, else the live ones.
-function ports_for(ports: BoardPorts | undefined, is_live: boolean): BoardPorts {
-	return ports ?? live_ports(is_live)
+function ports_for(ports: BoardPorts | undefined, is_live: boolean, theme?: Theme): BoardPorts {
+	return ports ?? live_ports(is_live, theme)
 }
 
 // A board a person watches, in the theme; the chat's frame and `--every`'s are passed on as they are,
@@ -188,7 +188,7 @@ async function draw(
 
 	const { is_tty } = ports ?? LIVE_PORTS
 	const mode = run_board_screen.mode_of({ is_tty, is_once: flag === ONCE_FLAG })
-	const board = run_board_timing.timed(ports_for(ports, mode === 'live'), is_timing)
+	const board = run_board_timing.timed(ports_for(ports, mode === 'live', theme), is_timing)
 
 	// A live board says it as it leaves its screen: `watch` only ever returns by throwing.
 	if (mode === 'live') await run_board_live.watch(run_board_theme.themed(board, theme), theme)

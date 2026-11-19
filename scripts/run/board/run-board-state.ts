@@ -28,7 +28,7 @@ type DrawKind = 'tick' | 'turn'
 type DrawTimer = <T>(kind: DrawKind, draw: () => T) => T
 // The stage a live board's loop is in, which `--timing` names a main-thread stall by (joshuafolkken/kit#8148).
 // `turn` is the spinners turned between seconds.
-type StallStage = 'redraw' | 'record' | 'turn'
+type StallStage = 'redraw' | 'turn'
 
 interface BoardPorts {
 	read_plan: (scope: NamedPlan) => Promise<BoardPlan | undefined>

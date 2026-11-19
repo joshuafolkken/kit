@@ -10,6 +10,7 @@ import {
 	type GatherRead,
 	type GatherState,
 } from './run-board-gather'
+import { run_board_gather_record, type RecordSetup } from './run-board-gather-record'
 import type { LocalRead } from './run-board-read'
 import {
 	run_board_state,
@@ -299,15 +300,27 @@ function worker_options(exec_argv: ReadonlyArray<string>): WorkerOptions {
 	return { execArgv: ts_entry_loader.loader_argv(exec_argv) }
 }
 
-function spawn_worker(seed: DataPost | undefined): GatherWorker {
-	return new Worker(WORKER_URL, { ...worker_options(process.execArgv), workerData: seed })
+// What a worker is started with: the data the last one handed over, and what it records its frames with.
+interface WorkerSeed {
+	seed: DataPost | undefined
+	setup: RecordSetup
+}
+
+// Starts each worker with the board's record setup (`run-board-gather-record.ts`).
+function spawner(setup: RecordSetup): Spawn {
+	return (seed) => {
+		const worker_data: WorkerSeed = { seed, setup }
+
+		return new Worker(WORKER_URL, {
+			...worker_options(process.execArgv),
+			env: run_board_gather_record.worker_environment(setup),
+			workerData: worker_data,
+		})
+	}
 }
 
 // The first redraw waits for the worker's first round; every later one draws the last round handed.
-function worker_gatherer(
-	spawn: Spawn = spawn_worker,
-	now: () => number = Date.now,
-): BoardPorts['gather'] {
+function worker_gatherer(spawn: Spawn, now: () => number = Date.now): BoardPorts['gather'] {
 	const thread: Thread = { worker: undefined, latest: undefined, waiting: [] }
 
 	return async () => {
@@ -322,9 +335,10 @@ const run_board_gather_thread = {
 	first_round,
 	gather_round,
 	post_of,
+	spawner,
 	worker_gatherer,
 	worker_options,
 }
 
 export { run_board_gather_thread }
-export type { FailedPost, GatherPost, GatherWorker, RoundState }
+export type { FailedPost, GatherPost, GatherWorker, RoundState, WorkerSeed }

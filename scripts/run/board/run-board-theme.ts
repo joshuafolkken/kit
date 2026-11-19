@@ -198,7 +198,16 @@ function themed<P extends Pick<BoardPorts, 'write' | 'is_themed'>>(
 	}
 }
 
-const run_board_theme = { LINE_LIMIT, THEME_ENV, choose, kept_lines, refusal, restyle, themed }
+const run_board_theme = {
+	LINE_LIMIT,
+	THEME_ENV,
+	THEMES,
+	choose,
+	kept_lines,
+	refusal,
+	restyle,
+	themed,
+}
 
 export { run_board_theme }
 export type { Theme }

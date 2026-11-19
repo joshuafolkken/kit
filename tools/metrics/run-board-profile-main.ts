@@ -93,8 +93,8 @@ function new_events_piece({ read, ports, state }: Settled): Piece {
 	}
 }
 
-// The live board's extra whole draws that record the chat's and `--once`'s frames, kept in memory
-// rather than in the live board's files.
+// The extra whole draws the live board's gather worker makes to record the chat's and `--once`'s
+// frames (off the main thread), kept in memory rather than in the live board's files.
 function record_piece({ ports, state }: Settled): Piece {
 	const frames = run_board_frame_store.memory_store()
 
