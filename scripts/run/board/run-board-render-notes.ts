@@ -45,14 +45,6 @@ interface NotesBody {
 	hidden: number
 }
 
-// One line the section can draw, with what it is kept by and the icon it leads with.
-interface NoteItem {
-	rank: number
-	at_ms: number
-	line: string
-	icon: string
-}
-
 interface ItemsView {
 	listed: ReadonlySet<number>
 	has_legend: boolean
@@ -155,15 +147,6 @@ function rank_index(rank: Rank): number {
 	return RANK_ORDER.indexOf(rank)
 }
 
-function note_item(note: BoardNote, view: ItemsView): NoteItem {
-	return {
-		rank: rank_index(note.kind),
-		at_ms: note.at_ms,
-		line: note_text(note, view),
-		icon: note_icon(note),
-	}
-}
-
 // A filed Issue the plan draws a row for (`listed`, the rows' numbers) would name its title twice, so
 // its row leads the title with ✚ instead (joshuafolkken/kit#4099).
 function is_listed(note: BoardNote, listed: ReadonlySet<number>): boolean {
@@ -178,15 +161,13 @@ function rest_of(notes: ReadonlyArray<BoardNote>, listed: ReadonlySet<number>): 
 	return notes.filter((note) => !is_listed(note, listed))
 }
 
-function by_rank(left: NoteItem, right: NoteItem): number {
-	return left.rank - right.rank || right.at_ms - left.at_ms
+function by_rank(left: BoardNote, right: BoardNote): number {
+	return rank_index(left.kind) - rank_index(right.kind) || right.at_ms - left.at_ms
 }
 
-// Every line the section can draw, in the order it keeps them: by rank, then newest first.
-function items_of(notes: ReadonlyArray<BoardNote>, view: ItemsView): Array<NoteItem> {
-	return rest_of(notes, view.listed)
-		.map((note) => note_item(note, view))
-		.toSorted(by_rank)
+// Every note the section can draw, in the order it keeps them: by rank, then newest first.
+function ranked_of(notes: ReadonlyArray<BoardNote>, listed: ReadonlySet<number>): Array<BoardNote> {
+	return rest_of(notes, listed).toSorted(by_rank)
 }
 
 // The first few by rank, so the section never pushes the plan off the screen, and how many more there
@@ -197,11 +178,14 @@ function note_lines(notes: ReadonlyArray<BoardNote>, view: NotesView): NotesBody
 	const { layout, link, repo, columns, is_keyed } = view
 	const has_legend = layout !== undefined
 	const listed = listed_of(has_legend ? run_board_layout.rows_of(layout) : [])
-	const issue_width = issue_width_of(rest_of(notes, listed))
-	const items = items_of(notes, { listed, has_legend, link, repo, columns, is_keyed, issue_width })
-	const lines = items.slice(0, NOTE_LIMIT).map((item) => item.line)
+	const ranked = ranked_of(notes, listed)
+	const shown = ranked.slice(0, NOTE_LIMIT)
+	// Measured over the drawn notes alone, so a hidden note's number never widens the column.
+	const issue_width = issue_width_of(shown)
+	const item_view = { listed, has_legend, link, repo, columns, is_keyed, issue_width }
+	const lines = shown.map((note) => note_text(note, item_view))
 
-	return { lines, hidden: items.length - lines.length }
+	return { lines, hidden: ranked.length - lines.length }
 }
 
 // The findings under a rule, led by 📌 where a legend names it and by its word where none does, and how
@@ -222,10 +206,8 @@ function notes_legend(
 	named: ReadonlySet<string>,
 	rows: ReadonlyArray<BoardRow>,
 ): Array<string> {
-	const view = { listed: listed_of(rows), has_legend: true, link: same, repo: undefined }
-	const shown = items_of(notes, view).slice(0, NOTE_LIMIT)
-
-	const drawn = new Set(shown.map((item) => item.icon))
+	const shown = ranked_of(notes, listed_of(rows)).slice(0, NOTE_LIMIT)
+	const drawn = new Set(shown.map((note) => note_icon(note)))
 
 	return NOTE_LEGEND.filter(([icon]) => drawn.has(icon) && !named.has(icon)).map(
 		([icon, word]) => `${icon} ${WORDS[word]}`,

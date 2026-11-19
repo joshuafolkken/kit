@@ -21,6 +21,9 @@ const REASON = 'superseded'
 const SHORT_TITLE = 'Short title'
 const GAP = '  '
 const HELD: RowReason = { icon: '📂', issues: [String(LANE)], tail: PATH }
+const NARROW = { occupied: 1, limit: 2 }
+// A lanes label wider than the lead before the rule's ⏰, which pushes the time columns right.
+const WIDE = { occupied: 10, limit: 12 }
 
 function row(number: number, extra: Partial<BoardRow> = {}): BoardRow {
 	return {
@@ -52,8 +55,8 @@ function done(): BoardRow {
 }
 
 // A board of a running lane with a free seat, a queued row held on a path, one with nothing after
-// its title, a waiting row with a reason and a done row.
-function board(): Array<string> {
+// its title, a waiting row with a reason and a done row; `lanes` widens the lanes rule's count.
+function board(lanes: Readonly<{ occupied: number; limit: number }> = NARROW): Array<string> {
 	const queued = [row(QUEUED, { reason: HELD }), row(BARE)].map((entry) => ({
 		kind: 'row' as const,
 		row: entry,
@@ -65,7 +68,8 @@ function board(): Array<string> {
 	const layout = { ...EMPTY_LAYOUT, active: [lane(), done()], queued, unreached: [waiting] }
 	const usages = board_usage(new Map())
 	const seats = { refusal: 'no room', hold: undefined }
-	const view = header({ layout, usages, spinner: '⠋', occupied_count: 1, lane_limit: 2, seats })
+	const counts = { occupied_count: lanes.occupied, lane_limit: lanes.limit }
+	const view = header({ layout, usages, spinner: '⠋', ...counts, seats })
 
 	return lines_of(view).map((line) => run_board_label_pair.untitled(line))
 }
@@ -97,6 +101,25 @@ describe('run_board_render.render — the shared row indent', () => {
 	})
 
 	it('draws the lanes rule’s 💪 CPU over the column the lane row’s cells start at', () => {
+		const rule = line_of(lines, '💪 CPU')
+		const lane_line = line_of(lines, ` ${String(LANE)} `)
+		const lead = lane_line.slice(0, lane_line.lastIndexOf('″') + 1)
+		const label = rule.slice(0, rule.indexOf('💪 CPU'))
+
+		expect(width_of(label)).toBe(width_of(`${lead} `))
+	})
+})
+
+// A lanes label past the lead's room moves the time and usage columns right, never the icon.
+describe('run_board_render.render — a wide lanes label', () => {
+	const lines = board(WIDE)
+
+	it('keeps a lane row’s phase icon and a free seat’s 💺 in the row indent’s column', () => {
+		expect(column_of(lines, ` ${String(LANE)} `, '🔨')).toBe(ROW_INDENT.length)
+		expect(column_of(lines, '💺', '💺')).toBe(ROW_INDENT.length)
+	})
+
+	it('still stands the rule’s 💪 CPU over the lane row’s cells', () => {
 		const rule = line_of(lines, '💪 CPU')
 		const lane_line = line_of(lines, ` ${String(LANE)} `)
 		const lead = lane_line.slice(0, lane_line.lastIndexOf('″') + 1)

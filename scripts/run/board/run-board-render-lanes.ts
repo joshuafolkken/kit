@@ -148,7 +148,7 @@ function seat_reason(lead: string, reason: string, columns: number | undefined):
 function seat_lines(header: BoardHeader, columns: number | undefined): Array<PlanLine> {
 	if (header.run_name !== undefined) return []
 
-	const lead = `${' '.repeat(column_offset(header))}${SEAT_LEAD}${SEAT_ICON} `
+	const lead = `${SEAT_LEAD}${SEAT_ICON} `
 	const section = header.is_keyed === true ? 'seat' : undefined
 
 	return reasons_of(header).map((reason) => ({

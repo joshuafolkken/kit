@@ -128,7 +128,7 @@ function line_of(row: ThroughputRow, widths: ReadonlyArray<number>): string {
 }
 
 // The blanks before a column's figures in a `width`-wide column, its fewest across the rows; a label
-// at the column's left end where no row draws a figure.
+// at the column's right end where no row draws a figure.
 function figures_offset(column: Column, rows: ReadonlyArray<ThroughputRow>, width: number): number {
 	const label = run_board_fit.width_of(column.label)
 	const blanks = rows

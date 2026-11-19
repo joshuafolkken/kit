@@ -116,14 +116,14 @@ function icon_of(row: BoardRow, header: BoardHeader): string {
 	return is_stopped_single(row, header) ? ICON_BLANK : state_icon(row)
 }
 
-// A lane row's lead after its indent, ending where its usage cells start less one blank.
+// A lane row's lead after its indent, ending where its usage cells start less one blank. A wide label's
+// offset falls after the icon, so the icon keeps `ROW_INDENT`'s column (joshuafolkken/kit#8257).
 function lead_of(row: BoardRow, header: BoardHeader): string {
 	const icon = running_fresh(row, icon_of(row, header), row.status?.phase_ms, header)
 	const phase = phase_time(row, header, TIME_WIDTH)
+	const shifted = `${icon}${' '.repeat(column_offset(header))}`
 
-	const progress = `${progress_of(row, header)}${' '.repeat(column_offset(header))}`
-
-	return [progress, icon, phase, whole_of(row, header)].join(' ')
+	return [progress_of(row, header), shifted, phase, whole_of(row, header)].join(' ')
 }
 
 const run_board_render_lead = {

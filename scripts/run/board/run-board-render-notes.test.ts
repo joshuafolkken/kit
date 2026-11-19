@@ -16,6 +16,7 @@ const { clock_of, minute_of } = run_board_labels
 const { EMPTY_LAYOUT, MINUTE, NOW, WORDS, header, lines_of, note, rule } = run_board_render_fixture
 const { ROW_INDENT } = run_board_render_section
 const { ELLIPSIS } = run_board_render_title
+const CROSS_REPO = 'other/repo#12'
 
 describe('run_board_render findings and no run', () => {
 	it('shows the newest findings and how many more there are', () => {
@@ -187,7 +188,7 @@ function bracketed(reference: string): string {
 
 // joshuafolkken/kit#3520: a finding's numbers open their GitHub issue, as the plan's rows do.
 describe('run_board_render.render findings links', () => {
-	const found: BoardNote = { ...filed, issue: 'other/repo#12', found_during: '3415' }
+	const found: BoardNote = { ...filed, issue: CROSS_REPO, found_during: '3415' }
 
 	it('links the finding’s issue and the issue it was found during', () => {
 		const lines = lines_of(header({ link: bracketed }), [found, note(NOW, 'seen')])
@@ -196,7 +197,7 @@ describe('run_board_render.render findings links', () => {
 			`${ROW_INDENT}🆕 ${minute_of(NOW)} [other/repo#12]  Lead (found during [3415])`,
 		)
 		// The number is padded to the section's widest before it is linked (joshuafolkken/kit#8257).
-		const pad = ' '.repeat('other/repo#12'.length - '3415'.length)
+		const pad = ' '.repeat(CROSS_REPO.length - '3415'.length)
 
 		expect(lines).toContain(`${ROW_INDENT}💬 ${minute_of(NOW)} [3415]${pad}  seen`)
 	})
@@ -313,6 +314,16 @@ describe('run_board_render.render findings columns', () => {
 		)
 
 		expect(lines_of(header(), notes)).toContain(`${ROW_INDENT}💬 ${String(hidden)} more`)
+	})
+
+	it('pads the number column to the drawn findings’ widest, never a hidden one’s', () => {
+		const drawn = Array.from({ length: run_board_render.NOTE_LIMIT }, (_, index) =>
+			note(NOW - index * MINUTE, `observation ${String(index)}`),
+		)
+		const hidden: BoardNote = { ...note(NOW - MINUTE * MINUTE, 'old'), issue: CROSS_REPO }
+		const lines = lines_of(header(), [...drawn, hidden])
+
+		expect(lines).toContain(`${ROW_INDENT}💬 ${minute_of(NOW)} 3415  observation 0`)
 	})
 })
 
