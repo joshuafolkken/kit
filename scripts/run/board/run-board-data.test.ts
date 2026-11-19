@@ -14,7 +14,7 @@ import { run_board_tick } from './run-board-tick'
 
 const { FIRST_ROUND, LOCAL, START, harness, plan_titled, round_ports } = run_board_fixture
 const { FRESH_DATA, FRESH_STATE, FRESH_VIEW } = run_board_state
-const { posted, received, step, view_for } = run_board_data
+const { posted, received, relaunched, step, view_for } = run_board_data
 const READ: GatherRead = {
 	...run_board_gather.read_of(run_board_gather.FRESH_GATHER),
 	local: LOCAL,
@@ -95,6 +95,7 @@ describe('run_board_data.posted and received', () => {
 		})
 		const back = received(structuredClone(posted(launched)), READ)
 
+		expect(back.plan_fetch?.answer()).toBeUndefined()
 		expect(back.plan_fetch).toBeDefined()
 		expect(back.closed_fetch).toBeUndefined()
 		expect(back.run_started_ms).toBe(START)
@@ -105,6 +106,35 @@ describe('run_board_data.posted and received', () => {
 
 		expect(posted(data).in_flight).toStrictEqual([])
 		expect(received(posted(data), READ).plan).toBe(data.plan)
+	})
+})
+
+describe('run_board_data.relaunched', () => {
+	const ASKED = posted({
+		...FRESH_DATA,
+		attempted_ms: START,
+		closed_attempted_ms: START,
+		closed_asked: new Set([1]),
+		thanks_attempted_ms: START,
+		rate_limit_attempted_ms: START,
+		issue_count_attempted_ms: START,
+	})
+
+	it('clears the asked stamps of the reads in flight, holding none', () => {
+		const post = relaunched({ ...ASKED, in_flight: ['plan_fetch', 'closed_fetch'] })
+
+		expect(post).toMatchObject({ in_flight: [], attempted_ms: undefined })
+		expect(post).toMatchObject({ closed_attempted_ms: undefined, closed_asked: new Set() })
+		expect(post).toMatchObject({ thanks_attempted_ms: START, rate_limit_attempted_ms: START })
+	})
+
+	it('clears the roster and allowance stamps of their reads in flight', () => {
+		const in_flight = ['thanks_fetch', 'rate_limit_fetch', 'issue_count_fetch'] as const
+		const post = relaunched({ ...ASKED, in_flight })
+
+		expect(post).toMatchObject({ thanks_attempted_ms: undefined, attempted_ms: START })
+		expect(post).toMatchObject({ rate_limit_attempted_ms: undefined })
+		expect(post).toMatchObject({ issue_count_attempted_ms: undefined })
 	})
 })
 

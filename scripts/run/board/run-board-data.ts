@@ -34,6 +34,14 @@ const FETCH_KEYS: ReadonlyArray<FetchKey> = [
 	'rate_limit_fetch',
 	'issue_count_fetch',
 ]
+// The stamps that say each read was asked; cleared, the read is due at once.
+const UNASKED: Readonly<Record<FetchKey, Partial<DataPost>>> = {
+	plan_fetch: { attempted_ms: undefined },
+	closed_fetch: { closed_attempted_ms: undefined, closed_asked: new Set() },
+	thanks_fetch: { thanks_attempted_ms: undefined },
+	rate_limit_fetch: { rate_limit_attempted_ms: undefined },
+	issue_count_fetch: { issue_count_attempted_ms: undefined },
+}
 
 // What a step reads through, at what moment and how long it waits for the reads it launches.
 interface DataStep {
@@ -134,13 +142,23 @@ function received(post: DataPost, read: GatherRead): BoardData {
 	}
 }
 
+// The posted data a worker started again begins from: the reads the last worker had in flight died
+// with it, so none is held and each is asked again at once rather than after its interval.
+function relaunched(post: DataPost): DataPost {
+	let data: DataPost = { ...post, in_flight: [] }
+
+	for (const key of post.in_flight) data = { ...data, ...UNASKED[key] }
+
+	return data
+}
+
 // What the frame keeps from the last redraw: all of it on the same run, none on a different one, so
 // no spinner, typing, sound or baseline of the previous run carries over.
 function view_for(state: BoardState, data: BoardData): BoardView {
 	return state.run_started_ms === data.run_started_ms ? state : FRESH_VIEW
 }
 
-const run_board_data = { posted, received, step, view_for }
+const run_board_data = { posted, received, relaunched, step, view_for }
 
 export { run_board_data }
 export type { DataStep }

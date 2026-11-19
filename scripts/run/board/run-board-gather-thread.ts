@@ -187,11 +187,11 @@ function is_data_post(value: unknown): value is DataPost {
 
 // A worker's state before its first round: the data the last worker handed over, when it is started
 // again, so the board keeps its plan rows, thanks and allowances. The reads that worker had in flight
-// died with it, so none is held.
+// died with it, so each is asked again at once.
 function first_round(seed?: unknown): RoundState {
 	const { FRESH_GATHER } = run_board_gather
 	const data = is_data_post(seed)
-		? run_board_data.received({ ...seed, in_flight: [] }, EMPTY_READ)
+		? run_board_data.received(run_board_data.relaunched(seed), EMPTY_READ)
 		: run_board_state.FRESH_DATA
 
 	return { gather: FRESH_GATHER, data }

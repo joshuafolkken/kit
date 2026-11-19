@@ -109,4 +109,13 @@ describe('run_board_gather_thread.first_round', () => {
 		expect(round.data.thanks).toStrictEqual(THANKS)
 		expect(round.data.plan_fetch).toBeUndefined()
 	})
+
+	it('asks again at once for the plan the last worker had in flight', async () => {
+		const { data } = await planned_post()
+		const board = harness(LOCAL, [plan_titled('b')])
+
+		await gather_round(first_round(structuredClone(data)), round_ports(board), vi.fn())
+
+		expect(board.read_plan).toHaveBeenCalledOnce()
+	})
 })
