@@ -1,0 +1,7 @@
+{
+	"reason": "#8136 adds four profiler pieces and the round-minus-parts row the Issue asks for",
+	"date": "2026-11-19",
+	"growth": {
+		"scripts.code_lines": 55
+	}
+}
