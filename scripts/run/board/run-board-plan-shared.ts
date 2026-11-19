@@ -1,6 +1,7 @@
 import { backlog_next_shared } from '#scripts/backlog/backlog-next-shared'
 import type { NamedPlan } from '#scripts/backlog/backlog-plan'
 import { shared_cache, type CacheSlot } from '#scripts/josh/shared-cache'
+import { launch_timing } from '#scripts/lane/launch-timing'
 import { z } from 'zod'
 import type { BoardPlan } from './run-board-layout'
 import { run_board_pause } from './run-board-pause'
@@ -12,6 +13,9 @@ import { run_board_plan } from './run-board-plan'
 // Only a plan that read is kept; a failed read is asked again by the next redraw.
 //
 // The plan holds maps and sets, which JSON does not, so each is kept as its entries and rebuilt on read.
+
+// Marked on both paths, so the first read's source is the one the report keeps.
+const CACHED_PHASE = 'plan: from cache (1 = yes)'
 
 const PLAN_CACHE: CacheSlot = {
 	prefix: 'josh-run-board-plan-',
@@ -106,13 +110,20 @@ const board_plan_schema = z.object({
 	withheld: number_set.optional(),
 })
 
+// A plan kept by another board within the minute is not read, so `--timing` says whether the plan came
+// from the cache beside its steps (joshuafolkken/kit#8218).
 async function read(
 	named: NamedPlan,
 	read_plan = run_board_plan.read_plan,
 ): Promise<BoardPlan | undefined> {
-	const key = await backlog_next_shared.stream_key({ board: named })
+	const key = await launch_timing.timed(
+		'plan: stream key',
+		async () => await backlog_next_shared.stream_key({ board: named }),
+	)
 	const now_ms = Date.now()
 	const kept = shared_cache.read(PLAN_CACHE, key, board_plan_schema, now_ms)
+
+	launch_timing.mark(CACHED_PHASE, kept === undefined ? 0 : 1)
 
 	if (kept !== undefined) return kept
 
@@ -125,6 +136,6 @@ async function read(
 	return plan
 }
 
-const run_board_plan_shared = { PLAN_CACHE, read }
+const run_board_plan_shared = { CACHED_PHASE, PLAN_CACHE, read }
 
 export { run_board_plan_shared }

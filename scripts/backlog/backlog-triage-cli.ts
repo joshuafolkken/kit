@@ -13,6 +13,7 @@ import { error_text } from '#scripts/lib/error-message'
 import { run_park } from '#scripts/run/park/run-park'
 import { backlog_triage_adopt } from './backlog-triage-adopt'
 import { backlog_triage_decision } from './backlog-triage-decision'
+import { backlog_triage_filing } from './backlog-triage-filing'
 import { backlog_triage_pass } from './backlog-triage-pass'
 import { backlog_triage_unblock } from './backlog-triage-unblock'
 
@@ -250,16 +251,32 @@ async function write_verdict(request: TriageRequest): Promise<string | undefined
 	return await issue_run_verdict.apply_labels(issue, run_label === undefined ? [] : [run_label])
 }
 
+// A prepared `--blocked-by` with no recorded plan is refused before any write (joshuafolkken/kit#8222).
+async function blocker_problem({ blocker }: TriageRequest): Promise<string | undefined> {
+	return blocker === undefined ? undefined : await backlog_triage_filing.prepared_problem(blocker)
+}
+
+// The verdict line, with the prepared blocker's publication once the wait is recorded.
+async function verdict_line(request: TriageRequest): Promise<string> {
+	const head = `triage ${session_cite.issue(request.issue)} — ${verdict_of(request, session_issue)}`
+	if (request.blocker === undefined) return head
+	const published = await backlog_triage_filing.publish_after(request.blocker)
+
+	return published === undefined ? head : `${head} · ${published}`
+}
+
 async function triage(request: TriageRequest, directory: string): Promise<number> {
 	const { issue } = request
+	const blocked = await blocker_problem(request)
 
+	if (blocked !== undefined) return refused(issue, blocked)
 	if (!(await clear_park(request, directory))) return refused(issue, 'could not clear the park')
 
 	const problem = await write_verdict(request)
 
 	if (problem !== undefined) return refused(issue, problem)
 
-	console.info(`triage ${session_cite.issue(issue)} — ${verdict_of(request, session_issue)}`)
+	console.info(await verdict_line(request))
 
 	return SUCCESS_EXIT_CODE
 }
