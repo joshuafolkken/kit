@@ -18,7 +18,7 @@ import { markdown_section } from './markdown-section'
 // The order: `--no-auto-ok`, a filing to another repository (whose own `backlogrun` would implement
 // and merge it though nobody opted that repository in), a label that keeps a person in the loop, and
 // last the body's recorded user prohibition or judgement declaration (`JUDGEMENT_NEEDED` / `JUDGEMENT_NOT_NEEDED`): whether a
-// policy decision, an external account or a human visual check is needed.
+// policy decision, an external account or a human visual check is needed before merge.
 
 interface AutoOkFiling {
 	// `--no-auto-ok`: an existing exclusion or a verified original user prohibition.
@@ -37,7 +37,7 @@ interface AutoOkDecision {
 const BACKGROUND_HEADING = issue_body_keys.heading('background')
 const JUDGEMENT_NOT_NEEDED = issue_body_keys.line('judgement', 'not_needed')
 const JUDGEMENT_NEEDED = issue_body_keys.line('judgement', 'needed')
-const DECLARATION_PROBLEM = `declare under \`${BACKGROUND_HEADING}\` whether a person's judgement (a policy decision, an external account, a human visual check) is needed: \`${JUDGEMENT_NOT_NEEDED}\` or \`${JUDGEMENT_NEEDED}（<which one>）\` — exactly one (\`issue-template.md\`)`
+const DECLARATION_PROBLEM = `declare under \`${BACKGROUND_HEADING}\` whether a person's judgement (a policy decision, an external account, a human visual check) is needed before merge: \`${JUDGEMENT_NOT_NEEDED}\` or \`${JUDGEMENT_NEEDED}（<which one>）\` — exactly one (\`issue-template.md\`)`
 const DECISION_RULE_PREFIX = issue_body_keys.prefix('decision_rule')
 const DECISION_PROBLEM = `a decision rule citing a measurement Issue determines the choice; declare \`${JUDGEMENT_NOT_NEEDED}\` and record the applied result and reason in an Issue comment`
 
