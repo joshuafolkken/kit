@@ -53,6 +53,14 @@ describe('run_board_profile.measure', () => {
 		})
 	})
 
+	it('carries the piece role into its sample', async () => {
+		const { ports, piece } = fixture_of()
+
+		const sample = await measure({ ...piece, role: 'part' }, 1, ports)
+
+		expect(sample.role).toBe('part')
+	})
+
 	it('settles the heap before each piece', async () => {
 		const { ports, piece, settle } = fixture_of()
 
@@ -107,5 +115,22 @@ describe('run_board_profile.format', () => {
 			'| stream | 60 | 1.00 | 3.00 | 180.00 | 1.00 | 0.06 |',
 			'| git | 60 | 1.00 | 1.00 | 60.00 | 1.00 | 0.06 |',
 		])
+	})
+
+	it('ends with the whole round minus its parts, leaving out the pieces with no role (ac-2a1d528d)', () => {
+		const table = format([
+			{ ...sample_of('round', 10), role: 'whole' },
+			{ ...sample_of('sysctl', 2), role: 'part' },
+			{ ...sample_of('quotas', 3), role: 'part' },
+			sample_of('ledger', 4),
+		])
+
+		expect(table.split('\n').at(-1)).toBe('| round minus its parts |  |  |  | 300.00 |  |  |')
+	})
+
+	it('adds no unattributed row where no whole round was measured', () => {
+		const table = format([{ ...sample_of('sysctl', 2), role: 'part' }])
+
+		expect(table).not.toContain('round minus its parts')
 	})
 })
