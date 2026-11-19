@@ -1,6 +1,7 @@
 import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { hook_bundle_stamp } from '#scripts/build/hook-bundle-stamp'
 import { buffered_process } from '#scripts/lib/buffered-process'
 import { NOTHING_TO_CHECK_MARKER, SKIP_MARKER } from '#scripts/test/skip-marker'
 import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
@@ -15,6 +16,11 @@ const DROPPED_LINE = 'library.ts:3  library.dropped'
 const READ_ALL = 'export const value = library.kept() + library.dropped()'
 const NO_UNUSED = 'no unused namespace member'
 const LIBRARY = 'library.ts'
+const PACKAGE_DIRECTORY = path.dirname(
+	fileURLToPath(new URL('../../package.json', import.meta.url)),
+)
+const CLI_BUNDLE = path.join(PACKAGE_DIRECTORY, 'dist', 'commands', 'unused-members-cli.js')
+const CLI_SOURCE = fileURLToPath(new URL('unused-members-cli.ts', import.meta.url))
 
 // A project that consumes kit, where the check is out of scope.
 function consumer_root(): string {
@@ -115,19 +121,64 @@ describe('unused_members_check.spawn_unused_members', () => {
 		expect(run.output).toContain(NO_UNUSED)
 		expect(spawn).not.toHaveBeenCalled()
 	})
+})
 
-	it('runs the CLI script with the files, not the core-claiming josh command', async () => {
+// joshuafolkken/kit#8203: the built bundle, so the child does not transform the CLI on every start.
+describe('unused_members_check.spawn_unused_members — the child launch', () => {
+	it('runs the CLI bundle of this package under node with the files, in a root that is not kit', async () => {
+		vi.spyOn(hook_bundle_stamp, 'is_fresh').mockReturnValue(true)
 		const spawn = vi
-			.spyOn(buffered_process, 'run_buffered_direct')
+			.spyOn(buffered_process, 'run_buffered_launch')
 			.mockResolvedValue({ output: DROPPED_LINE, exit_code: undefined, elapsed_ms: 0 })
 		const root = create_project(with_reader(READ_KEPT))
 		const run = await unused_members_check.spawn_unused_members(root, [LIBRARY])
 
 		expect(run).toStrictEqual({ exit_code: FAIL_EXIT_CODE, output: DROPPED_LINE })
 		expect(spawn).toHaveBeenCalledWith(
-			['exec', 'tsx', fileURLToPath(new URL('unused-members-cli.ts', import.meta.url)), LIBRARY],
+			{ file: process.execPath, args: [CLI_BUNDLE, LIBRARY] },
 			{ cwd: root },
 		)
+	})
+
+	it('scans the whole program with no file argument when given no list', async () => {
+		vi.spyOn(hook_bundle_stamp, 'is_fresh').mockReturnValue(true)
+		const spawn = vi
+			.spyOn(buffered_process, 'run_buffered_launch')
+			.mockResolvedValue({ output: NO_UNUSED, exit_code: 0, elapsed_ms: 0 })
+		const root = create_project(with_reader(READ_ALL))
+
+		await unused_members_check.spawn_unused_members(root)
+
+		expect(spawn).toHaveBeenCalledWith(
+			{ file: process.execPath, args: [CLI_BUNDLE] },
+			{ cwd: root },
+		)
+	})
+})
+
+describe('unused_members_check.spawn_unused_members — a stale bundle', () => {
+	it('runs the CLI source under tsx when the bundle is stale, as the dispatcher does', async () => {
+		const fresh = vi.spyOn(hook_bundle_stamp, 'is_fresh').mockReturnValue(false)
+		const spawn = vi
+			.spyOn(buffered_process, 'run_buffered_direct')
+			.mockResolvedValue({ output: DROPPED_LINE, exit_code: FAIL_EXIT_CODE, elapsed_ms: 0 })
+		const root = create_project(with_reader(READ_KEPT))
+		const run = await unused_members_check.spawn_unused_members(root, [LIBRARY])
+
+		expect(run).toStrictEqual({ exit_code: FAIL_EXIT_CODE, output: DROPPED_LINE })
+		expect(fresh).toHaveBeenCalledWith(path.dirname(CLI_BUNDLE), PACKAGE_DIRECTORY)
+		expect(spawn).toHaveBeenCalledWith(['exec', 'tsx', CLI_SOURCE, LIBRARY], { cwd: root })
+	})
+})
+
+describe('unused_members_check.is_bundle_entry', () => {
+	it('accepts the CLI started as its bundle, the node child of spawn_unused_members', () => {
+		expect(unused_members_check.is_bundle_entry(CLI_BUNDLE)).toBe(true)
+	})
+
+	it('refuses any other script, so importing the CLI module runs no scan', () => {
+		expect(unused_members_check.is_bundle_entry(fileURLToPath(import.meta.url))).toBe(false)
+		expect(unused_members_check.is_bundle_entry(undefined)).toBe(false)
 	})
 })
 
