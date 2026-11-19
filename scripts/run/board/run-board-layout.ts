@@ -190,9 +190,15 @@ function numbers_of(plan: BoardPlan): ReadonlySet<number> {
 	return new Set([...children_of(plan), ...running].map((child) => child.number))
 }
 
-// The blockers a person acts on that no row of the run draws (`run-board-decision-rows.ts`).
-function blocker_rows(plan: BoardPlan, statuses: Overlay['statuses']): Array<BoardRow> {
-	const drawn = new Set([...numbers_of(plan), ...statuses.keys()])
+// The blockers a person acts on that no row of the board draws — the run's own rows and an earlier
+// run's lane working the blocker (`run-board-decision-rows.ts`).
+function blocker_rows(overlay: Overlay, earlier: ReadonlyArray<BoardRow>): Array<BoardRow> {
+	const { plan, statuses } = overlay
+	const drawn = new Set([
+		...numbers_of(plan),
+		...statuses.keys(),
+		...earlier.map((row) => row.number),
+	])
 
 	return run_board_decision_rows.rows_of(plan, drawn)
 }
@@ -215,16 +221,17 @@ function layout_of(
 	const overlay = { plan, statuses, reason_of }
 	const queue = plan.waves.waves.flat().filter((child) => is_untouched(child, overlay))
 	const read = row_read(overlay)
+	const earlier_rows = run_board_earlier
+		.rows_of(earlier, statuses, read)
+		.filter((row) => !current.waiting_numbers.has(row.number))
 
 	return {
 		active: run_board_decision_rows.held(active_rows(statuses, read), plan),
 		queued: queued_entries(queue, overlay),
 		people: run_board_decision_rows.held(unreached_rows(overlay, true), plan),
 		unreached: unreached_rows(overlay, false),
-		blockers: blocker_rows(plan, statuses),
-		earlier: run_board_earlier
-			.rows_of(earlier, statuses, read)
-			.filter((row) => !current.waiting_numbers.has(row.number)),
+		blockers: blocker_rows(overlay, earlier_rows),
+		earlier: earlier_rows,
 	}
 }
 
