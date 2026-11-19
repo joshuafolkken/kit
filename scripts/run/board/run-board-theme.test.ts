@@ -203,6 +203,13 @@ describe('run_board_theme.restyle from its cache', () => {
 		expect(run_board_theme.restyle('wargames', FRAME)).toBe(whole_frame(FRAME))
 		expect(run_board_theme.restyle('wargames', SPINNER_WRITE)).toBe(whole_frame(SPINNER_WRITE))
 	})
+
+	it('transforms each line of a colored frame as it did the whole frame', () => {
+		vi.stubEnv('FORCE_COLOR', '3')
+		const lines = FRAME.split('\n')
+
+		expect(lines.map((line) => whole_frame(line))).toStrictEqual(whole_frame(FRAME).split('\n'))
+	})
 })
 
 describe('run_board_theme.restyle cache bounds', () => {

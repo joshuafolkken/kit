@@ -164,7 +164,9 @@ function remembered(open: string, line: string): string {
 	return drawn
 }
 
-// Every transform of the theme reads one line, so a frame is drawn a line at a time.
+// A frame is drawn a line at a time: the transforms change only text within a line, and a render
+// module closes every color on the line it opens it (`styleText`), so the color `textual` reads
+// across a line's end is the default it reads at a line's start.
 function restyle(theme: Theme | undefined, frame: string): string {
 	if (theme === undefined) return frame
 	const open = phosphor()
