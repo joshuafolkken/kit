@@ -1,5 +1,6 @@
 import { lane_host_gaps } from '#scripts/lane/lane-host-gaps'
 import type { LedgerEntry } from '#scripts/lane/lane-ledger'
+import { run_event_tail } from '#scripts/run/event/run-event-tail'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_ledger_window } from './run-board-ledger-window'
 import { run_board_read } from './run-board-read'
@@ -43,5 +44,24 @@ describe('run_board_read.read_local usual times net of the host stops', () => {
 
 		expect(read?.usual?.get('implement')).toBe(7 * MINUTE_MS)
 		expect(gaps_of).toHaveBeenCalledWith([INSIDE, AFTER])
+	})
+})
+
+// joshuafolkken/kit#8135: a reread that hands back the same events array does not fold its stops again.
+describe('run_board_read.read_local over the same events array', () => {
+	it('folds the host stops once for two reads of one array', async () => {
+		arrange({ kind: 'none' }, ENDED_RUN)
+		vi.spyOn(run_board_ledger_window, 'entries_of').mockReturnValue([DISPATCHED, PREFLIGHT])
+		const events = [INSIDE, AFTER]
+
+		vi.spyOn(run_event_tail, 'read_events').mockReturnValue(events)
+		const gaps_of = vi.spyOn(lane_host_gaps, 'gaps_of').mockReturnValue([SLEEP])
+
+		await run_board_read.read_local()
+		const again = await run_board_read.read_local()
+		const on_stream = gaps_of.mock.calls.filter(([folded]) => folded === events)
+
+		expect(again?.usual?.get('implement')).toBe(7 * MINUTE_MS)
+		expect(on_stream).toHaveLength(1)
 	})
 })
