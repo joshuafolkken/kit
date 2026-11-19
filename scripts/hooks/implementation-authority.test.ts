@@ -258,6 +258,7 @@ describe('no-filing production authority', () => {
 		['the main session itself', {}],
 		['a main session launched as the producer agent', { agent_type: 'producer' }],
 		['a subagent of another type', { agent_id: 'a1', agent_type: 'investigator' }],
+		['a producer whose id leaves the launch records', { ...PRODUCER, agent_id: '/../agent-a1' }],
 	])('refuses %s on the same prompt', (_name, unit) => {
 		expect(verdict(asked(), unit)).toContain(REFUSED)
 	})
