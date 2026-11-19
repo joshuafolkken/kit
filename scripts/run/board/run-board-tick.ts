@@ -159,7 +159,7 @@ function layout_for(state: BoardState, local: LocalRead, now_ms: number): BoardL
 function draw_no_run(state: BoardState, ports: BoardPorts, now_ms: number): BoardState {
 	draw(ports, run_board_render.render_no_run(now_ms, bounds_of(ports), state))
 
-	return { ...state, spots: [] }
+	return { ...state, spots: [], sweep: undefined }
 }
 
 // The frame over the display a live board's worker assembled (joshuafolkken/kit#8160), so this thread

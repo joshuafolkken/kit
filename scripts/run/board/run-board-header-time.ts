@@ -9,6 +9,7 @@ import { run_board_labels } from './run-board-labels'
 import type { NowLine } from './run-board-now'
 import { run_board_render_slot } from './run-board-render-slot'
 import { run_board_row_key } from './run-board-row-key'
+import { run_board_spot } from './run-board-spot'
 
 // The header's time cells (`run-board-header.ts`): the run's age over the `💓` — or over the minute an
 // ended run ended — over the third line's spinner and age, and the `💓`'s stale coloring a row's newest
@@ -17,6 +18,7 @@ import { run_board_row_key } from './run-board-row-key'
 const { HEADER_ICONS, minute_of, span_of } = run_board_labels
 const { cell_of } = run_board_render_slot
 const { padded } = run_board_fresh
+const { SECONDS_MARK, TICK } = run_board_spot
 const aged_fresh = run_board_fresh.aged
 // A running run whose newest event is older than this is drawn as stale, so a hang stands out; past
 // twice that it is drawn as alarming.
@@ -132,7 +134,8 @@ function fresh_age(now: NowLine | undefined, header: TimeHeader): number | undef
 
 // The third line's time: the spinner in the `⏰`'s and `💓`'s column — turning only while the run
 // works, so a watch or an end stands blank — then its age, digits under theirs, emphasized while what
-// the line says is fresh.
+// the line says is fresh. Where the spinner turns, the age's `″` is drawn as the placeholder the sweep
+// below it is placed by (joshuafolkken/kit#8240).
 function now_time(
 	header: TimeHeader,
 	mark: RunMark,
@@ -141,7 +144,8 @@ function now_time(
 ): string {
 	const spinner = WORKING_MARKS.has(mark) ? header.spinner : undefined
 	const icon = cell_of(spinner, run_board_fit.width_of(HEADER_ICONS.heartbeat))
-	const age = span_or_blank(now?.age_ms)
+	const span = span_or_blank(now?.age_ms)
+	const age = spinner === undefined ? span : span.split(SECONDS_MARK).join(TICK)
 
 	return `${icon} ${padded(age, width, aged_fresh(age, fresh_age(now, header), header))}`
 }
