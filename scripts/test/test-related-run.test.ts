@@ -33,6 +33,7 @@ const TEST = 'unit.test.ts'
 const TREE = { files: { [SOURCE]: 'digest' }, base: 'base' }
 const BLOBS = { [TEST]: 'unit-inputs' }
 const CARRIED = 'carried.test.ts'
+const REUSED = 'reused.test.ts'
 
 function input(): RelatedInput {
 	return {
@@ -98,6 +99,17 @@ describe('test_related_run.run_and_vouch — red carry', () => {
 		await test_related_run.run_and_vouch(input(), [], TREE)
 		expect(test_related_reuse.carried).toHaveBeenCalledWith(process.cwd(), TREE)
 		expect(test_related_reuse.blobs).toHaveBeenCalledWith(process.cwd(), [TEST, CARRIED])
+	})
+})
+
+// joshuafolkken/kit#8095: a test the cap deferred never ran, so it is never green evidence.
+describe('test_related_run.run_and_vouch — capped run', () => {
+	it('records only the tests vitest passed and the reused ones, never a deferred one', async () => {
+		const reuse = { excluded: [REUSED], reused: 1, missed: 1, reason: 'fixture', elapsed_ms: 0 }
+
+		vi.mocked(test_related_reuse.carried).mockResolvedValue([])
+		await test_related_run.run_and_vouch({ ...input(), deferred: 2, reuse }, [], TREE)
+		expect(test_related_reuse.blobs).toHaveBeenCalledWith(process.cwd(), [TEST, REUSED])
 	})
 })
 

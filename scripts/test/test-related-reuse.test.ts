@@ -70,6 +70,39 @@ describe('test_related_reuse', () => {
 	})
 })
 
+// joshuafolkken/kit#8095: a green is compared test by test with no main sync since it.
+describe('test_related_reuse without a main sync', () => {
+	beforeEach(async () => {
+		const blobs = await test_related_reuse.blobs(ROOT, TESTS)
+
+		vi.mocked(since_green.read_moved_parts).mockResolvedValue({ changed: [], synced: [] })
+		vi.spyOn(review_stamps.test_related_stamp, 'read').mockReturnValue({
+			taken_at: '',
+			files: {},
+			blobs,
+		})
+	})
+	it('reuses every selected test whose closed inputs are unchanged', async () => {
+		const result = await test_related_reuse.read(ROOT, SCOPE, TREE)
+
+		expect(result.excluded).toEqual([CHANGED, UNCHANGED])
+		expect(result).toMatchObject({ reused: 2, missed: 1, reason: 'closed-inputs-unchanged' })
+		expect(test_related_reuse.flags(result)).toContain('--passWithNoTests')
+	})
+	it('runs a test once one file of its closed inputs changed', async () => {
+		writeFileSync(CHANGED, 'after')
+		const result = await test_related_reuse.read(ROOT, SCOPE, TREE)
+
+		expect(result.excluded).toEqual([UNCHANGED])
+	})
+	it('records the unchanged-inputs reason only when it reused a test', async () => {
+		writeFileSync(SOURCE, 'after')
+		const result = await test_related_reuse.read(ROOT, SCOPE, TREE)
+
+		expect(result).toMatchObject({ reused: 0, reason: 'closed-inputs-changed' })
+	})
+})
+
 describe('test_related_reuse fallbacks', () => {
 	it('reuses nothing without recorded individual successes', async () => {
 		vi.spyOn(review_stamps.test_related_stamp, 'read').mockReturnValue(undefined)
