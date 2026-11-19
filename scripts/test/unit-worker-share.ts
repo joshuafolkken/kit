@@ -167,6 +167,12 @@ function has_worker_flag(vitest_arguments: ReadonlyArray<string>): boolean {
 	return vitest_arguments.some((argument) => is_worker_flag(argument))
 }
 
+// The worker count changes how fast a run goes, never which tests it runs or what they assert — so a
+// run given only a worker flag is the bare run, and still vouches for the tree (joshuafolkken/kit#8168).
+function without_worker_flags(command_arguments: ReadonlyArray<string>): ReadonlyArray<string> {
+	return command_arguments.filter((argument) => !is_worker_flag(argument))
+}
+
 function worker_arguments(
 	vitest_arguments: ReadonlyArray<string>,
 	share: number | undefined,
@@ -207,6 +213,7 @@ const unit_worker_share = {
 	current_share,
 	has_worker_flag,
 	with_run_marker,
+	without_worker_flags,
 	worker_arguments,
 }
 
