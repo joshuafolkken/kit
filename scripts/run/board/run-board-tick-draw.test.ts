@@ -210,6 +210,50 @@ describe('run_board_tick_draw.draw_run epic line typing', () => {
 	})
 })
 
+// The empty seats a themed redraw draws: `free` seats, held by `hold`, on a pane `columns` wide.
+interface Seated {
+	free: number
+	hold: string
+	columns?: number
+}
+
+function seated_over(state: BoardState, now_ms: number, seated: Seated): BoardState {
+	const local = { ...LOCAL, lane_limit: seated.free, occupied_count: 0, launch_hold: seated.hold }
+	const { ports } = harness(local, [])
+	const pane = { ...SIZE, columns: seated.columns ?? SIZE.columns }
+	const typing = { ...ports, types_rows: true, size: (): typeof SIZE => pane }
+
+	return draw_run(state, local, { ports: typing, now_ms }, layout_for(state, local, START))
+}
+
+function seat_keys(state: BoardState): Array<string> {
+	return typing_keys(state).filter((key) => key.startsWith('seat:'))
+}
+
+// joshuafolkken/kit#8116: an empty seat's 💺 line types when its reason appears or changes, and not
+// again while the reason stays, whatever the pane's width.
+describe('run_board_tick_draw.draw_run seat line typing', () => {
+	const HELD = { free: 1, hold: 'hold-a' }
+	const base = typed_over(planned(), [], START)
+	const appeared = seated_over(base, START + SECOND, HELD)
+	const later = seated_over(appeared, START + TYPED_MS, HELD)
+
+	it('types a seat line that appears after the base frame, and not again on a later redraw', () => {
+		expect(seat_keys(base)).toStrictEqual([])
+		expect(seat_keys(appeared)).toHaveLength(1)
+		expect(seat_keys(later)).toStrictEqual([])
+	})
+
+	it('types it again when its reason changes, and not when only the pane’s width changes', () => {
+		const narrowed = seated_over(later, START + TYPED_MS + SECOND, { ...HELD, columns: 40 })
+		const changed = seated_over(later, START + TYPED_MS + SECOND, { ...HELD, hold: 'hold-b' })
+
+		expect(seat_keys(narrowed)).toStrictEqual([])
+		expect(seat_keys(changed)).toHaveLength(1)
+		expect(seat_keys(changed)[0]).toContain('hold-b')
+	})
+})
+
 describe('run_board_tick_draw.bounds_of', () => {
 	it('reads the pane size, footer and folded sections off the ports', () => {
 		const { ports } = harness(LOCAL, [])

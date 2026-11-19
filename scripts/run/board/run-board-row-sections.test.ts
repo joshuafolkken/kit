@@ -3,6 +3,7 @@ import { run_board_header } from './run-board-header'
 import type { BoardLayout, BoardRow } from './run-board-layout'
 import { run_board_render_fixture } from './run-board-render-fixture'
 import { run_board_row_sections } from './run-board-row-sections'
+import { run_board_seat } from './run-board-seat'
 
 // joshuafolkken/kit#8003: the key of every row the layout puts in a keyed section, drawn or not.
 
@@ -57,6 +58,14 @@ describe('run_board_row_sections.known_of', () => {
 	it('knows the now line’s key', () => {
 		expect(run_board_header.now_key(board)).toBeDefined()
 		expect(known.has(run_board_header.now_key(board) ?? '')).toBe(true)
+	})
+
+	// joshuafolkken/kit#8116
+	it('knows every empty seat’s key, by its reason', () => {
+		const seated = header({ layout: EMPTY_LAYOUT, lane_limit: 2, occupied_count: 1, seats: {} })
+
+		expect(known_of(seated).has(`seat:${run_board_seat.NO_CANDIDATE}`)).toBe(true)
+		expect([...known].some((key) => key.startsWith('seat:'))).toBe(false)
 	})
 
 	it('knows no epic before a layout is read', () => {
