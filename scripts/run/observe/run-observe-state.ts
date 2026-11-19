@@ -14,7 +14,8 @@ const MAX_RETAKES = 1
 
 const SAMPLE_SCHEMA = z.object({ at: z.string(), value: z.string() })
 const RECORD_SCHEMA = z.object({
-	command: z.string(),
+	// The argv as typed after `--`, started without a shell so no argument is split again.
+	command: z.array(z.string()).nonempty(),
 	sample: z.string(),
 	// A failed observation keeps only the offsets it sampled, so it reads as finished.
 	offsets_ms: z.array(z.number().int().positive()),
@@ -70,7 +71,7 @@ function comment_of(record: ObserveRecord, note: string): string {
 	return [
 		`## Observation: ${note}`,
 		'',
-		`- Observed: \`${record.command}\` (pid ${String(record.pid)}, started ${record.started_at})`,
+		`- Observed: \`${record.command.join(' ')}\` (pid ${String(record.pid)}, started ${record.started_at})`,
 		`- Sample: \`${record.sample}\``,
 		...sample_lines(record.samples),
 		'',

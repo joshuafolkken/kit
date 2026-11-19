@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_observe_cli } from './run-observe-cli'
 
+const { sample, start } = vi.hoisted(() => ({ sample: vi.fn(), start: vi.fn() }))
+
+vi.mock('./run-observe', () => ({ run_observe: { sample, start, SYSTEM_DEPS: {} } }))
+
 // joshuafolkken/kit#8128: `josh run:observe` reads a start or a sample request, and refuses the rest.
 
 const ISSUE = '8035'
@@ -23,7 +27,7 @@ describe('run_observe_cli.request_of — start', () => {
 			action: 'start',
 			issue: ISSUE,
 			plan: {
-				command: 'pnpm josh run:board',
+				command: ['pnpm', 'josh', 'run:board'],
 				sample: SAMPLE,
 				offsets_ms: [HALF_HOUR_MS, 2 * HOUR_MS],
 			},
@@ -70,5 +74,32 @@ describe('run_observe_cli.run — a refused request', () => {
 
 		expect(await run_observe_cli.run(['sample'])).toBe(1)
 		expect(error).toHaveBeenCalledWith(run_observe_cli.USAGE)
+	})
+})
+
+describe('run_observe_cli.run — a read request', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('prints what the sample answers', async () => {
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		sample.mockResolvedValue('sample 1')
+
+		expect(await run_observe_cli.run(['sample', ISSUE])).toBe(0)
+		expect(info).toHaveBeenCalledWith('sample 1')
+	})
+
+	it('starts the plan it read, and prints a refusal as a failure', async () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		const refusal = 'could not start'
+
+		start.mockRejectedValue(new Error(refusal))
+
+		expect(await run_observe_cli.run(start_argv('--at', '30m', '--sample', SAMPLE))).toBe(1)
+		expect(start).toHaveBeenCalledWith(ISSUE, expect.objectContaining({ sample: SAMPLE }), {})
+		expect(error).toHaveBeenCalledWith(refusal)
 	})
 })

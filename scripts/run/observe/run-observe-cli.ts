@@ -34,14 +34,19 @@ function offsets_of(texts: ReadonlyArray<string> = []): ReadonlyArray<number> | 
 function complete_plan(
 	offsets_ms: ReadonlyArray<number> | undefined,
 	sample: string,
-	command: string,
+	command: ReadonlyArray<string>,
 ): ObservePlan | undefined {
-	return offsets_ms === undefined || [sample, command].includes('')
+	const [program, ...rest] = command
+
+	return offsets_ms === undefined || sample === '' || program === undefined
 		? undefined
-		: { command, sample, offsets_ms }
+		: { command: [program, ...rest], sample, offsets_ms }
 }
 
-function plan_of(flags: ReadonlyArray<string>, command: string): ObservePlan | undefined {
+function plan_of(
+	flags: ReadonlyArray<string>,
+	command: ReadonlyArray<string>,
+): ObservePlan | undefined {
 	const parsed = cli_flags.arguments_of(flags, OPTIONS)
 
 	if (parsed === undefined) return undefined
@@ -54,7 +59,7 @@ function start_request(issue: string, rest: ReadonlyArray<string>): Request | un
 
 	if (separator === -1) return undefined
 
-	const plan = plan_of(rest.slice(0, separator), rest.slice(separator + 1).join(' '))
+	const plan = plan_of(rest.slice(0, separator), rest.slice(separator + 1))
 
 	return plan === undefined ? undefined : { action: 'start', issue, plan }
 }

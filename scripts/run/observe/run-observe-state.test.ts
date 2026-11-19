@@ -10,7 +10,7 @@ const TWO_HOURS_MS = 2 * HOUR_MS
 const STARTED_AT = '2026-11-19T05:00:00.000Z'
 
 const RECORD: ObserveRecord = {
-	command: 'pnpm josh run:board',
+	command: ['pnpm', 'josh', 'run:board'],
 	sample: 'ps -o rss= -p "$OBSERVE_PID"',
 	offsets_ms: [HALF_HOUR_MS, TWO_HOURS_MS],
 	pid: 4242,

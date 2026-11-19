@@ -123,6 +123,14 @@ describe('the start-time declaration of a measurement follow-up', () => {
 		expect(issue_not_before.problems(body_with(`${ABSENT}\n${example}`), FILED)).toEqual([])
 	})
 
+	it('suggests a date inside the week when filed mid-minute', () => {
+		const late = FILED + 30_000
+		const [found = ''] = issue_not_before.problems(measured_with('2026-11-11T00:00Z'), late)
+		const suggested = measured_with(found.slice(-'2026-11-10T00:00Z'.length))
+
+		expect(issue_not_before.problems(suggested, late)).toEqual([])
+	})
+
 	it('refuses the date beside a sample condition', () => {
 		const body = body_with(`${ABSENT}\n- 実施可能日: 2026-11-04T00:00Z\n${CONDITION}`)
 

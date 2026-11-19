@@ -121,15 +121,16 @@ function stray_heading_problems(body: string): ReadonlyArray<string> {
 	)
 }
 
-// `ms` as the declaration spells it, rounded up to the minute so the wait never ends early.
-function minute_text(ms: number): string {
-	const minute = Math.ceil(ms / MINUTE_MS) * MINUTE_MS
+// `ms` as the declaration spells it, rounded to the minute by `round`.
+function minute_text(ms: number, round: (minutes: number) => number): string {
+	const minute = round(ms / MINUTE_MS) * MINUTE_MS
 
 	return `${new Date(minute).toISOString().slice(0, MINUTES_LENGTH)}Z`
 }
 
+// Rounded down, so the suggested date stays inside the week.
 function latest_date(now: number): string {
-	return minute_text(now + MAX_WAIT_MS)
+	return minute_text(now + MAX_WAIT_MS, Math.floor)
 }
 
 function is_background(line: string): boolean {
@@ -146,7 +147,8 @@ function without_declaration(section: string): string {
 // joshuafolkken/kit#8128: `run:observe` moves the wait to its next sample time, or drops it with
 // `undefined`. The declaration leads the background section, which is added when the body has none.
 function with_date(body: string, at_ms: number | undefined): string {
-	const declaration = at_ms === undefined ? '' : `${PREFIX} ${minute_text(at_ms)}\n`
+	// Rounded up, so the wait never ends before the sample time.
+	const declaration = at_ms === undefined ? '' : `${PREFIX} ${minute_text(at_ms, Math.ceil)}\n`
 
 	if (!markdown_section.has_unfenced_line(body, BACKGROUND_HEADING)) {
 		return declaration === ''

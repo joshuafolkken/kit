@@ -4,9 +4,11 @@ import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { issue_not_before } from '#scripts/issue/issue-not-before'
 import { issue_read } from '#scripts/issue/issue-read'
+import { issue_sample_gate } from '#scripts/issue/issue-sample-gate'
 import { process_identity } from '#scripts/josh/process-identity'
 import { lane_child_mark_keys } from '#scripts/lane/lane-child-mark-keys'
 import { lane_registry } from '#scripts/lane/lane-registry'
+import { run_carry_session } from '#scripts/run/carry/run-carry-session'
 import { run_observe_state, type ObserveRecord } from './run-observe-state'
 
 // joshuafolkken/kit#8128: a lane child observes a process at times hours apart without waiting.
@@ -24,9 +26,15 @@ const TERMINATE_SIGNAL = 'SIGTERM'
 const PID_ENV = 'OBSERVE_PID'
 const DELIVER = 'pnpm josh run:cut'
 const RELAUNCH = 'end this session; the driver relaunches'
+const CONTINUE = 'pnpm josh run:step'
+// The marks that make a process read as a lane child or the run's parent session.
+const DROPPED_ENV: ReadonlySet<string> = new Set([
+	...lane_child_mark_keys.MARK_KEYS,
+	run_carry_session.KEY,
+])
 
 interface ObservePlan {
-	command: string
+	command: ReadonlyArray<string>
 	sample: string
 	offsets_ms: ReadonlyArray<number>
 }
@@ -37,7 +45,7 @@ interface Launched {
 }
 
 interface ObserveDependencies {
-	launch: (command: string) => Promise<Launched | undefined>
+	launch: (command: ReadonlyArray<string>) => Promise<Launched | undefined>
 	read_start: (pid: number) => string | undefined
 	run_sample: (command: string, pid: number) => string
 	stop: (pid: number) => void
@@ -86,12 +94,13 @@ async function launched_record(
 ): Promise<ObserveRecord> {
 	const launched = await deps.launch(plan.command)
 
-	if (launched === undefined) throw new Error(`could not start \`${plan.command}\``)
+	if (launched === undefined) throw new Error(`could not start \`${plan.command.join(' ')}\``)
 
 	const started_at = new Date(deps.now()).toISOString()
 
 	return {
 		...plan,
+		command: [...plan.command],
 		offsets_ms: [...plan.offsets_ms],
 		...launched,
 		started_at,
@@ -101,6 +110,11 @@ async function launched_record(
 }
 
 async function start(issue: string, plan: ObservePlan, deps: ObserveDependencies): Promise<string> {
+	// A sample gate and a not-before date are exclusive (issue-not-before.ts BOTH): refuse before launching.
+	if (issue_sample_gate.cited_number(await deps.read_body(issue)) !== undefined) {
+		throw new Error(`${cite(issue)} already waits on a sample condition`)
+	}
+
 	return await record(issue, await launched_record(plan, 0, deps), 'started', deps)
 }
 
@@ -151,8 +165,13 @@ async function sample(issue: string, deps: ObserveDependencies): Promise<string>
 
 	const next = run_observe_state.next_at_ms(observed)
 
-	if (next === undefined) return `${cite(issue)}'s observation is already finished`
-	if (deps.now() < next) return `not due until ${new Date(next).toISOString()}`
+	if (next === undefined) {
+		return `${cite(issue)}'s observation is already finished\nnext: ${CONTINUE} ${issue}`
+	}
+
+	if (deps.now() < next) {
+		return `not due until ${new Date(next).toISOString()}\nnext: ${RELAUNCH} ${cite(issue)} then`
+	}
 
 	if (deps.read_start(observed.pid) !== observed.process_start) {
 		return await retake(issue, observed, deps)
@@ -161,11 +180,12 @@ async function sample(issue: string, deps: ObserveDependencies): Promise<string>
 	return await take(issue, observed, deps)
 }
 
-async function launch(command: string): Promise<Launched | undefined> {
+async function launch(command: ReadonlyArray<string>): Promise<Launched | undefined> {
+	const [program = '', ...argv] = command
 	const environment = Object.fromEntries(
-		Object.entries(process.env).filter(([key]) => key !== lane_child_mark_keys.KEY),
+		Object.entries(process.env).filter(([key]) => !DROPPED_ENV.has(key)),
 	)
-	const child = spawn('sh', ['-c', `exec ${command}`], {
+	const child = spawn(program, argv, {
 		cwd: await lane_registry.main_repository_root(),
 		detached: true,
 		env: environment,
@@ -206,6 +226,15 @@ async function comments(issue: string): Promise<ReadonlyArray<string>> {
 		.map((comment) => comment.body)
 }
 
+// A failed read throws: an empty body written back would erase the Issue.
+async function read_body(issue: string): Promise<string> {
+	const body = await git_gh_issue_read.issue_get_body(issue)
+
+	if (body === undefined) throw new Error(`could not read ${cite(issue)}'s body`)
+
+	return body
+}
+
 const SYSTEM_DEPS: ObserveDependencies = {
 	launch,
 	read_start: (pid) => process_identity.read_start(pid),
@@ -213,14 +242,14 @@ const SYSTEM_DEPS: ObserveDependencies = {
 	stop,
 	comments,
 	post: async (issue, body) => await git_gh_issue_write.issue_comment(issue, body),
-	read_body: async (issue) => (await git_gh_issue_read.issue_get_body(issue)) ?? '',
+	read_body,
 	edit_body: async (issue, body) => {
 		await git_gh_issue_write.issue_edit_body(issue, body)
 	},
 	now: () => Date.now(),
 }
 
-const run_observe = { launch, sample, start, SYSTEM_DEPS }
+const run_observe = { launch, read_body, run_sample, sample, start, stop, SYSTEM_DEPS }
 
 export type { ObserveDependencies, ObservePlan }
 export { run_observe }

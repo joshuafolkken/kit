@@ -11,7 +11,7 @@ const PAUSE_COMMANDS: Record<string, CommandEntry> = {
 		reference: [
 			'start <issue> --at <offset>... --sample "<command>" -- <command...> | sample <issue>',
 			'automation',
-			['network', 'files'],
+			['network', 'files', 'processes'],
 		],
 		usage: {
 			examples: [
