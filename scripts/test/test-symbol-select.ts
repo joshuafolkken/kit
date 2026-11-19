@@ -151,8 +151,8 @@ function changed_lines(diff: string): Map<string, Array<number>> {
 }
 
 // **The changed code files a reading starts from** (joshuafolkken/kit#8090): those the diff lists lines
-// for, and an untracked file, new whole. A tracked file with no line changed — a pure rename, a mode
-// change — changed no declaration, where read whole it would select every user of every one.
+// for, and an untracked file, new whole. A tracked file with no line changed — a mode change, or a
+// file another change brought in — changed no declaration, where read whole it would select every user of every one.
 function with_lines(
 	code: ReadonlyArray<string>,
 	lines: ChangedLines,
