@@ -1,4 +1,4 @@
-import { writeFileSync } from 'node:fs'
+import { symlinkSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it, vi, type Mock } from 'vitest'
@@ -64,14 +64,39 @@ describe('run_board_saved_state.file_store', () => {
 	it('reads a missing file as none', () => {
 		expect(file_store(temporary_file()).load()).toBeUndefined()
 	})
+
+	it('reads a symlink as none, never what it points at', () => {
+		const real = temporary_file()
+		const link = `${real}-link`
+
+		file_store(real).save(SAVED)
+		symlinkSync(real, link)
+
+		expect(file_store(link).load()).toBeUndefined()
+	})
 })
 
 describe('run_board_saved_state.for_run', () => {
 	it('answers the saved round on the same run, its plan read asked again', async () => {
 		const read = await for_run(memory_store(SAVED), this_run)
 
-		expect(read?.display).toStrictEqual(GATHER.display)
+		expect(read?.display?.header).toStrictEqual(GATHER.display?.header)
 		expect(read?.data).toMatchObject({ run_started_ms: START, attempted_ms: undefined })
+	})
+
+	it('answers the saved round without the cue the last board sounded', async () => {
+		const shown = GATHER.display
+		const display = shown === undefined ? undefined : { ...shown, cue: 'lane-end' as const }
+		const read = await for_run(memory_store({ ...SAVED, gather: { ...GATHER, display } }), this_run)
+
+		expect(display?.cue).toBe('lane-end')
+		expect(read?.display?.cue).toBeUndefined()
+	})
+
+	it('answers none where the run check throws', async () => {
+		const failing = vi.fn<() => Promise<number>>().mockRejectedValue(new Error('git'))
+
+		await expect(for_run(memory_store(SAVED), failing)).resolves.toBeUndefined()
 	})
 
 	it('answers none for a round saved on another run', async () => {
@@ -89,19 +114,35 @@ describe('run_board_saved_state.saver', () => {
 		let now_ms = START
 		const save = saver(store, () => now_ms)
 
-		save(GATHER)
+		save(POST)
 		now_ms += SAVE_EVERY_MS - 1
-		save(GATHER)
+		save(POST)
 		now_ms += 1
-		save(GATHER)
+		save(POST)
 
 		expect(store.save).toHaveBeenCalledTimes(2)
+	})
+
+	it('saves the round the post carries, its data and display', () => {
+		const store = memory_store()
+
+		saver(store, () => START)(POST)
+
+		expect(store.save).toHaveBeenCalledWith(SAVED)
 	})
 
 	it('saves no round without a run’s data', () => {
 		const store = memory_store()
 
-		saver(store, () => START)({ ...GATHER, data: undefined })
+		saver(store, () => START)({ ...POST, data: undefined })
+
+		expect(store.save).not.toHaveBeenCalled()
+	})
+
+	it('saves no failed round', () => {
+		const store = memory_store()
+
+		saver(store, () => START)({ failed: 'read failed' })
 
 		expect(store.save).not.toHaveBeenCalled()
 	})

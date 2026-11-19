@@ -1,10 +1,11 @@
-import { readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { deserialize, serialize } from 'node:v8'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { z } from 'zod'
+import type { FailedPost, GatherPost } from './run-board-gather-thread'
 import { run_board_span_read } from './run-board-span-read'
 import type { BoardGather } from './run-board-state'
 
@@ -19,7 +20,6 @@ import type { BoardGather } from './run-board-state'
 const SAVED_PREFIX = 'josh-run-board-saved-'
 const SAVE_EVERY_SECONDS = 5
 const SAVE_EVERY_MS = SAVE_EVERY_SECONDS * MS_PER_SECOND
-const TEMPORARY_SUFFIX = '.writing'
 
 interface Saved {
 	run_started_ms: number
@@ -42,8 +42,11 @@ const saved_schema = z.object({
 	gather: z.custom<BoardGather>(is_gather),
 })
 
+// Read only from this account's own regular file, as every shared temp-directory record is
+// (`stamp-file.ts`).
 function load(target: string): Saved | undefined {
 	try {
+		if (!stamp_file.is_own_regular_file(target)) return undefined
 		const parsed = saved_schema.safeParse(deserialize(readFileSync(target)))
 
 		return parsed.success ? parsed.data : undefined
@@ -52,13 +55,10 @@ function load(target: string): Saved | undefined {
 	}
 }
 
-// Written beside the file, then moved over it, so a board never reads half a write.
+// Staged beside the file and moved over it, so a board never reads half a write (`stamp-file.ts`).
 function save(target: string, saved: Saved): void {
-	const writing = `${target}${TEMPORARY_SUFFIX}`
-
 	try {
-		writeFileSync(writing, serialize(saved))
-		renameSync(writing, target)
+		stamp_file.replace_text_stamp(target, serialize(saved))
 	} catch {
 		// The next round writes it again.
 	}
@@ -75,17 +75,20 @@ function file_store(
 	}
 }
 
-// What the worker calls with each round it hands over: one with the run's data saved at most every
-// `SAVE_EVERY_MS`.
-function saver(store: SavedStore, now: () => number): (gather: BoardGather) => void {
+// What the worker calls with each post it hands over: a round with the run's data saved at most every
+// `SAVE_EVERY_MS`, a failed round never.
+function saver(store: SavedStore, now: () => number): (post: GatherPost | FailedPost) => void {
 	let saved_ms = -Infinity
 
-	return (gather) => {
-		const run_started_ms = gather.data?.run_started_ms
+	return (post) => {
+		if ('failed' in post) return
+		const run_started_ms = post.data?.run_started_ms
 		const now_ms = now()
 
 		if (run_started_ms === undefined || now_ms - saved_ms < SAVE_EVERY_MS) return
 		saved_ms = now_ms
+		const gather = { ...post.read, data: post.data, display: post.display }
+
 		store.save({ run_started_ms, saved_ms: now_ms, gather })
 	}
 }
@@ -99,20 +102,40 @@ async function started_here(): Promise<number | undefined> {
 	return span?.started_ms
 }
 
+// A run check that fails reads as another run, so the board waits for the worker as it did before.
+async function started_safely(
+	started: () => Promise<number | undefined>,
+): Promise<number | undefined> {
+	try {
+		return await started()
+	} catch {
+		return undefined
+	}
+}
+
+// The saved round as a board opening now draws it: its plan read asked again at once, so the saved
+// plan is drawn dimmed only until a fresh one lands, and without the cue the last board already sounded.
+// The sound it carried is kept, so what changed since that board sounds once on this one.
+function reopened(gather: BoardGather): BoardGather {
+	const data = gather.data === undefined ? undefined : { ...gather.data, attempted_ms: undefined }
+	const display = gather.display === undefined ? undefined : { ...gather.display, cue: undefined }
+
+	return { ...gather, data, display }
+}
+
 // The saved round when it was saved on the run drawn here, else none — a round of another run is never
-// drawn over this one. Its plan read is asked again at once, so the saved plan is drawn dimmed only
-// until a fresh one lands.
+// drawn over this one.
 async function for_run(
 	store: SavedStore,
 	started: () => Promise<number | undefined> = started_here,
 ): Promise<BoardGather | undefined> {
 	const saved = store.load()
-	if (saved === undefined || saved.run_started_ms !== (await started())) return undefined
 
-	const { gather } = saved
-	const data = gather.data === undefined ? undefined : { ...gather.data, attempted_ms: undefined }
+	if (saved === undefined || saved.run_started_ms !== (await started_safely(started))) {
+		return undefined
+	}
 
-	return { ...gather, data }
+	return reopened(saved.gather)
 }
 
 const run_board_saved_state = { SAVE_EVERY_MS, file_store, for_run, saver }

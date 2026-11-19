@@ -2,6 +2,6 @@
 	"reason": "New behavior for #8219: saved-round store (run-board-saved-state.ts), faint helper (run-board-faint.ts), header 🕘 part and plan_saved_ms wiring; no existing logic to remove",
 	"date": "2026-11-19",
 	"growth": {
-		"scripts.code_lines": 178
+		"scripts.code_lines": 195
 	}
 }
