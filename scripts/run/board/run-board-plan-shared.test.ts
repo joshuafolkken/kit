@@ -84,17 +84,21 @@ describe('run_board_plan_shared.read keeping a plan', () => {
 		expect(read_plan).toHaveBeenCalledOnce()
 	})
 
-	// joshuafolkken/kit#8218: `--timing` says the plan was taken from the cache, not read step by step.
-	it('marks when the plan was taken from the cache, and a read plan not', async () => {
+	// joshuafolkken/kit#8218: `--timing` says whether the plan was taken from the cache or read.
+	it('marks a read plan 0 and a plan taken from the cache 1', async () => {
+		const { CACHED_PHASE } = run_board_plan_shared
+
 		launch_timing.clear()
 		await run_board_plan_shared.read(NAMED, read_plan)
-		const read_names = launch_timing.phases().map(({ name }) => name)
+		const read_phases = launch_timing.phases().map(({ name, ms }) => ({ name, ms }))
 
+		launch_timing.clear()
 		await run_board_plan_shared.read(NAMED, read_plan)
 
-		expect(read_names).toStrictEqual(['plan: stream key'])
-		expect(launch_timing.phases().map(({ name }) => name)).toContain(
-			run_board_plan_shared.CACHED_PHASE,
+		expect(read_phases.map(({ name }) => name)).toStrictEqual(['plan: stream key', CACHED_PHASE])
+		expect(read_phases).toContainEqual({ name: CACHED_PHASE, ms: 0 })
+		expect(launch_timing.phases()).toContainEqual(
+			expect.objectContaining({ name: CACHED_PHASE, ms: 1 }),
 		)
 	})
 

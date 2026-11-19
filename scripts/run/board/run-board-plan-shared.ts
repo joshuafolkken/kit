@@ -14,7 +14,8 @@ import { run_board_plan } from './run-board-plan'
 //
 // The plan holds maps and sets, which JSON does not, so each is kept as its entries and rebuilt on read.
 
-const CACHED_PHASE = 'plan: cached at'
+// Marked on both paths, so the first read's source is the one the report keeps.
+const CACHED_PHASE = 'plan: from cache (1 = yes)'
 
 const PLAN_CACHE: CacheSlot = {
 	prefix: 'josh-run-board-plan-',
@@ -109,8 +110,8 @@ const board_plan_schema = z.object({
 	withheld: number_set.optional(),
 })
 
-// A plan kept by another board within the minute is not read, so `--timing` names when it was taken
-// from the cache rather than its steps (joshuafolkken/kit#8218).
+// A plan kept by another board within the minute is not read, so `--timing` says whether the plan came
+// from the cache beside its steps (joshuafolkken/kit#8218).
 async function read(
 	named: NamedPlan,
 	read_plan = run_board_plan.read_plan,
@@ -122,11 +123,9 @@ async function read(
 	const now_ms = Date.now()
 	const kept = shared_cache.read(PLAN_CACHE, key, board_plan_schema, now_ms)
 
-	if (kept !== undefined) {
-		launch_timing.mark(CACHED_PHASE, performance.now())
+	launch_timing.mark(CACHED_PHASE, kept === undefined ? 0 : 1)
 
-		return kept
-	}
+	if (kept !== undefined) return kept
 
 	const plan = await read_plan(named)
 

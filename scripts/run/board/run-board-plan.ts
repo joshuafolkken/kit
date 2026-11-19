@@ -19,9 +19,10 @@ import { run_board_layout, type BoardPlan } from './run-board-layout'
 // places the pool with, fed as an opted-in set of their own, so an epic is expanded the way the run
 // expands it and no second placement exists to disagree with it.
 
-// Counts, not ms, under the `--timing` report's ms heading — the name says so.
-const GH_CALLS_PHASE = 'plan: gh calls (count)'
-const GH_NOT_MODIFIED_PHASE = 'plan: gh 304 (count)'
+// Counts, not ms, under the `--timing` report's ms heading — the name says so. They count the window,
+// not the plan alone: the thread-wide tally also takes the calls other board reads send concurrently.
+const GH_CALLS_PHASE = 'gh calls during plan read (count)'
+const GH_NOT_MODIFIED_PHASE = 'gh 304 during plan read (count)'
 
 // The reads the plan is drawn from, a seam so each scope is tested without GitHub.
 interface PlanPorts {
@@ -195,8 +196,9 @@ async function read_steps(named: NamedPlan, ports: PlanPorts): Promise<BoardPlan
 	)
 }
 
-// The `gh` calls the read sent and how many GitHub answered 304, counted as `--timing` phases
-// (joshuafolkken/kit#8218).
+// The `gh` calls sent while the plan was read and how many GitHub answered 304, counted as `--timing`
+// phases (joshuafolkken/kit#8218). The rate-limit, thanks and closed reads running beside it in the
+// same thread are included.
 function mark_calls(before: CallCount): void {
 	const after = gh_request_tally.snapshot()
 

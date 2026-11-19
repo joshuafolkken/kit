@@ -221,16 +221,27 @@ describe('run_board_cli.run --timing launch phases', () => {
 		expect(frames.at(-1)).toContain(SCREEN_ENTER_PHASE)
 	})
 
-	it('marks neither without the flag, nor a code load where no dispatcher set its start', async () => {
+	it('marks nothing without the flag, nor a code load where no dispatcher set its start', async () => {
 		const { ports } = harness(undefined, [])
 
 		launch_timing.set_dispatched_ms(0)
 		run_board_timing.timed(ports, false)
-		run_board_timing.timed(ports, true).write('frame')
+		const without_flag = launch_timing.phases()
+
 		launch_timing.clear()
 		run_board_timing.timed(ports, true)
 
+		expect(without_flag).toStrictEqual([])
 		expect(launch_timing.phases()).toStrictEqual([])
+	})
+
+	it('marks the code load but no screen enter for a plain frame', async () => {
+		const { ports } = harness(undefined, [])
+
+		launch_timing.set_dispatched_ms(0)
+		run_board_timing.timed(ports, true).write('frame')
+
+		expect(launch_timing.phases().map(({ name }) => name)).toStrictEqual([CODE_LOAD_PHASE])
 	})
 
 	it('says nothing of timing as a live board leaves without the flag', async () => {
