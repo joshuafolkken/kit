@@ -20,6 +20,10 @@ An interrupted or partially failed batch is resumed on the same issue numbers: r
 step and retry publication. Already published children are skipped. Never refile the children.
 `issue:spill` leaves its follow-up prepared and prints the plan/publication steps after placement.
 
+A prepared Issue filed mid-run is published by the lane that records the wait: record its plan
+before `pnpm josh run:pause <M> --for <N>`, which publishes the epic listing it before releasing the
+hold. A failed publication leaves the child prepared; follow the command `run:pause` comments on both Issues.
+
 `pnpm josh backlog:plan --pending-publication` lists each pending issue that blocks an open issue, beside the issue it blocks.
 
 Pending children are excluded from approval judgement, standalone and epic selection, and direct

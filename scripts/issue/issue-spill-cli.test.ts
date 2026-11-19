@@ -182,6 +182,9 @@ describe('issue_spill_cli.run placement', () => {
 		expect(edit_body_mock).toHaveBeenCalledWith(String(ISSUE), expect.stringContaining(LINK_LINE))
 		expect(create_epic_mock).not.toHaveBeenCalled()
 		expect(console.info).toHaveBeenCalledWith(expect.stringContaining('issue:file --publish <E>'))
+		expect(console.info).toHaveBeenCalledWith(
+			expect.stringContaining('mid-run, pnpm josh run:pause <M> --for <N> publishes it'),
+		)
 	})
 
 	it('creates an epic of #N and the follow-up when the full listing has none', async () => {
