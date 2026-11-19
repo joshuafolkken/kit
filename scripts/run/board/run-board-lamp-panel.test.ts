@@ -1,16 +1,22 @@
 import { stripVTControlCharacters } from 'node:util'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_fit, type FrameParts } from './run-board-fit'
+import { run_board_fixture } from './run-board-fixture'
 import { run_board_fold } from './run-board-fold'
+import type { BoardRow } from './run-board-layout'
 import { run_board_render_throughput } from './run-board-render-throughput'
 import { run_board_spot } from './run-board-spot'
 import type { ThroughputRow } from './run-board-throughput'
+import { run_board_tick } from './run-board-tick'
 import { run_board_tick_draw } from './run-board-tick-draw'
 
 // joshuafolkken/kit#8236: where the WOPR lamp panel goes — two columns past the throughput rows' NOW,
 // on to the end of the section's rule — and the boards that draw none.
 
-const { LAMP, LAMP_START } = run_board_spot
+const { LAMP, LAMP_MARK, LAMP_START } = run_board_spot
+const { LOCAL, START, drawn_from, harness, plan_titled } = run_board_fixture
+const { FRESH_STATE, layout_for } = run_board_tick
+const WIDE = { rows: 60, columns: 200 }
 const { rows_part } = run_board_render_throughput
 const { has_lamps } = run_board_tick_draw
 const { width_of } = run_board_fit
@@ -36,6 +42,15 @@ function row_of(label: ThroughputRow['label'], now: number | undefined): Through
 }
 
 const ROWS = [row_of('24h', 5), row_of('7d', undefined)]
+// A running lane whose long number runs the frame's rules on past room for eight lamps.
+const WIDE_LANE: BoardRow = {
+	number: 123_456_789,
+	title: undefined,
+	kind: undefined,
+	state: 'running',
+	status: undefined,
+	waits: [],
+}
 
 function texts(has_panel: boolean): Array<string> {
 	return rows_part(ROWS, has_panel).lines.map((line) => stripVTControlCharacters(line.text))
@@ -114,5 +129,32 @@ describe('run_board_tick_draw.has_lamps', () => {
 		vi.stubEnv('FORCE_COLOR', '0')
 
 		expect(has_lamps({ types_rows: true, is_tty: true })).toBe(false)
+	})
+})
+
+// A live redraw of a frame with throughput rows, on a terminal drawing color; `types_rows` as given.
+function redrawn(types_rows: boolean): { lamps: number; marks: number } {
+	vi.stubEnv('FORCE_COLOR', '3')
+	const { ports, frames } = harness(LOCAL, [])
+	const state = { ...FRESH_STATE, plan: plan_titled('a'), run_started_ms: LOCAL.started_ms }
+	const local = { ...LOCAL, throughput: ROWS }
+	const redraw = { ports: { ...ports, types_rows, size: () => WIDE }, now_ms: START }
+	const active = [{ ...WIDE_LANE }]
+	const drawn = drawn_from(state, local, redraw, { ...layout_for(state, local, START), active })
+	const written = stripVTControlCharacters(frames.join(''))
+
+	return { lamps: drawn.lamps?.length ?? 0, marks: written.split(LAMP_MARK).length - 1 }
+}
+
+describe('run_board_tick_draw.draw_display with lamps', () => {
+	it('draws the panel and keeps its lamps for the turns where the board has lamps', () => {
+		const { lamps, marks } = redrawn(true)
+
+		expect(lamps).toBeGreaterThanOrEqual(2 * FEWEST)
+		expect(marks).toBe(lamps)
+	})
+
+	it('draws and keeps none where it has none', () => {
+		expect(redrawn(false)).toStrictEqual({ lamps: 0, marks: 0 })
 	})
 })

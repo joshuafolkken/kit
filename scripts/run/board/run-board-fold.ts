@@ -145,10 +145,11 @@ function widened_parts(parts: FrameParts): FrameParts {
 	}
 }
 
-// The throughput rows' lamp panels run on to the end of the section's rule (joshuafolkken/kit#8236).
+// The throughput rows' lamp panels run on to the end of the section's rule, its head's widest line
+// (joshuafolkken/kit#8236).
 function lamped(part: DetailPart | undefined): DetailPart | undefined {
 	if (part === undefined) return undefined
-	const end = run_board_fit.width_of(part.head.at(-1) ?? '')
+	const end = Math.max(...part.head.map((line) => run_board_fit.width_of(line)))
 	const lines = part.lines.map((line) => ({
 		...line,
 		text: run_board_lamps.expanded(line.text, end),
