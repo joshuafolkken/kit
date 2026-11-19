@@ -1,0 +1,7 @@
+{
+	"reason": "Splitting run-board-layout.ts into types and order modules adds their own imports, export lines and the re-export block; no new logic",
+	"date": "2026-11-19",
+	"growth": {
+		"scripts.code_lines": 30
+	}
+}
