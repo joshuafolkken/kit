@@ -1,0 +1,7 @@
+{
+	"reason": "prerequisite.md names run:pause as the publisher of mid-run prepared children, required by #8088's acceptance criterion",
+	"date": "2026-11-19",
+	"growth": {
+		"ai_cost.on_demand_bytes": 41
+	}
+}

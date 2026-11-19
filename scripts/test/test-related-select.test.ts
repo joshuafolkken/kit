@@ -207,15 +207,17 @@ describe('test_related_select.select by declaration users', () => {
 
 	it('runs the users of the changed declarations in place of the import layers', async () => {
 		const root = fixture.workspace
-		const symbol = { tests: [OUTER_TESTS[1] ?? ''], reach: [{ file: CODE, count: 1 }] }
+		const tests = [OUTER_TESTS[1] ?? '']
+		const symbol = { tests, reach: [{ file: CODE, count: 1 }], direct: tests }
 		const selection = await select_by_users(root, related_of(root, [CODE]), symbol)
 
-		expect(selection).toEqual({ ...symbol, deferred: 0, method: 'symbol' })
+		expect(selection).toEqual({ tests, reach: symbol.reach, deferred: 0, method: 'symbol' })
 	})
 
 	it('still defers what the users select past the cap', async () => {
 		const root = fixture.workspace
-		const symbol = { tests: ALL_TESTS, reach: [{ file: CODE, count: ALL_TESTS.length }] }
+		const reach = [{ file: CODE, count: ALL_TESTS.length }]
+		const symbol = { tests: ALL_TESTS, reach, direct: [] }
 		const selection = await select_by_users(root, related_of(root, [CODE]), symbol)
 
 		expect(selection).toMatchObject({ deferred: DEFERRED, method: 'symbol' })
@@ -223,11 +225,47 @@ describe('test_related_select.select by declaration users', () => {
 
 	it('reads the import layers for a scope fallen to the whole suite', async () => {
 		const scope: RelatedScope = { mode: 'all', files: [], reason: '' }
-		const symbol = { tests: [], reach: [] }
+		const symbol = { tests: [], reach: [], direct: [] }
 		const selection = await select_by_users(fixture.workspace, scope, symbol)
 
 		expect(selection.method).toBe('import')
 		expect(selection.tests).toHaveLength(MAX_TEST_FILES)
+	})
+})
+
+// joshuafolkken/kit#8091: past the cap the direct users of a changed declaration run first.
+describe('test_related_select.select by declaration users, cut by rank', () => {
+	const reach = [{ file: CODE, count: ALL_TESTS.length }]
+	let fixture: FixtureWorkspace
+
+	beforeEach(() => {
+		fixture = open_fixture()
+	})
+
+	afterEach(async () => {
+		await git_fixture_workspace.close_workspace(fixture)
+	})
+
+	it('keeps a direct user sorting last past the cap, the farther users cut first', async () => {
+		const root = fixture.workspace
+		const symbol = { tests: ALL_TESTS, reach, direct: [DIRECT_TEST] }
+		const selection = await select_by_users(root, related_of(root, [CODE]), symbol)
+
+		expect(selection.tests[0]).toBe(DIRECT_TEST)
+		expect(selection.tests.slice(1)).toEqual(OUTER_TESTS.slice(0, MAX_TEST_FILES - 1))
+		expect(selection.deferred).toBe(DEFERRED)
+	})
+
+	it('selects the same tests in path order within a rank, whatever their order', async () => {
+		const root = fixture.workspace
+		const scope = related_of(root, [CODE])
+		const direct = [DIRECT_TEST, OUTER_TESTS[2] ?? '', OUTER_TESTS[1] ?? '']
+		const first = await select_by_users(root, scope, { tests: ALL_TESTS, reach, direct })
+		const reversed = { tests: ALL_TESTS.toReversed(), reach, direct: direct.toReversed() }
+		const second = await select_by_users(root, scope, reversed)
+
+		expect(first.tests.slice(0, direct.length)).toEqual(direct.toReversed())
+		expect(second.tests).toEqual(first.tests)
 	})
 })
 

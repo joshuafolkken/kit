@@ -224,7 +224,7 @@ async function place(issue: SpillIssue, follow_up: number): Promise<number> {
 	const exit_code = await placed(issue, follow_up)
 
 	console.info(
-		`Prepared ${session_cite.issue(follow_up)} stays unpublished: record its plan with issue:plan --planned --no-notify, then run pnpm josh issue:file --publish <E> after placement succeeds.`,
+		`Prepared ${session_cite.issue(follow_up)} stays unpublished: record its plan with issue:plan --planned --no-notify, then publish it after placement succeeds — mid-run, pnpm josh run:pause <M> --for <N> publishes it; otherwise run pnpm josh issue:file --publish <E>.`,
 	)
 
 	if (exit_code !== SUCCESS_EXIT_CODE) {

@@ -30,11 +30,15 @@ interface SymbolInput {
 	imports: ImportMap
 }
 
-// Root-relative test files selected, and each changed code file's count of them.
+// Root-relative test files selected, each changed code file's count of them, and among them the
+// direct users — those within one file boundary, which a cut keeps first (joshuafolkken/kit#8091).
 interface SymbolSelection {
 	tests: Array<string>
 	reach: Array<ReachedCount>
+	direct: Array<string>
 }
+
+type Reached = Omit<SymbolSelection, 'direct'>
 
 interface Selecting {
 	input: SymbolInput
@@ -80,7 +84,7 @@ function tests_of(selecting: Selecting, source: Source, reach: Reach): Array<str
 	return [...new Set([...users, ...registry_tests(selecting, source, lines)])]
 }
 
-function selection_at(selecting: Selecting, reach: Reach): SymbolSelection {
+function selection_at(selecting: Selecting, reach: Reach): Reached {
 	const changed = new Set(selecting.input.changed)
 	const sources = selecting.input.sources.filter((source) => changed.has(source.file))
 	const each = sources.map((source) => ({
@@ -105,11 +109,11 @@ function selecting_of(input: SymbolInput): Selecting {
 
 // Every user followed, or one file boundary where that selects more than the cap.
 function select_within(selecting: Selecting): SymbolSelection {
+	const direct = selection_at(selecting, ONE_HOP)
 	const full = selection_at(selecting, FULL)
+	const chosen = full.tests.length > test_pinned_logic.MAX_TEST_FILES ? direct : full
 
-	return full.tests.length > test_pinned_logic.MAX_TEST_FILES
-		? selection_at(selecting, ONE_HOP)
-		: full
+	return { ...chosen, direct: direct.tests }
 }
 
 function select_from(input: SymbolInput): SymbolSelection {

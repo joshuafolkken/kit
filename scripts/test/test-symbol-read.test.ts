@@ -9,12 +9,13 @@ import { test_symbol_read } from './test-symbol-read'
 
 // joshuafolkken/kit#7980: the work tree and the diff since the change base, read for the symbol walk.
 const LIB = 'lib.ts'
+const TWO_TEST = 'two.test.ts'
 const FILES: Readonly<Record<string, string>> = {
 	'package.json': '{"type":"module"}',
 	'.gitignore': 'node_modules\n',
 	[LIB]: 'export function one() { return 1 }\nexport function two() { return 2 }\n',
 	'one.test.ts': "import { one } from './lib'\nit('o', one)\n",
-	'two.test.ts': "import { two } from './lib'\nit('t', two)\n",
+	[TWO_TEST]: "import { two } from './lib'\nit('t', two)\n",
 }
 const CHANGED_LIB = 'export function one() { return 1 }\nexport function two() { return 3 }\n'
 const fixture: { current?: FixtureWorkspace } = {}
@@ -54,8 +55,9 @@ afterEach(async () => {
 describe('test_symbol_read.symbols', () => {
 	it('selects the tests using the declarations the diff since the change base touched', async () => {
 		expect(await test_symbol_read.symbols(process.cwd(), [LIB])).toEqual({
-			tests: ['two.test.ts'],
+			tests: [TWO_TEST],
 			reach: [{ file: LIB, count: 1 }],
+			direct: [TWO_TEST],
 		})
 	})
 
