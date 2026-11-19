@@ -11,6 +11,7 @@ const TWO_TEST = 'src/two.test.ts'
 const MOCKING_TEST = 'src/mocking.test.ts'
 const REGISTRY = 'scripts/josh/josh-commands-thing.ts'
 const SOLO = 'src/solo.ts'
+const FAR_TEST = 'src/far-0.test.ts'
 
 const LIB_SOURCE: Source = {
 	file: LIB,
@@ -70,7 +71,7 @@ describe('test_symbol_select.select_from', () => {
 			input_of(sources, [LIB], new Map([[LIB, [1]]])),
 		)
 
-		expect(tests.toSorted(by_name)).toEqual(['src/far-0.test.ts', ONE_TEST])
+		expect(tests.toSorted(by_name)).toEqual([FAR_TEST, ONE_TEST])
 	})
 
 	it('falls back to one file boundary where every user exceeds the cap', () => {
@@ -87,10 +88,11 @@ describe('test_symbol_select.select_from', () => {
 describe('test_symbol_select.select_from — the direct users', () => {
 	it('reads the users within one file boundary as direct while following every user', () => {
 		const sources = [LIB_SOURCE, ONE_SOURCE, MID_SOURCE, ...far_tests(1)]
-		const { direct } = test_symbol_select.select_from(
+		const { tests, direct } = test_symbol_select.select_from(
 			input_of(sources, [LIB], new Map([[LIB, [1]]])),
 		)
 
+		expect(tests.toSorted(by_name)).toEqual([FAR_TEST, ONE_TEST])
 		expect(direct).toEqual([ONE_TEST])
 	})
 })
