@@ -118,9 +118,16 @@ describe('lane_plan_signals.signals_from', () => {
 // joshuafolkken/kit#6652: the change base's file listing, so `lane:plan` can tell a new file from an existing one.
 const BASE = 'base-sha'
 const HUB = 'scripts/split/split-assess.ts'
+const LISTED = 'scripts/b.ts'
+const MOVED_LINES = 3
 
 async function listing(arguments_: ReadonlyArray<string>): Promise<string> {
-	return await (arguments_[0] === 'ls-tree' ? 'a.ts\nscripts/b.ts\n' : '')
+	return await (arguments_[0] === 'ls-tree' ? `a.ts\n${LISTED}\n` : '')
+}
+
+// The listing, and a three-line file for each `git show` of a move source (joshuafolkken/kit#8119).
+async function moved_listing(arguments_: ReadonlyArray<string>): Promise<string> {
+	return await (arguments_[0] === 'show' ? 'one\ntwo\nthree\n' : listing(arguments_))
 }
 
 describe('lane_plan_signals.signals_of base_files', () => {
@@ -136,7 +143,7 @@ describe('lane_plan_signals.signals_of base_files', () => {
 
 		const signals = await lane_plan_signals.signals_of(ISSUE)
 
-		expect(signals.base_files).toStrictEqual(new Set(['a.ts', 'scripts/b.ts']))
+		expect(signals.base_files).toStrictEqual(new Set(['a.ts', LISTED]))
 		expect(read).toHaveBeenCalledWith(['ls-tree', '-r', '--name-only', BASE])
 	})
 
@@ -147,6 +154,17 @@ describe('lane_plan_signals.signals_of base_files', () => {
 		const signals = await lane_plan_signals.signals_of(ISSUE)
 
 		expect(signals.base_files).toBeUndefined()
+	})
+
+	it('reads each planned move source at the base (joshuafolkken/kit#8119)', async () => {
+		vi.spyOn(change_base, 'resolved_through_merge').mockResolvedValue(BASE)
+		vi.spyOn(git_spawn, 'read').mockImplementation(moved_listing)
+		vi.spyOn(test_related_cap, 'hubs_of').mockResolvedValue([])
+		vi.spyOn(lane_ledger, 'target').mockResolvedValue(undefined)
+
+		const signals = await lane_plan_signals.signals_of(ISSUE, [LISTED, 'tools/b.ts'])
+
+		expect(signals.moved_source_lines).toStrictEqual(new Map([[LISTED, MOVED_LINES]]))
 	})
 
 	it('answers no listing, not an empty one, when the listing cannot be read', async () => {
