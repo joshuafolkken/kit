@@ -5,6 +5,9 @@ import { describe, expect, it, vi } from 'vitest'
 import { run_board_profile } from './run-board-profile'
 import { run_board_profile_main } from './run-board-profile-main'
 
+const PER_SECOND = MS_PER_MINUTE / run_board_gather.MACHINE_SAMPLE_MS
+const REPOSITORY = '/repository'
+
 vi.mock(import('./run-board-profile'), async (import_original) => {
 	const original = await import_original()
 
@@ -23,7 +26,7 @@ describe('run-board-profile-main', () => {
 	it('measures the lane records read and the throughput fold apart, once per local read', () => {
 		vi.mocked(run_event_tail.read_events).mockReturnValue([])
 
-		const pieces = run_board_profile_main.local_pieces('/repository')
+		const pieces = run_board_profile_main.local_pieces(REPOSITORY)
 		const shares = pieces.filter((piece) =>
 			['lane records read', 'throughput fold'].includes(piece.label),
 		)
@@ -32,5 +35,25 @@ describe('run-board-profile-main', () => {
 			MS_PER_MINUTE / run_board_gather.LOCAL_READ_MS,
 			MS_PER_MINUTE / run_board_gather.LOCAL_READ_MS,
 		])
+	})
+
+	it('measures the budget waits, the quotas and the usages as parts of every round (ac-17c66d31)', () => {
+		const pieces = run_board_profile_main.round_part_pieces()
+
+		expect(pieces.map((piece) => [piece.label, piece.per_minute, piece.role])).toStrictEqual([
+			['budget waits', PER_SECOND, 'part'],
+			['quotas', PER_SECOND, 'part'],
+			['usages', PER_SECOND, 'part'],
+		])
+	})
+
+	it('measures the ledger read once per local read, as a share outside the round parts (ac-17c66d31)', () => {
+		vi.mocked(run_event_tail.read_events).mockReturnValue([])
+
+		const pieces = run_board_profile_main.local_pieces(REPOSITORY)
+		const ledger = pieces.find((piece) => piece.label === 'ledger')
+
+		expect(ledger?.per_minute).toBe(MS_PER_MINUTE / run_board_gather.LOCAL_READ_MS)
+		expect(ledger?.role).toBeUndefined()
 	})
 })
