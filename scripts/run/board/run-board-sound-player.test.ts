@@ -1,9 +1,14 @@
 import { existsSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import type { Spawner, Started } from '#scripts/run/wake/run-wake-caffeinate'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it, vi, type Mock } from 'vitest'
-import { run_board_sound_player, type SoundPorts } from './run-board-sound-player'
+import {
+	run_board_sound_player,
+	type Playing,
+	type SoundPorts,
+	type SoundSpawner,
+	type StartHandlers,
+} from './run-board-sound-player'
 
 const WAV = 'sounds/chime.wav'
 const QUOTED_WAV = "C:\\o'clock.wav"
@@ -11,14 +16,15 @@ const DETACHED = { detached: true, stdio: 'ignore', windowsHide: true }
 const DIRECTORY_PREFIX = 'run-board-sound-player-'
 const create_directory = temporary_directory()
 
-interface FakeChild extends Started {
+interface FakeChild extends Playing {
 	fail: () => void
 	unref: Mock<() => unknown>
+	kill: Mock<() => unknown>
 }
 
 interface Harness {
 	ports: SoundPorts
-	spawner: Mock<Spawner>
+	spawner: Mock<SoundSpawner>
 	write: Mock<(text: string) => unknown>
 	children: Array<FakeChild>
 }
@@ -31,6 +37,7 @@ function fake_child(): FakeChild {
 			listeners.push(listener)
 		},
 		unref: vi.fn<() => unknown>(),
+		kill: vi.fn<() => unknown>(),
 		fail: () => {
 			for (const listener of listeners) listener()
 		},
@@ -39,7 +46,7 @@ function fake_child(): FakeChild {
 
 function harness(): Harness {
 	const children: Array<FakeChild> = []
-	const spawner = vi.fn<Spawner>(() => {
+	const spawner = vi.fn<SoundSpawner>(() => {
 		const child = fake_child()
 
 		children.push(child)
@@ -158,6 +165,50 @@ describe('run_board_sound_player.play detachment', () => {
 
 		expect(child?.unref).toHaveBeenCalledOnce()
 		expect(test.write).not.toHaveBeenCalled()
+	})
+})
+
+function handlers(): {
+	started: Mock<StartHandlers['started']>
+	failed: Mock<StartHandlers['failed']>
+} {
+	return { started: vi.fn<StartHandlers['started']>(), failed: vi.fn<StartHandlers['failed']>() }
+}
+
+// joshuafolkken/kit#8250: a start hands back each candidate it starts, so a lasting sound can be ended.
+describe('run_board_sound_player.start', () => {
+	it('tells each candidate it starts, in order, so the last one started is the one playing', () => {
+		const test = harness()
+		const told = handlers()
+
+		run_board_sound_player.start(WAV, told, 'linux', test.ports)
+		fail_child(test, 0)
+
+		expect(told.started.mock.calls.map(([child]) => child)).toStrictEqual(test.children)
+		expect(test.spawner).toHaveBeenLastCalledWith('pw-play', [WAV], DETACHED)
+		expect(told.failed).not.toHaveBeenCalled()
+	})
+
+	it('reports the failure of every candidate without ringing the bell', () => {
+		const test = harness()
+		const told = handlers()
+
+		run_board_sound_player.start(WAV, told, 'darwin', test.ports)
+		fail_child(test, 0)
+
+		expect(told.failed).toHaveBeenCalledOnce()
+		expect(test.write).not.toHaveBeenCalled()
+	})
+
+	it('hands back a child the caller can kill', () => {
+		const test = harness()
+		const told = handlers()
+
+		run_board_sound_player.start(WAV, told, 'darwin', test.ports)
+		told.started.mock.calls[0]?.[0].kill()
+		const [child] = test.children
+
+		expect(child?.kill).toHaveBeenCalledOnce()
 	})
 })
 

@@ -34,6 +34,7 @@ type DrawPorts = Pick<
 	| 'opened_ms'
 	| 'cue'
 	| 'sound'
+	| 'typing_sound'
 >
 
 // What one redraw draws with.
@@ -131,7 +132,8 @@ function draw(ports: Pick<DrawPorts, 'write'>, lines: ReadonlyArray<string>): vo
 }
 
 // The assembled frame drawn, its cue sounded through `cue` where the board passes one — before the
-// frame is written, so the notice shows on the frame it sounds on.
+// frame is written, so the notice shows on the frame it sounds on — and the trill switched on while a
+// row types, apart from the cue, so both sound on one frame (joshuafolkken/kit#8250).
 function draw_display(state: BoardState, display: BoardDisplay, redraw: Redraw): BoardState {
 	const header = header_of(display, state, redraw)
 
@@ -140,6 +142,7 @@ function draw_display(state: BoardState, display: BoardDisplay, redraw: Redraw):
 	const typing = typing_of(state, drawn, header, redraw)
 
 	draw(redraw.ports, run_board_type_rows.typed_lines(drawn.lines, typing, redraw.now_ms))
+	redraw.ports.typing_sound?.set(run_board_type_rows.is_typing(typing, redraw.now_ms))
 
 	return { ...state, ...display.carried, spots: drawn.spots, sweep: drawn.sweep, typing }
 }

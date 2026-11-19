@@ -182,4 +182,10 @@ describe('run_board_cli.live_ports cue', () => {
 		expect(run_board_cli.live_ports(true).cue).toBe(run_board_sound_player.play_cue)
 		expect(run_board_cli.live_ports(false).cue).toBeUndefined()
 	})
+
+	// joshuafolkken/kit#8250: the trill, like the cues, sounds on the live board alone.
+	it('passes the trill to the live board alone', () => {
+		expect(run_board_cli.live_ports(true).typing_sound).toBeDefined()
+		expect(run_board_cli.live_ports(false).typing_sound).toBeUndefined()
+	})
 })

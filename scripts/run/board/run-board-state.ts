@@ -17,6 +17,7 @@ import { run_board_snapshot, type Known, type SnapshotStore } from './run-board-
 import type { CueName } from './run-board-sound-cues'
 import type { Pending } from './run-board-sound-repeat'
 import type { SoundSnapshot } from './run-board-sound-transition'
+import type { TypingSound } from './run-board-sound-typing'
 import type { Spot } from './run-board-spin'
 import type { Sweep } from './run-board-sweep'
 import type { Thanks } from './run-board-thanks-csv'
@@ -90,6 +91,9 @@ interface BoardPorts {
 	cue?: ((name: CueName) => void) | undefined
 	// Whether the sound switch a person flips with `s` is on (`run-board-keys.ts`); none where no key is read.
 	sound?: (() => boolean) | undefined
+	// The trill sounded while a line types (`run-board-sound-typing.ts`): the live board alone passes
+	// one, and only in a theme with the sound switch on does it reach the draws.
+	typing_sound?: TypingSound | undefined
 	// Times each draw for `--timing`'s report (`run-board-timing.ts`); none times nothing.
 	time_draw?: DrawTimer | undefined
 	// Marks the stage a live board's loop enters, for `--timing`'s stalls (`run-board-stall.ts`); none marks nothing.

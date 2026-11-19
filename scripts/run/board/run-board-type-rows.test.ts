@@ -101,6 +101,21 @@ describe('run_board_type_rows.next', () => {
 	})
 })
 
+// joshuafolkken/kit#8250: the trill reads whether a row is typing by the clock.
+describe('run_board_type_rows.is_typing', () => {
+	it('is true while a row is still typing and false once it is typed through', () => {
+		const typing = after_base(frame_of([line_of('#1', 0)]), [line_of('#1', 0), line_of('#2', 1)])
+		const typed_ms = START + SECOND + ROW.length * LETTER_MS
+
+		expect(run_board_type_rows.is_typing(typing, START + SECOND)).toBe(true)
+		expect(run_board_type_rows.is_typing(typing, typed_ms)).toBe(false)
+	})
+
+	it('is false with no row typing', () => {
+		expect(run_board_type_rows.is_typing(NO_TYPING, START)).toBe(false)
+	})
+})
+
 describe('run_board_type_rows — what is written', () => {
 	it('draws a row on a redraw as typed so far with the block after it, the rest of the frame as drawn', () => {
 		const typing = after_base(frame_of([]), [line_of('done:7', 1)])

@@ -121,7 +121,13 @@ function type_bytes(typing: Typing, now_ms: number): string {
 		.join('')
 }
 
-const run_board_type_rows = { NO_TYPING, next, type_bytes, typed_lines }
+// Whether any row is still typing at `now_ms` — by the clock, since a row typed through stays in
+// `lines` until the next redraw drops it (joshuafolkken/kit#8250).
+function is_typing(typing: Typing, now_ms: number): boolean {
+	return typing.lines.some((line) => !is_typed(line, now_ms))
+}
+
+const run_board_type_rows = { NO_TYPING, is_typing, next, type_bytes, typed_lines }
 
 export { run_board_type_rows }
 export type { KeyedLine, Typing, TypingFrame, TypingLine }

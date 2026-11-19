@@ -230,7 +230,7 @@ What each cue sounds like:
 - `human` is two triangle-wave A5 tones.
 - `alert` is a falling square-wave figure, played three times.
 
-`s` turns the cues on or off. The default is on, and turning them on plays `launch` once. The setting is saved as `sound` in `~/.claude/josh/board.json` (under `$CLAUDE_CONFIG_DIR` if set). A missing or non-boolean value reads as on.
+`s` turns the sound on or off — the cues and the typing trill below. The default is on, and turning it on plays `launch` once; turning it off also stops a trill that is sounding. The setting is saved as `sound` in `~/.claude/josh/board.json` (under `$CLAUDE_CONFIG_DIR` if set). A missing or non-boolean value reads as on.
 
 Each cue is synthesized to a WAV once and cached in `~/.claude/josh/sounds`. A detached player plays it:
 
@@ -241,6 +241,17 @@ Each cue is synthesized to a WAV once and cached in `~/.claude/josh/sounds`. A d
 | Windows | `powershell` with `System.Media.SoundPlayer` |
 
 The board writes the terminal BEL instead in three cases: the platform has no row in this table, every player for it fails, or the WAV cannot be written (`run-board-sound-player.ts`).
+
+#### The typing trill
+
+A live board in a theme sounds a teletype trill while it types: the opening `SHALL WE PLAY A GAME?` and each row that appears (joshuafolkken/kit#8250, `run-board-sound-typing.ts`). It works apart from the cues:
+
+- The sound: two sine notes, B♭5 then D6, 25 ms each. One pair is 50 ms, the same as one letter (`LETTER_MS`). The WAV holds 80 pairs (4 seconds), synthesized once and cached like the cues.
+- One player: the trill has one on/off state. While any line types it is on; once every line is typed through it is off. Rows that type at the same time do not start a second player. A player that ends while the trill is still on is started again, so a longer typing sounds without a gap.
+- Apart from the cues: no tier, transition or repeat rule reaches it. A cue on the same frame sounds over the trill and does not stop it.
+- Stops: the letters typed through or skipped by a key, every row typed through, `s` turning the sound off, and the board closing (quit, Ctrl-C) — the player is killed, so no process stays behind.
+- Silent where it cannot play: a trill whose player fails rings no BEL, which stays the cues' single notice.
+- Live in a theme only: `--once`, `--chat`, `--every` and a board with no theme never sound it.
 
 ## The strand report in detail
 
