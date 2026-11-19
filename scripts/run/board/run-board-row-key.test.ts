@@ -15,13 +15,30 @@ describe('run_board_row_key', () => {
 	it('gives back the key and the row it led, the indent before it kept', () => {
 		const line = `${INDENT}${keyed('done', 7, ROW)}`
 
-		expect(split_key(line)).toStrictEqual({ key: 'done:7', text: `${INDENT}${ROW}` })
+		expect(split_key(line)).toStrictEqual({
+			key: 'done:7',
+			text: `${INDENT}${ROW}`,
+			prefix: INDENT,
+		})
 		expect(without_key(line)).toBe(`${INDENT}${ROW}`)
 	})
 
 	it('leaves a row whose section names no key as it is', () => {
 		expect(keyed(undefined, 7, ROW)).toBe(ROW)
-		expect(split_key(ROW)).toStrictEqual({ key: undefined, text: ROW })
+		expect(split_key(ROW)).toStrictEqual({ key: undefined, text: ROW, prefix: '' })
+	})
+
+	it('keys the now line by its words, the time before them a prefix (joshuafolkken/kit#8103)', () => {
+		const prefix = `${GREEN}KIT  5″  > `
+		const words = '#8093 · WRITE'
+		const line = `${prefix}${keyed('now', words, words)}`
+
+		expect(split_key(line)).toStrictEqual({
+			key: `now:${words}`,
+			text: `${prefix}${words}`,
+			prefix,
+		})
+		expect(run_board_fit.width_of(line)).toBe(run_board_fit.width_of(`${prefix}${words}`))
 	})
 
 	it('takes no column, so a keyed row wraps where the row alone does', () => {

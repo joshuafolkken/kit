@@ -15,6 +15,9 @@ const SIZE = { rows: 15, columns: 80 }
 const FOOTER = ['footer']
 const BASELINE = 7
 const HEADER_LINES = 3
+const SECOND = 1000
+// Past the time the header's now line takes to type through.
+const TYPED_MS = 10 * SECOND
 
 function planned(): BoardState {
 	return { ...FRESH_STATE, plan: plan_titled('a'), run_started_ms: LOCAL.started_ms }
@@ -127,6 +130,33 @@ describe('run_board_tick_draw.draw_run sound mark', () => {
 
 	it('draws 🔇 after josh-board while the sound is off', () => {
 		expect(header_drawn(false)[0]).toMatch(/^⏸ josh-board 🔇 {2}⏰/u)
+	})
+})
+
+// A themed redraw over `rows` at `now_ms`, typing the rows and the header's now line.
+function typed_over(state: BoardState, rows: ReadonlyArray<BoardRow>, now_ms: number): BoardState {
+	const { ports } = harness(LOCAL, [])
+	const run_layout = { ...layout_for(state, LOCAL, START), active: rows }
+
+	return draw_run(state, LOCAL, { ports: { ...ports, types_rows: true }, now_ms }, run_layout)
+}
+
+function typing_keys(state: BoardState): Array<string> {
+	return state.typing.lines.map((line) => line.key)
+}
+
+// joshuafolkken/kit#8103: the header's now line types when its words change, and not again while they
+// stay — its key is known to the next frame.
+describe('run_board_tick_draw.draw_run now line typing', () => {
+	it('types the now line once its words appear, and not again on a later redraw', () => {
+		const now_key = 'now:1 running'
+		const running = [row(1, 'running')]
+		const base = typed_over(planned(), [], START)
+		const appeared = typed_over(base, running, START + SECOND)
+		const later = typed_over(appeared, running, START + TYPED_MS)
+
+		expect(typing_keys(appeared)).toContain(now_key)
+		expect(typing_keys(later)).not.toContain(now_key)
 	})
 })
 

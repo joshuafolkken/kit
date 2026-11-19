@@ -21,6 +21,7 @@ import type { ProcessGroups } from './run-board-process-groups'
 import type { QuotaHold, QuotaView } from './run-board-render-quota'
 import { run_board_render_slot } from './run-board-render-slot'
 import { run_board_render_title } from './run-board-render-title'
+import { run_board_row_key } from './run-board-row-key'
 import type { SeatRead } from './run-board-seat'
 import { run_board_setup } from './run-board-setup'
 import type { LaneUsages, UsageScale } from './run-board-usage'
@@ -359,6 +360,14 @@ function estimate_legend(header: BoardHeader): string | undefined {
 	return estimate_part(header) === undefined ? undefined : run_board_estimate.LEGEND
 }
 
+// The key the third line's words carry where the board types rows (`run-board-header-time.ts`), so a
+// frame knows them typed; none while the line names no words.
+function now_key(header: BoardHeader): string | undefined {
+	const now = now_line(counts_of(layout_of(header)), header)
+
+	return now === undefined ? undefined : run_board_row_key.key_of('now', now.text)
+}
+
 // The third line's icon, so the legend names the phase it draws.
 function now_icon(header: BoardHeader): string | undefined {
 	return now_line(counts_of(layout_of(header)), header)?.icon
@@ -370,6 +379,7 @@ const run_board_header = {
 	header_lines,
 	is_plan_read,
 	now_icon,
+	now_key,
 	now_legend,
 	run_mark_of,
 	warning_of,
