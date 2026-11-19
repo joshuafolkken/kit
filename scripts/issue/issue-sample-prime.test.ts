@@ -7,6 +7,7 @@ import { CURRENT_REPO_ISSUES, rest_issue } from '#scripts/gh/git-gh-issue-rest-f
 import { too_many_files_failure } from '#scripts/gh/git-gh-pr-fixture'
 import { shared_cache_fixture } from '#scripts/josh/shared-cache-fixture'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
+import { json_value } from '#scripts/lib/json-value'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_sample_gate } from './issue-sample-gate'
@@ -116,16 +117,37 @@ describe('issue_sample_prime.prime on the lane ledger', () => {
 
 		expect(counted()).toBe(0)
 	})
+})
 
-	it('reads the window once while the ledger is unchanged', async () => {
-		const window = vi.spyOn(lane_ledger, 'read_since')
+describe('issue_sample_prime.prime on a ledger a run appends to', () => {
+	afterEach(() => {
+		issue_sample_gate.reset()
+	})
 
+	it('parses nothing again on a redraw while the ledger is unchanged', async () => {
 		await prime_on(ledger_file())
 		counted()
-		counted()
+		const parse = vi.spyOn(json_value, 'parse_or_undefined')
 
-		expect(window).toHaveBeenCalledTimes(1)
-		expect(window).toHaveBeenCalledWith(expect.any(String), Date.parse(MERGED_AT))
+		expect(counted()).toBe(1)
+		expect(parse).not.toHaveBeenCalled()
+	})
+
+	// joshuafolkken/kit#8133: a live run appends to the ledger every few seconds, and the board's
+	// redraw then parsed the whole window again for each waiting issue.
+	it('parses only the appended line on a redraw after the ledger grew, across a prime', async () => {
+		const ledger = ledger_file()
+
+		await prime_on(ledger)
+		counted()
+		await prime_on(ledger)
+		appendFileSync(ledger, ledger_line('merge', 4))
+		const parse = vi.spyOn(json_value, 'parse_or_undefined')
+
+		expect(counted()).toBe(2)
+		expect(parse.mock.calls.map(([line]) => line).filter(Boolean)).toStrictEqual([
+			ledger_line('merge', 4).trim(),
+		])
 	})
 })
 
