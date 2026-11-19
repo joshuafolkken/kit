@@ -2,6 +2,8 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # The WarGames computer the board's lamp panel is drawn after (#8236).
+  - WOPR
   # The macOS and Linux audio players the board's sound player starts (#7945).
   - afplay
   - paplay

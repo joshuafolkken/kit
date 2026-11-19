@@ -3,9 +3,10 @@ import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { run_board_fit, type TerminalSize } from './run-board-fit'
 import { run_board_intro } from './run-board-intro'
 import { run_board_labels } from './run-board-labels'
+import { run_board_lamp_spots, type Lamp } from './run-board-lamp-spots'
 import { run_board_row_key } from './run-board-row-key'
 import { run_board_screen } from './run-board-screen'
-import { run_board_spot } from './run-board-spot'
+import { run_board_spot, type Spot } from './run-board-spot'
 import type { BoardPorts } from './run-board-state'
 import { run_board_sweep, type Sweep } from './run-board-sweep'
 import { run_board_timing } from './run-board-timing'
@@ -19,61 +20,52 @@ import { run_board_type_rows, type KeyedLine, type Typing } from './run-board-ty
 // row the frame was cut to the terminal's rows without is not on screen, so it records nothing. The
 // sweep under the third line's age (`run-board-sweep.ts`) is placed the same way, by its own placeholder.
 
-const { SPOT, TICK } = run_board_spot
+const { SPOT, TICK, spot_at } = run_board_spot
 const { SWEEP_MS, sweep_bytes, sweep_index } = run_board_sweep
 const REDRAW_MS = MS_PER_SECOND
 const CSI = '\u{1B}['
 const RESET = `${CSI}0m`
-// eslint-disable-next-line no-control-regex -- the color escapes a spot keeps are control characters
-const SGR = /\u{1B}\[[\d;]*m/gu
 const { SPINNER_INTERVAL_MS, spinner_of } = run_board_labels
 const { LETTER_MS } = run_board_intro
 
-// Where one spinner is on screen, 1-based, and the colors in effect where it is drawn.
-interface Spot {
-	row: number
-	column: number
-	style: string
-}
-
-// The frame's lines as written, its spinners' spots, its keyed rows on screen, without their keys, and
-// the sweep where the frame has room for one.
+// The frame's lines as written, its spinners' spots, its keyed rows on screen, without their keys, the
+// sweep where the frame has room for one and its lamps (`run-board-lamp-spots.ts`).
 interface Spun {
 	lines: Array<string>
 	spots: Array<Spot>
 	keyed: Array<KeyedLine>
 	sweep: Sweep | undefined
+	lamps: Array<Lamp>
 }
 
-// What is written between redraws: the spinners turned, the sweep moved and the rows typing.
+// What is written between redraws: the spinners turned, the sweep moved, the lamps blinked and the rows
+// typing.
 interface Turning {
 	spots: ReadonlyArray<Spot>
 	typing: Typing
 	sweep?: Sweep | undefined
+	lamps?: ReadonlyArray<Lamp> | undefined
 }
 
-// What changed since the last turn was written: the spinner's frame, the sweep's cell.
+// What changed since the last turn was written: the spinner's frame, the sweep's cell, and the moment
+// the lamps were last written at — none to write every lamp.
 interface Turned {
 	is_turned: boolean
 	is_swept: boolean
+	since_ms: number | undefined
 }
 
 // The spinner's frame and the sweep's cell at a moment, compared turn to turn.
 interface Moment {
 	frame: string
 	cell: number
+	ms: number
 }
 
-type SpinPorts = Pick<BoardPorts, 'now' | 'sleep' | 'write' | 'time_draw' | 'typing_sound'>
-
-// The spot of the placeholder at `index` in a line that starts `row` rows down the screen.
-function spot_at(line: string, index: number, row: number, columns: number): Spot {
-	const before = line.slice(0, index)
-	const width = run_board_fit.width_of(before)
-	const style = (before.match(SGR) ?? []).join('')
-
-	return { row: row + Math.floor(width / columns), column: (width % columns) + 1, style }
-}
+type SpinPorts = Pick<
+	BoardPorts,
+	'now' | 'sleep' | 'write' | 'write_drawn' | 'time_draw' | 'typing_sound'
+>
 
 function line_spots(line: string, row: number, columns: number): Array<Spot> {
 	return [...line.matchAll(new RegExp(SPOT, 'gu'))].map((match) =>
@@ -153,6 +145,7 @@ function spun(lines: ReadonlyArray<string>, frame: string, size?: TerminalSize):
 		spots: spots.filter((spot) => spot.row <= rows),
 		keyed: drawn.keyed.filter((line) => can_type(line, rows, columns)),
 		sweep: sweep_in(lines, starts, { rows, columns }),
+		lamps: run_board_lamp_spots.lamps_in(lines, starts, columns).filter((lamp) => lamp.row <= rows),
 	}
 }
 
@@ -190,28 +183,36 @@ function turn_bytes(turning: Turning, at_ms: number, turned: Turned): string {
 	)
 }
 
-// The turn built and written, timed as a turn where `--timing` times draws; the trill sounds on while
-// a row is still typing, off once every row is typed through (joshuafolkken/kit#8250).
+// The lamps blink once the first frame is out, the base the rows type against (joshuafolkken/kit#8236).
+function blinking(turning: Turning): ReadonlyArray<Lamp> {
+	return turning.typing.seen === undefined ? [] : (turning.lamps ?? [])
+}
+
+// The turn built and written, timed as a turn where `--timing` times draws, then the lamps that changed;
+// the trill sounds on while a row is still typing, off once every row is typed through
+// (joshuafolkken/kit#8250).
 function write_turn(turning: Turning, ports: SpinPorts, at_ms: number, turned: Turned): void {
 	run_board_timing.drawn(ports, 'turn', () => {
 		ports.write(turn_bytes(turning, at_ms, turned))
+		run_board_lamp_spots.write_lamps(blinking(turning), ports, at_ms, turned.since_ms)
 	})
 	ports.typing_sound?.set(run_board_type_rows.is_typing(turning.typing, at_ms))
 }
 
 function moment_of(at_ms: number): Moment {
-	return { frame: spinner_of(at_ms), cell: sweep_index(at_ms) }
+	return { frame: spinner_of(at_ms), cell: sweep_index(at_ms), ms: at_ms }
 }
 
 function turned_since(last: Moment, at: Moment): Turned {
-	return { is_turned: at.frame !== last.frame, is_swept: at.cell !== last.cell }
+	return { is_turned: at.frame !== last.frame, is_swept: at.cell !== last.cell, since_ms: last.ms }
 }
 
-// The sweep written where the frame has one, so its cell on the second shows before its first wake.
+// The sweep and every lamp written where the frame has them, so they show on the second before the first
+// wake.
 function start_sweep(turning: Turning, ports: SpinPorts): void {
-	if (turning.sweep === undefined) return
+	if (turning.sweep === undefined && blinking(turning).length === 0) return
 
-	write_turn(turning, ports, ports.now(), { is_turned: false, is_swept: true })
+	write_turn(turning, ports, ports.now(), { is_turned: false, is_swept: true, since_ms: undefined })
 }
 
 // joshuafolkken/kit#8123: a wake for a letter or the sweep between frame boundaries writes no spinner,
@@ -236,11 +237,11 @@ async function turn_until(turning: Turning, ports: SpinPorts, until_ms: number):
 	})
 }
 
-// A frame with no spinner, sweep or typing row writes nothing between redraws.
+// A frame with no spinner, sweep, typing row or blinking lamp writes nothing between redraws.
 function is_still(turning: Turning): boolean {
-	return (
-		turning.spots.length === 0 && turning.typing.lines.length === 0 && turning.sweep === undefined
-	)
+	const is_moving = turning.typing.lines.length > 0 || blinking(turning).length > 0
+
+	return turning.spots.length === 0 && !is_moving && turning.sweep === undefined
 }
 
 // Waits for the next second, turning the spinners, moving the sweep and typing the rows until then; a
@@ -261,4 +262,6 @@ async function spin_to_second(turning: Turning, ports: SpinPorts): Promise<void>
 const run_board_spin = { REDRAW_MS, SPOT, spin_bytes, spin_to_second, spun }
 
 export { run_board_spin }
-export type { Spot, Spun, Turning }
+export type { Spun, Turning }
+
+export { type Spot } from './run-board-spot'

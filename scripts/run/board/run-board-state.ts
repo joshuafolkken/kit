@@ -10,6 +10,7 @@ import type { Notice } from './run-board-header-notice'
 import { run_board_idle } from './run-board-idle'
 import type { IssueCount } from './run-board-issue-count'
 import type { KeyInput } from './run-board-keys'
+import type { Lamp } from './run-board-lamp-spots'
 import type { BoardPlan } from './run-board-layout'
 import type { Link } from './run-board-link'
 import type { GithubRateLimit } from './run-board-render-quota-github'
@@ -150,6 +151,8 @@ interface BoardView {
 	spots: ReadonlyArray<Spot>
 	// Where the last frame has room for the sweep under its third line's age (`run-board-sweep.ts`), if anywhere.
 	sweep?: Sweep | undefined
+	// Where the last frame drew its lamp panel's lamps, blinked between redraws (`run-board-lamp-spots.ts`).
+	lamps?: ReadonlyArray<Lamp> | undefined
 	// The rows the last frame drew and the ones typing, typed on between redraws (`run-board-type-rows.ts`).
 	typing: Typing
 	// The rows and run conditions the last frame sounded over, and the standing cue waiting to replay

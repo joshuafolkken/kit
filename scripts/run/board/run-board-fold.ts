@@ -7,6 +7,7 @@ import {
 	type SectionKey,
 	type TerminalSize,
 } from './run-board-fit'
+import { run_board_lamps } from './run-board-lamps'
 import { run_board_render_section } from './run-board-render-section'
 
 // A live `run:board`'s sections folded and unfolded by one key each (joshuafolkken/kit#4172): every
@@ -144,10 +145,24 @@ function widened_parts(parts: FrameParts): FrameParts {
 	}
 }
 
+// The throughput rows' lamp panels run on to the end of the section's rule, its head's widest line
+// (joshuafolkken/kit#8236).
+function lamped(part: DetailPart | undefined): DetailPart | undefined {
+	if (part === undefined) return undefined
+	const end = Math.max(...part.head.map((line) => run_board_fit.width_of(line)))
+	const lines = part.lines.map((line) => ({
+		...line,
+		text: run_board_lamps.expanded(line.text, end),
+	}))
+
+	return { ...part, lines }
+}
+
 // A live frame is kept within its terminal, folded as a person folded it; any other is drawn whole.
 function bounded(parts: FrameParts, bounds: FrameBounds): Array<string> {
 	const { size, folded } = bounds
-	const shown = widened_parts(folded === undefined ? parts : fold_parts(parts, folded))
+	const ruled = widened_parts(folded === undefined ? parts : fold_parts(parts, folded))
+	const shown = { ...ruled, throughput: lamped(ruled.throughput) }
 
 	return size === undefined ? run_board_fit.whole(shown) : run_board_fit.fit(shown, size)
 }
