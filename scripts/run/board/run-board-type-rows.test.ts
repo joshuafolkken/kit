@@ -22,8 +22,16 @@ const START = Date.parse('2026-11-19T09:00:00.000Z')
 const SECOND = 1000
 const ROW = 'x'.repeat(100)
 
-function line_of(key: string, index: number, text = ROW): KeyedLine {
-	return { key, index, row: index + 1, text }
+function line_of(key: string, index: number, text = ROW, prefix_columns = 0): KeyedLine {
+	return { key, index, row: index + 1, text, prefix_columns }
+}
+
+// joshuafolkken/kit#8103: the header's now line, its time drawn whole before the words that type.
+const NOW_PREFIX = 'KIT  ─  5″  > '
+const WORDS = '#8093 · WRITE'
+
+function now_of(words: string, prefix = NOW_PREFIX): KeyedLine {
+	return line_of(`now:${words}`, 2, `${prefix}${words}`, prefix.length)
 }
 
 // A frame drawing `keyed`, its layout holding those rows and the `hidden` ones a fold or the fit cut.
@@ -127,5 +135,43 @@ describe('run_board_type_rows — what is written', () => {
 
 		expect(typing.lines).toStrictEqual([])
 		expect(type_bytes(typing, START + SECOND + LETTER_MS)).toBe('')
+	})
+})
+
+describe('run_board_type_rows — the header’s now line (joshuafolkken/kit#8103)', () => {
+	it('types the now line’s new words after its prefix, the prefix drawn whole', () => {
+		const typing = after_base(frame_of([now_of('#1 · READ')]), [now_of(WORDS)])
+		const at_ms = START + SECOND + 2 * LETTER_MS
+
+		expect(keys_of(typing)).toStrictEqual([`now:${WORDS}`])
+		expect(type_bytes(typing, at_ms)).toBe(`${ESC}[3;1H${NOW_PREFIX}#80${RESET}${CURSOR}${ESC}[K`)
+	})
+
+	it('writes the now line whole once its words are typed through', () => {
+		const typing = after_base(frame_of([]), [now_of(WORDS)])
+		const at_ms = START + SECOND + WORDS.length * LETTER_MS
+
+		expect(typed_lines(['a', 'b', `${NOW_PREFIX}${WORDS}`], typing, at_ms)).toStrictEqual([
+			'a',
+			'b',
+			`${NOW_PREFIX}${WORDS}`,
+		])
+	})
+
+	it('types not the now line whose time alone changed, nor its base frame', () => {
+		const base = next(NO_TYPING, frame_of([now_of(WORDS)]), START, true)
+		const typing = after_base(frame_of([now_of(WORDS)]), [now_of(WORDS, 'KIT  ─  6″  > ')])
+
+		expect(base.lines).toStrictEqual([])
+		expect(typing.lines).toStrictEqual([])
+	})
+
+	it('drops words still typing for the next ones, typed from their first letter', () => {
+		const typing = after_base(frame_of([]), [now_of(WORDS)])
+		const changed_ms = START + SECOND + 3 * LETTER_MS
+		const changed = next(typing, frame_of([now_of('#9 · SHIP')]), changed_ms, true)
+
+		expect(keys_of(changed)).toStrictEqual(['now:#9 · SHIP'])
+		expect(changed.lines[0]?.start_ms).toBe(changed_ms)
 	})
 })

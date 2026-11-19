@@ -6,36 +6,42 @@
 const OPEN = '\u{E001}'
 const CLOSE = '\u{E002}'
 
-// The sections whose rows a theme types as they appear (`run-board-type-rows.ts`).
-type KeySection = 'lanes' | 'decision' | 'queued' | 'waiting' | 'done'
+// The sections whose rows a theme types as they appear (`run-board-type-rows.ts`), and the header's
+// now line (joshuafolkken/kit#8103), keyed by its text rather than a number.
+type KeySection = 'lanes' | 'decision' | 'queued' | 'waiting' | 'done' | 'now'
 
+// A line's key, the line without it, and the part of the line before the key — drawn whole, never typed.
 interface Split {
 	key: string | undefined
 	text: string
+	prefix: string
 }
 
-// The key of the row numbered `number` in `section`.
-function key_of(section: KeySection, number: number): string {
-	return `${section}:${String(number)}`
+// The key of the row `id` names in `section`: an issue row's number, the now line's text.
+function key_of(section: KeySection, id: number | string): string {
+	return `${section}:${String(id)}`
 }
 
-// `text` led by the key of the row it draws; no key where the row's section names none.
-function keyed(section: KeySection | undefined, number: number, text: string): string {
+// `text` led by the key of the row it draws; no key where the row's section names none. A line whose
+// key follows a prefix types only from the key on.
+function keyed(section: KeySection | undefined, id: number | string, text: string): string {
 	if (section === undefined) return text
 
-	return `${OPEN}${key_of(section, number)}${CLOSE}${text}`
+	return `${OPEN}${key_of(section, id)}${CLOSE}${text}`
 }
 
-// A line's key and the line without it.
 function split_key(line: string): Split {
 	const open = line.indexOf(OPEN)
 	const close = line.indexOf(CLOSE, open)
 
-	if (open === -1 || close === -1) return { key: undefined, text: line }
+	if (open === -1 || close === -1) return { key: undefined, text: line, prefix: '' }
+
+	const prefix = line.slice(0, open)
 
 	return {
 		key: line.slice(open + OPEN.length, close),
-		text: `${line.slice(0, open)}${line.slice(close + CLOSE.length)}`,
+		text: `${prefix}${line.slice(close + CLOSE.length)}`,
+		prefix,
 	}
 }
 

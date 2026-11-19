@@ -8,6 +8,7 @@ import type { RunMark } from './run-board-header-names'
 import { run_board_labels } from './run-board-labels'
 import type { NowLine } from './run-board-now'
 import { run_board_render_slot } from './run-board-render-slot'
+import { run_board_row_key } from './run-board-row-key'
 
 // The header's time cells (`run-board-header.ts`): the run's age over the `💓` — or over the minute an
 // ended run ended — over the third line's spinner and age, and the `💓`'s stale coloring a row's newest
@@ -32,6 +33,7 @@ interface TimeHeader {
 	activity: Pick<RunActivity, 'last_event_ms' | 'outage' | 'is_stopped'>
 	spinner: string | undefined
 	form: 'screen' | 'chat'
+	is_keyed?: boolean | undefined
 }
 
 // The marks of a run that is working: they turn the spinner, and only they can go stale.
@@ -144,9 +146,13 @@ function now_time(
 	return `${icon} ${padded(age, width, aged_fresh(age, fresh_age(now, header), header))}`
 }
 
-// What the third line says, emphasized while it is fresh.
+// What the third line says, emphasized while it is fresh. Where the board types rows its words are keyed
+// by themselves (joshuafolkken/kit#8103), so new words type after the icon and a new age alone does not.
 function now_text(now: NowLine, header: TimeHeader): string {
-	return `${now.icon} ${aged_fresh(now.text, fresh_age(now, header), header)}`
+	const section = header.is_keyed === true ? 'now' : undefined
+	const words = aged_fresh(now.text, fresh_age(now, header), header)
+
+	return `${now.icon} ${run_board_row_key.keyed(section, now.text, words)}`
 }
 
 // A run's age over the `💓` — or over the minute an ended run ended — over the third line's age: the
