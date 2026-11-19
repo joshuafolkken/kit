@@ -64,7 +64,7 @@ interface Moment {
 	cell: number
 }
 
-type SpinPorts = Pick<BoardPorts, 'now' | 'sleep' | 'write' | 'time_draw'>
+type SpinPorts = Pick<BoardPorts, 'now' | 'sleep' | 'write' | 'time_draw' | 'typing_sound'>
 
 // The spot of the placeholder at `index` in a line that starts `row` rows down the screen.
 function spot_at(line: string, index: number, row: number, columns: number): Spot {
@@ -190,11 +190,13 @@ function turn_bytes(turning: Turning, at_ms: number, turned: Turned): string {
 	)
 }
 
-// The turn built and written, timed as a turn where `--timing` times draws.
+// The turn built and written, timed as a turn where `--timing` times draws; the trill sounds on while
+// a row is still typing, off once every row is typed through (joshuafolkken/kit#8250).
 function write_turn(turning: Turning, ports: SpinPorts, at_ms: number, turned: Turned): void {
 	run_board_timing.drawn(ports, 'turn', () => {
 		ports.write(turn_bytes(turning, at_ms, turned))
 	})
+	ports.typing_sound?.set(run_board_type_rows.is_typing(turning.typing, at_ms))
 }
 
 function moment_of(at_ms: number): Moment {

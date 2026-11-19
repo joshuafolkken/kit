@@ -5,6 +5,7 @@ import { run_board_intro, type Reveal } from './run-board-intro'
 import { run_board_keys, type KeyReading } from './run-board-keys'
 import { run_board_labels } from './run-board-labels'
 import { run_board_screen, type Screen } from './run-board-screen'
+import type { TypingSound } from './run-board-sound-typing'
 import { run_board_spin } from './run-board-spin'
 import type { BoardPorts, BoardState } from './run-board-state'
 import type { Theme } from './run-board-theme'
@@ -45,7 +46,27 @@ function leaver(ports: BoardPorts, screen: Screen, keys: KeyReading): () => void
 		if (has_left) return
 		has_left = true
 		keys.stop?.()
+		ports.typing_sound?.stop()
 		ports.write(screen.leave)
+	}
+}
+
+// The trill reaches the draws only in a theme, and sounds only while the sound switch is on
+// (joshuafolkken/kit#8250); `stop` stays the board's, called as it leaves.
+function trill_of(
+	ports: BoardPorts,
+	keys: KeyReading,
+	theme: Theme | undefined,
+): TypingSound | undefined {
+	const typing = ports.typing_sound
+
+	if (typing === undefined || theme === undefined) return undefined
+
+	return {
+		set: (is_on) => {
+			typing.set(is_on && (keys.sound?.() ?? true))
+		},
+		stop: typing.stop,
 	}
 }
 
@@ -121,33 +142,35 @@ async function redraw_forever(
 	)
 }
 
+// The ports the live board draws through: the folds, the sound switch and the cue it gates read off the
+// keys, and, in a theme, the rows typed and the trill sounded while they type.
+function live_ports(ports: BoardPorts, keys: KeyReading, theme: Theme | undefined): BoardPorts {
+	return {
+		...ports,
+		folded: keys.folded,
+		sound: keys.sound,
+		cue: keys.cue ?? ports.cue,
+		types_rows: theme !== undefined,
+		typing_sound: trill_of(ports, keys, theme),
+	}
+}
+
 // A signal leaves through `on_exit`; a failed redraw leaves before its error is printed, so the error
 // lands on the normal screen rather than vanishing with the alternate one. Only a board in a theme types
 // its opening line, reveals its first frame a block at a time and types each row that appears after it;
 // one in none draws it whole at once.
 async function watch(ports: BoardPorts, theme: Theme | undefined): Promise<void> {
 	const screen = run_board_screen.screen_of('live')
-	const keys = run_board_keys.read_keys(ports.keys, ports.cue)
+	const keys = run_board_keys.read_keys(ports.keys, ports.cue, ports.typing_sound)
 	const leave = leaver(ports, screen, keys)
+	const live = live_ports(ports, keys, theme)
 
 	ports.write(screen.enter)
 	ports.on_exit(leave)
-	const { gather, reveal } = run_board_intro.opening(ports.gather, ports, keys, theme)
+	const { gather, reveal } = run_board_intro.opening(ports.gather, live, keys, theme)
 
 	try {
-		await redraw_forever(
-			{
-				...ports,
-				gather,
-				folded: keys.folded,
-				opened_ms: ports.now(),
-				sound: keys.sound,
-				cue: keys.cue ?? ports.cue,
-				types_rows: theme !== undefined,
-			},
-			screen,
-			reveal,
-		)
+		await redraw_forever({ ...live, gather, opened_ms: ports.now() }, screen, reveal)
 	} finally {
 		leave()
 	}
