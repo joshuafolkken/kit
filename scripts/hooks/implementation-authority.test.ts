@@ -1,4 +1,4 @@
-import { writeFileSync } from 'node:fs'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { agent_session_role } from '#scripts/agent/agent-session-role'
@@ -202,10 +202,29 @@ function prompt_line(content: unknown): string {
 	return JSON.stringify({ type: 'user', timestamp: TIMESTAMP, message: { role: 'user', content } })
 }
 
-function transcript(lines: Array<string>): string {
-	const file_path = path.join(create_directory('authority-transcript-'), 'session.jsonl')
+const TOOL_USE_ID = 'toolu_producer'
+// The consultation's Agent call that dispatched the producer (joshuafolkken/kit#8248).
+const DISPATCH = JSON.stringify({
+	type: 'assistant',
+	timestamp: TIMESTAMP,
+	message: { content: [{ type: 'tool_use', id: TOOL_USE_ID, name: 'Agent', input: {} }] },
+})
+
+const LAUNCHED: { tool_use_id?: string } = { tool_use_id: TOOL_USE_ID }
+
+// A parent transcript, with the harness's launch record for `PRODUCER` naming `tool_use_id`, or none.
+function transcript(lines: Array<string>, { tool_use_id } = LAUNCHED): string {
+	const directory = create_directory('authority-transcript-')
+	const file_path = path.join(directory, 'session.jsonl')
+	const subagents = path.join(directory, 'session', 'subagents')
 
 	writeFileSync(file_path, `${lines.join('\n')}\n`)
+	if (tool_use_id === undefined) return file_path
+	mkdirSync(subagents, { recursive: true })
+	writeFileSync(
+		path.join(subagents, 'agent-a1.meta.json'),
+		JSON.stringify({ toolUseId: tool_use_id }),
+	)
 
 	return file_path
 }
@@ -227,7 +246,7 @@ function verdict(transcript_path: string, unit: object, tool_name = 'Edit'): str
 }
 
 function asked(): string {
-	return transcript([prompt_line(NO_FILING)])
+	return transcript([prompt_line(NO_FILING), DISPATCH])
 }
 
 describe('no-filing production authority', () => {
@@ -244,9 +263,40 @@ describe('no-filing production authority', () => {
 	})
 
 	it('refuses the producer when the prompt asks for no such thing', () => {
-		const plain = transcript([prompt_line(PLAIN)])
+		const plain = transcript([prompt_line(PLAIN), DISPATCH])
 
 		expect(verdict(plain, PRODUCER)).toContain(REFUSED)
+	})
+
+	it('keeps refusing the producer’s shell write and a missing transcript', () => {
+		const missing = path.join(ROOT, 'no-such-session.jsonl')
+
+		expect(verdict(asked(), PRODUCER, 'Bash')).toContain(REFUSED)
+		expect(verdict(missing, PRODUCER)).toContain(REFUSED)
+	})
+})
+
+// joshuafolkken/kit#8248: the grant is read from the prompt the producer was dispatched under.
+describe('no-filing production authority — the dispatching prompt', () => {
+	it('keeps the grant when the person prompts again while the producer works', () => {
+		const later = transcript([prompt_line(NO_FILING), DISPATCH, prompt_line(PLAIN)])
+
+		expect(verdict(later, PRODUCER, 'Write')).toBeUndefined()
+	})
+
+	it('reads the dispatching prompt, not a no-filing prompt sent after it', () => {
+		const later = transcript([prompt_line(PLAIN), DISPATCH, prompt_line(NO_FILING)])
+
+		expect(verdict(later, PRODUCER, 'Write')).toContain(REFUSED)
+	})
+
+	it.each([
+		['no launch record', {}],
+		['a launch record naming no call on the transcript', { tool_use_id: 'toolu_other' }],
+	])('refuses the producer with %s', (_name, launch) => {
+		const unknown = transcript([prompt_line(NO_FILING), DISPATCH], launch)
+
+		expect(verdict(unknown, PRODUCER, 'Write')).toContain(REFUSED)
 	})
 
 	it('grants nothing from a tool result or a hand-back that says no filing', () => {
@@ -259,15 +309,9 @@ describe('no-filing production authority', () => {
 				origin: { kind: 'task' },
 				message: { content: NO_FILING },
 			}),
+			DISPATCH,
 		])
 
 		expect(verdict(forged, PRODUCER)).toContain(REFUSED)
-	})
-
-	it('keeps refusing the producer’s shell write and a missing transcript', () => {
-		const missing = path.join(ROOT, 'no-such-session.jsonl')
-
-		expect(verdict(asked(), PRODUCER, 'Bash')).toContain(REFUSED)
-		expect(verdict(missing, PRODUCER)).toContain(REFUSED)
 	})
 })
