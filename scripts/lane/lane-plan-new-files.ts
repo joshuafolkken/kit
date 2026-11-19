@@ -14,14 +14,26 @@ function new_files_of(
 	return counted.filter((file) => !file.endsWith('/') && !base_files.has(file))
 }
 
+// The floor a lines overrun carries: the new files and the bar in grown lines it was compared against.
+interface NewFilesFloor {
+	files: number
+	grown_limit: number
+}
+
 function floor_lines(new_files: number): number {
 	return new_files * LINES_PER_NEW_FILE
 }
 
-function floor_text(new_files: number): string {
-	return `its ${String(new_files)} new file(s) floor it at ${String(floor_lines(new_files))} (${String(LINES_PER_NEW_FILE)} lines each)`
+// No new file, no floor to name.
+function floor_of(new_files: number, grown_limit: number): NewFilesFloor | undefined {
+	return new_files === 0 ? undefined : { files: new_files, grown_limit }
 }
 
-const lane_plan_new_files = { floor_lines, floor_text, new_files_of }
+function floor_text(floor: NewFilesFloor): string {
+	return `its ${String(floor.files)} new file(s) floor it at ${String(floor_lines(floor.files))} (${String(LINES_PER_NEW_FILE)} lines each) against the ${String(floor.grown_limit)} grown lines the bar allows`
+}
+
+const lane_plan_new_files = { floor_lines, floor_of, floor_text, new_files_of }
 
 export { lane_plan_new_files }
+export type { NewFilesFloor }

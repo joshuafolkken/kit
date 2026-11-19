@@ -10,7 +10,7 @@ import { test_pinned_logic } from '#scripts/test/test-pinned-logic'
 import type { ImplementRate } from './lane-implement-rate'
 import { lane_plan, type LanePlan } from './lane-plan'
 import { lane_plan_approval } from './lane-plan-approval'
-import { lane_plan_new_files } from './lane-plan-new-files'
+import { lane_plan_new_files, type NewFilesFloor } from './lane-plan-new-files'
 import type { SizeRatios } from './lane-size-stats'
 import { lane_stage_budget } from './lane-stage-budget'
 
@@ -94,7 +94,7 @@ interface MeasureOver {
 	declared: number
 	limit: number
 	measured: number
-	new_files?: number
+	floor?: NewFilesFloor | undefined
 }
 
 // `limit` is the test-file cap the hubs' reach passes.
@@ -247,10 +247,13 @@ function lines_over(
 	const limit = lines_limit(signals)
 	const growth = declared_growth.factor(ratios_of(signals), 'lines')
 	const floor = lane_plan_new_files.floor_lines(new_files)
-	if (declared <= limit && floor <= limit * growth) return undefined
+	const grown_limit = Math.floor(limit * growth)
+	if (declared <= limit && floor <= grown_limit) return undefined
 	const measured = Math.max(Math.round(declared * growth), floor)
 
-	return { reason: 'lines', declared, limit, measured, new_files }
+	const named = lane_plan_new_files.floor_of(new_files, grown_limit)
+
+	return { reason: 'lines', declared, limit, measured, floor: named }
 }
 
 function new_files_in(plan: LanePlan, signals: PlanSignals): number {
@@ -383,8 +386,8 @@ function measure_bar(over: MeasureOver): string {
 		return `change holds ${String(over.measured)} hunks outside the plan's files (tests excluded), over ${String(over.limit)} — ${String(over.limit / over.declared)} times the ${String(over.declared)} files its \`${SIZE_PREFIX}\` declares`
 	}
 
-	const added = over.new_files ?? 0
-	const floor = added === 0 ? '' : `, and ${lane_plan_new_files.floor_text(added)}`
+	const floor =
+		over.floor === undefined ? '' : `, and ${lane_plan_new_files.floor_text(over.floor)}`
 
 	return `\`${SIZE_PREFIX}\` declares ${String(over.declared)} lines, about ${String(over.measured)} at the lines lanes ran over their declaration${floor} — over the ${String(over.limit)} declared lines the size bar allows`
 }

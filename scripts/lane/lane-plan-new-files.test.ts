@@ -49,20 +49,30 @@ describe('lane_plan_size.oversize floored by the plan new files', () => {
 		const over = oversize_of(paths)
 		const floor = lane_plan_new_files.floor_lines(NEW_FILES.length)
 
-		expect(over).toMatchObject({ reason: 'lines', measured: floor, new_files: NEW_FILES.length })
+		expect(over).toMatchObject({
+			reason: 'lines',
+			measured: floor,
+			floor: { files: NEW_FILES.length },
+		})
 		expect(over && lane_plan_size.is_past_cap(plan_of(paths), over)).toBe(true)
 	})
 
 	it('names the new files in the refusal', () => {
 		const over = oversize_of([...BASE, ...NEW_FILES])
 
-		expect(over && lane_plan_size.refusal_text(ISSUE, over)).toContain('2 new file(s) floor it')
+		expect(over && lane_plan_size.refusal_text(ISSUE, over)).toContain(
+			'2 new file(s) floor it at 320 (160 lines each) against the 200 grown lines the bar allows',
+		)
 	})
+})
 
-	it('does not count new test files or directory claims', () => {
-		const paths = [...BASE, 'scripts/issue/issue-kind-cli.test.ts', 'scripts/issue/new/']
-
-		expect(oversize_of(paths)).toBeUndefined()
+describe('lane_plan_size.oversize on paths that floor nothing', () => {
+	// Two of each, so counting either kind would floor the plan past the bar.
+	it.each([
+		['test files', ['scripts/issue/issue-kind-cli.test.ts', 'scripts/issue/kind.test.ts']],
+		['directory claims', ['scripts/issue/new/', 'scripts/issue/other/']],
+	])('does not count new %s', (_kind, added) => {
+		expect(oversize_of([...BASE, ...added])).toBeUndefined()
 	})
 
 	it('reads no file as new without a base listing', () => {
