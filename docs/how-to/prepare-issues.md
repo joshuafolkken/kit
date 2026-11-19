@@ -20,6 +20,8 @@ An interrupted or partially failed batch is resumed on the same issue numbers: r
 step and retry publication. Already published children are skipped. Never refile the children.
 `issue:spill` leaves its follow-up prepared and prints the plan/publication steps after placement.
 
+`pnpm josh backlog:plan --pending-publication` lists each pending issue that blocks an open issue, beside the issue it blocks.
+
 Pending children are excluded from approval judgement, standalone and epic selection, and direct
 worker spawn. Even manually applying `auto-ok` cannot make a pending child a candidate.
 
