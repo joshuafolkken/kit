@@ -1,3 +1,4 @@
+import { run_board_faint } from './run-board-faint'
 import {
 	run_board_fit,
 	type FrameParts,
@@ -117,6 +118,16 @@ function rows_section(
 	)
 }
 
+// The plan's rows drawn faint while the plan is a saved one (joshuafolkken/kit#8219).
+function planned(header: BoardHeader, sections: Array<PlanSection>): Array<PlanSection> {
+	if (header.plan_saved_ms === undefined) return sections
+
+	return sections.map((section) => ({
+		...section,
+		lines: section.lines.map((line) => ({ ...line, text: run_board_faint.faint(line.text) })),
+	}))
+}
+
 function frame_of(
 	header: BoardHeader,
 	notes: ReadonlyArray<BoardNote>,
@@ -176,9 +187,17 @@ function active_sections(
 		frame.columns,
 	)
 
-	const plan = [...lanes, ...rows_section(decision, people, { ...frame, section: 'decision' })]
+	const decided = rows_section(decision, people, { ...frame, section: 'decision' })
+	const plan = [...lanes, ...planned(frame.header, decided)]
 
 	return { plan, rule_width: rule_width(lead, { ...lane_frame, shared }) }
+}
+
+// The 🔗 rows waiting on an issue the run has not reached.
+function waiting_section(layout: BoardLayout, frame: RowFrame): Array<PlanSection> {
+	const waiting = pair(WAITS_ICON, WORDS.waiting)
+
+	return rows_section(waiting, layout.unreached, { ...frame, section: 'waiting' }, 'waiting')
 }
 
 // The plan's rest under the findings, the 🔗 waiting rows giving way before them.
@@ -194,16 +213,13 @@ function plan_parts(
 	const frame = frame_of(header, notes, size)
 	const conditioned = { ...frame, condition_width: width_for(layout.unreached) }
 	const done = run_board_row_sections.done_rows(layout)
-	const waiting = pair(WAITS_ICON, WORDS.waiting)
+	const queued = queued_section(layout, { ...conditioned, section: 'queued' })
 
 	return {
 		...active_sections(layout, frame),
 		below: [
-			...keyed('queued', queued_section(layout, { ...conditioned, section: 'queued' })),
-			...keyed(
-				'waiting',
-				rows_section(waiting, layout.unreached, { ...conditioned, section: 'waiting' }, 'waiting'),
-			),
+			...keyed('queued', planned(header, queued)),
+			...keyed('waiting', planned(header, waiting_section(layout, conditioned))),
 			...done_section(done, (row) =>
 				row_line(ROW_INDENT, row, { ...conditioned, section: 'done' }),
 			),

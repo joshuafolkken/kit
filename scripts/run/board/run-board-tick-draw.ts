@@ -31,6 +31,7 @@ type DrawPorts = Pick<
 	| 'size'
 	| 'footer'
 	| 'folded'
+	| 'opened_ms'
 	| 'cue'
 	| 'sound'
 >
@@ -57,6 +58,16 @@ function port_header(ports: DrawPorts): PortHeader {
 	}
 }
 
+// A plan read before the board opened is the saved one it first drew (joshuafolkken/kit#8219).
+function saved_of(
+	fetched_ms: number | undefined,
+	opened_ms: number | undefined,
+): number | undefined {
+	if (fetched_ms === undefined || opened_ms === undefined) return undefined
+
+	return fetched_ms < opened_ms ? fetched_ms : undefined
+}
+
 // The assembled header with what the ports add — the terminal's form, the sound switch and the links —
 // stamped with this redraw's moment and the reads' failure as the board holds them now, so a display a
 // live board's worker assembled earlier still moves every elapsed time (joshuafolkken/kit#8160).
@@ -68,6 +79,7 @@ function header_of(display: BoardDisplay, state: BoardState, redraw: Redraw): La
 		now_ms: redraw.now_ms,
 		read_failed_ms: state.read_failed_ms,
 		read_error: state.read_error,
+		plan_saved_ms: saved_of(display.header.plan_fetched_ms, ports.opened_ms),
 		...port_header(ports),
 		...run_board_link.links_of(display.header.repo, ports.link),
 	}

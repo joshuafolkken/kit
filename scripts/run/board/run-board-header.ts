@@ -2,6 +2,7 @@ import { styleText } from 'node:util'
 import type { BudgetWait } from '#scripts/gate/core-wait'
 import type { RunActivity } from './run-board-activity'
 import { run_board_estimate } from './run-board-estimate'
+import { run_board_faint } from './run-board-faint'
 import { run_board_first_lane } from './run-board-first-lane'
 import { run_board_fit } from './run-board-fit'
 import type { FoundOf } from './run-board-found'
@@ -13,6 +14,7 @@ import { run_board_issue_count, type IssueCount } from './run-board-issue-count'
 import { run_board_labels } from './run-board-labels'
 import type { LaneTotals } from './run-board-lane-totals'
 import { run_board_layout, type BoardLayout, type BoardRow } from './run-board-layout'
+import { run_board_length } from './run-board-length'
 import type { BoardLinks } from './run-board-link'
 import { run_board_machine, type MachineGauges } from './run-board-machine'
 import { run_board_now, type NowLine } from './run-board-now'
@@ -50,6 +52,8 @@ const { now_text, time_parts } = run_board_header_time
 // The columns a failed read's reason is cut to, so the header keeps its line.
 const REASON_LIMIT = 40
 const UNKNOWN = '-'
+// The age of a saved plan (joshuafolkken/kit#8219); a theme draws it as its glyph table says.
+const SAVED_ICON = '🕘'
 const { GAP, PERCENT_WIDTH } = run_board_machine
 
 // Who reads the frame: a person on a screen, or a chat a session answers a progress question in, which
@@ -89,6 +93,9 @@ interface BoardHeader
 	// The total the board first saw, so arrivals since then read as `(+N)`.
 	baseline_total: number | undefined
 	plan_fetched_ms: number | undefined
+	// When the plan drawn was read, while it is the one a live board saved before it opened
+	// (`run-board-tick-draw.ts`); none once a fresh plan lands (joshuafolkken/kit#8219).
+	plan_saved_ms?: number | undefined
 	plan_failed_ms: number | undefined
 	// When the reads off this machine last failed (`run-board-gather-thread.ts`); none once they answer.
 	read_failed_ms?: number | undefined
@@ -251,16 +258,32 @@ function waiting_of(counts: BoardCounts, header: BoardHeader): string {
 	return `${String(counts.remaining)}${run_board_priority.tally_of(layout_of(header))}`
 }
 
+// A figure only the plan knows, drawn faint while the plan is a saved one.
+function planned(header: BoardHeader, part: string | undefined): string | undefined {
+	if (part === undefined || header.plan_saved_ms === undefined) return part
+
+	return run_board_faint.faint(part)
+}
+
 function progress_parts(counts: BoardCounts, header: BoardHeader): Array<string | undefined> {
 	const is_read = is_plan_read(header)
 
 	return [
-		`${tally_part(counts, header)}${is_read ? plus_of(counts, header) : ''}`,
-		estimate_part(header),
+		planned(header, `${tally_part(counts, header)}${is_read ? plus_of(counts, header) : ''}`),
+		planned(header, estimate_part(header)),
 		`${STATE_ICONS.running} ${String(counts.running)}`,
-		`${STATE_ICONS.waiting} ${is_read ? waiting_of(counts, header) : UNKNOWN}`,
+		planned(header, `${STATE_ICONS.waiting} ${is_read ? waiting_of(counts, header) : UNKNOWN}`),
 		`${STATE_ICONS.parked} ${String(counts.parked)}`,
 	]
+}
+
+// How long ago the saved plan drawn was read, last on the line, so nothing moves as it goes.
+function saved_part(header: BoardHeader): string | undefined {
+	const { plan_saved_ms } = header
+
+	return plan_saved_ms === undefined
+		? undefined
+		: `${SAVED_ICON} ${run_board_length.span_of(header.now_ms - plan_saved_ms)}`
 }
 
 // The alert level a themed screen ends the progress line on (`run-board-header-defcon.ts`).
@@ -280,6 +303,7 @@ function progress_part(counts: BoardCounts, header: BoardHeader): string {
 		warning_of(WORDS.read, header.read_failed_ms, header.read_error),
 		run_board_issue_count.part_of(header.repo, header.issue_count, header.repo_link),
 		defcon_part(header),
+		saved_part(header),
 	]
 
 	return parts.filter((part) => part !== undefined).join(GAP)
