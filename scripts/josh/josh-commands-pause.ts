@@ -1,9 +1,40 @@
 import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types'
 
-// `run:pause`, `run:split`, `run:stale` and `tree:status`. `RUN_COMMANDS` spreads this in after
-// `run:release`, so the map keeps the order the run reads them in.
+// `run:observe`, `run:pause`, `run:split`, `run:stale` and `tree:status`. `RUN_COMMANDS` spreads this
+// in after `run:release`, so the map keeps the order the run reads them in.
 
 const PAUSE_COMMANDS: Record<string, CommandEntry> = {
+	'run:observe': {
+		script: 'scripts/run/observe/run-observe-cli.ts',
+		description: 'Sample a process at times hours apart without holding a lane',
+		category: 'AI tools',
+		reference: [
+			'start <issue> --at <offset>... --sample "<command>" -- <command...> | sample <issue>',
+			'automation',
+			['network', 'files'],
+		],
+		usage: {
+			examples: [
+				{
+					arguments:
+						'start 8035 --at 30m --at 2h --sample \'ps -o rss= -p "$OBSERVE_PID"\' -- pnpm josh run:board',
+					note: 'sample the board’s memory after 30 minutes and 2 hours',
+				},
+				{ arguments: 'sample 8035', note: 'the resumed child takes the due sample' },
+			],
+			flags: [
+				{
+					names: ['--at <offset>'],
+					description: 'repeatable; a sample time after the start, as `<N>m` or `<N>h`.',
+				},
+				{
+					names: ['--sample "<command>"'],
+					description:
+						'the shell command whose output is one sample; `$OBSERVE_PID` names the process.',
+				},
+			],
+		},
+	},
 	'run:pause': {
 		script: 'scripts/run/pause/run-pause-cli.ts',
 		description: 'Set a run aside while its prerequisite lands first',

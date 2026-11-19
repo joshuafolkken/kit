@@ -176,3 +176,38 @@ describe('a start condition written as its own heading in issue:lint', () => {
 		expect(issue_lint_cli.problems(body)).toEqual([])
 	})
 })
+
+// joshuafolkken/kit#8128: `run:observe` writes and drops its next sample time through `with_date`.
+describe('issue_not_before.with_date', () => {
+	const NEXT = Date.parse('2026-10-20T10:00:20Z')
+	const NEXT_MINUTE = '2026-10-20T10:01Z'
+
+	it('replaces the declared time with the next one, rounded up to the minute', () => {
+		const body = issue_not_before.with_date(DATED_BODY, NEXT)
+
+		expect(issue_not_before.waiting_date(body, NOW_AFTER)).toBe(NEXT_MINUTE)
+		expect(body.match(/実施可能日/gu)).toHaveLength(1)
+		expect(body).toContain('- 種別: 非不具合')
+	})
+
+	it('adds the declaration to a background section that has none', () => {
+		const body = issue_not_before.with_date(body_with(''), NEXT)
+
+		expect(issue_not_before.waiting_ms(body, NOW_AFTER)).toBe(Date.parse(NEXT_MINUTE))
+	})
+
+	it('adds a background section to a body without one', () => {
+		const body = issue_not_before.with_date('## 概要\n\ntext\n', NEXT)
+
+		expect(issue_not_before.waiting_date(body, NOW_AFTER)).toBe(NEXT_MINUTE)
+	})
+
+	it('drops the declaration with no time and leaves the rest', () => {
+		const body = issue_not_before.with_date(DATED_BODY, undefined)
+
+		expect(issue_not_before.is_due(body, NOW_BEFORE)).toBe(true)
+		expect(body).not.toContain('実施可能日')
+		expect(body).toContain('## 現象')
+		expect(issue_not_before.with_date('## 概要\n', undefined)).toBe('## 概要\n')
+	})
+})
