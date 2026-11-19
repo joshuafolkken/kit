@@ -59,6 +59,7 @@ describe('lane_ledger_tail.tail_store on a ledger larger than a chunk', () => {
 		lane_ledger_tail.tail_store().read(target)
 		const sizes = alloc.mock.calls.map(([size]) => size)
 
+		expect(sizes.length).toBeGreaterThan(0)
 		expect(Math.max(...sizes)).toBeLessThanOrEqual(GROW_CHUNK_BYTES)
 	})
 
