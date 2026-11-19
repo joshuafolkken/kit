@@ -50,6 +50,10 @@ vi.mock('#scripts/run/hold/run-hold-cli', () => ({
 	},
 }))
 
+vi.mock('#scripts/run/pause/run-pause-publish', () => ({
+	run_pause_publish: { publish_prepared: async () => 'not prepared' },
+}))
+
 const tracking_with = vi.hoisted(() => vi.fn())
 const record = vi.hoisted(() => vi.fn())
 
