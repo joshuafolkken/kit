@@ -10,6 +10,7 @@ import { test_pinned_logic } from '#scripts/test/test-pinned-logic'
 import type { ImplementRate } from './lane-implement-rate'
 import { lane_plan, type LanePlan } from './lane-plan'
 import { lane_plan_approval } from './lane-plan-approval'
+import { lane_plan_new_files, type NewFilesFloor } from './lane-plan-new-files'
 import type { SizeRatios } from './lane-size-stats'
 import { lane_stage_budget } from './lane-stage-budget'
 
@@ -93,6 +94,7 @@ interface MeasureOver {
 	declared: number
 	limit: number
 	measured: number
+	floor?: NewFilesFloor | undefined
 }
 
 // `limit` is the test-file cap the hubs' reach passes.
@@ -235,12 +237,29 @@ function lines_limit(signals: PlanSignals): number {
 	return bar ?? Math.floor(guide_of(signals).lines / declared_growth.factor(growth, 'lines'))
 }
 
-function lines_over(declared: number, signals: PlanSignals): MeasureOver | undefined {
+// The grown declaration, floored by the plan's new files (`lane-plan-new-files.ts`, joshuafolkken/kit#8120):
+// a floor past the lines the bar allows answers too, though the declaration stays within it.
+function lines_over(
+	declared: number,
+	signals: PlanSignals,
+	new_files: number,
+): MeasureOver | undefined {
 	const limit = lines_limit(signals)
-	if (declared <= limit) return undefined
-	const measured = Math.round(declared * declared_growth.factor(ratios_of(signals), 'lines'))
+	const growth = declared_growth.factor(ratios_of(signals), 'lines')
+	const floor = lane_plan_new_files.floor_lines(new_files)
+	const grown_limit = Math.floor(limit * growth)
+	if (declared <= limit && floor <= grown_limit) return undefined
+	const measured = Math.max(Math.round(declared * growth), floor)
 
-	return { reason: 'lines', declared, limit, measured }
+	const named = lane_plan_new_files.floor_of(new_files, grown_limit)
+
+	return { reason: 'lines', declared, limit, measured, floor: named }
+}
+
+function new_files_in(plan: LanePlan, signals: PlanSignals): number {
+	const counted = plan.paths.filter((file) => is_counted(file))
+
+	return lane_plan_new_files.new_files_of(counted, signals.base_files).length
 }
 
 function unapproved(
@@ -264,7 +283,7 @@ function planned_lines(
 	const approval = plan.size_approval ?? recorded?.size_approval
 	if (approval === undefined && lane_plan.is_sized(recorded)) return undefined
 
-	return unapproved(lines_over(declared, signals), plan, approval)
+	return unapproved(lines_over(declared, signals, new_files_in(plan, signals)), plan, approval)
 }
 
 function measure_over(
@@ -367,7 +386,10 @@ function measure_bar(over: MeasureOver): string {
 		return `change holds ${String(over.measured)} hunks outside the plan's files (tests excluded), over ${String(over.limit)} — ${String(over.limit / over.declared)} times the ${String(over.declared)} files its \`${SIZE_PREFIX}\` declares`
 	}
 
-	return `\`${SIZE_PREFIX}\` declares ${String(over.declared)} lines, about ${String(over.measured)} at the lines lanes ran over their declaration — over the ${String(over.limit)} declared lines the size bar allows`
+	const floor =
+		over.floor === undefined ? '' : `, and ${lane_plan_new_files.floor_text(over.floor)}`
+
+	return `\`${SIZE_PREFIX}\` declares ${String(over.declared)} lines, about ${String(over.measured)} at the lines lanes ran over their declaration${floor} — over the ${String(over.limit)} declared lines the size bar allows`
 }
 
 function measure_text(issue: number, over: MeasureOver): string {
