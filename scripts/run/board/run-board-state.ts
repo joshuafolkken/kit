@@ -93,8 +93,9 @@ interface BoardPorts {
 // drawing.
 type Pace = 'background' | 'settled'
 
-// The last reads off this machine, then what the board folds over them.
-interface BoardState extends GatherRead {
+// The last reads off this machine, then what the board folds over them — the data a redraw draws
+// from, apart from what the frame itself keeps between redraws (`BoardView`).
+interface BoardData extends GatherRead {
 	// The start of the run the plan state was built for, so a run that begins draws nothing of the last.
 	run_started_ms: number | undefined
 	plan: BoardPlan | undefined
@@ -105,7 +106,6 @@ interface BoardState extends GatherRead {
 	attempted_ms: number | undefined
 	fetched_ms: number | undefined
 	failed_ms: number | undefined
-	baseline_total: number | undefined
 	// The run's children read closed, kept for the run: a closed issue's answer does not change.
 	closed: ReadonlyMap<number, ClosedIssue>
 	closed_fetch: Fetch<ClosedAnswer> | undefined
@@ -114,10 +114,6 @@ interface BoardState extends GatherRead {
 	closed_asked: ReadonlySet<number>
 	// The last ask every child answered, open or closed; a failed read leaves it where it was.
 	closed_answered_ms: number | undefined
-	// Where the last frame drew its spinners, turned between redraws.
-	spots: ReadonlyArray<Spot>
-	// The rows the last frame drew and the ones typing, typed on between redraws (`run-board-type-rows.ts`).
-	typing: Typing
 	// The reviewers drawn above the legend, the read of them in flight, and when it was last launched.
 	thanks: Thanks
 	thanks_fetch: Fetch<Thanks> | undefined
@@ -132,6 +128,17 @@ interface BoardState extends GatherRead {
 	issue_count: IssueCount | undefined
 	issue_count_fetch: Fetch<IssueCount | undefined> | undefined
 	issue_count_attempted_ms: number | undefined
+}
+
+// What the frame keeps between redraws: its spinners, typing, sound and notice, and the total it
+// counts from.
+interface BoardView {
+	// The total the first frame counted, which later frames count their progress from.
+	baseline_total: number | undefined
+	// Where the last frame drew its spinners, turned between redraws.
+	spots: ReadonlyArray<Spot>
+	// The rows the last frame drew and the ones typing, typed on between redraws (`run-board-type-rows.ts`).
+	typing: Typing
 	// The rows and run conditions the last frame sounded over, and the standing cue waiting to replay
 	// (`run-board-sound-repeat.ts`); none before a run's first frame, so it sounds nothing already there.
 	sound_snapshot?: SoundSnapshot | undefined
@@ -140,7 +147,9 @@ interface BoardState extends GatherRead {
 	notice?: Notice | undefined
 }
 
-const FRESH_STATE: BoardState = {
+type BoardState = BoardData & BoardView
+
+const FRESH_DATA: BoardData = {
 	local: undefined,
 	read_ms: undefined,
 	idle_since: run_board_idle.NO_IDLE,
@@ -151,15 +160,12 @@ const FRESH_STATE: BoardState = {
 	attempted_ms: undefined,
 	fetched_ms: undefined,
 	failed_ms: undefined,
-	baseline_total: undefined,
 	closed: new Map(),
 	closed_fetch: undefined,
 	closed_attempted_ms: undefined,
 	closed_asked: new Set(),
 	closed_answered_ms: undefined,
 	gauges: undefined,
-	spots: [],
-	typing: run_board_type_rows.NO_TYPING,
 	usages: undefined,
 	budget_waits: [],
 	thanks: [],
@@ -173,11 +179,19 @@ const FRESH_STATE: BoardState = {
 	issue_count_attempted_ms: undefined,
 }
 
+const FRESH_VIEW: BoardView = {
+	baseline_total: undefined,
+	spots: [],
+	typing: run_board_type_rows.NO_TYPING,
+}
+
+const FRESH_STATE: BoardState = { ...FRESH_DATA, ...FRESH_VIEW }
+
 function is_due(last_ms: number | undefined, interval_ms: number, now_ms: number): boolean {
 	return last_ms === undefined || now_ms - last_ms >= interval_ms
 }
 
-const run_board_state = { FRESH_STATE, is_due }
+const run_board_state = { FRESH_DATA, FRESH_STATE, FRESH_VIEW, is_due }
 
 export { run_board_state }
-export type { BoardPorts, BoardState, DrawKind, DrawTimer, Pace, StallStage }
+export type { BoardData, BoardPorts, BoardState, BoardView, DrawKind, DrawTimer, Pace, StallStage }
