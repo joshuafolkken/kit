@@ -101,6 +101,15 @@ describe('test_related_reuse without a main sync', () => {
 
 		expect(result).toMatchObject({ reused: 0, reason: 'closed-inputs-changed' })
 	})
+	it('reuses nothing once a whole-suite input changed on the branch', async () => {
+		vi.mocked(since_green.read_moved_parts).mockResolvedValue({
+			changed: [VITEST_CONFIG],
+			synced: [],
+		})
+		const result = await test_related_reuse.read(ROOT, SCOPE, TREE)
+
+		expect(result).toMatchObject({ excluded: [], reason: 'whole-suite-input' })
+	})
 })
 
 describe('test_related_reuse fallbacks', () => {
