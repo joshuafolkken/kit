@@ -133,6 +133,12 @@ interface PublicationFacts {
 	has_epic: boolean
 }
 
+// A recorded plan lets a pending child publish; `plan:unverified` asks for it again, so it does not
+// count. `--publish` and `backlog:plan --pending-publication` share this predicate.
+function has_plan_record(labels: ReadonlyArray<string>): boolean {
+	return has_label_name(labels, PLANNED_LABEL) && !has_label_name(labels, PLAN_UNVERIFIED_LABEL)
+}
+
 // What a pending issue still lacks before it publishes, in the order the steps are taken
 // (joshuafolkken/kit#8173): `--publish` reaches only an epic's task list and withholds an unplanned
 // child, so an issue in no epic or with no plan is stuck however long it waits. `plan:unverified`
@@ -143,11 +149,9 @@ function missing_steps({
 	has_epic,
 }: PublicationFacts): ReadonlyArray<PublicationStep> {
 	if (!is_pending(body)) return []
-	const has_plan =
-		has_label_name(labels, PLANNED_LABEL) && !has_label_name(labels, PLAN_UNVERIFIED_LABEL)
 	const steps: ReadonlyArray<[PublicationStep, boolean]> = [
 		['epic placement', has_epic],
-		['plan record', has_plan],
+		['plan record', has_plan_record(labels)],
 		['publish', false],
 	]
 
@@ -156,6 +160,7 @@ function missing_steps({
 
 const issue_publication_state = {
 	is_pending,
+	has_plan_record,
 	missing_steps,
 	prepare,
 	carried,

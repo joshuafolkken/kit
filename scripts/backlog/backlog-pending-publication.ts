@@ -15,7 +15,8 @@ import { backlog_pool } from './backlog-pool'
 // `josh backlog:plan --pending-publication` — the prepared issues that hold an open issue back
 // (joshuafolkken/kit#8087). A prepared issue leaves the start pool until its epic publishes, and the
 // issue it blocks reads as an ordinary dependency wait, so the pair was found only by opening each
-// waiting issue in turn. This lists every pair from one open-issue read.
+// waiting issue in turn. This lists every pair from one open-issue read, then every pending issue
+// with the steps it still lacks before it publishes (joshuafolkken/kit#8173).
 
 interface PendingPair {
 	blocker: number

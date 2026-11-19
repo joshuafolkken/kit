@@ -128,6 +128,16 @@ it('withholds a prepared standalone child even if auto-ok is applied manually', 
 })
 
 // joshuafolkken/kit#8173: the steps a pending issue still lacks before it publishes.
+const UNVERIFIED = 'plan:unverified'
+
+describe('issue_publication_state.has_plan_record', () => {
+	it('counts a plan record only while plan:unverified is absent', () => {
+		expect(issue_publication_state.has_plan_record([PLANNED])).toBe(true)
+		expect(issue_publication_state.has_plan_record([PLANNED, UNVERIFIED])).toBe(false)
+		expect(issue_publication_state.has_plan_record([])).toBe(false)
+	})
+})
+
 describe('issue_publication_state.missing_steps', () => {
 	const pending = issue_publication_state.prepare(BODY, LABELS)
 	const EPIC_STEP = 'epic placement'
@@ -152,7 +162,7 @@ describe('issue_publication_state.missing_steps', () => {
 	})
 
 	it('reads plan:unverified as no plan record', () => {
-		const labels = [PLANNED, 'plan:unverified']
+		const labels = [PLANNED, UNVERIFIED]
 
 		expect(
 			issue_publication_state.missing_steps({ body: pending, labels, has_epic: true }),

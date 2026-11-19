@@ -110,6 +110,16 @@ describe('backlog_pending_publication.lines_of', () => {
 		])
 	})
 
+	it('keeps the wording of the none, publish and truncation lines', () => {
+		expect(backlog_pending_publication.NONE_LINE).toBe('No issue is pending publication.')
+		expect(backlog_pending_publication.PUBLISH_LINE).toBe(
+			'Place each issue in an epic, record its plan, then publish the epic: pnpm josh issue:file --publish <epic>',
+		)
+		expect(backlog_pending_publication.TRUNCATED_MESSAGE).toMatch(
+			/^⚠ The open-issue or epic listing stopped at \d+ rows, so issues past the cut are missing or misread\.$/u,
+		)
+	})
+
 	it('prints each pending issue with its missing steps after the pairs', () => {
 		expect(
 			backlog_pending_publication.lines_of(
