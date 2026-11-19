@@ -2,6 +2,6 @@
 	"reason": "#8247 adds run-board-rule-width.ts, a row-independent rule width probe that keeps every run:board rule one width with or without lane rows",
 	"date": "2026-11-19",
 	"growth": {
-		"scripts.code_lines": 16
+		"scripts.code_lines": 30
 	}
 }

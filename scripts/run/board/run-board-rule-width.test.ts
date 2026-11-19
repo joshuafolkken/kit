@@ -35,11 +35,7 @@ function lanes(count: number, title = SHORT_TITLE): Array<BoardRow> {
 	return Array.from({ length: count }, (_, index) => lane(FIRST_LANE + index, title))
 }
 
-function rule_widths(
-	active: Array<BoardRow>,
-	is_themed: boolean,
-	columns = COLUMNS,
-): Array<number> {
+function rendered(active: Array<BoardRow>, is_themed: boolean, columns: number): Array<string> {
 	const board = header({
 		layout: { ...EMPTY_LAYOUT, active, unreached: [lane(FIRST_LANE - 1, SHORT_TITLE)] },
 		occupied_count: active.length,
@@ -54,10 +50,26 @@ function rule_widths(
 		folded: new Set(),
 	})
 
+	return lines.map((line) => stripVTControlCharacters(line))
+}
+
+function rules_of(lines: ReadonlyArray<string>): Array<number> {
 	return lines
-		.map((line) => stripVTControlCharacters(line))
 		.filter((line) => RULE_MARKS.some((mark) => line.startsWith(mark)))
 		.map((line) => width_of(line))
+}
+
+function rule_widths(
+	active: Array<BoardRow>,
+	is_themed: boolean,
+	columns = COLUMNS,
+): Array<number> {
+	return rules_of(rendered(active, is_themed, columns))
+}
+
+// The column a lane row's cut title ends in, its ellipsis included.
+function title_end(line: string): number {
+	return width_of(line.slice(0, line.indexOf('…') + 1))
 }
 
 describe.each([false, true])('run_board_render rule width (themed: %s)', (is_themed) => {
@@ -76,6 +88,15 @@ describe.each([false, true])('run_board_render rule width (themed: %s)', (is_the
 
 		expect(new Set(short)).toStrictEqual(new Set(long))
 		expect(new Set(short).size).toBe(1)
+	})
+
+	it.each([12, 10_001])('ends every rule where lane #%i’s full title ends', (number) => {
+		const active = [lane(number, LONG_TITLE)]
+		const lines = rendered(active, is_themed, COLUMNS)
+		const row = lines.find((line) => line.includes(` ${String(number)} `)) ?? ''
+		const ends = new Set([title_end(row)])
+
+		expect(new Set(rules_of(lines))).toStrictEqual(ends)
 	})
 
 	it('ends every rule at the pane edge where the pane is narrower than a full title', () => {
