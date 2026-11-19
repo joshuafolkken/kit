@@ -45,11 +45,21 @@ function layout_of(plan: BoardPlan, status: ItemStatus, issue = WAITS): BoardLay
 	const statuses = new Map([[issue, status]])
 	const read = { plan, statuses, events: [], free_lanes: 1, is_stopped: false, now_ms: NOW_MS }
 
-	return run_board_layout.layout_of(plan, statuses, run_board_reason.reader(read))
+	return run_board_layout.layout_of(
+		{ ...plan, now_ms: NOW_MS },
+		statuses,
+		run_board_reason.reader(read),
+	)
 }
 
 function markdown_link(text: string, url: string): string {
 	return `[${text}](${url})`
+}
+
+const UPSTREAM_NAMED = '🔗 app-kit#7691'
+
+function text_of(layout: BoardLayout): string {
+	return lines_of(header({ layout })).join('\n')
 }
 
 function numbers_of(rows: ReadonlyArray<{ number: number }>): Array<number> {
@@ -108,7 +118,7 @@ describe('run_board_layout.layout_of — a lane held by an upstream interrupt', 
 			expect(numbers_of(layout.active)).toStrictEqual([WAITS])
 			expect(numbers_of(layout.unreached)).toStrictEqual([])
 			expect(layout.active[0]?.waits).toStrictEqual(['app-kit#7691'])
-			expect(lines_of(header({ layout })).join('\n')).toContain('🔗 app-kit#7691')
+			expect(text_of(layout)).toContain(UPSTREAM_NAMED)
 		},
 	)
 })
@@ -139,5 +149,42 @@ describe('run_board_layout.layout_of — a ⏳ lane row line end', () => {
 		]
 
 		expect(lines).toMatchSnapshot()
+	})
+})
+
+// joshuafolkken/kit#8084: one that launched, parked and was re-queued with a start date ahead waits on
+// that date in the waiting section; past the date it is the retry a free lane starts.
+describe('run_board_layout.layout_of — a re-queued issue that launched before and has a start date', () => {
+	const AHEAD = '- 実施可能日: 2026-11-25T09:00Z'
+	const PASSED = '- 実施可能日: 2026-11-13T09:00Z'
+	const FREE_LANE = 'retry · → next free lane'
+
+	it('draws a date still ahead as a 📅 row in the waiting section, not as a free-lane retry', () => {
+		const layout = layout_of(plan_of([], [child(WAITS, AHEAD)]), RELAUNCHED)
+		const text = text_of(layout)
+
+		expect(numbers_of(layout.active)).toStrictEqual([])
+		expect(numbers_of(layout.unreached)).toStrictEqual([WAITS])
+		expect(text).toContain('📅')
+		expect(hourglass_lines(layout)).toStrictEqual([])
+		expect(text).not.toContain(FREE_LANE)
+	})
+
+	it('keeps a passed date with no blocker as a ⏳ lane row a free lane starts', () => {
+		const layout = layout_of(plan_of([child(WAITS, PASSED)], []), RELAUNCHED)
+		const [line] = hourglass_lines(layout)
+
+		expect(numbers_of(layout.active)).toStrictEqual([WAITS])
+		expect(line).toContain(FREE_LANE)
+	})
+
+	it('keeps a row an upstream Issue holds in the lanes while its date is ahead', () => {
+		const upstream = { repo: UPSTREAM_REPO, number: 7691, state: 'OPEN' } as const
+		const held = { ...child(WAITS, AHEAD), blocked_by: [upstream] }
+		const layout = layout_of(plan_of([], [held]), RELAUNCHED)
+
+		expect(numbers_of(layout.active)).toStrictEqual([WAITS])
+		expect(numbers_of(layout.unreached)).toStrictEqual([])
+		expect(text_of(layout)).toContain(UPSTREAM_NAMED)
 	})
 })
