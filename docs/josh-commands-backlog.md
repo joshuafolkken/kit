@@ -1036,6 +1036,12 @@ pnpm josh backlog:triage --apply 915 --adopt 1 --reason "<why>"
 The parent follows `--pass`'s stdout command; diagnostics go to stderr. Apply prints
 `triage #N — <label> · blocked by #M`; without `--clear`, the park stays.
 
+`--blocked-by <M>` and `--done "filed #<M>"` share `run:pause`'s judgement (`prepared-prerequisite.ts`):
+a prepared (unpublished) `#M` with no recorded plan is refused before any write, exit 1, naming
+`issue:plan <M> … --planned --no-notify`. A planned prepared `#M` has the epic listing it published
+after the wait is recorded (`· published #E`); a withheld publish names its reason and
+`issue:file --publish <E>`, exit 0.
+
 The pass reads local `needs-decision`, `run:stalled` and remaining judgments once per issue.
 Foreign-repository and excluded children are not read. With none left it prints `backlog:plan --waves`.
 

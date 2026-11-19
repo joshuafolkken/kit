@@ -13,6 +13,9 @@ vi.mock('#scripts/gh/git-gh-issue-write', () => ({
 }))
 vi.mock('#scripts/epic/epic-blocked-by', () => ({ epic_blocked_by: { record: vi.fn() } }))
 vi.mock('#scripts/run/park/run-park', () => ({ run_park: { clear: vi.fn() } }))
+vi.mock('./backlog-triage-filing', () => ({
+	backlog_triage_filing: { prepared_problem: vi.fn(), publish_after: vi.fn() },
+}))
 vi.mock('./backlog-triage-unblock', () => ({ backlog_triage_unblock: { remove: vi.fn() } }))
 
 const { backlog_triage_unblock } = await import('./backlog-triage-unblock')
