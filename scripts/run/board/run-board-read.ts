@@ -2,7 +2,6 @@ import { backlog_drive_memory } from '#scripts/backlog/backlog-drive-memory'
 import type { NamedPlan } from '#scripts/backlog/backlog-plan'
 import { backlog_ready } from '#scripts/backlog/backlog-ready'
 import { lane_held_stats } from '#scripts/lane/lane-held-stats'
-import { lane_host_gaps } from '#scripts/lane/lane-host-gaps'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
 import type { TableRead } from '#scripts/lane/lane-process-table'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
@@ -14,6 +13,7 @@ import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-st
 import { run_event_tail } from '#scripts/run/event/run-event-tail'
 import type { HoldCause } from '#scripts/run/merge/run-merge-usage-limit'
 import { run_wake } from '#scripts/run/wake/run-wake'
+import { run_board_events_memo } from './run-board-events-memo'
 import type { FoundOf } from './run-board-found'
 import { run_board_lane_result } from './run-board-lane-result'
 import { run_board_lane_state, type BoardLanes } from './run-board-lane-state'
@@ -243,7 +243,7 @@ function ledger_here(
 	const launch_hold = lane_held_stats.open_reason(entries, now_ms)
 
 	return {
-		usual: run_board_usual.usual_of(entries, now_ms, lane_host_gaps.gaps_of(events)),
+		usual: run_board_usual.usual_of(entries, now_ms, run_board_events_memo.host_gaps(events)),
 		lane_totals: run_board_lane_totals.totals_of(entries, now_ms),
 		is_memory_held: launch_hold === backlog_drive_memory.HOLD_REASON,
 		launch_hold,
