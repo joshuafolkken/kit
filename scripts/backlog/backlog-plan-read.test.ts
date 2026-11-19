@@ -40,6 +40,29 @@ function plan_stub(): Plan {
 	return { result, repo: REPO, exclude: [], tracked: new Map(), scope }
 }
 
+const OPTED_IN: PoolContext['opted_in'] = { kind: 'read', issues: [], cutoff: 'none' }
+
+function context_stub(): PoolContext {
+	return {
+		opted_in: OPTED_IN,
+		tracking: { kind: 'read', index: new Map(), cutoff: 'none' },
+		repo: REPO,
+		exclude: [],
+		implement_rate: undefined,
+	}
+}
+
+// The classification's reads, answering `result` from the resolution.
+function stub_classification(result: Plan['result'] | undefined): void {
+	vi.spyOn(backlog_next, 'context_of').mockResolvedValue(context_stub())
+	vi.spyOn(backlog_next, 'resolve').mockResolvedValue(result)
+	vi.spyOn(backlog_gate_scope, 'gate_scope').mockResolvedValue(plan_stub().scope)
+}
+
+function stub_listing(): void {
+	issue_list_recent_mock.mockResolvedValue({ json: JSON.stringify(ROWS), is_capped: false })
+}
+
 beforeEach(() => {
 	issue_list_recent_mock.mockReset()
 	fetch_opted_in_mock.mockReset()
@@ -90,27 +113,12 @@ describe('backlog_plan_read.classify timing', () => {
 	const WAVE_LIMIT = 4
 	const STEPS = ['plan: context', 'plan: resolve', 'plan: gate scope', 'plan: wave limit']
 
-	function arrange(): Plan {
-		const stub = plan_stub()
-		const context: PoolContext = {
-			opted_in: { kind: 'read', issues: [], cutoff: 'none' },
-			tracking: { kind: 'read', index: new Map(), cutoff: 'none' },
-			repo: REPO,
-			exclude: [],
-			implement_rate: undefined,
-		}
-
-		vi.spyOn(backlog_next, 'context_of').mockResolvedValue(context)
-		vi.spyOn(backlog_next, 'resolve').mockResolvedValue(stub.result)
-		vi.spyOn(backlog_gate_scope, 'gate_scope').mockResolvedValue(stub.scope)
-		vi.spyOn(lane_capacity, 'lane_limit').mockResolvedValue({ kind: 'limit', limit: WAVE_LIMIT })
-
-		return stub
-	}
-
 	it('answers the plan the classification reads, each step recorded as a plan phase', async () => {
-		const stub = arrange()
-		const plan = await backlog_plan_read.classify({ kind: 'read', issues: [], cutoff: 'none' }, [])
+		const stub = plan_stub()
+
+		stub_classification(stub.result)
+		vi.spyOn(lane_capacity, 'lane_limit').mockResolvedValue({ kind: 'limit', limit: WAVE_LIMIT })
+		const plan = await backlog_plan_read.classify(OPTED_IN, [])
 
 		expect(plan).toStrictEqual({
 			...stub,
@@ -119,13 +127,51 @@ describe('backlog_plan_read.classify timing', () => {
 		})
 		expect(launch_timing.phases().map(({ name }) => name)).toStrictEqual(STEPS)
 	})
+
+	// joshuafolkken/kit#8220: the gate scope runs beside the resolution, never in place of its failure.
+	it('answers nothing when the resolution fails, though the gate scope ran beside it', async () => {
+		stub_classification(undefined)
+
+		await expect(backlog_plan_read.classify(OPTED_IN, [])).resolves.toBeUndefined()
+	})
 })
 
+// joshuafolkken/kit#8220: the pool and the listing are read side by side, the listing once, and handed to
+// the classification so the epics are drawn from it rather than read again.
 describe('backlog_plan_read.read_plan', () => {
-	it('answers nothing without reading the listing when the opted-in read fails', async () => {
+	it('answers nothing when the opted-in read fails', async () => {
 		fetch_opted_in_mock.mockResolvedValue({ kind: 'failed' })
+		stub_listing()
 
 		await expect(backlog_plan_read.read_plan()).resolves.toBeUndefined()
-		expect(issue_list_recent_mock).not.toHaveBeenCalled()
+	})
+
+	it('answers nothing when the listing read fails', async () => {
+		fetch_opted_in_mock.mockResolvedValue(OPTED_IN)
+		issue_list_recent_mock.mockResolvedValue({ json: undefined, is_capped: false })
+
+		await expect(backlog_plan_read.read_plan()).resolves.toBeUndefined()
+	})
+
+	it('starts the listing while the opted-in read is still pending', () => {
+		fetch_opted_in_mock.mockReturnValue(new Promise(() => undefined))
+		stub_listing()
+		void backlog_plan_read.read_plan()
+
+		expect(issue_list_recent_mock).toHaveBeenCalledOnce()
+	})
+
+	it('reads the listing once and hands it to the classification with the plan', async () => {
+		const stub = plan_stub()
+
+		fetch_opted_in_mock.mockResolvedValue(OPTED_IN)
+		stub_listing()
+		stub_classification(stub.result)
+		const read = await backlog_plan_read.read_plan()
+
+		expect(issue_list_recent_mock).toHaveBeenCalledOnce()
+		expect(backlog_next.context_of).toHaveBeenCalledWith(OPTED_IN, [], read?.listing)
+		expect(read?.listing.rows.map((row) => row.number)).toStrictEqual([1, 2])
+		expect(read?.plan.result).toStrictEqual(stub.result)
 	})
 })

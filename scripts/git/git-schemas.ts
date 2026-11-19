@@ -170,6 +170,13 @@ type EpicIssueData = z.infer<typeof epic_issue_schema>
 type OpenIssueData = z.infer<typeof open_issue_schema>
 type RestCommentData = z.infer<typeof rest_comment_schema>
 
+// A listing of every open issue plus whether it was cut. Carried together because the rows alone cannot
+// say whether what is missing from them is absent or merely past the cap.
+interface OpenListing {
+	rows: ReadonlyArray<OpenIssueData>
+	is_capped: boolean
+}
+
 export {
 	author_fields_schema,
 	package_name_schema,
@@ -187,4 +194,11 @@ export {
 	blocking_issue_schema,
 	blocked_by_schema,
 }
-export type { RollupItemData, EpicChildData, EpicIssueData, OpenIssueData, RestCommentData }
+export type {
+	RollupItemData,
+	EpicChildData,
+	EpicIssueData,
+	OpenIssueData,
+	OpenListing,
+	RestCommentData,
+}

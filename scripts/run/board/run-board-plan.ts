@@ -28,17 +28,22 @@ const GH_NOT_MODIFIED_PHASE = 'gh 304 during plan read (count)'
 interface PlanPorts {
 	fetch_open: () => Promise<OpenListing | undefined>
 	fetch_opted_in: () => Promise<OptedInRead>
-	classify: (opted_in: OptedIn, exclude: ReadonlyArray<number>) => Promise<Plan | undefined>
+	classify: (
+		opted_in: OptedIn,
+		exclude: ReadonlyArray<number>,
+		open: OpenListing,
+	) => Promise<Plan | undefined>
 }
 
 // The board leads a row withheld for a person with 🙋, so classifying says no ❗ notice over it.
 async function classify_quietly(
 	opted_in: OptedIn,
 	exclude: ReadonlyArray<number>,
+	open: OpenListing,
 ): Promise<Plan | undefined> {
 	epic_classify.mute_notices()
 
-	return await backlog_plan_read.classify(opted_in, exclude)
+	return await backlog_plan_read.classify(opted_in, exclude, open)
 }
 
 const LIVE_PORTS: PlanPorts = {
@@ -47,9 +52,11 @@ const LIVE_PORTS: PlanPorts = {
 	classify: classify_quietly,
 }
 
-// One classified plan, against the listing it was read with.
+// One classified plan, against the listing it was read with, and the opted-in pool read beside it —
+// `undefined` when the scope draws no pool.
 interface PlanRead {
 	listing: OpenListing
+	pool: OptedInRead | undefined
 	ports: PlanPorts
 }
 
@@ -67,7 +74,7 @@ async function board_of(
 	exclude: ReadonlyArray<number>,
 	read: PlanRead,
 ): Promise<BoardPlan | undefined> {
-	const plan = await read.ports.classify(opted_in, exclude)
+	const plan = await read.ports.classify(opted_in, exclude, read.listing)
 
 	if (plan === undefined) return undefined
 
@@ -86,9 +93,9 @@ async function pool_board(
 	exclude: ReadonlyArray<number>,
 	read: PlanRead,
 ): Promise<BoardPlan | undefined> {
-	const opted_in = await launch_timing.timed('plan: pool', read.ports.fetch_opted_in)
+	const { pool } = read
 
-	return opted_in.kind === 'read' ? await board_of(opted_in, exclude, read) : undefined
+	return pool?.kind === 'read' ? await board_of(pool, exclude, read) : undefined
 }
 
 // The named issues as the open listing holds them — a closed one is the stream's to show, not the plan's.
@@ -175,12 +182,24 @@ async function scoped_board(named: NamedPlan, read: PlanRead): Promise<BoardPlan
 	return pool === undefined ? undefined : joined(lead, pool)
 }
 
+// The pool, read only when the scope draws it: an `--only` run names its issues and draws no pool.
+async function read_pool(named: NamedPlan, ports: PlanPorts): Promise<OptedInRead | undefined> {
+	if (named.only && named.issues.length > 0) return undefined
+
+	return await launch_timing.timed('plan: pool', ports.fetch_opted_in)
+}
+
+// The open listing and the pool take nothing from each other, so they are read side by side
+// (joshuafolkken/kit#8220).
 async function read_steps(named: NamedPlan, ports: PlanPorts): Promise<BoardPlan | undefined> {
-	const listing = await launch_timing.timed('plan: list', ports.fetch_open)
+	const [listing, pool] = await Promise.all([
+		launch_timing.timed('plan: list', ports.fetch_open),
+		read_pool(named, ports),
+	])
 
 	if (listing === undefined || listing.rows.length === 0) return undefined
 
-	const read = { listing, ports }
+	const read = { listing, pool, ports }
 
 	const plan =
 		named.issues.length === 0 ? await pool_board([], read) : await scoped_board(named, read)
