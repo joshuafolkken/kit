@@ -9,6 +9,7 @@ const PENDING_BODY = 'Body\n\n<!-- josh:publication {"labels":["run:lane"]} -->'
 
 const state = vi.hoisted(() => ({
 	body: '',
+	repo: 'o/r' as string | undefined,
 	epics: [] as Array<number>,
 	withheld: undefined as string | undefined,
 	published: [] as Array<number>,
@@ -16,7 +17,7 @@ const state = vi.hoisted(() => ({
 }))
 
 vi.mock('#scripts/gh/git-gh-command', () => ({
-	git_gh_command: { repo_get_name_with_owner: async () => 'o/r' },
+	git_gh_command: { repo_get_name_with_owner: async () => state.repo },
 }))
 
 vi.mock('#scripts/epic/epic-live', () => ({
@@ -72,6 +73,7 @@ function comments_on(issue: string): ReadonlyArray<string> {
 beforeEach(() => {
 	Object.assign(state, {
 		body: PENDING_BODY,
+		repo: 'o/r',
 		epics: [7],
 		withheld: undefined,
 		published: [],
@@ -130,6 +132,16 @@ describe('run_pause_publish.publish_prepared — nothing to publish or already n
 		const detail = await run_pause_publish.publish_prepared({ issue: '10', prerequisite: 'o/x#3' })
 
 		expect(detail).toBe(run_pause_publish.NOT_PREPARED)
+	})
+
+	it('fails without writing when the publication repository cannot be resolved', async () => {
+		state.repo = undefined
+
+		await expect(run_pause_publish.publish_prepared(REQUEST)).rejects.toThrow(
+			'Cannot resolve the publication repository',
+		)
+		expect(state.published).toStrictEqual([])
+		expect(state.comments.size).toBe(0)
 	})
 
 	it('does not post the note twice on a rerun', async () => {
