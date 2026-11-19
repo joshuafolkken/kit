@@ -126,6 +126,7 @@ describe('backlog:plan --pending-publication', () => {
 
 		await expect(backlog_plan_cli.run([FLAG])).resolves.toBe(SUCCESS_EXIT_CODE)
 		expect(streams.stdout()).toContain(PAIR_LINE)
+		expect(streams.stderr()).not.toContain(backlog_pending_publication.TRUNCATED_MESSAGE)
 	})
 
 	it('fails on an unreadable listing rather than reporting no pair', async () => {
