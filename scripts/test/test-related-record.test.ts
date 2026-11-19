@@ -176,12 +176,14 @@ describe('test_related_record.record_of — the tests deferred past the cap', ()
 		expect(record).toMatchObject({ deferred: DEFERRED, over_cap_hub: OWN_CHANGE })
 	})
 
-	it('names no hub where nothing was deferred or none is the branch own change', () => {
+	it('names no hub where nothing was deferred, none is own or none passes the cap alone', () => {
 		const none = { ...related_input(), branch: [OWN_CHANGE], ...WIDE_SYNC, deferred: 0 }
 		const foreign = { ...related_input(), branch: [READER_TEST], ...WIDE_SYNC }
+		const under = { ...none, deferred: DEFERRED, reach: [{ file: OWN_CHANGE, count: 150 }] }
 
 		expect(test_related_record.record_of(none, result)).not.toHaveProperty('over_cap_hub')
 		expect(test_related_record.record_of(foreign, result)).not.toHaveProperty('over_cap_hub')
+		expect(test_related_record.record_of(under, result)).not.toHaveProperty('over_cap_hub')
 	})
 })
 
