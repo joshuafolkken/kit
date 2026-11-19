@@ -2,7 +2,7 @@
 	"reason": "#8105 adds the run:pause plan check and documents the refusal in the four run docs the acceptance criteria name",
 	"date": "2026-11-19",
 	"growth": {
-		"scripts.code_lines": 15,
+		"scripts.code_lines": 23,
 		"ai_cost.on_demand_bytes": 216,
 		"prose.long_paragraphs": 2
 	}

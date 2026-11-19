@@ -68,8 +68,8 @@ async function leave_note(request: PublishRequest, note: string): Promise<void> 
 	}
 }
 
-// A pending `#N` and the repository it is published in, or `undefined` when `#N` is not prepared here
-// (a cross-repository prerequisite is published from its own checkout).
+// A pending open `#N` and the repository it is published in, or `undefined` when `#N` is not prepared
+// here (a cross-repository prerequisite is published from its own checkout) or already closed.
 async function prepared_of(
 	prerequisite: string,
 ): Promise<{ repo: string; child: EpicChild } | undefined> {
@@ -78,13 +78,15 @@ async function prepared_of(
 	if (repo === undefined) throw new Error('Cannot resolve the publication repository')
 	const child = await epic_live.child(Number(prerequisite), repo)
 
-	return issue_publication_state.is_pending(child.body) ? { repo, child } : undefined
+	const is_prepared = child.state === 'OPEN' && issue_publication_state.is_pending(child.body)
+
+	return is_prepared ? { repo, child } : undefined
 }
 
 // Why `run:pause` refuses before any step (joshuafolkken/kit#8105): a prepared `#N` with no recorded
 // plan would wait unpublished until a person planned it, so the lane that filed it records the plan
 // first. The plan is judged by publication's own predicate; other withholding reasons stay notes.
-async function unplanned(request: PublishRequest): Promise<string | undefined> {
+async function plan_refusal(request: PublishRequest): Promise<string | undefined> {
 	const prepared = await prepared_of(request.prerequisite)
 	const missing = prepared && issue_publication.missing_plan_of(prepared.child)
 	if (missing === undefined) return undefined
@@ -93,6 +95,15 @@ async function unplanned(request: PublishRequest): Promise<string | undefined> {
 		`Prepared ${cite(request.prerequisite)} ${missing}: nothing was set aside.`,
 		`Next: \`pnpm josh issue:plan ${request.prerequisite} --body-file … --planned --no-notify\`, then rerun this pause`,
 	].join('\n')
+}
+
+// A read that fails refuses too, as a reason, so the caller reports it like any failed step.
+async function unplanned(request: PublishRequest): Promise<string | undefined> {
+	try {
+		return await plan_refusal(request)
+	} catch (error) {
+		return `Cannot check the plan of ${cite(request.prerequisite)}: ${error_text.message_of(error)}`
+	}
 }
 
 async function publish_prepared(request: PublishRequest): Promise<string> {

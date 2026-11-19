@@ -9,6 +9,8 @@ const PENDING_BODY = 'Body\n\n<!-- josh:publication {"labels":["run:lane"]} -->'
 
 const state = vi.hoisted(() => ({
 	body: '',
+	child_state: 'OPEN',
+	read_error: undefined as Error | undefined,
 	labels: [] as Array<string>,
 	ran: [] as Array<string>,
 	published: [] as Array<number>,
@@ -39,14 +41,18 @@ vi.mock('#scripts/gh/git-gh-command', () => ({
 
 vi.mock('#scripts/epic/epic-live', () => ({
 	epic_live: {
-		child: async (number: number, repo: string) => ({
-			number,
-			repo,
-			state: 'OPEN',
-			labels: state.labels,
-			blocked_by: [],
-			body: state.body,
-		}),
+		child: async (number: number, repo: string) => {
+			if (state.read_error !== undefined) throw state.read_error
+
+			return {
+				number,
+				repo,
+				state: state.child_state,
+				labels: state.labels,
+				blocked_by: [],
+				body: state.body,
+			}
+		},
 	},
 }))
 
@@ -71,7 +77,14 @@ const REQUEST = { issue: '10', prerequisite: '11' }
 const PLANNED = 'run:planned'
 
 beforeEach(() => {
-	Object.assign(state, { body: PENDING_BODY, labels: [], ran: [], published: [] })
+	Object.assign(state, {
+		body: PENDING_BODY,
+		child_state: 'OPEN',
+		read_error: undefined,
+		labels: [],
+		ran: [],
+		published: [],
+	})
 })
 
 describe('run_pause.pause — a prepared prerequisite with no recorded plan', () => {
@@ -94,6 +107,18 @@ describe('run_pause.pause — a prepared prerequisite with no recorded plan', ()
 		expect(result).toMatchObject({ kind: 'failed', step: 'plan' })
 		expect(state.ran).toStrictEqual([])
 	})
+
+	it('reports a failing read as a failed plan step, not a rejection', async () => {
+		const read_failure = 'gh: timeout'
+
+		state.read_error = new Error(read_failure)
+
+		const result = await run_pause.pause(REQUEST)
+
+		expect(result).toMatchObject({ kind: 'failed', step: 'plan', done: [] })
+		expect(result.kind === 'failed' && result.reason).toContain(read_failure)
+		expect(state.ran).toStrictEqual([])
+	})
 })
 
 describe('run_pause.pause — a prerequisite the check lets through', () => {
@@ -114,6 +139,16 @@ describe('run_pause.pause — a prerequisite the check lets through', () => {
 
 		expect(result.kind).toBe('paused')
 		expect(state.ran).toHaveLength(4)
+	})
+
+	it('runs every step for a closed prerequisite that still carries the pending marker', async () => {
+		state.child_state = 'CLOSED'
+
+		const result = await run_pause.pause(REQUEST)
+
+		expect(result.kind).toBe('paused')
+		expect(state.ran).toHaveLength(4)
+		expect(state.published).toStrictEqual([])
 	})
 
 	it('runs every step for a cross-repository prerequisite', async () => {
