@@ -3,7 +3,8 @@ import { run_board_layout_order } from './run-board-layout-order'
 import type { BoardRow, RowReason } from './run-board-layout-types'
 import type { ItemState, ItemStatus } from './run-board-status'
 
-// joshuafolkken/kit#8030: the order the board's rows are drawn in, moved out of `run-board-layout.ts`.
+// The order the board's rows are drawn in: the touched rows by state then time, the unreached rows by
+// the start time they wait on.
 
 const EARLY_MS = 1000
 const LATE_MS = 2000
@@ -50,6 +51,14 @@ describe('run_board_layout_order.active_order', () => {
 		expect(numbers_of(rows.toSorted(run_board_layout_order.active_order))).toEqual([3, 2, 1])
 	})
 
+	it('places a row with no status after a started one, whichever side each is on', () => {
+		const started = row_of(1, 'running', { started_ms: EARLY_MS })
+		const unread = { ...row_of(2, 'running'), status: undefined }
+
+		expect(run_board_layout_order.active_order(started, unread)).toBe(-1)
+		expect(run_board_layout_order.active_order(unread, started)).toBe(1)
+	})
+
 	it('orders finished rows from the newest end, one with none last', () => {
 		const rows = [
 			row_of(1, 'done'),
@@ -70,6 +79,14 @@ describe('run_board_layout_order.start_order', () => {
 		]
 
 		expect(numbers_of(rows.toSorted(run_board_layout_order.start_order))).toEqual([3, 2, 1])
+	})
+
+	it('places a row with a start time after one with none, whichever side each is on', () => {
+		const dated = row_of(1, 'waiting', {}, { not_before_ms: EARLY_MS })
+		const undated = row_of(2, 'waiting')
+
+		expect(run_board_layout_order.start_order(dated, undated)).toBe(1)
+		expect(run_board_layout_order.start_order(undated, dated)).toBe(-1)
 	})
 })
 
