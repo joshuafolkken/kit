@@ -72,6 +72,10 @@ pnpm josh run:pause 1091 --for 1102   # pause 1091 until 1102 lands
 
 <!-- /usage -->
 
+A prepared (unpublished) prerequisite is published before the hold is released, through `issue:file --publish <epic>` on the open epic listing it.
+
+When that is withheld (no recorded plan, unrecorded dependencies, no epic), a comment naming the reason and the next commands (`issue:plan <prerequisite> … --planned --no-notify`, then `issue:file --publish <epic>`) lands once on both issues and is printed.
+
 A pause that lands prints `prerequisite.md` → "Each entry's branch, and the pause" after its step lines (one line naming it once this session printed it).
 
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh run:pause` in detail".
