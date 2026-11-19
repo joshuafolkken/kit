@@ -1,0 +1,7 @@
+{
+	"reason": "New backlog:plan --pending-publication listing (#8087) adds its module",
+	"date": "2026-11-19",
+	"growth": {
+		"scripts.code_lines": 86
+	}
+}
