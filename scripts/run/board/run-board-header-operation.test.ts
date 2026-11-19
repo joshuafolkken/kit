@@ -3,6 +3,7 @@ import { run_board_header, type BoardHeader } from './run-board-header'
 import type { BoardLayout, BoardRow } from './run-board-layout'
 import type { SessionOperations } from './run-board-operation-read'
 import { run_board_render_fixture } from './run-board-render-fixture'
+import { run_board_row_key } from './run-board-row-key'
 
 // joshuafolkken/kit#3757: the header's third line draws the newest operation of a child the board
 // draws as running, the same on a screen and in a chat. joshuafolkken/kit#3767: its spinner under the
@@ -77,6 +78,30 @@ describe('run_board_header.header_lines with a session’s operation', () => {
 
 	it('counts the running children where no operation was read', () => {
 		expect(third_of({}).trim()).toBe('🔄 1 running')
+	})
+})
+
+// joshuafolkken/kit#8103: where the board types rows, the third line's words carry a key of their own.
+describe('run_board_header — the third line’s key', () => {
+	const GATE_KEY = 'now:#7 · Bash pnpm josh gate'
+
+	it('keys the words after the time, the line drawn as it is without the key', () => {
+		const keyed = { operations: OPERATIONS, is_keyed: true }
+		const split = run_board_row_key.split_key(third_of(keyed))
+
+		expect(split.key).toBe(GATE_KEY)
+		expect(split.text).toBe(STILL_LINE)
+		expect(run_board_header.now_key(header({ layout: LAYOUT, ...keyed }))).toBe(GATE_KEY)
+	})
+
+	it('keys nothing where the third line names no words, nor where the board types no rows', () => {
+		const empty = header({ is_keyed: true })
+
+		expect(run_board_header.now_key(empty)).toBeUndefined()
+		expect(
+			lines_of(empty).every((line) => run_board_row_key.split_key(line).key === undefined),
+		).toBe(true)
+		expect(third_of({ operations: OPERATIONS })).toBe(STILL_LINE)
 	})
 })
 
