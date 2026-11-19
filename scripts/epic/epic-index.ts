@@ -1,5 +1,5 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
-import type { OpenIssueData } from '#scripts/git/git-schemas'
+import type { OpenIssueData, OpenListing } from '#scripts/git/git-schemas'
 import { cutoff_of, type ScanCutoff } from '#scripts/git/listing-cutoff'
 import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
 import { EPIC_LABEL, has_any_label } from '#scripts/issue/issue-labels'
@@ -208,9 +208,31 @@ async function fetch_epics(limit: number): Promise<FetchedEpics | undefined> {
 	}
 }
 
+// The open epics drawn from a listing of every open issue already read, so a plan read pays one listing
+// rather than a second, label-filtered one (joshuafolkken/kit#8220). Both listings are open-only and
+// newest-first, so a whole listing holds the same epics in the same order. `undefined` when the listing
+// was cut or a row came without its labels or body: an epic past the cut, unlabelled, or with no task
+// list read, would read as absent or as tracking nothing.
+function is_whole(listing: OpenListing, limit: number): boolean {
+	if (cutoff_of(listing.rows.length, limit, listing.is_capped) !== 'none') return false
+
+	return listing.rows.every((row) => row.labels !== undefined && row.body !== undefined)
+}
+
+function epics_of_listing(listing: OpenListing, limit: number): FetchedEpics | undefined {
+	if (!is_whole(listing, limit)) return undefined
+	const rows = listing.rows.filter((row) => has_any_label(row.labels, EPIC_LABELS))
+
+	return {
+		cutoff: 'none',
+		epics: rows.map((row) => ({ number: row.number, body: row.body ?? '' })),
+	}
+}
+
 const epic_index = {
 	build_epic_index,
 	build_tracking_index,
+	epics_of_listing,
 	fetch_epics,
 	first_epics,
 	reachable_epic_numbers,

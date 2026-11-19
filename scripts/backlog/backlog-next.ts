@@ -13,6 +13,7 @@ import type { SoloGate } from '#scripts/epic/epic-solo'
 import { epic_solo_parked } from '#scripts/epic/epic-solo-parked'
 import { epic_solo_stale } from '#scripts/epic/epic-solo-stale'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import type { OpenListing } from '#scripts/git/git-schemas'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { issue_not_before_label } from '#scripts/issue/issue-not-before-label'
 import { lane_net_read } from '#scripts/lane/lane-net-read'
@@ -304,12 +305,19 @@ async function answer_pool(context: PoolContext): Promise<number> {
 // The two reads that stand between the opted-in listing and the pool. Extracted for the same reason
 // `resolve` is: `backlog:plan` needs the identical context, and a second copy of these two failure
 // branches would be a second place for them to be worded differently. `undefined` is the failure —
-// already reported.
+// already reported. The three reads take nothing from one another, so they run side by side
+// (joshuafolkken/kit#8220); the failures are still checked tracking first, so a double failure says what
+// it said before. `open` is a whole open listing a plan read already holds, which answers the epics.
 async function context_of(
 	opted_in: OptedIn,
 	exclude: ReadonlyArray<number>,
+	open?: OpenListing,
 ): Promise<PoolContext | undefined> {
-	const tracking = await auto_ok_cli.fetch_tracking(opted_in.issues.length)
+	const [tracking, repo, measurements] = await Promise.all([
+		auto_ok_cli.fetch_tracking(opted_in.issues.length, open),
+		git_gh_command.repo_get_name_with_owner(),
+		lane_net_read.measurements(),
+	])
 
 	if (tracking.kind !== 'read') {
 		console.error(auto_ok_cli.EPICS_UNREADABLE_MESSAGE)
@@ -317,15 +325,13 @@ async function context_of(
 		return undefined
 	}
 
-	const repo = await git_gh_command.repo_get_name_with_owner()
-
 	if (repo === undefined) {
 		console.error(REPO_UNREADABLE_MESSAGE)
 
 		return undefined
 	}
 
-	return { opted_in, tracking, repo, exclude, ...(await lane_net_read.measurements()) }
+	return { opted_in, tracking, repo, exclude, ...measurements }
 }
 
 async function answer(opted_in: OptedIn, exclude: ReadonlyArray<number>): Promise<number> {

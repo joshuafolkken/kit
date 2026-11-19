@@ -17,6 +17,7 @@ function tally(calls: number, not_modified: number): GhRequestTally {
 
 const POOL_ONLY = { issues: [], only: false }
 const LIST_PHASE = 'plan: list'
+const POOL_PHASE = 'plan: pool'
 
 // The listing given and an opted-in read that fails, so the read ends with no plan and no `gh` call.
 function ports(rows: OpenListing['rows'] = [ROW]): PlanPorts {
@@ -47,7 +48,7 @@ describe('run_board_plan.read_plan timing', () => {
 		await read_plan(POOL_ONLY, ports())
 
 		expect(phase_names()).toStrictEqual(
-			expect.arrayContaining([LIST_PHASE, 'plan: pool', 'plan: decisions', 'plan: prs']),
+			expect.arrayContaining([LIST_PHASE, POOL_PHASE, 'plan: decisions', 'plan: prs']),
 		)
 	})
 
@@ -59,9 +60,15 @@ describe('run_board_plan.read_plan timing', () => {
 		expect(phases).toContainEqual({ name: GH_NOT_MODIFIED_PHASE, ms: NOT_MODIFIED })
 	})
 
+	// joshuafolkken/kit#8220: the pool is read beside the listing, so its phase is recorded too.
 	it('still counts the calls of a read that ends at an empty listing', async () => {
 		await expect(read_plan(POOL_ONLY, ports([]))).resolves.toBeUndefined()
 
-		expect(phase_names()).toStrictEqual([LIST_PHASE, GH_CALLS_PHASE, GH_NOT_MODIFIED_PHASE])
+		expect(phase_names()).toStrictEqual([
+			LIST_PHASE,
+			POOL_PHASE,
+			GH_CALLS_PHASE,
+			GH_NOT_MODIFIED_PHASE,
+		])
 	})
 })
