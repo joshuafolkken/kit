@@ -83,10 +83,19 @@ const context_schema = z.object({
 	open_numbers: unknown_or_set,
 })
 
+const blocker_schema = z.object({
+	number: z.number(),
+	title: z.string(),
+	labels: names,
+	need: z.enum(['decide', 'merge', 'publish', 'take']),
+	detail: z.string().optional(),
+	blocks: z.array(z.number()).readonly(),
+})
+
 const board_plan_schema = z.object({
 	pause_reasons: map_of(run_board_pause.record_schema).optional(),
 	decision_questions: map_of(z.string()).optional(),
-	decision_waits: map_of(z.string()).optional(),
+	decision_blockers: z.array(blocker_schema).readonly().optional(),
 	human_merge_prs: map_of(z.number()).optional(),
 	waves: waves_schema,
 	tracked: map_of(z.number()),

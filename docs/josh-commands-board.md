@@ -183,7 +183,6 @@ A queued or waiting row draws `<icon> <condition> <number> <kind> <title>  <tail
 - `🚪` / `📥` / `📤` `<time>` — how long its lane has been opening, installing or dispatching.
 - `❓` — neither `run:lane` nor `run:solo`, and a blocker stands (the column names the first) or its start is ahead; a person may judge.
 - `🔗 <N>` — a standing blocker; with more, `<N>+<rest>`, the rest after the title. A first blocker too wide for the column (`owner/repo#N`) leaves it blank; every blocker follows the title.
-- `🙋 <N>` — withheld for a person; the tail is `→ decide #<B>: <title>`, even with no blocker left.
 - `📅 <MM-DD HH:MM>` — the body's `- 実施可能日:` names a UTC time not yet reached, so `backlog:next` (in UTC) withholds it; the board shows local time.
 - `📅 <n>/<K>` / `📅 <PR>` — the body's `- 実施可能条件: #<PR> のマージ後 <K> マージ` is not yet met: the lane ledger has recorded `n` of the `K` merges it waits on after `<PR>` merged, or `<PR>` has not merged (or its merge is unread).
   The issue form, `#<issue> を閉じる PR のマージ後 <K> マージ`, shows `<issue>` and counts after the merged pull request that closed it.
@@ -201,7 +200,10 @@ A queued or waiting row draws `<icon> <condition> <number> <kind> <title>  <tail
 - `🧠 <n>%` — a lane is free, but the driver opens none while the kernel reads critical memory pressure, 🧠 is red or 💾 swaps at a red rate, `💾 <n>M/s` after the title; it resumes within one poll once the kernel reads under critical and both are under yellow. The ledger records the hold as `memory` (its own `lane:stats` row); an unread figure is left out.
 - `⏳` with a blank column — no wait is read.
 
-A `🙋` or stopped row outside those sections still ends `🔗` and every standing blocker. A blocked `run:stalled` row ends `waiting on #<B>`.
+A row withheld for a person leads with `🔗` and its blockers and carries no action.
+The 🙋 decision section draws the blocker a person acts on, one row per blocker (a `needs-human-merge` one with `🔏`), ending on the action and `(blocks #<N>, …)`, the children it holds.
+The action: `→ merge PR #<P>` for an open pull request (`→ find its PR for #<N>` for a merge wait with none), `→ publish` for a prepared filing, `→ decide` for another stop, `→ take into a run` for an issue outside the run.
+A blocker outside the run's scope gets a row of its own and counts in the header's people and the now line. A stopped row outside those sections still ends `🔗` and every standing blocker. A blocked `run:stalled` row ends `waiting on #<B>`.
 Above the legend, the terminal board thanks the people who helped review kit, read from a published roster.
 
 While the run is at its `planning` stage, the one row it launches next — a named run's next declared issue, else the plan's first waiting row — leads with `📝 <time>` in place of any wait above; no other row draws it.

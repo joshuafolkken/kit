@@ -4,6 +4,7 @@ import { run_board_fit, type TerminalSize } from './run-board-fit'
 import { run_board_intro } from './run-board-intro'
 import { run_board_labels } from './run-board-labels'
 import { run_board_row_key } from './run-board-row-key'
+import { run_board_screen } from './run-board-screen'
 import { run_board_spot } from './run-board-spot'
 import type { BoardPorts } from './run-board-state'
 import { run_board_type_rows, type KeyedLine, type Typing } from './run-board-type-rows'
@@ -140,11 +141,12 @@ function next_turn(now_ms: number, until_ms: number, turning: Turning): number {
 	return Math.min(turn_ms, letter_ms, until_ms)
 }
 
-// The spinners turned when their frame changed, then the rows typing written over them, in one write.
+// The spinners turned when their frame changed, then the rows typing written over them, in one
+// synchronized write (joshuafolkken/kit#8125).
 function turn_bytes(turning: Turning, at_ms: number, is_turned: boolean): string {
 	const spin = is_turned ? spin_bytes(turning.spots, spinner_of(at_ms)) : ''
 
-	return `${spin}${run_board_type_rows.type_bytes(turning.typing, at_ms)}`
+	return run_board_screen.synced(`${spin}${run_board_type_rows.type_bytes(turning.typing, at_ms)}`)
 }
 
 // joshuafolkken/kit#8123: a wake for a letter between frame boundaries writes no spinner, so each frame

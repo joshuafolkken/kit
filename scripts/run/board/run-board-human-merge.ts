@@ -24,8 +24,18 @@ function has_waiting(plan: BoardPlan): boolean {
 	return false
 }
 
+// A blocker the 🙋 decision section draws is paired too: an open pull request is what a person merges
+// for it (joshuafolkken/kit#8026).
+function is_blocker(plan: BoardPlan, issue: number): boolean {
+	return plan.decision_blockers?.some((blocker) => blocker.number === issue) === true
+}
+
+function is_wanted(plan: BoardPlan, issue: number): boolean {
+	return is_waiting(plan, issue) || is_blocker(plan, issue)
+}
+
 async function read_prs(plan: BoardPlan): Promise<ReadonlyMap<number, number>> {
-	if (!has_waiting(plan)) return new Map()
+	if (!has_waiting(plan) && (plan.decision_blockers ?? []).length === 0) return new Map()
 	const per_page = git_gh_api_path.FULL_PAGE_SIZE
 	const path = `${git_gh_api_path.pulls_api_path(plan.context.repo)}?state=open&per_page=${String(per_page)}`
 	const json = await git_gh_etag_read.read_listing(path, per_page)
@@ -33,10 +43,18 @@ async function read_prs(plan: BoardPlan): Promise<ReadonlyMap<number, number>> {
 	const pairs = pulls.flatMap((pull) => {
 		const issue = Number(git_closes_keyword.parse_closes_issue_number(pull.body ?? undefined))
 
-		return is_waiting(plan, issue) ? [[issue, pull.number] as const] : []
+		return is_wanted(plan, issue) ? [[issue, pull.number] as const] : []
 	})
 
 	return new Map(pairs)
+}
+
+function merge_reason(pr: number): RowReason {
+	return {
+		value: `PR ${String(pr)}`,
+		tail: `→ merge PR ${issue_cite.plain_for('terminal', pr)}`,
+		pr,
+	}
 }
 
 // The tail says what the person does next: merge the PR, or find it when the read listing pairs
@@ -53,12 +71,7 @@ function pr_reason(issue: number, prs: BoardPlan['human_merge_prs']): RowReason 
 		return { icon, value: undefined, tail }
 	}
 
-	return {
-		icon,
-		value: `PR ${String(pr)}`,
-		tail: `→ merge PR ${issue_cite.plain_for('terminal', pr)}`,
-		pr,
-	}
+	return { icon, ...merge_reason(pr) }
 }
 
 function reason_of(child: EpicChild, plan: BoardPlan): RowReason | undefined {
@@ -108,6 +121,6 @@ function overlay_of(
 	}
 }
 
-const run_board_human_merge = { overlay_of, read_prs, reason_of, with_prs }
+const run_board_human_merge = { merge_reason, overlay_of, pr_reason, read_prs, reason_of, with_prs }
 
 export { run_board_human_merge }
