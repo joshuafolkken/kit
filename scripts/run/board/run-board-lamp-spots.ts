@@ -11,8 +11,13 @@ import type { BoardPorts } from './run-board-state'
 const { LAMP, spot_at } = run_board_spot
 const { is_lit, lamp_text, place_of } = run_board_lamps
 const CSI = '\u{1B}['
-// The panel blinks its groups apart, never in a burst.
-const is_burst = false
+
+// A moment the lamps are written at, and whether the panel bursts then — every group changing on every
+// step while the screen types (joshuafolkken/kit#8237).
+interface LampMoment {
+	ms: number
+	is_burst: boolean
+}
 
 // One lamp on screen, 1-based, the row of the panel it is on (`0` the `24h`), its group and its place.
 interface Lamp {
@@ -51,36 +56,37 @@ function lamps_in(
 	)
 }
 
-function is_on(lamp: Lamp, at_ms: number): boolean {
-	return is_lit(at_ms, lamp.group, lamp.lamp, is_burst)
+function is_on(lamp: Lamp, at: LampMoment): boolean {
+	return is_lit(at.ms, lamp.group, lamp.lamp, at.is_burst)
 }
 
-function lamp_bytes(lamp: Lamp, at_ms: number): string {
-	const cell = lamp_text(lamp.panel_row, is_on(lamp, at_ms))
+function lamp_bytes(lamp: Lamp, at: LampMoment): string {
+	const cell = lamp_text(lamp.panel_row, is_on(lamp, at))
 
 	return `${CSI}${String(lamp.row)};${String(lamp.column)}H${cell}`
 }
 
-// The lamps that changed since `since_ms` written as they are at `at_ms`, every one with no `since_ms`.
+// The lamps that changed since `since` written as they are `at`, every one with no `since`; each moment
+// is read with its own burst, so a burst's start and end write just the lamps it changes.
 function lamps_bytes(
 	lamps: ReadonlyArray<Lamp>,
-	at_ms: number,
-	since_ms: number | undefined,
+	at: LampMoment,
+	since: LampMoment | undefined,
 ): string {
 	const changed = lamps.filter(
-		(lamp) => since_ms === undefined || is_on(lamp, at_ms) !== is_on(lamp, since_ms),
+		(lamp) => since === undefined || is_on(lamp, at) !== is_on(lamp, since),
 	)
 
-	return changed.map((lamp) => lamp_bytes(lamp, at_ms)).join('')
+	return changed.map((lamp) => lamp_bytes(lamp, at)).join('')
 }
 
 function write_lamps(
 	lamps: ReadonlyArray<Lamp>,
 	ports: LampPorts,
-	at_ms: number,
-	since_ms: number | undefined,
+	at: LampMoment,
+	since: LampMoment | undefined,
 ): void {
-	const bytes = lamps_bytes(lamps, at_ms, since_ms)
+	const bytes = lamps_bytes(lamps, at, since)
 
 	if (bytes === '') return
 	const write = ports.write_drawn ?? ports.write
@@ -91,4 +97,4 @@ function write_lamps(
 const run_board_lamp_spots = { lamps_in, write_lamps }
 
 export { run_board_lamp_spots }
-export type { Lamp }
+export type { Lamp, LampMoment }
