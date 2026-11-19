@@ -44,12 +44,14 @@ interface SelectReaders {
 // The layers past the changed tests, the reach they record and how they were chosen.
 type Layered = Pick<Selection, 'reach' | 'method'> & { layers: Array<ReadonlyArray<string>> }
 
-// What selecting starts from: the scope's files, root-relative, and the code files among them.
+// What selecting starts from: the scope's files, root-relative, the code files among them, and the
+// run's own change.
 interface Seeded {
 	root: string
 	scope: RelatedScope
 	seeds: ReadonlyArray<string>
 	code: ReadonlyArray<string>
+	changed: ReadonlyArray<string>
 }
 
 async function all_tests(): Promise<ReadonlyArray<string>> {
@@ -154,15 +156,26 @@ function symbol_layers(seeded: Seeded, symbol: SymbolSelection): Layered {
 	}
 }
 
+// **The code files the declaration users are read from: the run's own change alone**
+// (joshuafolkken/kit#8090). A scope file the run did not change — a code file of the change since the
+// map naming a moved file — has no changed line, and read whole it selected every user of every
+// declaration in it.
+function symbol_code(seeded: Seeded): ReadonlyArray<string> {
+	const changed = new Set(seeded.changed)
+
+	return seeded.code.filter((file) => changed.has(file))
+}
+
 // By declaration users, unless the scope fell to the whole suite or no symbol reading could be made.
 async function layered_of(seeded: Seeded, readers: SelectReaders): Promise<Layered> {
 	const is_whole = seeded.scope.mode === 'all'
-	const symbol = is_whole ? undefined : await readers.symbols(seeded.root, seeded.code)
+	const symbol = is_whole ? undefined : await readers.symbols(seeded.root, symbol_code(seeded))
 
 	return symbol === undefined ? await import_layers(seeded, readers) : symbol_layers(seeded, symbol)
 }
 
-// `changed` is root-relative, as the change was read; a `none` scope selects nothing.
+// `changed` is the run's own change (`test_related_record.named_of`), root-relative, as it was read —
+// no other lane's change since the map's tree; unread, the scope's files. A `none` scope selects nothing.
 async function select(
 	root: string,
 	scope: RelatedScope,
@@ -172,7 +185,11 @@ async function select(
 	if (scope.mode === 'none') return { tests: [], deferred: 0, reach: [], method: 'import' }
 	const seeds = seeds_of(root, scope, changed)
 	const code = seeds.filter((file) => is_code(file))
-	const { layers, reach, method } = await layered_of({ root, scope, seeds, code }, readers)
+	const own = changed ?? seeds
+	const { layers, reach, method } = await layered_of(
+		{ root, scope, seeds, code, changed: own },
+		readers,
+	)
 	const units = [changed ?? [], ...layers].map((layer) =>
 		layer.filter((file) => is_unit_test(root, file)),
 	)

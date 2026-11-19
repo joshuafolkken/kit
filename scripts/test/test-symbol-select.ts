@@ -150,7 +150,18 @@ function changed_lines(diff: string): Map<string, Array<number>> {
 	return lines
 }
 
-const test_symbol_select = { changed_lines, counts_from, select_from }
+// **The changed code files a reading starts from** (joshuafolkken/kit#8090): those the diff lists lines
+// for, and an untracked file, new whole. A tracked file with no line changed — a pure rename, a mode
+// change — changed no declaration, where read whole it would select every user of every one.
+function with_lines(
+	code: ReadonlyArray<string>,
+	lines: ChangedLines,
+	untracked: ReadonlySet<string>,
+): Array<string> {
+	return code.filter((file) => lines.has(file) || untracked.has(file))
+}
+
+const test_symbol_select = { changed_lines, counts_from, select_from, with_lines }
 
 export type { ChangedLines, SymbolInput, SymbolSelection }
 export { test_symbol_select }

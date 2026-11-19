@@ -133,16 +133,25 @@ function triggers_of(input: RunInput): Partial<TestRelatedRecord> {
 	return { trigger_files: input.scope.files.map((file) => path.relative(input.root, file)) }
 }
 
-// **The run's own change is the branch's, where it was read** (joshuafolkken/kit#5041): a synced file
-// the split cannot vouch for is in `changed` without being this branch's change. Unread, it is what
-// neither a main sync nor the map's tree joined.
-function own_of(
-	input: Pick<RunInput, 'changed' | 'branch'> & Partial<Pick<RunInput, 'synced' | 'since_map'>>,
-): ReadonlyArray<string> {
-	const { changed = [], branch, synced = [], since_map = [] } = input
+type ChangeParts = Pick<RunInput, 'changed'> & Partial<Pick<RunInput, 'synced' | 'since_map'>>
+
+// **What the run named itself**: the change neither a main sync nor the map's tree joined — the
+// selection's input (joshuafolkken/kit#8090), a red run's failed test included.
+function named_of(input: ChangeParts): ReadonlyArray<string> {
+	const { changed = [], synced = [], since_map = [] } = input
 	const joined = new Set([...synced, ...since_map])
 
-	return changed.filter((file) => branch?.includes(file) ?? !joined.has(file))
+	return changed.filter((file) => !joined.has(file))
+}
+
+// **The run's own change is the branch's, where it was read** (joshuafolkken/kit#5041): a synced file
+// the split cannot vouch for is in `changed` without being this branch's change. Unread, it is what
+// the run named itself.
+function own_of(input: ChangeParts & Pick<RunInput, 'branch'>): ReadonlyArray<string> {
+	const { changed = [], branch } = input
+	const named = named_of(input)
+
+	return changed.filter((file) => branch?.includes(file) ?? named.includes(file))
 }
 
 // The input split into its counted parts, each file in one. A synced non-code file is in `since_map`
@@ -283,7 +292,7 @@ async function record_run(input: RunInput, result: RunResult, ledger?: string): 
 	await lane_ledger_write.record_test_related({ ...record_of(input, result), issue }, ledger)
 }
 
-const test_related_record = { own_of, record_of, record_run, with_test_count }
+const test_related_record = { named_of, own_of, record_of, record_run, with_test_count }
 
 export type { RunInput, RunResult, StageTimes }
 export { test_related_record }

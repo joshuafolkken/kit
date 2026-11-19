@@ -248,7 +248,8 @@ async function selected_of(
 ): Promise<Selected> {
 	if (scope.mode === 'none') return { scope }
 	const started_ms = performance.now()
-	const selection = await test_related_select.select(root, scope, change.changed)
+	const named = test_related_record.named_of(change)
+	const selection = await test_related_select.select(root, scope, named)
 	const select_elapsed_ms = performance.now() - started_ms
 	const { deferred, reach, method } = selection
 
