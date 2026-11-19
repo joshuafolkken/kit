@@ -1,7 +1,8 @@
 import { setTimeout as sleep } from 'node:timers/promises'
 import { core_budget } from '#scripts/gate/core-budget'
+import type { BudgetWait } from '#scripts/gate/core-wait'
 import { machine_capacity } from '#scripts/gate/machine-capacity'
-import { lane_process_table } from '#scripts/lane/lane-process-table'
+import { lane_process_table, type ProcessTable } from '#scripts/lane/lane-process-table'
 import type { GatherPorts } from './run-board-gather'
 import { run_board_quota_held } from './run-board-quota-held'
 import { run_board_read } from './run-board-read'
@@ -10,12 +11,20 @@ import { run_board_usage_read } from './run-board-usage-read'
 // The live reads off this machine, shared by the live board's worker thread
 // (`run-board-gather-worker.ts`) and the single frame that reads where it draws.
 
+// The round's snapshot answers each claim's process start, so no claim spawns its own `ps`; a round
+// without one falls back to `budget_waits`' own reader.
+function read_waits(table: ProcessTable | undefined): Array<BudgetWait> {
+	const read = table === undefined ? undefined : lane_process_table.start_reader(table)
+
+	return core_budget.budget_waits({ read })
+}
+
 function ports_of(is_live: boolean): GatherPorts {
 	return {
 		read_table: lane_process_table.read_table,
 		read_local: run_board_read.read_local,
 		read_machine: machine_capacity.read_sample,
-		read_waits: () => core_budget.budget_waits(),
+		read_waits,
 		read_usage: run_board_usage_read.usage_reader(),
 		read_quotas: run_board_quota_held.live_quota_reader(),
 		is_live,
