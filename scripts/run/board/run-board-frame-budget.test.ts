@@ -31,9 +31,10 @@ vi.mock('string-width', async (original) => {
 // thread between spinner turns, so it is held to a budget over a run the size of a busy day's: eight
 // lanes, a thousand processes and six thousand events, about what the stream held on 2026-10-20.
 // joshuafolkken/kit#5161: the budget counts the events a redraw reads, not the time it takes, so a
-// shared CI runner's load cannot fail it.
+// shared CI runner's load cannot fail it. Every fold over the stream reads each event's issue once.
+// joshuafolkken/kit#8160: the worker assembles the frame, so a redraw reads none of the stream.
 
-const { LOCAL, START, harness } = run_board_fixture
+const { FIRST_ROUND, LOCAL, START, harness } = run_board_fixture
 const { FRESH_STATE, tick } = run_board_tick
 const REPO = 'joshuafolkken/kit'
 const LANES = 8
@@ -44,10 +45,6 @@ const FIRST_ISSUE = 4000
 const SECOND_MS = 1000
 const STAGES = ['preflight', 'sync', 'gate', 'commit', 'push', 'checks', 'review']
 const ROUNDS = 3
-// Every fold over the stream reads each event's issue once, so the issues a redraw reads count the
-// events it folds. A redraw that keeps the stream's folds read one, and one that folds the stream
-// again read 18,294 (three folds of six thousand), so a redraw is held under one fold of the stream.
-const READ_BUDGET = EVENTS
 // The pane the live board was profiled in (joshuafolkken/kit#5185).
 const PANE = { rows: 50, columns: 160 }
 const ISSUES = EVENTS / EVENTS_PER_ISSUE
@@ -120,47 +117,43 @@ function read_at(read_ms: number): GatherState {
 
 interface Rereading {
 	gather: Gatherer
-	// The worker reads the same busy stream again and hands the round over, cloned across the thread.
+	// The worker reads the same busy stream again and hands the round's frame over, cloned across the
+	// thread.
 	reread: () => void
 }
 
-// A round as the worker hands it over; `is_afresh` hands the stream over whole each read, as a worker
-// that lost the kept stream would, so the board folds it again.
-function handed(before: GatherState, after: GatherState, is_afresh: boolean): GatherPost {
-	const post = run_board_gather_thread.post_of(before, after)
+// A round as the worker hands it over: the frame it assembled over the busy run and its plan.
+function handed(read: GatherState): GatherPost {
+	const data = { ...FIRST_ROUND.data, ...run_board_gather.read_of(read), plan: PLAN }
 
-	if (!is_afresh || post.local === undefined) return post
-
-	return { ...post, local: { value: after.local } }
+	return run_board_gather_thread.post_of(FIRST_ROUND.board, read, data, read.read_ms ?? START).post
 }
 
 // A worker over the busy run, whose rounds the test hands over itself — outside the redraw it counts,
 // as a live worker's reads are.
-function rereading(is_afresh: boolean): Rereading {
+function rereading(): Rereading {
 	const listeners = new Map<string, (value: unknown) => void>()
 	const worker: GatherWorker = {
 		on: (event, listener) => listeners.set(event, listener),
 		unref: vi.fn(),
 	}
-	let before: GatherState = run_board_gather.FRESH_GATHER
+	let read_ms = START
 
 	return {
 		gather: run_board_gather_thread.worker_gatherer(() => worker),
 		reread: () => {
-			const after = read_at((before.read_ms ?? START) + SECOND_MS)
+			read_ms += SECOND_MS
+			const post = structuredClone(handed(read_at(read_ms)))
 
-			listeners.get('message')?.(structuredClone(handed(before, after, is_afresh)))
-			before = after
+			listeners.get('message')?.(post)
 		},
 	}
 }
 
 // The board over the busy run, drawn once — its first frame waits for the worker's first round.
 async function first_frame(reread: () => void, gather: Gatherer): Promise<Board> {
-	const { ports, read_plan, frames } = harness(BUSY, [])
+	const { ports, frames } = harness(BUSY, [])
 	const live = { ...ports, gather }
-
-	read_plan.mockResolvedValue(PLAN)
 	const first = tick(FRESH_STATE, live)
 
 	reread()
@@ -191,37 +184,27 @@ async function redraw(state: BoardState, redrawing: Redrawing): Promise<BoardSta
 	return await tick(state, redrawing.live, 'background')
 }
 
-// How many events each of `ROUNDS` redraws read.
-async function redraws_read(is_afresh = false): Promise<Redraws> {
-	const { gather, reread } = rereading(is_afresh)
+interface Redrawn {
+	reads: number
+	// The run's read the redraw's state holds — none, as the worker keeps it (joshuafolkken/kit#8160).
+	local: LocalRead | undefined
+}
+
+// How many events each of `ROUNDS` redraws read, each right after the worker handed a round over.
+async function redraws_read(): Promise<Array<Redrawn>> {
+	const { gather, reread } = rereading()
 	const { live, state: drawn } = await first_frame(reread, gather)
 	const redrawing = { live, reread, reads: vi.spyOn(run_event_scope, 'issue_named') }
 	let state = drawn
 	const spent: Array<Redrawn> = []
 
 	for (let round = 0; round < ROUNDS; round += 1) {
-		// eslint-disable-next-line no-await-in-loop -- each redraw folds the state the last one left
+		// eslint-disable-next-line no-await-in-loop -- each redraw draws over the state the last one left
 		state = await redraw(state, redrawing)
-		spent.push({ reads: redrawing.reads.mock.calls.length, events: state.local?.events })
+		spent.push({ reads: redrawing.reads.mock.calls.length, local: state.local })
 	}
 
-	return { events: drawn.local?.events, spent }
-}
-
-interface Redrawn {
-	reads: number
-	// The stream the redraw drew — the folds over it are kept for as long as it is the same array.
-	events: ReadonlyArray<RunEvent> | undefined
-}
-
-interface Redraws {
-	// The stream the first frame drew.
-	events: ReadonlyArray<RunEvent> | undefined
-	spent: Array<Redrawn>
-}
-
-function most_read({ spent }: Redraws): number {
-	return Math.max(...spent.map(({ reads }) => reads))
+	return spent
 }
 
 interface Measured {
@@ -234,7 +217,7 @@ interface Measured {
 // joshuafolkken/kit#5185: a redraw fitted to a pane the size of a live one, right after another in the
 // same pane as a live board's once a second, its widths counted.
 async function fitted_redraw(): Promise<Measured> {
-	const { gather, reread } = rereading(false)
+	const { gather, reread } = rereading()
 	const { live, state, frames } = await first_frame(reread, gather)
 	const sized = { ...live, size: () => PANE }
 	const before = await redraw(state, { live: sized, reread, reads: vi.mocked(string_width) })
@@ -249,21 +232,11 @@ async function fitted_redraw(): Promise<Measured> {
 afterEach(() => vi.restoreAllMocks())
 
 describe('run_board_tick.tick frame budget', () => {
-	it('redraws a busy run read again reading less than one fold of its stream', async () => {
-		expect(most_read(await redraws_read())).toBeLessThan(READ_BUDGET)
-	})
+	it('redraws a busy run read again reading none of its stream on the board’s thread', async () => {
+		const spent = await redraws_read()
 
-	it('draws the stream it folded first while each read hands over the same stream', async () => {
-		const { events, spent } = await redraws_read()
-
-		expect(events).toHaveLength(EVENTS)
-		for (const redrawn of spent) expect(redrawn.events).toBe(events)
-	})
-
-	it('reads past the budget on every redraw when each read hands the stream over afresh', async () => {
-		const { spent } = await redraws_read(true)
-
-		for (const { reads } of spent) expect(reads).toBeGreaterThanOrEqual(READ_BUDGET)
+		expect(spent).toHaveLength(ROUNDS)
+		for (const redrawn of spent) expect(redrawn).toStrictEqual({ reads: 0, local: undefined })
 	})
 
 	it('measures no more widths in a redraw fitted to the pane than its frame has lines', async () => {

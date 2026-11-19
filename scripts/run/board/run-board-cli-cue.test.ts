@@ -1,15 +1,22 @@
 import { describe, expect, it } from 'vitest'
 import { run_board_cli } from './run-board-cli'
 import { run_board_fixture } from './run-board-fixture'
-import type { GatherRead } from './run-board-gather'
+import { run_board_gather, type GatherRead } from './run-board-gather'
+import {
+	run_board_gather_thread,
+	type GatherPost,
+	type GatherWorker,
+	type Handed,
+} from './run-board-gather-thread'
+import type { LocalRead } from './run-board-read'
 import type { CueName } from './run-board-sound-cues'
 import { run_board_sound_player } from './run-board-sound-player'
-import type { BoardPorts } from './run-board-state'
+import type { BoardPorts, BoardState } from './run-board-state'
 
 // joshuafolkken/kit#7951: the live board alone sounds a lane's launch; a single frame — `--once`,
 // `--chat`, `--every` — stays silent.
 
-const { LOCAL, STOPPED, harness, plan_titled } = run_board_fixture
+const { FIRST_ROUND, LOCAL, START, STOPPED, harness, plan_titled } = run_board_fixture
 const LAUNCH = { pos: 1, at: '2026-10-08T08:00:00.000Z', kind: 'child-launch', text: '#1 a' }
 // Enough waits for a few live frames, their spinners turned between them.
 const SLEEPS = 40
@@ -115,6 +122,57 @@ describe('run_board_cli.run sound switch', () => {
 		const cues: Array<CueName> = []
 
 		await expect(run_board_cli.run([], silenced(cues, 's'))).rejects.toBe(STOPPED)
+		expect(cues).toStrictEqual(['launch', 'launch'])
+	})
+})
+
+// joshuafolkken/kit#8160: the worker decides the cue over its own read of the run and hands it over on
+// the frame; the board plays it through its switch, once.
+function worker_post(local: LocalRead, board: BoardState, now_ms: number): Handed {
+	const read = { ...run_board_gather.FRESH_GATHER, local, read_ms: now_ms }
+	const data = { ...FIRST_ROUND.data, ...run_board_gather.read_of(read), plan: plan_titled('a') }
+
+	return run_board_gather_thread.post_of(board, read, data, now_ms)
+}
+
+// The frame the worker hands over once lane 1 launches after a quiet frame.
+function launched_post(): GatherPost {
+	const quiet = worker_post(LOCAL, FIRST_ROUND.board, START)
+
+	return worker_post({ ...LOCAL, events: [LAUNCH] }, quiet.board, START + QUIET_READS).post
+}
+
+// The live board over a worker that hands the launch's frame over once, its sound switch as `typed`
+// leaves it.
+function worker_launching(cues: Array<CueName>, typed: string): BoardPorts {
+	const ports = silenced(cues, typed)
+	const post = launched_post()
+	const worker: GatherWorker = {
+		on: (event, listener) => {
+			if (event === 'message') listener(post)
+		},
+		unref: () => undefined,
+	}
+
+	return { ...ports, gather: run_board_gather_thread.worker_gatherer(() => worker, ports.now) }
+}
+
+describe('run_board_cli.run cue the worker decided', () => {
+	it('hands the launch over on the worker’s frame', () => {
+		expect(launched_post().display?.cue).toBe('launch')
+	})
+
+	it('sounds nothing while the sound is off', async () => {
+		const cues: Array<CueName> = []
+
+		await expect(run_board_cli.run([], worker_launching(cues, ''))).rejects.toBe(STOPPED)
+		expect(cues).toStrictEqual([])
+	})
+
+	it('plays the launch once over every redraw of its frame once s switches the sound on', async () => {
+		const cues: Array<CueName> = []
+
+		await expect(run_board_cli.run([], worker_launching(cues, 's'))).rejects.toBe(STOPPED)
 		expect(cues).toStrictEqual(['launch', 'launch'])
 	})
 })

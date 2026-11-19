@@ -59,10 +59,17 @@ function port_header(ports: DrawPorts): PortHeader {
 	}
 }
 
-// The assembled header with what the ports add: the terminal's form, the sound switch and the links.
-function header_of(display: BoardDisplay, ports: DrawPorts): LaidHeader {
+// The assembled header with what the ports add — the terminal's form, the sound switch and the links —
+// stamped with this redraw's moment and the reads' failure as the board holds them now, so a display a
+// live board's worker assembled earlier still moves every elapsed time (joshuafolkken/kit#8160).
+function header_of(display: BoardDisplay, state: BoardState, redraw: Redraw): LaidHeader {
+	const { ports } = redraw
+
 	return {
 		...display.header,
+		now_ms: redraw.now_ms,
+		read_failed_ms: state.read_failed_ms,
+		read_error: state.read_error,
 		...port_header(ports),
 		...run_board_link.links_of(display.header.repo, ports.link),
 	}
@@ -116,7 +123,7 @@ function draw(ports: Pick<DrawPorts, 'write'>, lines: ReadonlyArray<string>): vo
 // The assembled frame drawn, its cue sounded through `cue` where the board passes one — before the
 // frame is written, so the notice shows on the frame it sounds on.
 function draw_display(state: BoardState, display: BoardDisplay, redraw: Redraw): BoardState {
-	const header = header_of(display, redraw.ports)
+	const header = header_of(display, state, redraw)
 
 	if (display.cue !== undefined) redraw.ports.cue?.(display.cue)
 	const drawn = frame_of(display, header, redraw)

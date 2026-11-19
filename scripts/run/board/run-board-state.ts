@@ -1,5 +1,6 @@
 import type { NamedPlan } from '#scripts/backlog/backlog-plan'
 import type { ClosedAnswer, ClosedIssue } from './run-board-closed'
+import type { BoardDisplay } from './run-board-display'
 import type { Fetch } from './run-board-fetch'
 import type { SectionKey, TerminalSize } from './run-board-fit'
 import type { FrameStore } from './run-board-frame-store'
@@ -166,8 +167,12 @@ type DataPost = Omit<BoardData, keyof GatherRead | FetchKey> & {
 	in_flight: ReadonlyArray<FetchKey>
 }
 
-// What a redraw gathers: the reads off this machine, and on a live board the data its worker folded over them.
-type BoardGather = GatherRead & { data?: DataPost | undefined }
+// What a redraw gathers: the reads off this machine, and on a live board the data its worker folded over
+// them and the frame it assembled over the run's read, which the board draws without the read itself.
+type BoardGather = GatherRead & {
+	data?: DataPost | undefined
+	display?: BoardDisplay | undefined
+}
 
 const FRESH_DATA: BoardData = {
 	local: undefined,

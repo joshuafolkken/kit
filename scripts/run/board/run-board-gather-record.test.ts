@@ -26,6 +26,7 @@ function round_of(fetched_ms: number | undefined): RoundState {
 	return {
 		gather: { ...run_board_gather.FRESH_GATHER, local: LOCAL, read_ms: START },
 		data: { ...run_board_state.FRESH_DATA, plan: plan_titled('a'), fetched_ms },
+		board: run_board_state.FRESH_STATE,
 	}
 }
 
