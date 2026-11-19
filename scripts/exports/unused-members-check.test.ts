@@ -15,6 +15,9 @@ const DROPPED_LINE = 'library.ts:3  library.dropped'
 const READ_ALL = 'export const value = library.kept() + library.dropped()'
 const NO_UNUSED = 'no unused namespace member'
 const LIBRARY = 'library.ts'
+const CLI_BUNDLE = fileURLToPath(
+	new URL('../../dist/commands/unused-members-cli.js', import.meta.url),
+)
 
 // A project that consumes kit, where the check is out of scope.
 function consumer_root(): string {
@@ -115,17 +118,34 @@ describe('unused_members_check.spawn_unused_members', () => {
 		expect(run.output).toContain(NO_UNUSED)
 		expect(spawn).not.toHaveBeenCalled()
 	})
+})
 
-	it('runs the CLI script with the files, not the core-claiming josh command', async () => {
+// joshuafolkken/kit#8203: the built bundle, so the child does not transform the CLI on every start.
+describe('unused_members_check.spawn_unused_members — the child launch', () => {
+	it('runs the CLI bundle of this package under node with the files, in a root that is not kit', async () => {
 		const spawn = vi
-			.spyOn(buffered_process, 'run_buffered_direct')
+			.spyOn(buffered_process, 'run_buffered_launch')
 			.mockResolvedValue({ output: DROPPED_LINE, exit_code: undefined, elapsed_ms: 0 })
 		const root = create_project(with_reader(READ_KEPT))
 		const run = await unused_members_check.spawn_unused_members(root, [LIBRARY])
 
 		expect(run).toStrictEqual({ exit_code: FAIL_EXIT_CODE, output: DROPPED_LINE })
 		expect(spawn).toHaveBeenCalledWith(
-			['exec', 'tsx', fileURLToPath(new URL('unused-members-cli.ts', import.meta.url)), LIBRARY],
+			{ file: process.execPath, args: [CLI_BUNDLE, LIBRARY] },
+			{ cwd: root },
+		)
+	})
+
+	it('scans the whole program with no file argument when given no list', async () => {
+		const spawn = vi
+			.spyOn(buffered_process, 'run_buffered_launch')
+			.mockResolvedValue({ output: NO_UNUSED, exit_code: 0, elapsed_ms: 0 })
+		const root = create_project(with_reader(READ_ALL))
+
+		await unused_members_check.spawn_unused_members(root)
+
+		expect(spawn).toHaveBeenCalledWith(
+			{ file: process.execPath, args: [CLI_BUNDLE] },
 			{ cwd: root },
 		)
 	})

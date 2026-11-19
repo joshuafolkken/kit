@@ -1,13 +1,19 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { doctor_consumer } from '#scripts/doctor/doctor-consumer'
+import { josh_in_process } from '#scripts/josh/josh-in-process'
 import { buffered_process } from '#scripts/lib/buffered-process'
 import { NOTHING_TO_CHECK_MARKER } from '#scripts/test/skip-marker'
 import type { NamespaceMember } from '#tools/exports/namespace-members'
 
 const CHECK = 'exports'
 const FAIL_EXIT_CODE = 1
-const CLI = '#scripts/exports/unused-members-cli'
+const CLI = 'unused-members-cli.ts'
+const PACKAGE_DIRECTORY = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
+// The CLI's build output, `<package>/dist/commands/unused-members-cli.js`. A bundle keeps its
+// source's `import.meta.url` (`scripts/build/source-location.ts`), so the CLI's guard also matches
+// this path for a node child started on it.
+const CLI_BUNDLE = josh_in_process.bundled_script_path(PACKAGE_DIRECTORY, CLI)
 // A consumer's namespaces are read from `.svelte` files and routes a TypeScript program over its
 // `tsconfig.json` does not see, so every member they use would read as unused. The check is kit's own.
 //
@@ -65,12 +71,14 @@ interface UnusedMembersRun {
 	output: string
 }
 
-// The child runs the CLI script, not `josh exports:unused`, which would claim the cores the
-// in-process check never did. No file list scans the whole program, as the CLI does with no argument.
-// The script is resolved from this package, not the root: the root under check need not be kit.
+// The child runs the CLI's built bundle under node, not `josh exports:unused`, which would claim the
+// cores the in-process check never did, nor the source under tsx, which transformed the CLI and its
+// imports on every start. `josh lint:related` runs past the dispatcher's rebuild of a stale `dist`
+// (`tools/josh/josh-ready.ts`). No file list scans the whole program, as the CLI does with no argument.
+// The bundle is resolved from this package, not the root: the root under check need not be kit.
 async function run_child(root: string, files: ReadonlyArray<string>): Promise<UnusedMembersRun> {
-	const list = ['exec', 'tsx', fileURLToPath(import.meta.resolve(CLI)), ...files]
-	const result = await buffered_process.run_buffered_direct(list, { cwd: root })
+	const launch = { file: process.execPath, args: [CLI_BUNDLE, ...files] }
+	const result = await buffered_process.run_buffered_launch(launch, { cwd: root })
 
 	return { exit_code: result.exit_code ?? FAIL_EXIT_CODE, output: result.output }
 }
@@ -90,6 +98,11 @@ async function spawn_unused_members(
 	return await run_child(root, files)
 }
 
-const unused_members_check = { run_unused_members, spawn_unused_members, CONSUMER_NOTICE }
+const unused_members_check = {
+	run_unused_members,
+	spawn_unused_members,
+	CLI_BUNDLE,
+	CONSUMER_NOTICE,
+}
 
 export { unused_members_check }
