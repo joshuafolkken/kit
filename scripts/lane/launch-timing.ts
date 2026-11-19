@@ -10,6 +10,7 @@
 const REBUILD_KEY = Symbol.for('josh.launch.rebuild_ms')
 const CORE_WAIT_KEY = Symbol.for('josh.launch.core_wait_ms')
 const PHASES_KEY = Symbol.for('josh.launch.phases')
+const DISPATCHED_KEY = Symbol.for('josh.launch.dispatched_ms')
 
 interface TimedPhase {
 	name: string
@@ -82,19 +83,32 @@ function core_wait_ms(): number | undefined {
 	return read_ms(CORE_WAIT_KEY)
 }
 
+// When the dispatcher started loading the command's module, from the process start
+// (joshuafolkken/kit#8218): the command takes its own start against it as its code load.
+function set_dispatched_ms(ms: number): void {
+	Reflect.set(globalThis, DISPATCHED_KEY, ms)
+}
+
+function dispatched_ms(): number | undefined {
+	return read_ms(DISPATCHED_KEY)
+}
+
 function clear(): void {
 	Reflect.deleteProperty(globalThis, REBUILD_KEY)
 	Reflect.deleteProperty(globalThis, CORE_WAIT_KEY)
+	Reflect.deleteProperty(globalThis, DISPATCHED_KEY)
 	Reflect.deleteProperty(globalThis, PHASES_KEY)
 }
 
 const launch_timing = {
 	clear,
 	core_wait_ms,
+	dispatched_ms,
 	mark,
 	phases,
 	rebuild_ms,
 	set_core_wait_ms,
+	set_dispatched_ms,
 	set_rebuild_ms,
 	timed,
 	timing,

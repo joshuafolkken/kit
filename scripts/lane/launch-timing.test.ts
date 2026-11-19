@@ -26,6 +26,16 @@ describe('launch_timing', () => {
 		expect(launch_timing.core_wait_ms()).toBeUndefined()
 	})
 
+	// joshuafolkken/kit#8218: the command reads its code load against when the dispatcher began loading it.
+	it('reads back the dispatch time the dispatcher set, and clears it beside the others', () => {
+		expect(launch_timing.dispatched_ms()).toBeUndefined()
+		launch_timing.set_dispatched_ms(REBUILD_MS)
+
+		expect(launch_timing.dispatched_ms()).toBe(REBUILD_MS)
+		launch_timing.clear()
+		expect(launch_timing.dispatched_ms()).toBeUndefined()
+	})
+
 	it('shares the value through the global registry, which a second copy of the module resolves to', () => {
 		Reflect.set(globalThis, Symbol.for('josh.launch.rebuild_ms'), REBUILD_MS)
 
