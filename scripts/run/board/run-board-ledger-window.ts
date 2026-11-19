@@ -14,6 +14,9 @@ import { run_board_usual } from './run-board-usual'
 // The read starts `MARGIN_DAYS` before the window, so a merge in the window whose lane was dispatched
 // shortly before it still finds its dispatch; only a lane running longer than the margin falls back.
 //
+// A live worker grows the window by the appended lines alone and lets go of the lines that fell out of
+// it (joshuafolkken/kit#8206).
+//
 // Remembered per ledger stamp, so a redraw over an unchanged ledger hands back the same array and the
 // readers' own memos aggregate nothing again (joshuafolkken/kit#7012).
 //
@@ -39,6 +42,9 @@ function is_board_entry(entry: LedgerEntry): boolean {
 	return BOARD_KINDS.has(entry.kind)
 }
 
+// joshuafolkken/kit#8206: the window grown by the appended lines alone, not read backward again on each
+// append; its start moves on with the clock, so it slides.
+const board_windows = lane_ledger.window_store(is_board_entry, { slides: true })
 const wholes = lane_ledger.tail_store(is_board_entry)
 
 function covers(entries: ReadonlyArray<LedgerEntry>, now_ms: number): boolean {
@@ -47,8 +53,7 @@ function covers(entries: ReadonlyArray<LedgerEntry>, now_ms: number): boolean {
 
 function read_window(path: string, now_ms: number): ReadonlyArray<LedgerEntry> {
 	const { since_ms } = lane_stats.window_of(READ_DAYS, now_ms)
-	const { entries: read } = lane_ledger.read_since(path, since_ms)
-	const entries = read.filter((entry) => is_board_entry(entry))
+	const entries = board_windows.read(path, since_ms)
 
 	if (!covers(entries, now_ms)) return wholes.read(path)
 

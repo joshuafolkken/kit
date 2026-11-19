@@ -312,12 +312,34 @@ function next_window(
 	}
 }
 
+// joshuafolkken/kit#8206: a sliding window — its reader's start only moves on with the clock — lets go
+// of the lines before the start once it moved on by `PRUNE_STEP_MS`, so a reader running for days holds
+// its window and at most one step more. A later ask for an earlier start reads backward again, so a
+// reader asking for several fixed starts keeps its window whole.
+const PRUNE_STEP_MS = BACKDATE_MARGIN_MS
+
+function pruned(window: Window, since_ms: number): Window {
+	if (since_ms - window.since_ms < PRUNE_STEP_MS) return window
+
+	const { tail } = window
+	const lines = tail.lines.filter((entry) => is_since(entry, since_ms))
+	const fragment = tail.entries.slice(tail.lines.length)
+	const entries = fragment.length === 0 ? lines : [...lines, ...fragment]
+
+	return { since_ms, tail: { ...tail, lines, entries } }
+}
+
 interface WindowStore {
 	// The kept entries at or after `since_ms`, oldest first; an absent or unreadable file has none.
 	readonly read: (path: string, since_ms: number) => ReadonlyArray<LedgerEntry>
 }
 
-function window_store(is_kept: Keep = is_any): WindowStore {
+interface WindowOptions {
+	// The reader's start only moves on with the clock: lines before it are let go (#8206).
+	readonly slides?: boolean
+}
+
+function window_store(is_kept: Keep = is_any, options: WindowOptions = {}): WindowStore {
 	const windows = new Map<string, Window>()
 
 	function read(path: string, since_ms: number): ReadonlyArray<LedgerEntry> {
@@ -331,7 +353,7 @@ function window_store(is_kept: Keep = is_any): WindowStore {
 			return EMPTY
 		}
 
-		windows.set(path, window)
+		windows.set(path, options.slides === true ? pruned(window, since_ms) : window)
 
 		return window.tail.entries.filter((entry) => is_since(entry, since_ms))
 	}
