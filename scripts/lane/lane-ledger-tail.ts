@@ -67,22 +67,70 @@ function base_of(previous: Tail | undefined, snapshot: Snapshot): Tail | undefin
 // The entries a store keeps; the others are parsed and dropped (joshuafolkken/kit#8034).
 type Keep = (entry: LedgerEntry) => boolean
 
-interface Growth {
-	readonly base: Tail | undefined
-	readonly from: number
-	readonly bytes: Buffer
+function read_range(descriptor: number, start: number, end: number): Buffer {
+	const bytes = Buffer.alloc(end - start)
+
+	return bytes.subarray(0, readSync(descriptor, bytes, 0, bytes.length, start))
+}
+
+// joshuafolkken/kit#8243: a read parses the file a chunk at a time, so a fresh process's first read of
+// a ledger of a hundred megabytes never holds its whole text, every line and every parsed entry at
+// once — only the entries kept so far and one chunk.
+const GROW_CHUNK_BYTES = 1_048_576
+const NO_BYTES = Buffer.alloc(0)
+
+interface Reading {
+	readonly descriptor: number
+	readonly size: number
 	readonly is_kept: Keep
 }
 
-function grow(snapshot: Snapshot, growth: Growth): Tail {
-	const { base, from, bytes, is_kept } = growth
-	const end = bytes.lastIndexOf(LINE_SEPARATOR) + 1
-	const parsed = parse_text(bytes.toString('utf8', 0, end)).filter((entry) => is_kept(entry))
-	const lines = [...(base?.lines ?? EMPTY), ...parsed]
-	const fragment = parse_text(bytes.toString('utf8', end)).filter((entry) => is_kept(entry))
-	const entries = fragment.length === 0 ? lines : [...lines, ...fragment]
+// The kept entries of the complete lines read through `position`, and the bytes read past the last
+// line separator — a line a chunk boundary cut, or at the end the fragment still landing.
+interface Growth {
+	readonly lines: Array<LedgerEntry>
+	readonly position: number
+	readonly rest: Buffer
+}
 
-	return { ...snapshot, size: from + bytes.length, offset: from + end, lines, entries }
+function parse_kept(bytes: Buffer, is_kept: Keep): Array<LedgerEntry> {
+	return parse_text(bytes.toString('utf8')).filter((entry) => is_kept(entry))
+}
+
+// One chunk further, or `undefined` once the snapshot's size — or the file's end — is reached.
+function grow_chunk(reading: Reading, growth: Growth): Growth | undefined {
+	const { descriptor, size, is_kept } = reading
+	const end_of_chunk = Math.min(size, growth.position + GROW_CHUNK_BYTES)
+	const read = read_range(descriptor, Math.min(growth.position, end_of_chunk), end_of_chunk)
+
+	if (read.length === 0) return undefined
+
+	const bytes = Buffer.concat([growth.rest, read])
+	const end = bytes.lastIndexOf(LINE_SEPARATOR) + 1
+	const kept = parse_kept(bytes.subarray(0, end), is_kept)
+
+	for (const entry of kept) growth.lines.push(entry)
+
+	return { lines: growth.lines, position: growth.position + read.length, rest: bytes.subarray(end) }
+}
+
+function grow_all(reading: Reading, start: Growth): Growth {
+	let growth = start
+	let next = grow_chunk(reading, growth)
+
+	while (next !== undefined) {
+		growth = next
+		next = grow_chunk(reading, growth)
+	}
+
+	return growth
+}
+
+// Where a read starts: past the base's parsed lines, or the file's start for a full read.
+function start_of(base: Tail | undefined): Growth {
+	if (base === undefined) return { lines: [], position: 0, rest: NO_BYTES }
+
+	return { lines: [...base.lines], position: base.offset, rest: NO_BYTES }
 }
 
 function next_tail(
@@ -93,12 +141,12 @@ function next_tail(
 ): Tail {
 	if (previous !== undefined && is_unchanged(previous, snapshot)) return previous
 
-	const base = base_of(previous, snapshot)
-	const from = base?.offset ?? 0
-	const bytes = Buffer.alloc(snapshot.size - from)
-	const length = readSync(descriptor, bytes, 0, bytes.length, from)
+	const start = start_of(base_of(previous, snapshot))
+	const { lines, position, rest } = grow_all({ descriptor, size: snapshot.size, is_kept }, start)
+	const fragment = parse_kept(rest, is_kept)
+	const entries = fragment.length === 0 ? lines : [...lines, ...fragment]
 
-	return grow(snapshot, { base, from, bytes: bytes.subarray(0, length), is_kept })
+	return { ...snapshot, size: position, offset: position - rest.length, lines, entries }
 }
 
 // `undefined` for an absent, unowned or unreadable file: an empty ledger.
@@ -177,12 +225,6 @@ const CHUNK_BYTES = 65_536
 // before it lands (`run-merge-dated.ts`), so the scan stops only past this margin.
 const BACKDATE_MARGIN_MS = 3_600_000
 const NONE: RecentWindow = { entries: EMPTY, reached_start: true }
-
-function read_range(descriptor: number, start: number, end: number): Buffer {
-	const bytes = Buffer.alloc(end - start)
-
-	return bytes.subarray(0, readSync(descriptor, bytes, 0, bytes.length, start))
-}
 
 // Where the chunk's first complete line starts: its head may be a line cut by the chunk boundary,
 // carried into the chunk before it — unless the chunk starts the file.
@@ -361,7 +403,13 @@ function window_store(is_kept: Keep = is_any, options: WindowOptions = {}): Wind
 	return { read }
 }
 
-const lane_ledger_tail = { read: every_entry.read, read_since, tail_store, window_store }
+const lane_ledger_tail = {
+	GROW_CHUNK_BYTES,
+	read: every_entry.read,
+	read_since,
+	tail_store,
+	window_store,
+}
 
 export type { RecentWindow, TailStore, WindowStore }
 export { lane_ledger_tail }
