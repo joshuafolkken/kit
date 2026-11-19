@@ -1,0 +1,7 @@
+{
+	"reason": "#8090 narrows test:related selection to the run's own change: named_of, symbol_code and with_lines (+25 code lines)",
+	"date": "2026-11-19",
+	"growth": {
+		"scripts.code_lines": 25
+	}
+}

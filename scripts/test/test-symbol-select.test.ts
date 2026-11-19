@@ -85,6 +85,34 @@ describe('test_symbol_select.select_from', () => {
 	})
 })
 
+// joshuafolkken/kit#8090: only the lines a run changed are the selection's input.
+describe('test_symbol_select.with_lines', () => {
+	const lines: ChangedLines = new Map([[LIB, [1]]])
+
+	it('leaves out a tracked file with no line changed, keeping an untracked one', () => {
+		const code = [LIB, MID, SOLO]
+
+		expect(test_symbol_select.with_lines(code, lines, new Set([SOLO]))).toEqual([LIB, SOLO])
+	})
+
+	it('selects no user of a tracked file with no line changed', () => {
+		const mid_lines: ChangedLines = new Map([[MID, [2]]])
+		const changed = test_symbol_select.with_lines([LIB, MID], mid_lines, new Set())
+		const sources = [...LIB_SOURCES, MID_SOURCE, ...far_tests(1)]
+		const { tests } = test_symbol_select.select_from(input_of(sources, changed, mid_lines))
+
+		expect(tests).toEqual([FAR_TEST])
+	})
+
+	it('selects the users of the one function changed, not those of the others', () => {
+		const changed = test_symbol_select.with_lines([LIB], lines, new Set())
+		const { tests } = test_symbol_select.select_from(input_of(LIB_SOURCES, changed, lines))
+
+		expect(tests).toEqual([ONE_TEST])
+		expect(tests).not.toContain(TWO_TEST)
+	})
+})
+
 describe('test_symbol_select.select_from — the direct users', () => {
 	it('reads the users within one file boundary as direct while following every user', () => {
 		const sources = [LIB_SOURCE, ONE_SOURCE, MID_SOURCE, ...far_tests(1)]

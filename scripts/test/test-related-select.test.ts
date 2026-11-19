@@ -19,6 +19,7 @@ const DIRECT_TEST = 'src/zz-direct.test.ts'
 const CHANGED_TEST = 'src/zzz-changed.test.ts'
 const E2E_SPEC = 'e2e/flow.spec.ts'
 const GONE_TEST = 'src/gone.test.ts'
+const SINCE_MAP_CODE = 'src/since-map.ts'
 const OUTER_TESTS = Array.from(
 	{ length: MAX_TEST_FILES + PAST_CAP },
 	(_, index) => `src/outer-${String(index).padStart(3, '0')}.test.ts`,
@@ -230,6 +231,49 @@ describe('test_related_select.select by declaration users', () => {
 
 		expect(selection.method).toBe('import')
 		expect(selection.tests).toHaveLength(MAX_TEST_FILES)
+	})
+})
+
+// The code files the declaration users were read from, `changed` the run's own change.
+async function symbol_input(
+	root: string,
+	scope: RelatedScope,
+	changed: ReadonlyArray<string>,
+): Promise<ReadonlyArray<string>> {
+	const read: Array<string> = []
+	const symbol = { tests: [], reach: [], direct: [] }
+	const readers: SelectReaders = {
+		...readers_of(root, ALL_TESTS, symbol),
+		symbols: async (_root, code) => {
+			read.push(...code)
+
+			return symbol
+		},
+	}
+
+	await test_related_select.select(root, scope, changed, readers)
+
+	return read
+}
+
+// joshuafolkken/kit#8090: a scope file the run did not change — a code file of the change since the
+// map naming a moved file — is no declaration users' input.
+describe('test_related_select.select — the declaration users’ input', () => {
+	let fixture: FixtureWorkspace
+
+	beforeEach(() => {
+		fixture = open_fixture()
+	})
+
+	afterEach(async () => {
+		await git_fixture_workspace.close_workspace(fixture)
+	})
+
+	it('reads the run’s own changed code alone', async () => {
+		const root = fixture.workspace
+		const scope = related_of(root, [CODE, SINCE_MAP_CODE])
+
+		expect(await symbol_input(root, scope, [CODE])).toEqual([CODE])
 	})
 })
 
