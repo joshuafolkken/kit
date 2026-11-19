@@ -7,7 +7,7 @@
 type ScreenMode = 'live' | 'plain'
 
 // The control bytes written on entering and on leaving, and each frame as written: `frame` in one
-// synchronized write, `held` without it for the first frame, revealed a line at a time.
+// synchronized write, `held` without it for the first frame, revealed a block at a time.
 interface Screen {
 	enter: string
 	frame: (text: string) => string
@@ -49,7 +49,7 @@ function overwritten_synced(text: string): string {
 	return synced(overwritten(text))
 }
 
-// The first frame, revealed a line at a time over the intro's typed line: the screen wiped first,
+// The first frame, revealed a block at a time over the intro's typed line: the screen wiped first,
 // whatever the intro left (joshuafolkken/kit#8000), and nothing held back by synchronized output.
 function wiped(text: string): string {
 	return `${CURSOR_HOME}${ERASE_BELOW}${text}`

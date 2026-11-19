@@ -123,7 +123,7 @@ async function redraw_forever(
 
 // A signal leaves through `on_exit`; a failed redraw leaves before its error is printed, so the error
 // lands on the normal screen rather than vanishing with the alternate one. Only a board in a theme types
-// its opening line, reveals its first frame a line at a time and types each row that appears after it;
+// its opening line, reveals its first frame a block at a time and types each row that appears after it;
 // one in none draws it whole at once.
 async function watch(ports: BoardPorts, theme: Theme | undefined): Promise<void> {
 	const screen = run_board_screen.screen_of('live')

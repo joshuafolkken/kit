@@ -2,6 +2,7 @@ import { stripVTControlCharacters } from 'node:util'
 import { describe, expect, it } from 'vitest'
 import { run_board_fit } from './run-board-fit'
 import type { BoardHeader } from './run-board-header'
+import { run_board_label_pair } from './run-board-label-pair'
 import type { BoardLayout, BoardRow } from './run-board-layout'
 import { run_board_render } from './run-board-render'
 import { run_board_render_condition } from './run-board-render-condition'
@@ -45,9 +46,10 @@ function frame_of(board: BoardHeader): RowFrame {
 }
 
 function drawn(row: BoardRow, board: BoardHeader): string {
-	return stripVTControlCharacters(
-		run_board_render_row.row_line(ROW_INDENT, row, frame_of(board)).text,
-	)
+	const { text } = run_board_render_row.row_line(ROW_INDENT, row, frame_of(board))
+
+	// joshuafolkken/kit#8224: a board in no theme draws a row without its title mark.
+	return run_board_label_pair.untitled(stripVTControlCharacters(text))
 }
 
 describe('run_board_render_row.row_line', () => {
