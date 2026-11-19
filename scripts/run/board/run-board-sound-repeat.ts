@@ -46,12 +46,13 @@ function is_kept(
 	pending: Pending | undefined,
 	standing: Cause,
 	transition: Cause | undefined,
-): boolean {
+): pending is Pending {
 	return transition?.cue !== standing.cue && pending?.cause.cue === standing.cue
 }
 
 // The pending cue carried into this frame: dropped once resolved, restarted when another cue stands or
 // this frame's transition sounds it afresh — a second lane entering the same wait counts from its own start.
+// A kept cue takes the cause standing now, so its replay names a lane still waiting, not one resolved.
 function carried(
 	pending: Pending | undefined,
 	standing: Cause | undefined,
@@ -59,7 +60,7 @@ function carried(
 	now_ms: number,
 ): Pending | undefined {
 	if (standing === undefined) return undefined
-	if (is_kept(pending, standing, transition)) return pending
+	if (is_kept(pending, standing, transition)) return { ...pending, cause: standing }
 
 	return { cause: standing, since_ms: now_ms, is_replayed: false }
 }

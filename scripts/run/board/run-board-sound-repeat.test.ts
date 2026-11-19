@@ -121,4 +121,21 @@ describe('run_board_sound_repeat.next_cue — a second instance of the same cue'
 
 		expect([entered.sounding?.cause.issue, again.sounding?.cause.cue]).toStrictEqual([2, 'human'])
 	})
+
+	it('names the lane still waiting in the replay once the lane it opened with resolves', () => {
+		const second = cause('human', 2)
+		const both: SoundSnapshot = {
+			rows: new Map([
+				[1, cause('human')],
+				[2, second],
+			]),
+			run: new Set(),
+		}
+		const left: SoundSnapshot = { rows: new Map([[2, second]]), run: new Set() }
+		const opened = next_cue(frame(), both, undefined, 0)
+		const resolved = next_cue(both, left, opened.pending, 1)
+		const replayed = next_cue(left, left, resolved.pending, REPLAY_AFTER_MS)
+
+		expect(replayed.sounding).toStrictEqual({ cause: second, is_repeat: true })
+	})
 })
