@@ -1,11 +1,13 @@
 import { change_base } from '#scripts/git/change-base'
 import { git_spawn } from '#scripts/git/git-spawn'
+import { split_measure } from '#scripts/split/split-measure'
 import { split_resolution } from '#scripts/split/split-resolution'
 import { test_pinned_logic } from '#scripts/test/test-pinned-logic'
 import { test_related_cap } from '#scripts/test/test-related-cap'
 import { lane_implement_rate } from './lane-implement-rate'
 import { lane_implement_rate_read } from './lane-implement-rate-read'
 import { lane_ledger, type LedgerEntry } from './lane-ledger'
+import { lane_plan_moves } from './lane-plan-moves'
 import type { PlanSignals } from './lane-plan-size'
 import { lane_size_stats } from './lane-size-stats'
 import { lane_stats } from './lane-stats'
@@ -37,7 +39,10 @@ function hunk_files(diff: string): Array<string> {
 	return test_pinned_logic.parse_hunks(diff).map((hunk) => hunk.file)
 }
 
-type TreeProbe = Pick<PlanSignals, 'hunk_files' | 'committed_files' | 'base_files'>
+type TreeProbe = Pick<
+	PlanSignals,
+	'hunk_files' | 'committed_files' | 'base_files' | 'moved_source_lines'
+>
 
 const NO_PROBE: TreeProbe = { hunk_files: [], committed_files: [] }
 
@@ -62,20 +67,46 @@ async function base_files_of(base: string): Promise<ReadonlySet<string> | undefi
 	}
 }
 
-async function probe_of(base: string): Promise<TreeProbe> {
+// The lines each planned move source holds at the base (`lane-plan-moves.ts`, joshuafolkken/kit#8119);
+// one it cannot read is left out, so it counts as nothing.
+async function moved_source_lines_of(
+	base: string,
+	paths: ReadonlyArray<string>,
+	base_files: ReadonlySet<string> | undefined,
+): Promise<ReadonlyMap<string, number>> {
+	const sources = lane_plan_moves.sources_of(paths, base_files)
+	const contents = await Promise.all(
+		sources.map(async (file) => await read_or_empty(['show', `${base}:${file}`])),
+	)
+
+	return new Map(
+		sources.map((file, index) => [
+			file,
+			split_measure.line_count(Buffer.from(contents[index] ?? '')),
+		]),
+	)
+}
+
+async function probe_of(base: string, paths: ReadonlyArray<string>): Promise<TreeProbe> {
 	const [diff, committed, base_files] = await Promise.all([
 		read_or_empty([...DIFF_ARGUMENTS, base]),
 		read_or_empty(['diff', NAME_ONLY, `${base}...HEAD`]),
 		base_files_of(base),
 	])
+	const moved_source_lines = await moved_source_lines_of(base, paths, base_files)
 
-	return { hunk_files: hunk_files(diff), committed_files: names_of(committed), base_files }
+	return {
+		hunk_files: hunk_files(diff),
+		committed_files: names_of(committed),
+		base_files,
+		moved_source_lines,
+	}
 }
 
-async function tree_of(): Promise<TreeProbe> {
+async function tree_of(paths: ReadonlyArray<string>): Promise<TreeProbe> {
 	const base = await change_base.resolved_through_merge()
 
-	return base === undefined ? NO_PROBE : await probe_of(base)
+	return base === undefined ? NO_PROBE : await probe_of(base, paths)
 }
 
 async function entries_of(): Promise<ReadonlyArray<LedgerEntry>> {
@@ -109,7 +140,7 @@ async function hubs_of(paths: ReadonlyArray<string>): Promise<ReadonlyArray<stri
 }
 
 async function signals_of(issue: number, paths: ReadonlyArray<string> = []): Promise<PlanSignals> {
-	const [tree, entries, hubs] = await Promise.all([tree_of(), entries_of(), hubs_of(paths)])
+	const [tree, entries, hubs] = await Promise.all([tree_of(paths), entries_of(), hubs_of(paths)])
 
 	return { ...signals_from(issue, tree, entries, Date.now()), hubs }
 }
