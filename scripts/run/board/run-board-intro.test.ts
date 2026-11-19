@@ -199,11 +199,11 @@ describe('run_board_intro.reveal', () => {
 		const { written, ports } = recorded(async (ms) => {
 			slept.push(ms)
 		})
-		const third = REVEAL_LINE_MS / 4
+		const quarter = REVEAL_LINE_MS / 4
 
 		await reveal(FRAME, ports, NO_KEYS, THEME)
 		expect(written).toStrictEqual(['ONE', '  TWO', '\n', '\nA', ' TITLE', '  B', '  C'])
-		expect(slept).toStrictEqual([37.5, 37.5, REVEAL_LINE_MS, third, third, third, third])
+		expect(slept).toStrictEqual([37.5, 37.5, REVEAL_LINE_MS, quarter, quarter, quarter, quarter])
 		expect(REVEAL_LINE_MS).toBe(75)
 	})
 
