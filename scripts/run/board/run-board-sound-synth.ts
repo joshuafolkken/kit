@@ -12,9 +12,18 @@ interface Note {
 }
 
 const REST = 'REST'
-// The default volume: amplitude as a fraction of full scale, applied here rather than by the player
-// because players do not take a volume argument alike across operating systems.
-const VOLUME = 0.5
+// The default loudness: the RMS (average level, not the amplitude) every note sounds at as a fraction
+// of full scale, about -20 dBFS like common notification sounds. Applied here rather than by the
+// player because players do not take a volume argument alike across operating systems.
+const TARGET_RMS = 0.1
+// Each wave's RMS at amplitude 1; a note's amplitude is `TARGET_RMS` over it, so no wave sounds
+// louder than another (joshuafolkken/kit#8190). A triangle's RMS is 1/√3.
+const TRIANGLE_MEAN_SQUARE_DIVISOR = 3
+const WAVE_RMS: ReadonlyMap<Wave, number> = new Map([
+	['sine', Math.SQRT1_2],
+	['square', 1],
+	['triangle', 1 / Math.sqrt(TRIANGLE_MEAN_SQUARE_DIVISOR)],
+])
 const FADE_MS = 5
 const MS_PER_SECOND = 1000
 const FULL_SCALE = 32_767
@@ -95,12 +104,13 @@ function note_samples(note: Note, sample_rate: number): Int16Array {
 
 	const frequency = frequency_of(note.pitch)
 	const fade_count = Math.max(1, sample_count_of(FADE_MS, sample_rate))
+	const amplitude = (TARGET_RMS / (WAVE_RMS.get(note.wave) ?? 1)) * FULL_SCALE
 
 	return Int16Array.from({ length: count }, (_, index) => {
 		const phase = ((index * frequency) / sample_rate) % 1
 		const gain = fade_gain(index, count, fade_count)
 
-		return Math.round(wave_value(note.wave, phase) * gain * VOLUME * FULL_SCALE)
+		return Math.round(wave_value(note.wave, phase) * gain * amplitude)
 	})
 }
 
@@ -111,7 +121,7 @@ function samples_of(notes: ReadonlyArray<Note>, sample_rate: number): Int16Array
 	return new Int16Array(parts.flatMap((part) => [...part]))
 }
 
-const run_board_sound_synth = { REST, VOLUME, frequency_of, samples_of }
+const run_board_sound_synth = { REST, TARGET_RMS, FULL_SCALE, frequency_of, samples_of }
 
 export { run_board_sound_synth }
 export type { Note, Wave }
