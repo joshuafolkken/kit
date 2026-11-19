@@ -4,6 +4,7 @@ import {
 	SUCCESS_EXIT_CODE,
 } from '#scripts/auto-ok/auto-ok-fixture'
 import type { EpicChild } from '#scripts/epic/epic-graph'
+import { epic_index, type FetchedEpics } from '#scripts/epic/epic-index'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { issue_publication_state } from '#scripts/issue/issue-publication-state'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -22,6 +23,10 @@ const CHAIN_WAITING = 8041
 const LONE_PENDING = 8057
 const CLOSED_BLOCKER = 8001
 const PAIR_LINE = '#8030 pending publication ← #8026'
+const LONE_LINE = '#8057 pending publication — missing: epic placement, publish'
+const EPIC_STEP = 'epic placement'
+const PLAN_STEP = 'plan record'
+const PUBLISH_STEP = 'publish'
 const FLAG = '--pending-publication'
 const PENDING_BODY = issue_publication_state.prepare('Prepared.', [])
 
@@ -99,10 +104,46 @@ describe('backlog_pending_publication.lines_of', () => {
 		).toStrictEqual([PAIR_LINE, backlog_pending_publication.PUBLISH_LINE])
 	})
 
-	it('says so when no pair exists', () => {
+	it('says so when no pair and no pending issue exists', () => {
 		expect(backlog_pending_publication.lines_of([])).toStrictEqual([
 			backlog_pending_publication.NONE_LINE,
 		])
+	})
+
+	it('prints each pending issue with its missing steps after the pairs', () => {
+		expect(
+			backlog_pending_publication.lines_of(
+				[{ blocker: PENDING, waiting: WAITING }],
+				[{ number: LONE_PENDING, steps: [EPIC_STEP, PUBLISH_STEP] }],
+			),
+		).toStrictEqual([PAIR_LINE, LONE_LINE, backlog_pending_publication.PUBLISH_LINE])
+	})
+})
+
+// joshuafolkken/kit#8173: a pending issue in no epic that blocks nothing has no pair, yet is listed.
+describe('backlog_pending_publication.pending_of', () => {
+	it('lists a pending issue in no epic that blocks nothing, with every missing step', () => {
+		expect(
+			backlog_pending_publication.pending_of(
+				BACKLOG.map((spec) => child(spec)),
+				REPO,
+				new Set([PENDING]),
+			),
+		).toStrictEqual([
+			{ number: PENDING, steps: [PLAN_STEP, PUBLISH_STEP] },
+			{ number: LONE_PENDING, steps: [EPIC_STEP, PLAN_STEP, PUBLISH_STEP] },
+		])
+	})
+
+	it('names only publish for a placed, planned issue and skips another repository', () => {
+		const children = [
+			{ ...child({ number: PENDING, body: PENDING_BODY }), labels: ['run:planned'] },
+			child({ number: LONE_PENDING, body: PENDING_BODY, repo: OTHER_REPO }),
+		]
+
+		expect(
+			backlog_pending_publication.pending_of(children, REPO, new Set([PENDING])),
+		).toStrictEqual([{ number: PENDING, steps: [PUBLISH_STEP] }])
 	})
 })
 
@@ -112,22 +153,65 @@ function stub_listing(json: string | undefined, is_capped: boolean): void {
 	vi.spyOn(git_gh_command, 'issue_list_open_relations').mockResolvedValue({ json, is_capped })
 }
 
-describe('backlog:plan --pending-publication', () => {
-	beforeEach(() => {
-		vi.restoreAllMocks()
-		vi.spyOn(console, 'info').mockImplementation(streams.info)
-		vi.spyOn(console, 'error').mockImplementation(streams.error)
-		streams.reset()
-		vi.spyOn(git_gh_command, 'repo_get_name_with_owner').mockResolvedValue(REPO)
-	})
+// One open epic tracking the blocker, so the lone pending issue is the one in no epic.
+function stub_epics(fetched: FetchedEpics | undefined): void {
+	vi.spyOn(epic_index, 'fetch_epics').mockResolvedValue(fetched)
+}
 
-	it('lists the pairs from the open relations listing', async () => {
+const EPICS: FetchedEpics = {
+	epics: [{ number: 8000, body: `- [ ] #${String(PENDING)}` }],
+	cutoff: 'none',
+}
+const ALL_STEPS_LINE = '#8057 pending publication — missing: epic placement, plan record, publish'
+
+function stub_cli(): void {
+	vi.restoreAllMocks()
+	vi.spyOn(console, 'info').mockImplementation(streams.info)
+	vi.spyOn(console, 'error').mockImplementation(streams.error)
+	streams.reset()
+	vi.spyOn(git_gh_command, 'repo_get_name_with_owner').mockResolvedValue(REPO)
+	stub_epics(EPICS)
+}
+
+describe('backlog:plan --pending-publication — every pending issue', () => {
+	beforeEach(stub_cli)
+
+	it('lists the pairs and every pending issue from the open relations listing', async () => {
 		stub_listing(BACKLOG_JSON, false)
 
 		await expect(backlog_plan_cli.run([FLAG])).resolves.toBe(SUCCESS_EXIT_CODE)
 		expect(streams.stdout()).toContain(PAIR_LINE)
+		expect(streams.stdout()).toContain(ALL_STEPS_LINE)
 		expect(streams.stderr()).not.toContain(backlog_pending_publication.TRUNCATED_MESSAGE)
 	})
+
+	it('lists a pending issue in no epic that blocks nothing rather than reporting none', async () => {
+		stub_listing(JSON.stringify([row({ number: LONE_PENDING, body: PENDING_BODY })]), false)
+
+		await expect(backlog_plan_cli.run([FLAG])).resolves.toBe(SUCCESS_EXIT_CODE)
+		expect(streams.stdout()).toContain(ALL_STEPS_LINE)
+		expect(streams.stdout()).not.toContain(backlog_pending_publication.NONE_LINE)
+	})
+
+	it('fails on an unreadable epic listing rather than naming every issue unplaced', async () => {
+		stub_listing(BACKLOG_JSON, false)
+		stub_epics(undefined)
+
+		await expect(backlog_plan_cli.run([FLAG])).resolves.toBe(FAILURE_EXIT_CODE)
+		expect(streams.stderr()).toContain(backlog_pending_publication.UNREADABLE_MESSAGE)
+	})
+
+	it('warns that a cut epic listing can misread placement', async () => {
+		stub_listing(BACKLOG_JSON, false)
+		stub_epics({ ...EPICS, cutoff: 'row_limit' })
+
+		await expect(backlog_plan_cli.run([FLAG])).resolves.toBe(SUCCESS_EXIT_CODE)
+		expect(streams.stderr()).toContain(backlog_pending_publication.TRUNCATED_MESSAGE)
+	})
+})
+
+describe('backlog:plan --pending-publication', () => {
+	beforeEach(stub_cli)
 
 	it('fails on an unreadable listing rather than reporting no pair', async () => {
 		stub_listing(undefined, false)
