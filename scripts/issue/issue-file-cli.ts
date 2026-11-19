@@ -121,8 +121,9 @@ async function link_release(url: string, filing: Filing): Promise<void> {
 
 // The Issue exists once `create` returns, so a failed placement is reported rather than failed: a
 // non-zero exit would read as "not filed" and invite the second filing the scout exists to stop —
-// except an unpublished split child, which publishing reaches only through an epic: its placement is
-// applied, and one that places nothing fails the filing with the next steps (`epic-bundle-apply.ts`).
+// except an unpublished split child filed directly (`is_placing_split`), which publishing reaches only
+// through an epic: its placement is applied, and one that places nothing fails the filing with the next
+// steps (`epic-bundle-apply.ts`).
 // The open listing trails the create call; `report_for` reads the new issue on its own when the
 // listing does not show it yet.
 async function place(url: string, target: string, mode: BundleMode): Promise<boolean> {
@@ -254,7 +255,8 @@ async function send(filing: Filing, labels: ReadonlyArray<string>): Promise<stri
 	await record_solo(url, filing, labels)
 	await record(url, filing, labels)
 	await link_release(url, filing)
-	const mode = has_label_name(labels, SPLIT_ROUTE_LABEL) ? 'place' : 'report'
+	const is_placing = filing.is_placing_split === true && has_label_name(labels, SPLIT_ROUTE_LABEL)
+	const mode = is_placing ? 'place' : 'report'
 
 	return (await place(url, filing.target, mode)) ? url : undefined
 }
@@ -372,7 +374,9 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	return await issue_file_pass.with_repository_restored(async () => {
 		if (filing.args.is_check) return await check(filing)
 
-		return (await file(filing)) === undefined ? FAILURE_EXIT_CODE : SUCCESS_EXIT_CODE
+		const url = await file({ ...filing, is_placing_split: true })
+
+		return url === undefined ? FAILURE_EXIT_CODE : SUCCESS_EXIT_CODE
 	})
 }
 

@@ -219,15 +219,19 @@ function required(
 	return { ...input(bundle), is_placement_required: true, ...overrides }
 }
 
+const NOTHING = 'nothing to place'
+const CYCLE = 'a cycle'
+const CUT = 'a cut listing'
+
 describe('epic_bundle_apply.apply_decision — placement required', () => {
 	beforeEach(() => {
 		vi.spyOn(console, 'error').mockImplementation(() => undefined)
 	})
 
 	it.each([
-		['nothing to place', required({ action: 'none' })],
-		['a cycle', required({ action: 'ask', epics: [EPIC_NUMBER] })],
-		['a cut listing', required({ action: 'none' }, { is_membership_established: false })],
+		[NOTHING, required({ action: 'none' })],
+		[CYCLE, required({ action: 'ask', epics: [EPIC_NUMBER] })],
+		[CUT, required({ action: 'none' }, { is_membership_established: false })],
 	])('fails with the epic steps on %s', async (_case, placement) => {
 		expect(await epic_bundle_apply.apply_decision(placement)).toBe(FAILURE_EXIT_CODE)
 		expect(console.error).toHaveBeenCalledWith(epic_bundle_apply.unplaced_line(SUBJECT_NUMBER))
@@ -237,8 +241,13 @@ describe('epic_bundle_apply.apply_decision — placement required', () => {
 		expect(epic_bundle_apply.unplaced_line(SUBJECT_NUMBER)).toContain('issue:file --publish <E>')
 	})
 
-	it('succeeds on a subject an epic already tracks', async () => {
-		const tracked = required({ action: 'none' }, { subject: issue(SUBJECT_NUMBER, { epic: 880 }) })
+	it.each([
+		[NOTHING, { action: 'none' as const }, true],
+		[CYCLE, { action: 'ask' as const }, true],
+		[CUT, { action: 'none' as const }, false],
+	])('succeeds on a subject an epic already tracks (%s)', async (_case, bundle, is_established) => {
+		const subject = issue(SUBJECT_NUMBER, { epic: 880 })
+		const tracked = required(bundle, { subject, is_membership_established: is_established })
 
 		expect(await epic_bundle_apply.apply_decision(tracked)).toBe(SUCCESS_EXIT_CODE)
 		expect(console.error).not.toHaveBeenCalled()

@@ -2,6 +2,6 @@
 	"reason": "#8172 adds the required-placement failure for unpublished split children (BundleMode + unapplied_exit/unplaced_line); +18 code lines within the Issue's ~30-line estimate",
 	"date": "2026-11-19",
 	"growth": {
-		"scripts.code_lines": 18
+		"scripts.code_lines": 22
 	}
 }

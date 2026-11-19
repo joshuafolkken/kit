@@ -138,11 +138,12 @@ function unplaced_line(issue_number: number): string {
 	return `✖ ${issue_cite.plain_for('github', issue_number)} is unpublished and in no confirmed epic, so publishing cannot reach it and no run picks it up. It is filed — do not file it again: create its epic with \`pnpm josh epic "<title>" ${String(issue_number)}\`, record the epic's plan, then publish it with \`pnpm josh issue:file --publish <E>\`.`
 }
 
-// `none` on a subject an epic already tracks is a placement made before; anything else wrote none.
+// A subject an epic already tracks was placed before, whatever this decision wrote.
 function unapplied_exit(input: ApplyInput): number {
-	const is_placed = input.subject.epic !== undefined && input.decision.action === 'none'
+	if (input.subject.epic !== undefined || input.is_placement_required !== true) {
+		return SUCCESS_EXIT_CODE
+	}
 
-	if (is_placed || input.is_placement_required !== true) return SUCCESS_EXIT_CODE
 	console.error(unplaced_line(input.subject.number))
 
 	return FAILURE_EXIT_CODE

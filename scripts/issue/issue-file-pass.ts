@@ -48,6 +48,9 @@ interface Filing {
 	target: string
 	current: string
 	scouted?: ScoutOutcome | undefined
+	// `issue:file` run directly: an unpublished split child is placed here. A caller filing through
+	// `file_issue` (`issue:spill`, `--batch`) places its children itself (joshuafolkken/kit#8172).
+	is_placing_split?: boolean
 }
 
 function auto_ok_filing(filing: Filing): AutoOkFiling {

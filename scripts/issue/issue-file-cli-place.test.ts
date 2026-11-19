@@ -80,6 +80,10 @@ interface Case {
 const SPLIT = 'split'
 const INTERRUPT = 'interrupt'
 
+function argv_of(route: string): Array<string> {
+	return ['A title', '--body-file', body_path, '--route', route]
+}
+
 describe('issue_file_cli.run — the epic placement a filing applies', () => {
 	it.each<Case>([
 		{ route: SPLIT, mode: 'place', placed: SUCCESS_EXIT_CODE, exit_code: SUCCESS_EXIT_CODE },
@@ -90,11 +94,19 @@ describe('issue_file_cli.run — the epic placement a filing applies', () => {
 		'--route $route runs epic:bundle $mode (answer $placed → exit $exit_code), URL printed',
 		async ({ route, mode, placed, exit_code }) => {
 			report_for.mockResolvedValue(placed)
-			const argv = ['A title', '--body-file', body_path, '--route', route]
-
-			expect(await issue_file_cli.run(argv)).toBe(exit_code)
+			expect(await issue_file_cli.run(argv_of(route))).toBe(exit_code)
 			expect(report_for).toHaveBeenCalledWith(ISSUE_NUMBER, HERE, mode)
 			expect(vi.mocked(console.info).mock.calls.join('\n')).toContain(ISSUE_URL)
 		},
 	)
+
+	// `issue:spill` and `--batch` file through `file_issue` and place their split children themselves,
+	// so the filing only reports and still answers with the URL of an Issue that exists.
+	it('leaves a split child filed through file_issue to its caller to place', async () => {
+		report_for.mockResolvedValue(FAILURE_EXIT_CODE)
+		const argv = argv_of(SPLIT)
+
+		expect(await issue_file_cli.file_issue(argv)).toBe(ISSUE_URL)
+		expect(report_for).toHaveBeenCalledWith(ISSUE_NUMBER, HERE, 'report')
+	})
 })
