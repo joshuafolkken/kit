@@ -198,6 +198,7 @@ The live redraw sounds a cue as the run moves (joshuafolkken/kit#7949, `run-boar
 - The opening frame is the base: the first frame sounds nothing, whatever it shows, even a run that is stopped or waiting on a person. A frame drawn before the plan's layout is read counts as the first frame too.
 - Live only: `--once`, `--chat` and `--every` never sound.
 - One replay after 10 minutes: a `human` or `alert` cue still standing 10 minutes after it sounded replays once. Where several stand, only the loudest replays. A cue sounded afresh, or a different cue starting to stand, starts the count again. An information cue never replays, and a frame's own cue takes precedence over a replay (`run-board-sound-repeat.ts`).
+- Picked before the header is drawn, sound on or off: each cue carries what sounded it — the lane's issue and its word, or the run's condition — and the frame that picks it ends the header's second line on it, so a muted board still shows what it would have sounded (joshuafolkken/kit#8107, `run-board-header-notice.ts`).
 
 The scenes, in the order the module's tests list them (`run-board-sound-transition.test.ts` checks this table against them):
 

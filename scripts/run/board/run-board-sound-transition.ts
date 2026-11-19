@@ -8,14 +8,27 @@ import type { ItemState } from './run-board-status'
 // Which cue `run:board` sounds as one frame follows another (joshuafolkken/kit#7949): each lane row and
 // the run as a whole are read down to what they would sound, and only what is new since the last frame
 // sounds — the loudest of it alone (`run-board-sound-cues.ts`). A CI result, a withdrawal, a pause and a
-// phase moving on are left out of the reading, so they never sound.
+// phase moving on are left out of the reading, so they never sound. Each cue carries its cause — the
+// row's issue and what it entered, or the run's condition — so the header can say what sounded
+// (joshuafolkken/kit#8107).
 
 // What the run as a whole is in, each sounding once on the frame it starts.
 type RunCondition = 'drained' | 'stopped' | 'human' | 'held' | 'offline'
 
+// A cue and the words for what sounded it, in the board's own vocabulary.
+interface Sound {
+	readonly cue: CueName
+	readonly word: string
+}
+
+// A cue with its cause: the row's issue, or none where the run as a whole sounded it.
+interface Cause extends Sound {
+	readonly issue?: number | undefined
+}
+
 interface SoundSnapshot {
-	// Each row's cue, by issue number; a row that would sound nothing is left out.
-	readonly rows: ReadonlyMap<number, CueName>
+	// Each row's cause, by issue number; a row that would sound nothing is left out.
+	readonly rows: ReadonlyMap<number, Cause>
 	readonly run: ReadonlySet<RunCondition>
 }
 
@@ -27,23 +40,26 @@ interface RunRead {
 
 const { DRAIN } = run_event_stream.EVENT_KIND
 
+const PERSON_WAIT: Sound = { cue: 'human', word: 'needs a person' }
+const FAILED_SHIP: Sound = { cue: 'alert', word: 'failed' }
+
 // A row's state as its cue: a launch, a lane's end, a wait on a person (🙋 and 💤 alike), a stopped lane.
-const ROW_CUES: Readonly<Partial<Record<ItemState, CueName>>> = {
-	running: 'launch',
-	merged: 'lane-end',
-	done: 'lane-end',
-	human: 'human',
-	parked: 'human',
-	stopped: 'alert',
+const ROW_SOUNDS: Readonly<Partial<Record<ItemState, Sound>>> = {
+	running: { cue: 'launch', word: 'running' },
+	merged: { cue: 'lane-end', word: 'merged' },
+	done: { cue: 'lane-end', word: 'done' },
+	human: PERSON_WAIT,
+	parked: PERSON_WAIT,
+	stopped: { cue: 'alert', word: 'stopped' },
 }
 
-const RUN_CUES: Readonly<Record<RunCondition, CueName>> = {
-	drained: 'drain',
-	stopped: 'alert',
+const RUN_SOUNDS: Readonly<Record<RunCondition, Sound>> = {
+	drained: { cue: 'drain', word: 'run drained' },
+	stopped: { cue: 'alert', word: 'run stopped' },
 	// A run with nothing left but what waits on a person has stopped as surely as a stopped one.
-	human: 'alert',
-	held: 'alert',
-	offline: 'alert',
+	human: { cue: 'alert', word: 'run needs a person' },
+	held: { cue: 'alert', word: 'usage held' },
+	offline: { cue: 'alert', word: 'offline' },
 }
 
 // A drained run is no stopped one: it ran out of work, so its stop never sounds as a fault. A usage
@@ -57,16 +73,16 @@ const RUN_CHECKS: ReadonlyArray<readonly [RunCondition, (read: RunRead) => boole
 ]
 
 // A ship that failed is a fault whatever state its row is drawn in.
-function row_cue(row: BoardRow): CueName | undefined {
-	if (row.status?.track?.at(-1) === 'failed') return 'alert'
+function row_sound(row: BoardRow): Sound | undefined {
+	if (row.status?.track?.at(-1) === 'failed') return FAILED_SHIP
 
-	return ROW_CUES[row.state]
+	return ROW_SOUNDS[row.state]
 }
 
-function row_entries(row: BoardRow): Array<[number, CueName]> {
-	const cue = row_cue(row)
+function row_entries(row: BoardRow): Array<[number, Cause]> {
+	const sound = row_sound(row)
 
-	return cue === undefined ? [] : [[row.number, cue]]
+	return sound === undefined ? [] : [[row.number, { ...sound, issue: row.number }]]
 }
 
 function conditions_of(
@@ -94,37 +110,42 @@ function snapshot_of(
 	return { rows: new Map(rows), run: conditions_of(header, events) }
 }
 
-function row_cues(previous: SoundSnapshot, current: SoundSnapshot): Array<CueName> {
-	const entered = [...current.rows].filter(([issue, cue]) => previous.rows.get(issue) !== cue)
-
-	return entered.map(([, cue]) => cue)
+// A row sounds when its cue changes; a move between two states of one cue stays silent.
+function row_causes(previous: SoundSnapshot, current: SoundSnapshot): Array<Cause> {
+	return [...current.rows]
+		.filter(([issue, cause]) => previous.rows.get(issue)?.cue !== cause.cue)
+		.map(([, cause]) => cause)
 }
 
-function run_cues(previous: SoundSnapshot, current: SoundSnapshot): Array<CueName> {
+function run_causes(previous: SoundSnapshot, current: SoundSnapshot): Array<Cause> {
 	return [...current.run]
 		.filter((condition) => !previous.run.has(condition))
-		.map((condition) => RUN_CUES[condition])
+		.map((condition) => RUN_SOUNDS[condition])
 }
 
-// The one cue this frame sounds; none on the first frame, whatever it shows.
-function cue_of(
+// The cause of the loudest cue among `causes` (`run-board-sound-cues.ts`), the first named winning a tie.
+function loudest_cause(causes: ReadonlyArray<Cause>): Cause | undefined {
+	const loudest = run_board_sound_cues.loudest(causes.map((cause) => cause.cue))
+
+	return causes.find((cause) => cause.cue === loudest)
+}
+
+// The one cause this frame sounds; none on the first frame, whatever it shows.
+function cause_of(
 	previous: SoundSnapshot | undefined,
 	current: SoundSnapshot | undefined,
-): CueName | undefined {
+): Cause | undefined {
 	if (previous === undefined || current === undefined) return undefined
 
-	return run_board_sound_cues.loudest([
-		...row_cues(previous, current),
-		...run_cues(previous, current),
-	])
+	return loudest_cause([...row_causes(previous, current), ...run_causes(previous, current)])
 }
 
-// Every cue a frame holds, its rows' and the run's alike — what stays true across frames, not what is new.
-function held_cues(snapshot: SoundSnapshot): Array<CueName> {
-	return [...snapshot.rows.values(), ...[...snapshot.run].map((condition) => RUN_CUES[condition])]
+// Every cause a frame holds, its rows' and the run's alike — what stays true across frames, not what is new.
+function held_causes(snapshot: SoundSnapshot): Array<Cause> {
+	return [...snapshot.rows.values(), ...[...snapshot.run].map((condition) => RUN_SOUNDS[condition])]
 }
 
-const run_board_sound_transition = { cue_of, held_cues, snapshot_of }
+const run_board_sound_transition = { cause_of, held_causes, loudest_cause, snapshot_of }
 
 export { run_board_sound_transition }
-export type { SoundSnapshot }
+export type { Cause, SoundSnapshot }

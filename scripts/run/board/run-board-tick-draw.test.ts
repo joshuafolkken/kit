@@ -2,7 +2,7 @@ import { stripVTControlCharacters } from 'node:util'
 import { describe, expect, it } from 'vitest'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_header } from './run-board-header'
-import type { BoardRow } from './run-board-layout'
+import type { BoardLayout, BoardRow } from './run-board-layout'
 import type { CueName } from './run-board-sound-cues'
 import type { BoardState } from './run-board-state'
 import { run_board_tick } from './run-board-tick'
@@ -18,6 +18,7 @@ const HEADER_LINES = 3
 const SECOND = 1000
 // Past the time the header's now line takes to type through.
 const TYPED_MS = 10 * SECOND
+const EPIC = 90
 
 function planned(): BoardState {
 	return { ...FRESH_STATE, plan: plan_titled('a'), run_started_ms: LOCAL.started_ms }
@@ -103,40 +104,64 @@ describe('run_board_tick_draw.draw_run cue', () => {
 	})
 })
 
-// The header's three lines a live redraw writes with the sound switch at `is_on`.
-function header_drawn(is_on: boolean): Array<string> {
-	const { ports, frames } = harness(LOCAL, [])
-	const state = planned()
-
-	draw_run(
-		state,
-		LOCAL,
-		{ ports: { ...ports, sound: () => is_on }, now_ms: START },
-		layout_for(state, LOCAL, START),
-	)
-
-	return stripVTControlCharacters(frames.join('')).split('\n').slice(0, HEADER_LINES)
+interface SoundDraw {
+	is_on: boolean
+	state?: BoardState
+	rows?: ReadonlyArray<BoardRow>
 }
 
-// joshuafolkken/kit#7952: the live header says whether the board sounds its cues.
+interface SoundDrawn {
+	lines: Array<string>
+	state: BoardState
+}
+
+// The header's three lines a live redraw over `rows` writes with the sound switch at `is_on`.
+function header_drawn({ is_on, state = planned(), rows }: SoundDraw): SoundDrawn {
+	const { ports, frames } = harness(LOCAL, [])
+	const run_layout = layout_for(state, LOCAL, START)
+	const sound_ports = { ...ports, sound: (): boolean => is_on }
+	const drawn = draw_run(
+		state,
+		LOCAL,
+		{ ports: sound_ports, now_ms: START },
+		{ ...run_layout, active: rows ?? run_layout.active },
+	)
+	const lines = stripVTControlCharacters(frames.join('')).split('\n').slice(0, HEADER_LINES)
+
+	return { lines, state: drawn }
+}
+
+// joshuafolkken/kit#7952, #8107: the live header ends its second line on the sound switch and the
+// last notice.
 describe('run_board_tick_draw.draw_run sound mark', () => {
-	it('draws 🔊 after josh-board while the sound is on, the lines under it aligned', () => {
-		expect(header_drawn(true)).toStrictEqual([
-			'⏸ josh-board 🔊  ⏰ 0″  ✅  0/- ──────────  🔄 0  ⏳ -  💤 0',
-			'  -                     💪 -  🧠 -  💾 -',
+	it('draws 🔊 and — at the end of the second line while the sound is on, none on the first', () => {
+		expect(header_drawn({ is_on: true }).lines).toStrictEqual([
+			'⏸ josh-board  ⏰ 0″  ✅  0/- ──────────  🔄 0  ⏳ -  💤 0',
+			'  -                  💪 -  🧠 -  💾 -  🔊 —',
 			'  kit',
 		])
 	})
 
-	it('draws 🔇 after josh-board while the sound is off', () => {
-		expect(header_drawn(false)[0]).toMatch(/^⏸ josh-board 🔇 {2}⏰/u)
+	it('records a notice the muted board keeps quiet, and draws it on the frame it is picked on', () => {
+		const before = header_drawn({ is_on: false, rows: [] }).state
+		const launched = header_drawn({ is_on: false, state: before, rows: [row(1, 'running')] })
+
+		expect(launched.state.notice?.cause).toStrictEqual({ cue: 'launch', word: 'running', issue: 1 })
+		expect(launched.lines[1]).toMatch(/🔇 \d{2}:\d{2} launch · #1 running$/u)
 	})
 })
 
-// A themed redraw over `rows` at `now_ms`, typing the rows and the header's now line.
-function typed_over(state: BoardState, rows: ReadonlyArray<BoardRow>, now_ms: number): BoardState {
+// A themed redraw over `rows` at `now_ms`, typing the rows and the header's now line; `queued` stands in
+// for the plan's queue where given.
+function typed_over(
+	state: BoardState,
+	rows: ReadonlyArray<BoardRow>,
+	now_ms: number,
+	queued?: BoardLayout['queued'],
+): BoardState {
 	const { ports } = harness(LOCAL, [])
-	const run_layout = { ...layout_for(state, LOCAL, START), active: rows }
+	const laid = layout_for(state, LOCAL, START)
+	const run_layout = { ...laid, active: rows, queued: queued ?? laid.queued }
 
 	return draw_run(state, LOCAL, { ports: { ...ports, types_rows: true }, now_ms }, run_layout)
 }
@@ -157,6 +182,31 @@ describe('run_board_tick_draw.draw_run now line typing', () => {
 
 		expect(typing_keys(appeared)).toContain(now_key)
 		expect(typing_keys(later)).not.toContain(now_key)
+	})
+})
+
+function epic_of(title: string): BoardLayout['queued'] {
+	return [{ kind: 'epic', epic: EPIC, title, rows: [row(EPIC + 1, 'waiting')] }]
+}
+
+// joshuafolkken/kit#8115: a queued epic's 📁 line types when it appears, and not again while it stays or
+// when only its title changes — its key is the epic's number.
+describe('run_board_tick_draw.draw_run epic line typing', () => {
+	const epic_key = `epic:${String(EPIC)}`
+	const base = typed_over(planned(), [], START, [])
+	const appeared = typed_over(base, [], START + SECOND, epic_of('an epic'))
+
+	it('types the 📁 line once the epic is queued after the base frame', () => {
+		expect(typing_keys(base)).not.toContain(epic_key)
+		expect(typing_keys(appeared)).toContain(epic_key)
+	})
+
+	it('types it not again on a later redraw, nor when only its title changes', () => {
+		const later = typed_over(appeared, [], START + TYPED_MS, epic_of('an epic'))
+		const retitled = typed_over(later, [], START + TYPED_MS + SECOND, epic_of('renamed'))
+
+		expect(typing_keys(later)).not.toContain(epic_key)
+		expect(typing_keys(retitled)).not.toContain(epic_key)
 	})
 })
 

@@ -44,19 +44,87 @@ function load(target: string): RecordedFrame | undefined {
 	return text === undefined ? undefined : frame_of(text)
 }
 
-function save(target: string, frame: RecordedFrame): void {
+async function save(target: string, frame: RecordedFrame): Promise<void> {
 	try {
-		stamp_file.replace_stamp(target, frame)
+		await stamp_file.replace_stamp_async(target, frame)
 	} catch {
 		// A failed write leaves no record, and the next answer reads from scratch.
 	}
 }
 
-function file_store(root: string = PROJECT_ROOT): FrameStore {
+interface LatestWriter {
+	save: (frame: RecordedFrame) => void
+	settled: () => Promise<void>
+}
+
+// The frame waiting for the write in flight, and that write's drain while one runs.
+interface WriterSlot {
+	waiting: RecordedFrame | undefined
+	draining: Promise<void> | undefined
+}
+
+// One key's writes, one at a time and never awaited by the saver: a frame saved while one is being
+// written replaces any still waiting, so the last frame saved is the last one written and no older
+// write lands over it.
+function latest_writer(write: (frame: RecordedFrame) => Promise<void>): LatestWriter {
+	const slot: WriterSlot = { waiting: undefined, draining: undefined }
+
+	async function drain(): Promise<void> {
+		const frame = slot.waiting
+
+		if (frame === undefined) {
+			slot.draining = undefined
+
+			return
+		}
+
+		slot.waiting = undefined
+		await write(frame)
+		await drain()
+	}
+
+	return {
+		save: (frame) => {
+			slot.waiting = frame
+			slot.draining ??= drain()
+		},
+		settled: async () => {
+			await slot.draining
+		},
+	}
+}
+
+// The file store's writes run off the caller's path; `settled` waits for every one started so far.
+interface FileFrameStore extends FrameStore {
+	settled: () => Promise<void>
+}
+
+function file_store(root: string = PROJECT_ROOT): FileFrameStore {
+	const writers = new Map<string, LatestWriter>()
+
+	function writer_of(key: string): LatestWriter {
+		const writer =
+			writers.get(key) ??
+			latest_writer(async (frame) => {
+				await save(path_of(key, root), frame)
+			})
+
+		writers.set(key, writer)
+
+		return writer
+	}
+
 	return {
 		load: (key) => load(path_of(key, root)),
 		save: (key, frame) => {
-			save(path_of(key, root), frame)
+			writer_of(key).save(frame)
+		},
+		settled: async () => {
+			await Promise.all(
+				[...writers.values()].map(async (writer) => {
+					await writer.settled()
+				}),
+			)
 		},
 	}
 }
@@ -123,6 +191,7 @@ const run_board_frame_store = {
 	FRESH_MS,
 	file_store,
 	fresh,
+	latest_writer,
 	memory_store,
 	once_key,
 	path_of,
@@ -131,4 +200,4 @@ const run_board_frame_store = {
 }
 
 export { run_board_frame_store }
-export type { FrameStore, RecordedFrame }
+export type { FileFrameStore, FrameStore, RecordedFrame }

@@ -1,0 +1,7 @@
+{
+	"reason": "#8107 adds the header notice: a cause carried with each cue, the notice state and its header part",
+	"date": "2026-11-19",
+	"growth": {
+		"scripts.code_lines": 83
+	}
+}

@@ -506,7 +506,7 @@ A `run:planned` candidate's plan comment (the latest trusted one carrying `### �
 
 A first plan over twice the files its `- 規模見積もり:` declares (tests excluded) answers `split`, exit 3, unrecorded, naming the files to file with `--route split`; an undeclared issue never does. A generated artifact planned beside its source (`.codex/hooks.json` beside `.claude/settings.json`, from `codex_hooks.GENERATED_SOURCES`) is not counted; planned without its source, it counts.
 
-Hunks over twice declared files or declared lines × recent ratio over 200 also split. Splits log their reason; hunks exclude planned files.
+Hunks outside planned files over 2× declared files, or declared lines × recent ratio (min 160 per new file) over 200, also split; logged.
 
 A planned `test:related` hub (reach over the test-file cap, `scripts/test/test-related-cap.ts`) also splits, as `split (hub)` naming it; with no dependency graph none reads as a hub. Related: [#6180](https://github.com/joshuafolkken/kit/issues/6180) splits the hubs themselves.
 

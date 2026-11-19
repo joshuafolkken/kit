@@ -19,6 +19,17 @@ vi.mock(import('node:fs'), async (import_original) => {
 	return { ...actual, renameSync: rename_after_probe }
 })
 
+vi.mock(import('node:fs/promises'), async (import_original) => {
+	const actual = await import_original()
+
+	async function rename_after_probe(old_path: PathLike, new_path: PathLike): Promise<void> {
+		before_rename()
+		await actual.rename(old_path, new_path)
+	}
+
+	return { ...actual, rename: rename_after_probe }
+})
+
 const { atomic_write } = await import('./atomic-write')
 
 const make_directory = temporary_directory('suite')
@@ -31,6 +42,7 @@ const EXECUTABLE_MODE = 0o755
 const PERMISSION_RANGE = 0o1000
 const RENAME_FAILURE = 'rename failed'
 const RECORD = 'record.json'
+const KEPT = 'kept'
 
 function directory_for(name: string): string {
 	const directory = path.join(scratch, name)
@@ -100,7 +112,7 @@ describe('atomic_write.replace_file — the staging file', () => {
 
 	it('removes its staging file and keeps the old content when the rename fails', () => {
 		const directory = directory_for('failing')
-		const target = path.join(directory, 'kept')
+		const target = path.join(directory, KEPT)
 
 		atomic_write.replace_file(target, FIRST)
 		before_rename.mockImplementationOnce(function fail(): void {
@@ -111,6 +123,40 @@ describe('atomic_write.replace_file — the staging file', () => {
 			atomic_write.replace_file(target, SECOND)
 		}).toThrow(RENAME_FAILURE)
 		expect(readFileSync(target, 'utf8')).toBe(FIRST)
-		expect(readdirSync(directory)).toEqual(['kept'])
+		expect(readdirSync(directory)).toEqual([KEPT])
+	})
+})
+
+// joshuafolkken/kit#8124: the live board's frame records are written without holding the redraw.
+describe('atomic_write.replace_file_async', () => {
+	it('stages and renames as the synchronous replace does, leaving only the target', async () => {
+		const directory = directory_for('async')
+		const target = path.join(directory, RECORD)
+		const staged: Array<Array<string>> = []
+
+		before_rename.mockImplementationOnce(function list_staging(): void {
+			staged.push(readdirSync(directory))
+		})
+
+		await atomic_write.replace_file_async(target, FIRST, { mode: PRIVATE_MODE })
+
+		expect(staged[0]).toEqual([expect.stringMatching(/^record\.json\..+\.tmp$/u)])
+		expect(readFileSync(target, 'utf8')).toBe(FIRST)
+		expect(statSync(target).mode % PERMISSION_RANGE).toBe(PRIVATE_MODE)
+		expect(readdirSync(directory)).toEqual([RECORD])
+	})
+
+	it('cleans up its staging file and keeps the old content on a failed rename', async () => {
+		const directory = directory_for('async-failing')
+		const target = path.join(directory, KEPT)
+
+		await atomic_write.replace_file_async(target, FIRST)
+		before_rename.mockImplementationOnce(function fail(): void {
+			throw new Error(RENAME_FAILURE)
+		})
+
+		await expect(atomic_write.replace_file_async(target, SECOND)).rejects.toThrow(RENAME_FAILURE)
+		expect(readFileSync(target, 'utf8')).toBe(FIRST)
+		expect(readdirSync(directory)).toEqual([KEPT])
 	})
 })
