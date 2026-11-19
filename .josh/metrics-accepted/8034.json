@@ -1,0 +1,7 @@
+{
+	"reason": "The board's own kind-filtered tail cache (tail_store) so the live worker stops holding every ledger row (#8034)",
+	"date": "2026-11-19",
+	"growth": {
+		"scripts.code_lines": 46
+	}
+}

@@ -21,6 +21,10 @@ function read_since(path: string, since_ms: number): RecentWindow {
 	return lane_ledger_tail.read_since(path, since_ms)
 }
 
+// A tail cache of its own, holding only the entries `is_kept` passes, for a long-lived reader that
+// needs a few kinds (joshuafolkken/kit#8034); `read_entries`' cache is never touched.
+const { tail_store } = lane_ledger_tail
+
 // The names a reader looks entries up by and the ledger it reads, the writer's own.
 const {
 	CI_WAIT_STAGE,
@@ -44,11 +48,12 @@ const lane_ledger = {
 	ROUND_ONE_REUSED,
 	read_entries,
 	read_since,
+	tail_store,
 	target,
 	target_of,
 }
 
-export type { RecentWindow } from './lane-ledger-tail'
+export type { RecentWindow, TailStore } from './lane-ledger-tail'
 export type {
 	CoreWaitEntry,
 	CoreWaitRecord,

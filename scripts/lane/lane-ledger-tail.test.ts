@@ -184,3 +184,45 @@ describe('lane_ledger_tail.read on a line still landing', () => {
 		expect(lane_ledger_tail.read(target)).toStrictEqual([merge(1), merge(9), merge(10)])
 	})
 })
+
+function is_odd(entry: object): boolean {
+	return 'issue' in entry && Number(entry.issue) % 2 === 1
+}
+
+// joshuafolkken/kit#8034: a store of its own holds only the entries its filter passes.
+describe('lane_ledger_tail.tail_store', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('holds only the kept entries and parses only the appended lines', () => {
+		const target = ledger('store-append')
+		const store = lane_ledger_tail.tail_store(is_odd)
+
+		lane_ledger_write.append(target, merge(1))
+		lane_ledger_write.append(target, merge(2))
+		store.read(target)
+		const parse = vi.spyOn(json_value, 'parse_or_undefined')
+
+		lane_ledger_write.append(target, merge(3))
+
+		expect(store.read(target)).toStrictEqual([merge(1), merge(3)])
+		expect(parse.mock.calls.map(([line]) => line).filter(Boolean)).toStrictEqual([
+			JSON.stringify(merge(3)),
+		])
+		expect(lane_ledger_tail.read(target)).toStrictEqual([merge(1), merge(2), merge(3)])
+	})
+
+	it('reads the whole file again once it forgets the path', () => {
+		const target = ledger('store-forget')
+		const store = lane_ledger_tail.tail_store(is_odd)
+
+		lane_ledger_write.append(target, merge(1))
+		const first = store.read(target)
+
+		store.forget(target)
+
+		expect(store.read(target)).not.toBe(first)
+		expect(store.read(target)).toStrictEqual([merge(1)])
+	})
+})

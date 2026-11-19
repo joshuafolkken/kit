@@ -1,6 +1,7 @@
 import { lane_host_gaps } from '#scripts/lane/lane-host-gaps'
-import { lane_ledger, type LedgerEntry } from '#scripts/lane/lane-ledger'
+import type { LedgerEntry } from '#scripts/lane/lane-ledger'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { run_board_ledger_window } from './run-board-ledger-window'
 import { run_board_read } from './run-board-read'
 import { run_board_read_fixture } from './run-board-read-fixture'
 
@@ -36,7 +37,7 @@ afterEach(() => {
 describe('run_board_read.read_local usual times net of the host stops', () => {
 	it('takes the stops on the whole stream out of the usual implementation', async () => {
 		arrange({ kind: 'none' }, ENDED_RUN)
-		vi.spyOn(lane_ledger, 'read_entries').mockReturnValue([DISPATCHED, PREFLIGHT])
+		vi.spyOn(run_board_ledger_window, 'entries_of').mockReturnValue([DISPATCHED, PREFLIGHT])
 		const gaps_of = vi.spyOn(lane_host_gaps, 'gaps_of').mockReturnValue([SLEEP])
 		const read = await run_board_read.read_local()
 
