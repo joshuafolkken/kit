@@ -1,0 +1,7 @@
+{
+	"reason": "Async atomic replace, async stamp replace and a per-key latest-only frame writer take the live board's frame records off the per-second redraw (#8124), plus their tests",
+	"date": "2026-11-19",
+	"growth": {
+		"scripts.code_lines": 90
+	}
+}
