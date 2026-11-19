@@ -2,7 +2,8 @@ import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_board_cli } from '#scripts/run/board/run-board-cli'
 import { run_board_every } from '#scripts/run/board/run-board-every'
-import { run_board_gather } from '#scripts/run/board/run-board-gather'
+import { run_board_fixture } from '#scripts/run/board/run-board-fixture'
+import { run_board_gather, type GatherRead } from '#scripts/run/board/run-board-gather'
 import { run_board_ledger_window } from '#scripts/run/board/run-board-ledger-window'
 import { run_board_tick } from '#scripts/run/board/run-board-tick'
 import { run_event_tail } from '#scripts/run/event/run-event-tail'
@@ -12,6 +13,7 @@ import { run_board_profile_main } from './run-board-profile-main'
 
 const PER_SECOND = MS_PER_MINUTE / run_board_gather.MACHINE_SAMPLE_MS
 const REPOSITORY = '/repository'
+const NEW_EVENTS = 'redraw (new events)'
 
 vi.mock(import('./run-board-profile'), async (import_original) => {
 	const original = await import_original()
@@ -22,6 +24,23 @@ vi.mock(import('./run-board-profile'), async (import_original) => {
 vi.mock(import('#scripts/run/event/run-event-tail'), () => ({
 	run_event_tail: { read_events: vi.fn() },
 }))
+
+// What the redraw after new events hands its tick when the tick asks for the read.
+async function gathered(read: GatherRead): Promise<GatherRead> {
+	const state = run_board_tick.FRESH_STATE
+	const ports = { ...run_board_cli.LIVE_PORTS, gather: async () => read }
+	const tick = vi.spyOn(run_board_tick, 'tick').mockResolvedValue(state)
+	const piece = run_board_profile_main
+		.redraw_pieces({ read, ports, state })
+		.find((candidate) => candidate.label === NEW_EVENTS)
+
+	await piece?.run()
+	const [, tick_ports] = tick.mock.calls[0] ?? []
+
+	tick.mockRestore()
+
+	return await (tick_ports?.gather('background') ?? Promise.reject(new Error('no tick')))
+}
 
 describe('run-board-profile-main', () => {
 	it('measures nothing when it is imported rather than run', () => {
@@ -51,9 +70,23 @@ describe('run-board-profile-main redraw pieces (#8147)', () => {
 
 		expect(pieces.map((piece) => [piece.label, piece.per_minute])).toStrictEqual([
 			['redraw', PER_SECOND],
-			['redraw (new events)', MS_PER_MINUTE / run_board_gather.LOCAL_READ_MS],
+			[NEW_EVENTS, MS_PER_MINUTE / run_board_gather.LOCAL_READ_MS],
 			['record (chat + once)', MS_PER_MINUTE / run_board_every.RECORD_EVERY_MS],
 		])
+	})
+
+	it('hands each redraw after new events a fresh copy of the read events', async () => {
+		const read = { ...run_board_tick.FRESH_STATE, local: run_board_fixture.LOCAL }
+		const { local } = await gathered(read)
+
+		expect(local?.events).not.toBe(read.local.events)
+		expect(local?.events).toStrictEqual(read.local.events)
+	})
+
+	it('hands the read as it is when no run has started', async () => {
+		const read = run_board_tick.FRESH_STATE
+
+		await expect(gathered(read)).resolves.toBe(read)
 	})
 })
 
