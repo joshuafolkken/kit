@@ -1,5 +1,6 @@
 import { lane_implement_rate, type ImplementRate } from './lane-implement-rate'
 import { lane_ledger } from './lane-ledger'
+import { lane_ledger_kind } from './lane-ledger-kind'
 import type { MeasureContext } from './lane-sampler'
 import { lane_size_stats, type SizeRatios } from './lane-size-stats'
 import { lane_stats } from './lane-stats'
@@ -17,7 +18,7 @@ interface SizeMeasurements {
 // joshuafolkken/kit#8243: the kinds the rate and the size ratios read. A long-lived reader — the board's
 // plan read — keeps these, not every entry of the whole ledger; the whole ledger still, since a lane
 // merged in the window may have been dispatched and sized before it.
-const { KIND } = lane_ledger
+const { KIND } = lane_ledger_kind
 const RATE_KINDS: ReadonlySet<string> = new Set([KIND.STAGE, KIND.DISPATCH, KIND.SIZE, KIND.MERGE])
 const rate_entries = lane_ledger.tail_store((entry) => RATE_KINDS.has(entry.kind))
 
