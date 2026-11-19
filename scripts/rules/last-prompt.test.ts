@@ -18,6 +18,35 @@ const ASSISTANT_LINE = JSON.stringify({ type: 'assistant', message: { content: '
 const PASTED_PROMPT = 'explain this log: closed #7'
 const NOTIFICATION = 'task-notification'
 
+describe('last_prompt.call_prompt', () => {
+	const CALL = JSON.stringify({
+		type: 'assistant',
+		message: {
+			content: [
+				{ type: 'text', text: 'x' },
+				{ type: 'tool_use', id: 'toolu_9' },
+			],
+		},
+	})
+
+	it('reads the person’s last prompt before the call, not one after it', () => {
+		const text = [prompt_line('first'), prompt_line('asked'), CALL, prompt_line('later')].join('\n')
+
+		expect(last_prompt.call_prompt(text, 'toolu_9')).toBe('asked')
+	})
+
+	it.each([
+		['the call is not on the text', [prompt_line('asked'), ASSISTANT_LINE]],
+		['no prompt precedes the call', [TOOL_RESULT_LINE, CALL, prompt_line('later')]],
+	])('is undefined when %s', (_name, lines) => {
+		expect(last_prompt.call_prompt(lines.join('\n'), 'toolu_9')).toBeUndefined()
+	})
+
+	it('is undefined for a missing transcript', () => {
+		expect(last_prompt.call_prompt_at('/no/such/session.jsonl', 'toolu_9')).toBeUndefined()
+	})
+})
+
 describe('last_prompt — native Codex provenance', () => {
 	const { line } = codex_transcript_fixture
 	const INSTRUCTION = '追跡Issueを起票してください'

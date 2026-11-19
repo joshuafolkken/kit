@@ -1,11 +1,11 @@
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
+import path from 'node:path'
 import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { hook_tool_payload } from '#scripts/josh/hook-tool-payload'
 import { json_value } from '#scripts/lib/json-value'
 import { last_prompt } from '#scripts/rules/last-prompt'
 import { unasked_filing } from '#scripts/rules/unasked-filing'
 import { time_shell } from '#scripts/time-runtime/time-shell'
-import { transcript_tail } from '#scripts/time-runtime/transcript-tail'
 import { z } from 'zod'
 import { hook_context, type HookContext } from './hook-context'
 import { implementation_shell } from './implementation-shell'
@@ -35,31 +35,45 @@ function unverified_write(raw_payload: string): string | undefined {
 
 // **A no-filing request is built by the production subagent** (joshuafolkken/kit#7761). The harness
 // stamps `agent_id` and `agent_type` on a call made inside a subagent, and `transcript_path` names the
-// parent's transcript, where the person's last prompt sits. Only those harness fields and the person's
-// own prompt line grant it — a tool result or a subagent's hand-back is not a person prompt
-// (`last_prompt.person_prompt`). Shell writes keep their refusal (`implementation-shell.ts`).
+// parent's transcript. Only those harness fields and the person's own prompt line grant it — a tool
+// result or a subagent's hand-back is not a person prompt (`last_prompt.person_prompt`). Shell writes
+// keep their refusal (`implementation-shell.ts`).
+//
+// **The prompt that grants it is the one the producer was dispatched under**, not the person's latest:
+// a prompt sent while the producer works would otherwise revoke it mid-task (joshuafolkken/kit#8248).
+// The harness files the launch at `<session>/subagents/agent-<agent_id>.meta.json`, whose `toolUseId`
+// names the parent's Agent call; with no such record or call, the edit is refused.
 const PRODUCERS: ReadonlySet<string> = new Set(['producer', 'kit:producer'])
 
 const SUBAGENT_CALL_SCHEMA = z.object({
 	tool_name: z.enum(['Edit', 'Write']),
-	agent_id: z.string().min(1),
+	agent_id: z.string().regex(/^[\w-]+$/u),
 	agent_type: z.string(),
 	transcript_path: z.string().min(1),
 })
 
-function person_asks_no_filing(transcript_path: string): boolean {
-	if (!existsSync(transcript_path)) return false
-	const text = last_prompt.prompt_reach(transcript_tail.read_tail(transcript_path), transcript_path)
-	const prompt = last_prompt.person_prompt(text)
+const LAUNCH_SCHEMA = z.object({ toolUseId: z.string().min(1) })
 
-	return prompt !== undefined && unasked_filing.is_no_filing(prompt)
+function dispatch_id(transcript_path: string, agent_id: string): string | undefined {
+	const session = transcript_path.replace(/\.jsonl$/u, '')
+	const launch = path.join(session, 'subagents', `agent-${agent_id}.meta.json`)
+	if (!existsSync(launch)) return undefined
+	const parsed = LAUNCH_SCHEMA.safeParse(
+		json_value.parse_or_undefined(readFileSync(launch, 'utf8')),
+	)
+
+	return parsed.data?.toolUseId
 }
 
 function is_no_filing_production(raw_payload: string): boolean {
 	const call = SUBAGENT_CALL_SCHEMA.safeParse(json_value.parse_or_undefined(raw_payload))
 	if (!call.success || !PRODUCERS.has(call.data.agent_type)) return false
+	const { transcript_path, agent_id } = call.data
+	const tool_use_id = dispatch_id(transcript_path, agent_id)
+	if (tool_use_id === undefined) return false
+	const prompt = last_prompt.call_prompt_at(transcript_path, tool_use_id)
 
-	return person_asks_no_filing(call.data.transcript_path)
+	return prompt !== undefined && unasked_filing.is_no_filing(prompt)
 }
 
 // A granted edit names its paths, so it passes `unverified_write` too.
