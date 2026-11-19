@@ -60,6 +60,20 @@ function assembled(
 	return run_board_display.assemble_display(state, local, now_ms, layout)
 }
 
+// Each redraw after the settled tick draws the frame as the worker posts it (joshuafolkken/kit#8160):
+// the data and the frame assembled over the run's read, which stays on the worker; the worker's own
+// assembly keeps the run's read.
+function settled_from({ read, ports, state }: Settled): Settled {
+	const posted = {
+		...read,
+		local: undefined,
+		data: run_board_data.posted(state),
+		display: assembled(state, read.local, Date.now()),
+	}
+
+	return { read, ports: { ...ports, gather: async () => posted }, state }
+}
+
 // One read taken beforehand, drawn and written nowhere. The settled tick waits for the GitHub reads,
 // so none lands inside a later piece's measurement, and no snapshot store is given, so the live
 // board's kept GitHub reads are not rewritten.
@@ -74,16 +88,8 @@ async function settled(): Promise<Settled> {
 		snapshot: undefined,
 	}
 	const state = await run_board_tick.tick(run_board_tick.FRESH_STATE, ports, 'settled')
-	// Each redraw after it draws the frame as the worker posts it (joshuafolkken/kit#8160): the data and
-	// the frame assembled over the run's read, which stays on the worker.
-	const posted = {
-		...read,
-		local: undefined,
-		data: run_board_data.posted(state),
-		display: assembled(state, read.local, Date.now()),
-	}
 
-	return { read, ports: { ...ports, gather: async () => posted }, state }
+	return settled_from({ read, ports, state })
 }
 
 function redraw_piece(ports: BoardPorts, first: BoardState): Piece {
@@ -273,6 +279,12 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
-const run_board_profile_main = { local_pieces, machine_pieces, redraw_pieces, round_part_pieces }
+const run_board_profile_main = {
+	local_pieces,
+	machine_pieces,
+	redraw_pieces,
+	round_part_pieces,
+	settled_from,
+}
 
 export { run_board_profile_main }

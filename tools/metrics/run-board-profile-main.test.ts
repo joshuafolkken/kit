@@ -90,6 +90,30 @@ describe('run-board-profile-main redraw pieces (#8147)', () => {
 	})
 })
 
+describe('run-board-profile-main settled_from (#8160)', () => {
+	it('redraws the worker’s frame without the run read, keeping the read for the worker’s assembly (#8160)', async () => {
+		const read = { ...run_board_tick.FRESH_STATE, local: run_board_fixture.LOCAL }
+		const ports = { ...run_board_cli.LIVE_PORTS, gather: async () => read }
+		const settled = run_board_profile_main.settled_from({ read, ports, state: read })
+
+		expect(settled.read.local).toBe(read.local)
+		await expect(settled.ports.gather('background')).resolves.toMatchObject({
+			local: undefined,
+			display: expect.objectContaining({ header: expect.anything() }),
+		})
+	})
+
+	it('redraws no worker frame when no run has started (#8160)', async () => {
+		const read = run_board_tick.FRESH_STATE
+		const ports = { ...run_board_cli.LIVE_PORTS, gather: async () => read }
+		const settled = run_board_profile_main.settled_from({ read, ports, state: read })
+
+		await expect(settled.ports.gather('background')).resolves.toMatchObject({
+			display: undefined,
+		})
+	})
+})
+
 describe('run-board-profile-main round pieces (#8136)', () => {
 	it('measures the budget waits, the quotas and the usages as parts of every round (ac-17c66d31)', () => {
 		const pieces = run_board_profile_main.round_part_pieces()

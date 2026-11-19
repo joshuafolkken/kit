@@ -98,7 +98,7 @@ interface GatherWorker {
 	unref: () => void
 }
 
-// Starts a worker from the data the last one handed over, if any.
+// Starts a worker from the data and the carried sound the last one handed over, if any.
 type Spawn = (seed: Seed | undefined) => GatherWorker
 
 interface Thread {
@@ -198,8 +198,9 @@ async function posted_round(state: RoundState, io: RoundIo): Promise<RoundState>
 		kept.early = post_early(kept.early, kept, read, io)
 	})
 	const data = await step_over(await kept.early, next, io.ports)
+	const phases = launch_timing.phases()
 
-	io.post({ ...hand_over(kept, next, data, io), phases: launch_timing.phases() })
+	io.post({ ...hand_over(kept, next, data, io), phases })
 
 	return { gather: next, data, board: kept.board }
 }
@@ -345,7 +346,8 @@ function worker_options(exec_argv: ReadonlyArray<string>): WorkerOptions {
 	return { execArgv: ts_entry_loader.loader_argv(exec_argv) }
 }
 
-// What a worker is started with: the data the last one handed over, and what it records its frames with.
+// What a worker is started with: the data and the carried sound the last one handed over, and what it
+// records its frames with.
 interface WorkerSeed {
 	seed: Seed | undefined
 	setup: RecordSetup
