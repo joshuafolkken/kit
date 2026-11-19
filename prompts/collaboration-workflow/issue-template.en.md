@@ -11,7 +11,7 @@ The `en` column of `issue-template.md`'s template; its rules and label table →
 
 <`- Type: defect` for a defect, else `- Type: non-defect`>
 <for a defect `- Cause: #<PR>`, or `- Cause: unknown（<reason>）` when it cannot be traced>
-<`- Human judgement: not needed` or `- Human judgement: needed（<policy decision / external account / visual check>）`>
+<`- Human judgement: not needed` or `- Human judgement: needed（<policy decision / external account / visual check before merge>）`; the criterion is the "人の判断" line under `issue-template.md`'s declaration table>
 <when a measurement picks: `- Decision rule: <condition> then <A>, else <B>（#<measurement Issue>）`, with `Human judgement: not needed`>
 <for a cause that lengthened a lane: `- Cause lane: <minutes> 分（#<N>）`; the minutes from `pnpm josh lane:net <N>`>
 <the minutes this Issue's cause could save: `- Cause loss: <minutes> 分`, one line per recurrence>

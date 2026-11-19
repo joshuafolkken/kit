@@ -149,6 +149,13 @@ describe('issue_auto_ok.declaration_problem', () => {
 			expect(problem).toContain('`- 人の判断: 要（<which one>）`')
 		},
 	)
+
+	it('limits the needed judgement to one required before merge, pointing at the criterion', () => {
+		const problem = issue_auto_ok.declaration_problem(UNDECLARED_BODY)
+
+		expect(problem).toContain('is needed before merge')
+		expect(problem).toContain('`issue-template.md`')
+	})
 })
 
 describe('issue_auto_ok.declares_judgement_needed', () => {
