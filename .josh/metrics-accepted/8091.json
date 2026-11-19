@@ -1,0 +1,7 @@
+{
+	"reason": "SymbolSelection gains the direct users field and its Reached type so a cut keeps them first (#8091)",
+	"date": "2026-11-19",
+	"growth": {
+		"scripts.code_lines": 2
+	}
+}

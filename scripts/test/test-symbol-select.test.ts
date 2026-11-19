@@ -54,6 +54,7 @@ describe('test_symbol_select.select_from', () => {
 		expect(test_symbol_select.select_from(input)).toEqual({
 			tests: [ONE_TEST],
 			reach: [{ file: LIB, count: 1 }],
+			direct: [ONE_TEST],
 		})
 	})
 
@@ -75,11 +76,22 @@ describe('test_symbol_select.select_from', () => {
 	it('falls back to one file boundary where every user exceeds the cap', () => {
 		const far = far_tests(test_pinned_logic.MAX_TEST_FILES)
 		const sources = [LIB_SOURCE, ONE_SOURCE, MID_SOURCE, ...far]
-		const { tests } = test_symbol_select.select_from(
+		const selection = test_symbol_select.select_from(
 			input_of(sources, [LIB], new Map([[LIB, [1]]])),
 		)
 
-		expect(tests).toEqual([ONE_TEST])
+		expect(selection).toMatchObject({ tests: [ONE_TEST], direct: [ONE_TEST] })
+	})
+})
+
+describe('test_symbol_select.select_from — the direct users', () => {
+	it('reads the users within one file boundary as direct while following every user', () => {
+		const sources = [LIB_SOURCE, ONE_SOURCE, MID_SOURCE, ...far_tests(1)]
+		const { direct } = test_symbol_select.select_from(
+			input_of(sources, [LIB], new Map([[LIB, [1]]])),
+		)
+
+		expect(direct).toEqual([ONE_TEST])
 	})
 })
 
