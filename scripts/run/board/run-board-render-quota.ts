@@ -2,6 +2,7 @@ import { styleText } from 'node:util'
 import { figure_format } from '#scripts/lib/figure-format'
 import type { HoldCause } from '#scripts/run/merge/run-merge-usage-limit'
 import { run_board_fit, type DetailPart } from './run-board-fit'
+import { run_board_label_pair } from './run-board-label-pair'
 import { run_board_labels } from './run-board-labels'
 import type { QuotaProvider, QuotaReading, Quotas, QuotaWindow } from './run-board-quota-read'
 import { run_board_render_quota_cell, type Cell } from './run-board-render-quota-cell'
@@ -207,7 +208,7 @@ function name_of(provider: QuotaProvider | 'github', view: QuotaView): string {
 
 	const mark = provider === view.scheduler_provider ? SCHEDULER_MARK : '  '
 
-	return `${mark} ${name}`
+	return run_board_label_pair.pair(mark, name)
 }
 
 function name_cell(name: string): string {
@@ -269,7 +270,7 @@ function rate_limit_summary(view: QuotaView): Array<string> {
 function summary_of(view: QuotaView): string {
 	const parts = providers_of(view).map((provider) => {
 		const reading = view.quotas?.[provider]
-		const name = name_of(provider, view).trimStart()
+		const name = run_board_label_pair.bare(name_of(provider, view)).trimStart()
 
 		return `${name} ${percents_text(reading, view.now_ms)}${counts_text(reading, view.now_ms)}`
 	})

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { run_board_fit } from './run-board-fit'
+import { run_board_label_pair } from './run-board-label-pair'
 import { run_board_render } from './run-board-render'
 import { run_board_render_fixture } from './run-board-render-fixture'
 import { run_board_render_lanes } from './run-board-render-lanes'
@@ -8,6 +9,7 @@ import { run_board_render_processes } from './run-board-render-processes'
 
 const { EMPTY_LAYOUT, NOW, board_usage, header } = run_board_render_fixture
 const { lanes_section } = run_board_render_lanes
+const { bare } = run_board_label_pair
 const { ELAPSED_START, USAGE_START, column_offset, lead_of } = run_board_render_lead
 const LINE = { text: 'lane', row: undefined }
 const USED = 12
@@ -41,8 +43,8 @@ describe('run board lane occupancy', () => {
 		const board = header({ occupied_count, lane_limit })
 		const [section] = lanes_section([LINE], undefined, board)
 
-		expect(section?.label).toBe(`🧵 lanes ${label}`)
-		expect(section?.head[1]).toContain(`🧵 lanes ${label}`)
+		expect(bare(section?.label ?? '')).toBe(`🧵 lanes ${label}`)
+		expect(bare(section?.head[1] ?? '')).toContain(`🧵 lanes ${label}`)
 	})
 })
 
@@ -53,7 +55,7 @@ describe('run board lane occupancy columns', () => {
 			{ ...board, usages: board_usage(new Map()) },
 			[],
 		)
-		const rule = lanes_section([LINE], cells, board)[0]?.head[1] ?? ''
+		const rule = bare(lanes_section([LINE], cells, board)[0]?.head[1] ?? '')
 		const lead = `  ${lead_of(ROW, board)} `
 
 		expect(column_of(rule, '⏰')).toBe(ELAPSED_START + column_offset(board))
@@ -72,7 +74,7 @@ describe('run board lane occupancy columns', () => {
 
 		if (part === undefined) throw new Error('Missing processes')
 
-		const rule = part.head[1] ?? ''
+		const rule = bare(part.head[1] ?? '')
 		const line = part.lines[0]?.text ?? ''
 
 		expect(column_of(rule, '💪 CPU')).toBe(USAGE_START + column_offset(board))

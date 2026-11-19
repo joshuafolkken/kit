@@ -107,7 +107,12 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: [BOARD_THEME],
 					description:
-						'draws the board as a text terminal does: every icon as ASCII text of its width (`🚨` → `P1`, `🔨` → `BD`, a section heading’s icon as blanks; one table, `run-board-theme-glyphs.ts`), the text in capitals (escapes and link URLs as written), and the spinner as `│ ╱ ─ ╲`; the columns line up as without it.',
+						'draws the board as a text terminal does: every icon as ASCII text of its width (`🚨` → `P1`, `🔨` → `BD`; one table, `run-board-theme-glyphs.ts`), the text in capitals (escapes and link URLs as written), and the spinner as `│ ╱ ─ ╲`; the columns line up as without it.',
+				},
+				{
+					names: [BOARD_THEME],
+					description:
+						'drops an icon drawn beside the label that says what it marks (`CPU`, `QUEUED`), keeping one before a value (`CP 67%`): in a column’s rule its place is the rule, a heading reads `V -- NAME`, a row label moves into its place. One helper marks them (`run-board-label-pair.ts`); no theme and `--chat` draw as before.',
 				},
 				{
 					names: [BOARD_THEME],
