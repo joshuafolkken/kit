@@ -14,7 +14,7 @@
   - not automated: the right act is another command, whose arguments the call does not carry
 - **Unasked filing** (`unasked-filing`, `.claude/skills/workflow-commands/observation-filing.md`)
   - fires: `pnpm josh pretool:guard` — an interactive session’s `pnpm josh issue:file` when the person’s last prompt asks for no filing; it hands over propose-then-file. Every occurrence
-  - silent: an unattended run (a kit-launched or headless session, a lane child, the `backlogrun` parent), `--check`, or a prompt that asks for filing
+  - silent: an unattended run (a kit-launched or headless session, a lane child, the `backlogrun` parent), `--check`, `--publish`, or a prompt that asks for filing
   - not automated: the call must not run at all, or only on a person's word — refusing is the remedy
 - **Direct issue comment** (`direct-issue-comment`, `shell-body.md`)
   - fires: `pnpm josh pretool:guard` — a comment to the checkout's own repository outside `josh issue:comment` (`gh issue comment` with no `--repo`, or a `gh api` write to `repos/<owner>/<r>/issues/<N>/comments` whose owner is the `{owner}` placeholder or the checkout's own `owner/repo` spelled out); it points at `pnpm josh issue:comment`. A line that is only `gh issue comment <N>` with one `--body-file` / `-F <path>` is rewritten to `pnpm josh issue:comment <N> --body-file <path>`; every other form is refused, every occurrence

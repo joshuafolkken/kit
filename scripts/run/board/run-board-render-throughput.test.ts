@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { run_board_fit } from './run-board-fit'
+import { run_board_label_pair } from './run-board-label-pair'
 import { run_board_render_throughput } from './run-board-render-throughput'
 import type { ThroughputCell, ThroughputRow } from './run-board-throughput'
 
@@ -49,11 +50,12 @@ function ramp(count: number): Array<ThroughputCell> {
 	return Array.from({ length: count }, (_, index) => cell(index % 8))
 }
 
-// The rule, then the rows — the blank above the rule left out.
+// The rule, then the rows — the blank above the rule left out, as a frame with no theme draws them.
 function drawn(rows: ReadonlyArray<ThroughputRow>): Array<string> {
 	const part = run_board_render_throughput.rows_part(rows)
+	const lines = [...part.head.slice(1), ...part.lines.map((line) => line.text)]
 
-	return [...part.head.slice(1), ...part.lines.map((line) => line.text)]
+	return lines.map((line) => run_board_label_pair.bare(line))
 }
 
 // The sparkline's characters each take one column and one code unit.

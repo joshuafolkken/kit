@@ -2,6 +2,7 @@ import { run_board_earlier } from './run-board-earlier'
 import { run_board_fit } from './run-board-fit'
 import { run_board_fresh } from './run-board-fresh'
 import type { BoardHeader } from './run-board-header'
+import { run_board_label_pair } from './run-board-label-pair'
 import { run_board_labels } from './run-board-labels'
 import type { BoardRow } from './run-board-layout'
 import { run_board_render_icon } from './run-board-render-icon'
@@ -35,7 +36,7 @@ const ELAPSED_START =
 	LANE_INDENT.length + PROGRESS_WIDTH + SPACE + ICON_WIDTH + SPACE + TIME_WIDTH + SPACE
 // The column a lane row's usage cells start at, after the lead and one blank; the processes rows' too.
 const USAGE_START = ELAPSED_START + TIME_WIDTH + SPACE
-const LANES_LABEL = `${run_board_labels.LANES_ICON} lanes`
+const LANES_LABEL = run_board_label_pair.pair(run_board_labels.LANES_ICON, 'lanes')
 // A single run's rule (joshuafolkken/kit#7523): it runs in the root checkout, not in a lane, so its
 // row stands under the command it runs rather than under the lanes.
 const SINGLE_RUN_ICON = '🏠'

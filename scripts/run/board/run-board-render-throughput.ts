@@ -1,6 +1,7 @@
 import { figure_format } from '#scripts/lib/figure-format'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_board_fit, type DetailPart } from './run-board-fit'
+import { run_board_label_pair } from './run-board-label-pair'
 import { run_board_render_section } from './run-board-render-section'
 import type { Peak, ThroughputCell, ThroughputRow } from './run-board-throughput'
 
@@ -9,6 +10,7 @@ import type { Peak, ThroughputCell, ThroughputRow } from './run-board-throughput
 // throughout, then the closes per active hour, the active hours, the closes, the peak and — the `24h`
 // row's alone — the closes in the cell still filling. The values are `run-board-throughput.ts`'s.
 
+const { pair } = run_board_label_pair
 const LABEL = '📈 throughput'
 const LEVELS = '▁▂▃▄▅▆▇█'
 const STOPPED_MARK = '┊'
@@ -56,14 +58,14 @@ function peak_text(peak: Peak | undefined): string {
 }
 
 const COLUMNS: ReadonlyArray<Column> = [
-	{ label: '⚡ /h', text: (row) => rate_of(row.per_hour) },
+	{ label: pair('⚡', '/h'), text: (row) => rate_of(row.per_hour) },
 	{
-		label: '🟢 ACTIVE',
+		label: pair('🟢', 'ACTIVE'),
 		text: (row) => `${hours_of(row.active_ms)}/${hours_of(row.window_ms)}h`,
 	},
-	{ label: '✅ DONE', text: (row) => String(row.done).padStart(DONE_WIDTH) },
+	{ label: pair('✅', 'DONE'), text: (row) => String(row.done).padStart(DONE_WIDTH) },
 	{ label: '🏔 PEAK', text: (row) => peak_text(row.peak) },
-	{ label: '🔄 NOW', text: (row) => (row.now === undefined ? '' : String(row.now)) },
+	{ label: pair('🔄', 'NOW'), text: (row) => (row.now === undefined ? '' : String(row.now)) },
 ]
 
 function level_of(cell: ThroughputCell, most: number): string {
