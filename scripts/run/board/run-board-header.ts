@@ -7,6 +7,7 @@ import { run_board_fit } from './run-board-fit'
 import type { FoundOf } from './run-board-found'
 import { run_board_header_defcon } from './run-board-header-defcon'
 import { run_board_header_names, type RunMark } from './run-board-header-names'
+import { run_board_header_notice, type Notice } from './run-board-header-notice'
 import { run_board_header_time } from './run-board-header-time'
 import { run_board_issue_count, type IssueCount } from './run-board-issue-count'
 import { run_board_labels } from './run-board-labels'
@@ -74,8 +75,10 @@ interface BoardHeader
 	run_name?: string | undefined
 	// The kit version the run's supervisor recorded; `undefined` draws `-`.
 	kit_version?: string | undefined
-	// The live board's sound switch, drawn after the name; `undefined` where no key is read.
+	// The live board's sound switch and its last notice, drawn at the second line's end
+	// (`run-board-header-notice.ts`); `undefined` where no key is read.
 	is_sound_on?: boolean | undefined
+	notice?: Notice | undefined
 	started_ms: number
 	// Set once the run has ended: the title then says when, and how long it took.
 	ended_ms: number | undefined
@@ -122,7 +125,7 @@ interface BoardHeader
 	// Whether each issue row leads its text with its key (`run-board-row-key.ts`) — only where the board
 	// types the rows that appear, so every other frame is drawn as it was.
 	is_keyed?: boolean | undefined
-	// Whether the frame is drawn in a theme, which ends the second line on the alert level.
+	// Whether the frame is drawn in a theme, which ends the first line on the alert level.
 	is_themed?: boolean | undefined
 	form: BoardForm
 	// The repository the plan was read for, as `owner/repo`; `undefined` before a plan is read.
@@ -257,7 +260,14 @@ function progress_parts(counts: BoardCounts, header: BoardHeader): Array<string 
 	]
 }
 
-// The run's progress, then what its reads are doing.
+// The alert level a themed screen ends the progress line on (`run-board-header-defcon.ts`).
+function defcon_part(header: BoardHeader): string | undefined {
+	if (header.is_themed !== true || header.form !== 'screen') return undefined
+
+	return run_board_header_defcon.field_of(run_board_header_defcon.level_of(header))
+}
+
+// The run's progress, then what its reads are doing, then the alert level.
 function progress_part(counts: BoardCounts, header: BoardHeader): string {
 	const parts = [
 		...progress_parts(counts, header),
@@ -266,6 +276,7 @@ function progress_part(counts: BoardCounts, header: BoardHeader): string {
 		warning_of(WORDS.plan, header.plan_failed_ms),
 		warning_of(WORDS.read, header.read_failed_ms, header.read_error),
 		run_board_issue_count.part_of(header.repo, header.issue_count, header.repo_link),
+		defcon_part(header),
 	]
 
 	return parts.filter((part) => part !== undefined).join(GAP)
@@ -306,19 +317,14 @@ const MACHINE_UNKNOWN = [HEADER_ICONS.cpu, HEADER_ICONS.memory, HEADER_ICONS.swa
 	.map((icon) => `${icon} ${UNKNOWN}`)
 	.join(GAP)
 
-// The alert level a themed screen ends the machine's line on (`run-board-header-defcon.ts`).
-function defcon_part(header: BoardHeader): Array<string> {
-	if (header.is_themed !== true || header.form !== 'screen') return []
-
-	return [run_board_header_defcon.field_of(run_board_header_defcon.level_of(header))]
-}
-
-// The machine the run is on, its first figure as wide as the tally over it.
+// The machine the run is on, its first figure as wide as the tally over it, then the sound switch and
+// the last notice where the board reads the switch.
 function machine_part(counts: BoardCounts, header: BoardHeader): string {
 	const width = figure_width(total_of(counts, header))
 	const machine = run_board_machine.line_of(machine_of(header), width) ?? MACHINE_UNKNOWN
+	const notice = run_board_header_notice.part_of(header)
 
-	return [machine, ...defcon_part(header)].join(GAP)
+	return notice === undefined ? machine : [machine, notice].join(GAP)
 }
 
 // The lines' cells of one column, the narrower padded to the wider as the terminal counts them.
