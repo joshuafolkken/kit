@@ -264,14 +264,14 @@ describe('run_board_cli.run --theme refused', () => {
 	})
 })
 
-// joshuafolkken/kit#7989: the themed header's second line ends on the alert level; no other frame has it.
+// joshuafolkken/kit#7989, #8107: the themed header's first line ends on the alert level; no other frame has it.
 describe('run_board_cli.run --theme alert level', () => {
-	it('ends the --once header second line on DEFCON in the theme alone', async () => {
+	it('ends the --once header first line on DEFCON in the theme alone', async () => {
 		vi.stubEnv('FORCE_COLOR', '0')
 		const frame = await frame_of([...THEMED, '--once'])
-		const [, second] = frame.split('\n', 2)
+		const [first] = frame.split('\n', 1)
 
-		expect(second).toMatch(/ {2}DEFCON(?: \d){0,4} \[\d\](?: \d){0,4}$/u)
+		expect(first).toMatch(/ {2}DEFCON(?: \d){0,4} \[\d\](?: \d){0,4}$/u)
 		expect(await frame_of(['--once'])).not.toContain('DEFCON')
 		expect(await frame_of([...THEMED, '--chat'])).not.toContain('DEFCON')
 	})
