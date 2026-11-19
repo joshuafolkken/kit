@@ -5,6 +5,7 @@ import { RETRY_PENDING_KEY, RETRY_PENDING_VALUE } from '#scripts/gh/git-gh-comme
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { lane_child_mark_keys } from '#scripts/lane/lane-child-mark-keys'
 import { review_pair } from '#scripts/review/review-pair'
+import { run_board_theme } from '#scripts/run/board/run-board-theme'
 import { run_headless_keys } from '#scripts/run/run-headless-keys'
 import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
 import { run_startup } from '#scripts/run/startup/run-startup'
@@ -266,6 +267,24 @@ describe('the unit environment blanks the live run startup scope', () => {
 
 	it('leaves no startup scope in a test process', () => {
 		expect(process.env[run_startup.ENVIRONMENT_KEY] ?? '').toBe('')
+	})
+})
+
+// joshuafolkken/kit#8214: a session exporting `JOSH_BOARD_THEME=wargames` restyled the frames the
+// run:board CLI suites compare, so they failed there alone.
+describe('the unit environment blanks the board theme', () => {
+	it('turns an inherited board theme off', () => {
+		const environment = unit_environment({ [run_board_theme.THEME_ENV]: 'wargames' })
+
+		expect(environment[run_board_theme.THEME_ENV]).toBe('')
+		expect(run_board_theme.choose([], environment)?.theme).toBeUndefined()
+		expect(run_board_theme.choose([], { [run_board_theme.THEME_ENV]: 'wargames' })?.theme).toBe(
+			'wargames',
+		)
+	})
+
+	it('leaves no board theme in a test process', () => {
+		expect(process.env[run_board_theme.THEME_ENV] ?? '').toBe('')
 	})
 })
 

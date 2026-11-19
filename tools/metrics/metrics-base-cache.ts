@@ -90,7 +90,7 @@ function write(commit: string, root: string, reading: CachedReading): void {
 	}
 }
 
-const metrics_base_cache = { cache_path, read, ruler_files, write }
+const metrics_base_cache = { cache_path, read, ruler_digest, ruler_files, write }
 
 export type { CachedReading }
 export { metrics_base_cache }

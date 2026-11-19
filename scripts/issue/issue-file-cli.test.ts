@@ -137,7 +137,7 @@ describe('issue_file_cli.run — a filing that clears every step', () => {
 			body: VALID_BODY,
 		})
 		// joshuafolkken/kit#6796: no poll — `report_for` reads a subject the listing trails on its own.
-		expect(report_for).toHaveBeenCalledWith(ISSUE_NUMBER, HERE)
+		expect(report_for).toHaveBeenCalledWith(ISSUE_NUMBER, HERE, 'report')
 	})
 
 	// joshuafolkken/kit#3423: the one `--distinct` declaration answers both the scout and the fold

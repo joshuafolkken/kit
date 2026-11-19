@@ -1,5 +1,5 @@
+import { run_board_data, type DataStep } from './run-board-data'
 import type { EarlierLanes } from './run-board-earlier'
-import type { GatherRead } from './run-board-gather'
 import { run_board_github } from './run-board-github'
 import { run_board_layout, type BoardLayout, type BoardPlan } from './run-board-layout'
 import type { LocalRead } from './run-board-read'
@@ -7,55 +7,39 @@ import { run_board_reason, type ReasonRead } from './run-board-reason'
 import { run_board_released } from './run-board-released'
 import { run_board_render } from './run-board-render'
 import { run_board_spin } from './run-board-spin'
-import { run_board_state, type BoardPorts, type BoardState, type Pace } from './run-board-state'
+import {
+	run_board_state,
+	type BoardData,
+	type BoardGather,
+	type BoardPorts,
+	type BoardState,
+	type Pace,
+} from './run-board-state'
 import { run_board_status, type ItemStatus } from './run-board-status'
-import { run_board_thanks } from './run-board-thanks'
 import { run_board_tick_draw } from './run-board-tick-draw'
 import { run_board_timing } from './run-board-timing'
 
 // One `run:board` redraw. The frame is redrawn once a second, on the second, so every elapsed time
 // moves by one, its spinners turned between redraws by `run-board-spin.ts`. It draws the last reads
-// off this machine (`run-board-gather.ts`) — a live board's taken on a worker thread, so the redraw
-// itself reads nothing that could stop a spinner — laid over the GitHub reads, `run-board-github.ts`'s,
-// which a live board never waits on. A run that ended stays on screen until the next one starts. With
-// no run in this checkout it reads nothing from GitHub.
+// off this machine (`run-board-gather.ts`) laid over the GitHub reads, `run-board-github.ts`'s, which a
+// live board never waits on. **A live board's redraw reads nothing**: its worker thread takes both and
+// posts them (`run-board-data.ts`), so nothing the redraw does could stop a spinner; one plain frame
+// takes them here. A run that ended stays on screen until the next one starts. With no run in this
+// checkout it reads nothing from GitHub.
 
 const { REDRAW_MS } = run_board_spin
 const { FRESH_STATE } = run_board_state
-const { PLAN_RETRY_MS, gather_github, open_read_of, statuses_for } = run_board_github
-const { gather_thanks } = run_board_thanks
+const { PLAN_RETRY_MS, open_read_of, statuses_for } = run_board_github
 const { activity_here, bounds_of, closed_under, draw, draw_run } = run_board_tick_draw
 const { drawn } = run_board_timing
 
-// What the last board on this run kept (`run-board-snapshot.ts`); one written on another run is
-// discarded.
-function saved_for(
-	ports: BoardPorts,
-	started_ms: number,
-): Pick<BoardState, 'known' | 'closed' | 'issue_count'> {
-	const snapshot = ports.snapshot?.load()
+// The data the redraw draws: what a live board's worker posted beside the reads, or a step taken here.
+async function data_of(state: BoardState, gathered: BoardGather, at: DataStep): Promise<BoardData> {
+	const { data, ...read } = gathered
 
-	if (snapshot?.run_started_ms !== started_ms) return FRESH_STATE
+	if (data !== undefined) return run_board_data.received(data, read)
 
-	const { titles, labels, closed, issue_count } = snapshot
-
-	return { known: { titles, labels }, closed, issue_count }
-}
-
-// The state of the run on screen, over the reads just taken; a different run starts its plan state
-// from what the last board on it kept, or from nothing, so no row, count or baseline of the previous
-// run is drawn over the new one.
-function state_for(
-	state: BoardState,
-	read: GatherRead,
-	local: LocalRead,
-	ports: BoardPorts,
-): BoardState {
-	if (state.run_started_ms === local.started_ms) return { ...state, ...read }
-
-	const saved = saved_for(ports, local.started_ms)
-
-	return { ...FRESH_STATE, ...saved, ...read, run_started_ms: local.started_ms }
+	return await run_board_data.step(state, read, at)
 }
 
 // The already-read supervisor or parent drives retries until the run stops or becomes stranded.
@@ -170,15 +154,10 @@ function layout_for(state: BoardState, local: LocalRead, now_ms: number): BoardL
 }
 
 // The frame with no run, which keeps no spinner.
-function draw_no_run(
-	state: BoardState,
-	read: GatherRead,
-	ports: BoardPorts,
-	now_ms: number,
-): BoardState {
-	draw(ports, run_board_render.render_no_run(now_ms, bounds_of(ports), read))
+function draw_no_run(state: BoardState, ports: BoardPorts, now_ms: number): BoardState {
+	draw(ports, run_board_render.render_no_run(now_ms, bounds_of(ports), state))
 
-	return { ...state, ...read, spots: [] }
+	return { ...state, spots: [] }
 }
 
 // One redraw. No run reads nothing from GitHub and keeps the plan it had for when one starts. A live
@@ -188,26 +167,18 @@ async function tick(
 	ports: BoardPorts,
 	pace: Pace = 'settled',
 ): Promise<BoardState> {
-	const read = await ports.gather(pace)
+	const gathered = await ports.gather(pace)
 	// Taken after the read, which a single frame may have waited on to confirm an idle lane.
 	const now_ms = ports.now()
-	const { local } = read
+	const data = await data_of(state, gathered, { ports, now_ms, pace })
+	const next: BoardState = { ...run_board_data.view_for(state, data), ...data }
+	const { local } = next
 
-	if (local === undefined) {
-		return drawn(ports, 'tick', () => draw_no_run(state, read, ports, now_ms))
-	}
-
-	const gathered = await gather_github(state_for(state, read, local, ports), {
-		ports,
-		local,
-		now_ms,
-		pace,
-	})
-	const thanked = await gather_thanks(gathered, ports, now_ms, pace)
+	if (local === undefined) return drawn(ports, 'tick', () => draw_no_run(next, ports, now_ms))
 
 	// joshuafolkken/kit#8126: `--timing` times the draw from the layout to the write.
 	return drawn(ports, 'tick', () =>
-		draw_run(thanked, local, { ports, now_ms }, layout_for(thanked, local, now_ms)),
+		draw_run(next, local, { ports, now_ms }, layout_for(next, local, now_ms)),
 	)
 }
 

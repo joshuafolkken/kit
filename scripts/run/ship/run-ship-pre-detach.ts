@@ -26,10 +26,11 @@ import { buffered_process, type BufferedProcessResult } from '#scripts/lib/buffe
 // the gate's own check passed silently here is recorded with the gate's per-check record
 // (`check-reuse.ts`), so the supervised gate stage reuses it while its declared inputs have not moved
 // and runs it again when they have. The record, its judgment and its inputs are the gate's; only the
-// type check (`check`) and `exports:unused` (`exports`) carry a gate label. The rest stay unrecorded:
-// `cspell:dot` declares no inputs and runs every gate (`verification-inputs.ts`), the guard tests are a
-// slice of the unit suite and do not answer for the gate's `test:unit`, and the metrics totals leave
-// out the durations the gate's `metrics` holds.
+// type check (`check`), `exports:unused` (`exports`) and `cspell:dot` (`cspell`) carry a gate label.
+// `cspell:dot` declares every file as its input (`verification-inputs.ts`, joshuafolkken/kit#5156), so
+// the gate reuses it only while no file moved. The rest stay unrecorded: the guard tests are a slice of
+// the unit suite and do not answer for the gate's `test:unit`, and the metrics totals leave out the
+// durations the gate's `metrics` holds.
 //
 // joshuafolkken/kit#3924: nine of ten ship gate stops were `exports:unused`, `cspell:dot` or a
 // repository-wide guard test failing on the child's own code — none a check `test:related` selects,
@@ -66,7 +67,7 @@ const UNPINNED = 'unpinned'
 const { METRICS_RERECORD_COMMAND } = metrics_totals
 const STATIC_CHECKS: ReadonlyArray<PreDetachCheck> = [
 	{ list: ['josh', 'exports:unused'], label: gate_labels.EXPORTS_LABEL },
-	{ list: ['josh', 'cspell:dot'] },
+	{ list: ['josh', gate_labels.SPELL_CHECK_TARGET], label: gate_labels.SPELL_CHECK_LABEL },
 ]
 const GUARD_TEST_TARGETS: ReadonlyArray<string> = [
 	'scripts/document',

@@ -1,0 +1,7 @@
+{
+	"reason": "Worker-side data step: new run-board-data.ts and run-board-data-ports.ts move GitHub/thanks/snapshot stepping off the render thread (#8159)",
+	"date": "2026-11-19",
+	"growth": {
+		"scripts.code_lines": 213
+	}
+}
