@@ -448,9 +448,9 @@ pnpm josh upstream:interrupt 2304 "<root-cause title>" --repo joshuafolkken/kit 
 
 <!-- /usage -->
 
-`--blocks-finder` は省略しても渡す。別リポジトリでも finder を上流 Issue の blocked-by に記録し、`run:board` は ⏳ レーン行の行末に 🔗 で出す。
+`--blocks-finder` applies even when omitted. The finder is recorded in the upstream Issue's blocked-by even across repositories, and `run:board` shows it with 🔗 at the end of the ⏳ lane row.
 
-finder のリポジトリは起票前に確定し、バックリンクとコメント失敗時の再実行先に明示する。起票で現在のリポジトリ設定が変わっても投稿先は変わらない。解決できなければ stash や書き込みの前に停止する。
+The finder's repository is fixed before filing and named in the backlink and in the retry target for a failed comment. A change to the current repository setting during filing does not move where the comment is posted. If it cannot be resolved, the command stops before any stash or write.
 
 A third-party `--repo` files nothing: the body goes to the finder under `## Upstream candidate` for a person to post. An `unknown` party writes nothing. Each step prints one line; a failing step stops the rest and prints the command to re-run. Resume with the `stash:pop` line the backlink carries.
 
@@ -669,7 +669,7 @@ against no streak, and a `usage-limit` event names the reset (unreadable or past
 a **failed** child (OPEN, unparked, not an outage) has it dropped, is parked with `run:stalled` and counts against the failure guard — unless it records
 an open blocker, a `- 実施可能日:` still ahead or a `- 実施可能条件:` not yet met (or, its body unreadable, carries `not-before`): then it
 is **waiting**, unparked and uncounted, its comment naming the wait.
-調査後に不足が判明した証拠も、[観測待ちの宣言と証拠チェックリスト](./observation-waits.md)で待機できる。初回のマージ件数条件とは独立して判定し、未知形式・証拠の取得失敗では再開しない。
+Evidence found missing after an investigation can also wait, through [the observation-wait declaration and evidence checklist](./observation-waits.md). It is judged independently of the first merge-count condition, and an unknown form or a failed evidence fetch does not resume it.
 A **withdrawn** child (a `lane:withdraw` on the stream, or CLOSED with no merged pull request) counts and logs nothing
 and launches no investigation; its lane is withdrawn through `lane:withdraw`'s path unless already withdrawn — kept, as the `run:wake` sweep keeps one, where its branch has commits on no remote; a retry where the withdrawal cannot read it.
 A failed child whose detached `josh ship` ended is parked for its stop: the comment's `Why` names the
