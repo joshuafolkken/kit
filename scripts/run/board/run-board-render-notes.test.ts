@@ -31,9 +31,11 @@ describe('run_board_render findings and no run', () => {
 		}
 		const lines = lines_of(header({ layout: undefined }), [filed, ...notes])
 
-		expect(lines).toContain(`    🆕 ${minute_of(NOW)} 3438 filed  Count seats (found during 3415)`)
-		expect(lines).toContain(`    💬 ${minute_of(NOW)} 3415 note  observation 0`)
-		expect(lines.at(-1)).toBe('  more 3')
+		expect(lines).toContain(
+			`${ROW_INDENT}🆕 ${minute_of(NOW)} 3438 filed  Count seats (found during 3415)`,
+		)
+		expect(lines).toContain(`${ROW_INDENT}💬 ${minute_of(NOW)} 3415 note  observation 0`)
+		expect(lines.at(-1)).toBe(`${ROW_INDENT}💬 3 more`)
 	})
 
 	it('says there is no run when none has started', () => {
@@ -63,9 +65,9 @@ describe('run_board_render.render findings icons', () => {
 			.join('\n')
 
 		expect(lines).toContain(NOTES_RULE)
-		expect(lines).toContain(`    🆕 ${minute_of(NOW)} 3473  Lead`)
-		expect(lines).toContain(`    💤 ${minute_of(NOW)} 3473  Lead`)
-		expect(lines).toContain(`    💬 ${minute_of(NOW)} 3415  seen`)
+		expect(lines).toContain(`${ROW_INDENT}🆕 ${minute_of(NOW)} 3473  Lead`)
+		expect(lines).toContain(`${ROW_INDENT}💤 ${minute_of(NOW)} 3473  Lead`)
+		expect(lines).toContain(`${ROW_INDENT}💬 ${minute_of(NOW)} 3415  seen`)
 
 		for (const word of [WORDS.notes, 'filed', 'park', ' note ']) {
 			expect(board).not.toContain(word)
@@ -89,7 +91,7 @@ describe('run_board_render.render findings icons', () => {
 		const lines = lines_of(header({ layout: undefined }), [filed])
 
 		expect(lines).toContain(rule(`${WORDS.notes} 1`))
-		expect(lines.at(-1)).toBe(`    🆕 ${minute_of(NOW)} 3473 filed  Lead`)
+		expect(lines.at(-1)).toBe(`${ROW_INDENT}🆕 ${minute_of(NOW)} 3473 filed  Lead`)
 	})
 })
 
@@ -138,7 +140,7 @@ describe('run_board_render.render filed kinds', () => {
 		const lines = lines_of(header(), [breaking, bug, enhancement, filed])
 
 		for (const icon of ['🧨', '🐛', '✨', '🆕']) {
-			expect(lines).toContain(`    ${icon} ${minute_of(NOW)} 3473  Lead`)
+			expect(lines).toContain(`${ROW_INDENT}${icon} ${minute_of(NOW)} 3473  Lead`)
 		}
 	})
 
@@ -174,7 +176,7 @@ describe('run_board_render.render filed kinds beside row kinds', () => {
 
 	it('keeps the kind word filed where no legend is drawn', () => {
 		expect(lines_of(header({ layout: undefined }), [bug]).at(-1)).toBe(
-			`    🐛 ${minute_of(NOW)} 3473 filed  Lead`,
+			`${ROW_INDENT}🐛 ${minute_of(NOW)} 3473 filed  Lead`,
 		)
 	})
 })
@@ -190,13 +192,18 @@ describe('run_board_render.render findings links', () => {
 	it('links the finding’s issue and the issue it was found during', () => {
 		const lines = lines_of(header({ link: bracketed }), [found, note(NOW, 'seen')])
 
-		expect(lines).toContain(`    🆕 ${minute_of(NOW)} [other/repo#12]  Lead (found during [3415])`)
-		expect(lines).toContain(`    💬 ${minute_of(NOW)} [3415]  seen`)
+		expect(lines).toContain(
+			`${ROW_INDENT}🆕 ${minute_of(NOW)} [other/repo#12]  Lead (found during [3415])`,
+		)
+		// The number is padded to the section's widest before it is linked (joshuafolkken/kit#8257).
+		const pad = ' '.repeat('other/repo#12'.length - '3415'.length)
+
+		expect(lines).toContain(`${ROW_INDENT}💬 ${minute_of(NOW)} [3415]${pad}  seen`)
 	})
 
 	it('draws the numbers unchanged where the terminal gets no link', () => {
 		expect(lines_of(header(), [found])).toContain(
-			`    🆕 ${minute_of(NOW)} other/repo#12  Lead (found during 3415)`,
+			`${ROW_INDENT}🆕 ${minute_of(NOW)} other/repo#12  Lead (found during 3415)`,
 		)
 	})
 })
@@ -207,7 +214,9 @@ describe('run_board_render.render park titles', () => {
 		const events = [{ pos: 1, at: new Date(NOW).toISOString(), kind: 'park', text: '#3526 parked' }]
 		const notes = run_board_notes.notes_of(events, new Map([[3526, 'Lead the lanes']]))
 
-		expect(lines_of(header(), notes)).toContain(`    💤 ${minute_of(NOW)} 3526  Lead the lanes`)
+		expect(lines_of(header(), notes)).toContain(
+			`${ROW_INDENT}💤 ${minute_of(NOW)} 3526  Lead the lanes`,
+		)
 	})
 })
 
@@ -216,7 +225,7 @@ describe('run_board_render.render findings with no legend', () => {
 		const lines = lines_of(header({ layout: undefined }), [filed])
 
 		expect(lines).toContain(rule(`${WORDS.notes} 1`))
-		expect(lines.at(-1)).toBe(`    🆕 ${minute_of(NOW)} 3473 filed  Lead`)
+		expect(lines.at(-1)).toBe(`${ROW_INDENT}🆕 ${minute_of(NOW)} 3473 filed  Lead`)
 	})
 })
 
@@ -278,6 +287,32 @@ describe('run_board_render.render findings within the pane', () => {
 		expect(line).toContain('[3415]')
 		expect(line.endsWith(ELLIPSIS)).toBe(true)
 		expect(line).not.toContain('during [')
+	})
+})
+
+function text_column(lines: ReadonlyArray<string>, text: string): number {
+	const line = lines.find((drawn) => drawn.endsWith(text)) ?? ''
+
+	return run_board_fit.width_of(line.slice(0, line.indexOf(text)))
+}
+
+// joshuafolkken/kit#8257: a finding with no Issue blanks the number column, so every text starts in
+// one column, and the findings past the limit are counted as the rows' sections count theirs.
+describe('run_board_render.render findings columns', () => {
+	it('starts a finding with no Issue’s text where a numbered finding’s starts', () => {
+		const bare: BoardNote = { ...note(NOW, 'bare'), issue: undefined }
+		const lines = lines_of(header(), [note(NOW, 'seen'), bare])
+
+		expect(text_column(lines, 'bare')).toBe(text_column(lines, 'seen'))
+	})
+
+	it('counts the findings past the limit as 💬 N more, at the rows’ indent', () => {
+		const hidden = 15
+		const notes = Array.from({ length: run_board_render.NOTE_LIMIT + hidden }, (_, index) =>
+			note(NOW - index * MINUTE, `observation ${String(index)}`),
+		)
+
+		expect(lines_of(header(), notes)).toContain(`${ROW_INDENT}💬 ${String(hidden)} more`)
 	})
 })
 

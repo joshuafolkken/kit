@@ -60,6 +60,8 @@ interface ItemsView {
 	repo: string | undefined
 	columns?: number | undefined
 	is_keyed?: boolean | undefined
+	// The widest Issue number the section's notes carry, every number column padded to it.
+	issue_width?: number | undefined
 }
 
 // The icons the legend can name, in its order, each with its word — a filed kind's the rows' own
@@ -118,14 +120,29 @@ function id_of(note: BoardNote): string {
 	return `${note.kind}:${note.issue ?? ''}:${String(note.at_ms)}`
 }
 
+// A note's Issue number padded to the section's widest, blanks where it carries none, so every note's
+// text starts in one column (joshuafolkken/kit#8257); none where no note carries one.
+function issue_column(note: BoardNote, view: ItemsView): string | undefined {
+	const width = view.issue_width ?? 0
+
+	if (width === 0) return undefined
+
+	const issue = note.issue ?? ''
+
+	return `${issue === '' ? '' : view.link(issue)}${' '.repeat(Math.max(0, width - issue.length))}`
+}
+
+// The widest Issue number among `notes`.
+function issue_width_of(notes: ReadonlyArray<BoardNote>): number {
+	return Math.max(0, ...notes.map((note) => note.issue?.length ?? 0))
+}
+
 // Where the legend names the symbols a note leads with its icon alone; where no legend is drawn it
 // keeps the kind's word. Its icon stands in the plan rows' icon column; a keyed line's indent is drawn
 // whole, before its key.
 function note_text(note: BoardNote, view: ItemsView): string {
-	const { has_legend, link } = view
-	const kind = has_legend ? undefined : WORDS[note.kind]
-	const issue = note.issue === undefined ? undefined : link(note.issue)
-	const lead = [note_icon(note), minute_of(note.at_ms), issue, kind]
+	const kind = view.has_legend ? undefined : WORDS[note.kind]
+	const lead = [note_icon(note), minute_of(note.at_ms), issue_column(note, view), kind]
 		.filter((part) => part !== undefined)
 		.join(' ')
 	const section = view.is_keyed === true ? 'note' : undefined
@@ -180,7 +197,8 @@ function note_lines(notes: ReadonlyArray<BoardNote>, view: NotesView): NotesBody
 	const { layout, link, repo, columns, is_keyed } = view
 	const has_legend = layout !== undefined
 	const listed = listed_of(has_legend ? run_board_layout.rows_of(layout) : [])
-	const items = items_of(notes, { listed, has_legend, link, repo, columns, is_keyed })
+	const issue_width = issue_width_of(rest_of(notes, listed))
+	const items = items_of(notes, { listed, has_legend, link, repo, columns, is_keyed, issue_width })
 	const lines = items.slice(0, NOTE_LIMIT).map((item) => item.line)
 
 	return { lines, hidden: items.length - lines.length }
@@ -191,10 +209,10 @@ function note_lines(notes: ReadonlyArray<BoardNote>, view: NotesView): NotesBody
 function notes_part(notes: ReadonlyArray<BoardNote>, view: NotesView): NotesPart {
 	const body = note_lines(notes, view)
 	const label = view.layout === undefined ? WORDS.notes : `${NOTES_ICON} ${WORDS.notes}`
-	const { counted, heading_lines } = run_board_render_section
+	const { counted, heading_lines, more_line } = run_board_render_section
 	const head = heading_lines(counted(label, body.lines.length + body.hidden))
 
-	return { head, label, ...body }
+	return { head, label, ...body, more: (hidden) => more_line(NOTE_ICONS.note, hidden) }
 }
 
 // Each kind a drawn line leads with — one the rows' legend already names (`named`) is not named twice.

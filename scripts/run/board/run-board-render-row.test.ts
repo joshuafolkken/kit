@@ -45,8 +45,9 @@ function frame_of(board: BoardHeader): RowFrame {
 	}
 }
 
-function drawn(row: BoardRow, board: BoardHeader): string {
-	const { text } = run_board_render_row.row_line(ROW_INDENT, row, frame_of(board))
+function drawn(row: BoardRow, board: BoardHeader, section?: RowFrame['section']): string {
+	const frame = { ...frame_of(board), section }
+	const { text } = run_board_render_row.row_line(ROW_INDENT, row, frame)
 
 	// joshuafolkken/kit#8224: a board in no theme draws a row without its title mark.
 	return run_board_label_pair.untitled(stripVTControlCharacters(text))
@@ -63,6 +64,17 @@ describe('run_board_render_row.row_line', () => {
 
 		expect(text).toContain(String(DONE.number))
 		expect(lines).toContain(text)
+	})
+
+	// joshuafolkken/kit#8257: a queued row's path starts after the whole title column, as a waiting
+	// row's reason and a done row's time do; a row with nothing after its title ends on it.
+	it('pads a queued row’s title to the title column only where a path follows it', () => {
+		const reason = { icon: '📂', issues: [String(DONE.number)], tail: 'package.json' }
+		const held = drawn({ ...QUEUED, reason }, board, 'queued')
+		const title_start = held.indexOf(QUEUED.title ?? '')
+
+		expect(held.indexOf(reason.tail) - title_start).toBe(run_board_render.TITLE_LIMIT + 2)
+		expect(drawn(QUEUED, board, 'queued').endsWith(QUEUED.title ?? '')).toBe(true)
 	})
 
 	it('draws a queued row as the board draws it', () => {

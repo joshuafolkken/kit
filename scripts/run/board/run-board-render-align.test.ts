@@ -105,7 +105,7 @@ describe('run_board_render.render lane row alignment', () => {
 		const ended = run_board_labels.day_minute_of(NOW - MINUTE)
 		const done = line_of(lines, DONE)
 
-		expect(done).toMatch(new RegExp(`^ {4}✅ ${ended} ${String(DONE)} `, 'u'))
+		expect(done).toMatch(new RegExp(`^ {5}✅ ${ended} ${String(DONE)} `, 'u'))
 		expect(lines.join('\n')).not.toContain('🔚')
 	})
 })

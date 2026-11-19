@@ -15,7 +15,7 @@ import { run_board_render_section } from './run-board-render-section'
 // A folded section is its heading alone, led by ▸ and saying what it holds, and the rows it gave up go
 // to the other sections before `run-board-fit.ts` cuts anything; an unfolded one's heading is led by ▾.
 
-const { folded_head, open_head, row_count, widened } = run_board_render_section
+const { folded_head, lone_head, open_head, row_count, widened } = run_board_render_section
 const SECTION_KEYS: ReadonlyMap<string, SectionKey> = new Map([
 	['t', 'throughput'],
 	['u', 'usage'],
@@ -72,7 +72,8 @@ function headed<Part extends Headed>(part: Part, label: string, summary: string 
 function fold_section(section: PlanSection, folded: ReadonlySet<SectionKey>): PlanSection {
 	const { key, label } = section
 
-	if (key === undefined || label === undefined) return section
+	if (label === undefined) return section
+	if (key === undefined) return { ...section, head: lone_head(section.head, label) }
 	if (!folded.has(key)) return headed(section, label, undefined)
 
 	const count = row_count(section.lines)

@@ -9,9 +9,10 @@ import type { BoardRow } from './run-board-layout'
 const { STATE_ICONS, WORDS } = run_board_labels
 const { pair } = run_board_label_pair
 const GAP = '  '
-// A row's indent under a rule whose icon stands in the second column, so the row's icon stands clear of
-// it (joshuafolkken/kit#4292); a lane row leads with its progress column two columns further left.
-const ROW_INDENT = `${GAP}${GAP}`
+// The column every section's row starts at, under a rule whose icon stands in the second column, so the
+// row's icon stands clear of it (joshuafolkken/kit#4292, joshuafolkken/kit#8257); a lane row leads with
+// its progress column in the blanks before it.
+const { ROW_INDENT } = run_board_fit
 const RULE = '─'
 const RULE_LEAD = `${RULE}${RULE}`
 const RULE_WIDTH = 50
@@ -101,9 +102,18 @@ function widened(head: ReadonlyArray<string>, width: number): Array<string> {
 	return [...head.slice(0, -1), `${rule}${fill}`]
 }
 
+// Where an open head draws the rule character its ▾ gives up: in the first run of rules longer than
+// the one `columns_rule` keeps between labels, so a column label a lone rule pushed past its start
+// comes back to it and every later label stands where it did (joshuafolkken/kit#8257).
+function given_up_at(rest: string): number {
+	const run = rest.indexOf(RULE_LEAD)
+
+	return run === -1 ? Math.max(0, rest.indexOf(RULE)) : run
+}
+
 // An unfolded section's rule led by ▾ in place of its first rule characters, the one it gives up drawn
-// where the rule after its label starts, so what follows the label — its count, every column label —
-// still stands where it did; a section drawn under a blank line alone gets a rule of its own.
+// in its rule after the label (`given_up_at`), so what follows the label — its count, every column
+// label — still stands where it did; a section drawn under a blank line alone gets a rule of its own.
 function open_head(head: ReadonlyArray<string>, label: string): Array<string> {
 	const rule = head.at(-1) ?? ''
 	const lead = `${RULE_LEAD} ${label} `
@@ -111,7 +121,7 @@ function open_head(head: ReadonlyArray<string>, label: string): Array<string> {
 	if (!rule.startsWith(lead)) return ['', rule_to_width(`${OPEN_MARK} ${label} `)]
 
 	const rest = rule.slice(lead.length)
-	const at = Math.max(0, rest.indexOf(RULE))
+	const at = given_up_at(rest)
 
 	return [
 		...head.slice(0, -1),
@@ -119,19 +129,37 @@ function open_head(head: ReadonlyArray<string>, label: string): Array<string> {
 	]
 }
 
+// The rule of a section no key folds, on a live frame: led by one rule character so its icon stands in
+// the second column as the ▾ heads' do (joshuafolkken/kit#8257), its width the same.
+function lone_head(head: ReadonlyArray<string>, label: string): Array<string> {
+	const rule = head.at(-1) ?? ''
+	const lead = `${RULE_LEAD} ${label} `
+
+	if (!rule.startsWith(lead)) return [...head]
+
+	return [...head.slice(0, -1), `${RULE} ${label} ${RULE}${rule.slice(lead.length)}`]
+}
+
 // A folded section's one line: `▸ ⏳ queued ── 3 ───`, ending on a rule however long its summary.
 function folded_head(label: string, summary: string): Array<string> {
 	return ['', rule_to_width(`${FOLDED_MARK} ${label} ${RULE_LEAD} ${summary} ${RULE_LEAD}`)]
+}
+
+// A section's cut rows counted on one line led by its rows' icon, `marks` beside the count:
+// `✅ 13 more`, `💬 15 more` (joshuafolkken/kit#8257).
+function more_line(icon: string, count: number, marks: ReadonlyArray<string> = []): string {
+	const counted_text = [icon, String(count), WORDS.more].join(' ')
+
+	return `${ROW_INDENT}${[counted_text, ...marks].join(GAP)}`
 }
 
 // The finished rows' cut ones counted on one line, the withdrawn among them beside it.
 function done_fold(withdrawn: ReadonlySet<PlanLine>): (cut: ReadonlyArray<PlanLine>) => string {
 	return (cut) => {
 		const gone = cut.filter((line) => withdrawn.has(line)).length
-		const count = `${STATE_ICONS.merged} ${String(cut.length)} ${WORDS.more}`
 		const marks = gone === 0 ? [] : [`${STATE_ICONS.withdrawn} ${String(gone)}`]
 
-		return `${ROW_INDENT}${[count, ...marks].join(GAP)}`
+		return more_line(STATE_ICONS.merged, cut.length, marks)
 	}
 }
 
@@ -159,6 +187,8 @@ const run_board_render_section = {
 	heading_lines,
 	kept_section,
 	keyed,
+	lone_head,
+	more_line,
 	open_head,
 	plan_section,
 	row_count,

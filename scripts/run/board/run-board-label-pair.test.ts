@@ -51,6 +51,8 @@ describe('run_board_label_pair.dropped', () => {
 	it.each([
 		{ lead: '▾ ', drawn: '▾ ── queued 6 ──' },
 		{ lead: '── ', drawn: '── ── queued 6 ──' },
+		// joshuafolkken/kit#8257: a live section drawn with no fold key leads with one rule.
+		{ lead: '─ ', drawn: '─ ── queued 6 ──' },
 	])(
 		'draws a dropped icon after a heading lead `$lead` as the rule, the gap kept',
 		({ lead, drawn }) => {

@@ -40,8 +40,10 @@ const LANES_LABEL = run_board_label_pair.pair(run_board_labels.LANES_ICON, 'lane
 // A single run's rule (joshuafolkken/kit#7523): it runs in the root checkout, not in a lane, so its
 // row stands under the command it runs rather than under the lanes.
 const SINGLE_RUN_ICON = '🏠'
-// Two leading rules, a space, and the separator before the first column.
-const RULE_ROOM = 6
+// An open head's ▾ and its blank, and the blank, rule and blank before the first column, so a lane
+// row's icon stands in `ROW_INDENT`'s column under a counted label (joshuafolkken/kit#8257); a chat's
+// two leading rules draw that column one further right.
+const RULE_ROOM = 5
 
 function root_label(run_name: string): string {
 	return `${SINGLE_RUN_ICON} ${run_name}`

@@ -59,7 +59,16 @@ describe('run_board_fit.fit processes', () => {
 	})
 
 	it('cuts the parts of each group next, before any note, keeping the groups', () => {
-		const kept = [...HEADER, '', '  1', '  more 1', ...GROUPS, ...NOTES.head, '  new', '  old']
+		const kept = [
+			...HEADER,
+			'',
+			'  1',
+			`${run_board_fit.ROW_INDENT}more 1`,
+			...GROUPS,
+			...NOTES.head,
+			'  new',
+			'  old',
+		]
 
 		expect(fitted(kept.length)).toStrictEqual(kept)
 	})

@@ -109,7 +109,7 @@ describe('run_board_render — finished reasons', () => {
 
 	it('preserves a merged row without adding a reason (ac-6fb88544)', () => {
 		expect(line_of('merged')).toBe(
-			'    ✅ 10-08 11:09 6227       Explain why each finished run needs no further …  2°09′00″',
+			'     ✅ 10-08 11:09 6227       Explain why each finished run needs no further …  2°09′00″',
 		)
 		expect(line_of('merged')).not.toContain('nothing to do')
 	})

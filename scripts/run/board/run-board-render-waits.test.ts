@@ -73,10 +73,10 @@ describe('run_board_render_waits.stray_lines', () => {
 		].map((extra) => ({ ...extra, lane: undefined }))
 
 		expect(stray_lines(header({ budget_waits: waits }))).toStrictEqual([
-			'  🚧 🧠 9″ lint main',
-			'  🚧 💪 9″ test main',
-			'  🚧 🧠 9″ step main',
-			'  🚧 🧠 1′15″ test main',
+			'     🚧 🧠 9″ lint main',
+			'     🚧 💪 9″ test main',
+			'     🚧 🧠 9″ step main',
+			'     🚧 🧠 1′15″ test main',
 		])
 	})
 
@@ -133,7 +133,7 @@ describe('run_board_render.render — a wait no row owns', () => {
 		wait({ lane: undefined, reason: 'cores', command: 'check', waited_ms: 3000 }),
 		wait({ lane: undefined, elsewhere: '.app-kit-lanes/12', command: 'audit', waited_ms: 0 }),
 	]
-	const drawn = ['  🚧 💪 3″ check main', '  🚧 🧠 0″ audit .app-kit-lanes/12']
+	const drawn = ['     🚧 💪 3″ check main', '     🚧 🧠 0″ audit .app-kit-lanes/12']
 
 	it('draws each on one line right before the legend, after the plan', () => {
 		const lines = plain_lines(stray)
@@ -154,8 +154,17 @@ describe('run_board_render.render — a wait no row owns', () => {
 		expect(above).toStrictEqual(without.slice(0, without.indexOf(plain_row)))
 	})
 
+	// joshuafolkken/kit#8257: a held check's line starts where every section's row does.
+	it('starts each line at the shared row indent', () => {
+		const lines = run_board_render_waits.stray_lines(header({ budget_waits: stray }))
+
+		expect(
+			lines.every((line) => line.startsWith(`${run_board_fit.ROW_INDENT}${BUDGET_ICON}`)),
+		).toBe(true)
+	})
+
 	it('draws a lane no running row stands for as its number', () => {
-		expect(plain_lines([wait({ lane: '12' })])).toContain('  🚧 🧠 9″ lint 12')
+		expect(plain_lines([wait({ lane: '12' })])).toContain('     🚧 🧠 9″ lint 12')
 	})
 })
 

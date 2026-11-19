@@ -30,7 +30,7 @@ const WEEK_MINUTES = DAYS_PER_WEEK * MINUTES_PER_DAY
 const WEEK_MS = WEEK_MINUTES * MS_PER_MINUTE
 const STALE_MINUTES = 10
 const PERCENT = 100
-const INDENT = '  '
+const INDENT = run_board_render_section.ROW_INDENT
 // `🤖 Claude`, the widest name, and a space; the label column's own lead space makes it two.
 const NAME_WIDTH = 10
 const COUNT_MARK = '≈'
@@ -167,11 +167,12 @@ function stale_text(reading: QuotaReading, now_ms: number): string | undefined {
 	return minutes > STALE_MINUTES ? `${String(minutes)}′` : undefined
 }
 
-// A single `—` where the provider reported no window, so none read stays apart from 0%.
+// A single `—` where the provider reported no window, so none read stays apart from 0%, in the window
+// label's column.
 function cells_text(reading: QuotaReading | undefined, now_ms: number): string {
 	const windows = windows_of(reading)
 
-	if (windows.length === 0) return NONE
+	if (windows.length === 0) return run_board_render_quota_cell.label_cell(NONE)
 
 	return run_board_render_quota_cell.row_text(
 		windows.map((window) => cell_of(window, now_ms, per_task_in(reading, window))),

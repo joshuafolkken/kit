@@ -86,6 +86,9 @@ interface RowFit {
 	head?: (cut: RowCut) => string
 	is_head_kept?: boolean
 	shared?: number | undefined
+	// A waiting row whose title is padded to the title column all the same — a queued row's, so its
+	// path starts where a waiting row's reason does (joshuafolkken/kit#8257).
+	is_title_padded?: boolean
 }
 
 // The columns a row's head runs past the pane at its whole title; none where it is not kept.
@@ -95,17 +98,21 @@ function head_overrun(fit: RowFit, columns: number | undefined): number {
 	return overrun_of(fit.head(WHOLE), true, columns)
 }
 
-// The columns the row's title cell takes as drawn: a waiting row's title is not padded, every other
-// row's is padded to the title column.
-function drawn_width(row: BoardRow, lead: number): number {
-	const title = (row.title?.length ?? 0) + lead
+// The columns the row's title cell takes as drawn: a waiting row's title is not padded unless its fit
+// says so, every other row's is padded to the title column.
+function is_padded(row: BoardRow, fit: RowFit): boolean {
+	return row.state !== 'waiting' || fit.is_title_padded === true
+}
 
-	return row.state === 'waiting' ? Math.min(TITLE_LIMIT, title) : TITLE_LIMIT
+function drawn_width(row: BoardRow, fit: RowFit): number {
+	const title = (row.title?.length ?? 0) + (fit.lead ?? 0)
+
+	return is_padded(row, fit) ? TITLE_LIMIT : Math.min(TITLE_LIMIT, title)
 }
 
 // The row's title once it has given up `overrun` columns, never under the floor.
-function narrowed_limit(row: BoardRow, overrun: number, lead: number): number {
-	return Math.max(TITLE_FLOOR, drawn_width(row, lead) - overrun)
+function narrowed_limit(row: BoardRow, overrun: number, fit: RowFit): number {
+	return Math.max(TITLE_FLOOR, drawn_width(row, fit) - overrun)
 }
 
 // A row's line at a narrowed title with its whole reason, or with the reason's end cut by the columns
@@ -151,7 +158,7 @@ function fitted_limit(
 ): number | undefined {
 	const overrun = Math.max(row_overrun(row, columns, draw, fit), fit.shared ?? 0)
 
-	return overrun === 0 ? undefined : narrowed_limit(row, overrun, fit.lead ?? 0)
+	return overrun === 0 ? undefined : narrowed_limit(row, overrun, fit)
 }
 
 // A row's line as `draw` draws it: whole, or — where it or its section runs past the pane — with its

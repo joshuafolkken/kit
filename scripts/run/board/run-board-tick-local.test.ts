@@ -242,7 +242,7 @@ describe('run_board_tick.tick in a short terminal', () => {
 
 		expect(lines[0]).toMatch(/josh-board/u)
 		expect(rows).toBeLessThanOrEqual(SHORT.rows)
-		expect(lines).toContainEqual(expect.stringMatching(/^ {2}more \d+$/u))
+		expect(lines).toContainEqual(expect.stringMatching(/^ {5}more \d+$/u))
 	})
 })
 
