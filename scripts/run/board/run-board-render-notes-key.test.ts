@@ -31,6 +31,17 @@ describe('run_board_render_notes keyed lines', () => {
 		expect(split.prefix).toBe(ROW_INDENT)
 	})
 
+	it('keys a note that names no issue by its kind and time alone', () => {
+		const note = { ...PARK, issue: undefined }
+		const [line = ''] = notes_part([note], {
+			layout: EMPTY_LAYOUT,
+			link: same,
+			is_keyed: true,
+		}).lines
+
+		expect(split_key(line).key).toBe(`note:park::${String(NOW)}`)
+	})
+
 	it('keys no line where the board is not keyed, and draws the same text either way', () => {
 		const plain = line_of({})
 
