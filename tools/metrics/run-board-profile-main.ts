@@ -196,6 +196,6 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
-const run_board_profile_main = { local_pieces, round_part_pieces }
+const run_board_profile_main = { local_pieces, machine_pieces, round_part_pieces }
 
 export { run_board_profile_main }
