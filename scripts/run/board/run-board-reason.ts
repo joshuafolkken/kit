@@ -348,9 +348,12 @@ function wait_of(
 }
 
 // `📰` with the step the pending filing still lacks (`run-board-publication.ts`), whatever else would
-// keep the row (joshuafolkken/kit#7572).
-function publication_of(child: EpicChild, read: ReasonRead): RowReason | undefined {
-	return run_board_publication.reason_of(child, read.plan.tracked.get(child.number))
+// keep the row (joshuafolkken/kit#7572). Any open epic's task list reaches the child, not only an
+// opted-in one's, so `tracked` alone would ask a child of another epic for an epic placement.
+function publication_of(child: EpicChild, { plan }: ReasonRead): RowReason | undefined {
+	const epic = plan.tracked.get(child.number) ?? plan.epics?.get(child.number)
+
+	return run_board_publication.reason_of(child, epic)
 }
 
 // What each waiting row of one layout says, the pool-wide facts read once for all of them.

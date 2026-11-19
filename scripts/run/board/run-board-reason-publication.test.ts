@@ -17,6 +17,7 @@ const { WAIT_ICONS, WAIT_WORDS, WORDS } = run_board_labels
 const PENDING_BODY = issue_publication_state.prepare('## 背景\n', [RUN_LANE_LABEL])
 
 const EPIC = 7500
+const OTHER_EPIC = 7400
 const EPIC_PLACEMENT = {
 	icon: WAIT_ICONS.publication,
 	tail: '→ epic placement: add it to an epic task list',
@@ -30,10 +31,21 @@ function row(
 	return { number: ROW, repo: REPO, state: 'OPEN', labels, blocked_by, body }
 }
 
-function plan_of(children: Array<EpicChild>, epic?: number): BoardPlan {
+// The opted-in epic withholding the row (`tracked`) and the first open epic listing it (`epics`).
+interface Epics {
+	tracked?: number
+	first?: number
+}
+
+function entry(epic: number | undefined): Array<[number, number]> {
+	return epic === undefined ? [] : [[ROW, epic]]
+}
+
+function plan_of(children: Array<EpicChild>, { tracked, first }: Epics): BoardPlan {
 	return {
 		waves: { waves: [children], unreached: [] },
-		tracked: new Map(epic === undefined ? [] : [[ROW, epic]]),
+		tracked: new Map(entry(tracked)),
+		epics: new Map(entry(first)),
 		context: { repo: REPO, titles: new Map(), open_numbers: new Set([ROW]) },
 		labels: new Map(),
 	}
@@ -42,10 +54,10 @@ function plan_of(children: Array<EpicChild>, epic?: number): BoardPlan {
 function reason(
 	child: EpicChild,
 	waits: ReadonlyArray<string> = [],
-	epic?: number,
+	epics: Epics = {},
 ): RowReason | undefined {
 	const read = {
-		plan: plan_of([child], epic),
+		plan: plan_of([child], epics),
 		statuses: new Map(),
 		events: [],
 		free_lanes: 1,
@@ -62,7 +74,7 @@ it('leads a pending row in no epic with 📰 and the epic placement step', () =>
 })
 
 it('names the plan record command for a pending child with no recorded plan', () => {
-	expect(reason(row(PENDING_BODY), [], EPIC)).toStrictEqual({
+	expect(reason(row(PENDING_BODY), [], { tracked: EPIC })).toStrictEqual({
 		icon: WAIT_ICONS.publication,
 		tail: `→ plan record: pnpm josh issue:plan ${String(ROW)} --planned`,
 	})
@@ -71,7 +83,27 @@ it('names the plan record command for a pending child with no recorded plan', ()
 it('names the epic publish command once a planned child sits in its epic', () => {
 	const planned = row(PENDING_BODY, [], [RUN_LANE_LABEL, PLANNED_LABEL])
 
-	expect(reason(planned, [], EPIC)).toStrictEqual({
+	expect(reason(planned, [], { tracked: EPIC })).toStrictEqual({
+		icon: WAIT_ICONS.publication,
+		tail: `→ publish: pnpm josh issue:file --publish ${String(EPIC)}`,
+	})
+})
+
+// A child only an epic that did not opt in lists is a standalone row, absent from `tracked`; its task
+// list still publishes the child.
+it('names the publish command of an epic that has not opted in', () => {
+	const planned = row(PENDING_BODY, [], [RUN_LANE_LABEL, PLANNED_LABEL])
+
+	expect(reason(planned, [], { first: OTHER_EPIC })).toStrictEqual({
+		icon: WAIT_ICONS.publication,
+		tail: `→ publish: pnpm josh issue:file --publish ${String(OTHER_EPIC)}`,
+	})
+})
+
+it('names the opted-in epic over an earlier listed one', () => {
+	const planned = row(PENDING_BODY, [], [RUN_LANE_LABEL, PLANNED_LABEL])
+
+	expect(reason(planned, [], { tracked: EPIC, first: OTHER_EPIC })).toStrictEqual({
 		icon: WAIT_ICONS.publication,
 		tail: `→ publish: pnpm josh issue:file --publish ${String(EPIC)}`,
 	})

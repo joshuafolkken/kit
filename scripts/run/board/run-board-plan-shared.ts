@@ -99,6 +99,7 @@ const board_plan_schema = z.object({
 	human_merge_prs: map_of(z.number()).optional(),
 	waves: waves_schema,
 	tracked: map_of(z.number()),
+	epics: map_of(z.number()).optional(),
 	context: context_schema,
 	labels: map_of(names),
 	declared: map_of(string_set).optional(),

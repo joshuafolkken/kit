@@ -2,6 +2,6 @@
 	"reason": "The 📰 row now names the missing publication step and its command (#8174), a new 22-line module",
 	"date": "2026-11-19",
 	"growth": {
-		"scripts.code_lines": 22
+		"scripts.code_lines": 44
 	}
 }
