@@ -1,0 +1,7 @@
+{
+	"reason": "Translating Japanese prose to English lengthens the same paragraphs past the long-paragraph threshold; content and paragraph structure are unchanged",
+	"date": "2026-11-19",
+	"growth": {
+		"prose.long_paragraphs": 6
+	}
+}

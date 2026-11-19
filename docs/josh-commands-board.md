@@ -165,21 +165,26 @@ A child without `in-progress` is named by that fact, not a guessed command. An o
 
 A finished row leads with `✅` merged, `🏁` done, `⏩` closed by `josh issue:already-done` or `🚫` withdrawn.
 
-マージせず終了した行は、記録済みの短い英語の結論を右端に出し、文全体から根拠のIssueコメントを開く。結論（ASCII、1行、80文字以内）は `issue:comment`・`issue:already-done`・`issue:measured`・`issue:premise-unmet` の `--outcome <summary>` で記録する。過去の根拠には `issue:comment --evidence-url <comment URL>` を併用する。同じIssue内に実在する信頼済みコメントだけが根拠。管理用のwithdrawコメントは結論を上書きしない。根拠なし・取得失敗では英語の代替表示になる。狭い端末では文を省略してからリンクを付け、chat/plainでは同じ可視文字をリンク制御なしで表示する。
+A row that finished without a merge shows its recorded short English conclusion at the right edge, and the whole sentence opens the Issue comment that backs it.
+Record the conclusion (ASCII, one line, at most 80 characters) with `--outcome <summary>` on `issue:comment`, `issue:already-done`, `issue:measured` or `issue:premise-unmet`. For earlier evidence, add `issue:comment --evidence-url <comment URL>`. Only a trusted comment that exists on the same Issue counts as evidence.
+A housekeeping withdraw comment does not overwrite the conclusion. With no evidence or a failed fetch, an English fallback is shown. A narrow terminal shortens the sentence before linking it, and chat/plain output shows the same visible text without link control sequences.
 
-停止中のparked/decision行も同じ短い英文と根拠リンクを使うが、parkedは狭い端末でタイトルから縮める。
-`run:park` は推奨の選択肢から作った次の一手（`--outcome`、上限 `issue_outcome.NEXT_LIMIT`）を必須にし marker として書く。コマンドを文章より優先し、引数を埋めた `pnpm josh …` をそのまま書く（例 `pnpm josh backlog:triage --apply 7447 --blocked-by 7839`、複数なら最初の一つ）。コマンドの無い作業だけ `parent:` / `person:` で始まる文章にする。markerのない過去の停止は `issue:comment --outcome <next action> --evidence-url <stop comment URL>` で補完する。描画時のAI要約はしない。補完は最新停止にだけ効き、承認・解除・再開を代行しない。
-`run:stalled` の park コメント（`run:merge` の park と `run:park --escalate`）は、`run_stalled.next_action` の一手を同じ marker で書く。一手は `Next:` の回復手順と同じ出どころで、最初に打つコマンドを出す。再開コマンドは `Next:` に残る。
-一手は、通常 `pnpm josh ship --log <N>`、古い hand-off・handed-off の cut は `pnpm josh run:cut --end`、escalation は `parent:` の文章。
-自身を根拠とする次の一手の marker を持つ信頼済みコメントは停止として読み、それより古い park に代わって理由になる。他のコメントを根拠にする補完と、markerのない過去の `run:stalled` コメントは停止として読まない。
+A parked or decision row that is stopped uses the same short English sentence and evidence link, but a narrow terminal shortens a parked row from its title.
+`run:park` requires a next action built from the recommended option (`--outcome`, capped at `issue_outcome.NEXT_LIMIT`) and writes it as a marker. A command wins over prose, and the `pnpm josh …` is written as is with its arguments filled in (for example `pnpm josh backlog:triage --apply 7447 --blocked-by 7839`; with several, the first one).
+Only work that has no command becomes a sentence starting with `parent:` / `person:`. An earlier stop without a marker is backfilled with `issue:comment --outcome <next action> --evidence-url <stop comment URL>`.
+No AI summary is made at render time. A backfill applies to the latest stop only, and never approves, clears or resumes on anyone's behalf.
+The park comment of `run:stalled` (the `run:merge` park and `run:park --escalate`) writes the action from `run_stalled.next_action` under the same marker. The action comes from the same source as the `Next:` recovery steps and shows the first command to type. The resume command stays in `Next:`.
+The action is normally `pnpm josh ship --log <N>`, `pnpm josh run:cut --end` for a stale hand-off or handed-off cut, and a `parent:` sentence for an escalation.
+A trusted comment carrying a next-action marker that cites itself as evidence is read as a stop and becomes the reason in place of any older park. A backfill citing another comment, and an earlier `run:stalled` comment without a marker, are not read as stops.
 
-説明不明でも最新停止コメントへリンクする。取得失敗や起動前の停止は `Reason unavailable: inspect issue`（Issueへリンク）、停止後に `backlog:triage --adopt` の採用があれば `adopted option <n> · relaunching`（採用コメントへリンク）。リンク非対応やchat/plainは行頭のIssue番号から確認する（CLIは `pnpm josh issue:read <N>`）。
+Even with no explanation, the row links to the latest stop comment. A failed fetch or a stop before launch shows `Reason unavailable: inspect issue` (linking to the Issue),
+and an adoption by `backlog:triage --adopt` after the stop shows `adopted option <n> · relaunching` (linking to the adoption comment). Without link support, or in chat/plain, check from the Issue number at the start of the row (on the CLI, `pnpm josh issue:read <N>`).
 
-親の操作待ちの行は park の一手を出す（park へリンク）。条件は、最新 park の推奨が親の操作（`必要な権限: 親…`）で、その後の採用が推奨を `parent action done:` なしで取ったこと。
+A row waiting on a parent's action shows the park's action (linking to the park). The condition: the latest park recommends a parent's action (`必要な権限: 親…`), and the adoption after it took the recommendation without `parent action done:`.
 
-- この一手は、起動時刻や後の `run:stalled` に関わらず、`relaunching` と停止の理由より優先する。
-- 一手は上のコマンド優先の規則のとおり、引数を埋めた `pnpm josh …` で出る。
-- 子の再起動で済む選択肢、推奨と違う選択肢、`parent action done:` 付きの採用は `relaunching` のまま。
+- This action takes precedence over `relaunching` and the stop reason, whatever the launch time or any later `run:stalled`.
+- Following the command-first rule above, the action appears as `pnpm josh …` with its arguments filled in.
+- An option that a child relaunch settles, an option other than the recommendation, or an adoption with `parent action done:` stays `relaunching`.
 
 A queued or waiting row draws `<icon> <condition> <number> <kind> <title>  <tail>`: the icon says what it waits on, in place of `⏳`, and the condition column — 11 columns in both sections, the width of `MM-DD HH:MM` — holds its figure, so every row's number starts in one column. The legend names each wait icon the frame draws. A row leads with one icon only, the first of these that holds:
 

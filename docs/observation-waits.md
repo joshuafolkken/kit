@@ -1,32 +1,55 @@
-# 観測条件が未達の調査を再開する
+# Resuming an investigation whose observation conditions are unmet
 
-調査で不足が判明したら、書き込み権限を持つ調査担当者が、同じ Issue のコメントに必要な証拠をチェックリストで記録する。
+When an investigation finds evidence missing, an investigator with write permission records the
+evidence it needs as a checklist in a comment on the same Issue.
 
 ```markdown
 ## Observation evidence
 
-- [ ] multi-slot: code 以外も含む複数レビュー slot の brief と処置実例
-- [ ] same-head: 同じ HEAD のレビュー先行 push・gate・Actions・全レビュー証明
-- [ ] comparison: 比較可能な対照と処置結果
-- [ ] cost: 取得済みの比較費用
+- [ ] multi-slot: a brief and a disposition example for several review slots, not only code
+- [ ] same-head: an early review push, gate, Actions and every review attestation on the same HEAD
+- [ ] comparison: a comparable control and its disposition result
+- [ ] cost: the comparison cost, fetched
 ```
 
-Issue 本文へ、実際のコメント URL と必須キーを次の形式で追加する。コメントの自由文や終了メッセージだけでは観測待ちに分類されない。
+Add the actual comment URL and the required keys to the Issue body in the form below. Free text in
+a comment or a closing message alone does not classify the Issue as waiting on an observation.
 
 ```markdown
 <!-- josh:observation-wait:v1 https://github.com/OWNER/REPO/issues/7400#issuecomment-123 multi-slot,same-head,comparison,cost -->
 ```
 
-本文とコメントが待機条件の永続記録となる。終了処理は既存の待機経路でレーンを解放し、失敗回数を増やさない。選択処理と board も同じ条件を使う。board は待機中の Issue を waiting 欄に置き、不足しているキーを表示する。その理由の文字列は、端末では証拠コメントへのリンクになる（`--chat` のようにパイプへ出す出力は、他のリンクと同様にリンクを付けない）。`run:add --retry` で積んだ未起動の Issue も、計画が到達させない（待機中の）ものは lanes 欄に出さず waiting 欄に置く。計画が次に起動するものは lanes 欄に残る。
+The body and the comment are the persistent record of the wait condition. Closing releases the lane
+through the existing wait path and does not add to the failure count. Selection and the board use
+the same condition. The board puts a waiting Issue in the waiting column and shows the missing keys.
+In a terminal, that reason text links to the evidence comment (output sent to a pipe, such as
+`--chat`, carries no link, like every other link). An Issue queued but not yet launched with `run:add --retry`
+that the plan will not reach (because it is waiting) also goes in the waiting column, not the lanes
+column. One the plan launches next stays in the lanes column.
 
-必要な実例を lane ledger が記録する条件なら、宣言の末尾に ledger 条件を足せる。条件を満たした時点で、証拠コメントのチェックを待たずに次の選択から再観測できる。満たすまでは従来どおり待ちとして保持し、失敗に数えない。
+When the lane ledger records the examples a condition needs, a ledger condition can be appended to
+the declaration. Once it is met, the next selection can re-observe the Issue without waiting for the
+evidence comment's checks. Until then it is held as a wait as before and is not counted as a
+failure.
 
 ```markdown
 <!-- josh:observation-wait:v1 https://github.com/OWNER/REPO/issues/7400#issuecomment-123 multi-slot,same-head,comparison,cost ledger:multi-slot-early-push>=1 -->
 ```
 
-`multi-slot-early-push` は、レビューの slot が 2 つ以上あるラウンドで、先行 push が成功（`pushed`）した early-push 記録の件数である。early-push 記録は対象の HEAD（`head`）とレビューの slot 数（`slots`）を持つ。`slots` の無い過去の記録は数えない。未知の指標名は未知の宣言形式として待機を維持する。ledger を読めない checkout では件数を 0 とする。
+`multi-slot-early-push` is the count of early-push records whose early push succeeded (`pushed`) in
+a round with two or more review slots. An early-push record carries its HEAD (`head`) and its review
+slot count (`slots`). Older records without `slots` are not counted. An unknown metric name keeps
+the wait as an unknown declaration form. A checkout that cannot read the ledger counts 0.
 
-証拠が得られた条件だけをチェックし、その行に GitHub の証拠リンクを付ける（例: `- [x] cost: 比較費用 [evidence](https://github.com/OWNER/REPO/issues/7400#issuecomment-456)`）。全必須キーが一意に存在し、チェック済みかつ証拠リンク付きになったとき、次の選択から再観測できる。担当者が証拠の内容を確認したという記録であり、リンクだけで測定結果を自動解釈する機能ではない。
+Check only the conditions whose evidence was obtained, and attach a GitHub evidence link on that
+line (for example `- [x] cost: comparison cost [evidence](https://github.com/OWNER/REPO/issues/7400#issuecomment-456)`).
+When every required key is present once, checked and linked to evidence, the next selection can
+re-observe the Issue. This records that the investigator confirmed the evidence; the link alone does
+not interpret a measurement automatically.
 
-マージ数の増加、code slot だけの先行 push、費用の未取得は、上記条件を充足しない。必要な条件を削除して再開してはいけない。コメントからのキー削除・重複、未チェック、証拠リンク不足、未知の宣言形式、取得失敗、書き込み権限を確認できない作者は待機を維持する。充足済みコメントも毎回再取得し、再起動後も本文から再判定する。通常の機械的失敗や人の判断待ちの分類は既存のまま扱う。
+More merges, an early push of the code slot alone, or a cost not yet fetched do not meet the
+conditions above. Do not delete a required condition to resume. A key deleted from or duplicated in
+the comment, an unchecked item, a missing evidence link, an unknown declaration form, a fetch
+failure, or an author whose write permission cannot be confirmed keeps the wait. A satisfied comment
+is fetched again every time, and the body is re-judged after a restart. Ordinary mechanical failures
+and waits on a person's judgment are classified as before.
