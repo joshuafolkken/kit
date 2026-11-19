@@ -6,7 +6,6 @@ import { epic_triage } from '#scripts/epic/epic-triage'
 import { has_label_name, has_parked_label, IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
 import { issue_not_before } from '#scripts/issue/issue-not-before'
 import { issue_observation_gate } from '#scripts/issue/issue-observation-gate'
-import { issue_publication_state } from '#scripts/issue/issue-publication-state'
 import { issue_sample_gate } from '#scripts/issue/issue-sample-gate'
 import { lane_state } from '#scripts/lane/lane-state'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
@@ -18,6 +17,7 @@ import { run_board_labels } from './run-board-labels'
 import { run_board_layout, type Overlay, type ReasonOf, type RowReason } from './run-board-layout'
 import { run_board_machine, type MachineGauges } from './run-board-machine'
 import { run_board_planning, type Planning } from './run-board-planning'
+import { run_board_publication } from './run-board-publication'
 import { run_board_setup } from './run-board-setup'
 import type { ItemStatus } from './run-board-status'
 
@@ -347,12 +347,13 @@ function wait_of(
 	return not_before_of(child, read.now_ms) ?? offer_wait(child, read, pool)
 }
 
-// `📰`: an issue whose filing has not published yet (`issue-publication-state.ts`), which no pickup
-// offers until it does, whatever else would keep it (joshuafolkken/kit#7572).
-function publication_of(child: EpicChild): RowReason | undefined {
-	return issue_publication_state.is_pending(child.body)
-		? { icon: WAIT_ICONS.publication }
-		: undefined
+// `📰` with the step the pending filing still lacks (`run-board-publication.ts`), whatever else would
+// keep the row (joshuafolkken/kit#7572). Any open epic's task list reaches the child, not only an
+// opted-in one's, so `tracked` alone would ask a child of another epic for an epic placement.
+function publication_of(child: EpicChild, { plan }: ReasonRead): RowReason | undefined {
+	const epic = plan.tracked.get(child.number) ?? plan.epics?.get(child.number)
+
+	return run_board_publication.reason_of(child, epic)
 }
 
 // What each waiting row of one layout says, the pool-wide facts read once for all of them.
@@ -365,7 +366,7 @@ function reader(read: ReasonRead): ReasonOf {
 			run_board_human_merge.reason_of(child, current.plan) ??
 			stage_of(child, current) ??
 			planned_of(child, pool) ??
-			publication_of(child) ??
+			publication_of(child, current) ??
 			wait_of(child, waits, current, pool)
 		)
 	}

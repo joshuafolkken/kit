@@ -26,6 +26,9 @@ interface Plan {
 	// past the listing cap. Carrying the *whole* index here instead would move that misreport rather
 	// than remove it: the sentence would name an epic that is withholding nothing.
 	tracked: ReadonlyMap<number, number>
+	// The first open epic, opted in or not, that lists each child (`epic_index.first_epics`): the epic a
+	// pending row's publication step names. Absent, a plan knows only `tracked`.
+	epics?: ReadonlyMap<number, number> | undefined
 	// The rows the offer's cap bounds and the paths each issue declares, so `--waves` separates each
 	// wave as `backlog:next` does — and the lane limit it cuts each wave at.
 	scope: GateScope
@@ -71,6 +74,7 @@ async function classify(
 		repo: context.repo,
 		exclude,
 		tracked: epic_index.withheld_children(context.tracking.index, context.opted_in.issues),
+		epics: epic_index.first_epics(context.tracking.index),
 		scope: {
 			...(await backlog_gate_scope.gate_scope(context)),
 			wave_limit: await read_wave_limit(),
