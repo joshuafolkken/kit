@@ -204,6 +204,7 @@ Steps 1–2 stop on refusal. Steps 3–7 report problems, including duplicates w
    Local `原因の park: #<N>` lines record stops through the shared epic recorder. Foreign filings skip them. Failures warn and continue; repair dependencies without refiling. Post-create failures leave exit 0.
 10. With `--release`, link the filed issue to the target's release issue, as [`josh issue:release`](#josh-issuerelease) does. A link that does not complete prints `⚠` with that command to re-run, prefixed with `GH_REPO=<target>` for a `--repo` filing.
 11. Run [`josh epic:bundle`](#josh-epicbundle) on the filed issue. When it gives no answer, print `⚠` with the command to re-run; the exit code stays 0.
+    An unpublished `--route split` child filed directly runs it with `--apply`; when nothing places it in an epic, print `✖` with the steps to create its epic and publish it, and exit 1 — it is filed, so do not file it again. `josh issue:spill` and `--batch` place their children themselves.
 
 A refusal in steps 1–7 files nothing and exits 1, and a filing that files nothing is never counted toward the cap. No delivered rule refuses the call ahead of the filing cap, WIP cap and fold steps.
 
