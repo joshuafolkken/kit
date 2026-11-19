@@ -52,7 +52,7 @@ function select(
 		excluded,
 		reused: excluded.length,
 		missed: tests.length - excluded.length,
-		reason: 'closed-inputs-unchanged',
+		reason: excluded.length > 0 ? 'closed-inputs-unchanged' : 'closed-inputs-changed',
 	}
 }
 
@@ -85,6 +85,8 @@ function carries_over(parts: MovedParts | undefined): boolean {
 	return parts?.synced.length === 0 && !moves_whole_suite(parts.changed)
 }
 
+// A comparable green is compared test by test with or without a main sync since it
+// (joshuafolkken/kit#8095): the closed-input digests, not the sync, decide what still holds.
 async function compare(
 	root: string,
 	scope: RelatedScope,
@@ -96,7 +98,7 @@ async function compare(
 		undefined,
 		tree,
 	)
-	if (parts === undefined || parts.synced.length === 0) return empty(NO_RECORD)
+	if (parts === undefined) return empty(NO_RECORD)
 
 	if (moves_whole_suite(moved_paths.union_of(parts))) return empty('whole-suite-input')
 
