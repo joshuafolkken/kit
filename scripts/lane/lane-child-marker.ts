@@ -31,6 +31,13 @@ const { KEY, OVERRUN_KEY } = lane_child_mark_keys
 const CACHE_TTL_KEY = 'CLAUDE_CODE_PROMPT_CACHE_TTL'
 const CACHE_TTL = '5m'
 
+// **A dispatched child also loads its tools up front** (joshuafolkken/kit#8096). Tool search defers
+// the launched `Monitor`, `SendMessage` and `TaskStop`, so a child spent a ToolSearch round trip
+// (about 19 s of model turn each) before its first use of one. A false value selects the standard
+// mode, where every launched tool's definition is in the first request.
+const TOOL_SEARCH_KEY = 'ENABLE_TOOL_SEARCH'
+const TOOL_SEARCH = 'false'
+
 // **An overrun investigation also carries its own mark** (joshuafolkken/kit#4880): it runs as the
 // lane's child, so `issue:file` reads this one to record its filings as the investigation's rather than
 // the child's. The launcher sets it, so the record never rests on the model passing an argument.
@@ -44,7 +51,12 @@ type MarkerSource = Readonly<Record<string, string | undefined>>
 function environment_for(issue: string): Record<string, string> {
 	issue_number_shape.require_issue_number(issue)
 
-	return { [KEY]: issue, [CACHE_TTL_KEY]: CACHE_TTL, [outer_command.KEY]: '' }
+	return {
+		[KEY]: issue,
+		[CACHE_TTL_KEY]: CACHE_TTL,
+		[TOOL_SEARCH_KEY]: TOOL_SEARCH,
+		[outer_command.KEY]: '',
+	}
 }
 
 // The issue a child was dispatched for, or `undefined` when the mark is absent or malformed. A blank

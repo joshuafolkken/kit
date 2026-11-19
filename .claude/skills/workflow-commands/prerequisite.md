@@ -49,9 +49,10 @@ pnpm josh issue:file "<title>" --body-file .josh/tmp/body.md --route tier-a
 
 If the size check requires a split, use `--route split --label route:tier-a` instead.
 Then run `pnpm josh run:split <M> --prerequisite <N>` to record that the kept Issue waits for it.
-For a split child, record its plan with `issue:plan --planned --no-notify` before `run:pause`;
-`run:pause` publishes it, and on a failure comments the command to run on both Issues
-(`docs/how-to/prepare-issues.md`).
+For a split child, the lane that filed it records its plan with `issue:plan --planned --no-notify`
+before `run:pause`; without it `run:pause` refuses before setting anything aside. `run:pause`
+publishes it, and on a publication withheld for another reason comments the command to run on both
+Issues (`docs/how-to/prepare-issues.md`).
 
 For a cause that stopped a run, declare `- 原因の park: #<M>` under `## 背景` before filing;
 repeat the single-number line for each local stopped Issue. `issue:file` records each stopped Issue

@@ -82,8 +82,16 @@ function keyed_of(
 	starts: ReadonlyArray<number>,
 ): Pick<Spun, 'lines' | 'keyed'> {
 	const split = lines.map((line) => run_board_row_key.split_key(line))
-	const keyed = split.flatMap(({ key, text }, index) =>
-		key === undefined ? [] : { key, index, row: starts[index] ?? 1, text },
+	const keyed = split.flatMap(({ key, text, prefix }, index) =>
+		key === undefined
+			? []
+			: {
+					key,
+					index,
+					row: starts[index] ?? 1,
+					text,
+					prefix_columns: run_board_fit.width_of(prefix),
+				},
 	)
 
 	return { lines: split.map((line) => run_board_spot.drawn(line.text, frame)), keyed }
