@@ -17,6 +17,7 @@ const DESTINATION = 'scripts/test/test-symbol-users.ts'
 const SOURCE_LINES = 300
 const MOVED = SOURCE_LINES * 2
 const SMALL_LINES = 40
+const EDITED_SKILL = '.claude/skills/a/SKILL.md'
 const OTHERS = ['scripts/test/a.ts', 'scripts/test/b.ts', 'scripts/test/c.ts', 'docs/d.md']
 const BASE = [SOURCE, ...OTHERS]
 const MOVE_PLAN = [...BASE, DESTINATION]
@@ -63,6 +64,16 @@ describe('lane_plan_moves.sources_of', () => {
 		['no unlisted namesake', BASE, new Set(BASE)],
 		['a directory claim', [SOURCE, 'scripts/test/'], new Set(BASE)],
 		['no base listing', MOVE_PLAN, undefined],
+		[
+			'an edited SKILL.md beside an added one',
+			[EDITED_SKILL, '.claude/skills/b/SKILL.md'],
+			new Set([EDITED_SKILL]),
+		],
+		[
+			'two listed namesakes for one unlisted one',
+			['a/x.ts', 'b/x.ts', 'c/x.ts'],
+			new Set(['a/x.ts', 'b/x.ts']),
+		],
 	])('reads no move with %s', (_case, paths, base) => {
 		expect(lane_plan_moves.sources_of(paths, base)).toStrictEqual([])
 	})

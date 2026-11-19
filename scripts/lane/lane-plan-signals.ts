@@ -75,16 +75,15 @@ async function moved_source_lines_of(
 	base_files: ReadonlySet<string> | undefined,
 ): Promise<ReadonlyMap<string, number>> {
 	const sources = lane_plan_moves.sources_of(paths, base_files)
-	const contents = await Promise.all(
-		sources.map(async (file) => await read_or_empty(['show', `${base}:${file}`])),
+	const counts = await Promise.all(
+		sources.map(async (file): Promise<[string, number]> => {
+			const content = await read_or_empty(['show', `${base}:${file}`])
+
+			return [file, split_measure.line_count(Buffer.from(content))]
+		}),
 	)
 
-	return new Map(
-		sources.map((file, index) => [
-			file,
-			split_measure.line_count(Buffer.from(contents[index] ?? '')),
-		]),
-	)
+	return new Map(counts)
 }
 
 async function probe_of(base: string, paths: ReadonlyArray<string>): Promise<TreeProbe> {

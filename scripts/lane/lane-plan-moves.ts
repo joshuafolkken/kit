@@ -4,9 +4,37 @@ import path from 'node:path'
 // measures a move as the whole file deleted and added (`git-diff-reads.ts` → `NO_RENAME_DETECTION`), and
 // split-assessment.md counts a move twice, but the declaration times the period's ratio left it out —
 // #7980 declared 250 lines and shipped 1,904, about 1,200 of them moved. A planned file the base holds
-// and a planned file it does not, sharing a file name, read as a move from the first; each source counts
+// and a planned file it does not, sharing a file name one-to-one, read as a move from the first; each source counts
 // twice its lines at the base. With no base listing no file reads as moved.
 const MOVE_WEIGHT = 2
+
+// File names many directories hold (an entry point, a route, a skill, a manifest): a plan editing one and
+// adding another is no move.
+const GENERIC_NAMES = new Set([
+	'+layout.svelte',
+	'+layout.ts',
+	'+page.server.ts',
+	'+page.svelte',
+	'+page.ts',
+	'+server.ts',
+	'CLAUDE.md',
+	'README.md',
+	'SKILL.md',
+	'index.js',
+	'index.ts',
+	'package.json',
+])
+
+// The file names held once among `files` and not generic, so a pair reads one-to-one.
+function unique_names(files: ReadonlyArray<string>): Set<string> {
+	const names = files.map((file) => path.basename(file))
+
+	return new Set(
+		names.filter(
+			(name) => names.indexOf(name) === names.lastIndexOf(name) && !GENERIC_NAMES.has(name),
+		),
+	)
+}
 
 // `counted` are the plan's counted files (tests excluded); a directory claim moves nothing.
 function sources_of(
@@ -15,11 +43,11 @@ function sources_of(
 ): Array<string> {
 	if (base_files === undefined) return []
 	const files = counted.filter((file) => !file.endsWith('/'))
-	const added = new Set(
-		files.filter((file) => !base_files.has(file)).map((file) => path.basename(file)),
-	)
+	const listed = files.filter((file) => base_files.has(file))
+	const sources = unique_names(listed)
+	const added = unique_names(files.filter((file) => !base_files.has(file)))
 
-	return files.filter((file) => base_files.has(file) && added.has(path.basename(file)))
+	return listed.filter((file) => sources.has(path.basename(file)) && added.has(path.basename(file)))
 }
 
 // `source_lines` holds each move source's lines at the base; one it could not read counts as 0.
