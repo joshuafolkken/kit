@@ -182,6 +182,30 @@ describe('run_board_gather_thread.worker_gatherer over a stream read again', () 
 	})
 })
 
+// joshuafolkken/kit#8135: a reread is told apart by its length and its last event, not a whole walk.
+const RETOLD = { pos: 0, at: new Date(START).toISOString(), kind: 'setup', text: 'went' }
+const SAME_COUNT: GatherState = { ...AGAIN, local: { ...LOCAL, events: [RETOLD] } }
+
+describe('run_board_gather_thread.post_of over a stream read again', () => {
+	it('hands over a stream of the same length whose last event differs', () => {
+		expect(post_of(STREAM, SAME_COUNT).local).toStrictEqual({ value: SAME_COUNT.local })
+	})
+
+	it('says an equal stream read afresh past a line without its newline is the same', () => {
+		expect(post_of(STREAM, AGAIN).local?.is_same_events).toBe(true)
+	})
+
+	it('says the same stream array read again is the same', () => {
+		expect(post_of(STREAM, { ...STREAM, read_ms: FAILED_MS }).local?.is_same_events).toBe(true)
+	})
+
+	it('hands over a longer stream that ends on the same event', () => {
+		const LONGER: GatherState = { ...AGAIN, local: { ...LOCAL, events: [RETOLD, ...EVENTS] } }
+
+		expect(post_of(STREAM, LONGER).local).toStrictEqual({ value: LONGER.local })
+	})
+})
+
 describe('run_board_gather_thread phases', () => {
 	it("marks the worker's first answer and the phases its round carried on the board's thread", async () => {
 		launch_timing.clear()
