@@ -27,7 +27,16 @@ const PLAN: BoardPlan = {
 		],
 	]),
 	decision_questions: new Map([[2, 'Choose the account']]),
-	decision_waits: new Map([[3, '→ decide #2: Choose the account']]),
+	decision_blockers: [
+		{
+			number: 2,
+			title: 'Account choice',
+			labels: [],
+			need: 'decide',
+			detail: 'account',
+			blocks: [3],
+		},
+	],
 	waves: {
 		waves: [
 			[{ number: 2, repo: REPO, state: 'OPEN', labels: [AUTO_OK], blocked_by: [], body: 'b' }],

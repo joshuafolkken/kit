@@ -7,11 +7,14 @@ import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { lane_process_table } from '#scripts/lane/lane-process-table'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_board_cli } from '#scripts/run/board/run-board-cli'
-import { run_board_gather } from '#scripts/run/board/run-board-gather'
+import { run_board_every } from '#scripts/run/board/run-board-every'
+import { run_board_frame_store } from '#scripts/run/board/run-board-frame-store'
+import { run_board_gather, type GatherRead } from '#scripts/run/board/run-board-gather'
 import { run_board_gather_live } from '#scripts/run/board/run-board-gather-live'
 import { run_board_ledger_window } from '#scripts/run/board/run-board-ledger-window'
 import { run_board_read } from '#scripts/run/board/run-board-read'
 import { run_board_records } from '#scripts/run/board/run-board-records'
+import type { BoardPorts, BoardState } from '#scripts/run/board/run-board-state'
 import { run_board_throughput } from '#scripts/run/board/run-board-throughput'
 import { run_board_tick } from '#scripts/run/board/run-board-tick'
 import { run_board_usage_board } from '#scripts/run/board/run-board-usage-board'
@@ -33,20 +36,33 @@ const PER_SECOND = MS_PER_MINUTE / MACHINE_SAMPLE_MS
 const PER_LOCAL_READ = MS_PER_MINUTE / LOCAL_READ_MS
 const PER_TOP = MS_PER_MINUTE / run_board_usage_top.TOP_INTERVAL_MS
 
-// The redraw alone: the frame is drawn from one read taken beforehand, and written nowhere. One
-// settled tick first waits for the GitHub reads, so none lands inside a later piece's measurement,
-// and no snapshot store is given, so the live board's kept GitHub reads are not rewritten.
-async function redraw_piece(): Promise<Piece> {
+// The read the redraws draw from, its frame ports and the state one settled tick left.
+interface Settled {
+	read: GatherRead
+	ports: BoardPorts
+	state: BoardState
+}
+
+// One read taken beforehand, drawn and written nowhere. The settled tick waits for the GitHub reads,
+// so none lands inside a later piece's measurement, and no snapshot store is given, so the live
+// board's kept GitHub reads are not rewritten.
+async function settled(): Promise<Settled> {
 	const live = run_board_gather_live.ports_of(false)
 	const read = await run_board_gather.frame_gatherer(live)('background')
-	const ports = {
+	const ports: BoardPorts = {
 		...run_board_cli.LIVE_PORTS,
 		gather: async () => read,
 		// eslint-disable-next-line @typescript-eslint/no-empty-function -- the frame is measured, not shown
 		write: () => {},
 		snapshot: undefined,
 	}
-	let state = await run_board_tick.tick(run_board_tick.FRESH_STATE, ports, 'settled')
+	const state = await run_board_tick.tick(run_board_tick.FRESH_STATE, ports, 'settled')
+
+	return { read, ports, state }
+}
+
+function redraw_piece(ports: BoardPorts, first: BoardState): Piece {
+	let state = first
 
 	async function run(): Promise<void> {
 		// eslint-disable-next-line require-atomic-updates -- measure_all awaits each run before the next
@@ -54,6 +70,40 @@ async function redraw_piece(): Promise<Piece> {
 	}
 
 	return { label: 'redraw', per_minute: PER_SECOND, run }
+}
+
+// The redraw on the tick a changed stream reaches: the worker posts a new events array only when its
+// re-read differs, and the memos keyed by that array miss on it. Each tick here gets a fresh copy.
+function new_events_piece({ read, ports, state }: Settled): Piece {
+	const { local } = read
+
+	async function gather(): Promise<GatherRead> {
+		return local === undefined ? read : { ...read, local: { ...local, events: [...local.events] } }
+	}
+
+	return {
+		...redraw_piece({ ...ports, gather }, state),
+		label: 'redraw (new events)',
+		per_minute: PER_LOCAL_READ,
+	}
+}
+
+// The live board's extra whole draws that record the chat's and `--once`'s frames, kept in memory
+// rather than in the live board's files.
+function record_piece({ ports, state }: Settled): Piece {
+	const frames = run_board_frame_store.memory_store()
+
+	return {
+		label: 'record (chat + once)',
+		per_minute: MS_PER_MINUTE / run_board_every.RECORD_EVERY_MS,
+		run: async () => {
+			run_board_every.record(state, { ...ports, frames }, undefined, Date.now())
+		},
+	}
+}
+
+function redraw_pieces(from: Settled): Array<Piece> {
+	return [redraw_piece(from.ports, from.state), new_events_piece(from), record_piece(from)]
 }
 
 // One worker round, the whole of what the live board reads each second. The rounds run back to back,
@@ -183,7 +233,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	const repository = await run_carry.repository_directory()
 	const local = repository === undefined ? [] : local_pieces(repository)
 	const pieces = [
-		await redraw_piece(),
+		...redraw_pieces(await settled()),
 		round_piece(),
 		...machine_pieces(),
 		...round_part_pieces(),
@@ -196,6 +246,6 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
-const run_board_profile_main = { local_pieces, machine_pieces, round_part_pieces }
+const run_board_profile_main = { local_pieces, machine_pieces, redraw_pieces, round_part_pieces }
 
 export { run_board_profile_main }

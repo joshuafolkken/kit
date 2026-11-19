@@ -20,7 +20,7 @@ import type { LocalRead } from './run-board-read'
 
 const WORKER_URL = new URL('run-board-gather-worker.ts', import.meta.url)
 const EMPTY_READ = run_board_gather.read_of(run_board_gather.FRESH_GATHER)
-const WORKER_PHASE = 'worker: first round'
+const WORKER_PHASE = 'worker: first answer'
 
 // The run's read as the worker hands it over. A stream read again unchanged is not handed over — the
 // board keeps its own array, so the folds it keyed on that array are not folded again.
@@ -96,6 +96,24 @@ function failed_of(error: unknown): FailedPost {
 	return { failed: reason_of(error) }
 }
 
+// The run's read is handed over as soon as it lands (joshuafolkken/kit#8134); the round's end hands
+// the rest over against it, so neither the run's read nor the phases go twice.
+async function posted_round(
+	state: GatherState,
+	ports: GatherPorts,
+	post: (value: GatherPost) => void,
+): Promise<GatherState> {
+	const posted = { before: state }
+	const next = await run_board_gather.gather(state, ports, 'background', (read) => {
+		post(post_of(posted.before, read))
+		posted.before = read
+	})
+
+	post({ ...post_of(posted.before, next), phases: launch_timing.phases() })
+
+	return next
+}
+
 // One round on the worker: the reads handed over, or why they threw — the state kept for the next.
 async function gather_round(
 	state: GatherState,
@@ -103,11 +121,7 @@ async function gather_round(
 	post: (value: GatherPost | FailedPost) => void,
 ): Promise<GatherState> {
 	try {
-		const next = await run_board_gather.gather(state, ports, 'background')
-
-		post({ ...post_of(state, next), phases: launch_timing.phases() })
-
-		return next
+		return await posted_round(state, ports, post)
 	} catch (error) {
 		post(failed_of(error))
 
@@ -156,7 +170,8 @@ function fail(thread: Thread, worker: GatherWorker, reason: string, now: () => n
 	said_failed(thread, reason, now)
 }
 
-// The first answer is timed from the spawn: the worker's start, its module load and its first round.
+// The first answer is timed from the spawn: the worker's start, its module load and its first read
+// handed over — the early lane read when it lands first, else the round's end.
 function listen(thread: Thread, worker: GatherWorker, now: () => number): void {
 	const spawned_ms = now()
 
