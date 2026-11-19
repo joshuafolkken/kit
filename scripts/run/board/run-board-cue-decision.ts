@@ -1,9 +1,8 @@
-import type { BoardHeader } from './run-board-header'
 import { run_board_header_notice } from './run-board-header-notice'
 import type { LocalRead } from './run-board-read'
 import type { CueName } from './run-board-sound-cues'
 import { run_board_sound_repeat } from './run-board-sound-repeat'
-import { run_board_sound_transition } from './run-board-sound-transition'
+import { run_board_sound_transition, type SoundHeader } from './run-board-sound-transition'
 import type { BoardState } from './run-board-state'
 
 // What a frame decides about its sound, without sounding it: the cue it picked, if any, and what the next
@@ -21,7 +20,7 @@ type CueDecision = Pick<BoardState, 'sound_snapshot' | 'sound_pending' | 'notice
 // It is decided before the frame is drawn, so the notice shows on the frame it sounds on.
 function decided(
 	state: CueState,
-	header: BoardHeader,
+	header: SoundHeader,
 	events: LocalRead['events'],
 	now_ms: number,
 ): CueDecision {
