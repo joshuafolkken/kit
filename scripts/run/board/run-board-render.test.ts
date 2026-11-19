@@ -202,16 +202,18 @@ describe('run_board_render.render sections', () => {
 		expect(lines_of(header({ layout }))).toContain(lane_of('⏳', '', `7       ${title}`))
 	})
 
-	// joshuafolkken/kit#4173: the rule names 🙋, so the legend names only the 🎯 its end draws (#7920).
-	it('draws a decision row under the decision rule, which names 🙋 in place of the legend', () => {
+	// joshuafolkken/kit#4173: the rule names 🙋 in place of the legend; a decision row's end draws no 🎯,
+	// so a board of decision rows alone draws no 🎯 legend either (#8166).
+	it('draws a decision row under the decision rule, ending without a finish or a 🎯 legend', () => {
 		const layout = { ...EMPTY_LAYOUT, people: [row(6, { state: 'human' })] }
 		const lines = lines_of(header({ layout }))
 		const decision_rule = rule('🙋 decision')
-		const decision_row = `    🙋 6       ${padded('Issue 6')}  ${UNKNOWN_FINISH}`
+		const decision_row = `    🙋 6       Issue 6`
 		const start = lines.indexOf(decision_rule)
 
 		expect(lines.slice(start, start + 2)).toStrictEqual([decision_rule, decision_row])
-		expect(lines.slice(-5)).toStrictEqual([decision_row, '', rule('⏳ queued 0'), '', ESTIMATE])
+		expect(lines.slice(-3)).toStrictEqual([decision_row, '', rule('⏳ queued 0')])
+		expect(lines.some((line) => line.includes(UNKNOWN_FINISH))).toBe(false)
 	})
 })
 

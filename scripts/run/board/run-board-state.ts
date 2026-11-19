@@ -26,6 +26,9 @@ import { run_board_type_rows, type Typing } from './run-board-type-rows'
 // A redraw's whole frame (`tick`) or the spinners and typing written between redraws (`turn`).
 type DrawKind = 'tick' | 'turn'
 type DrawTimer = <T>(kind: DrawKind, draw: () => T) => T
+// The stage a live board's loop is in, which `--timing` names a main-thread stall by (joshuafolkken/kit#8148).
+// `turn` is the spinners turned between seconds.
+type StallStage = 'redraw' | 'record' | 'turn'
 
 interface BoardPorts {
 	read_plan: (scope: NamedPlan) => Promise<BoardPlan | undefined>
@@ -82,6 +85,8 @@ interface BoardPorts {
 	sound?: (() => boolean) | undefined
 	// Times each draw for `--timing`'s report (`run-board-timing.ts`); none times nothing.
 	time_draw?: DrawTimer | undefined
+	// Marks the stage a live board's loop enters, for `--timing`'s stalls (`run-board-stall.ts`); none marks nothing.
+	enter_stage?: ((stage: StallStage) => void) | undefined
 }
 
 // `background` launches the GitHub reads and draws without them; `settled` waits for them before
@@ -175,4 +180,4 @@ function is_due(last_ms: number | undefined, interval_ms: number, now_ms: number
 const run_board_state = { FRESH_STATE, is_due }
 
 export { run_board_state }
-export type { BoardPorts, BoardState, DrawKind, DrawTimer, Pace }
+export type { BoardPorts, BoardState, DrawKind, DrawTimer, Pace, StallStage }
