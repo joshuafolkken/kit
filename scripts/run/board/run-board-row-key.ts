@@ -7,8 +7,9 @@ const OPEN = '\u{E001}'
 const CLOSE = '\u{E002}'
 
 // The sections whose rows a theme types as they appear (`run-board-type-rows.ts`), and the header's
-// now line (joshuafolkken/kit#8103), keyed by its text rather than a number.
-type KeySection = 'lanes' | 'decision' | 'queued' | 'waiting' | 'done' | 'now'
+// now line (joshuafolkken/kit#8103), keyed by its text rather than a number, and a queued epic's 📁 line
+// (joshuafolkken/kit#8115), keyed by the epic's number.
+type KeySection = 'lanes' | 'decision' | 'queued' | 'waiting' | 'done' | 'now' | 'epic'
 
 // A line's key, the line without it, and the part of the line before the key — drawn whole, never typed.
 interface Split {

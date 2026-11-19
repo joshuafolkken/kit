@@ -5,6 +5,7 @@ import type { SectionKey } from './run-board-fit'
 import { run_board_layout, type BoardPlan } from './run-board-layout'
 import { run_board_render } from './run-board-render'
 import { run_board_render_fixture } from './run-board-render-fixture'
+import { run_board_row_key } from './run-board-row-key'
 
 // joshuafolkken/kit#4137: a running batch starts each row once a lane and its paths are free, never
 // wave by wave, so the rows not yet started are one `⏳ queued` section in the plan's order.
@@ -103,5 +104,44 @@ describe('run_board_render.render an empty queue', () => {
 
 		expect(open).toMatch(/^▾ ⏳ queued 0 ─+$/u)
 		expect(shut).toMatch(/^▸ ⏳ queued ─+ 0 ─+$/u)
+	})
+})
+
+// joshuafolkken/kit#8115: a themed board keys a queued epic's 📁 line by the epic's number, after its
+// indent, so the line types as it appears and the indent is drawn whole.
+const EPIC_LAYOUT = {
+	...EMPTY_LAYOUT,
+	queued: [
+		{
+			kind: 'epic' as const,
+			epic: 9,
+			title: 'an epic',
+			rows: [{ ...WAITING, status: undefined, kind: undefined }],
+		},
+	],
+}
+
+function epic_line(is_keyed: boolean): string {
+	const line = lines_of(header({ layout: EPIC_LAYOUT, is_keyed })).find((text) =>
+		text.includes('📁'),
+	)
+
+	return line ?? ''
+}
+
+describe('run_board_render.render a queued epic line', () => {
+	it('keys the 📁 line after its indent where the board types rows', () => {
+		const split = run_board_row_key.split_key(epic_line(true))
+
+		expect(split.key).toBe('epic:9')
+		expect(split.prefix).toMatch(/^ +$/u)
+		expect(split.text).toBe(`${split.prefix}📁 9  an epic`)
+	})
+
+	it('draws the same words keyed or not, and no key on an untyped board', () => {
+		const split = run_board_row_key.split_key(epic_line(false))
+
+		expect(split.key).toBeUndefined()
+		expect(run_board_row_key.without_key(epic_line(true))).toBe(epic_line(false))
 	})
 })

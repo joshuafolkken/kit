@@ -1,7 +1,11 @@
 import type { BudgetWait } from '#scripts/gate/core-wait'
 import type { MachineSample } from '#scripts/gate/machine-capacity'
 import { lane_await } from '#scripts/lane/lane-await'
-import { lane_process_table, type TableRead } from '#scripts/lane/lane-process-table'
+import {
+	lane_process_table,
+	type ProcessTable,
+	type TableRead,
+} from '#scripts/lane/lane-process-table'
 import { launch_timing } from '#scripts/lane/launch-timing'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import type { BoardUsage } from './run-board-header'
@@ -35,7 +39,8 @@ interface GatherPorts {
 	read_local: (table: TableRead) => Promise<LocalRead | undefined>
 	read_machine: () => Promise<MachineSample>
 	// The claims waiting in the core budget, read on the machine's second; none where it is not given.
-	read_waits?: (() => Array<BudgetWait>) | undefined
+	// Handed the round's snapshot, so each claim's liveness reads its start there rather than a `ps`.
+	read_waits?: ((table: ProcessTable | undefined) => Array<BudgetWait>) | undefined
 	// Every process and its lane, the last reading's lanes reused (`run-board-usage-read.ts`).
 	read_usage: (before: UsageMark | undefined, table: TableRead) => Promise<UsageMark | undefined>
 	// The usage-limit windows' held readings (`run-board-quota-held.ts`); none where it is not given.
@@ -176,7 +181,7 @@ async function resample(
 	if (sampled === undefined) return state
 
 	const gauges = run_board_machine.gauges_of(state.machine, sampled.machine)
-	const budget_waits = ports.read_waits?.() ?? []
+	const budget_waits = ports.read_waits?.(await at.table()) ?? []
 	const usages = await timed(
 		'usages',
 		async () => await run_board_usage_board.read_usages(state, ports, at.table),

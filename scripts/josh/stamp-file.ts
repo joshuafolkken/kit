@@ -135,11 +135,14 @@ function is_foreign_file(target: string): boolean {
 // `rename` replaces the path itself rather than following a symlink planted there, so the write still
 // never lands somewhere else; a regular file another account owns is refused before it is replaced,
 // the same answer the unlink gives on a sticky temp directory.
-function replace_text_stamp(target: string, text: string): string {
+function refuse_foreign(target: string): void {
 	if (is_foreign_file(target)) {
 		throw new Error(`refusing to replace another account's file: ${target}`)
 	}
+}
 
+function replace_text_stamp(target: string, text: string): string {
+	refuse_foreign(target)
 	atomic_write.replace_file(target, text, { mode: STAMP_FILE_MODE })
 
 	return target
@@ -147,6 +150,14 @@ function replace_text_stamp(target: string, text: string): string {
 
 function replace_stamp(target: string, payload: unknown): string {
 	return replace_text_stamp(target, JSON.stringify(payload))
+}
+
+// `replace_stamp` for a writer that must not wait on the disk — the live board's frame records.
+async function replace_stamp_async(target: string, payload: unknown): Promise<string> {
+	refuse_foreign(target)
+	await atomic_write.replace_file_async(target, JSON.stringify(payload), { mode: STAMP_FILE_MODE })
+
+	return target
 }
 
 // The same write for a payload that is already text. `josh gate`'s log is another tool's output read
@@ -205,6 +216,7 @@ const stamp_file = {
 	is_own_regular_file,
 	read_stamp_text,
 	replace_stamp,
+	replace_stamp_async,
 	replace_text_stamp,
 	remove_stamp,
 	stamp_name,
