@@ -13,7 +13,15 @@ import { run_board_type_rows } from './run-board-type-rows'
 // joshuafolkken/kit#7929: `run:board --timing` says what the first board waited on, phase by phase.
 
 const { LOCAL, STOPPED, harness } = run_board_fixture
-const { FIRST_FRAME_PHASE, FIRST_READ_PHASE, TIMING_FLAG, report, split } = run_board_timing
+const {
+	CODE_LOAD_PHASE,
+	FIRST_FRAME_PHASE,
+	FIRST_READ_PHASE,
+	SCREEN_ENTER_PHASE,
+	TIMING_FLAG,
+	report,
+	split,
+} = run_board_timing
 const { NO_TYPING } = run_board_type_rows
 const HEADING = 'run:board timing (ms):'
 const REBUILD_MS = 812.4
@@ -197,6 +205,32 @@ describe('run_board_cli.run --timing', () => {
 		await run_board_cli.run(['--once'], ports)
 
 		expect(frames.join('')).not.toContain(HEADING)
+	})
+})
+
+// joshuafolkken/kit#8218: the code load, taken against the dispatcher's start, and the screen entered.
+describe('run_board_cli.run --timing launch phases', () => {
+	it('says the code load and when the live board entered its screen', async () => {
+		const { ports, frames, leaves } = harness(undefined, [])
+
+		launch_timing.set_dispatched_ms(0)
+		await expect(run_board_cli.run([TIMING_FLAG], ports)).rejects.toBe(STOPPED)
+		leaves[0]?.()
+
+		expect(frames.at(-1)).toContain(CODE_LOAD_PHASE)
+		expect(frames.at(-1)).toContain(SCREEN_ENTER_PHASE)
+	})
+
+	it('marks neither without the flag, nor a code load where no dispatcher set its start', async () => {
+		const { ports } = harness(undefined, [])
+
+		launch_timing.set_dispatched_ms(0)
+		run_board_timing.timed(ports, false)
+		run_board_timing.timed(ports, true).write('frame')
+		launch_timing.clear()
+		run_board_timing.timed(ports, true)
+
+		expect(launch_timing.phases()).toStrictEqual([])
 	})
 
 	it('says nothing of timing as a live board leaves without the flag', async () => {

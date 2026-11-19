@@ -5,7 +5,9 @@ import { backlog_plan_read, type OpenListing, type Plan } from '#scripts/backlog
 import { backlog_waves } from '#scripts/backlog/backlog-waves'
 import { epic_classify } from '#scripts/epic/epic-classify'
 import type { EpicChild } from '#scripts/epic/epic-graph'
+import { gh_request_tally, type CallCount } from '#scripts/gh/gh-request-tally'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
+import { launch_timing } from '#scripts/lane/launch-timing'
 import { run_board_decision_read } from './run-board-decision-read'
 import { run_board_human_merge } from './run-board-human-merge'
 import { run_board_layout, type BoardPlan } from './run-board-layout'
@@ -16,6 +18,10 @@ import { run_board_layout, type BoardPlan } from './run-board-layout'
 // opted-in waves. The named issues are classified through the very function `backlog:next`
 // places the pool with, fed as an opted-in set of their own, so an epic is expanded the way the run
 // expands it and no second placement exists to disagree with it.
+
+// Counts, not ms, under the `--timing` report's ms heading — the name says so.
+const GH_CALLS_PHASE = 'plan: gh calls (count)'
+const GH_NOT_MODIFIED_PHASE = 'plan: gh 304 (count)'
 
 // The reads the plan is drawn from, a seam so each scope is tested without GitHub.
 interface PlanPorts {
@@ -79,7 +85,7 @@ async function pool_board(
 	exclude: ReadonlyArray<number>,
 	read: PlanRead,
 ): Promise<BoardPlan | undefined> {
-	const opted_in = await read.ports.fetch_opted_in()
+	const opted_in = await launch_timing.timed('plan: pool', read.ports.fetch_opted_in)
 
 	return opted_in.kind === 'read' ? await board_of(opted_in, exclude, read) : undefined
 }
@@ -168,15 +174,8 @@ async function scoped_board(named: NamedPlan, read: PlanRead): Promise<BoardPlan
 	return pool === undefined ? undefined : joined(lead, pool)
 }
 
-// `undefined` is a failed read, which the board answers by keeping the plan it already has.
-// An empty listing is one too: the board is read while its own run's issues are open, and an empty one
-// drew every live child finished and the pool empty (joshuafolkken/kit#4537). The guard is the board's
-// alone — `backlog:plan` in a repository with no open issue reads an empty listing correctly.
-async function read_plan(
-	named: NamedPlan,
-	ports: PlanPorts = LIVE_PORTS,
-): Promise<BoardPlan | undefined> {
-	const listing = await ports.fetch_open()
+async function read_steps(named: NamedPlan, ports: PlanPorts): Promise<BoardPlan | undefined> {
+	const listing = await launch_timing.timed('plan: list', ports.fetch_open)
 
 	if (listing === undefined || listing.rows.length === 0) return undefined
 
@@ -184,12 +183,46 @@ async function read_plan(
 
 	const plan =
 		named.issues.length === 0 ? await pool_board([], read) : await scoped_board(named, read)
+	const decided = await launch_timing.timed(
+		'plan: decisions',
+		async () => await run_board_decision_read.with_decisions(plan),
+	)
 
 	// The pull requests are paired after the decisions, so a blocker the 🙋 section draws is paired too.
-	return await run_board_human_merge.with_prs(await run_board_decision_read.with_decisions(plan))
+	return await launch_timing.timed(
+		'plan: prs',
+		async () => await run_board_human_merge.with_prs(decided),
+	)
 }
 
-const run_board_plan = { read_plan }
+// The `gh` calls the read sent and how many GitHub answered 304, counted as `--timing` phases
+// (joshuafolkken/kit#8218).
+function mark_calls(before: CallCount): void {
+	const after = gh_request_tally.snapshot()
+
+	launch_timing.mark(GH_CALLS_PHASE, after.calls - before.calls)
+	launch_timing.mark(GH_NOT_MODIFIED_PHASE, after.not_modified - before.not_modified)
+}
+
+// `undefined` is a failed read, which the board answers by keeping the plan it already has.
+// An empty listing is one too: the board is read while its own run's issues are open, and an empty one
+// drew every live child finished and the pool empty (joshuafolkken/kit#4537). The guard is the board's
+// alone — `backlog:plan` in a repository with no open issue reads an empty listing correctly.
+// Each step is timed under a `plan:` phase; `launch_timing` keeps the first read's.
+async function read_plan(
+	named: NamedPlan,
+	ports: PlanPorts = LIVE_PORTS,
+): Promise<BoardPlan | undefined> {
+	const before = gh_request_tally.snapshot()
+
+	try {
+		return await read_steps(named, ports)
+	} finally {
+		mark_calls(before)
+	}
+}
+
+const run_board_plan = { GH_CALLS_PHASE, GH_NOT_MODIFIED_PHASE, read_plan }
 
 export { run_board_plan }
 export type { PlanPorts }

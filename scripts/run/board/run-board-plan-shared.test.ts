@@ -1,5 +1,6 @@
 import type { NamedPlan } from '#scripts/backlog/backlog-plan'
 import { shared_cache_fixture } from '#scripts/josh/shared-cache-fixture'
+import { launch_timing } from '#scripts/lane/launch-timing'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -81,6 +82,20 @@ describe('run_board_plan_shared.read keeping a plan', () => {
 
 		expect(await run_board_plan_shared.read(NAMED, read_plan)).toEqual(PLAN)
 		expect(read_plan).toHaveBeenCalledOnce()
+	})
+
+	// joshuafolkken/kit#8218: `--timing` says the plan was taken from the cache, not read step by step.
+	it('marks when the plan was taken from the cache, and a read plan not', async () => {
+		launch_timing.clear()
+		await run_board_plan_shared.read(NAMED, read_plan)
+		const read_names = launch_timing.phases().map(({ name }) => name)
+
+		await run_board_plan_shared.read(NAMED, read_plan)
+
+		expect(read_names).toStrictEqual(['plan: stream key'])
+		expect(launch_timing.phases().map(({ name }) => name)).toContain(
+			run_board_plan_shared.CACHED_PHASE,
+		)
 	})
 
 	it('keeps a plan read from a cut-short listing, its open issues unknown', async () => {

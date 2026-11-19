@@ -1,5 +1,6 @@
 import { lane_stats } from '#scripts/lane/lane-stats'
 import { launch_timing } from '#scripts/lane/launch-timing'
+import { run_board_screen } from './run-board-screen'
 import { run_board_stall, type Stall, type StallProbes, type StallWatch } from './run-board-stall'
 import type { BoardPorts, DrawKind, DrawTimer } from './run-board-state'
 
@@ -8,10 +9,15 @@ import type { BoardPorts, DrawKind, DrawTimer } from './run-board-state'
 // is `launch_timing`'s: the launcher's rebuild and core wait, the reads `read_local` and `resample`
 // timed (on the worker for a live board, handed over with its first round), the worker's first answer,
 // and when the first read came back and the first frame was written, counted from the process start.
+// joshuafolkken/kit#8218 adds the code load, when the screen was entered, and the plan read's steps and
+// `gh` calls (`run-board-plan.ts`, `backlog-plan-read.ts`).
 
 const TIMING_FLAG = '--timing'
 const FIRST_READ_PHASE = 'first read at'
 const FIRST_FRAME_PHASE = 'first frame at'
+const SCREEN_ENTER_PHASE = 'screen enter at'
+const CODE_LOAD_PHASE = 'code load'
+const SCREEN_ENTER = run_board_screen.screen_of('live').enter
 const HEADING = 'run:board timing (ms):'
 const DRAW_KINDS: ReadonlyArray<DrawKind> = ['tick', 'turn']
 
@@ -133,8 +139,29 @@ function drawn<T>(ports: Pick<BoardPorts, 'time_draw'>, kind: DrawKind, draw: ()
 	return ports.time_draw === undefined ? draw() : ports.time_draw(kind, draw)
 }
 
-// The ports with the first read and the first frame marked, and the report said after the screen is
-// left. Without `--timing` they are the ports as they came.
+// How long the dispatcher took to load this command's code, taken where the board starts
+// (joshuafolkken/kit#8218); none when it was not launched through the dispatcher.
+function mark_code_load(now: () => number): void {
+	const dispatched = launch_timing.dispatched_ms()
+
+	if (dispatched !== undefined) launch_timing.mark(CODE_LOAD_PHASE, now() - dispatched)
+}
+
+// The frame written, marked as the screen entered or — once the first read is back — the first frame.
+function marked_write(
+	ports: BoardPorts,
+	now: () => number,
+	has_read: () => boolean,
+): BoardPorts['write'] {
+	return (frame) => {
+		ports.write(frame)
+		if (frame === SCREEN_ENTER) launch_timing.mark(SCREEN_ENTER_PHASE, now())
+		else if (has_read()) launch_timing.mark(FIRST_FRAME_PHASE, now())
+	}
+}
+
+// The ports with the code load, the screen entered, the first read and the first frame marked, and the
+// report said after the screen is left. Without `--timing` they are the ports as they came.
 function timed(
 	ports: BoardPorts,
 	is_timing: boolean,
@@ -143,6 +170,8 @@ function timed(
 ): BoardPorts {
 	if (!is_timing) return ports
 	let has_read = false
+
+	mark_code_load(now)
 
 	return {
 		...ports,
@@ -155,10 +184,7 @@ function timed(
 
 			return read
 		},
-		write: (frame) => {
-			ports.write(frame)
-			if (has_read) launch_timing.mark(FIRST_FRAME_PHASE, now())
-		},
+		write: marked_write(ports, now, () => has_read),
 	}
 }
 
@@ -168,8 +194,10 @@ function say(ports: BoardPorts, is_timing: boolean): void {
 }
 
 const run_board_timing = {
+	CODE_LOAD_PHASE,
 	FIRST_FRAME_PHASE,
 	FIRST_READ_PHASE,
+	SCREEN_ENTER_PHASE,
 	TIMING_FLAG,
 	drawn,
 	report,

@@ -186,6 +186,7 @@ async function run_script_entry(
 	const target = josh_in_process.in_process_target(script, PACKAGE_DIR, import.meta.url)
 
 	josh_environment_file.apply_node_flags(entry.tsx_arguments ?? [])
+	launch_timing.set_dispatched_ms(performance.now())
 
 	return await josh_in_process.run_in_process(target, script_arguments)
 }

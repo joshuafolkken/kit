@@ -6,7 +6,8 @@ import { open_issue_schema, type OpenIssueData } from '#scripts/git/git-schemas'
 import { read_json_listing } from '#scripts/git/parse-json-array'
 import { issue_sample_prime } from '#scripts/issue/issue-sample-prime'
 import { lane_capacity } from '#scripts/lane/lane-capacity'
-import { backlog_gate_scope, type OptedIn } from './backlog-gate-scope'
+import { launch_timing } from '#scripts/lane/launch-timing'
+import { backlog_gate_scope, type OptedIn, type PoolContext } from './backlog-gate-scope'
 import { backlog_next } from './backlog-next'
 import type { PlanContext } from './backlog-plan'
 import type { GateScope } from './backlog-rank'
@@ -55,17 +56,33 @@ async function read_wave_limit(): Promise<number | undefined> {
 	return choice.kind === 'limit' ? lane_capacity.seated_limit(choice.limit) : undefined
 }
 
+async function scope_of(context: PoolContext): Promise<GateScope> {
+	const scope = await launch_timing.timed(
+		'plan: gate scope',
+		async () => await backlog_gate_scope.gate_scope(context),
+	)
+
+	return { ...scope, wave_limit: await launch_timing.timed('plan: wave limit', read_wave_limit) }
+}
+
 // The same reads and the same classification `backlog:next` makes, through the same two functions.
-// `undefined` is a failure it has already reported.
+// `undefined` is a failure it has already reported. Each step is timed under a `plan:` phase for
+// `run:board --timing` (joshuafolkken/kit#8218); timing only records, so the plan is the same.
 async function classify(
 	opted_in: OptedIn,
 	exclude: ReadonlyArray<number>,
 ): Promise<Plan | undefined> {
-	const context = await backlog_next.context_of(opted_in, exclude)
+	const context = await launch_timing.timed(
+		'plan: context',
+		async () => await backlog_next.context_of(opted_in, exclude),
+	)
 
 	if (context === undefined) return undefined
 
-	const result = await backlog_next.resolve(context)
+	const result = await launch_timing.timed(
+		'plan: resolve',
+		async () => await backlog_next.resolve(context),
+	)
 
 	if (result === undefined) return undefined
 
@@ -75,10 +92,7 @@ async function classify(
 		exclude,
 		tracked: epic_index.withheld_children(context.tracking.index, context.opted_in.issues),
 		epics: epic_index.first_epics(context.tracking.index),
-		scope: {
-			...(await backlog_gate_scope.gate_scope(context)),
-			wave_limit: await read_wave_limit(),
-		},
+		scope: await scope_of(context),
 	}
 }
 
