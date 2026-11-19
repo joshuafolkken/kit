@@ -1,0 +1,7 @@
+{
+	"reason": "#8205 adds the per-file line-count cache (metrics-line-cache.ts) and its lookup in code_line_counts; second metrics run drops from 18 s to 4 s CPU",
+	"date": "2026-11-19",
+	"growth": {
+		"scripts.code_lines": 103
+	}
+}
