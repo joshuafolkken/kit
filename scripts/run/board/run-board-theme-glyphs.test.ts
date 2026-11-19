@@ -17,6 +17,9 @@ const ESCAPE = '\u{1B}'
 const RED = `${ESCAPE}[31m`
 const DEFAULT_FOREGROUND = `${ESCAPE}[39m`
 const RESET = `${ESCAPE}[0m`
+const DIM = `${ESCAPE}[2m`
+const BOLD = `${ESCAPE}[1m`
+const INTENSITY_OFF = `${ESCAPE}[22m`
 // The tone of each text the Issue's table names; `▾` reads as `V` too, but is a disclosure mark.
 const TABLE: Readonly<Record<Tone, ReadonlyArray<string>>> = {
 	alert: ['P1', 'FL', 'ST', 'XX', '!!', 'XP', 'RL', 'BL', 'NO', 'HT', 'X'],
@@ -139,5 +142,17 @@ describe('run_board_theme_glyphs.textual in color', () => {
 		vi.stubEnv('FORCE_COLOR', '0')
 
 		expect(stripVTControlCharacters(textual('💥 ✅ 🔄'))).toBe(textual('💥 ✅ 🔄'))
+	})
+})
+
+describe('run_board_theme_glyphs.textual in bold or dim', () => {
+	it('turns a dim or bold the line has on back on after a tone that ends it', () => {
+		vi.stubEnv('FORCE_COLOR', '3')
+		const line = `${DIM}🔄 a ${BOLD}💤${INTENSITY_OFF} 🔄`
+		const running = run_board_theme_tones.toned('running', 'RN')
+
+		expect(textual(line)).toBe(
+			`${DIM}${running}${DIM} a ${BOLD}${run_board_theme_tones.toned('idle', 'ZZ')}${DIM}${BOLD}${INTENSITY_OFF} ${running}`,
+		)
 	})
 })

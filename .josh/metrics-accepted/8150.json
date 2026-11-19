@@ -2,6 +2,6 @@
 	"reason": "#8150 adds the WarGames tone colors module and the color-state walk that keeps a render module's color; the feature needs the lines",
 	"date": "2026-11-19",
 	"growth": {
-		"scripts.code_lines": 48
+		"scripts.code_lines": 70
 	}
 }
