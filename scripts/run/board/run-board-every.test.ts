@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto'
+import { rmSync } from 'node:fs'
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_cli } from './run-board-cli'
@@ -12,6 +14,7 @@ import { run_board_tick } from './run-board-tick'
 
 const { LOCAL, START, harness, plan_titled } = run_board_fixture
 const { FRESH_STATE } = run_board_tick
+const { CHAT_KEY, once_key, path_of } = run_board_frame_store
 const ESCAPE = '\u{1B}'
 const FIVE_MINUTES_MS = 300_000
 const ENDED: LocalRead = { ...LOCAL, ended_ms: START + FIVE_MINUTES_MS }
@@ -136,6 +139,30 @@ describe('run_board_every.recorder', () => {
 		run_board_every.recorder({ ...ports, frames: store }, undefined)(state)
 
 		expect(store.load(run_board_frame_store.CHAT_KEY)?.text).not.toMatch(/\(\+\d+\)/u)
+	})
+})
+
+// joshuafolkken/kit#8124: the frames are written off the redraw, which never waits on the disk.
+describe('run_board_every.recorder on the file store', () => {
+	const root = `/run-board-every-test-${randomUUID()}`
+	const keys = [CHAT_KEY, once_key(undefined, false), once_key(undefined, true)]
+
+	afterEach(() => {
+		for (const key of keys) rmSync(path_of(key, root), { force: true })
+	})
+
+	it('returns before the file store has written the frames', async () => {
+		const { ports } = harness(LOCAL, PLANS)
+		const store = run_board_frame_store.file_store(root)
+		const state = { ...FRESH_STATE, local: LOCAL, fetched_ms: START }
+
+		run_board_every.recorder({ ...ports, frames: store }, undefined)(state)
+
+		expect(store.load(CHAT_KEY)).toBeUndefined()
+
+		await store.settled()
+
+		expect(store.load(CHAT_KEY)?.saved_ms).toBe(START)
 	})
 })
 

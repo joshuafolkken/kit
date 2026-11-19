@@ -131,8 +131,8 @@ function record(
 }
 
 // What a live board calls after each redraw: records its frames at most once every
-// `RECORD_EVERY_MS`, from the first state whose plan read has settled. Drawn and saved in place, they
-// take no read, so the redraw on the second is never held up waiting on one.
+// `RECORD_EVERY_MS`, from the first state whose plan read has settled. Drawn in place, they take no
+// read, and the store writes them without being awaited, so the redraw on the second waits on neither.
 function recorder(ports: BoardPorts, theme: Theme | undefined): (state: BoardState) => void {
 	let next_ms = -Infinity
 

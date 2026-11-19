@@ -1,16 +1,20 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { core_budget } from '#scripts/gate/core-budget'
 import { machine_capacity } from '#scripts/gate/machine-capacity'
 import { git_worktree } from '#scripts/git/git-worktree'
+import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { lane_process_table } from '#scripts/lane/lane-process-table'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_board_cli } from '#scripts/run/board/run-board-cli'
 import { run_board_gather } from '#scripts/run/board/run-board-gather'
 import { run_board_gather_live } from '#scripts/run/board/run-board-gather-live'
+import { run_board_ledger_window } from '#scripts/run/board/run-board-ledger-window'
 import { run_board_read } from '#scripts/run/board/run-board-read'
 import { run_board_records } from '#scripts/run/board/run-board-records'
 import { run_board_throughput } from '#scripts/run/board/run-board-throughput'
 import { run_board_tick } from '#scripts/run/board/run-board-tick'
+import { run_board_usage_board } from '#scripts/run/board/run-board-usage-board'
 import { run_board_usage_read } from '#scripts/run/board/run-board-usage-read'
 import { run_board_usage_top } from '#scripts/run/board/run-board-usage-top'
 import { run_carry } from '#scripts/run/carry/run-carry'
@@ -66,7 +70,44 @@ function round_piece(): Piece {
 		clock.ms += MACHINE_SAMPLE_MS
 	}
 
-	return { label: 'gather round (all reads)', per_minute: PER_SECOND, run }
+	return { label: 'gather round (all reads)', per_minute: PER_SECOND, run, role: 'whole' }
+}
+
+// The usage fold a round makes, carried round to round as `resample` carries it, with one `ps` per
+// round shared by its askers; one set of ports keeps the held `top` reading between rounds.
+function usages_piece(): Piece {
+	const ports = run_board_gather_live.ports_of(true)
+	let state = run_board_gather.FRESH_GATHER
+
+	async function run(): Promise<void> {
+		const table = lane_process_table.shared(ports.read_table)
+
+		// eslint-disable-next-line require-atomic-updates -- measure_all awaits each run before the next
+		state = { ...state, ...(await run_board_usage_board.read_usages(state, ports, table)) }
+	}
+
+	return { label: 'usages', per_minute: PER_SECOND, run, role: 'part' }
+}
+
+// The reads a round makes each second besides the machine sample (#8136).
+function round_part_pieces(): Array<Piece> {
+	const { read_quotas } = run_board_gather_live.ports_of(true)
+
+	return [
+		{
+			label: 'budget waits',
+			per_minute: PER_SECOND,
+			run: async () => core_budget.budget_waits(),
+			role: 'part',
+		},
+		{
+			label: 'quotas',
+			per_minute: PER_SECOND,
+			run: async () => await read_quotas?.(),
+			role: 'part',
+		},
+		usages_piece(),
+	]
 }
 
 function machine_pieces(): Array<Piece> {
@@ -74,7 +115,7 @@ function machine_pieces(): Array<Piece> {
 	const { read_table } = lane_process_table
 
 	return [
-		{ label: 'sysctl', per_minute: PER_SECOND, run: machine_capacity.read_sample },
+		{ label: 'sysctl', per_minute: PER_SECOND, run: machine_capacity.read_sample, role: 'part' },
 		{ label: 'ps', per_minute: PER_SECOND, run: read_table },
 		{
 			label: 'usage (ps + top held)',
@@ -89,12 +130,19 @@ function machine_pieces(): Array<Piece> {
 	]
 }
 
-// The two shares of `read_local` #7257 found heaviest, each called as `read_local` calls it; the
-// throughput fold is given one stream read taken beforehand, so the fold alone is measured.
+// The two shares of `read_local` #7257 found heaviest, each called as `read_local` calls it, and the
+// ledger read (#8136); the throughput fold is given one stream read taken beforehand, so the fold alone
+// is measured.
 function local_share_pieces(repository: string): Array<Piece> {
 	const events = run_event_tail.read_events(run_event_stream.target_of(repository))
+	const ledger = lane_ledger.target_of(repository)
 
 	return [
+		{
+			label: 'ledger',
+			per_minute: PER_LOCAL_READ,
+			run: async () => run_board_ledger_window.entries_of(ledger, Date.now()),
+		},
 		{
 			label: 'lane records read',
 			per_minute: PER_LOCAL_READ,
@@ -125,6 +173,7 @@ function local_pieces(repository: string): Array<Piece> {
 			// One `ps` shared by the read's askers, as a gather round shares it.
 			run: async () =>
 				await run_board_read.read_local(lane_process_table.shared(lane_process_table.read_table)),
+			role: 'part',
 		},
 	]
 }
@@ -133,7 +182,13 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	const runs = run_board_profile.runs_of(argv[0])
 	const repository = await run_carry.repository_directory()
 	const local = repository === undefined ? [] : local_pieces(repository)
-	const pieces = [await redraw_piece(), round_piece(), ...machine_pieces(), ...local]
+	const pieces = [
+		await redraw_piece(),
+		round_piece(),
+		...machine_pieces(),
+		...round_part_pieces(),
+		...local,
+	]
 	const samples = await run_board_profile.measure_all(pieces, runs, run_board_profile.LIVE_PORTS)
 
 	process.stdout.write(`${run_board_profile.format(samples)}\n`)
@@ -141,6 +196,6 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
-const run_board_profile_main = { local_pieces }
+const run_board_profile_main = { local_pieces, machine_pieces, round_part_pieces }
 
 export { run_board_profile_main }

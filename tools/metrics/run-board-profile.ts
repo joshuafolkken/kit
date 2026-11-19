@@ -9,6 +9,7 @@ const MIB = KIB * KIB
 const DECIMALS = 2
 const US_PER_MS = 1000
 const DEFAULT_RUNS = 20
+const UNATTRIBUTED_LABEL = 'round minus its parts'
 const HEADER = ['read', 'calls/min', 'wall ms', 'cpu ms', 'cpu ms/min', 'heap KiB', 'heap MiB/min']
 
 interface ProfilePorts {
@@ -45,10 +46,16 @@ function runs_of(argument: string | undefined): number {
 	return Number.isSafeInteger(runs) && runs > 0 ? runs : DEFAULT_RUNS
 }
 
+// A piece's place in the worker round (#8136): the whole round, or a read the round makes directly. A
+// piece with no role is outside the round (the redraw) or a share of a part (the ledger read inside
+// the local read), so counting it again would hide what the parts leave out.
+type Role = 'part' | 'whole'
+
 interface Piece {
 	label: string
 	per_minute: number
 	run: () => Promise<unknown>
+	role?: Role | undefined
 }
 
 interface Sample {
@@ -57,6 +64,7 @@ interface Sample {
 	wall_ms: number
 	cpu_ms: number
 	heap_bytes: number
+	role?: Role | undefined
 }
 
 async function repeat(run: () => Promise<unknown>, times: number): Promise<void> {
@@ -78,6 +86,7 @@ async function measure(piece: Piece, runs: number, ports: ProfilePorts): Promise
 		wall_ms: (ports.now() - start.wall) / runs,
 		cpu_ms: (ports.cpu_ms() - start.cpu) / runs,
 		heap_bytes: (ports.heap_bytes() - start.heap) / runs,
+		role: piece.role,
 	}
 }
 
@@ -116,14 +125,25 @@ function line_of(cells: ReadonlyArray<string>): string {
 	return `| ${cells.join(' | ')} |`
 }
 
-// A Markdown table, the read that costs the most CPU per minute first.
+// The round's CPU per minute its parts do not account for, or none where no whole round was measured.
+function unattributed_rows(samples: ReadonlyArray<Sample>): Array<Array<string>> {
+	const whole = samples.find((sample) => sample.role === 'whole')
+
+	if (whole === undefined) return []
+
+	const parts = samples.filter((sample) => sample.role === 'part')
+	const left = parts.reduce((sum, part) => sum - cpu_per_minute(part), cpu_per_minute(whole))
+
+	return [[UNATTRIBUTED_LABEL, '', '', '', left.toFixed(DECIMALS), '', '']]
+}
+
+// A Markdown table, the read that costs the most CPU per minute first, then the round's unattributed rest.
 function format(samples: ReadonlyArray<Sample>): string {
 	const sorted = samples.toSorted((left, right) => cpu_per_minute(right) - cpu_per_minute(left))
 	const rule = HEADER.map(() => '---')
+	const rows = [...sorted.map((sample) => row_of(sample)), ...unattributed_rows(samples)]
 
-	return [HEADER, rule, ...sorted.map((sample) => row_of(sample))]
-		.map((cells) => line_of(cells))
-		.join('\n')
+	return [HEADER, rule, ...rows].map((cells) => line_of(cells)).join('\n')
 }
 
 const run_board_profile = { DEFAULT_RUNS, LIVE_PORTS, format, measure, measure_all, runs_of }

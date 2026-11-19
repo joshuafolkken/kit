@@ -1,6 +1,5 @@
 import type { AgentResult } from '#scripts/agent/agent-event'
 import type { IssueOutcome } from '#scripts/issue/issue-outcome'
-import { lane_host_gaps } from '#scripts/lane/lane-host-gaps'
 import type { LaneSpan } from '#scripts/lane/lane-net-time'
 import type { Span } from '#scripts/lane/lane-spans'
 import { run_event_retry } from '#scripts/run/event/run-event-retry'
@@ -232,12 +231,11 @@ function fold_events(
 const { remembered } = run_board_events_memo
 const FOLDED: EventsMemo<ReadonlyMap<number, ItemStatus>> = new WeakMap()
 const SPANS: EventsMemo<ReadonlyMap<number | undefined, ReadonlyArray<Span>>> = new WeakMap()
-const GAPS: EventsMemo<ReadonlyArray<LaneSpan>> = new WeakMap()
 
 // A child the stream never saw launched keeps no spans, so its row is timed from its lane record.
 function with_spans(statuses: Map<number, ItemStatus>, events: ReadonlyArray<RunEvent>): void {
 	const spans = remembered(SPANS, events, run_board_lane_time.spans_of)
-	const gaps = remembered(GAPS, events, lane_host_gaps.gaps_of)
+	const gaps = run_board_events_memo.host_gaps(events)
 
 	for (const [issue, status] of statuses) {
 		const issue_spans = spans.get(issue)

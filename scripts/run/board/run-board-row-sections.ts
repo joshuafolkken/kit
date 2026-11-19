@@ -1,3 +1,4 @@
+import { run_board_header, type BoardHeader } from './run-board-header'
 import { run_board_layout, type BoardLayout, type BoardRow } from './run-board-layout'
 import { run_board_row_key, type KeySection } from './run-board-row-key'
 
@@ -31,6 +32,27 @@ function keys_of(layout: BoardLayout | undefined): Set<string> {
 	)
 }
 
-const run_board_row_sections = { done_rows, keys_of }
+// joshuafolkken/kit#8115: the key of every queued epic's 📁 line, folded or not.
+function epic_keys_of(layout: BoardLayout | undefined): Array<string> {
+	if (layout === undefined) return []
+
+	return layout.queued
+		.filter((entry) => entry.kind === 'epic')
+		.map((entry) => run_board_row_key.key_of('epic', entry.epic))
+}
+
+// Every key the board knows this frame — its rows', its epics' and the header's now line's — so a line is
+// typed only when its key is new. A keyed line a later Issue adds puts its keys here.
+function known_of(header: BoardHeader): Set<string> {
+	const known = keys_of(header.layout)
+	const now_key = run_board_header.now_key(header)
+
+	for (const key of epic_keys_of(header.layout)) known.add(key)
+	if (now_key !== undefined) known.add(now_key)
+
+	return known
+}
+
+const run_board_row_sections = { done_rows, keys_of, known_of }
 
 export { run_board_row_sections }

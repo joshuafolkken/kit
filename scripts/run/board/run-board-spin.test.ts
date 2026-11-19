@@ -165,20 +165,57 @@ describe('run_board_spin — the rows a theme types (joshuafolkken/kit#8003)', (
 		])
 	})
 
-	it('writes a typing row on every letter after the turns, at its row, until the next second', async () => {
+	it('writes a typing row on every letter, at its row, until the next second', async () => {
 		const { ports, writes } = spin_ports(START)
-		const spots = SPOTS
 		const typing = typing_with({ key: 'done:7', row: 3, text: 'x'.repeat(40), start_ms: START })
 
-		await spin_to_second({ spots, typing }, ports)
+		await spin_to_second({ spots: SPOTS, typing }, ports)
 
 		const first_ms = START + LETTER_MS
+		const letters = Array.from({ length: REDRAW_MS / LETTER_MS - 1 }, (_, index) => index + 1)
 
-		expect(writes).toHaveLength(REDRAW_MS / LETTER_MS - 1)
-		expect(writes[0]?.text).toBe(
-			`${spin_bytes(spots, spinner_of(first_ms))}${type_bytes(typing, first_ms)}`,
-		)
+		expect(
+			letters.every((letter) => writes.some(({ at_ms }) => at_ms === START + letter * LETTER_MS)),
+		).toBe(true)
+		expect(writes[0]?.text).toBe(type_bytes(typing, first_ms))
 		expect(writes[0]?.text).toContain(`${ESCAPE}[3;1Hxx${ESCAPE}[0m█`)
+	})
+})
+
+describe('run_board_spin — the spinner while rows type (joshuafolkken/kit#8123)', () => {
+	const SPOT_ROW = [{ row: 1, column: 5, style: '' }]
+	const ROW_TYPING = typing_with({ key: 'done:7', row: 3, text: 'x'.repeat(40), start_ms: START })
+
+	async function written(): Promise<Array<{ at_ms: number; text: string }>> {
+		const { ports, writes } = spin_ports(START)
+
+		await spin_to_second({ spots: SPOT_ROW, typing: ROW_TYPING }, ports)
+
+		return writes
+	}
+
+	it('turns the spinner once on each frame boundary, skipping none', async () => {
+		const writes = await written()
+		const turned = writes.filter(({ text }) => text.startsWith(`${ESCAPE}[1;5H`))
+		const turns = Math.ceil(REDRAW_MS / SPINNER_INTERVAL_MS) - 1
+
+		expect(turned.map(({ at_ms }) => at_ms - START)).toStrictEqual(
+			Array.from({ length: turns }, (_, index) => (index + 1) * SPINNER_INTERVAL_MS),
+		)
+		expect(
+			turned.every(({ at_ms, text }) => text.startsWith(spin_bytes(SPOT_ROW, spinner_of(at_ms)))),
+		).toBe(true)
+	})
+
+	it('writes the typing row on every wake, each letter on its own time', async () => {
+		const writes = await written()
+
+		expect(writes.every(({ at_ms, text }) => text.endsWith(type_bytes(ROW_TYPING, at_ms)))).toBe(
+			true,
+		)
+		expect(writes.filter(({ at_ms }) => (at_ms - START) % LETTER_MS === 0)).toHaveLength(
+			REDRAW_MS / LETTER_MS - 1,
+		)
 	})
 })
 

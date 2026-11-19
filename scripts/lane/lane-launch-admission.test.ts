@@ -58,9 +58,9 @@ async function launches_after_memory_recovers(): Promise<void> {
 		async () => ({ available_mb: probe.polls > 1 ? MEMORY_MB : MEMORY_MB - 1, busy_cores: 0 }),
 		async () => {
 			expect(run).not.toHaveBeenCalled()
-			expect(core_budget.budget_waits(probe.directory, probe.now)).toMatchObject([
-				{ command: LAUNCH_COMMAND, lane: CONTEXT.issue, reason: 'memory' },
-			])
+			expect(
+				core_budget.budget_waits({ directory: probe.directory, now: probe.now }),
+			).toMatchObject([{ command: LAUNCH_COMMAND, lane: CONTEXT.issue, reason: 'memory' }])
 			probe.now += WAIT_MS
 			probe.polls += 1
 		},
@@ -105,7 +105,9 @@ describe('lane_launch_admission.launch — memory admission', () => {
 
 	it('keeps simultaneous starts from spending memory not yet reflected in the machine reading', async () => {
 		stub_machine(available, async () => {
-			expect(core_budget.budget_waits(probe.directory, probe.now)[0]?.reason).toBe('memory')
+			const waits = core_budget.budget_waits({ directory: probe.directory, now: probe.now })
+
+			expect(waits[0]?.reason).toBe('memory')
 			throw new Error(HELD_ERROR)
 		})
 		await lane_launch_admission.launch(CONTEXT, async () => LAUNCHED)
