@@ -165,3 +165,21 @@ describe('metrics_code_lines.code_line_counts with a store', () => {
 		expect(linted).toStrictEqual([kept, edited, edited])
 	})
 })
+
+describe('metrics_code_lines.code_line_counts on a file eslint reported no count on', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('leaves the file out and stores nothing for it', async () => {
+		const file = path.join(make_directory(DIRECTORY_PREFIX), 'uncounted.ts')
+
+		writeFileSync(file, FIRST_TEXT)
+		const store = memory_store()
+
+		vi.spyOn(line_budget, 'counts_from').mockImplementation(() => new Map())
+
+		expect(await metrics_code_lines.code_line_counts([file], ROOT, store)).toStrictEqual(new Map())
+		expect(store.load().size).toBe(0)
+	})
+})
