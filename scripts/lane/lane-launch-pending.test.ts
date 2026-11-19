@@ -41,7 +41,7 @@ describe('lane_launch_pending.launch', () => {
 		expect(await lane_launch_pending.launch(CONTEXT, run)).toEqual({ kind: 'waiting' })
 		expect(run).not.toHaveBeenCalled()
 		expect(core_budget.live_reservations(probe.directory)).toHaveLength(1)
-		expect(core_budget.budget_waits(probe.directory)[0]).toMatchObject({
+		expect(core_budget.budget_waits({ directory: probe.directory })[0]).toMatchObject({
 			lane: '17',
 			reason: 'memory',
 		})
@@ -62,7 +62,9 @@ describe('lane_launch_pending.launch', () => {
 		])
 		lane_launch_pending.keep([CONTEXT.issue])
 
-		expect(core_budget.budget_waits(probe.directory).map((wait) => wait.lane)).toStrictEqual(['17'])
+		const waits = core_budget.budget_waits({ directory: probe.directory })
+
+		expect(waits.map((wait) => wait.lane)).toStrictEqual(['17'])
 	})
 
 	it('releases a waiting claim when the offer withdraws it or the driver exits', async () => {
