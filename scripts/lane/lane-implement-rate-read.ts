@@ -14,12 +14,20 @@ interface SizeMeasurements {
 	growth: SizeRatios
 }
 
+// joshuafolkken/kit#8243: the kinds the rate and the size ratios read. A long-lived reader — the board's
+// plan read — keeps these, not every entry of the whole ledger; the whole ledger still, since a lane
+// merged in the window may have been dispatched and sized before it.
+const { KIND } = lane_ledger
+const RATE_KINDS: ReadonlySet<string> = new Set([KIND.STAGE, KIND.DISPATCH, KIND.SIZE, KIND.MERGE])
+const rate_entries = lane_ledger.tail_store((entry) => RATE_KINDS.has(entry.kind))
+
+// The ledger's stage, dispatch, size and merge entries, oldest first.
 async function read_ledger(
 	context: ReadContext,
 ): Promise<ReturnType<typeof lane_ledger.read_entries>> {
 	const path = context.ledger_path ?? (await lane_ledger.target())
 
-	return path === undefined ? [] : lane_ledger.read_entries(path)
+	return path === undefined ? [] : rate_entries.read(path)
 }
 
 async function implement_rate(

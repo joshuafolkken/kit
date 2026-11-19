@@ -1,0 +1,7 @@
+{
+	"reason": "Chunked ledger tail read and kind-filtered rate store cut the resident run:board footprint (#8243)",
+	"date": "2026-11-19",
+	"growth": {
+		"scripts.code_lines": 33
+	}
+}
