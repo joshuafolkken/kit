@@ -194,6 +194,16 @@ describe('run_board_gather_thread.post_of over a stream read again', () => {
 	it('says an equal stream read afresh past a line without its newline is the same', () => {
 		expect(post_of(STREAM, AGAIN).local?.is_same_events).toBe(true)
 	})
+
+	it('says the same stream array read again is the same', () => {
+		expect(post_of(STREAM, { ...STREAM, read_ms: FAILED_MS }).local?.is_same_events).toBe(true)
+	})
+
+	it('hands over a longer stream that ends on the same event', () => {
+		const LONGER: GatherState = { ...AGAIN, local: { ...LOCAL, events: [RETOLD, ...EVENTS] } }
+
+		expect(post_of(STREAM, LONGER).local).toStrictEqual({ value: LONGER.local })
+	})
 })
 
 describe('run_board_gather_thread phases', () => {
