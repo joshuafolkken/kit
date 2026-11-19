@@ -1,5 +1,7 @@
 import { run_board_header, type BoardHeader } from './run-board-header'
 import { run_board_layout, type BoardLayout, type BoardRow } from './run-board-layout'
+import type { BoardNote } from './run-board-notes'
+import { run_board_render_notes } from './run-board-render-notes'
 import { run_board_row_key, type KeySection } from './run-board-row-key'
 import { run_board_seat } from './run-board-seat'
 
@@ -47,13 +49,21 @@ function seat_keys_of(header: BoardHeader): Array<string> {
 	return run_board_seat.reasons_of(header).map((reason) => run_board_row_key.key_of('seat', reason))
 }
 
-// Every key the board knows this frame — its rows', its epics', its seats' and the header's now line's —
-// so a line is typed only when its key is new. A keyed line a later Issue adds puts its keys here.
-function known_of(header: BoardHeader): Set<string> {
+// joshuafolkken/kit#8117: the key of every note the frame was drawn from, past the section's limit or
+// the pane's fit or not.
+function note_keys_of(notes: ReadonlyArray<BoardNote>): Array<string> {
+	return notes.map((note) => run_board_row_key.key_of('note', run_board_render_notes.id_of(note)))
+}
+
+// Every key the board knows this frame — its rows', its epics', its seats', its notes' and the header's
+// now line's — so a line is typed only when its key is new. A keyed line a later Issue adds puts its keys
+// here.
+function known_of(header: BoardHeader, notes: ReadonlyArray<BoardNote>): Set<string> {
 	const known = keys_of(header.layout)
 	const now_key = run_board_header.now_key(header)
+	const keys = [...epic_keys_of(header.layout), ...seat_keys_of(header), ...note_keys_of(notes)]
 
-	for (const key of [...epic_keys_of(header.layout), ...seat_keys_of(header)]) known.add(key)
+	for (const key of keys) known.add(key)
 	if (now_key !== undefined) known.add(now_key)
 
 	return known

@@ -6,6 +6,7 @@ import { run_board_layout, type BoardLayout, type BoardRow } from './run-board-l
 import type { BoardNote } from './run-board-notes'
 import { run_board_render_section } from './run-board-render-section'
 import { run_board_render_title } from './run-board-render-title'
+import { run_board_row_key } from './run-board-row-key'
 
 // The findings section of `run:board`, under the 🙋 decision rows, and the part of the legend that
 // names its symbols. A finding is read to the minute, and the legend names only the kinds the section
@@ -16,6 +17,7 @@ const NOTE_LIMIT = 6
 const { ROW_INDENT } = run_board_render_section
 const { columns_cut } = run_board_render_title
 const { width_of } = run_board_fit
+const { keyed } = run_board_row_key
 const GAP = '  '
 const NUMBER_PLACEHOLDER = '{n}'
 // An `owner/repo#N` reference written out in a text.
@@ -35,6 +37,7 @@ interface NotesView {
 	link: Link
 	repo?: string | undefined
 	columns?: number | undefined
+	is_keyed?: boolean | undefined
 }
 
 interface NotesBody {
@@ -56,6 +59,7 @@ interface ItemsView {
 	link: Link
 	repo: string | undefined
 	columns?: number | undefined
+	is_keyed?: boolean | undefined
 }
 
 // The icons the legend can name, in its order, each with its word — a filed kind's the rows' own
@@ -108,8 +112,15 @@ function fitted_line(head: string, note: BoardNote, view: ItemsView): string {
 	return `${head}${columns_cut(text, Math.max(1, columns - width_of(head)))}`
 }
 
+// joshuafolkken/kit#8117: the event a note came from — never its drawn text, which the legend, the
+// pane's width and the link change — so a note is typed once, the frame it first shows in.
+function id_of(note: BoardNote): string {
+	return `${note.kind}:${note.issue ?? ''}:${String(note.at_ms)}`
+}
+
 // Where the legend names the symbols a note leads with its icon alone; where no legend is drawn it
-// keeps the kind's word. Its icon stands in the plan rows' icon column.
+// keeps the kind's word. Its icon stands in the plan rows' icon column; a keyed line's indent is drawn
+// whole, before its key.
 function note_text(note: BoardNote, view: ItemsView): string {
 	const { has_legend, link } = view
 	const kind = has_legend ? undefined : WORDS[note.kind]
@@ -117,8 +128,10 @@ function note_text(note: BoardNote, view: ItemsView): string {
 	const lead = [note_icon(note), minute_of(note.at_ms), issue, kind]
 		.filter((part) => part !== undefined)
 		.join(' ')
+	const section = view.is_keyed === true ? 'note' : undefined
+	const head = keyed(section, id_of(note), lead + GAP)
 
-	return fitted_line(`${ROW_INDENT}${lead}${GAP}`, note, view)
+	return fitted_line(`${ROW_INDENT}${head}`, note, view)
 }
 
 function rank_index(rank: Rank): number {
@@ -164,10 +177,10 @@ function items_of(notes: ReadonlyArray<BoardNote>, view: ItemsView): Array<NoteI
 // gives way first. Their numbers go through the board's
 // `header.link`, so they open their GitHub issue as the plan's rows do.
 function note_lines(notes: ReadonlyArray<BoardNote>, view: NotesView): NotesBody {
-	const { layout, link, repo, columns } = view
+	const { layout, link, repo, columns, is_keyed } = view
 	const has_legend = layout !== undefined
 	const listed = listed_of(has_legend ? run_board_layout.rows_of(layout) : [])
-	const items = items_of(notes, { listed, has_legend, link, repo, columns })
+	const items = items_of(notes, { listed, has_legend, link, repo, columns, is_keyed })
 	const lines = items.slice(0, NOTE_LIMIT).map((item) => item.line)
 
 	return { lines, hidden: items.length - lines.length }
@@ -201,6 +214,6 @@ function notes_legend(
 	)
 }
 
-const run_board_render_notes = { NOTE_LIMIT, notes_legend, notes_part }
+const run_board_render_notes = { NOTE_LIMIT, id_of, notes_legend, notes_part }
 
 export { run_board_render_notes, type NotesView }
