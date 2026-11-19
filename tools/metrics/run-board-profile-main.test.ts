@@ -1,7 +1,10 @@
 import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
+import { run_board_cli } from '#scripts/run/board/run-board-cli'
+import { run_board_every } from '#scripts/run/board/run-board-every'
 import { run_board_gather } from '#scripts/run/board/run-board-gather'
 import { run_board_ledger_window } from '#scripts/run/board/run-board-ledger-window'
+import { run_board_tick } from '#scripts/run/board/run-board-tick'
 import { run_event_tail } from '#scripts/run/event/run-event-tail'
 import { describe, expect, it, vi } from 'vitest'
 import { run_board_profile } from './run-board-profile'
@@ -36,6 +39,20 @@ describe('run-board-profile-main', () => {
 		expect(shares.map((piece) => piece.per_minute)).toStrictEqual([
 			MS_PER_MINUTE / run_board_gather.LOCAL_READ_MS,
 			MS_PER_MINUTE / run_board_gather.LOCAL_READ_MS,
+		])
+	})
+})
+
+describe('run-board-profile-main redraw pieces (#8147)', () => {
+	it('measures the redraw after new events and the record draws, one line each (ac-35eb33e6)', () => {
+		const state = run_board_tick.FRESH_STATE
+		const ports = { ...run_board_cli.LIVE_PORTS, gather: async () => state }
+		const pieces = run_board_profile_main.redraw_pieces({ read: state, ports, state })
+
+		expect(pieces.map((piece) => [piece.label, piece.per_minute])).toStrictEqual([
+			['redraw', PER_SECOND],
+			['redraw (new events)', MS_PER_MINUTE / run_board_gather.LOCAL_READ_MS],
+			['record (chat + once)', MS_PER_MINUTE / run_board_every.RECORD_EVERY_MS],
 		])
 	})
 })
