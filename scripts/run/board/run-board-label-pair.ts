@@ -8,6 +8,10 @@ import { run_board_fit } from './run-board-fit'
 // marks alone, so it is drawn as before.
 
 const MARK = '\u{2060}'
+// joshuafolkken/kit#8224: a zero-width mark before a row's title, the one place the WarGames reveal
+// tells a title from the words before it (`run-board-reveal-blocks.ts`); a frame kept for the theme
+// carries it to the theme, which drops it as it draws, and every other frame drops it here.
+const TITLE_MARK = '\u{2063}'
 const RULE = '─'
 const BLANK = ' '
 const PAIRED = new RegExp(`${MARK}([^${MARK}]*)${MARK}${BLANK}`, 'u')
@@ -28,6 +32,16 @@ function bare(text: string): string {
 	return text.replaceAll(MARK, '')
 }
 
+// The text without its title marks, as every write a person or a chat reads draws it.
+function untitled(text: string): string {
+	return text.replaceAll(TITLE_MARK, '')
+}
+
+// A title marked at its start.
+function titled(title: string): string {
+	return `${TITLE_MARK}${title}`
+}
+
 // What a frame's form and theme are read from.
 interface Drawn {
 	form: 'screen' | 'chat'
@@ -39,7 +53,7 @@ interface Drawn {
 function settled(lines: ReadonlyArray<string>, drawn: Drawn): Array<string> {
 	if (drawn.is_themed === true && drawn.form === 'screen') return [...lines]
 
-	return lines.map((line) => bare(line))
+	return lines.map((line) => bare(untitled(line)))
 }
 
 function rule_of(icon: string): string {
@@ -95,6 +109,6 @@ function dropped(frame: string): string {
 		.join('\n')
 }
 
-const run_board_label_pair = { MARK, bare, dropped, pair, settled }
+const run_board_label_pair = { MARK, TITLE_MARK, bare, dropped, pair, settled, titled, untitled }
 
 export { run_board_label_pair }

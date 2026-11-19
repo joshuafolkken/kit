@@ -1,7 +1,8 @@
 import { stripVTControlCharacters } from 'node:util'
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import { describe, expect, it } from 'vitest'
-import type { SectionKey } from './run-board-fit'
+import { run_board_fit, type SectionKey } from './run-board-fit'
+import { run_board_label_pair } from './run-board-label-pair'
 import { run_board_layout, type BoardPlan } from './run-board-layout'
 import { run_board_render } from './run-board-render'
 import { run_board_render_fixture } from './run-board-render-fixture'
@@ -143,5 +144,35 @@ describe('run_board_render.render a queued epic line', () => {
 
 		expect(split.key).toBeUndefined()
 		expect(run_board_row_key.without_key(epic_line(true))).toBe(epic_line(false))
+	})
+})
+
+// joshuafolkken/kit#8224: a themed screen marks each title at its start, for the reveal to write it as
+// one block; every other frame draws no mark.
+const { TITLE_MARK, bare, untitled } = run_board_label_pair
+
+function epic_lines(is_themed: boolean): Array<string> {
+	return lines_of(header({ layout: EPIC_LAYOUT, is_themed })).filter(
+		(text) => text.includes('📁') || text.includes('7290'),
+	)
+}
+
+describe('run_board_render.render a title mark', () => {
+	it('marks the epic and its issue row titles at their start on a themed screen', () => {
+		const [epic = '', row = ''] = epic_lines(true)
+
+		expect(epic).toContain(`📁 9  ${TITLE_MARK}an epic`)
+		expect(row).toContain(`${TITLE_MARK}Issue 7290`)
+	})
+
+	it('draws the same columns marked or not, and no mark with no theme', () => {
+		const themed = epic_lines(true)
+		const plain = epic_lines(false)
+
+		expect(plain.join('')).not.toContain(TITLE_MARK)
+		expect(themed.map((line) => run_board_fit.width_of(line))).toStrictEqual(
+			plain.map((line) => run_board_fit.width_of(line)),
+		)
+		expect(themed.map((line) => bare(untitled(line)))).toStrictEqual(plain)
 	})
 })

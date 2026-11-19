@@ -1,6 +1,7 @@
 import type { KeyReading } from './run-board-keys'
+import { run_board_reveal_blocks, type Beat } from './run-board-reveal-blocks'
 import type { BoardPorts, Pace } from './run-board-state'
-import type { Theme } from './run-board-theme'
+import { run_board_theme, type Theme } from './run-board-theme'
 import { run_board_typing } from './run-board-typing'
 
 // The line a live board in a theme types before its first frame, a letter at a time with a block cursor after
@@ -11,16 +12,11 @@ import { run_board_typing } from './run-board-typing'
 const LINE = 'SHALL WE PLAY A GAME?'
 const LETTER_MS = 50
 const HOLD_MS = 2000
-const REVEAL_LINE_MS = 50
+const { LINE_MS: REVEAL_LINE_MS, beats_of } = run_board_reveal_blocks
 const LINE_START = '\r'
 const ERASE_LINE_END = '\u{1B}[K'
 
-interface Beat {
-	text: string
-	ms: number
-}
-
-type IntroPorts = Pick<BoardPorts, 'intro_sleep' | 'write'>
+type IntroPorts = Pick<BoardPorts, 'intro_sleep' | 'write' | 'write_drawn'>
 type Reveal = (frame: string) => Promise<void>
 
 const BEATS: ReadonlyArray<Beat> = [
@@ -80,16 +76,31 @@ async function play(ports: IntroPorts, keys: KeyReading): Promise<void> {
 	await listen(BEATS, ports, keys)
 }
 
-// The first frame written a line at a time from the top, each line a beat; the lines a key leaves
-// unwritten are written at once, as is the whole frame where the ports carry no pauses.
-async function reveal(frame: string, ports: IntroPorts, keys: KeyReading): Promise<void> {
-	const beats = frame.split('\n').map((line, index) => ({
-		text: index === 0 ? line : `\n${line}`,
-		ms: REVEAL_LINE_MS,
-	}))
-	const rest = await listen(beats, ports, keys)
+// A line's beats, each line after the first led by the line break before it.
+function line_beats(line: string, index: number): Array<Beat> {
+	const beats = beats_of(line)
 
-	if (rest.length > 0) ports.write(rest.map((beat) => beat.text).join(''))
+	if (index === 0) return beats
+
+	return beats.map((beat, at) => (at === 0 ? { ...beat, text: `\n${beat.text}` } : beat))
+}
+
+// joshuafolkken/kit#8224: the first frame, as the theme draws it, written from the top a line at a
+// time and each line left to right a block at a time (`run-board-reveal-blocks.ts`), the line's beat
+// shared out between its blocks; what a key leaves unwritten is written at once, as is the whole frame
+// where the ports carry no pauses. It is drawn once, so it is written past the theme.
+async function reveal(
+	frame: string,
+	ports: IntroPorts,
+	keys: KeyReading,
+	theme: Theme,
+): Promise<void> {
+	const write = ports.write_drawn ?? ports.write
+	const lines = run_board_theme.marked(theme, frame).split('\n')
+	const beats = lines.flatMap((line, index) => line_beats(line, index))
+	const rest = await listen(beats, { ...ports, write }, keys)
+
+	if (rest.length > 0) write(rest.map((beat) => beat.text).join(''))
 }
 
 // The first read starts at once, but returns or throws only once the intro is over, so a failed read
@@ -112,7 +123,7 @@ function after<Read>(
 	}
 }
 
-// A board in a theme types its line, its first read held behind it, and reveals its first frame a line at
+// A board in a theme types its line, its first read held behind it, and reveals its first frame a block at
 // a time; one in none plays nothing, reads at once and draws the frame whole. Called once the screen is
 // entered, since the line starts typing here.
 function opening<Read>(
@@ -126,7 +137,7 @@ function opening<Read>(
 	return {
 		gather: after(gather, play(ports, keys)),
 		reveal: async (frame) => {
-			await reveal(frame, ports, keys)
+			await reveal(frame, ports, keys, theme)
 		},
 	}
 }
