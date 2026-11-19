@@ -1,9 +1,11 @@
 import { stripVTControlCharacters } from 'node:util'
 import { describe, expect, it } from 'vitest'
 import { run_board_header_notice, type Notice } from './run-board-header-notice'
+import { run_board_row_key } from './run-board-row-key'
 import type { CueName } from './run-board-sound-cues'
 
-const { next, part_of } = run_board_header_notice
+const { key_of, next, part_of } = run_board_header_notice
+const HOUR_MS = 3_600_000
 const YEAR = 2026
 const HOUR = 10
 const MINUTE = 42
@@ -107,6 +109,37 @@ describe('run_board_header_notice.part_of', () => {
 		const unread = part_of({ is_sound_on: undefined, notice: STOP_NOTICE, link: plain_link })
 
 		expect(unread).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#8114: where the board types rows, the words carry their key behind the switch.
+describe('run_board_header_notice.part_of keyed', () => {
+	const keyed = { notice: STOP_NOTICE, link: plain_link, is_keyed: true }
+	const words = '10:42 alert · #8103 stopped'
+
+	it('keys the words behind the switch, the same key whether the sound is on or off', () => {
+		const on = run_board_row_key.split_key(part_of({ ...keyed, is_sound_on: true }) ?? '')
+		const off = run_board_row_key.split_key(part_of({ ...keyed, is_sound_on: false }) ?? '')
+
+		expect(on).toStrictEqual({ key: `notice:${words}`, text: `🔊 ${words}`, prefix: '🔊 ' })
+		expect(off.key).toBe(on.key)
+		expect(key_of({ ...keyed, is_sound_on: false })).toBe(on.key)
+	})
+
+	it('gives a new key when the notice changes', () => {
+		const other = { ...STOP_NOTICE, at_ms: AT_MS + HOUR_MS }
+
+		expect(key_of({ ...keyed, is_sound_on: true, notice: other })).not.toBe(
+			key_of({ ...keyed, is_sound_on: true }),
+		)
+	})
+
+	it('keys nothing where the board types no rows or reads no switch', () => {
+		const plain = part_of({ ...keyed, is_keyed: undefined, is_sound_on: true }) ?? ''
+
+		expect(run_board_row_key.split_key(plain).key).toBeUndefined()
+		expect(key_of({ ...keyed, is_keyed: undefined, is_sound_on: true })).toBeUndefined()
+		expect(key_of({ ...keyed, is_sound_on: undefined })).toBeUndefined()
 	})
 })
 

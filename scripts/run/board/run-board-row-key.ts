@@ -10,9 +10,10 @@ const CLOSE = '\u{E002}'
 // now line (joshuafolkken/kit#8103), keyed by its text rather than a number, and a queued epic's 📁 line
 // (joshuafolkken/kit#8115), keyed by the epic's number, and an empty seat's 💺 line
 // (joshuafolkken/kit#8116), keyed by its reason, and a findings / notes line (joshuafolkken/kit#8117),
-// keyed by the event it came from.
+// keyed by the event it came from, and the header's last notice (joshuafolkken/kit#8114), keyed by its
+// words, after the sound switch drawn whole.
 type KeySection =
-	'lanes' | 'decision' | 'queued' | 'waiting' | 'done' | 'now' | 'epic' | 'seat' | 'note'
+	'lanes' | 'decision' | 'queued' | 'waiting' | 'done' | 'now' | 'epic' | 'seat' | 'note' | 'notice'
 
 // A line's key, the line without it, and the part of the line before the key — drawn whole, never typed.
 interface Split {
