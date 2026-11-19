@@ -25,9 +25,10 @@ import { toolchain_inputs } from './toolchain-inputs'
 // - `tools` — the packages whose installed version runs the check.
 // - `env` — the environment variables whose value changes the verdict.
 //
-// **A check with no declaration always runs**: `cspell` reads every text file and `behavior` reads a
-// transcript outside the tree. Naming inputs for either would be a guess, and a wrong guess is a check
-// reported green without having run. **The declarations over-approximate, never under**: a path in
+// **A check with no declaration always runs**: `behavior` reads a transcript outside the tree, and
+// naming inputs for it would be a guess, and a wrong guess is a check reported green without having
+// run. `cspell` reads every text file, so its declaration is every file (`is_any_file`,
+// joshuafolkken/kit#5156). **The declarations over-approximate, never under**: a path in
 // doubt is an input. `metrics` reads the scripts it counts, the approvals under
 // `.josh/metrics-accepted/` (JSON) and the Markdown it measures (joshuafolkken/kit#4085). `lint` is
 // prettier plus eslint, so its inputs are the sources plus every file prettier formats, less what
