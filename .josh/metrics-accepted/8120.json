@@ -1,0 +1,7 @@
+{
+	"reason": "#8120 adds the new-file floor to lane:plan's lines axis (new module lane-plan-new-files.ts)",
+	"date": "2026-11-19",
+	"growth": {
+		"scripts.code_lines": 30
+	}
+}
