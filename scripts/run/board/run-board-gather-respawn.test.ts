@@ -6,15 +6,16 @@ import {
 	type FailedPost,
 	type GatherPost,
 	type GatherWorker,
+	type Seed,
 } from './run-board-gather-thread'
-import { run_board_state, type DataPost } from './run-board-state'
+import { run_board_state } from './run-board-state'
 
 // joshuafolkken/kit#8159: a worker started again begins from the data the last one handed over, so the
 // board keeps its plan rows, thanks and allowances until the new worker's reads land.
 
 const { FIRST_ROUND, LOCAL, START, harness, plan_titled, round_ports } = run_board_fixture
 const { first_round, gather_round, worker_gatherer } = run_board_gather_thread
-const { FRESH_DATA } = run_board_state
+const { FRESH_DATA, FRESH_STATE } = run_board_state
 const THANKS = [{ name: 'reviewer', url: undefined }]
 
 interface Fake extends GatherWorker {
@@ -36,12 +37,12 @@ function fake_worker(): Fake {
 function faked(): {
 	gather: ReturnType<typeof worker_gatherer>
 	spawned: Array<Fake>
-	seeds: Array<DataPost | undefined>
+	seeds: Array<Seed | undefined>
 } {
 	const spawned: Array<Fake> = []
-	const seeds: Array<DataPost | undefined> = []
+	const seeds: Array<Seed | undefined> = []
 
-	function spawn(seed: DataPost | undefined): Fake {
+	function spawn(seed: Seed | undefined): Fake {
 		const worker = fake_worker()
 
 		spawned.push(worker)
@@ -69,7 +70,7 @@ async function planned_post(): Promise<GatherPost> {
 }
 
 describe('run_board_gather_thread.worker_gatherer over a worker started again', () => {
-	it('spawns the first worker with no seed and the next from the data last handed over', async () => {
+	it('spawns the first worker with no seed and the next from the data and sound last handed over', async () => {
 		const post = await planned_post()
 		const { gather, spawned, seeds } = faked()
 		const first = gather('background')
@@ -79,7 +80,7 @@ describe('run_board_gather_thread.worker_gatherer over a worker started again', 
 		spawned[0]?.emit('exit', 1)
 		await gather('background')
 
-		expect(seeds).toStrictEqual([undefined, post.data])
+		expect(seeds).toStrictEqual([undefined, { data: post.data, carried: post.display?.carried }])
 	})
 
 	it('keeps the last data for a post that carries none', async () => {
@@ -97,13 +98,18 @@ describe('run_board_gather_thread.worker_gatherer over a worker started again', 
 
 describe('run_board_gather_thread.first_round', () => {
 	it('starts from fresh data with no seed or a seed that is not posted data', () => {
-		expect(first_round()).toStrictEqual({ gather: run_board_gather.FRESH_GATHER, data: FRESH_DATA })
+		expect(first_round()).toStrictEqual({
+			gather: run_board_gather.FRESH_GATHER,
+			data: FRESH_DATA,
+			board: FRESH_STATE,
+		})
 		expect(first_round({ plan: 'x' }).data).toBe(FRESH_DATA)
+		expect(first_round({ data: { plan: 'x' } }).data).toBe(FRESH_DATA)
 	})
 
 	it('keeps the plan and thanks of a seed, with none of its reads held in flight', async () => {
 		const { data } = await planned_post()
-		const round = first_round(structuredClone(data))
+		const round = first_round(structuredClone({ data, carried: undefined }))
 
 		expect(round.data.plan).toStrictEqual(data?.plan)
 		expect(round.data.thanks).toStrictEqual(THANKS)
@@ -114,7 +120,7 @@ describe('run_board_gather_thread.first_round', () => {
 		const { data } = await planned_post()
 		const board = harness(LOCAL, [plan_titled('b')])
 
-		await gather_round(first_round(structuredClone(data)), round_ports(board), vi.fn())
+		await gather_round(first_round({ data, carried: undefined }), round_ports(board), vi.fn())
 
 		expect(board.read_plan).toHaveBeenCalledOnce()
 	})

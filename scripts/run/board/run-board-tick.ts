@@ -1,5 +1,5 @@
 import { run_board_data, type DataStep } from './run-board-data'
-import { run_board_display } from './run-board-display'
+import { run_board_display, type BoardDisplay } from './run-board-display'
 import type { EarlierLanes } from './run-board-earlier'
 import { run_board_github } from './run-board-github'
 import { run_board_layout, type BoardLayout, type BoardPlan } from './run-board-layout'
@@ -162,6 +162,24 @@ function draw_no_run(state: BoardState, ports: BoardPorts, now_ms: number): Boar
 	return { ...state, spots: [] }
 }
 
+// The frame over the display a live board's worker assembled (joshuafolkken/kit#8160), so this thread
+// draws without the run's read; with none, the frame assembled here over the read, or no run.
+function draw_over(
+	state: BoardState,
+	display: BoardDisplay | undefined,
+	ports: BoardPorts,
+	now_ms: number,
+): BoardState {
+	const { local } = state
+
+	if (display !== undefined) return draw_display(state, display, { ports, now_ms })
+	if (local === undefined) return draw_no_run(state, ports, now_ms)
+
+	const assembled = assemble_display(state, local, now_ms, layout_for(state, local, now_ms))
+
+	return draw_display(state, assembled, { ports, now_ms })
+}
+
 // One redraw. No run reads nothing from GitHub and keeps the plan it had for when one starts. A live
 // board redraws at the `background` pace; one plain frame waits for the GitHub reads.
 async function tick(
@@ -169,21 +187,14 @@ async function tick(
 	ports: BoardPorts,
 	pace: Pace = 'settled',
 ): Promise<BoardState> {
-	const gathered = await ports.gather(pace)
+	const { display, ...gathered } = await ports.gather(pace)
 	// Taken after the read, which a single frame may have waited on to confirm an idle lane.
 	const now_ms = ports.now()
 	const data = await data_of(state, gathered, { ports, now_ms, pace })
 	const next: BoardState = { ...run_board_data.view_for(state, data), ...data }
-	const { local } = next
-
-	if (local === undefined) return drawn(ports, 'tick', () => draw_no_run(next, ports, now_ms))
 
 	// joshuafolkken/kit#8126: `--timing` times the draw from the layout to the write.
-	return drawn(ports, 'tick', () => {
-		const display = assemble_display(next, local, now_ms, layout_for(next, local, now_ms))
-
-		return draw_display(next, display, { ports, now_ms })
-	})
+	return drawn(ports, 'tick', () => draw_over(next, display, ports, now_ms))
 }
 
 const run_board_tick = {
