@@ -1,0 +1,7 @@
+{
+	"reason": "One env key turns tool search off for lane children so launched tools need no ToolSearch round trip (#8096)",
+	"date": "2026-11-19",
+	"growth": {
+		"scripts.code_lines": 7
+	}
+}
