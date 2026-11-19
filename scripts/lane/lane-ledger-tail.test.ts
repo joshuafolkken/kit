@@ -227,6 +227,13 @@ describe('lane_ledger_tail.tail_store', () => {
 	})
 })
 
+// Past one chunk of the backward read (`CHUNK_BYTES` in `lane-ledger-tail.ts`).
+const LONGER_THAN_A_CHUNK = 70_000
+
+function issue_of(entry: object): unknown {
+	return 'issue' in entry ? entry.issue : undefined
+}
+
 function appended_lines(parse: { mock: { calls: Array<Array<unknown>> } }): Array<unknown> {
 	return parse.mock.calls.map(([line]) => line).filter(Boolean)
 }
@@ -292,6 +299,18 @@ describe('lane_ledger_tail.window_store on a replaced or landing ledger', () => 
 		appendFileSync(target, '\n')
 
 		expect(store.read(target, since(3))).toStrictEqual([merge_on(3), merge_on(3)])
+	})
+
+	it('counts a landing line longer than a chunk once it is complete', () => {
+		const target = days_ledger('window-long-fragment')
+		const store = lane_ledger_tail.window_store()
+		const long = { ...merge_on(3), note: 'x'.repeat(LONGER_THAN_A_CHUNK) }
+
+		appendFileSync(target, JSON.stringify(long))
+		store.read(target, since(3))
+		appendFileSync(target, '\n')
+
+		expect(store.read(target, since(3)).map((entry) => issue_of(entry))).toStrictEqual([3, 3])
 	})
 
 	it('reads an absent ledger as no entries', () => {

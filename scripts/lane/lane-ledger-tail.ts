@@ -262,12 +262,21 @@ interface Window {
 	readonly tail: Tail
 }
 
-// Bytes through the last line separator of the file's final chunk: the window read backward ends on a
-// complete line, and the line still landing after it is parsed as a tail's fragment is.
+// Bytes through the file's last line separator, sought a chunk at a time from the end: the window read
+// backward ends on a complete line, and the line still landing after it — however long — is parsed as
+// a tail's fragment is.
 function line_end(descriptor: number, size: number): number {
-	const start = Math.max(0, size - CHUNK_BYTES)
+	let end = size
 
-	return start + read_range(descriptor, start, size).lastIndexOf(LINE_SEPARATOR) + 1
+	while (end > 0) {
+		const start = Math.max(0, end - CHUNK_BYTES)
+		const index = read_range(descriptor, start, end).lastIndexOf(LINE_SEPARATOR)
+
+		if (index !== -1) return start + index + 1
+		end = start
+	}
+
+	return 0
 }
 
 function seed(descriptor: number, snapshot: Snapshot, since_ms: number, is_kept: Keep): Window {
