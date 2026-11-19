@@ -1,0 +1,7 @@
+{
+	"reason": "Two constants and one replace call add the stable OSC 8 id that stops VSCode freezing on a long-running board's exit (#8242)",
+	"date": "2026-11-19",
+	"growth": {
+		"scripts.code_lines": 3
+	}
+}
