@@ -15,10 +15,10 @@ const START = Date.parse('2026-11-19T09:00:00.000Z')
 const WIDE = { rows: 24, columns: 80 }
 const CELLS = 20
 const ESCAPE = '\u{1B}'
-const DOT = '▪'
+const DOT = '■'
 const SWEEP = { row: 4, left: 8 }
 // eslint-disable-next-line no-control-regex -- a sweep write is a cursor move then its cells
-const SWEEP_WRITE = /\u{1B}\[4;8H([ ▪]{20})/u
+const SWEEP_WRITE = /\u{1B}\[4;8H([ ■]{20})/u
 
 describe('run_board_sweep.sweep_index', () => {
 	it('moves one cell every 50 ms and starts again on the second', () => {

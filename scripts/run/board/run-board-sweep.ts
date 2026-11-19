@@ -8,7 +8,9 @@ import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 const SWEEP_MS = 50
 const SWEEP_CELLS = 20
 const SWEEP_MARGIN = 5
-const SWEEP_DOT = '▪'
+// The board's own one-column block: not pictographic, so the WarGames theme draws it as it is, and the
+// sweep, written past the theme, looks the same with the theme on.
+const SWEEP_DOT = '■'
 const CSI = '\u{1B}['
 
 // Where the sweep's twenty cells start on screen, 1-based.
