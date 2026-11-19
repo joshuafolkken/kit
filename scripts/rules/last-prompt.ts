@@ -87,6 +87,42 @@ function prompt_reach(tail: string, transcript_path: string): string {
 	return transcript_tail.read_tail(transcript_path, PROMPT_REACH_BYTES)
 }
 
+const BLOCK_SCHEMA = z.object({ type: z.string(), id: z.string().nullish() })
+const CALL_LINE_SCHEMA = z.object({
+	type: z.literal('assistant'),
+	message: z.object({ content: z.array(BLOCK_SCHEMA) }),
+})
+
+function is_call_line(line: string, tool_use_id: string): boolean {
+	const call = CALL_LINE_SCHEMA.safeParse(json_value.parse_or_undefined(line))
+	if (!call.success) return false
+
+	return call.data.message.content.some(
+		(block) => block.type === 'tool_use' && block.id === tool_use_id,
+	)
+}
+
+// **The person's prompt a tool call was made under** — their last prompt before the assistant line
+// carrying `tool_use_id`, so a prompt sent while the call runs does not stand in for it
+// (joshuafolkken/kit#8248). `undefined` when that line, or a prompt before it, is not on the text.
+function call_prompt(text: string, tool_use_id: string): string | undefined {
+	const lines = text.split('\n')
+	const index = lines.findIndex((line) => is_call_line(line, tool_use_id))
+	if (index === -1) return undefined
+
+	return person_prompt(lines.slice(0, index).join('\n'))
+}
+
+// `call_prompt` read from the transcript — the tail first, then `PROMPT_REACH_BYTES` back when the
+// call or its prompt sits before the tail.
+function call_prompt_at(transcript_path: string, tool_use_id: string): string | undefined {
+	if (!existsSync(transcript_path)) return undefined
+	const prompt = call_prompt(transcript_tail.read_tail(transcript_path), tool_use_id)
+	if (prompt !== undefined) return prompt
+
+	return call_prompt(transcript_tail.read_tail(transcript_path, PROMPT_REACH_BYTES), tool_use_id)
+}
+
 // When the person last prompted on the tail, or `undefined` when no prompt of theirs is on it.
 function prompt_time(tail: string): string | undefined {
 	return tail
@@ -111,6 +147,13 @@ function pause_start(tail: string): string | undefined {
 	return prompt_time(tail) ?? tail_time(tail)
 }
 
-const last_prompt = { pause_start, person_prompt, prompt_reach, turn_prompt }
+const last_prompt = {
+	call_prompt,
+	call_prompt_at,
+	pause_start,
+	person_prompt,
+	prompt_reach,
+	turn_prompt,
+}
 
 export { last_prompt }

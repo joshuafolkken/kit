@@ -1,0 +1,8 @@
+{
+	"reason": "#8246 adds the before-merge criterion for the human-judgement declaration to issue-template.md (its single source) and points the en template and run-backlog at it",
+	"date": "2026-11-19",
+	"growth": {
+		"rules.lines": 2,
+		"ai_cost.on_demand_bytes": 404
+	}
+}

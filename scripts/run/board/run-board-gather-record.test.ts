@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_cli } from './run-board-cli'
 import { run_board_every } from './run-board-every'
 import { run_board_fixture } from './run-board-fixture'
@@ -20,6 +20,20 @@ const ROUNDS = 12
 const SETUP: RecordSetup = { theme: undefined, is_tty: true, is_linked: false }
 const TERMINAL_ONCE = once_key(undefined, true)
 const ESCAPE = '\u{1B}'
+const OSC = `${ESCAPE}]`
+const BEL = '\u{7}'
+
+// `terminal-link` decides support as it loads, so the test decides it here; a supported link is the
+// escape `ansi-escapes` 7 writes — no `id=` of its own.
+const hyperlinks = vi.hoisted(() => ({ is_supported: false }))
+
+vi.mock('terminal-link', () => ({
+	default: Object.assign(
+		(text: string, url: string) =>
+			hyperlinks.is_supported ? `\u{1B}]8;;${url}\u{7}${text}\u{1B}]8;;\u{7}` : text,
+		{ isSupported: false },
+	),
+}))
 
 // A worker's round over `LOCAL`, its plan read when `fetched_ms` says.
 function round_of(fetched_ms: number | undefined): RoundState {
@@ -147,6 +161,29 @@ describe('run_board_gather_record.worker_environment', () => {
 
 		expect(worker_environment({ ...SETUP, is_linked: true })['FORCE_HYPERLINK']).toBe('1')
 		expect(worker_environment(SETUP)['FORCE_HYPERLINK']).toBe('0')
+	})
+})
+
+// joshuafolkken/kit#8242: an id-less OSC 8 link is a new record in xterm.js each frame, piled up on the
+// alternate screen and dropped at once on leaving it — a long-running board froze VSCode on Ctrl+C.
+describe('run_board_gather_record.link', () => {
+	const URL = 'https://github.com/joshuafolkken/kit/issues/8242'
+
+	afterEach(() => {
+		hyperlinks.is_supported = false
+	})
+
+	it('opens each link with the same id, so a redraw re-uses the terminal’s record', () => {
+		hyperlinks.is_supported = true
+		const { link } = run_board_gather_record
+		const linked = link('8242', URL)
+
+		expect(linked).toBe(`${OSC}8;id=josh-run-board;${URL}${BEL}8242${OSC}8;;${BEL}`)
+		expect(link('8242', URL)).toBe(linked)
+	})
+
+	it('draws the bare text on a terminal that opens no link', () => {
+		expect(run_board_gather_record.link('8242', URL)).toBe('8242')
 	})
 })
 
