@@ -1,5 +1,5 @@
 import type { LedgerEntry } from './lane-ledger-schema'
-import { lane_ledger_tail, type RecentWindow } from './lane-ledger-tail'
+import { lane_ledger_tail } from './lane-ledger-tail'
 import { lane_ledger_write } from './lane-ledger-write'
 
 // The measurement ledger read back: every line `lane-ledger-write.ts` appended, for `josh lane:stats`,
@@ -12,13 +12,6 @@ import { lane_ledger_write } from './lane-ledger-write'
 // (joshuafolkken/kit#7012).
 function read_entries(path: string): ReadonlyArray<LedgerEntry> {
 	return lane_ledger_tail.read(path)
-}
-
-// The entries at or after `since_ms`, oldest first, read backward from the end so a fresh process
-// skips the older lines (joshuafolkken/kit#7930). `reached_start` — the ledger's start was read with
-// no line older than the window met.
-function read_since(path: string, since_ms: number): RecentWindow {
-	return lane_ledger_tail.read_since(path, since_ms)
 }
 
 // A tail cache of its own, holding only the entries `is_kept` passes, for a long-lived reader that
@@ -51,7 +44,6 @@ const lane_ledger = {
 	PRE_DETACH_STAGE,
 	ROUND_ONE_REUSED,
 	read_entries,
-	read_since,
 	tail_store,
 	target,
 	target_of,

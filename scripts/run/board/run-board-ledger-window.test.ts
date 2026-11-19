@@ -251,23 +251,14 @@ describe('run_board_ledger_window.entries_of over an appended ledger', () => {
 	})
 })
 
-// The lines `entries_of` parses past its backward window read — the whole-ledger fallback's alone.
-function whole_read_lines(file: string): Array<string> {
+// The lines `entries_of` parses on this read: the window grows by the appended lines alone, so an older
+// line is parsed only by the whole-ledger fallback.
+function parsed_lines(file: string): Array<string> {
 	const parse = vi.spyOn(json_value, 'parse_or_undefined')
-	const read_since = lane_ledger.read_since.bind(lane_ledger)
 
-	vi.spyOn(lane_ledger, 'read_since').mockImplementation(
-		function read_then_clear(ledger, since_ms) {
-			const read = read_since(ledger, since_ms)
-
-			parse.mockClear()
-
-			return read
-		},
-	)
 	run_board_ledger_window.entries_of(file, NOW)
 
-	return parse.mock.calls.map(([line]) => line)
+	return parse.mock.calls.map(([line]) => line).filter(Boolean)
 }
 
 describe('run_board_ledger_window.entries_of after the release', () => {
@@ -283,8 +274,24 @@ describe('run_board_ledger_window.entries_of after the release', () => {
 		ledger_of(name, [...lane(2, NOW - DAY), ...lane(3, NOW - 2 * DAY)])
 		run_board_ledger_window.entries_of(file, NOW)
 		ledger_of(name, [{ kind: 'merge', at: iso(NOW - HOUR), issue: 9 }])
-		const parsed = whole_read_lines(file)
+		const parsed = parsed_lines(file)
 
 		expect(parsed.some((line) => line.includes(iso(NOW - 10 * DAY)))).toBe(true)
+	})
+
+	// joshuafolkken/kit#8206: not the window read backward again on each append.
+	it('parses only the appended line while the window covers', () => {
+		const name = 'window-append'
+		const file = ledger_of(name, [...lane(1, NOW - DAY), ...lane(2, NOW - 2 * DAY)])
+		const appended = { kind: 'merge', at: iso(NOW - HOUR), issue: 1 }
+
+		run_board_ledger_window.entries_of(file, NOW)
+		ledger_of(name, [appended])
+
+		expect(parsed_lines(file)).toStrictEqual([JSON.stringify(appended)])
+		vi.restoreAllMocks()
+		const { window, whole } = compare(file)
+
+		expect(window).toStrictEqual(whole)
 	})
 })
