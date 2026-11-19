@@ -1,0 +1,7 @@
+{
+	"reason": "Concurrent plan-read stages and the epics drawn from the open listing (#8220) add the read_pool / is_whole / epics_of_listing helpers and the Promise.all wiring",
+	"date": "2026-11-19",
+	"growth": {
+		"scripts.code_lines": 38
+	}
+}
