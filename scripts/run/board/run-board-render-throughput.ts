@@ -1,7 +1,6 @@
 import { figure_format } from '#scripts/lib/figure-format'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_board_fit, type DetailPart } from './run-board-fit'
-import { run_board_label_pair } from './run-board-label-pair'
 import { run_board_render_section } from './run-board-render-section'
 import type { Peak, ThroughputCell, ThroughputRow } from './run-board-throughput'
 
@@ -10,14 +9,16 @@ import type { Peak, ThroughputCell, ThroughputRow } from './run-board-throughput
 // throughout, then the closes per active hour, the active hours, the closes, the peak and — the `24h`
 // row's alone — the closes in the cell still filling. The values are `run-board-throughput.ts`'s.
 
-const { pair } = run_board_label_pair
 const LABEL = '📈 throughput'
 const LEVELS = '▁▂▃▄▅▆▇█'
 const STOPPED_MARK = '┊'
 const INDENT = '  '
 const ROW_LABEL_WIDTH = 3
-const COLUMN_GAP_WIDTH = 3
+const COLUMN_GAP_WIDTH = 2
 const COLUMN_GAP = ' '.repeat(COLUMN_GAP_WIDTH)
+// A label stands where its column starts, and `columns_rule` puts a blank, a rule and a blank between
+// two labels: with the gap of 2, a column one wider than its label leaves the rule one column.
+const LABEL_CLEARANCE = 1
 // The `24h` row's 24 cells; the `7d` row's 14 are drawn from the left in the same width.
 const SPARK_WIDTH = 24
 // Where the first column starts: the indent, the row's label, its gap and the sparkline.
@@ -57,15 +58,16 @@ function peak_text(peak: Peak | undefined): string {
 	return `${rate_of(peak.per_hour)} @ ${day_hour_of(peak.start_ms)}`
 }
 
+// The labels carry no icon (joshuafolkken/kit#8235), so a column is as wide as its word needs.
 const COLUMNS: ReadonlyArray<Column> = [
-	{ label: pair('⚡', '/h'), text: (row) => rate_of(row.per_hour) },
+	{ label: '/h', text: (row) => rate_of(row.per_hour) },
 	{
-		label: pair('🟢', 'ACTIVE'),
+		label: 'ACTIVE',
 		text: (row) => `${hours_of(row.active_ms)}/${hours_of(row.window_ms)}h`,
 	},
-	{ label: pair('✅', 'DONE'), text: (row) => String(row.done).padStart(DONE_WIDTH) },
-	{ label: '🏔 PEAK', text: (row) => peak_text(row.peak) },
-	{ label: pair('🔄', 'NOW'), text: (row) => (row.now === undefined ? '' : String(row.now)) },
+	{ label: 'DONE', text: (row) => String(row.done).padStart(DONE_WIDTH) },
+	{ label: 'PEAK', text: (row) => peak_text(row.peak) },
+	{ label: 'NOW', text: (row) => (row.now === undefined ? '' : String(row.now)) },
 ]
 
 function level_of(cell: ThroughputCell, most: number): string {
@@ -86,12 +88,14 @@ function sparkline(cells: ReadonlyArray<ThroughputCell>): string {
 }
 
 function width_of(column: Column, rows: ReadonlyArray<ThroughputRow>): number {
-	const texts = [column.label, ...rows.map((row) => column.text(row))]
+	const label = run_board_fit.width_of(column.label) + LABEL_CLEARANCE
+	const cells = rows.map((row) => run_board_fit.width_of(column.text(row)))
 
-	return Math.max(...texts.map((text) => run_board_fit.width_of(text)))
+	return Math.max(label, ...cells)
 }
 
-// Each column's width, the widest of its label and its cells, so the two rows' columns stand aligned.
+// Each column's width, the widest of its cells and its label's room, so the two rows' columns stand
+// aligned.
 function widths_of(rows: ReadonlyArray<ThroughputRow>): Array<number> {
 	return COLUMNS.map((column) => width_of(column, rows))
 }
