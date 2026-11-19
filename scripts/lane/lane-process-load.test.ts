@@ -117,6 +117,52 @@ describe('lane_process_load.summarize', () => {
 	})
 })
 
+// joshuafolkken/kit#8170: josh's subcommands are ranked as one kind, so they never push another kind out.
+const JOSH_SUBCOMMANDS = [
+	'gate',
+	'ship',
+	'run:board',
+	'backlog:drive',
+	'lint:related',
+	'issue:read',
+]
+const JOSH_LISTING = [
+	...JOSH_SUBCOMMANDS.map(
+		(command, index) =>
+			`${String(200 + index)} ${String(KB_PER_MB)} ${String(50 - index)}.0 node tools/josh/josh-ready.ts ${command}`,
+	),
+	`300 ${String(KB_PER_MB)} 3.0 pnpm install`,
+	`301 ${String(KB_PER_MB)} 4.0 node /repo/node_modules/vitest/vitest.mjs run`,
+	`302 ${String(KB_PER_MB)} 2.0 /Users/me/.local/bin/claude -p`,
+].join('\n')
+
+describe('lane_process_load.summarize josh breakdown', () => {
+	it('keeps the kinds behind josh in the sample', () => {
+		const kinds = lane_process_load.summarize(JOSH_LISTING).map((total) => total.kind)
+
+		expect(kinds).toStrictEqual([
+			...JOSH_SUBCOMMANDS.slice(0, lane_process_load.TOP_KINDS).map((command) => `josh ${command}`),
+			'josh',
+			'vitest',
+			'claude',
+		])
+	})
+
+	it('folds the subcommands past the top and the bare josh lines into one josh row', () => {
+		const josh = lane_process_load.summarize(JOSH_LISTING).find((total) => total.kind === 'josh')
+
+		expect(josh).toStrictEqual({ kind: 'josh', cpu_percent: 48, rss_mb: 2, count: 2 })
+	})
+
+	it('keeps the josh rows summing to josh as a whole', () => {
+		const rows = lane_process_load
+			.summarize(JOSH_LISTING)
+			.filter((total) => total.kind.startsWith('josh'))
+
+		expect(rows.reduce((sum, total) => sum + total.count, 0)).toBe(JOSH_SUBCOMMANDS.length + 1)
+	})
+})
+
 // joshuafolkken/kit#7244: the footprint `top`'s MEM shows, compressed pages included, read by pid.
 describe('lane_process_load.summarize footprint', () => {
 	it('sums each kind over the processes whose footprint was read', () => {

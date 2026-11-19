@@ -167,14 +167,31 @@ function resident_mb(listing: string, names: ReadonlyArray<string>): number | un
 	return Math.round(resident.reduce((total, reading) => total + reading.rss_mb, 0))
 }
 
-function add_reading(total: ProcessKind, reading: ProcessReading): void {
-	total.cpu_percent += reading.cpu_percent
-	total.rss_mb += reading.rss_mb
-	total.count += 1
+function add_total(total: ProcessKind, part: ProcessKind): void {
+	total.cpu_percent += part.cpu_percent
+	total.rss_mb += part.rss_mb
+	total.count += part.count
 
-	if (reading.footprint_mb !== undefined) {
-		total.footprint_mb = (total.footprint_mb ?? 0) + reading.footprint_mb
+	if (part.footprint_mb !== undefined) {
+		total.footprint_mb = (total.footprint_mb ?? 0) + part.footprint_mb
 	}
+}
+
+function add_reading(total: ProcessKind, reading: ProcessReading): void {
+	add_total(total, { ...reading, count: 1 })
+}
+
+// The josh parts summed into one plain `josh` row.
+function josh_total(parts: ReadonlyArray<ProcessKind>): ProcessKind {
+	const total: ProcessKind = { kind: JOSH_KIND, cpu_percent: 0, rss_mb: 0, count: 0 }
+
+	for (const part of parts) add_total(total, part)
+
+	return total
+}
+
+function is_josh(total: ProcessKind): boolean {
+	return total.kind === JOSH_KIND || total.kind.startsWith(`${JOSH_KIND} `)
 }
 
 function add_line(
@@ -209,15 +226,34 @@ function by_weight(left: ProcessKind, right: ProcessKind): number {
 	return right.cpu_percent - left.cpu_percent || right.rss_mb - left.rss_mb
 }
 
+// The josh slot's rows: its heaviest subcommands by name, the rest — and any line with no subcommand —
+// folded into one plain `josh` row, so the rows still sum to josh's whole.
+function josh_breakdown(parts: ReadonlyArray<ProcessKind>): Array<ProcessKind> {
+	const named = parts
+		.filter((part) => part.kind !== JOSH_KIND)
+		.toSorted(by_weight)
+		.slice(0, TOP_KINDS)
+	const rest = parts.filter((part) => !named.includes(part))
+	const folded = rest.length === 0 ? [] : [josh_total(rest)]
+
+	return [...named, ...folded].map((total) => rounded(total))
+}
+
+// The top kinds are ranked with josh as one kind, so its subcommands share josh's slot rather than push
+// vitest, eslint or claude out of the sample; the josh slot then expands into `josh_breakdown`'s rows.
 function summarize(listing: string, footprint?: RusageReader): Array<ProcessKind> {
 	const totals = new Map<string, ProcessKind>()
 
 	for (const line of listing.split('\n')) add_line(totals, line, footprint)
 
-	return [...totals.values()]
+	const josh = [...totals.values()].filter((total) => is_josh(total))
+	const coarse = [...totals.values()].filter((total) => !is_josh(total))
+	const ranked = [...coarse, ...(josh.length === 0 ? [] : [josh_total(josh)])]
 		.map((total) => rounded(total))
 		.toSorted(by_weight)
 		.slice(0, TOP_KINDS)
+
+	return ranked.flatMap((total) => (total.kind === JOSH_KIND ? josh_breakdown(josh) : [total]))
 }
 
 // `undefined` where `ps` did not answer, so the sample records no breakdown rather than an empty one.
