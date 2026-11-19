@@ -91,7 +91,10 @@ vi.mock('#scripts/run/hold/run-hold-cli', () => ({
 
 // The prepared-prerequisite step is `run-pause-publish.test.ts`'s; here only its place in the order.
 vi.mock('#scripts/run/pause/run-pause-publish', () => ({
-	run_pause_publish: { publish_prepared: async () => 'not prepared' },
+	run_pause_publish: {
+		publish_prepared: async () => 'not prepared',
+		unplanned: async () => undefined,
+	},
 }))
 
 const REQUEST = { issue: '10', prerequisite: '11' }

@@ -10,6 +10,7 @@ const state = vi.hoisted(() => ({
 	stashes: [] as Array<string>,
 	comments: [] as Array<string>,
 	calls: [] as Array<string>,
+	unplanned: undefined as string | undefined,
 }))
 
 vi.mock('#scripts/git/stash/stash-push-cli', () => ({
@@ -51,7 +52,10 @@ vi.mock('#scripts/run/hold/run-hold-cli', () => ({
 }))
 
 vi.mock('#scripts/run/pause/run-pause-publish', () => ({
-	run_pause_publish: { publish_prepared: async () => 'not prepared' },
+	run_pause_publish: {
+		publish_prepared: async () => 'not prepared',
+		unplanned: async () => state.unplanned,
+	},
 }))
 
 const tracking_with = vi.hoisted(() => vi.fn())
@@ -77,7 +81,7 @@ const NEEDS_DECISION = 'needs-decision'
 const BLOCKED_BY = 'blocked-by'
 
 beforeEach(() => {
-	Object.assign(state, { stashes: [], comments: [], calls: [] })
+	Object.assign(state, { stashes: [], comments: [], calls: [], unplanned: undefined })
 	vi.spyOn(git_stash, 'list').mockImplementation(async () =>
 		state.stashes.map((subject, index) => ({ selector: `stash@{${String(index)}}`, subject })),
 	)
@@ -129,6 +133,17 @@ describe('run_split_prerequisite.prerequisite — no epic tracks the issue', () 
 
 		expect(result).toMatchObject({ kind: 'failed', step: 'title', done: [] })
 		expect(state.calls).toStrictEqual([])
+	})
+
+	// joshuafolkken/kit#8105: the split path waits through `run_pause.pause`, so its plan check holds.
+	it('refuses a prepared prerequisite with no recorded plan before writing anything', async () => {
+		state.unplanned = 'Prepared #11 needs its recorded plan'
+
+		const result = await run_split_prerequisite.prerequisite(REQUEST)
+
+		expect(result).toMatchObject({ kind: 'failed', step: 'plan', done: [] })
+		expect(state.calls).toStrictEqual([])
+		expect(epic_create).not.toHaveBeenCalled()
 	})
 })
 

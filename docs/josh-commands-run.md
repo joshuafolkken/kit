@@ -74,7 +74,9 @@ pnpm josh run:pause 1091 --for 1102   # pause 1091 until 1102 lands
 
 A prepared (unpublished) prerequisite is published before the hold is released, through `issue:file --publish <epic>` on the open epic listing it.
 
-When that is withheld (no recorded plan, unrecorded dependencies, no epic), a comment naming the reason and the next commands (`issue:plan <prerequisite> … --planned --no-notify`, then `issue:file --publish <epic>`) lands once on both issues and is printed.
+A prepared prerequisite with no recorded plan (no `run:planned`, or `plan:unverified`) is refused before the first step: nothing is set aside, commented, related or released. The lane that filed it records the plan (`issue:plan <prerequisite> --body-file … --planned --no-notify`) and reruns the pause; `run:split --prerequisite` waits through the same check.
+
+When the publication is withheld for another reason (unrecorded dependencies, no epic), a comment naming the reason and the next commands (`issue:plan <prerequisite> … --planned --no-notify`, then `issue:file --publish <epic>`) lands once on both issues and is printed.
 
 A pause that lands prints `prerequisite.md` → "Each entry's branch, and the pause" after its step lines (one line naming it once this session printed it).
 

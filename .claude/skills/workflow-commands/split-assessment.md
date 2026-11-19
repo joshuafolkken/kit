@@ -90,6 +90,7 @@ It is created unpublished. Record every child's plan with `issue:plan --planned 
 create/promote the epic and register its native dependencies, then run
 `pnpm josh issue:file --publish <E>` to validate the batch and publish its prepared children.
 Retry the same epic after a partial failure; never recreate its prepared children.
+A mid-run split child the lane waits on → `prerequisite.md` (`run:pause` refuses it unplanned).
 
 Over the bar before dispatch → a split-only unit answers question 1 (`scripts/backlog/backlog-drive-split-unit.ts`).
 

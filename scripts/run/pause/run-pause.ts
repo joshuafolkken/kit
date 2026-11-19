@@ -8,7 +8,8 @@ import { run_set_aside, type AsideRequest, type Step, type StepReport } from './
 // `josh run:pause <M> --for <N>` — set a run aside while its prerequisite `#N` lands first
 // (`prerequisite.md`): the work in progress stashed under a fixed name, a comment on `#M` naming the
 // pop, `#M` blocked by `#N`, a prepared `#N` published (or what it needs noted on both, by
-// `run-pause-publish.ts`) and the hold released, in that order.
+// `run-pause-publish.ts`) and the hold released, in that order. A prepared `#N` with no recorded plan
+// is refused before the first step (joshuafolkken/kit#8105).
 //
 // The set-aside steps are `run-set-aside.ts`'s, each asking whether it is already done, so a rerun
 // after a failure carries on from the step that failed. The relation is `epic_blocked_by.record`'s,
@@ -55,6 +56,9 @@ async function pause(
 	request: PauseRequest,
 	around: AroundRelation = NO_STEPS,
 ): Promise<PauseResult> {
+	const unplanned = await run_pause_publish.unplanned(request)
+	if (unplanned !== undefined) return { kind: 'failed', step: 'plan', reason: unplanned, done: [] }
+
 	const steps = run_set_aside.steps_of(aside_of(request), [
 		...around.before,
 		['blocked-by', async () => await epic_blocked_by.record(request)],
