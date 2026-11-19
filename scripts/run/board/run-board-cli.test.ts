@@ -1,5 +1,5 @@
 import { stripVTControlCharacters } from 'node:util'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_board_cli } from './run-board-cli'
 import { run_board_fixture, type Harness } from './run-board-fixture'
 import { run_board_intro } from './run-board-intro'
@@ -12,6 +12,16 @@ import { run_board_typing } from './run-board-typing'
 // `run-board-tick.test.ts`'s (joshuafolkken/kit#3444).
 
 const { LOCAL, SPINNING, START, STOPPED, harness, plan_titled } = run_board_fixture
+
+// A theme colors every write where color is on (`FORCE_COLOR` in the gate's environment), so the
+// screen's control bytes are compared with color off.
+beforeEach(() => {
+	vi.stubEnv('FORCE_COLOR', '0')
+})
+
+afterEach(() => {
+	vi.unstubAllEnvs()
+})
 const ESCAPE = '\u{1B}'
 const ENTER = `${ESCAPE}[?1049h${ESCAPE}[?25l`
 const LEAVE = `${ESCAPE}[?25h${ESCAPE}[?1049l`
