@@ -2,11 +2,13 @@ import { epic_blocked_by } from '#scripts/epic/epic-blocked-by'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { session_language } from '#scripts/josh/session-language'
 import { run_pause_comment } from './run-pause-comment'
+import { run_pause_publish } from './run-pause-publish'
 import { run_set_aside, type AsideRequest, type Step, type StepReport } from './run-set-aside'
 
 // `josh run:pause <M> --for <N>` — set a run aside while its prerequisite `#N` lands first
 // (`prerequisite.md`): the work in progress stashed under a fixed name, a comment on `#M` naming the
-// pop, `#M` blocked by `#N` and the hold released, in that order.
+// pop, `#M` blocked by `#N`, a prepared `#N` published (or what it needs noted on both, by
+// `run-pause-publish.ts`) and the hold released, in that order.
 //
 // The set-aside steps are `run-set-aside.ts`'s, each asking whether it is already done, so a rerun
 // after a failure carries on from the step that failed. The relation is `epic_blocked_by.record`'s,
@@ -57,6 +59,7 @@ async function pause(
 		...around.before,
 		['blocked-by', async () => await epic_blocked_by.record(request)],
 		...around.after,
+		['publish-prepared', async () => await run_pause_publish.publish_prepared(request)],
 	])
 	const result = await run_set_aside.run_steps(steps)
 

@@ -68,6 +68,17 @@ describe('test_related_cap.hub_of', () => {
 		expect(test_related_cap.hub_of(selection_of(DEFERRED), own)).toBe(WIDE_MODULE)
 	})
 
+	// joshuafolkken/kit#8092: a cut that only the spread sums to names no hub.
+	it('names no hub where no own file reaches past the cap alone', () => {
+		expect(test_related_cap.hub_of(selection_of(DEFERRED), [MIDDLE_MODULE])).toBeUndefined()
+	})
+
+	it('names the widest of the own files past the cap', () => {
+		const own = [WIDE_MODULE, MERGED_HUB]
+
+		expect(test_related_cap.hub_of(selection_of(DEFERRED), own)).toBe(MERGED_HUB)
+	})
+
 	it('names no hub where no reached file is of the own change', () => {
 		expect(test_related_cap.hub_of(selection_of(DEFERRED), [])).toBeUndefined()
 	})

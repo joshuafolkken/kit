@@ -89,6 +89,11 @@ vi.mock('#scripts/run/hold/run-hold-cli', () => ({
 	},
 }))
 
+// The prepared-prerequisite step is `run-pause-publish.test.ts`'s; here only its place in the order.
+vi.mock('#scripts/run/pause/run-pause-publish', () => ({
+	run_pause_publish: { publish_prepared: async () => 'not prepared' },
+}))
+
 const REQUEST = { issue: '10', prerequisite: '11' }
 const MESSAGE = 'run:pause: #10 waits on #11'
 const BLOCKED_BY = 'blocked-by'
@@ -153,6 +158,15 @@ describe('run_pause.pause — the four steps in order', () => {
 		expect(state.stashes).toStrictEqual([`On 4160-lane: ${MESSAGE}`])
 		expect(state.comments[0]).toContain(`pnpm josh stash:pop "${MESSAGE}"`)
 		expect(state.blockers).toStrictEqual([11])
+	})
+
+	// joshuafolkken/kit#8086: a prepared `#N` is settled before the hold is released.
+	it('settles a prepared prerequisite after the relation and before the release', async () => {
+		const result = await run_pause.pause(REQUEST)
+		const steps = result.done.map(({ step }) => step)
+
+		expect(steps.indexOf('publish-prepared')).toBe(steps.indexOf(BLOCKED_BY) + 1)
+		expect(steps.at(-1)).toBe('release')
 	})
 
 	// joshuafolkken/kit#7700: the headline follows the session language; the marker, the stash
@@ -287,7 +301,7 @@ describe('run_pause.pause — a failure stops, and a rerun continues', () => {
 		const result = await run_pause.pause(REQUEST)
 
 		expect(result).toMatchObject({ kind: 'failed', step: 'release' })
-		expect(result.done).toHaveLength(3)
+		expect(result.done).toHaveLength(4)
 	})
 })
 
