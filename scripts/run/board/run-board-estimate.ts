@@ -22,7 +22,7 @@ const LEGEND = `${HEADER_ICONS.estimate} ${WORDS.estimate}`
 const ESTIMATE_MARK = '~'
 // A row whose finish nothing measures.
 const UNKNOWN = `${HEADER_ICONS.estimate} —`
-const FINISH_STATES: ReadonlySet<ItemState> = new Set(['running', 'human', 'parked'])
+const FINISH_STATES: ReadonlySet<ItemState> = new Set(['running', 'parked'])
 // A failed ship sends its child back to implement, so it has that phase and every later one left.
 const FAILED_PHASE: Phase = 'failed'
 const RESUMED_PHASE: Phase = 'implement'
@@ -154,8 +154,8 @@ function row_finish(row: BoardRow, read: EstimateRead): RowFinish | undefined {
 	return { finish_ms, drift_ms: finish_ms - foretold_ms }
 }
 
-// Whether a row ends on its finish (joshuafolkken/kit#7920): a running row, and one waiting on a person
-// or parked, while the run goes on — a stopped or ended run's header draws no 🎯, nor do its rows. An
+// Whether a row ends on its finish (joshuafolkken/kit#7920): a running row, and a parked one, while the
+// run goes on; a row waiting on a person draws none, its finish never measured (joshuafolkken/kit#8166) — a stopped or ended run's header draws no 🎯, nor do its rows. An
 // earlier run's lane (🧳) draws none: this run's lane totals do not foretell it.
 function is_finish_drawn(row: BoardRow, run: RunMotion): boolean {
 	const is_moving = run.ended_ms === undefined && !run.activity.is_stopped
