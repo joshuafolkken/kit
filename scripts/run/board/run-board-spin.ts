@@ -140,11 +140,6 @@ function next_turn(now_ms: number, until_ms: number, turning: Turning): number {
 	return Math.min(turn_ms, letter_ms, until_ms)
 }
 
-// The spinner's frame number at a moment, as `spinner_of` counts it.
-function step_of(at_ms: number): number {
-	return Math.floor(at_ms / SPINNER_INTERVAL_MS)
-}
-
 // The spinners turned when their frame changed, then the rows typing written over them, in one write.
 function turn_bytes(turning: Turning, at_ms: number, is_turned: boolean): string {
 	const spin = is_turned ? spin_bytes(turning.spots, spinner_of(at_ms)) : ''
@@ -155,7 +150,7 @@ function turn_bytes(turning: Turning, at_ms: number, is_turned: boolean): string
 // joshuafolkken/kit#8123: a wake for a letter between frame boundaries writes no spinner, so each frame
 // is written once, on its boundary.
 async function turn_until(turning: Turning, ports: SpinPorts, until_ms: number): Promise<void> {
-	let step = step_of(ports.now())
+	let frame = spinner_of(ports.now())
 
 	await poll.poll_until(() => ports.now() >= until_ms, {
 		attempts: Infinity,
@@ -165,10 +160,10 @@ async function turn_until(turning: Turning, ports: SpinPorts, until_ms: number):
 
 			await ports.sleep(next_turn(now_ms, until_ms, turning) - now_ms)
 			const at_ms = ports.now()
-			const at_step = step_of(at_ms)
+			const at_frame = spinner_of(at_ms)
 
-			if (at_ms < until_ms) ports.write(turn_bytes(turning, at_ms, at_step !== step))
-			step = at_step
+			if (at_ms < until_ms) ports.write(turn_bytes(turning, at_ms, at_frame !== frame))
+			frame = at_frame
 		},
 	})
 }
