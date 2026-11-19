@@ -1,8 +1,23 @@
+import type { EpicChild } from '#scripts/epic/epic-graph'
+import { has_label_name, NEEDS_HUMAN_MERGE_LABEL } from '#scripts/issue/issue-labels'
+import { issue_publication_state } from '#scripts/issue/issue-publication-state'
 import { markdown_section } from '#scripts/issue/markdown-section'
 import { run_park_body } from '#scripts/run/park/run-park-body'
-import type { BoardPlan, RowRead, RowReason } from './run-board-layout'
+import { run_board_human } from './run-board-human'
+import type {
+	BlockerNeed,
+	BoardPlan,
+	DecisionBlocker,
+	RowRead,
+	RowReason,
+} from './run-board-layout-types'
 import { run_board_pause } from './run-board-pause'
 import type { ItemStatus } from './run-board-status'
+
+// A blocker the decision read walked to, with the title its listing or view carries.
+interface DecisionNode extends EpicChild {
+	title: string
+}
 
 // The park's question, then after `;` a note on why it parked that is not the question
 // (`backlog-drive-retry.ts`: `needs-decision; blocker #M closed`).
@@ -85,13 +100,29 @@ function plan_reason(number: number, plan: BoardPlan): RowReason | undefined {
 	return reason_of(number, undefined, { ...plan, titles: plan.context.titles })
 }
 
-function waiting_tail(reference: string, title: string, body = ''): string {
-	const detail = HUMAN_DETAIL.exec(body)?.[1]
-	const suffix = detail === undefined ? '' : ` (${detail})`
+// What a person does for a blocker the walk stopped at: a merge wait merges, a prepared filing is
+// published, another stop the registry names is decided, and an issue outside the run is taken in.
+function need_of(node: DecisionNode): BlockerNeed {
+	if (has_label_name(node.labels, NEEDS_HUMAN_MERGE_LABEL)) return 'merge'
+	if (issue_publication_state.is_pending(node.body)) return 'publish'
 
-	return `→ decide ${reference}: ${title}${suffix}`
+	return run_board_human.is_human(node.labels) ? 'decide' : 'take'
 }
 
-const run_board_decision = { comment_question, plan_reason, reason_of, waiting_tail }
+function blocker_of(node: DecisionNode, blocks: ReadonlyArray<number>): DecisionBlocker {
+	const detail = HUMAN_DETAIL.exec(node.body ?? '')?.[1]
+
+	return {
+		...(detail !== undefined && { detail }),
+		number: node.number,
+		title: node.title,
+		labels: node.labels,
+		need: need_of(node),
+		blocks,
+	}
+}
+
+const run_board_decision = { blocker_of, comment_question, plan_reason, reason_of }
 
 export { run_board_decision }
+export type { DecisionNode }

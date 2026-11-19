@@ -2,20 +2,17 @@ import { epic_graph, type EpicChild, type IssueReference } from '#scripts/epic/e
 import { epic_issue } from '#scripts/epic/epic-issue'
 import { git_gh_etag_read } from '#scripts/gh/git-gh-etag-read'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
-import { has_label_name, has_parked_label, NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
+import { has_parked_label } from '#scripts/issue/issue-labels'
 import { issue_read, type IssueComment } from '#scripts/issue/issue-read'
-import { run_board_decision } from './run-board-decision'
+import { run_board_decision, type DecisionNode } from './run-board-decision'
 import { run_board_decision_graphql, type ViewLoader } from './run-board-decision-graphql'
-import { run_board_layout, type BoardPlan } from './run-board-layout'
+import { run_board_human } from './run-board-human'
+import { run_board_layout, type BoardPlan, type DecisionBlocker } from './run-board-layout'
 import { run_board_pause, type PauseRecord } from './run-board-pause'
 
 interface CommentReasons {
 	question: string | undefined
 	pause: PauseRecord
-}
-
-interface DecisionNode extends EpicChild {
-	title: string
 }
 
 interface DecisionRead {
@@ -71,24 +68,21 @@ function is_outside(node: DecisionNode, plan: BoardPlan): boolean {
 	return node.repo !== plan.context.repo || !run_board_layout.numbers_of(plan).has(node.number)
 }
 
-function is_human(node: DecisionNode, plan: BoardPlan): boolean {
-	return (
-		has_label_name(node.labels, NEEDS_DECISION_LABEL) ||
-		is_outside(node, plan) ||
-		plan.withheld?.has(node.number) === true
-	)
+// The one answer to whether a blocker waits on a person (joshuafolkken/kit#8026): a stop the
+// human-stop registry names (a decision, a park, a merge) or an issue this run does not run. The walk
+// ends there, and the 🙋 decision section draws it.
+function stops_at(node: DecisionNode, plan: BoardPlan): boolean {
+	return run_board_human.is_human(node.labels) || is_outside(node, plan)
 }
 
 function is_eligible(node: DecisionNode | undefined, plan: BoardPlan): node is DecisionNode {
-	return node !== undefined && node.state !== 'CLOSED' && is_human(node, plan)
+	if (node === undefined || node.state === 'CLOSED') return false
+
+	return stops_at(node, plan) || plan.withheld?.has(node.number) === true
 }
 
 function terminal_of(node: DecisionNode): DecisionNode | undefined {
 	return node.blocked_by.length === 0 ? node : undefined
-}
-
-function stops_at(node: DecisionNode, plan: BoardPlan): boolean {
-	return has_label_name(node.labels, NEEDS_DECISION_LABEL) || is_outside(node, plan)
 }
 
 function is_seen(reference: IssueReference, seen: ReadonlySet<string>): boolean {
@@ -176,20 +170,32 @@ async function questions_of(
 	}
 }
 
-async function wait_of(
-	child: EpicChild,
-	read: DecisionRead,
-): Promise<readonly [number, string] | undefined> {
+type Wait = readonly [number, DecisionNode]
+
+async function wait_of(child: EpicChild, read: DecisionRead): Promise<Wait | undefined> {
 	if (read.plan.withheld?.has(child.number) !== true) return undefined
 	const blockers = await Promise.all(
 		child.blocked_by.map(async (edge) => await blocker_of(edge, read, new Set())),
 	)
 	const blocker = blockers.find((node) => node !== undefined)
 
-	if (blocker === undefined) return undefined
-	const reference = epic_graph.format_reference(blocker, read.plan.context.repo)
+	return blocker === undefined ? undefined : [child.number, blocker]
+}
 
-	return [child.number, run_board_decision.waiting_tail(reference, blocker.title, blocker.body)]
+// One blocker per issue, with every withheld child it holds. A blocker in another repository has no
+// row the board can draw by its number, so it is left out.
+function blockers_of(waits: ReadonlyArray<Wait>, repo: string): Array<DecisionBlocker> {
+	const groups = new Map<number, { node: DecisionNode; blocks: Array<number> }>()
+	const own = waits.filter(([, blocker]) => blocker.repo === repo)
+
+	for (const [child, node] of own) {
+		const group = groups.get(node.number) ?? { node, blocks: [] }
+
+		group.blocks.push(child)
+		groups.set(node.number, group)
+	}
+
+	return [...groups.values()].map(({ node, blocks }) => run_board_decision.blocker_of(node, blocks))
 }
 
 // The plan's own children are seeded as read, so the walk reads only the nodes outside it.
@@ -218,11 +224,9 @@ async function with_decisions(plan: BoardPlan | undefined): Promise<BoardPlan | 
 		Promise.all(children.map(async (child) => await wait_of(child, read))),
 	])
 
-	return {
-		...plan,
-		...questions,
-		decision_waits: new Map(waits.filter((pair) => pair !== undefined)),
-	}
+	const found = waits.filter((wait) => wait !== undefined)
+
+	return { ...plan, ...questions, decision_blockers: blockers_of(found, plan.context.repo) }
 }
 
 const run_board_decision_read = { with_decisions }
