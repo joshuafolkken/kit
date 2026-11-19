@@ -155,8 +155,8 @@ describe('run_board_layout.layout_of — a ⏳ lane row line end', () => {
 // joshuafolkken/kit#8084: one that launched, parked and was re-queued with a start date ahead waits on
 // that date in the waiting section; past the date it is the retry a free lane starts.
 describe('run_board_layout.layout_of — a re-queued issue that launched before and has a start date', () => {
-	const AHEAD = '- 実施可能日: 2026-11-25T09:00Z'
-	const PASSED = '- 実施可能日: 2026-11-13T09:00Z'
+	const AHEAD = '## 背景\n\n- 実施可能日: 2026-11-25T09:00Z\n'
+	const PASSED = '## 背景\n\n- 実施可能日: 2026-11-13T09:00Z\n'
 	const FREE_LANE = 'retry · → next free lane'
 
 	it('draws a date still ahead as a 📅 row in the waiting section, not as a free-lane retry', () => {
@@ -171,10 +171,11 @@ describe('run_board_layout.layout_of — a re-queued issue that launched before 
 	})
 
 	it('keeps a passed date with no blocker as a ⏳ lane row a free lane starts', () => {
-		const layout = layout_of(plan_of([child(WAITS, PASSED)], []), RELAUNCHED)
+		const layout = layout_of(plan_of([], [child(WAITS, PASSED)]), RELAUNCHED)
 		const [line] = hourglass_lines(layout)
 
 		expect(numbers_of(layout.active)).toStrictEqual([WAITS])
+		expect(numbers_of(layout.unreached)).toStrictEqual([])
 		expect(line).toContain(FREE_LANE)
 	})
 
