@@ -38,7 +38,7 @@ describe('run_board_render_quota.usage_part github row gauges', () => {
 		const row = row_of({ rate_limit: BOTH })
 
 		expect(row).toMatch(
-			/^ {2}GitHub {6}REST {2}38% \S{20} 3123 {5}12:33 {2}GraphQL {3}1% \S{20} 4952 {5}12:40$/u,
+			/^ {5}GitHub {6}REST {2}38% \S{20} 3123 {5}12:33 {2}GraphQL {3}1% \S{20} 4952 {5}12:40$/u,
 		)
 		expect(row).not.toMatch(/↻| · |▶/u)
 	})

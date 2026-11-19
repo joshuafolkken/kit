@@ -40,8 +40,10 @@ const LANES_LABEL = run_board_label_pair.pair(run_board_labels.LANES_ICON, 'lane
 // A single run's rule (joshuafolkken/kit#7523): it runs in the root checkout, not in a lane, so its
 // row stands under the command it runs rather than under the lanes.
 const SINGLE_RUN_ICON = '🏠'
-// Two leading rules, a space, and the separator before the first column.
-const RULE_ROOM = 6
+// An open head's ▾ and its blank, and the blank, rule and blank before the first column, so a lane
+// row's icon stands in `ROW_INDENT`'s column under a counted label (joshuafolkken/kit#8257); a chat's
+// two leading rules draw that column one further right.
+const RULE_ROOM = 5
 
 function root_label(run_name: string): string {
 	return `${SINGLE_RUN_ICON} ${run_name}`
@@ -114,14 +116,14 @@ function icon_of(row: BoardRow, header: BoardHeader): string {
 	return is_stopped_single(row, header) ? ICON_BLANK : state_icon(row)
 }
 
-// A lane row's lead after its indent, ending where its usage cells start less one blank.
+// A lane row's lead after its indent, ending where its usage cells start less one blank. A wide label's
+// offset falls after the icon, so the icon keeps `ROW_INDENT`'s column (joshuafolkken/kit#8257).
 function lead_of(row: BoardRow, header: BoardHeader): string {
 	const icon = running_fresh(row, icon_of(row, header), row.status?.phase_ms, header)
 	const phase = phase_time(row, header, TIME_WIDTH)
+	const shifted = `${icon}${' '.repeat(column_offset(header))}`
 
-	const progress = `${progress_of(row, header)}${' '.repeat(column_offset(header))}`
-
-	return [progress, icon, phase, whole_of(row, header)].join(' ')
+	return [progress_of(row, header), shifted, phase, whole_of(row, header)].join(' ')
 }
 
 const run_board_render_lead = {

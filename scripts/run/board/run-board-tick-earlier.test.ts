@@ -76,7 +76,7 @@ describe('run_board_tick.tick — an earlier run’s lanes holding a place', () 
 		const lanes = `${String(LANE_LIMIT)}/${String(LANE_LIMIT)}`
 		// joshuafolkken/kit#4288: the count fills the condition column; a row with no title ends at its
 		// number.
-		const queued = new RegExp(`^ {4}🧵 ${lanes} +${String(QUEUED)}$`, 'u')
+		const queued = new RegExp(`^ {5}🧵 ${lanes} +${String(QUEUED)}$`, 'u')
 
 		expect(lines).toContainEqual(expect.stringMatching(queued))
 		expect(lane_rows(lines)).toHaveLength(LANE_LIMIT)

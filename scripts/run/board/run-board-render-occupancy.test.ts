@@ -15,6 +15,8 @@ const LINE = { text: 'lane', row: undefined }
 const USED = 12
 const LIMIT = 24
 const NARROW = 70
+// A `── ` head's second leading rule, which a live `▾ ` head does not draw (joshuafolkken/kit#8257).
+const CHAT_RULE_SHIFT = 1
 const ROW = {
 	number: 5465,
 	title: 'A long lane title that must fit the terminal',
@@ -58,7 +60,8 @@ describe('run board lane occupancy columns', () => {
 		const rule = bare(lanes_section([LINE], cells, board)[0]?.head[1] ?? '')
 		const lead = `  ${lead_of(ROW, board)} `
 
-		expect(column_of(rule, '⏰')).toBe(ELAPSED_START + column_offset(board))
+		// The open head's `▾ ` draws ⏰ at the elapsed column; this unfolded `── ` head one further right.
+		expect(column_of(rule, '⏰')).toBe(ELAPSED_START + column_offset(board) + CHAT_RULE_SHIFT)
 		expect(column_of(rule, '💪 CPU')).toBe(USAGE_START + column_offset(board))
 		expect(run_board_fit.width_of(lead)).toBe(column_of(rule, '💪 CPU'))
 	})

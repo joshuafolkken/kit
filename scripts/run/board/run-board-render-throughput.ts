@@ -12,17 +12,17 @@ import type { Peak, ThroughputCell, ThroughputRow } from './run-board-throughput
 const LABEL = '📈 throughput'
 const LEVELS = '▁▂▃▄▅▆▇█'
 const STOPPED_MARK = '┊'
-const INDENT = '  '
+const { ROW_INDENT } = run_board_render_section
 const ROW_LABEL_WIDTH = 3
 const COLUMN_GAP_WIDTH = 2
 const COLUMN_GAP = ' '.repeat(COLUMN_GAP_WIDTH)
-// A label stands where its column starts, and `columns_rule` puts a blank, a rule and a blank between
-// two labels: with the gap of 2, a column one wider than its label leaves the rule one column.
+// `columns_rule` puts a blank, a rule and a blank between two labels: a column one wider than its
+// label leaves the rule room.
 const LABEL_CLEARANCE = 1
 // The `24h` row's 24 cells; the `7d` row's 14 are drawn from the left in the same width.
 const SPARK_WIDTH = 24
 // Where the first column starts: the indent, the row's label, its gap and the sparkline.
-const LEAD_WIDTH = `${INDENT}${INDENT}`.length + ROW_LABEL_WIDTH + SPARK_WIDTH
+const LEAD_WIDTH = ROW_INDENT.length + ROW_LABEL_WIDTH + COLUMN_GAP_WIDTH + SPARK_WIDTH
 const HOUR_WIDTH = 3
 const DONE_WIDTH = 4
 const RATE_WIDTH = 4
@@ -31,8 +31,11 @@ const MS_PER_HOUR = MINUTES_PER_HOUR * MS_PER_MINUTE
 const NONE = '-'
 const { two_digits } = figure_format
 
+// A label stands over its column's figures (joshuafolkken/kit#8257): `end` at their right end, as a
+// count's is read, `start` at their left end, as a span's or a time's is.
 interface Column {
 	label: string
+	align: 'start' | 'end'
 	text: (row: ThroughputRow) => string
 }
 
@@ -60,14 +63,19 @@ function peak_text(peak: Peak | undefined): string {
 
 // The labels carry no icon (joshuafolkken/kit#8235), so a column is as wide as its word needs.
 const COLUMNS: ReadonlyArray<Column> = [
-	{ label: '/h', text: (row) => rate_of(row.per_hour) },
+	{ label: '/h', align: 'end', text: (row) => rate_of(row.per_hour) },
 	{
 		label: 'ACTIVE',
+		align: 'start',
 		text: (row) => `${hours_of(row.active_ms)}/${hours_of(row.window_ms)}h`,
 	},
-	{ label: 'DONE', text: (row) => String(row.done).padStart(DONE_WIDTH) },
-	{ label: 'PEAK', text: (row) => peak_text(row.peak) },
-	{ label: 'NOW', text: (row) => (row.now === undefined ? '' : String(row.now)) },
+	{ label: 'DONE', align: 'end', text: (row) => String(row.done).padStart(DONE_WIDTH) },
+	{ label: 'PEAK', align: 'start', text: (row) => peak_text(row.peak) },
+	{
+		label: 'NOW',
+		align: 'end',
+		text: (row) => (row.now === undefined ? '' : String(row.now)),
+	},
 ]
 
 function level_of(cell: ThroughputCell, most: number): string {
@@ -87,9 +95,18 @@ function sparkline(cells: ReadonlyArray<ThroughputCell>): string {
 		.padEnd(SPARK_WIDTH)
 }
 
+// A cell's columns, with a blank before a figure that starts its text in a column whose label stands at
+// the figures' left end — so a label there keeps the rule's room from an `end` label before it however
+// many digits the figure has (`131/168h`).
+function cell_width(column: Column, text: string): number {
+	const lead = column.align === 'start' && !text.startsWith(' ') ? LABEL_CLEARANCE : 0
+
+	return run_board_fit.width_of(text) + lead
+}
+
 function width_of(column: Column, rows: ReadonlyArray<ThroughputRow>): number {
 	const label = run_board_fit.width_of(column.label) + LABEL_CLEARANCE
-	const cells = rows.map((row) => run_board_fit.width_of(column.text(row)))
+	const cells = rows.map((row) => cell_width(column, column.text(row)))
 
 	return Math.max(label, ...cells)
 }
@@ -101,7 +118,7 @@ function widths_of(rows: ReadonlyArray<ThroughputRow>): Array<number> {
 }
 
 function lead_of(row: ThroughputRow): string {
-	return `${INDENT}${row.label.padStart(ROW_LABEL_WIDTH)}${INDENT}${sparkline(row.cells)}`
+	return `${ROW_INDENT}${row.label.padStart(ROW_LABEL_WIDTH)}${COLUMN_GAP}${sparkline(row.cells)}`
 }
 
 function line_of(row: ThroughputRow, widths: ReadonlyArray<number>): string {
@@ -110,14 +127,30 @@ function line_of(row: ThroughputRow, widths: ReadonlyArray<number>): string {
 	return [lead_of(row), ...cells].join(COLUMN_GAP).trimEnd()
 }
 
-// Each label stands where its column starts.
-function rule_columns(widths: ReadonlyArray<number>): Array<{ label: string; start: number }> {
+// The blanks before a column's figures in a `width`-wide column, its fewest across the rows; a label
+// at the column's right end where no row draws a figure.
+function figures_offset(column: Column, rows: ReadonlyArray<ThroughputRow>, width: number): number {
+	const label = run_board_fit.width_of(column.label)
+	const blanks = rows
+		.map((row) => column.text(row).padStart(width))
+		.filter((text) => text.trim() !== '')
+		.map((text) => text.length - text.trimStart().length)
+
+	return column.align === 'end' ? width - label : Math.min(width - label, ...blanks)
+}
+
+// Each label stands over its column's figures, at their right or left end by its `align`.
+function rule_columns(
+	widths: ReadonlyArray<number>,
+	rows: ReadonlyArray<ThroughputRow>,
+): Array<{ label: string; start: number }> {
 	let start = LEAD_WIDTH + COLUMN_GAP_WIDTH
 
 	return COLUMNS.map((column, index) => {
-		const placed = { label: column.label, start }
+		const width = widths[index] ?? 0
+		const placed = { label: column.label, start: start + figures_offset(column, rows, width) }
 
-		start += (widths[index] ?? 0) + COLUMN_GAP_WIDTH
+		start += width + COLUMN_GAP_WIDTH
 
 		return placed
 	})
@@ -131,7 +164,7 @@ function summary_of(rows: ReadonlyArray<ThroughputRow>): string {
 function rows_part(rows: ReadonlyArray<ThroughputRow>): DetailPart {
 	const widths = widths_of(rows)
 	const lines = rows.map((row) => ({ text: line_of(row, widths), is_detail: false }))
-	const rule = run_board_render_section.columns_rule(LABEL, rule_columns(widths))
+	const rule = run_board_render_section.columns_rule(LABEL, rule_columns(widths, rows))
 
 	return { head: ['', rule], lines, label: LABEL, summary: summary_of(rows) }
 }

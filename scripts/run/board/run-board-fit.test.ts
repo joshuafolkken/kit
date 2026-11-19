@@ -15,12 +15,17 @@ import {
 // under the notes, the notes, the thanks, then the rows above them: not yet started, parked, waiting
 // on a decision, running — each stage from its oldest.
 
-const { fit, height_of, whole } = run_board_fit
+const { ROW_INDENT, fit, height_of, whole } = run_board_fit
 const HEADER = ['state', 'clock']
 const LEGEND = ['', 'legend']
 const FOOTER = ['', 'footer']
 const WIDE = 80
 const NO_NOTES: NotesPart = { head: [], lines: [], hidden: 0 }
+
+// The line counting the cut rows, at the column every section's row starts at (joshuafolkken/kit#8257).
+function more(count: number): string {
+	return `${ROW_INDENT}more ${String(count)}`
+}
 
 function issue(number: number, stage: YieldStage = 'pending', at_ms?: number): PlanLine {
 	return { text: `  ${String(number)}`, row: { stage, at_ms } }
@@ -60,7 +65,7 @@ describe('run_board_fit.fit', () => {
 	it('drops the legend, then cuts the plan from its end into one more line', () => {
 		const lines = fit_wide(parts_of([issues(10)]), 7)
 
-		expect(lines).toStrictEqual([...HEADER, '', '  1', '  2', '  3', '  more 7'])
+		expect(lines).toStrictEqual([...HEADER, '', '  1', '  2', '  3', more(7)])
 	})
 
 	it('counts the issue rows it hides, dropping a wave rule and an epic line left with none', () => {
@@ -68,7 +73,7 @@ describe('run_board_fit.fit', () => {
 		const parts = parts_of([section([issue(1)]), wave])
 		const lines = fit_wide(parts, 5)
 
-		expect(lines).toStrictEqual([...HEADER, '', '  1', '  more 2'])
+		expect(lines).toStrictEqual([...HEADER, '', '  1', more(2)])
 	})
 
 	it('counts a wrapped line by the rows it takes, escapes and all', () => {
@@ -77,7 +82,8 @@ describe('run_board_fit.fit', () => {
 
 		expect(lines.slice(0, 3)).toStrictEqual(above)
 		expect(rows_of(lines, 10)).toBe(14)
-		expect(lines.at(-1)).toBe('  more 3')
+		// The more line itself is wider than the pane, so it wraps and one more row gives way.
+		expect(lines.at(-1)).toBe(more(4))
 	})
 
 	it('keeps the top of a frame when even the header is taller than the pane', () => {
@@ -101,7 +107,7 @@ const WAVE = section([issue(7), issue(8)], ['', '── 1 ──'])
 const ENDED = section([issue(2, 'finished', 20), issue(4, 'finished', 10)], ['', 'D'])
 const STAGED = parts_of([ACTIVE], { notes: NOTES, below: [WAVE, ENDED], footer: FOOTER })
 const KEPT_ACTIVE = ['', '  1', '  3', '  5', '  6']
-const KEPT_NOTES = [...NOTES.head, '  new', '  old', '  more 1']
+const KEPT_NOTES = [...NOTES.head, '  new', '  old', more(1)]
 const KEPT_WAVE = ['', '── 1 ──', '  7', '  8']
 
 describe('run_board_fit.fit order', () => {
@@ -118,35 +124,30 @@ describe('run_board_fit.fit order', () => {
 	})
 
 	it('cuts the finished rows under the notes next', () => {
-		const lines = [...HEADER, ...KEPT_ACTIVE, ...KEPT_NOTES, ...KEPT_WAVE, '  more 2']
+		const lines = [...HEADER, ...KEPT_ACTIVE, ...KEPT_NOTES, ...KEPT_WAVE, more(2)]
 
 		expect(fit_wide(STAGED, 19)).toStrictEqual(lines)
 	})
 
 	// joshuafolkken/kit#4099: a wave drawn under the notes gives way before them.
 	it('cuts the rows not yet started under the notes before any note, from the plan end', () => {
-		const wave = ['', '── 1 ──', '  7', '  more 3']
+		const wave = ['', '── 1 ──', '  7', more(3)]
 
 		expect(fit_wide(STAGED, 16)).toStrictEqual([...HEADER, ...KEPT_ACTIVE, ...KEPT_NOTES, ...wave])
-		expect(fit_wide(STAGED, 15)).toStrictEqual([
-			...HEADER,
-			...KEPT_ACTIVE,
-			'  more 4',
-			...KEPT_NOTES,
-		])
+		expect(fit_wide(STAGED, 15)).toStrictEqual([...HEADER, ...KEPT_ACTIVE, more(4), ...KEPT_NOTES])
 	})
 
 	it('cuts the notes next, the oldest first, and the section with the last', () => {
-		const notes = [...NOTES.head, '  new', '  more 2']
+		const notes = [...NOTES.head, '  new', more(2)]
 
-		expect(fit_wide(STAGED, 12)).toStrictEqual([...HEADER, ...KEPT_ACTIVE, '  more 4', ...notes])
-		expect(fit_wide(STAGED, 11)).toStrictEqual([...HEADER, ...KEPT_ACTIVE, '  more 4'])
+		expect(fit_wide(STAGED, 12)).toStrictEqual([...HEADER, ...KEPT_ACTIVE, more(4), ...notes])
+		expect(fit_wide(STAGED, 11)).toStrictEqual([...HEADER, ...KEPT_ACTIVE, more(4)])
 	})
 
 	it('leads the plan’s more with a blank when no section is left above the notes', () => {
 		const parts = parts_of([], { notes: NOTES, below: [WAVE] })
 
-		expect(fit_wide(parts, 9)).toStrictEqual([...HEADER, '', '  more 2', ...KEPT_NOTES])
+		expect(fit_wide(parts, 9)).toStrictEqual([...HEADER, '', more(2), ...KEPT_NOTES])
 	})
 })
 
@@ -156,16 +157,16 @@ describe('run_board_fit.fit an empty section under the plan', () => {
 		const empty = section([], ['', 'Q 0'])
 		const lines = fit_wide(parts_of([issues(5)], { below: [empty] }), 8)
 
-		expect(lines).toStrictEqual([...HEADER, '', '  1', '  2', '  more 3', '', 'Q 0'])
+		expect(lines).toStrictEqual([...HEADER, '', '  1', '  2', more(3), '', 'Q 0'])
 	})
 })
 
 describe('run_board_fit.fit order of the rows that stay longest', () => {
 	it.each([
-		['the oldest parked row', 7, ['', '  1', '  3', '  5', '  more 5']],
-		['the other parked row', 6, ['', '  1', '  5', '  more 6']],
-		['the running row that started first', 5, ['', '  5', '  more 7']],
-		['the last running row', 4, ['', '  more 8']],
+		['the oldest parked row', 7, ['', '  1', '  3', '  5', more(5)]],
+		['the other parked row', 6, ['', '  1', '  5', more(6)]],
+		['the running row that started first', 5, ['', '  5', more(7)]],
+		['the last running row', 4, ['', more(8)]],
 	])('then cuts %s', (_, rows, plan) => {
 		expect(fit_wide(STAGED, rows)).toStrictEqual([...HEADER, ...plan])
 	})
@@ -199,7 +200,7 @@ describe('run_board_fit.fit usage', () => {
 		expect(fit_wide(parts, 10)).toStrictEqual([...HEADER, ...gauges, ...rows, ...THANKS])
 		expect(fit_wide(parts, 8)).toStrictEqual([...HEADER, ...gauges, ...rows])
 		expect(fit_wide(parts, 5)).toStrictEqual([...HEADER, ...rows])
-		expect(fit_wide(parts, 4)).toStrictEqual([...HEADER, '', '  more 2'])
+		expect(fit_wide(parts, 4)).toStrictEqual([...HEADER, '', more(2)])
 	})
 })
 
@@ -245,26 +246,26 @@ const CROWDED_ROWS = [...HEADER, '', '  1', '  2', '  3', '  4']
 describe('run_board_fit.fit order from the bottom up', () => {
 	it('cuts the finished and the 🔗 waiting rows under the notes before any note', () => {
 		const notes = ['', 'N', '  n1', '  n2', '  n3']
-		const waiting = ['', 'W', '  6', '  more 1']
+		const waiting = ['', 'W', '  6', more(1)]
 
 		expect(whole(CROWDED)).toHaveLength(24)
 		expect(fit_wide(CROWDED, 18)).toStrictEqual([...CROWDED_ROWS, ...notes, ...waiting, ...THANKS])
-		expect(fit_wide(CROWDED, 15)).toStrictEqual([...CROWDED_ROWS, '  more 2', ...notes, ...THANKS])
+		expect(fit_wide(CROWDED, 15)).toStrictEqual([...CROWDED_ROWS, more(2), ...notes, ...THANKS])
 	})
 
 	it('cuts the notes oldest first, the plan’s more staying above them, before the thanks', () => {
-		const plan = [...CROWDED_ROWS, '  more 2']
+		const plan = [...CROWDED_ROWS, more(2)]
 
-		expect(fit_wide(CROWDED, 14)).toStrictEqual([...plan, '', 'N', '  n1', '  more 2', ...THANKS])
+		expect(fit_wide(CROWDED, 14)).toStrictEqual([...plan, '', 'N', '  n1', more(2), ...THANKS])
 		expect(fit_wide(CROWDED, 13)).toStrictEqual([...plan, ...THANKS])
 		expect(fit_wide(CROWDED, 8)).toStrictEqual(plan)
 	})
 
 	it.each([
-		['a row not yet started', 7, ['', '  1', '  2', '  3', '  more 3']],
-		['then the parked row', 6, ['', '  1', '  2', '  more 4']],
-		['then the row waiting on a decision, before the running row', 5, ['', '  1', '  more 5']],
-		['the running row last', 4, ['', '  more 6']],
+		['a row not yet started', 7, ['', '  1', '  2', '  3', more(3)]],
+		['then the parked row', 6, ['', '  1', '  2', more(4)]],
+		['then the row waiting on a decision, before the running row', 5, ['', '  1', more(5)]],
+		['the running row last', 4, ['', more(6)]],
 	])('after the thanks cuts %s', (_, rows, plan) => {
 		expect(fit_wide(CROWDED, rows)).toStrictEqual([...HEADER, ...plan])
 	})
@@ -293,7 +294,7 @@ describe('run_board_fit.fit folding section', () => {
 	})
 
 	it('goes with its last row, the plan’s more counting every row it held', () => {
-		expect(fit_wide(FOLDING, 7)).toStrictEqual([...RUNNING, '  more 3'])
+		expect(fit_wide(FOLDING, 7)).toStrictEqual([...RUNNING, more(3)])
 	})
 })
 
@@ -301,7 +302,7 @@ describe('run_board_fit.whole', () => {
 	it('draws every part in its order, the notes counting the ones past their limit', () => {
 		const notes = { head: ['', 'notes'], lines: ['  a'], hidden: 2 }
 		const lines = whole(parts_of([issues(1)], { notes, footer: FOOTER }))
-		const drawn_notes = ['', 'notes', '  a', '  more 2']
+		const drawn_notes = ['', 'notes', '  a', more(2)]
 
 		expect(lines).toStrictEqual([...HEADER, '', '  1', ...drawn_notes, ...LEGEND, ...FOOTER])
 	})

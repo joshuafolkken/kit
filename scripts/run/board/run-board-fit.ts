@@ -16,7 +16,9 @@ import { run_board_row_key } from './run-board-row-key'
 // screen, not as one.
 
 const { WORDS } = run_board_labels
-const INDENT = '  '
+// The column every section's row starts at (joshuafolkken/kit#8257).
+const ROW_INDENT_WIDTH = 5
+const ROW_INDENT = ' '.repeat(ROW_INDENT_WIDTH)
 
 interface TerminalSize {
 	rows: number
@@ -65,6 +67,8 @@ interface NotesPart extends Foldable {
 	head: ReadonlyArray<string>
 	lines: ReadonlyArray<string>
 	hidden: number
+	// The line counting the hidden notes, as the rows' sections count theirs: `💬 15 more`.
+	more?: ((hidden: number) => string) | undefined
 }
 
 // A part drawn after `plan` whose lines a group's parts are, `is_detail`, and give way all at once;
@@ -158,8 +162,12 @@ function heights(lines: ReadonlyArray<string>, columns: number): number {
 	return lines.reduce((sum, line) => sum + height_of(line, columns), 0)
 }
 
-function more_lines(hidden: number): Array<string> {
-	return hidden > 0 ? [`${INDENT}${WORDS.more} ${String(hidden)}`] : []
+function plain_more(hidden: number): string {
+	return `${ROW_INDENT}${WORDS.more} ${String(hidden)}`
+}
+
+function more_lines(hidden: number, line_of = plain_more): Array<string> {
+	return hidden > 0 ? [line_of(hidden)] : []
 }
 
 // A section that ends on an epic whose children were all cut ends on its last row instead.
@@ -218,7 +226,7 @@ function notes_lines(notes: NotesPart, cut: number): Array<string> {
 
 	if (kept.length === 0) return []
 
-	return [...notes.head, ...kept, ...more_lines(notes.hidden + cut)]
+	return [...notes.head, ...kept, ...more_lines(notes.hidden + cut, notes.more)]
 }
 
 function sections_lines(
@@ -391,7 +399,7 @@ function fit(parts: FrameParts, size: TerminalSize): Array<string> {
 	return clamped(fitting ?? frames.at(-1) ?? [], size)
 }
 
-const run_board_fit = { fit, height_of, whole, width_of }
+const run_board_fit = { ROW_INDENT, fit, height_of, whole, width_of }
 
 export { run_board_fit }
 export type {

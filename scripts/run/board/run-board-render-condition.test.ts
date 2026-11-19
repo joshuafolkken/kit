@@ -122,8 +122,8 @@ describe('run_board_render.render — the condition column across sections', () 
 	const lines = lines_of(header({ layout }))
 
 	it('starts every queued and waiting row’s number in one column', () => {
-		const queued_line = lines.find((line) => line.startsWith(`    ${WAIT_ICONS.lane} `)) ?? ''
-		const waiting_line = lines.find((line) => line.startsWith(`    ${WAIT_ICONS.blocker} `)) ?? ''
+		const queued_line = lines.find((line) => line.startsWith(`     ${WAIT_ICONS.lane} `)) ?? ''
+		const waiting_line = lines.find((line) => line.startsWith(`     ${WAIT_ICONS.blocker} `)) ?? ''
 
 		expect(queued_line.indexOf(' 5')).toBe(waiting_line.indexOf(' 1234'))
 		expect(queued_line).not.toBe('')
@@ -135,8 +135,9 @@ describe('run_board_render.render — the condition column across sections', () 
 		const behind = row(4269, { icon: WAIT_ICONS.solo_ahead, issues: ['4287'] })
 		const rows = [solo, behind].map((entry) => ({ kind: 'row' as const, row: entry }))
 		const drawn = lines_of(header({ layout: { ...EMPTY_LAYOUT, queued: rows } }))
-		const solo_line = drawn.find((line) => line.startsWith(`    ${WAIT_ICONS.solo} `)) ?? ''
-		const behind_line = drawn.find((line) => line.startsWith(`    ${WAIT_ICONS.solo_ahead} `)) ?? ''
+		const solo_line = drawn.find((line) => line.startsWith(`     ${WAIT_ICONS.solo} `)) ?? ''
+		const behind_line =
+			drawn.find((line) => line.startsWith(`     ${WAIT_ICONS.solo_ahead} `)) ?? ''
 
 		expect(solo_line).toContain(`4288+1${' '.repeat(CONDITION_WIDTH - '4288+1'.length)} 4287`)
 		expect(solo_line.endsWith('4268')).toBe(true)
@@ -180,7 +181,8 @@ describe('run_board_render.render — a row a running run:solo issue holds', () 
 		const drawn = lines_of(
 			header({ layout: { ...EMPTY_LAYOUT, queued: [{ kind: 'row', row: held }] } }),
 		)
-		const held_line = drawn.find((line) => line.startsWith(`    ${WAIT_ICONS.solo_running} `)) ?? ''
+		const held_line =
+			drawn.find((line) => line.startsWith(`     ${WAIT_ICONS.solo_running} `)) ?? ''
 
 		expect(held_line).toContain(`4374${' '.repeat(CONDITION_WIDTH - '4374'.length)} 4387`)
 		expect(held_line.endsWith('4387')).toBe(true)

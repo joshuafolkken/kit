@@ -132,7 +132,7 @@ describe('run_board_render.render settled rows', () => {
 	])('leads a %s row with its finish time and ends it on its duration', (state, icon) => {
 		const finish = day_minute_of(NOW)
 
-		expect(settled_line(state, FAILED)).toBe(`    ${icon} ${finish} 1       ${title}  5′00″`)
+		expect(settled_line(state, FAILED)).toBe(`     ${icon} ${finish} 1       ${title}  5′00″`)
 	})
 
 	// joshuafolkken/kit#4171: a lane no child works in blanks its CPU, MEM and CMPRS.

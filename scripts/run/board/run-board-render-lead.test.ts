@@ -109,6 +109,14 @@ describe('run_board_render_lead.lead_of — columns', () => {
 		expect(width(text)).toBe(USAGE_START - 1)
 	})
 
+	// joshuafolkken/kit#8257: the spinner and two blanks put the icon where every section's row starts.
+	it('stands the phase icon in the shared row indent’s column', () => {
+		const text = lead(lane())
+		const before = text.slice(0, text.indexOf('🚦'))
+
+		expect(width(before)).toBe(run_board_fit.ROW_INDENT.length)
+	})
+
 	it('starts the run’s time at the column the rule’s ⏰ stands over', () => {
 		const before = lead(lane()).slice(0, -TIME_WIDTH)
 

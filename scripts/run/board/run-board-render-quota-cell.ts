@@ -54,12 +54,18 @@ function right(text: string, width: number): string {
 	return `${' '.repeat(Math.max(0, width - run_board_fit.width_of(text)))}${text}`
 }
 
+// A text in the window label's column, its right end where `7d` and `REST` end — a row's `—` where
+// its provider reported no window (joshuafolkken/kit#8257).
+function label_cell(label: string): string {
+	return right(label, LABEL_WIDTH)
+}
+
 function cell_text(cell: Cell): string {
 	const { label, used_percent, pace, count, reset } = cell
 	const shade = GAUGE_SHADES[level_of(used_percent, pace)]
 
 	return [
-		right(label, LABEL_WIDTH),
+		label_cell(label),
 		run_board_machine.percent_text(used_percent),
 		bar_text(used_percent, pace, shade),
 		right(count, COUNT_WIDTH),
@@ -75,7 +81,7 @@ function row_text(cells: ReadonlyArray<Cell>): string {
 		.trimEnd()
 }
 
-const run_board_render_quota_cell = { cell_text, row_text }
+const run_board_render_quota_cell = { cell_text, label_cell, row_text }
 
 export { run_board_render_quota_cell }
 export type { Cell }

@@ -21,16 +21,16 @@ import { run_board_usage_text, type CellLimits } from './run-board-usage-text'
 
 const { HEADER_ICONS } = run_board_labels
 const { cell_widths, cells_of, lane_limits } = run_board_usage_text
-const { columns_rule } = run_board_render_section
+const { ROW_INDENT, columns_rule } = run_board_render_section
 const { ELAPSED_START, LANES_LABEL, USAGE_START, column_offset, lane_label, root_label } =
 	run_board_render_lead
 const { width_of } = run_board_fit
 const { columns_cut } = run_board_render_title
 const { reasons_of } = run_board_seat
 const { keyed } = run_board_row_key
-// A seat line's lead up to its icon: a lane row's indent, progress column and the blank after it.
-const SEAT_LEAD_WIDTH = 5
-const SEAT_LEAD = ' '.repeat(SEAT_LEAD_WIDTH)
+// A seat line's lead up to its icon: as wide as a lane row's indent, progress column and the blank
+// after it, the column every section's row starts at.
+const SEAT_LEAD = ROW_INDENT
 const SEAT_ICON = '💺'
 // A seat line ends the lanes section as a lane row does, so the section keeps it, and gives way
 // before every running row in a short pane (`run-board-fit.ts`).
@@ -148,7 +148,7 @@ function seat_reason(lead: string, reason: string, columns: number | undefined):
 function seat_lines(header: BoardHeader, columns: number | undefined): Array<PlanLine> {
 	if (header.run_name !== undefined) return []
 
-	const lead = `${' '.repeat(column_offset(header))}${SEAT_LEAD}${SEAT_ICON} `
+	const lead = `${SEAT_LEAD}${SEAT_ICON} `
 	const section = header.is_keyed === true ? 'seat' : undefined
 
 	return reasons_of(header).map((reason) => ({

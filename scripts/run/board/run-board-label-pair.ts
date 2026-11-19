@@ -16,9 +16,10 @@ const RULE = '─'
 const BLANK = ' '
 const PAIRED = new RegExp(`${MARK}([^${MARK}]*)${MARK}${BLANK}`, 'u')
 // A rule's gap before a column's label; what opens a section heading before its label — the arrow
-// of a screen that folds, the rule of one that does not.
+// of a screen that folds, the rule of one that does not, and the one rule character a screen that
+// folds leads a section no key folds with (joshuafolkken/kit#8257).
 const RULE_GAP = `${RULE}${BLANK}`
-const HEADING_LEAD = /^(?:[▸▾]|──)\s$/u
+const HEADING_LEAD = /^(?:[▸▾]|──?)\s$/u
 // The blanks a row's label is padded with before its cells.
 const LABEL_END = `${BLANK}${BLANK}`
 

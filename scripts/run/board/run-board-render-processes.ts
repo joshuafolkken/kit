@@ -3,7 +3,6 @@ import type { BoardHeader, BoardUsage } from './run-board-header'
 import { run_board_label_pair } from './run-board-label-pair'
 import type { NamedFigure, ProcessGroups } from './run-board-process-groups'
 import { run_board_render_lanes } from './run-board-render-lanes'
-import { run_board_render_lead } from './run-board-render-lead'
 import { run_board_render_section } from './run-board-render-section'
 import { run_board_render_title } from './run-board-render-title'
 import type { UsageFigure, UsageScale } from './run-board-usage'
@@ -12,26 +11,28 @@ import { run_board_usage_text } from './run-board-usage-text'
 // What is loading the machine, by who started it: the backlogrun's own processes — its supervisor, the
 // parent session and the lanes — the apps outside it, and whatever a run left behind. On a terminal
 // one row each with gauges under a rule whose labels stand over them, the parts of each group indented
-// under it so a short pane can drop them first; anywhere else one line of figures. The cells start
-// at `USAGE_START`, as the lane rows' do, whatever the names (joshuafolkken/kit#4292): a part's name is
-// cut to fit before them.
+// under it so a short pane can drop them first; anywhere else one line of figures. The cells start in
+// one column whatever the names: a part's name is cut to fit before them. Since every section's rows
+// start at `ROW_INDENT` (joshuafolkken/kit#8257) that column is two right of the lane rows' cells,
+// whose lead the lanes' rule places.
 
 const { LANES_LABEL, column_cells, label_columns } = run_board_render_lanes
 const { pair } = run_board_label_pair
-const { USAGE_START, column_offset } = run_board_render_lead
-const { columns_rule, heading_lines } = run_board_render_section
+const { ROW_INDENT, columns_rule, heading_lines } = run_board_render_section
 const { title_of } = run_board_render_title
 const { plain_of } = run_board_usage_text
 const GAUGE = 5
 const CELL_GAP = ' '
 const DETAIL = '  '
-const PLAIN_INDENT = '  '
-// Two levels under the section's rule, whose icon stands in the second column.
-const INDENT = `${PLAIN_INDENT}${DETAIL}`
-// The columns a row's label is padded to, so its cells start at `USAGE_START`.
-const LABEL_WIDTH = USAGE_START - INDENT.length - CELL_GAP.length
+const INDENT = ROW_INDENT
 // A part's name with its count, in the label's columns after the part's own indent.
-const DETAIL_ROOM = LABEL_WIDTH - DETAIL.length
+const DETAIL_ROOM = 20
+// The columns a row's label is padded to, so its cells start in one column.
+const LABEL_WIDTH = DETAIL.length + DETAIL_ROOM
+const CELLS_START = INDENT.length + LABEL_WIDTH + CELL_GAP.length
+// A group's icon stands two columns wide, so `▶ backlogrun` and `🌐 apps` start their names in one
+// column (joshuafolkken/kit#8257).
+const ICON_WIDTH = 2
 // A part's name on the one-line form, which has no column to fit.
 const PLAIN_LIMIT = 24
 // Icons Unicode draws as emoji by default, which `string-width` counts two columns wide as a terminal
@@ -40,13 +41,21 @@ const LABEL = '💻 processes'
 const PART_GAP = ' · '
 const SUMMARY_GAP = ' ── '
 const ICONS = { backlogrun: '▶', apps: '🌐', leftover: '👻' }
+
+// `icon word`, a one-column icon padded to `ICON_WIDTH`.
+function group_label(icon: string, word: string): string {
+	const room = Math.max(0, ICON_WIDTH - run_board_fit.width_of(icon))
+
+	return pair(`${icon}${' '.repeat(room)}`, word)
+}
+
 const LABELS = {
-	backlogrun: pair(ICONS.backlogrun, 'backlogrun'),
+	backlogrun: group_label(ICONS.backlogrun, 'backlogrun'),
 	supervisor: pair('🧭', 'supervisor'),
 	parent: pair('🎬', 'parent'),
 	lanes: LANES_LABEL,
-	apps: pair(ICONS.apps, 'apps'),
-	leftover: pair(ICONS.leftover, 'leftover'),
+	apps: group_label(ICONS.apps, 'apps'),
+	leftover: group_label(ICONS.leftover, 'leftover'),
 }
 
 interface Labeled {
@@ -122,17 +131,17 @@ function padded(text: string, width: number): string {
 	return `${text}${' '.repeat(Math.max(0, width - run_board_fit.width_of(text)))}`
 }
 
-function screen_part(usage: BoardUsage, offset: number): DetailPart {
+function screen_part(usage: BoardUsage): DetailPart {
 	const lines = labeled_of(usage).map((entry) => {
 		const cells = column_cells(entry.figure, usage.scale, GAUGE)
 
 		return {
-			text: `${INDENT}${padded(label_text(entry), LABEL_WIDTH + offset)}${CELL_GAP}${cells}`,
+			text: `${INDENT}${padded(label_text(entry), LABEL_WIDTH)}${CELL_GAP}${cells}`,
 			is_detail: entry.is_detail,
 		}
 	})
 
-	return { head: ['', columns_rule(LABEL, label_columns(USAGE_START + offset, GAUGE))], lines }
+	return { head: ['', columns_rule(LABEL, label_columns(CELLS_START, GAUGE))], lines }
 }
 
 function plain_group(
@@ -161,7 +170,7 @@ function plain_part(usage: BoardUsage): DetailPart {
 		leftover.entries.length === 0
 			? []
 			: [plain_group(scale, LABELS.leftover, leftover.total, leftover.entries)]
-	const text = `${PLAIN_INDENT}${[...groups, ...left].join(PART_GAP)}`
+	const text = `${INDENT}${[...groups, ...left].join(PART_GAP)}`
 
 	return { head: heading_lines(LABEL), lines: [{ text, is_detail: false }] }
 }
@@ -188,8 +197,7 @@ function processes_part(header: BoardHeader): DetailPart | undefined {
 
 	if (usages === undefined) return undefined
 
-	const part =
-		header.spinner === undefined ? plain_part(usages) : screen_part(usages, column_offset(header))
+	const part = header.spinner === undefined ? plain_part(usages) : screen_part(usages)
 
 	return { ...part, label: LABEL, summary: summary_of(usages) }
 }

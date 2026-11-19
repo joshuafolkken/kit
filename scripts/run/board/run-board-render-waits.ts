@@ -15,7 +15,7 @@ const { HEADER_ICONS, WORDS, minute_span_of, span_of } = run_board_labels
 // 🚧 rather than ⏳, which a waiting row already draws, or 🚦, the gate stage's; an emoji a terminal
 // draws two columns wide.
 const BUDGET_ICON = '🚧'
-const INDENT = '  '
+const INDENT = run_board_fit.ROW_INDENT
 const MAIN_CHECKOUT = 'main'
 const UNNAMED_CHECK = 'step'
 const RELATED_SUFFIX = ':related'

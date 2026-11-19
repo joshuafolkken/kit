@@ -95,19 +95,38 @@ function time_text(row: BoardRow, frame: RowFrame): string {
 	return `${padded(net_of(row, header.now_ms) ?? '', frame.time_width, fresh)}${' '.repeat(after)}`
 }
 
-// The title padded to the title column, then the time; a waiting row's title is not padded. A lane row
-// draws its time in its lead.
+function joined(parts: ReadonlyArray<string | undefined>): string {
+	return parts.filter((part) => part !== undefined && part !== '').join(GAP)
+}
+
+// What a row draws after its title and time: the issues it waits on, then its reason.
+function notes_of(row: BoardRow, frame: RowFrame, reason_cut = 0): Array<string | undefined> {
+	const { header } = frame
+
+	return [waits_of(row, header, frame.condition_width), tail_of(row, reason_cut, header)]
+}
+
+// A queued row's title is padded to the title column where something follows it, so its path starts
+// where a waiting row's reason does (joshuafolkken/kit#8257); a row with no title or nothing after it
+// ends where its text does.
+function is_title_padded(row: BoardRow, frame: RowFrame): boolean {
+	if (frame.section !== 'queued' || (row.title ?? '') === '') return false
+
+	return joined(notes_of(row, frame)) !== ''
+}
+
+// The title padded to the title column, then the time; a waiting row's title is not padded but where
+// `is_title_padded` says so. A lane row draws its time in its lead.
 function timed_parts(row: BoardRow, frame: RowFrame): Array<string> {
 	const title = title_text(row, frame)
 
-	if (row.state === 'waiting') return [title]
+	if (row.state === 'waiting') {
+		return [is_title_padded(row, frame) ? title.padEnd(frame.title_limit) : title]
+	}
+
 	if (frame.is_lane_row === true) return [title.padEnd(frame.title_limit)]
 
 	return [title.padEnd(frame.title_limit), time_text(row, frame)]
-}
-
-function joined(parts: ReadonlyArray<string | undefined>): string {
-	return parts.filter((part) => part !== undefined && part !== '').join(GAP)
 }
 
 // A lane row's lead, else the icon and, in a section that draws one, the condition column after it.
@@ -169,12 +188,14 @@ function room_after(indent: string, head: string, frame: RowFrame): number | und
 // (`run-board-render-tail.ts`), a done row on what was filed during it (`run-board-render-found.ts`),
 // and a row with nothing after its padded columns ends where its text does.
 function row_text(indent: string, row: BoardRow, frame: RowFrame): string {
-	const { header, reason_cut } = frame
 	const head = tailed_head(row, frame)
-	const found = run_board_render_found.found_fitted(room_after(indent, head, frame), row, header)
-	const notes = [waits_of(row, header, frame.condition_width), tail_of(row, reason_cut, header)]
+	const found = run_board_render_found.found_fitted(
+		room_after(indent, head, frame),
+		row,
+		frame.header,
+	)
 
-	return `${indent}${joined([head, found, ...notes]).trimEnd()}`
+	return `${indent}${joined([head, found, ...notes_of(row, frame, frame.reason_cut)]).trimEnd()}`
 }
 
 // A pane narrower than a done row's head leaves its end too few columns to say anything in, so there
@@ -212,6 +233,7 @@ function row_fit(indent: string, row: BoardRow, frame: RowFrame): RowFit {
 		head: (cut) => `${indent}${head_text(row, { ...frame, ...cut })}`,
 		is_head_kept: frame.is_lane_row === true,
 		shared: is_tailed ? frame.shared : undefined,
+		is_title_padded: is_title_padded(row, frame),
 	}
 }
 

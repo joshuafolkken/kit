@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { run_board_fit } from './run-board-fit'
 import { run_board_labels } from './run-board-labels'
 import type { BoardRow } from './run-board-layout'
 import { run_board_phase, type Phase } from './run-board-phase'
@@ -25,6 +26,7 @@ const {
 	unfinished,
 } = run_board_render_fixture
 const SECOND = 1000
+const { ROW_INDENT } = run_board_fit
 // A queued or waiting row's condition column where it names no condition (joshuafolkken/kit#4288).
 const BLANK_CONDITION = ' '.repeat(run_board_render_condition.CONDITION_WIDTH)
 // A lane row's indent, its two-column progress column and the blank after it, up to its phase icon
@@ -110,7 +112,7 @@ describe('run_board_render.render done rows', () => {
 		const layout = { ...EMPTY_LAYOUT, active: [row(2, { state: 'merged', status })] }
 
 		expect(lines_of(header({ layout }))).toContain(
-			`    ✅ ${ENDED_AT_30} 2       ${padded('Issue 2')}  30′00″`,
+			`${ROW_INDENT}✅ ${ENDED_AT_30} 2       ${padded('Issue 2')}  30′00″`,
 		)
 	})
 
@@ -118,7 +120,9 @@ describe('run_board_render.render done rows', () => {
 		const status = { state: 'done' as const, started_ms: STARTED }
 		const layout = { ...EMPTY_LAYOUT, active: [row(3, { state: 'done', status })] }
 
-		expect(lines_of(header({ layout }))).toContain(`    🏁 ${BLANK_CONDITION} 3       Issue 3`)
+		expect(lines_of(header({ layout }))).toContain(
+			`${ROW_INDENT}🏁 ${BLANK_CONDITION} 3       Issue 3`,
+		)
 	})
 })
 
@@ -135,10 +139,10 @@ describe('run_board_render.render release kinds', () => {
 		]
 		const lines = lines_of(header({ layout: { ...EMPTY_LAYOUT, active: kinds } }))
 
-		expect(lines).toContain(`    ✅ ${ENDED_AT_1} 1    🧨 ${padded('Issue 1')}  1′00″`)
-		expect(lines).toContain(`    ✅ ${ENDED_AT_1} 2    ✨ ${padded('Issue 2')}  1′00″`)
-		expect(lines).toContain(`    ✅ ${ENDED_AT_1} 3    🐛 ${padded('Issue 3')}  1′00″`)
-		expect(lines).toContain(`    ✅ ${ENDED_AT_1} 4       ${padded('Issue 4')}  1′00″`)
+		expect(lines).toContain(`${ROW_INDENT}✅ ${ENDED_AT_1} 1    🧨 ${padded('Issue 1')}  1′00″`)
+		expect(lines).toContain(`${ROW_INDENT}✅ ${ENDED_AT_1} 2    ✨ ${padded('Issue 2')}  1′00″`)
+		expect(lines).toContain(`${ROW_INDENT}✅ ${ENDED_AT_1} 3    🐛 ${padded('Issue 3')}  1′00″`)
+		expect(lines).toContain(`${ROW_INDENT}✅ ${ENDED_AT_1} 4       ${padded('Issue 4')}  1′00″`)
 	})
 
 	// joshuafolkken/kit#4026: a waiting row's title is not padded, so what it waits on follows it.
@@ -169,7 +173,7 @@ describe('run_board_render.render a row waiting on its start time', () => {
 		const dated = { kind: 'row' as const, row: row(14, { reason }) }
 		const lines = lines_of(header({ layout: { ...EMPTY_LAYOUT, queued: [dated] } }))
 
-		expect(lines).toContain('    📅 01-01 09:00 14       Issue 14')
+		expect(lines).toContain(`${ROW_INDENT}📅 01-01 09:00 14       Issue 14`)
 		expect(lines.at(-1)).toBe('📅 not before')
 	})
 })
@@ -187,10 +191,10 @@ describe('run_board_render.render sections', () => {
 
 		expect(lines.slice(lines.indexOf(queued_rule), -2)).toStrictEqual([
 			queued_rule,
-			'    📁 10  Epic ten',
-			`       ├ ⏳ ${BLANK_CONDITION} 11       Issue 11`,
-			`       └ ⏳ ${BLANK_CONDITION} 12       Issue 12`,
-			`    🔗 3409+1      5       ${'x'.repeat(run_board_render.TITLE_LIMIT - 1)}…  3410`,
+			`${ROW_INDENT}📁 10  Epic ten`,
+			`${ROW_INDENT}   ├ ⏳ ${BLANK_CONDITION} 11       Issue 11`,
+			`${ROW_INDENT}   └ ⏳ ${BLANK_CONDITION} 12       Issue 12`,
+			`${ROW_INDENT}🔗 3409+1      5       ${'x'.repeat(run_board_render.TITLE_LIMIT - 1)}…  3410`,
 		])
 	})
 
@@ -208,7 +212,7 @@ describe('run_board_render.render sections', () => {
 		const layout = { ...EMPTY_LAYOUT, people: [row(6, { state: 'human' })] }
 		const lines = lines_of(header({ layout }))
 		const decision_rule = rule('🙋 decision')
-		const decision_row = `    🙋 6       Issue 6`
+		const decision_row = `${ROW_INDENT}🙋 6       Issue 6`
 		const start = lines.indexOf(decision_rule)
 
 		expect(lines.slice(start, start + 2)).toStrictEqual([decision_rule, decision_row])
@@ -295,8 +299,10 @@ describe('run_board_render.render running row lead', () => {
 		const queued = [{ kind: 'epic' as const, epic: 9, title: 'Epic', rows }]
 		const lines = lines_of(header({ layout: { ...EMPTY_LAYOUT, queued }, spinner: '⠙' }))
 
-		expect(lines.join('\n')).toContain(`⠙      ├ 🚦 ${BLANK_CONDITION} 4       Issue 4`)
-		expect(lines).toContain(`       └ ⏳ ${BLANK_CONDITION} 5       Issue 5`)
+		expect(lines.join('\n')).toContain(
+			`⠙${ROW_INDENT.slice(1)}   ├ 🚦 ${BLANK_CONDITION} 4       Issue 4`,
+		)
+		expect(lines).toContain(`${ROW_INDENT}   └ ⏳ ${BLANK_CONDITION} 5       Issue 5`)
 	})
 
 	it('leads a running row with its newest phase’s icon, and 🔄 before it reaches one', () => {
@@ -339,8 +345,8 @@ describe('run_board_render.render links', () => {
 	it('links every issue number, the epic and the wait', () => {
 		const lines = lines_of(header({ layout, link: bracketed }))
 
-		expect(lines).toContain('    📁 [10]')
-		expect(lines).toContain(`       └ ⏳ ${BLANK_CONDITION} [11]       Issue 11`)
+		expect(lines).toContain(`${ROW_INDENT}📁 [10]`)
+		expect(lines).toContain(`${ROW_INDENT}   └ ⏳ ${BLANK_CONDITION} [11]       Issue 11`)
 		expect(lines.join('\n')).toContain('🔗 [other/repo#7]')
 	})
 
@@ -349,10 +355,10 @@ describe('run_board_render.render links', () => {
 		const plain = lines_of(header({ layout }))
 
 		expect(linked).toContain(
-			`    ✅ ${ENDED_AT_1} [2]       ${padded('Issue 2')}  1′00″  🔗 [other/repo#7]`,
+			`${ROW_INDENT}✅ ${ENDED_AT_1} [2]       ${padded('Issue 2')}  1′00″  🔗 [other/repo#7]`,
 		)
 		expect(plain).toContain(
-			`    ✅ ${ENDED_AT_1} 2       ${padded('Issue 2')}  1′00″  🔗 other/repo#7`,
+			`${ROW_INDENT}✅ ${ENDED_AT_1} 2       ${padded('Issue 2')}  1′00″  🔗 other/repo#7`,
 		)
 	})
 })

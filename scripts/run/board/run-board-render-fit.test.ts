@@ -77,7 +77,7 @@ describe('run_board_render.render in a short pane', () => {
 		expect(has(lines, 'Issue 4')).toBe(false)
 		expect(kept.map((text) => has(lines, text))).toStrictEqual([true, true, true, true, true])
 		expect(lines[newest - 1]).toMatch(/^── ✅ done 3 ─+$/u)
-		expect(lines[newest + 1]).toBe('    ✅ 2 more  🚫 1')
+		expect(lines[newest + 1]).toBe('     ✅ 2 more  🚫 1')
 		expect(has(lines, '  more')).toBe(false)
 	})
 
@@ -86,7 +86,7 @@ describe('run_board_render.render in a short pane', () => {
 
 		expect(has(lines, '✅ done')).toBe(false)
 		expect([has(lines, 'Issue 1'), has(lines, 'Issue 3')]).toStrictEqual([true, true])
-		expect(lines).toContain('  more 3')
+		expect(lines).toContain('     more 3')
 	})
 
 	it('cuts the oldest note before the newer, and the earlier running row before the later', () => {
