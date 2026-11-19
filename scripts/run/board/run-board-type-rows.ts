@@ -15,13 +15,15 @@ import { run_board_typing } from './run-board-typing'
 const CSI = '\u{1B}['
 const { ERASE_LINE_END, LETTER_MS } = run_board_intro
 
-// A keyed row on screen: its key, its line in the frame, its row on screen (1-based) and its text as
-// the frame draws it.
+// A keyed row on screen: its key, its line in the frame, its row on screen (1-based), its text as the
+// frame draws it and the columns before its key — drawn whole, so only the rest types
+// (joshuafolkken/kit#8103: the header's now line types its words, not its time).
 interface KeyedLine {
 	key: string
 	index: number
 	row: number
 	text: string
+	prefix_columns: number
 }
 
 interface TypingLine extends KeyedLine {
@@ -42,9 +44,10 @@ interface TypingFrame {
 
 const NO_TYPING: Typing = { seen: undefined, lines: [] }
 
-// The columns typed by `now_ms`: one the moment a row starts, one more every letter's pause.
+// The columns drawn by `now_ms`: the prefix, then one typed the moment a row starts and one more every
+// letter's pause.
 function columns_at(line: TypingLine, now_ms: number): number {
-	return Math.floor((now_ms - line.start_ms) / LETTER_MS) + 1
+	return line.prefix_columns + Math.floor((now_ms - line.start_ms) / LETTER_MS) + 1
 }
 
 function is_typed(line: TypingLine, now_ms: number): boolean {
@@ -121,4 +124,4 @@ function type_bytes(typing: Typing, now_ms: number): string {
 const run_board_type_rows = { NO_TYPING, next, type_bytes, typed_lines }
 
 export { run_board_type_rows }
-export type { KeyedLine, Typing, TypingFrame }
+export type { KeyedLine, Typing, TypingFrame, TypingLine }

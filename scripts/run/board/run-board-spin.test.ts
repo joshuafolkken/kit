@@ -3,7 +3,7 @@ import { run_board_intro } from './run-board-intro'
 import { run_board_labels } from './run-board-labels'
 import { run_board_row_key } from './run-board-row-key'
 import { run_board_spin, type Spot } from './run-board-spin'
-import { run_board_type_rows } from './run-board-type-rows'
+import { run_board_type_rows, type Typing, type TypingLine } from './run-board-type-rows'
 
 // joshuafolkken/kit#3495: where a frame's spinners are on screen, and the turns written between
 // redraws — a cursor move and one frame each, on the package's interval, until the next second.
@@ -45,6 +45,11 @@ function spin_ports(now_ms: number): {
 
 function places(spots: ReadonlyArray<Spot>): Array<[number, number]> {
 	return spots.map(({ row, column }) => [row, column])
+}
+
+// A typing of the one row `line` names, typed from its first column.
+function typing_with(line: Pick<TypingLine, 'key' | 'row' | 'text' | 'start_ms'>): Typing {
+	return { seen: new Set(), lines: [{ index: line.row - 1, prefix_columns: 0, ...line }] }
 }
 
 describe('run_board_spin.spun', () => {
@@ -146,23 +151,24 @@ describe('run_board_spin — the rows a theme types (joshuafolkken/kit#8003)', (
 		const { lines: written, keyed: rows } = spun(lines, '⠋', { rows: 4, columns: 10 })
 
 		expect(written).toStrictEqual(['x'.repeat(25), '⠋ ✅ 7', 'off'])
-		expect(rows).toStrictEqual([{ key: 'done:7', index: 1, row: 4, text: `${SPOT} ✅ 7` }])
+		expect(rows).toStrictEqual([
+			{ key: 'done:7', index: 1, row: 4, text: `${SPOT} ✅ 7`, prefix_columns: 0 },
+		])
 	})
 
 	it('records no keyed row that wraps, so a row typed shorter never moves the lines below it', () => {
 		const lines = [keyed('done', 7, 'x'.repeat(25)), keyed('lanes', 8, 'short')]
 		const { keyed: rows } = spun(lines, '⠋', { rows: 24, columns: 10 })
 
-		expect(rows).toStrictEqual([{ key: 'lanes:8', index: 1, row: 4, text: 'short' }])
+		expect(rows).toStrictEqual([
+			{ key: 'lanes:8', index: 1, row: 4, text: 'short', prefix_columns: 0 },
+		])
 	})
 
 	it('writes a typing row on every letter after the turns, at its row, until the next second', async () => {
 		const { ports, writes } = spin_ports(START)
 		const spots = SPOTS
-		const typing = {
-			seen: new Set<string>(),
-			lines: [{ key: 'done:7', index: 2, row: 3, text: 'x'.repeat(40), start_ms: START }],
-		}
+		const typing = typing_with({ key: 'done:7', row: 3, text: 'x'.repeat(40), start_ms: START })
 
 		await spin_to_second({ spots, typing }, ports)
 
@@ -179,15 +185,47 @@ describe('run_board_spin — the rows a theme types (joshuafolkken/kit#8003)', (
 describe('run_board_spin — a typing row’s spinner (joshuafolkken/kit#8003)', () => {
 	it('turns on each write, as the turns between redraws do', () => {
 		const text = `${SPOT} ${'x'.repeat(40)}`
-		const typing = {
-			seen: new Set<string>(),
-			lines: [{ key: 'lanes:8', index: 0, row: 1, text, start_ms: START - 5 * LETTER_MS }],
-		}
+		const typing = typing_with({ key: 'lanes:8', row: 1, text, start_ms: START - 5 * LETTER_MS })
 		const first_ms = START + SPINNER_INTERVAL_MS
 		const second_ms = first_ms + SPINNER_INTERVAL_MS
 
 		expect(type_bytes(typing, first_ms)).toContain(`H${spinner_of(first_ms)} x`)
 		expect(type_bytes(typing, second_ms)).toContain(`H${spinner_of(second_ms)} x`)
 		expect(spinner_of(first_ms)).not.toBe(spinner_of(second_ms))
+	})
+})
+
+describe('run_board_spin — the header’s now line (joshuafolkken/kit#8103)', () => {
+	const PREFIX = `KIT  ${SPOT} 5″  > `
+	const WORDS = '#8093 · WRITE'
+	const NOW = `${PREFIX}${keyed('now', WORDS, WORDS)}`
+	const THIRD_ROW = `${ESCAPE}[3;1H`
+
+	it('records the columns before the key, its spinner a spot that still turns', () => {
+		const { spots, keyed: rows } = spun(['a', 'b', NOW], '⠋', WIDE)
+
+		expect(places(spots)).toStrictEqual([[3, 6]])
+		expect(rows).toStrictEqual([
+			{
+				key: `now:${WORDS}`,
+				index: 2,
+				row: 3,
+				text: `${PREFIX}${WORDS}`,
+				prefix_columns: 13,
+			},
+		])
+	})
+
+	it('writes the spinner’s turn and the typed words together, the spinner redrawn in the prefix', () => {
+		const [row] = spun(['a', 'b', NOW], '⠋', WIDE).keyed
+		const typing = { seen: new Set<string>(), lines: row ? [{ ...row, start_ms: START }] : [] }
+		const at_ms = START + LETTER_MS
+		const bytes = type_bytes(typing, at_ms)
+
+		expect(bytes).toBe(`${THIRD_ROW}KIT  ${spinner_of(at_ms)} 5″  > #8${ESCAPE}[0m█${ESCAPE}[K`)
+	})
+
+	it('records no now line that wraps', () => {
+		expect(spun(['a', 'b', NOW], '⠋', { rows: 24, columns: 20 }).keyed).toStrictEqual([])
 	})
 })
