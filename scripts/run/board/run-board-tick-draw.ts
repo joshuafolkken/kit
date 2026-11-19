@@ -1,11 +1,10 @@
-import { run_board_display, type BoardDisplay } from './run-board-display'
+import type { BoardDisplay } from './run-board-display'
 import type { FrameBounds } from './run-board-fold'
 import type { BoardHeader } from './run-board-header'
 import { run_board_labels } from './run-board-labels'
 import type { BoardLayout } from './run-board-layout'
 import { run_board_link } from './run-board-link'
 import type { BoardNote } from './run-board-notes'
-import type { LocalRead } from './run-board-read'
 import { run_board_render } from './run-board-render'
 import { run_board_row_sections } from './run-board-row-sections'
 import { run_board_spin, type Spun } from './run-board-spin'
@@ -18,7 +17,6 @@ import { run_board_type_rows, type Typing } from './run-board-type-rows'
 // the board's ports.
 
 const { SPOT } = run_board_spin
-const { assemble_display } = run_board_display
 
 // The ports a frame is drawn through — no read among them, so the worker thread draws the frames it
 // records through the same ones (`run-board-gather-record.ts`).
@@ -134,17 +132,7 @@ function draw_display(state: BoardState, display: BoardDisplay, redraw: Redraw):
 	return { ...state, ...display.carried, spots: drawn.spots, typing }
 }
 
-// The run's frame over `run_layout`, the run's own rows, the root checkout's single runs laid over them.
-function draw_run(
-	state: BoardState,
-	local: LocalRead,
-	redraw: Redraw,
-	run_layout: BoardLayout,
-): BoardState {
-	return draw_display(state, assemble_display(state, local, redraw.now_ms, run_layout), redraw)
-}
-
-const run_board_tick_draw = { bounds_of, draw, draw_display, draw_run }
+const run_board_tick_draw = { bounds_of, draw, draw_display }
 
 export { run_board_tick_draw }
-export type { DrawPorts }
+export type { DrawPorts, Redraw }
