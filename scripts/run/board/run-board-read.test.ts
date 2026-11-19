@@ -11,6 +11,7 @@ import { run_event_tail } from '#scripts/run/event/run-event-tail'
 import { run_stranded_detect } from '#scripts/run/run-stranded-detect'
 import { run_wake } from '#scripts/run/wake/run-wake'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { run_board_ledger_window } from './run-board-ledger-window'
 import { run_board_operation_read } from './run-board-operation-read'
 import { run_board_read } from './run-board-read'
 import { run_board_read_fixture } from './run-board-read-fixture'
@@ -148,12 +149,12 @@ describe('run_board_read.read_local usual times', () => {
 			stage: 'round-2',
 			elapsed_ms: MINUTE_MS,
 		}
-		const read = vi.spyOn(lane_ledger, 'read_entries').mockReturnValue([stage])
+		const read = vi.spyOn(run_board_ledger_window, 'entries_of').mockReturnValue([stage])
 
 		await expect(run_board_read.read_local()).resolves.toMatchObject({
 			usual: new Map([['round_two', MINUTE_MS]]),
 		})
-		expect(read).toHaveBeenCalledWith(lane_ledger.target_of(REPOSITORY))
+		expect(read).toHaveBeenCalledWith(lane_ledger.target_of(REPOSITORY), expect.any(Number))
 	})
 })
 
@@ -163,7 +164,7 @@ describe('run_board_read.read_local memory hold', () => {
 
 	function arrange_ledger(entries: ReadonlyArray<LedgerEntry>): void {
 		arrange(NONE, { invocation: EPIC_RUN, started_at: STARTED_AT, ended_at: ENDED_AT })
-		vi.spyOn(lane_ledger, 'read_entries').mockReturnValue(entries)
+		vi.spyOn(run_board_ledger_window, 'entries_of').mockReturnValue(entries)
 		// Inside the hold's cap, so the open hold is not read as a driver killed while held.
 		vi.spyOn(Date, 'now').mockReturnValue(Date.parse(INSIDE.at))
 	}

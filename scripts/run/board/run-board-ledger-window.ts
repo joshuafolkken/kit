@@ -16,20 +16,45 @@ import { run_board_usual } from './run-board-usual'
 //
 // Remembered per ledger stamp, so a redraw over an unchanged ledger hands back the same array and the
 // readers' own memos aggregate nothing again (joshuafolkken/kit#7012).
+//
+// The live worker holds only the kinds those readers count — a stage, dispatch, merge, hold or release
+// — and the whole ledger's only while the window leaves a value to fill, in a tail cache of its own
+// that grows by the appended lines and is let go once the window covers (joshuafolkken/kit#8034).
 
 const MARGIN_DAYS = 1
 const PERIOD_DAYS = Math.max(run_board_usual.PERIOD_DAYS, run_board_lane_totals.PERIOD_DAYS)
+// The days the board reads back: the readers' period and the margin before it.
+const READ_DAYS = PERIOD_DAYS + MARGIN_DAYS
+const { KIND } = lane_ledger
+const BOARD_KINDS: ReadonlySet<string> = new Set([
+	KIND.STAGE,
+	KIND.DISPATCH,
+	KIND.MERGE,
+	KIND.HELD,
+	KIND.RELEASED,
+])
 const windows = stamped_memo.create<ReadonlyArray<LedgerEntry>>()
+
+function is_board_entry(entry: LedgerEntry): boolean {
+	return BOARD_KINDS.has(entry.kind)
+}
+
+const wholes = lane_ledger.tail_store(is_board_entry)
 
 function covers(entries: ReadonlyArray<LedgerEntry>, now_ms: number): boolean {
 	return run_board_usual.covers(entries, now_ms) && run_board_lane_totals.covers(entries, now_ms)
 }
 
 function read_window(path: string, now_ms: number): ReadonlyArray<LedgerEntry> {
-	const { since_ms } = lane_stats.window_of(PERIOD_DAYS + MARGIN_DAYS, now_ms)
-	const { entries } = lane_ledger.read_since(path, since_ms)
+	const { since_ms } = lane_stats.window_of(READ_DAYS, now_ms)
+	const { entries: read } = lane_ledger.read_since(path, since_ms)
+	const entries = read.filter((entry) => is_board_entry(entry))
 
-	return covers(entries, now_ms) ? entries : lane_ledger.read_entries(path)
+	if (!covers(entries, now_ms)) return wholes.read(path)
+
+	wholes.forget(path)
+
+	return entries
 }
 
 // An absent or unreadable ledger is never remembered, so it reads again once it appears.
@@ -41,6 +66,6 @@ function entries_of(path: string, now_ms: number): ReadonlyArray<LedgerEntry> {
 	return windows.of(path, stamp, () => read_window(path, now_ms))
 }
 
-const run_board_ledger_window = { entries_of }
+const run_board_ledger_window = { READ_DAYS, entries_of }
 
 export { run_board_ledger_window }

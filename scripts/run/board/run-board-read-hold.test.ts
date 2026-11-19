@@ -1,5 +1,6 @@
-import { lane_ledger, type LedgerEntry } from '#scripts/lane/lane-ledger'
+import type { LedgerEntry } from '#scripts/lane/lane-ledger'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { run_board_ledger_window } from './run-board-ledger-window'
 import { run_board_read } from './run-board-read'
 import { run_board_read_fixture } from './run-board-read-fixture'
 
@@ -16,7 +17,7 @@ afterEach(() => {
 
 function arrange_ledger(entries: ReadonlyArray<LedgerEntry>): void {
 	arrange({ kind: 'carried', carry: CARRY }, undefined)
-	vi.spyOn(lane_ledger, 'read_entries').mockReturnValue(entries)
+	vi.spyOn(run_board_ledger_window, 'entries_of').mockReturnValue(entries)
 	// Inside the hold's cap, so the open hold is not read as a driver killed while held.
 	vi.spyOn(Date, 'now').mockReturnValue(Date.parse(INSIDE.at))
 }

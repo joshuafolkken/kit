@@ -64,16 +64,33 @@ function base_of(previous: Tail | undefined, snapshot: Snapshot): Tail | undefin
 	return previous.ino === snapshot.ino && previous.size < snapshot.size ? previous : undefined
 }
 
-function grow(base: Tail | undefined, snapshot: Snapshot, from: number, bytes: Buffer): Tail {
+// The entries a store keeps; the others are parsed and dropped (joshuafolkken/kit#8034).
+type Keep = (entry: LedgerEntry) => boolean
+
+interface Growth {
+	readonly base: Tail | undefined
+	readonly from: number
+	readonly bytes: Buffer
+	readonly is_kept: Keep
+}
+
+function grow(snapshot: Snapshot, growth: Growth): Tail {
+	const { base, from, bytes, is_kept } = growth
 	const end = bytes.lastIndexOf(LINE_SEPARATOR) + 1
-	const lines = [...(base?.lines ?? EMPTY), ...parse_text(bytes.toString('utf8', 0, end))]
-	const fragment = parse_text(bytes.toString('utf8', end))
+	const parsed = parse_text(bytes.toString('utf8', 0, end)).filter((entry) => is_kept(entry))
+	const lines = [...(base?.lines ?? EMPTY), ...parsed]
+	const fragment = parse_text(bytes.toString('utf8', end)).filter((entry) => is_kept(entry))
 	const entries = fragment.length === 0 ? lines : [...lines, ...fragment]
 
 	return { ...snapshot, size: from + bytes.length, offset: from + end, lines, entries }
 }
 
-function next_tail(descriptor: number, snapshot: Snapshot, previous: Tail | undefined): Tail {
+function next_tail(
+	descriptor: number,
+	snapshot: Snapshot,
+	previous: Tail | undefined,
+	is_kept: Keep,
+): Tail {
 	if (previous !== undefined && is_unchanged(previous, snapshot)) return previous
 
 	const base = base_of(previous, snapshot)
@@ -81,7 +98,7 @@ function next_tail(descriptor: number, snapshot: Snapshot, previous: Tail | unde
 	const bytes = Buffer.alloc(snapshot.size - from)
 	const length = readSync(descriptor, bytes, 0, bytes.length, from)
 
-	return grow(base, snapshot, from, bytes.subarray(0, length))
+	return grow(snapshot, { base, from, bytes: bytes.subarray(0, length), is_kept })
 }
 
 // `undefined` for an absent, unowned or unreadable file: an empty ledger.
@@ -101,29 +118,51 @@ function with_ledger<T>(path: string, read_open: (descriptor: number) => T): T |
 	}
 }
 
-function read_tail(path: string, previous: Tail | undefined): Tail | undefined {
+function read_tail(path: string, previous: Tail | undefined, is_kept: Keep): Tail | undefined {
 	return with_ledger(path, (descriptor) =>
-		next_tail(descriptor, snapshot_of(fstatSync(descriptor)), previous),
+		next_tail(descriptor, snapshot_of(fstatSync(descriptor)), previous, is_kept),
 	)
 }
 
-const tails = new Map<string, Tail>()
+interface TailStore {
+	// The kept entries, oldest first; the same array while the file is unchanged, so a reader can key
+	// its own aggregation on it.
+	readonly read: (path: string) => ReadonlyArray<LedgerEntry>
+	// Lets go of the path's kept entries; the next read parses the whole file again.
+	readonly forget: (path: string) => void
+}
 
-// Every entry, oldest first; the same array while the file is unchanged, so a reader can key its own
-// aggregation on it.
-function read(path: string): ReadonlyArray<LedgerEntry> {
-	const tail = read_tail(path, tails.get(path))
+function is_any(): boolean {
+	return true
+}
 
-	if (tail === undefined) {
-		tails.delete(path)
+// The tails read so far, by path, holding only the entries `is_kept` passes — a reader that needs a
+// few kinds keeps those, not the whole ledger (joshuafolkken/kit#8034).
+function tail_store(is_kept: Keep = is_any): TailStore {
+	const tails = new Map<string, Tail>()
 
-		return EMPTY
+	function read(path: string): ReadonlyArray<LedgerEntry> {
+		const tail = read_tail(path, tails.get(path), is_kept)
+
+		if (tail === undefined) {
+			tails.delete(path)
+
+			return EMPTY
+		}
+
+		tails.set(path, tail)
+
+		return tail.entries
 	}
 
-	tails.set(path, tail)
+	function forget(path: string): void {
+		tails.delete(path)
+	}
 
-	return tail.entries
+	return { read, forget }
 }
+
+const every_entry = tail_store()
 
 // The recent window read backward from the end (joshuafolkken/kit#7930): a fresh process reads only the
 // chunks covering the window, not the whole ledger. `reached_start` — the ledger's start was read with
@@ -209,7 +248,7 @@ function read_since(path: string, since_ms: number, chunk_bytes = CHUNK_BYTES): 
 	return with_ledger(path, (descriptor) => scan_back(descriptor, since_ms, chunk_bytes)) ?? NONE
 }
 
-const lane_ledger_tail = { read, read_since }
+const lane_ledger_tail = { read: every_entry.read, read_since, tail_store }
 
-export type { RecentWindow }
+export type { RecentWindow, TailStore }
 export { lane_ledger_tail }
