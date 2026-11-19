@@ -2,6 +2,7 @@ import path from 'node:path'
 import { lane_held_stats } from '#scripts/lane/lane-held-stats'
 import { lane_ledger, type LedgerEntry } from '#scripts/lane/lane-ledger'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
+import { json_value } from '#scripts/lib/json-value'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_lane_totals } from './run-board-lane-totals'
@@ -247,5 +248,43 @@ describe('run_board_ledger_window.entries_of over an appended ledger', () => {
 
 		expect(window).toStrictEqual(whole)
 		expect(fell_back).toBe(false)
+	})
+})
+
+// The lines `entries_of` parses past its backward window read — the whole-ledger fallback's alone.
+function whole_read_lines(file: string): Array<string> {
+	const parse = vi.spyOn(json_value, 'parse_or_undefined')
+	const read_since = lane_ledger.read_since.bind(lane_ledger)
+
+	vi.spyOn(lane_ledger, 'read_since').mockImplementation(
+		function read_then_clear(ledger, since_ms) {
+			const read = read_since(ledger, since_ms)
+
+			parse.mockClear()
+
+			return read
+		},
+	)
+	run_board_ledger_window.entries_of(file, NOW)
+
+	return parse.mock.calls.map(([line]) => line)
+}
+
+describe('run_board_ledger_window.entries_of after the release', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('parses the whole ledger again when the window falls short after the release', () => {
+		const name = 'held-reread'
+		const file = ledger_of(name, [...lane(1, NOW - 10 * DAY)])
+
+		run_board_ledger_window.entries_of(file, NOW)
+		ledger_of(name, [...lane(2, NOW - DAY), ...lane(3, NOW - 2 * DAY)])
+		run_board_ledger_window.entries_of(file, NOW)
+		ledger_of(name, [{ kind: 'merge', at: iso(NOW - HOUR), issue: 9 }])
+		const parsed = whole_read_lines(file)
+
+		expect(parsed.some((line) => line.includes(iso(NOW - 10 * DAY)))).toBe(true)
 	})
 })
