@@ -3,7 +3,7 @@ import { rmSync, writeFileSync } from 'node:fs'
 import { afterEach, describe, expect, it } from 'vitest'
 import { run_board_frame_store } from './run-board-frame-store'
 
-const { CHAT_KEY, FRESH_MS, file_store, fresh, memory_store, once_key, path_of } =
+const { CHAT_KEY, FRESH_MS, file_store, fresh, latest_writer, memory_store, once_key, path_of } =
 	run_board_frame_store
 const SAVED_MS = Date.parse('2026-11-18T09:00:00.000Z')
 const FRAME = { text: 'board\n', saved_ms: SAVED_MS }
@@ -14,13 +14,26 @@ afterEach(() => {
 })
 
 describe('run_board_frame_store.file_store', () => {
-	it('loads the frame it saved', () => {
+	it('loads the frame it saved once its write has settled', async () => {
 		const store = file_store(ROOT)
 
 		store.save(CHAT_KEY, FRAME)
+		await store.settled()
 
 		expect(store.load(CHAT_KEY)).toStrictEqual(FRAME)
 		expect(store.load(once_key(undefined, false))).toBeUndefined()
+	})
+
+	it('keeps the last of the frames saved while one is being written', async () => {
+		const store = file_store(ROOT)
+		const last = { ...FRAME, text: 'last\n' }
+
+		store.save(CHAT_KEY, FRAME)
+		store.save(CHAT_KEY, { ...FRAME, text: 'skipped\n' })
+		store.save(CHAT_KEY, last)
+		await store.settled()
+
+		expect(store.load(CHAT_KEY)).toStrictEqual(last)
 	})
 
 	it('reads a broken record as no record', () => {
@@ -33,6 +46,45 @@ describe('run_board_frame_store.file_store', () => {
 		writeFileSync(path_of(CHAT_KEY, ROOT), JSON.stringify({ text: 1, saved: SAVED_MS }))
 
 		expect(file_store(ROOT).load(CHAT_KEY)).toBeUndefined()
+	})
+})
+
+interface HeldWriter {
+	written: Array<string>
+	writer: ReturnType<typeof latest_writer>
+	gate: { open: () => void }
+}
+
+// A writer whose every write is held until the gate opens, listing the frames it was asked to write.
+function held_writer(): HeldWriter {
+	const written: Array<string> = []
+	const gate = { open: (): void => undefined }
+	const released = new Promise<void>((resolve) => {
+		gate.open = resolve
+	})
+	const writer = latest_writer(async (frame) => {
+		written.push(frame.text)
+		await released
+	})
+
+	return { written, writer, gate }
+}
+
+// joshuafolkken/kit#8124: one key's writes run one at a time, and only the newest waiting frame follows.
+describe('run_board_frame_store.latest_writer', () => {
+	it('writes the frame in flight, then only the newest one saved during it', async () => {
+		const { written, writer, gate } = held_writer()
+
+		writer.save(FRAME)
+		writer.save({ ...FRAME, text: 'skipped\n' })
+		writer.save({ ...FRAME, text: 'last\n' })
+
+		expect(written).toStrictEqual([FRAME.text])
+
+		gate.open()
+		await writer.settled()
+
+		expect(written).toStrictEqual([FRAME.text, 'last\n'])
 	})
 })
 
