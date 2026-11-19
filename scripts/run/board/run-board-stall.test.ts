@@ -117,6 +117,30 @@ describe('run_board_stall.watch', () => {
 		expect(before.watch.stalls()[0]?.gc_ms).toBe(GC_MS)
 		expect(after.watch.stalls()[0]?.gc_ms).toBe(GC_MS)
 	})
+})
+
+describe('run_board_stall.watch stage and threshold', () => {
+	it('names the stall by the stage that held most of it, not the one current at the probe', () => {
+		const fake = fake_probes()
+		const watch = run_board_stall.watch(fake.probes)
+
+		hold(fake, watch.enter, 'record')
+		watch.enter('turn')
+		fake.clock.now_ms += PROBE_MS
+		fake.fire()
+
+		expect(watch.stalls()).toStrictEqual([expect.objectContaining({ stage: 'record' })])
+	})
+
+	it('records a probe that ran late by exactly the threshold', () => {
+		const { probes, clock, fire } = fake_probes()
+		const watch = run_board_stall.watch(probes)
+
+		clock.now_ms = PROBE_MS + STALL_MS
+		fire()
+
+		expect(watch.stalls()).toStrictEqual([expect.objectContaining({ ms: STALL_MS })])
+	})
 
 	it('records no probe that ran late by less than the threshold', () => {
 		const { probes, clock, fire } = fake_probes()
@@ -127,7 +151,9 @@ describe('run_board_stall.watch', () => {
 
 		expect(watch.stalls()).toStrictEqual([])
 	})
+})
 
+describe('run_board_stall.watch stop', () => {
 	it('stops its probe and its GC observer', () => {
 		const { probes, stops } = fake_probes()
 
