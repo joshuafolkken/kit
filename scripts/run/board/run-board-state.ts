@@ -130,8 +130,10 @@ interface BoardData extends GatherRead {
 	issue_count_attempted_ms: number | undefined
 }
 
-// What the frame keeps between redraws: its spinners, typing, sound and notice, and the total it counts from.
+// What the frame keeps between redraws: its spinners, typing, sound and notice, and the total it
+// counts from.
 interface BoardView {
+	// The total the first frame counted, which later frames count their progress from.
 	baseline_total: number | undefined
 	// Where the last frame drew its spinners, turned between redraws.
 	spots: ReadonlyArray<Spot>
