@@ -198,8 +198,8 @@ function frame_of(state: BoardState, local: LocalRead, header: LaidHeader, redra
 }
 
 // The rows this frame types where the board types them; a frame before the plan is read is no base — the
-// rows the plan brings were already there — so the frame the plan arrives on is the first base. The
-// header's now line is known by its words (joshuafolkken/kit#8103).
+// rows the plan brings were already there — so the frame the plan arrives on is the first base. What
+// counts as known is `run_board_row_sections.known_of`'s.
 function typing_of(
 	state: BoardState,
 	keyed: ReadonlyArray<KeyedLine>,
@@ -207,12 +207,7 @@ function typing_of(
 	redraw: Redraw,
 ): Typing {
 	const is_on = redraw.ports.types_rows === true && state.plan !== undefined
-	const known = run_board_row_sections.keys_of(header.layout)
-	const now_key = run_board_header.now_key(header)
-
-	if (now_key !== undefined) known.add(now_key)
-
-	const frame = { keyed, known }
+	const frame = { keyed, known: run_board_row_sections.known_of(header) }
 
 	return run_board_type_rows.next(state.typing, frame, redraw.now_ms, is_on)
 }
