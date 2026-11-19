@@ -111,6 +111,35 @@ describe('run_board_gather.gather, the budget waits', () => {
 	})
 })
 
+// joshuafolkken/kit#8134: a round hands its lane read on as it lands, and only a round that read it.
+describe('run_board_gather.gather, the lane read handed on', () => {
+	it('hands the lane read on before the usages are read', async () => {
+		const { ports, release } = gated_ports()
+		const on_local = vi.fn(() => {
+			expect(ports.read_usage).not.toHaveBeenCalled()
+		})
+
+		release(run_board_fixture.LOCAL)
+		await run_board_gather.gather(run_board_gather.FRESH_GATHER, ports, 'background', on_local)
+
+		expect(on_local).toHaveBeenCalledExactlyOnceWith(
+			expect.objectContaining({ local: run_board_fixture.LOCAL, read_ms: NOW_MS }),
+		)
+	})
+
+	it('hands nothing on in a round whose lane read is not due', async () => {
+		const { ports, release } = gated_ports()
+		const on_local = vi.fn()
+
+		release(run_board_fixture.LOCAL)
+		const first = await run_board_gather.gather(run_board_gather.FRESH_GATHER, ports, 'background')
+
+		await run_board_gather.gather(first, ports, 'background', on_local)
+
+		expect(on_local).not.toHaveBeenCalled()
+	})
+})
+
 describe('run_board_gather.gather, a round after a sample', () => {
 	it('takes no sample before the machine is due again', async () => {
 		const { ports, release } = gated_ports()

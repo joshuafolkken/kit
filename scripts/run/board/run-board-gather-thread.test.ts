@@ -4,7 +4,12 @@ import { ts_entry_loader } from '#scripts/run/ts-entry-loader'
 import { describe, expect, it, vi } from 'vitest'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_gather, type GatherState } from './run-board-gather'
-import { run_board_gather_thread, type GatherWorker } from './run-board-gather-thread'
+import {
+	run_board_gather_thread,
+	type FailedPost,
+	type GatherPost,
+	type GatherWorker,
+} from './run-board-gather-thread'
 import { run_board_tick } from './run-board-tick'
 
 // joshuafolkken/kit#4267: a live board's reads come from a worker thread; a redraw draws the last round
@@ -230,7 +235,70 @@ describe('run_board_gather_thread phases', () => {
 			posts.push(value)
 		})
 
-		expect(posts[0]).toHaveProperty('phases', expect.arrayContaining([WORKER_PHASE]))
+		expect(posts.at(-1)).toHaveProperty('phases', expect.arrayContaining([WORKER_PHASE]))
+	})
+})
+
+interface HeldRound {
+	posts: Array<GatherPost | FailedPost>
+	release: () => void
+	round: Promise<GatherState>
+}
+
+// A round whose usages hold until `release`, each post kept in `posts`.
+function held_round(): HeldRound {
+	const gate: { release: () => void } = { release: vi.fn() }
+	const held = new Promise<undefined>((resolve) => {
+		gate.release = () => {
+			resolve(undefined)
+		}
+	})
+	const ports = { ...harness(LOCAL, []).gathering, read_usage: async () => await held }
+	const posts: Array<GatherPost | FailedPost> = []
+	const round = gather_round(FRESH_GATHER, ports, (value) => {
+		posts.push(value)
+	})
+
+	return { posts, release: () => gate.release(), round }
+}
+
+// joshuafolkken/kit#8134: the run's read is handed over as it lands, not after the round's usages.
+describe('run_board_gather_thread.gather_round, the run read handed early', () => {
+	it('hands the run read over before the usages answer', async () => {
+		const { posts, release, round } = held_round()
+
+		await vi.waitFor(() => {
+			expect(posts).toHaveLength(1)
+		})
+		expect(posts[0]).toMatchObject({ local: { value: LOCAL } })
+		expect(posts[0]).not.toHaveProperty('phases')
+		release()
+		await round
+	})
+
+	it('hands the round’s end over without the run read or the phases twice', async () => {
+		launch_timing.clear()
+		const { posts, release, round } = held_round()
+
+		release()
+		await round
+
+		expect(posts).toHaveLength(2)
+		expect(posts[1]).toMatchObject({ local: undefined })
+		expect(posts.filter((post) => 'phases' in post)).toHaveLength(1)
+	})
+
+	it('keeps the run read handed early once the round’s end arrives', async () => {
+		const { posts, release, round } = held_round()
+		const { gather, spawned } = faked()
+		const first = gather('background')
+
+		release()
+		await round
+		for (const post of posts) spawned[0]?.emit('message', post)
+		await first
+
+		await expect(gather('background')).resolves.toMatchObject({ local: LOCAL })
 	})
 })
 
