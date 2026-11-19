@@ -1,145 +1,153 @@
 import { run_board_fit } from './run-board-fit'
 import { run_board_labels } from './run-board-labels'
+import { run_board_theme_tones, type Tone } from './run-board-theme-tones'
 
 // joshuafolkken/kit#7988: the WarGames theme draws the board as a text terminal would, so every icon is
 // drawn as ASCII text of the width the icon took — the columns line up as they do without the theme.
 // The one table of what each icon reads as; the render modules keep their own icons and never see it.
+// joshuafolkken/kit#8150: each text in the color of the tone of the state its icon marks.
 
-type Glyphs = ReadonlyMap<string, string>
+type Glyph = readonly [text: string, tone: Tone]
+type Glyphs = ReadonlyMap<string, Glyph>
 
 // Each emoji the board's sources draw, by what it marks; a text-presentation symbol one column wide
 // gets one character. A section heading's icon reads as blanks, so only its word is left.
-const EMOJI: Glyphs = new Map([
-	['💻', '  '],
-	['📈', '  '],
-	['⛽', '  '],
-	['🧵', '  '],
-	['📌', '  '],
-	['🚨', 'P1'],
-	['🔺', 'P2'],
-	['✨', 'FT'],
-	['🐛', 'BG'],
-	['🔍', 'IV'],
-	['📝', 'PL'],
-	['🔨', 'BD'],
-	['👀', 'RV'],
-	['🔀', 'MG'],
-	['📦', 'CM'],
-	['🔂', 'R2'],
-	['🚢', 'SH'],
-	['📣', 'RP'],
-	['💥', 'FL'],
-	['⏳', 'HD'],
-	['💤', 'ZZ'],
-	['✅', 'OK'],
-	['🚫', 'XX'],
-	['🔄', 'RN'],
-	['🏁', 'FN'],
-	['⏩', 'AD'],
-	['🧊', 'PS'],
-	['❔', '??'],
-	['❓', 'Q?'],
-	['❗', '!!'],
-	['🔧', '> '],
-	['💬', ': '],
-	['🔭', 'WT'],
-	['🔚', 'EN'],
-	['⏰', 'T+'],
-	['🎯', 'ET'],
-	['💓', 'HB'],
-	['🧠', 'MM'],
-	['💾', 'DK'],
-	['💪', 'CP'],
-	['⚡', 'PW'],
-	['🔥', 'HT'],
-	['📴', 'OF'],
-	['🔊', 'SN'],
-	['🔇', 'MU'],
-	['✋', 'HU'],
-	['🙋', 'DC'],
-	['🛑', 'ST'],
-	['🧳', 'ER'],
-	['🔗', 'LK'],
-	['📂', 'FD'],
-	['🧍', 'SO'],
-	['🙅', 'NO'],
-	['📋', 'OR'],
-	['🚦', 'SG'],
-	['🛫', 'TO'],
-	['📮', 'IS'],
-	['📅', 'NB'],
-	['⚓', 'AN'],
-	['🔁', 'RT'],
-	['🆕', 'NW'],
-	['🧨', 'XP'],
-	['🚪', 'DR'],
-	['📥', 'IN'],
-	['📤', 'DS'],
-	['🚀', 'GO'],
-	['🤝', 'HO'],
-	['🤔', 'JG'],
-	['💭', 'SS'],
-	['🚧', 'BL'],
-	['🔒', 'LC'],
-	['🪫', 'LO'],
-	['📰', 'NS'],
-	['🔏', 'HM'],
-	['🔑', 'AU'],
-	['🐰', 'CR'],
-	['⛔', 'RL'],
-	['🤏', 'CX'],
-	['💺', 'SE'],
-	['🏠', 'HQ'],
-	['🌐', 'WB'],
-	['👻', 'GH'],
-	['🧭', 'SV'],
-	['🎬', 'PA'],
-	['🤖', 'AI'],
-	['🙏', 'TY'],
-	['🟢', 'AC'],
-	['📁', 'EP'],
-	['▶', '>'],
-	['⏸', '='],
-	['⏭', '>'],
-	['⏱', 'T'],
-	['↪', '^'],
-	['🅿', 'P'],
-	['☑', 'V'],
-	['⛓', '#'],
-	['🗓', 'D'],
-	['⚠', '!'],
-	['🛤', '='],
-	['🗜', 'C'],
-	['🖥', 'M'],
-	['🎛', 'K'],
-	['🏔', '^'],
+const EMOJI: Glyphs = new Map<string, Glyph>([
+	['💻', ['  ', 'info']],
+	['📈', ['  ', 'info']],
+	['⛽', ['  ', 'info']],
+	['🧵', ['  ', 'info']],
+	['📌', ['  ', 'info']],
+	['🚨', ['P1', 'alert']],
+	['🔺', ['P2', 'caution']],
+	['✨', ['FT', 'info']],
+	['🐛', ['BG', 'info']],
+	['🔍', ['IV', 'running']],
+	['📝', ['PL', 'running']],
+	['🔨', ['BD', 'running']],
+	['👀', ['RV', 'running']],
+	['🔀', ['MG', 'done']],
+	['📦', ['CM', 'running']],
+	['🔂', ['R2', 'running']],
+	['🚢', ['SH', 'done']],
+	['📣', ['RP', 'running']],
+	['💥', ['FL', 'alert']],
+	['⏳', ['HD', 'idle']],
+	['💤', ['ZZ', 'idle']],
+	['✅', ['OK', 'done']],
+	['🚫', ['XX', 'alert']],
+	['🔄', ['RN', 'running']],
+	['🏁', ['FN', 'done']],
+	['⏩', ['AD', 'idle']],
+	['🧊', ['PS', 'idle']],
+	['❔', ['??', 'caution']],
+	['❓', ['Q?', 'human']],
+	['❗', ['!!', 'alert']],
+	['🔧', ['> ', 'info']],
+	['💬', [': ', 'info']],
+	['🔭', ['WT', 'idle']],
+	['🔚', ['EN', 'info']],
+	['⏰', ['T+', 'caution']],
+	['🎯', ['ET', 'info']],
+	['💓', ['HB', 'info']],
+	['🧠', ['MM', 'info']],
+	['💾', ['DK', 'info']],
+	['💪', ['CP', 'info']],
+	['⚡', ['PW', 'info']],
+	['🔥', ['HT', 'alert']],
+	['📴', ['OF', 'idle']],
+	['🔊', ['SN', 'info']],
+	['🔇', ['MU', 'idle']],
+	['✋', ['HU', 'human']],
+	['🙋', ['DC', 'human']],
+	['🛑', ['ST', 'alert']],
+	['🧳', ['ER', 'info']],
+	['🔗', ['LK', 'idle']],
+	['📂', ['FD', 'info']],
+	['🧍', ['SO', 'info']],
+	['🙅', ['NO', 'alert']],
+	['📋', ['OR', 'info']],
+	['🚦', ['SG', 'info']],
+	['🛫', ['TO', 'info']],
+	['📮', ['IS', 'info']],
+	['📅', ['NB', 'idle']],
+	['⚓', ['AN', 'info']],
+	['🔁', ['RT', 'caution']],
+	['🆕', ['NW', 'info']],
+	['🧨', ['XP', 'alert']],
+	['🚪', ['DR', 'info']],
+	['📥', ['IN', 'info']],
+	['📤', ['DS', 'info']],
+	['🚀', ['GO', 'done']],
+	['🤝', ['HO', 'info']],
+	['🤔', ['JG', 'caution']],
+	['💭', ['SS', 'info']],
+	['🚧', ['BL', 'alert']],
+	['🔒', ['LC', 'caution']],
+	['🪫', ['LO', 'caution']],
+	['📰', ['NS', 'info']],
+	['🔏', ['HM', 'info']],
+	['🔑', ['AU', 'info']],
+	['🐰', ['CR', 'info']],
+	['⛔', ['RL', 'alert']],
+	['🤏', ['CX', 'info']],
+	['💺', ['SE', 'info']],
+	['🏠', ['HQ', 'info']],
+	['🌐', ['WB', 'info']],
+	['👻', ['GH', 'info']],
+	['🧭', ['SV', 'info']],
+	['🎬', ['PA', 'info']],
+	['🤖', ['AI', 'info']],
+	['🙏', ['TY', 'info']],
+	['🟢', ['AC', 'done']],
+	['📁', ['EP', 'info']],
+	['▶', ['>', 'info']],
+	['⏸', ['=', 'idle']],
+	['⏭', ['>', 'info']],
+	['⏱', ['T', 'info']],
+	['↪', ['^', 'info']],
+	['🅿', ['P', 'info']],
+	['☑', ['V', 'done']],
+	['⛓', ['#', 'info']],
+	['🗓', ['D', 'info']],
+	['⚠', ['!', 'caution']],
+	['🛤', ['=', 'info']],
+	['🗜', ['C', 'info']],
+	['🖥', ['M', 'info']],
+	['🎛', ['K', 'info']],
+	['🏔', ['^', 'info']],
 ])
 
 // The one-column symbols drawn as one ASCII character. The rules and gauges (`■ █ ▁…▇ ┊ ├ └`) stay.
-const SYMBOLS: Glyphs = new Map([
-	['→', '>'],
-	['↻', '@'],
-	['▸', '>'],
-	['▾', 'V'],
-	['✚', '+'],
-	['✓', '+'],
-	['✗', 'X'],
+const SYMBOLS: Glyphs = new Map<string, Glyph>([
+	['→', ['>', 'info']],
+	['↻', ['@', 'info']],
+	['▸', ['>', 'info']],
+	['▾', ['V', 'info']],
+	['✚', ['+', 'done']],
+	['✓', ['+', 'done']],
+	['✗', ['X', 'alert']],
 ])
 
 // The spinner turns a line through `│ ╱ ─ ╲` instead of the braille dots, each frame the turn
 // its place in the dots' cycle falls on, so one cycle of the dots is one turn.
 const TURN = ['│', '╱', '─', '╲'] as const
-const UNKNOWN = '?'
+const UNKNOWN: Glyph = ['?', 'info']
 const VARIATION_SELECTOR = '\u{FE0F}'
+const ESC = '\u{1B}'
+// A color escape after its ESC, and the codes that open a foreground color and that end one.
+const SGR_BODY = /^\[([\d;]*)m/u
+const FOREGROUND = /^(?:3[0-8]|9[0-7])$/u
+const DEFAULT_CODES: ReadonlySet<string> = new Set(['', '0', '39'])
 
 function turn_of(index: number, count: number): string {
 	return TURN[Math.floor((index * TURN.length) / count)] ?? TURN[0]
 }
 
-function spinner_turns(): Array<[string, string]> {
+function spinner_turns(): Array<[string, Glyph]> {
 	const frames = run_board_labels.SPINNER_FRAMES
 
-	return frames.map((frame, index) => [frame, turn_of(index, frames.length)])
+	return frames.map((frame, index) => [frame, [turn_of(index, frames.length), 'info']])
 }
 
 const SINGLES: Glyphs = new Map([...SYMBOLS, ...spinner_turns()])
@@ -147,19 +155,51 @@ const SINGLE_CLASS = [...SINGLES.keys()].join('')
 const PICTOGRAPHIC = String.raw`\p{Extended_Pictographic}`
 const GLYPH = new RegExp(`${PICTOGRAPHIC}${VARIATION_SELECTOR}?|[${SINGLE_CLASS}]`, 'gu')
 
-// An emoji, with its variation selector, as its text padded to the width it took; one the table
-// misses as `?`, so no emoji is ever drawn.
-function text_of(glyph: string): string {
-	const single = SINGLES.get(glyph)
-
-	if (single !== undefined) return single
-	const text = EMOJI.get(glyph.replace(VARIATION_SELECTOR, '')) ?? UNKNOWN
-
-	return text.padEnd(run_board_fit.width_of(glyph))
+function entry_of(glyph: string): Glyph {
+	return SINGLES.get(glyph) ?? EMOJI.get(glyph.replace(VARIATION_SELECTOR, '')) ?? UNKNOWN
 }
 
-function textual(line: string): string {
-	return line.replaceAll(GLYPH, (glyph: string) => text_of(glyph))
+// An emoji, with its variation selector, as its text in its tone's color padded to the width it took;
+// one the table misses as `?`, so no emoji is ever drawn. Inside a color a render module gave, the
+// text is left uncolored, so that color is not cut.
+function text_of(glyph: string, is_colored: boolean): string {
+	const [text, tone] = entry_of(glyph)
+	const padding = ' '.repeat(Math.max(0, run_board_fit.width_of(glyph) - text.length))
+
+	return (is_colored ? text : run_board_theme_tones.toned(tone, text)) + padding
+}
+
+function glyphs_as_text(text: string, is_colored: boolean): string {
+	return text.replaceAll(GLYPH, (glyph: string) => text_of(glyph, is_colored))
+}
+
+// The first code of the color escape a segment starts with; `undefined` for any other segment.
+function first_code(segment: string): string | undefined {
+	return SGR_BODY.exec(segment)?.[1]?.split(';', 1)[0]
+}
+
+// What the escape a segment starts with does to the foreground color: `true` opens one, `false` ends
+// it, `undefined` leaves it as it was.
+function color_change(segment: string): boolean | undefined {
+	const code = first_code(segment)
+
+	if (code === undefined) return undefined
+	if (FOREGROUND.test(code)) return true
+
+	return DEFAULT_CODES.has(code) ? false : undefined
+}
+
+function textual(frame: string): string {
+	const [head = '', ...escaped] = frame.split(ESC)
+	const drawn = [glyphs_as_text(head, false)]
+	let is_colored = false
+
+	for (const segment of escaped) {
+		is_colored = color_change(segment) ?? is_colored
+		drawn.push(glyphs_as_text(segment, is_colored))
+	}
+
+	return drawn.join(ESC)
 }
 
 const run_board_theme_glyphs = { EMOJI, SYMBOLS, TURN, textual }

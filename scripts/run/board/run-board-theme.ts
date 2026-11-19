@@ -6,8 +6,10 @@ import { run_board_theme_glyphs } from './run-board-theme-glyphs'
 // joshuafolkken/kit#7934: a theme for the board a person watches — `wargames` draws the text no color
 // is given in the cyan glow of the film's terminal phosphor and every rule as a run of `-`, so each
 // character of a line shows; joshuafolkken/kit#7988: each icon as text of its width
-// (`run-board-theme-glyphs.ts`) and the text uppercase, as a text terminal draws it. It is put on the frame as it is written, once, so no render module carries
-// it; a color a render module gives (red, yellow, …) is kept, the cyan resumed after it.
+// (`run-board-theme-glyphs.ts`) and the text uppercase, as a text terminal draws it;
+// joshuafolkken/kit#8150: that text in the color of the state its icon marks
+// (`run-board-theme-tones.ts`). It is put on the frame as it is written, once, so no render module
+// carries it; a color a render module gives (red, yellow, …) is kept, the cyan resumed after it.
 
 const THEME_FLAG = '--theme'
 const THEME_ENV = 'JOSH_BOARD_THEME'
