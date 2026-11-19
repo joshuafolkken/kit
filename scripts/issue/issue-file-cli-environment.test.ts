@@ -110,7 +110,7 @@ describe.each([undefined, '', HERE])('filing with original GH_REPO=%j', (origina
 		expect(scout).toHaveBeenCalledExactlyOnceWith(expect.anything(), THERE)
 
 		if (mode === 'run' || mode === 'file_issue') {
-			expect(place).toHaveBeenCalledExactlyOnceWith(ISSUE_NUMBER, THERE)
+			expect(place).toHaveBeenCalledExactlyOnceWith(ISSUE_NUMBER, THERE, 'report')
 		}
 	})
 
@@ -151,7 +151,7 @@ describe.each([undefined, '', HERE])('placement with original GH_REPO=%j', (orig
 
 	it('keeps the target through placement with a precomputed scout', async () => {
 		expect(await issue_file_cli.file_issue(ARGV, CLEAR)).toBe(ISSUE_URL)
-		expect(place).toHaveBeenCalledExactlyOnceWith(ISSUE_NUMBER, THERE)
+		expect(place).toHaveBeenCalledExactlyOnceWith(ISSUE_NUMBER, THERE, 'report')
 		expect(scout).not.toHaveBeenCalled()
 		expect(process.env[KEY]).toBe(original)
 	})
