@@ -4,7 +4,7 @@ import { auto_ok_judge } from '#scripts/auto-ok/auto-ok-judge'
 import { KICKOFF_BODY, USER_PROHIBITION } from '#scripts/auto-ok/auto-ok-kickoff-fixture'
 import { epic_classify } from '#scripts/epic/epic-classify'
 import type { EpicChild } from '#scripts/epic/epic-graph'
-import { expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { issue_publication_state } from './issue-publication-state'
 
 const BODY = KICKOFF_BODY.trimEnd()
@@ -125,4 +125,53 @@ it('withholds a prepared standalone child even if auto-ok is applied manually', 
 
 	expect(auto_ok_cli.is_runnable(issue, new Map(), [])).toBe(false)
 	expect(auto_ok_cli.pick_next([issue])).toBeUndefined()
+})
+
+// joshuafolkken/kit#8173: the steps a pending issue still lacks before it publishes.
+const UNVERIFIED = 'plan:unverified'
+
+describe('issue_publication_state.has_plan_record', () => {
+	it('counts a plan record only while plan:unverified is absent', () => {
+		expect(issue_publication_state.has_plan_record([PLANNED])).toBe(true)
+		expect(issue_publication_state.has_plan_record([PLANNED, UNVERIFIED])).toBe(false)
+		expect(issue_publication_state.has_plan_record([])).toBe(false)
+	})
+})
+
+describe('issue_publication_state.missing_steps', () => {
+	const pending = issue_publication_state.prepare(BODY, LABELS)
+	const EPIC_STEP = 'epic placement'
+	const PLAN_STEP = 'plan record'
+
+	it('names nothing for a published issue', () => {
+		expect(
+			issue_publication_state.missing_steps({ body: BODY, labels: [], has_epic: false }),
+		).toStrictEqual([])
+	})
+
+	it('names every step for a pending issue in no epic with no plan', () => {
+		expect(
+			issue_publication_state.missing_steps({ body: pending, labels: [], has_epic: false }),
+		).toStrictEqual([EPIC_STEP, PLAN_STEP, 'publish'])
+	})
+
+	it('names only publish once the issue is placed and planned', () => {
+		expect(
+			issue_publication_state.missing_steps({ body: pending, labels: [PLANNED], has_epic: true }),
+		).toStrictEqual(['publish'])
+	})
+
+	it('reads plan:unverified as no plan record', () => {
+		const labels = [PLANNED, UNVERIFIED]
+
+		expect(
+			issue_publication_state.missing_steps({ body: pending, labels, has_epic: true }),
+		).toStrictEqual([PLAN_STEP, 'publish'])
+	})
+
+	it('names the epic placement alone for a planned issue in no epic', () => {
+		expect(
+			issue_publication_state.missing_steps({ body: pending, labels: [PLANNED], has_epic: false }),
+		).toStrictEqual([EPIC_STEP, 'publish'])
+	})
 })

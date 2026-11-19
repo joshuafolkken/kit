@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { issue_auto_ok } from './issue-auto-ok'
-import { AUTO_OK_LABEL, has_label_name } from './issue-labels'
+import { AUTO_OK_LABEL, has_label_name, PLAN_UNVERIFIED_LABEL, PLANNED_LABEL } from './issue-labels'
 
 // A body record survives process termination without adding a workflow label or a user prohibition.
 // The record is an HTML comment starting its own line outside a fence: the prefix quoted inline or in
@@ -125,8 +125,43 @@ function creation(
 	}
 }
 
+type PublicationStep = 'epic placement' | 'plan record' | 'publish'
+
+interface PublicationFacts {
+	body?: string | undefined
+	labels: ReadonlyArray<string>
+	has_epic: boolean
+}
+
+// A recorded plan lets a pending child publish; `plan:unverified` asks for it again, so it does not
+// count. `--publish` and `backlog:plan --pending-publication` share this predicate.
+function has_plan_record(labels: ReadonlyArray<string>): boolean {
+	return has_label_name(labels, PLANNED_LABEL) && !has_label_name(labels, PLAN_UNVERIFIED_LABEL)
+}
+
+// What a pending issue still lacks before it publishes, in the order the steps are taken
+// (joshuafolkken/kit#8173): `--publish` reaches only an epic's task list and withholds an unplanned
+// child, so an issue in no epic or with no plan is stuck however long it waits. `plan:unverified`
+// asks for the plan again, so it does not count as a record. A published issue lacks nothing.
+function missing_steps({
+	body,
+	labels,
+	has_epic,
+}: PublicationFacts): ReadonlyArray<PublicationStep> {
+	if (!is_pending(body)) return []
+	const steps: ReadonlyArray<[PublicationStep, boolean]> = [
+		['epic placement', has_epic],
+		['plan record', has_plan_record(labels)],
+		['publish', false],
+	]
+
+	return steps.filter(([, is_done]) => !is_done).map(([step]) => step)
+}
+
 const issue_publication_state = {
 	is_pending,
+	has_plan_record,
+	missing_steps,
 	prepare,
 	carried,
 	public_body,
@@ -134,4 +169,5 @@ const issue_publication_state = {
 	creation,
 }
 
+export type { PublicationFacts, PublicationStep }
 export { issue_publication_state }

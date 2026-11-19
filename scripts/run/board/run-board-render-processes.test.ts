@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { run_board_fit, type DetailPart } from './run-board-fit'
+import { run_board_label_pair } from './run-board-label-pair'
 import type { ProcessGroups } from './run-board-process-groups'
 import { run_board_render_fixture } from './run-board-render-fixture'
 import { run_board_render_lead } from './run-board-render-lead'
@@ -12,6 +13,7 @@ import type { UsageFigure } from './run-board-usage'
 const { processes_part } = run_board_render_processes
 const { GB, board_usage, header } = run_board_render_fixture
 const { USAGE_START } = run_board_render_lead
+const { bare } = run_board_label_pair
 const GROUP_INDENT = 4
 const DETAIL_INDENT = 6
 const SPINNER = '⠋'
@@ -39,10 +41,18 @@ const LEFTOVER: ProcessGroups['leftover'] = {
 	entries: [{ name: 'node', instances: 2, figure: figure(0.4, 0.3, 0.1) }],
 }
 
+// The part as a frame with no theme draws it, its labels' marks dropped (`run-board-label-pair.ts`).
 function part_of(groups: Partial<ProcessGroups>, spinner?: string): DetailPart | undefined {
 	const usages = board_usage(new Map(), groups)
+	const part = processes_part(header({ spinner, usages }))
 
-	return processes_part(header({ spinner, usages }))
+	if (part === undefined) return undefined
+
+	return {
+		...part,
+		head: part.head.map((line) => bare(line)),
+		lines: part.lines.map((line) => ({ ...line, text: bare(line.text) })),
+	}
 }
 
 function texts(part: DetailPart | undefined): Array<string> {

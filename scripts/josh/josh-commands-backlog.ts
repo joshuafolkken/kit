@@ -173,7 +173,7 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: [PENDING_PUBLICATION],
 					description:
-						'list each pending-publication issue that blocks an open issue, instead of the plan. Read-only.',
+						'list each pending-publication issue that blocks an open issue, then every pending issue with its missing steps (epic placement, plan record, publish), instead of the plan. Read-only.',
 				},
 			],
 		},

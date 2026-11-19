@@ -27,6 +27,7 @@ const DAY_MS = 86_400_000
 const MAX_WAIT_MS = MAX_WAIT_DAYS * DAY_MS
 // `YYYY-MM-DDTHH:MM` — the part of `toISOString` the declaration spells.
 const MINUTES_LENGTH = 16
+const MINUTE_MS = 60_000
 const TOO_LATE = `\`${PREFIX}\` of a measurement follow-up must be at most ${String(MAX_WAIT_DAYS)} days after filing — wait on samples with \`${issue_sample_gate.DECLARATION}\` instead`
 const BOTH = `a measurement follow-up declares one of \`${PREFIX}\` and \`${issue_body_keys.prefix('sample_gate')}\`, not both — keep the condition`
 const HEADING_MARKS = /^#{1,6}\s+/u
@@ -120,8 +121,46 @@ function stray_heading_problems(body: string): ReadonlyArray<string> {
 	)
 }
 
+// `ms` as the declaration spells it, rounded to the minute by `round`.
+function minute_text(ms: number, round: (minutes: number) => number): string {
+	const minute = round(ms / MINUTE_MS) * MINUTE_MS
+
+	return `${new Date(minute).toISOString().slice(0, MINUTES_LENGTH)}Z`
+}
+
+// Rounded down, so the suggested date stays inside the week.
 function latest_date(now: number): string {
-	return `${new Date(now + MAX_WAIT_MS).toISOString().slice(0, MINUTES_LENGTH)}Z`
+	return minute_text(now + MAX_WAIT_MS, Math.floor)
+}
+
+function is_background(line: string): boolean {
+	return line.trim() === BACKGROUND_HEADING
+}
+
+function without_declaration(section: string): string {
+	return section
+		.split(/(?<=\n)/u)
+		.filter((line) => !line.trim().startsWith(PREFIX))
+		.join('')
+}
+
+// joshuafolkken/kit#8128: `run:observe` moves the wait to its next sample time, or drops it with
+// `undefined`. The declaration leads the background section, which is added when the body has none.
+function with_date(body: string, at_ms: number | undefined): string {
+	// Rounded up, so the wait never ends before the sample time.
+	const declaration = at_ms === undefined ? '' : `${PREFIX} ${minute_text(at_ms, Math.ceil)}\n`
+
+	if (!markdown_section.has_unfenced_line(body, BACKGROUND_HEADING)) {
+		return declaration === ''
+			? body
+			: `${body.trimEnd()}\n\n${BACKGROUND_HEADING}\n\n${declaration}`
+	}
+
+	return markdown_section.map_section(
+		body,
+		is_background,
+		(section) => `\n${declaration}${without_declaration(section).replace(/^\r?\n/u, '')}`,
+	)
 }
 
 // The calendar-wait refusals of a body with a measure declaration; `now` stands for the filing time.
@@ -146,6 +185,6 @@ function problems(body: string, now: number = Date.now()): ReadonlyArray<string>
 	]
 }
 
-const issue_not_before = { is_due, problems, waiting_date, waiting_ms, waiting_reason }
+const issue_not_before = { is_due, problems, waiting_date, waiting_ms, waiting_reason, with_date }
 
 export { issue_not_before }

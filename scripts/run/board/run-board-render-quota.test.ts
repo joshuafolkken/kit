@@ -1,6 +1,7 @@
 import { stripVTControlCharacters } from 'node:util'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_fit } from './run-board-fit'
+import { run_board_label_pair } from './run-board-label-pair'
 import type { QuotaReading, Quotas } from './run-board-quota-read'
 import { run_board_render_quota, type QuotaView } from './run-board-render-quota'
 
@@ -29,7 +30,9 @@ function window_of(
 function rows_of(view: Partial<QuotaView>): Array<string> {
 	const part = usage_part({ now_ms: NOW_MS, ...view })
 
-	return (part?.lines ?? []).map((line) => stripVTControlCharacters(line.text))
+	return (part?.lines ?? []).map((line) =>
+		run_board_label_pair.bare(stripVTControlCharacters(line.text)),
+	)
 }
 
 function raw_row(observation: QuotaReading, now_ms: number): string {
