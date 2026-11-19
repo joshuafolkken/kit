@@ -1,12 +1,5 @@
 import { run_board_faint } from './run-board-faint'
-import {
-	run_board_fit,
-	type FrameParts,
-	type PlanLine,
-	type PlanSection,
-	type TerminalSize,
-	type YieldStage,
-} from './run-board-fit'
+import type { FrameParts, PlanLine, PlanSection, TerminalSize, YieldStage } from './run-board-fit'
 import { run_board_fold, type FrameBounds } from './run-board-fold'
 import { run_board_header, type BoardHeader } from './run-board-header'
 import { run_board_label_pair } from './run-board-label-pair'
@@ -34,6 +27,7 @@ import { run_board_render_time } from './run-board-render-time'
 import { run_board_render_title } from './run-board-render-title'
 import { run_board_row_key } from './run-board-row-key'
 import { run_board_row_sections } from './run-board-row-sections'
+import { run_board_rule_width } from './run-board-rule-width'
 import type { Thanks } from './run-board-thanks-csv'
 import type { ThroughputRow } from './run-board-throughput'
 
@@ -50,12 +44,11 @@ const { stops_width, time_width } = run_board_render_time
 const { NOTE_LIMIT } = run_board_render_notes
 const { lane_cells_of, lanes_section } = run_board_render_lanes
 const { indent_of } = run_board_render_lead
-const { TITLE_LIMIT, WHOLE, fitted_limit, title_of } = run_board_render_title
-const { width_of } = run_board_fit
+const { TITLE_LIMIT, WHOLE, title_of } = run_board_render_title
 const { width_for } = run_board_render_condition
 const { legend_lines, resume_lines, thanks_part } = run_board_render_foot
 const { ROW_INDENT, done_section, kept_section, keyed, plan_section } = run_board_render_section
-const { GAP, head_text, row_draw, row_fit, row_line, shared_overrun } = run_board_render_row
+const { GAP, row_line, shared_overrun } = run_board_render_row
 const BRANCH = `${ROW_INDENT}   ├ `
 const LAST_BRANCH = `${ROW_INDENT}   └ `
 const { bounded } = run_board_fold
@@ -151,29 +144,10 @@ function queued_section(layout: BoardLayout, frame: RowFrame): Array<PlanSection
 	return [kept_section(pair(STATE_ICONS.waiting, WORDS.queued), lines)]
 }
 
-// The column the lane rows' titles end in as drawn, cut as `fitted` cuts them, where every rule ends
-// (joshuafolkken/kit#5520), kept within the pane; none without a lane row.
-function rule_width(rows: ReadonlyArray<BoardRow>, frame: RowFrame): number | undefined {
-	const ends = rows.map((row) => {
-		const fit = row_fit(indent_of(row), row, frame)
-		const draw = row_draw(indent_of(row), row, frame, fit)
-		const title_limit = fitted_limit(row, frame.columns, draw, fit) ?? TITLE_LIMIT
-
-		return width_of(`${indent_of(row)}${head_text(row, { ...frame, title_limit })}`)
-	})
-
-	if (ends.length === 0) return undefined
-
-	return Math.min(Math.max(...ends), frame.columns ?? Infinity)
-}
-
 // The rows above the findings: the run's own, the earlier run's lanes still holding a place, then the
 // ones waiting on a person's decision — a child parked on one and an untouched plan row alike
 // (joshuafolkken/kit#4099).
-function active_sections(
-	layout: BoardLayout,
-	frame: RowFrame,
-): Pick<FrameParts, 'plan' | 'rule_width'> {
+function active_sections(layout: BoardLayout, frame: RowFrame): Array<PlanSection> {
 	const people = run_board_layout.people_of(layout)
 	const lead = run_board_layout.lanes_drawn(layout)
 	const decision = pair(STATE_ICONS.human, WORDS.decision)
@@ -188,9 +162,8 @@ function active_sections(
 	)
 
 	const decided = rows_section(decision, people, { ...frame, section: 'decision' })
-	const plan = [...lanes, ...planned(frame.header, decided)]
 
-	return { plan, rule_width: rule_width(lead, { ...lane_frame, shared }) }
+	return [...lanes, ...planned(frame.header, decided)]
 }
 
 // The 🔗 rows waiting on an issue the run has not reached.
@@ -207,16 +180,18 @@ function plan_parts(
 	size: TerminalSize | undefined,
 ): Pick<FrameParts, 'below' | 'plan' | 'rule_width'> {
 	const { layout } = header
-
-	if (layout === undefined) return { plan: [] }
-
 	const frame = frame_of(header, notes, size)
+	const rule_width = run_board_rule_width.rule_width(frame)
+
+	if (layout === undefined) return { plan: [], rule_width }
+
 	const conditioned = { ...frame, condition_width: width_for(layout.unreached) }
 	const done = run_board_row_sections.done_rows(layout)
 	const queued = queued_section(layout, { ...conditioned, section: 'queued' })
 
 	return {
-		...active_sections(layout, frame),
+		plan: active_sections(layout, frame),
+		rule_width,
 		below: [
 			...keyed('queued', planned(header, queued)),
 			...keyed('waiting', planned(header, waiting_section(layout, conditioned))),

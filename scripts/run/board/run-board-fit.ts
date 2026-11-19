@@ -91,7 +91,7 @@ interface FrameParts {
 	thanks?: ReadonlyArray<string> | undefined
 	legend: ReadonlyArray<string>
 	footer: ReadonlyArray<string>
-	// The column every rule runs on to: where the lane rows' titles end; none where no lane row is drawn.
+	// The column every rule runs on to: where a lane row's full title ends (`run-board-rule-width.ts`).
 	rule_width?: number | undefined
 }
 
