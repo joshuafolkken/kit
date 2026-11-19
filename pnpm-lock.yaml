@@ -189,6 +189,9 @@ importers:
 
   .:
     dependencies:
+      '@cacheable/memory':
+        specifier: ^2.2.0
+        version: 2.2.0
       cli-spinners:
         specifier: ^3.4.0
         version: 3.4.0

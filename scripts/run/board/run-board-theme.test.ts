@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_fit } from './run-board-fit'
 import { run_board_label_pair } from './run-board-label-pair'
 import { run_board_theme } from './run-board-theme'
+import { run_board_theme_case } from './run-board-theme-case'
+import { run_board_theme_glyphs } from './run-board-theme-glyphs'
 
 // joshuafolkken/kit#7934: the WarGames theme — which one a board takes, and how it draws a frame.
 
@@ -156,6 +158,85 @@ describe('run_board_theme.restyle beside a label', () => {
 
 	it('leaves a frame with no theme as it is', () => {
 		expect(run_board_theme.restyle(undefined, VALUES)).toBe(VALUES)
+	})
+})
+
+// joshuafolkken/kit#8207: a line drawn before is taken from a bounded cache, in the same bytes.
+const FRAME = [
+	...HEADINGS,
+	`${RED}🚨 fix${DEFAULT_FOREGROUND} ${RULED}`,
+	...PROCESSES,
+	VALUES,
+].join('\n')
+const SPINNER_WRITE = `${ESCAPE}[5;3H⠋ ${pair('🔨', 'build')} #1`
+
+// The frame as the theme drew it before the cache, on the whole frame at once.
+function whole_frame(frame: string): string {
+	const ruled = run_board_label_pair.dropped(frame).replaceAll('─', '-')
+
+	return run_board_theme_case.capitals(run_board_theme_glyphs.textual(ruled))
+}
+
+// Drops the cache: a change in stdout's color drops the lines drawn in the colors before.
+function cold(force_color: string): void {
+	vi.stubEnv('FORCE_COLOR', force_color === '0' ? '1' : '0')
+	run_board_theme.restyle('wargames', 'A')
+	vi.stubEnv('FORCE_COLOR', force_color)
+}
+
+describe('run_board_theme.restyle from its cache', () => {
+	it.each(['0', '3'])(
+		'draws the same bytes from the cache as with none, FORCE_COLOR=%s',
+		(force) => {
+			for (const write of [FRAME, SPINNER_WRITE]) {
+				cold(force)
+				const fresh = run_board_theme.restyle('wargames', write)
+
+				expect(run_board_theme.restyle('wargames', write)).toBe(fresh)
+			}
+		},
+	)
+
+	it('draws a frame in the bytes it drew on the whole frame before the cache', () => {
+		cold('0')
+
+		expect(run_board_theme.restyle('wargames', FRAME)).toBe(whole_frame(FRAME))
+		expect(run_board_theme.restyle('wargames', SPINNER_WRITE)).toBe(whole_frame(SPINNER_WRITE))
+	})
+
+	it('transforms each line of a colored frame as it did the whole frame', () => {
+		vi.stubEnv('FORCE_COLOR', '3')
+		const lines = FRAME.split('\n')
+
+		expect(lines.map((line) => whole_frame(line))).toStrictEqual(whole_frame(FRAME).split('\n'))
+	})
+})
+
+describe('run_board_theme.restyle cache bounds', () => {
+	it('holds no more lines than its limit', () => {
+		cold('0')
+		const lines = Array.from(
+			{ length: run_board_theme.LINE_LIMIT * 2 },
+			(_, index) => `ROW ${index}`,
+		)
+
+		run_board_theme.restyle('wargames', lines.join('\n'))
+
+		expect(run_board_theme.kept_lines()).toBe(run_board_theme.LINE_LIMIT)
+	})
+
+	it('makes the phosphor escape again when stdout changes its colors', () => {
+		const drawn = ['3', '1', '3'].map((force) => {
+			vi.stubEnv('FORCE_COLOR', force)
+
+			return run_board_theme.restyle('wargames', 'A')
+		})
+
+		expect(drawn).toStrictEqual([
+			`${RGB_PHOSPHOR}A${DEFAULT_FOREGROUND}`,
+			`${NAMED_CYAN}A${DEFAULT_FOREGROUND}`,
+			`${RGB_PHOSPHOR}A${DEFAULT_FOREGROUND}`,
+		])
 	})
 })
 
