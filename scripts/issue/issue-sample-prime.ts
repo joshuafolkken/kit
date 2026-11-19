@@ -1,3 +1,4 @@
+import { statSync } from 'node:fs'
 import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_rest } from '#scripts/gh/git-gh-issue-rest'
@@ -11,6 +12,7 @@ import {
 	issue_sample_gate,
 	type Condition,
 	type MergeSample,
+	type MergesSince,
 	type PullRead,
 } from './issue-sample-gate'
 
@@ -78,15 +80,58 @@ const DEFAULT_PORTS: PrimePorts = {
 	ledger_path: lane_ledger.target,
 }
 
-// The ledger's merges, read on each judgement so a merge recorded since the prime counts; an absent
-// ledger records none.
-function merges_of(path: string | undefined): () => ReadonlyArray<MergeSample> {
-	return function merges(): ReadonlyArray<MergeSample> {
-		if (path === undefined) return []
+// The windows read while the ledger kept one stamp, by their start; a new stamp drops them all.
+interface WindowCache {
+	stamp: string | undefined
+	readonly by_since: Map<number, ReadonlyArray<MergeSample>>
+}
 
-		return lane_ledger
-			.read_entries(path)
-			.filter((entry): entry is MergeEntry => entry.kind === lane_ledger.KIND.MERGE)
+// The ledger file's identity and size; `undefined` when it is absent.
+function stamp_of(path: string): string | undefined {
+	const stat = statSync(path, { throwIfNoEntry: false })
+
+	return stat === undefined
+		? undefined
+		: `${String(stat.ino)}:${String(stat.size)}:${String(stat.mtimeMs)}`
+}
+
+function read_window(path: string, since_ms: number): ReadonlyArray<MergeSample> {
+	return lane_ledger
+		.read_since(path, since_ms)
+		.entries.filter((entry): entry is MergeEntry => entry.kind === lane_ledger.KIND.MERGE)
+}
+
+function cached_window(
+	path: string,
+	cache: WindowCache,
+	since_ms: number,
+): ReadonlyArray<MergeSample> {
+	const kept = cache.by_since.get(since_ms)
+
+	if (kept !== undefined) return kept
+
+	const merges = read_window(path, since_ms)
+
+	cache.by_since.set(since_ms, merges)
+
+	return merges
+}
+
+// joshuafolkken/kit#8057: the ledger's merges at or after `since_ms`, read from its tail on each
+// judgement so a merge recorded since the prime counts; the whole ledger is never read. A window is read
+// again only once the ledger changes, as the board judges each waiting issue on every redraw. An absent
+// ledger records none.
+function merges_of(path: string | undefined): MergesSince {
+	const cache: WindowCache = { stamp: undefined, by_since: new Map() }
+
+	return function merges(since_ms: number): ReadonlyArray<MergeSample> {
+		const stamp = path === undefined ? undefined : stamp_of(path)
+
+		if (path === undefined || stamp === undefined) return []
+		if (stamp !== cache.stamp) cache.by_since.clear()
+		cache.stamp = stamp
+
+		return cached_window(path, cache, since_ms)
 	}
 }
 

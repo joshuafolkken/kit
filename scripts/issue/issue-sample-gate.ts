@@ -63,9 +63,12 @@ interface MergeSample {
 	issue: number
 }
 
-// The ledger's merges as they read now; none until a prime has handed them over.
+// The ledger's merges at or after `since_ms` as they read now; none until a prime has handed them over.
+// joshuafolkken/kit#8057: a window, so the resident board never holds the whole ledger for the wait.
+type MergesSince = (since_ms: number) => ReadonlyArray<MergeSample>
+
 interface LedgerState {
-	merges: () => ReadonlyArray<MergeSample>
+	merges: MergesSince
 }
 
 // A cited number with no entry was never read. Keyed by `key_of`, as one number may be cited both ways.
@@ -139,7 +142,7 @@ function record(condition: Condition, pull: PullRead | undefined): void {
 	else pull_by_key.set(key, pull)
 }
 
-function use_merges(merges: () => ReadonlyArray<MergeSample>): void {
+function use_merges(merges: MergesSince): void {
 	ledger.merges = merges
 }
 
@@ -161,8 +164,9 @@ function unread_of(bodies: ReadonlyArray<string | undefined>): Array<Condition> 
 function merges_after({ merged_at, closes }: PullRead & { merged_at: string }): number {
 	const since = Date.parse(merged_at)
 
-	return ledger.merges().filter((merge) => merge.issue !== closes && Date.parse(merge.at) > since)
-		.length
+	return ledger
+		.merges(since)
+		.filter((merge) => merge.issue !== closes && Date.parse(merge.at) > since).length
 }
 
 // What the body still waits on, or `undefined` when it declares nothing or has its samples.
@@ -220,5 +224,5 @@ const issue_sample_gate = {
 	wait_of,
 }
 
-export type { Condition, MergeSample, PullRead, SampleWait }
+export type { Condition, MergeSample, MergesSince, PullRead, SampleWait }
 export { issue_sample_gate }
