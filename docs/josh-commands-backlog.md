@@ -1152,7 +1152,7 @@ A measurement declaration with no sample yet waits, not a lane (`sample conditio
 Merged causes use guarded `run:add --retry` for dependents; each offer, for cleared `followup` parks.
 
 A watch with no child running sends one `💤` Telegram per idle episode (merged count, `needs-decision` issues, issues waiting on a not-before date); the next dispatch ends the episode.
-A watch with a child still running and a lane free — no issue ready to start below the lane limit — sends one `💺` Telegram instead: `no issue ready to start: <free> lane(s) free, <running> running.`
+A watch with a child still running, a lane free and an `exhausted` or `parked` answer — no issue ready to start below the lane limit — sends one `💺` Telegram instead: `no issue ready to start: <free> lane(s) free, <running> running.`
 It is not repeated while the shortfall lasts; the next child launch ends the episode, so the next shortfall sends again. Every lane taken sends nothing. `JOSH_NOTIFY=off` silences both.
 
 The `needs-human-review` and `already-done` labels a backlog run reads are in [Labels and run states](./labels-and-run-states.md).

@@ -51,9 +51,21 @@ function is_watch(read: OfferRead): boolean {
 	return read.answer !== BLOCKED_ANSWER && read.verdict === WATCH_VERDICT
 }
 
-// A watch with a child still running is the shortfall (joshuafolkken/kit#8332): no issue is ready to
-// start while the run still holds lanes, so a free one waits on a person to supply work — the idle
-// notice says the same once nothing runs, so the two never fire on one pass.
+// Only these answers say no issue is ready; a watch draining a run that is ending (`--max` reached,
+// idle expired) still has `candidates`, and an `unreadable` listing says nothing either way.
+const NOTHING_READY_ANSWERS: ReadonlySet<string | undefined> = new Set(['exhausted', 'parked'])
+
+// A watch with a child still running and nothing ready is the shortfall (joshuafolkken/kit#8332): a
+// free lane waits on a person to supply work — the idle notice says the same once nothing runs, so the
+// two never fire on one pass.
+async function notice_running(
+	state: DriveState,
+	read: OfferRead,
+	ports: Pick<DrivePorts, 'shortfall'>,
+): Promise<void> {
+	if (NOTHING_READY_ANSWERS.has(read.answer)) await ports.shortfall(state)
+}
+
 async function noticed(
 	result: PassResult,
 	read: OfferRead,
@@ -63,7 +75,7 @@ async function noticed(
 
 	await (result.state.in_flight.length === 0
 		? ports.idle(result.state)
-		: ports.shortfall(result.state))
+		: notice_running(result.state, read, ports))
 
 	return result
 }
@@ -201,16 +213,26 @@ const SHORTFALL_PORTS: ShortfallPorts = {
 	send: send_shortfall,
 }
 
+// An unreadable lane count reads as none free: no notice rather than a guess.
+async function read_free(ports: ShortfallPorts): Promise<number> {
+	try {
+		return await ports.free_lanes()
+	} catch {
+		return 0
+	}
+}
+
 // The production `shortfall` port, best-effort as `notify` is. Lanes all taken is no shortfall, so the
 // marker is left unwritten and the episode stays open until a lane frees.
 async function shortfall(
 	state: DriveState,
 	ports: ShortfallPorts = SHORTFALL_PORTS,
 ): Promise<void> {
-	try {
-		const free = await ports.free_lanes()
+	const free = await read_free(ports)
 
-		if (free === 0) return
+	if (free === 0) return
+
+	try {
 		const body = await ports.emit(async () => describe_shortfall(state.in_flight.length, free))
 
 		if (body !== undefined) await ports.send(body)

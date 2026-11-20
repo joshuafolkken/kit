@@ -79,7 +79,7 @@ describe('backlog_drive — the idle port', () => {
 describe('backlog_drive — the shortfall port', () => {
 	it('notices a watch with a child in flight, apart from the idle notice', async () => {
 		const shortfall = vi.fn(async () => undefined)
-		const { ports, idles } = harness({ offers: [offer('watch')] })
+		const { ports, idles } = harness({ offers: [{ ...offer('watch'), answer: 'exhausted' }] })
 
 		await backlog_drive.run_pass(state([FIRST_CHILD]), true, { ...ports, shortfall })
 
@@ -87,9 +87,15 @@ describe('backlog_drive — the shortfall port', () => {
 		expect(idles).toStrictEqual([])
 	})
 
-	it('stays quiet with nothing in flight, on a retry, or on any other verdict', async () => {
+	it('stays quiet with nothing in flight, on a retry, a drain or an unreadable listing, or on any other verdict', async () => {
 		const shortfall = vi.fn(async () => undefined)
-		const offers = [offer('watch'), { ...offer('watch'), answer: 'blocked' }, offer('wait')]
+		const offers = [
+			{ ...offer('watch'), answer: 'parked' },
+			{ ...offer('watch'), answer: 'blocked' },
+			{ ...offer('watch'), answer: 'candidates' },
+			{ ...offer('watch'), answer: 'unreadable' },
+			offer('wait'),
+		]
 
 		await Promise.all(
 			offers.map(async (read, index) => {
@@ -144,14 +150,17 @@ describe('backlog_drive_idle.shortfall', () => {
 		expect(emit).not.toHaveBeenCalled()
 	})
 
-	it('drops an unreadable lane count, so the watch carries on', async () => {
+	it('drops an unreadable lane count unsent, so the watch carries on', async () => {
+		const emit = vi.fn(async () => SHORTFALL_TEXT)
 		const failing = shortfall_ports({
 			free_lanes: async () => {
 				throw new Error(SHORTFALL_TEXT)
 			},
+			emit,
 		})
 
 		await expect(backlog_drive_idle.shortfall(state(), failing)).resolves.toBeUndefined()
+		expect(emit).not.toHaveBeenCalled()
 	})
 })
 
