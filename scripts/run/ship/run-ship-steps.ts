@@ -47,7 +47,8 @@ async function josh(argv: ReadonlyArray<string>): Promise<JoshResult> {
 }
 
 // The pull request's preconditions and the scoped pair are asked first, so a stop they would cause
-// lands before the review and the gate rather than after them.
+// lands before the review and the gate rather than after them. A default branch that moved leaves the
+// pair to the sync stage's merged tree, which still stops before the review (joshuafolkken/kit#8304).
 const PREFLIGHT_STEP: Step = {
 	stage: STAGE.PREFLIGHT,
 	header: run_ship.PREFLIGHT_HEADER,

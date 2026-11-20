@@ -282,6 +282,7 @@ words:
   # its counterpart uses for the first of those alone. Neither reaches a distributed file.
   - untimed
   - unstarted
+  - undercounted
   # What `propagate-git-failure.ts` calls a branch `josh git` committed to and could not push — the
   # state a consumer's pre-push hook leaves behind (joshuafolkken/kit#1417). It reaches no
   # distributed file: the word appears only in that module's own unit suite.

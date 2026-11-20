@@ -69,12 +69,10 @@ describe('test_related.run_related_tests — a worker flag (joshuafolkken/kit#81
 		expect(flagged).toEqual(bare)
 	})
 
-	it('a narrowing file argument vouches for no tree', async () => {
+	// joshuafolkken/kit#8288: it still compares the green test by test.
+	it('a narrowing file argument compares the tree but vouches for none', async () => {
 		expect(await test_related.run_related_tests([SOURCE, WORKER_FLAG])).toBe(0)
-		expect(vi.mocked(test_related_reuse.read).mock.calls[0]?.slice(2)).toEqual([
-			undefined,
-			'scoped-arguments',
-		])
+		expect(vi.mocked(test_related_reuse.read).mock.calls[0]?.[2]).toBe(TREE)
 		expect(vouched_tree()).toBeUndefined()
 	})
 })
