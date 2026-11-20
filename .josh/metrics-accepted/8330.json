@@ -1,0 +1,7 @@
+{
+	"reason": "The live board's worker now judges whether a round's data moved (new run-board-round-change.ts) and the board's thread draws the machine samples itself, so unchanged rounds skip assembly and post (#8330)",
+	"date": "2026-11-20",
+	"growth": {
+		"scripts.code_lines": 55
+	}
+}

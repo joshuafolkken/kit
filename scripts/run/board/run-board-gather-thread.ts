@@ -10,6 +10,7 @@ import {
 	type GatherState,
 } from './run-board-gather'
 import { run_board_gather_record, type RecordSetup } from './run-board-gather-record'
+import { run_board_round_change, type RoundInputs } from './run-board-round-change'
 import {
 	run_board_state,
 	type BoardData,
@@ -40,10 +41,12 @@ const { layout_for } = run_board_tick
 // roster and snapshot data folded over them (`run-board-data.ts`), and the frame assembled over the
 // run's read (`run-board-display.ts`) — none before a run starts — so the board draws without the
 // run's read, whatever its size (joshuafolkken/kit#8160). The phases the worker timed ride along, so
-// `run:board --timing` reads them on the board's own thread.
+// `run:board --timing` reads them on the board's own thread. A round with no new frame hands over its
+// reads alone, with no `display` key: the board keeps drawing the last frame over them
+// (joshuafolkken/kit#8330).
 interface GatherPost {
 	read: GatherRead & { local: undefined }
-	display: BoardDisplay | undefined
+	display?: BoardDisplay | undefined
 	data?: DataPost | undefined
 	phases?: ReadonlyArray<TimedPhase> | undefined
 }
@@ -55,6 +58,8 @@ interface RoundState {
 	gather: GatherState
 	data: BoardData
 	board: BoardState
+	// What the last round's end handed over was assembled from (`run-board-round-change.ts`).
+	handed?: RoundInputs | undefined
 }
 
 // What a worker is started again from: the data and the carried sound the last one handed over.
@@ -122,13 +127,16 @@ function assembled(board: BoardState, data: BoardData, now_ms: number): Assemble
 	return { board: { ...state, ...display.carried }, display }
 }
 
-// One hand-over of `read` and the data stepped over it, its frame assembled at `now_ms`. The run's
-// read stays on the worker.
+// The reads handed over: the run's read stays on the worker.
+function reads_of(read: GatherState): GatherPost['read'] {
+	return { ...run_board_gather.read_of(read), local: undefined }
+}
+
+// One hand-over of `read` and the data stepped over it, its frame assembled at `now_ms`.
 function post_of(board: BoardState, read: GatherState, data: BoardData, now_ms: number): Handed {
-	const reads = { ...run_board_gather.read_of(read), local: undefined }
 	const { display, board: next } = assembled(board, data, now_ms)
 
-	return { post: { read: reads, display, data: run_board_data.posted(data) }, board: next }
+	return { post: { read: reads_of(read), display, data: run_board_data.posted(data) }, board: next }
 }
 
 function is_post(value: unknown): value is GatherPost {
@@ -192,19 +200,35 @@ async function post_early(
 	}
 }
 
+// The round's end — its reads, the data stepped over them and what a frame over them is assembled
+// from — handed over with the round's phases: its frame, or its reads alone when the frame would be the
+// one `last` handed over.
+function end_round(
+	last: RoundInputs | undefined,
+	kept: RoundKept,
+	ended: Pick<RoundState, 'gather' | 'data'> & { handed: RoundInputs },
+	io: RoundIo,
+): RoundState {
+	const post = run_board_round_change.is_unchanged(last, ended.handed, kept.board)
+		? { read: reads_of(ended.gather) }
+		: hand_over(kept, ended.gather, ended.data, io)
+
+	io.post({ ...post, phases: launch_timing.phases() })
+
+	return { ...ended, board: kept.board }
+}
+
 // The run's read is handed over as soon as it lands (joshuafolkken/kit#8134), and the round's end
-// hands its frame over again with the round's phases.
+// hands its frame over again (`end_round`).
 async function posted_round(state: RoundState, io: RoundIo): Promise<RoundState> {
 	const kept: RoundKept = { board: state.board, early: Promise.resolve(state.data) }
 	const next = await run_board_gather.gather(state.gather, io.ports, 'background', (read) => {
 		kept.early = post_early(kept.early, kept, read, io)
 	})
 	const data = await step_over(await kept.early, next, io.ports)
-	const phases = launch_timing.phases()
+	const handed = run_board_round_change.inputs_of(data, io.ports.now())
 
-	io.post({ ...hand_over(kept, next, data, io), phases })
-
-	return { gather: next, data, board: kept.board }
+	return end_round(state.handed, kept, { gather: next, data, handed }, io)
 }
 
 function is_data_post(value: unknown): value is DataPost {
@@ -240,7 +264,7 @@ async function gather_round(
 	} catch (error) {
 		post(failed_of(error))
 
-		return state
+		return { ...state, handed: undefined }
 	}
 }
 
@@ -261,20 +285,19 @@ function data_of(thread: Thread, post: GatherPost): DataPost | undefined {
 
 // A cue no redraw has sounded yet rides on to the next frame, so the round's end handed over before a
 // redraw does not drop the cue its early hand-over decided.
-function display_of(thread: Thread, post: GatherPost): BoardDisplay | undefined {
-	const { display } = post
-
+function display_of(thread: Thread, display: BoardDisplay | undefined): BoardDisplay | undefined {
 	if (display === undefined) return undefined
 
 	return { ...display, cue: display.cue ?? thread.latest?.display?.cue }
 }
 
+// A post with no frame keeps the last one, drawn over the post's reads.
 function receive(thread: Thread, post: GatherPost): void {
 	const { phases = [] } = post
 
 	for (const phase of phases) launch_timing.mark(phase.name, phase.ms)
 	const data = data_of(thread, post)
-	const display = display_of(thread, post)
+	const display = 'display' in post ? display_of(thread, post.display) : thread.latest?.display
 
 	settle(thread, { ...post.read, data, display, read_failed_ms: undefined, read_error: undefined })
 }

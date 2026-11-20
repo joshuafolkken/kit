@@ -83,7 +83,7 @@ describe('run_board_gather_thread.gather_round', () => {
 		const kept = await gather_round(FIRST_ROUND, ports, post)
 		const next = await gather_round(kept, ports, post)
 
-		expect(kept).toBe(FIRST_ROUND)
+		expect(kept).toStrictEqual({ ...FIRST_ROUND, handed: undefined })
 		expect(posts[0]).toStrictEqual({ failed: REASON })
 		expect(next.gather.local).toStrictEqual(LOCAL)
 		expect(posts[1]).toHaveProperty('read')
