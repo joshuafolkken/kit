@@ -15,7 +15,7 @@ import { gate_ledger, type GateLedgerStart } from './gate-ledger'
 import { gate_plan, type CheckSelection, type GatePlan } from './gate-plan'
 import { gate_report, type GateStepResult } from './gate-report'
 import { gate_run_steps, type ReusedChecks } from './gate-run-steps'
-import { gate_skip } from './gate-skip'
+import { gate_skip, type GateReuse } from './gate-skip'
 import { gate_static_group } from './gate-static-group'
 import { build_gate_step, build_gate_steps, UNIT_WORKER_FLAG } from './gate-steps'
 import { gate_tree, type GateTree } from './gate-tree'
@@ -238,6 +238,9 @@ interface GateOptions {
 	// Where each check's own green record lives (`check-reuse.ts`). Only the CLI entry resolves it, for
 	// the ledger's reason: a suite whose checks never ran must not record them green on the live tree.
 	check_records?: CheckRecords | undefined
+	// The kind of the reuse miss that sent this run to its checks, for the ledger's `fallback`. Set by
+	// the gate itself once the green record is refused, never by a caller.
+	reuse_miss?: string
 }
 
 // **Per-check records belong to the full local gate alone**: CI's `--no-unit` gate is the safety net
@@ -344,7 +347,7 @@ async function run_checked_gate(
 	}
 	// Read before the concurrent-run count, never between it and the marker below: the reading waits out
 	// a sample window, and a lane counting inside that window would miss this gate.
-	const ledger = await gate_ledger.start(options.ledger_path)
+	const ledger = await gate_ledger.start(options.ledger_path, options.reuse_miss)
 	// Resolved at the gate's entry, before this gate sets `JOSH_UNIT_RUN_MARKED`, so a gate nested in the
 	// unit suite reads the flag as set and reserves nothing.
 	const budget = gate_run_steps.default_budget()
@@ -370,18 +373,18 @@ async function run_checked_gate(
 }
 
 // `--force` is answered here rather than inside `gate_skip`, so the module stays about what the
-// record can prove and this one stays about what the caller asked for.
-async function reusable_stamp(
-	tree: GateTree,
-	options: GateOptions,
-): Promise<FileMapStamp | undefined> {
-	if (options.is_forced === true) return undefined
+// record can prove and this one stays about what the caller asked for. A miss keeps its reason, so
+// the ledger can say why the checks ran (joshuafolkken/kit#8285).
+async function gate_reuse_of(tree: GateTree, options: GateOptions): Promise<GateReuse> {
+	if (options.is_forced === true) return { miss: gate_skip.FORCED_MISS }
 
-	const stamp = gate_skip.reusable_green_gate(tree.files, tree.base, options.stamp_path)
+	const reuse = gate_skip.gate_reuse(tree.files, tree.base, options.stamp_path)
 
-	if (stamp === undefined || options.is_whole_tree_included !== true) return stamp
+	if ('miss' in reuse || options.is_whole_tree_included !== true) return reuse
 
-	return (await whole_tree_reuse.is_reused(tree, options.check_records)) ? stamp : undefined
+	const is_reused = await whole_tree_reuse.is_reused(tree, options.check_records)
+
+	return is_reused ? reuse : { miss: gate_skip.WHOLE_TREE_MISS }
 }
 
 // The reuse leaves its line in the ledger too, so `josh lane:stats` counts the gates it saved
@@ -398,20 +401,21 @@ async function reuse_gate(
 }
 
 // The two ways a gate ends before it runs a check: a green record it can reuse (exit 0), and the
-// scoped pre-check refusing a tree the pair has not been green on (exit 1). `undefined` means neither
-// fired and the checks run. **Nothing else stands between the skip and the checks.**
+// scoped pre-check refusing a tree the pair has not been green on (exit 1). A string means neither
+// fired and the checks run: it is the reuse miss's kind. **Nothing else stands between the skip and
+// the checks.**
 async function short_circuit_gate(
 	tree: GateTree,
 	options: GateOptions,
 	started_at: number,
-): Promise<number | undefined> {
-	const reusable = await reusable_stamp(tree, options)
+): Promise<number | string> {
+	const reuse = await gate_reuse_of(tree, options)
 
-	if (reusable !== undefined) return await reuse_gate(reusable, options, started_at)
+	if ('stamp' in reuse) return await reuse_gate(reuse.stamp, options, started_at)
 
 	const scoped_refusal = scoped_precheck_refusal(tree, options)
 
-	if (scoped_refusal === undefined) return undefined
+	if (scoped_refusal === undefined) return gate_skip.miss_kind(reuse.miss)
 
 	process.stderr.write(`${scoped_refusal}\n`)
 
@@ -425,9 +429,9 @@ async function run_verification_gate(options: GateOptions = {}): Promise<number>
 	const tree = await gate_tree.read_gate_tree()
 	const short_circuit = await short_circuit_gate(tree, options, started_at)
 
-	if (short_circuit !== undefined) return short_circuit
+	if (typeof short_circuit === 'number') return short_circuit
 
-	return await run_checked_gate(tree, options, started_at)
+	return await run_checked_gate(tree, { ...options, reuse_miss: short_circuit }, started_at)
 }
 
 // `josh gate` fans out to four sub-commands and forwards nothing to them, so an appended flag

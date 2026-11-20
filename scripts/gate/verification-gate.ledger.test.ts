@@ -41,12 +41,16 @@ function mock_every_check(exit_code: number): void {
 	mocked_execa.mockImplementation(gate_test_fixture.as_execa_implementation(fake_execa))
 }
 
-async function run_into(ledger_path: string | undefined, exit_code: number): Promise<number> {
+async function run_into(
+	ledger_path: string | undefined,
+	exit_code: number,
+	extra: { is_forced?: boolean } = {},
+): Promise<number> {
 	mock_every_check(exit_code)
 	const stdout = gate_test_fixture.capture_stdout()
 
 	try {
-		return await verification_gate.run_verification_gate({ ...RECORDS, ledger_path })
+		return await verification_gate.run_verification_gate({ ...RECORDS, ledger_path, ...extra })
 	} finally {
 		stdout.restore()
 	}
@@ -121,14 +125,45 @@ describe('run_verification_gate — a reused gate', () => {
 	it('records a reused gate as reused, running no check', async () => {
 		const ledger_path = path.join(scratch, 'gate-reused.jsonl')
 
-		vi.spyOn(gate_skip, 'reusable_green_gate').mockReturnValueOnce({
-			taken_at: new Date().toISOString(),
-			files: {},
+		vi.spyOn(gate_skip, 'gate_reuse').mockReturnValueOnce({
+			stamp: { taken_at: new Date().toISOString(), files: {} },
 		})
 		// Every check would fail, so a passing gate is one that ran none.
 		await expect(run_into(ledger_path, FAIL)).resolves.toBe(PASS)
+
+		const [entry] = lane_ledger.read_entries(ledger_path)
+
+		expect(entry).toMatchObject({ kind: 'gate', is_passed: true, is_reused: true })
+		expect(entry).not.toHaveProperty('fallback')
+	})
+})
+
+// joshuafolkken/kit#8285: a gate that ran its checks records why the green record was not reused.
+describe('run_verification_gate — why the green record was not reused', () => {
+	it.each([
+		['the merge base moved since the green gate (a → b)', 'base-moved'],
+		['a checked tool or environment variable changed since the green gate', 'inputs-moved'],
+		[
+			'no green gate record matches the changed files (3 changed, record covers 2, 1 differ)',
+			'record-differs',
+		],
+		['no green gate record matches the changed files', 'no-record'],
+	])('records the miss "%s" as fallback %s', async (miss, fallback) => {
+		const ledger_path = path.join(scratch, `gate-miss-${fallback}.jsonl`)
+
+		vi.spyOn(gate_skip, 'gate_reuse').mockReturnValueOnce({ miss })
+		await run_into(ledger_path, PASS)
+
+		expect(lane_ledger.read_entries(ledger_path)).toMatchObject([{ kind: 'gate', fallback }])
+	})
+
+	it('records a forced gate as fallback forced', async () => {
+		const ledger_path = path.join(scratch, 'gate-miss-forced.jsonl')
+
+		await run_into(ledger_path, PASS, { is_forced: true })
+
 		expect(lane_ledger.read_entries(ledger_path)).toMatchObject([
-			{ kind: 'gate', is_passed: true, is_reused: true },
+			{ kind: 'gate', fallback: 'forced' },
 		])
 	})
 })
