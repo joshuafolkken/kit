@@ -277,9 +277,9 @@ describe('investigator_foreground.lacks_background_field — remembered for the 
 		vi.stubEnv(delivered_rules.SWITCH_ENV_KEY, '')
 		writeFileSync(run.transcript, '')
 
-		expect(delivered_rules.delivery(payload)).toBe(investigator_foreground.ROW.reason)
+		expect(delivered_rules.delivery(payload, Date.now())).toBe(investigator_foreground.ROW.reason)
 		expect(lacks(string_tail, agent_call({ subagent_type: INVESTIGATOR }), run)).toBe(true)
-		expect(delivered_rules.delivery(payload)).toBeUndefined()
+		expect(delivered_rules.delivery(payload, Date.now())).toBeUndefined()
 	})
 })
 
@@ -347,7 +347,7 @@ describe('investigator_foreground.lacks_background_field — the row’s own ref
 		vi.stubEnv(delivered_rules.SWITCH_ENV_KEY, '')
 		writeFileSync(run.transcript, refused_tail)
 
-		expect(delivered_rules.delivery(payload_of(run, REWRITTEN_INPUT))).toBe(ROW_REASON)
+		expect(delivered_rules.delivery(payload_of(run, REWRITTEN_INPUT), Date.now())).toBe(ROW_REASON)
 	})
 })
 

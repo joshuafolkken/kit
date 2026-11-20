@@ -148,14 +148,14 @@ describe('is_parking_child', () => {
 		vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(true)
 		vi.spyOn(lane_handoff, 'is_handed_off').mockReturnValue(false)
 
-		expect(lane_park.is_parking_child(WORK_DIRECTORY)).toBe(true)
+		expect(lane_park.is_parking_child({ directory: WORK_DIRECTORY })).toBe(true)
 	})
 
 	it('reads a lane child handed to the detached ship as not parking', () => {
 		vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(true)
 		const handed_off = vi.spyOn(lane_handoff, 'is_handed_off').mockReturnValue(true)
 
-		expect(lane_park.is_parking_child(WORK_DIRECTORY)).toBe(false)
+		expect(lane_park.is_parking_child({ directory: WORK_DIRECTORY })).toBe(false)
 		expect(handed_off).toHaveBeenCalledWith(WORK_DIRECTORY, process.env)
 	})
 
@@ -163,7 +163,7 @@ describe('is_parking_child', () => {
 		vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(false)
 		const handed_off = vi.spyOn(lane_handoff, 'is_handed_off')
 
-		expect(lane_park.is_parking_child(WORK_DIRECTORY)).toBe(false)
+		expect(lane_park.is_parking_child({ directory: WORK_DIRECTORY })).toBe(false)
 		expect(handed_off).not.toHaveBeenCalled()
 	})
 })
@@ -183,13 +183,13 @@ describe('is_unparked_child', () => {
 	it('reads a parking child with no park record as unparked', () => {
 		vi.spyOn(run_park, 'is_parked_sync').mockReturnValue(false)
 
-		expect(lane_park.is_unparked_child(WORK_DIRECTORY)).toBe(true)
+		expect(lane_park.is_unparked_child({ directory: WORK_DIRECTORY })).toBe(true)
 	})
 
 	it('reads a parking child whose park is recorded as parked', () => {
 		const parked = vi.spyOn(run_park, 'is_parked_sync').mockReturnValue(true)
 
-		expect(lane_park.is_unparked_child(WORK_DIRECTORY)).toBe(false)
+		expect(lane_park.is_unparked_child({ directory: WORK_DIRECTORY })).toBe(false)
 		expect(parked).toHaveBeenCalledWith(ISSUE, WORK_DIRECTORY)
 	})
 
@@ -197,7 +197,7 @@ describe('is_unparked_child', () => {
 		vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(false)
 		const parked = vi.spyOn(run_park, 'is_parked_sync')
 
-		expect(lane_park.is_unparked_child(WORK_DIRECTORY)).toBe(false)
+		expect(lane_park.is_unparked_child({ directory: WORK_DIRECTORY })).toBe(false)
 		expect(parked).not.toHaveBeenCalled()
 	})
 })

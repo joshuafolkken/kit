@@ -61,7 +61,7 @@ beforeEach(() => {
 
 describe('the branch to pull request number resolution', () => {
 	it('asks gh for the pull requests whose head is that branch', async () => {
-		stub(pr_routes())
+		stub(pr_routes({}))
 
 		await expect(git_gh_pr_read.pr_get_number(PR_BRANCH)).resolves.toBe(PR_NUMBER)
 		expect(mocked_api).toHaveBeenCalledWith({ path: pr_lookup_path() })
@@ -70,7 +70,7 @@ describe('the branch to pull request number resolution', () => {
 	// The whole point of resolving in one place: six branch-keyed readers were one request each, and
 	// a naive rewrite makes every one of them two.
 	it('resolves a branch once and reuses the number', async () => {
-		stub(pr_routes())
+		stub(pr_routes({}))
 
 		await git_gh_pr_read.pr_get_number(PR_BRANCH)
 		await git_gh_pr_read.pr_get_url(PR_BRANCH)
@@ -104,7 +104,7 @@ describe('the branch to pull request number resolution', () => {
 	// `git-pr.ts` opens a second pull request on a branch whose first one merged, so the memo has to
 	// be dropped there or `pr_get_url` keeps answering with the merged one.
 	it('re-resolves after the memo is cleared', async () => {
-		stub(pr_routes())
+		stub(pr_routes({}))
 
 		await git_gh_pr_read.pr_get_number(PR_BRANCH)
 		forget_pr_numbers()
@@ -120,7 +120,7 @@ describe('the branch to pull request number resolution', () => {
 // because the describe above is at its line limit.
 describe('the branch to pull request number resolution — two readers in one tick', () => {
 	it('resolves a branch once when two readers ask together', async () => {
-		stub(pr_routes())
+		stub(pr_routes({}))
 
 		await Promise.all([git_gh_pr_read.pr_get_body(PR_BRANCH), git_gh_pr_read.pr_get_url(PR_BRANCH)])
 
@@ -218,14 +218,14 @@ describe('pr_exists tells an absent pull request from an unreadable lookup', () 
 
 describe('the reads keyed by the resolved number', () => {
 	it('finds a pull request the lookup resolved', async () => {
-		stub(pr_routes())
+		stub(pr_routes({}))
 
 		await expect(git_gh_pr_read.pr_exists(PR_BRANCH)).resolves.toBe(true)
 	})
 
 	// REST's own `url` is the API endpoint, which no reader of this value expects.
 	it('answers the browser url rather than the API endpoint', async () => {
-		stub(pr_routes())
+		stub(pr_routes({}))
 
 		await expect(git_gh_pr_read.pr_get_url(PR_BRANCH)).resolves.toBe(PR_HTML_URL)
 	})
@@ -297,7 +297,7 @@ describe.each([
 	})
 
 	it('reports a failed read rather than answering with an empty listing', async () => {
-		stub(pr_routes())
+		stub(pr_routes({}))
 
 		await expect(read(PR_BRANCH)).resolves.toBeUndefined()
 	})
