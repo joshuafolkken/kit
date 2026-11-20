@@ -136,6 +136,25 @@ pnpm josh doc:read backlogrun.md   # over the cap: prints a directive, no conten
 
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh doc:read` in detail".
 
+### `josh scratch:run`
+
+<!-- usage: scratch:run -->
+
+Run a scratch script that may write only to the scratch directory, with no network or child.
+
+```bash
+pnpm josh scratch:run .josh/tmp/scratch/chart.mjs   # writes only under .josh/tmp/scratch/
+```
+
+<!-- /usage -->
+
+- Runs a script from the scratch directory `.josh/tmp/scratch/` under Node's permission model: `--permission --allow-fs-read=* --allow-fs-write=<scratch real path>`.
+- No `--allow-net`, `--allow-child-process`, `--allow-worker` or `--allow-addons` — a write outside the scratch directory, a network call or a child process fails at runtime with `ERR_ACCESS_DENIED`.
+- Fails closed: a script outside the scratch directory is refused, and so is every run on a Node that does not know `--allow-net`.
+- The child's working directory is the script's directory.
+
+**Output / exit codes:** a refusal prints its reason and exits 1; otherwise the script's own exit code.
+
 ### `josh read:files`
 
 <!-- usage: read:files -->

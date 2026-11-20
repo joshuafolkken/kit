@@ -91,7 +91,8 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	// The `concurrent lanes` table's core-wait columns (joshuafolkken/kit#7550) crossed the 32768 block.
 	{ path: 'docs/josh-commands-lane.md', bytes: 36_864 },
 	// `cost:audit`'s dated period and usage breakdown (joshuafolkken/kit#7042) crossed the 16384 block.
-	{ path: 'docs/josh-commands-session.md', bytes: 20_480 },
+	// `josh scratch:run` (joshuafolkken/kit#8263) crossed the 20480 block.
+	{ path: 'docs/josh-commands-session.md', bytes: 24_576 },
 	// `josh effect:audit` (joshuafolkken/kit#4958) and `issue:priority`'s usage section (joshuafolkken/kit#4960) crossed the 57344 block;
 	// `josh prose:stale` (joshuafolkken/kit#5287) crossed the 61440 block; `josh diff:summary`
 	// (joshuafolkken/kit#5547) crossed the 65536 block; solo evidence in `backlog:triage`
