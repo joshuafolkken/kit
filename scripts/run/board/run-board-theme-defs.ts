@@ -11,6 +11,13 @@ interface IntroDefinition {
 	hold_ms: number
 }
 
+// The live board's effects (joshuafolkken/kit#8360): whether each row types as it appears, and whether
+// the trill sounds while it types.
+interface LiveDefinition {
+	types_rows: boolean
+	trill: boolean
+}
+
 interface ThemeDefinition {
 	// The color the theme draws text no color is given in.
 	paint: Paint
@@ -21,6 +28,7 @@ interface ThemeDefinition {
 	// Whether a live board in the theme draws the lamp panel (`run-board-lamps.ts`;
 	// joshuafolkken/kit#8359).
 	lamps: boolean
+	live: LiveDefinition
 }
 
 const THEME_DEFS = {
@@ -30,6 +38,7 @@ const THEME_DEFS = {
 		intro: { line: 'SHALL WE PLAY A GAME?', letter_ms: 50, hold_ms: 2000 },
 		alert: run_board_header_defcon.field_of,
 		lamps: true,
+		live: { types_rows: true, trill: true },
 	},
 } as const satisfies Readonly<Record<string, ThemeDefinition>>
 
@@ -56,4 +65,4 @@ const run_board_theme_defs = {
 }
 
 export { run_board_theme_defs }
-export type { IntroDefinition, Theme, ThemeDefinition }
+export type { IntroDefinition, LiveDefinition, Theme, ThemeDefinition }
