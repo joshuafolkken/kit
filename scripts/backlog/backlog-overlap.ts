@@ -75,6 +75,39 @@ function declared_of(issues: ReadonlyArray<DeclaringIssue>): Declared {
 	return new Map(issues.map((issue) => [issue.number, declared_paths(issue.body ?? '')]))
 }
 
+// The tracked files by their name — `run-board-render.ts` → every tracked path ending in it.
+function by_name(files: ReadonlyArray<string>): ReadonlyMap<string, ReadonlyArray<string>> {
+	const names = new Map<string, Array<string>>()
+
+	for (const file of files) {
+		const name = file.slice(file.lastIndexOf(SEPARATOR) + 1)
+
+		names.set(name, [...(names.get(name) ?? []), file])
+	}
+
+	return names
+}
+
+function resolved_path(path: string, names: ReadonlyMap<string, ReadonlyArray<string>>): string {
+	const matches = path.includes(SEPARATOR) ? [] : (names.get(path) ?? [])
+
+	return matches.length === 1 ? (matches[0] ?? path) : path
+}
+
+// A bare file name a body writes with no directory (`run-board-render.ts`) is the one tracked file of
+// that name when exactly one exists, so it meets the full path a running lane plans
+// (joshuafolkken/kit#8273). A root file of that name is itself; none, or two of one name, keep the
+// root-file reading above rather than serialize on a guess.
+function with_resolved_names(declared: Declared, files: ReadonlyArray<string>): Declared {
+	const names = by_name(files)
+	const entries = [...declared].map(([number, paths]): [number, ReadonlySet<string>] => [
+		number,
+		new Set([...paths].map((path) => resolved_path(path, names))),
+	])
+
+	return new Map(entries)
+}
+
 function contains(outer: string, inner: string): boolean {
 	return outer.endsWith(SEPARATOR) ? inner.startsWith(outer) : outer === inner
 }
@@ -247,6 +280,7 @@ const backlog_overlap = {
 	running_clash,
 	running_numbers,
 	separate,
+	with_resolved_names,
 }
 
 export { backlog_overlap }
