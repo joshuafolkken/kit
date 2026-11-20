@@ -19,7 +19,19 @@ interface TestReuse {
 	elapsed_ms: number
 }
 
-const NO_RECORD = 'no-comparable-green'
+// **Each reuse miss keeps its own cause in the ledger** (joshuafolkken/kit#8283): a comparable
+// green that cannot be read answers `green-` and the since-green fallback, so `reuse_reason` counts
+// which cause to fix instead of one value for all.
+// A run handed no tree names why, from the caller that withheld it (`test-related.ts`).
+const GREEN_MISS = 'green-'
+const SCOPE_MISS = 'scope-'
+const MISS = {
+	NO_TREE: 'no-gate-tree',
+	AFTER_RED: `${GREEN_MISS}${since_green.FALLBACK.AFTER_RED}`,
+	SCOPED_ARGUMENTS: 'scoped-arguments',
+} as const
+
+type ReuseMiss = (typeof MISS)[keyof typeof MISS]
 
 function digest_of(graph: ImportGraph, file: string): string | undefined {
 	const inputs = graph.test_inputs?.(file)
@@ -92,17 +104,30 @@ async function compare(
 	scope: RelatedScope,
 	tree: GateTree,
 ): Promise<Omit<TestReuse, 'elapsed_ms'>> {
-	const parts = await since_green.read_moved_parts(
+	const verdict = await since_green.read_verdict(
 		review_stamps.test_related_stamp,
 		gate_labels.UNIT_LABEL,
 		undefined,
 		tree,
 	)
-	if (parts === undefined) return empty(NO_RECORD)
+	if ('fallback' in verdict) return empty(`${GREEN_MISS}${verdict.fallback}`)
 
-	if (moves_whole_suite(moved_paths.union_of(parts))) return empty('whole-suite-input')
+	if (moves_whole_suite(moved_paths.union_of(verdict.parts))) return empty('whole-suite-input')
 
 	return await select_scope(root, scope)
+}
+
+// No gate tree to compare, or a scope that is not `related`, never reaches the green record.
+async function attempt(
+	root: string,
+	scope: RelatedScope,
+	tree: GateTree | undefined,
+	miss: ReuseMiss,
+): Promise<Omit<TestReuse, 'elapsed_ms'>> {
+	if (tree === undefined) return empty(miss)
+	if (scope.mode !== 'related') return empty(`${SCOPE_MISS}${scope.mode}`)
+
+	return await compare(root, scope, tree)
 }
 
 async function blobs(root: string, files: ReadonlyArray<string>): Promise<Record<string, string>> {
@@ -131,14 +156,12 @@ async function read(
 	root: string,
 	scope: RelatedScope,
 	tree: GateTree | undefined,
+	miss: ReuseMiss = MISS.NO_TREE,
 ): Promise<TestReuse> {
 	const started = performance.now()
 
 	try {
-		const result =
-			tree === undefined || scope.mode !== 'related'
-				? empty(NO_RECORD)
-				: await compare(root, scope, tree)
+		const result = await attempt(root, scope, tree, miss)
 
 		return { ...result, elapsed_ms: performance.now() - started }
 	} catch {
@@ -186,7 +209,7 @@ function flags(reuse: TestReuse | undefined): ReadonlyArray<string> {
 	return ['--passWithNoTests', ...reuse.excluded.flatMap((file) => ['--exclude', file])]
 }
 
-const test_related_reuse = { blobs, carried, flags, read, retained }
+const test_related_reuse = { MISS, blobs, carried, flags, read, retained }
 
-export type { TestReuse }
+export type { ReuseMiss, TestReuse }
 export { test_related_reuse }
