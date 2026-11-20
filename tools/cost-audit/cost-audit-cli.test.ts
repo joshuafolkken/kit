@@ -3,7 +3,10 @@ import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { measure_declaration, type MeasureDeclaration } from '#scripts/issue/measure-declaration'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { lane_breakdown, type Breakdown } from '#scripts/lane/lane-breakdown'
+import type { LedgerEntry } from '#scripts/lane/lane-ledger'
+import { lane_ledger_archive } from '#scripts/lane/lane-ledger-archive'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { cost_audit } from './cost-audit'
 import { cost_audit_cli } from './cost-audit-cli'
 import { cost_audit_fixture } from './cost-audit-fixture'
 import { cost_audit_read } from './cost-audit-read'
@@ -159,6 +162,37 @@ describe('cost_audit_cli.run — the printed report', () => {
 
 		expect(await cost_audit_cli.run(['--period', '0'], '/repo', NOW_MS)).toBe(1)
 		expect(error).toHaveBeenCalledWith(cost_audit_cli.USAGE)
+	})
+})
+
+// joshuafolkken/kit#8383: the Issues the lane ledger records a merge of reach the audit.
+describe('cost_audit_cli.run — the merged-issue set', () => {
+	beforeEach(stub_sources)
+
+	it("passes the ledger's merge entries as merged_issues", async () => {
+		const at = '2026-01-10T00:00:00.000Z'
+		const entries: Array<LedgerEntry> = [
+			{ kind: 'merge', at, issue: 5 },
+			{ kind: 'dispatch', at, issue: 6 },
+		]
+
+		vi.spyOn(lane_ledger_archive, 'read_history').mockResolvedValue(entries)
+		const audit = vi.spyOn(cost_audit, 'audit')
+
+		vi.spyOn(console, 'info').mockImplementation(() => undefined)
+		await cost_audit_cli.run([], '/repo', NOW_MS)
+
+		expect(audit).toHaveBeenCalledWith(expect.objectContaining({ merged_issues: new Set([5]) }))
+	})
+
+	it('passes merged_issues as undefined when the ledger cannot be read', async () => {
+		vi.spyOn(lane_ledger_archive, 'read_history').mockRejectedValue(new Error('unreadable'))
+		const audit = vi.spyOn(cost_audit, 'audit')
+
+		vi.spyOn(console, 'info').mockImplementation(() => undefined)
+		await cost_audit_cli.run([], '/repo', NOW_MS)
+
+		expect(audit).toHaveBeenCalledWith(expect.objectContaining({ merged_issues: undefined }))
 	})
 })
 
