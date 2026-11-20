@@ -30,7 +30,7 @@ waits to the block limit, one that matches a mid-run line exits early. the `poll
 (`prompts/collaboration-workflow/rule-delivery.md`); in a started child, the `poll-loop-child` row.
 
 Nor a `sleep` chain followed by a read before the completion notification (`sleep 20; tail …/x.output`,
-`sleep 20; ps -p <pid>`) — the same poll unrolled; the same row refuses it.
+`sleep 20; ps -p <pid>`) — the same poll unrolled; the same row refuses it. Started child → `pnpm josh wait`: the `poll-loop-child` row.
 
 **To glance at interim output, `Read` the output file once**, never in a sleep loop. CI is waited on by
 `pnpm josh followup`; a progress heartbeat is `run:progress --wait`'s job (`early-heartbeat` refuses a

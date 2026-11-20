@@ -201,6 +201,24 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
+	wait: {
+		script: 'scripts/run/run-wait-main.ts',
+		description:
+			'Wait until a pid or process ends or a file exists, or one ship:wait chunk (done | pending)',
+		category: 'AI tools',
+		reference: [
+			'[--pid <pid> | --process <pattern> | --file <path>]',
+			'automation',
+			['processes', 'files'],
+		],
+		is_read_only: true,
+		usage: {
+			examples: [
+				{ arguments: '--process "run:chain <N>"', note: 'as `pgrep -f`' },
+				{ arguments: '', note: 'a background subagent: the chunk' },
+			],
+		},
+	},
 }
 
 export { PROGRESS_COMMANDS }
