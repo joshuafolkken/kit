@@ -11,6 +11,11 @@ import { run_review_pinned_accepted } from './run-review-pinned-accepted'
 // total or added an unpinned hunk stops here, not one ship later. The stage runs no command: its hold
 // is the check. Each one honours what this branch already accepted (`--accept-metrics`,
 // `--unpinned-ok`).
+//
+// **The fixed tree's `josh test:pinned` runs once, here** (joshuafolkken/kit#8271): the hold has
+// `pinned_check` launch it on the tree as the background check and wait on it, so the ship's
+// pre-detach, asking the same tree next, reads that answer instead of running the check again. A skip
+// under the reason, or a cache answer, launches nothing.
 
 const RECHECK = 'recheck'
 const SUCCESS_EXIT_CODE = 0
@@ -53,9 +58,11 @@ async function pinned_hold(
 	print: Print,
 ): Promise<HoldStop | undefined> {
 	const reason = await run_review_pinned_accepted.recorded_reason()
+
 	const result = await run_ship_pre_detach_pinned.pinned_check({
 		number: issue,
 		unpinned_ok: run_ship_pre_detach_pinned.ok_argv(reason),
+		is_launching: true,
 	})
 
 	if (result.code === SUCCESS_EXIT_CODE) return undefined
