@@ -10,6 +10,7 @@ import type { NowLine } from './run-board-now'
 import { run_board_render_slot } from './run-board-render-slot'
 import { run_board_row_key } from './run-board-row-key'
 import { run_board_spot } from './run-board-spot'
+import { run_board_theme_defs, type Theme } from './run-board-theme-defs'
 
 // The header's time cells (`run-board-header.ts`): the run's age over the `💓` — or over the minute an
 // ended run ended — over the third line's spinner and age, and the `💓`'s stale coloring a row's newest
@@ -35,6 +36,7 @@ interface TimeHeader {
 	activity: Pick<RunActivity, 'last_event_ms' | 'outage' | 'is_stopped'>
 	spinner: string | undefined
 	form: 'screen' | 'chat'
+	theme?: Theme | undefined
 	is_keyed?: boolean | undefined
 }
 
@@ -133,9 +135,11 @@ function fresh_age(now: NowLine | undefined, header: TimeHeader): number | undef
 }
 
 // Whether the third line's `″` is drawn as the placeholder the sweep below it is placed by
-// (joshuafolkken/kit#8240): on a terminal — where a spinner is given — for a run neither stopped nor
+// (joshuafolkken/kit#8240, #8425): in wargames on a terminal — where a spinner is given — for a run neither stopped nor
 // ended, so a run that waits keeps its heartbeat moving (joshuafolkken/kit#8404).
 function is_swept(header: TimeHeader, mark: RunMark): boolean {
+	if (!run_board_theme_defs.live_of(header.theme).sweep) return false
+
 	return header.spinner !== undefined && mark !== 'stopped' && header.ended_ms === undefined
 }
 
