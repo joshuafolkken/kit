@@ -35,6 +35,7 @@ interface Held {
 	is_stopped: boolean
 	child: Playing | undefined
 	file: string | undefined
+	generation: symbol | undefined
 }
 
 const DEFAULT_PORTS: TypingPorts = {
@@ -45,8 +46,8 @@ const DEFAULT_PORTS: TypingPorts = {
 }
 
 // An ended loop stays silent, including a clean exit: restarting would reintroduce the gap.
-function hold(held: Held, child: Playing): void {
-	if (!held.is_on || held.is_stopped) {
+function hold(held: Held, child: Playing, generation: symbol): void {
+	if (!held.is_on || held.is_stopped || held.generation !== generation) {
 		child.kill()
 
 		return
@@ -62,13 +63,16 @@ function hold(held: Held, child: Playing): void {
 function begin(held: Held, ports: TypingPorts): void {
 	held.file ??= ports.file()
 	if (held.file === undefined) return
+	const generation = Symbol('typing playback')
+
+	held.generation = generation
 
 	ports.start(held.file, {
 		started: (child) => {
-			hold(held, child)
+			hold(held, child, generation)
 		},
 		failed: () => {
-			held.child = undefined
+			if (held.generation === generation) held.child = undefined
 		},
 	})
 }
@@ -87,7 +91,13 @@ function set(held: Held, ports: TypingPorts, is_on: boolean): void {
 
 // The board's trill, off until a line types; `stop` ends it for good as the board closes.
 function typing_sound(ports: TypingPorts = DEFAULT_PORTS): TypingSound {
-	const held: Held = { is_on: false, is_stopped: false, child: undefined, file: undefined }
+	const held: Held = {
+		is_on: false,
+		is_stopped: false,
+		child: undefined,
+		file: undefined,
+		generation: undefined,
+	}
 
 	return {
 		set: (is_on) => {

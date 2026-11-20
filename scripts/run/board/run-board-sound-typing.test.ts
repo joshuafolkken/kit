@@ -190,7 +190,55 @@ describe('run_board_sound_typing.typing_sound default ports', () => {
 	})
 })
 
+describe('run_board_sound_typing.typing_sound exited player', () => {
+	it('keeps the current player when an older player exits (ac-ebfbdd99)', () => {
+		const test = harness()
+		const sound = typing_sound(test.ports)
+
+		sound.set(true)
+		sound.set(false)
+		sound.set(true)
+		first_player(test)?.exit()
+		sound.stop()
+
+		expect(test.players[1]?.kill).toHaveBeenCalledOnce()
+	})
+
+	it('does not kill a player that already exited (ac-ebfbdd99)', () => {
+		const test = harness()
+		const sound = typing_sound(test.ports)
+
+		sound.set(true)
+		first_player(test)?.exit()
+		sound.set(false)
+
+		expect(first_player(test)?.kill).not.toHaveBeenCalled()
+	})
+})
+
 describe('run_board_sound_typing.typing_sound late player', () => {
+	it.each(['started', 'failed'] as const)(
+		'ignores an old %s after typing restarts (ac-ebfbdd99)',
+		(event) => {
+			const test = harness()
+			const old_player = fake_player()
+
+			test.start.mockImplementationOnce(() => undefined)
+			const sound = typing_sound(test.ports)
+
+			sound.set(true)
+			sound.set(false)
+			sound.set(true)
+			test.start.mock.calls[0]?.[1][event](old_player)
+			sound.stop()
+
+			expect([
+				first_player(test)?.kill.mock.calls.length,
+				old_player.kill.mock.calls.length,
+			]).toStrictEqual([1, event === 'started' ? 1 : 0])
+		},
+	)
+
 	it('kills a late player after typing stops (ac-ebfbdd99)', () => {
 		const test = harness()
 		const player = fake_player()

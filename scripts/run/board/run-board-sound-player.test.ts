@@ -180,6 +180,19 @@ function handlers(): {
 	return { started: vi.fn<StartHandlers['started']>(), failed: vi.fn<StartHandlers['failed']>() }
 }
 
+describe('run_board_sound_player.loop unsupported platform', () => {
+	it('reports an unsupported platform without spawning or ringing the bell (ac-fe518468)', () => {
+		const test = harness()
+		const told = handlers()
+
+		run_board_sound_player.loop(WAV, told, 'aix', test.ports)
+
+		expect(told.failed).toHaveBeenCalledOnce()
+		expect(test.spawner).not.toHaveBeenCalled()
+		expect(test.write).not.toHaveBeenCalled()
+	})
+})
+
 describe('run_board_sound_player.loop', () => {
 	it('loops within one player without restarting at clip boundaries (ac-036747cc)', () => {
 		const test = harness()
