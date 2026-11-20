@@ -229,14 +229,19 @@ function phases_inside(input: AuditInput, window: AuditWindow): Array<PhaseRow> 
 	})
 }
 
+// The lane-child density of the requests made inside `window`.
+function density_inside(sessions: ReadonlyArray<AuditSession>, window: AuditWindow): Density {
+	return cost_audit_density.density_of(inside(sessions, window))
+}
+
 function lane_density(
 	sessions: ReadonlyArray<AuditSession>,
 	current: AuditWindow,
 	previous: AuditWindow,
 ): LaneDensity {
 	return {
-		current: cost_audit_density.density_of(inside(sessions, current)),
-		previous: cost_audit_density.density_of(inside(sessions, previous)),
+		current: density_inside(sessions, current),
+		previous: density_inside(sessions, previous),
 	}
 }
 
@@ -284,7 +289,7 @@ function since_ms(days: number, now_ms: number): number {
 	return windows_of(days, now_ms)[1].start_ms
 }
 
-const cost_audit = { DEFAULT_PERIOD_DAYS, MS_PER_DAY, audit, since_ms, windows_of }
+const cost_audit = { DEFAULT_PERIOD_DAYS, MS_PER_DAY, audit, density_inside, since_ms, windows_of }
 
 export type { Audit, AuditRow, AuditWindow, LaneDensity, MergeCounts }
 export { cost_audit }

@@ -127,17 +127,23 @@ describe('cost_audit_format.report_lines — the lane-child density line', () =>
 
 // joshuafolkken/kit#5952: a measurement Issue declares the density, so it has to be a bare number.
 describe('cost_audit_format.density_value — the density as one number', () => {
-	it('prints the current period calls per request alone, two decimals', () => {
-		const lane_density = {
-			current: { requests: 4, calls: 8, single: 1 },
-			previous: { requests: 100, calls: 145, single: 79 },
-		}
-
-		expect(cost_audit_format.density_value(audit_with({ lane_density }))).toBe('2.00')
+	it('prints the calls per request alone, two decimals', () => {
+		expect(cost_audit_format.density_value({ requests: 4, calls: 8, single: 1 })).toBe('2.00')
 	})
 
 	it('answers nothing, not a zero, where no lane child made a request', () => {
-		expect(cost_audit_format.density_value(audit_with())).toBeUndefined()
+		expect(cost_audit_format.density_value(NO_DENSITY)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#8284: the line above the number names the value and the dates it covers.
+describe('cost_audit_format.density_label — the line over the density', () => {
+	it('names the value and the UTC dates of the window, its end excluded', () => {
+		const window = { start_ms: Date.UTC(2026, 10, 10), end_ms: Date.UTC(2026, 10, 19) }
+
+		expect(cost_audit_format.density_label(window)).toBe(
+			'lane-child calls per request 2026-11-10..2026-11-18',
+		)
 	})
 })
 
