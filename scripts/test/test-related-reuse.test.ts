@@ -1,6 +1,7 @@
 import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { gate_labels } from '#scripts/gate/gate-labels'
+import type { MovedParts } from '#scripts/gate/moved-paths'
 import { since_green } from '#scripts/gate/since-green'
 import { import_graph, type ImportGraph } from '#scripts/lint/import-graph'
 import { review_stamps } from '#scripts/review/review-stamps'
@@ -29,11 +30,17 @@ const GRAPH: ImportGraph = {
 	test_inputs: (file) => (file === UNKNOWN ? undefined : [file, SOURCE]),
 }
 
+// What moved since the green record, for both since-green readers the reuse module calls.
+function mock_moved(parts: MovedParts): void {
+	vi.spyOn(since_green, 'read_moved_parts').mockResolvedValue(parts)
+	vi.spyOn(since_green, 'read_verdict').mockResolvedValue({ parts })
+}
+
 beforeEach(() => {
 	for (const file of [SOURCE, ...TESTS]) writeFileSync(file, 'before')
 	vi.spyOn(import_graph, 'create').mockResolvedValue(GRAPH)
 	vi.spyOn(test_pinned_reach, 'code_universe').mockResolvedValue(TESTS)
-	vi.spyOn(since_green, 'read_moved_parts').mockResolvedValue({ changed: [], synced: ['main.ts'] })
+	mock_moved({ changed: [], synced: ['main.ts'] })
 })
 
 afterEach(() => {
@@ -75,7 +82,7 @@ describe('test_related_reuse without a main sync', () => {
 	beforeEach(async () => {
 		const blobs = await test_related_reuse.blobs(ROOT, TESTS)
 
-		vi.mocked(since_green.read_moved_parts).mockResolvedValue({ changed: [], synced: [] })
+		mock_moved({ changed: [], synced: [] })
 		vi.spyOn(review_stamps.test_related_stamp, 'read').mockReturnValue({
 			taken_at: '',
 			files: {},
@@ -102,10 +109,7 @@ describe('test_related_reuse without a main sync', () => {
 		expect(result).toMatchObject({ reused: 0, reason: 'closed-inputs-changed' })
 	})
 	it('reuses nothing once a whole-suite input changed on the branch', async () => {
-		vi.mocked(since_green.read_moved_parts).mockResolvedValue({
-			changed: [VITEST_CONFIG],
-			synced: [],
-		})
+		mock_moved({ changed: [VITEST_CONFIG], synced: [] })
 		const result = await test_related_reuse.read(ROOT, SCOPE, TREE)
 
 		expect(result).toMatchObject({ excluded: [], reason: 'whole-suite-input' })
@@ -122,23 +126,50 @@ describe('test_related_reuse fallbacks', () => {
 	it.each(['pnpm-lock.yaml', 'package.json', VITEST_CONFIG, 'tools/test/unit-projects.ts'])(
 		'invalidates on %s',
 		async (file) => {
-			vi.mocked(since_green.read_moved_parts).mockResolvedValue({ changed: [], synced: [file] })
+			mock_moved({ changed: [], synced: [file] })
 			const result = await test_related_reuse.read(ROOT, SCOPE, TREE)
 
 			expect(result.excluded).toEqual([])
 		},
 	)
 	it('requires the comparable successful scoped record, including tools and configuration', async () => {
-		vi.mocked(since_green.read_moved_parts).mockResolvedValue(undefined)
+		vi.mocked(since_green.read_verdict).mockResolvedValue({
+			fallback: since_green.FALLBACK.NO_RECORD,
+		})
 		const result = await test_related_reuse.read(ROOT, SCOPE, TREE)
 
 		expect(result.excluded).toEqual([])
-		expect(since_green.read_moved_parts).toHaveBeenCalledWith(
+		expect(since_green.read_verdict).toHaveBeenCalledWith(
 			review_stamps.test_related_stamp,
 			gate_labels.UNIT_LABEL,
 			undefined,
 			TREE,
 		)
+	})
+})
+
+// joshuafolkken/kit#8283: each reuse miss keeps its own cause in the ledger.
+describe('test_related_reuse miss reasons', () => {
+	it.each([
+		[since_green.FALLBACK.NO_RECORD, 'green-no-record'],
+		[since_green.FALLBACK.INPUT_MISMATCH, 'green-input-mismatch'],
+		[since_green.FALLBACK.NO_BASE, 'green-no-base'],
+		[since_green.FALLBACK.CONFIG_FILE, 'green-config-file'],
+	])('records the since-green fallback %s as %s', async (fallback, reason) => {
+		vi.mocked(since_green.read_verdict).mockResolvedValue({ fallback })
+		const result = await test_related_reuse.read(ROOT, SCOPE, TREE)
+
+		expect(result).toMatchObject({ excluded: [], reason })
+	})
+	it('records a run with no gate tree as no-gate-tree', async () => {
+		const result = await test_related_reuse.read(ROOT, SCOPE, undefined)
+
+		expect(result).toMatchObject({ excluded: [], reason: 'no-gate-tree' })
+	})
+	it('records a scope that is not related under its own mode', async () => {
+		const result = await test_related_reuse.read(ROOT, { ...SCOPE, mode: 'all' }, TREE)
+
+		expect(result).toMatchObject({ excluded: [], reason: 'scope-all' })
 	})
 })
 
