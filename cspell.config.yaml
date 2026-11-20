@@ -10,6 +10,9 @@ words:
   - ABCDEFGHJKLMNPQRSTUVWXYZ
   # The macOS and Linux audio players the board's sound player starts (#7945).
   - afplay
+  - osascript
+  - backpressure
+  - NSURL
   - paplay
   - aplay
   # osv-scanner's config table for ignored advisories and the picomatch advisory id it ignores (#7839).

@@ -15,6 +15,7 @@ const PAIR_MS = 50
 const TOLERANCE = 0.01
 const B_FLAT_5 = 932.33
 const D_6 = 1174.66
+const CLIP_SECONDS = 8
 const create_directory = temporary_directory()
 
 interface FakePlayer extends Playing {
@@ -113,6 +114,11 @@ function within(measured: number, expected: number): boolean {
 }
 
 describe('run_board_sound_typing WAV', () => {
+	it('doubles the clip to approximately eight seconds (ac-a2637e92)', () => {
+		const seconds = written_samples().length / SAMPLE_RATE
+
+		expect(within(seconds, CLIP_SECONDS)).toBe(true)
+	})
 	it('sounds B♭5 then D6, each within 1%', () => {
 		const samples = written_samples()
 		const [low, high] = [note_of(0), note_of(1)]
@@ -159,14 +165,14 @@ describe('run_board_sound_typing.typing_sound', () => {
 })
 
 describe('run_board_sound_typing.typing_sound player ends', () => {
-	it('starts the file again when it ends while still on, synthesizing it once', () => {
+	it('never restarts an ended stream while still on (ac-036747cc)', () => {
 		const test = harness()
 		const sound = typing_sound(test.ports)
 
 		sound.set(true)
 		first_player(test)?.exit()
 
-		expect(test.start).toHaveBeenCalledTimes(2)
+		expect(test.start).toHaveBeenCalledOnce()
 		expect(test.file).toHaveBeenCalledOnce()
 	})
 })
@@ -174,13 +180,29 @@ describe('run_board_sound_typing.typing_sound player ends', () => {
 describe('run_board_sound_typing.typing_sound default ports', () => {
 	it('plays the cached teletype WAV through the sound player by default', () => {
 		const cached = vi.spyOn(run_board_sound_wav, 'cached_wav').mockReturnValue(WAV)
-		const start = vi.spyOn(run_board_sound_player, 'start').mockReturnValue(undefined)
+		const start = vi.spyOn(run_board_sound_player, 'loop').mockReturnValue(undefined)
 
 		typing_sound().set(true)
 
 		expect(cached).toHaveBeenCalledWith(NAME, NOTES)
 		expect(start).toHaveBeenCalledWith(WAV, expect.anything())
 		vi.restoreAllMocks()
+	})
+})
+
+describe('run_board_sound_typing.typing_sound late player', () => {
+	it('kills a late player after typing stops (ac-ebfbdd99)', () => {
+		const test = harness()
+		const player = fake_player()
+
+		test.start.mockImplementation(() => undefined)
+		const sound = typing_sound(test.ports)
+
+		sound.set(true)
+		sound.stop()
+		test.start.mock.calls[0]?.[1].started(player)
+
+		expect(player.kill).toHaveBeenCalledOnce()
 	})
 })
 

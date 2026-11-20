@@ -5,8 +5,7 @@ import { run_board_sound_wav } from './run-board-sound-wav'
 // joshuafolkken/kit#8250: the teletype trill a live board in a theme sounds while a line types — two
 // sine notes, B♭5 then D6, one pair per letter at the intro's pace (the theme row's `intro.letter_ms`, `run-board-theme-defs.ts`). One player sounds it
 // however many rows type at once: `set` is idempotent, so a second `on` starts no second player and a
-// second `off` does nothing. The WAV is `TRILL_PAIRS` pairs long; a player that ends while the trill is
-// still on is started again on the same file, so a longer typing sounds without a gap. A
+// second `off` does nothing. The WAV is `TRILL_PAIRS` pairs long and loops in one audio stream. A
 // trill whose player cannot start stays silent rather than ringing BEL, which is the cues' single
 // notice. It is apart from the cues (`run-board-sound-cues.ts`): no tier, transition or repeat rule
 // reaches it, so a cue sounds over it.
@@ -16,7 +15,7 @@ const TELETYPE: ReadonlyArray<Note> = [
 	{ pitch: 'Bb5', ms: 25, wave: 'sine' },
 	{ pitch: 'D6', ms: 25, wave: 'sine' },
 ]
-const TRILL_PAIRS = 80
+const TRILL_PAIRS = 160
 const NOTES: ReadonlyArray<Note> = Array.from({ length: TRILL_PAIRS }, () => TELETYPE).flat()
 
 interface TypingSound {
@@ -41,20 +40,22 @@ interface Held {
 const DEFAULT_PORTS: TypingPorts = {
 	file: () => run_board_sound_wav.cached_wav(NAME, NOTES),
 	start: (file, handlers) => {
-		run_board_sound_player.start(file, handlers)
+		run_board_sound_player.loop(file, handlers)
 	},
 }
 
-// The player now sounding the trill; when it plays its file through (exit code 0) while the trill is
-// on, it is started again. A candidate that failed or was killed is no longer held, so its end starts
-// nothing, and a player that exits with a failure — a player with no audio server, say — is not
-// started again, so it is never started over and over while rows type.
-function hold(held: Held, child: Playing, restart: () => void): void {
+// An ended loop stays silent, including a clean exit: restarting would reintroduce the gap.
+function hold(held: Held, child: Playing): void {
+	if (!held.is_on || held.is_stopped) {
+		child.kill()
+
+		return
+	}
+
 	held.child = child
-	child.on('exit', (code) => {
+	child.on('exit', () => {
 		if (held.child !== child) return
 		held.child = undefined
-		if (code === 0 && held.is_on) restart()
 	})
 }
 
@@ -64,9 +65,7 @@ function begin(held: Held, ports: TypingPorts): void {
 
 	ports.start(held.file, {
 		started: (child) => {
-			hold(held, child, () => {
-				begin(held, ports)
-			})
+			hold(held, child)
 		},
 		failed: () => {
 			held.child = undefined
