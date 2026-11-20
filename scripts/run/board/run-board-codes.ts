@@ -69,15 +69,6 @@ function locked_at(typing: Typing): number | undefined {
 	return (step_of(done_ms) + SCATTER_STEPS) * CODE_MS
 }
 
-// The steps since the last row typed through by `at_ms`; `-1` while a row types or before any has.
-function cooled_steps(typing: Typing, at_ms: number): number {
-	const done_ms = run_board_type_rows.done_ms(typing)
-
-	if (done_ms === undefined || run_board_type_rows.is_typing(typing, at_ms)) return -1
-
-	return step_of(at_ms) - step_of(done_ms)
-}
-
 // Whether the rules run code at `at_ms`: while a row types, and until every cell is back to the rule.
 function is_coding(typing: Typing, cells: ReadonlyArray<RuleCell>, at_ms: number): boolean {
 	if (cells.length === 0) return false
@@ -103,20 +94,35 @@ function cell_text(cell: RuleCell, look: CellLook, at_ms: number): string {
 	return run_board_labels.painted(CODE_PAINT, look === 'rule' ? '-' : code_of(cell, at_ms))
 }
 
+// The moment whose code cells a write at `at_ms` covers: the last write's, `since_ms`, when the rules ran
+// code then, else this one's when they run code now; none when they ran code at neither.
+function covered_ms(
+	typing: Typing,
+	cells: ReadonlyArray<RuleCell>,
+	at_ms: number,
+	since_ms: number | undefined,
+): number | undefined {
+	if (since_ms !== undefined && is_coding(typing, cells, since_ms)) return since_ms
+
+	return is_coding(typing, cells, at_ms) ? at_ms : undefined
+}
+
 // The cells to write at `at_ms`: every cell running code, and the rule back in each cell that ran code at
 // `since_ms`, the last write — none to restore after a redraw, which drew the rules. A cell that is code
-// at `at_ms` was code at `since_ms` too, so the earlier step picks both.
+// at `at_ms` was code at `since_ms` too, so the earlier step picks both. The steps are counted from
+// `done_ms`, still ahead while a row types, so every cell runs code until it has typed through.
 function code_bytes(
 	typing: Typing,
 	cells: ReadonlyArray<RuleCell>,
 	at_ms: number,
 	since_ms: number | undefined,
 ): string {
-	const did_code = since_ms !== undefined && is_coding(typing, cells, since_ms)
+	const done_ms = run_board_type_rows.done_ms(typing)
+	const from_ms = covered_ms(typing, cells, at_ms, since_ms)
 
-	if (!did_code && !is_coding(typing, cells, at_ms)) return ''
-	const cooled = cooled_steps(typing, at_ms)
-	const passed = did_code ? Math.min(cooled_steps(typing, since_ms), cooled) : cooled
+	if (done_ms === undefined || from_ms === undefined) return ''
+	const cooled = step_of(at_ms) - step_of(done_ms)
+	const passed = step_of(from_ms) - step_of(done_ms)
 
 	return cells
 		.filter((cell) => look_of(cell, passed) === 'code')

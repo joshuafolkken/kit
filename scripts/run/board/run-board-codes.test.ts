@@ -195,8 +195,12 @@ describe('run_board_codes.locked_at', () => {
 		expect(locked_at(typing_at(START))).toBe(DONE + SCATTER_STEPS * CODE_MS)
 	})
 
-	it('is none before any row has typed', () => {
-		expect(locked_at({ seen: undefined, lines: [] })).toBeUndefined()
+	it('is none before any row has typed, and the rules run no code', () => {
+		const untyped: Typing = { seen: undefined, lines: [] }
+
+		expect(locked_at(untyped)).toBeUndefined()
+		expect(is_coding(untyped, CELLS, START)).toBe(false)
+		expect(code_bytes(untyped, CELLS, START, START - CODE_MS)).toBe('')
 	})
 
 	it.each([
