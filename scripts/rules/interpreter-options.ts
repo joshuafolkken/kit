@@ -142,23 +142,40 @@ function interpreter_word(word: string, name: string): string {
 	return SHELLS.has(name) ? word.replace(/^\+/u, '-') : word
 }
 
-function found_index(step: number, index: number): number {
-	return step === -1 ? index : -1
+// Where the option walk stops: `step` -1 at an inline flag, 0 at the script operand or `--`.
+interface OptionStop {
+	index: number
+	step: number
 }
 
-function inline_index(call: ProgramCall, flags: ReadonlySet<string>): number {
+function option_stop(call: ProgramCall, flags: ReadonlySet<string>): OptionStop {
 	let index = 0
 
 	while (index < call.args.length) {
 		const word = interpreter_word(syntax_word(call.args[index] ?? ''), call.name)
 		const step = option_step(word, flags, call.name)
 
-		if (step <= 0) return found_index(step, index)
+		if (step <= 0) return { index, step }
 
 		index += step
 	}
 
-	return -1
+	return { index: -1, step: 0 }
+}
+
+function inline_index(call: ProgramCall, flags: ReadonlySet<string>): number {
+	const stop = option_stop(call, flags)
+
+	return stop.step === -1 ? stop.index : -1
+}
+
+// joshuafolkken/kit#8262: the script file an interpreter runs, past its options and their values, or
+// `undefined` when it names none.
+function script_operand(call: ProgramCall): string | undefined {
+	const { index } = option_stop(call, new Set())
+	const word = call.args[index]
+
+	return word === LONG_FLAG ? call.args[index + NEXT] : word
 }
 
 function is_inline_execution(call: ProgramCall): boolean {
@@ -174,6 +191,12 @@ function shell_script_index(call: ProgramCall): number {
 	return inline_index(call, new Set([`-${SHELL_SCRIPT_LETTERS}`]))
 }
 
-const interpreter_options = { SHELLS, is_inline_execution, shell_script_index, syntax_word }
+const interpreter_options = {
+	SHELLS,
+	is_inline_execution,
+	script_operand,
+	shell_script_index,
+	syntax_word,
+}
 
 export { interpreter_options }
