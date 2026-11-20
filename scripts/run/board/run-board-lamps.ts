@@ -5,8 +5,9 @@ import { run_board_spot } from './run-board-spot'
 
 // The WOPR lamp panel of `run:board --theme wargames` (joshuafolkken/kit#8236): right of the throughput
 // rows' NOW, a `■` every other column up to the section's rule, lit yellow on the `24h` row and red on
-// the `7d` row, out at a quarter of the row's color (dim where the terminal has no 24-bit color). Lamps blink four to a group, each group on its own period and phase,
-// about four in ten lit; whether one is lit is read off the moment, its group and its place alone.
+// the `7d` row, out at a quarter of the row's color (dim where the terminal has no 24-bit color).
+// Lamps blink four to a group, each group on its own period and phase, about four in ten lit; whether
+// one is lit is read off the moment, its group and its place alone.
 
 const { LAMP, LAMP_MARK, LAMP_START } = run_board_spot
 const { GAUGE_SHADES, SPINNER_INTERVAL_MS, painted } = run_board_labels
