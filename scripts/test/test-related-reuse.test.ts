@@ -220,7 +220,35 @@ describe('test_related_reuse.retained', () => {
 		})
 		expect(await test_related_reuse.retained(ROOT, TREE)).toEqual([path.relative(ROOT, UNCHANGED)])
 	})
-	it('does not carry evidence across a moved base or file', async () => {
+	it('does not carry evidence across a moved base', async () => {
+		expect(await test_related_reuse.retained(ROOT, TREE)).toEqual([])
+	})
+})
+
+// joshuafolkken/kit#8289: a green that proves no test of its own (scope `none`) after a branch edit
+// keeps the earlier green's digests whose closed inputs still hash the same.
+describe('test_related_reuse.retained after a branch edit', () => {
+	beforeEach(async () => {
+		const blobs = await test_related_reuse.blobs(ROOT, [CHANGED, UNCHANGED])
+
+		vi.mocked(since_green.read_moved_parts).mockResolvedValue({ changed: ['docs.md'], synced: [] })
+		vi.spyOn(review_stamps.test_related_stamp, 'read').mockReturnValue({
+			taken_at: '',
+			files: {},
+			blobs,
+		})
+	})
+	it('keeps the digests of tests whose closed inputs are unchanged', async () => {
+		writeFileSync(CHANGED, 'after')
+
+		expect(await test_related_reuse.retained(ROOT, TREE)).toEqual([path.relative(ROOT, UNCHANGED)])
+	})
+	it('keeps nothing once a whole-suite input changed', async () => {
+		vi.mocked(since_green.read_moved_parts).mockResolvedValue({
+			changed: [VITEST_CONFIG],
+			synced: [],
+		})
+
 		expect(await test_related_reuse.retained(ROOT, TREE)).toEqual([])
 	})
 })
