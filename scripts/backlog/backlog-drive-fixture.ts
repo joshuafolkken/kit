@@ -312,13 +312,16 @@ function report_ports(
 	holds: Array<string | undefined>,
 	idles: Array<DriveState>,
 	pauses: Array<string>,
-): Pick<LoopPorts, 'hold' | 'idle' | 'paused'> {
+): Pick<LoopPorts, 'hold' | 'idle' | 'shortfall' | 'paused'> {
 	return {
 		hold: async (reason) => {
 			holds.push(reason)
 		},
 		idle: async (idle_state) => {
 			idles.push(idle_state)
+		},
+		shortfall: async () => {
+			// A suite reading the shortfall passes its own port (`backlog-drive-idle.test.ts`).
 		},
 		paused: async () => {
 			pauses.push('paused')

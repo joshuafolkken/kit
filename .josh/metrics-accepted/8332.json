@@ -1,0 +1,8 @@
+{
+	"reason": "#8332 adds the shortfall notice: a new driver port, notifier type, event kind and its documented condition",
+	"date": "2026-11-20",
+	"growth": {
+		"scripts.code_lines": 68,
+		"prose.long_paragraphs": 1
+	}
+}

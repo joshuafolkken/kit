@@ -192,6 +192,8 @@ Dependencies are re-installed against the lock the popped stash brought in. A th
 
 Launches reserve 470 MB, one lane's share of the measured claude RSS peak (its subagents run inside it), waiting for free memory without a timeout bypass. The child retains the claim. `run:board` shows the wait; `lane:stats` lists it as `lane:launch` under held-by.
 
+Below held-by, `held by cause` splits a `chain+gate` watch into its causes and `held behind` ranks the issues a hold waited on. Both count an overlapping hold in full under each row (`docs/maintainers/lane-limit-measurement.md` → "Why a free lane stayed empty").
+
 The child's pid is the one thing on stdout; a refusal is an empty capture beside a non-zero exit, as `lane:dispatch`'s is. A lane a park kept (dispatched before) is dispatched into, not reopened; a refused `lane:open`, pop or re-install stops it before dispatch.
 
 #### `josh lane:sample` / `josh lane:stats`

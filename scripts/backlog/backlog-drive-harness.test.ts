@@ -118,6 +118,7 @@ function ports(world_state: World): LoopPorts {
 		usage_limited: async () => false,
 		hold: async () => undefined,
 		idle: async () => undefined,
+		shortfall: async () => undefined,
 		paused: async () => undefined,
 		retrospective: async () => true,
 		now: () => new Date(world_state.clock),

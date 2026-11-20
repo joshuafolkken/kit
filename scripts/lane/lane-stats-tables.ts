@@ -98,6 +98,8 @@ function plan_tables(
 		lane_size_stats.table(entries, window, options),
 		lane_implement_rate.table(entries, window),
 		lane_held_stats.table(entries, window),
+		lane_held_stats.cause_table(entries, window),
+		lane_held_stats.blocker_table(entries, window),
 		lane_dispatch_wait_stats.table(entries, window, events),
 		lane_core_wait_stats.table(entries, window, options),
 	]

@@ -60,6 +60,16 @@ const NO_RECORD: Pick<
 	listing_changed: async () => false,
 }
 
+// The run's notices: none observed.
+const NO_NOTICE: Pick<DrivePorts, 'park' | 'stall' | 'hold' | 'idle' | 'shortfall' | 'paused'> = {
+	park: async () => undefined,
+	stall: async () => undefined,
+	hold: async () => undefined,
+	idle: async () => undefined,
+	shortfall: async () => undefined,
+	paused: async () => undefined,
+}
+
 function drive_ports(world: World): DrivePorts {
 	return {
 		is_finished: () => world.started,
@@ -82,11 +92,7 @@ function drive_ports(world: World): DrivePorts {
 		memory_held: async () => false,
 		usage_limited: async () => false,
 		yields: async () => [],
-		park: async () => undefined,
-		stall: async () => undefined,
-		hold: async () => undefined,
-		idle: async () => undefined,
-		paused: async () => undefined,
+		...NO_NOTICE,
 		retrospective: async () => true,
 		now: () => NOW,
 		sleep: async () => undefined,
