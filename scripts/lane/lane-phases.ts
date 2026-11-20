@@ -251,7 +251,7 @@ function text(rows: ReadonlyArray<PhaseRow>, lanes: number): string {
 	return [`Lane phases over ${String(lanes)} lanes (median, samples):`, ...lines].join('\n')
 }
 
-const lane_phases = { PHASE, line_of, merged_in, phases_of, rows_of, text }
+const lane_phases = { PHASE, line_of, merged_in, phases_of, row_of, rows_of, text }
 
 export { lane_phases }
 export type { PhaseRow, PhaseSample, Span }

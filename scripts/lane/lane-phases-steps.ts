@@ -1,28 +1,18 @@
-import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
 import { lane_ledger, type LedgerEntry } from './lane-ledger'
-import { lane_phases, type PhaseRow } from './lane-phases'
-import { lane_stats } from './lane-stats'
+import { lane_phases, type PhaseRow, type PhaseSample } from './lane-phases'
+import { lane_stage_events } from './lane-stage-events'
 
 // `josh lane:phases`'s two finer tables (joshuafolkken/kit#8291): each `run:chain` stage's and each
 // `josh ship` step's median minutes and sample count across the lanes read. A sample is one run of
 // the stage or step, not one lane, since `run:chain` runs several times per lane. The stages come
 // from the `chain-stage` lines `run:chain` appends as each stage ends (joshuafolkken/kit#8286); the
-// steps from the `stage` lines `josh ship` writes, whose `stage` is a `run_ship_stage.STAGE` value or
-// `pre-detach` — the other `stage` lines (`ci-wait`, the CodeRabbit waits) are not ship steps.
+// steps from the `stage` lines `josh ship` writes, whose `stage` is in `lane_stage_events.SHIP_STAGES`
+// — the other `stage` lines (`ci-wait`, the CodeRabbit waits) are not ship steps.
 
 type ChainStageEntry = Extract<LedgerEntry, { kind: typeof KIND.CHAIN_STAGE }>
 type StageEntry = Extract<LedgerEntry, { kind: typeof KIND.STAGE }>
 
-interface Sample {
-	readonly name: string
-	readonly ms: number
-}
-
-const { KIND, PRE_DETACH_STAGE } = lane_ledger
-const SHIP_STEPS: ReadonlySet<string> = new Set([
-	PRE_DETACH_STAGE,
-	...Object.values(run_ship_stage.STAGE),
-])
+const { KIND } = lane_ledger
 const UNIT = 'runs'
 
 function is_chain_stage(entry: LedgerEntry): entry is ChainStageEntry {
@@ -30,7 +20,7 @@ function is_chain_stage(entry: LedgerEntry): entry is ChainStageEntry {
 }
 
 function is_ship_step(entry: LedgerEntry): entry is StageEntry {
-	return entry.kind === KIND.STAGE && SHIP_STEPS.has(entry.stage)
+	return entry.kind === KIND.STAGE && lane_stage_events.SHIP_STAGES.has(entry.stage)
 }
 
 function is_lane(entry: LedgerEntry, issues: ReadonlySet<number>): boolean {
@@ -40,33 +30,26 @@ function is_lane(entry: LedgerEntry, issues: ReadonlySet<number>): boolean {
 function chain_samples(
 	entries: ReadonlyArray<LedgerEntry>,
 	issues: ReadonlySet<number>,
-): Array<Sample> {
+): Array<PhaseSample> {
 	return entries
 		.filter((entry): entry is ChainStageEntry => is_chain_stage(entry) && is_lane(entry, issues))
-		.map((entry) => ({ name: entry.name, ms: entry.elapsed_ms }))
+		.map((entry) => ({ phase: entry.name, ms: entry.elapsed_ms }))
 }
 
 function ship_samples(
 	entries: ReadonlyArray<LedgerEntry>,
 	issues: ReadonlySet<number>,
-): Array<Sample> {
+): Array<PhaseSample> {
 	return entries
 		.filter((entry): entry is StageEntry => is_ship_step(entry) && is_lane(entry, issues))
-		.map((entry) => ({ name: entry.stage, ms: entry.elapsed_ms }))
+		.map((entry) => ({ phase: entry.stage, ms: entry.elapsed_ms }))
 }
 
-function row_of(name: string, samples: ReadonlyArray<Sample>): Array<PhaseRow> {
-	const values = samples.filter((sample) => sample.name === name).map((sample) => sample.ms)
-	const median_ms = lane_stats.median(values)
+// One row per stage or step, in the order the names first appear.
+function rows_of(samples: ReadonlyArray<PhaseSample>): Array<PhaseRow> {
+	const names = [...new Set(samples.map((sample) => sample.phase))]
 
-	return median_ms === undefined ? [] : [{ phase: name, median_ms, samples: values.length }]
-}
-
-// One row per name, in the order the names first appear.
-function rows_of(samples: ReadonlyArray<Sample>): Array<PhaseRow> {
-	const names = [...new Set(samples.map((sample) => sample.name))]
-
-	return names.flatMap((name) => row_of(name, samples))
+	return names.flatMap((name) => lane_phases.row_of(name, samples))
 }
 
 // The earliest `chain-stage` line read, so a range before #8286 says where the records begin.

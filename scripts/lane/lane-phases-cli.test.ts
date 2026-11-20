@@ -41,14 +41,14 @@ function write(file: string, lines: ReadonlyArray<object>): void {
 
 // Three lanes merged at minutes 40, 140 and 340, read with "now" a day in. `rotated` moves lane 1's
 // rows but its merge into the archive beside the ledger, as rotation does.
-function source(rotated = false): Source {
+function source(rotated = false, extra: ReadonlyArray<object> = []): Source {
 	const directory = create_directory('lane-phases-')
 	const ledger = path.join(directory, 'ledger.jsonl')
 	const [dispatch, chain, merge] = lines_of(1, 0)
 	const first = rotated ? [merge] : [dispatch, chain, merge]
 
 	if (rotated) write(path.join(directory, 'ledger-archive.jsonl'), [dispatch, chain])
-	write(ledger, [...first, ...lines_of(2, 100), ...lines_of(3, 300)])
+	write(ledger, [...first, ...lines_of(2, 100), ...lines_of(3, 300), ...extra])
 
 	return {
 		ledger_path: async () => await ledger,
@@ -89,15 +89,6 @@ describe('lane_phases_cli.run', () => {
 		expect(await printed([SINCE, at(100)])).toContain(TWO_LANES)
 	})
 
-	it('prints the run:chain stage and josh ship step tables after the phases', async () => {
-		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
-
-		expect(await lane_phases_cli.run(['#1'], source())).toBe(0)
-		expect(String(info.mock.calls.at(1)?.at(0))).toMatch(
-			/^run:chain stages: .*\njosh ship steps: /u,
-		)
-	})
-
 	it('prints the usage for a malformed request', async () => {
 		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
 		const requests = [[], ['abc'], [SINCE, 'never'], [SINCE, at(0), '--to', at(1)]]
@@ -107,5 +98,28 @@ describe('lane_phases_cli.run', () => {
 
 		expect(codes).toEqual([1, 1, 1, 1])
 		expect(error).toHaveBeenCalledWith(lane_phases_cli.USAGE)
+	})
+})
+
+// joshuafolkken/kit#8291: the stage and step tables print after the phases.
+async function steps_printed(extra: ReadonlyArray<object> = []): Promise<string> {
+	const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+	expect(await lane_phases_cli.run(['#1'], source(false, extra))).toBe(0)
+
+	return String(info.mock.calls.at(1)?.at(0))
+}
+
+describe('lane_phases_cli.run — stage and step tables', () => {
+	it('prints the run:chain stage and josh ship step tables after the phases', async () => {
+		expect(await steps_printed()).toMatch(/^run:chain stages: .*\njosh ship steps: /u)
+	})
+
+	it('names where the chain-stage records begin from another lane than the ones named', async () => {
+		const other = { kind: 'chain-stage', issue: 3, result: 'passed', name: 'ship', at: at(5) }
+
+		expect(await steps_printed([{ ...other, elapsed_ms: 1 }])).toContain(
+			`(first recorded ${at(5)})`,
+		)
 	})
 })
