@@ -44,3 +44,20 @@ describe('run_board_tick — the sweep (joshuafolkken/kit#8240)', () => {
 		expect(drawn.spots).toStrictEqual([])
 	})
 })
+
+// joshuafolkken/kit#8404: a run that waits keeps its heartbeat — in a theme too.
+describe('run_board_tick — the sweep of a waiting run (joshuafolkken/kit#8404)', () => {
+	it('carries the sweep of a watching run in the wargames theme', () => {
+		const local = {
+			...LOCAL,
+			events: [{ pos: 0, at: new Date(START).toISOString(), kind: 'drain' as const, text: 'x' }],
+		}
+		const { ports } = harness(local, [])
+		const state: BoardState = { ...FRESH_STATE, run_started_ms: LOCAL.started_ms }
+		const themed = { ...ports, size: () => PANE, theme: 'wargames' as const }
+		const redraw = { ports: themed, now_ms: START + AGED_MS }
+		const drawn = drawn_from(state, local, redraw, layout_for(state, local, START))
+
+		expect(drawn.sweep).toBeDefined()
+	})
+})

@@ -132,10 +132,16 @@ function fresh_age(now: NowLine | undefined, header: TimeHeader): number | undef
 	return age === undefined ? undefined : age + header.now_ms - (header.ended_ms ?? header.now_ms)
 }
 
+// Whether the third line's `″` is drawn as the placeholder the sweep below it is placed by
+// (joshuafolkken/kit#8240): on a terminal — where a spinner is given — for a run neither stopped nor
+// ended, so a run that waits keeps its heartbeat moving (joshuafolkken/kit#8404).
+function is_swept(header: TimeHeader, mark: RunMark): boolean {
+	return header.spinner !== undefined && mark !== 'stopped' && header.ended_ms === undefined
+}
+
 // The third line's time: the spinner in the `⏰`'s and `💓`'s column — turning only while the run
 // works, so a watch or an end stands blank — then its age, digits under theirs, emphasized while what
-// the line says is fresh. Where the spinner turns, the age's `″` is drawn as the placeholder the sweep
-// below it is placed by (joshuafolkken/kit#8240).
+// the line says is fresh, its `″` the sweep's placeholder where the run is swept.
 function now_time(
 	header: TimeHeader,
 	mark: RunMark,
@@ -145,7 +151,7 @@ function now_time(
 	const spinner = WORKING_MARKS.has(mark) ? header.spinner : undefined
 	const icon = cell_of(spinner, run_board_fit.width_of(HEADER_ICONS.heartbeat))
 	const span = span_or_blank(now?.age_ms)
-	const age = spinner === undefined ? span : span.split(SECONDS_MARK).join(TICK)
+	const age = is_swept(header, mark) ? span.split(SECONDS_MARK).join(TICK) : span
 
 	return `${icon} ${padded(age, width, aged_fresh(age, fresh_age(now, header), header))}`
 }
