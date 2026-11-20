@@ -84,6 +84,15 @@ describe('run_board_strip.strip_cells', () => {
 		expect(STRIPS.every((cell) => cell.count === LAMP_COUNT)).toBe(true)
 	})
 
+	it('puts a strip on the screen row its blank line starts at, past a line that wraps, and none on a last blank line', () => {
+		const lines = [...LINES, '']
+		const starts = lines.map((_line, index) => index + 3)
+		const rules = run_board_codes.rule_cells(lines, starts, COLUMNS)
+		const strips = strip_cells(lines, starts, { lamps: LAMPS, rules })
+
+		expect(new Set(strips.map((cell) => cell.row))).toStrictEqual(new Set([4]))
+	})
+
 	it('puts none where the frame has no panel', () => {
 		expect(strip_cells(LINES, STARTS, { lamps: [], rules: RULES })).toStrictEqual([])
 	})

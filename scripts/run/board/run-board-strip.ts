@@ -51,9 +51,9 @@ function strip_cells(
 ): Array<StripCell> {
 	const columns = panel.lamps.filter((lamp) => lamp.panel_row === 0).map((lamp) => lamp.column)
 	const rule_rows = new Set(panel.rules.map((cell) => cell.row))
-	const rows = [...lines.keys()]
-		.filter((index) => is_blank(lines[index]) && rule_rows.has(starts[index + 1] ?? 0))
-		.map((index) => starts[index] ?? 1)
+	const rows = starts.filter(
+		(_start, index) => is_blank(lines[index]) && rule_rows.has(starts[index + 1] ?? 0),
+	)
 
 	return rows.flatMap((row) =>
 		columns.map((column, index) => ({ row, column, index, count: columns.length })),

@@ -181,14 +181,18 @@ describe('run_board_spin.spin_to_second — the rules', () => {
 	})
 })
 
-// The rule cells a live redraw of a frame with section rules keeps for the turns, in `theme`.
-function drawn_rules(theme: Theme | undefined): number {
+// What a live redraw of a frame with section rules keeps for the turns, in `theme`.
+function drawn_in(theme: Theme | undefined): ReturnType<typeof drawn_from> {
 	const { ports } = harness(LOCAL, [])
 	const state = { ...FRESH_STATE, plan: plan_titled('a'), run_started_ms: LOCAL.started_ms }
 	const types_rows = theme !== undefined
 	const redraw = { ports: { ...ports, types_rows, theme, size: () => WIDE }, now_ms: START }
 
-	return drawn_from(state, LOCAL, redraw, layout_for(state, LOCAL, START)).rules?.length ?? 0
+	return drawn_from(state, LOCAL, redraw, layout_for(state, LOCAL, START))
+}
+
+function drawn_rules(theme: Theme | undefined): number {
+	return drawn_in(theme).rules?.length ?? 0
 }
 
 describe('run_board_tick_draw.draw_display — the rules', () => {
@@ -198,5 +202,10 @@ describe('run_board_tick_draw.draw_display — the rules', () => {
 
 	it.each([undefined, 'matrix' as const])('keeps none in the %s theme', (theme) => {
 		expect(drawn_rules(theme)).toBe(0)
+	})
+
+	// joshuafolkken/kit#8376: the lamp strips come and go with the rules' code.
+	it.each([undefined, 'matrix' as const])('keeps no lamp strip in the %s theme', (theme) => {
+		expect(drawn_in(theme).strips).toStrictEqual([])
 	})
 })
