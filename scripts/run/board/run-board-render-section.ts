@@ -36,21 +36,41 @@ interface RuleColumn {
 	start: number
 }
 
-// A rule whose column labels stand over their cells: `── 🧵 lanes ── 💪 CPU ─ 🧠 MEM ───`, each label at
-// its column's start where the rule before it leaves room, and one blank after the label before it
-// where a rule and its blank do not fit (`/H ACTIVE`, joshuafolkken/kit#8280).
-function column_fill(room: number): string {
+// The characters before a column label, `room` columns short of its start.
+type ColumnFill = (room: number) => string
+
+// A rule and a blank to the label's start, at least one rule character where the rule has reached it.
+function forced_fill(room: number): string {
+	return `${RULE.repeat(Math.max(1, room - 1))} `
+}
+
+// A rule and a blank to the label's start, blanks alone where a rule and its blank do not fit
+// (`/H ACTIVE`, joshuafolkken/kit#8280).
+function tight_fill(room: number): string {
 	return room > 1 ? `${RULE.repeat(room - 1)} ` : ' '.repeat(Math.max(0, room))
 }
 
-function columns_rule(label: string, columns: ReadonlyArray<RuleColumn>): string {
+function rule_with(label: string, columns: ReadonlyArray<RuleColumn>, fill: ColumnFill): string {
 	let rule = `${RULE_LEAD} ${label} `
 
 	for (const column of columns) {
-		rule += `${column_fill(column.start - run_board_fit.width_of(rule))}${column.label} `
+		rule += `${fill(column.start - run_board_fit.width_of(rule))}${column.label} `
 	}
 
 	return `${rule}${RULE.repeat(Math.max(RULE_LEAD.length, RULE_WIDTH - run_board_fit.width_of(rule)))}`
+}
+
+// A rule whose column labels stand over their cells: `── 🧵 lanes ── 💪 CPU ─ 🧠 MEM ───`, each label at
+// its column's start where the rule before it leaves room, and one rule character after the label
+// before it where it does not.
+function columns_rule(label: string, columns: ReadonlyArray<RuleColumn>): string {
+	return rule_with(label, columns, forced_fill)
+}
+
+// `columns_rule` with no rule forced between labels: a label the rule has reached runs on after one
+// blank, so labels a column apart keep their columns (the throughput rule, joshuafolkken/kit#8280).
+function tight_columns_rule(label: string, columns: ReadonlyArray<RuleColumn>): string {
+	return rule_with(label, columns, tight_fill)
 }
 
 function heading_lines(heading: string | undefined): Array<string> {
@@ -105,8 +125,9 @@ function widened(head: ReadonlyArray<string>, width: number): Array<string> {
 }
 
 // Where an open head draws the rule character its ▾ gives up: in the first run of rules longer than
-// the one `columns_rule` keeps between labels, so a column label a lone rule pushed past its start
-// comes back to it and every later label stands where it did (joshuafolkken/kit#8257).
+// the one `columns_rule` forces between labels (`tight_columns_rule` forces none), so a column label a
+// lone rule pushed past its start comes back to it and every later label stands where it did
+// (joshuafolkken/kit#8257).
 function given_up_at(rest: string): number {
 	const run = rest.indexOf(RULE_LEAD)
 
@@ -194,6 +215,7 @@ const run_board_render_section = {
 	open_head,
 	plan_section,
 	row_count,
+	tight_columns_rule,
 	widened,
 }
 

@@ -22,7 +22,8 @@ const SPARK_WIDTH = 24
 // Where the first column starts: the indent, the row's label, its gap and the sparkline.
 const LEAD_WIDTH = ROW_INDENT.length + ROW_LABEL_WIDTH + COLUMN_GAP_WIDTH + SPARK_WIDTH
 // Each column's fewest characters, wide enough for `99.9`, `168h` and four-digit closes so the rows'
-// figures keep their place (joshuafolkken/kit#8280); a wider figure widens its column.
+// figures keep their place (joshuafolkken/kit#8280); a wider figure widens its column. The 5-wide
+// HOURS, DONE and PEAK also leave room for ` ─ ` before the DONE, PEAK and NOW labels.
 const RATE_WIDTH = 4
 const HOURS_WIDTH = 5
 const DONE_WIDTH = 5
@@ -131,7 +132,7 @@ function rows_part(rows: ReadonlyArray<ThroughputRow>, has_lamps = false): Detai
 		text: line_of(row, widths, has_lamps ? run_board_lamps.start_of(index) : undefined),
 		is_detail: false,
 	}))
-	const rule = run_board_render_section.columns_rule(LABEL, rule_columns(widths))
+	const rule = run_board_render_section.tight_columns_rule(LABEL, rule_columns(widths))
 
 	return { head: ['', rule], lines, label: LABEL, summary: summary_of(rows) }
 }
