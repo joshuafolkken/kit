@@ -48,11 +48,28 @@ interface TriggerRow {
 	previous: TriggerTotal
 }
 
+interface Classified {
+	kind: string
+	trigger: string | undefined
+}
+
 // The trigger a `resume` session's opening prompt names, `undefined` for every other kind.
 function prompt_trigger(kind: string, prompt: string): string | undefined {
 	if (kind !== cost_audit_kind.RESUME) return undefined
 
 	return PROMPT_RULES.find(([marker]) => prompt.includes(marker))?.[1] ?? UNKNOWN
+}
+
+// A session's kind and trigger from the kind its opening prompt gave and every user prompt it holds,
+// the opening one first. The outage relaunch resumes the stopped session (`lane-resume.ts`), so its
+// prompt follows the opening `fullrun` one: any prompt naming the outage makes the session an outage
+// resume.
+function classify(kind: string, prompts: ReadonlyArray<string>): Classified {
+	const is_outage = prompts.some((prompt) => prompt.includes(lane_child_invocation.OUTAGE_MARKER))
+
+	if (is_outage) return { kind: cost_audit_kind.RESUME, trigger: OUTAGE }
+
+	return { kind, trigger: prompt_trigger(kind, prompts[0] ?? '') }
 }
 
 function commands_of(lines: ReadonlyArray<TranscriptLine>): Array<string> {
@@ -160,11 +177,12 @@ const cost_audit_resume = {
 	REVIEW_FIX_CUT,
 	SHIP_STOP,
 	UNKNOWN,
+	classify,
 	cut_trigger,
 	prompt_trigger,
 	rows_of,
 	with_triggers,
 }
 
-export type { TriggerRow, TriggerTotal }
+export type { Classified, TriggerRow, TriggerTotal }
 export { cost_audit_resume }

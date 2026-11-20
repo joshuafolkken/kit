@@ -10,6 +10,7 @@ import { cost_audit_read } from './cost-audit-read'
 const { prompt_line, request_line, record, session } = cost_audit_fixture
 
 const FULLRUN_PROMPT = 'fullrun #1'
+const OUTAGE_PROMPT = lane_child_invocation.outage_resume_invocation('1')
 const LANE = '/p/-dev--kit-lanes-5936'
 const MAIN_FILE = {
 	session_id: 's1',
@@ -50,20 +51,45 @@ describe('cost_audit_read.session_of — one transcript read into a session', ()
 		expect(cost_audit_read.session_of(text, false, true).is_lane).toBe(true)
 	})
 
-	// joshuafolkken/kit#8311: only a resume session carries the trigger its prompt names.
-	it('gives a resume session its trigger and a run session none', () => {
-		const outage = lane_child_invocation.outage_resume_invocation('1')
-		const resumed = cost_audit_read.session_of(prompt_line(0, outage), false, true)
-
-		expect(resumed.trigger).toBe('API outage')
-		expect(read.trigger).toBeUndefined()
-	})
-
 	// A delegated review's kind is `review`, not `subagent`, so only the delegation flag keeps it out.
 	it('leaves a delegated unit in a lane transcript directory unmarked', () => {
 		const review = [prompt_line(0, 'Run /code-review'), request_line(1, 'r1', 1, [GREP])].join('\n')
 
 		expect(cost_audit_read.session_of(review, true, true).is_lane).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#8311: why a resume session was started, read off its user prompts.
+const OUTAGE_RESUME = ['resume', 'API outage']
+const FULLRUN = ['fullrun', undefined]
+
+function kind_and_trigger(lines: ReadonlyArray<string>): Array<string | undefined> {
+	const read = cost_audit_read.session_of(lines.join('\n'), false, true)
+
+	return [read.kind, read.trigger]
+}
+
+describe('cost_audit_read.session_of — the trigger of a resume session', () => {
+	it('gives a resume session its trigger and a run session none', () => {
+		expect(kind_and_trigger([prompt_line(0, OUTAGE_PROMPT)])).toStrictEqual(OUTAGE_RESUME)
+		expect(kind_and_trigger([prompt_line(0, FULLRUN_PROMPT)])).toStrictEqual(FULLRUN)
+	})
+
+	// The outage relaunch resumes the stopped session, so its prompt follows the opening fullrun one.
+	it('reads an outage prompt after the opening fullrun prompt as an outage resume', () => {
+		const relaunched = [
+			prompt_line(0, FULLRUN_PROMPT),
+			request_line(1, 'r1', 1, [GREP]),
+			prompt_line(2, OUTAGE_PROMPT),
+		]
+
+		expect(kind_and_trigger(relaunched)).toStrictEqual(OUTAGE_RESUME)
+	})
+
+	it('keeps the opening prompt the kind when a later prompt names no outage', () => {
+		const later = [prompt_line(0, FULLRUN_PROMPT), prompt_line(1, 'carry on')]
+
+		expect(kind_and_trigger(later)).toStrictEqual(FULLRUN)
 	})
 })
 
