@@ -8,8 +8,8 @@ import { review_record_pinned } from './review-record-pinned'
 import { review_reviewed_tree } from './review-reviewed-tree'
 
 // joshuafolkken/kit#4834: a recorded code round records its tree, names the ship next for a lane child,
-// names a due interaction pass, and starts test:pinned again on a tree its fixes moved — in that order,
-// each over the same checkout. Only a lane child's round the ship reuses restarts the check.
+// names a due interaction pass, and reads a skipped join — in that order, each over the same checkout.
+// joshuafolkken/kit#8271: it starts no test:pinned; the recheck before the ship judges the fixed tree.
 
 const ISSUE = 4834
 const ROOT = '/checkout'
@@ -35,6 +35,11 @@ function spy_steps(order: Array<string>, is_handed_over: boolean): void {
 
 		return true
 	})
+	vi.spyOn(review_record_pinned, 'restart_in_lane').mockImplementation(async () => {
+		order.push('pinned')
+
+		return true
+	})
 }
 
 beforeEach(() => {
@@ -47,7 +52,7 @@ afterEach(() => {
 })
 
 describe('review_record_code_round.follow', () => {
-	it('records the tree with the High-cited files unsettled, then the handover, the due pass, the skipped join and the restart', async () => {
+	it('records the tree with the High-cited files unsettled, then the handover, the due pass and the skipped join', async () => {
 		const order: Array<string> = []
 
 		spy_steps(order, true)
@@ -62,8 +67,17 @@ describe('review_record_code_round.follow', () => {
 		expect(review_lane_handover.is_handed_over).toHaveBeenCalledWith(ISSUE)
 		expect(console.info).toHaveBeenCalledWith(review_lane_handover.NEXT_STEP_LINE)
 		expect(review_record_interaction.report_due).toHaveBeenCalledWith(ISSUE, ROOT)
-		expect(review_record_pinned.restart_if_moved).toHaveBeenCalledWith(ROOT)
-		expect(order).toStrictEqual(['tree', 'handover', 'interaction', 'join', 'pinned'])
+		expect(order).toStrictEqual(['tree', 'handover', 'interaction', 'join'])
+	})
+
+	// ac-492b1176: the record's restart probed a tree the held finding's fix then moved.
+	it('starts no test:pinned on the fixed tree, which the recheck before the ship judges', async () => {
+		spy_steps([], true)
+
+		await review_record_code_round.follow(ISSUE, ROOT, [])
+
+		expect(review_record_pinned.restart_if_moved).not.toHaveBeenCalled()
+		expect(review_record_pinned.restart_in_lane).not.toHaveBeenCalled()
 	})
 })
 

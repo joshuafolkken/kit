@@ -1,9 +1,11 @@
 import { metrics_totals } from '#scripts/gate/metrics-totals'
+import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { review_record_slot } from '#scripts/review/review-record-slot'
 import { run_review_pinned_accepted } from '#scripts/run/review/run-review-pinned-accepted'
 import { run_ship_pre_detach_pinned } from '#scripts/run/ship/run-ship-pre-detach-pinned'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_chain_cli } from './run-chain-cli'
+import { run_review_pinned_join } from './run-review-pinned-join'
 
 const josh_run_mock = vi.hoisted(() =>
 	vi.fn(async (_argv: ReadonlyArray<string>) => ({ code: 0, out: '' })),
@@ -47,6 +49,7 @@ beforeEach(() => {
 	josh_run_mock.mockResolvedValue({ code: 0, out: '' })
 	vi.spyOn(review_record_slot, 'slot_text').mockReturnValue('')
 	vi.spyOn(run_review_pinned_accepted, 'recorded_reason').mockResolvedValue(undefined)
+	vi.spyOn(run_review_pinned_join, 'launch_on_tree').mockResolvedValue()
 	totals_answer(undefined)
 	pinned_answers(0, '')
 	printed.length = 0
@@ -140,5 +143,26 @@ describe('run_chain_cli.run --join — the recheck under what the branch accepte
 		await run_chain_cli.run(SHIPPING)
 
 		expect(pinned).toHaveBeenCalledWith({ number: ISSUE, unpinned_ok })
+		expect(run_review_pinned_join.launch_on_tree).toHaveBeenCalledWith(PROJECT_ROOT, reason)
+	})
+})
+
+// joshuafolkken/kit#8271 (ac-0b9841e2): the fixed tree's check is the one the ship's pre-detach reads.
+describe('run_chain_cli.run --join — the fixed tree launched once for the recheck and the ship', () => {
+	it('launches the check on the tree before the pinned judgment waits on it', async () => {
+		const order: Array<string> = []
+
+		vi.mocked(run_review_pinned_join.launch_on_tree).mockImplementation(async () => {
+			order.push('launch')
+		})
+		pinned_answers(0, '').mockImplementation(async () => {
+			order.push('judge')
+
+			return { code: 0, out: '' }
+		})
+
+		await run_chain_cli.run([...SHIPPING, '--from', 'recheck'])
+
+		expect(order).toStrictEqual(['launch', 'judge'])
 	})
 })

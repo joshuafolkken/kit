@@ -39,14 +39,15 @@ const READ_COMMAND = 'pnpm josh run:review --pinned'
 const STILL_RUNNING_NOTE = `it is still running on this tree; wait for its answer with \`${READ_COMMAND}\` (a lane child: the ship's pre-detach reads it)`
 const TIMED_OUT_NOTE = `no answer within ${String(GRACE_MS / MS_PER_SECOND)}s of the gate and the review`
 const QUEUED_NOTE = 'it was still waiting for cores when the gate and the review ended'
-// A round 1 with fixes to make moves the tree, and the round's `josh review:record` starts the check
-// again on the fixed one — a lane child runs no `josh check:related` after the fixes
-// (joshuafolkken/kit#4983) — so the join waits no grace on this tree's (joshuafolkken/kit#4895).
+// A round 1 with fixes to make moves the tree, and `run:chain --join`'s recheck starts the check on
+// the fixed one — a lane child runs no `josh check:related` after the fixes (joshuafolkken/kit#4983),
+// and its `josh review:record` starts none (joshuafolkken/kit#8271) — so the join waits no grace on
+// this tree's (joshuafolkken/kit#4895).
 const FIXING_NOTE =
-	"round 1 has fixes to make — it is left running, and the round's `josh review:record` starts it again on the fixed tree for the ship's pre-detach to read"
-// `josh run:review --pinned` reads a check `josh review:record` started seconds before
-// (joshuafolkken/kit#4834), so it waits through the core queue and the whole run; the bound only
-// stops a check that hung.
+	"round 1 has fixes to make — it is left running, and the recheck before the ship starts it again on the fixed tree for the ship's pre-detach to read"
+// A lone read — `josh run:review --pinned`, the recheck, the ship's pre-detach — reads a check started
+// seconds before (joshuafolkken/kit#4834), so it waits through the core queue and the whole run; the
+// bound only stops a check that hung.
 const ALONE_GRACE_MS = 900_000
 const ALONE_TIMED_OUT_NOTE = `no answer within ${String(ALONE_GRACE_MS / MS_PER_SECOND)}s of the read`
 
