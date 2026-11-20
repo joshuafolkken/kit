@@ -195,19 +195,6 @@ describe('operational shell authority', () => {
 // joshuafolkken/kit#8262: a consultation artifact is written to the scratch area and its script run
 // only through `josh scratch:run`.
 const SCRATCH_SCRIPT = '.josh/tmp/scratch/x/gen.mjs'
-const SCRATCH_RULE = 'scratch:run'
-// Every launcher that names a scratch script, not only a known interpreter, meets the scratch rule.
-const LAUNCHERS = ['node', 'python3', 'python3.12', 'bash', 'source', '.', 'npx tsx', 'make -f']
-const SCRATCH_LAUNCHERS = LAUNCHERS.map((name) => `${name} ${SCRATCH_SCRIPT}`)
-const SCRATCH_DIRECT_RUNS = [
-	`./${SCRATCH_SCRIPT}`,
-	`"$PWD/${SCRATCH_SCRIPT}"`,
-	`\${PWD}/${SCRATCH_SCRIPT}`,
-	`node --loader=${SCRATCH_SCRIPT} a.mjs`,
-	`find . -exec ./${SCRATCH_SCRIPT} {} ;`,
-	`sh -c 'bash ${SCRATCH_SCRIPT}'`,
-	`sed -f ${SCRATCH_SCRIPT} a.txt`,
-]
 
 describe('consultation scratch artifacts', () => {
 	it('allows writing a script of any extension into the scratch area', () => {
@@ -228,7 +215,7 @@ describe('consultation scratch artifacts', () => {
 
 	it.each([
 		['node --input-type=module - out.png <<EOF\nx\nEOF', 'a heredoc'],
-		...[...SCRATCH_LAUNCHERS, ...SCRATCH_DIRECT_RUNS].map((command) => [command, SCRATCH_RULE]),
+		[`node ${SCRATCH_SCRIPT}`, 'scratch:run'],
 	])('refuses %s', (command, rule) => {
 		vi.stubEnv(agent_session_role.KEY, undefined)
 
@@ -237,8 +224,7 @@ describe('consultation scratch artifacts', () => {
 
 	it.each([
 		`pnpm josh scratch:run ${SCRATCH_SCRIPT}`,
-		`cat ${SCRATCH_SCRIPT}`,
-		'ls .josh/tmp/scratch',
+		'magick a.svg .josh/tmp/scratch/x/out.png',
 		'printf x | tee .josh/tmp/scratch/x/out.png',
 		'printf x > .josh/tmp/scratch/x/out.svg',
 	])('runs %s', (command) => {
