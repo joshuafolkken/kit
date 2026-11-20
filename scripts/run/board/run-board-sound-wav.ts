@@ -1,12 +1,12 @@
 import { createHash } from 'node:crypto'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { atomic_write } from '#scripts/lib/atomic-write'
 import { usage_state_path } from '#scripts/usage/usage-state-path'
 import { run_board_sound_synth, type Note } from './run-board-sound-synth'
 
 // Synthesized cues saved as WAV files an OS player can open (joshuafolkken/kit#7944). Each sound is
-// written once into the josh state directory under a name carrying a digest of its bytes, so a
+// written once into the josh state directory under a digest of its definition and implementation, so a
 // changed sound gets a new file and an unchanged one reuses the file already there.
 
 const SAMPLE_RATE = 44_100
@@ -21,6 +21,18 @@ const BYTES_PER_SAMPLE = 2
 const U16_BYTES = 2
 const U32_BYTES = 4
 const DIGEST_LENGTH = 12
+const source: { digest: string | undefined } = { digest: undefined }
+
+// In source runs these are separate modules; a distributed build contains both in this module's
+// bundle. Hash the actual implementation, so changing synthesis needs no manually bumped version.
+function implementation_digest(): string {
+	const digest = createHash('sha256').update(readFileSync(new URL(import.meta.url)))
+	const synth = new URL('run-board-sound-synth.ts', import.meta.url)
+
+	if (existsSync(synth)) digest.update(readFileSync(synth))
+
+	return digest.digest('hex')
+}
 
 function u16(value: number): Buffer {
 	const field = Buffer.alloc(U16_BYTES)
@@ -76,19 +88,22 @@ function wav_of(samples: Int16Array, sample_rate: number): Buffer {
 	])
 }
 
-// The digest is of the rendered bytes, so any change to the notes or to the synth's shaping (volume,
-// fade, waveform) names a new file.
-function file_name_of(name: string, wav: Buffer): string {
-	const digest = createHash('sha256').update(wav).digest('hex').slice(0, DIGEST_LENGTH)
+// The key is available before rendering, including the output and synthesis implementations.
+function file_name_of(name: string, notes: ReadonlyArray<Note>): string {
+	source.digest ??= implementation_digest()
+	const definition = JSON.stringify([notes, SAMPLE_RATE, source.digest])
+	const digest = createHash('sha256').update(definition).digest('hex').slice(0, DIGEST_LENGTH)
 
 	return `${name}-${digest}.wav`
 }
 
 function written_wav(name: string, notes: ReadonlyArray<Note>, directory: string): string {
-	const wav = wav_of(run_board_sound_synth.samples_of(notes, SAMPLE_RATE), SAMPLE_RATE)
-	const target = path.join(directory, file_name_of(name, wav))
+	const target = path.join(directory, file_name_of(name, notes))
 
-	if (!existsSync(target)) atomic_write.replace_file(target, wav)
+	if (existsSync(target)) return target
+	const wav = wav_of(run_board_sound_synth.samples_of(notes, SAMPLE_RATE), SAMPLE_RATE)
+
+	atomic_write.replace_file(target, wav)
 
 	return target
 }
