@@ -6,7 +6,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_chain_cli } from './run-chain-cli'
 import { run_chain_review_fix } from './run-chain-review-fix'
 import { run_review_pinned_accepted } from './run-review-pinned-accepted'
-import { run_review_pinned_join } from './run-review-pinned-join'
 
 const josh_run_mock = vi.hoisted(() =>
 	vi.fn(async (_argv: ReadonlyArray<string>) => ({ code: 0, out: '' })),
@@ -58,7 +57,6 @@ beforeEach(() => {
 	slot_holds('')
 	vi.spyOn(metrics_totals, 'totals_check').mockResolvedValue(undefined)
 	vi.spyOn(run_review_pinned_accepted, 'recorded_reason').mockResolvedValue(undefined)
-	vi.spyOn(run_review_pinned_join, 'launch_on_tree').mockResolvedValue()
 	vi.spyOn(run_ship_pre_detach_pinned, 'pinned_check').mockResolvedValue({ code: 0, out: '' })
 	error_lines.length = 0
 	vi.spyOn(console, 'info').mockReturnValue(undefined)

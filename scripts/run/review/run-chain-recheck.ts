@@ -4,7 +4,6 @@ import { buffered_process } from '#scripts/lib/buffered-process'
 import { run_ship_pre_detach_pinned } from '#scripts/run/ship/run-ship-pre-detach-pinned'
 import { run_chain, type ChainStage, type HoldStop } from './run-chain'
 import { run_review_pinned_accepted } from './run-review-pinned-accepted'
-import { run_review_pinned_join } from './run-review-pinned-join'
 
 // The judgments `run:review`'s open stops on — a metrics total grown past every approval, and a changed
 // place no test pins — asked again of the tree round 1's fixes left, before the ship
@@ -13,9 +12,10 @@ import { run_review_pinned_join } from './run-review-pinned-join'
 // is the check. Each one honours what this branch already accepted (`--accept-metrics`,
 // `--unpinned-ok`).
 //
-// **The fixed tree's `josh test:pinned` runs once, here** (joshuafolkken/kit#8271): the hold launches it
-// on the tree as the background check and waits on it, so the ship's pre-detach, asking the same tree
-// next, reads that answer instead of running the check again.
+// **The fixed tree's `josh test:pinned` runs once, here** (joshuafolkken/kit#8271): the hold has
+// `pinned_check` launch it on the tree as the background check and wait on it, so the ship's
+// pre-detach, asking the same tree next, reads that answer instead of running the check again. A skip
+// under the reason, or a cache answer, launches nothing.
 
 const RECHECK = 'recheck'
 const SUCCESS_EXIT_CODE = 0
@@ -59,10 +59,10 @@ async function pinned_hold(
 ): Promise<HoldStop | undefined> {
 	const reason = await run_review_pinned_accepted.recorded_reason()
 
-	await run_review_pinned_join.launch_on_tree(PROJECT_ROOT, reason)
 	const result = await run_ship_pre_detach_pinned.pinned_check({
 		number: issue,
 		unpinned_ok: run_ship_pre_detach_pinned.ok_argv(reason),
+		is_launching: true,
 	})
 
 	if (result.code === SUCCESS_EXIT_CODE) return undefined

@@ -2,7 +2,7 @@
 	"reason": "launch_on_tree runs the fixed tree's test:pinned once for the recheck and the ship; chain-rule step names the new single run",
 	"date": "2026-11-20",
 	"growth": {
-		"scripts.code_lines": 12,
+		"scripts.code_lines": 26,
 		"ai_cost.on_demand_bytes": 85
 	}
 }
