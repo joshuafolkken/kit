@@ -13,6 +13,7 @@ const MATRIX: ThemeDefinition = {
 	intro: { line: 'WAKE UP', letter_ms: 1, hold_ms: 1 },
 	alert: run_board_header_defcon.field_of,
 	lamps: false,
+	live: { types_rows: false, trill: false },
 }
 const WIDER = { ...THEME_DEFS, matrix: MATRIX }
 
@@ -47,6 +48,7 @@ describe('run_board_theme_defs.THEME_DEFS wargames', () => {
 			intro: { line: 'SHALL WE PLAY A GAME?', letter_ms: 50, hold_ms: 2000 },
 			alert: run_board_header_defcon.field_of,
 			lamps: true,
+			live: { types_rows: true, trill: true },
 		})
 	})
 })
