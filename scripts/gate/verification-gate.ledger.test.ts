@@ -9,6 +9,7 @@ import { gate_ledger } from './gate-ledger'
 import { gate_skip } from './gate-skip'
 import { gate_test_fixture } from './gate-test-fixture'
 import { machine_capacity } from './machine-capacity'
+import { whole_tree_reuse } from './whole-tree-reuse'
 
 vi.mock('execa', () => ({
 	execa: vi.fn(),
@@ -44,7 +45,7 @@ function mock_every_check(exit_code: number): void {
 async function run_into(
 	ledger_path: string | undefined,
 	exit_code: number,
-	extra: { is_forced?: boolean } = {},
+	extra: { is_forced?: boolean; is_whole_tree_included?: boolean } = {},
 ): Promise<number> {
 	mock_every_check(exit_code)
 	const stdout = gate_test_fixture.capture_stdout()
@@ -164,6 +165,20 @@ describe('run_verification_gate — why the green record was not reused', () => 
 
 		expect(lane_ledger.read_entries(ledger_path)).toMatchObject([
 			{ kind: 'gate', fallback: 'forced' },
+		])
+	})
+
+	it('records a whole-tree run whose whole-tree checks hold no record as whole-tree-unrecorded', async () => {
+		const ledger_path = path.join(scratch, 'gate-miss-whole-tree.jsonl')
+
+		vi.spyOn(gate_skip, 'gate_reuse').mockReturnValueOnce({
+			stamp: { taken_at: new Date().toISOString(), files: {} },
+		})
+		vi.spyOn(whole_tree_reuse, 'is_reused').mockResolvedValueOnce(false)
+		await run_into(ledger_path, PASS, { is_whole_tree_included: true })
+
+		expect(lane_ledger.read_entries(ledger_path)).toMatchObject([
+			{ kind: 'gate', fallback: 'whole-tree-unrecorded' },
 		])
 	})
 })
