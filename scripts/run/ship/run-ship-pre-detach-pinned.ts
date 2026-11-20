@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { check_reuse } from '#scripts/gate/check-reuse'
+import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { buffered_process } from '#scripts/lib/buffered-process'
 import { error_text } from '#scripts/lib/error-message'
 import { review_round_reuse } from '#scripts/review/review-round-reuse'
@@ -38,8 +39,12 @@ const SKIPPED_NOTE =
 	'test:pinned not run before the detach; round 1 lists the unpinned places under --unpinned-ok: '
 const CARRIED_NOTE = 'josh ship: --unpinned-ok carried from an earlier run on this branch: '
 
-type CheckOptions = Pick<ShipArguments, 'number' | 'unpinned_ok'>
-type PinnedOptions = CheckOptions & Pick<ShipArguments, 'is_review'>
+// `is_launching` — the recheck before the ship (joshuafolkken/kit#8271): the tree's check is started in
+// the background right before it is read, so the ship's pre-detach reads that answer next.
+type CheckOptions = Pick<ShipArguments, 'number' | 'unpinned_ok'> & {
+	readonly is_launching?: boolean
+}
+type PinnedOptions = Pick<ShipArguments, 'is_review' | 'number' | 'unpinned_ok'>
 
 // A check that left no answer could not run, and fails open as the one `run:review` launches does.
 // Its arguments follow the reason (`test_pinned_record.launch_argv`).
@@ -102,13 +107,29 @@ async function held_summary(): Promise<PinnedSummary | undefined> {
 	}
 }
 
+// **A launch happens only where its answer is read** (joshuafolkken/kit#8271): a skip under the reason,
+// or a cache answer, starts no check left running unread.
+async function launched_summary(
+	options: CheckOptions,
+	reason: string | undefined,
+): Promise<PinnedSummary> {
+	if (options.is_launching === true) {
+		await run_review_pinned_join.launch_on_tree(PROJECT_ROOT, reason)
+	}
+
+	return await summary(reason)
+}
+
 // **A re-ship with a new reason probes nothing the cache already answers** (joshuafolkken/kit#5078):
 // the earlier probe's verdicts are judged under the reason, with no wait on a check elsewhere. A moved
 // hunk falls to `summary`, whose run probes only the hunks the cache no longer holds.
-async function summary_for(reason: string | undefined): Promise<PinnedSummary> {
+async function summary_for(
+	options: CheckOptions,
+	reason: string | undefined,
+): Promise<PinnedSummary> {
 	const held = reason === undefined ? undefined : await held_summary()
 
-	return held ?? (await summary(reason))
+	return held ?? (await launched_summary(options, reason))
 }
 
 // Whether the supervisor runs a fresh round 1, whose `run:review --join` lists and records the unpinned
@@ -144,7 +165,7 @@ async function pinned_check(options: CheckOptions): Promise<PinnedResult> {
 		return { code: SUCCESS_EXIT_CODE, out: `${SKIPPED_NOTE}${reason}\n` }
 	}
 
-	return await judged(await summary_for(reason), reason)
+	return await judged(await summary_for(options, reason), reason)
 }
 
 // **A ship with no `--review` reads no background probe, so it stops the one left running**

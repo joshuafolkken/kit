@@ -39,11 +39,12 @@ describe('chain-rule — a lane child records and ships after a round-1 fix', ()
 		)
 	})
 
-	// joshuafolkken/kit#4834: a round-1 fix that moves the tree restarts test:pinned at the record;
-	// joshuafolkken/kit#7730: the join's recheck reads it before the ship, with the ship's judgment.
-	it('step 0 leaves the restarted test:pinned to the recheck before the ship', () => {
+	// joshuafolkken/kit#7730: the join's recheck judges the fixed tree before the ship, with the ship's
+	// judgment; joshuafolkken/kit#8271: the record starts none, and the ship reads the recheck's answer.
+	it("step 0 leaves the fixed tree's one test:pinned to the recheck before the ship", () => {
+		expect(lane_step()).toContain('the record starts no `test:pinned`')
 		expect(lane_step()).toContain(
-			'on `test:pinned restarted`, go on — the recheck reads that check',
+			"the recheck runs the fixed tree's one `test:pinned` and the ship's pre-detach reads its answer — run none by hand",
 		)
 		expect(lane_step()).toContain(
 			'`pnpm josh run:chain <N> --join --ship "<title> #<N>" --from recheck`',
