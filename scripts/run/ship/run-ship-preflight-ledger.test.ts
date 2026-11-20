@@ -6,6 +6,7 @@ const scoped_mock = vi.hoisted(() => vi.fn())
 const lock_mock = vi.hoisted(() => vi.fn())
 const branch_mock = vi.hoisted(() => vi.fn<() => Promise<string>>())
 const record_mock = vi.hoisted(() => vi.fn<(record: PreflightLedgerRecord) => Promise<void>>())
+const merge_ahead_mock = vi.hoisted(() => vi.fn<() => Promise<boolean>>())
 
 vi.mock('#scripts/git/git-preflight', () => ({
 	git_preflight: {
@@ -30,6 +31,9 @@ vi.mock('#scripts/review/removed-tests-check', () => ({
 	removed_tests_check: { body_refusal: vi.fn().mockResolvedValue(undefined) },
 }))
 vi.mock('./run-ship-scoped', () => ({ run_ship_scoped: { scoped_pair: scoped_mock } }))
+vi.mock('./run-ship-behind-default', () => ({
+	run_ship_behind_default: { is_merge_ahead: merge_ahead_mock },
+}))
 vi.mock('./run-ship-preflight-reuse', () => ({
 	run_ship_preflight_reuse: { run: async (_k: unknown, ask: () => unknown) => await ask() },
 }))
@@ -53,6 +57,8 @@ const REQUEST = {
 	title: `Record every preflight evaluation #${String(ISSUE)}`,
 	body_path: undefined,
 }
+const SCOPED_RED = { code: FAILED, out: 'lint:related red' }
+const UNMET_CLASSIFICATION = { kind: 'classification', problem: 'no classification' }
 const ASKED = [
 	'issue',
 	'branch',
@@ -70,6 +76,59 @@ beforeEach(() => {
 	lock_mock.mockReset().mockResolvedValue([])
 	branch_mock.mockReset().mockResolvedValue(`${String(ISSUE)}-lane`)
 	record_mock.mockReset().mockResolvedValue()
+	merge_ahead_mock.mockReset().mockResolvedValue(false)
+})
+
+// joshuafolkken/kit#8304: a default branch the sync stage will merge leaves the pair to the merged
+// tree.
+describe('run_ship_preflight.stage — a default branch the sync stage will merge', () => {
+	it('skips the scoped pair and records it unasked when the default branch moved', async () => {
+		merge_ahead_mock.mockResolvedValue(true)
+
+		const result = await run_ship_preflight.stage(REQUEST)
+
+		expect(scoped_mock).not.toHaveBeenCalled()
+		expect(result.code).toBe(OK)
+		expect(record_mock).toHaveBeenCalledExactlyOnceWith({
+			issue: ISSUE,
+			evaluated: ASKED,
+			unmet: [],
+		})
+	})
+
+	it('runs the scoped pair as before when the default branch has not moved', async () => {
+		await run_ship_preflight.stage(REQUEST)
+
+		expect(merge_ahead_mock).toHaveBeenCalledOnce()
+		expect(scoped_mock).toHaveBeenCalledOnce()
+	})
+
+	it('asks nothing of the default branch when a precondition already stops the ship', async () => {
+		problems_mock.mockResolvedValue([UNMET_CLASSIFICATION])
+
+		await run_ship_preflight.stage(REQUEST)
+
+		expect(merge_ahead_mock).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#2946: the scoped pair is met only once the preconditions hold.
+describe('run_ship_preflight.stage — the scoped pair once the preconditions hold', () => {
+	it('runs the scoped pair and passes when it is green', async () => {
+		const result = await run_ship_preflight.stage(REQUEST)
+
+		expect(scoped_mock).toHaveBeenCalledOnce()
+		expect(result).toStrictEqual({ code: OK, out: 'ready' })
+	})
+
+	it('stops on a red scoped check, its output forwarded and the scoped pair named', async () => {
+		scoped_mock.mockResolvedValue(SCOPED_RED)
+
+		expect(await run_ship_preflight.stage(REQUEST)).toStrictEqual({
+			...SCOPED_RED,
+			preconditions: ['scoped'],
+		})
+	})
 })
 
 describe('run_ship_preflight.stage — the evaluation recorded in the lane ledger', () => {
@@ -84,7 +143,7 @@ describe('run_ship_preflight.stage — the evaluation recorded in the lane ledge
 	})
 
 	it('records the unmet kinds of a stop, without the scoped pair it never ran', async () => {
-		problems_mock.mockResolvedValue([{ kind: 'classification', problem: 'no classification' }])
+		problems_mock.mockResolvedValue([UNMET_CLASSIFICATION])
 		lock_mock.mockResolvedValue(['pnpm-lock.yaml drifted'])
 
 		await run_ship_preflight.stage(REQUEST)
@@ -98,7 +157,7 @@ describe('run_ship_preflight.stage — the evaluation recorded in the lane ledge
 	})
 
 	it('records a red scoped pair as its one unmet kind', async () => {
-		scoped_mock.mockResolvedValue({ code: FAILED, out: 'lint:related red' })
+		scoped_mock.mockResolvedValue(SCOPED_RED)
 
 		await run_ship_preflight.stage(REQUEST)
 

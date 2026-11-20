@@ -10,6 +10,7 @@ const KIND = {
 	STAGE: 'stage',
 	STOP: 'stop',
 	CHAIN: 'chain',
+	CHAIN_STAGE: 'chain-stage',
 	OVERLAP: 'overlap',
 	HELD: 'held',
 	RELEASED: 'released',

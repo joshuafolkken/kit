@@ -4,6 +4,7 @@ import type { GateTree } from '#scripts/gate/gate-tree'
 import { input_fingerprint } from '#scripts/gate/input-fingerprint'
 import { moved_paths, type MovedParts } from '#scripts/gate/moved-paths'
 import { since_green } from '#scripts/gate/since-green'
+import type { FileMapStampAccess } from '#scripts/josh/file-map-stamp'
 import { import_graph, type ImportGraph } from '#scripts/lint/import-graph'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { test_declared_logic } from './test-declared-logic'
@@ -22,16 +23,11 @@ interface TestReuse {
 // **Each reuse miss keeps its own cause in the ledger** (joshuafolkken/kit#8283): a comparable
 // green that cannot be read answers `green-` and the since-green fallback, so `reuse_reason` counts
 // which cause to fix instead of one value for all.
-// A run handed no tree names why, from the caller that withheld it (`test-related.ts`).
+// Every run compares, scoped or after a red (joshuafolkken/kit#8288), so only a missing tree misses here.
 const GREEN_MISS = 'green-'
 const SCOPE_MISS = 'scope-'
-const MISS = {
-	NO_TREE: 'no-gate-tree',
-	AFTER_RED: `${GREEN_MISS}${since_green.FALLBACK.AFTER_RED}`,
-	SCOPED_ARGUMENTS: 'scoped-arguments',
-} as const
-
-type ReuseMiss = (typeof MISS)[keyof typeof MISS]
+const NO_TREE = 'no-gate-tree'
+const FAILED_LAST_RUN = 'failed-last-run'
 
 function digest_of(graph: ImportGraph, file: string): string | undefined {
 	const inputs = graph.test_inputs?.(file)
@@ -122,9 +118,8 @@ async function attempt(
 	root: string,
 	scope: RelatedScope,
 	tree: GateTree | undefined,
-	miss: ReuseMiss,
 ): Promise<Omit<TestReuse, 'elapsed_ms'>> {
-	if (tree === undefined) return empty(miss)
+	if (tree === undefined) return empty(NO_TREE)
 	if (scope.mode !== 'related') return empty(`${SCOPE_MISS}${scope.mode}`)
 
 	return await compare(root, scope, tree)
@@ -156,12 +151,11 @@ async function read(
 	root: string,
 	scope: RelatedScope,
 	tree: GateTree | undefined,
-	miss: ReuseMiss = MISS.NO_TREE,
 ): Promise<TestReuse> {
 	const started = performance.now()
 
 	try {
-		const result = await attempt(root, scope, tree, miss)
+		const result = await attempt(root, scope, tree)
 
 		return { ...result, elapsed_ms: performance.now() - started }
 	} catch {
@@ -179,28 +173,28 @@ async function unchanged(
 	return Object.keys(recorded).filter((file) => current[file] === recorded[file])
 }
 
-// No-op scoped runs preserve evidence only on exactly the same tree, base and check inputs.
-async function retained(root: string, tree: GateTree): Promise<ReadonlyArray<string>> {
-	const parts = await since_green.read_moved_parts(
-		review_stamps.test_related_stamp,
-		gate_labels.UNIT_LABEL,
-		undefined,
-		tree,
-	)
-	if (parts === undefined || moved_paths.union_of(parts).length > 0) return []
-
-	return await unchanged(root, review_stamps.test_related_stamp.read()?.blobs ?? {})
-}
-
-// **A red run's passed files join the next green record** (joshuafolkken/kit#7966): on the red
-// record's own base and check inputs, with no whole-suite input moved since, each file whose closed
-// inputs still hash as they did when it passed.
-async function carried(root: string, tree: GateTree): Promise<ReadonlyArray<string>> {
-	const stamp = review_stamps.test_related_red_stamp
+// On the record's own base and check inputs, with no whole-suite input moved since, each recorded
+// file whose closed inputs still hash as they did when it passed.
+async function still_passing(
+	root: string,
+	tree: GateTree,
+	stamp: FileMapStampAccess,
+): Promise<ReadonlyArray<string>> {
 	const parts = await since_green.read_moved_parts(stamp, gate_labels.UNIT_LABEL, undefined, tree)
 	if (!carries_over(parts)) return []
 
 	return await unchanged(root, stamp.read()?.blobs ?? {})
+}
+
+// **A green keeps the last green's still-passing files** (joshuafolkken/kit#8289): a green that
+// proves no test of its own after a branch edit (scope `none`) would otherwise record no digest.
+async function retained(root: string, tree: GateTree): Promise<ReadonlyArray<string>> {
+	return await still_passing(root, tree, review_stamps.test_related_stamp)
+}
+
+// **A red run's passed files join the next green record** (joshuafolkken/kit#7966).
+async function carried(root: string, tree: GateTree): Promise<ReadonlyArray<string>> {
+	return await still_passing(root, tree, review_stamps.test_related_red_stamp)
 }
 
 function flags(reuse: TestReuse | undefined): ReadonlyArray<string> {
@@ -209,7 +203,23 @@ function flags(reuse: TestReuse | undefined): ReadonlyArray<string> {
 	return ['--passWithNoTests', ...reuse.excluded.flatMap((file) => ['--exclude', file])]
 }
 
-const test_related_reuse = { MISS, blobs, carried, flags, read, retained }
+// **A file the last run failed on runs again whatever its digest** (joshuafolkken/kit#8288): its
+// closed inputs may match the older green, yet that green no longer vouches for it.
+function keeping(root: string, reuse: TestReuse, failed: ReadonlyArray<string>): TestReuse {
+	const kept = new Set(failed.map((file) => path.resolve(root, file)))
+	const excluded = reuse.excluded.filter((file) => !kept.has(file))
+	if (excluded.length === reuse.excluded.length) return reuse
 
-export type { ReuseMiss, TestReuse }
+	return {
+		...reuse,
+		excluded,
+		reused: excluded.length,
+		missed: reuse.missed + reuse.excluded.length - excluded.length,
+		reason: excluded.length > 0 ? reuse.reason : FAILED_LAST_RUN,
+	}
+}
+
+const test_related_reuse = { blobs, carried, flags, keeping, read, retained }
+
+export type { TestReuse }
 export { test_related_reuse }

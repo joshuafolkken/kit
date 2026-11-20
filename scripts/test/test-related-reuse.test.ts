@@ -13,8 +13,10 @@ import { test_related_reuse } from './test-related-reuse'
 const make_directory = temporary_directory('suite')
 const ROOT = make_directory('josh-test-reuse-')
 const SOURCE = path.join(ROOT, 'source.ts')
-const CHANGED = path.join(ROOT, 'changed.test.ts')
-const UNCHANGED = path.join(ROOT, 'unchanged.test.ts')
+const CHANGED_NAME = 'changed.test.ts'
+const UNCHANGED_NAME = 'unchanged.test.ts'
+const CHANGED = path.join(ROOT, CHANGED_NAME)
+const UNCHANGED = path.join(ROOT, UNCHANGED_NAME)
 const UNKNOWN = path.join(ROOT, 'unknown.test.ts')
 const TESTS = [CHANGED, UNCHANGED, UNKNOWN]
 const VITEST_CONFIG = 'vitest.config.ts'
@@ -166,18 +168,29 @@ describe('test_related_reuse miss reasons', () => {
 
 		expect(result).toMatchObject({ excluded: [], reason: 'no-gate-tree' })
 	})
-	it.each([
-		[test_related_reuse.MISS.AFTER_RED, 'green-after-red'],
-		[test_related_reuse.MISS.SCOPED_ARGUMENTS, 'scoped-arguments'],
-	])('records the caller-named withheld tree %s', async (miss, reason) => {
-		const result = await test_related_reuse.read(ROOT, SCOPE, undefined, miss)
-
-		expect(result).toMatchObject({ excluded: [], reason })
-	})
 	it('records a scope that is not related under its own mode', async () => {
 		const result = await test_related_reuse.read(ROOT, { ...SCOPE, mode: 'all' }, TREE)
 
 		expect(result).toMatchObject({ excluded: [], reason: 'scope-all' })
+	})
+})
+
+// joshuafolkken/kit#8288: a file the last run failed on runs again whatever its digest.
+describe('test_related_reuse.keeping', () => {
+	const REUSE = { excluded: [CHANGED, UNCHANGED], reused: 2, missed: 1, reason: 'r', elapsed_ms: 0 }
+
+	it('keeps a failed file from the exclusions and counts it as missed', () => {
+		const result = test_related_reuse.keeping(ROOT, REUSE, [CHANGED_NAME])
+
+		expect(result).toMatchObject({ excluded: [UNCHANGED], reused: 1, missed: 2, reason: 'r' })
+	})
+	it('names the failed run once nothing is left to exclude', () => {
+		const result = test_related_reuse.keeping(ROOT, REUSE, [CHANGED_NAME, UNCHANGED_NAME])
+
+		expect(result).toMatchObject({ excluded: [], reused: 0, reason: 'failed-last-run' })
+	})
+	it('returns the reuse unchanged when no excluded file failed', () => {
+		expect(test_related_reuse.keeping(ROOT, REUSE, [])).toBe(REUSE)
 	})
 })
 
@@ -207,7 +220,42 @@ describe('test_related_reuse.retained', () => {
 		})
 		expect(await test_related_reuse.retained(ROOT, TREE)).toEqual([path.relative(ROOT, UNCHANGED)])
 	})
-	it('does not carry evidence across a moved base or file', async () => {
+	it('does not carry evidence across a moved base', async () => {
+		const blobs = await test_related_reuse.blobs(ROOT, [UNCHANGED])
+
+		vi.spyOn(review_stamps.test_related_stamp, 'read').mockReturnValue({
+			taken_at: '',
+			files: {},
+			blobs,
+		})
+		expect(await test_related_reuse.retained(ROOT, TREE)).toEqual([])
+	})
+})
+
+// joshuafolkken/kit#8289: a green that proves no test of its own (scope `none`) after a branch edit
+// keeps the earlier green's digests whose closed inputs still hash the same.
+describe('test_related_reuse.retained after a branch edit', () => {
+	beforeEach(async () => {
+		const blobs = await test_related_reuse.blobs(ROOT, [CHANGED, UNCHANGED])
+
+		vi.mocked(since_green.read_moved_parts).mockResolvedValue({ changed: ['docs.md'], synced: [] })
+		vi.spyOn(review_stamps.test_related_stamp, 'read').mockReturnValue({
+			taken_at: '',
+			files: {},
+			blobs,
+		})
+	})
+	it('keeps the digests of tests whose closed inputs are unchanged', async () => {
+		writeFileSync(CHANGED, 'after')
+
+		expect(await test_related_reuse.retained(ROOT, TREE)).toEqual([path.relative(ROOT, UNCHANGED)])
+	})
+	it('keeps nothing once a whole-suite input changed', async () => {
+		vi.mocked(since_green.read_moved_parts).mockResolvedValue({
+			changed: [VITEST_CONFIG],
+			synced: [],
+		})
+
 		expect(await test_related_reuse.retained(ROOT, TREE)).toEqual([])
 	})
 })

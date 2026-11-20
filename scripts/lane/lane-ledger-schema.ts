@@ -180,6 +180,7 @@ const entry_schema = z.discriminatedUnion('kind', [
 	stage_schema,
 	stop_schema,
 	lane_ledger_schema_ship.chain_schema,
+	lane_ledger_schema_ship.chain_stage_entry_schema,
 	overlap_schema,
 	held_schema,
 	released_schema,

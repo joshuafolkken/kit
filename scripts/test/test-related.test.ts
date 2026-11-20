@@ -178,7 +178,6 @@ describe('test_related.run_related_tests — individual reuse', () => {
 			REPOSITORY_ROOT,
 			expect.objectContaining({ mode: 'related' }),
 			BEFORE_TREE,
-			test_related_reuse.MISS.NO_TREE,
 		)
 		expect(vitest_arguments()).toEqual([
 			'related',
