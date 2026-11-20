@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { run_board_intro } from './run-board-intro'
 import { run_board_row_key } from './run-board-row-key'
 import { run_board_spin } from './run-board-spin'
+import { run_board_theme_defs } from './run-board-theme-defs'
 import {
 	run_board_type_rows,
 	type KeyedLine,
@@ -14,7 +14,7 @@ import { run_board_typing } from './run-board-typing'
 // a letter at a time at the opening line's pace, a block after the last letter until the row is out.
 
 const { NO_TYPING, next, type_bytes, typed_lines } = run_board_type_rows
-const { LETTER_MS } = run_board_intro
+const LETTER_MS = run_board_theme_defs.THEME_DEFS.wargames.intro.letter_ms
 const { CURSOR } = run_board_typing
 const ESC = '\u{1B}'
 const RESET = `${ESC}[0m`

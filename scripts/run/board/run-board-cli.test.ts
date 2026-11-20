@@ -2,10 +2,10 @@ import { stripVTControlCharacters } from 'node:util'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_board_cli } from './run-board-cli'
 import { run_board_fixture, type Harness } from './run-board-fixture'
-import { run_board_intro } from './run-board-intro'
 import type { IssueCount } from './run-board-issue-count'
 import type { BoardPlan } from './run-board-layout'
 import type { BoardPorts } from './run-board-state'
+import { run_board_theme_defs } from './run-board-theme-defs'
 import { run_board_typing } from './run-board-typing'
 
 // joshuafolkken/kit#3430: the command's arguments and its terminal. What one redraw reads and draws is
@@ -26,7 +26,7 @@ const ESCAPE = '\u{1B}'
 const ENTER = `${ESCAPE}[?1049h${ESCAPE}[?25l`
 const LEAVE = `${ESCAPE}[?25h${ESCAPE}[?1049l`
 const RUN_MARK = '■ josh-board'
-const INTRO_LINE = run_board_intro.LINE
+const INTRO_LINE = run_board_theme_defs.THEME_DEFS.wargames.intro.line
 const TYPING_CURSOR = run_board_typing.CURSOR
 const LANE_ROW = '  🔍 1°00′00″ 1°00′00″ 1       a'
 const LAUNCH = { pos: 1, at: '2026-10-08T08:00:00.000Z', kind: 'child-launch', text: '#1 a' }

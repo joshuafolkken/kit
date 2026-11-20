@@ -2,6 +2,7 @@ import type { KeyReading } from './run-board-keys'
 import { run_board_reveal_blocks, type Beat } from './run-board-reveal-blocks'
 import type { BoardPorts, Pace } from './run-board-state'
 import { run_board_theme, type Theme } from './run-board-theme'
+import { run_board_theme_defs, type IntroDefinition } from './run-board-theme-defs'
 import { run_board_typing } from './run-board-typing'
 
 // The line a live board in a theme types before its first frame, a letter at a time with a block cursor after
@@ -9,9 +10,6 @@ import { run_board_typing } from './run-board-typing'
 // frame is drawn over the line once both are done. A key skips the rest; the key is spent on the skip,
 // not on a fold. Each beat rewrites the whole line, so the screen always matches the beat last written.
 
-const LINE = 'SHALL WE PLAY A GAME?'
-const LETTER_MS = 50
-const HOLD_MS = 2000
 const { LINE_MS: REVEAL_LINE_MS, beats_of } = run_board_reveal_blocks
 const LINE_START = '\r'
 const ERASE_LINE_END = '\u{1B}[K'
@@ -19,11 +17,14 @@ const ERASE_LINE_END = '\u{1B}[K'
 type IntroPorts = Pick<BoardPorts, 'intro_sleep' | 'write' | 'write_drawn' | 'typing_sound'>
 type Reveal = (frame: string) => Promise<void>
 
-const LETTER_BEATS: ReadonlyArray<Beat> = Array.from(LINE, (_letter, index) => ({
-	text: `${LINE_START}${run_board_typing.typed(LINE, LINE.slice(0, index + 1))}${ERASE_LINE_END}`,
-	ms: LETTER_MS,
-}))
-const HOLD_BEAT: Beat = { text: '', ms: HOLD_MS }
+// The theme's line typed a letter at a time (joshuafolkken/kit#8349: the line and its pauses are the
+// theme's row).
+function letter_beats({ line, letter_ms }: IntroDefinition): ReadonlyArray<Beat> {
+	return Array.from(line, (_letter, index) => ({
+		text: `${LINE_START}${run_board_typing.typed(line, line.slice(0, index + 1))}${ERASE_LINE_END}`,
+		ms: letter_ms,
+	}))
+}
 
 // Each beat written, then its pause raced against the skip; a skip writes no further beat, and the
 // beats left unwritten are handed back.
@@ -72,23 +73,28 @@ async function listen(
 
 // The letters typed with the trill sounding (joshuafolkken/kit#8250), which stops however they end —
 // typed through or skipped by a key. Where the ports carry no pauses nothing types, so no trill starts.
-async function letters(ports: IntroPorts, keys: KeyReading): Promise<ReadonlyArray<Beat>> {
+async function letters(
+	ports: IntroPorts,
+	keys: KeyReading,
+	intro: IntroDefinition,
+): Promise<ReadonlyArray<Beat>> {
 	const trill = ports.intro_sleep === undefined ? undefined : ports.typing_sound
 
 	trill?.set(true)
 
 	try {
-		return await listen(LETTER_BEATS, ports, keys)
+		return await listen(letter_beats(intro), ports, keys)
 	} finally {
 		trill?.set(false)
 	}
 }
 
-// The letters, then the hold, silent, unless a key skipped the letters.
-async function play(ports: IntroPorts, keys: KeyReading): Promise<void> {
-	const rest = await letters(ports, keys)
+// The theme's letters, then its hold, silent, unless a key skipped the letters.
+async function play(ports: IntroPorts, keys: KeyReading, theme: Theme): Promise<void> {
+	const { intro } = run_board_theme_defs.THEME_DEFS[theme]
+	const rest = await letters(ports, keys, intro)
 
-	if (rest.length === 0) await listen([HOLD_BEAT], ports, keys)
+	if (rest.length === 0) await listen([{ text: '', ms: intro.hold_ms }], ports, keys)
 }
 
 // A line's beats, each line after the first led by the line break before it.
@@ -150,7 +156,7 @@ function opening<Read>(
 	if (theme === undefined) return { gather, reveal: undefined }
 
 	return {
-		gather: after(gather, play(ports, keys)),
+		gather: after(gather, play(ports, keys, theme)),
 		reveal: async (frame) => {
 			await reveal(frame, ports, keys, theme)
 		},
@@ -159,9 +165,6 @@ function opening<Read>(
 
 const run_board_intro = {
 	ERASE_LINE_END,
-	HOLD_MS,
-	LETTER_MS,
-	LINE,
 	LINE_START,
 	REVEAL_LINE_MS,
 	after,

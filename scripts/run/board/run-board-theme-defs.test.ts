@@ -1,0 +1,47 @@
+import { describe, expect, it } from 'vitest'
+import { z } from 'zod'
+import { run_board_theme } from './run-board-theme'
+import { run_board_theme_defs, type ThemeDefinition } from './run-board-theme-defs'
+
+// joshuafolkken/kit#8349: each theme's look is one row of a table, and the theme names the CLI and the
+// worker accept are its keys — a row added is a theme accepted.
+
+const { THEMES, THEME_DEFS, names_of } = run_board_theme_defs
+const MATRIX: ThemeDefinition = {
+	paint: { rgb: '0;255;65', named: 'green' },
+	intro: { line: 'WAKE UP', letter_ms: 1, hold_ms: 1 },
+}
+const WIDER = { ...THEME_DEFS, matrix: MATRIX }
+
+describe('run_board_theme_defs.THEMES', () => {
+	it('names every row of the table, in its order', () => {
+		expect(THEMES).toStrictEqual(Object.keys(THEME_DEFS))
+	})
+
+	it('is the list the CLI and the worker check a theme name against', () => {
+		expect(run_board_theme.THEMES).toBe(THEMES)
+	})
+})
+
+describe('run_board_theme_defs.names_of', () => {
+	it('names a row added to the table', () => {
+		expect(names_of(WIDER)).toStrictEqual(['wargames', 'matrix'])
+	})
+
+	it('gives a list the worker check accepts the added theme from', () => {
+		expect(z.enum(names_of(WIDER)).parse('matrix')).toBe('matrix')
+	})
+
+	it('refuses a table with no theme', () => {
+		expect(() => names_of({})).toThrow('no theme')
+	})
+})
+
+describe('run_board_theme_defs.THEME_DEFS wargames', () => {
+	it('keeps the phosphor cyan and the opening line the board drew before the table', () => {
+		expect(THEME_DEFS.wargames).toStrictEqual({
+			paint: { rgb: '62;236;225', named: 'cyan' },
+			intro: { line: 'SHALL WE PLAY A GAME?', letter_ms: 50, hold_ms: 2000 },
+		})
+	})
+})

@@ -2,22 +2,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_board_intro, type IntroPorts } from './run-board-intro'
 import type { KeyReading } from './run-board-keys'
 import { run_board_label_pair } from './run-board-label-pair'
+import { run_board_theme_defs } from './run-board-theme-defs'
 import { run_board_typing } from './run-board-typing'
 
 // joshuafolkken/kit#7927: a live board types its line a letter at a time and holds it before the first
 // frame, which a key skips; the first read runs meanwhile and is handed over only once the line is done.
 
+const { ERASE_LINE_END, LINE_START, REVEAL_LINE_MS, after, play, reveal } = run_board_intro
+const THEME = 'wargames'
 const {
-	ERASE_LINE_END,
-	HOLD_MS,
-	LETTER_MS,
-	LINE,
-	LINE_START,
-	REVEAL_LINE_MS,
-	after,
-	play,
-	reveal,
-} = run_board_intro
+	line: LINE,
+	letter_ms: LETTER_MS,
+	hold_ms: HOLD_MS,
+} = run_board_theme_defs.THEME_DEFS[THEME].intro
 const { CURSOR } = run_board_typing
 const { TITLE_MARK, untitled } = run_board_label_pair
 
@@ -130,7 +127,7 @@ describe('run_board_intro.play', () => {
 			slept.push(ms)
 		})
 
-		await play(ports, NO_KEYS)
+		await play(ports, NO_KEYS, THEME)
 		expect(written).toHaveLength(LINE.length + 1)
 		expect(slept).toStrictEqual([...Array.from(LINE, () => LETTER_MS), HOLD_MS])
 	})
@@ -138,14 +135,14 @@ describe('run_board_intro.play', () => {
 	it('types nothing where the ports carry no pauses', async () => {
 		const { written, ports } = recorded(never)
 
-		await play({ write: ports.write }, NO_KEYS)
+		await play({ write: ports.write }, NO_KEYS, THEME)
 		expect(written).toStrictEqual([])
 	})
 
 	it('stops typing at a key, cutting the pause short, and gives the keys back', async () => {
 		const { keys, press, released } = skippable()
 		const { written, ports } = recorded(never)
-		const pending = play(ports, keys)
+		const pending = play(ports, keys, THEME)
 
 		press()
 		await pending
@@ -160,7 +157,7 @@ describe('run_board_intro.play cursor', () => {
 	it('rewrites the line with a cursor after each letter, and drops it on the last letter', async () => {
 		const { written, ports } = recorded(instant)
 
-		await play(ports, NO_KEYS)
+		await play(ports, NO_KEYS, THEME)
 		const typing = Array.from(LINE.slice(0, -1), (_letter, index) =>
 			line_of(`${LINE.slice(0, index + 1)}${CURSOR}`),
 		)
@@ -171,7 +168,7 @@ describe('run_board_intro.play cursor', () => {
 	it('shows no cursor while it holds the line', async () => {
 		const { written, ports } = recorded(instant)
 
-		await play(ports, NO_KEYS)
+		await play(ports, NO_KEYS, THEME)
 		expect(written.at(-1)).toBe('')
 		expect(written.at(-2)?.includes(CURSOR)).toBe(false)
 	})
@@ -183,7 +180,6 @@ describe('run_board_intro.play cursor', () => {
 // here is drawn in no color, already in capitals, so the theme leaves its text as it is.
 const FRAME = `ONE  TWO\n\nA ${TITLE_MARK}TITLE  B  C`
 const SHOWN = untitled(FRAME)
-const THEME = 'wargames'
 
 beforeEach(() => {
 	vi.stubEnv('FORCE_COLOR', '0')

@@ -2,8 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_board_cli } from './run-board-cli'
 import { run_board_fit } from './run-board-fit'
 import { run_board_fixture } from './run-board-fixture'
-import { run_board_intro } from './run-board-intro'
+import { run_board_theme_defs } from './run-board-theme-defs'
 import { run_board_typing } from './run-board-typing'
+
+const INTRO_LINE = run_board_theme_defs.THEME_DEFS.wargames.intro.line
 
 // joshuafolkken/kit#7934: a board a person watches takes the theme; the chat's frame never does. How
 // the theme draws a frame is `run-board-theme.test.ts`'s.
@@ -91,7 +93,7 @@ describe('run_board_cli.run --theme as text', () => {
 			STOPPED,
 		)
 		expect(frames[1]?.startsWith(NAMED_CYAN)).toBe(true)
-		expect(frames.join('')).toContain(run_board_intro.LINE.at(0))
+		expect(frames.join('')).toContain(INTRO_LINE.at(0))
 	})
 })
 
@@ -155,7 +157,7 @@ describe('run_board_cli.run --theme intro', () => {
 	it('types no line and waits on no beat on a board in no theme', async () => {
 		const { text, beats } = await intro_run([])
 
-		expect(text).not.toContain(run_board_intro.LINE)
+		expect(text).not.toContain(INTRO_LINE)
 		expect(text).not.toContain(run_board_typing.CURSOR)
 		expect(beats).toBe(0)
 	})
@@ -165,7 +167,7 @@ describe('run_board_cli.run --theme intro', () => {
 		const { text, beats } = await intro_run([])
 
 		expect(text).toContain(run_board_typing.CURSOR)
-		expect(beats).toBeGreaterThan(run_board_intro.LINE.length)
+		expect(beats).toBeGreaterThan(INTRO_LINE.length)
 	})
 })
 
