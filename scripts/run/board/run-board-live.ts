@@ -9,11 +9,7 @@ import type { TypingSound } from './run-board-sound-typing'
 import { run_board_spin } from './run-board-spin'
 import type { BoardPorts, BoardState } from './run-board-state'
 import type { Theme } from './run-board-theme'
-import {
-	run_board_theme_defs,
-	type LiveDefinition,
-	type ThemeDefinition,
-} from './run-board-theme-defs'
+import { run_board_theme_defs, type LiveDefinition } from './run-board-theme-defs'
 import { run_board_tick } from './run-board-tick'
 
 // The live `josh run:board` loop: the alternate screen entered and left, the first frame drawn (or
@@ -23,7 +19,7 @@ import { run_board_tick } from './run-board-tick'
 const TRAILING_NEWLINE = /\n$/u
 const { FRESH_STATE, tick } = run_board_tick
 const { WORDS } = run_board_labels
-const { THEME_DEFS } = run_board_theme_defs
+const { live_of } = run_board_theme_defs
 
 // Every frame starts from the top of the alternate screen, erasing what the last one left below it, and
 // ends on the line that says closing the screen leaves the run going — only a screen a person can
@@ -55,18 +51,6 @@ function leaver(ports: BoardPorts, screen: Screen, keys: KeyReading): () => void
 		ports.typing_sound?.stop()
 		ports.write(screen.leave)
 	}
-}
-
-// The theme rows whose live effects the board reads.
-type LiveDefs = Readonly<Partial<Record<string, Pick<ThemeDefinition, 'live'>>>>
-
-const NO_LIVE: LiveDefinition = { types_rows: false, trill: false, codes: false, strip: false }
-
-// The live effects a theme's definition chooses (joshuafolkken/kit#8360); a board in no theme has none.
-function live_of(theme: Theme | undefined, defs: LiveDefs = THEME_DEFS): LiveDefinition {
-	if (theme === undefined) return NO_LIVE
-
-	return defs[theme]?.live ?? NO_LIVE
 }
 
 // The trill reaches the draws only where the theme sounds it, and sounds only while the sound switch is

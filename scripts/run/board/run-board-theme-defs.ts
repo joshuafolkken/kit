@@ -78,11 +78,24 @@ const THEMES = names_of(THEME_DEFS)
 
 type Theme = keyof typeof THEME_DEFS
 
+// The theme rows whose live effects a reader reads.
+type LiveDefs = Readonly<Partial<Record<string, Pick<ThemeDefinition, 'live'>>>>
+
+const NO_LIVE: LiveDefinition = { types_rows: false, trill: false, codes: false, strip: false }
+
+// The live effects a theme's definition chooses (joshuafolkken/kit#8360); a board in no theme has none.
+function live_of(theme: Theme | undefined, defs: LiveDefs = THEME_DEFS): LiveDefinition {
+	if (theme === undefined) return NO_LIVE
+
+	return defs[theme]?.live ?? NO_LIVE
+}
+
 const run_board_theme_defs = {
 	THEMES,
 	THEME_DEFS,
+	live_of,
 	names_of,
 }
 
 export { run_board_theme_defs }
-export type { IntroDefinition, LiveDefinition, Theme, ThemeDefinition }
+export type { IntroDefinition, LiveDefinition, LiveDefs, Theme, ThemeDefinition }
