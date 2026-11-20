@@ -99,6 +99,7 @@ pnpm josh run:board --chat             # one frame for a chat, recorded as a pro
 pnpm josh run:board --chat --fresh     # the same, read from scratch past the one-minute record
 pnpm josh run:board --every 5          # the --chat frame as a 📊 Progress Telegram every 5 minutes, until the run ends
 pnpm josh run:board --theme wargames   # cyan phosphor text and dashed rules
+pnpm josh run:board --theme matrix     # green phosphor text and the TRACE gauge
 pnpm josh run:board --once --timing    # one frame, then how long each phase of it took
 ```
 
@@ -115,6 +116,7 @@ pnpm josh run:board --once --timing    # one frame, then how long each phase of 
 - `--theme wargames` — ends the header’s first line on the alert level, `DEFCON 5 4 [3] 2 1`: the current level bracketed, green (5), amber (4, 3) or red (2, 1). The lowest level whose condition holds wins — 1 the run is stopped, out of its usage or failing its reads · 2 a person is asked to decide · 3 a `P1` waits while a lane is free · 4 more lanes run than the limit · 5 none of these.
 - `--theme wargames` — a live board runs a WOPR lamp panel on `24h`, `7d`, the blank line and usage’s first two provider rows (both or neither): past `NOW`, a `■` every other column to the throughput rule’s end, yellow, yellow, red, yellow, red, out in dimmed half yellow on every row (`run-board-lamps.ts`). None with no theme, `--once`, `--chat`, `--every`, no TTY or color, or under 8 lamps.
 - `--theme wargames` — bursts the lamp panel while a row types (the header’s third line, a section’s new row): the groups of four, each on its own period, all change every 80ms step, back to their periods from the step after typing ends (`run-board-spin.ts`).
+- `--theme matrix` — draws as `--theme wargames` does, red and amber kept, with uncolored text in green phosphor (`green` without 24-bit color) and `TRACE ■■■■-` in place of `DEFCON`: one more `■` per level nearer 1, blinking red at 1 (`run-board-header-trace.ts`). No opening line, lamps or typed rows.
 - `--timing` — after the `--once` frame, or once a live board leaves its screen, writes how long each phase of the first frame took (ms). `--chat` and `--every` ignore it.
 - `--timing` — on a live board, adds each kind of draw's max and median, then its main-thread stalls of 200 ms or more: their count, and the longest ten each with its length, the loop's stage that held it (`redraw` or `turn`) and the GC within it (`run-board-stall.ts`).
 

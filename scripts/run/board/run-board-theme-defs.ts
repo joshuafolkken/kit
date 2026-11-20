@@ -1,4 +1,5 @@
 import { run_board_header_defcon } from './run-board-header-defcon'
+import { run_board_header_trace } from './run-board-header-trace'
 import type { Paint } from './run-board-labels'
 
 // joshuafolkken/kit#8349: what each theme draws, one row per theme — a theme is added by adding its
@@ -39,6 +40,15 @@ const THEME_DEFS = {
 		alert: run_board_header_defcon.field_of,
 		lamps: true,
 		live: { types_rows: true, trill: true },
+	},
+	// joshuafolkken/kit#8354: the green phosphor body and the `TRACE` gauge; its opening and live
+	// effects come with the epic's later children, so it types no opening line yet.
+	matrix: {
+		paint: run_board_header_trace.SHADES.body,
+		intro: { line: '', letter_ms: 0, hold_ms: 0 },
+		alert: run_board_header_trace.field_of,
+		lamps: false,
+		live: { types_rows: false, trill: false },
 	},
 } as const satisfies Readonly<Record<string, ThemeDefinition>>
 

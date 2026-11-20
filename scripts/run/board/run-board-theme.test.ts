@@ -7,6 +7,7 @@ import type { BoardPorts } from './run-board-state'
 import { run_board_theme } from './run-board-theme'
 import { run_board_theme_case } from './run-board-theme-case'
 import { run_board_theme_glyphs } from './run-board-theme-glyphs'
+import { run_board_theme_tones } from './run-board-theme-tones'
 import type { ThroughputRow } from './run-board-throughput'
 
 // joshuafolkken/kit#7934: the WarGames theme — which one a board takes, and how it draws a frame.
@@ -18,6 +19,9 @@ const DEFAULT_FOREGROUND = `${ESCAPE}[39m`
 const RED = `${ESCAPE}[31m`
 const RULED = '── LANES ─────\n  ■■■──── 3/7 ── 2 CPU'
 const ENV = { [run_board_theme.THEME_ENV]: 'wargames' }
+const MATRIX_ENV = { [run_board_theme.THEME_ENV]: 'matrix' }
+const RGB_MATRIX = `${ESCAPE}[38;2;0;215;60m`
+const NAMED_GREEN = `${ESCAPE}[32m`
 const LINK_OPEN = `${ESCAPE}]8;;https://github.com/joshuafolkken/kit/issues/1\u{7}`
 const LINK_CLOSE = `${ESCAPE}]8;;\u{7}`
 const PICTOGRAPHIC = /\p{Extended_Pictographic}/u
@@ -48,6 +52,43 @@ describe('run_board_theme.choose', () => {
 		{ argv: [], env: { [run_board_theme.THEME_ENV]: 'nope' } },
 	])('refuses a name no theme has in $argv and $env', ({ argv, env }) => {
 		expect(run_board_theme.choose(argv, env)).toBeUndefined()
+	})
+
+	// joshuafolkken/kit#8354: `matrix` from either place, `--theme` over `JOSH_BOARD_THEME`.
+	it.each([
+		{ argv: ['--theme', 'matrix'], env: {}, theme: 'matrix' },
+		{ argv: [], env: MATRIX_ENV, theme: 'matrix' },
+		{ argv: ['--theme', 'wargames'], env: MATRIX_ENV, theme: 'wargames' },
+		{ argv: ['--theme', 'matrix'], env: ENV, theme: 'matrix' },
+	])('takes $theme with matrix in $argv or $env', ({ argv, env, theme }) => {
+		expect(run_board_theme.choose(argv, env)).toStrictEqual({ theme, argv: [] })
+	})
+})
+
+describe('run_board_theme.restyle matrix', () => {
+	it('opens every line in the 24-bit green phosphor body', () => {
+		vi.stubEnv('FORCE_COLOR', '3')
+
+		expect(run_board_theme.restyle('matrix', 'A')).toBe(`${RGB_MATRIX}A${DEFAULT_FOREGROUND}`)
+	})
+
+	it('draws the palette green where stdout has no 24-bit color', () => {
+		vi.stubEnv('FORCE_COLOR', '1')
+
+		expect(run_board_theme.restyle('matrix', 'A')).toBe(`${NAMED_GREEN}A${DEFAULT_FOREGROUND}`)
+	})
+
+	it('keeps the fault red and the caution amber, resuming the green after each', () => {
+		vi.stubEnv('FORCE_COLOR', '3')
+		const fault = run_board_theme_tones.toned('alert', 'FL')
+		const caution = run_board_theme_tones.toned('caution', 'JG')
+		const resumed = [fault, caution].map((text) => text.split(DEFAULT_FOREGROUND).join(RGB_MATRIX))
+
+		expect(run_board_theme.restyle('matrix', `${fault} ${caution}`)).toBe(
+			`${RGB_MATRIX}${resumed.join(' ')}${DEFAULT_FOREGROUND}`,
+		)
+		expect(fault).toContain('255;69;58')
+		expect(caution).toContain('255;214;10')
 	})
 })
 

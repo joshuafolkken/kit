@@ -228,7 +228,7 @@ describe('run_board_cli.run --theme rows', () => {
 
 describe('run_board_cli.run --theme refused', () => {
 	it('names the theme in the usage', () => {
-		expect(run_board_cli.USAGE).toContain('[--theme wargames]')
+		expect(run_board_cli.USAGE).toContain('[--theme wargames|matrix]')
 	})
 
 	it('draws --chat and pushes --every whatever JOSH_BOARD_THEME holds', async () => {
@@ -250,7 +250,7 @@ describe('run_board_cli.run --theme refused', () => {
 
 		await expect(run_board_cli.run(['--once'], ports)).resolves.toBe(1)
 		expect(stderr).toHaveBeenCalledWith(
-			`JOSH_BOARD_THEME=nope names no theme (wargames)\n${run_board_cli.USAGE}\n`,
+			`JOSH_BOARD_THEME=nope names no theme (wargames, matrix)\n${run_board_cli.USAGE}\n`,
 		)
 		stderr.mockRestore()
 	})
@@ -276,5 +276,18 @@ describe('run_board_cli.run --theme alert level', () => {
 		expect(first).toMatch(/ {2}DEFCON(?: \d){0,4} \[\d\](?: \d){0,4}$/u)
 		expect(await frame_of(['--once'])).not.toContain('DEFCON')
 		expect(await frame_of([...THEMED, '--chat'])).not.toContain('DEFCON')
+	})
+
+	// joshuafolkken/kit#8354: `matrix` ends it on TRACE, from --theme or JOSH_BOARD_THEME, --theme winning.
+	it('ends the matrix header first line on TRACE, never in --chat', async () => {
+		vi.stubEnv('FORCE_COLOR', '0')
+		const frame = await frame_of(['--theme', 'matrix', '--once'])
+		const [first] = frame.split('\n', 1)
+
+		expect(first).toMatch(/ {2}TRACE [■-]{5}$/u)
+		vi.stubEnv('JOSH_BOARD_THEME', 'matrix')
+		expect(await frame_of(['--once'])).toContain('TRACE')
+		expect(await frame_of([...THEMED, '--once'])).toContain('DEFCON')
+		expect(await frame_of(['--chat'])).not.toContain('TRACE')
 	})
 })
