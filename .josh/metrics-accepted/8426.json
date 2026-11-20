@@ -1,0 +1,7 @@
+{
+	"reason": "Default-theme rule dimming and shared ANSI intensity restoration require 19 code lines; reuse the existing escape walker and heading detector to preserve style boundaries without duplicate logic.",
+	"date": "2026-11-20",
+	"growth": {
+		"scripts.code_lines": 19
+	}
+}

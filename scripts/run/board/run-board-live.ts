@@ -52,7 +52,7 @@ function on_screen(ports: BoardPorts, screen: Screen): Framing {
 	const { theme } = ports
 
 	return {
-		wrap: (text) => screen.frame(theme === undefined ? text : run_board_theme.restyle(theme, text)),
+		wrap: (text) => screen.frame(run_board_theme.restyle(theme, text)),
 		sink: ports.write_drawn ?? ports.write,
 	}
 }
