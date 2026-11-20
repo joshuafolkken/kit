@@ -71,6 +71,13 @@ describe('run_ship_review_record.is_fix_verified', () => {
 
 		expect(await run_ship_review_record.is_fix_verified(['code'])).toBe(false)
 	})
+
+	it('counts a fix the scoped pair left green', async () => {
+		verdict_text.value = FIXED_MEDIUM
+
+		expect(await run_ship_review_record.is_fix_verified(['code'])).toBe(true)
+		expect(scoped_pair_mock).toHaveBeenCalledOnce()
+	})
 })
 
 describe('run_ship_review_record.record_and_route', () => {
