@@ -181,14 +181,26 @@ async function summary(cwd: string, now_ms: number = Date.now()): Promise<string
 	)
 }
 
-// `--density` prints the lane-child density alone, so the number is the output's last line; a period
-// with no lane-child request prints nothing, never a zero a declared bound would read as met.
-function printed_lines(argv: ReadonlyArray<string>, audit: Audit): Array<string> {
-	if (!argv.includes(DENSITY_FLAG)) return cost_audit_format.report_lines(audit)
+// `--density` reads the lane children's own sessions of the current period alone, with no merges,
+// breakdowns or pricing (joshuafolkken/kit#8284), and prints a label line over the number, so the
+// number stays the output's last line; a period with no lane-child request prints nothing, never a
+// zero a declared bound would read as met.
+function density_lines(cwd: string, span: AuditSpan): Array<string> {
+	const [window] = cost_audit.windows_of(span.days, span.now_ms)
+	const sessions = cost_audit_read.load_lane_children(cwd, window.start_ms)
+	const value = cost_audit_format.density_value(cost_audit.density_inside(sessions, window))
 
-	const value = cost_audit_format.density_value(audit)
+	return value === undefined ? [] : [cost_audit_format.density_label(window), value]
+}
 
-	return value === undefined ? [] : [value]
+async function printed_lines(
+	argv: ReadonlyArray<string>,
+	cwd: string,
+	span: AuditSpan,
+): Promise<Array<string>> {
+	if (argv.includes(DENSITY_FLAG)) return density_lines(cwd, span)
+
+	return cost_audit_format.report_lines(await measure(cwd, span.days, span.now_ms))
 }
 
 // Nothing to print is a failure: `--density` with no sample exits non-zero, like `lane:value`.
@@ -207,7 +219,7 @@ async function run(
 
 	if (span === undefined) return cli_flags.answer_usage(argv, USAGE)
 
-	return printed(printed_lines(argv, await measure(cwd, span.days, span.now_ms)))
+	return printed(await printed_lines(argv, cwd, span))
 }
 
 const cost_audit_cli = { USAGE, read_period, read_span, merged_query, run, summary }
