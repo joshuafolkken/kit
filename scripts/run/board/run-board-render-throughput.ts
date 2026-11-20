@@ -123,7 +123,7 @@ function lead_of(row: ThroughputRow): string {
 }
 
 // A row with a lamp panel starts it two columns past its NOW column, the same column on both rows
-// (joshuafolkken/kit#8236).
+// (joshuafolkken/kit#8236) and the column the panel's other rows start at (joshuafolkken/kit#8277).
 function line_of(row: ThroughputRow, widths: ReadonlyArray<number>, panel?: string): string {
 	const cells = COLUMNS.map((column, index) => column.text(row).padStart(widths[index] ?? 0))
 	const line = [lead_of(row), ...cells].join(COLUMN_GAP)

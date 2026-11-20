@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
+import { cost_transcript, type SessionFile } from '#scripts/cost-runtime/cost-transcript'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -69,5 +69,33 @@ describe('time_density_cli.run', () => {
 
 		expect(time_density_cli.run([], lane_of(root), home)).toBe(0)
 		expect(info.mock.calls[0]?.[0]).toMatch(/^lanes=1 /u)
+	})
+})
+
+function session_file(index: number, is_delegated: boolean): SessionFile {
+	return {
+		session_id: String(index),
+		path: `/t/${String(index)}.jsonl`,
+		modified_ms: index,
+		is_delegated,
+		depth: is_delegated ? ONE_CALL : 0,
+	}
+}
+
+describe('time_density_cli.run — the cap stops the read', () => {
+	it('opens no transcript older than the last qualifying lane', () => {
+		const files = [session_file(0, false), session_file(1, true), session_file(2, false)]
+		const files_tail = [session_file(3, false), session_file(4, false)]
+
+		vi.spyOn(cost_transcript, 'transcript_directories').mockReturnValue(['/t'])
+		vi.spyOn(cost_transcript, 'list_sessions_across').mockReturnValue([...files, ...files_tail])
+		const read = vi
+			.spyOn(cost_transcript, 'read_raw')
+			.mockReturnValue(time_transcript_fixture.density_text(LONG_TURNS, ONE_CALL))
+
+		vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		expect(time_density_cli.run(['--lanes', '2', '--path', '/repo'], '/repo', '/home')).toBe(0)
+		expect(read.mock.calls.map(([file]) => file.session_id)).toEqual(['0', '2'])
 	})
 })

@@ -83,6 +83,11 @@ function stamp_miss(stamp: FileMapStamp, base: string): string | undefined {
 
 const NO_MATCHING_RECORD = 'no green gate record matches the changed files'
 
+// The two refusals `josh gate` makes on top of the record's own (joshuafolkken/kit#8285): `--force`,
+// and a whole-tree run whose whole-tree checks hold no green record of their own (`whole-tree-reuse.ts`).
+const FORCED_MISS = `${FORCE_FLAG} was given`
+const WHOLE_TREE_MISS = 'the whole-tree checks have no green record for this tree'
+
 // joshuafolkken/kit#5214: a record that exists but covers other files is told apart from no record
 // at all, with the sizes of the two maps, so a log shows how far the tree had moved past it.
 function record_miss(recorded: FileMapStamp | undefined, tree: Record<string, string>): string {
@@ -124,6 +129,8 @@ const MISS_KINDS: ReadonlyArray<readonly [string, string]> = [
 	[NO_MATCHING_RECORD, 'no-record'],
 	[BASE_MOVED, 'base-moved'],
 	[INPUTS_MOVED, 'inputs-moved'],
+	[FORCED_MISS, 'forced'],
+	[WHOLE_TREE_MISS, 'whole-tree-unrecorded'],
 ]
 
 const OTHER_MISS = 'other'
@@ -188,6 +195,8 @@ function format_skip(taken_at: string): string {
 
 const gate_skip = {
 	FORCE_FLAG,
+	FORCED_MISS,
+	WHOLE_TREE_MISS,
 	format_reuse_notice,
 	format_skip,
 	gate_reuse,

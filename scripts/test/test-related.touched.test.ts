@@ -1,9 +1,12 @@
 import path from 'node:path'
 import { scoped_green } from '#scripts/gate/scoped-green'
+import { change_base } from '#scripts/git/change-base'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { test_read_map, type ReadMap } from './test-read-map'
+import { test_read_trace } from './test-read-trace'
 import { test_related } from './test-related'
 import { test_related_claim } from './test-related-claim'
 import { test_related_record } from './test-related-record'
@@ -33,6 +36,7 @@ vi.mock(import('#scripts/gate/since-green'), async (import_original) => {
 	return { since_green: { ...since_green, read_verdict: vi.fn(async () => no_record) } }
 })
 vi.mock('./test-related-claim', () => ({ test_related_claim: { with_unit_claim: vi.fn() } }))
+vi.mock('#scripts/git/change-base', () => ({ change_base: { resolved_through_merge: vi.fn() } }))
 
 const REPOSITORY_ROOT = process.cwd()
 // A real module of this tree, so its same-named test is found on disk.
@@ -47,7 +51,25 @@ const TOUCHED = '--touched'
 const SHARED_FIXTURE = 'scripts/run/cut/run-cut-cli-fixture.ts'
 const FIXTURE_CONSUMER = path.join(REPOSITORY_ROOT, 'scripts/run/cut/run-cut-cli.test.ts')
 
+const BASE = 'base-commit'
+const BOARD = 'scripts/run/board'
+const GLYPHS_TEST = `${BOARD}/run-board-theme-glyphs.test.ts`
+const BOARD_MAP: ReadMap = {
+	version: test_read_map.MAP_VERSION,
+	commit: BASE,
+	dirty: {},
+	change: [],
+	directories: [BOARD],
+	readers: { [test_read_trace.read_key(BOARD, 'listing')]: [GLYPHS_TEST] },
+}
+
 const mocked_record = vi.spyOn(test_related_record, 'record_run')
+
+async function touched_arguments(file: string): Promise<ReadonlyArray<string>> {
+	await test_related.run_related_tests([TOUCHED, file])
+
+	return vi.mocked(test_unit_guard.run_guarded_vitest).mock.calls[0]?.[1] ?? []
+}
 
 beforeEach(() => {
 	vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
@@ -59,6 +81,10 @@ beforeEach(() => {
 		async (_files, run) => await run(),
 	)
 	mocked_record.mockResolvedValue()
+	// No map unless a case gives one, so no case reads this machine's recording.
+	vi.spyOn(test_read_map, 'read_map').mockReturnValue(undefined)
+	vi.mocked(change_base.resolved_through_merge).mockResolvedValue(BASE)
+	vi.mocked(changed_paths.read_held_at).mockResolvedValue([])
 })
 
 // joshuafolkken/kit#5237: the implementation loop's narrow re-check.
@@ -129,5 +155,34 @@ describe('test_related.run_related_tests — a --touched run', () => {
 
 		expect(changed_paths.read_changed_paths).not.toHaveBeenCalled()
 		expect(test_unit_guard.run_guarded_vitest).toHaveBeenCalledOnce()
+	})
+})
+
+// joshuafolkken/kit#8275: a test enumerating a directory imports no file added there, so the touched
+// run takes the map's listers of a directory whose entries moved — never for an edit in place.
+describe('test_related.run_related_tests — a --touched run with a read map', () => {
+	const ADDED = `${BOARD}/run-board-added.ts`
+	const EDITED = `${BOARD}/run-board-sweep.ts`
+	const GLYPHS = path.join(REPOSITORY_ROOT, GLYPHS_TEST)
+
+	beforeEach(() => {
+		vi.spyOn(test_read_map, 'read_map').mockReturnValue(BOARD_MAP)
+	})
+
+	it('runs the test listing the directory a file was added to', async () => {
+		expect(await touched_arguments(ADDED)).toContain(GLYPHS)
+	})
+
+	it('leaves the lister out for an edit in place the change base held', async () => {
+		vi.mocked(changed_paths.read_held_at).mockResolvedValue([EDITED])
+
+		expect(await touched_arguments(EDITED)).not.toContain(GLYPHS)
+	})
+
+	it('counts every changed file as moved when no change base resolves', async () => {
+		vi.mocked(changed_paths.read_held_at).mockResolvedValue([EDITED])
+		vi.mocked(change_base.resolved_through_merge).mockResolvedValue(undefined)
+
+		expect(await touched_arguments(EDITED)).toContain(GLYPHS)
 	})
 })
