@@ -10,7 +10,8 @@ import { run_board_spot } from './run-board-spot'
 const { gap_line, provider_rows } = run_board_quota_lamps
 const { LAMP_START } = run_board_spot
 const ROWS = ['claude', 'codex', 'github']
-const LIT_RED = '38;2;128;35;29'
+// The red rows' out color before joshuafolkken/kit#8305.
+const OUT_RED = '38;2;128;35;29'
 const OUT_YELLOW = '38;2;128;107;5'
 const NOW_MS = Date.parse('2026-11-20T09:00:00.000Z')
 
@@ -26,13 +27,14 @@ describe('run_board_quota_lamps', () => {
 		expect(rows).toStrictEqual([`claude ${LAMP_START}`, `codex ${LAMP_START}`, 'github'])
 	})
 
-	it('colors the blank line red and the provider rows yellow then red', () => {
+	it('starts the blank line and both provider rows out in half yellow, never half red', () => {
 		vi.stubEnv('FORCE_COLOR', '3')
 		const [first = '', second = ''] = provider_rows(ROWS, true)
 
-		expect(gap_line(true)).toContain(LIT_RED)
-		expect(first).toContain(OUT_YELLOW)
-		expect(second).toContain(LIT_RED)
+		for (const line of [gap_line(true), first, second]) {
+			expect(line).toContain(OUT_YELLOW)
+			expect(line).not.toContain(OUT_RED)
+		}
 	})
 
 	it('leaves the blank line and the rows as they were where the frame has none', () => {
