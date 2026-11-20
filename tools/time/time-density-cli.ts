@@ -114,19 +114,38 @@ function transcript_stats(text: string): TranscriptStats {
 	}
 }
 
+// Each text's stats, lazily and with short sessions dropped, so the caller's `break` ends the read.
+function* long_enough(
+	texts: Iterable<string>,
+	min_round_trips: number,
+): Generator<TranscriptStats> {
+	for (const text of texts) {
+		const one = transcript_stats(text)
+
+		if (one.round_trips >= min_round_trips) yield one
+	}
+}
+
 // The most recent transcripts holding enough round trips to measure, newest first and capped at
 // `max_lanes`. A short session is dropped rather than counted, so the cap is reached by qualifying
 // lanes rather than by the newest handful whatever their length. The texts arrive newest first, so the
-// cap keeps the front of the filtered list.
+// cap keeps the front of the qualifying ones.
+// **The cap stops the read, not just the count.** The texts are pulled one at a time and only the
+// stats are kept, so once `max_lanes` qualify no older transcript is read at all — reading the whole
+// history before capping it ran a lane-heavy home out of heap (kit#8282).
 function qualifying(
-	texts: ReadonlyArray<string>,
+	texts: Iterable<string>,
 	min_round_trips: number,
 	max_lanes: number,
 ): Array<TranscriptStats> {
-	return texts
-		.map((text) => transcript_stats(text))
-		.filter((one) => one.round_trips >= min_round_trips)
-		.slice(NONE, max_lanes)
+	const kept: Array<TranscriptStats> = []
+
+	for (const one of long_enough(texts, min_round_trips)) {
+		kept.push(one)
+		if (kept.length >= max_lanes) break
+	}
+
+	return kept
 }
 
 // A loop rather than `reduce`, which this project's lint config forbids — the same idiom
@@ -166,7 +185,7 @@ function kinds(stats: ReadonlyArray<TranscriptStats>): Array<BundleToolRow> {
 // more than a short one. Pure over the transcript texts, so a test drives it with fixtures rather than
 // a home directory.
 function summarize(
-	texts: ReadonlyArray<string>,
+	texts: Iterable<string>,
 	min_round_trips: number,
 	max_lanes: number,
 ): DensitySummary {
@@ -208,14 +227,13 @@ function format(summary: DensitySummary): string {
 
 // The recent lane sessions' transcripts, newest first. A dispatched lane child writes its own
 // transcript under the lane's slug, so the session files — not the delegated units under them — are
-// what a run's tool calls sit in; `list_sessions_across` already orders them newest first.
-function lane_texts(cwd: string, home: string): Array<string> {
+// what a run's tool calls sit in; `list_sessions_across` already orders them newest first. Each text is
+// read only when `qualifying` pulls it, so a file past the lane cap is never opened.
+function* lane_texts(cwd: string, home: string): Generator<string> {
 	const directories = cost_transcript.transcript_directories(cwd, home)
+	const files = cost_transcript.list_sessions_across(directories)
 
-	return cost_transcript
-		.list_sessions_across(directories)
-		.filter((file) => !file.is_delegated)
-		.map((file) => cost_transcript.read_raw(file))
+	for (const file of files) if (!file.is_delegated) yield cost_transcript.read_raw(file)
 }
 
 // The checkout whose lanes are aggregated: a lane worktree resolves to its main checkout, because a

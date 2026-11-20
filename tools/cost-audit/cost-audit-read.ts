@@ -165,19 +165,42 @@ function file_session(file: SessionFile, lanes: ReadonlyArray<string>): AuditSes
 	return { ...session, issue, agent_type }
 }
 
-// Every session touched since `since_ms`. A file last written before then holds no request inside the
-// window, so it is not read at all.
-function load(cwd: string, since_ms: number): Array<AuditSession> {
+type FileFilter = (file: SessionFile, lanes: ReadonlyArray<string>) => boolean
+
+// The sessions touched since `since_ms` that `keep` admits. A file last written before then holds no
+// request inside the window, and a file `is_kept` refuses is never opened.
+function load_where(cwd: string, since_ms: number, is_kept: FileFilter): Array<AuditSession> {
 	const lanes = cost_transcript.lane_transcript_directories(
 		cost_transcript.session_cwd(cwd),
 		homedir(),
 	)
-	const sessions = session_files(cwd, since_ms).map((file) => file_session(file, lanes))
+	const files = session_files(cwd, since_ms).filter((file) => is_kept(file, lanes))
 
-	return dedupe_across(sessions)
+	return dedupe_across(files.map((file) => file_session(file, lanes)))
 }
 
-const cost_audit_read = { session_of, dedupe_across, issue_of, agent_type_of, load }
+function load(cwd: string, since_ms: number): Array<AuditSession> {
+	return load_where(cwd, since_ms, () => true)
+}
+
+function is_lane_child_file(file: SessionFile, lanes: ReadonlyArray<string>): boolean {
+	return !file.is_delegated && issue_of(file.path, lanes) !== undefined
+}
+
+// The lane children's own sessions alone — all `cost:audit --density` reads (joshuafolkken/kit#8284), so
+// the main checkout's and the delegated units' transcripts are never opened.
+function load_lane_children(cwd: string, since_ms: number): Array<AuditSession> {
+	return load_where(cwd, since_ms, is_lane_child_file)
+}
+
+const cost_audit_read = {
+	session_of,
+	dedupe_across,
+	issue_of,
+	agent_type_of,
+	load,
+	load_lane_children,
+}
 
 export type { AuditSession }
 export { cost_audit_read }

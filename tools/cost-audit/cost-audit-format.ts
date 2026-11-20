@@ -1,5 +1,5 @@
 import { figure_format } from '#scripts/lib/figure-format'
-import type { Audit, AuditRow } from './cost-audit'
+import type { Audit, AuditRow, AuditWindow } from './cost-audit'
 import { cost_audit_cause, type CauseRow } from './cost-audit-cause'
 import { cost_audit_density, type Density } from './cost-audit-density'
 import type { PhaseRow } from './cost-audit-phase'
@@ -75,6 +75,7 @@ function merge_lines(audit: Audit): Array<string> {
 }
 
 const DENSITY_DECIMALS = 2
+const ISO_DATE_LENGTH = 10
 
 function density_text(density: Density): string {
 	const calls = cost_audit_density.calls_per_request(density).toFixed(DENSITY_DECIMALS)
@@ -90,15 +91,23 @@ function density_line(audit: Audit): string {
 	return `  lane-child density: ${density_text(current)} (prev ${density_text(previous)})`
 }
 
-// The period's lane-child calls per request alone — `cost:audit --density`'s output, a number a
+// The period's lane-child calls per request alone — `cost:audit --density`'s last line, a number a
 // measurement Issue declares because it is the output's last line (`measure-declaration.ts`). A period
 // with no lane-child request answers `undefined`, never a zero that would pass a declared bound.
-function density_value(audit: Audit): string | undefined {
-	const { current } = audit.lane_density
+function density_value(density: Density): string | undefined {
+	if (density.requests === 0) return undefined
 
-	if (current.requests === 0) return undefined
+	return cost_audit_density.calls_per_request(density).toFixed(DENSITY_DECIMALS)
+}
 
-	return cost_audit_density.calls_per_request(current).toFixed(DENSITY_DECIMALS)
+function utc_date(at_ms: number): string {
+	return new Date(at_ms).toISOString().slice(0, ISO_DATE_LENGTH)
+}
+
+// The line `--density` prints above its number, naming the value and the UTC dates the window covers,
+// its end excluded (joshuafolkken/kit#8284).
+function density_label(window: AuditWindow): string {
+	return `lane-child calls per request ${utc_date(window.start_ms)}..${utc_date(window.end_ms - 1)}`
 }
 
 function rewrite_figures(count: RewriteCount): string {
@@ -300,6 +309,7 @@ const cost_audit_format = {
 	FILING_PREFIX,
 	FILING_ROW_SEPARATOR,
 	FILING_SUFFIX,
+	density_label,
 	density_value,
 	filing_lines,
 	report_lines,

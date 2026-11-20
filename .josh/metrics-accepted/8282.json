@@ -1,0 +1,7 @@
+{
+	"reason": "time:density reads transcripts lazily and stops at the lane cap; the generator and early-exit loop replace a map/filter/slice chain (+9 lines) to fix the heap exhaustion in kit#8282",
+	"date": "2026-11-20",
+	"growth": {
+		"scripts.code_lines": 9
+	}
+}

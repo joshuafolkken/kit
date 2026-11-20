@@ -232,3 +232,7 @@
   - fires: `pnpm josh stop:guard` — an unattended run (a kit-launched headless session, a lane child, a `backlogrun` parent) whose last reply offers to file without filing. Blocks the stop
   - silent: an interactive session, already filed, inside a fence or quote, a named third-party `owner/repo`, or an unknown owner
   - not automated: the filing needs a title and a body only the model can write
+- **Deferral owner** (`deferral-owner`, `prompts/collaboration-workflow/principles.md` → "concise-reply")
+  - fires: `pnpm josh stop:guard` — any session whose last reply recommends deciding, investigating or filing later with no `#N`, filing draft or reason not to track in that paragraph. Blocks the stop
+  - silent: an owner in the same paragraph, inside a fence or quote, a named third-party `owner/repo`, or an unknown owner
+  - not automated: which Issue owns the deferral, or why it is not tracked, is the model’s call

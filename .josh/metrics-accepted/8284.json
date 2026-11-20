@@ -1,0 +1,7 @@
+{
+	"reason": "cost:audit --density gains its own lane-child-only read path and label line (#8284)",
+	"date": "2026-11-20",
+	"growth": {
+		"scripts.code_lines": 36
+	}
+}

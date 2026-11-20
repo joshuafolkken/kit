@@ -1,0 +1,7 @@
+{
+	"reason": "gate rows record the reuse miss kind in a new fallback field (#8285)",
+	"date": "2026-11-20",
+	"growth": {
+		"scripts.code_lines": 8
+	}
+}

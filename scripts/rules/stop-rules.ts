@@ -2,6 +2,7 @@ import { hook_decision } from '#scripts/josh/hook-decision'
 import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
 import { concise_reply } from './concise-reply'
+import { deferral_owner } from './deferral-owner'
 import { filing_offer } from './filing-offer'
 import { lane_background } from './lane-background'
 import { reply_language } from './reply-language'
@@ -296,14 +297,23 @@ function needs_release(context: StopContext): boolean {
 	return is_held_idle(context) && context.tree_clean && !context.prrun_stopped
 }
 
-// The rules that read the reply and need the model: the filing offer, then the language, then the
-// length. **A headless agent's reply has no reader**: its text lands in a stream-json log, so
+// **A deferral with no owner is sent back in every session** (joshuafolkken/kit#8296): unlike the filing
+// offer, a consultation session must name the owner or a filing draft too — `deferral-owner.ts`.
+function deferral_reason(context: StopContext): string | undefined {
+	return deferral_owner.needs_owner(context.message, context.session_owner)
+		? deferral_owner.REASON
+		: undefined
+}
+
+// The rules that read the reply and need the model: the filing offer, the unowned deferral, then the
+// language, then the length. **A headless agent's reply has no reader**: its text lands in a stream-json log, so
 // correcting its language costs a turn and reaches nobody. A drifted reply
 // refused for another reason is not rewritten, but the drift still ends: `block_envelope` appends the
 // session-language note to every refusal, so the turn it continues is written in the session language.
 function reply_reason(context: StopContext): string | undefined {
 	if (needs_filing(context)) return FILING_OFFER_REASON
-	if (context.headless_agent) return undefined
+	const deferral = deferral_reason(context)
+	if (deferral !== undefined || context.headless_agent) return deferral
 
 	return language_reason(context) ?? concise_reason(context)
 }
