@@ -1,0 +1,7 @@
+{
+	"reason": "unicorn 80 prefer-options-parameter: issue_here and window_store take a typed options object (IssueHereOptions, WindowOptions.is_kept)",
+	"date": "2026-11-20",
+	"growth": {
+		"scripts.code_lines": 5
+	}
+}

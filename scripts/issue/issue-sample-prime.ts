@@ -84,7 +84,7 @@ function is_merge(entry: LedgerEntry): entry is MergeEntry {
 }
 
 // joshuafolkken/kit#8133: one store for the process, so a later prime keeps the windows read.
-const merge_windows = lane_ledger.window_store(is_merge)
+const merge_windows = lane_ledger.window_store({ is_kept: is_merge })
 
 // joshuafolkken/kit#8057: the ledger's merges at or after `since_ms`, read on each judgement so a merge
 // recorded since the prime counts; the whole ledger is never read. The board judges each waiting issue

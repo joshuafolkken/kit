@@ -92,7 +92,7 @@ async function measure(root: string, is_startup_timed: boolean): Promise<Measure
 	if (!is_startup_timed) return { durations: recorded, is_busy, is_startup_busy: false }
 	const startups = time_startups(root)
 	const load = await lane_load.sample(new Date().toISOString())
-	const is_in_lane = lane_paths.issue_here(root) !== undefined
+	const is_in_lane = lane_paths.issue_here({ directory: root }) !== undefined
 	const is_startup_busy = metrics_duration_load.is_startup_loaded(load, cores, is_in_lane)
 
 	return { durations: { ...recorded, ...startups }, is_busy, is_startup_busy }

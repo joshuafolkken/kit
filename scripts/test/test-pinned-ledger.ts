@@ -81,7 +81,7 @@ async function record(
 	elapsed_ms: number,
 ): Promise<void> {
 	await lane_ledger_write.record_test_pinned({
-		issue: lane_paths.issue_here(PROJECT_ROOT),
+		issue: lane_paths.issue_here({ directory: PROJECT_ROOT }),
 		held: skipped.held,
 		rechecked: skipped.rechecked ?? 0,
 		unregistered: skipped.unregistered ?? 0,
@@ -103,7 +103,7 @@ async function record_discarded(
 	origin: PinnedOrigin = BACKGROUND_ORIGIN,
 ): Promise<void> {
 	await lane_ledger_write.record_test_pinned({
-		issue: lane_paths.issue_here(PROJECT_ROOT),
+		issue: lane_paths.issue_here({ directory: PROJECT_ROOT }),
 		held: 0,
 		probes: [],
 		elapsed_ms,

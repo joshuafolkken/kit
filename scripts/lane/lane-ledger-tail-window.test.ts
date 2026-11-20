@@ -39,7 +39,7 @@ function keep_all(): boolean {
 }
 
 function sliding(): ReturnType<typeof lane_ledger_tail.window_store> {
-	return lane_ledger_tail.window_store(keep_all, { slides: true })
+	return lane_ledger_tail.window_store({ is_kept: keep_all, slides: true })
 }
 
 describe('lane_ledger_tail.window_store against a whole backward read', () => {
