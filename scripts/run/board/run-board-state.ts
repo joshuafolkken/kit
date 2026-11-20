@@ -1,5 +1,6 @@
 import type { NamedPlan } from '#scripts/backlog/backlog-plan'
 import type { ClosedAnswer, ClosedIssue } from './run-board-closed'
+import type { RuleCell } from './run-board-codes'
 import type { BoardDisplay } from './run-board-display'
 import type { Fetch } from './run-board-fetch'
 import type { SectionKey, TerminalSize } from './run-board-fit'
@@ -158,6 +159,8 @@ interface BoardView {
 	sweep?: Sweep | undefined
 	// Where the last frame drew its lamp panel's lamps, blinked between redraws (`run-board-lamp-spots.ts`).
 	lamps?: ReadonlyArray<Lamp> | undefined
+	// Where the last frame drew its section rules' cells, running code while a row types (`run-board-codes.ts`).
+	rules?: ReadonlyArray<RuleCell> | undefined
 	// The rows the last frame drew and the ones typing, typed on between redraws (`run-board-type-rows.ts`).
 	typing: Typing
 	// The rows and run conditions the last frame sounded over, and the standing cue waiting to replay

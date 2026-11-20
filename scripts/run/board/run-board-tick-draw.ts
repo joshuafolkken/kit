@@ -128,6 +128,12 @@ function has_lamps(
 	return is_lamp_theme(ports, defs) && ports.is_tty && run_board_lamps.is_colored()
 }
 
+// Whether the section rules run code while a row types: a theme whose live board decodes them, where its
+// lamp panel shows — the spin gates them on the lamps it blinks (joshuafolkken/kit#8375).
+function has_codes(ports: Pick<DrawPorts, 'theme'>): boolean {
+	return ports.theme !== undefined && THEME_DEFS[ports.theme].live.codes
+}
+
 // The frame under `header` with its spinners drawn at this moment's frame, and where they are on screen.
 function frame_of(display: BoardDisplay, header: LaidHeader, redraw: Redraw): Drawn {
 	const bounds = bounds_of(redraw.ports)
@@ -180,8 +186,9 @@ function draw_display(state: BoardState, display: BoardDisplay, redraw: Redraw):
 	redraw.ports.typing_sound?.set(run_board_type_rows.is_typing(typing, redraw.now_ms))
 
 	const { spots, sweep, lamps } = drawn
+	const rules = has_codes(redraw.ports) ? drawn.rules : []
 
-	return { ...state, ...display.carried, spots, sweep, lamps, typing }
+	return { ...state, ...display.carried, spots, sweep, lamps, rules, typing }
 }
 
 const run_board_tick_draw = { bounds_of, draw, draw_display, has_lamps }

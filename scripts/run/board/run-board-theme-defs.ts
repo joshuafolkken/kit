@@ -13,10 +13,12 @@ interface IntroDefinition {
 }
 
 // The live board's effects (joshuafolkken/kit#8360): whether each row types as it appears, and whether
-// the trill sounds while it types.
+// the trill sounds while it types, and whether the section rules run launch codes while it types where
+// the lamp panel shows (`run-board-codes.ts`; joshuafolkken/kit#8375).
 interface LiveDefinition {
 	types_rows: boolean
 	trill: boolean
+	codes: boolean
 }
 
 interface ThemeDefinition {
@@ -39,7 +41,7 @@ const THEME_DEFS = {
 		intro: { line: 'SHALL WE PLAY A GAME?', letter_ms: 50, hold_ms: 2000 },
 		alert: run_board_header_defcon.field_of,
 		lamps: true,
-		live: { types_rows: true, trill: true },
+		live: { types_rows: true, trill: true, codes: true },
 	},
 	// joshuafolkken/kit#8354: the green phosphor body and the `TRACE` gauge; its opening and live
 	// effects come with the epic's later children, so it types no opening line yet.
@@ -48,7 +50,7 @@ const THEME_DEFS = {
 		intro: { line: '', letter_ms: 0, hold_ms: 0 },
 		alert: run_board_header_trace.field_of,
 		lamps: false,
-		live: { types_rows: false, trill: false },
+		live: { types_rows: false, trill: false, codes: false },
 	},
 } as const satisfies Readonly<Record<string, ThemeDefinition>>
 

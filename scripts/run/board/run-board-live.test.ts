@@ -10,31 +10,30 @@ import type { TypingSound } from './run-board-sound-typing'
 
 const { LOCAL, STOPPED, harness, plan_titled } = run_board_fixture
 const SCREEN = run_board_screen.screen_of('live')
+const NO_LIVE = { types_rows: false, trill: false, codes: false }
 
 // joshuafolkken/kit#8360: the live effects are the theme definition's, not whether a theme is given.
 describe('run_board_live.live_of', () => {
-	it('reads the rows typed and the trill from the wargames definition', () => {
-		expect(run_board_live.live_of('wargames')).toStrictEqual({ types_rows: true, trill: true })
+	it('reads the rows typed, the trill and the rules code from the wargames definition', () => {
+		expect(run_board_live.live_of('wargames')).toStrictEqual({
+			types_rows: true,
+			trill: true,
+			codes: true,
+		})
 	})
 
 	it('chooses no live effect with no theme', () => {
-		expect(run_board_live.live_of(undefined)).toStrictEqual({ types_rows: false, trill: false })
+		expect(run_board_live.live_of(undefined)).toStrictEqual(NO_LIVE)
 	})
 
 	it('chooses no live effect for a theme the table has no row for', () => {
-		expect(run_board_live.live_of('wargames', {})).toStrictEqual({
-			types_rows: false,
-			trill: false,
-		})
+		expect(run_board_live.live_of('wargames', {})).toStrictEqual(NO_LIVE)
 	})
 
 	it('chooses no live effect where the definition turns them off', () => {
-		const defs = { wargames: { live: { types_rows: false, trill: false } } }
-
-		expect(run_board_live.live_of('wargames', defs)).toStrictEqual({
-			types_rows: false,
-			trill: false,
-		})
+		expect(run_board_live.live_of('wargames', { wargames: { live: NO_LIVE } })).toStrictEqual(
+			NO_LIVE,
+		)
 	})
 })
 

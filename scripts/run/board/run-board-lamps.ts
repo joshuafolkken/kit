@@ -166,6 +166,7 @@ const run_board_lamps = {
 	is_colored,
 	is_lit,
 	lamp_text,
+	mixed,
 	place_of,
 	start_column,
 	start_of,
