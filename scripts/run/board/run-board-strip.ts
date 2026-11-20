@@ -10,7 +10,7 @@ import { run_board_type_rows, type Typing } from './run-board-type-rows'
 // on (`live.strip`, off by default; joshuafolkken/kit#8398), the blank line right
 // above each section rule holds a strip of lamps in the lamp panel's columns. It fills from the left as
 // far as the typing has gone — yellow lamps twinkling on their own, the front one red and steady, out
-// ahead — stays full while the lock crosses the rules, and goes out at once when the lock is done. The
+// ahead — stays full while the rules' code turns back into the rule, and goes out at once when it has. The
 // cells are written between redraws, like the lamps and the codes.
 
 const TWINKLE_MS = 100
@@ -67,7 +67,7 @@ function is_twinkled(cell: StripCell, at_ms: number): boolean {
 	return run_board_lamps.mixed([cell.row, cell.column, step]) % PERCENT < LIT_PERCENT
 }
 
-// The lamps the typing has filled at `at_ms`, every one while the lock crosses; none while the rules
+// The lamps the typing has filled at `at_ms`, every one while the code turns back; none while the rules
 // run no code.
 function filled_of(striped: Striped, count: number, at_ms: number): number | undefined {
 	if (!run_board_codes.is_coding(striped.typing, striped.cells, at_ms)) return undefined
