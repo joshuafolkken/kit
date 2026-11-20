@@ -84,6 +84,8 @@ const record_check = vi.fn<typeof review_record.check>()
 // The digest is read off the session's real transcript; no case carries one unless it says so
 // once (joshuafolkken/kit#5040).
 const own_digest = vi.fn<typeof run_cut_digest.own_digest>().mockReturnValue(undefined)
+// The checkout every case runs in; a case can make one read of it fail without a `vi` call of its own.
+const worktree_directory = vi.fn<typeof run_cut.worktree_directory>().mockResolvedValue(REPOSITORY)
 // The section a verdict is followed by is `run_step_section`'s own print; spied so `verdict()` still
 // reads the token, and so a case can pin which section followed it (joshuafolkken/kit#5953).
 const print_section = vi.fn<typeof run_step_section.print_once>().mockReturnValue(0)
@@ -189,7 +191,7 @@ function install(): void {
 	beforeEach(() => {
 		vi.clearAllMocks()
 		run_cut.end_cut(target())
-		vi.spyOn(run_cut, 'worktree_directory').mockResolvedValue(REPOSITORY)
+		vi.spyOn(run_cut, 'worktree_directory').mockImplementation(worktree_directory)
 		state.mockResolvedValue({ branch: BRANCH, is_dirty: true, is_held: true })
 		default_branch.mockResolvedValue(DEFAULT_BRANCH)
 		find_open_lane.mockResolvedValue(lane())
@@ -232,6 +234,7 @@ const run_cut_cli_fixture = {
 	is_attested_on,
 	record_check,
 	own_digest,
+	worktree_directory,
 	print_section,
 	emit,
 	verdict,

@@ -1,0 +1,7 @@
+{
+	"reason": "the fixture exposes a worktree_directory handle (+2 lines) so the regression test pinning run-cut-cli.ts's process.cwd() fallback stays in the pure suite",
+	"date": "2026-11-20",
+	"growth": {
+		"scripts.code_lines": 2
+	}
+}
