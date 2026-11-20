@@ -96,7 +96,14 @@ function rewrites_in(sessions: ReadonlyArray<RecordedSession>, is_counted: IsCou
 	return rewrites
 }
 
-const cost_audit_rewrite = { REWRITE_FLOOR_TOKENS, is_wait_rewrite, pairs_of, rewrites_in }
+const cost_audit_rewrite = {
+	REWRITE_FLOOR_TOKENS,
+	is_wait_rewrite,
+	pairs_of,
+	rewrites_in,
+	write_cost,
+	written,
+}
 
 export type { RewriteCount, Rewrites }
 export { cost_audit_rewrite }

@@ -1,0 +1,7 @@
+{
+	"reason": "New cost:audit after-wait rewrite breakdown (kind, phase, preceding call) required by #8308",
+	"date": "2026-11-20",
+	"growth": {
+		"scripts.code_lines": 154
+	}
+}

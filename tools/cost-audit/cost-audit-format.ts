@@ -15,6 +15,7 @@ import {
 	type LongOutput,
 	type UsageBreakdown,
 } from './cost-audit-usage'
+import { cost_audit_wait_format } from './cost-audit-wait-format'
 
 // The printed form of a `josh cost:audit` result: the full report the command prints, and the one
 // summary line `josh retrospective` carries so a run's digest shows the trend it ran in.
@@ -133,6 +134,7 @@ function rewrite_lines(audit: Audit): Array<string> {
 		`Full cache rewrites (cache write over ${floor} tokens, the earlier context not read back)`,
 		rewrite_line('after a wait of 5 min or more', current.after_wait, previous.after_wait),
 		rewrite_line('within 5 min', current.within_ttl, previous.within_ttl),
+		...cost_audit_wait_format.wait_lines(audit.rewrites.waits),
 	]
 }
 

@@ -166,17 +166,23 @@ interface PhaseInput {
 	breakdowns: ReadonlyMap<number, Breakdown>
 }
 
-function add_session(rows: RecordGroups, input: PhaseInput, session: AuditSession): void {
+// Each of a lane session's requests with its phase; a session with no issue places none.
+function placed_phases(input: PhaseInput, session: AuditSession): Array<[UsageRecord, string]> {
 	const { issue } = session
 
-	if (issue === undefined) return
+	if (issue === undefined) return []
 
 	const breakdown = input.breakdowns.get(issue)
 	const from_ms = review_from_ms(input.reviews, issue)
 
-	for (const record of session.records) {
-		add_record(rows, phase_of({ session, record, breakdown, review_from_ms: from_ms }), record)
-	}
+	return session.records.map((record) => [
+		record,
+		phase_of({ session, record, breakdown, review_from_ms: from_ms }),
+	])
+}
+
+function add_session(rows: RecordGroups, input: PhaseInput, session: AuditSession): void {
+	for (const [record, phase] of placed_phases(input, session)) add_record(rows, phase, record)
 }
 
 function sorted(groups: RecordGroups): Array<PhaseRow> {
@@ -222,8 +228,9 @@ const cost_audit_phase = {
 	ROUND_TWO,
 	UNATTRIBUTED,
 	agent_rows_of,
+	placed_phases,
 	rows_of,
 }
 
-export type { PhaseRow, PhaseTokens }
+export type { PhaseInput, PhaseRow, PhaseTokens }
 export { cost_audit_phase }

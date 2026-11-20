@@ -41,7 +41,7 @@ function audit_with(overrides: Partial<Audit> = {}): Audit {
 		kinds: [],
 		tools: [],
 		guards: [],
-		rewrites: { current: NO_REWRITES, previous: NO_REWRITES },
+		rewrites: { current: NO_REWRITES, previous: NO_REWRITES, waits: [] },
 		write_causes: [],
 		phases: [],
 		agents: [],
@@ -182,7 +182,7 @@ describe('cost_audit_format.report_lines — the full cache rewrites', () => {
 	it('prints the rewrites after a wait and within the TTL beside the previous period', () => {
 		const current = { after_wait: { count: 631, usd: 182 }, within_ttl: { count: 2, usd: 0.5 } }
 		const lines = cost_audit_format.report_lines(
-			audit_with({ rewrites: { current, previous: NO_REWRITES } }),
+			audit_with({ rewrites: { current, previous: NO_REWRITES, waits: [] } }),
 		)
 
 		expect(lines).toContain('  after a wait of 5 min or more: 631 ($182.0000) (prev 0 ($0.0000))')
