@@ -2,6 +2,6 @@
 	"reason": "scratch:run adds the permission-restricted runner for consultation scripts (#8263)",
 	"date": "2026-11-20",
 	"growth": {
-		"scripts.code_lines": 71
+		"scripts.code_lines": 75
 	}
 }

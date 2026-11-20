@@ -66,7 +66,12 @@ function launch(
 	const result = spawnSync(
 		process.execPath,
 		[...permission_arguments(scratch_root), real_script, ...script_arguments],
-		{ cwd: path.dirname(real_script), stdio: 'inherit' },
+		// NODE_OPTIONS is dropped: an inherited `--allow-net` or `--allow-child-process` would widen the grant.
+		{
+			cwd: path.dirname(real_script),
+			stdio: 'inherit',
+			env: { ...process.env, NODE_OPTIONS: undefined },
+		},
 	)
 
 	return result.status ?? FAILURE_EXIT_CODE

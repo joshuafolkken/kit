@@ -67,7 +67,7 @@ const DOCUMENT_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			'Run a scratch script that may write only to the scratch directory, with no network or child',
 		category: 'AI tools',
-		reference: ['<path> [args…]', 'automation', ['none']],
+		reference: ['<path> [args…]', 'automation', ['files', 'processes']],
 		usage: {
 			examples: [
 				{ arguments: '.josh/tmp/scratch/chart.mjs', note: 'writes only under .josh/tmp/scratch/' },
