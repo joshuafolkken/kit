@@ -1,5 +1,6 @@
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { review_attest } from '#scripts/review/review-attest'
+import { review_prompt_level } from '#scripts/review/review-prompt-level'
 import { describe, expect, it } from 'vitest'
 import { run_ship_review } from './run-ship-review'
 
@@ -26,6 +27,15 @@ describe('run_ship_review.reviewer_prompt', () => {
 		expect(prompt).toContain(BRIEF)
 		expect(prompt).toContain(SUBMIT)
 		expect(prompt).toContain('review:attest')
+	})
+
+	// joshuafolkken/kit#8337: each launch names its trigger for `cost:audit`.
+	it.each([
+		[run_ship_review.reviewer_prompt, CODE_SLOT, 'initial'],
+		[run_ship_review.report_prompt, review_attest.REVIEW_SLOT.INTERACTION, 'interaction'],
+		[run_ship_review.verification_prompt, CODE_SLOT, 'round-2'],
+	] as const)('writes the %# trigger %s', (prompt_of, slot, trigger) => {
+		expect(review_prompt_level.trigger_of(prompt_of(BRIEF, slot, ISSUE))).toBe(trigger)
 	})
 })
 

@@ -114,7 +114,7 @@ describe('run_review_briefs.open_briefs', () => {
 		expect(write_text_stamp).toHaveBeenCalledWith(CODE_PATH, `${CODE_BRIEF}\n`)
 		expect(remove_stamp).toHaveBeenCalledWith('/briefs/findings-code.txt')
 		expect(output.stdout.join('')).toBe(
-			`code brief: ${CODE_PATH}\ncode prompt: ${run_ship_review.round_one_opening(CODE_PATH)}\n`,
+			`code brief: ${CODE_PATH}\ncode prompt: ${run_ship_review.round_one_opening(CODE_PATH, 'initial')}\n`,
 		)
 	})
 

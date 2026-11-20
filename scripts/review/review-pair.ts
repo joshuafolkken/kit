@@ -54,7 +54,7 @@ function paired_brief(text: string, findings: string): string {
 
 function paired_opening(brief: string): string {
 	return [
-		`${review_prompt_level.opening(brief)}Review this checkout as a paired /code-review, recorded only: read the review brief at ${brief}`,
+		`${review_prompt_level.opening(brief, 'paired')}Review this checkout as a paired /code-review, recorded only: read the review brief at ${brief}`,
 		'and follow its first section over everything else — never run review:attest or review:submit.',
 		'Review it yourself in this session and never launch a second reviewer.',
 	].join(' ')
