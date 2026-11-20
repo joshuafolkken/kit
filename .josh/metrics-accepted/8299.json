@@ -1,0 +1,10 @@
+{
+	"reason": "the reply-close Stop row #8299 adds its predicate, two concise-reply rule lines and one rationale paragraph",
+	"date": "2026-11-20",
+	"growth": {
+		"scripts.code_lines": 92,
+		"rules.lines": 2,
+		"ai_cost.on_demand_bytes": 453,
+		"prose.long_paragraphs": 1
+	}
+}

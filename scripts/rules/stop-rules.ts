@@ -5,6 +5,7 @@ import { concise_reply } from './concise-reply'
 import { deferral_owner } from './deferral-owner'
 import { filing_offer } from './filing-offer'
 import { lane_background } from './lane-background'
+import { reply_close } from './reply-close'
 import { reply_language } from './reply-language'
 import { stop_decision, type StopDecision } from './stop-decision'
 
@@ -293,6 +294,30 @@ function needs_decision(context: StopContext): boolean {
 	return needs_notify(context) && stop_decision.decision_of(context.message) === undefined
 }
 
+// **A reply with no close line is sent back once** — `reply-close.ts`. An unattended session's reply
+// has no person closing the session, and a held stop's decision refusal already asks for the close.
+function is_close_exempt(context: StopContext): boolean {
+	return is_unattended(context) || needs_decision(context)
+}
+
+function close_reason(context: StopContext): string | undefined {
+	if (is_close_exempt(context)) return undefined
+
+	return reply_close.reason_of(context.message, context.prompt, context.session_lang)
+}
+
+// The rules that read the reply's prose: its language, then its length, then its close. The
+// loop-breaker lets a rewrite stop unchecked, so a language or length refusal asks for the close too.
+function prose_reason(context: StopContext): string | undefined {
+	const reason = language_reason(context) ?? concise_reason(context)
+	if (reason === undefined) return close_reason(context)
+	const { message, prompt, session_lang } = context
+
+	return is_close_exempt(context)
+		? reason
+		: `${reason}${reply_close.note_of(message, prompt, session_lang)}`
+}
+
 function needs_release(context: StopContext): boolean {
 	return is_held_idle(context) && context.tree_clean && !context.prrun_stopped
 }
@@ -315,7 +340,7 @@ function reply_reason(context: StopContext): string | undefined {
 	const deferral = deferral_reason(context)
 	if (deferral !== undefined || context.headless_agent) return deferral
 
-	return language_reason(context) ?? concise_reason(context)
+	return prose_reason(context)
 }
 
 // Sent back once; past the loop-breaker the run has said nothing is awaited, and nothing is sent.
