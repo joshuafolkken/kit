@@ -41,7 +41,7 @@ function rendered(active: Array<BoardRow>, is_themed: boolean, columns: number):
 		occupied_count: active.length,
 		lane_limit: LANE_COUNT,
 		usages: board_usage(new Map()),
-		is_themed,
+		theme: is_themed ? 'wargames' : undefined,
 	})
 	const lines = run_board_render.render({
 		header: board,

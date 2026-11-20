@@ -185,9 +185,9 @@ function kept_lines(): number {
 	return memo.lines.size
 }
 
-// Ports whose every write is put through the theme, marked so the header draws the alert level; what
-// the theme already drew goes past it.
-function themed<P extends Pick<BoardPorts, 'write' | 'is_themed' | 'write_drawn'>>(
+// Ports whose every write is put through the theme, named so the header draws the theme's alert level;
+// what the theme already drew goes past it.
+function themed<P extends Pick<BoardPorts, 'write' | 'theme' | 'write_drawn'>>(
 	ports: P,
 	theme: Theme | undefined,
 ): P {
@@ -195,7 +195,7 @@ function themed<P extends Pick<BoardPorts, 'write' | 'is_themed' | 'write_drawn'
 
 	return {
 		...ports,
-		is_themed: true,
+		theme,
 		write: (frame: string) => {
 			ports.write(restyle(theme, frame))
 		},

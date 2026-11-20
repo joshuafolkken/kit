@@ -26,14 +26,13 @@ describe('run_board_label_pair.settled', () => {
 	const lines = [`── ${pair('⏳', 'queued')} ──`]
 
 	it('keeps the marks for a themed screen alone', () => {
-		expect(settled(lines, { form: 'screen', is_themed: true })).toStrictEqual(lines)
+		expect(settled(lines, { form: 'screen', theme: 'wargames' })).toStrictEqual(lines)
 	})
 
 	it.each([
-		{ form: 'screen', is_themed: false },
-		{ form: 'screen', is_themed: undefined },
-		{ form: 'chat', is_themed: true },
-	] as const)('draws $form (themed: $is_themed) bare', (drawn) => {
+		{ form: 'screen', theme: undefined },
+		{ form: 'chat', theme: 'wargames' },
+	] as const)('draws $form (theme: $theme) bare', (drawn) => {
 		expect(settled(lines, drawn)).toStrictEqual(['── ⏳ queued ──'])
 	})
 })
@@ -78,13 +77,15 @@ describe('run_board_label_pair title marks', () => {
 	const titled_line = `  ${pair('▶', 'backlogrun')}      ${titled('A TITLE')}  46.6`
 
 	it('keeps the title mark for a themed screen alone', () => {
-		expect(settled([titled_line], { form: 'screen', is_themed: true })).toStrictEqual([titled_line])
+		expect(settled([titled_line], { form: 'screen', theme: 'wargames' })).toStrictEqual([
+			titled_line,
+		])
 	})
 
 	it.each([
-		{ form: 'screen', is_themed: false },
-		{ form: 'chat', is_themed: true },
-	] as const)('drops the title mark for $form (themed: $is_themed)', (drawn) => {
+		{ form: 'screen', theme: undefined },
+		{ form: 'chat', theme: 'wargames' },
+	] as const)('drops the title mark for $form (theme: $theme)', (drawn) => {
 		expect(settled([titled_line], drawn)).toStrictEqual(['  ▶ backlogrun      A TITLE  46.6'])
 	})
 

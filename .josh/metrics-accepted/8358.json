@@ -1,0 +1,7 @@
+{
+	"reason": "the theme row's alert field and the header's lookup through it, which the alert display selection needs",
+	"date": "2026-11-20",
+	"growth": {
+		"scripts.code_lines": 8
+	}
+}

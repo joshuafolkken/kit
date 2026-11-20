@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
+import { run_board_header_defcon } from './run-board-header-defcon'
 import { run_board_theme } from './run-board-theme'
 import { run_board_theme_defs, type ThemeDefinition } from './run-board-theme-defs'
 
@@ -10,6 +11,7 @@ const { THEMES, THEME_DEFS, names_of } = run_board_theme_defs
 const MATRIX: ThemeDefinition = {
 	paint: { rgb: '0;255;65', named: 'green' },
 	intro: { line: 'WAKE UP', letter_ms: 1, hold_ms: 1 },
+	alert: run_board_header_defcon.field_of,
 }
 const WIDER = { ...THEME_DEFS, matrix: MATRIX }
 
@@ -42,6 +44,7 @@ describe('run_board_theme_defs.THEME_DEFS wargames', () => {
 		expect(THEME_DEFS.wargames).toStrictEqual({
 			paint: { rgb: '62;236;225', named: 'cyan' },
 			intro: { line: 'SHALL WE PLAY A GAME?', letter_ms: 50, hold_ms: 2000 },
+			alert: run_board_header_defcon.field_of,
 		})
 	})
 })
