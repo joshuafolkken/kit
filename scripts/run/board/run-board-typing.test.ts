@@ -4,7 +4,7 @@ import { run_board_typing } from './run-board-typing'
 // joshuafolkken/kit#8000: a line being typed shows a block cursor after what is typed so far, and
 // drops it once the whole line is out.
 
-const { BLINK_MS, CURSOR, typed } = run_board_typing
+const { CURSOR, typed } = run_board_typing
 const TEXT = 'SHALL'
 
 describe('run_board_typing.typed', () => {
@@ -21,21 +21,13 @@ describe('run_board_typing.typed', () => {
 	})
 })
 
-// joshuafolkken/kit#8397: given the clock, the block is lit for one beat and a blank for the next.
-describe('run_board_typing.typed on the clock', () => {
-	it('lights the block on an even beat, from its first to its last moment', () => {
-		expect(typed(TEXT, 'SH', 0)).toBe(`SH${CURSOR}`)
-		expect(typed(TEXT, 'SH', BLINK_MS - 1)).toBe(`SH${CURSOR}`)
-		expect(typed(TEXT, 'SH', 2 * BLINK_MS)).toBe(`SH${CURSOR}`)
+// joshuafolkken/kit#8402: the block no longer blinks, so typing takes no clock and keeps no beat.
+describe('run_board_typing — no blink', () => {
+	it('exposes only the block and the typing, no blink beat', () => {
+		expect(Object.keys(run_board_typing)).toStrictEqual(['CURSOR', 'typed'])
 	})
 
-	it('draws a blank in the block’s place on an odd beat', () => {
-		expect(typed(TEXT, 'SH', BLINK_MS)).toBe('SH ')
-		expect(typed(TEXT, 'SH', 2 * BLINK_MS - 1)).toBe('SH ')
-	})
-
-	it('draws no block at all once the line is typed, on either beat', () => {
-		expect(typed(TEXT, TEXT, BLINK_MS)).toBe(TEXT)
-		expect(typed(TEXT, TEXT, 0)).toBe(TEXT)
+	it('takes the text and the part shown, and no clock', () => {
+		expect(typed).toHaveLength(2)
 	})
 })

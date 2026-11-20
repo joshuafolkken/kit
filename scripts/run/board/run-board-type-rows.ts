@@ -84,7 +84,7 @@ function shown(line: TypingLine, now_ms: number): string {
 		: run_board_cut_styled.cut_styled(line.text, columns_at(line, now_ms))
 
 	return run_board_spot.drawn(
-		run_board_typing.typed(line.text, part, now_ms),
+		run_board_typing.typed(line.text, part),
 		run_board_labels.spinner_of(now_ms),
 	)
 }
