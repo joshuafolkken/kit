@@ -4,7 +4,7 @@ import { review_finding_kind } from '#scripts/review/review-finding-kind'
 import { review_finding_ledger } from '#scripts/review/review-finding-ledger'
 import { review_finding_text } from '#scripts/review/review-finding-text'
 import { review_prior_findings } from '#scripts/review/review-prior-findings'
-import { review_prompt_level } from '#scripts/review/review-prompt-level'
+import { review_prompt_level, type ReviewTrigger } from '#scripts/review/review-prompt-level'
 import { review_record_cli } from '#scripts/review/review-record-cli'
 
 // The pure half of `josh ship --review`: the one-line prompts the supervised reviewers are launched
@@ -161,10 +161,11 @@ function issue_read_instruction(issue: string): string {
 const IN_SESSION_CLAUSE =
 	'Review it yourself in this session — you carry no Skill or Agent tool, so never launch a second reviewer.'
 
-// Each opening leads with the brief's level, so a transcript tells the review's level (joshuafolkken/kit#5555).
-function round_one_opening(brief_path: string): string {
+// Each opening leads with the brief's level and the launch's trigger, so a transcript tells both
+// (joshuafolkken/kit#5555, joshuafolkken/kit#8337).
+function round_one_opening(brief_path: string, trigger: ReviewTrigger): string {
 	return [
-		`${review_prompt_level.opening(brief_path)}Review this checkout as a /code-review: read the review brief at ${brief_path} and follow it exactly —`,
+		`${review_prompt_level.opening(brief_path, trigger)}Review this checkout as a /code-review: read the review brief at ${brief_path} and follow it exactly —`,
 		'the level on its first line, the rubric it names, the checkout it pins and its review:attest step.',
 		IN_SESSION_CLAUSE,
 	].join(' ')
@@ -179,7 +180,7 @@ function reviewer_prompt(
 	findings_path?: string,
 ): string {
 	return [
-		round_one_opening(brief_path),
+		round_one_opening(brief_path, review_prompt_level.round_one_trigger(slot)),
 		issue_read_instruction(issue),
 		...review_prior_findings.prompt_clauses(issue),
 		'Apply a fix only for a Medium finding whose fix is small and local — a one-function refactor, an',
@@ -203,7 +204,7 @@ function report_prompt(
 	findings_path?: string,
 ): string {
 	return [
-		round_one_opening(brief_path),
+		round_one_opening(brief_path, review_prompt_level.round_one_trigger(slot)),
 		'Do not edit any file: the code review running beside this one fixes in this checkout.',
 		issue_read_instruction(issue),
 		...review_prior_findings.prompt_clauses(issue),
@@ -225,7 +226,7 @@ function slot_prompt(
 
 // The round-2 verification pass: a fresh session over the round-1 fix delta, reading only.
 function final_opening(brief_path: string): string {
-	return `${round_one_opening(brief_path)} This is the final round-2 verification pass; read the scope the brief names. Do not edit any file.`
+	return `${round_one_opening(brief_path, 'round-2')} This is the final round-2 verification pass; read the scope the brief names. Do not edit any file.`
 }
 
 function verification_prompt(

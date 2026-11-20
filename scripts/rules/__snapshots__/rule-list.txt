@@ -50,7 +50,7 @@
   - not automated: the hook makes the same call right itself; it refuses only a spelling it cannot rewrite
 - **Early progress report** (`early-heartbeat`, `.claude/skills/workflow-commands/progress-watcher.md` → "Progress while the run is quiet")
   - fires: `pnpm josh pretool:guard` — a `Bash` whose only purpose is waiting (`sleep` alone, or `echo` / `:` / `date`) while a timer is live or before the interval. Every occurrence
-  - silent: no hand-made wait timer — `run:progress` holds the one clock; a dispatched lane child, which runs no watcher and waits with the Stop hook's `sleep 20`
+  - silent: no hand-made wait timer — `run:progress` holds the one clock; a dispatched lane child, which runs no watcher and waits with the Stop hook's `pnpm josh wait`
   - not automated: the right act is another command, whose arguments the call does not carry
 - **Test declaration** (`test-declared`, `testing-guide.md` → "0. Per-Requirement Test Coverage (MANDATORY)")
   - fires: `pnpm josh pretool:guard` — `pnpm josh git -y` (`josh g`) while `pnpm josh test:declared` answers `required`
@@ -186,7 +186,7 @@
   - not automated: the right act is another command, whose arguments the call does not carry
 - **Output poll loop in a started child** (`poll-loop-child`, `.claude/skills/workflow-commands/background-commands.md`)
   - fires: `pnpm josh pretool:guard` — a hand-written `while` / `until` wait loop over a command's output, a marker file or a process, a counted `for` that sleeps, or a `sleep` chain of 10 s or more before a read of a file or process. Every occurrence, in a started lane, hand-off or beside child
-  - silent: a bare `sleep 20` between reads, or the command run in the foreground
+  - silent: `pnpm josh wait` before the read, or the command run in the foreground
   - not automated: the right act is another command, whose arguments the call does not carry
 - **Direct git status** (`direct-git-status`, `docs/josh-commands-backlog.md` → "`josh tree:status`")
   - fires: `pnpm josh pretool:guard` — a `git status` with no flag or only `-s` / `--short` / `-b` / `--branch` / `--porcelain` (bare, wrapped or inside `sh -c`); it points at `pnpm josh tree:status`. Once per run

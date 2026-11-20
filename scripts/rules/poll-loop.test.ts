@@ -108,6 +108,9 @@ describe('poll_loop.is_poll_loop — a sleep chain before a read', () => {
 		'sleep 3; tail -5 /tmp/x.log',
 		'tail -c 1500 /tmp/tasks/x.output',
 		'sleep 20; pnpm josh ship:wait 5115',
+		'pnpm josh wait --pid 123',
+		'sleep 20; pnpm josh wait --process "run:chain 8283"',
+		'pnpm josh wait --file /tmp/tasks/x.output; tail -c 1500 /tmp/tasks/x.output',
 		'sleep 20; tail -5 /tmp/x.log; pnpm build',
 		// The sleep after the read is not a wait for it (review round 1).
 		'tail -5 /tmp/x.log; sleep 20',
@@ -160,7 +163,12 @@ describe('poll_loop rows — the refusal fits the runner', () => {
 
 	it('tells a started child to wait in the foreground, never to end the turn', () => {
 		expect(poll_loop.STARTED_CHILD_POLL_LOOP_REASON).not.toContain('end the turn')
-		expect(poll_loop.STARTED_CHILD_POLL_LOOP_REASON).toContain('a bare `sleep 20`')
+		expect(poll_loop.STARTED_CHILD_POLL_LOOP_REASON).toContain(
+			'`pnpm josh wait --pid|--process|--file`',
+		)
+		expect(poll_loop.STARTED_CHILD_POLL_LOOP_REASON).not.toContain('sleep 20')
+		expect(poll_loop.STARTED_CHILD_ROW.about.quiet).toContain('`pnpm josh wait`')
+		expect(poll_loop.STARTED_CHILD_ROW.about.quiet).not.toContain('sleep 20')
 		expect(poll_loop.STARTED_CHILD_POLL_LOOP_REASON).toContain('pnpm josh run:liveness')
 	})
 

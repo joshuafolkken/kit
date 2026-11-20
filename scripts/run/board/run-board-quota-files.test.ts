@@ -1,5 +1,6 @@
 import { mkdir, readFile, rm, utimes, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { transcript_tail } from '#scripts/time-runtime/transcript-tail'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { run_board_quota_read } from './run-board-quota-read'
@@ -189,6 +190,43 @@ describe('run_board_quota_read.claude_files cache', () => {
 		expect(cached.map((file) => file.path)).toEqual([log])
 		await launched(log, 200, [OPENAI])
 		expect(await claude_files(root)).toEqual([])
+	})
+})
+
+async function claude_paths(root: string): Promise<Array<string>> {
+	const found = await claude_files(root)
+
+	return found.map((file) => file.path)
+}
+
+describe('run_board_quota_read.claude_files off the tail', () => {
+	const root_of = temporary_root()
+	// One line longer than the first tail read, so a header before it lies outside that window.
+	const FILLER = 'x'.repeat(transcript_tail.TAIL_BYTES)
+
+	it('judges by a last header inside the first window, as a whole read would', async () => {
+		const root = root_of()
+
+		await launched(lane_log(root, 1), 100, [ANTHROPIC, FILLER, OPENAI])
+		const claude = await launched(lane_log(root, 2), 200, [OPENAI, FILLER, ANTHROPIC])
+
+		expect(await claude_paths(root)).toEqual([claude])
+	})
+
+	it('widens to a last header outside the first window, as a whole read would', async () => {
+		const root = root_of()
+
+		await launched(lane_log(root, 1), 100, [ANTHROPIC, OPENAI, FILLER])
+		const claude = await launched(lane_log(root, 2), 200, [OPENAI, ANTHROPIC, FILLER])
+
+		expect(await claude_paths(root)).toEqual([claude])
+	})
+
+	it('keeps a long log with no launch header as Claude, as a whole read would', async () => {
+		const root = root_of()
+		const headless = await launched(lane_log(root, 1), 100, [FILLER, CLAUDE_EVENT])
+
+		expect(await claude_paths(root)).toEqual([headless])
 	})
 })
 

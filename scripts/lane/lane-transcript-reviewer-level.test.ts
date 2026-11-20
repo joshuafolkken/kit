@@ -38,14 +38,15 @@ function subagent_of(prompt: string): unknown {
 }
 
 describe('reviewer launch prompts — the level on the first line', () => {
+	// joshuafolkken/kit#8337: the trigger after the level leaves the level and pass reads unchanged.
 	it.each([
-		['round 1', run_ship_review.reviewer_prompt, undefined],
-		['the read-only round 1', run_ship_review.report_prompt, undefined],
-		['round 2', run_ship_review.verification_prompt, 'round 2'],
-	])('%s opens with the level in one launch-safe line', (_round, prompt_of, pass) => {
+		['round 1', run_ship_review.reviewer_prompt, undefined, 'initial'],
+		['the read-only round 1', run_ship_review.report_prompt, undefined, 'initial'],
+		['round 2', run_ship_review.verification_prompt, 'round 2', 'round-2'],
+	])('%s opens with the level in one launch-safe line', (_round, prompt_of, pass, trigger) => {
 		const prompt = prompt_of(brief_file(), CODE_SLOT, ISSUE)
 
-		expect(prompt.startsWith('medium — Review this checkout')).toBe(true)
+		expect(prompt.startsWith(`medium — trigger: ${trigger} — Review this checkout`)).toBe(true)
 		expect(prompt).not.toMatch(/\n/u)
 		expect(agent_role_profile.is_safe_value(prompt)).toBe(true)
 		expect(subagent_of(prompt)).toStrictEqual({
@@ -57,7 +58,7 @@ describe('reviewer launch prompts — the level on the first line', () => {
 	})
 
 	it('opens the printed round-1 prompt with the level too', () => {
-		const opening = run_ship_review.round_one_opening(brief_file())
+		const opening = run_ship_review.round_one_opening(brief_file(), 'interaction')
 
 		expect(subagent_of(opening)).toMatchObject({ level: 'medium' })
 	})

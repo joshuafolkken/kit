@@ -68,7 +68,7 @@ vi.mock('./run-review-steps', () => ({
 	},
 }))
 
-const BRIEF_LINE = `code brief: ${BRIEF_PATH}\ncode prompt: ${run_ship_review.round_one_opening(BRIEF_PATH)}\n`
+const BRIEF_LINE = `code brief: ${BRIEF_PATH}\ncode prompt: ${run_ship_review.round_one_opening(BRIEF_PATH, 'initial')}\n`
 const FAILURE_EXIT_CODE = 1
 const REASON = 'the branch only logs'
 const SITE = 'scripts/a.ts 0123456789abcdef'

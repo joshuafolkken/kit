@@ -273,15 +273,15 @@ describe('delivered_rules.delivery — the row, through the hook that carries it
 })
 
 // joshuafolkken/kit#8278: a lane child waiting on a background subagent is told by the Stop hook to
-// make one short call; refusing that call and pointing at a watcher a lane child never runs left the
-// child polling verification commands as a wait.
+// make one blocking call (joshuafolkken/kit#8336); refusing a bare `sleep` and pointing at a watcher a
+// lane child never runs left the child polling verification commands as a wait.
 describe('a lane child — the Stop hook wait is the one form, and nothing refuses it', () => {
-	it('lets the Stop hook wait through where a parent would be refused', () => {
+	it('lets a bare sleep through where a parent would be refused', () => {
 		with_last_report(MINUTE_MS)
 		as_lane_child()
 
-		expect(arm('lane-wait', lane_background.LANE_AGENT_WAIT)).toBe(false)
-		expect(arm('lane-wait', lane_background.LANE_AGENT_WAIT, NOW_MS + 1)).toBe(false)
+		expect(arm('lane-wait', EARLY_SLEEP)).toBe(false)
+		expect(arm('lane-wait', EARLY_SLEEP, NOW_MS + 1)).toBe(false)
 	})
 
 	it.each([lane_background.LANE_AGENT_WAIT, EARLY_SLEEP])(
@@ -296,11 +296,17 @@ describe('a lane child — the Stop hook wait is the one form, and nothing refus
 		},
 	)
 
-	it('names in the Stop hook reason the same wait the rule reads as a wait timer', () => {
+	it('names in the Stop hook reason the one blocking wait, not a sleep the rule reads as a timer', () => {
 		const wait = lane_background.LANE_AGENT_WAIT
 
 		expect(lane_background.LANE_AGENT_STOP_REASON).toContain(`\`${wait}\``)
-		expect(early_heartbeat.is_wait_timer(wait)).toBe(true)
+		expect(lane_background.LANE_AGENT_STOP_REASON).not.toContain('sleep 20')
+		expect(early_heartbeat.is_wait_timer(wait)).toBe(false)
+	})
+
+	// A hand-off or beside child gets no foreground rewrite, so the reason itself carries the timeout.
+	it('names the Bash timeout the wait needs outside a lane child', () => {
+		expect(lane_background.LANE_AGENT_STOP_REASON).toContain('`timeout: 600000`')
 	})
 })
 
