@@ -26,7 +26,7 @@ type Probe = () => Promise<boolean> | boolean
 
 interface WaitOptions {
 	chunk_ms: number
-	sleeper?: (duration_ms: number) => Promise<void>
+	sleeper: (duration_ms: number) => Promise<void>
 }
 
 const POLL_MS = 2000
@@ -78,8 +78,11 @@ function pid_probe(value: string): Probe | undefined {
 	return () => !process_identity.is_present_pid(pid)
 }
 
+// The pattern is compiled here so one that does not read as an expression is refused as usage.
 function process_probe(pattern: string): Probe {
-	return async () => is_gone_in(await lane_process_table.read_table(), pattern)
+	const { source } = new RegExp(pattern, 'u')
+
+	return async () => is_gone_in(await lane_process_table.read_table(), source)
 }
 
 // The probe the arguments name, `undefined` for arguments that do not read as one target or none.
@@ -104,7 +107,7 @@ async function wait_for(is_done: Probe, options: WaitOptions): Promise<Verdict> 
 
 			return Date.now() >= deadline ? VERDICT.PENDING : undefined
 		},
-		{ interval_ms: POLL_MS, sleeper: options.sleeper ?? sleep },
+		{ interval_ms: POLL_MS, sleeper: options.sleeper },
 	)
 }
 
@@ -136,7 +139,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	const verdict = await wait_for(probe, { chunk_ms: chunk_left() })
+	const verdict = await wait_for(probe, { chunk_ms: chunk_left(), sleeper: sleep })
 
 	console.info(`wait: ${verdict} — ${NEXT_ACTION[verdict]}`)
 

@@ -2,7 +2,7 @@
 	"reason": "New josh wait command (#8336) replaces the lane child's sleep 20 polling; its code and the run doc usage span are the growth",
 	"date": "2026-11-20",
 	"growth": {
-		"scripts.code_lines": 111,
+		"scripts.code_lines": 113,
 		"ai_cost.on_demand_bytes": 63
 	}
 }

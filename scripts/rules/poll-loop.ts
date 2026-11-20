@@ -161,7 +161,7 @@ const POLL_LOOP_REASON =
 // `claude -p` child once its turn ends, so the interactive advice ends its run with the work unfinished.
 // It waits in the foreground instead.
 const STARTED_CHILD_POLL_LOOP_REASON =
-	'⛔ output poll loop (started child): a loop or `sleep` chain before a read cannot tell when ' +
+	'⛔ output poll loop (started child): a loop or `sleep` chain before a read does not know when ' +
 	'the task finished, and nothing re-invokes a started child after its turn. Wait in the ' +
 	'foreground: `pnpm josh wait --pid|--process|--file`, then read; `pnpm josh run:liveness`; ' +
 	'or re-run it in the foreground, timed to fit; CI by `pnpm josh followup` ' +

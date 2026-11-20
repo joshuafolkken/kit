@@ -2,7 +2,7 @@ import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import type { ProcessRow } from '#scripts/lane/lane-process-table'
 import { temporary_directory } from '#tools/test/temporary-directory'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { run_wait_cli } from './run-wait-cli'
 import { run_ship_wait_cli } from './ship/run-ship-wait-cli'
 
@@ -16,6 +16,7 @@ const LONG_CHUNK = { chunk_ms: 60_000, sleeper: no_sleep }
 const OTHER_PID = 424_242
 const SHELL_PID = 900_001
 const LAUNCHER_PID = 900_002
+const DIRECTORY_PREFIX = 'josh-wait-'
 
 function row(pid: number, parent: number, command: string): ProcessRow {
 	return { pid, parent, command, time: '0:00', rss_kb: 1, stat: 'S', start: '' }
@@ -54,7 +55,7 @@ describe('run_wait_cli.probe_of', () => {
 	})
 
 	it('answers done once the file appears', async () => {
-		const target = path.join(create_directory('josh-wait-'), 'task.output')
+		const target = path.join(create_directory(DIRECTORY_PREFIX), 'task.output')
 		const probe = run_wait_cli.probe_of(['--file', target])
 
 		expect(probe && (await run_wait_cli.wait_for(probe, NO_CHUNK))).toBe(PENDING)
@@ -72,6 +73,30 @@ describe('run_wait_cli.probe_of', () => {
 		expect(run_wait_cli.probe_of(['--pid', '1', '--file', 'x'])).toBeUndefined()
 		expect(run_wait_cli.probe_of(['--pid', 'abc'])).toBeUndefined()
 		expect(() => run_wait_cli.probe_of(['--every', '5'])).toThrow()
+	})
+
+	it('answers done for a pattern no other process carries', async () => {
+		const probe = run_wait_cli.probe_of(['--process', `josh-wait-absent-${String(OTHER_PID)}-x`])
+
+		expect(probe && (await run_wait_cli.wait_for(probe, NO_CHUNK))).toBe(DONE)
+	})
+})
+
+describe('run_wait_cli.run', () => {
+	const create_directory = temporary_directory()
+
+	it('answers usage, not a stack, for a pattern that is not an expression', async () => {
+		expect(await run_wait_cli.run(['--process', '('])).toBe(1)
+	})
+
+	it('prints the verdict and exits 0 for a target already finished', async () => {
+		const target = path.join(create_directory(DIRECTORY_PREFIX), 'done.output')
+		const info = vi.spyOn(console, 'info').mockReturnValue(undefined)
+
+		writeFileSync(target, '')
+		expect(await run_wait_cli.run(['--file', target])).toBe(0)
+		expect(info).toHaveBeenCalledWith(expect.stringContaining(`wait: ${DONE}`))
+		info.mockRestore()
 	})
 })
 
@@ -99,6 +124,10 @@ describe('run_wait_cli.is_gone_in', () => {
 			new Set([process.pid, SHELL_PID, LAUNCHER_PID, 1]),
 		)
 		expect(run_wait_cli.lineage(looped, SHELL_PID)).toEqual(new Set([SHELL_PID, LAUNCHER_PID]))
+	})
+
+	it('answers an empty lineage for a pid the table does not list', () => {
+		expect(run_wait_cli.lineage(own_rows(), OTHER_PID)).toEqual(new Set())
 	})
 })
 

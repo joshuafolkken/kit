@@ -142,8 +142,8 @@ function foreground_input(
 const FOREGROUND_NOTE =
 	"lane background: a lane child's `josh ship`, `josh ship:wait`, `josh wait` or `josh lane:plan` backgrounded, by its flag or by " +
 	'outrunning the Bash timeout, dies with the headless turn — so it was run in the foreground at the ' +
-	'600000 ms cap, where `ship` detaches itself after the preflight. Then follow ' +
-	'`chain-rule.md` step 0 (`josh ship:wait` on its `pending`).'
+	'600000 ms cap, where `ship` detaches after the preflight. Then a `pending` wait is re-run as ' +
+	'it says (a ship: `chain-rule.md` step 0, `josh ship:wait` on its `pending`).'
 
 type LaunchedIds = (block: TranscriptBlock) => ReadonlyArray<string>
 
@@ -216,7 +216,8 @@ const LANE_AGENT_WAIT = 'pnpm josh wait'
 const LANE_AGENT_STOP_REASON =
 	'⛔ lane agent stop: a subagent this started child (lane, hand-off or beside) launched has not ' +
 	'finished; ending this turn kills it. Dispatch subagents with `run_in_background: false`: no wait. Its notice arrives only ' +
-	`when a tool call ends: do the foreground work left, then one \`${LANE_AGENT_WAIT}\` at a time — ` +
+	`when a tool call ends: do the foreground work left, then one \`${LANE_AGENT_WAIT}\` ` +
+	'(Bash `timeout: 600000`) at a time — ' +
 	'never a loop over `.output`. Do not notify, stop or repeat your reply.'
 
 // The row itself, so `delivered-rules.ts` spreads one entry. It fires on every occurrence (`decide`
