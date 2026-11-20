@@ -300,16 +300,16 @@ function red_fields(
 
 // **The tree reuse compares against is not the tree a green is recorded on** (joshuafolkken/kit#8288):
 // a scoped run or one after a red records nothing, yet each test whose closed inputs still hash as
-// recorded is as proven there as in a bare run. The red run's failed files run again regardless.
+// recorded is as proven there as in a bare run. A standing red record's failed files run again
+// regardless — read whether or not this run narrows by that record.
 async function read_reuse(
 	root: string,
 	resolved: RelatedScope,
 	compared: GateTree | undefined,
-	red: RedReading | undefined,
 ): Promise<TestReuse> {
 	const reuse = await test_related_reuse.read(root, resolved, compared)
 
-	return test_related_reuse.keeping(root, reuse, red?.failed ?? [])
+	return test_related_reuse.keeping(root, reuse, test_related_red.recorded_failures())
 }
 
 // `before`: the tree a green may be recorded on; `compared`: the tree reuse compares against.
@@ -324,7 +324,7 @@ async function read_run_input(
 	const { changed, synced = [], since_map = [], branch } = change
 	const resolved = await resolve_change(root, change)
 	const selected = await selected_of(root, change, resolved)
-	const reuse = await read_reuse(root, resolved, compared, red)
+	const reuse = await read_reuse(root, resolved, compared)
 
 	return {
 		root,

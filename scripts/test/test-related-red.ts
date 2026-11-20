@@ -77,6 +77,12 @@ function marks_on(before: GateTree): Record<string, string> {
 	return record.blobs ?? {}
 }
 
+// **Every file a standing red record failed on, whatever run reads it** (joshuafolkken/kit#8288): a
+// scoped run or one on a moved base narrows by no red record, yet still never reuses a green for these.
+function recorded_failures(): ReadonlyArray<string> {
+	return marked(review_stamps.test_related_red_stamp.read()?.blobs ?? {}, FAILED_MARK)
+}
+
 async function read_red(before: GateTree | undefined): Promise<RedReading | undefined> {
 	if (before === undefined) return undefined
 
@@ -221,7 +227,15 @@ function describe(reading: RedReading): string {
 	)
 }
 
-const test_related_red = { describe, failed_of, narrowing, no_base_files, read_red, record_red }
+const test_related_red = {
+	describe,
+	failed_of,
+	narrowing,
+	no_base_files,
+	read_red,
+	record_red,
+	recorded_failures,
+}
 
 export type { RedReading, RedRun, RelatedInput }
 export { test_related_red }

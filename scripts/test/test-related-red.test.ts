@@ -161,6 +161,24 @@ describe('test_related_red.record_red — clearing', () => {
 	})
 })
 
+// joshuafolkken/kit#8288: the files reuse never excludes, read by a run that narrows by no red record.
+describe('test_related_red.recorded_failures', () => {
+	it('reads the failed marks alone, on any base', () => {
+		const record = stored(OTHER_BASE)
+
+		record.blobs = { ...record.blobs, [PASSED_TEST]: PASSED_DIGEST }
+		vi.spyOn(review_stamps.test_related_red_stamp, 'read').mockReturnValue(record)
+
+		expect(test_related_red.recorded_failures()).toEqual([FAILED_TEST])
+	})
+
+	it('reads nothing without a red record', () => {
+		vi.spyOn(review_stamps.test_related_red_stamp, 'read').mockReturnValue(undefined)
+
+		expect(test_related_red.recorded_failures()).toEqual([])
+	})
+})
+
 describe('test_related_red.read_red', () => {
 	it('reads the failed, owed and moved files on the record base', async () => {
 		vi.spyOn(review_stamps.test_related_red_stamp, 'read').mockReturnValue(stored(BASE))

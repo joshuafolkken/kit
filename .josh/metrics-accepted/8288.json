@@ -2,6 +2,6 @@
 	"reason": "keeping() keeps a red run's failed files out of the reuse exclusions now that reuse compares after a red (#8288)",
 	"date": "2026-11-20",
 	"growth": {
-		"scripts.code_lines": 5
+		"scripts.code_lines": 15
 	}
 }

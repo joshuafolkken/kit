@@ -147,6 +147,8 @@ describe('test_related.run_related_tests — reuse after failure or with argumen
 
 		expect(read).toHaveBeenCalledWith(REPOSITORY_ROOT, expect.anything(), BEFORE)
 		expect(vitest_arguments()).toEqual(expect.arrayContaining(['--exclude', REUSED_TEST]))
+		// The standing red record's failed file stays out of the exclusions in a scoped run too.
+		expect(vitest_arguments().filter((argument) => argument === '--exclude')).toHaveLength(1)
 		expect(scoped_green.record_if_green).toHaveBeenCalledWith(review_stamps.test_related_stamp, {
 			before: undefined,
 			exit_code: 0,
