@@ -71,7 +71,10 @@ describe('test_related.run_related_tests — a worker flag (joshuafolkken/kit#81
 
 	it('a narrowing file argument vouches for no tree', async () => {
 		expect(await test_related.run_related_tests([SOURCE, WORKER_FLAG])).toBe(0)
-		expect(vi.mocked(test_related_reuse.read).mock.calls[0]?.[2]).toBeUndefined()
+		expect(vi.mocked(test_related_reuse.read).mock.calls[0]?.slice(2)).toEqual([
+			undefined,
+			'scoped-arguments',
+		])
 		expect(vouched_tree()).toBeUndefined()
 	})
 })

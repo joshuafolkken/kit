@@ -13,7 +13,7 @@ import { test_related_cap } from './test-related-cap'
 import { test_related_moved, type ChangeReading } from './test-related-moved'
 import { test_related_record } from './test-related-record'
 import { test_related_red, type RedReading, type RelatedInput } from './test-related-red'
-import { test_related_reuse } from './test-related-reuse'
+import { test_related_reuse, type ReuseMiss } from './test-related-reuse'
 import { test_related_run } from './test-related-run'
 import { related_scope, type RelatedScope } from './test-related-scope'
 import { test_related_select } from './test-related-select'
@@ -298,6 +298,22 @@ function red_fields(
 	return { owed: red?.owed ?? [], red_rerun: change.is_red_rerun === true }
 }
 
+// The tree reuse compares against, and why it gets none (joshuafolkken/kit#8283): a red record owes
+// its failed files, a scoping argument vouches for no tree, else no gate tree was read.
+function reuse_input(
+	command_arguments: ReadonlyArray<string>,
+	red: RedReading | undefined,
+	before: GateTree | undefined,
+): { tree: GateTree | undefined; miss: ReuseMiss } {
+	const { MISS } = test_related_reuse
+
+	if (red !== undefined) return { tree: undefined, miss: MISS.AFTER_RED }
+
+	const is_scoped = unit_worker_share.without_worker_flags(command_arguments).length > 0
+
+	return { tree: before, miss: is_scoped ? MISS.SCOPED_ARGUMENTS : MISS.NO_TREE }
+}
+
 async function read_run_input(
 	root: string,
 	command_arguments: ReadonlyArray<string>,
@@ -308,8 +324,8 @@ async function read_run_input(
 	const { changed, synced = [], since_map = [], branch } = change
 	const resolved = await resolve_change(root, change)
 	const selected = await selected_of(root, change, resolved)
-	const green = red === undefined ? before : undefined
-	const reuse = await test_related_reuse.read(root, resolved, green)
+	const { tree, miss } = reuse_input(command_arguments, red, before)
+	const reuse = await test_related_reuse.read(root, resolved, tree, miss)
 
 	return {
 		root,

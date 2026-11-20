@@ -423,3 +423,8 @@ test file pins:
   `stop_hook_active` never blocks; an unattended offer to file × nothing filed blocks, while an interactive session, filed, a third-party
   repository or an unknown owner is silent; a bare `#N` in the reply neither acts nor blocks), and
   `scripts/claude/claude-settings-hooks.test.ts` pins the `Stop` hook's wiring
+- `scripts/rules/deferral-owner.test.ts` and `scripts/rules/stop-rules-deferral.test.ts` — pin the
+  `deferral-owner` stop row (joshuafolkken/kit#8296). A reply recommending a later decision, investigation
+  or filing, with no `#N`, filing draft or reason not to track in that paragraph, blocks in every session —
+  a consultation one included, since the deferred point otherwise belongs to nobody once the reply ends.
+  A fence, a quote, a third-party repository or an unknown owner is silent, as for `filing-offer`
