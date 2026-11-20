@@ -11,6 +11,7 @@ import { main_merge, type MergeOutcome } from '#scripts/git/main-merge'
 import { pre_commit_lint_switch } from '#scripts/hooks/pre-commit-lint-switch'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { error_text } from '#scripts/lib/error-message'
+import { run_ship_behind_default } from './run-ship-behind-default'
 import { run_ship_conflict_probe } from './run-ship-conflict-probe'
 import { run_ship_lap } from './run-ship-lap'
 import { run_ship_overlap } from './run-ship-overlap'
@@ -216,18 +217,6 @@ async function gate_merged(): Promise<StepResult | undefined> {
 	return { ...gate, out, cause: run_ship_stop_cause.CAUSE.CHECK }
 }
 
-// Whether origin's default branch holds a commit the branch lacks. An unreadable count reads as moved,
-// so the skipped merge is still said on the ship log.
-async function is_behind_default(): Promise<boolean> {
-	try {
-		const default_branch = await git_command.get_default_branch()
-
-		return (await git_command.commit_count_beyond('HEAD', `origin/${default_branch}`)) > 0
-	} catch {
-		return true
-	}
-}
-
 // A default branch that merges into the branch without a conflict is left to CI: the pull request's
 // checks run on the merge ref, the tree combined with the default branch, so a tree only the combined
 // change breaks still turns them red, and the followup merges again (`merge_again`). A probe that
@@ -236,7 +225,7 @@ async function is_merge_left_to_ci(): Promise<boolean> {
 	const conflicts = await run_ship_conflict_probe.read_conflicts()
 
 	if (conflicts?.length !== 0) return false
-	if (await is_behind_default()) console.error(LEFT_TO_CI_NOTE)
+	if (await run_ship_behind_default.is_behind_default()) console.error(LEFT_TO_CI_NOTE)
 
 	return true
 }

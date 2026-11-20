@@ -14,6 +14,7 @@ import { acceptance_map } from '#scripts/review/acceptance-map'
 import { acceptance_map_check } from '#scripts/review/acceptance-map-check'
 import { live_evidence } from '#scripts/review/live-evidence'
 import { removed_tests_check } from '#scripts/review/removed-tests-check'
+import { run_ship_behind_default } from './run-ship-behind-default'
 import { run_ship_body_draft } from './run-ship-body-draft'
 import { run_ship_lap } from './run-ship-lap'
 import { run_ship_lock } from './run-ship-lock'
@@ -57,6 +58,10 @@ const ASKED_KINDS = [
 	PRECONDITION.LOCK,
 	PRECONDITION.UNPLANNED,
 ]
+const DEFERRED: PreflightResult = {
+	code: SUCCESS_EXIT_CODE,
+	out: 'ready — scoped pair left to the tree the sync stage merges: the default branch moved',
+}
 const EVIDENCE_PROBLEM = `This change touches runtime code, but the body this ship delivers has no ${live_evidence.EVIDENCE_HEADING} section: run the acceptance criteria for real and write it into the ship body draft run:prep wrote (josh ship reads it when --body-file is omitted), or pass the body with --body-file <path>. Write it ${live_evidence.EVIDENCE_FORMAT}`
 const EVIDENCE_PENDING = `This change touches runtime code and no PR is open yet: write the ${live_evidence.EVIDENCE_HEADING} section into the ship body draft run:prep wrote (or a file handed to josh ship with --body-file <path>), or the ship refuses. Write it ${live_evidence.EVIDENCE_FORMAT}`
 
@@ -236,6 +241,10 @@ async function scoped_stage(): Promise<PreflightResult> {
 	return { ...scoped, preconditions: [PRECONDITION.SCOPED] }
 }
 
+// **A default branch that moved leaves the pair to the merged tree** (joshuafolkken/kit#8304): the sync
+// stage merges it and, with a pull request open, runs the pair over the merged tree before its push;
+// without one the gate stage's pair is the first. Either stops a red pair before any push, and this
+// one's record would not outlive the merge's moved base.
 async function asked_stage(request: PreflightRequest): Promise<PreflightResult> {
 	const problems = await run_ship_lap.timed(
 		run_ship_lap.STEP.PRECONDITIONS,
@@ -243,6 +252,7 @@ async function asked_stage(request: PreflightRequest): Promise<PreflightResult> 
 	)
 
 	if (problems.length > 0) return await recorded(refusal(problems), ASKED_KINDS)
+	if (await run_ship_behind_default.is_merge_ahead()) return await recorded(DEFERRED, ASKED_KINDS)
 
 	return await recorded(await scoped_stage(), [...ASKED_KINDS, PRECONDITION.SCOPED])
 }
