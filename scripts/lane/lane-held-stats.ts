@@ -40,7 +40,7 @@ const { OFFER_PREFIX, REASON_SEPARATOR, WATCH_VERDICT } = backlog_hold_codes
 const WATCH_PREFIX = `${OFFER_PREFIX}${REASON_SEPARATOR}${WATCH_VERDICT}${REASON_SEPARATOR}`
 const CAUSE_HEADER = 'held by cause (a hold with several causes counts in full under each)'
 const BLOCKER_HEADER =
-	'held behind (chain + gate; a hold naming several issues counts in full under each)'
+	'held behind (any cause; a hold naming several issues counts in full under each)'
 // The blocking issues printed, the longest total first: the ones worth unblocking next.
 const BLOCKER_ROWS = 10
 

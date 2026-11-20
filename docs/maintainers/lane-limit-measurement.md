@@ -319,7 +319,7 @@ Two tables follow it and read the same holds (`scripts/lane/lane-held-stats.ts`)
 
 - `held by cause` splits each `offer:watch:` tag into `chain`, `gate`, `lane` and `publication`.
 - `held behind` sums the minutes per issue a hold's `waiting` named, the longest total first, top
-  ten. `waiting` is not split by cause, so it covers `chain` and `gate` together.
+  ten. `waiting` is not split by cause, so it covers every cause together.
 
 Overlap is counted in full: a `chain+gate` hold counts its whole time under both `chain` and
 `gate`, and a hold naming two issues counts it under each. The rows of these two tables can therefore
