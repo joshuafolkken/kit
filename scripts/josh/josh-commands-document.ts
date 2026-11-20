@@ -62,6 +62,18 @@ const DOCUMENT_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
+	'scratch:run': {
+		script: 'scripts/scratch/scratch-run-cli.ts',
+		description:
+			'Run a scratch script that may write only to the scratch directory, with no network or child',
+		category: 'AI tools',
+		reference: ['<path> [args…]', 'automation', ['files', 'processes']],
+		usage: {
+			examples: [
+				{ arguments: '.josh/tmp/scratch/chart.mjs', note: 'writes only under .josh/tmp/scratch/' },
+			],
+		},
+	},
 	'read:files': {
 		script: 'scripts/document/read-files-cli.ts',
 		description: 'Read several files in one call so edit targets fold into one turn',
