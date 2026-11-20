@@ -43,10 +43,11 @@ describe('write_stop_decision — the concise-reply prompt is wired', () => {
 		expect(written.join('')).toContain('⛔ concise reply')
 	})
 
-	it('lets a long reply stop when a slash command asked for the detail', async () => {
+	it('lets a closed long reply stop when a slash command asked for the detail', async () => {
 		const tail = [prompt_line('/kickoff 詳しく'), SKILL_BODY].join('\n')
+		const closed = `${LONG_REPLY}\n\nNothing left in this session.`
 
-		expect(await decide_in(write_stop_decision, 'en', LONG_REPLY, tail)).toEqual([])
+		expect(await decide_in(write_stop_decision, 'en', closed, tail)).toEqual([])
 	})
 
 	it('lets a long reply stop when no prompt of the person’s is on the tail', async () => {

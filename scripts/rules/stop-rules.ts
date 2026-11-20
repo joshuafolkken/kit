@@ -5,6 +5,7 @@ import { concise_reply } from './concise-reply'
 import { deferral_owner } from './deferral-owner'
 import { filing_offer } from './filing-offer'
 import { lane_background } from './lane-background'
+import { reply_close } from './reply-close'
 import { reply_language } from './reply-language'
 import { stop_decision, type StopDecision } from './stop-decision'
 
@@ -236,11 +237,13 @@ function language_reason(context: StopContext): string | undefined {
 	return build_language_reason(context.session_lang)
 }
 
-// **A reply's narrative over the limit is sent back once to be shortened** — `concise-reply.ts`.
+// **A reply's narrative over the limit is sent back once to be shortened** — `concise-reply.ts`. The
+// loop-breaker lets the rewrite stop unchecked, so a missing close is asked for in the same refusal.
 function concise_reason(context: StopContext): string | undefined {
 	if (!concise_reply.is_over(context.message, context.prompt)) return undefined
+	const { message, prompt, session_lang } = context
 
-	return concise_reply.build_reason(context.message)
+	return `${concise_reply.build_reason(message)}${reply_close.note_of(message, prompt, session_lang)}`
 }
 
 // The sessions no person answers: one kit launched under `claude -p` (a lane child, a woken session), a
@@ -293,6 +296,19 @@ function needs_decision(context: StopContext): boolean {
 	return needs_notify(context) && stop_decision.decision_of(context.message) === undefined
 }
 
+// **A reply with no close line is sent back once** — `reply-close.ts`. A lane child reports to its
+// parent, and a held stop's decision refusal already asks for the close.
+function close_reason(context: StopContext): string | undefined {
+	if (context.lane_child || needs_decision(context)) return undefined
+
+	return reply_close.reason_of(context.message, context.prompt, context.session_lang)
+}
+
+// The rules that read the reply's prose: its language, then its length, then its close.
+function prose_reason(context: StopContext): string | undefined {
+	return language_reason(context) ?? concise_reason(context) ?? close_reason(context)
+}
+
 function needs_release(context: StopContext): boolean {
 	return is_held_idle(context) && context.tree_clean && !context.prrun_stopped
 }
@@ -315,7 +331,7 @@ function reply_reason(context: StopContext): string | undefined {
 	const deferral = deferral_reason(context)
 	if (deferral !== undefined || context.headless_agent) return deferral
 
-	return language_reason(context) ?? concise_reason(context)
+	return prose_reason(context)
 }
 
 // Sent back once; past the loop-breaker the run has said nothing is awaited, and nothing is sent.
