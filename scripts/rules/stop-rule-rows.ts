@@ -44,6 +44,18 @@ const ROWS: ReadonlyArray<StopRule> = [
 				'an interactive session, already filed, inside a fence or quote, a named third-party `owner/repo`, or an unknown owner',
 		},
 	},
+	{
+		id: 'deferral-owner',
+		about: {
+			title: 'Deferral owner',
+			topic: '`prompts/collaboration-workflow/principles.md` → "concise-reply"',
+			entry: STOP_GUARD,
+			fires:
+				'any session whose last reply recommends deciding, investigating or filing later with no `#N`, filing draft or reason not to track in that paragraph. Blocks the stop',
+			quiet:
+				'an owner in the same paragraph, inside a fence or quote, a named third-party `owner/repo`, or an unknown owner',
+		},
+	},
 ]
 
 const stop_rule_rows = { ROWS }
