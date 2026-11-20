@@ -211,11 +211,13 @@ const LANE_BACKGROUND_STOP_REASON =
 // itself gives up. **A foreground dispatch needs no wait at all**, so the reason leads with it: a
 // `sleep 20` repeated rereads the context on every call (joshuafolkken/kit#7879). The harness refuses a
 // longer standalone `sleep`, so one already in the background is waited on by the foreground work left,
-// then short calls.
+// then short calls. `LANE_AGENT_WAIT` is that short call — the one form `early-heartbeat.ts` lets
+// through in a lane child (joshuafolkken/kit#8278).
+const LANE_AGENT_WAIT = 'sleep 20'
 const LANE_AGENT_STOP_REASON =
 	'⛔ lane agent stop: a subagent this started child (lane, hand-off or beside) launched has not ' +
 	'finished; ending this turn kills it. Dispatch subagents with `run_in_background: false`: no wait. Its notice arrives only ' +
-	'when a tool call ends: do the foreground work left, then one short call at a time (`sleep 20`) — ' +
+	`when a tool call ends: do the foreground work left, then one short call at a time (\`${LANE_AGENT_WAIT}\`) — ` +
 	'never a loop over `.output`. Do not notify, stop or repeat your reply.'
 
 // The row itself, so `delivered-rules.ts` spreads one entry. It fires on every occurrence (`decide`
@@ -245,6 +247,7 @@ const ROW = {
 const lane_background = {
 	FOREGROUND_NOTE,
 	LANE_AGENT_STOP_REASON,
+	LANE_AGENT_WAIT,
 	LANE_BACKGROUND_REASON,
 	LANE_BACKGROUND_STOP_REASON,
 	ROW,
