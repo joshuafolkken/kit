@@ -3,7 +3,7 @@ import { run_board_label_pair } from './run-board-label-pair'
 import { run_board_labels, type Paint } from './run-board-labels'
 import type { BoardPorts } from './run-board-state'
 import { run_board_theme_case } from './run-board-theme-case'
-import { run_board_theme_defs, type Theme } from './run-board-theme-defs'
+import { run_board_theme_defs, type Theme, type ThemeDefinition } from './run-board-theme-defs'
 import { run_board_theme_glyphs } from './run-board-theme-glyphs'
 
 // joshuafolkken/kit#7934: a theme for the board a person watches — `wargames` draws the text no color
@@ -141,20 +141,31 @@ function lit(open: string, line: string): string {
 	return open + resumed + DEFAULT_FOREGROUND
 }
 
-// joshuafolkken/kit#8154: an icon beside its label is dropped (`run-board-label-pair.ts`).
-function restyled_line(open: string, line: string): string {
-	const ruled = run_board_label_pair.dropped(line).split(RULE).join(DASH)
+// On a section rule's line — one opening on a heading lead — every `-`, its rule and the section icon
+// drawn as text alike, in the theme's rule paint where it has one (joshuafolkken/kit#8397); the name and
+// column titles keep the text's color.
+function dimmed(rule: Paint | undefined, is_rule: boolean, text: string): string {
+	if (rule === undefined || !is_rule) return text
 
-	return lit(open, run_board_theme_case.capitals(run_board_theme_glyphs.textual(ruled)))
+	return text.split(DASH).join(run_board_labels.painted(rule, DASH))
+}
+
+// joshuafolkken/kit#8154: an icon beside its label is dropped (`run-board-label-pair.ts`).
+function restyled_line(open: string, rule: Paint | undefined, line: string): string {
+	const kept = run_board_label_pair.dropped(line)
+	const ruled = kept.split(RULE).join(DASH)
+	const text = run_board_theme_case.capitals(run_board_theme_glyphs.textual(ruled))
+
+	return lit(open, dimmed(rule, run_board_label_pair.heading_lead(kept) !== undefined, text))
 }
 
 // joshuafolkken/kit#8207: a line drawn before is taken from the cache — most lines of a redraw, and of
-// a spinner's write, are the ones the write before drew.
-function remembered(open: string, line: string): string {
+// a spinner's write, are the ones the write before drew. The cache is cleared with the theme.
+function remembered(open: string, rule: Paint | undefined, line: string): string {
 	const kept = memo.lines.get<string>(line)
 
 	if (kept !== undefined) return kept
-	const drawn = restyled_line(open, line)
+	const drawn = restyled_line(open, rule, line)
 
 	memo.lines.set(line, drawn)
 
@@ -168,10 +179,11 @@ function remembered(open: string, line: string): string {
 function marked(theme: Theme | undefined, frame: string): string {
 	if (theme === undefined) return frame
 	const open = phosphor(theme)
+	const { rule }: ThemeDefinition = THEME_DEFS[theme]
 
 	return frame
 		.split('\n')
-		.map((line) => remembered(open, line))
+		.map((line) => remembered(open, rule, line))
 		.join('\n')
 }
 

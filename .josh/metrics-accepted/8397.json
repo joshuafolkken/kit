@@ -1,0 +1,7 @@
+{
+	"reason": "Issue #8397 adds three requested wargames effects: dim rule paint, separate 100 ms code pace, and a clock-driven blinking typing head (+25 code lines)",
+	"date": "2026-11-20",
+	"growth": {
+		"scripts.code_lines": 25
+	}
+}

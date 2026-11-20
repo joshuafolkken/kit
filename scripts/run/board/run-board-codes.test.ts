@@ -11,7 +11,8 @@ import type { Typing } from './run-board-type-rows'
 // joshuafolkken/kit#8375: a wargames live board's section rules run launch codes while a row types, then
 // a lock crosses them left to right and turns them back into the rule.
 
-const { CODE, CODE_MS, code_bytes, is_coding, locked_at, rule_cells } = run_board_codes
+const { CHANGE_MS, CODE, CODE_MS, CODE_PAINT, code_bytes, is_coding, locked_at, rule_cells } =
+	run_board_codes
 const { LOCAL, drawn_from, harness, plan_titled } = run_board_fixture
 const { FRESH_STATE, layout_for } = run_board_tick
 const WIDE = { rows: 60, columns: 200 }
@@ -23,6 +24,7 @@ const DONE = START + (TEXT.length - 1) * LETTER_MS
 const RULE_LINE = '── LANES ── CPU ──'
 const CELLS: ReadonlyArray<RuleCell> = rule_cells(['KIT', RULE_LINE, '     8336'], [1, 2, 3], 80)
 const WHITE = '235;255;252'
+const DIM = '31;118;113'
 // eslint-disable-next-line no-control-regex -- a cell is written after a cursor move
 const MOVE = /\u{1B}\[(\d+);(\d+)H/u
 
@@ -101,6 +103,33 @@ describe('run_board_codes.code_bytes — while a row types', () => {
 
 	it('writes nothing with no rule cell', () => {
 		expect(code_bytes(typing_at(START), [], START + CODE_MS, undefined)).toBe('')
+	})
+})
+
+function codes_at(at_ms: number): Array<string> {
+	return [...shown(code_bytes(typing_at(START), CELLS, at_ms, undefined)).values()]
+}
+
+// joshuafolkken/kit#8397: the code sinks behind the typing head — slower than the lock, in the rule's dim.
+describe('run_board_codes.code_bytes — the code’s pace and paint', () => {
+	it('changes the code every `CHANGE_MS`, two lock steps, holding it across the step between', () => {
+		expect(CHANGE_MS).toBe(2 * CODE_MS)
+		expect(codes_at(START + CHANGE_MS + CODE_MS)).toStrictEqual(codes_at(START + CHANGE_MS))
+		expect(codes_at(START + 2 * CHANGE_MS)).not.toStrictEqual(codes_at(START + CHANGE_MS))
+	})
+
+	it('paints the code in the rule’s dim cyan, the wargames rule paint', () => {
+		const cells = written(code_bytes(typing_at(START), CELLS, START + CODE_MS, undefined))
+
+		expect(CODE_PAINT).toStrictEqual({ rgb: DIM, named: 'dim' })
+		for (const text of cells.values()) expect(text).toContain(`[38;2;${DIM}m`)
+	})
+
+	it('puts the rule back in the dim cyan behind the lock, its head still white', () => {
+		const cells = written(code_bytes(typing_at(START), CELLS, DONE + 2 * CODE_MS, DONE + CODE_MS))
+
+		expect(cells.get(10)).toContain(`[38;2;${DIM}m-`)
+		expect(cells.get(11)).toContain(WHITE)
 	})
 })
 

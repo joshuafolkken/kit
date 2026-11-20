@@ -15,7 +15,7 @@ import { run_board_typing } from './run-board-typing'
 
 const { NO_TYPING, next, type_bytes, typed_lines } = run_board_type_rows
 const LETTER_MS = run_board_theme_defs.THEME_DEFS.wargames.intro.letter_ms
-const { CURSOR } = run_board_typing
+const { BLINK_MS, CURSOR } = run_board_typing
 const ESC = '\u{1B}'
 const RESET = `${ESC}[0m`
 const START = Date.parse('2026-11-19T09:00:00.000Z')
@@ -173,10 +173,10 @@ describe('run_board_type_rows — what is written', () => {
 
 	it('types two rows that appear together side by side, each with its own block, at its own row', () => {
 		const typing = after_base(frame_of([]), [line_of('done:7', 2), line_of('done:9', 4)])
-		const bytes = type_bytes(typing, START + SECOND + LETTER_MS)
+		const bytes = type_bytes(typing, START + SECOND + 2 * BLINK_MS)
 
 		expect(bytes).toBe(
-			`${ESC}[3;1Hxx${RESET}${CURSOR}${ESC}[K${ESC}[5;1Hxx${RESET}${CURSOR}${ESC}[K`,
+			`${ESC}[3;1H${'x'.repeat(7)}${RESET}${CURSOR}${ESC}[K${ESC}[5;1H${'x'.repeat(7)}${RESET}${CURSOR}${ESC}[K`,
 		)
 	})
 
@@ -199,13 +199,34 @@ describe('run_board_type_rows — what is written', () => {
 	})
 })
 
+// joshuafolkken/kit#8397: the block blinks on the clock's beat, so rows typing together blink as one.
+describe('run_board_type_rows — the blinking block', () => {
+	it('blanks every typing row’s block together on the clock’s off beat, the letters kept', () => {
+		const typing = after_base(frame_of([]), [line_of('done:7', 2), line_of('done:9', 4)])
+		const off_ms = START + SECOND + 3 * BLINK_MS
+
+		expect(Math.floor(off_ms / BLINK_MS) % 2).toBe(1)
+		expect(type_bytes(typing, off_ms)).toBe(
+			`${ESC}[3;1H${'x'.repeat(10)}${RESET} ${ESC}[K${ESC}[5;1H${'x'.repeat(10)}${RESET} ${ESC}[K`,
+		)
+	})
+
+	it('lights the block again on the next beat', () => {
+		const typing = after_base(frame_of([]), [line_of('done:7', 2)])
+
+		expect(type_bytes(typing, START + SECOND + 4 * BLINK_MS)).toContain(`${RESET}${CURSOR}`)
+	})
+})
+
 describe('run_board_type_rows — the header’s now line (joshuafolkken/kit#8103)', () => {
 	it('types the now line’s new words after its prefix, the prefix drawn whole', () => {
 		const typing = after_base(frame_of([now_of('#1 · READ')]), [now_of(WORDS)])
-		const at_ms = START + SECOND + 2 * LETTER_MS
+		const at_ms = START + SECOND + 2 * BLINK_MS
 
 		expect(keys_of(typing)).toStrictEqual([`now:${WORDS}`])
-		expect(type_bytes(typing, at_ms)).toBe(`${ESC}[3;1H${NOW_PREFIX}#80${RESET}${CURSOR}${ESC}[K`)
+		expect(type_bytes(typing, at_ms)).toBe(
+			`${ESC}[3;1H${NOW_PREFIX}#8093 ·${RESET}${CURSOR}${ESC}[K`,
+		)
 	})
 
 	it('writes the now line whole once its words are typed through', () => {
