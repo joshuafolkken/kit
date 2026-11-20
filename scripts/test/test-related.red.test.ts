@@ -121,7 +121,12 @@ describe('test_related.run_related_tests — reuse after failure', () => {
 
 		await test_related.run_related_tests([])
 
-		expect(read).toHaveBeenCalledWith(REPOSITORY_ROOT, expect.anything(), undefined)
+		expect(read).toHaveBeenCalledWith(
+			REPOSITORY_ROOT,
+			expect.anything(),
+			undefined,
+			test_related_reuse.MISS.AFTER_RED,
+		)
 		expect(vitest_arguments()).not.toContain('--exclude')
 		expect(vitest_arguments()).toContain(absolute(FAILED_TEST))
 	})

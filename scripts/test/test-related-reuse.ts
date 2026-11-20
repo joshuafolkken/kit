@@ -22,9 +22,16 @@ interface TestReuse {
 // **Each reuse miss keeps its own cause in the ledger** (joshuafolkken/kit#8283): a comparable
 // green that cannot be read answers `green-` and the since-green fallback, so `reuse_reason` counts
 // which cause to fix instead of one value for all.
+// A run handed no tree names why, from the caller that withheld it (`test-related.ts`).
 const GREEN_MISS = 'green-'
-const NO_TREE = 'no-gate-tree'
 const SCOPE_MISS = 'scope-'
+const MISS = {
+	NO_TREE: 'no-gate-tree',
+	AFTER_RED: `${GREEN_MISS}${since_green.FALLBACK.AFTER_RED}`,
+	SCOPED_ARGUMENTS: 'scoped-arguments',
+} as const
+
+type ReuseMiss = (typeof MISS)[keyof typeof MISS]
 
 function digest_of(graph: ImportGraph, file: string): string | undefined {
 	const inputs = graph.test_inputs?.(file)
@@ -115,8 +122,9 @@ async function attempt(
 	root: string,
 	scope: RelatedScope,
 	tree: GateTree | undefined,
+	miss: ReuseMiss,
 ): Promise<Omit<TestReuse, 'elapsed_ms'>> {
-	if (tree === undefined) return empty(NO_TREE)
+	if (tree === undefined) return empty(miss)
 	if (scope.mode !== 'related') return empty(`${SCOPE_MISS}${scope.mode}`)
 
 	return await compare(root, scope, tree)
@@ -148,11 +156,12 @@ async function read(
 	root: string,
 	scope: RelatedScope,
 	tree: GateTree | undefined,
+	miss: ReuseMiss = MISS.NO_TREE,
 ): Promise<TestReuse> {
 	const started = performance.now()
 
 	try {
-		const result = await attempt(root, scope, tree)
+		const result = await attempt(root, scope, tree, miss)
 
 		return { ...result, elapsed_ms: performance.now() - started }
 	} catch {
@@ -200,7 +209,7 @@ function flags(reuse: TestReuse | undefined): ReadonlyArray<string> {
 	return ['--passWithNoTests', ...reuse.excluded.flatMap((file) => ['--exclude', file])]
 }
 
-const test_related_reuse = { blobs, carried, flags, read, retained }
+const test_related_reuse = { MISS, blobs, carried, flags, read, retained }
 
-export type { TestReuse }
+export type { ReuseMiss, TestReuse }
 export { test_related_reuse }

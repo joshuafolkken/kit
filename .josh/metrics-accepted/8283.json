@@ -2,6 +2,6 @@
 	"reason": "#8283 splits the single no-comparable-green reuse miss into per-cause reasons; the early-return function and its constants add 8 code lines",
 	"date": "2026-11-20",
 	"growth": {
-		"scripts.code_lines": 8
+		"scripts.code_lines": 25
 	}
 }

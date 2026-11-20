@@ -166,6 +166,14 @@ describe('test_related_reuse miss reasons', () => {
 
 		expect(result).toMatchObject({ excluded: [], reason: 'no-gate-tree' })
 	})
+	it.each([
+		[test_related_reuse.MISS.AFTER_RED, 'green-after-red'],
+		[test_related_reuse.MISS.SCOPED_ARGUMENTS, 'scoped-arguments'],
+	])('records the caller-named withheld tree %s', async (miss, reason) => {
+		const result = await test_related_reuse.read(ROOT, SCOPE, undefined, miss)
+
+		expect(result).toMatchObject({ excluded: [], reason })
+	})
 	it('records a scope that is not related under its own mode', async () => {
 		const result = await test_related_reuse.read(ROOT, { ...SCOPE, mode: 'all' }, TREE)
 
