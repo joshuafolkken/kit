@@ -3,7 +3,7 @@ import { issue_human_stops } from '#scripts/issue/issue-human-stops'
 import { describe, expect, it, vi } from 'vitest'
 import { backlog_drive } from './backlog-drive'
 import { backlog_drive_fixture } from './backlog-drive-fixture'
-import { backlog_drive_idle, type IdlePorts } from './backlog-drive-idle'
+import { backlog_drive_idle, type IdlePorts, type ShortfallPorts } from './backlog-drive-idle'
 
 // joshuafolkken/kit#4015: the one notification an idle backlogrun sends — a watch with no child running.
 
@@ -17,6 +17,8 @@ const STALLED = 4104
 const UNTRUSTED = 4105
 const OVER_CAP = 4106
 const IDLE_TEXT = 'idle body'
+const SHORTFALL_TEXT = 'shortfall body'
+const FREE_LANES = 3
 
 // The pool as `auto_ok_cli.fetch_opted_in` answers it: each row's author trust already assembled.
 function issue(number: number, extra: Partial<OpenIssueData> = {}): OpenIssueData {
@@ -70,6 +72,95 @@ describe('backlog_drive — the idle port', () => {
 		await backlog_drive.run_pass(state(), true, ports)
 
 		expect(idles).toStrictEqual([])
+	})
+})
+
+// joshuafolkken/kit#8332: a watch with a child still running is the shortfall, never the idle notice.
+describe('backlog_drive — the shortfall port', () => {
+	it('notices a watch with a child in flight, apart from the idle notice', async () => {
+		const shortfall = vi.fn(async () => undefined)
+		const { ports, idles } = harness({ offers: [{ ...offer('watch'), answer: 'exhausted' }] })
+
+		await backlog_drive.run_pass(state([FIRST_CHILD]), true, { ...ports, shortfall })
+
+		expect(shortfall).toHaveBeenCalledOnce()
+		expect(idles).toStrictEqual([])
+	})
+
+	it('stays quiet with nothing in flight, on a retry, a drain or an unreadable listing, or on any other verdict', async () => {
+		const shortfall = vi.fn(async () => undefined)
+		const offers = [
+			{ ...offer('watch'), answer: 'parked' },
+			{ ...offer('watch'), answer: 'blocked' },
+			{ ...offer('watch'), answer: 'candidates' },
+			{ ...offer('watch'), answer: 'unreadable' },
+			offer('wait'),
+		]
+
+		await Promise.all(
+			offers.map(async (read, index) => {
+				const { ports } = harness({ offers: [read] })
+				const children = index === 0 ? [] : [FIRST_CHILD]
+
+				await backlog_drive.run_pass(state(children), true, { ...ports, shortfall })
+			}),
+		)
+
+		expect(shortfall).not.toHaveBeenCalled()
+	})
+})
+
+function shortfall_ports(overrides: Partial<ShortfallPorts>): ShortfallPorts {
+	return {
+		free_lanes: async () => FREE_LANES,
+		emit: async (compose) => await compose(),
+		send: async () => true,
+		...overrides,
+	}
+}
+
+describe('backlog_drive_idle.shortfall', () => {
+	it('sends once, naming the free lanes and the running children', async () => {
+		const send = vi.fn(async (_body: string) => true)
+
+		await backlog_drive_idle.shortfall(state([FIRST_CHILD]), shortfall_ports({ send }))
+
+		expect(send.mock.calls).toStrictEqual([[backlog_drive_idle.describe_shortfall(1, FREE_LANES)]])
+	})
+
+	it('does not repeat while the episode is already marked', async () => {
+		const send = vi.fn(async () => true)
+
+		await backlog_drive_idle.shortfall(
+			state([FIRST_CHILD]),
+			shortfall_ports({ emit: async () => undefined, send }),
+		)
+
+		expect(send).not.toHaveBeenCalled()
+	})
+
+	it('leaves the marker unwritten while every lane is taken', async () => {
+		const emit = vi.fn(async () => SHORTFALL_TEXT)
+
+		await backlog_drive_idle.shortfall(
+			state([FIRST_CHILD]),
+			shortfall_ports({ free_lanes: async () => 0, emit }),
+		)
+
+		expect(emit).not.toHaveBeenCalled()
+	})
+
+	it('drops an unreadable lane count unsent, so the watch carries on', async () => {
+		const emit = vi.fn(async () => SHORTFALL_TEXT)
+		const failing = shortfall_ports({
+			free_lanes: async () => {
+				throw new Error(SHORTFALL_TEXT)
+			},
+			emit,
+		})
+
+		await expect(backlog_drive_idle.shortfall(state(), failing)).resolves.toBeUndefined()
+		expect(emit).not.toHaveBeenCalled()
 	})
 })
 

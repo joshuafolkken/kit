@@ -182,9 +182,9 @@ function decide_on_clock(call: GuardedCall, run: GuardRun, can_record: boolean):
 /**
  * **A lane child is out of the rule's scope** (joshuafolkken/kit#8278). It never runs the watcher —
  * `run:progress` declines in a dispatched lane child — so the clock it would read is the parent's, and
- * the remedy the refusal names does nothing there. Its wait is the Stop hook's short call
- * (`lane-background.ts` → `LANE_AGENT_WAIT`); refusing it left the child polling verification commands
- * as a wait instead.
+ * the remedy the refusal names does nothing there. Its wait is the Stop hook's blocking call
+ * (`lane-background.ts` → `LANE_AGENT_WAIT`, joshuafolkken/kit#8336) or a bare `sleep`; refusing a
+ * `sleep` left the child polling verification commands as a wait instead.
  */
 function decide(call: GuardedCall, run: GuardRun, can_record: boolean): boolean {
 	if (lane_child_marker.is_child_of(run.context.cwd, run.context.env)) return false

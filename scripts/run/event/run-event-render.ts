@@ -52,6 +52,7 @@ const KIND_LABELS: Readonly<Record<EventKind, KindLabel>> = {
 	setup: { ja: '準備', en: 'setup' },
 	'pr-checks': { ja: 'PR のチェック', en: 'PR checks' },
 	'idle-notice': { ja: '待機の通知', en: 'idle notice' },
+	'shortfall-notice': { ja: '着手可能不足の通知', en: 'shortfall notice' },
 	'lane-state': { ja: 'レーンの状態', en: 'lane state' },
 	'paused-notice': { ja: '一時停止の通知', en: 'paused notice' },
 	measured: { ja: '計測で完了', en: 'measured' },

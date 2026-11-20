@@ -163,8 +163,8 @@ const POLL_LOOP_REASON =
 const STARTED_CHILD_POLL_LOOP_REASON =
 	'⛔ output poll loop (started child): a loop or `sleep` chain before a read does not know when ' +
 	'the task finished, and nothing re-invokes a started child after its turn. Wait in the ' +
-	'foreground: a bare `sleep 20`, then re-read; `pnpm josh run:liveness`; or re-run the ' +
-	'command in the foreground with a timeout that fits; CI by `pnpm josh followup` ' +
+	'foreground: `pnpm josh wait --pid|--process|--file`, then read; `pnpm josh run:liveness`; ' +
+	'or re-run it in the foreground, timed to fit; CI by `pnpm josh followup` ' +
 	'(`background-commands.md`). Fires on every occurrence.'
 
 const FIRES =
@@ -211,7 +211,7 @@ const STARTED_CHILD_ROW = {
 		title: 'Output poll loop in a started child',
 		topic: TOPIC,
 		fires: `${FIRES}, in a started lane, hand-off or beside child`,
-		quiet: 'a bare `sleep 20` between reads, or the command run in the foreground',
+		quiet: '`pnpm josh wait` before the read, or the command run in the foreground',
 	},
 }
 

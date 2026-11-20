@@ -6,9 +6,11 @@ import { issue_human_stops, type HumanStop } from '#scripts/issue/issue-human-st
 import { has_any_label, RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
 import { issue_not_before } from '#scripts/issue/issue-not-before'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
+import { run_board_seat } from '#scripts/run/board/run-board-seat'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import type { DrivePorts, DriveState, OfferRead, PassResult } from './backlog-drive'
+import { backlog_ready } from './backlog-ready'
 
 // The one notification an idle backlogrun sends (joshuafolkken/kit#4015): a watch with no child running
 // is where a person's hand is wanted — a parked issue to decide, a dated one to wait out, or the next run
@@ -25,6 +27,8 @@ const STALLED_HEADING = `Stalled mechanically (${RUN_STALLED_LABEL}):`
 const IDLE_HEAD = 'No child running and nothing left to dispatch.'
 const IDLE_RECOVERY =
 	'Act on each issue under its heading, fix and release the stalled ones, or start the next run with `backlogrun`.'
+const SHORTFALL_RECOVERY =
+	'Opt more issues in with `auto-ok`, or decide the parked ones `pnpm josh run:board --chat` lists.'
 
 interface IdlePorts {
 	read_issues: () => Promise<ReadonlyArray<OpenIssueData> | undefined>
@@ -43,18 +47,35 @@ interface IdleReading {
 // Idle is any watch with nothing in flight, not only the drain: a watch over parked or dated issues
 // alone waits on a person just the same. A `blocked` watch is not: with nothing in flight it is only a
 // transient `retry`, which says nothing about whether work is left to dispatch.
-function is_idle(result: PassResult, read: OfferRead): boolean {
-	if (read.answer === BLOCKED_ANSWER) return false
+function is_watch(read: OfferRead): boolean {
+	return read.answer !== BLOCKED_ANSWER && read.verdict === WATCH_VERDICT
+}
 
-	return read.verdict === WATCH_VERDICT && result.state.in_flight.length === 0
+// Only these answers say no issue is ready; a watch draining a run that is ending (`--max` reached,
+// idle expired) still has `candidates`, and an `unreadable` listing says nothing either way.
+const NOTHING_READY_ANSWERS: ReadonlySet<string | undefined> = new Set(['exhausted', 'parked'])
+
+// A watch with a child still running and nothing ready is the shortfall (joshuafolkken/kit#8332): a
+// free lane waits on a person to supply work — the idle notice says the same once nothing runs, so the
+// two never fire on one pass.
+async function notice_running(
+	state: DriveState,
+	read: OfferRead,
+	ports: Pick<DrivePorts, 'shortfall'>,
+): Promise<void> {
+	if (NOTHING_READY_ANSWERS.has(read.answer)) await ports.shortfall(state)
 }
 
 async function noticed(
 	result: PassResult,
 	read: OfferRead,
-	ports: Pick<DrivePorts, 'idle'>,
+	ports: Pick<DrivePorts, 'idle' | 'shortfall'>,
 ): Promise<PassResult> {
-	if (is_idle(result, read)) await ports.idle(result.state)
+	if (!is_watch(read)) return result
+
+	await (result.state.in_flight.length === 0
+		? ports.idle(result.state)
+		: notice_running(result.state, read, ports))
 
 	return result
 }
@@ -166,7 +187,61 @@ async function notify(state: DriveState, ports: IdlePorts = DEFAULT_PORTS): Prom
 	}
 }
 
-const backlog_drive_idle = { describe, noticed, notify, read_pool }
+interface ShortfallPorts {
+	free_lanes: () => Promise<number>
+	emit: (compose: () => Promise<string>) => Promise<string | undefined>
+	send: (body: string) => Promise<boolean>
+}
+
+function describe_shortfall(running: number, free: number): string {
+	return `${run_board_seat.NO_CANDIDATE}: ${String(free)} lane(s) free, ${String(running)} running.`
+}
+
+async function emit_shortfall(compose: () => Promise<string>): Promise<string | undefined> {
+	const { SHORTFALL_NOTICE, CHILD_LAUNCH } = run_event_stream.EVENT_KIND
+
+	return await run_event_stream_emit.emit_once_since_with(SHORTFALL_NOTICE, CHILD_LAUNCH, compose)
+}
+
+async function send_shortfall(body: string): Promise<boolean> {
+	return await telegram_notify.shortfall({ body, recovery: SHORTFALL_RECOVERY })
+}
+
+const SHORTFALL_PORTS: ShortfallPorts = {
+	free_lanes: backlog_ready.drive_free_lane_count,
+	emit: emit_shortfall,
+	send: send_shortfall,
+}
+
+// An unreadable lane count reads as none free: no notice rather than a guess.
+async function read_free(ports: ShortfallPorts): Promise<number> {
+	try {
+		return await ports.free_lanes()
+	} catch {
+		return 0
+	}
+}
+
+// The production `shortfall` port, best-effort as `notify` is. Lanes all taken is no shortfall, so the
+// marker is left unwritten and the episode stays open until a lane frees.
+async function shortfall(
+	state: DriveState,
+	ports: ShortfallPorts = SHORTFALL_PORTS,
+): Promise<void> {
+	const free = await read_free(ports)
+
+	if (free === 0) return
+
+	try {
+		const body = await ports.emit(async () => describe_shortfall(state.in_flight.length, free))
+
+		if (body !== undefined) await ports.send(body)
+	} catch {
+		// Reporting is best-effort: a shortfall notice we could not read or send is dropped.
+	}
+}
+
+const backlog_drive_idle = { describe, describe_shortfall, noticed, notify, read_pool, shortfall }
 
 export { backlog_drive_idle }
-export type { IdlePorts }
+export type { IdlePorts, ShortfallPorts }

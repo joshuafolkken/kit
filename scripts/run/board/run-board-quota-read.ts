@@ -1,4 +1,4 @@
-import { open, readdir, readFile, stat } from 'node:fs/promises'
+import { readdir, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { agent_provider } from '#scripts/agent/agent-provider'
 import { codex_home_source } from '#scripts/agent/codex-home-source'
@@ -282,7 +282,7 @@ function is_claude_launch(text: string): boolean {
 	return provider === undefined || provider === agent_provider.ANTHROPIC_PROVIDER
 }
 
-// Whether a log's last launch ran Claude, by its path and `mtime`: a log is read whole once per write.
+// Whether a log's last launch ran Claude, by its path and `mtime`: once per write, off its tail.
 const CLAUDE_LAUNCHES = new Map<string, { mtime_ms: number; is_claude: boolean }>()
 
 async function read_claude_launch(file: QuotaFile): Promise<boolean> {
@@ -290,7 +290,8 @@ async function read_claude_launch(file: QuotaFile): Promise<boolean> {
 
 	if (known?.mtime_ms === file.mtime_ms) return known.is_claude
 
-	const is_claude = is_claude_launch(await readFile(file.path, 'utf8'))
+	const header = await transcript_tail.last_line_matching(file.path, LAUNCH_HEADERS)
+	const is_claude = is_claude_launch(header ?? '')
 
 	CLAUDE_LAUNCHES.set(file.path, { mtime_ms: file.mtime_ms, is_claude })
 
@@ -359,20 +360,6 @@ async function read_tail(file: string, bytes: number = TAIL_BYTES): Promise<stri
 	return transcript_tail.read_tail(file, bytes)
 }
 
-// The first `bytes` of `file`; only the bytes read are decoded.
-async function read_head(file: string, bytes: number = TAIL_BYTES): Promise<string> {
-	const handle = await open(file, 'r')
-
-	try {
-		const buffer = Buffer.alloc(bytes)
-		const { bytesRead: read } = await handle.read(buffer, 0, bytes, 0)
-
-		return buffer.subarray(0, read).toString('utf8')
-	} finally {
-		await handle.close()
-	}
-}
-
 // Whether a tail of `bytes` ends the widening: it found a reading, held the whole file, or reached the limit.
 function is_last_tail(reading: QuotaReading | undefined, text: string, bytes: number): boolean {
 	return (
@@ -412,7 +399,7 @@ const run_board_quota_read = {
 	codex_heads,
 	codex_lane: run_board_quota_lane.codex_lane,
 	codex_reading,
-	read_head,
+	read_head: transcript_tail.read_head,
 	line_stamp,
 	read_tail,
 	reading_in,
