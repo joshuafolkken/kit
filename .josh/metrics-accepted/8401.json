@@ -1,0 +1,7 @@
+{
+	"reason": "#8401: the live frame's restyle-then-screen order needs a Framing type and on_screen helper (+11 code lines)",
+	"date": "2026-11-20",
+	"growth": {
+		"scripts.code_lines": 11
+	}
+}

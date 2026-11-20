@@ -1,0 +1,7 @@
+- rf:bug-risks | high | scripts/issue/issue-file-cli.ts:259 | 2026-11-19 | #8172 | fixed | naming-callers
+- rf:bug-risks | medium | scripts/issue/issue-file-batch.ts:122 | 2026-11-19 | #8172 | fixed | naming-callers
+- rf:bug-risks | low | scripts/epic/epic-bundle-apply.ts:90 | 2026-11-19 | #8172 | fixed | state-reasoning
+- rf:tests | low | scripts/issue/issue-file-cli-place.test.ts:91 | 2026-11-19 | #8172 | fixed | untested-branch
+- rf:bug-risks | medium | docs/josh-commands-backlog.md:206 | 2026-11-19 | #8172 | - | stale-docs
+- rf:bug-risks | medium | scripts/issue/issue-file-cli.ts:136 | 2026-11-19 | #8172 | fixed | swallowed-failure
+- rf:none | none | - | 2026-11-19 | #8172
