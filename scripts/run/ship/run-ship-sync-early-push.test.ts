@@ -72,14 +72,33 @@ describe('run_ship_sync.sync_stage — the scoped pair settles before the push',
 		expect(commands()).toStrictEqual([PUSH])
 	})
 
-	it('pushes nothing ahead of the gate when the scoped pair is red, and says so', async () => {
+	// joshuafolkken/kit#8304: the preflight leaves the pair to the merged tree when main moved, so a red
+	// one stops the ship here, before the review, rather than only noting it.
+	it('stops the ship on a red scoped pair over the merged tree, pushing nothing', async () => {
 		pair_mock.mockResolvedValue({ code: FAILED, out: 'lint failed' })
 
 		expect(await run_ship_sync.sync_stage(ISSUE, TITLE, is_dirty)).toStrictEqual({
-			code: OK,
-			out: `merged main\n${run_ship_sync.PAIR_RED_NOTE}`,
+			code: FAILED,
+			out: 'merged main\nthe scoped pair is red on the tree merged with the default branch:\nlint failed',
+			cause: 'check',
 		})
 		expect(commands()).toStrictEqual([])
+	})
+
+	it('settles the pair on the merged tree with no open pull request too', async () => {
+		pr_number_mock.mockResolvedValue(undefined)
+
+		await run_ship_sync.sync_stage(ISSUE, TITLE, is_dirty)
+
+		expect(pair_mock).toHaveBeenCalledOnce()
+	})
+
+	it('runs no pair when nothing was merged', async () => {
+		merge_mock.mockResolvedValue({ kind: 'current', branch: 'main' })
+
+		await run_ship_sync.sync_stage(ISSUE, TITLE, is_dirty)
+
+		expect(pair_mock).not.toHaveBeenCalled()
 	})
 })
 

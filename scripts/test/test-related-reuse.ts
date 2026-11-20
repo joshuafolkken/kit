@@ -22,16 +22,11 @@ interface TestReuse {
 // **Each reuse miss keeps its own cause in the ledger** (joshuafolkken/kit#8283): a comparable
 // green that cannot be read answers `green-` and the since-green fallback, so `reuse_reason` counts
 // which cause to fix instead of one value for all.
-// A run handed no tree names why, from the caller that withheld it (`test-related.ts`).
+// Every run compares, scoped or after a red (joshuafolkken/kit#8288), so only a missing tree misses here.
 const GREEN_MISS = 'green-'
 const SCOPE_MISS = 'scope-'
-const MISS = {
-	NO_TREE: 'no-gate-tree',
-	AFTER_RED: `${GREEN_MISS}${since_green.FALLBACK.AFTER_RED}`,
-	SCOPED_ARGUMENTS: 'scoped-arguments',
-} as const
-
-type ReuseMiss = (typeof MISS)[keyof typeof MISS]
+const NO_TREE = 'no-gate-tree'
+const FAILED_LAST_RUN = 'failed-last-run'
 
 function digest_of(graph: ImportGraph, file: string): string | undefined {
 	const inputs = graph.test_inputs?.(file)
@@ -122,9 +117,8 @@ async function attempt(
 	root: string,
 	scope: RelatedScope,
 	tree: GateTree | undefined,
-	miss: ReuseMiss,
 ): Promise<Omit<TestReuse, 'elapsed_ms'>> {
-	if (tree === undefined) return empty(miss)
+	if (tree === undefined) return empty(NO_TREE)
 	if (scope.mode !== 'related') return empty(`${SCOPE_MISS}${scope.mode}`)
 
 	return await compare(root, scope, tree)
@@ -156,12 +150,11 @@ async function read(
 	root: string,
 	scope: RelatedScope,
 	tree: GateTree | undefined,
-	miss: ReuseMiss = MISS.NO_TREE,
 ): Promise<TestReuse> {
 	const started = performance.now()
 
 	try {
-		const result = await attempt(root, scope, tree, miss)
+		const result = await attempt(root, scope, tree)
 
 		return { ...result, elapsed_ms: performance.now() - started }
 	} catch {
@@ -209,7 +202,23 @@ function flags(reuse: TestReuse | undefined): ReadonlyArray<string> {
 	return ['--passWithNoTests', ...reuse.excluded.flatMap((file) => ['--exclude', file])]
 }
 
-const test_related_reuse = { MISS, blobs, carried, flags, read, retained }
+// **A file the last run failed on runs again whatever its digest** (joshuafolkken/kit#8288): its
+// closed inputs may match the older green, yet that green no longer vouches for it.
+function keeping(root: string, reuse: TestReuse, failed: ReadonlyArray<string>): TestReuse {
+	const kept = new Set(failed.map((file) => path.resolve(root, file)))
+	const excluded = reuse.excluded.filter((file) => !kept.has(file))
+	if (excluded.length === reuse.excluded.length) return reuse
 
-export type { ReuseMiss, TestReuse }
+	return {
+		...reuse,
+		excluded,
+		reused: excluded.length,
+		missed: reuse.missed + reuse.excluded.length - excluded.length,
+		reason: excluded.length > 0 ? reuse.reason : FAILED_LAST_RUN,
+	}
+}
+
+const test_related_reuse = { blobs, carried, flags, keeping, read, retained }
+
+export type { TestReuse }
 export { test_related_reuse }

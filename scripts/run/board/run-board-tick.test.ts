@@ -234,7 +234,6 @@ describe('run_board_tick.tick throughput', () => {
 		const row: ThroughputRow = {
 			label: '24h',
 			cells: [],
-			window_ms: 0,
 			active_ms: 0,
 			done: 0,
 			per_hour: undefined,
