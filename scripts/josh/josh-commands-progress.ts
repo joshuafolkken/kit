@@ -127,7 +127,7 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: [BOARD_THEME],
 					description:
-						'a live board runs a WOPR lamp panel on its throughput rows: two columns past `NOW`, a `■` every other column to the section’s rule end, yellow on `24h`, red on `7d`, dim when out (`run-board-lamps.ts`). None with no theme, `--once`, `--chat`, `--every`, no TTY or color, or under 8 lamps.',
+						'a live board runs a WOPR lamp panel on its throughput rows: two columns past `NOW`, a `■` every other column to the section’s rule end, yellow on `24h`, red on `7d`, out at half the row’s color, dimmed (named color dimmed without 24-bit color) (`run-board-lamps.ts`). None with no theme, `--once`, `--chat`, `--every`, no TTY or color, or under 8 lamps.',
 				},
 				{
 					names: [BOARD_THEME],

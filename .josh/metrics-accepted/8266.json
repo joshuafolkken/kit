@@ -1,0 +1,7 @@
+{
+	"reason": "Out-lamp color derived at 25% of the lit shade plus the dim fallback for terminals without 24-bit color (#8266)",
+	"date": "2026-11-20",
+	"growth": {
+		"scripts.code_lines": 14
+	}
+}
