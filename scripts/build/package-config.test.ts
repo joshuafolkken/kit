@@ -162,6 +162,13 @@ describe('package.json files field', () => {
 	})
 })
 
+// The board-theme skill builds kit's own `run:board` themes, so it stays out of the package (#8393).
+describe('package.json files field kit-only skills', () => {
+	it('keeps the board-theme skill out of the package', () => {
+		expect(load_manifest().files).toContain('!.claude/skills/board-theme')
+	})
+})
+
 // The agents ship as a directory, so a new definition needs no list entry (joshuafolkken/kit#7757).
 describe('package.json files field agent definitions', () => {
 	it.each(['investigator', 'producer'])('ships the %s agent definition', (name) => {
