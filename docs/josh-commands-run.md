@@ -854,6 +854,19 @@ A stop in the gate or review round 1 returns to the lane session waiting here; w
 
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh ship:wait` in detail".
 
+### `josh wait`
+
+<!-- usage: wait -->
+
+Wait until a pid or process ends or a file exists, or one ship:wait chunk (done | pending).
+
+```bash
+pnpm josh wait --process "run:chain <N>"   # as `pgrep -f`
+pnpm josh wait                             # a background subagent: the chunk
+```
+
+<!-- /usage -->
+
 ### `josh ship:evidence`
 
 <!-- usage: ship:evidence -->

@@ -175,10 +175,11 @@ function judgement_reader(): () => Promise<number> {
 }
 
 // The reports an offered pass leaves: why it started nothing, the idle notice and the paused notice.
-function reporters(holds: HoldRecorder): Pick<LoopPorts, 'hold' | 'idle' | 'paused'> {
+function reporters(holds: HoldRecorder): Pick<LoopPorts, 'hold' | 'idle' | 'shortfall' | 'paused'> {
 	return {
 		hold: holds.hold,
 		idle: backlog_drive_idle.notify,
+		shortfall: backlog_drive_idle.shortfall,
 		paused: backlog_drive_paused.notify,
 	}
 }

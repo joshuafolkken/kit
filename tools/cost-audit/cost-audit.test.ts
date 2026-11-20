@@ -62,6 +62,25 @@ describe('cost_audit.audit — the period set against the one before it', () => 
 	})
 })
 
+// joshuafolkken/kit#8329: a kind row carries each period's session count.
+describe('cost_audit.audit — the session counts on the kind rows', () => {
+	it('counts each kind’s sessions per period, a session only where a request of it falls', () => {
+		const sessions = [
+			...SESSIONS,
+			session('fullrun', [record('e', PREVIOUS, 1)]),
+			session('resume', [record('f', PREVIOUS, 1)]),
+			session('handoff', [record('g', CURRENT, 1)]),
+		]
+		const { kinds } = cost_audit.audit({ sessions, days: DAYS, now_ms: NOW_MS, merges: undefined })
+
+		expect(key_of(kinds, 'fullrun')?.sessions).toStrictEqual({ current: 1, previous: 2 })
+		expect(key_of(kinds, 'review')?.sessions).toStrictEqual({ current: 1, previous: 1 })
+		expect(key_of(kinds, 'resume')?.sessions).toStrictEqual({ current: 0, previous: 1 })
+		expect(key_of(kinds, 'handoff')?.sessions).toStrictEqual({ current: 1, previous: 0 })
+		expect(key_of(kinds, 'wake')).toBeUndefined()
+	})
+})
+
 // joshuafolkken/kit#6913: each kind's current-period spend by model and token type, priced by #6899's
 // breakdown, so the kinds' model terms sum to the period's total.
 const OPUS = 'claude-opus-4-6'

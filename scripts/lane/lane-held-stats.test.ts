@@ -14,6 +14,8 @@ const HAND_BACK = 'hand-back:merge'
 const MEMORY = 'memory'
 const LAUNCH = 'lane:launch'
 const LONG_AGO_MINUTES = 300
+const WATCH_BLOCKED = 'offer:watch:blocked'
+const NONE_ROW = '| none | not measured | not measured | not measured | 0 | 0 |'
 
 function minutes_before_now(minutes: number): string {
 	return new Date(NOW - minutes * MS_PER_MINUTE).toISOString()
@@ -115,9 +117,7 @@ describe('lane_held_stats.table', () => {
 	})
 
 	it('prints a zero row for a period without a hold', () => {
-		expect(row_of([dispatch(1)], 'none')).toBe(
-			'| none | not measured | not measured | not measured | 0 | 0 |',
-		)
+		expect(row_of([dispatch(1)], 'none')).toBe(NONE_ROW)
 	})
 })
 
@@ -134,11 +134,66 @@ describe('lane_held_stats.table — a memory hold', () => {
 describe('lane_held_stats.table — a run:solo wait', () => {
 	it('rows a run:solo hold apart from the other blocked offers', () => {
 		const solo = 'offer:watch:solo'
-		const blocked = 'offer:watch:blocked'
+		const blocked = WATCH_BLOCKED
 		const entries = [held(blocked, 30), held(solo, 25), held(blocked, 20), dispatch(10)]
 
 		expect(row_of(entries, solo)).toBe(`| ${solo} | 5.0 | 5.0 | 5.0 | 1 | 0 |`)
 		expect(row_of(entries, blocked)).toBe(`| ${blocked} | 15.0 | 7.5 | 10.0 | 2 | 0 |`)
+	})
+})
+
+// joshuafolkken/kit#8331: a watch offer's joined tag split into its causes, and the issues it waited on.
+const CHAIN_GATE = 'offer:watch:chain+gate'
+const CHAIN = 'offer:watch:chain'
+
+function waited(reason: string, minutes_before: number, waiting: Array<number>): LedgerEntry {
+	return { kind: 'held', at: minutes_before_now(minutes_before), reason, waiting }
+}
+
+function body_of(table: string): Array<string> {
+	return table.split('\n').slice(2)
+}
+
+describe('lane_held_stats.cause_table', () => {
+	it('counts a chain+gate hold in full under both chain and gate', () => {
+		const entries = [held(CHAIN_GATE, 30), held(CHAIN, 20), held(MEMORY, 15), dispatch(10)]
+
+		expect(body_of(lane_held_stats.cause_table(entries, WINDOW))).toStrictEqual([
+			'| chain | 15.0 | 7.5 | 10.0 | 2 | 0 |',
+			'| gate | 10.0 | 10.0 | 10.0 | 1 | 0 |',
+		])
+	})
+
+	it('rows no cause for a watch offer whose tag names none', () => {
+		const entries = [held(WATCH_BLOCKED, 30), dispatch(10)]
+
+		expect(body_of(lane_held_stats.cause_table(entries, WINDOW))).toStrictEqual([NONE_ROW])
+	})
+
+	it('names the overlap in its header', () => {
+		expect(lane_held_stats.cause_table([], WINDOW).split('\n', 1)[0]).toContain(
+			'a hold with several causes counts in full under each',
+		)
+	})
+})
+
+describe('lane_held_stats.blocker_table', () => {
+	it('sums each waited-on issue, the longest total first', () => {
+		const entries = [waited(CHAIN, 30, [7]), waited(CHAIN_GATE, 25, [8, 7]), dispatch(5)]
+
+		expect(body_of(lane_held_stats.blocker_table(entries, WINDOW))).toStrictEqual([
+			'| #7 | 25.0 | 12.5 | 20.0 | 2 | 0 |',
+			'| #8 | 20.0 | 20.0 | 20.0 | 1 | 0 |',
+		])
+	})
+
+	it('keeps only the ten longest issues', () => {
+		const issues = Array.from({ length: 12 }, (_, index) => index + 1)
+
+		const entries = [waited(CHAIN, 10, issues), dispatch(5)]
+		const table = lane_held_stats.blocker_table(entries, WINDOW)
+
+		expect(body_of(table)).toHaveLength(10)
 	})
 })
 
