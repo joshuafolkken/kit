@@ -8,6 +8,7 @@ import { run_board_row_key } from './run-board-row-key'
 import { run_board_screen } from './run-board-screen'
 import { run_board_spot, type Spot } from './run-board-spot'
 import type { BoardPorts } from './run-board-state'
+import { run_board_strip, type StripCell } from './run-board-strip'
 import { run_board_sweep, type Sweep } from './run-board-sweep'
 import { run_board_theme_defs } from './run-board-theme-defs'
 import { run_board_timing } from './run-board-timing'
@@ -40,6 +41,7 @@ interface Spun {
 	sweep: Sweep | undefined
 	lamps: Array<Lamp>
 	rules: Array<RuleCell>
+	strips: Array<StripCell>
 }
 
 // What is written between redraws: the spinners turned, the sweep moved, the lamps blinked, the rules'
@@ -50,6 +52,7 @@ interface Turning {
 	sweep?: Sweep | undefined
 	lamps?: ReadonlyArray<Lamp> | undefined
 	rules?: ReadonlyArray<RuleCell> | undefined
+	strips?: ReadonlyArray<StripCell> | undefined
 }
 
 // What changed since the last turn was written: the spinner's frame, the sweep's cell, and the moment
@@ -144,14 +147,21 @@ function spun(lines: ReadonlyArray<string>, frame: string, size?: TerminalSize):
 	const starts = starts_of(lines, columns)
 	const spots = lines.flatMap((line, index) => line_spots(line, starts[index] ?? 1, columns))
 	const drawn = keyed_of(lines, frame, starts)
+	const lamps = run_board_lamp_spots
+		.lamps_in(lines, starts, columns)
+		.filter((lamp) => lamp.row <= rows)
+	const rules = run_board_codes
+		.rule_cells(lines, starts, columns)
+		.filter((cell) => cell.row <= rows)
 
 	return {
 		lines: drawn.lines,
 		spots: spots.filter((spot) => spot.row <= rows),
 		keyed: drawn.keyed.filter((line) => can_type(line, rows, columns)),
 		sweep: sweep_in(lines, starts, { rows, columns }),
-		lamps: run_board_lamp_spots.lamps_in(lines, starts, columns).filter((lamp) => lamp.row <= rows),
-		rules: run_board_codes.rule_cells(lines, starts, columns).filter((cell) => cell.row <= rows),
+		lamps,
+		rules,
+		strips: run_board_strip.strip_cells(lines, starts, { lamps, rules }),
 	}
 }
 
@@ -227,6 +237,9 @@ function write_turn(turning: Turning, ports: SpinPorts, at_ms: number, turned: T
 			turned.since,
 		)
 		run_board_codes.write_codes(coded(turning), ports, at_ms, turned.since?.ms)
+		const striped = { ...coded(turning), strips: turning.strips ?? [] }
+
+		run_board_strip.write_strips(striped, ports, at_ms, turned.since?.ms)
 	})
 	ports.typing_sound?.set(run_board_type_rows.is_typing(turning.typing, at_ms))
 }

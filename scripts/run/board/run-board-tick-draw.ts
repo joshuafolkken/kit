@@ -186,9 +186,10 @@ function draw_display(state: BoardState, display: BoardDisplay, redraw: Redraw):
 	redraw.ports.typing_sound?.set(run_board_type_rows.is_typing(typing, redraw.now_ms))
 
 	const { spots, sweep, lamps } = drawn
-	const rules = has_codes(redraw.ports) ? drawn.rules : []
+	const coded = has_codes(redraw.ports) ? drawn : { rules: [], strips: [] }
+	const { rules, strips } = coded
 
-	return { ...state, ...display.carried, spots, sweep, lamps, rules, typing }
+	return { ...state, ...display.carried, spots, sweep, lamps, rules, strips, typing }
 }
 
 const run_board_tick_draw = { bounds_of, draw, draw_display, has_lamps }

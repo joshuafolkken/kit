@@ -147,6 +147,21 @@ describe('run_board_type_rows.done_ms', () => {
 	})
 })
 
+// joshuafolkken/kit#8376: the lamp strips fill with the row that types through last.
+describe('run_board_type_rows.progress', () => {
+	it('is the share the row typing through last has typed, with rows typing together', () => {
+		const short = line_of('#2', 1, 'x'.repeat(10))
+		const typing = after_base(frame_of([]), [short, line_of('#3', 2)])
+		const at_ms = START + SECOND + (ROW.length / 2 - 1) * LETTER_MS
+
+		expect(run_board_type_rows.progress(typing, at_ms)).toBe(1 / 2)
+	})
+
+	it('is all once no row types', () => {
+		expect(run_board_type_rows.progress(NO_TYPING, START)).toBe(1)
+	})
+})
+
 describe('run_board_type_rows — what is written', () => {
 	it('draws a row on a redraw as typed so far with the block after it, the rest of the frame as drawn', () => {
 		const typing = after_base(frame_of([]), [line_of('done:7', 1)])

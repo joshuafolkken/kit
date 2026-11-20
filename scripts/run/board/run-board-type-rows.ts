@@ -149,7 +149,28 @@ function is_typing(typing: Typing, now_ms: number): boolean {
 	return typing.lines.some((line) => !is_typed(line, now_ms))
 }
 
-const run_board_type_rows = { NO_TYPING, done_ms, is_typing, next, type_bytes, typed_lines }
+// The share of its letters the row that types through last has typed by `now_ms`, so every effect that
+// follows the typing reads one progress (joshuafolkken/kit#8376); all once no row types.
+function progress(typing: Typing, now_ms: number): number {
+	const typing_now = typing.lines.filter((line) => !is_typed(line, now_ms))
+	const latest = Math.max(...typing_now.map((line) => typed_at(line)))
+	const last = typing_now.find((line) => typed_at(line) === latest)
+
+	if (last === undefined) return 1
+	const letters = run_board_fit.width_of(last.text) - last.prefix_columns
+
+	return Math.min(1, (columns_at(last, now_ms) - last.prefix_columns) / letters)
+}
+
+const run_board_type_rows = {
+	NO_TYPING,
+	done_ms,
+	is_typing,
+	next,
+	progress,
+	type_bytes,
+	typed_lines,
+}
 
 export { run_board_type_rows }
 export type { KeyedLine, Typing, TypingFrame, TypingLine }
