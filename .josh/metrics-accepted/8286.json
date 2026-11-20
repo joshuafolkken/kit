@@ -1,0 +1,7 @@
+{
+	"reason": "#8286 adds the per-stage chain-stage ledger record: kind, schema, writer file and the run_stages call",
+	"date": "2026-11-20",
+	"growth": {
+		"scripts.code_lines": 43
+	}
+}
