@@ -2,10 +2,12 @@ import { stripVTControlCharacters } from 'node:util'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_fit } from './run-board-fit'
 import { run_board_label_pair } from './run-board-label-pair'
+import { run_board_render_throughput } from './run-board-render-throughput'
 import type { BoardPorts } from './run-board-state'
 import { run_board_theme } from './run-board-theme'
 import { run_board_theme_case } from './run-board-theme-case'
 import { run_board_theme_glyphs } from './run-board-theme-glyphs'
+import type { ThroughputRow } from './run-board-throughput'
 
 // joshuafolkken/kit#7934: the WarGames theme — which one a board takes, and how it draws a frame.
 
@@ -125,6 +127,15 @@ const PROCESSES = [
 	`  ${pair('🌐', 'apps')}            17.2`,
 ]
 const VALUES = '  💪 67%  ✅ 264/283  ▶ GraphQL'
+const THROUGHPUT_ROW: ThroughputRow = {
+	label: '24h',
+	cells: [],
+	active_ms: 0,
+	done: 0,
+	per_hour: undefined,
+	peak: undefined,
+	now: undefined,
+}
 const LABELED = [...HEADINGS, ...PROCESSES, VALUES].join('\n')
 
 function wargames_lines(frame: string): Array<string> {
@@ -140,6 +151,14 @@ describe('run_board_theme.restyle beside a label', () => {
 		expect(throughput).toMatch(/^V -- THROUGHPUT -{5} \/H -{5} DONE -- \S+ PEAK --$/u)
 		expect(usage).toBe('V -- USAGE --')
 		expect(waiting).toBe('> -- WAITING -- 8 --')
+	})
+
+	// joshuafolkken/kit#8280: the narrowed throughput columns' labels, as the approved sample draws them.
+	it('draws the throughput rule `/H ACTIVE - DONE - PEAK - NOW`', () => {
+		const [rule = ''] = run_board_render_throughput.rows_part([THROUGHPUT_ROW]).head.slice(1)
+		const [throughput] = wargames_lines(rule)
+
+		expect(throughput).toMatch(/^-- -- THROUGHPUT -{20} \/H ACTIVE - DONE - PEAK - NOW -+$/u)
 	})
 
 	it('starts each group label at one column, a child two columns in, the figures unmoved', () => {

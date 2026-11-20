@@ -31,7 +31,10 @@ const MOST_PERIOD_STEPS = 18
 const ESCAPE = '\u{1B}'
 const BLINK = `${ESCAPE}[5m`
 const DIM = `${ESCAPE}[2m`
+// The red rows' out color before joshuafolkken/kit#8305, which no out lamp is drawn in now.
 const OUT_RED = '38;2;128;35;29'
+const OUT_YELLOW = '38;2;128;107;5'
+const PANEL = [0, 1, 2, 3, 4]
 
 afterEach(() => {
 	vi.unstubAllEnvs()
@@ -172,24 +175,25 @@ describe('run_board_lamps colors', () => {
 		expect(PANEL_ROWS).toEqual({ gap: 2, first_usage: 3, second_usage: 4 })
 	})
 
-	it('draws a lamp out at half its row’s color, dimmed, the start placeholder too', () => {
+	it('draws every row’s lamp out at half yellow, dimmed, the start placeholder too', () => {
 		vi.stubEnv('FORCE_COLOR', '3')
-		const start = start_of(2)
-		const out = [lamp_text(0, false), lamp_text(2, false), start]
+		const out = PANEL.flatMap((row) => [lamp_text(row, false), start_of(row)])
 
-		expect(out[0]).toContain('38;2;128;107;5')
-		expect(out[1]).toContain(OUT_RED)
-		expect(start).toContain(OUT_RED)
-		expect(stripVTControlCharacters(start)).toBe(LAMP_START)
-		for (const text of out) expect(text).toContain(DIM)
+		for (const text of out) {
+			expect(text).toContain(OUT_YELLOW)
+			expect(text).toContain(DIM)
+			expect(text).not.toContain(OUT_RED)
+		}
+
+		expect(stripVTControlCharacters(start_of(2))).toBe(LAMP_START)
 	})
 
-	it('draws an out lamp in the lit named color dim where the terminal has no 24-bit color', () => {
+	it('draws every row’s out lamp in named yellow dim where the terminal has no 24-bit color', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 		const lit = lamp_text(0, true)
 
 		expect(lit).not.toContain('38;2;')
-		expect(lamp_text(0, false)).toBe(`${DIM}${lit}${ESCAPE}[22m`)
+		for (const row of PANEL) expect(lamp_text(row, false)).toBe(`${DIM}${lit}${ESCAPE}[22m`)
 	})
 
 	it('draws lamps only where stdout draws color', () => {

@@ -6,8 +6,8 @@ import { run_board_spot } from './run-board-spot'
 // The WOPR lamp panel of `run:board --theme wargames` (joshuafolkken/kit#8236): from two columns past the
 // throughput rows' NOW, a `■` every other column up to the section's rule, on five rows — the `24h` and
 // `7d` rows, the blank line under them, and the usage section's first two provider rows
-// (joshuafolkken/kit#8277) — lit yellow, yellow, red, yellow, red from the top, out at half the row's
-// color, dimmed (the row's named color dimmed where the terminal has no 24-bit color).
+// (joshuafolkken/kit#8277) — lit yellow, yellow, red, yellow, red from the top, out on every row at half
+// yellow, dimmed (named `yellow` dimmed where the terminal has no 24-bit color; joshuafolkken/kit#8305).
 // Lamps blink four to a group, each group on its own period and phase, about four in ten lit; whether
 // one is lit is read off the moment, its group and its place alone.
 
@@ -32,7 +32,7 @@ const PHASE_SALT = 2
 const MIX_MULTIPLIER = 48_271
 const MIX_MODULUS = 2_147_483_647
 const MIX_SEED = 1
-// An out lamp is its row's color at half of each channel.
+// An out lamp is yellow at half of each channel, on every row.
 const OUT_DIVISOR = 2
 type Shade = Exclude<Paint, TextColor>
 const { red, yellow } = GAUGE_SHADES
@@ -94,22 +94,22 @@ function halved(rgb: string): string {
 		.join(';')
 }
 
-// `text` out in `shade`, dimmed: at half its color where the terminal draws 24-bit color, else in its
-// named color.
-function out_text(shade: Shade, text: string): string {
-	const out = painted({ rgb: halved(shade.rgb), named: shade.named }, text)
+// Every row's out lamp: yellow at half of each channel, its named color where the terminal has no 24-bit
+// color (joshuafolkken/kit#8305).
+const OUT_SHADE: Shade = { rgb: halved(yellow.rgb), named: yellow.named }
 
-	return styleText('dim', out, { validateStream: false })
+// `text` out, dimmed, in `OUT_SHADE` whatever its row's color.
+function out_text(text: string): string {
+	return styleText('dim', painted(OUT_SHADE, text), { validateStream: false })
 }
 
 // A lamp of the panel's row at `row` (`PANEL_ROWS`) as drawn lit or out.
 function lamp_text(row: number, is_on: boolean, text = LAMP_MARK): string {
 	const shade = shade_of(row)
-	const lit = painted(shade, text)
 
-	if (is_on || shade === undefined) return lit
+	if (is_on || shade === undefined) return painted(shade, text)
 
-	return out_text(shade, text)
+	return out_text(text)
 }
 
 // Lamps are drawn only where stdout draws color — a `■` with none would never go out.

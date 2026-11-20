@@ -19,14 +19,12 @@ interface ThroughputCell extends Span {
 interface Peak {
 	done: number
 	per_hour: number
-	start_ms: number
 }
 
 interface ThroughputRow {
 	label: RowLabel
 	// Oldest first; the last cell holds now and is still filling.
 	cells: ReadonlyArray<ThroughputCell>
-	window_ms: number
 	active_ms: number
 	done: number
 	// Closes per active hour over the complete cells; none when they had no active time.
@@ -132,7 +130,7 @@ function peak_of(cells: ReadonlyArray<ThroughputCell>, cell_hours: number): Peak
 
 	if (top === undefined || most === 0) return undefined
 
-	return { done: top.done, per_hour: top.done / cell_hours, start_ms: top.start_ms }
+	return { done: top.done, per_hour: top.done / cell_hours }
 }
 
 // The current cell is drawn and counted in the window, but kept out of the average and the peak.
@@ -143,7 +141,6 @@ function row_of(shape: RowShape, read: StreamRead): ThroughputRow {
 	return {
 		label: shape.label,
 		cells,
-		window_ms: sum(cells.map((cell) => cell.end_ms - cell.start_ms)),
 		active_ms: sum(cells.map((cell) => cell.active_ms)),
 		done: sum(cells.map((cell) => cell.done)),
 		per_hour: per_hour_of(complete),
