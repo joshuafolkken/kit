@@ -1,0 +1,7 @@
+{
+	"reason": "The Issue adds the gather worker's heap cap as a new module of measured constants, kept out of the near-cap gather thread file",
+	"date": "2026-11-20",
+	"growth": {
+		"scripts.code_lines": 13
+	}
+}

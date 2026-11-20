@@ -115,7 +115,7 @@ describe('run_board_gather_thread.worker_gatherer over spawner', () => {
 		worker.emit('message', POST)
 		await first
 		expect(worker_spawn).toHaveBeenCalledWith(run_board_gather_thread.WORKER_URL, {
-			execArgv: ts_entry_loader.loader_argv(process.execArgv),
+			...worker_options(process.execArgv),
 			env: run_board_gather_record.worker_environment(setup),
 			workerData: worker_data,
 		})

@@ -20,6 +20,7 @@ import {
 	type DataPost,
 } from './run-board-state'
 import { run_board_tick } from './run-board-tick'
+import { run_board_worker_limits } from './run-board-worker-limits'
 
 // The live board's side of its worker thread (`run-board-gather-worker.ts`): the worker takes the
 // reads off this machine, steps the GitHub, roster and snapshot data over them, and hands each round
@@ -343,7 +344,10 @@ async function latest_of(thread: Thread): Promise<BoardGather> {
 }
 
 function worker_options(exec_argv: ReadonlyArray<string>): WorkerOptions {
-	return { execArgv: ts_entry_loader.loader_argv(exec_argv) }
+	return {
+		execArgv: ts_entry_loader.loader_argv(exec_argv),
+		resourceLimits: run_board_worker_limits.WORKER_LIMITS,
+	}
 }
 
 // What a worker is started with: the data and the carried sound the last one handed over, and what it
