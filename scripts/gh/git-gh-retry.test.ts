@@ -12,7 +12,10 @@ const OK = 'ok'
 const SERVER_ERROR_STATUS = 503
 const NOT_FOUND_STATUS = 404
 
-function gh_error(message: string, status?: number, cause: unknown = {}): Error {
+function gh_error(
+	message: string,
+	{ status, cause = {} }: { status?: number; cause?: unknown } = {},
+): Error {
 	return gh_failure.attach(new Error(message, { cause }), { status })
 }
 
@@ -68,7 +71,7 @@ describe('gh_retry.with_retry', () => {
 	})
 
 	it('does not retry a 4xx', async () => {
-		const not_found = gh_error('gh: Not Found (HTTP 404)', NOT_FOUND_STATUS)
+		const not_found = gh_error('gh: Not Found (HTTP 404)', { status: NOT_FOUND_STATUS })
 		const request = failing_then([not_found])
 		const recorded = hooks()
 
@@ -99,7 +102,7 @@ describe('gh_retry.with_retry — a spent retry', () => {
 
 describe('gh_retry.is_transient', () => {
 	it('reads a 5xx from the error document', () => {
-		expect(is_transient(gh_error('gh: failed', SERVER_ERROR_STATUS))).toBe(true)
+		expect(is_transient(gh_error('gh: failed', { status: SERVER_ERROR_STATUS }))).toBe(true)
 	})
 
 	it("reads a 5xx from gh's summary line when the body is not GitHub's document", () => {
@@ -114,7 +117,7 @@ describe('gh_retry.is_transient', () => {
 		const answered = Object.assign(new Error('failed'), { stdout: '{"errors":[{"message":"x"}]}' })
 
 		expect(
-			is_transient(gh_error('GraphQL: x (enablePullRequestAutoMerge)', undefined, answered)),
+			is_transient(gh_error('GraphQL: x (enablePullRequestAutoMerge)', { cause: answered })),
 		).toBe(false)
 	})
 
@@ -123,13 +126,13 @@ describe('gh_retry.is_transient', () => {
 	})
 
 	it('does not retry a timed-out request', () => {
-		expect(is_transient(gh_error('gh request timed out', undefined, { timedOut: true }))).toBe(
+		expect(is_transient(gh_error('gh request timed out', { cause: { timedOut: true } }))).toBe(
 			false,
 		)
 	})
 
 	it('does not retry a request gh refused for want of authentication', () => {
-		expect(is_transient(gh_error('gh auth login', undefined, { exitCode: 4 }))).toBe(false)
+		expect(is_transient(gh_error('gh auth login', { cause: { exitCode: 4 } }))).toBe(false)
 	})
 
 	it('does not retry an error gh never answered with', () => {

@@ -159,8 +159,7 @@ function comment_only(
 async function inert_since(
 	base: string,
 	paths: ReadonlyArray<string>,
-	root?: string,
-	api?: TypeScriptApi,
+	{ root, api }: { root?: string; api?: TypeScriptApi } = {},
 ): Promise<ReadonlyArray<string>> {
 	const checkout = root ?? (await git_command.repository_root())
 	const typescript = api ?? load_typescript(checkout)

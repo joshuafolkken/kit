@@ -29,6 +29,6 @@ describe('investigator foreground on the first dispatch', () => {
 		vi.stubEnv('CLAUDE_CODE_ENTRYPOINT', entrypoint)
 		writeFileSync(transcript, '')
 
-		expect(delivered_rules.delivery(JSON.stringify(payload))).toBe(expected)
+		expect(delivered_rules.delivery(JSON.stringify(payload), Date.now())).toBe(expected)
 	})
 })

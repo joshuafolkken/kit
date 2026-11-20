@@ -44,7 +44,7 @@ beforeEach(() => {
 
 describe('the branch lookup through the ETag layer', () => {
 	it('answers the same number from the kept listing when the next process is answered 304', async () => {
-		stub(pr_routes())
+		stub(pr_routes({}))
 		await expect(git_gh_pr_read.pr_get_number(PR_BRANCH)).resolves.toBe(PR_NUMBER)
 		forget_pr_numbers()
 
