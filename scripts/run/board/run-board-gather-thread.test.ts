@@ -1,7 +1,6 @@
 import { stripVTControlCharacters } from 'node:util'
 import { serialize } from 'node:v8'
 import { launch_timing } from '#scripts/lane/launch-timing'
-import { ts_entry_loader } from '#scripts/run/ts-entry-loader'
 import { describe, expect, it, vi } from 'vitest'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_gather, type GatherState } from './run-board-gather'
@@ -17,6 +16,8 @@ import {
 import type { CueName } from './run-board-sound-cues'
 import type { BoardGather } from './run-board-state'
 import { run_board_tick } from './run-board-tick'
+import { run_board_worker_entry } from './run-board-worker-entry'
+import { run_board_worker_limits } from './run-board-worker-limits'
 
 // joshuafolkken/kit#4267: a live board's reads come from a worker thread; a redraw draws the last round
 // it handed over, and a worker that dies is said on the board and started again on the next redraw.
@@ -60,17 +61,14 @@ interface Fake extends GatherWorker {
 }
 
 describe('run_board_gather_thread.worker_options', () => {
-	it('adds the loader for a dist-launched parent with no loader flags', () => {
-		expect(worker_options([]).execArgv).toStrictEqual([
-			ts_entry_loader.IMPORT_FLAG,
-			ts_entry_loader.loader_url(),
-		])
-	})
+	it('starts the worker with the launch flags and its heap limits', () => {
+		const flags = ['--trace-warnings']
+		const launch = run_board_worker_entry.launch_of(true, flags)
 
-	it('keeps an existing parent loader without adding it twice', () => {
-		const exec_argv = [ts_entry_loader.IMPORT_FLAG, ts_entry_loader.loader_url()]
-
-		expect(worker_options(exec_argv).execArgv).toStrictEqual(exec_argv)
+		expect(worker_options(launch)).toStrictEqual({
+			execArgv: flags,
+			resourceLimits: run_board_worker_limits.WORKER_LIMITS,
+		})
 	})
 })
 
@@ -114,8 +112,10 @@ describe('run_board_gather_thread.worker_gatherer over spawner', () => {
 
 		worker.emit('message', POST)
 		await first
-		expect(worker_spawn).toHaveBeenCalledWith(run_board_gather_thread.WORKER_URL, {
-			...worker_options(process.execArgv),
+		const launch = run_board_worker_entry.launch_of(false, process.execArgv)
+
+		expect(worker_spawn).toHaveBeenCalledWith(launch.url, {
+			...worker_options(launch),
 			env: run_board_gather_record.worker_environment(setup),
 			workerData: worker_data,
 		})

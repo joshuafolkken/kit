@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { run_board_gather_thread } from './run-board-gather-thread'
+import { run_board_worker_entry } from './run-board-worker-entry'
 import { run_board_worker_limits } from './run-board-worker-limits'
 
 // joshuafolkken/kit#8343: the live board's gather worker is started under a heap cap taken from the
@@ -19,6 +20,8 @@ describe('run_board_worker_limits.WORKER_LIMITS', () => {
 
 describe('run_board_gather_thread.worker_options under the heap cap', () => {
 	it('starts the worker with the heap cap', () => {
-		expect(worker_options([]).resourceLimits).toBe(WORKER_LIMITS)
+		const launch = run_board_worker_entry.launch_of(true, [])
+
+		expect(worker_options(launch).resourceLimits).toBe(WORKER_LIMITS)
 	})
 })

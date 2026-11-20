@@ -1,6 +1,6 @@
 import { Worker, type WorkerOptions } from 'node:worker_threads'
+import { bundle_flag } from '#scripts/build/bundle-flag'
 import { launch_timing, type TimedPhase } from '#scripts/lane/launch-timing'
-import { ts_entry_loader } from '#scripts/run/ts-entry-loader'
 import { run_board_data } from './run-board-data'
 import { run_board_display, type BoardDisplay, type Carried } from './run-board-display'
 import {
@@ -20,6 +20,7 @@ import {
 	type DataPost,
 } from './run-board-state'
 import { run_board_tick } from './run-board-tick'
+import { run_board_worker_entry, type WorkerLaunch } from './run-board-worker-entry'
 import { run_board_worker_limits } from './run-board-worker-limits'
 
 // The live board's side of its worker thread (`run-board-gather-worker.ts`): the worker takes the
@@ -29,7 +30,7 @@ import { run_board_worker_limits } from './run-board-worker-limits'
 // the board, and started again on the next redraw from the data it last handed — there is no other
 // place the reads are taken.
 
-const WORKER_URL = new URL('run-board-gather-worker.ts', import.meta.url)
+const { launch_of } = run_board_worker_entry
 const EMPTY_READ = run_board_gather.read_of(run_board_gather.FRESH_GATHER)
 const WORKER_PHASE = 'worker: first answer'
 const { assemble_display } = run_board_display
@@ -343,11 +344,8 @@ async function latest_of(thread: Thread): Promise<BoardGather> {
 	})
 }
 
-function worker_options(exec_argv: ReadonlyArray<string>): WorkerOptions {
-	return {
-		execArgv: ts_entry_loader.loader_argv(exec_argv),
-		resourceLimits: run_board_worker_limits.WORKER_LIMITS,
-	}
+function worker_options(launch: WorkerLaunch): WorkerOptions {
+	return { execArgv: launch.exec_argv, resourceLimits: run_board_worker_limits.WORKER_LIMITS }
 }
 
 // What a worker is started with: the data and the carried sound the last one handed over, and what it
@@ -361,9 +359,10 @@ interface WorkerSeed {
 function spawner(setup: RecordSetup): Spawn {
 	return (seed) => {
 		const worker_data: WorkerSeed = { seed, setup }
+		const launch = launch_of(bundle_flag.is_bundled(), process.execArgv)
 
-		return new Worker(WORKER_URL, {
-			...worker_options(process.execArgv),
+		return new Worker(launch.url, {
+			...worker_options(launch),
 			env: run_board_gather_record.worker_environment(setup),
 			workerData: worker_data,
 		})
@@ -405,7 +404,6 @@ function worker_gatherer(
 }
 
 const run_board_gather_thread = {
-	WORKER_URL,
 	first_round,
 	gather_round,
 	post_of,

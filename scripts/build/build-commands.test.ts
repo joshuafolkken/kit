@@ -1,13 +1,15 @@
 import { spawnSync } from 'node:child_process'
-import { mkdirSync, readdirSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { josh_in_process } from '#scripts/josh/josh-in-process'
 import { josh_logic } from '#scripts/josh/josh-logic'
+import { run_board_worker_entry } from '#scripts/run/board/run-board-worker-entry'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { build_commands, bundled_scripts } from './build-commands'
+import { bundle_flag } from './bundle-flag'
 import { COMMANDS_TEST_PREFIX } from './distribution-scratch-fixture'
 import { hook_bundle_stamp } from './hook-bundle-stamp'
 import { SCRIPTS_DIR } from './import-closure-fixture'
@@ -19,6 +21,9 @@ const DOC_SECTION_SCRIPT = 'scripts/document/document-section-main.ts'
 const SECTION_ARGUMENTS = ['CLAUDE.md', 'Communication']
 const SECTION_HEADING = '## Communication'
 const CHUNK_PREFIX = 'chunk-'
+// A run-time read of the variable the build replaces with a constant (`bundle-flag.ts`) — the define's
+// own key may still ride along as a string, never as a comparison.
+const BUNDLED_READ = /process\.env(?:\.JOSH_BUNDLED|\[["']JOSH_BUNDLED["']\])\s*===/u
 
 // A private directory at the same depth as `dist/commands`, so a module that finds the package from
 // its own `import.meta.url` resolves the same root, and a `pnpm build` running beside this suite never
@@ -88,6 +93,19 @@ describe('every script command is pre-built', () => {
 		)
 
 		expect(new Set(outputs).size).toBe(outputs.length)
+	})
+
+	// joshuafolkken/kit#8344: the live board's worker thread starts from its own bundle.
+	it('builds the live board worker beside the commands', () => {
+		expect(existsSync(bundle_of(run_board_worker_entry.WORKER_SCRIPT))).toBe(true)
+	})
+
+	it('reads as bundled inside the build, and as source here', () => {
+		const bundles = readdirSync(out_directory).filter((name) => name.endsWith('.js'))
+		const texts = bundles.map((name) => readFileSync(path.join(out_directory, name), 'utf8'))
+
+		expect(texts.some((text) => BUNDLED_READ.test(text))).toBe(false)
+		expect(bundle_flag.is_bundled()).toBe(false)
 	})
 
 	it('moves the code the commands share into chunks beside them', () => {
