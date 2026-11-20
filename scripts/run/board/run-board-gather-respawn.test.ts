@@ -17,6 +17,7 @@ const { FIRST_ROUND, LOCAL, START, harness, plan_titled, round_ports } = run_boa
 const { first_round, gather_round, worker_gatherer } = run_board_gather_thread
 const { FRESH_DATA, FRESH_STATE } = run_board_state
 const THANKS = [{ name: 'reviewer', url: undefined }]
+const OUT_OF_MEMORY = 'ERR_WORKER_OUT_OF_MEMORY'
 
 interface Fake extends GatherWorker {
 	emit: (event: string, value?: unknown) => void
@@ -81,6 +82,22 @@ describe('run_board_gather_thread.worker_gatherer over a worker started again', 
 		await gather('background')
 
 		expect(seeds).toStrictEqual([undefined, { data: post.data, carried: post.display?.carried }])
+	})
+
+	// joshuafolkken/kit#8343: a worker past its heap cap errors with ERR_WORKER_OUT_OF_MEMORY, then exits.
+	it('starts a worker that ran out of its heap cap again, from the data last handed over', async () => {
+		const post = await planned_post()
+		const { gather, spawned, seeds } = faked()
+		const first = gather('background')
+
+		spawned[0]?.emit('message', post)
+		await first
+		spawned[0]?.emit('error', Object.assign(new Error('out of memory'), { code: OUT_OF_MEMORY }))
+		spawned[0]?.emit('exit', 1)
+		await gather('background')
+
+		expect(spawned).toHaveLength(2)
+		expect(seeds[1]).toStrictEqual({ data: post.data, carried: post.display?.carried })
 	})
 
 	it('keeps the last data for a post that carries none', async () => {
