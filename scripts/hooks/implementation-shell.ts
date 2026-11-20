@@ -4,6 +4,7 @@ import { shell_segments } from '#scripts/rules/shell-segments'
 import { time_shell } from '#scripts/time-runtime/time-shell'
 import { implementation_shell_deny } from './implementation-shell-deny'
 import { implementation_shell_nested } from './implementation-shell-nested'
+import { implementation_shell_scratch } from './implementation-shell-scratch'
 import { step_zero_notice } from './step-zero-notice'
 
 // A consultation scope's pre-execution check (joshuafolkken/kit#6586): a shell runs unless it makes a
@@ -165,7 +166,16 @@ function call_refusal(segment: string, call: ProgramCall, root: string): Refusal
 	// `pnpm install` reaches here as the program `install`, so a writer still meets the deny-list.
 	const outside = outside_write_refusal(call, root)
 
-	return outside ?? implementation_shell_deny.refusal(segment, { name, args })
+	return (
+		outside ??
+		implementation_shell_scratch.refusal(
+			segment,
+			{ name, args },
+			root,
+			redirected_paths(segment),
+		) ??
+		implementation_shell_deny.refusal(segment, { name, args })
+	)
 }
 
 function body_of(segment: string): string {

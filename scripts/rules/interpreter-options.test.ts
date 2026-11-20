@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { egress_guard } from './egress-guard'
+import { interpreter_options } from './interpreter-options'
 
 describe('shell permissions — stops interpreter options at the script', () => {
 	it.each([
@@ -32,5 +33,18 @@ describe('shell permissions — stops interpreter options at the script', () => 
 		'deno --config config.json run scripts/check.ts --eval fixture',
 	])('allows %j', (command) => {
 		expect(egress_guard.ROW.is_trigger({ name: 'Bash', input: { command } })).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#8262: the script operand is read past options and their values.
+describe('interpreter_options.script_operand', () => {
+	it.each([
+		['node', ['--import', 'x', 'a.mjs', 'b'], 'a.mjs'],
+		['python3', ['-X', 'dev', 'a.py'], 'a.py'],
+		['python3', ['-m', 'json.tool', 'd.json'], 'json.tool'],
+		['bash', ['--', 'a.sh'], 'a.sh'],
+		['node', ['--version'], undefined],
+	])('%s %j runs %s', (name, args, operand) => {
+		expect(interpreter_options.script_operand({ name, args })).toBe(operand)
 	})
 })

@@ -229,6 +229,11 @@ describe('egress_guard.ROW — the delivered reason', () => {
 		expect(egress_guard.EGRESS_REASON).toContain('ask the user to run it')
 	})
 
+	// joshuafolkken/kit#8262: a refused inline script has a scratch route to take instead.
+	it('names scratch:run as the route for a consultation script', () => {
+		expect(egress_guard.EGRESS_REASON).toContain('`pnpm josh scratch:run <path>`')
+	})
+
 	it('fires on a Bash call and not on another tool', () => {
 		expect(egress_guard.ROW.is_trigger({ name: 'Bash', input: { command: LEAK } })).toBe(true)
 		expect(egress_guard.ROW.is_trigger({ name: 'Read', input: { file_path: LEAK } })).toBe(false)
