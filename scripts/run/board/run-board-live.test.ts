@@ -21,6 +21,13 @@ describe('run_board_live.live_of', () => {
 		expect(run_board_live.live_of(undefined)).toStrictEqual({ types_rows: false, trill: false })
 	})
 
+	it('chooses no live effect for a theme the table has no row for', () => {
+		expect(run_board_live.live_of('wargames', {})).toStrictEqual({
+			types_rows: false,
+			trill: false,
+		})
+	})
+
 	it('chooses no live effect where the definition turns them off', () => {
 		const defs = { wargames: { live: { types_rows: false, trill: false } } }
 
