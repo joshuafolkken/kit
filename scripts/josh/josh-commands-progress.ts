@@ -5,6 +5,7 @@ import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types
 // the map keeps its order.
 
 const BOARD_THEME = '--theme wargames'
+const MATRIX_THEME = '--theme matrix'
 
 const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 	'run:progress': {
@@ -58,7 +59,7 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Draw a live board of the running backlogrun, redrawn every second',
 		category: 'AI tools',
 		reference: [
-			`[--once | --chat [--fresh] | --every <minutes>] [${BOARD_THEME}] [--timing]`,
+			`[--once | --chat [--fresh] | --every <minutes>] [--theme wargames|matrix] [--timing]`,
 			'automation',
 			['files', 'network'],
 		],
@@ -76,6 +77,7 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 					note: 'the --chat frame as a 📊 Progress Telegram every 5 minutes, until the run ends',
 				},
 				{ arguments: BOARD_THEME, note: 'cyan phosphor text and dashed rules' },
+				{ arguments: MATRIX_THEME, note: 'green phosphor text and the TRACE gauge' },
 				{ arguments: '--once --timing', note: 'one frame, then how long each phase of it took' },
 			],
 			flags: [
@@ -133,6 +135,11 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 					names: [BOARD_THEME],
 					description:
 						'bursts the lamp panel while a row types (the header’s third line, a section’s new row): the groups of four, each on its own period, all change every 80ms step, back to their periods from the step after typing ends (`run-board-spin.ts`).',
+				},
+				{
+					names: [MATRIX_THEME],
+					description:
+						'draws as `--theme wargames` does, red and amber kept, with uncolored text in green phosphor (`green` without 24-bit color) and `TRACE ■■■■-` in place of `DEFCON`: one more `■` per level nearer 1, blinking red at 1 (`run-board-header-trace.ts`). No opening line, lamps or typed rows.',
 				},
 				{
 					names: ['--timing'],

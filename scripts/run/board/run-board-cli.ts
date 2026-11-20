@@ -39,7 +39,7 @@ const PASSED_ON_FLAGS: ReadonlySet<string> = new Set([CHAT_FLAG, EVERY_FLAG])
 const SIGINT_EXIT_CODE = 130
 const SIGTERM_EXIT_CODE = 143
 const USAGE =
-	'Usage: josh run:board [--once | --chat [--fresh] | --every <minutes>] [--theme wargames] [--timing]'
+	'Usage: josh run:board [--once | --chat [--fresh] | --every <minutes>] [--theme wargames|matrix] [--timing]'
 const DISABLED_NOTICE = `\`${run_progress.DISABLED_KEY}=${run_progress.DISABLED_VALUE}\` is set, so no progress is pushed.`
 const { FRESH_STATE, tick } = run_board_tick
 const { CHAT_KEY, fresh } = run_board_frame_store
