@@ -107,7 +107,7 @@ describe('run_board_spin.spin_to_second with lamps', () => {
 		vi.stubEnv('FORCE_COLOR', '3')
 		const { ports } = lamp_ports(START)
 		const { lamps } = spun(LINES, '⠋', WIDE)
-		const live = run_board_theme.themed({ ...ports, is_themed: undefined }, 'wargames')
+		const live = run_board_theme.themed({ ...ports, theme: undefined }, 'wargames')
 
 		await spin_to_second(turning_of(lamps), live)
 		const kept = run_board_theme.kept_lines()

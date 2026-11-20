@@ -28,7 +28,7 @@ type DrawPorts = Pick<
 	| 'is_tty'
 	| 'form'
 	| 'types_rows'
-	| 'is_themed'
+	| 'theme'
 	| 'size'
 	| 'footer'
 	| 'folded'
@@ -47,7 +47,7 @@ interface Redraw {
 // A run's header, always over its laid-out rows.
 type LaidHeader = BoardHeader & { layout: BoardLayout }
 
-type PortHeader = Pick<BoardHeader, 'form' | 'spinner' | 'is_keyed' | 'is_themed' | 'is_sound_on'>
+type PortHeader = Pick<BoardHeader, 'form' | 'spinner' | 'is_keyed' | 'theme' | 'is_sound_on'>
 
 // What the header reads off the board's own ports: only a live board reads the sound switch.
 function port_header(ports: DrawPorts): PortHeader {
@@ -55,7 +55,7 @@ function port_header(ports: DrawPorts): PortHeader {
 		form: ports.form,
 		spinner: ports.is_tty ? SPOT : undefined,
 		is_keyed: ports.types_rows,
-		is_themed: ports.is_themed,
+		theme: ports.theme,
 		is_sound_on: ports.sound?.(),
 	}
 }

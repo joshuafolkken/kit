@@ -152,9 +152,9 @@ describe('run_board_render.render a queued epic line', () => {
 const { TITLE_MARK, bare, untitled } = run_board_label_pair
 
 function epic_lines(is_themed: boolean): Array<string> {
-	return lines_of(header({ layout: EPIC_LAYOUT, is_themed })).filter(
-		(text) => text.includes('📁') || text.includes('7290'),
-	)
+	return lines_of(
+		header({ layout: EPIC_LAYOUT, theme: is_themed ? 'wargames' : undefined }),
+	).filter((text) => text.includes('📁') || text.includes('7290'))
 }
 
 describe('run_board_render.render a title mark', () => {

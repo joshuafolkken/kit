@@ -27,6 +27,7 @@ import { run_board_render_title } from './run-board-render-title'
 import { run_board_row_key } from './run-board-row-key'
 import type { SeatRead } from './run-board-seat'
 import { run_board_setup } from './run-board-setup'
+import { run_board_theme_defs, type Theme } from './run-board-theme-defs'
 import type { LaneUsages, UsageScale } from './run-board-usage'
 import type { UsualTimes } from './run-board-usual'
 
@@ -132,8 +133,8 @@ interface BoardHeader
 	// Whether each issue row leads its text with its key (`run-board-row-key.ts`) — only where the board
 	// types the rows that appear, so every other frame is drawn as it was.
 	is_keyed?: boolean | undefined
-	// Whether the frame is drawn in a theme, which ends the first line on the alert level.
-	is_themed?: boolean | undefined
+	// The theme the frame is drawn in, whose alert display ends the first line (`run-board-theme-defs.ts`).
+	theme?: Theme | undefined
 	form: BoardForm
 	// The repository the plan was read for, as `owner/repo`; `undefined` before a plan is read.
 	repo: string | undefined
@@ -286,11 +287,13 @@ function saved_part(header: BoardHeader): string | undefined {
 		: `${SAVED_ICON} ${run_board_length.span_of(header.now_ms - plan_saved_ms)}`
 }
 
-// The alert level a themed screen ends the progress line on (`run-board-header-defcon.ts`).
-function defcon_part(header: BoardHeader): string | undefined {
-	if (header.is_themed !== true || header.form !== 'screen') return undefined
+// The alert level a themed screen ends the progress line on, drawn as the theme's row says.
+function alert_part(header: BoardHeader): string | undefined {
+	if (header.theme === undefined || header.form !== 'screen') return undefined
 
-	return run_board_header_defcon.field_of(run_board_header_defcon.level_of(header))
+	return run_board_theme_defs.THEME_DEFS[header.theme].alert(
+		run_board_header_defcon.level_of(header),
+	)
 }
 
 // The run's progress, then what its reads are doing, then the alert level.
@@ -302,7 +305,7 @@ function progress_part(counts: BoardCounts, header: BoardHeader): string {
 		warning_of(WORDS.plan, header.plan_failed_ms),
 		warning_of(WORDS.read, header.read_failed_ms, header.read_error),
 		run_board_issue_count.part_of(header.repo, header.issue_count, header.repo_link),
-		defcon_part(header),
+		alert_part(header),
 		saved_part(header),
 	]
 

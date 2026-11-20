@@ -23,6 +23,7 @@ import type { TypingSound } from './run-board-sound-typing'
 import type { Spot } from './run-board-spin'
 import type { Sweep } from './run-board-sweep'
 import type { Thanks } from './run-board-thanks-csv'
+import type { Theme } from './run-board-theme-defs'
 import { run_board_type_rows, type Typing } from './run-board-type-rows'
 
 // What a `run:board` redraw reads through and folds forward, shared by the
@@ -60,8 +61,8 @@ interface BoardPorts {
 	is_tty: boolean
 	// Whether a live board types each issue row that appears, a letter at a time — only in a theme.
 	types_rows?: boolean | undefined
-	// Whether the frame is drawn in a theme (`run-board-theme.ts`), which adds the header's alert level.
-	is_themed?: boolean | undefined
+	// The theme the frame is drawn in (`run-board-theme.ts`), whose alert display the header adds.
+	theme?: Theme | undefined
 	// The terminal a live frame is kept within, read at every redraw so a resized pane is fitted on the
 	// next one; none where the frame is drawn whole — one frame, a pipe, a chat.
 	size?: (() => TerminalSize) | undefined
