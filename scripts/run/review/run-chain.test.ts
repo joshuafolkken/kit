@@ -1,4 +1,5 @@
 import { derive_check } from '#scripts/document/derive-check'
+import { lane_ledger_write_chain_stage } from '#scripts/lane/lane-ledger-write-chain-stage'
 import { describe, expect, it, vi } from 'vitest'
 import { run_chain, type ChainStage, type StageRunner } from './run-chain'
 
@@ -71,6 +72,41 @@ describe('run_chain — a run', () => {
 		expect(runner).not.toHaveBeenCalled()
 		expect(hold).toHaveBeenCalledWith(ISSUE)
 		expect(chain.stop?.notice).toBe('held')
+	})
+})
+
+// joshuafolkken/kit#8286: a ledger line per stage as it ends, the stopped stage's included.
+describe('run_chain — the chain-stage ledger lines', () => {
+	it('appends one chain-stage line as each stage ends, the stopped one marked stopped', async () => {
+		const record = vi
+			.spyOn(lane_ledger_write_chain_stage, 'record_chain_stage')
+			.mockResolvedValue(undefined)
+		const runner = vi.fn<StageRunner>(async (argv) => ({
+			code: argv[0] === CHECK_RELATED ? STOP_EXIT : 0,
+			out: '',
+		}))
+
+		await run_chain.run_stages(run_chain.review_stages([], false), ISSUE, vi.fn(), runner)
+
+		expect(record.mock.calls.map(([line]) => [line.issue, line.name, line.result])).toStrictEqual([
+			[Number(ISSUE), SELFCHECK, 'passed'],
+			[Number(ISSUE), CHECK_RELATED, 'stopped'],
+		])
+		expect(record.mock.calls.every(([line]) => !Number.isNaN(Date.parse(line.at)))).toBe(true)
+		record.mockRestore()
+	})
+
+	it('marks a stage stopped on a hold, though it exited 0', async () => {
+		const record = vi
+			.spyOn(lane_ledger_write_chain_stage, 'record_chain_stage')
+			.mockResolvedValue(undefined)
+		const hold = vi.fn(async () => ({ notice: 'on hold', next: () => '' }))
+		const stage: ChainStage = { name: RUN_REVIEW, argv: [], next: () => '', hold }
+
+		await run_chain.run_stages([stage], ISSUE, vi.fn())
+
+		expect(record.mock.calls.map(([line]) => line.result)).toStrictEqual(['stopped'])
+		record.mockRestore()
 	})
 
 	it('opens the stop report with the invocation, not an Issue citation', () => {

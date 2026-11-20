@@ -1,6 +1,7 @@
 import { derive_check } from '#scripts/document/derive-check'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import type { ChainRefusal, ChainStageEntry } from '#scripts/lane/lane-ledger-schema-ship'
+import { lane_ledger_write_chain_stage } from '#scripts/lane/lane-ledger-write-chain-stage'
 import { run_ship_pre_detach } from '#scripts/run/ship/run-ship-pre-detach'
 import { test_related_caller } from '#scripts/test/test-related-caller'
 
@@ -59,6 +60,11 @@ interface ChainStop {
 interface ChainRun {
 	stop?: ChainStop
 	stages: ReadonlyArray<ChainStageEntry>
+}
+
+interface TimedStage {
+	entry: ChainStageEntry
+	stop: ChainStop | undefined
 }
 
 type StageRunner = (argv: ReadonlyArray<string>) => Promise<JoshResult>
@@ -209,8 +215,30 @@ async function run_stage(
 	return await held(stage, issue)
 }
 
-// Each stage that ran, the stopped one included, timed from its start through its hold, so the ledger
-// line shows where a long run spent its time (joshuafolkken/kit#7736).
+// One stage run and timed from its start through its hold, its `chain-stage` ledger line appended as it
+// ends, so a run killed or stopped part way still leaves the stages it finished (joshuafolkken/kit#8286).
+async function timed_stage(
+	stage: ChainStage,
+	issue: string,
+	print: Print,
+	run: StageRunner,
+): Promise<TimedStage> {
+	const started_ms = Date.now()
+	const stop = await run_stage(stage, issue, print, run)
+	const entry = {
+		name: stage.name,
+		at: new Date(started_ms).toISOString(),
+		elapsed_ms: Date.now() - started_ms,
+	}
+	const result = stop === undefined ? 'passed' : 'stopped'
+
+	await lane_ledger_write_chain_stage.record_chain_stage({ issue: Number(issue), ...entry, result })
+
+	return { entry, stop }
+}
+
+// Each stage that ran, the stopped one included, so the run's `chain` line shows where a long run
+// spent its time (joshuafolkken/kit#7736).
 async function run_stages(
 	stages: ReadonlyArray<ChainStage>,
 	issue: string,
@@ -220,15 +248,10 @@ async function run_stages(
 	const timed: Array<ChainStageEntry> = []
 
 	for (const stage of stages) {
-		const started_ms = Date.now()
 		// eslint-disable-next-line no-await-in-loop -- each stage runs on the tree the earlier ones left
-		const stop = await run_stage(stage, issue, print, run)
+		const { entry, stop } = await timed_stage(stage, issue, print, run)
 
-		timed.push({
-			name: stage.name,
-			at: new Date(started_ms).toISOString(),
-			elapsed_ms: Date.now() - started_ms,
-		})
+		timed.push(entry)
 		if (stop !== undefined) return { stop, stages: timed }
 	}
 
