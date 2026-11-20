@@ -38,6 +38,8 @@ describe('stop_rules.stop_outcome — concise reply', () => {
 	it('sends back a drifted reply for its language first', () => {
 		const drifted = context({ message: LONG_REPLY, session_lang: 'ja' })
 
-		expect(stop_rules.stop_outcome(drifted).reason).toBe(stop_rules.build_language_reason('ja'))
+		const { reason } = stop_rules.stop_outcome(drifted)
+
+		expect(reason?.startsWith(stop_rules.build_language_reason('ja'))).toBe(true)
 	})
 })

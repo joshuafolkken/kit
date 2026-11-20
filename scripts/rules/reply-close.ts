@@ -86,7 +86,7 @@ const ROW: MeasuredRule = {
 		fires:
 			'a reply whose last paragraph has no `次の一手:` / `Next:` line and no `このセッションのやり残しはない` / `Nothing left in this session` line. Blocks the stop',
 		quiet:
-			'a reply with a `Recommended:` decision, a fixed output in a code block, a held stop with no decision (its own refusal asks for the close), no prompt of the person’s on the transcript tail, a lane child, or a headless session',
+			'a reply with a `Recommended:` decision, a reply that is only a code block (a fixed output), a held stop with no decision (its own refusal asks for the close), no prompt of the person’s on the transcript tail, or an unattended session (headless, a lane child, the backlogrun parent)',
 	},
 }
 

@@ -237,13 +237,11 @@ function language_reason(context: StopContext): string | undefined {
 	return build_language_reason(context.session_lang)
 }
 
-// **A reply's narrative over the limit is sent back once to be shortened** — `concise-reply.ts`. The
-// loop-breaker lets the rewrite stop unchecked, so a missing close is asked for in the same refusal.
+// **A reply's narrative over the limit is sent back once to be shortened** — `concise-reply.ts`.
 function concise_reason(context: StopContext): string | undefined {
 	if (!concise_reply.is_over(context.message, context.prompt)) return undefined
-	const { message, prompt, session_lang } = context
 
-	return `${concise_reply.build_reason(message)}${reply_close.note_of(message, prompt, session_lang)}`
+	return concise_reply.build_reason(context.message)
 }
 
 // The sessions no person answers: one kit launched under `claude -p` (a lane child, a woken session), a
@@ -296,17 +294,28 @@ function needs_decision(context: StopContext): boolean {
 	return needs_notify(context) && stop_decision.decision_of(context.message) === undefined
 }
 
-// **A reply with no close line is sent back once** — `reply-close.ts`. A lane child reports to its
-// parent, and a held stop's decision refusal already asks for the close.
+// **A reply with no close line is sent back once** — `reply-close.ts`. An unattended session's reply
+// has no person closing the session, and a held stop's decision refusal already asks for the close.
+function is_close_exempt(context: StopContext): boolean {
+	return is_unattended(context) || needs_decision(context)
+}
+
 function close_reason(context: StopContext): string | undefined {
-	if (context.lane_child || needs_decision(context)) return undefined
+	if (is_close_exempt(context)) return undefined
 
 	return reply_close.reason_of(context.message, context.prompt, context.session_lang)
 }
 
-// The rules that read the reply's prose: its language, then its length, then its close.
+// The rules that read the reply's prose: its language, then its length, then its close. The
+// loop-breaker lets a rewrite stop unchecked, so a language or length refusal asks for the close too.
 function prose_reason(context: StopContext): string | undefined {
-	return language_reason(context) ?? concise_reason(context) ?? close_reason(context)
+	const reason = language_reason(context) ?? concise_reason(context)
+	if (reason === undefined) return close_reason(context)
+	const { message, prompt, session_lang } = context
+
+	return is_close_exempt(context)
+		? reason
+		: `${reason}${reply_close.note_of(message, prompt, session_lang)}`
 }
 
 function needs_release(context: StopContext): boolean {
