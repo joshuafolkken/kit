@@ -1,4 +1,4 @@
-import { open, readdir, stat } from 'node:fs/promises'
+import { readdir, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { agent_provider } from '#scripts/agent/agent-provider'
 import { codex_home_source } from '#scripts/agent/codex-home-source'
@@ -285,21 +285,22 @@ function is_claude_launch(text: string): boolean {
 // Whether a log's last launch ran Claude, by its path and `mtime`: once per write, off its tail.
 const CLAUDE_LAUNCHES = new Map<string, { mtime_ms: number; is_claude: boolean }>()
 
-function read_claude_launch(file: QuotaFile): boolean {
+async function read_claude_launch(file: QuotaFile): Promise<boolean> {
 	const known = CLAUDE_LAUNCHES.get(file.path)
 
 	if (known?.mtime_ms === file.mtime_ms) return known.is_claude
 
-	const is_claude = is_claude_launch(transcript_tail.read_tail_holding(file.path, LAUNCH_HEADERS))
+	const header = await transcript_tail.last_line_matching(file.path, LAUNCH_HEADERS)
+	const is_claude = is_claude_launch(header ?? '')
 
 	CLAUDE_LAUNCHES.set(file.path, { mtime_ms: file.mtime_ms, is_claude })
 
 	return is_claude
 }
 
-function claude_log(file: QuotaFile): Array<QuotaFile> {
+async function claude_log(file: QuotaFile): Promise<Array<QuotaFile>> {
 	try {
-		return read_claude_launch(file) ? [file] : []
+		return (await read_claude_launch(file)) ? [file] : []
 	} catch {
 		return []
 	}
@@ -317,7 +318,8 @@ async function claude_files(
 
 	for (const file of scanned) {
 		if (claude.length >= limit) break
-		claude.push(...claude_log(file))
+		// eslint-disable-next-line no-await-in-loop -- Stop reading headers as soon as enough Claude logs are found.
+		claude.push(...(await claude_log(file)))
 	}
 
 	return claude
@@ -356,20 +358,6 @@ async function codex_files(
 
 async function read_tail(file: string, bytes: number = TAIL_BYTES): Promise<string> {
 	return transcript_tail.read_tail(file, bytes)
-}
-
-// The first `bytes` of `file`; only the bytes read are decoded.
-async function read_head(file: string, bytes: number = TAIL_BYTES): Promise<string> {
-	const handle = await open(file, 'r')
-
-	try {
-		const buffer = Buffer.alloc(bytes)
-		const { bytesRead: read } = await handle.read(buffer, 0, bytes, 0)
-
-		return buffer.subarray(0, read).toString('utf8')
-	} finally {
-		await handle.close()
-	}
 }
 
 // Whether a tail of `bytes` ends the widening: it found a reading, held the whole file, or reached the limit.
@@ -411,7 +399,7 @@ const run_board_quota_read = {
 	codex_heads,
 	codex_lane: run_board_quota_lane.codex_lane,
 	codex_reading,
-	read_head,
+	read_head: transcript_tail.read_head,
 	line_stamp,
 	read_tail,
 	reading_in,
