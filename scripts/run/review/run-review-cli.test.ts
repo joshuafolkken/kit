@@ -52,7 +52,7 @@ describe('JOIN_HINT', () => {
 
 	// joshuafolkken/kit#4863: the brief travels by path, so the review phase is read off the prompt.
 	it('prints a launch prompt the review-phase timer reads as a review', () => {
-		const prompt = run_ship_review.round_one_opening('/briefs/brief.md')
+		const prompt = run_ship_review.round_one_opening('/briefs/brief.md', 'initial')
 
 		expect(time_markers.tool_marker('Agent', { prompt })).toBe(time_markers.REVIEW_MARKER)
 	})

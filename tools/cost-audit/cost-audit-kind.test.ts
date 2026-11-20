@@ -6,7 +6,7 @@ import { cost_audit_kind } from './cost-audit-kind'
 const REVIEW_PROMPT = 'Run a /code-review of this checkout'
 // joshuafolkken/kit#4863: the prompt `josh run:review` prints beside a brief file, which the brief no
 // longer travels in.
-const BRIEF_FILE_PROMPT = run_ship_review.round_one_opening('/briefs/brief.md')
+const BRIEF_FILE_PROMPT = run_ship_review.round_one_opening('/briefs/brief.md', 'initial')
 // joshuafolkken/kit#6898: a `josh run:handoff` child opens with its keyword, and the wording an earlier
 // preamble used still names the same origin.
 const HANDOFF_PROMPT = run_handoff_launch.prompt_of(
