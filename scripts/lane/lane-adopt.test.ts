@@ -86,8 +86,8 @@ function ports_of(overrides: Partial<AdoptPorts> = {}): AdoptPorts {
 }
 
 // Adopt with `ports`, assert nothing was written, and answer why the lane was left.
-async function left_by(ports: AdoptPorts, records = NO_RECORDS, lane = LANE): Promise<string> {
-	const adoption = await lane_adopt.adopt(lane, records, ports)
+async function left_by(ports: AdoptPorts, lane = LANE): Promise<string> {
+	const adoption = await lane_adopt.adopt(lane, NO_RECORDS, ports)
 
 	expect(ports.record).not.toHaveBeenCalled()
 
@@ -174,9 +174,7 @@ describe('lane_adopt.adopt — nothing guessed', () => {
 	})
 
 	it('leaves a stranded lane', async () => {
-		expect(await left_by(ports_of(), NO_RECORDS, { ...LANE, is_stranded: true })).toBe(
-			'its work tree is gone',
-		)
+		expect(await left_by(ports_of(), { ...LANE, is_stranded: true })).toBe('its work tree is gone')
 	})
 })
 

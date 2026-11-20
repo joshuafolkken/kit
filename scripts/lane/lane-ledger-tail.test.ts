@@ -245,7 +245,7 @@ describe('lane_ledger_tail.window_store on a growing ledger', () => {
 	})
 
 	it('returns the kept entries of the window, oldest first', () => {
-		const store = lane_ledger_tail.window_store(is_odd)
+		const store = lane_ledger_tail.window_store({ is_kept: is_odd })
 
 		expect(store.read(days_ledger('window-store'), since(1))).toStrictEqual([
 			merge_on(1),

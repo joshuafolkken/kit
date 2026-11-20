@@ -81,7 +81,7 @@ function mark_stop_at(
 function take_over(target: string, issue: string, mark: HoldMark): boolean {
 	run_hold.release_hold(target)
 
-	return run_hold.create_hold(target, issue, new Date(), mark)
+	return run_hold.create_hold(target, issue, mark)
 }
 
 // **A fix round re-opens the stop** (`run:hold <N> --halfrun-round`, joshuafolkken/kit#7494): the person

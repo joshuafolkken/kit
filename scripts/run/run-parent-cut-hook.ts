@@ -122,7 +122,7 @@ function is_exempt(raw_payload: string): boolean {
  */
 async function parent_cut_reason(
 	raw_payload: string,
-	now_ms: number = Date.now(),
+	now_ms: number,
 	state: ParentCutState = current_state(),
 ): Promise<string | undefined> {
 	if (is_exempt(raw_payload)) return undefined
