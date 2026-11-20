@@ -11,6 +11,7 @@ import { cost_audit_result, type ResultBreakdown } from './cost-audit-result'
 import { cost_audit_resume, type TriggerRow } from './cost-audit-resume'
 import { cost_audit_rewrite, type Rewrites } from './cost-audit-rewrite'
 import { cost_audit_sequence, type Sequences } from './cost-audit-sequence'
+import { cost_audit_session_count, type SessionCounts } from './cost-audit-session-count'
 import { cost_audit_spend, type ModelSpend } from './cost-audit-spend'
 import { cost_audit_tool } from './cost-audit-tool'
 import { cost_audit_usage, type UsageBreakdown } from './cost-audit-usage'
@@ -50,6 +51,8 @@ interface AuditRow {
 	is_regression: boolean
 	// The current period's spend per model, on the session-kind rows (joshuafolkken/kit#6913).
 	models?: ReadonlyArray<ModelSpend>
+	// Each period's session count, on the session-kind rows (joshuafolkken/kit#8329).
+	sessions?: SessionCounts
 }
 
 interface LaneDensity {
@@ -233,17 +236,22 @@ function records_by_kind(sessions: ReadonlyArray<AuditSession>): Map<string, Arr
 	return records
 }
 
-// The kind rows, each carrying its current-period requests' spend per model and token type.
+// The kind rows, each carrying its current-period requests' spend per model and token type, and each
+// period's session count.
 function kind_rows(
-	current: PeriodCost,
-	previous: PeriodCost,
-	cut: ReadonlyArray<AuditSession>,
+	input: AuditInput,
+	costs: { current: PeriodCost; previous: PeriodCost },
+	windows: { current: AuditWindow; previous: AuditWindow },
 ): Array<AuditRow> {
+	const cut = inside(input.sessions, windows.current)
 	const records = records_by_kind(cut)
+	const current = cost_audit_session_count.counts_by_kind(cut)
+	const previous = cost_audit_session_count.counts_by_kind(inside(input.sessions, windows.previous))
 
-	return rows_of(current.kinds, previous.kinds).map((kind) => ({
+	return rows_of(costs.current.kinds, costs.previous.kinds).map((kind) => ({
 		...kind,
 		models: cost_audit_spend.spend_of(records.get(kind.key) ?? []),
+		sessions: { current: current.get(kind.key) ?? 0, previous: previous.get(kind.key) ?? 0 },
 	}))
 }
 
@@ -326,7 +334,11 @@ function audit(input: AuditInput): Audit {
 		total: row('total', current.total, previous.total),
 		merges: input.merges,
 		per_merge: per_merge(current, previous, input.merges),
-		kinds: kind_rows(current, previous, inside(input.sessions, current_window)),
+		kinds: kind_rows(
+			input,
+			{ current, previous },
+			{ current: current_window, previous: previous_window },
+		),
 		tools: rows_of(current.tools, previous.tools),
 		guards: rows_of(current.guards, previous.guards),
 		rewrites: rewrites(input, current_window, previous_window),

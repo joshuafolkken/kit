@@ -281,14 +281,13 @@ const FULLRUN_LINE = '  fullrun: $9.0000 (prev $12.0000, -25.0%)'
 describe('cost_audit_format.report_lines — the session kinds by model', () => {
 	it('prints each model of a session kind under it with its dollars by token type', () => {
 		const models = [{ model: OPUS, input: 4, cache_read: 2, cache_write: 1, output: 2 }]
+		const sessions = { current: 3, previous: 0 }
 		const lines = cost_audit_format.report_lines(
-			audit_with({ kinds: [{ ...row('fullrun', 9, 12), models }] }),
+			audit_with({ kinds: [{ ...row('fullrun', 9, 12), models, sessions }] }),
 		)
-		const kind = lines.indexOf(FULLRUN_LINE)
+		const kind = lines.indexOf(`${FULLRUN_LINE} · 3 session(s) (prev 0)`)
 
-		expect(lines[kind - 1]).toBe(
-			'By session kind (this period per model: cost — input / cache read / cache write / output in dollars)',
-		)
+		expect(lines[kind - 1]).toMatch(/^By session kind \(cost · sessions · cost per session/u)
 		expect(lines[kind + 1]).toBe(
 			'    claude-opus-4-6: $9.0000 — $4.0000 / $2.0000 / $1.0000 / $2.0000',
 		)
