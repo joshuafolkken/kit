@@ -376,9 +376,9 @@ async function pre_detach_checks(
 // supervisor. Only the slow stages go to the supervisor, which re-asks the preflight itself. The fast
 // checks (`run-ship-pre-detach.ts`) follow it here for the same reason; they are not a stage, so the
 // supervisor's gate runs them again rather than passing over them. They run even when the preflight
-// refused, so one ship reports every failure there is to fix (joshuafolkken/kit#4305); the preflight's
-// refusal still comes before its own scoped pair, the one heavy check here beside a `--review` ship's
-// `test:pinned`.
+// refused, so one ship reports every failure there is to fix (joshuafolkken/kit#4305); the refusal still
+// comes before its scoped pair, the one heavy check here beside a `--review` ship's `test:pinned` — left
+// to the sync's merged tree, which stops on its red, when the default branch moved (kit#8304).
 //
 // **The refusal is printed last**: a lane child reading the report through `tail` saw only the red
 // metrics or type check after it, fixed those, and shipped into the same refusal again — every repeated
