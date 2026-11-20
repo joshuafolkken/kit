@@ -100,6 +100,8 @@ interface AuditInput {
 	merges: MergeCounts | undefined
 	// Each lane's stages by its Issue, for the phase table; absent, every lane request is unattributed.
 	breakdowns?: ReadonlyMap<number, Breakdown>
+	// The Issues the lane ledger records a merge of; absent, the ledger could not be read.
+	merged_issues?: ReadonlySet<number> | undefined
 }
 
 interface PeriodCost {
