@@ -296,11 +296,12 @@ describe('a lane child — the Stop hook wait is the one form, and nothing refus
 		},
 	)
 
-	it('names in the Stop hook reason the same wait the rule reads as a wait timer', () => {
+	it('names in the Stop hook reason the one blocking wait, not a sleep the rule reads as a timer', () => {
 		const wait = lane_background.LANE_AGENT_WAIT
 
 		expect(lane_background.LANE_AGENT_STOP_REASON).toContain(`\`${wait}\``)
-		expect(early_heartbeat.is_wait_timer(wait)).toBe(true)
+		expect(lane_background.LANE_AGENT_STOP_REASON).not.toContain('sleep 20')
+		expect(early_heartbeat.is_wait_timer(wait)).toBe(false)
 	})
 })
 

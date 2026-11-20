@@ -194,7 +194,7 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 			fires:
 				'a `Bash` whose only purpose is waiting (`sleep` alone, or `echo` / `:` / `date`) while a timer is live or before the interval. Every occurrence',
 			quiet:
-				"no hand-made wait timer — `run:progress` holds the one clock; a dispatched lane child, which runs no watcher and waits with the Stop hook's `sleep 20`",
+				"no hand-made wait timer — `run:progress` holds the one clock; a dispatched lane child, which runs no watcher and waits with the Stop hook's `pnpm josh wait`",
 		},
 	},
 	// Before `run-tail`: whether to commit at all is decided before how to push.
