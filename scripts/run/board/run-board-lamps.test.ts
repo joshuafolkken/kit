@@ -205,3 +205,13 @@ describe('run_board_lamps colors', () => {
 		expect(is_colored()).toBe(false)
 	})
 })
+
+describe('run_board_lamps.look_text (joshuafolkken/kit#8376)', () => {
+	it('draws a strip’s lamps in the panel’s own yellow, red and out', () => {
+		vi.stubEnv('FORCE_COLOR', '3')
+
+		expect(run_board_lamps.look_text('yellow')).toBe(lamp_text(0, true))
+		expect(run_board_lamps.look_text('red')).toBe(lamp_text(PANEL_ROWS.gap, true))
+		expect(run_board_lamps.look_text('out')).toBe(lamp_text(0, false))
+	})
+})
