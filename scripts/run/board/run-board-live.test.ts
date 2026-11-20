@@ -11,6 +11,26 @@ import type { TypingSound } from './run-board-sound-typing'
 const { LOCAL, STOPPED, harness, plan_titled } = run_board_fixture
 const SCREEN = run_board_screen.screen_of('live')
 
+// joshuafolkken/kit#8360: the live effects are the theme definition's, not whether a theme is given.
+describe('run_board_live.live_of', () => {
+	it('reads the rows typed and the trill from the wargames definition', () => {
+		expect(run_board_live.live_of('wargames')).toStrictEqual({ types_rows: true, trill: true })
+	})
+
+	it('chooses no live effect with no theme', () => {
+		expect(run_board_live.live_of(undefined)).toStrictEqual({ types_rows: false, trill: false })
+	})
+
+	it('chooses no live effect where the definition turns them off', () => {
+		const defs = { wargames: { live: { types_rows: false, trill: false } } }
+
+		expect(run_board_live.live_of('wargames', defs)).toStrictEqual({
+			types_rows: false,
+			trill: false,
+		})
+	})
+})
+
 describe('run_board_live.watch', () => {
 	it('enters the alternate screen first and leaves it last when the redraw stops', async () => {
 		const { ports, frames, leaves } = harness(undefined, [])

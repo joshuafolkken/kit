@@ -1,0 +1,7 @@
+{
+	"reason": "Theme definition gains a live-effect field and the live board reads it instead of a themed flag (#8360)",
+	"date": "2026-11-20",
+	"growth": {
+		"scripts.code_lines": 18
+	}
+}
