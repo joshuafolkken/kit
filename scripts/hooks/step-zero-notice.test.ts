@@ -1,4 +1,5 @@
 import { rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -124,6 +125,29 @@ describe('step_zero_notice — default root', () => {
 		const raw = JSON.stringify({ tool_name: 'Edit', tool_input: { file_path } })
 
 		expect(step_zero_notice.is_runtime_edit(raw)).toBe(true)
+	})
+})
+
+describe('step_zero_notice — the scratch area', () => {
+	it.each(['.josh/tmp/scratch/x/gen.mjs', '/repo/.josh/tmp/scratch/chart.svg'])(
+		'excludes any file in the scratch area: %s',
+		(file_path) => {
+			expect(step_zero_notice.is_runtime_file(file_path, ROOT, true)).toBe(false)
+		},
+	)
+
+	it.each(['.josh/tmp/gen.mjs', '.josh/tmp/scratch/../gen.mjs', '.josh/tmp/scratch-other/gen.mjs'])(
+		'keeps a script outside the scratch area runtime: %s',
+		(file_path) => {
+			expect(step_zero_notice.is_runtime_file(file_path, ROOT, true)).toBe(true)
+		},
+	)
+
+	it('keeps a script under the system temporary directory runtime', () => {
+		// A name of this suite's own, so no concurrent suite shares it.
+		const file_path = path.join(tmpdir(), `${path.basename(make_directory('scratch-'))}-gen.mjs`)
+
+		expect(step_zero_notice.is_runtime_file(file_path, ROOT, true)).toBe(true)
 	})
 })
 
