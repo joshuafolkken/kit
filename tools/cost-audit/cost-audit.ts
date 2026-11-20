@@ -4,9 +4,11 @@ import type { Breakdown } from '#scripts/lane/lane-breakdown'
 import { guard_friction } from '#tools/retrospective/guard-friction'
 import { cost_audit_cause, type CauseRow } from './cost-audit-cause'
 import { cost_audit_density, type Density } from './cost-audit-density'
+import { cost_audit_kind } from './cost-audit-kind'
 import { cost_audit_phase, type PhaseRow } from './cost-audit-phase'
 import type { AuditSession } from './cost-audit-read'
 import { cost_audit_result, type ResultBreakdown } from './cost-audit-result'
+import { cost_audit_resume, type TriggerRow } from './cost-audit-resume'
 import { cost_audit_rewrite, type Rewrites } from './cost-audit-rewrite'
 import { cost_audit_sequence, type Sequences } from './cost-audit-sequence'
 import { cost_audit_spend, type ModelSpend } from './cost-audit-spend'
@@ -76,6 +78,14 @@ interface Audit {
 	results: ResultBreakdown
 	// The current period's Bash command runs and refusal retries (joshuafolkken/kit#7138).
 	sequences: Sequences
+	// The resume sessions by trigger, each period's (joshuafolkken/kit#8311).
+	resumes: ResumeBreakdown
+}
+
+interface ResumeBreakdown {
+	triggers: ReadonlyArray<TriggerRow>
+	// The resume sessions' dollars inside the `implement: review-fix` phase.
+	review_fix: AuditRow
 }
 
 interface AuditInput {
@@ -229,6 +239,31 @@ function phases_inside(input: AuditInput, window: AuditWindow): Array<PhaseRow> 
 	})
 }
 
+function resume_review_fix(input: AuditInput, window: AuditWindow): number {
+	const resumed = input.sessions.filter((session) => session.kind === cost_audit_kind.RESUME)
+	const rows = cost_audit_phase.rows_of({
+		sessions: inside(resumed, window),
+		reviews: input.sessions,
+		breakdowns: input.breakdowns ?? new Map<number, Breakdown>(),
+	})
+
+	return rows.find((one) => one.key === cost_audit_phase.REVIEW_FIX_PHASE)?.usd ?? 0
+}
+
+function resumes(input: AuditInput, current: AuditWindow, previous: AuditWindow): ResumeBreakdown {
+	return {
+		triggers: cost_audit_resume.rows_of(
+			inside(input.sessions, current),
+			inside(input.sessions, previous),
+		),
+		review_fix: row(
+			cost_audit_phase.REVIEW_FIX_PHASE,
+			resume_review_fix(input, current),
+			resume_review_fix(input, previous),
+		),
+	}
+}
+
 // The lane-child density of the requests made inside `window`.
 function density_inside(sessions: ReadonlyArray<AuditSession>, window: AuditWindow): Density {
 	return cost_audit_density.density_of(inside(sessions, window))
@@ -281,6 +316,7 @@ function audit(input: AuditInput): Audit {
 			previous: rewrites_inside(input.sessions, previous_window),
 		},
 		write_causes: write_causes(input.sessions, current_window, previous_window),
+		resumes: resumes(input, current_window, previous_window),
 	}
 }
 
@@ -291,5 +327,5 @@ function since_ms(days: number, now_ms: number): number {
 
 const cost_audit = { DEFAULT_PERIOD_DAYS, MS_PER_DAY, audit, density_inside, since_ms, windows_of }
 
-export type { Audit, AuditRow, AuditWindow, LaneDensity, MergeCounts }
+export type { Audit, AuditRow, AuditWindow, LaneDensity, MergeCounts, ResumeBreakdown }
 export { cost_audit }

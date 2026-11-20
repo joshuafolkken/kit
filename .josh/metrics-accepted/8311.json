@@ -1,0 +1,7 @@
+{
+	"reason": "cost:audit gains the resume-trigger breakdown (#8311): a new cost-audit-resume module and its wiring into read/format",
+	"date": "2026-11-20",
+	"growth": {
+		"scripts.code_lines": 199
+	}
+}

@@ -1,6 +1,7 @@
 import { writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
+import { cost_transcript, type SessionFile } from '#scripts/cost-runtime/cost-transcript'
+import { lane_child_invocation } from '#scripts/lane/lane-child-invocation'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { cost_audit_fixture } from './cost-audit-fixture'
@@ -49,6 +50,15 @@ describe('cost_audit_read.session_of — one transcript read into a session', ()
 		expect(cost_audit_read.session_of(text, false, true).is_lane).toBe(true)
 	})
 
+	// joshuafolkken/kit#8311: only a resume session carries the trigger its prompt names.
+	it('gives a resume session its trigger and a run session none', () => {
+		const outage = lane_child_invocation.outage_resume_invocation('1')
+		const resumed = cost_audit_read.session_of(prompt_line(0, outage), false, true)
+
+		expect(resumed.trigger).toBe('API outage')
+		expect(read.trigger).toBeUndefined()
+	})
+
 	// A delegated review's kind is `review`, not `subagent`, so only the delegation flag keeps it out.
 	it('leaves a delegated unit in a lane transcript directory unmarked', () => {
 		const review = [prompt_line(0, 'Run /code-review'), request_line(1, 'r1', 1, [GREP])].join('\n')
@@ -72,6 +82,14 @@ describe('cost_audit_read.issue_of — the lane a transcript was written under',
 	})
 })
 
+// The store listing `files`, newest first, under the one lane `LANE`.
+function stub_lane_files(files: Array<SessionFile>): void {
+	vi.spyOn(cost_transcript, 'session_cwd').mockReturnValue('/dev/kit')
+	vi.spyOn(cost_transcript, 'transcript_directories').mockReturnValue([])
+	vi.spyOn(cost_transcript, 'list_sessions_across').mockReturnValue(files)
+	vi.spyOn(cost_transcript, 'lane_transcript_directories').mockReturnValue([LANE])
+}
+
 describe('cost_audit_read.load — each session carries its lane', () => {
 	afterEach(() => {
 		vi.restoreAllMocks()
@@ -92,6 +110,24 @@ describe('cost_audit_read.load — each session carries its lane', () => {
 			[undefined, false],
 			[5936, true],
 		])
+	})
+
+	// joshuafolkken/kit#8311: a cut resume is placed by the lane's session before it once all are read.
+	it("places a lane's cut resume by the lane session read before it", () => {
+		const first = { ...MAIN_FILE, session_id: 's2', path: `${LANE}/s2.jsonl`, modified_ms: 1 }
+		const second = { ...first, session_id: 's3', path: `${LANE}/s3.jsonl`, modified_ms: 2 }
+		const cut = { name: 'Bash', input: { command: 'pnpm josh run:cut 5936' } }
+		const texts = new Map([
+			[first.path, [prompt_line(0, FULLRUN_PROMPT), request_line(1, 'r1', 1, [cut])].join('\n')],
+			[second.path, prompt_line(2, lane_child_invocation.resume_invocation('5936'))],
+		])
+
+		stub_lane_files([second, first])
+		vi.spyOn(cost_transcript, 'read_raw').mockImplementation((file) => texts.get(file.path) ?? '')
+
+		const triggers = cost_audit_read.load('/dev/kit', 0).map((one) => one.trigger)
+
+		expect(triggers).toStrictEqual([undefined, 'pre-gate cut'])
 	})
 })
 

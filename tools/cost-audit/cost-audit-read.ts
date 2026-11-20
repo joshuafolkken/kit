@@ -10,6 +10,7 @@ import {
 } from '#scripts/time-runtime/time-transcript-line'
 import { z } from 'zod'
 import { cost_audit_kind } from './cost-audit-kind'
+import { cost_audit_resume } from './cost-audit-resume'
 import { cost_audit_tool, type ToolCategory } from './cost-audit-tool'
 
 // Reading the transcript store for `josh cost:audit`: every session of this repository and its lanes
@@ -35,6 +36,8 @@ interface AuditSession {
 	issue?: number | undefined
 	// A delegated unit's agent type from its `meta.json`; absent for a main session or a unit with none.
 	agent_type?: string | undefined
+	// Why a `resume` session was started (`cost-audit-resume.ts`); absent for every other kind.
+	trigger?: string | undefined
 	records: ReadonlyArray<UsageRecord>
 	// The categories of the calls each request issued, keyed by request id; a request absent here
 	// issued none.
@@ -92,9 +95,12 @@ function session_of(text: string, is_delegated: boolean, is_lane = false): Audit
 
 	for (const raw of text.split('\n')) add_line(parts, raw)
 
+	const kind = cost_audit_kind.kind_of(parts.prompt, is_delegated)
+
 	return {
-		kind: cost_audit_kind.kind_of(parts.prompt, is_delegated),
+		kind,
 		is_lane: is_lane && !is_delegated,
+		trigger: cost_audit_resume.prompt_trigger(kind, parts.prompt),
 		records: cost_usage.dedupe(parts.records),
 		categories: parts.categories,
 		lines: parts.lines,
@@ -176,7 +182,9 @@ function load_where(cwd: string, since_ms: number, is_kept: FileFilter): Array<A
 	)
 	const files = session_files(cwd, since_ms).filter((file) => is_kept(file, lanes))
 
-	return dedupe_across(files.map((file) => file_session(file, lanes)))
+	return cost_audit_resume.with_triggers(
+		dedupe_across(files.map((file) => file_session(file, lanes))),
+	)
 }
 
 function load(cwd: string, since_ms: number): Array<AuditSession> {

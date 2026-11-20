@@ -9,6 +9,7 @@ function row(key: string, current: number, previous: number, is_regression = fal
 }
 
 const NO_DENSITY = { requests: 0, calls: 0, single: 0 }
+const REVIEW_FIX_PHASE = 'implement: review-fix'
 const NO_REGRESSIONS = 'Regressions: none'
 const NO_REWRITES = { after_wait: { count: 0, usd: 0 }, within_ttl: { count: 0, usd: 0 } }
 const NO_FIRST = { sessions: 0, p50_tokens: undefined }
@@ -47,9 +48,39 @@ function audit_with(overrides: Partial<Audit> = {}): Audit {
 		usage: NO_USAGE,
 		results: NO_RESULTS,
 		sequences: { runs: [], retries: [] },
+		resumes: { triggers: [], review_fix: row(REVIEW_FIX_PHASE, 0, 0) },
 		...overrides,
 	}
 }
+
+// joshuafolkken/kit#8311: the resume sessions by trigger, and their share of the review-fix phase.
+describe('cost_audit_format.report_lines — the resume triggers', () => {
+	const triggers = [
+		{ key: 'review-fix cut', current: { sessions: 4, usd: 8 }, previous: { sessions: 1, usd: 2 } },
+	]
+	const resumes = { triggers, review_fix: row(REVIEW_FIX_PHASE, 6, 1) }
+
+	it('prints each trigger with its sessions and per-merge cost beside the period before', () => {
+		const lines = cost_audit_format.report_lines(
+			audit_with({ resumes, merges: { current: 4, previous: 2 } }),
+		)
+
+		expect(lines).toContain(
+			'  review-fix cut: $8.0000 (prev $2.0000, +300.0%) · 4 session(s) (prev 1) · $2.0000 per merge (prev $1.0000)',
+		)
+		expect(lines).toContain(
+			'  resume within implement: review-fix: $6.0000 (prev $1.0000, +500.0%)',
+		)
+	})
+
+	it('leaves out the per-merge cost when the merges were not read', () => {
+		const lines = cost_audit_format.report_lines(audit_with({ resumes }))
+
+		expect(lines).toContain(
+			'  review-fix cut: $8.0000 (prev $2.0000, +300.0%) · 4 session(s) (prev 1)',
+		)
+	})
+})
 
 // joshuafolkken/kit#7042: the usage breakdown a cost-reduction Issue compares before and after.
 describe('cost_audit_format.report_lines — the usage breakdown', () => {
