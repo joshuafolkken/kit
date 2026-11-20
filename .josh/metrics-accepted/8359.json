@@ -1,0 +1,7 @@
+{
+	"reason": "Theme definitions gain a lamps field and has_lamps reads it, so a theme can drop the lamp panel (#8359)",
+	"date": "2026-11-20",
+	"growth": {
+		"scripts.code_lines": 12
+	}
+}

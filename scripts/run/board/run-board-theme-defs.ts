@@ -18,6 +18,9 @@ interface ThemeDefinition {
 	// The alert field a screen's first line ends on, drawn from the level every theme shares
 	// (`run-board-header-defcon.ts` → `level_of`), 1 the worst (joshuafolkken/kit#8358).
 	alert: (level: number) => string
+	// Whether a live board in the theme draws the lamp panel (`run-board-lamps.ts`;
+	// joshuafolkken/kit#8359).
+	lamps: boolean
 }
 
 const THEME_DEFS = {
@@ -26,6 +29,7 @@ const THEME_DEFS = {
 		paint: { rgb: '62;236;225', named: 'cyan' },
 		intro: { line: 'SHALL WE PLAY A GAME?', letter_ms: 50, hold_ms: 2000 },
 		alert: run_board_header_defcon.field_of,
+		lamps: true,
 	},
 } as const satisfies Readonly<Record<string, ThemeDefinition>>
 

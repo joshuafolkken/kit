@@ -10,6 +10,7 @@ import { run_board_render } from './run-board-render'
 import { run_board_row_sections } from './run-board-row-sections'
 import { run_board_spin, type Spun } from './run-board-spin'
 import type { BoardPorts, BoardState } from './run-board-state'
+import { run_board_theme_defs, type ThemeDefinition } from './run-board-theme-defs'
 import { run_board_type_rows, type Typing } from './run-board-type-rows'
 
 // The frame one `run:board` redraw draws (`run-board-tick.ts`) from what `run-board-display.ts`
@@ -18,6 +19,7 @@ import { run_board_type_rows, type Typing } from './run-board-type-rows'
 // the board's ports.
 
 const { SPOT } = run_board_spin
+const { THEME_DEFS } = run_board_theme_defs
 
 // The ports a frame is drawn through — no read among them, so the worker thread draws the frames it
 // records through the same ones (`run-board-gather-record.ts`).
@@ -95,10 +97,23 @@ function bounds_of(ports: DrawPorts): FrameBounds {
 // A drawn frame and every note it was drawn from — shown or not (joshuafolkken/kit#8117).
 type Drawn = Spun & { notes: ReadonlyArray<BoardNote> }
 
-// The lamp panel shows where the rows type — a live board in a theme — on a terminal drawing color
-// (joshuafolkken/kit#8236).
-function has_lamps(ports: Pick<DrawPorts, 'types_rows' | 'is_tty'>): boolean {
-	return ports.types_rows === true && ports.is_tty && run_board_lamps.is_colored()
+// The theme rows whose lamp choice the panel reads.
+type LampDefs = Readonly<Partial<Record<string, Pick<ThemeDefinition, 'lamps'>>>>
+
+// Whether the board's rows type in a theme whose definition draws lamps (joshuafolkken/kit#8359).
+function is_lamp_theme(ports: Pick<DrawPorts, 'types_rows' | 'theme'>, defs: LampDefs): boolean {
+	if (ports.types_rows !== true || ports.theme === undefined) return false
+
+	return defs[ports.theme]?.lamps === true
+}
+
+// The lamp panel shows where the rows type — a live board in a theme that draws lamps — on a terminal
+// drawing color (joshuafolkken/kit#8236).
+function has_lamps(
+	ports: Pick<DrawPorts, 'types_rows' | 'theme' | 'is_tty'>,
+	defs: LampDefs = THEME_DEFS,
+): boolean {
+	return is_lamp_theme(ports, defs) && ports.is_tty && run_board_lamps.is_colored()
 }
 
 // The frame under `header` with its spinners drawn at this moment's frame, and where they are on screen.
