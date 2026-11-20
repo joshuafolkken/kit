@@ -6,9 +6,21 @@ import { run_board_spot } from './run-board-spot'
 // joshuafolkken/kit#8236: the WOPR lamp panel's pure parts — whether a lamp is lit at a moment, how many
 // fit, and the panel run on to the rule's end.
 
-const { LAMP_TICK_MS, count_of, expanded, is_colored, is_lit, lamp_text, place_of, start_of } =
-	run_board_lamps
+const {
+	LAMP_TICK_MS,
+	PANEL_ROWS,
+	count_of,
+	expanded,
+	is_colored,
+	is_lit,
+	lamp_text,
+	place_of,
+	start_column,
+	start_of,
+} = run_board_lamps
 const { LAMP, LAMP_START } = run_board_spot
+const LIT_YELLOW = '38;2;255;214;10'
+const LIT_RED = '38;2;255;69;58'
 const START = Date.parse('2026-11-20T09:00:00.000Z')
 const STEPS = 20_000
 const GROUPS = 12
@@ -24,6 +36,10 @@ const OUT_RED = '38;2;128;35;29'
 afterEach(() => {
 	vi.unstubAllEnvs()
 })
+
+function lamps(count: number): string {
+	return Array.from({ length: count }, () => LAMP).join(' ')
+}
 
 // A group's four lamps at `step` steps past the start, as one string.
 function group_at(group: number, step: number, is_burst: boolean): string {
@@ -113,31 +129,53 @@ describe('run_board_lamps.expanded', () => {
 	it('runs the panel on to the rule’s end, a lamp every other column', () => {
 		const line = `ab  ${LAMP_START}`
 
-		expect(expanded(line, 4 + 17)).toBe(`ab  ${Array.from({ length: 9 }, () => LAMP).join(' ')}`)
+		expect(expanded(line, { start: 4, end: 4 + 17 })).toBe(`ab  ${lamps(9)}`)
+	})
+
+	it('moves a panel started short of the start out to it', () => {
+		expect(expanded(`ab ${LAMP_START}`, { start: 6, end: 6 + 17 })).toBe(`ab    ${lamps(9)}`)
+	})
+
+	it('runs a panel started on a blank line from the start', () => {
+		expect(expanded(` ${LAMP_START}`, { start: 4, end: 4 + 15 })).toBe(`    ${lamps(8)}`)
 	})
 
 	it('drops the panel and the blanks before it where eight lamps do not fit', () => {
-		expect(expanded(`ab  ${LAMP_START}`, 4 + 14)).toBe('ab')
+		expect(expanded(`ab  ${LAMP_START}`, { start: 4, end: 4 + 14 })).toBe('ab')
+		expect(expanded(` ${LAMP_START}`, { start: 4, end: 4 + 14 })).toBe('')
 	})
 
 	it('leaves a line with no panel as it was', () => {
-		expect(expanded('ab', 40)).toBe('ab')
+		expect(expanded('ab', { start: 4, end: 40 })).toBe('ab')
+	})
+})
+
+describe('run_board_lamps.start_column', () => {
+	it('reads the column a panel starts at, none where the line starts none', () => {
+		expect(start_column(`ab  ${LAMP_START}`)).toBe(4)
+		expect(start_column('ab')).toBeUndefined()
 	})
 })
 
 describe('run_board_lamps colors', () => {
-	it('lights the 24h row yellow and the 7d row red, never blinking', () => {
+	it('lights the panel’s five rows yellow, yellow, red, yellow, red, never blinking', () => {
 		vi.stubEnv('FORCE_COLOR', '3')
+		const rows = [0, 1, 2, 3, 4].map((row) => lamp_text(row, true))
+		const colors = rows.map((text) => (text.includes(LIT_RED) ? 'red' : 'yellow'))
 
-		expect(lamp_text(0, true)).toContain('38;2;255;214;10')
-		expect(lamp_text(1, true)).toContain('38;2;255;69;58')
-		expect(lamp_text(0, true) + lamp_text(1, false)).not.toContain(BLINK)
+		expect(colors).toEqual(['yellow', 'yellow', 'red', 'yellow', 'red'])
+		expect(rows.filter((text) => text.includes(LIT_YELLOW))).toHaveLength(3)
+		expect(rows.join('') + lamp_text(1, false)).not.toContain(BLINK)
+	})
+
+	it('names the panel’s rows under the throughput rows', () => {
+		expect(PANEL_ROWS).toEqual({ gap: 2, first_usage: 3, second_usage: 4 })
 	})
 
 	it('draws a lamp out at half its row’s color, dimmed, the start placeholder too', () => {
 		vi.stubEnv('FORCE_COLOR', '3')
-		const start = start_of(1)
-		const out = [lamp_text(0, false), lamp_text(1, false), start]
+		const start = start_of(2)
+		const out = [lamp_text(0, false), lamp_text(2, false), start]
 
 		expect(out[0]).toContain('38;2;128;107;5')
 		expect(out[1]).toContain(OUT_RED)
