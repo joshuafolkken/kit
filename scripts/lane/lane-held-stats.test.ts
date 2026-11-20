@@ -14,6 +14,8 @@ const HAND_BACK = 'hand-back:merge'
 const MEMORY = 'memory'
 const LAUNCH = 'lane:launch'
 const LONG_AGO_MINUTES = 300
+const WATCH_BLOCKED = 'offer:watch:blocked'
+const NONE_ROW = '| none | not measured | not measured | not measured | 0 | 0 |'
 
 function minutes_before_now(minutes: number): string {
 	return new Date(NOW - minutes * MS_PER_MINUTE).toISOString()
@@ -115,9 +117,7 @@ describe('lane_held_stats.table', () => {
 	})
 
 	it('prints a zero row for a period without a hold', () => {
-		expect(row_of([dispatch(1)], 'none')).toBe(
-			'| none | not measured | not measured | not measured | 0 | 0 |',
-		)
+		expect(row_of([dispatch(1)], 'none')).toBe(NONE_ROW)
 	})
 })
 
@@ -134,7 +134,7 @@ describe('lane_held_stats.table — a memory hold', () => {
 describe('lane_held_stats.table — a run:solo wait', () => {
 	it('rows a run:solo hold apart from the other blocked offers', () => {
 		const solo = 'offer:watch:solo'
-		const blocked = 'offer:watch:blocked'
+		const blocked = WATCH_BLOCKED
 		const entries = [held(blocked, 30), held(solo, 25), held(blocked, 20), dispatch(10)]
 
 		expect(row_of(entries, solo)).toBe(`| ${solo} | 5.0 | 5.0 | 5.0 | 1 | 0 |`)
@@ -162,6 +162,12 @@ describe('lane_held_stats.cause_table', () => {
 			'| chain | 15.0 | 7.5 | 10.0 | 2 | 0 |',
 			'| gate | 10.0 | 10.0 | 10.0 | 1 | 0 |',
 		])
+	})
+
+	it('rows no cause for a watch offer whose tag names none', () => {
+		const entries = [held(WATCH_BLOCKED, 30), dispatch(10)]
+
+		expect(body_of(lane_held_stats.cause_table(entries, WINDOW))).toStrictEqual([NONE_ROW])
 	})
 
 	it('names the overlap in its header', () => {
