@@ -15,7 +15,8 @@ import { lane_stop_stats } from './lane-stop-stats'
 //   `run:chain`'s end to the first `--join` run's start;
 // - push → merge — the first `ship` chain stage's start to the last merge, and apart under it the
 //   `ci-wait` stages inside that span.
-// A lane lacking a phase's records is left out of that phase's samples, never counted as zero.
+// A lane lacking a phase's records is left out of that phase's samples, never counted as zero; a lane
+// whose dispatch before its first run was not read (cut off by a period's window) gives no sample.
 
 type ChainEntry = Extract<LedgerEntry, { kind: typeof KIND.CHAIN }>
 type StageEntry = Extract<LedgerEntry, { kind: typeof KIND.STAGE }>
@@ -106,16 +107,19 @@ function lane_start_ms(lane: ReadonlyArray<LedgerEntry>, before_ms: number): num
 		.at(-1)
 }
 
-function opening(
-	lane: ReadonlyArray<LedgerEntry>,
-	events: ReadonlyArray<RunEvent>,
-	issue: number,
-): Array<PhaseSample> {
+// The lane's start (its last dispatch before the first chain run) and that run's start; undefined
+// where the read missed the dispatch, so a lane cut off by a period's window yields no partial phase.
+function opening_span(lane: ReadonlyArray<LedgerEntry>): Span | undefined {
 	const chain = lane.find((entry) => is_chain(entry))
-	if (chain === undefined) return []
+	if (chain === undefined) return undefined
 	const to_ms = start_ms(chain)
 	const from_ms = lane_start_ms(lane, to_ms)
-	if (from_ms === undefined) return []
+
+	return from_ms === undefined ? undefined : { from_ms, to_ms }
+}
+
+function opening(span: Span, events: ReadonlyArray<RunEvent>, issue: number): Array<PhaseSample> {
+	const { from_ms, to_ms } = span
 	const mark_ms = implement_ms(events, issue, { from_ms, to_ms })
 	if (mark_ms === undefined) return []
 
@@ -199,10 +203,12 @@ function phases_of(
 	issue: number,
 ): Array<PhaseSample> {
 	const lane = lane_of(entries, issue)
+	const span = opening_span(lane)
+	if (span === undefined) return []
 	const chains = lane.filter((entry) => is_chain(entry))
 
 	return [
-		...opening(lane, events, issue),
+		...opening(span, events, issue),
 		...check(chains),
 		...review(chains),
 		...closing(lane, chains),

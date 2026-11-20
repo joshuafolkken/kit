@@ -13,13 +13,14 @@ const SHIP_MINUTES = 2
 const MINUTES_PER_DAY = 1440
 const SINCE = '--since'
 const TWO_LANES = 'over 2 lanes'
+const TWO_SHIPS = '- push → merge: 40.0 min median / 2 lanes'
 const create_directory = temporary_directory()
 
 function at(minute: number): string {
 	return new Date(minute * MS_PER_MINUTE).toISOString()
 }
 
-function lines_of(issue: number, offset: number): Array<object> {
+function lines_of(issue: number, offset: number): [object, object, object] {
 	return [
 		{ kind: 'dispatch', at: at(offset), issue },
 		{
@@ -34,12 +35,20 @@ function lines_of(issue: number, offset: number): Array<object> {
 	]
 }
 
-// Three lanes merged at minutes 40, 140 and 340, read with "now" a day in.
-function source(): Source {
-	const ledger = path.join(create_directory('lane-phases-'), 'ledger.jsonl')
-	const lines = [...lines_of(1, 0), ...lines_of(2, 100), ...lines_of(3, 300)]
+function write(file: string, lines: ReadonlyArray<object>): void {
+	writeFileSync(file, `${lines.map((line) => JSON.stringify(line)).join('\n')}\n`)
+}
 
-	writeFileSync(ledger, `${lines.map((line) => JSON.stringify(line)).join('\n')}\n`)
+// Three lanes merged at minutes 40, 140 and 340, read with "now" a day in. `rotated` moves lane 1's
+// rows but its merge into the archive beside the ledger, as rotation does.
+function source(rotated = false): Source {
+	const directory = create_directory('lane-phases-')
+	const ledger = path.join(directory, 'ledger.jsonl')
+	const [dispatch, chain, merge] = lines_of(1, 0)
+	const first = rotated ? [merge] : [dispatch, chain, merge]
+
+	if (rotated) write(path.join(directory, 'ledger-archive.jsonl'), [dispatch, chain])
+	write(ledger, [...first, ...lines_of(2, 100), ...lines_of(3, 300)])
 
 	return {
 		ledger_path: async () => await ledger,
@@ -48,10 +57,10 @@ function source(): Source {
 	}
 }
 
-async function printed(argv: ReadonlyArray<string>): Promise<string> {
+async function printed(argv: ReadonlyArray<string>, rotated = false): Promise<string> {
 	const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
 
-	expect(await lane_phases_cli.run(argv, source())).toBe(0)
+	expect(await lane_phases_cli.run(argv, source(rotated))).toBe(0)
 
 	return String(info.mock.calls.at(0)?.at(0))
 }
@@ -65,7 +74,11 @@ describe('lane_phases_cli.run', () => {
 		const text = await printed(['#1', '2'])
 
 		expect(text).toContain(TWO_LANES)
-		expect(text).toContain('- push → merge: 40.0 min median / 2 lanes')
+		expect(text).toContain(TWO_SHIPS)
+	})
+
+	it('reads a named Issue whose rows rotation moved into the archive', async () => {
+		expect(await printed(['#1', '2'], true)).toContain(TWO_SHIPS)
 	})
 
 	it('reads the lanes merged inside --since and --until', async () => {

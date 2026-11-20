@@ -132,6 +132,12 @@ describe('lane_phases.phases_of — missing records', () => {
 		)
 		expect(lane_phases.phases_of(LANE, [plan_event(3)], OTHER)).toEqual([])
 	})
+
+	it('reads no phase of a lane whose dispatch before its first run fell outside the read', () => {
+		const cut_off = LANE.filter((entry) => entry.kind !== 'dispatch')
+
+		expect(lane_phases.phases_of(cut_off, [plan_event(3)], ISSUE)).toEqual([])
+	})
 })
 
 describe('lane_phases.rows_of', () => {

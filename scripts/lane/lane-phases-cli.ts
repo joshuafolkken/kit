@@ -5,13 +5,15 @@ import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { lane_ledger, type LedgerEntry } from './lane-ledger'
+import { lane_ledger_archive } from './lane-ledger-archive'
 import { lane_ledger_tail } from './lane-ledger-tail'
 import { lane_phases, type Span } from './lane-phases'
 import { lane_stats_request } from './lane-stats-request'
 
 // `josh lane:phases <issue>... | --since <date> [--until <date>]` — the lanes' median minutes by phase
 // (joshuafolkken/kit#8287). A period reads the ledger's window backward (`read_since`), so the ledger
-// older than it never lands in memory; named Issues keep only their own entries (`tail_store`).
+// older than it never lands in memory; named Issues read the ledger and its archive (`history_at`),
+// since rotation moves an older lane's rows there and keeps only its merge.
 
 const ARGV_OFFSET = 2
 const FAILURE_EXIT_CODE = 1
@@ -81,7 +83,7 @@ function entries_of(request: Request, path: string): ReadonlyArray<LedgerEntry> 
 
 	const wanted = new Set(request.issues)
 
-	return lane_ledger.tail_store((entry) => has_issue(wanted, entry)).read(path)
+	return lane_ledger_archive.history_at(path).filter((entry) => has_issue(wanted, entry))
 }
 
 function failed(message: string): number {

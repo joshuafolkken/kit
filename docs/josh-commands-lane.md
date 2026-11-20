@@ -453,11 +453,11 @@ pnpm josh lane:phases --since 2026-11-19 --until 2026-11-20   # the lanes merged
 **Options:**
 
 - `--since` — reads the lanes merged on or after this date (ISO) instead of named Issues.
-- `--until` — with `--since`, leaves out the lanes merged after this date (ISO).
+- `--until` — with `--since`, leaves out the lanes merged at or after this instant (ISO; a bare date is its midnight UTC).
 
 <!-- /usage -->
 
-Prints, for the named lanes or the lanes merged in the period, each phase's median minutes and its sample count. A lane lacking a phase's bounding records is left out of that phase's samples, not counted as zero (`lane-phases.ts`).
+Prints, for the named lanes or the lanes merged in the period, each phase's median minutes and its sample count. A lane lacking a phase's bounding records is left out of that phase's samples, not counted as zero; a lane whose dispatch before its first run was not read gives no sample at all (`lane-phases.ts`).
 
 The bounds, per lane:
 

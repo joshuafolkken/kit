@@ -627,7 +627,8 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 				},
 				{
 					names: ['--until'],
-					description: 'with `--since`, leaves out the lanes merged after this date (ISO).',
+					description:
+						'with `--since`, leaves out the lanes merged at or after this instant (ISO; a bare date is its midnight UTC).',
 				},
 			],
 			examples: [
