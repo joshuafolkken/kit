@@ -139,6 +139,8 @@ describe('run_chain_cli.run --join — the recheck under what the branch accepte
 
 		await run_chain_cli.run(SHIPPING)
 
-		expect(pinned).toHaveBeenCalledWith({ number: ISSUE, unpinned_ok })
+		// joshuafolkken/kit#8271 (ac-0b9841e2): the fixed tree's check, launched where it is read, is
+		// the one the ship's pre-detach reads next.
+		expect(pinned).toHaveBeenCalledWith({ number: ISSUE, unpinned_ok, is_launching: true })
 	})
 })
