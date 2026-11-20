@@ -21,6 +21,11 @@ const RESUME_GUIDE = '.claude/skills/workflow-commands/pre-gate-cut.md'
 // (kit itself) `josh ship` runs in-process, so no process ever carries `run-ship-cli.ts` — the `pnpm josh
 // ship …` process and the `josh.ts ship …` / `josh.js ship …` dispatcher are what `pgrep` sees there.
 const SHIP_PROCESS = String.raw`(josh(\.[jt]s)? ship|run-ship-cli\.ts)`
+// The words that tell an outage and a ship-stop resume apart from a cut's; `cost:audit` reads a resumed
+// session's trigger off them (`cost-audit-resume.ts`).
+const OUTAGE_MARKER = 'after an API disconnection'
+const SHIP_STOP_MARKER = 'after its detached ship supervisor stopped at a failed stage'
+const CUT_MARKER = 'it checks the carried cut'
 
 function child_invocation(issue: string): string {
 	issue_number_shape.require_issue_number(issue)
@@ -61,7 +66,7 @@ function review_invocation(issue: string): string {
 }
 
 function resume_invocation(issue: string): string {
-	const preamble = `Resuming the lane child for issue ${issue_cite.plain_for('program', issue)} — do not re-read the workflow-commands entry documents (SKILL.md, fullrun.md). Run \`pnpm josh run:entry ${issue}\` once before anything else; it checks the carried cut and completes the entry on \`fresh\`. Follow its resume verdict in ${RESUME_GUIDE}: \`resume\` goes to the gate, \`resume-impl\` continues implementation. Continue this`
+	const preamble = `Resuming the lane child for issue ${issue_cite.plain_for('program', issue)} — do not re-read the workflow-commands entry documents (SKILL.md, fullrun.md). Run \`pnpm josh run:entry ${issue}\` once before anything else; ${CUT_MARKER} and completes the entry on \`fresh\`. Follow its resume verdict in ${RESUME_GUIDE}: \`resume\` goes to the gate, \`resume-impl\` continues implementation. Continue this`
 
 	return `${preamble} ${child_invocation(issue)}`
 }
@@ -76,7 +81,7 @@ function resume_invocation(issue: string): string {
 // `process_pattern` against the command line, so the trailing
 // `fullrun #<N>` keeps the relaunched process matching, and it is the ordinary run the child carries on.
 function outage_resume_invocation(issue: string): string {
-	const preamble = `Resuming the lane child for issue ${issue_cite.plain_for('program', issue)} after an API disconnection — your session was restored with its full context, so do not re-read the workflow-commands entry documents (SKILL.md, fullrun.md). Continue the run from where it stopped: run \`pnpm josh run:step ${issue}\` to find the next action, redoing only the last step if it did not complete.`
+	const preamble = `Resuming the lane child for issue ${issue_cite.plain_for('program', issue)} ${OUTAGE_MARKER} — your session was restored with its full context, so do not re-read the workflow-commands entry documents (SKILL.md, fullrun.md). Continue the run from where it stopped: run \`pnpm josh run:step ${issue}\` to find the next action, redoing only the last step if it did not complete.`
 
 	return `${preamble} ${child_invocation(issue)}`
 }
@@ -115,7 +120,7 @@ function known_stop_lines(
 }
 
 function ship_stop_invocation(issue: string, stop?: ShipStop): string {
-	const opening = `Resuming the lane child for issue ${issue_cite.plain_for('program', issue)} after its detached ship supervisor stopped at a failed stage — do not re-read the workflow-commands entry documents (SKILL.md, fullrun.md).`
+	const opening = `Resuming the lane child for issue ${issue_cite.plain_for('program', issue)} ${SHIP_STOP_MARKER} — do not re-read the workflow-commands entry documents (SKILL.md, fullrun.md).`
 	const closing = `Do not re-plan or re-implement what is already on the branch. ${child_invocation(issue)}`
 	const middle =
 		stop === undefined
@@ -134,6 +139,9 @@ function ship_stop_note(issue: string, stop: ShipStop): string {
 }
 
 const lane_child_invocation = {
+	CUT_MARKER,
+	OUTAGE_MARKER,
+	SHIP_STOP_MARKER,
 	child_invocation,
 	outage_resume_invocation,
 	process_pattern,
