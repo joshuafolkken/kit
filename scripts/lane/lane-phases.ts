@@ -240,16 +240,18 @@ function merged_in(entries: ReadonlyArray<LedgerEntry>, span: Span): Array<numbe
 		.map(([issue]) => issue)
 }
 
+// One table row: `<phase>: <median> min median / <samples> <unit>`, shared with `lane-phases-steps.ts`.
+function line_of(row: PhaseRow, unit: string): string {
+	return `- ${row.phase}: ${lane_breakdown.minutes_text(row.median_ms)} median / ${String(row.samples)} ${unit}`
+}
+
 function text(rows: ReadonlyArray<PhaseRow>, lanes: number): string {
-	const lines = rows.map(
-		(row) =>
-			`- ${row.phase}: ${lane_breakdown.minutes_text(row.median_ms)} median / ${String(row.samples)} lanes`,
-	)
+	const lines = rows.map((row) => line_of(row, 'lanes'))
 
 	return [`Lane phases over ${String(lanes)} lanes (median, samples):`, ...lines].join('\n')
 }
 
-const lane_phases = { PHASE, merged_in, phases_of, rows_of, text }
+const lane_phases = { PHASE, line_of, merged_in, phases_of, row_of, rows_of, text }
 
 export { lane_phases }
 export type { PhaseRow, PhaseSample, Span }

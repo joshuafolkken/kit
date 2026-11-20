@@ -1,0 +1,8 @@
+{
+	"reason": "#8312: the review-fix cut now checks the cost verdict (+6 code lines), and chain-rule.md says the fix stays in place below the threshold (+38 bytes)",
+	"date": "2026-11-20",
+	"growth": {
+		"scripts.code_lines": 6,
+		"ai_cost.on_demand_bytes": 38
+	}
+}

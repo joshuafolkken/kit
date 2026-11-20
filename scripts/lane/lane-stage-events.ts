@@ -98,6 +98,6 @@ function of(
 	].toSorted((left, right) => Date.parse(left.at) - Date.parse(right.at))
 }
 
-const lane_stage_events = { of }
+const lane_stage_events = { SHIP_STAGES, of }
 
 export { lane_stage_events }

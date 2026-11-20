@@ -51,7 +51,7 @@ function low_only_next(mode: ReadonlyArray<string>): (issue: string) => string {
 		`fix, file or drop each Low with a one-line reason, record each disposition with ${record_call(issue)} (\`<n>=<disposition>\`: its usage), ${recheck_then(issue, mode, 'ship')} — no round 2 is due`
 }
 
-// A lane child takes the fix to a fresh session (`run-chain-review-fix.ts`).
+// A lane child past the cut threshold takes the fix to a fresh session (`run-chain-review-fix.ts`).
 function findings_stop(
 	issue: string,
 	specs: ReadonlyArray<string>,

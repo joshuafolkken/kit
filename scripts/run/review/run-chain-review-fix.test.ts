@@ -1,3 +1,4 @@
+import { cost_cli, type CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { run_cut_handoff } from '#scripts/run/cut/run-cut-handoff'
 import { run_cut_ready } from '#scripts/run/cut/run-cut-ready'
@@ -18,14 +19,17 @@ const ISSUE = '6900'
 const FINDINGS = ['bug-risks:medium:scripts/a.ts — a bug', 'bug-risks:low:scripts/b.ts — a nit']
 const HANDOFF_FILE = '.josh/tmp/handoff-6900.json'
 const IN_PLACE = 'fix each finding, record, then ship'
+const OVER: CostVerdict = 'over'
+const UNPAID_VERDICTS: ReadonlyArray<CostVerdict> = ['under', 'unmeasurable']
 
 function fix_next(issue: string): string {
 	return `${IN_PLACE} #${issue}`
 }
 
-function in_lane(is_child: boolean, is_dirty = true): void {
+function in_lane(is_child: boolean, is_dirty = true, verdict: CostVerdict = OVER): void {
 	vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(is_child)
 	vi.spyOn(run_cut_ready, 'is_ready_sync').mockReturnValue(is_dirty)
+	vi.spyOn(cost_cli, 'session_verdict').mockReturnValue(verdict)
 }
 
 function written(): string {
@@ -41,7 +45,7 @@ afterEach(() => {
 	vi.restoreAllMocks()
 })
 
-describe('run_chain_review_fix.route — a lane child (ac-c38296ce)', () => {
+describe('run_chain_review_fix.route — a lane child past the cut threshold (ac-c38296ce)', () => {
 	it('asks for the implementation cut that hands the fix to a fresh session', () => {
 		in_lane(true)
 
@@ -83,6 +87,16 @@ describe('run_chain_review_fix.route — the fix stays in place', () => {
 		expect(run_chain_review_fix.route(ISSUE, FINDINGS, fix_next)).toBe(fix_next)
 		expect(fs_mock.writeFileSync).not.toHaveBeenCalled()
 	})
+
+	it.each(UNPAID_VERDICTS)(
+		'on a session the cut would not pay back (%s), writing no handoff',
+		(verdict) => {
+			in_lane(true, true, verdict)
+
+			expect(run_chain_review_fix.route(ISSUE, FINDINGS, fix_next)).toBe(fix_next)
+			expect(fs_mock.writeFileSync).not.toHaveBeenCalled()
+		},
+	)
 
 	it('where the handoff cannot be written', () => {
 		in_lane(true)

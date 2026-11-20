@@ -36,6 +36,7 @@ import { poll_loop } from './poll-loop'
 import { pre_gate_cut } from './pre-gate-cut'
 import { raw_field_body } from './raw-field-body'
 import { repeat_check_related } from './repeat-check-related'
+import { reply_close } from './reply-close'
 import { reviewer_foreground } from './reviewer-foreground'
 import { round_one_check_related } from './round-one-check-related'
 import { rule_body_guard } from './rule-body-guard'
@@ -313,6 +314,7 @@ const MEASURED_RULES: ReadonlyArray<MeasuredRule> = [
 	INVESTIGATION_RULE,
 	// Delivered by `stop:guard`; listed here so `rule:value` counts its refusals.
 	concise_reply.ROW,
+	reply_close.ROW,
 ]
 
 const { SWITCH_ENV_KEY, guard_of } = delivered_rules_guard

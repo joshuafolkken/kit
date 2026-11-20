@@ -3,7 +3,7 @@ import { concise_reply } from './concise-reply'
 import { stop_rules } from './stop-rules'
 import { stop_rules_fixture } from './stop-rules-fixture'
 
-const { context } = stop_rules_fixture
+const { prose_context: context } = stop_rules_fixture
 
 const LONG_REPLY = 'The gate passed and the pull request is open. '.repeat(20)
 
@@ -16,8 +16,9 @@ describe('stop_rules.stop_outcome — concise reply', () => {
 		expect(reason).toContain('"concise-reply"')
 	})
 
-	it('lets a reply over the limit stop when the prompt asked for the detail', () => {
-		const asked = context({ message: LONG_REPLY, prompt: '具体的に教えて' })
+	it('lets a closed reply over the limit stop when the prompt asked for the detail', () => {
+		const message = `${LONG_REPLY}\n\nNext: wait for the review`
+		const asked = context({ message, prompt: '具体的に教えて' })
 
 		expect(stop_rules.stop_outcome(asked).reason).toBeUndefined()
 	})
@@ -37,6 +38,8 @@ describe('stop_rules.stop_outcome — concise reply', () => {
 	it('sends back a drifted reply for its language first', () => {
 		const drifted = context({ message: LONG_REPLY, session_lang: 'ja' })
 
-		expect(stop_rules.stop_outcome(drifted).reason).toBe(stop_rules.build_language_reason('ja'))
+		const { reason } = stop_rules.stop_outcome(drifted)
+
+		expect(reason?.startsWith(stop_rules.build_language_reason('ja'))).toBe(true)
 	})
 })
