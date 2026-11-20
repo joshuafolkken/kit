@@ -78,8 +78,8 @@ describe('run --pinned in a lane child', () => {
 	})
 })
 
-// joshuafolkken/kit#4834: `review:record` starts the check again on a tree a round-1 fix moved, and
-// `--pinned` reads its answer alone, after the pair's join has already closed.
+// joshuafolkken/kit#4834: a check started again on a tree a round-1 fix moved has its answer read
+// alone by `--pinned`, after the pair's join has already closed.
 describe('run --pinned', () => {
 	const LINE = 'unpinned a.ts:1'
 	const UNPINNED = { text: `${LINE}\n`, unpinned: ['a.ts 0123456789abcdef'] }

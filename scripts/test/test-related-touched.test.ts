@@ -2,6 +2,8 @@ import path from 'node:path'
 import { outer_command } from '#scripts/josh/outer-command'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { describe, expect, it } from 'vitest'
+import { test_read_map, type ReadMap } from './test-read-map'
+import { test_read_trace } from './test-read-trace'
 import { test_related_touched, type CallSite, type ListDirectory } from './test-related-touched'
 
 const ROOT = path.resolve('/repo')
@@ -148,5 +150,73 @@ describe('test_related_touched.read_scope', () => {
 
 	it('runs no test for an empty change without needing an import graph', async () => {
 		expect(await test_related_touched.read_scope(ROOT, [])).toMatchObject({ mode: 'none' })
+	})
+})
+
+const BOARD = path.join('scripts', 'run', 'board')
+const GLYPHS_TEST = path.join(BOARD, 'run-board-theme-glyphs.test.ts')
+const WALK_TEST = path.join('scripts', 'walk.test.ts')
+const NAME_TEST = path.join('scripts', 'name.test.ts')
+const ADDED = path.join(BOARD, 'run-board-sweep.ts')
+
+// A checkout holding the board directory's lister, a walker above it, a reader by name and the file
+// added to the board.
+function list_board(directory: string): ReadonlyArray<string> {
+	const files = [GLYPHS_TEST, WALK_TEST, NAME_TEST, ADDED]
+
+	return files
+		.filter((file) => path.join(ROOT, path.dirname(file)) === directory)
+		.map((file) => path.basename(file))
+}
+
+const BOARD_MAP: ReadMap = {
+	version: test_read_map.MAP_VERSION,
+	commit: 'abc',
+	dirty: {},
+	change: [],
+	directories: [BOARD],
+	readers: {
+		[test_read_trace.read_key(BOARD, 'listing')]: [GLYPHS_TEST],
+		[test_read_trace.read_key('scripts', 'walk')]: [WALK_TEST],
+		[ADDED]: [NAME_TEST],
+	},
+}
+
+// joshuafolkken/kit#8275: a test that enumerates a directory imports no file added there, so the
+// touched scope takes the map's listing readers of the changed file's directory — and only those.
+describe('test_related_touched.listing_readers', () => {
+	const { listing_readers, touched_scope } = test_related_touched
+
+	it('answers the test listing the directory a new file lands in, not its walkers or name readers', () => {
+		expect(listing_readers([ADDED], BOARD_MAP)).toEqual([GLYPHS_TEST])
+	})
+
+	it('runs that listing test in the touched scope', () => {
+		const changed = [ADDED, ...listing_readers([ADDED], BOARD_MAP)]
+
+		expect(touched_scope(ROOT, changed, list_board).files).toEqual([path.join(ROOT, GLYPHS_TEST)])
+	})
+
+	it('adds no listing reader when there is no map, leaving the touched scope as it was', () => {
+		expect(listing_readers([ADDED], undefined)).toEqual([])
+		expect(touched_scope(ROOT, [ADDED], list_board)).toMatchObject({ mode: 'none' })
+	})
+})
+
+// A listing moves only when an entry appears or goes, so an edit in place adds no listing reader.
+describe('test_related_touched.entry_moves', () => {
+	const EDITED = path.join(BOARD, 'run-board.ts')
+	const REMOVED = path.join(BOARD, 'run-board-gone.ts')
+	const HELD = new Set([EDITED, REMOVED])
+
+	function is_on_disk(file: string): boolean {
+		return file !== REMOVED
+	}
+
+	it('keeps a file the base did not hold and one it held that is gone, not an edit in place', () => {
+		expect(test_related_touched.entry_moves([ADDED, EDITED, REMOVED], HELD, is_on_disk)).toEqual([
+			ADDED,
+			REMOVED,
+		])
 	})
 })

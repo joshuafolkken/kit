@@ -48,6 +48,15 @@ test('keeps an explicitly allowed actual GET and refuses shell or outside cwd', 
 	).toBe(true)
 })
 
+// joshuafolkken/kit#8273: the offer lists the tracked files to resolve a bare name in a body.
+test('allows the tracked-file listing, a read', () => {
+	const root = directory('measure-ls-files-')
+
+	expect(
+		backlog_measure_guard.allowed(['git', ['ls-files', '-z'], { cwd: root }], SCENARIO, root),
+	).toBe(true)
+})
+
 test('blocks a native spawn and records the refusal before it can start a worker', () => {
 	const records: Array<MeasureBoundary> = []
 	const restore = backlog_measure_guard.install(SCENARIO, process.cwd(), records)

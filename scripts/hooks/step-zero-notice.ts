@@ -2,6 +2,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { hook_tool_payload } from '#scripts/josh/hook-tool-payload'
+import { JOSH_SCRATCH_DIRECTORY, JOSH_TMP_DIRECTORY } from '#scripts/lib/josh-temporary-directory'
 import { json_value } from '#scripts/lib/json-value'
 import { test_declared_logic } from '#scripts/test/test-declared-logic'
 
@@ -51,6 +52,14 @@ function is_scratch_record(file_path: string, scratch_root = tmpdir()): boolean 
 	return is_scratch && ['.md', '.json', '.txt'].includes(path.extname(file_path))
 }
 
+// joshuafolkken/kit#8262: anything goes in the scratch area, because a script placed there runs only
+// through `josh scratch:run`, whose permission model confines its writes to the same area.
+function is_scratch_file(file_path: string, root: string): boolean {
+	const scratch = path.join(root, JOSH_SCRATCH_DIRECTORY)
+
+	return !is_external(path.relative(scratch, path.resolve(root, file_path)))
+}
+
 function should_skip_external(
 	relative: string,
 	file_path: string,
@@ -67,7 +76,8 @@ function is_runtime_file(
 	const relative = path.relative(root, path.resolve(root, file_path))
 
 	if (
-		is_scratch_record(path.resolve(root, file_path), path.join(root, '.josh/tmp')) ||
+		is_scratch_file(file_path, root) ||
+		is_scratch_record(path.resolve(root, file_path), path.join(root, JOSH_TMP_DIRECTORY)) ||
 		should_skip_external(relative, path.resolve(root, file_path), should_include_external)
 	) {
 		return false
@@ -116,6 +126,7 @@ const step_zero_notice = {
 	edited_paths,
 	is_runtime_edit,
 	is_runtime_file,
+	is_scratch_file,
 	notice,
 	stamp_path: STAMP.path,
 }

@@ -162,6 +162,27 @@ describe('test_read_map.readers_of', () => {
 	})
 })
 
+// joshuafolkken/kit#8275: the touched `test:related` adds only the listings among `readers_of`'s keys.
+describe('test_read_map.listing_readers_of', () => {
+	it('answers the listing of the file’s own directory, not its name readers or the walks above', () => {
+		expect(test_read_map.listing_readers_of(MAP, NESTED_DOCUMENT)).toEqual([LISTER])
+		expect(test_read_map.listing_readers_of(MAP, DOCUMENT)).toEqual([])
+	})
+
+	it('answers the listing that gains a directory new since the recording', () => {
+		const added = path.join('scratch', 'x.md')
+
+		expect(test_read_map.listing_readers_of(SHALLOW_ROOT_MAP, added)).toEqual([ROOT_LISTER])
+	})
+
+	it('answers nothing for a run record, which only a read of itself reaches', () => {
+		const directory = path.join('.josh', 'observations')
+		const map = { ...MAP, readers: { [test_read_trace.read_key(directory, 'listing')]: [LISTER] } }
+
+		expect(test_read_map.listing_readers_of(map, path.join(directory, '1.json'))).toEqual([])
+	})
+})
+
 // joshuafolkken/kit#4303: whether a file added since the recording lands where no test reads.
 describe('test_read_map.in_unread_directory', () => {
 	it('holds a file added to a recorded directory nothing inside was read from', () => {
