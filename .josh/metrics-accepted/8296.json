@@ -1,0 +1,9 @@
+{
+	"reason": "New deferral-owner Stop row (#8296): predicate module, rule text in concise-reply and its rationale paragraph",
+	"date": "2026-11-20",
+	"growth": {
+		"scripts.code_lines": 66,
+		"ai_cost.on_demand_bytes": 350,
+		"prose.long_paragraphs": 1
+	}
+}
