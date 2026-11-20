@@ -39,6 +39,7 @@ type TelegramTaskType =
 	| 'kickoff_retry'
 	| 'confirmation'
 	| 'idle'
+	| 'shortfall'
 	| 'stranded'
 	| 'progress'
 	| 'decision'
@@ -76,6 +77,7 @@ const TASK_DEFINITIONS: Record<TelegramTaskType, TaskDefinition> = {
 	kickoff_retry: { icon: '🔄', label: 'Kickoff retry' },
 	confirmation: { icon: '⏸️', label: 'Confirmation required' },
 	idle: { icon: '💤', label: 'Backlog run idle — nothing left to dispatch' },
+	shortfall: { icon: '💺', label: 'Lanes free — no issue ready to start' },
 	stranded: { icon: '🚨', label: 'Run stranded — nobody is driving it' },
 	progress: { icon: '📊', label: 'Progress' },
 	decision: { icon: '🤖', label: 'Decided by the run — override with a later decision comment' },
@@ -450,6 +452,15 @@ async function idle(input: HeadlineInput): Promise<boolean> {
 	return await headline('idle', input)
 }
 
+/**
+ * Push the 💺 shortfall type — a backlog run with a child still running and a lane free, because no
+ * issue is ready to start (joshuafolkken/kit#8332). `idle`'s shape exactly; `idle` is the same
+ * shortfall once no child is left running.
+ */
+async function shortfall(input: HeadlineInput): Promise<boolean> {
+	return await headline('shortfall', input)
+}
+
 interface StrandedInput {
 	body: string
 	recovery: string
@@ -497,6 +508,7 @@ const telegram_notify = {
 	progress,
 	send,
 	send_or_report,
+	shortfall,
 	stranded,
 	warn,
 }
