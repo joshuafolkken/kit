@@ -50,7 +50,7 @@
   - not automated: the hook makes the same call right itself; it refuses only a spelling it cannot rewrite
 - **Early progress report** (`early-heartbeat`, `.claude/skills/workflow-commands/progress-watcher.md` → "Progress while the run is quiet")
   - fires: `pnpm josh pretool:guard` — a `Bash` whose only purpose is waiting (`sleep` alone, or `echo` / `:` / `date`) while a timer is live or before the interval. Every occurrence
-  - silent: no hand-made wait timer — `run:progress` holds the one clock
+  - silent: no hand-made wait timer — `run:progress` holds the one clock; a dispatched lane child, which runs no watcher and waits with the Stop hook's `sleep 20`
   - not automated: the right act is another command, whose arguments the call does not carry
 - **Test declaration** (`test-declared`, `testing-guide.md` → "0. Per-Requirement Test Coverage (MANDATORY)")
   - fires: `pnpm josh pretool:guard` — `pnpm josh git -y` (`josh g`) while `pnpm josh test:declared` answers `required`
