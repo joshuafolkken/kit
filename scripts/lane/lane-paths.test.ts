@@ -138,11 +138,11 @@ describe('issue_here', () => {
 	it('reads the lane a directory sits in as a number', () => {
 		const directory = lane_paths.lane_directory(lane_paths.lane_root(REPOSITORY_ROOT, {}), ISSUE)
 
-		expect(lane_paths.issue_here(directory, {})).toBe(Number(ISSUE))
+		expect(lane_paths.issue_here({ directory, environment: {} })).toBe(Number(ISSUE))
 	})
 
 	it('says nothing outside a lane', () => {
-		expect(lane_paths.issue_here(REPOSITORY_ROOT, {})).toBeUndefined()
+		expect(lane_paths.issue_here({ directory: REPOSITORY_ROOT, environment: {} })).toBeUndefined()
 	})
 })
 

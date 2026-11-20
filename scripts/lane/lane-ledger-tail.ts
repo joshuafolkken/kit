@@ -377,11 +377,13 @@ interface WindowStore {
 }
 
 interface WindowOptions {
+	// The entries the window keeps; every entry when omitted.
+	readonly is_kept?: Keep
 	// The reader's start only moves on with the clock: lines before it are let go (#8206).
 	readonly slides?: boolean
 }
 
-function window_store(is_kept: Keep = is_any, options: WindowOptions = {}): WindowStore {
+function window_store({ is_kept = is_any, slides = false }: WindowOptions = {}): WindowStore {
 	const windows = new Map<string, Window>()
 
 	function read(path: string, since_ms: number): ReadonlyArray<LedgerEntry> {
@@ -395,7 +397,7 @@ function window_store(is_kept: Keep = is_any, options: WindowOptions = {}): Wind
 			return EMPTY
 		}
 
-		windows.set(path, options.slides === true ? pruned(window, since_ms) : window)
+		windows.set(path, slides ? pruned(window, since_ms) : window)
 
 		return window.tail.entries.filter((entry) => is_since(entry, since_ms))
 	}
