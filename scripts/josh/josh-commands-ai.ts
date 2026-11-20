@@ -611,6 +611,34 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
+	'lane:phases': {
+		script: 'scripts/lane/lane-phases-cli.ts',
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
+		description:
+			"Print the lanes' median minutes and sample count by phase, across Issues or a date range",
+		category: 'AI tools',
+		reference: ['<issue>... | --since <date> [--until <date>]', 'maintainer', ['none']],
+		usage: {
+			flags: [
+				{
+					names: ['--since'],
+					description:
+						'reads the lanes merged on or after this date (ISO) instead of named Issues.',
+				},
+				{
+					names: ['--until'],
+					description: 'with `--since`, leaves out the lanes merged after this date (ISO).',
+				},
+			],
+			examples: [
+				{ arguments: '101 102 103', note: 'the phases of the named lanes' },
+				{
+					arguments: '--since 2026-11-19 --until 2026-11-20',
+					note: 'the lanes merged in a period',
+				},
+			],
+		},
+	},
 	'lane:why': {
 		script: 'scripts/lane/lane-why-cli.ts',
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,

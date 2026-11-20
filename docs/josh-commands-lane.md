@@ -439,6 +439,36 @@ Each ship stage lists its inner steps under it, longest first: the `ship-lap` ro
 
 A stretch between ship stages that a park fell in is named after the park instead: `pause for #<M>` or `park (<reason>)`, net of its wait, and what the lane redid up to its next park — `(re-plan, ship ×2 re-run)`, a ship counted again where a stage starts twice (`lane-breakdown-pause.ts`).
 
+#### `josh lane:phases`
+
+<!-- usage: lane:phases -->
+
+Print the lanes' median minutes and sample count by phase, across Issues or a date range.
+
+```bash
+pnpm josh lane:phases 101 102 103                             # the phases of the named lanes
+pnpm josh lane:phases --since 2026-11-19 --until 2026-11-20   # the lanes merged in a period
+```
+
+**Options:**
+
+- `--since` — reads the lanes merged on or after this date (ISO) instead of named Issues.
+- `--until` — with `--since`, leaves out the lanes merged after this date (ISO).
+
+<!-- /usage -->
+
+Prints, for the named lanes or the lanes merged in the period, each phase's median minutes and its sample count. A lane lacking a phase's bounding records is left out of that phase's samples, not counted as zero (`lane-phases.ts`).
+
+The bounds, per lane:
+
+- prep & investigation — the last dispatch before the first `run:chain` to the lane's first implementation marker (`plan` / `lane-phase … implement` run event, as `lane:breakdown` reads it);
+- implement — that marker to the first `run:chain`'s start;
+- local checks — every `run:chain` stage but the review stages and `ship`, summed;
+- review — the review stages summed, plus the first review round's wait: the last pre-review `run:chain`'s end to the first `--join` run's start;
+- push → merge — the first `ship` chain stage's start to the last merge, and apart under it the `ci-wait` stages inside that span.
+
+A period is read with the ledger's window read (`lane_ledger_tail.read_since`), so the ledger older than `--since` is never held in memory; named Issues read the ledger and its archive.
+
 #### `josh lane:why`
 
 <!-- usage: lane:why -->
