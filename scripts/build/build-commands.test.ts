@@ -8,7 +8,7 @@ import { josh_logic } from '#scripts/josh/josh-logic'
 import { run_board_worker_entry } from '#scripts/run/board/run-board-worker-entry'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { build_commands, bundled_scripts } from './build-commands'
+import { build_commands, built_scripts, bundled_scripts } from './build-commands'
 import { bundle_flag } from './bundle-flag'
 import { COMMANDS_TEST_PREFIX } from './distribution-scratch-fixture'
 import { hook_bundle_stamp } from './hook-bundle-stamp'
@@ -88,16 +88,33 @@ describe('every script command is pre-built', () => {
 	})
 
 	it('names each bundle once, so no two commands write the same output file', () => {
-		const outputs = bundled_scripts().map((script) =>
+		const outputs = built_scripts().map((script) =>
 			josh_in_process.bundled_script_path(PACKAGE_DIR, script),
 		)
 
 		expect(new Set(outputs).size).toBe(outputs.length)
 	})
 
-	// joshuafolkken/kit#8344: the live board's worker thread starts from its own bundle.
+	it('moves the code the commands share into chunks beside them', () => {
+		const chunks = readdirSync(out_directory).filter((name) => name.startsWith(CHUNK_PREFIX))
+
+		expect(chunks.length).toBeGreaterThan(0)
+	})
+})
+
+// joshuafolkken/kit#8344: the live board's worker thread starts from its own bundle.
+describe('the live board worker is pre-built', () => {
 	it('builds the live board worker beside the commands', () => {
 		expect(existsSync(bundle_of(run_board_worker_entry.WORKER_SCRIPT))).toBe(true)
+	})
+
+	it('loads the built worker under plain node, with no TypeScript loader', () => {
+		const result = spawnSync('node', [bundle_of(run_board_worker_entry.WORKER_SCRIPT)], {
+			cwd: PACKAGE_DIR,
+			encoding: 'utf8',
+		})
+
+		expect(result.status).toBe(0)
 	})
 
 	it('reads as bundled inside the build, and as source here', () => {
@@ -106,11 +123,5 @@ describe('every script command is pre-built', () => {
 
 		expect(texts.some((text) => BUNDLED_READ.test(text))).toBe(false)
 		expect(bundle_flag.is_bundled()).toBe(false)
-	})
-
-	it('moves the code the commands share into chunks beside them', () => {
-		const chunks = readdirSync(out_directory).filter((name) => name.startsWith(CHUNK_PREFIX))
-
-		expect(chunks.length).toBeGreaterThan(0)
 	})
 })

@@ -68,4 +68,4 @@ async function build_commands(out_directory: string = OUT_DIR): Promise<string> 
 	return out_directory
 }
 
-export { build_commands, bundled_scripts, OUT_DIR }
+export { build_commands, built_scripts, bundled_scripts, OUT_DIR }
