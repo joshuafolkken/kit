@@ -130,7 +130,7 @@ describe('run_board_strip.strip_bytes — while a row types', () => {
 describe('run_board_strip.strip_bytes — the lock', () => {
 	const typing = typing_of(START)
 	const done_ms = START + (LETTERS - 1) * LETTER_MS
-	const locked_ms = run_board_codes.locked_at(typing, RULES) ?? 0
+	const locked_ms = run_board_codes.locked_at(typing) ?? 0
 
 	it('stays full while the lock crosses, the last lamp red', () => {
 		const cells = bytes_at(typing, done_ms + 100)

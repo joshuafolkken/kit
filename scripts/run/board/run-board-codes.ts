@@ -8,18 +8,18 @@ import { run_board_theme_defs } from './run-board-theme-defs'
 import { run_board_type_rows, type Typing } from './run-board-type-rows'
 
 // joshuafolkken/kit#8375: while a row types on a wargames live board, every section rule's `─` runs
-// launch-code characters; once the last row is typed through, a lock crosses the screen left to right
-// and turns the code back into the rule. The cells are written between redraws, like the lamps.
+// launch-code characters; once the last row is typed through, each cell turns back into the rule on a
+// step of its own, all within `SCATTER_STEPS` (joshuafolkken/kit#8403). The cells are written between
+// redraws, like the lamps.
 
 const CSI = '\u{1B}['
 const RULE = '─'
 const CODE = 'ABCDEFGHJKLMNPQRSTUVWXYZ0123456789'
-// The lock's step; the code changes every `CHANGE_MS`.
+// The write step; the code changes every `CHANGE_MS`.
 const CODE_MS = 50
 const CHANGE_MS = 100
-const LOCK_COLUMNS = 5
-const LOCK_HEAD_COLUMNS = 2
-const LOCK_PAINT: Paint = { rgb: '235;255;252', named: 'white' }
+// The steps after the typing within which every cell is back to the rule, whatever the board's width.
+const SCATTER_STEPS = 20
 // The code and the rule it turns back into, in the rule's dim paint (joshuafolkken/kit#8397).
 const CODE_PAINT: Paint = run_board_theme_defs.THEME_DEFS.wargames.rule
 
@@ -29,8 +29,8 @@ interface RuleCell {
 	column: number
 }
 
-// What a rule cell shows at a moment: the rule, the code, or the code at the lock's head.
-type CellLook = 'rule' | 'code' | 'head'
+// What a rule cell shows at a moment: the rule or the code.
+type CellLook = 'rule' | 'code'
 
 type CodePorts = Pick<BoardPorts, 'write' | 'write_drawn'>
 
@@ -59,42 +59,40 @@ function step_of(ms: number, step_ms = CODE_MS): number {
 	return Math.floor(ms / step_ms)
 }
 
-// The moment the lock reaches the rightmost cell — none before any row has typed — so another effect can
+// The moment the last cell is back to the rule — none before any row has typed — so another effect can
 // end on it (joshuafolkken/kit#8376).
-function locked_at(typing: Typing, cells: ReadonlyArray<RuleCell>): number | undefined {
+function locked_at(typing: Typing): number | undefined {
 	const done_ms = run_board_type_rows.done_ms(typing)
 
 	if (done_ms === undefined) return undefined
-	const right = Math.max(0, ...cells.map((cell) => cell.column))
 
-	return (step_of(done_ms) + Math.ceil(right / LOCK_COLUMNS)) * CODE_MS
+	return (step_of(done_ms) + SCATTER_STEPS) * CODE_MS
 }
 
-// The columns the lock has turned back into the rule by `at_ms`; none while a row types.
-function locked_columns(typing: Typing, at_ms: number): number {
+// The steps since the last row typed through by `at_ms`; `-1` while a row types or before any has.
+function cooled_steps(typing: Typing, at_ms: number): number {
 	const done_ms = run_board_type_rows.done_ms(typing)
 
-	if (done_ms === undefined || run_board_type_rows.is_typing(typing, at_ms)) return 0
+	if (done_ms === undefined || run_board_type_rows.is_typing(typing, at_ms)) return -1
 
-	return Math.max(0, step_of(at_ms) - step_of(done_ms)) * LOCK_COLUMNS
+	return step_of(at_ms) - step_of(done_ms)
 }
 
-// Whether the rules run code at `at_ms`: while a row types, and until the lock has crossed them.
+// Whether the rules run code at `at_ms`: while a row types, and until every cell is back to the rule.
 function is_coding(typing: Typing, cells: ReadonlyArray<RuleCell>, at_ms: number): boolean {
 	if (cells.length === 0) return false
 	if (run_board_type_rows.is_typing(typing, at_ms)) return true
 
-	return at_ms < (locked_at(typing, cells) ?? -Infinity)
+	return at_ms < (locked_at(typing) ?? -Infinity)
 }
 
-function look_of(cell: RuleCell, locked: number): CellLook {
-	if (cell.column <= locked) return 'rule'
-
-	return cell.column - locked <= LOCK_HEAD_COLUMNS && locked > 0 ? 'head' : 'code'
+// A cell turns back into the rule once `cooled` passes its own step, so the cells go back scattered.
+function look_of(cell: RuleCell, cooled: number): CellLook {
+	return run_board_lamps.mixed([cell.row, cell.column]) % SCATTER_STEPS < cooled ? 'rule' : 'code'
 }
 
-// A code character for the cell, changing every `CHANGE_MS` — slower than the lock's step, so the code
-// stays behind the typing head (joshuafolkken/kit#8397).
+// A code character for the cell, changing every `CHANGE_MS` — two write steps, so the code stays behind
+// the typing head (joshuafolkken/kit#8397).
 function code_of(cell: RuleCell, at_ms: number): string {
 	const step = step_of(at_ms, CHANGE_MS)
 
@@ -102,13 +100,12 @@ function code_of(cell: RuleCell, at_ms: number): string {
 }
 
 function cell_text(cell: RuleCell, look: CellLook, at_ms: number): string {
-	if (look === 'rule') return run_board_labels.painted(CODE_PAINT, '-')
-
-	return run_board_labels.painted(look === 'head' ? LOCK_PAINT : CODE_PAINT, code_of(cell, at_ms))
+	return run_board_labels.painted(CODE_PAINT, look === 'rule' ? '-' : code_of(cell, at_ms))
 }
 
 // The cells to write at `at_ms`: every cell running code, and the rule back in each cell that ran code at
-// `since_ms`, the last write — none to restore after a redraw, which drew the rules.
+// `since_ms`, the last write — none to restore after a redraw, which drew the rules. A cell that is code
+// at `at_ms` was code at `since_ms` too, so the earlier step picks both.
 function code_bytes(
 	typing: Typing,
 	cells: ReadonlyArray<RuleCell>,
@@ -118,14 +115,14 @@ function code_bytes(
 	const did_code = since_ms !== undefined && is_coding(typing, cells, since_ms)
 
 	if (!did_code && !is_coding(typing, cells, at_ms)) return ''
-	const locked = locked_columns(typing, at_ms)
-	const passed = did_code ? locked_columns(typing, since_ms) : locked
+	const cooled = cooled_steps(typing, at_ms)
+	const passed = did_code ? Math.min(cooled_steps(typing, since_ms), cooled) : cooled
 
 	return cells
-		.filter((cell) => cell.column > Math.min(passed, locked))
+		.filter((cell) => look_of(cell, passed) === 'code')
 		.map(
 			(cell) =>
-				`${CSI}${String(cell.row)};${String(cell.column)}H${cell_text(cell, look_of(cell, locked), at_ms)}`,
+				`${CSI}${String(cell.row)};${String(cell.column)}H${cell_text(cell, look_of(cell, cooled), at_ms)}`,
 		)
 		.join('')
 }
@@ -154,6 +151,7 @@ const run_board_codes = {
 	is_coding,
 	locked_at,
 	rule_cells,
+	SCATTER_STEPS,
 	write_codes,
 }
 
