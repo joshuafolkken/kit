@@ -1,0 +1,7 @@
+{
+	"reason": "Optional positional parameters now use typed options; 14 added code lines preserve defaults and error isolation.",
+	"date": "2026-11-20",
+	"growth": {
+		"scripts.code_lines": 14
+	}
+}

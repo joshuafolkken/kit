@@ -330,7 +330,7 @@ function delivery_path(rule_id: string, transcript_path: string): string {
 // still right one reissue later; stamps are keyed per id, so it is delivered then.
 function delivery(
 	raw_payload: string,
-	now_ms: number = Date.now(),
+	now_ms: number,
 	context: HookContext = hook_context.from_process(),
 ): string | undefined {
 	for (const guard of GUARDS.values()) {

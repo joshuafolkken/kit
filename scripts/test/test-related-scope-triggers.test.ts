@@ -35,7 +35,7 @@ function at(file: string): string {
 
 function scope_of(
 	changed: ScopeRequest['changed'],
-	since_map: ReadonlyArray<string> = [],
+	since_map: ReadonlyArray<string>,
 	naming_moved: ReadonlySet<string> = new Set(),
 ): ReturnType<typeof related_scope.resolve_scope> {
 	return related_scope.resolve_scope({
@@ -117,13 +117,16 @@ describe('related_scope.resolve_scope — the worker share', () => {
 	const worker_share = path.join(SCRIPTS_DIRECTORY, 'test', 'unit-worker-share.ts')
 
 	it('narrows a change to the worker share rather than running the whole suite', () => {
-		expect(scope_of([worker_share])).toMatchObject({ mode: 'related', files: [at(worker_share)] })
+		expect(scope_of([worker_share], [])).toMatchObject({
+			mode: 'related',
+			files: [at(worker_share)],
+		})
 	})
 })
 
 describe('related_scope.resolve_scope — the files that sent it to the whole suite', () => {
 	it('holds every changed file every test depends on, while the reason names the first', () => {
-		const scope = scope_of([SOURCE_FILE, PACKAGE_FILE, LOCK_FILE])
+		const scope = scope_of([SOURCE_FILE, PACKAGE_FILE, LOCK_FILE], [])
 
 		expect(scope.mode).toBe('all')
 		expect(scope.files).toStrictEqual([at(PACKAGE_FILE), at(LOCK_FILE)])
@@ -131,7 +134,7 @@ describe('related_scope.resolve_scope — the files that sent it to the whole su
 	})
 
 	it('holds every changed file no recorded test read', () => {
-		const scope = scope_of([NEW_DRAFT, DOCUMENT_FILE, OTHER_NEW_DRAFT])
+		const scope = scope_of([NEW_DRAFT, DOCUMENT_FILE, OTHER_NEW_DRAFT], [])
 
 		expect(scope.mode).toBe('all')
 		expect(scope.files).toStrictEqual([at(NEW_DRAFT), at(OTHER_NEW_DRAFT)])
@@ -152,8 +155,8 @@ describe('related_scope.resolve_scope — the files that sent it to the whole su
 	})
 
 	it('holds no file where no file sent it there', () => {
-		expect(scope_of(undefined).files).toStrictEqual([])
-		expect(scope_of([]).files).toStrictEqual([])
+		expect(scope_of(undefined, []).files).toStrictEqual([])
+		expect(scope_of([], []).files).toStrictEqual([])
 	})
 })
 

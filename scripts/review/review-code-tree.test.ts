@@ -23,6 +23,7 @@ const DELETED = 'src/gone.ts'
 const BASE = '0123456789abcdef0123456789abcdef01234567'
 const CODE = 'const value = 1\n'
 const CHANGED_CODE = 'const value = 2\n'
+const IN_ROOT = { root: ROOT, api: ts }
 
 function write(relative: string, text: string): void {
 	mkdirSync(path.dirname(path.join(ROOT, relative)), { recursive: true })
@@ -116,9 +117,9 @@ describe('review_code_tree.inert_since — the paths whose code the base already
 		write(SOURCE, `// Explained.\n${CODE}`)
 		write(OTHER_SOURCE, CHANGED_CODE)
 
-		expect(
-			await review_code_tree.inert_since(BASE, [SOURCE, OTHER_SOURCE], ROOT, ts),
-		).toStrictEqual([SOURCE])
+		expect(await review_code_tree.inert_since(BASE, [SOURCE, OTHER_SOURCE], IN_ROOT)).toStrictEqual(
+			[SOURCE],
+		)
 	})
 
 	it('names neither a file new since the base nor a documentation path', async () => {
@@ -126,14 +127,14 @@ describe('review_code_tree.inert_since — the paths whose code the base already
 		write(SOURCE, CODE)
 		write(DOCUMENT, '# Guide\n')
 
-		expect(await review_code_tree.inert_since(BASE, [SOURCE, DOCUMENT], ROOT, ts)).toStrictEqual([])
+		expect(await review_code_tree.inert_since(BASE, [SOURCE, DOCUMENT], IN_ROOT)).toStrictEqual([])
 	})
 
 	it('names nothing where TypeScript cannot be resolved from the project', async () => {
 		base_holds({ [SOURCE]: CODE })
 		write(SOURCE, CODE)
 
-		expect(await review_code_tree.inert_since(BASE, [SOURCE], ROOT)).toStrictEqual([])
+		expect(await review_code_tree.inert_since(BASE, [SOURCE], { root: ROOT })).toStrictEqual([])
 	})
 })
 
@@ -146,28 +147,28 @@ describe('review_code_tree.inert_since — a change to import specifiers only', 
 		base_holds({ [SOURCE]: `${OLD_IMPORT}${CODE}` })
 		write(SOURCE, `${NEW_IMPORT}${CODE}`)
 
-		expect(await review_code_tree.inert_since(BASE, [SOURCE], ROOT, ts)).toStrictEqual([SOURCE])
+		expect(await review_code_tree.inert_since(BASE, [SOURCE], IN_ROOT)).toStrictEqual([SOURCE])
 	})
 
 	it('does not name a file whose body changed beside the import', async () => {
 		base_holds({ [SOURCE]: `${OLD_IMPORT}${CODE}` })
 		write(SOURCE, `${NEW_IMPORT}${CHANGED_CODE}`)
 
-		expect(await review_code_tree.inert_since(BASE, [SOURCE], ROOT, ts)).toStrictEqual([])
+		expect(await review_code_tree.inert_since(BASE, [SOURCE], IN_ROOT)).toStrictEqual([])
 	})
 
 	it('does not name a file whose import changed a binding name', async () => {
 		base_holds({ [SOURCE]: `${OLD_IMPORT}${CODE}` })
 		write(SOURCE, `import { schema } from '#scripts/agent/agent-profile-schema'\n${CODE}`)
 
-		expect(await review_code_tree.inert_since(BASE, [SOURCE], ROOT, ts)).toStrictEqual([])
+		expect(await review_code_tree.inert_since(BASE, [SOURCE], IN_ROOT)).toStrictEqual([])
 	})
 
 	it('does not name a file whose side-effect import moved, since that path alone decides what runs', async () => {
 		base_holds({ [SOURCE]: `import './setup-old'\n${CODE}` })
 		write(SOURCE, `import './setup-new'\n${CODE}`)
 
-		expect(await review_code_tree.inert_since(BASE, [SOURCE], ROOT, ts)).toStrictEqual([])
+		expect(await review_code_tree.inert_since(BASE, [SOURCE], IN_ROOT)).toStrictEqual([])
 	})
 
 	it('keeps the round-1 digest sensitive to a moved import', () => {

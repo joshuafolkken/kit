@@ -71,7 +71,7 @@ function guarded_share(
 // resolves `#scripts` from the working directory, as the config does. A child that fails or prints no
 // number counts no lane, which leaves the division to the run count, as `live_lane_count` does.
 const LANE_COUNT_SOURCE = `import { unit_lane_count } from '#scripts/test/unit-lane-count'
-process.stdout.write(String(unit_lane_count.live_lane_count(process.argv[1])))`
+process.stdout.write(String(unit_lane_count.live_lane_count({ checkout: process.argv[1] })))`
 
 function spawned_lane_count(
 	checkout: string = process.cwd(),

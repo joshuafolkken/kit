@@ -124,7 +124,7 @@ describe('vitest_config_workers.lane_count_probe.spawned_lane_count', () => {
 
 		expect(lane_count_probe.spawned_lane_count(checkout, {})).toBe(LANES.length)
 		expect(lane_count_probe.spawned_lane_count(checkout, {})).toBe(
-			unit_lane_count.live_lane_count(checkout, {}),
+			unit_lane_count.live_lane_count({ checkout, environment: {} }),
 		)
 	})
 

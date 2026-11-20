@@ -40,10 +40,10 @@ function own_lane(checkout: string, environment: LaneEnvironment): string | unde
 // the asking lane itself, which a person may gate while its record still says `human-review`. A stray
 // directory or one with no record is still counted, an upper bound. **Unreadable counts none**, which
 // leaves the division to the run count as it was — a lanes root that does not exist, as on CI, among them.
-function live_lane_count(
-	checkout: string = process.cwd(),
-	environment: LaneEnvironment = process.env,
-): number {
+function live_lane_count({
+	checkout = process.cwd(),
+	environment = process.env,
+}: { checkout?: string; environment?: LaneEnvironment } = {}): number {
 	try {
 		const lanes_root = lane_paths.lanes_root_of(checkout, environment)
 		const own = own_lane(checkout, environment)

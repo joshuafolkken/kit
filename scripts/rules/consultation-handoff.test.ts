@@ -39,7 +39,7 @@ function delivered(model: string | undefined, command: string): string | undefin
 		tool_input: { command },
 	}
 
-	return delivered_rules.delivery(JSON.stringify(payload))
+	return delivered_rules.delivery(JSON.stringify(payload), Date.now())
 }
 
 function codex_delivered(payload_model: string, command: string): string | undefined {
@@ -50,7 +50,7 @@ function codex_delivered(payload_model: string, command: string): string | undef
 		model: payload_model,
 	}
 
-	return delivered_rules.delivery(JSON.stringify(payload))
+	return delivered_rules.delivery(JSON.stringify(payload), Date.now())
 }
 
 function unit_delivered(command: string): string | undefined {
@@ -64,6 +64,7 @@ function unit_delivered(command: string): string | undefined {
 
 	return delivered_rules.delivery(
 		JSON.stringify({ transcript_path, agent_id, tool_name: 'Bash', tool_input: { command } }),
+		Date.now(),
 	)
 }
 

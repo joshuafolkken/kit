@@ -169,13 +169,12 @@ async function issue_list_label_first_page(label: string): Promise<ReadDetail> {
 // repository", and asking for `blockedBy` would put a dependencies request behind the guard — where
 // a refused one fails the whole listing, which this caller must never read as "nothing is running".
 //
-// `repo` names the repository inside the REST path (`git-gh-api-path.ts`). Omitted, the listing is
-// the repository the command runs in, exactly as every other listing here. `json_fields` widens the
+// `repo` names the repository inside the REST path (`git-gh-api-path.ts`). `json_fields` widens the
 // fields for a caller that judges the rows (`backlog-interrupt.ts` reads the body).
 async function issue_list_by_label_in_repo(
 	label: string,
 	limit: number,
-	repo?: string,
+	repo: string,
 	options?: { json_fields?: string },
 ): Promise<IssueListOutcome> {
 	return await issue_list({
