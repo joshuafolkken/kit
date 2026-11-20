@@ -2,7 +2,7 @@ import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
 import { temporary_directory } from '#tools/test/temporary-directory'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { cost_audit_fixture } from './cost-audit-fixture'
 import { cost_audit_read } from './cost-audit-read'
 
@@ -142,6 +142,40 @@ describe('cost_audit_read.load — a delegated unit carries its agent type', () 
 		const types = cost_audit_read.load('/dev/kit', 0).map((one) => one.agent_type)
 
 		expect(types).toStrictEqual([undefined, 'investigator'])
+	})
+})
+
+// joshuafolkken/kit#8284: `--density` opens the lane children's own transcripts alone.
+const LANE_FILE = { ...MAIN_FILE, session_id: 's2', path: `${LANE}/s2.jsonl`, modified_ms: 5 }
+const STORE = [
+	LANE_FILE,
+	{ ...LANE_FILE, session_id: 's3', path: `${LANE}/s3.jsonl`, modified_ms: 1 },
+	{ ...LANE_FILE, path: `${LANE}/s2/a.jsonl`, is_delegated: true, depth: 1 },
+	{ ...MAIN_FILE, modified_ms: 5 },
+]
+
+// The store stubbed to `STORE` under the one lane `LANE`, answering the spy every file read goes through.
+function stub_store(): MockInstance<typeof cost_transcript.read_raw> {
+	vi.spyOn(cost_transcript, 'session_cwd').mockReturnValue('/dev/kit')
+	vi.spyOn(cost_transcript, 'transcript_directories').mockReturnValue([])
+	vi.spyOn(cost_transcript, 'list_sessions_across').mockReturnValue(STORE)
+	vi.spyOn(cost_transcript, 'lane_transcript_directories').mockReturnValue([LANE])
+
+	return vi.spyOn(cost_transcript, 'read_raw').mockReturnValue(prompt_line(0, FULLRUN_PROMPT))
+}
+
+describe('cost_audit_read.load_lane_children — only lane children are opened', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('opens no main checkout, delegated unit or pre-since transcript', () => {
+		const read = stub_store()
+		const sessions = cost_audit_read.load_lane_children('/dev/kit', 3)
+		const lane_file = LANE_FILE
+
+		expect(read.mock.calls.map(([file]) => file.path)).toStrictEqual([lane_file.path])
+		expect(sessions.map((one) => [one.issue, one.is_lane])).toStrictEqual([[5936, true]])
 	})
 })
 
