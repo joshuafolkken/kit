@@ -1,0 +1,7 @@
+{
+	"reason": "cost:audit kind rows gain per-period session counts and cost per session (#8329)",
+	"date": "2026-11-20",
+	"growth": {
+		"scripts.code_lines": 48
+	}
+}
