@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { git_argv, type ProgramCall } from '#scripts/rules/git-argv'
+import { interpreter_options } from '#scripts/rules/interpreter-options'
 import { shell_segments } from '#scripts/rules/shell-segments'
 import { time_shell } from '#scripts/time-runtime/time-shell'
 import { implementation_shell_deny } from './implementation-shell-deny'
@@ -62,6 +63,8 @@ const TIME_PROGRAM = /(?:^|\/)time$/u
 const TIME_WRITE = /^-(?:[A-Za-z]*o|-o)/u
 const CD_WRITE = 'a write beside `cd`, whose target is not read off the repository root'
 const STDIN_SHELL = 'a shell running the commands its standard input spells, which may be any write'
+const SCRATCH_RUN =
+	'a scratch script run directly, whose writes cannot be verified; run it with `pnpm josh scratch:run <path>`'
 
 // The irreversible operation a shell matched, or `undefined` when it runs.
 type Refusal = string | undefined
@@ -156,6 +159,15 @@ function outside_write_refusal(call: ProgramCall, root: string): Refusal {
 		: `\`${call.name}\` to a runtime path outside this checkout`
 }
 
+// joshuafolkken/kit#8262: a scratch script run directly writes wherever it likes and a revert takes back
+// only the files the call names; `josh scratch:run` confines its writes to the scratch area.
+function scratch_run_refusal(name: string, args: Array<string>, root: string): Refusal {
+	const words = interpreter_options.is_interpreter(name) ? [name, ...args] : [name]
+	const is_direct = words.some((word) => step_zero_notice.is_scratch_file(word, root))
+
+	return is_direct ? SCRATCH_RUN : undefined
+}
+
 function call_refusal(segment: string, call: ProgramCall, root: string): Refusal {
 	if (FILE_PROGRAMS.has(call.name)) return file_write_refusal(call, root)
 	if (implementation_shell_nested.reads_stdin(call)) return STDIN_SHELL
@@ -165,7 +177,11 @@ function call_refusal(segment: string, call: ProgramCall, root: string): Refusal
 	// `pnpm install` reaches here as the program `install`, so a writer still meets the deny-list.
 	const outside = outside_write_refusal(call, root)
 
-	return outside ?? implementation_shell_deny.refusal(segment, { name, args })
+	return (
+		outside ??
+		scratch_run_refusal(name, args, root) ??
+		implementation_shell_deny.refusal(segment, { name, args })
+	)
 }
 
 function body_of(segment: string): string {

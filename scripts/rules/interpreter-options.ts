@@ -174,6 +174,17 @@ function shell_script_index(call: ProgramCall): number {
 	return inline_index(call, new Set([`-${SHELL_SCRIPT_LETTERS}`]))
 }
 
-const interpreter_options = { SHELLS, is_inline_execution, shell_script_index, syntax_word }
+// A program that runs the script file its arguments name.
+function is_interpreter(name: string): boolean {
+	return INLINE_FLAGS.has(name) || SHELLS.has(name)
+}
+
+const interpreter_options = {
+	SHELLS,
+	is_inline_execution,
+	is_interpreter,
+	shell_script_index,
+	syntax_word,
+}
 
 export { interpreter_options }

@@ -48,6 +48,9 @@ const UNLINKED_REQUEST =
 // joshuafolkken/kit#7759: a no-filing request is carried out, but through subagents, never by this session.
 const NO_FILING_REQUEST =
 	'a no-filing request (「起票せずに」) is carried out through the investigator and producer subagents, never edited by this session; '
+// joshuafolkken/kit#8262: a consultation artifact (an image, a diagram) has its own scratch route.
+const SCRATCH_ARTIFACT =
+	'a scratch artifact is written under `.josh/tmp/scratch/` and its script run with `pnpm josh scratch:run <path>`; '
 const CONSULTATION_SUFFIX =
 	'otherwise hand implementation to a launcher-assigned worker lane. Model names and conversational requests do not grant implementation authority.'
 
@@ -60,7 +63,7 @@ function scope_line(
 
 	const request = is_linked() ? LINKED_REQUEST : UNLINKED_REQUEST
 
-	return `${CONSULTATION_PREFIX}${request}${NO_FILING_REQUEST}${CONSULTATION_SUFFIX}`
+	return `${CONSULTATION_PREFIX}${request}${NO_FILING_REQUEST}${SCRATCH_ARTIFACT}${CONSULTATION_SUFFIX}`
 }
 
 const agent_session_role = {

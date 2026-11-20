@@ -192,6 +192,47 @@ describe('operational shell authority', () => {
 	})
 })
 
+// joshuafolkken/kit#8262: a consultation artifact is written to the scratch area and its script run
+// only through `josh scratch:run`.
+const SCRATCH_SCRIPT = '.josh/tmp/scratch/x/gen.mjs'
+
+describe('consultation scratch artifacts', () => {
+	it('allows writing a script of any extension into the scratch area', () => {
+		vi.stubEnv(agent_session_role.KEY, undefined)
+
+		expect(implementation_authority.reason(payload([SCRATCH_SCRIPT], 'Write'))).toBeUndefined()
+	})
+
+	it.each(['src/app.ts', RUNTIME_FILE, '.josh/tmp/gen.mjs'])(
+		'still refuses a write outside the scratch area: %s',
+		(file_path) => {
+			vi.stubEnv(agent_session_role.KEY, undefined)
+
+			expect(implementation_authority.reason(payload([file_path], 'Write'))).toContain(REFUSED)
+			expect(implementation_authority.reason(payload([file_path]))).toContain(REFUSED)
+		},
+	)
+
+	it.each([
+		['node --input-type=module - out.png <<EOF\nx\nEOF', 'a heredoc'],
+		...['node', 'python3', 'bash'].map((name) => [`${name} ${SCRATCH_SCRIPT}`, 'scratch:run']),
+	])('refuses %s', (command, rule) => {
+		vi.stubEnv(agent_session_role.KEY, undefined)
+
+		expect(implementation_authority.reason(shell_payload(command))).toContain(rule)
+	})
+
+	it.each([
+		`pnpm josh scratch:run ${SCRATCH_SCRIPT}`,
+		'printf x | tee .josh/tmp/scratch/x/out.png',
+		'printf x > .josh/tmp/scratch/x/out.svg',
+	])('runs %s', (command) => {
+		vi.stubEnv(agent_session_role.KEY, undefined)
+
+		expect(implementation_authority.reason(shell_payload(command))).toBeUndefined()
+	})
+})
+
 // joshuafolkken/kit#7761: a no-filing request is built by the production subagent alone.
 const NO_FILING = '起票せずにボタンを作って'
 const PLAIN = 'ボタンを作って'
