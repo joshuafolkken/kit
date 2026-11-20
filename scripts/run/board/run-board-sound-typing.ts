@@ -3,7 +3,7 @@ import type { Note } from './run-board-sound-synth'
 import { run_board_sound_wav } from './run-board-sound-wav'
 
 // joshuafolkken/kit#8250: the teletype trill a live board in a theme sounds while a line types — two
-// sine notes, B♭5 then D6, one pair per letter at the intro's pace (`LETTER_MS`). One player sounds it
+// sine notes, B♭5 then D6, one pair per letter at the intro's pace (the theme row's `intro.letter_ms`, `run-board-theme-defs.ts`). One player sounds it
 // however many rows type at once: `set` is idempotent, so a second `on` starts no second player and a
 // second `off` does nothing. The WAV is `TRILL_PAIRS` pairs long; a player that ends while the trill is
 // still on is started again on the same file, so a longer typing sounds without a gap. A
