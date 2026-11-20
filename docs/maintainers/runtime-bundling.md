@@ -36,6 +36,10 @@ build fails. tsx stays a runtime dependency: a detached `.ts` child (the ship re
 supervisors) gets it through `ts_entry_loader.loader_argv`, and `metrics` loads the command map
 with `tsImport`.
 
+The live `run:board`'s worker is built to `dist/commands/run-board-gather-worker.js`; a bundled
+board starts it without tsx or an esbuild service (joshuafolkken/kit#8344,
+`scripts/build/bundle-flag.ts`).
+
 - **One build, shared chunks** — `pnpm build` bundles the script of every command-map entry
   (`scripts/build/build-commands.ts`) to `dist/commands/<script basename>.js` with code splitting,
   so code the commands share lands once in `chunk-*.js`. The dispatcher derives the same path
