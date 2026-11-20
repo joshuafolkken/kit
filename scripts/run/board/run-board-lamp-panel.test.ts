@@ -10,6 +10,7 @@ import { run_board_render_fixture } from './run-board-render-fixture'
 import { run_board_render_quota } from './run-board-render-quota'
 import { run_board_render_throughput } from './run-board-render-throughput'
 import { run_board_spot } from './run-board-spot'
+import type { Theme } from './run-board-theme-defs'
 import type { ThroughputRow } from './run-board-throughput'
 import { run_board_tick } from './run-board-tick'
 import { run_board_tick_draw } from './run-board-tick-draw'
@@ -23,6 +24,7 @@ const { FRESH_STATE, layout_for } = run_board_tick
 const WIDE = { rows: 60, columns: 200 }
 const { rows_part } = run_board_render_throughput
 const { has_lamps } = run_board_tick_draw
+const THEME: Theme = 'wargames'
 const { width_of } = run_board_fit
 const HOUR = 3_600_000
 const GAP = 2
@@ -263,13 +265,13 @@ describe('run_board_tick_draw.has_lamps', () => {
 	it('draws lamps on a live board in a theme, on a terminal drawing color', () => {
 		vi.stubEnv('FORCE_COLOR', '3')
 
-		expect(has_lamps({ types_rows: true, is_tty: true })).toBe(true)
+		expect(has_lamps({ types_rows: true, theme: THEME, is_tty: true })).toBe(true)
 	})
 
 	it.each([
-		['no theme', { types_rows: undefined, is_tty: true }],
-		['--every', { types_rows: false, is_tty: true }],
-		['--once, --chat and a pipe', { types_rows: true, is_tty: false }],
+		['no theme', { types_rows: undefined, theme: undefined, is_tty: true }],
+		['--every', { types_rows: false, theme: THEME, is_tty: true }],
+		['--once, --chat and a pipe', { types_rows: true, theme: THEME, is_tty: false }],
 	])('draws none with %s', (_, ports) => {
 		vi.stubEnv('FORCE_COLOR', '3')
 
@@ -279,7 +281,14 @@ describe('run_board_tick_draw.has_lamps', () => {
 	it('draws none on a terminal drawing no color', () => {
 		vi.stubEnv('FORCE_COLOR', '0')
 
-		expect(has_lamps({ types_rows: true, is_tty: true })).toBe(false)
+		expect(has_lamps({ types_rows: true, theme: THEME, is_tty: true })).toBe(false)
+	})
+
+	it('draws none in a theme whose definition draws no lamps', () => {
+		vi.stubEnv('FORCE_COLOR', '3')
+		const ports = { types_rows: true, theme: THEME, is_tty: true }
+
+		expect(has_lamps(ports, { [THEME]: { lamps: false } })).toBe(false)
 	})
 })
 
@@ -289,7 +298,8 @@ function redrawn(types_rows: boolean): { lamps: number; marks: number } {
 	const { ports, frames } = harness(LOCAL, [])
 	const state = { ...FRESH_STATE, plan: plan_titled('a'), run_started_ms: LOCAL.started_ms }
 	const local = { ...LOCAL, throughput: ROWS }
-	const redraw = { ports: { ...ports, types_rows, size: () => WIDE }, now_ms: START }
+	const theme = types_rows ? THEME : undefined
+	const redraw = { ports: { ...ports, types_rows, theme, size: () => WIDE }, now_ms: START }
 	const active = [{ ...WIDE_LANE }]
 	const drawn = drawn_from(state, local, redraw, { ...layout_for(state, local, START), active })
 	const written = stripVTControlCharacters(frames.join(''))
