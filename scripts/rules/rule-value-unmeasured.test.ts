@@ -41,6 +41,8 @@ const UNMEASURABLE_ROWS: ReadonlyArray<string> = [
 	'investigation',
 	// A Stop rule: a reply under the limit is the absence of an act, with no call to score.
 	'concise-reply',
+	// A Stop rule: a closed reply is the absence of an act, with no call to score.
+	'reply-close',
 ]
 
 describe('rule_value.measure — rules nothing can score', () => {
