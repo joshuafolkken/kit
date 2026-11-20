@@ -53,9 +53,11 @@ const LANE = with_lines(
 )
 const HANDOFF = with_lines(session('handoff', [write('d', 0), write('e', 20)]), [
 	request_line(0, 'd', 0, [bash('git status')]),
+	request_line(20, 'e', 0),
 ])
 const CONVERSATION = with_lines(session('conversation', [write('f', 0), write('g', 30)]), [
 	request_line(0, 'f', 0, [{ name: 'Read', input: { file_path: 'a.ts' } }]),
+	request_line(30, 'g', 0, [bash('ls')]),
 ])
 const SUBAGENT = session('subagent', [write('h', 0), write('i', 9)])
 const SESSIONS = [LANE, HANDOFF, CONVERSATION, SUBAGENT]

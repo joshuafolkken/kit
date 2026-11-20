@@ -53,13 +53,12 @@ function call_key(call: Block): string {
 	return command === '' ? call.name : command
 }
 
-// The last tool call the session issued before the request, the request's own lines excluded.
+// The last tool call the transcript holds above the request's first line; a request with no line has
+// none.
 function call_before(lines: ReadonlyArray<TranscriptLine>, record: UsageRecord): string {
-	const at_ms = record.at_ms ?? 0
-	const before = lines.filter(
-		(line) => line.timestamp_ms < at_ms && line.request_id !== record.request_id,
-	)
-	const calls = before
+	const first = lines.findIndex((line) => line.request_id === record.request_id)
+	const calls = lines
+		.slice(0, Math.max(first, 0))
 		.flatMap((line) => line.blocks)
 		.filter((block) => block.type === transcript_record.TOOL_USE_TYPE)
 	const call = calls.at(-1)

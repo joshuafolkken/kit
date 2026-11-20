@@ -61,9 +61,8 @@ describe('cost_audit_format.report_lines — the resume triggers', () => {
 	const resumes = { triggers, review_fix: row(REVIEW_FIX_PHASE, 6, 1) }
 
 	it('prints each trigger with its sessions and per-merge cost beside the period before', () => {
-		const lines = cost_audit_format.report_lines(
-			audit_with({ resumes, merges: { current: 4, previous: 2 } }),
-		)
+		const merges = { current: 4, previous: 2 }
+		const lines = cost_audit_format.report_lines(audit_with({ resumes, merges }))
 
 		expect(lines).toContain(
 			'  review-fix cut: $8.0000 (prev $2.0000, +300.0%) · 4 session(s) (prev 1) · $2.0000 per merge (prev $1.0000)',
@@ -181,12 +180,13 @@ describe('cost_audit_format.density_label — the line over the density', () => 
 describe('cost_audit_format.report_lines — the full cache rewrites', () => {
 	it('prints the rewrites after a wait and within the TTL beside the previous period', () => {
 		const current = { after_wait: { count: 631, usd: 182 }, within_ttl: { count: 2, usd: 0.5 } }
-		const lines = cost_audit_format.report_lines(
-			audit_with({ rewrites: { current, previous: NO_REWRITES, waits: [] } }),
-		)
+		const waits = [{ by: 'phase', rows: [{ key: 'plan', count: 631, usd: 182, tokens: 1 }] }]
+		const rewrites = { current, previous: NO_REWRITES, waits }
+		const lines = cost_audit_format.report_lines(audit_with({ rewrites }))
 
 		expect(lines).toContain('  after a wait of 5 min or more: 631 ($182.0000) (prev 0 ($0.0000))')
 		expect(lines).toContain('  within 5 min: 2 ($0.5000) (prev 0 ($0.0000))')
+		expect(lines).toContain('  plan: 631 · $182.0000 · 1 tokens')
 	})
 })
 
