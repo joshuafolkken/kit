@@ -4,6 +4,7 @@ import type { HoldCause } from '#scripts/run/merge/run-merge-usage-limit'
 import { run_board_fit, type DetailPart } from './run-board-fit'
 import { run_board_label_pair } from './run-board-label-pair'
 import { run_board_labels } from './run-board-labels'
+import { run_board_quota_lamps } from './run-board-quota-lamps'
 import type { QuotaProvider, QuotaReading, Quotas, QuotaWindow } from './run-board-quota-read'
 import { run_board_render_quota_cell, type Cell } from './run-board-render-quota-cell'
 import {
@@ -82,6 +83,8 @@ interface QuotaView {
 	hold?: QuotaHold | undefined
 	// GitHub's allowances, drawn after the usage-limit rows; none where they could not be read.
 	rate_limit?: GithubRateLimit | undefined
+	// Whether the frame runs the WOPR lamp panel (`run-board-quota-lamps.ts`).
+	has_lamps?: boolean | undefined
 }
 
 // The windows the provider reported, shortest first — the order its row and its summary both read.
@@ -283,14 +286,17 @@ function summary_of(view: QuotaView): string {
 function usage_part(view: QuotaView): DetailPart | undefined {
 	if (view.quotas === undefined) return undefined
 
+	const has_lamps = view.has_lamps === true
+	const providers = providers_of(view).map((provider) => row_of(provider, view))
 	const rows = [
-		...providers_of(view).map((provider) => row_of(provider, view)),
+		...run_board_quota_lamps.provider_rows(providers, has_lamps),
 		...rate_limit_rows(view),
 	]
 	const lines = rows.map((text) => ({ text, is_detail: false }))
 	const rule = run_board_render_section.columns_rule(LABEL, [])
+	const head = [run_board_quota_lamps.gap_line(has_lamps), rule]
 
-	return { head: ['', rule], lines, label: LABEL, summary: summary_of(view) }
+	return { head, lines, label: LABEL, summary: summary_of(view) }
 }
 
 const run_board_render_quota = { LEGEND, usage_part }

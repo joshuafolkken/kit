@@ -3,10 +3,11 @@ import { run_board_fit } from './run-board-fit'
 import { run_board_labels, type Paint, type TextColor } from './run-board-labels'
 import { run_board_spot } from './run-board-spot'
 
-// The WOPR lamp panel of `run:board --theme wargames` (joshuafolkken/kit#8236): right of the throughput
-// rows' NOW, a `■` every other column up to the section's rule, lit yellow on the `24h` row and red on
-// the `7d` row, out at half the row's color, dimmed (the row's named color dimmed where the terminal has
-// no 24-bit color).
+// The WOPR lamp panel of `run:board --theme wargames` (joshuafolkken/kit#8236): from two columns past the
+// throughput rows' NOW, a `■` every other column up to the section's rule, on five rows — the `24h` and
+// `7d` rows, the blank line under them, and the usage section's first two provider rows
+// (joshuafolkken/kit#8277) — lit yellow, yellow, red, yellow, red from the top, out at half the row's
+// color, dimmed (the row's named color dimmed where the terminal has no 24-bit color).
 // Lamps blink four to a group, each group on its own period and phase, about four in ten lit; whether
 // one is lit is read off the moment, its group and its place alone.
 
@@ -34,7 +35,17 @@ const MIX_SEED = 1
 // An out lamp is its row's color at half of each channel.
 const OUT_DIVISOR = 2
 type Shade = Exclude<Paint, TextColor>
-const SHADES: ReadonlyArray<Shade> = [GAUGE_SHADES.yellow, GAUGE_SHADES.red]
+const { red, yellow } = GAUGE_SHADES
+// The panel's rows from the top: the `24h` and `7d` rows (`0`, `1`), the blank line under them, and the
+// usage section's first two provider rows.
+const PANEL_ROWS = { gap: 2, first_usage: 3, second_usage: 4 }
+const SHADES: ReadonlyArray<Shade> = [yellow, yellow, red, yellow, red]
+
+// Where a panel starts and the column its rule ends at.
+interface PanelSpan {
+	start: number
+	end: number
+}
 
 function mix_step(state: number, value: number): number {
 	return ((state + value) * MIX_MULTIPLIER) % MIX_MODULUS
@@ -72,7 +83,7 @@ function count_of(width: number): number {
 }
 
 function shade_of(row: number): Shade | undefined {
-	return SHADES[row % SHADES.length]
+	return SHADES[row]
 }
 
 // `rgb` (`R;G;B`) with each channel halved, rounded.
@@ -91,7 +102,7 @@ function out_text(shade: Shade, text: string): string {
 	return styleText('dim', out, { validateStream: false })
 }
 
-// A lamp of the row at `row` (`0` the `24h`, `1` the `7d`) as drawn lit or out.
+// A lamp of the panel's row at `row` (`PANEL_ROWS`) as drawn lit or out.
 function lamp_text(row: number, is_on: boolean, text = LAMP_MARK): string {
 	const shade = shade_of(row)
 	const lit = painted(shade, text)
@@ -117,18 +128,27 @@ function dropped(before: string): string {
 	return before.slice(0, before.lastIndexOf(' ')).trimEnd()
 }
 
-// The panel started in `line` run on to column `end`, each lamp a placeholder the spinner's turns write
-// (`run-board-lamp-spots.ts`); a panel with no room for eight is dropped with the blanks before it.
-function expanded(line: string, end: number): string {
+// The column the panel started in `line` starts at, none where it starts none.
+function start_column(line: string): number | undefined {
+	const index = line.indexOf(LAMP_START)
+
+	return index === -1 ? undefined : run_board_fit.width_of(line.slice(0, index))
+}
+
+// The panel started in `line` moved out to `span.start` and run on to its `end`, each lamp a placeholder
+// the spinner's turns write (`run-board-lamp-spots.ts`); a panel with no room for eight is dropped with
+// the blanks before it.
+function expanded(line: string, span: PanelSpan): string {
 	const index = line.indexOf(LAMP_START)
 
 	if (index === -1) return line
 	const before = line.slice(0, index)
-	const count = count_of(end - run_board_fit.width_of(before))
+	const lead = ' '.repeat(Math.max(0, span.start - run_board_fit.width_of(before)))
+	const count = count_of(span.end - run_board_fit.width_of(before) - lead.length)
 	const panel = Array.from({ length: count }, () => LAMP).join(' ')
 	const after = line.slice(index + LAMP_START.length)
 
-	return count === 0 ? dropped(before) : `${before}${panel}${after}`
+	return count === 0 ? dropped(before) : `${before}${lead}${panel}${after}`
 }
 
 // The group and its place of the lamp at `index` along the row at `row`.
@@ -140,13 +160,16 @@ function place_of(row: number, index: number): { group: number; lamp: number } {
 
 const run_board_lamps = {
 	LAMP_TICK_MS,
+	PANEL_ROWS,
 	count_of,
 	expanded,
 	is_colored,
 	is_lit,
 	lamp_text,
 	place_of,
+	start_column,
 	start_of,
 }
 
 export { run_board_lamps }
+export type { PanelSpan }
