@@ -19,6 +19,7 @@ const BODY_FILE = 'scripts/backlog/backlog-rank.ts'
 const PLANNED_FILE = 'scripts/lane/lane-overrun.ts'
 const PLANNED_AT = '2026-10-25T03:10:00.000Z'
 const UNLISTED = 7121
+const BARE = 8273
 
 const BUSY: BusyRead = {
 	kind: 'busy',
@@ -90,5 +91,19 @@ describe('backlog_gate_scope.gate_scope', () => {
 		const scope = await backlog_gate_scope.gate_scope(CONTEXT)
 
 		expect(scope.declared.has(UNLISTED)).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#8273: a bare file name resolves to the one tracked file of that name.
+describe('backlog_gate_scope.gate_scope — a bare file name', () => {
+	it('resolves a bare file name a body declares against the tracked files', async () => {
+		const bare = { ...issue(BARE), body: 'Touches `backlog-gate-scope.ts`.' }
+		const context = { ...CONTEXT, opted_in: { ...CONTEXT.opted_in, issues: [bare] } }
+
+		const scope = await backlog_gate_scope.gate_scope(context)
+
+		expect([...(scope.declared.get(BARE) ?? [])]).toStrictEqual([
+			'scripts/backlog/backlog-gate-scope.ts',
+		])
 	})
 })
