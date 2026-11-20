@@ -80,7 +80,7 @@ function record_ports(setup: RecordSetup, ports: Pick<BoardPorts, 'now' | 'frame
 		link,
 		is_tty: setup.is_tty,
 		form: 'screen',
-		is_themed: setup.theme !== undefined,
+		theme: setup.theme,
 	}
 }
 

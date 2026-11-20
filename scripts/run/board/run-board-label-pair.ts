@@ -1,5 +1,6 @@
 import { stripVTControlCharacters } from 'node:util'
 import { run_board_fit } from './run-board-fit'
+import type { Theme } from './run-board-theme-defs'
 
 // joshuafolkken/kit#8154: an icon drawn beside the label that says what it marks — a column's
 // `💪 CPU`, a section's `⏳ queued`, a row's `▶ backlogrun` — is put between two zero-width marks, the
@@ -46,13 +47,13 @@ function titled(title: string): string {
 // What a frame's form and theme are read from.
 interface Drawn {
 	form: 'screen' | 'chat'
-	is_themed?: boolean | undefined
+	theme?: Theme | undefined
 }
 
 // A frame's lines with their marks kept only for the theme that drops their icons — a themed screen;
 // a chat and a frame with no theme are drawn bare, as they were before the marks.
 function settled(lines: ReadonlyArray<string>, drawn: Drawn): Array<string> {
-	if (drawn.is_themed === true && drawn.form === 'screen') return [...lines]
+	if (drawn.theme !== undefined && drawn.form === 'screen') return [...lines]
 
 	return lines.map((line) => bare(untitled(line)))
 }

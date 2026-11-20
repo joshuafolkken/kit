@@ -23,7 +23,7 @@ import type { BoardState } from './run-board-state'
 const { known_of } = run_board_github
 
 // The header fields read off the board's own ports, which the draw adds.
-type PortField = 'form' | 'spinner' | 'is_keyed' | 'is_themed' | 'is_sound_on' | keyof BoardLinks
+type PortField = 'form' | 'spinner' | 'is_keyed' | 'theme' | 'is_sound_on' | keyof BoardLinks
 
 type DisplayHeader = Omit<BoardHeader, PortField> & { layout: BoardLayout }
 

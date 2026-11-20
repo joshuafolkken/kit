@@ -4,9 +4,12 @@ import { run_board_header, type BoardHeader } from './run-board-header'
 import { run_board_header_defcon } from './run-board-header-defcon'
 import type { BoardLayout, BoardRow } from './run-board-layout'
 import { run_board_render_fixture } from './run-board-render-fixture'
+import { run_board_theme_defs } from './run-board-theme-defs'
 
 const { field_of, level_of } = run_board_header_defcon
 const { EMPTY_LAYOUT, NOW, header } = run_board_render_fixture
+const { THEME_DEFS } = run_board_theme_defs
+const WARGAMES = { theme: 'wargames' } as const
 const LANES = 3
 const HALTED = 1
 const ASKING = 2
@@ -55,6 +58,7 @@ function header_line(index: number, extra: Partial<BoardHeader>): string {
 
 afterEach(() => {
 	vi.unstubAllEnvs()
+	vi.restoreAllMocks()
 })
 
 describe('run_board_header_defcon.level_of', () => {
@@ -150,17 +154,33 @@ describe('run_board_header_defcon.field_of', () => {
 // joshuafolkken/kit#8107: the level ends the first line, leaving the second's end to the notice.
 describe('run_board_header.header_lines with the alert level', () => {
 	it('ends a themed screen header first line on the level, and draws none on the second', () => {
-		const themed = { is_themed: true }
-
-		expect(header_line(0, themed)).toMatch(/ {2}DEFCON \[5\] 4 3 2 1$/u)
-		expect(header_line(1, themed)).not.toContain('DEFCON')
+		expect(header_line(0, WARGAMES)).toMatch(/ {2}DEFCON \[5\] 4 3 2 1$/u)
+		expect(header_line(1, WARGAMES)).not.toContain('DEFCON')
 	})
 
 	it('leaves a header with no theme, and a chat frame, as it was', () => {
 		const plain = header_line(0, {})
 
 		expect(plain).not.toContain('DEFCON')
-		expect(header_line(0, { is_themed: true, form: 'chat' })).toBe(plain)
-		expect(header_line(0, { is_themed: true }).startsWith(plain)).toBe(true)
+		expect(header_line(0, { ...WARGAMES, form: 'chat' })).toBe(plain)
+		expect(header_line(0, WARGAMES).startsWith(plain)).toBe(true)
+	})
+})
+
+// joshuafolkken/kit#8358: the theme's row picks how the level is drawn; the level stays shared.
+describe('run_board_header.header_lines with the theme row alert', () => {
+	it('draws the alert the theme row names, at the shared level', () => {
+		const alert = vi.spyOn(THEME_DEFS.wargames, 'alert').mockReturnValue('ALERT')
+
+		expect(header_line(0, WARGAMES)).toMatch(/ {2}ALERT$/u)
+		expect(alert).toHaveBeenCalledWith(CALM)
+	})
+
+	it('draws no alert where no theme is drawn', () => {
+		const alert = vi.spyOn(THEME_DEFS.wargames, 'alert')
+
+		header_line(0, {})
+
+		expect(alert).not.toHaveBeenCalled()
 	})
 })
