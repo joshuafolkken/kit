@@ -1,0 +1,2 @@
+- rf:comments | low | scripts/review/review-prompt-level.ts | 2026-11-20 | #8337 | deferred:#8361
+- rf:comments | low | scripts/review/review-prompt-level.ts:12 | 2026-11-20 | #8337 | - | stale-comment

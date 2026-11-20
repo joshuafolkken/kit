@@ -1,0 +1,3 @@
+- rf:bug-risks | medium | scripts/josh/josh-commands-backlog.ts:176 | 2026-11-19 | #8173 | fixed | stale-docs
+- rf:project-conventions | low | scripts/issue/issue-publication-state.ts:92 | 2026-11-19 | #8173 | fixed | other
+- rf:none | none | - | 2026-11-19 | #8173

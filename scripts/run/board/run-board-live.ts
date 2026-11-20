@@ -8,7 +8,7 @@ import { run_board_screen, type Screen } from './run-board-screen'
 import type { TypingSound } from './run-board-sound-typing'
 import { run_board_spin } from './run-board-spin'
 import type { BoardPorts, BoardState } from './run-board-state'
-import type { Theme } from './run-board-theme'
+import { run_board_theme, type Theme } from './run-board-theme'
 import { run_board_theme_defs, type LiveDefinition } from './run-board-theme-defs'
 import { run_board_tick } from './run-board-tick'
 
@@ -20,21 +20,40 @@ const TRAILING_NEWLINE = /\n$/u
 const { FRESH_STATE, tick } = run_board_tick
 const { WORDS } = run_board_labels
 const { live_of } = run_board_theme_defs
+const SCREEN = run_board_screen.screen_of('live')
+
+// How a frame reaches the screen: the bytes put around its text, and where they are written.
+interface Framing {
+	wrap: (text: string) => string
+	sink: (bytes: string) => void
+}
 
 // Every frame starts from the top of the alternate screen, erasing what the last one left below it, and
 // ends on the line that says closing the screen leaves the run going — only a screen a person can
 // close says it, and it is the first line to give way to a short pane. Nothing follows the last line,
 // so a frame that fills the pane never scrolls the header off the top.
 // The keys are named under it where a person can type them.
-function framed(ports: BoardPorts, screen: Screen): BoardPorts {
+function framed(ports: BoardPorts, framing: Framing): BoardPorts {
 	const keys = ports.folded === undefined ? [] : [run_board_fold.KEYS_LINE]
 
 	return {
 		...ports,
 		footer: ['', ...[WORDS.keeps_running, ...keys].map((line) => styleText('dim', line))],
 		write: (frame) => {
-			ports.write(screen.frame(frame.replace(TRAILING_NEWLINE, '')))
+			framing.sink(framing.wrap(frame.replace(TRAILING_NEWLINE, '')))
 		},
+	}
+}
+
+// A redrawn frame: the theme restyles the board's own lines, then the screen's control bytes go in
+// front of them and the whole is written past the theme, so no line the theme reads starts with an
+// erase (joshuafolkken/kit#8401).
+function on_screen(ports: BoardPorts, screen: Screen): Framing {
+	const { theme } = ports
+
+	return {
+		wrap: (text) => screen.frame(theme === undefined ? text : run_board_theme.restyle(theme, text)),
+		sink: ports.write_drawn ?? ports.write,
 	}
 }
 
@@ -73,7 +92,8 @@ function trill_of(
 }
 
 // A tick whose frame is held off the screen, then revealed before it returns, so no spinner turns until
-// every line is out.
+// every line is out. The held frame is left unstyled: the reveal restyles it once, keeping the marks it
+// types the title by.
 async function revealed_tick(
 	state: BoardState,
 	ports: BoardPorts,
@@ -81,15 +101,12 @@ async function revealed_tick(
 	reveal: Reveal,
 ): Promise<BoardState> {
 	const held: Array<string> = []
-	const holding = framed(
-		{
-			...ports,
-			write: (frame) => {
-				held.push(frame)
-			},
+	const holding = framed(ports, {
+		wrap: screen.held,
+		sink: (frame) => {
+			held.push(frame)
 		},
-		{ ...screen, frame: screen.held },
-	)
+	})
 	const next = await tick(state, holding, 'background')
 
 	await reveal(held.join(''))
@@ -110,7 +127,10 @@ function ticker(
 		const revealing = opening
 
 		opening = undefined
-		if (revealing === undefined) return await tick(state, framed(ports, screen), 'background')
+
+		if (revealing === undefined) {
+			return await tick(state, framed(ports, on_screen(ports, screen)), 'background')
+		}
 
 		return await revealed_tick(state, ports, screen, revealing)
 	}
@@ -161,19 +181,20 @@ function live_ports(ports: BoardPorts, keys: KeyReading, live: LiveDefinition): 
 // A signal leaves through `on_exit`; a failed redraw leaves before its error is printed, so the error
 // lands on the normal screen rather than vanishing with the alternate one. Only a board in a theme types
 // its opening line, reveals its first frame a block at a time and types each row that appears after it;
-// one in none draws it whole at once.
-async function watch(ports: BoardPorts, theme: Theme | undefined): Promise<void> {
-	const screen = run_board_screen.screen_of('live')
+// one in none draws it whole at once. The board arrives without its theme and is themed here, where
+// each frame is restyled before its screen control bytes are added (`on_screen`).
+async function watch(board: BoardPorts, theme: Theme | undefined): Promise<void> {
+	const ports = run_board_theme.themed(board, theme)
 	const keys = run_board_keys.read_keys(ports.keys, ports.cue, ports.typing_sound)
-	const leave = leaver(ports, screen, keys)
+	const leave = leaver(ports, SCREEN, keys)
 	const live = live_ports(ports, keys, live_of(theme))
 
-	ports.write(screen.enter)
+	ports.write(SCREEN.enter)
 	ports.on_exit(leave)
 	const { gather, reveal } = run_board_intro.opening(ports.gather, live, keys, theme)
 
 	try {
-		await redraw_forever({ ...live, gather, opened_ms: ports.now() }, screen, reveal)
+		await redraw_forever({ ...live, gather, opened_ms: ports.now() }, SCREEN, reveal)
 	} finally {
 		leave()
 	}

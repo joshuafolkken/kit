@@ -217,7 +217,7 @@ async function draw(
 	const board = run_board_timing.timed(ports_for(ports, mode === 'live', theme), is_timing)
 
 	// A live board says it as it leaves its screen: `watch` only ever returns by throwing.
-	if (mode === 'live') await run_board_live.watch(run_board_theme.themed(board, theme), theme)
+	if (mode === 'live') await run_board_live.watch(board, theme)
 	else await still(board, theme)
 	run_board_timing.say(board, is_timing)
 }

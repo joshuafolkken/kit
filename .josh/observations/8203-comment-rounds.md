@@ -1,0 +1,3 @@
+- rf:bug-risks | medium | scripts/exports/unused-members-check.ts:76 | 2026-11-19 | #8203 | fixed | stale-cache
+- rf:tests | medium | scripts/exports/unused-members-cli.ts:11 | 2026-11-19 | #8203 | fixed | untested-branch
+- rf:none | none | - | 2026-11-19 | #8203

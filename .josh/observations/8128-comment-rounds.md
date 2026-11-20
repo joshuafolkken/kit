@@ -1,0 +1,1 @@
+- rf:bug-risks | low | scripts/run/observe/run-observe.ts:158 | 2026-11-19 | #8128 | - | state-reasoning

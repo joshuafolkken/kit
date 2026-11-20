@@ -1,0 +1,2 @@
+- rf:bug-risks | medium | scripts/run/board/run-board-gather-thread.ts:191 | 2026-11-19 | #8159 | fixed | state-reasoning
+- rf:comments | low | tools/metrics/run-board-profile-main.ts:120 | 2026-11-19 | #8159 | - | stale-comment

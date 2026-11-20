@@ -1,0 +1,2 @@
+- rf:tests | low | scripts/run/board/run-board-live.test.ts:25 | 2026-11-20 | #8360 | - | untested-branch
+- rf:bug-risks | low | scripts/run/board/run-board-tick-draw.ts:105 | 2026-11-20 | #8360 | - | other

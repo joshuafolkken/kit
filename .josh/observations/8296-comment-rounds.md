@@ -1,0 +1,1 @@
+- rf:comments | low | docs/maintainers/josh-commands-automation-rationale.md:98 | 2026-11-20 | #8296 | - | stale-docs
