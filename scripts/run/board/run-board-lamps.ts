@@ -5,7 +5,8 @@ import { run_board_spot } from './run-board-spot'
 
 // The WOPR lamp panel of `run:board --theme wargames` (joshuafolkken/kit#8236): right of the throughput
 // rows' NOW, a `■` every other column up to the section's rule, lit yellow on the `24h` row and red on
-// the `7d` row, out at a quarter of the row's color (dim where the terminal has no 24-bit color).
+// the `7d` row, out at half the row's color, dimmed (the row's named color dimmed where the terminal has
+// no 24-bit color).
 // Lamps blink four to a group, each group on its own period and phase, about four in ten lit; whether
 // one is lit is read off the moment, its group and its place alone.
 
@@ -30,8 +31,8 @@ const PHASE_SALT = 2
 const MIX_MULTIPLIER = 48_271
 const MIX_MODULUS = 2_147_483_647
 const MIX_SEED = 1
-// An out lamp is its row's color at a quarter of each channel.
-const OUT_DIVISOR = 4
+// An out lamp is its row's color at half of each channel.
+const OUT_DIVISOR = 2
 type Shade = Exclude<Paint, TextColor>
 const SHADES: ReadonlyArray<Shade> = [GAUGE_SHADES.yellow, GAUGE_SHADES.red]
 
@@ -74,20 +75,20 @@ function shade_of(row: number): Shade | undefined {
 	return SHADES[row % SHADES.length]
 }
 
-// `rgb` (`R;G;B`) with each channel a quarter, rounded.
-function quartered(rgb: string): string {
+// `rgb` (`R;G;B`) with each channel halved, rounded.
+function halved(rgb: string): string {
 	return rgb
 		.split(';')
 		.map((channel) => Math.round(Number(channel) / OUT_DIVISOR))
 		.join(';')
 }
 
-// `text` out in `shade`: at a quarter of its color where the terminal draws 24-bit color, else — the
-// quarter drawn the same as `lit` — the lit color dim.
-function out_text(shade: Shade, text: string, lit: string): string {
-	const out = painted({ rgb: quartered(shade.rgb), named: shade.named }, text)
+// `text` out in `shade`, dimmed: at half its color where the terminal draws 24-bit color, else in its
+// named color.
+function out_text(shade: Shade, text: string): string {
+	const out = painted({ rgb: halved(shade.rgb), named: shade.named }, text)
 
-	return out === lit ? styleText('dim', lit, { validateStream: false }) : out
+	return styleText('dim', out, { validateStream: false })
 }
 
 // A lamp of the row at `row` (`0` the `24h`, `1` the `7d`) as drawn lit or out.
@@ -97,7 +98,7 @@ function lamp_text(row: number, is_on: boolean, text = LAMP_MARK): string {
 
 	if (is_on || shade === undefined) return lit
 
-	return out_text(shade, text, lit)
+	return out_text(shade, text)
 }
 
 // Lamps are drawn only where stdout draws color — a `■` with none would never go out.
