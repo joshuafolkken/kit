@@ -8,8 +8,14 @@ import { review_reviewed_tree } from './review-reviewed-tree'
 // What `josh review:record` does once a code round is on the ledger: it records the tree the verdict
 // stands for, which `josh ship` reuses while the tree holds still (`review-reviewed-tree.ts`), names
 // the ship next for a lane child (`review-lane-handover.ts`), names an interaction review its fixes
-// made due (`review-record-interaction.ts`), reads a `josh run:review --join` the lane skipped, and
-// starts `josh test:pinned` again on a tree its fixes moved (`review-record-pinned.ts`).
+// made due (`review-record-interaction.ts`) and reads a `josh run:review --join` the lane skipped
+// (`review-record-pinned.ts`).
+//
+// **It starts no `josh test:pinned` on the fixed tree** (joshuafolkken/kit#8271): a held finding is
+// fixed after the record, so a check started here probed a tree the fix then moved — its answer went
+// unread, and the verdicts it reached after the move were stored with no basis, so the next run probed
+// them again. The fixed tree is judged once, by the recheck before the ship, whose launch the ship's
+// pre-detach reads (`run-chain-recheck.ts`).
 
 const HIGH_SEVERITY = 'high'
 
@@ -30,9 +36,9 @@ async function report_handover(issue: number): Promise<boolean> {
 	return is_handed_over
 }
 
-// Only a lane child's round the ship will reuse restarts the check: the ship's own rounds run under its
-// supervisor, where nothing reads the answer and the check would hold cores the ship's gate waits on.
-function is_restarted_here(is_handed_over: boolean): boolean {
+// Only a lane child's round the ship will reuse reads the skipped join: the ship's own rounds run under
+// its supervisor, where its pre-detach reads the check itself.
+function is_read_here(is_handed_over: boolean): boolean {
 	return is_handed_over && !run_ship_detach.is_supervised()
 }
 
@@ -45,9 +51,8 @@ async function follow(
 	const is_handed_over = await report_handover(issue)
 
 	await review_record_interaction.report_due(issue, root)
-	if (!is_restarted_here(is_handed_over)) return
+	if (!is_read_here(is_handed_over)) return
 	await review_record_pinned.read_skipped_join(root)
-	await review_record_pinned.restart_if_moved(root)
 }
 
 const review_record_code_round = { follow }

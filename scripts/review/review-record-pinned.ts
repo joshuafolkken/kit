@@ -10,22 +10,21 @@ import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
 import { test_pinned_logic } from '#scripts/test/test-pinned-logic'
 import { review_finding_ledger } from './review-finding-ledger'
 
-// What `josh review:record` does about the background `josh test:pinned` (joshuafolkken/kit#4834).
+// What `josh review:record` and `josh check:related` do about the background `josh test:pinned`
+// (joshuafolkken/kit#4834).
 //
 // **A round-1 fix can add hunks the check never read**: `josh run:review` launched it on the briefed
-// tree, and its join closed before the fix. The ship's pre-detach was then the first to name the fixed
-// tree's unpinned places, and stopped on them. A recorded code round compares the fixed tree with the
+// tree, and its join closed before the fix. `restart_if_moved` compares the current tree with the
 // launch's and, where they differ, starts the check again with the launch's `--unpinned-ok` reason and
-// says who reads its answer. **The fresh round-1 check is not waited on** (joshuafolkken/kit#4895): the
-// ship's pre-detach reads that same check's answer on that tree rather than running its own
-// (`run-review-pinned-join.ts`). A foreground read stalled the lane for minutes, and pinning what it
-// named moved the tree again under the next probe.
+// says who reads its answer. **The fresh check is not waited on** (joshuafolkken/kit#4895): a later
+// reader on that tree reads its answer rather than running its own (`run-review-pinned-join.ts`).
 //
 // **The same tree starts nothing**, and so does a tree either side could not read, or a checkout with
-// no launch. The fix's first `josh check:related` runs this same restart (joshuafolkken/kit#4948), so a
-// record on the tree it checked takes over the check already running there. `check:related` alone
+// no launch. Only the fix's first `josh check:related` runs this restart (joshuafolkken/kit#4948), and
 // waits on the check it started (joshuafolkken/kit#4987), within a bound that keeps the verdict line
-// under a foreground Bash call's cap (`check-related-pinned.ts`).
+// under a foreground Bash call's cap (`check-related-pinned.ts`). A recorded code round starts none
+// (joshuafolkken/kit#8271): the recheck before the ship judges the fixed tree once
+// (`run-chain-recheck.ts`).
 
 function started_line(): string {
 	return `test:pinned restarted in the background on the tree this round's fixes moved. Where it names unpinned places, the ship's pre-detach stops on them: pin each with a test that turns red without it, or ship with \`--unpinned-ok "<reason>"\`.`
