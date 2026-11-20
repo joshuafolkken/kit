@@ -111,7 +111,11 @@ describe('scratch:run CLI', () => {
 	})
 })
 
-describe('scratch:run under the permission model', () => {
+// A Node without `--allow-net` refuses every run (covered by the refusals above), so the enforcement
+// itself can only be observed on a Node that knows the flag.
+const KNOWS_NETWORK_FLAG = process.allowedNodeEnvironmentFlags.has('--allow-net')
+
+describe.skipIf(!KNOWS_NETWORK_FLAG)('scratch:run under the permission model', () => {
 	it('lets the script write inside the scratch directory', { timeout: SPAWN_TIMEOUT_MS }, () => {
 		expect(run_probe("writeFileSync('inside.txt', 'ok')")).toBe(ALLOWED_EXIT_CODE)
 	})
