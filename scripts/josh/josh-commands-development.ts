@@ -256,7 +256,10 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 			examples: [
 				{ arguments: '' },
 				NARROWED,
-				{ arguments: '--touched', note: 'diff tests, same-named tests and direct test importers' },
+				{
+					arguments: '--touched',
+					note: 'diff, same-named and importing tests, added-file listers',
+				},
 				{ arguments: '--silent', note: FORWARDED_TO_VITEST },
 			],
 		},

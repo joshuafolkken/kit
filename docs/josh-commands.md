@@ -315,7 +315,7 @@ Run only the unit tests related to the changed files (full suite on fallback).
 ```bash
 pnpm josh test:related
 pnpm josh test:related scripts/thing.ts   # narrow by the given files instead
-pnpm josh test:related --touched          # diff tests, same-named tests and direct test importers
+pnpm josh test:related --touched          # diff, same-named and importing tests, added-file listers
 pnpm josh test:related --silent           # flags are forwarded to vitest
 ```
 
@@ -323,7 +323,7 @@ pnpm josh test:related --silent           # flags are forwarded to vitest
 
 `josh gate` runs it as its unit leg.
 
-- `--touched` rechecks changed tests, each changed module's `foo.test.ts` / `foo.*.test.ts`, and its direct test importers, including fixture consumers (`scripts/test/test-related-touched.ts`). It scans import text without a read map or transitive graph. The `touched` record never replaces full-reach verification.
+- `--touched` rechecks changed tests, each changed module's `foo.test.ts` / `foo.*.test.ts` and its direct test importers, including fixture consumers (`scripts/test/test-related-touched.ts`). It adds the read map's listers of a directory whose entries changed, never a transitive graph. The `touched` record never replaces full-reach verification.
   With no other arguments, its separate green record admits review round 2; round 1 and the gate's reuse require a full-reach run.
 - A bare call a lane child types itself runs as `--touched` and says so in one line; `check:related` and ship's scoped pair run the full reach. A call another josh command makes (`check:related`, `gate`, `ship`, `propagate`), the pre-push hook and any call outside a lane keep the full reach (`JOSH_OUTER_COMMAND`, `scripts/josh/outer-command.ts`).
 
