@@ -110,6 +110,31 @@ describe('time_density_cli.summarize', () => {
 	})
 })
 
+// The texts handed out one at a time, recording how many were pulled — the read the cap must stop.
+function counted(texts: ReadonlyArray<string>, pulls: { count: number }): Iterable<string> {
+	return {
+		*[Symbol.iterator](): Generator<string> {
+			for (const text of texts) {
+				pulls.count += ONE_CALL
+				yield text
+			}
+		},
+	}
+}
+
+describe('time_density_cli.summarize — the cap stops the read', () => {
+	it('pulls no text once the cap is met', () => {
+		const pulls = { count: 0 }
+		const long = density_text(LONG_TURNS, ONE_CALL)
+		const texts = [density_text(SHORT_TURNS, ONE_CALL), long, long, long, long]
+
+		const summary = time_density_cli.summarize(counted(texts, pulls), MIN, 2)
+
+		expect(summary.lanes).toBe(2)
+		expect(pulls.count).toBe(THREE_CALLS)
+	})
+})
+
 describe('time_density_cli.summarize — nothing qualifying', () => {
 	it('reports no lanes when nothing qualifies', () => {
 		const summary = time_density_cli.summarize([density_text(SHORT_TURNS, ONE_CALL)], MIN, MAX)
