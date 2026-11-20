@@ -10,6 +10,7 @@ import {
 } from '#scripts/time-runtime/time-transcript-line'
 import { z } from 'zod'
 import { cost_audit_kind } from './cost-audit-kind'
+import { cost_audit_resume } from './cost-audit-resume'
 import { cost_audit_tool, type ToolCategory } from './cost-audit-tool'
 
 // Reading the transcript store for `josh cost:audit`: every session of this repository and its lanes
@@ -35,6 +36,8 @@ interface AuditSession {
 	issue?: number | undefined
 	// A delegated unit's agent type from its `meta.json`; absent for a main session or a unit with none.
 	agent_type?: string | undefined
+	// Why a `resume` session was started (`cost-audit-resume.ts`); absent for every other kind.
+	trigger?: string | undefined
 	records: ReadonlyArray<UsageRecord>
 	// The categories of the calls each request issued, keyed by request id; a request absent here
 	// issued none.
@@ -42,6 +45,7 @@ interface AuditSession {
 	lines: ReadonlyArray<TranscriptLine>
 }
 
+const USER_TYPE = 'user'
 const LANE_ISSUE_PATTERN = /-(\d+)$/u
 const TRANSCRIPT_EXTENSION = /\.jsonl$/u
 const META_SCHEMA = z.object({ agentType: z.string().min(1) })
@@ -51,14 +55,20 @@ interface SessionParts {
 	categories: Map<string, Array<ToolCategory>>
 	lines: Array<TranscriptLine>
 	prompt: string
+	// The text of every user line after the opening prompt, for the outage relaunch's prompt.
+	prompts: Array<string>
 }
 
-function first_text(raw: string): string {
-	const block = cost_blocks
+function texts_of(raw: string): Array<string> {
+	return cost_blocks
 		.parse_line(raw)
-		.find((one) => one.type === cost_blocks.TEXT_TYPE && one.text.trim() !== '')
+		.filter((one) => one.type === cost_blocks.TEXT_TYPE && one.text.trim() !== '')
+		.map((one) => one.text)
+}
 
-	return block?.text ?? ''
+function add_prompts(parts: SessionParts, raw: string, line: TranscriptLine | undefined): void {
+	if (parts.prompt === '') parts.prompt = texts_of(raw)[0] ?? ''
+	else if (line?.type === USER_TYPE) parts.prompts.push(...texts_of(raw))
 }
 
 function line_categories(line: TranscriptLine): Array<ToolCategory> {
@@ -78,7 +88,7 @@ function add_line(parts: SessionParts, raw: string): void {
 	const outcome = cost_usage.parse_line(raw)
 	const line = time_transcript_line.parse_line(raw)
 
-	if (parts.prompt === '') parts.prompt = first_text(raw)
+	add_prompts(parts, raw, line)
 	if (line !== undefined) parts.lines.push(line)
 	if (outcome.kind !== 'record') return
 
@@ -88,13 +98,23 @@ function add_line(parts: SessionParts, raw: string): void {
 
 // One transcript's text read into a session — the pure half a test drives with fixture lines.
 function session_of(text: string, is_delegated: boolean, is_lane = false): AuditSession {
-	const parts: SessionParts = { records: [], categories: new Map(), lines: [], prompt: '' }
+	const parts: SessionParts = {
+		records: [],
+		categories: new Map(),
+		lines: [],
+		prompt: '',
+		prompts: [],
+	}
 
 	for (const raw of text.split('\n')) add_line(parts, raw)
 
+	const opening = cost_audit_kind.kind_of(parts.prompt, is_delegated)
+	const { kind, trigger } = cost_audit_resume.classify(opening, [parts.prompt, ...parts.prompts])
+
 	return {
-		kind: cost_audit_kind.kind_of(parts.prompt, is_delegated),
+		kind,
 		is_lane: is_lane && !is_delegated,
+		trigger,
 		records: cost_usage.dedupe(parts.records),
 		categories: parts.categories,
 		lines: parts.lines,
@@ -176,7 +196,9 @@ function load_where(cwd: string, since_ms: number, is_kept: FileFilter): Array<A
 	)
 	const files = session_files(cwd, since_ms).filter((file) => is_kept(file, lanes))
 
-	return dedupe_across(files.map((file) => file_session(file, lanes)))
+	return cost_audit_resume.with_triggers(
+		dedupe_across(files.map((file) => file_session(file, lanes))),
+	)
 }
 
 function load(cwd: string, since_ms: number): Array<AuditSession> {

@@ -26,6 +26,7 @@ const ROUND_ONE = 'review round 1'
 const ROUND_TWO = 'review round 2'
 const IMPLEMENT_LEAD = 'implement: '
 const REVIEW_FIX = 'review-fix'
+const REVIEW_FIX_PHASE = `${IMPLEMENT_LEAD}${REVIEW_FIX}`
 const AGENT_LEAD = 'subagent: '
 // A request that issued none of the calls below edits or thinks — the remainder `lane:breakdown`
 // names `editing & thinking`.
@@ -99,7 +100,7 @@ function implement_phase(placed: Placed, at_ms: number): string {
 
 // Between ship stages a request after the review is the fix of a stopped ship; any other is the stage's.
 function between_phase(placed: Placed, at_ms: number): string {
-	return is_fix(placed, at_ms) ? `${IMPLEMENT_LEAD}${REVIEW_FIX}` : lane_breakdown.BETWEEN_STAGE
+	return is_fix(placed, at_ms) ? REVIEW_FIX_PHASE : lane_breakdown.BETWEEN_STAGE
 }
 
 function review_round(stage: string): string {
@@ -214,7 +215,15 @@ function agent_rows_of(sessions: ReadonlyArray<AuditSession>): Array<PhaseRow> {
 	return sorted(rows)
 }
 
-const cost_audit_phase = { PLAN, ROUND_ONE, ROUND_TWO, UNATTRIBUTED, agent_rows_of, rows_of }
+const cost_audit_phase = {
+	PLAN,
+	REVIEW_FIX_PHASE,
+	ROUND_ONE,
+	ROUND_TWO,
+	UNATTRIBUTED,
+	agent_rows_of,
+	rows_of,
+}
 
 export type { PhaseRow, PhaseTokens }
 export { cost_audit_phase }

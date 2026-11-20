@@ -1,9 +1,10 @@
 import { figure_format } from '#scripts/lib/figure-format'
-import type { Audit, AuditRow, AuditWindow } from './cost-audit'
+import type { Audit, AuditRow, AuditWindow, MergeCounts } from './cost-audit'
 import { cost_audit_cause, type CauseRow } from './cost-audit-cause'
 import { cost_audit_density, type Density } from './cost-audit-density'
 import type { PhaseRow } from './cost-audit-phase'
 import { cost_audit_result } from './cost-audit-result'
+import type { TriggerRow } from './cost-audit-resume'
 import { cost_audit_rewrite, type RewriteCount } from './cost-audit-rewrite'
 import { cost_audit_sequence } from './cost-audit-sequence'
 import { cost_audit_spend, type ModelSpend } from './cost-audit-spend'
@@ -36,6 +37,10 @@ const LONG_OUTPUT = String(cost_audit_usage.LONG_OUTPUT_TOKENS)
 const TABLE_FIGURES = `cost — billed input / cache read / cache write / output tokens · calls with output over ${LONG_OUTPUT} tokens; per model in dollars`
 const PHASE_TITLE = `Lane children by phase (this period: ${TABLE_FIGURES})`
 const AGENT_TITLE = `Lane subagents by agent type (this period: ${TABLE_FIGURES})`
+const RESUME_TITLE =
+	'Resume sessions by trigger (cost · sessions · cost per merge, each beside the period before)'
+// The last resume line: the resume sessions' dollars inside the review-fix phase.
+const RESUME_SHARE_LEAD = 'resume within '
 
 interface AuditSection {
 	name: string
@@ -247,6 +252,34 @@ function section_lines(section: AuditSection): Array<string> {
 	return ['', section.title, ...body]
 }
 
+function trigger_per_merge(row: TriggerRow, merges: MergeCounts | undefined): string {
+	if (merges === undefined || merges.current === 0 || merges.previous === 0) return ''
+
+	const current = figure_format.format_usd(row.current.usd / merges.current)
+	const previous = figure_format.format_usd(row.previous.usd / merges.previous)
+
+	return ` · ${current} per merge (prev ${previous})`
+}
+
+function trigger_line(row: TriggerRow, merges: MergeCounts | undefined): string {
+	const usd = { current: row.current.usd, previous: row.previous.usd }
+	const cost = row_line({ key: row.key, ...usd, is_regression: false })
+	const sessions = `${String(row.current.sessions)} session(s) (prev ${String(row.previous.sessions)})`
+
+	return `${cost} · ${sessions}${trigger_per_merge(row, merges)}`
+}
+
+function resume_lines(audit: Audit): Array<string> {
+	const { triggers, review_fix } = audit.resumes
+
+	return [
+		'',
+		RESUME_TITLE,
+		...triggers.map((row) => trigger_line(row, audit.merges)),
+		row_line({ ...review_fix, key: `${RESUME_SHARE_LEAD}${review_fix.key}` }),
+	]
+}
+
 // Every flagged row, named by its section so `doc read` the tool and a guard of the same name differ.
 function regression_names(audit: Audit): Array<string> {
 	const head = [audit.total, audit.per_merge]
@@ -276,6 +309,7 @@ function report_lines(audit: Audit): Array<string> {
 		...sections_of(audit).flatMap((section) => section_lines(section)),
 		...rewrite_lines(audit),
 		...cause_lines(audit),
+		...resume_lines(audit),
 		...phase_lines(audit),
 		...usage_lines(audit.usage),
 		...cost_audit_result.result_lines(audit.results),
