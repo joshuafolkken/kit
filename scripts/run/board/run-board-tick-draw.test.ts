@@ -1,5 +1,6 @@
 import { stripVTControlCharacters } from 'node:util'
 import { describe, expect, it } from 'vitest'
+import { run_board_display } from './run-board-display'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_header } from './run-board-header'
 import type { BoardLayout, BoardRow } from './run-board-layout'
@@ -148,6 +149,35 @@ describe('run_board_tick_draw.draw_display sound mark', () => {
 
 		expect(launched.state.notice?.cause).toStrictEqual({ cue: 'launch', word: 'running', issue: 1 })
 		expect(launched.lines[1]).toMatch(/🔇 \d{2}:\d{2} launch · #1 running$/u)
+	})
+})
+
+const CPU_PERCENT = 23
+
+// joshuafolkken/kit#8330: a live board's worker assembles a frame only when its data moves, so the
+// machine's samples are drawn as the board holds them now, not as the frame was assembled.
+describe('run_board_tick_draw.draw_display machine samples', () => {
+	it('draws the gauges the board holds now over a frame assembled before them', () => {
+		const { ports, frames } = harness(LOCAL, [])
+		const state = planned()
+		const display = run_board_display.assemble_display(
+			state,
+			LOCAL,
+			START,
+			layout_for(state, LOCAL, START),
+		)
+		const gauges = {
+			cpu_percent: CPU_PERCENT,
+			memory_percent: 1,
+			swap_mb_per_s: 0,
+			memory_pressure: undefined,
+		}
+
+		run_board_tick_draw.draw_display({ ...state, gauges }, display, { ports, now_ms: START })
+		const lines = stripVTControlCharacters(frames.join('')).split('\n')
+
+		expect(display.header.machine).toBeUndefined()
+		expect(lines[1]).toContain(`${String(CPU_PERCENT)}%`)
 	})
 })
 

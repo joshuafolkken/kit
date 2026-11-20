@@ -72,14 +72,26 @@ function saved_of(
 	return fetched_ms < opened_ms ? fetched_ms : undefined
 }
 
+type Sampled = Pick<BoardHeader, 'machine' | 'usages' | 'budget_waits' | 'quotas'>
+
+// The machine's samples as the board holds them now: a live board's worker samples them every round
+// but assembles a frame only when its data moves (joshuafolkken/kit#8330).
+function sampled_of(state: BoardState): Sampled {
+	const { gauges, usages, budget_waits, quotas } = state
+
+	return { machine: gauges, usages, budget_waits, quotas }
+}
+
 // The assembled header with what the ports add — the terminal's form, the sound switch and the links —
-// stamped with this redraw's moment and the reads' failure as the board holds them now, so a display a
-// live board's worker assembled earlier still moves every elapsed time (joshuafolkken/kit#8160).
+// stamped with this redraw's moment, the machine's samples and the reads' failure as the board holds
+// them now, so a display a live board's worker assembled earlier still moves every elapsed time
+// (joshuafolkken/kit#8160).
 function header_of(display: BoardDisplay, state: BoardState, redraw: Redraw): LaidHeader {
 	const { ports } = redraw
 
 	return {
 		...display.header,
+		...sampled_of(state),
 		now_ms: redraw.now_ms,
 		read_failed_ms: state.read_failed_ms,
 		read_error: state.read_error,

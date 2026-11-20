@@ -154,7 +154,8 @@ describe('run_board_data.view_for', () => {
 
 const read_thanks = vi.fn(async (): Promise<Thanks> => [])
 
-// The last post of two worker rounds over the harness's reads and a roster read.
+// The last post with data of two worker rounds over the harness's reads and a roster read; a round
+// whose data is the last one's hands its reads over alone (joshuafolkken/kit#8330).
 async function worker_post(): Promise<GatherPost> {
 	const ports = { ...round_ports(harness(LOCAL, [PLAN])), read_thanks }
 	const posts: Array<unknown> = []
@@ -166,7 +167,9 @@ async function worker_post(): Promise<GatherPost> {
 		posts.push(value)
 	})
 
-	return posts.at(-1) as GatherPost
+	return posts.findLast(
+		(post) => typeof post === 'object' && post !== null && 'data' in post,
+	) as GatherPost
 }
 
 describe('run_board_tick.tick over the data a worker posted', () => {
