@@ -137,12 +137,19 @@ function has_codes(ports: Pick<DrawPorts, 'theme'>): boolean {
 // The theme rows whose lamp strip choice the board reads.
 type StripDefs = Readonly<Partial<Record<string, Pick<ThemeDefinition, 'live'>>>>
 
+// The live effects `theme`'s row in `defs` chooses, none for a board in no theme or a theme with no row.
+function live_in(theme: DrawPorts['theme'], defs: StripDefs): ThemeDefinition['live'] | undefined {
+	if (theme === undefined) return undefined
+
+	return defs[theme]?.live
+}
+
 // Whether a lamp strip fills above each rule: where the rules run code, in a theme whose definition
 // switches the strip on (joshuafolkken/kit#8376) — off by default (joshuafolkken/kit#8398).
 function has_strip(ports: Pick<DrawPorts, 'theme'>, defs: StripDefs = THEME_DEFS): boolean {
-	if (ports.theme === undefined || !has_codes(ports)) return false
+	const live = live_in(ports.theme, defs)
 
-	return defs[ports.theme]?.live.strip === true
+	return live?.codes === true && live.strip
 }
 
 // The rules running code and the strips filling above them that the spin draws, each kept only where its
@@ -150,10 +157,11 @@ function has_strip(ports: Pick<DrawPorts, 'theme'>, defs: StripDefs = THEME_DEFS
 function decoded_of(
 	ports: Pick<DrawPorts, 'theme'>,
 	drawn: Pick<Drawn, 'rules' | 'strips'>,
+	defs: StripDefs = THEME_DEFS,
 ): Pick<Drawn, 'rules' | 'strips'> {
 	return {
 		rules: has_codes(ports) ? drawn.rules : [],
-		strips: has_strip(ports) ? drawn.strips : [],
+		strips: has_strip(ports, defs) ? drawn.strips : [],
 	}
 }
 
@@ -214,7 +222,7 @@ function draw_display(state: BoardState, display: BoardDisplay, redraw: Redraw):
 	return { ...state, ...display.carried, spots, sweep, lamps, rules, strips, typing }
 }
 
-const run_board_tick_draw = { bounds_of, draw, draw_display, has_lamps, has_strip }
+const run_board_tick_draw = { bounds_of, decoded_of, draw, draw_display, has_lamps, has_strip }
 
 export { run_board_tick_draw }
 export type { DrawPorts, Redraw }

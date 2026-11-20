@@ -6,7 +6,8 @@ import { run_board_screen } from './run-board-screen'
 import type { BoardPorts } from './run-board-state'
 import { run_board_type_rows, type Typing } from './run-board-type-rows'
 
-// joshuafolkken/kit#8376: while the rules run launch codes on a wargames live board, the blank line right
+// joshuafolkken/kit#8376: while the rules run launch codes on a live board whose theme switches the strip
+// on (`live.strip`, off by default; joshuafolkken/kit#8398), the blank line right
 // above each section rule holds a strip of lamps in the lamp panel's columns. It fills from the left as
 // far as the typing has gone — yellow lamps twinkling on their own, the front one red and steady, out
 // ahead — stays full while the lock crosses the rules, and goes out at once when the lock is done. The
