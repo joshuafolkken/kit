@@ -1,5 +1,6 @@
 import { lane_stats } from '#scripts/lane/lane-stats'
 import { launch_timing } from '#scripts/lane/launch-timing'
+import { run_board_heap, type HeapProbes, type HeapWatch } from './run-board-heap'
 import { run_board_screen } from './run-board-screen'
 import { run_board_stall, type Stall, type StallProbes, type StallWatch } from './run-board-stall'
 import type { BoardPorts, DrawKind, DrawTimer } from './run-board-state'
@@ -23,6 +24,22 @@ const DRAW_KINDS: ReadonlyArray<DrawKind> = ['tick', 'turn']
 
 // Each draw's time in ms, by its kind (joshuafolkken/kit#8126).
 type Draws = Record<DrawKind, Array<number>>
+
+// The main thread's heap read and the heap's own sampling timer, apart from the stall probe's.
+type HeapTimer = Omit<HeapProbes, 'worker'>
+
+// The stall probes with the heap's — the process's own where a test hands none.
+type TimingProbes = StallProbes & { heap?: HeapTimer }
+
+const HEAP_PROBES: HeapTimer = {
+	main: run_board_heap.main,
+	every: run_board_stall.PROCESS_PROBES.every,
+}
+
+interface Watching {
+	stalls: StallWatch
+	heap: HeapWatch
+}
 
 interface TimingArgv {
 	argv: Array<string>
@@ -74,11 +91,15 @@ function draw_rows(draws: Draws | undefined): Array<[string, string]> {
 	})
 }
 
-// The launch phases, then — on a live board under `--timing` — each kind of draw it timed and the
-// main-thread stalls it watched (joshuafolkken/kit#8148).
-function report(draws?: Draws, stalls?: ReadonlyArray<Stall>): string {
+// The launch phases, then — on a live board under `--timing` — each kind of draw it timed, the
+// main-thread stalls it watched (joshuafolkken/kit#8148) and the heaps it sampled (joshuafolkken/kit#8339).
+function report(
+	draws?: Draws,
+	stalls?: ReadonlyArray<Stall>,
+	heap_rows: ReadonlyArray<[string, string]> = [],
+): string {
 	const stall_rows = stalls === undefined ? [] : run_board_stall.rows(stalls)
-	const rows = [...phase_rows(), ...draw_rows(draws), ...stall_rows]
+	const rows = [...phase_rows(), ...draw_rows(draws), ...stall_rows, ...heap_rows]
 	const width = Math.max(0, ...rows.map(([name]) => name.length))
 	const lines = rows.map(([name, value]) => `  ${name.padEnd(width)}  ${value}`)
 
@@ -89,13 +110,21 @@ function reporting(
 	ports: BoardPorts,
 	leave: () => void,
 	draws: Draws,
-	watching: StallWatch,
+	watching: Watching,
 ): () => void {
 	return () => {
 		leave()
-		watching.stop()
-		ports.write(report(draws, watching.stalls()))
+		watching.stalls.stop()
+		watching.heap.stop()
+		ports.write(report(draws, watching.stalls.stalls(), watching.heap.rows()))
 	}
+}
+
+// The stalls and the heaps, watched from when a live board takes its screen.
+function watch(ports: BoardPorts, probes: TimingProbes): Watching {
+	const heap = run_board_heap.watch({ ...(probes.heap ?? HEAP_PROBES), worker: ports.worker_heap })
+
+	return { stalls: run_board_stall.watch(probes), heap }
 }
 
 // Times each draw into `draws`, by its kind.
@@ -115,17 +144,17 @@ function draw_timer(draws: Draws, now: () => number): DrawTimer {
 function draw_ports(
 	ports: BoardPorts,
 	now: () => number,
-	probes: StallProbes,
+	probes: TimingProbes,
 ): Pick<BoardPorts, 'enter_stage' | 'on_exit' | 'time_draw'> {
 	const draws: Draws = { tick: [], turn: [] }
-	const watched: { watching?: StallWatch } = {}
+	const watched: { watching?: Watching } = {}
 
 	return {
 		enter_stage: (stage) => {
-			watched.watching?.enter(stage)
+			watched.watching?.stalls.enter(stage)
 		},
 		on_exit: (leave) => {
-			const watching = run_board_stall.watch(probes)
+			const watching = watch(ports, probes)
 
 			watched.watching = watching
 			ports.on_exit(reporting(ports, leave, draws, watching))
@@ -166,7 +195,7 @@ function timed(
 	ports: BoardPorts,
 	is_timing: boolean,
 	now: () => number = performance.now.bind(performance),
-	probes: StallProbes = run_board_stall.PROCESS_PROBES,
+	probes: TimingProbes = run_board_stall.PROCESS_PROBES,
 ): BoardPorts {
 	if (!is_timing) return ports
 	let has_read = false

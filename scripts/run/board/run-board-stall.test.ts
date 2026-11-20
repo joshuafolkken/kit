@@ -167,8 +167,11 @@ describe('run_board_timing.timed stalls', () => {
 	it('says each stall with its length, stage and GC as the board leaves', () => {
 		const { frame, stops } = left_after_stall()
 
-		expect(frame).toContain(`stalls   n 1 over ${String(STALL_MS)}`)
-		expect(frame).toContain(`stall 1  ${STALL_LENGTH.toFixed(1)} turn · gc 30.0`)
+		// The rows are padded to the longest name the report says, the heaps' among them.
+		expect(frame).toMatch(new RegExp(`stalls +n 1 over ${String(STALL_MS)}`, 'u'))
+		expect(frame).toMatch(
+			new RegExp(String.raw`stall 1 +${STALL_LENGTH.toFixed(1)} turn · gc 30\.0`, 'u'),
+		)
 		expect(stops).toStrictEqual(['probe', 'gc'])
 	})
 

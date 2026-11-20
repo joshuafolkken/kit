@@ -1,0 +1,7 @@
+{
+	"reason": "New run-board-heap module and its tests add the --timing heap report #8339",
+	"date": "2026-11-20",
+	"growth": {
+		"scripts.code_lines": 133
+	}
+}
