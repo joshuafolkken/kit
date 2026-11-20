@@ -1,10 +1,13 @@
 import { gate_skip } from '#scripts/gate/gate-skip'
 import { gate_tree } from '#scripts/gate/gate-tree'
 import { run_ship_planned } from '#scripts/run/ship/run-ship-planned'
+import { run_ship_wait_cli } from '#scripts/run/ship/run-ship-wait-cli'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { GATE_GREEN, GATE_RUNNING } from './run-review'
 import { run_review_join_ready } from './run-review-join-ready'
 import { run_review_pinned_steps } from './run-review-pinned-steps'
 import { run_review_pinned_tree } from './run-review-pinned-tree'
+import { run_review_steps } from './run-review-steps'
 
 const TREE = { files: Object.fromEntries([['scripts/example.ts', 'digest']]), base: 'base' }
 const SUMMARY = { text: 'All pinned\n', unpinned: [] }
@@ -92,5 +95,41 @@ describe('run_review_join_ready changing or unread state', () => {
 		vi.mocked(run_ship_planned.unplanned).mockRejectedValue(new Error('unread'))
 
 		expect(await run_review_join_ready.read()).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#8309: the join's gate wait ends before the prompt cache does, as `ship:wait`'s chunk.
+describe('run_review_join_ready.gate_state wait cap', () => {
+	const STARTED_MS = 1000
+
+	beforeEach(() => {
+		vi.spyOn(run_review_steps, 'wait_for_gate_finish').mockResolvedValue(GATE_RUNNING)
+	})
+
+	it('caps the wait at the ship:wait chunk left since process start', async () => {
+		vi.spyOn(performance, 'now').mockReturnValue(STARTED_MS)
+
+		expect(await run_review_join_ready.gate_state(undefined, true)).toBe(GATE_RUNNING)
+		expect(run_review_steps.wait_for_gate_finish).toHaveBeenCalledWith(
+			run_ship_wait_cli.CHUNK_MS - STARTED_MS,
+		)
+	})
+
+	it('waits no more once the chunk is spent', async () => {
+		vi.spyOn(performance, 'now').mockReturnValue(run_ship_wait_cli.CHUNK_MS + STARTED_MS)
+		await run_review_join_ready.gate_state(undefined, true)
+
+		expect(run_review_steps.wait_for_gate_finish).toHaveBeenCalledWith(0)
+	})
+
+	it("keeps the gate wait's own cap for a join without --chunk, such as the ship's", async () => {
+		await run_review_join_ready.gate_state(undefined)
+
+		expect(run_review_steps.wait_for_gate_finish).toHaveBeenCalledWith(undefined)
+	})
+
+	it('waits on no gate for a ready answer', async () => {
+		expect(await run_review_join_ready.gate_state(SUMMARY)).toBe(GATE_GREEN)
+		expect(run_review_steps.wait_for_gate_finish).not.toHaveBeenCalled()
 	})
 })

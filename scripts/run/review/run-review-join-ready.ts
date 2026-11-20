@@ -4,6 +4,7 @@ import { gate_tree, type GateTree } from '#scripts/gate/gate-tree'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { error_text } from '#scripts/lib/error-message'
 import { run_ship_planned } from '#scripts/run/ship/run-ship-planned'
+import { run_ship_wait_cli } from '#scripts/run/ship/run-ship-wait-cli'
 import type { PinnedSummary } from '#scripts/test/test-pinned-record'
 import { GATE_GREEN, type GateState } from './run-review'
 import { run_review_join_read, type JoinVerdict } from './run-review-join-read'
@@ -66,8 +67,20 @@ async function read(is_fixing = false): Promise<PinnedSummary | undefined> {
 	}
 }
 
-async function gate_state(ready: PinnedSummary | undefined): Promise<GateState> {
-	return ready === undefined ? await run_review_steps.wait_for_gate_finish() : GATE_GREEN
+// The join's foreground wait ends before the prompt cache does, counted from process start as
+// `ship:wait` counts its chunk: a gate still running then is `pending`, and the same command waits on
+// (joshuafolkken/kit#8309).
+function wait_left(): number {
+	return Math.max(0, run_ship_wait_cli.CHUNK_MS - performance.now())
+}
+
+async function gate_state(
+	ready: PinnedSummary | undefined,
+	is_chunked = false,
+): Promise<GateState> {
+	if (ready !== undefined) return GATE_GREEN
+
+	return await run_review_steps.wait_for_gate_finish(is_chunked ? wait_left() : undefined)
 }
 
 async function verdict(

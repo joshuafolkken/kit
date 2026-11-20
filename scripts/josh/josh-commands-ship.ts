@@ -58,7 +58,7 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 			'Start test:pinned in the background, run the gate and, once it is green, write the /code-review brief to a file, printing its path (--join to join them; it stops on an unpinned change)',
 		category: 'AI tools',
 		reference: [
-			'[--code-only] [--unpinned-ok "<reason>"] [--accept-metrics "<reason>"] | --join [--fixing] | --pinned | --push [<slots>]',
+			'[--code-only] [--unpinned-ok "<reason>"] [--accept-metrics "<reason>"] | --join [--fixing] [--chunk] | --pinned | --push [<slots>]',
 			'automation',
 			['processes', 'files', 'git', 'network'],
 		],
@@ -83,6 +83,10 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 				{
 					arguments: '--join --fixing',
 					note: 'the join when round 1 has fixes to make: no grace on test:pinned, left running; prints the unpinned places the cache already holds',
+				},
+				{
+					arguments: '--join --chunk',
+					note: '`run:chain`’s join: a gate still running at the `ship:wait` chunk exits 4, `pending` — re-run the same command',
 				},
 				{
 					arguments: '--pinned',

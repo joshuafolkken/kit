@@ -1,0 +1,7 @@
+{
+	"reason": "the chunked join mode for run:chain (#8309): a capped gate wait, its pending exit and two mode entries",
+	"date": "2026-11-20",
+	"growth": {
+		"scripts.code_lines": 26
+	}
+}

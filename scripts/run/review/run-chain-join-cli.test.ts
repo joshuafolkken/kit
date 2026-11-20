@@ -20,7 +20,9 @@ const RUN_REVIEW = 'run:review'
 const ATTEST = 'review:attest'
 const RECORD = 'review:record'
 const RECORD_ARGV = [RECORD, '--from-slot', '--issue', ISSUE]
-const JOIN_LINE = [[RUN_REVIEW, JOIN], [ATTEST, '--check'], RECORD_ARGV]
+// The chain's join is chunked: it returns `pending` before the prompt cache expires (#8309).
+const CHUNK = '--chunk'
+const JOIN_LINE = [[RUN_REVIEW, JOIN, CHUNK], [ATTEST, '--check'], RECORD_ARGV]
 const STOP_EXIT = 2
 const LOW_FINDING = 'bug-risks:low:scripts/a.ts — a nit'
 const MEDIUM_FINDING = 'fixed bug-risks:medium:scripts/b.ts — fixed in place'
@@ -79,7 +81,7 @@ describe('run_chain_cli.run --join — a clean round', () => {
 	it('forwards --fixing to the join', async () => {
 		await run_chain_cli.run([ISSUE, JOIN, '--fixing'])
 
-		expect(ran()[0]).toStrictEqual([RUN_REVIEW, JOIN, '--fixing'])
+		expect(ran()[0]).toStrictEqual([RUN_REVIEW, JOIN, '--fixing', CHUNK])
 	})
 
 	it('leaves an unreadable slot to review:record, whose refusal names it', async () => {

@@ -703,6 +703,7 @@ pnpm josh run:review --code-only                 # josh ship's own open: code's 
 pnpm josh run:review --unpinned-ok "only logs"   # check beside the pair as ever; the join prints the list and the reason and carries on past unpinned places
 pnpm josh run:review --join                      # after the review returns: join the gate and test:pinned; exit 3 on an unpinned change
 pnpm josh run:review --join --fixing             # the join when round 1 has fixes to make: no grace on test:pinned, left running; prints the unpinned places the cache already holds
+pnpm josh run:review --join --chunk              # `run:chain`’s join: a gate still running at the `ship:wait` chunk exits 4, `pending` — re-run the same command
 pnpm josh run:review --pinned                    # collect a stopped ship's remaining verdicts before editing or retrying; a lane child waits only for this continuation
 pnpm josh run:review --push 2                    # launched by a lane open: push and open the PR at a green gate, recording the review plan’s slot count on the ledger
 ```
