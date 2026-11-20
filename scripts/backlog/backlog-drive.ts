@@ -151,6 +151,9 @@ interface DrivePorts extends YieldCapPorts {
 	// A watch with nothing in flight — the one idle notification (`backlog-drive-idle.ts`), deduplicated
 	// per episode by the port itself.
 	idle: (state: DriveState) => Promise<void>
+	// A watch with a child still running — the shortfall notice (`backlog-drive-idle.ts`): no issue is
+	// ready to start while a lane may be free, deduplicated per episode by the port itself.
+	shortfall: (state: DriveState) => Promise<void>
 	// A holding offer with nothing in flight — the paused-lane notice (`backlog-drive-paused.ts`), which
 	// reads the lane records itself and is deduplicated per pause episode by the port.
 	paused: () => Promise<void>

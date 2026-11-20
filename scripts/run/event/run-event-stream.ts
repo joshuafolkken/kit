@@ -165,6 +165,11 @@ const EVENT_KIND = {
 	// is the dedup marker for the one idle Telegram. A trace: a drain's retrospective is read off the
 	// position beneath it, so the marker must not stand over it.
 	IDLE_NOTICE: 'idle-notice',
+	// `backlog:drive` reached a watch with a child still running and a lane free — the issues ready to start
+	// ran out before the lane limit did (joshuafolkken/kit#8332). Emitted once per shortfall episode
+	// (`emit_once_since_with`, reset by `CHILD_LAUNCH`), it is the dedup marker for the one shortfall
+	// Telegram. A trace, as `IDLE_NOTICE` is.
+	SHORTFALL_NOTICE: 'shortfall-notice',
 	// A person paused or resumed a lane child (`lane:pause` / `lane:resume`), so who halted a lane and
 	// when is on the stream rather than only in a shell history (joshuafolkken/kit#4268). A trace: it
 	// says what a lane's processes were told, not where the run is.
@@ -221,6 +226,7 @@ const TRACE_KINDS: ReadonlySet<string> = new Set([
 	EVENT_KIND.SETUP,
 	EVENT_KIND.PR_CHECKS,
 	EVENT_KIND.IDLE_NOTICE,
+	EVENT_KIND.SHORTFALL_NOTICE,
 	EVENT_KIND.LANE_STATE,
 	EVENT_KIND.PAUSED_NOTICE,
 	EVENT_KIND.MEASURED,
