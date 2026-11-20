@@ -4,6 +4,8 @@ import { run_board_fit, type FrameParts } from './run-board-fit'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_fold } from './run-board-fold'
 import type { BoardRow } from './run-board-layout'
+import { run_board_quota_lamps } from './run-board-quota-lamps'
+import { run_board_render_quota } from './run-board-render-quota'
 import { run_board_render_throughput } from './run-board-render-throughput'
 import { run_board_spot } from './run-board-spot'
 import type { ThroughputRow } from './run-board-throughput'
@@ -23,6 +25,9 @@ const { width_of } = run_board_fit
 const HOUR = 3_600_000
 const GAP = 2
 const FEWEST = 8
+// A panel 21 columns wide holds 11 lamps.
+const PANEL_WIDTH = 21
+const PANEL_LAMPS = 11
 
 afterEach(() => {
 	vi.unstubAllEnvs()
@@ -105,6 +110,83 @@ describe('the throughput rows’ lamp panel', () => {
 
 		expect(lines.join('')).not.toMatch(new RegExp(`[${LAMP}${LAMP_START}]`, 'u'))
 		expect(lines.map((line) => line.trimEnd())).toStrictEqual(lines)
+	})
+})
+
+// A live frame's throughput and usage sections, the usage rows as given, its rule run on to the panel's
+// start and `width` past it.
+function panel_frame(usage_rows: ReadonlyArray<string>, has_panel = true): Array<string> {
+	const start = width_of(texts(false)[0] ?? '') + GAP
+	const usage = run_board_render_quota.usage_part({
+		quotas: { claude: undefined, codex: undefined },
+		now_ms: START,
+		has_lamps: has_panel,
+	})
+	const lines = run_board_quota_lamps
+		.provider_rows(usage_rows, has_panel)
+		.map((text) => ({ text, is_detail: false }))
+	const parts: FrameParts = {
+		above: [],
+		plan: [],
+		legend: [],
+		footer: [],
+		notes: { head: [], lines: [], hidden: 0 },
+		throughput: rows_part(ROWS, has_panel),
+		usage: usage === undefined ? undefined : { ...usage, lines },
+		rule_width: start + PANEL_WIDTH,
+	}
+
+	return run_board_fold.bounded(parts, {}).map((line) => stripVTControlCharacters(line))
+}
+
+function lamp_starts(lines: ReadonlyArray<string>): Array<number> {
+	return lines
+		.filter((line) => line.includes(LAMP))
+		.map((line) => width_of(line.split(LAMP)[0] ?? ''))
+}
+
+const ROWS_TEXT = ['     CLAUDE  7d 84%', '     CODEX  —', '     GITHUB  REST 8%']
+
+describe('the lamp panel’s five rows (joshuafolkken/kit#8277)', () => {
+	it('runs on throughput’s two rows, the blank line and usage’s first two rows alike', () => {
+		const lines = panel_frame(ROWS_TEXT)
+		const lamped = lines.filter((line) => line.includes(LAMP))
+		const [start] = lamp_starts(lines)
+		const leads = lamped.slice(2).map((line) => line.slice(0, line.indexOf(LAMP)).trimEnd())
+
+		expect(lamped).toHaveLength(5)
+		expect(lamp_starts(lines)).toStrictEqual(Array.from({ length: 5 }, () => start))
+		for (const line of lamped) expect(line.split(LAMP)).toHaveLength(PANEL_LAMPS + 1)
+		expect(leads).toStrictEqual(['', ...ROWS_TEXT.slice(0, 2)])
+	})
+
+	it('draws none on GitHub’s row or the usage rule', () => {
+		const unlit = panel_frame(ROWS_TEXT).filter(
+			(text) => text.includes('GITHUB') || text.includes('usage'),
+		)
+
+		expect(unlit).toHaveLength(2)
+		expect(unlit.join('')).not.toContain(LAMP)
+	})
+
+	it('drops both usage rows’ lamps where one row reaches the panel, keeping the throughput three', () => {
+		const long = 'x'.repeat(width_of(texts(false)[0] ?? '') + 1)
+		const lines = panel_frame([ROWS_TEXT[0] ?? '', long, ROWS_TEXT[2] ?? ''])
+
+		expect(lines.filter((line) => line.includes(LAMP))).toHaveLength(3)
+		expect(lines).toContain(long)
+		expect(lines).toContain(ROWS_TEXT[0])
+	})
+})
+
+describe('the lamp panel’s rows under the throughput rows, with no lamps', () => {
+	it('leaves the blank line and the usage rows as they were where the frame draws no lamps', () => {
+		const lines = panel_frame(ROWS_TEXT, false)
+		const rule = lines.findIndex((line) => line.includes('usage'))
+
+		expect(lines.join('')).not.toMatch(new RegExp(`[${LAMP}${LAMP_START}]`, 'u'))
+		expect(lines[rule - 1]).toBe('')
+		for (const row of ROWS_TEXT) expect(lines).toContain(row)
 	})
 })
 

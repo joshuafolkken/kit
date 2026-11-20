@@ -210,7 +210,11 @@ function render(view: BoardView): Array<string> {
 	const parts = {
 		above,
 		throughput: run_board_render_throughput.throughput_part(view.throughput, view.has_lamps),
-		usage: run_board_render_quota.usage_part({ ...header, hold: header.quota_hold }),
+		usage: run_board_render_quota.usage_part({
+			...header,
+			hold: header.quota_hold,
+			has_lamps: view.has_lamps,
+		}),
 		...plan_parts(header, notes, view.size),
 		processes: run_board_render_processes.processes_part(header),
 		notes: run_board_render_notes.notes_part(notes, { ...header, columns: view.size?.columns }),
