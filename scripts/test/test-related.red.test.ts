@@ -115,20 +115,42 @@ beforeEach(() => {
 	mocked_moved.mockResolvedValue(GREEN_MOVED)
 })
 
-describe('test_related.run_related_tests — reuse after failure', () => {
-	it('executes failed tests without consulting an old success record for exclusions', async () => {
-		const read = vi.spyOn(test_related_reuse, 'read')
+// joshuafolkken/kit#8288: a run after a red, or a scoped one, compares the green test by test too.
+describe('test_related.run_related_tests — reuse after failure or with arguments', () => {
+	const REUSED_TEST = absolute(path.join('scripts', 'test', 'test-related-moved.test.ts'))
+
+	function reuse_both(): ReturnType<typeof vi.spyOn> {
+		return vi.spyOn(test_related_reuse, 'read').mockResolvedValue({
+			excluded: [absolute(FAILED_TEST), REUSED_TEST],
+			reused: 2,
+			missed: 0,
+			reason: 'closed-inputs-unchanged',
+			elapsed_ms: 0,
+		})
+	}
+
+	it('excludes a green test with unchanged inputs but runs the failed one again', async () => {
+		const read = reuse_both()
 
 		await test_related.run_related_tests([])
 
-		expect(read).toHaveBeenCalledWith(
-			REPOSITORY_ROOT,
-			expect.anything(),
-			undefined,
-			test_related_reuse.MISS.AFTER_RED,
-		)
-		expect(vitest_arguments()).not.toContain('--exclude')
+		expect(read).toHaveBeenCalledWith(REPOSITORY_ROOT, expect.anything(), BEFORE)
+		expect(vitest_arguments()).toEqual(expect.arrayContaining(['--exclude', REUSED_TEST]))
+		expect(vitest_arguments().filter((argument) => argument === '--exclude')).toHaveLength(1)
 		expect(vitest_arguments()).toContain(absolute(FAILED_TEST))
+	})
+
+	it('compares a scoped run against the tree yet records no green from it', async () => {
+		const read = reuse_both()
+
+		await test_related.run_related_tests([FIXED_SOURCE])
+
+		expect(read).toHaveBeenCalledWith(REPOSITORY_ROOT, expect.anything(), BEFORE)
+		expect(vitest_arguments()).toEqual(expect.arrayContaining(['--exclude', REUSED_TEST]))
+		expect(scoped_green.record_if_green).toHaveBeenCalledWith(review_stamps.test_related_stamp, {
+			before: undefined,
+			exit_code: 0,
+		})
 	})
 })
 

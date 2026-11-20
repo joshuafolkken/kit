@@ -13,7 +13,7 @@ import { test_related_cap } from './test-related-cap'
 import { test_related_moved, type ChangeReading } from './test-related-moved'
 import { test_related_record } from './test-related-record'
 import { test_related_red, type RedReading, type RelatedInput } from './test-related-red'
-import { test_related_reuse, type ReuseMiss } from './test-related-reuse'
+import { test_related_reuse, type TestReuse } from './test-related-reuse'
 import { test_related_run } from './test-related-run'
 import { related_scope, type RelatedScope } from './test-related-scope'
 import { test_related_select } from './test-related-select'
@@ -298,34 +298,33 @@ function red_fields(
 	return { owed: red?.owed ?? [], red_rerun: change.is_red_rerun === true }
 }
 
-// The tree reuse compares against, and why it gets none (joshuafolkken/kit#8283): a red record owes
-// its failed files, a scoping argument vouches for no tree, else no gate tree was read.
-function reuse_input(
-	command_arguments: ReadonlyArray<string>,
+// **The tree reuse compares against is not the tree a green is recorded on** (joshuafolkken/kit#8288):
+// a scoped run or one after a red records nothing, yet each test whose closed inputs still hash as
+// recorded is as proven there as in a bare run. The red run's failed files run again regardless.
+async function read_reuse(
+	root: string,
+	resolved: RelatedScope,
+	compared: GateTree | undefined,
 	red: RedReading | undefined,
-	before: GateTree | undefined,
-): { tree: GateTree | undefined; miss: ReuseMiss } {
-	const { MISS } = test_related_reuse
+): Promise<TestReuse> {
+	const reuse = await test_related_reuse.read(root, resolved, compared)
 
-	if (red !== undefined) return { tree: undefined, miss: MISS.AFTER_RED }
-
-	const is_scoped = unit_worker_share.without_worker_flags(command_arguments).length > 0
-
-	return { tree: before, miss: is_scoped ? MISS.SCOPED_ARGUMENTS : MISS.NO_TREE }
+	return test_related_reuse.keeping(root, reuse, red?.failed ?? [])
 }
 
+// `before`: the tree a green may be recorded on; `compared`: the tree reuse compares against.
 async function read_run_input(
 	root: string,
 	command_arguments: ReadonlyArray<string>,
 	before: GateTree | undefined,
+	compared: GateTree | undefined,
 ): Promise<RelatedInput> {
 	const red = await test_related_red.read_red(before)
 	const change = await read_change(root, command_arguments, red)
 	const { changed, synced = [], since_map = [], branch } = change
 	const resolved = await resolve_change(root, change)
 	const selected = await selected_of(root, change, resolved)
-	const { tree, miss } = reuse_input(command_arguments, red, before)
-	const reuse = await test_related_reuse.read(root, resolved, tree, miss)
+	const reuse = await read_reuse(root, resolved, compared, red)
 
 	return {
 		root,
@@ -381,7 +380,7 @@ async function run_fresh(
 	const root = await changed_file_scope.repository_root_or_cwd()
 	const scoping = unit_worker_share.without_worker_flags(command_arguments)
 	const before = scoping.length === 0 ? tree : undefined
-	const input = await read_run_input(root, command_arguments, before)
+	const input = await read_run_input(root, command_arguments, before, tree)
 	// The branch change by half and base, for the ledger alone (joshuafolkken/kit#6982).
 	const branch_parts = await read_or_undefined(changed_paths.read_changed_parts)
 
