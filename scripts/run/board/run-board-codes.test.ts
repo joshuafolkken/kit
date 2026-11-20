@@ -1,14 +1,20 @@
 import { stripVTControlCharacters } from 'node:util'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_board_codes, type RuleCell } from './run-board-codes'
+import { run_board_fixture } from './run-board-fixture'
 import type { Lamp } from './run-board-lamp-spots'
 import { run_board_spin } from './run-board-spin'
+import type { Theme } from './run-board-theme-defs'
+import { run_board_tick } from './run-board-tick'
 import type { Typing } from './run-board-type-rows'
 
 // joshuafolkken/kit#8375: a wargames live board's section rules run launch codes while a row types, then
 // a lock crosses them left to right and turns them back into the rule.
 
 const { CODE, CODE_MS, code_bytes, is_coding, locked_at, rule_cells } = run_board_codes
+const { LOCAL, drawn_from, harness, plan_titled } = run_board_fixture
+const { FRESH_STATE, layout_for } = run_board_tick
+const WIDE = { rows: 60, columns: 200 }
 const START = Date.parse('2026-11-20T09:00:00.000Z')
 const LETTER_MS = 50
 const TEXT = 'x'.repeat(10)
@@ -136,7 +142,10 @@ describe('run_board_codes.locked_at', () => {
 
 const LAMP: Lamp = { row: 6, column: 72, panel_row: 0, group: 0, lamp: 0 }
 
-async function turns_with(lamps: ReadonlyArray<Lamp>): Promise<string> {
+async function turns_with(
+	lamps: ReadonlyArray<Lamp>,
+	typing: Typing = typing_at(START),
+): Promise<string> {
 	let now_ms = START
 	const writes: Array<string> = []
 	const ports = {
@@ -149,10 +158,7 @@ async function turns_with(lamps: ReadonlyArray<Lamp>): Promise<string> {
 		},
 	}
 
-	await run_board_spin.spin_to_second(
-		{ spots: [], typing: typing_at(START), lamps, rules: CELLS },
-		ports,
-	)
+	await run_board_spin.spin_to_second({ spots: [], typing, lamps, rules: CELLS }, ports)
 
 	return writes.join('')
 }
@@ -164,5 +170,33 @@ describe('run_board_spin.spin_to_second — the rules', () => {
 
 	it('writes no rule cell where the lamp panel is off', async () => {
 		expect(await turns_with([])).not.toContain('\u{1B}[2;10H')
+	})
+
+	// The lock's second step, its head on column 11, falls between two spinner turns: only a code step
+	// writes it (joshuafolkken/kit#8375).
+	it('wakes on every code step, not only when the spinner turns', async () => {
+		const locking: Typing = { seen: new Set(), lines: [], done_ms: START }
+
+		expect(await turns_with([LAMP], locking)).toContain(`\u{1B}[2;11H\u{1B}[38;2;${WHITE}m`)
+	})
+})
+
+// The rule cells a live redraw of a frame with section rules keeps for the turns, in `theme`.
+function drawn_rules(theme: Theme | undefined): number {
+	const { ports } = harness(LOCAL, [])
+	const state = { ...FRESH_STATE, plan: plan_titled('a'), run_started_ms: LOCAL.started_ms }
+	const types_rows = theme !== undefined
+	const redraw = { ports: { ...ports, types_rows, theme, size: () => WIDE }, now_ms: START }
+
+	return drawn_from(state, LOCAL, redraw, layout_for(state, LOCAL, START)).rules?.length ?? 0
+}
+
+describe('run_board_tick_draw.draw_display — the rules', () => {
+	it('keeps the section rules’ cells for the turns on a wargames board', () => {
+		expect(drawn_rules('wargames')).toBeGreaterThan(0)
+	})
+
+	it.each([undefined, 'matrix' as const])('keeps none in the %s theme', (theme) => {
+		expect(drawn_rules(theme)).toBe(0)
 	})
 })
