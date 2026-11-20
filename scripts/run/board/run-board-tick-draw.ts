@@ -134,6 +134,29 @@ function has_codes(ports: Pick<DrawPorts, 'theme'>): boolean {
 	return ports.theme !== undefined && THEME_DEFS[ports.theme].live.codes
 }
 
+// The theme rows whose lamp strip choice the board reads.
+type StripDefs = Readonly<Partial<Record<string, Pick<ThemeDefinition, 'live'>>>>
+
+// Whether a lamp strip fills above each rule: where the rules run code, in a theme whose definition
+// switches the strip on (joshuafolkken/kit#8376) — off by default (joshuafolkken/kit#8398).
+function has_strip(ports: Pick<DrawPorts, 'theme'>, defs: StripDefs = THEME_DEFS): boolean {
+	if (ports.theme === undefined || !has_codes(ports)) return false
+
+	return defs[ports.theme]?.live.strip === true
+}
+
+// The rules running code and the strips filling above them that the spin draws, each kept only where its
+// switch is on — off, the board holds no cell for it and the spin writes none.
+function decoded_of(
+	ports: Pick<DrawPorts, 'theme'>,
+	drawn: Pick<Drawn, 'rules' | 'strips'>,
+): Pick<Drawn, 'rules' | 'strips'> {
+	return {
+		rules: has_codes(ports) ? drawn.rules : [],
+		strips: has_strip(ports) ? drawn.strips : [],
+	}
+}
+
 // The frame under `header` with its spinners drawn at this moment's frame, and where they are on screen.
 function frame_of(display: BoardDisplay, header: LaidHeader, redraw: Redraw): Drawn {
 	const bounds = bounds_of(redraw.ports)
@@ -186,13 +209,12 @@ function draw_display(state: BoardState, display: BoardDisplay, redraw: Redraw):
 	redraw.ports.typing_sound?.set(run_board_type_rows.is_typing(typing, redraw.now_ms))
 
 	const { spots, sweep, lamps } = drawn
-	const coded = has_codes(redraw.ports) ? drawn : { rules: [], strips: [] }
-	const { rules, strips } = coded
+	const { rules, strips } = decoded_of(redraw.ports, drawn)
 
 	return { ...state, ...display.carried, spots, sweep, lamps, rules, strips, typing }
 }
 
-const run_board_tick_draw = { bounds_of, draw, draw_display, has_lamps }
+const run_board_tick_draw = { bounds_of, draw, draw_display, has_lamps, has_strip }
 
 export { run_board_tick_draw }
 export type { DrawPorts, Redraw }

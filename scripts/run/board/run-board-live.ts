@@ -60,7 +60,7 @@ function leaver(ports: BoardPorts, screen: Screen, keys: KeyReading): () => void
 // The theme rows whose live effects the board reads.
 type LiveDefs = Readonly<Partial<Record<string, Pick<ThemeDefinition, 'live'>>>>
 
-const NO_LIVE: LiveDefinition = { types_rows: false, trill: false, codes: false }
+const NO_LIVE: LiveDefinition = { types_rows: false, trill: false, codes: false, strip: false }
 
 // The live effects a theme's definition chooses (joshuafolkken/kit#8360); a board in no theme has none.
 function live_of(theme: Theme | undefined, defs: LiveDefs = THEME_DEFS): LiveDefinition {

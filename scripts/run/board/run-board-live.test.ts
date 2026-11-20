@@ -10,7 +10,7 @@ import type { TypingSound } from './run-board-sound-typing'
 
 const { LOCAL, STOPPED, harness, plan_titled } = run_board_fixture
 const SCREEN = run_board_screen.screen_of('live')
-const NO_LIVE = { types_rows: false, trill: false, codes: false }
+const NO_LIVE = { types_rows: false, trill: false, codes: false, strip: false }
 
 // joshuafolkken/kit#8360: the live effects are the theme definition's, not whether a theme is given.
 describe('run_board_live.live_of', () => {
@@ -19,6 +19,7 @@ describe('run_board_live.live_of', () => {
 			types_rows: true,
 			trill: true,
 			codes: true,
+			strip: false,
 		})
 	})
 
