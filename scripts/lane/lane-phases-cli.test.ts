@@ -89,6 +89,15 @@ describe('lane_phases_cli.run', () => {
 		expect(await printed([SINCE, at(100)])).toContain(TWO_LANES)
 	})
 
+	it('prints the run:chain stage and josh ship step tables after the phases', async () => {
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		expect(await lane_phases_cli.run(['#1'], source())).toBe(0)
+		expect(String(info.mock.calls.at(1)?.at(0))).toMatch(
+			/^run:chain stages: .*\njosh ship steps: /u,
+		)
+	})
+
 	it('prints the usage for a malformed request', async () => {
 		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
 		const requests = [[], ['abc'], [SINCE, 'never'], [SINCE, at(0), '--to', at(1)]]

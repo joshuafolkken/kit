@@ -8,6 +8,7 @@ import { lane_ledger, type LedgerEntry } from './lane-ledger'
 import { lane_ledger_archive } from './lane-ledger-archive'
 import { lane_ledger_tail } from './lane-ledger-tail'
 import { lane_phases, type Span } from './lane-phases'
+import { lane_phases_steps } from './lane-phases-steps'
 import { lane_stats_request } from './lane-stats-request'
 
 // `josh lane:phases <issue>... | --since <date> [--until <date>]` — the lanes' median minutes by phase
@@ -72,18 +73,12 @@ function request_of(argv: ReadonlyArray<string>, now_ms: number): Request | unde
 	return argv[0] === SINCE_FLAG ? period_of(argv, now_ms) : issues_of(argv)
 }
 
-function has_issue(wanted: ReadonlySet<number>, entry: LedgerEntry): boolean {
-	return 'issue' in entry && typeof entry.issue === 'number' && wanted.has(entry.issue)
-}
-
+// Every line read, unfiltered: each table keeps only the requested lanes' lines itself, and the
+// stage table reads where the `chain-stage` records begin from the rest.
 function entries_of(request: Request, path: string): ReadonlyArray<LedgerEntry> {
-	if ('span' in request) {
-		return lane_ledger_tail.read_since(path, request.span.from_ms - LEAD_MS).entries
-	}
-
-	const wanted = new Set(request.issues)
-
-	return lane_ledger_archive.history_at(path).filter((entry) => has_issue(wanted, entry))
+	return 'span' in request
+		? lane_ledger_tail.read_since(path, request.span.from_ms - LEAD_MS).entries
+		: lane_ledger_archive.history_at(path)
 }
 
 function failed(message: string): number {
@@ -101,6 +96,7 @@ async function report(request: Request, source: Source): Promise<number> {
 	const samples = issues.flatMap((issue) => lane_phases.phases_of(entries, events, issue))
 
 	console.info(lane_phases.text(lane_phases.rows_of(samples), issues.length))
+	console.info(lane_phases_steps.text(entries, issues))
 
 	return 0
 }
