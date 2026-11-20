@@ -4,6 +4,7 @@ import type { GateTree } from '#scripts/gate/gate-tree'
 import { input_fingerprint } from '#scripts/gate/input-fingerprint'
 import { moved_paths, type MovedParts } from '#scripts/gate/moved-paths'
 import { since_green } from '#scripts/gate/since-green'
+import type { FileMapStampAccess } from '#scripts/josh/file-map-stamp'
 import { import_graph, type ImportGraph } from '#scripts/lint/import-graph'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { test_declared_logic } from './test-declared-logic'
@@ -172,28 +173,28 @@ async function unchanged(
 	return Object.keys(recorded).filter((file) => current[file] === recorded[file])
 }
 
-// No-op scoped runs preserve evidence only on exactly the same tree, base and check inputs.
-async function retained(root: string, tree: GateTree): Promise<ReadonlyArray<string>> {
-	const parts = await since_green.read_moved_parts(
-		review_stamps.test_related_stamp,
-		gate_labels.UNIT_LABEL,
-		undefined,
-		tree,
-	)
-	if (parts === undefined || moved_paths.union_of(parts).length > 0) return []
-
-	return await unchanged(root, review_stamps.test_related_stamp.read()?.blobs ?? {})
-}
-
-// **A red run's passed files join the next green record** (joshuafolkken/kit#7966): on the red
-// record's own base and check inputs, with no whole-suite input moved since, each file whose closed
-// inputs still hash as they did when it passed.
-async function carried(root: string, tree: GateTree): Promise<ReadonlyArray<string>> {
-	const stamp = review_stamps.test_related_red_stamp
+// On the record's own base and check inputs, with no whole-suite input moved since, each recorded
+// file whose closed inputs still hash as they did when it passed.
+async function still_passing(
+	root: string,
+	tree: GateTree,
+	stamp: FileMapStampAccess,
+): Promise<ReadonlyArray<string>> {
 	const parts = await since_green.read_moved_parts(stamp, gate_labels.UNIT_LABEL, undefined, tree)
 	if (!carries_over(parts)) return []
 
 	return await unchanged(root, stamp.read()?.blobs ?? {})
+}
+
+// **A green keeps the last green's still-passing files** (joshuafolkken/kit#8289): a green that
+// proves no test of its own after a branch edit (scope `none`) would otherwise record no digest.
+async function retained(root: string, tree: GateTree): Promise<ReadonlyArray<string>> {
+	return await still_passing(root, tree, review_stamps.test_related_stamp)
+}
+
+// **A red run's passed files join the next green record** (joshuafolkken/kit#7966).
+async function carried(root: string, tree: GateTree): Promise<ReadonlyArray<string>> {
+	return await still_passing(root, tree, review_stamps.test_related_red_stamp)
 }
 
 function flags(reuse: TestReuse | undefined): ReadonlyArray<string> {
