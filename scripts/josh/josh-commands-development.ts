@@ -258,7 +258,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 				NARROWED,
 				{
 					arguments: '--touched',
-					note: 'diff, same-named and importing tests, added-file listers',
+					note: 'diff, same-named and importing tests, added/removed listers',
 				},
 				{ arguments: '--silent', note: FORWARDED_TO_VITEST },
 			],

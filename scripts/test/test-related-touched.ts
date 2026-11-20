@@ -23,7 +23,7 @@ const TOUCHED_FLAG = '--touched'
 const TOUCHED_KIND = 'touched'
 const TEST_SUFFIX = '.test.ts'
 const TOUCHED_REASON =
-	"the diff test files, their modules' same-named tests, direct test importers, listers of an added file and pinned tests"
+	"the diff test files, their modules' same-named tests, direct test importers, listers of an added or removed file and pinned tests"
 const NOTHING_TOUCHED_REASON = 'no changed file reaches a touched test'
 const COMMAND = 'test:related'
 const LANE_NOTICE =
