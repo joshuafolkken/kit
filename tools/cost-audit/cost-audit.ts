@@ -14,6 +14,7 @@ import { cost_audit_sequence, type Sequences } from './cost-audit-sequence'
 import { cost_audit_spend, type ModelSpend } from './cost-audit-spend'
 import { cost_audit_tool } from './cost-audit-tool'
 import { cost_audit_usage, type UsageBreakdown } from './cost-audit-usage'
+import { cost_audit_wait, type WaitTable } from './cost-audit-wait'
 
 // The aggregation half of `josh cost:audit`: one period's cost broken down by session kind, tool
 // category and guard, set beside the period before it, with every row that grew past the regression
@@ -65,7 +66,8 @@ interface Audit {
 	kinds: ReadonlyArray<AuditRow>
 	tools: ReadonlyArray<AuditRow>
 	guards: ReadonlyArray<AuditRow>
-	rewrites: { current: Rewrites; previous: Rewrites }
+	// The current period's after-wait rewrites by kind, phase and preceding call (kit#8308).
+	rewrites: { current: Rewrites; previous: Rewrites; waits: ReadonlyArray<WaitTable> }
 	// The cache write by cause, each row set beside the period before (joshuafolkken/kit#7877).
 	write_causes: ReadonlyArray<CauseRow>
 	// The current period's lane requests by phase (joshuafolkken/kit#5936).
@@ -194,6 +196,22 @@ function rewrites_inside(sessions: ReadonlyArray<AuditSession>, window: AuditWin
 	return cost_audit_rewrite.rewrites_in(sessions, (at_ms) => is_inside(at_ms, window))
 }
 
+function rewrites(
+	input: AuditInput,
+	current: AuditWindow,
+	previous: AuditWindow,
+): Audit['rewrites'] {
+	return {
+		current: rewrites_inside(input.sessions, current),
+		previous: rewrites_inside(input.sessions, previous),
+		waits: cost_audit_wait.waits_of({
+			sessions: input.sessions,
+			breakdowns: input.breakdowns ?? new Map<number, Breakdown>(),
+			is_counted: (at_ms) => is_inside(at_ms, current),
+		}),
+	}
+}
+
 function write_causes(
 	sessions: ReadonlyArray<AuditSession>,
 	current: AuditWindow,
@@ -311,10 +329,7 @@ function audit(input: AuditInput): Audit {
 		kinds: kind_rows(current, previous, inside(input.sessions, current_window)),
 		tools: rows_of(current.tools, previous.tools),
 		guards: rows_of(current.guards, previous.guards),
-		rewrites: {
-			current: rewrites_inside(input.sessions, current_window),
-			previous: rewrites_inside(input.sessions, previous_window),
-		},
+		rewrites: rewrites(input, current_window, previous_window),
 		write_causes: write_causes(input.sessions, current_window, previous_window),
 		resumes: resumes(input, current_window, previous_window),
 	}
