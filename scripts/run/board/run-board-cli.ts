@@ -11,6 +11,7 @@ import { run_board_gather } from './run-board-gather'
 import { run_board_gather_live } from './run-board-gather-live'
 import { run_board_gather_record } from './run-board-gather-record'
 import { run_board_gather_thread } from './run-board-gather-thread'
+import { run_board_heap } from './run-board-heap'
 import { run_board_live } from './run-board-live'
 import { run_board_saved_state } from './run-board-saved-state'
 import { run_board_screen } from './run-board-screen'
@@ -91,23 +92,40 @@ const LIVE_PORTS: Omit<BoardPorts, 'gather'> = {
 	},
 }
 
+// A live board's worker gathers, its heap readable for `--timing` (`run-board-heap.ts`); a single
+// frame gathers where it draws.
+function gather_ports(is_live: boolean, theme?: Theme): Pick<BoardPorts, 'gather' | 'worker_heap'> {
+	if (!is_live) {
+		return { gather: run_board_gather.frame_gatherer(run_board_gather_live.ports_of(false)) }
+	}
+
+	const { spawn, heap } = run_board_heap.tracked(
+		run_board_gather_thread.spawner(run_board_gather_record.setup_of(theme)),
+	)
+	const gather = run_board_gather_thread.worker_gatherer(
+		spawn,
+		Date.now,
+		async () => await run_board_saved_state.for_run(run_board_saved_state.file_store()),
+	)
+
+	return { gather, worker_heap: heap }
+}
+
 // A live board reads and records its frames on its worker thread, so neither stops its spinner, and
 // sounds its cues and the trill (joshuafolkken/kit#8250); a single frame has no spinner to stop, reads
 // where it draws, and stays silent.
 function live_ports(is_live: boolean, theme?: Theme): BoardPorts {
-	const setup = run_board_gather_record.setup_of(theme)
-	const gather = is_live
-		? run_board_gather_thread.worker_gatherer(
-				run_board_gather_thread.spawner(setup),
-				Date.now,
-				async () => await run_board_saved_state.for_run(run_board_saved_state.file_store()),
-			)
-		: run_board_gather.frame_gatherer(run_board_gather_live.ports_of(false))
 	const cue = is_live ? run_board_sound_player.play_cue : undefined
 	const typing_sound = is_live ? run_board_sound_typing.typing_sound() : undefined
 
 	// Kept off `LIVE_PORTS`, so the profile that spreads them always reads from scratch.
-	return { ...LIVE_PORTS, gather, cue, typing_sound, frames: run_board_frame_store.file_store() }
+	return {
+		...LIVE_PORTS,
+		...gather_ports(is_live, theme),
+		cue,
+		typing_sound,
+		frames: run_board_frame_store.file_store(),
+	}
 }
 
 // A chat frame read from scratch, kept so the next question within a minute is answered from it; dated

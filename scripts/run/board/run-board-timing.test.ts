@@ -1,10 +1,13 @@
+import { setImmediate as settled } from 'node:timers/promises'
 import { launch_timing } from '#scripts/lane/launch-timing'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { run_board_cli } from './run-board-cli'
 import { run_board_fixture } from './run-board-fixture'
+import type { HeapStats } from './run-board-heap'
 import { run_board_read } from './run-board-read'
 import { run_board_read_fixture } from './run-board-read-fixture'
 import { run_board_spin } from './run-board-spin'
+import type { StallProbes } from './run-board-stall'
 import type { DrawKind, DrawTimer } from './run-board-state'
 import { run_board_tick } from './run-board-tick'
 import { run_board_timing } from './run-board-timing'
@@ -116,6 +119,54 @@ describe('run_board_timing.timed draws', () => {
 		leaves[0]?.()
 
 		expect(frames.at(-1)).toContain('tick draw')
+	})
+})
+
+const HEAP: HeapStats = { used_heap_size: 1_048_576, total_heap_size: 2_097_152 }
+
+// Probes whose timer and GC observer never fire, so only the first heap sample is taken.
+function heap_probes(): StallProbes & {
+	heap: { main: Mock<() => HeapStats>; every: StallProbes['every'] }
+} {
+	const every = vi.fn<StallProbes['every']>().mockReturnValue(vi.fn())
+
+	return {
+		now: vi.fn<() => number>().mockReturnValue(0),
+		every,
+		observe_gc: vi.fn<StallProbes['observe_gc']>().mockReturnValue(vi.fn()),
+		heap: { main: vi.fn<() => HeapStats>().mockReturnValue(HEAP), every },
+	}
+}
+
+// joshuafolkken/kit#8339: each isolate's heap, sampled while a live board is up under the flag.
+describe('run_board_timing.timed heaps', () => {
+	const MAIN_HEAP = /main heap +used 1\.0 MB \(peak 1\.0\) · total 2\.0 MB \(peak 2\.0\)/u
+	const WORKER_HEAP = /worker heap +used 1\.0 MB/u
+
+	it('says the main and the worker heap, latest and peak, as a live board leaves', async () => {
+		const { ports, frames, leaves } = harness(undefined, [])
+		const worker_heap = vi.fn(async () => await HEAP)
+		const board = run_board_timing.timed({ ...ports, worker_heap }, true, () => 0, heap_probes())
+
+		board.on_exit(() => 0)
+		await settled()
+		leaves.at(-1)?.()
+
+		expect(frames.at(-1)).toMatch(MAIN_HEAP)
+		expect(frames.at(-1)).toMatch(WORKER_HEAP)
+	})
+
+	it('reads no heap without the flag', () => {
+		const { ports, leaves } = harness(undefined, [])
+		const worker_heap = vi.fn(async () => await HEAP)
+		const probes = heap_probes()
+		const board = run_board_timing.timed({ ...ports, worker_heap }, false, () => 0, probes)
+
+		board.on_exit(() => 0)
+		leaves.at(-1)?.()
+
+		expect(probes.heap.main).not.toHaveBeenCalled()
+		expect(worker_heap).not.toHaveBeenCalled()
 	})
 })
 

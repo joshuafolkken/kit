@@ -188,4 +188,13 @@ describe('run_board_cli.live_ports cue', () => {
 		expect(run_board_cli.live_ports(true).typing_sound).toBeDefined()
 		expect(run_board_cli.live_ports(false).typing_sound).toBeUndefined()
 	})
+
+	// joshuafolkken/kit#8339: `--timing` reads the heap of the worker a live board gathers on.
+	it('passes the worker heap to the live board alone, reading none before a worker starts', async () => {
+		const { worker_heap } = run_board_cli.live_ports(true)
+
+		expect(worker_heap).toBeDefined()
+		await expect(worker_heap?.()).resolves.toBeUndefined()
+		expect(run_board_cli.live_ports(false).worker_heap).toBeUndefined()
+	})
 })

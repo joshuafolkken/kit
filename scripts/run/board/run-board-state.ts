@@ -7,6 +7,7 @@ import type { FrameStore } from './run-board-frame-store'
 import type { GatherRead } from './run-board-gather'
 import type { BoardForm } from './run-board-header'
 import type { Notice } from './run-board-header-notice'
+import type { WorkerHeap } from './run-board-heap'
 import { run_board_idle } from './run-board-idle'
 import type { IssueCount } from './run-board-issue-count'
 import type { KeyInput } from './run-board-keys'
@@ -39,6 +40,9 @@ interface BoardPorts {
 	// The reads off this machine a redraw draws from (`run-board-gather.ts`): a live board's come from
 	// a worker thread, so no read stops its spinner, with the GitHub reads it folded over them.
 	gather: (pace: Pace) => Promise<BoardGather>
+	// The gather worker's heap, which only `--timing` reads (`run-board-heap.ts`); none where no worker
+	// gathers.
+	worker_heap?: WorkerHeap | undefined
 	// The issues that answered as closed, and whether every issue answered (`run-board-closed.ts`).
 	read_closed: (issues: ReadonlyArray<number>) => Promise<ClosedAnswer>
 	// Where the last GitHub reads are kept between boards (`run-board-snapshot.ts`); none keeps nothing.

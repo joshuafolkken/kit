@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { run_board_fixture } from './run-board-fixture'
+import { run_board_heap } from './run-board-heap'
 import { run_board_live } from './run-board-live'
 import { run_board_stall, type StallProbes } from './run-board-stall'
 import type { StallStage } from './run-board-state'
@@ -76,7 +77,9 @@ function held_in_turn(): FakeProbes & { watch: ReturnType<typeof run_board_stall
 function left_after_stall(): { frame: string | undefined; stops: Array<string> } {
 	const fake = fake_probes()
 	const { ports, frames, leaves } = harness(undefined, [])
-	const board = run_board_timing.timed(ports, true, () => 0, fake.probes)
+	// The heaps on a timer of their own, so the probe fired is the stall watch's.
+	const heap = { main: run_board_heap.main, every: vi.fn().mockReturnValue(vi.fn()) }
+	const board = run_board_timing.timed(ports, true, () => 0, { ...fake.probes, heap })
 
 	board.on_exit(() => 0)
 	hold(fake, (stage) => board.enter_stage?.(stage), 'turn')
@@ -167,8 +170,11 @@ describe('run_board_timing.timed stalls', () => {
 	it('says each stall with its length, stage and GC as the board leaves', () => {
 		const { frame, stops } = left_after_stall()
 
-		expect(frame).toContain(`stalls   n 1 over ${String(STALL_MS)}`)
-		expect(frame).toContain(`stall 1  ${STALL_LENGTH.toFixed(1)} turn · gc 30.0`)
+		// The rows are padded to the longest name the report says, the heaps' among them.
+		expect(frame).toMatch(new RegExp(`stalls +n 1 over ${String(STALL_MS)}`, 'u'))
+		expect(frame).toMatch(
+			new RegExp(String.raw`stall 1 +${STALL_LENGTH.toFixed(1)} turn · gc 30\.0`, 'u'),
+		)
 		expect(stops).toStrictEqual(['probe', 'gc'])
 	})
 
