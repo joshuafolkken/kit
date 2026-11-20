@@ -14,6 +14,7 @@ const NO_LIVE = { types_rows: false, trill: false, codes: false, strip: false }
 const ESCAPE = '\u{1B}'
 const DIM_RULE = new RegExp(`${ESCAPE}\\[2m─+${ESCAPE}\\[22m`, 'u')
 const REFRESH_START = `${ESCAPE}[?2026h${ESCAPE}[H${ESCAPE}[K`
+const DIM_HEADING_START = `\n${ESCAPE}[K${ESCAPE}[2m──${ESCAPE}[22m `
 
 afterEach(() => {
 	vi.unstubAllEnvs()
@@ -57,6 +58,7 @@ describe('run_board_live.watch', () => {
 
 		for (const frame of drawn) {
 			expect(frame.endsWith(`${ESCAPE}[?2026l`)).toBe(true)
+			expect(frame).toContain(DIM_HEADING_START)
 			expect(frame).toMatch(DIM_RULE)
 			expect(frame).not.toContain(`${ESCAPE}[2m${ESCAPE}[2m`)
 		}
