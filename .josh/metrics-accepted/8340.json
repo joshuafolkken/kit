@@ -1,0 +1,7 @@
+{
+	"reason": "read_tail_holding widens a tail read so the quota read stops reading lane logs whole (#8340)",
+	"date": "2026-11-20",
+	"growth": {
+		"scripts.code_lines": 15
+	}
+}

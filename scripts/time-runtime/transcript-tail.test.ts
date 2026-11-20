@@ -39,3 +39,36 @@ describe('transcript_tail.read_tail', () => {
 		expect(transcript_tail.read_tail(target)).toBe(LONG_TEXT)
 	})
 })
+
+describe('transcript_tail.read_tail_holding', () => {
+	const FILLER = 'x'.repeat(TAIL_SAMPLE_BYTES * transcript_tail.TAIL_GROWTH)
+	const MARK = /^MARK$/gmu
+
+	it('reads only the window when the window holds a match', () => {
+		const target = write_transcript('holding-near', `${FILLER}\nMARK\n`)
+		const tail = transcript_tail.read_tail_holding(target, MARK, TAIL_SAMPLE_BYTES)
+
+		expect(tail).toBe(`${FILLER}\nMARK\n`.slice(-TAIL_SAMPLE_BYTES))
+		expect(transcript_tail.read_tail_holding(target, MARK, TAIL_SAMPLE_BYTES)).toBe(tail)
+	})
+
+	it('widens past the window to a match further back, up to the whole file', () => {
+		const text = `MARK\n${FILLER}`
+		const target = write_transcript('holding-far', text)
+
+		expect(transcript_tail.read_tail_holding(target, MARK, TAIL_SAMPLE_BYTES)).toBe(text)
+	})
+
+	it('widens past a match the window cuts at its start', () => {
+		const text = `MARK\n${'y'.repeat(TAIL_SAMPLE_BYTES - 2)}`
+		const target = write_transcript('holding-cut', text)
+
+		expect(transcript_tail.read_tail_holding(target, MARK, TAIL_SAMPLE_BYTES)).toBe(text)
+	})
+
+	it('reads the whole file when nothing matches', () => {
+		const target = write_transcript('holding-none', FILLER)
+
+		expect(transcript_tail.read_tail_holding(target, MARK, TAIL_SAMPLE_BYTES)).toBe(FILLER)
+	})
+})

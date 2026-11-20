@@ -1,4 +1,4 @@
-import { open, readdir, readFile, stat } from 'node:fs/promises'
+import { open, readdir, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { agent_provider } from '#scripts/agent/agent-provider'
 import { codex_home_source } from '#scripts/agent/codex-home-source'
@@ -282,24 +282,24 @@ function is_claude_launch(text: string): boolean {
 	return provider === undefined || provider === agent_provider.ANTHROPIC_PROVIDER
 }
 
-// Whether a log's last launch ran Claude, by its path and `mtime`: a log is read whole once per write.
+// Whether a log's last launch ran Claude, by its path and `mtime`: once per write, off its tail.
 const CLAUDE_LAUNCHES = new Map<string, { mtime_ms: number; is_claude: boolean }>()
 
-async function read_claude_launch(file: QuotaFile): Promise<boolean> {
+function read_claude_launch(file: QuotaFile): boolean {
 	const known = CLAUDE_LAUNCHES.get(file.path)
 
 	if (known?.mtime_ms === file.mtime_ms) return known.is_claude
 
-	const is_claude = is_claude_launch(await readFile(file.path, 'utf8'))
+	const is_claude = is_claude_launch(transcript_tail.read_tail_holding(file.path, LAUNCH_HEADERS))
 
 	CLAUDE_LAUNCHES.set(file.path, { mtime_ms: file.mtime_ms, is_claude })
 
 	return is_claude
 }
 
-async function claude_log(file: QuotaFile): Promise<Array<QuotaFile>> {
+function claude_log(file: QuotaFile): Array<QuotaFile> {
 	try {
-		return (await read_claude_launch(file)) ? [file] : []
+		return read_claude_launch(file) ? [file] : []
 	} catch {
 		return []
 	}
@@ -317,8 +317,7 @@ async function claude_files(
 
 	for (const file of scanned) {
 		if (claude.length >= limit) break
-		// eslint-disable-next-line no-await-in-loop -- Stop reading headers as soon as enough Claude logs are found.
-		claude.push(...(await claude_log(file)))
+		claude.push(...claude_log(file))
 	}
 
 	return claude

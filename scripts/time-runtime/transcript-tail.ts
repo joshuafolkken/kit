@@ -11,6 +11,9 @@ import { closeSync, fstatSync, openSync, readSync } from 'node:fs'
 // couple of milliseconds.
 const TAIL_BYTES = 262_144
 const FILE_START = 0
+// How much wider each re-read of `read_tail_holding` is: a lane log's last launch header usually sits
+// at its start, megabytes back, so a doubling window would read the file nearly twice over.
+const TAIL_GROWTH = 8
 
 // The last `max_bytes` of a file, as text. The leading line is usually cut mid-way, which every
 // reader already handles: an unparseable line is dropped rather than dated.
@@ -34,6 +37,26 @@ function read_tail(file_path: string, max_bytes: number = TAIL_BYTES): string {
 	}
 }
 
-const transcript_tail = { TAIL_BYTES, read_tail }
+// The shortest tail — `max_bytes` widened by `TAIL_GROWTH` each time — that holds a match of `pattern`,
+// or the whole file when none does (joshuafolkken/kit#8340). A match cut by the tail's start is no
+// match, so the tail widens past it. The probe drops `g` and `y`, whose `lastIndex` would carry over.
+function read_tail_holding(
+	file_path: string,
+	pattern: RegExp,
+	max_bytes: number = TAIL_BYTES,
+): string {
+	const probe = new RegExp(pattern.source, pattern.flags.replaceAll(/[gy]/gu, ''))
+	let bytes = max_bytes
+	let text = read_tail(file_path, bytes)
+
+	while (!probe.test(text) && Buffer.byteLength(text) >= bytes) {
+		bytes *= TAIL_GROWTH
+		text = read_tail(file_path, bytes)
+	}
+
+	return text
+}
+
+const transcript_tail = { TAIL_BYTES, TAIL_GROWTH, read_tail, read_tail_holding }
 
 export { transcript_tail }
