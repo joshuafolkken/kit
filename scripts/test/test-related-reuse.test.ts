@@ -221,6 +221,13 @@ describe('test_related_reuse.retained', () => {
 		expect(await test_related_reuse.retained(ROOT, TREE)).toEqual([path.relative(ROOT, UNCHANGED)])
 	})
 	it('does not carry evidence across a moved base', async () => {
+		const blobs = await test_related_reuse.blobs(ROOT, [UNCHANGED])
+
+		vi.spyOn(review_stamps.test_related_stamp, 'read').mockReturnValue({
+			taken_at: '',
+			files: {},
+			blobs,
+		})
 		expect(await test_related_reuse.retained(ROOT, TREE)).toEqual([])
 	})
 })
