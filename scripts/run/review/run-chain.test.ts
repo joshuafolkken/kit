@@ -15,6 +15,8 @@ const RUN_CUT = 'run:cut'
 const [DERIVE_CHECK] = derive_check.DERIVE_CHECK_ARGV
 const ISSUE = '5630'
 const STOP_EXIT = 2
+const STAGE_MS = 7_200_000
+const START_MS = Date.parse('2026-01-01T00:00:00.000Z')
 
 function stage_named(name: string): ChainStage {
 	const stage = run_chain.main_line_stages([], false).find((candidate) => candidate.name === name)
@@ -95,8 +97,36 @@ describe('run_chain — the chain-stage ledger lines', () => {
 		expect(record.mock.calls.every(([line]) => !Number.isNaN(Date.parse(line.at)))).toBe(true)
 		record.mockRestore()
 	})
+})
 
-	it('marks a stage stopped on a hold, though it exited 0', async () => {
+// The ledger tail scans back by `at`, so a line dated at a long stage's start would stop it early.
+describe('run_chain — the chain-stage line date', () => {
+	it('dates each chain-stage line at its stage end, the chain entry at its start', async () => {
+		const record = vi
+			.spyOn(lane_ledger_write_chain_stage, 'record_chain_stage')
+			.mockResolvedValue(undefined)
+
+		vi.useFakeTimers({ toFake: ['Date'], now: START_MS })
+		const runner = vi.fn<StageRunner>(async () => {
+			vi.setSystemTime(START_MS + STAGE_MS)
+
+			return { code: 0, out: '' }
+		})
+		const chain = await run_chain.run_stages([stage_named(SELFCHECK)], ISSUE, vi.fn(), runner)
+
+		vi.useRealTimers()
+		expect(chain.stages).toStrictEqual([
+			{ name: SELFCHECK, at: new Date(START_MS).toISOString(), elapsed_ms: STAGE_MS },
+		])
+		expect(record).toHaveBeenCalledWith(
+			expect.objectContaining({ at: new Date(START_MS + STAGE_MS).toISOString() }),
+		)
+		record.mockRestore()
+	})
+})
+
+describe('run_chain — a held stage and the reports', () => {
+	it('marks a stage stopped on a hold', async () => {
 		const record = vi
 			.spyOn(lane_ledger_write_chain_stage, 'record_chain_stage')
 			.mockResolvedValue(undefined)

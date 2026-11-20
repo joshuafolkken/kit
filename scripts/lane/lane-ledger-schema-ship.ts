@@ -83,8 +83,9 @@ const chain_schema = z.object({
 	stages: z.array(chain_stage_schema).optional(),
 })
 // One `josh run:chain` stage on `issue`, appended as it ends so a run killed or stopped part way still
-// leaves the stages it finished (joshuafolkken/kit#8286): `at` is the stage's start, as on a `chain`
-// line's `stages`, and `result` is `stopped` on the stage the run stopped at (non-zero exit or a hold).
+// leaves the stages it finished (joshuafolkken/kit#8286): `at` is the stage's end, as on a `stage` line,
+// so its start is `at` less `elapsed_ms`, and `result` is `stopped` on the stage the run stopped at
+// (non-zero exit or a hold).
 const chain_stage_entry_schema = chain_stage_schema.extend({
 	kind: z.literal(KIND.CHAIN_STAGE),
 	issue: z.number(),

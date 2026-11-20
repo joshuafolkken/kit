@@ -225,14 +225,22 @@ async function timed_stage(
 ): Promise<TimedStage> {
 	const started_ms = Date.now()
 	const stop = await run_stage(stage, issue, print, run)
+	const ended_ms = Date.now()
 	const entry = {
 		name: stage.name,
 		at: new Date(started_ms).toISOString(),
-		elapsed_ms: Date.now() - started_ms,
+		elapsed_ms: ended_ms - started_ms,
 	}
 	const result = stop === undefined ? 'passed' : 'stopped'
+	// Dated at its end, as it is appended, so a long stage never stops the ledger tail's backward scan.
+	const at = new Date(ended_ms).toISOString()
 
-	await lane_ledger_write_chain_stage.record_chain_stage({ issue: Number(issue), ...entry, result })
+	await lane_ledger_write_chain_stage.record_chain_stage({
+		issue: Number(issue),
+		...entry,
+		at,
+		result,
+	})
 
 	return { entry, stop }
 }
