@@ -92,9 +92,6 @@ const LIVE_PORTS: Omit<BoardPorts, 'gather'> = {
 	},
 }
 
-// A live board reads and records its frames on its worker thread, so neither stops its spinner, and
-// sounds its cues and the trill (joshuafolkken/kit#8250); a single frame has no spinner to stop, reads
-// where it draws, and stays silent.
 // A live board's worker gathers, its heap readable for `--timing` (`run-board-heap.ts`); a single
 // frame gathers where it draws.
 function gather_ports(is_live: boolean, theme?: Theme): Pick<BoardPorts, 'gather' | 'worker_heap'> {
@@ -114,6 +111,9 @@ function gather_ports(is_live: boolean, theme?: Theme): Pick<BoardPorts, 'gather
 	return { gather, worker_heap: heap }
 }
 
+// A live board reads and records its frames on its worker thread, so neither stops its spinner, and
+// sounds its cues and the trill (joshuafolkken/kit#8250); a single frame has no spinner to stop, reads
+// where it draws, and stays silent.
 function live_ports(is_live: boolean, theme?: Theme): BoardPorts {
 	const cue = is_live ? run_board_sound_player.play_cue : undefined
 	const typing_sound = is_live ? run_board_sound_typing.typing_sound() : undefined

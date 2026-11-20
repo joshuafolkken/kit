@@ -28,13 +28,8 @@ type Draws = Record<DrawKind, Array<number>>
 // The main thread's heap read and the heap's own sampling timer, apart from the stall probe's.
 type HeapTimer = Omit<HeapProbes, 'worker'>
 
-// The stall probes with the heap's — the process's own where a test hands none.
+// The stall probes with the heap's; where none are handed, the process's heap on the stall probes' timer.
 type TimingProbes = StallProbes & { heap?: HeapTimer }
-
-const HEAP_PROBES: HeapTimer = {
-	main: run_board_heap.main,
-	every: run_board_stall.PROCESS_PROBES.every,
-}
 
 interface Watching {
 	stalls: StallWatch
@@ -122,7 +117,8 @@ function reporting(
 
 // The stalls and the heaps, watched from when a live board takes its screen.
 function watch(ports: BoardPorts, probes: TimingProbes): Watching {
-	const heap = run_board_heap.watch({ ...(probes.heap ?? HEAP_PROBES), worker: ports.worker_heap })
+	const timer = probes.heap ?? { main: run_board_heap.main, every: probes.every }
+	const heap = run_board_heap.watch({ ...timer, worker: ports.worker_heap })
 
 	return { stalls: run_board_stall.watch(probes), heap }
 }
