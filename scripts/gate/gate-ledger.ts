@@ -35,11 +35,12 @@ const BACKGROUND_CORES = 2
 // a process probe each — costs the gate nothing it could measure.
 const SAMPLE_INTERVAL_MS = 3000
 
-// Where the line goes, the external load read so far — before the first check started, then every
-// sample since — and the timer taking the samples. No readings and no timer when no ledger was
-// resolved: a suite driving the gate reads the machine for nothing.
+// Where the line goes, why the green record was not reused, the external load read so far — before
+// the first check started, then every sample since — and the timer taking the samples. No readings
+// and no timer when no ledger was resolved: a suite driving the gate reads the machine for nothing.
 interface GateLedgerStart {
 	ledger_path: string | undefined
+	fallback?: string | undefined
 	readings: Array<number | undefined>
 	sampler: ReturnType<typeof setInterval> | undefined
 }
@@ -87,12 +88,13 @@ function start_sampler(readings: Array<number | undefined>): ReturnType<typeof s
 	}, SAMPLE_INTERVAL_MS).unref()
 }
 
-async function start(ledger_path: string | undefined): Promise<GateLedgerStart> {
+// `fallback` is the kind of the reuse miss that sent the gate to its checks (`gate_skip.miss_kind`).
+async function start(ledger_path: string | undefined, fallback?: string): Promise<GateLedgerStart> {
 	if (ledger_path === undefined) return { ledger_path, readings: [], sampler: undefined }
 
 	const readings = [await read_external_cores()]
 
-	return { ledger_path, readings, sampler: start_sampler(readings) }
+	return { ledger_path, fallback, readings, sampler: start_sampler(readings) }
 }
 
 // The unit leg's own facts: the whole-suite fallback it took, or the since-green no-op that ran no
@@ -148,6 +150,7 @@ async function record(
 		unit_ms,
 		external_cores,
 		checks: check_records(results),
+		...(begun.fallback !== undefined && { fallback: begun.fallback }),
 		issue: lane_paths.issue_here(),
 	})
 }

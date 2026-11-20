@@ -19,7 +19,8 @@ interface LampMoment {
 	is_burst: boolean
 }
 
-// One lamp on screen, 1-based, the row of the panel it is on (`0` the `24h`), its group and its place.
+// One lamp on screen, 1-based, the row of the panel it is on (`run_board_lamps.PANEL_ROWS`, `0` the
+// `24h`), its group and its place.
 interface Lamp {
 	row: number
 	column: number
@@ -43,7 +44,7 @@ function row_lamps(
 }
 
 // Every lamp in the frame's lines, which start on the screen rows `starts`; the panel's rows counted in
-// order, the `24h` row's first.
+// order from the top — the `24h` row's first, the usage rows' last.
 function lamps_in(
 	lines: ReadonlyArray<string>,
 	starts: ReadonlyArray<number>,
