@@ -37,15 +37,17 @@ interface RuleColumn {
 }
 
 // A rule whose column labels stand over their cells: `── 🧵 lanes ── 💪 CPU ─ 🧠 MEM ───`, each label at
-// its column's start where the rule before it leaves room, and one rule character after the label
-// before it where it does not.
+// its column's start where the rule before it leaves room, and one blank after the label before it
+// where a rule and its blank do not fit (`/H ACTIVE`, joshuafolkken/kit#8280).
+function column_fill(room: number): string {
+	return room > 1 ? `${RULE.repeat(room - 1)} ` : ' '.repeat(Math.max(0, room))
+}
+
 function columns_rule(label: string, columns: ReadonlyArray<RuleColumn>): string {
 	let rule = `${RULE_LEAD} ${label} `
 
 	for (const column of columns) {
-		const fill = Math.max(1, column.start - run_board_fit.width_of(rule) - 1)
-
-		rule += `${RULE.repeat(fill)} ${column.label} `
+		rule += `${column_fill(column.start - run_board_fit.width_of(rule))}${column.label} `
 	}
 
 	return `${rule}${RULE.repeat(Math.max(RULE_LEAD.length, RULE_WIDTH - run_board_fit.width_of(rule)))}`

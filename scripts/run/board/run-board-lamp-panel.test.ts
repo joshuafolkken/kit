@@ -30,6 +30,10 @@ const FEWEST = 8
 // A panel 21 columns wide holds 11 lamps.
 const PANEL_WIDTH = 21
 const PANEL_LAMPS = 11
+const SAMPLE_RULE_WIDTH = 114
+const SAMPLE_ROW_END = 67
+const SAMPLE_LAMP_COLUMN = 70
+const SAMPLE_LAMPS = 23
 
 afterEach(() => {
 	vi.unstubAllEnvs()
@@ -39,7 +43,6 @@ function row_of(label: ThroughputRow['label'], now: number | undefined): Through
 	return {
 		label,
 		cells: [{ start_ms: 0, end_ms: HOUR, done: 2, active_ms: HOUR }],
-		window_ms: HOUR,
 		active_ms: HOUR,
 		done: 2,
 		per_hour: 2,
@@ -103,6 +106,21 @@ describe('the throughput rows’ lamp panel', () => {
 		for (const line of lines) {
 			expect(line.split(LAMP)).toHaveLength(12)
 			expect(width_of(line)).toBe(start + 21)
+		}
+	})
+
+	// joshuafolkken/kit#8280: the narrowed columns end the `24h` row at column 67, so a rule as wide
+	// as the approved sample's (114) holds 23 lamps from column 70.
+	it('starts at column 70 and holds 23 lamps on the approved sample’s rule', () => {
+		const lines = bounded_rows(SAMPLE_RULE_WIDTH)
+
+		expect(width_of(texts(false)[0] ?? '')).toBe(SAMPLE_ROW_END)
+
+		for (const line of lines) {
+			const before = line.slice(0, line.indexOf(LAMP))
+
+			expect(width_of(before)).toBe(SAMPLE_LAMP_COLUMN - 1)
+			expect(line.split(LAMP)).toHaveLength(SAMPLE_LAMPS + 1)
 		}
 	})
 

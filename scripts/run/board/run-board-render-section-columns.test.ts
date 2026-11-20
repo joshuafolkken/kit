@@ -19,10 +19,26 @@ describe('run_board_render_section.columns_rule', () => {
 		expect(run_board_fit.width_of(rule)).toBe(50)
 	})
 
-	it('keeps one rule character before a label whose start the rule has already passed', () => {
-		const rule = columns_rule('lanes', [{ label: 'CPU', start: 2 }])
+	// joshuafolkken/kit#8280: no rule is forced between labels, so `/H ACTIVE` keeps each at its column.
+	it('runs a label on after one blank where its start the rule has already reached or passed', () => {
+		const reached = columns_rule('lanes', [{ label: 'CPU', start: 9 }])
+		const passed = columns_rule('lanes', [{ label: 'CPU', start: 2 }])
 
-		expect(rule.startsWith('── lanes ─ CPU ──')).toBe(true)
+		expect(reached).toBe(passed)
+		expect(reached.startsWith('── lanes CPU ──')).toBe(true)
+	})
+
+	it('puts a label one blank further where the room before it holds no rule and blank', () => {
+		const rule = columns_rule('lanes', [{ label: 'CPU', start: 10 }])
+
+		expect(rule.indexOf('CPU')).toBe(10)
+		expect(rule.startsWith('── lanes  CPU ──')).toBe(true)
+	})
+
+	it('puts a rule and a blank before a label two columns past the rule', () => {
+		expect(
+			columns_rule('lanes', [{ label: 'CPU', start: 11 }]).startsWith('── lanes ─ CPU ──'),
+		).toBe(true)
 	})
 
 	it('ends on a short rule where the labels run past the usual width', () => {
