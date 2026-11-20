@@ -46,6 +46,8 @@ describe('run_board_theme_defs.THEME_DEFS wargames', () => {
 	it('keeps the phosphor cyan and the opening line the board drew before the table', () => {
 		expect(THEME_DEFS.wargames).toStrictEqual({
 			paint: { rgb: '62;236;225', named: 'cyan' },
+			// joshuafolkken/kit#8397: the rules in the idle tone's dim cyan.
+			rule: { rgb: '31;118;113', named: 'dim' },
 			intro: { line: 'SHALL WE PLAY A GAME?', letter_ms: 50, hold_ms: 2000 },
 			alert: run_board_header_defcon.field_of,
 			lamps: true,

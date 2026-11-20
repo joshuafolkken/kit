@@ -1,6 +1,7 @@
 import { run_board_header_defcon } from './run-board-header-defcon'
 import { run_board_header_trace } from './run-board-header-trace'
 import type { Paint } from './run-board-labels'
+import { run_board_theme_tones } from './run-board-theme-tones'
 
 // joshuafolkken/kit#8349: what each theme draws, one row per theme — a theme is added by adding its
 // row, and the theme names the CLI and the worker accept are this table's keys.
@@ -24,6 +25,8 @@ interface LiveDefinition {
 interface ThemeDefinition {
 	// The color the theme draws text no color is given in.
 	paint: Paint
+	// The color of a section rule's `─`, where it is not the text's (joshuafolkken/kit#8397).
+	rule?: Paint
 	intro: IntroDefinition
 	// The alert field a screen's first line ends on, drawn from the level every theme shares
 	// (`run-board-header-defcon.ts` → `level_of`), 1 the worst (joshuafolkken/kit#8358).
@@ -38,6 +41,8 @@ const THEME_DEFS = {
 	wargames: {
 		// The cyan of the film terminal's phosphor glyph core in 24-bit color, else the palette's own cyan.
 		paint: { rgb: '62;236;225', named: 'cyan' },
+		// The rules in the idle tone, behind the row typing (joshuafolkken/kit#8397).
+		rule: run_board_theme_tones.IDLE_PAINT,
 		intro: { line: 'SHALL WE PLAY A GAME?', letter_ms: 50, hold_ms: 2000 },
 		alert: run_board_header_defcon.field_of,
 		lamps: true,

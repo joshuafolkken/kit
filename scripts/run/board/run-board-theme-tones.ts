@@ -14,13 +14,14 @@ const { GAUGE_SHADES, painted } = run_board_labels
 
 // The color of each tone; `info` is left in the theme's phosphor cyan. Where stdout has no 24-bit
 // color the idle tone is the cyan dimmed, as the phosphor's own palette color.
+const IDLE_PAINT: Paint = { rgb: '31;118;113', named: 'dim' }
 const TONE_PAINTS: Readonly<Record<Tone, Paint | undefined>> = {
 	alert: GAUGE_SHADES.red,
 	caution: GAUGE_SHADES.yellow,
 	human: { rgb: '255;95;215', named: 'magentaBright' },
 	done: GAUGE_SHADES.normal,
 	running: { rgb: '255;255;255', named: 'whiteBright' },
-	idle: { rgb: '31;118;113', named: 'dim' },
+	idle: IDLE_PAINT,
 	info: undefined,
 }
 
@@ -32,7 +33,7 @@ function toned(tone: Tone, text: string): string {
 	return tone === 'running' ? styleText('bold', colored) : colored
 }
 
-const run_board_theme_tones = { TONES, TONE_PAINTS, toned }
+const run_board_theme_tones = { IDLE_PAINT, TONES, TONE_PAINTS, toned }
 
 export { run_board_theme_tones }
 export type { Tone }

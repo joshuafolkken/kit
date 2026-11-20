@@ -15,11 +15,14 @@ const CSI = '\u{1B}['
 const RULE = '─'
 const BLANK = ' '
 const CODE = 'ABCDEFGHJKLMNPQRSTUVWXYZ0123456789'
+// The lock's step; the code changes every `CHANGE_MS`.
 const CODE_MS = 50
+const CHANGE_MS = 100
 const LOCK_COLUMNS = 5
 const LOCK_HEAD_COLUMNS = 2
 const LOCK_PAINT: Paint = { rgb: '235;255;252', named: 'white' }
-const CODE_PAINT: Paint = run_board_theme_defs.THEME_DEFS.wargames.paint
+// The code and the rule it turns back into, in the rule's dim paint (joshuafolkken/kit#8397).
+const CODE_PAINT: Paint = run_board_theme_defs.THEME_DEFS.wargames.rule
 
 // A rule's `─` on screen.
 interface RuleCell {
@@ -59,8 +62,8 @@ function rule_cells(
 	return lines.flatMap((line, index) => line_cells(line, starts[index] ?? 1, columns))
 }
 
-function step_of(ms: number): number {
-	return Math.floor(ms / CODE_MS)
+function step_of(ms: number, step_ms = CODE_MS): number {
+	return Math.floor(ms / step_ms)
 }
 
 // The moment the lock reaches the rightmost cell — none before any row has typed — so another effect can
@@ -97,9 +100,12 @@ function look_of(cell: RuleCell, locked: number): CellLook {
 	return cell.column - locked <= LOCK_HEAD_COLUMNS && locked > 0 ? 'head' : 'code'
 }
 
-// A code character for the cell, changing every step.
+// A code character for the cell, changing every `CHANGE_MS` — slower than the lock's step, so the code
+// stays behind the typing head (joshuafolkken/kit#8397).
 function code_of(cell: RuleCell, at_ms: number): string {
-	return CODE[run_board_lamps.mixed([cell.row, cell.column, step_of(at_ms)]) % CODE.length] ?? '-'
+	const step = step_of(at_ms, CHANGE_MS)
+
+	return CODE[run_board_lamps.mixed([cell.row, cell.column, step]) % CODE.length] ?? '-'
 }
 
 function cell_text(cell: RuleCell, look: CellLook, at_ms: number): string {
@@ -147,8 +153,10 @@ function write_codes(
 }
 
 const run_board_codes = {
+	CHANGE_MS,
 	CODE,
 	CODE_MS,
+	CODE_PAINT,
 	code_bytes,
 	is_coding,
 	locked_at,
