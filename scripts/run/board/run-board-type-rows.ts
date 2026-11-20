@@ -3,6 +3,7 @@ import { run_board_fit } from './run-board-fit'
 import { run_board_intro } from './run-board-intro'
 import { run_board_labels } from './run-board-labels'
 import { run_board_spot } from './run-board-spot'
+import { run_board_theme_defs } from './run-board-theme-defs'
 import { run_board_typing } from './run-board-typing'
 
 // joshuafolkken/kit#8003: a live board in a theme types each issue row that appears after its base frame
@@ -13,7 +14,10 @@ import { run_board_typing } from './run-board-typing'
 // row within one screen row types (`run-board-spin.ts`); a wider one is drawn whole.
 
 const CSI = '\u{1B}['
-const { ERASE_LINE_END, LETTER_MS } = run_board_intro
+const { ERASE_LINE_END } = run_board_intro
+// joshuafolkken/kit#8349: the rows type at the wargames intro's pace; joshuafolkken/kit#8360 picks it
+// per theme.
+const LETTER_MS = run_board_theme_defs.THEME_DEFS.wargames.intro.letter_ms
 
 // A keyed row on screen: its key, its line in the frame, its row on screen (1-based), its text as the
 // frame draws it and the columns before its key — drawn whole, so only the rest types

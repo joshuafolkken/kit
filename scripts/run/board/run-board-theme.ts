@@ -3,6 +3,7 @@ import { run_board_label_pair } from './run-board-label-pair'
 import { run_board_labels, type Paint } from './run-board-labels'
 import type { BoardPorts } from './run-board-state'
 import { run_board_theme_case } from './run-board-theme-case'
+import { run_board_theme_defs, type Theme } from './run-board-theme-defs'
 import { run_board_theme_glyphs } from './run-board-theme-glyphs'
 
 // joshuafolkken/kit#7934: a theme for the board a person watches — `wargames` draws the text no color
@@ -15,10 +16,8 @@ import { run_board_theme_glyphs } from './run-board-theme-glyphs'
 
 const THEME_FLAG = '--theme'
 const THEME_ENV = 'JOSH_BOARD_THEME'
-const THEMES = ['wargames'] as const
+const { THEMES, THEME_DEFS } = run_board_theme_defs
 const THEME_NAMES: ReadonlySet<string> = new Set(THEMES)
-// The cyan of the film terminal's phosphor glyph core in 24-bit color, else the palette's own cyan.
-const PHOSPHOR: Paint = { rgb: '62;236;225', named: 'cyan' }
 const RULE = '─'
 const DASH = '-'
 // The escapes that end a color and fall back to the terminal's default foreground: the default
@@ -35,8 +34,6 @@ const COLOR_INPUTS = [
 	'TERM',
 	'COLORTERM',
 ] as const
-
-type Theme = (typeof THEMES)[number]
 
 interface Memo {
 	inputs: string | undefined
@@ -102,10 +99,10 @@ function refusal(argv: ReadonlyArray<string>, environment: NodeJS.ProcessEnv): s
 	return `${THEME_ENV}=${environment[THEME_ENV] ?? ''} names no theme (${THEMES.join(', ')})\n`
 }
 
-// The escape that opens the phosphor color, as `painted` draws it — `''` where stdout draws no color,
+// The escape that opens the theme's color, as `painted` draws it — `''` where stdout draws no color,
 // so the theme draws no escape where the board's own colors would not.
-function phosphor_open(): string {
-	const sample = run_board_labels.painted(PHOSPHOR, DASH)
+function phosphor_open(paint: Paint): string {
+	const sample = run_board_labels.painted(paint, DASH)
 
 	return sample.slice(0, sample.indexOf(DASH))
 }
@@ -119,14 +116,14 @@ function color_inputs(): string {
 	return [String(process.stdout.isTTY), ...named].join('\n')
 }
 
-// joshuafolkken/kit#8207: the phosphor's escape, made again only when what decides stdout's color
-// changes; the lines drawn in the colors before are dropped with it.
-function phosphor(): string {
-	const inputs = color_inputs()
+// joshuafolkken/kit#8207: the theme color's escape, made again only when the theme or what decides
+// stdout's color changes; the lines drawn in the colors before are dropped with it.
+function phosphor(theme: Theme): string {
+	const inputs = `${theme}\n${color_inputs()}`
 
 	if (inputs === memo.inputs) return memo.open
 	memo.inputs = inputs
-	memo.open = phosphor_open()
+	memo.open = phosphor_open(THEME_DEFS[theme].paint)
 	memo.lines.clear()
 
 	return memo.open
@@ -170,7 +167,7 @@ function remembered(open: string, line: string): string {
 // the reveal that writes a title as one block (joshuafolkken/kit#8224).
 function marked(theme: Theme | undefined, frame: string): string {
 	if (theme === undefined) return frame
-	const open = phosphor()
+	const open = phosphor(theme)
 
 	return frame
 		.split('\n')
@@ -219,4 +216,5 @@ const run_board_theme = {
 }
 
 export { run_board_theme }
-export type { Theme }
+
+export { type Theme } from './run-board-theme-defs'
