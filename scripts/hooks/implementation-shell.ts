@@ -1,6 +1,5 @@
 import path from 'node:path'
 import { git_argv, type ProgramCall } from '#scripts/rules/git-argv'
-import { interpreter_options } from '#scripts/rules/interpreter-options'
 import { shell_segments } from '#scripts/rules/shell-segments'
 import { time_shell } from '#scripts/time-runtime/time-shell'
 import { implementation_shell_deny } from './implementation-shell-deny'
@@ -65,6 +64,21 @@ const CD_WRITE = 'a write beside `cd`, whose target is not read off the reposito
 const STDIN_SHELL = 'a shell running the commands its standard input spells, which may be any write'
 const SCRATCH_RUN =
 	'a scratch script run directly, whose writes cannot be verified; run it with `pnpm josh scratch:run <path>`'
+// Programs that only read the scratch files they name; `sed` and `open` are absent, as both can execute.
+const SCRATCH_READERS: ReadonlySet<string> = new Set([
+	'cat',
+	'diff',
+	'file',
+	'grep',
+	'head',
+	'ls',
+	'rg',
+	'stat',
+	'tail',
+	'wc',
+])
+const OPTION_PREFIX = /^-[^=]*=/u
+const PWD_PREFIX = /^\$\{?PWD\}?(?=\/|$)/u
 
 // The irreversible operation a shell matched, or `undefined` when it runs.
 type Refusal = string | undefined
@@ -159,13 +173,35 @@ function outside_write_refusal(call: ProgramCall, root: string): Refusal {
 		: `\`${call.name}\` to a runtime path outside this checkout`
 }
 
-// joshuafolkken/kit#8262: a scratch script run directly writes wherever it likes and a revert takes back
-// only the files the call names; `josh scratch:run` confines its writes to the scratch area.
-function scratch_run_refusal(name: string, args: Array<string>, root: string): Refusal {
-	const words = interpreter_options.is_interpreter(name) ? [name, ...args] : [name]
-	const is_direct = words.some((word) => step_zero_notice.is_scratch_file(word, root))
+// The scratch path a word names, with `$PWD` read as the root and a `--flag=` prefix dropped.
+function names_scratch(word: string, root: string): boolean {
+	const bare = word.replaceAll(ARGUMENT_QUOTES, '').replace(OPTION_PREFIX, '')
 
-	return is_direct ? SCRATCH_RUN : undefined
+	return step_zero_notice.is_scratch_file(
+		bare.replace(PWD_PREFIX, () => root),
+		root,
+	)
+}
+
+// joshuafolkken/kit#8262: a scratch script run directly writes wherever it likes and a revert takes back
+// only the files the call names; `josh scratch:run` confines its writes to the scratch area. Every
+// launcher (`source`, `npx tsx`, `make -f`, `./x.sh`, …) cannot be listed, so any other program naming a
+// scratch path is refused unless it only reads.
+function scratch_run_refusal(
+	segment: string,
+	name: string,
+	args: Array<string>,
+	root: string,
+): Refusal {
+	if (SCRATCH_READERS.has(name) || (name === 'josh' && args[0] === 'scratch:run')) return undefined
+
+	// A redirect target is judged by the redirect check, which lets a write into the scratch area pass.
+	const redirected = new Set(redirected_paths(segment))
+	const is_named = git_argv
+		.words_of(segment)
+		.some((word) => !redirected.has(word) && names_scratch(word, root))
+
+	return is_named ? SCRATCH_RUN : undefined
 }
 
 function call_refusal(segment: string, call: ProgramCall, root: string): Refusal {
@@ -179,7 +215,7 @@ function call_refusal(segment: string, call: ProgramCall, root: string): Refusal
 
 	return (
 		outside ??
-		scratch_run_refusal(name, args, root) ??
+		scratch_run_refusal(segment, name, args, root) ??
 		implementation_shell_deny.refusal(segment, { name, args })
 	)
 }
